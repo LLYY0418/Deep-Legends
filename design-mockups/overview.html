@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deep Legends 重设计 · 总览</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 玩家页签 */
+  .ptabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .ptab { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+  .ptab.on { border-color: var(--gold-dim); background: rgba(217,164,65,.08); color: var(--gold-bright); font-weight: 600; }
+  .ptab .x { color: var(--faint); font-size: 13px; }
+
+  /* 召唤师横幅 */
+  .banner { position: relative; border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; margin-bottom: 18px; }
+  .banner .bg { position: absolute; inset: 0; background: url(https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Camille_0.jpg) center 20%/cover; opacity: .22; }
+  .banner .bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(11,14,20,.92) 0%, rgba(11,14,20,.55) 55%, rgba(11,14,20,.85) 100%); }
+  .banner-in { position: relative; display: flex; align-items: center; gap: 18px; padding: 22px 26px; }
+  .banner .avatar { width: 72px; height: 72px; border: 2px solid var(--gold-dim); }
+  .banner h2 { font-size: 20px; font-weight: 700; }
+  .ranks { margin-left: auto; display: flex; gap: 28px; }
+  .rank { display: flex; align-items: center; gap: 10px; }
+  .rank img.emblem { width: 108px; height: 108px; object-fit: contain; margin: -26px -16px -26px -24px; }
+  .rank .q { font-size: 11.5px; color: var(--faint); }
+  .rank .t { font-size: 14.5px; font-weight: 700; }
+  .rank .w { font-size: 12px; color: var(--muted); }
+
+  .cols { display: grid; grid-template-columns: 342px 1fr; gap: 16px; align-items: start; }
+
+  /* 左栏小组件 */
+  .champ-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+  .champ-row img { width: 32px; height: 32px; }
+  .champ-row .nm { font-size: 12.5px; font-weight: 600; }
+  .champ-row .gm { font-size: 11px; color: var(--faint); }
+  .champ-row .wr { width: 96px; }
+  .champ-row .wr b { font-size: 12px; display: block; text-align: right; }
+  .pos-row { display: grid; grid-template-columns: 64px 1fr 40px; align-items: center; gap: 10px; padding: 6px 0; font-size: 12.5px; }
+  .pos-row .pos img { width: 14px; height: 14px; vertical-align: -2px; margin-right: 6px; }
+  .heat { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin-top: 6px; }
+  .heat i { height: 16px; border-radius: 3px; background: var(--line-soft); }
+  .heat i.h1 { background: rgba(217,164,65,.25); }
+  .heat i.h2 { background: rgba(217,164,65,.5); }
+  .heat i.h3 { background: var(--gold); }
+  .mini-stat { display: flex; gap: 18px; }
+  .mini-stat .k { font-size: 11.5px; color: var(--faint); }
+  .mini-stat .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* 战绩卡 */
+  .filters { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .match { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px 14px 20px; }
+  .match::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 3px 0 0 3px; }
+  .match.w::before { background: var(--green); }
+  .match.l::before { background: var(--red); }
+  .match-in { display: grid; grid-template-columns: auto auto 1fr auto auto; gap: 18px; align-items: center; }
+  .mc-champ { display: flex; gap: 6px; align-items: center; }
+  .mc-champ .avatar { width: 46px; height: 46px; }
+  .mc-mini { display: flex; flex-direction: column; gap: 3px; }
+  .mc-mini img { width: 21px; height: 21px; border-radius: 5px; border: 1px solid var(--line); }
+  .kda { text-align: center; }
+  .kda .n { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .kda .s { font-size: 11px; color: var(--faint); }
+  .items { display: flex; gap: 4px; }
+  .items img { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2); }
+  .ten { display: grid; grid-template-columns: repeat(5, auto); gap: 3px 6px; font-size: 10.5px; color: var(--faint); }
+  .ten span { display: flex; align-items: center; gap: 4px; max-width: 76px; overflow: hidden; white-space: nowrap; }
+  .ten img { width: 15px; height: 15px; border-radius: 4px; }
+  .badge-multi { font-size: 10.5px; padding: 2px 7px; border-radius: 4px; background: rgba(217,164,65,.16); color: var(--gold-bright); font-weight: 700; }
+
+  /* 展开区 */
+  .expand { border-top: 1px solid var(--line-soft); margin-top: 13px; padding-top: 12px; }
+  .subtabs { display: flex; gap: 4px; margin-bottom: 12px; }
+  .subtabs span { padding: 5px 14px; border-radius: 7px; font-size: 12px; color: var(--muted); }
+  .subtabs span.on { background: var(--surface-2); color: var(--gold-bright); font-weight: 600; }
+  .subtabs .replay { margin-left: auto; }
+  .teamtbl td img { width: 22px; height: 22px; border-radius: 6px; vertical-align: -6px; margin-right: 6px; }
+  .teamlabel { font-size: 11.5px; font-weight: 700; padding: 4px 0; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">
+    <div class="hexcore"></div>
+    <div><div class="brand-name">Deep Legends</div><div class="brand-sub">本地英雄联盟助手</div></div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>总览</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M14.5 3l6.5 6.5-11 11L3.5 14z"/><path d="M13 6l5 5"/></svg>英雄</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5"/></svg>对局</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>收藏</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="conn"><span class="dot"></span>已连接 · 国服客户端</div>
+    <div class="me">
+      <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/4568.png" alt="">
+      <div><div class="n">青钢影不加班</div><div class="l">等级 436</div></div>
+    </div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>设置</div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <span class="crumb"><b>总览</b> · 生涯与最近战绩</span>
+    <div class="topbar-actions">
+      <div class="iconbtn">◐</div>
+      <div class="iconbtn">↻</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- 玩家页签 -->
+    <div class="ptabs">
+      <span class="ptab on">当前召唤师</span>
+      <span class="ptab">追风剑豪本人 <span class="x">✕</span></span>
+      <span class="ptab">峡谷第一莫甘娜 <span class="x">✕</span></span>
+    </div>
+
+    <!-- 召唤师横幅 -->
+    <div class="banner">
+      <div class="bg"></div>
+      <div class="banner-in">
+        <img class="avatar" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/4568.png" alt="">
+        <div>
+          <h2>青钢影不加班</h2>
+          <div class="muted mt8">等级 436 · 艾欧尼亚 <span class="tag gold" style="margin-left:8px">主播模式关闭</span></div>
+        </div>
+        <div class="ranks">
+          <div class="rank">
+            <img class="emblem" src="assets/emblem-emerald.png" alt="">
+            <div>
+              <div class="q">单双排</div>
+              <div class="t">翡翠 II · 56 LP</div>
+              <div class="w num">217 场 · 胜率 <b class="goldtxt">54.2%</b></div>
+            </div>
+          </div>
+          <div class="rank">
+            <img class="emblem" src="assets/emblem-platinum.png" alt="">
+            <div>
+              <div class="q">灵活组排</div>
+              <div class="t">铂金 I · 21 LP</div>
+              <div class="w num">88 场 · 胜率 51.8%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <!-- 左栏 -->
+      <div class="stack">
+        <div class="card">
+          <div class="card-h">英雄胜率<span class="more">全部英雄 ›</span></div>
+          <div class="card-b">
+            <div class="champ-row">
+              <img class="avatar champ" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Camille.png" alt="">
+              <div class="grow"><div class="nm">卡蜜尔</div><div class="gm">128 场 · KDA 3.42</div></div>
+              <div class="wr"><b class="win num">58.6%</b><div class="bar mt8"><i style="width:58.6%"></i></div></div>
+            </div>
+            <div class="champ-row">
+              <img class="avatar champ" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Riven.png" alt="">
+              <div class="grow"><div class="nm">锐雯</div><div class="gm">86 场 · KDA 2.96</div></div>
+              <div class="wr"><b class="win num">55.8%</b><div class="bar mt8"><i style="width:55.8%"></i></div></div>
+            </div>
+            <div class="champ-row">
+              <img class="avatar champ" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Aatrox.png" alt="">
+              <div class="grow"><div class="nm">亚托克斯</div><div class="gm">64 场 · KDA 2.71</div></div>
+              <div class="wr"><b class="num">51.6%</b><div class="bar mt8"><i style="width:51.6%"></i></div></div>
+            </div>
+            <div class="champ-row">
+              <img class="avatar champ" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/JarvanIV.png" alt="">
+              <div class="grow"><div class="nm">嘉文四世</div><div class="gm">41 场 · KDA 3.18</div></div>
+              <div class="wr"><b class="num">48.8%</b><div class="bar mt8"><i style="width:48.8%"></i></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h">位置偏好</div>
+          <div class="card-b">
+            <div class="pos-row"><span class="pos"><img src="assets/top.svg" alt="">上单</span><div class="bar"><i style="width:62%"></i></div><b class="num">62%</b></div>
+            <div class="pos-row"><span class="pos"><img src="assets/jungle.svg" alt="">打野</span><div class="bar"><i style="width:18%"></i></div><b class="num muted">18%</b></div>
+            <div class="pos-row"><span class="pos"><img src="assets/middle.svg" alt="">中单</span><div class="bar"><i style="width:11%"></i></div><b class="num muted">11%</b></div>
+            <div class="pos-row"><span class="pos"><img src="assets/bottom.svg" alt="">下路</span><div class="bar"><i style="width:6%"></i></div><b class="num faint">6%</b></div>
+            <div class="pos-row"><span class="pos"><img src="assets/utility.svg" alt="">辅助</span><div class="bar"><i style="width:3%"></i></div><b class="num faint">3%</b></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h">英雄熟练度</div>
+          <div class="card-b">
+            <div class="champ-row">
+              <img class="avatar champ" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Camille.png" alt="">
+              <div class="grow"><div class="nm">卡蜜尔</div><div class="gm">熟练度 7</div></div>
+              <b class="goldtxt num">42.6 万</b>
+            </div>
+            <div class="champ-row">
+              <img class="avatar champ" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Riven.png" alt="">
+              <div class="grow"><div class="nm">锐雯</div><div class="gm">熟练度 7</div></div>
+              <b class="goldtxt num">31.2 万</b>
+            </div>
+            <div class="champ-row">
+              <img class="avatar champ" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Aatrox.png" alt="">
+              <div class="grow"><div class="nm">亚托克斯</div><div class="gm">熟练度 6</div></div>
+              <b class="num muted">18.9 万</b>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h">过去 7 天排位</div>
+          <div class="card-b">
+            <div class="mini-stat">
+              <div><div class="k">场次</div><div class="v">21</div></div>
+              <div><div class="k">胜 / 负</div><div class="v"><span class="win">12</span> / <span class="loss">9</span></div></div>
+              <div><div class="k">LP 变化</div><div class="v goldtxt">+86</div></div>
+            </div>
+            <div class="bar mt12"><i class="green" style="width:57%"></i></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h">最近同场玩家</div>
+          <div class="card-b">
+            <div class="pos-row" style="grid-template-columns:1fr auto auto"><span class="goldtxt">追风剑豪本人</span><span class="faint num">6 场</span><b class="win num">67%</b></div>
+            <div class="pos-row" style="grid-template-columns:1fr auto auto"><span>峡谷第一莫甘娜</span><span class="faint num">4 场</span><b class="num">50%</b></div>
+            <div class="pos-row" style="grid-template-columns:1fr auto auto"><span>永远滴神李青</span><span class="faint num">3 场</span><b class="loss num">33%</b></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h">活跃时段<span class="more faint">近 30 天</span></div>
+          <div class="card-b">
+            <div class="heat">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i class="h1"></i><i class="h1"></i><i></i><i></i><i class="h1"></i><i class="h2"></i>
+              <i class="h1"></i><i></i><i class="h1"></i><i class="h2"></i><i class="h2"></i><i class="h1"></i><i class="h2"></i><i class="h3"></i><i class="h3"></i><i class="h3"></i><i class="h2"></i><i class="h1"></i>
+            </div>
+            <div class="row mt8" style="justify-content:space-between"><span class="faint" style="font-size:10.5px">0 时</span><span class="faint" style="font-size:10.5px">12 时</span><span class="faint" style="font-size:10.5px">23 时</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右栏 战绩 -->
+      <div>
+        <div class="filters">
+          <div class="pills">
+            <span class="pill">全部</span>
+            <span class="pill on">单双排</span>
+            <span class="pill">灵活组排</span>
+            <span class="pill">海克斯大乱斗</span>
+            <span class="pill">斗魂竞技场</span>
+            <span class="pill">更多模式 ▾</span>
+          </div>
+          <div class="select" style="margin-left:auto">每批 20 场</div>
+        </div>
+
+        <div class="stack">
+          <!-- 胜场 · 展开 -->
+          <div class="match w">
+            <div class="match-in">
+              <div class="mc-champ">
+                <img class="avatar champ" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Camille.png" alt="">
+                <div class="mc-mini">
+                  <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/spell/SummonerFlash.png" alt="">
+                  <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/spell/SummonerTeleport.png" alt="">
+                </div>
+              </div>
+              <div>
+                <div class="win">胜利 · 单双排</div>
+                <div class="faint" style="font-size:11.5px">32 分 14 秒 · 2 小时前</div>
+                <span class="badge-multi mt8" style="display:inline-block">三杀</span>
+              </div>
+              <div class="row" style="justify-content:center; gap:28px">
+                <div class="kda"><div class="n">8 / 2 / 11</div><div class="s">KDA 9.50 · 参团 68%</div></div>
+                <div class="kda"><div class="n">214</div><div class="s">补刀 · 分均 6.6</div></div>
+              </div>
+              <div class="items">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/6631.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3153.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3006.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3071.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3053.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3364.png" alt="">
+              </div>
+              <div class="ten">
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Camille.png" alt="">青钢影不加班</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/LeeSin.png" alt="">永远滴神李青</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Ahri.png" alt="">狐狸不吃鱼</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Jinx.png" alt="">暴走萝莉金克丝</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Thresh.png" alt="">魂锁典狱长</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Aatrox.png" alt="">剑魔一刀秒</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Vi.png" alt="">皮城执法官蔚</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Orianna.png" alt="">发条魔灵</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Kaisa.png" alt="">虚空之女卡莎</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Nautilus.png" alt="">深海泰坦</span>
+              </div>
+            </div>
+
+            <div class="expand">
+              <div class="subtabs">
+                <span class="on">概览</span><span>队伍分析</span><span>构建</span>
+                <span class="replay"><span class="btn">▶ 观看回放</span></span>
+              </div>
+              <div class="teamlabel" style="color:var(--blue)">我方 · 蓝色方（胜）</div>
+              <table class="data teamtbl">
+                <tr><th>玩家</th><th>KDA</th><th>伤害</th><th>视野</th><th>补刀</th><th>装备</th></tr>
+                <tr><td><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Camille.png" alt="">青钢影不加班</td><td class="win">8/2/11</td><td>28,410</td><td>21</td><td>214</td><td class="items" style="display:flex;padding-top:6px"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/6631.png" style="width:20px;height:20px" alt=""><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3153.png" style="width:20px;height:20px" alt=""><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3071.png" style="width:20px;height:20px" alt=""></td></tr>
+                <tr><td><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/LeeSin.png" alt="">永远滴神李青</td><td>4/5/16</td><td>15,832</td><td>34</td><td>168</td><td class="items" style="display:flex;padding-top:6px"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/6653.png" style="width:20px;height:20px" alt=""><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3047.png" style="width:20px;height:20px" alt=""></td></tr>
+                <tr><td><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Ahri.png" alt="">狐狸不吃鱼</td><td>7/3/9</td><td>24,190</td><td>18</td><td>201</td><td class="items" style="display:flex;padding-top:6px"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/4645.png" style="width:20px;height:20px" alt=""><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3089.png" style="width:20px;height:20px" alt=""></td></tr>
+              </table>
+              <div class="teamlabel mt12" style="color:var(--red)">敌方 · 红色方</div>
+              <table class="data teamtbl">
+                <tr><td><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Aatrox.png" alt="">剑魔一刀秒</td><td class="loss">3/7/4</td><td>19,204</td><td>15</td><td>188</td><td class="items" style="display:flex;padding-top:6px"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/6630.png" style="width:20px;height:20px" alt=""><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3053.png" style="width:20px;height:20px" alt=""></td></tr>
+                <tr><td><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Vi.png" alt="">皮城执法官蔚</td><td>5/6/8</td><td>14,522</td><td>27</td><td>142</td><td class="items" style="display:flex;padding-top:6px"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/6632.png" style="width:20px;height:20px" alt=""><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3047.png" style="width:20px;height:20px" alt=""></td></tr>
+              </table>
+            </div>
+          </div>
+
+          <!-- 负场 · 收起 -->
+          <div class="match l">
+            <div class="match-in">
+              <div class="mc-champ">
+                <img class="avatar champ" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Riven.png" alt="">
+                <div class="mc-mini">
+                  <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/spell/SummonerFlash.png" alt="">
+                  <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/spell/SummonerDot.png" alt="">
+                </div>
+              </div>
+              <div>
+                <div class="loss">失败 · 单双排</div>
+                <div class="faint" style="font-size:11.5px">28 分 47 秒 · 5 小时前</div>
+              </div>
+              <div class="row" style="justify-content:center; gap:28px">
+                <div class="kda"><div class="n">4 / 8 / 5</div><div class="s">KDA 1.13 · 参团 45%</div></div>
+                <div class="kda"><div class="n">186</div><div class="s">补刀 · 分均 6.5</div></div>
+              </div>
+              <div class="items">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/6630.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3071.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3111.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3026.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3364.png" alt="">
+              </div>
+              <div class="ten">
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Riven.png" alt="">青钢影不加班</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Sylas.png" alt="">解脱者塞拉斯</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Ezreal.png" alt="">探险家伊泽瑞尔</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Lux.png" alt="">光辉女郎</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Zed.png" alt="">影流之主</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Yasuo.png" alt="">追风剑豪本人</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Morgana.png" alt="">峡谷第一莫甘娜</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/MissFortune.png" alt="">赏金猎人</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Syndra.png" alt="">暗黑元首</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Nautilus.png" alt="">深海泰坦</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 胜场 · 收起（大乱斗） -->
+          <div class="match w">
+            <div class="match-in">
+              <div class="mc-champ">
+                <img class="avatar champ" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Jinx.png" alt="">
+                <div class="mc-mini">
+                  <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/spell/SummonerFlash.png" alt="">
+                  <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/spell/SummonerBoost.png" alt="">
+                </div>
+              </div>
+              <div>
+                <div class="win">胜利 · 海克斯大乱斗</div>
+                <div class="faint" style="font-size:11.5px">19 分 03 秒 · 昨天</div>
+                <span class="badge-multi mt8" style="display:inline-block">四杀</span>
+              </div>
+              <div class="row" style="justify-content:center; gap:28px">
+                <div class="kda"><div class="n">15 / 6 / 12</div><div class="s">KDA 4.50 · 参团 71%</div></div>
+                <div class="kda"><div class="n">142</div><div class="s">补刀 · 分均 7.5</div></div>
+              </div>
+              <div class="items">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/6672.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3031.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3036.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3006.png" alt="">
+                <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/3364.png" alt="">
+              </div>
+              <div class="ten">
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Jinx.png" alt="">青钢影不加班</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Thresh.png" alt="">魂锁典狱长</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Orianna.png" alt="">发条魔灵</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/LeeSin.png" alt="">盲僧不瞎</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Aatrox.png" alt="">剑魔一刀秒</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Kaisa.png" alt="">虚空之女卡莎</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Zed.png" alt="">影流之主</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Lux.png" alt="">光辉女郎</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Vi.png" alt="">皮城执法官蔚</span>
+                <span><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Sylas.png" alt="">解脱者塞拉斯</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="row" style="justify-content:center; padding:10px 0">
+            <span class="faint">向下滚动自动加载更多 · 已加载 20 / 217 场</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

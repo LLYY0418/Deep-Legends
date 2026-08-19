@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deep Legends 重设计 · 服务器选择器</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { display: block; padding: 26px 30px 60px; }
+
+  .page-head { margin-bottom: 8px; }
+  .page-head h1 { font-size: 19px; font-weight: 650; letter-spacing: .2px; }
+  .page-head p { color: var(--muted); font-size: 12.5px; margin-top: 5px; max-width: 780px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 28px; }
+  .legend span { font-size: 11px; color: var(--faint); border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 10px; }
+  .legend b { color: var(--gold); font-weight: 600; }
+
+  .grid { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+
+  .state { width: 366px; }
+  .state > h2 { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .state > p { font-size: 11.5px; color: var(--faint); margin-bottom: 12px; min-height: 32px; }
+
+  /* ============ 顶栏片段（提供上下文） ============ */
+  .topbar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; background: var(--surface); border: 1px solid var(--line-soft);
+    border-radius: var(--radius); position: relative;
+  }
+  .topbar.tall { padding-bottom: 12px; }
+
+  /* 触发按钮 */
+  .trigger {
+    display: inline-flex; align-items: center; gap: 6px; height: 34px;
+    padding: 0 8px 0 11px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+    font-size: 12.5px; font-weight: 600; white-space: nowrap; flex-shrink: 0;
+  }
+  .trigger .sub { color: var(--muted); font-weight: 500; }
+  .trigger .chev { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; color: var(--faint); }
+  .trigger.open { border-color: var(--blue); }
+  .trigger.open .chev { transform: rotate(180deg); }
+  .trigger.kr { color: var(--blue); border-color: rgba(91,155,217,.42); background: rgba(91,155,217,.10); }
+
+  /* 搜索输入区（灰显，仅作上下文） */
+  .fields { display: flex; align-items: center; gap: 0; flex: 1; min-width: 0; height: 34px; padding: 0 4px 0 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); }
+  .fields .ph { font-size: 12px; color: var(--faint); }
+  .fields .hash { color: var(--line); margin: 0 7px; }
+  .fields .go { margin-left: auto; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; background: var(--gold); color: #14100A; font-size: 12px; }
+
+  /* ============ 下拉菜单 ============ */
+  .menu {
+    position: absolute; top: calc(100% + 6px); left: 12px; z-index: 5; width: 318px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 11px; box-shadow: 0 18px 44px rgb(0 0 0/.45);
+    padding: 6px; overflow: hidden;
+  }
+  .menu.static { position: static; width: 318px; margin-top: 10px; box-shadow: none; }
+
+  /* 分区外壳：国服中性、韩服蓝调 —— 这是“分界”的关键 */
+  .sect { border-radius: 8px; overflow: hidden; }
+  .sect.cn { background: rgba(255,255,255,.018); border: 1px solid var(--line-soft); }
+  .sect.kr { background: rgba(91,155,217,.07); border: 1px solid rgba(91,155,217,.24); margin-top: 6px; }
+
+  /* 一级行 */
+  .row1 {
+    display: flex; align-items: center; gap: 8px;
+    height: 40px; padding: 0 10px; cursor: default;
+  }
+  .row1 .name { font-size: 13px; font-weight: 600; }
+  .row1.cn .name { color: var(--ink); }
+  .row1.kr .name { color: var(--blue); }
+  .row1 .spacer { flex: 1; }
+  .row1 .info {
+    width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%;
+    border: 1px solid var(--line); color: var(--faint); font-size: 10.5px; font-weight: 700;
+    font-family: Georgia, serif; flex-shrink: 0;
+  }
+  .row1 .info.hot { border-color: var(--gold-dim); color: var(--gold); background: rgba(217,164,65,.10); }
+  .row1 .chev2 { width: 13px; height: 13px; stroke: var(--faint); stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .row1 .chev2.down { transform: rotate(90deg); }
+  .row1.kr .tick { color: var(--blue); font-size: 12px; }
+
+  /* 二级：跟随客户端 */
+  .auto {
+    display: flex; align-items: center; gap: 9px; margin: 0 6px 5px; padding: 8px 10px;
+    border-radius: 7px; background: transparent;
+  }
+  .auto.on { background: rgba(217,164,65,.12); }
+  .dot { width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid var(--faint); flex-shrink: 0; position: relative; }
+  .auto.on .dot { border-color: var(--gold); }
+  .auto.on .dot::after { content: ""; position: absolute; inset: 2.5px; border-radius: 50%; background: var(--gold); }
+  .auto .t { font-size: 12.5px; font-weight: 600; }
+  .auto.on .t { color: var(--gold-bright); }
+  .auto .cur { font-size: 11.5px; color: var(--muted); }
+  .auto.on .cur { color: rgba(240,190,92,.78); }
+  .auto.off .t, .auto.off .cur { color: var(--faint); }
+  .auto .warn { margin-left: auto; font-size: 10.5px; color: var(--faint); }
+
+  /* 二级：服务器两列网格 */
+  .srv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 0 6px 6px; }
+  .srv {
+    height: 34px; display: flex; align-items: center; padding: 0 10px; border-radius: 7px;
+    font-size: 12.5px; color: var(--ink);
+  }
+  .srv.wide { grid-column: 1 / -1; }
+  .srv.on { background: rgba(217,164,65,.14); color: var(--gold-bright); font-weight: 600; }
+  .srv.hover { background: rgba(255,255,255,.045); }
+
+  .divider { height: 1px; background: var(--line-soft); margin: 6px 4px; }
+
+  /* ============ 合区说明浮层 ============ */
+  .tip {
+    position: absolute; z-index: 9; width: 316px; padding: 11px 13px;
+    background: #0E121A; border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 16px 40px rgb(0 0 0/.55); font-size: 11.5px; line-height: 1.62;
+  }
+  .tip .lead { color: var(--ink); margin-bottom: 8px; }
+  .tip dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 9px; }
+  .tip dt { color: var(--gold); font-weight: 600; white-space: nowrap; }
+  .tip dd { color: var(--muted); }
+  .tip .solo { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line-soft); color: var(--muted); }
+  .tip .src { margin-top: 6px; color: var(--faint); font-size: 10.5px; }
+
+  /* 说明卡 */
+  .notes { margin-top: 34px; border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 16px 18px; max-width: 940px; }
+  .notes h3 { font-size: 13px; font-weight: 650; margin-bottom: 9px; }
+  .notes ul { list-style: none; display: grid; gap: 7px; }
+  .notes li { font-size: 12px; color: var(--muted); padding-left: 15px; position: relative; }
+  .notes li::before { content: ""; position: absolute; left: 0; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--gold-dim); }
+  .notes li b { color: var(--ink); font-weight: 600; }
+  .notes li code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--gold); background: rgba(217,164,65,.09); padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1>服务器选择器 · 重设计</h1>
+  <p>两层折叠：默认只露「国服 / 韩服」两行，点国服才展开子服务器；国服首项为「跟随客户端」；两个分区用不同底色分界；服务器代号不再上屏。</p>
+</div>
+
+<div class="legend">
+  <span>选中态 <b>金色</b></span>
+  <span>国服分区 中性底</span>
+  <span>韩服分区 蓝调底</span>
+  <span>合区说明 悬停浮层</span>
+</div>
+
+<div class="grid">
+
+  <!-- A 收起态 -->
+  <div class="state">
+    <h2>A · 默认收起</h2>
+    <p>菜单打开时的初始形态。只有两行，不再是一整面按钮墙。</p>
+    <div class="topbar">
+      <button class="trigger open">国服 <span class="sub">· 黑色玫瑰</span>
+        <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="fields"><span class="ph">玩家名称</span><span class="hash">#</span><span class="ph">编号</span><span class="go">→</span></div>
+      <div class="menu">
+        <div class="sect cn">
+          <div class="row1 cn">
+            <span class="name">国服</span>
+            <span class="spacer"></span>
+            <span class="info">i</span>
+            <svg class="chev2" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+          </div>
+        </div>
+        <div class="sect kr">
+          <div class="row1 kr">
+            <span class="name">韩服</span>
+            <span class="spacer"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B 国服展开 -->
+  <div class="state">
+    <h2>B · 展开国服（默认选中「跟随客户端」）</h2>
+    <p>点「国服」整行展开。首项固定是跟随客户端，括号里显示当前登录服务器。</p>
+    <div class="topbar">
+      <button class="trigger open">国服 <span class="sub">· 黑色玫瑰</span>
+        <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="fields"><span class="ph">玩家名称</span><span class="hash">#</span><span class="ph">编号</span><span class="go">→</span></div>
+      <div class="menu">
+        <div class="sect cn">
+          <div class="row1 cn">
+            <span class="name">国服</span>
+            <span class="spacer"></span>
+            <span class="info">i</span>
+            <svg class="chev2 down" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+          </div>
+          <div class="auto on">
+            <span class="dot"></span>
+            <span class="t">跟随客户端</span>
+            <span class="cur">黑色玫瑰</span>
+          </div>
+          <div class="divider"></div>
+          <div class="srv-grid">
+            <div class="srv">艾欧尼亚</div>
+            <div class="srv">黑色玫瑰</div>
+            <div class="srv">联盟一区</div>
+            <div class="srv">联盟二区</div>
+            <div class="srv">联盟三区</div>
+            <div class="srv">联盟四区</div>
+            <div class="srv">联盟五区</div>
+            <div class="srv">峡谷之巅</div>
+            <div class="srv wide">体验服</div>
+          </div>
+        </div>
+        <div class="sect kr">
+          <div class="row1 kr"><span class="name">韩服</span><span class="spacer"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C 合区说明 -->
+  <div class="state">
+    <h2>C · 合区说明浮层</h2>
+    <p>悬停国服行右侧的 ⓘ。内容取自单一常量，末行标注口径来源。</p>
+    <div class="topbar">
+      <button class="trigger open">国服 <span class="sub">· 联盟一区</span>
+        <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="fields"><span class="ph">玩家名称</span><span class="hash">#</span><span class="ph">编号</span><span class="go">→</span></div>
+      <div class="menu">
+        <div class="sect cn">
+          <div class="row1 cn">
+            <span class="name">国服</span>
+            <span class="spacer"></span>
+            <span class="info hot">i</span>
+            <svg class="chev2 down" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+          </div>
+          <div class="auto">
+            <span class="dot"></span>
+            <span class="t">跟随客户端</span>
+            <span class="cur">黑色玫瑰</span>
+          </div>
+          <div class="divider"></div>
+          <div class="srv-grid">
+            <div class="srv">艾欧尼亚</div>
+            <div class="srv">黑色玫瑰</div>
+            <div class="srv on">联盟一区</div>
+            <div class="srv">联盟二区</div>
+          </div>
+        </div>
+      </div>
+      <div class="tip" style="top: 58px; left: 344px;">
+        <div class="lead">腾讯已将部分大区合并为联盟大区，同一联盟内可跨区匹配、加好友与组队：</div>
+        <dl>
+          <dt>联盟一区</dt><dd>祖安、皮尔特沃夫、巨神峰、教育网、男爵领域、均衡教派、影流、守望之海</dd>
+          <dt>联盟二区</dt><dd>卡拉曼达、暗影岛、征服之海、诺克萨斯、战争学院、雷瑟守备</dd>
+          <dt>联盟三区</dt><dd>班德尔城、裁决之地、水晶之痕、钢铁烈阳、皮城警备</dd>
+          <dt>联盟四区</dt><dd>比尔吉沃特、弗雷尔卓德、扭曲丛林</dd>
+          <dt>联盟五区</dt><dd>德玛西亚、无畏先锋、恕瑞玛、巨龙之巢</dd>
+        </dl>
+        <div class="solo">艾欧尼亚、黑色玫瑰、峡谷之巅独立运营，未参与合并。</div>
+        <div class="src">（整理自公开资料，以英雄联盟官网公告为准）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- D 韩服选中 -->
+  <div class="state" style="margin-top: 8px;">
+    <h2>D · 选中韩服（国服自动收起）</h2>
+    <p>触发按钮与分区同用蓝调，和页签上的韩服标记保持同一套配色。</p>
+    <div class="topbar">
+      <button class="trigger kr open">韩服
+        <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="fields"><span class="ph">玩家名称</span><span class="hash">#</span><span class="ph">编号（可留空）</span><span class="go">→</span></div>
+      <div class="menu">
+        <div class="sect cn">
+          <div class="row1 cn">
+            <span class="name">国服</span>
+            <span class="spacer"></span>
+            <span class="info">i</span>
+            <svg class="chev2" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+          </div>
+        </div>
+        <div class="sect kr" style="background: rgba(91,155,217,.13); border-color: rgba(91,155,217,.45);">
+          <div class="row1 kr">
+            <span class="name">韩服</span>
+            <span class="spacer"></span>
+            <span class="tick">✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- E 未连接客户端 -->
+  <div class="state" style="margin-top: 8px;">
+    <h2>E · 未连接客户端</h2>
+    <p>「跟随客户端」置灰不可选，避免用户撞后端 400；已手动选服务器仍可用（但查询本身仍需客户端）。</p>
+    <div class="topbar">
+      <button class="trigger open">国服
+        <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="fields"><span class="ph">玩家名称</span><span class="hash">#</span><span class="ph">编号</span><span class="go">→</span></div>
+      <div class="menu">
+        <div class="sect cn">
+          <div class="row1 cn">
+            <span class="name">国服</span>
+            <span class="spacer"></span>
+            <span class="info">i</span>
+            <svg class="chev2 down" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+          </div>
+          <div class="auto off">
+            <span class="dot"></span>
+            <span class="t">跟随客户端</span>
+            <span class="warn">需要客户端在运行</span>
+          </div>
+          <div class="divider"></div>
+          <div class="srv-grid">
+            <div class="srv hover">艾欧尼亚</div>
+            <div class="srv">黑色玫瑰</div>
+            <div class="srv">联盟一区</div>
+            <div class="srv">联盟二区</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="notes">
+  <h3>实现要点（与工单一致）</h3>
+  <ul>
+    <li><b>「国服」整行只负责展开/收起</b>，不兼任「选中国服」——避免一次点击两种语义；选择行为全部落在子项上。</li>
+    <li><b>打开时的展开策略</b>：当前选中的是国服（含跟随客户端）就默认展开国服；当前是韩服则保持收起。</li>
+    <li><b>键盘导航只在可见项之间移动</b>。收起状态下国服子项不可聚焦，否则焦点会跑进隐藏区域。<code>Esc</code> 关闭并把焦点还给触发按钮。</li>
+    <li><b>服务器代号不再上屏</b>，但 <code>data-server-id</code> 属性必须保留——后端契约与 <code>applySearchRegion</code> 的匹配都依赖它。</li>
+    <li><b>「跟随客户端」= <code>serverId</code> 传空串</b>。后端 <code>gameplay.go:452</code> 已支持：为空时用 <code>client.platformInfo()</code> 推断当前登录服务器，查询链路无需改动。</li>
+    <li><b>唯一的后端改动</b>：<code>/api/status</code> 需新增当前登录服务器（id + 中文名），否则界面无法显示括号里的「黑色玫瑰」。该字段不是账号标识，与「不返回 PUUID / AccountID / SummonerID」的承诺不冲突。</li>
+    <li><b>合区文案存为单一常量</b>（如 <code>CN_SERVER_MERGE_NOTE</code>），复用已有的 <code>data-tooltip</code> 浮层机制，不新造一套。</li>
+    <li><b>配色沿用现有页签</b>：国服中性 <code>--surface-strong</code> 系，韩服 <code>--accent</code> 系淡底加同色描边，与 <code>gameplay.css</code> 的 <code>.region-chip</code> 一致。</li>
+  </ul>
+</div>
+
+</body>
+</html>

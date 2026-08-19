@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deep Legends 重设计 · 设计稿总览</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { display: block; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 32px 80px; }
+  h1 { font-size: 26px; font-weight: 800; }
+  .lede { color: var(--muted); margin: 8px 0 32px; max-width: 720px; }
+  h2 { font-size: 17px; font-weight: 700; margin: 36px 0 14px; padding-left: 12px; border-left: 3px solid var(--gold); }
+
+  .swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .sw { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .sw .c { height: 52px; }
+  .sw .t { padding: 7px 10px; font-size: 11px; color: var(--muted); }
+  .sw .t b { display: block; color: var(--ink); font-size: 11.5px; font-family: Consolas, monospace; }
+
+  .pages { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .page-link { display: flex; align-items: center; gap: 14px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); color: var(--ink); text-decoration: none; }
+  .page-link:hover { border-color: var(--gold-dim); }
+  .page-link .no { width: 34px; height: 38px; clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); background: rgba(217,164,65,.16); color: var(--gold-bright); display: grid; place-items: center; font-weight: 800; font-size: 14px; flex-shrink: 0; }
+  .page-link b { display: block; font-size: 14px; }
+  .page-link span { font-size: 12px; color: var(--faint); }
+
+  .launchpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .lp { display: flex; align-items: center; gap: 12px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+  .lp:hover { border-color: var(--gold-dim); }
+  .lp .ic { width: 38px; height: 38px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--gold-bright); }
+  .lp b { font-size: 13px; display: block; }
+  .lp span { font-size: 11px; color: var(--faint); }
+
+  ol.steps { padding-left: 20px; color: var(--muted); line-height: 2; font-size: 13px; }
+  ol.steps b { color: var(--ink); }
+  code { background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 7px; font-size: 12px; font-family: Consolas, monospace; color: var(--gold-bright); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="row" style="gap:12px">
+    <div class="hexcore" style="width:38px;height:43px"></div>
+    <div>
+      <h1>Deep Legends 界面重设计</h1>
+    </div>
+  </div>
+  <p class="lede">设计方向「暗夜金库 Dark Vault」：深色优先、原画大面积呈现、海克斯金只用于值得强调的地方。共 8 个页面画板，覆盖现有全部功能，可整体导入 Figma 后继续编辑。</p>
+
+  <h2>色彩系统（深色主题 · 默认）</h2>
+  <div class="swatches">
+    <div class="sw"><div class="c" style="background:#0B0E14"></div><div class="t"><b>#0B0E14</b>页面背景</div></div>
+    <div class="sw"><div class="c" style="background:#080A0F"></div><div class="t"><b>#080A0F</b>侧栏</div></div>
+    <div class="sw"><div class="c" style="background:#131822"></div><div class="t"><b>#131822</b>卡片表面</div></div>
+    <div class="sw"><div class="c" style="background:#1A2130"></div><div class="t"><b>#1A2130</b>浮起表面</div></div>
+    <div class="sw"><div class="c" style="background:#242D3D"></div><div class="t"><b>#242D3D</b>描边</div></div>
+    <div class="sw"><div class="c" style="background:#E8EAF0"></div><div class="t"><b>#E8EAF0</b>正文</div></div>
+    <div class="sw"><div class="c" style="background:#D9A441"></div><div class="t"><b>#D9A441</b>品牌金</div></div>
+    <div class="sw"><div class="c" style="background:#F0BE5C"></div><div class="t"><b>#F0BE5C</b>亮金 · 选中</div></div>
+    <div class="sw"><div class="c" style="background:#5B9BD9"></div><div class="t"><b>#5B9BD9</b>辅助蓝 · 我方</div></div>
+    <div class="sw"><div class="c" style="background:#E05C5C"></div><div class="t"><b>#E05C5C</b>红 · 败 / 敌方</div></div>
+    <div class="sw"><div class="c" style="background:#4CAF7D"></div><div class="t"><b>#4CAF7D</b>绿 · 胜 / 拥有</div></div>
+    <div class="sw"><div class="c" style="background:#C778E8"></div><div class="t"><b>#C778E8</b>神话品质</div></div>
+  </div>
+  <p class="faint mt12" style="font-size:12px">字体：Segoe UI Variable / Segoe UI / Microsoft YaHei UI · 字号层级 11 / 12 / 13 / 15 / 17 / 22 / 26px · 数字 tabular-nums · 卡片圆角 12px · 动效 160–220ms。浅色主题同构派生（背景 #F7F5F1，金加深为 #B07E24），自动主题按 6:00–18:00 切换。</p>
+
+  <h2>页面画板（点击预览）</h2>
+  <div class="pages">
+    <a class="page-link" href="overview.html"><span class="no">1</span><div><b>总览</b><span>玩家页签 · 召唤师横幅 · 生涯统计 · 战绩列表与展开详情</span></div></a>
+    <a class="page-link" href="champions.html"><span class="no">2</span><div><b>英雄</b><span>韩服梯度榜单 · 三模式切换 · 段位 / 位置筛选 · 拼音搜索</span></div></a>
+    <a class="page-link" href="champion-detail.html"><span class="no">3</span><div><b>英雄详情</b><span>原画 Hero · 推荐符文 · 技能加点 · 出装路线 · 优劣势对抗</span></div></a>
+    <a class="page-link" href="live.html"><span class="no">4</span><div><b>对局</b><span>双方队伍实时分析 · 符文推荐与应用 · 自动刷新</span></div></a>
+    <a class="page-link" href="collection-skins.html"><span class="no">5</span><div><b>收藏 · 皮肤与炫彩</b><span>收藏指标 · 皮肤墙 · 臻彩独立原画 · 炫彩横向平铺</span></div></a>
+    <a class="page-link" href="collection-pool.html"><span class="no">6</span><div><b>收藏 · 三合一奖池</b><span>剩余进度环 · 奖池目录 · 清单上传 · 本地历史与对比</span></div></a>
+    <a class="page-link" href="collection-account.html"><span class="no">7</span><div><b>收藏 · 账户与物品</b><span>精粹与钥匙 · 战利品八分类 · 待领取奖励 · 数据来源状态</span></div></a>
+    <a class="page-link" href="settings.html"><span class="no">8</span><div><b>设置</b><span>外观与导航 · 战绩与对局 · 隐私与能力 · 全部设置项</span></div></a>
+  </div>
+
+  <h2>未连接启动台（总览页空状态）</h2>
+  <p class="faint" style="font-size:12px; margin-bottom:12px">客户端未连接时，总览页显示居中品牌标与程序检测到的客户端入口；不接受任意程序路径。</p>
+  <div class="launchpad">
+    <div class="lp"><span class="ic">T</span><div><b>英雄联盟（TCLS）</b><span>已验证安装目录 · 点击启动</span></div></div>
+    <div class="lp"><span class="ic">W</span><div><b>WeGame</b><span>已验证安装目录 · 点击启动</span></div></div>
+    <div class="lp"><span class="ic">R</span><div><b>Riot 客户端</b><span>已验证安装目录 · 点击启动</span></div></div>
+  </div>
+
+  <h2>导入 Figma 的方法</h2>
+  <ol class="steps">
+    <li>在 Chrome / Edge 安装 <b>html.to.design</b> 浏览器扩展（divRIOTS 出品，Figma 官方社区同名插件的配套扩展）。</li>
+    <li>在本目录启动本地预览：<code>python3 -m http.server 8400</code>，浏览器打开 <code>http://localhost:8400/overview.html</code>。</li>
+    <li>点击扩展图标 → <b>Capture current tab</b>，把捕获结果复制到剪贴板。</li>
+    <li>在 Figma 新建文件，运行插件 <b>html.to.design</b>，选择 <b>Paste from extension</b>，页面即以可编辑图层（Frame / 文本 / 填充）导入。</li>
+    <li>其余 7 个页面重复第 2–4 步，每页一个画板；建议画板宽度 1440。</li>
+  </ol>
+  <p class="faint" style="font-size:12px">说明：皮肤原画与英雄图标引用 Riot Data Dragon 公共 CDN，联网打开即可显示；导入 Figma 时图片会一并嵌入。</p>
+</div>
+</body>
+</html>

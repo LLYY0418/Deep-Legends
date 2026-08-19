@@ -1,0 +1,17 @@
+desktop/node_modules/
+desktop/backend/*.exe
+dist/
+*.test
+*.log
+.gocache/
+/lol-loot-assistant
+
+# 沙箱/编辑器/agent 工具产物，不属于产品源码
+.builder/
+.impeccable/
+.playwright-cli/
+.DS_Store
+*.go.[0-9]*
+
+# 本机临时构建密钥（不应存在，但以防万一）
+riot_key.local.*

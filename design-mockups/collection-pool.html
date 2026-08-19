@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deep Legends 重设计 · 收藏 · 三合一奖池</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .fav-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .fav-nav { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+  .fav-nav span { padding: 7px 18px; border-radius: 7px; font-size: 13px; color: var(--muted); }
+  .fav-nav span.on { background: var(--surface-2); color: var(--gold-bright); font-weight: 600; box-shadow: inset 0 0 0 1px var(--gold-dim); }
+  .metrics { display: flex; gap: 10px; margin-left: auto; }
+  .mcard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 16px; text-align: center; min-width: 96px; }
+  .mcard .k { font-size: 11px; color: var(--faint); }
+  .mcard .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .mcard .v small { font-size: 11px; color: var(--faint); font-weight: 400; }
+  .mcard.hot { border-color: var(--gold-dim); background: rgba(217,164,65,.07); }
+  .mcard.hot .v { color: var(--gold-bright); }
+
+  .pooltabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .pooltab { padding: 7px 18px; border-radius: var(--radius-sm); border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+  .pooltab.on { border-color: var(--gold-dim); background: rgba(217,164,65,.08); color: var(--gold-bright); font-weight: 600; }
+
+  /* 进度环 */
+  .ringcard { display: flex; align-items: center; gap: 26px; padding: 18px 22px; }
+  .ring { position: relative; width: 132px; height: 132px; flex-shrink: 0; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring .center { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .ring .center b { font-size: 26px; font-weight: 800; color: var(--gold-bright); font-variant-numeric: tabular-nums; display: block; }
+  .ring .center span { font-size: 10.5px; color: var(--faint); }
+  .ringstats { display: flex; gap: 30px; }
+  .ringstats .k { font-size: 11.5px; color: var(--faint); }
+  .ringstats .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+  .toolbar { display: flex; align-items: center; gap: 10px; margin: 16px 0 8px; flex-wrap: wrap; }
+
+  .group-h { display: flex; align-items: center; gap: 10px; margin: 16px 0 10px; }
+  .group-h b { font-size: 14px; }
+  .group-h .cnt { font-size: 11.5px; color: var(--faint); }
+  .qdot { width: 9px; height: 9px; border-radius: 2px; }
+
+  .skin-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .skin { position: relative; border-radius: 14px; border: 1px solid var(--line); overflow: hidden; aspect-ratio: 16/9; background: var(--surface-2); }
+  .skin img.art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .skin .shade { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(8,10,15,.92) 100%); }
+  .skin .info { position: absolute; left: 12px; right: 12px; bottom: 9px; }
+  .skin .info b { font-size: 13px; display: block; }
+  .skin .info span { font-size: 11px; color: var(--muted); }
+  .skin.locked img.art { filter: grayscale(.9) brightness(.55); }
+  .skin.locked .lock { position: absolute; inset: 0; display: grid; place-items: center; font-size: 24px; color: rgba(232,234,240,.75); }
+  .skin .own { position: absolute; top: 8px; right: 9px; width: 22px; height: 22px; border-radius: 50%; background: var(--gold); color: #14100A; display: grid; place-items: center; font-size: 12px; font-weight: 800; }
+
+  .hash { font-family: Consolas, monospace; font-size: 11px; color: var(--faint); }
+  .upload { border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: 22px; text-align: center; color: var(--faint); font-size: 12.5px; background: rgba(19,24,34,.5); }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">
+    <div class="hexcore"></div>
+    <div><div class="brand-name">Deep Legends</div><div class="brand-sub">本地英雄联盟助手</div></div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>总览</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M14.5 3l6.5 6.5-11 11L3.5 14z"/><path d="M13 6l5 5"/></svg>英雄</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5"/></svg>对局</div>
+    <div class="nav-item active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>收藏</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="conn"><span class="dot"></span>已连接 · 国服客户端</div>
+    <div class="me">
+      <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/4568.png" alt="">
+      <div><div class="n">青钢影不加班</div><div class="l">等级 436</div></div>
+    </div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>设置</div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <span class="crumb"><b>收藏</b> · 三合一奖池</span>
+    <div class="topbar-actions">
+      <div class="iconbtn">◐</div>
+      <div class="iconbtn">↻</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="fav-head">
+      <div class="fav-nav">
+        <span>皮肤与炫彩</span>
+        <span>账户与物品</span>
+        <span class="on">三合一奖池</span>
+      </div>
+      <div class="metrics">
+        <div class="mcard"><div class="k">皮肤收藏</div><div class="v">312<small> / 1,624</small></div></div>
+        <div class="mcard"><div class="k">炫彩收藏</div><div class="v">87<small> / 2,410</small></div></div>
+        <div class="mcard"><div class="k">奖池总量</div><div class="v">554</div></div>
+        <div class="mcard hot"><div class="k">三合一剩余</div><div class="v">173</div></div>
+      </div>
+    </div>
+
+    <div class="pooltabs">
+      <span class="pooltab on">奖池目录</span>
+      <span class="pooltab">清单上传</span>
+      <span class="pooltab">本地历史</span>
+    </div>
+
+    <!-- 进度环 -->
+    <div class="card">
+      <div class="ringcard">
+        <div class="ring">
+          <svg width="132" height="132" viewBox="0 0 132 132">
+            <circle cx="66" cy="66" r="56" fill="none" stroke="#1C2331" stroke-width="11"/>
+            <circle cx="66" cy="66" r="56" fill="none" stroke="#D9A441" stroke-width="11" stroke-linecap="round"
+                    stroke-dasharray="242 352" />
+          </svg>
+          <div class="center"><div><b>173</b><span>三合一剩余</span></div></div>
+        </div>
+        <div class="grow">
+          <div class="row" style="gap:10px">
+            <b style="font-size:15px">国服 14.5 三合一奖池</b>
+            <span class="tag gold">内置 · 已人工核验</span>
+            <span class="hash">SHA-256 9f3a…c41e</span>
+          </div>
+          <div class="faint mt8" style="font-size:12px">554 个条目全部唯一映射成功 · 按稳定皮肤 ID 与当前客户端核对 · 更新于 12 分钟前</div>
+          <div class="ringstats mt12">
+            <div><div class="k">奖池总量</div><div class="v">554</div></div>
+            <div><div class="k">已拥有</div><div class="v win">381</div></div>
+            <div><div class="k">剩余</div><div class="v goldtxt">173</div></div>
+            <div><div class="k">待核对</div><div class="v">0</div></div>
+          </div>
+        </div>
+        <div class="select">切换奖池：国服 14.5（内置）</div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="seg"><span>已拥有</span><span class="on">未拥有</span></div>
+      <div class="input">🔍 搜索奖池内皮肤</div>
+      <div class="select">品质：全部</div>
+      <div class="select">排序：按品质</div>
+      <div class="row" style="margin-left:auto; gap:8px">
+        <span class="btn">导出 JSON</span><span class="btn">导出 CSV</span><span class="btn">离线 HTML</span>
+      </div>
+    </div>
+
+    <div class="group-h"><span class="qdot" style="background:var(--q-legendary)"></span><b>传说</b><span class="cnt">剩余 24 款</span></div>
+    <div class="skin-grid">
+      <div class="skin locked">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_27.jpg" alt="">
+        <div class="shade"></div><div class="lock">🔒</div>
+        <div class="info"><b>K/DA ALL OUT 阿狸</b><span>阿狸 · ID 103027</span></div>
+      </div>
+      <div class="skin locked">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Yasuo_9.jpg" alt="">
+        <div class="shade"></div><div class="lock">🔒</div>
+        <div class="info"><b>夜幽 亚索</b><span>亚索 · ID 157009</span></div>
+      </div>
+      <div class="skin locked">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Thresh_1.jpg" alt="">
+        <div class="shade"></div><div class="lock">🔒</div>
+        <div class="info"><b>深海泰坦 锤石</b><span>锤石 · ID 412001</span></div>
+      </div>
+      <div class="skin locked">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ezreal_5.jpg" alt="">
+        <div class="shade"></div><div class="lock">🔒</div>
+        <div class="info"><b>未来战士 伊泽瑞尔</b><span>伊泽瑞尔 · ID 81005</span></div>
+      </div>
+    </div>
+
+    <div class="group-h"><span class="qdot" style="background:var(--q-epic)"></span><b>史诗</b><span class="cnt">剩余 118 款</span></div>
+    <div class="skin-grid">
+      <div class="skin locked">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_13.jpg" alt="">
+        <div class="shade"></div><div class="lock">🔒</div>
+        <div class="info"><b>奥德赛金克丝</b><span>金克丝 · ID 222013</span></div>
+      </div>
+      <div class="skin locked">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Riven_16.jpg" alt="">
+        <div class="shade"></div><div class="lock">🔒</div>
+        <div class="info"><b>灵魂莲华 锐雯</b><span>锐雯 · ID 92016</span></div>
+      </div>
+      <div class="skin locked">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Lux_2.jpg" alt="">
+        <div class="shade"></div><div class="lock">🔒</div>
+        <div class="info"><b>魔法少女 拉克丝</b><span>拉克丝 · ID 99002</span></div>
+      </div>
+      <div class="skin locked">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Zed_1.jpg" alt="">
+        <div class="shade"></div><div class="lock">🔒</div>
+        <div class="info"><b>冲击之刃 劫</b><span>劫 · ID 238001</span></div>
+      </div>
+    </div>
+
+    <!-- 页签预览：清单上传 -->
+    <div class="group-h mt20"><b class="goldtxt">页签预览 · 清单上传</b></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-h">导入自定义奖池</div>
+        <div class="card-b">
+          <div class="upload">拖入或选择 TXT / 单列 CSV / JSON 文件<br><span style="font-size:11px">上限 1 MiB · 10,000 条 · 导入后需显式切换才会生效</span></div>
+          <div class="row mt12" style="gap:8px"><span class="btn btn-gold">选择文件</span><span class="btn">粘贴文本</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h">奖池清单</div>
+        <div class="card-b">
+          <table class="data">
+            <tr><th>名称</th><th>条目</th><th>规范化 SHA-256</th><th>状态</th></tr>
+            <tr><td>国服 14.5 三合一奖池（内置）</td><td class="num">554</td><td class="hash">9f3a…c41e</td><td><span class="tag gold">使用中</span></td></tr>
+            <tr><td>custom-a3f8e21b04d7</td><td class="num">320</td><td class="hash">77b2…09aa</td><td><span class="tag">未启用</span></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 页签预览：本地历史 -->
+    <div class="group-h mt20"><b class="goldtxt">页签预览 · 本地历史</b><span class="cnt">最近 30 份脱敏快照 · 同账号同奖池版本可比较</span></div>
+    <div class="card">
+      <div class="card-b" style="padding-top:14px">
+        <table class="data">
+          <tr><th>时间</th><th>账号摘要</th><th>奖池</th><th>已拥有</th><th>剩余</th><th>操作</th></tr>
+          <tr><td class="num">2026-08-13 09:41</td><td class="hash">acct-7fe2a9b3c1d4</td><td>国服 14.5</td><td class="num">381</td><td class="num goldtxt">173</td><td><span class="tag blue">对比</span> <span class="tag">导出</span></td></tr>
+          <tr><td class="num">2026-08-06 22:15</td><td class="hash">acct-7fe2a9b3c1d4</td><td>国服 14.5</td><td class="num">376</td><td class="num">178</td><td><span class="tag blue">对比</span> <span class="tag">导出</span></td></tr>
+          <tr><td class="num">2026-07-28 20:02</td><td class="hash">acct-7fe2a9b3c1d4</td><td>国服 14.5</td><td class="num">371</td><td class="num">183</td><td><span class="tag blue">对比</span> <span class="tag">导出</span></td></tr>
+        </table>
+        <div class="row mt12" style="gap:10px">
+          <span class="tag green">对比 08-06 → 08-13：新增拥有 5 款 · 不再剩余 5 款</span>
+          <span class="faint" style="font-size:11.5px">数据来源：腾讯官方 14.5 公告原图人工转录 · 554 条已核验</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

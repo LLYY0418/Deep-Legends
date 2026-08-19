@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Deep Legends · 韩服符文推荐预览</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: oklch(0.10 0 0);
+      --surface: oklch(0.16 0.006 57);
+      --surface-strong: oklch(0.22 0.008 57);
+      --ink: oklch(0.94 0.006 57);
+      --muted: oklch(0.74 0.010 57);
+      --primary: oklch(0.76 0.145 56.6);
+      --primary-strong: oklch(0.67 0.15 56.6);
+      --primary-soft: oklch(0.22 0.035 56.6);
+      --success: oklch(0.74 0.13 151);
+      --success-soft: oklch(0.20 0.035 151);
+      --warning: oklch(0.80 0.13 75);
+      --warning-soft: oklch(0.21 0.04 75);
+      --line: oklch(0.28 0 0);
+      --hex-line: color-mix(in oklch,var(--primary) 32%,var(--line));
+      --font: "Segoe UI Variable","Segoe UI","Microsoft YaHei UI",system-ui,sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; color: var(--ink); background: var(--bg); font: 14px/1.5 var(--font); }
+    button { font: inherit; }
+    .shell { width: min(1480px,100%); min-height: 100vh; margin: 0 auto; padding: 26px 30px 34px; }
+    .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+    .page-head h1 { margin: 0; font-size: 26px; letter-spacing: -.02em; text-wrap: balance; }
+    .page-head p { margin: 4px 0 0; color: var(--muted); }
+    .status { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+    .status::before { width: 8px; height: 8px; background: var(--success); border-radius: 50%; content: ""; }
+    .source-tabs { display: flex; gap: 4px; margin: 18px 0 14px; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+    .source-tab { min-height: 38px; padding: 0 15px; color: var(--muted); background: transparent; border: 0; border-radius: 9px; font-weight: 700; }
+    .source-tab.active { color: var(--ink); background: var(--surface-strong); }
+    .source-tab span { margin-left: 7px; color: var(--primary-strong); font-size: 11px; }
+    .hero { display: grid; grid-template-columns: minmax(0,1fr) 290px; gap: 12px; }
+    .rune-panel,.summary-panel,.players { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 15px; border-bottom: 1px solid var(--line); }
+    .panel-head h2,.panel-head h3 { margin: 0; font-size: 15px; }
+    .panel-head p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+    .source-badge { padding: 3px 8px; color: var(--primary-strong); background: var(--primary-soft); border-radius: 999px; font-size: 10px; font-weight: 800; }
+    .rune-board { display: grid; grid-template-columns: repeat(2,minmax(250px,1fr)) 180px; gap: 10px; padding: 12px; }
+    .rune-tree,.fragments { padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 11px; }
+    .tree-title { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .tree-title img { width: 28px; height: 28px; }
+    .tree-title small { display: block; color: var(--muted); font-weight: 500; }
+    .rune-row { display: flex; min-height: 54px; align-items: center; justify-content: center; gap: 14px; border-top: 1px solid color-mix(in oklch,var(--line) 66%,transparent); }
+    .rune { position: relative; display: grid; width: 42px; height: 42px; place-items: center; opacity: .38; filter: grayscale(1); }
+    .rune img { width: 40px; height: 40px; object-fit: contain; }
+    .rune.selected { opacity: 1; filter: none; }
+    .rune.selected::after { position: absolute; inset: -3px; border: 2px solid var(--primary); border-radius: 50%; content: ""; }
+    .fragments { display: grid; align-content: center; gap: 14px; }
+    .fragments h3 { margin: 0; font-size: 13px; }
+    .fragment-row { display: flex; gap: 10px; }
+    .fragment-row .rune { width: 38px; height: 38px; }
+    .fragment-row .rune img { width: 36px; height: 36px; }
+    .summary-panel { display: flex; flex-direction: column; overflow: hidden; }
+    .champion { display: grid; grid-template-columns: 62px minmax(0,1fr); align-items: center; gap: 11px; padding: 15px; }
+    .champion > img { width: 62px; height: 62px; object-fit: cover; border: 1px solid var(--hex-line); border-radius: 50%; }
+    .champion strong { display: block; font-size: 17px; }
+    .champion span { color: var(--muted); font-size: 11px; }
+    .stats { display: grid; grid-template-columns: repeat(2,1fr); margin: 0 15px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .stats div { padding: 12px 0; }
+    .stats div + div { padding-left: 13px; border-left: 1px solid var(--line); }
+    .stats dt { color: var(--muted); font-size: 10px; }
+    .stats dd { margin: 2px 0 0; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .summary-copy { padding: 13px 15px; color: var(--muted); font-size: 11px; }
+    .apply { min-height: 42px; margin: auto 15px 15px; color: oklch(0.16 0.02 57); background: var(--primary); border: 0; border-radius: 9px; font-weight: 800; }
+    .players { margin-top: 12px; overflow: hidden; }
+    .player-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); }
+    .player { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 10px; padding: 14px 15px 15px; }
+    .player + .player { border-left: 1px solid var(--line); }
+    .rank { display: grid; width: 34px; height: 34px; place-items: center; color: var(--primary-strong); background: var(--primary-soft); border-radius: 9px; font-weight: 850; }
+    .player-main { min-width: 0; }
+    .player-title { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 9px; }
+    .player-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .player-title span { color: var(--muted); font-size: 10px; white-space: nowrap; }
+    .player-meta { display: flex; gap: 10px; margin: 2px 0 10px; color: var(--muted); font-size: 11px; }
+    .known-runes { display: flex; align-items: center; gap: 7px; }
+    .known-runes img { width: 34px; height: 34px; object-fit: contain; }
+    .unknown-runes { display: flex; gap: 4px; margin-left: 5px; }
+    .unknown-runes i { width: 25px; height: 25px; background: var(--surface-strong); border: 1px dashed var(--muted); border-radius: 50%; opacity: .55; }
+    .availability { grid-column: 1/-1; display: flex; align-items: center; gap: 7px; margin-top: 10px; padding: 8px 10px; color: var(--warning); background: var(--warning-soft); border-radius: 8px; font-size: 10px; }
+    .availability::before { content: "i"; display: grid; width: 16px; height: 16px; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-weight: 800; }
+    .footnote { margin: 11px 2px 0; color: var(--muted); font-size: 10px; }
+    @media (max-width: 980px) {
+      .hero { grid-template-columns: 1fr; }
+      .rune-board { grid-template-columns: repeat(2,minmax(220px,1fr)); }
+      .fragments { grid-column: 1/-1; }
+      .player-grid { grid-template-columns: 1fr; }
+      .player + .player { border-top: 1px solid var(--line); border-left: 0; }
+    }
+    @media (max-width: 620px) {
+      .shell { padding: 16px 12px 24px; }
+      .page-head { align-items: flex-start; flex-direction: column; }
+      .rune-board { grid-template-columns: 1fr; }
+      .fragments { grid-column: auto; }
+      .source-tabs { overflow-x: auto; }
+      .source-tab { white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="page-head">
+      <div>
+        <h1>韩服符文推荐</h1>
+        <p>九尾妖狐 · 中路 · 单排/双排 · 翡翠及以上</p>
+      </div>
+      <div class="status">OP.GG 数据已更新 · 版本 16.15</div>
+    </header>
+
+    <nav class="source-tabs" aria-label="推荐来源">
+      <button class="source-tab active" type="button">OP.GG 综合推荐 <span>25,955 场</span></button>
+      <button class="source-tab" type="button">高场次玩家 <span>韩服 Top 3</span></button>
+      <button class="source-tab" type="button">职业选手 <span>待接入</span></button>
+    </nav>
+
+    <section class="hero">
+      <article class="rune-panel">
+        <header class="panel-head">
+          <div><h2>配置一</h2></div>
+          <span class="source-badge">OP.GG · KR</span>
+        </header>
+        <div class="rune-board">
+          <section class="rune-tree">
+            <div class="tree-title"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perkStyle/8100.png" alt="主宰"></div>
+            <div class="rune-row">
+              <span class="rune selected" title="电刑"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8112.png" alt="电刑"></span>
+              <span class="rune" title="黑暗收割"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8128.png" alt="黑暗收割"></span>
+              <span class="rune" title="丛刃"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/9923.png" alt="丛刃"></span>
+            </div>
+            <div class="rune-row">
+              <span class="rune" title="恶意中伤"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8126.png" alt="恶意中伤"></span>
+              <span class="rune selected" title="血之滋味"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8139.png" alt="血之滋味"></span>
+              <span class="rune" title="猛然冲击"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8143.png" alt="猛然冲击"></span>
+            </div>
+            <div class="rune-row">
+              <span class="rune" title="第六感"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8137.png" alt="第六感"></span>
+              <span class="rune selected" title="可怖纪念品"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8140.png" alt="可怖纪念品"></span>
+              <span class="rune" title="深层守卫"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8141.png" alt="深层守卫"></span>
+            </div>
+            <div class="rune-row">
+              <span class="rune" title="寻宝猎人"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8135.png" alt="寻宝猎人"></span>
+              <span class="rune" title="无情猎手"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8105.png" alt="无情猎手"></span>
+              <span class="rune selected" title="终极猎人"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8106.png" alt="终极猎人"></span>
+            </div>
+          </section>
+
+          <section class="rune-tree">
+            <div class="tree-title"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perkStyle/8200.png" alt="巫术"></div>
+            <div class="rune-row">
+              <span class="rune" title="召唤：艾黎"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8214.png" alt="召唤：艾黎"></span>
+              <span class="rune" title="奥术彗星"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8229.png" alt="奥术彗星"></span>
+              <span class="rune" title="相位猛冲"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8230.png" alt="相位猛冲"></span>
+            </div>
+            <div class="rune-row">
+              <span class="rune" title="公理秘术"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8224.png" alt="公理秘术"></span>
+              <span class="rune selected" title="法力流系带"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8226.png" alt="法力流系带"></span>
+              <span class="rune" title="灵光披风"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8275.png" alt="灵光披风"></span>
+            </div>
+            <div class="rune-row">
+              <span class="rune selected" title="超然"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8210.png" alt="超然"></span>
+              <span class="rune" title="迅捷"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8234.png" alt="迅捷"></span>
+              <span class="rune" title="绝对专注"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8233.png" alt="绝对专注"></span>
+            </div>
+            <div class="rune-row">
+              <span class="rune" title="焦灼"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8237.png" alt="焦灼"></span>
+              <span class="rune" title="水上行走"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8232.png" alt="水上行走"></span>
+              <span class="rune" title="风暴聚集"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8236.png" alt="风暴聚集"></span>
+            </div>
+          </section>
+
+          <section class="fragments">
+            <div class="fragment-row"><span class="rune selected"><img src="https://ddragon.leagueoflegends.com/cdn/img/perk-images/StatMods/StatModsAttackSpeedIcon.png" alt="攻击速度"></span><span class="rune"><img src="https://ddragon.leagueoflegends.com/cdn/img/perk-images/StatMods/StatModsAdaptiveForceIcon.png" alt="自适应之力"></span></div>
+            <div class="fragment-row"><span class="rune selected"><img src="https://ddragon.leagueoflegends.com/cdn/img/perk-images/StatMods/StatModsAdaptiveForceIcon.png" alt="自适应之力"></span><span class="rune"><img src="https://ddragon.leagueoflegends.com/cdn/img/perk-images/StatMods/StatModsMovementSpeedIcon.png" alt="移动速度"></span></div>
+            <div class="fragment-row"><span class="rune selected"><img src="https://ddragon.leagueoflegends.com/cdn/img/perk-images/StatMods/StatModsHealthScalingIcon.png" alt="成长生命值"></span><span class="rune"><img src="https://ddragon.leagueoflegends.com/cdn/img/perk-images/StatMods/StatModsHealthPlusIcon.png" alt="生命值"></span></div>
+          </section>
+        </div>
+      </article>
+
+      <aside class="summary-panel">
+        <div class="champion"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Ahri.png" alt="九尾妖狐"><div><strong>九尾妖狐</strong><span>Middle · Emerald+</span></div></div>
+        <button class="apply" type="button">应用到客户端</button>
+      </aside>
+    </section>
+
+    <section class="players">
+      <header class="panel-head"><div><h3>韩服高场次玩家</h3><p>按该英雄累计场次排序；符文摘要取各玩家最近一场阿狸排位</p></div><span class="source-badge">OP.GG 官方 MCP</span></header>
+      <div class="player-grid">
+        <article class="player"><span class="rank">1</span><div class="player-main"><div class="player-title"><strong>준생배01#5633</strong><span>最近：今天 09:51</span></div><div class="player-meta"><span>1,739 场</span><span>52.9% 胜率</span></div><div class="known-runes"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8112.png" alt="电刑"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perkStyle/8200.png" alt="巫术"><div class="unknown-runes" aria-label="其余符文未公开"><i></i><i></i><i></i><i></i></div></div></div><div class="availability">OP.GG 官方接口未公开这场比赛的其余小符文，不提供应用按钮</div></article>
+        <article class="player"><span class="rank">2</span><div class="player-main"><div class="player-title"><strong>아리 냥냥#KR1</strong><span>最近：今天 13:50</span></div><div class="player-meta"><span>1,094 场</span><span>51.9% 胜率</span></div><div class="known-runes"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8112.png" alt="电刑"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perkStyle/8200.png" alt="巫术"><div class="unknown-runes" aria-label="其余符文未公开"><i></i><i></i><i></i><i></i></div></div></div><div class="availability">OP.GG 官方接口未公开这场比赛的其余小符文，不提供应用按钮</div></article>
+        <article class="player"><span class="rank">3</span><div class="player-main"><div class="player-title"><strong>김슨동#KR1</strong><span>最近：07-31 20:11</span></div><div class="player-meta"><span>1,054 场</span><span>51.8% 胜率</span></div><div class="known-runes"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8112.png" alt="电刑"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perkStyle/8400.png" alt="坚决"><div class="unknown-runes" aria-label="其余符文未公开"><i></i><i></i><i></i><i></i></div></div></div><div class="availability">OP.GG 官方接口未公开这场比赛的其余小符文，不提供应用按钮</div></article>
+      </div>
+    </section>
+    <p class="footnote">界面预览使用 2026-08-10 查询到的真实韩服数据；未知字段保持缺省，不使用推测值。</p>
+  </main>
+</body>
+</html>

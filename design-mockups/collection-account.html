@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deep Legends 重设计 · 收藏 · 账户与物品</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .fav-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .fav-nav { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+  .fav-nav span { padding: 7px 18px; border-radius: 7px; font-size: 13px; color: var(--muted); }
+  .fav-nav span.on { background: var(--surface-2); color: var(--gold-bright); font-weight: 600; box-shadow: inset 0 0 0 1px var(--gold-dim); }
+  .metrics { display: flex; gap: 10px; margin-left: auto; }
+  .mcard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 16px; text-align: center; min-width: 96px; }
+  .mcard .k { font-size: 11px; color: var(--faint); }
+  .mcard .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .mcard .v small { font-size: 11px; color: var(--faint); font-weight: 400; }
+  .mcard.hot { border-color: var(--gold-dim); background: rgba(217,164,65,.07); }
+  .mcard.hot .v { color: var(--gold-bright); }
+
+  .banner { position: relative; border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; margin-bottom: 16px; }
+  .banner .bg { position: absolute; inset: 0; background: url(https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Camille_0.jpg) center 20%/cover; opacity: .2; }
+  .banner .bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(11,14,20,.92), rgba(11,14,20,.6)); }
+  .banner-in { position: relative; display: flex; align-items: center; gap: 16px; padding: 18px 22px; }
+  .banner .avatar { width: 58px; height: 58px; border: 2px solid var(--gold-dim); }
+
+  /* 货币卡 */
+  .currencies { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+  .cur { position: relative; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+  .cur::after { content: ""; position: absolute; right: -22px; top: -22px; width: 74px; height: 74px; border-radius: 50%; background: radial-gradient(circle, rgba(217,164,65,.10), transparent 70%); }
+  .cur img.ico { width: 34px; height: 34px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); }
+  .cur .k { font-size: 11px; color: var(--faint); }
+  .cur .v { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* 皮肤碎片：沿用皮肤页原画卡 */
+  .shard-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .skin { position: relative; border-radius: 14px; border: 1px solid var(--line); overflow: hidden; aspect-ratio: 16/9; background: var(--surface-2); }
+  .skin img.art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .skin .shade { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(8,10,15,.94) 100%); }
+  .skin .info { position: absolute; left: 12px; right: 12px; bottom: 9px; }
+  .skin .info b { font-size: 13px; display: block; }
+  .skin .info .tag { margin-top: 4px; }
+  .skin .q { position: absolute; top: 9px; left: 10px; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(8,10,15,.75); }
+  .skin .q.legendary { color: var(--q-legendary); } .skin .q.epic { color: var(--q-epic); } .skin .q.mythic { color: var(--q-mythic); }
+  .skin .cnt { position: absolute; top: 8px; right: 9px; min-width: 26px; height: 22px; padding: 0 7px; border-radius: 6px; background: rgba(8,10,15,.8); border: 1px solid var(--line); color: var(--ink); display: grid; place-items: center; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .skin.dup { border-color: var(--gold-dim); }
+  .skin.dup .cnt { background: var(--gold); border-color: var(--gold); color: #14100A; }
+
+  /* 战利品分类：图标瓦片卡 */
+  .lootgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .lootcard .cat { display: flex; align-items: center; gap: 8px; }
+  .lootcard .cat i { width: 8px; height: 8px; border-radius: 2px; font-style: normal; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .lootcard.wide { grid-column: span 2; }
+  .lootcard.wide .tiles { grid-template-columns: repeat(8, 1fr); }
+  .tile { position: relative; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--surface-2); padding: 10px 6px 8px; text-align: center; }
+  .tile img { width: 44px; height: 44px; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,.45)); }
+  .tile img.round { border-radius: 8px; }
+  .tile .tn { font-size: 10.5px; color: var(--muted); margin-top: 6px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .x { position: absolute; top: 5px; right: 6px; font-size: 10.5px; font-weight: 700; color: var(--gold-bright); background: rgba(8,10,15,.7); border-radius: 5px; padding: 1px 5px; font-variant-numeric: tabular-nums; }
+  .tile.more { display: grid; place-items: center; align-content: center; gap: 2px; border-style: dashed; background: transparent; }
+  .tile.more b { font-size: 16px; font-weight: 700; color: var(--gold-bright); font-variant-numeric: tabular-nums; }
+  .tile.more span { font-size: 10px; color: var(--faint); }
+
+  /* 待领取奖励卡 */
+  .reward-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .reward { position: relative; overflow: hidden; display: flex; align-items: center; gap: 14px; border: 1px solid var(--gold-dim); border-radius: var(--radius); background: linear-gradient(135deg, rgba(217,164,65,.10), rgba(19,24,34,.9) 55%); padding: 14px 16px; }
+  .reward img { width: 52px; height: 52px; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,.5)); }
+  .reward b { font-size: 13px; display: block; }
+  .reward .src { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .reward .tag { position: absolute; top: 10px; right: 10px; }
+  .caps td { font-size: 12px; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">
+    <div class="hexcore"></div>
+    <div><div class="brand-name">Deep Legends</div><div class="brand-sub">本地英雄联盟助手</div></div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>总览</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M14.5 3l6.5 6.5-11 11L3.5 14z"/><path d="M13 6l5 5"/></svg>英雄</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5"/></svg>对局</div>
+    <div class="nav-item active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>收藏</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="conn"><span class="dot"></span>已连接 · 国服客户端</div>
+    <div class="me">
+      <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/4568.png" alt="">
+      <div><div class="n">青钢影不加班</div><div class="l">等级 436</div></div>
+    </div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>设置</div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <span class="crumb"><b>收藏</b> · 账户与物品 · 只读</span>
+    <div class="topbar-actions">
+      <div class="iconbtn">◐</div>
+      <div class="iconbtn">↻</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="fav-head">
+      <div class="fav-nav">
+        <span>皮肤与炫彩</span>
+        <span class="on">账户与物品</span>
+        <span>三合一奖池</span>
+      </div>
+      <div class="metrics">
+        <div class="mcard"><div class="k">皮肤收藏</div><div class="v">312<small> / 1,624</small></div></div>
+        <div class="mcard"><div class="k">炫彩收藏</div><div class="v">87<small> / 2,410</small></div></div>
+        <div class="mcard"><div class="k">奖池总量</div><div class="v">554</div></div>
+        <div class="mcard hot"><div class="k">三合一剩余</div><div class="v">173</div></div>
+      </div>
+    </div>
+
+    <!-- 召唤师卡 -->
+    <div class="banner">
+      <div class="bg"></div>
+      <div class="banner-in">
+        <img class="avatar" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/4568.png" alt="">
+        <div>
+          <b style="font-size:17px">青钢影不加班</b>
+          <div class="muted" style="font-size:12px">等级 436 · 艾欧尼亚</div>
+        </div>
+        <div class="row" style="margin-left:auto; gap:24px">
+          <div style="text-align:center"><div class="faint" style="font-size:11px">皮肤类物品</div><div class="big-num" style="font-size:20px">46</div></div>
+          <div style="text-align:center"><div class="faint" style="font-size:11px">待领取奖励</div><div class="big-num goldtxt" style="font-size:20px">3</div></div>
+          <span class="tag">本页只读 · 不提供任何合成 / 分解操作</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 货币 -->
+    <div class="currencies">
+      <div class="cur"><img class="ico" src="assets/blue-essence.png" alt=""><div><div class="k">蓝色精粹</div><div class="v">48,230</div></div></div>
+      <div class="cur"><img class="ico" src="assets/orange-essence.png" alt=""><div><div class="k">橙色精粹</div><div class="v">3,845</div></div></div>
+      <div class="cur"><img class="ico" src="assets/mythic-essence.png" alt=""><div><div class="k">神话精粹</div><div class="v">40</div></div></div>
+      <div class="cur"><img class="ico" src="assets/hextech-key.png" alt=""><div><div class="k">海克斯钥匙</div><div class="v">6</div></div></div>
+      <div class="cur"><img class="ico" src="assets/sanctum-spark.svg" alt=""><div><div class="k">圣堂花火</div><div class="v">120</div></div></div>
+    </div>
+
+    <!-- 皮肤类物品：原画卡置顶 -->
+    <div class="card mt16" style="border-color:var(--gold-dim)">
+      <div class="card-h">皮肤类物品<span class="tag gold" style="margin-left:8px">碎片 28 项</span><span class="more">查看全部 ›</span></div>
+      <div class="card-b">
+        <div class="shard-grid">
+          <div class="skin">
+            <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_28.jpg" alt="">
+            <div class="shade"></div>
+            <span class="q legendary">传说 · 碎片</span>
+            <span class="cnt">×1</span>
+            <div class="info"><b>K/DA ALL OUT 阿狸</b><span class="tag gold">可升级 · 需 1,520 橙色精粹</span></div>
+          </div>
+          <div class="skin">
+            <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Yasuo_9.jpg" alt="">
+            <div class="shade"></div>
+            <span class="q epic">史诗 · 碎片</span>
+            <span class="cnt">×1</span>
+            <div class="info"><b>夜幽 亚索</b><span class="tag">分解可得 364 橙色精粹</span></div>
+          </div>
+          <div class="skin">
+            <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_13.jpg" alt="">
+            <div class="shade"></div>
+            <span class="q epic">史诗 · 碎片</span>
+            <span class="cnt">×1</span>
+            <div class="info"><b>奥德赛 金克丝</b><span class="tag gold">可升级 · 需 1,050 橙色精粹</span></div>
+          </div>
+          <div class="skin dup">
+            <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Riven_16.jpg" alt="">
+            <div class="shade"></div>
+            <span class="q mythic">神话 · 碎片</span>
+            <span class="cnt">×2</span>
+            <div class="info"><b>灵魂莲华 锐雯</b><span class="tag red">已拥有本皮肤 · 建议分解</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 战利品分类：图标瓦片卡 -->
+    <div class="lootgrid mt16">
+      <div class="card lootcard">
+        <div class="card-h"><span class="cat"><i style="background:var(--blue)"></i>材料</span><span class="more">12 项</span></div>
+        <div class="card-b">
+          <div class="tiles">
+            <div class="tile"><span class="x">×4</span><img src="assets/hextech-chest.png" alt=""><div class="tn">海克斯宝箱</div></div>
+            <div class="tile"><span class="x">×1</span><img src="assets/loot-masterwork-chest.png" alt=""><div class="tn">杰作宝箱</div></div>
+            <div class="tile"><span class="x">×2</span><img src="assets/loot-honor-capsule.png" alt=""><div class="tn">荣誉胶囊</div></div>
+            <div class="tile"><span class="x">×7</span><img src="assets/key-fragment.png" alt=""><div class="tn">钥匙碎片</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card lootcard wide">
+        <div class="card-h"><span class="cat"><i style="background:var(--green)"></i>英雄碎片</span><span class="more">16 项</span></div>
+        <div class="card-b">
+          <div class="tiles">
+            <div class="tile"><span class="x">×2</span><img class="round" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Aatrox.png" alt=""><div class="tn">亚托克斯</div></div>
+            <div class="tile"><span class="x">×1</span><img class="round" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Kaisa.png" alt=""><div class="tn">卡莎</div></div>
+            <div class="tile"><span class="x">×1</span><img class="round" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Sylas.png" alt=""><div class="tn">塞拉斯</div></div>
+            <div class="tile"><span class="x">×3</span><img class="round" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Thresh.png" alt=""><div class="tn">锤石</div></div>
+            <div class="tile"><span class="x">×2</span><img class="round" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Yasuo.png" alt=""><div class="tn">亚索</div></div>
+            <div class="tile"><span class="x">×1</span><img class="round" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Ashe.png" alt=""><div class="tn">艾希</div></div>
+            <div class="tile"><span class="x">×2</span><img class="round" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Vayne.png" alt=""><div class="tn">薇恩</div></div>
+            <div class="tile"><span class="x">×4</span><img class="round" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/LeeSin.png" alt=""><div class="tn">李青</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card lootcard">
+        <div class="card-h"><span class="cat"><i style="background:var(--q-mythic)"></i>小小英雄</span><span class="more">5 项</span></div>
+        <div class="card-b">
+          <div class="tiles">
+            <div class="tile"><span class="x">×1</span><img src="assets/loot-egg-1.png" alt=""><div class="tn">默尔 彩蛋</div></div>
+            <div class="tile"><span class="x">×2</span><img src="assets/loot-egg-2.png" alt=""><div class="tn">噬齿獾 彩蛋</div></div>
+            <div class="tile"><span class="x">×2</span><img src="assets/loot-egg-3.png" alt=""><div class="tn">阿福 星光彩蛋</div></div>
+            <div class="tile more"><b>+2</b><span>更多</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card lootcard">
+        <div class="card-h"><span class="cat"><i style="background:var(--q-epic)"></i>永恒星碑</span><span class="more">6 项</span></div>
+        <div class="card-b">
+          <div class="tiles">
+            <div class="tile"><span class="x">×1</span><img src="assets/loot-statstone.png" alt=""><div class="tn">卡蜜尔 系列一</div></div>
+            <div class="tile"><span class="x">×2</span><img src="assets/loot-statstone-2.png" alt=""><div class="tn">起源系列 胶囊</div></div>
+            <div class="tile more"><b>+4</b><span>更多</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card lootcard">
+        <div class="card-h"><span class="cat"><i style="background:var(--q-legendary)"></i>表情</span><span class="more">9 项</span></div>
+        <div class="card-b">
+          <div class="tiles">
+            <div class="tile"><span class="x">×1</span><img src="assets/loot-emote.png" alt=""><div class="tn">「稳住别浪」</div></div>
+            <div class="tile"><span class="x">×1</span><img src="assets/loot-emote.png" alt=""><div class="tn">「送你回家」</div></div>
+            <div class="tile more"><b>+7</b><span>更多</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card lootcard">
+        <div class="card-h"><span class="cat"><i style="background:var(--blue)"></i>守卫皮肤</span><span class="more">7 项</span></div>
+        <div class="card-b">
+          <div class="tiles">
+            <div class="tile"><span class="x">×1</span><img src="assets/loot-ward.png" alt=""><div class="tn">灵魂莲华守卫</div></div>
+            <div class="tile"><span class="x">×1</span><img src="assets/loot-ward.png" alt=""><div class="tn">电玩守卫</div></div>
+            <div class="tile more"><b>+5</b><span>更多</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card lootcard">
+        <div class="card-h"><span class="cat"><i style="background:var(--muted)"></i>召唤师图标</span><span class="more">11 项</span></div>
+        <div class="card-b">
+          <div class="tiles">
+            <div class="tile"><span class="x">×1</span><img class="round" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/6296.png" alt=""><div class="tn">2026 季前赛</div></div>
+            <div class="tile"><span class="x">×2</span><img class="round" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/5205.png" alt=""><div class="tn">灵魂莲华</div></div>
+            <div class="tile more"><b>+9</b><span>更多</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 待领取奖励 -->
+    <div class="card mt16">
+      <div class="card-h">待领取奖励<span class="more">3 项 · 在客户端领取</span></div>
+      <div class="card-b">
+        <div class="reward-grid">
+          <div class="reward">
+            <img src="assets/emblem-emerald.png" alt="">
+            <div><b>排位赛季奖励 · 翡翠段位边框</b><div class="src">2026 赛季 S1 · 单双排</div></div>
+            <span class="tag gold">待领取</span>
+          </div>
+          <div class="reward">
+            <img src="assets/loot-orb.png" alt="">
+            <div><b>事件通行证 · 海克斯宝珠 ×2</b><div class="src">灵魂莲华 2026 通行证</div></div>
+            <span class="tag gold">待领取</span>
+          </div>
+          <div class="reward">
+            <img src="assets/loot-honor-capsule.png" alt="">
+            <div><b>荣誉等级 4 · 荣誉胶囊</b><div class="src">本赛季荣誉进度奖励</div></div>
+            <span class="tag gold">待领取</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据来源状态 -->
+    <div class="card mt16">
+      <div class="card-h">数据来源状态<span class="more">收起 ▴</span></div>
+      <div class="card-b">
+        <table class="data caps">
+          <tr><th>只读端点</th><th>用途</th><th>状态</th></tr>
+          <tr><td>皮肤目录（skins-minimal）</td><td>皮肤所有权 · 权威来源</td><td><span class="tag green">可用</span></td></tr>
+          <tr><td>英雄库存（champions）</td><td>所有权交叉验证</td><td><span class="tag green">可用</span></td></tr>
+          <tr><td>战利品（loot）</td><td>碎片与精粹</td><td><span class="tag green">可用</span></td></tr>
+          <tr><td>待领取奖励（rewards）</td><td>奖励列表</td><td><span class="tag green">可用</span></td></tr>
+          <tr><td>商店皮肤详情（store）</td><td>RP 价格 · 条件展示</td><td><span class="tag">当前客户端不支持 · 已降级</span></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

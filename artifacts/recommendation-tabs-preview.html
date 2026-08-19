@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Deep Legends · 推荐页预览</title>
+  <link rel="stylesheet" href="/web/app.css">
+  <link rel="stylesheet" href="/web/gameplay.css">
+  <style>
+    body { background: var(--bg); }
+    .preview-shell { width: min(1380px,calc(100% - 32px)); margin: 0 auto; padding: 22px 0 34px; }
+    .recommendation-area { margin-top: 0; }
+    @media (max-width:620px) { .preview-shell { width: min(100% - 20px,1380px); padding-top: 12px; } }
+  </style>
+</head>
+<body>
+  <main class="preview-shell">
+    <section class="recommendation-area">
+      <section class="recommendation-champion-summary">
+        <div class="champion-summary-main"><span class="game-icon is-live"><img src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Ahri.png" alt="九尾妖狐"></span><div><strong>九尾妖狐</strong><span>中路 · 韩服</span></div><dl><div><dt>胜率</dt><dd>50.5%</dd></div><div><dt>选取率</dt><dd>8.6%</dd></div><div><dt>禁用率</dt><dd>1%</dd></div></dl></div>
+        <div class="champion-matchups"><div><span>优势对抗</span><span class="game-icon is-small" title="英勇投弹手"><img src="https://ddragon.leagueoflegends.com/cdn/16.15.1/img/champion/Corki.png" alt="英勇投弹手"></span><span class="game-icon is-small" title="荒漠屠夫"><img src="https://ddragon.leagueoflegends.com/cdn/16.15.1/img/champion/Renekton.png" alt="荒漠屠夫"></span><span class="game-icon is-small" title="亡灵战神"><img src="https://ddragon.leagueoflegends.com/cdn/16.15.1/img/champion/Sion.png" alt="亡灵战神"></span><span class="game-icon is-small" title="虚空先知"><img src="https://ddragon.leagueoflegends.com/cdn/16.15.1/img/champion/Malzahar.png" alt="虚空先知"></span><span class="game-icon is-small" title="沙漠皇帝"><img src="https://ddragon.leagueoflegends.com/cdn/16.15.1/img/champion/Azir.png" alt="沙漠皇帝"></span></div><div><span>劣势对抗</span><span class="game-icon is-small" title="诺克萨斯统领"><img src="https://ddragon.leagueoflegends.com/cdn/16.15.1/img/champion/Swain.png" alt="诺克萨斯统领"></span><span class="game-icon is-small" title="炼金术士"><img src="https://ddragon.leagueoflegends.com/cdn/16.15.1/img/champion/Singed.png" alt="炼金术士"></span><span class="game-icon is-small" title="黑暗之女"><img src="https://ddragon.leagueoflegends.com/cdn/16.15.1/img/champion/Annie.png" alt="黑暗之女"></span><span class="game-icon is-small" title="不屈之枪"><img src="https://ddragon.leagueoflegends.com/cdn/16.15.1/img/champion/Pantheon.png" alt="不屈之枪"></span><span class="game-icon is-small" title="不祥之刃"><img src="https://ddragon.leagueoflegends.com/cdn/16.15.1/img/champion/Katarina.png" alt="不祥之刃"></span></div></div>
+      </section>
+      <div class="recommendation-tabs" role="tablist" aria-label="推荐类型">
+        <button class="is-active" type="button" role="tab" aria-selected="true" data-preview-tab="runes">符文</button>
+        <button type="button" role="tab" aria-selected="false" data-preview-tab="build">出装与技能</button>
+      </div>
+      <div id="rune-panel" class="recommendation-panel" role="tabpanel"></div>
+      <div id="build-panel" class="recommendation-panel" role="tabpanel" hidden></div>
+    </section>
+  </main>
+  <script>
+    const runeBase = "https://opgg-static.akamaized.net/meta/images/lol/16.15.1";
+    const itemBase = "https://ddragon.leagueoflegends.com/cdn/16.15.1/img/item";
+    const spellBase = "https://ddragon.leagueoflegends.com/cdn/16.15.1/img/spell";
+    const abilityBase = "https://ddragon.leagueoflegends.com/cdn/16.15.1/img/spell";
+    const runeSetA = new Set([8112,8139,8140,8106,8210,8226,5005,5008,5001]);
+    const runeSetB = new Set([8112,8139,8140,8106,8226,8237,5005,5008,5011]);
+    const domination = [
+      [{id:8112,name:"电刑",copy:"3秒内用3个独立攻击或技能命中英雄，造成70–240额外自适应伤害（+0.1额外攻击力、+0.05法术强度）。冷却20秒。"},{id:8128,name:"黑暗收割",copy:"伤害低于50%生命值的英雄时造成30点基础自适应伤害；每个灵魂永久增加11点伤害。冷却35秒，参与击杀后降至1秒。"},{id:9923,name:"丛刃",copy:"攻击英雄时，最多3次攻击获得120%攻击速度（远程60%）并附带4–20额外真实伤害。冷却10秒。"}],
+      [{id:8126,name:"恶意中伤",copy:"对移动或行动受损的敌人造成10–45额外真实伤害。冷却4秒。"},{id:8139,name:"血之滋味",copy:"伤害敌方英雄时回复16–40生命值（+0.1额外攻击力、+0.05法术强度）。冷却20秒。"},{id:8143,name:"猛然冲击",copy:"突进、闪烁、传送或离开潜行后4秒内，对英雄造成20–80额外真实伤害。冷却10秒。"}],
+      [{id:8137,name:"第六感",copy:"自动感知附近未被追踪的守卫；11级后使其显形10秒。冷却250秒。"},{id:8140,name:"可怖纪念品",copy:"参与击杀英雄获得纪念品，最多18个；每层提供6饰品急速，无视野饰品的模式改为3召唤师技能急速。"},{id:8141,name:"深入守卫",copy:"敌方野区的守卫获得1点额外生命值和30–45秒额外持续时间；9级后河道守卫也生效。"}],
+      [{id:8135,name:"寻宝猎人",copy:"首次参与击杀不同英雄获得额外金币：首层50，之后每层增加20，单层最多130。"},{id:8105,name:"无情猎手",copy:"每层赏金猎人提供8点非战斗状态移动速度。"},{id:8106,name:"终极猎人",copy:"终极技能获得6点基础技能急速，且每层赏金猎人再提供5点。"}]
+    ];
+    const sorcery = [
+      [{id:8224,name:"公理秘术",copy:"终极技能的伤害、治疗和护盾提升12%（群体效果8%）；参与击杀后缩短当前终极技能7%冷却。"},{id:8226,name:"法力流系带",copy:"技能命中英雄永久增加25最大法力值，最多250；叠满后每5秒回复1%已损失法力。冷却15秒。"},{id:8275,name:"灵光披风",copy:"施放召唤师技能后获得15%–45%移动速度，持续2秒，并无视单位碰撞。"}],
+      [{id:8210,name:"超然",copy:"5级和8级各获得5技能急速；11级参与击杀后使基础技能剩余冷却缩短20%。"},{id:8234,name:"迅捷",copy:"所有移动速度加成的效能提升7%，并额外获得1%移动速度。"},{id:8233,name:"绝对专注",copy:"高于70%生命值时，最多获得18攻击力或30法术强度（随等级成长）。"}],
+      [{id:8237,name:"焦灼",copy:"下一个伤害型技能命中英雄后造成20–40额外魔法伤害。冷却10秒。"},{id:8232,name:"水上行走",copy:"在河道时获得10移动速度和13–30适应之力。"},{id:8236,name:"风暴聚集",copy:"每10分钟获得递增适应属性：10分钟+8法术强度，20分钟+24，30分钟+48。"}]
+    ];
+    const shardRows = [
+      [{id:5005,name:"攻击速度",copy:"+10%攻击速度",icon:"StatModsAttackSpeedIcon"},{id:5008,name:"自适应之力",copy:"+9适应之力",icon:"StatModsAdaptiveForceIcon"},{id:5007,name:"技能急速",copy:"+8技能急速",icon:"StatModsCDRScalingIcon"}],
+      [{id:5008,name:"自适应之力",copy:"+9适应之力",icon:"StatModsAdaptiveForceIcon"},{id:5010,name:"移动速度",copy:"+2.5%移动速度",icon:"StatModsMovementSpeedIcon"},{id:5001,name:"成长生命值",copy:"+10–180生命值（基于等级）",icon:"StatModsHealthScalingIcon"}],
+      [{id:5011,name:"生命值",copy:"+65生命值",icon:"StatModsHealthPlusIcon"},{id:5013,name:"韧性和减速抗性",copy:"+15%韧性和减速抗性",icon:"StatModsTenacityIcon"},{id:5001,name:"成长生命值",copy:"+10–180生命值（基于等级）",icon:"StatModsHealthScalingIcon"}]
+    ];
+    function runeImage(id) { return `${runeBase}/perk/${id}.png`; }
+    function styleImage(id) { return `/web/rune-styles/${({8000:'precision',8100:'domination',8200:'sorcery',8300:'inspiration',8400:'resolve'})[id]}.svg`; }
+    function shardImage(icon) { return `https://ddragon.leagueoflegends.com/cdn/img/perk-images/StatMods/${icon}.png`; }
+    function runeButton(rune, selected, shard=false) {
+      const src = shard ? shardImage(rune.icon) : runeImage(rune.id);
+      const tooltip = `${rune.name}\n${rune.copy || rune.name}`;
+      return `<button class="rune-option-button${selected ? " is-selected" : ""}" type="button" aria-label="${rune.name}：${rune.copy || rune.name}" data-tooltip="${tooltip}"><span class="game-icon is-rune"><img src="${src}" alt="${rune.name}"></span></button>`;
+    }
+    function runeBoard(selected, shardSelections) {
+      return `<div class="unified-rune-board"><section class="unified-rune-column" aria-label="主系"><header><span class="game-icon is-rune-style"><img src="${styleImage(8100)}" alt=""></span></header>${domination.map(row=>`<div class="unified-rune-row">${row.map(r=>runeButton(r,selected.has(r.id))).join("")}</div>`).join("")}</section><section class="unified-rune-column is-secondary" aria-label="副系"><header><span class="game-icon is-rune-style"><img src="${styleImage(8200)}" alt=""></span></header><div class="unified-rune-row is-spacer" aria-hidden="true"></div>${sorcery.map(row=>`<div class="unified-rune-row">${row.map(r=>runeButton(r,selected.has(r.id))).join("")}</div>`).join("")}</section><section class="unified-rune-column rune-shards" aria-label="属性碎片"><header aria-hidden="true"></header><div class="unified-rune-row is-spacer" aria-hidden="true"></div>${shardRows.map((row,rowIndex)=>`<div class="unified-rune-row">${row.map(r=>runeButton(r,shardSelections[rowIndex]===r.id,true)).join("")}</div>`).join("")}</section></div>`;
+    }
+    function choice(key,title,selected,shards,playerStats="") {
+      return `<article class="rune-choice-card${key==='opgg'?' is-selected':''}"><button class="rune-choice-selector" type="button" role="radio" aria-checked="${key==='opgg'}" data-choice="${key}"><span class="radio-mark"></span><strong>${title}</strong>${playerStats}</button>${runeBoard(selected,shards)}</article>`;
+    }
+    const playerStats=(games,win)=>`<dl class="rune-player-stats"><div><dt>场次</dt><dd>${games}</dd></div><div><dt>胜率</dt><dd>${win}</dd></div></dl>`;
+    document.querySelector('#rune-panel').innerHTML = `<div class="rune-source-stack"><section class="rune-source-section"><header><h3>OPGG</h3></header><div class="rune-choice-list">${choice('opgg','配置一',runeSetA,[5005,5008,5001])}${choice('opgg-1','配置二',runeSetB,[5005,5008,5011])}</div></section><section class="rune-source-section"><header><h3>绝活哥</h3></header><div class="recommendation-empty"><strong>暂无可核验数据源</strong><p>当前 OP.GG 专家榜不返回玩家的完整符文。</p></div></section><section class="rune-source-section"><header><h3>职业选手</h3></header><div class="recommendation-empty"><strong>暂无可核验数据源</strong><p>当前数据源不提供可核验的职业选手身份与完整符文。</p></div></section></div><footer class="recommendation-action"><div><strong>已选择：OPGG 配置一</strong><span>将新建符文页并设为当前页</span></div><button class="button button-primary">应用所选符文</button></footer>`;
+    const itemDescriptions={1056:'多兰之戒\n+18法术强度 · +90生命值\n每秒回复1法力值；伤害英雄后提升至2，持续5秒。攻击对小兵额外造成5物理伤害。',2003:'生命药水\n15秒内回复120生命值。',1120:'多兰之盔\n+150生命值 · +8护甲 · +8魔法抗性\n攻击对小兵额外造成5物理伤害。',3020:'法师之靴\n+12法术穿透 · +45移动速度',3158:'明朗之靴\n+10技能急速 · +45移动速度 · +10召唤师技能急速',3118:'残疫\n+90法术强度 · +600法力 · +15技能急速\n额外获得20终极技能急速；终极技能伤害会生成持续3秒的灼烧区域。',4645:'影焰\n+110法术强度 · +15法术穿透\n魔法和真实伤害对低于40%生命值的敌人暴击，伤害提升20%。',3157:'中娅沙漏\n+105法术强度 · +50护甲\n主动：进入凝滞2.5秒。',3089:'灭世者的死亡之帽\n+130法术强度\n总法术强度提升30%。',3135:'虚空之杖\n+95法术强度 · +40%法术穿透',3152:'海克斯科技火箭腰带\n+60法术强度 · +350生命值 · +20技能急速\n主动：向目标方向冲刺并发射魔法弹。',3100:'巫妖之祸\n+100法术强度 · +6%移动速度 · +10技能急速\n施放技能后，下一次普通攻击造成额外魔法伤害。'};
+    const item=(id,name)=>`<button class="item-option-button" type="button" data-tooltip="${itemDescriptions[id]||name}" aria-label="${itemDescriptions[id]||name}"><span class="game-icon is-large"><img src="${itemBase}/${id}.png" alt="${name}"></span></button>`;
+    const spellDescriptions={闪现:'使你朝着指针位置瞬间传送一小段距离。',传送:'短暂引导后进入不可被选取状态并行进到一个友方单位；升级为解封的传送后显著提升行进速度。',点燃:'对目标英雄持续造成真实伤害，并在持续期间降低其受到的治疗效果。'};
+    const spell=(name,file)=>`<button class="item-option-button" type="button" data-tooltip="${name}\n${spellDescriptions[name]}" aria-label="${name}：${spellDescriptions[name]}"><span class="game-icon is-large"><img src="${spellBase}/${file}.png" alt="${name}"></span></button>`;
+    const optionStats=(pick,win)=>`<dl class="option-stats"><div class="is-pick"><dt>选取率</dt><dd>${pick}</dd></div><div class="is-win"><dt>胜率</dt><dd>${win}</dd></div></dl>`;
+    const option=(icons,pick,win)=>`<div class="config-option"><div class="config-icons">${icons}</div>${optionStats(pick,win)}</div>`;
+    const skillOrder=['W','Q','E','Q','Q','R','Q','W','Q','W','R','W','W','E','E','R','E','E'];
+    const skill=(key,name,file,copy,label)=>`<button class="skill-icon-button" type="button" data-tooltip="${copy}" aria-label="${key} ${name}：${copy}"><span class="game-icon is-large"><img src="${abilityBase}/${file}.png" alt="${name}"></span><span>${label}</span></button>`;
+    const route=(ids,pick,win)=>option(ids.map((id,index)=>`${index?'<span class="route-arrow">›</span>':''}${item(id,'推荐装备')}`).join(''),pick,win);
+    document.querySelector('#build-panel').innerHTML = `<section class="build-recommendation"><div class="build-essentials"><section><h3>召唤师技能</h3><div class="config-option-list">${option(spell('闪现','SummonerFlash')+spell('传送','SummonerTeleport'),'57.3%','49.4%')}${option(spell('闪现','SummonerFlash')+spell('点燃','SummonerDot'),'41.5%','53%')}</div></section><section class="skill-plan"><h3>技能加点</h3><div class="skill-priority">${skill('Q','欺诈宝珠','AhriQ','放出并收回宝珠；去程造成魔法伤害，回程造成真实伤害。\n消耗：55 / 65 / 75 / 85 / 95\n冷却：7秒 · 施法距离：970','主升')}${skill('W','妖异狐火','AhriW','获得短暂移动速度并释放三团狐火，优先攻击附近英雄；同一目标受到后续狐火时伤害降低。','副升')}${skill('E','魅惑妖术','AhriE','对命中的第一个敌人造成魔法伤害并魅惑，立刻终止其移动技能。','最后')}${skill('R','灵魄突袭','AhriR','向前冲刺并对附近敌人发射灵魄弹，优先攻击英雄；基础可施放3次，参与击杀可获得额外次数。','终极技能')}</div><div class="skill-order">${skillOrder.map((key,i)=>`<span class="is-${key.toLowerCase()}"><b>${key}</b><small>${i+1}</small></span>`).join('')}</div>${optionStats('61.9%','58.1%')}</section></div><div class="item-option-groups"><section><h3>出门装</h3><div class="config-option-list">${option(item(1056,'多兰之戒')+item(2003,'生命药水')+item(2003,'生命药水'),'98%','50.8%')}${option(item(1120,'多兰之盔')+item(2003,'生命药水'),'0.8%','55.6%')}</div></section><section><h3>鞋子</h3><div class="config-option-list">${option(item(3020,'法师之靴'),'54.2%','51.3%')}${option(item(3158,'明朗之靴'),'28.1%','52.3%')}</div></section><section class="route-options"><h3>出装路线</h3><div class="config-option-list">${route([3118,4645,3157,3089,3135],'17.1%','52.4%')}${route([3118,3152,3157,3089,3135],'6.2%','53%')}${route([3118,3100,3157,3089,3135],'6.1%','55.3%')}</div></section></div></section>`;
+    const tabs=[...document.querySelectorAll('[data-preview-tab]')];
+    tabs.forEach(button=>button.addEventListener('click',()=>{ const build=button.dataset.previewTab==='build'; tabs.forEach(tab=>{tab.classList.toggle('is-active',tab===button);tab.setAttribute('aria-selected',String(tab===button));});document.querySelector('#rune-panel').hidden=build;document.querySelector('#build-panel').hidden=!build;}));
+    document.querySelectorAll('[data-choice]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('.rune-choice-card').forEach(card=>card.classList.remove('is-selected'));document.querySelectorAll('[data-choice]').forEach(item=>item.setAttribute('aria-checked','false'));button.closest('.rune-choice-card').classList.add('is-selected');button.setAttribute('aria-checked','true');}));
+  </script>
+</body>
+</html>

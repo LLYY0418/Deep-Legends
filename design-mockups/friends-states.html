@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deep Legends 重设计 · 好友面板 · 状态规格</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { display: block; padding: 28px 32px 48px; }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 12.5px; color: var(--faint); margin-bottom: 22px; }
+  .spec-grid { display: grid; grid-template-columns: 396px 1fr; gap: 16px; align-items: start; }
+  .spec-col { display: flex; flex-direction: column; gap: 16px; }
+  .spec { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .spec-h { padding: 12px 16px 8px; font-size: 13.5px; font-weight: 600; }
+  .spec-h small { display: block; font-weight: 400; font-size: 11px; color: var(--faint); margin-top: 1px; }
+  .spec-b { padding: 4px 10px 12px; }
+
+  /* 好友条目（同主稿） */
+  .rowline { display: grid; grid-template-columns: 1fr 168px; gap: 12px; align-items: center; padding: 3px 6px; }
+  .rowline .why { font-size: 10.5px; color: var(--faint); line-height: 1.45; }
+  .rowline .why b { color: var(--muted); font-weight: 600; }
+  .fr { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--radius-sm); position: relative; background: var(--sidebar); border: 1px solid var(--line-soft); }
+  .fr.hovering { background: var(--surface-2); }
+  .fr .ava { position: relative; flex-shrink: 0; }
+  .fr .ava img { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); display: block; }
+  .fr .dot { position: absolute; right: -3px; bottom: -3px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--sidebar); background: var(--faint); }
+  .fr .dot.online { background: var(--green); }
+  .fr .dot.ingame { background: var(--blue); }
+  .fr .dot.away { background: var(--red); }
+  .fr .dot.mobile { background: var(--sidebar); box-shadow: inset 0 0 0 1.5px var(--green); }
+  .fr .meta { flex: 1; min-width: 0; }
+  .fr .nm { display: flex; align-items: baseline; gap: 4px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+  .fr .nm .tag-line { font-size: 10.5px; color: var(--faint); font-weight: 400; }
+  .fr .nm .note { font-size: 10.5px; color: var(--gold-dim); font-weight: 400; }
+  .fr .st { font-size: 11px; color: var(--faint); margin-top: 1px; white-space: nowrap; }
+  .fr .st.ingame { color: var(--blue); }
+  .fr .st.online { color: var(--green); }
+  .fr .st.away { color: var(--red); }
+  .fr .st .dur { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .fr .champ-mini { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line); flex-shrink: 0; }
+  .fr .acts { display: flex; gap: 4px; }
+  .fr .acts span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 12px; }
+  .fr .acts span.main { color: var(--gold-bright); border-color: var(--gold-dim); }
+  .fr.off .ava img { opacity: .45; filter: grayscale(.4); }
+  .fr.off .nm { color: var(--muted); font-weight: 400; }
+
+  /* 分组头 */
+  .fg-head { display: flex; align-items: center; gap: 7px; padding: 7px 8px 5px; font-size: 11.5px; font-weight: 600; color: var(--muted); background: var(--sidebar); border: 1px solid var(--line-soft); border-radius: 7px; }
+  .fg-head .arr { font-size: 9px; color: var(--faint); width: 10px; }
+  .fg-head .cnt { margin-left: auto; font-weight: 400; color: var(--faint); }
+
+  /* 顶栏入口 */
+  .iconbtn.frd { position: relative; width: auto; padding: 0 10px; gap: 6px; display: inline-flex; align-items: center; height: 30px; }
+  .iconbtn.frd svg { width: 15px; height: 15px; }
+  .iconbtn.frd.on { border-color: var(--gold-dim); color: var(--gold-bright); background: rgba(217,164,65,.08); }
+  .iconbtn.frd.disabled { opacity: .45; }
+  .frd-count { font-size: 11.5px; font-weight: 600; color: var(--green); }
+
+  /* 空状态 */
+  .empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 12px; color: var(--faint); font-size: 11.5px; text-align: center; background: var(--sidebar); border: 1px solid var(--line-soft); border-radius: var(--radius-sm); }
+  .empty svg { width: 26px; height: 26px; opacity: .5; }
+
+  .note-list { font-size: 11.5px; color: var(--muted); line-height: 1.8; padding: 0 8px; }
+  .note-list b { color: var(--ink); font-weight: 600; }
+  .note-list code { font-family: Consolas, monospace; font-size: 10.5px; background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 4px; padding: 1px 5px; color: var(--gold-bright); }
+  .kv { display: flex; gap: 8px; align-items: center; padding: 3px 8px; font-size: 11.5px; color: var(--muted); }
+  .kv .sw { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<h1>好友面板 · 状态与交互规格</h1>
+<div class="sub">配合 friends.html 主稿使用 · 分组与排序完全跟随本机客户端（/lol-chat/v1/friend-groups + /lol-chat/v1/friends）</div>
+
+<div class="spec-grid">
+  <div class="spec-col">
+    <div class="spec">
+      <div class="spec-h">好友条目 · 全部状态<small>状态点 + 第二行文案；金色仅用于备注与主操作</small></div>
+      <div class="spec-b">
+        <div class="rowline">
+          <div class="fr">
+            <div class="ava"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/5205.png"><span class="dot ingame"></span></div>
+            <div class="meta"><div class="nm">追风剑豪本人 <span class="tag-line">#52048</span></div><div class="st ingame">排位 · 亚索 · <span class="dur">23:41</span></div></div>
+            <img class="champ-mini" src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Yasuo.png">
+          </div>
+          <div class="why"><b>游戏中</b>：availability=dnd 且 gameStatus=inGame。队列名 · 英雄 · 已进行时长，右侧英雄小图</div>
+        </div>
+        <div class="rowline">
+          <div class="fr">
+            <div class="ava"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/588.png"><span class="dot ingame"></span></div>
+            <div class="meta"><div class="nm">永远滴神李青 <span class="tag-line">#11007</span></div><div class="st ingame">英雄选择中</div></div>
+          </div>
+          <div class="why"><b>选人 / 排队 / 组队中</b>：gameStatus = championSelect / inQueue / hosting_*，蓝点同游戏中</div>
+        </div>
+        <div class="rowline">
+          <div class="fr">
+            <div class="ava"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/3546.png"><span class="dot online"></span></div>
+            <div class="meta"><div class="nm">暴走萝莉金克丝 <span class="tag-line">#00001</span></div><div class="st online">在线 · “晚上八点开车”</div></div>
+          </div>
+          <div class="why"><b>在线</b>：availability=chat。有签名（statusMessage）时拼接显示</div>
+        </div>
+        <div class="rowline">
+          <div class="fr">
+            <div class="ava"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/1389.png"><span class="dot away"></span></div>
+            <div class="meta"><div class="nm">魂锁典狱长 <span class="tag-line">#40002</span></div><div class="st away">离开</div></div>
+          </div>
+          <div class="why"><b>离开</b>：availability=away，红点红字</div>
+        </div>
+        <div class="rowline">
+          <div class="fr">
+            <div class="ava"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/7.png"><span class="dot mobile"></span></div>
+            <div class="meta"><div class="nm">发条魔灵 <span class="tag-line">#31415</span></div><div class="st">手机在线</div></div>
+          </div>
+          <div class="why"><b>手机在线</b>：availability=mobile，绿色空心点，文字中性色</div>
+        </div>
+        <div class="rowline">
+          <div class="fr off">
+            <div class="ava"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/29.png"><span class="dot"></span></div>
+            <div class="meta"><div class="nm">深海泰坦 <span class="tag-line">#88420</span></div><div class="st">3 小时前在线</div></div>
+          </div>
+          <div class="why"><b>离线</b>：头像降饱和，显示 lastSeenOnlineTimestamp 相对时间；无法计算时只写“离线”</div>
+        </div>
+        <div class="rowline">
+          <div class="fr hovering">
+            <div class="ava"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/685.png"><span class="dot ingame"></span></div>
+            <div class="meta"><div class="nm">峡谷第一莫甘娜 <span class="note">· 表妹</span></div><div class="st ingame">大乱斗 · 莫甘娜 · <span class="dur">07:12</span></div></div>
+            <div class="acts"><span class="main" title="查看战绩">▦</span><span title="观战本局">◉</span></div>
+          </div>
+          <div class="why"><b>悬停</b>：显示操作按钮，替换英雄小图。备注（note）金色弱化跟在名字后。整行点击 = 查看战绩</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="spec">
+      <div class="spec-h">分组头<small>组名、顺序、折叠初始态均来自客户端</small></div>
+      <div class="spec-b" style="display:flex; flex-direction:column; gap:6px; padding:8px 10px 14px">
+        <div class="fg-head"><span class="arr">▾</span>开黑车队<span class="cnt">4 / 6</span></div>
+        <div class="fg-head"><span class="arr">▸</span>峡谷小学同学<span class="cnt">2 / 9</span></div>
+        <div class="fg-head" style="color:var(--faint)"><span class="arr">▾</span>离线<span class="cnt">53</span></div>
+        <div class="note-list">
+          <b>排序</b>：按客户端 priority；<code>**Default</code> 显示为「默认分组」<br>
+          <b>计数</b>：非离线组显示 在线数 / 总数；离线组仅显示总数<br>
+          <b>归属</b>：非 offline 好友进各自分组；offline 统一归入固定「离线」组（与客户端行为一致）<br>
+          <b>折叠</b>：初始取客户端 collapsed 值，此后本地记忆，点击组头切换
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="spec-col">
+    <div class="spec">
+      <div class="spec-h">状态色板<small>沿用现有语义色，不新增颜色</small></div>
+      <div class="spec-b" style="padding-bottom:14px">
+        <div class="kv"><span class="sw" style="background:var(--green)"></span>在线 chat — var(--green) #4CAF7D</div>
+        <div class="kv"><span class="sw" style="background:var(--blue)"></span>游戏中 / 选人 / 排队 dnd — var(--blue) #5B9BD9</div>
+        <div class="kv"><span class="sw" style="background:var(--red)"></span>离开 away — var(--red) #E05C5C</div>
+        <div class="kv"><span class="sw" style="box-shadow:inset 0 0 0 2px var(--green)"></span>手机在线 mobile — 绿色空心</div>
+        <div class="kv"><span class="sw" style="background:var(--faint)"></span>离线 offline — var(--faint)</div>
+      </div>
+    </div>
+
+    <div class="spec">
+      <div class="spec-h">顶栏入口 · 三态<small>所有页面可用；徽标为在线好友数</small></div>
+      <div class="spec-b" style="display:flex; gap:14px; align-items:center; padding:10px 16px 16px">
+        <div style="text-align:center">
+          <div class="iconbtn frd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.4"/><path d="M2.8 20c.7-3.2 3.2-5 6.2-5s5.5 1.8 6.2 5"/><circle cx="17" cy="9" r="2.6"/><path d="M16.4 15.2c2.5.2 4.3 1.8 4.8 4.3"/></svg><span class="frd-count">12</span></div>
+          <div class="faint" style="font-size:10.5px; margin-top:6px">默认（面板收起）</div>
+        </div>
+        <div style="text-align:center">
+          <div class="iconbtn frd on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.4"/><path d="M2.8 20c.7-3.2 3.2-5 6.2-5s5.5 1.8 6.2 5"/><circle cx="17" cy="9" r="2.6"/><path d="M16.4 15.2c2.5.2 4.3 1.8 4.8 4.3"/></svg><span class="frd-count">12</span></div>
+          <div class="faint" style="font-size:10.5px; margin-top:6px">激活（面板展开）</div>
+        </div>
+        <div style="text-align:center">
+          <div class="iconbtn frd disabled"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.4"/><path d="M2.8 20c.7-3.2 3.2-5 6.2-5s5.5 1.8 6.2 5"/><circle cx="17" cy="9" r="2.6"/><path d="M16.4 15.2c2.5.2 4.3 1.8 4.8 4.3"/></svg></div>
+          <div class="faint" style="font-size:10.5px; margin-top:6px">未连接客户端（禁用，无徽标）</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="spec">
+      <div class="spec-h">空状态与降级</div>
+      <div class="spec-b" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:8px 10px 14px">
+        <div class="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3.4"/><path d="M2.8 20c.7-3.2 3.2-5 6.2-5s5.5 1.8 6.2 5"/><path d="m16 8 5 5m0-5-5 5"/></svg>
+          未连接英雄联盟客户端<br>登录并进入大厅后自动读取好友
+        </div>
+        <div class="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+          没有匹配“xxx”的好友<br>支持名称、Riot ID 与备注搜索
+        </div>
+      </div>
+    </div>
+
+    <div class="spec">
+      <div class="spec-h">布局与交互约定</div>
+      <div class="spec-b" style="padding-bottom:14px">
+        <div class="note-list">
+          <b>位置</b>：右侧伴随栏，宽 302px，与左侧导航对称；展开/收起由顶栏按钮控制，偏好写入 localStorage<br>
+          <b>响应式</b>：窗口 ≥ 1280px 挤压内容区；&lt; 1280px 改为覆盖式浮层（带投影，Esc 或再次点击按钮关闭）<br>
+          <b>行点击</b>：整行 = 在总览页打开该好友战绩标签（复用玩家搜索管线，按 puuid）<br>
+          <b>观战</b>：仅当好友在可观战对局（isObservable）时显示；点击后单次调用客户端观战，符合“明确点击才写操作”原则<br>
+          <b>刷新</b>：LCU 好友事件经 SSE 推送，前端 1.5s 防抖合并刷新；无轮询<br>
+          <b>动效</b>：面板滑入滑出 200ms；prefers-reduced-motion 下直接切换
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

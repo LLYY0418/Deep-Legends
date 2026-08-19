@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="28" height="32" viewBox="0 0 28 32">
+  <path d="M14 1 27 8.5v15L14 31 1 23.5v-15Z" fill="#B9C2D4"/>
+  <path d="M14 3.3 25 9.65v12.7L14 28.7 3 22.35V9.65Z" fill="none" stroke="#14100A" stroke-opacity=".16" stroke-width="1"/>
+  <text x="14" y="16.5" text-anchor="middle" dominant-baseline="central" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13" font-weight="800" fill="#14100A">2</text>
+</svg>

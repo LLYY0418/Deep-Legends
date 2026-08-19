@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deep Legends 重设计 · 收藏 · 皮肤与炫彩</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 收藏子导航 + 指标 */
+  .fav-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .fav-nav { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+  .fav-nav span { padding: 7px 18px; border-radius: 7px; font-size: 13px; color: var(--muted); }
+  .fav-nav span.on { background: var(--surface-2); color: var(--gold-bright); font-weight: 600; box-shadow: inset 0 0 0 1px var(--gold-dim); }
+  .metrics { display: flex; gap: 10px; margin-left: auto; }
+  .mcard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 16px; text-align: center; min-width: 96px; }
+  .mcard .k { font-size: 11px; color: var(--faint); }
+  .mcard .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .mcard .v small { font-size: 11px; color: var(--faint); font-weight: 400; }
+  .mcard.hot { border-color: var(--gold-dim); background: rgba(217,164,65,.07); }
+  .mcard.hot .v { color: var(--gold-bright); }
+
+  /* 工具栏 */
+  .toolbar { position: sticky; top: 46px; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 10px 0; background: var(--bg); flex-wrap: wrap; margin-bottom: 8px; }
+  .tgl { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+
+  /* 分组标题 */
+  .group-h { display: flex; align-items: center; gap: 10px; margin: 18px 0 10px; }
+  .group-h img { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); }
+  .group-h b { font-size: 14.5px; }
+  .group-h .cnt { font-size: 11.5px; color: var(--faint); }
+  .group-h .mastery { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(217,164,65,.12); color: var(--gold-bright); font-weight: 600; }
+
+  /* 皮肤卡 */
+  .skin-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .skin { position: relative; border-radius: 14px; border: 1px solid var(--line); overflow: hidden; aspect-ratio: 16/9; background: var(--surface-2); }
+  .skin img.art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .skin .shade { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(8,10,15,.92) 100%); }
+  .skin .info { position: absolute; left: 12px; right: 12px; bottom: 9px; }
+  .skin .info b { font-size: 13px; display: block; }
+  .skin .info span { font-size: 11px; color: var(--muted); }
+  .skin .q { position: absolute; top: 9px; left: 10px; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(8,10,15,.75); }
+  .skin .q.legendary { color: var(--q-legendary); } .skin .q.epic { color: var(--q-epic); } .skin .q.mythic { color: var(--q-mythic); } .skin .q.ultimate { color: var(--q-ultimate); }
+  .skin .own { position: absolute; top: 8px; right: 9px; width: 22px; height: 22px; border-radius: 50%; background: var(--gold); color: #14100A; display: grid; place-items: center; font-size: 12px; font-weight: 800; }
+  .skin.locked img.art { filter: grayscale(.9) brightness(.55); }
+  .skin.locked .lock { position: absolute; inset: 0; display: grid; place-items: center; font-size: 26px; color: rgba(232,234,240,.75); }
+  .skin .pooltag { position: absolute; top: 8px; right: 9px; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(217,164,65,.9); color: #14100A; }
+
+  /* 炫彩 */
+  .prestige-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .chroma-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; overflow: hidden; }
+  .chroma-row .lead { flex-shrink: 0; width: 178px; display: flex; align-items: center; gap: 10px; }
+  .chroma-row .lead img { width: 44px; height: 25px; border-radius: 6px; object-fit: cover; border: 1px solid var(--line); }
+  .chroma-row .lead b { font-size: 12px; display: block; }
+  .chroma-row .lead span { font-size: 10.5px; color: var(--faint); }
+  .chromas { display: flex; gap: 8px; }
+  .chroma { width: 112px; border-radius: 10px; border: 1px solid var(--line); overflow: hidden; flex-shrink: 0; background: var(--surface-2); }
+  .chroma .sw { height: 58px; }
+  .chroma .cn { font-size: 10.5px; padding: 5px 8px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+  .chroma.owned { border-color: var(--gold-dim); }
+  .chroma.owned .cn b { color: var(--gold-bright); }
+  .chroma.miss { opacity: .5; }
+  .arrbtn { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--muted); display: grid; place-items: center; flex-shrink: 0; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">
+    <div class="hexcore"></div>
+    <div><div class="brand-name">Deep Legends</div><div class="brand-sub">本地英雄联盟助手</div></div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>总览</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M14.5 3l6.5 6.5-11 11L3.5 14z"/><path d="M13 6l5 5"/></svg>英雄</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5"/></svg>对局</div>
+    <div class="nav-item active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>收藏</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="conn"><span class="dot"></span>已连接 · 国服客户端</div>
+    <div class="me">
+      <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/4568.png" alt="">
+      <div><div class="n">青钢影不加班</div><div class="l">等级 436</div></div>
+    </div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>设置</div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <span class="crumb"><b>收藏</b> · 皮肤与炫彩</span>
+    <div class="topbar-actions">
+      <div class="iconbtn">◐</div>
+      <div class="iconbtn">↻</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- 子导航 + 指标 -->
+    <div class="fav-head">
+      <div class="fav-nav">
+        <span class="on">皮肤与炫彩</span>
+        <span>账户与物品</span>
+        <span>三合一奖池</span>
+      </div>
+      <div class="metrics">
+        <div class="mcard"><div class="k">皮肤收藏</div><div class="v">312<small> / 1,624</small></div></div>
+        <div class="mcard"><div class="k">炫彩收藏</div><div class="v">87<small> / 2,410</small></div></div>
+        <div class="mcard"><div class="k">奖池总量</div><div class="v">554</div></div>
+        <div class="mcard hot"><div class="k">三合一剩余</div><div class="v">173</div></div>
+      </div>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="toolbar">
+      <div class="seg"><span>已拥有</span><span class="on">全部皮肤</span><span>全部炫彩</span></div>
+      <div class="input" style="min-width:200px">🔍 搜索皮肤名 / 英雄名 / ID</div>
+      <div class="select">品质：全部 ▾（神话含 10 个子系列）</div>
+      <div class="select">排序：按英雄熟练度</div>
+      <div class="iconbtn" title="降序">↓</div>
+      <span class="tgl" style="margin-left:auto"><span class="switch on"></span>显示未获取</span>
+      <span class="tgl"><span class="switch on"></span>显示臻彩</span>
+    </div>
+
+    <!-- 分组：阿狸 -->
+    <div class="group-h">
+      <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Ahri.png" alt="">
+      <b>阿狸</b><span class="mastery">熟练度 7</span><span class="cnt">已拥有 3 / 16 款</span>
+    </div>
+    <div class="skin-grid">
+      <div class="skin">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_7.jpg" alt="">
+        <div class="shade"></div>
+        <span class="q legendary">传说</span>
+        <span class="own">✓</span>
+        <div class="info"><b>K/DA 阿狸</b><span>阿狸 · 2023-06-12 获取</span></div>
+      </div>
+      <div class="skin">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_85.jpg" alt="">
+        <div class="shade"></div>
+        <span class="q mythic">神话 · 灵魂莲华</span>
+        <span class="own">✓</span>
+        <div class="info"><b>灵魂莲华 阿狸</b><span>阿狸 · 2024-01-28 获取</span></div>
+      </div>
+      <div class="skin locked">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_27.jpg" alt="">
+        <div class="shade"></div>
+        <span class="q legendary">传说</span>
+        <span class="pooltag">三合一剩余</span>
+        <div class="lock">🔒</div>
+        <div class="info"><b>K/DA ALL OUT 阿狸</b><span>阿狸 · 未拥有</span></div>
+      </div>
+      <div class="skin locked">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_2.jpg" alt="">
+        <div class="shade"></div>
+        <span class="q epic">史诗</span>
+        <div class="lock">🔒</div>
+        <div class="info"><b>午夜阿狸</b><span>阿狸 · 未拥有</span></div>
+      </div>
+    </div>
+
+    <!-- 分组：金克丝 -->
+    <div class="group-h">
+      <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Jinx.png" alt="">
+      <b>金克丝</b><span class="mastery">熟练度 6</span><span class="cnt">已拥有 2 / 12 款</span>
+    </div>
+    <div class="skin-grid">
+      <div class="skin">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_4.jpg" alt="">
+        <div class="shade"></div>
+        <span class="q legendary">传说</span>
+        <span class="own">✓</span>
+        <div class="info"><b>星之守护者 金克丝</b><span>金克丝 · 2022-11-05 获取</span></div>
+      </div>
+      <div class="skin">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_2.jpg" alt="">
+        <div class="shade"></div>
+        <span class="q epic">史诗</span>
+        <span class="own">✓</span>
+        <div class="info"><b>爆竹金克丝</b><span>金克丝 · 2023-02-14 获取</span></div>
+      </div>
+      <div class="skin locked">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_13.jpg" alt="">
+        <div class="shade"></div>
+        <span class="q epic">史诗</span>
+        <span class="pooltag">三合一剩余</span>
+        <div class="lock">🔒</div>
+        <div class="info"><b>奥德赛金克丝</b><span>金克丝 · 未拥有</span></div>
+      </div>
+      <div class="skin locked">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_3.jpg" alt="">
+        <div class="shade"></div>
+        <span class="q epic">史诗</span>
+        <div class="lock">🔒</div>
+        <div class="info"><b>丧尸猎手金克丝</b><span>金克丝 · 未拥有</span></div>
+      </div>
+    </div>
+
+    <!-- 全部炫彩视图示意 -->
+    <div class="group-h mt20">
+      <b class="goldtxt">全部炫彩视图 · 臻彩区</b><span class="cnt">臻彩使用腾讯官方独立横版原画 · 可单独关闭</span>
+    </div>
+    <div class="prestige-grid">
+      <div class="skin" style="border-color:var(--gold-dim)">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_28.jpg" alt="">
+        <div class="shade"></div>
+        <span class="q ultimate">臻彩</span>
+        <span class="own">✓</span>
+        <div class="info"><b>K/DA ALL OUT 阿狸 臻藏版</b><span>臻彩 · 2023-09-30 获取</span></div>
+      </div>
+      <div class="skin locked" style="border-color:var(--gold-dim)">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Kaisa_14.jpg" alt="">
+        <div class="shade"></div>
+        <span class="q ultimate">臻彩</span>
+        <div class="lock">🔒</div>
+        <div class="info"><b>K/DA 卡莎 臻藏版</b><span>臻彩 · 未获取</span></div>
+      </div>
+      <div class="skin locked" style="border-color:var(--gold-dim)">
+        <img class="art" src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Lux_7.jpg" alt="">
+        <div class="shade"></div>
+        <span class="q ultimate">臻彩</span>
+        <div class="lock">🔒</div>
+        <div class="info"><b>光明哨兵 拉克丝 臻藏版</b><span>臻彩 · 未获取</span></div>
+      </div>
+    </div>
+
+    <div class="group-h mt16">
+      <b class="goldtxt">普通炫彩 · 按所属皮肤横向平铺</b><span class="cnt">触控板横滑 / Shift + 滚轮 / 行内箭头横向浏览</span>
+    </div>
+    <div class="chroma-row">
+      <div class="lead">
+        <img src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_7.jpg" alt="">
+        <div><b>K/DA 阿狸</b><span>已拥有 2 / 8 款炫彩</span></div>
+      </div>
+      <span class="arrbtn">‹</span>
+      <div class="chromas">
+        <div class="chroma owned"><div class="sw" style="background:linear-gradient(135deg,#E8608A,#7E2249)"></div><div class="cn"><b>玫瑰石英</b>✓</div></div>
+        <div class="chroma owned"><div class="sw" style="background:linear-gradient(135deg,#5BC8DB,#1F5F80)"></div><div class="cn"><b>猫眼石</b>✓</div></div>
+        <div class="chroma miss"><div class="sw" style="background:linear-gradient(135deg,#B9C2D4,#5A6377)"></div><div class="cn">珍珠</div></div>
+        <div class="chroma miss"><div class="sw" style="background:linear-gradient(135deg,#F0BE5C,#8A6A2E)"></div><div class="cn">黄水晶</div></div>
+        <div class="chroma miss"><div class="sw" style="background:linear-gradient(135deg,#C778E8,#5E2E80)"></div><div class="cn">紫水晶</div></div>
+        <div class="chroma miss"><div class="sw" style="background:linear-gradient(135deg,#4CAF7D,#1E5B3E)"></div><div class="cn">翡翠</div></div>
+      </div>
+      <span class="arrbtn">›</span>
+    </div>
+    <div class="chroma-row">
+      <div class="lead">
+        <img src="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_2.jpg" alt="">
+        <div><b>爆竹金克丝</b><span>已拥有 1 / 5 款炫彩</span></div>
+      </div>
+      <span class="arrbtn">‹</span>
+      <div class="chromas">
+        <div class="chroma owned"><div class="sw" style="background:linear-gradient(135deg,#E05C5C,#7E2222)"></div><div class="cn"><b>红宝石</b>✓</div></div>
+        <div class="chroma miss"><div class="sw" style="background:linear-gradient(135deg,#5B9BD9,#23507E)"></div><div class="cn">蓝宝石</div></div>
+        <div class="chroma miss"><div class="sw" style="background:linear-gradient(135deg,#3A445A,#171C28)"></div><div class="cn">曜石</div></div>
+        <div class="chroma miss"><div class="sw" style="background:linear-gradient(135deg,#F5EBDD,#B9AE9C)"></div><div class="cn">象牙白</div></div>
+      </div>
+      <span class="arrbtn">›</span>
+    </div>
+
+    <div class="row mt16" style="justify-content:center">
+      <span class="faint">点击卡片打开详情：原画 / 动态 WebM · 上一款 / 下一款 · 全屏 · RP 价格 · 获取时间 · 边框 · 复制 ID</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

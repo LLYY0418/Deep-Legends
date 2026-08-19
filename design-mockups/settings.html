@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deep Legends 重设计 · 设置</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .set-cols { display: grid; grid-template-columns: 210px 1fr; gap: 20px; align-items: start; }
+  .anchors { position: sticky; top: 66px; display: flex; flex-direction: column; gap: 2px; }
+  .anchor { padding: 9px 14px; border-radius: var(--radius-sm); font-size: 13px; color: var(--muted); position: relative; }
+  .anchor.on { background: var(--surface); color: var(--gold-bright); font-weight: 600; }
+  .anchor.on::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--gold); }
+
+  .set-section { margin-bottom: 22px; }
+  .set-section > h3 { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+  .set-item { display: flex; align-items: center; gap: 14px; padding: 13px 16px; border-top: 1px solid var(--line-soft); }
+  .set-item:first-of-type { border-top: none; }
+  .set-item .lbl { flex: 1; }
+  .set-item .lbl b { font-size: 13px; font-weight: 600; display: block; }
+  .set-item .lbl span { font-size: 11.5px; color: var(--faint); }
+  .privacy-list { font-size: 12px; color: var(--muted); line-height: 1.9; padding: 4px 16px 14px; }
+  .privacy-list b { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">
+    <div class="hexcore"></div>
+    <div><div class="brand-name">Deep Legends</div><div class="brand-sub">本地英雄联盟助手</div></div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>总览</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M14.5 3l6.5 6.5-11 11L3.5 14z"/><path d="M13 6l5 5"/></svg>英雄</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5"/></svg>对局</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>收藏</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="conn"><span class="dot"></span>已连接 · 国服客户端</div>
+    <div class="me">
+      <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/4568.png" alt="">
+      <div><div class="n">青钢影不加班</div><div class="l">等级 436</div></div>
+    </div>
+    <div class="nav-item active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>设置</div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <span class="crumb"><b>设置</b></span>
+    <div class="topbar-actions">
+      <div class="iconbtn">◐</div>
+      <div class="iconbtn">↻</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="page-head">
+      <h1>设置</h1>
+      <p>偏好保存在本机 · 不上传任何数据</p>
+    </div>
+
+    <div class="set-cols">
+      <div class="anchors">
+        <span class="anchor on">外观与导航</span>
+        <span class="anchor">战绩与对局</span>
+        <span class="anchor">隐私与能力</span>
+      </div>
+
+      <div>
+        <!-- 外观与导航 -->
+        <div class="set-section">
+          <h3>外观与导航</h3>
+          <div class="card">
+            <div class="set-item">
+              <div class="lbl"><b>主题</b><span>自动模式按本地时间 6:00–18:00 使用浅色，其余使用深色</span></div>
+              <div class="seg"><span class="on">自动</span><span>浅色</span><span>深色</span></div>
+            </div>
+            <div class="set-item">
+              <div class="lbl"><b>界面密度</b><span>紧凑模式降低卡片最小宽度与间距</span></div>
+              <div class="seg"><span class="on">舒适</span><span>紧凑</span></div>
+            </div>
+            <div class="set-item">
+              <div class="lbl"><b>收起侧边栏</b><span>收起后保留图标、连接状态与悬停提示</span></div>
+              <span class="switch"></span>
+            </div>
+            <div class="set-item">
+              <div class="lbl"><b>默认页面</b><span>启动后进入的页面</span></div>
+              <div class="select">总览</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 战绩与对局 -->
+        <div class="set-section">
+          <h3>战绩与对局</h3>
+          <div class="card">
+            <div class="set-item">
+              <div class="lbl"><b>战绩展示数量</b><span>滚动到底部自动按同一批次继续读取</span></div>
+              <div class="seg"><span>10</span><span class="on">20</span><span>30</span><span>40</span><span>50</span></div>
+            </div>
+            <div class="set-item">
+              <div class="lbl"><b>默认战绩筛选</b><span>打开总览时默认使用的队列</span></div>
+              <div class="select">单双排</div>
+            </div>
+            <div class="set-item">
+              <div class="lbl"><b>英雄页默认位置</b><span>打开英雄梯度时默认选中的位置</span></div>
+              <div class="select">上单</div>
+            </div>
+            <div class="set-item">
+              <div class="lbl"><b>对局玩家排序</b><span>实时对局中玩家的排列方式</span></div>
+              <div class="select">按胜率</div>
+            </div>
+            <div class="set-item">
+              <div class="lbl"><b>实时对局自动刷新</b><span>停留在对局页时按间隔刷新，页面隐藏时暂停</span></div>
+              <div class="row" style="gap:10px"><div class="seg"><span>10 秒</span><span class="on">15 秒</span><span>30 秒</span><span>60 秒</span></div><span class="switch on"></span></div>
+            </div>
+            <div class="set-item">
+              <div class="lbl"><b>应用符文前二次确认</b><span>符文写入只允许发生在英雄选择阶段</span></div>
+              <span class="switch on"></span>
+            </div>
+            <div class="set-item">
+              <div class="lbl"><b>回放操作前二次确认</b><span>回放的下载与启动交由英雄联盟客户端处理</span></div>
+              <span class="switch on"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 隐私与能力 -->
+        <div class="set-section">
+          <h3>隐私与能力</h3>
+          <div class="card">
+            <div class="set-item">
+              <div class="lbl"><b>隐私遮罩</b><span>隐藏其他玩家名称，仅遮罩显示，不影响战绩加载</span></div>
+              <span class="switch"></span>
+            </div>
+            <div class="set-item">
+              <div class="lbl"><b>英雄数据网络</b><span>仅影响 OP.GG 与 Data Dragon 公共请求，不涉及客户端数据</span></div>
+              <div class="row" style="gap:8px">
+                <div class="seg"><span class="on">自动</span><span>直连</span><span>手动</span></div>
+                <div class="input" style="min-width:180px">socks5://127.0.0.1:7890</div>
+              </div>
+            </div>
+            <div class="set-item">
+              <div class="lbl"><b>对局能力状态</b><span>客户端不支持的附加端点会单独降级</span></div>
+              <span class="tag green">全部可用 · 5 / 5</span>
+            </div>
+            <div class="privacy-list">
+              <b>隐私说明</b><br>
+              · 不要求 QQ 账号、密码或扫码登录；不调用任何合成、分解、兑换或购买接口。<br>
+              · 默认只读取玩家资料、排位、熟练度、战绩、当前对局、皮肤目录、库存、战利品与待领取奖励。<br>
+              · 不向外部服务器发送召唤师信息、库存、客户端令牌或客户端图片。<br>
+              · 本地历史仅保存带随机设备盐的账号摘要与皮肤 ID，退出或切换账号后立即失效。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

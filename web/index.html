@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#080d12">
+    <title>Deep Legends</title>
+    <link rel="icon" href="/app-icon.png" type="image/png">
+    <link rel="stylesheet" href="/app.css">
+    <link rel="stylesheet" href="/gameplay.css">
+    <link rel="stylesheet" href="/champions.css">
+    <link rel="stylesheet" href="/friends.css">
+    <script src="/demo-data.js" defer></script>
+    <script src="/app.js" defer></script>
+    <script src="/gameplay.js" defer></script>
+    <script src="/champions.js" defer></script>
+    <script src="/friends.js" defer></script>
+  </head>
+  <body>
+    <div id="startup-loading" class="startup-loading" role="status" aria-live="polite" aria-label="正在读取英雄联盟客户端信息">
+      <div class="startup-loading-panel">
+        <div class="startup-spinner" aria-hidden="true"><img src="/app-icon.png" alt=""></div>
+        <div><strong id="startup-loading-title">正在读取客户端信息</strong><span id="startup-loading-copy">正在核对账号与收藏，通常只需几秒。</span></div>
+      </div>
+    </div>
+    <a class="skip-link" href="#overview-panel">跳到主要内容</a>
+    <div id="app-frame" class="app-frame" inert>
+      <aside id="sidebar" class="sidebar" aria-label="主导航">
+        <button id="sidebar-toggle" class="sidebar-brand" type="button" aria-label="收起侧边栏" aria-expanded="true" aria-controls="sidebar">
+          <img src="/app-icon.png" alt="" aria-hidden="true">
+          <div class="sidebar-brand-copy"><strong>Deep Legends</strong><span>战绩 · 英雄 · 对局 · 收藏</span></div>
+        </button>
+
+        <nav class="section-tabs" role="tablist" aria-label="助手功能" aria-orientation="vertical">
+          <button id="section-overview" class="section-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="overview-panel" tabindex="0" data-section="overview"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.2" y="3.2" width="8.1" height="8.1" rx="1.8"/><rect x="12.7" y="3.2" width="8.1" height="11.3" rx="1.8"/><rect x="3.2" y="12.7" width="8.1" height="8.1" rx="1.8"/><rect x="12.7" y="15.9" width="8.1" height="5.4" rx="1.8"/></svg><span>总览</span></button>
+          <button id="section-champions" class="section-tab" type="button" role="tab" aria-selected="false" aria-controls="champions-panel" tabindex="-1" data-section="champions"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 7.4a.9.9 0 0 1 1.47-.7L8.4 9.4l2.8-5.2a.92.92 0 0 1 1.62 0l2.8 5.2 3.32-2.7a.9.9 0 0 1 1.46.7l-1.2 9.2H4.8L3.6 7.4Z"/><path d="M4.8 18.2h14.4v.7a1.7 1.7 0 0 1-1.7 1.7H6.5a1.7 1.7 0 0 1-1.7-1.7v-.7Z"/></svg><span>英雄</span></button>
+          <button id="section-live" class="section-tab" type="button" role="tab" aria-selected="false" aria-controls="live-panel" tabindex="-1" data-section="live"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2.6 2.6 4.6 1 9.8 9.8 1.5-1.4 1.5 1.5-2.2 2.2 2.6 2.6-1.5 1.5-2.6-2.6-2.2 2.2-1.5-1.5 1.4-1.5L4.2 6.6l-1.6-4Zm18.8 0-1.6 4-4.6 4.7 2.2 2.2 5-5.9 1-4-2 1Zm-12.6 10-2.6 2.6-1.4-1.5-1.5 1.5 2.2 2.2-2.6 2.6 1.5 1.5 2.6-2.6 2.2 2.2 1.5-1.5-1.5-1.4 1.8-1.9-2.2-1.7Z"/></svg><span>对局</span></button>
+          <button id="section-favorites" class="section-tab" type="button" role="tab" aria-selected="false" aria-controls="favorites-panel" tabindex="-1" data-section="favorites"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 2.6h9.4l4.5 5.6L12 21.8 2.8 8.2l4.5-5.6Zm1 2L5.2 8.4 12 18.3l6.8-9.9-3.1-3.8H8.3Zm3.7 2.6 3 3.4-3 4.6-3-4.6 3-3.4Z"/></svg><span>收藏</span></button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div id="connection" class="connection" role="status" aria-live="polite"><img id="connection-avatar" class="connection-avatar" src="/image-unavailable.svg" alt="" hidden><span class="status-dot"></span><span class="connection-label">正在检查客户端</span></div>
+          <button id="section-settings" class="section-tab sidebar-settings" type="button" role="tab" aria-selected="false" aria-controls="settings-panel" tabindex="-1" data-section="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.7 2 .6 2.1c.5-.1 1.1-.1 1.7-.1s1.2 0 1.7.1l.6-2.1 2.3 1.3-.9 2c.8.7 1.4 1.5 1.8 2.5l2.2-.2.5 2.6-2 .8v2l2 .8-.5 2.6-2.2-.2a9 9 0 0 1-1.8 2.5l.9 2-2.3 1.3-.6-2.1c-.5.1-1.1.1-1.7.1s-1.2 0-1.7-.1L9.7 22l-2.3-1.3.9-2a9 9 0 0 1-1.8-2.5l-2.2.2-.5-2.6 2-.8v-2l-2-.8.5-2.6 2.2.2a9 9 0 0 1 1.8-2.5l-.9-2L9.7 2ZM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/></svg><span>设置</span></button>
+        </div>
+      </aside>
+
+      <div id="app-main" class="app-main">
+        <header class="topbar">
+          <div class="window-drag"><strong id="current-section-title">总览</strong><span id="topbar-subtitle">召唤师生涯与最近对局</span></div>
+          <div id="player-search" class="player-search" role="search" aria-label="召唤师搜索">
+            <div class="player-search-region">
+              <button id="player-search-region" type="button" aria-haspopup="menu" aria-expanded="false" data-region="cn" data-server-id=""><span id="player-search-region-label">国服</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+              <div id="player-search-region-menu" class="region-menu" role="menu" hidden>
+                <div class="region-menu-section region-menu-section-cn" role="none">
+                  <div class="region-menu-section-head">
+                    <button id="player-search-cn-toggle" class="region-menu-section-toggle" type="button" role="menuitem" aria-expanded="false" aria-controls="player-search-cn-options" data-region-menu-entry><b>国服</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+                    <button id="player-search-cn-info" class="region-menu-section-info" type="button" aria-label="查看国服合区说明" data-tooltip data-tooltip-side="menu" data-tooltip-size="compact"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10.8v6M12 7.5h.01"/></svg></button>
+                  </div>
+                  <div id="player-search-cn-options" class="region-menu-cn-options" role="group" aria-label="国服服务器" hidden>
+                    <button id="player-search-follow-client" class="region-menu-follow" type="button" role="menuitemradio" aria-checked="true" data-region-option="cn" data-server-id="" data-region-menu-entry disabled><span class="region-option-dot" aria-hidden="true"></span><span class="region-follow-copy"><b>跟随客户端</b><span id="player-search-follow-status">需要客户端在运行</span></span></button>
+                    <div class="region-menu-divider" role="presentation"></div>
+                    <div class="region-server-grid" role="group" aria-label="指定国服服务器">
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="cn" data-server-id="HN1" data-region-menu-entry><b>艾欧尼亚</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="cn" data-server-id="HN10" data-region-menu-entry><b>黑色玫瑰</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="cn" data-server-id="NJ100" data-region-menu-entry><b>联盟一区</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="cn" data-server-id="GZ100" data-region-menu-entry><b>联盟二区</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="cn" data-server-id="CQ100" data-region-menu-entry><b>联盟三区</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="cn" data-server-id="TJ100" data-region-menu-entry><b>联盟四区</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="cn" data-server-id="TJ101" data-region-menu-entry><b>联盟五区</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="cn" data-server-id="BGP2" data-region-menu-entry><b>峡谷之巅</b></button>
+                      <button class="region-server-wide" type="button" role="menuitemradio" aria-checked="false" data-region-option="cn" data-server-id="PBE" data-region-menu-entry><b>体验服</b></button>
+                    </div>
+                  </div>
+                </div>
+                <div class="region-menu-section region-menu-section-kr" role="none">
+                  <button class="region-menu-kr" type="button" role="menuitemradio" aria-checked="false" data-region-option="kr" data-server-id="" data-region-menu-entry><b>韩服</b><span class="region-option-check" aria-hidden="true">✓</span></button>
+                </div>
+              </div>
+            </div>
+            <div class="player-search-fields">
+              <input id="player-search-name" type="text" placeholder="玩家名称" autocomplete="off" spellcheck="false" maxlength="40" aria-label="玩家名称">
+              <span class="player-search-hash" aria-hidden="true">#</span>
+              <input id="player-search-tag" type="text" placeholder="编号" autocomplete="off" spellcheck="false" maxlength="12" aria-label="Riot ID 编号">
+              <button id="player-search-clear" class="player-search-button player-search-clear" type="button" aria-label="清空搜索内容" title="清空" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg></button>
+              <button id="player-search-go" class="player-search-button" type="button" aria-label="搜索玩家" title="搜索玩家"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3a7.5 7.5 0 1 0 4.72 13.35l4.7 4.7 1.42-1.4-4.7-4.71A7.5 7.5 0 0 0 10.5 3Zm0 2a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Z"/></svg></button>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <button id="friends-toggle" class="friends-toggle" type="button" aria-label="好友列表" title="好友（未连接客户端）" aria-expanded="false" aria-controls="friends-dock" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.4"/><path d="M2.8 20c.7-3.2 3.2-5 6.2-5s5.5 1.8 6.2 5"/><circle cx="17" cy="9" r="2.6"/><path d="M16.4 15.2c2.5.2 4.3 1.8 4.8 4.3"/></svg>
+              <span class="friends-toggle-label">好友</span>
+              <span id="friends-count" class="friends-count" hidden>0</span>
+            </button>
+            <button id="refresh" class="button button-primary" type="button" aria-label="重新读取" title="重新读取"><span class="refresh-icon" aria-hidden="true">↻</span><span>重新读取</span></button>
+            <button id="quit" class="icon-button page-quit" type="button" aria-label="退出助手" title="退出助手">×</button>
+          </div>
+        </header>
+
+        <div id="app-scroll" class="app-scroll">
+        <main class="shell">
+          <section id="page-intro" class="favorites-header" aria-label="收藏工作区" hidden>
+            <nav class="favorites-nav" role="tablist" aria-label="收藏功能" aria-orientation="horizontal">
+              <button id="favorites-tab-collection" class="favorites-nav-item is-active" type="button" role="tab" aria-selected="true" aria-controls="favorites-collection-panel" data-favorites-page="collection"><span aria-hidden="true">◆</span><span><strong>皮肤与炫彩</strong><small>收藏浏览与筛选</small></span></button>
+              <button id="favorites-tab-account" class="favorites-nav-item" type="button" role="tab" aria-selected="false" aria-controls="favorites-account-panel" data-favorites-page="account"><span aria-hidden="true">◉</span><span><strong>账户与物品</strong><small>战利品与奖励</small></span></button>
+              <button id="favorites-tab-pools" class="favorites-nav-item" type="button" role="tab" aria-selected="false" aria-controls="favorites-pools-panel" data-favorites-page="pools"><span aria-hidden="true">⬡</span><span><strong>三合一奖池</strong><small>目录、清单与历史</small></span></button>
+            </nav>
+            <dl class="metrics" aria-label="收藏概览">
+              <div title="按客户端收藏口径统计永久普通皮肤；不含基础皮肤、炫彩、独立任务形态和库存附属项"><dt>皮肤收藏</dt><dd id="owned-count">—</dd></div>
+              <div title="当前账号已拥有的炫彩数量"><dt>炫彩收藏</dt><dd id="chroma-count">—</dd></div>
+              <div><dt>奖池总量</dt><dd id="pool-count">—</dd></div>
+              <div class="metric-focus"><dt>三合一剩余</dt><dd id="remaining-count">—</dd></div>
+            </dl>
+          </section>
+
+          <section id="client-launchpad" class="launchpad" hidden aria-labelledby="launchpad-title">
+            <div class="launchpad-emblem"><img src="/app-icon.png" alt=""></div>
+            <div class="launchpad-copy"><p class="eyebrow">英雄联盟客户端未运行</p><h2 id="launchpad-title">选择一个入口开始</h2><p>登录并进入大厅后自动读取召唤师资料与收藏。</p></div>
+            <div id="launcher-list" class="launcher-list"><span class="muted">正在检查安装位置…</span></div>
+          </section>
+
+          <section id="notice" class="notice" aria-live="polite">
+            <div class="notice-symbol" aria-hidden="true">⋯</div><div><strong>正在准备数据</strong><p>首次读取通常只需要几秒。</p></div>
+          </section>
+
+          <section id="overview-panel" class="panel gameplay-panel" role="tabpanel" tabindex="-1" aria-labelledby="section-overview">
+            <div class="player-workspace-head">
+              <div id="player-tabs" class="player-tabs" role="tablist" aria-label="已打开的召唤师"><span class="player-tab-skeleton">正在读取当前召唤师…</span></div>
+              <button id="overview-refresh" class="text-button" type="button">刷新战绩</button>
+            </div>
+            <div id="overview-content" class="gameplay-content" aria-live="polite"><div class="gameplay-skeleton"><span></span><span></span><span></span></div></div>
+          </section>
+
+          <section id="champions-panel" class="panel champions-panel" role="tabpanel" tabindex="-1" aria-labelledby="section-champions" hidden>
+            <div id="champions-root" aria-live="polite"><div class="champions-skeleton" aria-label="英雄数据准备中"><span></span><span></span><span></span><span></span></div></div>
+          </section>
+
+          <section id="live-panel" class="panel gameplay-panel" role="tabpanel" tabindex="-1" aria-labelledby="section-live" hidden>
+            <div class="live-toolbar"><div id="live-session-summary" class="live-session-summary" hidden></div><button id="live-refresh" class="text-button" type="button">刷新对局</button></div>
+            <div id="live-content" class="gameplay-content" aria-live="polite"><div class="gameplay-skeleton"><span></span><span></span></div></div>
+          </section>
+
+          <section id="favorites-panel" class="panel favorites-workspace" role="tabpanel" tabindex="-1" aria-labelledby="section-favorites" hidden>
+            <div class="favorites-layout">
+              <div class="favorites-content">
+          <section id="favorites-collection-panel" class="favorites-subpanel collection" role="tabpanel" tabindex="-1" aria-labelledby="favorites-tab-collection">
+            <div class="collection-toolbar">
+              <div class="collection-head">
+                <div class="view-tabs" role="tablist" aria-label="皮肤视图">
+                  <button id="view-owned" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="skin-grid" tabindex="0" data-view="owned">已拥有</button>
+                  <button id="view-all" class="tab" type="button" role="tab" aria-selected="false" aria-controls="skin-grid" tabindex="-1" data-view="all">全部皮肤</button>
+                  <button id="view-chromas" class="tab" type="button" role="tab" aria-selected="false" aria-controls="skin-grid" tabindex="-1" data-view="chromas">全部炫彩</button>
+                </div>
+              </div>
+              <div class="filters" aria-label="皮肤筛选">
+                <label class="search"><span aria-hidden="true">⌕</span><span class="sr-only">搜索皮肤或英雄</span><input id="search" type="search" placeholder="搜索皮肤、英雄或 ID" autocomplete="off"></label>
+                <div class="quality-menu" aria-label="品质筛选">
+                  <button id="rarity-button" class="quality-trigger" type="button" aria-haspopup="menu" aria-expanded="false">全部品质</button>
+                  <div id="rarity-menu" class="quality-popover" role="menu" hidden>
+                    <button type="button" role="menuitemcheckbox" aria-checked="true" data-rarity="all">全部品质</button>
+                    <button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="transcendent">卓越</button>
+                    <button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="exalted">圣堂</button>
+                    <div class="quality-option has-submenu"><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="mythic" aria-haspopup="menu">神话 <span aria-hidden="true">›</span></button><div class="mythic-submenu" role="menu" aria-label="神话子类">
+                      <button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="mythic" data-subtier="神话幻想">神话幻想</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="mythic" data-subtier="殿堂系列">殿堂系列</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="mythic" data-subtier="总决赛FMVP系列">总决赛FMVP系列</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="mythic" data-subtier="战队系列">战队系列</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="mythic" data-subtier="至臻">至臻</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="mythic" data-subtier="海克斯系列">海克斯系列</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="mythic" data-subtier="水晶系列">水晶系列</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="mythic" data-subtier="灰烬系列">灰烬系列</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="mythic" data-subtier="周年系列">周年系列</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="mythic" data-subtier="强行神话">强行神话</button>
+                    </div></div>
+                    <button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="ultimate">终极</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="legendary">传说</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="limited">限定</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="epic">史诗</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="royal">王者</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="brave">勇士</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="archive">典藏</button><button type="button" role="menuitemcheckbox" aria-checked="false" data-rarity="unranked">未分级</button>
+                  </div>
+                </div>
+                <label id="chroma-unowned-control" class="toggle-control" hidden><input id="show-unowned-chromas" type="checkbox" checked><span>显示未获取</span></label>
+                <label id="chroma-prestige-control" class="toggle-control" hidden><input id="show-prestige-chromas" type="checkbox" checked><span>显示臻彩</span></label>
+                <div class="sort-menu-control"><button id="sort-button" class="select-menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false"><span id="sort-label">按获取时间排序</span></button><div id="sort-menu" class="select-menu-popover" role="menu" hidden></div><select id="sort" class="sr-only" tabindex="-1" aria-hidden="true"><option value="acquired">按获取时间排序</option></select></div>
+                <button id="sort-direction" class="text-button" type="button" aria-label="切换排序方向" aria-pressed="false">升序</button>
+              </div>
+            </div>
+            <div class="list-row"><div id="list-meta" class="list-meta" role="status" aria-live="polite">等待客户端数据</div><button id="retry-list" class="text-button" type="button" hidden>重试列表</button></div>
+            <div id="skin-grid" class="skin-grid" aria-busy="true" aria-labelledby="favorites-tab-collection"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+          </section>
+
+          <section id="favorites-account-panel" class="favorites-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="favorites-tab-account" hidden><div class="panel-heading page-heading"><div><p class="eyebrow">客户端仓库</p><h2>账户与物品</h2><p>按类别展示客户端物品。</p></div><span id="account-live-state" class="state-chip">等待客户端</span></div><div id="account-content" class="data-panel"><p class="muted">打开此页后读取当前客户端数据。</p></div></section>
+
+          <section id="favorites-pools-panel" class="favorites-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="favorites-tab-pools" hidden>
+            <div class="panel-heading page-heading"><div><p class="eyebrow">三合一奖池</p><h2>奖池皮肤</h2></div></div>
+            <div class="view-tabs pool-primary-tabs" role="tablist" aria-label="奖池功能">
+              <button id="pool-tab-catalog" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="pool-catalog-panel" data-pool-page="catalog">奖池目录</button>
+              <button id="pool-tab-upload" class="tab" type="button" role="tab" aria-selected="false" aria-controls="pool-upload-panel" data-pool-page="upload">清单上传</button>
+              <button id="pool-tab-history" class="tab" type="button" role="tab" aria-selected="false" aria-controls="pool-history-panel" data-pool-page="history">本地历史</button>
+            </div>
+            <section id="pool-catalog-panel" class="pool-subpanel" role="tabpanel" aria-labelledby="pool-tab-catalog">
+              <div class="pool-catalog-toolbar">
+                <div class="view-tabs" role="tablist" aria-label="奖池拥有状态">
+                  <button class="tab is-active" type="button" role="tab" aria-selected="true" data-pool-view="owned">已拥有</button>
+                  <button class="tab" type="button" role="tab" aria-selected="false" data-pool-view="unowned">未拥有</button>
+                </div>
+                <label class="select-wrap pool-picker-wrap"><span class="sr-only">选择奖池</span><select id="pool-picker" aria-label="选择奖池"><option>正在读取奖池…</option></select></label>
+              </div>
+              <div class="filters pool-filters" aria-label="奖池皮肤筛选">
+                <label class="search"><span aria-hidden="true">⌕</span><span class="sr-only">搜索奖池皮肤</span><input id="pool-search" type="search" placeholder="搜索皮肤、英雄或 ID" autocomplete="off"></label>
+                <label class="select-wrap"><span class="sr-only">奖池品质</span><select id="pool-quality"><option value="all">全部品质</option><option value="legendary">传说</option><option value="limited">限定</option><option value="epic">史诗</option><option value="royal">王者</option><option value="brave">勇士</option><option value="archive">典藏</option><option value="unranked">未分级</option></select></label>
+                <label class="select-wrap"><span class="sr-only">奖池排序</span><select id="pool-sort"><option value="rarity">按品质排序</option><option value="champion">按英雄排序</option><option value="name">按皮肤名排序</option></select></label>
+              </div>
+              <div id="pool-list-meta" class="list-meta" role="status" aria-live="polite">正在读取奖池目录</div>
+              <div id="pool-skin-grid" class="skin-grid" aria-busy="true"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+            </section>
+            <section id="pool-upload-panel" class="pool-subpanel" role="tabpanel" aria-labelledby="pool-tab-upload" hidden>
+              <div id="pools-content" class="data-panel"><p class="muted">尚未读取奖池。</p></div>
+              <form id="pool-import" class="import-form"><div class="form-grid"><label>名称<input id="pool-name" required maxlength="80" placeholder="例如：自定义三合一奖池"></label><label>版本<input id="pool-version" maxlength="80" placeholder="例如：25.1 / 2026-01-10"></label><label class="form-wide">来源<input id="pool-source-input" maxlength="300" placeholder="公告链接或说明"></label><label class="form-wide">名单文件<input id="pool-file" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" required></label></div><p class="form-help">TXT/CSV 每行一个名称；JSON 可为字符串数组或包含 names 数组的对象。最多 1 MiB、10,000 条。</p><div class="form-actions"><button class="button button-secondary" type="submit">检查并导入</button><span id="pool-import-status" class="inline-status" role="status" aria-live="polite"></span></div></form>
+            </section>
+            <section id="pool-history-panel" class="pool-subpanel" role="tabpanel" aria-labelledby="pool-tab-history" hidden><div class="panel-heading compact-heading"><div><h2>本地历史</h2><p>仅保留收藏或三合一结果真正变化后的脱敏快照，完全重复的记录会自动合并。</p></div><button id="refresh-history" class="text-button" type="button">刷新历史</button></div><div id="history-content" class="data-panel"><p class="muted">尚未读取历史。</p></div></section>
+            <footer class="footer pool-footer"><p>数据来源：<a id="pool-source" href="https://lol.qq.com/news/detail.shtml?docid=12008689032502035596" target="_blank" rel="noreferrer">当前奖池清单</a></p></footer>
+          </section>
+              </div>
+            </div>
+          </section>
+
+          <section id="settings-panel" class="panel settings-panel" role="tabpanel" tabindex="-1" aria-labelledby="section-settings" hidden>
+            <header class="settings-head"><h2>设置</h2><p>偏好保存在本机 · 不上传任何数据 · 修改立即生效</p></header>
+            <div class="settings-tabs" role="tablist" aria-label="设置分类" aria-orientation="vertical">
+              <button id="settings-tab-appearance" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="settings-appearance-panel" data-settings-page="appearance">外观与导航</button>
+              <button id="settings-tab-gameplay" class="tab" type="button" role="tab" aria-selected="false" aria-controls="settings-gameplay-panel" data-settings-page="gameplay">战绩与对局</button>
+              <button id="settings-tab-privacy" class="tab" type="button" role="tab" aria-selected="false" aria-controls="settings-privacy-panel" data-settings-page="privacy">隐私与能力</button>
+            </div>
+            <section id="settings-appearance-panel" class="settings-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="settings-tab-appearance">
+              <div class="settings-grid">
+                <section class="setting-card"><div><h3>界面密度</h3><p>舒适模式显示更大的卡片；紧凑模式适合小窗口。</p></div><button id="density-toggle" class="text-button" type="button" aria-label="切换界面密度">切换为紧凑</button></section>
+                <section class="setting-card"><div><h3>侧边栏</h3><p>可以随时收起，只保留功能图标和连接状态。</p></div><button id="settings-sidebar-toggle" class="text-button" type="button">收起侧边栏</button></section>
+                <section class="setting-card"><div><h3>主题</h3><p>自动模式按时段在浅色与深色之间切换；其余主题使用固定配色。</p></div><label class="select-wrap"><span class="sr-only">主题</span><select id="setting-theme"><option value="auto">自动（昼夜切换）</option><option value="light">浅色</option><option value="dark">海克斯黑金</option><option value="azure">寒冰蓝</option><option value="emerald">翡翠绿</option><option value="violet">星域紫</option><option value="crimson">血月红</option><option value="aurora">极光青</option><option value="oled">纯黑 OLED</option></select></label></section>
+                <section class="setting-card"><div><h3>默认页面</h3><p>下次启动时优先打开常用功能。</p></div><label class="select-wrap"><span class="sr-only">默认页面</span><select id="setting-default-page"><option value="overview">总览</option><option value="champions">英雄</option><option value="live">对局</option><option value="favorites">收藏</option></select></label></section>
+              </div>
+            </section>
+            <section id="settings-gameplay-panel" class="settings-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="settings-tab-gameplay" hidden>
+              <div class="settings-grid">
+                <section class="setting-card"><div><h3>战绩展示数量</h3><p>首次展示及滚动到底后的每次追加数量。</p></div><label class="select-wrap"><span class="sr-only">战绩展示数量</span><select id="setting-match-count"><option value="10">每次 10 场</option><option value="20">每次 20 场</option><option value="30">每次 30 场</option><option value="40">每次 40 场</option><option value="50">每次 50 场</option></select></label></section>
+                <section class="setting-card"><div><h3>默认战绩筛选</h3><p>打开召唤师总览时优先显示的游戏类型。</p></div><label class="select-wrap"><span class="sr-only">默认战绩筛选</span><select id="setting-default-match-filter"><option value="all">全部对局</option><option value="solo">单排/双排</option><option value="flex">灵活组排</option></select></label></section>
+                <section class="setting-card"><div><h3>英雄页默认位置</h3><p>打开英雄梯度时优先展示的位置。</p></div><label class="select-wrap"><span class="sr-only">英雄页默认位置</span><select id="setting-champion-position"><option value="all">全部</option><option value="top">上单</option><option value="jungle">打野</option><option value="mid">中单</option><option value="adc">下路</option><option value="support">辅助</option></select></label></section>
+                <section class="setting-card"><div><h3>对局玩家排序</h3><p>实时对局中，每支队伍内玩家卡片的排列方式。</p></div><label class="select-wrap"><span class="sr-only">对局玩家排序</span><select id="setting-live-order"><option value="team">客户端顺序</option><option value="position">按位置</option><option value="kda">按 KDA</option><option value="win-rate">按胜率</option></select></label></section>
+                <section class="setting-card"><div><h3>实时对局刷新</h3><p>停留在“对局”页时按选定间隔重新读取队伍状态。</p></div><div class="setting-actions"><label class="toggle-control"><input id="setting-live-refresh" type="checkbox" checked><span>自动刷新</span></label><label class="select-wrap"><span class="sr-only">实时对局刷新间隔</span><select id="setting-live-interval"><option value="10">10 秒</option><option value="15">15 秒</option><option value="30">30 秒</option><option value="60">60 秒</option></select></label></div></section>
+                <section class="setting-card"><div><h3>回放操作确认</h3><p>下载或启动回放前再次确认，避免误触。</p></div><label class="toggle-control"><input id="setting-confirm-replay" type="checkbox" checked><span>操作前确认</span></label></section>
+                <section class="setting-card"><div><h3>自动接受对局</h3><p>匹配到对局时自动点击“接受”，不再错过任何一次排队。</p></div><label class="toggle-control"><input id="setting-auto-accept" type="checkbox"><span>启用</span></label></section>
+                <section class="setting-card"><div><h3>快速下一把</h3><p>对局结算后自动点击“再来一局”，直接回到队列。</p></div><label class="toggle-control"><input id="setting-auto-play-again" type="checkbox"><span>启用</span></label></section>
+                <section class="setting-card"><div><h3>断线自动重连</h3><p>检测到掉线时自动重新连接正在进行的对局。</p></div><label class="toggle-control"><input id="setting-auto-reconnect" type="checkbox"><span>启用</span></label></section>
+              </div>
+            </section>
+            <section id="settings-privacy-panel" class="settings-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="settings-tab-privacy" hidden>
+              <div class="settings-grid">
+                <section class="setting-card"><div><h3>隐私遮罩</h3><p>在界面中隐藏其他玩家名称，适合直播或截图。</p></div><label class="toggle-control"><input id="setting-mask-names" type="checkbox"><span>隐藏名称</span></label></section>
+                <section class="setting-card setting-network-card"><div><h3>英雄数据网络</h3><p>自动模式跟随系统代理；直连适合可直接访问 OP.GG 的网络；手动模式可填写本机代理。</p><span id="setting-proxy-state" class="inline-status" role="status" aria-live="polite">正在读取网络设置…</span></div><div class="setting-network-controls"><label class="select-wrap"><span class="sr-only">英雄数据网络模式</span><select id="setting-proxy-mode"><option value="auto">自动检测</option><option value="direct">直接连接</option><option value="manual">手动代理</option></select></label><label id="setting-proxy-url-wrap" class="setting-proxy-url" hidden><span class="sr-only">代理地址</span><input id="setting-proxy-url" type="url" inputmode="url" maxlength="300" spellcheck="false" placeholder="http://127.0.0.1:7890"></label><button id="setting-proxy-save" class="text-button" type="button">保存</button></div></section>
+              </div>
+              <section class="settings-capabilities"><div class="panel-heading compact-heading"><div><h2>对局能力</h2><p>国服客户端接口随版本变化；不支持的能力会单独降级。</p></div></div><div id="gameplay-settings-status" class="data-panel"><p class="muted">打开总览或对局后显示能力状态。</p></div></section>
+              <div class="settings-privacy"><div class="panel-heading compact-heading"><div><h2>隐私与安全</h2><p>助手只连接本机客户端，不接受账号密码，也不会上传收藏数据。</p></div></div><div id="privacy-content" class="data-panel"><p class="muted">正在读取隐私说明…</p></div></div>
+            </section>
+          </section>
+
+        </main>
+        </div>
+
+        <div id="player-overlay" class="player-overlay" hidden aria-label="玩家总览">
+          <div class="player-overlay-bar">
+            <button id="player-overlay-back" class="player-overlay-return" type="button" aria-label="返回上一个页面"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>返回</span></button>
+            <div id="player-overlay-title" class="player-overlay-title"></div>
+          </div>
+          <div class="player-overlay-scroll"><div id="player-overlay-content" class="gameplay-content player-overlay-content"></div></div>
+        </div>
+      </div>
+
+      <aside id="friends-dock" class="friends-dock" aria-label="好友列表">
+        <header class="friends-head">
+          <h2>好友</h2>
+          <span id="friends-summary" class="friends-summary"></span>
+          <button id="friends-close" class="icon-button friends-close-btn" type="button" aria-label="收起好友面板" title="收起好友面板">»</button>
+        </header>
+        <label class="friends-search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+          <span class="sr-only">搜索好友名称、Riot ID 或备注</span>
+          <input id="friends-search-input" type="search" placeholder="搜索好友名称或备注" autocomplete="off" spellcheck="false">
+        </label>
+        <div id="friends-list" class="friends-list" role="list" aria-busy="false"></div>
+        <footer class="friends-foot">分组、排序与备注来自本机客户端 · 只读</footer>
+      </aside>
+    </div>
+
+    <section id="diagnostics-panel" hidden aria-hidden="true"><button id="copy-diagnostics" type="button">复制诊断摘要</button><div id="diagnostics-content"></div></section>
+    <button id="back-to-top" class="back-to-top control-icon-button" type="button" aria-label="返回列表顶部" title="返回顶部" hidden><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 14 7-7 7 7M12 7v11"/></svg></button>
+    <dialog id="skin-dialog" class="skin-dialog" aria-labelledby="skin-dialog-title"><div class="dialog-art" id="skin-dialog-art"><img id="skin-dialog-backdrop" class="dialog-art-backdrop" alt="" hidden><video id="skin-dialog-video" muted loop playsinline preload="metadata" aria-hidden="true" hidden></video><img id="skin-dialog-image" class="dialog-art-primary" src="/image-unavailable.svg" alt=""><span id="skin-dialog-fallback">加载中</span><div class="dialog-toolbar"><button id="skin-dialog-artwork" class="dialog-action control-icon-button" type="button" aria-label="切换到臻彩原画" title="切换到臻彩原画" hidden><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4V5Zm3 10 3-3 2 2 2-2 3 3M8 9h.01"/><path d="M17 2v3M14 3.5h6"/></svg></button><button id="skin-dialog-fullscreen" class="dialog-action control-icon-button" type="button" aria-label="全屏查看原画" title="全屏查看原画"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg></button><button id="skin-dialog-close" class="dialog-action control-icon-button" type="button" aria-label="关闭详情" title="关闭"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><button id="skin-dialog-previous" class="dialog-nav dialog-nav-previous control-icon-button" type="button" aria-label="查看上一款"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button><button id="skin-dialog-next" class="dialog-nav dialog-nav-next control-icon-button" type="button" aria-label="查看下一款"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></div><div class="dialog-copy"><p id="skin-dialog-status" class="account-label"></p><h2 id="skin-dialog-title"></h2><p id="skin-dialog-hero" class="dialog-hero"></p><dl id="skin-dialog-data" class="detail-list"></dl><button id="copy-skin-id" class="text-button" type="button">复制皮肤 ID</button></div></dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <template id="skin-card-template"><button class="skin-card" type="button"><span class="skin-art"><video muted loop playsinline preload="metadata" hidden></video><img src="/image-unavailable.svg" alt="" loading="lazy" decoding="async"><span class="image-fallback" role="img">加载中</span><span class="skin-lock" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 10V7a5 5 0 0 1 10 0v3h1.5A1.5 1.5 0 0 1 20 11.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19.5v-8A1.5 1.5 0 0 1 5.5 10H7Zm2 0h6V7a3 3 0 0 0-6 0v3Zm3 4a1.5 1.5 0 0 0-1 2.62V18h2v-1.38A1.5 1.5 0 0 0 12 14Z"/></svg></span><span class="skin-state"></span></span><span class="skin-copy"><strong></strong><span class="skin-hero"></span><span class="skin-meta"></span></span></button></template>
+  </body>
+</html>

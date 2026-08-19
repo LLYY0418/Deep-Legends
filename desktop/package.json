@@ -1,0 +1,67 @@
+{
+  "name": "deep-legends-desktop",
+  "version": "0.11.0",
+  "description": "英雄联盟国服生涯战绩、实时对局与收藏本地助手",
+  "author": "Deep Legends Contributors",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "pack:win": "electron-builder --win portable --x64",
+    "pack:win-setup": "electron-builder --win nsis --x64",
+    "pack:win-dir": "electron-builder --win dir --x64"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.7"
+  },
+  "build": {
+    "appId": "cn.hexcore.lootassistant",
+    "productName": "Deep Legends",
+    "electronLanguages": ["zh-CN", "en-US"],
+    "asar": true,
+    "asarUnpack": ["backend/loot-service.exe"],
+    "directories": {
+      "output": "../dist/desktop"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "proxy-resolution.cjs",
+      "backend/loot-service.exe",
+      "assets/hexcore-icon.ico"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/hexcore-icon.ico",
+      "executableName": "Deep Legends",
+      "verifyUpdateCodeSignature": false
+    },
+    "portable": {
+      "useZip": true,
+      "artifactName": "Deep Legends.${ext}"
+    },
+    "nsis": {
+      "artifactName": "Deep Legends Setup.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Deep Legends",
+      "uninstallDisplayName": "Deep Legends",
+      "installerLanguages": ["zh_CN", "en_US"],
+      "differentialPackage": false
+    }
+  }
+}

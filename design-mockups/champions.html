@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deep Legends 重设计 · 英雄</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .postabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .postab { display: flex; align-items: center; gap: 7px; padding: 7px 16px; border-radius: var(--radius-sm); border: 1px solid transparent; color: var(--muted); font-size: 12.5px; }
+  .postab img { width: 15px; height: 15px; }
+  .postab.on { border-color: var(--gold-dim); background: rgba(217,164,65,.08); color: var(--gold-bright); font-weight: 600; }
+
+  /* 前三名大卡 */
+  .top3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  .topcard { position: relative; border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; height: 128px; }
+  .topcard .bg { position: absolute; inset: 0; background-size: cover; background-position: center 18%; }
+  .topcard .bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(11,14,20,.94) 8%, rgba(11,14,20,.55) 60%, rgba(11,14,20,.25) 100%); }
+  .topcard.first { border-color: var(--gold-dim); }
+  .topcard-in { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; padding: 14px 16px; }
+  .topcard .rk { position: absolute; top: 12px; left: 16px; font-size: 13px; font-weight: 800; color: var(--gold-bright); letter-spacing: 1px; }
+  .topcard h3 { font-size: 17px; font-weight: 700; }
+  .topcard .sub { font-size: 11.5px; color: var(--muted); }
+  .topcard .stats { display: flex; gap: 16px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .topcard .stats b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .topcard .hexbadge { position: absolute; top: 10px; right: 14px; }
+
+  table.data .champcell { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  table.data .champcell img { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); }
+  table.data .champcell .en { font-size: 10.5px; color: var(--faint); font-weight: 400; }
+  .wrcell { display: flex; align-items: center; gap: 10px; }
+  .wrcell .bar { width: 74px; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">
+    <div class="hexcore"></div>
+    <div><div class="brand-name">Deep Legends</div><div class="brand-sub">本地英雄联盟助手</div></div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>总览</div>
+    <div class="nav-item active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M14.5 3l6.5 6.5-11 11L3.5 14z"/><path d="M13 6l5 5"/></svg>英雄</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5"/></svg>对局</div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>收藏</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="conn"><span class="dot"></span>已连接 · 国服客户端</div>
+    <div class="me">
+      <img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/4568.png" alt="">
+      <div><div class="n">青钢影不加班</div><div class="l">等级 436</div></div>
+    </div>
+    <div class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>设置</div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <span class="crumb"><b>英雄</b> · 韩服梯度与构建 · 无需登录客户端</span>
+    <div class="topbar-actions">
+      <div class="iconbtn">◐</div>
+      <div class="iconbtn">↻</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="page-head">
+      <h1>英雄梯度</h1>
+      <p>数据来源 OP.GG 韩服 · 版本 14.10 · 更新于 26 分钟前</p>
+    </div>
+
+    <div class="toolbar">
+      <div class="seg">
+        <span class="on">单 / 双排</span>
+        <span>海克斯大乱斗</span>
+        <span>斗魂竞技场</span>
+      </div>
+      <div class="select">翡翠以上</div>
+      <div class="input" style="margin-left:auto">🔍 搜索：中文 / 拼音 / 缩写 / 外号（如 jjm、蛮王）</div>
+    </div>
+
+    <div class="postabs">
+      <span class="postab on"><img src="assets/all.svg" alt="">全部</span>
+      <span class="postab"><img src="assets/top.svg" alt="">上单</span>
+      <span class="postab"><img src="assets/jungle.svg" alt="">打野</span>
+      <span class="postab"><img src="assets/middle.svg" alt="">中单</span>
+      <span class="postab"><img src="assets/bottom.svg" alt="">下路</span>
+      <span class="postab"><img src="assets/utility.svg" alt="">辅助</span>
+    </div>
+
+    <!-- 前三名 -->
+    <div class="top3">
+      <div class="topcard first">
+        <div class="bg" style="background-image:url(https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Aatrox_0.jpg)"></div>
+        <div class="topcard-in">
+          <span class="rk">RANK 1</span>
+          <div class="hexbadge t1">OP</div>
+          <h3>亚托克斯</h3>
+          <div class="sub">暗裔剑魔 · 上单</div>
+          <div class="stats"><span>胜率 <b>53.84%</b></span><span>选用 <b>12.6%</b></span><span>禁用 <b>28.4%</b></span></div>
+        </div>
+      </div>
+      <div class="topcard">
+        <div class="bg" style="background-image:url(https://ddragon.leagueoflegends.com/cdn/img/champion/splash/LeeSin_0.jpg)"></div>
+        <div class="topcard-in">
+          <span class="rk">RANK 2</span>
+          <div class="hexbadge t1">1</div>
+          <h3>李青</h3>
+          <div class="sub">盲僧 · 打野</div>
+          <div class="stats"><span>胜率 <b>52.41%</b></span><span>选用 <b>18.2%</b></span><span>禁用 <b>21.7%</b></span></div>
+        </div>
+      </div>
+      <div class="topcard">
+        <div class="bg" style="background-image:url(https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_0.jpg)"></div>
+        <div class="topcard-in">
+          <span class="rk">RANK 3</span>
+          <div class="hexbadge t1">1</div>
+          <h3>阿狸</h3>
+          <div class="sub">九尾妖狐 · 中单</div>
+          <div class="stats"><span>胜率 <b>52.08%</b></span><span>选用 <b>14.9%</b></span><span>禁用 <b>9.3%</b></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 梯度表 -->
+    <div class="card">
+      <table class="data">
+        <tr><th style="width:56px">排名</th><th>英雄</th><th>位置</th><th style="width:64px">梯度</th><th style="width:170px">胜率</th><th>选用率</th><th>禁用率</th><th>场次</th></tr>
+        <tr>
+          <td class="num muted">4</td>
+          <td><div class="champcell"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Camille.png" alt=""><div>卡蜜尔<div class="en">Camille</div></div></div></td>
+          <td class="muted">上单</td>
+          <td><div class="hexbadge t1">1</div></td>
+          <td><div class="wrcell"><b class="num win">51.96%</b><div class="bar"><i class="green" style="width:52%"></i></div></div></td>
+          <td class="num">8.4%</td><td class="num">6.1%</td><td class="num faint">42,318</td>
+        </tr>
+        <tr>
+          <td class="num muted">5</td>
+          <td><div class="champcell"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Vi.png" alt=""><div>蔚<div class="en">Vi</div></div></div></td>
+          <td class="muted">打野</td>
+          <td><div class="hexbadge t2">2</div></td>
+          <td><div class="wrcell"><b class="num">51.42%</b><div class="bar"><i style="width:51%"></i></div></div></td>
+          <td class="num">7.8%</td><td class="num">4.2%</td><td class="num faint">38,904</td>
+        </tr>
+        <tr>
+          <td class="num muted">6</td>
+          <td><div class="champcell"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Yasuo.png" alt=""><div>亚索<div class="en">Yasuo</div></div></div></td>
+          <td class="muted">中单</td>
+          <td><div class="hexbadge t2">2</div></td>
+          <td><div class="wrcell"><b class="num">50.87%</b><div class="bar"><i style="width:51%"></i></div></div></td>
+          <td class="num">16.3%</td><td class="num">18.9%</td><td class="num faint">81,226</td>
+        </tr>
+        <tr>
+          <td class="num muted">7</td>
+          <td><div class="champcell"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Kaisa.png" alt=""><div>卡莎<div class="en">Kai'Sa</div></div></div></td>
+          <td class="muted">下路</td>
+          <td><div class="hexbadge t2">2</div></td>
+          <td><div class="wrcell"><b class="num">50.61%</b><div class="bar"><i style="width:51%"></i></div></div></td>
+          <td class="num">22.7%</td><td class="num">11.4%</td><td class="num faint">96,772</td>
+        </tr>
+        <tr>
+          <td class="num muted">8</td>
+          <td><div class="champcell"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Thresh.png" alt=""><div>锤石<div class="en">Thresh</div></div></div></td>
+          <td class="muted">辅助</td>
+          <td><div class="hexbadge t2">2</div></td>
+          <td><div class="wrcell"><b class="num">50.34%</b><div class="bar"><i style="width:50%"></i></div></div></td>
+          <td class="num">13.1%</td><td class="num">7.6%</td><td class="num faint">57,410</td>
+        </tr>
+        <tr>
+          <td class="num muted">9</td>
+          <td><div class="champcell"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Sylas.png" alt=""><div>塞拉斯<div class="en">Sylas</div></div></div></td>
+          <td class="muted">中单</td>
+          <td><div class="hexbadge t3">3</div></td>
+          <td><div class="wrcell"><b class="num">49.92%</b><div class="bar"><i style="width:50%"></i></div></div></td>
+          <td class="num">9.6%</td><td class="num">6.8%</td><td class="num faint">44,163</td>
+        </tr>
+        <tr>
+          <td class="num muted">10</td>
+          <td><div class="champcell"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Jinx.png" alt=""><div>金克丝<div class="en">Jinx</div></div></div></td>
+          <td class="muted">下路</td>
+          <td><div class="hexbadge t3">3</div></td>
+          <td><div class="wrcell"><b class="num">49.75%</b><div class="bar"><i style="width:50%"></i></div></div></td>
+          <td class="num">15.8%</td><td class="num">5.2%</td><td class="num faint">68,530</td>
+        </tr>
+        <tr>
+          <td class="num muted">11</td>
+          <td><div class="champcell"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Riven.png" alt=""><div>锐雯<div class="en">Riven</div></div></div></td>
+          <td class="muted">上单</td>
+          <td><div class="hexbadge t3">3</div></td>
+          <td><div class="wrcell"><b class="num">49.28%</b><div class="bar"><i style="width:49%"></i></div></div></td>
+          <td class="num">7.2%</td><td class="num">3.9%</td><td class="num faint">33,847</td>
+        </tr>
+        <tr>
+          <td class="num muted">12</td>
+          <td><div class="champcell"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Orianna.png" alt=""><div>奥莉安娜<div class="en">Orianna</div></div></div></td>
+          <td class="muted">中单</td>
+          <td><div class="hexbadge t4">4</div></td>
+          <td><div class="wrcell"><b class="num loss">48.61%</b><div class="bar"><i class="red" style="width:49%"></i></div></div></td>
+          <td class="num">5.4%</td><td class="num">1.8%</td><td class="num faint">24,092</td>
+        </tr>
+        <tr>
+          <td class="num muted">13</td>
+          <td><div class="champcell"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Zed.png" alt=""><div>劫<div class="en">Zed</div></div></div></td>
+          <td class="muted">中单</td>
+          <td><div class="hexbadge t4">4</div></td>
+          <td><div class="wrcell"><b class="num loss">48.12%</b><div class="bar"><i class="red" style="width:48%"></i></div></div></td>
+          <td class="num">11.9%</td><td class="num">24.6%</td><td class="num faint">52,668</td>
+        </tr>
+        <tr>
+          <td class="num muted">14</td>
+          <td><div class="champcell"><img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Ezreal.png" alt=""><div>伊泽瑞尔<div class="en">Ezreal</div></div></div></td>
+          <td class="muted">下路</td>
+          <td><div class="hexbadge t5">5</div></td>
+          <td><div class="wrcell"><b class="num loss">47.43%</b><div class="bar"><i class="red" style="width:47%"></i></div></div></td>
+          <td class="num">19.2%</td><td class="num">8.1%</td><td class="num faint">77,315</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="row mt12" style="justify-content:center">
+      <span class="faint">共 168 位英雄 · 向下滚动查看更多</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
