@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep Legends — a local desktop companion for League of Legends</title>
+<meta name="description" content="Deep Legends is a free, Windows-only, local-first desktop companion for League of Legends. Read-only KR lookups via the Riot API, and local client data for players on the Chinese server.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#0B0E14;
+    --surface:#131822;
+    --surface-strong:#1A2130;
+    --line: rgba(216,225,242,0.10);
+    --hex-line: rgba(217,164,65,0.22);
+    --ink:#E8EAF0;
+    --muted:#8B93A6;
+    --primary:#D9A441;
+    --primary-strong:#F0BE5C;
+    --accent:#5B9BD9;
+    --danger:#E0A45C;
+    --maxw: 880px;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:
+      radial-gradient(1100px 520px at 82% -10%, rgba(91,155,217,0.10), transparent 60%),
+      radial-gradient(900px 480px at -10% 12%, rgba(217,164,65,0.08), transparent 55%),
+      var(--bg);
+    color: var(--ink);
+    font-family: "Inter", system-ui, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  a{ color: var(--primary-strong); text-decoration-color: rgba(240,190,92,0.35); text-underline-offset: 3px; }
+  a:hover{ text-decoration-color: var(--primary-strong); }
+  .wrap{ max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  header.hero{
+    position: relative;
+    padding: 96px 0 64px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--line);
+  }
+  .hexmark{
+    position:absolute; top:-120px; right:-160px; width:520px; height:520px;
+    opacity:0.55; pointer-events:none;
+  }
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:10px;
+    font-family:"JetBrains Mono", ui-monospace, monospace;
+    font-size:12px; letter-spacing:0.14em; text-transform:uppercase;
+    color: var(--primary);
+    margin-bottom: 22px;
+  }
+  .eyebrow::before{
+    content:""; width:7px; height:7px; background:var(--primary-strong);
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  }
+  h1{
+    font-family:"Space Grotesk", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: clamp(2.4rem, 5vw, 3.6rem);
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin: 0 0 20px;
+  }
+  h1 .accent{ color: var(--primary-strong); }
+  .lede{
+    font-size: 1.15rem;
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0 0 32px;
+  }
+  .cta-row{ display:flex; gap:14px; flex-wrap:wrap; }
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-family:"Space Grotesk", sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-decoration: none;
+    border: 1px solid var(--line);
+  }
+  .btn.primary{ background: var(--primary); color: #17130A; border-color: transparent; }
+  .btn.primary:hover{ background: var(--primary-strong); }
+  .btn.ghost{ color: var(--ink); }
+  .btn.ghost:hover{ border-color: var(--hex-line); background: var(--surface); }
+
+  main{ padding: 64px 0 40px; }
+  section{ margin-bottom: 56px; }
+  .kicker{
+    font-family:"JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing:0.14em; text-transform:uppercase;
+    color: var(--muted); margin: 0 0 12px;
+  }
+  h2{
+    font-family:"Space Grotesk", system-ui, sans-serif;
+    font-size: 1.5rem; font-weight: 600; margin: 0 0 16px;
+  }
+  p{ margin: 0 0 14px; color: var(--ink); }
+  p.dim{ color: var(--muted); }
+
+  .grid{
+    display:grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .grid .cell{ background: var(--surface); padding: 22px 20px; }
+  .grid .cell h3{
+    font-family:"Space Grotesk", sans-serif; font-size: 0.98rem; font-weight: 600;
+    margin: 0 0 8px; color: var(--primary-strong);
+  }
+  .grid .cell p{ font-size: 0.92rem; color: var(--muted); margin:0; }
+
+  .divider{
+    height: 1px; margin: 48px 0;
+    background: linear-gradient(90deg, var(--hex-line), transparent 70%);
+  }
+
+  .legal{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 22px;
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+  .legal strong{ color: var(--ink); }
+
+  footer{
+    border-top: 1px solid var(--line);
+    padding: 28px 0 60px;
+    font-size: 0.85rem;
+    color: var(--muted);
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;
+  }
+
+  @media (max-width: 680px){
+    .grid{ grid-template-columns: 1fr; }
+    header.hero{ padding: 64px 0 44px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <svg class="hexmark" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="100,4 190,52 190,148 100,196 10,148 10,52" stroke="#D9A441" stroke-opacity="0.35" stroke-width="1"/>
+    <polygon points="100,34 164,68 164,132 100,166 36,132 36,68" stroke="#5B9BD9" stroke-opacity="0.28" stroke-width="1"/>
+    <polygon points="100,64 138,84 138,116 100,136 62,116 62,84" stroke="#D9A441" stroke-opacity="0.4" stroke-width="1"/>
+  </svg>
+  <div class="wrap">
+    <div class="eyebrow">Local-first · Windows desktop</div>
+    <h1>Deep <span class="accent">Legends</span></h1>
+    <p class="lede">
+      A free desktop companion for League of Legends. Browse Korean-server tier
+      lists, runes and builds without opening the client, and review your own
+      match history and collection once you're logged in locally — all
+      processed on your own machine.
+    </p>
+    <div class="cta-row">
+      <a class="btn primary" href="https://github.com/LLYY0418/Deep-Legends">View source on GitHub</a>
+      <a class="btn ghost" href="https://github.com/LLYY0418/Deep-Legends#readme">Read the docs</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section>
+    <p class="kicker">What it does</p>
+    <h2>Two data paths, both read-only</h2>
+    <p>
+      For the Korean (KR) server, Deep Legends calls the official Riot Games
+      API to look up a searched player's summoner profile, ranked tier and LP,
+      champion mastery, and recent match history — then pairs that with
+      champion tier lists, rune recommendations, and item builds drawn from
+      Riot's public Data Dragon assets and community data.
+    </p>
+    <p>
+      For players logged into the Chinese (Tencent) client, the app instead
+      reads profile, ranked, match history, live-game, and collection data
+      directly from the player's own local League Client. This path never
+      touches the Riot API.
+    </p>
+  </section>
+
+  <div class="grid">
+    <div class="cell">
+      <h3>Read-only by default</h3>
+      <p>No account credentials are collected, no login is automated, and nothing is written back to Riot's servers. Optional client actions (a rune page, an item set) run only against the player's own local client, triggered by an explicit click.</p>
+    </div>
+    <div class="cell">
+      <h3>Nothing leaves the machine</h3>
+      <p>Data retrieved via the Riot API is never uploaded to a server the developer operates. Everything is processed and cached locally, and only salted, anonymized identifiers are ever written to local history files.</p>
+    </div>
+    <div class="cell">
+      <h3>Fail closed on uncertainty</h3>
+      <p>Where the data isn't verifiable — a stale endpoint, an ambiguous match, an unmapped item — the app shows a clear degraded state instead of guessing.</p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <section>
+    <p class="kicker">Legal</p>
+    <div class="legal">
+      Deep Legends isn't endorsed by Riot Games and doesn't reflect the views
+      or opinions of Riot Games or anyone officially involved in producing or
+      managing League of Legends. League of Legends and Riot Games are
+      trademarks or registered trademarks of Riot Games, Inc.
+      <br><br>
+      <strong>This is not an official Riot Games product.</strong> It does not
+      provide account login, automated matchmaking actions, or in-game item
+      synthesis, disenchanting, or purchasing of any kind.
+    </div>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  <span>Deep Legends</span>
+  <span><a href="https://github.com/LLYY0418/Deep-Legends">github.com/LLYY0418/Deep-Legends</a></span>
+</footer>
+
+</body>
+</html>
