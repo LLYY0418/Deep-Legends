@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark" data-skin="hextech" data-title="primary">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep Legends · 提示框改版对照</title>
+<style>
+/* ==========================================================================
+   主题 token：与 web/app.css:1-142 一致。
+   提示框：底色中性/近黑，主题识别交给 --primary-strong 的标题与主色描边。
+   ========================================================================== */
+:root {
+  color-scheme: light;
+  --bg: oklch(1 0 0);
+  --surface: oklch(0.972 0 0);
+  --surface-strong: oklch(0.925 0 0);
+  --ink: oklch(0.18 0.012 57);
+  --muted: oklch(0.46 0.012 57);
+  --primary: oklch(0.70 0.155 56.6);
+  --primary-strong: oklch(0.54 0.145 56.6);
+  --accent: oklch(0.36 0.115 236);
+  --line: oklch(0.87 0 0);
+  --focus: oklch(0.57 0.15 236);
+  --font: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --radius-sm: 8px;
+  --hex-line: color-mix(in oklab, var(--primary) 34%, var(--line));
+
+  /* 提示框：浅色主题下是全主题最亮的一层 */
+  --tooltip-surface: #FFFFFF;
+  --tooltip-ink: var(--ink);
+  --tooltip-muted: var(--muted);
+  --tooltip-title: var(--primary-strong);
+  --tooltip-line: color-mix(in oklab, var(--primary) 32%, var(--line));
+  --tooltip-shadow-cast: rgb(11 14 20 / .16);
+  --tooltip-shadow-contact: rgb(11 14 20 / .10);
+}
+
+:root[data-theme="dark"] {          /* 海克斯黑金 */
+  color-scheme: dark;
+  --bg: #0B0E14; --surface: #131822; --surface-strong: #1A2130;
+  --ink: #E8EAF0; --muted: #8B93A6; --primary: #D9A441;
+  --primary-strong: #F0BE5C; --accent: #5B9BD9;
+  --line: #242D3D; --focus: #5B9BD9;
+  --hex-line: color-mix(in oklab, var(--primary) 32%, var(--line));
+  --tooltip-surface: #293040;
+}
+:root[data-theme="azure"] {         /* 寒冰蓝 */
+  color-scheme: dark;
+  --bg: #0A0F16; --surface: #121926; --surface-strong: #192338;
+  --ink: #E7EBF2; --muted: #8B95A8; --primary: #58B7E8;
+  --primary-strong: #8AD2F5; --accent: #4DA3FF;
+  --line: #232E44; --focus: #58B7E8;
+  --hex-line: color-mix(in oklab, var(--primary) 32%, var(--line));
+  --tooltip-surface: #253046;
+}
+:root[data-theme="emerald"] {       /* 翡翠绿 */
+  color-scheme: dark;
+  --bg: #0B0E12; --surface: #131820; --surface-strong: #1A2129;
+  --ink: #E7EBEE; --muted: #8B96A0; --primary: #3ECF8E;
+  --primary-strong: #74E2B2; --accent: #58AEDC;
+  --line: #242D38; --focus: #3ECF8E;
+  --hex-line: color-mix(in oklab, var(--primary) 32%, var(--line));
+  --tooltip-surface: #2A313A;
+}
+:root[data-theme="violet"] {        /* 星域紫 */
+  color-scheme: dark;
+  --bg: #0C0D14; --surface: #14151F; --surface-strong: #1C1D2C;
+  --ink: #E9E8F0; --muted: #9294A8; --primary: #A78BFA;
+  --primary-strong: #C4B0FF; --accent: #6AA9E9;
+  --line: #262838; --focus: #A78BFA;
+  --hex-line: color-mix(in oklab, var(--primary) 32%, var(--line));
+  --tooltip-surface: #2D2F3F;
+}
+:root[data-theme="crimson"] {       /* 血月红 */
+  color-scheme: dark;
+  --bg: #0E0C0D; --surface: #171316; --surface-strong: #201A1E;
+  --ink: #EFE8EA; --muted: #A08F96; --primary: #D94A5A;
+  --primary-strong: #F07A85; --accent: #E0A45C;
+  --line: #2E242A; --focus: #F07A85;
+  --hex-line: color-mix(in oklab, var(--primary) 32%, var(--line));
+  --tooltip-surface: #352E32;
+}
+:root[data-theme="aurora"] {        /* 极光青 */
+  color-scheme: dark;
+  --bg: #0A0F12; --surface: #121A1E; --surface-strong: #192530;
+  --ink: #E6EDEE; --muted: #8AA0A8; --primary: #4DD8C0;
+  --primary-strong: #7EEAD6; --accent: #A78BFA;
+  --line: #23303A; --focus: #4DD8C0;
+  --hex-line: color-mix(in oklab, var(--primary) 32%, var(--line));
+  --tooltip-surface: #25323D;
+}
+:root[data-theme="oled"] {          /* 纯黑 OLED */
+  color-scheme: dark;
+  --bg: #000000; --surface: #0B0B0E; --surface-strong: #161619;
+  --ink: #EDEDF0; --muted: #8F94A0; --primary: #D9A441;
+  --primary-strong: #F0BE5C; --accent: #5B9BD9;
+  --line: #1F2026; --focus: #5B9BD9;
+  --hex-line: color-mix(in oklab, var(--primary) 32%, var(--line));
+  --tooltip-surface: #303033;
+}
+
+/* 深色系主题共用的提示框前景与投影 */
+:root[data-theme="dark"], :root[data-theme="azure"], :root[data-theme="emerald"],
+:root[data-theme="violet"], :root[data-theme="crimson"], :root[data-theme="aurora"],
+:root[data-theme="oled"] {
+  --tooltip-ink: var(--ink);
+  --tooltip-muted: color-mix(in oklab, var(--ink) 62%, var(--muted));
+  --tooltip-title: var(--primary-strong);
+  --tooltip-line: color-mix(in oklab, var(--primary) 30%, var(--line));
+  --tooltip-shadow-cast: rgb(0 0 0 / .55);
+  --tooltip-shadow-contact: rgb(0 0 0 / .38);
+}
+
+/* ==========================================================================
+   海克斯档：近黑面板 + 主色细框 + 主色标题 + 掺了主色的暖白正文。
+   只有 --tooltip-surface 需要按主题写死，其余全部从 token 推导。
+   ========================================================================== */
+:root[data-skin="hextech"] {
+  --tooltip-line: color-mix(in oklab, var(--primary) 40%, var(--line));
+  --tooltip-muted: color-mix(in oklab, var(--ink) 80%, var(--primary));
+  --tooltip-shadow-cast: rgb(11 14 20 / .20);
+  --tooltip-shadow-contact: rgb(11 14 20 / .12);
+}
+:root[data-skin="hextech"][data-theme="dark"],
+:root[data-skin="hextech"][data-theme="azure"],
+:root[data-skin="hextech"][data-theme="emerald"],
+:root[data-skin="hextech"][data-theme="violet"],
+:root[data-skin="hextech"][data-theme="crimson"],
+:root[data-skin="hextech"][data-theme="aurora"],
+:root[data-skin="hextech"][data-theme="oled"] {
+  --tooltip-line: color-mix(in oklab, var(--primary) 46%, var(--line));
+  --tooltip-muted: color-mix(in oklab, var(--ink) 72%, var(--primary));
+  --tooltip-shadow-cast: rgb(0 0 0 / .66);
+  --tooltip-shadow-contact: rgb(0 0 0 / .45);
+}
+:root[data-skin="hextech"][data-theme="dark"]    { --tooltip-surface: #0D1118; }
+:root[data-skin="hextech"][data-theme="azure"]   { --tooltip-surface: #0C121B; }
+:root[data-skin="hextech"][data-theme="emerald"] { --tooltip-surface: #0D1116; }
+:root[data-skin="hextech"][data-theme="violet"]  { --tooltip-surface: #0E0F17; }
+:root[data-skin="hextech"][data-theme="crimson"] { --tooltip-surface: #110E10; }
+:root[data-skin="hextech"][data-theme="aurora"]  { --tooltip-surface: #0C1216; }
+:root[data-skin="hextech"][data-theme="oled"]    { --tooltip-surface: #000000; }
+
+/* ===== 仅原型用：标题不上主色 ===== */
+:root[data-title="ink"] { --tooltip-title: var(--tooltip-ink); }
+
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; padding: 24px 24px 64px; color: var(--ink); background: var(--bg); font: 14px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+h1 { margin: 0 0 4px; font-size: 19px; letter-spacing: -.01em; }
+.lede { margin: 0 0 16px; max-width: 74ch; color: var(--muted); font-size: 12.5px; }
+.controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.controls .label { width: 34px; color: var(--muted); font-size: 11px; letter-spacing: .06em; }
+.controls button { min-height: 32px; padding: 0 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); font: inherit; font-size: 12.5px; cursor: pointer; }
+.controls button:hover { color: var(--ink); border-color: var(--hex-line); }
+.controls button.is-active { color: var(--ink); background: color-mix(in oklab,var(--primary) 18%,var(--surface)); border-color: var(--hex-line); }
+.readout { display: flex; gap: 8px; align-items: center; margin: 12px 0 20px; color: var(--muted); font-size: 11.5px; font-family: ui-monospace,"Cascadia Mono",Consolas,monospace; }
+.readout .swatch { width: 22px; height: 22px; background: var(--tooltip-surface); border: 1px solid var(--tooltip-line); border-radius: 5px; }
+
+.stage { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill,minmax(300px,1fr)); }
+.card { padding: 13px 14px 15px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.card h2 { margin: 0 0 3px; font-size: 13px; }
+.card > p { margin: 0 0 11px; color: var(--muted); font-size: 11.5px; }
+.targets { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+
+.slot { display: grid; width: 38px; height: 38px; place-items: center; background: var(--surface-strong); border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-size: 10px; font-weight: 600; cursor: default; }
+.slot.is-item { border-color: var(--hex-line); color: var(--primary-strong); }
+.slot.is-skill { border-radius: 50%; }
+.chip { display: inline-flex; height: 30px; align-items: center; padding: 0 11px; background: var(--surface-strong); border: 1px solid var(--line); border-radius: 15px; font-size: 11.5px; cursor: default; }
+.iconbtn { display: grid; width: 34px; height: 34px; place-items: center; color: var(--accent); background: color-mix(in oklab,var(--accent) 14%,transparent); border: 1px solid color-mix(in oklab,var(--accent) 30%,transparent); border-radius: 8px; font-size: 13px; cursor: pointer; }
+.linkish { color: var(--accent); border-bottom: 1px dashed currentColor; cursor: help; font-size: 12.5px; }
+[data-tooltip]:focus-visible { outline: 3px solid color-mix(in oklab,var(--focus) 44%,transparent); outline-offset: 2px; }
+
+.notes { margin-top: 26px; max-width: 80ch; color: var(--muted); font-size: 12px; line-height: 1.75; }
+.notes strong { color: var(--ink); }
+.notes code { padding: 1px 5px; background: var(--surface-strong); border-radius: 4px; font-family: ui-monospace,"Cascadia Mono",Consolas,monospace; font-size: 11px; }
+
+/* ===== 旧版：现状（web/app.css:163-167 原样） ===== */
+body.is-old #tip {
+  position: fixed; z-index: 55; width: max-content; max-width: min(360px,calc(100vw - 24px));
+  padding: 10px 12px 11px; color: var(--ink);
+  background: color-mix(in oklab,var(--surface-strong) 92%,var(--bg));
+  border: 1px solid color-mix(in oklab,var(--primary) 38%,var(--line));
+  border-top: 2px solid var(--primary);            /* ← 就是这根黄条 */
+  border-radius: 7px;
+  box-shadow: 0 12px 30px rgb(0 0 0/.28),0 0 0 1px color-mix(in oklab,var(--primary) 10%,transparent);
+  font-size: 11px; line-height: 1.58;
+  overflow-wrap: anywhere; pointer-events: none; text-align: left; white-space: pre-line;
+  backdrop-filter: blur(12px);
+  opacity: 1; transform: none; display: block;
+}
+body.is-old #tip .tooltip-title,
+body.is-old #tip .tooltip-body { display: contents; color: inherit; font: inherit; }
+
+/* ===== 新版 ===== */
+body.is-new #tip {
+  position: fixed; z-index: 55; width: max-content; max-width: min(360px,calc(100vw - 24px));
+  padding: 7px 11px 8px;
+  color: var(--tooltip-muted);
+  background: var(--tooltip-surface);
+  border: 1px solid var(--tooltip-line);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 14px 34px var(--tooltip-shadow-cast), 0 2px 8px var(--tooltip-shadow-contact);
+  font-size: 11.5px; line-height: 1.5;
+  overflow-wrap: anywhere; pointer-events: none; text-align: left;
+  opacity: 0; transform: scale(.97) translateY(2px);
+  transition: opacity 120ms ease-out, transform 120ms ease-out;
+}
+body.is-new #tip[data-shown="true"] { opacity: 1; transform: none; }
+body.is-new #tip[data-layout="titled"] { display: grid; gap: 3px; padding: 9px 12px 10px; }
+body.is-new #tip .tooltip-title { color: var(--tooltip-title); font-size: 12px; font-weight: 600; letter-spacing: -.005em; }
+body.is-new #tip[data-layout="single"] .tooltip-title { color: var(--tooltip-ink); font-weight: 500; font-size: 11.5px; }
+body.is-new #tip .tooltip-body { color: var(--tooltip-muted); font-size: 11.5px; line-height: 1.58; white-space: pre-line; }
+
+#tip[data-size="compact"] { max-width: min(280px,calc(100vw - 24px)); }
+#tip[data-size="item"] { max-width: min(420px,calc(100vw - 24px)); }
+#tip[data-placement="top"] { transform-origin: bottom center; }
+#tip[data-placement="bottom"] { transform-origin: top center; }
+#tip[data-placement="left"] { transform-origin: right center; }
+#tip[data-placement="right"] { transform-origin: left center; }
+@media (prefers-reduced-motion: reduce) {
+  body.is-new #tip, body.is-new #tip[data-shown="true"] { transition-duration: 1ms; transform: none; }
+}
+[hidden] { display: none !important; }
+</style>
+</head>
+<body class="is-new">
+
+<h1>提示框改版对照</h1>
+<p class="lede">把鼠标放到下面任意元素上。「海克斯」档是近黑面板 + 主色细框 + 暖白正文，每套配色各取自己的「黑 + 自己的金」；「浮起」档是中性面板抬升到卡片之上。底部读数显示当前实际生效的色值。</p>
+
+<div class="controls">
+  <span class="label">样式</span>
+  <button type="button" data-style="new" class="is-active">新版</button>
+  <button type="button" data-style="old">旧版（现状）</button>
+</div>
+<div class="controls">
+  <span class="label">底色</span>
+  <button type="button" data-skin-set="hextech" class="is-active">海克斯（近黑 + 细框）</button>
+  <button type="button" data-skin-set="lift">浮起（中性抬升）</button>
+</div>
+<div class="controls">
+  <span class="label">标题</span>
+  <button type="button" data-title-set="primary" class="is-active">主色（默认）</button>
+  <button type="button" data-title-set="ink">常规墨色</button>
+</div>
+<div class="controls">
+  <span class="label">配色</span>
+  <button type="button" data-theme-set="light">浅色</button>
+  <button type="button" data-theme-set="dark" class="is-active">海克斯黑金</button>
+  <button type="button" data-theme-set="azure">寒冰蓝</button>
+  <button type="button" data-theme-set="emerald">翡翠绿</button>
+  <button type="button" data-theme-set="violet">星域紫</button>
+  <button type="button" data-theme-set="crimson">血月红</button>
+  <button type="button" data-theme-set="aurora">极光青</button>
+  <button type="button" data-theme-set="oled">纯黑 OLED</button>
+</div>
+
+<div class="readout"><span class="swatch"></span><span id="readout">—</span></div>
+
+<div class="stage">
+
+  <div class="card">
+    <h2>装备</h2>
+    <p>最长的一类，走 <code>data-tooltip-size="item"</code>。</p>
+    <div class="targets">
+      <span class="slot is-item" tabindex="0" data-tooltip-size="item" data-tooltip="无尽之刃&#10;暴击伤害提高 40%，对生命值低于 50% 的敌方英雄造成的伤害额外提高 8%。&#10;攻击力 +65 · 暴击几率 +25% · 总价 3400">无尽</span>
+      <span class="slot is-item" tabindex="0" data-tooltip-size="item" data-tooltip="卢登的伴生&#10;法术命中时对目标及其附近最多 3 名敌人造成 60 点额外魔法伤害，冷却 10 秒。&#10;法术强度 +100 · 法力 +600 · 技能急速 +20 · 总价 3200">卢登</span>
+      <span class="slot is-item" tabindex="0" data-tooltip-size="item" data-tooltip="多兰之刃&#10;攻击力 +10 · 生命值 +100 · 生命偷取 3.5% · 总价 450">多兰</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>技能</h2>
+    <p>首行天然是「Q · 技能名」，正好当标题。</p>
+    <div class="targets">
+      <span class="slot is-skill" tabindex="0" data-tooltip="Q · 破空斩&#10;向前突进并对路径上的敌人造成物理伤害，命中英雄可刷新一次。&#10;消耗：30/35/40/45/50&#10;冷却：13/12/11/10/9 秒&#10;施法距离：600">Q</span>
+      <span class="slot is-skill" tabindex="0" data-tooltip="W · 战意&#10;获得一层护盾并提高攻击速度，持续 4 秒。&#10;消耗：40&#10;冷却：18/16/14/12/10 秒">W</span>
+      <span class="slot is-skill" tabindex="0" data-tooltip="R · 终末之息&#10;对目标造成基于其已损失生命值的真实伤害，击杀可立即重置冷却。&#10;冷却：100/80/60 秒&#10;施法距离：400">R</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>单行提示</h2>
+    <p>没有换行时不分层、不上主色，内边距自动收紧。</p>
+    <div class="targets">
+      <button class="iconbtn" data-tooltip="展开详情" data-tooltip-size="compact">▾</button>
+      <button class="iconbtn" data-tooltip="观看回放" data-tooltip-size="compact">▶</button>
+      <span class="chip" tabindex="0" data-tooltip="影流之主 · 12/3/7 · CS 214 · 胜利" data-tooltip-size="compact">Faker#KR1</span>
+      <span class="chip" tabindex="0" data-tooltip="疾风剑豪 · 8/5/4 · 失败" data-tooltip-size="compact">最近一局</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>海克斯 / 符文</h2>
+    <p>名称 + 稀有度 + 说明，三行结构。</p>
+    <div class="targets">
+      <span class="slot" tabindex="0" data-tooltip="灵光乍现&#10;棱彩级&#10;每有 100 点法力上限，获得 3 点法术强度。">棱彩</span>
+      <span class="slot" tabindex="0" data-tooltip="致命节奏&#10;攻击英雄后获得叠加攻击速度，最多 6 层。">符文</span>
+      <span class="slot" tabindex="0" data-tooltip="适应之力">碎片</span>
+    </div>
+  </div>
+
+  <div class="card" style="grid-column: 1 / -1;">
+    <h2>长文本：国服大区合并说明</h2>
+    <p>全项目唯一一条「首行不是标题」的提示（web/app.js:5-12）。左边照搬现状，右边补了一行标题。</p>
+    <div class="targets">
+      <span class="linkish" tabindex="0" data-tooltip="联盟一区：祖安、皮尔特沃夫、巨神峰、教育网、男爵领域、均衡教派、影流、守望之海&#10;联盟二区：卡拉曼达、暗影岛、征服之海、诺克萨斯、战争学院、雷瑟守备&#10;联盟三区：班德尔城、裁决之地、水晶之痕、钢铁烈阳、皮城警备&#10;联盟四区：比尔吉沃特、弗雷尔卓德、扭曲丛林&#10;联盟五区：德玛西亚、无畏先锋、恕瑞玛、巨龙之巢&#10;艾欧尼亚、黑色玫瑰、峡谷之巅独立运营，未参与合并。">现状：首行被当成标题（错）</span>
+      <span class="linkish" tabindex="0" data-tooltip="国服大区合并对照&#10;联盟一区：祖安、皮尔特沃夫、巨神峰、教育网、男爵领域、均衡教派、影流、守望之海&#10;联盟二区：卡拉曼达、暗影岛、征服之海、诺克萨斯、战争学院、雷瑟守备&#10;联盟三区：班德尔城、裁决之地、水晶之痕、钢铁烈阳、皮城警备&#10;联盟四区：比尔吉沃特、弗雷尔卓德、扭曲丛林&#10;联盟五区：德玛西亚、无畏先锋、恕瑞玛、巨龙之巢&#10;艾欧尼亚、黑色玫瑰、峡谷之巅独立运营，未参与合并。">建议：补一行标题</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="notes">
+  <p><strong>海克斯档在做什么。</strong>黑是底、金是框和字。面板取 <code>mix(--bg 70%, --surface)</code>，比卡片还暗一点点；描边是主色掺 46% 进 <code>--line</code>，对面板有 2.2–3.7 的对比，真正撑起轮廓的是这道框；正文是 <code>--ink</code> 掺 28% 主色，黑金下得到 <code>#E5D7C3</code> 那种羊皮纸暖白。掺主色进<em>文字</em>安全（<code>--ink</code> 近中性，只会被稀释）；掺进<em>底色</em>会翻车 —— 金色 H≈80° 与深蓝表面 H≈264° 在 OKLab 里接近对角，彩度会被抵消掉。</p>
+  <p><strong>和原来那根黄条的区别。</strong>原来是 <code>border-top: 2px solid var(--primary)</code> 顶部实色横条，外加金色四边描边和 <code>0 0 0 1px</code> 金色外圈，三份叠一起，浮层拿到全页最重的视觉权重。现在只剩一道均匀的 1px 描边，没有横条、没有外圈发光。</p>
+  <p><strong>浅色为什么是纯白。</strong>八套配色实测层级亮度，浅色是 bg <code>1.000</code> / surface <code>0.973</code> / surface-strong <code>0.925</code>，越往上层越亮；深色系反过来。统一规律是「层级越高越亮」，所以最上面一层在浅色下就是 <code>#FFFFFF</code>，靠描边和投影从白底上分离。</p>
+  <p><strong>纯黑 OLED 下面板就是 <code>#000000</code>。</strong>和页面底同色，完全靠金框划出轮廓 —— 这是 OLED 下唯一不糊像素的做法，也正好最像客户端。</p>
+  <p><strong>单行提示不上主色。</strong>「展开详情」这种只有一行的提示没有标题正文之分，标题色会让它看起来像个状态提示。<code>data-layout="single"</code> 下退回普通墨色。</p>
+  <p><strong>顺手修掉一个真 bug。</strong>现在 <code>show()</code> 先 <code>hidden = false</code> 并把 left/top 设成 0，下一帧才定位，所以每次都会在视口左上角闪一帧全不透明的提示框。初始 <code>opacity: 0</code> 之后天然看不见。另外删掉了无效的 <code>backdrop-filter: blur(12px)</code>。</p>
+</div>
+
+<div id="tip" role="tooltip" hidden></div>
+
+<script>
+(() => {
+  const tooltip = document.getElementById("tip");
+  let anchor = null;
+  let frame = 0;
+
+  const targetOf = (node) => node instanceof Element ? node.closest("[data-tooltip]") : null;
+
+  const hide = () => {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    if (anchor?.getAttribute("aria-describedby") === tooltip.id) anchor.removeAttribute("aria-describedby");
+    anchor = null;
+    delete tooltip.dataset.shown;
+    tooltip.hidden = true;
+  };
+
+  const position = () => {
+    frame = 0;
+    if (!anchor?.isConnected || tooltip.hidden) { hide(); return; }
+    const rect = anchor.getBoundingClientRect();
+    const viewportPadding = 12;
+    const gap = 8;
+    const width = tooltip.offsetWidth;
+    const height = tooltip.offsetHeight;
+    const left = Math.min(window.innerWidth - width - viewportPadding, Math.max(viewportPadding, rect.left + rect.width / 2 - width / 2));
+    const fitsAbove = rect.top >= height + gap + viewportPadding;
+    const top = fitsAbove ? rect.top - height - gap : Math.min(window.innerHeight - height - viewportPadding, rect.bottom + gap);
+    tooltip.dataset.placement = fitsAbove ? "top" : "bottom";
+    tooltip.style.left = `${Math.round(left)}px`;
+    tooltip.style.top = `${Math.round(Math.max(viewportPadding, top))}px`;
+    tooltip.dataset.shown = "true";
+  };
+
+  const show = (next) => {
+    const content = String(next?.dataset.tooltip || "").trim();
+    if (!content) { hide(); return; }
+    if (anchor && anchor !== next && anchor.getAttribute("aria-describedby") === tooltip.id) anchor.removeAttribute("aria-describedby");
+    anchor = next;
+    anchor.setAttribute("aria-describedby", tooltip.id);
+
+    const lineBreak = content.indexOf("\n");
+    const title = lineBreak < 0 ? content : content.slice(0, lineBreak);
+    const body = lineBreak < 0 ? "" : content.slice(lineBreak + 1).trim();
+    const titleNode = document.createElement("strong");
+    titleNode.className = "tooltip-title";
+    titleNode.textContent = title;
+    const nodes = [titleNode];
+    if (body) {
+      const bodyNode = document.createElement("span");
+      bodyNode.className = "tooltip-body";
+      bodyNode.textContent = body;
+      nodes.push(bodyNode);
+    }
+    tooltip.replaceChildren(...nodes);
+    tooltip.dataset.layout = body ? "titled" : "single";
+    tooltip.dataset.size = next.dataset.tooltipSize || "";
+
+    tooltip.hidden = false;
+    tooltip.style.left = "0px";
+    tooltip.style.top = "0px";
+    if (frame) cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(position);
+  };
+
+  document.addEventListener("pointerover", (event) => {
+    const next = targetOf(event.target);
+    if (next && next !== anchor) show(next);
+  });
+  document.addEventListener("pointerout", (event) => {
+    const current = targetOf(event.target);
+    if (!current || current !== anchor || (event.relatedTarget instanceof Node && current.contains(event.relatedTarget)) || document.activeElement === current) return;
+    hide();
+  });
+  document.addEventListener("focusin", (event) => { const next = targetOf(event.target); if (next) show(next); });
+  document.addEventListener("focusout", (event) => { if (targetOf(event.target) === anchor) hide(); });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") hide(); });
+  window.addEventListener("resize", () => { if (anchor && !frame) frame = requestAnimationFrame(position); }, { passive: true });
+  document.addEventListener("scroll", () => { if (anchor && !frame) frame = requestAnimationFrame(position); }, { passive: true, capture: true });
+
+  // 读数：显示当前实际生效的色值，方便核对渲染是否和标注一致
+  const readout = document.getElementById("readout");
+  const themeName = { light: "浅色", dark: "海克斯黑金", azure: "寒冰蓝", emerald: "翡翠绿", violet: "星域紫", crimson: "血月红", aurora: "极光青", oled: "纯黑 OLED" };
+  const toHex = (value) => {
+    const nums = value.match(/[\d.]+/g);
+    if (!nums || nums.length < 3) return value;
+    return "#" + nums.slice(0, 3).map((v) => Number(v).toString(16).padStart(2, "0").toUpperCase()).join("");
+  };
+  const refresh = () => {
+    const styles = getComputedStyle(document.documentElement);
+    const root = document.documentElement.dataset;
+    const skin = root.skin === "lift" ? "浮起" : "海克斯";
+    const titleMode = root.title === "ink" ? "墨色标题" : "主色标题";
+    const read = (name) => toHex(styles.getPropertyValue(name).trim());
+    readout.textContent = `${themeName[root.theme]} · ${skin} · ${titleMode} · 面板 ${read("--tooltip-surface")} · 描边 ${read("--tooltip-line")} · 标题 ${read("--tooltip-title")} · 正文 ${read("--tooltip-muted")}`;
+  };
+
+  const setActive = (attribute, value) => {
+    for (const button of document.querySelectorAll(`[${attribute}]`)) {
+      button.classList.toggle("is-active", button.getAttribute(attribute) === value);
+    }
+  };
+  for (const button of document.querySelectorAll("[data-style]")) {
+    button.addEventListener("click", () => {
+      const value = button.dataset.style;
+      document.body.classList.toggle("is-new", value === "new");
+      document.body.classList.toggle("is-old", value === "old");
+      setActive("data-style", value);
+      hide();
+    });
+  }
+  for (const [attribute, key] of [["data-theme-set", "theme"], ["data-skin-set", "skin"], ["data-title-set", "title"]]) {
+    for (const button of document.querySelectorAll(`[${attribute}]`)) {
+      button.addEventListener("click", () => {
+        document.documentElement.dataset[key] = button.getAttribute(attribute);
+        setActive(attribute, button.getAttribute(attribute));
+        hide(); refresh();
+      });
+    }
+  }
+  refresh();
+})();
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 {
   "name": "deep-legends-desktop",
-  "version": "0.11.0",
+  "version": "0.11.2",
   "description": "英雄联盟国服生涯战绩、实时对局与收藏本地助手",
   "author": "Deep Legends Contributors",
   "private": true,
@@ -14,33 +14,46 @@
   },
   "devDependencies": {
     "electron": "^43.2.0",
-    "electron-builder": "^26.15.7"
+    "electron-builder": "^26.15.7",
+    "jsdom": "^30.0.1"
   },
   "build": {
     "appId": "cn.hexcore.lootassistant",
     "productName": "Deep Legends",
-    "electronLanguages": ["zh-CN", "en-US"],
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
     "asar": true,
-    "asarUnpack": ["backend/loot-service.exe"],
+    "asarUnpack": [
+      "backend/loot-service.exe"
+    ],
     "directories": {
       "output": "../dist/desktop"
     },
     "files": [
       "main.cjs",
       "preload.cjs",
+      "share-export.cjs",
       "proxy-resolution.cjs",
+      "window-bounds.cjs",
       "backend/loot-service.exe",
       "assets/hexcore-icon.ico"
     ],
+    "beforePack": "verify-embedded-riot-key.cjs",
     "win": {
       "target": [
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/hexcore-icon.ico",
@@ -49,10 +62,10 @@
     },
     "portable": {
       "useZip": true,
-      "artifactName": "Deep Legends.${ext}"
+      "artifactName": "Deep Legends ${env.DEEP_LEGENDS_FINGERPRINT}.${ext}"
     },
     "nsis": {
-      "artifactName": "Deep Legends Setup.${ext}",
+      "artifactName": "Deep Legends Setup ${env.DEEP_LEGENDS_FINGERPRINT}.${ext}",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
@@ -60,7 +73,10 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Deep Legends",
       "uninstallDisplayName": "Deep Legends",
-      "installerLanguages": ["zh_CN", "en_US"],
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ],
       "differentialPackage": false
     }
   }

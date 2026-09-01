@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.11.0",
+    [string]$Version = "0.11.2",
     [string]$OutputDirectory = "",
     [string]$CertificateThumbprint = "",
     [string]$TimestampUrl = "http://timestamp.digicert.com",
@@ -12,10 +12,26 @@ if ($Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$') {
     throw "Version must use semantic version syntax, for example 0.3.0 or 0.3.0-beta.1"
 }
 
-# 真实 Riot API Key 密文只能通过参数或环境变量在构建时临时注入，
-# 绝不写入任何会被提交到 git 的文件。
+# 真实 Riot API Key 只能通过参数、环境变量或本机专属的 riot_key.local.txt
+# 在构建时临时注入，绝不写入任何会被提交到 git 的文件（riot_key.local.*
+# 已在 .gitignore 中排除）。
 if (-not $RiotAPIKeyCipher -and $env:RIOT_API_KEY_CIPHER) {
     $RiotAPIKeyCipher = $env:RIOT_API_KEY_CIPHER
+}
+$localKeyFile = Join-Path $projectRoot "riot_key.local.txt"
+if (-not $RiotAPIKeyCipher -and (Test-Path $localKeyFile)) {
+    $plainKey = (Get-Content $localKeyFile | Where-Object { $_ -and ($_.Trim() -notmatch '^#') } | Select-Object -First 1)
+    if ($plainKey) { $plainKey = $plainKey.Trim() }
+    if ($plainKey) {
+        Push-Location $projectRoot
+        try {
+            $RiotAPIKeyCipher = (go run . -encrypt-riot-key $plainKey | Select-Object -Last 1).Trim()
+        } finally {
+            Pop-Location
+        }
+        if (-not $RiotAPIKeyCipher) { throw "Failed to encrypt the key from riot_key.local.txt" }
+        Write-Host "Riot API key loaded from riot_key.local.txt (not tracked by git) and encrypted for this build."
+    }
 }
 if ($RiotAPIKeyCipher -and $RiotAPIKeyCipher -match '["`]') {
     throw "RiotAPIKeyCipher must not contain quote characters"
@@ -50,11 +66,13 @@ try {
     $previousGoos = $env:GOOS
     $previousGoarch = $env:GOARCH
     $previousCgo = $env:CGO_ENABLED
+    $sourceFingerprint = (& node (Join-Path $projectRoot "desktop\source-fingerprint.cjs")).Trim()
+    if ($sourceFingerprint -notmatch '^[0-9a-f]{12}$') { throw "Invalid source fingerprint: $sourceFingerprint" }
     try {
         $env:GOOS = "windows"
         $env:GOARCH = "amd64"
         $env:CGO_ENABLED = "0"
-        $ldflags = "-s -w -H=windowsgui -buildid= -X main.version=$Version"
+        $ldflags = "-s -w -H=windowsgui -buildid= -X main.version=$Version -X main.buildFingerprint=$sourceFingerprint"
         if ($RiotAPIKeyCipher) {
             $ldflags += " -X main.riotAPIKeyCipher=$RiotAPIKeyCipher"
         } else {
@@ -66,6 +84,9 @@ try {
         $env:GOARCH = $previousGoarch
         $env:CGO_ENABLED = $previousCgo
     }
+
+    & node (Join-Path $projectRoot "desktop\verify-build-fingerprint.cjs") $versionedOutput $sourceFingerprint
+    if ($LASTEXITCODE -ne 0) { throw "Windows executable build fingerprint verification failed" }
 
     if ($CertificateThumbprint) {
         $signTool = (Get-Command signtool.exe -ErrorAction Stop).Source

@@ -1,0 +1,31 @@
+Beaufort for LOL Bold — font notice
+
+This build embeds a subsetted copy of "Beaufort for LOL Bold" (ASCII glyphs only,
+U+0020-007E), used for the sidebar brand wordmark ("DEEP LEGENDS").
+
+Verbatim copyright / trademark strings recorded in the font's own `name` table
+(nameID 0/7/8/9/10/11/12/14), preserved as-is when subsetting:
+
+  Copyright (c) 2008, 2013 by Nick Shinn. Published by Shinn Type Foundry.
+  All rights reserved. Customized and extended for Riot Games by Monotype
+  Imaging, Inc.
+
+  Trademark: Beaufort Pro is a trademark of by Nick Shinn. Published by
+  Shinn Type Foundry.
+
+  Manufacturer: Monotype Imaging, Inc.
+  Designers: Nick Shinn, Jim Ford
+  Vendor URL: www.shinntype.com
+  License / EULA URL: http://www.shinntype.com/ShinnType_EULA.pdf
+
+Unlike the previously embedded Cinzel typeface (SIL Open Font License), Beaufort
+for LOL is NOT an open-source font. It is a
+typeface commissioned by Riot Games from Shinn Type / Monotype specifically
+for League of Legends branding, and is bundled here because Deep Legends is
+an unofficial, non-commercial, fan-made League of Legends companion tool —
+Deep Legends is not endorsed by Riot Games and does not reflect the views or
+opinions of Riot Games or anyone officially involved in producing or
+managing League of Legends. League of Legends and Riot Games are trademarks
+or registered trademarks of Riot Games, Inc. See Riot Games' fan content
+policy for the terms under which League of Legends IP may be used in
+fan-made projects: https://www.riotgames.com/en/legal

@@ -8,7 +8,7 @@
 .friends-toggle:active { transform: translateY(1px); }
 .friends-toggle:hover { color: var(--ink); background: var(--surface-strong); border-color: var(--hex-line); }
 .friends-toggle svg { width: 17px; height: 17px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.friends-toggle[aria-expanded="true"] { color: var(--primary-strong); background: var(--primary-soft); border-color: color-mix(in oklch, var(--primary) 46%, var(--line)); }
+.friends-toggle[aria-expanded="true"] { color: var(--primary-strong); background: var(--primary-soft); border-color: color-mix(in oklab, var(--primary) 46%, var(--line)); }
 .friends-toggle[disabled] { opacity: .5; cursor: default; }
 .friends-toggle[disabled]:hover { color: var(--muted); background: var(--surface); border-color: var(--line); transform: none; }
 .friends-count { min-width: 18px; padding: 1px 5px; border-radius: 999px; background: var(--success-soft); color: var(--success); font-size: 10.5px; font-weight: 700; line-height: 1.5; text-align: center; font-variant-numeric: tabular-nums; pointer-events: none; }
@@ -48,7 +48,7 @@
 .friends-group-arrow { width: 10px; flex-shrink: 0; font-size: 9px; opacity: .75; }
 .friends-group-count { margin-left: auto; color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
 .friends-group-count b { color: var(--success); font-weight: 600; }
-.friends-group-head.is-offline-group, .friends-group-head.is-offline-group:hover { color: color-mix(in oklch, var(--muted) 72%, var(--bg)); }
+.friends-group-head.is-offline-group, .friends-group-head.is-offline-group:hover { color: color-mix(in oklab, var(--muted) 72%, var(--bg)); }
 .friends-group-head.is-offline-group .friends-group-count b { color: inherit; }
 
 /* 好友条目（按钮） */
@@ -63,6 +63,8 @@
 .friend-presence.mobile { background: var(--sidebar-bg); box-shadow: inset 0 0 0 1.5px var(--success); }
 .friend-copy { flex: 1; min-width: 0; }
 .friend-name { display: flex; align-items: baseline; gap: 4px; overflow: hidden; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.friend-player-name { display: flex; min-width: 0; align-items: baseline; gap: 4px; overflow: hidden; }
+.friend-game-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .friend-tag { flex-shrink: 0; color: var(--muted); font-size: 10.5px; font-weight: 400; }
 .friend-note { overflow: hidden; color: var(--primary); font-size: 10.5px; font-weight: 400; text-overflow: ellipsis; }
 .friend-status { margin-top: 1px; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
@@ -82,7 +84,7 @@
 .friends-empty svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
 .friends-empty .text-button { font-size: 12px; }
 .friends-skeleton { display: grid; gap: 10px; padding: 12px 8px; }
-.friends-skeleton span { display: block; height: 44px; border-radius: var(--radius-sm); background: color-mix(in oklch, var(--surface) 82%, var(--ink)); opacity: .35; animation: friends-pulse 1.4s ease-in-out infinite; }
+.friends-skeleton span { display: block; height: 44px; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--surface) 82%, var(--ink)); opacity: .35; animation: friends-pulse 1.4s ease-in-out infinite; }
 .friends-skeleton span:nth-child(2) { animation-delay: .16s; }
 .friends-skeleton span:nth-child(3) { animation-delay: .32s; }
 @keyframes friends-pulse { 0%, 100% { opacity: .22; } 50% { opacity: .42; } }

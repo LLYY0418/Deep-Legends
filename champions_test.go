@@ -1,13 +1,28 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
 
 	xhtml "golang.org/x/net/html"
 )
+
+func TestDDragonItemCatalogParsesGoldTotal(t *testing.T) {
+	var catalog ddragonAssetList
+	if err := json.Unmarshal([]byte(`{"data":{"3153":{"name":"破败王者之刃","gold":{"total":3200},"image":{"full":"3153.png"}}}}`), &catalog); err != nil {
+		t.Fatal(err)
+	}
+	if item := catalog.Data["3153"]; item.Gold.Total != 3200 {
+		t.Fatalf("ddragon item gold total = %#v", item.Gold)
+	}
+}
 
 func TestValidateChampionAssetPath(t *testing.T) {
 	tests := []struct {
@@ -20,6 +35,8 @@ func TestValidateChampionAssetPath(t *testing.T) {
 		{"opgg", "/meta/images/lol/latest/aram-augment/DoubleTap_large.png", opggAssetHost, true},
 		{"ddragon", "/cdn/16.15.1/img/item/3153.png", dataDragonHost, true},
 		{"ddragon", "/cdn/img/champion/splash/Vayne_0.jpg", dataDragonHost, true},
+		{"communitydragon", "/latest/plugins/rcp-fe-lol-collections/global/default/images/item-element/crest-and-banner-mastery-10.png", communityDragonHost, true},
+		{"communitydragon", "/latest/plugins/rcp-fe-lol-collections/global/default/images/other.png", communityDragonHost, false},
 		{"gtimg", "/images/lol/act/img/champion/Vayne.png", prestigeArtworkHost, true},
 		{"gtimg", "/images/lol/act/img/skin/big67000.jpg", prestigeArtworkHost, true},
 		{"opgg", "/meta/images/lol/../../secret.png", "", false},
@@ -80,10 +97,109 @@ func TestLoadTopPlayersParsesLeaderboardFlight(t *testing.T) {
 	}
 }
 
+func TestLoadTopPlayersUsesLeaderboardTableAndCapsFive(t *testing.T) {
+	players := []struct {
+		name, tag, tier, lp, games, winRate string
+	}{
+		{"Player One", "KR1", "大师", "211", "1,675", "51%"},
+		{"Player Two", "KR2", "大师", "226", "1,380", "55%"},
+		{"Player Three", "KR3", "大师", "0", "1,104", "53%"},
+		{"Player Four", "kr2", "大师", "94", "858", "52%"},
+		{"Player Five", "4208", "钻石 2", "20", "841", "51%"},
+		{"Player Six", "KR6", "大师", "811", "768", "50%"},
+	}
+	var table strings.Builder
+	table.WriteString(`<table><caption>Champion Table</caption><tbody>`)
+	for index, player := range players {
+		fmt.Fprintf(&table, `<tr><td>%d</td><td><a href="/zh-cn/lol/summoners/kr/player-%s"><img src="https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon%d.jpg?image=test"><span>%s</span><span>#<!-- -->%s</span></a></td><td><div>%s</div></td><td>%s</td><td>1.00:1</td><td>%s</td><td><span>10胜</span><span>9败</span><span>%s</span></td></tr>`, index+1, player.tag, index+1, player.name, player.tag, player.tier, player.lp, player.games, player.winRate)
+	}
+	table.WriteString(`</tbody></table>`)
+
+	provider := newChampionProvider()
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path != "/zh-cn/lol/leaderboards/champions/nasus" || request.URL.Query().Get("region") != "kr" {
+			return nil, fmt.Errorf("unexpected leaderboard request: %s", request.URL.String())
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(table.String())), Header: make(http.Header)}, nil
+	})}
+
+	got := provider.loadTopPlayers(context.Background(), "nasus")
+	if len(got) != 5 {
+		t.Fatalf("top players = %d, want 5: %#v", len(got), got)
+	}
+	if got[3].Name != "Player Four" || got[3].Games != "858" || got[3].WinRate != 52 || got[3].Tier != "master" {
+		t.Fatalf("fourth player was not parsed from the table: %#v", got[3])
+	}
+	if got[4].Name != "Player Five" || got[4].Tagline != "4208" || got[4].Tier != "diamond 2" || got[4].LP != "20" || got[4].Games != "841" || got[4].WinRate != 51 {
+		t.Fatalf("fifth player was not parsed from the table: %#v", got[4])
+	}
+	if got[4].IconSource != "opgg" || got[4].IconPath != "/meta/images/profile_icons/profileIcon5.jpg" {
+		t.Fatalf("fifth player icon was not normalized: %#v", got[4])
+	}
+}
+
 func TestValidateChampionAssetPathAllowsOPGGProfileIcons(t *testing.T) {
 	host, ok := validateChampionAssetPath("opgg", "/meta/images/profile_icons/profileIcon1594.jpg")
 	if !ok || host != opggAssetHost {
 		t.Fatalf("profile icon path rejected: %q %v", host, ok)
+	}
+}
+
+func TestCommunityDragonAugmentAssetPathsStayScoped(t *testing.T) {
+	requestPath := "/latest/game/assets/maps/cherry/augments/icons/test.png"
+	host, ok := validateChampionAssetPath("communitydragon", requestPath)
+	if !ok || host != communityDragonHost {
+		t.Fatalf("CommunityDragon augment path rejected: %q %v", host, ok)
+	}
+	provider := newChampionProvider()
+	lcuPath, ok := provider.championAssetLCUPath("communitydragon", requestPath)
+	if !ok || lcuPath != "/lol-game-data/assets/ASSETS/maps/cherry/augments/icons/test.png" {
+		t.Fatalf("CommunityDragon LCU path = %q %v", lcuPath, ok)
+	}
+	if _, ok := validateChampionAssetPath("communitydragon", "/latest/other/test.png"); ok {
+		t.Fatal("CommunityDragon proxy accepted an unrelated path")
+	}
+}
+
+func TestAugmentMetadataMergeUsesRealIDsAndPreservesLCUDescriptions(t *testing.T) {
+	lcu := []gameplayAugment{
+		{ID: 1323, Name: "残忍", Description: "客户端真实说明", Rarity: "kGold"},
+		{ID: 1400, Name: "本地条目", Description: ""},
+	}
+	communityDragon := []gameplayAugment{
+		{ID: 1323, Name: "错误的补充名称", Description: "不应覆盖客户端说明", Rarity: "kSilver", IconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/test.png"},
+		{ID: 1400, Name: "远端名称", Description: "远端补充说明", Rarity: "kPrismatic"},
+		{ID: 2323, Name: "新增条目", Description: "新增说明"},
+	}
+
+	merged := mergeGameplayAugmentMetadata(lcu, communityDragon)
+	byID := gameplayAugmentIndexAll(merged)
+	if got := byID[1323].Description; got != "客户端真实说明" {
+		t.Fatalf("LCU description was overwritten: %q", got)
+	}
+	if got := byID[1323].IconPath; got == "" {
+		t.Fatal("CommunityDragon icon was not merged into the real ID")
+	}
+	if got := byID[1400].Description; got != "远端补充说明" {
+		t.Fatalf("empty LCU description was not supplemented: %q", got)
+	}
+	if _, ok := byID[323]; ok {
+		t.Fatal("augment metadata must not use id-1000 mapping")
+	}
+	if _, ok := byID[2323]; !ok {
+		t.Fatal("new CommunityDragon entry was not retained")
+	}
+}
+
+func TestAugmentOfflineGuidanceOnlyFillsMissingMayhemDescriptions(t *testing.T) {
+	if got := augmentDescriptionWithOfflineGuidance(1323, ""); got != augmentOfflineDescription {
+		t.Fatalf("offline mayhem guidance = %q, want %q", got, augmentOfflineDescription)
+	}
+	if got := augmentDescriptionWithOfflineGuidance(1323, "已有说明"); got != "已有说明" {
+		t.Fatalf("existing description was replaced: %q", got)
+	}
+	if got := augmentDescriptionWithOfflineGuidance(323, ""); got != "" {
+		t.Fatalf("non-mayhem empty description got guidance: %q", got)
 	}
 }
 
@@ -129,6 +245,88 @@ func TestChampionAssetLCUPathUsesGameDataRoutes(t *testing.T) {
 	}
 }
 
+func TestLoadRankedFiltersUnknownPositionsBeforeChoosingDefaults(t *testing.T) {
+	positionStats := func(play int, winRate, pickRate, banRate float64, tier, rank int) map[string]any {
+		return map[string]any{
+			"play": play, "win_rate": winRate, "pick_rate": pickRate, "ban_rate": banRate, "kda": 3.4,
+			"tier_data": map[string]any{"tier": tier, "rank": rank},
+		}
+	}
+	data := []map[string]any{
+		{
+			"id": 1,
+			"positions": []map[string]any{
+				{"name": "ALIEN", "stats": positionStats(999, 0.99, 0.99, 0.99, 1, 1)},
+				{"name": "mid", "stats": positionStats(100, 0.51, 0.12, 0.03, 2, 7)},
+			},
+		},
+		{
+			"id":        2,
+			"positions": []map[string]any{{"name": "ALIEN", "stats": positionStats(999, 0.99, 0.99, 0.99, 1, 1)}},
+		},
+	}
+	for id := 3; id <= 51; id++ {
+		data = append(data, map[string]any{
+			"id": id,
+			"positions": []map[string]any{{
+				"name": "top", "stats": positionStats(200+id, 0.50, 0.10, 0.02, 3, 100+id),
+			}},
+		})
+	}
+	fixture, err := json.Marshal(map[string]any{"data": data})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	provider := newChampionProvider()
+	provider.cache = newChampionDataCache(nil)
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Host != opggChampionHost || request.URL.Path != "/api/KR/champions/ranked" || request.URL.Query().Get("tier") != "emerald_plus" {
+			return nil, fmt.Errorf("unexpected ranked request: %s", request.URL.String())
+		}
+		return &http.Response{StatusCode: http.StatusOK, Status: http.StatusText(http.StatusOK), Header: make(http.Header), Body: io.NopCloser(strings.NewReader(string(fixture))), ContentLength: int64(len(fixture)), Request: request}, nil
+	})}
+
+	all, err := provider.loadRanked(context.Background(), "emerald_plus", "all")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all.Rows) != 50 {
+		t.Fatalf("ranked rows = %d, want 50 after dropping the unknown-only row", len(all.Rows))
+	}
+	var defaulted *championRankingRow
+	for index := range all.Rows {
+		if all.Rows[index].ChampionID == 2 {
+			t.Fatalf("unknown-only position row leaked: %#v", all.Rows[index])
+		}
+		if all.Rows[index].ChampionID == 1 {
+			defaulted = &all.Rows[index]
+		}
+	}
+	if defaulted == nil {
+		t.Fatal("row with a valid second position was dropped")
+	}
+	if defaulted.Position != "mid" || len(defaulted.Positions) != 1 || defaulted.Positions[0] != "mid" || defaulted.Play != 100 || defaulted.Rank != 7 || defaulted.Tier != 2 || defaulted.WinRate != 51 || defaulted.PickRate != 12 || defaulted.BanRate != 3 {
+		t.Fatalf("default position did not use the first valid candidate: %#v", defaulted)
+	}
+
+	top, err := provider.loadRanked(context.Background(), "emerald_plus", "TOP")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(top.Rows) != 49 || top.Position != "top" {
+		t.Fatalf("top filter = position %q rows %d", top.Position, len(top.Rows))
+	}
+	for _, row := range top.Rows {
+		if row.Position != "top" || len(row.Positions) != 1 || row.Positions[0] != "top" {
+			t.Fatalf("top filter leaked a non-canonical position: %#v", row)
+		}
+	}
+	if _, err := provider.loadRanked(context.Background(), "emerald_plus", "ALIEN"); err == nil {
+		t.Fatal("unknown ranked position was accepted")
+	}
+}
+
 func TestDecodeNextFlightAndExtractBestArray(t *testing.T) {
 	fragment := `0:["$",{"small":{"data":[{"id":1}]},"champions":[{"champion_id":67,"key":"vayne"},{"champion_id":22,"key":"ashe"}]}}]`
 	quoted, err := json.Marshal(fragment)
@@ -150,9 +348,9 @@ func TestDecodeNextFlightAndExtractBestArray(t *testing.T) {
 }
 
 func TestParseArenaTeamCompositionsAndStats(t *testing.T) {
-	decoded := `{"average_stats":{"win_rate":48.77,"pick_rate":13.85,"ban_rate":42.49,"first_place":16.07,"avg_place":3.56},"teamData":[{"champion_ids":[11,44,350],"champion_id":0,"champions":[{"id":11,"key":"masteryi","name":"无极剑圣","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/MasterYi.png"},{"id":44,"key":"taric","name":"瓦洛兰之盾","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Taric.png"},{"id":350,"key":"yuumi","name":"魔法猫咪","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Yuumi.png"}],"combination_size":3,"play":"342","win_rate":68.13,"first_place_rate":29.53,"average_place":2.85,"pick_rate":0.53}]}`
-	teams := parseArenaTeamCompositions(decoded, `"teamData":`, 3)
-	if len(teams) != 1 || len(teams[0].Champions) != 3 || teams[0].Champions[1].Key != "taric" {
+	decoded := `{"average_stats":{"win_rate":48.77,"pick_rate":13.85,"ban_rate":42.49,"first_place":16.07,"avg_place":3.56},"teamData":[{"champion_ids":[44,350,11],"champion_id":11,"champions":[{"id":44,"key":"taric","name":"瓦洛兰之盾","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Taric.png"},{"id":350,"key":"yuumi","name":"魔法猫咪","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Yuumi.png"},{"id":11,"key":"masteryi","name":"无极剑圣","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/MasterYi.png"}],"combination_size":3,"play":"342","win_rate":68.13,"first_place_rate":29.53,"average_place":2.85,"pick_rate":0.53}]}`
+	teams := parseArenaTeamCompositions(decoded, `"teamData":`, 11, 3)
+	if len(teams) != 1 || len(teams[0].Champions) != 3 || teams[0].Champions[0].Key != "masteryi" || teams[0].Champions[1].Key != "taric" || teams[0].Champions[2].Key != "yuumi" {
 		t.Fatalf("arena team champions were not parsed: %#v", teams)
 	}
 	if teams[0].Games != 342 || teams[0].AveragePlacement != 2.85 || teams[0].FirstPlaceRate != 29.53 || teams[0].WinRate != 68.13 {
@@ -184,38 +382,6 @@ func TestBalancedJSONArrayHandlesQuotedBrackets(t *testing.T) {
 	var rows []map[string]any
 	if err := json.Unmarshal(data, &rows); err != nil || len(rows) != 2 {
 		t.Fatalf("balanced array was invalid: %s (%v)", string(data), err)
-	}
-}
-
-func TestParseChampionBuild(t *testing.T) {
-	document, err := xhtml.Parse(strings.NewReader(`<!doctype html><table>
-<caption>SummonerSpells Table</caption><thead><tr><th>召唤师技能推荐</th></tr></thead><tbody><tr>
-<td><img alt="闪现" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/spell/SummonerFlash.png"><img alt="屏障" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/spell/SummonerBarrier.png"></td>
-<td><strong>69.31</strong><span>4,282 场</span></td><td><strong>49.58%</strong></td></tr></tbody></table>
-<table><caption>Items Table</caption><thead><tr><th>出门装</th></tr></thead><tbody><tr>
-<td><img alt="多兰之刃" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/item/1055.png"></td><td>72.86% 4,491 场</td><td>48.19%</td></tr></tbody></table>
-<table><caption>Depth 4 Items Table</caption><thead><tr><th>第四件装备</th></tr></thead><tbody><tr>
-<td><img alt="无尽之刃" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/item/3031.png"></td><td>62.08% 683 场</td></tr></tbody></table>
-<table><caption>Prismatic Items Table</caption><thead><tr><th>棱彩装备</th></tr></thead><tbody><tr>
-<td><img alt="残忍" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/item/447104.png"></td><td>13.72% 17,675 场</td><td>58.06%</td></tr></tbody></table>`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	build := parseChampionBuild(document)
-	if len(build.SummonerSpells) != 1 || len(build.SummonerSpells[0].Assets) != 2 {
-		t.Fatalf("summoner spells were not parsed: %#v", build.SummonerSpells)
-	}
-	if build.SummonerSpells[0].PickRate != 69.31 || build.SummonerSpells[0].Games != 4282 || build.SummonerSpells[0].WinRate != 49.58 {
-		t.Fatalf("summoner metrics mismatch: %#v", build.SummonerSpells[0])
-	}
-	if len(build.StarterItems) != 1 || build.StarterItems[0].Assets[0].Kind != "item" {
-		t.Fatalf("starter items were not parsed: %#v", build.StarterItems)
-	}
-	if len(build.FourthItems) != 1 || build.FourthItems[0].WinRate != 62.08 || build.FourthItems[0].PickRate != 0 {
-		t.Fatalf("late item metrics were not normalized: %#v", build.FourthItems)
-	}
-	if len(build.PrismItems) != 1 || build.PrismItems[0].Assets[0].Name != "残忍" || build.PrismItems[0].WinRate != 58.06 {
-		t.Fatalf("prismatic items were not parsed: %#v", build.PrismItems)
 	}
 }
 
@@ -294,8 +460,8 @@ func TestCleanMarkupAndRarity(t *testing.T) {
 
 func TestParseChampionCounters(t *testing.T) {
 	document, err := xhtml.Parse(strings.NewReader(`<!doctype html><main><section>
-<div><div>对线劣势的英雄</div></div><div><ul><li><a href="/zh-cn/lol/champions/vayne/counters?target_champion=yunara"><img alt="芸阿娜" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Yunara.png"><strong>41.27%</strong><span>126 场</span></a></li></ul></div>
-<div><div>强烈对抗</div></div><div><ul><li><a href="/zh-cn/lol/champions/vayne/counters?target_champion=kaisa"><img alt="卡莎" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Kaisa.png"><strong>58.73%</strong><span>1,206 场</span></a></li></ul></div>
+<div><div>劣势对抗</div></div><div><ul><li><a href="/zh-cn/lol/champions/vayne/counters?target_champion=yunara"><img alt="芸阿娜" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Yunara.png"><strong>41.27%</strong><span>126 场</span></a></li></ul></div>
+<div><div>优势对抗</div></div><div><ul><li><a href="/zh-cn/lol/champions/vayne/counters?target_champion=kaisa"><img alt="卡莎" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Kaisa.png"><strong>58.73%</strong><span>1,206 场</span></a></li></ul></div>
 </section></main>`))
 	if err != nil {
 		t.Fatal(err)
@@ -306,6 +472,29 @@ func TestParseChampionCounters(t *testing.T) {
 	}
 	if len(counters.StrongAgainst) != 1 || counters.StrongAgainst[0].Key != "kaisa" || counters.StrongAgainst[0].Games != 1206 {
 		t.Fatalf("strong counters were not parsed: %#v", counters.StrongAgainst)
+	}
+}
+
+func TestParseChampionCountersAcceptsNonDivSectionHeadings(t *testing.T) {
+	document, err := xhtml.Parse(strings.NewReader(`<main><section>
+<h3>劣势对抗</h3><div><ul>
+<li><a href="/counters?target_champion=yunara"><img alt="芸阿娜" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Yunara.png"><strong>41.27%</strong><span>126 场</span></a></li>
+<li><a href="/counters?target_champion=kaisa"><img alt="卡莎" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Kaisa.png"><strong>43.10%</strong><span>90 场</span></a></li>
+</ul></div>
+<span>优势对抗</span><div><ul>
+<li><a href="/counters?target_champion=vayne"><img alt="薇恩" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Vayne.png"><strong>58.73%</strong><span>1,206 场</span></a></li>
+<li><a href="/counters?target_champion=ezreal"><img alt="伊泽瑞尔" src="https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Ezreal.png"><strong>56.20%</strong><span>800 场</span></a></li>
+</ul></div>
+</section></main>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	counters := parseChampionCounters(document)
+	if len(counters.WeakAgainst) != 2 || len(counters.StrongAgainst) != 2 {
+		t.Fatalf("non-div headings were not parsed: %#v", counters)
+	}
+	if counters.WeakAgainst[0].Key != "yunara" || counters.StrongAgainst[0].Key != "vayne" {
+		t.Fatalf("counter grouping changed: %#v", counters)
 	}
 }
 
@@ -331,5 +520,313 @@ func TestDecorateChampionAssetAddsTooltipMetadata(t *testing.T) {
 	})
 	if asset.Name != "破败王者之刃" || asset.Description == "" {
 		t.Fatalf("item tooltip metadata was not applied: %#v", asset)
+	}
+}
+
+func TestFilterChampionItemComponentsKeepsFinalAndUnknownItems(t *testing.T) {
+	rows := []championMetricRow{{Assets: []championAsset{
+		{ID: 3070, Kind: "item", Name: "女神之泪", Path: "/cdn/16.16/img/item/3070.png"},
+		{ID: 6655, Kind: "item", Name: "卢登的伙伴", Path: "/cdn/16.16/img/item/6655.png"},
+		{ID: 999999, Kind: "item", Name: "未知上游装备", Path: "/cdn/16.16/img/item/999999.png"},
+	}}}
+	descriptions := map[string]championAssetDescription{
+		"item/3070.png": {Name: "女神之泪", BuildsInto: true},
+		"item/6655.png": {Name: "卢登的伙伴"},
+	}
+	filtered := filterChampionItemComponents(rows, descriptions)
+	if len(filtered) != 1 || len(filtered[0].Assets) != 2 {
+		t.Fatalf("filtered routes = %#v", filtered)
+	}
+	if filtered[0].Assets[0].ID != 6655 || filtered[0].Assets[1].ID != 999999 {
+		t.Fatalf("final or unknown item was removed: %#v", filtered[0].Assets)
+	}
+}
+
+func TestFillMissingChampionCountersPreservesAvailableSide(t *testing.T) {
+	current := championCounterSections{
+		StrongAgainst: []championCounterRow{{ChampionID: 24, Name: "贾克斯"}},
+	}
+	fallback := championCounterSections{
+		WeakAgainst: []championCounterRow{{ChampionID: 122, Name: "德莱厄斯"}},
+		StrongAgainst: []championCounterRow{
+			{ChampionID: 24, Name: "贾克斯"},
+			{ChampionID: 92, Name: "锐雯"},
+		},
+	}
+	if !fillMissingChampionCounters(&current, fallback) {
+		t.Fatal("missing counter side was not filled")
+	}
+	if len(current.WeakAgainst) != 1 || current.WeakAgainst[0].ChampionID != 122 {
+		t.Fatalf("weak counters were not filled: %#v", current.WeakAgainst)
+	}
+	if len(current.StrongAgainst) != 2 || current.StrongAgainst[0].ChampionID != 24 || current.StrongAgainst[1].ChampionID != 92 {
+		t.Fatalf("available strong counters were not preserved and extended: %#v", current.StrongAgainst)
+	}
+}
+
+func TestLoadStructuredCountersUsesOnlyOPGGDetailPayload(t *testing.T) {
+	provider := newChampionProvider()
+	provider.championIDs["jax"] = 24
+	provider.championMeta[24] = championMetadata{ID: 24, Slug: "jax", Key: "Jax"}
+	for _, id := range []int{92, 122, 164, 266, 891} {
+		provider.championMeta[id] = championMetadata{ID: id, Key: strconv.Itoa(id), NameZH: strconv.Itoa(id)}
+	}
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Host != opggChampionHost || request.URL.Path != "/api/KR/champions/ranked/24/TOP" || request.URL.Query().Get("tier") != championCounterFallbackTier {
+			return nil, fmt.Errorf("unexpected counter fallback request: %s", request.URL.String())
+		}
+		body := `{"data":{"summary":{"id":24},"counters":[{"champion_id":92,"play":100,"win":40},{"champion_id":122,"play":100,"win":45},{"champion_id":164,"play":100,"win":50},{"champion_id":266,"play":100,"win":55},{"champion_id":891,"play":100,"win":60}]},"meta":{"version":"16.16"}}`
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
+	})}
+	counters, err := provider.loadStructuredCounters(context.Background(), "ranked", "jax", "top", championCounterFallbackTier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(counters.WeakAgainst) != 3 || len(counters.StrongAgainst) != 2 {
+		t.Fatalf("counter fallback = %#v", counters)
+	}
+	seen := make(map[int]bool)
+	for _, row := range counters.WeakAgainst {
+		seen[row.ChampionID] = true
+	}
+	for _, row := range counters.StrongAgainst {
+		if seen[row.ChampionID] {
+			t.Fatalf("counter appeared on both sides: %#v", counters)
+		}
+	}
+}
+
+func TestStructuredCountersDropsSubjectAndDuplicateRows(t *testing.T) {
+	provider := newChampionProvider()
+	provider.championMeta[24] = championMetadata{ID: 24, Key: "jax", NameZH: "贾克斯"}
+	for _, id := range []int{92, 122, 164, 266, 891} {
+		provider.championMeta[id] = championMetadata{ID: id, Key: strconv.Itoa(id), NameZH: strconv.Itoa(id)}
+	}
+	counters := provider.structuredCountersForChampion([]opggCounter{
+		{ChampionID: 24, Play: 999, Win: 500}, // OP.GG occasionally echoes the subject.
+		{ChampionID: 92, Play: 100, Win: 40},
+		{ChampionID: 122, Play: 100, Win: 45},
+		{ChampionID: 164, Play: 100, Win: 55},
+		{ChampionID: 266, Play: 100, Win: 60},
+		{ChampionID: 266, Play: 90, Win: 50}, // Duplicate must not appear twice.
+	}, 24)
+	seen := make(map[int]bool)
+	for _, rows := range [][]championCounterRow{counters.WeakAgainst, counters.StrongAgainst} {
+		for _, row := range rows {
+			if row.ChampionID == 24 || seen[row.ChampionID] {
+				t.Fatalf("subject or duplicate counter survived: %#v", counters)
+			}
+			seen[row.ChampionID] = true
+		}
+	}
+}
+
+func TestLoadStructuredCountersUsesTopLevelCounters(t *testing.T) {
+	provider := newChampionProvider()
+	provider.championIDs["jax"] = 24
+	provider.championMeta[24] = championMetadata{ID: 24, Slug: "jax", Key: "Jax", NameZH: "贾克斯"}
+	for id := 100; id < 130; id++ {
+		provider.championMeta[id] = championMetadata{ID: id, Key: strconv.Itoa(id), NameZH: strconv.Itoa(id)}
+	}
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		rows := make([]string, 0, 30)
+		for index := 0; index < 30; index++ {
+			rows = append(rows, fmt.Sprintf(`{"champion_id":%d,"play":1000,"win":%d}`, 100+index, 30+index))
+		}
+		body := fmt.Sprintf(`{"data":{"summary":{"id":24,"positions":[{"name":"TOP","counters":[{"champion_id":100,"play":100,"win":40},{"champion_id":101,"play":100,"win":45},{"champion_id":102,"play":100,"win":55}]}]},"counters":[%s]},"meta":{"version":"16.16"}}`, strings.Join(rows, ","))
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
+	})}
+	counters, err := provider.loadStructuredCounters(context.Background(), "ranked", "jax", "top", championCounterFallbackTier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(counters.WeakAgainst) != 5 || len(counters.StrongAgainst) != 5 {
+		t.Fatalf("top-level counters were not retained for strong/weak split: %#v", counters)
+	}
+	for _, row := range append(counters.WeakAgainst, counters.StrongAgainst...) {
+		if row.ChampionID < 100 || row.ChampionID >= 130 {
+			t.Fatalf("summary counter leaked into result: %#v", counters)
+		}
+	}
+}
+
+func TestLoadStructuredDetailUsesTopLevelCounters(t *testing.T) {
+	provider := newChampionProvider()
+	provider.championIDs["jax"] = 24
+	provider.championMeta[24] = championMetadata{ID: 24, Slug: "jax", Key: "Jax", NameZH: "贾克斯"}
+	for id := 100; id < 130; id++ {
+		provider.championMeta[id] = championMetadata{ID: id, Key: strconv.Itoa(id), NameZH: strconv.Itoa(id)}
+	}
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Host == opggPageHost {
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`no item depths`)), Header: make(http.Header)}, nil
+		}
+		rows := make([]string, 0, 30)
+		for index := 0; index < 30; index++ {
+			rows = append(rows, fmt.Sprintf(`{"champion_id":%d,"play":1000,"win":%d}`, 100+index, 30+index))
+		}
+		cores := make([]string, 0, 6)
+		for index := 0; index < 6; index++ {
+			cores = append(cores, fmt.Sprintf(`{"ids":[%d,%d,%d],"play":%d,"win":20}`, 3000+index*3, 3001+index*3, 3002+index*3, 49-index))
+		}
+		body := fmt.Sprintf(`{"data":{"summary":{"id":24,"average_stats":{},"positions":[{"name":"TOP","counters":[{"champion_id":100,"play":100,"win":40},{"champion_id":101,"play":100,"win":45},{"champion_id":102,"play":100,"win":55}]}]},"core_items":[%s],"counters":[%s]},"meta":{"version":"16.16"}}`, strings.Join(cores, ","), strings.Join(rows, ","))
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
+	})}
+	detail, err := provider.loadStructuredDetail(context.Background(), "ranked", "jax", "top", championCounterFallbackTier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(detail.Counters.WeakAgainst) != 5 || len(detail.Counters.StrongAgainst) != 5 {
+		t.Fatalf("detail used summary counters: %#v", detail.Counters)
+	}
+	if len(detail.Build.CoreItems) != 6 {
+		t.Fatalf("ranked detail sample-gated OP.GG core recommendations: %#v", detail.Build.CoreItems)
+	}
+}
+
+func TestParseOPGGItemDepthsExpandsDelayedFifthItemGames(t *testing.T) {
+	payload := []byte(`1:["$","tr",null,{"children":["depth_4_item_0",{"metaType":"item","metaId":6333},{"children":["61.19","%"]},{"children":"572 场"}]}]
+2:["$","tr",null,{"children":["depth_5_item_0",{"metaId":3026,"metaType":"item"},{"children":["57.14","%"]},"$L7e"]}]
+7e:["$","span",null,{"children":"49 场"}]`)
+	depths := parseOPGGDepthRows(payload)
+	if len(depths[4]) != 1 || depths[4][0].Assets[0].ID != 6333 || depths[4][0].WinRate != 61.19 || depths[4][0].Games != 572 {
+		t.Fatalf("fourth items = %#v", depths[4])
+	}
+	if len(depths[5]) != 1 || depths[5][0].Assets[0].ID != 3026 || depths[5][0].WinRate != 57.14 || depths[5][0].Games != 49 {
+		t.Fatalf("fifth items = %#v", depths[5])
+	}
+}
+
+func TestParseOPGGItemDepthsDeduplicatesExpandedRowsBeforeApplyingLimit(t *testing.T) {
+	// Current OP.GG RSC contains a long expanded mobile row followed by the
+	// compact desktop row with the same logical key. The duplicate item_0 must
+	// not consume one of the five recommendation slots.
+	duplicate := `"depth_5_item_0",{"metaType":"item","metaId":3089,"children":[54.35,"%"],"sample":"20 场","filler":"` + strings.Repeat("x", 5000) + `"}`
+	rows := []string{
+		duplicate,
+		`"depth_5_item_0",{"metaType":"item","metaId":3089,"children":[54.35,"%"],"sample":"46 场"}`,
+		`"depth_5_item_1",{"metaType":"item","metaId":3157,"children":[48.28,"%"],"sample":"29 场"}`,
+		`"depth_5_item_2",{"metaType":"item","metaId":3135,"children":[52,"%"],"sample":"25 场"}`,
+		`"depth_5_item_3",{"metaType":"item","metaId":3110,"children":[58.33,"%"],"sample":"12 场"}`,
+		`"depth_5_item_4",{"metaType":"item","metaId":3165,"children":[75,"%"],"sample":"4 场"}`,
+	}
+	depths := parseOPGGDepthRows([]byte(strings.Join(rows, "\n")))
+	if len(depths[5]) != 5 {
+		t.Fatalf("fifth-item rows = %#v", depths[5])
+	}
+	if depths[5][0].Assets[0].ID != 3089 || depths[5][0].Games != 46 || depths[5][4].Assets[0].ID != 3165 {
+		t.Fatalf("expanded duplicate displaced an OP.GG recommendation: %#v", depths[5])
+	}
+}
+
+func TestRankedCoreRecommendationsKeepCompleteOPGGOrderBelowLocalSampleGate(t *testing.T) {
+	provider := newChampionProvider()
+	values := make([]opggMetric, 0, championCoreRecommendationLimit+1)
+	for index := 0; index < championCoreRecommendationLimit+1; index++ {
+		values = append(values, opggMetric{IDs: []int{3000 + index}, Play: 49 - index, Win: 20})
+	}
+	rows := provider.structuredRecommendationMetrics(values, "item", "core", championCoreRecommendationLimit)
+	if len(rows) != championCoreRecommendationLimit {
+		t.Fatalf("ranked core recommendations were sample-gated: %#v", rows)
+	}
+	for index, row := range rows {
+		if len(row.Assets) != 1 || row.Assets[0].ID != 3000+index {
+			t.Fatalf("OP.GG order changed at %d: %#v", index, rows)
+		}
+	}
+}
+
+func TestParseOPGGItemDepthsAcceptsCurrentNumericRSCPercentages(t *testing.T) {
+	payload := []byte(`1:["$","tr",null,{"children":["depth_4_item_0",{"metaType":"item","metaId":6333},{"children":[54.05,"%"]},{"children":"1,112 场"}]}]
+2:["$","tr",null,{"children":["depth_5_item_0",{"metaType":"item","metaId":3026},{"children":[63.19,"%"]},{"children":"49 场"}]}]`)
+	depths := parseOPGGDepthRows(payload)
+	if len(depths[4]) != 1 || depths[4][0].WinRate != 54.05 || depths[4][0].Games != 1112 {
+		t.Fatalf("current fourth item shape was not parsed: %#v", depths[4])
+	}
+	if len(depths[5]) != 1 || depths[5][0].WinRate != 63.19 || depths[5][0].Games != 49 {
+		t.Fatalf("current fifth item shape was not parsed: %#v", depths[5])
+	}
+}
+
+func TestParseOPGGItemDepthsKeepsZeroWinRateWithRealGames(t *testing.T) {
+	payload := []byte(`1:["$","tr",null,{"children":["depth_5_item_0",{"metaType":"item","metaId":3110},{"children":[0,"%"]},{"children":"1 场"}]}]
+2:["$","tr",null,{"children":["depth_6_item_0",{"metaType":"item","metaId":3089},{"children":[0,"%"]},{"children":"1场"}]}]`)
+	depths := parseOPGGDepthRows(payload)
+	for _, depth := range []int{5, 6} {
+		if len(depths[depth]) != 1 || depths[depth][0].WinRate != 0 || depths[depth][0].Games != 1 {
+			t.Fatalf("zero-win depth %d row was dropped: %#v", depth, depths[depth])
+		}
+	}
+}
+
+func TestParseOPGGItemDepthsIncludesSixthItem(t *testing.T) {
+	payload := []byte(`1:["$","tr",null,{"children":["depth_6_item_0",{"metaType":"item","metaId":3089},{"children":[55.5,"%"]},{"children":"123 场"}]}]`)
+	depths := parseOPGGDepthRows(payload)
+	if len(depths[6]) != 1 || depths[6][0].Assets[0].ID != 3089 || depths[6][0].Games != 123 {
+		t.Fatalf("sixth items = %#v", depths[6])
+	}
+}
+
+func TestLoadOPGGDepthRowsAllowsMissingSixthItemDepth(t *testing.T) {
+	payload := `1:["$","tr",null,{"children":["depth_4_item_0",{"metaType":"item","metaId":6333},{"children":[54.05,"%"]},{"children":"1,112 场"}]}]
+2:["$","tr",null,{"children":["depth_5_item_0",{"metaType":"item","metaId":3026},{"children":[63.19,"%"]},{"children":"49 场"}]}]`
+	provider := newChampionProvider()
+	provider.cache = nil
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Host != opggPageHost || request.Header.Get("Accept") != "text/x-component" || request.Header.Get("RSC") != "1" {
+			t.Fatalf("unexpected OP.GG depth request: %s headers=%v", request.URL, request.Header)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(payload)), Header: make(http.Header)}, nil
+	})}
+
+	depths, _, err := provider.loadOPGGDepthRows(context.Background(), "lulu", "support", "emerald_plus", "16.16.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(depths[4]) != 1 || len(depths[5]) != 1 || len(depths[6]) != 0 {
+		t.Fatalf("missing sixth depth invalidated usable fourth/fifth rows: %#v", depths)
+	}
+}
+
+func TestLoadOPGGDepthRowsRejectsMissingFifthItemDepth(t *testing.T) {
+	payload := `1:["$","tr",null,{"children":["depth_4_item_0",{"metaType":"item","metaId":6333},{"children":[54.05,"%"]},{"children":"1,112 场"}]}]
+2:["$","tr",null,{"children":["depth_6_item_0",{"metaType":"item","metaId":3089},{"children":[55.5,"%"]},{"children":"123 场"}]}]`
+	provider := newChampionProvider()
+	provider.cache = nil
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(payload)), Header: make(http.Header)}, nil
+	})}
+
+	if _, _, err := provider.loadOPGGDepthRows(context.Background(), "lulu", "support", "emerald_plus", "16.16.1"); err == nil || !strings.Contains(err.Error(), "item-depth response changed") {
+		t.Fatalf("missing fifth depth was accepted: %v", err)
+	}
+}
+
+func TestParseOPGGItemDepthsKeepsThreeRowsForFiveChampionFixtures(t *testing.T) {
+	for _, champion := range []string{"jax", "leesin", "malphite", "jayce", "sylas"} {
+		var rows []string
+		for _, depth := range []int{4, 5, 6} {
+			for index := 0; index < 3; index++ {
+				rows = append(rows, fmt.Sprintf(`%d:["$","tr",null,{"children":["depth_%d_item_%d",{"metaType":"item","metaId":%d},{"children":[55.0,"%%"]},{"children":"%d 场"}]}]`, len(rows)+1, depth, index, depth*100+index, 200-index))
+			}
+		}
+		depths := parseOPGGDepthRows([]byte(strings.Join(rows, "\n")))
+		for _, depth := range []int{4, 5, 6} {
+			if len(depths[depth]) < 3 {
+				t.Fatalf("%s depth %d rows = %#v", champion, depth, depths[depth])
+			}
+		}
+	}
+}
+
+func TestOPGGDepthRowsAreNotDeduplicatedAgainstCoreItems(t *testing.T) {
+	// 第四/五/六件一律原样展示 OP.GG 给的行，不再剔除核心装里出现过的装备。
+	// 去重看着「更干净」，但会把上游真实的推荐删掉——用户反复反馈的就是这个。
+	source, err := os.ReadFile("champions_structured.go")
+	if err != nil {
+		t.Fatalf("read champions_structured.go: %v", err)
+	}
+	if strings.Contains(string(source), "filterOPGGDepthCoreItems") {
+		t.Fatal("depth rows must keep the OP.GG rows verbatim; the core-item dedup must stay deleted")
 	}
 }

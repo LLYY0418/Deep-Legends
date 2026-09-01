@@ -96,7 +96,10 @@ func TestConvenienceReadyCheckPostsAcceptOnce(t *testing.T) {
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	runner := newConvenienceRunner(nil, nil)
-	runner.apply(convenienceSettings{AutoAccept: true})
+	settings := defaultWatchSettings()
+	settings.Rules.AutoAccept.Enabled = true
+	settings.Rules.AutoAccept.DelayMS = 0
+	runner.apply(settings)
 	runner.handlePhase(client, "ReadyCheck")
 	runner.handlePhase(client, "ReadyCheck")
 	select {
@@ -130,7 +133,7 @@ func TestConvenienceDisabledPhaseDoesNotCallClient(t *testing.T) {
 
 func TestConvenienceReconnectPostsAndNotifies(t *testing.T) {
 	done := make(chan string, 1)
-	events := make(chan string, 1)
+	events := make(chan string, 4)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		done <- r.Method + " " + r.URL.Path
 		w.WriteHeader(http.StatusNoContent)
@@ -138,19 +141,30 @@ func TestConvenienceReconnectPostsAndNotifies(t *testing.T) {
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	runner := newConvenienceRunner(nil, func(event string) { events <- event })
-	runner.apply(convenienceSettings{AutoReconnect: true})
+	settings := defaultWatchSettings()
+	settings.Rules.AutoReconnect.Enabled = true
+	settings.Rules.AutoReconnect.DelayMS = 3000
+	runner.apply(settings)
 	runner.handlePhase(client, "Reconnect")
+	select {
+	case event := <-events:
+		if event != "watch:armed:reconnect:3000" {
+			t.Fatalf("armed event = %q", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("reconnect was not armed")
+	}
 	select {
 	case got := <-done:
 		if got != "POST /lol-gameflow/v1/reconnect" {
 			t.Fatalf("got %q", got)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(4 * time.Second):
 		t.Fatal("reconnect was not posted")
 	}
 	select {
 	case event := <-events:
-		if event != "convenience:reconnect" {
+		if event != "watch:fired:reconnect" {
 			t.Fatalf("event = %q", event)
 		}
 	case <-time.After(2 * time.Second):

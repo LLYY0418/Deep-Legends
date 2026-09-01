@@ -65,18 +65,74 @@ type LCUClient struct {
 	region        string
 	rsoPlatform   string
 	platformProbe bool
+	// inventoryV1Failures remembers a client-version-specific dead endpoint
+	// during this client session so every snapshot retry does not repeat it.
+	inventoryV1Failures int
+	inventoryV1Disabled bool
+}
+
+const inventoryV1FailureBudget = 3
+
+func (c *LCUClient) noteInventoryV1Failure() (int, bool) {
+	if c == nil {
+		return 0, false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.inventoryV1Failures++
+	if c.inventoryV1Failures >= inventoryV1FailureBudget {
+		c.inventoryV1Disabled = true
+	}
+	return c.inventoryV1Failures, c.inventoryV1Disabled
+}
+
+func (c *LCUClient) resetInventoryV1Failures() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.inventoryV1Failures = 0
+	c.inventoryV1Disabled = false
+	c.mu.Unlock()
+}
+
+func (c *LCUClient) disableInventoryV1() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.inventoryV1Disabled = true
+	c.mu.Unlock()
+}
+
+func (c *LCUClient) inventoryV1DisabledNow() bool {
+	if c == nil {
+		return false
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.inventoryV1Disabled
 }
 
 type LCUHTTPError struct {
 	Method     string
 	Path       string
 	StatusCode int
+	ErrorCode  string
+	Message    string
 }
 
 func (e *LCUHTTPError) Error() string {
 	method := e.Method
 	if method == "" {
 		method = http.MethodGet
+	}
+	detail := strings.TrimSpace(e.ErrorCode)
+	if detail == "" {
+		detail = strings.TrimSpace(e.Message)
+	}
+	if detail != "" {
+		return fmt.Sprintf("LCU %s %s: HTTP %d (%s)", method, e.Path, e.StatusCode, detail)
 	}
 	return fmt.Sprintf("LCU %s %s: HTTP %d", method, e.Path, e.StatusCode)
 }
@@ -392,7 +448,11 @@ func (c *LCUClient) probe() error {
 }
 
 func (c *LCUClient) GetJSON(path string, target any) error {
-	data, err := c.GetBytes(path)
+	return c.GetJSONContext(context.Background(), path, target)
+}
+
+func (c *LCUClient) GetJSONContext(ctx context.Context, path string, target any) error {
+	data, err := c.GetBytesContext(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -445,8 +505,14 @@ func (c *LCUClient) RequestJSON(ctx context.Context, method, path string, body, 
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
-		return &LCUHTTPError{Method: method, Path: path, StatusCode: response.StatusCode}
+		data, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+		_, _ = io.Copy(io.Discard, response.Body)
+		var payload struct {
+			ErrorCode string `json:"errorCode"`
+			Message   string `json:"message"`
+		}
+		_ = json.Unmarshal(data, &payload)
+		return &LCUHTTPError{Method: method, Path: path, StatusCode: response.StatusCode, ErrorCode: payload.ErrorCode, Message: payload.Message}
 	}
 	if target == nil || response.StatusCode == http.StatusNoContent {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))

@@ -124,6 +124,7 @@
       state.groups = Array.isArray(data.groups) ? data.groups : [];
       state.friends = Array.isArray(data.friends) ? data.friends : [];
       state.stale = false;
+      window.dispatchEvent(new CustomEvent("deep-legends:friends-presence", { detail: { friends: state.friends } }));
     } catch (error) {
       state.error = error?.message || "读取好友列表失败";
     } finally {
@@ -207,10 +208,10 @@
     const champion = !offlineSection && kind === "ingame" && friend.championId && (friend.product || "league_of_legends") === "league_of_legends"
       ? `<img class="friend-champion" src="${championIcon(friend.championId)}" alt="" loading="lazy" decoding="async">`
       : "";
-    return `<button class="friend-row${offlineSection ? " is-offline" : ""}" type="button" role="listitem" data-game-name="${escapeHTML(friend.gameName)}" data-tag-line="${escapeHTML(friend.tagLine || "")}" title="查看 ${escapeHTML(nameTitle)} 的战绩">
+    return `<button class="friend-row${offlineSection ? " is-offline" : ""}" type="button" role="listitem" data-player-ref="${escapeHTML(friend.playerRef || "")}" data-game-name="${escapeHTML(friend.gameName)}" data-tag-line="${escapeHTML(friend.tagLine || "")}" data-tooltip="${escapeHTML(nameTitle)}" data-tooltip-overflow=".friend-game-name" data-tooltip-size="compact"${friend.playerRef ? "" : " disabled"}>
       <span class="friend-avatar"><img src="${profileIcon(friend.icon)}" alt="" loading="lazy" decoding="async"><span class="friend-presence ${kind}"></span></span>
       <span class="friend-copy">
-        <span class="friend-name"><span>${escapeHTML(friend.gameName)}</span>${tag}${note}</span>
+        <span class="friend-name"><span class="friend-player-name"><span class="friend-game-name">${escapeHTML(friend.gameName)}</span>${tag}</span>${note}</span>
         <span class="friend-status ${kind}">${statusHTML(friend, kind)}</span>
       </span>
       ${champion}<span class="friend-open-hint" aria-hidden="true">战绩 ›</span>
@@ -260,16 +261,17 @@
     const online = state.friends.filter((friend) => presenceKind(friend) !== "offline").length;
     el.count.textContent = String(online);
     el.count.hidden = !state.connected || !state.friends.length;
-    el.toggle.title = state.connected ? `好友（在线 ${online} / ${state.friends.length}）` : "好友（未连接客户端）";
+    el.toggle.dataset.tooltip = state.connected ? `好友（在线 ${online} / ${state.friends.length}）` : "好友（未连接客户端）";
+    if (el.toggle.hasAttribute("aria-describedby")) document.dispatchEvent(new CustomEvent("deep-legends:tooltip-hide", { detail: { anchor: el.toggle } }));
   }
 
-  /* ---------- 对局时长每 30 秒原位刷新，避免整列表重绘 ---------- */
+  /* ---------- 对局时长每秒原位刷新，避免整列表重绘 ---------- */
   function updateDurations() {
     for (const node of el.list.querySelectorAll("[data-started]")) {
       node.textContent = formatDuration(Date.now() - Number(node.dataset.started));
     }
   }
-  function startTick() { stopTick(); state.tickTimer = setInterval(updateDurations, 30_000); }
+  function startTick() { stopTick(); state.tickTimer = setInterval(updateDurations, 1_000); }
   function stopTick() { clearInterval(state.tickTimer); state.tickTimer = 0; }
 
   /* ---------- 打开 / 收起 ---------- */
@@ -280,7 +282,7 @@
     if (open) {
       el.dock.classList.add("is-open");
       render();
-      if (state.stale || state.error) void loadFriends();
+      void loadFriends();
       startTick();
       el.search.focus({ preventScroll: true });
     } else {
@@ -314,9 +316,9 @@
       return;
     }
     const row = event.target.closest(".friend-row");
-    if (!row) return;
+    if (!row?.dataset.playerRef) return;
     window.dispatchEvent(new CustomEvent("deep-legends:open-player", {
-      detail: { gameName: row.dataset.gameName, tagLine: row.dataset.tagLine, region: "cn", source: "search" },
+      detail: { playerRef: row.dataset.playerRef, gameName: row.dataset.gameName, tagLine: row.dataset.tagLine, region: "cn", source: "search" },
     }));
     setOpen(false);
   });
@@ -354,6 +356,7 @@
       state.groups = [];
       state.friends = [];
       state.error = "";
+      window.dispatchEvent(new CustomEvent("deep-legends:friends-presence", { detail: { friends: [] } }));
       updateBadge();
       if (state.open) render();
     }

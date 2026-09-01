@@ -2,9 +2,17 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
+	"image/png"
+	"io"
+	"io/fs"
+	"mime"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -26,6 +34,40 @@ func TestBootstrapSetsHttpOnlyCookieAndRedirects(t *testing.T) {
 	}
 }
 
+func TestLootIconPNGsUseRGBAColorType(t *testing.T) {
+	paths, err := filepath.Glob("web/loot-icons/*.png")
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("loot icon glob: paths=%v err=%v", paths, err)
+	}
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		if len(data) < 26 || !bytes.Equal(data[:8], []byte("\x89PNG\r\n\x1a\n")) || string(data[12:16]) != "IHDR" {
+			t.Fatalf("%s is not a valid PNG with an IHDR header", path)
+		}
+		if colorType := data[25]; colorType != 6 {
+			t.Fatalf("%s PNG color type = %d, want 6 (RGBA)", path, colorType)
+		}
+		if filepath.Base(path) != "promotion-chest.png" {
+			continue
+		}
+		if width, height := binary.BigEndian.Uint32(data[16:20]), binary.BigEndian.Uint32(data[20:24]); width != 512 || height != 512 {
+			t.Fatalf("promotion chest dimensions = %dx%d, want 512x512", width, height)
+		}
+		decoded, err := png.Decode(bytes.NewReader(data))
+		if err != nil {
+			t.Fatalf("decode promotion chest: %v", err)
+		}
+		_, _, _, cornerAlpha := decoded.At(0, 0).RGBA()
+		_, _, _, centerAlpha := decoded.At(decoded.Bounds().Dx()/2, decoded.Bounds().Dy()/2).RGBA()
+		if cornerAlpha != 0 || centerAlpha == 0 {
+			t.Fatalf("promotion chest alpha: corner=%d center=%d", cornerAlpha, centerAlpha)
+		}
+	}
+}
+
 func TestBootstrapReissuesCookieForTrustedNavigation(t *testing.T) {
 	a := &app{token: "test-secret"}
 	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -40,6 +82,129 @@ func TestBootstrapReissuesCookieForTrustedNavigation(t *testing.T) {
 	cookies := recorder.Result().Cookies()
 	if len(cookies) != 1 || cookies[0].Value != "test-secret" || !cookies[0].HttpOnly || cookies[0].MaxAge <= 0 {
 		t.Fatalf("trusted navigation should reissue session cookie, got %#v", cookies)
+	}
+}
+
+func TestStatusIncludesBuildFingerprint(t *testing.T) {
+	a := &app{}
+	recorder := httptest.NewRecorder()
+	a.handleStatus(recorder, httptest.NewRequest(http.MethodGet, "/api/status", nil))
+	var response statusResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(response.BuildFingerprint) == "" {
+		t.Fatalf("status omitted build fingerprint: %s", recorder.Body.String())
+	}
+}
+
+func TestEmbeddedFilesystemExcludesDevOnlyFiles(t *testing.T) {
+	for _, present := range []string{
+		"web/champions.js",
+		"web/build-item-row.css",
+		"web/index.html",
+		"web/app-icon.png",
+		"web/image-unavailable.svg",
+		"web/arena-team-icons/gromp.svg",
+		"web/position-icons/all.svg",
+		"web/tier-icons/1.svg",
+		"web/rune-styles/precision.svg",
+		"web/loot-icons/sanctum-spark.svg",
+		"web/loot-icons/hextech-key.png",
+		"web/rank-crests/diamond.png",
+		// 侧边栏字标字体和它的版权/授权 notice 文本都必须随二进制一起分发：
+		// 字体丢了字标会静默跌回系统衬线体（这种回归在开发机上看不出来，
+		// 因为开发机上装着别的衬线体），notice 丢了版权来源就没法追溯。
+		"web/beaufort-for-lol-bold.woff2",
+		"web/beaufort-for-lol-notice.txt",
+	} {
+		if _, err := embedded.ReadFile(present); err != nil {
+			t.Fatalf("expected %s to be embedded, got %v", present, err)
+		}
+	}
+	for _, absent := range []string{
+		"web/champions.test.cjs",
+		"web/remaining-sort.test.cjs",
+		"web/loot-icons/README.md",
+	} {
+		if _, err := embedded.ReadFile(absent); !errors.Is(err, fs.ErrNotExist) {
+			t.Fatalf("expected %s to be excluded from the embedded binary, got err=%v", absent, err)
+		}
+	}
+}
+
+// Go 内置 MIME 表里没有 .woff2，缺省会回落成 application/octet-stream；
+// 我们对所有响应都加了 X-Content-Type-Options: nosniff，类型不对时浏览器
+// 有权拒绝加载字体，字标就静默跌回回退字形。这种问题只在打包后的真机上暴露，
+// 所以这里直接钉住注册结果，而不是相信各平台的系统 MIME 数据库。
+func TestWoff2ContentTypeIsRegistered(t *testing.T) {
+	if err := mime.AddExtensionType(".woff2", "font/woff2"); err != nil {
+		t.Fatalf("registering woff2 mime type failed: %v", err)
+	}
+	if got := mime.TypeByExtension(".woff2"); !strings.HasPrefix(got, "font/woff2") {
+		t.Fatalf("expected .woff2 to resolve to font/woff2, got %q", got)
+	}
+}
+
+// 上面两条测试各自证明了"文件被内嵌"和"MIME 类型注册成功"，但都没有验证这两件事
+// 拼在一起、走真实的静态文件服务代码路径之后，一次实际的 HTTP 请求到底会不会
+// 拿到能被浏览器接受的响应——这正是 R21 内嵌 Cinzel 时踩过的坑："机制测过了，但
+// 没测用户屏幕上的结果"（同一类问题见 [[deep-legends-verification-blindspot]]）。
+// 这里用 embedded 这个真的 embed.FS（不是手搭的假文件系统）、真的
+// http.FileServer(http.FS(...))，跑一次真请求，钉住 Content-Type、WOFF2 魔数、
+// 以及字节数和源文件一致（防止以后有人不小心把占位符/空文件提交进去）。
+func TestFontAssetsServeWithCorrectContentType(t *testing.T) {
+	if err := mime.AddExtensionType(".woff2", "font/woff2"); err != nil {
+		t.Fatalf("registering woff2 mime type failed: %v", err)
+	}
+	webFS, err := fs.Sub(embedded, "web")
+	if err != nil {
+		t.Fatalf("fs.Sub: %v", err)
+	}
+	server := httptest.NewServer(http.FileServer(http.FS(webFS)))
+	defer server.Close()
+
+	fontResp, err := http.Get(server.URL + "/beaufort-for-lol-bold.woff2")
+	if err != nil {
+		t.Fatalf("GET woff2: %v", err)
+	}
+	defer fontResp.Body.Close()
+	fontBody, err := io.ReadAll(fontResp.Body)
+	if err != nil {
+		t.Fatalf("read woff2 body: %v", err)
+	}
+	if ct := fontResp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "font/woff2") {
+		t.Fatalf("expected font/woff2 content type, got %q", ct)
+	}
+	if !bytes.HasPrefix(fontBody, []byte("wOF2")) {
+		t.Fatalf("expected WOFF2 magic bytes, got %x", fontBody[:min(4, len(fontBody))])
+	}
+	wantBody, err := embedded.ReadFile("web/beaufort-for-lol-bold.woff2")
+	if err != nil {
+		t.Fatalf("read embedded font: %v", err)
+	}
+	if !bytes.Equal(fontBody, wantBody) {
+		t.Fatalf("served font body (%d bytes) does not match embedded file (%d bytes)", len(fontBody), len(wantBody))
+	}
+
+	noticeResp, err := http.Get(server.URL + "/beaufort-for-lol-notice.txt")
+	if err != nil {
+		t.Fatalf("GET notice: %v", err)
+	}
+	defer noticeResp.Body.Close()
+	if noticeResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for notice txt, got %d", noticeResp.StatusCode)
+	}
+	noticeBody, err := io.ReadAll(noticeResp.Body)
+	if err != nil {
+		t.Fatalf("read notice body: %v", err)
+	}
+	// notice 必须如实转录字体自带的版权声明和 EULA 链接，不能只是一句空话，
+	// 否则版权来源没法追溯（这是这份 notice 存在的唯一理由）。
+	for _, want := range []string{"Nick Shinn", "Riot Games", "ShinnType_EULA.pdf"} {
+		if !bytes.Contains(noticeBody, []byte(want)) {
+			t.Fatalf("expected notice to mention %q, got: %s", want, noticeBody)
+		}
 	}
 }
 
@@ -133,6 +298,30 @@ func TestCommunityDragonImagePathsCoverPluginAndGameAssets(t *testing.T) {
 	if paths := communityDragonImagePaths("https://example.com/private.png"); paths != nil {
 		t.Fatalf("external path was accepted: %#v", paths)
 	}
+	large := communityDragonImagePaths("/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/Deft_large.png")
+	if len(large) != 4 || !containsTestString(large, "/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/deft_small.png") || !containsTestString(large, "/latest/game/assets/ux/cherry/augments/icons/deft_small.png") {
+		t.Fatalf("large asset fallbacks missing: %#v", large)
+	}
+	if !strings.HasSuffix(large[0], "deft_large.png") || !strings.HasSuffix(large[1], "deft_small.png") {
+		t.Fatalf("large asset priority changed: %#v", large)
+	}
+	for _, path := range large {
+		if strings.Contains(path, "assets/assets") {
+			t.Fatalf("candidate contains duplicated assets segment: %q", path)
+		}
+	}
+	if !containsTestString(large, "/latest/game/assets/ux/cherry/augments/icons/deft_large.png") {
+		t.Fatalf("game asset candidate missing: %#v", large)
+	}
+}
+
+func containsTestString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func TestPrestigeArtworkURLIsFixedToTencentImageHost(t *testing.T) {

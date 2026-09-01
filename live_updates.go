@@ -25,11 +25,12 @@ func (a *app) handleAccount(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "当前没有可用的客户端快照", http.StatusConflict)
 		return
 	}
+	_, _, backgroundSource, backgroundPath := profileBackground(a.account.Profile)
 	response := struct {
 		Summoner publicSummoner `json:"summoner"`
 		Account  AccountData    `json:"account"`
 	}{
-		Summoner: publicSummoner{DisplayName: a.summoner.DisplayName, GameName: a.summoner.GameName, TagLine: a.summoner.TagLine, ProfileIconID: a.summoner.ProfileIconID, SummonerLevel: a.summoner.SummonerLevel},
+		Summoner: publicSummoner{DisplayName: a.summoner.DisplayName, GameName: a.summoner.GameName, TagLine: a.summoner.TagLine, ProfileIconID: a.summoner.ProfileIconID, SummonerLevel: a.summoner.SummonerLevel, BackgroundSource: backgroundSource, BackgroundPath: backgroundPath},
 		Account:  cloneAccountData(a.account),
 	}
 	a.mu.RUnlock()
@@ -45,7 +46,7 @@ func (a *app) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	updates := make(chan string, 4)
+	updates := make(chan string, 32)
 	a.eventMu.Lock()
 	a.eventSubscribers[updates] = struct{}{}
 	a.eventMu.Unlock()

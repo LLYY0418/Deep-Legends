@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
@@ -15,14 +17,17 @@ const (
 	capabilityAvailable   = "available"
 	capabilityUnsupported = "unsupported"
 	capabilityFailed      = "failed"
+	capabilityCanceled    = "canceled"
 )
 
 type EndpointCapability struct {
-	Name   string `json:"name"`
-	Path   string `json:"path"`
-	State  string `json:"state"`
-	Count  int    `json:"count"`
-	Detail string `json:"detail,omitempty"`
+	Name           string              `json:"name"`
+	Path           string              `json:"path"`
+	State          string              `json:"state"`
+	Count          int                 `json:"count"`
+	Detail         string              `json:"detail,omitempty"`
+	Attempts       []DataSourceAttempt `json:"attempts,omitempty"`
+	FallbackReason string              `json:"fallbackReason,omitempty"`
 }
 
 type SummonerProfile struct {
@@ -64,6 +69,7 @@ var lootChineseNames = map[string]string{
 	"MATERIAL_KEY":           "战利品宝箱钥匙",
 	"MATERIAL_KEY_FRAGMENT":  "钥匙碎片",
 	"CHEST_CHAMPION_MASTERY": "战利品宝箱",
+	"CHEST_PROMOTION":        "紫色宝箱",
 }
 
 var lootClientIcons = map[string]string{
@@ -72,6 +78,7 @@ var lootClientIcons = map[string]string{
 	"MATERIAL_KEY":           "/fe/lol-loot/assets/loot_item_icons/material_key.png",
 	"MATERIAL_KEY_FRAGMENT":  "/fe/lol-loot/assets/loot_item_icons/material_key_fragment.png",
 	"CHEST_CHAMPION_MASTERY": "/fe/lol-loot/assets/loot_item_icons/chest_champion_mastery.png",
+	"CHEST_PROMOTION":        "/fe/lol-loot/assets/loot_item_icons/chest_promotion.png",
 }
 
 func enrichLootItems(items []LootItem, skins []Skin) []LootItem {
@@ -213,12 +220,15 @@ type RewardItem struct {
 }
 
 type RewardGrant struct {
-	ID          string       `json:"id"`
-	Status      string       `json:"status"`
-	DateCreated string       `json:"dateCreated,omitempty"`
-	Title       string       `json:"title,omitempty"`
-	Description string       `json:"description,omitempty"`
-	Items       []RewardItem `json:"items"`
+	ID            string       `json:"id"`
+	RewardGroupID string       `json:"rewardGroupId,omitempty"`
+	Status        string       `json:"status"`
+	DateCreated   string       `json:"dateCreated,omitempty"`
+	Title         string       `json:"title,omitempty"`
+	Description   string       `json:"description,omitempty"`
+	MinSelections int          `json:"minSelections,omitempty"`
+	MaxSelections int          `json:"maxSelections,omitempty"`
+	Items         []RewardItem `json:"items"`
 }
 
 type AccountData struct {
@@ -551,6 +561,10 @@ func sanitizeClientImagePath(value string) string {
 }
 
 func (api RewardsAPI) PendingGrants() ([]RewardGrant, EndpointCapability) {
+	return api.PendingGrantsContext(context.Background())
+}
+
+func (api RewardsAPI) PendingGrantsContext(ctx context.Context) ([]RewardGrant, EndpointCapability) {
 	const path = "/lol-rewards/v1/grants"
 	var raw []struct {
 		Info struct {
@@ -565,6 +579,11 @@ func (api RewardsAPI) PendingGrants() ([]RewardGrant, EndpointCapability) {
 			} `json:"grantElements"`
 		} `json:"info"`
 		RewardGroup struct {
+			ID                      string `json:"id"`
+			SelectionStrategyConfig struct {
+				MinSelectionsAllowed int `json:"minSelectionsAllowed"`
+				MaxSelectionsAllowed int `json:"maxSelectionsAllowed"`
+			} `json:"selectionStrategyConfig"`
 			Localizations struct {
 				Title       string `json:"title"`
 				Description string `json:"description"`
@@ -585,7 +604,7 @@ func (api RewardsAPI) PendingGrants() ([]RewardGrant, EndpointCapability) {
 		} `json:"rewardGroup"`
 	}
 	capability := EndpointCapability{Name: "pending-rewards", Path: path}
-	if err := api.client.GetJSON(path, &raw); err != nil {
+	if err := api.client.RequestJSON(ctx, http.MethodGet, path, nil, &raw); err != nil {
 		return nil, optionalCapabilityError(capability, err)
 	}
 	grants := make([]RewardGrant, 0, len(raw))
@@ -593,7 +612,12 @@ func (api RewardsAPI) PendingGrants() ([]RewardGrant, EndpointCapability) {
 		if !isPendingRewardStatus(source.Info.Status) {
 			continue
 		}
-		grant := RewardGrant{ID: source.Info.ID, Status: source.Info.Status, DateCreated: source.Info.DateCreated, Title: source.RewardGroup.Localizations.Title, Description: source.RewardGroup.Localizations.Description}
+		grant := RewardGrant{
+			ID: source.Info.ID, RewardGroupID: source.RewardGroup.ID, Status: source.Info.Status,
+			DateCreated: source.Info.DateCreated, Title: rewardTitle(source.RewardGroup.Localizations.Title), Description: rewardDescription(source.RewardGroup.Localizations.Description),
+			MinSelections: source.RewardGroup.SelectionStrategyConfig.MinSelectionsAllowed,
+			MaxSelections: source.RewardGroup.SelectionStrategyConfig.MaxSelectionsAllowed,
+		}
 		for _, item := range source.RewardGroup.Rewards {
 			grant.Items = append(grant.Items, RewardItem{ID: item.ID, ItemID: item.ItemID, ItemType: item.ItemType, Title: item.Localizations.Title, Details: item.Localizations.Details, Quantity: item.Quantity, IconURL: sanitizeAssetPath(item.Media.IconURL)})
 		}
@@ -602,6 +626,15 @@ func (api RewardsAPI) PendingGrants() ([]RewardGrant, EndpointCapability) {
 				grant.Items = append(grant.Items, RewardItem{ID: item.ElementID, ItemID: item.ItemID, ItemType: item.ItemType, Quantity: item.Quantity})
 			}
 		}
+		if grant.MaxSelections > len(grant.Items) {
+			grant.MaxSelections = len(grant.Items)
+		}
+		if grant.MinSelections > grant.MaxSelections && grant.MaxSelections > 0 {
+			grant.MinSelections = grant.MaxSelections
+		}
+		if grant.Title == "待领取奖励" {
+			grant.Title = fmt.Sprintf("未命名奖励组 (%d)", len(grant.Items))
+		}
 		grants = append(grants, grant)
 	}
 	capability.State = capabilityAvailable
@@ -609,7 +642,45 @@ func (api RewardsAPI) PendingGrants() ([]RewardGrant, EndpointCapability) {
 	return grants, capability
 }
 
+func rewardTitle(value string) string {
+	value = strings.TrimSpace(value)
+	if rewardLocalizationPlaceholder(value) {
+		return "待领取奖励"
+	}
+	return value
+}
+
+func rewardDescription(value string) string {
+	value = strings.TrimSpace(value)
+	if rewardLocalizationPlaceholder(value) {
+		return ""
+	}
+	return value
+}
+
+func rewardLocalizationPlaceholder(value string) bool {
+	upper := strings.ToUpper(value)
+	if value == "" || strings.Contains(upper, "DO NOT TRANSLATE") {
+		return true
+	}
+	hasLetter, placeholderShape := false, true
+	for _, character := range value {
+		switch {
+		case character >= 'A' && character <= 'Z':
+			hasLetter = true
+		case character == '_' || character == ' ':
+		default:
+			placeholderShape = false
+		}
+	}
+	return hasLetter && placeholderShape
+}
+
 func optionalCapabilityError(capability EndpointCapability, err error) EndpointCapability {
+	if isCancellation(err) {
+		capability.State = capabilityCanceled
+		return capability
+	}
 	var httpErr *LCUHTTPError
 	if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
 		capability.State = capabilityUnsupported

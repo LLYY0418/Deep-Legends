@@ -29,8 +29,7 @@
 /* 页面内容作为命名容器：总览布局按实际可用宽度自适应，不再依赖视口断点（避免侧边栏挤压时出现横向滚动条） */
 .gameplay-content { padding-top: 16px; container: gameplay-page / inline-size; }
 .gameplay-panel.is-disconnected { min-height: 0; }
-.gameplay-panel.is-disconnected .player-workspace-head,
-.gameplay-panel.is-disconnected .gameplay-content { display: none; }
+.gameplay-panel.is-disconnected .player-workspace-head { display: none; }
 
 .player-workspace-head {
   position: sticky;
@@ -53,9 +52,17 @@
   gap: 5px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
+.player-tabs::-webkit-scrollbar { display: none; }
+.player-tabs-shell { display: grid; min-width: 0; flex: 1 1 auto; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 5px; }
+.player-tabs-arrow { display: grid; width: 30px; height: 34px; flex: 0 0 30px; place-items: center; padding: 0; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.player-tabs-arrow:hover:not(:disabled), .player-tabs-arrow:focus-visible { color: var(--ink); background: var(--surface-strong); border-color: var(--hex-line); }
+.player-tabs-arrow:disabled { opacity: .35; cursor: default; }
+.player-tabs-arrow svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
 .player-tab-wrap {
+  position: relative;
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -66,11 +73,34 @@
   border-radius: 10px;
 }
 
+/* 选中态与「当前登录账号」态必须一眼分得开，所以用两种完全不同的视觉语言：
+   · 选中 = 抬升的实底 + 亮字 + 底部一条粗的主色指示条（形状信号，不依赖配色）
+   · 当前账号 = 左侧一条金色竖条 + 名字前的 ★（见 .is-self）
+   两者叠加时互不遮挡。 */
 .player-tab-wrap.is-active {
   color: var(--ink);
-  background: var(--surface-strong);
+  background: color-mix(in oklab,var(--surface-strong) 82%,var(--ink) 8%);
   border-color: var(--hex-line);
+  box-shadow: 0 2px 10px rgb(0 0 0 / .35);
 }
+
+.player-tab-wrap.is-active::after {
+  position: absolute;
+  right: 9px;
+  bottom: -1px;
+  left: 9px;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 3px 3px 0 0;
+  content: "";
+}
+
+.player-tab-wrap:not(.is-active) { opacity: .72; }
+.player-tab-wrap:not(.is-active):hover { opacity: 1; background: var(--surface-strong); }
+.player-tab-wrap[draggable="true"] { cursor: grab; }
+.player-tab-wrap[draggable="true"]:active { cursor: grabbing; }
+.player-tab-wrap.is-dragging { opacity: .35; }
+.player-tab-wrap.is-drop-target { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
 
 .player-tab {
   display: flex;
@@ -95,10 +125,12 @@
 .player-tab-copy { display: grid; min-width: 0; justify-items: start; }
 .player-tab-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 隐藏战绩玩家：名称下方的提示标签 */
-.player-tab-hidden { flex: 0 0 auto; width: fit-content; margin-top: 1px; padding: 0 5px; color: var(--warning); background: color-mix(in oklch,var(--warning) 13%,transparent); border: 1px solid color-mix(in oklch,var(--warning) 34%,transparent); border-radius: 5px; font-size: 9px; font-weight: 750; line-height: 1.6; white-space: nowrap; }
-/* 登录账号的页签固定第一且样式区分：金色描边 + 星标 */
-.player-tab-wrap.is-self { background: linear-gradient(120deg,color-mix(in oklch,var(--primary) 16%,var(--surface)),var(--surface)); border-color: color-mix(in oklch,var(--primary) 46%,var(--line)); }
-.player-tab-wrap.is-self.is-active { background: linear-gradient(120deg,color-mix(in oklch,var(--primary) 24%,var(--surface-strong)),var(--surface-strong)); border-color: var(--primary); box-shadow: 0 0 0 1px color-mix(in oklch,var(--primary) 40%,transparent); }
+.player-tab-hidden { flex: 0 0 auto; width: fit-content; margin-top: 1px; padding: 0 5px; color: var(--warning); background: color-mix(in oklab,var(--warning) 13%,transparent); border: 1px solid color-mix(in oklab,var(--warning) 34%,transparent); border-radius: 5px; font-size: 9px; font-weight: 750; line-height: 1.6; white-space: nowrap; }
+/* 登录账号的页签固定第一：只用左侧金色竖条 + 星标区分，不再整块金色描边，
+   否则会和「选中态」撞在一起分不出来。 */
+.player-tab-wrap.is-self { background: var(--surface); border-color: transparent; }
+.player-tab-wrap.is-self::before { position: absolute; top: 8px; bottom: 8px; left: 0; width: 3px; background: var(--primary); border-radius: 0 3px 3px 0; content: ""; }
+.player-tab-wrap.is-self.is-active { background: color-mix(in oklab,var(--surface-strong) 82%,var(--ink) 8%); border-color: var(--hex-line); }
 .player-tab-self { flex: 0 0 auto; color: var(--primary-strong); font-size: 12px; line-height: 1; }
 
 .player-tab-close {
@@ -112,14 +144,14 @@
   font-size: 18px;
 }
 
-.player-tab-close:hover { color: var(--ink); background: color-mix(in oklch,var(--danger-soft) 72%,transparent); }
+.player-tab-close:hover { color: var(--ink); background: color-mix(in oklab,var(--danger-soft) 72%,transparent); }
 .player-tab-placeholder { display: grid; width: 25px; height: 25px; place-items: center; color: var(--primary-strong); }
 .player-tab-skeleton { color: var(--muted); font-size: 12px; }
-/* 服务器标签：国服显示具体子服务器，韩服使用独立强调色。 */
-.player-tab-region { flex: 0 0 auto; max-width: 64px; padding: 1px 5px; overflow: hidden; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 5px; font-size: 9px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
-.player-tab-region.is-kr { color: var(--accent); background: color-mix(in oklch,var(--accent) 14%,transparent); border-color: color-mix(in oklch,var(--accent) 32%,transparent); }
 .region-chip { flex: 0 0 auto; align-self: center; padding: 2px 7px; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 6px; font-size: 10px; font-weight: 750; white-space: nowrap; }
-.region-chip.is-kr { color: var(--accent); background: color-mix(in oklch,var(--accent) 13%,transparent); border-color: color-mix(in oklch,var(--accent) 34%,transparent); }
+.region-chip.is-kr { color: var(--accent); background: color-mix(in oklab,var(--accent) 13%,transparent); border-color: color-mix(in oklab,var(--accent) 34%,transparent); }
+.player-live-chip { display: inline-flex; min-width: 0; max-width: 100%; min-height: 24px; flex: 0 1 auto; align-items: baseline; gap: 6px; padding: 2px 8px; color: var(--accent); background: color-mix(in oklab,var(--accent) 21%,var(--surface)); border: 1px solid color-mix(in oklab,var(--accent) 54%,var(--line)); border-radius: 6px; box-shadow: inset 0 0 0 1px color-mix(in oklab,var(--accent) 10%,transparent); font-size: 11px; font-weight: 750; line-height: 1.4; white-space: nowrap; }
+.player-live-chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.player-live-chip b { flex: 0 0 auto; color: inherit; font-weight: 650; font-variant-numeric: tabular-nums; }
 
 .mini-loading {
   width: 12px;
@@ -131,21 +163,64 @@
 }
 
 .summoner-strip {
-  display: grid;
-  grid-template-columns: auto minmax(180px,1fr);
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+	position: relative;
+	display: grid;
+	min-height: 140px;
+	grid-template-columns: auto minmax(180px,1fr) auto;
+	align-items: center;
+	gap: 16px;
+	padding: 13px 18px;
+	overflow: hidden;
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: var(--radius-lg);
+	isolation: isolate;
 }
+
+.summoner-strip-art { position: absolute; inset: -1px; z-index: 0; width: calc(100% + 2px); height: calc(100% + 2px); opacity: 0; object-fit: cover; object-position: 50% 17%; transition: opacity 180ms ease-out; }
+.summoner-strip.has-loaded-image .summoner-strip-art { opacity: .5; }
+.summoner-strip.has-loaded-image::before { position: absolute; inset: 0; z-index: 1; background: color-mix(in oklab,var(--surface) 64%,transparent); content: ""; }
+.summoner-strip > :not(.summoner-strip-art) { position: relative; z-index: 2; }
 
 .summoner-strip-copy { min-width: 0; }
 .summoner-strip-copy > div { display: flex; min-width: 0; align-items: baseline; gap: 6px; }
-.summoner-strip-copy h2 { overflow: hidden; font-size: 19px; text-overflow: ellipsis; white-space: nowrap; }
+.summoner-name-meta { display: inline-flex; min-width: 0; flex: 0 1 auto; align-items: center; gap: 6px; }
+.summoner-strip-copy h2 { overflow: hidden; font-size: 24px; text-overflow: ellipsis; text-shadow: 0 1px 8px var(--surface); white-space: nowrap; }
 .summoner-strip-copy span, .summoner-strip-copy p { color: var(--muted); }
-.summoner-strip-copy p { margin: 3px 0 0; font-size: 12px; }
+.summoner-strip-copy .player-live-chip, .summoner-strip-copy .player-live-chip > span { color: color-mix(in oklab,var(--accent) 74%,var(--ink)); }
+.summoner-strip-copy p { margin: 4px 0 0; font-size: 13px; }
+.summoner-level-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 7px; }
+.summoner-level-row .player-tab-hidden { margin-top: 0; color: var(--warning); }
+
+/* 熟练度与最高段位两列必须逐行对齐：标签行、图像行、名称行、数值行各自共用一条行轨。
+   用 subgrid 而不是给每个元素写死高度——两列的图像本来就不一样高（熟练度是头像+徽章
+   82px，段位徽章 78px），写死高度会把其中一边撑变形。也不能用 display: contents 让
+   figure 消失，那样熟练度那块的 data-tooltip 就没有 hover 目标了。
+   Electron 43 = Chromium 136，subgrid 从 Chromium 117 起就是稳定特性。 */
+.summoner-strip-highlights { display: grid; min-width: 0; align-self: stretch; align-content: center; grid-auto-flow: column; grid-auto-columns: minmax(92px,auto); grid-template-rows: auto auto auto; gap: 4px 16px; justify-items: center; padding-left: 16px; border-left: 1px solid color-mix(in oklab,var(--line) 75%,transparent); }
+.summoner-highlight { display: grid; min-width: 92px; grid-row: span 3; grid-template-rows: subgrid; margin: 0; justify-items: center; align-items: center; text-align: center; }
+.summoner-highlight figcaption { display: grid; grid-row: span 2; grid-template-rows: subgrid; justify-items: center; align-items: center; line-height: 1.25; }
+.summoner-highlight figcaption strong { max-width: 104px; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.summoner-highlight figcaption small { color: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* 熟练度徽章按客户端的版式：英雄头像完整可见，徽章从头像下缘探出来。
+   头像 z-index 高于徽章，所以徽章顶部那截旗面被头像压住，不会糊住英雄的脸。
+   头像是识别这名英雄的主角，徽章只是等级注脚，所以头像要比徽章明显更大——
+   徽章图本身已经表达了等级，真实等级（可能超过 10）写在下方说明里，
+   不再往徽章上盖一块 Lv 牌，那块牌正好压住徽章下半截的纹样。 */
+/* 熟练度头像徽标块（portrait）的高度必须卡在内容实际占据的高度，不能留白：
+   内容底边 = 徽章 top + 徽章 height。曾经容器比内容高 6px，多出的空白全部沉在
+   容器底部（因为头像贴顶排布），subgrid 行高被这一列撑高后整列"顶满"、没有自动
+   居中的空间，于是上下两侧间距不等、头像像是贴着上一行。容器高度=内容高度后，
+   上下两侧都只吃行间距，天然对称，不用额外加 margin 去凑。
+   ★改徽章尺寸或 top 时，这里的 height 必须跟着重算，测试里有硬等式钉着。
+   头像 52 + 徽章 42（top 36）是"再减一点但还看得清"的下限：头像小于 48px 时
+   英雄脸在圆形裁切里就辨认不出，徽章小于 40px 时旗面纹样糊成一团。 */
+.summoner-mastery-portrait { position: relative; display: block; width: 72px; height: 78px; }
+.game-icon.is-summoner-mastery-icon { position: absolute; top: 0; left: 50%; z-index: 2; width: 52px; height: 52px; flex-basis: 52px; transform: translateX(-50%); border: 2px solid color-mix(in oklab,var(--primary) 78%,var(--line)); border-radius: 50%; box-shadow: 0 3px 10px rgb(0 0 0 / .3); }
+.summoner-mastery-crest { position: absolute; top: 36px; left: 50%; z-index: 1; display: block; width: 42px; height: 42px; transform: translateX(-50%); object-fit: contain; filter: drop-shadow(0 2px 4px rgb(0 0 0 / .38)); }
+.summoner-highlight-rank { display: grid; width: 78px; height: 78px; margin: 0; place-items: center; }
+.summoner-highlight-rank .rank-crest-icon { width: 78px; height: 78px; filter: drop-shadow(0 4px 9px rgb(0 0 0 / .42)); }
 
 .overview-layout {
   display: grid;
@@ -155,20 +230,55 @@
   padding-top: 12px;
 }
 
+.overview-career-entry { display: none; align-items: center; justify-content: flex-start; }
+.career-dialog-trigger { display: inline-flex; min-height: 36px; align-items: center; gap: 7px; padding: 0 12px; color: var(--primary-strong); background: var(--primary-soft); border: 1px solid color-mix(in oklab,var(--primary) 45%,var(--line)); border-radius: 8px; font-size: 12px; font-weight: 700; }
+.career-dialog-trigger:hover, .career-dialog-trigger:focus-visible { color: var(--ink); background: color-mix(in oklab,var(--primary) 21%,var(--surface)); }
+.career-dialog-trigger svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
 @container gameplay-page (max-width: 1020px) {
   .overview-layout { grid-template-columns: 1fr; }
-  .career-column { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .champion-performance { grid-row: span 2; }
+  .overview-layout > .career-column { display: none; }
+  .overview-career-entry { display: flex; }
 }
 
 @container gameplay-page (max-width: 760px) {
-  .career-column { grid-template-columns: 1fr; }
-  .champion-performance { grid-row: auto; }
+	.summoner-strip { grid-template-columns: auto minmax(130px,1fr) auto; gap: 11px; padding: 14px; }
+	.summoner-strip-highlights { gap: 4px 9px; padding-left: 11px; }
+}
+
+@container gameplay-page (max-width: 520px) {
+	.summoner-strip { grid-template-columns: auto minmax(0,1fr); }
+	/* 放不下时换到第二行，但仍然靠左、和上面的头像同一条左边缘，不要甩到右边去。
+	   min-width 归零后每块收缩到内容宽度，居中的内容边缘就正好落在头像的左边缘上。 */
+	.summoner-strip-highlights { grid-column: 1/-1; align-self: auto; justify-content: flex-start; gap: 4px 26px; padding: 9px 0 0; border-top: 1px solid color-mix(in oklab,var(--line) 72%,transparent); border-left: 0; }
+	.summoner-highlight { min-width: 0; }
+}
+
+.career-dialog { position: fixed; inset: 0; width: min(var(--career-dialog-width, 960px),calc(100dvw - 24px)); max-width: none; height: min(760px,calc(100dvh - 28px)); max-height: none; margin: auto; padding: 0; overflow: hidden; color: var(--ink); background: transparent; border: 0; }
+.career-dialog[open] { animation: career-dialog-in 180ms ease-out; }
+.career-dialog::backdrop { background: var(--overlay); backdrop-filter: blur(2px); }
+.career-dialog-sheet { display: flex; height: 100%; min-height: 0; flex-direction: column; overflow: hidden; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: 0 18px 50px rgb(0 0 0 / .5); container: career-dialog / inline-size; }
+.career-dialog-head { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.career-dialog-head > div { min-width: 0; }
+.career-dialog-head h2 { margin: 0; font-size: 14px; }
+.career-dialog-head p { margin: 2px 0 0; overflow: hidden; color: var(--muted); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+.career-dialog-head .control-icon-button { width: 32px; height: 32px; flex: 0 0 32px; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); }
+.career-dialog-grid { display: grid; min-height: 0; flex: 1 1 0; grid-template-columns: repeat(2,minmax(0,1fr)); grid-auto-rows: max-content; align-content: start; align-items: start; gap: 10px; padding: 12px 14px 16px; overflow-y: auto; overscroll-behavior: contain; }
+.career-dialog-stack { display: grid; min-width: 0; grid-auto-rows: max-content; align-content: start; gap: 10px; }
+.career-dialog-item { min-width: 0; }
+
+@container career-dialog (max-width: 640px) {
+  .career-dialog-grid { grid-template-columns: minmax(0,1fr); }
+}
+
+@keyframes career-dialog-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .career-column, .matches-column { display: grid; min-width: 0; gap: 10px; }
 .career-section { overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
-.career-section > header, .team-overview > header, .build-detail section > header, .live-team > header {
+.career-section > header, .team-overview > header, .build-detail > section > header, .live-team > header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -176,8 +286,14 @@
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
 }
-.career-section > header h3, .live-team h3 { margin: 0; font-size: 14px; }
-.career-section > header span, .team-overview > header span, .build-detail section > header span, .live-team > header span { color: var(--muted); font-size: 11px; }
+.career-section > header h3, .build-detail > section > header h4, .live-team h3 { margin: 0; font-size: 14px; }
+.career-section > header span, .team-overview > header span, .build-detail > section > header span, .live-team > header span { color: var(--muted); font-size: 11px; }
+.career-section-tools { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 8px; }
+.season-progress-badge { flex: 0 1 auto; overflow: hidden; padding: 3px 6px; color: var(--warning-ink,var(--ink)); background: color-mix(in oklab,var(--warning,#d49b32) 14%,var(--surface)); border: 1px solid color-mix(in oklab,var(--warning,#d49b32) 38%,var(--line)); border-radius: 4px; font-size: 10px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.ranked-queue-switcher { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; padding: 2px; background: color-mix(in oklab,var(--surface-strong) 74%,transparent); border: 1px solid var(--line); border-radius: 6px; }
+.ranked-queue-button { min-height: 25px; padding: 3px 7px; color: var(--muted); background: transparent; border: 0; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.ranked-queue-button:hover, .ranked-queue-button:focus-visible { color: var(--ink); background: color-mix(in oklab,var(--primary) 12%,transparent); }
+.ranked-queue-button.is-active { color: var(--ink); background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / .14); }
 .section-empty { margin: 0; padding: 18px 12px; color: var(--muted); font-size: 12px; text-align: center; }
 .rank-unavailable { display: grid; gap: 4px; padding: 16px 12px; text-align: center; }
 .rank-unavailable strong { color: var(--ink); font-size: 12px; }
@@ -201,6 +317,168 @@
 .rank-crest.is-unranked { color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 50%; }
 .rank-crest-icon { width: 44px; height: 44px; object-fit: contain; filter: drop-shadow(0 2px 4px rgb(0 0 0 / .4)); }
 
+.rank-history { border-top: 1px solid var(--line); }
+.rank-history-head, .rank-history-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0,1fr) 52px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+.rank-history-head { min-height: 34px; color: var(--muted); background: color-mix(in oklab,var(--surface-strong) 68%,transparent); font-size: 10px; }
+.rank-history-head span:last-child { text-align: right; }
+.rank-history-row { min-height: 38px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.rank-history-row + .rank-history-row { border-top: 1px solid color-mix(in oklab,var(--line) 72%,transparent); }
+.rank-season { color: var(--muted); font-weight: 700; }
+.rank-history-tier { display: flex; min-width: 0; align-items: center; gap: 5px; }
+.rank-history-tier b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-history-tier > span:last-child { flex: 0 0 auto; color: var(--muted); }
+.rank-history-crest { display: grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; }
+.rank-history-crest .rank-crest-icon { width: 22px; height: 22px; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .35)); }
+.rank-history-winrate { color: var(--ink); text-align: right; }
+.rank-history-winrate span { color: var(--muted); font-weight: 500; }
+.rank-history-toggle {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 12px;
+  color: var(--muted);
+  background: color-mix(in oklab,var(--surface-strong) 46%,transparent);
+  border: 0;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+}
+.rank-history-toggle:hover, .rank-history-toggle:focus-visible { color: var(--primary-strong); background: var(--surface-strong); }
+.rank-history-toggle svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; transition: transform 180ms cubic-bezier(.25,.8,.25,1); }
+.rank-history-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+.rank-milestones { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); border-top: 1px solid var(--line); }
+.rank-milestone { display: grid; min-width: 0; grid-template-columns: 32px minmax(0,1fr); align-items: center; gap: 8px; padding: 10px 12px; }
+.rank-milestone + .rank-milestone { border-left: 1px solid var(--line); }
+.rank-milestone-crest { display: grid; width: 32px; height: 32px; place-items: center; }
+.rank-milestone-crest .rank-crest-icon { width: 32px; height: 32px; }
+.rank-milestone > div { display: grid; min-width: 0; gap: 1px; }
+.rank-milestone small { color: var(--muted); font-size: 10px; }
+.rank-milestone strong { overflow: hidden; color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.rank-milestone div > span { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 圆环必须和「平均 K/D/A」永远同一行；「KDA」+「击杀参与率」打包成
+   .recent-ranked-metrics-tail 这一个整体，宽度够就跟着排在同一行，
+   不够就整体掉到下一行——不能只让其中一列换行，那样会把配对读的两个
+   数字拆散，也不能让圆环跟着一起被甩下去（之前的版本就是这样，圆环
+   单独悬在上面、下面空出一整行三列，被用户吐槽"太丑"）。
+   实测：总览左栏卡片内宽 338px，减 24px 内边距 = 314px；圆环 88px + 间距
+   11px = 99px，剩给指标区 215px，用来判断 tail 能不能跟第一列同行。 */
+.recent-ranked-content { display: flex; min-width: 0; align-items: center; gap: 11px; padding: 12px; }
+.recent-ranked-content > .recent-ranked-record { flex: 0 0 88px; }
+.recent-ranked-content > .recent-ranked-metrics { flex: 1 1 auto; min-width: 0; }
+.recent-ranked-record { display: grid; justify-items: center; gap: 5px; }
+.recent-ranked-ring { position: relative; display: grid; width: 70px; height: 70px; place-content: center; place-items: center; overflow: hidden; background: conic-gradient(var(--success) var(--recent-win-rate,0%),color-mix(in oklab,var(--danger) 76%,var(--surface-strong)) 0); border-radius: 50%; }
+.recent-ranked-ring::before { position: absolute; inset: 7px; background: var(--surface); border-radius: inherit; content: ""; }
+.recent-ranked-ring > * { position: relative; z-index: 1; }
+.recent-ranked-ring strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.recent-ranked-ring span { color: var(--muted); font-size: 9px; }
+.recent-ranked-record > small { display: flex; gap: 7px; font-size: 9px; font-style: normal; }
+.recent-ranked-record > small b { color: var(--success); }
+.recent-ranked-record > small i { color: var(--danger); font-style: normal; font-weight: 700; }
+/* 指标按真实内容定宽（flex 自然尺寸，等效 max-content），不压缩、不省略号。
+   .recent-ranked-metrics-tail 是「KDA」「击杀参与率」共用的 flex 子项，
+   对外层换行算法来说它是不可拆分的原子单元：要么整个跟着第一列排在同一行，
+   要么整个掉到下一行，绝不会出现只掉一列、另一列还留在上面的情况。 */
+.recent-ranked-metrics { display: flex; flex-wrap: wrap; min-width: 0; align-items: center; column-gap: 0; row-gap: 6px; margin: 0; }
+/* flex-grow: 1（而不是 0）让「平均K/D/A」和 tail 在有富余宽度时（比如生涯统计
+   弹窗，两栏平分 960px 宽的对话框，圆环+三列吃不满整行）各自把多出来的空间
+   吸收掉、把分隔线往右推开，不再挤成一坨；flex-shrink 仍然钉死在 0，
+   宽度不够时行为跟以前完全一样（不会被压缩出截断，只是不再有多余空间可占）。
+   tail 和「平均K/D/A」的 grow 权重都是 1：因为 tail 内部两列自己还要再分一次，
+   平均K/D/A 单独吃一整份、KDA+击杀参与率两个只各分半份，这也顺带回应了
+   "平均K/D/A 感觉该再宽一点"——它本来就该比另外两列分到更多余量。 */
+.recent-ranked-metrics-tail { display: flex; flex: 1 0 auto; min-width: 0; }
+.recent-ranked-metric { display: grid; flex: 1 0 auto; min-width: 0; min-height: 52px; align-content: center; padding: 0 7px; border-left: 1px solid var(--line); cursor: help; }
+.recent-ranked-metrics > .recent-ranked-metric:first-child { border-left: 0; }
+.recent-ranked-metric dt { overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.recent-ranked-metric dd { min-width: 0; margin: 4px 0 0; overflow: hidden; font-size: 13px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.recent-ranked-metric dd i { margin: 0 2px; color: var(--muted); font-size: 10px; font-style: normal; }
+.recent-ranked-metric dd b:first-child { color: var(--success); }
+.recent-ranked-metric dd b:nth-of-type(2) { color: var(--danger); }
+.recent-ranked-metric dd b:nth-of-type(3) { color: var(--accent); }
+.recent-ranked-positions { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 9px; padding: 9px 12px; background: color-mix(in oklab,var(--surface-strong) 58%,transparent); border-top: 1px solid var(--line); }
+.recent-ranked-positions > span { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
+.recent-ranked-positions > div { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 7px; }
+.recent-ranked-positions small { color: var(--muted); font-size: 10px; }
+.recent-ranked-position { display: inline-flex; min-width: 0; align-items: center; gap: 5px; padding: 3px 7px; color: var(--primary-strong); background: color-mix(in oklab,var(--primary) 12%,transparent); border: 1px solid color-mix(in oklab,var(--primary) 30%,var(--line)); border-radius: 6px; font-size: 10px; white-space: nowrap; }
+.recent-ranked-position strong { font-variant-numeric: tabular-nums; }
+.recent-ranked-position.is-jungle { color: var(--success); background: color-mix(in oklab,var(--success) 11%,transparent); border-color: color-mix(in oklab,var(--success) 30%,var(--line)); }
+.recent-ranked-position.is-middle { color: var(--accent); background: color-mix(in oklab,var(--accent) 11%,transparent); border-color: color-mix(in oklab,var(--accent) 30%,var(--line)); }
+.recent-ranked-position.is-bottom { color: var(--danger); background: color-mix(in oklab,var(--danger) 11%,transparent); border-color: color-mix(in oklab,var(--danger) 30%,var(--line)); }
+.recent-ranked-position.is-utility { color: var(--warning); background: color-mix(in oklab,var(--warning) 11%,transparent); border-color: color-mix(in oklab,var(--warning) 30%,var(--line)); }
+
+@container career-dialog (max-width: 360px) {
+  .career-section > header { align-items: flex-start; flex-wrap: wrap; }
+	.career-section-tools { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+	.season-progress-badge { flex: 0 0 auto; overflow: visible; text-overflow: clip; }
+  .rank-history-head, .rank-history-row { grid-template-columns: 64px minmax(0,1fr) 44px; gap: 6px; padding-inline: 8px; }
+  .rank-history-row { font-size: 10px; }
+  .rank-history-tier { gap: 4px; }
+  .rank-history-crest { display: none; }
+	.recent-ranked-content { gap: 7px; padding-inline: 8px; }
+	.recent-ranked-ring { width: 62px; height: 62px; }
+	.recent-ranked-metric { padding-inline: 0; }
+	.recent-ranked-positions { align-items: flex-start; flex-direction: column; }
+	.recent-ranked-positions > div { width: 100%; justify-content: flex-start; }
+}
+
+@container career-dialog (max-width: 260px) {
+	.rank-milestones { grid-template-columns: minmax(0,1fr); }
+	.rank-milestone + .rank-milestone { border-top: 1px solid var(--line); border-left: 0; }
+	/* 弹窗窄到这个程度，圆环也没法再跟指标凑一行了：三项数据整体收成竖排，
+	   平均K/D/A、KDA、击杀参与率各自独占一行，border-top 当分隔线。
+	   flex-direction 改 column 让 tail 里的 KDA/击杀参与率也各占一行，
+	   不再维持"打包同行"的效果——这个宽度下打包也放不下，不如老实竖排。 */
+	.recent-ranked-metrics, .recent-ranked-metrics-tail { flex-direction: column; }
+	.recent-ranked-metric { min-height: 46px; grid-template-columns: minmax(0,1fr) auto; align-items: center; border-left: 0; border-top: 1px solid var(--line); }
+	.recent-ranked-metrics > .recent-ranked-metric:first-child { border-top: 0; }
+	/* 260px 时"平均 K / D / A"标签本身就有 5 个字符+2 个斜杠，`auto` 值列会先
+	   按内容定宽把剩下的空间挤给 1fr 的标签列，实测标签只分到 47px 却需要
+	   57px，被 white-space:nowrap 强行截断成"平均 K / …"。这个宽度已经窄到
+	   放不下"标签+数值同一行都不截断"了，索性放开标签换行，用两行换空间，
+	   彻底不截断（数值那一列本来就不长，不受影响）。 */
+	.recent-ranked-metric dt { overflow: visible; white-space: normal; text-overflow: clip; }
+	.recent-ranked-metric dd { margin-top: 0; }
+}
+
+.ability-unavailable { display: grid; gap: 4px; padding: 18px 12px; text-align: center; }
+.ability-unavailable strong { font-size: 12px; }
+.ability-unavailable small { color: var(--muted); font-size: 11px; }
+.ability-meta { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 12px 0; color: var(--muted); font-size: 10px; }
+.ability-legend { display: flex; min-width: 0; flex-wrap: wrap; gap: 5px 10px; }
+.ability-legend span { display: inline-flex; min-width: 0; align-items: center; gap: 5px; }
+.ability-legend i { display: block; width: 15px; height: 3px; border-radius: 999px; }
+.ability-legend .is-player { background: var(--primary-strong); }
+.ability-legend .is-baseline { background: var(--ink); opacity: .7; }
+.ability-meta > span { flex: 0 0 auto; }
+.ability-radar-wrap { position: relative; width: 100%; max-width: 325px; margin: 0 auto; }
+.ability-radar { display: block; width: 100%; height: auto; overflow: visible; }
+.ability-radar-grid { fill: none; stroke: var(--line); stroke-width: 1; }
+.ability-radar-grid line { opacity: .72; }
+.ability-radar-baseline { fill: color-mix(in oklab,var(--ink) 8%,transparent); stroke: color-mix(in oklab,var(--ink) 70%,transparent); stroke-width: 1.5; }
+.ability-radar-player { fill: color-mix(in oklab,var(--primary-strong) 20%,transparent); stroke: var(--primary-strong); stroke-width: 2; }
+.ability-radar-points circle { fill: var(--primary-strong); stroke: var(--surface); stroke-width: 2; }
+.ability-radar-controls { position: absolute; inset: 0; pointer-events: none; }
+.ability-radar-metric { position: absolute; display: grid; min-width: 48px; min-height: 38px; padding: 3px 4px; transform: translate(-50%,-50%); place-content: center; color: var(--muted); background: transparent; border: 0; border-radius: 4px; font: inherit; font-size: 10px; line-height: 1.2; text-align: center; cursor: help; pointer-events: auto; }
+.ability-radar-metric.is-metric-0 { left: 50%; top: 12%; }
+.ability-radar-metric.is-metric-1 { left: 79%; top: 25%; }
+.ability-radar-metric.is-metric-2 { left: 86%; top: 61%; }
+.ability-radar-metric.is-metric-3 { left: 66%; top: 91%; }
+.ability-radar-metric.is-metric-4 { left: 34%; top: 91%; }
+.ability-radar-metric.is-metric-5 { left: 14%; top: 61%; }
+.ability-radar-metric.is-metric-6 { left: 21%; top: 25%; }
+.ability-radar-metric b { color: var(--ink); font-size: 12px; }
+.ability-radar-metric:hover, .ability-radar-metric:focus-visible { color: var(--ink); background: color-mix(in oklab,var(--surface-strong) 88%,transparent); outline: 2px solid var(--primary-soft); outline-offset: 1px; }
+
 .champion-stat-row {
   display: grid;
   grid-template-columns: 38px minmax(85px,1fr) minmax(86px,auto) 54px;
@@ -213,8 +491,12 @@
 .champion-stat-row > div:nth-last-child(2) { text-align: center; }
 .champion-stat-row > div:last-child { text-align: right; }
 .champion-stat-row b { font-size: 12px; font-variant-numeric: tabular-nums; }
-.champion-stat-row.is-overall { background: color-mix(in oklch,var(--primary-soft) 60%,transparent); }
+.champion-stat-row.is-overall { background: color-mix(in oklab,var(--primary-soft) 60%,transparent); }
 .overall-champion-mark { display: grid; width: 36px; height: 36px; place-items: center; color: var(--primary-strong); background: var(--bg); border-radius: 50%; font-weight: 750; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rank-history-toggle svg { transition: none; }
+}
 
 .position-row { display: grid; grid-template-columns: 28px minmax(0,1fr) 40px; align-items: center; gap: 8px; padding: 7px 12px; }
 .position-row > span { display: grid; width: 26px; height: 26px; place-items: center; background: var(--primary-soft); border-radius: 7px; }
@@ -227,10 +509,6 @@
 
 .mastery-row { display: grid; grid-template-columns: 36px minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 8px 11px; }
 .mastery-row > b { color: var(--primary-strong); font-size: 11px; }
-.seven-day-content { display: flex; align-items: center; gap: 14px; padding: 14px; }
-.seven-day-content > strong { display: grid; width: 62px; height: 62px; place-items: center; color: var(--primary-strong); background: var(--primary-soft); border-radius: 50%; font-size: 18px; }
-.seven-day-content > div { display: grid; }
-.seven-day-content small { color: var(--muted); }
 
 .recent-player { display: grid; grid-template-columns: 34px minmax(0,1fr) auto; align-items: center; gap: 8px; width: 100%; padding: 8px 11px; color: var(--ink); background: transparent; border: 0; text-align: left; }
 .recent-player:hover { background: var(--surface-strong); }
@@ -243,106 +521,199 @@
 .activity-grid { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap: 3px; padding: 5px 10px 11px; }
 .activity-cell { display: grid; aspect-ratio: 1; place-items: center; color: var(--muted); background: var(--surface-strong); border-radius: 4px; }
 .activity-cell b { font-size: 8px; font-weight: 600; }
-.activity-cell.level-1 { background: color-mix(in oklch,var(--primary) 22%,var(--surface)); }
-.activity-cell.level-2 { color: var(--ink); background: color-mix(in oklch,var(--primary) 42%,var(--surface)); }
-.activity-cell.level-3 { color: var(--bg); background: color-mix(in oklch,var(--primary) 68%,var(--surface)); }
+.activity-cell.level-1 { background: color-mix(in oklab,var(--primary) 22%,var(--surface)); }
+.activity-cell.level-2 { color: var(--ink); background: color-mix(in oklab,var(--primary) 42%,var(--surface)); }
+.activity-cell.level-3 { color: var(--bg); background: color-mix(in oklab,var(--primary) 68%,var(--surface)); }
 .activity-cell.level-4 { color: var(--bg); background: var(--primary-strong); }
+
+.overview-share-action {
+  display: inline-flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  overflow: hidden;
+  color: var(--primary-strong);
+  background: color-mix(in oklab,var(--primary-soft) 72%,var(--surface));
+  border: 1px solid color-mix(in oklab,var(--primary) 42%,var(--line));
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+  transition: color 160ms ease-out,background-color 160ms ease-out,border-color 160ms ease-out,transform 160ms ease-out;
+}
+.overview-share-action:hover:not(:disabled) { color: var(--ink); background: color-mix(in oklab,var(--primary) 17%,var(--surface)); border-color: color-mix(in oklab,var(--primary) 66%,var(--line)); }
+.overview-share-action:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.overview-share-action:active:not(:disabled) { transform: translateY(1px); }
+.overview-share-action:disabled { cursor: wait; opacity: .78; }
+.overview-share-action.is-success { color: var(--success); background: color-mix(in oklab,var(--success-soft) 72%,var(--surface)); border-color: color-mix(in oklab,var(--success) 44%,var(--line)); }
+.overview-share-action.is-error { color: var(--danger); background: color-mix(in oklab,var(--danger-soft) 72%,var(--surface)); border-color: color-mix(in oklab,var(--danger) 44%,var(--line)); }
+.overview-share-action svg { width: 17px; height: 17px; flex: 0 0 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.overview-share-action .mini-loading { width: 15px; height: 15px; flex: 0 0 15px; }
+.overview-share-action > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+
+body.overview-share-document { min-width: 1488px; min-height: 0; overflow: visible; background: var(--bg); }
+body.overview-share-document::-webkit-scrollbar { display: none; }
+.overview-share-document { scrollbar-width: none; }
+.overview-share-surface {
+  position: relative;
+  width: 1488px;
+  min-height: 300px;
+  padding: 24px 24px 58px;
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--bg);
+  font: 14px/1.5 var(--font);
+}
+.overview-share-surface .overview-share-content { width: 1440px; padding-top: 0; container: gameplay-page / inline-size; }
+.overview-share-surface .overview-layout { grid-template-columns: minmax(300px,340px) minmax(0,1fr) !important; }
+.overview-share-surface .overview-layout > .career-column { display: grid !important; }
+.overview-share-surface .overview-career-entry,
+.overview-share-surface .overview-share-action,
+.overview-share-surface .overview-refreshing { display: none !important; }
+.overview-share-surface *, .overview-share-surface *::before, .overview-share-surface *::after { animation: none !important; transition: none !important; }
+.overview-share-watermark { position: absolute; bottom: 19px; left: 24px; color: var(--primary-strong); font-size: 12px; font-weight: 800; letter-spacing: 0; line-height: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-share-action { transition: none; }
+}
 
 .match-filterbar { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; padding: 5px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .match-filter-tabs { display: flex; min-width: 0; gap: 3px; overflow-x: auto; }
 .match-filter { min-height: 34px; padding: 0 10px; color: var(--muted); background: transparent; border: 0; border-radius: 8px; white-space: nowrap; }
 .match-filter:hover, .match-filter.is-active { color: var(--ink); background: var(--surface-strong); }
 .match-filter.is-active { font-weight: 700; }
-.match-more-filter { flex: 0 0 auto; }
-.match-more-filter select { min-height: 34px; }
-.match-list { display: grid; gap: 8px; }
+.match-more-filter { flex: 0 0 154px; }
+.match-more-filter .app-select-trigger { min-height: 34px; }
+.match-more-filter.is-active .app-select-trigger { color: var(--primary-strong); background: var(--primary-soft); border-color: color-mix(in oklab,var(--primary) 44%,var(--line)); font-weight: 700; }
+.match-more-filter .app-select-menu { width: 220px; }
+.match-details-warning { gap: 9px; margin: 8px 0; padding: 9px 11px; border: 1px solid color-mix(in oklab,var(--warning) 38%,var(--line)); }
+.match-details-warning .notice-symbol { flex-basis: 20px; width: 20px; height: 20px; font-size: 11px; }
+.match-details-warning strong { font-size: 11.5px; }
+.match-details-warning p { max-width: none; margin-top: 1px; font-size: 10.5px; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+.match-list { display: grid; gap: 8px; overflow-anchor: auto; }
 .match-pagination { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 9px; color: var(--muted); font-size: 11px; }
+.match-filter-paging { display: flex; min-height: 132px; align-items: center; justify-content: center; gap: 9px; color: var(--muted); font-size: 11px; }
 .match-pagination .text-button { min-height: 30px; }
 
-.matches-column { container-type: inline-size; }
-.match-entry { overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
-.match-entry.is-win { background: color-mix(in oklch,var(--accent) 17%,var(--surface)); border-color: color-mix(in oklch,var(--accent) 55%,var(--line)); box-shadow: inset 4px 0 0 var(--accent); }
-.match-entry.is-loss { background: color-mix(in oklch,var(--danger) 15%,var(--surface)); border-color: color-mix(in oklch,var(--danger) 52%,var(--line)); box-shadow: inset 4px 0 0 var(--danger); }
-.match-summary { display: grid; grid-template-columns: 118px minmax(0,1fr) minmax(150px,236px) 44px; align-items: center; gap: 10px; min-height: 132px; padding: 10px 10px 10px 12px; }
+:root { --match-roster-width: clamp(150px,18cqi,190px); }
+.matches-column { container: matches-column / inline-size; }
+.match-entry { min-height: 118px; contain-intrinsic-size: 118px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.match-entry.is-win { background: color-mix(in oklab,var(--accent) 17%,var(--surface)); border-color: color-mix(in oklab,var(--accent) 55%,var(--line)); box-shadow: inset 4px 0 0 var(--accent); }
+.match-entry.is-loss { background: color-mix(in oklab,var(--danger) 15%,var(--surface)); border-color: color-mix(in oklab,var(--danger) 52%,var(--line)); box-shadow: inset 4px 0 0 var(--danger); }
+.match-entry.is-remake { background: color-mix(in oklab,var(--muted) 28%,var(--surface-strong)); border-color: color-mix(in oklab,var(--muted) 68%,var(--line)); box-shadow: inset 4px 0 0 var(--muted); }
+.match-detail-failure { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 10px 7px 14px; color: var(--muted); background: color-mix(in oklab,var(--warning) 9%,var(--surface)); border-top: 1px solid color-mix(in oklab,var(--warning) 32%,var(--line)); }
+.match-detail-failure > span { display: grid; min-width: 0; gap: 2px; }
+.match-detail-failure strong { color: var(--ink); font-size: 11px; }
+.match-detail-failure small { overflow-wrap: anywhere; font-size: 10px; }
+.match-detail-failure .text-button { min-height: 30px; flex: 0 0 auto; }
+.match-summary { display: grid; grid-template-columns: 108px minmax(0,1fr) var(--match-roster-width,clamp(150px,18cqi,190px)) 40px; align-items: center; gap: 8px; min-height: 118px; padding: 10px 10px 10px 14px; }
+.match-summary.is-arena { grid-template-columns: 108px minmax(220px,1fr) var(--match-roster-width,clamp(150px,18cqi,190px)) 40px; }
 .match-result-meta { display: grid; align-self: stretch; align-content: center; padding-right: 10px; border-right: 1px solid var(--line); }
 .match-result-meta strong { color: var(--accent); font-size: 12.5px; }
 .is-loss .match-result-meta strong, .is-loss .result-word { color: var(--danger); }
+.is-remake .match-result-meta strong, .is-remake .result-word { color: color-mix(in oklab,var(--muted) 70%,var(--ink)); }
 .match-result-meta time, .match-result-meta small { color: var(--muted); font-size: 11px; }
 .match-result-meta time { cursor: help; }
-.result-word { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--accent); font-weight: 750; }
+.result-word { display: flex; min-width: 0; align-items: center; gap: 6px; margin-top: 8px; overflow: hidden; color: var(--accent); font-weight: 750; }
 /* 排位胜点变化：仅单双排 / 灵活组排且本地记录到时展示 */
 .lp-delta { flex: 0 0 auto; padding: 1px 5px; border-radius: 5px; font-size: 10.5px; font-style: normal; font-weight: 800; cursor: help; font-variant-numeric: tabular-nums; }
-.lp-delta.is-gain { color: var(--success); background: color-mix(in oklch,var(--success) 16%,transparent); }
-.lp-delta.is-drop { color: var(--danger); background: color-mix(in oklch,var(--danger) 15%,transparent); }
+.lp-delta.is-gain { color: var(--success); background: color-mix(in oklab,var(--success) 16%,transparent); }
+.lp-delta.is-drop { color: var(--danger); background: color-mix(in oklab,var(--danger) 15%,transparent); }
 /* 中部主区：第一行 英雄+技能符文 / KDA / 数据列，第二行装备栏 + 徽章。
    中列弹性伸缩：宽度变化时 KDA 居中、数据列贴住右侧玩家名单，
    多余空间均匀分布在块之间，而不是堆在数据列右侧。 */
-.match-main { display: grid; min-width: 0; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 9px 16px; }
-.match-champion { position: relative; display: grid; grid-template-columns: 58px auto; align-items: center; gap: 7px; }
+.match-main { display: grid; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }
+.match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); row-gap: 5px; }
+.match-champion { position: relative; display: grid; min-width: 0; min-height: 63px; grid-template-columns: 58px minmax(0,auto); align-items: center; gap: 7px; }
 .champion-level { position: absolute; top: 44px; left: 40px; display: grid; width: 22px; height: 22px; place-items: center; color: white; background: #171717; border-radius: 50%; font-size: 10px; }
 /* 召唤师技能一列、主副系符文一列（各上下两格） */
-.match-loadout-mini { display: grid; grid-auto-flow: column; grid-auto-columns: 26px; grid-template-rows: repeat(2,26px); gap: 3px; }
-.match-kda { display: grid; justify-items: center; justify-self: center; font-variant-numeric: tabular-nums; }
-.match-kda strong { font-size: 17px; white-space: nowrap; }
+.match-loadout-mini { display: grid; min-height: 63px; grid-auto-flow: column; grid-template-columns: repeat(2,26px); grid-template-rows: repeat(2,26px); gap: 3px; }
+.match-loadout-slot { display: block; width: 26px; height: 26px; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 7px; }
+.match-loadout-slot.is-empty { opacity: .35; }
+.match-kda { display: grid; min-width: 0; justify-items: center; justify-self: center; font-variant-numeric: tabular-nums; }
+.match-kda strong { min-width: 0; max-width: 100%; overflow: hidden; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
 .match-kda em { color: var(--danger); font-style: normal; }
-.match-kda small { color: var(--muted); font-size: 11px; }
-/* 数据列：击杀参与率 / 分均补刀 / 平均段位，悬停有完整说明；
+.match-kda small { max-width: 96px; color: var(--muted); font-size: 11px; line-height: 1.25; text-align: center; white-space: normal; }
+/* 数据列：按模式展示参团、补刀、段位或伤害数据，悬停有完整说明；
    固定最小宽度并靠右，保证多张卡片的左右边缘对齐 */
-.match-stats { display: grid; align-content: center; gap: 4px; min-width: 190px; justify-self: end; padding-left: 14px; border-left: 1px solid var(--line); }
-.match-stat { display: flex; min-width: 0; align-items: center; gap: 7px; font-size: 11px; cursor: help; }
-.match-stat > em { flex: 0 0 auto; min-width: 60px; color: var(--faint); font-size: 10.5px; font-style: normal; }
-.match-stat > b { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
-.match-stat-tier .match-tier-value { display: inline-flex; align-items: center; gap: 4px; min-height: 18px; }
+.match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }
+.match-stats.is-arena { align-content: center; grid-template-rows: repeat(2,18px); min-height: 41px; }
+.match-stat { display: grid; min-width: 0; grid-template-columns: 72px minmax(0,1fr); align-items: baseline; gap: 8px; font-size: 11px; cursor: help; white-space: nowrap; }
+.match-stat > em { min-width: 0; color: var(--faint); font-size: 10.5px; font-style: normal; }
+.match-stat > b { min-width: 0; justify-self: end; overflow: hidden; color: var(--muted); font-weight: 700; text-align: right; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.match-stat-secondary { color: var(--muted); font-weight: 500; }
+.match-stat-participation > b { color: var(--success); }
+.match-stat-tier { align-items: center; }
+.match-stat-tier .match-tier-value { display: flex; min-width: 0; justify-self: end; align-items: center; gap: 4px; min-height: 19px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .match-stat-tier .match-tier-value b { color: var(--muted); font-size: 11px; font-weight: 700; }
+.match-stat-damage > b { display: inline-flex; align-items: baseline; gap: 3px; }
 .match-tier-crest { width: 19px; height: 19px; object-fit: contain; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .35)); }
 .match-tier-unknown { color: var(--faint); font-weight: 600; }
 .match-build { display: flex; min-width: 0; grid-column: 1 / -1; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 .match-items { display: flex; flex: 0 0 auto; align-items: center; gap: 3px; }
 /* 装备槽：按原始槽位渲染，空位保留暗色占位框；第 7 格为饰品（圆形、留间隔） */
 .item-slot { position: relative; display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; }
-.item-slot.is-empty { background: color-mix(in oklch,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 7px; opacity: .5; }
+.item-slot.is-empty { background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 7px; opacity: .5; }
 .item-slot.is-trinket { margin-left: 7px; }
 .item-slot.is-trinket.is-empty, .item-slot.is-trinket .game-icon { border-radius: 50%; }
 .game-icon.is-slot { flex-basis: 30px; width: 30px; height: 30px; border-radius: 7px; }
+.item-tooltip { display: inline-flex; flex: 0 0 auto; border-radius: 7px; }
+.item-tooltip:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .table-items, .final-build, .selected-rune-strip { display: flex; min-width: 0; flex-wrap: wrap; gap: 3px; }
 .match-badges { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px; }
-.match-badges span { padding: 1px 6px; color: var(--bg); background: var(--primary-strong); border-radius: 999px; font-size: 10px; font-weight: 700; }
+.match-badges span { display: inline-flex; min-height: 18px; align-items: center; justify-content: center; padding: 1px 6px; color: var(--bg); background: var(--primary-strong); border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1; }
 /* 本场评分排名：前三名金 / 银 / 铜，其余中性配色 */
-.match-rank-chip { padding: 1px 6px; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 6px; font-size: 10px; font-style: normal; font-weight: 800; letter-spacing: .4px; cursor: help; font-variant-numeric: tabular-nums; }
+.match-rank-chip { display: inline-flex; min-height: 18px; align-items: center; justify-content: center; padding: 1px 6px; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 6px; font-size: 10px; font-style: normal; font-weight: 800; line-height: 1; letter-spacing: .4px; cursor: help; font-variant-numeric: tabular-nums; }
 .match-rank-chip.is-rank-1 { color: #14100A; background: linear-gradient(120deg,#F2CB5C,#D9A441); border-color: transparent; }
 .match-rank-chip.is-rank-2 { color: #171C22; background: linear-gradient(120deg,#DFE7EE,#9FB2C1); border-color: transparent; }
 .match-rank-chip.is-rank-3 { color: #2B190E; background: linear-gradient(120deg,#DFA678,#B4794C); border-color: transparent; }
 /* 单场评分与 MVP / SVP 徽章 */
-.match-score-line { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; }
-.match-score-line > small { color: var(--muted); font-size: 10px; }
 .match-score { min-width: 30px; padding: 1px 6px; color: var(--ink); background: var(--surface-strong); border-radius: 6px; font-size: 11px; font-style: normal; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
 .match-score.is-gold { color: #14100A; background: var(--primary); }
-.match-score.is-good { color: var(--success); background: color-mix(in oklch,var(--success) 16%,transparent); }
+.match-score.is-good { color: var(--success); background: color-mix(in oklab,var(--success) 16%,transparent); }
 .match-score.is-poor { color: var(--faint); }
-.match-badge-chip { padding: 1px 6px; border-radius: 6px; font-size: 10px; font-style: normal; font-weight: 800; letter-spacing: .4px; }
+.match-badge-chip { display: inline-flex; min-height: 18px; align-items: center; justify-content: center; padding: 1px 6px; border-radius: 6px; font-size: 10px; font-style: normal; font-weight: 800; line-height: 1; letter-spacing: .4px; }
 .match-badge-chip.is-mvp { color: #14100A; background: linear-gradient(120deg,#F2CB5C,#D9A441); }
 .match-badge-chip.is-svp { color: #ECEFFA; background: linear-gradient(120deg,#7E8BD9,#5667BE); }
-.match-score-cell { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.match-score-cell { display: inline-grid; width: 86px; grid-template-columns: 34px 48px; align-items: center; justify-content: end; gap: 4px; white-space: nowrap; }
+.match-score-value, .match-score-badge { display: grid; min-width: 0; justify-items: end; }
+.match-score-badge { min-height: 18px; }
+.match-build > .match-score-cell { flex: 0 0 86px; justify-content: center; }
 /* 对局玩家名单：两列（蓝方 / 红方），紧贴右侧操作按钮 */
-.match-players { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 2px 8px; align-self: center; }
+.match-players { display: grid; width: var(--match-roster-width,clamp(150px,18cqi,190px)); min-width: 0; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 2px 8px; align-self: center; }
 .match-team-list { display: grid; gap: 2px; }
 .match-team-list button { display: flex; min-width: 0; align-items: center; gap: 5px; padding: 0; overflow: hidden; color: var(--muted); background: transparent; border: 0; font-size: 10.5px; text-align: left; }
 .match-team-list button:hover:not(:disabled) { color: var(--ink); }
 .match-team-list button:disabled { cursor: default; }
 .match-team-list button span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* 斗魂竞技场：按名次展示前四队，每队三名玩家一行。 */
-.match-players.is-arena { display: grid; gap: 3px; align-content: center; }
-.arena-team-row-compact { display: grid; min-width: 0; grid-template-columns: 25px minmax(68px,.75fr) auto; align-items: center; gap: 5px; padding: 3px 5px; background: color-mix(in oklch,var(--bg) 50%,transparent); border: 1px solid var(--line); border-radius: 6px; }
-.arena-team-row-compact.is-first { border-color: color-mix(in oklch,var(--primary) 55%,var(--line)); box-shadow: inset 2px 0 0 var(--primary); }
-.arena-team-row-compact > b { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
-.arena-team-row-compact.is-first > b { color: var(--primary-strong); }
-.arena-team-name { display: flex; min-width: 0; align-items: center; gap: 4px; color: var(--muted); font-size: 9.5px; }
-.arena-team-name > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.arena-team-roster { display: flex; justify-content: flex-end; gap: 2px; }
-.arena-team-roster button { display: grid; padding: 0; background: transparent; border: 0; }
-.match-loadout-mini.is-augments { grid-auto-columns: 26px; }
-.arena-augment-icon { display: inline-flex; border-radius: 7px; }
+/* 斗魂竞技场：卡片正面按名次预览前四队，展开详情展示全部队伍。 */
+.match-players.is-arena { display: grid; width: var(--match-roster-width,clamp(150px,18cqi,190px)); max-height: 98px; min-width: 0; grid-template-columns: minmax(0,1fr); gap: 2px; align-content: center; overflow: hidden; }
+.arena-team-row-compact { display: grid; min-width: 0; grid-template-columns: 18px minmax(0,1fr); align-items: center; gap: 4px; padding: 1px 5px; background: color-mix(in oklab,var(--bg) 50%,transparent); border: 1px solid var(--line); border-radius: 6px; }
+.arena-team-row-compact.is-first { border-color: color-mix(in oklab,#D9A441 55%,var(--line)); box-shadow: inset 2px 0 0 #D9A441; }
+.arena-rank-chip { --rank-tone: transparent; display: grid; width: 18px; height: 18px; place-items: center; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 5px; font-size: 9.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.arena-rank-chip.is-rank-1 { color: #2A1D05; background: linear-gradient(160deg,#F5D372,#D9A441); border-color: #E8C468; box-shadow: 0 0 0 1px rgb(217 164 65 / .28), 0 1px 3px rgb(217 164 65 / .35); }
+.arena-rank-chip.is-rank-2 { color: #1C2027; background: linear-gradient(160deg,#DDE4EC,#AFBAC8); border-color: #C7D0DC; }
+.arena-rank-chip.is-rank-3 { color: #2A1A0E; background: linear-gradient(160deg,#DCA070,#B87333); border-color: #C8834A; }
+.arena-team-roster { display: grid; min-width: 0; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
+.arena-team-roster button { display: flex; min-width: 0; align-items: center; gap: 4px; padding: 0; overflow: hidden; color: var(--muted); background: transparent; border: 0; font-size: 9.5px; text-align: left; }
+.arena-team-roster button span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match-loadout-mini.is-augments { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(2,30px); grid-template-rows: repeat(2,30px); }
+.match-loadout-mini.is-augments.is-mayhem { grid-auto-flow: column; grid-template-columns: repeat(3,30px); grid-template-rows: repeat(2,30px); }
+.arena-augment-icon { --augment-accent: #6F7885; display: inline-flex; flex: 0 0 auto; overflow: hidden; background: #090B0F; border: 1px solid var(--augment-accent); border-radius: 7px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .035); }
+.arena-augment-icon.is-bronze { --augment-accent: #B98255; }
+.arena-augment-icon.is-silver { --augment-accent: #9FB2C1; }
+.arena-augment-icon.is-gold { --augment-accent: #E3B341; }
+.arena-augment-icon.is-prismatic { --augment-accent: #C77DFF; }
+.arena-augment-icon.is-event { --augment-accent: #55C8D7; }
+.arena-augment-icon > .game-icon { border: 0; border-radius: 5px; }
+.arena-augment-icon > .game-icon.is-small { width: 28px; height: 28px; flex-basis: 28px; }
+.arena-augment-icon > .game-icon.is-large { width: 62px; height: 62px; flex-basis: 62px; border-radius: 5px; }
 .arena-augment-icon:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.arena-augment-slot { display: block; width: 26px; height: 26px; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 7px; }
+.arena-augment-slot.is-empty { opacity: .35; }
 /* 竞技场详情：按名次分组的小队卡与伤害对比 */
 .team-overview.is-arena > header strong { color: var(--muted); }
 .team-overview.is-arena.is-first > header strong { color: var(--primary-strong); }
@@ -350,36 +721,83 @@
 .damage-compare.is-arena .damage-team h4 { color: var(--muted); }
 .damage-compare.is-arena .damage-team:first-child h4 { color: var(--primary-strong); }
 /* 设计稿：右侧操作列，展开与回放按钮高度约 3:1，悬停浮起 */
-.match-actions { display: flex; align-self: stretch; width: 44px; flex-direction: column; gap: 4px; }
-.match-actions button { display: grid; width: 100%; place-items: center; padding: 0; color: var(--accent); background: color-mix(in oklch,var(--accent) 11%,transparent); border: 1px solid color-mix(in oklch,var(--accent) 26%,transparent); border-radius: 9px; transition: transform 150ms ease-out, background-color 150ms ease-out, color 150ms ease-out, box-shadow 150ms ease-out; }
+.match-actions { display: flex; align-self: stretch; width: 40px; flex-direction: column; gap: 4px; }
+.match-actions button { display: grid; width: 100%; place-items: center; padding: 0; color: var(--accent); background: color-mix(in oklab,var(--accent) 11%,transparent); border: 1px solid color-mix(in oklab,var(--accent) 26%,transparent); border-radius: 9px; transition: transform 150ms ease-out, background-color 150ms ease-out, color 150ms ease-out, box-shadow 150ms ease-out; }
 .match-actions svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .match-replay svg { fill: currentColor; stroke: none; }
-.match-actions button:hover, .match-actions button:focus-visible { color: var(--ink); background: color-mix(in oklch,var(--accent) 30%,transparent); box-shadow: 0 4px 12px rgb(0 0 0 / .3); transform: translateY(-1px); }
-.is-loss .match-actions button { color: var(--danger); background: color-mix(in oklch,var(--danger) 10%,transparent); border-color: color-mix(in oklch,var(--danger) 26%,transparent); }
-.is-loss .match-actions button:hover, .is-loss .match-actions button:focus-visible { color: var(--ink); background: color-mix(in oklch,var(--danger) 28%,transparent); }
+.match-actions button:hover, .match-actions button:focus-visible { color: var(--ink); background: color-mix(in oklab,var(--accent) 30%,transparent); box-shadow: 0 4px 12px rgb(0 0 0 / .3); transform: translateY(-1px); }
+.match-actions button:disabled { color: var(--faint); background: color-mix(in oklab,var(--surface-strong) 52%,transparent); border-color: var(--line); box-shadow: none; cursor: not-allowed; opacity: .62; transform: none; }
+.is-loss .match-actions button { color: var(--danger); background: color-mix(in oklab,var(--danger) 10%,transparent); border-color: color-mix(in oklab,var(--danger) 26%,transparent); }
+.is-loss .match-actions button:hover, .is-loss .match-actions button:focus-visible { color: var(--ink); background: color-mix(in oklab,var(--danger) 28%,transparent); }
 .match-expand { flex: 3; }
 .match-replay { flex: 1; }
 .match-expand svg { transition: transform 180ms ease-out; }
 .match-expand[aria-expanded="true"] svg { transform: rotate(180deg); }
 
-@container (max-width: 1080px) {
-  .match-summary { grid-template-columns: 108px minmax(0,1fr) minmax(118px,152px) 44px; gap: 8px; }
-  .match-main { gap: 8px 12px; }
-  .match-stats { min-width: 170px; padding-left: 10px; }
-  .arena-team-row-compact { grid-template-columns: 20px 22px auto; gap: 4px; padding-inline: 4px; }
-  .arena-team-name > span:last-child { display: none; }
+@container matches-column (max-width: 1080px) {
+	.match-summary { --match-roster-width: clamp(146px,20cqi,180px); }
+	.match-summary, .match-summary.is-arena { grid-template-columns: 108px minmax(0,1fr) var(--match-roster-width,clamp(146px,20cqi,180px)) 40px; gap: 8px; }
+	.match-main { gap: 8px 12px; }
+	.match-stats { padding-left: 10px; }
+	.arena-team-row-compact { padding-inline: 4px; }
 }
 
-@container (max-width: 680px) {
-  .match-summary { grid-template-columns: 108px minmax(0,1fr) 44px; }
-  .match-players, .match-players.is-arena { display: none; }
+@container matches-column (max-width: 900px) {
+	.match-summary { --match-roster-width: clamp(150px,24cqi,210px); }
+	.match-summary.is-arena .arena-team-roster { gap: 2px; }
 }
 
-@container (max-width: 640px) {
-  .match-main { grid-template-columns: auto minmax(0,1fr); }
-  .match-stats { grid-column: 1 / -1; grid-auto-flow: column; justify-content: start; justify-self: start; min-width: 0; gap: 14px; padding-left: 0; border-left: 0; }
-  .match-stat { flex-direction: column; align-items: flex-start; gap: 1px; }
-  .match-stat > em { min-width: 0; }
+@container matches-column (max-width: 720px) {
+	.match-summary { --match-roster-width: 100%; }
+	.match-players, .match-players.is-arena { display: none; }
+	.match-summary, .match-summary.is-arena { grid-template-columns: 108px minmax(0,1fr) 40px; align-items: center; }
+	.match-summary.is-arena .match-result-meta { grid-column: 1; grid-row: 1; }
+	.match-summary.is-arena .match-main { grid-column: 2; grid-row: 1; }
+	.match-summary.is-arena .match-actions { grid-column: 3; grid-row: 1; }
+}
+
+@container matches-column (max-width: 640px) {
+	.match-main, .match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,1fr); }
+	.match-stats { display: grid; grid-column: 1 / -1; grid-row: 2; min-height: 54px; padding-left: 10px; border-left: 0; border-top: 1px solid var(--line); padding-top: 6px; }
+	.match-build { column-gap: 4px; }
+	.match-stats.is-arena { align-content: center; grid-template-rows: repeat(2,18px); min-height: 41px; }
+	.item-slot.is-trinket { margin-left: 0; }
+}
+
+@container matches-column (max-width: 420px) {
+	.match-summary, .match-summary.is-arena { grid-template-columns: minmax(0,1fr) 34px; gap: 8px; padding: 10px; }
+	.match-result-meta, .match-summary.is-arena .match-result-meta { grid-column: 1; grid-row: 1; align-self: center; padding: 0; border-right: 0; }
+	.match-result-meta .result-word { margin-top: 4px; }
+	.match-main, .match-main.is-arena, .match-summary.is-arena .match-main { grid-column: 1 / -1; grid-row: 2; grid-template-columns: minmax(0,1fr) minmax(88px,auto); gap: 7px 4px; }
+	.match-kda { min-width: 88px; }
+	.match-kda strong { font-size: 16px; }
+	.match-stats { gap: 8px; }
+	.match-build { gap: 5px 8px; }
+	.match-actions { grid-column: 2; grid-row: 1; width: 34px; min-height: 64px; }
+	.match-summary.is-arena .match-actions { grid-column: 2; grid-row: 1; }
+}
+
+@container arena-first (max-width: 720px) {
+	.match-summary.is-arena { --match-roster-width: clamp(146px,20cqi,180px); grid-template-columns: 108px minmax(0,1fr) 40px; align-items: center; }
+	.match-players, .match-players.is-arena { display: none; }
+	.match-summary.is-arena .match-result-meta { grid-column: 1; grid-row: 1; }
+	.match-summary.is-arena .match-main { grid-column: 2; grid-row: 1; gap: 5px 12px; }
+	.match-summary.is-arena .match-build { column-gap: 4px; }
+	.match-summary.is-arena .item-slot.is-trinket { margin-left: 0; }
+	.match-summary.is-arena .match-actions { grid-column: 3; grid-row: 1; }
+	.match-stats { padding-left: 10px; }
+}
+
+@container arena-first (max-width: 520px) {
+	.match-summary.is-arena { --match-roster-width: clamp(150px,24cqi,210px); grid-template-columns: minmax(0,1fr) 34px; gap: 8px; padding: 10px; }
+	.match-summary.is-arena .match-result-meta { grid-column: 1; grid-row: 1; align-self: center; padding: 0; border-right: 0; }
+	.match-summary.is-arena .match-main { grid-column: 1 / -1; grid-row: 2; grid-template-columns: minmax(0,auto) minmax(0,1fr); gap: 7px 4px; }
+	.match-summary.is-arena .match-stats { display: grid; }
+	.match-summary.is-arena .match-actions { grid-column: 2; grid-row: 1; width: 34px; min-height: 64px; }
+}
+
+@container arena-first (max-width: 420px) {
+	.match-summary.is-arena { --match-roster-width: 100%; }
 }
 
 .match-detail { padding: 0 8px 8px; border-top: 1px solid var(--line); }
@@ -391,48 +809,61 @@
 .match-detail-tabs button.is-active { font-weight: 700; }
 .match-detail-head .replay-button { min-height: 36px; padding: 0 12px; color: var(--primary-strong); background: var(--primary-soft); border: 0; border-radius: 8px; }
 .match-overview-teams { display: grid; gap: 7px; }
-.arena-match-detail { display: grid; gap: 7px; }
+.arena-match-detail { display: grid; gap: 0; }
 .arena-match-detail > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 2px 4px 6px; }
 .arena-match-detail > header strong { font-size: 13px; }
 .arena-match-detail > header span { color: var(--muted); font-size: 10px; }
-.arena-detail-team { overflow: hidden; background: color-mix(in oklch,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 8px; }
-.arena-detail-team.is-first { border-color: color-mix(in oklch,var(--primary) 50%,var(--line)); }
-.arena-detail-team > header { display: grid; min-height: 40px; grid-template-columns: 30px 26px minmax(90px,1fr) auto; align-items: center; gap: 7px; padding: 5px 10px; background: color-mix(in oklch,var(--surface-strong) 60%,transparent); border-bottom: 1px solid var(--line); }
+.arena-detail-columns { display: grid; grid-template-columns: minmax(140px,.9fr) 104px 96px 100px 116px 200px; align-items: center; justify-items: center; column-gap: 12px; padding: 7px 10px; color: var(--faint); background: color-mix(in oklab,var(--surface-strong) 44%,transparent); border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; font-size: 10.5px; text-align: center; }
+.arena-detail-team { overflow: hidden; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 8px; }
+.arena-detail-columns + .arena-detail-team { border-radius: 0; }
+.arena-detail-team + .arena-detail-team { margin-top: -1px; border-radius: 0; }
+.arena-detail-team:last-child { border-radius: 0 0 8px 8px; }
+.arena-detail-team.is-first { border-color: color-mix(in oklab,var(--primary) 50%,var(--line)); }
+.arena-detail-team > header { display: grid; min-height: 40px; grid-template-columns: 30px 26px minmax(90px,1fr) auto; align-items: center; gap: 7px; padding: 5px 10px; background: color-mix(in oklab,var(--surface-strong) 60%,transparent); border-bottom: 1px solid var(--line); }
 .arena-detail-team > header > b { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .arena-detail-team.is-first > header > b { color: var(--primary-strong); }
 .arena-detail-team > header > strong { font-size: 12px; }
 .arena-detail-team > header > span:last-child { color: var(--muted); font-size: 10px; }
 .arena-detail-player-list { display: grid; }
-.arena-detail-player { display: grid; min-height: 52px; grid-template-columns: minmax(150px,1fr) 86px 105px minmax(90px,.75fr) minmax(170px,1.25fr) auto; align-items: center; gap: 9px; padding: 6px 10px; border-top: 1px solid var(--line); }
+.arena-detail-player { display: grid; min-height: 52px; grid-template-columns: minmax(140px,.9fr) 104px 96px 100px 116px 200px; align-items: center; justify-items: center; column-gap: 12px; padding: 6px 10px; border-top: 1px solid var(--line); text-align: center; }
 .arena-detail-player:first-child { border-top: 0; }
-.arena-detail-kda, .arena-detail-damage { display: grid; font-variant-numeric: tabular-nums; }
+.arena-detail-columns > :first-child { justify-self: start; text-align: left; }
+.arena-detail-player > .participant-link { width: auto; justify-self: start; justify-content: flex-start; }
+.arena-detail-kda { display: grid; justify-items: center; font-variant-numeric: tabular-nums; }
+.arena-detail-damage { display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.arena-detail-damage i { color: var(--muted); font-style: normal; }
 .arena-detail-kda b, .arena-detail-damage b { font-size: 10.5px; }
-.arena-detail-kda small, .arena-detail-damage small { color: var(--muted); font-size: 9px; }
-.arena-detail-augments, .arena-detail-items { display: flex; min-width: 0; flex-wrap: wrap; gap: 3px; }
-@container (max-width: 720px) {
-  .arena-detail-player { grid-template-columns: minmax(150px,1fr) 82px 100px minmax(90px,.8fr); }
-  .arena-detail-items, .arena-detail-player > .match-score-cell { display: none; }
+.arena-detail-kda small { color: var(--muted); font-size: 9px; }
+.arena-detail-augments { display: grid; min-width: 0; grid-template-columns: repeat(3,30px); justify-content: center; gap: 3px; }
+.arena-detail-items { display: flex; min-width: 0; justify-self: stretch; justify-content: flex-start; flex-wrap: nowrap; gap: 3px; }
+.arena-detail-player .match-score-cell, .match-table .match-score-cell { width: 86px; grid-template-columns: 34px 48px; justify-content: center; justify-items: center; gap: 4px; }
+.arena-detail-player .match-score-value, .arena-detail-player .match-score-badge, .match-table .match-score-value, .match-table .match-score-badge { justify-items: center; }
+.arena-detail-player .match-score-badge:empty, .match-table .match-score-badge:empty { display: none; }
+@container matches-column (max-width: 720px) {
+	.arena-match-detail { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-gutter: stable; }
+	.arena-detail-columns, .arena-detail-team { min-width: 860px; }
 }
-@container (max-width: 620px) {
-  .arena-match-detail > header { align-items: flex-start; flex-direction: column; gap: 2px; }
-  .arena-detail-team > header { grid-template-columns: 28px 26px minmax(0,1fr); }
-  .arena-detail-team > header > span:last-child { display: none; }
-  .arena-detail-player { grid-template-columns: minmax(130px,1fr) 80px; }
-  .arena-detail-damage, .arena-detail-augments { display: none; }
+@container arena-first (max-width: 640px) {
+	.arena-match-detail { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-gutter: stable; }
+	.arena-detail-columns, .arena-detail-team { min-width: 860px; }
 }
-.team-overview { overflow: hidden; background: color-mix(in oklch,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 10px; }
+.team-overview { overflow: hidden; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 10px; }
 .team-overview.is-blue > header strong { color: var(--accent); }
 .team-overview.is-red > header strong { color: var(--danger); }
 .table-scroll { overflow-x: auto; }
 .match-table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
-.match-table th { padding: 7px 8px; color: var(--muted); font-weight: 600; text-align: left; }
+.match-table th, .match-table td { text-align: center; vertical-align: middle; }
+.match-table th { padding: 7px 8px; color: var(--muted); font-weight: 600; }
 .match-table td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .match-table td > small { display: block; color: var(--muted); }
+.match-table th:first-child, .match-table td:first-child { text-align: left; }
 .participant-link { display: flex; min-width: 130px; align-items: center; gap: 6px; padding: 0; color: var(--ink); background: transparent; border: 0; }
 .participant-link span { max-width: 118px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match-table .participant-link { width: auto; justify-content: flex-start; }
+.match-table .table-items { justify-content: flex-start; }
 
 .team-analysis-grid { display: grid; grid-template-columns: repeat(3,minmax(150px,1fr)); gap: 7px; }
-.team-metric { min-width: 0; padding: 12px; background: color-mix(in oklch,var(--bg) 56%,transparent); border: 1px solid var(--line); border-radius: 10px; }
+.team-metric { min-width: 0; padding: 12px; background: color-mix(in oklab,var(--bg) 56%,transparent); border: 1px solid var(--line); border-radius: 10px; }
 /* 红蓝双色对峙条：单元素渐变实现，蓝方在左、红方在右，长度即占比 */
 .team-metric-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 .team-metric-head h4 { margin: 0; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
@@ -443,7 +874,7 @@
 .team-metric-track i { display: block; width: 100%; height: 100%; background: linear-gradient(to right, var(--accent) var(--blue-share, 50%), var(--danger) var(--blue-share, 50%)); }
 
 .build-detail { display: grid; gap: 7px; }
-.build-detail > section { overflow: hidden; background: color-mix(in oklch,var(--bg) 56%,transparent); border: 1px solid var(--line); border-radius: 10px; }
+.build-detail > section { overflow: hidden; background: color-mix(in oklab,var(--bg) 56%,transparent); border: 1px solid var(--line); border-radius: 10px; }
 .build-detail > section > :not(header) { margin: 12px; }
 .final-build { min-height: 50px; align-items: center; }
 .detail-empty { padding: 22px; color: var(--muted); text-align: center; }
@@ -454,7 +885,7 @@
 /* 装备路线：按分钟分组，组间箭头衔接；出售的装备降饱和并画斜线 */
 .timeline-route { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; row-gap: 12px; }
 .timeline-group { display: grid; justify-items: center; gap: 3px; }
-.timeline-group-items { display: flex; flex-wrap: wrap; gap: 3px; padding: 4px; background: color-mix(in oklch,var(--surface-strong) 62%,transparent); border: 1px solid var(--line); border-radius: 9px; }
+.timeline-group-items { display: flex; flex-wrap: wrap; gap: 3px; padding: 4px; background: color-mix(in oklab,var(--surface-strong) 62%,transparent); border: 1px solid var(--line); border-radius: 9px; }
 .timeline-group > small { color: var(--muted); font-variant-numeric: tabular-nums; }
 .timeline-item { position: relative; display: inline-flex; }
 .timeline-item.is-sold .game-icon { opacity: .45; filter: grayscale(.7); }
@@ -464,13 +895,13 @@
 /* 战绩详情的技能加点序列：一格一次加点（字母按技能着色 + 第几级）。
    注意类名不能叫 .skill-order —— 对局页的技能顺序网格已占用该名。 */
 .match-skill-seq { display: flex; flex-wrap: wrap; gap: 3px; }
-.match-skill-cell { display: grid; width: 30px; height: 40px; place-items: center; align-content: center; background: color-mix(in oklch,var(--bg) 62%,transparent); border: 1px solid var(--line); border-radius: 6px; }
+.match-skill-cell { display: grid; width: 30px; height: 40px; place-items: center; align-content: center; background: color-mix(in oklab,var(--bg) 62%,transparent); border: 1px solid var(--line); border-radius: 6px; }
 .match-skill-cell b { font-size: 12px; }
 .match-skill-cell small { color: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; }
 .match-skill-cell.is-slot-1 b { color: var(--accent); }
 .match-skill-cell.is-slot-2 b { color: var(--success); }
 .match-skill-cell.is-slot-3 b { color: #b48cf2; }
-.match-skill-cell.is-slot-4 { background: var(--danger-soft); border-color: color-mix(in oklch,var(--danger) 45%,var(--line)); }
+.match-skill-cell.is-slot-4 { background: var(--danger-soft); border-color: color-mix(in oklab,var(--danger) 45%,var(--line)); }
 .match-skill-cell.is-slot-4 b { color: var(--danger); }
 .match-skill-priority { color: var(--muted); font-size: 11px; }
 .match-skill-priority b.is-slot-1 { color: var(--accent); }
@@ -478,29 +909,24 @@
 .match-skill-priority b.is-slot-3 { color: #b48cf2; }
 
 /* 目录未加载时的占位图标：不发请求，安静等待目录就绪后重绘 */
-.game-icon.is-pending { background: color-mix(in oklch,var(--surface-strong) 68%,transparent); }
+.game-icon.is-pending { background: color-mix(in oklab,var(--surface-strong) 68%,transparent); }
 
-.rune-board { display: grid; grid-template-columns: repeat(2,minmax(210px,1fr)) minmax(120px,.55fr); gap: 10px; }
-.rune-tree, .rune-fragments { padding: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
-.rune-tree > header { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
-.rune-slot { display: flex; justify-content: center; gap: 8px; padding: 5px 0; }
-.rune-option { display: grid; place-items: center; opacity: .2; filter: grayscale(1); }
-.rune-option.is-selected { opacity: 1; filter: none; }
-.rune-option.is-selected .game-icon { outline: 2px solid var(--primary); outline-offset: 2px; }
-.rune-fragments { display: grid; align-content: center; gap: 10px; }
-.rune-fragments > div { display: flex; flex-wrap: wrap; gap: 8px; }
 .rune-loading-copy { margin-top: 8px; }
 
 .game-icon { position: relative; display: grid; flex: 0 0 36px; width: 36px; height: 36px; place-items: center; overflow: hidden; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 8px; font-size: 10px; }
 .game-icon > span { position: absolute; }
 .game-icon img { position: relative; z-index: 1; display: block; width: 100%; height: 100%; object-fit: cover; }
+/* 去掉英雄方形头像源图自带的一圈暗角：暗角实测从半径 0.42w 起才开始压暗，
+   放大 1.18 倍后可视区只剩中心 85%，正好整片落在暗角内侧。数值推导与踩过的坑
+   见 gameplay.js 里 iconFigure 上方的注释，别改成"看着差不多"的数。 */
+.game-icon.is-champion-art img { transform: scale(1.18); }
 .game-icon.is-tiny { flex-basis: 18px; width: 18px; height: 18px; border: 0; border-radius: 4px; }
 .game-icon.is-small { flex-basis: 26px; width: 26px; height: 26px; border-radius: 6px; }
 .game-icon.is-large { flex-basis: 58px; width: 58px; height: 58px; border-radius: 50%; }
 .game-icon.is-live { flex-basis: 48px; width: 48px; height: 48px; border-radius: 10px; }
-.game-icon.is-rune { flex-basis: 38px; width: 38px; height: 38px; overflow: visible; background: color-mix(in oklch,var(--bg) 62%,transparent); border-radius: 50%; }
+.game-icon.is-rune { flex-basis: 38px; width: 38px; height: 38px; overflow: visible; background: color-mix(in oklab,var(--bg) 62%,transparent); border-radius: 50%; }
 .game-icon.is-rune img { object-fit: contain; image-rendering: auto; }
-.game-icon.is-summoner-avatar { flex-basis: 58px; width: 58px; height: 58px; border-color: var(--primary); border-radius: 50%; }
+.game-icon.is-summoner-avatar { flex-basis: 72px; width: 72px; height: 72px; border-width: 2px; border-color: var(--primary); border-radius: 50%; box-shadow: 0 5px 16px rgb(0 0 0 / .26); }
 
 .gameplay-empty { display: grid; min-height: 360px; place-items: center; align-content: center; gap: 8px; padding: 28px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); text-align: center; }
 .opgg-escape { display: grid; justify-items: center; gap: 8px; margin-top: 10px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); text-align: center; }
@@ -513,9 +939,12 @@
 .player-overlay-return { display: inline-flex; min-height: 34px; align-items: center; gap: 5px; padding: 0 12px 0 8px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; font-weight: 650; }
 .player-overlay-return:hover { background: var(--surface-strong); border-color: var(--hex-line); }
 .player-overlay-return svg { width: 18px; height: 18px; }
-.player-overlay-title { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.player-overlay-title { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: 8px; }
 .player-overlay-title strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .player-overlay-title small { color: var(--muted); font-size: 10px; }
+.player-overlay-add { min-height: 34px; flex: 0 0 auto; margin-left: auto; padding: 0 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; font-weight: 650; white-space: nowrap; }
+.player-overlay-add:hover:not(:disabled) { background: var(--surface-strong); border-color: var(--hex-line); }
+.player-overlay-add:disabled { color: var(--muted); opacity: .62; cursor: default; }
 .player-overlay-scroll { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior-y: contain; }
 .player-overlay-content { width: min(1580px, 100%); margin: 0 auto; padding: 4px clamp(18px, 3.2vw, 52px) 28px; }
 .gameplay-empty > span { display: grid; width: 58px; height: 58px; place-items: center; color: var(--primary-strong); background: var(--primary-soft); border-radius: 50%; font-size: 28px; }
@@ -526,25 +955,32 @@
 
 /* 设计稿：阶段与队列信息放在“刷新对局”同一行的左侧 */
 .live-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; margin-bottom: 10px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
-.live-session-summary { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.live-session-summary { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
 .live-session-summary[hidden] { display: none; }
-.live-session-summary .state-chip { flex: 0 0 auto; color: var(--primary-strong); background: var(--primary-soft); border: 1px solid color-mix(in oklch,var(--primary) 42%,var(--line)); }
-.live-session-copy { display: grid; min-width: 0; }
+.live-session-summary .state-chip { flex: 0 0 auto; color: var(--primary-strong); background: var(--primary-soft); border: 1px solid color-mix(in oklab,var(--primary) 42%,var(--line)); }
+.live-session-copy { display: grid; min-width: 0; flex: 1 1 180px; }
 .live-session-copy strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .live-session-copy span { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.live-current-position { display: inline-flex; min-height: 30px; flex: 0 0 auto; align-items: center; gap: 6px; margin-left: auto; padding: 4px 9px; color: #17130A; background: var(--primary); border: 1px solid var(--primary-strong); border-radius: 999px; box-shadow: 0 2px 8px color-mix(in oklab,var(--primary) 24%,transparent); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.live-current-position .position-icon { width: 17px; height: 17px; filter: brightness(.2); }
 .live-toolbar > .text-button { flex: 0 0 auto; margin-left: auto; }
 .state-chip { display: inline-flex; width: fit-content; min-height: 26px; align-items: center; padding: 0 8px; color: var(--muted); background: var(--surface-strong); border-radius: 999px; font-size: 11px; font-weight: 650; }
 .state-chip.success { color: var(--success); background: var(--success-soft); }
 .live-teams { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; padding-top: 10px; }
+.live-teams.is-arena { grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); }
 .live-team { overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .live-team.is-blue { box-shadow: inset 3px 0 0 var(--accent); }
 .live-team.is-red { box-shadow: inset 3px 0 0 var(--danger); }
 .live-team.is-blue > header h3 { color: var(--accent); }
 .live-team.is-red > header h3 { color: var(--danger); }
+.live-team.is-arena { box-shadow: inset 3px 0 0 var(--primary); }
+.live-team.is-arena > header h3 { color: var(--primary-strong); }
+.live-roster-notice { display: flex; grid-column: 1/-1; align-items: center; gap: 9px; margin: 0; padding: 10px 12px; color: var(--ink); background: color-mix(in oklab,var(--primary-soft) 58%,var(--surface)); border: 1px solid color-mix(in oklab,var(--primary) 48%,var(--line)); border-radius: var(--radius-md); font-size: 10.5px; line-height: 1.45; }
+.live-roster-notice svg { width: 18px; height: 18px; flex: 0 0 18px; fill: none; stroke: var(--primary-strong); stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 .live-player-list { display: grid; }
 .live-player { display: grid; grid-template-columns: 48px minmax(100px,1fr) minmax(220px,auto) auto; align-items: center; gap: 9px; min-height: 72px; padding: 9px 11px; }
 .live-player + .live-player { border-top: 1px solid var(--line); }
-.live-player.is-self { background: color-mix(in oklch,var(--primary-soft) 62%,transparent); }
+.live-player.is-self { background: color-mix(in oklab,var(--primary-soft) 62%,transparent); }
 .live-player-copy { display: grid; min-width: 0; }
 .live-player-copy button { padding: 0; overflow: hidden; color: var(--ink); background: transparent; border: 0; font-weight: 700; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .live-player-copy button:hover { color: var(--primary-strong); }
@@ -560,95 +996,276 @@
 .live-waiting p { margin: 3px 0 0; color: var(--muted); }
 .live-orbit { display: grid; width: 62px; height: 62px; place-items: center; color: var(--primary-strong); background: var(--primary-soft); border: 1px solid var(--hex-line); border-radius: 50%; font-size: 28px; }
 
-.recommendation-area { container-type: inline-size; margin-top: 14px; }
+.recommendation-area { --rune-icon-size: 32px; --rune-style-icon-width: 32px; --rune-style-icon-height: 40px; --rune-header-height: 52px; --rune-row-height: 52px; container: recommendation-area / inline-size; margin-top: 14px; }
 .live-content > .recommendation-area:first-child, .recommendation-area:first-child { margin-top: 0; border-top: 0; padding-top: 0; }
-.recommendation-champion-summary { display: grid; gap: 10px; margin-bottom: 10px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
-.champion-summary-main { display: flex; align-items: center; gap: 11px; }
-.champion-summary-main > div { display: grid; min-width: 132px; }
+.recommendation-champion-summary { display: grid; grid-template-columns: minmax(360px,.82fr) minmax(0,1.18fr); grid-template-areas: "summary matchups" "positions matchups"; align-items: center; gap: 7px 16px; margin-bottom: 10px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.recommendation-champion-summary.is-no-counters { grid-template-columns: 1fr; grid-template-areas: "summary" "positions"; }
+.recommendation-champion-summary.is-no-counters.has-tier { grid-template-columns: minmax(0,1fr) 72px; grid-template-areas: "summary tier" "positions tier"; }
+.champion-summary-main { display: flex; min-width: 0; grid-area: summary; align-items: center; gap: 0; }
+.champion-summary-main > .game-icon { margin-right: 11px; }
+.champion-summary-main > div { display: grid; min-width: 0; }
+.champion-summary-main > div strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .champion-summary-main > div span { color: var(--muted); font-size: 10px; }
-.champion-summary-main dl { display: flex; gap: 24px; margin: 0 0 0 14px; }
+.champion-summary-main dl { display: flex; gap: 12px; margin: 0 0 0 15px; padding-left: 15px; border-left: 1px solid var(--line); }
 .champion-summary-main dt { color: var(--muted); font-size: 9px; }
-.champion-summary-main dd { margin: 1px 0 0; font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.champion-matchups { display: flex; flex-wrap: wrap; gap: 12px 28px; padding-top: 10px; border-top: 1px solid var(--line); }
-.champion-matchups > div { display: flex; align-items: center; gap: 6px; }
-.champion-matchups > div > span:first-child { width: 58px; color: var(--muted); font-size: 10px; }
+.champion-summary-main dd { margin: 1px 0 0; font-size: 14px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.champion-summary-main .is-win dd { color: var(--success); }
+.champion-summary-main .is-pick dd { color: var(--accent); }
+.champion-summary-main .is-ban dd { color: var(--danger); }
+.champion-summary-tier { display: grid; min-width: 72px; min-height: 50px; grid-area: tier; align-self: stretch; place-content: center; gap: 1px; padding-left: 14px; border-left: 1px solid var(--line); text-align: center; }
+.champion-summary-tier > span { color: var(--muted); font-size: 9px; }
+.champion-summary-tier > strong { display: grid; min-height: 27px; place-items: center; }
+.champion-stats-empty { max-width: 210px; margin: 0 0 0 15px; padding-left: 15px; border-left: 1px solid var(--line); color: var(--muted); font-size: 10.5px; line-height: 1.45; }
+.live-position-switch { display: flex; min-width: 0; grid-area: positions; flex-wrap: nowrap; gap: 6px; overflow-x: auto; }
+.live-position-chip { display: inline-flex; min-width: 0; min-height: 34px; align-items: center; gap: 5px; padding: 4px 6px; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; white-space: nowrap; }
+.live-position-chip:hover { color: var(--ink); border-color: var(--primary); }
+.live-position-chip.is-active { color: var(--ink); background: var(--primary-soft); border-color: var(--primary); }
+.live-position-chip img.position-icon { display: block; width: 20px; height: 20px; object-fit: contain; }
+.live-position-chip span { font-size: 10px; font-weight: 700; }
+.live-position-rate { color: var(--muted); font-size: 9px; font-weight: 700; }
+.champion-matchups { display: grid; min-width: 0; grid-area: matchups; align-content: center; gap: 6px; padding-left: 16px; border-left: 1px solid var(--line); }
+.champion-matchups > div { display: grid; min-width: 0; grid-template-columns: 58px repeat(3,minmax(0,1fr)); align-items: center; gap: 6px; padding-bottom: 2px; }
+.champion-matchups > div > span:first-child { min-width: 0; color: var(--muted); font-size: 10px; white-space: nowrap; }
 .champion-matchups .game-icon { border-radius: 50%; }
+.matchups-empty { font-size: 10.5px; text-decoration: underline dotted color-mix(in oklab,var(--muted) 60%,transparent); text-underline-offset: 3px; }
 .recommendation-tabs { display: flex; gap: 3px; width: fit-content; margin-bottom: 10px; padding: 3px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
 .recommendation-tabs button { min-width: 150px; min-height: 38px; padding: 0 16px; color: var(--muted); background: transparent; border: 0; border-radius: 7px; font-weight: 750; }
 .recommendation-tabs button:hover { color: var(--ink); }
 .recommendation-tabs button.is-active { color: var(--ink); background: var(--surface-strong); }
 .recommendation-panel[hidden] { display: none; }
+/* 页签内加载遮罩：只盖住 tab 栏下方的这块面板，tab 栏与其上方内容照常可用。 */
+.recommendation-panel { position: relative; min-width: 0; min-height: 220px; }
+.recommendation-panel.is-loading > :not(.panel-loading) { filter: blur(1.5px) saturate(.6); opacity: .35; pointer-events: none; user-select: none; }
+.panel-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: block;
+  padding: 0;
+  background: radial-gradient(120% 90% at 50% 45%,color-mix(in oklab,var(--surface) 92%,transparent),color-mix(in oklab,var(--bg) 88%,transparent));
+  backdrop-filter: blur(2px);
+}
+.panel-loading-content { position: sticky; top: calc(var(--topbar-height) + 16px); display: grid; width: 100%; height: min(100%,calc(100vh - var(--topbar-height) - 32px)); min-height: min(220px,100%); place-content: center; justify-items: center; gap: 10px; padding: 24px; text-align: center; }
+.panel-loading strong { color: var(--ink); font-size: 13px; letter-spacing: 0; }
+.panel-loading small { max-width: 46ch; color: var(--muted); font-size: 10.5px; line-height: 1.6; }
+/* 双环反向旋转 + 主色渐隐描边，和整体的六边形金色主题一致 */
+.panel-spinner { position: relative; display: block; width: 42px; height: 42px; }
+.panel-spinner::before, .panel-spinner::after { position: absolute; inset: 0; border-radius: 50%; content: ""; }
+.panel-spinner::before {
+  border: 2.5px solid color-mix(in oklab,var(--primary) 18%,transparent);
+  border-top-color: var(--primary);
+  border-right-color: color-mix(in oklab,var(--primary) 62%,transparent);
+  animation: panel-spin 900ms cubic-bezier(.5,.15,.4,.9) infinite;
+}
+.panel-spinner::after {
+  inset: 9px;
+  border: 2px solid transparent;
+  border-bottom-color: color-mix(in oklab,var(--primary-strong) 78%,transparent);
+  animation: panel-spin 1400ms cubic-bezier(.4,.1,.5,.95) infinite reverse;
+}
+@keyframes panel-spin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) {
+  .panel-spinner::before, .panel-spinner::after { animation-duration: 3s; animation-timing-function: linear; }
+  .recommendation-panel.is-loading > :not(.panel-loading) { filter: none; }
+}
+.recommendation-data-notices { display: grid; gap: 6px; margin-bottom: 10px; }
+.recommendation-data-notices p { margin: 0; padding: 9px 12px; color: var(--warning); background: var(--surface); border: 1px solid color-mix(in oklab,var(--warning) 42%,var(--line)); border-radius: 8px; font-size: 11px; }
 .rune-source-stack { display: grid; gap: 9px; }
+.rune-source-tabs { display: flex; min-width: 0; align-items: center; gap: 10px; margin-bottom: 9px; padding: 3px 11px 3px 3px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.rune-source-tab-buttons { display: flex; min-width: 0; flex: 0 1 auto; gap: 3px; overflow-x: auto; }
+.rune-source-tab { min-height: 34px; flex: 0 0 108px; padding: 0 12px; color: var(--muted); background: transparent; border: 0; border-radius: 7px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.rune-source-tab:hover { color: var(--ink); background: var(--surface-strong); }
+.rune-source-tab.is-active { color: var(--ink); background: var(--primary-soft); box-shadow: inset 0 0 0 1px color-mix(in oklab,var(--primary) 50%,transparent); }
 .rune-source-section { overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
-.rune-source-section > header { display: flex; align-items: center; min-height: 42px; padding: 8px 13px; border-bottom: 1px solid var(--line); }
-.rune-source-section > header h3 { margin: 0; font-size: 15px; }
+.rune-source-note { min-width: 0; flex: 0 1 auto; margin-left: auto; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .rune-choice-list { display: grid; grid-template-columns: 1fr; }
+.rune-choice-card { cursor: pointer; }
 .rune-choice-card + .rune-choice-card { border-top: 1px solid var(--line); }
-.rune-choice-card.is-selected { background: color-mix(in oklch,var(--primary-soft) 35%,transparent); box-shadow: inset 0 0 0 1px var(--primary); }
-.rune-choice-selector { display: grid; width: 100%; min-height: 52px; grid-template-columns: 18px minmax(150px,1fr) auto; align-items: center; gap: 10px; padding: 7px 13px; color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--line); text-align: left; }
-.rune-choice-selector:hover { background: color-mix(in oklch,var(--surface-strong) 68%,transparent); }
+.rune-choice-card.is-selected { background: color-mix(in oklab,var(--primary-soft) 35%,transparent); box-shadow: inset 0 0 0 1px var(--primary); }
+.rune-choice-card:hover { background: color-mix(in oklab,var(--surface-strong) 68%,transparent); }
+.rune-choice-card:focus-visible { outline: 2px solid var(--primary); outline-offset: -3px; }
+.rune-choice-selector { display: grid; width: 100%; min-height: 48px; grid-template-columns: 18px 26px minmax(150px,1fr) auto; align-items: center; gap: 9px; padding: 5px 10px; color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--line); text-align: left; }
+.rune-choice-detail[hidden] { display: none; }
 .rune-choice-copy { display: grid; min-width: 0; gap: 3px; }
 .rune-choice-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rune-choice-copy small { color: var(--muted); font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; white-space: normal; }
+.rune-choice-champion-placeholder { display: block; width: 26px; height: 26px; background: var(--surface-strong); border: 1px solid var(--line); border-radius: 6px; }
 .radio-mark { width: 16px; height: 16px; border: 1px solid var(--muted); border-radius: 50%; }
-.rune-choice-selector[aria-checked="true"] .radio-mark { border: 5px solid var(--primary); }
-.rune-player-stats { display: grid; grid-template-columns: repeat(2,72px); margin: 0; text-align: right; }
+.rune-choice-card[aria-checked="true"] .radio-mark, .specialist-game-row[aria-checked="true"] .radio-mark { border: 5px solid var(--primary); }
+.rune-player-stats { display: grid; grid-template-columns: repeat(3,72px); margin: 0; text-align: right; }
 .rune-player-stats dt { color: var(--muted); font-size: 9px; }
 .rune-player-stats dd { margin: 1px 0 0; color: var(--ink); font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .rune-player-stats > div:last-child dd { color: var(--success); }
-.recommendation-stats { display: flex; gap: 14px; margin: 0; }
-.recommendation-stats > div { min-width: 54px; }
-.recommendation-stats dt { color: var(--muted); font-size: 9px; }
-.recommendation-stats dd { margin: 0; font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
-.unified-rune-board { display: grid; grid-template-columns: minmax(0,1.08fr) minmax(0,1fr) minmax(0,.86fr); min-height: 320px; }
-.unified-rune-column { display: grid; min-width: 0; grid-template-rows: 44px repeat(4,64px); align-content: center; justify-items: center; padding: 14px 20px 18px; }
+.specialist-player-tabs { display: flex; min-width: 0; gap: 4px; padding: 10px 12px; overflow-x: auto; border-bottom: 1px solid var(--line); }
+.specialist-player-tab { min-width: 0; max-width: 220px; min-height: 32px; flex: 1 1 0; padding: 0 10px; overflow: hidden; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; font-size: 10.5px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.specialist-player-tab:hover { color: var(--ink); border-color: var(--primary); }
+.specialist-player-tab.is-active { color: var(--ink); background: var(--primary-soft); border-color: var(--primary); }
+.specialist-player-games { display: grid; gap: 8px; padding: 10px 12px 12px; }
+.specialist-game-row { min-width: 0; overflow: hidden; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 8px; }
+.specialist-game-row.is-win { border-color: color-mix(in oklab,var(--success) 54%,var(--line)); box-shadow: inset 3px 0 0 var(--success); }
+.specialist-game-row.is-loss { border-color: color-mix(in oklab,var(--danger) 54%,var(--line)); box-shadow: inset 3px 0 0 var(--danger); }
+.specialist-game-row.is-remake { border-color: color-mix(in oklab,var(--muted) 54%,var(--line)); box-shadow: inset 3px 0 0 var(--muted); }
+.specialist-game-row.is-selected { outline: 2px solid var(--primary); outline-offset: -2px; }
+.specialist-game-row { cursor: pointer; }
+.specialist-game-row:hover { background: color-mix(in oklab,var(--primary-soft) 22%,transparent); }
+.specialist-game-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -3px; }
+.specialist-game-head { display: grid; width: 100%; min-height: 48px; grid-template-columns: minmax(300px,1.1fr) minmax(0,1fr); align-items: center; gap: 12px; padding: 6px 10px; color: var(--ink); background: transparent; border-bottom: 1px solid var(--line); font: inherit; text-align: left; }
+.specialist-game-row.is-selected .specialist-game-head { background: color-mix(in oklab,var(--primary-soft) 62%,transparent); }
+.specialist-game-choice { display: grid; min-width: 0; grid-template-columns: 18px 26px minmax(0,1fr); align-items: center; gap: 9px; }
+.specialist-game-choice > .game-icon, .specialist-game-choice > .rune-choice-champion-placeholder { width: 26px; height: 26px; flex-basis: 26px; }
+.specialist-game-title { display: flex; min-width: 0; align-items: baseline; gap: 10px; }
+.specialist-game-title > strong { min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.specialist-game-meta { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 5px; color: var(--muted); font-size: 9px; white-space: nowrap; }
+.specialist-game-meta i { font-style: normal; }
+.specialist-game-head time { color: inherit; font-size: inherit; white-space: nowrap; }
+.specialist-result-dot { display: inline-block; width: 8px; height: 8px; flex: 0 0 8px; background: currentColor; border-radius: 50%; }
+.specialist-game-content { display: block; min-width: 0; }
+.specialist-game-runes { min-width: 0; overflow: visible; }
+.specialist-game-items { display: flex; min-height: 44px; align-items: center; gap: 8px; padding: 7px 10px 10px; border-top: 1px solid var(--line); }
+.specialist-game-items > span { flex: 0 0 auto; color: var(--muted); font-size: 9px; }
+.specialist-game-items > div { display: flex; min-width: 0; flex-wrap: wrap; gap: 4px; }
+.specialist-game-items .item-option-button { width: 30px; height: 30px; padding: 2px; }
+.specialist-game-items .game-icon { width: 24px; height: 24px; flex-basis: 24px; }
+.specialist-opponent { display: flex; min-width: 0; align-items: center; justify-self: end; justify-content: flex-end; gap: 7px; overflow: hidden; }
+.specialist-opponent-copy { display: flex; min-width: 0; align-items: baseline; gap: 6px; overflow: hidden; }
+.specialist-opponent.is-win { color: var(--accent); }
+.specialist-opponent.is-loss { color: var(--danger); }
+.specialist-opponent.is-remake { color: var(--muted); }
+.specialist-opponent b { max-width: 100px; overflow: hidden; color: currentColor; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.specialist-opponent small { max-width: 150px; overflow: hidden; color: var(--muted); font-size: 9.5px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.specialist-opponent-rank { display: flex; min-width: 0; align-items: center; gap: 4px; color: var(--ink); }
+.specialist-opponent-rank .rank-crest-icon { width: 18px; height: 18px; flex: 0 0 18px; object-fit: contain; }
+.specialist-opponent-rank small { overflow: hidden; color: var(--ink); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.recommendation-matchup { display: inline-flex; min-width: 0; overflow: hidden; align-items: center; gap: 6px; padding: 3px 5px; background: color-mix(in oklab,var(--bg) 48%,transparent); border: 1px solid var(--line); border-radius: 7px; }
+.recommendation-matchup > span:last-child { display: grid; min-width: 0; gap: 1px; }
+.recommendation-matchup b, .recommendation-matchup small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recommendation-matchup b { color: var(--ink); font-size: 10px; }
+.recommendation-matchup small { color: var(--muted); font-size: 9px; }
+.recommendation-matchup.is-placeholder { min-height: 38px; visibility: hidden; pointer-events: none; }
+.recommendation-matchup.is-strong small { color: var(--success); }
+.recommendation-matchup.is-weak small { color: var(--danger); }
+.unified-rune-board { --rune-icon-size: 32px; --rune-style-icon-width: 32px; --rune-style-icon-height: 40px; --rune-header-height: 52px; --rune-row-height: 52px; display: grid; grid-template-columns: minmax(0,1.08fr) minmax(0,1fr) minmax(0,.86fr); min-height: 284px; }
+.specialist-game-runes .unified-rune-board { --rune-header-height: 46px; --rune-row-height: 46px; min-height: 252px; }
+.rune-detail .unified-rune-board { --rune-icon-size: 30px; --rune-style-icon-width: 28px; --rune-style-icon-height: 35px; --rune-header-height: 46px; --rune-row-height: 46px; min-height: 252px; }
+.unified-rune-column { display: grid; min-width: 0; grid-template-rows: var(--rune-header-height) repeat(4,var(--rune-row-height)); align-content: center; justify-items: center; padding: 10px 12px 12px; }
 .unified-rune-column + .unified-rune-column { border-left: 1px solid var(--line); }
-.unified-rune-column > header { display: flex; width: 100%; min-height: 44px; align-items: flex-start; justify-content: center; }
-.game-icon.is-rune-style { flex-basis: 38px; width: 38px; height: 38px; overflow: visible; background: transparent; border: 0; border-radius: 0; }
+/* 符文系 SVG 是 24:30 的纵向资源，按 32x40 完整展示；普通符文仍保持 32x32。 */
+.unified-rune-column > header { display: flex; box-sizing: border-box; width: 100%; height: var(--rune-header-height); min-height: var(--rune-header-height); align-items: center; justify-content: center; padding: 6px 0; }
+.game-icon.is-rune-style { flex: 0 0 auto; flex-basis: var(--rune-style-icon-width); width: var(--rune-style-icon-width); height: var(--rune-style-icon-height); max-width: 100%; overflow: hidden; background: transparent; border: 0; border-radius: 0; }
+.unified-rune-column > header > .game-icon.is-rune-style { box-sizing: border-box; flex: 0 0 var(--rune-style-icon-width); width: var(--rune-style-icon-width); min-width: var(--rune-style-icon-width); max-width: var(--rune-style-icon-width); height: var(--rune-style-icon-height); min-height: var(--rune-style-icon-height); max-height: var(--rune-style-icon-height); }
 .game-icon.is-rune-style > span { display: none; }
-.game-icon.is-rune-style img { object-fit: contain; image-rendering: auto; }
-.unified-rune-row { display: flex; width: 100%; min-height: 64px; align-items: center; justify-content: center; gap: 18px; }
+.game-icon.is-rune-style img { width: 100%; height: 100%; object-fit: contain; image-rendering: auto; }
+.unified-rune-row { display: flex; width: 100%; min-height: var(--rune-row-height); align-items: center; justify-content: center; gap: 8px; }
+.build-augment-grid { display: flex; min-height: 116px; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; padding: 16px; }
+.build-augment-grid .arena-augment-icon > .game-icon.is-large { width: 62px; height: 62px; flex-basis: 62px; }
+.live-augment-recommendations { overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.live-augment-recommendations > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.live-augment-recommendations > header h3 { margin: 0; font-size: 13px; }
+.live-augment-recommendations > header span { color: var(--muted); font-size: 10px; }
+.live-augment-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: 8px; padding: 10px 12px 14px; }
+.live-augment-option { --augment-accent: #6F7885; display: grid; min-width: 0; min-height: 64px; grid-template-columns: 48px minmax(0,1fr); align-items: center; gap: 10px; padding: 7px; color: var(--ink); background: var(--bg); border: 1px solid var(--augment-accent); border-radius: 8px; }
+.live-augment-option.is-bronze { --augment-accent: #B98255; }
+.live-augment-option.is-silver { --augment-accent: #9FB2C1; }
+.live-augment-option.is-gold { --augment-accent: #E3B341; }
+.live-augment-option.is-prismatic { --augment-accent: #C77DFF; }
+.live-augment-option.is-event { --augment-accent: #55C8D7; }
+.live-augment-option .arena-augment-icon { border-radius: 5px; }
+.live-augment-option .arena-augment-icon > .game-icon.is-large { width: 48px; height: 48px; flex-basis: 48px; border-radius: 5px; }
+.live-augment-option > span:last-child { display: grid; min-width: 0; gap: 3px; }
+.live-augment-title { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.live-augment-title .augment-grade { width: 20px; height: 20px; flex: 0 0 20px; font-size: 11px; }
+.live-augment-option strong { overflow: hidden; color: var(--ink); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.live-augment-option small { color: var(--muted); font-size: 9px; line-height: 1.45; }
+.live-augment-option small.live-augment-stats { display: flex; min-width: 0; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.3; }
+.live-augment-stat { display: inline-flex; min-width: 0; align-items: baseline; gap: 3px; white-space: nowrap; }
+.live-augment-stat > span { color: var(--muted); font-size: 10px; }
+.live-augment-stat > b { color: var(--ink); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.live-augment-stat.is-win > b { color: var(--success); }
+.live-augment-stat.is-pick > b { color: var(--accent); }
+.live-augment-columns { display: grid; grid-template-columns: minmax(0,1fr); }
+.live-augment-column { min-width: 0; }
+.live-augment-column + .live-augment-column { border-top: 1px solid var(--line); }
+.live-augment-column > header { display: flex; min-height: 42px; align-items: center; gap: 7px; padding: 8px 11px; border-bottom: 1px solid var(--line); }
+.live-augment-column > header > span { width: 9px; height: 9px; flex: 0 0 9px; background: #6F7885; border-radius: 3px; }
+.live-augment-column.is-silver > header > span { background: #9AA7B8; }
+.live-augment-column.is-gold > header > span { background: #E3B341; }
+.live-augment-column.is-prismatic > header > span { background: linear-gradient(135deg,#C77DFF,#5AA9FF,#FF8AC7); }
+.live-augment-column > header strong { color: var(--ink); font-size: 11px; }
+.live-augment-column > header small { margin-left: auto; color: var(--muted); font-size: 9px; }
+.live-augment-column > div { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; padding: 10px 11px 12px; }
+.live-augment-column .live-augment-option { border: 1px solid var(--augment-accent); border-radius: 8px; }
+.live-augment-column.is-silver .arena-augment-icon { border-color: #9AA7B8; }
+.live-augment-column.is-gold .arena-augment-icon { border-color: #E3B341; }
+.live-augment-column.is-prismatic .arena-augment-icon { border-color: #C77DFF; }
 .unified-rune-row.is-spacer { visibility: hidden; }
-.rune-option-button { position: relative; display: grid; width: 42px; height: 42px; place-items: center; padding: 0; background: transparent; border: 0; border-radius: 50%; }
+.rune-option-button { position: relative; display: grid; width: var(--rune-icon-size); height: var(--rune-icon-size); place-items: center; padding: 0; background: transparent; border: 0; border-radius: 50%; }
+.unified-rune-board .game-icon.is-rune { flex-basis: var(--rune-icon-size); width: var(--rune-icon-size); height: var(--rune-icon-size); overflow: hidden; }
 .rune-option-button .game-icon { opacity: .34; filter: grayscale(1); transition: opacity 180ms ease-out,filter 180ms ease-out; }
 .rune-option-button.is-selected .game-icon { opacity: 1; filter: none; }
 .rune-option-button.is-selected .game-icon { outline: 2px solid var(--primary); outline-offset: 2px; }
-.rune-shards .rune-option-button { width: 38px; height: 38px; }
+.rune-shards .rune-option-button { width: var(--rune-icon-size); height: var(--rune-icon-size); }
 /* “详情”页签：队伍卡内嵌每名玩家的最近战绩小卡 */
 .live-teams.is-insight { padding-top: 0; }
 .live-player-list.is-insight .insight-match-row { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 11px 11px 68px; }
 .live-player-list.is-insight .live-player { border-top: 1px solid var(--line); }
 .live-player-list.is-insight .live-player:first-child { border-top: 0; }
-.live-player-list.is-insight .live-player.is-self + .insight-match-row { background: color-mix(in oklch,var(--primary-soft) 62%,transparent); }
-.insight-match { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; background: color-mix(in oklch,var(--bg) 55%,transparent); border: 1px solid var(--line); border-radius: 8px; }
-.insight-match.is-win { border-color: color-mix(in oklch,var(--success) 45%,var(--line)); box-shadow: inset 0 -2px 0 var(--success); }
-.insight-match.is-loss { border-color: color-mix(in oklch,var(--danger) 42%,var(--line)); box-shadow: inset 0 -2px 0 var(--danger); }
+.live-player-list.is-insight .live-player.is-self + .insight-match-row { background: color-mix(in oklab,var(--primary-soft) 62%,transparent); }
+.insight-match { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; background: color-mix(in oklab,var(--bg) 55%,transparent); border: 1px solid var(--line); border-radius: 8px; }
+.insight-match.is-win { border-color: color-mix(in oklab,var(--success) 45%,var(--line)); box-shadow: inset 0 -2px 0 var(--success); }
+.insight-match.is-loss { border-color: color-mix(in oklab,var(--danger) 42%,var(--line)); box-shadow: inset 0 -2px 0 var(--danger); }
 .insight-match.is-loss .game-icon { opacity: .78; }
 .insight-match > b { font-size: 10.5px; font-variant-numeric: tabular-nums; }
 .insight-score { min-width: 26px; padding: 1px 5px; color: var(--muted); background: var(--surface-strong); border-radius: 5px; font-size: 10px; font-style: normal; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
 .insight-score.is-gold { color: #14100A; background: var(--primary); }
-.insight-score.is-good { color: var(--success); background: color-mix(in oklch,var(--success) 16%,transparent); }
+.insight-score.is-good { color: var(--success); background: color-mix(in oklab,var(--success) 16%,transparent); }
 .insight-score.is-poor { color: var(--faint); }
 .insight-none { color: var(--faint); font-size: 10px; }
 
 /* 队伍分析：逐人伤害与承伤 */
 .damage-compare { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin-top: 7px; }
-.damage-team { padding: 12px; background: color-mix(in oklch,var(--bg) 56%,transparent); border: 1px solid var(--line); border-radius: 10px; }
-.damage-team h4 { margin: 0 0 9px; font-size: 12px; }
+.damage-team { padding: 12px; background: color-mix(in oklab,var(--bg) 56%,transparent); border: 1px solid var(--line); border-radius: 10px; }
+.damage-team-head { display: flex; min-height: 30px; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.damage-team h4 { margin: 0; font-size: 12px; }
 .damage-team.is-blue h4 { color: var(--accent); }
 .damage-team.is-red h4 { color: var(--danger); }
+.damage-sort-toggle { display: inline-flex; min-height: 28px; align-items: center; gap: 4px; padding: 0 7px; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 7px; font-size: 9.5px; }
+.damage-sort-toggle:hover, .damage-sort-toggle:focus-visible { color: var(--ink); border-color: var(--hex-line); }
+.damage-sort-toggle svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .damage-row { display: grid; grid-template-columns: 18px minmax(64px,.45fr) minmax(0,1fr); align-items: center; gap: 7px; padding: 3px 0; }
 .damage-name { overflow: hidden; color: var(--muted); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
-/* 每行两条：上“伤害”（队伍色）、下“承伤”（灰色），数值标在各自条末端 */
-.damage-bar-lines { display: grid; gap: 2px; }
-.damage-bar-line { display: grid; grid-template-columns: 24px minmax(0,1fr) minmax(44px,auto); align-items: center; gap: 5px; }
-.damage-bar-line em { color: var(--faint); font-size: 9px; font-style: normal; }
+.damage-bar-line { display: grid; min-width: 0; grid-template-columns: minmax(0,1fr) minmax(64px,auto); align-items: center; gap: 7px; }
 .damage-bar-line b { font-size: 10.5px; text-align: right; font-variant-numeric: tabular-nums; }
-.damage-bar { display: block; height: 5px; overflow: hidden; background: var(--surface-strong); border-radius: 999px; }
-.damage-bar i { display: block; height: 100%; border-radius: 999px; }
+.damage-bar { display: block; height: 8px; overflow: hidden; background: color-mix(in oklab,var(--surface-strong) 78%,var(--line)); border: 1px solid color-mix(in oklab,var(--line) 82%,transparent); border-radius: 999px; box-shadow: inset 0 1px 2px rgb(0 0 0 / .18); }
+.damage-bar i { display: block; width: 0; height: 100%; border-radius: 999px; }
 .damage-bar.is-blue i { background: var(--accent); }
 .damage-bar.is-red i { background: var(--danger); }
-.damage-bar.is-taken i { background: color-mix(in oklch,var(--muted) 62%,var(--line)); }
+
+/* 普通 5v5 逐人对抗：头像固定在外侧，两队数值与进度条向中线对照。 */
+.team-contribution { min-width: 0; margin-top: 7px; padding: 10px 12px 12px; background: color-mix(in oklab,var(--bg) 56%,transparent); border: 1px solid var(--line); border-radius: 10px; }
+.team-analysis-metrics { display: flex; min-width: 0; gap: 4px; padding: 0 0 9px; overflow-x: auto; border-bottom: 1px solid var(--line); overscroll-behavior-x: contain; scrollbar-width: none; }
+.team-analysis-metrics::-webkit-scrollbar { display: none; }
+.team-analysis-metrics button { min-height: 28px; flex: 0 0 auto; padding: 0 7px; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 6px; font-size: 10px; white-space: nowrap; }
+.team-analysis-metrics button:hover, .team-analysis-metrics button:focus-visible { color: var(--ink); background: var(--surface-strong); border-color: var(--line); }
+.team-analysis-metrics button[aria-selected="true"] { color: var(--primary-strong); background: var(--primary-soft); border-color: color-mix(in oklab,var(--primary) 58%,var(--line)); box-shadow: inset 0 -2px 0 var(--primary); font-weight: 700; }
+.team-duel-chart { min-width: 0; padding-top: 8px; }
+.team-duel-head { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 10px; min-height: 24px; padding: 0 1px 4px; }
+.team-duel-head b { font-size: 10.5px; }
+.team-duel-head b.is-blue { color: var(--accent); text-align: left; }
+.team-duel-head b.is-red { color: var(--danger); text-align: right; }
+.team-duel-head strong { color: var(--muted); font-size: 10px; font-weight: 600; }
+.team-duel-row { display: grid; min-width: 0; min-height: 34px; grid-template-columns: 26px minmax(44px,64px) minmax(120px,1fr) minmax(44px,64px) 26px; align-items: center; gap: 7px; }
+.team-duel-player { display: grid; width: 26px; height: 26px; place-items: center; }
+.team-duel-player .game-icon.is-small { flex-basis: 26px; width: 26px; height: 26px; }
+.team-duel-value { overflow: hidden; font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.team-duel-value.is-blue { color: var(--accent); text-align: left; }
+.team-duel-value.is-red { color: var(--danger); text-align: right; }
+.team-duel-bars { display: grid; min-width: 0; grid-template-columns: minmax(0,1fr) 1px minmax(0,1fr); align-items: center; gap: 7px; }
+.team-duel-bars > i { width: 1px; height: 16px; background: var(--line); }
+.team-duel-half { display: flex; height: 8px; overflow: hidden; background: color-mix(in oklab,var(--surface-strong) 78%,var(--line)); border: 1px solid color-mix(in oklab,var(--line) 82%,transparent); border-radius: 999px; box-shadow: inset 0 1px 2px rgb(0 0 0 / .18); }
+.team-duel-half.is-red { justify-content: flex-end; }
+.team-duel-half i { display: block; width: 0; height: 100%; border-radius: 999px; }
+.team-duel-half.is-blue i { background: var(--accent); }
+.team-duel-half.is-red i { background: var(--danger); }
 
 .recommendation-empty { padding: 20px 14px; color: var(--muted); text-align: center; }
 .recommendation-empty strong { color: var(--ink); }
@@ -660,57 +1277,124 @@
 .recommendation-empty.is-panel p { margin: 0; }
 
 /* “对局”页签的新对局提示：随主题主色呼吸 */
-.live-beacon { position: absolute; top: 50%; right: 9px; width: 9px; height: 9px; background: var(--primary); border-radius: 50%; box-shadow: 0 0 0 0 color-mix(in oklch,var(--primary) 55%,transparent); animation: beacon-breathe 1.8s ease-in-out infinite; pointer-events: none; transform: translateY(-50%); }
+.live-beacon { position: absolute; top: 50%; right: 9px; width: 9px; height: 9px; background: var(--primary); border-radius: 50%; box-shadow: 0 0 0 0 color-mix(in oklab,var(--primary) 55%,transparent); animation: beacon-breathe 1.8s ease-in-out infinite; pointer-events: none; transform: translateY(-50%); }
+:root[data-sidebar="collapsed"] #section-live { overflow: visible; }
+:root[data-sidebar="collapsed"] #section-live .live-beacon { right: 7px; }
 @keyframes beacon-breathe {
-  0%, 100% { opacity: .55; box-shadow: 0 0 0 0 color-mix(in oklch,var(--primary) 50%,transparent); }
-  50% { opacity: 1; box-shadow: 0 0 0 5px color-mix(in oklch,var(--primary) 18%,transparent); }
+  0%, 100% { opacity: .55; box-shadow: 0 0 0 0 color-mix(in oklab,var(--primary) 50%,transparent); }
+  50% { opacity: 1; box-shadow: 0 0 0 5px color-mix(in oklab,var(--primary) 18%,transparent); }
 }
 @media (prefers-reduced-motion: reduce) { .live-beacon { animation: none; } }
 
 /* 回放按钮忙碌态：图标保持不变，仅降透明度提示处理中 */
 .match-replay.is-busy svg { opacity: .35; }
 .match-replay.is-busy { position: relative; }
-.match-replay.is-busy::after { position: absolute; width: 14px; height: 14px; border: 2px solid color-mix(in oklch,currentColor 30%,transparent); border-top-color: currentColor; border-radius: 50%; content: ""; animation: spin .8s linear infinite; }
+.match-replay.is-busy::after { position: absolute; width: 14px; height: 14px; border: 2px solid color-mix(in oklab,currentColor 30%,transparent); border-top-color: currentColor; border-radius: 50%; content: ""; animation: spin .8s linear infinite; }
 .recommendation-action { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 10px; padding: 11px 13px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .recommendation-action > div { display: grid; }
 .recommendation-action span { color: var(--muted); font-size: 10px; }
-.build-recommendation { overflow: visible; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.build-recommendation { overflow: hidden; container: build-recommendation / inline-size; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.live-augment-recommendations + .build-recommendation { position: relative; margin-top: 20px; }
+.live-augment-recommendations + .build-recommendation::before { position: absolute; top: -11px; right: 0; left: 0; height: 1px; background: var(--line); content: ""; }
+.build-recommendation-heading { display: flex; min-height: 44px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.build-recommendation-heading h3 { margin: 0; font-size: 13px; }
 .build-recommendation .item-set-action { margin: 0; border-width: 1px 0 0; border-radius: 0 0 var(--radius-md) var(--radius-md); }
-.build-essentials { display: grid; grid-template-columns: minmax(300px,.8fr) minmax(0,1.6fr); border-bottom: 1px solid var(--line); }
-.build-essentials > section { padding: 14px 15px; }
-.build-essentials > section + section { border-left: 1px solid var(--line); }
+/* 三块摘要（召唤师技能 / 出门装 / 鞋子）按各自内容占宽，不再强行等宽；
+   宽度不够时让摘要区整块换行，图标始终保持固定尺寸。 */
+.build-summary-bar { display: grid; grid-template-columns: repeat(3,minmax(0,auto)); grid-template-rows: repeat(2,minmax(0,auto)); overflow: visible; border-bottom: 1px solid var(--line); }
+.build-summary-bar > section { min-width: 0; padding: 12px 15px; }
+.build-summary-bar > section + section { border-left: 1px solid var(--line); }
+.build-summary-bar > .build-summary-skill { grid-column: 1 / -1; border-top: 1px solid var(--line); border-left: 0; }
+.build-summary-bar.is-arena { grid-template-columns: minmax(220px,.7fr) minmax(0,1.3fr); grid-template-rows: minmax(0,auto); }
+.build-summary-bar.is-arena > .build-summary-skill { display: flex; grid-column: auto; flex-direction: column; border-top: 0; border-left: 1px solid var(--line); }
+.build-summary-bar.is-arena > .build-summary-skill > .skill-priority-row { margin-top: auto; }
+.build-summary-bar.is-arena > .build-summary-skill > .skill-order { margin-bottom: auto; }
+.build-recommendation.is-arena-build .late-option-band .config-option,
+.build-recommendation.is-arena-build .item-core-column .config-option { padding: 7px 9px; background: var(--bg); border: 1px solid var(--line); }
+.live-arena-build-section { padding: 12px 14px 14px; }
+.live-arena-build-section + .live-arena-build-section,
+.live-arena-build-section + .item-build-layout,
+.live-arena-build-section + .build-core-ranking-row,
+.item-build-layout + .live-arena-build-section { border-top: 1px solid var(--line); }
+.live-arena-build-section.is-prismatic > h3 { color: #C77DFF; }
+.live-arena-build-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.live-arena-build-section.is-core .live-arena-build-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.live-arena-build-section.is-prismatic .live-arena-build-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.live-arena-build-option { min-height: 102px; }
+.live-arena-build-option .item-option-button > .game-icon.is-large { width: 48px; height: 48px; flex-basis: 48px; border-radius: 7px; }
+.live-build-expand { display: block; width: 100%; min-height: 36px; margin: 10px 0 0; color: var(--muted); background: transparent; border: 1px dashed var(--line); border-radius: 6px; font-size: 10px; }
+.live-build-expand:hover, .live-build-expand:focus-visible { color: var(--ink); background: var(--surface-strong); }
 .build-recommendation h3 { margin: 0 0 10px; font-size: 13px; }
 .skill-plan { min-width: 0; }
-.skill-priority { display: flex; min-width: 0; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
-.skill-icon-button { position: relative; display: grid; grid-template-columns: 42px auto; align-items: center; gap: 7px; padding: 4px 8px 4px 4px; color: var(--muted); background: var(--surface-strong); border: 0; border-radius: 8px; font-size: 9px; }
+.skill-priority { display: flex; min-width: 0; flex: 1 1 0; flex-wrap: nowrap; gap: 7px; }
+/* 技能图标与右侧选取率/胜率/场次同一行，垂直居中对齐 */
+.skill-priority-row { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px 16px; margin-bottom: 10px; }
+.skill-priority-row > .option-stats { flex: 0 0 auto; margin: 0; }
+.skill-icon-button { position: relative; display: grid; min-width: 0; flex: 0 1 auto; overflow: hidden; grid-template-columns: minmax(0,42px) minmax(0,1fr); align-items: center; gap: 7px; padding: 4px 8px 4px 4px; color: var(--ink); background: var(--surface-strong); border: 0; border-radius: 8px; font-size: 9px; }
+.skill-icon-button.is-priority { color: var(--ink); background: color-mix(in oklab,var(--primary-soft) 58%,var(--surface-strong)); box-shadow: inset 0 -2px 0 var(--primary); }
+.skill-icon-button.is-secondary { background: color-mix(in oklab,var(--surface-strong) 78%,var(--primary-soft)); box-shadow: inset 0 -2px 0 color-mix(in oklab,var(--primary) 42%,var(--line)); }
+.skill-icon-button.is-ultimate { background: color-mix(in oklab,var(--primary-soft) 38%,var(--surface-strong)); }
+.skill-copy { display: grid; min-width: 0; gap: 1px; text-align: left; }
+.skill-copy b { color: var(--primary-strong); font-size: 12px; line-height: 1; }
+.skill-copy .skill-name { overflow: hidden; color: inherit; text-overflow: ellipsis; white-space: nowrap; }
+.skill-copy small { color: var(--muted); font-size: 8px; }
 .skill-icon-button .game-icon { width: 42px; height: 42px; flex-basis: 42px; border-radius: 7px; }
 .skill-letter { display: grid; width: 42px; height: 42px; place-items: center; color: var(--accent); background: var(--bg); border-radius: 7px; font-size: 15px; font-weight: 800; }
 .skill-order { display: grid; min-width: 0; grid-template-columns: repeat(auto-fit,minmax(28px,1fr)); gap: 3px; overflow: visible; }
 .skill-order span { display: grid; min-width: 0; height: 40px; place-items: center; align-content: center; background: var(--bg); border-radius: 6px; }
 .skill-order b { color: var(--accent); font-size: 11px; }
 .skill-order small { color: var(--muted); font-size: 8px; }
+.skill-order .is-q b { color: #57A6FF; }
+.skill-order .is-w b { color: #61C992; }
+.skill-order .is-e b { color: #E3B341; }
 .skill-order .is-r { background: var(--primary-soft); }
 .skill-order .is-r b { color: var(--primary-strong); }
-.item-option-groups { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
-.item-option-groups > section { padding: 14px 15px; }
-.item-option-groups > section:nth-child(2) { border-left: 1px solid var(--line); }
-.item-option-groups .route-options { grid-column: 1/-1; border-top: 1px solid var(--line); }
+.build-core-ranking-row { display: grid; min-width: 0; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr); align-items: start; border-bottom: 1px solid var(--line); }
+.build-core-ranking-row > .item-build-layout { border-bottom: 0; }
+.build-core-ranking-row > .live-item-ranking { margin-top: 0; border: 0; border-left: 1px solid var(--line); border-radius: 0; }
+.item-build-layout { display: block; min-width: 0; overflow: visible; border-bottom: 1px solid var(--line); }
+.item-depth-columns > section h4 { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.build-depth-sample-badge { display: inline-flex; min-height: 16px; align-items: center; padding: 0 4px; color: #F2C46D; background: rgb(242 196 109 / .1); border: 1px solid rgb(242 196 109 / .38); border-radius: 3px; font-size: 8px; line-height: 1; white-space: nowrap; }
+.item-core-column { min-width: 0; padding: 12px 14px; }
+.late-option-band { padding: 12px 15px 14px; border-top: 1px solid var(--line); }
+.late-option-band .config-option-list { grid-template-columns: repeat(auto-fit,minmax(250px,1fr)); }
+.late-option-band.is-prismatic h3 { color: #C77DFF; }
+.build-group-empty { min-height: 66px; margin: 0; display: grid; place-items: center; color: var(--faint); font-size: 11px; text-align: center; }
+.build-apply-bar { border-top: 1px solid var(--line); }
+.build-apply-bar .item-set-action { border-top: 0; }
 .config-option-list { display: grid; gap: 6px; }
-/* 选用率/胜率默认与图标同行靠右，窄容器时才换到下一行 */
-.config-option { display: flex; min-width: 0; min-height: 66px; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 12px 16px; padding: 6px 8px; background: color-mix(in oklch,var(--bg) 55%,transparent); border-radius: 8px; }
-.config-icons { display: flex; min-width: 0; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 6px; overflow: visible; }
+/* 选用率/胜率始终与图标同一行靠右 */
+.config-option { display: flex; min-width: 0; min-height: var(--build-row-height, 60px); flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 12px 16px; padding: 1px 8px; background: color-mix(in oklab,var(--bg) 55%,transparent); border-radius: 8px; }
+/* 装备图标固定 42px；列宽不足时由外层装备分组换行，图标排本身不换行。 */
+.config-icons { display: flex; min-width: 0; flex: 0 0 auto; flex-wrap: nowrap; align-items: center; gap: 6px; overflow: visible; --option-icon-size: 42px; }
+.config-option.is-route .config-icons { flex-wrap: nowrap; overflow: visible; }
 .skill-plan-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .skill-plan-head h3 { margin: 0 0 10px; }
 .skill-plan .skill-order { margin-top: 10px; }
 .config-icons .game-icon { border-radius: 8px; }
-.route-step { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
-.route-arrow { color: var(--muted); font-size: 22px; }
-.option-stats { display: grid; min-width: 0; flex: 0 1 auto; grid-template-columns: repeat(2,minmax(62px,74px)); margin: 0; text-align: right; }
+.route-step { display: inline-flex; min-width: 0; flex: 0 0 auto; align-items: center; gap: 6px; }
+.route-arrow { flex: 0 0 auto; color: var(--muted); font-size: 18px; }
+.option-stats { display: grid; min-width: 0; flex: 0 0 auto; grid-template-columns: repeat(3,minmax(48px,64px)); margin: 0; text-align: right; }
+.option-stats.is-depth { grid-template-columns: repeat(2,minmax(48px,64px)); }
 .option-stats dt { color: var(--muted); font-size: 9px; }
 .option-stats dd { margin: 1px 0 0; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .option-stats .is-pick dd { color: var(--accent); }
 .option-stats .is-win dd { color: var(--success); }
-.item-option-button { position: relative; display: grid; width: 58px; height: 58px; flex: 0 0 58px; place-items: center; padding: 0; background: transparent; border: 0; border-radius: 8px; }
+.option-stats .is-games dd { color: var(--muted); }
+.item-option-button { position: relative; display: grid; width: var(--option-icon-size,42px); height: var(--option-icon-size,42px); flex: 0 0 var(--option-icon-size,42px); place-items: center; padding: 0; background: transparent; border: 0; border-radius: 8px; }
+.config-icons .item-option-button {
+  flex: 0 0 var(--option-icon-size); width: var(--option-icon-size); min-width: var(--option-icon-size); max-width: var(--option-icon-size);
+  height: var(--option-icon-size); min-height: var(--option-icon-size); max-height: var(--option-icon-size);
+}
+.config-icons .item-option-button > .game-icon { flex: 0 0 100%; width: 100%; height: 100%; min-width: 0; }
+.config-item { display: inline-grid; width: var(--option-icon-size,42px); min-width: 0; justify-items: start; gap: 3px; }
+.live-item-ranking { margin-top: 14px; }
+.live-item-ranking .mayhem-ranking-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.live-item-ranking .mayhem-ranking-list article { grid-template-columns: 20px 42px minmax(0,1fr); }
+.live-item-ranking .mayhem-ranking-list article dl { grid-column: 3; grid-template-columns: repeat(3,minmax(0,1fr)); }
+.live-ranking-icon { display: inline-flex; width: 42px; height: 42px; align-items: center; justify-content: center; }
+.live-ranking-icon .item-option-button, .live-ranking-icon .game-icon { width: 42px; height: 42px; }
+.item-option-name { display: block; width: 100%; max-width: 100%; overflow: hidden; color: var(--muted); font-size: 8px; line-height: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .skill-plan > .option-stats { margin-top: 8px; }
 .build-empty { min-height: 260px; display: grid; place-content: center; }
 
@@ -735,14 +1419,47 @@
 .capability-dot.is-available { background: var(--success); }
 .capability-dot.is-unsupported, .capability-dot.is-error { background: var(--danger); }
 
+@container recommendation-area (max-width: 900px) {
+  .live-augment-column > div { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .live-item-ranking .mayhem-ranking-list { grid-template-columns: minmax(0,1fr); }
+}
+
+@container recommendation-area (max-width: 620px) {
+  .live-augment-column > div { grid-template-columns: minmax(0,1fr); }
+}
+
 @media (max-width: 1260px) {
   .live-player { grid-template-columns: 44px minmax(90px,1fr); }
   .live-player dl { grid-column: 2; }
   .live-player .self-chip { grid-column: 1; grid-row: 2; text-align: center; }
 }
 
-@media (max-width: 1080px) {
+/* 推荐区是独立的 inline-size 容器；这些规则必须按面板宽度而不是窗口宽度触发。 */
+@container recommendation-area (min-width: 1081px) {
+  .build-core-ranking-row .build-item-row { grid-template-columns: minmax(0,1fr); }
+  .build-core-ranking-row .build-item-row[data-depth-count="1"] { grid-template-columns: 250px minmax(0,1fr); }
+  .build-core-ranking-row .build-item-row[data-depth-count="2"] { grid-template-columns: 250px repeat(2,minmax(0,1fr)); }
+  .build-core-ranking-row .build-item-row[data-depth-count="3"] { grid-template-columns: 250px repeat(3,minmax(0,1fr)); }
+  .build-core-ranking-row .item-core-column,
+  .build-core-ranking-row .item-depth-columns > section { padding-inline: 4px; }
+  .build-core-ranking-row .config-option { gap: 4px; padding-inline: 2px; }
+  .build-core-ranking-row .option-stats.is-depth { grid-template-columns: repeat(2,minmax(30px,32px)); column-gap: 4px; }
+  .build-core-ranking-row .option-stats dt { font-size: 8px; }
+  .build-core-ranking-row .option-stats dd { font-size: 10px; }
+}
+
+@container recommendation-area (max-width: 1080px) {
   .live-teams { grid-template-columns: 1fr; }
+  .live-teams.is-arena { grid-template-columns: 1fr; }
+  .build-core-ranking-row { grid-template-columns: minmax(0,1fr); }
+  .build-core-ranking-row > .item-build-layout { border-bottom: 1px solid var(--line); }
+  .build-core-ranking-row > .live-item-ranking { border-left: 0; }
+  .recommendation-champion-summary { grid-template-columns: 1fr; grid-template-areas: "summary" "positions" "matchups"; }
+  .recommendation-champion-summary.is-no-counters.has-tier { grid-template-columns: minmax(0,1fr) 72px; grid-template-areas: "summary tier" "positions tier"; }
+  .champion-matchups { padding: 8px 0 0; border-top: 1px solid var(--line); border-left: 0; }
+}
+
+@media (max-width: 1080px) {
   .team-analysis-grid { grid-template-columns: repeat(2,minmax(180px,1fr)); }
 }
 
@@ -750,37 +1467,40 @@
   .favorites-nav { flex: 1 1 auto; }
   .favorites-nav-item { flex: 1 1 0; width: auto; grid-template-columns: 24px minmax(0,1fr); }
   .favorites-nav-item > span:first-child { width: 24px; height: 24px; }
-  .summoner-strip { grid-template-columns: auto minmax(0,1fr); }
-  .unified-rune-board { grid-template-columns: repeat(2,minmax(220px,1fr)); overflow-x: auto; }
+  .unified-rune-board { grid-template-columns: repeat(2,minmax(0,1fr)); overflow: visible; }
   .rune-shards { grid-column: 1/-1; border-top: 1px solid var(--line); border-left: 0 !important; }
-  .rune-shards { grid-template-rows: repeat(3,64px); }
+	.rune-shards { grid-template-rows: repeat(3,40px); }
   .rune-shards > header, .rune-shards > .is-spacer { display: none; }
-  .build-essentials { grid-template-columns: 1fr; }
-  .build-essentials > section + section { border-top: 1px solid var(--line); border-left: 0; }
-  .item-option-groups { grid-template-columns: 1fr; }
-  .item-option-groups > section:nth-child(2) { border-top: 1px solid var(--line); border-left: 0; }
-  .item-option-groups .route-options { grid-column: auto; }
-  .rune-board { grid-template-columns: repeat(2,minmax(200px,1fr)); overflow-x: auto; }
-  .rune-fragments { grid-column: 1/-1; }
+  .build-summary-bar { grid-template-columns: 1fr; }
+  .build-summary-bar > section + section { border-top: 1px solid var(--line); border-left: 0; }
 }
 
 @media (max-width: 700px) {
   .damage-compare { grid-template-columns: 1fr; }
   .match-filterbar { align-items: stretch; flex-direction: column; }
-  .match-more-filter select { width: 100%; }
+	.match-more-filter { flex-basis: auto; width: 100%; }
+	.match-more-filter .app-select-menu { right: auto; left: 0; width: 100%; }
   .match-detail-head { grid-template-columns: 1fr; }
   .match-detail-tabs { grid-template-columns: repeat(3,minmax(76px,1fr)); }
-  .team-analysis-grid { grid-template-columns: 1fr; }
+	.team-analysis-grid { grid-template-columns: 1fr; }
+	.team-contribution { padding: 8px; }
+	.team-duel-row { grid-template-columns: 26px 42px minmax(100px,1fr) 42px 26px; gap: 4px; }
+	.team-duel-bars { gap: 4px; }
   .favorites-nav-item { grid-template-columns: 1fr; justify-items: center; text-align: center; }
   .favorites-nav-item > span:last-child small { display: none; }
-  .live-player dl { grid-template-columns: repeat(3,minmax(60px,1fr)); }
 }
 
 @media (max-width: 620px) {
+  .player-overlay-bar { gap: 6px; padding-inline: 10px; }
+  .player-overlay-return { width: 34px; flex: 0 0 34px; justify-content: center; padding: 0; }
+  .player-overlay-return span { display: none; }
+  .player-overlay-title { gap: 4px; }
+  .player-overlay-title small { display: none; }
+  .player-overlay-add { padding-inline: 8px; font-size: 11px; }
   .player-workspace-head { align-items: stretch; flex-direction: column; }
   .player-workspace-head > .text-button { align-self: flex-end; }
   .summoner-strip { padding: 12px; }
-  .summoner-strip-copy > div { align-items: flex-start; flex-direction: column; gap: 0; }
+  .summoner-strip-copy > div { align-items: flex-start; flex-direction: column; gap: 2px; }
   .summoner-strip-copy span { font-size: 11px; }
   .live-waiting { align-items: flex-start; flex-direction: column; }
   .live-toolbar { align-items: stretch; flex-direction: column; }
@@ -789,30 +1509,39 @@
   .live-player-list.is-insight .insight-match-row { padding-left: 11px; }
   .live-player dl { grid-column: 1/-1; }
   .live-player .self-chip { grid-column: auto; grid-row: auto; }
-  .rune-board { grid-template-columns: 1fr; overflow: visible; }
-  .rune-fragments { grid-column: auto; }
-  .recommendation-tabs { width: 100%; overflow-x: auto; }
-  .recommendation-tabs button { min-width: 132px; flex: 1 0 auto; }
-  .recommendation-action { align-items: flex-start; flex-direction: column; }
-  .rune-choice-selector { display: grid; grid-template-columns: 18px minmax(0,1fr); }
-  .rune-player-stats { grid-column: 2; width: 100%; grid-template-columns: repeat(2,1fr); text-align: left; }
   .unified-rune-board { grid-template-columns: 1fr; overflow: visible; }
   .unified-rune-column + .unified-rune-column { border-top: 1px solid var(--line); border-left: 0; }
-  .unified-rune-column.is-secondary { grid-template-rows: 44px repeat(3,64px); }
+	.unified-rune-column.is-secondary { grid-template-rows: var(--rune-header-height) repeat(3,var(--rune-row-height)); }
   .unified-rune-column.is-secondary > .is-spacer { display: none; }
   .rune-shards { grid-column: auto; }
-  .recommendation-action .apply-runes, .recommendation-action .apply-item-set { width: 100%; }
-  .recommendation-action { position: static; }
-  .champion-summary-main { align-items: flex-start; flex-wrap: wrap; }
-  .champion-summary-main dl { width: 100%; margin: 2px 0 0; justify-content: space-between; gap: 8px; }
-  .champion-matchups { display: grid; gap: 8px; }
-  .champion-matchups > div { overflow-x: auto; padding-bottom: 2px; }
-  .skill-priority { overflow: visible; padding-bottom: 0; }
+  .skill-priority-row { align-items: flex-start; flex-wrap: wrap; }
+  .skill-priority { flex-basis: 100%; overflow: visible; padding-bottom: 0; }
+  .skill-icon-button { min-width: 48px; flex: 1 1 48px; }
+  .skill-priority-row > .option-stats { margin-left: auto; }
   .config-option { align-items: center; flex-direction: row; }
-  .config-icons { width: auto; flex: 1 1 220px; flex-wrap: wrap; }
+  .config-icons { width: auto; flex: 0 0 auto; flex-wrap: nowrap; }
   .option-stats { width: auto; justify-content: flex-end; }
   .gameplay-empty { min-height: 270px; }
   .gameplay-capabilities { grid-template-columns: 1fr; }
+}
+
+@container recommendation-area (max-width: 700px) {
+	.live-position-rate { display: none; }
+  .rune-source-note { display: none; }
+  .live-player dl { grid-template-columns: repeat(3,minmax(60px,1fr)); }
+  .recommendation-tabs { width: 100%; overflow-x: auto; }
+  .recommendation-tabs button { min-width: 132px; flex: 1 0 auto; }
+  .recommendation-action { align-items: flex-start; flex-direction: column; position: static; }
+  .recommendation-action .apply-runes, .recommendation-action .apply-item-set { width: 100%; }
+  .rune-choice-selector { display: grid; grid-template-columns: 18px 26px minmax(0,1fr); }
+  .rune-player-stats { grid-column: 3; width: 100%; grid-template-columns: repeat(3,minmax(52px,1fr)); text-align: left; }
+  .specialist-game-head { grid-template-columns: 1fr; align-items: start; gap: 5px; padding-block: 7px; }
+  .specialist-opponent { width: 100%; justify-self: start; justify-content: flex-start; flex-wrap: wrap; overflow: visible; }
+  .specialist-opponent-copy { flex: 1 1 150px; }
+  .champion-summary-main { align-items: flex-start; flex-wrap: wrap; }
+  .champion-summary-main dl { width: 100%; margin: 2px 0 0; padding-left: 0; border-left: 0; justify-content: flex-start; gap: 12px; }
+  .champion-matchups { display: grid; gap: 8px; }
+  .champion-matchups > div { overflow-x: auto; padding-bottom: 2px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -826,18 +1555,72 @@
 }
 
 @container (max-width: 980px) {
-  .rune-option-button { width: 38px; height: 38px; }
-  .unified-rune-row { gap: 12px; min-height: 56px; }
-  .unified-rune-column { grid-template-rows: 44px repeat(4,56px); padding: 12px 12px 14px; }
+	.unified-rune-row { gap: 10px; }
+	.unified-rune-column { padding: 10px 12px 12px; }
   .live-teams.is-insight { grid-template-columns: 1fr; }
-  .config-option { flex-wrap: wrap; }
+  .config-option { flex-wrap: nowrap; }
+}
+
+@container (max-width: 820px) {
+  .build-summary-bar { grid-template-columns: 1fr; }
+  .build-summary-bar > section + section { border-top: 1px solid var(--line); border-left: 0; }
+  .build-summary-bar.is-arena { grid-template-columns: 1fr; grid-template-rows: repeat(2,minmax(0,auto)); }
+  .build-summary-bar.is-arena > .build-summary-skill { grid-column: 1; border-top: 1px solid var(--line); border-left: 0; }
+  .live-arena-build-grid,
+  .live-arena-build-section.is-core .live-arena-build-grid,
+  .live-arena-build-section.is-prismatic .live-arena-build-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+
+@media (max-width: 820px) {
+  #section-live { overflow: visible; }
+  #section-live .live-beacon { right: 7px; }
 }
 
 @container (max-width: 640px) {
+  .recommendation-panel { --rune-icon-size: 32px; }
   .unified-rune-board { grid-template-columns: 1fr; overflow: visible; }
   .unified-rune-column + .unified-rune-column { border-top: 1px solid var(--line); border-left: 0; }
-  .rune-shards { grid-template-rows: repeat(3,56px); }
+	.rune-shards { grid-template-rows: repeat(3,var(--rune-row-height)); }
   .rune-shards > header, .rune-shards > .is-spacer { display: none; }
-  .build-essentials, .item-option-groups { grid-template-columns: 1fr; }
-  .build-essentials > section + section, .item-option-groups > section:nth-child(2) { border-top: 1px solid var(--line); border-left: 0; }
+  .option-stats { grid-template-columns: repeat(3,minmax(38px,52px)); }
+  .option-stats.is-depth { grid-template-columns: repeat(2,minmax(38px,52px)); }
 }
+
+@container build-recommendation (max-width: 500px) {
+  .skill-icon-button { grid-template-columns: minmax(0,42px) minmax(0,12px); gap: 3px; padding-right: 4px; }
+  .skill-copy .skill-name, .skill-copy small { display: none; }
+  .live-arena-build-section.is-core .arena-option-card { padding: 5px; }
+  .live-arena-build-section.is-core .arena-option-main { gap: 2px; }
+  .live-arena-build-section.is-core .arena-option-icons { gap: 1px; }
+  .live-arena-build-section.is-core .arena-option-card .item-option-button,
+  .live-arena-build-section.is-core .arena-option-card .item-option-button > .game-icon.is-large {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+  }
+  .live-arena-build-section.is-core .arena-option-card .route-arrow { font-size: 9px; }
+  .live-arena-build-section.is-core .arena-option-card .augment-grade {
+    width: 18px;
+    height: 18px;
+    flex-basis: 18px;
+    font-size: 10px;
+  }
+  .live-arena-build-section.is-prismatic .arena-option-card .item-option-button,
+  .live-arena-build-section.is-prismatic .arena-option-card .item-option-button > .game-icon.is-large {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+  .live-arena-build-section.is-prismatic .arena-option-main { gap: 5px; }
+  .live-arena-build-section.is-prismatic .arena-option-main > strong { font-size: 12px; }
+}
+
+/* 极窄窗口仍保留完整三件套；仅将统计信息移到下一行，装备图标不缩放也不拆行。 */
+@container build-recommendation (max-width: 360px) {
+  .build-summary-bar .config-option { column-gap: 10px; padding-inline: 4px; }
+  .item-core-column .config-option { align-items: stretch; flex-direction: column; gap: 6px; padding-block: 7px; }
+  .item-core-column .option-stats { width: 100%; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0; text-align: left; }
+}
+
+.gameplay-content { position: relative; }
+.overview-refreshing { position: sticky; right: 12px; bottom: 12px; z-index: 8; display: flex; width: fit-content; max-width: calc(100% - 24px); align-items: center; gap: 8px; margin: -36px 12px 12px auto; padding: 8px 11px; color: var(--ink); background: color-mix(in oklab,var(--surface) 92%,transparent); border: 1px solid var(--hex-line); border-radius: 8px; box-shadow: 0 8px 22px rgb(0 0 0 / .22); font-size: 10.5px; }

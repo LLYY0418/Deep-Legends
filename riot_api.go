@@ -132,6 +132,22 @@ const (
 )
 
 var errRiotNotFound = errors.New("riot: not found")
+var errThrottled = errors.New("riot: throttled")
+
+type riotQueueDeadlineKey struct{}
+
+type riotAccountCacheEntry struct {
+	account   riotAccount
+	err       error
+	expiresAt time.Time
+	failures  int
+}
+
+type riotAccountFlight struct {
+	done    chan struct{}
+	account riotAccount
+	err     error
+}
 
 type riotProvider struct {
 	champions *championProvider
@@ -140,24 +156,75 @@ type riotProvider struct {
 	shortWindow []time.Time
 	longWindow  []time.Time
 
-	cacheMu    sync.Mutex
-	matchCache map[string]*riotMatch
-	matchOrder []string
+	cacheMu        sync.Mutex
+	matchCache     map[string]*riotMatch
+	matchOrder     []string
+	accountMu      sync.Mutex
+	accountCache   map[string]riotAccountCacheEntry
+	accountFlights map[string]*riotAccountFlight
 
 	specialistMu      sync.Mutex
-	specialistCache   map[int64]specialistRuneCacheEntry
-	specialistFlights map[int64]*specialistRuneFlight
+	specialistCache   map[string]specialistRuneCacheEntry
+	specialistFlights map[string]*specialistRuneFlight
+	specialistRecent  map[string]specialistRecentSummaryCacheEntry
 	specialistSlots   chan struct{}
+	opponentRankScore func(context.Context, string) rankScoreEntry
+}
+
+type riotOverviewCostTrackerKey struct{}
+
+type riotOverviewCostTracker struct {
+	mu               sync.Mutex
+	rateLimitedCount int
+}
+
+func (t *riotOverviewCostTracker) recordRateLimit() {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	t.rateLimitedCount++
+	t.mu.Unlock()
+}
+
+func (t *riotOverviewCostTracker) rateLimitCount() int {
+	if t == nil {
+		return 0
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.rateLimitedCount
+}
+
+func riotOverviewCostTrackerFromContext(ctx context.Context) *riotOverviewCostTracker {
+	tracker, _ := ctx.Value(riotOverviewCostTrackerKey{}).(*riotOverviewCostTracker)
+	return tracker
 }
 
 func newRiotProvider(champions *championProvider) *riotProvider {
 	return &riotProvider{
-		champions: champions, matchCache: make(map[string]*riotMatch),
-		specialistCache: make(map[int64]specialistRuneCacheEntry), specialistFlights: make(map[int64]*specialistRuneFlight), specialistSlots: make(chan struct{}, 1),
+		champions: champions, matchCache: make(map[string]*riotMatch), accountCache: make(map[string]riotAccountCacheEntry), accountFlights: make(map[string]*riotAccountFlight),
+		specialistCache: make(map[string]specialistRuneCacheEntry), specialistFlights: make(map[string]*specialistRuneFlight), specialistRecent: make(map[string]specialistRecentSummaryCacheEntry), specialistSlots: make(chan struct{}, specialistRunePlayerLimit),
 	}
 }
 
-func riotKeyConfigured() bool { return riotKey() != "" }
+func riotKeyConfiguredValue(ciphertext string) bool {
+	if strings.TrimSpace(ciphertext) == "" {
+		return false
+	}
+	plain, err := decryptRiotKeyCipher(ciphertext)
+	return err == nil && strings.TrimSpace(plain) != ""
+}
+
+func riotKeyConfigured() bool {
+	if strings.TrimSpace(os.Getenv("RIOT_API_KEY")) != "" {
+		return true
+	}
+	if strings.TrimSpace(riotAPIKeyCipher) != "" {
+		return riotKeyConfiguredValue(riotAPIKeyCipher)
+	}
+	return strings.TrimSpace(riotAPIKey) != ""
+}
 
 // wait 在本地执行保守限速（Personal Key 上限 20 次/秒、100 次/2 分钟，
 // 这里各留出安全余量），超过预算时阻塞等待而不是直接失败。
@@ -192,11 +259,43 @@ func (p *riotProvider) wait(ctx context.Context) error {
 		if sleep < 50*time.Millisecond {
 			sleep = 50 * time.Millisecond
 		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(sleep):
+		if err := waitRiotDelay(ctx, sleep); err != nil {
+			return err
 		}
+	}
+}
+
+func withRiotQueueLimit(ctx context.Context, limit time.Duration) context.Context {
+	if limit <= 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, riotQueueDeadlineKey{}, time.Now().Add(limit))
+}
+
+func waitRiotDelay(ctx context.Context, delay time.Duration) error {
+	if deadline, ok := ctx.Value(riotQueueDeadlineKey{}).(time.Time); ok {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return errThrottled
+		}
+		if delay > remaining {
+			timer := time.NewTimer(remaining)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+				return errThrottled
+			}
+		}
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
 }
 
@@ -254,22 +353,28 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		case http.StatusNotFound:
 			return errRiotNotFound
 		case http.StatusUnauthorized, http.StatusForbidden:
-			return errors.New("Riot API Key 无效、过期或无权访问：请到 developer.riotgames.com 检查后重新生成密文并在构建时注入")
+			return &riotStatusError{message: "Riot API Key 无效、过期或无权访问：请到 developer.riotgames.com 检查后重新生成密文并在构建时注入", status: response.StatusCode}
 		case http.StatusTooManyRequests:
 			retryAfter := time.Duration(3) * time.Second
 			if seconds, parseErr := strconv.Atoi(response.Header.Get("Retry-After")); parseErr == nil && seconds > 0 && seconds <= 30 {
 				retryAfter = time.Duration(seconds) * time.Second
 			}
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(retryAfter):
+			rioTracker := riotOverviewCostTrackerFromContext(ctx)
+			rioTracker.recordRateLimit()
+			if p.champions != nil && p.champions.diag != nil {
+				p.champions.diag(map[string]any{
+					"event": "riot_rate_limited", "host": host, "path": requestPath,
+					"retry_after_ms": retryAfter.Milliseconds(), "attempt": attempt + 1,
+				})
+			}
+			if err := waitRiotDelay(ctx, retryAfter); err != nil {
+				return err
 			}
 		default:
-			return fmt.Errorf("Riot 接口返回 HTTP %d", response.StatusCode)
+			return &riotStatusError{message: fmt.Sprintf("Riot 接口返回 HTTP %d", response.StatusCode), status: response.StatusCode}
 		}
 	}
-	return errors.New("Riot 接口限流中（HTTP 429），请稍后重试")
+	return &riotStatusError{message: "Riot 接口限流中（HTTP 429），请稍后重试", status: http.StatusTooManyRequests}
 }
 
 // riotStatusError 携带面向用户的中文提示与对应的 HTTP 状态码。
@@ -334,17 +439,20 @@ type riotPerkSelections struct {
 }
 
 type riotParticipant struct {
-	ParticipantID               int64  `json:"participantId"`
-	TeamID                      int64  `json:"teamId"`
-	PUUID                       string `json:"puuid"`
-	RiotIDGameName              string `json:"riotIdGameName"`
-	RiotIDTagline               string `json:"riotIdTagline"`
-	SummonerName                string `json:"summonerName"`
-	ProfileIcon                 int64  `json:"profileIcon"`
-	ChampionID                  int64  `json:"championId"`
-	ChampLevel                  int    `json:"champLevel"`
-	Summoner1ID                 int64  `json:"summoner1Id"`
-	Summoner2ID                 int64  `json:"summoner2Id"`
+	ParticipantID  int64  `json:"participantId"`
+	TeamID         int64  `json:"teamId"`
+	PUUID          string `json:"puuid"`
+	RiotIDGameName string `json:"riotIdGameName"`
+	RiotIDTagline  string `json:"riotIdTagline"`
+	SummonerName   string `json:"summonerName"`
+	ProfileIcon    int64  `json:"profileIcon"`
+	ChampionID     int64  `json:"championId"`
+	ChampLevel     int    `json:"champLevel"`
+	Summoner1ID    int64  `json:"summoner1Id"`
+	Summoner2ID    int64  `json:"summoner2Id"`
+	// 国服 SGP 的 SUMMARY 在部分版本沿用旧字段名；兼容两种响应。
+	Spell1ID                    int64  `json:"spell1Id"`
+	Spell2ID                    int64  `json:"spell2Id"`
 	Item0                       int64  `json:"item0"`
 	Item1                       int64  `json:"item1"`
 	Item2                       int64  `json:"item2"`
@@ -365,6 +473,9 @@ type riotParticipant struct {
 	VisionScore                 int    `json:"visionScore"`
 	WardsPlaced                 int    `json:"wardsPlaced"`
 	WardsKilled                 int    `json:"wardsKilled"`
+	VisionWardsBoughtInGame     *int   `json:"visionWardsBoughtInGame"`
+	GameEndedInEarlySurrender   bool   `json:"gameEndedInEarlySurrender"`
+	GameEndedInSurrender        bool   `json:"gameEndedInSurrender"`
 	Win                         bool   `json:"win"`
 	LargestMultiKill            int    `json:"largestMultiKill"`
 	// 斗魂竞技场：多支小队同场，playerSubteamId 标记所属小队，
@@ -416,6 +527,7 @@ type riotMatchInfo struct {
 	GameEndTimestamp int64             `json:"gameEndTimestamp"`
 	QueueID          int64             `json:"queueId"`
 	GameMode         string            `json:"gameMode"`
+	GameType         string            `json:"gameType"`
 	MapID            int64             `json:"mapId"`
 	Participants     []riotParticipant `json:"participants"`
 	Teams            []riotTeam        `json:"teams"`
@@ -431,6 +543,55 @@ type riotMatch struct {
 /* ---------- 端点封装 ---------- */
 
 func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine string) (riotAccount, error) {
+	key := strings.ToLower(strings.TrimSpace(gameName)) + "\x1f" + strings.ToLower(strings.TrimSpace(tagLine))
+	now := time.Now()
+	p.accountMu.Lock()
+	if cached, ok := p.accountCache[key]; ok && now.Before(cached.expiresAt) {
+		p.accountMu.Unlock()
+		return cached.account, cached.err
+	}
+	if flight := p.accountFlights[key]; flight != nil {
+		done := flight.done
+		p.accountMu.Unlock()
+		select {
+		case <-done:
+			return flight.account, flight.err
+		case <-ctx.Done():
+			return riotAccount{}, ctx.Err()
+		}
+	}
+	flight := &riotAccountFlight{done: make(chan struct{})}
+	previousFailures := p.accountCache[key].failures
+	p.accountFlights[key] = flight
+	p.accountMu.Unlock()
+
+	account, err := p.fetchAccountByRiotID(ctx, gameName, tagLine)
+	entry := riotAccountCacheEntry{account: account, err: err}
+	completedAt := time.Now()
+	if err == nil {
+		entry.expiresAt = completedAt.Add(24 * time.Hour)
+	} else if !errors.Is(err, context.Canceled) {
+		entry.failures = previousFailures + 1
+		backoff := 30 * time.Second
+		if entry.failures > 1 {
+			backoff = 60 * time.Second
+		}
+		entry.expiresAt = completedAt.Add(backoff)
+	}
+	p.accountMu.Lock()
+	if !entry.expiresAt.IsZero() {
+		p.accountCache[key] = entry
+	} else {
+		delete(p.accountCache, key)
+	}
+	flight.account, flight.err = account, err
+	delete(p.accountFlights, key)
+	close(flight.done)
+	p.accountMu.Unlock()
+	return account, err
+}
+
+func (p *riotProvider) fetchAccountByRiotID(ctx context.Context, gameName, tagLine string) (riotAccount, error) {
 	var account riotAccount
 	path := "/riot/account/v1/accounts/by-riot-id/" + url.PathEscape(gameName) + "/" + url.PathEscape(tagLine)
 	if err := p.get(ctx, riotClusterHost, path, nil, &account); err != nil {
@@ -462,8 +623,18 @@ func (p *riotProvider) topMasteries(ctx context.Context, puuid string, count int
 }
 
 func (p *riotProvider) matchIDs(ctx context.Context, puuid string, start, count int) ([]string, error) {
+	return p.matchIDsFiltered(ctx, puuid, start, count, 0, "")
+}
+
+func (p *riotProvider) matchIDsFiltered(ctx context.Context, puuid string, start, count int, queueID int64, matchType string) ([]string, error) {
 	var ids []string
 	query := url.Values{"start": {strconv.Itoa(start)}, "count": {strconv.Itoa(count)}}
+	if queueID > 0 {
+		query.Set("queue", strconv.FormatInt(queueID, 10))
+	}
+	if strings.TrimSpace(matchType) != "" {
+		query.Set("type", strings.TrimSpace(matchType))
+	}
 	err := p.get(ctx, riotClusterHost, "/lol/match/v5/matches/by-puuid/"+url.PathEscape(puuid)+"/ids", query, &ids)
 	return ids, err
 }
@@ -471,18 +642,23 @@ func (p *riotProvider) matchIDs(ctx context.Context, puuid string, start, count 
 // matchByID 带进程内缓存：对局 JSON 一旦生成就不会变化，翻页或
 // 查看同场其他玩家时直接命中，显著节省官方接口配额。
 func (p *riotProvider) matchByID(ctx context.Context, matchID string) (*riotMatch, error) {
+	match, _, err := p.matchByIDWithCache(ctx, matchID)
+	return match, err
+}
+
+func (p *riotProvider) matchByIDWithCache(ctx context.Context, matchID string) (*riotMatch, string, error) {
 	p.cacheMu.Lock()
 	if cached, ok := p.matchCache[matchID]; ok {
 		p.cacheMu.Unlock()
-		return cached, nil
+		return cached, "hit", nil
 	}
 	p.cacheMu.Unlock()
 	var match riotMatch
 	if err := p.get(ctx, riotClusterHost, "/lol/match/v5/matches/"+url.PathEscape(matchID), nil, &match); err != nil {
-		return nil, err
+		return nil, "miss", err
 	}
 	if match.Metadata.MatchID == "" || len(match.Info.Participants) == 0 {
-		return nil, errors.New("Riot 战绩详情缺少必要字段，可能接口已变更")
+		return nil, "miss", errors.New("Riot 战绩详情缺少必要字段，可能接口已变更")
 	}
 	p.cacheMu.Lock()
 	if _, exists := p.matchCache[matchID]; !exists {
@@ -494,27 +670,21 @@ func (p *riotProvider) matchByID(ctx context.Context, matchID string) (*riotMatc
 		}
 	}
 	p.cacheMu.Unlock()
-	return &match, nil
-}
-
-// riotTimeline 只保留时间线里项目需要的帧结构（事件形状与 SGP 同构）。
-type riotTimeline struct {
-	Info struct {
-		Frames []timelineFrame `json:"frames"`
-	} `json:"info"`
+	return &match, "miss", nil
 }
 
 // matchTimeline 读取单场对局的时间线（装备路线与技能加点用）。
 // 韩服对局的 matchID 由 "KR_" + gameId 构成。
 func (p *riotProvider) matchTimeline(ctx context.Context, matchID string) ([]timelineFrame, error) {
-	var timeline riotTimeline
+	var timeline lcuGameTimeline
 	if err := p.getLimited(ctx, riotClusterHost, "/lol/match/v5/matches/"+url.PathEscape(matchID)+"/timeline", nil, &timeline, riotTimelineResponseMax); err != nil {
 		return nil, err
 	}
-	if len(timeline.Info.Frames) == 0 {
+	frames := timeline.frames()
+	if len(frames) == 0 {
 		return nil, errors.New("Riot 未返回该对局的时间线")
 	}
-	return timeline.Info.Frames, nil
+	return frames, nil
 }
 
 /* ---------- 数据映射 ---------- */
@@ -548,6 +718,24 @@ func riotMatchDurationSeconds(info *riotMatchInfo) int64 {
 	return duration
 }
 
+func riotMatchInfoIsRemake(info *riotMatchInfo) bool {
+	if info == nil {
+		return false
+	}
+	explicitRemake := false
+	surrendered := false
+	hasWinner := false
+	for _, participant := range info.Participants {
+		explicitRemake = explicitRemake || participant.GameEndedInEarlySurrender
+		surrendered = surrendered || participant.GameEndedInSurrender
+		hasWinner = hasWinner || participant.Win
+	}
+	for _, team := range info.Teams {
+		hasWinner = hasWinner || team.Win
+	}
+	return isRemakeGame(explicitRemake, surrendered, riotMatchDurationSeconds(info), info.QueueID, info.GameMode, info.GameType, hasWinner)
+}
+
 func riotConvertMatch(match *riotMatch, subjectPUUID string, names map[int64]string) gameplayMatch {
 	return convertRiotMatchInfo(&match.Info, subjectPUUID, names, nil, riotRegionKR, "")
 }
@@ -561,15 +749,21 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 		// 个别对局缺少 gameCreation：用结束时间倒推开局时间兜底。
 		createdAt = normalizeEpochMillis(info.GameEndTimestamp) - duration*1000
 	}
+	remake := riotMatchInfoIsRemake(info)
+	label := queueLabel(info.QueueID, info.GameMode, queueLabels)
 	result := gameplayMatch{
 		GameID:     info.GameID,
 		CreatedAt:  createdAt,
 		Duration:   duration,
 		QueueID:    info.QueueID,
-		QueueLabel: queueLabel(info.QueueID, info.GameMode, queueLabels),
-		ModeGroup:  queueModeGroup(info.QueueID),
+		QueueLabel: label,
+		ModeGroup:  queueModeGroupForLabel(info.QueueID, info.GameMode, info.MapID, label),
 		GameMode:   info.GameMode,
+		GameType:   info.GameType,
 		MapID:      info.MapID,
+	}
+	if remake {
+		result.Result = "remake"
 	}
 	for _, raw := range info.Participants {
 		name := strings.TrimSpace(raw.RiotIDGameName)
@@ -612,11 +806,18 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 			PlayerRef: raw.PUUID, GameName: raw.RiotIDGameName, TagLine: raw.RiotIDTagline,
 			DisplayName: raw.SummonerName, ProfileIconID: raw.ProfileIcon, Region: region, ServerID: serverID,
 		})
+		spell1ID, spell2ID := raw.Summoner1ID, raw.Summoner2ID
+		if spell1ID == 0 {
+			spell1ID = raw.Spell1ID
+		}
+		if spell2ID == 0 {
+			spell2ID = raw.Spell2ID
+		}
 		participant := gameplayParticipant{
 			ParticipantID: raw.ParticipantID, TeamID: raw.TeamID, PlayerRef: reference.PlayerRef,
 			DisplayName: name, GameName: raw.RiotIDGameName, TagLine: raw.RiotIDTagline, ProfileIconID: raw.ProfileIcon,
 			ChampionID: raw.ChampionID, ChampionName: championName(names, raw.ChampionID), ChampionLevel: raw.ChampLevel,
-			Spell1ID: raw.Summoner1ID, Spell2ID: raw.Summoner2ID, PrimaryStyleID: primaryStyle, SubStyleID: subStyle,
+			Spell1ID: spell1ID, Spell2ID: spell2ID, PrimaryStyleID: primaryStyle, SubStyleID: subStyle,
 			PerkIDs: perkIDs, ItemIDs: itemSlots(raw.Item0, raw.Item1, raw.Item2, raw.Item3, raw.Item4, raw.Item5, raw.Item6),
 			Position: riotPositionKey(raw),
 			Kills:    raw.Kills, Deaths: raw.Deaths, Assists: raw.Assists,
@@ -624,13 +825,16 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 			LaneCS: raw.TotalMinionsKilled, JungleCS: raw.NeutralMinionsKilled, CSPerMinute: perMinute(cs, duration),
 			Gold: raw.GoldEarned, Damage: raw.TotalDamageDealtToChampions, DamageTaken: raw.TotalDamageTaken,
 			VisionScore: raw.VisionScore, WardsPlaced: raw.WardsPlaced, WardsKilled: raw.WardsKilled,
-			Win: raw.Win, Hidden: hidden, MultiKill: raw.LargestMultiKill,
+			ControlWardsBought: raw.VisionWardsBoughtInGame,
+			Win:                raw.Win, Hidden: hidden, MultiKill: raw.LargestMultiKill,
 			SubteamID: raw.PlayerSubteamID, Placement: raw.SubteamPlacement, AugmentIDs: augments, reference: reference,
 		}
 		result.Participants = append(result.Participants, participant)
 		if subjectPUUID != "" && raw.PUUID == subjectPUUID {
 			result.SubjectParticipantID = raw.ParticipantID
-			if raw.Win {
+			if remake {
+				continue
+			} else if raw.Win {
 				result.Result = "win"
 			} else {
 				result.Result = "loss"
@@ -683,6 +887,20 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		return gameplayOverview{}, errors.New("Riot 查询通道未初始化")
 	}
 	provider := a.riot
+	started := time.Now()
+	tracker := &riotOverviewCostTracker{}
+	ctx = context.WithValue(ctx, riotOverviewCostTrackerKey{}, tracker)
+	matchesRequested, matchesLoaded := 0, 0
+	defer func() {
+		if provider.champions == nil || provider.champions.diag == nil {
+			return
+		}
+		provider.champions.diag(map[string]any{
+			"event": "riot_overview_cost", "duration_ms": time.Since(started).Milliseconds(),
+			"matches_requested": matchesRequested, "matches_loaded": matchesLoaded,
+			"rate_limited_count": tracker.rateLimitCount(),
+		})
+	}()
 	puuid := strings.TrimSpace(reference.PlayerRef)
 	gameName := strings.TrimSpace(reference.GameName)
 	tagLine := strings.TrimSpace(reference.TagLine)
@@ -731,12 +949,14 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	if err != nil && !errors.Is(err, errRiotNotFound) {
 		return gameplayOverview{}, err
 	}
+	matchesRequested = len(ids)
 	// 段位与熟练度和对局详情并行读取：串行时一次搜索要等 20 多个请求
 	// 依次返回，是“韩服搜索慢”的主要来源之一。
 	var ranks []gameplayRank
 	var rankCapability EndpointCapability
 	var masteries []gameplayMastery
 	var masteryCapability EndpointCapability
+	var historicalRanks []gameplayHistoricalRank
 	var profileWait sync.WaitGroup
 	if begIndex == 0 {
 		profileWait.Add(2)
@@ -748,12 +968,21 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			defer profileWait.Done()
 			masteries, masteryCapability = provider.loadRiotMasteries(ctx, puuid, names)
 		}()
+		if !strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE") {
+			profileWait.Add(1)
+			go func() {
+				defer profileWait.Done()
+				historyCtx, historyCancel := context.WithTimeout(ctx, 7*time.Second)
+				defer historyCancel()
+				historicalRanks = a.opggHistoricalRanks(historyCtx, gameName, tagLine, puuid, reference.Privacy)
+			}()
+		}
 	}
 	matches := make([]gameplayMatch, 0, len(ids))
 	loadedDetails := 0
 	var loadMu sync.Mutex
 	var wait sync.WaitGroup
-	semaphore := make(chan struct{}, 8)
+	semaphore := make(chan struct{}, 4)
 	details := make([]*riotMatch, len(ids))
 	for index := range ids {
 		wait.Add(1)
@@ -772,11 +1001,18 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		}(index)
 	}
 	wait.Wait()
+	if ctx.Err() != nil {
+		return gameplayOverview{}, ctx.Err()
+	}
+	matchesLoaded = loadedDetails
 	for _, detail := range details {
 		if detail == nil {
 			continue
 		}
-		matches = append(matches, riotConvertMatch(detail, puuid, names))
+		match := riotConvertMatch(detail, puuid, names)
+		if !isCustomGameplayMatch(match) {
+			matches = append(matches, match)
+		}
 	}
 	historyCapability := EndpointCapability{Name: "match-history", Path: "riot: /lol/match/v5/matches/by-puuid", State: capabilityAvailable, Count: len(ids)}
 	if err != nil {
@@ -801,7 +1037,8 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		Player: gameplayPlayer{
 			PlayerRef: puuid, DisplayName: gameName, GameName: gameName, TagLine: tagLine,
 			ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel,
-			Region: riotRegionKR, Hidden: gameName == "", IsCurrent: false, reference: reference,
+			Region: riotRegionKR, Hidden: gameName == "", PrivateHistory: strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE"),
+			IsCurrent: false, reference: reference,
 		},
 		Matches:      matches,
 		Capabilities: capabilities,
@@ -814,24 +1051,27 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		return response, nil
 	}
 	profileWait.Wait()
+	if ctx.Err() != nil {
+		return gameplayOverview{}, ctx.Err()
+	}
 	capabilities = append(capabilities, rankCapability)
 	capabilities = append(capabilities, masteryCapability)
 	// 汇总统计基于当前已读取的这一页战绩：Riot Personal Key 配额有限，
 	// 不像本机客户端那样一次拉取 100 场样本。
 	capabilities = append(capabilities, EndpointCapability{Name: "seven-day-history", Path: "riot: 复用本页战绩样本", State: capabilityAvailable, Count: len(matches), Detail: fmt.Sprintf("基于最近 %d 场计算 30 天排位与活跃时段", len(matches))})
 	response.Ranks = ranks
+	response.HistoricalRanks = historicalRanks
 	response.Masteries = masteries
+	// 韩服拿不到客户端个人主页背景（Riot API 无此字段），退回最高熟练度英雄原画。
+	applyMasteryBackgroundFallback(&response.Player, masteries)
 	response.Capabilities = capabilities
 	response.Overall = aggregateMatches(matches, puuid, nil)
 	recentWindowAfter := time.Now().Add(-recentWindowDays * 24 * time.Hour).UnixMilli()
-	response.SevenDayRank = aggregateMatches(matches, puuid, func(match gameplayMatch) bool {
-		return match.CreatedAt >= recentWindowAfter && (match.QueueID == 420 || match.QueueID == 440)
-	})
-	if response.SevenDayRank.Games > 0 && hasMore {
-		response.SevenDayRank.Sampled = true
-	}
+	response.RecentRanked = recentRankedSummary(matches, puuid, nil)
 	response.ChampionStats = championStats(matches, puuid, names)
 	response.Positions = positionStats(matches, puuid)
+	response.Ability = buildGameplayAbilityProfile(matches, puuid, ranks, riotRegionKR)
+	response.RankedQueues = buildGameplayRankedQueues(recentRankedMatchesForQueue(matches, 420, defaultMatchCount), recentRankedMatchesForQueue(matches, 440, defaultMatchCount), puuid, ranks, riotRegionKR)
 	response.ActivityHours = activityHours(matches)
 	response.RecentPlayers = recentPlayers(matches, puuid, recentWindowAfter)
 	a.publicizeOverviewReferences(&response)
@@ -920,6 +1160,10 @@ func opggParseSearchResult(data []byte) []riotAccount {
 func (p *riotProvider) loadRiotRanks(ctx context.Context, puuid string) ([]gameplayRank, EndpointCapability) {
 	capability := EndpointCapability{Name: "ranked-stats", Path: "riot: /lol/league/v4/entries/by-puuid"}
 	entries, err := p.leagueEntries(ctx, puuid)
+	if isCancellation(err) {
+		capability.State = capabilityCanceled
+		return nil, capability
+	}
 	if err != nil && !errors.Is(err, errRiotNotFound) {
 		capability.State = capabilityFailed
 		capability.Detail = err.Error()
@@ -953,6 +1197,10 @@ func (p *riotProvider) loadRiotRanks(ctx context.Context, puuid string) ([]gamep
 func (p *riotProvider) loadRiotMasteries(ctx context.Context, puuid string, names map[int64]string) ([]gameplayMastery, EndpointCapability) {
 	capability := EndpointCapability{Name: "champion-mastery", Path: "riot: /lol/champion-mastery/v4/by-puuid/top"}
 	entries, err := p.topMasteries(ctx, puuid, 6)
+	if isCancellation(err) {
+		capability.State = capabilityCanceled
+		return nil, capability
+	}
 	if err != nil && !errors.Is(err, errRiotNotFound) {
 		capability.State = capabilityFailed
 		capability.Detail = err.Error()

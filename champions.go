@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	stdhtml "html"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -24,15 +25,18 @@ import (
 )
 
 const (
-	opggChampionHost    = "lol-api-champion.op.gg"
-	opggWebAPIHost      = "lol-web-api.op.gg"
-	opggPageHost        = "op.gg"
-	communityDragonHost = "raw.communitydragon.org"
-	opggAssetHost       = "opgg-static.akamaized.net"
-	dataDragonHost      = "ddragon.leagueoflegends.com"
-	championJSONMax     = 6 << 20
-	championHTMLMax     = 5 << 20
-	championImageMax    = 4 << 20
+	opggChampionHost                = "lol-api-champion.op.gg"
+	opggWebAPIHost                  = "lol-web-api.op.gg"
+	opggPageHost                    = "op.gg"
+	qq101Host                       = "mlol.qt.qq.com"
+	communityDragonHost             = "raw.communitydragon.org"
+	yourGGArenaHost                 = "api.your.gg"
+	opggAssetHost                   = "opgg-static.akamaized.net"
+	dataDragonHost                  = "ddragon.leagueoflegends.com"
+	championJSONMax                 = 6 << 20
+	championHTMLMax                 = 5 << 20
+	championImageMax                = 4 << 20
+	championCoreRecommendationLimit = 15
 
 	gtimgChampionIconPrefix = "/images/lol/act/img/champion/"
 	gtimgSkinArtworkPrefix  = "/images/lol/act/img/skin/big"
@@ -40,7 +44,6 @@ const (
 
 var (
 	championSlugPattern  = regexp.MustCompile(`^[a-z0-9]+$`)
-	championPatchPattern = regexp.MustCompile(`版本\s*([0-9]+(?:\.[0-9]+){1,2})`)
 	numberPattern        = regexp.MustCompile(`[0-9]+(?:\.[0-9]+)?`)
 	gamesPattern         = regexp.MustCompile(`([0-9][0-9,]*)\s*场`)
 	markupPattern        = regexp.MustCompile(`<[^>]+>`)
@@ -73,20 +76,46 @@ var (
 )
 
 type championProvider struct {
-	clientMu     sync.RWMutex
-	client       *http.Client
-	network      championNetworkSettings
-	activeProxy  string
-	cache        *championDataCache
-	diag         func(event map[string]any)
-	mu           sync.Mutex
-	patch        string
-	static       map[string]championAssetDescription
-	championKeys map[string]string
-	championIDs  map[string]int
-	championMeta map[int]championMetadata
-	abilities    map[string]map[string]championAssetDescription
-	diagLast     map[string]time.Time
+	clientMu          sync.RWMutex
+	client            *http.Client
+	network           championNetworkSettings
+	activeProxy       string
+	cache             *championDataCache
+	diag              func(event map[string]any)
+	mu                sync.Mutex
+	patch             string
+	static            map[string]championAssetDescription
+	championKeys      map[string]string
+	championIDs       map[string]int
+	championMeta      map[int]championMetadata
+	abilities         map[string]map[string]championAssetDescription
+	diagLast          map[string]time.Time
+	yourGGMu          sync.Mutex
+	yourGGLast        time.Time
+	arenaItemsAt      time.Time
+	arenaItems        []gameplayItem
+	hexdata           *hexdataClient
+	featureGates      *featureGates
+	qq101ProbeMu      sync.Mutex
+	qq101ProbeRunning map[string]bool
+	qq101ProbeAt      map[string]time.Time
+	qq101Wait         time.Duration
+	// Mayhem augment copy resolved from Hexdata detail pages, keyed by augment
+	// ID. Riot ships no description for these, so the page is the only source;
+	// caching the parsed text keeps repeat renders free.
+	augmentCopyMu       sync.Mutex
+	augmentCopy         map[int]string
+	augmentSlugs        map[int]string
+	augmentSlugsRetryAt time.Time
+	// Keep the last valid augment catalog in memory so a transient empty
+	// Hexdata/OP.GG response cannot blank the atlas during refresh.
+	augmentCatalogMu    sync.Mutex
+	augmentCatalog      championAugmentResponse
+	augmentCatalogReady bool
+	// Injected by main to read the authenticated LCU augment catalog.
+	// Keeping it as a callback makes the provider testable and preserves the
+	// CommunityDragon fallback when the client is offline.
+	gameplayAugments func(context.Context) ([]gameplayAugment, error)
 }
 
 type championFilterOption struct {
@@ -117,33 +146,38 @@ type championMetadata struct {
 }
 
 type championRankingResponse struct {
-	Mode                string                 `json:"mode"`
-	Region              string                 `json:"region"`
-	Tier                string                 `json:"tier,omitempty"`
-	Position            string                 `json:"position,omitempty"`
-	Patch               string                 `json:"patch,omitempty"`
-	Source              string                 `json:"source"`
-	FetchedAt           time.Time              `json:"fetchedAt"`
-	EntertainmentSample bool                   `json:"entertainmentSample,omitempty"`
-	Rows                []championRankingRow   `json:"rows"`
-	TeamCompositions    []arenaTeamComposition `json:"teamCompositions,omitempty"`
+	Mode                 string                  `json:"mode"`
+	Region               string                  `json:"region"`
+	Tier                 string                  `json:"tier,omitempty"`
+	Position             string                  `json:"position,omitempty"`
+	Patch                string                  `json:"patch,omitempty"`
+	Source               string                  `json:"source"`
+	FetchedAt            time.Time               `json:"fetchedAt"`
+	EntertainmentSample  bool                    `json:"entertainmentSample,omitempty"`
+	Citation             *championSourceCitation `json:"citation,omitempty"`
+	MeasurementTechnique string                  `json:"measurementTechnique,omitempty"`
+	Rows                 []championRankingRow    `json:"rows"`
+	TeamCompositions     []arenaTeamComposition  `json:"teamCompositions,omitempty"`
 }
 
 type championRankingRow struct {
-	ChampionID  int      `json:"championId"`
-	Key         string   `json:"key,omitempty"`
-	Name        string   `json:"name,omitempty"`
-	ImageSource string   `json:"imageSource,omitempty"`
-	ImagePath   string   `json:"imagePath,omitempty"`
-	Rank        int      `json:"rank"`
-	Tier        int      `json:"tier"`
-	Position    string   `json:"position,omitempty"`
-	Positions   []string `json:"positions,omitempty"`
-	Play        int      `json:"play,omitempty"`
-	WinRate     float64  `json:"winRate,omitempty"`
-	PickRate    float64  `json:"pickRate,omitempty"`
-	BanRate     float64  `json:"banRate,omitempty"`
-	KDA         float64  `json:"kda,omitempty"`
+	ChampionID            int      `json:"championId"`
+	Key                   string   `json:"key,omitempty"`
+	Name                  string   `json:"name,omitempty"`
+	ImageSource           string   `json:"imageSource,omitempty"`
+	ImagePath             string   `json:"imagePath,omitempty"`
+	Rank                  int      `json:"rank"`
+	Tier                  int      `json:"tier"`
+	Position              string   `json:"position,omitempty"`
+	Positions             []string `json:"positions,omitempty"`
+	Play                  int      `json:"play,omitempty"`
+	WinRate               float64  `json:"winRate,omitempty"`
+	PickRate              float64  `json:"pickRate,omitempty"`
+	BanRate               float64  `json:"banRate,omitempty"`
+	KDA                   float64  `json:"kda,omitempty"`
+	AveragePlacement      float64  `json:"averagePlacement,omitempty"`
+	FirstPlaceRate        float64  `json:"firstPlaceRate,omitempty"`
+	TierLocallyCalculated bool     `json:"tierLocallyCalculated,omitempty"`
 }
 
 type arenaTeamChampion struct {
@@ -164,6 +198,11 @@ type arenaTeamComposition struct {
 }
 
 type arenaChampionStats struct {
+	Tier             *int    `json:"tier,omitempty"`
+	Rank             int     `json:"rank,omitempty"`
+	RankPrevPatch    int     `json:"rankPrevPatch,omitempty"`
+	Games            int     `json:"games,omitempty"`
+	KDA              float64 `json:"kda,omitempty"`
 	AveragePlacement float64 `json:"averagePlacement,omitempty"`
 	FirstPlaceRate   float64 `json:"firstPlaceRate,omitempty"`
 	PickRate         float64 `json:"pickRate,omitempty"`
@@ -172,17 +211,18 @@ type arenaChampionStats struct {
 }
 
 type championAsset struct {
-	ID          int       `json:"id,omitempty"`
-	Kind        string    `json:"kind"`
-	Name        string    `json:"name"`
-	Description string    `json:"description,omitempty"`
-	Source      string    `json:"source"`
-	Path        string    `json:"path"`
-	Active      bool      `json:"active,omitempty"`
-	CostType    string    `json:"costType,omitempty"`
-	Costs       []float64 `json:"costs,omitempty"`
-	Cooldowns   []float64 `json:"cooldowns,omitempty"`
-	Ranges      []float64 `json:"ranges,omitempty"`
+	ID           int       `json:"id,omitempty"`
+	Kind         string    `json:"kind"`
+	Name         string    `json:"name"`
+	Description  string    `json:"description,omitempty"`
+	Source       string    `json:"source"`
+	Path         string    `json:"path"`
+	FallbackPath string    `json:"fallbackPath,omitempty"`
+	Active       bool      `json:"active,omitempty"`
+	CostType     string    `json:"costType,omitempty"`
+	Costs        []float64 `json:"costs,omitempty"`
+	Cooldowns    []float64 `json:"cooldowns,omitempty"`
+	Ranges       []float64 `json:"ranges,omitempty"`
 }
 
 type championAssetDescription struct {
@@ -190,6 +230,8 @@ type championAssetDescription struct {
 	Description string
 	Source      string
 	Path        string
+	BuildsInto  bool
+	Price       int64
 	CostType    string
 	Costs       []float64
 	Cooldowns   []float64
@@ -197,25 +239,101 @@ type championAssetDescription struct {
 }
 
 type championMetricRow struct {
-	Assets        []championAsset `json:"assets"`
-	Ultimate      *championAsset  `json:"ultimate,omitempty"`
-	PickRate      float64         `json:"pickRate,omitempty"`
-	WinRate       float64         `json:"winRate,omitempty"`
-	Games         int             `json:"games,omitempty"`
-	SkillPriority []string        `json:"skillPriority,omitempty"`
-	SkillOrder    []string        `json:"skillOrder,omitempty"`
+	Assets           []championAsset `json:"assets"`
+	Ultimate         *championAsset  `json:"ultimate,omitempty"`
+	Rarity           string          `json:"rarity,omitempty"`
+	Tier             string          `json:"tier,omitempty"`
+	Grade            string          `json:"grade,omitempty"`
+	Score            float64         `json:"score,omitempty"`
+	PickRate         float64         `json:"pickRate,omitempty"`
+	WinRate          float64         `json:"winRate,omitempty"`
+	Games            int             `json:"games,omitempty"`
+	GamesUnavailable bool            `json:"gamesUnavailable,omitempty"`
+	AveragePlacement float64         `json:"averagePlacement,omitempty"`
+	FirstPlaceRate   float64         `json:"firstPlaceRate,omitempty"`
+	SkillPriority    []string        `json:"skillPriority,omitempty"`
+	SkillOrder       []string        `json:"skillOrder,omitempty"`
+}
+
+func applyLocalAugmentGrades(rows []championMetricRow) {
+	scores := make([]float64, 0, len(rows))
+	for index := range rows {
+		if rows[index].Score <= 0 {
+			rows[index].Score = localAugmentScore(rows[index])
+		}
+		if rows[index].Score > 0 {
+			scores = append(scores, rows[index].Score)
+		}
+	}
+	for index := range rows {
+		percentile := float64(len(rows)-index) / float64(max(1, len(rows)))
+		if len(scores) > 0 {
+			percentile = 0
+			for _, score := range scores {
+				if score <= rows[index].Score {
+					percentile++
+				}
+			}
+			percentile /= float64(len(scores))
+		}
+		switch {
+		case percentile >= 0.9:
+			rows[index].Grade = "S"
+		case percentile >= 0.7:
+			rows[index].Grade = "A"
+		default:
+			rows[index].Grade = "B"
+		}
+	}
+}
+
+func localAugmentScore(row championMetricRow) float64 {
+	if row.Score > 0 {
+		return row.Score
+	}
+	if row.Games <= 0 || row.WinRate <= 0 || row.WinRate > 100 {
+		return 0
+	}
+	p := row.WinRate / 100
+	n := float64(row.Games)
+	const z = 1.96
+	return 100 * (p + z*z/(2*n) - z*math.Sqrt((p*(1-p)+z*z/(4*n))/n)) / (1 + z*z/n)
+}
+
+func appendMeasurementTechnique(value, note string) string {
+	value, note = strings.TrimSpace(value), strings.TrimSpace(note)
+	if value == "" {
+		return note
+	}
+	if note == "" || strings.Contains(value, note) {
+		return value
+	}
+	return value + "；" + note
+}
+
+type arenaAugmentGroup struct {
+	Rarity int                 `json:"rarity"`
+	Rows   []championMetricRow `json:"rows"`
 }
 
 type championBuildSections struct {
-	SummonerSpells []championMetricRow `json:"summonerSpells,omitempty"`
-	Skills         []championMetricRow `json:"skills,omitempty"`
-	StarterItems   []championMetricRow `json:"starterItems,omitempty"`
-	Boots          []championMetricRow `json:"boots,omitempty"`
-	CoreItems      []championMetricRow `json:"coreItems,omitempty"`
-	FourthItems    []championMetricRow `json:"fourthItems,omitempty"`
-	FifthItems     []championMetricRow `json:"fifthItems,omitempty"`
-	SixthItems     []championMetricRow `json:"sixthItems,omitempty"`
-	PrismItems     []championMetricRow `json:"prismItems,omitempty"`
+	SummonerSpells  []championMetricRow `json:"summonerSpells,omitempty"`
+	Skills          []championMetricRow `json:"skills,omitempty"`
+	StarterItems    []championMetricRow `json:"starterItems,omitempty"`
+	Boots           []championMetricRow `json:"boots,omitempty"`
+	CoreItems       []championMetricRow `json:"coreItems,omitempty"`
+	FourthItems     []championMetricRow `json:"fourthItems,omitempty"`
+	FifthItems      []championMetricRow `json:"fifthItems,omitempty"`
+	SixthItems      []championMetricRow `json:"sixthItems,omitempty"`
+	PrismItems      []championMetricRow `json:"prismItems,omitempty"`
+	ItemSource      string              `json:"itemSource,omitempty"`
+	ItemWindow      string              `json:"itemWindow,omitempty"`
+	ItemChainStatus string              `json:"itemChainStatus,omitempty"`
+	ItemAttempts    []DataSourceAttempt `json:"itemAttempts,omitempty"`
+	ItemFallback    string              `json:"itemFallbackReason,omitempty"`
+	FourthSample    int                 `json:"fourthSample,omitempty"`
+	FifthSample     int                 `json:"fifthSample,omitempty"`
+	SixthSample     int                 `json:"sixthSample,omitempty"`
 }
 
 type championRunePage struct {
@@ -246,55 +364,80 @@ type championCounterSections struct {
 }
 
 type championDetailStats struct {
+	Tier     *int    `json:"tier,omitempty"`
 	WinRate  float64 `json:"winRate,omitempty"`
 	PickRate float64 `json:"pickRate,omitempty"`
 	BanRate  float64 `json:"banRate,omitempty"`
 }
 
+type championPositionOption struct {
+	Position string  `json:"position"`
+	WinRate  float64 `json:"winRate"`
+	PickRate float64 `json:"pickRate"`
+	BanRate  float64 `json:"banRate"`
+	RoleRate float64 `json:"roleRate"`
+	Play     int     `json:"play"`
+	Tier     int     `json:"tier"`
+	Rank     int     `json:"rank"`
+}
+
 type championDetailResponse struct {
-	Mode                string                  `json:"mode"`
-	Region              string                  `json:"region"`
-	Tier                string                  `json:"tier,omitempty"`
-	Position            string                  `json:"position,omitempty"`
-	Patch               string                  `json:"patch,omitempty"`
-	Source              string                  `json:"source"`
-	FetchedAt           time.Time               `json:"fetchedAt"`
-	EntertainmentSample bool                    `json:"entertainmentSample,omitempty"`
-	Stats               championDetailStats     `json:"stats,omitempty"`
-	Runes               []championRunePage      `json:"runes,omitempty"`
-	Counters            championCounterSections `json:"counters,omitempty"`
+	Mode                 string                   `json:"mode"`
+	Region               string                   `json:"region"`
+	Tier                 string                   `json:"tier,omitempty"`
+	Position             string                   `json:"position,omitempty"`
+	Positions            []championPositionOption `json:"positions,omitempty"`
+	PositionsSource      string                   `json:"positionsSource,omitempty"`
+	Patch                string                   `json:"patch,omitempty"`
+	CurrentPatch         string                   `json:"currentPatch,omitempty"`
+	IsStale              bool                     `json:"isStale,omitempty"`
+	Source               string                   `json:"source"`
+	FetchedAt            time.Time                `json:"fetchedAt"`
+	EntertainmentSample  bool                     `json:"entertainmentSample,omitempty"`
+	Citation             *championSourceCitation  `json:"citation,omitempty"`
+	BuildCitation        *championSourceCitation  `json:"buildCitation,omitempty"`
+	MeasurementTechnique string                   `json:"measurementTechnique,omitempty"`
+	Stats                championDetailStats      `json:"stats,omitempty"`
+	Runes                []championRunePage       `json:"runes,omitempty"`
+	Counters             championCounterSections  `json:"counters,omitempty"`
 	// SampleTier / CountersTier：所选段位样本不足时实际使用的回退段位。
 	SampleTier          string                 `json:"sampleTier,omitempty"`
 	CountersTier        string                 `json:"countersTier,omitempty"`
 	TopPlayers          []championTopPlayer    `json:"topPlayers,omitempty"`
-	RecommendedAugments []championAsset        `json:"recommendedAugments,omitempty"`
+	RecommendedAugments []championMetricRow    `json:"recommendedAugments,omitempty"`
+	ItemRanking         []championMetricRow    `json:"itemRanking,omitempty"`
 	ArenaStats          arenaChampionStats     `json:"arenaStats,omitempty"`
 	TeamCompositions    []arenaTeamComposition `json:"teamCompositions,omitempty"`
 	ArenaAugments       []championMetricRow    `json:"arenaAugments,omitempty"`
+	ArenaAugmentGroups  []arenaAugmentGroup    `json:"arenaAugmentGroups,omitempty"`
 	Build               championBuildSections  `json:"build"`
 }
 
 type championAugmentResponse struct {
-	Source              string            `json:"source"`
-	Mode                string            `json:"mode"`
-	FetchedAt           time.Time         `json:"fetchedAt"`
-	EntertainmentSample bool              `json:"entertainmentSample"`
-	Rows                []championAugment `json:"rows"`
+	Source               string                  `json:"source"`
+	Mode                 string                  `json:"mode"`
+	FetchedAt            time.Time               `json:"fetchedAt"`
+	EntertainmentSample  bool                    `json:"entertainmentSample"`
+	Citation             *championSourceCitation `json:"citation,omitempty"`
+	MeasurementTechnique string                  `json:"measurementTechnique,omitempty"`
+	Rows                 []championAugment       `json:"rows"`
 }
 
 type championAugment struct {
-	ID          int                       `json:"id"`
-	Key         string                    `json:"key"`
-	Name        string                    `json:"name"`
-	Tier        int                       `json:"tier"`
-	Rarity      string                    `json:"rarity"`
-	Performance float64                   `json:"performance,omitempty"`
-	Popularity  float64                   `json:"popularity,omitempty"`
-	Description string                    `json:"description"`
-	Tooltip     string                    `json:"tooltip,omitempty"`
-	ImageSource string                    `json:"imageSource"`
-	ImagePath   string                    `json:"imagePath"`
-	Champions   []championAugmentChampion `json:"champions,omitempty"`
+	ID                int                       `json:"id"`
+	Key               string                    `json:"key"`
+	Name              string                    `json:"name"`
+	Tier              int                       `json:"tier"`
+	Rarity            string                    `json:"rarity"`
+	Performance       float64                   `json:"performance,omitempty"`
+	Popularity        float64                   `json:"popularity,omitempty"`
+	WinRate           float64                   `json:"winRate,omitempty"`
+	Description       string                    `json:"description"`
+	Tooltip           string                    `json:"tooltip,omitempty"`
+	ImageSource       string                    `json:"imageSource"`
+	ImagePath         string                    `json:"imagePath"`
+	ImageFallbackPath string                    `json:"imageFallbackPath,omitempty"`
+	Champions         []championAugmentChampion `json:"champions,omitempty"`
 }
 
 type championAugmentChampion struct {
@@ -305,13 +448,17 @@ type championAugmentChampion struct {
 	ImagePath   string  `json:"imagePath,omitempty"`
 	Performance float64 `json:"performance,omitempty"`
 	Popularity  float64 `json:"popularity,omitempty"`
+	Score       float64 `json:"score,omitempty"`
+	WinRate     float64 `json:"winRate,omitempty"`
+	Games       int     `json:"games,omitempty"`
 }
 
 func newChampionProvider() *championProvider {
 	provider := &championProvider{
 		static: make(map[string]championAssetDescription), championKeys: make(map[string]string), championIDs: make(map[string]int), championMeta: make(map[int]championMetadata),
-		abilities: make(map[string]map[string]championAssetDescription),
+		abilities: make(map[string]map[string]championAssetDescription), featureGates: newFeatureGates(), qq101Wait: qq101DetailWait,
 	}
+	provider.hexdata = newHexdataClient(provider, nil)
 	if err := provider.setNetworkSettings(defaultChampionNetworkSettings()); err != nil {
 		panic(err)
 	}
@@ -319,7 +466,7 @@ func newChampionProvider() *championProvider {
 }
 
 func newChampionHTTPClient(proxy func(*http.Request) (*url.URL, error)) *http.Client {
-	dialer := &net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}
+	dialer := &net.Dialer{Timeout: 3 * time.Second, KeepAlive: 30 * time.Second}
 	transport := &http.Transport{
 		Proxy:           proxy,
 		DialContext:     dialer.DialContext,
@@ -370,17 +517,92 @@ func (a *app) championDataProvider() *championProvider {
 }
 
 func (p *championProvider) fetch(ctx context.Context, host, requestPath string, query url.Values, maxBytes int64, accept string) ([]byte, error) {
-	ttl, staleFor := championCachePolicy(host, requestPath, accept)
-	if ttl <= 0 || p.cache == nil {
-		return p.fetchDirect(ctx, host, requestPath, query, maxBytes, accept)
-	}
-	key := championCacheKey(host, requestPath, query.Encode(), accept)
-	return p.cache.load(ctx, key, ttl, staleFor, func(loadContext context.Context) ([]byte, error) {
+	data, _, err := p.fetchWithMetadata(ctx, host, requestPath, query, maxBytes, accept)
+	return data, err
+}
+
+func (p *championProvider) fetchWithMetadata(ctx context.Context, host, requestPath string, query url.Values, maxBytes int64, accept string) ([]byte, time.Time, error) {
+	return p.fetchWithMetadataCacheKey(ctx, host, requestPath, query, maxBytes, accept, "")
+}
+
+func (p *championProvider) fetchWithMetadataCacheKey(ctx context.Context, host, requestPath string, query url.Values, maxBytes int64, accept, explicitKey string) ([]byte, time.Time, error) {
+	return p.fetchWithMetadataCacheKeyLoader(ctx, host, requestPath, query, maxBytes, accept, explicitKey, func(loadContext context.Context) ([]byte, error) {
 		return p.fetchDirect(loadContext, host, requestPath, query, maxBytes, accept)
 	})
 }
 
+func (p *championProvider) fetchWithMetadataCacheKeyLoader(ctx context.Context, host, requestPath string, query url.Values, maxBytes int64, accept, explicitKey string, loader func(context.Context) ([]byte, error)) ([]byte, time.Time, error) {
+	started := time.Now()
+	ttl, staleFor, persistDisk := championCachePolicy(host, requestPath, accept)
+	if ttl <= 0 || p.cache == nil {
+		data, err := loader(ctx)
+		fetchedAt := time.Time{}
+		cacheState := championCacheStateMiss
+		if err != nil {
+			cacheState = championCacheStateError
+		} else {
+			fetchedAt = started
+		}
+		p.reportChampionUpstream(host, accept, data, err, cacheState, started)
+		return data, fetchedAt, err
+	}
+	key := explicitKey
+	if key == "" {
+		key = championCacheKey(host, requestPath, query.Encode(), accept)
+	}
+	result, err := p.cache.loadWithStatus(ctx, key, ttl, staleFor, persistDisk, loader)
+	observedErr := err
+	if observedErr == nil && result.upstreamErr != nil {
+		observedErr = result.upstreamErr
+	}
+	p.reportChampionUpstream(host, accept, result.data, observedErr, result.state, started)
+	return result.data, result.fetchedAt, err
+}
+
+func (p *championProvider) reportChampionUpstream(host, accept string, data []byte, err error, cacheState string, started time.Time) {
+	if p.diag == nil || isCancellation(err) || (accept != "application/json" && accept != "text/html,application/xhtml+xml") {
+		return
+	}
+	p.diag(map[string]any{
+		"event": "champion_upstream", "host": host, "status": championUpstreamHTTPStatus(err),
+		"duration_ms": time.Since(started).Milliseconds(), "bytes": len(data), "cache": cacheState,
+	})
+}
+
+func championUpstreamHTTPStatus(err error) int {
+	if err == nil {
+		return http.StatusOK
+	}
+	var status int
+	if _, scanErr := fmt.Sscanf(err.Error(), "champion provider returned HTTP %d", &status); scanErr == nil && status >= 100 && status <= 599 {
+		return status
+	}
+	return 0
+}
+
+func championProviderErrorKind(err error) string {
+	if status := championUpstreamHTTPStatus(err); status > 0 {
+		return "http-" + strconv.Itoa(status)
+	}
+	value := strings.ToLower(err.Error())
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded) || strings.Contains(value, "timeout") || strings.Contains(value, "deadline"):
+		return "timeout"
+	case strings.Contains(value, "empty response"):
+		return "empty-response"
+	case strings.Contains(value, "too large"):
+		return "too-large"
+	default:
+		return "unavailable"
+	}
+}
+
 func (p *championProvider) fetchDirect(ctx context.Context, host, requestPath string, query url.Values, maxBytes int64, accept string) ([]byte, error) {
+	if gate := featureGateForChampionHost(host); gate != "" && !p.featureGates.enabled(gate) {
+		return nil, fmt.Errorf("%s data source disabled by feature gate", gate)
+	}
 	if !allowedChampionHost(host) || !strings.HasPrefix(requestPath, "/") || strings.Contains(requestPath, "\\") {
 		return nil, errors.New("champion provider request rejected")
 	}
@@ -389,6 +611,11 @@ func (p *championProvider) fetchDirect(ctx context.Context, host, requestPath st
 		return nil, errors.New("champion provider path rejected")
 	}
 	u := url.URL{Scheme: "https", Host: host, Path: requestPath, RawQuery: query.Encode()}
+	if host == yourGGArenaHost {
+		if err := p.waitForYourGG(ctx); err != nil {
+			return nil, err
+		}
+	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
@@ -421,7 +648,7 @@ func (p *championProvider) fetchDirect(ctx context.Context, host, requestPath st
 }
 
 func allowedChampionHost(host string) bool {
-	return host == opggChampionHost || host == opggWebAPIHost || host == opggPageHost || host == opggAssetHost || host == dataDragonHost || host == prestigeArtworkHost || host == communityDragonHost
+	return host == opggChampionHost || host == opggWebAPIHost || host == opggPageHost || host == opggAssetHost || host == dataDragonHost || host == prestigeArtworkHost || host == communityDragonHost || host == yourGGArenaHost || host == hexdataHost || host == qq101Host
 }
 
 func (a *app) handleChampionCatalog(w http.ResponseWriter, r *http.Request) {
@@ -430,7 +657,7 @@ func (a *app) handleChampionCatalog(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) handleChampionRankings(w http.ResponseWriter, r *http.Request) {
-	mode := strings.TrimSpace(r.URL.Query().Get("mode"))
+	mode := normalizeInternalChampionMode(r.URL.Query().Get("mode"))
 	provider := a.championDataProvider()
 	var response championRankingResponse
 	var err error
@@ -449,10 +676,12 @@ func (a *app) handleChampionRankings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response, err = provider.loadRanked(r.Context(), tier, position)
-	case "aram-mayhem":
+	case "hextech-aram":
 		response, err = provider.loadARAMRankings(r.Context())
 	case "arena":
 		response, err = provider.loadArenaRankings(r.Context())
+	case "aram", "urf", "nexus-blitz":
+		response, err = provider.loadStructuredModeRankings(r.Context(), mode)
 	default:
 		http.Error(w, "invalid champion mode", http.StatusBadRequest)
 		return
@@ -465,8 +694,40 @@ func (a *app) handleChampionAugments(w http.ResponseWriter, r *http.Request) {
 	writeChampionResponse(w, response, err)
 }
 
+func (a *app) handleChampionAugmentDetail(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("id")))
+	slug := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("slug")))
+	if err != nil || id <= 0 || id > 10000 {
+		http.Error(w, "invalid augment", http.StatusBadRequest)
+		return
+	}
+	if !regexp.MustCompile(`^[a-z0-9-]+$`).MatchString(slug) {
+		// OP.GG keys use a different namespace (for example ARAM_MagicMissile).
+		// Let the provider resolve the entry by ID instead of sending a
+		// non-canonical slug to Hexdata.
+		slug = ""
+	}
+	response, err := a.championDataProvider().loadHexdataAugmentDetail(r.Context(), id, slug)
+	writeChampionResponse(w, response, err)
+}
+
+func sanitizeAugmentSlug(value string) string {
+	value = strings.TrimSpace(value)
+	value = regexp.MustCompile(`(?i)^aram[_-]`).ReplaceAllString(value, "")
+	value = regexp.MustCompile(`([a-z0-9])([A-Z])`).ReplaceAllString(value, `${1}-${2}`)
+	value = strings.NewReplacer("_", "-", " ", "-").Replace(value)
+	value = strings.ToLower(value)
+	value = regexp.MustCompile(`[^a-z0-9-]+`).ReplaceAllString(value, "-")
+	return strings.Trim(regexp.MustCompile(`-+`).ReplaceAllString(value, "-"), "-")
+}
+
+func (a *app) handleChampionAugmentRarity(w http.ResponseWriter, r *http.Request) {
+	response, err := a.championDataProvider().loadHexdataRarity(r.Context())
+	writeChampionResponse(w, response, err)
+}
+
 func (a *app) handleChampionDetail(w http.ResponseWriter, r *http.Request) {
-	mode := strings.TrimSpace(r.URL.Query().Get("mode"))
+	mode := normalizeInternalChampionMode(r.URL.Query().Get("mode"))
 	champion := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("champion")))
 	position := strings.TrimSpace(r.URL.Query().Get("position"))
 	tier := strings.TrimSpace(r.URL.Query().Get("tier"))
@@ -474,17 +735,62 @@ func (a *app) handleChampionDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid champion", http.StatusBadRequest)
 		return
 	}
+	spec, supported := opggModeSpecs[mode]
 	if mode == "ranked" {
 		if !allowedChampionTiers[tier] || position == "all" || championPositionNames[position] == "" {
 			http.Error(w, "invalid champion detail filter", http.StatusBadRequest)
 			return
 		}
-	} else if mode != "aram-mayhem" && mode != "arena" {
+	} else if !supported {
 		http.Error(w, "invalid champion mode", http.StatusBadRequest)
 		return
+	} else {
+		position = spec.requestPosition("")
+		tier = ""
 	}
 	response, err := a.championDataProvider().loadDetail(r.Context(), mode, champion, position, tier)
 	writeChampionResponse(w, response, err)
+}
+
+func (a *app) handleArenaFirstPlaces(w http.ResponseWriter, r *http.Request) {
+	championID, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("championId")))
+	if err != nil || championID <= 0 || championID > 10000 {
+		http.Error(w, "invalid champion", http.StatusBadRequest)
+		return
+	}
+	limit := 5
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		limit, err = strconv.Atoi(raw)
+		if err != nil || limit < 1 || limit > 10 {
+			http.Error(w, "invalid limit", http.StatusBadRequest)
+			return
+		}
+	}
+	response, err := a.championDataProvider().loadArenaFirstPlaces(r.Context(), championID, limit)
+	if err != nil {
+		writeArenaFirstPlacesError(w, err)
+		return
+	}
+	writeChampionResponse(w, response, err)
+}
+
+func writeArenaFirstPlacesError(w http.ResponseWriter, err error) {
+	message := "高手对局读取失败，请稍后重试"
+	status := http.StatusBadGateway
+	value := strings.ToLower(err.Error())
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || strings.Contains(value, "timeout") || strings.Contains(value, "deadline"):
+		message, status = "YOUR.GG 请求超时，请稍后重试", http.StatusGatewayTimeout
+	case strings.Contains(value, "http 403"):
+		message = "YOUR.GG 拒绝了本次请求（HTTP 403）"
+	case strings.Contains(value, "http 404"):
+		message = "YOUR.GG 暂未提供该英雄的数据（HTTP 404）"
+	case strings.Contains(value, "empty response"):
+		message = "YOUR.GG 返回了空响应，请稍后重试"
+	case strings.Contains(value, "数据格式"):
+		message = "YOUR.GG 返回的数据格式暂时无法识别"
+	}
+	http.Error(w, message, status)
 }
 
 func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
@@ -561,6 +867,9 @@ func validateChampionAssetPath(source, requestPath string) (string, bool) {
 		return opggAssetHost, strings.HasPrefix(requestPath, "/meta/images/")
 	case "ddragon":
 		return dataDragonHost, strings.HasPrefix(requestPath, "/cdn/")
+	case "communitydragon":
+		const masteryCrestPrefix = "/latest/plugins/rcp-fe-lol-collections/global/default/images/item-element/crest-and-banner-mastery-"
+		return communityDragonHost, strings.HasPrefix(requestPath, "/latest/game/") || strings.HasPrefix(requestPath, "/latest/plugins/rcp-be-lol-game-data/global/default/") || strings.HasPrefix(requestPath, masteryCrestPrefix)
 	case "gtimg":
 		return prestigeArtworkHost, strings.HasPrefix(requestPath, gtimgChampionIconPrefix) || strings.HasPrefix(requestPath, gtimgSkinArtworkPrefix)
 	default:
@@ -621,6 +930,15 @@ func (p *championProvider) championAssetFallback(source, requestPath string) (st
 }
 
 func (p *championProvider) championAssetLCUPath(source, requestPath string) (string, bool) {
+	if source == "communitydragon" {
+		if relative, ok := strings.CutPrefix(requestPath, "/latest/game/assets/"); ok && relative != "" {
+			return "/lol-game-data/assets/ASSETS/" + relative, true
+		}
+		if relative, ok := strings.CutPrefix(requestPath, "/latest/plugins/rcp-be-lol-game-data/global/default/"); ok && relative != "" {
+			return "/lol-game-data/assets/" + relative, true
+		}
+		return "", false
+	}
 	key, skinID, ok := parseGtimgAssetRef(source, requestPath)
 	if !ok {
 		return "", false
@@ -671,7 +989,11 @@ type ddragonAssetList struct {
 		Cooldown    []float64 `json:"cooldown"`
 		Cost        []float64 `json:"cost"`
 		Range       []float64 `json:"range"`
-		Image       struct {
+		Into        []string  `json:"into"`
+		Gold        struct {
+			Total int64 `json:"total"`
+		} `json:"gold"`
+		Image struct {
 			Full string `json:"full"`
 		} `json:"image"`
 	} `json:"data"`
@@ -789,6 +1111,7 @@ func (p *championProvider) decorateDetailAssets(ctx context.Context, champion st
 				}
 			}
 		}
+		response.Build.CoreItems = filterChampionItemComponents(response.Build.CoreItems, descriptions)
 		for pageIndex := range response.Runes {
 			page := &response.Runes[pageIndex]
 			decorateChampionAsset(&page.PrimaryStyle, descriptions)
@@ -851,6 +1174,7 @@ func (p *championProvider) loadStaticDescriptions(ctx context.Context) (map[stri
 			descriptions[endpoint.kind+"/"+strings.ToLower(item.Image.Full)] = championAssetDescription{
 				Name: item.Name, Description: cleanMarkup(firstNonEmpty(item.Description, item.Tooltip)),
 				Source: "ddragon", Path: "/cdn/" + patch + "/img/" + endpoint.kind + "/" + item.Image.Full,
+				BuildsInto: len(item.Into) > 0, Price: item.Gold.Total,
 				Costs: cloneNumbers(item.Cost), Cooldowns: cloneNumbers(item.Cooldown), Ranges: cloneNumbers(item.Range),
 			}
 			if endpoint.kind == "spell" {
@@ -938,6 +1262,29 @@ func decorateChampionAsset(asset *championAsset, descriptions map[string]champio
 		asset.Cooldowns = cloneNumbers(item.Cooldowns)
 		asset.Ranges = cloneNumbers(item.Ranges)
 	}
+}
+
+// OP.GG occasionally includes a component such as Tear as the first step of a
+// core route. Data Dragon's `into` relation is the authoritative signal that
+// an item still builds into another item; unknown assets are retained.
+func filterChampionItemComponents(rows []championMetricRow, descriptions map[string]championAssetDescription) []championMetricRow {
+	result := make([]championMetricRow, 0, len(rows))
+	for _, row := range rows {
+		assets := make([]championAsset, 0, len(row.Assets))
+		for _, asset := range row.Assets {
+			key := asset.Kind + "/" + strings.ToLower(pathpkg.Base(asset.Path))
+			if item, known := descriptions[key]; asset.Kind == "item" && known && item.BuildsInto {
+				continue
+			}
+			assets = append(assets, asset)
+		}
+		if len(assets) == 0 {
+			continue
+		}
+		row.Assets = assets
+		result = append(result, row)
+	}
+	return result
 }
 
 func (p *championProvider) loadChampionAbilityDescriptions(ctx context.Context, champion string) (map[string]championAssetDescription, error) {
@@ -1127,13 +1474,27 @@ type opggRankedStats struct {
 	WinRate    float64 `json:"win_rate"`
 	PickRate   float64 `json:"pick_rate"`
 	BanRate    float64 `json:"ban_rate"`
+	RoleRate   float64 `json:"role_rate"`
 	KDA        float64 `json:"kda"`
-	Tier       int     `json:"tier"`
+	Tier       *int    `json:"tier"`
 	Rank       int     `json:"rank"`
 	TierData   struct {
-		Tier int `json:"tier"`
-		Rank int `json:"rank"`
+		Tier          int `json:"tier"`
+		Rank          int `json:"rank"`
+		RankPrev      int `json:"rank_prev"`
+		RankPrevPatch int `json:"rank_prev_patch"`
 	} `json:"tier_data"`
+}
+
+func opggTierRank(stats opggRankedStats) (int, int) {
+	tierValue, rankValue := stats.TierData.Tier, stats.TierData.Rank
+	if tierValue == 0 && stats.Tier != nil && *stats.Tier > 0 {
+		tierValue = *stats.Tier
+	}
+	if rankValue == 0 {
+		rankValue = stats.Rank
+	}
+	return tierValue, rankValue
 }
 
 func (p *championProvider) loadRanked(ctx context.Context, tier, position string) (championRankingResponse, error) {
@@ -1145,25 +1506,40 @@ func (p *championProvider) loadRanked(ctx context.Context, tier, position string
 	if json.Unmarshal(data, &raw) != nil || len(raw.Data) < 50 {
 		return championRankingResponse{}, errors.New("OP.GG ranked response changed")
 	}
-	wanted := championPositionNames[position]
+	position = strings.ToLower(strings.TrimSpace(position))
+	wanted, validPosition := championPositionNames[position]
+	if !validPosition {
+		return championRankingResponse{}, errors.New("OP.GG ranked position is invalid")
+	}
 	rows := make([]championRankingRow, 0, len(raw.Data))
 	for _, item := range raw.Data {
 		positions := make([]string, 0, len(item.Positions))
 		for _, candidate := range item.Positions {
-			positions = append(positions, strings.ToLower(candidate.Name))
+			positionName := strings.ToLower(strings.TrimSpace(candidate.Name))
+			upstreamName, ok := championPositionNames[positionName]
+			if !ok || upstreamName == "" {
+				continue
+			}
+			positions = append(positions, positionName)
 		}
 		stats := item.AverageStats
 		rowPosition := ""
 		if wanted == "" {
-			if len(item.Positions) == 0 {
+			if len(positions) == 0 {
 				continue
 			}
-			rowPosition = strings.ToLower(item.Positions[0].Name)
+			rowPosition = positions[0]
+			for _, candidate := range item.Positions {
+				if strings.EqualFold(strings.TrimSpace(candidate.Name), championPositionNames[rowPosition]) {
+					stats = candidate.Stats
+					break
+				}
+			}
 		} else {
 			found := false
 			for _, candidate := range item.Positions {
-				if candidate.Name == wanted {
-					stats, rowPosition, found = candidate.Stats, strings.ToLower(candidate.Name), true
+				if strings.EqualFold(strings.TrimSpace(candidate.Name), wanted) {
+					stats, rowPosition, found = candidate.Stats, strings.ToLower(strings.TrimSpace(candidate.Name)), true
 					break
 				}
 			}
@@ -1171,13 +1547,7 @@ func (p *championProvider) loadRanked(ctx context.Context, tier, position string
 				continue
 			}
 		}
-		tierValue, rankValue := stats.TierData.Tier, stats.TierData.Rank
-		if tierValue == 0 && stats.Tier > 0 {
-			tierValue = stats.Tier
-		}
-		if rankValue == 0 {
-			rankValue = stats.Rank
-		}
+		tierValue, rankValue := opggTierRank(stats)
 		rows = append(rows, championRankingRow{ChampionID: item.ID, Rank: rankValue, Tier: tierValue, Position: rowPosition, Positions: positions, Play: stats.Play, WinRate: stats.WinRate * 100, PickRate: stats.PickRate * 100, BanRate: stats.BanRate * 100, KDA: stats.KDA})
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
@@ -1260,6 +1630,9 @@ func (p *championProvider) loadARAMPage(ctx context.Context) ([]byte, string, er
 }
 
 func (p *championProvider) loadARAMRankings(ctx context.Context) (championRankingResponse, error) {
+	if response, err := p.loadHexdataRankings(ctx); err == nil {
+		return response, nil
+	}
 	data, err := p.fetch(ctx, opggChampionHost, "/api/contents/tiers", url.Values{"type": {"aram_mayhem"}}, championJSONMax, "application/json")
 	if err != nil {
 		return championRankingResponse{}, err
@@ -1284,8 +1657,60 @@ func (p *championProvider) loadARAMRankings(ctx context.Context) (championRankin
 		}
 		rows = append(rows, championRankingRow{ChampionID: id, Key: item.Key, Name: item.Name, Rank: item.Rank, Tier: item.Tier})
 	}
+	if len(rows) < 100 {
+		return championRankingResponse{}, errors.New("OP.GG ARAM champion response changed")
+	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Rank < rows[j].Rank })
-	return championRankingResponse{Mode: "aram-mayhem", Region: "KR", Patch: payload.Meta.Version, Source: "OP.GG JSON", FetchedAt: time.Now(), EntertainmentSample: true, Rows: rows}, nil
+	return championRankingResponse{Mode: "hextech-aram", Region: "KR", Patch: payload.Meta.Version, Source: "OP.GG JSON · Hexdata fallback", FetchedAt: time.Now(), EntertainmentSample: true, Rows: rows}, nil
+}
+
+func (p *championProvider) loadStructuredModeRankings(ctx context.Context, mode string) (championRankingResponse, error) {
+	spec, ok := opggModeSpecs[mode]
+	if !ok || mode == "ranked" || mode == "arena" || mode == "hextech-aram" {
+		return championRankingResponse{}, errors.New("unsupported structured ranking mode")
+	}
+	requestPath := "/api/" + spec.Region + "/champions/" + spec.APIMode
+	data, err := p.fetch(ctx, opggChampionHost, requestPath, nil, championJSONMax, "application/json")
+	if err != nil {
+		return championRankingResponse{}, err
+	}
+	var payload struct {
+		Data []struct {
+			ID           int             `json:"id"`
+			AverageStats opggRankedStats `json:"average_stats"`
+		} `json:"data"`
+		Meta struct {
+			Version string `json:"version"`
+		} `json:"meta"`
+	}
+	if json.Unmarshal(data, &payload) != nil || len(payload.Data) < 50 {
+		return championRankingResponse{}, errors.New("OP.GG champion ranking response changed")
+	}
+	rows := make([]championRankingRow, 0, len(payload.Data))
+	for _, item := range payload.Data {
+		stats := item.AverageStats
+		if item.ID <= 0 || stats.Play <= 0 {
+			continue
+		}
+		rows = append(rows, championRankingRow{
+			ChampionID: item.ID, Rank: firstPositiveInt(stats.TierData.Rank, stats.Rank), Tier: stats.TierData.Tier,
+			Play: stats.Play, WinRate: firstPositive(ratePercent(stats.WinRate), percentOf(stats.Win, stats.Play)),
+			PickRate: ratePercent(stats.PickRate), BanRate: ratePercent(stats.BanRate), KDA: stats.KDA,
+		})
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].Rank == rows[j].Rank {
+			return rows[i].ChampionID < rows[j].ChampionID
+		}
+		if rows[i].Rank == 0 {
+			return false
+		}
+		if rows[j].Rank == 0 {
+			return true
+		}
+		return rows[i].Rank < rows[j].Rank
+	})
+	return championRankingResponse{Mode: mode, Region: spec.Region, Patch: payload.Meta.Version, Source: "OP.GG JSON", FetchedAt: time.Now(), Rows: rows}, nil
 }
 
 func (p *championProvider) loadArenaPage(ctx context.Context) ([]byte, string, error) {
@@ -1324,19 +1749,27 @@ func (p *championProvider) loadArenaRankings(ctx context.Context) (championRanki
 			continue
 		}
 		rows = append(rows, championRankingRow{
-			ChampionID: item.ID, Rank: stats.Rank, Tier: stats.Tier,
-			Play: stats.Play, WinRate: firstPositive(ratePercent(stats.WinRate), percentOf(stats.Win, stats.Play)), PickRate: ratePercent(stats.PickRate), BanRate: ratePercent(stats.BanRate),
+			ChampionID: item.ID, Rank: stats.Rank, Tier: arenaTierValue(stats.Tier),
+			Play: stats.Play, WinRate: firstPositive(ratePercent(stats.WinRate), percentOf(stats.Win, stats.Play)), PickRate: ratePercent(stats.PickRate), BanRate: ratePercent(stats.BanRate), KDA: stats.KDA,
+			AveragePlacement: arenaAverage(float64(stats.TotalPlace), stats.Play), FirstPlaceRate: percentOf(stats.FirstPlace, stats.Play),
 		})
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Rank < rows[j].Rank })
 	var teams []arenaTeamComposition
 	if _, decoded, pageErr := p.loadArenaPage(ctx); pageErr == nil {
-		teams = parseArenaTeamCompositions(decoded, `"teamData":`, 40)
+		teams = parseArenaTeamCompositions(decoded, `"teamData":`, 0, 40)
 	}
 	return championRankingResponse{
 		Mode: "arena", Region: "GLOBAL", Patch: payload.Meta.Version, Source: "OP.GG JSON", FetchedAt: time.Now(),
 		EntertainmentSample: true, Rows: rows, TeamCompositions: teams,
 	}, nil
+}
+
+func arenaTierValue(value *int) int {
+	if value == nil {
+		return -1
+	}
+	return *value
 }
 
 func ratePercent(value float64) float64 {
@@ -1353,7 +1786,9 @@ func percentOf(value, total int) float64 {
 	return float64(value) / float64(total) * 100
 }
 
-func parseArenaTeamCompositions(decoded, marker string, limit int) []arenaTeamComposition {
+// parseArenaTeamCompositions keeps the requested subject in the first slot while
+// preserving the upstream order of every teammate.
+func parseArenaTeamCompositions(decoded, marker string, subjectID, limit int) []arenaTeamComposition {
 	var raw []arenaTeamRaw
 	if !extractBestArray(decoded, marker, func(candidate []json.RawMessage) int {
 		score := 0
@@ -1395,6 +1830,21 @@ func parseArenaTeamCompositions(decoded, marker string, limit int) []arenaTeamCo
 			if len(team.Champions) == 3 {
 				break
 			}
+		}
+		wantedID := subjectID
+		if wantedID <= 0 {
+			wantedID = item.ChampionID
+		}
+		for index, champion := range team.Champions {
+			if index > 0 && champion.ID == wantedID {
+				copy(team.Champions[1:index+1], team.Champions[0:index])
+				team.Champions[0] = champion
+				break
+			}
+		}
+		ids = ids[:0]
+		for _, champion := range team.Champions {
+			ids = append(ids, strconv.Itoa(champion.ID))
 		}
 		signature := strings.Join(ids, ",")
 		if len(team.Champions) != 3 || signature == "" || seen[signature] {
@@ -1522,8 +1972,46 @@ type augmentChampionRaw struct {
 }
 
 func (p *championProvider) loadAugments(ctx context.Context) (championAugmentResponse, error) {
+	if p.hexdata != nil {
+		if page, pageErr := p.hexdata.load(ctx, "augments", "all", "/augments", "text/html,application/xhtml+xml", false); pageErr == nil {
+			if rows, citation, parseErr := parseHexdataAugments(page.Data); parseErr == nil && hexdataCitationComplete(citation) && (page.Cache == championCacheStateStale || p.hexdata.adoptCitation(citation)) {
+				catalog := p.loadAugmentMetadataCatalog(ctx)
+				byID := gameplayAugmentIndexAll(catalog)
+				for index := range rows {
+					if meta, ok := byID[rows[index].ID]; ok {
+						if strings.TrimSpace(rows[index].Description) == "" && strings.TrimSpace(meta.Description) != "" {
+							rows[index].Description = meta.Description
+						}
+						if rarity := normalizeAugmentRarity(meta.Rarity); rarity != "unknown" {
+							rows[index].Rarity = rarity
+						}
+						if path := communityDragonGameAssetPath(meta.IconPath); path != "" {
+							rows[index].ImageSource, rows[index].ImagePath = "communitydragon", path
+							rows[index].ImageFallbackPath = communityDragonGameAssetPath(meta.FallbackIconPath)
+						}
+					}
+					rows[index].Description = augmentDescriptionWithOfflineGuidance(rows[index].ID, rows[index].Description)
+				}
+				p.hexdata.promote("augments", "all", citation.BuildID, page.Data, page.FetchedAt)
+				p.hexdata.recordSuccess("augments", "/augments")
+				p.reportHexdataShape("augments", len(rows), hexdataTableFieldCount(page.Data), citation.BuildID)
+				response := championAugmentResponse{Source: "Hexdata", Mode: "aram-mayhem", FetchedAt: page.FetchedAt, EntertainmentSample: true, Citation: &citation, MeasurementTechnique: p.loadHexdataMeasurementTechnique(ctx), Rows: rows}
+				p.rememberAugmentCatalog(response)
+				return response, nil
+			} else {
+				p.hexdata.recordShapeFailure("augments", len(rows), hexdataTableFieldCount(page.Data), citation.BuildID)
+			}
+		} else {
+			p.reportHexdataFallback("augments", pageErr)
+		}
+	}
 	_, decoded, err := p.loadARAMPage(ctx)
 	if err != nil {
+		if cached, ok := p.rememberedAugmentCatalog(); ok {
+			cached.MeasurementTechnique = appendMeasurementTechnique(cached.MeasurementTechnique, "本次海克斯目录刷新失败，暂显示上次成功读取的缓存")
+			cached.Source += "（缓存）"
+			return cached, nil
+		}
 		return championAugmentResponse{}, err
 	}
 	var raw []augmentRaw
@@ -1540,6 +2028,11 @@ func (p *championProvider) loadAugments(ctx context.Context) (championAugmentRes
 		}
 		return score
 	}, &raw) {
+		if cached, ok := p.rememberedAugmentCatalog(); ok {
+			cached.MeasurementTechnique = appendMeasurementTechnique(cached.MeasurementTechnique, "本次海克斯目录解析失败，暂显示上次成功读取的缓存")
+			cached.Source += "（缓存）"
+			return cached, nil
+		}
 		return championAugmentResponse{}, errors.New("OP.GG augment response changed")
 	}
 	rows := make([]championAugment, 0, len(raw))
@@ -1568,7 +2061,15 @@ func (p *championProvider) loadAugments(ctx context.Context) (championAugmentRes
 		}
 		rows = append(rows, championAugment{ID: item.ID, Key: item.Key, Name: item.Name, Tier: item.Tier, Rarity: augmentRarity(item.Rarity), Performance: item.Performance, Popularity: item.Popular, Description: cleanMarkup(item.Desc), Tooltip: cleanMarkup(item.Tooltip), ImageSource: asset.Source, ImagePath: asset.Path, Champions: champions})
 	}
+	for index := range rows {
+		rows[index].Description = augmentDescriptionWithOfflineGuidance(rows[index].ID, rows[index].Description)
+	}
 	if len(rows) < 40 {
+		if cached, ok := p.rememberedAugmentCatalog(); ok {
+			cached.MeasurementTechnique = appendMeasurementTechnique(cached.MeasurementTechnique, "本次海克斯目录样本不足，暂显示上次成功读取的缓存")
+			cached.Source += "（缓存）"
+			return cached, nil
+		}
 		return championAugmentResponse{}, errors.New("OP.GG augment catalog is incomplete")
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
@@ -1580,7 +2081,72 @@ func (p *championProvider) loadAugments(ctx context.Context) (championAugmentRes
 		}
 		return rows[i].Tier < rows[j].Tier
 	})
-	return championAugmentResponse{Source: "OP.GG", Mode: "aram-mayhem", FetchedAt: time.Now(), EntertainmentSample: true, Rows: rows}, nil
+	response := championAugmentResponse{Source: "OP.GG", Mode: "aram-mayhem", FetchedAt: time.Now(), EntertainmentSample: true, Rows: rows}
+	p.rememberAugmentCatalog(response)
+	return response, nil
+}
+
+func cloneChampionAugmentResponse(value championAugmentResponse) championAugmentResponse {
+	value.Rows = append([]championAugment(nil), value.Rows...)
+	for index := range value.Rows {
+		value.Rows[index].Champions = append([]championAugmentChampion(nil), value.Rows[index].Champions...)
+	}
+	if value.Citation != nil {
+		citation := *value.Citation
+		value.Citation = &citation
+	}
+	return value
+}
+
+func (p *championProvider) rememberAugmentCatalog(value championAugmentResponse) {
+	p.augmentCatalogMu.Lock()
+	p.augmentCatalog = cloneChampionAugmentResponse(value)
+	p.augmentCatalogReady = true
+	p.augmentCatalogMu.Unlock()
+}
+
+func (p *championProvider) rememberedAugmentCatalog() (championAugmentResponse, bool) {
+	p.augmentCatalogMu.Lock()
+	defer p.augmentCatalogMu.Unlock()
+	if !p.augmentCatalogReady || len(p.augmentCatalog.Rows) == 0 {
+		return championAugmentResponse{}, false
+	}
+	return cloneChampionAugmentResponse(p.augmentCatalog), true
+}
+
+// loadAugmentMetadataCatalog gives the authenticated client the first chance
+// to describe an augment by its real ID. CommunityDragon is merged afterward
+// for icons, rarity, and entries absent from the local catalog.
+func (p *championProvider) loadAugmentMetadataCatalog(ctx context.Context) []gameplayAugment {
+	var catalog []gameplayAugment
+	if p.gameplayAugments != nil {
+		if local, err := p.gameplayAugments(ctx); err == nil {
+			catalog = append(catalog, local...)
+		}
+	}
+	if remote, err := p.loadCommunityDragonAugments(ctx); err == nil {
+		catalog = mergeGameplayAugmentMetadata(catalog, remote)
+	}
+	return catalog
+}
+
+// Riot ships no description for Mayhem augments anywhere we can reach:
+// cherry-augments.json carries six fields and none of them is a description
+// (the CommunityDragon mirror is byte-for-byte the client's own file, so
+// launching the client does not help), and /latest/cdragon/arena/zh_cn.json
+// stops at ID 405. The one rendered Chinese description we can obtain comes
+// from Hexdata's augment page, which is fetched on demand when the entry is
+// opened in the atlas — hence "点开查看" rather than a client prompt.
+const augmentOfflineDescription = "海克斯图鉴中可读取说明"
+
+func augmentDescriptionWithOfflineGuidance(id int, description string) string {
+	if strings.TrimSpace(description) != "" {
+		return description
+	}
+	if id >= 1000 {
+		return augmentOfflineDescription
+	}
+	return ""
 }
 
 func augmentRarityOrder(value string) int {
@@ -1597,13 +2163,15 @@ func augmentRarityOrder(value string) int {
 }
 
 func augmentRarity(value int) string {
+	// OP.GG's legacy 1/4/8 scale must be translated before this enters the
+	// CommunityDragon 0/1/2/4 normalization scale, where 1 and 4 differ.
 	switch value {
 	case 1:
-		return "silver"
+		return normalizeAugmentRarity(0)
 	case 4:
-		return "gold"
+		return normalizeAugmentRarity(1)
 	case 8:
-		return "prismatic"
+		return normalizeAugmentRarity(2)
 	default:
 		return "unknown"
 	}
@@ -1731,52 +2299,6 @@ func balancedJSONObject(source string, start int) ([]byte, int, bool) {
 	return nil, start, false
 }
 
-func (p *championProvider) loadDetailHTML(ctx context.Context, mode, champion, position, tier string) (championDetailResponse, error) {
-	requestPath := "/zh-cn/lol/modes/aram-mayhem/" + champion + "/build"
-	query := url.Values{}
-	if mode == "ranked" {
-		requestPath = "/zh-cn/lol/champions/" + champion + "/build/" + position
-		query = url.Values{"region": {"kr"}, "type": {"ranked"}, "tier": {tier}}
-	} else if mode == "arena" {
-		requestPath = "/zh-cn/lol/modes/arena/" + champion + "/build"
-	}
-	page, err := p.fetch(ctx, opggPageHost, requestPath, query, championHTMLMax, "text/html,application/xhtml+xml")
-	if err != nil {
-		return championDetailResponse{}, err
-	}
-	document, err := xhtml.Parse(strings.NewReader(string(page)))
-	if err != nil {
-		return championDetailResponse{}, errors.New("OP.GG detail page could not be parsed")
-	}
-	region := "KR"
-	if mode == "arena" {
-		region = "GLOBAL"
-	}
-	response := championDetailResponse{Mode: mode, Region: region, Tier: tier, Position: position, Source: "OP.GG", FetchedAt: time.Now(), Build: parseChampionBuild(document)}
-	if match := championPatchPattern.FindSubmatch(page); len(match) == 2 {
-		response.Patch = string(match[1])
-	}
-	decoded := decodeNextFlight(page)
-	if mode == "ranked" {
-		response.Runes = parseChampionRunes(decoded)
-		response.Counters = parseChampionCounters(document)
-	} else if mode == "aram-mayhem" {
-		response.EntertainmentSample = true
-		response.RecommendedAugments = parseRecommendedAugments(document)
-	} else {
-		response.EntertainmentSample = true
-		response.ArenaStats = parseArenaStats(decoded)
-		response.TeamCompositions = parseArenaTeamCompositions(decoded, `"arenaCombinations":`, 5)
-		response.ArenaAugments = parseArenaAugments(decoded)
-		response.Build = normalizeArenaBuild(response.Build)
-	}
-	p.decorateDetailAssets(ctx, champion, &response)
-	if len(response.Build.SummonerSpells) == 0 && len(response.Build.CoreItems) == 0 && len(response.Build.PrismItems) == 0 {
-		return championDetailResponse{}, errors.New("OP.GG detail data changed")
-	}
-	return response, nil
-}
-
 func normalizeArenaBuild(sections championBuildSections) championBuildSections {
 	core := make([]championMetricRow, 0, len(sections.CoreItems))
 	for _, row := range sections.CoreItems {
@@ -1811,53 +2333,25 @@ func isArenaBoot(asset championAsset) bool {
 	return false
 }
 
-func parseChampionBuild(document *xhtml.Node) championBuildSections {
-	sections := championBuildSections{}
-	for _, table := range descendantElements(document, "table") {
-		caption := strings.ToLower(nodeText(firstDescendant(table, "caption")))
-		heading := nodeText(firstDescendant(table, "th"))
-		key := caption + " " + heading
-		rows := parseMetricRows(table)
-		if len(rows) == 0 {
-			continue
-		}
-		switch {
-		case strings.Contains(key, "summonerspells") || strings.Contains(key, "召唤师技能"):
-			sections.SummonerSpells = appendUniqueMetricRows(sections.SummonerSpells, rows...)
-		case strings.Contains(key, "skillorder") || strings.Contains(key, "技能加点"):
-			sections.Skills = appendUniqueMetricRows(sections.Skills, rows...)
-		case strings.Contains(key, "depth 4") || strings.Contains(key, "第四件"):
-			rows = normalizeLateItemMetrics(rows)
-			sections.FourthItems = appendUniqueMetricRows(sections.FourthItems, rows...)
-		case strings.Contains(key, "depth 5") || strings.Contains(key, "第五件"):
-			rows = normalizeLateItemMetrics(rows)
-			sections.FifthItems = appendUniqueMetricRows(sections.FifthItems, rows...)
-		case strings.Contains(key, "depth 6") || strings.Contains(key, "第六件"):
-			rows = normalizeLateItemMetrics(rows)
-			sections.SixthItems = appendUniqueMetricRows(sections.SixthItems, rows...)
-		case strings.Contains(key, "boots") || strings.Contains(key, "鞋子"):
-			sections.Boots = appendUniqueMetricRows(sections.Boots, rows...)
-		case strings.Contains(key, "prismatic") || strings.Contains(key, "棱镜装备") || strings.Contains(key, "棱彩装备"):
-			sections.PrismItems = appendUniqueMetricRows(sections.PrismItems, rows...)
-		case strings.Contains(key, "builds") || strings.Contains(key, "核心装备"):
-			sections.CoreItems = appendUniqueMetricRows(sections.CoreItems, rows...)
-		case strings.Contains(key, "items") || strings.Contains(key, "出门装"):
-			sections.StarterItems = appendUniqueMetricRows(sections.StarterItems, rows...)
-		}
-	}
-	return sections
-}
-
 func parseChampionCounters(document *xhtml.Node) championCounterSections {
 	return championCounterSections{
-		WeakAgainst:   parseChampionCounterGroup(document, "对线劣势的英雄"),
-		StrongAgainst: parseChampionCounterGroup(document, "强烈对抗"),
+		WeakAgainst:   parseChampionCounterGroups(document, "劣势对抗", "对线劣势的英雄", "对线劣势", "劣势对线"),
+		StrongAgainst: parseChampionCounterGroups(document, "优势对抗", "强烈对抗", "对线优势的英雄", "对线优势", "优势对线"),
 	}
+}
+
+func parseChampionCounterGroups(document *xhtml.Node, labels ...string) []championCounterRow {
+	for _, label := range labels {
+		if rows := parseChampionCounterGroup(document, label); len(rows) > 0 {
+			return rows
+		}
+	}
+	return nil
 }
 
 func parseChampionCounterGroup(document *xhtml.Node, label string) []championCounterRow {
 	var heading *xhtml.Node
-	for _, node := range descendantElements(document, "div") {
+	for _, node := range allDescendantElements(document) {
 		if strings.TrimSpace(nodeText(node)) == label {
 			heading = node
 			break
@@ -1867,11 +2361,15 @@ func parseChampionCounterGroup(document *xhtml.Node, label string) []championCou
 		return nil
 	}
 	var listContainer *xhtml.Node
-	for container, depth := heading, 0; container != nil && depth < 5; container, depth = container.Parent, depth+1 {
-		candidate := nextElementSibling(container)
-		if len(descendantElements(candidate, "li")) > 0 {
-			listContainer = candidate
-			break
+	// OP.GG has used several wrapper depths for this section. Search a small
+	// sibling window at each ancestor instead of assuming the list is the
+	// immediate next sibling; this keeps the grouped direction labels intact.
+	for container, depth := heading, 0; container != nil && depth < 8 && listContainer == nil; container, depth = container.Parent, depth+1 {
+		for candidate, siblings := nextElementSibling(container), 0; candidate != nil && siblings < 5; candidate, siblings = nextElementSibling(candidate), siblings+1 {
+			if len(descendantElements(candidate, "li")) > 0 {
+				listContainer = candidate
+				break
+			}
 		}
 	}
 	if listContainer == nil {
@@ -1904,56 +2402,24 @@ func parseChampionCounterGroup(document *xhtml.Node, label string) []championCou
 	return rows
 }
 
-func normalizeLateItemMetrics(rows []championMetricRow) []championMetricRow {
-	for index := range rows {
-		if rows[index].WinRate == 0 && rows[index].PickRate > 0 {
-			rows[index].WinRate, rows[index].PickRate = rows[index].PickRate, 0
+// OPGG has rendered counter section labels as div, h3, and span elements
+// across different page builds. Keep the grouping parser independent of that
+// presentational choice while still requiring an exact text match.
+func allDescendantElements(node *xhtml.Node) []*xhtml.Node {
+	result := make([]*xhtml.Node, 0)
+	var walk func(*xhtml.Node)
+	walk = func(current *xhtml.Node) {
+		if current.Type == xhtml.ElementNode {
+			result = append(result, current)
+		}
+		for child := current.FirstChild; child != nil; child = child.NextSibling {
+			walk(child)
 		}
 	}
-	return rows
-}
-
-func parseMetricRows(table *xhtml.Node) []championMetricRow {
-	rows := make([]championMetricRow, 0)
-	for _, body := range descendantElements(table, "tbody") {
-		for _, rowNode := range directElements(body, "tr") {
-			cells := directElements(rowNode, "td")
-			if len(cells) == 0 {
-				continue
-			}
-			row := championMetricRow{}
-			for _, image := range descendantElements(cells[0], "img") {
-				asset, ok := remoteAsset(attribute(image, "src"), attribute(image, "alt"))
-				if ok {
-					row.Assets = append(row.Assets, asset)
-				}
-			}
-			if len(cells) > 1 {
-				row.PickRate = firstNumber(nodeText(cells[1]))
-				row.Games = firstGames(nodeText(cells[1]))
-			}
-			if len(cells) > 2 {
-				row.WinRate = firstNumber(nodeText(cells[2]))
-			}
-			keys := make([]string, 0, 24)
-			for _, strong := range descendantElements(cells[0], "strong") {
-				value := strings.TrimSpace(nodeText(strong))
-				if value == "Q" || value == "W" || value == "E" || value == "R" {
-					keys = append(keys, value)
-				}
-			}
-			if len(keys) >= 3 {
-				row.SkillPriority = append([]string(nil), keys[:3]...)
-				if len(keys) > 3 {
-					row.SkillOrder = append([]string(nil), keys[3:]...)
-				}
-			}
-			if len(row.Assets) > 0 || len(row.SkillOrder) > 0 {
-				rows = append(rows, row)
-			}
-		}
+	if node != nil {
+		walk(node)
 	}
-	return rows
+	return result
 }
 
 func appendUniqueMetricRows(existing []championMetricRow, rows ...championMetricRow) []championMetricRow {
@@ -2095,41 +2561,18 @@ func runeShardDescription(id int) string {
 
 func dataDragonRuneShardPath(id int) (string, bool) {
 	name, ok := map[int]string{
-		5001: "StatModsHealthScalingIcon.png",
+		5001: "StatModsHealthPlusIcon.png",
 		5005: "StatModsAttackSpeedIcon.png",
 		5007: "StatModsCDRScalingIcon.png",
 		5008: "StatModsAdaptiveForceIcon.png",
 		5010: "StatModsMovementSpeedIcon.png",
-		5011: "StatModsHealthPlusIcon.png",
+		5011: "StatModsHealthScalingIcon.png",
 		5013: "StatModsTenacityIcon.png",
 	}[id]
 	if !ok {
 		return "", false
 	}
 	return "/cdn/img/perk-images/StatMods/" + name, true
-}
-
-func parseRecommendedAugments(document *xhtml.Node) []championAsset {
-	result := make([]championAsset, 0, 12)
-	seen := make(map[string]bool)
-	for _, item := range descendantElements(document, "li") {
-		for _, image := range descendantElements(item, "img") {
-			source := attribute(image, "src")
-			if !strings.Contains(source, "/aram-augment/") && !strings.Contains(source, "/augment/") {
-				continue
-			}
-			asset, ok := remoteAsset(source, attribute(image, "alt"))
-			if ok && !seen[asset.Path] {
-				seen[asset.Path] = true
-				result = append(result, asset)
-			}
-			break
-		}
-		if len(result) == 12 {
-			break
-		}
-	}
-	return result
 }
 
 func remoteAsset(rawURL, name string) (championAsset, bool) {

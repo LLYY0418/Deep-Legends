@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRiotClientCommandLineUsesIndependentCredentials(t *testing.T) {
@@ -153,11 +154,47 @@ func TestResolveTencentRiotIDKeepsRiotAndLeagueTokensSeparate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reference.PlayerRef != puuid || reference.ServerID != "HN1" || reference.GameName != "跨服玩家" || reference.TagLine != "9988" || reference.ProfileIconID != 27 {
+	if reference.PlayerRef != puuid || reference.ServerID != "HN1" || reference.GameName != "跨服玩家" || reference.TagLine != "9988" || reference.ProfileIconID != 27 || reference.Privacy != "PUBLIC" {
 		t.Fatalf("reference = %#v", reference)
 	}
 	if token, ok := riotAPI.local.credentials(); ok || token != "" {
 		t.Fatal("short-lived Riot Client credential was not cleared")
+	}
+}
+
+func TestResolveTencentRiotIDUsesLCUForCurrentServer(t *testing.T) {
+	puuid := strings.Repeat("l", 48)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/lol-summoner/v1/alias/lookup" {
+			http.Error(w, "unexpected endpoint", http.StatusNotFound)
+			return
+		}
+		if r.URL.Query().Get("gameName") != "当前玩家" || r.URL.Query().Get("tagLine") != "1234" {
+			http.Error(w, "unexpected query", http.StatusBadRequest)
+			return
+		}
+		_, _ = io.WriteString(w, `[{"puuid":"`+puuid+`"}]`)
+	}))
+	defer server.Close()
+
+	discoveryCalls := 0
+	client := &LCUClient{
+		baseURL: server.URL, token: "lcu-secret", http: server.Client(),
+		region: "TENCENT", rsoPlatform: "HN1", platformProbe: true,
+	}
+	a := &app{riotClientDiscovery: func() (*RiotClientAPI, error) {
+		discoveryCalls++
+		return nil, errors.New("Riot Client must not be discovered for the current server")
+	}}
+	reference, err := a.resolveTencentRiotID(context.Background(), client, "当前玩家", "1234", "HN1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if discoveryCalls != 0 {
+		t.Fatalf("Riot Client discovery calls = %d, want 0", discoveryCalls)
+	}
+	if reference.PlayerRef != puuid || reference.ServerID != "HN1" || reference.GameName != "当前玩家" || reference.TagLine != "1234" {
+		t.Fatalf("reference = %#v", reference)
 	}
 }
 
@@ -185,35 +222,45 @@ func TestRemoteMatchHistoryFailureNeverFallsBackToCurrentLCU(t *testing.T) {
 	provider.http = sgpServer.Client()
 	provider.serverBases["HN10"] = sgpServer.URL
 	a := &app{sgp: provider}
-	matches, capabilities, _ := a.loadDetailedMatches(context.Background(), client, gameplayReference{PlayerRef: puuid, ServerID: "HN10"}, puuid, false, 0, 20, nil, nil)
+	matches, capabilities, _ := a.loadDetailedMatches(context.Background(), client, gameplayReference{PlayerRef: puuid, ServerID: "HN10"}, puuid, false, 0, 20, "all", nil, nil)
 	if len(matches) != 0 || lcuHistoryCalls != 0 {
 		t.Fatalf("remote failure fell back to current LCU: matches=%d calls=%d", len(matches), lcuHistoryCalls)
 	}
 	if len(capabilities) < 2 || capabilities[0].State != capabilityFailed {
 		t.Fatalf("remote failure was not surfaced: %#v", capabilities)
 	}
+	if len(capabilities[0].Attempts) != 1 || capabilities[0].Attempts[0].Source != dataSourceSGP || capabilities[0].Attempts[0].Outcome != dataSourceFailed || capabilities[0].FallbackReason != "sgp-failed" {
+		t.Fatalf("remote failure attempts = %#v", capabilities[0])
+	}
 }
 
-func TestRemoteRankedStatsIsExplicitlyUnsupported(t *testing.T) {
+func TestRemoteRankedStatsUsesExplicitSGPFallbackWithoutLCU(t *testing.T) {
 	puuid := strings.Repeat("q", 48)
 	var sgpCalls int
 	sgpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		sgpCalls++
-		http.Error(w, "remote ranked endpoint must not be called", http.StatusInternalServerError)
+		_, _ = io.WriteString(w, `{"queues":[{"queueType":"RANKED_SOLO_5x5","tier":"GOLD","rank":"II","leaguePoints":55,"wins":12,"losses":8}]}`)
 	}))
 	defer sgpServer.Close()
 	provider := newSGPProvider()
 	provider.http = sgpServer.Client()
 	provider.serverBases["HN10"] = sgpServer.URL
-	client := &LCUClient{region: "TENCENT", rsoPlatform: "HN1", platformProbe: true}
+	client := &LCUClient{token: "test", region: "TENCENT", rsoPlatform: "HN1", platformProbe: true}
+	provider.sessionToken, provider.sessionAt, provider.sessionOwner = "league-session", time.Now(), client
 	a := &app{sgp: provider}
 
-	ranks, capability := a.loadRanksWithFallback(context.Background(), client, puuid, false, "HN10")
-	if len(ranks) != 0 || sgpCalls != 0 {
-		t.Fatalf("remote ranked query ran: ranks=%#v calls=%d", ranks, sgpCalls)
+	ranks, milestones, capability := a.loadRanksWithFallback(context.Background(), client, puuid, false, "HN10", "")
+	if len(ranks) != 1 || sgpCalls != 1 {
+		t.Fatalf("remote ranked fallback = %#v calls=%d", ranks, sgpCalls)
 	}
-	if capability.Name != "ranked-stats" || capability.State != capabilityUnsupported || capability.Detail != "跨服暂不支持排位" {
+	if milestones != nil {
+		t.Fatalf("remote ranked query returned milestones: %#v", milestones)
+	}
+	if capability.Name != "ranked-stats" || capability.State != capabilityAvailable || capabilitySource(capability) != dataSourceSGP || capability.FallbackReason != "cross-server-lcu-unavailable" {
 		t.Fatalf("remote ranked capability = %#v", capability)
+	}
+	if len(capability.Attempts) != 1 || capability.Attempts[0].Source != dataSourceSGP || capability.Attempts[0].Outcome != dataSourceSuccess {
+		t.Fatalf("remote ranked attempts = %#v", capability.Attempts)
 	}
 }
 

@@ -17,6 +17,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +36,8 @@ const (
 	opggGamesTimeSlack   = 180 * 1000 // 开局时间匹配容差（毫秒）
 	opggGamesSpanSlack   = 20         // 时长匹配容差（秒）
 	opggGamesResponseMax = 8 << 20
+	opggHistoryCacheTTL  = 30 * time.Minute
+	opggHistoryCacheMax  = 32
 )
 
 type opggGameTier struct {
@@ -52,15 +56,211 @@ type opggTierFlight struct {
 	done chan struct{}
 }
 
+type opggHistoryCacheEntry struct {
+	at    time.Time
+	ranks []gameplayHistoricalRank
+}
+
+type opggHistoryFlight struct {
+	done chan struct{}
+}
+
 // opggInsights 缓存按玩家抓取的 OP.GG 对局段位数据。
 type opggInsights struct {
-	mu      sync.Mutex
-	tiers   map[string]opggTierCacheEntry
-	flights map[string]*opggTierFlight
+	mu             sync.Mutex
+	tiers          map[string]opggTierCacheEntry
+	flights        map[string]*opggTierFlight
+	histories      map[string]opggHistoryCacheEntry
+	historyFlights map[string]*opggHistoryFlight
+	historyStarts  map[string]struct{}
 }
 
 func newOPGGInsights() *opggInsights {
-	return &opggInsights{tiers: make(map[string]opggTierCacheEntry), flights: make(map[string]*opggTierFlight)}
+	return &opggInsights{
+		tiers: make(map[string]opggTierCacheEntry), flights: make(map[string]*opggTierFlight),
+		histories: make(map[string]opggHistoryCacheEntry), historyFlights: make(map[string]*opggHistoryFlight), historyStarts: make(map[string]struct{}),
+	}
+}
+
+var (
+	opggSeasonPattern = regexp.MustCompile(`"season":"(S(20[0-9]{2})(?: S[1-3])?)\s*","rank_entries":`)
+	opggRankPattern   = regexp.MustCompile(`"rank_info":\{"tier":"([^"]*)","value":"([^"]*)","division":(?:(\d+)|"\$undefined"|null),"lp":?(?:"([^"]*)"|(\d+)|null)`)
+)
+
+func parseOPGGHistoricalRanks(data []byte) []gameplayHistoricalRank {
+	decoded := strings.ReplaceAll(string(data), `\"`, `"`)
+	matches := opggSeasonPattern.FindAllStringSubmatchIndex(decoded, -1)
+	result := make([]gameplayHistoricalRank, 0, len(matches))
+	seen := make(map[string]bool)
+	for index, match := range matches {
+		season := strings.TrimSpace(decoded[match[2]:match[3]])
+		year, _ := strconv.Atoi(decoded[match[4]:match[5]])
+		if year < 2023 || seen[season] {
+			continue
+		}
+		end := len(decoded)
+		if index+1 < len(matches) {
+			end = matches[index+1][0]
+		} else if end > match[1]+2400 {
+			end = match[1] + 2400
+		}
+		rankMatch := opggRankPattern.FindStringSubmatch(decoded[match[1]:end])
+		if len(rankMatch) == 0 {
+			continue
+		}
+		tier := strings.ToUpper(strings.TrimSpace(rankMatch[2]))
+		if tier == "" || strings.EqualFold(strings.TrimSpace(rankMatch[2]), "Unranked") {
+			continue
+		}
+		division := ""
+		if rawDivision, err := strconv.Atoi(rankMatch[3]); err == nil && rawDivision >= 1 && rawDivision <= 4 {
+			division = opggRomanDivision(rawDivision)
+		}
+		lpText := strings.ReplaceAll(strings.TrimSpace(rankMatch[4]+rankMatch[5]), ",", "")
+		var leaguePoints *int
+		if lp, err := strconv.Atoi(lpText); err == nil {
+			leaguePoints = &lp
+		}
+		result = append(result, gameplayHistoricalRank{
+			Season: season, QueueType: "RANKED_SOLO_5x5", Tier: tier,
+			Division: division, LeaguePoints: leaguePoints,
+		})
+		seen[season] = true
+	}
+	return result
+}
+
+func (a *app) fetchOPGGHistoricalRanks(ctx context.Context, slug string) []gameplayHistoricalRank {
+	if a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) {
+		return nil
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://op.gg/zh-cn/lol/summoners/kr/"+slug, nil)
+	if err != nil {
+		return nil
+	}
+	request.Header.Set("Accept", "text/html")
+	request.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36")
+	response, err := a.champions.httpClient().Do(request)
+	if err != nil {
+		return nil
+	}
+	data, readErr := readLimited(response.Body, opggGamesResponseMax)
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK || readErr != nil {
+		return nil
+	}
+	return parseOPGGHistoricalRanks(data)
+}
+
+func (a *app) opggHistoricalRanks(ctx context.Context, gameName, tagLine, puuid, privacy string) []gameplayHistoricalRank {
+	if a.champions == nil || a.opgg == nil || strings.EqualFold(strings.TrimSpace(privacy), "PRIVATE") || strings.TrimSpace(gameName) == "" || !validPlayerReference(puuid) {
+		return nil
+	}
+	var stale []gameplayHistoricalRank
+	cacheKey := sourceScopedKey(dataSourceOPGG, puuid)
+	for {
+		a.opgg.mu.Lock()
+		entry, cached := a.opgg.histories[cacheKey]
+		if cached {
+			stale = append(stale[:0], entry.ranks...)
+		}
+		if cached && time.Since(entry.at) < opggHistoryCacheTTL {
+			ranks := append([]gameplayHistoricalRank(nil), entry.ranks...)
+			a.opgg.mu.Unlock()
+			return ranks
+		}
+		if flight := a.opgg.historyFlights[cacheKey]; flight != nil {
+			done := flight.done
+			a.opgg.mu.Unlock()
+			select {
+			case <-done:
+				continue
+			case <-ctx.Done():
+				return stale
+			}
+		}
+		a.opgg.historyFlights[cacheKey] = &opggHistoryFlight{done: make(chan struct{})}
+		a.opgg.mu.Unlock()
+		break
+	}
+
+	slug := url.PathEscape(gameName + "-" + tagLine)
+	ranks := a.fetchOPGGHistoricalRanks(ctx, slug)
+	a.opgg.mu.Lock()
+	if len(ranks) > 0 {
+		if _, exists := a.opgg.histories[cacheKey]; !exists && len(a.opgg.histories) >= opggHistoryCacheMax {
+			oldestKey := ""
+			oldestAt := time.Now()
+			for key, entry := range a.opgg.histories {
+				if entry.at.Before(oldestAt) {
+					oldestAt, oldestKey = entry.at, key
+				}
+			}
+			delete(a.opgg.histories, oldestKey)
+		}
+		a.opgg.histories[cacheKey] = opggHistoryCacheEntry{at: time.Now(), ranks: append([]gameplayHistoricalRank(nil), ranks...)}
+	}
+	flight := a.opgg.historyFlights[cacheKey]
+	delete(a.opgg.historyFlights, cacheKey)
+	if flight != nil {
+		close(flight.done)
+	}
+	a.opgg.mu.Unlock()
+	if len(ranks) == 0 {
+		return stale
+	}
+	return ranks
+}
+
+func (a *app) cachedOPGGHistoricalRanks(puuid string) []gameplayHistoricalRank {
+	if a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) || a.opgg == nil || !validPlayerReference(puuid) {
+		return nil
+	}
+	key := sourceScopedKey(dataSourceOPGG, puuid)
+	a.opgg.mu.Lock()
+	entry, ok := a.opgg.histories[key]
+	a.opgg.mu.Unlock()
+	if !ok {
+		return nil
+	}
+	return append([]gameplayHistoricalRank(nil), entry.ranks...)
+}
+
+func (a *app) startOPGGHistoricalRanks(reference gameplayReference, gameName, tagLine, puuid, privacy string) {
+	if a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) || a.opgg == nil || strings.EqualFold(strings.TrimSpace(privacy), "PRIVATE") || strings.TrimSpace(gameName) == "" || !validPlayerReference(puuid) {
+		return
+	}
+	key := sourceScopedKey(dataSourceOPGG, puuid)
+	a.opgg.mu.Lock()
+	if entry, ok := a.opgg.histories[key]; ok && time.Since(entry.at) < opggHistoryCacheTTL {
+		a.opgg.mu.Unlock()
+		return
+	}
+	if _, running := a.opgg.historyStarts[key]; running || a.opgg.historyFlights[key] != nil {
+		a.opgg.mu.Unlock()
+		return
+	}
+	a.opgg.historyStarts[key] = struct{}{}
+	a.opgg.mu.Unlock()
+	go func() {
+		defer func() {
+			a.opgg.mu.Lock()
+			delete(a.opgg.historyStarts, key)
+			a.opgg.mu.Unlock()
+		}()
+		ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
+		defer cancel()
+		ranks := a.opggHistoricalRanks(ctx, gameName, tagLine, puuid, privacy)
+		if len(ranks) == 0 {
+			return
+		}
+		payload, _ := json.Marshal(map[string]any{
+			"type": "historical-ranks", "account": a.registerGameplayReferenceDetails(mergeGameplayReferences(reference, gameplayReference{PlayerRef: puuid})),
+			"count": len(ranks),
+		})
+		a.clearOverviewQuerySnapshots()
+		a.broadcastEvent(string(payload))
+	}()
 }
 
 type opggGamesRequest struct {

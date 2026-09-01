@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Deep Legends 重设计 · 战绩页（多模式 + 详情展开）</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { display: block; padding: 26px 30px 70px; }
+  .page-head h1 { font-size: 19px; font-weight: 650; }
+  .page-head p { color: var(--muted); font-size: 12.5px; margin-top: 5px; max-width: 860px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 24px; }
+  .legend span { font-size: 11px; color: var(--faint); border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 10px; }
+  .legend b { color: var(--gold); font-weight: 600; }
+  .wrap { max-width: 980px; }
+  .blk { margin-bottom: 30px; }
+  .blk > h2 { font-size: 13.5px; font-weight: 650; margin-bottom: 3px; }
+  .blk > p { font-size: 11.5px; color: var(--faint); margin-bottom: 12px; }
+
+  /* ============ 筛选行（新版：极地大乱斗移入更多模式；自定义下拉） ============ */
+  .filterbar { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; position: relative; }
+  .ftab { padding: 7px 13px; border-radius: 8px; font-size: 12.5px; color: var(--muted); background: transparent; border: 1px solid transparent; }
+  .ftab.on { color: var(--gold-bright); background: rgba(217,164,65,.10); border-color: var(--gold-dim); font-weight: 600; }
+  .fmore { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px 7px 13px; border-radius: 8px; font-size: 12.5px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); font-weight: 600; }
+  .fmore .chev { width: 12px; height: 12px; stroke: var(--faint); stroke-width: 2; fill: none; stroke-linecap: round; }
+  .fmenu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 6; width: 210px; padding: 5px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 16px 40px rgb(0 0 0/.45); }
+  .fmenu button { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 8px 11px; border-radius: 7px; font-size: 12.5px; color: var(--ink); background: transparent; border: 0; text-align: left; }
+  .fmenu button.on { color: var(--gold-bright); background: rgba(217,164,65,.12); font-weight: 600; }
+  .fmenu button:hover { background: rgba(255,255,255,.05); }
+  .fmenu button .tick { color: var(--gold); font-size: 11px; }
+
+  /* ============ 通用卡片骨架 ============ */
+  .mcard { border-radius: var(--radius); border: 1px solid var(--line-soft); background: var(--surface); margin-bottom: 10px; overflow: hidden; }
+  .mcard.win { border-left: 4px solid var(--blue); }
+  .mcard.loss { border-left: 4px solid var(--red); }
+  .mrow { display: grid; grid-template-columns: 108px minmax(0,1fr) auto 40px; gap: 8px; align-items: center; padding: 12px 10px 12px 14px; min-height: 118px; }
+
+  /* 左列 */
+  .mmeta { display: grid; gap: 2px; font-size: 11px; }
+  .mmeta .mode { font-size: 12px; font-weight: 650; }
+  .win .mmeta .mode { color: var(--blue); }
+  .loss .mmeta .mode { color: var(--red); }
+  .mmeta time { color: var(--faint); }
+  .mmeta .res { font-weight: 700; font-size: 12.5px; }
+  .win .mmeta .res { color: var(--blue); }
+  .loss .mmeta .res { color: var(--red); }
+  .mmeta .lp { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 5px; font-size: 10px; font-weight: 700; }
+  .lp.gain { color: var(--green); background: rgba(76,175,125,.13); }
+  .lp.drop { color: var(--red); background: rgba(224,92,92,.13); }
+  .mmeta .dur { color: var(--faint); }
+
+  /* 中列：英雄 | KDA | 数据 三组紧凑聚拢（固定间距），末尾 1fr 吸收多余空白；
+     数据列不再吸到最右，与 KDA 相邻成为同一内容组。 */
+  .mmain { display: grid; grid-template-columns: auto minmax(110px,auto) auto 1fr; gap: 10px 30px; align-items: center; min-width: 0; }
+  .champ { position: relative; display: flex; gap: 5px; align-items: center; }
+  .cface { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(140deg,#2a3245,#171c28); border: 1px solid var(--line); display: grid; place-items: center; font-size: 10px; color: var(--faint); flex-shrink: 0; }
+  .clv { position: absolute; left: 42px; bottom: -2px; padding: 0 5px; border-radius: 6px; background: #0a0d13; border: 1px solid var(--line); font-size: 9.5px; color: var(--muted); }
+  .loadout { display: grid; grid-template-columns: 27px 27px; gap: 3px; }
+  .li { width: 27px; height: 27px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; font-size: 8.5px; color: var(--faint); }
+  .li.rune { border-radius: 50%; }
+  /* 竞技场：海克斯 3×2 */
+  .loadout.aug { grid-template-columns: repeat(3, 26px); }
+  .loadout.aug .li { width: 26px; height: 26px; border-radius: 50%; }
+  .loadout.aug .li.gold { border-color: var(--gold-dim); color: var(--gold); background: rgba(217,164,65,.08); }
+  .loadout.aug .li.prism { border-color: #7f7fd9; color: #a9a9f0; background: rgba(127,127,217,.10); }
+  .loadout.aug .li.empty { opacity: .35; }
+
+  .kda { display: grid; gap: 3px; justify-items: center; }
+  .kda .nums { font-size: 17px; font-weight: 700; white-space: nowrap; }
+  .kda .nums em { color: var(--red); font-style: normal; }
+  .kda .ratio { font-size: 11.5px; color: var(--muted); }
+  .kda .score { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--faint); }
+  .chip { display: inline-grid; place-items: center; min-width: 30px; height: 17px; padding: 0 5px; border-radius: 6px; font-size: 10px; font-weight: 700; }
+  .chip.gold { color: #14100A; background: var(--gold); }
+  .chip.good { color: var(--green); background: rgba(76,175,125,.14); }
+  .chip.mvp { color: #14100A; background: linear-gradient(135deg,var(--gold-bright),var(--gold)); }
+  .chip.r1 { color: #14100A; background: linear-gradient(135deg,#f4d489,#caa24a); }
+
+  /* 数据列：紧凑两行，标签左值右 */
+  /* 数据列：紧跟 KDA 左对齐，加浅色左分隔线成组；不再飘到卡片最右 */
+  .stats { display: grid; gap: 6px; align-content: center; justify-self: start; min-width: 0; font-size: 12px; padding-left: 22px; border-left: 1px solid var(--line); }
+  .stats .srow { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+  .stats .srow em { font-style: normal; color: var(--faint); font-size: 11.5px; min-width: 62px; }
+  .stats .srow b { font-variant-numeric: tabular-nums; }
+  .stats .srow .dim { color: var(--muted); font-weight: 400; }
+  .tierrow img, .tier-ic { width: 15px; height: 15px; border-radius: 3px; background: #223; display: inline-block; vertical-align: -3px; }
+
+  /* 装备行（第二行跨全宽） */
+  .mbuild { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+  .items { display: flex; gap: 3px; }
+  .it { width: 30px; height: 30px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; font-size: 8px; color: var(--faint); }
+  .it.empty { opacity: .35; }
+  .it.trink { border-radius: 50%; margin-left: 6px; }
+  .badges { display: flex; gap: 4px; }
+  .badges span { padding: 2px 7px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); font-size: 10px; color: var(--muted); }
+
+  /* 右侧玩家名单：普通两列 */
+  .plist { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; font-size: 11.5px; width: 236px; }
+  .prow { display: flex; align-items: center; gap: 4px; color: var(--muted); min-width: 0; }
+  .prow .pi { width: 20px; height: 20px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--line); flex-shrink: 0; }
+  .prow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prow.me span { color: var(--gold-bright); font-weight: 600; }
+  /* 竞技场：收窄，仅名次+三头像 */
+  .plist.arena { display: grid; grid-template-columns: 1fr; gap: 4px; width: 150px; }
+  .arow { display: flex; align-items: center; gap: 4px; }
+  .arow .rk { font-size: 10.5px; font-weight: 700; color: var(--faint); min-width: 22px; }
+  .arow.first .rk { color: var(--gold); }
+  .arow .pi { width: 21px; height: 21px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--line); }
+  .arow.first .pi { border-color: var(--gold-dim); }
+  .arow.mine .pi { border-color: var(--gold); }
+
+  .mact { display: grid; gap: 4px; align-self: stretch; }
+  .mact button { flex: 1; display: grid; place-items: center; width: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); }
+  .mact .expand { height: 68%; }
+  .mact .replay { height: 30%; }
+  .win .mact button { background: rgba(91,155,217,.08); border-color: rgba(91,155,217,.25); }
+  .loss .mact button { background: rgba(224,92,92,.07); border-color: rgba(224,92,92,.22); }
+
+  /* ============ 警示条（SGP 失败上屏） ============ */
+  .warnbar { display: flex; gap: 8px; align-items: flex-start; padding: 9px 12px; margin-bottom: 10px; border-radius: 9px; border: 1px solid rgba(224,180,92,.35); background: rgba(224,180,92,.08); font-size: 11.5px; color: var(--muted); }
+  .warnbar b { color: var(--gold-bright); }
+  .warnbar .wi { color: var(--gold); font-weight: 800; }
+
+  /* ============ 详情：概览表 ============ */
+  .detail { border-top: 1px solid var(--line-soft); background: rgba(0,0,0,.16); padding: 12px 14px 14px; }
+  .dtabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--surface-2); margin-bottom: 12px; }
+  .dtabs button { padding: 6px 16px; border-radius: 7px; font-size: 12px; color: var(--muted); background: transparent; border: 0; }
+  .dtabs button.on { color: var(--ink); background: var(--surface); font-weight: 600; }
+  .tteam { border-radius: 10px; border: 1px solid var(--line-soft); overflow: hidden; margin-bottom: 8px; }
+  .tteam header { display: flex; gap: 10px; align-items: baseline; padding: 8px 12px; font-size: 12px; }
+  .tteam.blue header { background: rgba(91,155,217,.09); color: var(--blue); }
+  .tteam.red header { background: rgba(224,92,92,.08); color: var(--red); }
+  .tteam header small { color: var(--faint); font-weight: 400; }
+  .trow, .thead { display: grid; grid-template-columns: minmax(150px,1.2fr) 64px 110px 110px 70px 80px 150px; gap: 8px; align-items: center; padding: 6px 12px; font-size: 11px; }
+  .thead { color: var(--faint); font-size: 10.5px; border-bottom: 1px solid var(--line-soft); background: rgba(255,255,255,.015); }
+  .trow { border-bottom: 1px solid var(--line-soft); }
+  .trow:last-child { border-bottom: 0; }
+  .trow .who { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .trow .who .pi { width: 22px; height: 22px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--line); flex-shrink: 0; }
+  .trow .who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .trow.me .who span { color: var(--gold-bright); font-weight: 600; }
+  .trow small { color: var(--faint); display: block; }
+  .miniit { display: flex; gap: 2px; }
+  .miniit i { width: 17px; height: 17px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--line); }
+  .miniit i.tk { border-radius: 50%; margin-left: 3px; }
+
+  /* 队伍分析：红蓝渐变条 */
+  .metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 10px; }
+  .metric { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-soft); background: rgba(255,255,255,.015); }
+  .metric .mh { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; margin-bottom: 7px; }
+  .metric .mh b:first-child { color: var(--blue); }
+  .metric .mh b:last-child { color: var(--red); }
+  .metric .mh span { color: var(--faint); font-size: 10.5px; }
+  .metric .bar { height: 7px; border-radius: 999px; overflow: hidden; }
+  .metric .bar i { display: block; height: 100%; }
+
+  /* ============ 竞技场详情（无 tab，全局列头 + 按名次分组） ============ */
+  .ahead { display: grid; grid-template-columns: minmax(140px,1.1fr) 96px 100px 130px 130px 64px; gap: 8px; padding: 7px 12px; font-size: 10.5px; color: var(--faint); border-radius: 8px 8px 0 0; background: rgba(255,255,255,.02); border: 1px solid var(--line-soft); border-bottom: 0; }
+  .agroup { border: 1px solid var(--line-soft); border-top: 0; }
+  .agroup:last-of-type { border-radius: 0 0 8px 8px; overflow: hidden; }
+  .agroup header { display: flex; align-items: center; gap: 8px; padding: 7px 12px; font-size: 11.5px; background: rgba(255,255,255,.02); }
+  .agroup header .rk { font-weight: 800; color: var(--muted); }
+  .agroup.first header { background: rgba(217,164,65,.08); }
+  .agroup.first header .rk, .agroup.first header strong { color: var(--gold-bright); }
+  .agroup header .emb { width: 16px; height: 16px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--line); }
+  .agroup header small { color: var(--faint); margin-left: auto; }
+  .aprow { display: grid; grid-template-columns: minmax(140px,1.1fr) 96px 100px 130px 130px 64px; gap: 8px; align-items: center; padding: 6px 12px; font-size: 11px; border-top: 1px solid var(--line-soft); }
+  .aprow .who { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .aprow .who .pi { width: 22px; height: 22px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--line); flex-shrink: 0; }
+  .aprow .who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .aprow.me .who span { color: var(--gold-bright); font-weight: 600; }
+  .augs { display: flex; gap: 2px; }
+  .augs i { width: 18px; height: 18px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--line); }
+  .augs i.g { border-color: var(--gold-dim); }
+  .augs i.p { border-color: #7f7fd9; }
+  .dmg2 { font-size: 10.5px; color: var(--muted); }
+  .dmg2 b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* ============ 小窗口：生涯统计改为弹窗 ============ */
+  .winframe { width: 820px; max-width: 100%; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); overflow: hidden; position: relative; }
+  .winframe .wtop { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); background: var(--surface); }
+  .wtab { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 8px; font-size: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); }
+  .wtab.self { border-color: var(--gold-dim); color: var(--gold-bright); background: rgba(217,164,65,.09); font-weight: 600; }
+  .wtab .st { width: 18px; height: 18px; border-radius: 4px; background: var(--surface-2); }
+  .career-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--gold-bright); background: rgba(217,164,65,.10); border: 1px solid var(--gold-dim); flex-shrink: 0; }
+  .career-btn svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 2; fill: none; }
+  .wtop .spacer { flex: 1; }
+  .wtop .refresh { font-size: 11.5px; color: var(--faint); }
+  .wbody { padding: 12px; }
+  .wbody .mcard { margin-bottom: 8px; }
+  .wbody .mrow { grid-template-columns: 96px minmax(0,1fr) auto 36px; min-height: 104px; }
+  .wbody .plist { width: 150px; grid-template-columns: 1fr; font-size: 10.5px; }
+  .wbody .plist .prow:nth-child(n+6) { display: none; }
+
+  /* 遮罩 + 面板 */
+  .wmask { position: absolute; inset: 0; background: var(--overlay, rgb(0 0 0/.7)); backdrop-filter: blur(1.5px); z-index: 8; }
+  .wsheet { position: absolute; inset: 10px 0 0; z-index: 9; display: flex; flex-direction: column; background: var(--bg); border-top: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0; box-shadow: 0 -18px 50px rgb(0 0 0/.5); overflow: hidden; }
+  .wsheet-head { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--line-soft); flex-shrink: 0; }
+  .wsheet-head strong { font-size: 13.5px; }
+  .wsheet-head small { color: var(--faint); font-size: 11px; }
+  .wsheet-head .x { margin-left: auto; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 13px; }
+  .wsheet-body { padding: 12px 14px 16px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 9px; align-content: start; }
+
+  /* 生涯小卡 */
+  .csec { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+  .csec > header { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 11px; border-bottom: 1px solid var(--line-soft); }
+  .csec > header h4 { font-size: 12px; font-weight: 650; }
+  .csec > header span { font-size: 10px; color: var(--faint); }
+  .csec .cbody { padding: 9px 11px; display: grid; gap: 7px; font-size: 11px; }
+  .rankrow { display: flex; align-items: center; gap: 8px; }
+  .rankrow .crest { width: 26px; height: 26px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); flex-shrink: 0; }
+  .rankrow div { display: grid; }
+  .rankrow strong { font-size: 11.5px; }
+  .rankrow small { color: var(--faint); font-size: 10px; }
+  .rankrow b { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .crow { display: grid; grid-template-columns: 22px 1fr auto; gap: 7px; align-items: center; }
+  .crow .ci { width: 22px; height: 22px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--line); }
+  .crow .cn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .crow .cv { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .posrow { display: grid; grid-template-columns: 34px 1fr 34px; gap: 7px; align-items: center; color: var(--muted); }
+  .posbar { height: 5px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .posbar i { display: block; height: 100%; background: var(--gold-dim); }
+  .heat { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; }
+  .heat span { height: 13px; border-radius: 3px; background: var(--surface-2); }
+  .heat span.l1 { background: rgba(217,164,65,.22); }
+  .heat span.l2 { background: rgba(217,164,65,.45); }
+  .heat span.l3 { background: rgba(217,164,65,.72); }
+  .csec.wide { grid-column: 1 / -1; }
+
+  .note-cards { margin-top: 26px; border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 16px 18px; }
+  .note-cards h3 { font-size: 13px; font-weight: 650; margin-bottom: 9px; }
+  .note-cards li { font-size: 12px; color: var(--muted); padding-left: 15px; position: relative; margin-bottom: 6px; list-style: none; }
+  .note-cards li::before { content: ""; position: absolute; left: 0; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--gold-dim); }
+  .note-cards li b { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1>战绩页 · 重设计（多模式卡片 + 详情展开）</h1>
+  <p>覆盖：新版筛选行（极地大乱斗移入更多模式、自定义下拉）、排位卡 + 展开详情（带列头的概览表 / 红蓝对比条）、斗魂竞技场卡（海克斯 3×2、紧凑数据、右列收窄）+ 无页签详情（全局列头 + 按名次分组）、极地大乱斗卡、SGP 失败警示条。</p>
+</div>
+<div class="legend">
+  <span>胜 <b>蓝</b> / 负 <b>红</b> 左边框</span><span>KDA 列保底 <b>96px</b> 不被压缩</span><span>海克斯 <b>3×2</b> 网格</span><span>竞技场右列 <b>128px</b></span><span>数据列两行紧凑</span><span>窄窗生涯统计 <b>弹窗化</b></span>
+</div>
+
+<div class="wrap">
+
+  <!-- 筛选行 -->
+  <div class="blk">
+    <h2>① 筛选行（新版）</h2>
+    <p>直筛五项不再溢出；「更多模式」为自定义菜单（与服务器选择器同风格），极地大乱斗为第一项；选中后触发器显示模式名。</p>
+    <div class="filterbar">
+      <button class="ftab">全部</button><button class="ftab">单排/双排</button><button class="ftab">灵活组排</button><button class="ftab">海克斯大乱斗</button><button class="ftab on">斗魂竞技场</button>
+      <button class="fmore">极地大乱斗 <svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="fmenu">
+        <button class="on">极地大乱斗 <span class="tick">✓</span></button>
+        <button>匹配模式</button>
+        <button>海克斯大乱斗 经典模式版</button>
+        <button>人机对战</button>
+        <button>无限火力</button>
+        <button>冠军杯赛</button>
+        <button>极限闪击</button>
+        <button>末日人工智能</button>
+        <button>特殊模式</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 警示条 -->
+  <div class="blk">
+    <h2>② SGP 失败警示条（战绩列表顶部）</h2>
+    <p>完整十人数据读取失败时不再静默：直接展示具体错误，用户可回传排查。</p>
+    <div class="warnbar"><span class="wi">⚠</span><span><b>完整对局数据读取失败，当前仅能显示你本人的数据。</b><br>SGP 网关连接失败：dial tcp hn10-k8s-sgp.lol.qq.com:21019 … （点击复制错误详情）</span></div>
+  </div>
+
+  <!-- 排位卡 收起 -->
+  <div class="blk">
+    <h2>③ 排位卡（单排/双排 · 胜 · 收起态）</h2>
+    <div class="mcard win">
+      <div class="mrow">
+        <div class="mmeta"><span class="mode">单排/双排</span><time>2 小时前</time><span class="res">胜利<span class="lp gain">+24 LP</span></span><span class="dur">28分40秒</span></div>
+        <div class="mmain">
+          <div class="champ"><span class="cface">伊泽</span><span class="clv">15</span><div class="loadout"><span class="li">闪</span><span class="li">治</span><span class="li rune">征</span><span class="li rune">启</span></div></div>
+          <div class="kda"><span class="nums">17 / <em>4</em> / 14</span><span class="ratio">7.75:1 KDA</span><span class="score">评分 <span class="chip gold">9.2</span></span></div>
+          <div class="stats">
+            <span class="srow"><em>击杀参与率</em><b>68%</b></span>
+            <span class="srow"><em>CS</em><b>181 <span class="dim">(6.3)</span></b></span>
+            <span class="srow"><em>平均段位</em><b><span class="tier-ic"></span> 白银 IV</b></span>
+          </div>
+          <div class="mbuild"><div class="items"><span class="it"></span><span class="it"></span><span class="it"></span><span class="it"></span><span class="it"></span><span class="it empty"></span><span class="it trink"></span></div><div class="badges"><span class="chip r1">1st</span><span class="chip mvp">MVP</span><span>双杀</span></div></div>
+        </div>
+        <div class="plist">
+          <span class="prow me"><span class="pi"></span><span>我听见风的颜色</span></span><span class="prow"><span class="pi"></span><span>无聊玩家A</span></span>
+          <span class="prow"><span class="pi"></span><span>影流之主</span></span><span class="prow"><span class="pi"></span><span>疾风剑豪</span></span>
+          <span class="prow"><span class="pi"></span><span>发条魔灵</span></span><span class="prow"><span class="pi"></span><span>皮城女警</span></span>
+          <span class="prow"><span class="pi"></span><span>暗夜猎手</span></span><span class="prow"><span class="pi"></span><span>光辉女郎</span></span>
+          <span class="prow"><span class="pi"></span><span>河流之王</span></span><span class="prow"><span class="pi"></span><span>魂锁典狱长</span></span>
+        </div>
+        <div class="mact"><button class="expand">⌄</button><button class="replay">▶</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 排位卡 展开详情 -->
+  <div class="blk">
+    <h2>④ 排位卡 · 展开详情（概览 + 队伍分析节选）</h2>
+    <p>概览表带列头；队伍分析为红蓝单条渐变对比。<b style="color:var(--gold)">展开后右侧玩家名单保留</b>（参考 OP.GG 桌面版），只在下方追加详情区。</p>
+    <div class="mcard loss">
+      <div class="mrow" style="min-height:0; padding-bottom:8px;">
+        <div class="mmeta"><span class="mode">灵活组排</span><time>21 小时前</time><span class="res">失败<span class="lp drop">−18 LP</span></span><span class="dur">26分39秒</span></div>
+        <div class="mmain"><div class="champ"><span class="cface">霞</span><span class="clv">13</span><div class="loadout"><span class="li">闪</span><span class="li">净</span><span class="li rune">强</span><span class="li rune">精</span></div></div>
+          <div class="kda"><span class="nums">4 / <em>11</em> / 2</span><span class="ratio">0.55:1 KDA</span><span class="score">评分 <span class="chip">3.4</span></span></div>
+          <div class="stats"><span class="srow"><em>击杀参与率</em><b>40%</b></span><span class="srow"><em>CS</em><b>163 <span class="dim">(6.1)</span></b></span><span class="srow"><em>平均段位</em><b><span class="tier-ic"></span> 白银 IV</b></span></div>
+        </div>
+        <div class="plist">
+          <span class="prow"><span class="pi"></span><span>강하다 별</span></span><span class="prow me"><span class="pi"></span><span>我听见风的颜色</span></span>
+          <span class="prow"><span class="pi"></span><span>MG2DA</span></span><span class="prow"><span class="pi"></span><span>Robin</span></span>
+          <span class="prow"><span class="pi"></span><span>quante</span></span><span class="prow"><span class="pi"></span><span>Sign</span></span>
+          <span class="prow"><span class="pi"></span><span>Isles</span></span><span class="prow"><span class="pi"></span><span>Ablazeoli</span></span>
+          <span class="prow"><span class="pi"></span><span>August</span></span><span class="prow"><span class="pi"></span><span>twtv kaid</span></span>
+        </div>
+        <div class="mact"><button class="expand" style="height:100%">⌃</button></div>
+      </div>
+      <div class="detail">
+        <div class="dtabs"><button class="on">概览</button><button>队伍分析</button><button>构建</button></div>
+        <div class="tteam blue">
+          <header><strong>蓝方 · 胜利</strong><small>29 击杀 · 63,233 金币</small></header>
+          <div class="thead"><span>玩家</span><span>评分</span><span>KDA</span><span>伤害</span><span>守卫</span><span>CS</span><span>装备</span></div>
+          <div class="trow"><span class="who"><span class="pi"></span><span>강하다 별#123</span></span><span><span class="chip mvp">MVP</span></span><span>13/2/9<small>11.0:1</small></span><span>16,822<small>承伤 12,000</small></span><span>21 / 8</span><span>228<small>8.0/分</small></span><span class="miniit"><i></i><i></i><i></i><i></i><i></i><i></i><i class="tk"></i></span></div>
+          <div class="trow"><span class="who"><span class="pi"></span><span>MG2DA#club</span></span><span><span class="chip good">7.1</span></span><span>8/4/12<small>5.0:1</small></span><span>13,526<small>承伤 18,304</small></span><span>14 / 3</span><span>195<small>6.8/分</small></span><span class="miniit"><i></i><i></i><i></i><i></i><i></i><i></i><i class="tk"></i></span></div>
+        </div>
+        <div class="tteam red">
+          <header><strong>红方</strong><small>21 击杀 · 57,808 金币</small></header>
+          <div class="thead"><span>玩家</span><span>评分</span><span>KDA</span><span>伤害</span><span>守卫</span><span>CS</span><span>装备</span></div>
+          <div class="trow me"><span class="who"><span class="pi"></span><span>我听见风的颜色#26247</span></span><span><span class="chip">3.4</span></span><span>4/11/2<small>0.55:1</small></span><span>10,245<small>承伤 19,573</small></span><span>9 / 3</span><span>163<small>6.1/分</small></span><span class="miniit"><i></i><i></i><i></i><i></i><i></i><i></i><i class="tk"></i></span></div>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="mh"><b>29</b><span>英雄击杀</span><b>21</b></div><div class="bar"><i style="background:linear-gradient(to right,var(--blue) 58%,var(--red) 58%)"></i></div></div>
+          <div class="metric"><div class="mh"><b>63,233</b><span>金币</span><b>57,808</b></div><div class="bar"><i style="background:linear-gradient(to right,var(--blue) 52%,var(--red) 52%)"></i></div></div>
+          <div class="metric"><div class="mh"><b>12.6万</b><span>伤害</span><b>11.7万</b></div><div class="bar"><i style="background:linear-gradient(to right,var(--blue) 52%,var(--red) 52%)"></i></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 竞技场 收起 -->
+  <div class="blk">
+    <h2>⑤ 斗魂竞技场卡（收起态）</h2>
+    <p>海克斯 3×2 替代召唤师技能位；数据列仅「本场名次 / 伤害·承伤」两行；右列收窄至 128px（名次 + 三头像，队名进悬停）。</p>
+    <div class="mcard win">
+      <div class="mrow">
+        <div class="mmeta"><span class="mode">斗魂竞技场 3×6</span><time>2 天前</time><span class="res">第 1 名</span><span class="dur">23分48秒</span></div>
+        <div class="mmain">
+          <div class="champ"><span class="cface">薇恩</span><span class="clv">26</span><div class="loadout aug"><span class="li prism"></span><span class="li gold"></span><span class="li gold"></span><span class="li"></span><span class="li"></span><span class="li empty"></span></div></div>
+          <div class="kda"><span class="nums">20 / <em>5</em> / 5</span><span class="ratio">5.00:1 KDA</span><span class="score">评分 <span class="chip gold">9.6</span></span></div>
+          <div class="stats">
+            <span class="srow"><em>本场名次</em><b style="color:var(--gold-bright)">第 1 名</b></span>
+            <span class="srow"><em>伤害</em><b>8.8万 <span class="dim">· 承伤 2.9万</span></b></span>
+          </div>
+          <div class="mbuild"><div class="items"><span class="it"></span><span class="it"></span><span class="it"></span><span class="it"></span><span class="it"></span><span class="it"></span><span class="it trink"></span></div><div class="badges"><span class="chip r1">1st</span><span>双杀</span></div></div>
+        </div>
+        <div class="plist arena">
+          <span class="arow first mine"><span class="rk">#1</span><span class="pi"></span><span class="pi"></span><span class="pi"></span></span>
+          <span class="arow"><span class="rk">#2</span><span class="pi"></span><span class="pi"></span><span class="pi"></span></span>
+          <span class="arow"><span class="rk">#3</span><span class="pi"></span><span class="pi"></span><span class="pi"></span></span>
+          <span class="arow"><span class="rk">#4</span><span class="pi"></span><span class="pi"></span><span class="pi"></span></span>
+        </div>
+        <div class="mact"><button class="expand">⌄</button><button class="replay">▶</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 竞技场 详情 -->
+  <div class="blk">
+    <h2>⑥ 斗魂竞技场 · 展开详情（无页签，全局列头 + 按名次分组）</h2>
+    <p>列头只出现一次；每组头部为「名次 + 队徽 + 中文队名 + 合计」；行内海克斯用圆形小图（金/棱彩描边区分稀有度）。</p>
+    <div class="mcard win">
+      <div class="detail" style="border-top:0;">
+        <div class="ahead"><span>玩家</span><span>海克斯</span><span>KDA</span><span>伤害 / 承伤</span><span>装备</span><span>评分</span></div>
+        <div class="agroup first">
+          <header><span class="rk">#1</span><span class="emb"></span><strong>河道蟹队</strong><small>30 击杀 · 11.7万 伤害</small></header>
+          <div class="aprow me"><span class="who"><span class="pi"></span><span>我听见风的颜色</span></span><span class="augs"><i class="p"></i><i class="g"></i><i class="g"></i><i></i></span><span>20/5/5<small>5.00:1</small></span><span class="dmg2"><b>8.8万</b> · 承伤 <b>2.9万</b></span><span class="miniit"><i></i><i></i><i></i><i></i><i></i><i></i></span><span><span class="chip mvp">MVP</span></span></div>
+          <div class="aprow"><span class="who"><span class="pi"></span><span>梦短梦长俱是梦</span></span><span class="augs"><i class="g"></i><i></i><i></i><i></i></span><span>6/7/14<small>2.86:1</small></span><span class="dmg2"><b>2.9万</b> · 承伤 <b>4.1万</b></span><span class="miniit"><i></i><i></i><i></i><i></i><i></i><i></i></span><span><span class="chip good">7.4</span></span></div>
+          <div class="aprow"><span class="who"><span class="pi"></span><span>玩家丙</span></span><span class="augs"><i class="g"></i><i class="p"></i><i></i><i></i></span><span>4/6/18<small>3.67:1</small></span><span class="dmg2"><b>2.1万</b> · 承伤 <b>3.3万</b></span><span class="miniit"><i></i><i></i><i></i><i></i><i></i><i></i></span><span><span class="chip">6.1</span></span></div>
+        </div>
+        <div class="agroup">
+          <header><span class="rk">#2</span><span class="emb"></span><strong>魄罗队</strong><small>24 击杀 · 9.6万 伤害</small></header>
+          <div class="aprow"><span class="who"><span class="pi"></span><span>石甲虫爱好者</span></span><span class="augs"><i class="p"></i><i class="g"></i><i></i><i></i></span><span>11/8/9<small>2.50:1</small></span><span class="dmg2"><b>4.2万</b> · 承伤 <b>3.8万</b></span><span class="miniit"><i></i><i></i><i></i><i></i><i></i><i></i></span><span><span class="chip good">7.0</span></span></div>
+          <div class="aprow"><span class="who"><span class="pi"></span><span>峡谷刺客</span></span><span class="augs"><i class="g"></i><i></i><i></i><i></i></span><span>9/9/7<small>1.78:1</small></span><span class="dmg2"><b>3.5万</b> · 承伤 <b>4.4万</b></span><span class="miniit"><i></i><i></i><i></i><i></i><i></i><i></i></span><span><span class="chip">5.8</span></span></div>
+          <div class="aprow"><span class="who"><span class="pi"></span><span>暗影收割</span></span><span class="augs"><i class="g"></i><i class="g"></i><i></i><i></i></span><span>4/10/11<small>1.50:1</small></span><span class="dmg2"><b>1.9万</b> · 承伤 <b>5.1万</b></span><span class="miniit"><i></i><i></i><i></i><i></i><i></i><i></i></span><span><span class="chip">4.9</span></span></div>
+        </div>
+        <div class="agroup">
+          <header><span class="rk">#6</span><span class="emb"></span><strong>小兵队</strong><small>9 击杀 · 3.0万 伤害</small></header>
+          <div class="aprow"><span class="who"><span class="pi"></span><span>回城读条中</span></span><span class="augs"><i class="g"></i><i></i><i></i><i></i></span><span>3/8/2<small>0.63:1</small></span><span class="dmg2"><b>1.3万</b> · 承伤 <b>1.7万</b></span><span class="miniit"><i></i><i></i><i></i><i></i><i></i><i></i></span><span><span class="chip">3.1</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 极地大乱斗 -->
+  <div class="blk">
+    <h2>⑦ 极地大乱斗卡（收起态）</h2>
+    <p>与排位卡同骨架：无胜点；数据列为「击杀参与率 / 伤害·承伤 / 平均段位」（大乱斗不看 CS，对照 OP.GG）；详情表隐藏守卫列。</p>
+    <div class="mcard loss">
+      <div class="mrow">
+        <div class="mmeta"><span class="mode">极地大乱斗</span><time>3 天前</time><span class="res">失败</span><span class="dur">18分22秒</span></div>
+        <div class="mmain">
+          <div class="champ"><span class="cface">拉克丝</span><span class="clv">18</span><div class="loadout"><span class="li">闪</span><span class="li">标</span><span class="li rune">奥</span><span class="li rune">巫</span></div></div>
+          <div class="kda"><span class="nums">12 / <em>9</em> / 21</span><span class="ratio">3.67:1 KDA</span><span class="score">评分 <span class="chip good">7.2</span></span></div>
+          <div class="stats"><span class="srow"><em>击杀参与率</em><b>62%</b></span><span class="srow"><em>伤害</em><b>3.1万 <span class="dim">· 承伤 2.4万</span></b></span><span class="srow"><em>平均段位</em><b><span class="tier-ic"></span> 黄金 III</b></span></div>
+          <div class="mbuild"><div class="items"><span class="it"></span><span class="it"></span><span class="it"></span><span class="it"></span><span class="it empty"></span><span class="it empty"></span><span class="it trink"></span></div><div class="badges"><span class="chip">4th</span><span>三杀</span></div></div>
+        </div>
+        <div class="plist">
+          <span class="prow me"><span class="pi"></span><span>我听见风的颜色</span></span><span class="prow"><span class="pi"></span><span>对面中单</span></span>
+          <span class="prow"><span class="pi"></span><span>队友甲</span></span><span class="prow"><span class="pi"></span><span>对面打野</span></span>
+          <span class="prow"><span class="pi"></span><span>队友乙</span></span><span class="prow"><span class="pi"></span><span>对面上单</span></span>
+        </div>
+        <div class="mact"><button class="expand">⌄</button><button class="replay">▶</button></div>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="blk">
+    <h2>⑧ 小窗口（&lt; 1020px）：左侧生涯统计收起为按钮</h2>
+    <p>生涯统计整列移出主流程，不再挤压或下推战绩列表；左上角出现「生涯统计」入口按钮，战绩独占全部宽度。</p>
+    <div class="winframe">
+      <div class="wtop"><button class="career-btn"><svg viewBox="0 0 24 24"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg>生涯统计</button><span class="wtab self"><span class="st"></span>我听见风的…</span><span class="wtab"><span class="st"></span>梦短梦长…</span><span class="spacer"></span><span class="refresh">刷新战绩</span></div>
+      <div class="wbody"><div class="mcard win"><div class="mrow">
+  <div class="mmeta"><span class="mode">单排/双排</span><time>2 小时前</time><span class="res">胜利<span class="lp gain">+24 LP</span></span><span class="dur">28分40秒</span></div>
+  <div class="mmain">
+    <div class="champ"><span class="cface">伊泽</span><span class="clv">15</span><div class="loadout"><span class="li">闪</span><span class="li">治</span><span class="li rune">征</span><span class="li rune">启</span></div></div>
+    <div class="kda"><span class="nums">17 / <em>4</em> / 14</span><span class="ratio">7.75:1 KDA</span><span class="score">评分 <span class="chip gold">9.2</span></span></div>
+    <div class="stats"><span class="srow"><em>击杀参与率</em><b>68%</b></span><span class="srow"><em>CS</em><b>181 <span class="dim">(6.3)</span></b></span><span class="srow"><em>平均段位</em><b><span class="tier-ic"></span> 白银 IV</b></span></div>
+    <div class="mbuild"><div class="items"><span class="it"></span><span class="it"></span><span class="it"></span><span class="it"></span><span class="it"></span><span class="it empty"></span><span class="it trink"></span></div><div class="badges"><span class="chip r1">1st</span><span class="chip mvp">MVP</span></div></div>
+  </div>
+  <div class="plist"><span class="prow me"><span class="pi"></span><span>我听见风的颜色</span></span><span class="prow"><span class="pi"></span><span>影流之主</span></span><span class="prow"><span class="pi"></span><span>发条魔灵</span></span><span class="prow"><span class="pi"></span><span>暗夜猎手</span></span><span class="prow"><span class="pi"></span><span>河流之王</span></span></div>
+  <div class="mact"><button class="expand">⌄</button><button class="replay">▶</button></div>
+</div></div><div class="mcard win"><div class="mrow">
+  <div class="mmeta"><span class="mode">单排/双排</span><time>2 小时前</time><span class="res">胜利<span class="lp gain">+24 LP</span></span><span class="dur">28分40秒</span></div>
+  <div class="mmain">
+    <div class="champ"><span class="cface">伊泽</span><span class="clv">15</span><div class="loadout"><span class="li">闪</span><span class="li">治</span><span class="li rune">征</span><span class="li rune">启</span></div></div>
+    <div class="kda"><span class="nums">17 / <em>4</em> / 14</span><span class="ratio">7.75:1 KDA</span><span class="score">评分 <span class="chip gold">9.2</span></span></div>
+    <div class="stats"><span class="srow"><em>击杀参与率</em><b>68%</b></span><span class="srow"><em>CS</em><b>181 <span class="dim">(6.3)</span></b></span><span class="srow"><em>平均段位</em><b><span class="tier-ic"></span> 白银 IV</b></span></div>
+    <div class="mbuild"><div class="items"><span class="it"></span><span class="it"></span><span class="it"></span><span class="it"></span><span class="it"></span><span class="it empty"></span><span class="it trink"></span></div><div class="badges"><span class="chip r1">1st</span><span class="chip mvp">MVP</span></div></div>
+  </div>
+  <div class="plist"><span class="prow me"><span class="pi"></span><span>我听见风的颜色</span></span><span class="prow"><span class="pi"></span><span>影流之主</span></span><span class="prow"><span class="pi"></span><span>发条魔灵</span></span><span class="prow"><span class="pi"></span><span>暗夜猎手</span></span><span class="prow"><span class="pi"></span><span>河流之王</span></span></div>
+  <div class="mact"><button class="expand">⌄</button><button class="replay">▶</button></div>
+</div></div></div>
+    </div>
+  </div>
+
+  <div class="blk">
+    <h2>⑨ 生涯统计弹窗（遮罩 + 面板）</h2>
+    <p>点击按钮后从下方升起，宽度与总览页内容区一致；遮罩点击、右上角 ×、<code>Esc</code> 三种方式关闭。面板内两列自适应，窄到极限时降为单列。</p>
+    <div class="winframe" style="min-height: 560px;">
+      <div class="wtop"><button class="career-btn"><svg viewBox="0 0 24 24"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg>生涯统计</button><span class="wtab self"><span class="st"></span>我听见风的…</span><span class="wtab"><span class="st"></span>梦短梦长…</span><span class="spacer"></span><span class="refresh">刷新战绩</span></div>
+      <div class="wbody"><div class="mcard win"><div class="mrow">
+  <div class="mmeta"><span class="mode">单排/双排</span><time>2 小时前</time><span class="res">胜利<span class="lp gain">+24 LP</span></span><span class="dur">28分40秒</span></div>
+  <div class="mmain">
+    <div class="champ"><span class="cface">伊泽</span><span class="clv">15</span><div class="loadout"><span class="li">闪</span><span class="li">治</span><span class="li rune">征</span><span class="li rune">启</span></div></div>
+    <div class="kda"><span class="nums">17 / <em>4</em> / 14</span><span class="ratio">7.75:1 KDA</span><span class="score">评分 <span class="chip gold">9.2</span></span></div>
+    <div class="stats"><span class="srow"><em>击杀参与率</em><b>68%</b></span><span class="srow"><em>CS</em><b>181 <span class="dim">(6.3)</span></b></span><span class="srow"><em>平均段位</em><b><span class="tier-ic"></span> 白银 IV</b></span></div>
+    <div class="mbuild"><div class="items"><span class="it"></span><span class="it"></span><span class="it"></span><span class="it"></span><span class="it"></span><span class="it empty"></span><span class="it trink"></span></div><div class="badges"><span class="chip r1">1st</span><span class="chip mvp">MVP</span></div></div>
+  </div>
+  <div class="plist"><span class="prow me"><span class="pi"></span><span>我听见风的颜色</span></span><span class="prow"><span class="pi"></span><span>影流之主</span></span><span class="prow"><span class="pi"></span><span>发条魔灵</span></span><span class="prow"><span class="pi"></span><span>暗夜猎手</span></span><span class="prow"><span class="pi"></span><span>河流之王</span></span></div>
+  <div class="mact"><button class="expand">⌄</button><button class="replay">▶</button></div>
+</div></div></div>
+      <div class="wmask"></div>
+      <div class="wsheet">
+        <div class="wsheet-head"><strong>生涯统计</strong><small>我听见风的颜色#26247 · 黑色玫瑰</small><span class="x">×</span></div>
+        <div class="wsheet-body"><div class="csec"><header><h4>排位</h4><span>当前赛季</span></header><div class="cbody"><div class="rankrow"><span class="crest"></span><div><strong>单排/双排</strong><small>白银 IV · 81 LP</small></div><b>2胜 0负</b></div><div class="rankrow"><span class="crest"></span><div><strong>灵活组排</strong><small>白银 IV · 36 LP</small></div><b>105胜 89负</b></div></div></div><div class="csec"><header><h4>英雄胜率</h4><span>最近 20 场</span></header><div class="cbody"><div class="crow"><span class="ci"></span><span class="cn">全部英雄</span><span class="cv">2.49:1 · 50%</span></div><div class="crow"><span class="ci"></span><span class="cn">莫德凯撒</span><span class="cv">2.16:1 · 80%</span></div><div class="crow"><span class="ci"></span><span class="cn">魔腾</span><span class="cv">3.00:1 · 67%</span></div><div class="crow"><span class="ci"></span><span class="cn">伊泽瑞尔</span><span class="cv">3.17:1 · 50%</span></div></div></div><div class="csec"><header><h4>位置偏好</h4><span>按最近对局</span></header><div class="cbody"><div class="posrow"><span>上路</span><span class="posbar"><i style="width:5%"></i></span><span>5%</span></div><div class="posrow"><span>打野</span><span class="posbar"><i style="width:5%"></i></span><span>5%</span></div><div class="posrow"><span>中路</span><span class="posbar"><i style="width:25%"></i></span><span>25%</span></div><div class="posrow"><span>下路</span><span class="posbar"><i style="width:5%"></i></span><span>5%</span></div><div class="posrow"><span>辅助</span><span class="posbar"><i style="width:50%"></i></span><span>50%</span></div></div></div><div class="csec"><header><h4>英雄熟练度</h4><span>最高分</span></header><div class="cbody"><div class="crow"><span class="ci"></span><span class="cn">李青</span><span class="cv">Lv.15</span></div><div class="crow"><span class="ci"></span><span class="cn">卡蜜尔</span><span class="cv">Lv.14</span></div><div class="crow"><span class="ci"></span><span class="cn">普朗克</span><span class="cv">Lv.13</span></div><div class="crow"><span class="ci"></span><span class="cn">杰斯</span><span class="cv">Lv.12</span></div></div></div><div class="csec"><header><h4>过去 30 天排位</h4><span>单排与灵活</span></header><div class="cbody"><div class="rankrow"><div><strong style="font-size:16px">54%</strong><small>27 胜 23 负 · 2.61:1 KDA</small></div></div></div></div><div class="csec"><header><h4>最近一起玩</h4><span>最近 30 天</span></header><div class="cbody"><div class="crow"><span class="ci"></span><span class="cn">梦短梦长俱是梦</span><span class="cv">6 场</span></div><div class="crow"><span class="ci"></span><span class="cn">影流之主</span><span class="cv">3 场</span></div><div class="crow"><span class="ci"></span><span class="cn">河流之王</span><span class="cv">2 场</span></div></div></div><div class="csec wide"><header><h4>游戏时间分布</h4><span>本地时间</span></header><div class="cbody"><div class="heat"><span class=""></span><span class=""></span><span class=""></span><span class=""></span><span class="l1"></span><span class="l2"></span><span class="l3"></span><span class="l3"></span><span class="l2"></span><span class="l1"></span><span class=""></span><span class=""></span></div><div style="display:flex;justify-content:space-between;color:var(--faint);font-size:10px"><span>上午</span><span>下午</span></div></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note-cards">
+    <h3>实现要点（对应工单 P4–P7）</h3>
+    <ul>
+      <li><b>网格列定义</b>：卡片 <b>108px | 1fr | auto | 40px</b>（列间距 8px）；中列内部 <b>auto | minmax(96px,auto) | auto | 1fr</b>——英雄、KDA、数据三组以 22px 固定间距紧凑聚拢在左，末尾 1fr 吸收多余空白；数据列带左分隔线与 KDA 成组，不再飘到卡片最右。</li>
+      <li><b>竞技场右列 128px</b>、普通模式 190px；释放的宽度归中列。容器 ~680px 以下先收玩家名单，KDA 永不隐藏。</li>
+      <li><b>数据列按模式取字段</b>（对照 OP.GG）：排位/匹配 = 击杀参与率 · CS(分均) · 平均段位；极地/海克斯大乱斗 = 击杀参与率 · 伤害·承伤 · 平均段位；斗魂竞技场 = 本场名次 · 伤害·承伤；其余模式 = 击杀参与率 · CS · 伤害。统一「标签左、数值右」，左侧分隔线与 KDA 成组。</li>
+      <li><b>小窗口生涯统计弹窗</b>：容器查询 <code>&lt; 1020px</code> 时 <code>.career-column</code> 移出布局（现有断点是改成两列堆叠在战绩下方，改为整列隐藏），左上角出现入口按钮；面板为覆盖内容区的底部升起式 sheet，宽度 = 内容区宽度，带 <code>--overlay</code> 遮罩；遮罩点击 / × / <code>Esc</code> 关闭，打开时给内容区加 <code>inert</code>，关闭后焦点回到按钮。≥1020px 时按钮与弹窗都不存在，维持现有两列布局。</li>
+      <li><b>展开详情时右侧玩家名单保留</b>，详情区只向下追加；名单列宽 236px（竞技场 150px），头像 20px。</li>
+      <li><b>海克斯 3×2</b>（26px 圆形），稀有度用描边色：棱彩紫 / 黄金金 / 白银默认；空位保留半透明占位。</li>
+      <li><b>竞技场详情</b>：全局列头一次 + 按名次分组，列头与行共用同一 grid template（不用独立 table），窄窗口先隐藏「装备」列再隐藏「海克斯」。</li>
+      <li><b>队名中文映射</b>：Poros 魄罗 / Minions 小兵 / Scuttles 河道蟹 / Krugs 石甲虫 / Raptors 锐咬鸟 / Sentinels 哨兵 / Wolves 暗影狼 / Gromp 魔沼蛙。</li>
+      <li><b>警示条</b>只在国服页签且 match-details capability 为 failed 时出现，展示后端返回的具体错误。</li>
+      <li><b>更多模式菜单</b>复用服务器选择器的视觉与键盘语义；选中后触发器文案替换为模式名。</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

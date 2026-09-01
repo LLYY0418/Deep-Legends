@@ -9,12 +9,16 @@ import (
 )
 
 const (
-	connectedFallbackInterval = time.Hour
-	eventDebounceInterval     = 900 * time.Millisecond
-	eventRetryInterval        = 5 * time.Minute
-	minimumDiscoveryBackoff   = 3 * time.Second
-	maximumDiscoveryBackoff   = 8 * time.Second
-	snapshotRetryInterval     = 5 * time.Second
+	connectedFallbackInterval   = time.Hour
+	eventDebounceInterval       = 900 * time.Millisecond
+	champSelectEventDebounce    = 300 * time.Millisecond
+	eventRetryInterval          = 5 * time.Minute
+	minimumDiscoveryBackoff     = 3 * time.Second
+	maximumDiscoveryBackoff     = 8 * time.Second
+	snapshotRetryInterval       = 5 * time.Second
+	snapshotRetryMaxInterval    = 60 * time.Second
+	snapshotRetryFailureBudget  = 10
+	snapshotRetryBudgetDuration = 2 * time.Minute
 	// 好友状态事件非常频繁（每位好友的每次状态变化都是一条事件），
 	// 合并后只提醒前端“该重新拉取好友列表了”，不触发库存刷新。
 	friendsEventDebounce = 1500 * time.Millisecond
@@ -26,6 +30,9 @@ func isFriendsLCUEvent(event LCUEvent) bool {
 }
 
 func (a *app) requestRefresh() {
+	a.mu.Lock()
+	a.manualDisconnected = false
+	a.mu.Unlock()
 	if a.refreshRequests == nil {
 		return
 	}
@@ -38,6 +45,18 @@ func (a *app) requestRefresh() {
 func (a *app) runConnectionManager(ctx context.Context) {
 	backoff := minimumDiscoveryBackoff
 	for ctx.Err() == nil {
+		a.mu.RLock()
+		paused := a.manualDisconnected
+		a.mu.RUnlock()
+		if paused {
+			a.setConnectionPhase("disconnected", false)
+			select {
+			case <-ctx.Done():
+				return
+			case <-a.refreshRequests:
+				continue
+			}
+		}
 		a.setConnectionPhase("connecting", false)
 		client, report, err := discoverLCUDetailed()
 		a.updateDiscovery(report)
@@ -89,6 +108,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 	sessionCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	eventTriggers := make(chan string, 4)
+	champSelectTriggers := make(chan struct{}, 8)
 	friendTriggers := make(chan struct{}, 1)
 	eventErrors := make(chan error, 1)
 	startEvents := func() {
@@ -100,14 +120,37 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 					var phase string
 					if json.Unmarshal(event.Data, &phase) == nil && phase != "" {
 						a.broadcastEvent("gameflow:" + phase)
-						a.convenience.handlePhase(client, phase)
+						if watch := a.activeWatch(); watch != nil {
+							watch.handlePhase(client, phase)
+						}
 						// 排位结算时记录这一场的胜点变化（段位优先走 SGP，
 						// 本机客户端的 ranked-stats 已不返回负场）。
 						if playerRef := a.currentPlayerRef(); playerRef != "" {
 							a.lpTracker.handlePhase(client, phase, playerRef, func() ([]gameplayRank, EndpointCapability) {
-								return a.loadRanksWithFallback(context.Background(), client, playerRef, true, clientTencentServerID(client))
+								ranks, _, capability := a.loadRanksWithFallback(context.Background(), client, playerRef, true, clientTencentServerID(client), "")
+								return ranks, capability
 							})
 						}
+					}
+					return
+				}
+				a.mu.RLock()
+				current := a.summoner
+				a.mu.RUnlock()
+				if watch := a.activeWatch(); watch != nil {
+					watch.handleEvent(client, event, current)
+				}
+				uri := strings.ToLower(event.URI)
+				if strings.HasPrefix(uri, "/lol-rewards/v1/grants") || strings.HasPrefix(uri, "/lol-missions/v1/missions") {
+					a.broadcastEvent("claim:changed")
+				}
+				if strings.HasPrefix(strings.ToLower(event.URI), "/lol-champ-select/v1/session") {
+					if watch := a.activeWatch(); watch != nil {
+						watch.handleChampSelect(client, current)
+					}
+					select {
+					case champSelectTriggers <- struct{}{}:
+					default:
 					}
 					return
 				}
@@ -134,12 +177,18 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 		}()
 	}
 	startEvents()
+	a.scheduleFacadeLoginReset(sessionCtx, client)
 	fallback := time.NewTicker(connectedFallbackInterval)
 	defer fallback.Stop()
-	snapshotRetry := time.NewTicker(snapshotRetryInterval)
-	defer snapshotRetry.Stop()
+	snapshotRetryTimer := time.NewTimer(snapshotRetryInterval)
+	defer snapshotRetryTimer.Stop()
+	snapshotRetry := snapshotRetryTimer.C
+	retryDelay := snapshotRetryInterval
+	retryFailures := 0
 	var debounceTimer *time.Timer
 	var debounce <-chan time.Time
+	var champSelectTimer *time.Timer
+	var champSelectDebounce <-chan time.Time
 	var friendsTimer *time.Timer
 	var friendsDebounce <-chan time.Time
 	var retryTimer *time.Timer
@@ -155,9 +204,10 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 			}
 			a.setSnapshotPhase(client)
 		case scope := <-eventTriggers:
-			if scope == "full" || pendingScope == "" {
-				pendingScope = scope
+			if scope == "champselect" {
+				continue
 			}
+			pendingScope = mergeDebouncedRefreshScope(pendingScope, scope)
 			if debounceTimer == nil {
 				debounceTimer = time.NewTimer(eventDebounceInterval)
 			} else {
@@ -170,6 +220,22 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 				debounceTimer.Reset(eventDebounceInterval)
 			}
 			debounce = debounceTimer.C
+		case <-champSelectTriggers:
+			if champSelectTimer == nil {
+				champSelectTimer = time.NewTimer(champSelectEventDebounce)
+			} else {
+				if !champSelectTimer.Stop() {
+					select {
+					case <-champSelectTimer.C:
+					default:
+					}
+				}
+				champSelectTimer.Reset(champSelectEventDebounce)
+			}
+			champSelectDebounce = champSelectTimer.C
+		case <-champSelectDebounce:
+			champSelectDebounce = nil
+			a.broadcastEvent("champselect:changed")
 		case <-friendTriggers:
 			if friendsTimer == nil {
 				friendsTimer = time.NewTimer(friendsEventDebounce)
@@ -190,26 +256,36 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 			debounce = nil
 			scope := pendingScope
 			pendingScope = ""
-			if scope == "account" {
-				a.refreshAccountWithClient(client)
-			} else if !a.refreshWithClient(client) {
+			if !a.handleDebouncedRefreshScope(client, scope, a.refreshAccountWithClient, a.refreshWithClient) {
 				return errors.New("LCU inventory refresh failed")
-			} else {
-				a.setSnapshotPhase(client)
 			}
 		case <-fallback.C:
 			if !a.refreshWithClient(client) {
 				return errors.New("LCU fallback refresh failed")
 			}
 			a.setSnapshotPhase(client)
-		case <-snapshotRetry.C:
+		case <-snapshotRetry:
 			if a.snapshotReadyForClient(client) {
+				retryDelay = snapshotRetryInterval
+				retryFailures = 0
+				snapshotRetryTimer.Reset(retryDelay)
 				continue
 			}
 			if !a.refreshWithClient(client) {
 				return errors.New("LCU snapshot retry failed")
 			}
 			a.setSnapshotPhase(client)
+			if a.snapshotReadyForClient(client) {
+				retryDelay = snapshotRetryInterval
+				retryFailures = 0
+			} else {
+				a.mu.RLock()
+				retryExhausted := a.snapshotRetryExhausted
+				a.mu.RUnlock()
+				retryFailures++
+				retryDelay = nextSnapshotRetryDelay(retryFailures, retryExhausted)
+			}
+			snapshotRetryTimer.Reset(retryDelay)
 		case <-eventErrors:
 			a.setEventStream(client, false)
 			if err := client.probe(); err != nil {
@@ -226,6 +302,72 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 			startEvents()
 		}
 	}
+}
+
+func mergeDebouncedRefreshScope(current, next string) string {
+	if current == "" || current == next {
+		return next
+	}
+	if next == "" {
+		return current
+	}
+	if current == "full" || next == "full" {
+		return "full"
+	}
+	if current == "account+collection" || next == "account+collection" ||
+		(current == "account" && next == "collection") || (current == "collection" && next == "account") {
+		return "account+collection"
+	}
+	return next
+}
+
+func (a *app) handleDebouncedRefreshScope(client *LCUClient, scope string, refreshAccount func(*LCUClient), refreshFull func(*LCUClient) bool) bool {
+	switch scope {
+	case "collection":
+		a.markCollectionDirty()
+		return true
+	case "account":
+		refreshAccount(client)
+		return true
+	case "account+collection":
+		a.markCollectionDirty()
+		refreshAccount(client)
+		return true
+	default:
+		if !refreshFull(client) {
+			return false
+		}
+		a.setSnapshotPhase(client)
+		return true
+	}
+}
+
+func (a *app) markCollectionDirty() {
+	a.mu.Lock()
+	a.collectionDirty = true
+	a.collectionDirtyAt = time.Now()
+	a.mu.Unlock()
+	a.broadcastEvent("collection-dirty")
+}
+
+func nextSnapshotRetryDelay(attempt int, exhausted bool) time.Duration {
+	if exhausted {
+		return snapshotRetryMaxInterval
+	}
+	if attempt < 1 {
+		return snapshotRetryInterval
+	}
+	delay := snapshotRetryInterval
+	for i := 0; i < attempt; i++ {
+		if delay >= snapshotRetryMaxInterval/2 {
+			return snapshotRetryMaxInterval
+		}
+		delay *= 2
+	}
+	if delay > snapshotRetryMaxInterval {
+		return snapshotRetryMaxInterval
+	}
+	return delay
 }
 
 func (a *app) snapshotReadyForClient(client *LCUClient) bool {

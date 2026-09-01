@@ -7,11 +7,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
+
+var diagnosticExportFilenamePattern = regexp.MustCompile(`attachment; filename="lol-loot-diagnostics-\d{4}-\d{4}\.jsonl"`)
 
 func inventoryTestClient(t *testing.T, handler http.Handler) *LCUClient {
 	t.Helper()
@@ -270,6 +273,42 @@ func TestSnapshotPersistenceIsRedacted(t *testing.T) {
 	}
 }
 
+func TestLatestMatchingSnapshotRequiresAccountAndPoolIdentity(t *testing.T) {
+	root := t.TempDir()
+	for _, dir := range []string{"snapshots", "pools", "logs"} {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	store := &localStore{root: root, salt: bytes.Repeat([]byte{7}, 32)}
+	pool, err := validatePoolManifest(PoolManifest{Name: "历史奖池", Version: "1", Names: []string{"一", "二"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := Summoner{PUUID: "account-a"}
+	first, err := store.saveSnapshot(Snapshot{Summoner: account, Owned: []Skin{{ID: 1, Name: "一"}}}, pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.saveSnapshot(Snapshot{Summoner: account, Owned: []Skin{{ID: 2, Name: "二"}}}, pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.ID == first.ID {
+		t.Fatal("different snapshot state should not be deduplicated")
+	}
+	got, ok := store.latestMatchingSnapshot(store.accountHash(account), pool.ID, pool.Hash)
+	if !ok || got.ID != second.ID {
+		t.Fatalf("latest matching snapshot = %#v, ok=%v; want %s", got, ok, second.ID)
+	}
+	if _, ok := store.latestMatchingSnapshot(store.accountHash(Summoner{PUUID: "account-b"}), pool.ID, pool.Hash); ok {
+		t.Fatal("snapshot must not cross accounts")
+	}
+	if _, ok := store.latestMatchingSnapshot(store.accountHash(account), pool.ID, "different-pool-hash"); ok {
+		t.Fatal("snapshot must not cross pool hashes")
+	}
+}
+
 func TestSnapshotExportUsesSelectedHistoryRecord(t *testing.T) {
 	root := t.TempDir()
 	for _, dir := range []string{"snapshots", "pools", "logs"} {
@@ -375,23 +414,26 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &privacy); err != nil {
 		t.Fatal(err)
 	}
-	if len(privacy.ExplicitWrites) != 3 {
+	if len(privacy.ExplicitWrites) != 9 {
 		t.Fatalf("explicit client writes = %#v", privacy.ExplicitWrites)
 	}
-	if len(privacy.AutomaticWrites) != 3 {
+	if len(privacy.AutomaticWrites) != 9 {
 		t.Fatalf("automatic client writes = %#v", privacy.AutomaticWrites)
 	}
 	automaticWrites := strings.Join(privacy.AutomaticWrites, "\n")
-	for _, expected := range []string{"默认关闭", "ReadyCheck", "EndOfGame", "Reconnect"} {
+	for _, expected := range []string{"默认关闭", "ReadyCheck", "EndOfGame", "Reconnect", "点赞", "任务庆祝", "阵营位置", "房主", "邀请", "匹配"} {
 		if !strings.Contains(automaticWrites, expected) {
 			t.Fatalf("automatic write statement is missing %q: %s", expected, automaticWrites)
 		}
 	}
 	writes := strings.Join(privacy.ExplicitWrites, "\n")
-	for _, expected := range []string{"符文", "装备方案", "英雄选择", "[DL] ", "页数已满", "最旧符文页", "最多回收 5 页", "绝不删除其它符文页", "回放"} {
+	for _, expected := range []string{"符文", "装备方案", "英雄选择", "[DL] ", "页数已满", "最旧符文页", "最多回收 5 页", "绝不删除其它符文页", "回放", "生涯背景", "个性签名", "头像框", "逐项领取", "客户端界面", "只读属性", "符号链接"} {
 		if !strings.Contains(writes, expected) {
 			t.Fatalf("privacy statement is missing %q: %s", expected, writes)
 		}
+	}
+	if strings.Contains(writes, "生涯背景皮肤与炫彩") {
+		t.Fatalf("privacy statement still claims facade chroma support: %s", writes)
 	}
 	externalReads := strings.Join(privacy.ExternalReads, "\n")
 	for _, expected := range []string{"绝活哥", "OP.GG 韩服专家榜", "第三方玩家 Riot ID", "Riot 官方接口", "公开对局", "不携带本机账号", "6 小时"} {
@@ -407,6 +449,11 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(privacy.Stores, "\n"), "脱敏账号标识") || !strings.Contains(strings.Join(privacy.NeverStores, "\n"), "PUUID") {
 		t.Fatalf("LP storage privacy boundary is incomplete: stores=%#v never=%#v", privacy.Stores, privacy.NeverStores)
+	}
+	for _, expected := range []string{"战利品", "待领取奖励", "任务", "活动奖励"} {
+		if !strings.Contains(strings.Join(privacy.NeverStores, "\n"), expected) {
+			t.Fatalf("reward storage privacy boundary is missing %q: %#v", expected, privacy.NeverStores)
+		}
 	}
 }
 
@@ -448,6 +495,34 @@ func TestDiagnosticsExposeOnlyDiscoveryCounts(t *testing.T) {
 		if strings.Contains(body, secret) {
 			t.Fatalf("diagnostics leaked %q: %s", secret, body)
 		}
+	}
+}
+
+func TestDiagnosticSourcesExcludeStableIdentifiers(t *testing.T) {
+	forbidden := []string{
+		`"server_id":`, `"queue_type":`, `"queue_types":`,
+		`"accountHash":`, `"puuid":`, `"requested_participant_id":`, `"event_participant_ids":`,
+		`"region": regionKey`,
+	}
+	for _, source := range []string{"gameplay.go", "lp_tracker.go", "match_timeline.go", "sgp_api.go"} {
+		data, err := os.ReadFile(source)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, field := range forbidden {
+			if strings.Contains(string(data), field) {
+				t.Errorf("%s contains forbidden diagnostic field %s", source, field)
+			}
+		}
+	}
+	// R39 explicitly permits the game ID only on the roster-shape diagnostic;
+	// all other stable identity fields remain forbidden above.
+	gameplayData, err := os.ReadFile("gameplay.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(gameplayData), `"game_id":`) != 1 || !strings.Contains(string(gameplayData), `"event": "live_roster_shape", "game_id":`) {
+		t.Errorf("gameplay.go game_id diagnostic is not scoped to live_roster_shape")
 	}
 }
 
@@ -524,6 +599,45 @@ func TestDiagnosticLogRotationRemainsBounded(t *testing.T) {
 	if backupInfo, err := os.Stat(backup); err != nil || backupInfo.Size() <= 2*1024*1024 {
 		t.Fatalf("diagnostic backup missing after rotation: info=%v err=%v", backupInfo, err)
 	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("rotated diagnostic lines = %d: %s", len(lines), data)
+	}
+	var rotated map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &rotated); err != nil {
+		t.Fatal(err)
+	}
+	if rotated["event"] != "log_rotated" || rotated["previous_lines"] != float64(1) || rotated["previous_bytes"] != float64(2*1024*1024+1) {
+		t.Fatalf("rotation marker = %#v", rotated)
+	}
+}
+
+func TestAppStartDiagnosticIdentifiesBuild(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a := &app{storage: &localStore{root: root}}
+	a.recordAppStartDiagnostic()
+	data, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("app start should be the first diagnostic line, got %d: %s", len(lines), data)
+	}
+	var event map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &event); err != nil {
+		t.Fatal(err)
+	}
+	if event["event"] != "app_start" || event["version"] != version || event["build_fingerprint"] != buildFingerprint || event["riot_key"] != riotKeyConfigured() || event["time"] == nil {
+		t.Fatalf("app start diagnostic = %#v", event)
+	}
 }
 
 func TestDiagnosticLogDownloadUsesTrustedFixedFile(t *testing.T) {
@@ -542,8 +656,52 @@ func TestDiagnosticLogDownloadUsesTrustedFixedFile(t *testing.T) {
 	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"event":"lcu_discovery"`) {
 		t.Fatalf("unexpected diagnostic download: status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
-	if disposition := recorder.Header().Get("Content-Disposition"); !strings.Contains(disposition, "lol-loot-diagnostics.jsonl") {
+	if disposition := recorder.Header().Get("Content-Disposition"); !diagnosticExportFilenamePattern.MatchString(disposition) {
 		t.Fatalf("unexpected disposition: %q", disposition)
+	}
+	var downloaded map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(recorder.Body.Bytes()), &downloaded); err != nil || downloaded["time"] == nil {
+		t.Fatalf("downloaded diagnostic line has no UTC time field: event=%#v err=%v", downloaded, err)
+	}
+}
+
+func TestDiagnosticLogExportFilenameChangesWithExportTime(t *testing.T) {
+	// 真实事故：导出文件名固定不变，用户删了旧日志重新导出并上传给第三方，
+	// 因为文件名一直一样被按名去重，内容其实还是几天前的旧日志。文件名必须
+	// 随导出时刻变化，且格式要和前端 web/app.js 的 diagnosticExportFilename() 一致。
+	first := diagnosticLogExportFilename(time.Date(2026, 8, 27, 13, 43, 0, 0, time.UTC))
+	if first != "lol-loot-diagnostics-0827-1343.jsonl" {
+		t.Fatalf("unexpected filename: %q", first)
+	}
+	second := diagnosticLogExportFilename(time.Date(2026, 8, 28, 9, 5, 0, 0, time.UTC))
+	if second == first {
+		t.Fatal("filename did not change across export times")
+	}
+	if second != "lol-loot-diagnostics-0828-0905.jsonl" {
+		t.Fatalf("unexpected filename: %q", second)
+	}
+}
+
+func TestDiagnosticsExposeCurrentLogSizeAndEventCount(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	store := &localStore{root: root}
+	for _, event := range []string{"first", "second"} {
+		if err := store.appendDiagnostic(map[string]any{"event": event}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a := &app{storage: store}
+	recorder := httptest.NewRecorder()
+	a.handleDiagnostics(recorder, httptest.NewRequest(http.MethodGet, "/api/diagnostics", nil))
+	var response diagnosticsResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if !response.DiagnosticLogReady || response.DiagnosticLogEvents != 2 || response.DiagnosticLogBytes <= 0 {
+		t.Fatalf("diagnostic log stats = ready:%v bytes:%d events:%d", response.DiagnosticLogReady, response.DiagnosticLogBytes, response.DiagnosticLogEvents)
 	}
 }
 

@@ -1,0 +1,61 @@
+# 共 60 个海克斯只有 _small.png、没有 _large.png（实测 2026-08-27）
+  177  NestingDoll                         套娃
+  316  GrievousVenom                       烈性毒液
+  340  CraftingPrisStatAnvil               获得一个棱彩阶属性锻造器
+  341  CraftingAugmentSlot                 获得一个强化符文栏位
+  342  CraftingSellAugment                 等级类强化符文
+  345  MagicalGirl                         魔法少女
+  346  BreadSandwich                       面包三明治
+  355  GainStatAnvil                       获得属性锻造器
+  356  SilverSpoon                         银汤匙
+  364  ReplaceAugment                      替换强化符文
+  374  RiceAndChicken                      Rice and Chicken
+  375  RiceAndFish                         Rice and Fish
+  376  RiceAndPork                         Rice and Pork
+  377  CombinationFriedRice                Combination Fried Rice
+  378  TransmuteSilver                     Transmute: Silver
+  379  WildFire                            Wild Fire
+  380  Mercy                               Mercy
+  381  Scavenger                           Scavenger
+  383  DemonicClasp                        Demonic Clasp
+  384  Spellcraft                          Spellcraft
+  388  ChromaFlux                          Chroma Flux
+  389  TrashToTreasure                     Trash To Treasure
+  391  RagsToRiches                        Rags to Riches
+  394  DustToDiamonds                      Dust To Diamonds
+ 1064  ARAM_Perseverance                   Perseverance
+ 1082  ARAM_TheBrutalizer                  The Brutalizer
+ 1108  ARAM_SelfDestruct                   Self Destruct
+ 1313  ARAM_Recall                         Cheating
+ 1317  ARAM_Upgrade_Cutlass                Upgrade Cutlass
+ 1321  Gash                                Gash
+ 1330  ReEnergize                          ReEnergize
+ 1341  HatOnAHat                           Hat on a Hat
+ 2001  ARAM_WatchOutGrapefruit             Heads Up Cupcake!
+ 2002  ARAM_VoidRift                       Void Rift
+ 2031  ARAM_DropBear                       DropBear
+ 7001  Upgrade_ZzRotPortal                 Upgrade: Zz'Rot Portal
+ 7002  DontStopCleavin                     Don't Stop Cleavin'
+ 7003  DoOrDie                             Do or Die
+ 7004  DrinkUp                             Drink Up
+ 7005  HasteMakesWaste                     Haste Makes Waste
+ 7006  StabbyStabby                        Stabby Stabby
+ 7007  Upgrade_DeathFireGrasp              Upgrade: Deathfire Grasp
+ 7008  DoransBiggestFan                    Doran's Biggest Fan
+ 7009  Upgrade_InnervatingLocket           Upgrade: Innervating Locket
+ 7010  FutureSightHeartsteel               Time Warp: Heartsteel
+ 7011  TrueEternity                        True Eternity
+ 7012  HexCore                             The Hex Core
+ 7014  DipDiveDodge                        Ragebait
+ 7015  SummonersSafari                     Summoner's Safari
+33101  Stat_AbilityHaste                   Ability Haste
+33102  Stat_AoeSize                        Area Size
+33103  Stat_Armor                          Armor
+33104  Stat_CritChance                     Critical Chance
+33105  Stat_DamagePercent                  Damage
+33106  Stat_Duration                       Duration
+33107  Stat_Exp                            EXP
+33109  Stat_MaxHealth                      Max Health
+33110  Stat_Movespeed                      Movement Speed
+33111  Stat_PickupRadius                   Pickup Radius
+33112  Stat_ProjectileCount                Projectile Count

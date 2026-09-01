@@ -18,11 +18,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -78,28 +81,92 @@ const (
 	sgpCacheMax     = 64
 )
 
+type overviewLoadCostContextKey struct{}
+
+type overviewLoadCost struct {
+	mu               sync.Mutex
+	requests         int
+	bytes            int
+	historyCalls     int
+	historyCacheHits int
+}
+
+func (c *overviewLoadCost) addRequest(bytes int) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.requests++
+	c.bytes += bytes
+	c.mu.Unlock()
+}
+
+func (c *overviewLoadCost) addHistoryCall() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.historyCalls++
+	c.mu.Unlock()
+}
+
+func (c *overviewLoadCost) addHistoryCacheHit() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.historyCacheHits++
+	c.mu.Unlock()
+}
+
+func (c *overviewLoadCost) snapshot() (requests, bytes, historyCalls, historyCacheHits int) {
+	if c == nil {
+		return 0, 0, 0, 0
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.requests, c.bytes, c.historyCalls, c.historyCacheHits
+}
+
+func overviewCostFromContext(ctx context.Context) *overviewLoadCost {
+	if ctx == nil {
+		return nil
+	}
+	cost, _ := ctx.Value(overviewLoadCostContextKey{}).(*overviewLoadCost)
+	return cost
+}
+
 type sgpProvider struct {
-	http *http.Client
+	http            *http.Client
+	observe         func(map[string]any)
+	rankedShapeOnce sync.Once
 	// serverBases is copied per provider so tests and future runtime overrides
 	// never mutate the package-level verified production table.
 	serverBases map[string]string
 
-	mu           sync.Mutex
-	token        string
-	tokenAt      time.Time
-	tokenClient  *LCUClient
-	sessionToken string
-	sessionAt    time.Time
-	sessionOwner *LCUClient
-	failUntil    time.Time
-	historyCache map[string]sgpHistoryCacheEntry
+	mu            sync.Mutex
+	token         string
+	tokenAt       time.Time
+	tokenClient   *LCUClient
+	sessionToken  string
+	sessionAt     time.Time
+	sessionOwner  *LCUClient
+	failUntil     time.Time
+	historyCache  map[string]sgpHistoryCacheEntry
+	summonerCache map[string]sgpSummonerCacheEntry
 }
 
 type sgpHistoryCacheEntry struct {
 	at       time.Time
+	lastUsed time.Time
 	games    []*riotMatchInfo
 	consumed int
 	more     bool
+}
+
+type sgpSummonerCacheEntry struct {
+	at       time.Time
+	summoner sgpSummoner
 }
 
 func newSGPProvider() *sgpProvider {
@@ -109,10 +176,46 @@ func newSGPProvider() *sgpProvider {
 	}
 	return &sgpProvider{
 		// SGP 网关是国内直连域名，不走“英雄数据网络”的代理设置。
-		http:         &http.Client{Timeout: 20 * time.Second},
-		serverBases:  serverBases,
-		historyCache: make(map[string]sgpHistoryCacheEntry),
+		http:          &http.Client{Timeout: 20 * time.Second},
+		serverBases:   serverBases,
+		historyCache:  make(map[string]sgpHistoryCacheEntry),
+		summonerCache: make(map[string]sgpSummonerCacheEntry),
 	}
+}
+
+func (p *sgpProvider) cachedSummoner(key string) (sgpSummoner, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	entry, ok := p.summonerCache[key]
+	if !ok || time.Since(entry.at) > sgpCacheTTL {
+		delete(p.summonerCache, key)
+		return sgpSummoner{}, false
+	}
+	return entry.summoner, true
+}
+
+func (p *sgpProvider) cacheSummoner(key string, summoner sgpSummoner) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.summonerCache == nil {
+		p.summonerCache = make(map[string]sgpSummonerCacheEntry)
+	}
+	if _, exists := p.summonerCache[key]; !exists && len(p.summonerCache) >= sgpCacheMax {
+		oldestKey := ""
+		var oldest time.Time
+		for candidate, entry := range p.summonerCache {
+			if oldestKey == "" || entry.at.Before(oldest) {
+				oldestKey, oldest = candidate, entry.at
+			}
+		}
+		delete(p.summonerCache, oldestKey)
+	}
+	p.summonerCache[key] = sgpSummonerCacheEntry{at: time.Now(), summoner: summoner}
+}
+
+func summonerCacheKey(source, serverID, playerRef string) string {
+	key := strings.ToUpper(strings.TrimSpace(serverID)) + "|" + strings.TrimSpace(playerRef)
+	return sourceScopedKey(source, key)
 }
 
 func (p *sgpProvider) serverBase(serverID string) (string, bool) {
@@ -164,10 +267,14 @@ func (p *sgpProvider) entitlementsToken(client *LCUClient, force bool) (string, 
 		AccessToken string `json:"accessToken"`
 	}
 	if err := client.GetJSON("/entitlements/v1/token", &payload); err != nil {
-		return "", fmt.Errorf("客户端未提供 SGP 访问令牌: %w", err)
+		var httpErr *LCUHTTPError
+		if errors.As(err, &httpErr) {
+			return "", fmt.Errorf("客户端 SGP 令牌端点返回 HTTP %d: %w", httpErr.StatusCode, err)
+		}
+		return "", fmt.Errorf("客户端 SGP 令牌请求失败: %w", err)
 	}
 	if strings.TrimSpace(payload.AccessToken) == "" {
-		return "", errors.New("客户端返回的 SGP 访问令牌为空")
+		return "", errors.New("客户端 SGP 令牌端点响应成功，但 accessToken 字段为空")
 	}
 	p.mu.Lock()
 	p.token = payload.AccessToken
@@ -179,9 +286,21 @@ func (p *sgpProvider) entitlementsToken(client *LCUClient, force bool) (string, 
 
 type sgpMatchHistoryPage struct {
 	Games []struct {
-		JSON *riotMatchInfo `json:"json"`
+		JSON json.RawMessage `json:"json"`
 	} `json:"games"`
 }
+
+type sgpPartialHistoryError struct {
+	Cause    error
+	Returned int
+	Consumed int
+}
+
+func (e *sgpPartialHistoryError) Error() string {
+	return fmt.Sprintf("SGP 分页读取中断（已返回 %d 场、消费 %d 条）: %v", e.Returned, e.Consumed, e.Cause)
+}
+
+func (e *sgpPartialHistoryError) Unwrap() error { return e.Cause }
 
 // leagueSessionToken 读取 league-session 令牌：段位（leagues-ledge）与
 // 召唤师（summoner-ledge）接口要求这种令牌，与战绩用的 entitlements 不同。
@@ -216,7 +335,204 @@ const (
 	sgpTokenLeagueSession
 )
 
-func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, kind sgpTokenKind, endpoint string, out any) error {
+func (kind sgpTokenKind) diagnosticName() string {
+	if kind == sgpTokenLeagueSession {
+		return "session"
+	}
+	return "entitlements"
+}
+
+func diagnosticPayloadPrefixShape(body []byte) string {
+	sample := bytes.TrimSpace(body)
+	if len(sample) > 200 {
+		sample = sample[:200]
+	}
+	if len(sample) == 0 {
+		return "empty"
+	}
+	switch sample[0] {
+	case '{':
+		return "json_object"
+	case '[':
+		return "json_array"
+	case '<':
+		lower := bytes.ToLower(sample)
+		if bytes.HasPrefix(lower, []byte("<!doctype html")) || bytes.HasPrefix(lower, []byte("<html")) {
+			return "html"
+		}
+		return "markup"
+	default:
+		return "other"
+	}
+}
+
+// diagnosticKeySet returns JSON object keys without retaining any values.
+func diagnosticKeySet(raw json.RawMessage) []string {
+	var object map[string]json.RawMessage
+	if json.Unmarshal(raw, &object) != nil {
+		return nil
+	}
+	keys := make([]string, 0, len(object))
+	for key := range object {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func diagnosticKeyUnion(entries []json.RawMessage) []string {
+	set := make(map[string]struct{})
+	for _, entry := range entries {
+		for _, key := range diagnosticKeySet(entry) {
+			set[key] = struct{}{}
+		}
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func diagnosticPrivacy(value string) string {
+	switch strings.ToUpper(strings.TrimSpace(value)) {
+	case "PUBLIC":
+		return "PUBLIC"
+	case "PRIVATE":
+		return "PRIVATE"
+	case "":
+		return "UNKNOWN"
+	default:
+		return "OTHER"
+	}
+}
+
+// rankedQueueEntries 把 queues 数组和 queueMap 对象统一成一组原始条目，
+// 这样两种形状的排位载荷可以走同一套字段探测。
+func rankedQueueEntries(raw json.RawMessage) []json.RawMessage {
+	var object map[string]json.RawMessage
+	if json.Unmarshal(raw, &object) != nil {
+		return nil
+	}
+	var entries []json.RawMessage
+	if value, ok := object["queues"]; ok {
+		var list []json.RawMessage
+		if json.Unmarshal(value, &list) == nil {
+			entries = append(entries, list...)
+		}
+	}
+	if value, ok := object["queueMap"]; ok {
+		var mapped map[string]json.RawMessage
+		if json.Unmarshal(value, &mapped) == nil {
+			for _, item := range mapped {
+				entries = append(entries, item)
+			}
+		}
+	}
+	return entries
+}
+
+// diagnosticRankedQueueSamples keeps only four reviewed scalar fields from the
+// first solo-queue entry in each container. Recording queues and queueMap
+// separately lets a single real-client sample reveal whether one is redacted.
+func diagnosticRankedQueueSamples(raw json.RawMessage) map[string]any {
+	var object map[string]json.RawMessage
+	if json.Unmarshal(raw, &object) != nil {
+		return nil
+	}
+	samples := make(map[string]any, 2)
+	if value, ok := object["queues"]; ok {
+		var entries []json.RawMessage
+		if json.Unmarshal(value, &entries) == nil {
+			for _, entry := range entries {
+				if sample := diagnosticRankedQueueSample(entry, ""); sample != nil {
+					samples["queues"] = sample
+					break
+				}
+			}
+		}
+	}
+	if value, ok := object["queueMap"]; ok {
+		var entries map[string]json.RawMessage
+		if json.Unmarshal(value, &entries) == nil {
+			if entry, exists := entries["RANKED_SOLO_5x5"]; exists {
+				if sample := diagnosticRankedQueueSample(entry, "RANKED_SOLO_5x5"); sample != nil {
+					samples["queueMap"] = sample
+				}
+			} else {
+				for queueType, entry := range entries {
+					if sample := diagnosticRankedQueueSample(entry, queueType); sample != nil {
+						samples["queueMap"] = sample
+						break
+					}
+				}
+			}
+		}
+	}
+	if len(samples) == 0 {
+		return nil
+	}
+	return samples
+}
+
+func diagnosticRankedQueueSample(raw json.RawMessage, fallbackQueueType string) map[string]any {
+	var object map[string]json.RawMessage
+	if json.Unmarshal(raw, &object) != nil {
+		return nil
+	}
+	queueType := fallbackQueueType
+	if value, ok := object["queueType"]; ok {
+		_ = json.Unmarshal(value, &queueType)
+	}
+	if queueType != "RANKED_SOLO_5x5" {
+		return nil
+	}
+	sample := make(map[string]any, 4)
+	for _, key := range []string{"wins", "losses", "tier", "division"} {
+		value, ok := object[key]
+		if !ok {
+			continue
+		}
+		var scalar any
+		if json.Unmarshal(value, &scalar) == nil {
+			switch scalar.(type) {
+			case nil, bool, float64, string:
+				sample[key] = scalar
+			}
+		}
+	}
+	return sample
+}
+
+func sgpNetworkErrorKind(err error) string {
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return "dns"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "timeout"
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return "timeout"
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return "connection_refused"
+	}
+	return "other"
+}
+
+func (p *sgpProvider) recordObservation(event map[string]any) {
+	if p != nil && p.observe != nil {
+		p.observe(event)
+	}
+}
+
+func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, kind sgpTokenKind, serverID, route, requestPath, endpoint string, out any) error {
 	for attempt := 0; attempt < 2; attempt++ {
 		var token string
 		var err error
@@ -234,38 +550,63 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 		}
 		request.Header.Set("Authorization", "Bearer "+token)
 		request.Header.Set("Accept", "application/json")
+		started := time.Now()
 		response, err := p.http.Do(request)
 		if err != nil {
+			// 即使连接在响应体到达前被取消，也算作一次已发出的 SGP 请求；
+			// 这样 overview_load_cost 能完整反映 context canceled 的请求放大。
+			overviewCostFromContext(ctx).addRequest(0)
+			p.recordObservation(map[string]any{
+				"event": "sgp_request", "method": http.MethodGet, "route": route, "path": requestPath,
+				"http_status": 0, "duration_ms": time.Since(started).Milliseconds(),
+				"retried": attempt > 0, "token_kind": kind.diagnosticName(), "body_bytes": 0,
+				"error_kind": sgpNetworkErrorKind(err),
+			})
 			return fmt.Errorf("SGP 网关连接失败: %w", err)
 		}
 		body, readErr := readLimited(response.Body, sgpResponseMax)
 		response.Body.Close()
+		overviewCostFromContext(ctx).addRequest(len(body))
+		diagnostic := map[string]any{
+			"event": "sgp_request", "method": http.MethodGet, "route": route, "path": requestPath,
+			"http_status": response.StatusCode, "duration_ms": time.Since(started).Milliseconds(),
+			"retried": attempt > 0, "token_kind": kind.diagnosticName(), "body_bytes": len(body),
+		}
 		switch {
 		case response.StatusCode == http.StatusOK:
 			if readErr != nil {
+				diagnostic["read_failed"] = true
+				p.recordObservation(diagnostic)
 				return readErr
 			}
 			if err := json.Unmarshal(body, out); err != nil {
+				diagnostic["parse_failed"] = true
+				diagnostic["payload_prefix_shape"] = diagnosticPayloadPrefixShape(body)
+				diagnostic["payload_sample_bytes"] = min(len(body), 200)
+				p.recordObservation(diagnostic)
 				return errors.New("SGP 网关返回的数据无法解析")
 			}
+			p.recordObservation(diagnostic)
 			return nil
 		case response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden:
+			p.recordObservation(diagnostic)
 			continue
 		default:
+			p.recordObservation(diagnostic)
 			return fmt.Errorf("SGP 网关返回 HTTP %d", response.StatusCode)
 		}
 	}
 	return errors.New("SGP 访问令牌无效，请确认客户端已登录")
 }
 
-func (p *sgpProvider) getJSON(ctx context.Context, client *LCUClient, endpoint string, out any) error {
-	return p.getJSONWithToken(ctx, client, sgpTokenEntitlements, endpoint, out)
+func (p *sgpProvider) getJSON(ctx context.Context, client *LCUClient, serverID, route, requestPath, endpoint string, out any) error {
+	return p.getJSONWithToken(ctx, client, sgpTokenEntitlements, serverID, route, requestPath, endpoint, out)
 }
 
 // matchHistory 读取指定玩家的完整战绩（每场包含全部十名参与者）。
 // 结果按 startIndex 起始，按需分页拉取，并做短期缓存以支撑对局页轮询。
 // 除对局列表外还返回两个分页参数：consumed 是本次在服务器侧实际消费的
-// 条目数（包含缺少 json 而被跳过的对局，调用方用它推进下一页偏移量），
+// 条目数（包含缺少 json 或参与者的对局，调用方用它推进下一页偏移量），
 // more 表示服务器侧是否可能还有更早的对局。
 func (p *sgpProvider) matchHistory(ctx context.Context, client *LCUClient, puuid string, start, count int, useCache bool) ([]*riotMatchInfo, int, bool, error) {
 	platform, _, ok := p.available(client)
@@ -273,7 +614,7 @@ func (p *sgpProvider) matchHistory(ctx context.Context, client *LCUClient, puuid
 		return nil, 0, false, errors.New("SGP 服务器不可用")
 	}
 	games, consumed, more, err := p.matchHistoryOn(ctx, client, platform, puuid, start, count, useCache)
-	if err != nil {
+	if err != nil && !isCancellation(err) {
 		p.markFailure()
 	}
 	return games, consumed, more, err
@@ -282,25 +623,44 @@ func (p *sgpProvider) matchHistory(ctx context.Context, client *LCUClient, puuid
 // matchHistoryOn 与 matchHistory 相同，但明确指定国服子服务器；
 // 跨服查询失败不会触发全局失败静默期。
 func (p *sgpProvider) matchHistoryOn(ctx context.Context, client *LCUClient, serverID, puuid string, start, count int, useCache bool) ([]*riotMatchInfo, int, bool, error) {
+	return p.matchHistoryFilteredOn(ctx, client, serverID, puuid, start, count, nil, useCache)
+}
+
+// matchHistoryFilteredOn adds the SGP server-side tag contract used by the
+// official client ecosystem. Multiple queue tags are sent as an OR query; the
+// caller validates the returned queues before treating the filter as supported.
+func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUClient, serverID, puuid string, start, count int, tags []string, useCache bool) ([]*riotMatchInfo, int, bool, error) {
+	overviewCostFromContext(ctx).addHistoryCall()
 	serverID = strings.ToUpper(strings.TrimSpace(serverID))
 	base, ok := p.serverBase(serverID)
 	if !ok {
 		return nil, 0, false, fmt.Errorf("未收录的国服子服务器：%s", serverID)
 	}
-	cacheKey := fmt.Sprintf("%s|%s|%d|%d", serverID, puuid, start, count)
+	tags = normalizeSGPMatchHistoryTags(tags)
+	cacheKey := sourceScopedKey(dataSourceSGP, fmt.Sprintf("%s|%s|%d|%d|%s", serverID, puuid, start, count, strings.Join(tags, ",")))
 	if useCache {
+		now := time.Now()
 		p.mu.Lock()
 		entry, ok := p.historyCache[cacheKey]
+		if ok && now.Sub(entry.at) < sgpCacheTTL {
+			entry.lastUsed = now
+			p.historyCache[cacheKey] = entry
+		} else if ok {
+			delete(p.historyCache, cacheKey)
+			ok = false
+		}
 		p.mu.Unlock()
-		if ok && time.Since(entry.at) < sgpCacheTTL {
+		if ok {
+			overviewCostFromContext(ctx).addHistoryCacheHit()
 			return entry.games, entry.consumed, entry.more, nil
 		}
 	}
 	games := make([]*riotMatchInfo, 0, count)
-	// fetched 记录服务器侧的偏移量（含缺少 json 的条目），避免因个别
+	// fetched 记录服务器侧的偏移量（含缺少 json 或参与者的条目），避免因个别
 	// 对局数据不完整导致同一页被反复请求。
 	fetched := 0
 	lastPageFull := false
+	var partialErr error
 	for len(games) < count && fetched < count+sgpPageSize {
 		pageSize := count - len(games)
 		if pageSize > sgpPageSize {
@@ -310,37 +670,90 @@ func (p *sgpProvider) matchHistoryOn(ctx context.Context, client *LCUClient, ser
 			"startIndex": {strconv.Itoa(start + fetched)},
 			"count":      {strconv.Itoa(pageSize)},
 		}
-		endpoint := base + "/match-history-query/v1/products/lol/" + url.PathEscape(puuid) + "/SUMMARY?" + query.Encode()
+		for _, tag := range tags {
+			query.Add("tag", tag)
+		}
+		if len(tags) > 1 {
+			query.Set("tagsQueryType", "OR")
+		}
+		// 玩家历史与单场 SUMMARY 是两条不同路由。腾讯 SGP 的玩家历史
+		// 固定包含 /player/ 段；漏掉它会命中错误路由并回退到只含本人的
+		// LCU 摘要，界面因而无法展示完整十人数据。
+		endpoint := base + "/match-history-query/v1/products/lol/player/" + url.PathEscape(puuid) + "/SUMMARY?" + query.Encode()
 		var page sgpMatchHistoryPage
-		if err := p.getJSON(ctx, client, endpoint, &page); err != nil {
+		if err := p.getJSON(ctx, client, serverID, "SUMMARY", "/match-history-query/v1/products/lol/player/{puuid}/SUMMARY", endpoint, &page); err != nil {
 			if len(games) > 0 {
+				partialErr = err
 				break
 			}
 			return nil, 0, false, err
 		}
+		participantKeys := make(map[string]struct{})
 		for _, game := range page.Games {
-			if game.JSON != nil && game.JSON.GameID > 0 && len(game.JSON.Participants) > 0 {
-				games = append(games, game.JSON)
+			var info riotMatchInfo
+			if len(game.JSON) == 0 || json.Unmarshal(game.JSON, &info) != nil {
+				continue
 			}
+			var shape struct {
+				Participants []json.RawMessage `json:"participants"`
+			}
+			if json.Unmarshal(game.JSON, &shape) == nil {
+				for _, key := range diagnosticKeyUnion(shape.Participants) {
+					participantKeys[key] = struct{}{}
+				}
+			}
+			// 保留参与者为空但仍有 gameId 的条目，让上层完整性摘要和
+			// 诊断日志能够明确指出 SGP 返回了空 roster；可展示列表会
+			// 在转换前过滤它，避免渲染没有主体的空卡片。
+			if info.GameID > 0 {
+				games = append(games, &info)
+			}
+		}
+		if len(participantKeys) > 0 {
+			keys := make([]string, 0, len(participantKeys))
+			for key := range participantKeys {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			p.recordObservation(map[string]any{"event": "sgp_participant_keys", "keys": keys})
 		}
 		fetched += len(page.Games)
 		lastPageFull = len(page.Games) >= pageSize
-		if !lastPageFull {
+		// A tagged request is already a pure queue page. Never fetch another
+		// server page just to replace malformed entries; user pagination owns
+		// the next startIndex.
+		if len(tags) > 0 || !lastPageFull {
 			break
 		}
 	}
+	if partialErr != nil {
+		return games, fetched, false, &sgpPartialHistoryError{Cause: partialErr, Returned: len(games), Consumed: fetched}
+	}
 	more := lastPageFull
 	if useCache {
+		now := time.Now()
 		p.mu.Lock()
-		p.historyCache[cacheKey] = sgpHistoryCacheEntry{at: time.Now(), games: games, consumed: fetched, more: more}
-		if len(p.historyCache) > sgpCacheMax {
+		p.historyCache[cacheKey] = sgpHistoryCacheEntry{at: now, lastUsed: now, games: games, consumed: fetched, more: more}
+		for key, entry := range p.historyCache {
+			if now.Sub(entry.at) >= sgpCacheTTL {
+				delete(p.historyCache, key)
+			}
+		}
+		for len(p.historyCache) > sgpCacheMax {
 			oldestKey := ""
-			oldestAt := time.Now()
+			var oldestAt time.Time
 			for key, entry := range p.historyCache {
-				if entry.at.Before(oldestAt) {
-					oldestAt = entry.at
+				lastUsed := entry.lastUsed
+				if lastUsed.IsZero() {
+					lastUsed = entry.at
+				}
+				if oldestKey == "" || lastUsed.Before(oldestAt) {
+					oldestAt = lastUsed
 					oldestKey = key
 				}
+			}
+			if oldestKey == "" {
+				break
 			}
 			delete(p.historyCache, oldestKey)
 		}
@@ -349,16 +762,29 @@ func (p *sgpProvider) matchHistoryOn(ctx context.Context, client *LCUClient, ser
 	return games, fetched, more, nil
 }
 
-// sgpGameDetails 是 DETAILS 端点的响应：与 Riot Match-V5 timeline 同构，
-// 帧内事件包含装备购买 / 出售 / 撤销与技能加点。
-type sgpGameDetails struct {
-	JSON struct {
-		Frames       []timelineFrame `json:"frames"`
-		Participants []struct {
-			ParticipantID int64  `json:"participantId"`
-			PUUID         string `json:"puuid"`
-		} `json:"participants"`
-	} `json:"json"`
+func normalizeSGPMatchHistoryTags(tags []string) []string {
+	result := make([]string, 0, min(len(tags), 4))
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		tag = strings.ToLower(strings.TrimSpace(tag))
+		valid := tag == "ranked" || tag == "normal"
+		if strings.HasPrefix(tag, "q_") {
+			queueID, err := strconv.ParseInt(strings.TrimPrefix(tag, "q_"), 10, 64)
+			valid = err == nil && queueID > 0 && queueID <= 10000
+		}
+		if !valid {
+			continue
+		}
+		if _, exists := seen[tag]; exists {
+			continue
+		}
+		seen[tag] = struct{}{}
+		result = append(result, tag)
+		if len(result) == 4 {
+			break
+		}
+	}
+	return result
 }
 
 // gameDetails 读取单场对局的完整时间线（装备路线与技能加点用）。
@@ -376,56 +802,107 @@ func (p *sgpProvider) gameDetailsOn(ctx context.Context, client *LCUClient, serv
 		return nil, fmt.Errorf("未收录的国服子服务器：%s", serverID)
 	}
 	endpoint := base + "/match-history-query/v1/products/lol/" + url.PathEscape(fmt.Sprintf("%s_%d", strings.ToUpper(serverID), gameID)) + "/DETAILS"
-	var details sgpGameDetails
-	if err := p.getJSON(ctx, client, endpoint, &details); err != nil {
+	var details lcuGameTimeline
+	if err := p.getJSON(ctx, client, strings.ToUpper(serverID), "DETAILS", "/match-history-query/v1/products/lol/{server_id}_{game_id}/DETAILS", endpoint, &details); err != nil {
 		return nil, err
 	}
-	if len(details.JSON.Frames) == 0 {
+	frames, framesWrapped := details.framesWithSource()
+	eventCount, eventTypes := summarizeTimelineEventTypes(frames)
+	p.recordObservation(map[string]any{
+		"event": "sgp_timeline_payload", "route": "DETAILS",
+		"http_status": http.StatusOK, "frames_wrapped": framesWrapped, "frame_count": len(frames),
+		"event_count": eventCount, "event_types": eventTypes,
+	})
+	if len(frames) == 0 {
 		return nil, errors.New("SGP 未返回该对局的时间线")
 	}
-	return details.JSON.Frames, nil
+	return frames, nil
 }
 
 /* ---------- 段位（leagues-ledge）与召唤师（summoner-ledge） ---------- */
 
-// sgpRankedQueue 是 SGP 段位数据里的单个队列条目：与本机客户端的
-// ranked-stats 不同，这里的 wins/losses 都是完整的当季胜负场次
-// （新版国服客户端的 ranked-stats 已不返回负场，胜率会错成 100%）。
+// sgpRankedQueue 是 SGP 段位数据里的单个队列条目。部分响应会省略或
+// 清空 losses，调用方必须验证胜负场次完整性后再展示胜率或计算 LP 差值。
 type sgpRankedQueue struct {
-	QueueType                 string `json:"queueType"`
-	Tier                      string `json:"tier"`
-	Rank                      string `json:"rank"`
-	LeaguePoints              int    `json:"leaguePoints"`
-	Wins                      int    `json:"wins"`
-	Losses                    int    `json:"losses"`
-	ProvisionalGamesRemaining int    `json:"provisionalGamesRemaining"`
+	QueueType                  string `json:"queueType"`
+	Tier                       string `json:"tier"`
+	Rank                       string `json:"rank"`
+	LeaguePoints               int    `json:"leaguePoints"`
+	Wins                       int    `json:"wins"`
+	Losses                     int    `json:"losses"`
+	ProvisionalGamesRemaining  int    `json:"provisionalGamesRemaining"`
+	HighestTier                string `json:"highestTier"`
+	HighestRank                string `json:"highestRank"`
+	PreviousSeasonAchievedTier string `json:"previousSeasonAchievedTier"`
+	PreviousSeasonAchievedRank string `json:"previousSeasonAchievedRank"`
+	PreviousSeasonEndTier      string `json:"previousSeasonEndTier"`
+	PreviousSeasonEndRank      string `json:"previousSeasonEndRank"`
+	PreviousSeasonHighestTier  string `json:"previousSeasonHighestTier"`
+	PreviousSeasonHighestRank  string `json:"previousSeasonHighestRank"`
 }
 
-// rankedStats 读取玩家的完整排位数据（当前服务器；该接口无法跨服）。
-func (p *sgpProvider) rankedStats(ctx context.Context, client *LCUClient, puuid string) ([]sgpRankedQueue, error) {
+type sgpRankedStats struct {
+	Queues                            []sgpRankedQueue `json:"queues"`
+	HighestPreviousSeasonEndTier      string           `json:"highestPreviousSeasonEndTier"`
+	HighestPreviousSeasonEndRank      string           `json:"highestPreviousSeasonEndRank"`
+	HighestPreviousSeasonAchievedTier string           `json:"highestPreviousSeasonAchievedTier"`
+	HighestPreviousSeasonAchievedRank string           `json:"highestPreviousSeasonAchievedRank"`
+}
+
+// rankedStats 读取玩家的排位数据（当前服务器；该接口无法跨服）。
+func (p *sgpProvider) rankedStats(ctx context.Context, client *LCUClient, puuid string) (sgpRankedStats, error) {
 	serverID, _, ok := p.available(client)
 	if !ok {
-		return nil, errors.New("SGP 服务器不可用")
+		return sgpRankedStats{}, errors.New("SGP 服务器不可用")
 	}
-	return p.rankedStatsOn(ctx, client, serverID, puuid)
+	return p.rankedStatsOn(ctx, client, serverID, puuid, true, "")
 }
 
 // rankedStatsOn 在当前登录的国服子服务器读取排位。接口路径虽然接受
 // serverID，但 league-session 令牌不具备跨服查询能力；调用方必须先拒绝远端服务器。
-func (p *sgpProvider) rankedStatsOn(ctx context.Context, client *LCUClient, serverID, puuid string) ([]sgpRankedQueue, error) {
+func (p *sgpProvider) rankedStatsOn(ctx context.Context, client *LCUClient, serverID, puuid string, isSelf bool, privacy string) (sgpRankedStats, error) {
 	serverID = strings.ToUpper(strings.TrimSpace(serverID))
 	base, ok := p.serverBase(serverID)
 	if !ok {
-		return nil, fmt.Errorf("未收录的国服子服务器：%s", serverID)
+		return sgpRankedStats{}, fmt.Errorf("未收录的国服子服务器：%s", serverID)
 	}
 	endpoint := base + "/leagues-ledge/v2/rankedStats/puuid/" + url.PathEscape(puuid)
+	var raw json.RawMessage
+	if err := p.getJSONWithToken(ctx, client, sgpTokenLeagueSession, serverID, "RANKED", "/leagues-ledge/v2/rankedStats/puuid/{puuid}", endpoint, &raw); err != nil {
+		return sgpRankedStats{}, err
+	}
 	var payload struct {
-		Queues []sgpRankedQueue `json:"queues"`
+		Queues                            []json.RawMessage `json:"queues"`
+		HighestPreviousSeasonEndTier      string            `json:"highestPreviousSeasonEndTier"`
+		HighestPreviousSeasonEndRank      string            `json:"highestPreviousSeasonEndRank"`
+		HighestPreviousSeasonAchievedTier string            `json:"highestPreviousSeasonAchievedTier"`
+		HighestPreviousSeasonAchievedRank string            `json:"highestPreviousSeasonAchievedRank"`
 	}
-	if err := p.getJSONWithToken(ctx, client, sgpTokenLeagueSession, endpoint, &payload); err != nil {
-		return nil, err
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return sgpRankedStats{}, err
 	}
-	return payload.Queues, nil
+	p.rankedShapeOnce.Do(func() {
+		p.recordObservation(map[string]any{
+			"event": "sgp_ranked_stats_shape", "is_self": isSelf,
+			"privacy": diagnosticPrivacy(privacy), "body_bytes": len(raw), "queue_count": len(payload.Queues),
+			"top_level_keys": diagnosticKeySet(raw), "queue_keys": diagnosticKeyUnion(payload.Queues),
+			"sample_queue_values": diagnosticRankedQueueSamples(raw),
+		})
+	})
+	stats := sgpRankedStats{
+		Queues:                            make([]sgpRankedQueue, 0, len(payload.Queues)),
+		HighestPreviousSeasonEndTier:      payload.HighestPreviousSeasonEndTier,
+		HighestPreviousSeasonEndRank:      payload.HighestPreviousSeasonEndRank,
+		HighestPreviousSeasonAchievedTier: payload.HighestPreviousSeasonAchievedTier,
+		HighestPreviousSeasonAchievedRank: payload.HighestPreviousSeasonAchievedRank,
+	}
+	for _, entry := range payload.Queues {
+		var queue sgpRankedQueue
+		if json.Unmarshal(entry, &queue) == nil {
+			stats.Queues = append(stats.Queues, queue)
+		}
+	}
+	return stats, nil
 }
 
 // sgpSummoner 是 summoner-ledge 返回的公开召唤师资料。
@@ -444,6 +921,10 @@ func (p *sgpProvider) summonerByPUUIDOn(ctx context.Context, client *LCUClient, 
 	if !ok {
 		return sgpSummoner{}, fmt.Errorf("未收录的国服子服务器：%s", serverID)
 	}
+	cacheKey := summonerCacheKey(dataSourceSGP, serverID, puuid)
+	if cached, ok := p.cachedSummoner(cacheKey); ok {
+		return cached, nil
+	}
 	endpoint := base + "/summoner-ledge/v1/regions/" + url.PathEscape(strings.ToLower(serverID)) + "/summoners/puuids"
 	body, err := json.Marshal([]string{puuid})
 	if err != nil {
@@ -461,27 +942,53 @@ func (p *sgpProvider) summonerByPUUIDOn(ctx context.Context, client *LCUClient, 
 		request.Header.Set("Authorization", "Bearer "+token)
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("Accept", "application/json")
+		started := time.Now()
 		response, doErr := p.http.Do(request)
 		if doErr != nil {
+			p.recordObservation(map[string]any{
+				"event": "sgp_request", "method": http.MethodPost, "route": "SUMMONER", "path": "/summoner-ledge/v1/regions/{server_id}/summoners/puuids",
+				"http_status": 0, "duration_ms": time.Since(started).Milliseconds(),
+				"retried": attempt > 0, "token_kind": sgpTokenLeagueSession.diagnosticName(), "body_bytes": 0,
+				"error_kind": sgpNetworkErrorKind(doErr),
+			})
 			return sgpSummoner{}, fmt.Errorf("SGP 网关连接失败: %w", doErr)
 		}
 		payload, readErr := readLimited(response.Body, sgpResponseMax)
 		response.Body.Close()
+		diagnostic := map[string]any{
+			"event": "sgp_request", "method": http.MethodPost, "route": "SUMMONER", "path": "/summoner-ledge/v1/regions/{server_id}/summoners/puuids",
+			"http_status": response.StatusCode, "duration_ms": time.Since(started).Milliseconds(),
+			"retried": attempt > 0, "token_kind": sgpTokenLeagueSession.diagnosticName(), "body_bytes": len(payload),
+		}
 		switch {
 		case response.StatusCode == http.StatusOK:
 			if readErr != nil {
+				diagnostic["read_failed"] = true
+				p.recordObservation(diagnostic)
 				return sgpSummoner{}, readErr
 			}
 			var summoners []sgpSummoner
-			if json.Unmarshal(payload, &summoners) != nil || len(summoners) == 0 {
+			if json.Unmarshal(payload, &summoners) != nil {
+				diagnostic["parse_failed"] = true
+				diagnostic["payload_prefix_shape"] = diagnosticPayloadPrefixShape(payload)
+				diagnostic["payload_sample_bytes"] = min(len(payload), 200)
+				p.recordObservation(diagnostic)
 				return sgpSummoner{}, errSGPSummonerNotFound
 			}
+			p.recordObservation(diagnostic)
+			if len(summoners) == 0 {
+				return sgpSummoner{}, errSGPSummonerNotFound
+			}
+			p.cacheSummoner(cacheKey, summoners[0])
 			return summoners[0], nil
 		case response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden:
+			p.recordObservation(diagnostic)
 			continue
 		case response.StatusCode == http.StatusNotFound:
+			p.recordObservation(diagnostic)
 			return sgpSummoner{}, errSGPSummonerNotFound
 		default:
+			p.recordObservation(diagnostic)
 			return sgpSummoner{}, fmt.Errorf("SGP 网关返回 HTTP %d", response.StatusCode)
 		}
 	}

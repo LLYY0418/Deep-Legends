@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Deep Legends · 斗魂竞技场页面改版设计稿</title>
+<style>
+/* ============================================================
+   设计令牌：直接复制自 web/app.css（改动时保持同步）
+   ============================================================ */
+:root {
+  color-scheme: light;
+  --bg: oklch(1 0 0);
+  --surface: oklch(0.972 0 0);
+  --surface-strong: oklch(0.925 0 0);
+  --ink: oklch(0.18 0.012 57);
+  --muted: oklch(0.46 0.012 57);
+  --faint: oklch(0.38 0.012 57);
+  --primary: oklch(0.70 0.155 56.6);
+  --primary-strong: oklch(0.54 0.145 56.6);
+  --primary-soft: oklch(0.94 0.04 56.6);
+  --accent: oklch(0.36 0.115 236);
+  --success: oklch(0.48 0.13 151);
+  --success-soft: oklch(0.95 0.035 151);
+  --warning: oklch(0.60 0.14 75);
+  --warning-soft: oklch(0.96 0.04 75);
+  --danger: oklch(0.50 0.18 28);
+  --danger-soft: oklch(0.96 0.035 28);
+  --line: oklch(0.87 0 0);
+  --focus: oklch(0.57 0.15 236);
+  --overlay: rgb(0 0 0 / .48);
+  --font: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --sidebar-bg: oklch(0.965 0.008 236);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0B0E14;
+  --surface: #131822;
+  --surface-strong: #1A2130;
+  --ink: #E8EAF0;
+  --muted: #8B93A6;
+  --faint: #667085;
+  --primary: #D9A441;
+  --primary-strong: #F0BE5C;
+  --primary-soft: #2A2312;
+  --accent: #5B9BD9;
+  --success: #4CAF7D;
+  --success-soft: #12271D;
+  --warning: #E0B45C;
+  --warning-soft: #2A2312;
+  --danger: #E05C5C;
+  --danger-soft: #2A1518;
+  --line: #242D3D;
+  --focus: #5B9BD9;
+  --overlay: rgb(0 0 0 / .7);
+  --sidebar-bg: #080A0F;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 0 0 60px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; cursor: pointer; }
+dl, dd, dt, h1, h2, h3, p, figure { margin: 0; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ---------- 原型自身的说明条（实现时删掉） ---------- */
+.proto-bar {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 10px 20px;
+  background: var(--sidebar-bg);
+  border-bottom: 1px solid var(--line);
+}
+.proto-bar h1 { font-size: 14px; font-weight: 750; }
+.proto-bar p { color: var(--muted); font-size: 11px; }
+.proto-bar .spacer { flex: 1; }
+.proto-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 12px;
+  color: var(--muted); background: transparent;
+  border: 1px solid var(--line); border-radius: 8px;
+  font-size: 11px; font-weight: 650;
+}
+.proto-toggle.is-on { color: var(--ink); background: var(--primary-soft); border-color: color-mix(in oklab, var(--primary) 44%, var(--line)); }
+
+/* 字段来源标注：默认隐藏，顶栏开关打开 */
+.src { display: none; }
+body.show-src .src {
+  display: block;
+  margin-top: 3px;
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px; font-weight: 500; line-height: 1.35;
+  letter-spacing: -.1px;
+}
+body.show-src .block-note { display: block; }
+.block-note {
+  display: none;
+  margin: 0 14px 10px;
+  padding: 7px 10px;
+  color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+  border-left: 2px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px; line-height: 1.55;
+}
+.step-tag {
+  display: inline-grid; place-items: center;
+  width: 18px; height: 18px; margin-right: 7px;
+  color: var(--bg); background: var(--primary-strong);
+  border-radius: 5px;
+  font-size: 10px; font-weight: 800;
+}
+
+.page { max-width: 1240px; margin: 0 auto; padding: 16px 20px; }
+
+/* ---------- 模式页签（复用 .champion-mode-tabs） ---------- */
+.champion-mode-tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+.champion-mode-tab {
+  position: relative; display: grid; gap: 1px;
+  padding: 9px 16px 11px;
+  color: var(--muted); background: transparent; border: 0; text-align: left;
+}
+.champion-mode-tab span { font-size: 14px; font-weight: 750; }
+.champion-mode-tab small { font-size: 10px; font-weight: 500; }
+.champion-mode-tab.is-active { color: var(--ink); }
+.champion-mode-tab.is-active::after {
+  content: ""; position: absolute; right: 8px; bottom: -1px; left: 8px;
+  height: 2px; background: var(--primary); border-radius: 2px;
+}
+
+/* ---------- 两栏骨架（复用 .aram-workspace） ---------- */
+.aram-workspace { display: grid; grid-template-columns: minmax(270px, 320px) minmax(0, 1fr); align-items: start; gap: 12px; }
+.champion-list-card, .recommendation-section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.aram-champions { position: sticky; top: 62px; display: flex; max-height: calc(100vh - 96px); flex-direction: column; }
+.aram-champion-head { display: flex; min-height: 52px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px 6px; }
+.aram-champion-head strong { font-size: 13px; font-weight: 750; }
+.aram-champion-head small { display: block; color: var(--muted); font-size: 10px; }
+.champion-result-count { color: var(--muted); font-size: 11px; }
+
+.champion-search {
+  display: grid; width: calc(100% - 24px); min-height: 36px; flex: 0 0 auto;
+  margin: 0 12px 8px;
+  grid-template-columns: 22px minmax(0, 1fr); align-items: center; gap: 2px;
+  padding: 0 10px;
+  color: var(--muted); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 10px;
+}
+.champion-search:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in oklab, var(--focus) 18%, transparent); }
+.champion-search input { width: 100%; height: 34px; padding: 0; color: var(--ink); background: transparent; border: 0; outline: 0; font-size: 12px; }
+
+.champion-table-scroll { flex: 1 1 auto; overflow-y: auto; }
+.champion-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
+.champion-table th {
+  position: sticky; top: 0; z-index: 1;
+  height: 32px; padding: 0 8px;
+  color: var(--muted); background: color-mix(in oklab, var(--surface-strong) 78%, var(--surface));
+  border-bottom: 1px solid var(--line);
+  font-size: 10px; font-weight: 650; text-align: center; white-space: nowrap;
+}
+.champion-table th:first-child { width: 34px; }
+.champion-table th:nth-child(2) { text-align: left; }
+.champion-table th:nth-child(3) { width: 46px; }
+.champion-table th:nth-child(4) { width: 54px; }
+.champion-table th:nth-child(5) { width: 50px; }
+.champion-table td { height: 46px; padding: 4px 8px; color: var(--muted); border-bottom: 1px solid var(--line); font-size: 12px; text-align: center; }
+.champion-table td:nth-child(2) { text-align: left; }
+.champion-table tbody tr { cursor: pointer; transition: background 140ms ease; }
+.champion-table tbody tr:hover { background: color-mix(in oklab, var(--primary-soft) 42%, transparent); }
+.champion-table tbody tr.is-active { background: color-mix(in oklab, var(--primary-soft) 70%, transparent); box-shadow: inset 2px 0 0 var(--primary); }
+.champion-rank { color: var(--faint); font-size: 12px !important; }
+.champion-identity { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.champion-identity strong { overflow: hidden; color: var(--ink); font-size: 12.5px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.metric-win { color: var(--success); font-weight: 800; }
+.metric-pick { color: var(--accent); font-weight: 800; }
+.metric-ban { color: var(--danger); font-weight: 800; }
+.metric-first { color: var(--primary-strong); font-weight: 800; }
+.is-lowsample { opacity: .45; }
+
+/* 图标基类（复用 .champion-portrait / .recommend-icon / .augment-icon） */
+.champion-portrait, .recommend-icon, .augment-icon, .champion-detail-portrait {
+  position: relative; display: grid; flex: 0 0 auto; place-items: center; overflow: hidden;
+  color: var(--faint); background: var(--surface-strong);
+  border: 1px solid var(--line);
+  font-size: 10px; font-weight: 800;
+}
+.champion-portrait { width: 30px; height: 30px; border-radius: 8px; }
+.champion-detail-portrait { width: 58px; height: 58px; border-radius: 12px; }
+.recommend-icon { width: 32px; height: 32px; border-radius: 8px; }
+.augment-icon { width: 34px; height: 34px; border-radius: 9px; }
+.champion-portrait img, .recommend-icon img, .augment-icon img, .champion-detail-portrait img { width: 100%; height: 100%; object-fit: cover; }
+
+/* 梯度徽章
+   注意：项目里不是 CSS 画的，而是 6 个静态 SVG 文件 web/tier-icons/{op,1,2,3,4,5}.svg，
+   由 champions.js:64 tierBadge(value) 按 0→"op"、1..5→数字 取文件名，越界走 .tier-badge-fallback 文本。
+   这里用 clip-path 占位块复刻它们的配色，实现时**照抄现成的 SVG，不要用这段 CSS**。 */
+.tier-badge {
+  display: inline-grid; place-items: center;
+  width: 26px; height: 30px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  color: #0B0E14; font-size: 12px; font-weight: 900;
+  filter: drop-shadow(0 2px 4px rgb(0 0 0 / .35));
+}
+.tier-badge.is-metric { width: 24px; height: 27px; font-size: 11px; }
+/* OP 档 = tier 0，op.svg：唯一带渐变 + 内描边高光的一档，字号比数字档小一号 */
+.tier-badge.top { background: linear-gradient(135deg, #F5CE7E 0%, #E0AC48 55%, #B07E28 100%); color: #14100A; font-size: 10.5px; letter-spacing: .3px; }
+.tier-badge.top.is-metric { font-size: 10px; }
+.tier-badge.t1 { background: #F0BE5C; }
+.tier-badge.t2 { background: #B9C2D4; }
+.tier-badge.t3 { background: #9B7B4E; }
+.tier-badge.t4 { background: #3A445A; color: #C6CDDC; }
+.tier-badge.t5 { background: #262E3E; color: #8B93A6; }
+.tier-badge-fallback { color: var(--muted); font-size: 12px; font-weight: 800; }
+
+/* ============================================================
+   右栏：详情
+   ============================================================ */
+.arena-detail { display: grid; gap: 12px; min-width: 0; }
+
+/* ① 顶部概览条 */
+.champion-detail-hero {
+  position: relative;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.champion-detail-art { position: absolute; inset: 0; background-size: cover; background-position: 50% 22%; opacity: .16; }
+.champion-detail-art-shade { position: absolute; inset: 0; background: linear-gradient(90deg, var(--surface) 30%, transparent 100%); }
+.champion-detail-title { position: relative; display: flex; align-items: center; gap: 12px; }
+.champion-detail-title h2 { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 750; }
+.champion-detail-title p { color: var(--muted); font-size: 11px; }
+.champion-detail-title b { color: var(--primary-strong); }
+
+.champion-detail-metrics {
+  position: relative;
+  display: grid; grid-template-columns: repeat(4, minmax(86px, 1fr));
+  gap: 8px; margin-left: auto;
+}
+.champion-detail-metrics > div {
+  display: grid; justify-items: center; gap: 2px;
+  padding: 9px 12px;
+  background: color-mix(in oklab, var(--surface-strong) 70%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.champion-detail-metrics dt { color: var(--muted); font-size: 10px; font-weight: 600; white-space: nowrap; }
+.champion-detail-metrics dd { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.champion-detail-metrics .sub { color: var(--faint); font-size: 9px; font-weight: 500; }
+.metrics-secondary {
+  position: relative;
+  display: flex; gap: 14px; flex-wrap: wrap;
+  width: 100%; padding-top: 10px; margin-top: 2px;
+  border-top: 1px dashed var(--line);
+  color: var(--muted); font-size: 11px;
+}
+.metrics-secondary b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* 区块外壳 */
+.recommendation-section > header {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  min-height: 48px; padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.recommendation-section > header h3 { display: flex; align-items: center; font-size: 13px; font-weight: 750; }
+.recommendation-section > header .section-copy { color: var(--muted); font-size: 10.5px; }
+.recommendation-section > header .spacer { flex: 1; }
+.section-body { padding: 12px 14px 14px; }
+
+/* chips（排序 / 品质筛选），复用 .section-tabs 语言 */
+.chips { display: inline-flex; gap: 4px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; }
+.chip {
+  height: 26px; padding: 0 11px;
+  color: var(--muted); background: transparent; border: 0; border-radius: 7px;
+  font-size: 11px; font-weight: 650;
+}
+.chip:hover { color: var(--ink); }
+.chip.is-active { color: var(--ink); background: var(--surface-strong); box-shadow: 0 1px 2px rgb(0 0 0 / .25); }
+.chip .dot { display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; vertical-align: 0; }
+.dot-silver { background: #B9C3D6; }
+.dot-gold { background: #E0B45C; }
+.dot-prismatic { background: linear-gradient(135deg, #DEC8FF, #B5D7FF, #F1E2FF); }
+
+/* 卡片网格：海克斯 / 棱彩 / 核心物品 共用同一套卡片语言 */
+.option-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.option-card {
+  position: relative;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px;
+  padding: 9px 11px 9px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  text-align: left;
+  transition: border-color 140ms ease, transform 140ms ease;
+}
+.option-card:hover { border-color: color-mix(in oklab, var(--primary) 50%, var(--line)); transform: translateY(-1px); }
+.option-card::before { content: ""; position: absolute; top: 9px; bottom: 9px; left: 0; width: 3px; border-radius: 0 3px 3px 0; background: var(--line); }
+.option-card.rare-silver::before { background: #B9C3D6; }
+.option-card.rare-gold::before { background: #E0B45C; }
+.option-card.rare-prismatic::before { background: linear-gradient(180deg, #DEC8FF, #B5D7FF, #F1E2FF); }
+.option-card.is-core::before { background: var(--accent); }
+.option-name { overflow: hidden; color: var(--ink); font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.option-stats { display: flex; align-items: baseline; gap: 7px; margin-top: 3px; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.option-stats .wr { color: var(--success); font-size: 12px; font-weight: 800; }
+.option-stats .ap { color: var(--primary-strong); font-weight: 700; }
+.option-rank {
+  position: absolute; top: 7px; right: 9px;
+  color: var(--faint); font-size: 9px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+
+/* 核心物品：多件组合 */
+.option-card.is-combo { grid-template-columns: minmax(0, 1fr); gap: 7px; padding: 10px 12px; }
+.combo-items { display: flex; align-items: center; gap: 4px; }
+.combo-items .recommend-icon { width: 34px; height: 34px; }
+.combo-arrow { color: var(--faint); font-size: 11px; }
+
+/* 折叠更多 */
+.show-more {
+  width: 100%; height: 34px; margin-top: 9px;
+  color: var(--muted); background: transparent;
+  border: 1px dashed var(--line); border-radius: 9px;
+  font-size: 11px; font-weight: 650;
+}
+.show-more:hover { color: var(--ink); border-color: color-mix(in oklab, var(--primary) 45%, var(--line)); }
+
+/* 鞋子 / 技能加点 slim 行 */
+.slim-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-top: 1px solid var(--line); }
+.slim-row > span.label { min-width: 60px; color: var(--muted); font-size: 11px; font-weight: 650; }
+.skill-order { display: flex; align-items: center; gap: 4px; }
+.skill-key {
+  display: grid; place-items: center;
+  width: 26px; height: 26px;
+  color: var(--ink); background: var(--surface-strong);
+  border: 1px solid var(--line); border-radius: 7px;
+  font-size: 11px; font-weight: 800;
+}
+.skill-key.is-r { color: var(--primary-strong); border-color: color-mix(in oklab, var(--primary) 50%, var(--line)); }
+
+/* ---------- ⑥ 第一名战绩列表 ----------
+   下面这一整段是从 web/gameplay.css:302-411 **原样搬过来**的（只删了与本页无关的 hover/transition），
+   目的是证明「战绩卡和总览里的完全一样」。实现时**一行 CSS 都不用新增**，
+   直接复用 gameplay.css 即可；本原型带这段只是因为它是独立文件打不开项目样式表。 */
+.match-list { display: grid; gap: 8px; overflow-anchor: auto; }
+.match-entry { min-height: 118px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.match-entry.is-win { background: color-mix(in oklab,var(--accent) 17%,var(--surface)); border-color: color-mix(in oklab,var(--accent) 55%,var(--line)); box-shadow: inset 4px 0 0 var(--accent); }
+.match-entry.is-loss { background: color-mix(in oklab,var(--danger) 15%,var(--surface)); border-color: color-mix(in oklab,var(--danger) 52%,var(--line)); box-shadow: inset 4px 0 0 var(--danger); }
+.match-summary { display: grid; grid-template-columns: 108px minmax(0,1fr) minmax(150px,190px) 40px; align-items: center; gap: 8px; min-height: 118px; padding: 10px 10px 10px 14px; }
+.match-summary.is-arena { grid-template-columns: 108px minmax(280px,.9fr) minmax(350px,1.1fr) 40px; }
+.match-result-meta { display: grid; align-self: stretch; align-content: center; padding-right: 10px; border-right: 1px solid var(--line); }
+.match-result-meta strong { color: var(--accent); font-size: 12.5px; }
+.match-result-meta time, .match-result-meta small { color: var(--muted); font-size: 11px; }
+.result-word { display: flex; min-width: 0; align-items: center; gap: 6px; margin-top: 8px; overflow: hidden; color: var(--accent); font-weight: 750; }
+.match-main { display: grid; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }
+.match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); }
+.match-champion { position: relative; display: grid; min-width: 0; grid-template-columns: 58px minmax(0,auto); align-items: center; gap: 7px; }
+.match-champion .champion-portrait { width: 58px; height: 58px; border-radius: 12px; }
+.champion-level { position: absolute; top: 44px; left: 40px; display: grid; width: 22px; height: 22px; place-items: center; color: white; background: #171717; border-radius: 50%; font-size: 10px; }
+.match-loadout-mini { display: grid; grid-auto-flow: column; grid-auto-columns: 26px; grid-template-rows: repeat(2,26px); gap: 3px; }
+.match-loadout-mini.is-augments { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(3,26px); grid-template-rows: repeat(2,26px); }
+.match-kda { display: grid; min-width: 0; justify-items: center; justify-self: center; font-variant-numeric: tabular-nums; }
+.match-kda strong { min-width: 0; max-width: 100%; overflow: hidden; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
+.match-kda em { color: var(--danger); font-style: normal; }
+.match-kda small { max-width: 96px; color: var(--muted); font-size: 11px; line-height: 1.25; text-align: center; white-space: normal; }
+
+/* 中部数据列——本次改动的关键：斗魂不再整列清空，用同一套 .match-stat 结构填 3 行 */
+.match-stats { display: grid; align-content: center; gap: 5px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }
+.match-stat { display: grid; min-width: 0; grid-template-columns: 72px minmax(0,1fr); align-items: baseline; gap: 8px; font-size: 11px; cursor: help; white-space: nowrap; }
+.match-stat > em { min-width: 0; color: var(--faint); font-size: 10.5px; font-style: normal; }
+.match-stat > b { min-width: 0; justify-self: end; overflow: hidden; color: var(--muted); font-weight: 700; text-align: right; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.match-stat-secondary { color: var(--muted); font-weight: 500; }
+.match-stat-damage > b { display: inline-flex; align-items: baseline; gap: 3px; }
+.match-damage-value { color: var(--accent); }
+.match-taken-value { color: var(--primary-strong); }
+.match-stat-separator { color: var(--faint); }
+
+.match-build { display: flex; min-width: 0; grid-column: 1 / -1; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.match-items { display: flex; flex: 0 0 auto; align-items: center; gap: 3px; }
+.match-items .recommend-icon { width: 26px; height: 26px; border-radius: 6px; }
+.match-badges { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px; }
+.match-badges span { padding: 1px 6px; color: var(--bg); background: var(--primary-strong); border-radius: 999px; font-size: 10px; font-weight: 700; }
+.match-rank-chip { padding: 1px 6px; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 6px; font-size: 10px; font-style: normal; font-weight: 800; letter-spacing: .4px; font-variant-numeric: tabular-nums; }
+.match-rank-chip.is-rank-1 { color: #14100A; background: linear-gradient(120deg,#F2CB5C,#D9A441); border-color: transparent; }
+.match-score-line { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; }
+.match-score-line > small { color: var(--muted); font-size: 10px; }
+.match-score { min-width: 30px; padding: 1px 6px; color: var(--ink); background: var(--surface-strong); border-radius: 6px; font-size: 11px; font-style: normal; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+.match-score.is-gold { color: #14100A; background: var(--primary); }
+.match-badge-chip { padding: 1px 6px; border-radius: 6px; font-size: 10px; font-style: normal; font-weight: 800; letter-spacing: .4px; }
+.match-badge-chip.is-mvp { color: #14100A; background: linear-gradient(120deg,#F2CB5C,#D9A441); }
+
+.match-players.is-arena { display: grid; grid-template-columns: minmax(0,1fr); gap: 3px; align-content: center; }
+.arena-team-row-compact { display: grid; min-width: 0; grid-template-columns: minmax(0,1fr); align-items: center; gap: 4px; padding: 3px 5px; background: color-mix(in oklab,var(--bg) 50%,transparent); border: 1px solid var(--line); border-radius: 6px; }
+.arena-team-row-compact.is-first { border-color: color-mix(in oklab,var(--primary) 55%,var(--line)); box-shadow: inset 2px 0 0 var(--primary); }
+.arena-team-roster { display: grid; min-width: 0; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
+.arena-team-roster button { display: flex; min-width: 0; align-items: center; gap: 4px; padding: 0; overflow: hidden; color: var(--muted); background: transparent; border: 0; font-size: 9.5px; text-align: left; }
+.arena-team-roster button span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arena-team-roster .champion-portrait { width: 18px; height: 18px; border-radius: 5px; }
+.arena-team-place { color: var(--faint); font-size: 9.5px; font-weight: 700; }
+.arena-team-row-compact.is-first .arena-team-place { color: var(--primary-strong); }
+.arena-augment-icon { display: inline-flex; border-radius: 7px; }
+.arena-augment-slot { display: block; width: 26px; height: 26px; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 7px; }
+.arena-augment-slot.is-empty { opacity: .35; }
+.match-actions { display: flex; align-self: stretch; width: 40px; flex-direction: column; gap: 4px; }
+.match-actions button { display: grid; width: 100%; place-items: center; padding: 0; color: var(--accent); background: color-mix(in oklab,var(--accent) 11%,transparent); border: 1px solid color-mix(in oklab,var(--accent) 26%,transparent); border-radius: 9px; }
+.match-actions svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.match-replay svg { fill: currentColor; stroke: none; }
+.match-expand { flex: 3; }
+.match-replay { flex: 1; }
+
+.empty-state {
+  display: grid; gap: 6px; place-items: center;
+  padding: 26px 16px;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px dashed var(--line); border-radius: 10px;
+  text-align: center;
+}
+.empty-state strong { color: var(--ink); font-size: 12.5px; }
+.empty-state span { font-size: 11px; }
+
+.notice {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 9px 12px; margin-bottom: 10px;
+  border-radius: 9px; font-size: 11px; line-height: 1.6;
+}
+.notice.is-warning { color: var(--ink); background: var(--warning-soft); border: 1px solid color-mix(in oklab, var(--warning) 45%, transparent); }
+.notice-symbol { color: var(--warning); font-weight: 800; }
+
+.source-line { display: flex; align-items: center; gap: 6px; color: var(--faint); font-size: 10px; }
+.source-line .pill { padding: 1px 6px; background: var(--surface-strong); border: 1px solid var(--line); border-radius: 5px; }
+
+@media (max-width: 1080px) {
+  .aram-workspace { grid-template-columns: minmax(0, 1fr); }
+  .aram-champions { position: static; max-height: 420px; }
+  .option-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .champion-detail-metrics { margin-left: 0; width: 100%; }
+}
+@media (max-width: 720px) {
+  .option-grid { grid-template-columns: minmax(0, 1fr); }
+  .match-summary, .match-summary.is-arena { grid-template-columns: minmax(0, 1fr) 40px; }
+  .match-main, .match-main.is-arena { grid-template-columns: minmax(0, 1fr); }
+  .match-stats { justify-self: stretch; padding-left: 0; border-left: 0; }
+}
+</style>
+</head>
+<body class="show-src">
+
+<div class="proto-bar">
+  <div>
+    <h1>Deep Legends · 斗魂竞技场页面改版设计稿</h1>
+    <p>参考 YOUR.GG Arena 的信息结构 · 区块顺序：概览 → 海克斯 → 棱彩装备 → 核心物品 → 一位战绩</p>
+  </div>
+  <div class="spacer"></div>
+  <button class="proto-toggle is-on" id="srcToggle">字段来源标注：开</button>
+  <button class="proto-toggle" id="themeToggle">切到亮色</button>
+</div>
+
+<div class="page">
+
+  <nav class="champion-mode-tabs">
+    <button class="champion-mode-tab"><span>排位</span><small>梯度与出装</small></button>
+    <button class="champion-mode-tab"><span>海克斯大乱斗</span><small>强化符文推荐</small></button>
+    <button class="champion-mode-tab is-active"><span>斗魂竞技场</span><small>海克斯 · 棱彩 · 一位战绩</small></button>
+  </nav>
+
+  <div class="aram-workspace">
+
+    <!-- ==================== 左栏：英雄梯度列表 ==================== -->
+    <section class="champion-list-card aram-champions">
+      <div class="aram-champion-head">
+        <div>
+          <strong>英雄梯度</strong>
+          <small>OP.GG 全球样本 · 版本 16.16</small>
+        </div>
+        <span class="champion-result-count tnum">173</span>
+      </div>
+      <label class="champion-search">
+        <span>🔍</span>
+        <input type="search" placeholder="搜索英雄" />
+      </label>
+      <div class="block-note">
+        列 = <b>#</b>(数组下标+1) / 英雄 / 梯度 / 胜率 / 平均名次。
+        数据源 <code>GET /api/champions/rankings?mode=arena</code> → <code>rows[]</code>。
+        <br>现有 <code>rows[]</code> 已有 tier / winRate / pickRate / banRate / play，<b>需新增</b> <code>averagePlacement</code> 与 <code>firstPlaceRate</code>（后端已有原料 total_place / first_place）。
+        <br>样本 <code>play &lt; 500</code> 时整行 <code>opacity:.45</code>（对齐 YOUR.GG 的低样本弱化处理）。
+      </div>
+      <div class="champion-table-scroll">
+        <table class="champion-table">
+          <thead>
+            <tr><th>#</th><th>英雄</th><th>梯度</th><th>胜率</th><th>均名次</th></tr>
+          </thead>
+          <tbody id="championRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ==================== 右栏：英雄详情 ==================== -->
+    <div class="arena-detail">
+
+      <!-- ① 顶部概览条 -->
+      <section class="champion-detail-hero">
+        <div class="champion-detail-art" style="background-image:url('https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ambessa_0.jpg')"></div>
+        <div class="champion-detail-art-shade"></div>
+        <div class="champion-detail-title">
+          <figure class="champion-detail-portrait">
+            <img src="https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/799.png" alt="" onerror="this.remove()" />
+            <span>安</span>
+          </figure>
+          <div>
+            <h2>安蓓萨 <span class="tier-badge top">OP</span></h2>
+            <p>斗魂竞技场 · 全球样本 · 版本 16.16 · 总榜第 <b>9</b> 位（上版本 12 ↑）</p>
+          </div>
+        </div>
+        <dl class="champion-detail-metrics">
+          <div>
+            <dt>梯度</dt>
+            <dd><span class="tier-badge is-metric top">OP</span></dd>
+            <span class="sub">OP.GG 分档</span>
+            <span class="src">average_stats.tier<br><b>0 = OP</b>，1–5 为数字档<br>tier_data.rank / rank_prev_patch</span>
+          </div>
+          <div>
+            <dt>胜率</dt>
+            <dd class="metric-win">56.05%</dd>
+            <span class="sub">进前 4 名</span>
+            <span class="src">win / play<br>= 20632 / 36809</span>
+          </div>
+          <div>
+            <dt>平均名次</dt>
+            <dd class="metric-first">3.26</dd>
+            <span class="sub">共 6 队</span>
+            <span class="src">total_place / play<br>= 119800 / 36809</span>
+          </div>
+          <div>
+            <dt>一位率</dt>
+            <dd class="metric-first">22.08%</dd>
+            <span class="sub">8127 场吃鸡</span>
+            <span class="src">first_place / play<br>= 8127 / 36809</span>
+          </div>
+        </dl>
+        <div class="metrics-secondary">
+          <span>选用率 <b class="metric-pick">8.61%</b></span>
+          <span>禁用率 <b class="metric-ban">18.06%</b></span>
+          <span>样本 <b>36,809</b> 场</span>
+          <span>KDA <b>3.44</b></span>
+          <span class="src">pick_rate · ban_rate · play · (kills+assists)/deaths</span>
+        </div>
+        <div class="block-note">
+          <b>梯度徽章直接复用项目现成的 6 个 SVG</b>（<code>web/tier-icons/{op,1,2,3,4,5}.svg</code>），
+          渲染走 <code>champions.js:64 tierBadge(value)</code>，语义是 <code>0 → op.svg（金色渐变 OP 档）</code>、<code>1–5 → 对应数字档</code>、越界 → <code>.tier-badge-fallback</code> 文本「—」。
+          本原型里的 <code>.tier-badge.top/.t1…t5</code> 只是配色占位，<u>实现时不要照抄这段 CSS</u>。
+          <br><b>⚠ 有一个已存在的坑必须一起修：</b><code>champions.go:1327</code> 的 arena 分支是 <code>Tier: stats.Tier</code> 直接透传，
+          且 <code>championRankingRow.Tier</code>（<code>champions.go:139</code>）<u>没有 <code>omitempty</code></u>——
+          OP.GG 不返回该键时 Go 零值 0 会照样序列化成 <code>"tier":0</code>，前端就把它渲染成金色 OP 徽章。
+          排位模式在 <code>champions.go:1174-1177</code> 有 <code>tier_data.tier</code> 回落兜底，斗魂分支没有。
+          修法：后端区分「真 OP（0）」与「无数据」，无数据时传 <code>-1</code> 或改用指针 + <code>omitempty</code>，让前端落到文本兜底。
+        </div>
+      </section>
+
+      <!-- ② 排序切换：作用于 ③④⑤ -->
+      <section class="recommendation-section">
+        <header>
+          <h3><span class="step-tag">②</span>排序</h3>
+          <span class="section-copy">同时作用于海克斯 / 棱彩装备 / 核心物品</span>
+          <span class="spacer"></span>
+          <div class="chips">
+            <button class="chip is-active">按胜率</button>
+            <button class="chip">按一位率</button>
+            <button class="chip">按平均名次</button>
+            <button class="chip">按场次</button>
+          </div>
+        </header>
+        <div class="block-note">
+          纯前端排序，不触发请求。默认 <b>按胜率</b>（降序），同值再按 play 降序。
+          YOUR.GG 是「按 tier / 按场次」两档，我们没有物品级 tier 字段，故换成四个可直接算出的指标。
+          埋点/状态：<code>state.arenaSort</code>，切英雄时重置为默认。
+        </div>
+      </section>
+
+      <!-- ③ 海克斯推荐 -->
+      <section class="recommendation-section">
+        <header>
+          <h3><span class="step-tag">③</span>海克斯推荐</h3>
+          <span class="section-copy">按品质分组 · 45 条</span>
+          <span class="spacer"></span>
+          <div class="chips">
+            <button class="chip is-active">全部</button>
+            <button class="chip"><i class="dot dot-silver"></i>银色</button>
+            <button class="chip"><i class="dot dot-gold"></i>黄金</button>
+            <button class="chip"><i class="dot dot-prismatic"></i>棱彩</button>
+          </div>
+        </header>
+        <div class="block-note">
+          数据源 <code>data.augment_group[]</code> = 3 组 × 15 条，<code>rarity</code> 是<b>数字</b>：1=银 / 4=黄金 / 8=棱彩。
+          每条字段：<code>id · win · play · total_place · first_place · pick_rate · win_rate</code>（<b>海克斯是唯一自带 win_rate 的区块</b>）。
+          <br>名称 / 图标 / 描述 OP.GG <b>不提供</b>，须用 CommunityDragon <code>cherry-augments.json</code>（zh_cn）做 id→名称映射，图标走 <code>/api/champion-asset</code> 代理。
+          <br>默认展示每组前 6 条；「全部」视图按当前排序混合展示前 6 条。
+        </div>
+        <div class="section-body">
+          <div class="option-grid" id="augmentGrid"></div>
+          <button class="show-more">展开全部 45 条海克斯</button>
+        </div>
+      </section>
+
+      <!-- ④ 棱彩装备 -->
+      <section class="recommendation-section">
+        <header>
+          <h3><span class="step-tag">④</span>棱彩装备</h3>
+          <span class="section-copy">单件 · 8 条</span>
+          <span class="spacer"></span>
+          <span class="source-line"><span class="pill">OP.GG</span> prism_items</span>
+        </header>
+        <div class="block-note">
+          数据源 <code>data.prism_items[]</code>，<code>ids</code> 恒为<b>单件</b>数组。
+          字段：<code>ids · win · play · total_place · first_place · pick_rate</code>（<b>无 win_rate</b>，自算 win/play）。
+          <br>注意 <code>pick_rate</code> 的分母与普通物品不同（棱彩内部占比），<b>不要和核心物品的选用率并排比较</b>。
+          <br>后端现有 <code>build.prismItems</code> 已经在传，只需给 <code>championMetricRow</code> 补 <code>averagePlacement</code> / <code>firstPlaceRate</code> / <code>games</code>。
+        </div>
+        <div class="section-body">
+          <div class="option-grid" id="prismGrid"></div>
+          <button class="show-more">展开全部 8 件</button>
+        </div>
+      </section>
+
+      <!-- ⑤ 核心物品 -->
+      <section class="recommendation-section">
+        <header>
+          <h3><span class="step-tag">⑤</span>核心物品</h3>
+          <span class="section-copy">三件套出装路线 · 15 条</span>
+          <span class="spacer"></span>
+          <span class="source-line"><span class="pill">OP.GG</span> core_items</span>
+        </header>
+        <div class="block-note">
+          数据源 <code>data.core_items[]</code>，<code>ids</code> 是<b>有序的 3–4 件组合</b>（与 YOUR.GG 的单件口径不同，组合更有参考价值，建议保留）。
+          <br>现有 <code>normalizeArenaBuild()</code> 会把单件鞋子行从 coreItems 挪进 boots、并剔除 id 220007 占位道具，这段逻辑保留。
+          <br>鞋子（<code>boots</code>，7 条）与技能加点（<code>skill_masteries</code>，5 条）作为附属细条放在本区块底部，不单独开区块。
+        </div>
+        <div class="section-body">
+          <div class="option-grid" id="coreGrid"></div>
+          <button class="show-more">展开全部 15 条路线</button>
+        </div>
+        <div class="slim-row">
+          <span class="label">鞋子</span>
+          <div class="option-grid" style="grid-template-columns:repeat(3,minmax(0,1fr));flex:1" id="bootsGrid"></div>
+        </div>
+        <div class="slim-row">
+          <span class="label">技能加点</span>
+          <div class="skill-order">
+            <span class="skill-key">Q</span><span class="combo-arrow">›</span>
+            <span class="skill-key">E</span><span class="combo-arrow">›</span>
+            <span class="skill-key">W</span>
+          </div>
+          <span class="option-stats"><b class="wr">57.4%</b><span>均名次 3.11</span><span>一位 23.8%</span><span>12,043 场</span></span>
+          <span class="src">skill_masteries[0].ids / win / play / total_place / first_place</span>
+        </div>
+      </section>
+
+      <!-- ⑥ 一位战绩列表 -->
+      <section class="recommendation-section">
+        <header>
+          <h3><span class="step-tag">⑥</span>一位战绩</h3>
+          <span class="section-copy">该英雄最近拿到第一名的对局</span>
+          <span class="spacer"></span>
+          <div class="chips">
+            <button class="chip is-active">高手对局</button>
+            <button class="chip">我的一位</button>
+          </div>
+        </header>
+        <div class="block-note">
+          <b>「高手对局」= 新增后端代理</b> <code>GET /api/champions/arena-first-places?championId=799&amp;limit=10</code>
+          → 上游 <code>https://api.your.gg/kr/api/arena/champions/{id}/top-builds?limit=10</code>（无鉴权、天然全是 subteamPlacement=1；上限 10 条；<b>浏览器直连会 403，必须服务端代理</b>）。
+          <br><b>战绩卡与总览页完全同一个组件</b>：后端把响应映射成现有的 <code>gameplayMatch</code> / <code>gameplayParticipant</code> 形状，前端<u>调用总览页那个 <code>renderMatch(match, playerRef, tab)</code></u>（<code>gameplay.js:1127</code>），
+          <b>不写任何简化版战绩卡</b>。下面这张卡的 DOM 结构和类名是照 <code>gameplay.js:1195-1211</code> 的输出 1:1 复刻的，CSS 直接吃 <code>gameplay.css:302-411</code>，本页零新增样式。
+          <br><b>隐私红线</b>：上游带 <code>summonerId</code>（Riot 加密稳定 ID），后端<b>必须剥除</b>，只透传 <code>riotIdGameName#tagline</code>；去重 me/participants 也在后端做完。
+          <br><b>能力边界</b>：<code>participants[]</code> 只有 11 个轻字段（英雄 / 名字 / subteamId / subteamPlacement），<b>没有队友的 KDA 与出装</b>。
+          这不影响卡片主体——总览页的 <code>renderMatchPlayers()</code> 在斗魂下本来就只画「第 N 名 + 3 个头像+名字」，字段刚好够；
+          受影响的只有<u>展开详情</u>（<code>renderArenaMatchOverview</code> 的伤害/承伤列会是空的），所以「高手对局」页签的卡片<b>要禁用展开按钮</b>并给出提示，「我的一位」页签则完全可展开。
+          <br>「我的一位」= 本地 <code>/api/gameplay/overview</code> 结果里筛 <code>modeGroup==='arena' &amp;&amp; championId===当前英雄 &amp;&amp; placement===1</code>，无记录时走空态。
+        </div>
+        <div class="section-body">
+          <div class="notice is-warning">
+            <span class="notice-symbol">!</span>
+            <span>YOUR.GG 的斗魂数据<b>只有韩服一份</b>（地区前缀 na/euw 返回的也是同一批韩服对局，cn 不支持）。区块标题旁需常驻来源标注，避免国服用户误认为是自己服的数据。</span>
+          </div>
+          <div class="match-list" id="matchList"></div>
+          <div class="block-note" style="margin-top:8px">
+            <b>本次唯一要改的战绩卡逻辑：把斗魂的中部数据列填上，而不是清空。</b>
+            现在 <code>gameplay.js:1179-1181</code> 是 <code>if (arenaPlacement) statRows = ""</code>，
+            于是 <code>gameplay.js:1201</code> 连 <code>.match-stats</code> 容器都不输出——参考站截图里的 KDA / Damage / DT 三个数，我们其实全都有，只是没渲染。
+            <br>三个数的含义与我们的字段对应：<b>KDA</b> = 击杀/死亡/助攻 + 括号里的 KDA 比值（我们已经画在 <code>.match-kda</code> 里，<u>不要在数据列重复</u>）；
+            <b>Damage</b> = 对英雄造成的伤害 = <code>subject.damage</code> ← <code>totalDamageDealtToChampions</code>；
+            <b>DT</b> = Damage Taken 承受伤害 = <code>subject.damageTaken</code> ← <code>totalDamageTaken</code>。
+            <br>这两个字段<b>三条链路全都已经填好了</b>，零后端改动：韩服 Riot <code>riot_api.go:363-364 → 621</code>、国服 SGP 复用同一转换（<code>gameplay.go:930 → riot_api.go:621</code>）、国服 LCU 兜底 <code>gameplay.go:363-364 → 1630</code>。
+            斗魂详情展开里的伤害列（<code>gameplay.js:1353</code>）早就在用它们，是活数据。
+            <br>建议的斗魂三行（复用现成变量，不新建 CSS）：<code>participationRow</code>（<code>gameplay.js:1175</code>，斗魂下 <code>participantGroupKey</code> 已按小队算，口径正确）
+            + <code>damageRow</code>（<code>gameplay.js:1177</code>，原样复用）+ 新增一行「经济」<code>subject.gold</code>（同样三条链路已填）。
+            <b>不要放平均段位</b>（斗魂无段位）、<b>不要放 CS / 视野</b>（上游恒 0）。
+            <br>数值格式沿用 <code>number()</code>（<code>gameplay.js:86</code>，输出 <code>98,209</code>）。参考站的 <code>29.0k</code> 我们没有对应函数——现有 <code>compactNumber()</code>（<code>gameplay.js:88</code>）是中文「万」制，
+            要么接受 <code>9.8万</code>，要么就用千分位；<u>不建议为此新写一个 k 制函数</u>，会和全项目其它数字口径打架。
+          </div>
+          <button class="show-more">加载更多（上游最多 10 条）</button>
+
+          <div style="margin-top:14px">
+            <div class="block-note" style="margin:0 0 8px">↓ 「我的一位」页签在无记录时的空态</div>
+            <div class="empty-state">
+              <strong>还没有用安蓓萨拿过第一名</strong>
+              <span>该英雄全球一位率 22.08% · 助手只能统计到本机可读取的对局</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* ------------------------------------------------------------------
+   以下全部是写死的示例数据，取自 2026-08-20 对 OP.GG / YOUR.GG 的实测响应，
+   只为让设计稿"看起来是真的"。实现时全部替换为接口数据。
+   ------------------------------------------------------------------ */
+
+const CDRAGON = "https://raw.communitydragon.org/latest";
+const champIcon = (id) => `${CDRAGON}/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${id}.png`;
+const augIcon = (slug) => `${CDRAGON}/game/assets/ux/cherry/augments/icons/${slug}_large.png`;
+const itemIcon = (id) => `https://ddragon.leagueoflegends.com/cdn/16.16.1/img/item/${id}.png`;
+const fallback = (text) => `onerror="this.remove()"`;
+
+const pct = (n) => (n * 100).toFixed(2) + "%";
+const pct1 = (n) => (n * 100).toFixed(1) + "%";
+const num = (n) => n.toLocaleString("zh-CN");
+/* 与项目 web/gameplay.js:86 number() 同口径的千分位；斗魂战绩卡的伤害列用它，不要用 k/万 缩写 */
+const number = (n) => new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 }).format(n);
+
+/* 梯度徽章：完全对齐项目 champions.js:63-71 的语义（0→OP，1..5→数字，其余→文本兜底） */
+function tierDisplay(value) { const n = Number(value); return Number.isFinite(n) ? (n === 0 ? "OP" : String(n)) : "—"; }
+function tierBadge(value, extra = "") {
+  const n = Number(value);
+  const key = Number.isFinite(n) && n >= 0 && n <= 5 ? (n === 0 ? "top" : `t${n}`) : "";
+  const cls = [key && "tier-badge", key, extra].filter(Boolean).join(" ");
+  return key
+    ? `<span class="${cls}">${tierDisplay(value)}</span>`
+    : `<span class="tier-badge-fallback ${extra}">${tierDisplay(value)}</span>`;
+}
+
+/* ---- 左栏英雄榜（真实字段，节选 12 条） ---- */
+const champions = [
+  { rank: 1, id: 799, name: "安蓓萨", tier: 0, win: 20632, play: 36809, place: 119800, first: 8127, active: true },
+  { rank: 2, id: 875, name: "瑟提", tier: 0, win: 31204, play: 56180, place: 180940, first: 12880 },
+  { rank: 3, id: 3, name: "加里奥", tier: 1, win: 32211, play: 58671, place: 193648, first: 12380 },
+  { rank: 4, id: 84, name: "阿卡丽", tier: 1, win: 19880, play: 37020, place: 122500, first: 7640 },
+  { rank: 5, id: 245, name: "艾克", tier: 2, win: 22400, play: 42600, place: 141900, first: 8420 },
+  { rank: 6, id: 157, name: "亚索", tier: 2, win: 26100, play: 50900, place: 171300, first: 9800 },
+  { rank: 7, id: 350, name: "悠米", tier: 3, win: 14200, play: 28100, place: 96400, first: 5100 },
+  { rank: 8, id: 350, name: "婕拉", tier: 3, win: 9100, play: 18400, place: 63800, first: 3300 },
+  { rank: 9, id: 86, name: "盖伦", tier: 4, win: 25123, play: 53238, place: 192434, first: 7776 },
+  { rank: 10, id: 33, name: "拉莫斯", tier: 4, win: 7600, play: 16800, place: 61200, first: 2200 },
+  { rank: 11, id: 17, name: "提莫", tier: 5, win: 5100, play: 12400, place: 46900, first: 1400 },
+  { rank: 12, id: 42, name: "库奇", tier: 5, win: 180, play: 420, place: 1620, first: 44 },
+];
+
+document.getElementById("championRows").innerHTML = champions.map((c) => {
+  const wr = c.win / c.play, ap = c.place / c.play;
+  const low = c.play < 500 ? " is-lowsample" : "";
+  return `<tr class="${c.active ? "is-active" : ""}${low}">
+    <td class="champion-rank tnum">${c.rank}</td>
+    <td><span class="champion-identity">
+      <figure class="champion-portrait"><img src="${champIcon(c.id)}" alt="" onerror="this.remove()"><span>${c.name[0]}</span></figure>
+      <strong>${c.name}</strong>
+    </span></td>
+    <td>${tierBadge(c.tier)}</td>
+    <td class="metric-win tnum">${pct1(wr)}</td>
+    <td class="metric-first tnum">${ap.toFixed(2)}</td>
+  </tr>`;
+}).join("");
+
+/* ---- ③ 海克斯（真实 id / 图标 slug；统计值为实测+示例） ---- */
+const augments = [
+  { id: 27, name: "地动山摇", slug: "earthwake", rarity: "prismatic", win: 5100, play: 8020, place: 23100, first: 2010, pick: .1812 },
+  { id: 48, name: "珠光护手", slug: "jeweledgauntlet", rarity: "prismatic", win: 4620, play: 7480, place: 21900, first: 1810, pick: .1690 },
+  { id: 63, name: "亡命之徒的坚毅", slug: "outlawsgrit", rarity: "silver", win: 7701, play: 12579, place: 38368, first: 3116, pick: .2633 },
+  { id: 73, name: "暗影疾行", slug: "shadowrunner", rarity: "silver", win: 6980, play: 11840, place: 36700, first: 2740, pick: .2478 },
+  { id: 310, name: "小丑学院", slug: "clowncollege", rarity: "gold", win: 3980, play: 6720, place: 20600, first: 1520, pick: .1406 },
+  { id: 82, name: "回声之力", slug: "erosion", rarity: "gold", win: 3410, play: 5980, place: 18600, first: 1280, pick: .1251 },
+];
+document.getElementById("augmentGrid").innerHTML = augments.map((a, i) => `
+  <div class="option-card rare-${a.rarity}">
+    <span class="option-rank">#${i + 1}</span>
+    <figure class="augment-icon"><img src="${augIcon(a.slug)}" alt="" onerror="this.remove()"><span>${a.name[0]}</span></figure>
+    <div>
+      <div class="option-name">${a.name}</div>
+      <div class="option-stats">
+        <span class="wr">${pct1(a.win / a.play)}</span>
+        <span class="ap">${(a.place / a.play).toFixed(2)} 名</span>
+        <span>一位 ${pct1(a.first / a.play)}</span>
+        <span>${num(a.play)} 场</span>
+      </div>
+      <div class="src">win/play · total_place/play · first_place/play · play</div>
+    </div>
+  </div>`).join("");
+
+/* ---- ④ 棱彩装备（真实 id 446691 等） ---- */
+const prisms = [
+  { ids: [446691], name: "德拉克萨的暮刃", win: 6232, play: 9472, place: 27190, first: 2642, pick: .2386 },
+  { ids: [447116], name: "均衡宗誓", win: 4180, play: 6640, place: 19100, first: 1780, pick: .1672 },
+  { ids: [447115], name: "摄政弑杀", win: 3910, play: 6320, place: 18400, first: 1640, pick: .1591 },
+  { ids: [447103], name: "血术师之盔", win: 3120, play: 5240, place: 15600, first: 1280, pick: .1319 },
+  { ids: [443060], name: "神圣之剑", win: 2640, play: 4610, place: 14000, first: 1040, pick: .1161 },
+  { ids: [446698], name: "无尽之力", win: 2010, play: 3680, place: 11400, first: 760, pick: .0927 },
+];
+const itemCard = (o, i, cls) => `
+  <div class="option-card ${cls}">
+    <span class="option-rank">#${i + 1}</span>
+    <figure class="recommend-icon"><img src="${itemIcon(o.ids[0])}" alt="" onerror="this.remove()"><span>${o.name[0]}</span></figure>
+    <div>
+      <div class="option-name">${o.name}</div>
+      <div class="option-stats">
+        <span class="wr">${pct1(o.win / o.play)}</span>
+        <span class="ap">${(o.place / o.play).toFixed(2)} 名</span>
+        <span>一位 ${pct1(o.first / o.play)}</span>
+        <span>${num(o.play)} 场</span>
+      </div>
+      <div class="src">ids[0] · win/play · total_place/play · first_place/play</div>
+    </div>
+  </div>`;
+document.getElementById("prismGrid").innerHTML = prisms.map((p, i) => itemCard(p, i, "rare-prismatic")).join("");
+
+/* ---- ⑤ 核心物品：3 件组合 ---- */
+const cores = [
+  { ids: [226692, 226699, 222517], names: ["日蚀", "颂唱之刃", "海妖杀手"], win: 682, play: 1055, place: 3025, first: 257 },
+  { ids: [226692, 223031, 223033], names: ["日蚀", "无尽之刃", "凡性的提醒"], win: 610, play: 980, place: 2860, first: 228 },
+  { ids: [446691, 226692, 223031], names: ["暮刃", "日蚀", "无尽之刃"], win: 545, play: 890, place: 2610, first: 205 },
+  { ids: [226692, 222517, 223033], names: ["日蚀", "海妖杀手", "凡性的提醒"], win: 470, play: 790, place: 2340, first: 172 },
+  { ids: [447116, 226692, 223031], names: ["均衡宗誓", "日蚀", "无尽之刃"], win: 402, play: 690, place: 2060, first: 148 },
+  { ids: [446691, 223031, 223033], names: ["暮刃", "无尽之刃", "凡性的提醒"], win: 358, play: 620, place: 1870, first: 129 },
+];
+document.getElementById("coreGrid").innerHTML = cores.map((c, i) => `
+  <div class="option-card is-combo is-core">
+    <span class="option-rank">#${i + 1}</span>
+    <div class="combo-items">
+      ${c.ids.map((id, k) => `${k ? '<span class="combo-arrow">›</span>' : ""}<figure class="recommend-icon"><img src="${itemIcon(id)}" alt="" onerror="this.remove()"><span>${c.names[k][0]}</span></figure>`).join("")}
+    </div>
+    <div class="option-stats">
+      <span class="wr">${pct1(c.win / c.play)}</span>
+      <span class="ap">${(c.place / c.play).toFixed(2)} 名</span>
+      <span>一位 ${pct1(c.first / c.play)}</span>
+      <span>${num(c.play)} 场</span>
+    </div>
+    <div class="src">core_items[i].ids（有序 3–4 件）</div>
+  </div>`).join("");
+
+const boots = [
+  { ids: [223008], name: "暴食胫甲", win: 9800, play: 15600, place: 45900, first: 3800, pick: .42 },
+  { ids: [223006], name: "疾步之靴", win: 4100, play: 7200, place: 22100, first: 1500, pick: .19 },
+  { ids: [223047], name: "板甲靴", win: 3200, play: 5900, place: 18400, first: 1150, pick: .16 },
+];
+document.getElementById("bootsGrid").innerHTML = boots.map((b, i) => itemCard(b, i, "")).join("");
+
+/* ---- ⑥ 一位战绩 ----
+   下面这段刻意写成「和 gameplay.js:1195-1211 的 renderMatch 输出逐行对齐」的样子，
+   实现时**不要照抄这段函数**——直接调用总览页的 renderMatch 即可，这里只是把它的产物画出来给人看。
+   与今天线上唯一的差别：statRows 不再是空串。                                   */
+const matches = [
+  {
+    matchId: 8347514443, player: "건실맨", tag: "arpr", champ: 799, champName: "安蓓萨", level: 18,
+    k: 22, d: 7, a: 14, dmg: 98209, taken: 71340, gold: 16260, sec: 1511, ago: "2 小时前",
+    groupKills: 41, score: 9.4, badge: "MVP",
+    items: [447116, 447115, 226692, 223033, 223031, 223008],
+    augSlugs: ["shadowrunner", "jeweledgauntlet", "earthwake", "clowncollege", null, null],
+    tags: ["五杀"],
+    teams: [
+      { place: 1, champs: [[799, "安", "건실맨"], [74, "黑", "Heimer"], [59, "嘉", "JarvanIV"]] },
+      { place: 2, champs: [[53, "布", "Blitz"], [12, "牛", "Alistar"], [497, "洛", "Rakan"]] },
+      { place: 3, champs: [[142, "佐", "Zoe"], [48, "巨", "Trundle"], [77, "熊", "Udyr"]] },
+    ],
+  },
+  {
+    matchId: 8347414043, player: "달빛사냥", tag: "KR1", champ: 799, champName: "安蓓萨", level: 17,
+    k: 13, d: 10, a: 14, dmg: 84120, taken: 66980, gold: 15040, sec: 1492, ago: "3 小时前",
+    groupKills: 33, score: 7.8, badge: "",
+    items: [446691, 226692, 223031, 223033, 223008, 447103],
+    augSlugs: ["earthwake", "outlawsgrit", "clowncollege", "jeweledgauntlet", null, null],
+    tags: [],
+    teams: [
+      { place: 1, champs: [[799, "安", "달빛사냥"], [236, "卢", "Lucian"], [43, "卡", "Karma"]] },
+      { place: 2, champs: [[75, "内", "Nasus"], [79, "古", "Gragas"], [111, "诺", "Nautilus"]] },
+      { place: 3, champs: [[64, "李", "LeeSin"], [238, "劫", "Zed"], [412, "锤", "Thresh"]] },
+    ],
+  },
+];
+
+const portrait = (id, ch, cls = "champion-portrait") =>
+  `<figure class="${cls}"><img src="${champIcon(id)}" alt="" onerror="this.remove()"><span>${ch}</span></figure>`;
+
+document.getElementById("matchList").innerHTML = matches.map((m) => {
+  const participation = Math.min(100, Math.round((m.k + m.a) * 100 / m.groupKills));
+  /* ★ 改动点：斗魂不再 statRows = ""，改成「击杀参与率 / 伤害·承伤 / 经济」三行，
+     结构与 gameplay.js:1175 participationRow、1177 damageRow 完全一致。 */
+  const statRows = `
+    <span class="match-stat" data-tooltip="击杀参与率：(击杀 ${m.k} + 助攻 ${m.a}) ÷ 小队总击杀 ${m.groupKills}"><em>击杀参与率</em><b>${participation}%</b></span>
+    <span class="match-stat match-stat-damage" data-tooltip="伤害 ${number(m.dmg)} · 承伤 ${number(m.taken)}"><em>伤害 · 承伤</em><b><span class="match-damage-value">${number(m.dmg)}</span><span class="match-stat-separator"> · </span><span class="match-taken-value">${number(m.taken)}</span></b></span>
+    <span class="match-stat"><em>经济</em><b>${number(m.gold)} <span class="match-stat-secondary">(${Math.round(m.gold / (m.sec / 60))}/分)</span></b></span>`;
+
+  const loadout = m.augSlugs.map((s) => s
+    ? `<figure class="augment-icon arena-augment-icon"><img src="${augIcon(s)}" alt="" onerror="this.remove()"></figure>`
+    : `<span class="arena-augment-slot is-empty" aria-hidden="true"></span>`).join("");
+
+  return `
+  <article class="match-entry is-win" data-match-id="${m.matchId}">
+    <div class="match-summary is-arena">
+      <div class="match-result-meta">
+        <strong>斗魂竞技场</strong>
+        <time>${m.ago}</time>
+        <span class="result-word">第 1 名</span>
+        <small>${Math.floor(m.sec / 60)}分${String(m.sec % 60).padStart(2, "0")}秒</small>
+      </div>
+      <div class="match-main is-arena">
+        <div class="match-champion">
+          ${portrait(m.champ, m.champName[0])}
+          <span class="champion-level">${m.level}</span>
+          <div class="match-loadout-mini is-augments">${loadout}</div>
+        </div>
+        <div class="match-kda">
+          <strong><span>${m.k}</span> / <em>${m.d}</em> / <span>${m.a}</span></strong>
+          <small>${((m.k + m.a) / Math.max(1, m.d)).toFixed(2)}:1 KDA</small>
+          <span class="match-score-line"><small>评分</small><b class="match-score is-gold">${m.score.toFixed(1)}</b></span>
+        </div>
+        <div class="match-stats">${statRows}<span class="src" style="grid-column:1/-1">subject.damage / subject.damageTaken / subject.gold<br>三条链路均已填充，本区块零后端改动</span></div>
+        <div class="match-build">
+          <div class="match-items">${m.items.map((id) => `<figure class="recommend-icon"><img src="${itemIcon(id)}" alt="" onerror="this.remove()"></figure>`).join("")}</div>
+          <div class="match-badges">${m.badge ? `<i class="match-badge-chip is-mvp">${m.badge}</i>` : `<i class="match-rank-chip is-rank-1">1st</i>`}${m.tags.map((t) => `<span>${t}</span>`).join("")}</div>
+        </div>
+      </div>
+      <div class="match-players is-arena">
+        ${m.teams.map((t) => `
+          <div class="arena-team-row-compact ${t.place === 1 ? "is-first" : ""}">
+            <span class="arena-team-place">第 ${t.place} 名</span>
+            <div class="arena-team-roster">
+              ${t.champs.map(([id, ch, nm]) => `<button type="button">${portrait(id, ch)}<span>${nm}</span></button>`).join("")}
+            </div>
+          </div>`).join("")}
+        <div class="arena-team-row-compact" style="opacity:.6"><span class="arena-team-place">…共 6 队 18 人，按 subteamId 分组、subteamPlacement 排序</span></div>
+        <span class="src">renderMatchPlayers() 的斗魂分支，字段刚好够：championKey / riotIdGameName / subteamId / subteamPlacement</span>
+      </div>
+      <div class="match-actions">
+        <button class="match-expand" type="button" aria-expanded="false" ${m.matchId === 8347514443 ? 'disabled style="opacity:.4" data-tooltip="YOUR.GG 不提供队友明细，本页签禁用展开"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+        <button class="match-replay" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg></button>
+      </div>
+    </div>
+  </article>`;
+}).join("");
+
+/* ---- 原型开关 ---- */
+const srcBtn = document.getElementById("srcToggle");
+srcBtn.addEventListener("click", () => {
+  const on = document.body.classList.toggle("show-src");
+  srcBtn.classList.toggle("is-on", on);
+  srcBtn.textContent = `字段来源标注：${on ? "开" : "关"}`;
+});
+const themeBtn = document.getElementById("themeToggle");
+themeBtn.addEventListener("click", () => {
+  const dark = document.documentElement.dataset.theme === "dark";
+  document.documentElement.dataset.theme = dark ? "light" : "dark";
+  themeBtn.textContent = dark ? "切到暗色" : "切到亮色";
+});
+document.querySelectorAll(".chips").forEach((group) => {
+  group.addEventListener("click", (e) => {
+    const btn = e.target.closest(".chip");
+    if (!btn) return;
+    group.querySelectorAll(".chip").forEach((c) => c.classList.remove("is-active"));
+    btn.classList.add("is-active");
+  });
+});
+document.querySelectorAll("#championRows tr").forEach((tr) => {
+  tr.addEventListener("click", () => {
+    document.querySelectorAll("#championRows tr").forEach((r) => r.classList.remove("is-active"));
+    tr.classList.add("is-active");
+  });
+});
+</script>
+</body>
+</html>

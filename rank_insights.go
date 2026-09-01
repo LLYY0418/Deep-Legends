@@ -9,6 +9,7 @@ package main
 //     OP.GG 对局页，再批量匹配整页战绩。两条链路都在首屏返回后异步触发。
 
 import (
+	"container/list"
 	"context"
 	"net/http"
 	"strconv"
@@ -65,58 +66,150 @@ const (
 	matchTiersMaxRefs     = 24
 	matchTiersMaxMatches  = 50
 	matchTiersOPGGTimeout = 9 * time.Second
+	// Four concurrent LCU ranked requests keep a 10-player match responsive
+	// without flooding the local client during reconnect or champion select.
+	matchTiersRankConcurrency = 4
 )
 
 type rankScoreEntry struct {
-	score int
-	known bool
-	at    time.Time
+	score        int
+	known        bool
+	source       string
+	tier         string
+	division     string
+	winRate      int
+	winRateKnown bool
+	at           time.Time
 }
 
 type rankScoreCache struct {
-	mu      sync.Mutex
-	entries map[string]rankScoreEntry
+	mu            sync.Mutex
+	entries       map[string]*list.Element
+	recent        *list.List
+	flights       map[string]*rankScoreFlight
+	evictionSteps uint64
+}
+
+type rankScoreCacheItem struct {
+	key   string
+	entry rankScoreEntry
+}
+
+type rankScoreFlight struct {
+	done  chan struct{}
+	entry rankScoreEntry
 }
 
 func newRankScoreCache() *rankScoreCache {
-	return &rankScoreCache{entries: make(map[string]rankScoreEntry)}
+	return &rankScoreCache{
+		entries: make(map[string]*list.Element),
+		recent:  list.New(),
+		flights: make(map[string]*rankScoreFlight),
+	}
 }
 
 func (c *rankScoreCache) get(playerRef string) (rankScoreEntry, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	entry, ok := c.entries[playerRef]
-	if !ok || time.Since(entry.at) > rankScoreCacheTTL {
+	element, ok := c.entries[playerRef]
+	if !ok {
 		return rankScoreEntry{}, false
 	}
-	return entry, true
+	item := element.Value.(rankScoreCacheItem)
+	if time.Since(item.entry.at) > rankScoreCacheTTL {
+		c.removeElement(element)
+		return rankScoreEntry{}, false
+	}
+	c.recent.MoveToFront(element)
+	return item.entry, true
 }
 
 func (c *rankScoreCache) put(playerRef string, entry rankScoreEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if len(c.entries) >= rankScoreCacheMax {
-		oldestKey := ""
-		oldestAt := time.Now()
-		for key, existing := range c.entries {
-			if existing.at.Before(oldestAt) {
-				oldestAt = existing.at
-				oldestKey = key
-			}
-		}
-		delete(c.entries, oldestKey)
+	if element, ok := c.entries[playerRef]; ok {
+		element.Value = rankScoreCacheItem{key: playerRef, entry: entry}
+		c.recent.MoveToFront(element)
+		return
 	}
-	c.entries[playerRef] = entry
+	c.entries[playerRef] = c.recent.PushFront(rankScoreCacheItem{key: playerRef, entry: entry})
+	if len(c.entries) > rankScoreCacheMax {
+		c.removeElement(c.recent.Back())
+	}
+}
+
+func (c *rankScoreCache) removeElement(element *list.Element) {
+	if element == nil {
+		return
+	}
+	item := element.Value.(rankScoreCacheItem)
+	delete(c.entries, item.key)
+	c.recent.Remove(element)
+	c.evictionSteps++
+}
+
+func (c *rankScoreCache) beginFlight(key string) (*rankScoreFlight, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if flight, ok := c.flights[key]; ok {
+		return flight, false
+	}
+	flight := &rankScoreFlight{done: make(chan struct{})}
+	c.flights[key] = flight
+	return flight, true
+}
+
+func (c *rankScoreCache) finishFlight(key string, flight *rankScoreFlight, entry rankScoreEntry) {
+	c.mu.Lock()
+	flight.entry = entry
+	delete(c.flights, key)
+	close(flight.done)
+	c.mu.Unlock()
 }
 
 // playerRankScore 读取单名玩家当前的排位绝对分数（单双排优先，其次灵活组排）。
-func (a *app) playerRankScore(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID string) rankScoreEntry {
-	cacheKey := strings.ToUpper(strings.TrimSpace(serverID)) + "|" + playerRef
+func (a *app) playerRankScore(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID, privacy string) rankScoreEntry {
+	serverID = strings.ToUpper(strings.TrimSpace(serverID))
+	useRiot := serverID == "KR" && a.riot != nil && validPlayerReference(playerRef)
+	preferredSource := dataSourceRiot
+	if !useRiot {
+		decision := resolveRankDataSources(rankDataSourceInput{
+			PlayerReferenceValid: validPlayerReference(playerRef), LCUConnected: client != nil,
+			RemoteServer: isRemoteTencentServer(client, serverID), SGPAvailable: a.sgp != nil && serverID != "",
+		})
+		preferredSource = "unknown"
+		if len(decision.Sources) > 0 {
+			preferredSource = decision.Sources[0]
+		}
+	}
+	cacheKey := rankScoreCacheKey(preferredSource, serverID, playerRef)
 	if entry, ok := a.rankScores.get(cacheKey); ok {
 		return entry
 	}
+	flight, leader := a.rankScores.beginFlight(cacheKey)
+	if !leader {
+		select {
+		case <-flight.done:
+			return flight.entry
+		case <-ctx.Done():
+			return rankScoreEntry{}
+		}
+	}
+	// A previous leader may have populated the cache between get() and
+	// beginFlight(). Recheck after winning leadership to close that race.
+	if cached, ok := a.rankScores.get(cacheKey); ok {
+		a.rankScores.finishFlight(cacheKey, flight, cached)
+		return cached
+	}
 	entry := rankScoreEntry{at: time.Now()}
-	ranks, capability := a.loadRanksWithFallback(ctx, client, playerRef, isCurrent, serverID)
+	defer func() { a.rankScores.finishFlight(cacheKey, flight, entry) }()
+	var ranks []gameplayRank
+	var capability EndpointCapability
+	if useRiot {
+		ranks, capability = a.riot.loadRiotRanks(ctx, playerRef)
+	} else {
+		ranks, _, capability = a.loadRanksWithFallback(ctx, client, playerRef, isCurrent, serverID, privacy)
+	}
 	if capability.State == capabilityAvailable {
 		for _, queue := range []string{"RANKED_SOLO_5x5", "RANKED_FLEX_SR"} {
 			for _, rank := range ranks {
@@ -124,8 +217,13 @@ func (a *app) playerRankScore(ctx context.Context, client *LCUClient, playerRef 
 					continue
 				}
 				if score, ok := rankAbsoluteScore(rank.Tier, rank.Division, rank.LeaguePoints); ok {
-					entry.score = score
-					entry.known = true
+					entry.score, entry.known = score, true
+					entry.tier = rank.Tier
+					entry.division = rank.Division
+					if rank.WinRate >= 0 {
+						entry.winRate = rank.WinRate
+						entry.winRateKnown = true
+					}
 				}
 				break
 			}
@@ -133,10 +231,21 @@ func (a *app) playerRankScore(ctx context.Context, client *LCUClient, playerRef 
 				break
 			}
 		}
-		// 已定级与未定级都缓存，避免同一玩家被反复查询。
-		a.rankScores.put(cacheKey, entry)
+		// 已定级与未定级都缓存。实际来源键继续隔离 LCU/SGP 的原始结果；
+		// 首选来源键代表这次稳定的数据源决策入口，使 LCU -> SGP fallback
+		// 能在下一次相同决策下命中，而不是重新请求两端。
+		entry.source = capabilitySource(capability)
+		actualKey := rankScoreCacheKey(entry.source, serverID, playerRef)
+		a.rankScores.put(actualKey, entry)
+		if actualKey != cacheKey {
+			a.rankScores.put(cacheKey, entry)
+		}
 	}
 	return entry
+}
+
+func rankScoreCacheKey(source, serverID, playerRef string) string {
+	return sourceScopedKey(source, strings.ToUpper(strings.TrimSpace(serverID))+"|"+strings.TrimSpace(playerRef))
 }
 
 type matchTierMatchRequest struct {
@@ -162,9 +271,16 @@ type matchTiersResponse struct {
 	Tier     string `json:"tier,omitempty"`
 	Division string `json:"division,omitempty"`
 	// LP 仅在大师及以上有意义（OP.GG 韩服数据提供），界面附加展示。
-	LP      int `json:"lp,omitempty"`
-	Score   int `json:"score,omitempty"`
-	Samples int `json:"samples"`
+	LP      int                        `json:"lp,omitempty"`
+	Score   int                        `json:"score,omitempty"`
+	Samples int                        `json:"samples"`
+	Players map[string]matchTierPlayer `json:"players,omitempty"`
+}
+
+type matchTierPlayer struct {
+	Score    int    `json:"score"`
+	Tier     string `json:"tier,omitempty"`
+	Division string `json:"division,omitempty"`
 }
 
 func (a *app) handleGameplayMatchTiers(w http.ResponseWriter, r *http.Request) {
@@ -191,9 +307,11 @@ func (a *app) handleGameplayMatchTiers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type task struct {
+		publicRef string
 		playerRef string
 		isCurrent bool
 		serverID  string
+		privacy   string
 	}
 	requestedServerID := ""
 	if strings.TrimSpace(request.ServerID) != "" {
@@ -221,27 +339,30 @@ func (a *app) handleGameplayMatchTiers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		seen[reference.PlayerRef] = true
-		tasks = append(tasks, task{playerRef: reference.PlayerRef, isCurrent: reference.PlayerRef == current.PUUID && !isRemoteTencentServer(client, serverID), serverID: serverID})
+		tasks = append(tasks, task{publicRef: publicRef, playerRef: reference.PlayerRef, isCurrent: reference.PlayerRef == current.PUUID && !isRemoteTencentServer(client, serverID), serverID: serverID, privacy: reference.Privacy})
 	}
 	scores := make([]int, 0, len(tasks))
+	players := make(map[string]matchTierPlayer, len(tasks))
 	var scoresMu sync.Mutex
 	var wait sync.WaitGroup
-	semaphore := make(chan struct{}, 4)
+	semaphore := make(chan struct{}, matchTiersRankConcurrency)
 	for _, item := range tasks {
 		wait.Add(1)
 		go func(item task) {
 			defer wait.Done()
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
-			if entry := a.playerRankScore(r.Context(), client, item.playerRef, item.isCurrent, item.serverID); entry.known {
+			if entry := a.playerRankScore(r.Context(), client, item.playerRef, item.isCurrent, item.serverID, item.privacy); entry.known {
 				scoresMu.Lock()
 				scores = append(scores, entry.score)
+				tier, division := rankFromScore(entry.score)
+				players[item.publicRef] = matchTierPlayer{Score: entry.score, Tier: tier, Division: division}
 				scoresMu.Unlock()
 			}
 		}(item)
 	}
 	wait.Wait()
-	response := matchTiersResponse{Samples: len(scores)}
+	response := matchTiersResponse{Samples: len(scores), Players: players}
 	if len(scores) > 0 {
 		total := 0
 		for _, score := range scores {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -83,9 +84,11 @@ type SnapshotDiff struct {
 }
 
 type localStore struct {
-	root string
-	salt []byte
-	mu   sync.Mutex
+	root                 string
+	salt                 []byte
+	mu                   sync.Mutex
+	diagnosticMu         sync.Mutex
+	onDiagnosticRotation func()
 }
 
 func openLocalStore() (*localStore, error) {
@@ -98,7 +101,7 @@ func openLocalStore() (*localStore, error) {
 		root = filepath.Join(base, storageDirectory)
 	}
 	root = filepath.Clean(root)
-	for _, path := range []string{root, filepath.Join(root, "pools"), filepath.Join(root, "snapshots"), filepath.Join(root, "logs"), filepath.Join(root, prestigeArtworkCacheDirectory), filepath.Join(root, championDataCacheDirectory)} {
+	for _, path := range []string{root, filepath.Join(root, "pools"), filepath.Join(root, "snapshots"), filepath.Join(root, "season-stats"), filepath.Join(root, "logs"), filepath.Join(root, prestigeArtworkCacheDirectory), filepath.Join(root, championDataCacheDirectory)} {
 		if err := os.MkdirAll(path, 0o700); err != nil {
 			return nil, fmt.Errorf("create local storage: %w", err)
 		}
@@ -132,6 +135,24 @@ func openLocalStore() (*localStore, error) {
 	_ = store.prunePrestigeArtworkLocked(time.Now())
 	store.mu.Unlock()
 	return store, nil
+}
+
+func readLocalStoreFile(s *localStore, relative string) ([]byte, error) {
+	if s == nil || filepath.IsAbs(relative) || filepath.Clean(relative) != relative || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return nil, errors.New("invalid local storage path")
+	}
+	return os.ReadFile(filepath.Join(s.root, relative))
+}
+
+func writeLocalStoreFile(s *localStore, relative string, data []byte) error {
+	if s == nil || filepath.IsAbs(relative) || filepath.Clean(relative) != relative || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return errors.New("invalid local storage path")
+	}
+	path := filepath.Join(s.root, relative)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	return atomicWriteFile(path, data, 0o600)
 }
 
 func atomicWriteFile(path string, data []byte, mode os.FileMode) error {
@@ -501,6 +522,28 @@ func (s *localStore) listSnapshots() []SnapshotSummary {
 	return summaries
 }
 
+// latestMatchingSnapshot returns only a snapshot captured for the same
+// account and exact pool identity. Historical data must never cross either
+// boundary, even when the skin IDs happen to overlap.
+func (s *localStore) latestMatchingSnapshot(accountHash, poolID, poolHash string) (SnapshotRecord, bool) {
+	if s == nil || strings.TrimSpace(accountHash) == "" || strings.TrimSpace(poolID) == "" || strings.TrimSpace(poolHash) == "" {
+		return SnapshotRecord{}, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var latest SnapshotRecord
+	found := false
+	for _, record := range s.snapshotRecordsLocked() {
+		if record.AccountHash != accountHash || record.PoolID != poolID || record.PoolHash != poolHash {
+			continue
+		}
+		if !found || record.CapturedAt.After(latest.CapturedAt) {
+			latest, found = record, true
+		}
+	}
+	return latest, found
+}
+
 func diffSnapshots(from, to SnapshotRecord) (SnapshotDiff, error) {
 	if from.PoolHash != to.PoolHash {
 		return SnapshotDiff{}, errors.New("奖池版本不同，不能直接比较")
@@ -533,47 +576,97 @@ func (s *localStore) appendDiagnostic(event map[string]any) error {
 	if s == nil {
 		return errors.New("local storage unavailable")
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	eventData, err := marshalDiagnosticRecord(event, time.Now().UTC())
+	if err != nil {
+		return err
+	}
+	s.diagnosticMu.Lock()
+	rotated, err := s.appendDiagnosticLocked(eventData)
+	callback := s.onDiagnosticRotation
+	s.diagnosticMu.Unlock()
+	if rotated && callback != nil {
+		callback()
+	}
+	return err
+}
+
+func marshalDiagnosticRecord(event map[string]any, recordedAt time.Time) ([]byte, error) {
+	record := make(map[string]any, len(event)+1)
+	for key, value := range event {
+		record[key] = value
+	}
+	record["time"] = recordedAt
+	data, err := json.Marshal(record)
+	if err != nil {
+		return nil, err
+	}
+	return append(data, '\n'), nil
+}
+
+// appendDiagnosticLocked serializes only diagnostic-log I/O. Snapshot and LP
+// persistence keep using localStore.mu and no longer wait behind log rotation.
+func (s *localStore) appendDiagnosticLocked(eventData []byte) (bool, error) {
 	path := filepath.Join(s.root, "logs", "diagnostics.jsonl")
-	if info, err := os.Stat(path); err == nil && info.Size() > 2*1024*1024 {
-		backup := filepath.Join(s.root, "logs", "diagnostics.1.jsonl")
-		_ = os.Remove(backup)
-		if err := os.Rename(path, backup); err != nil {
-			if truncateErr := os.Truncate(path, 0); truncateErr != nil {
-				return truncateErr
-			}
+	var rotationData []byte
+	rotated := false
+	if info, err := os.Lstat(path); err == nil {
+		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			return false, errors.New("diagnostic log is not a trusted regular file")
 		}
+		if info.Size() > 2*1024*1024 {
+			previous, readErr := os.ReadFile(path)
+			if readErr != nil {
+				return false, readErr
+			}
+			previousLines := bytes.Count(previous, []byte{'\n'})
+			if len(previous) > 0 && previous[len(previous)-1] != '\n' {
+				previousLines++
+			}
+			rotationData, readErr = marshalDiagnosticRecord(map[string]any{"event": "log_rotated", "previous_lines": previousLines, "previous_bytes": info.Size()}, time.Now().UTC())
+			if readErr != nil {
+				return false, readErr
+			}
+			backup := filepath.Join(s.root, "logs", "diagnostics.1.jsonl")
+			_ = os.Remove(backup)
+			if err := os.Rename(path, backup); err != nil {
+				if truncateErr := os.Truncate(path, 0); truncateErr != nil {
+					return false, truncateErr
+				}
+			}
+			rotated = true
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false, err
 	}
 	if info, err := os.Lstat(path); err == nil {
 		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
-			return errors.New("diagnostic log is not a trusted regular file")
+			return rotated, errors.New("diagnostic log is not a trusted regular file")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	event["time"] = time.Now().UTC()
-	data, err := json.Marshal(event)
-	if err != nil {
-		return err
+		return rotated, err
 	}
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
-		return err
+		return rotated, err
 	}
-	if _, err := file.Write(append(data, '\n')); err != nil {
-		_ = file.Close()
-		return err
+	for _, data := range [][]byte{rotationData, eventData} {
+		if len(data) == 0 {
+			continue
+		}
+		if _, writeErr := file.Write(data); writeErr != nil {
+			_ = file.Close()
+			return rotated, writeErr
+		}
 	}
-	return file.Close()
+	return rotated, file.Close()
 }
 
 func (s *localStore) readDiagnosticLog() ([]byte, error) {
 	if s == nil {
 		return nil, errors.New("local storage unavailable")
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.diagnosticMu.Lock()
+	defer s.diagnosticMu.Unlock()
 	path := filepath.Join(s.root, "logs", "diagnostics.jsonl")
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {

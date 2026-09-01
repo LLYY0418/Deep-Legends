@@ -20,7 +20,7 @@
       --warning: oklch(0.80 0.13 75);
       --warning-soft: oklch(0.21 0.04 75);
       --line: oklch(0.28 0 0);
-      --hex-line: color-mix(in oklch,var(--primary) 32%,var(--line));
+      --hex-line: color-mix(in oklab,var(--primary) 32%,var(--line));
       --font: "Segoe UI Variable","Segoe UI","Microsoft YaHei UI",system-ui,sans-serif;
     }
     * { box-sizing: border-box; }
@@ -47,7 +47,7 @@
     .tree-title { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
     .tree-title img { width: 28px; height: 28px; }
     .tree-title small { display: block; color: var(--muted); font-weight: 500; }
-    .rune-row { display: flex; min-height: 54px; align-items: center; justify-content: center; gap: 14px; border-top: 1px solid color-mix(in oklch,var(--line) 66%,transparent); }
+    .rune-row { display: flex; min-height: 54px; align-items: center; justify-content: center; gap: 14px; border-top: 1px solid color-mix(in oklab,var(--line) 66%,transparent); }
     .rune { position: relative; display: grid; width: 42px; height: 42px; place-items: center; opacity: .38; filter: grayscale(1); }
     .rune img { width: 40px; height: 40px; object-fit: contain; }
     .rune.selected { opacity: 1; filter: none; }

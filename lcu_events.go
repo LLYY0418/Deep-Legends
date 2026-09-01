@@ -91,15 +91,20 @@ func shouldRefreshForLCUEvent(event LCUEvent) bool {
 
 func lcuEventRefreshScope(event LCUEvent) string {
 	uri := strings.ToLower(event.URI)
+	if strings.HasPrefix(uri, "/lol-champ-select/v1/session") {
+		return "champselect"
+	}
 	for _, prefix := range []string{
 		"/lol-champions/v1/inventories/",
 		"/lol-champion-mastery/",
 		"/lol-inventory/",
-		"/lol-summoner/v1/current-summoner",
 	} {
 		if strings.HasPrefix(uri, prefix) {
-			return "full"
+			return "collection"
 		}
+	}
+	if strings.HasPrefix(uri, "/lol-summoner/v1/current-summoner") {
+		return "full"
 	}
 	for _, prefix := range []string{"/lol-loot/v1/player-loot-map", "/lol-rewards/v1/grants"} {
 		if strings.HasPrefix(uri, prefix) {

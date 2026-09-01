@@ -2,7 +2,19 @@
   "use strict";
 
   const STATUS_INTERVAL = 60 * 60 * 1000;
+	const LIVE_UPDATE_STATE_SLICES = Object.freeze({
+	  "refresh-started": ["status"],
+	  "refresh-failed": ["status"],
+	  "snapshot-updated": ["status", "collection", "account", "pools"],
+	  "collection-dirty": ["status"],
+	  "account-updated": ["account"],
+	  "connection-state": ["status"],
+	  "friends-updated": ["friends"],
+	  "season-progress": ["overview-season"],
+	  "historical-ranks": ["overview-ranks"],
+	});
   const CN_SERVER_MERGE_NOTE = [
+    "国服大区合并对照",
     "联盟一区：祖安、皮尔特沃夫、巨神峰、教育网、男爵领域、均衡教派、影流、守望之海",
     "联盟二区：卡拉曼达、暗影岛、征服之海、诺克萨斯、战争学院、雷瑟守备",
     "联盟三区：班德尔城、裁决之地、水晶之痕、钢铁烈阳、皮城警备",
@@ -14,6 +26,7 @@
   const state = {
     status: null,
     section: "overview",
+    sectionScroll: Object.create(null),
     favoritesPage: "collection",
     view: "owned",
     items: [],
@@ -24,6 +37,8 @@
     loading: true,
     listError: "",
     controllers: new Map(),
+    manualRefreshing: false,
+    collectionRescanInFlight: false,
     skinLoadGeneration: 0,
     renderGeneration: 0,
     poolRenderGeneration: 0,
@@ -49,6 +64,8 @@
     destroyed: false,
     eventSource: null,
     liveUpdateTimer: 0,
+    eventReconnectTimer: 0,
+    eventReconnectDelay: 1000,
     detailGeneration: 0,
     detailMediaTimer: 0,
     skinDetailCache: new Map(),
@@ -64,6 +81,8 @@
     chromaCapability: null,
     chromaRenderedItems: [],
     startupFallbackTimer: 0,
+    staleSnapshot: false,
+    staleSnapshotAt: "",
     overlayForced: false,
     overlayBaselineAttempt: "",
     overlayTimer: 0,
@@ -83,15 +102,15 @@
   const el = Object.fromEntries([
     "connection", "connection-avatar", "refresh", "quit", "owned-count", "chroma-count", "pool-count", "remaining-count", "notice",
     "search", "rarity-button", "rarity-menu", "sort", "sort-button", "sort-label", "sort-menu", "sort-direction", "list-meta", "retry-list", "skin-grid", "skin-card-template",
-    "pool-source", "setting-theme", "density-toggle", "account-content", "account-live-state", "diagnostics-content", "copy-diagnostics", "history-content",
+    "pool-source", "setting-theme", "density-toggle", "account-content", "account-live-state", "diagnostics-content", "copy-diagnostics", "export-diagnostics", "diagnostic-log-meta", "history-content",
     "player-search-region", "player-search-region-label", "player-search-region-menu", "player-search-cn-toggle", "player-search-cn-info", "player-search-cn-options",
     "player-search-follow-client", "player-search-follow-status", "player-search-name", "player-search-tag", "player-search-go", "player-search-clear",
     "refresh-history", "pools-content", "pool-import", "pool-name", "pool-version", "pool-source-input", "pool-file", "pool-import-status",
     "privacy-content", "skin-dialog", "skin-dialog-close", "skin-dialog-image", "skin-dialog-fallback", "skin-dialog-status",
     "skin-dialog-title", "skin-dialog-hero", "skin-dialog-data", "skin-dialog-video", "copy-skin-id", "toast", "client-launchpad", "launcher-list",
-    "sidebar-toggle", "settings-sidebar-toggle", "current-section-title", "topbar-subtitle", "page-intro",
+    "sidebar-toggle", "settings-sidebar-toggle", "current-section-title", "topbar-subtitle", "page-intro", "settings-build-identity", "setting-share-directory", "setting-share-directory-change",
     "chroma-unowned-control", "show-unowned-chromas", "chroma-prestige-control", "show-prestige-chromas",
-    "startup-loading", "startup-loading-title", "startup-loading-copy", "app-frame",
+    "startup-loading", "startup-loading-title", "startup-loading-copy", "startup-loading-meta", "startup-loading-retry", "app-frame",
     "pool-catalog-panel", "pool-upload-panel", "pool-history-panel", "pool-picker", "pool-search", "pool-quality", "pool-sort", "pool-list-meta", "pool-skin-grid",
     "favorites-collection-panel", "favorites-account-panel", "favorites-pools-panel",
     "skin-dialog-art", "skin-dialog-backdrop", "skin-dialog-artwork", "skin-dialog-fullscreen", "skin-dialog-previous", "skin-dialog-next", "app-main", "app-scroll", "back-to-top",
@@ -115,6 +134,96 @@
   function camel(value) { return value.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase()); }
   function preference(key, fallback) { try { return localStorage.getItem(`lol-loot-${key}`) ?? fallback; } catch (_) { return fallback; } }
   function savePreference(key, value) { try { localStorage.setItem(`lol-loot-${key}`, String(value)); } catch (_) {} }
+
+	function syncNativeSelectMenu(select) {
+	  const root = select?._appSelectRoot;
+	  if (!root) return;
+	  const trigger = root.querySelector("[data-app-select-trigger]");
+	  const menu = root.querySelector("[data-app-select-menu]");
+	  const options = [...select.options];
+	  const selected = options.find((option) => option.value === select.value) || options[0];
+	  trigger.disabled = select.disabled;
+	  trigger.querySelector("span").textContent = selected?.textContent?.trim() || select.getAttribute("aria-label") || "请选择";
+	  menu.innerHTML = options.map((option) => `<button type="button" role="menuitemradio" aria-checked="${option === selected}" data-native-select-value="${escapeHTML(option.value)}" ${option.disabled ? "disabled" : ""}><span>${escapeHTML(option.textContent.trim())}</span><span class="app-select-check" aria-hidden="true">✓</span></button>`).join("");
+	}
+
+	function closeNativeSelectMenu(root, restoreFocus = false) {
+	  const trigger = root?.querySelector("[data-app-select-trigger]");
+	  const menu = root?.querySelector("[data-app-select-menu]");
+	  if (!trigger || !menu) return;
+	  trigger.setAttribute("aria-expanded", "false");
+	  menu.hidden = true;
+	  if (restoreFocus) trigger.focus();
+	}
+
+	function enhanceNativeSelect(select) {
+	  if (!(select instanceof HTMLSelectElement) || select._appSelectRoot) return;
+	  const label = select.closest(".select-wrap");
+	  if (!label) return;
+	  const root = document.createElement("div");
+	  root.className = "app-select native-select-menu";
+	  root.innerHTML = `<button class="app-select-trigger" type="button" aria-haspopup="menu" aria-expanded="false" data-app-select-trigger><span></span></button><div class="app-select-menu" role="menu" data-app-select-menu hidden></div>`;
+	  select.classList.add("sr-only");
+	  select.tabIndex = -1;
+	  select.setAttribute("aria-hidden", "true");
+	  label.append(root);
+	  select._appSelectRoot = root;
+	  root._nativeSelect = select;
+	  syncNativeSelectMenu(select);
+	  const trigger = root.querySelector("[data-app-select-trigger]");
+	  const menu = root.querySelector("[data-app-select-menu]");
+	  const open = (focus = "selected") => {
+		for (const other of document.querySelectorAll('.native-select-menu [data-app-select-trigger][aria-expanded="true"]')) closeNativeSelectMenu(other.closest(".native-select-menu"));
+		syncNativeSelectMenu(select);
+		trigger.setAttribute("aria-expanded", "true");
+		menu.hidden = false;
+		const options = [...menu.querySelectorAll('[role="menuitemradio"]:not(:disabled)')];
+		(options.find((option) => option.getAttribute("aria-checked") === "true") || options[focus === "last" ? options.length - 1 : 0])?.focus();
+	  };
+	  trigger.addEventListener("click", () => trigger.getAttribute("aria-expanded") === "true" ? closeNativeSelectMenu(root) : open());
+	  trigger.addEventListener("keydown", (event) => {
+		if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+		event.preventDefault();
+		open(event.key === "ArrowUp" || event.key === "End" ? "last" : "first");
+	  });
+	  menu.addEventListener("click", (event) => {
+		const option = event.target.closest("[data-native-select-value]");
+		if (!option || option.disabled) return;
+		select.value = option.dataset.nativeSelectValue;
+		select.dispatchEvent(new Event("change", { bubbles: true }));
+		syncNativeSelectMenu(select);
+		closeNativeSelectMenu(root, true);
+	  });
+	  menu.addEventListener("keydown", (event) => {
+		const options = [...menu.querySelectorAll('[role="menuitemradio"]:not(:disabled)')];
+		const index = options.indexOf(document.activeElement);
+		if (event.key === "Escape" || event.key === "Tab") { closeNativeSelectMenu(root, event.key === "Escape"); return; }
+		if (event.key === "Enter" || event.key === " ") { event.preventDefault(); document.activeElement?.click(); return; }
+		if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+		event.preventDefault();
+		const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+		options[next]?.focus();
+	  });
+	  select.addEventListener("change", () => syncNativeSelectMenu(select));
+	  new MutationObserver(() => syncNativeSelectMenu(select)).observe(select, { childList: true, subtree: true, attributes: true });
+	}
+
+	function enhanceNativeSelects(container = document) {
+	  for (const select of container.querySelectorAll?.(".select-wrap > select") || []) enhanceNativeSelect(select);
+	}
+
+	window.deepLegendsSelects = { enhance: enhanceNativeSelects, sync: syncNativeSelectMenu };
+	enhanceNativeSelects();
+	requestAnimationFrame(() => {
+	  for (const select of document.querySelectorAll(".select-wrap > select")) syncNativeSelectMenu(select);
+	});
+	new MutationObserver((entries) => {
+	  for (const entry of entries) for (const node of entry.addedNodes) if (node.nodeType === Node.ELEMENT_NODE) enhanceNativeSelects(node.matches?.(".select-wrap") ? node.parentElement : node);
+	}).observe(document.body, { childList: true, subtree: true });
+	document.addEventListener("pointerdown", (event) => {
+	  if (event.target.closest(".native-select-menu")) return;
+	  for (const trigger of document.querySelectorAll('.native-select-menu [data-app-select-trigger][aria-expanded="true"]')) closeNativeSelectMenu(trigger.closest(".native-select-menu"));
+	});
 
   async function api(path, options = {}, requestKey = path, timeout = 10000) {
     const previous = state.controllers.get(requestKey);
@@ -159,9 +268,11 @@
     try {
       const previous = state.status;
       state.status = await api("/api/status", {}, "status", 8000);
+	  if (!state.status.connected || !state.status.collectionDirty) state.collectionRescanInFlight = false;
+	  if (!state.status.connected) clearDisconnectedClientState();
       state.statusDelay = STATUS_INTERVAL;
       if (!previous?.connected && state.status.connected) state.overlaySuppressed = false;
-      const changed = !previous || previous.lastSync !== state.status.lastSync || previous.lastAttempt !== state.status.lastAttempt || previous.calculationOK !== state.status.calculationOK || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.snapshotReady !== state.status.snapshotReady;
+      const changed = !previous || previous.lastSync !== state.status.lastSync || previous.lastAttempt !== state.status.lastAttempt || previous.calculationOK !== state.status.calculationOK || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotRetryCount !== state.status.snapshotRetryCount || previous.snapshotRetryExhausted !== state.status.snapshotRetryExhausted || previous.snapshotFallback !== state.status.snapshotFallback;
       if (changed) {
         if (!(state.section === "favorites" && state.favoritesPage === "account")) state.accountLoaded = false;
         if (!(state.section === "favorites" && state.favoritesPage === "pools")) {
@@ -183,6 +294,29 @@
     } finally {
       scheduleStatus();
     }
+  }
+
+	function clearDisconnectedClientState() {
+	  state.account = null;
+	  state.accountLoaded = false;
+	  state.history = [];
+	  state.historyLoaded = false;
+	  state.pools = [];
+	  state.poolsLoaded = false;
+	  state.poolItems = [];
+	  state.skinsCache?.clear();
+	  state.items = [];
+	  state.staleSnapshot = false;
+	  state.staleSnapshotAt = "";
+	}
+
+  function snapshotRetryText(data) {
+    const count = Number(data?.snapshotRetryCount || 0);
+    if (!count) return data?.snapshotRetryExhausted ? "将每 60 秒继续尝试" : "";
+    const elapsed = Math.max(0, Number(data?.snapshotRetryElapsedMs || 0));
+    const seconds = Math.max(1, Math.round(elapsed / 1000));
+    const duration = seconds >= 60 ? `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒` : `${seconds} 秒`;
+    return `已重试 ${count} 次，耗时 ${duration}，${data?.snapshotRetryExhausted ? "将每 60 秒继续尝试" : "稍后自动重试"}`;
   }
 
   function updateReadingOverlay(willLoadItems = false) {
@@ -213,7 +347,7 @@
       state.statusDelay = 900;
       return;
     }
-    showReadingOverlay(data.connected ? "正在读取收藏信息" : "正在连接英雄联盟客户端", data.connected ? "正在整理皮肤、炫彩与账户物品；失败时会自动重试…" : "检测到客户端正在启动，请稍候。", state.overlayForced);
+    showReadingOverlay(data.connected ? "正在读取收藏信息" : "正在连接英雄联盟客户端", data.connected ? (data.snapshotRetryExhausted ? "库存暂时不一致，将每 60 秒继续尝试。" : "正在整理皮肤、炫彩与账户物品。") : "检测到客户端正在启动，请稍候。", state.overlayForced);
     state.statusDelay = 900;
   }
 
@@ -224,6 +358,8 @@
     state.overlayForced ||= forced;
     el.startupLoadingTitle.textContent = title;
     el.startupLoadingCopy.textContent = copy;
+    if (el.startupLoadingMeta) el.startupLoadingMeta.textContent = snapshotRetryText(state.status);
+    if (el.startupLoadingRetry) el.startupLoadingRetry.hidden = !state.status?.connected;
     el.startupLoading.hidden = false;
     el.startupLoading.classList.remove("is-leaving");
     el.appFrame.setAttribute("inert", "");
@@ -252,8 +388,10 @@
     state.overlayTimer = setTimeout(() => { el.startupLoading.hidden = true; }, 180);
   }
 
-  function applySkinsPayload(items, capability) {
+  function applySkinsPayload(items, capability, stale = false, capturedAt = "") {
     state.items = items;
+    state.staleSnapshot = Boolean(stale);
+    state.staleSnapshotAt = capturedAt || "";
     state.chromaCapability = state.view === "chromas" ? capability || null : state.chromaCapability;
     state.acquisitionAvailable = state.items.some((skin) => acquisitionTime(skin) !== null);
     state.acquisitionFallback = state.sort === "acquired" && !state.acquisitionAvailable;
@@ -265,17 +403,20 @@
     const generation = ++state.skinLoadGeneration;
     state.listError = "";
     el.retryList.hidden = true;
-    if (!state.status?.connected || !state.status?.snapshotReady) {
+    const fallbackAvailable = state.status?.connected && state.status?.snapshotFallback && (state.view === "owned" || state.view === "remaining");
+    if (!state.status?.connected || (!state.status?.snapshotReady && !fallbackAvailable)) {
       state.items = [];
+      state.staleSnapshot = false;
+      state.staleSnapshotAt = "";
       state.loading = false;
-      state.listError = state.status?.connected && !state.status?.snapshotReady ? "客户端已连接，正在自动重试读取收藏" : "";
+      state.listError = state.status?.connected && !state.status?.snapshotReady ? `客户端已连接，正在自动重试读取收藏${snapshotRetryText(state.status) ? `（${snapshotRetryText(state.status)}）` : ""}` : "";
       renderItems();
       return;
     }
     state.skinsCache ||= new Map();
     const cached = force ? null : state.skinsCache.get(state.view);
     if (cached && Date.now() - cached.at < 10 * 60 * 1000) {
-      applySkinsPayload(cached.items, cached.capability);
+      applySkinsPayload(cached.items, cached.capability, cached.stale, cached.capturedAt);
       state.loading = false;
       renderItems();
       return;
@@ -287,12 +428,21 @@
       const payload = await api(endpoint, {}, "skins", 15000);
       if (generation !== state.skinLoadGeneration || state.destroyed) return;
       const items = Array.isArray(payload.items) ? payload.items : [];
-      applySkinsPayload(items, payload.capability || null);
-      state.skinsCache.set(state.view, { items, capability: payload.capability || null, at: Date.now() });
+      applySkinsPayload(items, payload.capability || null, payload.stale, payload.capturedAt);
+      state.skinsCache.set(state.view, { items, capability: payload.capability || null, stale: Boolean(payload.stale), capturedAt: payload.capturedAt || "", at: Date.now() });
     } catch (error) {
       if (generation !== state.skinLoadGeneration || error.name === "RequestCancelled" || state.destroyed) return;
-      state.items = [];
-      state.listError = error.message;
+      // 保留已经渲染的实时/历史列表，避免一次瞬时请求失败把可用内容清空。
+      // 只有没有任何旧内容时才进入空态错误页。
+      const hadItems = state.items.length > 0;
+      if (!hadItems) {
+        state.items = [];
+        state.staleSnapshot = false;
+        state.staleSnapshotAt = "";
+        state.listError = error.message;
+      } else {
+        state.listError = "";
+      }
       el.retryList.hidden = false;
     } finally {
       if (generation !== state.skinLoadGeneration || state.destroyed) return;
@@ -304,8 +454,8 @@
   function renderStatus() {
     const data = state.status;
     document.body.classList.remove("is-fatal");
-    el.refresh.disabled = data.syncing;
-    el.refresh.classList.toggle("is-loading", data.syncing);
+    el.refresh.disabled = data.syncing || state.manualRefreshing;
+    el.refresh.classList.toggle("is-loading", data.syncing || state.manualRefreshing);
     el.connection.className = "connection";
     const summoner = data.summoner || {};
     const name = summoner.gameName || summoner.displayName || "当前召唤师";
@@ -321,22 +471,26 @@
     if (data.connected && data.snapshotReady) {
       el.connection.classList.add("is-connected");
       el.connection.lastElementChild.textContent = `${name}${tag}`;
-      el.connection.title = `${name}${tag} · 等级 ${summoner.summonerLevel || "—"}${data.syncing ? " · 正在同步" : data.eventStream ? " · 实时连接" : ""}`;
     } else if (data.connected) {
       el.connection.classList.add("is-connecting");
       el.connection.lastElementChild.textContent = `${name}${tag}`;
-      el.connection.title = `${name}${tag} · 正在读取客户端数据`;
     } else {
       el.connection.classList.add(data.connectionState === "connecting" ? "is-connecting" : "is-error");
-      el.connection.lastElementChild.textContent = data.syncing || data.connectionState === "connecting" ? "正在检查客户端" : "尚未连接";
-      el.connection.title = el.connection.lastElementChild.textContent;
+      el.connection.lastElementChild.textContent = data.syncing || data.connectionState === "connecting" ? "正在检查客户端" : "未检测到客户端";
     }
-    el.ownedCount.textContent = data.snapshotReady ? formatNumber(data.ownedCount) : "—";
+    el.connection.dataset.tooltip = el.connection.lastElementChild.textContent;
+    el.connection.dataset.tooltipOverflow = ".connection-label";
+    el.connection.dataset.tooltipSize = "compact";
+    el.ownedCount.textContent = data.snapshotReady || data.snapshotFallback ? formatNumber(data.ownedCount) : "—";
     el.chromaCount.textContent = data.snapshotReady ? formatNumber(data.chromaOwnedCount || 0) : "—";
     el.poolCount.textContent = data.poolTotal ? formatNumber(data.poolTotal) : "—";
-    el.remainingCount.textContent = data.calculationOK ? formatNumber(data.remainingCount) : "—";
+    el.remainingCount.textContent = data.calculationOK || data.snapshotFallback ? formatNumber(data.remainingCount) : "—";
     if (safeHTTPURL(data.poolSource)) el.poolSource.href = data.poolSource; else el.poolSource.removeAttribute("href");
     el.poolSource.textContent = `${data.poolVersion || "当前"} 奖池清单`;
+    if (el.settingsBuildIdentity) {
+      const fingerprint = String(data.buildFingerprint || "dev");
+      el.settingsBuildIdentity.textContent = `版本 ${data.version || "未知"} · 构建 ${fingerprint}`;
+    }
     renderNotice(data);
     renderLaunchpad(data);
     updateWorkspaceAvailability(data);
@@ -347,7 +501,7 @@
   const workspaceControls = {
     collectionToolbar: document.querySelector(".collection-toolbar"),
     listRow: document.querySelector(".list-row"),
-    accountHeading: document.querySelector("#favorites-account-panel .page-heading"),
+	accountStatus: document.querySelector("#favorites-account-panel .account-status-row"),
     poolHeading: document.querySelector("#favorites-pools-panel > .page-heading"),
     poolTabs: document.querySelector(".pool-primary-tabs"),
     poolToolbar: document.querySelector(".pool-catalog-toolbar"),
@@ -377,16 +531,17 @@
       el.notice.hidden = true;
       return;
     }
-    if (!data.calculationOK) {
+    const stale = data.snapshotFallback && !data.snapshotReady;
+    if (!data.calculationOK || stale) {
       el.notice.classList.add("is-warning");
       const issues = data.poolIssues || [];
       const issueRows = issues.slice(0, 100).map((item) => `<li>${escapeHTML(item.name)}：${escapeHTML(item.reason)}</li>`).join("");
-	  const detail = !data.snapshotReady ? "正在读取收藏信息；如果客户端刚启动，Deep Legends 会自动重试。" : `奖池共 ${formatNumber(data.poolTotal)} 款，已经确认 ${formatNumber(data.poolMatched)} 款；数据完整后会自动显示结果。`;
-	  el.notice.innerHTML = `<div class="notice-symbol" aria-hidden="true">!</div><div><strong>${data.connected ? "部分收藏信息暂时不可用" : "奖池结果暂不可用"}</strong><p>${escapeHTML(detail)}</p>${issues.length ? `<details><summary>查看未识别条目</summary><ul class="issue-list">${issueRows}</ul></details>` : ""}</div>`;
+      const detail = !data.snapshotReady ? `${stale ? `实时库存暂不可用，当前显示 ${formatDateTime(data.snapshotFallbackAt)} 保存的历史快照（可能不是最新）。` : "正在读取收藏信息。"} ${snapshotRetryText(data)}${data.lastError ? ` 原因：${data.lastError}` : ""}` : `奖池共 ${formatNumber(data.poolTotal)} 款，已经确认 ${formatNumber(data.poolMatched)} 款；数据完整后会自动显示结果。`;
+	  el.notice.innerHTML = `<div class="notice-symbol" aria-hidden="true">!</div><div><strong>${data.connected ? (stale ? "显示历史收藏快照" : "部分收藏信息暂时不可用") : "奖池结果暂不可用"}</strong><p>${escapeHTML(detail)}</p>${issues.length ? `<details><summary>查看未识别条目</summary><ul class="issue-list">${issueRows}</ul></details>` : ""}${data.connected && !data.snapshotReady ? '<button class="text-button retry-inline" type="button">立即重新读取</button>' : ""}</div>`;
+	  el.notice.querySelector(".retry-inline")?.addEventListener("click", () => el.refresh.click());
       return;
     }
-    el.notice.classList.add("is-success");
-    el.notice.innerHTML = '<div class="notice-symbol" aria-hidden="true">✓</div><div><strong>收藏与奖池已更新</strong></div>';
+    el.notice.hidden = true;
   }
 
   async function loadClientInstallations() {
@@ -418,7 +573,7 @@
       el.launcherList.querySelector(".scan-launchers")?.addEventListener("click", loadClientInstallations);
       return;
     }
-    el.launcherList.innerHTML = state.installations.map((item) => `<button class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"><span class="launcher-kind">${escapeHTML(item.kind === "riot" ? "R" : item.kind === "tcls" ? "L" : "W")}</span><span class="launcher-card-copy"><strong>${escapeHTML(item.name)}</strong><small title="${escapeHTML(item.location || item.description)}">${escapeHTML(item.location || item.description)}</small></span><span class="launcher-arrow" aria-hidden="true">›</span></button>`).join("");
+    el.launcherList.innerHTML = state.installations.map((item) => `<button class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"><span class="launcher-kind">${escapeHTML(item.kind === "riot" ? "R" : item.kind === "tcls" ? "L" : "W")}</span><span class="launcher-card-copy"><strong>${escapeHTML(item.name)}</strong><small data-tooltip="${escapeHTML(item.location || item.description)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(item.location || item.description)}</small></span><span class="launcher-arrow" aria-hidden="true">›</span></button>`).join("");
     for (const button of el.launcherList.querySelectorAll("[data-client-id]")) button.addEventListener("click", () => launchDetectedClient(button));
   }
 
@@ -561,9 +716,9 @@
       el.listMeta.textContent = "正在整理皮肤…";
       return;
     }
-	if (state.status?.connected && !state.status?.snapshotReady) {
+	if (state.status?.connected && !state.status?.snapshotReady && !state.staleSnapshot) {
 	  el.listMeta.textContent = "正在读取收藏";
-	  el.grid.innerHTML = '<div class="empty-state"><strong>客户端已经连接</strong><p>收藏信息还在准备中，读取失败时会自动重试。</p><div class="empty-actions"><button class="text-button refresh-inline" type="button">立即重新读取</button></div></div>';
+	  el.grid.innerHTML = `<div class="empty-state"><strong>客户端已经连接</strong><p>收藏信息还在准备中，${escapeHTML(snapshotRetryText(state.status) || "正在自动重试")}。${state.status.lastError ? ` 原因：${escapeHTML(state.status.lastError)}` : ""}</p><div class="empty-actions"><button class="text-button refresh-inline" type="button">立即重新读取</button></div></div>`;
 	  el.grid.querySelector(".refresh-inline")?.addEventListener("click", () => el.refresh.click());
 	  return;
 	}
@@ -578,7 +733,8 @@
     const label = { owned: "已拥有", all: "全部皮肤", chromas: "全部炫彩" }[state.view];
     const heroCount = ["all", "chromas"].includes(state.view) ? new Set(visible.map((skin) => skin.championId || skin.championName)).size : 0;
     const acquisitionHint = state.acquisitionFallback ? " · 客户端未提供获取时间，已改按名称排列" : state.view === "all" && state.sort === "acquired" ? " · 英雄按最近获得的皮肤排列" : "";
-    el.listMeta.textContent = `${label} ${formatNumber(visible.length)} 款${heroCount ? ` · ${formatNumber(heroCount)} 位英雄` : ""}${visible.length !== state.items.length ? ` · 共 ${formatNumber(state.items.length)} 款` : ""}${acquisitionHint}`;
+    const staleHint = state.staleSnapshot ? ` · 历史快照${state.staleSnapshotAt ? `（${formatDateTime(state.staleSnapshotAt)}）` : ""}` : "";
+    el.listMeta.textContent = `${label} ${formatNumber(visible.length)} 款${heroCount ? ` · ${formatNumber(heroCount)} 位英雄` : ""}${visible.length !== state.items.length ? ` · 共 ${formatNumber(state.items.length)} 款` : ""}${acquisitionHint}${staleHint}`;
     el.grid.replaceChildren();
     if (!visible.length) {
       if (!state.status?.connected) {
@@ -912,7 +1068,7 @@
     const showingPrestige = canToggle && state.detailArtworkMode === "prestige";
     const label = showingPrestige ? "切换到普通炫彩图" : "切换到臻彩原画";
     el.skinDialogArtwork.setAttribute("aria-label", label);
-    el.skinDialogArtwork.title = label;
+    el.skinDialogArtwork.dataset.tooltip = label;
     el.skinDialogArtwork.classList.toggle("is-active", showingPrestige);
     el.skinDialog.classList.toggle("is-prestige-dialog", showingPrestige);
   }
@@ -1361,9 +1517,15 @@
       }).join("");
       el.accountLiveState.textContent = state.status?.eventStream ? "自动更新" : "已连接";
       el.accountLiveState.className = `state-chip ${state.status?.eventStream ? "success" : ""}`;
-      const backgroundName = account.profile?.backgroundSkinName || (account.profile?.backgroundSkinId ? "客户端未返回对应名称" : "未设置");
-      el.accountContent.innerHTML = `<section class="account-hero"><span class="account-hex" aria-hidden="true">⬡</span><div class="account-identity"><p class="eyebrow">当前召唤师</p><h3>${escapeHTML(playerName(summoner))}</h3><p>等级 ${formatNumber(summoner.summonerLevel)} · 本机只读连接</p></div><dl class="account-facts"><div><dt>主页背景</dt><dd>${escapeHTML(backgroundName)}</dd></div><div><dt>皮肤物品</dt><dd>${formatNumber(skinLoot.length)} 种 · ${formatNumber(skinLootQuantity)} 件</dd></div><div><dt>待领取</dt><dd>${formatNumber(rewards.length)} 组 · ${formatNumber(rewardQuantity)} 件</dd></div></dl></section>${categorySections || '<div class="empty-state"><strong>仓库当前没有可展示物品</strong></div>'}<section class="account-section"><div class="section-copy"><h3>待领取奖励</h3><span class="section-count">${formatNumber(rewards.length)} 组</span></div>${rewardCards ? `<div class="reward-grid">${rewardCards}</div>` : '<div class="empty-state compact"><strong>没有待领取奖励</strong><p>领取操作仍需回到英雄联盟客户端完成。</p></div>'}</section><details class="capability-details"><summary>数据来源状态</summary><p>只读接口单独降级，不影响皮肤库存的双来源一致性核验。</p><div class="capability-list">${capabilityRows || '<p class="muted">尚无能力状态</p>'}</div></details>`;
+	  const profileName = playerName(summoner);
+	  const profileIcon = window.deepLegendsGameIcons?.iconFigure?.("profile", summoner.profileIconId, profileName, "summoner-avatar", false)
+		|| `<span class="game-icon is-summoner-avatar"><span aria-hidden="true">${escapeHTML(profileName.slice(0, 1) || "?")}</span></span>`;
+	  const backgroundArt = summoner.backgroundSource && summoner.backgroundPath
+		? `<img class="summoner-strip-art account-hero-art" src="/api/champion-asset?source=${encodeURIComponent(summoner.backgroundSource)}&path=${encodeURIComponent(summoner.backgroundPath)}" alt="" aria-hidden="true" decoding="async" data-game-image>`
+		: "";
+	  el.accountContent.innerHTML = `<section class="account-hero">${backgroundArt}${profileIcon}<div class="account-identity"><p class="eyebrow">当前召唤师</p><h3>${escapeHTML(profileName)}</h3><p>等级 ${formatNumber(summoner.summonerLevel)} · 本机只读连接</p></div><dl class="account-facts"><div><dt>皮肤物品</dt><dd>${formatNumber(skinLoot.length)} 种 · ${formatNumber(skinLootQuantity)} 件</dd></div><div><dt>待领取</dt><dd>${formatNumber(rewards.length)} 组 · ${formatNumber(rewardQuantity)} 件</dd></div></dl></section>${categorySections || '<div class="empty-state"><strong>仓库当前没有可展示物品</strong></div>'}<section class="account-section"><div class="section-copy"><h3>待领取奖励</h3><span class="section-count">${formatNumber(rewards.length)} 组</span><button class="text-button" type="button" data-navigate-suite="sweep">去拾遗领取</button></div>${rewardCards ? `<div class="reward-grid">${rewardCards}</div>` : '<div class="empty-state compact"><strong>没有待领取奖励</strong><p>随行会扫描奖励账本、任务与事件中心。</p></div>'}</section><details class="capability-details"><summary>数据来源状态</summary><p>只读接口单独降级，不影响皮肤库存的双来源一致性核验。</p><div class="capability-list">${capabilityRows || '<p class="muted">尚无能力状态</p>'}</div></details>`;
       for (const image of el.accountContent.querySelectorAll(".loot-art img")) loadNextLootImage(image, true);
+	  window.deepLegendsGameIcons?.prepareImages?.(el.accountContent);
     } catch (error) {
       if (error.name === "RequestCancelled" || state.destroyed) return;
       state.accountLoaded = false;
@@ -1378,6 +1540,9 @@
     try {
       state.diagnostics = await api("/api/diagnostics", {}, "diagnostics");
       const data = state.diagnostics;
+	  el.diagnosticLogMeta.textContent = `${formatFileSize(data.diagnosticLogBytes)} · ${formatNumber(data.diagnosticLogEvents)} 条事件`;
+	  el.exportDiagnostics.toggleAttribute("aria-disabled", !data.diagnosticLogReady);
+	  el.exportDiagnostics.setAttribute("download", diagnosticExportFilename());
 	  const discovery = data.discovery || {};
       const rows = (data.ownershipSources || []).map((source) => {
         const evidenceCount = Number(source.evidenceCount || 0);
@@ -1587,20 +1752,49 @@
     });
   }
 
+  // 回到某个页面时把滚动位置还原回去。一次性 scrollTo 是不够的：英雄页
+  // 重新进入时会先渲染一版加载态（内容比原来矮得多），浏览器会把 scrollTop
+  // 夹回 0；等数据到位、页面重新变高时已经没人再去设置它了。所以这里持续
+  // 重试到真正滚到目标位置为止，并给一个时间上限，同时一旦用户自己动了滚轮／
+  // 触摸／键盘就立刻放弃，绝不和用户抢滚动条。
+  function restoreSectionScroll(name) {
+    const sectionScrollRestoreBudget = 2000;
+    const target = Number(state.sectionScroll[name] || 0);
+    el.appScroll.scrollTo({ top: target, behavior: "instant" });
+    if (target <= 0) return;
+    const deadline = Date.now() + sectionScrollRestoreBudget;
+    let cancelled = false;
+    const abort = () => { cancelled = true; };
+    const events = ["wheel", "touchstart", "keydown", "pointerdown"];
+    for (const type of events) window.addEventListener(type, abort, { once: true, passive: true });
+    const stop = () => { for (const type of events) window.removeEventListener(type, abort); };
+    const apply = () => {
+      if (cancelled || state.section !== name || Date.now() > deadline) { stop(); return; }
+      if (Math.abs(el.appScroll.scrollTop - target) <= 1) { stop(); return; }
+      el.appScroll.scrollTo({ top: target, behavior: "instant" });
+      requestAnimationFrame(apply);
+    };
+    requestAnimationFrame(apply);
+  }
+
   function activateSection(name) {
     const tab = el.sectionTabs.find((item) => item.dataset.section === name);
     if (!tab) return;
     const previousSection = state.section;
+    if (previousSection !== name) state.sectionScroll[previousSection] = el.appScroll.scrollTop;
     if (name !== "favorites" && state.section === "favorites" && state.favoritesPage === "collection") cancelDeferredImages(el.grid);
     state.section = name;
-    const sectionTitles = { overview: ["总览", "召唤师生涯与最近对局"], champions: ["英雄", "韩服梯度、符文与构建推荐"], live: ["对局", "实时队伍与赛前配置"], favorites: ["收藏", "皮肤、物品与三合一奖池"], settings: ["设置", "显示、对局行为与隐私"] };
+    const sectionTitles = { overview: ["总览", "召唤师生涯与最近对局"], champions: ["英雄", "韩服梯度、符文与构建推荐"], live: ["对局", "实时队伍与赛前配置"], favorites: ["收藏", "皮肤、物品与三合一奖池"], suite: ["随行", "托管流程 · 端侧整备 · 门面 · 拾遗"], settings: ["设置", "显示、对局行为与隐私"] };
     const title = sectionTitles[name] || ["Deep Legends", "战绩 · 英雄 · 对局 · 收藏"];
     el.currentSectionTitle.textContent = title[0];
     el.topbarSubtitle.textContent = title[1];
     el.pageIntro.hidden = name !== "favorites";
-    const applyPanels = () => activateTab(tab, el.sectionTabs, (selected) => {
-      for (const panel of el.sectionPanels) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
-    });
+    const applyPanels = () => {
+      activateTab(tab, el.sectionTabs, (selected) => {
+        for (const panel of el.sectionPanels) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
+      });
+      if (previousSection !== name) restoreSectionScroll(name);
+    };
     if (previousSection !== name && typeof document.startViewTransition === "function" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       document.startViewTransition(applyPanels);
     } else {
@@ -1615,6 +1809,7 @@
     if (name === "settings") {
       if (previousSection !== "settings") activateSettingsPage("appearance");
       loadPrivacy();
+      loadDiagnostics();
     }
     if (state.status) renderNotice(state.status);
     if (state.status) renderLaunchpad(state.status);
@@ -1623,7 +1818,10 @@
 
   window.addEventListener("deep-legends:navigate", (event) => {
     const name = event.detail?.section;
-    if (name) activateSection(name);
+	if (name) {
+	  activateSection(name);
+	  if (name === "settings" && event.detail?.page) activateSettingsPage(event.detail.page);
+	}
   });
 
   // 总览页切换玩家页签时同步启动入口卡的可见性（只对当前召唤师展示）。
@@ -1666,7 +1864,8 @@
       const ownedTab = el.viewTabs.find((item) => item.dataset.view === "owned");
       resetCollectionControls("owned");
       if (ownedTab) activateTab(ownedTab, el.viewTabs, () => {});
-      loadSkins();
+      triggerCollectionRescanIfDirty();
+      loadSkins(true);
     }
     if (name === "account" && !state.accountLoaded) loadAccount();
     if (name === "pools" && !state.poolsLoaded) loadPools();
@@ -1691,6 +1890,16 @@
     el.rarityButton.setAttribute("aria-expanded", "false");
     updateQualityMenu();
     configureSortControls();
+  }
+
+  function triggerCollectionRescanIfDirty() {
+    if (!state.status?.connected || !state.status?.collectionDirty || state.collectionRescanInFlight) return false;
+    state.collectionRescanInFlight = true;
+    void api("/api/refresh", { method: "POST" }, "collection-rescan").catch((error) => {
+      state.collectionRescanInFlight = false;
+      if (error.name !== "RequestCancelled") showToast(`收藏后台补刷未启动：${error.message}`);
+    });
+    return true;
   }
 
   function activateSettingsPage(name) {
@@ -1783,6 +1992,7 @@
     document.documentElement.dataset.sidebar = collapsed ? "collapsed" : "expanded";
     el.sidebarToggle.setAttribute("aria-expanded", String(!collapsed));
     el.sidebarToggle.setAttribute("aria-label", collapsed ? "展开侧边栏" : "收起侧边栏");
+    el.sidebarToggle.dataset.tooltip = collapsed ? "展开侧边栏" : "收起侧边栏";
     el.settingsSidebarToggle.textContent = collapsed ? "展开侧边栏" : "收起侧边栏";
   }
 
@@ -1794,6 +2004,51 @@
   function toggleDensity() {
     savePreference("density", preference("density", "comfortable") === "compact" ? "comfortable" : "compact");
     applyAppearance();
+  }
+
+  function renderShareDirectorySetting(directory, available = true) {
+    const value = String(directory || "").trim();
+    el.settingShareDirectory.textContent = available ? (value || "首次生成时选择") : "仅桌面客户端可设置";
+    if (value) el.settingShareDirectory.dataset.tooltip = value;
+    else delete el.settingShareDirectory.dataset.tooltip;
+    el.settingShareDirectoryChange.disabled = !available;
+    el.settingShareDirectoryChange.querySelector("span").textContent = value ? "更改位置" : "选择位置";
+  }
+
+  async function setupShareDirectorySetting() {
+    const bridge = window.desktopShare;
+    if (!bridge?.getSaveDirectory || !bridge?.chooseSaveDirectory) {
+      renderShareDirectorySetting("", false);
+      return;
+    }
+    try {
+      const result = await bridge.getSaveDirectory();
+      renderShareDirectorySetting(result?.directory || "");
+    } catch (error) {
+      renderShareDirectorySetting("", false);
+      showToast(error?.message || "分享图保存位置读取失败");
+    }
+  }
+
+  window.addEventListener("deep-legends:share-directory-changed", (event) => {
+    renderShareDirectorySetting(event.detail?.directory || "");
+  });
+
+  async function changeShareDirectory() {
+    const bridge = window.desktopShare;
+    if (!bridge?.chooseSaveDirectory || el.settingShareDirectoryChange.disabled) return;
+    el.settingShareDirectoryChange.disabled = true;
+    try {
+      const result = await bridge.chooseSaveDirectory();
+      if (!result?.canceled) {
+        renderShareDirectorySetting(result?.directory || "");
+        showToast("分享图保存位置已更新");
+      }
+    } catch (error) {
+      showToast(error?.message || "分享图保存位置修改失败");
+    } finally {
+      el.settingShareDirectoryChange.disabled = false;
+    }
   }
 
   function renderChampionNetwork(status) {
@@ -1846,7 +2101,7 @@
   // 只保留一张与各页面空状态同风格的居中提示卡；恢复由 renderStatus 完成。
   function showFatal(message) {
     el.connection.className = "connection is-error";
-    el.connection.lastElementChild.textContent = "本地服务异常";
+    el.connection.lastElementChild.textContent = "未检测到客户端";
     const expired = /会话已过期/.test(String(message || ""));
     el.notice.className = "notice is-fatal";
     el.notice.hidden = false;
@@ -1860,6 +2115,7 @@
 
   let toastTimer = 0;
   function showToast(message) { clearTimeout(toastTimer); el.toast.textContent = message; el.toast.hidden = false; toastTimer = setTimeout(() => { el.toast.hidden = true; }, 3200); }
+  window.deepLegendsToast = showToast;
   function localeCompare(left, right) { return String(left || "").localeCompare(String(right || ""), "zh-CN", { numeric: true, sensitivity: "base" }); }
   const rarityKeys = { "卓越": "transcendent", "圣堂": "exalted", "神话": "mythic", "终极": "ultimate", "传说": "legendary", "限定": "limited", "史诗": "epic", "王者": "royal", "勇士": "brave", "典藏": "archive", "未分级": "unranked" };
   const rarityRanks = { transcendent: 0, exalted: 1, mythic: 2, ultimate: 3, legendary: 4, limited: 5, epic: 6, royal: 7, brave: 8, archive: 9, unranked: 10 };
@@ -1933,6 +2189,7 @@
       MATERIAL_KEY: "/loot-icons/hextech-key.png",
       MATERIAL_KEY_FRAGMENT: "/loot-icons/key-fragment.png",
       CHEST_CHAMPION_MASTERY: "/loot-icons/hextech-chest-transparent.png",
+	  CHEST_PROMOTION: "/loot-icons/promotion-chest.png",
       CURRENCY_ANCIENT_SPARK: "/loot-icons/sanctum-spark.svg",
     };
     return [...new Set([fixed[token], item.tilePath, item.asset, item.splashPath].filter(Boolean))];
@@ -1984,21 +2241,69 @@
   function playerName(summoner) { const name = summoner.gameName || summoner.displayName || "当前召唤师"; return `${name}${summoner.tagLine ? `#${summoner.tagLine}` : ""}`; }
   function rewardStatusLabel(value) { return ({ PENDING_SELECTION: "待选择", PENDING: "待领取", CREATED: "待处理" })[String(value || "").toUpperCase()] || value || "待处理"; }
   function formatNumber(value) { const number = Number(value); return Number.isFinite(number) ? new Intl.NumberFormat("zh-CN").format(number) : "—"; }
+  function formatFileSize(value) { const bytes = Math.max(0, Number(value) || 0); if (bytes < 1024) return `${formatNumber(bytes)} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KiB`; return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`; }
   function formatDateTime(value) { const date = new Date(value); return Number.isNaN(date.valueOf()) ? "时间未知" : new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(date); }
+  // 导出诊断日志的文件名带上日期时间（MMDD-HHmm），避免同名文件在反复导出/
+  // 上传时被按文件名去重，导致明明是新导出的日志被误判成旧文件（真实事故：
+  // 用户删了旧日志重新导出，上传后内容仍是旧的，根因是文件名一直不变）。
+  function diagnosticExportFilename() {
+    const date = new Date();
+    const pad = (value) => String(value).padStart(2, "0");
+    const stamp = `${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}`;
+    return `lol-loot-diagnostics-${stamp}.jsonl`;
+  }
   function shortHash(value = "") { return value ? `${value.slice(0, 12)}…` : "—"; }
   function escapeHTML(value) { const node = document.createElement("span"); node.textContent = String(value ?? ""); return node.innerHTML; }
   function safeHTTPURL(value) { try { const parsed = new URL(value); return parsed.protocol === "https:" || parsed.protocol === "http:"; } catch (_) { return false; } }
 
+  function softResetShellState() {
+    for (const controller of state.controllers.values()) controller.abort();
+    state.controllers.clear();
+    clearTimeout(state.startupFallbackTimer);
+    state.startupFallbackTimer = 0;
+    state.overlayForced = false;
+    state.overlaySuppressed = false;
+    state.overlayBaselineAttempt = "";
+    updateReadingOverlay();
+    clearTimeout(state.eventReconnectTimer);
+    state.eventReconnectDelay = 1000;
+    setupLiveUpdates();
+    clearTimeout(state.statusTimer);
+    clearTimeout(state.liveUpdateTimer);
+    state.statusDelay = STATUS_INTERVAL;
+    state.skinsCache?.clear();
+    void refreshStatus(false);
+  }
+
   el.refresh.addEventListener("click", async () => {
+    if (state.manualRefreshing) return;
+    state.manualRefreshing = true;
     el.refresh.disabled = true;
     el.refresh.classList.add("is-loading");
-    showReadingOverlay("正在重新读取", "正在更新皮肤、炫彩与账户物品…", true);
-    try { await api("/api/refresh", { method: "POST" }, "refresh"); showToast("正在重新读取客户端"); setTimeout(() => refreshStatus(true), 450); }
-    catch (error) { showFatal(error.message); }
+    showToast("正在重新读取对局与总览");
+    softResetShellState();
+    try {
+      const waitFor = [];
+      window.dispatchEvent(new CustomEvent("deep-legends:hard-refresh", { detail: { waitFor, reason: "manual" } }));
+      await Promise.allSettled(waitFor);
+      void api("/api/refresh", { method: "POST" }, "refresh-background").catch((error) => {
+        if (error.name !== "RequestCancelled") showToast(`收藏后台补刷未启动：${error.message}`);
+      });
+      showToast("对局与总览已重新读取");
+    } finally {
+      state.manualRefreshing = false;
+      if (state.status) renderStatus();
+      else {
+        el.refresh.disabled = false;
+        el.refresh.classList.remove("is-loading");
+      }
+    }
   });
-  el.quit.addEventListener("click", async () => { if (!confirm("退出 Deep Legends？")) return; state.destroyed = true; clearTimeout(state.statusTimer); clearTimeout(state.liveUpdateTimer); state.eventSource?.close(); for (const controller of state.controllers.values()) controller.abort(); state.controllers.clear(); try { await fetch("/api/quit", { method: "POST" }); } catch (_) {} document.body.innerHTML = '<main class="shell"><section class="empty-state"><strong>Deep Legends 已退出</strong><p>现在可以关闭这个页面。</p></section></main>'; });
+  el.startupLoadingRetry?.addEventListener("click", () => el.refresh.click());
+  el.quit.addEventListener("click", async () => { if (!confirm("退出 Deep Legends？")) return; state.destroyed = true; clearTimeout(state.statusTimer); clearTimeout(state.liveUpdateTimer); clearTimeout(state.eventReconnectTimer); state.eventSource?.close(); for (const controller of state.controllers.values()) controller.abort(); state.controllers.clear(); try { await fetch("/api/quit", { method: "POST" }); } catch (_) {} document.body.innerHTML = '<main class="shell"><section class="empty-state"><strong>Deep Legends 已退出</strong><p>现在可以关闭这个页面。</p></section></main>'; });
   el.settingTheme.addEventListener("change", () => { savePreference("theme", el.settingTheme.value); applyAppearance(); });
   el.densityToggle.addEventListener("click", toggleDensity);
+  el.settingShareDirectoryChange.addEventListener("click", changeShareDirectory);
 
   /* ---------- 顶部召唤师搜索：名称 + # 编号，支持整段粘贴自动拆分 ---------- */
   function splitRiotID(raw) {
@@ -2013,9 +2318,11 @@
     if (!parts) return false;
     el.playerSearchName.value = parts.name;
     if (parts.tag || input === el.playerSearchTag) el.playerSearchTag.value = parts.tag;
-    const target = parts.tag ? el.playerSearchGo : el.playerSearchTag;
     el.playerSearchTag.focus();
-    if (target === el.playerSearchGo) el.playerSearchTag.select();
+    // 粘贴完整 Riot ID 后保留编号输入框的焦点，但不要选中内容；
+    // 选中态会让用户继续输入时意外覆盖刚粘贴的编号。
+    const caret = el.playerSearchTag.value.length;
+    el.playerSearchTag.setSelectionRange?.(caret, caret);
     return true;
   }
 
@@ -2222,7 +2529,8 @@
   for (const tab of el.settingsTabs) tab.addEventListener("click", () => activateSettingsPage(tab.dataset.settingsPage));
   for (const tab of el.viewTabs) tab.addEventListener("click", () => activateTab(tab, el.viewTabs, (selected) => {
     resetCollectionControls(selected.dataset.view);
-    loadSkins();
+    triggerCollectionRescanIfDirty();
+    loadSkins(true);
   }));
   setupTabKeyboard(el.sectionTabs);
   setupTabKeyboard(el.favoritesTabs);
@@ -2345,7 +2653,7 @@
     const active = document.fullscreenElement === el.skinDialogArt;
     el.skinDialogFullscreen.classList.toggle("is-active", active);
     el.skinDialogFullscreen.setAttribute("aria-label", active ? "退出全屏" : "全屏查看原画");
-    el.skinDialogFullscreen.title = active ? "退出全屏" : "全屏查看原画";
+    el.skinDialogFullscreen.dataset.tooltip = active ? "退出全屏" : "全屏查看原画";
     if (!active && !state.fullscreenExitInProgress) window.desktopTheme?.exitFullscreen?.();
   });
   document.addEventListener("keydown", (event) => {
@@ -2362,14 +2670,35 @@
 
   function setupLiveUpdates() {
     if (!("EventSource" in window) || state.destroyed) return;
+    clearTimeout(state.eventReconnectTimer);
     state.eventSource?.close();
     const source = new EventSource("/api/events");
     state.eventSource = source;
+    source.onopen = () => { if (state.eventSource === source) state.eventReconnectDelay = 1000; };
     source.onmessage = (event) => {
       if (event.data === "ready" || state.destroyed) return;
+	  if (typeof event.data === "string" && event.data.startsWith("{")) {
+		try {
+		  const detail = JSON.parse(event.data);
+		  const slices = LIVE_UPDATE_STATE_SLICES[detail?.type] || [];
+		  if (slices.includes("overview-season")) window.dispatchEvent(new CustomEvent("deep-legends:season-progress", { detail }));
+		  if (slices.includes("overview-ranks")) window.dispatchEvent(new CustomEvent("deep-legends:overview-incremental", { detail }));
+		  if (slices.length) return;
+		} catch (_) {}
+	  }
+      if (typeof event.data === "string" && event.data.startsWith("watch:")) {
+        window.dispatchEvent(new CustomEvent("deep-legends:watch", { detail: { event: event.data } }));
+        return;
+      }
+      if (event.data === "claim:changed") {
+        state.accountLoaded = false;
+        window.dispatchEvent(new CustomEvent("deep-legends:claim-changed"));
+        return;
+      }
       // 对局阶段事件只转发给对局模块（“对局”页签的新对局提示灯），不触发全量刷新。
-      if (typeof event.data === "string" && event.data.startsWith("gameflow:")) {
-        window.dispatchEvent(new CustomEvent("deep-legends:gameflow", { detail: { phase: event.data.slice(9) } }));
+      if (typeof event.data === "string" && (event.data.startsWith("gameflow:") || event.data === "champselect:changed")) {
+        const detail = event.data === "champselect:changed" ? { changed: true } : { phase: event.data.slice(9) };
+        window.dispatchEvent(new CustomEvent("deep-legends:gameflow", { detail }));
         return;
       }
       if (typeof event.data === "string" && event.data.startsWith("convenience:")) {
@@ -2378,11 +2707,13 @@
         return;
       }
       // 好友状态事件只转发给好友面板模块，不触发全量状态刷新。
-      if (event.data === "friends-updated") {
+	  const slices = LIVE_UPDATE_STATE_SLICES[event.data] || [];
+	  if (slices.includes("friends")) {
         window.dispatchEvent(new CustomEvent("deep-legends:friends-updated"));
         return;
       }
-      if (event.data === "account-updated") state.accountLoaded = false;
+	  if (!slices.length) return;
+	  if (slices.includes("account")) state.accountLoaded = false;
       // 只在首次连接（快照尚未就绪）时展示全屏读取遮罩；客户端事件触发的
       // 后台刷新静默进行，避免总览等页面每隔几秒被遮罩闪一下。
       if (event.data === "refresh-started" && state.status?.connected && !state.status?.snapshotReady) {
@@ -2391,10 +2722,30 @@
       }
       clearTimeout(state.liveUpdateTimer);
       state.liveUpdateTimer = setTimeout(async () => {
-        await refreshStatus(false);
-        if (event.data === "account-updated" && state.section === "favorites" && state.favoritesPage === "account") await loadAccount();
+		if (slices.includes("status")) await refreshStatus(false);
+		if (slices.includes("collection") && !slices.includes("status") && state.section === "favorites" && state.favoritesPage === "collection") await loadSkins(true);
+		if (slices.includes("account") && state.section === "favorites" && state.favoritesPage === "account") await loadAccount();
+		if (slices.includes("pools") && !slices.includes("status") && state.section === "favorites" && state.favoritesPage === "pools") await loadPools();
       }, 180);
     };
+	source.onerror = () => {
+	  if (state.destroyed || state.eventSource !== source) return;
+	  if (state.status) state.status = { ...state.status, eventStream: false };
+	  if (el.accountLiveState) {
+		el.accountLiveState.textContent = "实时连接已中断";
+		el.accountLiveState.className = "state-chip";
+	  }
+	  window.dispatchEvent(new CustomEvent("deep-legends:live-disconnected"));
+	  clearTimeout(state.liveUpdateTimer);
+	  state.liveUpdateTimer = setTimeout(() => refreshStatus(false), 180);
+	  if (source.readyState === EventSource.CLOSED) {
+		state.eventSource = null;
+		const delay = state.eventReconnectDelay;
+		state.eventReconnectDelay = Math.min(30000, Math.max(1000, delay * 2));
+		clearTimeout(state.eventReconnectTimer);
+		state.eventReconnectTimer = setTimeout(setupLiveUpdates, delay);
+	  }
+	};
   }
 
   function setupScrollControls() {
@@ -2422,18 +2773,44 @@
     document.body.append(tooltip);
     let anchor = null;
     let frame = 0;
+    let pointerSuppressedAnchor = null;
+    let pointerSuppressedPoint = null;
 
-    const targetOf = (node) => node instanceof Element ? node.closest("[data-tooltip]") : null;
+    const clearPointerSuppression = () => {
+      pointerSuppressedAnchor = null;
+      pointerSuppressedPoint = null;
+    };
+
+    const rawTargetOf = (node) => node instanceof Element ? node.closest("[data-tooltip]") : null;
+    const overflowTarget = (next) => {
+      const selector = next?.dataset.tooltipOverflow;
+      if (!selector) return null;
+      if (selector === "self") return next;
+      try { return next.querySelector(selector); } catch (_) { return null; }
+    };
+    const targetOf = (node) => {
+      const next = rawTargetOf(node);
+      const compactSidebar = document.documentElement.dataset.sidebar === "collapsed"
+        || window.matchMedia("(max-width: 820px)").matches;
+      const sidebarAnchor = next?.dataset.sidebarTooltip !== undefined;
+      if (sidebarAnchor && compactSidebar) return next;
+      const sidebarTooltipHidden = sidebarAnchor && !compactSidebar;
+      if (sidebarTooltipHidden) return null;
+      if (!next?.dataset.tooltipOverflow) return next;
+      const target = overflowTarget(next);
+      return target && (target.scrollWidth > target.clientWidth + 1 || target.scrollHeight > target.clientHeight + 1) ? next : null;
+    };
     const hide = () => {
       if (frame) cancelAnimationFrame(frame);
       frame = 0;
       if (anchor?.getAttribute("aria-describedby") === tooltip.id) anchor.removeAttribute("aria-describedby");
       anchor = null;
+      delete tooltip.dataset.shown;
       tooltip.hidden = true;
     };
     const position = () => {
       frame = 0;
-      if (!anchor?.isConnected || tooltip.hidden) { hide(); return; }
+      if (!anchor?.isConnected || tooltip.hidden || !targetOf(anchor)) { hide(); return; }
       const rect = anchor.getBoundingClientRect();
       const viewportPadding = 12;
       const gap = 8;
@@ -2449,6 +2826,7 @@
           tooltip.dataset.placement = fitsRight ? "right" : "left";
           tooltip.style.left = `${Math.round(left)}px`;
           tooltip.style.top = `${Math.round(top)}px`;
+          tooltip.dataset.shown = "true";
           return;
         }
       }
@@ -2458,15 +2836,31 @@
       tooltip.dataset.placement = fitsAbove ? "top" : "bottom";
       tooltip.style.left = `${Math.round(left)}px`;
       tooltip.style.top = `${Math.round(Math.max(viewportPadding, top))}px`;
+      tooltip.dataset.shown = "true";
     };
     const show = (next) => {
       const content = String(next?.dataset.tooltip || "").trim();
-      if (!content) { hide(); return; }
+      if (!content || !targetOf(next)) { hide(); return; }
       if (anchor && anchor !== next && anchor.getAttribute("aria-describedby") === tooltip.id) anchor.removeAttribute("aria-describedby");
       anchor = next;
       anchor.setAttribute("aria-describedby", tooltip.id);
-      tooltip.textContent = content;
+      const lineBreak = content.indexOf("\n");
+      const title = lineBreak < 0 ? content : content.slice(0, lineBreak);
+      const body = lineBreak < 0 ? "" : content.slice(lineBreak + 1).trim();
+      const titleNode = document.createElement("strong");
+      titleNode.className = "tooltip-title";
+      titleNode.textContent = title;
+      const children = [titleNode];
+      if (body) {
+        const bodyNode = document.createElement("span");
+        bodyNode.className = "tooltip-body";
+        bodyNode.textContent = body;
+        children.push(bodyNode);
+      }
+      tooltip.replaceChildren(...children);
+      tooltip.dataset.layout = body ? "titled" : "single";
       tooltip.dataset.size = next.dataset.tooltipSize || "";
+      delete tooltip.dataset.shown;
       tooltip.hidden = false;
       tooltip.style.left = "0px";
       tooltip.style.top = "0px";
@@ -2476,16 +2870,44 @@
 
     document.addEventListener("pointerover", (event) => {
       const next = targetOf(event.target);
-      if (next && next !== anchor) show(next);
+      if (next && next !== anchor && !pointerSuppressedPoint && next !== pointerSuppressedAnchor) show(next);
     });
-    document.addEventListener("pointerout", (event) => {
-      const current = targetOf(event.target);
-      if (!current || current !== anchor || (event.relatedTarget instanceof Node && current.contains(event.relatedTarget)) || document.activeElement === current) return;
+    document.addEventListener("pointerdown", (event) => {
+      const current = rawTargetOf(event.target);
+      if (!current || current !== anchor) return;
+      pointerSuppressedAnchor = current;
+      pointerSuppressedPoint = { x: Number(event.clientX), y: Number(event.clientY) };
       hide();
     });
-    document.addEventListener("focusin", (event) => { const next = targetOf(event.target); if (next) show(next); });
-    document.addEventListener("focusout", (event) => { if (targetOf(event.target) === anchor) hide(); });
-    document.addEventListener("keydown", (event) => { if (event.key === "Escape") hide(); });
+    document.addEventListener("pointermove", (event) => {
+      if (!pointerSuppressedPoint) return;
+      const distance = Math.hypot(Number(event.clientX) - pointerSuppressedPoint.x, Number(event.clientY) - pointerSuppressedPoint.y);
+      if (!Number.isFinite(distance) || distance <= 4) return;
+      clearPointerSuppression();
+      const next = targetOf(event.target);
+      if (next) show(next);
+    }, { passive: true });
+    document.addEventListener("pointerout", (event) => {
+      const current = rawTargetOf(event.target);
+      if (!current || (event.relatedTarget instanceof Node && current.contains(event.relatedTarget))) return;
+      if (pointerSuppressedAnchor === current && current.isConnected) clearPointerSuppression();
+      if (current !== anchor || (document.activeElement === current && current.matches(":focus-visible"))) return;
+      hide();
+    });
+    document.addEventListener("focusin", (event) => {
+      const next = targetOf(event.target);
+      if (next && !pointerSuppressedPoint && next !== pointerSuppressedAnchor) show(next);
+    });
+    document.addEventListener("focusout", (event) => {
+      if (targetOf(event.target) === anchor) hide();
+    });
+    document.addEventListener("deep-legends:tooltip-hide", (event) => {
+      if (!event.detail?.anchor || event.detail.anchor === anchor) hide();
+    });
+    document.addEventListener("keydown", (event) => {
+      clearPointerSuppression();
+      if (event.key === "Escape") hide();
+    });
     window.addEventListener("resize", () => { if (anchor && !frame) frame = requestAnimationFrame(position); }, { passive: true });
     document.addEventListener("scroll", () => { if (anchor && !frame) frame = requestAnimationFrame(position); }, { passive: true, capture: true });
   }
@@ -2519,6 +2941,7 @@
   }
   applyAppearance();
   applySidebar();
+  void setupShareDirectorySetting();
   setupLiveUpdates();
   setupScrollControls();
   setupFloatingTooltips();

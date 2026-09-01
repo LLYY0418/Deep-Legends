@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 	"unicode"
 )
 
@@ -81,6 +83,7 @@ type Snapshot struct {
 	Account     AccountData
 	Chromas     []Chroma
 	ChromaState EndpointCapability
+	LoadPhases  map[string]int64 `json:"-"`
 }
 
 type OwnershipSourceStatus struct {
@@ -99,6 +102,8 @@ type OwnershipSourceStatus struct {
 	UnknownIDs         []int64 `json:"unknownIds,omitempty"`
 	RentalIDs          []int64 `json:"rentalIds,omitempty"`
 	FreeToPlayIDs      []int64 `json:"freeToPlayIds,omitempty"`
+	MissingIDs         []int64 `json:"missingIds,omitempty"`
+	ExtraIDs           []int64 `json:"extraIds,omitempty"`
 	CatalogOwnedIDHash string  `json:"catalogOwnedIdHash,omitempty"`
 	Detail             string  `json:"detail,omitempty"`
 }
@@ -131,24 +136,125 @@ func loadSnapshot(pool PoolManifest) (Snapshot, error) {
 }
 
 func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, error) {
-	summoner, err := NewSummonerAPI(client).Current()
-	if err != nil {
-		return Snapshot{Client: client}, err
+	loadStarted := time.Now()
+	loadPhases := make(map[string]int64)
+	var loadPhasesMu sync.Mutex
+	measure := func(name string, load func()) {
+		started := time.Now()
+		load()
+		loadPhasesMu.Lock()
+		loadPhases[name] = time.Since(started).Milliseconds()
+		loadPhasesMu.Unlock()
+	}
+	finishPhases := func() {
+		loadPhasesMu.Lock()
+		loadPhases["total"] = time.Since(loadStarted).Milliseconds()
+		loadPhasesMu.Unlock()
 	}
 
-	all, err := NewSkinCatalogAPI(client).Load()
+	var summoner Summoner
+	var err error
+	measure("summoner", func() { summoner, err = NewSummonerAPI(client).Current() })
 	if err != nil {
-		return Snapshot{}, err
+		finishPhases()
+		return Snapshot{Client: client, LoadPhases: loadPhases}, err
 	}
-	chromas, chromaCatalogErr := loadChromaCatalog(client, all)
-	ownedIDs, ownershipSources, ownershipErr := NewInventoryAPI(client).OwnedSkinIDs(summoner.SummonerID, all)
+
+	var all []Skin
+	measure("skin_catalog", func() { all, err = NewSkinCatalogAPI(client).Load() })
+	if err != nil {
+		finishPhases()
+		return Snapshot{Summoner: summoner, Client: client, LoadPhases: loadPhases}, err
+	}
+
+	var (
+		chromas            []Chroma
+		chromaCatalogErr   error
+		ownedIDs           map[int64]bool
+		ownershipSources   []OwnershipSourceStatus
+		ownershipErr       error
+		ownedChampionIDs   map[int64]bool
+		championCapability EndpointCapability
+		masteries          map[int64]ChampionMastery
+		masteryCapability  EndpointCapability
+		profile            SummonerProfile
+		profileCapability  EndpointCapability
+		loot               []LootItem
+		lootCapability     EndpointCapability
+		sanctumSparks      int
+		sanctumCapability  EndpointCapability
+		rewards            []RewardGrant
+		rewardsCapability  EndpointCapability
+	)
+	var independent sync.WaitGroup
+	independent.Add(8)
+	go func() {
+		defer independent.Done()
+		measure("chroma_catalog", func() { chromas, chromaCatalogErr = loadChromaCatalog(client, all) })
+	}()
+	go func() {
+		defer independent.Done()
+		measure("skin_ownership", func() {
+			ownedIDs, ownershipSources, ownershipErr = NewInventoryAPI(client).OwnedSkinIDs(summoner.SummonerID, all)
+		})
+	}()
+	go func() {
+		defer independent.Done()
+		measure("champion_ownership", func() {
+			ownedChampionIDs, championCapability = NewInventoryAPI(client).OwnedChampionIDs(summoner.SummonerID)
+		})
+	}()
+	go func() {
+		defer independent.Done()
+		measure("masteries", func() { masteries, masteryCapability = NewChampionMasteryAPI(client).All(summoner.PUUID) })
+	}()
+	go func() {
+		defer independent.Done()
+		measure("profile", func() { profile, profileCapability = NewSummonerAPI(client).Profile() })
+	}()
+	go func() {
+		defer independent.Done()
+		measure("loot", func() { loot, lootCapability = NewLootAPI(client).PlayerLoot() })
+	}()
+	go func() {
+		defer independent.Done()
+		measure("sanctum", func() { sanctumSparks, sanctumCapability = NewLootAPI(client).SanctumSparks() })
+	}()
+	go func() {
+		defer independent.Done()
+		measure("rewards", func() { rewards, rewardsCapability = NewRewardsAPI(client).PendingGrants() })
+	}()
+	independent.Wait()
+
 	if ownershipErr != nil {
-		return Snapshot{Summoner: summoner, All: all, Client: client, Ownership: ownershipSources, Catalog: buildCatalogStats(all)}, ownershipErr
+		finishPhases()
+		return Snapshot{Summoner: summoner, All: all, Client: client, Ownership: ownershipSources, Catalog: buildCatalogStats(all), LoadPhases: loadPhases}, ownershipErr
 	}
-	ownedChampionIDs, championCapability := NewInventoryAPI(client).OwnedChampionIDs(summoner.SummonerID)
 	applySkinOwnership(all, ownedIDs, ownedChampionIDs)
-	acquiredAt, acquisitionCapability := NewInventoryAPI(client).SkinAcquisitionDates(summoner.SummonerID, ownedIDs)
-	masteries, masteryCapability := NewChampionMasteryAPI(client).All(summoner.PUUID)
+
+	var (
+		acquiredAt            map[int64]string
+		acquisitionCapability EndpointCapability
+		chromaOwnedIDs        map[int64]bool
+		chromaState           = EndpointCapability{Name: "owned-chromas", Path: "本机炫彩目录与库存"}
+	)
+	var dependent sync.WaitGroup
+	dependent.Add(1)
+	go func() {
+		defer dependent.Done()
+		measure("skin_acquisition_dates", func() {
+			acquiredAt, acquisitionCapability = NewInventoryAPI(client).SkinAcquisitionDates(summoner.SummonerID, ownedIDs)
+		})
+	}()
+	if chromaCatalogErr == nil {
+		dependent.Add(1)
+		go func() {
+			defer dependent.Done()
+			measure("chroma_ownership", func() { chromaOwnedIDs, chromaState = loadOwnedChromaIDs(client, summoner.SummonerID, chromas) })
+		}()
+	}
+	dependent.Wait()
+
 	for i := range all {
 		if all[i].Owned {
 			all[i].AcquiredAt = acquiredAt[all[i].ID]
@@ -158,15 +264,15 @@ func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, err
 			all[i].ChampionMasteryLevel = mastery.ChampionLevel
 		}
 	}
-	chromaState := EndpointCapability{Name: "owned-chromas", Path: "本机炫彩目录与库存"}
 	if chromaCatalogErr != nil {
 		chromaState.State = capabilityFailed
 		chromaState.Detail = "客户端炫彩目录不可用；普通皮肤和三合一结果不受影响"
 		chromas = nil
 	} else {
-		chromaOwnedIDs, ownershipCapability := loadOwnedChromaIDs(client, summoner.SummonerID, chromas)
-		chromaState = ownershipCapability
-		chromaDates, _ := NewInventoryAPI(client).SkinAcquisitionDates(summoner.SummonerID, chromaOwnedIDs)
+		var chromaDates map[int64]string
+		measure("chroma_acquisition_dates", func() {
+			chromaDates, _ = NewInventoryAPI(client).SkinAcquisitionDates(summoner.SummonerID, chromaOwnedIDs)
+		})
 		for i := range chromas {
 			chromas[i].Owned = chromaOwnedIDs[chromas[i].ID]
 			if chromas[i].Owned {
@@ -181,7 +287,8 @@ func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, err
 	}
 
 	if len(pool.Names) == 0 {
-		return Snapshot{}, errors.New("pool manifest has no entries")
+		finishPhases()
+		return Snapshot{Summoner: summoner, All: all, Client: client, Ownership: ownershipSources, Catalog: buildCatalogStats(all), LoadPhases: loadPhases}, errors.New("pool manifest has no entries")
 	}
 	matched, issues := matchPoolManifest(pool, all)
 	annotatePoolMembership(all, matched)
@@ -202,17 +309,14 @@ func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, err
 	}
 	sortSkins(displayAll)
 
-	profile, profileCapability := NewSummonerAPI(client).Profile()
 	for _, skin := range all {
 		if skin.ID == profile.BackgroundSkinID {
 			profile.BackgroundSkinName = skin.Name
 			break
 		}
 	}
-	loot, lootCapability := NewLootAPI(client).PlayerLoot()
 	loot = enrichLootItems(loot, all)
-	sanctumSparks, sanctumCapability := NewLootAPI(client).SanctumSparks()
-	rewards, rewardsCapability := NewRewardsAPI(client).PendingGrants()
+	finishPhases()
 
 	return Snapshot{
 		Summoner:    summoner,
@@ -227,6 +331,7 @@ func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, err
 		Catalog:     buildCatalogStats(all),
 		Chromas:     chromas,
 		ChromaState: chromaState,
+		LoadPhases:  loadPhases,
 		Account: AccountData{
 			Profile: profile, Loot: loot, Rewards: rewards, SanctumSparks: sanctumSparks, SanctumSparksKnown: sanctumCapability.State == capabilityAvailable,
 			Capabilities: []EndpointCapability{profileCapability, lootCapability, sanctumCapability, rewardsCapability, championCapability, acquisitionCapability, masteryCapability, chromaState},
@@ -762,15 +867,32 @@ func loadOwnedSkinInventory(client *LCUClient, summonerID int64, catalog []Skin)
 	var statuses []OwnershipSourceStatus
 	for _, source := range sources {
 		statusPath := strings.ReplaceAll(source.path, strconv.FormatInt(summonerID, 10), "{summonerId}")
+		if strings.HasPrefix(source.path, "/lol-inventory/v1/") && client.inventoryV1DisabledNow() {
+			statuses = append(statuses, OwnershipSourceStatus{Path: statusPath, State: "unsupported", Detail: "endpoint disabled after repeated failures"})
+			continue
+		}
 		data, err := client.GetBytes(source.path)
 		if err != nil {
+			if strings.HasPrefix(source.path, "/lol-inventory/v1/") {
+				_, disabled := client.noteInventoryV1Failure()
+				if disabled {
+					statuses = append(statuses, OwnershipSourceStatus{Path: statusPath, State: "unsupported", Detail: "endpoint disabled after repeated failures"})
+					continue
+				}
+			}
 			var httpErr *LCUHTTPError
 			if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
+				if strings.HasPrefix(source.path, "/lol-inventory/v1/") {
+					client.disableInventoryV1()
+				}
 				statuses = append(statuses, OwnershipSourceStatus{Path: statusPath, State: "unsupported", Detail: "endpoint unavailable in this client"})
 			} else {
 				statuses = append(statuses, OwnershipSourceStatus{Path: statusPath, State: "failed", Detail: "request failed"})
 			}
 			continue
+		}
+		if strings.HasPrefix(source.path, "/lol-inventory/v1/") {
+			client.resetInventoryV1Failures()
 		}
 		var root any
 		if err := json.Unmarshal(data, &root); err != nil {
@@ -829,6 +951,7 @@ func loadOwnedSkinInventory(client *LCUClient, summonerID int64, catalog []Skin)
 			for _, candidate := range authoritative {
 				if !equalIDSets(inventory.ids, candidate.ids) {
 					missing, extra := idSetDifferenceCounts(inventory.ids, candidate.ids)
+					annotateOwnershipDifference(&statuses[candidate.statusIndex], inventory.ids, candidate.ids)
 					markOwnershipSource(&statuses[candidate.statusIndex], "warning", fmt.Sprintf("explicit source is fully contained by verified inventory: inventory adds %d, explicit-only %d", missing, extra))
 				}
 			}
@@ -852,6 +975,7 @@ func loadOwnedSkinInventory(client *LCUClient, summonerID int64, catalog []Skin)
 			for _, candidate := range authoritative {
 				if !equalIDSets(baseline.ids, candidate.ids) {
 					missing, extra := idSetDifferenceCounts(baseline.ids, candidate.ids)
+					annotateOwnershipDifference(&statuses[candidate.statusIndex], baseline.ids, candidate.ids)
 					markOwnershipSource(&statuses[candidate.statusIndex], "conflict", fmt.Sprintf("differs from the primary explicit source: missing %d, extra %d", missing, extra))
 				}
 			}
@@ -860,12 +984,14 @@ func loadOwnedSkinInventory(client *LCUClient, summonerID int64, catalog []Skin)
 		for _, candidate := range authoritative {
 			if !equalIDSets(baseline.ids, candidate.ids) {
 				missing, extra := idSetDifferenceCounts(baseline.ids, candidate.ids)
+				annotateOwnershipDifference(&statuses[candidate.statusIndex], baseline.ids, candidate.ids)
 				markOwnershipSource(&statuses[candidate.statusIndex], "warning", fmt.Sprintf("explicit audit differs: missing %d, extra %d; corroborated source retained", missing, extra))
 			}
 		}
 		for _, candidate := range presence {
 			if !equalIDSets(baseline.ids, candidate.ids) {
 				missing, extra := idSetDifferenceCounts(baseline.ids, candidate.ids)
+				annotateOwnershipDifference(&statuses[candidate.statusIndex], baseline.ids, candidate.ids)
 				markOwnershipSource(&statuses[candidate.statusIndex], "warning", fmt.Sprintf("presence-only audit differs: missing %d, extra %d; explicit full-coverage source retained", missing, extra))
 			}
 		}
@@ -878,6 +1004,7 @@ func loadOwnedSkinInventory(client *LCUClient, summonerID int64, catalog []Skin)
 	for _, candidate := range presence[1:] {
 		if !equalIDSets(baseline.ids, candidate.ids) {
 			missing, extra := idSetDifferenceCounts(baseline.ids, candidate.ids)
+			annotateOwnershipDifference(&statuses[candidate.statusIndex], baseline.ids, candidate.ids)
 			statuses[candidate.statusIndex].State = "conflict"
 			statuses[candidate.statusIndex].Detail = fmt.Sprintf("presence sources differ: missing %d, extra %d", missing, extra)
 			return map[int64]bool{}, statuses, fmt.Errorf("presence ownership sources disagree: %s=%d, %s=%d", baseline.source.path, len(baseline.ids), candidate.source.path, len(candidate.ids))
@@ -913,6 +1040,8 @@ func corroboratingPresenceSuperset(authoritative, presence []ownershipResult) (o
 }
 
 func bestCorroboratedAuthoritative(authoritative, presence []ownershipResult) (int, int, bool) {
+	// 精确相等仍然优先；只有没有精确佐证时，才接受“缓存滞后的 presence
+	// 是权威源子集”。这样不会让一个不完整的库存覆盖完整权威结果。
 	bestIndex := 0
 	bestSupport := -1
 	tied := false
@@ -929,7 +1058,42 @@ func bestCorroboratedAuthoritative(authoritative, presence []ownershipResult) (i
 			tied = support > 0
 		}
 	}
+	if bestSupport > 0 {
+		return bestIndex, bestSupport, tied
+	}
+	bestIndex, bestSupport, tied = 0, 0, false
+	for index, candidate := range authoritative {
+		support := 0
+		for _, audit := range presence {
+			if len(audit.ids) == 0 || !idSetContains(audit.ids, candidate.ids) {
+				continue
+			}
+			support++
+		}
+		if support > bestSupport {
+			bestIndex, bestSupport, tied = index, support, false
+			continue
+		}
+		if support == bestSupport && support > 0 && !equalIDSets(candidate.ids, authoritative[bestIndex].ids) {
+			// 结构性差异通常表现为较小的权威源缺少几项，而较大的源
+			// 额外包含这些项；在同一滞后 presence 支持两者时保留较小源。
+			if len(candidate.ids) < len(authoritative[bestIndex].ids) {
+				bestIndex, tied = index, false
+			} else if len(candidate.ids) == len(authoritative[bestIndex].ids) {
+				tied = true
+			}
+		}
+	}
 	return bestIndex, bestSupport, tied
+}
+
+func idSetContains(subset, superset map[int64]bool) bool {
+	for id := range subset {
+		if !superset[id] {
+			return false
+		}
+	}
+	return true
 }
 
 func markOwnershipSource(status *OwnershipSourceStatus, state, detail string) {
@@ -1011,6 +1175,30 @@ func ownershipSourceStatus(path, state string, validated map[int64]bool, extract
 		RentalIDs: sortedIDKeys(extraction.RentalIDs), FreeToPlayIDs: sortedIDKeys(extraction.FreeToPlayIDs),
 		CatalogOwnedIDHash: idSetHash(validated), Detail: detail,
 	}
+}
+
+const ownershipDifferenceIDLimit = 64
+
+func annotateOwnershipDifference(status *OwnershipSourceStatus, reference, candidate map[int64]bool) {
+	if status == nil {
+		return
+	}
+	status.MissingIDs = limitedIDSetDifference(reference, candidate)
+	status.ExtraIDs = limitedIDSetDifference(candidate, reference)
+}
+
+func limitedIDSetDifference(reference, candidate map[int64]bool) []int64 {
+	ids := make([]int64, 0)
+	for id := range reference {
+		if id > 0 && !candidate[id] {
+			ids = append(ids, id)
+		}
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	if len(ids) > ownershipDifferenceIDLimit {
+		ids = ids[:ownershipDifferenceIDLimit]
+	}
+	return ids
 }
 
 func sortedIDKeys(ids map[int64]bool) []int64 {
@@ -1434,6 +1622,9 @@ func sanitizeAssetPath(path string) string {
 	path = strings.TrimSpace(strings.ReplaceAll(path, "\\", "/"))
 	if path == "" {
 		return ""
+	}
+	if strings.HasPrefix(strings.ToLower(path), "ddragon:/") {
+		return "ddragon:" + path[len("ddragon:"):]
 	}
 	index := strings.Index(strings.ToLower(path), "/lol-game-data/assets/")
 	if index >= 0 {

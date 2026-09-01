@@ -2,10 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestEmbeddedPoolHas554UniqueEntries(t *testing.T) {
@@ -49,6 +52,60 @@ func TestEmbeddedPoolHas554UniqueStableIDs(t *testing.T) {
 		if entry.Name != confirmedNames[index] {
 			t.Fatalf("stable entry %d name=%q, confirmed text=%q", index+1, entry.Name, confirmedNames[index])
 		}
+	}
+}
+
+func TestLoadSnapshotIndependentRefreshesOverlap(t *testing.T) {
+	type catalogEntry struct {
+		ID         int64  `json:"id"`
+		Name       string `json:"name"`
+		ChampionID int64  `json:"championId"`
+	}
+	catalog := make([]catalogEntry, 0, 1000)
+	for championID := int64(1); championID <= 100; championID++ {
+		for offset := int64(0); offset < 10; offset++ {
+			catalog = append(catalog, catalogEntry{ID: championID*1000 + offset, Name: "测试皮肤", ChampionID: championID})
+		}
+	}
+	catalogJSON, err := json.Marshal(catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var catalogServed atomic.Bool
+	var active atomic.Int32
+	var maxActive atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/lol-summoner/v1/current-summoner":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"summonerId":1,"puuid":"test-puuid"}`))
+			return
+		case r.URL.Path == "/lol-game-data/assets/v1/skins.json" && !catalogServed.Swap(true):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(catalogJSON)
+			return
+		}
+
+		current := active.Add(1)
+		for {
+			seen := maxActive.Load()
+			if current <= seen || maxActive.CompareAndSwap(seen, current) {
+				break
+			}
+		}
+		time.Sleep(25 * time.Millisecond)
+		active.Add(-1)
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	if _, err := loadSnapshotWithClient(client, PoolManifest{}); err == nil {
+		t.Fatal("expected the controlled ownership failure")
+	}
+	if got := maxActive.Load(); got < 2 {
+		t.Fatalf("independent refresh requests did not overlap: max active = %d", got)
 	}
 }
 
@@ -416,6 +473,57 @@ func TestAuthoritativeOwnedSourcesStillMustAgree(t *testing.T) {
 	got, statuses, err := loadOwnedSkinInventory(client, 42, catalog)
 	if err == nil || len(got) != 0 || countSourceState(statuses, "conflict") != 1 {
 		t.Fatalf("authoritative disagreement must stop calculation: got=%#v statuses=%#v err=%v", got, statuses, err)
+	}
+}
+
+func TestStalePresenceSubsetRetainsAuthoritativeNewIDs(t *testing.T) {
+	catalog := make([]Skin, 0, 7)
+	for id := int64(1); id <= 7; id++ {
+		catalog = append(catalog, Skin{ID: id, Name: fmt.Sprintf("皮肤%d", id), ChampionID: id})
+	}
+	client := inventoryTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.Contains(r.URL.Path, "skins-minimal"):
+			_, _ = w.Write([]byte(`[{"id":1,"owned":true},{"id":2,"owned":true},{"id":3,"owned":true},{"id":4,"owned":true},{"id":5,"owned":true},{"id":6,"owned":false},{"id":7,"owned":false}]`))
+		case strings.HasSuffix(r.URL.Path, "/champions"):
+			_, _ = w.Write([]byte(`[{"id":1,"owned":true},{"id":2,"owned":true},{"id":3,"owned":true},{"id":4,"owned":true},{"id":5,"owned":true},{"id":6,"owned":true},{"id":7,"owned":true}]`))
+		case r.URL.Path == "/lol-inventory/v2/inventory/CHAMPION_SKIN":
+			_, _ = w.Write([]byte(`[{"itemId":1,"inventoryType":"CHAMPION_SKIN"},{"itemId":2,"inventoryType":"CHAMPION_SKIN"},{"itemId":3,"inventoryType":"CHAMPION_SKIN"}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	ids, statuses, err := loadOwnedSkinInventory(client, 42, catalog)
+	if err != nil || len(ids) != 5 || !ids[4] || !ids[5] {
+		t.Fatalf("stale presence should support the smaller authoritative source without dropping new IDs: ids=%#v statuses=%#v err=%v", ids, statuses, err)
+	}
+	if len(statuses) != 4 || len(statuses[2].MissingIDs) != 2 || statuses[2].MissingIDs[0] != 4 {
+		t.Fatalf("presence lag should be visible as ID-level diagnostics: %#v", statuses)
+	}
+}
+
+func TestPresenceExtraIDsDoNotCorroborateConflictingAuthorities(t *testing.T) {
+	catalog := make([]Skin, 0, 10)
+	for id := int64(1); id <= 10; id++ {
+		catalog = append(catalog, Skin{ID: id, Name: fmt.Sprintf("皮肤%d", id), ChampionID: id})
+	}
+	client := inventoryTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.Contains(r.URL.Path, "skins-minimal"):
+			_, _ = w.Write([]byte(`[{"id":1,"owned":true},{"id":2,"owned":true},{"id":3,"owned":true},{"id":4,"owned":true},{"id":5,"owned":true},{"id":6,"owned":true},{"id":7,"owned":true},{"id":8,"owned":true},{"id":9,"owned":false},{"id":10,"owned":false}]`))
+		case strings.HasSuffix(r.URL.Path, "/champions"):
+			_, _ = w.Write([]byte(`[{"id":1,"owned":true},{"id":2,"owned":true},{"id":3,"owned":true},{"id":4,"owned":true},{"id":5,"owned":true},{"id":6,"owned":true},{"id":7,"owned":true},{"id":8,"owned":true},{"id":9,"owned":true},{"id":10,"owned":false}]`))
+		case r.URL.Path == "/lol-inventory/v2/inventory/CHAMPION_SKIN":
+			_, _ = w.Write([]byte(`[{"itemId":1,"inventoryType":"CHAMPION_SKIN"},{"itemId":2,"inventoryType":"CHAMPION_SKIN"},{"itemId":3,"inventoryType":"CHAMPION_SKIN"},{"itemId":4,"inventoryType":"CHAMPION_SKIN"},{"itemId":5,"inventoryType":"CHAMPION_SKIN"},{"itemId":6,"inventoryType":"CHAMPION_SKIN"},{"itemId":7,"inventoryType":"CHAMPION_SKIN"},{"itemId":8,"inventoryType":"CHAMPION_SKIN"},{"itemId":10,"inventoryType":"CHAMPION_SKIN"}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	ids, statuses, err := loadOwnedSkinInventory(client, 42, catalog)
+	if err == nil || len(ids) != 0 || countSourceState(statuses, "conflict") == 0 {
+		t.Fatalf("presence with an authority-unknown extra ID must not resolve conflicting authorities: ids=%#v statuses=%#v err=%v", ids, statuses, err)
 	}
 }
 

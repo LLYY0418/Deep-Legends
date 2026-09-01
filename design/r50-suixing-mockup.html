@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Deep Legends · 「随行」设计稿 R50</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0B0E14; --surface:#131822; --surface-strong:#1A2130;
+  --ink:#E8EAF0; --muted:#8B93A6; --faint:#667085;
+  --primary:#D9A441; --primary-strong:#F0BE5C; --primary-soft:#2A2312; --on-primary:#14100A;
+  --accent:#5B9BD9; --success:#4CAF7D; --success-soft:#12271D;
+  --warning:#E0B45C; --warning-soft:#2A2312; --danger:#E05C5C; --danger-soft:#2A1518;
+  --line:#242D3D; --line-soft:#1C2432; --focus:#5B9BD9; --overlay:rgb(0 0 0/.7);
+  --sidebar-bg:#080A0F; --hex-line:color-mix(in oklab,var(--primary) 32%,var(--line));
+  --font:"Segoe UI Variable","Segoe UI","Microsoft YaHei UI",system-ui,sans-serif;
+  --radius-sm:8px; --radius-md:12px; --radius-lg:14px;
+  --sidebar-width:226px; --topbar-height:56px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{margin:0;font-weight:650}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.num{font-variant-numeric:tabular-nums}
+
+/* ── 说明横幅（仅设计稿有，实现时删） ── */
+.mock-banner{padding:10px 20px;background:linear-gradient(90deg,var(--primary-soft),transparent);border-bottom:1px solid var(--hex-line);font-size:12.5px;color:var(--primary-strong)}
+.mock-banner b{color:var(--primary-strong)}
+.mock-banner span{color:var(--muted)}
+
+/* ── 外壳 ── */
+.app-frame{display:grid;grid-template-columns:var(--sidebar-width) minmax(0,1fr);min-height:calc(100vh - 40px)}
+.sidebar{display:flex;flex-direction:column;gap:14px;padding:14px 10px;background:var(--sidebar-bg);border-right:1px solid var(--line)}
+.sidebar-brand{display:flex;align-items:center;gap:10px;padding:8px 10px;background:transparent;border:0;border-radius:var(--radius-sm)}
+.brand-mark{display:grid;place-items:center;width:26px;height:26px;background:linear-gradient(150deg,var(--primary),#8a6420);border-radius:7px;color:#14100A;font-size:13px;font-weight:800}
+.sidebar-brand strong{font-family:Constantia,Georgia,serif;font-size:14px;letter-spacing:.06em}
+.brand-accent{color:var(--primary)}
+.section-tabs{display:flex;flex-direction:column;gap:2px}
+.section-tab{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 11px;background:transparent;border:0;border-radius:var(--radius-sm);color:var(--muted);text-align:left;font-size:13.5px;transition:background-color 160ms ease-out,color 160ms ease-out}
+.section-tab:hover{background:var(--surface);color:var(--ink)}
+.section-tab.is-active{background:var(--surface-strong);color:var(--ink)}
+.section-tab.is-active .glyph{color:var(--primary)}
+.section-tab .glyph{width:18px;text-align:center;font-size:14px;color:var(--faint)}
+.section-tab.is-new{position:relative}
+.section-tab.is-new::after{content:"新";position:absolute;right:9px;padding:1px 5px;background:var(--primary-soft);border:1px solid var(--hex-line);border-radius:999px;color:var(--primary-strong);font-size:10px}
+.sidebar-foot{margin-top:auto;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+.conn{display:flex;align-items:center;gap:8px;padding:8px 11px;background:var(--surface);border-radius:var(--radius-sm)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 0 3px color-mix(in oklab,var(--success) 22%,transparent)}
+
+.app-main{display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;height:var(--topbar-height);padding:0 22px;border-bottom:1px solid var(--line)}
+.topbar h1{font-size:15px}
+.topbar small{display:block;margin-top:1px;color:var(--muted);font-size:11.5px;font-weight:400}
+.topbar-actions{display:flex;gap:8px}
+
+/* ── 通用件（沿用项目类名） ── */
+.shell{padding:18px 22px 40px}
+.panel{min-height:420px}
+.button{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;min-height:34px;padding:0 14px;background:var(--surface-strong);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:12.5px;transition:border-color 160ms ease-out,background-color 160ms ease-out}
+.button:hover{border-color:var(--hex-line)}
+.button-primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary);font-weight:600}
+.button-primary:hover{background:var(--primary-strong);border-color:var(--primary-strong)}
+.button-danger{border-color:color-mix(in oklab,var(--danger) 40%,var(--line));color:var(--danger)}
+.button[disabled]{opacity:.45;cursor:not-allowed}
+.text-button{background:transparent;border:0;padding:0;color:var(--primary);font-size:12.5px}
+.state-chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:var(--surface-strong);border:1px solid var(--line);color:var(--muted);font-size:11px;white-space:nowrap}
+.state-chip.success{background:var(--success-soft);border-color:color-mix(in oklab,var(--success) 34%,var(--line));color:var(--success)}
+.state-chip.warn{background:var(--warning-soft);border-color:color-mix(in oklab,var(--warning) 34%,var(--line));color:var(--warning)}
+.state-chip.fail{background:var(--danger-soft);border-color:color-mix(in oklab,var(--danger) 34%,var(--line));color:var(--danger)}
+.state-chip.accent{background:color-mix(in oklab,var(--accent) 14%,transparent);border-color:color-mix(in oklab,var(--accent) 34%,var(--line));color:var(--accent)}
+.state-chip.gold{background:var(--primary-soft);border-color:var(--hex-line);color:var(--primary-strong)}
+.muted{color:var(--muted)}
+.faint{color:var(--faint)}
+.toggle{position:relative;width:34px;height:19px;flex:0 0 auto;appearance:none;background:var(--line);border-radius:999px;cursor:pointer;transition:background-color 160ms ease-out}
+.toggle::after{content:"";position:absolute;top:2.5px;left:3px;width:14px;height:14px;background:var(--muted);border-radius:50%;transition:left 160ms ease-out,background-color 160ms ease-out}
+.toggle:checked{background:var(--primary)}
+.toggle:checked::after{left:17px;background:#14100A}
+.notice{display:flex;gap:10px;padding:11px 13px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--muted);border-radius:var(--radius-sm);font-size:12.5px;line-height:1.6;color:var(--muted)}
+.notice.is-warning{border-left-color:var(--warning)}
+.notice.is-info{border-left-color:var(--accent)}
+.notice strong{color:var(--ink)}
+
+/* ── 二级导航（对齐收藏页 .favorites-nav） ── */
+.rail-header{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:16px}
+.suite-nav{display:flex;gap:6px;flex-wrap:wrap}
+.suite-nav-item{display:flex;align-items:center;gap:10px;min-height:52px;padding:0 15px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);color:var(--muted);text-align:left;transition:border-color 160ms ease-out,background-color 160ms ease-out}
+.suite-nav-item:hover{border-color:var(--hex-line)}
+.suite-nav-item .glyph{font-size:15px;color:var(--faint)}
+.suite-nav-item strong{display:block;font-size:13.5px;color:var(--ink)}
+.suite-nav-item small{display:block;margin-top:1px;font-size:11px}
+.suite-nav-item.is-active{background:var(--surface-strong);border-color:var(--hex-line)}
+.suite-nav-item.is-active .glyph{color:var(--primary)}
+.suite-metrics{display:flex;gap:22px}
+.suite-metrics div{display:flex;flex-direction:column;gap:2px}
+.suite-metrics dt{color:var(--muted);font-size:11px}
+.suite-metrics dd{margin:0;font-size:19px;font-weight:650;font-variant-numeric:tabular-nums}
+.suite-metrics .focus dd{color:var(--primary-strong)}
+
+.subpanel[hidden]{display:none}
+.panel-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:22px 0 10px}
+.panel-heading:first-child{margin-top:0}
+.panel-heading h2{font-size:14px}
+.panel-heading p{margin-top:2px;color:var(--muted);font-size:11.5px}
+
+/* ════ 1. 值守：相位轨 ════ */
+.watch-top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md)}
+.watch-master{display:flex;align-items:center;gap:12px}
+.watch-master .ring{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;border:2px solid var(--primary);color:var(--primary);font-size:13px;box-shadow:0 0 0 4px var(--primary-soft)}
+.watch-master strong{display:block;font-size:13.5px}
+.watch-master span{color:var(--muted);font-size:11.5px}
+.watch-stats{display:flex;gap:20px;font-size:11.5px;color:var(--muted)}
+.watch-stats b{display:block;margin-top:2px;color:var(--ink);font-size:16px;font-variant-numeric:tabular-nums}
+
+.phase-rail{position:relative;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:14px 0 0}
+.phase-rail::before{content:"";position:absolute;top:9.5px;left:6%;right:6%;height:1px;background:var(--line)}
+.phase-node{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:4px}
+.phase-node .pip{position:relative;z-index:1;width:11px;height:11px;border-radius:50%;background:var(--surface);border:2px solid var(--line)}
+.phase-node .name{font-size:11.5px;color:var(--faint)}
+.phase-node.is-done .pip{border-color:var(--line);background:var(--line)}
+.phase-node.is-live .pip{border-color:var(--primary);background:var(--primary);box-shadow:0 0 0 5px var(--primary-soft);animation:pulse 1.8s ease-in-out infinite}
+.phase-node.is-live .name{color:var(--primary-strong);font-weight:600}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 5px var(--primary-soft)}50%{box-shadow:0 0 0 8px color-mix(in oklab,var(--primary) 12%,transparent)}}
+
+.rule-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(322px,1fr));gap:10px;margin-top:12px}
+.rule{position:relative;display:flex;flex-direction:column;padding:13px 15px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);transition:border-color 160ms ease-out}
+.rule:hover{border-color:var(--hex-line)}
+.rule.is-armed{border-color:var(--hex-line);background:linear-gradient(180deg,var(--primary-soft) 0%,var(--surface) 42%)}
+.rule-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.rule-head h3{font-size:13.5px}
+.rule-phase{display:inline-flex;align-items:center;gap:4px;margin-top:5px;font-size:10.5px;color:var(--faint)}
+.rule-phase b{color:var(--muted);font-weight:500}
+.rule p{margin-top:7px;color:var(--muted);font-size:12px;line-height:1.6}
+.rule-params{display:flex;align-items:center;gap:10px;margin-top:11px;padding-top:10px;border-top:1px solid var(--line-soft)}
+.rule-params label{font-size:11.5px;color:var(--muted)}
+.slider{flex:1;height:3px;background:var(--line);border-radius:999px;position:relative}
+.slider i{position:absolute;inset:0 62% 0 0;background:var(--primary);border-radius:999px}
+.slider b{position:absolute;top:50%;left:38%;width:12px;height:12px;margin-top:-6px;background:var(--primary);border:2px solid var(--bg);border-radius:50%}
+.rule-foot{margin-top:auto;padding-top:9px;font-size:11px;color:var(--faint)}
+.rule-countdown{position:absolute;right:14px;bottom:12px;padding:2px 9px;background:var(--primary);border-radius:999px;color:var(--on-primary);font-size:11px;font-weight:650;font-variant-numeric:tabular-nums}
+.rule-strategy{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.pill{padding:3px 10px;background:var(--surface-strong);border:1px solid var(--line);border-radius:999px;font-size:11px;color:var(--muted)}
+.pill.is-on{background:var(--primary-soft);border-color:var(--hex-line);color:var(--primary-strong)}
+
+/* ════ 2. 整备：装置台 ════ */
+.rig{display:grid;grid-template-columns:minmax(0,1fr) 326px;gap:12px}
+.card{padding:15px 17px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md)}
+.card > h3{font-size:13px;margin-bottom:11px}
+.kv{display:grid;grid-template-columns:104px minmax(0,1fr);gap:7px 14px;font-size:12px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.lock{display:flex;align-items:center;gap:16px;margin-top:12px;padding:16px;border-radius:var(--radius-md);background:linear-gradient(135deg,var(--primary-soft),transparent 70%);border:1px solid var(--hex-line)}
+.lock .shackle{display:grid;place-items:center;width:52px;height:52px;flex:0 0 auto;border-radius:14px;background:var(--surface-strong);border:1px solid var(--hex-line);font-size:22px;color:var(--primary)}
+.lock strong{display:block;font-size:14px}
+.lock p{margin-top:4px;color:var(--muted);font-size:12px;line-height:1.6;max-width:52ch}
+.action-list{display:flex;flex-direction:column}
+.action-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0}
+.action-row + .action-row{border-top:1px solid var(--line-soft)}
+.action-row strong{display:block;font-size:12.5px}
+.action-row p{margin-top:2px;color:var(--muted);font-size:11px;line-height:1.5}
+
+/* ════ 3. 门面：预览 + 控制台 ════ */
+.face{display:grid;grid-template-columns:392px minmax(0,1fr);gap:12px}
+.preview{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface)}
+.preview-art{position:relative;height:206px;background:linear-gradient(150deg,#1d2a44,#3a2a4d 45%,#5a3a28);}
+.preview-art::after{content:"生涯背景 · 星之守护者 拉克丝";position:absolute;left:14px;top:12px;padding:3px 9px;background:rgb(11 14 20/.55);border-radius:999px;color:#E8EAF0;font-size:11.5px;text-shadow:0 1px 6px rgb(0 0 0/.7)}
+.preview-art .scrim{position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgb(11 14 20/.9))}
+.preview-body{position:relative;padding:0 16px 16px;margin-top:-34px}
+.preview-id{display:flex;align-items:flex-end;gap:12px}
+.avatar{position:relative;width:66px;height:66px;flex:0 0 auto;border-radius:50%;background:linear-gradient(140deg,#3c4a63,#222a3a);border:2px solid var(--primary)}
+.avatar .lvl{position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);padding:1px 8px;background:var(--bg);border:1px solid var(--hex-line);border-radius:999px;font-size:10px;color:var(--primary-strong)}
+.preview-id .who strong{display:block;font-size:16px}
+.preview-id .who span{color:var(--muted);font-size:11.5px}
+.preview-tags{display:flex;gap:6px;margin-top:16px;flex-wrap:wrap}
+.preview-sig{margin-top:12px;padding:9px 11px;background:var(--surface-strong);border:1px solid var(--line);border-radius:var(--radius-sm);font-size:12px;color:var(--muted)}
+.preview-slots{display:flex;gap:6px;margin-top:10px}
+.slot{flex:1;height:34px;display:grid;place-items:center;background:var(--surface-strong);border:1px dashed var(--line);border-radius:var(--radius-sm);font-size:10.5px;color:var(--faint)}
+.film{display:flex;gap:7px;margin-top:10px;overflow-x:auto;padding-bottom:5px}
+.film span{flex:0 0 auto;width:74px;height:44px;border-radius:6px;border:1px solid var(--line);background:linear-gradient(140deg,#2a3550,#43304a)}
+.film span.is-sel{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-soft)}
+.film span.locked{opacity:.35;background:linear-gradient(140deg,#232a36,#2c3242)}
+.setting-row{display:flex;min-height:60px;align-items:center;justify-content:space-between;gap:18px;padding:12px 0}
+.setting-row + .setting-row{border-top:1px solid var(--line-soft)}
+.setting-row h4{font-size:13px}
+.setting-row p{max-width:54ch;margin-top:3px;color:var(--muted);font-size:11.5px;line-height:1.55}
+.seg{display:inline-flex;background:var(--surface-strong);border:1px solid var(--line);border-radius:999px;padding:2px}
+.seg button{padding:4px 11px;background:transparent;border:0;border-radius:999px;color:var(--muted);font-size:11.5px}
+.seg button.is-on{background:var(--primary);color:var(--on-primary);font-weight:600}
+.field{min-height:32px;padding:0 11px;background:var(--surface-strong);border:1px solid var(--line);border-radius:var(--radius-sm);color:var(--ink);font-size:12.5px;display:inline-flex;align-items:center}
+
+/* ════ 4. 拾遗：合流清单 ════ */
+.sweep-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md)}
+.sources{display:flex;gap:8px;flex-wrap:wrap}
+.source{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--surface-strong);border:1px solid var(--line);border-radius:999px;font-size:11.5px;color:var(--muted)}
+.source b{color:var(--ink);font-size:13px;font-variant-numeric:tabular-nums}
+.source .tick{width:6px;height:6px;border-radius:50%;background:var(--success)}
+.source.is-empty .tick{background:var(--faint)}
+.source.is-fail .tick{background:var(--danger)}
+.filters{display:flex;gap:6px;margin:12px 0 0;flex-wrap:wrap}
+
+.claim-list{margin-top:10px;border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden;background:var(--surface)}
+.claim-row{display:grid;grid-template-columns:26px minmax(0,1fr) 96px;gap:14px;padding:13px 15px;align-items:start}
+.claim-row + .claim-row{border-top:1px solid var(--line-soft)}
+.claim-row.is-picked{background:color-mix(in oklab,var(--primary) 5%,var(--surface))}
+.claim-row.is-done{opacity:.6}
+.cbox{width:15px;height:15px;margin-top:3px;appearance:none;background:var(--surface-strong);border:1px solid var(--line);border-radius:4px;cursor:pointer;position:relative}
+.cbox:checked{background:var(--primary);border-color:var(--primary)}
+.cbox:checked::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;color:var(--on-primary);font-size:10px;font-weight:800}
+.claim-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.claim-title{font-size:13.5px;font-weight:600}
+.tiles{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}
+.tile{position:relative;display:flex;align-items:center;gap:8px;width:158px;padding:7px 9px;background:var(--surface-strong);border:1px solid var(--line);border-radius:var(--radius-sm)}
+.tile .ico{width:30px;height:30px;flex:0 0 auto;border-radius:6px;background:linear-gradient(140deg,#3a4560,#5a4530)}
+.tile strong{display:block;font-size:11.5px;line-height:1.35}
+.tile span{color:var(--faint);font-size:10.5px}
+.tile.is-choice{cursor:pointer;border-style:dashed}
+.tile.is-choice.is-sel{border-style:solid;border-color:var(--primary);background:var(--primary-soft)}
+.tile.is-choice.is-sel::after{content:"已选";position:absolute;top:-7px;right:8px;padding:0 6px;background:var(--primary);border-radius:999px;color:var(--on-primary);font-size:9.5px;font-weight:700;line-height:14px}
+.claim-status{text-align:right;font-size:11.5px;color:var(--muted);padding-top:2px}
+.claim-error{display:flex;gap:8px;margin-top:10px;padding:7px 10px;background:var(--danger-soft);border:1px solid color-mix(in oklab,var(--danger) 30%,var(--line));border-radius:var(--radius-sm);color:var(--danger);font-size:11.5px;line-height:1.55}
+.choice-hint{margin-top:9px;padding:7px 10px;background:var(--warning-soft);border:1px solid color-mix(in oklab,var(--warning) 30%,var(--line));border-radius:var(--radius-sm);color:var(--warning);font-size:11.5px}
+.sticky-bar{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px;padding:12px 16px;background:var(--surface-strong);border:1px solid var(--hex-line);border-radius:var(--radius-md);box-shadow:0 -8px 28px rgb(0 0 0/.4)}
+.progress{flex:1;max-width:280px;height:4px;background:var(--line);border-radius:999px;overflow:hidden}
+.progress i{display:block;height:100%;width:34%;background:var(--primary);border-radius:999px}
+
+@media (max-width:1180px){.rig,.face{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="mock-banner">
+  <b>设计稿 · R50「随行」</b> <span>— 静态视觉稿，点击左侧菜单与二级页签可切换。数据为示意，非真实客户端内容。</span>
+</div>
+
+<div class="app-frame">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><span class="brand-mark">DL</span><strong>DEEP <span class="brand-accent">LEGENDS</span></strong></div>
+    <nav class="section-tabs">
+      <button class="section-tab"><span class="glyph">▦</span><span>总览</span></button>
+      <button class="section-tab"><span class="glyph">♛</span><span>英雄</span></button>
+      <button class="section-tab"><span class="glyph">◈</span><span>对局</span></button>
+      <button class="section-tab"><span class="glyph">⬡</span><span>收藏</span></button>
+      <button class="section-tab is-active is-new"><span class="glyph">◎</span><span>随行</span></button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="conn"><span class="dot"></span><span>已连接 · 国服</span></div>
+      <button class="section-tab"><span class="glyph">⚙</span><span>设置</span></button>
+    </div>
+  </aside>
+
+  <div class="app-main">
+    <header class="topbar">
+      <div><h1 id="pageTitle">随行</h1><small id="pageSub">托管流程 · 端侧整备 · 门面 · 拾遗</small></div>
+      <div class="topbar-actions">
+        <button class="button">重新读取</button>
+      </div>
+    </header>
+
+    <main class="shell">
+      <div class="rail-header">
+        <nav class="suite-nav" id="suiteNav">
+          <button class="suite-nav-item is-active" data-tab="watch"><span class="glyph">◉</span><span><strong>值守</strong><small>托管客户端流程</small></span></button>
+          <button class="suite-nav-item" data-tab="rig"><span class="glyph">⬢</span><span><strong>整备</strong><small>游戏端与客户端维护</small></span></button>
+          <button class="suite-nav-item" data-tab="face"><span class="glyph">◈</span><span><strong>门面</strong><small>生涯展示与聊天身份</small></span></button>
+          <button class="suite-nav-item" data-tab="sweep"><span class="glyph">✦</span><span><strong>拾遗</strong><small>未领取奖励清扫</small></span></button>
+        </nav>
+        <dl class="suite-metrics">
+          <div><dt>值守规则</dt><dd class="num">6 / 9</dd></div>
+          <div><dt>设置锁</dt><dd style="font-size:15px;color:var(--success)">已锁定</dd></div>
+          <div class="focus"><dt>待领取</dt><dd class="num">12</dd></div>
+        </dl>
+      </div>
+
+      <!-- ══════════ 值守 ══════════ -->
+      <section class="panel subpanel" data-panel="watch">
+        <div class="watch-top">
+          <div class="watch-master">
+            <span class="ring">◎</span>
+            <div><strong>值守中</strong><span>客户端已连接，规则会在对应阶段自动触发</span></div>
+          </div>
+          <div class="watch-stats">
+            <div>本次启动已代劳<b class="num">7 次</b></div>
+            <div>最近一次<b style="font-size:13px">自动接受 · 3 分钟前</b></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:9px;font-size:12.5px"><input class="toggle" type="checkbox" checked><span>总开关</span></label>
+        </div>
+
+        <div class="phase-rail">
+          <div class="phase-node is-done"><span class="pip"></span><span class="name">房间</span></div>
+          <div class="phase-node is-done"><span class="pip"></span><span class="name">匹配中</span></div>
+          <div class="phase-node is-live"><span class="pip"></span><span class="name">确认对局</span></div>
+          <div class="phase-node"><span class="pip"></span><span class="name">英雄选择</span></div>
+          <div class="phase-node"><span class="pip"></span><span class="name">游戏中</span></div>
+          <div class="phase-node"><span class="pip"></span><span class="name">结算</span></div>
+        </div>
+
+        <div class="panel-heading"><div><h2>规则</h2><p>每条规则挂在它会触发的阶段上；当前阶段的规则会高亮并显示倒计时</p></div><span class="state-chip gold">6 条已启用</span></div>
+
+        <div class="rule-grid">
+          <article class="rule is-armed">
+            <div class="rule-head">
+              <div><h3>自动接受对局</h3><div class="rule-phase">触发于 <b>确认对局 · ReadyCheck</b></div></div>
+              <input class="toggle" type="checkbox" checked>
+            </div>
+            <p>匹配到对局时替你点「接受」。延时设为 0 会在毫秒内响应，建议留 1–2 秒更接近手动节奏。</p>
+            <div class="rule-params"><label>延时</label><span class="slider"><i></i><b></b></span><span class="state-chip num">1.5 s</span></div>
+            <div class="rule-foot">上次触发 · 今天 21:04</div>
+            <span class="rule-countdown num">1.2 s 后接受</span>
+          </article>
+
+          <article class="rule">
+            <div class="rule-head">
+              <div><h3>断线自动重连</h3><div class="rule-phase">触发于 <b>掉线 · Reconnect</b></div></div>
+              <input class="toggle" type="checkbox" checked>
+            </div>
+            <p>检测到掉线状态时自动重连正在进行的对局。只尝试一次，失败后交还给你手动处理。</p>
+            <div class="rule-params"><label>延时</label><span class="slider"><i style="inset:0 40% 0 0"></i><b style="left:60%"></b></span><span class="state-chip num">10 s</span></div>
+            <div class="rule-foot">上次触发 · 昨天 23:41</div>
+          </article>
+
+          <article class="rule">
+            <div class="rule-head">
+              <div><h3>快速下一把</h3><div class="rule-phase">触发于 <b>结算 · EndOfGame</b></div></div>
+              <input class="toggle" type="checkbox" checked>
+            </div>
+            <p>结算后自动回到房间。若同时开启了自动点赞，会等点赞投票完成再返回。</p>
+            <div class="rule-params"><label>延时</label><span class="slider"><i style="inset:0 78% 0 0"></i><b style="left:22%"></b></span><span class="state-chip num">1.6 s</span></div>
+            <div class="rule-foot">上次触发 · 今天 20:38</div>
+          </article>
+
+          <article class="rule">
+            <div class="rule-head">
+              <div><h3>结算自动点赞</h3><div class="rule-phase">触发于 <b>结算 · 出现点赞票</b></div></div>
+              <input class="toggle" type="checkbox" checked>
+            </div>
+            <p>把点赞票投给同一房间的队友。找不到队友时按下方策略处理，不会像上游那样悄悄投给敌方。</p>
+            <div class="rule-strategy"><span class="pill is-on">优先房间队友</span><span class="pill">仅房间队友</span><span class="pill">任意队友</span><span class="pill">弃票</span></div>
+            <div class="rule-foot">上次触发 · 今天 20:37</div>
+          </article>
+
+          <article class="rule">
+            <div class="rule-head">
+              <div><h3>跳过任务庆祝</h3><div class="rule-phase">触发于 <b>结算前 · PreEndOfGame</b></div></div>
+              <input class="toggle" type="checkbox" checked>
+            </div>
+            <p>结算前的任务庆祝动画会拖慢回到房间的速度，开启后自动跳过这一段。</p>
+            <div class="rule-foot">上次触发 · 今天 20:37</div>
+          </article>
+
+          <article class="rule">
+            <div class="rule-head">
+              <div><h3>阵营位置播报</h3><div class="rule-phase">触发于 <b>英雄选择 · 大乱斗类模式</b></div></div>
+              <input class="toggle" type="checkbox" checked>
+            </div>
+            <p>在极地大乱斗、海克斯大乱斗里告诉你当前是蓝色方还是红色方。</p>
+            <div class="rule-strategy"><span class="pill is-on">仅自己可见</span><span class="pill">发到队伍频道</span></div>
+            <div class="rule-foot">上次触发 · 昨天 22:15</div>
+          </article>
+
+          <article class="rule">
+            <div class="rule-head">
+              <div><h3>房主自动转交</h3><div class="rule-phase">触发于 <b>房间 · 自己是房主</b></div></div>
+              <input class="toggle" type="checkbox">
+            </div>
+            <p>组队时把房主让给别人。优先转给已准备的成员，全员未准备时才随机挑一个。</p>
+            <div class="rule-foot">未触发过</div>
+          </article>
+
+          <article class="rule">
+            <div class="rule-head">
+              <div><h3>房间邀请处理</h3><div class="rule-phase">触发于 <b>收到邀请</b></div></div>
+              <input class="toggle" type="checkbox">
+            </div>
+            <p>按队列类型分别设定接受 / 拒绝 / 不处理。默认全部「不处理」，需要你逐个队列开。</p>
+            <div class="rule-strategy"><span class="pill">单双排 · 不处理</span><span class="pill">灵活组排 · 不处理</span><span class="pill">大乱斗 · 不处理</span><span class="pill">+ 6 项</span></div>
+            <div class="rule-foot">未触发过</div>
+          </article>
+
+          <article class="rule">
+            <div class="rule-head">
+              <div><h3>自动开始匹配</h3><div class="rule-phase">触发于 <b>房间 · 满足人数且可开始</b></div></div>
+              <input class="toggle" type="checkbox">
+            </div>
+            <p>作为房主时自动开始匹配。<strong style="color:var(--warning)">不提供「排队超时自动重排」</strong>——那会形成无人值守的循环排队。</p>
+            <div class="rule-params"><label>最少人数</label><span class="field num">1</span><label style="margin-left:8px">延时</label><span class="field num">5 s</span></div>
+            <div class="rule-foot">未触发过</div>
+          </article>
+        </div>
+
+      </section>
+
+      <!-- ══════════ 整备 ══════════ -->
+      <section class="panel subpanel" data-panel="rig" hidden>
+        <div class="rig">
+          <div>
+            <div class="card">
+              <h3>安装与连接</h3>
+              <dl class="kv">
+                <dt>区服</dt><dd>腾讯国服 <span class="state-chip">TENCENT</span></dd>
+                <dt>安装根目录</dt><dd class="mono" style="font-size:11.5px">D:\WeGameApps\英雄联盟\LeagueClient</dd>
+                <dt>配置目录</dt><dd class="mono" style="font-size:11.5px">D:\WeGameApps\英雄联盟\Game\Config <span class="state-chip accent">国服上跳一级</span></dd>
+                <dt>设置文件</dt><dd class="mono" style="font-size:11.5px">PersistedSettings.json · 已定位</dd>
+                <dt>客户端接口</dt><dd>127.0.0.1 已连接 <span class="faint">（端口与令牌不展示、不落盘）</span></dd>
+                <dt>界面进程</dt><dd>LeagueClientUx 运行中</dd>
+              </dl>
+
+              <div class="lock">
+                <span class="shackle"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5V7.6a4 4 0 0 1 8 0v2.9"/><circle cx="12" cy="15.4" r="1.3" fill="currentColor" stroke="none"/></svg></span>
+                <div>
+                  <strong>游戏设置已锁定</strong>
+                  <p>画质、按键、界面布局等设置已被设为只读。游戏仍然照常读取现有设置，但游戏内的改动不会写回文件——重装驱动、切换分辨率、客户端异常都不会再冲掉你调好的配置。</p>
+                </div>
+                <div style="margin-left:auto;display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+                  <span class="state-chip success">只读</span>
+                  <button class="button">解除锁定</button>
+                </div>
+              </div>
+              <div class="notice is-info" style="margin-top:12px">
+                <span>ℹ</span><span>需要改设置时先解除锁定，改完再锁回来。此开关只影响<strong>当前连接的这一份安装目录</strong>，不会动其它客户端。</span>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="card">
+            <h3>客户端维护</h3>
+            <p class="muted" style="font-size:11.5px;line-height:1.6;margin-bottom:6px">以下动作都只调用本机客户端接口，全部需要你手动点击，不会自动执行。</p>
+            <div class="action-list">
+              <div class="action-row"><div><strong>重启客户端界面</strong><p>界面卡白、错位时先试这个，不影响正在进行的对局</p></div><button class="button">重启</button></div>
+              <div class="action-row"><div><strong>结束界面进程</strong><p>进游戏后关掉界面可显著降低占用</p></div><button class="button">结束</button></div>
+              <div class="action-row"><div><strong>启动界面进程</strong><p>界面已关闭时重新拉起</p></div><button class="button">启动</button></div>
+              <div class="action-row"><div><strong>关闭客户端</strong><p>直接退出客户端进程，会一并关闭游戏</p></div><button class="button button-danger">关闭</button></div>
+              <div class="action-row"><div><strong>断开连接</strong><p>让 Deep Legends 停止读取客户端，客户端本身不受影响</p></div><button class="button">断开</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════ 门面 ══════════ -->
+      <section class="panel subpanel" data-panel="face" hidden>
+        <div class="face">
+          <div>
+            <div class="preview">
+              <div class="preview-art"><div class="scrim"></div></div>
+              <div class="preview-body">
+                <div class="preview-id">
+                  <span class="avatar"><span class="lvl num">452</span></span>
+                  <div class="who"><strong>召唤师名称</strong><span>#CN1 · 艾欧尼亚</span></div>
+                </div>
+                <div class="preview-tags">
+                  <span class="state-chip gold">钻石 II · 单双排</span>
+                  <span class="state-chip">在线</span>
+                  <span class="state-chip">上赛季旗帜</span>
+                </div>
+                <div class="preview-sig">个性签名会显示在这里</div>
+                <div class="preview-slots"><span class="slot">勋章 1</span><span class="slot">勋章 2</span><span class="slot">勋章 3</span></div>
+                <p class="faint" style="margin-top:10px;font-size:11px;line-height:1.6">这是好友悬浮卡与生涯页的示意预览。右侧任何改动都会先反映在这里，确认后才写入客户端。</p>
+              </div>
+            </div>
+
+            <div class="card" style="margin-top:12px">
+              <h3>本页会写入客户端的内容</h3>
+              <div class="kv" style="grid-template-columns:96px minmax(0,1fr);font-size:11.5px;line-height:1.6">
+                <dt>生涯背景</dt><dd class="muted">当前召唤师的背景皮肤</dd>
+                <dt>聊天卡片</dt><dd class="muted">在线状态、个性签名、展示段位</dd>
+                <dt>展示位</dt><dd class="muted">头像框、挑战勋章、旗帜、表情轮盘</dd>
+              </div>
+              <div class="notice" style="margin-top:11px"><span>⚑</span><span>以上全部<strong>只在你点击后执行</strong>，没有任何自动写入。只有「登录时重设」两项是例外，它们默认关闭，且开启后仅重放你自己保存过的值。</span></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="card">
+              <h3>生涯背景</h3>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <span class="field">拉克丝 ▾</span>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px"><input class="toggle" type="checkbox" checked><span>只显示已拥有</span></label>
+                <span class="state-chip" style="margin-left:auto">已应用</span>
+              </div>
+              <div class="film">
+                <span class="is-sel"></span><span></span><span></span><span class="locked"></span><span></span><span class="locked"></span><span></span>
+              </div>
+              <p class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.6">客户端接口<strong style="color:var(--warning)">不校验皮肤是否拥有</strong>——关掉上面的开关就能设置未拥有的皮肤，但它可能在下次登录时被服务端还原。</p>
+            </div>
+
+            <div class="card" style="margin-top:12px">
+              <h3>聊天身份</h3>
+              <div class="setting-row">
+                <div><h4>在线状态</h4><p>部分状态只在特定情况下可用；设为离线后可开启「锁定离线」防止客户端自动切回</p></div>
+                <div class="seg"><button class="is-on">在线</button><button>离开</button><button>游戏中</button><button>离线</button></div>
+              </div>
+              <div class="setting-row">
+                <div><h4>个性签名</h4><p>留空即删除签名。开启「登录时重设」后每次客户端登录都会重新应用</p></div>
+                <div style="display:flex;gap:8px;align-items:center"><span class="field" style="width:190px">输入签名…</span><input class="toggle" type="checkbox" checked></div>
+              </div>
+              <div class="setting-row">
+                <div><h4>展示段位</h4><p>只改好友悬浮卡上的段位显示，不影响你的真实段位、战绩与匹配。大师及以上不需要选分段</p></div>
+                <div style="display:flex;gap:6px"><span class="field">单双排</span><span class="field">钻石</span><span class="field">II</span></div>
+              </div>
+            </div>
+
+            <div class="card" style="margin-top:12px">
+              <h3>展示清理</h3>
+              <p class="muted" style="font-size:11.5px;line-height:1.6;margin-bottom:4px">以下都是<strong style="color:var(--warning)">不可撤销的一次性动作</strong>，点击后会二次确认。</p>
+              <div class="action-list">
+                <div class="action-row"><div><strong>卸下头像框</strong><p>换成固定的典藏边框；需要召唤师等级 ≥ 526</p></div><span class="state-chip fail">等级不足</span></div>
+                <div class="action-row"><div><strong>卸下全部勋章</strong><p>清空生涯页展示的挑战勋章</p></div><button class="button">卸下</button></div>
+                <div class="action-row"><div><strong>切换上赛季旗帜</strong><p>换回上个赛季的旗帜样式，可能导致旗帜暂时不显示</p></div><button class="button">切换</button></div>
+                <div class="action-row"><div><strong>清空表情轮盘</strong><p>一次性清掉 13 个表情位，需要重新自行配置</p></div><button class="button button-danger">清空</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════ 拾遗 ══════════ -->
+      <section class="panel subpanel" data-panel="sweep" hidden>
+        <div class="sweep-bar">
+          <div class="sources">
+            <span class="source"><i class="tick"></i>奖励账本 <b class="num">7</b></span>
+            <span class="source"><i class="tick"></i>任务 <b class="num">3</b></span>
+            <span class="source"><i class="tick"></i>事件中心 <b class="num">2</b></span>
+            <span class="source is-empty"><i class="tick"></i>战利品宝箱 <b class="num">0</b></span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="faint" style="font-size:11.5px">上次扫描 · 12 秒前</span>
+            <button class="button">重新扫描</button>
+          </div>
+        </div>
+
+        <div class="filters">
+          <span class="pill is-on">全部 12</span>
+          <span class="pill">历史活动 5</span>
+          <span class="pill">需要选择 3</span>
+          <span class="pill">任务链 2</span>
+          <span class="pill">已失败 1</span>
+        </div>
+
+        <div class="claim-list">
+          <article class="claim-row is-picked">
+            <input class="cbox" type="checkbox" checked>
+            <div>
+              <div class="claim-meta">
+                <span class="claim-title">灵魂莲华 2023 · 通行证赠礼</span>
+                <span class="state-chip accent">奖励账本</span>
+                <span class="state-chip">历史活动</span>
+                <span class="state-chip gold">三选一</span>
+              </div>
+              <div class="tiles">
+                <span class="tile is-choice is-sel"><i class="ico"></i><span><strong>星之守护者宝箱</strong><span>×1</span></span></span>
+                <span class="tile is-choice"><i class="ico"></i><span><strong>1350 蓝色精粹</strong><span>×1</span></span></span>
+                <span class="tile is-choice"><i class="ico"></i><span><strong>海克斯钥匙</strong><span>×3</span></span></span>
+              </div>
+            </div>
+            <div class="claim-status">待领取</div>
+          </article>
+
+          <article class="claim-row is-picked">
+            <input class="cbox" type="checkbox" checked>
+            <div>
+              <div class="claim-meta">
+                <span class="claim-title">斗魂竞技场 · 首赛季参与奖</span>
+                <span class="state-chip accent">奖励账本</span>
+                <span class="state-chip">历史活动</span>
+                <span class="state-chip warn">与「事件中心」重叠</span>
+              </div>
+              <div class="tiles">
+                <span class="tile"><i class="ico"></i><span><strong>斗魂头像</strong><span>×1</span></span></span>
+                <span class="tile"><i class="ico"></i><span><strong>斗魂图标</strong><span>×1</span></span></span>
+              </div>
+            </div>
+            <div class="claim-status">待领取</div>
+          </article>
+
+          <article class="claim-row">
+            <input class="cbox" type="checkbox">
+            <div>
+              <div class="claim-meta">
+                <span class="claim-title">未命名奖励组 (4)</span>
+                <span class="state-chip accent">奖励账本</span>
+                <span class="state-chip gold">四选一</span>
+              </div>
+              <div class="tiles">
+                <span class="tile is-choice"><i class="ico"></i><span><strong>符文之地传送门</strong><span>×1</span></span></span>
+                <span class="tile is-choice"><i class="ico"></i><span><strong>普通宝箱</strong><span>×2</span></span></span>
+                <span class="tile is-choice"><i class="ico"></i><span><strong>625 蓝色精粹</strong><span>×1</span></span></span>
+                <span class="tile is-choice"><i class="ico"></i><span><strong>表情</strong><span>×1</span></span></span>
+              </div>
+              <div class="choice-hint">⚠ 这一组需要你先选出 1 项才能领取。上游工具在这里是随机替你选的，我们把选择权交还给你。</div>
+            </div>
+            <div class="claim-status">需要选择</div>
+          </article>
+
+          <article class="claim-row">
+            <input class="cbox" type="checkbox">
+            <div>
+              <div class="claim-meta">
+                <span class="claim-title">周常任务 · 完成 3 场对局</span>
+                <span class="state-chip accent">任务</span>
+                <span class="state-chip">任务链 1/3</span>
+              </div>
+              <div class="tiles"><span class="tile"><i class="ico"></i><span><strong>任务积分</strong><span>×250</span></span></span></div>
+            </div>
+            <div class="claim-status">待领取</div>
+          </article>
+
+          <article class="claim-row is-done">
+            <input class="cbox" type="checkbox" disabled>
+            <div>
+              <div class="claim-meta">
+                <span class="claim-title">海克斯狂欢 2024 · 通行证轨道</span>
+                <span class="state-chip accent">事件中心</span>
+                <span class="state-chip">历史活动</span>
+              </div>
+            </div>
+            <div class="claim-status"><span class="state-chip success">已领取</span></div>
+          </article>
+
+          <article class="claim-row">
+            <input class="cbox" type="checkbox">
+            <div>
+              <div class="claim-meta">
+                <span class="claim-title">冠军之路 · 段位达成奖励</span>
+                <span class="state-chip accent">奖励账本</span>
+              </div>
+              <div class="tiles"><span class="tile"><i class="ico"></i><span><strong>胜利皮肤碎片</strong><span>×1</span></span></span></div>
+              <div class="claim-error"><span>✕</span><span>客户端返回 <b>400 · RewardGrantAlreadyFulfilled</b>：该发放单已被处理。重新扫描后这一条会自动消失；本次批量领取的其余条目未受影响。</span></div>
+            </div>
+            <div class="claim-status"><span class="state-chip fail">领取失败</span></div>
+          </article>
+        </div>
+
+        <div class="sticky-bar">
+          <div style="display:flex;align-items:center;gap:12px">
+            <strong style="font-size:13px">已选 2 项</strong>
+            <span class="progress"><i></i></span>
+            <span class="muted num" style="font-size:11.5px">已完成 4 / 12 · 失败 1</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="button">全选可领取</button>
+            <button class="button button-primary">开始领取</button>
+          </div>
+        </div>
+
+        <div class="notice" style="margin-top:14px">
+          <span>⚑</span><span>领取过程<strong>逐项独立执行</strong>：某一项失败不会中断后面的项，失败原因会解析客户端返回的错误体展示在该行。<strong>待领取奖励明细不会落盘</strong>，关闭页面即从内存中丢弃。</span>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+(() => {
+  const titles = {
+    watch: ["值守", "托管客户端流程 · 规则挂在触发阶段上"],
+    rig:   ["整备", "游戏端设置锁与客户端维护"],
+    face:  ["门面", "生涯展示、聊天身份与展示清理"],
+    sweep: ["拾遗", "把三个来源的未领取奖励合成一张清单"]
+  };
+  const nav = document.getElementById("suiteNav");
+  const panels = [...document.querySelectorAll("[data-panel]")];
+  nav.addEventListener("click", (e) => {
+    const item = e.target.closest("[data-tab]");
+    if (!item) return;
+    const key = item.dataset.tab;
+    for (const b of nav.querySelectorAll("[data-tab]")) b.classList.toggle("is-active", b === item);
+    for (const p of panels) p.hidden = p.dataset.panel !== key;
+    document.getElementById("pageTitle").textContent = "随行 · " + titles[key][0];
+    document.getElementById("pageSub").textContent = titles[key][1];
+    window.scrollTo({ top: 0 });
+  });
+  // 多选一磁贴：演示单选行为
+  document.addEventListener("click", (e) => {
+    const tile = e.target.closest(".tile.is-choice");
+    if (!tile) return;
+    for (const t of tile.parentElement.querySelectorAll(".tile.is-choice")) t.classList.toggle("is-sel", t === tile);
+    const row = tile.closest(".claim-row");
+    const hint = row.querySelector(".choice-hint");
+    if (hint) { hint.remove(); row.querySelector(".claim-status").textContent = "待领取"; }
+  });
+})();
+</script>
+</body>
+</html>

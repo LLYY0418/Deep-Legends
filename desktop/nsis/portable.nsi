@@ -11,6 +11,9 @@
 # 依赖 electron-builder 生成的宏：PRODUCT_NAME、VERSION、APP_FILENAME、
 # APP_EXECUTABLE_FILENAME（common.nsh）、extractEmbeddedAppPackage（zip 分支）。
 
+# 构建脚本在打包前注入后端与桌面壳指纹，避免同版本复用旧缓存。
+!define DEEP_LEGENDS_BUILD_FINGERPRINT "@@BUILD_FINGERPRINT@@"
+
 !include "common.nsh"
 !include "extractAppPackage.nsh"
 
@@ -24,7 +27,7 @@ Caption "${PRODUCT_NAME}"
 Var CacheHit
 
 Function .onInit
-  StrCpy $INSTDIR "$LOCALAPPDATA\${APP_FILENAME}\app-${VERSION}"
+  StrCpy $INSTDIR "$LOCALAPPDATA\${APP_FILENAME}\app-${VERSION}-${DEEP_LEGENDS_BUILD_FINGERPRINT}"
   StrCpy $CacheHit "0"
   ${If} ${FileExists} "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
   ${AndIf} ${FileExists} "$INSTDIR\.deep-legends-ready"
@@ -51,7 +54,7 @@ Section
       !insertmacro extractEmbeddedAppPackage
     !endif
     FileOpen $0 "$INSTDIR\.deep-legends-ready" w
-    FileWrite $0 "${VERSION}"
+    FileWrite $0 "${VERSION}-${DEEP_LEGENDS_BUILD_FINGERPRINT}"
     FileClose $0
   ${EndIf}
 

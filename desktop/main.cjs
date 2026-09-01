@@ -6,6 +6,8 @@ const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const { resolveSystemProxy } = require("./proxy-resolution.cjs");
+const { createShareExportController } = require("./share-export.cjs");
+const { windowBoundsForWorkArea } = require("./window-bounds.cjs");
 
 const APP_ID = "cn.hexcore.lootassistant";
 const READY_PREFIX = "LOOT_READY ";
@@ -22,6 +24,7 @@ let quitting = false;
 let shutdownStarted = false;
 let rendererTheme = null;
 let modalOpen = false;
+let shareExportController = null;
 
 app.setAppUserModelId(APP_ID);
 
@@ -230,10 +233,7 @@ function isLoopback(hostname) {
 // proportion on any resolution (small laptops through 4K monitors).
 function initialWindowBounds() {
   const { screen } = require("electron");
-  const area = screen.getPrimaryDisplay().workAreaSize;
-  const width = Math.min(1680, Math.max(1080, Math.round(area.width * 0.84)));
-  const height = Math.min(1050, Math.max(680, Math.round(area.height * 0.88)));
-  return { width, height };
+  return windowBoundsForWorkArea(screen.getPrimaryDisplay().workAreaSize);
 }
 
 function createMainWindow() {
@@ -269,6 +269,25 @@ function createMainWindow() {
     if (process.platform === "win32" && mainWindow && !mainWindow.isDestroyed()) mainWindow.setTitleBarOverlay(titleBarOverlay(rendererTheme));
   };
   nativeTheme.on("updated", syncTitleBar);
+  shareExportController?.clear();
+  const windowShareExportController = createShareExportController({
+    BrowserWindow,
+    app,
+    dialog,
+    fileSystem: fs,
+    isTrustedRenderer,
+    getBaseURL: () => backendReady?.baseUrl || "",
+    log: appendDesktopLog,
+  });
+  shareExportController = windowShareExportController;
+  ipcMain.removeHandler("desktop-share-prepare-save");
+  ipcMain.handle("desktop-share-prepare-save", (event, suggestedName) => windowShareExportController.prepareSave(event, suggestedName));
+  ipcMain.removeHandler("desktop-share-get-directory");
+  ipcMain.handle("desktop-share-get-directory", (event) => windowShareExportController.getSaveDirectory(event));
+  ipcMain.removeHandler("desktop-share-choose-directory");
+  ipcMain.handle("desktop-share-choose-directory", (event) => windowShareExportController.chooseSaveDirectory(event));
+  ipcMain.removeHandler("desktop-share-capture-and-save");
+  ipcMain.handle("desktop-share-capture-and-save", (event, payload) => windowShareExportController.captureAndSave(event, payload));
   ipcMain.removeAllListeners("desktop-theme");
   ipcMain.on("desktop-theme", (_event, theme) => {
     if (process.platform === "win32" && mainWindow && !mainWindow.isDestroyed() && (theme === "dark" || theme === "light")) {
@@ -314,6 +333,8 @@ function createMainWindow() {
   });
   mainWindow.on("closed", () => {
     nativeTheme.removeListener("updated", syncTitleBar);
+    windowShareExportController.clear();
+    if (shareExportController === windowShareExportController) shareExportController = null;
     mainWindow = null;
     if (!quitting) app.quit();
   });

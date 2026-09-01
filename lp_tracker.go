@@ -45,6 +45,12 @@ type lpSnapshot struct {
 
 func (s lpSnapshot) games() int { return s.Wins + s.Losses }
 
+// trustworthy reports whether a snapshot is complete enough for LP differences.
+// Tencent ranked responses with wins but no losses are known to be truncated.
+func (s lpSnapshot) trustworthy() bool {
+	return !(s.Wins > 0 && s.Losses == 0)
+}
+
 type lpGameRecord struct {
 	AccountHash string `json:"accountHash"`
 	QueueType   string `json:"queueType"`
@@ -61,14 +67,17 @@ type lpHistoryData struct {
 }
 
 type lpTracker struct {
-	mu      sync.Mutex
-	store   *localStore
-	history lpHistoryData
-	pending map[string]bool
+	mu           sync.Mutex
+	store        *localStore
+	history      lpHistoryData
+	pending      map[string]bool
+	captureIndex uint64
+	observeEvent func(map[string]any)
+	sleep        func(time.Duration)
 }
 
 func newLPTracker(store *localStore) *lpTracker {
-	tracker := &lpTracker{store: store, pending: make(map[string]bool)}
+	tracker := &lpTracker{store: store, pending: make(map[string]bool), sleep: time.Sleep}
 	tracker.history = lpHistoryData{SchemaVersion: lpHistorySchemaVersion, Baselines: make(map[string]map[string]lpSnapshot), Games: make(map[string]lpGameRecord)}
 	if store == nil {
 		return tracker
@@ -98,6 +107,20 @@ func newLPTracker(store *localStore) *lpTracker {
 		tracker.history.Games = loaded.Games
 	}
 	return tracker
+}
+
+func (t *lpTracker) recordObservation(event map[string]any) {
+	if t != nil && t.observeEvent != nil {
+		t.observeEvent(event)
+	}
+}
+
+func (t *lpTracker) wait(duration time.Duration) {
+	if t != nil && t.sleep != nil {
+		t.sleep(duration)
+		return
+	}
+	time.Sleep(duration)
 }
 
 func validLPAccountHash(value string) bool {
@@ -193,6 +216,14 @@ func (t *lpTracker) observe(playerRef string, ranks []gameplayRank) {
 		if _, tracked := lpRankedQueues[queueIDForRankedType(rank.QueueType)]; !tracked {
 			continue
 		}
+		snapshot := lpSnapshotFromRank(rank)
+		if !snapshot.trustworthy() {
+			t.recordObservation(map[string]any{
+				"event": "lp_snapshot_rejected", "stage": "observe",
+				"reason": "missing_losses",
+			})
+			continue
+		}
 		if t.pending[accountHash+"|"+rank.QueueType] {
 			continue
 		}
@@ -201,7 +232,6 @@ func (t *lpTracker) observe(playerRef string, ranks []gameplayRank) {
 			byQueue = make(map[string]lpSnapshot)
 			t.history.Baselines[accountHash] = byQueue
 		}
-		snapshot := lpSnapshotFromRank(rank)
 		if byQueue[rank.QueueType] != snapshot {
 			byQueue[rank.QueueType] = snapshot
 			changed = true
@@ -240,8 +270,8 @@ func (t *lpTracker) annotate(matches []gameplayMatch, playerRef string) {
 }
 
 // handlePhase 由 LCU gameflow 事件触发：对局结算时启动一次捕获。
-// loadRanks 由调用方注入（优先 SGP 段位数据：新版客户端 ranked-stats
-// 不返回负场，输掉的排位靠它才能察觉场次 +1）。
+// loadRanks 由调用方注入（优先 SGP 段位数据）；只有包含胜负场次的
+// 可信快照才会用于判断场次 +1。
 func (t *lpTracker) handlePhase(client *LCUClient, phase, playerRef string, loadRanks func() ([]gameplayRank, EndpointCapability)) {
 	if t == nil || client == nil || playerRef == "" || loadRanks == nil {
 		return
@@ -264,15 +294,22 @@ type lpGameflowSession struct {
 func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func() ([]gameplayRank, EndpointCapability)) {
 	accountHash := t.accountHash(playerRef)
 	if accountHash == "" {
+		t.recordObservation(map[string]any{"event": "lp_capture_ignored", "reason": "invalid_player_reference"})
 		return
 	}
 	var session lpGameflowSession
 	if err := client.GetJSON("/lol-gameflow/v1/session", &session); err != nil {
+		t.recordObservation(map[string]any{"event": "lp_capture_ignored", "reason": "session_unavailable"})
 		return
 	}
 	gameID := session.GameData.GameID
 	queueType, ranked := lpRankedQueues[session.GameData.Queue.ID]
-	if !ranked || gameID <= 0 {
+	if !ranked {
+		t.recordObservation(map[string]any{"event": "lp_capture_ignored", "reason": "unranked_queue"})
+		return
+	}
+	if gameID <= 0 {
+		t.recordObservation(map[string]any{"event": "lp_capture_ignored", "reason": "invalid_game"})
 		return
 	}
 	gameKey := strconv.FormatInt(gameID, 10)
@@ -280,41 +317,85 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 	t.mu.Lock()
 	_, recorded := t.history.Games[gameKey]
 	if recorded || t.pending[pendingKey] {
+		pending := t.pending[pendingKey]
 		t.mu.Unlock()
+		reason := "already_recorded"
+		if pending {
+			reason = "capture_pending"
+		}
+		t.recordObservation(map[string]any{"event": "lp_capture_ignored", "reason": reason})
 		return
 	}
+	t.captureIndex++
+	captureIndex := t.captureIndex
 	t.pending[pendingKey] = true
 	baseline, hasBaseline := t.history.Baselines[accountHash][queueType]
 	t.mu.Unlock()
+	t.recordObservation(map[string]any{
+		"event": "lp_capture_started", "capture_index": captureIndex,
+		"has_baseline": hasBaseline,
+	})
 	defer func() {
 		t.mu.Lock()
 		delete(t.pending, pendingKey)
 		t.mu.Unlock()
 	}()
-	time.Sleep(lpCaptureFirstWait)
+	t.wait(lpCaptureFirstWait)
 	for attempt := 0; attempt < lpCaptureAttempts; attempt++ {
 		if attempt > 0 {
-			time.Sleep(lpCaptureInterval)
+			t.wait(lpCaptureInterval)
 		}
 		ranks, capability := loadRanks()
-		if capability.State != capabilityAvailable {
-			continue
-		}
 		var current *gameplayRank
-		for index := range ranks {
-			if ranks[index].QueueType == queueType {
-				current = &ranks[index]
-				break
+		if capability.State == capabilityAvailable {
+			for index := range ranks {
+				if ranks[index].QueueType == queueType {
+					current = &ranks[index]
+					break
+				}
 			}
 		}
+		var snapshot lpSnapshot
+		if current != nil && current.Tier != "" {
+			snapshot = lpSnapshotFromRank(*current)
+		}
+		t.recordObservation(map[string]any{
+			"event": "lp_capture_poll", "capture_index": captureIndex,
+			"attempt": attempt + 1, "capability_state": capability.State,
+		})
 		if current == nil || current.Tier == "" {
 			continue
 		}
-		snapshot := lpSnapshotFromRank(*current)
+		if !snapshot.trustworthy() {
+			t.recordObservation(map[string]any{
+				"event": "lp_snapshot_rejected", "stage": "capture", "capture_index": captureIndex,
+				"reason": "missing_losses",
+			})
+			continue
+		}
 		// 结算数据尚未同步时场次不变，继续等待。
 		if hasBaseline && snapshot.games() <= baseline.games() {
 			continue
 		}
+		recordedDelta := 0
+		recordedGame := false
+		skipReason := ""
+		switch {
+		case !hasBaseline:
+			skipReason = "no_baseline"
+		case snapshot.games() > baseline.games()+1:
+			skipReason = "games_jumped"
+		default:
+			after, afterOK := rankAbsoluteScore(snapshot.Tier, snapshot.Division, snapshot.LeaguePoints)
+			before, beforeOK := rankAbsoluteScore(baseline.Tier, baseline.Division, baseline.LeaguePoints)
+			if afterOK && beforeOK {
+				recordedDelta = after - before
+				recordedGame = true
+			} else {
+				skipReason = "score_unresolved"
+			}
+		}
+
 		t.mu.Lock()
 		byQueue := t.history.Baselines[accountHash]
 		if byQueue == nil {
@@ -322,16 +403,25 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 			t.history.Baselines[accountHash] = byQueue
 		}
 		byQueue[queueType] = snapshot
-		// 恰好多出一场才可靠归因；缺基线或跨越多场时只刷新基线。
-		if hasBaseline && snapshot.games() == baseline.games()+1 {
-			after, afterOK := rankAbsoluteScore(snapshot.Tier, snapshot.Division, snapshot.LeaguePoints)
-			before, beforeOK := rankAbsoluteScore(baseline.Tier, baseline.Division, baseline.LeaguePoints)
-			if afterOK && beforeOK {
-				t.history.Games[gameKey] = lpGameRecord{AccountHash: accountHash, QueueType: queueType, Delta: after - before, RecordedAt: time.Now().UnixMilli()}
-			}
+		if recordedGame {
+			t.history.Games[gameKey] = lpGameRecord{AccountHash: accountHash, QueueType: queueType, Delta: recordedDelta, RecordedAt: time.Now().UnixMilli()}
 		}
 		t.persistLocked()
 		t.mu.Unlock()
+		if recordedGame {
+			t.recordObservation(map[string]any{
+				"event": "lp_capture_recorded", "capture_index": captureIndex,
+			})
+		} else {
+			t.recordObservation(map[string]any{
+				"event": "lp_capture_skipped", "capture_index": captureIndex,
+				"reason": skipReason,
+			})
+		}
 		return
 	}
+	t.recordObservation(map[string]any{
+		"event": "lp_capture_timeout", "capture_index": captureIndex,
+		"attempts": lpCaptureAttempts,
+	})
 }

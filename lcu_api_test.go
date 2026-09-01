@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
@@ -25,7 +26,7 @@ func TestOptionalReadOnlyAPIsAndCapabilityDegradation(t *testing.T) {
 		case "/lol-loot/v1/player-loot-map":
 			_, _ = w.Write([]byte(`{"skin_1":{"localizedName":"测试皮肤碎片","lootName":"CHAMPION_SKIN","type":"SKIN","count":2},"currency":{"localizedName":"蓝色精粹","type":"CURRENCY","count":5}}`))
 		case "/lol-rewards/v1/grants":
-			_, _ = w.Write([]byte(`[{"info":{"id":"pending","status":"PENDING_SELECTION","dateCreated":"2026-08-07T00:00:00Z"},"rewardGroup":{"localizations":{"title":"待选奖励"},"rewards":[{"id":"r1","itemId":"1","itemType":"SKIN","quantity":1,"localizations":{"title":"皮肤奖励"}}]}},{"info":{"id":"done","status":"CLAIMED"},"rewardGroup":{}}]`))
+			_, _ = w.Write([]byte(`[{"info":{"id":"pending","status":"PENDING_SELECTION","dateCreated":"2026-08-07T00:00:00Z"},"rewardGroup":{"localizations":{"title":"待选奖励","description":"Placeholder Description DO NOT TRANSLATE"},"rewards":[{"id":"r1","itemId":"1","itemType":"SKIN","quantity":1,"localizations":{"title":"皮肤奖励"}}]}},{"info":{"id":"done","status":"CLAIMED"},"rewardGroup":{}}]`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -41,7 +42,7 @@ func TestOptionalReadOnlyAPIsAndCapabilityDegradation(t *testing.T) {
 		t.Fatalf("loot=%#v capability=%#v", loot, lootCapability)
 	}
 	rewards, rewardCapability := NewRewardsAPI(client).PendingGrants()
-	if len(rewards) != 1 || rewards[0].ID != "pending" || rewardCapability.Count != 1 {
+	if len(rewards) != 1 || rewards[0].ID != "pending" || rewards[0].Description != "" || rewardCapability.Count != 1 {
 		t.Fatalf("rewards=%#v capability=%#v", rewards, rewardCapability)
 	}
 }
@@ -79,7 +80,7 @@ func TestRelevantLCUEventClassification(t *testing.T) {
 	if scope := lcuEventRefreshScope(LCUEvent{URI: "/lol-loot/v1/player-loot-map/item"}); scope != "account" {
 		t.Fatalf("loot event scope = %q", scope)
 	}
-	if scope := lcuEventRefreshScope(LCUEvent{URI: "/lol-inventory/v2/inventory/CHAMPION_SKIN"}); scope != "full" {
+	if scope := lcuEventRefreshScope(LCUEvent{URI: "/lol-inventory/v2/inventory/CHAMPION_SKIN"}); scope != "collection" {
 		t.Fatalf("inventory event scope = %q", scope)
 	}
 }
@@ -170,9 +171,10 @@ func TestEnrichLootItemsUsesChineseNamesAndCatalogSkinNames(t *testing.T) {
 		{LootID: "CHAMPION_45", Type: "CHAMPION", Count: 1},
 		{LootID: "loot-box", LocalizedName: "未命名战利品", Count: 64},
 		{LootID: "CHEST_champion_mastery", Type: "CHEST", Count: 54},
+		{LootID: "CHEST_promotion", Type: "CHEST", Count: 1},
 	}
 	items = enrichLootItems(items, []Skin{{ID: 143002, Name: "K/DA ALL OUT 萨勒芬妮 独立音乐人", ChampionID: 143, ChampionName: "萨勒芬妮", TilePath: "/lol-game-data/assets/skin.png", Owned: true}, {ID: 45000, Name: "维迦", ChampionID: 45, ChampionName: "维迦"}})
-	want := []string{"K/DA ALL OUT 萨勒芬妮 独立音乐人", "蓝色精粹", "橙色精粹", "战利品宝箱钥匙", "钥匙碎片", "维迦", "未识别材料", "战利品宝箱"}
+	want := []string{"K/DA ALL OUT 萨勒芬妮 独立音乐人", "蓝色精粹", "橙色精粹", "战利品宝箱钥匙", "钥匙碎片", "维迦", "未识别材料", "战利品宝箱", "紫色宝箱"}
 	for index, expected := range want {
 		if items[index].DisplayName != expected {
 			t.Fatalf("item %d name=%q want=%q", index, items[index].DisplayName, expected)
@@ -195,6 +197,47 @@ func TestEnrichLootItemsUsesChineseNamesAndCatalogSkinNames(t *testing.T) {
 	}
 	if items[5].Category != "英雄" {
 		t.Fatalf("champion enrichment=%#v", items[5])
+	}
+	if items[8].Asset != "/fe/lol-loot/assets/loot_item_icons/chest_promotion.png" || items[8].Category != "材料" {
+		t.Fatalf("promotion chest enrichment=%#v", items[8])
+	}
+}
+
+func TestPromotionChestUsesRequestedChineseName(t *testing.T) {
+	if got := lootChineseNames["CHEST_PROMOTION"]; got != "紫色宝箱" {
+		t.Fatalf("CHEST_PROMOTION name = %q, want 紫色宝箱", got)
+	}
+}
+
+func TestRewardTitleFiltersClientPlaceholders(t *testing.T) {
+	for _, fixture := range []string{
+		"Placeholder Name for Reward Group dO nOt TrAnSlAtE",
+		"PLACEHOLDER_NAME_FOR_REWARD_GROUP",
+		"REWARD GROUP PLACEHOLDER",
+	} {
+		if got := rewardTitle(fixture); got != "待领取奖励" {
+			t.Fatalf("rewardTitle(%q) = %q", fixture, got)
+		}
+		if got := rewardDescription(fixture); got != "" {
+			t.Fatalf("rewardDescription(%q) = %q", fixture, got)
+		}
+	}
+	for _, fixture := range []string{"待选奖励", "K/DA ALL OUT 奖励", "2026 SEASON REWARD"} {
+		if got := rewardTitle(fixture); got != fixture {
+			t.Fatalf("valid reward title %q was replaced with %q", fixture, got)
+		}
+	}
+	for _, fixture := range []string{"完成一场对局后领取。", "Includes one skin shard", "2026 SEASON REWARD"} {
+		if got := rewardDescription(fixture); got != fixture {
+			t.Fatalf("valid reward description %q was replaced with %q", fixture, got)
+		}
+	}
+}
+
+func TestOptionalCapabilityCancellationIsNotFailure(t *testing.T) {
+	capability := optionalCapabilityError(EndpointCapability{Name: "pending-rewards"}, context.Canceled)
+	if capability.State != capabilityCanceled || capability.Detail != "" {
+		t.Fatalf("canceled optional capability = %#v", capability)
 	}
 }
 
