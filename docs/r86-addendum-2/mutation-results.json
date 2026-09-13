@@ -1,0 +1,130 @@
+[
+  {
+    "mutation": "wrong-lock-mode",
+    "file": "game_settings_lock.go",
+    "before": "mode = 0o444",
+    "after": "mode = 0o600",
+    "command": [
+      "go",
+      "test",
+      "-json",
+      "-overlay",
+      "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r86-add2-mutations-2j9meo9h/overlay.json",
+      ".",
+      "-run",
+      "^TestSettingsLockUsesTencentConfigAndRejectsSymlink$",
+      "-count=1"
+    ],
+    "killed": true,
+    "assertionEvidence": [
+      {
+        "test": "TestSettingsLockUsesTencentConfigAndRejectsSymlink",
+        "output": "=== RUN   TestSettingsLockUsesTencentConfigAndRejectsSymlink\n    r50_suite_test.go:271: lock status = 503, body = 设置文件只读状态未生效或无法确认，请刷新后重试\n--- FAIL: TestSettingsLockUsesTencentConfigAndRejectsSymlink (0.00s)"
+      }
+    ]
+  },
+  {
+    "mutation": "verification-bypassed",
+    "file": "game_settings_lock.go",
+    "before": "if !status.SettingsKnown || status.SettingsLocked != request.Locked {",
+    "after": "if false {",
+    "command": [
+      "go",
+      "test",
+      "-json",
+      "-overlay",
+      "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r86-add2-mutations-2j9meo9h/overlay.json",
+      ".",
+      "-run",
+      "^TestSettingsLockRejectsUnverifiedResult$",
+      "-count=1"
+    ],
+    "killed": true,
+    "assertionEvidence": [
+      {
+        "test": "TestSettingsLockRejectsUnverifiedResult/lock-reverted",
+        "output": "=== RUN   TestSettingsLockRejectsUnverifiedResult/lock-reverted\n    game_settings_lock_test.go:81: unverified state response = 200 {\"connected\":true,\"region\":\"TENCENT\",\"installRoot\":\"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestSettingsLockRejectsUnverifiedResultlock-reverted2439389409/001/LeagueClient\",\"configRoot\":\"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestSettingsLockRejectsUnverifiedResultlock-reverted2439389409/001/Game/Config\",\"settingsFile\":\"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestSettingsLockRejectsUnverifiedResultlock-reverted2439389409/001/Game/Config/PersistedSettings.json\",\"settingsKnown\":true,\"settingsLocked\":false,\"uxState\":\"Running\"}\n        , want 503 verification failure\n--- FAIL: TestSettingsLockRejectsUnverifiedResult/lock-reverted (0.00s)"
+      },
+      {
+        "test": "TestSettingsLockRejectsUnverifiedResult/unlock-reverted",
+        "output": "=== RUN   TestSettingsLockRejectsUnverifiedResult/unlock-reverted\n    game_settings_lock_test.go:81: unverified state response = 200 {\"connected\":true,\"region\":\"TENCENT\",\"installRoot\":\"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestSettingsLockRejectsUnverifiedResultunlock-reverted150639423/001/LeagueClient\",\"configRoot\":\"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestSettingsLockRejectsUnverifiedResultunlock-reverted150639423/001/Game/Config\",\"settingsFile\":\"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestSettingsLockRejectsUnverifiedResultunlock-reverted150639423/001/Game/Config/PersistedSettings.json\",\"settingsKnown\":true,\"settingsLocked\":true,\"uxState\":\"Running\"}\n        , want 503 verification failure\n--- FAIL: TestSettingsLockRejectsUnverifiedResult/unlock-reverted (0.00s)"
+      },
+      {
+        "test": "TestSettingsLockRejectsUnverifiedResult/lock-file-missing",
+        "output": "=== RUN   TestSettingsLockRejectsUnverifiedResult/lock-file-missing\n    game_settings_lock_test.go:81: unverified state response = 200 {\"connected\":true,\"region\":\"TENCENT\",\"installRoot\":\"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestSettingsLockRejectsUnverifiedResultlock-file-missing3280687312/001/LeagueClient\",\"configRoot\":\"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestSettingsLockRejectsUnverifiedResultlock-file-missing3280687312/001/Game/Config\",\"settingsFile\":\"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestSettingsLockRejectsUnverifiedResultlock-file-missing3280687312/001/Game/Config/PersistedSettings.json\",\"settingsKnown\":false,\"settingsLocked\":false,\"uxState\":\"Running\",\"reason\":\"设置文件尚未生成或无法读取\"}\n        , want 503 verification failure\n--- FAIL: TestSettingsLockRejectsUnverifiedResult/lock-file-missing (0.00s)"
+      },
+      {
+        "test": "TestSettingsLockRejectsUnverifiedResult/unlock-file-missing",
+        "output": "=== RUN   TestSettingsLockRejectsUnverifiedResult/unlock-file-missing\n    game_settings_lock_test.go:81: unverified state response = 200 {\"connected\":true,\"region\":\"TENCENT\",\"installRoot\":\"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestSettingsLockRejectsUnverifiedResultunlock-file-missing3081681533/001/LeagueClient\",\"configRoot\":\"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestSettingsLockRejectsUnverifiedResultunlock-file-missing3081681533/001/Game/Config\",\"settingsFile\":\"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestSettingsLockRejectsUnverifiedResultunlock-file-missing3081681533/001/Game/Config/PersistedSettings.json\",\"settingsKnown\":false,\"settingsLocked\":false,\"uxState\":\"Running\",\"reason\":\"设置文件尚未生成或无法读取\"}\n        , want 503 verification failure\n--- FAIL: TestSettingsLockRejectsUnverifiedResult/unlock-file-missing (0.00s)"
+      }
+    ]
+  },
+  {
+    "mutation": "copy-.gocache",
+    "file": "desktop/build-fingerprint.test.cjs",
+    "before": "filter: (file) => !excludedDirectories.has(path.basename(file)),",
+    "after": "filter: (file) => path.basename(file) === \".gocache\" || !excludedDirectories.has(path.basename(file)),",
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "--test-name-pattern=R86 ADD2",
+      "/private/tmp/r86-add2-acceptance-r5RaHN/desktop/r86-add2-mutation-82gx_w25.cjs"
+    ],
+    "killed": true,
+    "assertionEvidence": [
+      "installer/.gocache must not be copied"
+    ]
+  },
+  {
+    "mutation": "copy-.gomodcache",
+    "file": "desktop/build-fingerprint.test.cjs",
+    "before": "filter: (file) => !excludedDirectories.has(path.basename(file)),",
+    "after": "filter: (file) => path.basename(file) === \".gomodcache\" || !excludedDirectories.has(path.basename(file)),",
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "--test-name-pattern=R86 ADD2",
+      "/private/tmp/r86-add2-acceptance-r5RaHN/desktop/r86-add2-mutation-8mb0vr4a.cjs"
+    ],
+    "killed": true,
+    "assertionEvidence": [
+      "installer/.gomodcache must not be copied"
+    ]
+  },
+  {
+    "mutation": "copy-node_modules",
+    "file": "desktop/build-fingerprint.test.cjs",
+    "before": "filter: (file) => !excludedDirectories.has(path.basename(file)),",
+    "after": "filter: (file) => path.basename(file) === \"node_modules\" || !excludedDirectories.has(path.basename(file)),",
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "--test-name-pattern=R86 ADD2",
+      "/private/tmp/r86-add2-acceptance-r5RaHN/desktop/r86-add2-mutation-0zmcxidq.cjs"
+    ],
+    "killed": true,
+    "assertionEvidence": [
+      "installer/node_modules must not be copied"
+    ]
+  },
+  {
+    "mutation": "copy-dist",
+    "file": "desktop/build-fingerprint.test.cjs",
+    "before": "filter: (file) => !excludedDirectories.has(path.basename(file)),",
+    "after": "filter: (file) => path.basename(file) === \"dist\" || !excludedDirectories.has(path.basename(file)),",
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "--test-name-pattern=R86 ADD2",
+      "/private/tmp/r86-add2-acceptance-r5RaHN/desktop/r86-add2-mutation-eddloo8n.cjs"
+    ],
+    "killed": true,
+    "assertionEvidence": [
+      "installer/dist must not be copied"
+    ]
+  }
+]

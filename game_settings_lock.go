@@ -197,6 +197,13 @@ func (a *app) handleSettingsLock(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "无法修改设置文件只读状态", http.StatusServiceUnavailable)
 		return
 	}
+	status := readRigStatus(r.Context(), client)
+	// Do not report success if the filesystem did not retain the requested state.
+	if !status.SettingsKnown || status.SettingsLocked != request.Locked {
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "verify-failed"})
+		http.Error(w, "设置文件只读状态未生效或无法确认，请刷新后重试", http.StatusServiceUnavailable)
+		return
+	}
 	a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "ok"})
-	respondJSON(w, readRigStatus(r.Context(), client))
+	respondJSON(w, status)
 }

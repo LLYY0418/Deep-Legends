@@ -271,8 +271,31 @@ func TestSettingsLockUsesTencentConfigAndRejectsSymlink(t *testing.T) {
 		t.Fatalf("lock status = %d, body = %s", recorder.Code, recorder.Body.String())
 	}
 	info, err := os.Stat(settingsFile)
-	if err != nil || info.Mode().Perm()&0o222 != 0 {
-		t.Fatalf("settings mode = %v, err = %v", info.Mode().Perm(), err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm()&0o222 != 0 {
+		t.Fatalf("settings mode = %v, want no write bits", info.Mode().Perm())
+	}
+	var status rigStatus
+	if err := json.Unmarshal(recorder.Body.Bytes(), &status); err != nil || !status.SettingsKnown || !status.SettingsLocked {
+		t.Fatalf("lock response = %s, err = %v", recorder.Body.String(), err)
+	}
+
+	recorder = httptest.NewRecorder()
+	a.handleSettingsLock(recorder, httptest.NewRequest(http.MethodPost, "/api/rig/settings-lock", strings.NewReader(`{"locked":false}`)))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("unlock status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	info, err = os.Stat(settingsFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm()&0o200 == 0 {
+		t.Fatalf("settings mode = %v, want owner writable", info.Mode().Perm())
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &status); err != nil || !status.SettingsKnown || status.SettingsLocked {
+		t.Fatalf("unlock response = %s, err = %v", recorder.Body.String(), err)
 	}
 
 	if err := os.Remove(settingsFile); err != nil {
@@ -282,13 +305,26 @@ func TestSettingsLockUsesTencentConfigAndRejectsSymlink(t *testing.T) {
 	if err := os.WriteFile(target, []byte(`{}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	targetInfo, err := os.Stat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Symlink(target, settingsFile); err != nil {
 		t.Skipf("symlink unavailable: %v", err)
 	}
-	recorder = httptest.NewRecorder()
-	a.handleSettingsLock(recorder, httptest.NewRequest(http.MethodPost, "/api/rig/settings-lock", strings.NewReader(`{"locked":false}`)))
-	if recorder.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("symlink status = %d, want 422", recorder.Code)
+	for _, payload := range []string{`{"locked":false}`, `{"locked":true}`} {
+		recorder = httptest.NewRecorder()
+		a.handleSettingsLock(recorder, httptest.NewRequest(http.MethodPost, "/api/rig/settings-lock", strings.NewReader(payload)))
+		if recorder.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("symlink status = %d, want 422 for %s", recorder.Code, payload)
+		}
+	}
+	info, err = os.Stat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != targetInfo.Mode().Perm() {
+		t.Fatalf("symlink target permissions changed: %v", info.Mode().Perm())
 	}
 }
 

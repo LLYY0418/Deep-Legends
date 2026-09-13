@@ -1,0 +1,128 @@
+{
+  "date": "2026-09-13",
+  "baseCommit": "a26c41ffc2d373836c15c73bee45178610c14e4e",
+  "scope": "isolated a26c41f plus the four listed code/test files only; concurrent R87 work excluded",
+  "environment": {
+    "platform": "Darwin arm64",
+    "go": "go version go1.24.5 darwin/arm64",
+    "node": "v24.14.1"
+  },
+  "verifiedFilesSHA256": {
+    "game_settings_lock.go": "f950e12f945a4289e713a28a0d28c5ce151d69459de149172a19c384b80fbb01",
+    "game_settings_lock_test.go": "0f73abf4b92ccd24163fb39ac166e23839eeb6fa2801a64048555e15e5f0bf95",
+    "r50_suite_test.go": "03dba0fde130e720c1c12cadf435995024f3e749a32ea896dc2973d6ffee4590",
+    "desktop/build-fingerprint.test.cjs": "4484c491e7f7484395810cf85e8b9db830c6b91680cf93587899bbe47e1d8fa0"
+  },
+  "baseline": {
+    "reportedPermissionFailureReproduced": false,
+    "focusedSettingsRepetitions": 10,
+    "focusedSettingsCommand": "go test -run 'TestSettingsLock' -count=10 .",
+    "full": {
+      "command": "go test -json ./...",
+      "pass": 1447,
+      "skip": 14,
+      "fail": 0,
+      "packageElapsedSeconds": 61.412,
+      "settingsPassCounts": {
+        "TestSettingsLockUsesTencentConfigAndRejectsSymlink": 1,
+        "TestSettingsLockRejectsAncestorSymlinkEscape": 1
+      },
+      "logSHA256": "77306e997a74ea02fcc3e4edd6f2a64e9c82b0f2a8ec7b64315a97f7a1141921"
+    }
+  },
+  "go": {
+    "command": "go test -json ./...",
+    "pass": 1452,
+    "skip": 14,
+    "fail": 0,
+    "packageElapsedSeconds": 60.537,
+    "settingsPassCounts": {
+      "TestSettingsLockRejectsUnverifiedResult/lock-reverted": 1,
+      "TestSettingsLockRejectsUnverifiedResult/unlock-reverted": 1,
+      "TestSettingsLockRejectsUnverifiedResult/lock-file-missing": 1,
+      "TestSettingsLockRejectsUnverifiedResult/unlock-file-missing": 1,
+      "TestSettingsLockRejectsUnverifiedResult": 1,
+      "TestSettingsLockUsesTencentConfigAndRejectsSymlink": 1,
+      "TestSettingsLockRejectsAncestorSymlinkEscape": 1
+    },
+    "logSHA256": "c29eafc6c0867bb14f563e89a04996368065fa62904244d433dfc420a0ecdfae"
+  },
+  "race": {
+    "command": "go test -race -json ./...",
+    "pass": 1452,
+    "skip": 14,
+    "fail": 0,
+    "packageElapsedSeconds": 115.724,
+    "settingsPassCounts": {
+      "TestSettingsLockRejectsUnverifiedResult/lock-reverted": 1,
+      "TestSettingsLockRejectsUnverifiedResult/unlock-reverted": 1,
+      "TestSettingsLockRejectsUnverifiedResult/lock-file-missing": 1,
+      "TestSettingsLockRejectsUnverifiedResult/unlock-file-missing": 1,
+      "TestSettingsLockRejectsUnverifiedResult": 1,
+      "TestSettingsLockUsesTencentConfigAndRejectsSymlink": 1,
+      "TestSettingsLockRejectsAncestorSymlinkEscape": 1
+    },
+    "logSHA256": "b028b1b3aa559f3ff74ea0827d5235a8a8428222bcb2bd83728ce7293ab863c3"
+  },
+  "settingsRepeatedRace": {
+    "command": "go test -race -json -run '^TestSettingsLock' -count=20 .",
+    "pass": 140,
+    "skip": 0,
+    "fail": 0,
+    "packageElapsedSeconds": 4.085,
+    "settingsPassCounts": {
+      "TestSettingsLockRejectsUnverifiedResult/lock-reverted": 20,
+      "TestSettingsLockRejectsUnverifiedResult/unlock-reverted": 20,
+      "TestSettingsLockRejectsUnverifiedResult/lock-file-missing": 20,
+      "TestSettingsLockRejectsUnverifiedResult/unlock-file-missing": 20,
+      "TestSettingsLockRejectsUnverifiedResult": 20,
+      "TestSettingsLockUsesTencentConfigAndRejectsSymlink": 20,
+      "TestSettingsLockRejectsAncestorSymlinkEscape": 20
+    },
+    "logSHA256": "4168b981ce43312528c2a6dc38ecf4eee94bd777a83e662a33387d4936c5bf1d"
+  },
+  "javascript": {
+    "tests": 595,
+    "pass": 594,
+    "fail": 0,
+    "skipped": 1,
+    "command": "node --test web/*.test.cjs desktop/*.test.cjs",
+    "elapsedSeconds": 260.4346455,
+    "skippedTest": "R86 Windows release stops on a real failing Go test and rejects an independent early build; requires Windows and PowerShell",
+    "logSHA256": "8e47a3507e4e459b1e023ae37726bf2ac778a454299d93b594a598aa11f57ad8"
+  },
+  "largeCacheExperiment": {
+    "unfiltered": {
+      "milliseconds": 174.719333,
+      "files": 806,
+      "bytes": 74789553
+    },
+    "filtered": {
+      "milliseconds": 57.86116700000002,
+      "files": 288,
+      "bytes": 7674545
+    },
+    "fingerprint": "86290076ea08",
+    "command": "DEEP_LEGENDS_LARGE_CACHE_TEST=1 node --test desktop/build-fingerprint.test.cjs",
+    "logSHA256": "79b5b976c41a6bfce91a9e88b751e02097808adb44e25735d72ed47fb97fcbd1"
+  },
+  "mutations": {
+    "total": 6,
+    "killed": 6
+  },
+  "otherPassingChecks": [
+    "go build ./...",
+    "go vet ./...",
+    "GOOS=windows go vet ./...",
+    "(cd installer && go test ./... && go vet ./... && GOOS=windows go vet ./...)",
+    "test -z \"$(gofmt -l .)\"",
+    "git diff --check"
+  ],
+  "notVerified": [
+    "original /sessions audit filesystem root cause",
+    "native Windows behavior",
+    "remote CI",
+    "concurrent R87 combined worktree"
+  ],
+  "originalWorklistSHA256": "ac07233644519da91aec914be296617ac2bcc9179f40107ac1acc66dd015f184"
+}
