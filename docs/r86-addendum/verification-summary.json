@@ -1,0 +1,53 @@
+{
+  "baseCommit": "65d7de0",
+  "scope": "isolated R86 addendum changes only; concurrent R87 excluded",
+  "go": {
+    "pass": 1447,
+    "skip": 14,
+    "fail": 0,
+    "packageElapsedSeconds": 49.279
+  },
+  "javascript": {
+    "total": 594,
+    "pass": 593,
+    "skip": 1,
+    "fail": 0,
+    "elapsedSeconds": 215.60315875,
+    "skipReason": "Windows-only release negative test on macOS"
+  },
+  "race": {
+    "passed": true,
+    "elapsedSeconds": 60.14
+  },
+  "buildVetInstallerWindowsCrossVet": true,
+  "windowsNativeExecuted": false,
+  "remoteCIRun": false,
+  "mutations": {
+    "hexdataProtectionDisabled": {
+      "repetitions": 20,
+      "killed": 20
+    },
+    "blockingSemaphoreSend": {
+      "repetitions": 5,
+      "killed": 5
+    },
+    "independentFullRenderRoutes": [
+      "detail",
+      "metric",
+      "damage",
+      "timeline"
+    ],
+    "otherInlineBypasses": [
+      "timeline automatic retry",
+      "hidden-state loss",
+      "dead selector appended",
+      "dialog double zoom"
+    ]
+  },
+  "championsTests": {
+    "pass": 234,
+    "fail": 0,
+    "skip": 0,
+    "elapsedSeconds": 1.069565666
+  }
+}

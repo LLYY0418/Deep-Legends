@@ -1,0 +1,13 @@
+{
+  "baseCommit": "65d7de0857c19ef55a20f3664f2eabc4108b32c4",
+  "verificationScope": "base commit plus only R86 addendum changes; excludes concurrent R87 work",
+  "patchSHA256": "7e7e6cf9f54dcdb6fcf37ed17ef439abb85c9c73aa823d9cb35c57e1d0964413",
+  "files": {
+    "web/gameplay.js": "8f1d85e1b6cee4477b7e6ec091ae13c5e03693c1680dca36a80a055a286c3544",
+    "web/champions.css": "b82a148ddf1ce7ae1d621f861124516123409049f7730e0d34f6658daa8f5dbc",
+    "web/champions.test.cjs": "ea09d27e7d001c4f1fd99918fc25b0a440547273d02e0511833cb86e0e245510",
+    "desktop/overview-render.test.cjs": "d229ab5d9107541056a5c78e57b7886a853ae7427efb2bd19f880637c06e5606",
+    "r86_cache_test.go": "943eebf35abd5c09148f1dd684400d76eb3622dd2b99bf194e8f1b65ba1361c8",
+    "r86_disk_test.go": "26274b7eeb701855498a069c00e21bebe03f940663e63cad4dc22e2d16cc138b"
+  }
+}

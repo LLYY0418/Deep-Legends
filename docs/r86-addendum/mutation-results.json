@@ -1,0 +1,81 @@
+[
+  {
+    "item": "R86-ADD-2",
+    "test": "TestR86ChampionDiskMigrationPruneAndThrottle",
+    "mutation": {
+      "file": "champion_cache.go",
+      "before": "protected := strings.HasPrefix(item.Name(), \"hexdata-\")",
+      "after": "protected := false"
+    },
+    "command": [
+      "go",
+      "test",
+      "-json",
+      "-overlay",
+      "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r86-add-mutations-33wpknos/overlay.json",
+      ".",
+      "-run",
+      "^TestR86ChampionDiskMigrationPruneAndThrottle$",
+      "-count=20",
+      "-timeout=90s"
+    ],
+    "repetitions": 20,
+    "failed": 20,
+    "passed": 0,
+    "killedEveryTime": true,
+    "assertionEvidence": [
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle707637498/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle2444975865/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle3640271250/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle3365814705/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle608649384/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle3078735731/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle1591393959/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle3714803614/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle3964508267/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle519462741/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle3618753378/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle2555713248/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle172542617/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle3446981729/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle2309124280/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle3740026099/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle2507266562/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle2251769833/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle512275175/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory",
+      "r86_disk_test.go:114: prune deleted recovery data at its migrated path: lstat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR86ChampionDiskMigrationPruneAndThrottle3047965884/001/champion-data/hexdata-1f41734a3e9cf248c1cf0b5358b9113e4d9133ae36156a46a9eeacb8cafcba4c.json: no such file or directory"
+    ]
+  },
+  {
+    "item": "R86-ADD-3",
+    "test": "TestR86RiotQueuedDetailsExitWhileActiveRequestsHoldSlots",
+    "mutation": {
+      "file": "riot_api.go",
+      "before": "\t\t\tselect {\n\t\t\tcase semaphore <- struct{}{}:\n\t\t\tcase <-ctx.Done():\n\t\t\t\treturn\n\t\t\t}",
+      "after": "\t\t\tsemaphore <- struct{}{}"
+    },
+    "command": [
+      "go",
+      "test",
+      "-json",
+      "-overlay",
+      "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r86-add-mutations-33wpknos/overlay.json",
+      ".",
+      "-run",
+      "^TestR86RiotQueuedDetailsExitWhileActiveRequestsHoldSlots$",
+      "-count=5",
+      "-timeout=90s"
+    ],
+    "repetitions": 5,
+    "failed": 5,
+    "passed": 0,
+    "killedEveryTime": true,
+    "assertionEvidence": [
+      "r86_cache_test.go:289: detail workers=12, want 4 while all four active slots remain held; total labeled=13, want 5",
+      "r86_cache_test.go:289: detail workers=12, want 4 while all four active slots remain held; total labeled=13, want 5",
+      "r86_cache_test.go:289: detail workers=12, want 4 while all four active slots remain held; total labeled=13, want 5",
+      "r86_cache_test.go:289: detail workers=12, want 4 while all four active slots remain held; total labeled=13, want 5",
+      "r86_cache_test.go:289: detail workers=12, want 4 while all four active slots remain held; total labeled=13, want 5"
+    ]
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "command": "go test -race -json . -run 'TestR86RiotQueuedDetailsExitWhileActiveRequestsHoldSlots|TestR86ChampionDiskMigrationPruneAndThrottle' -count=20 -timeout=90s",
+  "passes": {
+    "TestR86RiotQueuedDetailsExitWhileActiveRequestsHoldSlots": 20,
+    "TestR86ChampionDiskMigrationPruneAndThrottle": 20
+  },
+  "failed": 0
+}

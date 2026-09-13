@@ -3034,8 +3034,7 @@
     } finally {
       state.matchTimelineFlights.delete(key);
       if (settled) {
-        tab.matchViewRevision = Number(tab.matchViewRevision || 0) + 1;
-        rerenderTab(tab);
+        rerenderMatch(tab, String(match.gameId));
       }
     }
   }
@@ -3353,14 +3352,49 @@
     list._matchData = current;
   }
 
-	function bindMatchDetailControls(container, tab, rerender) {
+  function rerenderMatch(tab, id) {
+    if (state.destroyed) return;
+    if (typeof tab?.externalRender === "function") return tab.externalRender(id);
+    if (tab.overlay && state.overlay[state.overlay.length - 1] !== tab) return;
+    const container = overviewContainer(tab);
+    const entry = [...(container?.querySelectorAll(".match-entry") || [])].find(item => item.dataset.matchId === id);
+    if (entry) replaceMatchEntry(entry, tab, () => rerenderTab(tab));
+  }
+
+  function replaceMatchEntry(entry, tab, rerender) {
+    const id = String(entry?.dataset.matchId || "");
+    const match = (tab.data?.matches || []).find((item) => String(item.gameId) === id);
+    if (!match || !entry.isConnected) {
+      rerender();
+      return;
+    }
+    // 展开、收起和卡内交互共用单卡替换，不改变 matchViewRevision；该 revision
+    // 只描述筛选、排序等会改变整张列表形态的状态。
+    const template = document.createElement("template");
+    template.innerHTML = renderMatch(match, tab.data?.player?.playerRef || "", tab).trim();
+    const replacement = template.content.firstElementChild;
+    if (!replacement) {
+      rerender();
+      return;
+    }
+    replacement.hidden = entry.hidden;
+    entry.replaceWith(replacement);
+    bindMatchEntryControls(replacement, tab, rerender);
+    bindMatchDetailControls(replacement, tab);
+    bindPlayerLinks(replacement, tab);
+    for (const replayButton of replacement.querySelectorAll("[data-replay]")) replayButton.addEventListener("click", () => replay(replayButton));
+    applyRenderedMetricStyles(replacement);
+    prepareImages(replacement);
+  }
+
+	function bindMatchDetailControls(container, tab) {
     for (const button of container.querySelectorAll("[data-timeline-retry]")) button.addEventListener("click", () => {
       const match = (tab.data?.matches || []).find((item) => String(item.gameId) === button.dataset.timelineRetry);
       if (!match) return;
       const subject = matchSubject(match, tab.data?.player?.playerRef);
       state.matchTimelines.delete(matchTimelineKey(match, subject, tab));
       void ensureMatchTimeline(match, subject, tab);
-      rerender();
+      rerenderMatch(tab, String(match.gameId));
     });
 
     for (const button of container.querySelectorAll("[data-match-detail]")) button.addEventListener("click", () => {
@@ -3370,24 +3404,21 @@
         const match = (tab.data?.matches || []).find((item) => String(item.gameId) === String(button.dataset.gameId));
         if (match) ensureMatchTimeline(match, matchSubject(match, tab.data?.player?.playerRef), tab);
       }
-      tab.matchViewRevision = Number(tab.matchViewRevision || 0) + 1;
-      rerender();
+      rerenderMatch(tab, String(button.dataset.gameId));
     });
 	  for (const button of container.querySelectorAll("[data-damage-sort]")) button.addEventListener("click", () => {
       const gameID = String(button.dataset.gameId || "");
       if (!gameID) return;
       const team = String(button.dataset.team || "");
       tab.damageSorts.set(`${gameID}:${team}`, button.dataset.damageSort === "damageTaken" ? "damage" : "damageTaken");
-		tab.matchViewRevision = Number(tab.matchViewRevision || 0) + 1;
-		rerender();
+		rerenderMatch(tab, gameID);
 	  });
 	  for (const button of container.querySelectorAll("[data-team-analysis-metric]")) button.addEventListener("click", () => {
 		const gameID = String(button.dataset.gameId || "");
 		const metric = String(button.dataset.teamAnalysisMetric || "");
 		if (!gameID || !TEAM_ANALYSIS_METRICS.some((item) => item.key === metric)) return;
 		tab.teamAnalysisMetrics.set(gameID, metric);
-		tab.matchViewRevision = Number(tab.matchViewRevision || 0) + 1;
-		rerender();
+		rerenderMatch(tab, gameID);
 	  });
 	  for (const group of container.querySelectorAll(".team-analysis-metrics")) group.addEventListener("keydown", (event) => {
 		if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -3398,8 +3429,9 @@
 		const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
 		const gameID = tabs[next].dataset.gameId;
 		const metric = tabs[next].dataset.teamAnalysisMetric;
+		const parent = tabs[next].closest(".match-entry")?.parentElement;
 		tabs[next].click();
-		container.querySelector(`[data-game-id="${gameID}"][data-team-analysis-metric="${metric}"]`)?.focus();
+		parent?.querySelector(`[data-game-id="${gameID}"][data-team-analysis-metric="${metric}"]`)?.focus();
 	  });
     for (const group of container.querySelectorAll(".match-detail-tabs")) group.addEventListener("keydown", (event) => {
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -3410,15 +3442,20 @@
       const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
       const gameID = tabs[next].dataset.gameId;
       const detail = tabs[next].dataset.matchDetail;
+      const parent = tabs[next].closest(".match-entry")?.parentElement;
       tabs[next].click();
-      container.querySelector(`[data-game-id="${gameID}"][data-match-detail="${detail}"]`)?.focus();
+      parent?.querySelector(`[data-game-id="${gameID}"][data-match-detail="${detail}"]`)?.focus();
     });
     // 已展开且停在“构建”页签的对局：确保时间线已请求（幂等，命中缓存
     // 或已在途时直接返回），避免请求被取消后一直停留在加载文案。
     for (const gameId of tab.openMatches) {
       if ((tab.matchDetailTabs.get(String(gameId)) || "overview") !== "build") continue;
       const match = (tab.data?.matches || []).find((item) => String(item.gameId) === String(gameId));
-      if (match) ensureMatchTimeline(match, matchSubject(match, tab.data?.player?.playerRef), tab);
+      if (!match) continue;
+      const subject = matchSubject(match, tab.data?.player?.playerRef);
+      // Rebinding a failed card is not a retry. Keep its retry button visible;
+      // explicit retry/reopening still calls ensureMatchTimeline above.
+      if (!state.matchTimelines.has(matchTimelineKey(match, subject, tab))) ensureMatchTimeline(match, subject, tab);
     }
   }
 
@@ -3433,26 +3470,7 @@
       } else {
         tab.openMatches.add(id);
       }
-      const match = (tab.data?.matches || []).find((item) => String(item.gameId) === id);
-      if (!match || !entry.isConnected) {
-        rerender();
-        return;
-      }
-      // 展开/收起只替换目标卡片，不改变 matchViewRevision；该 revision
-      // 只描述筛选、排序等会改变整张列表形态的状态。
-      const template = document.createElement("template");
-      template.innerHTML = renderMatch(match, tab.data?.player?.playerRef || "", tab).trim();
-      const replacement = template.content.firstElementChild;
-      if (!replacement) {
-        rerender();
-        return;
-      }
-      entry.replaceWith(replacement);
-      bindMatchEntryControls(replacement, tab, rerender);
-      bindMatchDetailControls(replacement, tab, rerender);
-      for (const replayButton of replacement.querySelectorAll("[data-replay]")) replayButton.addEventListener("click", () => replay(replayButton));
-      applyRenderedMetricStyles(replacement);
-      prepareImages(replacement);
+      replaceMatchEntry(entry, tab, rerender);
     });
   }
 
@@ -3468,7 +3486,7 @@
     bindRankedQueueControls(container, tab);
     bindMatchSentinel(container, tab);
     for (const entry of container.querySelectorAll(".match-entry")) bindMatchEntryControls(entry, tab, rerender);
-    bindMatchDetailControls(container, tab, rerender);
+    bindMatchDetailControls(container, tab);
     for (const button of container.querySelectorAll("[data-replay]")) button.addEventListener("click", () => replay(button));
   }
 
@@ -5575,7 +5593,7 @@
           entry.replaceWith(scope);
         } else container.innerHTML = matches.map((match) => renderMatch(match, playerRef, tab)).join("");
 		for (const button of scope.querySelectorAll("[data-toggle-match]:not(:disabled), [data-retry-match-detail]")) button.addEventListener("click", () => view.toggleMatch(button.dataset.toggleMatch || button.dataset.retryMatchDetail));
-        bindMatchDetailControls(scope, tab, () => view.render(id));
+        bindMatchDetailControls(scope, tab);
         for (const button of scope.querySelectorAll("[data-replay]:not(:disabled)")) button.addEventListener("click", () => replay(button));
         bindPlayerLinks(scope, tab);
         applyRenderedMetricStyles(scope);
@@ -5583,7 +5601,7 @@
       },
     };
     externalMatchViews.get(container)?.destroy?.();
-    tab.externalRender = () => view.render();
+    tab.externalRender = (id = "") => view.render(id);
     externalMatchViews.set(container, view);
     view.render();
     ensurePerks();

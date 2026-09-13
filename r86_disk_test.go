@@ -66,8 +66,15 @@ func TestR86ChampionDiskMigrationPruneAndThrottle(t *testing.T) {
 	if c.migrationErr != nil {
 		t.Fatal(c.migrationErr)
 	}
-	for _, key := range keys {
+	for i, key := range keys {
 		if _, err := c.readDisk(key); err != nil {
+			t.Fatal(err)
+		}
+		// Explicit, widely separated timestamps make the victim order deterministic:
+		// this assertion does not depend on filesystem mtime creation order or scheduling.
+		// Without the protection every recovery file MUST precede ordinary LRU victims.
+		old := time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC).Add(time.Duration(i) * time.Hour)
+		if err := os.Chtimes(c.pathFor(key), old, old); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -80,7 +87,13 @@ func TestR86ChampionDiskMigrationPruneAndThrottle(t *testing.T) {
 		if err = f.Truncate(400 << 10); err != nil {
 			t.Fatal(err)
 		}
-		f.Close()
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
+		newer := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC).Add(time.Duration(i) * time.Hour)
+		if err := os.Chtimes(f.Name(), newer, newer); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := c.pruneDisk(); err != nil {
 		t.Fatal(err)
@@ -97,6 +110,9 @@ func TestR86ChampionDiskMigrationPruneAndThrottle(t *testing.T) {
 		t.Fatal(total)
 	}
 	for _, key := range keys {
+		if info, err := os.Lstat(c.pathFor(key)); err != nil || !info.Mode().IsRegular() {
+			t.Fatalf("prune deleted recovery data at its migrated path: %v", err)
+		}
 		if _, err := c.readDisk(key); err != nil {
 			t.Fatal("prune deleted recovery data", err)
 		}

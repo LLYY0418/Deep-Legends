@@ -1409,7 +1409,7 @@ test("failed build timelines retry on reopening, successful timelines remain cac
   const match = {gameId:42}, subject = {participantId:2};
   let calls=0, renders=0;
   const api=async()=>{ calls++; if(calls===1) throw Error("temporary timeout"); return {available:true,itemGroups:[{}],skillOrder:[1]}; };
-  const ensure = new Function("state","api","riotTab","connected","matchTimelineKey","tabServerID","rerenderTab","recordTimelineClient",
+  const ensure = new Function("state","api","riotTab","connected","matchTimelineKey","tabServerID","rerenderMatch","recordTimelineClient",
     `return (${functionSource(gameplaySource,"ensureMatchTimeline")});`)(state,api,()=>true,()=>true,()=>"kr:42:2",()=>"",()=>renders++,()=>{});
   await ensure(match,subject,tab);
   assert.equal(state.matchTimelines.get("kr:42:2").available,false);
@@ -1419,6 +1419,192 @@ test("failed build timelines retry on reopening, successful timelines remain cac
   assert.equal(calls,2);
   assert.equal(renders,2);
   assert.equal(state.matchTimelineFlights.size,0);
+});
+
+test("R86 ADD-1 card detail, metric, legacy damage controls and timeline stay local at 200 matches", async () => {
+  async function check(mutation = "", external = false) {
+    const { window: w, errors } = bootDemoApp({ matchCount: 200, gameplaySourceTransform(source) {
+      const boundary = "function bindMatchDetailControls(container, tab) {";
+      assert.ok(source.includes(boundary));
+      // Test-only access to real renderers/bindings, not alternate implementations.
+      source = source.replace(boundary, `window.__r86CardTest = {activeTab, renderTeamAnalysis, bindMatchDetailControls, matchPlayerGroups};\n${boundary}`);
+      const selectors = { detail: "[data-match-detail]", metric: "[data-team-analysis-metric]", damage: "[data-damage-sort]" };
+      if (selectors[mutation]) {
+        source = source.replace(boundary, `${boundary}\nfor (const button of container.querySelectorAll(${JSON.stringify(selectors[mutation])})) button.addEventListener("click", () => { tab.matchViewRevision++; rerenderTab(tab); });`);
+      } else if (mutation === "timeline") {
+        source = source.replace("if (settled) {", "if (settled) { tab.matchViewRevision++; rerenderTab(tab);");
+      }
+      return source;
+    } });
+    try {
+      await settled();
+      const d = w.document, hooks = w.__r86CardTest, tab = hooks.activeTab();
+      const match = tab.data.matches.find(item => !hooks.matchPlayerGroups(item).arena);
+      assert.ok(match);
+      // Demo names intentionally omit player references; provide one clickable
+      // teammate so real link rebinding is covered as well as visual updates.
+      match.participants[1].playerRef = "r86-fixture-teammate";
+      const id = String(match.gameId);
+      let list = d.querySelector(".match-list");
+      if (external) {
+        list = d.createElement("div"); d.body.append(list);
+        w.deepLegendsMatchCards.mount(list, { matches: tab.data.matches, playerRef: tab.data.player.playerRef });
+      }
+      const card = () => list.querySelector(`[data-match-id="${id}"]`);
+      card().querySelector("[data-toggle-match]").click();
+      assert.ok(card().querySelector(".match-detail-tabs"));
+      let releaseTimeline;
+      const originalFetch = w.fetch;
+      w.fetch = (url, ...args) => String(url).startsWith("/api/gameplay/match-timeline")
+        ? new Promise(resolve => { releaseTimeline = resolve; }) : originalFetch(url, ...args);
+      async function bounded(label, action) {
+        const before = [...list.querySelectorAll(".match-entry")];
+        assert.equal(before.length, 200, label);
+        const parent = list.parentElement;
+        let calls = 0;
+        const create = d.createElement.bind(d);
+        d.createElement = (...args) => { calls++; return create(...args); };
+        try {
+          action();
+          await new Promise(resolve => setTimeout(resolve, 30));
+          assert.ok(list.isConnected && list.parentElement === parent, `${label}: match-list was replaced`);
+          const after = [...list.querySelectorAll(".match-entry")];
+          assert.equal(after.length, 200, label);
+          before.forEach((entry, index) => {
+            if (entry.dataset.matchId !== id) assert.equal(after[index], entry, `${label}: another card was replaced`);
+          });
+          assert.ok(calls < 500, `${label}: createElement=${calls}, budget <500`);
+        } finally { d.createElement = create; }
+      }
+      await bounded("detail-build", () => card().querySelector('[data-match-detail="build"]').click());
+      assert.equal(card().querySelector('[data-match-detail="build"]').getAttribute("aria-selected"), "true");
+      assert.equal(typeof releaseTimeline, "function", "a real timeline request must remain in flight");
+      await bounded("timeline", () => releaseTimeline(new w.Response(JSON.stringify({ available: true, itemGroups: [{ minute: 5, events: [{ itemId: 1036 }] }], skillOrder: [1, 2] }))));
+      assert.ok(card().querySelector(".timeline-route"), "settled timeline must update the current card");
+      await bounded("detail-team", () => card().querySelector('[data-match-detail="team"]').click());
+      await bounded("metric", () => card().querySelector('[data-team-analysis-metric="gold"]').click());
+      assert.equal(card().querySelector('[data-team-analysis-metric="gold"]').getAttribute("aria-selected"), "true");
+      await bounded("metric-keyboard", () => {
+        const current = card().querySelector('[data-team-analysis-metric="gold"]');
+        current.focus(); current.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+      });
+      assert.equal(d.activeElement?.dataset.teamAnalysisMetric, "damage");
+
+      if (!external) {
+        // Legacy damage-sort controls are generated only by renderTeamAnalysis's
+        // arena branch; current arena cards use renderArenaMatchOverview instead.
+        // Mount the REAL legacy output on this card to guard its still-present
+        // binding without inventing a new production UI route.
+        const arena = tab.data.matches.find(item => hooks.matchPlayerGroups(item).arena);
+        assert.ok(arena);
+        const legacy = d.createElement("div");
+        legacy.innerHTML = hooks.renderTeamAnalysis({ ...arena, gameId: match.gameId }, tab);
+        card().append(legacy); hooks.bindMatchDetailControls(legacy, tab);
+        const damage = legacy.querySelector("[data-damage-sort]");
+        assert.ok(damage);
+        const key = `${id}:${damage.dataset.team}`;
+        await bounded("damage", () => damage.click());
+        assert.equal(tab.damageSorts.get(key), "damageTaken");
+      }
+      await bounded("detail-keyboard", () => {
+        const current = card().querySelector('[data-match-detail="team"]');
+        current.focus(); current.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+      });
+      assert.equal(d.activeElement?.dataset.matchDetail, "overview");
+      const player = [...card().querySelectorAll("[data-player-ref]")].find(button => button.dataset.playerRef !== tab.data.player.playerRef);
+      assert.ok(player, "expanded details need another player's clickable name");
+      const playerRef = player.dataset.playerRef;
+      player.click();
+      if (external) assert.equal(d.getElementById("player-overlay").hidden, false);
+      else assert.equal(hooks.activeTab().playerRef, playerRef, "single-card replacement must rebind player links");
+      // Opening a player starts loadOverview; let that real navigation settle
+      // before closing jsdom, rather than accepting teardown TypeErrors as kills.
+      await settled();
+      assert.deepEqual(errors, []);
+    } finally { w.close(); }
+  }
+  await check();
+  await check("", true);
+  for (const mutant of ["detail", "metric", "damage", "timeline"]) {
+    await assert.rejects(check(mutant), error => error.name === "AssertionError" && /match-list was replaced|another card was replaced|createElement=/.test(error.message), `${mutant} independent full-render bypass must fail the DOM guard`);
+  }
+});
+
+test("R86 ADD optional cs-dialog computed zoom stays one inside the zoomed app frame", () => {
+  function check(css) {
+    const dom = new JSDOM(`<style>${appStyles}</style><style>${css}</style><div class="app-frame" id="app-frame"><div class="cs-dialog"></div></div>`);
+    try {
+      for (const zoom of [1, 2, 2.5]) {
+        dom.window.document.documentElement.style.setProperty("--ui-zoom", String(zoom));
+        assert.equal(dom.window.getComputedStyle(dom.window.document.querySelector(".cs-dialog")).zoom, "1");
+      }
+    } finally { dom.window.close(); }
+  }
+  check(suiteStyles);
+  assert.throws(() => check(`${suiteStyles}\n.cs-dialog { zoom: var(--ui-zoom, 1); }`), { name: "AssertionError" });
+});
+
+test("R86 ADD-1 failed timelines wait for explicit retry and keep unrelated cards", async () => {
+  async function check(mutate = false) {
+    const { window: w, errors } = bootDemoApp({ gameplaySourceTransform: source => mutate
+      ? source.replace("if (!state.matchTimelines.has(matchTimelineKey(match, subject, tab)))", "if (true)") : source });
+    try {
+      await settled();
+      const d = w.document, list = d.querySelector(".match-list");
+      const initial = [...list.querySelectorAll(".match-entry")];
+      const id = initial[0].dataset.matchId;
+      const card = () => list.querySelector(`[data-match-id="${id}"]`);
+      card().querySelector("[data-toggle-match]").click();
+      let requests = 0;
+      const originalFetch = w.fetch;
+      w.fetch = (url, ...args) => String(url).startsWith("/api/gameplay/match-timeline")
+        ? Promise.resolve(new w.Response(JSON.stringify(++requests === 1
+          ? { available: false, detail: "fixture upstream unavailable" }
+          : { available: true, itemGroups: [{ minute: 5, events: [{ itemId: 1036 }] }] }))) : originalFetch(url, ...args);
+      card().querySelector('[data-match-detail="build"]').click();
+      await new Promise(resolve => setTimeout(resolve, 60));
+      assert.equal(requests, 1, "rendering a failure must not silently retry it");
+      assert.ok(card().querySelector("[data-timeline-retry]"));
+      card().querySelector("[data-timeline-retry]").click();
+      await new Promise(resolve => setTimeout(resolve, 60));
+      assert.equal(requests, 2);
+      assert.ok(card().querySelector(".timeline-route"));
+      assert.equal(d.querySelector(".match-list"), list);
+      const after = [...list.querySelectorAll(".match-entry")];
+      initial.forEach((entry, index) => { if (entry.dataset.matchId !== id) assert.ok(after[index] === entry, "retry replaced an unrelated card"); });
+      assert.deepEqual(errors, []);
+    } finally { w.close(); }
+  }
+  await check();
+  await assert.rejects(check(true), { name: "AssertionError", message: /rendering a failure must not silently retry it/ });
+});
+
+test("R86 ADD-1 late timeline cannot reveal a filtered-out card", async () => {
+  async function check(mutate = false) {
+    const { window: w } = bootDemoApp({ matchCount: 200, gameplaySourceTransform: source => mutate
+      ? source.replace("replacement.hidden = entry.hidden;", "replacement.hidden = false;") : source });
+    try {
+      await settled();
+      const d = w.document, list = d.querySelector(".match-list");
+      const entry = list.querySelector(".match-entry"), id = entry.dataset.matchId;
+      const card = () => list.querySelector(`[data-match-id="${id}"]`);
+      entry.querySelector("[data-toggle-match]").click();
+      let release;
+      const original = w.fetch;
+      w.fetch = (url, ...args) => String(url).startsWith("/api/gameplay/match-timeline")
+        ? new Promise(resolve => { release = resolve; }) : original(url, ...args);
+      card().querySelector('[data-match-detail="build"]').click();
+      d.querySelector('[data-match-filter="arena"]').click();
+      assert.equal(card().hidden, true, "the ordinary match must first be filtered out");
+      const others = [...list.querySelectorAll(".match-entry")].filter(node => node.dataset.matchId !== id);
+      release(new w.Response(JSON.stringify({ available: true })));
+      await new Promise(resolve => setTimeout(resolve, 60));
+      assert.equal(card().hidden, true, "late timeline must retain the filter's hidden state");
+      assert.ok(others.every(node => node.isConnected));
+    } finally { w.close(); }
+  }
+  await check();
+  await assert.rejects(check(true), { name: "AssertionError", message: /late timeline must retain the filter's hidden state/ });
 });
 
 test("R86 hero search preserves input and coalesces five keystrokes (including bypass mutation)", async () => {

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"runtime/pprof"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -181,6 +183,120 @@ func TestR86RiotOverviewCancellationStopsQueuedDetails(t *testing.T) {
 	if got := len(provider.longWindow); got > 12 {
 		t.Fatalf("quota reservations=%d, want <=8 details + 4 profile requests", got)
 	}
+}
+
+func TestR86RiotQueuedDetailsExitWhileActiveRequestsHoldSlots(t *testing.T) {
+	t.Setenv("RIOT_API_KEY", "RGAPI-test")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	started := make(chan struct{}, 4)
+	release := make(chan struct{})
+	finished := make(chan error, 1)
+	var releaseOnce sync.Once
+	defer releaseOnce.Do(func() { close(release) })
+	var entered, completed atomic.Int32
+	champions := newChampionProvider()
+	champions.championMeta = map[int]championMetadata{1: {NameZH: "测试"}}
+	champions.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		body := "[]"
+		switch {
+		case strings.Contains(r.URL.Path, "/lol/summoner/v4/"):
+			body = `{"puuid":"subject","summonerLevel":100}`
+		case strings.HasSuffix(r.URL.Path, "/ids"):
+			body = `["KR_1","KR_2","KR_3","KR_4","KR_5","KR_6","KR_7","KR_8","KR_9","KR_10","KR_11","KR_12"]`
+		case strings.Contains(r.URL.Path, "/lol/match/v5/matches/"):
+			entered.Add(1)
+			started <- struct{}{}
+			// Deliberately keep in-flight HTTP work alive after cancellation, until
+			// the test releases it. Bottom-layer p.wait cannot free these four slots.
+			<-release
+			completed.Add(1)
+			body = `{"metadata":{"matchId":"fixture"},"info":{"gameId":1,"participants":[]}}`
+		}
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
+	})}
+	a := &app{riot: newRiotProvider(champions)}
+	// Goroutines inherit pprof labels. Count only this invocation's detail workers,
+	// not process-wide NumGoroutine, stack addresses, or a fragile funcN ordinal.
+	pprof.Do(ctx, pprof.Labels("r86-add-3", t.Name()), func(ctx context.Context) {
+		go func() {
+			_, err := a.loadRiotOverview(ctx, gameplayReference{PlayerRef: "subject", Region: riotRegionKR}, 1, 12)
+			finished <- err
+		}()
+	})
+	t.Cleanup(func() {
+		cancel()
+		releaseOnce.Do(func() { close(release) })
+		select {
+		case err := <-finished:
+			if !errors.Is(err, context.Canceled) || completed.Load() != 4 {
+				t.Errorf("active requests did not finish normally after release: completed=%d err=%v", completed.Load(), err)
+			}
+		case <-time.After(3 * time.Second):
+			t.Error("overview workers leaked after releasing the fake upstream")
+		}
+	})
+	for i := 0; i < 4; i++ {
+		select {
+		case <-started:
+		case <-time.After(3 * time.Second):
+			t.Fatal("could not fill the four detail slots")
+		}
+	}
+	workers := func() (details, labeled int) {
+		var profile bytes.Buffer
+		if err := pprof.Lookup("goroutine").WriteTo(&profile, 1); err != nil {
+			t.Fatal(err)
+		}
+		for _, stack := range strings.Split(profile.String(), "\n\n") {
+			if !strings.Contains(stack, `"r86-add-3":"`+t.Name()+`"`) {
+				continue
+			}
+			var count int
+			var header string
+			for _, line := range strings.Split(stack, "\n") {
+				if strings.Contains(line, " @ ") {
+					header = line
+					break
+				}
+			}
+			if _, err := fmt.Sscanf(header, "%d @", &count); err != nil {
+				t.Fatalf("cannot parse labeled goroutine count: %v\n%s", err, stack)
+			}
+			labeled += count
+			if strings.Contains(stack, "loadRiotOverview.func") {
+				details += count
+			}
+		}
+		return details, labeled
+	}
+	waitForWorkers := func(want int) {
+		t.Helper()
+		deadline := time.Now().Add(2 * time.Second)
+		for {
+			got, labeled := workers()
+			if got == want && labeled == want+1 { // Include the waiting overview parent.
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("detail workers=%d, want %d while all four active slots remain held; total labeled=%d, want %d", got, want, labeled, want+1)
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}
+	waitForWorkers(12) // Four active HTTP requests + eight semaphore waiters.
+	cancel()
+	waitForWorkers(4) // A bare semaphore send leaves all twelve alive and MUST fail.
+	if entered.Load() != 4 || completed.Load() != 0 {
+		t.Fatalf("active requests were affected: entered=%d completed=%d", entered.Load(), completed.Load())
+	}
+	select {
+	case err := <-finished:
+		finished <- err // Keep cleanup able to inspect the terminal result.
+		t.Fatal("overview returned before the four active requests were released")
+	default:
+	}
+	// Keep the four requests blocked through every assertion; cleanup releases them.
 }
 
 func TestR86PlayAgainEarlierPhaseRearmsWithoutDuplicateOrPostponement(t *testing.T) {

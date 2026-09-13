@@ -11,6 +11,22 @@ const appScript = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
 const appStyles = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
 const script = fs.readFileSync(path.join(__dirname, "champions.js"), "utf8");
 const styles = fs.readFileSync(path.join(__dirname, "champions.css"), "utf8");
+
+test("R86 ADD-4 retired synergy panel selector stays absent without removing shared card styles", () => {
+  const retired = ["arena", "synergy", "panel"].join("-");
+  function check(css) {
+    const dom = new JSDOM(`<style>${css}</style><div class="champion-list-card"></div>`);
+    try {
+      const rules = [...dom.window.document.styleSheets[0].cssRules];
+      assert.ok(!rules.some(rule => rule.selectorText?.split(",").some(selector => selector.trim() === `.${retired}`)));
+      for (const selector of [".champion-list-card", ".augment-directory", ".recommendation-section"]) {
+        assert.ok(rules.some(rule => rule.selectorText?.split(",").map(part => part.trim()).includes(selector) && rule.style.getPropertyValue("overflow") === "hidden"));
+      }
+    } finally { dom.window.close(); }
+  }
+  check(styles);
+  assert.throws(() => check(`${styles}\n.${retired} { overflow: hidden; }`), { name: "AssertionError" });
+});
 const gameplayScript = fs.readFileSync(path.join(__dirname, "gameplay.js"), "utf8");
 const gameplayStyles = fs.readFileSync(path.join(__dirname, "gameplay.css"), "utf8");
 const sharedBuildStyles = fs.readFileSync(path.join(__dirname, "build-item-row.css"), "utf8");

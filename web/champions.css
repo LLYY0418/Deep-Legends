@@ -41,7 +41,7 @@
 .champion-mode-tab span { font-size: 14px; font-weight: 750; }
 .champion-mode-tab small { color: var(--muted); font-size: 10px; font-weight: 500; }
 
-.champion-list-card, .augment-directory, .arena-synergy-panel, .recommendation-section {
+.champion-list-card, .augment-directory, .recommendation-section {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
