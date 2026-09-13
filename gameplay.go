@@ -105,6 +105,12 @@ type overviewPhaseTimings struct {
 	started time.Time
 	last    time.Time
 	values  map[string]int64
+	spans   map[string][]overviewPhaseSpan
+}
+
+type overviewPhaseSpan struct {
+	started  time.Time
+	finished time.Time
 }
 
 var overviewPhaseNames = []string{
@@ -117,7 +123,7 @@ func newOverviewPhaseTimings(started time.Time) *overviewPhaseTimings {
 	for _, name := range overviewPhaseNames {
 		values[name] = 0
 	}
-	return &overviewPhaseTimings{started: started, last: started, values: values}
+	return &overviewPhaseTimings{started: started, last: started, values: values, spans: make(map[string][]overviewPhaseSpan)}
 }
 
 func (p *overviewPhaseTimings) mark(name string) {
@@ -140,10 +146,11 @@ func (p *overviewPhaseTimings) markSpan(name string, started, finished time.Time
 	}
 	p.mu.Lock()
 	p.values[name] += finished.Sub(started).Milliseconds()
+	p.spans[name] = append(p.spans[name], overviewPhaseSpan{started: started, finished: finished})
 	p.mu.Unlock()
 }
 
-func (p *overviewPhaseTimings) snapshot(now time.Time) map[string]int64 {
+func (p *overviewPhaseTimings) snapshot(now time.Time) map[string]any {
 	if p == nil {
 		return nil
 	}
@@ -153,11 +160,21 @@ func (p *overviewPhaseTimings) snapshot(now time.Time) map[string]int64 {
 	// every millisecond is accounted for and total stays directly comparable.
 	p.values["serialize"] += now.Sub(p.last).Milliseconds()
 	p.last = now
-	result := make(map[string]int64, len(p.values)+1)
+	result := make(map[string]any, len(p.values)+2)
 	for _, name := range overviewPhaseNames {
 		result[name] = p.values[name]
 	}
 	result["total"] = now.Sub(p.started).Milliseconds()
+	spans := make(map[string][][2]int64, len(p.spans))
+	for name, entries := range p.spans {
+		for _, entry := range entries {
+			spans[name] = append(spans[name], [2]int64{
+				entry.started.Sub(p.started).Milliseconds(),
+				entry.finished.Sub(p.started).Milliseconds(),
+			})
+		}
+	}
+	result["spans"] = spans
 	return result
 }
 
@@ -1041,6 +1058,11 @@ type recentRankedSampleSet struct {
 	ByQueue map[int64][]gameplayMatch
 }
 
+type recentRankedResult struct {
+	value          recentRankedSampleSet
+	started, ended time.Time
+}
+
 func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, current Summoner, reference gameplayReference, begIndex, count int, matchFilter string, force bool) gameplayOverview {
 	reference = normalizeGameplayReference(reference)
 	if reference.Region == "" && reference.ServerID == "" {
@@ -1166,21 +1188,27 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		stats, progress, _, byQueue := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
 		seasonCh <- seasonResult{stats, progress, byQueue, started, time.Now()}
 	}()
-	var rankCh chan rankScoreEntry
-	var masteryCh chan struct {
-		value      map[int64]ChampionMastery
-		capability EndpointCapability
+	type rankResult struct {
+		value          rankScoreEntry
+		started, ended time.Time
 	}
+	type masteryResult struct {
+		value          map[int64]ChampionMastery
+		capability     EndpointCapability
+		started, ended time.Time
+	}
+	var rankCh chan rankResult
+	var masteryCh chan masteryResult
 	if begIndex == 0 && ctx.Err() == nil {
-		rankCh = make(chan rankScoreEntry, 1)
+		rankCh = make(chan rankResult, 1)
 		go func() {
-			rankCh <- a.playerRankScore(ctx, client, playerRef, isCurrent, reference.ServerID, reference.Privacy)
+			started := time.Now()
+			value := a.playerRankScore(ctx, client, playerRef, isCurrent, reference.ServerID, reference.Privacy)
+			rankCh <- rankResult{value: value, started: started, ended: time.Now()}
 		}()
-		masteryCh = make(chan struct {
-			value      map[int64]ChampionMastery
-			capability EndpointCapability
-		}, 1)
+		masteryCh = make(chan masteryResult, 1)
 		go func() {
+			started := time.Now()
 			capability := EndpointCapability{Name: "champion-mastery", Path: "/lol-champion-mastery/v1/{player}/champion-mastery"}
 			value := map[int64]ChampionMastery{}
 			if isRemoteTencentServer(client, reference.ServerID) {
@@ -1190,10 +1218,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 				value, capability = NewChampionMasteryAPI(client).AllContext(ctx, playerRef)
 				capability.Path = "/lol-champion-mastery/v1/{player}/champion-mastery"
 			}
-			masteryCh <- struct {
-				value      map[int64]ChampionMastery
-				capability EndpointCapability
-			}{value, capability}
+			masteryCh <- masteryResult{value: value, capability: capability, started: started, ended: time.Now()}
 		}()
 	}
 	queue := <-queueCh
@@ -1203,8 +1228,18 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	phases.markSpan("champion_names", namesResultValue.started, namesResultValue.finished)
 	detailedStarted := time.Now()
 	matches, historyCapabilities, pagination := a.loadDetailedMatches(ctx, client, reference, playerRef, isCurrent, begIndex, count, matchFilter, names, queueLabels)
-	phases.markSpan("detailed_matches", detailedStarted, time.Now())
+	detailedFinished := time.Now()
+	phases.markSpan("detailed_matches", detailedStarted, detailedFinished)
 	capabilities = append(capabilities, historyCapabilities...)
+	var rankedCh chan recentRankedResult
+	if begIndex == 0 && ctx.Err() == nil {
+		rankedCh = make(chan recentRankedResult, 1)
+		go func() {
+			started := time.Now()
+			value := a.loadRecentRankedSamples(ctx, client, reference, playerRef, matchFilter, pagination, matches, names, queueLabels)
+			rankedCh <- recentRankedResult{value: value, started: started, ended: time.Now()}
+		}()
+	}
 	a.recordMatchModeClassifications(matches)
 	// 标注本地追踪到的排位胜点变化（仅当前登录玩家的场次有记录）。
 	if isCurrent {
@@ -1255,9 +1290,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	// ranks or player identity in the core overview response.
 	a.startSeasonStatsRefresh(client, reference, player, playerRef, names)
 
-	rankStarted := time.Now()
-	rankEntry := <-rankCh
-	phases.markSpan("ranks", rankStarted, time.Now())
+	rankResultValue := <-rankCh
+	phases.markSpan("ranks", rankResultValue.started, rankResultValue.ended)
+	rankEntry := rankResultValue.value
 	ranks := append([]gameplayRank(nil), rankEntry.ranks...)
 	rankMilestones, rankCapability := rankEntry.milestones, rankEntry.capability
 	ranks, rankCapability = a.applySeasonRankWinRateFallback(ranks, rankCapability, seasonByQueue)
@@ -1271,10 +1306,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	if isCurrent {
 		a.lpTracker.observe(playerRef, ranks)
 	}
-	masteryStarted := time.Now()
-	masteryResult := <-masteryCh
-	phases.markSpan("mastery", masteryStarted, time.Now())
-	masteryMap, masteryCapability := masteryResult.value, masteryResult.capability
+	masteryResultValue := <-masteryCh
+	phases.markSpan("mastery", masteryResultValue.started, masteryResultValue.ended)
+	masteryMap, masteryCapability := masteryResultValue.value, masteryResultValue.capability
 	windowMatches := matches
 	windowAvailable := len(matches) > 0
 	windowExhausted := false
@@ -1394,13 +1428,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	response.Capabilities = capabilities
 	response.Overall = aggregateMatches(matches, playerRef, nil)
 	recentWindowAfter := time.Now().Add(-recentWindowDays * 24 * time.Hour).UnixMilli()
-	recentRankedStarted := time.Now()
-	rankedCh := make(chan recentRankedSampleSet, 1)
-	go func() {
-		rankedCh <- a.loadRecentRankedSamples(ctx, client, reference, playerRef, matchFilter, pagination, matches, names, queueLabels)
-	}()
-	rankedSamples := <-rankedCh
-	phases.markSpan("recent_ranked", recentRankedStarted, time.Now())
+	rankedResult := <-rankedCh
+	phases.markSpan("recent_ranked", rankedResult.started, rankedResult.ended)
+	rankedSamples := rankedResult.value
 	rankedSampleMatches := append(append([]gameplayMatch(nil), rankedSamples.ByQueue[420]...), rankedSamples.ByQueue[440]...)
 	response.RecentRanked = recentRankedSummary(rankedSampleMatches, playerRef, nil)
 	windowReachedCutoff := len(windowMatches) > 0 && windowMatches[len(windowMatches)-1].CreatedAt < recentWindowAfter

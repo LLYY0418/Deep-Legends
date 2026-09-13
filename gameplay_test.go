@@ -279,6 +279,70 @@ func TestGameplayOverviewRecordsCompletePhaseTiming(t *testing.T) {
 	}
 }
 
+func TestGameplayOverviewOverlapsIndependentUpstreams(t *testing.T) {
+	a, publicRef, _ := newGameplayOverviewSGPFixture(t, true)
+	store := &localStore{root: t.TempDir()}
+	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a.storage = store
+	a.sgp.observe = a.recordDiagnostic
+
+	originalSGPTransport := a.sgp.http.Transport
+	var delayedSGP atomic.Bool
+	a.sgp.http.Transport = gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if strings.Contains(request.URL.Path, "/match-history-query/") && delayedSGP.CompareAndSwap(false, true) {
+			time.Sleep(150 * time.Millisecond)
+		}
+		return originalSGPTransport.RoundTrip(request)
+	})
+	originalLCUTransport := a.lcu.http.Transport
+	a.lcu.http.Transport = gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if strings.Contains(request.URL.Path, "/lol-ranked/") || strings.Contains(request.URL.Path, "/lol-champion-mastery/") {
+			time.Sleep(150 * time.Millisecond)
+		}
+		return originalLCUTransport.RoundTrip(request)
+	})
+
+	started := time.Now()
+	callGameplayOverviewForTest(t, a, publicRef)
+	if elapsed := time.Since(started); elapsed >= 400*time.Millisecond {
+		t.Fatalf("independent overview upstreams were serialized: elapsed=%s", elapsed)
+	}
+
+	data, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var phases map[string]any
+	for _, line := range bytes.Split(bytes.TrimSpace(data), []byte("\n")) {
+		var event map[string]any
+		if json.Unmarshal(line, &event) == nil && event["event"] == "overview_phases_ms" {
+			phases, _ = event["load_phases_ms"].(map[string]any)
+		}
+	}
+	if phases == nil {
+		t.Fatalf("missing phase diagnostics: %s", data)
+	}
+	span := func(name string) [2]float64 {
+		values, _ := phases["spans"].(map[string]any)
+		entries, _ := values[name].([]any)
+		if len(entries) == 0 {
+			t.Fatalf("phase %q has no measured span: %#v", name, phases["spans"])
+		}
+		pair, ok := entries[0].([]any)
+		if !ok || len(pair) != 2 {
+			t.Fatalf("phase %q span has unexpected shape: %#v", name, entries[0])
+		}
+		return [2]float64{pair[0].(float64), pair[1].(float64)}
+	}
+	overlaps := func(left, right [2]float64) bool { return left[0] < right[1] && right[0] < left[1] }
+	detailed, ranks, mastery := span("detailed_matches"), span("ranks"), span("mastery")
+	if !overlaps(detailed, ranks) || !overlaps(detailed, mastery) {
+		t.Fatalf("expected detailed matches to overlap ranks and mastery: detailed=%v ranks=%v mastery=%v", detailed, ranks, mastery)
+	}
+}
+
 func TestGameplayOverviewReturnsPartialBeforeTwentySeconds(t *testing.T) {
 	a, publicRef, _ := newGameplayOverviewSGPFixture(t, true)
 	store := &localStore{root: t.TempDir()}
