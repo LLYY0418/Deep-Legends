@@ -131,6 +131,18 @@ func (p *overviewPhaseTimings) mark(name string) {
 	p.mu.Unlock()
 }
 
+// markSpan records an independently measured phase. Unlike mark, it is safe to
+// call from concurrent overview workers and therefore does not pretend that
+// overlapping upstream requests were serialized.
+func (p *overviewPhaseTimings) markSpan(name string, started, finished time.Time) {
+	if p == nil || started.IsZero() || finished.Before(started) {
+		return
+	}
+	p.mu.Lock()
+	p.values[name] += finished.Sub(started).Milliseconds()
+	p.mu.Unlock()
+}
+
 func (p *overviewPhaseTimings) snapshot(now time.Time) map[string]int64 {
 	if p == nil {
 		return nil
@@ -1122,12 +1134,76 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		reference = mergeGameplayReferences(gameplayReferenceFromSummoner(player), reference)
 	}
 	phases := overviewPhasesFromContext(ctx)
-	queueLabels := loadQueueLabels(client)
-	phases.mark("queue_labels")
-	names := a.overviewChampionNames(ctx)
-	phases.mark("champion_names")
+	type queueResult struct {
+		value             map[int64]string
+		started, finished time.Time
+	}
+	type namesResult struct {
+		value             map[int64]string
+		started, finished time.Time
+	}
+	type seasonResult struct {
+		stats             []gameplaySeasonChampionStat
+		progress          seasonStatsProgress
+		byQueue           map[int64]gameplayAggregate
+		started, finished time.Time
+	}
+	queueCh := make(chan queueResult, 1)
+	namesCh := make(chan namesResult, 1)
+	seasonCh := make(chan seasonResult, 1)
+	go func() {
+		started := time.Now()
+		value := loadQueueLabelsContext(ctx, client)
+		queueCh <- queueResult{value, started, time.Now()}
+	}()
+	go func() {
+		started := time.Now()
+		value := a.overviewChampionNames(ctx)
+		namesCh <- namesResult{value, started, time.Now()}
+	}()
+	go func() {
+		started := time.Now()
+		stats, progress, _, byQueue := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
+		seasonCh <- seasonResult{stats, progress, byQueue, started, time.Now()}
+	}()
+	var rankCh chan rankScoreEntry
+	var masteryCh chan struct {
+		value      map[int64]ChampionMastery
+		capability EndpointCapability
+	}
+	if begIndex == 0 && ctx.Err() == nil {
+		rankCh = make(chan rankScoreEntry, 1)
+		go func() {
+			rankCh <- a.playerRankScore(ctx, client, playerRef, isCurrent, reference.ServerID, reference.Privacy)
+		}()
+		masteryCh = make(chan struct {
+			value      map[int64]ChampionMastery
+			capability EndpointCapability
+		}, 1)
+		go func() {
+			capability := EndpointCapability{Name: "champion-mastery", Path: "/lol-champion-mastery/v1/{player}/champion-mastery"}
+			value := map[int64]ChampionMastery{}
+			if isRemoteTencentServer(client, reference.ServerID) {
+				capability.State = capabilityUnsupported
+				capability.Detail = "所选服务器暂未提供可核验的跨服熟练度接口"
+			} else {
+				value, capability = NewChampionMasteryAPI(client).AllContext(ctx, playerRef)
+				capability.Path = "/lol-champion-mastery/v1/{player}/champion-mastery"
+			}
+			masteryCh <- struct {
+				value      map[int64]ChampionMastery
+				capability EndpointCapability
+			}{value, capability}
+		}()
+	}
+	queue := <-queueCh
+	namesResultValue := <-namesCh
+	queueLabels, names := queue.value, namesResultValue.value
+	phases.markSpan("queue_labels", queue.started, queue.finished)
+	phases.markSpan("champion_names", namesResultValue.started, namesResultValue.finished)
+	detailedStarted := time.Now()
 	matches, historyCapabilities, pagination := a.loadDetailedMatches(ctx, client, reference, playerRef, isCurrent, begIndex, count, matchFilter, names, queueLabels)
-	phases.mark("detailed_matches")
+	phases.markSpan("detailed_matches", detailedStarted, time.Now())
 	capabilities = append(capabilities, historyCapabilities...)
 	a.recordMatchModeClassifications(matches)
 	// 标注本地追踪到的排位胜点变化（仅当前登录玩家的场次有记录）。
@@ -1149,8 +1225,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		Matches: matches, Capabilities: capabilities,
 		Pagination: pagination,
 	}
-	seasonStats, seasonProgress, _, seasonByQueue := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
-	phases.mark("season_snapshot")
+	season := <-seasonCh
+	phases.markSpan("season_snapshot", season.started, season.finished)
+	seasonStats, seasonProgress, seasonByQueue := season.stats, season.progress, season.byQueue
 	response.SeasonChampionStats = seasonStats
 	response.SeasonStatsProgress = seasonProgress
 	response.SeasonOverall = seasonStatsOverall(seasonStats)
@@ -1178,10 +1255,11 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	// ranks or player identity in the core overview response.
 	a.startSeasonStatsRefresh(client, reference, player, playerRef, names)
 
-	rankEntry := a.playerRankScore(ctx, client, playerRef, isCurrent, reference.ServerID, reference.Privacy)
+	rankStarted := time.Now()
+	rankEntry := <-rankCh
+	phases.markSpan("ranks", rankStarted, time.Now())
 	ranks := append([]gameplayRank(nil), rankEntry.ranks...)
 	rankMilestones, rankCapability := rankEntry.milestones, rankEntry.capability
-	phases.mark("ranks")
 	ranks, rankCapability = a.applySeasonRankWinRateFallback(ranks, rankCapability, seasonByQueue)
 	capabilities = append(capabilities, rankCapability)
 	response.RankMilestones = rankMilestonesForRegion(reference.Region, rankMilestones)
@@ -1193,6 +1271,10 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	if isCurrent {
 		a.lpTracker.observe(playerRef, ranks)
 	}
+	masteryStarted := time.Now()
+	masteryResult := <-masteryCh
+	phases.markSpan("mastery", masteryStarted, time.Now())
+	masteryMap, masteryCapability := masteryResult.value, masteryResult.capability
 	windowMatches := matches
 	windowAvailable := len(matches) > 0
 	windowExhausted := false
@@ -1303,18 +1385,8 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 			})
 		}
 	}
-	masteryMap := map[int64]ChampionMastery{}
-	masteryCapability := EndpointCapability{Name: "champion-mastery", Path: "/lol-champion-mastery/v1/{player}/champion-mastery"}
-	if remoteServer {
-		masteryCapability.State = capabilityUnsupported
-		masteryCapability.Detail = "所选服务器暂未提供可核验的跨服熟练度接口"
-	} else {
-		masteryMap, masteryCapability = NewChampionMasteryAPI(client).All(playerRef)
-		masteryCapability.Path = "/lol-champion-mastery/v1/{player}/champion-mastery"
-	}
 	capabilities = append(capabilities, masteryCapability)
 	masteries := normalizeMasteries(masteryMap, names, 6)
-	phases.mark("mastery")
 	response.Ranks = ranks
 	response.Masteries = masteries
 	applyMasteryBackgroundFallback(&response.Player, masteries)
@@ -1322,8 +1394,13 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	response.Capabilities = capabilities
 	response.Overall = aggregateMatches(matches, playerRef, nil)
 	recentWindowAfter := time.Now().Add(-recentWindowDays * 24 * time.Hour).UnixMilli()
-	rankedSamples := a.loadRecentRankedSamples(ctx, client, reference, playerRef, matchFilter, pagination, matches, names, queueLabels)
-	phases.mark("recent_ranked")
+	recentRankedStarted := time.Now()
+	rankedCh := make(chan recentRankedSampleSet, 1)
+	go func() {
+		rankedCh <- a.loadRecentRankedSamples(ctx, client, reference, playerRef, matchFilter, pagination, matches, names, queueLabels)
+	}()
+	rankedSamples := <-rankedCh
+	phases.markSpan("recent_ranked", recentRankedStarted, time.Now())
 	rankedSampleMatches := append(append([]gameplayMatch(nil), rankedSamples.ByQueue[420]...), rankedSamples.ByQueue[440]...)
 	response.RecentRanked = recentRankedSummary(rankedSampleMatches, playerRef, nil)
 	windowReachedCutoff := len(windowMatches) > 0 && windowMatches[len(windowMatches)-1].CreatedAt < recentWindowAfter
@@ -8210,21 +8287,27 @@ func (a *app) fallbackGameplayPerks(ctx context.Context) ([]gameplayPerkStyle, [
 }
 
 func loadQueueLabels(client *LCUClient) map[int64]string {
+	return loadQueueLabelsContext(context.Background(), client)
+}
+
+func loadQueueLabelsContext(ctx context.Context, client *LCUClient) map[int64]string {
 	if client == nil {
 		return map[int64]string{}
 	}
 	client.queueLabelsMu.Lock()
-	defer client.queueLabelsMu.Unlock()
 	if client.queueLabelsLoaded {
-		return cloneQueueLabels(client.queueLabels)
+		result := cloneQueueLabels(client.queueLabels)
+		client.queueLabelsMu.Unlock()
+		return result
 	}
+	client.queueLabelsMu.Unlock()
 	var queues []struct {
 		ID        int64  `json:"id"`
 		Name      string `json:"name"`
 		ShortName string `json:"shortName"`
 	}
 	result := make(map[int64]string)
-	if client.GetJSON("/lol-game-queues/v1/queues", &queues) == nil {
+	if client.GetJSONContext(ctx, "/lol-game-queues/v1/queues", &queues) == nil {
 		for _, queue := range queues {
 			name := strings.TrimSpace(queue.ShortName)
 			if name == "" {
@@ -8234,8 +8317,14 @@ func loadQueueLabels(client *LCUClient) map[int64]string {
 				result[queue.ID] = name
 			}
 		}
-		client.queueLabels = cloneQueueLabels(result)
-		client.queueLabelsLoaded = true
+		client.queueLabelsMu.Lock()
+		if !client.queueLabelsLoaded {
+			client.queueLabels = cloneQueueLabels(result)
+			client.queueLabelsLoaded = true
+		} else {
+			result = cloneQueueLabels(client.queueLabels)
+		}
+		client.queueLabelsMu.Unlock()
 	}
 	return result
 }

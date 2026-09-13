@@ -612,6 +612,10 @@ func (api InventoryAPI) SkinAcquisitionDates(summonerID int64, ownedIDs map[int6
 }
 
 func (api ChampionMasteryAPI) All(puuid string) (map[int64]ChampionMastery, EndpointCapability) {
+	return api.AllContext(context.Background(), puuid)
+}
+
+func (api ChampionMasteryAPI) AllContext(ctx context.Context, puuid string) (map[int64]ChampionMastery, EndpointCapability) {
 	path := "/lol-champion-mastery/v1/" + url.PathEscape(strings.TrimSpace(puuid)) + "/champion-mastery"
 	capability := EndpointCapability{Name: "champion-mastery", Path: path}
 	if strings.TrimSpace(puuid) == "" {

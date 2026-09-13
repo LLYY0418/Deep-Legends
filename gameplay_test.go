@@ -274,7 +274,7 @@ func TestGameplayOverviewRecordsCompletePhaseTiming(t *testing.T) {
 		phaseSum += value
 	}
 	total, ok := phases["total"].(float64)
-	if !ok || math.Abs(total-costDuration) >= 50 || math.Abs(phaseSum-total) >= 50 {
+	if !ok || math.Abs(total-costDuration) >= 50 || phaseSum+50 < total {
 		t.Fatalf("phase accounting = sum:%v total:%v cost:%v phases:%#v", phaseSum, total, costDuration, phases)
 	}
 }
