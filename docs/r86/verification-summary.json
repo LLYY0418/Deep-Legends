@@ -1,0 +1,84 @@
+{
+  "date": "2026-09-13",
+  "platform": "darwin/arm64",
+  "goVersion": "1.24.5",
+  "goTests": {
+    "pass": 1446,
+    "skip": 14,
+    "fail": 0,
+    "elapsedSeconds": 38.591
+  },
+  "race": {
+    "pass": true,
+    "elapsedSeconds": 52.814
+  },
+  "slowTests": [
+    {
+      "Test": "TestConvenienceReconnectPostsAndNotifies",
+      "Elapsed": 0
+    },
+    {
+      "Test": "TestGameplayOverviewReturnsPartialBeforeTwentySeconds",
+      "Elapsed": 0.01
+    },
+    {
+      "Test": "TestR56ReadyCheckAcceptIsOncePerWindowAndResetsForNextRound",
+      "Elapsed": 0.01
+    },
+    {
+      "Test": "TestSGPConnectionErrorsHaveStableKinds/timeout",
+      "Elapsed": 0
+    },
+    {
+      "Test": "TestSGPConnectionErrorsHaveStableKinds/dns",
+      "Elapsed": 0
+    },
+    {
+      "Test": "TestSGPConnectionErrorsHaveStableKinds/connection_refused",
+      "Elapsed": 0
+    },
+    {
+      "Test": "TestSGPConnectionErrorsHaveStableKinds/other",
+      "Elapsed": 0
+    },
+    {
+      "Test": "TestSGPConnectionErrorsHaveStableKinds",
+      "Elapsed": 0
+    },
+    {
+      "Test": "TestUpdateProgressAndStalledSourceFallback",
+      "Elapsed": 0.02
+    }
+  ],
+  "appendDiagnosticBenchmark": {
+    "iterations": 10000,
+    "nanosecondsPerOp": 2300,
+    "lstatCalls": 3
+  },
+  "goMutants": {
+    "total": 17,
+    "killed": 17
+  },
+  "windowsRuntimeTested": false,
+  "remoteCIRunVerified": false,
+  "buildVetInstallerWindowsCrossChecks": true,
+  "deadcodeTestUnreachable": 0,
+  "javascriptTests": {
+    "total": 589,
+    "pass": 588,
+    "skip": 1,
+    "fail": 0,
+    "elapsedSeconds": 151.839613334,
+    "skipReason": "Windows-only negative release test; current host is macOS",
+    "teardownTypeErrorObserved": false
+  },
+  "latestVerifiedSourceCommit": "504e999",
+  "worklistItems": 42,
+  "deferredDesignItems": [
+    "P1-6 persistent Riot match cache privacy model",
+    "P1-15(c) userData migration",
+    "P2-13 overview response contract",
+    "P2-14 update manifest trust root",
+    "P2-15 Git history rewrite"
+  ]
+}

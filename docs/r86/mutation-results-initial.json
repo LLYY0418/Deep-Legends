@@ -1,0 +1,72 @@
+[
+  {
+    "case": "P1-3 pool bypass",
+    "test": "TestProviderTransportPoolsReuseEightConnections",
+    "killed": true,
+    "exit": 1,
+    "output": "--- FAIL: TestProviderTransportPoolsReuseEightConnections (0.02s)\n    --- FAIL: TestProviderTransportPoolsReuseEightConnections/champion (0.00s)\n        transport_pool_test.go:41: production pool configuration drifted\nFAIL\nFAIL\tlol-loot-assistant\t1.149s\nFAIL\n"
+  },
+  {
+    "case": "P1-3 h2 bypass",
+    "test": "TestChampionTransportNegotiatesHTTP2",
+    "killed": true,
+    "exit": 1,
+    "output": "--- FAIL: TestChampionTransportNegotiatesHTTP2 (0.01s)\n    transport_pool_test.go:106: protocol = HTTP/1.1\nFAIL\nFAIL\tlol-loot-assistant\t0.380s\nFAIL\n"
+  },
+  {
+    "case": "P1-5 accounting bypass",
+    "test": "TestMatchHistoryCacheEvictsByBytes",
+    "killed": true,
+    "exit": 1,
+    "output": "--- FAIL: TestMatchHistoryCacheEvictsByBytes (0.00s)\n    sgp_api_test.go:893: history cache entries = 3, want 2\nFAIL\nFAIL\tlol-loot-assistant\t0.375s\nFAIL\n"
+  },
+  {
+    "case": "P1-6 independent detail route",
+    "test": "TestR86RiotMatchSingleflightAndCanceledWaiter",
+    "killed": true,
+    "exit": 1,
+    "output": "--- FAIL: TestR86RiotMatchSingleflightAndCanceledWaiter (0.03s)\n    r86_cache_test.go:54: same match fetched 8 times\nFAIL\nFAIL\tlol-loot-assistant\t0.412s\nFAIL\n"
+  },
+  {
+    "case": "P1-7 late deadline bypass",
+    "test": "TestR86PlayAgainEarlierPhaseRearmsWithoutDuplicateOrPostponement",
+    "killed": true,
+    "exit": 1,
+    "output": "--- FAIL: TestR86PlayAgainEarlierPhaseRearmsWithoutDuplicateOrPostponement (0.00s)\n    r86_cache_test.go:215: shorter phase was swallowed by dedupe\nFAIL\nFAIL\tlol-loot-assistant\t0.376s\nFAIL\n"
+  },
+  {
+    "case": "P1-14 negative cache bypass",
+    "test": "TestR86ChampionNamesNegativeCacheAndExpiry",
+    "killed": true,
+    "exit": 1,
+    "output": "--- FAIL: TestR86ChampionNamesNegativeCacheAndExpiry (0.00s)\n    r86_cache_test.go:106: upstream requests=5, want 1\nFAIL\nFAIL\tlol-loot-assistant\t0.377s\nFAIL\n"
+  },
+  {
+    "case": "P1-17 independent page cap",
+    "test": "TestMatchHistoryPhysicalPageCacheReusesTwentyBeforeFifty",
+    "killed": true,
+    "exit": 1,
+    "output": "--- FAIL: TestMatchHistoryPhysicalPageCacheReusesTwentyBeforeFifty (0.00s)\n    sgp_api_test.go:414: physical page requests = [0:20 20:20 40:10], want [0:20 20:30] (second logical request must add exactly 1 upstream call)\nFAIL\nFAIL\tlol-loot-assistant\t0.359s\nFAIL\n"
+  },
+  {
+    "case": "P1-18 independent global lock",
+    "test": "TestR86RankCacheDoesNotAcquireApplicationLock",
+    "killed": true,
+    "exit": 1,
+    "output": "--- FAIL: TestR86RankCacheDoesNotAcquireApplicationLock (2.00s)\n    r86_cache_test.go:143: rank cache blocked on application lock\nFAIL\nFAIL\tlol-loot-assistant\t2.377s\nFAIL\n"
+  },
+  {
+    "case": "P1-19 canceled reservation bypass",
+    "test": "TestR86CanceledQuotaWaitDoesNotReserveTokens",
+    "killed": true,
+    "exit": 1,
+    "output": "--- FAIL: TestR86CanceledQuotaWaitDoesNotReserveTokens (0.00s)\n    r86_cache_test.go:88: canceled reservation consumed quota\nFAIL\nFAIL\tlol-loot-assistant\t0.380s\nFAIL\n"
+  },
+  {
+    "case": "P2-12 snapshot prune bypass",
+    "test": "TestR86SnapshotsPruneByBytesAndCount",
+    "killed": true,
+    "exit": 1,
+    "output": "--- FAIL: TestR86SnapshotsPruneByBytesAndCount (0.01s)\n    --- FAIL: TestR86SnapshotsPruneByBytesAndCount/8388608 (0.01s)\n        r86_storage_test.go:43: count=35 bytes=293601280\n    --- FAIL: TestR86SnapshotsPruneByBytesAndCount/1 (0.01s)\n        r86_storage_test.go:43: count=35 bytes=35\nFAIL\nFAIL\tlol-loot-assistant\t0.388s\nFAIL\n"
+  }
+]
