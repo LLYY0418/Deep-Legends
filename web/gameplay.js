@@ -3381,6 +3381,40 @@
     }
   }
 
+  function bindMatchEntryControls(entry, tab, rerender) {
+    if (!entry) return;
+    for (const button of entry.querySelectorAll("[data-toggle-match]")) button.addEventListener("click", () => {
+      const id = String(button.dataset.toggleMatch || "");
+      if (tab.openMatches.has(id)) {
+        tab.openMatches.delete(id);
+        // 收起后清除页签记忆，重新展开时回到“概览”。
+        tab.matchDetailTabs.delete(id);
+      } else {
+        tab.openMatches.add(id);
+      }
+      const match = (tab.data?.matches || []).find((item) => String(item.gameId) === id);
+      if (!match || !entry.isConnected) {
+        rerender();
+        return;
+      }
+      // 展开/收起只替换目标卡片，不改变 matchViewRevision；该 revision
+      // 只描述筛选、排序等会改变整张列表形态的状态。
+      const template = document.createElement("template");
+      template.innerHTML = renderMatch(match, tab.data?.player?.playerRef || "", tab).trim();
+      const replacement = template.content.firstElementChild;
+      if (!replacement) {
+        rerender();
+        return;
+      }
+      entry.replaceWith(replacement);
+      bindMatchEntryControls(replacement, tab, rerender);
+      bindMatchDetailControls(replacement, tab, rerender);
+      for (const replayButton of replacement.querySelectorAll("[data-replay]")) replayButton.addEventListener("click", () => replay(replayButton));
+      applyRenderedMetricStyles(replacement);
+      prepareImages(replacement);
+    });
+  }
+
   function bindOverviewContent(container, tab) {
     const rerender = () => rerenderTab(tab);
     bindPlayerLinks(container, tab);
@@ -3392,18 +3426,7 @@
     bindRankHistoryControls(container);
     bindRankedQueueControls(container, tab);
     bindMatchSentinel(container, tab);
-    for (const button of container.querySelectorAll("[data-toggle-match]")) button.addEventListener("click", () => {
-      const id = button.dataset.toggleMatch;
-      if (tab.openMatches.has(id)) {
-        tab.openMatches.delete(id);
-        // 收起后清除页签记忆，重新展开时回到“概览”。
-        tab.matchDetailTabs.delete(id);
-      } else {
-        tab.openMatches.add(id);
-      }
-      tab.matchViewRevision = Number(tab.matchViewRevision || 0) + 1;
-      rerender();
-    });
+    for (const entry of container.querySelectorAll(".match-entry")) bindMatchEntryControls(entry, tab, rerender);
     bindMatchDetailControls(container, tab, rerender);
     for (const button of container.querySelectorAll("[data-replay]")) button.addEventListener("click", () => replay(button));
   }
