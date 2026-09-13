@@ -119,7 +119,7 @@ $env:RIOT_API_KEY_CIPHER = "上一步生成的密文"
 
 公开包默认保留国服本地客户端功能；韩服账号、段位、战绩、竞技场详情和绝活哥符文等 Riot API 查询需要使用者在启动应用的环境中自行提供 `RIOT_API_KEY`。未配置时沿用现有的明确提示／空结果降级，且不发送 Riot API 请求。运行时 Key 只用于本机向固定 Riot 官方域名发起请求，不会写入公开构建物。
 
-每次构建在设置页显示版本和构建指纹；Setup 文件名仅使用版本号，源码指纹继续用于诊断和发布校验。构建目录保留 `release-build.json` 和 `SHA256SUMS.txt`；下一次构建会清理旧产物。R83 最新安装启动验证只需正常安装一次，提供 `%TEMP%\DeepLegendsSetup-startup.log` 和 `%LOCALAPPDATA%\LOLLootAssistant\logs\diagnostics.jsonl` 两个文件，不需要多份构建或 A/B 脚本。以 `spawn_to_ready` 为主判据，`launch elapsed_ms` 仅作参考，完整操作见 [执行预热默认关闭验收报告](ACCEPTANCE-REPORT-R83-READ-ONLY-DEFAULT.md)。
+每次构建在设置页显示版本和构建指纹；Setup 文件名仅使用版本号，源码指纹继续用于诊断和发布校验。构建目录保留 `release-build.json` 和 `SHA256SUMS.txt`；下一次构建会清理旧产物。R83 最新安装启动验证只需正常安装一次，提供 `%TEMP%\DeepLegendsSetup-startup.log` 和 `%LOCALAPPDATA%\LOLLootAssistant\logs\diagnostics.jsonl` 两个文件，不需要多份构建或 A/B 脚本。以 `spawn_to_ready` 为主判据，`launch elapsed_ms` 仅作参考，完整操作见 [执行预热默认关闭验收报告](docs/history/ACCEPTANCE-REPORT-R83-READ-ONLY-DEFAULT.md)。
 
 Windows 脚本会检查 `gofmt`、运行测试与 `go vet`、校验前端和 Electron 主进程 JavaScript，将 Go 后台编译为无命令窗口的 Windows GUI 程序。两条构建脚本只生成 `Deep Legends Setup <version>.exe`、构建收据和 SHA-256，不生成便携版、独立 ZIP 或源码压缩包。安装版先生成现有 NSIS 包，再通过 `installer/build-shell.cjs` 嵌入独立 Go/WebView2 外壳；验证外壳为大于 50 MB 的 x64 GUI 程序后才计算哈希，并在核验完成后清理临时 payload 与 `win-unpacked`。未提供证书时构建仍可运行，但 Windows 可能显示“未知发布者”。
 
@@ -131,9 +131,9 @@ macOS 继续运行 `./build-desktop.sh`；需要内部计时信息时使用 `DEB
 
 构建时先编译不含 payload 的 `installer/uninstall` 到 `desktop/uninstall-shell.exe`，再让 NSIS 的 `customInstall` 钩子将真实卸载器移至 `resources/uninstall-core.dat`、将外壳放到原卸载文件名 `Uninstall Deep Legends.exe`，并清理旧版根目录 Core 卸载器；注册表卸载入口不变。两条脚本均在成功或失败收尾清理生成的卸载外壳。
 
-R83 当前默认只开启读预热，安装完成后完整读取最终目录中的主程序和后端两个 EXE，预热阶段不启动或强杀进程。执行预热默认关闭，日志明确记录 `startup warm mode=execute enabled=false`；仅在启动安装器的环境中显式设置 `DEEP_LEGENDS_STARTUP_EXECUTE_WARM=1` 才开启实验性执行预热。2026-09-12 20:22（指纹 `d2212835fcb1`）曾发生安装后首次启动主窗口未出现、splash 永久停留的故障；执行预热的因果关系和额外收益均未证实，因此默认关闭。显式开启时保留最终文件稳定 400ms、共享 8 秒预算、文件改写复核和不等待执行进程的收尾行为；成功、失败或 `still_running` 均不改变两个文件的读取范围，`execute_valid` / `fallback_files` 仅作诊断。真实应用启动始终剔除 `ELECTRON_RUN_AS_NODE`。`DEEP_LEGENDS_STARTUP_PREWARM=0` 仍关闭全部预热。PID 行首前缀、微秒时间戳及真实启动计时保留；暂存目录执行方案仍无备用开关。详见 [执行预热默认关闭验收报告](ACCEPTANCE-REPORT-R83-READ-ONLY-DEFAULT.md)。
+R83 当前默认只开启读预热，安装完成后完整读取最终目录中的主程序和后端两个 EXE，预热阶段不启动或强杀进程。执行预热默认关闭，日志明确记录 `startup warm mode=execute enabled=false`；仅在启动安装器的环境中显式设置 `DEEP_LEGENDS_STARTUP_EXECUTE_WARM=1` 才开启实验性执行预热。2026-09-12 20:22（指纹 `d2212835fcb1`）曾发生安装后首次启动主窗口未出现、splash 永久停留的故障；执行预热的因果关系和额外收益均未证实，因此默认关闭。显式开启时保留最终文件稳定 400ms、共享 8 秒预算、文件改写复核和不等待执行进程的收尾行为；成功、失败或 `still_running` 均不改变两个文件的读取范围，`execute_valid` / `fallback_files` 仅作诊断。真实应用启动始终剔除 `ELECTRON_RUN_AS_NODE`。`DEEP_LEGENDS_STARTUP_PREWARM=0` 仍关闭全部预热。PID 行首前缀、微秒时间戳及真实启动计时保留；暂存目录执行方案仍无备用开关。详见 [执行预热默认关闭验收报告](docs/history/ACCEPTANCE-REPORT-R83-READ-ONLY-DEFAULT.md)。
 
-R84 起，“设置 → 诊断与日志 → 导出诊断日志”也包含外壳启动阶段：`backend_ready`、`main_window_created`、`main_window_did_finish_load`、`main_window_ready_to_show`。每一步发生时就向后端提交，不等主窗口显示成功；如果卡在加载页，强制关闭后重开再导出，可按 `run_id` 查看上一次停在哪一步，无需另找 `desktop.log`。原 `desktop_startup_phases_ms` 耗时摘要保持不变。历史 R82 采集脚本已移除 `.at()` 依赖，并在启动安装器前拦截当前组已有 3 个样本的情况；日常验证仍不需要六次 A/B。测试范围与说明见 [R84 收尾验收报告](ACCEPTANCE-REPORT-R84-CLEANUP.md)。
+R84 起，“设置 → 诊断与日志 → 导出诊断日志”也包含外壳启动阶段：`backend_ready`、`main_window_created`、`main_window_did_finish_load`、`main_window_ready_to_show`。每一步发生时就向后端提交，不等主窗口显示成功；如果卡在加载页，强制关闭后重开再导出，可按 `run_id` 查看上一次停在哪一步，无需另找 `desktop.log`。原 `desktop_startup_phases_ms` 耗时摘要保持不变。历史 R82 采集脚本已移除 `.at()` 依赖，并在启动安装器前拦截当前组已有 3 个样本的情况；日常验证仍不需要六次 A/B。测试范围与说明见 [R84 收尾验收报告](docs/history/ACCEPTANCE-REPORT-R84-CLEANUP.md)。
 
 历史便携版模板仍保留在仓库中，当前构建不再应用或校验该模板。Go 后端可执行文件通过 `asarUnpack` 随安装包分发，桌面壳启动时直接运行，不在每次启动时复制后台服务。
 

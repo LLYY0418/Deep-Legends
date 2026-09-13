@@ -1,6 +1,6 @@
 # R82 执行结果与尚未完成的实测
 
-日期：2026-09-12。对应工单：`WORKLIST-R82-CURRENT-GAME-PROBE-MATRIX.md`。
+日期：2026-09-12。对应工单：`docs/history/WORKLIST-R82-CURRENT-GAME-PROBE-MATRIX.md`。
 
 **代码与本地验证已经执行；国服缺失格子的真实 HTTP 结果尚未取得。不能称为已修复任意国服玩家阵容查询。**
 
