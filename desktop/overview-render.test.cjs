@@ -82,10 +82,7 @@ test("collapsed sidebar hides the label but keeps the live beacon rendered", () 
 
 const openDemoWindows = new Set();
 test.afterEach(() => {
-  for (const w of openDemoWindows) {
-    try { w.dispatchEvent(new w.CustomEvent("deep-legends:dispose")); w.close(); } catch (_) {}
-  }
-  openDemoWindows.clear();
+  for (const w of openDemoWindows) w.close();
 });
 
 function bootDemoApp(options = {}) {
@@ -95,8 +92,27 @@ function bootDemoApp(options = {}) {
   const dom = new JSDOM(html, { url: "http://127.0.0.1:1/?demo", runScripts: "outside-only", pretendToBeVisual: true });
   const w = dom.window;
   openDemoWindows.add(w);
+  const mutationObservers = new Set();
+  const NativeMutationObserver = w.MutationObserver;
+  w.MutationObserver = class extends NativeMutationObserver {
+    constructor(callback) {
+      super(callback);
+      mutationObservers.add(this);
+    }
+  };
   const closeWindow = w.close.bind(w);
-  w.close = () => { openDemoWindows.delete(w); closeWindow(); };
+  w.close = () => {
+    if (!openDemoWindows.delete(w)) return;
+    try {
+      w.dispatchEvent(new w.CustomEvent("deep-legends:dispose"));
+    } finally {
+      // jsdom keeps queued observer microtasks after deleting window.document.
+      // Keep real observer behavior during each test, but end it with its window.
+      for (const observer of mutationObservers) observer.disconnect();
+      mutationObservers.clear();
+      closeWindow();
+    }
+  };
   w.onerror = (message, source, line, column, error) => { errors.push(String((error && error.stack) || message)); };
   w.addEventListener("unhandledrejection", (event) => { errors.push(String((event.reason && event.reason.stack) || event.reason)); });
   // jsdom 未实现的浏览器能力，用最小替身补齐（只影响可见性/尺寸，不影响渲染分支）。
@@ -160,6 +176,27 @@ function bootDemoApp(options = {}) {
 }
 
 const settled = () => new Promise((resolve) => setTimeout(resolve, 1500));
+
+test("R86 DOM teardown disconnects pending observers without disabling live callbacks", async () => {
+  const { window: w, errors } = bootDemoApp();
+  await settled();
+  let callbacks = 0;
+  let disposals = 0;
+  w.addEventListener("deep-legends:dispose", () => { disposals += 1; });
+  const target = w.document.createElement("div");
+  new w.MutationObserver(() => { callbacks += 1; }).observe(target, { childList: true });
+  target.append(w.document.createElement("span"));
+  await Promise.resolve();
+  assert.equal(callbacks, 1, "the fixture must not suppress live observer callbacks");
+  target.append(w.document.createElement("span"));
+  w.close();
+  w.close();
+  await Promise.resolve();
+  assert.equal(callbacks, 1, "queued callbacks cannot outlive their jsdom window");
+  assert.equal(disposals, 1, "explicit close and afterEach cleanup must be idempotent");
+  assert.deepEqual(errors, []);
+});
+
 async function visitTool(w, name) {
   w.document.querySelector(`[data-suite-tab="${name}"]`).click();
   const root = w.document.getElementById(`suite-${name}-root`);
