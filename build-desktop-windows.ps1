@@ -68,7 +68,9 @@ try {
     $unformatted = @(gofmt -l .)
     if ($unformatted.Count -gt 0) { throw "Go files are not formatted: $($unformatted -join ', ')" }
     go test ./...
+    if ($LASTEXITCODE -ne 0) { throw "Root tests failed" }
     go vet ./...
+    if ($LASTEXITCODE -ne 0) { throw "Root vet failed" }
     Push-Location (Join-Path $projectRoot "installer")
     try {
         go test ./...
@@ -79,13 +81,19 @@ try {
         Pop-Location
     }
     node --check web/app.js
+    if ($LASTEXITCODE -ne 0) { throw "web/app.js syntax check failed" }
     node --check web/champions.js
+    if ($LASTEXITCODE -ne 0) { throw "web/champions.js syntax check failed" }
     $webTests = @(Get-ChildItem (Join-Path $projectRoot "web\*.test.cjs") | ForEach-Object { $_.FullName })
     node --test $webTests
+    if ($LASTEXITCODE -ne 0) { throw "Web tests failed" }
     node --check desktop/main.cjs
+    if ($LASTEXITCODE -ne 0) { throw "desktop/main.cjs syntax check failed" }
     node --check desktop/proxy-resolution.cjs
+    if ($LASTEXITCODE -ne 0) { throw "desktop/proxy-resolution.cjs syntax check failed" }
     $desktopTests = @(Get-ChildItem (Join-Path $desktopRoot "*.test.cjs") | ForEach-Object { $_.FullName })
     node --test $desktopTests
+    if ($LASTEXITCODE -ne 0) { throw "Desktop tests failed" }
 
     $previousGoos = $env:GOOS
     $previousGoarch = $env:GOARCH

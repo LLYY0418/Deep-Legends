@@ -11,6 +11,12 @@ case "$DEEP_LEGENDS_KEY_MODE" in public|private) ;; *) echo "DEEP_LEGENDS_KEY_MO
 rm -f "$project_root/dist/desktop/release-build.json"
 find "$project_root/dist/desktop" -maxdepth 1 -type f \( -name 'Deep Legends*.exe' -o -name 'Deep Legends*.zip' -o -name 'SHA256SUMS.txt' \) -delete 2>/dev/null || true
 rm -rf "$project_root/dist/desktop/win-unpacked"
+
+unformatted="$(gofmt -l .)"
+[[ -z "$unformatted" ]] || { echo "Go files are not formatted:" >&2; printf '%s\n' "$unformatted" >&2; exit 1; }
+go test ./...
+go vet ./...
+(cd installer && go test ./... && go vet ./...)
 cipher=""
 if [[ "$DEEP_LEGENDS_KEY_MODE" == "private" ]]; then
   key_file="${RIOT_KEY_FILE:-$project_root/riot_key.local.txt}"

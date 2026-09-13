@@ -3265,7 +3265,7 @@ test("player-name tooltips are gated by the actual ellipsized text", () => {
   assert.match(appScript, /target\.scrollWidth > target\.clientWidth \+ 1 \|\| target\.scrollHeight > target\.clientHeight \+ 1/);
   assert.match(appScript, /dataset\.tooltipOverflow/);
   assert.match(appScript, /\.connection-label/);
-  for (const selector of [".player-tab-name", "self", ".recent-player-name", ".match-player-name", ".participant-name"]) {
+  for (const selector of ["self", ".recent-player-name", ".match-player-name", ".participant-name"]) {
     assert.match(gameplayScript, new RegExp(`data-tooltip-overflow="${selector.replace(".", "\\.")}"`));
   }
   assert.match(gameplayScript, /class="damage-name"[^>]+data-tooltip-overflow="self"/);

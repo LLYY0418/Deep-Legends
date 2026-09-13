@@ -5,6 +5,7 @@ dist/
 *.log
 .gocache/
 /.gomodcache
+/.tmpbuild/
 /lol-loot-assistant
 /deep-legends
 /deep-legends.exe
@@ -38,7 +39,6 @@ __pycache__/
 
 # 本机临时构建密钥（不应存在，但以防万一）
 riot_key.local.*
-.github/workflows/
 
 # Release payload is embedded into the installer shell, then removed.
 /installer/payload/files/*
