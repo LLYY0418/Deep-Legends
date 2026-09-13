@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/list"
 	"context"
 	"encoding/json"
 	"errors"
@@ -482,7 +483,10 @@ func (a *app) loadSeasonChampionStatsSnapshot(reference gameplayReference, playe
 	return cache.Stats, progress, cache.RankedMatches, cache.QueueStats
 }
 
-const seasonQueryDedupTTL = 10 * time.Second
+const (
+	seasonQueryDedupTTL     = 10 * time.Second
+	seasonQuerySnapshotsMax = 512
+)
 
 func seasonQuerySnapshotKey(serverID, playerRef, season string) string {
 	return sourceScopedKey(seasonStatsSource, strings.Join([]string{
@@ -508,14 +512,11 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 	key := seasonQuerySnapshotKey(serverID, playerRef, season)
 	now := time.Now()
 	a.seasonBackfillMu.Lock()
-	if a.seasonQuerySnapshots == nil {
-		a.seasonQuerySnapshots = make(map[string]time.Time)
-	}
-	if previous := a.seasonQuerySnapshots[key]; !previous.IsZero() && now.Sub(previous) < seasonQueryDedupTTL {
+	if previous := a.seasonQuerySnapshotLocked(key, now); !previous.IsZero() && now.Sub(previous) < seasonQueryDedupTTL {
 		a.seasonBackfillMu.Unlock()
 		return
 	}
-	a.seasonQuerySnapshots[key] = now
+	a.cacheSeasonQuerySnapshotLocked(key, now)
 	flightKey := "overview:" + key
 	if a.seasonBackfills == nil {
 		a.seasonBackfills = make(map[string]struct{})
@@ -535,7 +536,7 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 		}()
 		ctx, cancel := context.WithTimeout(context.Background(), seasonBackfillTimeout)
 		defer cancel()
-		_, progress, _, _ := a.loadSeasonChampionStatsWithHistoryCache(ctx, client, reference, player, playerRef, names, false)
+		_, progress, _, _ := a.loadSeasonChampionStatsWithHistoryCache(ctx, client, reference, player, playerRef, names, true)
 		publicRef := a.registerGameplayReferenceDetails(mergeGameplayReferences(reference, gameplayReference{PlayerRef: playerRef}))
 		progressEvent, _ := json.Marshal(map[string]any{
 			"type": "season-progress", "season": season, "scanned": progress.Scanned,
@@ -544,6 +545,54 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 		a.clearOverviewQuerySnapshots()
 		a.broadcastEvent(string(progressEvent))
 	}()
+}
+
+func (a *app) seasonQuerySnapshotLocked(key string, now time.Time) time.Time {
+	previous := a.seasonQuerySnapshots[key]
+	if previous.IsZero() {
+		return time.Time{}
+	}
+	if now.Sub(previous) >= seasonQueryDedupTTL {
+		a.removeSeasonQuerySnapshotLocked(key)
+		return time.Time{}
+	}
+	if element := a.seasonQuerySnapshotEntries[key]; element != nil {
+		a.seasonQuerySnapshotOrder.MoveToFront(element)
+	}
+	return previous
+}
+
+func (a *app) cacheSeasonQuerySnapshotLocked(key string, at time.Time) {
+	if a.seasonQuerySnapshots == nil {
+		a.seasonQuerySnapshots = make(map[string]time.Time)
+	}
+	if a.seasonQuerySnapshotOrder == nil {
+		a.seasonQuerySnapshotOrder = list.New()
+	}
+	if a.seasonQuerySnapshotEntries == nil {
+		a.seasonQuerySnapshotEntries = make(map[string]*list.Element)
+	}
+	a.seasonQuerySnapshots[key] = at
+	if element := a.seasonQuerySnapshotEntries[key]; element != nil {
+		a.seasonQuerySnapshotOrder.MoveToFront(element)
+	} else {
+		a.seasonQuerySnapshotEntries[key] = a.seasonQuerySnapshotOrder.PushFront(key)
+	}
+	for len(a.seasonQuerySnapshots) > seasonQuerySnapshotsMax {
+		back := a.seasonQuerySnapshotOrder.Back()
+		if back == nil {
+			break
+		}
+		a.removeSeasonQuerySnapshotLocked(back.Value.(string))
+	}
+}
+
+func (a *app) removeSeasonQuerySnapshotLocked(key string) {
+	delete(a.seasonQuerySnapshots, key)
+	if element := a.seasonQuerySnapshotEntries[key]; element != nil {
+		a.seasonQuerySnapshotOrder.Remove(element)
+		delete(a.seasonQuerySnapshotEntries, key)
+	}
 }
 
 // seasonScanState 把一次扫描的可变状态收在一起，让前台增量扫描与后台回补
@@ -685,7 +734,7 @@ func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference
 			seen[id] = true
 		}
 		scan := &seasonScanState{cache: cache, stats: stats, queueStats: queueStats, seen: seen, seasonStartMillis: seasonStart.UnixMilli()}
-		a.seasonScanPagesWithHistoryCache(ctx, client, serverID, playerRef, scan, seasonScanBackgroundPages, false)
+		a.seasonScanPagesWithHistoryCache(ctx, client, serverID, playerRef, scan, seasonScanBackgroundPages, true)
 		a.finishSeasonScan(scan, names, accountHash)
 		a.recordDiagnostic(map[string]any{
 			"event": "season_backfill_round", "season": season, "scanned": scan.scanned,

@@ -1,0 +1,86 @@
+{
+  "checkedAt": "2026-09-09",
+  "source": "Official getLeagues/getTeams actual public capture; only identifying fields retained",
+  "leagues": [
+    {
+      "id": "98767975604431411",
+      "slug": "worlds",
+      "name": "Worlds"
+    },
+    {
+      "id": "98767991325878492",
+      "slug": "msi",
+      "name": "MSI"
+    },
+    {
+      "id": "113464388705111224",
+      "slug": "first_stand",
+      "name": "First Stand"
+    },
+    {
+      "id": "98767991314006698",
+      "slug": "lpl",
+      "name": "LPL"
+    },
+    {
+      "id": "98767991310872058",
+      "slug": "lck",
+      "name": "LCK"
+    },
+    {
+      "id": "98767991335774713",
+      "slug": "lck_challengers_league",
+      "name": "LCK Challengers"
+    }
+  ],
+  "teams": [
+    {
+      "id": "99566404853854212",
+      "slug": "bilibili-gaming",
+      "name": "BILIBILI GAMING",
+      "code": "BLG"
+    },
+    {
+      "id": "99566404848691211",
+      "slug": "invictus-gaming",
+      "name": "Invictus Gaming",
+      "code": "IG"
+    },
+    {
+      "id": "98767991853197861",
+      "slug": "t1",
+      "name": "T1",
+      "code": "T1"
+    },
+    {
+      "id": "100205573496804586",
+      "slug": "hanwha-life-esports",
+      "name": "Hanwha Life Esports",
+      "code": "HLE"
+    },
+    {
+      "id": "100205573495116443",
+      "slug": "geng",
+      "name": "Gen.G Esports",
+      "code": "GEN"
+    },
+    {
+      "id": "100725845018863243",
+      "slug": "dwg-kia",
+      "name": "Dplus KIA",
+      "code": "DK"
+    },
+    {
+      "id": "105550026570060790",
+      "slug": "dwg-kia-challengers",
+      "name": "DK Challengers",
+      "code": "DK"
+    }
+  ],
+  "missingWindowRecheck": {
+    "gameId": "115548147900619044",
+    "httpStatus": 204,
+    "bytes": 0,
+    "date": "2026-09-09"
+  }
+}

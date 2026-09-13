@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"strings"
@@ -362,11 +363,11 @@ func TestRiotAccountCacheStoresSuccessAndBacksOffFailures(t *testing.T) {
 			t.Fatalf("positive account cache requests = %d", requests.Load())
 		}
 	})
-	t.Run("failure", func(t *testing.T) {
+	t.Run("not-found", func(t *testing.T) {
 		var requests atomic.Int64
 		provider := specialistTestProvider(gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 			requests.Add(1)
-			return specialistTestResponse(request, http.StatusServiceUnavailable, `{}`)
+			return specialistTestResponse(request, http.StatusNotFound, `{}`)
 		}))
 		for range 2 {
 			if _, err := provider.accountByRiotID(context.Background(), "Broken", "KR1"); err == nil {
@@ -913,6 +914,22 @@ func TestSpecialistRunesWithoutRiotKeyReturnsEmptyWithoutRequests(t *testing.T) 
 	}))
 	if runes, outcome := provider.specialistRunes(context.Background(), 64, "leesin", "李青"); len(runes) != 0 || outcome != specialistOutcomeError || requests.Load() != 0 {
 		t.Fatalf("runes=%#v requests=%d", runes, requests.Load())
+	}
+}
+
+func TestR68SpecialistHandlerRecordsResolvedADCPosition(t *testing.T) {
+	t.Setenv("RIOT_API_KEY", "")
+	provider := newChampionProvider()
+	var events []map[string]any
+	provider.diag = func(event map[string]any) { events = append(events, event) }
+	a := &app{champions: provider}
+	recorder := httptest.NewRecorder()
+	a.handleGameplaySpecialistRunes(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/specialist-runes?championId=222&position=adc", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("handler status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if len(events) != 1 || events[0]["event"] != "specialist_runes_handler" || events[0]["champion_id"] != int64(222) || events[0]["position"] != "adc" {
+		t.Fatalf("specialist handler diagnostic = %#v", events)
 	}
 }
 

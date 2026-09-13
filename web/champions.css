@@ -106,7 +106,7 @@
 .position-pill .position-icon img { opacity: 1; filter: none; }
 
 /* 左侧英雄梯度固定占满视口高度：右侧内容再长，左栏也始终撑到底。 */
-.aram-champions { position: sticky; top: 12px; display: flex; height: calc(100dvh - 24px); flex-direction: column; }
+.aram-champions { position: sticky; top: 12px; display: flex; height: calc(100dvh / var(--ui-zoom, 1) - 24px); flex-direction: column; }
 .aram-champion-head { display: flex; min-height: 58px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px 7px; }
 .aram-champion-head > div { display: grid; min-width: 0; }
 .aram-champions > .champion-search { width: calc(100% - 24px); flex: 0 0 auto; margin: 0 12px 10px; }
@@ -208,7 +208,7 @@
 .mayhem-workspace { display: grid; grid-template-columns: minmax(320px,340px) minmax(0,1fr); align-items: start; gap: 12px; container: mayhem-page / inline-size; }
 .mayhem-detail-pane { display: grid; min-width: 0; gap: 12px; container: mayhem-pane / inline-size; }
 .mayhem-tier-entry { display: none; }
-.mayhem-champions { position: sticky; top: 12px; display: flex; height: calc(100dvh - 24px); min-height: 460px; flex-direction: column; }
+.mayhem-champions { position: sticky; top: 12px; display: flex; height: calc(100dvh / var(--ui-zoom, 1) - 24px); min-height: 460px; flex-direction: column; }
 .mayhem-champions > .champion-search { width: calc(100% - 24px); flex: 0 0 auto; margin: 0 12px 10px; }
 .mayhem-champions .champion-table-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; border-top: 1px solid var(--line); }
 .mayhem-champions .champion-table { min-width: 320px; table-layout: fixed; }
@@ -245,15 +245,15 @@
 .mayhem-measurement b { flex: 0 0 auto; color: var(--ink); }
 
 .mayhem-ranking-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
-.mayhem-ranking-list article { display: grid; min-height: 70px; grid-template-columns: 22px 46px minmax(92px,1fr) minmax(210px,auto); align-items: center; gap: 8px; padding: 9px 12px; border-top: 1px solid var(--line); }
+.mayhem-ranking-list article { display: grid; min-height: 70px; grid-template-columns: 22px 46px minmax(92px,1fr) max-content; align-items: center; gap: 8px; padding: 9px 12px; border-top: 1px solid var(--line); }
 .mayhem-ranking-list article:nth-child(odd) { border-right: 1px solid var(--line); }
 .mayhem-ranking-list article:nth-child(-n+2) { border-top: 0; }
 .mayhem-ranking-list article > b { color: var(--muted); font-size: 10px; text-align: center; }
 .mayhem-ranking-list article > strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .mayhem-ranking-list article > .recommend-icon { width: 46px; height: 46px; border-radius: 8px; }
 .mayhem-item-name-only { width: 0; height: 46px; }
-.mayhem-ranking-list dl { display: grid; grid-template-columns: repeat(3,minmax(60px,1fr)); margin: 0; }
-.mayhem-ranking-list dl > div { display: grid; gap: 1px; padding-left: 7px; border-left: 1px solid var(--line); }
+.mayhem-ranking-list dl { display: grid; grid-template-columns: repeat(2,max-content); column-gap: 20px; margin: 0; white-space: nowrap; }
+.mayhem-ranking-list dl > div { display: grid; gap: 1px; padding-left: 0; }
 .mayhem-ranking-list dt { color: var(--muted); font-size: 8px; }
 .mayhem-ranking-list dd { margin: 0; font-size: 10px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .mayhem-ranking-list .metric-win { color: var(--success); }
@@ -274,7 +274,7 @@
 .mayhem-opening-grid h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 9px; color: var(--muted); font-size: 11px; }
 .mayhem-opening-grid .config-option-list { display: grid; gap: 7px; }
 
-.mayhem-tier-dialog { position: fixed; inset: 0; width: min(760px,calc(100dvw - 24px)); max-width: none; height: min(780px,calc(100dvh - 28px)); max-height: none; margin: auto; padding: 0; color: var(--ink); background: transparent; border: 0; }
+.mayhem-tier-dialog { position: fixed; inset: 0; zoom: var(--ui-zoom, 1); width: min(760px,calc((100dvw - 24px) / var(--ui-zoom, 1))); max-width: none; height: min(780px,calc((100dvh - 28px) / var(--ui-zoom, 1))); max-height: none; margin: auto; padding: 0; color: var(--ink); background: transparent; border: 0; }
 .mayhem-tier-dialog::backdrop { background: var(--overlay); backdrop-filter: blur(2px); }
 .mayhem-tier-dialog-sheet { display: flex; height: 100%; min-height: 0; flex-direction: column; overflow: hidden; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: 0 18px 50px rgb(0 0 0 / .5); }
 .mayhem-tier-dialog-sheet > header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; background: var(--surface); border-bottom: 1px solid var(--line); }
@@ -288,7 +288,7 @@
 
 /* 左右两列共用同一个高度上限，各自内部滚动：右侧的 12 位适配英雄比左侧列表
    长时，整块会溢出并盖住下面的品质概率面板。 */
-.mayhem-atlas { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: stretch; gap: 16px; --atlas-column-height: calc(100vh - 344px); }
+.mayhem-atlas { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: stretch; gap: 16px; --atlas-column-height: calc(100vh / var(--ui-zoom, 1) - 344px); }
 .mayhem-atlas-browser, .mayhem-atlas-detail { display: flex; min-width: 0; min-height: 360px; max-height: var(--atlas-column-height); flex-direction: column; }
 .mayhem-rarity-tabs button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 6px; }
 .mayhem-rarity-tabs i { display: inline-block; width: 8px; height: 8px; border-radius: 3px; }
@@ -528,6 +528,8 @@
 .champion-build-board { container: champion-build / inline-size; }
 .champion-build-board .recommend-icon { width: 42px; height: 42px; border-radius: 8px; }
 .item-chain-source { color: var(--muted); font-size: 10px; font-weight: 650; }
+.build-primary-source { color: var(--muted); font-size: 10px; font-weight: 650; }
+.build-depth-column > .item-chain-source { display: block; margin: 0 0 5px; color: var(--primary-strong); }
 .build-depth-column h4 { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .build-depth-sample-badge { display: inline-flex; min-height: 16px; align-items: center; padding: 0 4px; color: #F2C46D; background: rgb(242 196 109 / .1); border: 1px solid rgb(242 196 109 / .38); border-radius: 3px; font-size: 8px; line-height: 1; white-space: nowrap; }
 .build-depth-empty { margin: 8px 0 0; font-size: 10px; line-height: 1.45; }
@@ -688,7 +690,7 @@
   .champion-filter-bar { grid-template-columns: 1fr; }
   .champion-position-tabs { grid-row: 2; }
   .augment-grid { grid-template-columns: minmax(0,1fr); }
-  .mayhem-atlas { grid-template-columns: 1fr; --atlas-column-height: calc(100vh - 260px); }
+  .mayhem-atlas { grid-template-columns: 1fr; --atlas-column-height: calc(100vh / var(--ui-zoom, 1) - 260px); }
   .mayhem-recommend-grid { grid-template-columns: 1fr; }
   .counter-groups { grid-template-columns: 1fr; }
   .counter-group + .counter-group { border-top: 1px solid var(--line); border-left: 0; }

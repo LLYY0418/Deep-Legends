@@ -34,6 +34,16 @@ func hexdataAugmentsTestPage() []byte {
 	return hexdataTestPage(rows.String())
 }
 
+func hexdataThreeColumnAugmentsTestPage() []byte {
+	var rows strings.Builder
+	rows.WriteString(`<table><tbody>`)
+	for id := 1000; id < 1209; id++ {
+		fmt.Fprintf(&rows, `<tr><td><a href="/augment/%d-augment%d"><img alt=""></a></td><td>胜率 52.3%%</td><td><a href="/augment/%d-augment%d">海克斯%d</a></td></tr>`, id, id, id, id, id)
+	}
+	rows.WriteString(`</tbody></table>`)
+	return hexdataTestPage(rows.String())
+}
+
 func hexdataRankingFixtures(t *testing.T) ([]byte, []byte) {
 	t.Helper()
 	answer := hexdataAnswerCards{BuildID: hexdataTestBuild, ReportPatch: "16.16", ReportDate: "2026-08-19"}
@@ -205,6 +215,21 @@ func TestParseHexdataAugmentsAcceptsMetricSeparatorsAndURLShapes(t *testing.T) {
 	}
 }
 
+func TestParseHexdataAugmentsAcceptsThreeColumnIconAndNameShape(t *testing.T) {
+	rows, citation, err := parseHexdataAugments(hexdataThreeColumnAugmentsTestPage())
+	if err != nil || len(rows) != 209 || citation.BuildID != hexdataTestBuild {
+		t.Fatalf("three-column augments = %d citation=%#v err=%v", len(rows), citation, err)
+	}
+	for _, row := range rows {
+		if row.ID <= 0 || strings.TrimSpace(row.Name) == "" {
+			t.Fatalf("invalid three-column row: %#v", row)
+		}
+		if row.Performance != 0 || !row.PerformanceUnavailable || row.WinRate != 52.3 {
+			t.Fatalf("single-metric row was misrepresented: %#v", row)
+		}
+	}
+}
+
 func TestHexdataHeroShapeReportsActualRecommendationAndItemCounts(t *testing.T) {
 	var event map[string]any
 	provider := &championProvider{diag: func(payload map[string]any) { event = payload }}
@@ -291,6 +316,12 @@ func TestInspectHexdataPayloadReportsRawFieldsWhenRowsAreRejected(t *testing.T) 
 	}
 	if columns[1]["text_class_counts"].(map[string]int)["has_globalhexscore"] != 150 || columns[2]["text_class_counts"].(map[string]int)["has_胜率+has_percent_sign"] != 150 {
 		t.Fatalf("metric column shape = %#v", columns)
+	}
+	if event["skip_metrics_unmatched"] != 150 || event["skip_path_unmatched"] != 0 || event["skip_empty_name"] != 0 || event["skip_bad_id"] != 0 || event["skip_short_cells"] != 0 {
+		t.Fatalf("augment parse branches = %#v", event)
+	}
+	if event["col0_link_text_len"].(int) == 0 || event["col0_text_len"].(int) == 0 || event["col2_link_text_len"].(int) != 0 || event["col2_text_len"].(int) == 0 {
+		t.Fatalf("first-row text lengths = %#v", event)
 	}
 }
 
@@ -1115,5 +1146,143 @@ func TestDecorateHexdataAugmentsHydratesMayhemCopy(t *testing.T) {
 	// 补齐要排在离线兜底之前，否则真说明永远被占位文案挡住。
 	if strings.Index(decorate, "p.hydrateMayhemAugmentCopy(ctx, rows)") > strings.LastIndex(decorate, "augmentDescriptionWithOfflineGuidance") {
 		t.Fatal("offline guidance runs before the Hexdata copy is hydrated")
+	}
+}
+
+func TestHydrateMayhemAugmentCopyUsesBoundedParallelismAndCache(t *testing.T) {
+	root := t.TempDir()
+	var active atomic.Int32
+	var maxActive atomic.Int32
+	var detailRequests atomic.Int32
+	var listRequests atomic.Int32
+	provider := newHexdataBudgetProvider(t, root, gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path == "/augments" {
+			listRequests.Add(1)
+			var rows strings.Builder
+			rows.WriteString(`<table><tbody>`)
+			for id := 1000; id < 1150; id++ {
+				fmt.Fprintf(&rows, `<tr><td><a href="/augment/%d-augment-%d">海克斯%d</a></td><td>globalHexScore 80.0 · 胜率 55.0%%</td></tr>`, id, id, id)
+			}
+			rows.WriteString(`</tbody></table>`)
+			return hexdataResponse(request, hexdataTestPage(rows.String())), nil
+		}
+		if hexdataAugmentPathPattern.MatchString(request.URL.Path) {
+			detailRequests.Add(1)
+			current := active.Add(1)
+			for {
+				previous := maxActive.Load()
+				if current <= previous || maxActive.CompareAndSwap(previous, current) {
+					break
+				}
+			}
+			time.Sleep(40 * time.Millisecond)
+			active.Add(-1)
+			var detail strings.Builder
+			detail.WriteString(`<table><tbody>`)
+			for hero := 1; hero <= 12; hero++ {
+				fmt.Fprintf(&detail, `<tr><td><a href="/hero/%d-hero%d">英雄%d</a></td><td>90.0</td><td>60.0%%</td><td>1,000</td></tr>`, hero, hero, hero)
+			}
+			detail.WriteString(`</tbody></table><section data-seo-guide><p>海克斯更适合先在英雄1这类高分高样本英雄上考虑。这是海克斯效果说明。如果你的英雄机制能稳定触发这个海克斯，优先看上方适配英雄。</p></section>`)
+			return hexdataResponse(request, hexdataTestPage(detail.String())), nil
+		}
+		return nil, errors.New("unexpected hexdata path")
+	}))
+	// Keep this timing probe focused on the production hydration fan-out; disk
+	// persistence is covered by the cache tests and adds unrelated I/O jitter.
+	provider.cache = nil
+	rows := make([]championMetricRow, 8)
+	for index := range rows {
+		rows[index] = championMetricRow{Assets: []championAsset{{ID: index + 1001, Name: fmt.Sprintf("海克斯%d", index+1001)}}}
+	}
+	started := time.Now()
+	provider.hydrateMayhemAugmentCopy(context.Background(), rows)
+	elapsed := time.Since(started)
+	if maxActive.Load() > mayhemAugmentCopyConcurrency {
+		t.Fatalf("augment detail concurrency = %d, want <= %d", maxActive.Load(), mayhemAugmentCopyConcurrency)
+	}
+	if maxActive.Load() < 2 || elapsed >= 500*time.Millisecond {
+		t.Fatalf("augment details were effectively serial: max=%d elapsed=%v", maxActive.Load(), elapsed)
+	}
+	if detailRequests.Load() != 8 || listRequests.Load() != 1 {
+		t.Fatalf("first hydration requests = details %d/list %d", detailRequests.Load(), listRequests.Load())
+	}
+	repeat := make([]championMetricRow, 8)
+	for index := range repeat {
+		repeat[index] = championMetricRow{Assets: []championAsset{{ID: index + 1001, Name: fmt.Sprintf("海克斯%d", index+1001)}}}
+	}
+	provider.hydrateMayhemAugmentCopy(context.Background(), repeat)
+	if detailRequests.Load() != 8 || listRequests.Load() != 1 {
+		t.Fatalf("cached hydration re-requested details/list: %d/%d", detailRequests.Load(), listRequests.Load())
+	}
+}
+
+func TestMayhemAugmentCopyCacheExpiresAfterTTL(t *testing.T) {
+	provider := newChampionProvider()
+	provider.augmentCopy = map[int]augmentCopyCacheEntry{1001: {Text: "旧说明", FetchedAt: time.Now().Add(-mayhemAugmentCopyTTL - time.Minute)}}
+	if _, ok := provider.augmentCopy[1001]; !ok {
+		t.Fatal("test cache entry was not installed")
+	}
+	// Expired entries must be considered misses by the production lookup.
+	provider.hexdata.minInterval = 0
+	provider.hexdata.maximumJitter = 0
+	provider.hexdata.retryDelay = 0
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("fixture upstream unavailable")
+	})}
+	if got := provider.mayhemAugmentCopy(context.Background(), []int{1001}); len(got) != 0 {
+		t.Fatalf("expired cache returned stale copy: %#v", got)
+	}
+}
+
+func TestDecorateHexdataAugmentsKeepsOfflineDescriptionWhenAugmentsAreUnavailable(t *testing.T) {
+	provider := newChampionProvider()
+	provider.hexdata = nil
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("augment catalogs unavailable")
+	})}
+	rows := []championMetricRow{{Assets: []championAsset{{ID: 1323, Kind: "augment", Name: "海克斯1323"}}}}
+	provider.decorateHexdataAugments(context.Background(), rows)
+	if got := rows[0].Assets[0].Description; got != augmentOfflineDescription {
+		t.Fatalf("degraded live description = %q, want %q", got, augmentOfflineDescription)
+	}
+	encoded, err := json.Marshal(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), `"description":"`+augmentOfflineDescription+`"`) {
+		t.Fatalf("degraded description missing from live payload: %s", encoded)
+	}
+}
+
+func TestDecorateHexdataAugmentsPersistsMissingMetadataDiagnostic(t *testing.T) {
+	store := &localStore{root: t.TempDir()}
+	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	provider := newChampionProvider()
+	provider.hexdata = nil
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("augment catalogs unavailable")
+	})}
+	a := &app{storage: store}
+	provider.diag = a.recordDiagnostic
+	rows := []championMetricRow{{Assets: []championAsset{{ID: 2031, Kind: "augment", Name: "空投熊"}}}}
+	provider.decorateHexdataAugments(context.Background(), rows)
+	data, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var missing map[string]any
+	for _, line := range bytes.Split(bytes.TrimSpace(data), []byte{'\n'}) {
+		var event map[string]any
+		if json.Unmarshal(line, &event) == nil && event["event"] == "hexdata_augment_metadata_missing" {
+			missing = event
+		}
+	}
+	if missing["id"] != float64(2031) {
+		t.Fatalf("persisted augment metadata diagnostic = %#v; log=%s", missing, data)
+	}
+	if rows[0].Assets[0].Path != "/latest/game/assets/ux/cherry/augments/icons/drop_bear.png" {
+		t.Fatal("Drop Bear must use its actual colored unsuffixed artwork, not the monochrome small HUD glyph", rows)
 	}
 }

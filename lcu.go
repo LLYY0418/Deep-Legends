@@ -10,14 +10,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -54,12 +57,21 @@ type LCUDiscoveryStatus struct {
 }
 
 type LCUClient struct {
-	mu      sync.RWMutex
-	baseURL string
-	token   string
-	http    *http.Client
-	port    int
-	source  string
+	acceptFocusSampling   atomic.Bool
+	acceptFocusLastTrace  atomic.Value
+	acceptFocusInspection acceptFocusInspection
+	acceptFocusHistory    acceptFocusHistory
+	acceptFocusOwner      atomic.Value
+	objectiveClearMu      sync.Mutex
+	claimExecutionMu      sync.Mutex
+	claimSettlements      claimSettlements
+	objectiveDiagnostics  objectiveDiagnostics
+	mu                    sync.RWMutex
+	baseURL               string
+	token                 string
+	http                  *http.Client
+	port                  int
+	source                string
 	// region 与 rsoPlatform 来自客户端启动参数（例如 TENCENT / HN1），
 	// 用于确定国服玩家所属的 SGP 大区服务器；读取失败时留空。
 	region        string
@@ -69,6 +81,234 @@ type LCUClient struct {
 	// during this client session so every snapshot retry does not repeat it.
 	inventoryV1Failures int
 	inventoryV1Disabled bool
+	queueLabelsMu       sync.Mutex
+	queueLabels         map[int64]string
+	queueLabelsLoaded   bool
+	diagnosticMu        sync.Mutex
+	diagnosticObserve   func(map[string]any)
+	requestDiagnostics  map[string]*lcuRequestDiagnosticBucket
+}
+
+const lcuRequestDiagnosticWindow = 10 * time.Second
+
+type lcuRequestTrace struct {
+	mu            sync.Mutex
+	startedAt     time.Time
+	getConnAt     time.Time
+	tlsStartedAt  time.Time
+	connWait      time.Duration
+	tls           time.Duration
+	ttfb          time.Duration
+	connectionGot bool
+	connReused    bool
+}
+
+type lcuRequestDiagnosticSample struct {
+	durationMS int64
+	connWaitMS int64
+	tlsMS      int64
+	ttfbMS     int64
+	connReused bool
+	httpStatus int
+}
+
+type lcuRequestDiagnosticBucket struct {
+	windowStart time.Time
+	method      string
+	path        string
+	samples     []lcuRequestDiagnosticSample
+}
+
+func newLCURequestTrace() *lcuRequestTrace {
+	trace := &lcuRequestTrace{startedAt: time.Now()}
+	return trace
+}
+
+func (t *lcuRequestTrace) clientTrace() *httptrace.ClientTrace {
+	return &httptrace.ClientTrace{
+		GetConn: func(string) {
+			t.mu.Lock()
+			t.getConnAt = time.Now()
+			t.mu.Unlock()
+		},
+		GotConn: func(info httptrace.GotConnInfo) {
+			t.mu.Lock()
+			now := time.Now()
+			if !t.getConnAt.IsZero() {
+				t.connWait = now.Sub(t.getConnAt)
+			}
+			t.connectionGot = true
+			t.connReused = info.Reused
+			t.mu.Unlock()
+		},
+		TLSHandshakeStart: func() {
+			t.mu.Lock()
+			t.tlsStartedAt = time.Now()
+			t.mu.Unlock()
+		},
+		TLSHandshakeDone: func(tls.ConnectionState, error) {
+			t.mu.Lock()
+			if !t.tlsStartedAt.IsZero() {
+				t.tls = time.Since(t.tlsStartedAt)
+			}
+			t.mu.Unlock()
+		},
+		GotFirstResponseByte: func() {
+			t.mu.Lock()
+			t.ttfb = time.Since(t.startedAt)
+			t.mu.Unlock()
+		},
+	}
+}
+
+func (t *lcuRequestTrace) sample(status int) lcuRequestDiagnosticSample {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return lcuRequestDiagnosticSample{
+		durationMS: diagnosticDurationMS(time.Since(t.startedAt)), connWaitMS: diagnosticDurationMS(t.connWait),
+		tlsMS: diagnosticDurationMS(t.tls), ttfbMS: diagnosticDurationMS(t.ttfb), connReused: t.connectionGot && t.connReused,
+		httpStatus: status,
+	}
+}
+
+func diagnosticDurationMS(value time.Duration) int64 {
+	if value <= 0 {
+		return 0
+	}
+	if milliseconds := value.Milliseconds(); milliseconds > 0 {
+		return milliseconds
+	}
+	return 1
+}
+
+func (c *LCUClient) setDiagnosticObserver(observe func(map[string]any)) {
+	if c == nil {
+		return
+	}
+	c.diagnosticMu.Lock()
+	c.diagnosticObserve = observe
+	c.diagnosticMu.Unlock()
+}
+
+func (c *LCUClient) recordRequestDiagnostic(method, path string, trace *lcuRequestTrace, status int) {
+	if c == nil || trace == nil {
+		return
+	}
+	now := time.Now()
+	windowStart := now.Truncate(lcuRequestDiagnosticWindow)
+	method = strings.ToUpper(strings.TrimSpace(method))
+	normalizedPath := lcuDiagnosticPath(path)
+	key := method + "\x00" + normalizedPath
+	var completed map[string]any
+	c.diagnosticMu.Lock()
+	if c.diagnosticObserve == nil {
+		c.diagnosticMu.Unlock()
+		return
+	}
+	if c.requestDiagnostics == nil {
+		c.requestDiagnostics = make(map[string]*lcuRequestDiagnosticBucket)
+	}
+	bucket := c.requestDiagnostics[key]
+	if bucket != nil && !bucket.windowStart.Equal(windowStart) {
+		completed = lcuRequestDiagnosticEvent(bucket)
+		bucket = nil
+	}
+	if bucket == nil {
+		bucket = &lcuRequestDiagnosticBucket{windowStart: windowStart, method: method, path: normalizedPath}
+		c.requestDiagnostics[key] = bucket
+	}
+	bucket.samples = append(bucket.samples, trace.sample(status))
+	observe := c.diagnosticObserve
+	c.diagnosticMu.Unlock()
+	if completed != nil {
+		observe(completed)
+	}
+}
+
+func (c *LCUClient) flushRequestDiagnostics() {
+	if c == nil {
+		return
+	}
+	c.diagnosticMu.Lock()
+	observe := c.diagnosticObserve
+	events := make([]map[string]any, 0, len(c.requestDiagnostics))
+	for _, bucket := range c.requestDiagnostics {
+		if len(bucket.samples) > 0 {
+			events = append(events, lcuRequestDiagnosticEvent(bucket))
+		}
+	}
+	c.requestDiagnostics = make(map[string]*lcuRequestDiagnosticBucket)
+	c.diagnosticMu.Unlock()
+	if observe != nil {
+		for _, event := range events {
+			observe(event)
+		}
+	}
+}
+
+func lcuRequestDiagnosticEvent(bucket *lcuRequestDiagnosticBucket) map[string]any {
+	durations := make([]int64, 0, len(bucket.samples))
+	connWaits := make([]int64, 0, len(bucket.samples))
+	tlsTimes := make([]int64, 0, len(bucket.samples))
+	ttfbTimes := make([]int64, 0, len(bucket.samples))
+	statusCounts := make(map[string]int)
+	reused := 0
+	for _, sample := range bucket.samples {
+		durations = append(durations, sample.durationMS)
+		connWaits = append(connWaits, sample.connWaitMS)
+		tlsTimes = append(tlsTimes, sample.tlsMS)
+		ttfbTimes = append(ttfbTimes, sample.ttfbMS)
+		statusCounts[strconv.Itoa(sample.httpStatus)]++
+		if sample.connReused {
+			reused++
+		}
+	}
+	return map[string]any{
+		"event": "lcu_request", "method": bucket.method, "path": bucket.path, "window_start": bucket.windowStart.UTC().Format(time.RFC3339),
+		"count": len(bucket.samples), "duration_ms": lcuMetricSummary(durations), "conn_wait_ms": lcuMetricSummary(connWaits),
+		"tls_ms": lcuMetricSummary(tlsTimes), "ttfb_ms": lcuMetricSummary(ttfbTimes),
+		"conn_reused": reused > 0, "reused_ratio": float64(reused) / float64(max(1, len(bucket.samples))), "http_status": statusCounts,
+	}
+}
+
+func lcuMetricSummary(values []int64) map[string]int64 {
+	if len(values) == 0 {
+		return map[string]int64{"p50": 0, "p90": 0, "max": 0}
+	}
+	sorted := append([]int64(nil), values...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+	percentile := func(value float64) int64 {
+		index := int(value*float64(len(sorted)-1) + 0.5)
+		return sorted[index]
+	}
+	return map[string]int64{"p50": percentile(0.50), "p90": percentile(0.90), "max": sorted[len(sorted)-1]}
+}
+
+func lcuDiagnosticPath(value string) string {
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil {
+		return "/invalid"
+	}
+	path := parsed.Path
+	// Fixed API names are not account identifiers. Keep these distinguishable
+	// so a successful/failed read cannot be hidden under the same {id} bucket.
+	switch path {
+	case "/lol-champ-select/v1/all-grid-champions", "/lol-champ-select/v1/pickable-champion-ids", "/lol-champ-select/v1/bannable-champion-ids":
+		return path
+	}
+	if path == "/lol-challenges/v1/update-player-preferences" || path == "/lol-challenges/v1/update-player-preferences/" {
+		return "/lol-challenges/v1/update-player-preferences/"
+	}
+	if strings.HasPrefix(path, "/lol-ranked/v1/ranked-stats/") {
+		return "/lol-ranked/v1/ranked-stats/{puuid}"
+	}
+	segments := strings.Split(path, "/")
+	for index, segment := range segments {
+		if len(segment) >= 20 || (len(segment) >= 5 && strings.IndexFunc(segment, func(r rune) bool { return r < '0' || r > '9' }) == -1) {
+			segments[index] = "{id}"
+		}
+	}
+	return strings.Join(segments, "/")
 }
 
 const inventoryV1FailureBudget = 3
@@ -485,6 +725,15 @@ func (c *LCUClient) RequestJSON(ctx context.Context, method, path string, body, 
 			return errors.New("LCU request body exceeds 1 MiB")
 		}
 	}
+	requestTrace := newLCURequestTrace()
+	ctx = httptrace.WithClientTrace(ctx, requestTrace.clientTrace())
+	httpStatus := 0
+	defer func() {
+		if status, ok := ctx.Value(acceptFocusStatusKey{}).(*atomic.Int64); ok {
+			status.Store(int64(httpStatus))
+		}
+		c.recordRequestDiagnostic(method, path, requestTrace, httpStatus)
+	}()
 	request, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bytes.NewReader(payload))
 	if err != nil {
 		return err
@@ -503,6 +752,7 @@ func (c *LCUClient) RequestJSON(ctx context.Context, method, path string, body, 
 	if err != nil {
 		return fmt.Errorf("LCU %s %s: %w", method, path, err)
 	}
+	httpStatus = response.StatusCode
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		data, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
@@ -567,6 +817,10 @@ func (c *LCUClient) getBytes(ctx context.Context, path string, limit int64, acce
 	if !strings.HasPrefix(path, "/") {
 		return nil, errors.New("LCU path must be absolute")
 	}
+	requestTrace := newLCURequestTrace()
+	ctx = httptrace.WithClientTrace(ctx, requestTrace.clientTrace())
+	httpStatus := 0
+	defer func() { c.recordRequestDiagnostic(http.MethodGet, path, requestTrace, httpStatus) }()
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
 	if err != nil {
 		return nil, err
@@ -582,13 +836,14 @@ func (c *LCUClient) getBytes(ctx context.Context, path string, limit int64, acce
 	if err != nil {
 		return nil, fmt.Errorf("LCU GET %s: %w", path, err)
 	}
+	httpStatus = response.StatusCode
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
 		return nil, &LCUHTTPError{Method: http.MethodGet, Path: path, StatusCode: response.StatusCode}
 	}
 	if response.ContentLength > limit {
-		return nil, fmt.Errorf("LCU GET %s: response exceeds %d MiB", path, limit/(1024*1024))
+		return nil, fmt.Errorf("LCU GET %s: response exceeds %d MiB: %w", path, limit/(1024*1024), errResponseLimitExceeded)
 	}
 	data, err := readLimited(response.Body, limit)
 	if err != nil {
@@ -606,6 +861,7 @@ func (c *LCUClient) credentials() (string, bool) {
 // Close removes the short-lived LCU credential from this process and releases
 // idle loopback connections. The credential is never persisted or logged.
 func (c *LCUClient) Close() {
+	c.flushRequestDiagnostics()
 	c.mu.Lock()
 	c.token = ""
 	c.mu.Unlock()

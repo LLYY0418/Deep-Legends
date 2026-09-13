@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -27,6 +28,7 @@ type Skin struct {
 	ParentSkinID          int64  `json:"parentSkinId,omitempty"`
 	Description           string `json:"description,omitempty"`
 	SplashPath            string `json:"splashPath,omitempty"`
+	CenteredSplashPath    string `json:"centeredSplashPath,omitempty"`
 	TilePath              string `json:"tilePath,omitempty"`
 	LoadScreenPath        string `json:"loadScreenPath,omitempty"`
 	SplashVideoPath       string `json:"splashVideoPath,omitempty"`
@@ -70,20 +72,23 @@ type PoolIssue struct {
 }
 
 type Snapshot struct {
-	Summoner    Summoner
-	All         []Skin
-	Owned       []Skin
-	Remaining   []Skin
-	PoolTotal   int
-	PoolMatched int
-	Issues      []PoolIssue
-	Client      *LCUClient
-	Ownership   []OwnershipSourceStatus
-	Catalog     CatalogStats
-	Account     AccountData
-	Chromas     []Chroma
-	ChromaState EndpointCapability
-	LoadPhases  map[string]int64 `json:"-"`
+	Summoner          Summoner
+	All               []Skin
+	Owned             []Skin
+	Remaining         []Skin
+	PoolTotal         int
+	PoolMatched       int
+	Issues            []PoolIssue
+	Client            *LCUClient
+	Ownership         []OwnershipSourceStatus
+	Catalog           CatalogStats
+	Account           AccountData
+	Chromas           []Chroma
+	ChromaState       EndpointCapability
+	Masteries         map[int64]ChampionMastery
+	MasteryCapability EndpointCapability
+	PhaseGroup        string
+	LoadPhases        map[string]int64 `json:"-"`
 }
 
 type OwnershipSourceStatus struct {
@@ -136,6 +141,83 @@ func loadSnapshot(pool PoolManifest) (Snapshot, error) {
 }
 
 func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, error) {
+	return loadSnapshotWithClientProvider(client, pool, nil, nil)
+}
+
+func loadSnapshotWithClientProvider(client *LCUClient, pool PoolManifest, provider *championProvider, observe func(map[string]any)) (Snapshot, error) {
+	identity, err := loadIdentitySnapshot(client)
+	if err != nil {
+		return identity, err
+	}
+	collection, err := loadCollectionSnapshotWithProvider(client, pool, identity, provider, observe)
+	if collection.LoadPhases == nil {
+		collection.LoadPhases = make(map[string]int64)
+	}
+	for name, duration := range identity.LoadPhases {
+		if name == "total" {
+			continue
+		}
+		collection.LoadPhases[name] = duration
+	}
+	collection.LoadPhases["identity_total"] = identity.LoadPhases["total"]
+	collection.LoadPhases["total"] += identity.LoadPhases["total"]
+	return collection, err
+}
+
+// loadIdentitySnapshot contains only the requests needed to make the overview
+// usable: current summoner, profile background, and champion masteries.
+func loadIdentitySnapshot(client *LCUClient) (Snapshot, error) {
+	loadStarted := time.Now()
+	loadPhases := make(map[string]int64)
+	var phasesMu sync.Mutex
+	measure := func(name string, load func()) {
+		started := time.Now()
+		load()
+		phasesMu.Lock()
+		loadPhases[name] = time.Since(started).Milliseconds()
+		phasesMu.Unlock()
+	}
+	finish := func() {
+		phasesMu.Lock()
+		loadPhases["total"] = time.Since(loadStarted).Milliseconds()
+		phasesMu.Unlock()
+	}
+
+	var summoner Summoner
+	var err error
+	measure("summoner", func() { summoner, err = NewSummonerAPI(client).Current() })
+	if err != nil {
+		finish()
+		return Snapshot{Client: client, PhaseGroup: "identity", LoadPhases: loadPhases}, err
+	}
+	var profile SummonerProfile
+	var profileCapability EndpointCapability
+	var masteries map[int64]ChampionMastery
+	var masteryCapability EndpointCapability
+	var group sync.WaitGroup
+	group.Add(2)
+	go func() {
+		defer group.Done()
+		measure("profile", func() { profile, profileCapability = NewSummonerAPI(client).Profile() })
+	}()
+	go func() {
+		defer group.Done()
+		measure("masteries", func() { masteries, masteryCapability = NewChampionMasteryAPI(client).All(summoner.PUUID) })
+	}()
+	group.Wait()
+	finish()
+	return Snapshot{
+		Summoner: summoner, Client: client, Masteries: masteries, MasteryCapability: masteryCapability,
+		PhaseGroup: "identity", LoadPhases: loadPhases,
+		Account: AccountData{Profile: profile, Capabilities: []EndpointCapability{profileCapability, masteryCapability}},
+	}, nil
+}
+
+func loadCollectionSnapshot(client *LCUClient, pool PoolManifest, identity Snapshot) (Snapshot, error) {
+	return loadCollectionSnapshotWithProvider(client, pool, identity, nil, nil)
+}
+
+func loadCollectionSnapshotWithProvider(client *LCUClient, pool PoolManifest, identity Snapshot, provider *championProvider, observe func(map[string]any)) (Snapshot, error) {
 	loadStarted := time.Now()
 	loadPhases := make(map[string]int64)
 	var loadPhasesMu sync.Mutex
@@ -152,13 +234,8 @@ func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, err
 		loadPhasesMu.Unlock()
 	}
 
-	var summoner Summoner
+	summoner := identity.Summoner
 	var err error
-	measure("summoner", func() { summoner, err = NewSummonerAPI(client).Current() })
-	if err != nil {
-		finishPhases()
-		return Snapshot{Client: client, LoadPhases: loadPhases}, err
-	}
 
 	var all []Skin
 	measure("skin_catalog", func() { all, err = NewSkinCatalogAPI(client).Load() })
@@ -175,19 +252,26 @@ func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, err
 		ownershipErr       error
 		ownedChampionIDs   map[int64]bool
 		championCapability EndpointCapability
-		masteries          map[int64]ChampionMastery
-		masteryCapability  EndpointCapability
-		profile            SummonerProfile
+		masteries          = identity.Masteries
+		masteryCapability  = identity.MasteryCapability
+		profile            = identity.Account.Profile
 		profileCapability  EndpointCapability
 		loot               []LootItem
 		lootCapability     EndpointCapability
+		lootMetadataValues map[string]lootMetadata
 		sanctumSparks      int
 		sanctumCapability  EndpointCapability
 		rewards            []RewardGrant
 		rewardsCapability  EndpointCapability
 	)
+	for _, capability := range identity.Account.Capabilities {
+		if capability.Name == "summoner-profile" {
+			profileCapability = capability
+			break
+		}
+	}
 	var independent sync.WaitGroup
-	independent.Add(8)
+	independent.Add(7)
 	go func() {
 		defer independent.Done()
 		measure("chroma_catalog", func() { chromas, chromaCatalogErr = loadChromaCatalog(client, all) })
@@ -206,15 +290,15 @@ func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, err
 	}()
 	go func() {
 		defer independent.Done()
-		measure("masteries", func() { masteries, masteryCapability = NewChampionMasteryAPI(client).All(summoner.PUUID) })
+		measure("loot", func() { loot, lootCapability = NewObservedLootAPI(client, observe).PlayerLoot() })
 	}()
 	go func() {
 		defer independent.Done()
-		measure("profile", func() { profile, profileCapability = NewSummonerAPI(client).Profile() })
-	}()
-	go func() {
-		defer independent.Done()
-		measure("loot", func() { loot, lootCapability = NewLootAPI(client).PlayerLoot() })
+		measure("loot_metadata", func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+			defer cancel()
+			lootMetadataValues = loadLootMetadata(ctx, client, provider, observe)
+		})
 	}()
 	go func() {
 		defer independent.Done()
@@ -238,22 +322,24 @@ func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, err
 		chromaOwnedIDs        map[int64]bool
 		chromaState           = EndpointCapability{Name: "owned-chromas", Path: "本机炫彩目录与库存"}
 	)
-	var dependent sync.WaitGroup
-	dependent.Add(1)
-	go func() {
-		defer dependent.Done()
+	var chromaDates map[int64]string
+	skinAcquisitionLoader := func() {
 		measure("skin_acquisition_dates", func() {
 			acquiredAt, acquisitionCapability = NewInventoryAPI(client).SkinAcquisitionDates(summoner.SummonerID, ownedIDs)
 		})
-	}()
-	if chromaCatalogErr == nil {
-		dependent.Add(1)
-		go func() {
-			defer dependent.Done()
-			measure("chroma_ownership", func() { chromaOwnedIDs, chromaState = loadOwnedChromaIDs(client, summoner.SummonerID, chromas) })
-		}()
 	}
-	dependent.Wait()
+	if chromaCatalogErr == nil {
+		runParallelLoaders(skinAcquisitionLoader, func() {
+			measure("chroma_ownership", func() { chromaOwnedIDs, chromaState = loadOwnedChromaIDs(client, summoner.SummonerID, chromas) })
+			if chromaState.State == capabilityAvailable {
+				measure("chroma_acquisition_dates", func() {
+					chromaDates, _ = NewInventoryAPI(client).SkinAcquisitionDates(summoner.SummonerID, chromaOwnedIDs)
+				})
+			}
+		})
+	} else {
+		skinAcquisitionLoader()
+	}
 
 	for i := range all {
 		if all[i].Owned {
@@ -269,10 +355,6 @@ func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, err
 		chromaState.Detail = "客户端炫彩目录不可用；普通皮肤和三合一结果不受影响"
 		chromas = nil
 	} else {
-		var chromaDates map[int64]string
-		measure("chroma_acquisition_dates", func() {
-			chromaDates, _ = NewInventoryAPI(client).SkinAcquisitionDates(summoner.SummonerID, chromaOwnedIDs)
-		})
 		for i := range chromas {
 			chromas[i].Owned = chromaOwnedIDs[chromas[i].ID]
 			if chromas[i].Owned {
@@ -315,7 +397,7 @@ func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, err
 			break
 		}
 	}
-	loot = enrichLootItems(loot, all)
+	loot = enrichLootItemsWithMetadata(loot, all, lootMetadataValues, observe)
 	finishPhases()
 
 	return Snapshot{
@@ -334,9 +416,18 @@ func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, err
 		LoadPhases:  loadPhases,
 		Account: AccountData{
 			Profile: profile, Loot: loot, Rewards: rewards, SanctumSparks: sanctumSparks, SanctumSparksKnown: sanctumCapability.State == capabilityAvailable,
-			Capabilities: []EndpointCapability{profileCapability, lootCapability, sanctumCapability, rewardsCapability, championCapability, acquisitionCapability, masteryCapability, chromaState},
+			Capabilities: append([]EndpointCapability{profileCapability, lootCapability, sanctumCapability, rewardsCapability, championCapability, acquisitionCapability, masteryCapability, chromaState}, identity.Account.Capabilities...),
 		},
+		Masteries: masteries, MasteryCapability: masteryCapability, PhaseGroup: "collection",
 	}, nil
+}
+
+func runParallelLoaders(first, second func()) {
+	var group sync.WaitGroup
+	group.Add(2)
+	go func() { defer group.Done(); first() }()
+	go func() { defer group.Done(); second() }()
+	group.Wait()
 }
 
 // applySkinOwnership deliberately requires evidence for each non-base skin ID.
@@ -372,11 +463,15 @@ func annotatePoolMembership(all, matched []Skin) {
 }
 
 func loadSkinCatalog(client *LCUClient) ([]Skin, error) {
+	return loadSkinCatalogContext(context.Background(), client)
+}
+
+func loadSkinCatalogContext(ctx context.Context, client *LCUClient) ([]Skin, error) {
 	paths := []string{"/lol-game-data/assets/v1/skins.json", "/lol-game-data/v1/skins.json"}
 	var data []byte
 	var err error
 	for _, path := range paths {
-		data, err = client.GetBytes(path)
+		data, err = client.GetBytesContext(ctx, path)
 		if err == nil {
 			break
 		}
@@ -416,6 +511,7 @@ func loadSkinCatalog(client *LCUClient) ([]Skin, error) {
 			IsLegacy:            hasTrueFlag(object, "isLegacy"),
 			Description:         firstString(object, "description"),
 			SplashPath:          sanitizeAssetPath(firstString(object, "uncenteredSplashPath", "splashPath")),
+			CenteredSplashPath:  sanitizeAssetPath(firstString(object, "splashPath")),
 			TilePath:            sanitizeAssetPath(firstString(object, "tilePath")),
 			LoadScreenPath:      sanitizeAssetPath(firstString(object, "loadScreenPath")),
 			SplashVideoPath:     sanitizeAssetPath(firstString(object, "splashVideoPath", "previewVideoUrl")),
@@ -423,9 +519,6 @@ func loadSkinCatalog(client *LCUClient) ([]Skin, error) {
 			CardHoverVideoPath:  sanitizeAssetPath(firstString(object, "collectionCardHoverVideoPath")),
 		}
 		skin.RarityTier, skin.RaritySubtier = classifySkinRarity(object, skin)
-		if skin.ChampionName == "" {
-			skin.ChampionName = lastWord(skin.Name)
-		}
 		if existing, ok := byID[id]; ok {
 			if normalizeName(existing.Name) != normalizeName(skin.Name) || existing.ChampionID != skin.ChampionID {
 				return nil, fmt.Errorf("skin catalog has conflicting records for ID %d: %q and %q", id, existing.Name, skin.Name)
@@ -461,6 +554,10 @@ func loadSkinCatalog(client *LCUClient) ([]Skin, error) {
 	}
 	out := make([]Skin, 0, len(byID))
 	for _, skin := range byID {
+		// A skin's last word is not a champion identity: e.g. "(2022)" or
+		// "仲达". Every validated champion has a base skin in this catalog.
+		base := byID[skin.ChampionID*1000]
+		skin.ChampionName = strings.TrimSpace(firstNonEmpty(base.ChampionName, base.Name))
 		out = append(out, skin)
 	}
 	return out, nil
@@ -794,6 +891,7 @@ func questSkinVariants(object map[string]any, parent Skin) []Skin {
 		variant.ParentSkinID = parent.ID
 		variant.Description = firstString(tier, "description")
 		variant.SplashPath = sanitizeAssetPath(firstString(tier, "uncenteredSplashPath", "splashPath"))
+		variant.CenteredSplashPath = sanitizeAssetPath(firstString(tier, "splashPath"))
 		variant.TilePath = sanitizeAssetPath(firstString(tier, "tilePath"))
 		variant.LoadScreenPath = sanitizeAssetPath(firstString(tier, "loadScreenPath"))
 		variant.SplashVideoPath = sanitizeAssetPath(firstString(tier, "splashVideoPath"))
@@ -1321,6 +1419,9 @@ func mergeSkin(existing, candidate Skin) Skin {
 	}
 	if existing.SplashPath == "" {
 		existing.SplashPath = candidate.SplashPath
+	}
+	if existing.CenteredSplashPath == "" {
+		existing.CenteredSplashPath = candidate.CenteredSplashPath
 	}
 	if existing.TilePath == "" {
 		existing.TilePath = candidate.TilePath

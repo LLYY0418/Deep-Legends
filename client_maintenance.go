@@ -22,6 +22,7 @@ func (a *app) handleClientMaintenance(w http.ResponseWriter, r *http.Request) {
 		if client != nil {
 			a.disconnectClient(client, "已按你的要求断开；点击顶部刷新可重新连接")
 		}
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "disconnect", "result": "ok"})
 		respondJSON(w, map[string]bool{"ok": true})
 		return
 	}
@@ -38,14 +39,17 @@ func (a *app) handleClientMaintenance(w http.ResponseWriter, r *http.Request) {
 	}
 	client, _, err := a.gameplayClient()
 	if err != nil {
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": request.Action, "result": "not-connected"})
 		http.Error(w, "未连接英雄联盟客户端", http.StatusConflict)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 	if err := client.RequestJSON(ctx, http.MethodPost, path, nil, nil); err != nil {
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": request.Action, "result": "failed"})
 		http.Error(w, "客户端维护动作执行失败", http.StatusBadGateway)
 		return
 	}
+	a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": request.Action, "result": "ok"})
 	respondJSON(w, map[string]bool{"ok": true})
 }

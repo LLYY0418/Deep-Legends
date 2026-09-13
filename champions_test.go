@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	xhtml "golang.org/x/net/html"
 )
@@ -21,6 +23,43 @@ func TestDDragonItemCatalogParsesGoldTotal(t *testing.T) {
 	}
 	if item := catalog.Data["3153"]; item.Gold.Total != 3200 {
 		t.Fatalf("ddragon item gold total = %#v", item.Gold)
+	}
+}
+
+func TestLoadStaticDescriptionsReportsDDragonPurchasabilityFields(t *testing.T) {
+	provider := newChampionProvider()
+	provider.patch = "16.16.1"
+	events := make([]map[string]any, 0, 1)
+	provider.diag = func(event map[string]any) { events = append(events, event) }
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		body := `{"data":{}}`
+		switch request.URL.Path {
+		case "/cdn/16.16.1/data/zh_CN/item.json":
+			body = `{"data":{"3040":{"name":"炽天使之拥","inStore":false,"gold":{"total":3000,"purchasable":true},"image":{"full":"3040.png"}},"3157":{"name":"中娅沙漏","gold":{"total":3250,"purchasable":true},"image":{"full":"3157.png"}},"8888":{"name":"字段未知","image":{"full":"8888.png"}},"9999":{"name":"隐藏装备","hideFromAll":true,"image":{"full":"9999.png"}}}}`
+		case "/cdn/16.16.1/data/zh_CN/runesReforged.json":
+			body = `[]`
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
+	})}
+	if _, err := provider.loadStaticDescriptions(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	purchasable := provider.itemPurchasabilitySnapshot()
+	if !purchasable[3040] || !purchasable[3157] || purchasable[9999] {
+		t.Fatalf("item purchasability = %#v", purchasable)
+	}
+	if _, known := purchasable[8888]; known {
+		t.Fatalf("missing fields were treated as a purchasability claim: %#v", purchasable)
+	}
+	var shape map[string]any
+	for _, event := range events {
+		if event["event"] == "ddragon_item_purchasability_shape" {
+			shape = event
+			break
+		}
+	}
+	if shape == nil || shape["items"] != 4 || shape["gold_purchasable_present"] != 2 || shape["in_store_present"] != 1 || shape["hide_from_all_present"] != 1 {
+		t.Fatalf("purchasability shape diagnostic = %#v", events)
 	}
 }
 
@@ -582,7 +621,7 @@ func TestLoadStructuredCountersUsesOnlyOPGGDetailPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(counters.WeakAgainst) != 3 || len(counters.StrongAgainst) != 2 {
+	if len(counters.WeakAgainst) != 2 || len(counters.StrongAgainst) != 2 {
 		t.Fatalf("counter fallback = %#v", counters)
 	}
 	seen := make(map[int]bool)
@@ -621,17 +660,17 @@ func TestStructuredCountersDropsSubjectAndDuplicateRows(t *testing.T) {
 	}
 }
 
-func TestLoadStructuredCountersUsesTopLevelCounters(t *testing.T) {
+func TestLoadStructuredCountersUsesCompletePositionFilteredTopLevelCounters(t *testing.T) {
 	provider := newChampionProvider()
 	provider.championIDs["jax"] = 24
 	provider.championMeta[24] = championMetadata{ID: 24, Slug: "jax", Key: "Jax", NameZH: "贾克斯"}
-	for id := 100; id < 130; id++ {
+	for id := 100; id < 134; id++ {
 		provider.championMeta[id] = championMetadata{ID: id, Key: strconv.Itoa(id), NameZH: strconv.Itoa(id)}
 	}
 	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-		rows := make([]string, 0, 30)
-		for index := 0; index < 30; index++ {
-			rows = append(rows, fmt.Sprintf(`{"champion_id":%d,"play":1000,"win":%d}`, 100+index, 30+index))
+		rows := make([]string, 0, 34)
+		for index := 0; index < 34; index++ {
+			rows = append(rows, fmt.Sprintf(`{"champion_id":%d,"play":100,"win":%d}`, 100+index, 30+index))
 		}
 		body := fmt.Sprintf(`{"data":{"summary":{"id":24,"positions":[{"name":"TOP","counters":[{"champion_id":100,"play":100,"win":40},{"champion_id":101,"play":100,"win":45},{"champion_id":102,"play":100,"win":55}]}]},"counters":[%s]},"meta":{"version":"16.16"}}`, strings.Join(rows, ","))
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
@@ -641,29 +680,27 @@ func TestLoadStructuredCountersUsesTopLevelCounters(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(counters.WeakAgainst) != 5 || len(counters.StrongAgainst) != 5 {
-		t.Fatalf("top-level counters were not retained for strong/weak split: %#v", counters)
+		t.Fatalf("complete top-level counter shape was not used: %#v", counters)
 	}
-	for _, row := range append(counters.WeakAgainst, counters.StrongAgainst...) {
-		if row.ChampionID < 100 || row.ChampionID >= 130 {
-			t.Fatalf("summary counter leaked into result: %#v", counters)
-		}
+	if counters.WeakAgainst[0].ChampionID != 100 || counters.StrongAgainst[0].ChampionID != 133 {
+		t.Fatalf("counter extremes do not come from the complete top-level list: %#v", counters)
 	}
 }
 
-func TestLoadStructuredDetailUsesTopLevelCounters(t *testing.T) {
+func TestLoadStructuredDetailUsesCompletePositionFilteredTopLevelCounters(t *testing.T) {
 	provider := newChampionProvider()
 	provider.championIDs["jax"] = 24
 	provider.championMeta[24] = championMetadata{ID: 24, Slug: "jax", Key: "Jax", NameZH: "贾克斯"}
-	for id := 100; id < 130; id++ {
+	for id := 100; id < 134; id++ {
 		provider.championMeta[id] = championMetadata{ID: id, Key: strconv.Itoa(id), NameZH: strconv.Itoa(id)}
 	}
 	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		if request.URL.Host == opggPageHost {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`no item depths`)), Header: make(http.Header)}, nil
 		}
-		rows := make([]string, 0, 30)
-		for index := 0; index < 30; index++ {
-			rows = append(rows, fmt.Sprintf(`{"champion_id":%d,"play":1000,"win":%d}`, 100+index, 30+index))
+		rows := make([]string, 0, 34)
+		for index := 0; index < 34; index++ {
+			rows = append(rows, fmt.Sprintf(`{"champion_id":%d,"play":100,"win":%d}`, 100+index, 30+index))
 		}
 		cores := make([]string, 0, 6)
 		for index := 0; index < 6; index++ {
@@ -677,10 +714,49 @@ func TestLoadStructuredDetailUsesTopLevelCounters(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(detail.Counters.WeakAgainst) != 5 || len(detail.Counters.StrongAgainst) != 5 {
-		t.Fatalf("detail used summary counters: %#v", detail.Counters)
+		t.Fatalf("detail did not preserve the complete top-level counters: %#v", detail.Counters)
 	}
 	if len(detail.Build.CoreItems) != 6 {
 		t.Fatalf("ranked detail sample-gated OP.GG core recommendations: %#v", detail.Build.CoreItems)
+	}
+}
+
+func TestStructuredCountersNeverCallLosingMatchupsStrong(t *testing.T) {
+	provider := newChampionProvider()
+	for id := 100; id < 106; id++ {
+		provider.championMeta[id] = championMetadata{ID: id, Key: strconv.Itoa(id), NameZH: strconv.Itoa(id)}
+	}
+	counters := provider.structuredCounters([]opggCounter{
+		{ChampionID: 100, Play: 100, Win: 40},
+		{ChampionID: 101, Play: 100, Win: 41},
+		{ChampionID: 102, Play: 100, Win: 42},
+		{ChampionID: 103, Play: 100, Win: 43},
+		{ChampionID: 104, Play: 100, Win: 44},
+		{ChampionID: 105, Play: 100, Win: 45},
+	})
+	if len(counters.StrongAgainst) != 0 {
+		t.Fatalf("losing matchups leaked into StrongAgainst: %#v", counters.StrongAgainst)
+	}
+	if len(counters.WeakAgainst) != 5 {
+		t.Fatalf("WeakAgainst = %#v, want five lowest losing matchups", counters.WeakAgainst)
+	}
+}
+
+func TestStructuredCountersNeverCallWinningMatchupsWeak(t *testing.T) {
+	provider := newChampionProvider()
+	for id := 100; id < 106; id++ {
+		provider.championMeta[id] = championMetadata{ID: id, Key: strconv.Itoa(id), NameZH: strconv.Itoa(id)}
+	}
+	counters := provider.structuredCounters([]opggCounter{
+		{ChampionID: 100, Play: 100, Win: 51},
+		{ChampionID: 101, Play: 100, Win: 52},
+		{ChampionID: 102, Play: 100, Win: 53},
+		{ChampionID: 103, Play: 100, Win: 54},
+		{ChampionID: 104, Play: 100, Win: 55},
+		{ChampionID: 105, Play: 100, Win: 56},
+	})
+	if len(counters.WeakAgainst) != 0 {
+		t.Fatalf("winning matchups were labeled weak: %#v", counters.WeakAgainst)
 	}
 }
 
@@ -694,6 +770,42 @@ func TestParseOPGGItemDepthsExpandsDelayedFifthItemGames(t *testing.T) {
 	}
 	if len(depths[5]) != 1 || depths[5][0].Assets[0].ID != 3026 || depths[5][0].WinRate != 57.14 || depths[5][0].Games != 49 {
 		t.Fatalf("fifth items = %#v", depths[5])
+	}
+}
+
+func TestOPGGItemDepthDiagnosticsSeparateNetworkFailureFromParsedZero(t *testing.T) {
+	provider := newChampionProvider()
+	provider.cache = newChampionDataCache(nil)
+	events := make([]map[string]any, 0, 2)
+	provider.diag = func(event map[string]any) { events = append(events, event) }
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`1:["$","div",null,{"children":"no depth rows"}]`)), Request: request}, nil
+	})}
+	if _, _, err := provider.loadOPGGDepthRows(context.Background(), "jax", "top", "emerald_plus", "16.17", time.Time{}); !isOPGGDepthParseError(err) {
+		t.Fatalf("parsed-zero error = %v", err)
+	}
+	if len(events) != 1 || events[0]["event"] != "opgg_item_depths_parsed_zero" || events[0]["fields"] == nil || events[0]["rows"] != 0 {
+		t.Fatalf("parsed-zero diagnostic = %#v", events)
+	}
+
+	events = nil
+	provider.cache = newChampionDataCache(nil)
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusBadGateway, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("failure")), Request: request}, nil
+	})}
+	response := championDetailResponse{}
+	provider.resolveRankedItemDepths(context.Background(), "jax", "top", "emerald_plus", "16.17", nil, "16.17", errors.New("QQ101 unavailable"), true, false, &response)
+	var failed map[string]any
+	for _, event := range events {
+		if event["event"] == "opgg_item_depths_failed" {
+			failed = event
+		}
+	}
+	if failed == nil || failed["error_kind"] != "http-502" {
+		t.Fatalf("network-failure diagnostic = %#v", events)
+	}
+	if _, legacy := failed["errorKind"]; legacy {
+		t.Fatalf("network-failure diagnostic kept legacy field: %#v", failed)
 	}
 }
 
@@ -779,7 +891,7 @@ func TestLoadOPGGDepthRowsAllowsMissingSixthItemDepth(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(payload)), Header: make(http.Header)}, nil
 	})}
 
-	depths, _, err := provider.loadOPGGDepthRows(context.Background(), "lulu", "support", "emerald_plus", "16.16.1")
+	depths, _, err := provider.loadOPGGDepthRows(context.Background(), "lulu", "support", "emerald_plus", "16.16.1", time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -788,7 +900,7 @@ func TestLoadOPGGDepthRowsAllowsMissingSixthItemDepth(t *testing.T) {
 	}
 }
 
-func TestLoadOPGGDepthRowsRejectsMissingFifthItemDepth(t *testing.T) {
+func TestLoadOPGGDepthRowsKeepsOtherStagesWhenFifthIsAbsent(t *testing.T) {
 	payload := `1:["$","tr",null,{"children":["depth_4_item_0",{"metaType":"item","metaId":6333},{"children":[54.05,"%"]},{"children":"1,112 场"}]}]
 2:["$","tr",null,{"children":["depth_6_item_0",{"metaType":"item","metaId":3089},{"children":[55.5,"%"]},{"children":"123 场"}]}]`
 	provider := newChampionProvider()
@@ -797,8 +909,9 @@ func TestLoadOPGGDepthRowsRejectsMissingFifthItemDepth(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(payload)), Header: make(http.Header)}, nil
 	})}
 
-	if _, _, err := provider.loadOPGGDepthRows(context.Background(), "lulu", "support", "emerald_plus", "16.16.1"); err == nil || !strings.Contains(err.Error(), "item-depth response changed") {
-		t.Fatalf("missing fifth depth was accepted: %v", err)
+	depths, _, err := provider.loadOPGGDepthRows(context.Background(), "lulu", "support", "emerald_plus", "16.16.1", time.Time{})
+	if err != nil || len(depths[4]) != 1 || len(depths[5]) != 0 || len(depths[6]) != 1 {
+		t.Fatalf("missing fifth depth discarded other stages: %v %#v", err, depths)
 	}
 }
 

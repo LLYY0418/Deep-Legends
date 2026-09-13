@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -25,14 +26,15 @@ func (a *app) handleAccount(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "当前没有可用的客户端快照", http.StatusConflict)
 		return
 	}
-	_, _, backgroundSource, backgroundPath := profileBackground(a.account.Profile)
+	backgroundID, backgroundName, backgroundSource, backgroundPath := profileBackground(a.account.Profile)
 	response := struct {
 		Summoner publicSummoner `json:"summoner"`
 		Account  AccountData    `json:"account"`
 	}{
-		Summoner: publicSummoner{DisplayName: a.summoner.DisplayName, GameName: a.summoner.GameName, TagLine: a.summoner.TagLine, ProfileIconID: a.summoner.ProfileIconID, SummonerLevel: a.summoner.SummonerLevel, BackgroundSource: backgroundSource, BackgroundPath: backgroundPath},
+		Summoner: publicSummoner{DisplayName: a.summoner.DisplayName, GameName: a.summoner.GameName, TagLine: a.summoner.TagLine, ProfileIconID: a.summoner.ProfileIconID, SummonerLevel: a.summoner.SummonerLevel, BackgroundSkinID: backgroundID, BackgroundSkinName: backgroundName, BackgroundSource: backgroundSource, BackgroundPath: backgroundPath},
 		Account:  cloneAccountData(a.account),
 	}
+	response.Summoner.BackgroundPosterPath, response.Summoner.BackgroundVideoPath = overviewSkinMedia(a.allSkins, backgroundID)
 	a.mu.RUnlock()
 	respondJSON(w, response)
 }
@@ -56,6 +58,14 @@ func (a *app) handleEvents(w http.ResponseWriter, r *http.Request) {
 		a.eventMu.Unlock()
 	}()
 	_, _ = fmt.Fprint(w, "data: ready\n\n")
+	// Include an updater snapshot on initial subscribe as well as reconnect;
+	// a check may have finished between the renderer's status fetch and SSE.
+	if a.updates != nil {
+		data, _ := json.Marshal(a.updates.Status())
+		if err := writeLiveEvent(w, "update:status\n"+string(data)); err != nil {
+			return
+		}
+	}
 	flusher.Flush()
 	heartbeat := time.NewTicker(20 * time.Second)
 	defer heartbeat.Stop()
@@ -64,10 +74,14 @@ func (a *app) handleEvents(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case event := <-updates:
-			_, _ = fmt.Fprintf(w, "data: %s\n\n", event)
+			if err := writeLiveEvent(w, event); err != nil {
+				return
+			}
 			flusher.Flush()
 		case <-heartbeat.C:
-			_, _ = fmt.Fprint(w, ": keepalive\n\n")
+			if _, err := fmt.Fprint(w, ": keepalive\n\n"); err != nil {
+				return
+			}
 			flusher.Flush()
 		}
 	}
@@ -80,6 +94,20 @@ func (a *app) broadcastEvent(event string) {
 		select {
 		case subscriber <- event:
 		default:
+			// A slow renderer must recover *all* dirty slices, not silently lose
+			// the only connection/claim/roster notification. Coalesce overflow.
+			draining := true
+			for draining {
+				select {
+				case <-subscriber:
+				default:
+					draining = false
+				}
+			}
+			select {
+			case subscriber <- "resync-required":
+			default: // Only possible for an unbuffered test subscriber.
+			}
 		}
 	}
 }

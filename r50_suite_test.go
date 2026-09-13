@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -37,6 +38,29 @@ func TestWatchSettingsMigrateLegacyAndDefaultNewRulesOff(t *testing.T) {
 	}
 }
 
+func TestWatchSettingsFreshDefaultsAllAutomationOff(t *testing.T) {
+	settings := loadWatchSettings(&localStore{root: t.TempDir()})
+	rules := map[string]bool{
+		"autoAccept":        settings.Rules.AutoAccept.Enabled,
+		"autoReconnect":     settings.Rules.AutoReconnect.Enabled,
+		"autoPlayAgain":     settings.Rules.AutoPlayAgain.Enabled,
+		"autoHonor":         settings.Rules.AutoHonor.Enabled,
+		"skipCelebration":   settings.Rules.SkipCelebration.Enabled,
+		"positionBroadcast": settings.Rules.PositionBroadcast.Enabled,
+		"promoteLeader":     settings.Rules.PromoteLeader.Enabled,
+		"invitations":       settings.Rules.Invitations.Enabled,
+		"autoMatchmaking":   settings.Rules.AutoMatchmaking.Enabled,
+	}
+	for name, enabled := range rules {
+		if enabled {
+			t.Errorf("fresh rule %s unexpectedly enabled", name)
+		}
+	}
+	if settings.Facade.StatusMessageEnabled || settings.Facade.RankEnabled {
+		t.Fatalf("fresh facade login reset unexpectedly enabled: %#v", settings.Facade)
+	}
+}
+
 func TestWatchSettingsNormalizeEnumsAndSelectionBounds(t *testing.T) {
 	settings := defaultWatchSettings()
 	settings.Rules.AutoHonor.Strategy = "enemy"
@@ -62,7 +86,7 @@ func TestWatchApplyCancelsPendingActionsWhenDisabled(t *testing.T) {
 	runner.apply(settings)
 	ctx, cancel := context.WithCancel(context.Background())
 	runner.mu.Lock()
-	runner.pending["play-again"] = cancel
+	runner.pending["play-again"] = &watchPendingAction{cancel: cancel}
 	runner.mu.Unlock()
 	settings.MasterEnabled = false
 	runner.apply(settings)
@@ -108,6 +132,112 @@ func TestWatchReadFailuresBroadcastAndDoNotWrite(t *testing.T) {
 	}
 	if atomic.LoadInt32(&writes) != 0 {
 		t.Fatalf("read failure still issued %d writes", writes)
+	}
+}
+
+func TestWatchEventsRouteSkipCelebrationAndInvitationPolicies(t *testing.T) {
+	writes := make(chan string, 4)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet && r.URL.Path == "/lol-lobby/v2/received-invitations" {
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"invitationId": "accept-one", "queueId": 420},
+				{"invitationId": "decline-one", "queueId": 440},
+				{"invitationId": "ignore-one", "queueId": 450},
+			})
+			return
+		}
+		if r.Method == http.MethodPost {
+			writes <- r.URL.Path
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	runner := newWatchRunner(nil, nil)
+	settings := defaultWatchSettings()
+	settings.Rules.SkipCelebration.Enabled = true
+	settings.Rules.Invitations.Enabled = true
+	settings.Rules.Invitations.Policies = map[string]string{"420": "accept", "440": "decline", "450": "ignore"}
+	runner.apply(settings)
+
+	runner.handleEvent(client, LCUEvent{
+		URI:  "/lol-pre-end-of-game/v1/currentSequenceEvent",
+		Data: json.RawMessage(`{"name":"missions-celebration"}`),
+	}, Summoner{})
+	runner.handleEvent(client, LCUEvent{URI: "/lol-lobby/v2/received-invitations"}, Summoner{})
+
+	seen := map[string]bool{}
+	for len(seen) < 3 {
+		select {
+		case path := <-writes:
+			seen[path] = true
+		case <-time.After(2 * time.Second):
+			t.Fatalf("timed out waiting for watch writes; seen=%#v", seen)
+		}
+	}
+	for _, path := range []string{
+		"/lol-pre-end-of-game/v1/complete/missions-celebration",
+		"/lol-lobby/v2/received-invitations/accept-one/accept",
+		"/lol-lobby/v2/received-invitations/decline-one/decline",
+	} {
+		if !seen[path] {
+			t.Errorf("missing watch write %s; seen=%#v", path, seen)
+		}
+	}
+	if seen["/lol-lobby/v2/received-invitations/ignore-one/ignore"] {
+		t.Fatal("ignore invitation unexpectedly issued a write")
+	}
+}
+
+func TestWatchHonorEventNeverSelectsEnemy(t *testing.T) {
+	recipients := make(chan string, 1)
+	ballots := make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/lol-lobby/v2/party/eog-status":
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && r.URL.Path == "/lol-honor/v1/honor":
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Error(err)
+			}
+			recipients <- anyString(body, "recipientPuuid")
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodPost && r.URL.Path == "/lol-honor/v1/ballot":
+			ballots <- struct{}{}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	runner := newWatchRunner(nil, nil)
+	settings := defaultWatchSettings()
+	settings.Rules.AutoHonor.Enabled = true
+	settings.Rules.AutoHonor.Strategy = "any-teammate"
+	runner.apply(settings)
+	runner.handleEvent(client, LCUEvent{
+		URI:  "/lol-honor-v2/v1/ballot",
+		Data: json.RawMessage(`{"eligiblePlayers":[{"puuid":"enemy","isEnemy":true,"isAlly":false},{"puuid":"ally","isEnemy":false,"isAlly":true}]}`),
+	}, Summoner{PUUID: "self"})
+
+	select {
+	case recipient := <-recipients:
+		if recipient != "ally" {
+			t.Fatalf("honor recipient = %q, want ally", recipient)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for honor request")
+	}
+	select {
+	case <-ballots:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for honor ballot completion")
 	}
 }
 
@@ -159,6 +289,35 @@ func TestSettingsLockUsesTencentConfigAndRejectsSymlink(t *testing.T) {
 	a.handleSettingsLock(recorder, httptest.NewRequest(http.MethodPost, "/api/rig/settings-lock", strings.NewReader(`{"locked":false}`)))
 	if recorder.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("symlink status = %d, want 422", recorder.Code)
+	}
+}
+
+func TestSettingsLockRejectsAncestorSymlinkEscape(t *testing.T) {
+	allowedRoot := t.TempDir()
+	externalRoot := t.TempDir()
+	externalFile := filepath.Join(externalRoot, "Config", "PersistedSettings.json")
+	if err := os.MkdirAll(filepath.Dir(externalFile), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(externalFile, []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(externalRoot, filepath.Join(allowedRoot, "Game")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	location := settingsLocation{
+		allowedRoot: allowedRoot,
+		file:        filepath.Join(allowedRoot, "Game", "Config", "PersistedSettings.json"),
+	}
+	if _, _, err := safeSettingsFile(location); !errors.Is(err, errUnsafeSettingsFile) {
+		t.Fatalf("ancestor symlink escape error = %v, want %v", err, errUnsafeSettingsFile)
+	}
+	info, err := os.Stat(externalFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm()&0o222 == 0 {
+		t.Fatalf("outside settings file changed unexpectedly: mode=%v", info.Mode().Perm())
 	}
 }
 
@@ -298,7 +457,7 @@ func TestEventClaimDetailConcurrencyIsLimitedToFour(t *testing.T) {
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	entries, source := scanEventClaims(context.Background(), client)
-	if len(entries) != 8 || source.State != "available" {
+	if len(entries) != 0 || source.Count != 0 || source.State != "available" {
 		t.Fatalf("entries=%d source=%#v", len(entries), source)
 	}
 	if maximum > 4 {
@@ -328,9 +487,12 @@ func TestClaimCenterHasNoPersistenceOrDiagnosticWritePath(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := string(data)
-	for _, forbidden := range []string{"recordDiagnostic", "appendDiagnostic", "atomicWriteFile", "os.WriteFile", "writeLocalStoreFile"} {
+	for _, forbidden := range []string{"appendDiagnostic", "atomicWriteFile", "os.WriteFile", "writeLocalStoreFile"} {
 		if strings.Contains(source, forbidden) {
 			t.Fatalf("claim center contains forbidden persistence path %q", forbidden)
 		}
+	}
+	if strings.Contains(source, `"playerName"`) || strings.Contains(source, `"puuid"`) || strings.Contains(source, `"summonerId"`) {
+		t.Fatal("claim center diagnostic path contains an identity field")
 	}
 }

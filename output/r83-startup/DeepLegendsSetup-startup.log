@@ -1,0 +1,196 @@
+[pid=27840] 2026/09/11 20:11:04 starting DeepLegendsSetup
+[pid=27840] 2026/09/11 20:11:04 installer version=0.12.1 fingerprint=5a6a6d81a476
+[pid=27840] 2026/09/11 20:11:04 WebView runtime version=152.0.4191.66
+[pid=27840] 2026/09/11 20:11:04 WebView environment/controller initialization
+[pid=27840] 2026/09/11 20:11:05 WebView controller created
+[pid=27840] 2026/09/11 20:11:05 安装界面启动失败: configure WebView: get_Settings: WebView COM interface is unavailable
+[pid=23376] 2026/09/11 20:28:38 starting DeepLegendsSetup
+[pid=23376] 2026/09/11 20:28:38 installer version=0.12.1 fingerprint=2bafb51fb3cc
+[pid=23376] 2026/09/11 20:28:38 WebView runtime version=152.0.4191.66
+[pid=23376] 2026/09/11 20:28:38 WebView environment/controller initialization
+[pid=23376] 2026/09/11 20:28:39 WebView controller created
+[pid=23376] 2026/09/11 20:28:39 WebView settings configured
+[pid=23376] 2026/09/11 20:28:39 loading installer document
+[pid=23376] 2026/09/11 20:28:39 WebView document initialization confirmed
+[pid=23376] 2026/09/11 20:28:39 WebView document navigation completed
+[pid=23376] 2026/09/11 20:28:39 installer page ready; WebView visible
+[pid=26276] 2026/09/11 21:51:39 starting DeepLegendsSetup
+[pid=26276] 2026/09/11 21:51:39 installer version=0.12.1 fingerprint=6df2d2c287e3
+[pid=26276] 2026/09/11 21:51:39 WebView runtime version=152.0.4191.66
+[pid=26276] 2026/09/11 21:51:39 WebView environment/controller initialization
+[pid=26276] 2026/09/11 21:51:40 WebView controller created
+[pid=26276] 2026/09/11 21:51:40 WebView settings configured
+[pid=26276] 2026/09/11 21:51:40 loading installer document
+[pid=26276] 2026/09/11 21:51:40 WebView document initialization confirmed
+[pid=26276] 2026/09/11 21:51:40 WebView document navigation completed
+[pid=26276] 2026/09/11 21:51:40 installer page ready; WebView visible
+[pid=5236] 2026/09/11 22:39:34 starting DeepLegendsSetup
+[pid=5236] 2026/09/11 22:39:34 installer version=0.12.1 fingerprint=6df2d2c287e3
+[pid=5236] 2026/09/11 22:39:34 WebView runtime version=152.0.4191.66
+[pid=5236] 2026/09/11 22:39:34 WebView environment/controller initialization
+[pid=5236] 2026/09/11 22:39:34 WebView controller created
+[pid=5236] 2026/09/11 22:39:34 WebView settings configured
+[pid=5236] 2026/09/11 22:39:34 loading installer document
+[pid=5236] 2026/09/11 22:39:34 WebView document initialization confirmed
+[pid=5236] 2026/09/11 22:39:34 WebView document navigation completed
+[pid=5236] 2026/09/11 22:39:34 installer page ready; WebView visible
+[pid=26944] 2026/09/11 22:43:22 starting DeepLegendsSetup
+[pid=26944] 2026/09/11 22:43:22 installer version=0.12.1 fingerprint=b2be5e865f81
+[pid=26944] 2026/09/11 22:43:22 WebView runtime version=152.0.4191.66
+[pid=26944] 2026/09/11 22:43:22 WebView environment/controller initialization
+[pid=26944] 2026/09/11 22:43:22 WebView controller created
+[pid=26944] 2026/09/11 22:43:22 WebView settings configured
+[pid=26944] 2026/09/11 22:43:22 loading installer document
+[pid=26944] 2026/09/11 22:43:22 WebView document initialization confirmed
+[pid=26944] 2026/09/11 22:43:22 WebView document navigation completed
+[pid=26944] 2026/09/11 22:43:22 installer page ready; WebView visible
+[pid=21744] 2026/09/11 23:19:47 starting DeepLegendsSetup
+[pid=21744] 2026/09/11 23:19:47 installer version=0.12.1 fingerprint=6403b9734c23
+[pid=21744] 2026/09/11 23:19:47 WebView runtime version=152.0.4191.66
+[pid=21744] 2026/09/11 23:19:47 WebView environment/controller initialization
+[pid=21744] 2026/09/11 23:19:47 WebView controller created
+[pid=21744] 2026/09/11 23:19:47 WebView settings configured
+[pid=21744] 2026/09/11 23:19:47 loading installer document
+[pid=21744] 2026/09/11 23:19:47 WebView document initialization confirmed
+[pid=21744] 2026/09/11 23:19:47 WebView document navigation completed
+[pid=21744] 2026/09/11 23:19:47 installer page ready; WebView visible
+[pid=6452] 2026/09/12 11:00:11 starting DeepLegendsSetup
+[pid=6452] 2026/09/12 11:00:11 installer version=0.12.1 fingerprint=3db0f3e1a604
+[pid=6452] 2026/09/12 11:00:11 WebView runtime version=152.0.4191.66
+[pid=6452] 2026/09/12 11:00:11 WebView environment/controller initialization
+[pid=6452] 2026/09/12 11:00:11 WebView controller created
+[pid=6452] 2026/09/12 11:00:11 WebView settings configured
+[pid=6452] 2026/09/12 11:00:11 loading installer document
+[pid=6452] 2026/09/12 11:00:11 WebView document initialization confirmed
+[pid=6452] 2026/09/12 11:00:11 WebView document navigation completed
+[pid=6452] 2026/09/12 11:00:11 installer page ready; WebView visible
+[pid=24000] 2026/09/12 16:10:11 starting DeepLegendsSetup
+[pid=24000] 2026/09/12 16:10:11 installer version=0.12.1 fingerprint=b07acedb0203
+[pid=24000] 2026/09/12 16:10:11 WebView runtime version=152.0.4191.66
+[pid=24000] 2026/09/12 16:10:11 WebView environment/controller initialization
+[pid=24000] 2026/09/12 16:10:11 WebView controller created
+[pid=24000] 2026/09/12 16:10:11 WebView settings configured
+[pid=24000] 2026/09/12 16:10:11 loading installer document
+[pid=24000] 2026/09/12 16:10:11 WebView document initialization confirmed
+[pid=24000] 2026/09/12 16:10:11 WebView document navigation completed
+[pid=24000] 2026/09/12 16:10:11 installer page ready; WebView visible
+[pid=24000] 2026/09/12 16:10:33 startup prewarm enabled=false elapsed_ms=0
+[pid=24000] 2026/09/12 16:10:36 application launch pid=7480 error=<nil>
+[pid=24000] 2026/09/12 16:10:38 application handoff visible=true elapsed_ms=5400
+[pid=25932] 2026/09/12 16:24:05 starting DeepLegendsSetup
+[pid=25932] 2026/09/12 16:24:05 installer version=0.12.1 fingerprint=b07acedb0203
+[pid=25932] 2026/09/12 16:24:05 WebView runtime version=152.0.4191.66
+[pid=25932] 2026/09/12 16:24:05 WebView environment/controller initialization
+[pid=25932] 2026/09/12 16:24:05 WebView controller created
+[pid=25932] 2026/09/12 16:24:05 WebView settings configured
+[pid=25932] 2026/09/12 16:24:05 loading installer document
+[pid=25932] 2026/09/12 16:24:05 WebView document initialization confirmed
+[pid=25932] 2026/09/12 16:24:05 WebView document navigation completed
+[pid=25932] 2026/09/12 16:24:05 installer page ready; WebView visible
+[pid=25932] 2026/09/12 16:24:32 startup prewarm enabled=false elapsed_ms=0
+[pid=25932] 2026/09/12 16:24:36 application launch pid=29132 error=<nil>
+[pid=25932] 2026/09/12 16:24:38 application handoff visible=true elapsed_ms=5301
+[pid=23408] 2026/09/12 16:29:16 starting DeepLegendsSetup
+[pid=23408] 2026/09/12 16:29:16 installer version=0.12.1 fingerprint=974ec9e7284f
+[pid=23408] 2026/09/12 16:29:16 WebView runtime version=152.0.4191.66
+[pid=23408] 2026/09/12 16:29:16 WebView environment/controller initialization
+[pid=23408] 2026/09/12 16:29:16 WebView controller created
+[pid=23408] 2026/09/12 16:29:16 WebView settings configured
+[pid=23408] 2026/09/12 16:29:16 loading installer document
+[pid=23408] 2026/09/12 16:29:16 WebView document initialization confirmed
+[pid=23408] 2026/09/12 16:29:16 WebView document navigation completed
+[pid=23408] 2026/09/12 16:29:16 installer page ready; WebView visible
+[pid=23408] 2026/09/12 16:29:38 startup prewarm enabled=false elapsed_ms=0
+[pid=23408] 2026/09/12 16:29:41 application launch pid=27232 error=<nil>
+[pid=23408] 2026/09/12 16:29:43 application handoff visible=true elapsed_ms=5401
+[pid=2940] 2026/09/12 16:35:14 starting DeepLegendsSetup
+[pid=2940] 2026/09/12 16:35:14 installer version=0.12.1 fingerprint=9e980bfbd6c7
+[pid=2940] 2026/09/12 16:35:14 WebView runtime version=152.0.4191.66
+[pid=2940] 2026/09/12 16:35:14 WebView environment/controller initialization
+[pid=2940] 2026/09/12 16:35:14 WebView controller created
+[pid=2940] 2026/09/12 16:35:14 WebView settings configured
+[pid=2940] 2026/09/12 16:35:14 loading installer document
+[pid=2940] 2026/09/12 16:35:14 WebView document initialization confirmed
+[pid=2940] 2026/09/12 16:35:14 WebView document navigation completed
+[pid=2940] 2026/09/12 16:35:15 installer page ready; WebView visible
+[pid=2940] 2026/09/12 16:35:34 startup prewarm enabled=false elapsed_ms=0
+[pid=2940] 2026/09/12 16:35:38 application launch pid=27796 error=<nil>
+[pid=2940] 2026/09/12 16:35:40 application handoff visible=true elapsed_ms=5401
+[pid=3860] 2026/09/12 16:40:38 starting DeepLegendsSetup
+[pid=3860] 2026/09/12 16:40:38 installer version=0.12.1 fingerprint=796786e3e13b
+[pid=3860] 2026/09/12 16:40:38 WebView runtime version=152.0.4191.66
+[pid=3860] 2026/09/12 16:40:38 WebView environment/controller initialization
+[pid=3860] 2026/09/12 16:40:38 WebView controller created
+[pid=3860] 2026/09/12 16:40:38 WebView settings configured
+[pid=3860] 2026/09/12 16:40:38 loading installer document
+[pid=3860] 2026/09/12 16:40:38 WebView document initialization confirmed
+[pid=3860] 2026/09/12 16:40:38 WebView document navigation completed
+[pid=3860] 2026/09/12 16:40:38 installer page ready; WebView visible
+[pid=3860] 2026/09/12 16:41:00 startup prewarm enabled=false elapsed_ms=0
+[pid=3860] 2026/09/12 16:41:03 application launch pid=27640 error=<nil>
+[pid=3860] 2026/09/12 16:41:05 application handoff visible=true elapsed_ms=5300
+[pid=23288] 2026/09/12 16:48:08 starting DeepLegendsSetup
+[pid=23288] 2026/09/12 16:48:08 installer version=0.12.1 fingerprint=4dda8ef4b66e
+[pid=23288] 2026/09/12 16:48:08 WebView runtime version=152.0.4191.66
+[pid=23288] 2026/09/12 16:48:08 WebView environment/controller initialization
+[pid=23288] 2026/09/12 16:48:08 WebView controller created
+[pid=23288] 2026/09/12 16:48:08 WebView settings configured
+[pid=23288] 2026/09/12 16:48:08 loading installer document
+[pid=23288] 2026/09/12 16:48:08 WebView document initialization confirmed
+[pid=23288] 2026/09/12 16:48:08 WebView document navigation completed
+[pid=23288] 2026/09/12 16:48:08 installer page ready; WebView visible
+[pid=23288] 2026/09/12 16:48:41 startup prewarm enabled=false elapsed_ms=0
+[pid=23288] 2026/09/12 16:48:44 application launch pid=25312 error=<nil>
+[pid=23288] 2026/09/12 16:48:46 application handoff visible=true elapsed_ms=5300
+[pid=22700] 2026/09/12 16:52:31 starting DeepLegendsSetup
+[pid=22700] 2026/09/12 16:52:31 installer version=0.12.1 fingerprint=4dda8ef4b66e
+[pid=22700] 2026/09/12 16:52:31 WebView runtime version=152.0.4191.66
+[pid=22700] 2026/09/12 16:52:31 WebView environment/controller initialization
+[pid=22700] 2026/09/12 16:52:32 WebView controller created
+[pid=22700] 2026/09/12 16:52:32 WebView settings configured
+[pid=22700] 2026/09/12 16:52:32 loading installer document
+[pid=22700] 2026/09/12 16:52:32 WebView document initialization confirmed
+[pid=22700] 2026/09/12 16:52:32 WebView document navigation completed
+[pid=22700] 2026/09/12 16:52:32 installer page ready; WebView visible
+[pid=22700] 2026/09/12 16:52:54 startup prewarm enabled=true files=2 failures=0 timed_out=false elapsed_ms=35
+[pid=22700] 2026/09/12 16:52:57 application launch pid=24772 error=<nil>
+[pid=22700] 2026/09/12 16:52:59 application handoff visible=true elapsed_ms=5300
+[pid=25340] 2026/09/12 16:57:06 starting DeepLegendsSetup
+[pid=25340] 2026/09/12 16:57:06 installer version=0.12.1 fingerprint=022674c1afe5
+[pid=25340] 2026/09/12 16:57:06 WebView runtime version=152.0.4191.66
+[pid=25340] 2026/09/12 16:57:06 WebView environment/controller initialization
+[pid=25340] 2026/09/12 16:57:06 WebView controller created
+[pid=25340] 2026/09/12 16:57:06 WebView settings configured
+[pid=25340] 2026/09/12 16:57:06 loading installer document
+[pid=25340] 2026/09/12 16:57:06 WebView document initialization confirmed
+[pid=25340] 2026/09/12 16:57:06 WebView document navigation completed
+[pid=25340] 2026/09/12 16:57:07 installer page ready; WebView visible
+[pid=25340] 2026/09/12 16:57:28 startup prewarm enabled=true files=2 failures=0 timed_out=false elapsed_ms=48
+[pid=25340] 2026/09/12 16:57:31 application launch pid=16536 error=<nil>
+[pid=25340] 2026/09/12 16:57:33 application handoff visible=true elapsed_ms=4901
+[pid=10768] 2026/09/12 17:05:52 starting DeepLegendsSetup
+[pid=10768] 2026/09/12 17:05:52 installer version=0.12.1 fingerprint=7f7ad7aa95e8
+[pid=10768] 2026/09/12 17:05:52 WebView runtime version=152.0.4191.66
+[pid=10768] 2026/09/12 17:05:52 WebView environment/controller initialization
+[pid=10768] 2026/09/12 17:05:52 WebView controller created
+[pid=10768] 2026/09/12 17:05:52 WebView settings configured
+[pid=10768] 2026/09/12 17:05:52 loading installer document
+[pid=10768] 2026/09/12 17:05:52 WebView document initialization confirmed
+[pid=10768] 2026/09/12 17:05:53 WebView document navigation completed
+[pid=10768] 2026/09/12 17:05:53 installer page ready; WebView visible
+[pid=10768] 2026/09/12 17:06:19 startup prewarm enabled=true files=2 failures=0 timed_out=false elapsed_ms=46
+[pid=10768] 2026/09/12 17:06:22 application launch pid=28364 error=<nil>
+[pid=10768] 2026/09/12 17:06:24 application handoff visible=true elapsed_ms=4902
+[pid=21732] 2026/09/12 17:13:50 starting DeepLegendsSetup
+[pid=21732] 2026/09/12 17:13:50 installer version=0.12.1 fingerprint=606ed957dc9c
+[pid=21732] 2026/09/12 17:13:50 WebView runtime version=152.0.4191.66
+[pid=21732] 2026/09/12 17:13:50 WebView environment/controller initialization
+[pid=21732] 2026/09/12 17:13:51 WebView controller created
+[pid=21732] 2026/09/12 17:13:51 WebView settings configured
+[pid=21732] 2026/09/12 17:13:51 loading installer document
+[pid=21732] 2026/09/12 17:13:51 WebView document initialization confirmed
+[pid=21732] 2026/09/12 17:13:51 WebView document navigation completed
+[pid=21732] 2026/09/12 17:13:51 installer page ready; WebView visible
+[pid=21732] 2026/09/12 17:14:18 startup prewarm enabled=true files=2 failures=0 timed_out=false elapsed_ms=42
+[pid=21732] 2026/09/12 17:14:22 application launch pid=24328 error=<nil>
+[pid=21732] 2026/09/12 17:14:23 application handoff visible=true elapsed_ms=4901

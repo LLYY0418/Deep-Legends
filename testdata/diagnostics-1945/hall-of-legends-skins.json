@@ -1,0 +1,570 @@
+{
+  "67000": {
+    "id": 67000,
+    "contentId": "eef90880-a07c-4c0f-b999-9cb1ec0d5d43",
+    "isBase": true,
+    "name": "暗夜猎手",
+    "skinClassification": "kChampion",
+    "splashPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Base/Images/vayne_splash_centered_0.jpg",
+    "uncenteredSplashPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Base/Images/vayne_splash_uncentered_0.jpg",
+    "tilePath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Base/Images/vayne_splash_tile_0.jpg",
+    "loadScreenPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Base/VayneLoadScreen.jpg",
+    "skinType": "",
+    "rarity": "kNoRarity",
+    "isLegacy": false,
+    "splashVideoPath": null,
+    "previewVideoUrl": null,
+    "collectionSplashVideoPath": null,
+    "collectionCardHoverVideoPath": null,
+    "featuresText": null,
+    "chromaPath": null,
+    "emblems": null,
+    "regionRarityId": 0,
+    "rarityGemPath": null,
+    "skinLines": null,
+    "description": null
+  },
+  "67064": {
+    "id": 67064,
+    "contentId": "e7982e8b-e2e3-4e82-b793-f676030fd7db",
+    "isBase": false,
+    "name": "殿堂传奇 薇恩",
+    "skinClassification": "kChampion",
+    "splashPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/Images/vayne_splash_centered_64.jpg",
+    "uncenteredSplashPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/Images/vayne_splash_uncentered_64.jpg",
+    "tilePath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/Images/vayne_splash_tile_64.jpg",
+    "loadScreenPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/VayneLoadScreen_64.jpg",
+    "skinType": "",
+    "rarity": "kMythic",
+    "isLegacy": false,
+    "splashVideoPath": null,
+    "previewVideoUrl": null,
+    "collectionSplashVideoPath": null,
+    "collectionCardHoverVideoPath": null,
+    "featuresText": null,
+    "chromaPath": "/lol-game-data/assets/v1/champion-chroma-images/67/67064.png",
+    "chromas": [
+      {
+        "id": 67065,
+        "name": "殿堂传奇 薇恩 至强",
+        "contentId": "20520315-d4b3-4bf2-9303-b20e8cc6f5c6",
+        "relatedPrimeContentId": "",
+        "skinClassification": "kRecolor",
+        "chromaPath": "/lol-game-data/assets/v1/champion-chroma-images/67/67065.png",
+        "tilePath": "/lol-game-data/assets/v1/champion-chroma-images/67/67065.png",
+        "colors": [
+          "#BCD6EF",
+          "#474AF7"
+        ],
+        "descriptions": [
+          {
+            "region": "riot",
+            "description": "这个炫彩曾作为专属奖励发布，用于奖励那些拥有致敬Uzi的联盟不朽签名版收藏礼包的玩家。"
+          }
+        ],
+        "description": "这个炫彩曾作为专属奖励发布，用于奖励那些拥有致敬Uzi的联盟不朽签名版收藏礼包的玩家。",
+        "rarities": [
+          {
+            "region": "TENCENT",
+            "rarity": 6
+          },
+          {
+            "region": "riot",
+            "rarity": 5
+          }
+        ],
+        "skinAugments": {
+          "borders": {
+            "layer0": [
+              {
+                "contentId": "991f20b9-8119-4b9c-bdaf-fd1763487af1",
+                "layer": 0,
+                "priority": 0,
+                "borderPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/UI/VayneLoadScreen_Augments_Border_Starter.png"
+              },
+              {
+                "contentId": "7c12a759-18c5-4a6d-8cd0-364bf6dc45f5",
+                "layer": 0,
+                "priority": 1,
+                "borderPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/UI/VayneLoadScreen_Augments_Border_Premium.png"
+              }
+            ],
+            "layer1": [
+              {
+                "contentId": "d4b8dbda-c11b-4e07-89eb-779945a7fad3",
+                "layer": 1,
+                "priority": 0,
+                "borderPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/UI/VayneLoadScreen_Augments_Border_Signature.png"
+              }
+            ]
+          },
+          "augments": [
+            {
+              "contentId": "0e5de60c-66b1-4e39-a2b3-a4ba0507e175",
+              "overlays": [
+                {
+                  "centeredLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/LCOverlays/splash_centered_signature.png",
+                  "uncenteredLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/LCOverlays/splash_uncentered_signature.png",
+                  "socialCardLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/LCOverlays/social_card_signature.png",
+                  "tileLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/LCOverlays/splash_tile_signature.png"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 67066,
+        "name": "殿堂传奇 薇恩 登神",
+        "contentId": "910df5d2-e183-41cb-b86f-a6b0183cb5ed",
+        "relatedPrimeContentId": "",
+        "skinClassification": "kRecolor",
+        "chromaPath": "/lol-game-data/assets/v1/champion-chroma-images/67/67066.png",
+        "tilePath": "/lol-game-data/assets/v1/champion-chroma-images/67/67066.png",
+        "colors": [
+          "#EE7BA0",
+          "#DCAF66"
+        ],
+        "descriptions": [
+          {
+            "region": "riot",
+            "description": "这个炫彩曾作为专属奖励发布，用于奖励那些完成了致敬Uzi的2025名人堂通行证的玩家。"
+          }
+        ],
+        "description": "这个炫彩曾作为专属奖励发布，用于奖励那些完成了致敬Uzi的2025名人堂通行证的玩家。",
+        "rarities": [
+          {
+            "region": "TENCENT",
+            "rarity": 3
+          },
+          {
+            "region": "riot",
+            "rarity": 2
+          }
+        ],
+        "skinAugments": {
+          "borders": {
+            "layer0": [
+              {
+                "contentId": "991f20b9-8119-4b9c-bdaf-fd1763487af1",
+                "layer": 0,
+                "priority": 0,
+                "borderPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/UI/VayneLoadScreen_Augments_Border_Starter.png"
+              },
+              {
+                "contentId": "7c12a759-18c5-4a6d-8cd0-364bf6dc45f5",
+                "layer": 0,
+                "priority": 1,
+                "borderPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/UI/VayneLoadScreen_Augments_Border_Premium.png"
+              }
+            ],
+            "layer1": [
+              {
+                "contentId": "d4b8dbda-c11b-4e07-89eb-779945a7fad3",
+                "layer": 1,
+                "priority": 0,
+                "borderPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/UI/VayneLoadScreen_Augments_Border_Signature.png"
+              }
+            ]
+          },
+          "augments": [
+            {
+              "contentId": "0e5de60c-66b1-4e39-a2b3-a4ba0507e175",
+              "overlays": [
+                {
+                  "centeredLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/LCOverlays/splash_centered_signature.png",
+                  "uncenteredLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/LCOverlays/splash_uncentered_signature.png",
+                  "socialCardLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/LCOverlays/social_card_signature.png",
+                  "tileLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/LCOverlays/splash_tile_signature.png"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "emblems": [
+      {
+        "name": "Mythic",
+        "emblemPath": {
+          "large": "/lol-game-data/assets/v1/emblem-images/68.png",
+          "small": "/lol-game-data/assets/v1/emblem-images/68.png"
+        },
+        "positions": {}
+      }
+    ],
+    "regionRarityId": 8,
+    "rarityGemPath": "/lol-game-data/assets/v1/rarity-gem-icons/8_large.png",
+    "skinLines": [
+      {
+        "id": 204
+      }
+    ],
+    "skinAugments": {
+      "borders": {
+        "layer0": [
+          {
+            "contentId": "991f20b9-8119-4b9c-bdaf-fd1763487af1",
+            "layer": 0,
+            "priority": 0,
+            "borderPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/UI/VayneLoadScreen_Augments_Border_Starter.png"
+          },
+          {
+            "contentId": "7c12a759-18c5-4a6d-8cd0-364bf6dc45f5",
+            "layer": 0,
+            "priority": 1,
+            "borderPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/UI/VayneLoadScreen_Augments_Border_Premium.png"
+          }
+        ],
+        "layer1": [
+          {
+            "contentId": "d4b8dbda-c11b-4e07-89eb-779945a7fad3",
+            "layer": 1,
+            "priority": 0,
+            "borderPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/UI/VayneLoadScreen_Augments_Border_Signature.png"
+          }
+        ]
+      },
+      "augments": [
+        {
+          "contentId": "0e5de60c-66b1-4e39-a2b3-a4ba0507e175",
+          "overlays": [
+            {
+              "centeredLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/LCOverlays/splash_centered_signature.png",
+              "uncenteredLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/LCOverlays/splash_uncentered_signature.png",
+              "socialCardLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/LCOverlays/social_card_signature.png",
+              "tileLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Vayne/Skins/Skin64/LCOverlays/splash_tile_signature.png"
+            }
+          ]
+        }
+      ]
+    },
+    "description": "有些人质疑我们的传承，薇恩。我们将向他们证明，怀疑可以磨砺一个人的决心。作为我的生机守护者，我号召你将恐惧植入那些未够格者的心中。教一教那些敢于挑战你的人，什么是无情猎手。"
+  },
+  "103000": {
+    "id": 103000,
+    "contentId": "8c3cccab-50b5-4584-baed-a6e55bc275a8",
+    "isBase": true,
+    "name": "九尾妖狐",
+    "skinClassification": "kChampion",
+    "splashPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Base/Images/ahri_splash_centered_0.jpg",
+    "uncenteredSplashPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Base/Images/ahri_splash_uncentered_0.jpg",
+    "tilePath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Base/Images/ahri_splash_tile_0.jpg",
+    "loadScreenPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Base/AhriLoadscreen_0.jpg",
+    "skinType": "",
+    "rarity": "kNoRarity",
+    "isLegacy": false,
+    "splashVideoPath": null,
+    "previewVideoUrl": null,
+    "collectionSplashVideoPath": null,
+    "collectionCardHoverVideoPath": null,
+    "featuresText": null,
+    "emblems": null,
+    "regionRarityId": 0,
+    "rarityGemPath": null,
+    "skinLines": null,
+    "description": null
+  },
+  "103085": {
+    "id": 103085,
+    "contentId": "60b39907-8755-44a6-9096-e8393a6d3eb5",
+    "isBase": false,
+    "name": "殿堂传奇 阿狸",
+    "skinClassification": "kChampion",
+    "splashPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin85/Images/ahri_splash_centered_85.jpg",
+    "uncenteredSplashPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin85/Images/ahri_splash_uncentered_85.jpg",
+    "tilePath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin85/Images/ahri_splash_tile_85.jpg",
+    "loadScreenPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin85/AhriLoadScreen_85.jpg",
+    "skinType": "",
+    "rarity": "kTranscendent",
+    "isLegacy": false,
+    "splashVideoPath": null,
+    "previewVideoUrl": null,
+    "collectionSplashVideoPath": null,
+    "collectionCardHoverVideoPath": null,
+    "featuresText": null,
+    "questSkinInfo": {
+      "name": "名人堂 阿狸",
+      "productType": "kTieredSkin",
+      "collectionDescription": "",
+      "descriptionInfo": [],
+      "splashPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin85/Images/ahri_splash_centered_85.jpg",
+      "uncenteredSplashPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/Images/ahri_splash_uncentered_86.jpg",
+      "tilePath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/Images/collage_tile.jpg",
+      "collectionCardPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin85/Images/collection_card.jpg",
+      "tiers": [
+        {
+          "id": 103085,
+          "name": "殿堂传奇 阿狸",
+          "stage": 1,
+          "description": "祝贺，阿狸，你以优雅和谦逊的姿态完成了我的试炼。成为殿堂传奇绝非易事，即使面对失败，你也证明了自己的韧性。去吧，为不死大魔王铸就一段传说。若你准备好探寻自己真正的潜力……只需听我呼唤。  ",
+          "splashPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin85/Images/ahri_splash_centered_85.jpg",
+          "uncenteredSplashPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin85/Images/ahri_splash_uncentered_85.jpg",
+          "tilePath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin85/Images/ahri_splash_tile_85.jpg",
+          "loadScreenPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin85/AhriLoadScreen_85.jpg",
+          "shortName": "殿堂传奇 阿狸",
+          "splashVideoPath": null,
+          "previewVideoUrl": null,
+          "collectionSplashVideoPath": null,
+          "collectionCardHoverVideoPath": null,
+          "skinAugments": {
+            "borders": {
+              "layer0": [
+                {
+                  "contentId": "d4de70bc-ecfc-42ff-91bb-7a7340ba5a52",
+                  "layer": 0,
+                  "priority": 0,
+                  "borderPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin85/UI/AhriLoadScreen_Augments_Border_Starter.png"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": 103086,
+          "name": "联盟不朽 阿狸",
+          "stage": 2,
+          "description": "阿狸，你已经得到了圣印，证明你就是不死大魔王的天选者。你就是不朽传奇，世间罕有的奇才。你的成就让祖辈们骄傲，也让我欣慰。经此一战，历史将铭记你的威名和神力。欢迎，登神。",
+          "splashPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/Images/ahri_splash_centered_86.jpg",
+          "uncenteredSplashPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/Images/ahri_splash_uncentered_86.jpg",
+          "tilePath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/Images/ahri_splash_tile_86.jpg",
+          "loadScreenPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/AhriLoadScreen_86.jpg",
+          "shortName": "联盟不朽 阿狸",
+          "splashVideoPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/AnimatedSplash/Ahri_Skin86_centered.webm",
+          "previewVideoUrl": null,
+          "collectionSplashVideoPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/AnimatedSplash/Ahri_Skin86_uncentered.webm",
+          "collectionCardHoverVideoPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/AnimatedSplash/Ahri_Skin86_card.webm",
+          "skinAugments": {
+            "borders": {
+              "layer0": [
+                {
+                  "contentId": "ec49b467-4a9c-4161-a61e-2bf3eda4d69d",
+                  "layer": 0,
+                  "priority": 0,
+                  "borderPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/UI/AhriLoadScreen_Augments_Border_Premium.png"
+                }
+              ],
+              "layer1": [
+                {
+                  "contentId": "42a2cabc-0baf-496c-b95b-8fb3e5e959ad",
+                  "layer": 1,
+                  "priority": 0,
+                  "borderPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/UI/AhriLoadScreen_Augments_Border_Signature.png"
+                }
+              ]
+            },
+            "augments": [
+              {
+                "contentId": "6ffabbe3-59d9-4030-90fe-8bb395a29ebe"
+              },
+              {
+                "contentId": "34ebf37b-dc46-42ad-aeed-95e71bc3f0c6",
+                "overlays": [
+                  {
+                    "centeredLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/LCOverlays/splash_centered_signature.png",
+                    "uncenteredLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/LCOverlays/splash_uncentered_signature.png",
+                    "socialCardLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/LCOverlays/social_card_signature.png",
+                    "tileLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/LCOverlays/splash_tile_signature.png"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "emblems": [
+      {
+        "name": "HOL",
+        "emblemPath": {
+          "large": "/lol-game-data/assets/v1/emblem-images/84.png",
+          "small": "/lol-game-data/assets/v1/emblem-images/84.png"
+        },
+        "positions": {}
+      }
+    ],
+    "regionRarityId": 11,
+    "rarityGemPath": "/lol-game-data/assets/v1/rarity-gem-icons/11_large.png",
+    "skinLines": [
+      {
+        "id": 204
+      }
+    ],
+    "skinAugments": {
+      "borders": {
+        "layer0": [
+          {
+            "contentId": "d4de70bc-ecfc-42ff-91bb-7a7340ba5a52",
+            "layer": 0,
+            "priority": 0,
+            "borderPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin85/UI/AhriLoadScreen_Augments_Border_Starter.png"
+          }
+        ]
+      }
+    },
+    "description": "祝贺，阿狸，你以优雅和谦逊的姿态完成了我的试炼。成为殿堂传奇绝非易事，即使面对失败，你也证明了自己的韧性。去吧，为不死大魔王铸就一段传说。若你准备好探寻自己真正的潜力……只需听我呼唤。  "
+  },
+  "145000": {
+    "id": 145000,
+    "contentId": "7c99b534-b8b6-4d80-a9a3-6b6e0f8eef6b",
+    "isBase": true,
+    "name": "虚空之女",
+    "skinClassification": "kChampion",
+    "splashPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Base/Images/kaisa_splash_centered_0.jpg",
+    "uncenteredSplashPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Base/Images/kaisa_splash_uncentered_0.jpg",
+    "tilePath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Base/Images/kaisa_splash_tile_0.jpg",
+    "loadScreenPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Base/KaisaLoadscreen.jpg",
+    "skinType": "",
+    "rarity": "kNoRarity",
+    "isLegacy": false,
+    "splashVideoPath": null,
+    "previewVideoUrl": null,
+    "collectionSplashVideoPath": null,
+    "collectionCardHoverVideoPath": null,
+    "featuresText": null,
+    "emblems": null,
+    "regionRarityId": 0,
+    "rarityGemPath": null,
+    "skinLines": null,
+    "description": null
+  },
+  "145070": {
+    "id": 145070,
+    "contentId": "e584ba0f-97fd-4d53-abee-0520f72c8c1d",
+    "isBase": false,
+    "name": "殿堂传奇 卡莎",
+    "skinClassification": "kChampion",
+    "splashPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin70/Images/kaisa_splash_centered_70.jpg",
+    "uncenteredSplashPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin70/Images/kaisa_splash_uncentered_70.jpg",
+    "tilePath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin70/Images/kaisa_splash_tile_70.jpg",
+    "loadScreenPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin70/KaisaLoadScreen_70.jpg",
+    "skinType": "",
+    "rarity": "kTranscendent",
+    "isLegacy": false,
+    "splashVideoPath": null,
+    "previewVideoUrl": null,
+    "collectionSplashVideoPath": null,
+    "collectionCardHoverVideoPath": null,
+    "featuresText": null,
+    "questSkinInfo": {
+      "name": "名人堂 卡莎",
+      "productType": "kTieredSkin",
+      "collectionDescription": "",
+      "descriptionInfo": [],
+      "splashPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin70/Images/kaisa_splash_centered_70.jpg",
+      "uncenteredSplashPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/Images/kaisa_splash_uncentered_71.jpg",
+      "tilePath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/Images/collage_tile.jpg",
+      "collectionCardPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin70/Images/kaisa_splash_tile_70.jpg",
+      "tiers": [
+        {
+          "id": 145070,
+          "name": "殿堂传奇 卡莎",
+          "stage": 1,
+          "description": "我对你付之以信任是对的，卡莎。我对这个世界的愿景，需要坚定不移的信念，而你已经在每一个转折点证明了自己的价值。现在，你真正的考验开始了——去掌控我赋予你的力量。你准备好迎接挑战了吗？",
+          "splashPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin70/Images/kaisa_splash_centered_70.jpg",
+          "uncenteredSplashPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin70/Images/kaisa_splash_uncentered_70.jpg",
+          "tilePath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin70/Images/kaisa_splash_tile_70.jpg",
+          "loadScreenPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin70/KaisaLoadScreen_70.jpg",
+          "shortName": "殿堂传奇 卡莎",
+          "splashVideoPath": null,
+          "previewVideoUrl": null,
+          "collectionSplashVideoPath": null,
+          "collectionCardHoverVideoPath": null,
+          "skinAugments": {
+            "borders": {
+              "layer0": [
+                {
+                  "contentId": "50b7cbc3-b463-416d-b4c8-94fe6027c7a3",
+                  "layer": 0,
+                  "priority": 0,
+                  "borderPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin70/UI/KaisaLoadScreen_Augments_Border_Starter.png"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": 145071,
+          "name": "联盟不朽 卡莎",
+          "stage": 2,
+          "description": "你感受到这股力量了吗，卡莎？这是无情猎手的拥抱。你经过激烈的战斗才赢得了我“联盟不朽”的称号。现在你必须放手。听从你的本能，做必须做的事，因为那些挡路者应该受到惩罚。让他们知道没有人能从狩猎中逃脱——即使是诸神。",
+          "splashPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/Images/kaisa_splash_centered_71.jpg",
+          "uncenteredSplashPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/Images/kaisa_splash_uncentered_71.jpg",
+          "tilePath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/Images/kaisa_splash_tile_71.jpg",
+          "loadScreenPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/KaisaLoadScreen_71.jpg",
+          "shortName": "联盟不朽 卡莎",
+          "splashVideoPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/AnimatedSplash/Kaisa_Skin71_centered.webm",
+          "previewVideoUrl": null,
+          "collectionSplashVideoPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/AnimatedSplash/Kaisa_Skin71_uncentered.webm",
+          "collectionCardHoverVideoPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/AnimatedSplash/Kaisa_Skin71_card.webm",
+          "skinAugments": {
+            "borders": {
+              "layer0": [
+                {
+                  "contentId": "4bb42983-db31-424c-8e06-d545001329f3",
+                  "layer": 0,
+                  "priority": 0,
+                  "borderPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/UI/KaisaLoadScreen_Augments_Border_Premium.png"
+                }
+              ],
+              "layer1": [
+                {
+                  "contentId": "5f5533a7-b951-473d-8272-c0a87cc56ddf",
+                  "layer": 1,
+                  "priority": 0,
+                  "borderPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/UI/KaisaLoadScreen_Augments_Border_Signature.png"
+                }
+              ]
+            },
+            "augments": [
+              {
+                "contentId": "6b817ce1-aac3-4f17-a2fe-1bcf2a0ea7d0"
+              },
+              {
+                "contentId": "45fe6596-ed0a-4b8a-9a4d-cf8a8743c693",
+                "overlays": [
+                  {
+                    "centeredLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/LCOverlays/splash_centered_signature.png",
+                    "uncenteredLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/LCOverlays/splash_uncentered_signature.png",
+                    "socialCardLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/LCOverlays/social_card_signature.png",
+                    "tileLCOverlayPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin71/LCOverlays/splash_tile_signature.png"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "emblems": [
+      {
+        "name": "HOL",
+        "emblemPath": {
+          "large": "/lol-game-data/assets/v1/emblem-images/84.png",
+          "small": "/lol-game-data/assets/v1/emblem-images/84.png"
+        },
+        "positions": {}
+      }
+    ],
+    "regionRarityId": 11,
+    "rarityGemPath": "/lol-game-data/assets/v1/rarity-gem-icons/11_large.png",
+    "skinLines": [
+      {
+        "id": 204
+      }
+    ],
+    "skinAugments": {
+      "borders": {
+        "layer0": [
+          {
+            "contentId": "50b7cbc3-b463-416d-b4c8-94fe6027c7a3",
+            "layer": 0,
+            "priority": 0,
+            "borderPath": "/lol-game-data/assets/ASSETS/Characters/Kaisa/Skins/Skin70/UI/KaisaLoadScreen_Augments_Border_Starter.png"
+          }
+        ]
+      }
+    },
+    "description": "我对你付之以信任是对的，卡莎。我对这个世界的愿景，需要坚定不移的信念，而你已经在每一个转折点证明了自己的价值。现在，你真正的考验开始了——去掌控我赋予你的力量。你准备好迎接挑战了吗？"
+  }
+}

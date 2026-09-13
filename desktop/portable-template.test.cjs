@@ -3,11 +3,54 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
+const crypto = require("node:crypto");
 const path = require("node:path");
 
 const templatePath = path.join(__dirname, "nsis", "portable.nsi");
 const applyTemplate = require("./apply-portable-template.cjs");
 const verifyHook = require("./verify-embedded-riot-key.cjs");
+const runtimeVerifier = require("./verify-packaged-runtime.cjs");
+
+// A test forgetting its fixture root must fail before touching a user's build.
+// Other test files run in separate Node processes; restore our wrappers on exit.
+const protectedBuildFiles = new Set([
+  path.join(__dirname, "backend", "loot-service.exe"),
+  path.join(__dirname, "node_modules", "app-builder-lib", "templates", "nsis", "portable.nsi"),
+]);
+const writeMethods = { writeFileSync: 0, appendFileSync: 0, copyFileSync: 1 };
+const originalWriteMethods = new Map();
+test.before(() => {
+  for (const [name, destinationIndex] of Object.entries(writeMethods)) {
+    const original = fs[name];
+    originalWriteMethods.set(name, original);
+    fs[name] = (...args) => {
+      const destination = args[destinationIndex];
+      if (typeof destination === "string") {
+        assert.ok(!protectedBuildFiles.has(path.resolve(destination)), `test attempted to overwrite a real build input: ${destination}`);
+      }
+      return original(...args);
+    };
+  }
+});
+test.after(() => { for (const [name, original] of originalWriteMethods) fs[name] = original; });
+
+function isolatedDesktop(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "deep-legends-portable-test-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const backend = path.join(root, "backend", "loot-service.exe");
+  const template = path.join(root, "node_modules", "app-builder-lib", "templates", "nsis", "portable.nsi");
+  fs.mkdirSync(path.dirname(backend), { recursive: true });
+  fs.mkdirSync(path.dirname(template), { recursive: true });
+  fs.mkdirSync(path.join(root, "nsis"));
+  fs.copyFileSync(templatePath, path.join(root, "nsis", "portable.nsi"));
+  fs.writeFileSync(backend, "synthetic test backend, never a packaged executable");
+  fs.writeFileSync(template, "synthetic upstream template");
+  for (const name of ["main.cjs", "preload.cjs", "proxy-resolution.cjs"]) {
+    fs.writeFileSync(path.join(root, name), `// synthetic ${name}\n`);
+  }
+  return { root, backend, template };
+}
 
 test("定制便携版模板存在且保留缓存秒开的关键行为", () => {
   const script = fs.readFileSync(templatePath, "utf8");
@@ -38,56 +81,163 @@ test("打包配置与模板配套：asarUnpack 后端、不再使用解压期启
   assert.deepEqual(config.build.asarUnpack, ["backend/loot-service.exe"]);
   assert.ok(!("splashImage" in (config.build.portable || {})));
   assert.ok(config.build.files.includes("backend/loot-service.exe"));
+  assert.ok(config.build.files.includes("window-bounds-store.cjs"));
   assert.ok(!config.build.files.includes("runtime-backend.cjs"));
 });
 
-test("模板应用会替换指纹占位符，且 beforePack 拒绝过期模板", () => {
-  const builderTemplate = path.join(__dirname, "node_modules", "app-builder-lib", "templates", "nsis", "portable.nsi");
-  const original = fs.existsSync(builderTemplate) ? fs.readFileSync(builderTemplate, "utf8") : null;
-  try {
-    const fingerprint = applyTemplate.applyPortableTemplate();
-    const applied = fs.readFileSync(builderTemplate, "utf8");
-    assert.doesNotMatch(applied, /@@BUILD_FINGERPRINT@@/);
-    assert.match(applied, new RegExp(`DEEP_LEGENDS_BUILD_FINGERPRINT\\s+"${fingerprint}"`));
-    assert.doesNotThrow(() => verifyHook.verifyPortableTemplate());
-    fs.writeFileSync(builderTemplate, applied.replace(fingerprint, "000000000000"), "utf8");
-    assert.throws(() => verifyHook.verifyPortableTemplate(), /指纹过期/);
-  } finally {
-    if (original !== null) fs.writeFileSync(builderTemplate, original, "utf8");
+test("所有桌面运行时本地模块都进入 app.asar 和源码指纹", () => {
+  const config = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
+  const packaged = new Set(config.build.files);
+  const runtimeModules = config.build.files.filter((name) => name.endsWith(".cjs"));
+  for (const moduleName of runtimeModules) {
+    const source = fs.readFileSync(path.join(__dirname, moduleName), "utf8");
+    for (const match of source.matchAll(/require\(["']\.\/([^"']+)["']\)/g)) {
+      const dependency = path.posix.normalize(path.posix.join(path.posix.dirname(moduleName), match[1]));
+      assert.ok(packaged.has(dependency), `${moduleName} requires unpackaged runtime module ${dependency}`);
+    }
+  }
+  const fingerprintSource = fs.readFileSync(path.join(__dirname, "source-fingerprint.cjs"), "utf8");
+  assert.match(fingerprintSource, /desktopConfig\.build\.files/);
+  assert.match(fingerprintSource, /name\.endsWith\("\.cjs"\)/);
+
+  const required = runtimeVerifier.requiredRuntimeEntries();
+  assert.ok(required.includes("window-bounds-store.cjs"));
+  assert.doesNotThrow(() => runtimeVerifier.verifyArchiveEntries(required.map((name) => `/${name}`)));
+  assert.throws(
+    () => runtimeVerifier.verifyArchiveEntries(required.filter((name) => name !== "window-bounds-store.cjs")),
+    /window-bounds-store\.cjs/,
+  );
+
+  const shellBuild = fs.readFileSync(path.join(__dirname, "..", "build-desktop.sh"), "utf8");
+  const windowsBuild = fs.readFileSync(path.join(__dirname, "..", "build-desktop-windows.ps1"), "utf8");
+  assert.match(shellBuild, /verify-packaged-runtime\.cjs/);
+  assert.match(windowsBuild, /verify-packaged-runtime\.cjs/);
+});
+
+test("Shell 只构建 setup 并复用 Electron 下载缓存", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "build-desktop.sh"), "utf8");
+
+  assert.doesNotMatch(source, /\bgo build\s+-a\b/);
+  assert.match(source, /electron_zip_name="electron-v\$\{electron_version\}-win32-x64\.zip"/);
+  assert.match(source, /\$HOME\/Library\/Caches\/electron/);
+  assert.match(source, /\$XDG_CACHE_HOME\/electron/);
+  assert.match(source, /command -v find/);
+  assert.match(source, /command -v unzip/);
+  assert.match(source, /unzip -tq "\$candidate"/);
+  assert.match(source, /AUTO_ELECTRON_DIST/);
+  assert.match(source, /if \[\[ -n "\$\{ELECTRON_DIST:-\}" \]\]; then\s+printf '%s\\n' "\$ELECTRON_DIST"/);
+  assert.match(source, /Reusing cached Electron distribution/);
+
+  const resolutionIndexes = [...source.matchAll(/electron_dist="\$\(resolve_electron_dist \|\| true\)"/g)].map((match) => match.index);
+  assert.equal(resolutionIndexes.length, 1, "setup 前只需查一次缓存");
+  assert.match(source, /setup_args\+=\(--config\.electronDist="\$electron_dist"\)/);
+
+  const setupIndex = source.indexOf('npm run pack:win-setup -- "${setup_args[@]}"');
+  assert.ok(setupIndex > resolutionIndexes[0], "setup 构建前应先尝试复用已有缓存");
+  for (const file of ["build-desktop.sh", "build-desktop-windows.ps1"]) {
+    const entry = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
+    assert.equal((entry.match(/npm run pack:win-setup/g) || []).length, 1);
+    assert.doesNotMatch(entry, /npm run pack:win\s|Compress-Archive|zip -qr|apply-portable-template|SKIP_SETUP/);
   }
 });
 
-test("模板前置校验拒绝未替换占位符，后端内容变化会改变指纹", () => {
-  const builderTemplate = path.join(__dirname, "node_modules", "app-builder-lib", "templates", "nsis", "portable.nsi");
-  const backendPath = path.join(__dirname, "backend", "loot-service.exe");
-  const originalTemplate = fs.readFileSync(builderTemplate, "utf8");
-  const originalBackend = fs.readFileSync(backendPath);
-  try {
-    fs.writeFileSync(builderTemplate, fs.readFileSync(templatePath, "utf8"), "utf8");
-    assert.throws(() => verifyHook.verifyPortableTemplate(), /占位符/);
-    fs.writeFileSync(builderTemplate, originalTemplate, "utf8");
-    const before = applyTemplate.buildFingerprint();
-    const changed = Buffer.from(originalBackend);
-    changed[changed.length - 1] ^= 1;
-    fs.writeFileSync(backendPath, changed);
-    assert.notEqual(applyTemplate.buildFingerprint(), before);
-  } finally {
-    fs.writeFileSync(backendPath, originalBackend);
-    fs.writeFileSync(builderTemplate, originalTemplate, "utf8");
-  }
+test("历史 portable 模板工具替换指纹占位符并拒绝过期模板", (t) => {
+  const { root, template } = isolatedDesktop(t);
+  const fingerprint = applyTemplate.applyPortableTemplate(root);
+  const applied = fs.readFileSync(template, "utf8");
+  assert.doesNotMatch(applied, /@@BUILD_FINGERPRINT@@/);
+  assert.match(applied, new RegExp(`DEEP_LEGENDS_BUILD_FINGERPRINT\\s+"${fingerprint}"`));
+  assert.doesNotThrow(() => verifyHook.verifyPortableTemplate(root));
+  fs.writeFileSync(template, applied.replace(fingerprint, "000000000000"), "utf8");
+  assert.throws(() => verifyHook.verifyPortableTemplate(root), /指纹过期/);
 });
 
-test("同时产出便携版与安装版，且文件名不冲突", () => {
+test("模板前置校验拒绝未替换占位符，后端内容变化会改变指纹", (t) => {
+  const { root, template, backend } = isolatedDesktop(t);
+  fs.copyFileSync(templatePath, template);
+  assert.throws(() => verifyHook.verifyPortableTemplate(root), /占位符/);
+  const before = applyTemplate.applyPortableTemplate(root);
+  fs.appendFileSync(backend, "changed backend");
+  assert.notEqual(applyTemplate.buildFingerprint(root), before);
+  assert.throws(() => verifyHook.verifyPortableTemplate(root), /指纹过期/);
+});
+
+test("模板指纹仅读取指定工作目录的四个输入", (t) => {
+  const { root } = isolatedDesktop(t);
+  const hash = crypto.createHash("sha256");
+  for (const name of ["backend/loot-service.exe", "main.cjs", "preload.cjs", "proxy-resolution.cjs"]) {
+    hash.update(fs.readFileSync(path.join(root, name)));
+  }
+  assert.equal(applyTemplate.buildFingerprint(root), hash.digest("hex").slice(0, 12));
+});
+
+test("交错执行破坏性模板测试不会污染另一个构建的后端和模板", (t) => {
+  const build = isolatedDesktop(t), probe = isolatedDesktop(t);
+  applyTemplate.applyPortableTemplate(build.root);
+  const originalBackend = fs.readFileSync(build.backend), originalTemplate = fs.readFileSync(build.template);
+  assert.doesNotThrow(() => verifyHook.verifyPortableTemplate(build.root));
+  applyTemplate.applyPortableTemplate(probe.root);
+  fs.writeFileSync(probe.backend, ""); // even the truncation phase stays inside the fixture
+  assert.throws(() => verifyHook.verifyPortableTemplate(probe.root), /指纹过期/);
+  fs.copyFileSync(templatePath, probe.template);
+  assert.throws(() => verifyHook.verifyPortableTemplate(probe.root), /占位符/);
+  assert.doesNotThrow(() => verifyHook.verifyPortableTemplate(build.root));
+  assert.deepEqual(fs.readFileSync(build.backend), originalBackend);
+  assert.deepEqual(fs.readFileSync(build.template), originalTemplate);
+});
+
+test("默认只有 setup 目标，安装选项和外观资源保持完整", () => {
   const config = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
   const targets = config.build.win.target.map((entry) => entry.target);
-  assert.deepEqual(targets.sort(), ["nsis", "portable"]);
-  assert.match(config.build.portable.artifactName, /Deep Legends \$\{env\.DEEP_LEGENDS_FINGERPRINT\}/);
-  assert.match(config.build.nsis.artifactName, /Deep Legends Setup \$\{env\.DEEP_LEGENDS_FINGERPRINT\}/);
+  assert.deepEqual(targets, ["nsis"]);
+  assert.equal(config.build.portable, undefined);
+  assert.match(config.build.nsis.artifactName, /Deep Legends Setup \$\{version\}/);
   // 安装版必须是用户级免管理员安装，且允许自选目录。
   assert.equal(config.build.nsis.oneClick, false);
   assert.equal(config.build.nsis.perMachine, false);
-  assert.equal(config.build.nsis.allowToChangeInstallationDirectory, true);
-  // 两个 NSIS 系目标必须分两次调用；同一次构建会互相踩包文件。
-  assert.equal(config.scripts["pack:win"], "electron-builder --win portable --x64");
+  // The stock directory page is replaced, not added alongside our branded page.
+  assert.equal(config.build.nsis.allowToChangeInstallationDirectory, false);
+  assert.equal(config.build.nsis.include, "nsis/installer.nsh");
+  const installer = fs.readFileSync(path.join(__dirname, config.build.nsis.include), "utf8");
+  assert.match(installer, /Page custom DLDirectoryPage DLDirectoryLeave/);
+  assert.equal(config.scripts["pack:win"], "npm run pack:win-setup --");
   assert.equal(config.scripts["pack:win-setup"], "electron-builder --win nsis --x64");
+});
+
+test("R71 executable resource editing stays enabled and branded setup has exactly two choices", () => {
+  for (const file of ["build-desktop.sh", "build-desktop-windows.ps1"]) {
+    const source = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
+    assert.doesNotMatch(source, /--config\.win\.signAndEditExecutable=false/);
+    assert.match(source, /--config\.win\.signExecutable=false/);
+  }
+  const { build } = require("./package.json");
+  for (const icon of [build.win.icon, build.nsis.installerIcon, build.nsis.uninstallerIcon]) {
+    assert.equal(icon, "assets/hexcore-icon.ico");
+    const data = fs.readFileSync(path.join(__dirname, icon));
+    assert.equal(data.readUInt16LE(2), 1, "ICO resource required");
+  }
+  const source = fs.readFileSync(path.join(__dirname, build.nsis.include), "utf8");
+  assert.equal((source.match(/Page custom /g) || []).length, 2);
+  assert.match(source, /NSD_CreateDirRequest/);
+  assert.match(source, /NSD_CreateCheckbox/);
+  assert.match(source, /customInstallMode/);
+  assert.ok(source.indexOf("kernel32::GetFullPathNameW") < source.indexOf("StrLen $2 $1"), "validate canonical destination, not user spelling");
+  assert.match(source, /ExecShellAsUser/);
+  assert.match(source, /CreateDirectory "\$1"/);
+  assert.match(source, /GetTempFileName \$2 "\$1"/);
+  assert.ok(source.indexOf("GetTempFileName") < source.indexOf("StrCpy $INSTDIR $1"));
+});
+
+
+test("NSIS page functions wait until standard builder plugins are available", () => {
+  const script = fs.readFileSync(path.join(__dirname, "nsis", "installer.nsh"), "utf8");
+  const start = script.indexOf("!macro customHeader");
+  const end = script.indexOf("!macroend", start);
+  assert.ok(start >= 0 && end > start);
+  for (const match of script.matchAll(/^Function /gm)) {
+    assert.ok(match.index > start && match.index < end, "functions must be deferred beyond the async custom include");
+  }
+  assert.match(script, /!define DL_INSTALLER_ICON/);
+  assert.match(script, /\$\{If\} \$\{isForAllUsers\}/);
+  assert.match(script, /\$\{ElseIf\} \$\{isForCurrentUser\}/);
 });

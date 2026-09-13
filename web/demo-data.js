@@ -10,9 +10,12 @@
   if (!enabled) return;
   const demoCatalogFailure = query.get("demoCatalogFailure") === "1";
   // `?demo=arena` keeps the normal demo intact while exposing the live Arena
-  // recommendation layout for visual review. It is intentionally demo-only.
+  // recommendation layout for visual review. `?demo=arena-full` shows the
+  // defensive 6 x 3 in-progress grouping. Both are intentionally demo-only.
   const arenaLiveDemo = query.get("demo") === "arena" || query.has("demoArena") || location.hash.includes("arena");
+  const arenaFullDemo = query.get("demo") === "arena-full" || query.has("demoArenaFull") || location.hash.includes("arena-full");
   const hextechLiveDemo = query.get("demo") === "hextech" || query.has("demoHextech") || location.hash.includes("hextech");
+  const currentGameDemo = query.get("demo") === "current-game" || query.has("demoCurrentGame") || location.hash.includes("current-game");
   try { if (query.has("demo") || location.hash.includes("demo")) localStorage.setItem("lol-loot-demo", "1"); } catch (_) {}
 
   const now = Date.now();
@@ -140,6 +143,7 @@
         { lootId: "CHEST_CHAMPION_MASTERY", displayName: "战利品宝箱", category: "材料", kind: "宝箱", count: 4 },
         { lootId: "CHEST_224", displayName: "杰作宝箱", category: "材料", kind: "宝箱", count: 1 },
         { lootId: "CHEST_PROMOTION", displayName: "紫色宝箱", category: "材料", kind: "宝箱", count: 1 },
+        { lootId: "CHEST_GENERIC", displayName: "海克斯科技宝箱", category: "材料", kind: "宝箱", count: 1 },
         { lootId: "MATERIAL_KEY_FRAGMENT", displayName: "钥匙碎片", category: "材料", kind: "材料", count: 7 },
         { lootId: "MATERIAL_KEY", displayName: "海克斯钥匙", category: "材料", kind: "材料", count: 6 },
         { lootId: "CURRENCY_CHAMPION", displayName: "蓝色精粹", category: "材料", kind: "货币", count: 48_230 },
@@ -160,7 +164,7 @@
         { title: "荣誉等级 4", status: "PENDING", dateCreated: iso(60 * 96), items: [{ title: "荣誉胶囊", quantity: 1 }] },
       ],
       capabilities: [
-        { name: "loot", state: "available", count: 15, detail: "本机客户端已返回数据" },
+		{ name: "loot", state: "available", count: 16, detail: "本机客户端已返回数据" },
         { name: "rewards", state: "available", count: 3, detail: "本机客户端已返回数据" },
         { name: "store", state: "unsupported", count: 0, detail: "当前客户端不支持，已降级" },
       ],
@@ -227,15 +231,15 @@
   // 斗魂竞技场演示对局：21 名玩家、3 人一队共 7 支小队，带名次。
   // ID、品质与图标路径来自 Riot 的 cherry-augments 中文目录；描述仅用于演示 tooltip。
   const arenaAugmentCatalog = [
-    { id: 1205, name: "物理转魔法", rarity: "kSilver", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/ADAPt_small.png", description: "将额外攻击力转化为法术强度。" },
-    { id: 1141, name: "全心为你", rarity: "kGold", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/AllForYou_small.png", description: "强化你为友军提供的治疗与护盾效果。" },
-    { id: 1002, name: "尖端发明家", rarity: "kGold", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/ApexInventor_small.png", description: "你的装备技能获得大量技能急速。" },
-    { id: 2087, name: "大法师", rarity: "kPrismatic", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/Eureka_small.png", description: "根据最大法力值获得额外法术强度。" },
-    { id: 1004, name: "回归基本功", rarity: "kPrismatic", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/BackToBasics_small.png", description: "禁用终极技能，并大幅强化基础技能。" },
-    { id: 2103, name: "狙神飞星", rarity: "kGold", iconPath: "/lol-game-data/assets/ASSETS/UX/Kiwi/Augments/Icons/QuestBangBang_small.png", description: "从远距离命中敌人时造成额外伤害。" },
-    { id: 1180, name: "超强大脑", rarity: "kGold", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/BigBrain_small.png", description: "战斗开始时获得基于法术强度的护盾。" },
-    { id: 1006, name: "利刃华尔兹", rarity: "kPrismatic", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/BladeWaltz_small.png", description: "获得利刃华尔兹，突进并连续攻击附近敌人。" },
-    { id: 1007, name: "大力", rarity: "kSilver", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/BluntForce_small.png", description: "获得额外攻击力。" },
+    { id: 1205, name: "物理转魔法", rarity: "kSilver", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/ADAPt_large.png", fallbackIconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/ADAPt_small.png", description: "将额外攻击力转化为法术强度。" },
+    { id: 1141, name: "全心为你", rarity: "kGold", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/AllForYou_large.png", fallbackIconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/AllForYou_small.png", description: "强化你为友军提供的治疗与护盾效果。" },
+    { id: 1002, name: "尖端发明家", rarity: "kGold", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/ApexInventor_large.png", fallbackIconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/ApexInventor_small.png", description: "你的装备技能获得大量技能急速。" },
+    { id: 2087, name: "大法师", rarity: "kPrismatic", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/Eureka_large.png", fallbackIconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/Eureka_small.png", description: "根据最大法力值获得额外法术强度。" },
+    { id: 1004, name: "回归基本功", rarity: "kPrismatic", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/BackToBasics_large.png", fallbackIconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/BackToBasics_small.png", description: "禁用终极技能，并大幅强化基础技能。" },
+    { id: 2103, name: "狙神飞星", rarity: "kGold", iconPath: "/lol-game-data/assets/ASSETS/UX/Kiwi/Augments/Icons/QuestBangBang_large.png", fallbackIconPath: "/lol-game-data/assets/ASSETS/UX/Kiwi/Augments/Icons/QuestBangBang_small.png", description: "从远距离命中敌人时造成额外伤害。" },
+    { id: 1180, name: "超强大脑", rarity: "kGold", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/BigBrain_large.png", fallbackIconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/BigBrain_small.png", description: "战斗开始时获得基于法术强度的护盾。" },
+    { id: 1006, name: "利刃华尔兹", rarity: "kPrismatic", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/BladeWaltz_large.png", fallbackIconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/BladeWaltz_small.png", description: "获得利刃华尔兹，突进并连续攻击附近敌人。" },
+    { id: 1007, name: "大力", rarity: "kSilver", iconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/BluntForce_large.png", fallbackIconPath: "/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/BluntForce_small.png", description: "获得额外攻击力。" },
     { id: 1103, name: "面包和黄油", rarity: "kGold", iconPath: "/lol-game-data/assets/ASSETS/UX/Kiwi/Augments/Icons/GenericAbilityAugmentIcon_Gold.png", description: "你的 Q 技能获得大量技能急速。" },
     { id: 1151, name: "面包和奶酪", rarity: "kGold", iconPath: "/lol-game-data/assets/ASSETS/UX/Kiwi/Augments/Icons/GenericAbilityAugmentIcon_Gold.png", description: "你的 E 技能获得大量技能急速。" },
     { id: 1150, name: "面包和果酱", rarity: "kGold", iconPath: "/lol-game-data/assets/ASSETS/UX/Kiwi/Augments/Icons/GenericAbilityAugmentIcon_Gold.png", description: "你的 W 技能获得大量技能急速。" },
@@ -279,7 +283,7 @@
   });
   const overview = {
     player: {
-      playerRef: "", displayName: summoner.displayName, gameName: summoner.gameName, tagLine: summoner.tagLine,
+      playerRef: currentGameDemo ? "demo-current-game" : "", displayName: summoner.displayName, gameName: summoner.gameName, tagLine: summoner.tagLine,
       profileIconId: summoner.profileIconId, summonerLevel: summoner.summonerLevel, hidden: false, isCurrent: true,
       backgroundSkinId: 164000, backgroundSkinName: "卡蜜尔", backgroundSource: "ddragon", backgroundPath: "/cdn/img/champion/splash/Camille_0.jpg",
     },
@@ -385,10 +389,11 @@
       artworkSource: "ddragon", artworkPath: `/cdn/img/champion/splash/${key}_0.jpg`, searchTerms: [name, key],
     };
   });
+	const akaliDemoChampion = { id: 84, key: "Akali", slug: "akali", nameZh: "阿卡丽", titleZh: "离群之刺", nameEn: "Akali", titleEn: "the Rogue Assassin", imageSource: "gtimg", imagePath: "/images/lol/act/img/champion/Akali.png", artworkSource: "ddragon", artworkPath: "/cdn/img/champion/splash/Akali_0.jpg", searchTerms: ["阿卡丽", "Akali", "adk"] };
   const championsCatalogFixture = {
     source: "Riot Data Dragon", region: "KR", patch: PATCH, fetchedAt: new Date(now).toISOString(),
     tiers: [["all", "全部段位"], ["emerald_plus", "翡翠以上"], ["diamond_plus", "钻石以上"]].map(([value, label]) => ({ value, label })),
-    champions: arenaDemoChampions,
+	champions: [...arenaDemoChampions, akaliDemoChampion],
   };
   const arenaRankingsFixture = {
     mode: "arena", region: "GLOBAL", patch: "16.16", source: "OP.GG JSON", fetchedAt: new Date(now).toISOString(), entertainmentSample: true,
@@ -416,6 +421,7 @@
   const demoAugmentAsset = (augment) => ({
     id: augment.id, kind: "arena-augment", name: augment.name, description: augment.description, source: "communitydragon",
     path: `/latest/game/assets/${augment.iconPath.split("/ASSETS/").at(-1).toLowerCase()}`,
+    fallbackPath: augment.fallbackIconPath ? `/latest/game/assets/${augment.fallbackIconPath.split("/ASSETS/").at(-1).toLowerCase()}` : "",
   });
   const augmentRarityNumber = { kSilver: 1, kGold: 4, kPrismatic: 8 };
   const augmentRarityKey = { kSilver: "silver", kGold: "gold", kPrismatic: "prismatic" };
@@ -497,6 +503,7 @@
       playerRef: "", gameName: isCurrent ? summoner.gameName : `演示玩家`, tagLine: "DEMO",
       rank: { tier, division: "II", leaguePoints: 45 },
       modeStats: { games: wins + losses, wins, losses, winRate: Number((wins * 100 / (wins + losses)).toFixed(1)), kda: kdaValue },
+      recentPositions: [{ position, games: Math.max(1, recentGames.length) }],
       recentGames, recentRankedRecord: { games: recentGames.length, wins: recentWins, losses: recentGames.length - recentWins },
     };
   };
@@ -517,7 +524,7 @@
     ],
     recommendations: {
       source: "ranked", resolvedMode: "ranked", resolvedRegion: "KR", dataVersion: PATCH, currentVersion: PATCH,
-      isFallback: false, isStale: false, hasRunes: true, hasAugments: false, hasTopPlayers: true,
+      isFallback: false, isStale: false, hasRunes: true, hasAugments: false, hasTopPlayers: true, hasItemDepths: true,
       positions: [{ position: "top", roleRate: 76.4 }, { position: "mid", roleRate: 23.6 }],
       resolvedPosition: "top", positionSource: "requested",
       hero: {
@@ -650,10 +657,12 @@
     })),
     fourthOptions: [], fifthOptions: [], sixthOptions: [], itemChainStatus: "ready",
   };
-  const arenaLivePlayers = arenaChampionPool.slice(0, 10).map(([championId, championName], index) => ({
+  const arenaLivePlayers = arenaChampionPool.slice(0, 18).map(([championId, championName], index) => ({
     ...livePlayer(championId, championName, "other", index < 5 ? 100 : 200, index === 0, index % 3 === 0 ? "diamond" : "emerald", 6 + (index % 4), 3 + (index % 3), 2.8 + index * .2, index + 1),
-    subteamId: Math.floor(index / 2) + 1,
-    placement: Math.floor(index / 2) + 1,
+    subteamId: Math.floor(index / 3) + 1,
+    arenaGroup: String(Math.floor(index / 3) + 1),
+    placement: Math.floor(index / 3) + 1,
+    isAlly: index < 3,
     championLocked: true,
     spell1Id: 4,
     spell2Id: 32,
@@ -670,7 +679,8 @@
     mapId: 30,
     gameId: 97001,
     currentChampionId: 799,
-    players: arenaLivePlayers,
+	champSelectNotice: "斗魂英雄选择阶段只展示小队玩家信息",
+	players: arenaLivePlayers.slice(0, 3).map((player) => ({ ...player, isAlly: true })),
     recommendations: {
       source: "OP.GG JSON",
       resolvedMode: "arena",
@@ -682,6 +692,7 @@
       hasRunes: false,
       hasAugments: true,
       hasTopPlayers: false,
+      hasItemDepths: false,
       hasCounters: false,
       hasBanRate: false,
       positions: [],
@@ -697,6 +708,14 @@
       })),
       { slot: "R", name: "终极技能", iconPath: `ddragon:/cdn/${PATCH}/img/spell/AmbessaR.png`, description: "向前突进并锁定目标。" },
     ],
+  };
+  const arenaFullLive = {
+    ...structuredClone(arenaLive),
+    phase: "InProgress",
+    champSelectNotice: "",
+    players: structuredClone(arenaLivePlayers),
+    arenaGrouped: true,
+    arenaMascotMapping: true,
   };
 
   const hextechLiveAugments = arenaLiveAugments.map((augment, index) => ({
@@ -747,6 +766,7 @@
       hasRunes: false,
       hasAugments: true,
       hasTopPlayers: false,
+      hasItemDepths: false,
       hasCounters: false,
       hasBanRate: false,
       positions: [],
@@ -832,9 +852,9 @@
     ],
   });
 
-  /* ---------- 随行：值守 / 整备 / 门面 / 拾遗 ---------- */
+  /* ---------- 工具：自动 / 维护 / 生涯 / 领奖 / 征召 ---------- */
   let suiteWatch = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     masterEnabled: true,
     rules: {
       autoAccept: { enabled: true, delayMs: 1500 },
@@ -849,6 +869,41 @@
     },
     facade: { statusMessageEnabled: false, statusMessage: "", rankEnabled: false, rank: {} },
   };
+  const suiteChampSelectGroups = [
+    { groupId: "ranked", name: "排位（单双 / 灵活）", banLimit: 5, pickLimit: 5, positions: ["top", "jungle", "middle", "bottom", "utility", "default"], hasBan: true, hasBench: false, hasTrade: true },
+    { groupId: "normal", name: "普通征召", banLimit: 5, pickLimit: 5, positions: ["default"], hasBan: true, hasBench: false, hasTrade: true },
+    { groupId: "aram", name: "大乱斗类", banLimit: 0, pickLimit: 5, positions: ["default"], hasBan: false, hasBench: true, hasTrade: true },
+    { groupId: "arena", name: "斗魂竞技场", banLimit: 3, pickLimit: 3, positions: ["default"], hasBan: true, hasBench: false, hasTrade: false },
+    { groupId: "event", name: "活动模式", banLimit: 3, pickLimit: 3, positions: ["default"], hasBan: true, hasBench: false, hasTrade: true },
+    { groupId: "practice", name: "人机 / 自定义", banLimit: 5, pickLimit: 5, positions: ["default"], hasBan: true, hasBench: false, hasTrade: true },
+  ];
+  const demoChampSelectSide = (delayMs, champions = {}) => ({ enabled: false, strategy: "show-then-lock", delayMs, avoidTeammateIntent: true, champions });
+  suiteWatch.champSelect = { enabled: true, groups: Object.fromEntries(suiteChampSelectGroups.map((definition) => {
+    const pools = Object.fromEntries(definition.positions.map((position) => [position, []]));
+    return [definition.groupId, { ban: demoChampSelectSide(2000, { default: [] }), pick: demoChampSelectSide(500, structuredClone(pools)), bench: { enabled: definition.hasBench, holdMs: 1000, preferFirst: definition.hasBench, handleTrade: false } }];
+  })) };
+  suiteWatch.champSelect.groups.ranked.ban.enabled = true;
+  suiteWatch.champSelect.groups.ranked.ban.champions.default = [157, 238, 103, 61];
+  suiteWatch.champSelect.groups.ranked.pick.enabled = true;
+  suiteWatch.champSelect.groups.ranked.pick.strategy = "lock-now";
+  suiteWatch.champSelect.groups.ranked.pick.champions.middle = [103, 61, 517];
+  suiteWatch.champSelect.groups.normal.ban.enabled = true;
+  suiteWatch.champSelect.groups.normal.ban.champions.default = [157, 238, 103];
+  suiteWatch.champSelect.groups.aram.pick.enabled = true;
+  suiteWatch.champSelect.groups.aram.pick.champions.default = [222, 145, 99, 412];
+  suiteWatch.champSelect.groups.aram.bench.enabled = true;
+  let suiteChampSelectState = {
+    active: true, phase: "ChampSelect", groupId: "ranked", position: "middle", remainingMs: 18000, benchEnabled: false, sessionPaused: false, unsupported: false,
+    banCapabilityKnown: true, hasBanAction: true, activeBanId: 103, activePickId: 0,
+    banStates: { "157": "gone", "238": "intent", "103": "available", "61": "available", "517": "available" },
+    pickStates: { "157": "gone", "238": "intent", "103": "available", "61": "available", "517": "unavailable" },
+    owned: { "157": true, "238": true, "103": true, "61": true, "517": false },
+    records: [
+      { at: iso(0.7), kind: "ok", message: "进入英雄选择，识别为排位（单双 / 灵活），禁用使用共用序列，选用使用中单序列" },
+      { at: iso(0.3), kind: "warn", message: "已顺延前 2 个不可用备选" },
+      { at: iso(0.1), kind: "ok", message: "已排定：2.0 秒后亮出禁用英雄 103" },
+    ],
+  };
   let suiteRig = {
     connected: true, region: "TENCENT", platform: "HN1",
     installRoot: "C:\\Riot Games\\League of Legends\\TCLS",
@@ -856,17 +911,21 @@
     settingsFile: "C:\\Riot Games\\League of Legends\\Game\\Config\\PersistedSettings.json",
     settingsKnown: true, settingsLocked: true, uxState: "Running",
   };
-  const facadeSkins = [
+	const facadeSkins = [
     [99000, "拉克丝", true], [99001, "星之守护者 拉克丝", true], [99007, "大元素使 拉克丝", false],
     [103000, "阿狸", true], [103028, "灵魂莲华 阿狸", true], [103071, "K/DA ALL OUT 阿狸", true],
     [222000, "金克丝", true], [222002, "爆竹 金克丝", true],
-  ].map(([id, name, owned]) => ({ id, name, championId: id < 100000 ? 99 : id < 200000 ? 103 : 222, championName: id < 100000 ? "拉克丝" : id < 200000 ? "阿狸" : "金克丝", splashPath: `/lol-game-data/assets/v1/champion-icons/${id < 100000 ? 99 : id < 200000 ? 103 : 222}.png`, tilePath: `/lol-game-data/assets/v1/champion-icons/${id < 100000 ? 99 : id < 200000 ? 103 : 222}.png`, owned }));
+	].map(([id, name, owned]) => ({ id, name, championId: id < 100000 ? 99 : id < 200000 ? 103 : 222, championName: id < 100000 ? "拉克丝" : id < 200000 ? "阿狸" : "金克丝", splashPath: `/lol-game-data/assets/v1/champion-icons/${id < 100000 ? 99 : id < 200000 ? 103 : 222}.png`, tilePath: `/lol-game-data/assets/v1/champion-icons/${id < 100000 ? 99 : id < 200000 ? 103 : 222}.png`, owned }))
+	  .concat(championsCatalogFixture.champions.filter((champion) => ![99, 103, 222].includes(champion.id)).map((champion) => ({ id: champion.id * 1000, name: champion.nameZh, championId: champion.id, championName: champion.nameZh, splashPath: `/lol-game-data/assets/v1/champion-icons/${champion.id}.png`, tilePath: `/lol-game-data/assets/v1/champion-icons/${champion.id}.png`, owned: true })));
   let suiteFacade = {
     connected: true,
     summoner: { ...summoner, summonerLevel: 452 },
     profile: { backgroundSkinId: 99001, backgroundSkinName: "星之守护者 拉克丝" },
-    chat: { availability: "chat", statusMessage: "今晚九点峡谷见", lol: { rankedLeagueQueue: "RANKED_SOLO_5X5", rankedLeagueTier: "DIAMOND", rankedLeagueDivision: "II" } },
-    regalia: { preferredBannerType: "lastSeasonHighestRank" },
+	chat: { availability: "chat", statusMessage: "今晚九点峡谷见", lol: { rankedLeagueQueue: "RANKED_SOLO_5X5", rankedLeagueTier: "DIAMOND", rankedLeagueDivision: "II", playerTitleSelected: 101, gameStatus: "outOfGame" } },
+	regalia: { preferredBannerType: "lastSeasonHighestRank" },
+	challengeSummary: { title: { name: "峡谷先锋", contentId: "demo-title-content-id", itemId: 101 }, topChallenges: [], selectedChallengesString: "", categoryProgress: [] },
+	challenges: [{ id: "101", name: "不破不立" }, { id: "202", name: "峡谷收藏家" }, { id: "303", name: "团队之星" }],
+	challengesReady: true,
     skins: facadeSkins,
     loginReset: structuredClone(suiteWatch.facade),
   };
@@ -874,8 +933,9 @@
   const suiteClaimItems = [
     { key: "grant:spirit-2023", source: "grant", id: "spirit-2023", rewardGroupId: "choice-a", title: "灵魂莲华 2023 · 通行证赠礼", description: "你从未做出选择，这份发放单一直挂在服务端账本上", dateCreated: "2023-06-14T08:00:00Z", items: [rewardItem("chest-star", "星之守护者宝箱"), rewardItem("be-1350", "1350 蓝色精粹"), rewardItem("keys-3", "海克斯钥匙", 3)], minSelections: 1, maxSelections: 1, historical: true, needsChoice: true },
     { key: "grant:arena-2023", source: "grant", id: "arena-2023", rewardGroupId: "arena-a", title: "斗魂竞技场 · 首赛季参与奖", dateCreated: "2023-07-21T08:00:00Z", items: [rewardItem("arena-avatar", "斗魂头像"), rewardItem("arena-icon", "斗魂图标")], historical: true, needsChoice: false, overlapWith: "event" },
-    { key: "grant:unnamed-4", source: "grant", id: "unnamed-4", rewardGroupId: "choice-b", title: "未命名奖励组 (4)", description: "客户端返回了 Riot 占位标题，已按奖励内容数量兜底命名", dateCreated: iso(60 * 30), items: [rewardItem("portal", "符文之地传送门"), rewardItem("chest-2", "普通宝箱", 2), rewardItem("be-625", "625 蓝色精粹"), rewardItem("emote", "随机表情")], minSelections: 1, maxSelections: 1, historical: false, needsChoice: true },
-    { key: "mission:weekly-1", source: "mission", id: "weekly-1", rewardGroupIds: ["weekly-a"], title: "周常任务 · 完成 3 场对局", description: "领取后服务端会解锁链上的下一个任务；随行会重扫但不会自动续领", items: [rewardItem("mission-points", "任务积分", 250)], historical: false, needsChoice: false, chainId: "weekly", chainIndex: 1, chainCount: 3 },
+    { key: "grant:pass-orange", source: "grant", id: "pass-orange", rewardGroupId: "pass-a", displayGroup: "pass", title: "通行证奖励", dateCreated: iso(60 * 30), items: [rewardItem("orange-25", "25 橙色精粹", 25)], historical: false, needsChoice: false },
+    { key: "grant:pass-blue", source: "grant", id: "pass-blue", rewardGroupId: "pass-b", displayGroup: "pass", title: "通行证奖励", dateCreated: iso(60 * 30), items: [rewardItem("blue-750", "750 蓝色精粹", 750)], historical: false, needsChoice: false },
+    { key: "mission:weekly-1", source: "mission", id: "weekly-1", rewardGroupIds: ["weekly-a"], title: "周常任务 · 完成 3 场对局", description: "领取后服务端会解锁链上的下一个任务；工具会重扫但不会自动续领", items: [rewardItem("mission-points", "任务积分", 250)], historical: false, needsChoice: false, chainId: "weekly", chainIndex: 1, chainCount: 3 },
     { key: "event:hextech-2024", source: "event", id: "hextech-2024", title: "海克斯狂欢 2024 · 通行证轨道", description: "事件中心会一次领取当前轨道的全部未领取项", dateCreated: "2024-03-01T08:00:00Z", items: [rewardItem("orb", "海克斯宝珠", 6)], historical: true, needsChoice: false },
     { key: "grant:champion-road", source: "grant", id: "champion-road", rewardGroupId: "road-a", title: "冠军之路 · 段位达成奖励", dateCreated: "2025-11-02T08:00:00Z", items: [rewardItem("victory-skin", "胜利皮肤碎片")], historical: true, needsChoice: false, failure: { statusCode: 400, errorCode: "RewardGrantAlreadyFulfilled", message: "该发放单已被处理", consequence: "重新扫描后可能消失；本批次其它条目不受影响。" } },
     { key: "mission:daily", source: "mission", id: "daily", rewardGroupIds: ["daily-a"], title: "每日首胜奖励", items: [rewardItem("xp", "赛季经验", 400)], historical: false, needsChoice: false },
@@ -885,7 +945,41 @@
     { key: "grant:anniversary", source: "grant", id: "anniversary", rewardGroupId: "anniversary-a", title: "联盟周年纪念奖励", dateCreated: "2022-10-08T08:00:00Z", items: [rewardItem("anniversary-icon", "周年纪念图标")], historical: true, needsChoice: false },
     { key: "grant:choice-small", source: "grant", id: "choice-small", rewardGroupId: "choice-c", title: "赛季材料二选一", items: [rewardItem("orange", "橙色精粹", 500), rewardItem("blue", "蓝色精粹", 1200)], minSelections: 1, maxSelections: 1, historical: false, needsChoice: true },
   ];
-  let suiteClaims = { connected: true, scannedAt: iso(0.2), items: suiteClaimItems, sources: { grant: { count: 7, state: "available" }, mission: { count: 3, state: "available" }, event: { count: 2, state: "available" } }, historicalEvidence: true };
+  let suiteClaims = { connected: true, scannedAt: iso(0.2), items: suiteClaimItems, sources: { grant: { count: 8, state: "available" }, mission: { count: 3, state: "available" }, event: { count: 2, state: "available" } }, historicalEvidence: true };
+
+  /* ---------- 正在进行的游戏演示（仅 ?demo=current-game） ---------- */
+  const currentGamePlayers = [
+    [64, "李青", "峡谷先锋", "KR1", "jungle", "win", 4, 11, 8010, 8100, "CHALLENGER", 1284],
+    [266, "亚托克斯", "不灭剑魔", "KR2", "top", "", 4, 12, 8010, 8400, "GRANDMASTER", 742],
+    [103, "阿狸", "九尾妖狐", "KR3", "middle", "loss", 4, 14, 8128, 8200, "MASTER", 516],
+    [145, "卡莎", "虚空之女", "KR4", "bottom", "win", 4, 7, 8005, 8300, "GRANDMASTER", 681],
+    [412, "锤石", "魂锁典狱长", "KR5", "utility", "", 4, 14, 8351, 8400, "MASTER", 447],
+    [24, "贾克斯", "武器大师", "KR6", "top", "loss", 4, 12, 8010, 8300, "CHALLENGER", 1138],
+    [121, "卡兹克", "虚空掠夺者", "KR7", "jungle", "", 4, 11, 8128, 8200, "GRANDMASTER", 809],
+    [61, "奥莉安娜", "发条魔灵", "KR8", "middle", "win", 4, 12, 8005, 8200, "MASTER", 593],
+    [51, "凯特琳", "皮城女警", "KR9", "bottom", "", 4, 7, 8005, 8300, "GRANDMASTER", 716],
+    [235, "赛娜", "涤魂圣枪", "KR10", "utility", "loss", 4, 14, 8351, 8400, "MASTER", 472],
+  ].map((entry, index) => ({
+    playerRef: `demo-live-player-${index + 1}`,
+    championId: entry[0], championName: entry[1], gameName: entry[2], tagLine: entry[3],
+    preferredPosition: entry[4], streak: entry[5], summonerLevel: 320 + index * 37,
+    spells: [entry[6], entry[7]], runes: [entry[8], entry[9]],
+    rank: { tier: entry[10], division: "I", leaguePoints: entry[11] },
+    recent: Array.from({ length: 8 }, (_, recentIndex) => ({
+      championId: [entry[0], 164, 222, 92][recentIndex % 4],
+      championName: [entry[1], "卡蜜尔", "金克丝", "锐雯"][recentIndex % 4],
+      win: (recentIndex + index) % 3 !== 1,
+      spells: [entry[6], entry[7]],
+    })),
+  }));
+  const currentGame = currentGameDemo ? {
+    status: "active", source: "OP.GG", checkedAt: iso(0), startedAt: iso(13), gameId: "demo-current-game",
+    queue: "单排/双排", map: "召唤师峡谷",
+    teams: [
+      { side: "blue", averageRank: { tier: "GRANDMASTER", division: "I" }, averageLP: 734, players: currentGamePlayers.slice(0, 5) },
+      { side: "red", averageRank: { tier: "GRANDMASTER", division: "I" }, averageLP: 746, players: currentGamePlayers.slice(5, 10) },
+    ],
+  } : { status: "none", source: "演示数据", checkedAt: iso(0) };
 
   /* ---------- fetch 拦截 ---------- */
   const fixtures = new Map([
@@ -893,12 +987,15 @@
     ["/api/chromas", () => ({ items: chromas, count: chromas.length, ownedCount: 2, capability: { name: "chromas", state: "available", count: chromas.length } })],
     ["/api/account", () => account],
     ["/api/gameplay/overview", () => overview],
-    ["/api/gameplay/live", () => hextechLiveDemo ? hextechLive : arenaLiveDemo ? arenaLive : live],
+    ["/api/gameplay/current-game", () => currentGame],
+    ["/api/gameplay/live", () => hextechLiveDemo ? hextechLive : arenaFullDemo ? arenaFullLive : arenaLiveDemo ? arenaLive : live],
     ["/api/gameplay/perks", () => perksCatalog],
     ["/api/gameplay/items", () => demoItemsCatalog],
     ["/api/champions/catalog", () => championsCatalogFixture],
     ["/api/social/friends", friendsFixture],
     ["/api/watch/rules", () => structuredClone(suiteWatch)],
+	["/api/champselect/groups", () => structuredClone(suiteChampSelectGroups)],
+	["/api/champselect/state", () => structuredClone(suiteChampSelectState)],
     ["/api/rig/status", () => structuredClone(suiteRig)],
     ["/api/facade/state", () => structuredClone(suiteFacade)],
     ["/api/claim/scan", () => structuredClone(suiteClaims)],
@@ -957,6 +1054,10 @@
       try { suiteWatch = JSON.parse(init?.body || "{}"); } catch (_) {}
       return Promise.resolve(new Response(JSON.stringify(structuredClone(suiteWatch)), { status: 200, headers: { "Content-Type": "application/json" } }));
     }
+	if (pathname === "/api/champselect/pause" && String(init?.method || "GET").toUpperCase() === "POST") {
+	  try { suiteChampSelectState.sessionPaused = Boolean(JSON.parse(init?.body || "{}").paused); } catch (_) {}
+	  return Promise.resolve(new Response(JSON.stringify(structuredClone(suiteChampSelectState)), { status: 200, headers: { "Content-Type": "application/json" } }));
+	}
     if (pathname === "/api/rig/settings-lock") {
       try { suiteRig.settingsLocked = Boolean(JSON.parse(init?.body || "{}").locked); } catch (_) {}
       return Promise.resolve(new Response(JSON.stringify(structuredClone(suiteRig)), { status: 200, headers: { "Content-Type": "application/json" } }));

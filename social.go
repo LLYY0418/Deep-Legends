@@ -1,24 +1,12 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
-
-const (
-	spectatorReadProbePath    = "/lol-spectator/v1/spectate/launch"
-	spectatorReadProbeTimeout = 1500 * time.Millisecond
-)
-
-var spectatorPresenceFieldNames = []string{
-	"championId", "gameId", "gameMode", "gameQueueType", "gameStatus", "mapId", "queueId", "timeStamp",
-}
 
 // 好友数据完全来自本机客户端聊天服务，只读；分组、顺序与折叠初始态
 // 均以客户端返回为准，界面不做二次编辑。
@@ -75,7 +63,10 @@ type socialFriend struct {
 	ChampionName  string `json:"championName,omitempty"`
 	QueueLabel    string `json:"queueLabel,omitempty"`
 	GameStartedAt int64  `json:"gameStartedAt,omitempty"`
+	PartySize     int64  `json:"partySize,omitempty"`
+	PartyCapacity int64  `json:"partyCapacity,omitempty"`
 	reference     gameplayReference
+	presence      socialPresenceDiagnostic
 }
 
 type socialFriendsResponse struct {
@@ -99,10 +90,10 @@ func (a *app) handleSocialFriends(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "读取好友列表失败："+friendlyError(err), http.StatusBadGateway)
 		return
 	}
-	a.maybeRecordFriendSpectatorReadProbe(r.Context(), client, rawFriends)
 	names := a.championNames()
 	queueLabels := loadQueueLabels(client)
 	friends := convertFriends(rawFriends, names, queueLabels)
+	a.recordSocialPresenceDiagnostics(friends)
 	for index := range friends {
 		friends[index].PlayerRef = a.registerGameplayReferenceDetails(friends[index].reference)
 	}
@@ -110,134 +101,6 @@ func (a *app) handleSocialFriends(w http.ResponseWriter, r *http.Request) {
 		Groups:  convertFriendGroups(rawGroups),
 		Friends: friends,
 	})
-}
-
-// The spectator endpoint is deliberately probed with one fixed GET only. This
-// records the local client's observable read contract before any launch action
-// is designed; it must never become a POST/PUT/PATCH/DELETE request here.
-func (a *app) maybeRecordFriendSpectatorReadProbe(parent context.Context, client *LCUClient, friends []lcuChatFriend) {
-	inGameCount, _ := friendSpectatorPresenceFields(friends)
-	if a == nil || a.storage == nil || client == nil || inGameCount == 0 {
-		return
-	}
-	a.spectatorReadProbeOnce.Do(func() {
-		ctx, cancel := context.WithTimeout(parent, spectatorReadProbeTimeout)
-		defer cancel()
-		a.recordDiagnostic(friendSpectatorReadProbe(ctx, client, friends))
-	})
-}
-
-func friendSpectatorReadProbe(ctx context.Context, client *LCUClient, friends []lcuChatFriend) map[string]any {
-	inGameCount, presenceFields := friendSpectatorPresenceFields(friends)
-	event := map[string]any{
-		"event":                "lcu_spectator_read_probe",
-		"method":               http.MethodGet,
-		"path":                 spectatorReadProbePath,
-		"in_game_friend_count": inGameCount,
-		"presence_fields":      presenceFields,
-	}
-	payload, err := client.GetBytesContext(ctx, spectatorReadProbePath)
-	if err != nil {
-		state, status := spectatorReadProbeErrorState(err)
-		event["state"] = state
-		if status > 0 {
-			event["http_status"] = status
-		}
-		return event
-	}
-	shape, fields := spectatorReadProbePayloadShape(payload)
-	event["state"] = "success"
-	if shape == "invalid-json" {
-		event["state"] = "invalid-json"
-	}
-	event["response_shape"] = shape
-	if len(fields) > 0 {
-		event["response_fields"] = fields
-	}
-	return event
-}
-
-func friendSpectatorPresenceFields(friends []lcuChatFriend) (int, []string) {
-	inGameCount := 0
-	present := make(map[string]bool)
-	for _, friend := range friends {
-		if !strings.EqualFold(strings.TrimSpace(friend.Lol["gameStatus"]), "inGame") {
-			continue
-		}
-		inGameCount++
-		for _, name := range spectatorPresenceFieldNames {
-			if strings.TrimSpace(friend.Lol[name]) != "" {
-				present[name] = true
-			}
-		}
-	}
-	fields := make([]string, 0, len(present))
-	for _, name := range spectatorPresenceFieldNames {
-		if present[name] {
-			fields = append(fields, name)
-		}
-	}
-	return inGameCount, fields
-}
-
-func spectatorReadProbeErrorState(err error) (string, int) {
-	var httpErr *LCUHTTPError
-	if errors.As(err, &httpErr) {
-		switch httpErr.StatusCode {
-		case http.StatusNotFound:
-			return "not-found", httpErr.StatusCode
-		case http.StatusMethodNotAllowed:
-			return "method-not-allowed", httpErr.StatusCode
-		default:
-			return "http-error", httpErr.StatusCode
-		}
-	}
-	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-		return "timeout", 0
-	}
-	return "request-failed", 0
-}
-
-func spectatorReadProbePayloadShape(payload []byte) (string, []string) {
-	if strings.TrimSpace(string(payload)) == "" {
-		return "empty", nil
-	}
-	var value any
-	if err := json.Unmarshal(payload, &value); err != nil {
-		return "invalid-json", nil
-	}
-	switch typed := value.(type) {
-	case map[string]any:
-		fields := make([]string, 0, len(typed))
-		for name := range typed {
-			if safeSpectatorProbeFieldName(name) {
-				fields = append(fields, name)
-			}
-		}
-		sort.Strings(fields)
-		if len(fields) > 32 {
-			fields = fields[:32]
-		}
-		return "object", fields
-	case []any:
-		return "array", nil
-	default:
-		return "scalar", nil
-	}
-}
-
-func safeSpectatorProbeFieldName(value string) bool {
-	if len(value) == 0 || len(value) > 64 {
-		return false
-	}
-	for index := 0; index < len(value); index++ {
-		character := value[index]
-		if (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (index > 0 && character >= '0' && character <= '9') || (index > 0 && (character == '_' || character == '-' || character == '.')) {
-			continue
-		}
-		return false
-	}
-	return true
 }
 
 func convertFriendGroups(raw []lcuFriendGroup) []socialFriendGroup {
@@ -283,14 +146,11 @@ func convertFriends(raw []lcuChatFriend, championNames map[int64]string, queueLa
 			ProductName:   strings.TrimSpace(friend.ProductName),
 			LastSeenAt:    chatTimestamp(friend.LastSeenOnlineTimestamp),
 		}
+		applySocialPresence(&converted, friend.Lol, queueLabels)
 		if lol := friend.Lol; lol != nil {
-			converted.GameStatus = strings.TrimSpace(lol["gameStatus"])
 			if championID, err := strconv.ParseInt(strings.TrimSpace(lol["championId"]), 10, 64); err == nil && championID > 0 {
 				converted.ChampionID = championID
 				converted.ChampionName = championNames[championID]
-			}
-			if queueID, err := strconv.ParseInt(strings.TrimSpace(lol["queueId"]), 10, 64); err == nil && queueID > 0 {
-				converted.QueueLabel = queueLabel(queueID, "", queueLabels)
 			}
 			if startedAt, err := strconv.ParseInt(strings.TrimSpace(lol["timeStamp"]), 10, 64); err == nil && startedAt > 0 {
 				converted.GameStartedAt = normalizeEpochMillis(startedAt)

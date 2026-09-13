@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -89,6 +90,8 @@ type localStore struct {
 	mu                   sync.Mutex
 	diagnosticMu         sync.Mutex
 	onDiagnosticRotation func()
+	diagnosticRunID      string
+	diagnosticSequence   uint64
 }
 
 func openLocalStore() (*localStore, error) {
@@ -101,7 +104,7 @@ func openLocalStore() (*localStore, error) {
 		root = filepath.Join(base, storageDirectory)
 	}
 	root = filepath.Clean(root)
-	for _, path := range []string{root, filepath.Join(root, "pools"), filepath.Join(root, "snapshots"), filepath.Join(root, "season-stats"), filepath.Join(root, "logs"), filepath.Join(root, prestigeArtworkCacheDirectory), filepath.Join(root, championDataCacheDirectory)} {
+	for _, path := range []string{root, filepath.Join(root, "updates"), filepath.Join(root, "pools"), filepath.Join(root, "snapshots"), filepath.Join(root, "season-stats"), filepath.Join(root, "logs"), filepath.Join(root, prestigeArtworkCacheDirectory), filepath.Join(root, championDataCacheDirectory)} {
 		if err := os.MkdirAll(path, 0o700); err != nil {
 			return nil, fmt.Errorf("create local storage: %w", err)
 		}
@@ -576,12 +579,22 @@ func (s *localStore) appendDiagnostic(event map[string]any) error {
 	if s == nil {
 		return errors.New("local storage unavailable")
 	}
-	eventData, err := marshalDiagnosticRecord(event, time.Now().UTC())
-	if err != nil {
-		return err
-	}
 	s.diagnosticMu.Lock()
-	rotated, err := s.appendDiagnosticLocked(eventData)
+	if s.diagnosticRunID == "" {
+		var random [12]byte
+		if _, err := rand.Read(random[:]); err != nil {
+			s.diagnosticMu.Unlock()
+			return err
+		}
+		s.diagnosticRunID = hex.EncodeToString(random[:])
+	}
+	s.diagnosticSequence++
+	record := make(map[string]any, len(event)+2)
+	for key, value := range event {
+		record[key] = value
+	}
+	record["run_id"], record["log_seq"] = s.diagnosticRunID, s.diagnosticSequence
+	rotated, err := s.appendDiagnosticLocked(record)
 	callback := s.onDiagnosticRotation
 	s.diagnosticMu.Unlock()
 	if rotated && callback != nil {
@@ -605,7 +618,11 @@ func marshalDiagnosticRecord(event map[string]any, recordedAt time.Time) ([]byte
 
 // appendDiagnosticLocked serializes only diagnostic-log I/O. Snapshot and LP
 // persistence keep using localStore.mu and no longer wait behind log rotation.
-func (s *localStore) appendDiagnosticLocked(eventData []byte) (bool, error) {
+func (s *localStore) appendDiagnosticLocked(record map[string]any) (bool, error) {
+	eventData, err := marshalDiagnosticRecord(record, time.Now().UTC())
+	if err != nil {
+		return false, err
+	}
 	path := filepath.Join(s.root, "logs", "diagnostics.jsonl")
 	var rotationData []byte
 	rotated := false
@@ -614,6 +631,18 @@ func (s *localStore) appendDiagnosticLocked(eventData []byte) (bool, error) {
 			return false, errors.New("diagnostic log is not a trusted regular file")
 		}
 		if info.Size() > 2*1024*1024 {
+			// Validate every archive before shifting any evidence. A directory or
+			// symlink at an archive path is an error, never a deletion target.
+			for generation := 1; generation <= 4; generation++ {
+				archive := filepath.Join(s.root, "logs", fmt.Sprintf("diagnostics.%d.jsonl", generation))
+				if info, err := os.Lstat(archive); err == nil {
+					if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+						return false, errors.New("diagnostic archive is not a trusted regular file")
+					}
+				} else if !errors.Is(err, os.ErrNotExist) {
+					return false, err
+				}
+			}
 			previous, readErr := os.ReadFile(path)
 			if readErr != nil {
 				return false, readErr
@@ -622,16 +651,36 @@ func (s *localStore) appendDiagnosticLocked(eventData []byte) (bool, error) {
 			if len(previous) > 0 && previous[len(previous)-1] != '\n' {
 				previousLines++
 			}
-			rotationData, readErr = marshalDiagnosticRecord(map[string]any{"event": "log_rotated", "previous_lines": previousLines, "previous_bytes": info.Size()}, time.Now().UTC())
+			rotationData, readErr = marshalDiagnosticRecord(map[string]any{"event": "log_rotated", "previous_lines": previousLines, "previous_bytes": info.Size(), "run_id": s.diagnosticRunID, "log_seq": s.diagnosticSequence, "retained_generations": 5}, time.Now().UTC())
 			if readErr != nil {
 				return false, readErr
 			}
-			backup := filepath.Join(s.root, "logs", "diagnostics.1.jsonl")
-			_ = os.Remove(backup)
-			if err := os.Rename(path, backup); err != nil {
-				if truncateErr := os.Truncate(path, 0); truncateErr != nil {
-					return false, truncateErr
+			// The marker is physically written before the triggering event.
+			s.diagnosticSequence++
+			record["log_seq"] = s.diagnosticSequence
+			eventData, readErr = marshalDiagnosticRecord(record, time.Now().UTC())
+			if readErr != nil {
+				return false, readErr
+			}
+			for generation := 3; generation >= 1; generation-- {
+				from := filepath.Join(s.root, "logs", fmt.Sprintf("diagnostics.%d.jsonl", generation))
+				to := filepath.Join(s.root, "logs", fmt.Sprintf("diagnostics.%d.jsonl", generation+1))
+				if _, err := os.Lstat(from); errors.Is(err, os.ErrNotExist) {
+					continue
+				} else if err != nil {
+					return false, err
 				}
+				if err := os.Remove(to); err != nil && !errors.Is(err, os.ErrNotExist) {
+					return false, err
+				}
+				if err := os.Rename(from, to); err != nil {
+					return false, err
+				}
+			}
+			backup := filepath.Join(s.root, "logs", "diagnostics.1.jsonl")
+			// A failed rename must not truncate the evidence we were preserving.
+			if err := os.Rename(path, backup); err != nil {
+				return false, err
 			}
 			rotated = true
 		}
@@ -653,7 +702,11 @@ func (s *localStore) appendDiagnosticLocked(eventData []byte) (bool, error) {
 		if len(data) == 0 {
 			continue
 		}
-		if _, writeErr := file.Write(data); writeErr != nil {
+		n, writeErr := file.Write(data)
+		if writeErr == nil && n != len(data) {
+			writeErr = io.ErrShortWrite
+		}
+		if writeErr != nil {
 			_ = file.Close()
 			return rotated, writeErr
 		}
@@ -675,8 +728,47 @@ func (s *localStore) readDiagnosticLog() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > 2*1024*1024+64*1024 {
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
 		return nil, errors.New("diagnostic log is not a trusted regular file")
 	}
+	if info.Size() > 2*1024*1024+64*1024 {
+		return nil, errResponseLimitExceeded
+	}
 	return os.ReadFile(path)
+}
+
+// Export all five retained generations under one lock so rotation cannot cut an
+// accept trace in half while the export-time probes add their observations.
+func (s *localStore) readDiagnosticLogForExport() ([]byte, error) {
+	if s == nil {
+		return nil, errors.New("local storage unavailable")
+	}
+	s.diagnosticMu.Lock()
+	defer s.diagnosticMu.Unlock()
+	var result []byte
+	for _, name := range []string{"diagnostics.4.jsonl", "diagnostics.3.jsonl", "diagnostics.2.jsonl", "diagnostics.1.jsonl", "diagnostics.jsonl"} {
+		path := filepath.Join(s.root, "logs", name)
+		info, err := os.Lstat(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			return nil, errors.New("diagnostic log is not a trusted regular file")
+		}
+		if info.Size() > 2*1024*1024+64*1024 {
+			return nil, errResponseLimitExceeded
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, data...)
+		if len(data) > 0 && data[len(data)-1] != '\n' {
+			result = append(result, '\n')
+		}
+	}
+	return result, nil
 }

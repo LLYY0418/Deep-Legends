@@ -12,4 +12,7 @@
 官方文件只有 303 × 303 RGB 版本，因此本地仅移除连续的深青背景并等比放入
 512 × 512 RGBA 透明画布，宝箱主体未重绘。
 
+国服客户端当前会为 `CHEST_promotion` 与 `CHEST_generic` 展示同一套紫色宝箱
+外观。应用仍按 loot ID 保留两个独立条目，只复用这张本地素材。
+
 League of Legends 与相关素材归 Riot Games / 腾讯所有；本项目不受其背书。

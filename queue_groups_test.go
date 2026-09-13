@@ -36,6 +36,7 @@ func TestSupportedQueueDefinitionsMatchCanonicalGroups(t *testing.T) {
 		{2300, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram"},
 		{2400, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram"},
 		{3100, "召唤师峡谷自选自定义", "custom", "excluded", "ranked"},
+		{3220, "极地大乱斗", "aram", "more:aram", "aram"},
 		{3270, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram"},
 		{4210, "RUBY", "other", "more:special", "unsupported"},
 		{4220, "RUBY", "other", "more:special", "unsupported"},
@@ -78,7 +79,7 @@ func TestMatchHistoryFilterSpecsUseDocumentedSGPTags(t *testing.T) {
 	}{
 		{"solo", "q_420"},
 		{"flex", "q_440"},
-		{"more:aram", "q_450,q_930"},
+		{"more:aram", "q_450,q_930,q_3220"},
 		{"more:match", "q_400,q_430,q_480,q_490"},
 		{"more:bots", "q_820,q_830,q_840,q_850,q_860,q_870,q_880,q_890"},
 		{"more:urf", "q_900,q_1900"},

@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="dark">
+<title>Deep Legends 安装程序</title>
+<style>
+/* ===========================================================================
+   Deep Legends 安装程序 · 完全自绘界面
+   宿主是 WebView2，窗口无边框（WS_POPUP），标题栏、按钮、复选框、进度条
+   全部是这份文档里的 DOM，没有任何 Win32 原生控件参与显示。
+   设计像素基准 = 700 x 470 @96DPI；高 DPI 由进程 PerMonitorV2 感知后
+   交给 WebView2 自己按 deviceScaleFactor 放大，这里不做任何手工缩放。
+   =========================================================================== */
+:root {
+  --bg: #0B0E14;
+  --bg-2: #0E121A;
+  --surface: #131822;
+  --surface-2: #1A2130;
+  --line: #242D3D;
+  --line-soft: #1C2331;
+  --ink: #E8EAF0;
+  --muted: #8B93A6;
+  --faint: #5A6377;
+  --gold: #D9A441;
+  --gold-bright: #F0BE5C;
+  --gold-dim: #8A6A2E;
+  --danger: #E05C5C;
+  --teal: #58C8C0;
+  --font: "Microsoft YaHei UI", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg);
+  user-select: none;
+  cursor: default;
+  -webkit-font-smoothing: antialiased;
+}
+
+img { -webkit-user-drag: none; }
+
+/* 背景：顶部金色辉光 + 底部冷色压暗 + 极淡的六边形纹理 */
+.backdrop {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(620px 300px at 50% -66px, rgba(217,164,65,.16), transparent 68%),
+    radial-gradient(460px 260px at 108% 112%, rgba(88,200,192,.07), transparent 70%),
+    linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 42%, #090C11 100%);
+}
+.backdrop::after {
+  content: ""; position: absolute; inset: 0; opacity: .3;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='36' height='62' viewBox='0 0 36 62'><path d='M18 1 35 11v20L18 41 1 31V11z' fill='none' stroke='%231B2231' stroke-width='1'/><path d='M18 42 35 52v20L18 82 1 72V52z' fill='none' stroke='%231B2231' stroke-width='1'/></svg>");
+}
+
+.shell { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; }
+
+/* ============================== 标题栏 ============================== */
+/* 标题栏不单独分色、不画分隔线：它和下面的内容共用同一张背景，
+   只是一条 38px 高的可拖动热区。这样整扇窗看起来是一块整的，
+   而不是"系统标题栏 + 内容区"两段。 */
+.titlebar {
+  flex: 0 0 38px; display: flex; align-items: center; gap: 9px;
+  padding-left: 14px; background: transparent;
+}
+.titlebar .grab { display: flex; align-items: center; gap: 9px; flex: 1; height: 100%; }
+.titlebar .mark { width: 17px; height: 17px; flex: 0 0 17px; }
+.titlebar .name { font-size: 12px; color: #AEB6C6; letter-spacing: .02em; }
+.titlebar .name b { color: var(--gold-bright); font-weight: 600; }
+.sysbtns { display: flex; height: 100%; }
+.sysbtn {
+  width: 44px; height: 100%; display: grid; place-items: center;
+  color: #7C8598; transition: background .12s, color .12s;
+}
+.sysbtn svg { width: 11px; height: 11px; }
+.sysbtn:hover { background: rgba(255,255,255,.07); color: var(--ink); }
+.sysbtn.close:hover { background: #C4433E; color: #fff; }
+.sysbtn.disabled { opacity: .28; pointer-events: none; }
+
+/* ============================== 通用 ============================== */
+.page { flex: 1; display: none; flex-direction: column; }
+.page.on { display: flex; }
+
+.btn-gold {
+  display: grid; place-items: center; height: 46px; border-radius: 10px;
+  font-size: 15px; font-weight: 700; letter-spacing: .22em; text-indent: .22em;
+  color: #17120A;
+  background: linear-gradient(180deg, #F5C878 0%, var(--gold) 58%, #C08F2E 100%);
+  box-shadow: 0 8px 22px rgba(217,164,65,.22), inset 0 1px 0 rgba(255,255,255,.42);
+  transition: filter .12s, transform .06s, box-shadow .12s;
+}
+.btn-gold:hover { filter: brightness(1.07); box-shadow: 0 10px 26px rgba(217,164,65,.3), inset 0 1px 0 rgba(255,255,255,.5); }
+.btn-gold:active { transform: translateY(1px); filter: brightness(.96); }
+.btn-gold.off {
+  color: #6E7486; background: #1A2130; box-shadow: none;
+  border: 1px solid var(--line); pointer-events: none;
+}
+
+.check { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
+.check .box {
+  width: 16px; height: 16px; flex: 0 0 16px; border-radius: 4px;
+  border: 1px solid #3A455A; background: #10141C;
+  display: grid; place-items: center; transition: background .12s, border-color .12s;
+}
+.check .box svg { width: 10px; height: 10px; opacity: 0; transform: scale(.6); transition: opacity .12s, transform .12s; }
+.check[data-on="1"] .box { background: linear-gradient(180deg, var(--gold-bright), var(--gold)); border-color: var(--gold); }
+.check[data-on="1"] .box svg { opacity: 1; transform: none; }
+.check[data-on="1"] { color: #C3CAD8; }
+.check:hover .box { border-color: var(--gold-dim); }
+.check a { color: var(--gold); text-decoration: none; border-bottom: 1px dashed rgba(217,164,65,.5); }
+.check a:hover { color: var(--gold-bright); }
+.check.warn .box { border-color: var(--danger); animation: nudge .4s; }
+@keyframes nudge { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
+/* ============================== 第一页 ============================== */
+.hero { padding: 26px 0 0; text-align: center; }
+.crest { position: relative; width: 74px; height: 74px; margin: 0 auto; }
+.crest img { width: 100%; height: 100%; display: block; filter: drop-shadow(0 6px 16px rgba(0,0,0,.55)); }
+.crest::before {
+  content: ""; position: absolute; left: 50%; top: 52%; width: 150px; height: 150px;
+  transform: translate(-50%,-50%); border-radius: 50%;
+  background: radial-gradient(circle, rgba(217,164,65,.22), transparent 62%);
+}
+.wordmark {
+  margin-top: 13px; font-size: 25px; font-weight: 800; letter-spacing: .3em; text-indent: .3em;
+  background: linear-gradient(180deg, #FBDFA4, var(--gold) 62%, #A87C2C);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.tagline { margin-top: 7px; font-size: 12px; color: var(--faint); letter-spacing: .16em; text-indent: .16em; }
+
+.form { padding: 24px 44px 0; }
+.field { display: flex; gap: 9px; }
+.path {
+  flex: 1; min-width: 0; height: 38px; display: flex; align-items: center;
+  padding: 0 12px; border: 1px solid var(--line); border-radius: 9px;
+  background: rgba(8,11,16,.72); color: var(--ink); font-size: 12.5px;
+  font-family: var(--font); outline: none; transition: border-color .14s, box-shadow .14s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.path:focus { border-color: var(--gold-dim); box-shadow: 0 0 0 3px rgba(217,164,65,.1); }
+.path.bad { border-color: rgba(224,92,92,.7); }
+.browse {
+  width: 84px; height: 38px; flex: 0 0 84px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--surface);
+  color: #C3CAD8; font-size: 12.5px; transition: background .12s, border-color .12s, color .12s;
+}
+.browse:hover { background: var(--surface-2); border-color: #33405A; color: var(--ink); }
+.browse:active { background: #11151E; }
+
+.meta { display: flex; align-items: center; gap: 18px; margin-top: 10px; height: 17px; font-size: 11.5px; color: var(--faint); }
+.meta b { color: #98A1B3; font-weight: 600; font-variant-numeric: tabular-nums; }
+.meta .dot { width: 3px; height: 3px; border-radius: 50%; background: #333E52; }
+.meta .err { color: var(--danger); }
+.meta .err b { color: var(--danger); }
+
+.actions { padding: 22px 44px 0; }
+.actions .btn-gold { width: 304px; margin: 0 auto; }
+
+.opts { display: flex; justify-content: center; gap: 26px; margin-top: 18px; }
+
+.foot {
+  margin-top: auto; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; height: 34px; border-top: 1px solid rgba(36,45,61,.55);
+  color: #4E5668; font-size: 11px; background: transparent;
+}
+.foot .safe { display: flex; align-items: center; gap: 6px; }
+.foot .safe svg { width: 11px; height: 12px; }
+
+/* ============================== 第二页（安装中） ============================== */
+.install { padding: 22px 40px 0; display: flex; flex-direction: column; height: 100%; }
+.install-head { display: flex; align-items: center; gap: 12px; }
+.install-head img { width: 34px; height: 34px; }
+.install-head .t { font-size: 15px; font-weight: 700; letter-spacing: .06em; color: var(--ink); }
+.install-head .s { margin-top: 2px; font-size: 11.5px; color: var(--faint); }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; margin-top: 18px; }
+.card {
+  padding: 13px 13px 14px; border: 1px solid var(--line-soft); border-radius: 11px;
+  background: linear-gradient(180deg, rgba(19,24,34,.9), rgba(13,17,24,.9));
+  opacity: 0; transform: translateY(8px);
+  animation: rise .5s cubic-bezier(.22,.8,.3,1) forwards;
+}
+.card:nth-child(2) { animation-delay: .1s; }
+.card:nth-child(3) { animation-delay: .2s; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+.card .ic { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; background: rgba(217,164,65,.1); }
+.card .ic svg { width: 14px; height: 14px; }
+.card h4 { margin-top: 10px; font-size: 12.5px; font-weight: 700; color: #D8DEEA; letter-spacing: .03em; }
+.card p { margin-top: 5px; font-size: 11px; line-height: 1.65; color: var(--faint); }
+
+.slogan { flex: 1; display: grid; place-items: center; text-align: center; font-size: 13.5px; color: #B7BECD; letter-spacing: .04em; }
+.slogan b { color: var(--gold-bright); font-weight: 600; }
+
+.progress-wrap { padding-bottom: 26px; }
+.progress-line { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin-bottom: 12px; }
+.progress-line .label { font-size: 13px; color: #AEB6C6; }
+.progress-line .pct {
+  font-size: 21px; font-weight: 700; color: var(--gold-bright);
+  font-variant-numeric: tabular-nums; letter-spacing: .01em;
+}
+.track { position: relative; height: 9px; border-radius: 99px; background: #161C28; overflow: hidden; border: 1px solid rgba(255,255,255,.04); }
+.fill {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+  border-radius: 99px; background: linear-gradient(90deg, #C08F2E, var(--gold) 40%, var(--gold-bright));
+  box-shadow: 0 0 12px rgba(217,164,65,.45);
+  transition: width .28s cubic-bezier(.3,.7,.4,1);
+}
+.fill::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 12%, rgba(255,255,255,.34) 46%, transparent 80%);
+  background-size: 220px 100%; animation: sheen 1.5s linear infinite;
+}
+@keyframes sheen { from { background-position: -220px 0; } to { background-position: 340px 0; } }
+.stage { margin-top: 11px; text-align: center; font-size: 11.5px; color: var(--faint); height: 16px; }
+
+/* 失败态 */
+.fail { padding: 0 44px; text-align: center; margin-top: auto; margin-bottom: auto; }
+.fail .ic { width: 46px; height: 46px; margin: 0 auto; display: grid; place-items: center; border-radius: 50%; background: rgba(224,92,92,.12); }
+.fail .ic svg { width: 22px; height: 22px; }
+.fail h3 { margin-top: 14px; font-size: 15px; font-weight: 700; }
+.fail p { margin-top: 8px; font-size: 12px; color: var(--muted); line-height: 1.8; }
+.fail p.code { margin-top: 4px; font-size: 11px; color: var(--faint); }
+.fail .row { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+.fail .row > * { min-width: 124px; padding: 0 18px; height: 38px; font-size: 13px; letter-spacing: .08em; text-indent: .08em; border-radius: 9px; }
+.ghost {
+  display: grid; place-items: center; border: 1px solid var(--line); background: var(--surface);
+  color: #C3CAD8; transition: background .12s, border-color .12s;
+}
+.ghost:hover { background: var(--surface-2); border-color: #33405A; }
+
+/* ============================== 条款浮层 ============================== */
+.modal {
+  position: fixed; inset: 0; z-index: 9; display: none;
+  background: rgba(5,7,10,.72);
+}
+.modal.on { display: grid; place-items: center; animation: fade .16s; }
+@keyframes fade { from { opacity: 0; } }
+.sheet {
+  width: 560px; max-height: 384px; display: flex; flex-direction: column;
+  border: 1px solid var(--line); border-radius: 13px; background: #11151D;
+  box-shadow: 0 14px 34px rgba(0,0,0,.55);
+  animation: pop .18s cubic-bezier(.22,.9,.3,1);
+}
+@keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.sheet header { display: flex; align-items: center; justify-content: space-between; padding: 15px 18px 12px; border-bottom: 1px solid var(--line-soft); }
+.sheet header h3 { font-size: 13.5px; font-weight: 700; letter-spacing: .04em; }
+.sheet .tabs { display: flex; gap: 4px; }
+.sheet .tab { padding: 5px 11px; border-radius: 7px; font-size: 12px; color: var(--faint); }
+.sheet .tab.on { background: rgba(217,164,65,.12); color: var(--gold-bright); }
+.sheet .body { padding: 15px 18px 18px; overflow-y: auto; font-size: 12px; line-height: 1.95; color: #A9B1C0; user-select: text; }
+.sheet .body h4 { margin: 14px 0 4px; font-size: 12.5px; color: #D8DEEA; }
+.sheet .body h4:first-child { margin-top: 0; }
+.sheet .body em { color: var(--gold); font-style: normal; }
+.sheet .body::-webkit-scrollbar { width: 8px; }
+.sheet .body::-webkit-scrollbar-thumb { background: #232C3C; border-radius: 99px; border: 2px solid #11151D; }
+.sheet footer { display: flex; justify-content: flex-end; gap: 9px; padding: 12px 18px; border-top: 1px solid var(--line-soft); }
+.sheet footer > * { height: 33px; padding: 0 18px; border-radius: 8px; display: grid; place-items: center; font-size: 12.5px; }
+.sheet footer .accept { background: linear-gradient(180deg, #F5C878, var(--gold) 62%, #C08F2E); color: #17120A; font-weight: 700; }
+.sheet footer .accept:hover { filter: brightness(1.07); }
+</style>
+</head>
+<body>
+<div class="backdrop"></div>
+
+<div class="shell">
+  <!-- ============================ 标题栏 ============================ -->
+  <div class="titlebar">
+    <div class="grab" id="grab">
+      <img class="mark" src="__LOGO__" alt="">
+      <div class="name"><b>Deep Legends</b> 安装程序</div>
+    </div>
+    <div class="sysbtns">
+      <div class="sysbtn" id="btn-min" title="最小化">
+        <svg viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+      </div>
+      <div class="sysbtn close" id="btn-close" title="关闭">
+        <svg viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ 第一页 ============================ -->
+  <div class="page on" id="page-setup">
+    <div class="hero">
+      <div class="crest"><img src="__LOGO__" alt=""></div>
+      <div class="wordmark">DEEP LEGENDS</div>
+      <div class="tagline">生涯 · 对局 · 收藏</div>
+    </div>
+
+    <div class="form">
+      <div class="field">
+        <input class="path" id="path" spellcheck="false" value="">
+        <div class="browse" id="btn-browse">浏览</div>
+      </div>
+      <div class="meta" id="meta">
+        <span>需要空间 <b id="need">—</b></span>
+        <i class="dot"></i>
+        <span id="free-wrap">可用空间 <b id="free">—</b></span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <div class="btn-gold" id="btn-install">开始安装</div>
+      <div class="opts">
+        <div class="check" id="chk-desktop" data-on="1">
+          <span class="box"><svg viewBox="0 0 12 12"><path d="M1.6 6.2l2.9 3 5.9-6.2" stroke="#17120A" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span>创建桌面快捷方式</span>
+        </div>
+        <div class="check" id="chk-terms" data-on="0">
+          <span class="box"><svg viewBox="0 0 12 12"><path d="M1.6 6.2l2.9 3 5.9-6.2" stroke="#17120A" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span>阅读并同意<a id="lnk-license">许可协议</a>与<a id="lnk-notice">使用须知</a></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <div class="safe">
+        <svg viewBox="0 0 12 13"><path d="M6 .8l4.6 1.9v4.1c0 2.7-1.9 4.7-4.6 5.6-2.7-.9-4.6-2.9-4.6-5.6V2.7z" fill="none" stroke="#4E5668" stroke-width="1"/></svg>
+        <span>仅安装到本机，不修改游戏文件，不需要账号密码</span>
+      </div>
+      <div id="version">__VERSION__</div>
+    </div>
+  </div>
+
+  <!-- ============================ 第二页 ============================ -->
+  <div class="page" id="page-install">
+    <div class="install">
+      <div class="install-head">
+        <img src="__LOGO__" alt="">
+        <div>
+          <div class="t">正在安装 Deep Legends</div>
+          <div class="s" id="dest-line">—</div>
+        </div>
+      </div>
+
+      <div class="cards">
+        <div class="card">
+          <div class="ic"><svg viewBox="0 0 14 14"><path d="M1.5 12V6m4 6V2m4 10V8m4 4V4" stroke="#F0BE5C" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></div>
+          <h4>生涯战绩</h4>
+          <p>段位曲线、英雄海、每一局的细节复盘</p>
+        </div>
+        <div class="card">
+          <div class="ic"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.4" fill="none" stroke="#F0BE5C" stroke-width="1.4"/><circle cx="7" cy="7" r="1.6" fill="#F0BE5C"/></svg></div>
+          <h4>实时对局</h4>
+          <p>进选人就亮出双方战力、绝活与组队关系</p>
+        </div>
+        <div class="card">
+          <div class="ic"><svg viewBox="0 0 14 14"><path d="M7 1.2l5 2.9v5.8L7 12.8 2 9.9V4.1z" fill="none" stroke="#F0BE5C" stroke-width="1.3"/></svg></div>
+          <h4>藏品图鉴</h4>
+          <p>皮肤、海克斯、斗魂数据一处收齐</p>
+        </div>
+      </div>
+
+      <div class="slogan"><span>装好即用，<b>赛前 10 秒</b>看清这一把的所有人</span></div>
+
+      <div class="progress-wrap">
+        <div class="progress-line">
+          <span class="label" id="prog-label">正在快速安装</span>
+          <span class="pct" id="pct">0%</span>
+        </div>
+        <div class="track"><div class="fill" id="fill"></div></div>
+        <div class="stage" id="stage">正在校验安装包…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ 失败页 ============================ -->
+  <div class="page" id="page-fail">
+    <div class="fail">
+      <div class="ic"><svg viewBox="0 0 22 22"><path d="M11 5.5v7.2M11 16.4v.1" stroke="#E05C5C" stroke-width="2" fill="none" stroke-linecap="round"/></svg></div>
+      <h3>安装没有完成</h3>
+      <p id="fail-msg">安装过程被中断了。</p>
+      <p class="code" id="fail-code"></p>
+      <div class="row">
+        <div class="ghost" id="btn-fail-close">关闭</div>
+        <div class="btn-gold" id="btn-retry">重试</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ 条款浮层 ============================ -->
+<div class="modal" id="modal">
+  <div class="sheet">
+    <header>
+      <h3 id="sheet-title">许可协议</h3>
+      <div class="tabs">
+        <div class="tab on" data-doc="license">许可协议</div>
+        <div class="tab" data-doc="notice">使用须知</div>
+      </div>
+    </header>
+    <div class="body" id="sheet-body"></div>
+    <footer>
+      <div class="ghost" id="sheet-close">关闭</div>
+      <div class="accept" id="sheet-accept">同意并继续</div>
+    </footer>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------------------------------------------------------------------------
+   与宿主（Go）的桥：JS 只发意图，所有磁盘/进程操作都在 Go 侧做。
+   宿主回调统一挂在 window.host.* 上，由 Go 用 ExecuteScript 调用。
+   --------------------------------------------------------------------------- */
+const send = (type, data) => {
+  const payload = JSON.stringify(Object.assign({ type }, data || {}));
+  if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage(payload);
+  else console.log("[send]", payload);
+};
+
+const $ = (id) => document.getElementById(id);
+const state = {
+  page: "setup",
+  needBytes: 0,
+  freeBytes: -1,
+  pathOk: true,
+  pathError: "",
+  installing: false,
+  shown: 0,
+};
+
+/* ----------------------------- 工具 ----------------------------- */
+function formatBytes(n) {
+  if (!(n >= 0)) return "—";
+  const gb = n / (1024 * 1024 * 1024);
+  if (gb >= 1) return gb.toFixed(gb >= 10 ? 0 : 1) + " GB";
+  return Math.max(1, Math.round(n / (1024 * 1024))) + " MB";
+}
+
+function setPage(name) {
+  state.page = name;
+  for (const id of ["setup", "install", "fail"]) {
+    $("page-" + id).classList.toggle("on", id === name);
+  }
+  const busy = name === "install";
+  $("btn-close").classList.toggle("disabled", busy);
+}
+
+/* ----------------------------- 标题栏 ----------------------------- */
+$("grab").addEventListener("mousedown", (e) => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  send("drag");
+});
+$("btn-min").addEventListener("click", () => send("minimize"));
+$("btn-close").addEventListener("click", () => {
+  if (state.installing) return;
+  send("close");
+});
+
+/* ----------------------------- 复选框 ----------------------------- */
+function toggle(el) {
+  el.dataset.on = el.dataset.on === "1" ? "0" : "1";
+  el.classList.remove("warn");
+}
+$("chk-desktop").addEventListener("click", () => toggle($("chk-desktop")));
+$("chk-terms").addEventListener("click", (e) => {
+  if (e.target.tagName === "A") return;
+  toggle($("chk-terms"));
+  refresh();
+});
+
+/* ----------------------------- 路径 ----------------------------- */
+const pathInput = $("path");
+let pathTimer = 0;
+pathInput.addEventListener("input", () => {
+  clearTimeout(pathTimer);
+  pathTimer = setTimeout(() => send("path", { path: pathInput.value }), 220);
+});
+$("btn-browse").addEventListener("click", () => send("browse", { path: pathInput.value }));
+
+/* ----------------------------- 开始安装 ----------------------------- */
+$("btn-install").addEventListener("click", () => {
+  if ($("chk-terms").dataset.on !== "1") {
+    const el = $("chk-terms");
+    el.classList.remove("warn");
+    void el.offsetWidth;
+    el.classList.add("warn");
+    openModal("notice");
+    return;
+  }
+  if (!state.pathOk) return;
+  send("install", {
+    path: pathInput.value,
+    desktopShortcut: $("chk-desktop").dataset.on === "1",
+  });
+});
+
+$("btn-retry").addEventListener("click", () => { setPage("setup"); refresh(); });
+$("btn-fail-close").addEventListener("click", () => send("close"));
+
+/* ----------------------------- 条款浮层 ----------------------------- */
+const DOCS = {
+  license: `__LICENSE__`,
+  notice: `__NOTICE__`,
+};
+function openModal(doc) {
+  $("modal").classList.add("on");
+  showDoc(doc || "license");
+}
+function showDoc(doc) {
+  $("sheet-body").innerHTML = DOCS[doc] || "";
+  $("sheet-body").scrollTop = 0;
+  $("sheet-title").textContent = doc === "notice" ? "使用须知" : "许可协议";
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.doc === doc));
+}
+document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => showDoc(t.dataset.doc)));
+$("lnk-license").addEventListener("click", (e) => { e.stopPropagation(); openModal("license"); });
+$("lnk-notice").addEventListener("click", (e) => { e.stopPropagation(); openModal("notice"); });
+$("sheet-close").addEventListener("click", () => $("modal").classList.remove("on"));
+$("sheet-accept").addEventListener("click", () => {
+  $("modal").classList.remove("on");
+  $("chk-terms").dataset.on = "1";
+  $("chk-terms").classList.remove("warn");
+  refresh();
+});
+
+/* ----------------------------- 状态刷新 ----------------------------- */
+function refresh() {
+  $("need").textContent = formatBytes(state.needBytes);
+  const freeWrap = $("free-wrap");
+  if (state.pathError) {
+    freeWrap.classList.add("err");
+    freeWrap.innerHTML = state.pathError;
+  } else {
+    freeWrap.classList.remove("err");
+    freeWrap.innerHTML = "可用空间 <b id=\"free\"></b>";
+    $("free").textContent = formatBytes(state.freeBytes);
+  }
+  pathInput.classList.toggle("bad", !state.pathOk);
+  const ready = state.pathOk && $("chk-terms").dataset.on === "1";
+  $("btn-install").classList.toggle("off", !ready);
+}
+
+/* ----------------------------- 宿主回调 ----------------------------- */
+window.host = {
+  init(s) {
+    pathInput.value = s.path || "";
+    state.needBytes = s.needBytes || 0;
+    $("version").textContent = s.version || "";
+    if (s.freeBytes !== undefined) state.freeBytes = s.freeBytes;
+    refresh();
+  },
+  path(s) {
+    if (s.path !== undefined && s.path !== null) pathInput.value = s.path;
+    state.freeBytes = s.freeBytes === undefined ? -1 : s.freeBytes;
+    state.pathOk = !!s.ok;
+    state.pathError = s.error || "";
+    refresh();
+  },
+  installing(s) {
+    state.installing = true;
+    setPage("install");
+    $("dest-line").textContent = s.path || "";
+    state.shown = 0;
+    window.host.progress({ percent: 0, stage: "正在校验安装包…" });
+  },
+  progress(s) {
+    const p = Math.max(state.shown, Math.min(100, Math.round(s.percent || 0)));
+    state.shown = p;
+    $("fill").style.width = p + "%";
+    $("pct").textContent = p + "%";
+    if (s.stage) $("stage").textContent = s.stage;
+  },
+  done() {
+    state.installing = true;
+    state.shown = 100;
+    $("fill").style.width = "100%";
+    $("pct").textContent = "100%";
+    $("prog-label").textContent = "正在启动 Deep Legends…";
+    $("stage").textContent = "安装已完成，正在等待应用窗口…";
+  },
+  failed(s) {
+    state.installing = false;
+    setPage("fail");
+    $("fail-msg").textContent = s.message || "安装过程被中断了。";
+    $("fail-code").textContent = s.detail || "";
+  },
+};
+
+refresh();
+
+/* 宿主在导航前用 AddScriptToExecuteOnDocumentCreated 注入 window.__INIT__，
+   这样首帧就是最终状态，不会出现"先渲染占位再跳变"。 */
+if (window.__INIT__) window.host.init(window.__INIT__);
+</script>
+</body>
+</html>

@@ -7,7 +7,7 @@ const path = require("node:path");
 const { JSDOM } = require("jsdom");
 
 const WEB = process.env.DEEP_LEGENDS_WEB_ROOT || path.join(__dirname, "..", "web");
-const SCRIPTS = ["demo-data.js", "app.js", "gameplay.js"];
+const SCRIPTS = ["runtime.js", "demo-data.js", "app.js", "gameplay.js"];
 const gameplaySource = fs.readFileSync(path.join(WEB, "gameplay.js"), "utf8");
 
 function functionSource(source, name) {
@@ -268,4 +268,179 @@ test("dirty collection rescans on entry and view changes without duplicate refre
   } finally {
     w.close();
   }
+});
+
+const appSourceR70 = fs.readFileSync(path.join(WEB, "app.js"), "utf8");
+function deferredR70() { let resolve; const promise = new Promise((r) => { resolve = r; }); return { promise, resolve }; }
+
+test("R70 app and gameplay retain cancellation ownership until body parsing completes", async () => {
+  for (const source of [appSourceR70, gameplaySource]) {
+    const oldBody = deferredR70(), newBody = deferredR70();
+    const state = { controllers: new Map() };
+    let calls = 0;
+    const { api } = compileFunctions(source, ["api"], {
+      state, fetch: async () => ({ ok: true, status: 200, json: () => (++calls === 1 ? oldBody.promise : newBody.promise) }),
+    });
+    const old = api("/test", {}, "same");
+    const outcome = old.then(() => "unexpected-success", (e) => e.name);
+    await Promise.resolve();
+    assert.equal(state.controllers.size, 1, "JSON body prematurely released request ownership");
+    const latest = api("/test", {}, "same");
+    await Promise.resolve();
+    newBody.resolve({ newest: true });
+    assert.deepEqual(await latest, { newest: true });
+    oldBody.resolve({ stale: true });
+    assert.equal(await outcome, "RequestCancelled");
+    assert.equal(state.controllers.size, 0);
+  }
+});
+
+test("R70 cached collection reentry avoids a request and never uses outgoing DOM snapshots", { concurrency: false }, async () => {
+  const { window: w, errors } = bootDemoApp();
+  try {
+    await waitFor(() => w.document.querySelector("#overview-content .summoner-strip"), "overview did not load");
+    let skinRequests = 0, transitions = 0;
+    const original = w.fetch;
+    w.fetch = (input, init) => { if (requestURL(input).startsWith("/api/skins")) skinRequests++; return original(input, init); };
+    w.document.startViewTransition = () => { transitions++; throw new Error("snapshot must not block navigation"); };
+    w.document.querySelector('[data-section="favorites"]').click();
+    await waitFor(() => skinRequests > 0 && w.document.querySelector("#skin-grid .skin-card"), "collection not rendered");
+    const first = skinRequests;
+    w.document.querySelector('[data-section="overview"]').click();
+    w.document.querySelector('[data-section="favorites"]').click();
+    await new Promise(r => setTimeout(r, 250));
+    assert.equal(skinRequests, first, "cached reentry refetched collection");
+    assert.equal(transitions, 0);
+    assert.deepEqual(errors, []);
+  } finally { w.close(); }
+});
+
+test("R70 SSE overflow and reconnect resync refresh visible collection even with unchanged status", { concurrency: false }, async () => {
+  const { window: w, errors, eventSources } = bootDemoApp({ withEventSource: true });
+  try {
+    await waitFor(() => eventSources.length && w.document.querySelector("#overview-content .summoner-strip"), "startup incomplete");
+    w.document.querySelector('[data-section="favorites"]').click();
+    await new Promise(r => setTimeout(r, 300));
+    let skins = 0;
+    const original = w.fetch;
+    w.fetch = (input, init) => { if (requestURL(input).startsWith("/api/skins")) skins++; return original(input, init); };
+    const source = eventSources.at(-1);
+    source.onmessage({data:"ready"});
+    source.onmessage({data:"resync-required"});
+    await waitFor(() => skins > 0, "overflow did not resync unchanged collection");
+    const afterOverflow = skins;
+    source.onmessage({data:"ready"});
+    await waitFor(() => skins > afterOverflow, "reconnected SSE did not resync");
+    assert.deepEqual(errors, []);
+  } finally { w.close(); }
+});
+
+test("R70 gameflow burst uses one fixed window and one non-aborting trailing request", async () => {
+  const state = { liveLoading: false, liveEventTimer: 0, liveRefreshQueued: false };
+  const callbacks = [];
+  let requests = 0;
+  const { queueLiveEventRefresh } = compileFunctions(gameplaySource, ["queueLiveEventRefresh"], {
+    state, document: { hidden: false }, connected: () => true,
+    setTimeout: (callback) => { callbacks.push(callback); return callbacks.length; },
+    loadLive: (force) => { assert.notEqual(force, true); requests++; state.liveLoading = true; },
+  });
+  for (let i = 0; i < 500; i++) queueLiveEventRefresh();
+  assert.equal(callbacks.length, 1);
+  callbacks.shift()();
+  assert.equal(requests, 1);
+  for (let i = 0; i < 500; i++) queueLiveEventRefresh();
+  assert.equal(callbacks.length, 0, "events must not abort or overlap an in-flight body");
+  assert.equal(state.liveRefreshQueued, true);
+  state.liveLoading = false;
+  queueLiveEventRefresh();
+  assert.equal(callbacks.length, 1);
+  callbacks.shift()();
+  assert.equal(requests, 2);
+  state.destroyed = true;
+  state.liveLoading = false;
+  queueLiveEventRefresh();
+  assert.equal(callbacks.length, 0);
+});
+
+test("R70 hidden gameplay pages do not construct DOM, and destroyed pages remain inert", () => {
+  for (const [name, section] of [["renderLive", "overview"], ["renderOverview", "favorites"]]) {
+    const state = { section };
+    const { [name]: render } = compileFunctions(gameplaySource, [name], { state });
+    assert.doesNotThrow(render, "hidden render must not touch nodes or observers");
+    state.section = name === "renderLive" ? "live" : "overview";
+    state.destroyed = true;
+    assert.doesNotThrow(render);
+  }
+});
+
+test("R70 superseded status completion cannot overwrite current state or reschedule polling", async () => {
+  const state = { destroyed: false, section: "overview", status: {} };
+  let resolveOld;
+  let polls = 0;
+  const old = new Promise((resolve) => { resolveOld = resolve; });
+  const source = fs.readFileSync(path.join(WEB, "app.js"), "utf8");
+  const { refreshStatus } = compileFunctions(source, ["refreshStatus"], {
+    state, api: () => old, scheduleStatus: () => polls++,
+  });
+  const pending = refreshStatus();
+  state.statusRequestToken++;
+  state.status = { connected: true, label: "new" };
+  resolveOld({ connected: false });
+  await pending;
+  assert.equal(state.status.label, "new");
+  assert.equal(polls, 0);
+});
+
+function r71RefreshHarness() {
+  const state = { section: "favorites", favoritesPage: "collection", statusRequestToken: 0, skinsCache: new Map(),
+    status: { connected: true, identityReady: false, snapshotReady: false, syncing: true, collectionDirty: true, lastAttempt: "initial", lastSync: "", poolId: "pool" } };
+  let next = { ...state.status }, failEnsure = false;
+  const requests = [], loads = [];
+  const methods = compileFunctions(appSourceR70, ["refreshStatus", "ensureCollection", "triggerCollectionRescanIfDirty"], {
+    state, STATUS_INTERVAL: 5000,
+    api: async (url) => { requests.push(url); if (url === "/api/status") return { ...next }; if (failEnsure && url === "/api/collection/ensure") throw Error("offline"); return null; },
+    clearDisconnectedClientState() {}, updateReadingOverlay() {}, renderStatus() {}, loadClientInstallations() {},
+    loadSkins: async () => loads.push("skins"), loadAccount() {}, loadPools() {}, showFatal(message) { throw Error(message); }, showToast() {}, scheduleStatus() {},
+  });
+  return { state, methods, requests, loads, set next(value) { next = { ...next, ...value }; }, set failEnsure(value) { failEnsure = value; } };
+}
+
+test("R71 collection startup issues one ensure across accepted requests, status events and scan start", async () => {
+  const h = r71RefreshHarness();
+  await h.methods.refreshStatus();
+  assert.equal(h.requests.filter((x) => x === "/api/collection/ensure").length, 0, "identity sync must finish first");
+  h.next = { syncing: false, identityReady: true };
+  await h.methods.refreshStatus();
+  await h.methods.ensureCollection();
+  for (let i = 0; i < 5; i++) await h.methods.refreshStatus();
+  assert.equal(h.requests.filter((x) => x === "/api/collection/ensure").length, 1, "202 is acceptance, not scan completion");
+  assert.equal(h.requests.filter((x) => x === "/api/refresh").length, 0, "dirty without a snapshot must not start a second rescan");
+  h.next = { syncing: true };
+  await h.methods.refreshStatus();
+  assert.equal(h.loads.length, 0, "scan-start events must not flash/reload collection cards");
+  h.next = { syncing: false, snapshotReady: true, collectionDirty: false, lastAttempt: "complete", lastSync: "complete" };
+  await h.methods.refreshStatus();
+  await h.methods.refreshStatus();
+  assert.equal(h.loads.length, 1, "one completed snapshot invalidates the collection once");
+  assert.equal(h.state.collectionEnsureInFlight, false);
+  h.next = { collectionDirty: true };
+  await h.methods.refreshStatus();
+  await h.methods.refreshStatus();
+  assert.equal(h.requests.filter((x) => x === "/api/refresh").length, 1);
+  assert.equal(h.loads.length, 1, "dirty events keep visible cached cards");
+});
+
+test("R71 a failed or lost collection acceptance can retry without a permanent gate", async () => {
+  const h = r71RefreshHarness();
+  h.next = { syncing: false, identityReady: true };
+  h.failEnsure = true;
+  await h.methods.refreshStatus();
+  await Promise.resolve();
+  assert.equal(h.state.collectionEnsureInFlight, false);
+  h.failEnsure = false;
+  await h.methods.refreshStatus();
+  assert.equal(h.state.collectionEnsureInFlight, true);
+  h.state.collectionRequestAt = Date.now() - 31000;
+  await h.methods.refreshStatus();
+  assert.equal(h.requests.filter((x) => x === "/api/collection/ensure").length, 3, "lost completion gets a bounded recovery, not a permanent block");
 });

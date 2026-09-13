@@ -113,6 +113,7 @@ var supportedQueueDefinitions = []queueDefinition{
 	{2300, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram"},
 	{2400, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram"},
 	{3100, "召唤师峡谷自选自定义", "custom", "excluded", "ranked"},
+	{3220, "极地大乱斗", "aram", "more:aram", "aram"},
 	{3270, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram"},
 	// Tencent SGP snapshots identify these queues as the RUBY family. Riot's
 	// localized queue catalog supplies the visible name when the client is
@@ -155,8 +156,8 @@ func matchHistoryFilterFor(value string) matchHistoryFilterSpec {
 		spec.Tags = []string{"q_440"}
 		spec.AllowedQueues = int64Set(440)
 	case "more:aram":
-		spec.Tags = []string{"q_450", "q_930"}
-		spec.AllowedQueues = int64Set(450, 930)
+		spec.Tags = []string{"q_450", "q_930", "q_3220"}
+		spec.AllowedQueues = int64Set(450, 930, 3220)
 	case "more:match":
 		spec.Tags = []string{"q_400", "q_430", "q_480", "q_490"}
 		spec.AllowedGroups = stringSet("match")

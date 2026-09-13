@@ -1,0 +1,25 @@
+# import config
+importmap golang.org/x/net/dns/dnsmessage=vendor/golang.org/x/net/dns/dnsmessage
+packagefile cmp=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/4c/4c0ecfbf082f5850bae46ac99ae3499a2743b9261cadf8334087720f4974e2c2-d
+packagefile context=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/5f/5f6a4b6aa9656bec33a61c902f7fde835176282ec9abfe6cf6640dc9d2cb3d62-d
+packagefile errors=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/92/92419c947b6b8bfa746aa9007873129b75d2ef850d10784f5891ce54731bc38c-d
+packagefile vendor/golang.org/x/net/dns/dnsmessage=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/56/560a46a9b02f9380632b015f01212979e2e2f31ab7646e05c3866e4f721e4172-d
+packagefile internal/bytealg=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/cf/cfd22ce061683b26f9722c1c8301138bcb015973e9e9a3887faea9e6d90ebe56-d
+packagefile internal/godebug=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/a6/a6e0d900b8a23f0b98122a061b246b8b9c8e879dfa9392c35f12cf50740bf05b-d
+packagefile internal/itoa=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/37/37d7794f340f29cd551afde546b47d2c557ffa833de7cd537dd69cc83f0318b8-d
+packagefile internal/nettrace=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/0b/0b9afc52515505dd19f6b2c8a6dfb428d69d4b0604ffe37d04418ef34febf637-d
+packagefile internal/poll=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/ac/acdc60124b7bedba16478d5e749b40d9d7db8e63ba2f4e8401134d72dc616734-d
+packagefile internal/singleflight=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/e8/e80c2f348302a6e3097b984743740e3bbaafe4cc7e31059f9da36ad98d80a0fa-d
+packagefile internal/stringslite=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/01/01c1d935e2ba10c15c49eef645d59e730e778e164c6a57bae2969e0374dca389-d
+packagefile internal/syscall/unix=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/14/14c7143b2fb9f89029be5a03c1751444943242012ac8b64533ee80cc866fbd35-d
+packagefile io=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/3b/3bcbdd40e3469a4285f39965d461e72e715464255108f7e56ab0b7745fd74ac4-d
+packagefile io/fs=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/5e/5e0d8de3a2a059ba992ce55e8cce376e34623df3b7f4e876c3b9aa42345841c4-d
+packagefile net/netip=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/6f/6f2f4de7c64ac46a27c067760d186c256c84e754ae6eb685e36b539c537ad188-d
+packagefile os=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/d3/d357241b1549d8642dd49facffc998f8c7e6cc01ff3a10c43422afc5910e1bea-d
+packagefile runtime=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/87/8752346f51b88838ddd89dfa76d496b693ccf0a09ae5a4747143af63f4dabf1b-d
+packagefile slices=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/92/92110244385c4969d5e9426b310e12365ee69c8e9bb832a91b815ec4cb6ca1e8-d
+packagefile sync=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/48/48c27578a3d8c6e8f5ba8d755e04e58938df632a1e6d378907c4ae56f3d061c9-d
+packagefile sync/atomic=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/da/daa8beeeb0f0f3d51550eadb9b51512dce44422a7b5dbe8a5d51a481dd56d45a-d
+packagefile syscall=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/66/669758773e34c245f3d6a71a7226ded63526c1a3bdeefbeda9703b9c525c287a-d
+packagefile time=/sessions/happy-adoring-darwin/mnt/deep-legends/.gocache/c8/c81dd4fa9dc191f8af1ab72bb44d41fb587f2e8f417a9e339b9374726e82f31d-d
+packagefile runtime/cgo=/sessions/happy-adoring-darwin/mnt/deep-legends/.tmpbuild/go-build3820070919/b150/_pkg_.a

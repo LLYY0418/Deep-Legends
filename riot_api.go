@@ -176,6 +176,20 @@ type riotOverviewCostTrackerKey struct{}
 type riotOverviewCostTracker struct {
 	mu               sync.Mutex
 	rateLimitedCount int
+	matchesFailed    int
+	firstErrorKind   string
+}
+
+func (t *riotOverviewCostTracker) recordMatchFailure(err error) {
+	if t == nil || err == nil {
+		return
+	}
+	t.mu.Lock()
+	t.matchesFailed++
+	if t.firstErrorKind == "" {
+		t.firstErrorKind = championProviderErrorKind(err)
+	}
+	t.mu.Unlock()
 }
 
 func (t *riotOverviewCostTracker) recordRateLimit() {
@@ -194,6 +208,15 @@ func (t *riotOverviewCostTracker) rateLimitCount() int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.rateLimitedCount
+}
+
+func (t *riotOverviewCostTracker) matchFailureSnapshot() (int, string) {
+	if t == nil {
+		return 0, ""
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.matchesFailed, t.firstErrorKind
 }
 
 func riotOverviewCostTrackerFromContext(ctx context.Context) *riotOverviewCostTracker {
@@ -236,6 +259,9 @@ func (p *riotProvider) wait(ctx context.Context) error {
 		longPeriod  = 2 * time.Minute
 	)
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		p.limitMu.Lock()
 		now := time.Now()
 		p.shortWindow = pruneTimestamps(p.shortWindow, now.Add(-shortPeriod))
@@ -258,6 +284,17 @@ func (p *riotProvider) wait(ctx context.Context) error {
 		p.limitMu.Unlock()
 		if sleep < 50*time.Millisecond {
 			sleep = 50 * time.Millisecond
+		}
+		// A local budget wait longer than the entire request cannot succeed.
+		// Report the quota recovery, rather than timing out identity resolution
+		// and then caching that timeout as though the account lookup had failed.
+		if deadline, ok := ctx.Deadline(); ok && sleep >= time.Until(deadline) {
+			seconds := int(math.Ceil(sleep.Seconds()))
+			riotOverviewCostTrackerFromContext(ctx).recordRateLimit()
+			if p.champions != nil && p.champions.diag != nil {
+				p.champions.diag(map[string]any{"event": "riot_local_rate_limited", "retry_after_seconds": seconds})
+			}
+			return &riotStatusError{status: http.StatusTooManyRequests, retryAfter: seconds, message: fmt.Sprintf("韩服查询额度正在恢复，请约 %d 秒后重试；已加载的战绩仍可查看", seconds)}
 		}
 		if err := waitRiotDelay(ctx, sleep); err != nil {
 			return err
@@ -379,8 +416,9 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 
 // riotStatusError 携带面向用户的中文提示与对应的 HTTP 状态码。
 type riotStatusError struct {
-	message string
-	status  int
+	retryAfter int
+	message    string
+	status     int
 }
 
 func (e *riotStatusError) Error() string { return e.message }
@@ -570,7 +608,7 @@ func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine st
 	completedAt := time.Now()
 	if err == nil {
 		entry.expiresAt = completedAt.Add(24 * time.Hour)
-	} else if !errors.Is(err, context.Canceled) {
+	} else if errors.Is(err, errRiotNotFound) {
 		entry.failures = previousFailures + 1
 		backoff := 30 * time.Second
 		if entry.failures > 1 {
@@ -895,13 +933,20 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		if provider.champions == nil || provider.champions.diag == nil {
 			return
 		}
+		matchesFailed, firstErrorKind := tracker.matchFailureSnapshot()
 		provider.champions.diag(map[string]any{
 			"event": "riot_overview_cost", "duration_ms": time.Since(started).Milliseconds(),
 			"matches_requested": matchesRequested, "matches_loaded": matchesLoaded,
+			"matches_failed": matchesFailed, "first_error_kind": firstErrorKind,
 			"rate_limited_count": tracker.rateLimitCount(),
 		})
 	}()
 	puuid := strings.TrimSpace(reference.PlayerRef)
+	if reference.OPGGIdentity {
+		puuid = ""
+		reference.PlayerRef, reference.AlternatePlayerRef = "", ""
+		reference.OPGGIdentity = false
+	}
 	gameName := strings.TrimSpace(reference.GameName)
 	tagLine := strings.TrimSpace(reference.TagLine)
 	if puuid == "" {
@@ -992,6 +1037,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			defer func() { <-semaphore }()
 			detail, detailErr := provider.matchByID(ctx, ids[index])
 			if detailErr != nil {
+				tracker.recordMatchFailure(detailErr)
 				return
 			}
 			loadMu.Lock()
@@ -1064,11 +1110,14 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	response.Masteries = masteries
 	// 韩服拿不到客户端个人主页背景（Riot API 无此字段），退回最高熟练度英雄原画。
 	applyMasteryBackgroundFallback(&response.Player, masteries)
+	a.applyOverviewSkinMedia(&response.Player)
 	response.Capabilities = capabilities
 	response.Overall = aggregateMatches(matches, puuid, nil)
 	recentWindowAfter := time.Now().Add(-recentWindowDays * 24 * time.Hour).UnixMilli()
 	response.RecentRanked = recentRankedSummary(matches, puuid, nil)
 	response.ChampionStats = championStats(matches, puuid, names)
+	// Never crawl a KR season in the background: it shares the foreground Riot budget.
+	response.SeasonStatsProgress = seasonStatsProgress{Unavailable: true, Message: "近期战绩样本（非本赛季汇总）"}
 	response.Positions = positionStats(matches, puuid)
 	response.Ability = buildGameplayAbilityProfile(matches, puuid, ranks, riotRegionKR)
 	response.RankedQueues = buildGameplayRankedQueues(recentRankedMatchesForQueue(matches, 420, defaultMatchCount), recentRankedMatchesForQueue(matches, 440, defaultMatchCount), puuid, ranks, riotRegionKR)
@@ -1243,4 +1292,17 @@ func (p *championProvider) championNamesZH(ctx context.Context) map[int64]string
 		}
 	}
 	return result
+}
+
+// Preserve a useful backoff hint through the local API without exposing keys.
+func writeRiotHTTPError(w http.ResponseWriter, err error) {
+	var statusErr *riotStatusError
+	if errors.As(err, &statusErr) && statusErr.retryAfter > 0 {
+		w.Header().Set("Retry-After", strconv.Itoa(statusErr.retryAfter))
+	}
+	message := err.Error()
+	if errors.Is(err, context.DeadlineExceeded) {
+		message = "韩服数据读取超时，请稍后重试"
+	}
+	http.Error(w, message, riotErrorStatus(err))
 }

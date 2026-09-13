@@ -109,6 +109,109 @@ func TestLoadSnapshotIndependentRefreshesOverlap(t *testing.T) {
 	}
 }
 
+func TestLoadCollectionSnapshotRunsAcquisitionAndChromaInParallel(t *testing.T) {
+	type chromaEntry struct {
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+	}
+	type catalogEntry struct {
+		ID         int64         `json:"id"`
+		Name       string        `json:"name"`
+		ChampionID int64         `json:"championId"`
+		Chromas    []chromaEntry `json:"chromas"`
+	}
+	catalog := make([]catalogEntry, 0, 1000)
+	for championID := int64(1); championID <= 100; championID++ {
+		for offset := int64(0); offset < 10; offset++ {
+			skinID := championID*1000 + offset
+			catalog = append(catalog, catalogEntry{
+				ID: skinID, Name: "测试皮肤", ChampionID: championID,
+				Chromas: []chromaEntry{{ID: skinID*10 + 1, Name: fmt.Sprintf("测试炫彩 %d", skinID)}},
+			})
+		}
+	}
+	catalogJSON, err := json.Marshal(catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	skinInventory := make([]map[string]any, 0, len(catalog))
+	for _, skin := range catalog {
+		skinInventory = append(skinInventory, map[string]any{"id": skin.ID, "owned": true})
+	}
+	skinInventoryJSON, err := json.Marshal(skinInventory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chromaInventoryJSON, err := json.Marshal([]map[string]any{{"id": catalog[0].Chromas[0].ID, "inventoryType": "CHROMA", "quantity": 1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const delayedChampionsPath = "/lol-champions/v1/inventories/1/champions"
+	const delayedChromaPath = "/lol-inventory/v2/inventory/CHROMA"
+	lootCatalogs := make(map[string][]byte)
+	for _, source := range lootMetadataCatalogs {
+		parts := strings.Split(source.clientPath, "/")
+		lootCatalogs[source.clientPath] = lootNamingCatalogFixture(t, parts[len(parts)-1])
+	}
+	var active atomic.Int32
+	var maxActive atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if body, ok := lootCatalogs[r.URL.Path]; ok {
+			_, _ = w.Write(body)
+			return
+		}
+		if r.URL.Path == delayedChampionsPath || r.URL.Path == delayedChromaPath {
+			current := active.Add(1)
+			for {
+				seen := maxActive.Load()
+				if current <= seen || maxActive.CompareAndSwap(seen, current) {
+					break
+				}
+			}
+			defer active.Add(-1)
+			time.Sleep(150 * time.Millisecond)
+		}
+		writeJSON := func(value any) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(value)
+		}
+		switch r.URL.Path {
+		case "/lol-game-data/assets/v1/skins.json", "/lol-game-data/v1/skins.json":
+			_, _ = w.Write(catalogJSON)
+		case "/lol-champions/v1/inventories/1/skins-minimal", delayedChampionsPath:
+			_, _ = w.Write(skinInventoryJSON)
+		case "/lol-champions/v1/inventories/1/champions-minimal":
+			writeJSON([]map[string]any{{"id": 1, "owned": true}})
+		case "/lol-inventory/v2/inventory/CHAMPION_SKIN", "/lol-inventory/v1/inventory":
+			writeJSON([]any{})
+		case delayedChromaPath:
+			_, _ = w.Write(chromaInventoryJSON)
+		case "/lol-loot/v1/player-loot-map":
+			writeJSON(lootNamingFixtureItems())
+		case "/lol-inventory/v1/wallet/lol_blessing_token":
+			writeJSON(0)
+		case "/lol-rewards/v1/grants":
+			writeJSON([]any{})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	identity := Snapshot{Summoner: Summoner{SummonerID: 1, PUUID: "test-puuid"}}
+	pool := PoolManifest{Entries: []PoolEntry{{ID: 1001, Name: "测试皮肤"}}, Names: []string{"测试皮肤"}}
+	snapshot, err := loadCollectionSnapshot(client, pool, identity)
+	if err != nil {
+		t.Fatalf("loadCollectionSnapshot failed: %v", err)
+	}
+	assertLootNamingFixture(t, snapshot.Account.Loot)
+	if got := maxActive.Load(); got < 2 {
+		t.Fatalf("acquisition and chroma requests did not overlap: max active = %d", got)
+	}
+}
+
 func TestEmbeddedPoolMapsOneToOneWithoutOmissions(t *testing.T) {
 	data, err := embedded.ReadFile("data/reroll_pool_14_5.txt")
 	if err != nil {

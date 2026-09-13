@@ -29,7 +29,7 @@ import (
 	"time"
 )
 
-var version = "0.11.2"
+var version = "dev"
 var buildFingerprint = "dev"
 
 const diagnosticDeduplicationLimit = 512
@@ -50,125 +50,198 @@ const diagnosticDeduplicationLimit = 512
 var embedded embed.FS
 
 type app struct {
-	mu                     sync.RWMutex
-	token                  string
-	startedAt              time.Time
-	lastSync               time.Time
-	lastAttempt            time.Time
-	lastDuration           time.Duration
-	lastError              string
-	snapshotRetryCount     int
-	snapshotRetryStarted   time.Time
-	snapshotRetryExhausted bool
-	snapshotFallback       bool
-	snapshotFallbackAt     time.Time
-	collectionDirty        bool
-	collectionDirtyAt      time.Time
-	fallbackOwned          []Skin
-	fallbackRemaining      []Skin
-	connected              bool
-	manualDisconnected     bool
-	snapshotReady          bool
-	connectionState        string
-	eventStream            bool
-	summoner               Summoner
-	account                AccountData
-	allSkins               []Skin
-	chromas                []Chroma
-	chromaState            EndpointCapability
-	owned                  []Skin
-	remaining              []Skin
-	poolTotal              int
-	poolMatched            int
-	poolIssues             []PoolIssue
-	lcu                    *LCUClient
-	syncing                bool
-	poolSource             string
-	poolVersion            string
-	poolID                 string
-	poolHash               string
-	poolGeneration         uint64
-	pools                  map[string]PoolManifest
-	storage                *localStore
-	diagnosticLogMu        sync.RWMutex
-	diagnosticLogErr       string
-	ownership              []OwnershipSourceStatus
-	catalog                CatalogStats
-	assetCacheMu           sync.RWMutex
-	assetCache             map[string][]byte
-	assetCacheOrder        []string
-	assetCacheBytes        int
-	assetCacheGeneration   uint64
-	assetFlights           map[string]*assetFlight
-	assetFailureUntil      map[string]time.Time
-	mediaSlots             chan struct{}
-	refreshRequests        chan struct{}
-	discovery              LCUDiscoveryStatus
-	eventMu                sync.Mutex
-	eventSubscribers       map[chan string]struct{}
-	gameplayRefsMu         sync.Mutex
-	gameplayRefs           map[string]string
-	gameplayRefDetails     map[string]gameplayReference
-	gameplayRefOrder       *list.List
-	gameplayRefEntries     map[string]*list.Element
-	riotClientDiscovery    func() (*RiotClientAPI, error)
-	itemSetMu              sync.Mutex
-	itemSetPriceMu         sync.Mutex
-	itemSetPrices          map[int64]int64
-	itemSetPricesAt        time.Time
-	champions              *championProvider
-	riot                   *riotProvider
-	sgp                    *sgpProvider
-	watch                  *watchRunner
-	convenience            *convenienceRunner // legacy alias; points at watch
-	lpTracker              *lpTracker
-	rankScores             *rankScoreCache
-	opgg                   *opggInsights
-	overviewQueries        *overviewQueryCache
-	matchTimelines         *matchTimelineCache
-	facadeMu               sync.Mutex
-	facadeManualVersion    uint64
-	perkCatalogMu          sync.Mutex
-	perkCatalog            map[string]gameplayPerkCatalogCacheEntry
+	updates                         *updateManager
+	runtimeCancel                   context.CancelFunc
+	quitOnce                        sync.Once
+	currentGames                    currentGameStore
+	proPlayers                      proPlayersCache
+	proRuneMu                       sync.Mutex
+	proRunes                        *proRuneProvider
+	mu                              sync.RWMutex
+	token                           string
+	startedAt                       time.Time
+	lastSync                        time.Time
+	lastAttempt                     time.Time
+	lastDuration                    time.Duration
+	lastError                       string
+	snapshotRetryCount              int
+	snapshotRetryStarted            time.Time
+	snapshotRetryExhausted          bool
+	snapshotFallback                bool
+	snapshotFallbackAt              time.Time
+	collectionDirty                 bool
+	collectionDirtyAt               time.Time
+	fallbackOwned                   []Skin
+	fallbackRemaining               []Skin
+	connected                       bool
+	manualDisconnected              bool
+	identityReady                   bool
+	snapshotReady                   bool
+	collectionRequested             bool
+	connectionState                 string
+	eventStream                     bool
+	summoner                        Summoner
+	summonerIdentityAt              time.Time
+	account                         AccountData
+	masteries                       map[int64]ChampionMastery
+	masteryCapability               EndpointCapability
+	allSkins                        []Skin
+	chromas                         []Chroma
+	chromaState                     EndpointCapability
+	owned                           []Skin
+	remaining                       []Skin
+	poolTotal                       int
+	poolMatched                     int
+	poolIssues                      []PoolIssue
+	lcu                             *LCUClient
+	syncing                         bool
+	poolSource                      string
+	poolVersion                     string
+	poolID                          string
+	poolHash                        string
+	poolGeneration                  uint64
+	pools                           map[string]PoolManifest
+	storage                         *localStore
+	diagnosticLogMu                 sync.RWMutex
+	diagnosticLogErr                string
+	diagnosticWriteFailures         uint64
+	diagnosticWritePending          uint64
+	diagnosticWriteRecovered        uint64
+	diagnosticWriteLastKind         string
+	ownership                       []OwnershipSourceStatus
+	catalog                         CatalogStats
+	assetCacheMu                    sync.RWMutex
+	assetCache                      map[string][]byte
+	assetCacheOrder                 []string
+	assetCacheBytes                 int
+	assetCacheGeneration            uint64
+	assetFlights                    map[string]*assetFlight
+	assetFailureUntil               map[string]time.Time
+	mediaSlots                      chan struct{}
+	collectionRefreshPending        bool
+	refreshRequests                 chan struct{}
+	discovery                       LCUDiscoveryStatus
+	eventMu                         sync.Mutex
+	eventSubscribers                map[chan string]struct{}
+	summonerIdentityMu              sync.Mutex
+	summonerIdentityFlight          *summonerIdentityFlight
+	summonerIdentityEventMu         sync.Mutex
+	summonerIdentityEventTimer      *time.Timer
+	summonerIdentityEventGeneration uint64
+	gameplayRefsMu                  sync.Mutex
+	gameplayRefs                    map[string]string
+	gameplayRefDetails              map[string]gameplayReference
+	gameplayRefOrder                *list.List
+	gameplayRefEntries              map[string]*list.Element
+	riotClientDiscovery             func() (*RiotClientAPI, error)
+	clientInstallations             func() []clientInstallation
+	clientInstallationsMu           sync.Mutex
+	clientInstallationsCache        []clientInstallation
+	clientInstallationsCacheScan    clientInstallationScan
+	clientInstallationsCacheAt      time.Time
+	collectionProbe                 func(context.Context, *LCUClient, int64) (bool, int)
+	collectionRefresh               func(*LCUClient) bool
+	liveClientPlayerList            func(context.Context) ([]byte, int, error)
+	liveClientPlayerListNow         func() time.Time
+	clientLauncher                  func(clientInstallation) (clientLaunchResult, error)
+	clientLaunch                    clientLaunchState
+	itemSetMu                       sync.Mutex
+	itemSetPriceMu                  sync.Mutex
+	itemSetPrices                   map[int64]int64
+	itemSetPricesAt                 time.Time
+	champions                       *championProvider
+	riot                            *riotProvider
+	sgp                             *sgpProvider
+	watch                           *watchRunner
+	convenience                     *convenienceRunner // legacy alias; points at watch
+	lpTracker                       *lpTracker
+	rankScores                      *rankScoreCache
+	opgg                            *opggInsights
+	overviewQueries                 *overviewQueryCache
+	matchTimelines                  *matchTimelineCache
+	facadeMu                        sync.Mutex
+	facadeManualVersion             uint64
+	perkCatalogMu                   sync.Mutex
+	perkCatalog                     map[string]gameplayPerkCatalogCacheEntry
 	// 赛季统计后台回补的单飞登记表：key 是 accountHash|season。
 	seasonBackfillMu sync.Mutex
 	seasonBackfills  map[string]struct{}
 	// seasonQuerySnapshots is the first query-parameter deduplication gate.
 	// Cache and single-flight remain the second and third gates.
-	seasonQuerySnapshots              map[string]time.Time
-	queueFilterCapabilityMu           sync.RWMutex
-	queueFilterCapabilities           map[string]string
-	recentRankedSamplesMu             sync.Mutex
-	recentRankedSamples               map[string]recentRankedSampleCacheEntry
-	rankedSplitProbeOnce              sync.Once
-	rankedSplitProbeEnabled           bool
-	rankedLCUShapeOnce                sync.Once
-	spectatorReadProbeOnce            sync.Once
-	rankedCompletionGateMu            sync.Mutex
-	rankedCompletionRecent            []bool
-	rankedCompletionClosed            bool
-	recommendationModeDiagnosticMu    sync.Mutex
-	recommendationModeDiagnosticKeys  map[string]struct{}
-	matchModeDiagnosticMu             sync.Mutex
-	matchModeDiagnosticKeys           map[int64]struct{}
-	championDataDiagnosticMu          sync.Mutex
-	championDataDiagnosticKeys        map[string]struct{}
-	liveRosterDiagnosticMu            sync.Mutex
-	liveRosterDiagnosticKeys          map[string]struct{}
-	unknownQueueDiagnosticMu          sync.Mutex
-	unknownQueueDiagnosticIDs         map[int64]struct{}
-	diagnosticDedupMu                 sync.Mutex
-	diagnosticDedupCounts             map[string]int
-	lcuGameflowShapeDiagnosticMu      sync.Mutex
-	lcuGameflowShapeDiagnosticKeys    map[string]struct{}
-	lcuChampSelectShapeDiagnosticMu   sync.Mutex
-	lcuChampSelectShapeDiagnosticKeys map[string]struct{}
+	seasonQuerySnapshots                map[string]time.Time
+	seasonQuerySnapshotOrder            *list.List
+	seasonQuerySnapshotEntries          map[string]*list.Element
+	queueFilterCapabilityMu             sync.RWMutex
+	queueFilterCapabilities             map[string]string
+	recentRankedSamplesMu               sync.Mutex
+	recentRankedSamples                 map[string]recentRankedSampleCacheEntry
+	recentRankedSampleOrder             *list.List
+	recentRankedSampleEntries           map[string]*list.Element
+	livePlayerMatchesMu                 sync.Mutex
+	livePlayerMatchCache                map[string]livePlayerMatchesCacheEntry
+	livePlayerMatchOrder                *list.List
+	livePlayerMatchEntries              map[string]*list.Element
+	livePlayerMatchFlights              map[string]*livePlayerMatchesFlight
+	liveRosterConcurrencyOverride       int
+	rankedSplitProbeOnce                sync.Once
+	rankedSplitProbeEnabled             bool
+	rankedLCUShapeOnce                  sync.Once
+	rankedCompletionGateMu              sync.Mutex
+	rankedCompletionRecent              []bool
+	rankedCompletionClosed              bool
+	recommendationModeDiagnosticMu      sync.Mutex
+	recommendationModeDiagnosticKeys    map[string]struct{}
+	matchModeDiagnosticMu               sync.Mutex
+	matchModeDiagnosticKeys             map[int64]struct{}
+	championDataDiagnosticMu            sync.Mutex
+	championDataDiagnosticKeys          map[string]struct{}
+	liveRosterDiagnosticMu              sync.Mutex
+	liveRosterDiagnosticKeys            map[string]struct{}
+	livePositionMu                      sync.Mutex
+	livePositionGameID                  int64
+	livePositionByRef                   map[string]string
+	liveClientPlayerListDiagnosticMu    sync.Mutex
+	liveClientPlayerListDiagnosticKeys  map[string]struct{}
+	liveClientProbeMu                   sync.Mutex
+	liveClientProbe                     liveClientProbeState
+	arenaAlliesMu                       sync.RWMutex
+	arenaAllyKeys                       map[string]struct{}
+	unknownQueueDiagnosticMu            sync.Mutex
+	unknownQueueDiagnosticIDs           map[int64]struct{}
+	diagnosticDedupMu                   sync.Mutex
+	diagnosticDedupCounts               map[string]int
+	rankedWinrateDiagnosticMu           sync.Mutex
+	rankedWinrateDiagnosticBuckets      map[string]*rankedWinrateDiagnosticBucket
+	lcuGameflowShapeDiagnosticMu        sync.Mutex
+	lcuGameflowShapeDiagnosticKeys      map[string]struct{}
+	lcuChampSelectShapeDiagnosticMu     sync.Mutex
+	lcuChampSelectShapeDiagnosticKeys   map[string]struct{}
+	facadeIdentityShapeDiagnosticMu     sync.Mutex
+	facadeIdentityShapeDiagnosticClient *LCUClient
+	facadeSkinCatalogMu                 sync.Mutex
+	facadeSkinCatalogClient             *LCUClient
+	facadeSkinCatalog                   []Skin
+	facadeSkinCatalogAt                 time.Time
+	facadeSkinCatalogErr                error
+	facadeChallengeCatalogMu            sync.Mutex
+	facadeChallengeCatalogClient        *LCUClient
+	facadeChallengeCatalogAttempted     bool
+	facadeChallengeCatalog              map[string]facadeChallenge
+	facadeChallengeCatalogRaw           json.RawMessage
+	facadeChallengeCatalogErr           error
+	facadeEventMu                       sync.Mutex
+	facadeEventLastBroadcast            time.Time
+	facadeEventTimer                    *time.Timer
+	facadeEventPending                  bool
+	facadeEventGeneration               uint64
 }
 
 type statusResponse struct {
+	Update                 updateStatus         `json:"update"`
 	Version                string               `json:"version"`
 	BuildFingerprint       string               `json:"buildFingerprint"`
 	Connected              bool                 `json:"connected"`
+	IdentityReady          bool                 `json:"identityReady"`
 	SnapshotReady          bool                 `json:"snapshotReady"`
 	ConnectionState        string               `json:"connectionState"`
 	EventStream            bool                 `json:"eventStream"`
@@ -202,16 +275,21 @@ type statusResponse struct {
 }
 
 type publicSummoner struct {
-	DisplayName      string `json:"displayName,omitempty"`
-	GameName         string `json:"gameName,omitempty"`
-	TagLine          string `json:"tagLine,omitempty"`
-	ProfileIconID    int64  `json:"profileIconId,omitempty"`
-	SummonerLevel    int64  `json:"summonerLevel,omitempty"`
-	BackgroundSource string `json:"backgroundSource,omitempty"`
-	BackgroundPath   string `json:"backgroundPath,omitempty"`
+	DisplayName          string `json:"displayName,omitempty"`
+	GameName             string `json:"gameName,omitempty"`
+	TagLine              string `json:"tagLine,omitempty"`
+	ProfileIconID        int64  `json:"profileIconId,omitempty"`
+	SummonerLevel        int64  `json:"summonerLevel,omitempty"`
+	BackgroundSkinID     int64  `json:"backgroundSkinId"`
+	BackgroundSkinName   string `json:"backgroundSkinName"`
+	BackgroundSource     string `json:"backgroundSource"`
+	BackgroundPath       string `json:"backgroundPath"`
+	BackgroundPosterPath string `json:"backgroundPosterPath,omitempty"`
+	BackgroundVideoPath  string `json:"backgroundVideoPath,omitempty"`
 }
 
 func main() {
+	startupWarmup := flag.Bool("startup-warmup", false, "exit before services, networking or user storage initialization")
 	selfTest := flag.Bool("self-test", false, "validate embedded resources and exit")
 	selfCheckRiotKey := flag.Bool("self-check-riot-key", false, "validate the embedded Riot API key and exit")
 	noBrowser := flag.Bool("no-browser", false, "do not open the default browser")
@@ -219,6 +297,11 @@ func main() {
 	listenAddress := flag.String("listen", "127.0.0.1:0", "loopback address for the local UI")
 	encryptRiotKeyFlag := flag.String("encrypt-riot-key", "", "encrypt a Riot API key for embedding in riot_api.go and exit")
 	flag.Parse()
+	// Execution-only warmup must precede every persistent/service initializer.
+	// --self-test below also validates user/provider state and is not read-only.
+	if *startupWarmup {
+		return
+	}
 	if strings.TrimSpace(*encryptRiotKeyFlag) != "" {
 		cipherText, err := encryptRiotKey(*encryptRiotKeyFlag)
 		if err != nil {
@@ -330,7 +413,16 @@ func main() {
 		return loadGameplayAugmentsFromClient(client)
 	}
 	a.sgp.observe = a.recordDiagnostic
+	a.sgp.gatewayAccount = func(client *LCUClient) string {
+		a.mu.RLock()
+		defer a.mu.RUnlock()
+		if a.lcu != client || !a.connected {
+			return ""
+		}
+		return a.summoner.PUUID
+	}
 	a.watch = newWatchRunner(store, a.broadcastEvent)
+	a.watch.observe = a.recordDiagnostic
 	a.convenience = a.watch
 	a.lpTracker = newLPTracker(store)
 	a.lpTracker.observeEvent = a.recordDiagnostic
@@ -343,6 +435,7 @@ func main() {
 	a.overviewQueries = newOverviewQueryCache()
 	a.matchTimelines = newMatchTimelineCache()
 	a.recordAppStartDiagnostic()
+	a.enableDiagnosticRotationSnapshot()
 
 	webFS, err := fs.Sub(embedded, "web")
 	if err != nil {
@@ -360,15 +453,11 @@ func main() {
 	if err := mime.AddExtensionType(".woff2", "font/woff2"); err != nil {
 		log.Fatal(err)
 	}
-	fileServer := http.FileServer(http.FS(webFS))
-	// 内嵌静态资源没有修改时间等校验信息，强制浏览器每次校验，
-	// 确保重新编译后前端样式与脚本立即生效（本机服务，无网络成本）。
-	staticFiles := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
-		fileServer.ServeHTTP(w, r)
-	}
-	mux.HandleFunc("GET /{$}", a.handleBootstrap(http.HandlerFunc(staticFiles)))
-	mux.HandleFunc("GET /", staticFiles)
+	// Content-based validators survive process restarts and change with the
+	// embedded asset, including development builds with fingerprint "dev".
+	staticFiles := newStaticAssetHandler(webFS)
+	mux.HandleFunc("GET /{$}", a.handleBootstrap(staticFiles))
+	mux.Handle("GET /", staticFiles)
 	mux.HandleFunc("GET /api/status", a.authorized(a.handleStatus))
 	mux.HandleFunc("GET /api/events", a.authorized(a.handleEvents))
 	mux.HandleFunc("GET /api/skins", a.authorized(a.handleSkins))
@@ -381,13 +470,19 @@ func main() {
 	mux.HandleFunc("GET /api/gameplay/live", a.authorized(a.handleGameplayLive))
 	mux.HandleFunc("GET /api/gameplay/recommendations", a.authorized(a.handleGameplayRecommendations))
 	mux.HandleFunc("GET /api/gameplay/specialist-runes", a.authorized(a.handleGameplaySpecialistRunes))
+	mux.HandleFunc("GET /api/gameplay/pro-runes", a.authorized(a.handleGameplayProRunes))
 	mux.HandleFunc("POST /api/gameplay/match-tiers", a.authorized(a.handleGameplayMatchTiers))
+	mux.HandleFunc("POST /api/gameplay/current-game", a.authorized(a.handleOverviewCurrentGame))
+	mux.HandleFunc("POST /api/gameplay/season-summary", a.authorized(a.handleOPGGSeasonSummary))
 	mux.HandleFunc("POST /api/gameplay/match-timeline", a.authorized(a.handleGameplayMatchTimeline))
 	mux.HandleFunc("GET /api/gameplay/phase", a.authorized(a.handleGameplayPhase))
 	mux.HandleFunc("GET /api/gameplay/convenience", a.authorized(a.handleGameplayConvenience))
 	mux.HandleFunc("POST /api/gameplay/convenience", a.authorized(a.handleGameplayConvenience))
 	mux.HandleFunc("GET /api/watch/rules", a.authorized(a.handleWatchRules))
 	mux.HandleFunc("POST /api/watch/rules", a.authorized(a.handleWatchRules))
+	mux.HandleFunc("GET /api/champselect/groups", a.authorized(a.handleChampSelectGroups))
+	mux.HandleFunc("GET /api/champselect/state", a.authorized(a.handleChampSelectState))
+	mux.HandleFunc("POST /api/champselect/pause", a.authorized(a.handleChampSelectPause))
 	mux.HandleFunc("GET /api/rig/status", a.authorized(a.handleRigStatus))
 	mux.HandleFunc("POST /api/rig/settings-lock", a.authorized(a.handleSettingsLock))
 	mux.HandleFunc("POST /api/rig/maintenance", a.authorized(a.handleClientMaintenance))
@@ -402,6 +497,7 @@ func main() {
 	mux.HandleFunc("POST /api/gameplay/item-sets/apply", a.authorized(a.handleGameplayItemSetApply))
 	mux.HandleFunc("GET /api/gameplay/replay", a.authorized(a.handleGameplayReplayMetadata))
 	mux.HandleFunc("POST /api/gameplay/replay", a.authorized(a.handleGameplayReplayAction))
+	mux.HandleFunc("GET /api/pro-players", a.authorized(a.handleProPlayers))
 	mux.HandleFunc("GET /api/champions/catalog", a.authorized(a.handleChampionCatalog))
 	mux.HandleFunc("GET /api/champions/rankings", a.authorized(a.handleChampionRankings))
 	mux.HandleFunc("GET /api/champions/augments", a.authorized(a.handleChampionAugments))
@@ -416,13 +512,17 @@ func main() {
 	mux.HandleFunc("POST /api/system-proxy", a.authorized(a.handleSystemProxy))
 	mux.HandleFunc("GET /api/champion-asset", a.authorized(a.handleChampionAsset))
 	mux.HandleFunc("POST /api/refresh", a.authorized(a.handleRefresh))
+	mux.HandleFunc("POST /api/collection/ensure", a.authorized(a.handleCollectionEnsure))
 	mux.HandleFunc("GET /api/image", a.authorized(a.handleImage))
 	mux.HandleFunc("GET /api/prestige-image", a.authorized(a.handlePrestigeImage))
 	mux.HandleFunc("GET /api/skin-art", a.authorized(a.handleSkinArt))
 	mux.HandleFunc("GET /api/media", a.authorized(a.handleMedia))
 	mux.HandleFunc("GET /api/diagnostics", a.authorized(a.handleDiagnostics))
 	mux.HandleFunc("GET /api/diagnostics/log", a.authorized(a.handleDiagnosticLog))
+	mux.HandleFunc("POST /api/diagnostics/objectives", a.authorized(a.handleObjectiveDiagnostics))
 	mux.HandleFunc("POST /api/diagnostics/client", a.authorized(a.handleClientDiagnostic))
+	mux.HandleFunc("POST /api/diagnostics/startup", a.authorized(a.handleDesktopStartup))
+	mux.HandleFunc("POST /api/diagnostics/startup-stage", a.authorized(a.handleDesktopStartupStage))
 	mux.HandleFunc("GET /api/pools", a.authorized(a.handlePools))
 	mux.HandleFunc("POST /api/pools/import", a.authorized(a.handlePoolImport))
 	mux.HandleFunc("POST /api/pools/select", a.authorized(a.handlePoolSelect))
@@ -436,6 +536,8 @@ func main() {
 	mux.HandleFunc("GET /api/client-installations", a.authorized(a.handleClientInstallations))
 	mux.HandleFunc("POST /api/client-launch", a.authorized(a.handleClientLaunch))
 	mux.HandleFunc("POST /api/quit", a.authorized(a.handleQuit))
+	a.registerUpdateRoutes(mux)
+	a.updates = newUpdateManager(version, a.storage, a.broadcastUpdateEvent)
 
 	listener, err := net.Listen("tcp", *listenAddress)
 	if err != nil {
@@ -454,7 +556,10 @@ func main() {
 		}
 	}
 
-	go a.runConnectionManager(context.Background())
+	runtimeContext, runtimeCancel := context.WithCancel(context.Background())
+	a.runtimeCancel = runtimeCancel
+	go a.runConnectionManager(runtimeContext)
+	a.updates.Start()
 	if !*noBrowser && !*desktopMode {
 		go func() {
 			time.Sleep(250 * time.Millisecond)
@@ -553,15 +658,18 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 		issues = issues[:100]
 	}
 	client := a.lcu
+	identityReady := a.identityReady || (a.connected && a.summoner.SummonerID != 0)
 	ownedCount := len(a.owned)
 	remainingCount := len(a.remaining)
 	if a.snapshotFallback && !a.snapshotReady {
 		ownedCount = len(a.fallbackOwned)
 		remainingCount = len(a.fallbackRemaining)
 	}
-	summoner := publicSummoner{DisplayName: a.summoner.DisplayName, GameName: a.summoner.GameName, TagLine: a.summoner.TagLine, ProfileIconID: a.summoner.ProfileIconID, SummonerLevel: a.summoner.SummonerLevel}
+	backgroundID, backgroundName, backgroundSource, backgroundPath := profileBackground(a.account.Profile)
+	summoner := publicSummoner{DisplayName: a.summoner.DisplayName, GameName: a.summoner.GameName, TagLine: a.summoner.TagLine, ProfileIconID: a.summoner.ProfileIconID, SummonerLevel: a.summoner.SummonerLevel, BackgroundSkinID: backgroundID, BackgroundSkinName: backgroundName, BackgroundSource: backgroundSource, BackgroundPath: backgroundPath}
+	summoner.BackgroundPosterPath, summoner.BackgroundVideoPath = overviewSkinMedia(a.allSkins, backgroundID)
 	response := statusResponse{
-		Version: version, BuildFingerprint: buildFingerprint, Connected: a.connected, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
+		Version: version, BuildFingerprint: buildFingerprint, Connected: a.connected, IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
 		Syncing: a.syncing, LastSync: a.lastSync, LastAttempt: a.lastAttempt, LastDurationMS: a.lastDuration.Milliseconds(),
 		LastError: a.lastError, Summoner: summoner, OwnedCount: ownedCount, ChromaOwnedCount: ownedChromaCount(a.chromas), PoolTotal: a.poolTotal,
 		PoolMatched: a.poolMatched, Remaining: remainingCount, CalculationOK: a.calculationOKLocked(),
@@ -576,6 +684,7 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 		response.SnapshotRetryElapsedMS = time.Since(a.snapshotRetryStarted).Milliseconds()
 	}
 	a.mu.RUnlock()
+	response.Update = a.updates.Status()
 	if response.Connected {
 		response.ServerID = clientTencentServerID(client)
 		response.ServerName = tencentServerName(response.ServerID)
@@ -723,23 +832,37 @@ func (a *app) handleSkinDetails(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) handleRefresh(w http.ResponseWriter, _ *http.Request) {
-	a.requestRefresh()
+	a.mu.RLock()
+	client := a.lcu
+	connected := a.connected
+	a.mu.RUnlock()
+	if connected && client != nil {
+		if _, err := a.refreshSummonerIdentity(client); err != nil {
+			a.recordDiagnostic(map[string]any{"event": "summoner_identity_manual_refresh_failed", "reason": safeDiagnosticReason(err)})
+		}
+	}
+	a.requestCollectionRefresh()
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (a *app) handleCollectionEnsure(w http.ResponseWriter, _ *http.Request) {
+	a.mu.RLock()
+	connected := a.connected && a.lcu != nil
+	ready := a.snapshotReady
+	a.mu.RUnlock()
+	if !connected {
+		http.Error(w, "当前没有已连接的英雄联盟客户端", http.StatusConflict)
+		return
+	}
+	if !ready {
+		a.requestCollectionRefresh()
+	}
 	w.WriteHeader(http.StatusAccepted)
 }
 
 func (a *app) handleQuit(w http.ResponseWriter, _ *http.Request) {
-	a.mu.Lock()
-	client := a.lcu
-	a.lcu = nil
-	a.mu.Unlock()
-	if client != nil {
-		client.Close()
-	}
 	respondJSON(w, map[string]bool{"ok": true})
-	go func() {
-		time.Sleep(150 * time.Millisecond)
-		os.Exit(0)
-	}()
+	a.scheduleQuit(150*time.Millisecond, "user")
 }
 
 func (a *app) handleImage(w http.ResponseWriter, r *http.Request) {
@@ -826,10 +949,12 @@ func communityDragonImagePaths(assetPath string) []string {
 	gamePath := "/latest/game/" + gameRelative
 	if strings.HasSuffix(relative, "_large.png") {
 		return []string{
-			pluginPath,
-			strings.TrimSuffix(pluginPath, "_large.png") + "_small.png",
 			gamePath,
+			pluginPath,
+			strings.TrimSuffix(gamePath, "_large.png") + ".png",
+			strings.TrimSuffix(pluginPath, "_large.png") + ".png",
 			strings.TrimSuffix(gamePath, "_large.png") + "_small.png",
+			strings.TrimSuffix(pluginPath, "_large.png") + "_small.png",
 		}
 	}
 	return []string{
@@ -893,7 +1018,65 @@ func (a *app) refresh() {
 	_ = a.refreshWithClient(client)
 }
 
+func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
+	client.setDiagnosticObserver(a.recordDiagnostic)
+	result, err := loadIdentitySnapshot(client)
+	if err != nil {
+		a.recordDiagnostic(map[string]any{"event": "identity_refresh_failed", "error": friendlyError(err), "load_phases_ms": result.LoadPhases, "phase_group": "identity"})
+		return false
+	}
+	a.mu.Lock()
+	if a.lcu != nil && a.lcu != client {
+		a.mu.Unlock()
+		return false
+	}
+	previous := a.summoner
+	a.connected = true
+	a.identityReady = result.Summoner.SummonerID != 0
+	a.collectionRequested = false
+	a.collectionRefreshPending = false
+	a.lastAttempt = time.Now()
+	a.lastDuration = time.Duration(result.LoadPhases["total"]) * time.Millisecond
+	a.lastError = ""
+	if gameplaySummonerChanged(previous, result.Summoner) {
+		a.clearGameplayReferences()
+	}
+	a.summoner = result.Summoner
+	a.summonerIdentityAt = a.lastAttempt
+	if result.Account.Profile != (SummonerProfile{}) || result.Account.Capabilities != nil {
+		if result.Account.Profile != (SummonerProfile{}) {
+			a.account.Profile = result.Account.Profile
+		}
+		a.account.Capabilities = result.Account.Capabilities
+	}
+	a.masteries = result.Masteries
+	a.masteryCapability = result.MasteryCapability
+	a.lcu = client
+	a.mu.Unlock()
+	a.recordDiagnostic(map[string]any{"event": "identity_refresh_succeeded", "duration_ms": result.LoadPhases["total"], "load_phases_ms": result.LoadPhases, "phase_group": "identity"})
+	a.broadcastEvent("summoner-updated")
+	a.broadcastEvent("connection-state")
+	return true
+}
+
+func (a *app) requestCollectionRefresh() {
+	a.mu.Lock()
+	a.collectionRequested = true
+	a.manualDisconnected = false
+	coalesced := a.collectionRefreshPending
+	if !coalesced && a.refreshRequests != nil {
+		a.collectionRefreshPending = true
+		select {
+		case a.refreshRequests <- struct{}{}:
+		default:
+		}
+	}
+	a.mu.Unlock()
+	a.recordDiagnostic(map[string]any{"event": "collection_refresh_request", "coalesced": coalesced})
+}
+
 func (a *app) refreshWithClient(client *LCUClient) bool {
+	client.setDiagnosticObserver(a.recordDiagnostic)
 	started := time.Now()
 	a.mu.Lock()
 	if a.syncing {
@@ -901,12 +1084,18 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 		return true
 	}
 	a.syncing = true
+	a.collectionRefreshPending = true
 	generation := a.poolGeneration
 	pool := a.pools[a.poolID]
 	a.mu.Unlock()
+	defer func() {
+		a.mu.Lock()
+		a.collectionRefreshPending = false
+		a.mu.Unlock()
+	}()
 	a.broadcastEvent("refresh-started")
 
-	result, err := loadSnapshotWithClient(client, pool)
+	result, err := loadSnapshotWithClientProvider(client, pool, a.champions, a.recordDiagnostic)
 	clientAlive := false
 	if err != nil {
 		clientAlive = client.probe() == nil
@@ -976,7 +1165,7 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 		}
 		a.mu.Unlock()
 		a.clearAssetCache()
-		a.recordDiagnostic(map[string]any{"event": "refresh_failed", "error": message, "client_alive": clientAlive, "duration_ms": time.Since(started).Milliseconds(), "load_phases_ms": result.LoadPhases, "pool_id": pool.ID, "pool_hash": pool.Hash, "catalog": result.Catalog, "ownership_sources": result.Ownership})
+		a.recordDiagnostic(map[string]any{"event": "refresh_failed", "error": message, "client_alive": clientAlive, "duration_ms": time.Since(started).Milliseconds(), "load_phases_ms": result.LoadPhases, "phase_group": result.PhaseGroup, "pool_id": pool.ID, "pool_hash": pool.Hash, "catalog": result.Catalog, "ownership_sources": result.Ownership})
 		a.broadcastEvent("refresh-failed")
 		return clientAlive
 	}
@@ -989,14 +1178,19 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 	a.fallbackOwned = nil
 	a.fallbackRemaining = nil
 	a.connected = true
+	a.identityReady = result.Summoner.SummonerID != 0
 	a.snapshotReady = true
+	a.collectionRequested = true
 	a.clearCollectionDirtyThroughLocked(started)
 	a.lastError = ""
 	if gameplaySummonerChanged(a.summoner, result.Summoner) {
 		a.clearGameplayReferences()
 	}
 	a.summoner = result.Summoner
+	a.summonerIdentityAt = a.lastAttempt
 	a.account = cloneAccountData(result.Account)
+	a.masteries = result.Masteries
+	a.masteryCapability = result.MasteryCapability
 	a.allSkins = result.All
 	a.chromas = append([]Chroma(nil), result.Chromas...)
 	a.chromaState = result.ChromaState
@@ -1011,7 +1205,7 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 	savedSnapshot := a.snapshotLocked()
 	calculationOK := a.calculationOKLocked()
 	a.mu.Unlock()
-	a.recordDiagnostic(map[string]any{"event": "refresh_succeeded", "duration_ms": time.Since(started).Milliseconds(), "load_phases_ms": result.LoadPhases, "pool_id": pool.ID, "pool_hash": pool.Hash, "owned": len(result.Owned), "remaining": len(result.Remaining), "matched": result.PoolMatched, "catalog": result.Catalog, "ownership_sources": result.Ownership})
+	a.recordDiagnostic(map[string]any{"event": "refresh_succeeded", "duration_ms": time.Since(started).Milliseconds(), "load_phases_ms": result.LoadPhases, "phase_group": result.PhaseGroup, "pool_id": pool.ID, "pool_hash": pool.Hash, "owned": len(result.Owned), "remaining": len(result.Remaining), "matched": result.PoolMatched, "catalog": result.Catalog, "ownership_sources": result.Ownership})
 	if calculationOK && a.storage != nil {
 		if _, saveErr := a.storage.saveSnapshot(savedSnapshot, pool); saveErr != nil {
 			a.recordDiagnostic(map[string]any{"event": "snapshot_save_failed", "error": "local write failed"})
@@ -1022,6 +1216,7 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 }
 
 func (a *app) refreshAccountWithClient(client *LCUClient) {
+	client.setDiagnosticObserver(a.recordDiagnostic)
 	a.mu.Lock()
 	if a.syncing || !a.connected || a.lcu != client {
 		a.mu.Unlock()
@@ -1031,8 +1226,11 @@ func (a *app) refreshAccountWithClient(client *LCUClient) {
 	skins := append([]Skin(nil), a.allSkins...)
 	a.mu.Unlock()
 	profile, profileCapability := NewSummonerAPI(client).Profile()
-	loot, lootCapability := NewLootAPI(client).PlayerLoot()
-	loot = enrichLootItems(loot, skins)
+	loot, lootCapability := NewObservedLootAPI(client, a.recordDiagnostic).PlayerLoot()
+	metadataContext, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	metadata := loadLootMetadata(metadataContext, client, a.champions, a.recordDiagnostic)
+	cancel()
+	loot = enrichLootItemsWithMetadata(loot, skins, metadata, a.recordDiagnostic)
 	sanctumSparks, sanctumCapability := NewLootAPI(client).SanctumSparks()
 	rewards, rewardsCapability := NewRewardsAPI(client).PendingGrants()
 	account := AccountData{Profile: profile, Loot: loot, Rewards: rewards, SanctumSparks: sanctumSparks, SanctumSparksKnown: sanctumCapability.State == capabilityAvailable, Capabilities: []EndpointCapability{profileCapability, lootCapability, sanctumCapability, rewardsCapability}}
@@ -1059,7 +1257,10 @@ func (a *app) clearCollectionDirtyThroughLocked(refreshStartedAt time.Time) {
 
 func (a *app) clearSnapshotLocked(message string) {
 	a.connected = false
+	a.identityReady = false
 	a.snapshotReady = false
+	a.collectionRequested = false
+	a.collectionRefreshPending = false
 	a.lastError = message
 	a.snapshotRetryCount = 0
 	a.snapshotRetryStarted = time.Time{}
@@ -1069,7 +1270,10 @@ func (a *app) clearSnapshotLocked(message string) {
 	a.fallbackOwned = nil
 	a.fallbackRemaining = nil
 	a.summoner = Summoner{}
+	a.summonerIdentityAt = time.Time{}
 	a.account = AccountData{}
+	a.masteries = nil
+	a.masteryCapability = EndpointCapability{}
 	a.allSkins = nil
 	a.chromas = nil
 	a.chromaState = EndpointCapability{}
@@ -1087,14 +1291,26 @@ func (a *app) clearSnapshotLocked(message string) {
 }
 
 func (a *app) retainClientAfterSnapshotErrorLocked(client *LCUClient, result Snapshot, message string) {
+	if result.Summoner.SummonerID == 0 {
+		result.Summoner = a.summoner
+	}
 	a.connected = true
+	a.identityReady = result.Summoner.SummonerID != 0
 	a.snapshotReady = false
+	a.collectionRequested = true
 	a.lastError = message
 	if gameplaySummonerChanged(a.summoner, result.Summoner) {
 		a.clearGameplayReferences()
 	}
 	a.summoner = result.Summoner
-	a.account = AccountData{}
+	if result.Summoner.SummonerID != 0 {
+		a.summonerIdentityAt = a.lastAttempt
+	}
+	profile := a.account.Profile
+	a.account = AccountData{Profile: profile}
+	if result.Account.Profile != (SummonerProfile{}) {
+		a.account.Profile = result.Account.Profile
+	}
 	a.allSkins = nil
 	a.chromas = nil
 	a.chromaState = result.ChromaState
@@ -1143,7 +1359,12 @@ func (a *app) recordDiagnostic(event map[string]any) {
 			return
 		}
 	}
+	if eventName, _ := event["event"].(string); eventName == "ranked_winrate_resolved" {
+		a.aggregateRankedWinrateDiagnostic(event, time.Now())
+		return
+	}
 	if eventName, ok := event["event"].(string); ok && isNoisyDiagnosticEvent(eventName) {
+		evicted := 0
 		raw, _ := json.Marshal(event)
 		key := eventName + "|" + string(raw)
 		a.diagnosticDedupMu.Lock()
@@ -1151,44 +1372,133 @@ func (a *app) recordDiagnostic(event map[string]any) {
 			a.diagnosticDedupCounts = make(map[string]int)
 		}
 		if _, exists := a.diagnosticDedupCounts[key]; !exists && len(a.diagnosticDedupCounts) >= diagnosticDeduplicationLimit {
+			evicted = len(a.diagnosticDedupCounts)
 			a.diagnosticDedupCounts = make(map[string]int)
 		}
 		a.diagnosticDedupCounts[key]++
 		count := a.diagnosticDedupCounts[key]
 		a.diagnosticDedupMu.Unlock()
+		if evicted > 0 {
+			a.appendDiagnosticEvent(map[string]any{"event": "diagnostic_dedup_reset", "keys_evicted": evicted})
+		}
 		if count > 1 {
 			if count%100 != 0 {
 				return
 			}
 			summary := map[string]any{"event": "diagnostic_dedup", "source_event": eventName, "repeat_count": count}
-			if err := a.storage.appendDiagnostic(summary); err != nil {
-				a.diagnosticLogMu.Lock()
-				a.diagnosticLogErr = "诊断日志写入失败"
-				a.diagnosticLogMu.Unlock()
-			}
+			a.appendDiagnosticEvent(summary)
 			return
 		}
 	}
+	a.appendDiagnosticEvent(event)
+}
+
+type rankedWinrateDiagnosticBucket struct {
+	source          string
+	windowStart     time.Time
+	count           int
+	completeCount   int
+	suppressedCount int
+}
+
+func (a *app) aggregateRankedWinrateDiagnostic(event map[string]any, now time.Time) {
+	source := strings.ToLower(strings.TrimSpace(fmt.Sprint(event["source"])))
+	if source == "" {
+		source = "unknown"
+	}
+	windowStart := now.UTC().Truncate(time.Minute)
+	var completed *rankedWinrateDiagnosticBucket
+	a.rankedWinrateDiagnosticMu.Lock()
+	if a.rankedWinrateDiagnosticBuckets == nil {
+		a.rankedWinrateDiagnosticBuckets = make(map[string]*rankedWinrateDiagnosticBucket)
+	}
+	bucket := a.rankedWinrateDiagnosticBuckets[source]
+	if bucket != nil && !bucket.windowStart.Equal(windowStart) {
+		copy := *bucket
+		completed = &copy
+		bucket = nil
+	}
+	if bucket == nil {
+		bucket = &rankedWinrateDiagnosticBucket{source: source, windowStart: windowStart}
+		a.rankedWinrateDiagnosticBuckets[source] = bucket
+	}
+	bucket.count++
+	if complete, _ := event["complete"].(bool); complete {
+		bucket.completeCount++
+	}
+	if suppressed, _ := event["suppressed"].(bool); suppressed {
+		bucket.suppressedCount++
+	}
+	a.rankedWinrateDiagnosticMu.Unlock()
+	if completed != nil {
+		a.appendDiagnosticEvent(rankedWinrateDiagnosticEvent(completed))
+	}
+}
+
+func rankedWinrateDiagnosticEvent(bucket *rankedWinrateDiagnosticBucket) map[string]any {
+	return map[string]any{
+		"event": "ranked_winrate_resolved", "source": bucket.source,
+		"window_start": bucket.windowStart.Format(time.RFC3339), "count": bucket.count,
+		"complete_count": bucket.completeCount, "suppressed_count": bucket.suppressedCount,
+	}
+}
+
+func (a *app) flushRankedWinrateDiagnostics() {
+	if a == nil || a.storage == nil {
+		return
+	}
+	a.rankedWinrateDiagnosticMu.Lock()
+	buckets := make([]*rankedWinrateDiagnosticBucket, 0, len(a.rankedWinrateDiagnosticBuckets))
+	for _, bucket := range a.rankedWinrateDiagnosticBuckets {
+		copy := *bucket
+		buckets = append(buckets, &copy)
+	}
+	a.rankedWinrateDiagnosticBuckets = make(map[string]*rankedWinrateDiagnosticBucket)
+	a.rankedWinrateDiagnosticMu.Unlock()
+	for _, bucket := range buckets {
+		a.appendDiagnosticEvent(rankedWinrateDiagnosticEvent(bucket))
+	}
+}
+
+func (a *app) appendDiagnosticEvent(event map[string]any) {
+	if a == nil || a.storage == nil {
+		return
+	}
 	// appendDiagnostic adds its timestamp to the map it receives. Keep that
-	// mutation on a private copy so callers can safely reuse a payload for
-	// payload-level deduplication on subsequent records.
+	// mutation on a private copy so callers can safely reuse a payload.
 	toWrite := make(map[string]any, len(event))
 	for key, value := range event {
 		toWrite[key] = value
 	}
+	a.diagnosticLogMu.RLock()
+	pending := a.diagnosticWritePending
+	observedFailures := a.diagnosticWriteFailures
+	if a.diagnosticWriteFailures > 0 {
+		toWrite["diagnostic_write_failures_total"] = a.diagnosticWriteFailures
+		toWrite["diagnostic_write_pending"] = pending
+		toWrite["diagnostic_write_last_kind"] = a.diagnosticWriteLastKind
+	}
+	a.diagnosticLogMu.RUnlock()
 	err := a.storage.appendDiagnostic(toWrite)
 	a.diagnosticLogMu.Lock()
 	if err != nil {
 		a.diagnosticLogErr = "诊断日志写入失败"
+		a.diagnosticWriteFailures++
+		a.diagnosticWritePending++
+		a.diagnosticWriteLastKind = diagnosticErrorKind(err)
 	} else {
-		a.diagnosticLogErr = ""
+		a.diagnosticWriteRecovered = max(observedFailures, a.diagnosticWriteRecovered)
+		a.diagnosticWritePending = a.diagnosticWriteFailures - a.diagnosticWriteRecovered
+		if a.diagnosticWritePending == 0 {
+			a.diagnosticLogErr = ""
+		}
 	}
 	a.diagnosticLogMu.Unlock()
 }
 
 func isNoisyDiagnosticEvent(event string) bool {
 	switch event {
-	case "ranked_winrate_resolved", "ranked_data_source_decision", "specialist_runes_client_skip", "lcu_spectator_read_probe":
+	case "ranked_winrate_resolved", "ranked_data_source_decision", "specialist_runes_client_skip", "client_installations_scan", "lcu_discovery", "live_position_shape", "social_presence_resolved":
 		return true
 	default:
 		return false
@@ -1211,6 +1521,9 @@ func (a *app) resetDiagnosticDeduplication() {
 	a.liveRosterDiagnosticMu.Lock()
 	a.liveRosterDiagnosticKeys = make(map[string]struct{})
 	a.liveRosterDiagnosticMu.Unlock()
+	a.liveClientPlayerListDiagnosticMu.Lock()
+	a.liveClientPlayerListDiagnosticKeys = make(map[string]struct{})
+	a.liveClientPlayerListDiagnosticMu.Unlock()
 	a.unknownQueueDiagnosticMu.Lock()
 	a.unknownQueueDiagnosticIDs = make(map[int64]struct{})
 	a.unknownQueueDiagnosticMu.Unlock()
@@ -1230,6 +1543,16 @@ func (a *app) recordAppStartDiagnostic() {
 		"event": "app_start", "version": version,
 		"build_fingerprint": buildFingerprint, "riot_key": riotKeyConfigured(),
 	})
+}
+
+func (a *app) enableDiagnosticRotationSnapshot() {
+	if a == nil || a.storage == nil {
+		return
+	}
+	a.storage.onDiagnosticRotation = func() {
+		a.resetDiagnosticDeduplication()
+		a.recordAppStartDiagnostic()
+	}
 }
 
 func (a *app) updateDiscovery(report LCUDiscoveryStatus) {
@@ -1258,6 +1581,7 @@ func (a *app) snapshotLocked() Snapshot {
 		Issues: append([]PoolIssue(nil), a.poolIssues...), Client: a.lcu,
 		Ownership: append([]OwnershipSourceStatus(nil), a.ownership...), Catalog: a.catalog,
 		Chromas: append([]Chroma(nil), a.chromas...), ChromaState: a.chromaState,
+		Masteries: a.masteries, MasteryCapability: a.masteryCapability,
 		Account: cloneAccountData(a.account),
 	}
 }
@@ -1367,6 +1691,8 @@ func friendlyError(err error) string {
 	return "读取失败。为避免泄露本机路径或客户端细节，只记录了本机脱敏日志。"
 }
 
+var errResponseLimitExceeded = errors.New("response size limit exceeded")
+
 func readLimited(body io.Reader, limit int64) ([]byte, error) {
 	if limit < 0 {
 		return nil, errors.New("invalid response limit")
@@ -1376,7 +1702,7 @@ func readLimited(body io.Reader, limit int64) ([]byte, error) {
 		return nil, err
 	}
 	if int64(len(data)) > limit {
-		return nil, fmt.Errorf("response exceeds %d bytes", limit)
+		return nil, fmt.Errorf("response exceeds %d bytes: %w", limit, errResponseLimitExceeded)
 	}
 	return data, nil
 }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -18,6 +19,40 @@ type LCUEvent struct {
 	Data      json.RawMessage `json:"data"`
 	EventType string          `json:"eventType"`
 	URI       string          `json:"uri"`
+}
+
+type lcuEventURIStat struct {
+	URI       string `json:"uri"`
+	LastBytes int    `json:"last_bytes"`
+	Count     int    `json:"count"`
+}
+
+type lcuEventStreamError struct {
+	Err     error
+	TopURIs []lcuEventURIStat
+}
+
+func (e *lcuEventStreamError) Error() string { return e.Err.Error() }
+func (e *lcuEventStreamError) Unwrap() error { return e.Err }
+
+func topLCUEventURIStats(stats map[string]lcuEventURIStat, limit int) []lcuEventURIStat {
+	result := make([]lcuEventURIStat, 0, len(stats))
+	for _, stat := range stats {
+		result = append(result, stat)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].LastBytes != result[j].LastBytes {
+			return result[i].LastBytes > result[j].LastBytes
+		}
+		if result[i].Count != result[j].Count {
+			return result[i].Count > result[j].Count
+		}
+		return result[i].URI < result[j].URI
+	})
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+	return result
 }
 
 func (c *LCUClient) ListenEvents(ctx context.Context, onReady func(), onEvent func(LCUEvent)) error {
@@ -43,7 +78,7 @@ func (c *LCUClient) ListenEvents(ctx context.Context, onReady func(), onEvent fu
 		return fmt.Errorf("LCU event stream unavailable: %w", err)
 	}
 	defer conn.Close()
-	conn.SetReadLimit(1024 * 1024)
+	conn.SetReadLimit(8 * 1024 * 1024)
 	if err := conn.WriteJSON([]any{5, "OnJsonApiEvent"}); err != nil {
 		return fmt.Errorf("LCU event subscription failed: %w", err)
 	}
@@ -60,6 +95,7 @@ func (c *LCUClient) ListenEvents(ctx context.Context, onReady func(), onEvent fu
 		}
 	}()
 	defer close(done)
+	uriStats := make(map[string]lcuEventURIStat)
 
 	for {
 		_, data, err := conn.ReadMessage()
@@ -67,7 +103,7 @@ func (c *LCUClient) ListenEvents(ctx context.Context, onReady func(), onEvent fu
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			return fmt.Errorf("LCU event stream closed: %w", err)
+			return &lcuEventStreamError{Err: fmt.Errorf("LCU event stream closed: %w", err), TopURIs: topLCUEventURIStats(uriStats, 3)}
 		}
 		var envelope []json.RawMessage
 		if err := json.Unmarshal(data, &envelope); err != nil || len(envelope) < 3 {
@@ -79,8 +115,15 @@ func (c *LCUClient) ListenEvents(ctx context.Context, onReady func(), onEvent fu
 			continue
 		}
 		var event LCUEvent
-		if json.Unmarshal(envelope[2], &event) == nil && event.URI != "" && onEvent != nil {
-			onEvent(event)
+		if json.Unmarshal(envelope[2], &event) == nil && event.URI != "" {
+			stat := uriStats[event.URI]
+			stat.URI = event.URI
+			stat.LastBytes = len(data)
+			stat.Count++
+			uriStats[event.URI] = stat
+			if onEvent != nil {
+				onEvent(event)
+			}
 		}
 	}
 }
@@ -103,8 +146,11 @@ func lcuEventRefreshScope(event LCUEvent) string {
 			return "collection"
 		}
 	}
+	if strings.HasPrefix(uri, "/lol-summoner/v1/current-summoner/summoner-profile") {
+		return "summoner-profile"
+	}
 	if strings.HasPrefix(uri, "/lol-summoner/v1/current-summoner") {
-		return "full"
+		return "summoner"
 	}
 	for _, prefix := range []string{"/lol-loot/v1/player-loot-map", "/lol-rewards/v1/grants"} {
 		if strings.HasPrefix(uri, prefix) {

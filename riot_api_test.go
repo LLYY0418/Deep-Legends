@@ -185,6 +185,9 @@ func TestRiotOverviewCapsMatchDetailConcurrencyAtFour(t *testing.T) {
 	if len(overview.Matches) != detailCount {
 		t.Fatalf("matches = %d, want %d", len(overview.Matches), detailCount)
 	}
+	if !overview.SeasonStatsProgress.Unavailable || overview.SeasonStatsProgress.Collecting || len(overview.SeasonChampionStats) != 0 {
+		t.Fatal("KR overview must not start an implicit season crawl")
+	}
 	if got := maxInFlight.Load(); got == 0 || got > 4 {
 		t.Fatalf("maximum concurrent Riot match detail requests = %d, want 1..4", got)
 	}

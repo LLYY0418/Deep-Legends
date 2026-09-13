@@ -5,12 +5,15 @@ import (
 	"container/list"
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -29,7 +32,25 @@ const (
 	sgpCompletionRecentLimit  = 20
 	sgpCompletionFailureLimit = 10
 	gameplayReferenceCacheMax = 4096
+	livePlayerMatchesCacheMax = 256
+	livePremadeMinSharedGames = 5
+	livePlayerMatchesCacheTTL = 45 * time.Second
+	liveRosterConcurrency     = 6
+	liveClientPlayerListURL   = "https://127.0.0.1:2999/liveclientdata/playerlist"
+	liveClientRetryDelay      = 3 * time.Second
 )
+
+var liveClientDataHTTPClient = &http.Client{
+	Transport: &http.Transport{
+		Proxy: nil,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // Live Client Data uses a self-signed loopback certificate.
+			MinVersion:         tls.VersionTLS12,
+		},
+		DisableKeepAlives: true,
+	},
+	Timeout: 1500 * time.Millisecond,
+}
 
 var playerReferencePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{16,128}$`)
 
@@ -45,9 +66,10 @@ var (
 var hiddenPlayerUUIDMask = [16]byte{0x81, 0x70, 0x76, 0xa9, 0xf4, 0x51, 0x50, 0x9b, 0x95, 0x98, 0x68, 0x13, 0xce, 0x91, 0x17, 0xe7}
 
 type gameplayOverviewRequest struct {
-	PlayerRef string `json:"playerRef"`
-	GameName  string `json:"gameName"`
-	TagLine   string `json:"tagLine"`
+	ExpectedTier string `json:"expectedTier,omitempty"`
+	PlayerRef    string `json:"playerRef"`
+	GameName     string `json:"gameName"`
+	TagLine      string `json:"tagLine"`
 	// Region 指定查询的服务器："kr" 走 Riot 官方 API 查询韩服；
 	// 留空表示国服，继续通过本机客户端查询。
 	Region string `json:"region"`
@@ -66,10 +88,73 @@ type gameplayPagination struct {
 	Count                int    `json:"count"`
 	Total                int    `json:"total,omitempty"`
 	HasMore              bool   `json:"hasMore"`
+	Partial              bool   `json:"partial,omitempty"`
+	BudgetExceeded       bool   `json:"budgetExceeded,omitempty"`
 	Filter               string `json:"filter,omitempty"`
 	ServerFiltered       bool   `json:"serverFiltered,omitempty"`
 	FilterFallback       bool   `json:"filterFallback,omitempty"`
 	FilterFallbackReason string `json:"filterFallbackReason,omitempty"`
+}
+
+var overviewSoftBudget = 18 * time.Second
+
+type overviewPhasesContextKey struct{}
+
+type overviewPhaseTimings struct {
+	mu      sync.Mutex
+	started time.Time
+	last    time.Time
+	values  map[string]int64
+}
+
+var overviewPhaseNames = []string{
+	"identity", "queue_labels", "champion_names", "detailed_matches", "season_snapshot",
+	"ranks", "mastery", "recent_ranked", "recent_players", "serialize",
+}
+
+func newOverviewPhaseTimings(started time.Time) *overviewPhaseTimings {
+	values := make(map[string]int64, len(overviewPhaseNames)+1)
+	for _, name := range overviewPhaseNames {
+		values[name] = 0
+	}
+	return &overviewPhaseTimings{started: started, last: started, values: values}
+}
+
+func (p *overviewPhaseTimings) mark(name string) {
+	if p == nil {
+		return
+	}
+	now := time.Now()
+	p.mu.Lock()
+	p.values[name] += now.Sub(p.last).Milliseconds()
+	p.last = now
+	p.mu.Unlock()
+}
+
+func (p *overviewPhaseTimings) snapshot(now time.Time) map[string]int64 {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	// Attribute the tiny tail after the last explicit mark to serialization so
+	// every millisecond is accounted for and total stays directly comparable.
+	p.values["serialize"] += now.Sub(p.last).Milliseconds()
+	p.last = now
+	result := make(map[string]int64, len(p.values)+1)
+	for _, name := range overviewPhaseNames {
+		result[name] = p.values[name]
+	}
+	result["total"] = now.Sub(p.started).Milliseconds()
+	return result
+}
+
+func overviewPhasesFromContext(ctx context.Context) *overviewPhaseTimings {
+	if ctx == nil {
+		return nil
+	}
+	phases, _ := ctx.Value(overviewPhasesContextKey{}).(*overviewPhaseTimings)
+	return phases
 }
 
 type participantCompletenessSummary struct {
@@ -115,16 +200,18 @@ type gameplayRankedQueueStats struct {
 }
 
 type gameplayPlayer struct {
-	PlayerRef          string `json:"playerRef,omitempty"`
-	DisplayName        string `json:"displayName"`
-	GameName           string `json:"gameName,omitempty"`
-	TagLine            string `json:"tagLine,omitempty"`
-	ProfileIconID      int64  `json:"profileIconId,omitempty"`
-	SummonerLevel      int64  `json:"summonerLevel,omitempty"`
-	BackgroundSkinID   int64  `json:"backgroundSkinId,omitempty"`
-	BackgroundSkinName string `json:"backgroundSkinName,omitempty"`
-	BackgroundSource   string `json:"backgroundSource,omitempty"`
-	BackgroundPath     string `json:"backgroundPath,omitempty"`
+	PlayerRef            string `json:"playerRef,omitempty"`
+	DisplayName          string `json:"displayName"`
+	GameName             string `json:"gameName,omitempty"`
+	TagLine              string `json:"tagLine,omitempty"`
+	ProfileIconID        int64  `json:"profileIconId,omitempty"`
+	SummonerLevel        int64  `json:"summonerLevel,omitempty"`
+	BackgroundSkinID     int64  `json:"backgroundSkinId,omitempty"`
+	BackgroundSkinName   string `json:"backgroundSkinName,omitempty"`
+	BackgroundSource     string `json:"backgroundSource,omitempty"`
+	BackgroundPath       string `json:"backgroundPath,omitempty"`
+	BackgroundPosterPath string `json:"backgroundPosterPath,omitempty"`
+	BackgroundVideoPath  string `json:"backgroundVideoPath,omitempty"`
 	// Region 标注该玩家所属服务器："kr" 表示韩服（Riot 官方 API），
 	// 空值表示国服（本机客户端）。两个服务器的玩家互不相通。
 	Region string `json:"region,omitempty"`
@@ -144,6 +231,7 @@ type gameplayPlayer struct {
 // keeps enough identity hints to continue loading match data when the client
 // hides a player's visible name or exposes an obfuscated champ-select ID.
 type gameplayReference struct {
+	OPGGIdentity        bool // resolve by Riot ID before sending to our Riot API project
 	PlayerRef           string
 	AlternatePlayerRef  string
 	SummonerID          int64
@@ -508,14 +596,21 @@ type lcuTeam struct {
 func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	loadStarted := time.Now()
 	loadCost := &overviewLoadCost{}
-	r = r.WithContext(context.WithValue(r.Context(), overviewLoadCostContextKey{}, loadCost))
+	phases := newOverviewPhaseTimings(loadStarted)
+	budgetContext, cancelBudget := context.WithTimeout(r.Context(), overviewSoftBudget)
+	defer cancelBudget()
+	requestContext := context.WithValue(budgetContext, overviewLoadCostContextKey{}, loadCost)
+	requestContext = context.WithValue(requestContext, overviewPhasesContextKey{}, phases)
+	r = r.WithContext(requestContext)
 	defer func() {
+		finishedAt := time.Now()
 		requests, bytes, historyCalls, historyCacheHits := loadCost.snapshot()
 		a.recordDiagnostic(map[string]any{
 			"event": "overview_load_cost", "sgp_requests": requests, "sgp_bytes": bytes,
 			"sgp_history_calls": historyCalls, "sgp_history_cache_hits": historyCacheHits,
-			"duration_ms": time.Since(loadStarted).Milliseconds(),
+			"duration_ms": finishedAt.Sub(loadStarted).Milliseconds(),
 		})
+		a.recordDiagnostic(map[string]any{"event": "overview_phases_ms", "load_phases_ms": phases.snapshot(finishedAt)})
 	}()
 	request := gameplayOverviewRequest{Count: defaultMatchCount}
 	if r.Method == http.MethodPost {
@@ -589,9 +684,10 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		if reference.Region == "" {
 			reference = gameplayReference{GameName: request.GameName, TagLine: request.TagLine, Region: riotRegionKR}
 		}
+		phases.mark("identity")
 		response, err := a.loadRiotOverviewDeduplicated(r.Context(), reference, request.BegIndex, request.Count, request.Force)
 		if err != nil {
-			http.Error(w, err.Error(), riotErrorStatus(err))
+			writeRiotHTTPError(w, err)
 			return
 		}
 		response.Pagination.Filter = request.MatchFilter
@@ -599,7 +695,12 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 			response.Pagination.FilterFallback = true
 			response.Pagination.FilterFallbackReason = "韩服战绩接口未启用 SGP tag，已使用客户端筛选"
 		}
-		respondJSON(w, response)
+		// Comparison is request-local: never mutate the shared overview cache.
+		respondJSON(w, struct {
+			gameplayOverview
+			ProMismatch bool `json:"proMismatch,omitempty"`
+		}{response, proOverviewMismatch(request.ExpectedTier, response.Ranks)})
+		phases.mark("serialize")
 		return
 	}
 	client, current, err := a.gameplayClient()
@@ -628,8 +729,15 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "跨服搜索需要 Riot Client 服务正在运行；查询当前服务器玩家不受影响", http.StatusConflict)
 			case remoteLookup:
 				http.Error(w, "国服跨服查询暂时不可用，请确认客户端已登录后重试", http.StatusBadGateway)
+			case errors.Is(lookupErr, context.DeadlineExceeded):
+				http.Error(w, "客户端响应超时，请稍后重试", http.StatusBadGateway)
 			default:
-				http.Error(w, "当前服务器玩家查询暂时不可用，请确认客户端已登录后重试", http.StatusBadGateway)
+				var lcuErr *LCUHTTPError
+				if errors.As(lookupErr, &lcuErr) && lcuErr.StatusCode != http.StatusNotFound {
+					http.Error(w, fmt.Sprintf("客户端返回异常（HTTP %d）", lcuErr.StatusCode), http.StatusBadGateway)
+				} else {
+					http.Error(w, "当前服务器玩家查询暂时不可用，请确认客户端已登录后重试", http.StatusBadGateway)
+				}
 			}
 			return
 		}
@@ -639,8 +747,10 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		_, platform := client.platformInfo()
 		reference.ServerID, _ = normalizeTencentServerID(platform)
 	}
+	phases.mark("identity")
 	response := a.loadGameplayOverviewDeduplicated(r.Context(), client, current, reference, request.BegIndex, request.Count, request.MatchFilter, request.Force)
 	respondJSON(w, response)
+	phases.mark("serialize")
 }
 
 var errTencentPlayerNotFound = errors.New("Tencent player was not found on selected server")
@@ -649,15 +759,84 @@ type lcuSummonerAlias struct {
 	PUUID string `json:"puuid"`
 }
 
-func (a *app) resolveTencentRiotID(ctx context.Context, lcu *LCUClient, gameName, tagLine, serverID string) (gameplayReference, error) {
+type lcuSummonerAliasResponse []lcuSummonerAlias
+
+func (aliases *lcuSummonerAliasResponse) UnmarshalJSON(data []byte) error {
+	// alias/lookup returns one object on Tencent clients. Preserve support for
+	// array-shaped responses without mistaking a successful HTTP 200 for failure.
+	*aliases = nil
+	data = bytes.TrimSpace(data)
+	if len(data) > 0 && data[0] == '{' {
+		var alias lcuSummonerAlias
+		if err := json.Unmarshal(data, &alias); err != nil {
+			return err
+		}
+		*aliases = []lcuSummonerAlias{alias}
+		return nil
+	}
+	var rows []lcuSummonerAlias
+	if err := json.Unmarshal(data, &rows); err != nil {
+		return err
+	}
+	*aliases = rows
+	return nil
+}
+
+func (a *app) resolveTencentRiotID(ctx context.Context, lcu *LCUClient, gameName, tagLine, serverID string) (resolved gameplayReference, resultErr error) {
+	started := time.Now()
 	serverID, ok := normalizeTencentServerID(serverID)
+	remoteLookup := ok && isRemoteTencentServer(lcu, serverID)
+	stage := "server-scope"
+	aliasCount, attempts := 0, 0
+	defer func() {
+		outcome := "success"
+		httpStatus := 0
+		if resultErr != nil {
+			switch {
+			case errors.Is(resultErr, errTencentPlayerNotFound):
+				outcome = "not-found"
+			case errors.Is(resultErr, context.DeadlineExceeded):
+				outcome = "timeout"
+			default:
+				var shapeErr *json.UnmarshalTypeError
+				var httpErr *LCUHTTPError
+				if errors.As(resultErr, &shapeErr) {
+					outcome = "response-shape-error"
+				} else if errors.As(resultErr, &httpErr) {
+					outcome = "http-error"
+					httpStatus = httpErr.StatusCode
+				} else {
+					outcome = "client-error"
+				}
+			}
+		}
+		a.recordDiagnostic(map[string]any{
+			"event": "tencent_riot_id_lookup", "outcome": outcome, "http_status": httpStatus,
+			"duration_ms": time.Since(started).Milliseconds(), "remote_lookup": remoteLookup, "server_id": serverID,
+			"stage": stage, "alias_count": aliasCount, "attempts": attempts, "error_kind": diagnosticErrorKind(resultErr),
+		})
+	}()
 	if !ok {
 		return gameplayReference{}, errTencentPlayerNotFound
 	}
 	if serverID == clientTencentServerID(lcu) {
+		stage = "local-alias"
 		query := url.Values{"gameName": {strings.TrimSpace(gameName)}, "tagLine": {strings.TrimSpace(tagLine)}}
-		var aliases []lcuSummonerAlias
-		err := lcu.RequestJSON(ctx, http.MethodGet, "/lol-summoner/v1/alias/lookup?"+query.Encode(), nil, &aliases)
+		var aliases lcuSummonerAliasResponse
+		requestPath := "/lol-summoner/v1/alias/lookup?" + query.Encode()
+		attempts++
+		err := lcu.RequestJSON(ctx, http.MethodGet, requestPath, nil, &aliases)
+		if retryableLCUAliasLookupError(err) {
+			timer := time.NewTimer(500 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return gameplayReference{}, ctx.Err()
+			case <-timer.C:
+			}
+			attempts++
+			err = lcu.RequestJSON(ctx, http.MethodGet, requestPath, nil, &aliases)
+		}
 		if err != nil {
 			var httpErr *LCUHTTPError
 			if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
@@ -665,16 +844,27 @@ func (a *app) resolveTencentRiotID(ctx context.Context, lcu *LCUClient, gameName
 			}
 			return gameplayReference{}, err
 		}
+		var matched string
+		aliasCount = len(aliases)
+		stage = "local-identity-validation"
 		for _, alias := range aliases {
 			if validPlayerReference(alias.PUUID) {
-				return normalizeGameplayReference(gameplayReference{
-					PlayerRef: alias.PUUID, GameName: gameName, TagLine: tagLine, ServerID: serverID,
-				}), nil
+				if matched != "" && matched != alias.PUUID {
+					stage = "ambiguous-local-identity"
+					return gameplayReference{}, errors.New("客户端返回多个不同玩家，无法确认身份")
+				}
+				matched = alias.PUUID
 			}
+		}
+		if matched != "" {
+			return normalizeGameplayReference(gameplayReference{
+				PlayerRef: matched, GameName: gameName, TagLine: tagLine, ServerID: serverID,
+			}), nil
 		}
 		return gameplayReference{}, errTencentPlayerNotFound
 	}
 	discover := a.riotClientDiscovery
+	stage = "riot-client-discovery"
 	if discover == nil {
 		discover = discoverRiotClient
 	}
@@ -683,7 +873,10 @@ func (a *app) resolveTencentRiotID(ctx context.Context, lcu *LCUClient, gameName
 		return gameplayReference{}, err
 	}
 	defer riotClient.Close()
+	stage = "remote-alias"
+	attempts++
 	aliases, err := riotClient.aliasesByRiotID(ctx, gameName, tagLine)
+	aliasCount = len(aliases)
 	if err != nil {
 		if errors.Is(err, errRiotClientAliasNotFound) {
 			return gameplayReference{}, errTencentPlayerNotFound
@@ -691,6 +884,7 @@ func (a *app) resolveTencentRiotID(ctx context.Context, lcu *LCUClient, gameName
 		return gameplayReference{}, err
 	}
 	for _, alias := range aliases {
+		stage = "remote-summoner"
 		summoner, lookupErr := a.sgp.summonerByPUUIDOn(ctx, lcu, serverID, alias.PUUID)
 		if errors.Is(lookupErr, errSGPSummonerNotFound) {
 			continue
@@ -712,6 +906,21 @@ func (a *app) resolveTencentRiotID(ctx context.Context, lcu *LCUClient, gameName
 		}), nil
 	}
 	return gameplayReference{}, errTencentPlayerNotFound
+}
+
+func retryableLCUAliasLookupError(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) {
+		return false
+	}
+	var httpErr *LCUHTTPError
+	if errors.As(err, &httpErr) {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var networkError net.Error
+	return errors.As(err, &networkError)
 }
 
 func (a *app) gameplayClient() (*LCUClient, Summoner, error) {
@@ -806,7 +1015,10 @@ func applyMasteryBackgroundFallback(player *gameplayPlayer, masteries []gameplay
 // recentWindowDays 是“最近排位 / 最近一起玩”等汇总统计的时间窗口（天）。
 const recentWindowDays = 30
 
-const recentRankedSampleCacheTTL = 10 * time.Minute
+const (
+	recentRankedSampleCacheTTL = 10 * time.Minute
+	recentRankedSampleCacheMax = 128
+)
 
 type recentRankedSampleCacheEntry struct {
 	at      time.Time
@@ -817,7 +1029,7 @@ type recentRankedSampleSet struct {
 	ByQueue map[int64][]gameplayMatch
 }
 
-func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, current Summoner, reference gameplayReference, begIndex, count int, matchFilter string) gameplayOverview {
+func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, current Summoner, reference gameplayReference, begIndex, count int, matchFilter string, force bool) gameplayOverview {
 	reference = normalizeGameplayReference(reference)
 	if reference.Region == "" && reference.ServerID == "" {
 		reference.ServerID = clientTencentServerID(client)
@@ -828,10 +1040,30 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	profileHidden := strings.TrimSpace(player.GameName) == "" && strings.TrimSpace(player.DisplayName) == ""
 	capabilities := make([]EndpointCapability, 0, 5)
 	if isCurrent {
+		summonerCapability := EndpointCapability{Name: "summoner", Path: "/lol-summoner/v1/current-summoner"}
+		if force {
+			if _, refreshErr := a.refreshSummonerIdentity(client); refreshErr != nil {
+				summonerCapability.State = capabilityFailed
+				summonerCapability.Detail = a.summonerCapabilityDetail("身份刷新失败，沿用上次读取的身份")
+			} else {
+				a.mu.RLock()
+				if a.lcu == client {
+					current = a.summoner
+				}
+				a.mu.RUnlock()
+				player = current
+				profileHidden = strings.TrimSpace(player.GameName) == "" && strings.TrimSpace(player.DisplayName) == ""
+				summonerCapability.State = capabilityAvailable
+				summonerCapability.Count = 1
+			}
+		} else {
+			summonerCapability.State = capabilityAvailable
+			summonerCapability.Detail = a.summonerCapabilityDetail("使用缓存身份，本次未请求客户端")
+		}
 		playerRef = current.PUUID
 		reference = mergeGameplayReferences(reference, gameplayReferenceFromSummoner(current))
 		a.startRankedSplitProbe(client, playerRef, current.SummonerID)
-		capabilities = append(capabilities, EndpointCapability{Name: "summoner", Path: "/lol-summoner/v1/current-summoner", State: capabilityAvailable, Count: 1})
+		capabilities = append(capabilities, summonerCapability)
 	} else if reference.ServerID != "" {
 		var loaded sgpSummoner
 		var loadErr error
@@ -889,9 +1121,13 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		playerRef = player.PUUID
 		reference = mergeGameplayReferences(gameplayReferenceFromSummoner(player), reference)
 	}
+	phases := overviewPhasesFromContext(ctx)
 	queueLabels := loadQueueLabels(client)
+	phases.mark("queue_labels")
 	names := a.overviewChampionNames(ctx)
+	phases.mark("champion_names")
 	matches, historyCapabilities, pagination := a.loadDetailedMatches(ctx, client, reference, playerRef, isCurrent, begIndex, count, matchFilter, names, queueLabels)
+	phases.mark("detailed_matches")
 	capabilities = append(capabilities, historyCapabilities...)
 	a.recordMatchModeClassifications(matches)
 	// 标注本地追踪到的排位胜点变化（仅当前登录玩家的场次有记录）。
@@ -914,10 +1150,27 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		Pagination: pagination,
 	}
 	seasonStats, seasonProgress, _, seasonByQueue := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
+	phases.mark("season_snapshot")
 	response.SeasonChampionStats = seasonStats
 	response.SeasonStatsProgress = seasonProgress
 	response.SeasonOverall = seasonStatsOverall(seasonStats)
 	if begIndex > 0 {
+		phases.mark("ranks")
+		phases.mark("mastery")
+		phases.mark("recent_ranked")
+		phases.mark("recent_players")
+		a.publicizeOverviewReferences(&response)
+		return response
+	}
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		response.Pagination.BudgetExceeded = true
+		response.Pagination.Partial = true
+		response.Pagination.HasMore = true
+		response.Capabilities = append(response.Capabilities, overviewBudgetCapabilities()...)
+		phases.mark("ranks")
+		phases.mark("mastery")
+		phases.mark("recent_ranked")
+		phases.mark("recent_players")
 		a.publicizeOverviewReferences(&response)
 		return response
 	}
@@ -925,7 +1178,10 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	// ranks or player identity in the core overview response.
 	a.startSeasonStatsRefresh(client, reference, player, playerRef, names)
 
-	ranks, rankMilestones, rankCapability := a.loadRanksWithFallback(ctx, client, playerRef, isCurrent, reference.ServerID, reference.Privacy)
+	rankEntry := a.playerRankScore(ctx, client, playerRef, isCurrent, reference.ServerID, reference.Privacy)
+	ranks := append([]gameplayRank(nil), rankEntry.ranks...)
+	rankMilestones, rankCapability := rankEntry.milestones, rankEntry.capability
+	phases.mark("ranks")
 	ranks, rankCapability = a.applySeasonRankWinRateFallback(ranks, rankCapability, seasonByQueue)
 	capabilities = append(capabilities, rankCapability)
 	response.RankMilestones = rankMilestonesForRegion(reference.Region, rankMilestones)
@@ -1058,13 +1314,16 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	}
 	capabilities = append(capabilities, masteryCapability)
 	masteries := normalizeMasteries(masteryMap, names, 6)
+	phases.mark("mastery")
 	response.Ranks = ranks
 	response.Masteries = masteries
 	applyMasteryBackgroundFallback(&response.Player, masteries)
+	a.applyOverviewSkinMedia(&response.Player)
 	response.Capabilities = capabilities
 	response.Overall = aggregateMatches(matches, playerRef, nil)
 	recentWindowAfter := time.Now().Add(-recentWindowDays * 24 * time.Hour).UnixMilli()
 	rankedSamples := a.loadRecentRankedSamples(ctx, client, reference, playerRef, matchFilter, pagination, matches, names, queueLabels)
+	phases.mark("recent_ranked")
 	rankedSampleMatches := append(append([]gameplayMatch(nil), rankedSamples.ByQueue[420]...), rankedSamples.ByQueue[440]...)
 	response.RecentRanked = recentRankedSummary(rankedSampleMatches, playerRef, nil)
 	windowReachedCutoff := len(windowMatches) > 0 && windowMatches[len(windowMatches)-1].CreatedAt < recentWindowAfter
@@ -1102,8 +1361,19 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		}
 	}
 	a.recordDiagnostic(map[string]any{"event": "overview_loadout_shape", "matches": len(matches), "spell1_present": spell1Present, "spell2_present": spell2Present})
+	phases.mark("recent_players")
 	a.publicizeOverviewReferences(&response)
 	return response
+}
+
+func overviewBudgetCapabilities() []EndpointCapability {
+	detail := "overview 18 秒软预算已用尽；保留已读取结果，点击继续可补齐"
+	return []EndpointCapability{
+		{Name: "ranks", State: capabilityFailed, Detail: detail},
+		{Name: "champion-mastery", State: capabilityFailed, Detail: detail},
+		{Name: "recent-ranked", State: capabilityFailed, Detail: detail},
+		{Name: "recent-players", State: capabilityFailed, Detail: detail},
+	}
 }
 
 func (a *app) loadRecentRankedSamples(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef, matchFilter string, pagination gameplayPagination, matches []gameplayMatch, names map[int64]string, queueLabels map[int64]string) recentRankedSampleSet {
@@ -1143,14 +1413,10 @@ func (a *app) loadRecentRankedSamples(ctx context.Context, client *LCUClient, re
 
 func (a *app) loadRecentRankedSampleQueue(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, queueID int64, names map[int64]string, queueLabels map[int64]string, fallback []gameplayMatch) []gameplayMatch {
 	cacheKey := strings.ToUpper(strings.TrimSpace(reference.ServerID)) + "|" + strings.TrimSpace(playerRef) + "|" + strconv.FormatInt(queueID, 10)
-	a.recentRankedSamplesMu.Lock()
-	if cached, ok := a.recentRankedSamples[cacheKey]; ok && time.Since(cached.at) < recentRankedSampleCacheTTL {
-		result := append([]gameplayMatch(nil), cached.matches...)
-		a.recentRankedSamplesMu.Unlock()
+	if result, ok := a.recentRankedSample(cacheKey, time.Now()); ok {
 		a.recordDiagnostic(map[string]any{"event": "recent_ranked_sample_resolved", "source": "cache", "queue_id": queueID, "matches": len(result)})
 		return result
 	}
-	a.recentRankedSamplesMu.Unlock()
 	filter := "solo"
 	if queueID == 440 {
 		filter = "flex"
@@ -1174,14 +1440,61 @@ func (a *app) loadRecentRankedSampleQueue(ctx context.Context, client *LCUClient
 			result = append(result, match)
 		}
 	}
+	a.cacheRecentRankedSample(cacheKey, recentRankedSampleCacheEntry{at: time.Now(), matches: append([]gameplayMatch(nil), result...)})
+	a.recordDiagnostic(map[string]any{"event": "recent_ranked_sample_resolved", "source": "sgp-tag", "queue_id": queueID, "filter": filter, "tag": "q_" + strconv.FormatInt(queueID, 10), "matches": len(result)})
+	return result
+}
+
+func (a *app) recentRankedSample(key string, now time.Time) ([]gameplayMatch, bool) {
 	a.recentRankedSamplesMu.Lock()
+	defer a.recentRankedSamplesMu.Unlock()
+	cached, ok := a.recentRankedSamples[key]
+	if !ok {
+		return nil, false
+	}
+	if now.Sub(cached.at) >= recentRankedSampleCacheTTL {
+		a.removeRecentRankedSampleLocked(key)
+		return nil, false
+	}
+	if element := a.recentRankedSampleEntries[key]; element != nil {
+		a.recentRankedSampleOrder.MoveToFront(element)
+	}
+	return append([]gameplayMatch(nil), cached.matches...), true
+}
+
+func (a *app) cacheRecentRankedSample(key string, entry recentRankedSampleCacheEntry) {
+	a.recentRankedSamplesMu.Lock()
+	defer a.recentRankedSamplesMu.Unlock()
 	if a.recentRankedSamples == nil {
 		a.recentRankedSamples = make(map[string]recentRankedSampleCacheEntry)
 	}
-	a.recentRankedSamples[cacheKey] = recentRankedSampleCacheEntry{at: time.Now(), matches: append([]gameplayMatch(nil), result...)}
-	a.recentRankedSamplesMu.Unlock()
-	a.recordDiagnostic(map[string]any{"event": "recent_ranked_sample_resolved", "source": "sgp-tag", "queue_id": queueID, "filter": filter, "tag": "q_" + strconv.FormatInt(queueID, 10), "matches": len(result)})
-	return result
+	if a.recentRankedSampleOrder == nil {
+		a.recentRankedSampleOrder = list.New()
+	}
+	if a.recentRankedSampleEntries == nil {
+		a.recentRankedSampleEntries = make(map[string]*list.Element)
+	}
+	a.recentRankedSamples[key] = entry
+	if element := a.recentRankedSampleEntries[key]; element != nil {
+		a.recentRankedSampleOrder.MoveToFront(element)
+	} else {
+		a.recentRankedSampleEntries[key] = a.recentRankedSampleOrder.PushFront(key)
+	}
+	for len(a.recentRankedSamples) > recentRankedSampleCacheMax {
+		back := a.recentRankedSampleOrder.Back()
+		if back == nil {
+			break
+		}
+		a.removeRecentRankedSampleLocked(back.Value.(string))
+	}
+}
+
+func (a *app) removeRecentRankedSampleLocked(key string) {
+	delete(a.recentRankedSamples, key)
+	if element := a.recentRankedSampleEntries[key]; element != nil {
+		a.recentRankedSampleOrder.Remove(element)
+		delete(a.recentRankedSampleEntries, key)
+	}
 }
 
 func buildGameplayRankedQueues(soloMatches, flexMatches []gameplayMatch, playerRef string, ranks []gameplayRank, region string) map[string]gameplayRankedQueueStats {
@@ -1448,7 +1761,13 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 				diagnostic["reason"] = safeDiagnosticReason(partialErr)
 			}
 			a.recordDiagnostic(diagnostic)
-			return matches, capabilities, filterResolution.pagination(begIndex, consumed, more)
+			pagination := filterResolution.pagination(begIndex, consumed, more)
+			pagination.Partial = partialErr != nil
+			pagination.BudgetExceeded = partialErr != nil && errors.Is(ctx.Err(), context.DeadlineExceeded)
+			if pagination.BudgetExceeded {
+				pagination.HasMore = true
+			}
+			return matches, capabilities, pagination
 		} else {
 			if isCancellation(historyErr) {
 				return nil, []EndpointCapability{{Name: "match-history", Path: "sgp: /match-history-query/v1/products/lol/player/{player}/SUMMARY", State: capabilityCanceled, Attempts: attempts}}, filterResolution.pagination(begIndex, 0, false)
@@ -2995,6 +3314,24 @@ func positionStatsForQueue(matches []gameplayMatch, playerRef string, queueID in
 	return positionStats(filtered, playerRef)
 }
 
+// Reuse the already-fetched latest ten games; never infer a role from a champion.
+func liveRecentPositions(matches []gameplayMatch, playerRef string, queueID int64) []gameplayPositionStat {
+	if queueID != 420 && queueID != 440 {
+		return nil
+	}
+	if len(matches) > 10 {
+		matches = matches[:10]
+	}
+	var result []gameplayPositionStat
+	for _, stat := range positionStatsForQueue(matches, playerRef, queueID) {
+		if stat.Games > 0 {
+			result = append(result, stat)
+		}
+	}
+	sort.SliceStable(result, func(i, j int) bool { return result[i].Games > result[j].Games })
+	return result
+}
+
 func activityHours(matches []gameplayMatch) []int {
 	hours := make([]int, 24)
 	for _, match := range matches {
@@ -3069,7 +3406,13 @@ type gameplayLiveResponse struct {
 	GameMode             string                    `json:"gameMode,omitempty"`
 	MapID                int64                     `json:"mapId,omitempty"`
 	CurrentChampionID    int64                     `json:"currentChampionId,omitempty"`
+	ResolvedChampionID   int64                     `json:"resolvedChampionId,omitempty"`
 	ChampSelectNotice    string                    `json:"champSelectNotice,omitempty"`
+	ArenaGrouped         bool                      `json:"arenaGrouped,omitempty"`
+	ArenaMascotMapping   bool                      `json:"arenaMascotMapping,omitempty"`
+	ArenaGroupSource     string                    `json:"arenaGroupSource,omitempty"`
+	ArenaGroupNames      map[string]string         `json:"arenaGroupNames,omitempty"`
+	DroppedStaleGameData bool                      `json:"droppedStaleGameData,omitempty"`
 	Players              []gameplayLivePlayer      `json:"players"`
 	ClientRecommendation *gameplayRecommendation   `json:"clientRecommendation,omitempty"`
 	ChampionAbilities    []gameplayChampionAbility `json:"championAbilities,omitempty"`
@@ -3085,6 +3428,14 @@ type gameplayRecommendationsResponse struct {
 }
 
 type gameplayRecommendationBundle struct {
+	TraceID              string                      `json:"traceId,omitempty"`
+	RecommendationKey    string                      `json:"recommendationKey,omitempty"`
+	RequestedPosition    string                      `json:"requestedPosition,omitempty"`
+	QueueID              int64                       `json:"queueId,omitempty"`
+	MapID                int64                       `json:"mapId,omitempty"`
+	GameID               int64                       `json:"gameId,omitempty"`
+	GameMode             string                      `json:"gameMode,omitempty"`
+	Tier                 string                      `json:"tier,omitempty"`
 	Source               string                      `json:"source"`
 	ResolvedMode         string                      `json:"resolvedMode"`
 	ResolvedRegion       string                      `json:"resolvedRegion"`
@@ -3097,6 +3448,7 @@ type gameplayRecommendationBundle struct {
 	HasCounters          bool                        `json:"hasCounters"`
 	HasBanRate           bool                        `json:"hasBanRate"`
 	HasTopPlayers        bool                        `json:"hasTopPlayers"`
+	HasItemDepths        bool                        `json:"hasItemDepths"`
 	Citation             *championSourceCitation     `json:"citation,omitempty"`
 	MeasurementTechnique string                      `json:"measurementTechnique,omitempty"`
 	Positions            []championPositionOption    `json:"positions,omitempty"`
@@ -3141,6 +3493,7 @@ type gameplayRecommendationRune struct {
 	SubStyleID           int64                       `json:"subStyleId"`
 	SelectedPerkIDs      []int64                     `json:"selectedPerkIds"`
 	StatModIDs           []int64                     `json:"statModIds,omitempty"`
+	ShardResolution      string                      `json:"shardResolution,omitempty"`
 	ItemIDs              []int64                     `json:"itemIds,omitempty"`
 	Stats                gameplayRecommendationStats `json:"stats"`
 	PlayerName           string                      `json:"playerName,omitempty"`
@@ -3160,6 +3513,15 @@ type gameplayRecommendationRune struct {
 	OpponentDivision     string                      `json:"opponentDivision,omitempty"`
 	OpponentWinRate      *int                        `json:"opponentWinRate,omitempty"`
 	Position             string                      `json:"position,omitempty"`
+	SourceKey            string                      `json:"sourceKey,omitempty"`
+	EventLabel           string                      `json:"eventLabel,omitempty"`
+	WinKnown             *bool                       `json:"winKnown,omitempty"`
+	Win                  *bool                       `json:"win,omitempty"`
+	SelectedComplete     *bool                       `json:"selectedComplete,omitempty"`
+	RecordGames          int                         `json:"recordGames,omitempty"`
+	RecordWins           int                         `json:"recordWins,omitempty"`
+	RecordPartial        bool                        `json:"recordPartial,omitempty"`
+	CacheReadAt          string                      `json:"cacheReadAt,omitempty"`
 	opponentPUUID        string
 }
 
@@ -3193,9 +3555,10 @@ type gameplayRecommendationBuild struct {
 }
 
 type gameplayRecommendationOption struct {
-	IDs   []int64                     `json:"ids"`
-	Grade string                      `json:"grade,omitempty"`
-	Stats gameplayRecommendationStats `json:"stats"`
+	IDs              []int64                     `json:"ids"`
+	Grade            string                      `json:"grade,omitempty"`
+	GamesUnavailable bool                        `json:"gamesUnavailable,omitempty"`
+	Stats            gameplayRecommendationStats `json:"stats"`
 }
 
 type gameplayRecommendationModeResolution struct {
@@ -3205,9 +3568,22 @@ type gameplayRecommendationModeResolution struct {
 }
 
 const (
-	maxRecommendationSmallID int64 = 100000
-	maxRecommendationGameID  int64 = 1 << 62
+	maxRecommendationSmallID  int64 = 100000
+	maxRecommendationGameID   int64 = 1 << 62
+	gameModeARAM                    = "ARAM"
+	gameModeKIWI                    = "KIWI"
+	gameModeARAMMayhem              = "ARAM_MAYHEM"
+	gameModeARAMMayhemClassic       = "ARAM_MAYHEM_CLASSIC"
 )
+
+func isARAMFamilyGameMode(gameMode string) bool {
+	switch strings.ToUpper(strings.TrimSpace(gameMode)) {
+	case gameModeARAM, gameModeKIWI, gameModeARAMMayhem, gameModeARAMMayhemClassic:
+		return true
+	default:
+		return false
+	}
+}
 
 func recommendationModeHasTopPlayers(resolution gameplayRecommendationModeResolution) bool {
 	// Top-player data belongs to the semantic Summoner's Rift classic mode.
@@ -3222,7 +3598,7 @@ func resolveGameplayRecommendationMode(queueID int64, gameMode string, mapID int
 	// Classic Mayhem has no dedicated OP.GG dataset. Resolve it to ordinary
 	// ARAM recommendations before queue-ID fallbacks so queue 2400 is not
 	// mistaken for the augment-enabled mode when the semantic field is present.
-	if mode == "ARAM_MAYHEM_CLASSIC" && (mapID == 0 || mapID == 12) {
+	if mode == gameModeARAMMayhemClassic && (mapID == 0 || mapID == 12) {
 		resolved.InternalMode, resolved.IsFallback = "aram", true
 		return resolved
 	}
@@ -3233,11 +3609,11 @@ func resolveGameplayRecommendationMode(queueID int64, gameMode string, mapID int
 		return resolved
 	}
 	switch {
-	case (mode == "KIWI" || mode == "ARAM_MAYHEM") && mapID == 12:
+	case (mode == gameModeKIWI || mode == gameModeARAMMayhem) && mapID == 12:
 		resolved.InternalMode = "hextech-aram"
 	case mode == "CHERRY" && mapID == 30:
 		resolved.InternalMode = "arena"
-	case mode == "ARAM" && mapID == 12:
+	case mode == gameModeARAM && mapID == 12:
 		resolved.InternalMode = "aram"
 	case (mode == "URF" || mode == "ARURF") && mapID == 11:
 		resolved.InternalMode = "urf"
@@ -3276,78 +3652,130 @@ func (a *app) recordRecommendationModeResolution(gameID, queueID int64, gameMode
 		"event": "recommendation_mode_resolved", "queue_id": queueID,
 		"game_mode": strings.ToUpper(strings.TrimSpace(gameMode)), "map_id": mapID,
 		"internal_mode": resolution.InternalMode, "has_top_players": recommendationModeHasTopPlayers(resolution),
+		"has_item_depths": opggModeSpecs[resolution.InternalMode].SupportsItemDepths,
 	})
 }
 
 func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Request) {
-	queueIDForDiagnostic, _ := parseOptionalRecommendationInt(r.URL.Query().Get("queueId"))
-	championIDForDiagnostic, _ := parseOptionalRecommendationInt(r.URL.Query().Get("championId"))
+	started := time.Now()
+	query := r.URL.Query()
+	queueIDForDiagnostic, _ := parseOptionalRecommendationInt(query.Get("queueId"))
+	championIDForDiagnostic, _ := parseOptionalRecommendationInt(query.Get("championId"))
+	mapIDForDiagnostic, _ := parseOptionalRecommendationInt(query.Get("mapId"))
+	gameIDForDiagnostic, _ := parseOptionalGameID(query.Get("gameId"))
+	traceID := normalizeItemSetTraceID(query.Get("traceId"))
+	if traceID == "" {
+		traceID = newItemSetTraceID("recommendation")
+	}
+	recommendationKey := truncateClientDiagnosticText(query.Get("recommendationKey"))
+	diagnosticStage := "request-validation"
+	diagnosticRecorded := false
+	diagnosticInternalMode := ""
+	diagnosticTier := truncateClientDiagnosticText(query.Get("tier"))
+	diagnosticRequestedPosition := strings.ToLower(strings.TrimSpace(query.Get("position")))
+	diagnosticResolvedPosition := ""
+	diagnosticPositionSource := ""
+	defer func() {
+		if diagnosticRecorded {
+			return
+		}
+		a.recordDiagnostic(map[string]any{
+			"event": "live_recommendations_response", "diagnostic_schema": 2, "trace_id": traceID,
+			"recommendation_key": recommendationKey, "champion_id": championIDForDiagnostic,
+			"queue_id": queueIDForDiagnostic, "map_id": mapIDForDiagnostic, "game_id": gameIDForDiagnostic,
+			"game_mode": strings.ToUpper(strings.TrimSpace(query.Get("gameMode"))), "internal_mode": diagnosticInternalMode,
+			"tier": diagnosticTier, "requested_position": diagnosticRequestedPosition,
+			"resolved_position": diagnosticResolvedPosition, "position_source": diagnosticPositionSource,
+			"status": "failed", "stage": diagnosticStage, "duration_ms": time.Since(started).Milliseconds(),
+		})
+	}()
 	a.recordDiagnostic(map[string]any{
-		"event": "live_recommendations_request", "champion_id": championIDForDiagnostic,
-		"queue_id": queueIDForDiagnostic, "raw_position": truncateClientDiagnosticText(r.URL.Query().Get("position")), "status": "received",
+		"event": "live_recommendations_request", "diagnostic_schema": 2, "trace_id": traceID,
+		"recommendation_key": recommendationKey, "champion_id": championIDForDiagnostic,
+		"queue_id": queueIDForDiagnostic, "map_id": diagnosticInt64(query.Get("mapId")),
+		"game_id": diagnosticInt64(query.Get("gameId")), "game_mode": strings.ToUpper(strings.TrimSpace(query.Get("gameMode"))),
+		"tier": truncateClientDiagnosticText(query.Get("tier")), "raw_position": query.Get("position"),
+		"requested_position": strings.ToLower(strings.TrimSpace(query.Get("position"))), "status": "received",
 	})
-	championID, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("championId")), 10, 64)
+	diagnosticStage = "champion-validation"
+	championID, err := strconv.ParseInt(strings.TrimSpace(query.Get("championId")), 10, 64)
 	if err != nil || championID <= 0 || championID > 10000 {
-		a.recordLiveRecommendationRejection("championId")
+		a.recordLiveRecommendationRejection("championId", query.Get("championId"))
 		http.Error(w, "推荐英雄无效", http.StatusBadRequest)
 		return
 	}
-	queueID, err := parseOptionalRecommendationInt(r.URL.Query().Get("queueId"))
+	diagnosticStage = "queue-validation"
+	queueID, err := parseOptionalRecommendationInt(query.Get("queueId"))
 	if err != nil {
-		a.recordLiveRecommendationRejection("queueId")
+		a.recordLiveRecommendationRejection("queueId", query.Get("queueId"))
 		http.Error(w, "推荐队列无效", http.StatusBadRequest)
 		return
 	}
-	mapID, err := parseOptionalRecommendationInt(r.URL.Query().Get("mapId"))
+	diagnosticStage = "map-validation"
+	mapID, err := parseOptionalRecommendationInt(query.Get("mapId"))
 	if err != nil {
-		a.recordLiveRecommendationRejection("mapId")
+		a.recordLiveRecommendationRejection("mapId", query.Get("mapId"))
 		http.Error(w, "推荐地图无效", http.StatusBadRequest)
 		return
 	}
-	gameID, err := parseOptionalGameID(r.URL.Query().Get("gameId"))
+	diagnosticStage = "game-validation"
+	gameID, err := parseOptionalGameID(query.Get("gameId"))
 	if err != nil {
-		a.recordLiveRecommendationRejection("gameId")
+		a.recordLiveRecommendationRejection("gameId", query.Get("gameId"))
 		gameID = 0
 	}
-	resolution := resolveGameplayRecommendationMode(queueID, r.URL.Query().Get("gameMode"), mapID)
-	a.recordUnknownQueue(queueID, r.URL.Query().Get("gameMode"), mapID)
-	a.recordRecommendationModeResolution(gameID, queueID, r.URL.Query().Get("gameMode"), mapID, resolution)
-	requestedSource := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("source")))
+	diagnosticStage = "mode-resolution"
+	resolution := resolveGameplayRecommendationMode(queueID, query.Get("gameMode"), mapID)
+	diagnosticInternalMode = resolution.InternalMode
+	a.recordUnknownQueue(queueID, query.Get("gameMode"), mapID)
+	a.recordRecommendationModeResolution(gameID, queueID, query.Get("gameMode"), mapID, resolution)
+	requestedSource := strings.ToLower(strings.TrimSpace(query.Get("source")))
 	if requestedSource != "" && (requestedSource != "mayhem" || resolution.InternalMode != "hextech-aram") {
-		a.recordLiveRecommendationRejection("source")
+		a.recordLiveRecommendationRejection("source", query.Get("source"))
 		http.Error(w, "推荐来源无效", http.StatusBadRequest)
 		return
 	}
 	spec := opggModeSpecs[resolution.InternalMode]
+	diagnosticStage = "tier-validation"
+	tier, err := gameplayRecommendationTier(spec, query.Get("tier"))
+	if err != nil {
+		a.recordLiveRecommendationRejection("tier", query.Get("tier"))
+		http.Error(w, "推荐段位无效", http.StatusBadRequest)
+		return
+	}
+	diagnosticTier = tier
+	diagnosticStage = "position-validation"
 	position := ""
 	positionSource := "fallback"
 	requestedPosition := ""
 	if spec.PositionMode == opggPositionRequired {
-		normalized, normalizeErr := normalizeOPGGPosition(r.URL.Query().Get("position"))
+		normalized, normalizeErr := normalizeOPGGPosition(query.Get("position"))
 		if normalizeErr != nil {
-			a.recordLiveRecommendationRejection("position")
+			a.recordLiveRecommendationRejection("position", query.Get("position"))
 			http.Error(w, "推荐位置无效", http.StatusBadRequest)
 			return
 		}
 		requestedPosition = normalized
 	} else {
-		position = spec.requestPosition(r.URL.Query().Get("position"))
+		position = spec.requestPosition(query.Get("position"))
 	}
-	spell1ID, err := parseOptionalRecommendationInt(r.URL.Query().Get("spell1Id"))
+	spell1ID, err := parseOptionalRecommendationInt(query.Get("spell1Id"))
 	if err != nil {
-		a.recordLiveRecommendationRejection("spell1Id")
+		a.recordLiveRecommendationRejection("spell1Id", query.Get("spell1Id"))
 		http.Error(w, "推荐召唤师技能无效", http.StatusBadRequest)
 		return
 	}
-	spell2ID, err := parseOptionalRecommendationInt(r.URL.Query().Get("spell2Id"))
+	spell2ID, err := parseOptionalRecommendationInt(query.Get("spell2Id"))
 	if err != nil {
-		a.recordLiveRecommendationRejection("spell2Id")
+		a.recordLiveRecommendationRejection("spell2Id", query.Get("spell2Id"))
 		http.Error(w, "推荐召唤师技能无效", http.StatusBadRequest)
 		return
 	}
 	if requestedPosition == "" && hasSmiteSpell(spell1ID, spell2ID) {
 		requestedPosition = "jungle"
 	}
+	diagnosticRequestedPosition = requestedPosition
+	diagnosticStage = "metadata-load"
 	provider := a.championDataProvider()
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
@@ -3356,45 +3784,80 @@ func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "暂时无法识别当前英雄", http.StatusNotFound)
 		return
 	}
+	diagnosticStage = "detail-load"
 	var detail championDetailResponse
 	if spec.PositionMode == opggPositionRequired {
 		probePosition := requestedPosition
 		if probePosition == "" {
 			probePosition = "mid"
 		}
-		detail, err = provider.loadDetail(ctx, resolution.InternalMode, metadata.Slug, probePosition, championCounterFallbackTier)
+		detail, err = provider.loadDetail(ctx, resolution.InternalMode, metadata.Slug, probePosition, tier)
 		if err == nil {
+			diagnosticStage = "position-resolution"
 			position, positionSource, err = resolveGameplayRecommendationPosition(requestedPosition, detail.Positions)
 			if err != nil {
 				http.Error(w, "推荐位置无法推断", http.StatusBadGateway)
 				return
 			}
 			if position != probePosition {
-				detail, err = provider.loadDetail(ctx, resolution.InternalMode, metadata.Slug, position, championCounterFallbackTier)
+				detail, err = provider.loadDetail(ctx, resolution.InternalMode, metadata.Slug, position, tier)
 			}
 		}
 	} else {
 		positionSource = "requested"
-		detail, err = provider.loadDetail(ctx, resolution.InternalMode, metadata.Slug, position, championCounterFallbackTier)
+		detail, err = provider.loadDetail(ctx, resolution.InternalMode, metadata.Slug, position, tier)
 	}
 	if err != nil {
 		http.Error(w, "推荐数据暂不可用", http.StatusBadGateway)
 		return
 	}
+	diagnosticStage = "response-build"
+	diagnosticResolvedPosition = strings.ToLower(strings.TrimSpace(position))
+	diagnosticPositionSource = positionSource
 	if spec.PositionMode == opggPositionRequired {
-		a.recordPositionResolution(championID, requestedPosition, position, positionSource, detail.Positions)
+		a.recordPositionResolution(traceID, championID, requestedPosition, position, positionSource, detail.Positions)
 	}
-	a.recordChampionDataResolution(gameID, championID, queueID, resolution.InternalMode, position, positionSource, detail)
+	a.recordChampionDataResolution(traceID, gameID, championID, queueID, resolution.InternalMode, position, positionSource, detail)
 	if !recommendationModeHasTopPlayers(resolution) {
 		detail.TopPlayers = nil
 	}
 	bundle := gameplayRecommendationsFromResolvedDetail(championID, strings.ToLower(position), detail, resolution)
+	bundle.TraceID = traceID
+	bundle.RecommendationKey = recommendationKey
+	bundle.RequestedPosition = requestedPosition
 	bundle.ResolvedPosition = strings.ToLower(position)
 	bundle.PositionSource = positionSource
+	bundle.QueueID = queueID
+	bundle.MapID = mapID
+	bundle.GameID = gameID
+	bundle.GameMode = strings.ToUpper(strings.TrimSpace(query.Get("gameMode")))
+	bundle.Tier = tier
 	coreIn := len(detail.Build.CoreItems)
 	bundle.Build.CoreOptions = capGameplayCoreOptions(bundle.Build.CoreOptions)
-	a.recordDiagnostic(map[string]any{"event": "live_build_shape", "core_in": coreIn, "core_out": len(bundle.Build.CoreOptions)})
+	a.recordDiagnostic(map[string]any{"event": "live_build_shape", "diagnostic_schema": 2, "trace_id": traceID, "recommendation_key": recommendationKey, "core_in": coreIn, "core_out": len(bundle.Build.CoreOptions)})
+	a.recordDiagnostic(map[string]any{
+		"event": "live_recommendations_response", "diagnostic_schema": 2, "trace_id": traceID, "recommendation_key": recommendationKey,
+		"champion_id": championID, "queue_id": queueID, "map_id": mapID, "game_id": gameID, "game_mode": bundle.GameMode,
+		"internal_mode": resolution.InternalMode, "tier": tier, "requested_position": requestedPosition,
+		"resolved_position": bundle.ResolvedPosition, "position_source": positionSource, "build_position": strings.ToLower(strings.TrimSpace(bundle.Build.Position)),
+		"build_options": recommendationBuildOrderDiagnostic(bundle.Build), "status": "success", "stage": "response", "duration_ms": time.Since(started).Milliseconds(),
+	})
+	diagnosticRecorded = true
 	respondJSON(w, gameplayRecommendationsResponse{ChampionID: championID, Position: strings.ToLower(position), Recommendations: bundle})
+}
+
+func recommendationBuildOrderDiagnostic(build gameplayRecommendationBuild) map[string]any {
+	options := func(rows []gameplayRecommendationOption) [][]int64 {
+		out := make([][]int64, 0, len(rows))
+		for _, row := range rows {
+			out = append(out, append([]int64(nil), row.IDs...))
+		}
+		return out
+	}
+	return map[string]any{
+		"starter": options(build.StarterOptions), "boots": options(build.BootOptions), "core": options(build.CoreOptions),
+		"fourth": options(build.FourthOptions), "fifth": options(build.FifthOptions), "sixth": options(build.SixthOptions), "prism": options(build.PrismOptions),
+	}
 }
 
 func (a *app) recordUnknownQueue(queueID int64, gameMode string, mapID int64) {
@@ -3420,11 +3883,35 @@ func (a *app) recordUnknownQueue(queueID int64, gameMode string, mapID int64) {
 	})
 }
 
-func (a *app) recordLiveRecommendationRejection(stage string) {
-	a.recordDiagnostic(map[string]any{"event": "live_recommendations_rejected", "stage": stage, "status": http.StatusBadRequest})
+func (a *app) recordLiveRecommendationRejection(stage, raw string) {
+	rawLength, firstCharacterClass := recommendationInputShape(raw)
+	a.recordDiagnostic(map[string]any{
+		"event": "live_recommendations_rejected", "stage": stage, "status": http.StatusBadRequest,
+		"raw_length": rawLength, "raw_first_character_class": firstCharacterClass,
+	})
 }
 
-func (a *app) recordPositionResolution(championID int64, requested, resolved, source string, positions []championPositionOption) {
+func recommendationInputShape(value string) (int, string) {
+	if value == "" {
+		return 0, "empty"
+	}
+	class := "other"
+	switch first := value[0]; {
+	case first >= '0' && first <= '9':
+		class = "digit"
+	case first == '-':
+		class = "minus"
+	case first == '+':
+		class = "plus"
+	case first == ' ' || first == '\t' || first == '\r' || first == '\n':
+		class = "whitespace"
+	case first >= 'A' && first <= 'Z' || first >= 'a' && first <= 'z':
+		class = "letter"
+	}
+	return len(value), class
+}
+
+func (a *app) recordPositionResolution(traceID string, championID int64, requested, resolved, source string, positions []championPositionOption) {
 	candidates := make([]string, 0, len(positions))
 	for _, option := range positions {
 		candidate := strings.ToLower(strings.TrimSpace(option.Position))
@@ -3433,12 +3920,12 @@ func (a *app) recordPositionResolution(championID int64, requested, resolved, so
 		}
 	}
 	a.recordDiagnostic(map[string]any{
-		"event": "position_resolved", "champion_id": championID, "requested": requested,
+		"event": "position_resolved", "diagnostic_schema": 2, "trace_id": traceID, "champion_id": championID, "requested": requested,
 		"resolved": resolved, "source": source, "candidates": candidates,
 	})
 }
 
-func (a *app) recordChampionDataResolution(gameID, championID, queueID int64, mode, position, positionSource string, detail championDetailResponse) {
+func (a *app) recordChampionDataResolution(traceID string, gameID, championID, queueID int64, mode, position, positionSource string, detail championDetailResponse) {
 	if a == nil {
 		return
 	}
@@ -3460,7 +3947,7 @@ func (a *app) recordChampionDataResolution(gameID, championID, queueID int64, mo
 	a.championDataDiagnosticKeys[key] = struct{}{}
 	a.championDataDiagnosticMu.Unlock()
 	a.recordDiagnostic(map[string]any{
-		"event": "champion_data_resolved", "champion_id": championID,
+		"event": "champion_data_resolved", "diagnostic_schema": 2, "trace_id": traceID, "champion_id": championID,
 		"position": strings.ToLower(strings.TrimSpace(position)), "position_source": positionSource,
 		"mode": strings.ToLower(strings.TrimSpace(mode)), "queue_id": queueID,
 		"win_rate_present": detail.Stats.WinRate > 0,
@@ -3473,10 +3960,43 @@ func (a *app) recordLiveRosterShape(response gameplayLiveResponse) {
 	if a == nil {
 		return
 	}
-	parts := []string{strconv.FormatInt(response.GameID, 10), strings.ToUpper(strings.TrimSpace(response.Phase))}
+	teamCounts := make(map[string]int)
+	arenaGroupCounts := make(map[string]int)
+	identities := make(map[string]struct{})
+	duplicates := 0
+	emptyRefs := 0
+	withStats := 0
+	for _, player := range response.Players {
+		teamKey := strconv.FormatInt(player.TeamID, 10)
+		teamCounts[teamKey]++
+		if group := strings.TrimSpace(player.ArenaGroup); group != "" {
+			arenaGroupCounts[group]++
+		}
+		identity := liveRosterDiagnosticIdentity(player)
+		if identity != "" {
+			if _, exists := identities[identity]; exists {
+				duplicates++
+			} else {
+				identities[identity] = struct{}{}
+			}
+		} else {
+			emptyRefs++
+		}
+		if player.Rank != nil || player.ModeStats.Games > 0 || len(player.RecentGames) > 0 {
+			withStats++
+		}
+	}
+	parts := []string{
+		strconv.FormatInt(response.GameID, 10),
+		strings.ToUpper(strings.TrimSpace(response.Phase)),
+		strconv.FormatBool(response.DroppedStaleGameData),
+		"with-stats:" + strconv.Itoa(withStats),
+		"empty-refs:" + strconv.Itoa(emptyRefs),
+		"arena-source:" + response.ArenaGroupSource,
+	}
 	for _, player := range response.Players {
 		identity := liveRosterDiagnosticIdentity(player)
-		parts = append(parts, fmt.Sprintf("%d:%s:%d", player.TeamID, identity, player.ChampionID))
+		parts = append(parts, fmt.Sprintf("%d:%s:%d:%s", player.TeamID, identity, player.ChampionID, player.ArenaGroup))
 	}
 	fingerprint := sha256.Sum256([]byte(strings.Join(parts, "|")))
 	key := "roster:" + hex.EncodeToString(fingerprint[:])
@@ -3493,34 +4013,149 @@ func (a *app) recordLiveRosterShape(response gameplayLiveResponse) {
 	}
 	a.liveRosterDiagnosticKeys[key] = struct{}{}
 	a.liveRosterDiagnosticMu.Unlock()
-	teamCounts := make(map[string]int)
-	identities := make(map[string]struct{})
-	duplicates := 0
-	emptyRefs := 0
-	withStats := 0
-	for _, player := range response.Players {
-		teamKey := strconv.FormatInt(player.TeamID, 10)
-		teamCounts[teamKey]++
-		identity := liveRosterDiagnosticIdentity(player)
-		if identity != "" {
-			if _, exists := identities[identity]; exists {
-				duplicates++
-			} else {
-				identities[identity] = struct{}{}
-			}
-		} else {
-			emptyRefs++
-		}
-		if player.Rank != nil || player.ModeStats.Games > 0 || len(player.RecentGames) > 0 {
-			withStats++
-		}
-	}
 	a.recordDiagnostic(map[string]any{
 		"event": "live_roster_shape", "game_id": response.GameID, "phase": response.Phase,
 		"players": len(response.Players), "raw_count": response.RawCount, "with_stats": withStats, "team_counts": teamCounts,
+		"arena_grouped": response.ArenaGrouped, "arena_group_source": response.ArenaGroupSource, "arena_group_counts": arenaGroupCounts,
 		"duplicate_player_refs": duplicates, "empty_ref_count": emptyRefs, "merge_appended": response.MergeAppended,
-		"fingerprint": hex.EncodeToString(fingerprint[:8]),
+		"dropped_stale_gamedata": response.DroppedStaleGameData,
+		"fingerprint":            hex.EncodeToString(fingerprint[:8]),
 	})
+}
+
+func (a *app) clearLivePositionSnapshot() {
+	if a == nil {
+		return
+	}
+	a.livePositionMu.Lock()
+	a.livePositionGameID = 0
+	a.livePositionByRef = nil
+	a.livePositionMu.Unlock()
+}
+
+func (a *app) rememberLivePositionSnapshot(gameID int64, players []gameplayLivePlayer) {
+	if a == nil || gameID <= 0 {
+		return
+	}
+	next := make(map[string]string)
+	for _, player := range players {
+		key := strings.TrimSpace(player.PlayerRef)
+		position := normalizePosition(player.Position, "")
+		// Snapshot keys are renderer-safe aliases, never upstream identity values.
+		if strings.HasPrefix(key, "player_") && position != "" {
+			next[key] = position
+		}
+	}
+	a.livePositionMu.Lock()
+	if a.livePositionGameID != 0 && a.livePositionGameID != gameID {
+		a.livePositionByRef = nil
+	}
+	a.livePositionGameID = gameID
+	a.livePositionByRef = next
+	a.livePositionMu.Unlock()
+}
+
+type livePositionSnapshotStats struct {
+	GameID       int64
+	Size         int
+	AppliedCount int
+}
+
+func (a *app) livePositionSnapshotStats() livePositionSnapshotStats {
+	if a == nil {
+		return livePositionSnapshotStats{}
+	}
+	a.livePositionMu.Lock()
+	defer a.livePositionMu.Unlock()
+	return livePositionSnapshotStats{GameID: a.livePositionGameID, Size: len(a.livePositionByRef)}
+}
+
+func (a *app) applyLivePositionSnapshot(gameID int64, players []gameplayLivePlayer) livePositionSnapshotStats {
+	if a == nil || gameID <= 0 {
+		return livePositionSnapshotStats{}
+	}
+	a.livePositionMu.Lock()
+	stats := livePositionSnapshotStats{GameID: a.livePositionGameID, Size: len(a.livePositionByRef)}
+	if a.livePositionGameID != gameID {
+		a.livePositionGameID = 0
+		a.livePositionByRef = nil
+		a.livePositionMu.Unlock()
+		return stats
+	}
+	positions := make(map[string]string, len(a.livePositionByRef))
+	for key, position := range a.livePositionByRef {
+		positions[key] = position
+	}
+	a.livePositionMu.Unlock()
+	for index := range players {
+		if position := positions[players[index].PlayerRef]; position != "" {
+			players[index].Position = position
+			stats.AppliedCount++
+		}
+	}
+	return stats
+}
+
+func livePositionShapeDiagnostic(response gameplayLiveResponse, session lcuGameflowSession, champSelect lcuChampSelectSession, current Summoner, snapshot livePositionSnapshotStats) map[string]any {
+	selectedPositions := map[string]int{}
+	selectedRoles := map[string]int{}
+	assignedPositions := map[string]int{}
+	normalizedPositions := map[string]int{}
+	selfSelected := ""
+	selfAssigned := ""
+	countSelected := func(player lcuLivePlayer) {
+		position := strings.ToUpper(strings.TrimSpace(player.SelectedPosition))
+		role := strings.ToUpper(strings.TrimSpace(player.SelectedRole))
+		selectedPositions[position]++
+		selectedRoles[role]++
+		if selfSelected == "" && strings.TrimSpace(current.PUUID) != "" && player.PUUID == current.PUUID {
+			selfSelected = position
+		}
+	}
+	for _, player := range session.GameData.TeamOne {
+		countSelected(player)
+	}
+	for _, player := range session.GameData.TeamTwo {
+		countSelected(player)
+	}
+	for _, player := range champSelect.MyTeam {
+		position := strings.ToUpper(strings.TrimSpace(player.AssignedPosition))
+		assignedPositions[position]++
+		isSelf := champSelect.LocalPlayerCellID != nil && player.CellID != nil && *champSelect.LocalPlayerCellID == *player.CellID
+		if !isSelf && strings.TrimSpace(current.PUUID) != "" {
+			isSelf = player.PUUID == current.PUUID
+		}
+		if isSelf {
+			selfAssigned = position
+		}
+	}
+	smiteCount := 0
+	for _, player := range response.Players {
+		normalizedPositions[normalizePosition(player.Position, "")]++
+		if player.Spell1ID == 11 || player.Spell2ID == 11 {
+			smiteCount++
+		}
+	}
+	positionSwapKeys := map[string]struct{}{}
+	for _, swap := range champSelect.PositionSwaps {
+		for key := range swap {
+			positionSwapKeys[key] = struct{}{}
+		}
+	}
+	keys := make([]string, 0, len(positionSwapKeys))
+	for key := range positionSwapKeys {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return map[string]any{
+		"event": "live_position_shape", "phase": response.Phase, "queue_id": response.QueueID,
+		"game_mode": response.GameMode, "game_id": response.GameID,
+		"selected_position_counts": selectedPositions, "selected_role_counts": selectedRoles,
+		"assigned_position_counts": assignedPositions, "normalized_position_counts": normalizedPositions,
+		"smite_count": smiteCount, "self_selected_position": selfSelected, "self_assigned_position": selfAssigned,
+		"position_swaps_length": len(champSelect.PositionSwaps), "position_swaps_element_keys": keys,
+		"snapshot_game_id": snapshot.GameID, "snapshot_size": snapshot.Size, "snapshot_applied_count": snapshot.AppliedCount,
+	}
 }
 
 const lcuSessionShapeDiagnosticLimit = 128
@@ -3543,6 +4178,634 @@ func claimBoundedDiagnosticKey(mu *sync.Mutex, keys *map[string]struct{}, key st
 
 func lcuSessionShapeDiagnosticKey(phase, gameMode string, queueID int64) string {
 	return strings.ToUpper(strings.TrimSpace(phase)) + ":" + strings.ToUpper(strings.TrimSpace(gameMode)) + ":" + strconv.FormatInt(queueID, 10)
+}
+
+type liveClientArenaGrouping struct {
+	Field             string
+	ByIdentity        map[string]string
+	NameByGroup       map[string]string
+	IdentifiedPlayers int
+}
+
+type liveClientSnapshot struct {
+	Grouping           liveClientArenaGrouping
+	PositionByIdentity map[string]string
+}
+
+type liveClientProbeState struct {
+	GameID        int64
+	Snapshot      liveClientSnapshot
+	MascotMapping bool
+	Diagnostic    *liveClientProbeDiagnostic
+	Succeeded     bool
+	InFlight      bool
+	Attempt       int
+	LastAttempt   time.Time
+}
+
+type liveClientPlayerListShape struct {
+	PlayerCount          int
+	ElementKeys          []string
+	TeamValues           map[string]int
+	SubteamValues        map[string]map[string]int
+	PositionValues       map[string]int
+	PositionMatchedCount int
+	PositionMatchSources map[string]int
+	GroupField           string
+	Grouped              bool
+}
+
+type liveClientProbeDiagnostic struct {
+	Status  int
+	Shape   liveClientPlayerListShape
+	Result  string
+	Attempt int
+	Phase   string
+}
+
+func (a *app) loadLiveClientPlayerList(ctx context.Context) ([]byte, int, error) {
+	if a != nil && a.liveClientPlayerList != nil {
+		return a.liveClientPlayerList(ctx)
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, liveClientPlayerListURL, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	request.Header.Set("Accept", "application/json")
+	response, err := liveClientDataHTTPClient.Do(request)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return nil, response.StatusCode, fmt.Errorf("live client player list returned HTTP %d", response.StatusCode)
+	}
+	data, err := readLimited(response.Body, 4*1024*1024)
+	if err != nil {
+		return nil, response.StatusCode, err
+	}
+	return data, response.StatusCode, nil
+}
+
+func liveClientMapValue(entry map[string]any, name string) (any, bool) {
+	for key, value := range entry {
+		if strings.EqualFold(strings.TrimSpace(key), name) {
+			return value, true
+		}
+	}
+	return nil, false
+}
+
+func liveClientDistributionValue(value any) (string, bool) {
+	switch typed := value.(type) {
+	case string:
+		value := strings.TrimSpace(typed)
+		if value == "" || len(value) > 64 {
+			return "", false
+		}
+		return value, true
+	case float64:
+		if math.IsNaN(typed) || math.IsInf(typed, 0) {
+			return "", false
+		}
+		if typed == math.Trunc(typed) {
+			return strconv.FormatInt(int64(typed), 10), true
+		}
+		return strconv.FormatFloat(typed, 'f', -1, 64), true
+	case bool:
+		return strconv.FormatBool(typed), true
+	default:
+		return "", false
+	}
+}
+
+func liveClientFieldDistribution(entries []map[string]any, field string) map[string]int {
+	distribution := make(map[string]int)
+	for _, entry := range entries {
+		value, exists := liveClientMapValue(entry, field)
+		if !exists {
+			continue
+		}
+		if normalized, ok := liveClientDistributionValue(value); ok {
+			distribution[normalized]++
+		}
+	}
+	if len(distribution) == 0 {
+		return nil
+	}
+	return distribution
+}
+
+func liveClientArenaDistribution(distribution map[string]int, playerCount int) bool {
+	if playerCount < 6 || playerCount > 18 || len(distribution) < 2 {
+		return false
+	}
+	total := 0
+	for _, count := range distribution {
+		if count < 1 || count > 3 {
+			return false
+		}
+		total += count
+	}
+	return total == playerCount
+}
+
+func normalizeLiveClientPlayerName(value string) []string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return nil
+	}
+	keys := []string{value}
+	if base, _, found := strings.Cut(value, "#"); found && strings.TrimSpace(base) != "" {
+		keys = append(keys, strings.TrimSpace(base))
+	}
+	return keys
+}
+
+func liveClientEntryIdentityKeys(entry map[string]any) []string {
+	set := make(map[string]struct{})
+	for _, field := range []string{"summonerName", "riotId", "displayName"} {
+		if value, exists := liveClientMapValue(entry, field); exists {
+			if text, ok := value.(string); ok {
+				for _, key := range normalizeLiveClientPlayerName(text) {
+					set[key] = struct{}{}
+				}
+			}
+		}
+	}
+	gameNameValue, _ := liveClientMapValue(entry, "gameName")
+	tagLineValue, _ := liveClientMapValue(entry, "tagLine")
+	gameName, _ := gameNameValue.(string)
+	tagLine, _ := tagLineValue.(string)
+	for _, key := range normalizeLiveClientPlayerName(gameName) {
+		set[key] = struct{}{}
+	}
+	if strings.TrimSpace(gameName) != "" && strings.TrimSpace(tagLine) != "" {
+		for _, key := range normalizeLiveClientPlayerName(gameName + "#" + tagLine) {
+			set[key] = struct{}{}
+		}
+	}
+	riotGameNameValue, _ := liveClientMapValue(entry, "riotIdGameName")
+	riotTagLineValue, _ := liveClientMapValue(entry, "riotIdTagLine")
+	riotGameName, _ := riotGameNameValue.(string)
+	riotTagLine, _ := riotTagLineValue.(string)
+	for _, key := range normalizeLiveClientPlayerName(riotGameName) {
+		set[key] = struct{}{}
+	}
+	if strings.TrimSpace(riotGameName) != "" && strings.TrimSpace(riotTagLine) != "" {
+		for _, key := range normalizeLiveClientPlayerName(riotGameName + "#" + riotTagLine) {
+			set[key] = struct{}{}
+		}
+	}
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func parseLiveClientPlayerList(raw []byte) (liveClientSnapshot, liveClientPlayerListShape, error) {
+	var rawEntries []json.RawMessage
+	if err := json.Unmarshal(raw, &rawEntries); err != nil {
+		return liveClientSnapshot{}, liveClientPlayerListShape{}, err
+	}
+	entries := make([]map[string]any, 0, len(rawEntries))
+	subteamFieldSet := make(map[string]struct{})
+	for _, rawEntry := range rawEntries {
+		var entry map[string]any
+		if err := json.Unmarshal(rawEntry, &entry); err != nil {
+			return liveClientSnapshot{}, liveClientPlayerListShape{}, err
+		}
+		entries = append(entries, entry)
+		for key := range entry {
+			if strings.Contains(strings.ToLower(key), "subteam") {
+				subteamFieldSet[key] = struct{}{}
+			}
+		}
+	}
+	shape := liveClientPlayerListShape{
+		PlayerCount:    len(entries),
+		ElementKeys:    diagnosticKeyUnion(rawEntries),
+		TeamValues:     liveClientFieldDistribution(entries, "team"),
+		PositionValues: make(map[string]int),
+	}
+	snapshot := liveClientSnapshot{PositionByIdentity: make(map[string]string)}
+	for _, entry := range entries {
+		value, _ := liveClientMapValue(entry, "position")
+		position, _ := value.(string)
+		position = normalizePosition(position, "")
+		shape.PositionValues[position]++
+		if position == "" {
+			continue
+		}
+		for _, identity := range liveClientEntryIdentityKeys(entry) {
+			snapshot.PositionByIdentity[identity] = position
+		}
+	}
+	if len(shape.PositionValues) == 0 {
+		shape.PositionValues = nil
+	}
+	subteamFields := make([]string, 0, len(subteamFieldSet))
+	for field := range subteamFieldSet {
+		subteamFields = append(subteamFields, field)
+	}
+	sort.Strings(subteamFields)
+	if len(subteamFields) > 0 {
+		shape.SubteamValues = make(map[string]map[string]int, len(subteamFields))
+		for _, field := range subteamFields {
+			shape.SubteamValues[field] = liveClientFieldDistribution(entries, field)
+		}
+	}
+	groupField := ""
+	for _, field := range subteamFields {
+		if !strings.EqualFold(field, "subteamId") && !strings.EqualFold(field, "playerSubteamId") {
+			continue
+		}
+		if liveClientArenaDistribution(shape.SubteamValues[field], len(entries)) {
+			groupField = field
+			break
+		}
+	}
+	if groupField == "" {
+		return snapshot, shape, nil
+	}
+	grouping := liveClientArenaGrouping{Field: groupField, ByIdentity: make(map[string]string), NameByGroup: make(map[string]string)}
+	conflictingNames := make(map[string]bool)
+	for _, entry := range entries {
+		value, _ := liveClientMapValue(entry, groupField)
+		group, ok := liveClientDistributionValue(value)
+		if !ok {
+			return snapshot, shape, nil
+		}
+		identities := liveClientEntryIdentityKeys(entry)
+		if len(identities) == 0 {
+			return snapshot, shape, nil
+		}
+		grouping.IdentifiedPlayers++
+		for _, identity := range identities {
+			grouping.ByIdentity[identity] = group
+		}
+		for _, field := range []string{"subteamName", "teamName"} {
+			rawName, exists := liveClientMapValue(entry, field)
+			name, _ := rawName.(string)
+			name = strings.TrimSpace(name)
+			if !exists || name == "" || len([]rune(name)) > 64 || conflictingNames[group] {
+				continue
+			}
+			if previous := grouping.NameByGroup[group]; previous != "" && previous != name {
+				delete(grouping.NameByGroup, group)
+				conflictingNames[group] = true
+			} else {
+				grouping.NameByGroup[group] = name
+			}
+			break
+		}
+	}
+	shape.GroupField = groupField
+	shape.Grouped = grouping.IdentifiedPlayers == len(entries) && len(grouping.ByIdentity) > 0
+	if !shape.Grouped {
+		return snapshot, shape, nil
+	}
+	snapshot.Grouping = grouping
+	return snapshot, shape, nil
+}
+
+func (a *app) recordLiveClientPlayerListShape(gameID int64, status int, shape liveClientPlayerListShape, result string, attempt int, phase string) {
+	if a == nil {
+		return
+	}
+	result = strings.ToLower(strings.TrimSpace(result))
+	key := "game:" + strconv.FormatInt(gameID, 10) + ":" + result
+	if !claimBoundedDiagnosticKey(&a.liveClientPlayerListDiagnosticMu, &a.liveClientPlayerListDiagnosticKeys, key, lcuSessionShapeDiagnosticLimit) {
+		return
+	}
+	a.recordDiagnostic(map[string]any{
+		"event": "live_client_playerlist_shape", "result": result,
+		"attempt": attempt, "phase": phase,
+		"http_status": status, "player_count": shape.PlayerCount, "element_keys": shape.ElementKeys,
+		"team_values": liveClientDiagnosticDistribution(shape.TeamValues), "subteam_field_values": liveClientDiagnosticNestedDistribution(shape.SubteamValues),
+		"position_values": liveClientDiagnosticDistribution(shape.PositionValues), "position_matched_count": shape.PositionMatchedCount,
+		"position_match_source_counts": liveClientPositionMatchSourceCounts(shape.PositionMatchSources),
+		"group_field":                  shape.GroupField, "grouped": shape.Grouped,
+	})
+}
+
+func liveClientPositionMatchSourceCounts(counts map[string]int) map[string]int {
+	return map[string]int{
+		"summonerName": counts["summonerName"],
+		"riotId":       counts["riotId"],
+	}
+}
+
+func cloneLiveClientArenaGrouping(grouping liveClientArenaGrouping) liveClientArenaGrouping {
+	return liveClientArenaGrouping{Field: grouping.Field, ByIdentity: maps.Clone(grouping.ByIdentity), NameByGroup: maps.Clone(grouping.NameByGroup), IdentifiedPlayers: grouping.IdentifiedPlayers}
+}
+
+func cloneLiveClientSnapshot(snapshot liveClientSnapshot) liveClientSnapshot {
+	return liveClientSnapshot{Grouping: cloneLiveClientArenaGrouping(snapshot.Grouping), PositionByIdentity: maps.Clone(snapshot.PositionByIdentity)}
+}
+
+func (a *app) liveClientPlayerListTime() time.Time {
+	if a != nil && a.liveClientPlayerListNow != nil {
+		return a.liveClientPlayerListNow()
+	}
+	return time.Now()
+}
+
+func (a *app) clearLiveClientProbe() {
+	if a == nil {
+		return
+	}
+	a.liveClientProbeMu.Lock()
+	a.liveClientProbe = liveClientProbeState{}
+	a.liveClientProbeMu.Unlock()
+}
+
+func (a *app) liveClientSnapshotForGame(ctx context.Context, gameID int64, phase string, expectedArenaPlayers int) (liveClientSnapshot, bool) {
+	if a == nil {
+		return liveClientSnapshot{}, false
+	}
+	now := a.liveClientPlayerListTime()
+	a.liveClientProbeMu.Lock()
+	if a.liveClientProbe.GameID != gameID {
+		a.liveClientProbe = liveClientProbeState{GameID: gameID}
+	}
+	if a.liveClientProbe.Succeeded {
+		snapshot := cloneLiveClientSnapshot(a.liveClientProbe.Snapshot)
+		mascotMapping := a.liveClientProbe.MascotMapping
+		a.liveClientProbeMu.Unlock()
+		return snapshot, mascotMapping
+	}
+	if a.liveClientProbe.InFlight || (!a.liveClientProbe.LastAttempt.IsZero() && now.Sub(a.liveClientProbe.LastAttempt) < liveClientRetryDelay) {
+		a.liveClientProbeMu.Unlock()
+		return liveClientSnapshot{}, false
+	}
+	a.liveClientProbe.InFlight = true
+	a.liveClientProbe.Attempt++
+	a.liveClientProbe.LastAttempt = now
+	attempt := a.liveClientProbe.Attempt
+	a.liveClientProbeMu.Unlock()
+
+	raw, status, fetchErr := a.loadLiveClientPlayerList(ctx)
+	var snapshot liveClientSnapshot
+	var shape liveClientPlayerListShape
+	var parseErr error
+	if fetchErr == nil {
+		snapshot, shape, parseErr = parseLiveClientPlayerList(raw)
+	}
+	result := "grouped"
+	if fetchErr != nil {
+		result = "unavailable"
+	} else if parseErr != nil {
+		result = "invalid"
+	} else if !shape.Grouped {
+		result = "ungrouped"
+	}
+	usable := shape.Grouped || len(snapshot.PositionByIdentity) > 0
+	if expectedArenaPlayers > 0 {
+		usable = shape.Grouped && shape.PlayerCount >= expectedArenaPlayers
+	}
+	succeeded := fetchErr == nil && parseErr == nil && usable
+	mascotMapping := succeeded && arenaLiveClientMascotMapping(snapshot.Grouping)
+	if !succeeded {
+		a.recordLiveClientPlayerListShape(gameID, status, shape, result, attempt, phase)
+	}
+
+	a.liveClientProbeMu.Lock()
+	if a.liveClientProbe.GameID == gameID {
+		a.liveClientProbe.InFlight = false
+		if succeeded {
+			a.liveClientProbe.Snapshot = cloneLiveClientSnapshot(snapshot)
+			a.liveClientProbe.MascotMapping = mascotMapping
+			a.liveClientProbe.Diagnostic = &liveClientProbeDiagnostic{Status: status, Shape: shape, Result: result, Attempt: attempt, Phase: phase}
+			a.liveClientProbe.Succeeded = true
+		}
+	}
+	a.liveClientProbeMu.Unlock()
+	if !succeeded {
+		return liveClientSnapshot{}, false
+	}
+	return snapshot, mascotMapping
+}
+
+func (a *app) finalizeLiveClientPlayerListShape(gameID int64, matchedCount int, sourceCounts map[string]int) {
+	if a == nil {
+		return
+	}
+	a.liveClientProbeMu.Lock()
+	if a.liveClientProbe.GameID != gameID || a.liveClientProbe.Diagnostic == nil {
+		a.liveClientProbeMu.Unlock()
+		return
+	}
+	diagnostic := *a.liveClientProbe.Diagnostic
+	a.liveClientProbe.Diagnostic = nil
+	a.liveClientProbeMu.Unlock()
+	diagnostic.Shape.PositionMatchedCount = matchedCount
+	diagnostic.Shape.PositionMatchSources = liveClientPositionMatchSourceCounts(sourceCounts)
+	a.recordLiveClientPlayerListShape(gameID, diagnostic.Status, diagnostic.Shape, diagnostic.Result, diagnostic.Attempt, diagnostic.Phase)
+}
+
+func liveClientDiagnosticDistribution(distribution map[string]int) map[string]int {
+	if len(distribution) == 0 {
+		return nil
+	}
+	result := make(map[string]int, len(distribution))
+	for value, count := range distribution {
+		safe := strings.ToUpper(strings.TrimSpace(value))
+		for _, char := range safe {
+			if (char < 'A' || char > 'Z') && (char < '0' || char > '9') && char != '_' && char != '-' && char != '.' {
+				safe = ""
+				break
+			}
+		}
+		if safe == "" || len(safe) > 32 {
+			safe = "text_length_" + strconv.Itoa(len([]rune(value)))
+		}
+		result[safe] += count
+	}
+	return result
+}
+
+func liveClientDiagnosticNestedDistribution(distributions map[string]map[string]int) map[string]map[string]int {
+	if len(distributions) == 0 {
+		return nil
+	}
+	result := make(map[string]map[string]int, len(distributions))
+	for field, distribution := range distributions {
+		result[field] = liveClientDiagnosticDistribution(distribution)
+	}
+	return result
+}
+
+func liveClientGroupingForPlayer(grouping liveClientArenaGrouping, player lcuLivePlayer) string {
+	for _, value := range []string{player.SummonerName, player.GameName, strings.TrimSpace(player.GameName) + "#" + strings.TrimSpace(player.TagLine)} {
+		for _, key := range normalizeLiveClientPlayerName(value) {
+			if group := grouping.ByIdentity[key]; group != "" {
+				return group
+			}
+		}
+	}
+	return ""
+}
+
+func liveClientPositionForPlayer(snapshot liveClientSnapshot, player lcuLivePlayer) string {
+	position, _ := liveClientPositionForIdentities(snapshot, []string{player.SummonerName}, []string{player.GameName, strings.TrimSpace(player.GameName) + "#" + strings.TrimSpace(player.TagLine)})
+	return position
+}
+
+func liveClientPositionForIdentities(snapshot liveClientSnapshot, summonerNames, riotIDs []string) (string, string) {
+	for _, candidate := range []struct {
+		source string
+		values []string
+	}{{source: "summonerName", values: summonerNames}, {source: "riotId", values: riotIDs}} {
+		for _, value := range candidate.values {
+			for _, key := range normalizeLiveClientPlayerName(value) {
+				if position := snapshot.PositionByIdentity[key]; position != "" {
+					return position, candidate.source
+				}
+			}
+		}
+	}
+	return "", ""
+}
+
+func arenaAllyIdentityKeys(player lcuLivePlayer) []string {
+	set := make(map[string]struct{})
+	for _, value := range []string{player.PUUID, player.ObfuscatedPUUID} {
+		if value = strings.ToLower(strings.TrimSpace(value)); value != "" {
+			set["puuid:"+value] = struct{}{}
+		}
+	}
+	for _, value := range []int64{player.SummonerID, player.ObfuscatedSummonerID} {
+		if value > 0 {
+			set["summoner:"+strconv.FormatInt(value, 10)] = struct{}{}
+		}
+	}
+	nameValues := []string{player.SummonerName, player.GameName}
+	if strings.TrimSpace(player.GameName) != "" && strings.TrimSpace(player.TagLine) != "" {
+		nameValues = append(nameValues, strings.TrimSpace(player.GameName)+"#"+strings.TrimSpace(player.TagLine))
+	}
+	for _, value := range nameValues {
+		for _, key := range normalizeLiveClientPlayerName(value) {
+			set["name:"+key] = struct{}{}
+		}
+	}
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func (a *app) rememberArenaAllies(players []struct {
+	player lcuLivePlayer
+	team   int64
+}) {
+	keys := make(map[string]struct{})
+	for _, player := range players {
+		for _, key := range arenaAllyIdentityKeys(player.player) {
+			keys[key] = struct{}{}
+		}
+	}
+	a.arenaAlliesMu.Lock()
+	a.arenaAllyKeys = keys
+	a.arenaAlliesMu.Unlock()
+}
+
+func (a *app) clearArenaAllies() {
+	if a == nil {
+		return
+	}
+	a.arenaAlliesMu.Lock()
+	a.arenaAllyKeys = nil
+	a.arenaAlliesMu.Unlock()
+}
+
+func (a *app) isRememberedArenaAlly(player lcuLivePlayer) bool {
+	if a == nil {
+		return false
+	}
+	a.arenaAlliesMu.RLock()
+	defer a.arenaAlliesMu.RUnlock()
+	for _, key := range arenaAllyIdentityKeys(player) {
+		if _, exists := a.arenaAllyKeys[key]; exists {
+			return true
+		}
+	}
+	return false
+}
+
+func validateArenaLiveGroups(players []gameplayLivePlayer) bool {
+	if len(players) < 6 || len(players) > 18 {
+		return false
+	}
+	counts := make(map[string]int)
+	for _, player := range players {
+		if strings.TrimSpace(player.ArenaGroup) == "" {
+			return false
+		}
+		counts[player.ArenaGroup]++
+	}
+	return liveClientArenaDistribution(counts, len(players))
+}
+
+func validArenaGroupAssignments(groups []string) bool {
+	if len(groups) < 6 || len(groups) > 18 {
+		return false
+	}
+	counts := make(map[string]int)
+	for _, group := range groups {
+		group = strings.TrimSpace(group)
+		if group == "" {
+			return false
+		}
+		counts[group]++
+	}
+	return liveClientArenaDistribution(counts, len(groups))
+}
+
+func arenaSessionOrderGroups(queueID int64, players []lcuLivePlayer) ([]string, bool) {
+	// Queue 1750 currently has six three-player squads. The observed complete
+	// gameflow roster follows champ-select cell order, so use that order only as
+	// a corroborated fallback when all 18 entries are present. A partial roster
+	// cannot prove which squad boundary lost a player and must fail closed.
+	if queueID != 1750 || len(players) != 18 {
+		return nil, false
+	}
+	groups := make([]string, len(players))
+	partyGroup := make(map[int64]string)
+	for index, player := range players {
+		if player.TeamParticipantID <= 0 {
+			return nil, false
+		}
+		group := strconv.Itoa(index/3 + 1)
+		if previous := partyGroup[player.TeamParticipantID]; previous != "" && previous != group {
+			return nil, false
+		}
+		partyGroup[player.TeamParticipantID] = group
+		groups[index] = group
+	}
+	return groups, validArenaGroupAssignments(groups)
+}
+
+func arenaLiveClientMascotMapping(grouping liveClientArenaGrouping) bool {
+	if !strings.EqualFold(grouping.Field, "subteamId") && !strings.EqualFold(grouping.Field, "playerSubteamId") {
+		return false
+	}
+	groups := make(map[string]struct{})
+	for _, group := range grouping.ByIdentity {
+		groups[group] = struct{}{}
+	}
+	if len(groups) < 2 || len(groups) > 8 {
+		return false
+	}
+	for group := range groups {
+		id, err := strconv.Atoi(group)
+		if err != nil || id < 1 || id > 8 {
+			return false
+		}
+	}
+	return true
 }
 
 func (a *app) recordLCUGameflowSessionShape(raw []byte, phase, gameMode string, queueID int64) {
@@ -3599,6 +4862,8 @@ func lcuGameflowSessionShapePayload(raw []byte, phase, gameMode string, queueID 
 		"top_level_keys":                      diagnosticKeySet(json.RawMessage(raw)),
 		"team_one_player_keys":                diagnosticKeyUnion(teamOne),
 		"team_two_player_keys":                diagnosticKeyUnion(teamTwo),
+		"team_one_nonzero_counts":             diagnosticNonZeroKeyCounts(teamOne),
+		"team_two_nonzero_counts":             diagnosticNonZeroKeyCounts(teamTwo),
 		"team_one_team_participant_id_counts": diagnosticInt64FieldCounts(teamOne, "teamParticipantId"),
 		"team_two_team_participant_id_counts": diagnosticInt64FieldCounts(teamTwo, "teamParticipantId"),
 	}
@@ -3881,6 +5146,20 @@ func hasSmiteSpell(spell1ID, spell2ID int64) bool {
 	return spell1ID == 11 || spell2ID == 11
 }
 
+func gameplayRecommendationTier(spec opggModeSpec, value string) (string, error) {
+	if !spec.UsesTier {
+		return "", nil
+	}
+	tier := strings.ToLower(strings.TrimSpace(value))
+	if tier == "" {
+		tier = championCounterFallbackTier
+	}
+	if !allowedChampionTiers[tier] {
+		return "", errors.New("invalid recommendation tier")
+	}
+	return tier, nil
+}
+
 func resolveGameplayRecommendationPosition(value string, positions []championPositionOption) (string, string, error) {
 	position, err := normalizeOPGGPosition(value)
 	if err != nil {
@@ -3935,7 +5214,7 @@ func gameplayRecommendationsFromResolvedDetail(championID int64, position string
 	result := gameplayRecommendationBundle{
 		Source: resolution.InternalMode, ResolvedMode: spec.APIMode, ResolvedRegion: spec.Region,
 		DataVersion: detail.Patch, CurrentVersion: detail.CurrentPatch, IsFallback: resolution.IsFallback, IsStale: detail.IsStale,
-		HasRunes: spec.HasRunes, HasAugments: spec.HasAugments, HasCounters: spec.HasCounters, HasBanRate: spec.HasBanRate, HasTopPlayers: hasTopPlayers,
+		HasRunes: spec.HasRunes, HasAugments: spec.HasAugments, HasCounters: spec.HasCounters, HasBanRate: spec.HasBanRate, HasTopPlayers: hasTopPlayers, HasItemDepths: spec.SupportsItemDepths,
 		Citation: detail.Citation, MeasurementTechnique: detail.MeasurementTechnique,
 		Positions: append([]championPositionOption(nil), detail.Positions...), ResolvedPosition: position,
 		Hero:     gameplayRecommendationHero{Tier: heroStats.Tier, WinRate: heroStats.WinRate, PickRate: heroStats.PickRate, BanRate: heroStats.BanRate, EmptyReason: emptyReason},
@@ -4030,7 +5309,7 @@ func recommendationOptions(rows []championMetricRow) []gameplayRecommendationOpt
 				stats.FirstPlaceRate = &firstPlaceRate
 			}
 			grade := strings.ToUpper(strings.TrimSpace(firstNonEmpty(row.Grade, row.Tier)))
-			result = append(result, gameplayRecommendationOption{IDs: ids, Grade: grade, Stats: stats})
+			result = append(result, gameplayRecommendationOption{IDs: ids, Grade: grade, GamesUnavailable: row.GamesUnavailable, Stats: stats})
 		}
 	}
 	return result
@@ -4045,20 +5324,29 @@ func recommendationStats(pickRate, winRate float64, games int) gameplayRecommend
 
 type gameplayLivePlayer struct {
 	gameplayPlayer
-	TeamID int64 `json:"teamId"`
+	TeamID               int64  `json:"teamId"`
+	ArenaGroup           string `json:"arenaGroup,omitempty"`
+	PremadeGroup         string `json:"premadeGroup,omitempty"`
+	PremadeSize          int    `json:"premadeSize,omitempty"`
+	PremadeSource        string `json:"premadeSource,omitempty"`
+	PremadeSessionSignal bool   `json:"premadeSessionSignal,omitempty"`
+	IsAlly               bool   `json:"isAlly,omitempty"`
 	// ChampionID is the locked champion. During champion select the client can
 	// expose a separate pick intent before the player locks it in.
-	ChampionID         int64                 `json:"championId,omitempty"`
-	ChampionPickIntent int64                 `json:"championPickIntent,omitempty"`
-	ChampionLocked     bool                  `json:"championLocked"`
-	ChampionName       string                `json:"championName,omitempty"`
-	Position           string                `json:"position,omitempty"`
-	Spell1ID           int64                 `json:"spell1Id,omitempty"`
-	Spell2ID           int64                 `json:"spell2Id,omitempty"`
-	Rank               *gameplayRank         `json:"rank,omitempty"`
-	ModeStats          gameplayAggregate     `json:"modeStats"`
-	RecentGames        []gameplayRecentGame  `json:"recentGames,omitempty"`
-	RecentRankedRecord *gameplayRecentRecord `json:"recentRankedRecord,omitempty"`
+	ChampionID          int64                  `json:"championId,omitempty"`
+	ChampionPickIntent  int64                  `json:"championPickIntent,omitempty"`
+	ChampionPickPending bool                   `json:"championPickPending,omitempty"`
+	ChampionLocked      bool                   `json:"championLocked"`
+	ChampionName        string                 `json:"championName,omitempty"`
+	Position            string                 `json:"position,omitempty"`
+	Spell1ID            int64                  `json:"spell1Id,omitempty"`
+	Spell2ID            int64                  `json:"spell2Id,omitempty"`
+	Rank                *gameplayRank          `json:"rank,omitempty"`
+	ModeStats           gameplayAggregate      `json:"modeStats"`
+	HistoryState        string                 `json:"historyState,omitempty"`
+	RecentGames         []gameplayRecentGame   `json:"recentGames,omitempty"`
+	RecentRankedRecord  *gameplayRecentRecord  `json:"recentRankedRecord,omitempty"`
+	RecentPositions     []gameplayPositionStat `json:"recentPositions,omitempty"`
 }
 
 // gameplayRecentGame 是对局页“详情”页签使用的单场极简摘要，
@@ -4163,6 +5451,7 @@ type lcuGameflowSession struct {
 			ShortName string `json:"shortName"`
 			GameMode  string `json:"gameMode"`
 			MapID     int64  `json:"mapId"`
+			Type      string `json:"type"`
 		} `json:"queue"`
 		TeamOne []lcuLivePlayer `json:"teamOne"`
 		TeamTwo []lcuLivePlayer `json:"teamTwo"`
@@ -4178,6 +5467,7 @@ type lcuLivePlayer struct {
 	CellID               *int64 `json:"cellId"`
 	ChampionID           int64  `json:"championId"`
 	ChampionPickIntent   int64  `json:"championPickIntent"`
+	ChampionPickPending  bool   `json:"-"`
 	ChampionLocked       bool   `json:"-"`
 	ProfileIconID        int64  `json:"profileIconId"`
 	PUUID                string `json:"puuid"`
@@ -4192,13 +5482,43 @@ type lcuLivePlayer struct {
 	NameVisibilityType   string `json:"nameVisibilityType"`
 	Spell1ID             int64  `json:"spell1Id"`
 	Spell2ID             int64  `json:"spell2Id"`
+	TeamParticipantID    int64  `json:"teamParticipantId"`
 }
 
 type lcuChampSelectSession struct {
-	GameID            int64                  `json:"gameId"`
-	LocalPlayerCellID *int64                 `json:"localPlayerCellId"`
-	MyTeam            []lcuChampSelectPlayer `json:"myTeam"`
-	TheirTeam         []lcuChampSelectPlayer `json:"theirTeam"`
+	GameID            int64                         `json:"gameId"`
+	QueueID           int64                         `json:"queueId"`
+	LocalPlayerCellID *int64                        `json:"localPlayerCellId"`
+	Actions           [][]lcuChampSelectAction      `json:"actions"`
+	MyTeam            []lcuChampSelectPlayer        `json:"myTeam"`
+	TheirTeam         []lcuChampSelectPlayer        `json:"theirTeam"`
+	PositionSwaps     []map[string]any              `json:"positionSwaps"`
+	BenchEnabled      bool                          `json:"benchEnabled"`
+	BenchChampions    []lcuChampSelectBenchChampion `json:"benchChampions"`
+	Timer             lcuChampSelectTimer           `json:"timer"`
+}
+
+type lcuChampSelectBenchChampion struct {
+	ChampionID int64 `json:"championId"`
+	IsPriority bool  `json:"isPriority"`
+}
+
+type lcuChampSelectTimer struct {
+	AdjustedTimeLeftInPhase int64  `json:"adjustedTimeLeftInPhase"`
+	Phase                   string `json:"phase"`
+	TotalTimeInPhase        int64  `json:"totalTimeInPhase"`
+}
+
+type lcuChampSelectAction struct {
+	ActorCellID  int64  `json:"actorCellId"`
+	ChampionID   int64  `json:"championId"`
+	Completed    bool   `json:"completed"`
+	Duration     int64  `json:"duration"`
+	ID           int64  `json:"id"`
+	IsAllyAction bool   `json:"isAllyAction"`
+	IsInProgress bool   `json:"isInProgress"`
+	PickTurn     int64  `json:"pickTurn"`
+	Type         string `json:"type"`
 }
 
 type lcuLobby struct {
@@ -4232,7 +5552,7 @@ type lcuChampSelectPlayer struct {
 }
 
 const (
-	arenaChampSelectNotice = "斗魂英雄选择阶段客户端只公开己方小队，其余玩家进入对局后显示"
+	arenaChampSelectNotice = "斗魂英雄选择阶段只展示小队玩家信息"
 	emptyLCUPlayerPUUID    = "00000000-0000-0000-0000-000000000000"
 )
 
@@ -4278,6 +5598,7 @@ func (a *app) handleGameplayPhase(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
+	liveLoadStarted := time.Now()
 	client, current, err := a.gameplayClient()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
@@ -4290,8 +5611,14 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 	}
 	response := gameplayLiveResponse{Phase: phase, Capabilities: []EndpointCapability{{Name: "gameflow", Path: "/lol-gameflow/v1/gameflow-phase", State: capabilityAvailable, Count: 1}}}
 	if phase != "ChampSelect" && phase != "InProgress" && phase != "GameStart" && phase != "Reconnect" {
+		a.clearArenaAllies()
+		a.clearLiveClientProbe()
+		a.clearLivePositionSnapshot()
 		respondJSON(w, response)
 		return
+	}
+	if phase == "ChampSelect" {
+		a.clearLiveClientProbe()
 	}
 	var session lcuGameflowSession
 	var sessionRaw []byte
@@ -4308,44 +5635,50 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	response.GameID = session.GameData.GameID
-	response.QueueID = session.GameData.Queue.ID
-	response.MapID = session.GameData.Queue.MapID
-	if response.MapID == 0 {
-		response.MapID = session.Map.ID
-	}
-	response.GameMode = session.GameData.Queue.GameMode
-	if response.GameMode == "" {
-		response.GameMode = session.Map.GameMode
-	}
-	response.QueueLabel = strings.TrimSpace(session.GameData.Queue.ShortName)
-	if response.QueueLabel == "" {
-		response.QueueLabel = strings.TrimSpace(session.GameData.Queue.Name)
-	}
-	if response.QueueLabel == "" {
-		response.QueueLabel = queueLabel(response.QueueID, response.GameMode, nil)
-	}
 	rawPlayers := make([]struct {
 		player lcuLivePlayer
 		team   int64
 	}, 0, 10)
-	for _, player := range session.GameData.TeamOne {
-		rawPlayers = append(rawPlayers, struct {
-			player lcuLivePlayer
-			team   int64
-		}{player, 100})
-	}
-	for _, player := range session.GameData.TeamTwo {
-		rawPlayers = append(rawPlayers, struct {
-			player lcuLivePlayer
-			team   int64
-		}{player, 200})
+	if phase == "ChampSelect" {
+		// gameData remains populated with the previous match until the new game
+		// starts. Rebuild ChampSelect solely from its own session and lobby.
+		response.DroppedStaleGameData = sessionErr == nil
+	} else {
+		response.GameID = session.GameData.GameID
+		response.QueueID = session.GameData.Queue.ID
+		response.MapID = session.GameData.Queue.MapID
+		if response.MapID == 0 {
+			response.MapID = session.Map.ID
+		}
+		response.GameMode = session.GameData.Queue.GameMode
+		if response.GameMode == "" {
+			response.GameMode = session.Map.GameMode
+		}
+		response.QueueLabel = strings.TrimSpace(session.GameData.Queue.ShortName)
+		if response.QueueLabel == "" {
+			response.QueueLabel = strings.TrimSpace(session.GameData.Queue.Name)
+		}
+		if response.QueueLabel == "" {
+			response.QueueLabel = queueLabel(response.QueueID, response.GameMode, nil)
+		}
+		for _, player := range session.GameData.TeamOne {
+			rawPlayers = append(rawPlayers, struct {
+				player lcuLivePlayer
+				team   int64
+			}{player, 100})
+		}
+		for _, player := range session.GameData.TeamTwo {
+			rawPlayers = append(rawPlayers, struct {
+				player lcuLivePlayer
+				team   int64
+			}{player, 200})
+		}
 	}
 	response.RawCount = len(rawPlayers)
 	mergeAppended := 0
 	var localPlayerCellID *int64
+	var champSelect lcuChampSelectSession
 	if phase == "ChampSelect" {
-		var champSelect lcuChampSelectSession
 		champSelectRaw, champSelectErr := client.GetBytesContext(r.Context(), "/lol-champ-select/v1/session")
 		if champSelectErr == nil {
 			champSelectErr = json.Unmarshal(champSelectRaw, &champSelect)
@@ -4360,9 +5693,23 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 				response.GameID = champSelect.GameID
 			}
 			if response.QueueID == 0 {
+				response.QueueID = champSelect.QueueID
+			}
+			if response.QueueID == 0 || response.MapID == 0 || response.GameMode == "" {
 				var lobby lcuLobby
 				if err := client.GetJSON("/lol-lobby/v2/lobby", &lobby); err == nil {
-					response.QueueID, response.MapID, response.GameMode = lobby.GameConfig.QueueID, lobby.GameConfig.MapID, lobby.GameConfig.GameMode
+					if response.QueueID == 0 {
+						response.QueueID = lobby.GameConfig.QueueID
+					}
+					if response.MapID == 0 {
+						response.MapID = lobby.GameConfig.MapID
+					}
+					if response.GameMode == "" {
+						response.GameMode = lobby.GameConfig.GameMode
+					}
+					response.Capabilities = append(response.Capabilities, EndpointCapability{Name: "lobby", Path: "/lol-lobby/v2/lobby", State: capabilityAvailable, Count: 1})
+				} else {
+					response.Capabilities = append(response.Capabilities, gameplayCapabilityError("lobby", "/lol-lobby/v2/lobby", err))
 				}
 			}
 			if response.QueueLabel == "" {
@@ -4371,6 +5718,9 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 			if isArenaChampSelectMode(response.GameMode) {
 				rawPlayers, _ = filterArenaChampSelectPlayers(rawPlayers)
 				response.ChampSelectNotice = arenaChampSelectNotice
+				a.rememberArenaAllies(rawPlayers)
+			} else {
+				a.clearArenaAllies()
 			}
 			a.recordLCUChampSelectSessionShape(champSelectRaw, phase, response.GameMode, response.QueueID)
 			response.Capabilities = append(response.Capabilities, EndpointCapability{Name: "champ-select", Path: "/lol-champ-select/v1/session", State: capabilityAvailable, Count: len(champSelect.MyTeam) + len(champSelect.TheirTeam)})
@@ -4404,10 +5754,56 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.Available = true
+	arenaMode := isArenaChampSelectMode(response.GameMode)
+	arenaGroups := make([]string, len(rawPlayers))
+	liveClientPositions := make([]string, len(rawPlayers))
+	var liveClientSnapshotValue liveClientSnapshot
+	arenaMascotMapping := false
+	arenaGroupSource := ""
+	var arenaGroupNames map[string]string
+	if phase == "InProgress" || phase == "Reconnect" {
+		if arenaMode {
+			sessionPlayers := make([]lcuLivePlayer, len(rawPlayers))
+			for index := range rawPlayers {
+				sessionPlayers[index] = rawPlayers[index].player
+			}
+			if groups, ok := arenaSessionOrderGroups(response.QueueID, sessionPlayers); ok {
+				copy(arenaGroups, groups)
+				arenaMascotMapping = true
+				arenaGroupSource = "session-order"
+			}
+		}
+		expectedArenaPlayers := 0
+		if arenaMode {
+			expectedArenaPlayers = len(rawPlayers)
+		}
+		snapshot, mascotMapping := a.liveClientSnapshotForGame(r.Context(), response.GameID, phase, expectedArenaPlayers)
+		liveClientSnapshotValue = snapshot
+		if arenaMode && len(snapshot.Grouping.ByIdentity) > 0 {
+			candidateGroups := make([]string, len(rawPlayers))
+			for index, rawPlayer := range rawPlayers {
+				candidateGroups[index] = liveClientGroupingForPlayer(snapshot.Grouping, rawPlayer.player)
+			}
+			if validArenaGroupAssignments(candidateGroups) {
+				arenaGroups = candidateGroups
+				arenaMascotMapping = mascotMapping
+				arenaGroupNames = maps.Clone(snapshot.Grouping.NameByGroup)
+				arenaGroupSource = "live-client"
+			}
+		}
+	}
 	names := a.overviewChampionNames(r.Context())
 	response.Players = make([]gameplayLivePlayer, len(rawPlayers))
+	premadeInputs := make([]livePremadeInput, len(rawPlayers))
+	ranksFinishedAt := make([]time.Time, len(rawPlayers))
+	matchesFinishedAt := make([]time.Time, len(rawPlayers))
+	enrichmentStarted := time.Now()
 	var wait sync.WaitGroup
-	semaphore := make(chan struct{}, 4)
+	concurrency := liveRosterConcurrency
+	if a.liveRosterConcurrencyOverride > 0 {
+		concurrency = a.liveRosterConcurrencyOverride
+	}
+	semaphore := make(chan struct{}, concurrency)
 	for index := range rawPlayers {
 		wait.Add(1)
 		go func(index int) {
@@ -4430,8 +5826,10 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 			playerRef := reference.PlayerRef
 			validRef := validPlayerReference(playerRef)
 			isCurrent := gameplayLivePlayerIsCurrent(reference, current.PUUID, raw.player.CellID, localPlayerCellID)
+			isAlly := isCurrent || (arenaMode && (phase == "ChampSelect" || a.isRememberedArenaAlly(raw.player)))
 			var ranks []gameplayRank
 			var matches []gameplayMatch
+			historyResult := livePlayerMatchesResult{}
 			if validRef {
 				// Rank and recent-history reads are independent once the player identity
 				// is resolved. Running them together shortens the live-page critical path.
@@ -4439,11 +5837,14 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 				enrichment.Add(2)
 				go func() {
 					defer enrichment.Done()
-					ranks, _, _ = a.loadRanksWithFallback(r.Context(), client, playerRef, isCurrent, reference.ServerID, summoner.Privacy)
+					ranks = append([]gameplayRank(nil), a.playerRankScore(r.Context(), client, playerRef, isCurrent, reference.ServerID, summoner.Privacy).ranks...)
+					ranksFinishedAt[index] = time.Now()
 				}()
 				go func() {
 					defer enrichment.Done()
-					matches = a.livePlayerMatches(r.Context(), client, reference, playerRef, isCurrent, names)
+					historyResult = a.livePlayerMatches(r.Context(), client, reference, playerRef, isCurrent, names)
+					matches = historyResult.Matches
+					matchesFinishedAt[index] = time.Now()
 				}()
 				enrichment.Wait()
 			}
@@ -4464,23 +5865,85 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 			if displayChampionID <= 0 {
 				displayChampionID = raw.player.ChampionPickIntent
 			}
+			if raw.player.ChampionPickPending || raw.player.ChampionPickIntent < 0 {
+				displayChampionID = -3
+			}
 			locked := raw.player.ChampionLocked || raw.player.ChampionID > 0
 			recentGames := recentGamesFromMatches(matches, playerRef, 8, response.QueueID)
 			var rankedRecord *gameplayRecentRecord
 			if response.QueueID == 420 || response.QueueID == 440 {
 				rankedRecord = recentRankedRecord(recentGames)
 			}
-			response.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: playerRef, DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Hidden: hidden, IsCurrent: isCurrent, reference: reference}, TeamID: raw.team, ChampionID: raw.player.ChampionID, ChampionPickIntent: raw.player.ChampionPickIntent, ChampionLocked: locked, ChampionName: championName(names, displayChampionID), Position: normalizePosition(raw.player.SelectedPosition, raw.player.SelectedRole), Spell1ID: raw.player.Spell1ID, Spell2ID: raw.player.Spell2ID, Rank: rank, ModeStats: modeStats, RecentGames: recentGames, RecentRankedRecord: rankedRecord}
+			response.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: playerRef, DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Hidden: hidden, IsCurrent: isCurrent, reference: reference}, TeamID: raw.team, ArenaGroup: arenaGroups[index], IsAlly: isAlly, ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionPickPending: raw.player.ChampionPickPending || raw.player.ChampionPickIntent < 0, ChampionLocked: locked, ChampionName: championName(names, displayChampionID), Position: normalizePosition(raw.player.SelectedPosition, raw.player.SelectedRole), Spell1ID: raw.player.Spell1ID, Spell2ID: raw.player.Spell2ID, Rank: rank, ModeStats: modeStats, HistoryState: liveHistoryState(validRef, historyResult), RecentGames: recentGames, RecentRankedRecord: rankedRecord, RecentPositions: liveRecentPositions(matches, playerRef, response.QueueID)}
+			premadeInputs[index] = livePremadeInput{TeamID: raw.team, TeamParticipantID: raw.player.TeamParticipantID, Matches: cloneGameplayMatches(matches)}
 		}(index)
 	}
 	wait.Wait()
+	phaseMilliseconds := func(finished []time.Time) int64 {
+		var latest time.Time
+		for _, value := range finished {
+			if value.After(latest) {
+				latest = value
+			}
+		}
+		if latest.IsZero() {
+			return 0
+		}
+		return latest.Sub(enrichmentStarted).Milliseconds()
+	}
+	ranksMS, matchesMS := phaseMilliseconds(ranksFinishedAt), phaseMilliseconds(matchesFinishedAt)
+	positionMatchSources := liveClientPositionMatchSourceCounts(nil)
+	for index, raw := range rawPlayers {
+		player := response.Players[index]
+		riotIDs := []string{
+			raw.player.GameName,
+			strings.TrimSpace(raw.player.GameName) + "#" + strings.TrimSpace(raw.player.TagLine),
+			player.GameName,
+			strings.TrimSpace(player.GameName) + "#" + strings.TrimSpace(player.TagLine),
+		}
+		position, source := liveClientPositionForIdentities(liveClientSnapshotValue, []string{raw.player.SummonerName}, riotIDs)
+		liveClientPositions[index] = position
+		if source != "" {
+			positionMatchSources[source]++
+		}
+	}
+	a.finalizeLiveClientPlayerListShape(response.GameID, positionMatchSources["summonerName"]+positionMatchSources["riotId"], positionMatchSources)
+	applyLivePremadeAssignments(response.Players, premadeInputs, phase, arenaMode)
+	response.ArenaGrouped = (phase == "InProgress" || phase == "Reconnect") && arenaMode && validateArenaLiveGroups(response.Players)
+	response.ArenaMascotMapping = response.ArenaGrouped && arenaMascotMapping
+	response.ArenaGroupSource = arenaGroupSource
+	response.ArenaGroupNames = arenaGroupNames
+	if !response.ArenaGrouped {
+		response.ArenaGroupSource = ""
+		response.ArenaGroupNames = nil
+		for index := range response.Players {
+			response.Players[index].ArenaGroup = ""
+		}
+	}
 	for index := range response.Players {
 		player := &response.Players[index]
 		player.PlayerRef = a.registerGameplayReferenceDetails(player.reference)
 	}
+	snapshotStats := livePositionSnapshotStats{}
+	if phase == "ChampSelect" {
+		a.rememberLivePositionSnapshot(response.GameID, response.Players)
+		snapshotStats = a.livePositionSnapshotStats()
+	} else if phase == "InProgress" || phase == "Reconnect" {
+		snapshotStats = a.applyLivePositionSnapshot(response.GameID, response.Players)
+		// Position source priority is deliberate: Live Client Data is the only
+		// in-game source covering self, allies, and opponents. Champ-select's
+		// snapshot remains the fallback, followed by gameflow selectedPosition.
+		for index, position := range liveClientPositions {
+			if position != "" {
+				response.Players[index].Position = position
+			}
+		}
+	}
 	response.Capabilities = append(response.Capabilities, EndpointCapability{Name: "live-player-analysis", Path: "本机召唤师、排位与战绩接口", State: capabilityAvailable, Count: len(response.Players)})
 	a.recordLiveRosterShape(response)
-	recommendationChampionID, recommendationPosition := gameplayLiveRecommendationTarget(response.Players, response.CurrentChampionID)
+	a.recordDiagnostic(livePositionShapeDiagnostic(response, session, champSelect, current, snapshotStats))
+	recommendationChampionID, recommendationPosition := gameplayLiveRecommendationTargetWithChampSelect(response.Players, response.CurrentChampionID, champSelect)
+	response.ResolvedChampionID = recommendationChampionID
 	if recommendationChampionID > 0 {
 		var recommendation *gameplayRecommendation
 		var abilities []gameplayChampionAbility
@@ -4509,6 +5972,10 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 			response.Capabilities = append(response.Capabilities, gameplayCapabilityError("champion-abilities", "/lol-game-data/assets/v1/champions/{id}.json", abilitiesErr))
 		}
 	}
+	a.recordDiagnostic(map[string]any{
+		"event": "live_load_cost", "players": len(response.Players), "concurrency": concurrency,
+		"ranks_ms": ranksMS, "matches_ms": matchesMS, "total_ms": time.Since(liveLoadStarted).Milliseconds(),
+	})
 	respondJSON(w, response)
 }
 
@@ -4531,6 +5998,10 @@ func loadCurrentChampionID(client *LCUClient) (int64, error) {
 }
 
 func gameplayLiveRecommendationTarget(players []gameplayLivePlayer, currentChampionID int64) (int64, string) {
+	return gameplayLiveRecommendationTargetWithChampSelect(players, currentChampionID, lcuChampSelectSession{})
+}
+
+func gameplayLiveRecommendationTargetWithChampSelect(players []gameplayLivePlayer, currentChampionID int64, champSelect lcuChampSelectSession) (int64, string) {
 	position := ""
 	for _, player := range players {
 		if !player.IsCurrent {
@@ -4549,6 +6020,15 @@ func gameplayLiveRecommendationTarget(players []gameplayLivePlayer, currentChamp
 	if currentChampionID > 0 {
 		return currentChampionID, position
 	}
+	if champSelect.LocalPlayerCellID != nil {
+		for _, group := range champSelect.Actions {
+			for _, action := range group {
+				if action.ActorCellID == *champSelect.LocalPlayerCellID && strings.EqualFold(strings.TrimSpace(action.Type), "PICK") && action.ChampionID > 0 {
+					return action.ChampionID, position
+				}
+			}
+		}
+	}
 	return 0, position
 }
 
@@ -4559,26 +6039,318 @@ func gameplayLivePlayerIsCurrent(reference gameplayReference, currentPUUID strin
 	return playerCellID != nil && localPlayerCellID != nil && *playerCellID == *localPlayerCellID
 }
 
-// livePlayerMatches 读取对局页单名玩家的最近战绩：先用本机客户端的
-// 列表接口（轻量），拿不到数据时改走 SGP 网关（带短期缓存，避免自动
-// 刷新反复请求）。
-func (a *app) livePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string) []gameplayMatch {
-	history, capabilities, _ := loadGameplayHistory(client, playerRef, isCurrent, 0, 10, false)
-	matches := make([]gameplayMatch, 0, len(history))
-	for _, game := range history {
-		matches = append(matches, normalizeGameplayMatch(game, reference, names, nil))
+type livePremadeInput struct {
+	TeamID            int64
+	TeamParticipantID int64
+	Matches           []gameplayMatch
+}
+
+type livePremadeAssignment struct {
+	Group         string
+	Size          int
+	Source        string
+	SessionSignal bool
+}
+
+func applyLivePremadeAssignments(players []gameplayLivePlayer, inputs []livePremadeInput, phase string, arenaMode bool) {
+	if arenaMode || (phase != "InProgress" && phase != "Reconnect") {
+		return
 	}
-	listFailed := len(capabilities) > 0 && capabilities[0].State != capabilityAvailable
-	if len(matches) == 0 && (listFailed || len(history) == 0) {
-		if _, _, ok := a.sgp.available(client); ok {
-			if infos, _, _, err := a.sgp.matchHistory(ctx, client, playerRef, 0, 10, true); err == nil {
-				for _, info := range infos {
-					matches = append(matches, convertRiotMatchInfo(info, playerRef, names, nil, "", reference.ServerID))
+	for index, assignment := range livePremadeAssignments(inputs, livePremadeMinSharedGames) {
+		if index >= len(players) {
+			break
+		}
+		players[index].PremadeGroup = assignment.Group
+		players[index].PremadeSize = assignment.Size
+		players[index].PremadeSource = assignment.Source
+		players[index].PremadeSessionSignal = assignment.SessionSignal
+	}
+}
+
+// livePremadeAssignments combines the client's direct teamParticipantId signal
+// with history inference. The caller excludes Arena before reaching this code:
+// teamParticipantId has different semantics there. History coverage can disable
+// inference, but must never suppress a direct same-team session grouping.
+func livePremadeAssignments(inputs []livePremadeInput, threshold int) []livePremadeAssignment {
+	assignments := make([]livePremadeAssignment, len(inputs))
+	if len(inputs) < 2 {
+		return assignments
+	}
+	if threshold <= 0 {
+		threshold = livePremadeMinSharedGames
+	}
+	gameIDs := make([]map[int64]struct{}, len(inputs))
+	covered := 0
+	for index, input := range inputs {
+		ids := make(map[int64]struct{}, len(input.Matches))
+		for _, match := range input.Matches {
+			if match.GameID > 0 {
+				ids[match.GameID] = struct{}{}
+			}
+		}
+		gameIDs[index] = ids
+		if len(ids) > 0 {
+			covered++
+		}
+	}
+	parent := make([]int, len(inputs))
+	rank := make([]int, len(inputs))
+	for index := range parent {
+		parent[index] = index
+	}
+	var find func(int) int
+	find = func(value int) int {
+		if parent[value] != value {
+			parent[value] = find(parent[value])
+		}
+		return parent[value]
+	}
+	union := func(left, right int) {
+		leftRoot, rightRoot := find(left), find(right)
+		if leftRoot == rightRoot {
+			return
+		}
+		if rank[leftRoot] < rank[rightRoot] {
+			parent[leftRoot] = rightRoot
+			return
+		}
+		parent[rightRoot] = leftRoot
+		if rank[leftRoot] == rank[rightRoot] {
+			rank[leftRoot]++
+		}
+	}
+	sessionEdges := make([][]bool, len(inputs))
+	inferredEdges := make([][]bool, len(inputs))
+	for index := range inputs {
+		sessionEdges[index] = make([]bool, len(inputs))
+		inferredEdges[index] = make([]bool, len(inputs))
+	}
+	// Direct session groups are deterministic and intentionally precede the
+	// history coverage gate.
+	for left := 0; left < len(inputs); left++ {
+		for right := left + 1; right < len(inputs); right++ {
+			if inputs[left].TeamID != inputs[right].TeamID {
+				continue
+			}
+			signal := inputs[left].TeamParticipantID
+			if signal > 0 && signal == inputs[right].TeamParticipantID {
+				sessionEdges[left][right] = true
+				union(left, right)
+			}
+		}
+	}
+	// Fail closed for inference when a majority of the roster did not yield
+	// history. Direct session groups above remain valid.
+	inferenceEnabled := covered > len(inputs)/2
+	for left := 0; left < len(inputs); left++ {
+		for right := left + 1; right < len(inputs); right++ {
+			if !inferenceEnabled {
+				continue
+			}
+			if inputs[left].TeamID != 0 && inputs[right].TeamID != 0 && inputs[left].TeamID != inputs[right].TeamID {
+				continue
+			}
+			shared := 0
+			for gameID := range gameIDs[left] {
+				if _, ok := gameIDs[right][gameID]; ok {
+					shared++
+					if shared >= threshold {
+						inferredEdges[left][right] = true
+						union(left, right)
+						break
+					}
 				}
 			}
 		}
 	}
-	return matches
+
+	components := make(map[int][]int)
+	for index := range inputs {
+		root := find(index)
+		components[root] = append(components[root], index)
+	}
+	groupNumber := 0
+	for first := range inputs {
+		root := find(first)
+		members := components[root]
+		if len(members) < 2 || members[0] != first {
+			continue
+		}
+		groupNumber++
+		hasSession, hasInference := false, false
+		for leftIndex, left := range members {
+			for _, right := range members[leftIndex+1:] {
+				hasSession = hasSession || sessionEdges[left][right]
+				hasInference = hasInference || inferredEdges[left][right]
+			}
+		}
+		source := "inferred"
+		if hasSession {
+			source = "session"
+		}
+		if hasSession && hasInference {
+			source = "both"
+		}
+		sessionCounts := make(map[int64]int)
+		for _, member := range members {
+			if signal := inputs[member].TeamParticipantID; signal > 0 {
+				sessionCounts[signal]++
+			}
+		}
+		for _, member := range members {
+			signal := inputs[member].TeamParticipantID
+			assignments[member] = livePremadeAssignment{
+				Group: strconv.Itoa(groupNumber), Size: len(members),
+				Source: source, SessionSignal: signal > 0 && sessionCounts[signal] > 1,
+			}
+		}
+	}
+	return assignments
+}
+
+type livePlayerMatchesCacheEntry struct {
+	Matches   []gameplayMatch
+	State     string
+	FetchedAt time.Time
+}
+
+type livePlayerMatchesFlight struct {
+	Done    chan struct{}
+	Matches []gameplayMatch
+	State   string
+}
+
+type livePlayerMatchesResult struct {
+	Matches []gameplayMatch
+	State   string
+}
+
+func liveHistoryState(validRef bool, result livePlayerMatchesResult) string {
+	if !validRef {
+		return "unavailable"
+	}
+	switch result.State {
+	case "ok", "empty", "failed":
+		return result.State
+	default:
+		return "failed"
+	}
+}
+
+func cloneGameplayMatches(matches []gameplayMatch) []gameplayMatch {
+	return append([]gameplayMatch(nil), matches...)
+}
+
+func (a *app) cachedLivePlayerMatches(ctx context.Context, key string, loader func(context.Context) livePlayerMatchesResult) livePlayerMatchesResult {
+	now := time.Now()
+	a.livePlayerMatchesMu.Lock()
+	if cached, ok := a.livePlayerMatchCache[key]; ok {
+		if now.Sub(cached.FetchedAt) < livePlayerMatchesCacheTTL {
+			if element := a.livePlayerMatchEntries[key]; element != nil {
+				a.livePlayerMatchOrder.MoveToFront(element)
+			}
+			a.livePlayerMatchesMu.Unlock()
+			return livePlayerMatchesResult{Matches: cloneGameplayMatches(cached.Matches), State: cached.State}
+		}
+		delete(a.livePlayerMatchCache, key)
+		if element := a.livePlayerMatchEntries[key]; element != nil {
+			a.livePlayerMatchOrder.Remove(element)
+			delete(a.livePlayerMatchEntries, key)
+		}
+	}
+	if flight := a.livePlayerMatchFlights[key]; flight != nil {
+		a.livePlayerMatchesMu.Unlock()
+		select {
+		case <-ctx.Done():
+			return livePlayerMatchesResult{State: "failed"}
+		case <-flight.Done:
+			return livePlayerMatchesResult{Matches: cloneGameplayMatches(flight.Matches), State: flight.State}
+		}
+	}
+	if a.livePlayerMatchCache == nil {
+		a.livePlayerMatchCache = make(map[string]livePlayerMatchesCacheEntry)
+		a.livePlayerMatchOrder = list.New()
+		a.livePlayerMatchEntries = make(map[string]*list.Element)
+		a.livePlayerMatchFlights = make(map[string]*livePlayerMatchesFlight)
+	}
+	flight := &livePlayerMatchesFlight{Done: make(chan struct{})}
+	a.livePlayerMatchFlights[key] = flight
+	a.livePlayerMatchesMu.Unlock()
+
+	loaded := loader(ctx)
+	stored := cloneGameplayMatches(loaded.Matches)
+	a.livePlayerMatchesMu.Lock()
+	// A transient failure is not evidence of an empty history and must not poison
+	// subsequent refreshes for the full cache TTL.
+	if loaded.State != "failed" {
+		a.livePlayerMatchCache[key] = livePlayerMatchesCacheEntry{Matches: stored, State: loaded.State, FetchedAt: time.Now()}
+		if element := a.livePlayerMatchEntries[key]; element != nil {
+			a.livePlayerMatchOrder.MoveToFront(element)
+		} else {
+			a.livePlayerMatchEntries[key] = a.livePlayerMatchOrder.PushFront(key)
+		}
+	}
+	for len(a.livePlayerMatchCache) > livePlayerMatchesCacheMax {
+		oldest := a.livePlayerMatchOrder.Back()
+		if oldest == nil {
+			break
+		}
+		oldestKey, _ := oldest.Value.(string)
+		delete(a.livePlayerMatchCache, oldestKey)
+		delete(a.livePlayerMatchEntries, oldestKey)
+		a.livePlayerMatchOrder.Remove(oldest)
+	}
+	flight.Matches = cloneGameplayMatches(stored)
+	flight.State = loaded.State
+	delete(a.livePlayerMatchFlights, key)
+	close(flight.Done)
+	a.livePlayerMatchesMu.Unlock()
+	return livePlayerMatchesResult{Matches: cloneGameplayMatches(stored), State: loaded.State}
+}
+
+// livePlayerMatches 读取对局页单名玩家的最近战绩：先用本机客户端的
+// 列表接口（轻量），拿不到数据时改走 SGP 网关。最终规范化结果按
+// playerRef + isCurrent 短暂缓存，避免 20 秒自动刷新重复请求。
+func (a *app) livePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string) livePlayerMatchesResult {
+	key := playerRef + "\x00" + strconv.FormatBool(isCurrent)
+	return a.cachedLivePlayerMatches(ctx, key, func(loadCtx context.Context) livePlayerMatchesResult {
+		return a.loadLivePlayerMatches(loadCtx, client, reference, playerRef, isCurrent, names)
+	})
+}
+
+func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string) livePlayerMatchesResult {
+	history, capabilities, _ := loadGameplayHistoryContext(ctx, client, playerRef, isCurrent, 0, 10, false)
+	matches := make([]gameplayMatch, 0, len(history))
+	for _, game := range history {
+		matches = append(matches, normalizeGameplayMatch(game, reference, names, nil))
+	}
+	listFailed := len(capabilities) == 0 || capabilities[0].State != capabilityAvailable
+	fallbackFailed := false
+	if len(matches) == 0 && (listFailed || len(history) == 0) {
+		if a.sgp != nil {
+			_, _, ok := a.sgp.available(client)
+			if ok {
+				infos, _, _, err := a.sgp.matchHistory(ctx, client, playerRef, 0, 10, true)
+				if err == nil {
+					for _, info := range infos {
+						matches = append(matches, convertRiotMatchInfo(info, playerRef, names, nil, "", reference.ServerID))
+					}
+					if len(matches) > 0 {
+						return livePlayerMatchesResult{Matches: matches, State: "ok"}
+					}
+					return livePlayerMatchesResult{Matches: matches, State: "empty"}
+				}
+				fallbackFailed = true
+			}
+		}
+	}
+	if len(matches) > 0 {
+		return livePlayerMatchesResult{Matches: matches, State: "ok"}
+	}
+	if listFailed || fallbackFailed {
+		return livePlayerMatchesResult{State: "failed"}
+	}
+	return livePlayerMatchesResult{State: "empty"}
 }
 
 func loadChampionAbilities(client *LCUClient, championID int64) ([]gameplayChampionAbility, error) {
@@ -4714,13 +6486,15 @@ func mergeChampSelectPlayers(existing []struct {
 				if rawCount > 0 && teamCount >= 5 {
 					continue
 				}
+				pickIntent := positiveChampionPickIntent(selected.ChampionPickIntent)
 				result = append(result, struct {
 					player lcuLivePlayer
 					team   int64
-				}{player: lcuLivePlayer{CellID: selected.CellID, PUUID: visiblePlayerRef, ObfuscatedPUUID: selected.ObfuscatedPUUID, SummonerID: selected.SummonerID, ObfuscatedSummonerID: selected.ObfuscatedSummonerID, ChampionID: selected.ChampionID, ChampionPickIntent: selected.ChampionPickIntent, ChampionLocked: selected.ChampionID > 0, SummonerName: selected.GameName, GameName: selected.GameName, TagLine: selected.TagLine, NameVisibilityType: selected.NameVisibilityType, SelectedPosition: selected.AssignedPosition, Spell1ID: selected.Spell1ID, Spell2ID: selected.Spell2ID}, team: team})
+				}{player: lcuLivePlayer{CellID: selected.CellID, PUUID: visiblePlayerRef, ObfuscatedPUUID: selected.ObfuscatedPUUID, SummonerID: selected.SummonerID, ObfuscatedSummonerID: selected.ObfuscatedSummonerID, ChampionID: selected.ChampionID, ChampionPickIntent: pickIntent, ChampionPickPending: selected.ChampionPickIntent < 0, ChampionLocked: selected.ChampionID > 0, SummonerName: selected.GameName, GameName: selected.GameName, TagLine: selected.TagLine, NameVisibilityType: selected.NameVisibilityType, SelectedPosition: selected.AssignedPosition, Spell1ID: selected.Spell1ID, Spell2ID: selected.Spell2ID}, team: team})
 				continue
 			}
-			result[index].player.ChampionPickIntent = selected.ChampionPickIntent
+			result[index].player.ChampionPickIntent = positiveChampionPickIntent(selected.ChampionPickIntent)
+			result[index].player.ChampionPickPending = selected.ChampionPickIntent < 0
 			if selected.ChampionID > 0 {
 				result[index].player.ChampionID = selected.ChampionID
 				result[index].player.ChampionLocked = true
@@ -5067,13 +6841,46 @@ func runePageName(championName, source string) string {
 	return runePagePrefix + championName + " · " + source
 }
 
+var itemSetTraceIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
+
+func normalizeItemSetTraceID(value string) string {
+	value = strings.TrimSpace(value)
+	if !itemSetTraceIDPattern.MatchString(value) {
+		return ""
+	}
+	return value
+}
+
+func newItemSetTraceID(prefix string) string {
+	prefix = strings.Trim(strings.ToLower(strings.TrimSpace(prefix)), "-_")
+	if prefix == "" {
+		prefix = "trace"
+	}
+	return fmt.Sprintf("%s-%d", prefix, time.Now().UnixNano())
+}
+
+func diagnosticInt64(value string) int64 {
+	n, _ := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	return n
+}
+
 type gameplayItemSetApplyRequest struct {
-	Title        string                        `json:"title"`
-	ChampionID   int64                         `json:"championId"`
-	MapID        int64                         `json:"mapId"`
-	Position     string                        `json:"position"`
-	SelfPosition string                        `json:"selfPosition,omitempty"`
-	Blocks       []gameplayItemSetBlockRequest `json:"blocks"`
+	Storage           string                        `json:"storage,omitempty"`
+	Title             string                        `json:"title"`
+	ChampionID        int64                         `json:"championId"`
+	MapID             int64                         `json:"mapId"`
+	Position          string                        `json:"position"`
+	SelfPosition      string                        `json:"selfPosition,omitempty"`
+	TraceID           string                        `json:"traceId,omitempty"`
+	RecommendationKey string                        `json:"recommendationKey,omitempty"`
+	RequestedPosition string                        `json:"requestedPosition,omitempty"`
+	ResolvedPosition  string                        `json:"resolvedPosition,omitempty"`
+	PositionSource    string                        `json:"positionSource,omitempty"`
+	GameID            int64                         `json:"gameId,omitempty"`
+	QueueID           int64                         `json:"queueId,omitempty"`
+	GameMode          string                        `json:"gameMode,omitempty"`
+	Tier              string                        `json:"tier,omitempty"`
+	Blocks            []gameplayItemSetBlockRequest `json:"blocks"`
 }
 
 type gameplayItemSetBlockRequest struct {
@@ -5082,8 +6889,39 @@ type gameplayItemSetBlockRequest struct {
 }
 
 type gameplayItemSetItemRequest struct {
-	ID    int64 `json:"id"`
-	Count int   `json:"count"`
+	ID            int64 `json:"id"`
+	Count         int   `json:"count"`
+	OriginalIndex int   `json:"-"`
+	PriceTotal    int64 `json:"-"`
+}
+
+var gameplayItemSetPurchasableReplacements = map[int64]int64{
+	3040: 3003,
+	3042: 3004,
+}
+
+type gameplayItemSetNormalization struct {
+	WriteTrace                  *itemSetWriteTrace
+	RequestedBlocks             []itemSetDiagnosticBlock
+	SortedBlocks                []itemSetDiagnosticBlock
+	WrittenBlocks               []itemSetDiagnosticBlock
+	ReadbackBlocks              []itemSetDiagnosticBlock
+	ItemMapping                 []itemSetItemMapping
+	RequestedOrderDigest        string
+	SortedOrderDigest           string
+	WrittenOrderDigest          string
+	ReadbackOrderDigest         string
+	ReadbackOrderMatch          bool
+	Storage                     string
+	LegacyCleanupFailed         bool
+	NormalizedCount             int
+	UnpurchasableCount          int
+	UnmappedItemIDs             []int64
+	RequestedItemCount          int
+	WrittenItemCount            int
+	WrittenBlockStats           []map[string]any
+	RemovedStaleCount           int
+	UpgradeReplacementCollapsed bool
 }
 
 type lcuItemSetDocument map[string]json.RawMessage
@@ -5121,7 +6959,42 @@ type lcuPreferredItemSlot struct {
 
 func (a *app) handleGameplayItemSetApply(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
-	var request gameplayItemSetApplyRequest
+	request := gameplayItemSetApplyRequest{}
+	normalization := gameplayItemSetNormalization{}
+	traceID := newItemSetTraceID("apply")
+	applyStage := "decode"
+	phase := ""
+	uid := ""
+	title := ""
+	stored := false
+	requestedItemCount := 0
+	defer func() {
+		event := map[string]any{
+			"event": "item_set_apply", "diagnostic_schema": 2, "trace_id": traceID,
+			"recommendation_key": truncateClientDiagnosticText(request.RecommendationKey),
+			"champion_id":        request.ChampionID, "uid": uid, "position": request.Position,
+			"requested_position": strings.ToLower(strings.TrimSpace(request.RequestedPosition)),
+			"resolved_position":  strings.ToLower(strings.TrimSpace(request.ResolvedPosition)),
+			"position_source":    truncateClientDiagnosticText(request.PositionSource),
+			"self_position":      strings.ToLower(strings.TrimSpace(request.SelfPosition)),
+			"game_id":            request.GameID, "queue_id": request.QueueID, "map_id": request.MapID,
+			"game_mode": strings.ToUpper(strings.TrimSpace(request.GameMode)), "tier": truncateClientDiagnosticText(request.Tier),
+			"requested_blocks": normalization.RequestedBlocks, "sorted_blocks": normalization.SortedBlocks,
+			"written_blocks": normalization.WrittenBlocks, "readback_blocks": normalization.ReadbackBlocks,
+			"requested_order_digest": normalization.RequestedOrderDigest, "sorted_order_digest": normalization.SortedOrderDigest,
+			"written_order_digest": normalization.WrittenOrderDigest, "readback_order_digest": normalization.ReadbackOrderDigest,
+			"readback_order_match": normalization.ReadbackOrderMatch, "item_mapping": normalization.ItemMapping,
+			"blocks": normalization.WrittenBlockStats, "block_count": len(normalization.WrittenBlocks), "item_count": normalization.WrittenItemCount,
+			"requested_item_count": requestedItemCount, "normalized_count": normalization.NormalizedCount,
+			"unpurchasable_count": normalization.UnpurchasableCount, "removed_stale_count": normalization.RemovedStaleCount,
+			"storage": normalization.Storage, "legacy_cleanup_failed": normalization.LegacyCleanupFailed,
+			"phase": phase, "duration_ms": time.Since(started).Milliseconds(), "stored": stored,
+			"apply_stage": applyStage, "write_trace": normalization.WriteTrace, "requested_storage": request.Storage,
+			"game_render_geometry": "unobservable", "game_loaded_recommendation": "unknown",
+		}
+		a.recordDiagnostic(event)
+	}()
+
 	r.Body = http.MaxBytesReader(w, r.Body, 32*1024)
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
@@ -5129,33 +7002,46 @@ func (a *app) handleGameplayItemSetApply(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "装备方案无效", http.StatusBadRequest)
 		return
 	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		http.Error(w, "装备方案无效", http.StatusBadRequest)
+		return
+	}
+	if normalized := normalizeItemSetTraceID(request.TraceID); normalized != "" {
+		traceID = normalized
+	}
+	request.TraceID = traceID
+	request.RecommendationKey = truncateClientDiagnosticText(request.RecommendationKey)
+	request.RequestedPosition = truncateClientDiagnosticText(request.RequestedPosition)
+	request.ResolvedPosition = truncateClientDiagnosticText(request.ResolvedPosition)
+	request.PositionSource = truncateClientDiagnosticText(request.PositionSource)
+	request.GameMode = truncateClientDiagnosticText(request.GameMode)
+	request.Tier = truncateClientDiagnosticText(request.Tier)
+	applyStage = "validate-storage"
+	if request.Storage != "" && request.Storage != "recommended" {
+		http.Error(w, "装备方案写入方式无效", http.StatusBadRequest)
+		return
+	}
+	applyStage = "validate-position"
 	position, err := normalizeGameplayItemSetPosition(request.Position)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	request.Position = position
+	uid = itemSetUID(request.ChampionID, request.Position)
+	applyStage = "validate-payload"
 	if err := validateGameplayItemSetRequest(request); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	blockStats := make([]map[string]any, 0, len(request.Blocks))
-	itemCount := 0
 	for _, block := range request.Blocks {
-		itemCount += len(block.Items)
-		blockStats = append(blockStats, map[string]any{"type": strings.TrimSpace(block.Type), "count": len(block.Items)})
+		requestedItemCount += len(block.Items)
 	}
-	verified := false
-	phase := ""
-	uid := itemSetUID(request.ChampionID, request.Position)
-	defer func() {
-		a.recordDiagnostic(map[string]any{
-			"event": "item_set_apply", "champion_id": request.ChampionID, "uid": uid,
-			"position": request.Position, "self_position": strings.ToLower(strings.TrimSpace(request.SelfPosition)),
-			"blocks": blockStats, "block_count": len(request.Blocks), "item_count": itemCount,
-			"phase": phase, "duration_ms": time.Since(started).Milliseconds(), "verified": verified,
-		})
-	}()
+	normalization.RequestedBlocks = diagnosticBlocksFromRequest(request.Blocks)
+	normalization.RequestedOrderDigest = itemSetOrderDigest(normalization.RequestedBlocks)
+
+	applyStage = "client-context"
 	client, current, err := a.gameplayClient()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
@@ -5167,28 +7053,65 @@ func (a *app) handleGameplayItemSetApply(w http.ResponseWriter, r *http.Request)
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 18*time.Second)
 	defer cancel()
-	if err := validateGameplayItemSetContext(ctx, client, current, request.ChampionID); err != nil {
+	applyStage = "champ-select-guard"
+	observedPhase, err := validateGameplayItemSetContextPhase(ctx, client, current, request.ChampionID)
+	phase = observedPhase
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-	phase = "ChampSelect"
 
 	a.itemSetMu.Lock()
 	defer a.itemSetMu.Unlock()
-	sortGameplayItemSetBlocksByPrice(request.Blocks, a.gameplayItemPrices(ctx, client))
-	uid, title, err := applyGameplayItemSet(ctx, client, current, request, func() error {
+	prices := a.gameplayItemPrices(ctx, client)
+	sortGameplayItemSetBlocksByPrice(request.Blocks, prices)
+	normalization.SortedBlocks = diagnosticBlocksFromRequest(request.Blocks)
+	normalization.SortedOrderDigest = itemSetOrderDigest(normalization.SortedBlocks)
+	var itemPurchasable map[int64]bool
+	if a.champions != nil {
+		itemPurchasable = a.champions.itemPurchasabilitySnapshot()
+	}
+	apply := applyGameplayItemSet
+	if request.Storage == "recommended" {
+		apply = applyRecommendedItemSet
+	}
+	applyStage = "apply"
+	uid, title, appliedNormalization, err := apply(ctx, client, current, request, itemPurchasable, func() error {
 		latestClient, latestCurrent, latestErr := a.gameplayClient()
 		if latestErr != nil || latestClient != client || gameplaySummonerChanged(current, latestCurrent) || (current.AccountID > 0 && latestCurrent.AccountID > 0 && current.AccountID != latestCurrent.AccountID) {
 			return errors.New("客户端账号已发生变化，已停止应用装备方案")
 		}
 		return validateGameplayItemSetContext(ctx, client, latestCurrent, request.ChampionID)
 	})
+	appliedNormalization.RequestedBlocks = normalization.RequestedBlocks
+	appliedNormalization.SortedBlocks = normalization.SortedBlocks
+	appliedNormalization.RequestedOrderDigest = normalization.RequestedOrderDigest
+	appliedNormalization.SortedOrderDigest = normalization.SortedOrderDigest
+	normalization = appliedNormalization
+	for _, itemID := range normalization.UnmappedItemIDs {
+		a.recordDiagnostic(map[string]any{"event": "item_set_unmapped_item", "diagnostic_schema": 2, "trace_id": traceID, "id": itemID, "champion_id": request.ChampionID})
+	}
 	if err != nil {
+		applyStage = itemSetFailureStage(err, "apply-failed")
+		if normalization.WriteTrace != nil {
+			applyStage = normalization.WriteTrace.Stage
+		}
 		http.Error(w, "装备方案应用失败："+safeGameplayError(err), http.StatusConflict)
 		return
 	}
-	verified = true
-	respondJSON(w, map[string]any{"applied": true, "verified": true, "uid": uid, "title": title})
+	stored = true
+	applyStage = "completed"
+	if normalization.LegacyCleanupFailed {
+		applyStage = "completed-with-legacy-warning"
+	}
+	result := map[string]any{"applied": true, "stored": true, "uid": uid, "title": title, "storage": normalization.Storage, "traceId": traceID}
+	if normalization.LegacyCleanupFailed {
+		result["notice"] = "推荐文件已写入，旧 DL 方案未能清理"
+	}
+	if normalization.UpgradeReplacementCollapsed && !normalization.LegacyCleanupFailed {
+		result["notice"] = "炽天使之拥等升级形态已替换为可购买的原始装备（大天使之杖），游戏内叠满后自动升级"
+	}
+	respondJSON(w, result)
 }
 
 func normalizeGameplayItemSetPosition(value string) (string, error) {
@@ -5235,13 +7158,27 @@ func validateGameplayItemSetRequest(request gameplayItemSetApplyRequest) error {
 }
 
 func validateGameplayItemSetContext(ctx context.Context, client *LCUClient, current Summoner, championID int64) error {
+	_, err := validateGameplayItemSetContextPhase(ctx, client, current, championID)
+	return err
+}
+
+// Report the gameflow phase actually observed alongside the guard result. The
+// apply diagnostic used to record a hardcoded "ChampSelect" after this guard
+// passed, which made the field tautological: it could never show the phase a
+// rejected apply was really in. Callers log the returned value instead. An
+// empty string means the endpoint could not be read at all.
+func validateGameplayItemSetContextPhase(ctx context.Context, client *LCUClient, current Summoner, championID int64) (string, error) {
 	var phase string
-	if err := client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/gameflow-phase", nil, &phase); err != nil || phase != "ChampSelect" {
-		return errors.New("只能在英雄选择阶段应用装备方案")
+	if err := client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/gameflow-phase", nil, &phase); err != nil {
+		return "", errors.New("只能在英雄选择阶段应用装备方案")
+	}
+	observed := strings.TrimSpace(phase)
+	if observed != "ChampSelect" {
+		return observed, errors.New("只能在英雄选择阶段应用装备方案")
 	}
 	var session lcuChampSelectSession
 	if err := client.RequestJSON(ctx, http.MethodGet, "/lol-champ-select/v1/session", nil, &session); err != nil {
-		return errors.New("无法确认当前英雄选择")
+		return observed, errors.New("无法确认当前英雄选择")
 	}
 	currentReference := gameplayReferenceFromSummoner(current)
 	for _, player := range session.MyTeam {
@@ -5258,11 +7195,11 @@ func validateGameplayItemSetContext(ctx context.Context, client *LCUClient, curr
 			selectedChampionID = player.ChampionPickIntent
 		}
 		if selectedChampionID <= 0 || selectedChampionID != championID {
-			return errors.New("当前选择的英雄已经变化，已停止应用装备方案")
+			return observed, errors.New("当前选择的英雄已经变化，已停止应用装备方案")
 		}
-		return nil
+		return observed, nil
 	}
-	return errors.New("英雄选择中没有找到当前账号")
+	return observed, errors.New("英雄选择中没有找到当前账号")
 }
 
 func (a *app) gameplayItemPrices(ctx context.Context, client *LCUClient) map[int64]int64 {
@@ -5300,22 +7237,21 @@ func (a *app) gameplayItemPrices(ctx context.Context, client *LCUClient) map[int
 }
 
 func sortGameplayItemSetBlocksByPrice(blocks []gameplayItemSetBlockRequest, prices map[int64]int64) {
-	if len(prices) == 0 {
-		return
-	}
 	for blockIndex := range blocks {
 		items := blocks[blockIndex].Items
 		knownIndexes := make([]int, 0, len(items))
 		knownItems := make([]gameplayItemSetItemRequest, 0, len(items))
-		for itemIndex, item := range items {
-			if prices[item.ID] <= 0 {
+		for itemIndex := range items {
+			items[itemIndex].OriginalIndex = itemIndex
+			items[itemIndex].PriceTotal = prices[items[itemIndex].ID]
+			if items[itemIndex].PriceTotal <= 0 {
 				continue
 			}
 			knownIndexes = append(knownIndexes, itemIndex)
-			knownItems = append(knownItems, item)
+			knownItems = append(knownItems, items[itemIndex])
 		}
 		sort.SliceStable(knownItems, func(left, right int) bool {
-			return prices[knownItems[left].ID] < prices[knownItems[right].ID]
+			return knownItems[left].PriceTotal < knownItems[right].PriceTotal
 		})
 		for index, itemIndex := range knownIndexes {
 			items[itemIndex] = knownItems[index]
@@ -5323,49 +7259,102 @@ func sortGameplayItemSetBlocksByPrice(blocks []gameplayItemSetBlockRequest, pric
 	}
 }
 
-func applyGameplayItemSet(ctx context.Context, client *LCUClient, current Summoner, request gameplayItemSetApplyRequest, beforeWrite func() error) (string, string, error) {
+func applyGameplayItemSet(ctx context.Context, client *LCUClient, current Summoner, request gameplayItemSetApplyRequest, itemPurchasable map[int64]bool, beforeWrite func() error) (string, string, gameplayItemSetNormalization, error) {
 	path := fmt.Sprintf("/lol-item-sets/v1/item-sets/%d/sets", current.SummonerID)
 	var document lcuItemSetDocument
 	if err := client.RequestJSON(ctx, http.MethodGet, path, nil, &document); err != nil {
-		return "", "", err
+		return "", "", gameplayItemSetNormalization{}, err
 	}
 	if current.AccountID > 0 {
 		if rawAccountID, ok := document["accountId"]; ok {
 			var accountID int64
 			if err := json.Unmarshal(rawAccountID, &accountID); err != nil || (accountID > 0 && accountID != current.AccountID) {
-				return "", "", errors.New("客户端装备方案属于另一个账号")
+				return "", "", gameplayItemSetNormalization{}, errors.New("客户端装备方案属于另一个账号")
 			}
 		}
 	}
-	itemSet := newLCUItemSet(request)
-	if err := upsertLCUItemSet(document, itemSet); err != nil {
-		return "", "", err
+	itemSet, normalization := newLCUItemSet(request, itemPurchasable)
+	normalization.Storage = "lcu"
+	normalization.WrittenBlockStats, normalization.WrittenItemCount = itemSetStats(itemSet)
+	removedStaleCount, err := upsertLCUItemSetWithCount(document, itemSet)
+	normalization.RemovedStaleCount = removedStaleCount
+	if err != nil {
+		return "", "", normalization, err
 	}
 	if beforeWrite != nil {
 		if err := beforeWrite(); err != nil {
-			return "", "", err
+			return "", "", normalization, err
 		}
 	}
 	if err := client.RequestJSON(ctx, http.MethodPut, path, document, nil); err != nil {
-		return "", "", err
+		return "", "", normalization, err
 	}
 	var verifiedDocument lcuItemSetDocument
 	if err := client.RequestJSON(ctx, http.MethodGet, path, nil, &verifiedDocument); err != nil {
-		return "", "", errors.New("客户端没有返回写入后的装备方案")
+		return "", "", normalization, errors.New("客户端没有返回写入后的装备方案")
 	}
 	verified, found, err := findLCUItemSet(verifiedDocument, itemSet.UID)
-	if err != nil || !found || !sameLCUItemSet(itemSet, verified) {
-		return "", "", errors.New("客户端未能确认装备方案写入结果")
+	if found {
+		normalization.ReadbackBlocks = diagnosticBlocksFromLCU(verified.Blocks)
+		normalization.ReadbackOrderDigest = itemSetOrderDigest(normalization.ReadbackBlocks)
+		normalization.ReadbackOrderMatch = normalization.WrittenOrderDigest == normalization.ReadbackOrderDigest
 	}
-	return itemSet.UID, itemSet.Title, nil
+	if err != nil || !found || !sameLCUItemSet(itemSet, verified) || !normalization.ReadbackOrderMatch {
+		return "", "", normalization, errors.New("客户端未能确认装备方案写入结果")
+	}
+	return itemSet.UID, itemSet.Title, normalization, nil
 }
 
-func newLCUItemSet(request gameplayItemSetApplyRequest) lcuItemSet {
+func newLCUItemSet(request gameplayItemSetApplyRequest, itemPurchasable map[int64]bool) (lcuItemSet, gameplayItemSetNormalization) {
 	blocks := make([]lcuItemSetBlock, 0, len(request.Blocks))
+	normalization := gameplayItemSetNormalization{}
 	for _, source := range request.Blocks {
+		normalization.RequestedItemCount += len(source.Items)
+	}
+	unmapped := make(map[int64]struct{})
+	for blockIndex, source := range request.Blocks {
 		items := make([]lcuItemSetItem, 0, len(source.Items))
-		for _, item := range source.Items {
-			items = append(items, lcuItemSetItem{ID: strconv.FormatInt(item.ID, 10), Count: item.Count})
+		seen := make(map[int64]struct{}, len(source.Items))
+		for sortedIndex, item := range source.Items {
+			itemID := item.ID
+			mapping := itemSetItemMapping{
+				BlockIndex: blockIndex, RequestedIndex: item.OriginalIndex, SortedIndex: sortedIndex, WrittenIndex: -1,
+				RequestedID: item.ID, NormalizedID: item.ID, Count: item.Count, Price: item.PriceTotal, PriceKnown: item.PriceTotal > 0,
+				Result: "written",
+			}
+			if replacement, ok := gameplayItemSetPurchasableReplacements[itemID]; ok {
+				itemID = replacement
+				mapping.NormalizedID = replacement
+				mapping.Result = "replaced-written"
+				mapping.Reason = "upgrade-replacement"
+				normalization.NormalizedCount++
+				normalization.UnpurchasableCount++
+			} else if purchasable, known := itemPurchasable[itemID]; known && !purchasable {
+				mapping.Result = "written-unpurchasable"
+				mapping.Reason = "no-safe-replacement"
+				normalization.UnpurchasableCount++
+				if _, recorded := unmapped[itemID]; !recorded {
+					unmapped[itemID] = struct{}{}
+					normalization.UnmappedItemIDs = append(normalization.UnmappedItemIDs, itemID)
+				}
+			}
+			if _, duplicate := seen[itemID]; duplicate {
+				mapping.Result = "duplicate-dropped"
+				if itemID != item.ID {
+					mapping.Reason = "replacement-duplicate"
+				} else {
+					mapping.Reason = "normalized-duplicate"
+				}
+				if itemID != item.ID && strings.Contains(strings.TrimSpace(source.Type), "核心") {
+					normalization.UpgradeReplacementCollapsed = true
+				}
+				normalization.ItemMapping = append(normalization.ItemMapping, mapping)
+				continue
+			}
+			seen[itemID] = struct{}{}
+			mapping.WrittenIndex = len(items)
+			normalization.ItemMapping = append(normalization.ItemMapping, mapping)
+			items = append(items, lcuItemSetItem{ID: strconv.FormatInt(itemID, 10), Count: item.Count})
 		}
 		blocks = append(blocks, lcuItemSetBlock{Type: strings.TrimSpace(source.Type), Items: items})
 	}
@@ -5373,70 +7362,90 @@ func newLCUItemSet(request gameplayItemSetApplyRequest) lcuItemSet {
 	if request.MapID > 0 {
 		associatedMaps = append(associatedMaps, request.MapID)
 	}
-	return lcuItemSet{
-		UID: itemSetUID(request.ChampionID, request.Position), Title: itemSetName(request.Title), Type: "custom", Map: "any", Mode: "any",
-		StartedFrom: "DL", AssociatedChampions: []int64{request.ChampionID}, AssociatedMaps: associatedMaps,
+	set := lcuItemSet{
+		UID: itemSetUID(request.ChampionID, request.Position), Title: itemSetName(request.Position), Type: "custom", Map: "any", Mode: "any",
+		StartedFrom: "DL", SortRank: 100, AssociatedChampions: []int64{request.ChampionID}, AssociatedMaps: associatedMaps,
 		Blocks: blocks, PreferredItemSlots: []lcuPreferredItemSlot{},
 	}
+	normalization.WrittenBlocks = diagnosticBlocksFromLCU(set.Blocks)
+	normalization.WrittenOrderDigest = itemSetOrderDigest(normalization.WrittenBlocks)
+	return set, normalization
+}
+
+func itemSetStats(itemSet lcuItemSet) ([]map[string]any, int) {
+	stats := make([]map[string]any, 0, len(itemSet.Blocks))
+	count := 0
+	for _, block := range itemSet.Blocks {
+		count += len(block.Items)
+		stats = append(stats, map[string]any{"type": strings.TrimSpace(block.Type), "count": len(block.Items)})
+	}
+	return stats, count
 }
 
 func itemSetUID(championID int64, position string) string {
 	return fmt.Sprintf("deep-legends-v1-%d-%s", championID, position)
 }
 
-func itemSetName(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		value = "推荐出装"
+func itemSetName(position string) string {
+	label := map[string]string{
+		"top": "上路", "jungle": "打野", "middle": "中路", "bottom": "下路", "utility": "辅助", "other": "通用",
+	}[strings.ToLower(strings.TrimSpace(position))]
+	if label == "" {
+		label = "通用"
 	}
-	value = "DL · " + value
-	runes := []rune(value)
-	if len(runes) > 60 {
-		value = string(runes[:60])
-	}
-	return value
+	return "DL · " + label
 }
 
 func upsertLCUItemSet(document lcuItemSetDocument, itemSet lcuItemSet) error {
+	_, err := upsertLCUItemSetWithCount(document, itemSet)
+	return err
+}
+
+func upsertLCUItemSetWithCount(document lcuItemSetDocument, itemSet lcuItemSet) (int, error) {
 	rawSets, ok := document["itemSets"]
 	if !ok {
-		return errors.New("客户端装备方案结构不受支持")
+		return 0, errors.New("客户端装备方案结构不受支持")
 	}
 	var sets []json.RawMessage
 	if err := json.Unmarshal(rawSets, &sets); err != nil || sets == nil {
-		return errors.New("客户端装备方案结构不受支持")
+		return 0, errors.New("客户端装备方案结构不受支持")
 	}
 	encoded, err := json.Marshal(itemSet)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	found := -1
-	for index, rawSet := range sets {
+	cleaned := make([]json.RawMessage, 0, len(sets)+1)
+	found := false
+	removed := 0
+	for _, rawSet := range sets {
 		var metadata struct {
-			UID string `json:"uid"`
+			UID         string `json:"uid"`
+			StartedFrom string `json:"startedFrom"`
 		}
 		if err := json.Unmarshal(rawSet, &metadata); err != nil || strings.TrimSpace(string(rawSet)) == "null" {
-			return errors.New("客户端装备方案集合包含无法识别的数据")
+			return 0, errors.New("客户端装备方案集合包含无法识别的数据")
 		}
-		if metadata.UID != itemSet.UID {
+		ownedByDeepLegends := strings.HasPrefix(metadata.UID, "deep-legends-v1-") || strings.EqualFold(strings.TrimSpace(metadata.StartedFrom), "DL")
+		if !ownedByDeepLegends {
+			cleaned = append(cleaned, rawSet)
 			continue
 		}
-		if found >= 0 {
-			return errors.New("客户端存在重复的 Deep Legends 装备方案")
+		if metadata.UID == itemSet.UID && !found {
+			cleaned = append(cleaned, encoded)
+			found = true
+			continue
 		}
-		found = index
+		removed++
 	}
-	if found >= 0 {
-		sets[found] = encoded
-	} else {
-		sets = append(sets, encoded)
+	if !found {
+		cleaned = append(cleaned, encoded)
 	}
-	encodedSets, err := json.Marshal(sets)
+	encodedSets, err := json.Marshal(cleaned)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	document["itemSets"] = encodedSets
-	return nil
+	return removed, nil
 }
 
 func findLCUItemSet(document lcuItemSetDocument, uid string) (lcuItemSet, bool, error) {
@@ -5987,6 +7996,12 @@ func normalizeAugmentIconPaths(path string) (string, string) {
 		return "", ""
 	}
 	lower := strings.ToLower(path)
+	if strings.HasSuffix(lower, "/cherry/augments/icons/drop_bear_small.png") || strings.HasSuffix(lower, "/cherry/augments/icons/drop_bear_large.png") {
+		// Verified in the actual game asset directory: no _large file; the
+		// unsuffixed artwork is colored, whereas _small is a monochrome glyph.
+		directory := path[:strings.LastIndex(path, "/")+1]
+		return directory + "drop_bear.png", directory + "drop_bear_small.png"
+	}
 	const suffix = "_small.png"
 	if !strings.HasSuffix(lower, suffix) {
 		return path, ""
@@ -6195,6 +8210,14 @@ func (a *app) fallbackGameplayPerks(ctx context.Context) ([]gameplayPerkStyle, [
 }
 
 func loadQueueLabels(client *LCUClient) map[int64]string {
+	if client == nil {
+		return map[int64]string{}
+	}
+	client.queueLabelsMu.Lock()
+	defer client.queueLabelsMu.Unlock()
+	if client.queueLabelsLoaded {
+		return cloneQueueLabels(client.queueLabels)
+	}
 	var queues []struct {
 		ID        int64  `json:"id"`
 		Name      string `json:"name"`
@@ -6211,6 +8234,16 @@ func loadQueueLabels(client *LCUClient) map[int64]string {
 				result[queue.ID] = name
 			}
 		}
+		client.queueLabels = cloneQueueLabels(result)
+		client.queueLabelsLoaded = true
+	}
+	return result
+}
+
+func cloneQueueLabels(labels map[int64]string) map[int64]string {
+	result := make(map[int64]string, len(labels))
+	for queueID, label := range labels {
+		result[queueID] = label
 	}
 	return result
 }
@@ -6244,11 +8277,11 @@ func queueModeGroupForLabel(queueID int64, gameMode string, mapID int64, label s
 	label = strings.TrimSpace(label)
 	labelLower := strings.ToLower(label)
 	switch {
-	case mode == "ARAM_MAYHEM_CLASSIC" || strings.Contains(label, "经典模式版") || (strings.Contains(labelLower, "classic") && (strings.Contains(labelLower, "mayhem") || strings.Contains(labelLower, "hextech aram"))):
+	case mode == gameModeARAMMayhemClassic || strings.Contains(label, "经典模式版") || (strings.Contains(labelLower, "classic") && (strings.Contains(labelLower, "mayhem") || strings.Contains(labelLower, "hextech aram"))):
 		return "hextech-classic"
 	case strings.Contains(label, "海选赛") || (strings.Contains(labelLower, "qualifier") && (strings.Contains(labelLower, "mayhem") || strings.Contains(labelLower, "hextech aram"))):
 		return "hextech-qualifier"
-	case (mode == "KIWI" || mode == "ARAM_MAYHEM") && (mapID == 0 || mapID == 12):
+	case (mode == gameModeKIWI || mode == gameModeARAMMayhem) && (mapID == 0 || mapID == 12):
 		return "hextech-aram"
 	}
 	if definition, ok := supportedQueueDefinition(queueID); ok {
@@ -6436,7 +8469,17 @@ func championName(names map[int64]string, id int64) string {
 	if id > 0 {
 		return fmt.Sprintf("英雄 %d", id)
 	}
+	if id < 0 {
+		return "随机待定"
+	}
 	return "未知英雄"
+}
+
+func positiveChampionPickIntent(value int64) int64 {
+	if value > 0 {
+		return value
+	}
+	return 0
 }
 func ratio(numerator, denominator int) float64 {
 	if denominator <= 0 {

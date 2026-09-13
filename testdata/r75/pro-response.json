@@ -1,0 +1,268 @@
+{
+  "pros": [
+    {
+      "key": "pro-117030752644841632-8",
+      "title": "T1 Faker",
+      "championId": 69,
+      "championName": "魔蛇之拥",
+      "primaryStyleId": 8200,
+      "subStyleId": 8000,
+      "selectedPerkIds": [
+        8992,
+        8226,
+        8234,
+        8237,
+        9105,
+        8017,
+        5008,
+        5010,
+        5011
+      ],
+      "statModIds": [
+        5008,
+        5010,
+        5011
+      ],
+      "itemIds": [
+        6657,
+        3116,
+        3157,
+        3364,
+        3137,
+        1058,
+        2139
+      ],
+      "stats": {
+        "pickRate": null,
+        "winRate": null,
+        "games": null
+      },
+      "playerName": "Faker",
+      "playedAt": 1788682178147,
+      "result": "win",
+      "opponentChampionId": 163,
+      "opponentChampionName": "岩雀",
+      "opponentPlayerName": "DK ShowMaker",
+      "position": "中路",
+      "sourceKey": "pro",
+      "eventLabel": "LCK · 2026-09-06 · DK vs T1 第 1 局",
+      "winKnown": true,
+      "win": true,
+      "selectedComplete": true,
+      "recordGames": 1,
+      "recordWins": 1,
+      "recordPartial": true
+    },
+    {
+      "key": "pro-117030752644841611-8",
+      "title": "HLE Zeka",
+      "championId": 69,
+      "championName": "魔蛇之拥",
+      "primaryStyleId": 8200,
+      "subStyleId": 8300,
+      "selectedPerkIds": [
+        8992,
+        8226,
+        8234,
+        8237,
+        8313,
+        8347,
+        5008,
+        5011
+      ],
+      "statModIds": [
+        0,
+        0,
+        0
+      ],
+      "itemIds": [
+        6657,
+        3020,
+        3152,
+        3116,
+        3363,
+        3041
+      ],
+      "stats": {
+        "pickRate": null,
+        "winRate": null,
+        "games": null
+      },
+      "playerName": "Zeka",
+      "playedAt": 1788346003104,
+      "result": "win",
+      "opponentChampionId": 61,
+      "opponentChampionName": "发条魔灵",
+      "opponentPlayerName": "T1 Faker",
+      "position": "中路",
+      "sourceKey": "pro",
+      "eventLabel": "LCK · 2026-09-02 · T1 vs HLE 第 4 局",
+      "winKnown": true,
+      "win": true,
+      "selectedComplete": false,
+      "recordGames": 2,
+      "recordWins": 2,
+      "recordPartial": true
+    },
+    {
+      "key": "pro-115548147900553482-8",
+      "title": "HLE Zeka",
+      "championId": 69,
+      "championName": "魔蛇之拥",
+      "primaryStyleId": 8200,
+      "subStyleId": 8000,
+      "selectedPerkIds": [
+        8992,
+        8226,
+        8234,
+        8237,
+        9105,
+        8017,
+        5008,
+        5010,
+        5011
+      ],
+      "statModIds": [
+        5008,
+        5010,
+        5011
+      ],
+      "itemIds": [
+        6657,
+        3116,
+        6653,
+        3364
+      ],
+      "stats": {
+        "pickRate": null,
+        "winRate": null,
+        "games": null
+      },
+      "playerName": "Zeka",
+      "playedAt": 1787472464168,
+      "result": "win",
+      "opponentChampionId": 61,
+      "opponentChampionName": "发条魔灵",
+      "opponentPlayerName": "T1 Faker",
+      "position": "中路",
+      "sourceKey": "pro",
+      "eventLabel": "LCK · 2026-08-23 · T1 vs HLE 第 1 局",
+      "winKnown": true,
+      "win": true,
+      "selectedComplete": true,
+      "recordGames": 2,
+      "recordWins": 2,
+      "recordPartial": true
+    },
+    {
+      "key": "pro-115548147900684587-3",
+      "title": "DK ShowMaker",
+      "championId": 69,
+      "championName": "魔蛇之拥",
+      "primaryStyleId": 8200,
+      "subStyleId": 8000,
+      "selectedPerkIds": [
+        8992,
+        8226,
+        8234,
+        8237,
+        8009,
+        8017,
+        5008,
+        5010,
+        5011
+      ],
+      "statModIds": [
+        5008,
+        5010,
+        5011
+      ],
+      "itemIds": [
+        1082,
+        6657,
+        3363,
+        3152,
+        8010,
+        1058
+      ],
+      "stats": {
+        "pickRate": null,
+        "winRate": null,
+        "games": null
+      },
+      "playerName": "ShowMaker",
+      "playedAt": 1787389358157,
+      "result": "win",
+      "opponentChampionId": 61,
+      "opponentChampionName": "发条魔灵",
+      "opponentPlayerName": "GEN Chovy",
+      "position": "中路",
+      "sourceKey": "pro",
+      "eventLabel": "LCK · 2026-08-22 · GEN vs DK 第 2 局",
+      "winKnown": true,
+      "win": true,
+      "selectedComplete": true,
+      "recordGames": 1,
+      "recordWins": 1,
+      "recordPartial": true
+    },
+    {
+      "key": "pro-115548147900619023-3",
+      "title": "GEN Chovy",
+      "championId": 69,
+      "championName": "魔蛇之拥",
+      "primaryStyleId": 8200,
+      "subStyleId": 8000,
+      "selectedPerkIds": [
+        8992,
+        8226,
+        8234,
+        8237,
+        9105,
+        8017,
+        5008,
+        5010,
+        5011
+      ],
+      "statModIds": [
+        5008,
+        5010,
+        5011
+      ],
+      "itemIds": [
+        3363,
+        6657,
+        3152,
+        3116,
+        3157,
+        3108
+      ],
+      "stats": {
+        "pickRate": null,
+        "winRate": null,
+        "games": null
+      },
+      "playerName": "Chovy",
+      "playedAt": 1786622758572,
+      "result": "win",
+      "opponentChampionId": 61,
+      "opponentChampionName": "发条魔灵",
+      "opponentPlayerName": "HLE Zeka",
+      "position": "中路",
+      "sourceKey": "pro",
+      "eventLabel": "LCK · 2026-08-13 · HLE vs GEN 第 2 局",
+      "winKnown": true,
+      "win": true,
+      "selectedComplete": true,
+      "recordGames": 1,
+      "recordWins": 1,
+      "recordPartial": true
+    }
+  ],
+  "reason": "network-unavailable",
+  "preparing": false,
+  "outcomesLoading": true,
+  "stale": true,
+  "readAt": "0001-01-01T00:00:00Z",
+  "failedGames": 1
+}

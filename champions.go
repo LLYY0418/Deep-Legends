@@ -85,6 +85,7 @@ type championProvider struct {
 	mu                sync.Mutex
 	patch             string
 	static            map[string]championAssetDescription
+	itemPurchasable   map[int64]bool
 	championKeys      map[string]string
 	championIDs       map[string]int
 	championMeta      map[int]championMetadata
@@ -104,7 +105,7 @@ type championProvider struct {
 	// ID. Riot ships no description for these, so the page is the only source;
 	// caching the parsed text keeps repeat renders free.
 	augmentCopyMu       sync.Mutex
-	augmentCopy         map[int]string
+	augmentCopy         map[int]augmentCopyCacheEntry
 	augmentSlugs        map[int]string
 	augmentSlugsRetryAt time.Time
 	// Keep the last valid augment catalog in memory so a transient empty
@@ -116,6 +117,11 @@ type championProvider struct {
 	// Keeping it as a callback makes the provider testable and preserves the
 	// CommunityDragon fallback when the client is offline.
 	gameplayAugments func(context.Context) ([]gameplayAugment, error)
+}
+
+type augmentCopyCacheEntry struct {
+	Text      string
+	FetchedAt time.Time
 }
 
 type championFilterOption struct {
@@ -168,6 +174,7 @@ type championRankingRow struct {
 	ImagePath             string   `json:"imagePath,omitempty"`
 	Rank                  int      `json:"rank"`
 	Tier                  int      `json:"tier"`
+	Grade                 string   `json:"grade,omitempty"`
 	Position              string   `json:"position,omitempty"`
 	Positions             []string `json:"positions,omitempty"`
 	Play                  int      `json:"play,omitempty"`
@@ -424,20 +431,21 @@ type championAugmentResponse struct {
 }
 
 type championAugment struct {
-	ID                int                       `json:"id"`
-	Key               string                    `json:"key"`
-	Name              string                    `json:"name"`
-	Tier              int                       `json:"tier"`
-	Rarity            string                    `json:"rarity"`
-	Performance       float64                   `json:"performance,omitempty"`
-	Popularity        float64                   `json:"popularity,omitempty"`
-	WinRate           float64                   `json:"winRate,omitempty"`
-	Description       string                    `json:"description"`
-	Tooltip           string                    `json:"tooltip,omitempty"`
-	ImageSource       string                    `json:"imageSource"`
-	ImagePath         string                    `json:"imagePath"`
-	ImageFallbackPath string                    `json:"imageFallbackPath,omitempty"`
-	Champions         []championAugmentChampion `json:"champions,omitempty"`
+	ID                     int                       `json:"id"`
+	Key                    string                    `json:"key"`
+	Name                   string                    `json:"name"`
+	Tier                   int                       `json:"tier"`
+	Rarity                 string                    `json:"rarity"`
+	Performance            float64                   `json:"performance,omitempty"`
+	PerformanceUnavailable bool                      `json:"performanceUnavailable,omitempty"`
+	Popularity             float64                   `json:"popularity,omitempty"`
+	WinRate                float64                   `json:"winRate,omitempty"`
+	Description            string                    `json:"description"`
+	Tooltip                string                    `json:"tooltip,omitempty"`
+	ImageSource            string                    `json:"imageSource"`
+	ImagePath              string                    `json:"imagePath"`
+	ImageFallbackPath      string                    `json:"imageFallbackPath,omitempty"`
+	Champions              []championAugmentChampion `json:"champions,omitempty"`
 }
 
 type championAugmentChampion struct {
@@ -456,7 +464,7 @@ type championAugmentChampion struct {
 func newChampionProvider() *championProvider {
 	provider := &championProvider{
 		static: make(map[string]championAssetDescription), championKeys: make(map[string]string), championIDs: make(map[string]int), championMeta: make(map[int]championMetadata),
-		abilities: make(map[string]map[string]championAssetDescription), featureGates: newFeatureGates(), qq101Wait: qq101DetailWait,
+		itemPurchasable: make(map[int64]bool), abilities: make(map[string]map[string]championAssetDescription), featureGates: newFeatureGates(), qq101Wait: qq101DetailWait,
 	}
 	provider.hexdata = newHexdataClient(provider, nil)
 	if err := provider.setNetworkSettings(defaultChampionNetworkSettings()); err != nil {
@@ -803,6 +811,24 @@ func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	const acceptImages = "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8"
 	provider := a.championDataProvider()
+	if source == "communitydragon" {
+		candidates := communityDragonChampionAssetCandidates(requestPath)
+		for index, candidatePath := range candidates {
+			if data, ok := a.loadChampionAssetFromClient(r.Context(), provider, source, candidatePath); ok {
+				provider.reportAugmentIconFetch(requestPath, http.StatusOK, index, index > 0)
+				writeChampionAssetImage(w, data)
+				return
+			}
+			data, err := provider.fetch(r.Context(), host, candidatePath, nil, championImageMax, acceptImages)
+			if err == nil && writeChampionAssetImage(w, data) {
+				provider.reportAugmentIconFetch(requestPath, http.StatusOK, index, index > 0)
+				return
+			}
+		}
+		provider.reportAugmentIconFetch(requestPath, http.StatusNotFound, -1, len(candidates) > 1)
+		http.NotFound(w, r)
+		return
+	}
 	if data, ok := a.loadChampionAssetFromClient(r.Context(), provider, source, requestPath); ok {
 		writeChampionAssetImage(w, data)
 		return
@@ -816,6 +842,70 @@ func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
 	if err != nil || !writeChampionAssetImage(w, data) {
 		http.NotFound(w, r)
 	}
+}
+
+func communityDragonChampionAssetCandidates(requestPath string) []string {
+	lower := strings.ToLower(strings.TrimSpace(requestPath))
+	if !strings.HasSuffix(lower, "_large.png") {
+		return []string{requestPath}
+	}
+	var relative string
+	switch {
+	case strings.HasPrefix(lower, "/latest/game/"):
+		relative = strings.TrimPrefix(lower, "/latest/game/")
+	case strings.HasPrefix(lower, "/latest/plugins/rcp-be-lol-game-data/global/default/"):
+		relative = strings.TrimPrefix(lower, "/latest/plugins/rcp-be-lol-game-data/global/default/")
+	default:
+		return []string{requestPath}
+	}
+	if candidates := communityDragonImagePaths("/lol-game-data/assets/" + relative); len(candidates) > 0 {
+		return candidates
+	}
+	return []string{requestPath}
+}
+
+func (p *championProvider) reportAugmentIconFetch(requestPath string, status, candidateIndex int, fellBack bool) {
+	pathTemplate, ok := augmentIconPathTemplate(requestPath)
+	if p == nil || p.diag == nil || !ok {
+		return
+	}
+	p.diag(map[string]any{
+		"event": "augment_icon_fetch", "source": "communitydragon", "path_template": pathTemplate,
+		"status": status, "candidate_index": candidateIndex, "fell_back": fellBack,
+	})
+}
+
+func augmentIconPathTemplate(requestPath string) (string, bool) {
+	lower := strings.ToLower(strings.TrimSpace(requestPath))
+	delivery := ""
+	switch {
+	case strings.HasPrefix(lower, "/latest/game/"):
+		delivery = "game"
+	case strings.HasPrefix(lower, "/latest/plugins/rcp-be-lol-game-data/global/default/"):
+		delivery = "plugin"
+	default:
+		return "", false
+	}
+	family := ""
+	switch {
+	case strings.Contains(lower, "/ux/cherry/augments/"):
+		family = "cherry"
+	case strings.Contains(lower, "/ux/kiwi/augments/"):
+		family = "kiwi"
+	default:
+		return "", false
+	}
+	suffix := ""
+	switch {
+	case strings.HasSuffix(lower, "_large.png"):
+		suffix = "_large"
+	case strings.HasSuffix(lower, "_small.png"):
+		suffix = "_small"
+	case strings.HasSuffix(lower, ".png"):
+	default:
+		return "", false
+	}
+	return delivery + "/ux/" + family + "/augments/icons/{icon}" + suffix + ".png", true
 }
 
 func writeChampionAssetImage(w http.ResponseWriter, data []byte) bool {
@@ -981,22 +1071,27 @@ type ddragonChampion struct {
 }
 
 type ddragonAssetList struct {
-	Data map[string]struct {
-		Key         string    `json:"key"`
-		Name        string    `json:"name"`
-		Description string    `json:"description"`
-		Tooltip     string    `json:"tooltip"`
-		Cooldown    []float64 `json:"cooldown"`
-		Cost        []float64 `json:"cost"`
-		Range       []float64 `json:"range"`
-		Into        []string  `json:"into"`
-		Gold        struct {
-			Total int64 `json:"total"`
-		} `json:"gold"`
-		Image struct {
-			Full string `json:"full"`
-		} `json:"image"`
-	} `json:"data"`
+	Data map[string]ddragonAsset `json:"data"`
+}
+
+type ddragonAsset struct {
+	Key         string    `json:"key"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Tooltip     string    `json:"tooltip"`
+	Cooldown    []float64 `json:"cooldown"`
+	Cost        []float64 `json:"cost"`
+	Range       []float64 `json:"range"`
+	Into        []string  `json:"into"`
+	InStore     *bool     `json:"inStore"`
+	HideFromAll *bool     `json:"hideFromAll"`
+	Gold        struct {
+		Total       int64 `json:"total"`
+		Purchasable *bool `json:"purchasable"`
+	} `json:"gold"`
+	Image struct {
+		Full string `json:"full"`
+	} `json:"image"`
 }
 
 type ddragonChampionDetail struct {
@@ -1032,6 +1127,19 @@ type ddragonRuneStyle struct {
 			Icon      string `json:"icon"`
 		} `json:"runes"`
 	} `json:"slots"`
+}
+
+// Supplementary overview APIs may run without a successful catalog request.
+// Keep identity verification strict, but recover a cold/failed initial load.
+func (p *championProvider) ensureChampionMetadata(ctx context.Context) error {
+	p.mu.Lock()
+	ready := len(p.championMeta) > 0
+	p.mu.Unlock()
+	if ready {
+		return nil
+	}
+	_, err := p.loadCatalog(ctx)
+	return err
 }
 
 func (p *championProvider) loadCatalog(ctx context.Context) (championCatalogResponse, error) {
@@ -1155,6 +1263,7 @@ func (p *championProvider) loadStaticDescriptions(ctx context.Context) (map[stri
 		patch = versions[0]
 	}
 	descriptions := make(map[string]championAssetDescription)
+	itemPurchasable := make(map[int64]bool)
 	for _, endpoint := range []struct {
 		path string
 		kind string
@@ -1167,7 +1276,34 @@ func (p *championProvider) loadStaticDescriptions(ctx context.Context) (map[stri
 		if json.Unmarshal(data, &catalog) != nil {
 			continue
 		}
+		if endpoint.kind == "item" {
+			goldPurchasablePresent, inStorePresent, hideFromAllPresent := 0, 0, 0
+			for _, item := range catalog.Data {
+				if item.Gold.Purchasable != nil {
+					goldPurchasablePresent++
+				}
+				if item.InStore != nil {
+					inStorePresent++
+				}
+				if item.HideFromAll != nil {
+					hideFromAllPresent++
+				}
+			}
+			if p.diag != nil {
+				p.diag(map[string]any{
+					"event": "ddragon_item_purchasability_shape", "items": len(catalog.Data),
+					"gold_purchasable_present": goldPurchasablePresent, "in_store_present": inStorePresent,
+					"hide_from_all_present": hideFromAllPresent,
+				})
+			}
+		}
 		for id, item := range catalog.Data {
+			if endpoint.kind == "item" {
+				numericID, parseErr := strconv.ParseInt(strings.TrimSpace(id), 10, 64)
+				if purchasable, known := ddragonItemPurchasability(item); parseErr == nil && numericID > 0 && known {
+					itemPurchasable[numericID] = purchasable
+				}
+			}
 			if item.Image.Full == "" {
 				continue
 			}
@@ -1210,8 +1346,39 @@ func (p *championProvider) loadStaticDescriptions(ctx context.Context) (map[stri
 	p.mu.Lock()
 	p.patch = patch
 	p.static = cloneAssetDescriptions(descriptions)
+	p.itemPurchasable = itemPurchasable
 	p.mu.Unlock()
 	return descriptions, nil
+}
+
+func ddragonItemPurchasability(item ddragonAsset) (bool, bool) {
+	// Data Dragon's explicit gold.purchasable flag is the authoritative store
+	// decision. Older payloads may also expose inStore/hideFromAll, but those
+	// fields can describe visibility rather than whether the item is buyable.
+	if item.Gold.Purchasable != nil {
+		return *item.Gold.Purchasable, true
+	}
+	purchasable, known := true, false
+	if item.InStore != nil {
+		purchasable, known = purchasable && *item.InStore, true
+	}
+	if item.HideFromAll != nil {
+		purchasable, known = purchasable && !*item.HideFromAll, true
+	}
+	return purchasable, known
+}
+
+func (p *championProvider) itemPurchasabilitySnapshot() map[int64]bool {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	result := make(map[int64]bool, len(p.itemPurchasable))
+	for id, purchasable := range p.itemPurchasable {
+		result[id] = purchasable
+	}
+	return result
 }
 
 func (p *championProvider) currentPatch() string {
@@ -1725,44 +1892,14 @@ func (p *championProvider) loadArenaPage(ctx context.Context) ([]byte, string, e
 	return data, decoded, nil
 }
 
+// Arena's list must use the same provider and region as the YOUR.GG page,
+// not OP.GG's global sample with a locally re-sorted ranking.
 func (p *championProvider) loadArenaRankings(ctx context.Context) (championRankingResponse, error) {
-	data, err := p.fetch(ctx, opggChampionHost, "/api/global/champions/arena", nil, championJSONMax, "application/json")
+	data, at, err := p.fetchWithMetadata(ctx, yourGGArenaHost, "/kr/api/arena/champions", nil, championJSONMax, "application/json")
 	if err != nil {
 		return championRankingResponse{}, err
 	}
-	var payload struct {
-		Data []struct {
-			ID           int             `json:"id"`
-			AverageStats opggRankedStats `json:"average_stats"`
-		} `json:"data"`
-		Meta struct {
-			Version string `json:"version"`
-		} `json:"meta"`
-	}
-	if json.Unmarshal(data, &payload) != nil || len(payload.Data) < 100 {
-		return championRankingResponse{}, errors.New("OP.GG Arena champion response changed")
-	}
-	rows := make([]championRankingRow, 0, len(payload.Data))
-	for _, item := range payload.Data {
-		stats := item.AverageStats
-		if item.ID == 0 || stats.Rank <= 0 {
-			continue
-		}
-		rows = append(rows, championRankingRow{
-			ChampionID: item.ID, Rank: stats.Rank, Tier: arenaTierValue(stats.Tier),
-			Play: stats.Play, WinRate: firstPositive(ratePercent(stats.WinRate), percentOf(stats.Win, stats.Play)), PickRate: ratePercent(stats.PickRate), BanRate: ratePercent(stats.BanRate), KDA: stats.KDA,
-			AveragePlacement: arenaAverage(float64(stats.TotalPlace), stats.Play), FirstPlaceRate: percentOf(stats.FirstPlace, stats.Play),
-		})
-	}
-	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Rank < rows[j].Rank })
-	var teams []arenaTeamComposition
-	if _, decoded, pageErr := p.loadArenaPage(ctx); pageErr == nil {
-		teams = parseArenaTeamCompositions(decoded, `"teamData":`, 0, 40)
-	}
-	return championRankingResponse{
-		Mode: "arena", Region: "GLOBAL", Patch: payload.Meta.Version, Source: "OP.GG JSON", FetchedAt: time.Now(),
-		EntertainmentSample: true, Rows: rows, TeamCompositions: teams,
-	}, nil
+	return parseYourGGArenaRankings(data, at)
 }
 
 func arenaTierValue(value *int) int {
@@ -2470,6 +2607,8 @@ type runeAssetRaw struct {
 }
 
 func parseChampionRunes(decoded string) []championRunePage {
+	// R60 cleanup marker: this legacy HTML parser is retained for its tests only;
+	// production champion details use the structured OP.GG response.
 	var raw []runePageRaw
 	if !extractBestArray(decoded, `"rune_pages":`, func(candidate []json.RawMessage) int {
 		if len(candidate) == 0 {

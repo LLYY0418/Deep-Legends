@@ -64,14 +64,7 @@ func (a *app) loadRiotOverviewDeduplicated(ctx context.Context, reference gamepl
 	a.overviewQueries.mu.Unlock()
 
 	response, err := a.loadRiotOverview(ctx, reference, begIndex, count)
-	a.overviewQueries.mu.Lock()
-	flight.response, flight.err = response, err
-	if err == nil {
-		a.overviewQueries.putLocked(key, overviewQueryCacheEntry{at: time.Now(), response: response})
-	}
-	delete(a.overviewQueries.flights, key)
-	close(flight.done)
-	a.overviewQueries.mu.Unlock()
+	a.overviewQueries.complete(key, flight, response, err)
 	return response, err
 }
 
@@ -136,10 +129,12 @@ func (cache *overviewQueryCache) removeElementLocked(element *list.Element) {
 func (cache *overviewQueryCache) complete(key string, flight *overviewQueryFlight, response gameplayOverview, err error) {
 	cache.mu.Lock()
 	flight.response, flight.err = response, err
-	if err == nil {
+	if err == nil && cache.flights[key] == flight {
 		cache.putLocked(key, overviewQueryCacheEntry{at: time.Now(), response: response})
 	}
-	delete(cache.flights, key)
+	if cache.flights[key] == flight {
+		delete(cache.flights, key)
+	}
 	close(flight.done)
 	cache.mu.Unlock()
 }
@@ -158,7 +153,7 @@ func overviewQuerySnapshotKey(client *LCUClient, reference gameplayReference, pl
 
 func (a *app) loadGameplayOverviewDeduplicated(ctx context.Context, client *LCUClient, current Summoner, reference gameplayReference, begIndex, count int, matchFilter string, force bool) gameplayOverview {
 	if force || a.overviewQueries == nil {
-		return a.loadGameplayOverview(ctx, client, current, reference, begIndex, count, matchFilter)
+		return a.loadGameplayOverview(ctx, client, current, reference, begIndex, count, matchFilter, force)
 	}
 	playerRef := strings.TrimSpace(reference.PlayerRef)
 	isCurrent := (playerRef == "" || gameplayReferenceContains(reference, current.PUUID)) && !isRemoteTencentServer(client, reference.ServerID)
@@ -192,7 +187,7 @@ func (a *app) loadGameplayOverviewDeduplicated(ctx context.Context, client *LCUC
 	a.overviewQueries.flights[key] = flight
 	a.overviewQueries.mu.Unlock()
 
-	response := a.loadGameplayOverview(ctx, client, current, reference, begIndex, count, matchFilter)
+	response := a.loadGameplayOverview(ctx, client, current, reference, begIndex, count, matchFilter, false)
 	a.overviewQueries.complete(key, flight, response, ctx.Err())
 	return response
 }
@@ -204,5 +199,8 @@ func (a *app) clearOverviewQuerySnapshots() {
 	a.overviewQueries.mu.Lock()
 	a.overviewQueries.entries = make(map[string]*list.Element)
 	a.overviewQueries.recent.Init()
+	// Detach old flights. Their waiters still finish, but new queries must not
+	// join them, and completion must not repopulate an invalidated snapshot.
+	a.overviewQueries.flights = make(map[string]*overviewQueryFlight)
 	a.overviewQueries.mu.Unlock()
 }

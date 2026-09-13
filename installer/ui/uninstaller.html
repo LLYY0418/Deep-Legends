@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="dark">
+<title>卸载 Deep Legends</title>
+<style>
+/* ===========================================================================
+   Deep Legends 卸载程序 · 完全自绘界面
+   与 installer.html 共用同一套设计系统（深色 + 金），但这是独立的文档，
+   因为它被编译进一个独立的宿主可执行文件："Uninstall Deep Legends.exe"，
+   由 Windows 的"卸载或更改程序"直接调用，运行环境和安装器完全不同。
+   设计像素基准 = 700 x 430 @96DPI（比安装器矮，因为没有第一页那组"三张功能卡"）。
+   =========================================================================== */
+:root {
+  --bg: #0B0E14;
+  --bg-2: #0E121A;
+  --surface: #131822;
+  --surface-2: #1A2130;
+  --line: #242D3D;
+  --line-soft: #1C2331;
+  --ink: #E8EAF0;
+  --muted: #8B93A6;
+  --faint: #5A6377;
+  --gold: #D9A441;
+  --gold-bright: #F0BE5C;
+  --gold-dim: #8A6A2E;
+  --danger: #E05C5C;
+  --danger-bright: #F08080;
+  --teal: #58C8C0;
+  --font: "Microsoft YaHei UI", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font); font-size: 13px; line-height: 1.5; color: var(--ink);
+  background: var(--bg); user-select: none; cursor: default; -webkit-font-smoothing: antialiased;
+}
+img { -webkit-user-drag: none; }
+
+.backdrop {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(620px 300px at 50% -66px, rgba(217,164,65,.13), transparent 68%),
+    radial-gradient(460px 260px at 108% 112%, rgba(88,200,192,.06), transparent 70%),
+    linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 42%, #090C11 100%);
+}
+.backdrop::after {
+  content: ""; position: absolute; inset: 0; opacity: .3;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='36' height='62' viewBox='0 0 36 62'><path d='M18 1 35 11v20L18 41 1 31V11z' fill='none' stroke='%231B2231' stroke-width='1'/><path d='M18 42 35 52v20L18 82 1 72V52z' fill='none' stroke='%231B2231' stroke-width='1'/></svg>");
+}
+
+.shell { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; }
+
+/* 标题栏：不单独分色、不画分隔线，和下方内容共用同一张背景（与安装器一致）。 */
+.titlebar {
+  flex: 0 0 38px; display: flex; align-items: center; gap: 9px;
+  padding-left: 14px; background: transparent;
+}
+.titlebar .grab { display: flex; align-items: center; gap: 9px; flex: 1; height: 100%; }
+.titlebar .mark { width: 17px; height: 17px; flex: 0 0 17px; }
+.titlebar .name { font-size: 12px; color: #AEB6C6; letter-spacing: .02em; }
+.titlebar .name b { color: var(--gold-bright); font-weight: 600; }
+.sysbtns { display: flex; height: 100%; }
+.sysbtn { width: 44px; height: 100%; display: grid; place-items: center; color: #7C8598; transition: background .12s, color .12s; }
+.sysbtn svg { width: 11px; height: 11px; }
+.sysbtn:hover { background: rgba(255,255,255,.07); color: var(--ink); }
+.sysbtn.close:hover { background: #C4433E; color: #fff; }
+.sysbtn.disabled { opacity: .28; pointer-events: none; }
+
+.page { flex: 1; display: none; flex-direction: column; }
+.page.on { display: flex; }
+
+.btn-gold {
+  display: grid; place-items: center; height: 44px; border-radius: 10px;
+  font-size: 14px; font-weight: 700; letter-spacing: .18em; text-indent: .18em; color: #17120A;
+  background: linear-gradient(180deg, #F5C878 0%, var(--gold) 58%, #C08F2E 100%);
+  box-shadow: 0 8px 22px rgba(217,164,65,.22), inset 0 1px 0 rgba(255,255,255,.42);
+  transition: filter .12s, transform .06s, box-shadow .12s;
+}
+.btn-gold:hover { filter: brightness(1.07); box-shadow: 0 10px 26px rgba(217,164,65,.3), inset 0 1px 0 rgba(255,255,255,.5); }
+.btn-gold:active { transform: translateY(1px); filter: brightness(.96); }
+
+/* 卸载是破坏性操作：主按钮在"确认删除数据"打开时改用暖红渐变，
+   平时（默认不删数据）仍是品牌金，不额外制造视觉惊吓。 */
+.btn-gold.danger {
+  background: linear-gradient(180deg, #F08A8A 0%, var(--danger) 58%, #A83B3B 100%);
+  box-shadow: 0 8px 22px rgba(224,92,92,.24), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.btn-gold.danger:hover { box-shadow: 0 10px 26px rgba(224,92,92,.32), inset 0 1px 0 rgba(255,255,255,.48); }
+
+.ghost {
+  display: grid; place-items: center; border: 1px solid var(--line); background: var(--surface);
+  color: #C3CAD8; border-radius: 10px; transition: background .12s, border-color .12s;
+}
+.ghost:hover { background: var(--surface-2); border-color: #33405A; }
+
+.check { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
+.check .box {
+  width: 16px; height: 16px; flex: 0 0 16px; border-radius: 4px; border: 1px solid #3A455A; background: #10141C;
+  display: grid; place-items: center; transition: background .12s, border-color .12s;
+}
+.check .box svg { width: 10px; height: 10px; opacity: 0; transform: scale(.6); transition: opacity .12s, transform .12s; }
+.check[data-on="1"] .box { background: linear-gradient(180deg, var(--danger-bright), var(--danger)); border-color: var(--danger); }
+.check[data-on="1"] .box svg { opacity: 1; transform: none; }
+.check[data-on="1"] { color: #C3CAD8; }
+.check:hover .box { border-color: var(--gold-dim); }
+
+/* ============================== 第一页：确认卸载 ============================== */
+.hero { padding: 16px 0 0; text-align: center; }
+.crest { position: relative; width: 50px; height: 50px; margin: 0 auto; }
+.crest img { width: 100%; height: 100%; display: block; filter: drop-shadow(0 6px 16px rgba(0,0,0,.55)) grayscale(.55); opacity: .92; }
+.crest::before {
+  content: ""; position: absolute; left: 50%; top: 52%; width: 130px; height: 130px;
+  transform: translate(-50%,-50%); border-radius: 50%; background: radial-gradient(circle, rgba(217,164,65,.14), transparent 62%);
+}
+.h1 { margin-top: 10px; font-size: 17px; font-weight: 700; color: var(--ink); }
+.h1 b { color: var(--gold-bright); }
+.sub { margin-top: 5px; font-size: 12px; color: var(--faint); }
+
+.summary { margin: 16px 44px 0; border: 1px solid var(--line-soft); border-radius: 11px; overflow: hidden; }
+.summary .row { display: flex; align-items: center; justify-content: space-between; padding: 9px 15px; font-size: 12.5px; }
+.summary .row + .row { border-top: 1px solid var(--line-soft); }
+.summary .row .k { color: var(--faint); }
+.summary .row .v { color: #C3CAD8; font-variant-numeric: tabular-nums; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.optrow { margin: 14px 44px 0; }
+.optrow .hint {
+  margin-top: 7px; margin-left: 24px; font-size: 11.5px; color: var(--faint); line-height: 1.7;
+  max-height: 0; opacity: 0; overflow: hidden; transition: max-height .16s ease, opacity .16s ease, margin-top .16s ease;
+}
+.optrow[data-on="1"] .hint { max-height: 60px; opacity: 1; }
+.optrow .hint b { color: var(--danger-bright); font-weight: 600; }
+
+.actions2 { margin-top: auto; padding: 16px 44px 0; display: flex; gap: 10px; }
+.actions2 .ghost { flex: 0 0 130px; height: 44px; font-size: 13px; letter-spacing: .06em; }
+.actions2 .btn-gold { flex: 1; }
+
+.foot {
+  margin-top: auto; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; height: 34px; border-top: 1px solid rgba(36,45,61,.55); color: #4E5668; font-size: 11px;
+}
+
+/* ============================== 第二页：卸载中 ============================== */
+.uninstall { padding: 30px 40px 0; display: flex; flex-direction: column; height: 100%; }
+.uninstall-head { display: flex; align-items: center; gap: 12px; }
+.uninstall-head img { width: 32px; height: 32px; filter: grayscale(.5); opacity: .9; }
+.uninstall-head .t { font-size: 15px; font-weight: 700; letter-spacing: .04em; color: var(--ink); }
+.uninstall-head .s { margin-top: 2px; font-size: 11.5px; color: var(--faint); }
+
+.farewell { flex: 0 0 auto; margin-top: 34px; text-align: center; padding: 0 30px; }
+.farewell p { font-size: 19px; font-weight: 700; color: var(--ink); margin: 0 auto; }
+.farewell b { color: var(--gold-bright); font-weight: 700; }
+
+.steps { flex: 0 0 auto; margin: 34px auto 0; display: flex; flex-direction: column; gap: 13px; }
+.steps .step { display: flex; align-items: center; gap: 11px; font-size: 12.5px; color: var(--faint); }
+.steps .dot {
+  width: 15px; height: 15px; flex: 0 0 15px; border-radius: 50%; border: 1px solid #333E52;
+  display: grid; place-items: center; transition: border-color .15s, background .15s;
+}
+.steps .dot::after { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--faint); transition: background .15s; }
+.steps .step.on { color: var(--ink); }
+.steps .step.on .dot { border-color: var(--gold); }
+.steps .step.on .dot::after { background: var(--gold-bright); }
+.steps .step.done { color: var(--muted); }
+.steps .step.done .dot { border-color: var(--gold-dim); background: rgba(217,164,65,.12); }
+.steps .step.done .dot::after { background: var(--gold-dim); }
+
+.progress-wrap { margin-top: auto; padding-bottom: 30px; }
+.progress-line { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin-bottom: 12px; }
+.progress-line .label { font-size: 13px; color: #AEB6C6; }
+.progress-line .pct { font-size: 21px; font-weight: 700; color: var(--gold-bright); font-variant-numeric: tabular-nums; }
+.track { position: relative; height: 9px; border-radius: 99px; background: #161C28; overflow: hidden; border: 1px solid rgba(255,255,255,.04); }
+.fill {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 99px;
+  background: linear-gradient(90deg, #C08F2E, var(--gold) 40%, var(--gold-bright));
+  box-shadow: 0 0 12px rgba(217,164,65,.45); transition: width .28s cubic-bezier(.3,.7,.4,1);
+}
+.fill::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 12%, rgba(255,255,255,.34) 46%, transparent 80%);
+  background-size: 220px 100%; animation: sheen 1.5s linear infinite;
+}
+@keyframes sheen { from { background-position: -220px 0; } to { background-position: 340px 0; } }
+.stage { margin-top: 11px; text-align: center; font-size: 11.5px; color: var(--faint); height: 16px; }
+
+/* ============================== 失败页（与安装器同款） ============================== */
+.fail { padding: 0 44px; text-align: center; margin-top: auto; margin-bottom: auto; }
+.fail .ic { width: 46px; height: 46px; margin: 0 auto; display: grid; place-items: center; border-radius: 50%; background: rgba(224,92,92,.12); }
+.fail .ic svg { width: 22px; height: 22px; }
+.fail h3 { margin-top: 14px; font-size: 15px; font-weight: 700; }
+.fail p { margin-top: 8px; font-size: 12px; color: var(--muted); line-height: 1.8; }
+.fail p.code { margin-top: 4px; font-size: 11px; color: var(--faint); }
+.fail .row { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+.fail .row > * { min-width: 124px; padding: 0 18px; height: 38px; font-size: 13px; letter-spacing: .08em; text-indent: .08em; border-radius: 9px; }
+</style>
+</head>
+<body>
+<div class="backdrop"></div>
+
+<div class="shell">
+  <div class="titlebar">
+    <div class="grab" id="grab">
+      <img class="mark" src="__LOGO__" alt="">
+      <div class="name">卸载 <b>Deep Legends</b></div>
+    </div>
+    <div class="sysbtns">
+      <div class="sysbtn" id="btn-min" title="最小化">
+        <svg viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+      </div>
+      <div class="sysbtn close" id="btn-close" title="关闭">
+        <svg viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ 第一页：确认卸载 ============================ -->
+  <div class="page on" id="page-confirm">
+    <div class="hero">
+      <div class="crest"><img src="__LOGO__" alt=""></div>
+      <div class="h1">确定要卸载 <b>Deep Legends</b> 吗？</div>
+      <div class="sub">程序文件会被移除，你的英雄联盟账号与游戏数据不受影响</div>
+    </div>
+
+    <div class="summary">
+      <div class="row"><span class="k">安装位置</span><span class="v" id="s-path">—</span></div>
+      <div class="row"><span class="k">占用空间</span><span class="v" id="s-size">—</span></div>
+      <div class="row"><span class="k">当前版本</span><span class="v" id="s-version">—</span></div>
+    </div>
+
+    <div class="optrow">
+      <div class="check" id="chk-data" data-on="0">
+        <span class="box"><svg viewBox="0 0 12 12"><path d="M1.6 6.2l2.9 3 5.9-6.2" stroke="#2A0B0B" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span>同时删除我的本地数据（战绩缓存、召唤师信息、设置）</span>
+      </div>
+      <div class="hint">包含 <span id="s-cache">—</span> 的本机缓存。<b>删除后无法恢复</b>，重新安装也找不回来。</div>
+    </div>
+
+    <div class="actions2">
+      <div class="ghost" id="btn-cancel">取消</div>
+      <div class="btn-gold" id="btn-uninstall">卸载 Deep Legends</div>
+    </div>
+
+    <div class="foot">
+      <span>卸载不会影响你的召唤师账号</span>
+      <span id="version-tag"></span>
+    </div>
+  </div>
+
+  <!-- ============================ 第二页：卸载中 ============================ -->
+  <div class="page" id="page-progress">
+    <div class="uninstall">
+      <div class="uninstall-head">
+        <img src="__LOGO__" alt="">
+        <div>
+          <div class="t">正在卸载 Deep Legends</div>
+          <div class="s" id="dest-line">—</div>
+        </div>
+      </div>
+
+      <div class="farewell">
+        <p>感谢你用过 <b>Deep Legends</b></p>
+      </div>
+
+      <div class="steps" id="steps">
+        <div class="step" data-match="正在关闭正在运行的客户端…"><span class="dot"></span>关闭正在运行的客户端</div>
+        <div class="step" data-match="正在删除程序文件…"><span class="dot"></span>删除程序文件</div>
+        <div class="step" data-match="正在清理快捷方式与注册表…"><span class="dot"></span>清理快捷方式与注册表</div>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-line">
+          <span class="label" id="prog-label">正在卸载</span>
+          <span class="pct" id="pct">0%</span>
+        </div>
+        <div class="track"><div class="fill" id="fill"></div></div>
+        <div class="stage" id="stage">正在关闭正在运行的客户端…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ 失败页 ============================ -->
+  <div class="page" id="page-fail">
+    <div class="fail">
+      <div class="ic"><svg viewBox="0 0 22 22"><path d="M11 5.5v7.2M11 16.4v.1" stroke="#E05C5C" stroke-width="2" fill="none" stroke-linecap="round"/></svg></div>
+      <h3>卸载没有完成</h3>
+      <p id="fail-msg">卸载过程被中断了。</p>
+      <p class="code" id="fail-code"></p>
+      <div class="row">
+        <div class="ghost" id="btn-fail-close">关闭</div>
+        <div class="btn-gold danger" id="btn-retry">重试</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const send = (type, data) => {
+  const payload = JSON.stringify(Object.assign({ type }, data || {}));
+  if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage(payload);
+  else console.log("[send]", payload);
+};
+const $ = (id) => document.getElementById(id);
+const state = { installing: false, shown: 0 };
+
+function formatBytes(n) {
+  if (!(n >= 0)) return "—";
+  const gb = n / (1024 * 1024 * 1024);
+  if (gb >= 1) return gb.toFixed(gb >= 10 ? 0 : 1) + " GB";
+  return Math.max(1, Math.round(n / (1024 * 1024))) + " MB";
+}
+function setPage(name) {
+  for (const id of ["confirm", "progress", "fail"]) $("page-" + id).classList.toggle("on", id === name);
+  $("btn-close").classList.toggle("disabled", name === "progress");
+}
+
+$("grab").addEventListener("mousedown", (e) => { if (e.button === 0) { e.preventDefault(); send("drag"); } });
+$("btn-min").addEventListener("click", () => send("minimize"));
+$("btn-close").addEventListener("click", () => { if (!state.installing) send("close"); });
+$("btn-cancel").addEventListener("click", () => send("close"));
+
+$("chk-data").addEventListener("click", () => {
+  const el = $("chk-data");
+  const on = el.dataset.on !== "1";
+  el.dataset.on = on ? "1" : "0";
+  el.closest(".optrow").dataset.on = on ? "1" : "0";
+  $("btn-uninstall").classList.toggle("danger", on);
+  $("btn-uninstall").textContent = on ? "删除数据并卸载" : "卸载 Deep Legends";
+});
+
+$("btn-uninstall").addEventListener("click", () => {
+  send("confirm", { deleteData: $("chk-data").dataset.on === "1" });
+});
+$("btn-retry").addEventListener("click", () => setPage("confirm"));
+$("btn-fail-close").addEventListener("click", () => send("close"));
+
+window.host = {
+  init(s) {
+    $("s-path").textContent = s.path || "—";
+    $("s-size").textContent = formatBytes(s.sizeBytes);
+    $("s-version").textContent = s.version || "—";
+    $("version-tag").textContent = s.version ? "版本 " + s.version : "";
+    $("s-cache").textContent = formatBytes(s.cacheBytes);
+  },
+  uninstalling(s) {
+    state.installing = true;
+    setPage("progress");
+    $("dest-line").textContent = s.path || "";
+    state.shown = 0;
+    window.host.progress({ percent: 0, stage: "正在关闭正在运行的客户端…" });
+  },
+  progress(s) {
+    const p = Math.max(state.shown, Math.min(100, Math.round(s.percent || 0)));
+    state.shown = p;
+    $("fill").style.width = p + "%";
+    $("pct").textContent = p + "%";
+    if (s.stage) {
+      $("stage").textContent = s.stage;
+      const steps = Array.from($("steps").children);
+      const at = steps.findIndex((el) => el.dataset.match === s.stage);
+      steps.forEach((el, i) => {
+        el.classList.toggle("on", i === at);
+        el.classList.toggle("done", at >= 0 && i < at);
+      });
+    }
+  },
+  done() {
+    state.installing = false;
+    state.shown = 100;
+    $("fill").style.width = "100%";
+    $("pct").textContent = "100%";
+    $("prog-label").textContent = "卸载完成";
+    $("stage").textContent = "已从这台电脑上移除";
+    Array.from($("steps").children).forEach((el) => { el.classList.remove("on"); el.classList.add("done"); });
+  },
+  failed(s) {
+    state.installing = false;
+    setPage("fail");
+    $("fail-msg").textContent = s.message || "卸载过程被中断了。";
+    $("fail-code").textContent = s.detail || "";
+  },
+};
+
+if (window.__INIT__) window.host.init(window.__INIT__);
+</script>
+</body>
+</html>

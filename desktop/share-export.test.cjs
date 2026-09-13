@@ -221,3 +221,17 @@ test("preload 只暴露受校验的分享接口，不暴露 ipcRenderer", async 
   assert.deepEqual(invokes.map(([channel]) => channel), ["desktop-share-prepare-save", "desktop-share-get-directory", "desktop-share-choose-directory", "desktop-share-capture-and-save"]);
   await assert.rejects(() => share.captureAndSavePng({ token: "bad", markup: validMarkup }), /内容无效/);
 });
+
+
+test("分享图独立窗口不携带主窗口 zoom，且使用独立内存会话", async () => {
+  const harness = createHarness();
+  await harness.controller.prepareSave(harness.event, "share.png");
+  await harness.controller.captureAndSave(harness.event, { token: validToken, markup: validMarkup, theme: "dark", density: "" });
+  const options = harness.events.find(([name]) => name === "window")[1];
+  assert.equal(Object.hasOwn(options, "zoomFactor"), false);
+  assert.equal(Object.hasOwn(options.webPreferences, "zoomFactor"), false);
+  assert.equal(options.webPreferences.partition, "deep-legends-share-export");
+  assert.equal(options.width, SHARE_EXPORT_SURFACE_WIDTH);
+  const source = fs.readFileSync(path.join(__dirname, "share-export.cjs"), "utf8");
+  assert.doesNotMatch(source, /applyUiScale|mainWindow\.webContents\.capturePage/);
+});

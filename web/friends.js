@@ -73,7 +73,12 @@
     if (!availability || availability === "offline" || availability === "none") return "offline";
     if (availability === "mobile") return "mobile";
     if (availability === "away") return "away";
-    if (availability === "dnd" || availability === "spectating") return "ingame";
+    if (availability === "spectating") return "ingame";
+    // Lobby members are online, not playing. Chat availability alone does not
+    // describe LoL activity: the client also publishes its game phase.
+    if (friend.gameStatus === "lobby") return "online";
+    if (["inGame", "championSelect", "inQueue", "spectating"].includes(friend.gameStatus)) return "ingame";
+    if (availability === "dnd") return "ingame";
     return "online";
   }
   const PRESENCE_WEIGHT = { ingame: 4, online: 3, away: 2, mobile: 1, offline: 0 };
@@ -85,52 +90,70 @@
     }
     if (kind === "mobile") return "手机在线";
     if (kind === "away") return "离开";
-    if (kind === "ingame") {
-      if (friend.availability === "spectating") return "观战中";
-      const product = (friend.product || "").toLowerCase();
-      if (product && product !== "league_of_legends") {
-        const label = friend.productName || "其他产品";
-        return escapeHTML(friend.gameStatus === "inGame" ? `${label} · 对局中` : label);
+    if (friend.availability === "spectating") return "观战中";
+    const product = (friend.product || "").toLowerCase();
+    if (product && product !== "league_of_legends") {
+      const label = friend.productName || "其他产品";
+      return escapeHTML(friend.gameStatus === "inGame" ? `${label} · 对局中` : label);
+    }
+    switch (friend.gameStatus) {
+      case "inGame": {
+        const parts = [friend.queueLabel || "对局中"];
+        if (friend.championName) parts.push(friend.championName);
+        const started = Number(friend.gameStartedAt);
+        const duration = Number.isFinite(started) && started > 0 ? ` · <b data-started="${started}">${formatDuration(Date.now() - started)}</b>` : "";
+        return escapeHTML(parts.join(" · ")) + duration;
       }
-      switch (friend.gameStatus) {
-        case "inGame": {
-          const parts = [friend.queueLabel || "对局中"];
-          if (friend.championName) parts.push(friend.championName);
-          const started = Number(friend.gameStartedAt) || 0;
-          const duration = started ? ` · <b data-started="${started}">${formatDuration(Date.now() - started)}</b>` : "";
-          return escapeHTML(parts.join(" · ")) + duration;
-        }
-        case "championSelect": return "英雄选择中";
-        case "inQueue": return "队列中";
-        case "spectating": return "观战中";
-        default:
-          if (/^hosting_/i.test(friend.gameStatus || "")) return "组队大厅";
-          return "游戏中";
+      case "championSelect": return "英雄选择中";
+      case "inQueue": return escapeHTML(friend.queueLabel ? `匹配中 · ${friend.queueLabel}` : "匹配中");
+      case "spectating": return "观战中";
+      case "lobby": {
+        const size = Number(friend.partySize), capacity = Number(friend.partyCapacity);
+        const validSize = Number.isInteger(size) && size > 0 && size <= 100;
+        const validCapacity = Number.isInteger(capacity) && capacity >= size && capacity <= 100;
+        if (validSize && validCapacity) return escapeHTML(`${size}/${capacity} ${friend.queueLabel || "组队大厅"}`);
+        const party = validSize ? `${size} 人组队` : "组队大厅";
+        return escapeHTML(friend.queueLabel ? `${party} · ${friend.queueLabel}` : party);
       }
     }
+    if (kind === "ingame") return "游戏中";
     return escapeHTML(friend.statusMessage ? `在线 · ${friend.statusMessage}` : "在线");
   }
 
   /* ---------- 数据 ---------- */
   async function loadFriends() {
-    if (state.loading || !state.connected) return;
+    if (!state.connected || state.destroyed) return;
+    if (state.loading) { state.refreshPending = true; return; }
     state.loading = true;
+    const generation = state.requestGeneration = Number(state.requestGeneration || 0) + 1;
+    const controller = new AbortController();
+    state.controller = controller;
+    let timedOut = false;
+    const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 10000);
     state.error = "";
     if (state.open && !state.friends.length) renderSkeleton();
     try {
-      const response = await fetch("/api/social/friends", { headers: { Accept: "application/json" } });
+      const response = await fetch("/api/social/friends", { headers: { Accept: "application/json" }, signal: controller.signal });
       if (!response.ok) throw new Error((await response.text()).trim() || `本地服务返回 HTTP ${response.status}`);
       const data = await response.json();
+      if (generation !== state.requestGeneration || !state.connected || controller.signal.aborted || state.destroyed) return;
       state.groups = Array.isArray(data.groups) ? data.groups : [];
       state.friends = Array.isArray(data.friends) ? data.friends : [];
       state.stale = false;
-      window.dispatchEvent(new CustomEvent("deep-legends:friends-presence", { detail: { friends: state.friends } }));
     } catch (error) {
-      state.error = error?.message || "读取好友列表失败";
+      if (generation !== state.requestGeneration || state.destroyed || (error.name === "AbortError" && !timedOut)) return;
+      state.error = timedOut ? "好友列表读取超时，请重试" : error?.message || "读取好友列表失败";
     } finally {
+      clearTimeout(timeout);
+      if (generation !== state.requestGeneration) return;
+      state.controller = null;
       state.loading = false;
       updateBadge();
       if (state.open) render();
+      if (state.refreshPending && state.connected) {
+        state.refreshPending = false;
+        void loadFriends();
+      }
     }
   }
 
@@ -205,7 +228,7 @@
     const nameTitle = `${friend.gameName}${friend.tagLine ? ` #${friend.tagLine}` : ""}`;
     const note = friend.note ? `<span class="friend-note">· ${escapeHTML(friend.note)}</span>` : "";
     const tag = friend.tagLine ? `<span class="friend-tag">#${escapeHTML(friend.tagLine)}</span>` : "";
-    const champion = !offlineSection && kind === "ingame" && friend.championId && (friend.product || "league_of_legends") === "league_of_legends"
+    const champion = !offlineSection && kind === "ingame" && ["inGame", "championSelect"].includes(friend.gameStatus) && friend.championId && (friend.product || "league_of_legends") === "league_of_legends"
       ? `<img class="friend-champion" src="${championIcon(friend.championId)}" alt="" loading="lazy" decoding="async">`
       : "";
     return `<button class="friend-row${offlineSection ? " is-offline" : ""}" type="button" role="listitem" data-player-ref="${escapeHTML(friend.playerRef || "")}" data-game-name="${escapeHTML(friend.gameName)}" data-tag-line="${escapeHTML(friend.tagLine || "")}" data-tooltip="${escapeHTML(nameTitle)}" data-tooltip-overflow=".friend-game-name" data-tooltip-size="compact"${friend.playerRef ? "" : " disabled"}>
@@ -353,10 +376,15 @@
       state.stale = true;
       void loadFriends();
     } else {
+      state.requestGeneration = Number(state.requestGeneration || 0) + 1;
+      state.controller?.abort();
+      state.loading = false;
+      state.refreshPending = false;
+      clearTimeout(state.refreshTimer);
+      state.refreshTimer = 0;
       state.groups = [];
       state.friends = [];
       state.error = "";
-      window.dispatchEvent(new CustomEvent("deep-legends:friends-presence", { detail: { friends: [] } }));
       updateBadge();
       if (state.open) render();
     }
@@ -364,9 +392,20 @@
 
   window.addEventListener("deep-legends:friends-updated", () => {
     if (!state.connected) return;
-    clearTimeout(state.refreshTimer);
-    state.refreshTimer = setTimeout(() => { state.stale = true; void loadFriends(); }, 300);
+    if (state.refreshTimer) return;
+    state.refreshTimer = setTimeout(() => { state.refreshTimer = 0; state.stale = true; void loadFriends(); }, 300);
   });
+
+  function disposeFriends() {
+    state.destroyed = true;
+    stopTick();
+    state.requestGeneration = Number(state.requestGeneration || 0) + 1;
+    state.controller?.abort();
+    clearTimeout(state.refreshTimer);
+    state.refreshPending = false;
+  }
+  window.addEventListener("deep-legends:dispose", disposeFriends, { once: true });
+  window.addEventListener("beforeunload", disposeFriends, { once: true });
 
   el.toggle.disabled = true;
   updateBadge();

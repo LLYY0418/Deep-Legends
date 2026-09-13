@@ -1,0 +1,290 @@
+[
+  {
+    "champion": "aatrox",
+    "position": "top",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-solo/aatrox_top.rsc",
+    "bytes": 294552,
+    "rows": {
+      "4": 5,
+      "5": 5,
+      "6": 0
+    },
+    "slots": {
+      "4": 5,
+      "5": 5,
+      "6": 0
+    }
+  },
+  {
+    "champion": "ahri",
+    "position": "mid",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-solo/ahri_mid.rsc",
+    "bytes": 295347,
+    "rows": {
+      "4": 5,
+      "5": 5,
+      "6": 0
+    },
+    "slots": {
+      "4": 5,
+      "5": 5,
+      "6": 0
+    }
+  },
+  {
+    "champion": "amumu",
+    "position": "jungle",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-solo/amumu_jungle.rsc",
+    "bytes": 289880,
+    "rows": {
+      "4": 5,
+      "5": 0,
+      "6": 0
+    },
+    "slots": {
+      "4": 5,
+      "5": 0,
+      "6": 0
+    }
+  },
+  {
+    "champion": "garen",
+    "position": "top",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-solo/garen_top.rsc",
+    "bytes": 294570,
+    "rows": {
+      "4": 5,
+      "5": 5,
+      "6": 0
+    },
+    "slots": {
+      "4": 5,
+      "5": 5,
+      "6": 0
+    }
+  },
+  {
+    "champion": "jax",
+    "position": "top",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-solo/jax_top.rsc",
+    "bytes": 295576,
+    "rows": {
+      "4": 5,
+      "5": 5,
+      "6": 0
+    },
+    "slots": {
+      "4": 5,
+      "5": 5,
+      "6": 0
+    }
+  },
+  {
+    "champion": "khazix",
+    "position": "jungle",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-solo/khazix_jungle.rsc",
+    "bytes": 302398,
+    "rows": {
+      "4": 5,
+      "5": 5,
+      "6": 2
+    },
+    "slots": {
+      "4": 5,
+      "5": 5,
+      "6": 5
+    }
+  },
+  {
+    "champion": "leesin",
+    "position": "jungle",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-solo/leesin_jungle.rsc",
+    "bytes": 307913,
+    "rows": {
+      "4": 5,
+      "5": 5,
+      "6": 2
+    },
+    "slots": {
+      "4": 5,
+      "5": 5,
+      "6": 5
+    }
+  },
+  {
+    "champion": "orianna",
+    "position": "mid",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-solo/orianna_mid.rsc",
+    "bytes": 294805,
+    "rows": {
+      "4": 5,
+      "5": 5,
+      "6": 0
+    },
+    "slots": {
+      "4": 5,
+      "5": 5,
+      "6": 0
+    }
+  },
+  {
+    "champion": "jinx",
+    "position": "adc",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-bot/jinx_adc_emerald_plus_16.18.rsc",
+    "bytes": 302624,
+    "rows": {
+      "4": 5,
+      "5": 5,
+      "6": 5
+    },
+    "slots": {
+      "4": 5,
+      "5": 5,
+      "6": 5
+    }
+  },
+  {
+    "champion": "kaisa",
+    "position": "adc",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-bot/kaisa_adc_emerald_plus_16.18.rsc",
+    "bytes": 305475,
+    "rows": {
+      "4": 5,
+      "5": 5,
+      "6": 5
+    },
+    "slots": {
+      "4": 5,
+      "5": 5,
+      "6": 5
+    }
+  },
+  {
+    "champion": "ashe",
+    "position": "adc",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-bot/ashe_adc_emerald_plus_16.18.rsc",
+    "bytes": 294230,
+    "rows": {
+      "4": 5,
+      "5": 5,
+      "6": 4
+    },
+    "slots": {
+      "4": 5,
+      "5": 5,
+      "6": 5
+    }
+  },
+  {
+    "champion": "lulu",
+    "position": "support",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-bot/lulu_support_emerald_plus_16.18.rsc",
+    "bytes": 303068,
+    "rows": {
+      "4": 5,
+      "5": 1,
+      "6": 0
+    },
+    "slots": {
+      "4": 5,
+      "5": 5,
+      "6": 0
+    }
+  },
+  {
+    "champion": "nami",
+    "position": "support",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-bot/nami_support_emerald_plus_16.18.rsc",
+    "bytes": 294430,
+    "rows": {
+      "4": 4,
+      "5": 1,
+      "6": 0
+    },
+    "slots": {
+      "4": 4,
+      "5": 4,
+      "6": 0
+    }
+  },
+  {
+    "champion": "yuumi",
+    "position": "support",
+    "tier": "emerald_plus",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-bot/yuumi_support_emerald_plus_16.18.rsc",
+    "bytes": 296026,
+    "rows": {
+      "4": 5,
+      "5": 1,
+      "6": 0
+    },
+    "slots": {
+      "4": 5,
+      "5": 5,
+      "6": 0
+    }
+  },
+  {
+    "champion": "lulu",
+    "position": "support",
+    "tier": "challenger",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-bot/lulu_support_challenger_16.18.rsc",
+    "bytes": 258959,
+    "rows": {
+      "4": 0,
+      "5": 0,
+      "6": 0
+    },
+    "slots": {
+      "4": 0,
+      "5": 0,
+      "6": 0
+    }
+  },
+  {
+    "champion": "anivia",
+    "position": "mid",
+    "tier": "challenger",
+    "patch": "16.18",
+    "path": "/private/tmp/item-depth-bot/anivia_mid_challenger_16.18.rsc",
+    "bytes": 150978,
+    "rows": {
+      "4": 0,
+      "5": 0,
+      "6": 0
+    },
+    "slots": {
+      "4": 0,
+      "5": 0,
+      "6": 0
+    }
+  }
+]

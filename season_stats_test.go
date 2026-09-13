@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -35,6 +36,22 @@ func TestSeasonRecordRankedMatchMirrorsSeasonStatsCriteria(t *testing.T) {
 	}
 	if first.Position != "middle" || first.Kills != 8 || first.Deaths != 2 || first.Assists != 6 || !first.Win {
 		t.Fatalf("unexpected ranked snapshot: %#v", first)
+	}
+}
+
+func TestSeasonQuerySnapshotCacheEvictsOldestEntry(t *testing.T) {
+	a := &app{}
+	now := time.Now()
+	a.seasonBackfillMu.Lock()
+	for index := 0; index < seasonQuerySnapshotsMax+1; index++ {
+		a.cacheSeasonQuerySnapshotLocked(fmt.Sprintf("snapshot-%03d", index), now)
+	}
+	a.seasonBackfillMu.Unlock()
+	if len(a.seasonQuerySnapshots) != seasonQuerySnapshotsMax {
+		t.Fatalf("season query snapshot cache size = %d, want %d", len(a.seasonQuerySnapshots), seasonQuerySnapshotsMax)
+	}
+	if _, exists := a.seasonQuerySnapshots["snapshot-000"]; exists {
+		t.Fatal("oldest season query snapshot was not evicted")
 	}
 }
 
@@ -291,7 +308,7 @@ func TestSeasonScanPagesClearsResumeIndexWhenComplete(t *testing.T) {
 	if !scan.cache.Complete || scan.cache.ResumeIndex != 0 {
 		t.Fatalf("completed scan retained a stale resume index: %#v", scan.cache)
 	}
-	foregroundKey := sourceScopedKey(dataSourceSGP, "HN1|subject|60|20|")
+	foregroundKey := sgpHistoryPageCacheKey("HN1", "subject", 60, sgpPageSize, nil)
 	provider.mu.Lock()
 	_, cached := provider.historyCache[foregroundKey]
 	provider.mu.Unlock()

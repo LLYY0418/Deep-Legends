@@ -1,13 +1,39 @@
 "use strict";
 
+// First executable statement in the shell. Everything before this mark is
+// Windows loading the executable plus Electron/Chromium cold boot -- on a
+// freshly installed, unsigned build that also includes the antivirus scan of
+// the new binaries, and no splash window can possibly appear during it.
+// Recording it here is the only way to tell that cost apart from our own.
+const startupMarks = { jsEntry: Date.now() };
+
 const { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell } = require("electron");
 const { spawn } = require("node:child_process");
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
-const { resolveSystemProxy } = require("./proxy-resolution.cjs");
-const { createShareExportController } = require("./share-export.cjs");
-const { windowBoundsForWorkArea } = require("./window-bounds.cjs");
+
+// Deliberately NOT required at module scope: none of these are needed before
+// the splash window exists, and every require() resolved out of the asar
+// archive delays the first frame the user sees.
+let attachDiagnosticsExport = null;
+let resolveSystemProxy = null;
+let createShareExportController = null;
+let windowBoundsForWorkArea = null;
+let readWindowBounds = null;
+let writeWindowBounds = null;
+let autoScaleFor = null;
+let normalizeScale = null;
+
+function loadDeferredModules() {
+  if (attachDiagnosticsExport) return;
+  ({ attachDiagnosticsExport } = require("./diagnostics-export.cjs"));
+  ({ resolveSystemProxy } = require("./proxy-resolution.cjs"));
+  ({ createShareExportController } = require("./share-export.cjs"));
+  ({ windowBoundsForWorkArea } = require("./window-bounds.cjs"));
+  ({ readWindowBounds, writeWindowBounds } = require("./window-bounds-store.cjs"));
+  ({ autoScaleFor, normalizeScale } = require("./ui-scale.cjs"));
+}
 
 const APP_ID = "cn.hexcore.lootassistant";
 const READY_PREFIX = "LOOT_READY ";
@@ -25,16 +51,22 @@ let shutdownStarted = false;
 let rendererTheme = null;
 let modalOpen = false;
 let shareExportController = null;
+let backendStarted = false;
+let backendStartTimer = null;
+let uiScalePreference = "auto";
+let currentUiScale = 1;
+let startupStageAgent = null;
+const reportedStartupStages = new Set();
 
 app.setAppUserModelId(APP_ID);
 
-if (!app.requestSingleInstanceLock()) {
+const hasInstanceLock = app.requestSingleInstanceLock();
+if (!hasInstanceLock) {
   app.quit();
 } else {
   app.on("second-instance", () => {
     if (!mainWindow) {
-      splashWindow?.show();
-      splashWindow?.focus();
+      if (startupMarks.splashWindowShown) { splashWindow?.show(); splashWindow?.focus(); }
       return;
     }
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -77,14 +109,20 @@ function iconPath() {
 function createSplashWindow() {
   let logo = "";
   try {
-    logo = `data:image/x-icon;base64,${fs.readFileSync(path.join(__dirname, "assets", "hexcore-icon.ico")).toString("base64")}`;
+    // Deliberately NOT hexcore-icon.ico: that file carries seven frames up to
+    // 256px (160KB), which became a ~225KB data: URL that Chromium had to parse
+    // and decode before the splash could paint anything. Measured cold-start
+    // splash paint was 975ms. splash-mark.png is the single 128px frame lifted
+    // out of the same icon (31KB), which is still sharp at the 94px render size
+    // on HiDPI displays.
+    logo = `data:image/png;base64,${fs.readFileSync(path.join(__dirname, "assets", "splash-mark.png")).toString("base64")}`;
   } catch (error) {
     appendDesktopLog(`启动标识读取失败：${error.message}`);
   }
   splashWindow = new BrowserWindow({
     width: 460,
     height: 292,
-    show: true,
+    show: false,
     frame: false,
     resizable: false,
     movable: true,
@@ -102,7 +140,15 @@ function createSplashWindow() {
     },
   });
   splashWindow.once("ready-to-show", () => {
-    if (splashWindow && !splashWindow.isDestroyed() && !splashWindow.isVisible()) splashWindow.show();
+    if (quitting || !splashWindow || splashWindow.isDestroyed()) return;
+    splashWindow.show();
+    startupMarks.splashWindowShown = Date.now();
+  });
+  // Preserve the R77 renderer-load cue for backend startup. This historical
+  // splashPaint mark is separate from actual window visibility above.
+  splashWindow.webContents.once("did-finish-load", () => {
+    if (!startupMarks.splashPainted) startupMarks.splashPainted = Date.now();
+    startBackendOnce();
   });
   splashWindow.on("closed", () => { splashWindow = null; });
   const markup = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>
@@ -122,11 +168,91 @@ function closeSplashWindow() {
   splashWindow.close();
 }
 
-function titleBarOverlay(theme, dimmed = modalOpen) {
+// Each stage is submitted when it happens, even if the main window never shows.
+// One socket preserves event order without waiting on diagnostics to build or
+// reveal a window. This is separate from the existing success-only summary.
+function reportStartupStage(stage) {
+  if (!backendReady || reportedStartupStages.has(stage)) return;
+  reportedStartupStages.add(stage);
+  const body = Buffer.from(JSON.stringify({ stage, elapsedMs: Math.max(0, Date.now() - startupMarks.jsEntry) }), "utf8");
+  try {
+    if (!startupStageAgent) startupStageAgent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+    const request = http.request(`${backendReady.baseUrl}/api/diagnostics/startup-stage`, {
+      method: "POST", agent: startupStageAgent,
+      headers: { "X-Local-Token": backendReady.token, "Content-Type": "application/json", "Content-Length": body.length },
+      timeout: 2000,
+    }, (response) => {
+      if (response.statusCode !== 204) appendDesktopLog(`启动阶段记录失败：${stage} HTTP ${response.statusCode}`);
+      response.resume();
+    });
+    request.once("error", () => appendDesktopLog(`启动阶段发送失败：${stage}`));
+    request.once("timeout", () => request.destroy());
+    request.end(body);
+  } catch (_) { appendDesktopLog(`启动阶段发送失败：${stage}`); }
+}
+
+// Keep the historical timing summary and payload unchanged; it is emitted only
+// after the main window is shown and remains the A/B collector's data source.
+function reportStartupPhases() {
+  const marks = startupMarks;
+  if (marks.reported || !backendReady) return;
+  marks.reported = true;
+  // Electron exposes the real OS process creation time; falling back to the
+  // first JS statement would silently hide the Electron boot cost, which is
+  // the exact thing we are trying to measure.
+  const created = typeof process.getCreationTime === "function" ? process.getCreationTime() : null;
+  const origin = Number.isFinite(created) ? created : marks.jsEntry;
+  const span = (from, to) => (Number.isFinite(from) && Number.isFinite(to) ? Math.max(0, Math.round(to - from)) : 0);
+  const payload = {
+    processToJs: span(origin, marks.jsEntry),
+    jsToReady: span(marks.jsEntry, marks.appReady),
+    readyToSplash: span(marks.appReady, marks.splashCreated),
+    splashPaint: span(marks.splashCreated, marks.splashPainted),
+    splashWindowShown: span(origin, marks.splashWindowShown),
+    spawnToReady: span(marks.backendSpawn, marks.backendReady),
+    readyToWindow: span(marks.backendReady, marks.mainShown),
+    total: span(origin, marks.mainShown),
+  };
+  appendDesktopLog(`启动耗时 ${JSON.stringify(payload)}`);
+  const body = Buffer.from(JSON.stringify(payload), "utf8");
+  const request = http.request(`${backendReady.baseUrl}/api/diagnostics/startup`, {
+    method: "POST",
+    headers: { "X-Local-Token": backendReady.token, "Content-Type": "application/json", "Content-Length": body.length },
+    timeout: 2000,
+  }, (response) => response.resume());
+  request.once("error", () => {});
+  request.once("timeout", () => request.destroy());
+  request.end(body);
+}
+
+function titleBarOverlay(theme, dimmed = modalOpen, scale = currentUiScale) {
   const dark = theme ? theme === "dark" : nativeTheme.shouldUseDarkColors;
-  // 高度需与前端 app.css 的 --topbar-height 保持一致，否则系统窗口按钮与顶栏错位。
-  if (dimmed) return { color: dark ? "#05070B" : "#8a8a8a", symbolColor: "#ffffff", height: 56 };
-  return { color: dark ? "#0B0E14" : "#ffffff", symbolColor: dark ? "#E8EAF0" : "#24211f", height: 56 };
+  // CSS topbar is 56px; the native overlay takes DIP, so it includes zoom.
+  const height = Math.round(56 * scale);
+  if (dimmed) return { color: dark ? "#05070B" : "#8a8a8a", symbolColor: "#ffffff", height };
+  return { color: dark ? "#0B0E14" : "#ffffff", symbolColor: dark ? "#E8EAF0" : "#24211f", height };
+}
+
+function syncTitleBar(scale = currentUiScale) {
+  if (process.platform === "win32" && mainWindow && !mainWindow.isDestroyed()) mainWindow.setTitleBarOverlay(titleBarOverlay(rendererTheme, modalOpen, scale));
+}
+
+function uiScaleState(window = mainWindow) {
+  const auto = autoScaleFor(window.getContentBounds());
+  return { mode: uiScalePreference === "auto" ? "auto" : "fixed", value: uiScalePreference === "auto" ? auto : uiScalePreference, auto };
+}
+
+function applyUiScale(window, scale, force = false) {
+  // The renderer performs the actual zoom (CSS `zoom` on .app-frame) so that the
+  // browser preview scales as well; the shell must NOT call setZoomFactor here or
+  // the two would multiply. Only the native chrome follows the step: the Windows
+  // caption overlay is DIP while --topbar-height is CSS px, and the minimum size
+  // has to grow or a 780px window would drop into the phone breakpoints.
+  if (!window || window !== mainWindow || window.isDestroyed()) return;
+  if (!force && currentUiScale === scale) return;
+  currentUiScale = scale;
+  syncTitleBar(scale);
+  window.setMinimumSize(Math.round(780 * scale), Math.round(600 * scale));
 }
 
 function appendDesktopLog(message) {
@@ -142,6 +268,29 @@ function appendDesktopLog(message) {
   } catch (_) {}
 }
 
+// Spawning the backend is NOT free on the main thread: libuv runs CreateProcessW
+// inline inside uv_spawn, and on a freshly installed unsigned build Windows
+// scans the new image while the process is being created. An earlier attempt to
+// start it before app.whenReady() -- on the theory that the backend is the long
+// pole -- backfired badly on real hardware: js_to_ready went 170ms -> 1557ms and
+// the splash slid from 2630ms to 4038ms after process start, which is exactly
+// the "nothing on screen" wait being complained about. Pixels first, then the
+// expensive work. The timer is a floor, not a schedule: if the splash renderer
+// never reports back we must still boot.
+function startBackendOnce() {
+  if (quitting) return;
+  if (backendStarted) return;
+  backendStarted = true;
+  clearTimeout(backendStartTimer);
+  backendStartTimer = null;
+  startBackend();
+  // Warm the deferred modules in the same window. The backend needs ~1.9s to
+  // answer on a cold start and nothing else competes for the main thread until
+  // it does, so paying the require cost here keeps it off the path between
+  // "backend ready" and "main window visible".
+  loadDeferredModules();
+}
+
 function startBackend() {
   let spec;
   try {
@@ -153,6 +302,7 @@ function startBackend() {
   }
   const childEnvironment = { ...process.env };
   delete childEnvironment.ELECTRON_RUN_AS_NODE;
+  startupMarks.backendSpawn = Date.now();
   backend = spawn(spec.command, spec.args, {
     cwd: spec.cwd,
     windowsHide: true,
@@ -165,7 +315,8 @@ function startBackend() {
   backend.stderr.setEncoding("utf8");
   backend.stderr.on("data", appendDesktopLog);
   backend.on("error", (error) => failStartup(`本地数据服务无法启动：${error.message}`));
-  backend.on("exit", (code, signal) => {
+  // close follows stdout EOF; exit may precede the final LOOT_QUIT message.
+  backend.on("close", (code, signal) => {
     clearTimeout(readyTimer);
     backend = null;
     if (!quitting && !shutdownStarted) failStartup(`本地数据服务已退出（${signal || code || "未知原因"}）。`);
@@ -177,6 +328,13 @@ function onBackendStdout(chunk) {
   const lines = stdoutBuffer.split(/\r?\n/);
   stdoutBuffer = lines.pop() || "";
   for (const line of lines) {
+    if (backendReady && (line === "LOOT_QUIT update" || line === "LOOT_QUIT user")) {
+      quitting = true;
+      shutdownStarted = true;
+      clearTimeout(readyTimer);
+      app.quit();
+      continue;
+    }
     if (!line.startsWith(READY_PREFIX)) continue;
     try {
       const payload = JSON.parse(line.slice(READY_PREFIX.length));
@@ -197,6 +355,8 @@ function acceptReadyPayload(payload) {
   }
   clearTimeout(readyTimer);
   backendReady = { baseUrl: base.origin, bootstrapUrl: bootstrap.toString(), token: payload.token };
+  startupMarks.backendReady = Date.now();
+  reportStartupStage("backend_ready");
   setSplashStatus("正在加载界面");
   createMainWindow();
   void pushSystemProxy();
@@ -205,6 +365,7 @@ function acceptReadyPayload(payload) {
 // 系统代理解析不再阻塞后端启动：后端就绪后异步解析并下发，
 // 英雄数据的联网请求在拿到结果前按“系统/环境代理”规则直连。
 async function pushSystemProxy() {
+  loadDeferredModules();
   let proxy = "";
   try {
     proxy = await resolveSystemProxy(session.defaultSession, "https://lol-api-champion.op.gg/");
@@ -233,18 +394,32 @@ function isLoopback(hostname) {
 // proportion on any resolution (small laptops through 4K monitors).
 function initialWindowBounds() {
   const { screen } = require("electron");
-  return windowBoundsForWorkArea(screen.getPrimaryDisplay().workAreaSize);
+  const display = screen.getPrimaryDisplay();
+  return windowBoundsForWorkArea(display.workAreaSize);
 }
 
 function createMainWindow() {
-  const bounds = initialWindowBounds();
+  loadDeferredModules();
+  const { screen } = require("electron");
+  const boundsPath = path.join(app.getPath("userData"), "window-bounds.json");
+  const scalePath = path.join(app.getPath("userData"), "ui-scale.json");
+  uiScalePreference = "auto";
+  currentUiScale = 1;
+  try {
+    if (fs.statSync(scalePath).size <= 1024) {
+      const stored = JSON.parse(fs.readFileSync(scalePath, "utf8"));
+      uiScalePreference = stored.mode === "fixed" ? normalizeScale(stored.value) : "auto";
+    }
+  } catch (_) { /* Missing or invalid preferences use auto. */ }
+  const storedBounds = readWindowBounds(boundsPath, screen.getAllDisplays());
+  const bounds = storedBounds || initialWindowBounds();
   mainWindow = new BrowserWindow({
     title: "Deep Legends",
     width: bounds.width,
     height: bounds.height,
     minWidth: 780,
     minHeight: 600,
-    center: true,
+    ...(storedBounds ? { x: bounds.x, y: bounds.y } : { center: true }),
     show: false,
     autoHideMenuBar: true,
     backgroundColor: titleBarOverlay(rendererTheme).color,
@@ -261,14 +436,85 @@ function createMainWindow() {
       spellcheck: false,
     },
   });
+  reportStartupStage("main_window_created");
+  if (storedBounds?.maximized) mainWindow.maximize();
+  let boundsWriteTimer = null;
+  const persistBounds = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const normal = mainWindow.isMaximized() ? mainWindow.getNormalBounds() : mainWindow.getBounds();
+    writeWindowBounds(boundsPath, { ...normal, maximized: mainWindow.isMaximized() });
+  };
+  const scheduleBoundsWrite = () => {
+    clearTimeout(boundsWriteTimer);
+    boundsWriteTimer = setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      applyUiScale(mainWindow, uiScaleState().value);
+      publishUiScale();
+      persistBounds();
+    }, 300);
+  };
+  mainWindow.on("resize", scheduleBoundsWrite);
+  mainWindow.on("move", scheduleBoundsWrite);
+  mainWindow.on("close", () => {
+    clearTimeout(boundsWriteTimer);
+    persistBounds();
+  });
   mainWindow.once("ready-to-show", () => {
+    reportStartupStage("main_window_ready_to_show");
     mainWindow?.show();
     closeSplashWindow();
+    startupMarks.mainShown = Date.now();
+    reportStartupPhases();
   });
-  const syncTitleBar = () => {
-    if (process.platform === "win32" && mainWindow && !mainWindow.isDestroyed()) mainWindow.setTitleBarOverlay(titleBarOverlay(rendererTheme));
+  let lastScaleState = "";
+  const publishUiScale = (force = false) => {
+    const state = uiScaleState();
+    const serialized = JSON.stringify(state);
+    if (!force && serialized === lastScaleState) return;
+    lastScaleState = serialized;
+    mainWindow.webContents.send("desktop-scale-changed", state);
   };
-  nativeTheme.on("updated", syncTitleBar);
+  mainWindow.webContents.on("did-finish-load", () => {
+    reportStartupStage("main_window_did_finish_load");
+    applyUiScale(mainWindow, uiScaleState().value, true);
+    publishUiScale(true);
+  });
+  const onDisplayMetricsChanged = () => {
+    applyUiScale(mainWindow, uiScaleState().value);
+    publishUiScale();
+  };
+  screen.on("display-metrics-changed", onDisplayMetricsChanged);
+  const onThemeUpdated = () => syncTitleBar();
+  nativeTheme.on("updated", onThemeUpdated);
+  ipcMain.removeHandler("desktop-scale-get");
+  ipcMain.handle("desktop-scale-get", (event) => {
+    if (!isTrustedRenderer(event.sender) || event.sender !== mainWindow?.webContents) return null;
+    return uiScaleState();
+  });
+  ipcMain.removeAllListeners("desktop-scale-set");
+  ipcMain.on("desktop-scale-set", (event, mode, value) => {
+    if (!isTrustedRenderer(event.sender)) return;
+    if (event.sender !== mainWindow?.webContents || !["auto", "fixed"].includes(mode)) return;
+    const next = mode === "auto" ? "auto" : normalizeScale(value);
+    if (mode === "fixed" && next === "auto") return;
+    if (next !== uiScalePreference) {
+      uiScalePreference = next;
+      try {
+        fs.mkdirSync(path.dirname(scalePath), { recursive: true });
+        fs.writeFileSync(`${scalePath}.tmp`, JSON.stringify({ mode, value: next }), { mode: 0o600 });
+        fs.renameSync(`${scalePath}.tmp`, scalePath);
+      } catch (error) { appendDesktopLog(`界面缩放偏好保存失败：${error.message}`); }
+    }
+    applyUiScale(mainWindow, uiScaleState().value);
+    publishUiScale();
+  });
+  ipcMain.removeAllListeners("desktop-scale-applied");
+  ipcMain.on("desktop-scale-applied", (event, scale) => {
+    if (!isTrustedRenderer(event.sender) || event.sender !== mainWindow?.webContents) return;
+    const step = normalizeScale(scale);
+    if (step === "auto") return;
+    applyUiScale(mainWindow, step, true);
+  });
   shareExportController?.clear();
   const windowShareExportController = createShareExportController({
     BrowserWindow,
@@ -280,6 +526,26 @@ function createMainWindow() {
     log: appendDesktopLog,
   });
   shareExportController = windowShareExportController;
+  let lastDiagnosticsFile = "";
+  const removeDiagnosticsExport = attachDiagnosticsExport({
+    session: mainWindow.webContents.session,
+    sender: mainWindow.webContents,
+    getBaseURL: () => backendReady?.baseUrl || "",
+    getDirectory: () => windowShareExportController.getSaveDirectory({ sender: mainWindow?.webContents }).directory,
+    fileSystem: fs,
+    onCompleted(file) {
+      lastDiagnosticsFile = file;
+      if (!mainWindow?.webContents.isDestroyed()) mainWindow.webContents.send("desktop-diagnostics-completed");
+    },
+  });
+  ipcMain.removeHandler("desktop-diagnostics-open-folder");
+  ipcMain.handle("desktop-diagnostics-open-folder", (event) => {
+    if ((event.sender !== mainWindow?.webContents || !isTrustedRenderer(event.sender)) || !lastDiagnosticsFile) return false;
+    shell.showItemInFolder(lastDiagnosticsFile);
+    lastDiagnosticsFile = "";
+    return true;
+  });
+  mainWindow.webContents.once("destroyed", removeDiagnosticsExport);
   ipcMain.removeHandler("desktop-share-prepare-save");
   ipcMain.handle("desktop-share-prepare-save", (event, suggestedName) => windowShareExportController.prepareSave(event, suggestedName));
   ipcMain.removeHandler("desktop-share-get-directory");
@@ -332,7 +598,11 @@ function createMainWindow() {
     }, 1200);
   });
   mainWindow.on("closed", () => {
-    nativeTheme.removeListener("updated", syncTitleBar);
+    clearTimeout(boundsWriteTimer);
+    nativeTheme.removeListener("updated", onThemeUpdated);
+    screen.removeListener("display-metrics-changed", onDisplayMetricsChanged);
+    ipcMain.removeHandler("desktop-scale-get");
+    ipcMain.removeAllListeners("desktop-scale-set");
     windowShareExportController.clear();
     if (shareExportController === windowShareExportController) shareExportController = null;
     mainWindow = null;
@@ -363,6 +633,7 @@ function isTrustedRenderer(webContents) {
 
 function failStartup(message) {
   clearTimeout(readyTimer);
+  clearTimeout(backendStartTimer);
   appendDesktopLog(message);
   if (quitting) return;
   void dialog.showMessageBox({ type: "error", title: "Deep Legends", message, detail: "可在本地数据目录的 logs 文件夹查看脱敏日志。" }).finally(() => {
@@ -398,18 +669,24 @@ async function shutdownBackend() {
 }
 
 app.whenReady().then(() => {
+  if (!hasInstanceLock) return;
+  startupMarks.appReady = Date.now();
   session.defaultSession.setPermissionCheckHandler((webContents, permission) => permission === "fullscreen" && isTrustedRenderer(webContents));
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => callback(permission === "fullscreen" && isTrustedRenderer(webContents)));
   createSplashWindow();
-  setImmediate(startBackend);
+  startupMarks.splashCreated = Date.now();
+  // Normally the splash's did-finish-load starts the backend a few frames from
+  // now. This is the fallback for a splash that fails to render at all.
+  backendStartTimer = setTimeout(startBackendOnce, 400);
 });
 
 app.on("activate", () => {
   if (mainWindow) mainWindow.show();
-  else splashWindow?.show();
+  else if (startupMarks.splashWindowShown) splashWindow?.show();
 });
 
 app.on("before-quit", (event) => {
+  clearTimeout(backendStartTimer);
   if (quitting) return;
   event.preventDefault();
   quitting = true;

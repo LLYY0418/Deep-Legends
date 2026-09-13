@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -86,6 +87,17 @@ var (
 	opggDepthGamesPattern   = regexp.MustCompile(`"?([0-9][0-9,]*)"?\s*(?:场|,\s*"场")`)
 )
 
+type opggDepthParseError struct {
+	depths []int // Stages supplied by the page whose rows could not be parsed.
+}
+
+func (*opggDepthParseError) Error() string { return "OP.GG item-depth response changed" }
+
+func isOPGGDepthParseError(err error) bool {
+	var parseErr *opggDepthParseError
+	return errors.As(err, &parseErr)
+}
+
 type opggArenaAugmentGroup struct {
 	Rarity   int                 `json:"rarity"`
 	Augments []opggAugmentMetric `json:"augments"`
@@ -137,19 +149,20 @@ const (
 )
 
 type opggModeSpec struct {
-	APIMode       string
-	Region        string
-	PositionMode  opggPositionMode
-	UsesTier      bool
-	HasRunes      bool
-	HasAugments   bool
-	HasCounters   bool
-	HasBanRate    bool
-	HasTopPlayers bool
+	APIMode            string
+	Region             string
+	PositionMode       opggPositionMode
+	UsesTier           bool
+	HasRunes           bool
+	HasAugments        bool
+	HasCounters        bool
+	HasBanRate         bool
+	HasTopPlayers      bool
+	SupportsItemDepths bool
 }
 
 var opggModeSpecs = map[string]opggModeSpec{
-	"ranked":       {APIMode: "ranked", Region: "KR", PositionMode: opggPositionRequired, UsesTier: true, HasRunes: true, HasCounters: true, HasBanRate: true, HasTopPlayers: true},
+	"ranked":       {APIMode: "ranked", Region: "KR", PositionMode: opggPositionRequired, UsesTier: true, HasRunes: true, HasCounters: true, HasBanRate: true, HasTopPlayers: true, SupportsItemDepths: true},
 	"aram":         {APIMode: "aram", Region: "KR", PositionMode: opggPositionLiteralNone, HasRunes: true},
 	"hextech-aram": {APIMode: "aram_mayhem", Region: "CN", PositionMode: opggPositionOmitted, HasRunes: false, HasAugments: true},
 	"arena":        {APIMode: "arena", Region: "global", PositionMode: opggPositionOmitted, HasAugments: true, HasBanRate: true},
@@ -357,8 +370,7 @@ func (p *championProvider) loadStructuredCounters(ctx context.Context, mode, cha
 	if json.Unmarshal(data, &payload) != nil || payload.Data.Summary.ID != id {
 		return championCounterSections{}, errors.New("OP.GG champion counters response changed")
 	}
-	counterValues := payload.Data.Counters
-	return p.structuredCountersForChampion(counterValues, id), nil
+	return p.structuredCountersForChampion(payload.Data.Counters, id), nil
 }
 
 func (p *championProvider) loadOPGGPageCounters(ctx context.Context, champion, position, tier, patch string) (championCounterSections, error) {
@@ -445,11 +457,19 @@ func (p *championProvider) loadOPGGPageCounters(ctx context.Context, champion, p
 	return result, nil
 }
 
-func parseOPGGDepthRows(data []byte) map[int][]championMetricRow {
-	expanded := expandRSCReferences(decodeNextFlight(data))
-	if !strings.Contains(expanded, `"depth_4_item_`) {
-		expanded = expandRSCReferences(string(data))
+func expandedOPGGItemDepths(data []byte) string {
+	flight := decodeNextFlight(data)
+	if flight == "" {
+		flight = string(data)
 	}
+	return expandRSCReferences(flight)
+}
+
+func parseOPGGDepthRows(data []byte) map[int][]championMetricRow {
+	return parseExpandedOPGGDepthRows(expandedOPGGItemDepths(data))
+}
+
+func parseExpandedOPGGDepthRows(expanded string) map[int][]championMetricRow {
 	result := make(map[int][]championMetricRow, 3)
 	for _, depth := range []int{4, 5, 6} {
 		segments := rscRowSegments(expanded, "depth_"+strconv.Itoa(depth)+"_item", 5)
@@ -496,7 +516,7 @@ func parseOPGGDepthRows(data []byte) map[int][]championMetricRow {
 	return result
 }
 
-func (p *championProvider) loadOPGGDepthRows(ctx context.Context, champion, position, tier, patch string) (map[int][]championMetricRow, time.Time, error) {
+func (p *championProvider) loadOPGGDepthRows(ctx context.Context, champion, position, tier, patch string, detailFetchedAt time.Time) (map[int][]championMetricRow, time.Time, error) {
 	slug := strings.ToLower(strings.TrimSpace(champion))
 	pagePosition, err := normalizeOPGGPosition(position)
 	if err != nil || !championSlugPattern.MatchString(slug) || pagePosition == "" {
@@ -505,12 +525,19 @@ func (p *championProvider) loadOPGGDepthRows(ctx context.Context, champion, posi
 		}
 		return nil, time.Time{}, err
 	}
+	// This page endpoint only serves ranked/Summoner's Rift item depths. The
+	// caller is gated by opggModeSpec.SupportsItemDepths so non-ranked modes can
+	// never leak through with a misleading type=ranked request.
 	query := url.Values{"region": {"kr"}, "tier": {tier}, "type": {"ranked"}}
 	if strings.TrimSpace(patch) != "" {
 		query.Set("patch", patch)
 	}
 	requestPath := "/zh-cn/lol/champions/" + slug + "/build/" + pagePosition + "?" + query.Encode()
-	cacheKey := strings.Join([]string{"v2", "opgg-depth", slug, pagePosition, tier, patch}, "|")
+	freshnessMarker := "unknown"
+	if !detailFetchedAt.IsZero() {
+		freshnessMarker = detailFetchedAt.UTC().Format(time.RFC3339Nano)
+	}
+	cacheKey := strings.Join([]string{"v3", "opgg-depth", slug, pagePosition, tier, patch, freshnessMarker}, "|")
 	loader := func(loadCtx context.Context) ([]byte, error) { return p.fetchOPGGRSCDirect(loadCtx, requestPath) }
 	var data []byte
 	var fetchedAt time.Time
@@ -524,9 +551,30 @@ func (p *championProvider) loadOPGGDepthRows(ctx context.Context, champion, posi
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	depths := parseOPGGDepthRows(data)
-	if len(depths[4]) == 0 || len(depths[5]) == 0 {
-		return nil, time.Time{}, errors.New("OP.GG item-depth response changed")
+	expanded := expandedOPGGItemDepths(data)
+	depths := parseExpandedOPGGDepthRows(expanded)
+	// A late item stage may be absent altogether on a new patch or a small
+	// champion/position sample. Only reject rows that were actually supplied
+	// but could not be parsed; never discard the other stages with real data.
+	var failedDepths []int
+	for _, depth := range []int{4, 5, 6} {
+		if len(depths[depth]) == 0 && strings.Contains(expanded, `"depth_`+strconv.Itoa(depth)+`_item_`) {
+			failedDepths = append(failedDepths, depth)
+		}
+	}
+	var parseErr error
+	if !itemDepthRowsAvailable(depths) || len(failedDepths) > 0 {
+		parseErr = &opggDepthParseError{depths: failedDepths}
+	}
+	if parseErr != nil {
+		if p.diag != nil {
+			p.diag(map[string]any{
+				"event": "opgg_item_depths_parsed_zero", "champion": slug, "position": pagePosition, "tier": tier,
+				"fields": bytes.Count(data, []byte(`"depth_`)), "rows": len(depths[4]) + len(depths[5]) + len(depths[6]),
+				"fourth": len(depths[4]), "fifth": len(depths[5]), "sixth": len(depths[6]),
+				"failed_depths": failedDepths,
+			})
+		}
 	}
 	for _, depth := range []int{4, 5, 6} {
 		for rowIndex := range depths[depth] {
@@ -536,10 +584,10 @@ func (p *championProvider) loadOPGGDepthRows(ctx context.Context, champion, posi
 			}
 		}
 	}
-	if p.diag != nil {
+	if p.diag != nil && parseErr == nil {
 		p.diag(map[string]any{"event": "opgg_item_depths_resolved", "champion": slug, "position": pagePosition, "tier": tier, "fourth": len(depths[4]), "fifth": len(depths[5]), "sixth": len(depths[6])})
 	}
-	return depths, fetchedAt, nil
+	return depths, fetchedAt, parseErr
 }
 
 func championItemAttempt(source string, err error) DataSourceAttempt {
@@ -560,6 +608,19 @@ func itemDepthRowsAvailable(depths map[int][]championMetricRow) bool {
 
 func itemDepthRowsReady(depths map[int][]championMetricRow) bool {
 	return len(depths[4]) > 0 && len(depths[5]) > 0
+}
+
+func itemDepthFallbackReady(depths map[int][]championMetricRow, opggErr error) bool {
+	var parseErr *opggDepthParseError
+	if errors.As(opggErr, &parseErr) && len(parseErr.depths) > 0 {
+		for _, depth := range parseErr.depths {
+			if len(depths[depth]) == 0 {
+				return false
+			}
+		}
+		return true
+	}
+	return itemDepthRowsReady(depths)
 }
 
 func mergeChampionItemDepths(preferred, fallback map[int][]championMetricRow) map[int][]championMetricRow {
@@ -596,8 +657,27 @@ func (p *championProvider) resolveRankedItemDepths(ctx context.Context, champion
 		return
 	}
 	build := &response.Build
-	qq101Useful := itemDepthRowsAvailable(qq101Depths)
+	qq101Useful := qq101Received && !qq101Deferred && qq101Err == nil && p.featureGates.enabled(featureGateQQ101) && itemDepthRowsAvailable(qq101Depths)
 	qq101Ready := itemDepthRowsReady(qq101Depths)
+	opggDepths, depthFetchedAt, opggErr := p.loadOPGGDepthRows(ctx, champion, position, tier, opggPatch, response.FetchedAt)
+	if opggErr == nil {
+		build.ItemAttempts = append(build.ItemAttempts, DataSourceAttempt{Source: dataSourceOPGG, Outcome: dataSourceSuccess})
+		applyChampionItemDepths(build, opggDepths)
+		build.ItemSource = "OP.GG"
+		build.ItemWindow = "当前版本"
+		build.ItemChainStatus = "ready"
+		response.Source = "OP.GG JSON + OP.GG RSC item depths"
+		response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "第四至第六件采用 OP.GG 当前版本统计")
+		if response.FetchedAt.IsZero() || (!depthFetchedAt.IsZero() && depthFetchedAt.Before(response.FetchedAt)) {
+			response.FetchedAt = depthFetchedAt
+		}
+		return
+	}
+	build.ItemAttempts = append(build.ItemAttempts, championItemAttempt(dataSourceOPGG, opggErr))
+	build.ItemFallback = "opgg-failed"
+	if p.diag != nil && !isCancellation(opggErr) && !isOPGGDepthParseError(opggErr) {
+		p.diag(map[string]any{"event": "opgg_item_depths_failed", "champion": champion, "position": position, "tier": tier, "error_kind": championProviderErrorKind(opggErr)})
+	}
 	switch {
 	case !p.featureGates.enabled(featureGateQQ101):
 		build.ItemAttempts = append(build.ItemAttempts, DataSourceAttempt{Source: dataSourceQQ101, Outcome: dataSourceDisabled, Message: "QQ101 数据源已由远程开关关闭"})
@@ -634,48 +714,46 @@ func (p *championProvider) resolveRankedItemDepths(ctx context.Context, champion
 		}
 	}
 
-	if qq101Ready {
-		applyChampionItemDepths(build, qq101Depths)
-		build.ItemSource = "QQ101"
-		build.ItemWindow = strings.TrimSpace("国服 " + qq101Patch)
-		build.ItemChainStatus = "ready"
-		response.Source = "OP.GG JSON + QQ101 item depths"
-		response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "第四至第六件优先采用腾讯掌上英雄联盟国服统计")
-		return
-	}
-
-	opggDepths, depthFetchedAt, opggErr := p.loadOPGGDepthRows(ctx, champion, position, tier, opggPatch)
-	if opggErr == nil {
-		build.ItemAttempts = append(build.ItemAttempts, DataSourceAttempt{Source: dataSourceOPGG, Outcome: dataSourceSuccess})
-		merged := mergeChampionItemDepths(qq101Depths, opggDepths)
-		applyChampionItemDepths(build, merged)
-		build.ItemWindow = "当前版本"
-		build.ItemChainStatus = "ready"
-		if qq101Useful {
-			build.ItemSource = "QQ101 + OP.GG"
-			response.Source = "OP.GG JSON + QQ101/OP.GG item depths"
-		} else {
-			build.ItemSource = "OP.GG"
-			response.Source = "OP.GG JSON + OP.GG RSC item depths"
-		}
-		response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "QQ101 不可用或数据不完整时显式回退到 OP.GG 当前版本统计")
-		if depthFetchedAt.After(response.FetchedAt) {
-			response.FetchedAt = depthFetchedAt
-		}
-		return
-	}
-
-	build.ItemAttempts = append(build.ItemAttempts, championItemAttempt(dataSourceOPGG, opggErr))
+	depths := opggDepths
+	var fallbackStages []string
 	if qq101Useful {
-		applyChampionItemDepths(build, qq101Depths)
+		depths = mergeChampionItemDepths(opggDepths, qq101Depths)
+		for _, depth := range []int{4, 5, 6} {
+			if len(opggDepths[depth]) == 0 && len(qq101Depths[depth]) > 0 {
+				fallbackStages = append(fallbackStages, "第"+strconv.Itoa(depth)+"件")
+			}
+		}
+	}
+	if itemDepthRowsAvailable(opggDepths) && (response.FetchedAt.IsZero() || (!depthFetchedAt.IsZero() && depthFetchedAt.Before(response.FetchedAt))) {
+		response.FetchedAt = depthFetchedAt
+	}
+	if len(fallbackStages) > 0 {
+		applyChampionItemDepths(build, depths)
 		build.ItemSource = "QQ101"
 		build.ItemWindow = strings.TrimSpace("国服 " + qq101Patch)
+		response.Source = "OP.GG JSON + QQ101 fallback item depths"
+		if itemDepthRowsAvailable(opggDepths) {
+			build.ItemSource = "OP.GG + QQ101"
+			build.ItemWindow = "当前版本 / " + build.ItemWindow
+			response.Source = "OP.GG JSON + OP.GG RSC / QQ101 fallback item depths"
+		}
+		if itemDepthFallbackReady(depths, opggErr) {
+			build.ItemChainStatus = "ready"
+		} else {
+			build.ItemChainStatus = "unavailable"
+		}
+		build.ItemFallback = "opgg-failed-qq101-fallback"
+		response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "保留 OP.GG 可用阶段；"+strings.Join(fallbackStages, "、")+"由 QQ101 补位")
+		return
+	}
+	if itemDepthRowsAvailable(opggDepths) {
+		applyChampionItemDepths(build, opggDepths)
+		build.ItemSource = "OP.GG"
+		build.ItemWindow = "当前版本"
+		response.Source = "OP.GG JSON + partial OP.GG RSC item depths"
 	}
 	build.ItemChainStatus = "unavailable"
-	response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "QQ101 与 OP.GG 第四至第六件装备统计均不完整，核心装仍可用")
-	if p.diag != nil {
-		p.diag(map[string]any{"event": "opgg_item_depths_failed", "champion": champion, "position": position, "tier": tier, "errorKind": championProviderErrorKind(opggErr)})
-	}
+	response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "部分装备阶段统计读取失败，保留已取得的核心装与阶段统计")
 }
 
 func fillMissingChampionCounters(current *championCounterSections, fallback championCounterSections) bool {
@@ -1139,22 +1217,29 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 	if spec.PositionMode == opggPositionRequired {
 		response.Positions = make([]championPositionOption, 0, len(payload.Data.Summary.Positions))
 		for _, raw := range payload.Data.Summary.Positions {
-			positionName := strings.ToLower(strings.TrimSpace(raw.Name))
+			positionName := normalizeQQ101Position(raw.Name)
 			upstreamName, ok := championPositionNames[positionName]
 			if !ok || upstreamName == "" {
 				continue
 			}
 			tierValue, rankValue := opggTierRank(raw.Stats)
+			roleRate := ratePercent(raw.Stats.RoleRate)
+			if roleRate == 0 && raw.Stats.Play > 0 && payload.Data.Summary.AverageStats.Play > 0 {
+				roleRate = percentOf(raw.Stats.Play, payload.Data.Summary.AverageStats.Play)
+			}
 			response.Positions = append(response.Positions, championPositionOption{
 				Position: positionName,
 				WinRate:  ratePercent(raw.Stats.WinRate),
 				PickRate: ratePercent(raw.Stats.PickRate),
 				BanRate:  ratePercent(raw.Stats.BanRate),
-				RoleRate: ratePercent(raw.Stats.RoleRate),
+				RoleRate: roleRate,
 				Play:     raw.Stats.Play,
 				Tier:     tierValue,
 				Rank:     rankValue,
 			})
+		}
+		if len(response.Positions) > 0 {
+			response.PositionsSource = "OP.GG"
 		}
 	}
 	var qq101Positions *qq101PositionsResult
@@ -1214,9 +1299,12 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 	}
 	if qq101Positions != nil {
 		if qq101Positions.err == nil {
+			before := len(response.Positions)
 			response.Positions = mergeQQ101PositionShares(response.Positions, qq101Positions.positions)
-			response.PositionsSource = "QQ101"
-			response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "分路占比采用腾讯掌上英雄联盟官方统计")
+			if len(response.Positions) > before {
+				response.PositionsSource = "OP.GG + QQ101 补位"
+				response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "QQ101 仅补充 OP.GG 未列出的偏门分路")
+			}
 			if p.diag != nil {
 				p.diag(map[string]any{"event": "qq101_positions_resolved", "champion": champion, "tier": tier, "patch": qq101Positions.patch, "positions": len(qq101Positions.positions)})
 			}
@@ -1240,7 +1328,7 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 		// 核心装是 OP.GG 已排序的推荐列表。保留完整的上游 15 条，
 		// 折叠展示数量由消费端决定，不能在数据投影层提前丢行。
 		response.Build.CoreItems = p.structuredRecommendationMetrics(payload.Data.CoreItems, "item", "core", championCoreRecommendationLimit)
-		if mode == "ranked" {
+		if spec.SupportsItemDepths {
 			var qq101Depths map[int][]championMetricRow
 			var qq101Patch string
 			var qq101Err error
@@ -1248,24 +1336,6 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 				qq101Depths, qq101Patch, qq101Err = qq101Build.depths, qq101Build.patch, qq101Build.err
 			}
 			p.resolveRankedItemDepths(ctx, metadata.Slug, position, tier, payload.Meta.Version, qq101Depths, qq101Patch, qq101Err, qq101Build != nil, buildDeferred, &response)
-		} else {
-			depths, depthFetchedAt, depthErr := p.loadOPGGDepthRows(ctx, metadata.Slug, position, tier, payload.Meta.Version)
-			response.Build.ItemSource = "OP.GG"
-			response.Build.ItemWindow = "当前版本"
-			if depthErr == nil {
-				applyChampionItemDepths(&response.Build, depths)
-				response.Build.ItemChainStatus = "ready"
-				response.Source = "OP.GG JSON + OP.GG RSC item depths"
-				if depthFetchedAt.After(response.FetchedAt) {
-					response.FetchedAt = depthFetchedAt
-				}
-			} else {
-				response.Build.ItemChainStatus = "unavailable"
-				response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "OP.GG 当前版本第四至第六件装备统计暂不可用，核心装仍可用")
-				if p.diag != nil {
-					p.diag(map[string]any{"event": "opgg_item_depths_failed", "champion": metadata.Slug, "position": position, "tier": tier, "errorKind": championProviderErrorKind(depthErr)})
-				}
-			}
 		}
 	}
 	if spec.HasRunes {
@@ -1352,12 +1422,17 @@ func (p *championProvider) structuredMetricCandidate(value opggMetric, assetKind
 }
 
 func (p *championProvider) structuredRecommendationMetrics(values []opggMetric, assetKind, diagnosticKind string, limit int) []championMetricRow {
-	result := make([]championMetricRow, 0, min(limit, len(values)))
+	candidates := make([]structuredMetricCandidate, 0, len(values))
 	for _, value := range values {
 		candidate, ok := p.structuredMetricCandidate(value, assetKind)
 		if !ok {
 			continue
 		}
+		candidates = append(candidates, candidate)
+	}
+	orderStructuredRecommendationCandidates(candidates)
+	result := make([]championMetricRow, 0, min(limit, len(candidates)))
+	for _, candidate := range candidates {
 		result = append(result, candidate.row)
 		if len(result) == limit {
 			break
@@ -1367,6 +1442,33 @@ func (p *championProvider) structuredRecommendationMetrics(values []opggMetric, 
 		p.diag(map[string]any{"event": "structured_recommendations", "kind": diagnosticKind, "in": len(values), "returned": len(result)})
 	}
 	return result
+}
+
+func orderStructuredRecommendationCandidates(candidates []structuredMetricCandidate) {
+	for _, candidate := range candidates {
+		if candidate.row.GamesUnavailable {
+			return
+		}
+	}
+	// Rows below 50 games stay behind every actionable sample and retain their
+	// upstream order. Actionable rows follow OP.GG's pick-rate order; older
+	// payloads without pick rate fall back to their game count.
+	sort.SliceStable(candidates, func(i, j int) bool {
+		leftReady := candidates[i].games >= structuredMetricMinimumGames
+		rightReady := candidates[j].games >= structuredMetricMinimumGames
+		if leftReady != rightReady {
+			return leftReady
+		}
+		if !leftReady {
+			return false
+		}
+		leftPick := candidates[i].row.PickRate
+		rightPick := candidates[j].row.PickRate
+		if leftPick > 0 && rightPick > 0 && leftPick != rightPick {
+			return leftPick > rightPick
+		}
+		return candidates[i].games > candidates[j].games
+	})
 }
 
 // structuredMetricsForKind keeps the established absolute and relative sample
@@ -1526,19 +1628,15 @@ func (p *championProvider) structuredCountersForChampion(values []opggCounter, s
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].WinRate < rows[j].WinRate })
 	result := championCounterSections{}
-	weakCount := min(5, (len(rows)+1)/2)
-	strongCount := min(5, len(rows)/2)
-	if len(rows) == 1 {
-		weakCount, strongCount = 0, 0
-		if rows[0].WinRate < 50 {
-			weakCount = 1
-		} else if rows[0].WinRate > 50 {
-			strongCount = 1
+	for _, row := range rows {
+		if row.WinRate < 50 && len(result.WeakAgainst) < 5 {
+			result.WeakAgainst = append(result.WeakAgainst, row)
 		}
 	}
-	result.WeakAgainst = append(result.WeakAgainst, rows[:weakCount]...)
-	for index := len(rows) - 1; index >= len(rows)-strongCount; index-- {
-		result.StrongAgainst = append(result.StrongAgainst, rows[index])
+	for index := len(rows) - 1; index >= 0 && len(result.StrongAgainst) < 5; index-- {
+		if rows[index].WinRate > 50 {
+			result.StrongAgainst = append(result.StrongAgainst, rows[index])
+		}
 	}
 	if p.diag != nil {
 		p.diag(map[string]any{"event": "counters_shape", "in": len(values), "out": len(rows), "dropped_no_meta": droppedNoMeta, "dropped_no_play": droppedNoPlay, "dropped_subject": droppedSubject, "dropped_duplicate": droppedDuplicate})

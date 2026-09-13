@@ -154,11 +154,11 @@ func TestQQ101PositionsParseSingleAndDualLaneShares(t *testing.T) {
 	}
 }
 
-func TestMergeQQ101PositionSharesPreservesOPGGOnlyLane(t *testing.T) {
+func TestMergeQQ101PositionSharesOnlyAppendsMissingLanes(t *testing.T) {
 	existing := []championPositionOption{{Position: "mid", RoleRate: 0, Play: 80}, {Position: "top", RoleRate: 0, Play: 20}}
-	official := []championPositionOption{{Position: "mid", RoleRate: 100}}
+	official := []championPositionOption{{Position: "mid", RoleRate: 100}, {Position: "support", RoleRate: 2}}
 	merged := mergeQQ101PositionShares(existing, official)
-	if len(merged) != 2 || merged[0].Position != "mid" || merged[0].RoleRate != 100 || merged[1].Position != "top" || merged[1].Play != 20 {
+	if len(merged) != 3 || merged[0].Position != "mid" || merged[0].RoleRate != 0 || merged[0].Play != 80 || merged[1].Position != "top" || merged[1].Play != 20 || merged[2].Position != "support" || merged[2].RoleRate != 2 {
 		t.Fatalf("partial QQ101 position merge = %#v", merged)
 	}
 }
@@ -343,7 +343,7 @@ func TestStructuredDetailUsesQQ101SharesAndExplicitOPGGVersion(t *testing.T) {
 			return qq101HTTPResponse(request, http.StatusOK, body), nil
 		case opggPageHost:
 			opggPageCalls++
-			return qq101HTTPResponse(request, http.StatusNotFound, nil), nil
+			return qq101HTTPResponse(request, http.StatusOK, opggItemDepthFixture()), nil
 		}
 		return nil, errors.New("unexpected detail request: " + request.URL.String())
 	})}
@@ -351,14 +351,17 @@ func TestStructuredDetailUsesQQ101SharesAndExplicitOPGGVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if detailVersion != "16.17" || detail.PositionsSource != "QQ101" || len(detail.Positions) != 2 || detail.Build.ItemSource != "QQ101" || detail.Build.ItemChainStatus != "ready" {
+	if detailVersion != "16.17" || detail.PositionsSource != "OP.GG" || len(detail.Positions) != 2 || detail.Build.ItemSource != "OP.GG" || detail.Build.ItemWindow != "当前版本" || detail.Build.ItemChainStatus != "ready" {
 		t.Fatalf("detail version/source/positions = %q/%q/%#v", detailVersion, detail.PositionsSource, detail.Positions)
 	}
-	if opggPageCalls != 0 || len(detail.Build.FourthItems) != 1 || len(detail.Build.ItemAttempts) != 1 || detail.Build.ItemAttempts[0].Source != dataSourceQQ101 || detail.Build.ItemAttempts[0].Outcome != dataSourceSuccess {
-		t.Fatalf("QQ101 item-depth decision = calls:%d build:%#v", opggPageCalls, detail.Build)
+	if opggPageCalls != 1 || len(detail.Build.FourthItems) != 1 || len(detail.Build.ItemAttempts) != 1 || detail.Build.ItemAttempts[0].Source != dataSourceOPGG || detail.Build.ItemAttempts[0].Outcome != dataSourceSuccess {
+		t.Fatalf("OP.GG-first item-depth decision = calls:%d build:%#v", opggPageCalls, detail.Build)
 	}
 	if math.Abs(detail.Positions[0].RoleRate+detail.Positions[1].RoleRate-100) > 0.01 {
 		t.Fatalf("detail lane shares = %#v", detail.Positions)
+	}
+	if detail.Positions[0].Position != "mid" || detail.Positions[0].RoleRate != 80 || detail.Positions[1].Position != "top" || detail.Positions[1].RoleRate != 20 {
+		t.Fatalf("OP.GG role_rate=0 was not recomputed from position play / average play: %#v", detail.Positions)
 	}
 }
 
@@ -388,11 +391,11 @@ func TestStructuredDetailFallsBackWhenQQ101PositionsAreEmpty(t *testing.T) {
 		return nil, errors.New("unexpected fallback request")
 	})}
 	detail, err := provider.loadStructuredDetail(context.Background(), "ranked", "ryze", "mid", "emerald_plus")
-	if err != nil || len(detail.Build.CoreItems) == 0 || len(detail.Positions) != 1 || detail.Positions[0].RoleRate != 100 || detail.PositionsSource != "" || detail.Build.ItemSource != "OP.GG" || detail.Build.ItemChainStatus != "ready" {
+	if err != nil || len(detail.Build.CoreItems) == 0 || len(detail.Positions) != 1 || detail.Positions[0].RoleRate != 100 || detail.PositionsSource != "OP.GG" || detail.Build.ItemSource != "OP.GG" || detail.Build.ItemChainStatus != "ready" {
 		t.Fatalf("fallback detail = %#v, err = %v", detail, err)
 	}
-	if len(detail.Build.ItemAttempts) != 2 || detail.Build.ItemAttempts[0].Source != dataSourceQQ101 || detail.Build.ItemAttempts[0].Outcome != dataSourceFailed || detail.Build.ItemAttempts[1].Source != dataSourceOPGG || detail.Build.ItemAttempts[1].Outcome != dataSourceSuccess {
-		t.Fatalf("empty QQ101 fallback attempts = %#v", detail.Build.ItemAttempts)
+	if len(detail.Build.ItemAttempts) != 1 || detail.Build.ItemAttempts[0].Source != dataSourceOPGG || detail.Build.ItemAttempts[0].Outcome != dataSourceSuccess {
+		t.Fatalf("OP.GG success should not expose QQ101 as a prerequisite: %#v", detail.Build.ItemAttempts)
 	}
 }
 
@@ -423,7 +426,7 @@ func TestStructuredDetailFallsBackWhenQQ101BuildTimesOut(t *testing.T) {
 		return nil, errors.New("unexpected timeout fallback request")
 	})}
 	detail, err := provider.loadStructuredDetail(t.Context(), "ranked", "ryze", "mid", "emerald_plus")
-	if err != nil || detail.Build.ItemSource != "OP.GG" || detail.Build.ItemFallback != "qq101-timeout" || len(detail.Build.ItemAttempts) != 2 || detail.Build.ItemAttempts[0].Outcome != dataSourceFailed || detail.Build.ItemAttempts[1].Outcome != dataSourceSuccess {
+	if err != nil || detail.Build.ItemSource != "OP.GG" || detail.Build.ItemFallback != "" || len(detail.Build.ItemAttempts) != 1 || detail.Build.ItemAttempts[0].Source != dataSourceOPGG || detail.Build.ItemAttempts[0].Outcome != dataSourceSuccess {
 		t.Fatalf("timeout fallback detail = %#v, err = %v", detail.Build, err)
 	}
 }
@@ -456,7 +459,7 @@ func TestStructuredDetailReportsBothItemDepthFailures(t *testing.T) {
 	if err != nil || len(detail.Build.CoreItems) == 0 || detail.Build.ItemChainStatus != "unavailable" || len(detail.Build.ItemAttempts) != 2 {
 		t.Fatalf("double failure detail = %#v, err = %v", detail, err)
 	}
-	if detail.Build.ItemAttempts[0].Source != dataSourceQQ101 || detail.Build.ItemAttempts[0].Outcome != dataSourceFailed || detail.Build.ItemAttempts[1].Source != dataSourceOPGG || detail.Build.ItemAttempts[1].Outcome != dataSourceFailed {
+	if detail.Build.ItemAttempts[0].Source != dataSourceOPGG || detail.Build.ItemAttempts[0].Outcome != dataSourceFailed || detail.Build.ItemAttempts[1].Source != dataSourceQQ101 || detail.Build.ItemAttempts[1].Outcome != dataSourceFailed {
 		t.Fatalf("double failure attempts = %#v", detail.Build.ItemAttempts)
 	}
 }

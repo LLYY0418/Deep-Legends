@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -61,15 +62,31 @@ type LootItem struct {
 	SplashPath           string `json:"splashPath,omitempty"`
 	IsSkinRelated        bool   `json:"isSkinRelated"`
 	Kind                 string `json:"kind,omitempty"`
+	rawKeyEmpty          bool
+	shapeDiagnostics     *lootShapeDiagnostics
+}
+
+type lootShapeDiagnostics struct {
+	rawEntries        int
+	kept              int
+	droppedZeroCount  int
+	typeCounts        map[string]int
+	idPrefixCounts    map[string]int
+	knownChestCounts  map[string]int
+	unnamedTypeCounts map[string]int
 }
 
 var lootChineseNames = map[string]string{
-	"CURRENCY_CHAMPION":      "蓝色精粹",
-	"CURRENCY_COSMETIC":      "橙色精粹",
-	"MATERIAL_KEY":           "战利品宝箱钥匙",
-	"MATERIAL_KEY_FRAGMENT":  "钥匙碎片",
+	"CURRENCY_CHAMPION":     "蓝色精粹",
+	"CURRENCY_COSMETIC":     "橙色精粹",
+	"MATERIAL_KEY":          "战利品宝箱钥匙",
+	"MATERIAL_KEY_FRAGMENT": "钥匙碎片",
+	// Legacy loot names live in rcp-fe-lol-loot/zh_cn/trans.json, not loot.json.
+	"MATERIAL_CLASHTICKETS":  "冠军杯赛挑战券",
+	"CHEST_128":              "英雄魔法引擎",
 	"CHEST_CHAMPION_MASTERY": "战利品宝箱",
 	"CHEST_PROMOTION":        "紫色宝箱",
+	"CHEST_GENERIC":          "海克斯科技宝箱",
 }
 
 var lootClientIcons = map[string]string{
@@ -77,31 +94,114 @@ var lootClientIcons = map[string]string{
 	"CURRENCY_COSMETIC":      "/fe/lol-loot/assets/loot_item_icons/currency_cosmetic.png",
 	"MATERIAL_KEY":           "/fe/lol-loot/assets/loot_item_icons/material_key.png",
 	"MATERIAL_KEY_FRAGMENT":  "/fe/lol-loot/assets/loot_item_icons/material_key_fragment.png",
+	"MATERIAL_CLASHTICKETS":  "/fe/lol-loot/assets/loot_item_icons/material_clashtickets.png",
+	"CHEST_128":              "/fe/lol-loot/assets/loot_item_icons/chest_128.png",
 	"CHEST_CHAMPION_MASTERY": "/fe/lol-loot/assets/loot_item_icons/chest_champion_mastery.png",
 	"CHEST_PROMOTION":        "/fe/lol-loot/assets/loot_item_icons/chest_promotion.png",
+	"CHEST_GENERIC":          "/fe/lol-loot/assets/loot_item_icons/chest_promotion.png",
+}
+
+type lootMetadata struct {
+	Name        string
+	Description string
+	Image       string
+}
+
+type communityDragonLootCatalog struct {
+	LootItems []struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Image       string `json:"image"`
+	} `json:"LootItems"`
+}
+
+func (p *championProvider) loadCommunityDragonLootMetadata(ctx context.Context) (map[string]lootMetadata, error) {
+	if p == nil {
+		return nil, errors.New("loot metadata provider is unavailable")
+	}
+	const requestPath = "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/loot.json"
+	data, err := p.fetch(ctx, communityDragonHost, requestPath, nil, championCacheMaxEntry, "application/json")
+	if err != nil {
+		return nil, err
+	}
+	return parseLootCatalog(data)
+}
+
+func parseLootCatalog(data []byte) (map[string]lootMetadata, error) {
+	var payload communityDragonLootCatalog
+	if json.Unmarshal(data, &payload) != nil || len(payload.LootItems) == 0 {
+		return nil, errors.New("CommunityDragon loot catalog response changed")
+	}
+	result := make(map[string]lootMetadata, len(payload.LootItems))
+	for _, item := range payload.LootItems {
+		token := normalizeLootToken(item.ID)
+		if token == "" {
+			continue
+		}
+		result[token] = lootMetadata{
+			Name: strings.TrimSpace(item.Name), Description: strings.TrimSpace(item.Description),
+			Image: sanitizeClientImagePath(item.Image),
+		}
+	}
+	return result, nil
 }
 
 func enrichLootItems(items []LootItem, skins []Skin) []LootItem {
+	return enrichLootItemsWithMetadata(items, skins, nil, nil)
+}
+
+func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[string]lootMetadata, observe func(map[string]any)) []LootItem {
 	byID := make(map[int64]Skin, len(skins))
 	championNames := make(map[int64]string)
+	var shape *lootShapeDiagnostics
+	if len(items) > 0 {
+		shape = items[0].shapeDiagnostics
+	}
 	for _, skin := range skins {
 		byID[skin.ID] = skin
 		if skin.ChampionID > 0 && strings.TrimSpace(skin.ChampionName) != "" {
 			championNames[skin.ChampionID] = skin.ChampionName
 		}
 	}
+	kept := items[:0]
 	for index := range items {
 		item := &items[index]
+		drop := false
+		// A real localized inventory name is more specific than a public catalog.
+		if lootNameMissing(*item, item.DisplayName) && !lootNameMissing(*item, item.LocalizedName) {
+			item.DisplayName = strings.TrimSpace(item.LocalizedName)
+		}
 		for _, raw := range []string{item.LootID, item.LootName} {
-			token := normalizeLootToken(raw)
-			if name, ok := lootChineseNames[token]; ok {
-				item.DisplayName = name
+			entry, ok := metadata[normalizeLootToken(raw)]
+			if !ok {
+				continue
+			}
+			if lootNameMissing(*item, item.DisplayName) && !lootNameMissing(*item, entry.Name) {
+				item.DisplayName = entry.Name
+			}
+			if item.LocalizedDescription == "" {
+				item.LocalizedDescription = entry.Description
 			}
 			if item.Asset == "" {
-				item.Asset = lootClientIcons[token]
+				item.Asset = entry.Image
+			}
+			break
+		}
+		for _, raw := range []string{item.LootID, item.LootName} {
+			token := normalizeLootToken(raw)
+			if name, ok := lootChineseNames[token]; ok && lootNameMissing(*item, item.DisplayName) {
+				item.DisplayName = name
+			}
+			if icon, ok := lootClientIcons[token]; ok {
+				item.Asset = icon
 			}
 		}
 		item.Category = lootCategory(*item)
+		if observe != nil && (item.Category == "宝箱" || (item.Category == "皮肤" && lootSkinID(*item) == 0)) {
+			observe(map[string]any{"event": "loot_category_assigned", "category": item.Category,
+				"id_prefix": lootIDPrefix(item.LootID), "type": normalizeLootToken(item.Type)})
+		}
 		if item.Category == "皮肤" {
 			item.Kind = lootSkinKind(*item)
 			if skinID := lootSkinID(*item); skinID > 0 {
@@ -132,11 +232,85 @@ func enrichLootItems(items []LootItem, skins []Skin) []LootItem {
 		if item.DisplayName == "" {
 			item.DisplayName = lootDisplayName(*item)
 		}
-		if strings.TrimSpace(item.DisplayName) == "" || item.DisplayName == "未命名战利品" {
-			item.DisplayName = "未识别材料"
+		if lootNameMissing(*item, item.DisplayName) {
+			if observe != nil {
+				observe(map[string]any{
+					"event": "loot_name_fallback", "loot_id_prefix": lootIDPrefix(item.LootID),
+					"has_localized_name":       strings.TrimSpace(item.LocalizedName) != "",
+					"has_loot_name":            strings.TrimSpace(item.LootName) != "",
+					"localized_is_placeholder": strings.TrimSpace(item.LocalizedName) == "未命名战利品",
+					"raw_key_empty":            item.rawKeyEmpty,
+					"type_empty":               strings.TrimSpace(item.Type) == "",
+					"display_categories":       normalizeLootToken(item.DisplayCategories),
+				})
+			}
+			if item.shapeDiagnostics != nil {
+				// Count entries, not inventory quantity: this preserves the privacy
+				// boundary while showing which LCU type still lacks a display name.
+				item.shapeDiagnostics.unnamedTypeCounts[normalizeLootToken(item.Type)]++
+			}
+			item.DisplayName = strings.TrimSpace(item.LootID)
+			if item.DisplayName == "" {
+				item.DisplayName = strings.TrimSpace(item.LootName)
+			}
+			if item.DisplayName == "" {
+				drop = true
+			}
+		}
+		if !drop {
+			kept = append(kept, *item)
 		}
 	}
+	items = kept
+	if shape != nil {
+		shape.kept = len(items)
+	}
+	if observe != nil && shape != nil {
+		observe(map[string]any{
+			"event": "loot_map_shape", "raw_entries": shape.rawEntries, "kept": shape.kept,
+			"dropped_zero_count": shape.droppedZeroCount, "type_counts": shape.typeCounts,
+			"id_prefix_counts": shape.idPrefixCounts, "known_chest_counts": shape.knownChestCounts, "unnamed_type_counts": shape.unnamedTypeCounts,
+		})
+	}
 	return items
+}
+
+func lootIDPrefix(value string) string {
+	token := normalizeLootToken(value)
+	for _, prefix := range []string{"CHEST_", "MATERIAL_", "CURRENCY_", "CHAMPION_", "SKIN_", "STATSTONE_", "EMOTE_", "WARD_", "WARDSKIN_", "SUMMONER_ICON_", "SUMMONERICON_", "COMPANION_", "TFT_"} {
+		if strings.HasPrefix(token, prefix) {
+			return prefix
+		}
+	}
+	return "OTHER"
+}
+
+func lootNameMissing(item LootItem, name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" || name == "未命名战利品" {
+		return true
+	}
+	if id := strings.TrimSpace(item.LootID); id != "" && normalizeLootToken(name) == normalizeLootToken(id) {
+		return true
+	}
+	return lootIDPrefix(item.LootName) != "OTHER" && normalizeLootToken(name) == normalizeLootToken(item.LootName)
+}
+
+func lootKnownChestKind(value string) string {
+	switch normalizeLootToken(value) {
+	case "CHEST_CHAMPION_MASTERY":
+		return "mastery"
+	case "CHEST_PROMOTION":
+		return "promotion"
+	case "CHEST_GENERIC":
+		return "generic"
+	case "CHEST_224":
+		return "masterwork"
+	case "CHEST_688":
+		return "premium-mastery"
+	default:
+		return "other"
+	}
 }
 
 func lootSkinKind(item LootItem) string {
@@ -147,9 +321,24 @@ func lootSkinKind(item LootItem) string {
 	return "完整皮肤"
 }
 
+func lootIsChest(item LootItem) bool {
+	if normalizeLootToken(item.Type) == "CHEST" {
+		return true
+	}
+	for _, value := range []string{item.LootID, item.LootName} {
+		if strings.HasPrefix(normalizeLootToken(value), "CHEST_") {
+			return true
+		}
+	}
+	return false
+}
+
 func lootCategory(item LootItem) string {
 	combined := strings.Join([]string{normalizeLootToken(item.Type), normalizeLootToken(item.DisplayCategories), normalizeLootToken(item.LootID), normalizeLootToken(item.LootName)}, "_")
 	switch {
+	// Classify the container itself, not the skin/emote it might contain.
+	case lootIsChest(item):
+		return "宝箱"
 	case item.IsSkinRelated:
 		return "皮肤"
 	case lootChampionID(item) > 0:
@@ -220,15 +409,17 @@ type RewardItem struct {
 }
 
 type RewardGrant struct {
-	ID            string       `json:"id"`
-	RewardGroupID string       `json:"rewardGroupId,omitempty"`
-	Status        string       `json:"status"`
-	DateCreated   string       `json:"dateCreated,omitempty"`
-	Title         string       `json:"title,omitempty"`
-	Description   string       `json:"description,omitempty"`
-	MinSelections int          `json:"minSelections,omitempty"`
-	MaxSelections int          `json:"maxSelections,omitempty"`
-	Items         []RewardItem `json:"items"`
+	ValidationError string       `json:"-"`
+	ID              string       `json:"id"`
+	RewardGroupID   string       `json:"rewardGroupId,omitempty"`
+	DisplayGroup    string       `json:"displayGroup,omitempty"`
+	Status          string       `json:"status"`
+	DateCreated     string       `json:"dateCreated,omitempty"`
+	Title           string       `json:"title,omitempty"`
+	Description     string       `json:"description,omitempty"`
+	MinSelections   int          `json:"minSelections,omitempty"`
+	MaxSelections   int          `json:"maxSelections,omitempty"`
+	Items           []RewardItem `json:"items"`
 }
 
 type AccountData struct {
@@ -255,10 +446,16 @@ type SkinDetailData struct {
 	OwnsBorder           bool `json:"ownsBorder"`
 }
 
-type SummonerAPI struct{ client *LCUClient }
+type SummonerAPI struct {
+	client *LCUClient
+	ctx    context.Context
+}
 type SkinCatalogAPI struct{ client *LCUClient }
 type InventoryAPI struct{ client *LCUClient }
-type LootAPI struct{ client *LCUClient }
+type LootAPI struct {
+	client  *LCUClient
+	observe func(map[string]any)
+}
 type RewardsAPI struct{ client *LCUClient }
 type ChampionMasteryAPI struct{ client *LCUClient }
 type StoreAPI struct{ client *LCUClient }
@@ -268,7 +465,10 @@ func NewSummonerAPI(client *LCUClient) SummonerAPI       { return SummonerAPI{cl
 func NewSkinCatalogAPI(client *LCUClient) SkinCatalogAPI { return SkinCatalogAPI{client: client} }
 func NewInventoryAPI(client *LCUClient) InventoryAPI     { return InventoryAPI{client: client} }
 func NewLootAPI(client *LCUClient) LootAPI               { return LootAPI{client: client} }
-func NewRewardsAPI(client *LCUClient) RewardsAPI         { return RewardsAPI{client: client} }
+func NewObservedLootAPI(client *LCUClient, observe func(map[string]any)) LootAPI {
+	return LootAPI{client: client, observe: observe}
+}
+func NewRewardsAPI(client *LCUClient) RewardsAPI { return RewardsAPI{client: client} }
 func NewChampionMasteryAPI(client *LCUClient) ChampionMasteryAPI {
 	return ChampionMasteryAPI{client: client}
 }
@@ -277,28 +477,45 @@ func NewSkinAppearanceAPI(client *LCUClient) SkinAppearanceAPI {
 	return SkinAppearanceAPI{client: client}
 }
 
+func (api SummonerAPI) withContext(ctx context.Context) SummonerAPI {
+	api.ctx = ctx
+	return api
+}
+
 func (api SummonerAPI) Current() (Summoner, error) {
+	ctx := api.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	var object map[string]any
-	if err := api.client.GetJSON("/lol-summoner/v1/current-summoner", &object); err != nil {
+	if err := api.client.GetJSONContext(ctx, "/lol-summoner/v1/current-summoner", &object); err != nil {
 		return Summoner{}, fmt.Errorf("current summoner: %w", err)
 	}
-	summoner := Summoner{
-		SummonerID: firstInt(object, "summonerId"), AccountID: firstInt(object, "accountId"),
-		PUUID: firstString(object, "puuid"), DisplayName: firstString(object, "displayName"),
-		GameName: firstString(object, "gameName"), TagLine: firstString(object, "tagLine"),
-		ProfileIconID: firstInt(object, "profileIconId"), SummonerLevel: firstInt(object, "summonerLevel"),
-	}
+	summoner := summonerFromLCUObject(object)
 	if summoner.SummonerID == 0 {
 		return Summoner{}, errors.New("current summoner is not ready")
 	}
 	return summoner, nil
 }
 
+func summonerFromLCUObject(object map[string]any) Summoner {
+	return Summoner{
+		SummonerID: firstInt(object, "summonerId"), AccountID: firstInt(object, "accountId"),
+		PUUID: firstString(object, "puuid"), DisplayName: firstString(object, "displayName"),
+		GameName: firstString(object, "gameName"), TagLine: firstString(object, "tagLine"),
+		ProfileIconID: firstInt(object, "profileIconId"), SummonerLevel: firstInt(object, "summonerLevel"),
+	}
+}
+
 func (api SummonerAPI) Profile() (SummonerProfile, EndpointCapability) {
 	const path = "/lol-summoner/v1/current-summoner/summoner-profile"
 	var profile SummonerProfile
 	capability := EndpointCapability{Name: "summoner-profile", Path: path}
-	if err := api.client.GetJSON(path, &profile); err != nil {
+	ctx := api.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := api.client.GetJSONContext(ctx, path, &profile); err != nil {
 		return SummonerProfile{}, optionalCapabilityError(capability, err)
 	}
 	capability.State = capabilityAvailable
@@ -480,7 +697,16 @@ func (api LootAPI) PlayerLoot() ([]LootItem, EndpointCapability) {
 		return nil, optionalCapabilityError(capability, err)
 	}
 	items := make([]LootItem, 0, len(lootMap))
+	droppedZeroCount := 0
+	typeCounts := make(map[string]int)
+	idPrefixCounts := make(map[string]int)
+	knownChestCounts := make(map[string]int)
+	shape := &lootShapeDiagnostics{
+		rawEntries: len(lootMap), typeCounts: typeCounts, idPrefixCounts: idPrefixCounts, knownChestCounts: knownChestCounts,
+		unnamedTypeCounts: make(map[string]int),
+	}
 	for key, item := range lootMap {
+		item.rawKeyEmpty = strings.TrimSpace(key) == ""
 		if item.LootID == "" {
 			item.LootID = key
 		}
@@ -490,7 +716,19 @@ func (api LootAPI) PlayerLoot() ([]LootItem, EndpointCapability) {
 		item.IsSkinRelated = isSkinLoot(item)
 		if item.Count > 0 {
 			items = append(items, item)
+			typeCounts[normalizeLootToken(item.Type)]++
+			idPrefixCounts[lootIDPrefix(item.LootID)]++
+			if lootIDPrefix(item.LootID) == "CHEST_" {
+				knownChestCounts[lootKnownChestKind(item.LootID)]++
+			}
+		} else {
+			droppedZeroCount++
 		}
+	}
+	shape.kept = len(items)
+	shape.droppedZeroCount = droppedZeroCount
+	for index := range items {
+		items[index].shapeDiagnostics = shape
 	}
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].IsSkinRelated != items[j].IsSkinRelated {
@@ -504,6 +742,13 @@ func (api LootAPI) PlayerLoot() ([]LootItem, EndpointCapability) {
 	})
 	capability.State = capabilityAvailable
 	capability.Count = len(items)
+	if api.observe != nil && len(items) == 0 {
+		api.observe(map[string]any{
+			"event": "loot_map_shape", "raw_entries": len(lootMap), "kept": len(items),
+			"dropped_zero_count": droppedZeroCount, "type_counts": typeCounts, "id_prefix_counts": idPrefixCounts,
+			"known_chest_counts": knownChestCounts, "unnamed_type_counts": map[string]int{},
+		})
+	}
 	return items, capability
 }
 
@@ -619,27 +864,54 @@ func (api RewardsAPI) PendingGrantsContext(ctx context.Context) ([]RewardGrant, 
 			MaxSelections: source.RewardGroup.SelectionStrategyConfig.MaxSelectionsAllowed,
 		}
 		for _, item := range source.RewardGroup.Rewards {
-			grant.Items = append(grant.Items, RewardItem{ID: item.ID, ItemID: item.ItemID, ItemType: item.ItemType, Title: item.Localizations.Title, Details: item.Localizations.Details, Quantity: item.Quantity, IconURL: sanitizeAssetPath(item.Media.IconURL)})
+			quantity := item.Quantity
+			// Display rewards may omit quantity while the matching grant element
+			// supplies it. Require exact option and item identity; never borrow a
+			// quantity from another currency reward or sum duplicate elements.
+			for _, element := range source.Info.GrantElements {
+				if item.ID == "" || element.ElementID != item.ID || item.ItemID == "" || element.ItemID != item.ItemID || item.ItemType == "" || !strings.EqualFold(element.ItemType, item.ItemType) || element.Quantity <= 0 {
+					continue
+				}
+				if quantity > 0 && quantity != element.Quantity {
+					grant.ValidationError = "同一奖励返回了不同数量，请在客户端确认"
+					continue
+				}
+				quantity = element.Quantity
+			}
+			grant.Items = append(grant.Items, RewardItem{ID: item.ID, ItemID: item.ItemID, ItemType: item.ItemType, Title: item.Localizations.Title, Details: item.Localizations.Details, Quantity: quantity, IconURL: sanitizeAssetPath(item.Media.IconURL)})
 		}
 		if len(grant.Items) == 0 {
 			for _, item := range source.Info.GrantElements {
-				grant.Items = append(grant.Items, RewardItem{ID: item.ElementID, ItemID: item.ItemID, ItemType: item.ItemType, Quantity: item.Quantity})
+				grant.Items = append(grant.Items, RewardItem{ID: item.ElementID, ItemID: item.ItemID, ItemType: item.ItemType, Title: item.ItemID, Quantity: item.Quantity})
 			}
 		}
-		if grant.MaxSelections > len(grant.Items) {
-			grant.MaxSelections = len(grant.Items)
-		}
-		if grant.MinSelections > grant.MaxSelections && grant.MaxSelections > 0 {
-			grant.MinSelections = grant.MaxSelections
-		}
-		if grant.Title == "待领取奖励" {
-			grant.Title = fmt.Sprintf("未命名奖励组 (%d)", len(grant.Items))
-		}
+		// Missing localization is not evidence of a battle pass. Keep each grant's
+		// identity; equal currency rewards can belong to different entitlements.
 		grants = append(grants, grant)
 	}
 	capability.State = capabilityAvailable
+	grants = uniqueRewardGrants(grants)
 	capability.Count = len(grants)
 	return grants, capability
+}
+
+// Only a grant ID identifies an entitlement. Equal items or localization do not.
+func uniqueRewardGrants(grants []RewardGrant) []RewardGrant {
+	result := make([]RewardGrant, 0, len(grants))
+	seen := make(map[string]int, len(grants))
+	for _, grant := range grants {
+		if index, ok := seen[grant.ID]; ok && grant.ID != "" {
+			previous := result[index]
+			previous.ValidationError = ""
+			if !reflect.DeepEqual(previous, grant) {
+				result[index].ValidationError = "同一奖励标识返回了不同明细，请在客户端确认"
+			}
+			continue
+		}
+		seen[grant.ID] = len(result)
+		result = append(result, grant)
+	}
+	return result
 }
 
 func rewardTitle(value string) string {

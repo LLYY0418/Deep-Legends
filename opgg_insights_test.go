@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -151,11 +152,13 @@ func TestOPGGHistoricalRanksStartDoesNotBlockCaller(t *testing.T) {
 func TestGameplayMatchTiersKeepsCNContract(t *testing.T) {
 	playerPUUID := strings.Repeat("p", 48)
 	currentPUUID := strings.Repeat("c", 48)
+	var rankedCalls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/lol-ranked/v1/ranked-stats/"+playerPUUID {
 			http.Error(w, "unexpected endpoint", http.StatusNotFound)
 			return
 		}
+		rankedCalls.Add(1)
 		_, _ = io.WriteString(w, `{"queues":[{"queueType":"RANKED_SOLO_5x5","tier":"GOLD","division":"II","leaguePoints":55,"wins":12,"losses":8}]}`)
 	}))
 	defer server.Close()
@@ -183,6 +186,18 @@ func TestGameplayMatchTiersKeepsCNContract(t *testing.T) {
 	}
 	if player := response.Players[publicRef]; player.Score != 1455 || player.Tier != "GOLD" || player.Division != "II" {
 		t.Fatalf("per-player response = %#v", response.Players)
+	}
+	secondRecorder := httptest.NewRecorder()
+	a.handleGameplayMatchTiers(secondRecorder, httptest.NewRequest(http.MethodPost, "/api/gameplay/match-tiers", strings.NewReader(string(body))))
+	var second matchTiersResponse
+	if secondRecorder.Code != http.StatusOK {
+		t.Fatalf("cached status = %d: %s", secondRecorder.Code, secondRecorder.Body.String())
+	}
+	if err := json.Unmarshal(secondRecorder.Body.Bytes(), &second); err != nil {
+		t.Fatal(err)
+	}
+	if second.CacheHits != 1 || rankedCalls.Load() != 1 {
+		t.Fatalf("cached response = %#v, ranked calls = %d", second, rankedCalls.Load())
 	}
 }
 
@@ -256,6 +271,73 @@ func TestPlayerRankScoreAllConcurrentFollowersReceiveLeaderResult(t *testing.T) 
 	}
 	if calls.Load() != 1 {
 		t.Fatalf("ranked lookups = %d, want 1", calls.Load())
+	}
+}
+
+func TestPlayerRankScoreNegativeCacheStopsImmediateLCURetry(t *testing.T) {
+	playerPUUID := strings.Repeat("n", 48)
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		http.Error(w, "temporarily unavailable", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	a := &app{rankScores: newRankScoreCache()}
+	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client(), platformProbe: true}
+	first := a.playerRankScore(context.Background(), client, playerPUUID, false, "", "")
+	second := a.playerRankScore(context.Background(), client, playerPUUID, false, "", "")
+	if calls.Load() != 1 || !first.negative || !second.negative || first.capability.State == capabilityAvailable {
+		t.Fatalf("negative rank cache = calls:%d first:%#v second:%#v", calls.Load(), first, second)
+	}
+}
+
+func TestGameplayMatchTiersUsesOneGlobalLCUConcurrencyGate(t *testing.T) {
+	var active atomic.Int32
+	var maximum atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/lol-ranked/v1/ranked-stats/") {
+			http.NotFound(w, r)
+			return
+		}
+		current := active.Add(1)
+		defer active.Add(-1)
+		for {
+			observed := maximum.Load()
+			if current <= observed || maximum.CompareAndSwap(observed, current) {
+				break
+			}
+		}
+		time.Sleep(40 * time.Millisecond)
+		_, _ = io.WriteString(w, `{"queues":[{"queueType":"RANKED_SOLO_5x5","tier":"GOLD","division":"II","leaguePoints":55,"wins":12,"losses":8}]}`)
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client(), platformProbe: true}
+	a := &app{
+		connected: true, lcu: client, summoner: currentSummoner(strings.Repeat("c", 48)), rankScores: newRankScoreCache(),
+		gameplayRefs: make(map[string]string), gameplayRefDetails: make(map[string]gameplayReference),
+	}
+	publicRefs := make([]string, 8)
+	for index := range publicRefs {
+		playerRef := strings.Repeat(string(rune('m'+index)), 48)
+		publicRefs[index] = a.registerGameplayReferenceDetails(gameplayReference{PlayerRef: playerRef})
+	}
+	var wait sync.WaitGroup
+	for _, publicRef := range publicRefs {
+		publicRef := publicRef
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			body, _ := json.Marshal(matchTiersRequest{PlayerRefs: []string{publicRef}})
+			recorder := httptest.NewRecorder()
+			a.handleGameplayMatchTiers(recorder, httptest.NewRequest(http.MethodPost, "/api/gameplay/match-tiers", strings.NewReader(string(body))))
+			if recorder.Code != http.StatusOK {
+				t.Errorf("status = %d: %s", recorder.Code, recorder.Body.String())
+			}
+		}()
+	}
+	wait.Wait()
+	if got := maximum.Load(); got > matchTiersRankConcurrency {
+		t.Fatalf("LCU ranked concurrency = %d, want <= %d", got, matchTiersRankConcurrency)
 	}
 }
 
@@ -616,7 +698,7 @@ func TestLoadRiotOverviewLoadsOPGGHistoryWithoutMatchTierRequests(t *testing.T) 
 			break
 		}
 	}
-	if cost == nil || cost["matches_requested"] != 1 || cost["matches_loaded"] != 1 || cost["rate_limited_count"] != 0 {
+	if cost == nil || cost["matches_requested"] != 1 || cost["matches_loaded"] != 1 || cost["matches_failed"] != 0 || cost["first_error_kind"] != "" || cost["rate_limited_count"] != 0 {
 		t.Fatalf("riot overview cost = %#v", cost)
 	}
 }

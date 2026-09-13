@@ -4,7 +4,11 @@ dist/
 *.test
 *.log
 .gocache/
+/.gomodcache
 /lol-loot-assistant
+/deep-legends
+/deep-legends.exe
+/lol-loot-assistant-go-tmp-*
 
 # 沙箱/编辑器/agent 工具产物，不属于产品源码
 .builder/
@@ -12,7 +16,31 @@ dist/
 .playwright-cli/
 .DS_Store
 *.go.[0-9]*
+__pycache__/
+*.pyc
+
+# 可重建的截图、原型、验收日志与变异测试结果
+/design/
+/design-mockups/
+/artifacts/
+**/_shots/
+/testdata/r75/validation/
+/testdata/r75/mutations/
+/output/*
+!/output/item-depths-0910/
+/output/item-depths-0910/*
+!/output/item-depths-0910/captured-pages.json
+!/output/r82-ab.json
+!/output/r83-startup/
+/output/r83-startup/*
+!/output/r83-startup/r82-ab.json
+!/output/r83-startup/DeepLegendsSetup-startup.log
 
 # 本机临时构建密钥（不应存在，但以防万一）
 riot_key.local.*
 .github/workflows/
+
+# Release payload is embedded into the installer shell, then removed.
+/installer/payload/files/*
+!/installer/payload/files/.gitkeep
+/desktop/uninstall-shell.exe

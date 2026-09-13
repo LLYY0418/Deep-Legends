@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { JSDOM } = require(path.join(__dirname, "..", "desktop", "node_modules", "jsdom"));
 
 const root = path.resolve(__dirname, "..");
 const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
@@ -20,7 +21,13 @@ const queueGroupsBackend = fs.readFileSync(path.join(root, "queue_groups.go"), "
 const riotBackend = fs.readFileSync(path.join(root, "riot_api.go"), "utf8");
 const sgpBackend = fs.readFileSync(path.join(root, "sgp_api.go"), "utf8");
 const lcuAPIBackend = fs.readFileSync(path.join(root, "lcu_api.go"), "utf8");
+const lcuBackend = fs.readFileSync(path.join(root, "lcu.go"), "utf8");
+const lcuEventsBackend = fs.readFileSync(path.join(root, "lcu_events.go"), "utf8");
+const connectionManagerBackend = fs.readFileSync(path.join(root, "connection_manager.go"), "utf8");
+const catalogBackend = fs.readFileSync(path.join(root, "catalog.go"), "utf8");
+const qq101Backend = fs.readFileSync(path.join(root, "qq101.go"), "utf8");
 const rankInsightsBackend = fs.readFileSync(path.join(root, "rank_insights.go"), "utf8");
+const seasonStatsBackend = fs.readFileSync(path.join(root, "season_stats.go"), "utf8");
 const friendsScript = fs.readFileSync(path.join(__dirname, "friends.js"), "utf8");
 const demoScript = fs.readFileSync(path.join(__dirname, "demo-data.js"), "utf8");
 const backend = fs.readFileSync(path.join(root, "champions.go"), "utf8");
@@ -37,11 +44,43 @@ const socialBackend = fs.readFileSync(path.join(root, "social.go"), "utf8");
 const positionIcons = ["all", "top", "jungle", "middle", "bottom", "utility"].map((name) => fs.readFileSync(path.join(__dirname, "position-icons", `${name}.svg`), "utf8"));
 const allPositionIcon = positionIcons[0];
 
+test("R69 career-column reentry preserves match width through the 1600 DIP band", () => {
+  assert.match(
+    gameplayStyles,
+    /@container gameplay-page \(min-width: 1021px\) and \(max-width: 1300px\)\s*\{\s*\.overview-layout\s*\{[^}]*grid-template-columns:\s*300px minmax\(0,\s*1fr\)/s,
+  );
+});
+
 function functionSource(source, name) {
   let start = source.indexOf(`function ${name}(`);
   assert.notEqual(start, -1, `${name} source not found`);
   if (source.slice(Math.max(0, start - 6), start) === "async ") start -= 6;
-  const bodyStart = source.indexOf("{", start);
+  const parametersStart = source.indexOf("(", start);
+  assert.notEqual(parametersStart, -1, `${name} parameters not found`);
+  let parametersEnd = -1;
+  let parameterDepth = 0;
+  let parameterQuote = "";
+  let parameterEscaped = false;
+  for (let index = parametersStart; index < source.length; index += 1) {
+    const character = source[index];
+    if (parameterQuote) {
+      if (parameterEscaped) parameterEscaped = false;
+      else if (character === "\\") parameterEscaped = true;
+      else if (character === parameterQuote) parameterQuote = "";
+      continue;
+    }
+    if (character === '"' || character === "'" || character === "`") {
+      parameterQuote = character;
+      continue;
+    }
+    if (character === "(") parameterDepth += 1;
+    if (character === ")" && --parameterDepth === 0) {
+      parametersEnd = index;
+      break;
+    }
+  }
+  assert.notEqual(parametersEnd, -1, `${name} parameters are not balanced`);
+  const bodyStart = source.indexOf("{", parametersEnd);
   assert.notEqual(bodyStart, -1, `${name} body not found`);
   let depth = 0;
   let quote = "";
@@ -105,12 +144,31 @@ function cssNumber(source, marker, property) {
 }
 
 function compileFunctions(source, names, dependencies = {}) {
-  const dependencyNames = Object.keys(dependencies);
+  const bodies = names.map((name) => functionSource(source, name));
+  const compiledDependencies = { ...dependencies };
+  // Older focused tests deliberately compile only the function under test.
+  // Keep their injected target semantics while production routes through the
+  // R68 request target, which has its own dedicated behavioral tests.
+  if (bodies.some((body) => body.includes("specialistRequestTarget(")) && !compiledDependencies.specialistRequestTarget) {
+    compiledDependencies.specialistRequestTarget = (data) => compiledDependencies.liveRecommendationTarget?.(data) || null;
+  }
+  if (bodies.some((body) => body.includes("insightTeamLayout(")) && !compiledDependencies.insightTeamLayout) {
+    compiledDependencies.insightTeamLayout = (players) => ({
+      teams: new Map([100, 200].map((teamID) => [teamID, players.filter((player) => Number(player.teamId) === teamID)])),
+      aligned: false,
+      reason: "",
+    });
+  }
+  // Compile the actual R75 helpers transitively for focused legacy render tests.
+  for (const name of ["proRunesFor", "proRequestTarget"]) {
+    if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
+  }
+  const dependencyNames = Object.keys(compiledDependencies);
   const factory = Function(
     ...dependencyNames,
-    `"use strict";\n${names.map((name) => functionSource(source, name)).join("\n")}\nreturn { ${names.join(", ")} };`,
+    `"use strict";\n${bodies.join("\n")}\nreturn { ${names.join(", ")} };`,
   );
-  return factory(...dependencyNames.map((name) => dependencies[name]));
+  return factory(...dependencyNames.map((name) => compiledDependencies[name]));
 }
 
 function assertR45Contracts(js = gameplayScript, css = gameplayStyles, goSource = gameplayBackend) {
@@ -139,7 +197,9 @@ function assertR45Contracts(js = gameplayScript, css = gameplayStyles, goSource 
   const coreIndex = buildSource.indexOf("${itemBuildLayout}");
   assert.ok(prismIndex >= 0 && coreIndex > prismIndex, "prismatic items must render before core routes");
 
-  const validationSource = goFunctionSource(goSource, "validateGameplayItemSetContext");
+  // R79 split the guard so the observed gameflow phase can be logged; the
+  // cell-identity check now lives in the phase-reporting variant.
+  const validationSource = goFunctionSource(goSource, "validateGameplayItemSetContextPhase");
   assert.match(validationSource, /gameplayLivePlayerIsCurrent\(playerReference, current\.PUUID, player\.CellID, session\.LocalPlayerCellID\)/);
   const liveHandlerSource = goFunctionSource(goSource, "handleGameplayLive");
   assert.match(liveHandlerSource, /localPlayerCellID = champSelect\.LocalPlayerCellID/);
@@ -185,19 +245,23 @@ function assertR47Contracts({ js = gameplayScript, css = gameplayStyles, goSourc
   assert.match(insights, /if \(arenaMode\)/);
   assert.match(insights, /data\.phase === "ChampSelect" \? "己方小队" : "全部玩家"/);
   assert.match(insights, /live-teams is-insight is-arena/);
-  assert.match(insights, /data\.champSelectNotice/);
-  assert.match(cssBlockAfter(css, ".live-teams.is-arena {"), /grid-template-columns:\s*repeat\(auto-fit,minmax\(320px,1fr\)\)/);
+  assert.doesNotMatch(insights, /data\.champSelectNotice|live-roster-notice/);
+  assert.match(functionSource(js, "renderRecommendationArea"), /data\.champSelectNotice[\s\S]*recommendation-tab-row/);
+  assert.match(cssBlockAfter(css, ".live-teams.is-arena {"), /grid-template-columns:\s*1fr/);
 
-  const spectatorProbe = goFunctionSource(socialBackend, "friendSpectatorReadProbe");
-  assert.match(spectatorProbe, /client\.GetBytesContext\(ctx, spectatorReadProbePath\)/);
-  assert.doesNotMatch(spectatorProbe, /RequestJSON|MethodPost|MethodPut|MethodPatch|MethodDelete/);
+  assert.doesNotMatch(socialBackend, /friendSpectatorReadProbe|spectatorReadProbePath/);
 }
 
 function assertR47AddendumContracts(css = gameplayStyles) {
   const wide = cssBlockAfter(css, "@container recommendation-area (max-width: 1080px)");
-  assert.match(wide, /\.live-teams\s*\{[^}]*grid-template-columns:\s*1fr/s);
+  assert.match(wide, /\.live-teams\.is-arena\s*\{[^}]*grid-template-columns:\s*1fr/s);
+  assert.match(wide, /\.live-teams\.is-arena\.is-grouped\s*\{[^}]*grid-template-columns:\s*1fr/s);
   assert.match(wide, /\.recommendation-champion-summary\s*\{[^}]*grid-template-areas:\s*"summary" "positions" "matchups"/s);
   assert.match(wide, /\.champion-matchups\s*\{[^}]*border-top:\s*1px solid var\(--line\)[^}]*border-left:\s*0/s);
+
+  const classicNarrow = cssBlockAfter(css, "@container recommendation-area (max-width: 840px)");
+  assert.match(classicNarrow, /\.live-teams\.is-insight:not\(\.is-arena\)\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
+  assert.match(classicNarrow, /\.live-teams\.is-insight:not\(\.is-arena\)\s*>\s*\.live-team\s*\{[^}]*display:\s*block/s);
 
   const narrow = cssBlockAfter(css, "@container recommendation-area (max-width: 700px)");
   assert.match(narrow, /\.live-player dl\s*\{[^}]*repeat\(3,minmax\(60px,1fr\)\)/s);
@@ -219,7 +283,7 @@ function assertR49RequiredMutationContracts({
 	assert.match(itemSet, /const coreIDs = new Set\(core\.map\(\(\{ id \}\) => id\)\);/);
 	assert.match(itemSet, /const depth = mergedItems\(depthOptions\)\.filter\(\(\{ id \}\) => !coreIDs\.has\(id\)\);/, "B-2 later groups must exclude core items");
 	const priceSort = goFunctionSource(goSource, "sortGameplayItemSetBlocksByPrice");
-	assert.match(priceSort, /sort\.SliceStable\(knownItems,[\s\S]*?return prices\[knownItems\[left\]\.ID\] < prices\[knownItems\[right\]\.ID\]/, "B-3 known item prices must be sorted ascending");
+	assert.match(priceSort, /sort\.SliceStable\(knownItems,[\s\S]*?return knownItems\[left\]\.PriceTotal < knownItems\[right\]\.PriceTotal/, "B-3 known item prices must be sorted ascending");
 
 	const positionChip = functionSource(js, "liveCurrentPositionChip");
 	assert.match(positionChip, /const resolved = livePositionDisplay\(target\?\.clientPosition \|\| self\?\.position\);/, "C-1 position chip must use the client position");
@@ -287,7 +351,7 @@ function assertR15PerformanceAndBuildContracts() {
   assert.match(rankInsightsBackend, /case <-flight\.done:\s*return flight\.entry/);
   assert.match(gameplayScript, /const MATCH_TIERS_MAX_REFS = 24/);
   assert.match(rankInsightsBackend, /matchTiersMaxRefs\s*=\s*24/);
-  assert.match(gameplayScript, /shouldHydrateMatchTiers\(tab, state\.activeTab\)/);
+  assert.match(gameplayScript, /shouldHydrateMatchTiers\(tab, activeKey\)/);
   assert.match(gameplayScript, /offset \+= MATCH_TIERS_MAX_REFS/);
   assert.match(gameplayScript, /function shouldHydrateMatchTiers\(tab, activeTabKey\)/);
   assert.match(gameplayScript, /return Boolean\(tab\?\.overlay \|\| tab\?\.key === activeTabKey\)/);
@@ -357,11 +421,11 @@ test("champion intelligence is a first-level accessible workspace", () => {
   assert.match(html, /id="setting-champion-position"/);
 });
 
-test("diagnostics panel exports the active structured log with rotation guidance", () => {
+test("diagnostics panel exports the active structured log with concise guidance", () => {
   assert.match(html, /id="export-diagnostics"[^>]+href="\/api\/diagnostics\/log"[^>]+download(?:="")?[^>]*role="button"/);
   assert.doesNotMatch(html, /id="export-diagnostics"[^>]+download="lol-loot-diagnostics\.jsonl"/);
   assert.match(html, /id="diagnostic-log-meta"/);
-  assert.match(html, /如果刚复现过问题，请立即导出/);
+  assert.match(html, /复现问题后导出日志。/);
   assert.match(appScript, /diagnosticLogBytes/);
   assert.match(appScript, /diagnosticLogEvents/);
   assert.match(appScript, /function formatFileSize\(value\)/);
@@ -399,7 +463,7 @@ test("renderer only calls the authenticated local champion API", () => {
 function assertPositionRecommendationContract(championJS, championCSS, liveJS) {
   const detailSource = functionSource(championJS, "renderDetail");
   assert.match(championJS, /detailPosition:\s*null/);
-  assert.match(championJS, /detailCache:\s*new Map\(\)/);
+  assert.match(championJS, /detailCache:\s*window\.deepLegendsRuntime\?\.createCache\(\{ max: 64, ttl: 300000 \}\)/);
   assert.match(championJS, /const positions = detailPositions\.length \? detailPositions : rowPositions;/);
   assert.match(championJS, /const hasPositions = state\.mode === "ranked" && positions\.length > 1/);
   assert.match(championJS, /positionIcon\(item\.position\)/);
@@ -407,7 +471,7 @@ function assertPositionRecommendationContract(championJS, championCSS, liveJS) {
   assert.match(championJS, /positionStats\?\.winRate \?\? row\.winRate/);
   assert.match(championJS, /state\.error = "请先选择分路"/);
   assert.match(championJS, /firstPositionOf\(ranked\) \|\| firstPositionOf\(\{ position: state\.selected\?\.position \}\) \|\| "mid"/);
-  assert.match(championJS, /state\.detailCache\.clear\(\)/);
+	assert.doesNotMatch(functionSource(championJS, "resetTransientChampionState"), /state\.detailCache\.clear\(\)/);
   assert.match(championJS, /class="metric-win">\$\{percent\(item\.winRate\)\}/);
   assert.match(championJS, /class="metric-pick">占\$\{percent\(item\.roleRate\)\}/);
   assert.match(championJS, /class="champion-detail-positions" data-count="\$\{positions\.length\}"/);
@@ -451,7 +515,7 @@ function assertPositionRecommendationContract(championJS, championCSS, liveJS) {
   assert.match(championCSS, /\.spell-options\.is-single \.spell-option\s*\{[^}]*width:\s*100%/s);
   assert.match(liveJS, /const baseKey = `\$\{championId\}:\$\{gameMode\}:\$\{mapId\}`;/);
   assert.match(liveJS, /const spellKey = \[Number\(self\?\.spell1Id\)[^;]+\.sort\(\(left, right\) => left - right\)\.join\("-"\) \|\| "none";/);
-  assert.match(liveJS, /key: `\$\{championId\}:\$\{position\}:\$\{gameMode\}:\$\{mapId\}:\$\{spellKey\}`/);
+  assert.match(liveJS, /key: `\$\{championId\}:\$\{position\}:\$\{gameMode\}:\$\{mapId\}:\$\{tier\}:\$\{spellKey\}`/);
   assert.match(liveJS, /orderedPositions\.length >= 1 \?/);
   assert.match(functionSource(liveJS, "resetLivePositionOverrides"), /gameChanged \|\| leftChampionSelect/);
   assert.match(functionSource(liveJS, "resetRecommendationTabsOnChampionChange"), /state\.recommendationTab = "runes"/);
@@ -462,7 +526,7 @@ function assertPositionRecommendationContract(championJS, championCSS, liveJS) {
   assert.match(gameplayStyles, /\.live-position-chip img\.position-icon\s*\{[^}]*object-fit:\s*contain/s);
   assert.doesNotMatch(gameplayStyles, /\.live-position-chip \.position-icon img/);
 	  assert.match(liveJS, /payload\.positionSource && payload\.positionSource !== "requested"/);
-	  assert.match(liveJS, /当前分路 · 最近 10 局/);
+	  assert.doesNotMatch(liveJS, /当前分路 · 最近 10 局/);
 }
 
 test("position-aware recommendation contracts kill documented mutations", () => {
@@ -515,7 +579,7 @@ test("position-aware recommendation contracts kill documented mutations", () => 
     assert.throws(() => assertPositionRecommendationContract(original.champion, original.styles, fs.readFileSync(copies.gameplay, "utf8")));
 	    fs.writeFileSync(copies.gameplay, original.gameplay.replace("orderedPositions.length >= 1", "orderedPositions.length > 1"));
     assert.throws(() => assertPositionRecommendationContract(original.champion, original.styles, fs.readFileSync(copies.gameplay, "utf8")));
-    fs.writeFileSync(copies.gameplay, original.gameplay.replace(":${mapId}:${spellKey}`", ":${mapId}`"));
+    fs.writeFileSync(copies.gameplay, original.gameplay.replace(":${mapId}:${tier}:${spellKey}`", ":${mapId}`"));
     assert.throws(() => assertPositionRecommendationContract(original.champion, original.styles, fs.readFileSync(copies.gameplay, "utf8")));
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
@@ -704,6 +768,10 @@ test("Mayhem recommendation and item ranking never request a guessed image URL",
   assert.deepEqual(urls, ["/image-unavailable.svg"]);
   assert.match(recommended, /arena-option-card/);
   assert.match(ranking, /mayhem-item-name-only/);
+  assert.match(ranking, /<dt>胜率<\/dt>/);
+  assert.match(ranking, /<dt>场次<\/dt>/);
+  assert.doesNotMatch(ranking, /<dt>综合评分<\/dt>|<dt>样本<\/dt>/);
+  assert.doesNotMatch(ranking, /按综合评分排序的高表现装备/);
 
   urls.length = 0;
   renderMayhemRecommendedAugment({ item: { name: "有图推荐" }, meta: { name: "有图推荐", imageSource: "opgg", imagePath: "/augment.png" }, grade: "S" }, 0);
@@ -777,6 +845,7 @@ test("Mayhem augment cards carry the augment copy in the tooltip", () => {
     grade: "S",
   }, 0);
   assert.match(markup, /data-tooltip="掷骰狂人\n这是掷骰狂人的效果说明。"/);
+  assert.doesNotMatch(markup, /品质/);
   assert.doesNotMatch(markup, /图鉴/);
 });
 
@@ -1021,7 +1090,8 @@ test("R8 mayhem item configuration hides win rate when requested", () => {
 
 test("R7 repeated disconnected status events preserve fallback item and augment catalogs", () => {
 	const state = {
-		status: { connected: false }, tabs: [], overlay: [], live: {}, liveError: "",
+		status: { connected: false }, tabs: [], overlay: [], live: {}, liveError: "", controllers: new Map(),
+		activeTabs: { players: "", pro: "" }, tabHistories: { players: [], pro: [] },
 		perks: { styles: [{ id: 1 }] }, items: { items: [{ id: 1001 }] }, summonerSpells: { spells: [{ id: 4 }] },
 	};
 	const loads = [];
@@ -1030,6 +1100,7 @@ test("R7 repeated disconnected status events preserve fallback item and augment 
 		resetLiveGameScopedState: () => {},
 		connected: () => Boolean(state.status?.connected),
 		riotTab: () => false,
+		tabGroup: (tab) => tab?.group === "pro" ? "pro" : tab?.region === "kr" ? "kr" : "players",
 		ensurePerks: (force) => loads.push(["perks", force]),
 		ensureItems: () => loads.push(["items"]),
 		ensureSummonerSpells: () => loads.push(["spells"]),
@@ -1056,15 +1127,16 @@ test("disconnection drops Tencent player identity while preserving Korean tabs",
 	const cn = { key: "cn", current: false, region: "", label: "国服玩家" };
 	const kr = { key: "kr", current: false, region: "kr", label: "韩服玩家", data: { player: {} } };
 	const state = {
-		tabs: [current, cn, kr], activeTab: "current", tabHistory: ["cn", "kr"],
+		tabs: [current, cn, kr], activeTabs: { players: "current", pro: "" }, tabHistories: { players: ["cn", "kr"], pro: [] },
 		controllers: new Map([["overview:cn", { abort: () => { aborted += 1; } }]]),
 	};
 	const { resetTencentTabsAfterDisconnect } = compileFunctions(gameplayScript, ["resetTencentTabsAfterDisconnect"], {
-		state, riotTab: (tab) => tab.region === "kr",
+		state, riotTab: (tab) => tab.region === "kr", tabGroup: (tab) => tab?.group === "pro" ? "pro" : tab?.region === "kr" ? "kr" : "players",
 	});
 	resetTencentTabsAfterDisconnect();
 	assert.deepEqual(state.tabs.map((tab) => tab.key), ["current", "kr"]);
-	assert.equal(state.activeTab, "kr");
+	assert.equal(state.activeTabs.players, "current");
+	assert.equal(state.activeTabs.kr, "kr");
 	assert.equal(current.label, "当前召唤师");
 	assert.equal(current.playerRef, "");
 	assert.equal(current.icon, 0);
@@ -1228,9 +1300,20 @@ test("arena keeps the champion list on wide screens and renders the redesigned d
   assert.match(yourGGArenaSource, /\/kr\/api\/arena\/champions\//);
   assert.match(yourGGArenaSource, /sameYourGGArenaPlayer/);
   assert.match(backend, /\/zh-cn\/lol\/modes\/arena/);
-  assert.match(backend, /`"teamData":`/);
+  assert.match(backend, /fetchWithMetadata\(ctx, yourGGArenaHost, "\/kr\/api\/arena\/champions"/);
   assert.match(structuredBackend, /response\.TeamCompositions = p\.structuredSynergies\(id, payload\.Data\.Synergies\)/);
-  assert.match(backend, /Region:\s+"GLOBAL"/);
+  assert.match(fs.readFileSync(path.join(root, "yourgg_arena_rankings.go"), "utf8"), /Region:\s*"KR"/);
+});
+
+test("YOUR.GG champion grades preserve all six source letters in project-style badges", () => {
+  const render = new Function("tierDisplay", `${functionSource(script,"tierBadge")}; return tierBadge;`)(String);
+  for (const grade of ["S","A","B","C","D","F"]) {
+    const html=render(0,"",grade);
+    assert.match(html,new RegExp(`yourgg-${grade.toLowerCase()}\\.svg`));
+    assert.match(html,new RegExp(`alt="梯度 ${grade}"`));
+    assert.match(fs.readFileSync(path.join(__dirname,"tier-icons",`yourgg-${grade.toLowerCase()}.svg`),"utf8"),new RegExp(`>${grade}</text>`));
+  }
+  assert.match(render(1),/\/tier-icons\/1\.svg/);
 });
 
 test("arena round 8 removals stay scoped to the arena workspace", () => {
@@ -1287,7 +1370,7 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.ok(arenaOverviewSource.indexOf("renderMatchScoreCell(record)") < arenaOverviewSource.indexOf('class="arena-detail-kda"'));
 	assert.match(arenaOverviewSource, /class="arena-detail-damage"[^>]+aria-label=[^>]+><b class="match-damage-value">\$\{plainInteger\(item\.damage\)\}<\/b><i aria-hidden="true">\/<\/i><b class="match-taken-value">\$\{plainInteger\(item\.damageTaken\)\}<\/b>/);
 	assert.doesNotMatch(arenaOverviewSource, /<small>伤害<\/small>|<small>承伤<\/small>/);
-	assert.match(functionSource(gameplayScript, "renderMatchLoadout"), /Array\.from\(\{ length: 4 \}[\s\S]{0,300}arena-augment-slot is-empty/);
+	assert.match(functionSource(gameplayScript, "renderMatchLoadout"), /matchAugmentIDs\(subject, modeKind === "mayhem" \? 2 : 4\)[\s\S]{0,180}Array\.from\(\{ length: modeKind === "mayhem" \? 2 : 4 \}/);
 	assert.match(gameplayScript, /function matchModeKind\(match, subject\)/);
 	assert.match(gameplayScript, /const spells = \[[\s\S]{0,260}spellIconFigure\(subject\.spell2Id, "small"\)/);
   assert.match(gameplayScript, /const statRows = modeKind === "arena" \? `\$\{damageRow\}\$\{takenRow\}` : `\$\{participationRow\}\$\{csRow\}\$\{tierRow\}`/);
@@ -1305,8 +1388,17 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.match(gameplayStyles, /\.match-loadout-mini\s*\{[^}]*grid-template-columns:\s*repeat\(2,26px\)/);
 	assert.match(gameplayStyles, /\.match-summary\.is-arena\s*\{[^}]*minmax\(220px,1fr\)[^}]*var\(--match-roster-width(?:,\s*clamp\([^)]*\))?\)[^}]*40px/s);
 	assert.match(gameplayStyles, /:root\s*\{[^}]*--match-roster-width:\s*clamp\(/s);
-	assert.match(gameplayStyles, /\.match-summary\s*\{[^}]*var\(--match-roster-width,\s*clamp\(/s);
-	assert.match(gameplayStyles, /\.match-players(?:\.is-arena)?\s*\{[^}]*width:\s*var\(--match-roster-width,\s*clamp\(/s);
+	// 名单那一列按内容收缩，--match-roster-width 只当 .match-players 的宽度上限：
+	// 把轨道钉死成变量宽度会在名字短时留出一条空缝（见 desktop/ui-scale-layout.cjs 的 gap 判据）。
+	assert.match(gameplayStyles, /\.match-summary\s*\{[^}]*grid-template-columns:\s*108px minmax\(0,1fr\) minmax\(0,max-content\) 40px/s);
+	assert.match(gameplayStyles, /\.match-players\s*\{[^}]*max-width:\s*var\(--match-roster-width,\s*clamp\(/s);
+	assert.match(gameplayStyles, /\.match-players\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,max-content\)\)/s);
+	// ★战绩条左半边（英雄 / KDA / 击杀·CS·段位）的排布是设计基准，加宽玩家名单不许动它：
+	// 第四条空的 1fr 轨道负责吃掉富余宽度，统计块靠左，KDA 保持在第二条 96px 轨道上。
+	assert.match(gameplayStyles, /\.match-main\s*\{[^}]*grid-template-columns:\s*minmax\(0,auto\) minmax\(0,96px\) minmax\(0,auto\) minmax\(0,1fr\)/s);
+	assert.doesNotMatch(gameplayStyles, /\.match-main\s*\{[^}]*justify-content:/s);
+	assert.match(gameplayStyles, /\.match-stats\s*\{[^}]*justify-self:\s*start/s);
+	assert.doesNotMatch(gameplayStyles, /\.match-stats\s*\{[^}]*(?:max-)?width:\s*min\(/s);
 	assert.match(gameplayStyles, /@container arena-first \(max-width: 720px\)[\s\S]{0,180}\.match-summary\.is-arena\s*\{[^}]*--match-roster-width:\s*clamp\(/s);
 	assert.match(gameplayStyles, /@container arena-first \(max-width: 520px\)[\s\S]{0,180}\.match-summary\.is-arena\s*\{[^}]*--match-roster-width:\s*clamp\(/s);
 	assert.match(gameplayStyles, /@container arena-first \(max-width: 420px\)[\s\S]{0,100}\.match-summary\.is-arena\s*\{[^}]*--match-roster-width:\s*100%/s);
@@ -1330,7 +1422,7 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.match(gameplayStyles, /\.arena-detail-player \.match-score-cell, \.match-table \.match-score-cell\s*\{[^}]*width:\s*86px[^}]*grid-template-columns:\s*34px 48px[^}]*justify-content:\s*center[^}]*justify-items:\s*center/s);
 	assert.match(gameplayStyles, /\.match-table th, \.match-table td\s*\{[^}]*text-align:\s*center[^}]*vertical-align:\s*middle/s);
 	assert.match(gameplayStyles, /\.match-table th:first-child, \.match-table td:first-child\s*\{[^}]*text-align:\s*left/s);
-	assert.match(gameplayStyles, /\.match-table \.participant-link\s*\{[^}]*width:\s*auto[^}]*justify-content:\s*flex-start/s);
+	assert.match(gameplayStyles, /\.match-table \.participant-link\s*\{[^}]*width:\s*100%[^}]*min-width:\s*0[^}]*justify-content:\s*flex-start/s);
 	assert.match(gameplayStyles, /\.match-table \.table-items\s*\{[^}]*justify-content:\s*flex-start/s);
 	assert.match(gameplayStyles, /\.matches-column\s*\{[^}]*container:\s*matches-column \/ inline-size/);
 	assert.match(gameplayStyles, /@container matches-column \(max-width: 720px\)[\s\S]{0,260}\.arena-detail-columns, \.arena-detail-team\s*\{[^}]*min-width:\s*860px/);
@@ -1418,7 +1510,14 @@ test("demo mode exposes a dedicated Hextech ARAM live session", () => {
 	assert.match(demoScript, /resolvedMode: "hextech",[\s\S]*hasRunes: false,[\s\S]*hasAugments: true,[\s\S]*hasTopPlayers: false/);
 	assert.match(demoScript, /hero: \{ tier: 1, winRate: 54\.72, pickRate: 7\.83 \}/);
 	assert.match(demoScript, /const hextechLiveAugments = arenaLiveAugments\.map[\s\S]*score: Number\(\(92\.4 - index \* 3\.1\)\.toFixed\(1\)\)/);
-	assert.match(demoScript, /"\/api\/gameplay\/live", \(\) => hextechLiveDemo \? hextechLive : arenaLiveDemo \? arenaLive : live/);
+	assert.match(demoScript, /"\/api\/gameplay\/live", \(\) => hextechLiveDemo \? hextechLive : arenaFullDemo \? arenaFullLive : arenaLiveDemo \? arenaLive : live/);
+});
+
+test("demo mode exposes a complete six-team Arena live session", () => {
+	assert.match(demoScript, /const arenaFullDemo = query\.get\("demo"\) === "arena-full"/);
+	assert.match(demoScript, /const arenaLivePlayers = arenaChampionPool\.slice\(0, 18\)/);
+	assert.match(demoScript, /arenaGroup: String\(Math\.floor\(index \/ 3\) \+ 1\)/);
+	assert.match(demoScript, /const arenaFullLive = \{[\s\S]*phase: "InProgress",[\s\S]*players: structuredClone\(arenaLivePlayers\),[\s\S]*arenaGrouped: true,[\s\S]*arenaMascotMapping: true/);
 });
 
 test("small overviews move career statistics into an accessible modal sheet", () => {
@@ -1596,7 +1695,8 @@ test("career ranked queue switches use one recent sample and ignore season scan 
 	assert.doesNotMatch(gameplayScript, /function renderSeasonProgressBadge/);
 	const entries = functionSource(gameplayScript, "careerSectionEntries");
 	assert.doesNotMatch(entries, /render(?:RecentRanked|Ability|PositionStats)\([^\n]*seasonStatsProgress/);
-	assert.match(entries, /renderChampionStats\([^\n]*data\.seasonStatsProgress/);
+	assert.match(entries, /renderChampionStats\(championRows, championOverall, championProgress\)/);
+	assert.match(entries, /const championProgress = opggSeason[\s\S]*: data\.seasonStatsProgress/);
 });
 
 test("season progress refreshes the active overview without resetting queue choices or scroll", async () => {
@@ -1613,6 +1713,8 @@ test("season progress refreshes the active overview without resetting queue choi
 	const { handleSeasonProgress } = compileFunctions(gameplayScript, ["handleSeasonProgress"], {
 		state,
 		activeTab: () => currentTab,
+		overviewGroupForSection: () => "players",
+		overviewSectionForGroup: () => "overview",
 		document: { getElementById: (id) => id === "app-scroll" ? scrollRoot : null },
 		loadOverview: async (...args) => { calls.push(args); tab.data.seasonStatsProgress = { season: "S26", scanned: 180, complete: true }; scrollRoot.scrollTop = 0; if (switchDuringRefresh) currentTab = { key: "new-active" }; },
 		requestAnimationFrame: (callback) => callback(),
@@ -1675,6 +1777,8 @@ test("historical rank increments refresh only the matching active overview", asy
 	const { handleOverviewIncremental } = compileFunctions(gameplayScript, ["handleOverviewIncremental"], {
 		state,
 		activeTab: () => tab,
+		overviewGroupForSection: () => "players",
+		overviewSectionForGroup: () => "overview",
 		document: { getElementById: () => scrollRoot },
 		loadOverview: async (...args) => { calls.push(args); scrollRoot.scrollTop = 0; },
 		requestAnimationFrame: (callback) => callback(),
@@ -1977,9 +2081,9 @@ test("match history surfaces SGP failures and uses an accessible custom mode men
 test("player tabs use arrow scrolling, hide the native scrollbar, and deduplicate searches", () => {
 	assert.match(html, /id="player-tabs-prev"[^>]+aria-controls="player-tabs"/);
 	assert.match(html, /id="player-tabs-next"[^>]+aria-controls="player-tabs"/);
-	assert.match(gameplayScript, /playerTabsPrev\?\.addEventListener\("click"/);
-	assert.match(gameplayScript, /playerTabsNext\?\.addEventListener\("click"/);
-	assert.match(gameplayScript, /nodes\.playerTabs\.scrollBy\(\{ left: direction \* distance/);
+	assert.match(gameplayScript, /prev\?\.addEventListener\("click", \(\) => scrollTabs\(-1\)\)/);
+	assert.match(gameplayScript, /next\?\.addEventListener\("click", \(\) => scrollTabs\(1\)\)/);
+	assert.match(gameplayScript, /tabs\.scrollBy\(\{ left: direction \* distance/);
 	assert.match(gameplayStyles, /\.player-tabs::-webkit-scrollbar\s*\{\s*display:\s*none/);
 	assert.match(gameplayStyles, /\.player-tabs\s*\{[^}]*scrollbar-width:\s*none/s);
 	assert.match(gameplayScript, /sameTabServerScope\(tab, region, serverId\)/);
@@ -1990,7 +2094,30 @@ test("player tabs use arrow scrolling, hide the native scrollbar, and deduplicat
 	assert.match(gameplayScript, /rememberTabPlayerRef\(tab, resolvedPlayerRef\)/);
 	assert.match(gameplayScript, /const loaded = tab\?\.data\?\.player \|\| \{\}/);
 	assert.match(gameplayScript, /loaded\.gameName \? loaded : null/);
-	assert.match(gameplayScript, /if \(existing\) \{ selectPlayerTab\(existing\.key\); return; \}/);
+	assert.match(gameplayScript, /if \(existing\) \{ applyPlayerTabContext\(existing, tabContext\); selectPlayerTab\(existing\.key\); return; \}/);
+});
+
+test("player tab avatars have no tooltip while overflowing names retain their own hint", () => {
+  const dom = new JSDOM('<div id="tabs"></div>');
+  try {
+    const tabs = dom.window.document.getElementById("tabs");
+    const state = { tabs: [{ key: "current", current: true, icon: 17, label: "测试玩家的完整名字" }], activeTabs: { players: "current" }, settings: {} };
+    const functions = compileFunctions(gameplayScript, ["renderPlayerTabWorkspace", "assetIcon", "proxyAsset"], {
+      state, overviewWorkspace: () => ({ tabs }), connected: () => true, tabGroup: () => "players", riotTab: () => false,
+      assetPath: (_kind, id) => `/lol-game-data/assets/v1/profile-icons/${id}.jpg`,
+      escapeHTML: (value) => String(value ?? ""), prepareImages: () => {}, requestAnimationFrame: () => {},
+    });
+    functions.renderPlayerTabWorkspace("players");
+    const avatar = tabs.querySelector(".game-icon img");
+    assert.ok(avatar);
+    assert.equal(avatar.closest("[data-tooltip], [title]"), null, "hover must not inherit the tab's name tooltip");
+    assert.equal(avatar.alt, "", "adjacent player name already labels this tab");
+    assert.doesNotMatch(tabs.innerHTML, /profile 17/);
+    const name = tabs.querySelector(".player-tab-name");
+    assert.equal(name.dataset.tooltip, state.tabs[0].label);
+    assert.equal(name.dataset.tooltipOverflow, "self");
+    assert.equal(tabs.querySelector(".player-tab").getAttribute("role"), "tab");
+  } finally { dom.window.close(); }
 });
 
 test("player overlays add durable tabs and non-self tabs can be reordered", () => {
@@ -2013,10 +2140,11 @@ test("player overlays add durable tabs and non-self tabs can be reordered", () =
 	const ordering = compileFunctions(gameplayScript, ["applySavedPlayerTabOrder", "persistPlayerTabOrder", "movePlayerTab", "dropPlayerTab"], {
 		state,
 		playerTabOrderIdentity: (tab) => tab.identity || "",
+		tabGroup: (tab) => tab?.group === "pro" ? "pro" : tab?.region === "kr" ? "kr" : "players",
 		writeSetting: (key, value) => writes.push([key, value]),
 		renderPlayerTabs: () => {},
 		requestAnimationFrame: (callback) => callback(),
-		nodes: { playerTabs: { querySelector: () => ({ focus() {} }) } },
+		overviewWorkspace: () => ({ tabs: { querySelector: () => ({ focus() {} }) } }),
 		CSS: { escape: (value) => value },
 	});
 	ordering.applySavedPlayerTabOrder();
@@ -2141,10 +2269,11 @@ test("team analysis exposes only metrics supported by each map and mode", () => 
 	assert.ok(urf.includes("controlWardsBought"));
 });
 
-test("match tier hydration is asynchronous and isolated by region, server, tab and container", () => {
+test("match tier hydration is asynchronous and isolated by stable region, server, player and container", () => {
   assert.match(gameplayScript, /function matchTierScope\(tab\)/);
-  assert.match(gameplayScript, /`cn:\$\{tabServerID\(tab\) \|\| "current"\}`/);
-  assert.match(gameplayScript, /return `\$\{region\}:\$\{tab\?\.key[^`]+:\$\{playerRef\}`/);
+	assert.match(gameplayScript, /const serverID = riotTab\(tab\) \? "kr" : \(tabServerID\(tab\) \|\| "current"\)/);
+	assert.match(gameplayScript, /return `\$\{region\}:\$\{serverID\}:\$\{playerRef\}`/);
+	assert.doesNotMatch(functionSource(gameplayScript, "matchTierScope"), /tab\?\.key|tab\.key/);
   assert.match(gameplayScript, /container\.dataset\.matchTierScope = tierScope/);
   assert.match(gameplayScript, /if \(!container \|\| container\.dataset\.matchTierScope !== scope\) return/);
   assert.match(gameplayScript, /container\.querySelectorAll\("\[data-match-tier\]"\)/);
@@ -2165,7 +2294,7 @@ test("top search and player navigation preserve the selected Chinese server", ()
   assert.match(html, /id="player-search-cn-options"[^>]+role="group"[^>]+hidden/);
   assert.match(html, /id="player-search-follow-client"[^>]+data-region-option="cn" data-server-id=""[^>]+disabled/);
   assert.match(html, /data-region-option="kr" data-server-id=""/);
-  assert.doesNotMatch(html.replace(/<[^>]*>/g, " "), /\b(?:HN1|HN10|NJ100|GZ100|CQ100|TJ100|TJ101|BGP2|PBE|KR)\b/);
+  assert.doesNotMatch(html.replace(/<[^>]*>/g, " "), /\b(?:HN1|HN10|NJ100|GZ100|CQ100|TJ100|TJ101|BGP2|PBE)\b/);
   assert.match(appScript, /function searchServerID\(\)/);
   assert.match(appScript, /function visibleRegionMenuEntries\(\)/);
   assert.match(appScript, /!entry\.disabled && !entry\.closest\("\[hidden\]"\)/);
@@ -2218,17 +2347,17 @@ test("cross-server ranked data is an explicit unsupported state", () => {
 });
 
 test("privacy UI separates explicit and opt-in automatic writes", () => {
-  assert.match(appScript, /group\("明确点击后写入客户端", data\.explicitWrites \|\| \[\]\)/);
-  assert.match(appScript, /group\("设置开启后自动写入客户端", data\.automaticWrites \|\| \[\]\)/);
-  assert.match(appScript, /group\("外部读取", data\.externalReads \|\| \[\]\)/);
+  assert.match(appScript, /客户端操作需主动点击；自动规则仅在开启后执行。/);
+  for (const flag of ["localOnly", "requiresPassword", "uploadsData"]) assert.ok(appScript.includes(`data.${flag}`));
+  assert.doesNotMatch(appScript, /group\("明确点击后写入客户端"/);
 });
 
 test("live recommendations render and select every returned option", () => {
   assert.match(gameplayScript, /const opggItems = Array\.isArray\(runes\.opgg\) \? runes\.opgg :/);
-	assert.match(gameplayScript, /const LIVE_CORE_OPTION_LIMIT = 15/);
-	assert.match(gameplayScript, /const LIVE_CORE_OPTION_PREVIEW_LIMIT = 6/);
-	assert.match(gameplayScript, /const allCoreOptions = inUpstreamOrder\(build\.coreOptions \|\| \[\], LIVE_CORE_OPTION_LIMIT\)/);
-	assert.match(gameplayScript, /data-live-build-expand/);
+	assert.match(gameplayScript, /const LIVE_CORE_OPTION_LIMIT = 5/);
+	assert.match(gameplayScript, /const coreOptions = inUpstreamOrder\(build\.coreOptions \|\| \[\], LIVE_CORE_OPTION_LIMIT\)/);
+	assert.doesNotMatch(gameplayScript, /LIVE_CORE_OPTION_PREVIEW_LIMIT|data-live-build-expand|liveBuildExpanded/);
+	assert.match(gameplayScript, /const bootOptions = inUpstreamOrder\([^\n]+, 3\)/);
   // 「后期备选」已整条移除（前端渲染、装备方案分组、后端 LateItems/LastItems 链路）。
   assert.doesNotMatch(gameplayScript, /lateOptions|后期备选/);
   assert.match(gameplayScript, /const prismOptions = inUpstreamOrder\(build\.prismOptions \|\| \[\], 10\)/);
@@ -2251,9 +2380,9 @@ test("live recommendations render and select every returned option", () => {
   assert.match(gameplayScript, /function ensureSpecialistRunes\(data\)/);
   assert.match(gameplayScript, /\/api\/gameplay\/specialist-runes\?/);
   assert.match(gameplayScript, /ensureLiveRecommendations\(state\.live\);\s*ensureSpecialistRunes\(state\.live\);/);
-	assert.match(functionSource(gameplayScript, "ensureLiveRecommendations"), /state\.liveRecommendations\.set\(targetKey, response\.recommendations\);[\s\S]{0,560}ensureSpecialistRunes\(state\.live\);/);
+	assert.match(functionSource(gameplayScript, "ensureLiveRecommendations"), /const recommendations = response\.recommendations;[\s\S]*?state\.liveRecommendations\.set\(targetKey, recommendations\);[\s\S]{0,1200}ensureSpecialistRunes\(state\.live\);/);
   assert.match(gameplayScript, /Array\.isArray\(response\?\.runes\)/);
-  assert.match(gameplayScript, /liveRecommendationTarget\(state\.live\)\?\.key === target\.key/);
+  assert.match(gameplayScript, /(?:liveRecommendation|specialistRequest)Target\(state\.live\)\?\.key === target(?:\.key|Key)/);
   assert.match(specialistSource, /specialistRuneCacheTTL\s*=\s*6 \* time\.Hour/);
 	assert.match(specialistSource, /specialistRuneRequestBudget\s*=\s*specialistRunePlayerLimit \* \(2 \+ specialistRuneMatchScanMax\)/);
 	assert.match(specialistSource, /specialistRuneMatchScanMax\s*=\s*10/);
@@ -2273,6 +2402,7 @@ test("current champion endpoint keeps live recommendations usable without a rost
     state,
     USE_CHAMPION_PICK_INTENT_FOR_RECOMMENDATIONS: false,
     liveAugmentRecommendationSource: () => "arena",
+	  liveRecommendationTier: () => "diamond",
   });
   const target = liveRecommendationTarget({
     players: [], currentChampionId: 64, queueId: 1750, gameMode: "CHERRY", mapId: 30, gameId: 99,
@@ -2280,26 +2410,36 @@ test("current champion endpoint keeps live recommendations usable without a rost
   assert.equal(target?.championId, 64);
   assert.equal(target?.position, "other");
   assert.equal(target?.self, undefined);
-  assert.equal(target?.key, "64:other:CHERRY:30:none");
+  assert.equal(target?.tier, "diamond");
+  assert.equal(target?.key, "64:other:CHERRY:30:diamond:none");
   assert.equal(liveRecommendationTarget({ players: [], currentChampionId: 0 }), null);
 });
 
+test("champion and live recommendations share the persisted tier", () => {
+	assert.match(script, /tier: normalizeTier\(readSetting\("champion-tier", "emerald_plus"\)\)/);
+	assert.match(script, /writeSetting\("champion-tier", tier\)/);
+	assert.match(functionSource(gameplayScript, "liveRecommendationTier"), /readSetting\("champion-tier", "emerald_plus"\)/);
+	assert.match(functionSource(gameplayScript, "liveRecommendationTarget"), /key: `\$\{championId\}:\$\{position\}:\$\{gameMode\}:\$\{mapId\}:\$\{tier\}:\$\{spellKey\}`/);
+	assert.match(goFunctionSource(gameplayBackend, "gameplayRecommendationTier"), /if !spec\.UsesTier[\s\S]*championCounterFallbackTier[\s\S]*allowedChampionTiers/);
+});
+
 test("live recommendation requests recover from stale flights and empty payloads", async () => {
-  const target = { key: "13:middle:CLASSIC:11:4-12", championId: 13, position: "middle", queueId: 420, gameMode: "CLASSIC", mapId: 11, gameId: 77, self: { spell1Id: 4, spell2Id: 12 } };
+  const target = { key: "13:middle:CLASSIC:11:diamond:4-12", championId: 13, position: "middle", queueId: 420, gameMode: "CLASSIC", mapId: 11, tier: "diamond", gameId: 77, self: { spell1Id: 4, spell2Id: 12 } };
   let now = 100_001;
   let apiCalls = 0;
   let diagnosticCalls = 0;
+	let lastAPIPath = "";
   const state = {
-    live: {}, liveRecommendations: new Map(), liveRecommendationFlights: new Map(),
-    liveRecommendationFailures: new Map(), liveRecommendationSkipDiagnostics: new Set(),
+    live: {}, liveRecommendations: new Map(), liveRecommendationFlights: new Map(), liveRecommendationTraces: new Map(),
+    liveRecommendationFailures: new Map(), liveRecommendationSkipDiagnostics: new Set(), liveGameGeneration: 0,
   };
-  const functions = compileFunctions(gameplayScript, ["ensureLiveRecommendations", "hasUsableLiveRecommendations", "liveRecommendationFlightActive", "recordLiveRecommendationSkip"], {
+  const functions = compileFunctions(gameplayScript, ["newLiveRecommendationTraceId", "recordItemSetClientDiagnostic", "ensureLiveRecommendations", "hasUsableLiveRecommendations", "liveRecommendationFlightActive", "recordLiveRecommendationSkip"], {
     state,
     Date: { now: () => now },
     liveRecommendationTarget: () => target,
     renderLive: () => {},
     ensurePerks: () => {}, ensureItems: () => {}, ensureSummonerSpells: () => {}, ensureSpecialistRunes: () => {},
-    api: async () => { apiCalls += 1; return apiCalls === 1 ? { recommendations: { runes: { opgg: [] } } } : { recommendations: { runes: { opgg: [{ key: "verified" }] } } }; },
+    api: async (path) => { lastAPIPath = path; apiCalls += 1; return apiCalls === 1 ? { recommendations: { runes: { opgg: [] } } } : { recommendations: { runes: { opgg: [{ key: "verified" }] } } }; },
     URLSearchParams,
     fetch: async () => { diagnosticCalls += 1; return { ok: true }; },
   });
@@ -2308,6 +2448,7 @@ test("live recommendation requests recover from stale flights and empty payloads
   state.liveRecommendationFlights.set(target.key, 60_000);
   await functions.ensureLiveRecommendations({});
   assert.equal(apiCalls, 1);
+	assert.match(lastAPIPath, /[?&]tier=diamond(?:&|$)/);
   assert.equal(state.liveRecommendations.has(target.key), false, "empty recommendations must not be cached");
   assert.equal(state.liveRecommendationFlights.has(target.key), false);
 
@@ -2325,21 +2466,19 @@ test("live recommendation requests recover from stale flights and empty payloads
 });
 
 test("recommendation tabs reset only when the champion changes", () => {
-  const state = { recommendationTab: "build", recommendationTabTouched: true, runeSourceTab: "specialist", liveBuildExpanded: true };
+  const state = { recommendationTab: "build", recommendationTabTouched: true, runeSourceTab: "specialist" };
   const functions = compileFunctions(gameplayScript, ["resetRecommendationTabsOnChampionChange"], {
     state,
     liveRecommendationTarget: (data) => data ? { championId: data.championId, key: `${data.championId}:${data.spell1Id || 0}` } : null,
   });
   functions.resetRecommendationTabsOnChampionChange({ championId: 13, spell1Id: 4 }, { championId: 14, spell1Id: 4 });
-  assert.deepEqual(state, { recommendationTab: "runes", recommendationTabTouched: false, runeSourceTab: "opgg", liveBuildExpanded: false });
+  assert.deepEqual(state, { recommendationTab: "runes", recommendationTabTouched: false, runeSourceTab: "opgg" });
   state.recommendationTab = "build";
   state.recommendationTabTouched = true;
   state.runeSourceTab = "specialist";
-  state.liveBuildExpanded = true;
   functions.resetRecommendationTabsOnChampionChange({ championId: 14, spell1Id: 4 }, { championId: 14, spell1Id: 12 });
-  assert.deepEqual(state, { recommendationTab: "build", recommendationTabTouched: true, runeSourceTab: "specialist", liveBuildExpanded: true });
+  assert.deepEqual(state, { recommendationTab: "build", recommendationTabTouched: true, runeSourceTab: "specialist" });
   functions.resetRecommendationTabsOnChampionChange({ championId: 14 }, null);
-  assert.equal(state.liveBuildExpanded, false, "clearing a champion must collapse the previous build before another pick");
   assert.equal(state.recommendationTab, "build", "a transient empty pick must not change the existing tab policy");
 });
 
@@ -2354,7 +2493,7 @@ test("live game scoped state resets on a new game or champion select entry", () 
     livePositionOverride: new Map([["old", "mid"]]),
     liveRecommendationSkipDiagnostics: new Set(["cached:old"]),
     specialistPlayerTabs: new Map([["old", "player"]]),
-    recommendationTab: "build", recommendationTabTouched: true, runeSourceTab: "specialist", selectedRecommendation: "specialist", liveBuildExpanded: true,
+    recommendationTab: "build", recommendationTabTouched: true, runeSourceTab: "specialist", selectedRecommendation: "specialist",
   };
   const functions = compileFunctions(gameplayScript, ["shouldResetLiveGameScopedState", "resetLiveGameScopedState"], { state });
   assert.equal(functions.shouldResetLiveGameScopedState({ gameId: 10, phase: "InProgress" }, { gameId: 11, phase: "InProgress" }), true);
@@ -2362,7 +2501,6 @@ test("live game scoped state resets on a new game or champion select entry", () 
   for (const collection of [state.liveRecommendations, state.specialistRunes, state.liveRecommendationFailures, state.liveRecommendationFlights, state.specialistRuneFailures, state.specialistRuneFlights, state.livePositionOverride, state.liveRecommendationSkipDiagnostics, state.specialistPlayerTabs]) assert.equal(collection.size, 0);
   assert.equal(state.recommendationTab, "runes");
   assert.equal(state.runeSourceTab, "opgg");
-  assert.equal(state.liveBuildExpanded, false);
   assert.equal(functions.shouldResetLiveGameScopedState({ gameId: 11, phase: "Lobby" }, { gameId: 11, phase: "ChampSelect" }), true);
   assert.equal(functions.shouldResetLiveGameScopedState({ gameId: 11, phase: "ChampSelect" }, { gameId: 11, phase: "ChampSelect" }), false, "ordinary same-game polling must not reset state");
   const loadSource = functionSource(gameplayScript, "loadLive");
@@ -2387,6 +2525,33 @@ test("round 9 recommendation percentages preserve backend units and hide empty s
   assert.match(renderCoreStats({ winRate: 53.2, games: 88 }), /胜率[\s\S]*场次/);
   assert.match(functionSource(gameplayScript, "renderOptionStats"), /if \(!hasPick && !hasWin\) return "";/);
   assert.match(functionSource(gameplayScript, "renderCoreStats"), /if \(!hasPick && !hasWin\) return "";/);
+});
+
+test("live QQ101 depth rows preserve unavailable sample metadata", () => {
+	const { renderConfigOption, renderDepthStats } = compileFunctions(gameplayScript, ["renderConfigOption", "renderDepthStats"], {
+		state: { items: { items: [{ id: 1, name: "测试装备" }] } },
+		renderSummonerSpellIcon: () => "<i></i>",
+		renderItemIcon: () => "<i></i>",
+		escapeHTML: (value) => String(value ?? ""),
+		renderOptionStats: () => "",
+		rate: (value) => `${value}%`,
+		compactNumber: (value) => String(value),
+	});
+	const markup = renderConfigOption({ ids: [1], gamesUnavailable: true, stats: { winRate: 61.58, games: 0 } }, "item", renderDepthStats);
+	assert.match(markup, /场次[\s\S]*未提供/);
+	assert.doesNotMatch(markup, />0<\/dd>/);
+	assert.match(functionSource(gameplayScript, "renderConfigOption"), /gamesUnavailable: option\.gamesUnavailable/);
+});
+
+test("live build item cards keep icon tooltips without visible item names", () => {
+	const { renderConfigOption } = compileFunctions(gameplayScript, ["renderConfigOption"], {
+		renderSummonerSpellIcon: (id) => `<span data-tooltip="技能 ${id}"></span>`,
+		renderItemIcon: (id) => `<span data-tooltip="装备 ${id}"></span>`,
+		renderOptionStats: () => "",
+	});
+	const markup = renderConfigOption({ ids: [3089] }, "item");
+	assert.match(markup, /data-tooltip="装备 3089"/);
+	assert.doesNotMatch(markup, /item-option-name|<small/);
 });
 
 test("round 9 match summaries show only placement while details align it beside scores", () => {
@@ -2581,6 +2746,8 @@ test("round 9 recommendation modes drive tabs, fallbacks, and ranked-only source
   assert.equal(functions.recommendationCapabilities({ queueId: 2400, gameMode: "ARAM_MAYHEM_CLASSIC", mapId: 12 }, { hasRunes: true }).hasRunes, true);
   assert.equal(functions.recommendationCapabilities({ queueId: 2400, gameMode: "ARAM_MAYHEM_CLASSIC", mapId: 12 }, { hasRunes: true }).hasAugments, false);
   assert.equal(functions.recommendationCapabilities({ queueId: 420 }, { hasRunes: true }).hasRunes, true);
+  assert.equal(functions.recommendationCapabilities({ queueId: 420 }, { hasItemDepths: true }).hasItemDepths, true);
+  assert.equal(functions.recommendationCapabilities({ queueId: 450 }, { hasItemDepths: false }).hasItemDepths, false);
   assert.equal(functions.recommendationActiveTab(["runes", "insight", "build"], { hasAugments: true }), "build");
   state.recommendationTab = "runes";
   state.recommendationTabTouched = true;
@@ -2589,7 +2756,8 @@ test("round 9 recommendation modes drive tabs, fallbacks, and ranked-only source
 	assert.match(functions.renderRuneRecommendations({ queueId: 1700 }, true), /class="rune-source-tabs"[\s\S]*class="rune-source-stack">\[opgg\]<\/div>/);
 	state.runeSourceTab = "specialist";
 	const specialistSources = functions.renderRuneRecommendations({ queueId: 420 }, true);
-	assert.match(specialistSources, /class="rune-source-tab-buttons" role="tablist"[\s\S]*class="rune-source-note">当前分路 · 最近 10 局<\/small><\/div><div class="rune-source-stack">\[specialist\]/);
+	assert.match(specialistSources, /class="rune-source-tab-buttons" role="tablist"[\s\S]*<div class="rune-source-stack">\[specialist\]/);
+	assert.doesNotMatch(specialistSources, /rune-source-note|当前分路 · 最近 10 局/);
 	assert.doesNotMatch(specialistSources, /rune-source-section"><header>/);
   assert.match(functions.renderRecommendationDataNotices({ isFallback: true, resolvedMode: "aram" }), /参考极地大乱斗数据/);
   assert.match(functions.renderRecommendationDataNotices({ isFallback: true, resolvedMode: "aram" }), /出装与技能/);
@@ -2627,10 +2795,58 @@ test("live recommendations can temporarily use a champ-select pick intent", () =
 	assert.match(gameplayScript, /if \(target\.gameId > 0\) query\.set\("gameId", String\(target\.gameId\)\)/);
   assert.match(gameplayBackend, /ChampionPickIntent\s+int64\s+`json:"championPickIntent,omitempty"`/);
   assert.match(gameplayBackend, /ChampionLocked\s+bool\s+`json:"championLocked"`/);
-  assert.match(gameplayBackend, /ChampionPickIntent: selected\.ChampionPickIntent/);
+	assert.match(gameplayBackend, /pickIntent := positiveChampionPickIntent\(selected\.ChampionPickIntent\)/);
+	assert.match(gameplayBackend, /ChampionPickPending: selected\.ChampionPickIntent < 0/);
   assert.match(gameplayBackend, /func gameplayLiveRecommendationTarget\(players \[\]gameplayLivePlayer, currentChampionID int64\)/);
   assert.match(gameplayBackend, /championID = player\.ChampionPickIntent/);
   assert.match(gameplayBackend, /if currentChampionID > 0 \{\s*return currentChampionID, position/s);
+});
+
+test("live recommendation champion ids reject negative pick sentinels and use resolved live fallback", () => {
+  const state = { livePositionOverride: new Map() };
+  const { liveRecommendationChampionId, liveRecommendationTarget } = compileFunctions(gameplayScript, ["liveRecommendationChampionId", "liveRecommendationTarget"], {
+    state,
+    USE_CHAMPION_PICK_INTENT_FOR_RECOMMENDATIONS: true,
+    liveAugmentRecommendationSource: () => "arena",
+    liveRecommendationTier: () => "diamond",
+  });
+  for (const sentinel of [-1, -3, -999]) assert.equal(liveRecommendationChampionId({ championId: 0, championPickIntent: sentinel }), 0);
+  assert.equal(liveRecommendationChampionId({ championId: 0, championPickIntent: 25 }), 25);
+  const target = liveRecommendationTarget({
+    players: [{ isCurrent: true, championId: 0, championPickIntent: -3, position: "other" }],
+    currentChampionId: -3, resolvedChampionId: 25, queueId: 1750, gameMode: "CHERRY", mapId: 30,
+  });
+  assert.equal(target?.championId, 25);
+});
+
+test("random pick pending state has distinct empty-state copy", () => {
+  const { renderRecommendationArea } = compileFunctions(gameplayScript, ["renderRecommendationArea"], {
+    state: {
+      recommendationTab: "build", recommendationTabTouched: false, runeSourceTab: "opgg", selectedRecommendation: "opgg",
+      livePositionOverride: new Map(), liveRecommendations: new Map(), liveRecommendationFailures: new Map(), liveRecommendationFlights: new Map(),
+    },
+    liveRecommendationTarget: () => null,
+    liveRecommendationsFor: () => ({}),
+    liveAugmentRecommendationSource: () => "arena",
+    recommendationCapabilities: () => ({ hasRunes: false, hasAugments: true, hasCounters: true, hasBanRate: true, hasTopPlayers: false }),
+    recommendationTabSpecs: () => [["build", "海克斯与出装"], ["insight", "详情"]],
+    recommendationActiveTab: () => "build",
+    selectedRuneRecommendation: () => null,
+    renderLiveInsights: () => "",
+    renderRecommendationDataNotices: () => "",
+    recommendationPanelBusy: () => false,
+    liveRecommendationFlightActive: () => false,
+    escapeHTML: (value) => String(value ?? ""),
+    renderLiveAugmentRecommendations: () => "",
+    renderBuildRecommendation: () => "",
+    renderChampionRecommendationHeader: () => "",
+    recommendationEmptyPanel: (title, copy) => `<strong>${title}</strong><p>${copy}</p>`,
+  });
+  const markup = renderRecommendationArea({ available: true, champSelectNotice: "斗魂英雄选择阶段只展示小队玩家信息", players: [{ isCurrent: true, championPickPending: true, championPickIntent: 0 }] });
+  assert.match(markup, /随机待定/);
+  assert.match(markup, /英雄尚未确定，锁定后自动加载/);
+  assert.match(markup, /class="recommendation-tab-row"><div class="recommendation-tabs"[\s\S]*class="live-roster-notice"/);
+  assert.ok(markup.indexOf("recommendation-tabs") < markup.indexOf("live-roster-notice"), "notice must follow tabs inside their shared row");
 });
 
 test("rune application creates or recycles only Deep Legends pages", () => {
@@ -2668,7 +2884,7 @@ test("friend navigation uses only session-scoped player references", () => {
 	assert.match(friendsScript, /data-player-ref="\$\{escapeHTML\(friend\.playerRef \|\| ""\)\}"/);
 	assert.match(friendsScript, /detail: \{ playerRef: row\.dataset\.playerRef, gameName:/);
 	assert.match(gameplayScript, /const playerRef = String\(event\.detail\?\.playerRef \|\| ""\)\.trim\(\)/);
-	assert.match(gameplayScript, /if \(playerRef\) \{[\s\S]+openPlayer\(playerRef, label, region, serverId\)/);
+	assert.match(gameplayScript, /if \(playerRef\) \{[\s\S]+source === "search"[\s\S]+openPlayer\(playerRef, label, region, serverId, tabContext\)/);
 	assert.doesNotMatch(friendsScript, /friend\.puuid|friend\.summonerId/);
 	assert.match(demoScript, /playerRef: `player_\$\{String\(icon\)/);
 	assert.doesNotMatch(demoScript, /puuid: `demo-|summonerId: 0/);
@@ -2733,6 +2949,7 @@ test("server-filtered flex switch makes one fresh first-page request", async () 
 	};
 	const { updateMatchFilter } = compileFunctions(gameplayScript, ["updateMatchFilter", "autoLoadMatchFilter"], {
 		state,
+		matchObserverKey: (currentTab) => currentTab.overlay ? "overlayObserver" : "matchObserver",
 		rememberMatchScrollTop: () => {},
 		renderFilteredMatchView: () => {},
 		filteredMatches: (matches, currentTab) => matches.filter((match) => currentTab.matchFilter !== "flex" || Number(match.queueId) === 440),
@@ -2762,6 +2979,7 @@ test("client-filter fallback alone may automatically page until flex appears", a
 	};
 	const { updateMatchFilter } = compileFunctions(gameplayScript, ["updateMatchFilter", "autoLoadMatchFilter"], {
 		state,
+		matchObserverKey: (currentTab) => currentTab.overlay ? "overlayObserver" : "matchObserver",
 		rememberMatchScrollTop: () => {},
 		renderFilteredMatchView: () => {},
 		filteredMatches: (matches, currentTab) => matches.filter((match) => currentTab.matchFilter !== "flex" || Number(match.queueId) === 440),
@@ -2894,7 +3112,7 @@ test("floating tooltip content is structured safely and shown only after placeme
   assert.match(appScript, /titleNode\.textContent = title/);
   assert.match(appScript, /bodyNode\.textContent = body/);
   assert.match(appScript, /tooltip\.replaceChildren\(\.\.\.children\)/);
-  assert.match(appScript, /tooltip\.dataset\.layout = body \? "titled" : "single"/);
+  assert.match(appScript, /tooltip\.dataset\.layout = roster \? "roster" : body \? "titled" : "single"/);
   assert.match(appScript, /delete tooltip\.dataset\.shown;[\s\S]*tooltip\.hidden = true/);
   const menuBranch = appScript.slice(appScript.indexOf('anchor.dataset.tooltipSide === "menu"'));
   const menuBeforeReturn = menuBranch.slice(0, menuBranch.indexOf("return;"));
@@ -2937,7 +3155,7 @@ test("round 9 section navigation restores each page scroll position after panel 
     loadPrivacy: () => {},
     renderNotice: () => {},
     renderLaunchpad: () => {},
-    document: {},
+		document: { getElementById: () => null },
     requestAnimationFrame: (callback) => frames.push(callback),
     window: { dispatchEvent: () => {}, matchMedia: () => ({ matches: false }), addEventListener: () => {}, removeEventListener: () => {} },
     CustomEvent: class CustomEvent { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
@@ -2961,7 +3179,7 @@ test("round 9 section navigation restores each page scroll position after panel 
   el.appScroll.scrollTop = 90;
   activateSection("overview");
   assert.equal(state.sectionScroll.live, 90);
-  assert.equal(scrollCalls[0].top, 240);
+  assert.equal(scrollCalls.length, 0, "总览由玩家页签恢复滚动，不再使用页面共享位置");
 });
 
 test("round 9 tooltip pointer suppression survives the click focus event", () => {
@@ -3070,7 +3288,7 @@ test("champion detail tooltips include static numerical metadata and player alia
 
 test("network preload excludes Hexdata and starts only ranked and arena work", () => {
   assert.match(script, /function beginStartupPreload\(\)/);
-  assert.match(script, /beginStartupPreload\(\);\s*\}\)\(\);/s);
+  assert.match(script, /beginStartupPreload\(\);[\s\S]*\}\)\(\);/s);
   assert.match(script, /preload-ranked/);
   assert.doesNotMatch(script, /preload-(?:aram|mayhem)/);
   assert.match(script, /preload-arena/);
@@ -3081,13 +3299,15 @@ test("network preload excludes Hexdata and starts only ranked and arena work", (
 test("champion data survives section switches and re-entry renders instantly while fresh", () => {
   assert.match(script, /function rankingsFresh\(\)/);
 	  assert.match(script, /if \(rankingsFresh\(\)\) \{ renderLoadedWorkspace\(\); return; \}/);
-	  assert.match(script, /resetTransientChampionState\(\{ restorePosition: true \}\);[\s\S]{0,120}state\.tier = "emerald_plus";/);
+	  assert.match(script, /tier: normalizeTier\(readSetting\("champion-tier", "emerald_plus"\)\)/);
+	  assert.match(script, /writeSetting\("champion-tier", tier\)/);
+	  assert.doesNotMatch(script, /resetTransientChampionState\(\{ restorePosition: true \}\);[\s\S]{0,120}state\.tier = "emerald_plus";/);
 	  assert.doesNotMatch(script, /resetTransientChampionState\(\{ restorePosition: true \}\);[\s\S]{0,120}state\.mode = "ranked";/);
 });
 
 test("champion mode, searches, and tabs persist while transient detail state resets", () => {
 	for (const [field, key] of [
-		["mode", "champion-mode"], ["query", "champion-query"], ["augmentQuery", "champion-augment-query"],
+		["augmentQuery", "champion-augment-query"],
 		["mayhemView", "champion-mayhem-view"], ["arenaFirstTab", "champion-arena-first-tab"], ["runePage", "champion-rune-page"],
 	]) {
 		assert.match(script, new RegExp(`${field}: normalize[A-Za-z]+\\(readSetting\\("${key}"`));
@@ -3099,7 +3319,7 @@ test("champion mode, searches, and tabs persist while transient detail state res
 	assert.match(reset, /state\.detail = null/);
 	assert.match(reset, /state\.selected = null/);
 	assert.match(reset, /state\.workspaceRequestToken \+= 1/);
-	assert.match(script, /detailChampionID: normalizeChampionDetailID\(readSetting\("champion-detail-id", ""\)\)/);
+	assert.ok(script.includes("detailChampionID: normalizeChampionDetailID(readSetting(`champion-detail-id-${initialMode}`, \"\"))"));
 	assert.doesNotMatch(script, /readSetting\("champion-(?:loading|error|request-token)/);
 });
 
@@ -3142,7 +3362,7 @@ test("account page removes the duplicate title and sizes facts to unwrapped cont
 });
 
 test("optional themes keep a neutral background and accent-only primary", () => {
-	assert.match(html, /自动模式按时段在浅色与海克斯黑金之间切换/);
+	assert.match(html, /自动主题随时段切换/);
 	assert.doesNotMatch(html, /浅色与深色之间切换/);
   assert.match(html, /option value="crimson">血月红<\/option>/);
   assert.match(html, /option value="aurora">极光青<\/option>/);
@@ -3201,9 +3421,13 @@ test("augment metadata is looked up by ID without an icon-directory filter", () 
 // 前端只能回落到白描 mask。mask 底下再垫一层品质渐变，整块就成了纯色方块。
 test("augment icons survive a client asset miss and never render as a solid tile", () => {
   const image = goFunctionSource(mainSource, "handleImage");
+  const candidates = goFunctionSource(mainSource, "communityDragonImagePaths");
   assert.match(image, /if err != nil \{[\s\S]{0,400}a\.serveCommunityDragonImage\(w, r, assetPath\)/);
   assert.doesNotMatch(image, /if err != nil \{\s*http\.NotFound\(w, r\)/);
   assert.match(mainSource, /"\/latest\/game\/" \+ gameRelative/);
+  assert.ok(candidates.indexOf("gamePath,") < candidates.indexOf("pluginPath,"), "game _large candidate must precede plugin _large");
+  assert.ok(candidates.indexOf("pluginPath,") < candidates.indexOf('strings.TrimSuffix(gamePath, "_large.png") + "_small.png"'), "every _large candidate must precede every _small candidate");
+  assert.doesNotMatch(script, /isColoredAugment/);
 });
 
 // 斗魂说明：@f1@/@f2@ 是客户端本局计数器，dataValues 里查不到的变量真值在
@@ -3245,6 +3469,7 @@ test("live session shows the current position only when position capability exis
 	const { liveCurrentPositionChip } = compileFunctions(gameplayScript, ["liveCurrentPositionChip"], {
 		liveRecommendationsFor: (data) => data.recommendations || {},
 		liveRecommendationTarget: (data) => ({ position: "mid", clientPosition: data.players?.find((player) => player.isCurrent)?.position || "other" }),
+		specialistPosition: () => "mid",
 		livePositionDisplay: (value) => value,
 		positionIcon: (value) => `<icon data-position="${value}"></icon>`,
 		positionLabel: (value) => ({ top: "上路", mid: "中路" }[value] || value),
@@ -3261,15 +3486,16 @@ test("live session shows the current position only when position capability exis
 });
 
 test("live position choices sort by role share and derive missing shares from play", () => {
+	let recommendation = {
+		resolvedPosition: "support", positionSource: "opgg-primary",
+		positions: [{ position: "top", roleRate: 0, play: 20 }, { position: "support", roleRate: 0, play: 80 }],
+	};
 	const { renderChampionRecommendationHeader } = compileFunctions(gameplayScript, ["renderChampionRecommendationHeader"], {
 		state: { live: {} },
 		escapeHTML: (value) => String(value ?? ""),
 		liveRecommendationChampionId: () => 64,
 		liveRecommendationTarget: () => ({ position: "support", clientPosition: "top", positionOverride: false }),
-		liveRecommendationsFor: () => ({
-			resolvedPosition: "support", positionSource: "opgg-primary",
-			positions: [{ position: "top", roleRate: 0, play: 20 }, { position: "support", roleRate: 0, play: 80 }],
-		}),
+		liveRecommendationsFor: () => recommendation,
 		livePositionValue: (value) => String(value || ""),
 		livePositionDisplay: (value) => String(value || ""),
 		positionLabel: (value) => String(value || ""),
@@ -3285,16 +3511,21 @@ test("live position choices sort by role share and derive missing shares from pl
 	assert.match(markup, /live-position-rate">80%/);
 	assert.match(markup, /live-position-rate">20%/);
 	assert.match(markup, /已按80% 场次占比/);
+	recommendation = {
+		resolvedPosition: "support", positionSource: "requested",
+		positions: [{ position: "mid", roleRate: 95 }, { position: "support", roleRate: 5 }],
+	};
+	const nicheMarkup = renderChampionRecommendationHeader({ emptyReason: "暂无" }, { championName: "瑞兹", position: "support" }, {});
+	assert.match(nicheMarkup, /当前展示的是support数据（该英雄此分路占比 5%）/);
 	assert.match(gameplayStyles, /@container recommendation-area \(max-width: 700px\)[\s\S]*?\.live-position-rate\s*\{[^}]*display:\s*none/s);
 });
 
 test("live build recommendations use a wide core column and only the available depth columns", () => {
   const { renderBuildRecommendation } = compileFunctions(gameplayScript, ["renderBuildRecommendation"], {
-    LIVE_CORE_OPTION_LIMIT: 15,
-    LIVE_CORE_OPTION_PREVIEW_LIMIT: 6,
-    state: { liveBuildExpanded: false },
+    LIVE_CORE_OPTION_LIMIT: 5,
+    state: {},
     escapeHTML: (value) => String(value ?? ""),
-    recommendationCapabilities: () => ({ hasAugments: false }),
+    recommendationCapabilities: (data) => ({ hasAugments: false, hasItemDepths: data?.hasItemDepths === true }),
     liveAugmentRecommendationSource: () => "",
     liveRecommendationsFor: () => ({}),
     recommendationEmptyPanel: (title) => `<empty>${title}</empty>`,
@@ -3309,7 +3540,7 @@ test("live build recommendations use a wide core column and only the available d
   });
   const build = {
     coreOptions: Array.from({ length: 6 }, (_, index) => ({ id: `core-${index}`, stats: { winRate: 60 - index } })),
-    fourthOptions: [{ id: "fourth", stats: { winRate: 59 } }],
+    fourthOptions: [{ id: "fourth", gamesUnavailable: true, stats: { winRate: 59 } }],
     fifthOptions: [{ id: "fifth", stats: { winRate: 58 } }],
     sixthOptions: [{ id: "sixth", stats: { winRate: 57 } }],
     itemSource: "OP.GG",
@@ -3319,7 +3550,7 @@ test("live build recommendations use a wide core column and only the available d
     fifthSample: 20,
     sixthSample: 12,
   };
-  const markup = renderBuildRecommendation(build, { championName: "瑞兹" }, [], { phase: "InProgress" });
+  const markup = renderBuildRecommendation(build, { championName: "瑞兹" }, [], { phase: "InProgress", hasItemDepths: true });
   assert.match(markup, /<div class="build-core-ranking-row"><div class="item-build-layout">/);
   const layoutStart = markup.indexOf('<div class="item-build-layout">');
   const coreStart = markup.indexOf('class="item-core-column"', layoutStart);
@@ -3328,34 +3559,38 @@ test("live build recommendations use a wide core column and only the available d
   assert.match(markup, /build-item-row" data-depth-count="3"/);
   assert.doesNotMatch(markup, /OP\.GG · 当前版本/);
   assert.match(markup, /item-depth-columns"><section><h4><span>第四件<\/span>[\s\S]*<h4><span>第五件<\/span>[\s\S]*<h4><span>第六件<\/span>/);
+	assert.match(markup, /上游未提供样本量，按上游推荐顺序展示/);
 	assert.doesNotMatch(markup, /样本少/);
-	  assert.equal((markup.match(/data-kind="route"/g) || []).length, 6);
+	  assert.equal((markup.match(/data-kind="route"/g) || []).length, 5);
 	  assert.match(markup, /data-apply-item-set/);
   assert.doesNotMatch(markup, /item-depth-grid/);
   // 上游没有第六件（辅助位普遍如此）就整列不展示，而不是留一列空态文案。
-  const missingSixth = renderBuildRecommendation({ ...build, sixthOptions: [], sixthSample: 0 }, { championName: "瑞兹" }, [], { phase: "InProgress" });
+  const missingSixth = renderBuildRecommendation({ ...build, sixthOptions: [], sixthSample: 0 }, { championName: "瑞兹" }, [], { phase: "InProgress", hasItemDepths: true });
   assert.match(missingSixth, /build-item-row" data-depth-count="2"/);
   assert.match(missingSixth, /data-id="fourth"/);
   assert.match(missingSixth, /data-id="fifth"/);
   assert.doesNotMatch(missingSixth, /data-id="sixth"/);
   assert.doesNotMatch(missingSixth, /第六件/);
   // 第四/第五件缺失才是真正的「暂不可用」，空态文案必须保留。
-  const missingFifth = renderBuildRecommendation({ ...build, fifthOptions: [], fifthSample: 0 }, { championName: "瑞兹" }, [], { phase: "InProgress" });
+  const missingFifth = renderBuildRecommendation({ ...build, fifthOptions: [], fifthSample: 0 }, { championName: "瑞兹" }, [], { phase: "InProgress", hasItemDepths: true });
   assert.match(missingFifth, /<h4><span>第五件<\/span><\/h4><p class="build-group-empty">该阶段暂无可用样本<\/p>/);
+  const unsupportedDepths = renderBuildRecommendation(build, { championName: "瑞兹" }, [], { phase: "InProgress", hasItemDepths: false });
+  assert.doesNotMatch(unsupportedDepths, /第四件|第五件|第六件|item-depth-columns/);
+  assert.match(unsupportedDepths, /item-core-column/);
   assert.doesNotMatch(renderBuildRecommendation({ coreOptions: [{ id: "core" }] }, { championName: "瑞兹" }, [], { phase: "InProgress" }), /item-depth-columns/);
   assert.match(sharedBuildStyles, /\.build-item-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,1\.6fr\) repeat\(3,minmax\(0,1fr\)\)/s);
   assert.match(sharedBuildStyles, /\.build-item-row\[data-depth-count="2"\]\s*\{[^}]*repeat\(2,minmax\(0,1fr\)\)/s);
   assert.match(sharedBuildStyles, /\.build-item-row\[data-depth-count="1"\]/);
   assert.match(sharedBuildStyles, /\.build-item-row\s*>\s*\.item-depth-columns\s*\{[^}]*display:\s*contents/s);
   assert.match(sharedBuildStyles, /\.build-item-row\s*\{[^}]*--build-row-height:\s*64px/s);
-  assert.match(gameplayStyles, /\.build-core-ranking-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,1\.5fr\) minmax\(0,1fr\)/s);
+	assert.match(gameplayStyles, /\.build-core-ranking-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
   const wideRanking = cssBlockAfter(gameplayStyles, "@container recommendation-area (min-width: 1081px)");
-  assert.match(wideRanking, /\.build-core-ranking-row \.build-item-row\[data-depth-count="3"\]\s*\{[^}]*grid-template-columns:\s*250px repeat\(3,minmax\(0,1fr\)\)/s);
-  assert.match(wideRanking, /\.build-core-ranking-row \.option-stats\.is-depth\s*\{[^}]*repeat\(2,minmax\(30px,32px\)\)[^}]*column-gap:\s*4px/s);
-  assert.match(gameplayStyles, /\.live-item-ranking \.mayhem-ranking-list\s*\{[^}]*repeat\(2,minmax\(0,1fr\)\)/s);
+  assert.match(wideRanking, /\.build-core-ranking-row \.build-item-row\[data-depth-count="3"\]\s*\{[^}]*grid-template-columns:\s*310px repeat\(3,minmax\(0,1fr\)\)/s);
+  assert.match(wideRanking, /\.build-core-ranking-row \.option-stats\.is-depth\s*\{[^}]*repeat\(2,minmax\(48px,64px\)\)[^}]*column-gap:\s*0/s);
+	assert.match(gameplayStyles, /\.live-item-ranking \.mayhem-ranking-list\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/s);
   assert.match(gameplayStyles, /\.config-item\s*\{[^}]*width:\s*var\(--option-icon-size,42px\)/s);
-  assert.match(gameplayStyles, /\.item-option-name\s*\{[^}]*width:\s*100%[^}]*max-width:\s*100%/s);
-  assert.match(functionSource(gameplayScript, "renderConfigOption"), /data-tooltip="\$\{escapeHTML\(name\)\}" data-tooltip-overflow="self"/);
+  assert.doesNotMatch(gameplayStyles, /\.item-option-name\s*\{/);
+  assert.doesNotMatch(functionSource(gameplayScript, "renderConfigOption"), /item-option-name/);
   const compact = cssBlockAfter(gameplayStyles, "@container recommendation-area (max-width: 1080px)");
   assert.match(compact, /\.build-core-ranking-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
   const medium = cssBlockAfter(gameplayStyles, "@container recommendation-area (max-width: 900px)");
@@ -3365,18 +3600,24 @@ test("live build recommendations use a wide core column and only the available d
 });
 
 test("live rune source tabs keep stable widths when the contextual note appears", () => {
-  assert.match(gameplayStyles, /\.rune-source-tab-buttons\s*\{[^}]*flex:\s*0 1 auto/s);
-  assert.match(gameplayStyles, /\.rune-source-tab\s*\{[^}]*flex:\s*0 0 108px/s);
-  assert.match(gameplayStyles, /\.rune-source-note\s*\{[^}]*min-width:\s*0[^}]*flex:\s*0 1 auto[^}]*margin-left:\s*auto[^}]*text-overflow:\s*ellipsis/s);
+	assert.match(gameplayStyles, /\.rune-source-tab-buttons\s*\{[^}]*flex:\s*1 1 auto/s);
+	assert.match(gameplayStyles, /\.rune-source-tab\s*\{[^}]*flex:\s*1 1 0[^}]*min-width:\s*0/s);
+	assert.match(gameplayStyles, /\.rune-source-note\s*\{[^}]*margin:\s*0 8px 2px[^}]*text-overflow:\s*ellipsis/s);
   const narrow = cssBlockAfter(gameplayStyles, "@container recommendation-area (max-width: 700px)");
   assert.match(narrow, /\.rune-source-note\s*\{[^}]*display:\s*none/s);
+});
+
+test("disabled controls use the not-allowed cursor throughout the web UI", () => {
+  for (const styles of [appStyles, gameplayStyles, friendsStyles]) {
+    assert.doesNotMatch(styles, /(?:\[disabled\]|:disabled)[^{}]*\{[^}]*cursor:\s*(?:wait|default)/s);
+  }
+  assert.match(appStyles, /button:disabled, select:disabled, \[aria-disabled="true"\]\s*\{[^}]*cursor:\s*not-allowed/s);
 });
 
 test("arena live build aligns prism and core cards with the three Arena metrics", () => {
   const state = { items: { items: [{ id: 447101, name: "棱彩测试装备" }] } };
   const { renderBuildRecommendation } = compileFunctions(gameplayScript, ["renderArenaBuildOption", "renderBuildRecommendation"], {
-    LIVE_CORE_OPTION_LIMIT: 15,
-    LIVE_CORE_OPTION_PREVIEW_LIMIT: 6,
+    LIVE_CORE_OPTION_LIMIT: 5,
     state,
     escapeHTML: (value) => String(value ?? ""),
     rate: (value) => value == null ? "—" : `${value}%`,
@@ -3414,18 +3655,20 @@ test("arena live build aligns prism and core cards with the three Arena metrics"
 	  const compactArenaBuild = cssBlockAfter(gameplayStyles, "@container (max-width: 820px)");
 	  assert.match(compactArenaBuild, /\.live-arena-build-section\.is-core \.live-arena-build-grid,[\s\S]*\.live-arena-build-section\.is-prismatic \.live-arena-build-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/s);
   assert.match(gameplayStyles, /\.live-arena-build-option \.item-option-button > \.game-icon\.is-large\s*\{[^}]*width:\s*48px[^}]*height:\s*48px[^}]*border-radius:\s*7px/s);
+	assert.match(gameplayStyles, /\.live-arena-build-option \.arena-option-main > strong\s*\{[^}]*font-size:\s*13px/s);
+	assert.match(gameplayStyles, /\.live-arena-build-option\.arena-option-card dl\s*\{[^}]*column-gap:\s*0/s);
+	assert.match(gameplayStyles, /\.live-arena-build-option\.arena-option-card dt\s*\{[^}]*font-size:\s*9px/s);
+	assert.match(gameplayStyles, /\.live-arena-build-option\.arena-option-card dd\s*\{[^}]*font-size:\s*12px/s);
 	  const narrowArenaBuild = cssBlockAfter(gameplayStyles, "@container build-recommendation (max-width: 500px)");
 	  assert.match(narrowArenaBuild, /\.live-arena-build-section\.is-core \.arena-option-card\s*\{[^}]*padding:\s*5px/s);
 	  assert.match(narrowArenaBuild, /\.live-arena-build-section\.is-core \.arena-option-card \.item-option-button,[\s\S]*\.item-option-button > \.game-icon\.is-large\s*\{[^}]*width:\s*28px[^}]*height:\s*28px[^}]*flex-basis:\s*28px/s);
 	  assert.match(narrowArenaBuild, /\.live-arena-build-section\.is-core \.arena-option-card \.augment-grade\s*\{[^}]*width:\s*18px[^}]*height:\s*18px[^}]*flex-basis:\s*18px/s);
 });
 
-test("live core routes receive fifteen rows, preview six, and expand in standard and Arena layouts", () => {
-  const state = { liveBuildExpanded: false };
+test("live core routes render at most five rows without an expansion control", () => {
   const { renderBuildRecommendation } = compileFunctions(gameplayScript, ["renderBuildRecommendation"], {
-    LIVE_CORE_OPTION_LIMIT: 15,
-    LIVE_CORE_OPTION_PREVIEW_LIMIT: 6,
-    state,
+    LIVE_CORE_OPTION_LIMIT: 5,
+    state: {},
     escapeHTML: (value) => String(value ?? ""),
     recommendationCapabilities: (data) => ({ hasAugments: Boolean(data?.hasAugments) }),
     liveAugmentRecommendationSource: (data) => data?.hasAugments ? "arena" : "",
@@ -3444,41 +3687,17 @@ test("live core routes receive fifteen rows, preview six, and expand in standard
   const build = { coreOptions: Array.from({ length: 18 }, (_, index) => ({ id: index + 1 })) };
   const render = (arena) => renderBuildRecommendation(build, { championName: "瑞兹" }, [], { phase: "InProgress", hasAugments: arena });
 
-  const standardPreview = render(false);
-  assert.equal((standardPreview.match(/data-normal-core=/g) || []).length, 6);
-  assert.match(standardPreview, /data-live-build-expand[^>]+aria-expanded="false"[^>]*>展开全部 15 条/);
-  state.liveBuildExpanded = true;
-  const standardExpanded = render(false);
-  assert.equal((standardExpanded.match(/data-normal-core=/g) || []).length, 15);
-  assert.match(standardExpanded, /aria-expanded="true"[^>]*>收起/);
-
-  state.liveBuildExpanded = false;
-  const arenaPreview = render(true);
-  assert.equal((arenaPreview.match(/data-arena-core=/g) || []).length, 6);
-  state.liveBuildExpanded = true;
-  assert.equal((render(true).match(/data-arena-core=/g) || []).length, 15);
-  assert.match(gameplayStyles, /\.live-build-expand\s*\{[^}]*width:\s*100%[^}]*min-height:\s*36px/s);
-
-  let renders = 0;
-  let focused = 0;
-  const toggleState = { liveBuildExpanded: false };
-  const { toggleLiveBuildExpanded } = compileFunctions(gameplayScript, ["toggleLiveBuildExpanded"], {
-    state: toggleState,
-    renderLive: () => { renders += 1; },
-    nodes: { liveContent: { querySelector: () => ({ focus: () => { focused += 1; } }) } },
-  });
-  toggleLiveBuildExpanded();
-  assert.equal(toggleState.liveBuildExpanded, true);
-  assert.equal(renders, 1);
-  assert.equal(focused, 1);
-  assert.match(functionSource(gameplayScript, "bindLiveContent"), /\[data-live-build-expand\][\s\S]*toggleLiveBuildExpanded/);
+  const standard = render(false);
+  assert.equal((standard.match(/data-normal-core=/g) || []).length, 5);
+  const arena = render(true);
+  assert.equal((arena.match(/data-arena-core=/g) || []).length, 5);
+  assert.doesNotMatch(`${standard}${arena}${gameplayStyles}`, /data-live-build-expand|live-build-expand|展开全部|收起/);
 });
 
 test("live recommendation option groups keep the upstream order and never re-sort by win rate", () => {
   const { renderBuildRecommendation } = compileFunctions(gameplayScript, ["renderBuildRecommendation"], {
-    LIVE_CORE_OPTION_LIMIT: 15,
-    LIVE_CORE_OPTION_PREVIEW_LIMIT: 6,
-    state: { liveBuildExpanded: false },
+    LIVE_CORE_OPTION_LIMIT: 5,
+    state: {},
     escapeHTML: (value) => String(value ?? ""),
     recommendationCapabilities: () => ({ hasAugments: false }),
     liveAugmentRecommendationSource: () => "",
@@ -3502,7 +3721,7 @@ test("live recommendation option groups keep the upstream order and never re-sor
     { id: `${prefix}-third`, stats: { pickRate: 0.02, winRate: 100, games: 1 } },
   ];
   const markup = renderBuildRecommendation({ spellOptions: upstream("spell"), starterOptions: upstream("starter"), bootOptions: upstream("boot") }, { championName: "瑞兹" }, [], { phase: "InProgress" });
-	for (const [prefix, limit] of [["spell", 2], ["starter", 3], ["boot", 2]]) {
+	for (const [prefix, limit] of [["spell", 2], ["starter", 3], ["boot", 3]]) {
     const head = markup.indexOf(`data-id="${prefix}-head"`);
     const tail = markup.indexOf(`data-id="${prefix}-tail"`);
     const third = markup.indexOf(`data-id="${prefix}-third"`);
@@ -3520,9 +3739,8 @@ test("live recommendation option groups keep the upstream order and never re-sor
 
 test("mayhem opening sections follow actual data instead of the augment capability", () => {
   const { renderBuildRecommendation } = compileFunctions(gameplayScript, ["renderBuildRecommendation"], {
-    LIVE_CORE_OPTION_LIMIT: 15,
-    LIVE_CORE_OPTION_PREVIEW_LIMIT: 6,
-    state: { liveBuildExpanded: false },
+    LIVE_CORE_OPTION_LIMIT: 5,
+    state: {},
     escapeHTML: (value) => String(value ?? ""),
     recommendationCapabilities: () => ({ hasAugments: true }),
     liveAugmentRecommendationSource: (data) =>
@@ -3566,6 +3784,9 @@ test("mayhem opening sections follow actual data instead of the augment capabili
 test("item set payload uses three core routes, removes cross-group duplicates, and follows recommendation position", () => {
 	const { buildItemSetPayload } = compileFunctions(gameplayScript, ["buildItemSetPayload"], {
 		liveRecommendationChampionId: () => 68,
+		liveRecommendationsFor: () => ({}),
+		liveRecommendationTarget: () => null,
+		state: { liveRecommendationTraces: new Map() },
 		positionLabel: (position) => ({ top: "上路", middle: "中路" }[position] || position),
 	});
 	const starterIDs = Array.from({ length: 24 }, (_, index) => 1000 + index);
@@ -3579,7 +3800,7 @@ test("item set payload uses three core routes, removes cross-group duplicates, a
 		sixthOptions: [{ ids: [6333, 6692] }],
 		prismOptions: [{ ids: [447101, 447102] }, { ids: [447102, 447103] }],
 	}, { championName: "兰博", position: "middle" }, { mapId: 11 });
-	assert.equal(payload.title, "兰博 · 上路");
+	assert.equal(payload.title, "上路");
 	assert.equal(payload.position, "top");
 	assert.equal(payload.selfPosition, "middle");
 	assert.deepEqual(payload.blocks.map((block) => block.type), ["出门装", "鞋子选择", "核心装", "后续装备", "棱彩装备"]);
@@ -3596,9 +3817,35 @@ test("item set payload uses three core routes, removes cross-group duplicates, a
 	}
 });
 
+test("item set payload preserves recommendation trace and resolved position context", () => {
+	const { buildItemSetPayload } = compileFunctions(gameplayScript, ["buildItemSetPayload"], {
+		liveRecommendationChampionId: () => 64,
+		liveRecommendationsFor: () => ({
+			traceId: "rec-trace-1234", recommendationKey: "64:support:ranked", requestedPosition: "adc",
+			resolvedPosition: "support", positionSource: "opgg-primary",
+		}),
+		liveRecommendationTarget: () => ({ key: "fallback-key", position: "top", tier: "emerald_plus" }),
+		state: { liveRecommendationTraces: new Map([["fallback-key", "fallback-trace"]]) },
+		positionLabel: (position) => ({ support: "辅助", top: "上路" }[position] || position),
+	});
+	const payload = buildItemSetPayload({ position: "top", coreOptions: [{ ids: [3071] }] }, { championName: "李青", position: "jungle" }, { mapId: 11, queueId: 420, gameId: 987, gameMode: "CLASSIC" });
+	assert.equal(payload.traceId, "rec-trace-1234");
+	assert.equal(payload.recommendationKey, "64:support:ranked");
+	assert.equal(payload.requestedPosition, "adc");
+	assert.equal(payload.resolvedPosition, "support");
+	assert.equal(payload.positionSource, "opgg-primary");
+	assert.equal(payload.position, "support");
+	assert.equal(payload.title, "辅助");
+	assert.equal(payload.gameId, 987);
+	assert.equal(payload.queueId, 420);
+});
+
 test("item set drops an empty post-core block and reports applied group and item counts", async () => {
 	const payloadFunctions = compileFunctions(gameplayScript, ["buildItemSetPayload"], {
 		liveRecommendationChampionId: () => 64,
+		liveRecommendationsFor: () => ({}),
+		liveRecommendationTarget: () => null,
+		state: { liveRecommendationTraces: new Map() },
 		positionLabel: () => "中路",
 	});
 	const payload = payloadFunctions.buildItemSetPayload({
@@ -3611,17 +3858,72 @@ test("item set drops an empty post-core block and reports applied group and item
 
 	const state = { live: { players: [{ isCurrent: true }] } };
 	let toast = "";
+	const diagnostics = [];
 	const { applyItemSet } = compileFunctions(gameplayScript, ["applyItemSet"], {
 		state,
 		liveRecommendationsFor: () => ({ build: {} }),
-		buildItemSetPayload: () => ({ championId: 64, blocks: [{ items: [{ id: 1 }, { id: 2 }] }, { items: [{ id: 3 }] }] }),
-		api: async () => ({ title: "DL · 李青 · 中路" }),
+		buildItemSetPayload: () => ({ traceId: "rec-trace-1234", recommendationKey: "64:middle", championId: 64, blocks: [{ items: [{ id: 1 }, { id: 2 }] }, { items: [{ id: 3 }] }] }),
+		api: async () => ({ title: "DL · 李青 · 中路", traceId: "rec-trace-1234" }),
+		recordItemSetClientDiagnostic: (...args) => diagnostics.push(args),
 		showToast: (message) => { toast = message; },
 	});
-	const button = { disabled: false, textContent: "应用装备方案" };
+	const button = { disabled: false, textContent: "应用装备方案", dataset: {} };
 	await applyItemSet({ currentTarget: button });
 	assert.match(toast, /2 组 \/ 3 件/);
-	assert.equal(button.textContent, "已应用");
+	assert.equal(button.textContent, "已写入");
+	assert.match(button.dataset.tooltip, /无法确认游戏是否已加载/);
+	assert.deepEqual(diagnostics.map(([event, reason]) => [event, reason]), [
+		["item_set_apply_request", "submitted"],
+		["item_set_apply_request", "succeeded"],
+	]);
+	assert.equal(diagnostics[1][2].traceId, "rec-trace-1234");
+	assert.equal(diagnostics[1][2].blockCount, 2);
+	assert.equal(diagnostics[1][2].itemCount, 3);
+});
+
+test("item set apply tooltip carries the in-game shop clipping workaround without repeating it in the toast", async () => {
+	let toast = "";
+	const { applyItemSet } = compileFunctions(gameplayScript, ["applyItemSet"], {
+		state: { live: { players: [{ isCurrent: true }] } },
+		liveRecommendationsFor: () => ({ build: {} }),
+		buildItemSetPayload: () => ({ traceId: "rec-trace-9001", recommendationKey: "127:middle", championId: 127, blocks: [{ items: [{ id: 1 }, { id: 2 }] }] }),
+		api: async () => ({ title: "DL · 中路" }),
+		recordItemSetClientDiagnostic: () => {},
+		showToast: (message) => { toast = message; },
+	});
+	const button = { disabled: false, textContent: "应用装备方案", dataset: {} };
+	await applyItemSet({ currentTarget: button });
+	// Three sources (this app, Akari, a hand-made client set) all clip on first
+	// shop open, so the limitation is explained in the hover tooltip, not popped
+	// up as a toast on every single apply.
+	assert.doesNotMatch(toast, /点一下任意装备即可归位/);
+	assert.match(button.dataset.tooltip, /点一下任意装备即可归位/);
+	assert.match(button.dataset.tooltip, /客户端渲染问题/);
+	assert.match(button.dataset.tooltip, /与写入内容无关/);
+});
+
+test("item set apply failure records the same trace and item counts", async () => {
+	const diagnostics = [];
+	let toast = "";
+	const { applyItemSet } = compileFunctions(gameplayScript, ["applyItemSet"], {
+		state: { live: { players: [{ isCurrent: true }] } },
+		liveRecommendationsFor: () => ({ build: {} }),
+		buildItemSetPayload: () => ({ traceId: "rec-trace-5678", recommendationKey: "64:middle", championId: 64, blocks: [{ items: [{ id: 1 }] }] }),
+		api: async () => { throw new Error("write failed"); },
+		recordItemSetClientDiagnostic: (...args) => diagnostics.push(args),
+		showToast: (message) => { toast = message; },
+	});
+	const button = { disabled: false, textContent: "应用装备方案", dataset: {} };
+	await applyItemSet({ currentTarget: button });
+	assert.deepEqual(diagnostics.map(([event, reason]) => [event, reason]), [
+		["item_set_apply_request", "submitted"],
+		["item_set_apply_request", "failed"],
+	]);
+	assert.equal(diagnostics[1][2].traceId, "rec-trace-5678");
+	assert.equal(diagnostics[1][2].blockCount, 1);
+	assert.equal(diagnostics[1][2].itemCount, 1);
+	assert.equal(toast, "write failed");
+	assert.equal(button.textContent, "应用装备方案");
 });
 
 test("live mayhem item ranking renders the passed-through rows without a new request", () => {
@@ -3638,20 +3940,176 @@ test("live mayhem item ranking renders the passed-through rows without a new req
   ]);
   assert.ok(markup.indexOf('data-id="126697"') < markup.indexOf('data-id="3006"'));
   assert.match(markup, /装备排行/);
+  assert.match(markup, /<dt>胜率<\/dt>/);
+  assert.match(markup, /<dt>场次<\/dt>/);
+  assert.doesNotMatch(markup, /<dt>综合评分<\/dt>|<dt>样本<\/dt>/);
+  assert.doesNotMatch(markup, /按综合评分排序的高表现装备/);
   assert.match(gameplayBackend, /ItemRanking\s+\[\]championMetricRow\s+`json:"itemRanking,omitempty"`/);
   assert.match(gameplayBackend, /result\.ItemRanking = append\(\[\]championMetricRow\(nil\), detail\.ItemRanking\.\.\.\)/);
-  assert.doesNotMatch(functionSource(gameplayScript, "renderLiveItemRanking"), /\bapi\(|\bfetch\(/);
+	assert.doesNotMatch(functionSource(gameplayScript, "renderLiveItemRanking"), /\bapi\(|\bfetch\(/);
 });
 
-test("overview re-entry reloads only after the 20 second freshness window", () => {
+test("live Mayhem builds keep only core equipment beside a two-column ranking", () => {
+  const { renderBuildRecommendation } = compileFunctions(gameplayScript, ["renderBuildRecommendation"], {
+    LIVE_CORE_OPTION_LIMIT: 5,
+    state: {},
+    recommendationCapabilities: () => ({ hasAugments: true }),
+    liveAugmentRecommendationSource: () => "hextech",
+    liveRecommendationsFor: () => ({
+      itemRanking: [{ score: 90, games: 1000, winRate: 60, assets: [{ id: 3071, name: "黑色切割者" }] }],
+    }),
+    recommendationEmptyPanel: (title) => `<empty>${title}</empty>`,
+    escapeHTML: (value) => String(value ?? ""),
+    renderConfigOption: (option, kind) => `<option data-kind="${kind}" data-id="${option.id}"></option>`,
+    buildItemSetPayload: () => ({ blocks: [] }),
+    liveRecommendationChampionId: () => 1,
+    positionLabel: () => "其他",
+    renderRecommendationStats: () => "",
+    renderSkillPlan: () => "",
+    renderCoreStats: () => "",
+    renderDepthStats: () => "",
+    renderLiveItemRanking: () => '<section class="recommendation-section live-item-ranking"><div class="mayhem-ranking-list"><article>排行</article><article>排行</article></div></section>',
+  });
+  const markup = renderBuildRecommendation({
+    coreOptions: [{ id: "core", stats: { winRate: 60 } }],
+    fourthOptions: [{ id: "fourth" }],
+    fifthOptions: [{ id: "fifth" }],
+    sixthOptions: [{ id: "sixth" }],
+    spellOptions: [{ ids: [4, 32] }],
+    itemChainStatus: "ready",
+  }, { championName: "卡蜜尔" }, [], { phase: "ChampSelect" });
+  assert.match(markup, /build-core-ranking-row is-mayhem-build-row/);
+  assert.match(markup, /data-kind="route" data-id="core"/);
+  assert.doesNotMatch(markup, /第四件|第五件|第六件|data-id="fourth"|data-id="fifth"|data-id="sixth"/);
+  assert.match(markup, /live-item-ranking/);
+  assert.match(gameplayStyles, /\.live-item-ranking \.mayhem-ranking-list article\s*\{[^}]*grid-template-columns:\s*20px 42px minmax\(82px,1fr\) max-content/s);
+  assert.match(gameplayStyles, /\.live-item-ranking \.mayhem-ranking-list\s*\{[^}]*gap:\s*6px;[^}]*padding:\s*0 4px 12px/s);
+  assert.match(gameplayStyles, /\.live-item-ranking\.recommendation-section > header\s*\{[^}]*border-bottom:\s*0/s);
+  assert.match(gameplayStyles, /\.live-item-ranking > header h3\s*\{[^}]*font-size:\s*13px;[^}]*line-height:\s*18px/s);
+  assert.match(gameplayStyles, /\.live-item-ranking \.mayhem-ranking-list article\s*\{[^}]*min-height:\s*64px;[^}]*background:\s*color-mix\(in oklab,var\(--bg\) 55%,transparent\);[^}]*border:\s*0;[^}]*border-radius:\s*8px/s);
+  assert.match(gameplayStyles, /\.live-item-ranking \.mayhem-ranking-list article:nth-child\(odd\)\s*\{[^}]*border:\s*0/s);
+  assert.match(gameplayStyles, /\.live-item-ranking \.mayhem-ranking-list article > strong\s*\{[^}]*font-size:\s*13px/s);
+  assert.match(gameplayStyles, /\.live-item-ranking \.mayhem-ranking-list article dl\s*\{[^}]*grid-column:\s*auto;[^}]*repeat\(2,minmax\(48px,64px\)\)[^}]*column-gap:\s*0;[^}]*white-space:\s*nowrap/s);
+  assert.match(gameplayStyles, /\.live-item-ranking \.mayhem-ranking-list dt\s*\{[^}]*font-size:\s*9px/s);
+  assert.match(gameplayStyles, /\.live-item-ranking \.mayhem-ranking-list dd\s*\{[^}]*font-size:\s*12px/s);
+  assert.match(gameplayStyles, /\.live-item-ranking \.mayhem-ranking-list dl > div:last-child dd\s*\{[^}]*color:\s*var\(--muted\)/s);
+  assert.doesNotMatch(styles, /\.mayhem-ranking-list dl > div\s*\{[^}]*border-left/s);
+  const wideMayhemBuild = cssBlockAfter(gameplayStyles, "@container recommendation-area (min-width: 1081px)");
+  assert.match(wideMayhemBuild, /\.build-core-ranking-row\.is-mayhem-build-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\.75fr\) minmax\(0,1\.25fr\)/s);
+  assert.match(wideMayhemBuild, /\.build-core-ranking-row\.is-mayhem-build-row > \.live-item-ranking\s*\{[^}]*align-self:\s*stretch;[^}]*border-left:\s*1px solid var\(--line\)/s);
+  assert.match(wideMayhemBuild, /\.build-core-ranking-row\.is-mayhem-build-row > \.live-item-ranking > header\s*\{[^}]*min-height:\s*41px;[^}]*padding-block:\s*8px/s);
+  assert.match(wideMayhemBuild, /\.build-core-ranking-row \.option-stats dt\s*\{[^}]*font-size:\s*9px/s);
+  assert.match(wideMayhemBuild, /\.build-core-ranking-row \.option-stats dd\s*\{[^}]*font-size:\s*12px/s);
+});
+
+test("overview re-entry keeps its pages for the two minute freshness window", () => {
   const { shouldReloadOverview } = compileFunctions(gameplayScript, ["shouldReloadOverview"]);
   const now = 1_000_000;
-  assert.equal(shouldReloadOverview({ data: {}, loadedAt: now - 10_000 }, now), false);
-  assert.equal(shouldReloadOverview({ data: {}, loadedAt: now - 20_000 }, now), true);
+  assert.equal(shouldReloadOverview({ data: {}, loadedAt: now - 25_000 }, now), false);
+  assert.equal(shouldReloadOverview({ data: {}, loadedAt: now - 120_000 }, now), true);
   assert.equal(shouldReloadOverview({ data: null, loadedAt: now - 1 }, now), true);
   const activateSource = functionSource(gameplayScript, "activateSection");
   assert.match(activateSource, /shouldReloadOverview\(tab\)/);
   assert.match(activateSource, /loadOverview\(tab, true\)/);
+});
+
+test("R63 forced overview refresh merges its first page into already loaded pages", async () => {
+	const oldMatches = Array.from({ length: 60 }, (_, index) => ({ gameId: index + 1, marker: "old" }));
+	const tab = {
+		key: "player-1", current: false, playerRef: "ref", matchFilter: "all", nextBegIndex: 60,
+		data: { player: { playerRef: "ref" }, matches: oldMatches, pagination: { begIndex: 40, count: 20, hasMore: true } },
+	};
+	const state = { controllers: new Map(), settings: { matchCount: 20 }, lastCapabilities: [] };
+	const { loadOverview } = compileFunctions(gameplayScript, ["loadOverview"], {
+		state,
+		loadOPGGSeasonSummary: async () => false,
+    loadOverviewCurrentGame: async () => false,
+		tabGroup: () => "players",
+		tabReady: () => true,
+		rerenderTab: () => {},
+		showLoadingMoreState: () => {},
+		api: async () => ({ player: { playerRef: "ref" }, matches: [{ gameId: 1, marker: "fresh" }, { gameId: 61, marker: "fresh" }], pagination: { begIndex: 0, count: 20, hasMore: true } }),
+		normalizedPagination: (payload) => ({ ...payload.pagination, nextBegIndex: 20 }),
+		rememberTabPlayerRef: () => {},
+		playerLabel: () => "Player",
+		renderCapabilitySettings: () => {},
+		showToast: () => {},
+		appendOverviewMatches: () => {},
+		MAX_BROWSE_MATCHES: 1000,
+		AUTO_PAGE_DELAY_MS: 400,
+		AUTO_PAGE_MAX_BACKOFF_MS: 8000,
+	});
+	assert.equal(await loadOverview(tab, true, false, false, true), true);
+	assert.equal(tab.data.matches.length, 61);
+	assert.equal(tab.data.matches[0].marker, "fresh");
+	assert.equal(tab.data.matches.filter((match) => match.gameId === 1).length, 1);
+	assert.equal(tab.nextBegIndex, 60);
+});
+
+test("R63 match-tier scope ignores transient tab keys", () => {
+	const { matchTierScope } = compileFunctions(gameplayScript, ["matchTierScope"], {
+		riotTab: () => false,
+		tabServerID: () => "HN1",
+	});
+	const player = { playerRef: "public-ref" };
+	assert.equal(matchTierScope({ key: "tab-a", data: { player } }), matchTierScope({ key: "tab-b", data: { player } }));
+});
+
+test("R61 append uses an independent controller and queues timed revalidation", async () => {
+	const tab = { key: "player-1", loadingMore: true, data: { pagination: { hasMore: true } }, openMatches: new Set(), matchDetailTabs: new Map() };
+	const state = { section: "champions", liveTimer: 0, tabs: [tab], settings: { defaultMatchFilter: "all" } };
+	const reloads = [];
+	let overviewRenders = 0;
+	const { activateSection } = compileFunctions(gameplayScript, ["activateSection"], {
+		state,
+		clearTimeout: () => {},
+		closeOverlay: () => {},
+		setPlayerGroupMenu: (open) => { assert.equal(open, false, "section changes close the group menu"); },
+		renderBeacon: () => {},
+		activeTab: () => tab,
+		overviewGroupForSection: () => "players",
+		tabReady: () => true,
+		shouldReloadOverview: () => true,
+		loadOverview: (...args) => { reloads.push(args); },
+		renderOverview: () => { overviewRenders += 1; },
+		connected: () => false,
+		loadLive: () => {},
+		renderLive: () => {},
+	});
+	activateSection("overview");
+	assert.equal(tab.reloadAfterAppend, true);
+	assert.equal(reloads.length, 0, "timed revalidation must not preempt an in-flight append");
+	assert.equal(overviewRenders, 1);
+
+	const controllerState = { controllers: new Map() };
+	const pending = [];
+	const fakeFetch = (_path, options) => new Promise((resolve) => pending.push({ resolve, signal: options.signal }));
+	const { api } = compileFunctions(gameplayScript, ["api"], { state: controllerState, fetch: fakeFetch });
+	const append = api("/append", {}, "overview-more:player-1", 1000);
+	const appendSignal = pending[0].signal;
+	const reload = api("/reload", {}, "overview:player-1", 1000);
+	assert.equal(appendSignal.aborted, false);
+	assert.equal(controllerState.controllers.size, 2);
+	for (const request of pending) request.resolve({ ok: true, status: 200, json: async () => ({}) });
+	await Promise.all([append, reload]);
+	const loadSource = functionSource(gameplayScript, "loadOverview");
+	assert.match(loadSource, /const requestKey = `\$\{append \? "overview-more" : "overview"\}:\$\{tab\.key\}`/);
+	assert.match(loadSource, /reloadAfterAppend[\s\S]*loadOverview\(tab, true, false, false, true\)/);
+});
+
+test("R61 partial and budget-limited pagination stays resumable", () => {
+	const { normalizedPagination, paginationCopyFor } = compileFunctions(gameplayScript, ["normalizedPagination", "paginationCopyFor"], {
+		MAX_BROWSE_MATCHES: 200,
+		number: (value) => String(value),
+		escapeHTML: (value) => String(value ?? ""),
+	});
+	const partial = normalizedPagination({ matches: Array(20), pagination: { begIndex: 0, count: 20, hasMore: true, partial: true } }, 0);
+	assert.equal(partial.hasMore, true);
+	assert.equal(partial.exhaustedReason, "");
+	assert.match(paginationCopyFor({ data: { matches: Array(20), pagination: partial } }), /上游中断，已加载 20 条，点击继续/);
+	const budget = normalizedPagination({ matches: Array(40), pagination: { begIndex: 0, count: 40, hasMore: true, budgetExceeded: true } }, 0);
+	assert.equal(budget.hasMore, true);
+	assert.match(paginationCopyFor({ data: { matches: Array(40), pagination: budget } }), /本次只读到 40 条，点这里继续/);
 });
 
 test("desktop packaging has a static embedded Riot ciphertext gate", () => {
@@ -3693,8 +4151,12 @@ test("champion detail keeps conditional fourth/fifth items out of core routes", 
   assert.match(groups, /第六件/);
   assert.equal((groups.match(/class="config-option-list"/g) || []).length, 3);
 	assert.doesNotMatch(groups, /样本少|该阶段共 20 场，仅供参考/);
-  const rankedMarkup = renderRankedBuild(build);
-  assert.match(rankedMarkup, /OP\.GG · 当前版本/);
+	  const rankedMarkup = renderRankedBuild(build);
+	  assert.match(rankedMarkup, /OP\.GG · 当前版本/);
+	  const qqFallbackMarkup = renderRankedBuild({ ...build, itemSource: "QQ101", itemWindow: "国服 16.17" });
+	  const qqFallbackDOM = new JSDOM(qqFallbackMarkup).window.document;
+	  assert.equal(qqFallbackDOM.querySelector(".champion-build-board > header")?.textContent.includes("QQ101"), false);
+	  assert.doesNotMatch(qqFallbackDOM.querySelector(".champion-item-depth-columns")?.textContent || "", /QQ101 · 国服 16\.17/);
   assert.match(rankedMarkup, /data-depth-count="3"/);
   const missingSixth = { ...build, sixthItems: [], sixthSample: 0 };
   const missingSixthGroups = renderBuildDepthGroups(missingSixth);
@@ -3838,13 +4300,18 @@ test("match loadout follows the OPGG mode matrix instead of trusting stray augme
   const mayhem = renderMatchLoadout(subject, "mayhem");
   assert.equal(mayhem.usesAugments, true);
   assert.equal(mayhem.layout, "mayhem");
-  assert.equal((mayhem.loadout.match(/<augment>/g) || []).length, 4);
+  assert.equal((mayhem.loadout.match(/<augment>/g) || []).length, 2);
   assert.equal((mayhem.loadout.match(/<spell>/g) || []).length, 2);
+  assert.match(mayhem.loadout, /<augment>901<\/augment>.*<augment>902<\/augment>/);
+  assert.doesNotMatch(mayhem.loadout, /<augment>90[34]<\/augment>/);
   assert.doesNotMatch(mayhem.loadout, /<perk>|<style>/);
 
   const arena = renderMatchLoadout(subject, "arena");
   assert.equal(arena.usesAugments, true);
+  assert.equal((arena.loadout.match(/<augment>/g) || []).length, 4);
   assert.doesNotMatch(arena.loadout, /<spell>|<perk>|<style>/);
+  assert.match(cssBlockAfter(gameplayStyles, ".match-loadout-mini.is-augments.is-mayhem {"), /grid-template-columns:\s*repeat\(2,30px\)/);
+  assert.match(functionSource(gameplayScript, "renderBuild"), /matchAugmentIDs\(subject, 6\)/);
 
   const classic = renderMatchLoadout(subject, "mayhem-classic");
   assert.equal(classic.usesAugments, false);
@@ -3926,7 +4393,8 @@ test("live rune matchups occupy the champion strip right side without wrapping t
   assert.match(header, /const values = \(items \|\| \[\]\)\.slice\(0, 3\)/);
   assert.match(header, /\$\{percent\(item\.winRate\)\} 胜率/);
   assert.match(header, /\$\{number\(item\.games\)\} 场/);
-  assert.match(header, /class="is-win"[\s\S]*class="is-pick"/);
+  assert.match(header, /\["win", "胜率", stats\.winRate, true\][\s\S]*\["pick", "选取率", stats\.pickRate, true\]/);
+  assert.match(header, /class="is-\$\{tone\}"/);
   assert.match(header, /hasBanRate/);
   assert.match(gameplayStyles, /\.recommendation-champion-summary\s*\{[^}]*grid-template-areas:\s*"summary matchups" "positions matchups"/s);
   assert.match(gameplayStyles, /\.recommendation-champion-summary\.is-no-counters\s*\{[^}]*grid-template-areas:\s*"summary" "positions"/s);
@@ -4223,11 +4691,12 @@ test("specialist matchups place the colored result dot beside the opponent", () 
 	  assert.doesNotMatch(markup, /specialist-game-selector"><span class="specialist-result-dot"/);
 	assert.equal((markup.match(/class="specialist-game-row/g) || []).length, 4, "active specialist must keep every returned game selectable");
 	assert.match(markup, /class="specialist-game-choice"><span class="radio-mark"[^>]*><\/span>[\s\S]*<strong>征服者 \+ 坚决<\/strong>/);
-	assert.match(markup, /class="specialist-game-meta"><span>中路<\/span><i aria-hidden="true">·<\/i><time>刚刚<\/time>/);
+	assert.match(markup, /class="specialist-game-meta"><span>中路<\/span><\/span>/);
+	assert.doesNotMatch(markup, /<time>|刚刚|天前/);
 	assert.doesNotMatch(markup, /胜（中路）|负（中路）|specialist-game-selector/);
 	assert.match(markup, /对线玩家#KR1/);
 	assert.match(markup, /class="specialist-opponent-rank"><img class="rank-crest-icon" src="\/rank-crests\/master\.png">/);
-	assert.match(markup, /大师 · 胜率 57%/);
+	assert.match(markup, /大师 · 胜率 <b class="win-rate-value">57%<\/b>/);
 	assert.doesNotMatch(markup, /大师 I/);
 	assert.match(markup, /最终装备/);
 	assert.doesNotMatch(markup, /场次/);
@@ -4474,6 +4943,7 @@ test("live page defaults to a 3 second refresh and resets recommendations to run
     state,
     clearTimeout: () => {},
     closeOverlay: () => {},
+    setPlayerGroupMenu: (open) => { assert.equal(open, false, "section changes close the group menu"); },
     connected: () => false,
     renderLive: () => {},
     renderBeacon: () => {},
@@ -4481,7 +4951,7 @@ test("live page defaults to a 3 second refresh and resets recommendations to run
   activateSection("live");
   assert.equal(state.recommendationTab, "runes");
   assert.equal(state.recommendationTabTouched, false);
-  assert.equal(state.tabs[0].matchFilter, "all");
+  assert.equal(state.tabs[0].matchFilter, "solo", "保留玩家内容状态以恢复原滚动锚点");
 });
 
 test("live beacon reacts to active phase changes and has a one second fallback", () => {
@@ -4541,7 +5011,7 @@ test("R46 TFT live sessions render one explicit unsupported state", () => {
 
 test("R47 Arena live insights use one honest roster with phase-specific context", () => {
   const state = { settings: { liveOrder: "position" } };
-  const { renderLiveInsights } = compileFunctions(gameplayScript, ["orderLivePlayers", "renderLiveInsights"], {
+  const { renderLiveInsights } = compileFunctions(gameplayScript, ["orderLivePlayers", "livePremadeRoster", "clusterPremadePlayers", "arenaLivePlayerGroups", "renderLiveRecentPositions", "renderLiveInsights"], {
     state,
     liveAugmentRecommendationSource: (data) => String(data?.gameMode || "").toUpperCase() === "CHERRY" ? "arena" : "",
     renderLivePlayer: (player) => `<player>${player.id}</player>`,
@@ -4559,12 +5029,12 @@ test("R47 Arena live insights use one honest roster with phase-specific context"
     phase: "ChampSelect",
     gameMode: "CHERRY",
     mapId: 30,
-    champSelectNotice: "斗魂英雄选择阶段客户端只公开己方小队，其余玩家进入对局后显示",
+    champSelectNotice: "斗魂英雄选择阶段只展示小队玩家信息",
     players,
   });
   assert.match(champSelect, /class="live-teams is-insight is-arena"/);
   assert.match(champSelect, /<h3>己方小队<\/h3>/);
-  assert.match(champSelect, /class="live-roster-notice"/);
+  assert.doesNotMatch(champSelect, /class="live-roster-notice"/);
   assert.doesNotMatch(champSelect, /<h3>我方<\/h3>|<h3>对方<\/h3>/);
   assert.equal((champSelect.match(/class="live-team/g) || []).length, 2, "one team section plus the live-teams wrapper");
 
@@ -4572,15 +5042,57 @@ test("R47 Arena live insights use one honest roster with phase-specific context"
   assert.match(inProgress, /<h3>全部玩家<\/h3>/);
   assert.doesNotMatch(inProgress, /己方小队|live-roster-notice/);
 
-  const classic = renderLiveInsights({ phase: "InProgress", gameMode: "CLASSIC", mapId: 11, players });
-  assert.match(classic, /<h3>我方<\/h3>/);
-  assert.match(classic, /<h3>对方<\/h3>/);
+	  const classic = renderLiveInsights({ phase: "InProgress", gameMode: "CLASSIC", mapId: 11, players });
+	  assert.match(classic, /<h3>蓝方<\/h3>/);
+	  assert.match(classic, /<h3>红方<\/h3>/);
+	  assert.match(classic, /无法确定你所在阵营，按蓝方\/红方展示/);
   assert.doesNotMatch(classic, /live-teams is-insight is-arena/);
+});
+
+test("R58 Arena live playerlist groups six teams and malformed shapes fall back to one roster", () => {
+  const state = { settings: { liveOrder: "team" } };
+  const { arenaLivePlayerGroups, renderLiveInsights } = compileFunctions(gameplayScript, ["orderLivePlayers", "livePremadeRoster", "clusterPremadePlayers", "arenaLivePlayerGroups", "renderLiveRecentPositions", "renderLiveInsights"], {
+    state,
+    liveAugmentRecommendationSource: () => "arena",
+    renderLivePlayer: (player) => `<player data-id="${player.id}"></player>`,
+    renderInsightMatches: () => "",
+    recordLiveRosterRendered: () => {},
+    escapeHTML: (value) => String(value ?? ""),
+    arenaTeamMeta: (group) => ({ name: `吉祥物 ${group.subteamId}` }),
+  });
+  const players = Array.from({ length: 18 }, (_, index) => ({ id: `p${index + 1}`, arenaGroup: String(Math.floor(index / 3) + 1), teamId: 100 }));
+  const grouped = renderLiveInsights({ phase: "InProgress", gameMode: "CHERRY", arenaGrouped: true, players });
+  assert.equal((grouped.match(/class="live-team is-arena"/g) || []).length, 6);
+  assert.equal((grouped.match(/<player /g) || []).length, 18);
+  for (let index = 1; index <= 6; index += 1) assert.match(grouped, new RegExp(`<h3>小队 ${index}<\\/h3>`));
+
+  const disconnected = players.slice(0, 17);
+  const groupedWithDisconnect = renderLiveInsights({ phase: "InProgress", gameMode: "CHERRY", arenaGrouped: true, players: disconnected });
+  assert.equal((groupedWithDisconnect.match(/class="live-team is-arena"/g) || []).length, 6);
+  assert.equal((groupedWithDisconnect.match(/<player /g) || []).length, 17);
+  const reconnect = renderLiveInsights({ phase: "Reconnect", gameMode: "CHERRY", arenaGrouped: true, players: disconnected });
+  assert.equal((reconnect.match(/class="live-team is-arena"/g) || []).length, 6);
+  const mapped = renderLiveInsights({ phase: "InProgress", gameMode: "CHERRY", arenaGrouped: true, arenaMascotMapping: true, players });
+  for (let index = 1; index <= 6; index += 1) assert.match(mapped, new RegExp(`<h3>吉祥物 ${index}<\\/h3>`));
+
+  const named = renderLiveInsights({ phase: "InProgress", gameMode: "CHERRY", arenaGrouped: true, arenaMascotMapping: true, arenaGroupNames: { "1": "客户端队名" }, players });
+	assert.match(named, /<h3>客户端队名<\/h3>/);
+	assert.doesNotMatch(named, /<h3>吉祥物 1<\/h3>/);
+
+  const malformed = players.map((player, index) => ({ ...player, arenaGroup: index < 15 ? player.arenaGroup : "5" }));
+  assert.equal(arenaLivePlayerGroups({ phase: "InProgress", arenaGrouped: true }, malformed).length, 0);
+  const fallback = renderLiveInsights({ phase: "InProgress", gameMode: "CHERRY", arenaGrouped: true, players: malformed });
+  assert.equal((fallback.match(/class="live-team is-arena"/g) || []).length, 1);
+  assert.match(fallback, /<h3>全部玩家<\/h3>/);
+  assert.doesNotMatch(fallback, /<h3>小队 /);
+  assert.match(cssBlockAfter(gameplayStyles, ".live-teams.is-arena.is-grouped {"), /grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(functionSource(gameplayScript, "renderLiveInsights"), /if \(groups\.length >= 2\)/);
 });
 
 test("R49 Arena player cards use the current champion fallback, hide lane copy, and put self first", () => {
   const renderedChampionIds = [];
-  const { renderLivePlayer } = compileFunctions(gameplayScript, ["liveDisplayedChampionId", "renderLivePlayer"], {
+  const { renderLivePlayer } = compileFunctions(gameplayScript, ["liveDisplayedChampionId", "livePremadeRoster", "renderLivePremadeTag", "renderLivePlayer"], {
+	state: { liveLoading: false },
     maskedPlayerName: (player) => player.id,
     iconFigure: (_kind, id) => { renderedChampionIds.push(id); return `<champion data-id="${id}"></champion>`; },
     escapeHTML: (value) => String(value ?? ""),
@@ -4591,61 +5103,240 @@ test("R49 Arena player cards use the current champion fallback, hide lane copy, 
     kda: (value) => String(value ?? 0),
   });
   const selfCard = renderLivePlayer({ id: "self", isCurrent: true, championId: 0, championPickIntent: 0, position: "" }, 0, true, 64);
-  const teammateCard = renderLivePlayer({ id: "mate", isCurrent: false, championId: 0, championPickIntent: 0, position: "" }, 1, true, 64);
+  const teammateCard = renderLivePlayer({ id: "mate", isCurrent: false, isAlly: true, championId: 0, championPickIntent: 0, position: "" }, 1, true, 64);
   assert.deepEqual(renderedChampionIds, [64, 0]);
   assert.match(selfCard, />未定级<\/span>/);
   assert.doesNotMatch(selfCard, /位置未知| · /);
   assert.doesNotMatch(teammateCard, /data-id="64"/);
+	assert.match(selfCard, /class="live-player is-self"[\s\S]*class="live-player-copy"[\s\S]*class="self-chip">自己<\/span>[\s\S]*<\/div><dl>/);
+	assert.doesNotMatch(selfCard, /<\/dl><span class="self-chip"/);
+	assert.match(teammateCard, /class="live-player is-ally"/);
+	const dom = new JSDOM(`<style>.live-player { ${cssBlockAfter(gameplayStyles, ".live-player {")} }</style>${selfCard}${teammateCard}`);
+	const cards = dom.window.document.querySelectorAll(".live-player");
+	assert.equal(cards[0].querySelector(".live-player-copy > .live-player-identity > .self-chip")?.textContent, "自己");
+	assert.equal(dom.window.getComputedStyle(cards[0]).gridTemplateColumns, dom.window.getComputedStyle(cards[1]).gridTemplateColumns);
 
   const state = { settings: { liveOrder: "team" } };
   const { orderLivePlayers } = compileFunctions(gameplayScript, ["orderLivePlayers"], { state });
   const ordered = orderLivePlayers([{ id: "mate" }, { id: "self", isCurrent: true }, { id: "other" }], false);
   assert.deepEqual(ordered.map((player) => player.id), ["self", "mate", "other"]);
-  assert.match(gameplayStyles, /\.live-roster-notice\s*\{[^}]*grid-column:\s*1\/-1[^}]*background:\s*color-mix[^}]*border:\s*1px solid color-mix/s);
+	const notice = cssBlockAfter(gameplayStyles, ".live-roster-notice {");
+	assert.match(notice, /width:\s*auto/);
+	assert.match(notice, /background:\s*color-mix/);
+	assert.match(notice, /border:\s*1px solid color-mix/);
+	assert.ok(cssNumber(gameplayStyles, ".live-roster-notice {", "font-size") >= 13);
+	assert.doesNotMatch(notice, /grid-column/);
+	assert.match(cssBlockAfter(gameplayStyles, ".live-player {"), /grid-template-columns:\s*48px minmax\(100px,1fr\) minmax\(220px,auto\)/);
+	assert.doesNotMatch(cssBlockAfter(gameplayStyles, "@container recommendation-area (max-width: 1080px)"), /\.live-player\s*\{/);
+	assert.match(cssBlockAfter(gameplayStyles, ".recommendation-tab-row {"), /justify-content:\s*space-between/);
+	assert.match(cssBlockAfter(gameplayStyles, "@container recommendation-area (max-width: 700px)"), /\.recommendation-tab-row\s*\{[^}]*flex-wrap:\s*wrap/s);
+	assert.match(cssBlockAfter(gameplayStyles, "@container recommendation-area (max-width: 700px)"), /\.live-player\s*\{[^}]*grid-template-columns:\s*42px minmax\(0,1fr\)/s);
+	assert.match(gameplayBackend, /arenaChampSelectNotice\s*=\s*"斗魂英雄选择阶段只展示小队玩家信息"/);
+  assert.doesNotMatch(functionSource(gameplayScript, "renderLiveInsights"), /live-roster-notice/);
 });
 
-test("R46 recommendation loading stays centered inside the visible panel", () => {
+test("R66 live premade hints cluster players and render a rich, fail-closed tag", () => {
+	const dependencies = {
+		LIVE_PREMADE_MIN_SHARED_GAMES: 5,
+		liveDisplayedChampionId: (player, current) => Number(player.championId) || (player.isCurrent ? current : 0),
+		maskedPlayerName: (player) => player.name,
+		proxyAsset: (path) => `/api/image?path=${encodeURIComponent(path)}`,
+		assetPath: (kind, id) => kind === "profile"
+			? `/lol-game-data/assets/v1/profile-icons/${id}.jpg`
+			: `/lol-game-data/assets/v1/champion-icons/${id}.png`,
+		escapeHTML: (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;"),
+	};
+	const { livePremadeRoster, renderLivePremadeTag, clusterPremadePlayers } = compileFunctions(
+		gameplayScript,
+		["livePremadeRoster", "renderLivePremadeTag", "clusterPremadePlayers"],
+		dependencies,
+	);
+	const players = [
+		{ id: "a", name: "甲", premadeGroup: "1", premadeSize: 2, profileIconId: 11, championId: 22, championName: "艾希" },
+		{ id: "solo", name: "独行", championId: 64 },
+		{ id: "b", name: "乙", premadeGroup: "1", premadeSize: 2, profileIconId: 12, championId: 81, championName: "伊泽瑞尔" },
+	];
+	assert.deepEqual(clusterPremadePlayers(players).map((player) => player.id), ["a", "b", "solo"]);
+	assert.equal(livePremadeRoster(players, players[0]).length, 2);
+	const tag = renderLivePremadeTag(players[0], players, 0);
+	assert.match(tag, /class="premade-team-tag is-color-0"/);
+	assert.match(tag, />预组 ×2<\/span>/);
+	assert.match(tag, /data-tooltip-roster=/);
+	assert.match(tag, /profile-icons%2F11\.jpg/);
+	assert.match(tag, /champion-icons%2F22\.png/);
+
+	const inconsistent = [{ ...players[0], premadeSize: 3 }, players[2]];
+	assert.equal(renderLivePremadeTag(inconsistent[0], inconsistent, 0), "");
+	assert.match(functionSource(gameplayScript, "renderLivePremadeTag"), /members\.length < 2/);
+	assert.doesNotMatch(functionSource(gameplayScript, "clusterPremadePlayers"), /CHERRY|queueId|gameMode/);
+	assert.match(functionSource(appScript, "setupFloatingTooltips"), /dataset\.tooltipRoster/);
+	assert.match(gameplayStyles, /\.premade-team-tag\.is-color-11/);
+	for (const color of ["#48e5db", "#628aff", "#d4de17", "#2eda3e", "#ff9f1c", "#da4e2e", "#bc2ebc", "#fa4e80", "#0b3d91", "#7f0000", "#8b4513", "#555"]) {
+		assert.match(gameplayStyles, new RegExp(color));
+	}
+});
+
+test("R66 premade backend guards reject cache and inference mutations", () => {
+	const assertContracts = (source) => {
+		assert.match(source, /TeamParticipantID\s+int64\s+`json:"teamParticipantId"`/);
+		assert.match(goFunctionSource(source, "livePremadeAssignments"), /inferenceEnabled := covered > len\(inputs\)\/2/);
+		assert.match(goFunctionSource(source, "livePremadeAssignments"), /shared >= threshold/);
+		assert.match(goFunctionSource(source, "livePremadeAssignments"), /union\(left, right\)/);
+		assert.match(goFunctionSource(source, "livePlayerMatches"), /return a\.cachedLivePlayerMatches/);
+		assert.match(goFunctionSource(source, "handleGameplayLive"), /applyLivePremadeAssignments\(response\.Players, premadeInputs, phase, arenaMode\)/);
+		assert.match(goFunctionSource(source, "applyLivePremadeAssignments"), /if arenaMode \|\| \(phase != "InProgress" && phase != "Reconnect"\)/);
+	};
+	assertContracts(gameplayBackend);
+	for (const [before, after] of [
+		["inferenceEnabled := covered > len(inputs)/2", "inferenceEnabled := true"],
+		["if shared >= threshold", "if shared >= 999"],
+		["return a.cachedLivePlayerMatches(ctx, key", "return a.loadLivePlayerMatches(ctx, client, reference, playerRef, isCurrent, names); /*"],
+		["if arenaMode || (phase != \"InProgress\" && phase != \"Reconnect\")", "if phase != \"InProgress\" && phase != \"Reconnect\""],
+	]) {
+		const mutated = gameplayBackend.replace(before, after);
+		assert.notEqual(mutated, gameplayBackend, `mutation target not found: ${before}`);
+		assert.throws(() => assertContracts(mutated));
+	}
+});
+
+test("Arena random champion IDs use the official unselected champion icon", () => {
+	const { assetPath } = compileFunctions(gameplayScript, ["assetPath"], { state: { perks: null } });
+	for (const id of [0, -1, -3]) {
+		assert.equal(assetPath("champion", id), "/lol-game-data/assets/v1/champion-icons/-1.png");
+	}
+	const mutated = gameplayScript.replace('if (kind === "champion" && Number(id) <= 0) return "/lol-game-data/assets/v1/champion-icons/-1.png";', "");
+	assert.notEqual(mutated, gameplayScript);
+	const mutatedAssetPath = compileFunctions(mutated, ["assetPath"], { state: { perks: null } }).assetPath;
+	assert.notEqual(mutatedAssetPath("champion", -3), "/lol-game-data/assets/v1/champion-icons/-1.png");
+});
+
+test("R56 recommendation loading is centered by its overlay without viewport overflow", () => {
 	assert.match(gameplayStyles, /\.recommendation-panel\s*\{[^}]*min-width:\s*0/s);
-	assert.match(gameplayStyles, /\.panel-loading-content\s*\{[^}]*position:\s*sticky[^}]*height:\s*min\(100%,calc\(100vh[^}]*place-content:\s*center[^}]*justify-items:\s*center/s);
+	// 视口单位要除以 --ui-zoom：被 .app-frame 的 CSS zoom 缩放之后，
+	// 60dvh 仍是未缩放的视口值，直接用会比视口高出 zoom 倍。
+	assert.match(cssBlockAfter(gameplayStyles, ".recommendation-panel.is-loading {"), /min-height:\s*min\(420px,calc\(60dvh \/ var\(--ui-zoom, 1\)\)\)/);
+	assert.match(cssBlockAfter(gameplayStyles, ".recommendation-panel.is-loading > :not(.panel-loading) {"), /display:\s*none/);
+	const overlay = cssBlockAfter(gameplayStyles, ".panel-loading {");
+	assert.match(overlay, /display:\s*grid/);
+	assert.match(overlay, /place-items:\s*center/);
+	const content = cssBlockAfter(gameplayStyles, ".panel-loading-content {");
+	assert.match(content, /display:\s*grid/);
+	assert.match(content, /min-height:\s*min\(220px,100%\)/);
+	assert.match(content, /max-height:\s*min\(220px,100%\)/);
+	assert.match(content, /place-content:\s*center/);
+	assert.match(content, /justify-items:\s*center/);
+	assert.doesNotMatch(content, /position:\s*sticky|100vh|(?:^|;)\s*top\s*:|(?:^|;)\s*height\s*:/);
 	assert.match(functionSource(gameplayScript, "renderRecommendationArea"), /class="panel-loading-content"/);
 });
 
-test("player header keeps the region beside level and shows live context beside the Riot ID", () => {
-	const startedAt = Date.now() - 65_000;
-	const state = { friendPresences: [{
-		gameStatus: "inGame",
-		product: "league_of_legends",
-		playerRef: "friend-ref",
-		queueLabel: "斗魂竞技场",
-		championName: "瑞兹",
-		gameStartedAt: startedAt,
-	}] };
-	const functions = compileFunctions(gameplayScript, ["friendPresenceForTab", "formatLiveElapsed", "summonerContextChip", "summonerRegionChip"], {
-		state,
-		riotTab: () => false,
-		sameRiotID: () => false,
+test("R56 missing recommendation metrics remove the whole metric item and empty wrappers", () => {
+	let recommendation = { hasCounters: false, hasBanRate: true, resolvedPosition: "top", positions: [] };
+	const { renderChampionRecommendationHeader } = compileFunctions(gameplayScript, ["renderChampionRecommendationHeader"], {
+		state: { live: {} },
 		escapeHTML: (value) => String(value ?? ""),
-		tabServerTitle: () => "黑色玫瑰 HN10",
-		tabServerLabel: () => "黑色玫瑰",
+		liveRecommendationChampionId: () => 64,
+		liveRecommendationTarget: () => ({ position: "top", positionOverride: true }),
+		liveRecommendationsFor: () => recommendation,
+		livePositionValue: (value) => String(value || ""),
+		livePositionDisplay: (value) => String(value || ""),
+		positionLabel: (value) => String(value || "位置未知"),
+		positionIcon: () => "",
+		iconFigure: () => '<span class="champion-icon"></span>',
+		rate: (value) => value === null || value === undefined || String(value).trim() === "" ? "—" : `${value}%`,
+		percent: (value) => `${value}%`,
+		number: (value) => String(value),
+		liveAugmentRecommendationSource: () => "",
 	});
-	const liveMarkup = functions.summonerContextChip({ playerRef: "friend-ref" });
-	assert.match(liveMarkup, /class="player-live-chip"/);
-	assert.match(liveMarkup, /斗魂竞技场 · 瑞兹/);
-	assert.match(liveMarkup, /data-player-live-started=/);
-	assert.match(liveMarkup, />1:0[45]</);
-	state.friendPresences = [];
-	assert.equal(functions.summonerContextChip({ playerRef: "friend-ref" }), "");
-	assert.match(functions.summonerRegionChip({ playerRef: "friend-ref" }), /class="region-chip"[\s\S]*黑色玫瑰/);
+	const missingPick = renderChampionRecommendationHeader(
+		{ winRate: 51, pickRate: null, banRate: 3 },
+		{ championName: "测试英雄", position: "top" },
+		{},
+	);
+	assert.match(missingPick, /<dt>胜率<\/dt>/);
+	assert.match(missingPick, /<dt>禁用率<\/dt>/);
+	assert.doesNotMatch(missingPick, /选取率|—/);
+	const presentPick = renderChampionRecommendationHeader(
+		{ winRate: 51, pickRate: 0, banRate: 3 },
+		{ championName: "测试英雄", position: "top" },
+		{},
+	);
+	assert.match(presentPick, /<dt>选取率<\/dt><dd>0%<\/dd>/);
+	const empty = renderChampionRecommendationHeader(
+		{ winRate: null, pickRate: "", banRate: Number.NaN },
+		{ championName: "测试英雄", position: "top" },
+		{},
+	);
+	assert.doesNotMatch(empty, /champion-summary-stats|选取率|—/);
 
-	const overviewSource = functionSource(gameplayScript, "renderOverviewBodyContent");
-	assert.match(overviewSource, /class="summoner-name-meta"[\s\S]*\$\{playerTag\}\$\{contextChip\}/);
-	assert.match(overviewSource, /class="summoner-level-row"[\s\S]*\$\{regionChip\}\$\{hiddenChip\}/);
-	assert.equal((friendsScript.match(/deep-legends:friends-presence/g) || []).length, 2);
-	assert.match(gameplayScript, /addEventListener\("deep-legends:friends-presence"[\s\S]*state\.friendPresences/);
-	assert.match(gameplayScript, /setInterval\(updatePlayerLiveDurations, 1_000\)/);
-	assert.match(gameplayStyles, /\.player-live-chip\s*\{[^}]*min-height:\s*24px[^}]*align-items:\s*baseline[^}]*background:\s*color-mix\(in oklab,var\(--accent\) 21%,var\(--surface\)\)[^}]*border:\s*1px solid color-mix\(in oklab,var\(--accent\) 54%,var\(--line\)\)/s);
-	assert.match(gameplayStyles, /\.summoner-name-meta\s*\{[^}]*display:\s*inline-flex[^}]*align-items:\s*center[^}]*gap:\s*6px/s);
-	assert.match(gameplayStyles, /\.summoner-strip-copy \.player-live-chip[^}]*color:\s*color-mix\(in oklab,var\(--accent\) 74%,var\(--ink\)\)/s);
+	const arenaDependencies = {
+		state: { detail: null, arenaDetailLoading: false, arenaDetailError: null },
+		championMeta: () => ({}),
+		escapeHTML: (value) => String(value ?? ""),
+		heroArtworkURL: () => "/art.png",
+		heroArtworkFallbackURL: () => "/fallback.png",
+		imageURL: () => "/portrait.png",
+		tierBadge: () => "",
+		tierDisplay: () => "A",
+		percent: (value) => value === null || value === undefined || String(value).trim() === "" ? "—" : `${value}%`,
+		number: (value) => String(value ?? ""),
+		compactNumber: (value) => value === null || value === undefined || String(value).trim() === "" ? "—" : String(value),
+		arenaOverviewMetric: () => "<metric></metric>",
+		renderArenaSortBar: () => "<sort></sort>",
+		renderDetailSkeleton: () => "",
+		renderError: () => "",
+		renderArenaFirstPlaces: () => "",
+		renderArenaDetailContent: () => "",
+	};
+	const { renderArenaDetailPane } = compileFunctions(script, ["renderArenaDetailPane"], arenaDependencies);
+	const arenaMarkup = renderArenaDetailPane({ championId: 1, name: "测试", pickRate: null, banRate: 4, play: 200 });
+	const arenaSecondary = /<div class="arena-overview-secondary">([\s\S]*?)<\/div>/.exec(arenaMarkup)?.[1] || "";
+	assert.match(arenaSecondary, /禁用率[\s\S]*4%/);
+	assert.match(arenaSecondary, /样本[\s\S]*200/);
+	assert.doesNotMatch(arenaSecondary, /选用率|—/);
+
+	const { renderRuneWorkspace } = compileFunctions(script, ["allocateLoadoutSideRows", "renderRuneWorkspace"], {
+		activeRunePage: () => 0,
+		runeStyleIcon: () => "",
+		compactNumber: (value) => String(value ?? ""),
+		percent: (value) => `${value}%`,
+		renderRuneTree: () => "",
+		renderSpellsCard: () => "",
+		renderSkillsCard: () => "",
+		renderAssetButton: () => "<icon></icon>",
+	});
+	const sideCards = renderRuneWorkspace([], {
+		starterItems: [{ assets: [{ id: 1 }], pickRate: null, winRate: 52 }],
+		boots: [{ assets: [{ id: 2 }], pickRate: undefined, winRate: "" }],
+	});
+	assert.match(sideCards, /class="side-stats"[\s\S]*<dt>胜率<\/dt>/);
+	assert.doesNotMatch(sideCards, /<dt>选用率<\/dt>/);
+	assert.equal((sideCards.match(/class="side-stats"/g) || []).length, 1);
+
+	const { renderSpellsCard } = compileFunctions(script, ["renderSpellsCard"], {
+		assetImage: () => "<icon></icon>",
+		compactNumber: (value) => value == null ? "—" : String(value),
+		percent: (value) => value == null ? "—" : `${value}%`,
+	});
+	const emptySpells = renderSpellsCard({ summonerSpells: [{ assets: [], games: null, pickRate: "", winRate: undefined }] });
+	assert.doesNotMatch(emptySpells, /spell-option-stats|选用率|—/);
+	assert.match(renderSpellsCard({ summonerSpells: [{ assets: [], pickRate: 7 }] }), /<dt>选用率<\/dt><dd class="metric-pick">7%<\/dd>/);
+
+	const { renderSkillsCard } = compileFunctions(script, ["renderSkillsCard"], {
+		percent: (value) => value == null ? "—" : `${value}%`,
+		renderChampionSkillPlan: () => "<plan></plan>",
+	});
+	const partialSkills = renderSkillsCard({ skills: [{ pickRate: null, winRate: 53 }] });
+	assert.match(partialSkills, /<span>胜率 <b class="metric-win">53%<\/b><\/span>/);
+	assert.doesNotMatch(partialSkills, /选用率|—/);
+	const emptySkills = renderSkillsCard({ skills: [{ pickRate: null, winRate: "" }] });
+	assert.doesNotMatch(emptySkills, /skill-head-stats|选用率|—/);
+});
+
+test("player header retains region but removes CN current-game presence integration", () => {
+ const functions = compileFunctions(gameplayScript, ["summonerRegionChip"], {riotTab:()=>false,escapeHTML:String,tabServerTitle:()=>"黑色玫瑰 HN10",tabServerLabel:()=>"黑色玫瑰"});
+ assert.match(functions.summonerRegionChip({}), /黑色玫瑰/);
+ assert.doesNotMatch(gameplayScript, /friendPresenceForTab|player-live-chip|deep-legends:friends-presence/);
+ assert.doesNotMatch(gameplayStyles, /player-live-chip/);
 });
 
 test("R46 restores only a persisted champion ID and clears unavailable selections", () => {
@@ -4681,14 +5372,211 @@ test("R46 restores only a persisted champion ID and clears unavailable selection
 	assert.deepEqual(opened, [266]);
 	assert.equal(renders, 1);
 	assert.equal(state.detailChampionID, 0);
-	assert.deepEqual(writes, [["champion-detail-id", ""]]);
+	assert.deepEqual(writes, [["champion-detail-id-ranked", ""]]);
 
-	assert.match(functionSource(script, "openDetail"), /state\.detailChampionID = championID;[\s\S]*writeSetting\("champion-detail-id", championID\)/);
-	assert.match(functionSource(script, "closeDetail"), /state\.detailChampionID = 0;[\s\S]*writeSetting\("champion-detail-id", ""\)/);
+	assert.match(functionSource(script, "openDetail"), /state\.detailChampionID = championID;[\s\S]*writeSetting\(`champion-detail-id-\$\{state\.mode\}`, championID\)/);
+	assert.match(functionSource(script, "closeDetail"), /state\.detailChampionID = 0;[\s\S]*writeSetting\(`champion-detail-id-\$\{state\.mode\}`, ""\)/);
 	assert.doesNotMatch(functionSource(script, "resetTransientChampionState"), /detailChampionID\s*=/);
 	for (const key of ["champion-loading", "champion-detail", "champion-error", "champion-request-token"]) {
 		assert.doesNotMatch(script, new RegExp(`readSetting\\("${key}"`));
 	}
+});
+
+test("R61 champion re-entry renders persisted detail on the first frame", async () => {
+	const dom = new JSDOM('<main id="champion-root"></main>');
+	const rootNode = dom.window.document.getElementById("champion-root");
+	const snapshots = [];
+	const state = {
+		section: "champions", mode: "ranked", mayhemView: "champions", detailChampionID: 266,
+		selected: null, rankings: { rows: [{ championId: 266, key: "aatrox" }] }, preload: null,
+	};
+	let functions;
+	const render = () => {
+		rootNode.innerHTML = state.selected ? '<section class="champion-detail-content"></section>' : '<table class="champion-table"></table>';
+		snapshots.push(rootNode.innerHTML);
+	};
+	functions = compileFunctions(script, ["restorePersistedChampionSelection", "renderLoadedWorkspace", "enterChampionSection"], {
+		state,
+		rankingRows: () => state.rankings.rows,
+		writeSetting: () => {},
+		openDetail: (row) => { state.selected = row; render(); return Promise.resolve(); },
+		prepareArenaSelection: () => null,
+		prepareMayhemSelection: () => null,
+		render,
+		loadArenaDetail: () => {},
+		loadMayhemDetail: () => {},
+		adoptCatalog: () => {},
+		stampRankings: () => {},
+		rankingsFresh: () => true,
+		loadWorkspace: () => {},
+	});
+	await functions.enterChampionSection();
+	assert.match(snapshots[0], /champion-detail-content/);
+	assert.doesNotMatch(snapshots[0], /champion-table/);
+});
+
+test("R61 stale rankings re-entry runs loadWorkspace(true) without flashing the list", async () => {
+	const dom = new JSDOM('<main id="champion-root"></main>');
+	const rootNode = dom.window.document.getElementById("champion-root");
+	const snapshots = [];
+	const apiCalls = [];
+	let resolveRankings;
+	const rankingsGate = new Promise((resolve) => { resolveRankings = resolve; });
+	const row = { championId: 266, key: "aatrox" };
+	const state = {
+		section: "champions", mode: "ranked", tier: "emerald_plus", position: "all", mayhemView: "champions",
+		detailChampionID: 266, selected: null, rankings: { rows: [row] }, rankingsKey: "ranked|diamond_plus|all",
+		rankingsAt: Date.now(), preload: null, preloaded: {}, catalog: { tiers: [], champions: [] },
+		workspaceRequestToken: 0, loading: false, error: "",
+	};
+	const render = () => {
+		rootNode.innerHTML = state.selected ? '<section class="champion-detail-content"></section>' : '<table class="champion-table"></table>';
+		snapshots.push(rootNode.innerHTML);
+	};
+	const api = (url) => {
+		apiCalls.push(url);
+		if (url === "/api/champions/catalog") return Promise.resolve({ tiers: [], champions: [] });
+		return rankingsGate;
+	};
+	const functions = compileFunctions(script, [
+		"rankingsCacheKey", "stampRankings", "rankingsFresh", "restorePersistedChampionSelection",
+		"renderLoadedWorkspace", "enterChampionSection", "loadWorkspace",
+	], {
+		state,
+		rankingRows: () => state.rankings.rows,
+		writeSetting: () => {},
+		openDetail: (selected) => { state.selected = selected; render(); return Promise.resolve(); },
+		prepareArenaSelection: () => null,
+		prepareMayhemSelection: () => null,
+		render,
+		loadArenaDetail: () => {},
+		loadMayhemDetail: () => {},
+		adoptCatalog: () => {},
+		api,
+	});
+
+	assert.equal(functions.rankingsFresh(), false, "fixture must exercise the stale rankings branch");
+	await functions.enterChampionSection();
+	assert.equal(state.loading, true, "loadWorkspace must be running while the rankings request is held");
+	assert.deepEqual(apiCalls, [
+		"/api/champions/catalog",
+		"/api/champions/rankings?mode=ranked&tier=emerald_plus&position=all",
+	], "force=true must refresh catalog even when a cached catalog exists");
+	assert.match(snapshots[0], /champion-detail-content/);
+	assert.doesNotMatch(snapshots[0], /champion-table/);
+
+	resolveRankings({ rows: [row] });
+	await new Promise((resolve) => setImmediate(resolve));
+});
+
+test("R61 detail cache survives leaving and prevents a second detail request", async () => {
+	const state = {
+		mode: "ranked", tier: "emerald_plus", position: "all", selected: null, detail: null,
+		detailChampionID: 0, detailPosition: null, detailCache: new Map(), detailRequestToken: 0,
+		workspaceRequestToken: 0, arenaRequestToken: 0, mayhemRequestToken: 0, mayhemAugmentRequestToken: 0,
+	};
+	let requests = 0;
+	const functions = compileFunctions(script, ["openDetail", "resetTransientChampionState"], {
+		state,
+		normalizeChampionDetailID: Number,
+		writeSetting: () => {},
+		selectArenaChampion: () => {},
+		selectMayhemChampion: () => {},
+		championMeta: () => ({ slug: "aatrox" }),
+		normalizeRunePage: () => 0,
+		readSetting: (_key, fallback) => fallback,
+		firstPositionOf: () => "top",
+		appScroll: { scrollTop: 0, scrollTo: () => {} },
+		render: () => {},
+		root: { querySelector: () => null },
+		api: async () => { requests += 1; return { position: "top", build: {} }; },
+		closeMayhemTierDialog: () => {},
+		closeArenaTierDialog: () => {},
+		resetArenaControls: () => {},
+		normalizePosition: (value) => value,
+	});
+	const row = { championId: 266, key: "aatrox", position: "top" };
+	await functions.openDetail(row);
+	functions.resetTransientChampionState({ restorePosition: true });
+	await functions.openDetail(row);
+	assert.equal(requests, 1);
+	assert.equal(state.detailCache.size, 1);
+});
+
+test("same champion route click overrides the previous detail position", async () => {
+  const state = {
+    mode: "ranked", tier: "emerald_plus", position: "all", selected: null, detail: null,
+    detailChampionID: 0, detailPosition: null, detailCache: new Map(), detailRequestToken: 0,
+  };
+  const requests = [];
+  const functions = compileFunctions(script, ["openDetail"], {
+    state,
+    normalizeChampionDetailID: Number,
+    writeSetting: () => {},
+    selectArenaChampion: () => {},
+    selectMayhemChampion: () => {},
+    championMeta: () => ({ slug: "aatrox" }),
+    normalizeRunePage: () => 0,
+    readSetting: (_key, fallback) => fallback,
+    firstPositionOf: (row) => ["top", "jungle", "mid", "adc", "support"].includes(row?.position) ? row.position : "",
+    appScroll: { scrollTop: 0, scrollTo: () => {} },
+    render: () => {},
+    root: { querySelector: () => null },
+    api: async (url) => {
+      requests.push(url);
+      const position = new URL(`http://local${url}`).searchParams.get("position");
+      return { position, build: {} };
+    },
+  });
+  await functions.openDetail({ championId: 266, key: "aatrox", position: "top" });
+  await functions.openDetail({ championId: 266, key: "aatrox", position: "adc" });
+  assert.equal(state.detailPosition, "adc");
+  assert.match(requests[0], /[?&]position=top(?:&|$)/);
+  assert.match(requests[1], /[?&]position=adc(?:&|$)/);
+});
+
+test("item route limit follows the active bottom or adc detail before the selected row", () => {
+  const state = { detail: null, detailPosition: "bottom", selected: { position: "top" }, position: "top" };
+  const { buildItemRoutes } = compileFunctions(script, ["buildItemRoutes"], {
+    state, ADC_ITEM_ROUTE_LIMIT: 7, DEFAULT_ITEM_ROUTE_LIMIT: 6, CORE_RECOMMENDATION_LIMIT: 5,
+  });
+  const build = { coreItems: [{ assets: Array.from({ length: 8 }, (_, index) => ({ path: `/item-${index}` })) }] };
+  assert.equal(buildItemRoutes(build)[0].assets.length, 7);
+  state.detailPosition = "adc";
+  assert.equal(buildItemRoutes(build)[0].assets.length, 7);
+  state.detail = { position: "top" };
+  assert.equal(buildItemRoutes(build)[0].assets.length, 6, "loaded detail position must be authoritative");
+});
+
+test("R61 detail tier persists and keeps the refreshed rankings cache fresh", () => {
+	const stored = { "champion-tier": "emerald_plus" };
+	const state = {
+		mode: "ranked", tier: "emerald_plus", position: "mid", selected: { championId: 13, position: "mid" },
+		detailPosition: "mid", detail: { position: "mid" }, rankings: { rows: [{}] }, rankingsKey: "", rankingsAt: 0,
+	};
+	const functions = compileFunctions(script, ["rankingsCacheKey", "rankingsFresh", "switchDetailTier"], {
+		state,
+		normalizeTier: (value) => value,
+		writeSetting: (key, value) => { stored[key] = value; },
+		refreshRankingsForDetailTier: () => { state.rankingsKey = `${state.mode}|${state.tier}|${state.position}`; state.rankingsAt = Date.now(); },
+		firstPositionOf: () => "mid",
+		openDetail: () => {},
+		render: () => {},
+		switchDetailPosition: () => {},
+	});
+	functions.switchDetailTier("diamond_plus");
+	state.tier = stored["champion-tier"];
+	assert.equal(state.tier, "diamond_plus");
+	assert.equal(functions.rankingsFresh(), true);
+	assert.match(script, /playerDetour:\s*false/);
+	assert.match(script, /state\.playerDetour = true;[\s\S]*deep-legends:open-player/);
+});
+
+test("R70 section event runs after synchronous panel activation without snapshot delay", () => {
+	const source = functionSource(appScript, "activateSection");
+	assert.match(source, /const applyPanels = \(\) => \{[\s\S]*window\.dispatchEvent\(new CustomEvent\("deep-legends:section"[\s\S]*\};[\s\S]*\bapplyPanels\(\)/);
+	assert.ok(source.indexOf('window.dispatchEvent(new CustomEvent("deep-legends:section"') < source.indexOf("    applyPanels();"));
+	assert.doesNotMatch(source, /startViewTransition/);
 });
 
 test("R47 ranked detail recovers to the list when champion metadata is unavailable", async () => {
@@ -4716,15 +5604,32 @@ test("R47 ranked detail recovers to the list when champion metadata is unavailab
   assert.equal(state.loading, false);
   assert.equal(state.error, "");
   assert.equal(renders, 1);
-  assert.deepEqual(writes, [["champion-detail-id", 266], ["champion-detail-id", ""]]);
+  assert.deepEqual(writes, [["champion-detail-id-ranked", 266], ["champion-detail-id-ranked", ""]]);
 });
 
-test("champion detail core routes omit pick rate and keep win rate plus games", () => {
+test("champion detail core routes hide pick rate and retain win rate with games", () => {
   const rankedBuild = functionSource(script, "renderRankedBuild");
   const genericBuild = functionSource(script, "renderBuildBoard");
   assert.match(rankedBuild, /renderConfigOption\(row, "route", null, renderDepthStats\)/);
   assert.doesNotMatch(rankedBuild, /renderOptionStats\(row\)/);
-  assert.match(genericBuild, /renderConfigOption\(row, "route", null, renderDepthStats\)/);
+	assert.match(genericBuild, /renderConfigOption\(row, "route", null, renderDepthStats\)/);
+	const { renderDepthStats } = compileFunctions(script, ["renderDepthStats"], {
+		percent: (value) => `${value}%`,
+		compactNumber: (value) => String(value),
+	});
+	const core = renderDepthStats({ pickRate: 44.98, winRate: 59.65, games: 10355 });
+	assert.doesNotMatch(core, /选取率|44\.98%/);
+	assert.match(core, /胜率[\s\S]*59\.65%[\s\S]*场次[\s\S]*10355/);
+});
+
+test("R63 keeps the OP.GG source only in the build header", () => {
+	const { championItemAttemptSummary, renderBuildDepthGroups } = compileFunctions(script, ["championItemAttemptSummary", "renderBuildDepthGroups"], {
+		escapeHTML: (value) => String(value ?? ""),
+		renderConfigOption: () => "",
+	});
+	const depthMarkup = renderBuildDepthGroups({ itemChainStatus: "ready", itemSource: "OP.GG", itemWindow: "当前版本", fourthItems: [], fifthItems: [] });
+	assert.doesNotMatch(depthMarkup, /item-chain-source|OP\.GG · 当前版本/);
+	assert.match(functionSource(script, "renderRankedBuild"), /build-primary-source">OP\.GG · 当前版本/);
 });
 
 test("QQ101 item depths disclose unavailable samples and flag extreme rates", () => {
@@ -4748,6 +5653,286 @@ test("QQ101 item depths disclose unavailable samples and flag extreme rates", ()
   const opgg = renderDepthStats({ winRate: 50, games: 18 });
   assert.match(opgg, /<dt>场次<\/dt><dd>18<\/dd>/);
   assert.doesNotMatch(opgg, /腾讯官方数据不提供样本量|样本极少|is-low-confidence/);
+});
+
+test("R61 unnamed loot remains visible by raw ID with a completion hint", () => {
+	const functions = compileFunctions(appScript, ["lootToken", "lootName", "lootNamePending", "lootTypeLabel", "lootImagePaths", "lootCategorySlug", "lootCategoryIcon", "lootCard"], {
+		escapeHTML: (value) => String(value ?? ""),
+		formatNumber: (value) => String(value),
+	});
+	const markup = functions.lootCard({ lootId: "CHEST_224", localizedName: "未命名战利品", count: 1 });
+	assert.match(markup, /CHEST_224/);
+	assert.match(markup, /名称待补全/);
+	assert.match(markup, /is-name-pending/);
+	assert.doesNotMatch(markup, />未命名战利品</);
+	const emptyShell = functions.lootCard({ lootId: "", lootName: "", type: "", localizedDescription: "不得展示的说明", count: 30 });
+	assert.match(emptyShell, /客户端返回的空白条目/);
+	assert.doesNotMatch(emptyShell, /名称待补全|is-name-pending|不得展示的说明/);
+	assert.match(appScript, /const displayLoot = \[\.\.\.loot\];/);
+	assert.deepEqual(functions.lootImagePaths({ lootId: "CHEST_generic", asset: "/old/chest_generic.png" }), ["/loot-icons/promotion-chest.png", "/old/chest_generic.png"]);
+	assert.deepEqual(functions.lootImagePaths({ lootId: "CHEST_promotion" }), ["/loot-icons/promotion-chest.png"]);
+});
+
+test("0912 named ward, icon and legacy loot render their resolved names", () => {
+  const functions = compileFunctions(appScript, ["lootToken", "lootName", "lootNamePending", "lootTypeLabel", "lootImagePaths", "lootCategorySlug", "lootCategoryIcon", "lootCard"], {
+    escapeHTML: (value) => String(value ?? ""), formatNumber: (value) => String(value),
+  });
+  const fixtures = (name) => JSON.parse(fs.readFileSync(path.join(root, "testdata", "loot-names-0912", name), "utf8"));
+  const translations = fixtures("trans.json");
+  const items = [
+    ...fixtures("ward-skins.json").map((ward) => ({ lootId: `WARD_SKIN_RENTAL_${ward.id}`, displayName: ward.name, asset: ward.wardImagePath, category: "守卫" })),
+    ...fixtures("summoner-icons.json").map((icon) => ({ lootId: `SUMMONER_ICON_${icon.id}`, displayName: icon.title, asset: icon.imagePath, category: "图标" })),
+    ...["chest_128", "material_clashtickets"].map((id) => ({ lootId: id.toUpperCase(), displayName: translations[`loot_name_${id}`], asset: `/fe/lol-loot/assets/loot_item_icons/${id}.png` })),
+  ];
+  assert.equal(items.length, 7);
+  for (const item of items) {
+    const markup = functions.lootCard({ ...item, localizedName: "未命名战利品", count: 1 });
+    assert.ok(markup.includes(item.displayName), item.lootId);
+    assert.doesNotMatch(markup, /名称待补全|is-name-pending|>未命名战利品</);
+    assert.ok(functions.lootImagePaths(item).includes(item.asset));
+  }
+});
+
+test("R61 account renderer directly retains unnamed loot and kills the old filter", async () => {
+	const renderAccountLoot = async (source) => {
+		const accountContent = { innerHTML: "", querySelectorAll: () => [] };
+		const state = { status: { connected: true, eventStream: true }, destroyed: false };
+		const { loadAccount } = compileFunctions(source, ["loadAccount"], {
+			state,
+			el: { accountContent, accountLiveState: { textContent: "", className: "" } },
+			api: async () => ({
+				summoner: { summonerLevel: 1 },
+				account: { loot: [{ lootId: "CHEST_224", localizedName: "未命名战利品", category: "材料", count: 1 }] },
+				rewards: [], capabilities: [],
+			}),
+			lootCategorySlug: () => "material",
+			lootCategoryIcon: () => "◇",
+			lootCard: (item) => `<article>${item.lootId}</article>`,
+			escapeHTML: (value) => String(value ?? ""),
+			formatNumber: (value) => String(value ?? 0),
+			playerName: () => "测试玩家",
+			capabilityName: (value) => value,
+			sourceStateLabel: (value) => value,
+			rewardStatusLabel: (value) => value,
+			formatDateTime: (value) => value,
+			renderPanelError: (_node, _title, error) => { throw error; },
+			loadNextLootImage: () => {},
+			window: { deepLegendsGameIcons: { iconFigure: () => "", prepareImages: () => {} } },
+		});
+		await loadAccount();
+		return accountContent.innerHTML;
+	};
+	assert.match(await renderAccountLoot(appScript), /CHEST_224/);
+	const oldFilter = appScript.replace(
+		"const displayLoot = [...loot];",
+		'const displayLoot = loot.filter((item) => item.displayName && item.displayName !== "未命名战利品");',
+	);
+	assert.notEqual(oldFilter, appScript, "B-1 mutation target not found");
+	await assert.rejects(async () => assert.match(await renderAccountLoot(oldFilter), /CHEST_224/));
+});
+
+test("R61 every mandatory contract rejects its documented production mutation", () => {
+	const originals = {
+		sgp: sgpBackend,
+		gameplayGo: gameplayBackend,
+		lcu: lcuAPIBackend,
+		lcuEvents: lcuEventsBackend,
+		connection: connectionManagerBackend,
+		catalog: catalogBackend,
+		structured: structuredBackend,
+		qq101: qq101Backend,
+		championsGo: backend,
+		appJS: appScript,
+		championsJS: script,
+		gameplayJS: gameplayScript,
+	};
+	const assertContracts = (sources) => {
+		assert.match(sources.sgp, /for retry := 0; retry <= 2; retry\+\+/); // A-1
+		assert.match(sources.sgp, /retryableSGPStatus\(response\.StatusCode\)/);
+		const historyPageKey = goFunctionSource(sources.sgp, "sgpHistoryPageCacheKey"); // A-2
+		assert.match(historyPageKey, /fmt\.Sprintf\("%s\|%s\|%d\|%d\|%s", serverID, puuid, startIndex, pageSize, strings\.Join\(tags, ","\)\)/);
+		assert.match(sources.sgp, /cachedHistoryPage\(serverID, puuid, pageStart, pageSize, tags\)/);
+		assert.match(sources.sgp, /cacheHistoryPage\(serverID, puuid, pageStart, pageSize, tags/);
+		assert.match(sources.gameplayGo, /context\.WithTimeout\(r\.Context\(\), overviewSoftBudget\)/); // A-3
+		assert.match(sources.sgp, /sgpPageSize\s+= 50/); // A-4
+		assert.match(sources.sgp, /shouldSample = cost\.claimParticipantShapeSample\(\)/); // A-5
+		assert.match(sources.gameplayGo, /"event": "tencent_riot_id_lookup"/); // A-6
+		assert.match(sources.gameplayGo, /所选服务器没有找到该玩家/);
+		assert.match(sources.gameplayJS, /const requestKey = `\$\{append \? "overview-more" : "overview"\}:\$\{tab\.key\}`/); // A-7 frontend key
+		assert.match(sources.sgp, /return "canceled"/); // A-7 backend kind
+		assert.match(sources.gameplayGo, /pagination\.Partial = partialErr != nil/); // A-8
+		assert.match(sources.gameplayGo, /pagination\.HasMore = true/);
+		assert.match(sources.sgp, /"start_index": startIndex/); // A-9
+		assert.match(sources.sgp, /"count":\s+count/);
+		assert.match(sources.lcuEvents, /stat\.Count\+\+/); // A-10
+		assert.match(sources.connection, /dropped\["top_uris"\] = streamErr\.TopURIs/);
+		assert.match(sources.gameplayGo, /"identity", "queue_labels", "champion_names", "detailed_matches", "season_snapshot",\s*"ranks", "mastery", "recent_ranked", "recent_players", "serialize"/); // A-11
+		assert.match(sources.gameplayGo, /"event": "overview_phases_ms"/);
+
+		assert.match(sources.appJS, /const displayLoot = \[\.\.\.loot\];/); // B-1
+		assert.match(sources.lcu, /global\/zh_cn\/v1\/loot\.json/); // B-2
+		assert.match(sources.lcu, /"CHEST_PROMOTION":\s+"紫色宝箱"/);
+		assert.match(sources.lcu, /"event": "loot_category_assigned"/); // B-3
+		for (const event of ["loot_map_shape", "loot_name_fallback", "loot_category_assigned"]) { // B-4
+			assert.match(sources.lcu, new RegExp(`"event": "${event}"`));
+		}
+		const lootEnrichment = goFunctionSource(sources.lcu, "enrichLootItemsWithMetadata");
+		assert.match(lootEnrichment, /"loot_id_prefix":\s+lootIDPrefix\(item\.LootID\)/);
+		assert.doesNotMatch(lootEnrichment, /"loot_id":\s+item\.LootID/);
+		assert.doesNotMatch(lootEnrichment, /"event": "loot_name_fallback"[\s\S]{0,400}"count":\s+item\.Count/);
+		assert.match(sources.catalog, /NewObservedLootAPI\(client, observe\)\.PlayerLoot\(\)/);
+
+		const depthResolver = goFunctionSource(sources.structured, "resolveRankedItemDepths");
+		assert.match(depthResolver, /opggDepths, depthFetchedAt, opggErr := p\.loadOPGGDepthRows/); // C-1
+		assert.match(depthResolver, /if opggErr == nil/);
+		assert.match(sources.structured, /"event": "opgg_item_depths_parsed_zero"/);
+		assert.doesNotMatch(sources.structured, /"event": "opgg_item_depths_failed"[^\n]+"errorKind"/);
+		assert.match(sources.structured, /roleRate = percentOf\(raw\.Stats\.Play, payload\.Data\.Summary\.AverageStats\.Play\)/); // C-2
+		assert.match(goFunctionSource(sources.qq101, "mergeQQ101PositionShares"), /if !merged\[item\.Position\]/); // C-3
+		const rankedBuild = functionSource(sources.championsJS, "renderRankedBuild");
+		const depthGroups = functionSource(sources.championsJS, "renderBuildDepthGroups");
+		assert.match(rankedBuild, /build-primary-source">OP\.GG · 当前版本/); // C-4
+		assert.doesNotMatch(rankedBuild, /\$\{sourceNote\}/);
+		assert.doesNotMatch(depthGroups, /item-chain-source|sourceNote/);
+		assert.match(sources.championsJS, /R60 cleanup marker: GamesUnavailable/); // C-6
+		assert.match(sources.championsGo, /R60 cleanup marker: this legacy HTML parser/);
+		assert.match(sources.qq101, /R60 cleanup marker: _runeinfo and _skill/);
+
+		const enter = functionSource(sources.championsJS, "enterChampionSection");
+		assert.ok(enter.indexOf("restorePersistedChampionSelection()") < enter.indexOf("render();")); // D-1
+		assert.doesNotMatch(functionSource(sources.championsJS, "resetTransientChampionState"), /detailCache\.clear/); // D-2
+		assert.match(functionSource(sources.championsJS, "switchDetailTier"), /writeSetting\("champion-tier", nextTier\)/); // D-3
+		const activate = functionSource(sources.appJS, "activateSection");
+		assert.match(activate, /const applyPanels = \(\) => \{[\s\S]*window\.dispatchEvent\(new CustomEvent\("deep-legends:section"[\s\S]*\bapplyPanels\(\)/); // D-4
+		assert.match(sources.championsJS, /playerDetour:\s*false/); // D-5
+		assert.match(sources.championsJS, /state\.playerDetour = true;[\s\S]*deep-legends:open-player/);
+	};
+	assertContracts(originals);
+	const mutations = [
+		["A-1 retry budget", "sgp", "for retry := 0; retry <= 2; retry++", "for retry := 0; retry < 1; retry++"],
+		["A-2 pageSize key dimension", "sgp", 'fmt.Sprintf("%s|%s|%d|%d|%s", serverID, puuid, startIndex, pageSize, strings.Join(tags, ","))', 'fmt.Sprintf("%s|%s|%d|%s", serverID, puuid, startIndex, strings.Join(tags, ","))'],
+		["A-3 overview deadline", "gameplayGo", "context.WithTimeout(r.Context(), overviewSoftBudget)", "context.WithCancel(r.Context())"],
+		["A-4 50-row cold page", "sgp", "sgpPageSize         = 50", "sgpPageSize         = 20"],
+		["A-5 one-shot participant sample", "sgp", "shouldSample = cost.claimParticipantShapeSample()", "shouldSample = true"],
+		["A-6 lookup diagnostic", "gameplayGo", '"event": "tencent_riot_id_lookup"', '"event": "tencent_lookup_removed"'],
+		["A-7 append request key", "gameplayJS", 'const requestKey = `${append ? "overview-more" : "overview"}:${tab.key}`;', 'const requestKey = `overview:${tab.key}`;'],
+		["A-7 canceled kind", "sgp", 'return "canceled"', 'return "other"'],
+		["A-8 resumable partial", "gameplayGo", "pagination.HasMore = true", "pagination.HasMore = false"],
+		["A-9 page fields", "sgp", '"start_index": startIndex', '"start_removed": startIndex'],
+		["A-10 URI counters", "lcuEvents", "stat.Count++", "// stat.Count removed"],
+		["A-11 complete phase set", "gameplayGo", '"ranks", "mastery", "recent_ranked"', '"ranks", "mastery_removed", "recent_ranked"'],
+		["B-1 retain unknown loot", "appJS", "const displayLoot = [...loot];", "const displayLoot = loot.filter((item) => lootName(item) !== item.lootId);"],
+		["B-2 hard-coded promotion fallback", "lcu", '"CHEST_PROMOTION":        "紫色宝箱"', '"CHEST_PROMOTION_REMOVED": "紫色宝箱"'],
+		["B-3 category diagnostic", "lcu", '"event": "loot_category_assigned"', '"event": "loot_category_removed"'],
+		["B-4 fallback diagnostic privacy", "lcu", '"loot_id_prefix": lootIDPrefix(item.LootID)', '"loot_id_prefix": item.LootID'],
+		["C-1 OP.GG priority", "structured", "if opggErr == nil {", "if qq101Ready {"],
+		["C-1 parsed-zero diagnostic", "structured", '"event": "opgg_item_depths_parsed_zero"', '"event": "opgg_item_depths_failed"'],
+		["C-2 role-rate fallback", "structured", "roleRate = percentOf(raw.Stats.Play, payload.Data.Summary.AverageStats.Play)", "roleRate = 0"],
+		["C-3 QQ101 append-only", "qq101", "if !merged[item.Position] {", "if merged[item.Position] {"],
+		["C-4 source label placement", "championsJS", '<section class="build-depth-column"><h4><span>${label}</span></h4>', '<section class="build-depth-column"><span class="item-chain-source">${build?.itemSource} · ${build?.itemWindow}</span><h4><span>${label}</span></h4>'],
+		["C-6 cleanup annotations", "championsJS", "R60 cleanup marker: GamesUnavailable", "cleanup marker removed"],
+		["D-1 restore before render", "championsJS", "const restored = restorePersistedChampionSelection();\n      if (restored) state.selected = restored;\n      render();", "render();\n      const restored = restorePersistedChampionSelection();\n      if (restored) state.selected = restored;"],
+		["D-2 preserve detail cache", "championsJS", "function resetTransientChampionState({ restorePosition = false } = {}) {\n    closeMayhemTierDialog(false);", "function resetTransientChampionState({ restorePosition = false } = {}) {\n    closeMayhemTierDialog(false);\n    state.detailCache.clear();"],
+		["D-3 persist detail tier", "championsJS", 'writeSetting("champion-tier", nextTier);', 'void nextTier;'],
+		["D-4 transition callback timing", "appJS", 'window.dispatchEvent(new CustomEvent("deep-legends:section", { detail: { name } }));', '// section event removed from applyPanels'],
+		["D-5 player detour state", "championsJS", "state.playerDetour = true;", "state.playerDetour = false;"],
+	];
+	for (const [label, key, before, after] of mutations) {
+		const mutatedValue = originals[key].replace(before, after);
+		assert.notEqual(mutatedValue, originals[key], `${label}: mutation target not found`);
+		assert.throws(() => assertContracts({ ...originals, [key]: mutatedValue }), label);
+	}
+});
+
+test("R63 mandatory contracts reject every documented production regression", () => {
+	const originals = {
+		structured: structuredBackend,
+		championsJS: script,
+		gameplayJS: gameplayScript,
+		gameplayGo: gameplayBackend,
+		rankGo: rankInsightsBackend,
+		lcuGo: lcuBackend,
+		seasonGo: seasonStatsBackend,
+		mainGo: mainSource,
+		lootGo: lcuAPIBackend,
+	};
+	const assertContracts = (sources) => {
+		const ordering = goFunctionSource(sources.structured, "orderStructuredRecommendationCandidates");
+		assert.match(ordering, /leftPick := candidates\[i\]\.row\.PickRate[\s\S]*rightPick := candidates\[j\]\.row\.PickRate[\s\S]*return leftPick > rightPick/); // A-1
+		const depthLoader = goFunctionSource(sources.structured, "loadOPGGDepthRows");
+		assert.match(depthLoader, /patch, freshnessMarker/); // A-3 shared version + snapshot marker
+		assert.match(goFunctionSource(sources.structured, "resolveRankedItemDepths"), /depthFetchedAt\.Before\(response\.FetchedAt\)/);
+		// Both cached and freshly fetched depths must preserve the oldest time.
+		// Matching one Before() alone lets a mutant in the other branch survive.
+		assert.doesNotMatch(goFunctionSource(sources.structured, "resolveRankedItemDepths"), /depthFetchedAt\.After\(response\.FetchedAt\)/);
+		assert.doesNotMatch(functionSource(sources.championsJS, "renderBuildDepthGroups"), /item-chain-source|sourceNote/); // A-4
+		assert.match(functionSource(sources.championsJS, "renderRankedBuild"), /build-primary-source">OP\.GG · 当前版本/);
+
+		assert.match(goFunctionSource(sources.lcuGo, "RequestJSON"), /httptrace\.WithClientTrace\(ctx, requestTrace\.clientTrace\(\)\)/); // B-1
+		assert.match(goFunctionSource(sources.lcuGo, "getBytes"), /httptrace\.WithClientTrace\(ctx, requestTrace\.clientTrace\(\)\)/);
+		assert.match(sources.gameplayGo, /rankEntry := a\.playerRankScore\(ctx,/); // B-2a overview
+		assert.match(sources.gameplayGo, /a\.playerRankScore\(r\.Context\(\), client, playerRef/); // B-2a live
+		assert.match(goFunctionSource(sources.gameplayGo, "loadQueueLabels"), /client\.queueLabelsLoaded[\s\S]*cloneQueueLabels/); // B-2b
+		assert.doesNotMatch(sources.gameplayJS, /deep-legends:friends-presence|updateFriendPresenceChips/); // CN overview integration retired
+		const tierScope = functionSource(sources.gameplayJS, "matchTierScope");
+		assert.match(tierScope, /return `\$\{region\}:\$\{serverID\}:\$\{playerRef\}`/); // B-3
+		assert.doesNotMatch(tierScope, /tab\?\.key|tab\.key/);
+		assert.match(sources.rankGo, /rankScoreNegativeCacheTTL = 60 \* time\.Second/); // B-4
+		assert.match(goFunctionSource(sources.rankGo, "playerRankScoreWithCacheStatus"), /entry\.negative = true[\s\S]*cache\.put\(cacheKey, entry\)/);
+		assert.match(sources.rankGo, /var globalMatchTiersRankSemaphore = make\(chan struct\{\}, matchTiersRankConcurrency\)/);
+		assert.match(functionSource(sources.gameplayJS, "hydrateMatchTiers"), /failure\.nextRetryAt[\s\S]*noteMatchTierFailure/);
+		assert.match(functionSource(sources.gameplayJS, "shouldReloadOverview"), />= 120_000/); // B-5
+		assert.match(functionSource(sources.gameplayJS, "loadOverview"), /preserveLoadedPages = force[\s\S]*mergedMatches = \[\.\.\.freshMatches, \.\.\.previousMatches\.filter/);
+		const overviewRenderer = functionSource(sources.gameplayJS, "renderOverviewBodyContent");
+		assert.match(overviewRenderer, /const preserveMatchList = Boolean\(retainedMatchList/); // B-6
+		assert.match(overviewRenderer, /preserveMatchList[\s\S]*retainedMatchList\.remove\(\)[\s\S]*container\.querySelector\("\.match-list"\)\?\.replaceWith\(retainedMatchList\)/);
+		assert.match(goFunctionSource(sources.gameplayGo, "cacheRecentRankedSample"), /len\(a\.recentRankedSamples\) > recentRankedSampleCacheMax[\s\S]*removeRecentRankedSampleLocked/); // B-7
+		assert.match(goFunctionSource(sources.seasonGo, "cacheSeasonQuerySnapshotLocked"), /len\(a\.seasonQuerySnapshots\) > seasonQuerySnapshotsMax[\s\S]*removeSeasonQuerySnapshotLocked/);
+		assert.match(goFunctionSource(sources.mainGo, "recordDiagnostic"), /eventName == "ranked_winrate_resolved"[\s\S]*aggregateRankedWinrateDiagnostic/); // B-8
+
+		assert.match(goFunctionSource(sources.structured, "loadStructuredCounters"), /structuredCountersForChampion\(payload\.Data\.Counters, id\)/); // C-1
+		assert.match(sources.structured, /response\.Counters = p\.structuredCountersForChampion\(payload\.Data\.Counters, id\)/);
+		assert.doesNotMatch(sources.structured, /opggCountersForPosition|countersPositionScoped/);
+		const counters = goFunctionSource(sources.structured, "structuredCountersForChampion");
+		assert.match(counters, /row\.WinRate < 50/); // C-2
+		assert.match(counters, /rows\[index\]\.WinRate > 50/);
+
+		const lootFallback = goFunctionSource(sources.lootGo, "enrichLootItemsWithMetadata");
+		for (const field of ["raw_key_empty", "type_empty", "display_categories", "unnamed_type_counts"]) assert.match(lootFallback, new RegExp(`"${field}"`)); // D-2
+		assert.doesNotMatch(lootFallback, /"loot_id":\s*item\.LootID|"count":\s*item\.Count/);
+		for (const prefix of ["CHEST_", "MATERIAL_", "CURRENCY_", "CHAMPION_", "SKIN_", "STATSTONE_", "EMOTE_", "WARD_", "COMPANION_", "TFT_"]) assert.match(goFunctionSource(sources.lootGo, "lootIDPrefix"), new RegExp(`"${prefix}"`));
+	};
+	assertContracts(originals);
+	const mutations = [
+		["A-1 pick-rate order", "structured", "leftPick := candidates[i].row.PickRate\n\t\trightPick := candidates[j].row.PickRate", "leftPick := candidates[i].row.WinRate\n\t\trightPick := candidates[j].row.WinRate"],
+		["A-3 shared snapshot key", "structured", "patch, freshnessMarker", "patch"],
+		["A-3 honest oldest timestamp", "structured", "depthFetchedAt.Before(response.FetchedAt)", "depthFetchedAt.After(response.FetchedAt)"],
+		["A-4 one source label", "championsJS", '<section class="build-depth-column"><h4><span>${label}</span></h4>', '<section class="build-depth-column"><span class="item-chain-source">${sourceNote}</span><h4><span>${label}</span></h4>'],
+		["B-1 request trace", "lcuGo", "ctx = httptrace.WithClientTrace(ctx, requestTrace.clientTrace())", "// trace attachment removed"],
+		["B-2a overview rank cache", "gameplayGo", "rankEntry := a.playerRankScore(ctx,", "rankEntry := directRankLookup(ctx,"],
+		["B-2a live rank cache", "gameplayGo", "a.playerRankScore(r.Context(), client, playerRef", "a.directRankLookup(r.Context(), client, playerRef"],
+		["B-2b queue cache", "gameplayGo", "if client.queueLabelsLoaded {", "if false {"],
+		["B-3 stable tier scope", "gameplayJS", "return `${region}:${serverID}:${playerRef}`;", "return `${region}:${tab.key}:${serverID}:${playerRef}`;"],
+		["B-4 negative cache", "rankGo", "entry.negative = true\n\t\tcache.put(cacheKey, entry)", "entry.negative = true"],
+		["B-4 global concurrency gate", "rankGo", "var globalMatchTiersRankSemaphore = make(chan struct{}, matchTiersRankConcurrency)", "// per-handler gate restored"],
+		["B-4 frontend backoff", "gameplayJS", "if (failure && Number(failure.nextRetryAt || 0) > Date.now())", "if (false)"],
+		["B-5 two-minute freshness", "gameplayJS", ">= 120_000", ">= 20_000"],
+		["B-5 preserve loaded pages", "gameplayJS", "const preserveLoadedPages = force && previousMatches.length > freshMatches.length;", "const preserveLoadedPages = false;"],
+		["B-6 preserve match DOM", "gameplayJS", "const preserveMatchList = Boolean(retainedMatchList", "const preserveMatchList = Boolean(false && retainedMatchList"],
+		["B-7 recent ranked LRU", "gameplayGo", "for len(a.recentRankedSamples) > recentRankedSampleCacheMax {", "for false {"],
+		["B-7 season snapshot LRU", "seasonGo", "for len(a.seasonQuerySnapshots) > seasonQuerySnapshotsMax {", "for false {"],
+		["B-8 minute aggregation", "mainGo", 'if eventName, _ := event["event"].(string); eventName == "ranked_winrate_resolved" {', "if false {"],
+		["C-1 complete counter payload", "structured", "structuredCountersForChampion(payload.Data.Counters, id)", "structuredCountersForChampion(payload.Data.Summary.Positions[0].Counters, id)"],
+		["C-2 weak sign", "structured", "row.WinRate < 50 && len(result.WeakAgainst) < 5", "len(result.WeakAgainst) < 5"],
+		["C-2 strong sign", "structured", "rows[index].WinRate > 50", "rows[index].WinRate < 50"],
+		["D-2 raw-key diagnostic", "lootGo", '"raw_key_empty":            item.rawKeyEmpty,', "// raw key diagnostic removed"],
+		["D-2 runtime privacy", "lootGo", '"loot_id_prefix": lootIDPrefix(item.LootID)', '"loot_id": item.LootID'],
+	];
+	for (const [label, key, before, after] of mutations) {
+		const mutated = originals[key].replace(before, after);
+		assert.notEqual(mutated, originals[key], `${label}: mutation target not found`);
+		assert.throws(() => assertContracts({ ...originals, [key]: mutated }), label);
+	}
 });
 
 test("live rune secondary style row stays aligned beneath the primary keystone row", () => {
@@ -4785,8 +5970,8 @@ test("R16 build, rune, skill, and Korean overview guards preserve the corrected 
     percent: (value) => `${value}%`,
     compactNumber: (value) => String(value),
   });
-  const championDepth = renderChampionDepthStats({ winRate: 55.38, games: 6233 });
-  assert.doesNotMatch(championDepth, /选用率|选取率/);
+	const championDepth = renderChampionDepthStats({ pickRate: 12.3, winRate: 55.38, games: 6233 });
+	assert.doesNotMatch(championDepth, /<dt>选取率<\/dt>/);
   assert.match(championDepth, /<dt>胜率<\/dt>/);
   assert.match(championDepth, /<dt>场次<\/dt>/);
   assert.match(script, /renderConfigOption\(row, "item", null, renderDepthStats\)/);
@@ -4905,8 +6090,8 @@ test("R45 mutation probes reject every documented A, B, and C regression", () =>
       ".build-summary-bar > .build-summary-skill { grid-column: auto;",
     ))],
     ["C3 prism order", () => assertR45Contracts(gameplayScript.replace(
-      '${lateBands}<div class="build-core-ranking-row">${itemBuildLayout}',
-      '<div class="build-core-ranking-row">${itemBuildLayout}${lateBands}',
+      '${lateBands}<div class="build-core-ranking-row${rankingLayoutClass}">${itemBuildLayout}',
+      '<div class="build-core-ranking-row${rankingLayoutClass}">${itemBuildLayout}${lateBands}',
     ))],
     ["C4 Arena card style", () => assertR45Contracts(gameplayScript, gameplayStyles.replace(
       ".build-recommendation.is-arena-build .item-core-column .config-option { padding: 7px 9px; background: var(--bg); border: 1px solid var(--line); }",
@@ -4981,8 +6166,8 @@ test("R47 A-group mutation probes reject mode and single-roster regressions", ()
     ["A-2 Arena branch", () => assertR47Contracts({
       js: gameplayScript.replace("if (arenaMode) {", "if (false) {"),
     })],
-    ["A-2 Arena responsive roster columns", () => assertR47Contracts({
-      css: gameplayStyles.replace(".live-teams.is-arena { grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); }", ".live-teams.is-arena { grid-template-columns: 1fr; }"),
+    ["A-2 Arena single-roster fallback columns", () => assertR47Contracts({
+      css: gameplayStyles.replace(".live-teams.is-arena { grid-template-columns: 1fr; }", ".live-teams.is-arena { grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); }"),
     })],
   ];
   for (const [label, probe] of probes) assert.throws(probe, label);
@@ -5010,7 +6195,7 @@ test("R49 all seven required mutation probes fail on true copied files", () => {
 			["A-3 remove per-step timeout", "specialistGo", "context.WithTimeout(ctx, timeout)", "context.WithCancel(ctx)"],
 			["A-4 classify timeout as no-position", "specialistGo", "return specialistOutcomeTimeout", "return specialistOutcomeNoPositionSample"],
 			["B-2 remove cross-group deduplication", "js", "const depth = mergedItems(depthOptions).filter(({ id }) => !coreIDs.has(id));", "const depth = mergedItems(depthOptions);"],
-			["B-3 remove ascending price order", "goSource", "return prices[knownItems[left].ID] < prices[knownItems[right].ID]", "return false"],
+			["B-3 remove ascending price order", "goSource", "return knownItems[left].PriceTotal < knownItems[right].PriceTotal", "return false"],
 			["C-1 relabel position with recommendation result", "js", "const resolved = livePositionDisplay(target?.clientPosition || self?.position);", "const resolved = livePositionDisplay(payload.resolvedPosition || target?.position || self?.position);"],
 			["C-2 remove role-share ordering", "js", ".sort((left, right) => right.displayRoleRate - left.displayRoleRate || (Number(right.play) || 0) - (Number(left.play) || 0));", ".sort((left, right) => (Number(right.play) || 0) - (Number(left.play) || 0));"],
 			["E-1 remove current champion fallback", "js", "return Number(player?.championId) || Number(player?.championPickIntent) || (player?.isCurrent === true ? Number(currentChampionId) || 0 : 0);", "return Number(player?.championId) || Number(player?.championPickIntent) || 0;"],
@@ -5037,11 +6222,16 @@ test("R47 addendum mutation probes reject media-query regressions", () => {
     "@container recommendation-area (max-width: 1080px)",
     "@media (max-width: 1080px)",
   );
+  const classicNarrowMedia = gameplayStyles.replace(
+    "@container recommendation-area (max-width: 840px)",
+    "@media (max-width: 840px)",
+  );
   const narrowMedia = gameplayStyles.replace(
     "@container recommendation-area (max-width: 700px)",
     "@media (max-width: 700px)",
   );
   assert.throws(() => assertR47AddendumContracts(wideMedia), "1080px breakpoint must remain a recommendation container query");
+  assert.throws(() => assertR47AddendumContracts(classicNarrowMedia), "840px breakpoint must remain a recommendation container query");
   assert.throws(() => assertR47AddendumContracts(narrowMedia), "700px breakpoint must remain a recommendation container query");
 });
 
@@ -5049,6 +6239,40 @@ test("R45 item-set branding uses DL in demo and LCU metadata", () => {
   assert.match(demoScript, /title: `DL · \$\{request\.title \|\| "推荐出装"\}`/);
   assert.doesNotMatch(demoScript, /title: `Deep Legends ·/);
   assert.match(goFunctionSource(gameplayBackend, "newLCUItemSet"), /StartedFrom:\s*"DL"/);
+});
+
+test("R71 item-set action uses game recommendations without verbose manual-cleanup notes", () => {
+  const build = functionSource(gameplayScript, "renderBuildRecommendation");
+  assert.doesNotMatch(build, /item-set-manual-note|若客户端配装列表出现其他工具/);
+  assert.match(build, /游戏装备方案/);
+  assert.match(functionSource(gameplayScript, "applyItemSet"), /payload\.storage\s*=\s*"recommended"/);
+  // Preserve the legacy API contract; the new game-file schema has its own test.
+  assert.match(goFunctionSource(gameplayBackend, "newLCUItemSet"), /SortRank:\s*100/);
+});
+
+test("R58 mutation probes reject stale-roster and Arena fallback regressions", () => {
+	const assertStaleGuard = (source) => {
+		const handler = goFunctionSource(source, "handleGameplayLive");
+		assert.match(handler, /if phase == "ChampSelect" \{\s*\/\/ gameData remains populated with the previous match[\s\S]*response\.DroppedStaleGameData = sessionErr == nil\s*\} else \{\s*response\.GameID = session\.GameData\.GameID/);
+	};
+	assertStaleGuard(gameplayBackend);
+	const mutatedBackend = gameplayBackend.replace(
+		'if phase == "ChampSelect" {\n\t\t// gameData remains populated with the previous match',
+		'if false {\n\t\t// gameData remains populated with the previous match',
+	);
+	assert.notEqual(mutatedBackend, gameplayBackend, "A mutation target must exist");
+	assert.throws(() => assertStaleGuard(mutatedBackend), "deleting the ChampSelect guard must fail the contract");
+
+	const fallbackGuard = 'if (grouped.size < 2 || [...grouped.values()].some((group) => group.length > 3)) return [];';
+	assert.match(functionSource(gameplayScript, "arenaLivePlayerGroups"), /grouped\.size < 2[\s\S]*group\.length > 3/);
+	const mutatedScript = gameplayScript.replace(fallbackGuard, "");
+	assert.notEqual(mutatedScript, gameplayScript, "B fallback mutation target must exist");
+	const { arenaLivePlayerGroups: mutatedGroups } = compileFunctions(mutatedScript, ["arenaLivePlayerGroups"]);
+	const malformed = Array.from({ length: 18 }, (_, index) => ({ arenaGroup: String(Math.min(5, Math.floor(index / 3) + 1)) }));
+	assert.throws(
+		() => assert.equal(mutatedGroups({ phase: "InProgress", arenaGrouped: true }, malformed).length, 0),
+		"deleting the invalid-shape fallback must fail the acceptance assertion",
+	);
 });
 
 // 「过去 30 天排位」整块已删除：它与「近 20 场排位」共用同一批 20 场详情战绩，
@@ -5219,6 +6443,8 @@ test("collection status wording is timeless and promotion chests use dedicated a
 	assert.doesNotMatch(html, /<p class="eyebrow">客户端仓库<\/p>|<p>按类别展示客户端物品。<\/p>|<p class="eyebrow">三合一奖池<\/p>/);
 	assert.match(lcuAPIBackend, /"CHEST_PROMOTION":\s+"紫色宝箱"/);
 	assert.match(appScript, /CHEST_PROMOTION:\s*"\/loot-icons\/promotion-chest\.png"/);
+	assert.match(lcuAPIBackend, /"CHEST_GENERIC":\s+"海克斯科技宝箱"/);
+	assert.match(appScript, /CHEST_GENERIC:\s*"\/loot-icons\/promotion-chest\.png"/);
 	assert.match(demoScript, /lootId:\s*"CHEST_CHAMPION_MASTERY",\s*displayName:\s*"战利品宝箱"/);
 	assert.match(demoScript, /lootId:\s*"CHEST_PROMOTION",\s*displayName:\s*"紫色宝箱"/);
 	assert.ok(fs.existsSync(path.join(__dirname, "loot-icons", "promotion-chest.png")), "紫色宝箱专属素材缺失");
@@ -5242,4 +6468,47 @@ test("returning to a section restores its scroll position past the loading skele
 	assert.match(championRender, /if \(list && !state\.listScrollRestorePending\) state\.listScrollInner = list\.scrollTop/);
 	assert.match(championRender, /state\.listScrollRestorePending = false/);
 	assert.match(script, /state\.listScrollRestorePending = \(state\.listScrollInner \|\| 0\) > 0/);
+});
+
+test("captured Arena equipment matches YOUR.GG preview order and expands to every source item", () => {
+  const capture = JSON.parse(fs.readFileSync(path.join(root, "testdata/arena-items/yourgg-122-20260909.json"), "utf8")).response;
+  const catalog = new Map(JSON.parse(fs.readFileSync(path.join(root, "testdata/arena-items/catalog-20260909.json"), "utf8")).map(item => [item.id, item]));
+  const state = { arenaExpanded: {prism:false,core:false} };
+  const functions = compileFunctions(script, ["objectRows", "sortedArenaItemRows", "renderArenaItemSection", "renderArenaCoreSection", "renderArenaExpand", "renderArenaOptionCard", "augmentGrade", "percent"], {
+    state, escapeHTML: x => String(x ?? ""), number: x => String(x ?? "—"), compactNumber: x => String(x ?? "—"),
+    renderAssetButton: asset => `<span data-item-id="${asset.id}">${asset.name}</span>`,
+    sortedArenaRows: rows => rows, renderArenaSlimRow: () => "",
+  });
+  const toRows = values => values.map(value => ({
+    assets:[{id:value.itemId,kind:"item",name:catalog.get(value.itemId)?.name || "未知装备"}],
+    tier:value.tier, score:value.score, games:value.matches, winRate:value.winRate*100,
+    firstPlaceRate:value.firstPlacementRate*100, averagePlacement:value.averagePlacement,
+  }));
+  const ids = document => [...document.querySelectorAll("[data-item-id]")].map(el => Number(el.dataset.itemId));
+  for (const [kind, values, expectedPreview] of [
+    ["prism", capture.prismaticItems, [443056,447106,443193,446632,447112,447107]],
+    ["core", capture.coreItems, [226695,224401,223075,223026,223143,226696]],
+  ]) {
+    const rows = toRows(values);
+    const render = () => kind === "prism" ? functions.renderArenaItemSection("棱彩装备", "单件", rows, kind) : functions.renderArenaCoreSection({coreItems:rows});
+    let dom = new JSDOM(render());
+    assert.deepEqual(ids(dom.window.document), expectedPreview, `${kind}: same-tier order must follow matches, not score`);
+    assert.equal(dom.window.document.querySelectorAll(".arena-option-card").length, 6);
+    assert.equal(dom.window.document.querySelector("[data-arena-expand]").textContent, `展开全部 ${values.length} 条`);
+    dom.window.close();
+    state.arenaExpanded[kind] = true;
+    dom = new JSDOM(render());
+    assert.deepEqual(ids(dom.window.document).sort((a,b)=>a-b), values.map(row=>row.itemId).sort((a,b)=>a-b), `${kind}: expansion must retain every ID`);
+    assert.equal(dom.window.document.querySelectorAll(".arena-option-card").length, values.length);
+    assert.equal(dom.window.document.querySelector("[data-arena-expand]").textContent, "收起");
+    assert.doesNotMatch(dom.window.document.body.textContent, /三件套出装路线/);
+    dom.window.close();
+  }
+});
+
+test("Arena equipment sorting retains low samples, missing metadata and ungraded items", () => {
+  const {sortedArenaItemRows} = compileFunctions(script,["objectRows","sortedArenaItemRows"]);
+  const rows = [{tier:"A",score:99,games:1,id:1},{tier:"A",score:10,games:100,id:2},{tier:"S",games:0,id:3},{games:50,id:4}];
+  assert.deepEqual(sortedArenaItemRows(rows).map(row=>row.id), [3,2,1,4]);
+  assert.deepEqual(rows.map(row=>row.id),[1,2,3,4],"do not mutate source array");
 });

@@ -150,6 +150,10 @@ async function renderOverviewPng(BrowserWindow, baseURL, payload) {
         devTools: false,
         backgroundThrottling: false,
         offscreen: true,
+        // Electron shares page zoom per origin within a session, even across
+        // BrowserWindows. This in-memory session keeps exports at 100%; the
+        // normal top-level navigation obtains its own local session cookie.
+        partition: "deep-legends-share-export",
       },
     });
     exportWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -205,7 +209,7 @@ function createShareExportController({ BrowserWindow, app, dialog, fileSystem, i
 
   function persistDirectory(directory) {
     const normalized = normalizeSaveDirectory(directory);
-    if (!usableDirectory(normalized)) throw new Error("所选分享图保存位置不可用。");
+    if (!usableDirectory(normalized)) throw new Error("所选导出位置不可用。");
     fileSystem.mkdirSync(path.dirname(settingsPath), { recursive: true });
     fileSystem.writeFileSync(settingsPath, `${JSON.stringify({ saveDirectory: normalized }, null, 2)}\n`, "utf8");
     saveDirectory = normalized;
@@ -234,7 +238,7 @@ function createShareExportController({ BrowserWindow, app, dialog, fileSystem, i
 
   async function chooseSaveDirectory(event) {
     if (!isTrustedRenderer(event?.sender)) throw new Error("不受信任的页面不能修改分享图设置。");
-    const result = await requestDirectory(event, "选择分享图保存位置");
+    const result = await requestDirectory(event, "选择导出位置");
     if (!result.canceled) pending.delete(event.sender.id);
     return result;
   }

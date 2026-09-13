@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -13,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,6 +26,78 @@ type championRoundTripFunc func(*http.Request) (*http.Response, error)
 
 func (fn championRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
 	return fn(request)
+}
+
+func TestHandleChampionAssetCommunityDragonFallsBackFromLargeToSmall(t *testing.T) {
+	smallImage := []byte("\x89PNG\r\n\x1a\nsmall-image")
+	provider := newChampionProvider()
+	var requested []string
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		requested = append(requested, request.URL.Path)
+		status, body := http.StatusNotFound, []byte("missing")
+		if strings.HasSuffix(request.URL.Path, "_small.png") {
+			status, body = http.StatusOK, smallImage
+		}
+		return &http.Response{
+			StatusCode: status, Status: http.StatusText(status), Header: make(http.Header),
+			Body: io.NopCloser(bytes.NewReader(body)), ContentLength: int64(len(body)), Request: request,
+		}, nil
+	})}
+	store := &localStore{root: t.TempDir()}
+	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a := &app{champions: provider, storage: store}
+	provider.diag = a.recordDiagnostic
+	recorder := httptest.NewRecorder()
+	a.handleChampionAsset(recorder, httptest.NewRequest(http.MethodGet, "/api/champion-asset?source=communitydragon&path=%2Flatest%2Fgame%2Fassets%2Fux%2Fcherry%2Faugments%2Ficons%2Fdrop_bear_large.png", nil))
+	if recorder.Code != http.StatusOK || !bytes.Equal(recorder.Body.Bytes(), smallImage) {
+		t.Fatalf("large-to-small response = status %d body %q", recorder.Code, recorder.Body.Bytes())
+	}
+	wantRequests := []string{
+		"/latest/game/assets/ux/cherry/augments/icons/drop_bear_large.png",
+		"/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/drop_bear_large.png",
+		"/latest/game/assets/ux/cherry/augments/icons/drop_bear.png",
+		"/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/drop_bear.png",
+		"/latest/game/assets/ux/cherry/augments/icons/drop_bear_small.png",
+	}
+	if !reflect.DeepEqual(requested, wantRequests) {
+		t.Fatalf("CommunityDragon candidate order = %#v, want %#v", requested, wantRequests)
+	}
+	data, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "drop_bear") || strings.Contains(string(data), "2031") {
+		t.Fatalf("augment icon diagnostic leaked a concrete icon: %s", data)
+	}
+	var event map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(data), &event); err != nil {
+		t.Fatal(err)
+	}
+	if event["event"] != "augment_icon_fetch" || event["source"] != "communitydragon" || event["path_template"] != "game/ux/cherry/augments/icons/{icon}_large.png" || event["status"] != float64(http.StatusOK) || event["candidate_index"] != float64(4) || event["fell_back"] != true {
+		t.Fatalf("persisted augment icon diagnostic = %#v", event)
+	}
+}
+
+func TestHandleChampionAssetCommunityDragonReportsFinalAugmentFailure(t *testing.T) {
+	provider := newChampionProvider()
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusNotFound, Status: http.StatusText(http.StatusNotFound), Header: make(http.Header),
+			Body: io.NopCloser(strings.NewReader("missing")), ContentLength: 7, Request: request,
+		}, nil
+	})}
+	var events []map[string]any
+	provider.diag = func(event map[string]any) { events = append(events, event) }
+	recorder := httptest.NewRecorder()
+	(&app{champions: provider}).handleChampionAsset(recorder, httptest.NewRequest(http.MethodGet, "/api/champion-asset?source=communitydragon&path=%2Flatest%2Fgame%2Fassets%2Fux%2Fcherry%2Faugments%2Ficons%2Fmissing_large.png", nil))
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("failed augment status = %d, want 404", recorder.Code)
+	}
+	if len(events) != 1 || events[0]["event"] != "augment_icon_fetch" || events[0]["status"] != http.StatusNotFound || events[0]["candidate_index"] != -1 || events[0]["fell_back"] != true {
+		t.Fatalf("final augment failure diagnostic = %#v", events)
+	}
 }
 
 func TestChampionNetworkSettingsValidation(t *testing.T) {
@@ -341,21 +415,83 @@ func TestStructuredMetricsFallbackKeepsHighestSamplesAndReportsGate(t *testing.T
 	}
 }
 
-func TestStructuredRecommendationMetricsKeepOPGGOrderWithoutSampleGate(t *testing.T) {
+func TestStructuredRecommendationMetricsPrioritizeLargeSamplesBeforeWinRate(t *testing.T) {
 	provider := newChampionProvider()
 	provider.patch = "16.16.1"
 	rows := provider.structuredRecommendationMetrics([]opggMetric{
-		{IDs: []int{1001}, Play: 5000, Win: 2500},
-		{IDs: []int{1002}, Play: 12, Win: 7},
-		{IDs: []int{1003}, Play: 3, Win: 2},
-		{IDs: []int{1004}, Play: 200, Win: 100},
-	}, "item", "starter", 3)
-	if len(rows) != 3 {
-		t.Fatalf("recommendation rows = %d, want 3", len(rows))
+		{IDs: []int{1001}, Play: 2, Win: 2},
+		{IDs: []int{1002}, Play: 5000, Win: 2650},
+	}, "item", "starter", 2)
+	if len(rows) != 2 {
+		t.Fatalf("recommendation rows = %d, want 2", len(rows))
 	}
-	for index, want := range []int{1001, 1002, 1003} {
+	for index, want := range []int{1002, 1001} {
 		if rows[index].Assets[0].ID != want {
 			t.Fatalf("recommendation %d = %d, want %d", index, rows[index].Assets[0].ID, want)
+		}
+	}
+}
+
+func TestStructuredRecommendationMetricsFollowPickRateAcrossEveryOPGGRecommendationKind(t *testing.T) {
+	provider := newChampionProvider()
+	fixture := []opggMetric{
+		{IDs: []int{1001}, Play: 500, Win: 350, PickRate: 0.10},
+		{IDs: []int{1002}, Play: 900, Win: 450, PickRate: 0.30},
+		{IDs: []int{1003}, Play: 700, Win: 420, PickRate: 0.20},
+	}
+	for _, kind := range []string{"spell", "starter", "boots", "core"} {
+		t.Run(kind, func(t *testing.T) {
+			rows := provider.structuredRecommendationMetrics(fixture, "item", kind, 3)
+			if len(rows) != 3 {
+				t.Fatalf("%s rows = %d, want 3", kind, len(rows))
+			}
+			got := []int{rows[0].Assets[0].ID, rows[1].Assets[0].ID, rows[2].Assets[0].ID}
+			want := []int{1002, 1003, 1001}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("%s recommendation order = %v, want pick-rate order %v", kind, got, want)
+			}
+		})
+	}
+}
+
+func TestRankedDepthCacheSharesDetailSnapshotAndUsesOlderFetchedAt(t *testing.T) {
+	provider := newChampionProvider()
+	provider.cache = newChampionDataCache(nil)
+	detailFetchedAt := time.Date(2026, 9, 3, 6, 0, 0, 123, time.UTC)
+	depthFetchedAt := detailFetchedAt.Add(-45 * time.Minute)
+	cacheKey := strings.Join([]string{
+		"v3", "opgg-depth", "jax", "top", "emerald_plus", "16.17",
+		detailFetchedAt.Format(time.RFC3339Nano),
+	}, "|")
+	depthPayload := []byte(`
+1:["$","tr",null,{"children":["depth_4_item_0",{"metaType":"item","metaId":6333},{"children":["61.19","%"]},{"children":"572 场"}]}]
+2:["$","tr",null,{"children":["depth_5_item_0",{"metaType":"item","metaId":3026},{"children":["57.14","%"]},{"children":"49 场"}]}]`)
+	provider.cache.entries[cacheKey] = championCacheEnvelope{
+		Schema: championCacheSchema, Key: cacheKey, Data: depthPayload, FetchedAt: depthFetchedAt,
+		ExpiresAt: time.Now().Add(time.Hour), StaleUntil: time.Now().Add(2 * time.Hour),
+	}
+	provider.cache.order = []string{cacheKey}
+	provider.cache.bytes = len(depthPayload)
+	response := championDetailResponse{FetchedAt: detailFetchedAt}
+	provider.resolveRankedItemDepths(context.Background(), "jax", "top", "emerald_plus", "16.17", nil, "", errors.New("unused"), false, false, &response)
+	if !response.FetchedAt.Equal(depthFetchedAt) {
+		t.Fatalf("combined detail FetchedAt = %s, want older depth snapshot %s", response.FetchedAt, depthFetchedAt)
+	}
+	if response.Build.ItemChainStatus != "ready" || len(response.Build.FourthItems) != 1 || len(response.Build.FifthItems) != 1 {
+		t.Fatalf("cached depth payload was not used: %#v", response.Build)
+	}
+}
+
+func TestStructuredRecommendationMetricsKeepUnknownSamplesInUpstreamOrder(t *testing.T) {
+	candidates := []structuredMetricCandidate{
+		{row: championMetricRow{Assets: []championAsset{{ID: 2001}}, WinRate: 48, GamesUnavailable: true}},
+		{row: championMetricRow{Assets: []championAsset{{ID: 2002}}, WinRate: 99, GamesUnavailable: true}},
+		{row: championMetricRow{Assets: []championAsset{{ID: 2003}}, WinRate: 60, GamesUnavailable: true}},
+	}
+	orderStructuredRecommendationCandidates(candidates)
+	for index, want := range []int{2001, 2002, 2003} {
+		if candidates[index].row.Assets[0].ID != want {
+			t.Fatalf("unknown-sample row %d = %d, want %d", index, candidates[index].row.Assets[0].ID, want)
 		}
 	}
 }
@@ -643,6 +779,9 @@ func TestStructuredDetailOmitsPositionsOutsideRanked(t *testing.T) {
 			provider.static["item/3153.png"] = championAssetDescription{Name: "破败王者之刃"}
 			requestedPath := ""
 			provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+				if request.URL.Host == opggPageHost {
+					t.Fatalf("%s mode unexpectedly requested ranked item depths: %s", test.mode, request.URL.String())
+				}
 				if request.URL.Host == opggChampionHost {
 					requestedPath = request.URL.Path
 				}
@@ -659,6 +798,9 @@ func TestStructuredDetailOmitsPositionsOutsideRanked(t *testing.T) {
 			}
 			if len(response.Positions) != 0 {
 				t.Fatalf("non-ranked detail leaked positions: %#v", response.Positions)
+			}
+			if response.Build.ItemChainStatus != "" || len(response.Build.FourthItems)+len(response.Build.FifthItems)+len(response.Build.SixthItems) != 0 {
+				t.Fatalf("non-ranked detail advertised unavailable item depths: %#v", response.Build)
 			}
 		})
 	}

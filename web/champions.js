@@ -23,18 +23,21 @@
     ["gold", "黄金"], ["silver", "白银"], ["bronze", "青铜"], ["iron", "黑铁"],
   ].map(([value, label]) => ({ value, label }));
 
+  const initialMode = normalizeMode(readSetting("champion-mode", "ranked"));
+  migrateChampionModePreferences(initialMode);
+
   const state = {
     section: "overview",
-	    mode: normalizeMode(readSetting("champion-mode", "ranked")),
-    tier: "emerald_plus",
+	    mode: initialMode,
+    tier: normalizeTier(readSetting("champion-tier", "emerald_plus")),
     position: normalizePosition(readSetting("champion-position", "all")),
-	    query: normalizeStoredSearch(readSetting("champion-query", "")),
+	    query: normalizeStoredSearch(readSetting(`champion-query-${initialMode}`, "")),
 	    augmentQuery: normalizeStoredSearch(readSetting("champion-augment-query", "")),
     augmentRarity: "all",
 	    mayhemView: normalizeMayhemView(readSetting("champion-mayhem-view", "champions")),
     mayhemAugmentID: 0,
     mayhemAugmentDetail: null,
-    mayhemAugmentDetailCache: new Map(),
+    mayhemAugmentDetailCache: window.deepLegendsRuntime?.createCache({ max: 96, ttl: 300000 }) || new Map(),
     mayhemAugmentLoading: false,
     mayhemAugmentError: "",
     mayhemAtlasLoading: false,
@@ -54,7 +57,7 @@
     augments: null,
 	    detail: null,
 	    detailPosition: null,
-	    detailCache: new Map(),
+	    detailCache: window.deepLegendsRuntime?.createCache({ max: 64, ttl: 300000 }) || new Map(),
 	    selected: null,
     loading: false,
     error: "",
@@ -82,13 +85,37 @@
     workspaceRequestToken: 0,
     detailRequestToken: 0,
 	    runePage: normalizeRunePage(readSetting("champion-rune-page", "0")),
-	    detailChampionID: normalizeChampionDetailID(readSetting("champion-detail-id", "")),
+	    detailChampionID: normalizeChampionDetailID(readSetting(`champion-detail-id-${initialMode}`, "")),
+    playerDetour: false,
   };
 
   let searchComposing = false;
 
   function readSetting(key, fallback) { try { return localStorage.getItem(`lol-loot-${key}`) ?? fallback; } catch (_) { return fallback; } }
   function writeSetting(key, value) { try { localStorage.setItem(`lol-loot-${key}`, String(value)); } catch (_) {} }
+  // The legacy selection belongs only to the mode saved alongside it, never all three.
+  function migrateChampionModePreferences(mode) {
+    if (readSetting("champion-mode-preferences-v2", "") === "1") return;
+    for (const key of ["champion-detail-id", "champion-query"]) {
+      const scoped = `${key}-${mode}`;
+      if (readSetting(scoped, null) === null) writeSetting(scoped, readSetting(key, ""));
+    }
+    writeSetting("champion-mode-preferences-v2", "1");
+  }
+
+  function switchChampionMode(value) {
+    const mode = normalizeMode(value);
+    if (mode === state.mode) return;
+    resetTransientChampionState({ restorePosition: true });
+    state.mode = mode;
+    writeSetting("champion-mode", mode);
+    state.detailChampionID = normalizeChampionDetailID(readSetting(`champion-detail-id-${mode}`, ""));
+    state.query = normalizeStoredSearch(readSetting(`champion-query-${mode}`, ""));
+    state.rankings = null;
+    state.augments = null;
+    loadWorkspace(true);
+  }
+
   function normalizeTier(value) { return fallbackTiers.some((item) => item.value === value) ? value : "emerald_plus"; }
   function normalizePosition(value) { return positionOptions.some((item) => item.value === value) ? value : "all"; }
   function firstPositionOf(row) {
@@ -108,9 +135,16 @@
   }
   function escapeHTML(value) { const span = document.createElement("span"); span.textContent = String(value ?? ""); return span.innerHTML; }
   function normalizeSearch(value) { return String(value || "").normalize("NFKC").toLocaleLowerCase("zh-CN").replace(/[\s\p{P}\p{S}]+/gu, ""); }
-  function number(value, digits = 1) { const parsed = Number(value); return Number.isFinite(parsed) ? new Intl.NumberFormat("zh-CN", { maximumFractionDigits: digits }).format(parsed) : "—"; }
+  const numberFormatters = new Map();
+  const integerFormatter = new Intl.NumberFormat("zh-CN");
+  function numberFormatter(digits) {
+    const precision = Math.max(0, Math.min(20, Number(digits) || 0));
+    if (!numberFormatters.has(precision)) numberFormatters.set(precision, new Intl.NumberFormat("zh-CN", { maximumFractionDigits: precision }));
+    return numberFormatters.get(precision);
+  }
+  function number(value, digits = 1) { const parsed = Number(value); return Number.isFinite(parsed) ? numberFormatter(digits).format(parsed) : "—"; }
   function percent(value) { if (value === null || value === undefined || String(value).trim() === "") return "—"; const parsed = Number(value); return Number.isFinite(parsed) ? `${parsed.toFixed(2)}%` : "—"; }
-  function compactNumber(value) { const parsed = Number(value); if (!Number.isFinite(parsed) || parsed <= 0) return "—"; return parsed >= 10000 ? `${(parsed / 10000).toFixed(parsed >= 100000 ? 0 : 1)}万` : new Intl.NumberFormat("zh-CN").format(parsed); }
+  function compactNumber(value) { const parsed = Number(value); if (!Number.isFinite(parsed) || parsed <= 0) return "—"; return parsed >= 10000 ? `${(parsed / 10000).toFixed(parsed >= 100000 ? 0 : 1)}万` : integerFormatter.format(parsed); }
   function positionLabel(value) { return ({ top: "上单", jungle: "打野", mid: "中单", adc: "下路", support: "辅助", all: "全部" })[value] || value || "位置未知"; }
   function positionIcon(value) {
     const name = ({ all: "all", top: "top", jungle: "jungle", mid: "middle", adc: "bottom", support: "utility" })[value] || "all";
@@ -121,7 +155,9 @@
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed >= 0 ? (parsed === 0 ? "OP" : String(parsed)) : "—";
   }
-  function tierBadge(value, extra = "") {
+  function tierBadge(value, extra = "", sourceGrade = "") {
+    const grade = String(sourceGrade).trim().toUpperCase();
+    if (["S", "A", "B", "C", "D", "F"].includes(grade)) return `<img class="tier-badge${extra ? ` ${extra}` : ""}" src="/tier-icons/yourgg-${grade.toLowerCase()}.svg" alt="梯度 ${grade}" decoding="async">`;
     const present = value !== null && value !== undefined && String(value).trim() !== "";
     const parsed = Number(value);
     const key = present && Number.isFinite(parsed) && parsed >= 0 && parsed <= 5 ? (parsed === 0 ? "op" : String(parsed)) : "";
@@ -148,7 +184,7 @@
   function tierLabel(value) { return catalogTiers().find((item) => item.value === value)?.label || fallbackTiers.find((item) => item.value === value)?.label || value; }
   function championMeta(id) { return catalogChampions().find((item) => Number(item.id) === Number(id)) || null; }
   function championMetaByKey(key) { const value = String(key || "").toLowerCase(); return catalogChampions().find((item) => String(item.slug || item.key || "").toLowerCase() === value || String(item.key || "").toLowerCase() === value) || null; }
-  function imageURL(source, path) { return source && path ? `/api/champion-asset?source=${encodeURIComponent(source)}&path=${encodeURIComponent(path)}` : "/image-unavailable.svg"; }
+  function imageURL(source, path) { return source && path ? `/api/champion-asset?source=${encodeURIComponent(source)}&path=${encodeURIComponent(path)}${/\/augments\/icons\//i.test(path) ? "&art=2" : ""}` : "/image-unavailable.svg"; }
   function heroArtworkURL(meta, fallbackSource, fallbackPath) {
     if (meta?.artworkSource && meta?.artworkPath) return imageURL(meta.artworkSource, meta.artworkPath);
     const key = String(meta?.key || "").replace(/[^A-Za-z0-9]/g, "");
@@ -175,7 +211,6 @@
     const isAugment = String(className).split(/\s+/).includes("augment-icon");
     const path = String(asset?.path || "");
     const isLargeAugment = isAugment && /_large\.png(?:[?#]|$)/i.test(path);
-    const isColoredAugment = /(?:arena_2026|(?:^|[/_])mercy\.png(?:[?#]|$))/i.test(path);
     const fallbackPath = asset?.fallbackPath || asset?.imageFallbackPath || "";
     const fallbackImage = isLargeAugment && asset?.source && fallbackPath ? imageURL(asset.source, fallbackPath) : "";
     const fallbackData = fallbackImage ? ` data-augment-fallback="${escapeHTML(fallbackImage)}"` : "";
@@ -191,7 +226,13 @@
       const response = await fetch(path, { headers: { Accept: "application/json" }, signal: controller.signal });
       if (response.status === 401) throw new Error("页面会话已过期，刷新页面即可重新连接");
       if (!response.ok) throw new Error((await response.text()).trim() || `本地服务返回 HTTP ${response.status}`);
-      return response.json();
+      const payload = await response.json();
+      if (controller.signal.aborted || state.requests.get(key) !== controller) {
+        const cancelled = new Error("请求已取消");
+        cancelled.name = "AbortError";
+        throw cancelled;
+      }
+      return payload;
     } catch (error) {
       if (error.name === "AbortError") throw new Error("联网读取超时，请重试");
       throw error;
@@ -291,6 +332,8 @@
       state.workspaceRequestToken = token;
       const mode = state.mode;
       state.loading = true;
+      const restored = restorePersistedChampionSelection();
+      if (restored) state.selected = restored;
       render();
       adoptCatalog(preload.catalog);
       if (mode === "ranked" && preload.tier === state.tier && preload.position === state.position) {
@@ -336,6 +379,8 @@
     const current = () => token === state.workspaceRequestToken && mode === state.mode && tier === state.tier && position === state.position;
     state.loading = true;
     state.error = "";
+    const restored = restorePersistedChampionSelection();
+    if (restored) state.selected = restored;
     render();
     const catalogPromise = state.catalog && !force
       ? Promise.resolve(state.catalog)
@@ -368,18 +413,25 @@
   }
 
   async function loadRankings() {
-    if (state.loading) return;
+    if (state.mode !== "ranked") return;
+    const token = ++state.workspaceRequestToken;
+    const tier = state.tier, position = state.position;
+    const current = () => state.mode === "ranked" && state.workspaceRequestToken === token && state.tier === tier && state.position === position;
     state.loading = true;
     state.error = "";
     state.rankings = null;
     render();
     try {
       if (!state.catalog) state.catalog = await api("/api/champions/catalog", "catalog");
-      state.rankings = await api(`/api/champions/rankings?mode=ranked&tier=${encodeURIComponent(state.tier)}&position=${encodeURIComponent(state.position)}`, "rankings");
+      if (!current()) return;
+      const rankings = await api(`/api/champions/rankings?mode=ranked&tier=${encodeURIComponent(tier)}&position=${encodeURIComponent(position)}`, "rankings");
+      if (!current()) return;
+      state.rankings = rankings;
       stampRankings();
     } catch (error) {
-      state.error = error.message || "梯度读取失败";
+      if (current()) state.error = error.message || "梯度读取失败";
     } finally {
+      if (!current()) return;
       state.loading = false;
       render();
     }
@@ -389,7 +441,7 @@
     const championID = normalizeChampionDetailID(row?.championId);
     if (!championID) return;
     state.detailChampionID = championID;
-    writeSetting("champion-detail-id", championID);
+    writeSetting(`champion-detail-id-${state.mode}`, championID);
     if (state.mode === "arena") {
       selectArenaChampion(row);
       return;
@@ -406,7 +458,7 @@
 	      state.detailChampionID = 0;
 	      state.loading = false;
 	      state.error = "";
-	      writeSetting("champion-detail-id", "");
+	      writeSetting(`champion-detail-id-${state.mode}`, "");
 	      render();
 	      return;
 	    }
@@ -417,7 +469,10 @@
     state.detail = null;
     state.error = "";
 	    state.runePage = normalizeRunePage(readSetting("champion-rune-page", "0"));
-    const candidatePosition = state.detailPosition || row.position || (state.position !== "all" ? state.position : "") || firstPositionOf(row);
+    // A clicked ranking row is an explicit route selection. It must win over
+    // the previous detail route even when the champion itself did not change.
+    const rowPosition = firstPositionOf({ position: row.position });
+    const candidatePosition = rowPosition || state.detailPosition || (state.position !== "all" ? state.position : "") || firstPositionOf(row);
     const position = firstPositionOf({ position: candidatePosition });
     state.detailPosition = position || null;
     if (!position) {
@@ -614,10 +669,10 @@
     try {
       state.mayhemRarityData = await api("/api/champions/augment-rarity", "mayhem-rarity");
     } catch (error) {
-      state.mayhemRarityError = error?.message || "阶段概率读取失败";
+      state.mayhemRarityError = error?.message || "品质分布读取失败";
     } finally {
       state.mayhemRarityLoading = false;
-      render();
+      if (state.section === "champions" && state.mode === "aram-mayhem") render();
     }
   }
 
@@ -704,19 +759,20 @@
     state.detailPosition = null;
     state.selected = null;
     state.detailChampionID = 0;
-    writeSetting("champion-detail-id", "");
+    writeSetting(`champion-detail-id-${state.mode}`, "");
     state.error = "";
     render();
     requestAnimationFrame(() => appScroll?.scrollTo({ top: state.listScroll, behavior: "instant" }));
   }
 
   function restorePersistedChampionSelection() {
-    if (state.selected || !state.detailChampionID || state.mode === "aram-mayhem" && state.mayhemView !== "champions") return null;
+    if (!state.detailChampionID || state.mode === "aram-mayhem" && state.mayhemView !== "champions") return null;
+    if (state.selected && Number(state.selected.championId) === Number(state.detailChampionID)) return state.selected;
     if (!Array.isArray(state.rankings?.rows)) return null;
     const row = rankingRows().find((item) => Number(item.championId) === Number(state.detailChampionID));
     if (row) return row;
     state.detailChampionID = 0;
-    writeSetting("champion-detail-id", "");
+    writeSetting(`champion-detail-id-${state.mode}`, "");
     return null;
   }
 
@@ -781,6 +837,7 @@
 	  const nextTier = normalizeTier(tier);
 	  if (nextTier === state.tier) return;
 	  state.tier = nextTier;
+	  writeSetting("champion-tier", nextTier);
 	  refreshRankingsForDetailTier(nextTier);
 	  const position = firstPositionOf({ position: state.detailPosition || state.detail?.position || state.selected?.position });
 	  if (!position) {
@@ -813,6 +870,7 @@
     else renderWorkspace();
 	window.deepLegendsSelects?.enhance(root);
     prepareImages();
+    if (state.section === "champions" && state.mode === "aram-mayhem" && root.querySelector(".mayhem-rarity-panel") && !state.mayhemRarityData && !state.mayhemRarityLoading && !state.mayhemRarityError) void loadMayhemRarity();
     applyRenderedMetricStyles();
     mountArenaMatchCards();
     mountMayhemTierDialog();
@@ -935,7 +993,7 @@
       <img class="mayhem-overview-art" src="${heroArtworkURL(meta, source, path)}" data-artwork-fallback="${escapeHTML(heroArtworkFallbackURL(meta))}" alt="" aria-hidden="true" decoding="async" data-champion-image>
       <span class="mayhem-overview-shade" aria-hidden="true"></span>
       <div class="mayhem-overview-identity"><span class="champion-detail-portrait"><img src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span><div><h2>${escapeHTML(title)} ${tierBadge(row.tier, "arena-title-tier")}</h2><small>${escapeHTML(subtitle)} · 总榜第 ${Number(row.rank) || "—"} 位</small></div></div>
-      <div class="mayhem-overview-metrics">${metric("胜率", percent(detail?.stats?.winRate || row.winRate))}${metric("样本", compactNumber(row.play))}${metric("梯度", `T${Number(row.tier) || "—"}`)}</div>
+      <div class="mayhem-overview-metrics">${metric("胜率", percent(detail?.stats?.winRate ?? row.winRate))}${metric("样本", compactNumber(row.play))}${metric("梯度", `T${Number(row.tier) || "—"}`)}</div>
     </section>`;
     if (state.mayhemDetailLoading && !detail) return overview + renderDetailSkeleton();
     if (state.mayhemDetailError && !detail) return overview + renderError(state.mayhemDetailError, true);
@@ -951,9 +1009,9 @@
     const content = rankingRows.slice(0, 8).map((row, index) => {
       const asset = row.assets?.[0] || {};
       const icon = asset.source && asset.path ? assetImage(asset, "recommend-icon", true) : '<span class="mayhem-item-name-only" aria-hidden="true"></span>';
-      return `<article><b>${index + 1}</b>${icon}<strong>${escapeHTML(asset.name || "未知装备")}</strong><dl><div><dt>综合评分</dt><dd>${number(row.score, 1)}</dd></div><div><dt>胜率</dt><dd class="metric-win">${percent(row.winRate)}</dd></div><div><dt>样本</dt><dd>${compactNumber(row.games)}</dd></div></dl></article>`;
+      return `<article><b>${index + 1}</b>${icon}<strong>${escapeHTML(asset.name || "未知装备")}</strong><dl><div><dt>胜率</dt><dd class="metric-win">${percent(row.winRate)}</dd></div><div><dt>场次</dt><dd>${compactNumber(row.games)}</dd></div></dl></article>`;
     }).join("");
-    return `<section class="recommendation-section mayhem-item-ranking"><header><div><h3><span class="arena-section-icon" aria-hidden="true">◈</span>装备排行</h3><p>按综合评分排序的高表现装备</p></div><span class="section-count">${objectRows(rows).length} 件</span></header><div class="mayhem-ranking-list">${content || '<p class="mayhem-inline-empty">暂无装备排行样本。</p>'}</div></section>`;
+    return `<section class="recommendation-section mayhem-item-ranking"><header><h3><span class="arena-section-icon" aria-hidden="true">◈</span>装备排行</h3><span class="section-count">${objectRows(rows).length} 件</span></header><div class="mayhem-ranking-list">${content || '<p class="mayhem-inline-empty">暂无装备排行样本。</p>'}</div></section>`;
   }
 
   function renderMayhemOpeningConfiguration(build, citation) {
@@ -1008,7 +1066,7 @@
     const performance = Number(item.performance);
     const metrics = [
       Number.isFinite(performance) && performance > 0 ? `<span>综合评分 <b>${number(performance, 1)}</b></span>` : "",
-      Number(item.winRate) > 0 ? `<span>胜率 <b>${percent(item.winRate)}</b></span>` : "",
+      Number(item.winRate) > 0 ? `<span>胜率 <b class="win-rate-value">${percent(item.winRate)}</b></span>` : "",
     ].filter(Boolean).join("");
     const body = state.mayhemAugmentLoading && !detail
       ? renderDetailSkeleton()
@@ -1020,7 +1078,7 @@
             const score = champion.score ?? champion.performance;
             const winRate = champion.winRate ?? champion.win_rate;
             const games = champion.games ?? champion.play;
-            return `<div class="mayhem-fit-row"><b>${index + 1}</b>${assetImage({ source: champion.imageSource || meta?.imageSource, path: champion.imagePath || meta?.imagePath, name: champion.name || meta?.nameZh || meta?.titleZh }, "augment-champion-icon")}<strong>${escapeHTML(champion.name || meta?.nameZh || meta?.titleZh || `英雄 ${champion.id}`)}</strong><span class="mayhem-fit-metrics">${score != null ? `综合评分 ${number(score, 1)} · ` : ""}${winRate != null ? `胜率 ${percent(winRate)} · ` : ""}${games != null ? `${compactNumber(games)} 场` : "暂无样本"}</span></div>`;
+            return `<div class="mayhem-fit-row"><b>${index + 1}</b>${assetImage({ source: champion.imageSource || meta?.imageSource, path: champion.imagePath || meta?.imagePath, name: champion.name || meta?.nameZh || meta?.titleZh }, "augment-champion-icon")}<strong>${escapeHTML(champion.name || meta?.nameZh || meta?.titleZh || `英雄 ${champion.id}`)}</strong><span class="mayhem-fit-metrics">${score != null ? `综合评分 ${number(score, 1)} · ` : ""}${winRate != null ? `胜率 <b class="win-rate-value">${percent(winRate)}</b> · ` : ""}${games != null ? `${compactNumber(games)} 场` : "暂无样本"}</span></div>`;
           }).join("") : '<p class="mayhem-inline-empty">当前没有可展示的适配英雄样本。</p>'}</div>${renderMeasurementTechnique(detail?.measurementTechnique)}`;
     return `<header class="mayhem-atlas-detail-head is-${escapeHTML(item.rarity || "unknown")}">
         ${assetImage({ source: item.imageSource, path: item.imagePath, fallbackPath: item.imageFallbackPath, name: item.name, description: item.tooltip || item.description }, "augment-icon")}
@@ -1052,10 +1110,10 @@
     const stages = objectRows(state.mayhemRarityData?.stages);
     // 用户要求：拿不到就别展示。读取失败时整块隐藏，不留一个报错的空壳。
     if (state.mayhemRarityError && !stages.length) return "";
-    let body = '<button class="text-button" type="button" data-load-mayhem-rarity>查看四阶段品质概率</button>';
-    if (state.mayhemRarityLoading) body = '<p class="mayhem-inline-empty">正在读取阶段概率…</p>';
-    else if (stages.length) body = `<div class="mayhem-rarity-stages">${stages.map((row) => `<article><b>第 ${Number(row.stage)} 阶段</b><span class="is-silver">白银 ${percent(row.silver)}</span><span class="is-gold">黄金 ${percent(row.gold)}</span><span class="is-prismatic">棱彩 ${percent(row.prismatic)}</span><small>${compactNumber(row.games)} 场</small></article>`).join("")}</div>${renderMeasurementTechnique(state.mayhemRarityData?.measurementTechnique)}`;
-    return `<section class="augment-directory mayhem-rarity-panel"><header><div><h3>海克斯品质概率</h3><p>由用户操作触发读取，不做后台预取</p></div></header>${body}</section>`;
+    let body = '<p class="mayhem-inline-empty">正在读取品质分布…</p>';
+    if (state.mayhemRarityLoading) body = '<p class="mayhem-inline-empty">正在读取品质分布…</p>';
+    else if (stages.length) body = `<div class="mayhem-rarity-stages">${stages.map((row) => `<article><b>第 ${Number(row.stage)} 阶段</b><span class="is-silver">白银 ${percent(row.silver)}</span><span class="is-gold">黄金 ${percent(row.gold)}</span><span class="is-prismatic">棱彩 ${percent(row.prismatic)}</span><small>${compactNumber(row.games)} 次选择</small></article>`).join("")}</div>${renderMeasurementTechnique(state.mayhemRarityData?.measurementTechnique)}`;
+    return `<section class="augment-directory mayhem-rarity-panel"><header><div><h3>海克斯品质分布</h3><p>玩家实际选择的样本分布，不代表抽取、刷新或保底概率</p></div></header>${body}</section>`;
   }
 
   function renderArena() {
@@ -1088,6 +1146,12 @@
     const path = row.imagePath || meta?.imagePath;
     const tier = stats.tier ?? row.tier;
     const rank = Number(stats.rank || row.rank) || 0;
+    const hasMetric = (value) => value !== null && value !== undefined && String(value).trim() !== "" && Number.isFinite(Number(value));
+    const secondaryMetrics = [
+      ["选用率", "metric-pick", stats.pickRate ?? row.pickRate, percent, ""],
+      ["禁用率", "metric-ban", stats.banRate ?? row.banRate, percent, ""],
+      ["样本", "", stats.games ?? row.play, compactNumber, " 场"],
+    ].filter(([, , value]) => hasMetric(value)).map(([label, className, value, formatter, suffix]) => `<span>${label} <b${className ? ` class="${className}"` : ""}>${formatter(value)}</b>${suffix}</span>`).join("");
     const overview = `<section class="arena-overview-strip">
       <img class="arena-overview-art" src="${heroArtworkURL(meta, source, path)}" data-artwork-fallback="${escapeHTML(heroArtworkFallbackURL(meta))}" alt="" aria-hidden="true" decoding="async" data-champion-image>
       <span class="arena-overview-shade" aria-hidden="true"></span>
@@ -1098,7 +1162,7 @@
         ${arenaOverviewMetric("平均名次", number(stats.averagePlacement || row.averagePlacement, 2), "placement", "名次越低越好")}
         ${arenaOverviewMetric("吃鸡率", percent(stats.firstPlaceRate || row.firstPlaceRate), "first", `${compactNumber(stats.games || row.play)} 场样本`)}
       </div>
-      <div class="arena-overview-secondary"><span>选用率 <b class="metric-pick">${percent(stats.pickRate || row.pickRate)}</b></span><span>禁用率 <b class="metric-ban">${percent(stats.banRate || row.banRate)}</b></span><span>样本 <b>${compactNumber(stats.games || row.play)}</b> 场</span>${renderArenaSortBar()}</div>
+      <div class="arena-overview-secondary">${secondaryMetrics}${renderArenaSortBar()}</div>
     </section>`;
     if (state.arenaDetailLoading) return overview + renderDetailSkeleton();
     if (state.arenaDetailError) return overview + `<div class="arena-detail-content">${renderError(state.arenaDetailError, true)}${renderArenaFirstPlaces({})}</div>`;
@@ -1163,8 +1227,17 @@
     return `<section class="arena-data-section arena-augment-section"><header><div><span class="arena-section-icon" aria-hidden="true">✦</span><span><h3>海克斯推荐</h3><small>按综合评分、胜率与样本展示前九项 · ${allRows.length} 条</small></span></div><div class="arena-chips arena-rarity-chips" role="tablist" aria-label="海克斯品质">${filters.map(([value, label]) => `<button type="button" role="tab" aria-selected="${state.arenaRarity === value}" class="${state.arenaRarity === value ? "is-active" : ""}" data-arena-rarity="${value}"><i class="is-${value}" aria-hidden="true"></i>${label}</button>`).join("")}</div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "augment", index, scores)).join("")}</div>${renderArenaExpand("augments", sorted.length, 9)}` : '<div class="arena-section-empty">该品质暂无海克斯样本</div>'}</section>`;
   }
 
+  // YOUR.GG's default equipment order is tier, then sample count (not score).
+  // Keep this separate from augment/mayhem scoring and retain every item.
+  function sortedArenaItemRows(rows) {
+    const tier = (value) => ({ OP: 0, S: 1, A: 2, B: 3, C: 4, D: 5, F: 6 })[String(value || "").toUpperCase()] ?? 99;
+    return [...objectRows(rows)].sort((left, right) =>
+      tier(left.tier || left.grade) - tier(right.tier || right.grade)
+        || (Number(right.games) || 0) - (Number(left.games) || 0));
+  }
+
 	function renderArenaItemSection(title, copy, rows, kind) {
-    const sorted = sortedGradeRows(rows);
+    const sorted = sortedArenaItemRows(rows);
 		const visible = state.arenaExpanded[kind] ? sorted : sorted.slice(0, 6);
 		const scores = sorted.map((row) => row.score);
 		if (!sorted.length) return "";
@@ -1172,11 +1245,11 @@
   }
 
   function renderArenaCoreSection(build) {
-    const sorted = sortedGradeRows(build.coreItems || []);
+    const sorted = sortedArenaItemRows(build.coreItems || []);
     const visible = state.arenaExpanded.core ? sorted : sorted.slice(0, 6);
     const scores = sorted.map((row) => row.score);
     if (!sorted.length && !(build.boots || []).length) return "";
-    return `<section class="arena-data-section arena-core-section"><header><div><span class="arena-section-icon" aria-hidden="true">◇</span><span><h3>核心物品</h3><small>三件套出装路线 · ${sorted.length} 条</small></span></div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "core", index, scores)).join("")}</div>${renderArenaExpand("core", sorted.length)}` : ""}<div class="arena-slim-rows">${renderArenaSlimRow(sortedArenaRows(build.boots || []).slice(0, 3))}</div></section>`;
+    return `<section class="arena-data-section arena-core-section"><header><div><span class="arena-section-icon" aria-hidden="true">◇</span><span><h3>核心物品</h3><small>核心装备统计 · ${sorted.length} 条</small></span></div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "core", index, scores)).join("")}</div>${renderArenaExpand("core", sorted.length)}` : ""}<div class="arena-slim-rows">${renderArenaSlimRow(sortedArenaRows(build.boots || []).slice(0, 3))}</div></section>`;
   }
 
   // 斗魂与海斗共用同一张海克斯卡片：DOM 与类名一致，样式就不会再走偏。
@@ -1216,7 +1289,7 @@
 
   function renderArenaSlimRow(rows) {
     if (!rows.length) return "";
-    return `<div class="arena-slim-row"><div class="arena-slim-grid">${rows.map((row, index) => `<article><b>#${index + 1}</b><span class="arena-slim-icons">${(row.assets || []).map(renderAssetButton).join("")}</span><span class="is-win">${percent(row.winRate)}</span><span class="is-placement">${number(row.averagePlacement, 2)} 名</span><small>吃鸡 ${percent(row.firstPlaceRate)} · ${compactNumber(row.games)} 场</small></article>`).join("")}</div></div>`;
+    return `<div class="arena-slim-row"><div class="arena-slim-grid">${rows.map((row, index) => `<article><b>#${index + 1}</b><span class="arena-slim-icons">${(row.assets || []).map(renderAssetButton).join("")}</span><span class="is-win">${percent(row.winRate)}</span><span class="is-placement">${number(row.averagePlacement, 2)} 名</span><small>吃鸡 ${percent(row.firstPlaceRate)} · ${compactNumber(row.games)} 次选择</small></article>`).join("")}</div></div>`;
   }
 
   function renderArenaSynergySection(teams) {
@@ -1433,7 +1506,7 @@
     return `<tr class="champion-row${rowClass ? ` ${rowClass}` : ""}" tabindex="0" role="button" data-champion-row="${Number(row.championId)}" aria-label="查看${escapeHTML(name)}详情"${selected ? ' aria-current="true"' : ""}>
       <td class="champion-rank">${rank}</td>
       <td class="champion-name-cell">${artwork}<span class="champion-identity"><span class="champion-portrait"><img src="${imageURL(source, path)}" alt="" loading="lazy" decoding="async" data-champion-image><span>${escapeHTML(name.slice(0, 1))}</span></span><span><strong>${escapeHTML(name)}</strong>${subname ? `<small>${escapeHTML(subname)}</small>` : ""}</span></span></td>
-      <td>${tierBadge(row.tier)}</td>
+      <td>${tierBadge(row.tier, "", arena ? row.grade : "")}</td>
       ${showPosition ? `<td><span class="position-pill">${positionIcon(row.position)}${positionLabel(row.position)}</span></td>` : ""}${mayhem ? `<td class="metric-win" data-tooltip="样本 ${escapeHTML(compactNumber(row.play))}">${percent(row.winRate)}</td>` : arena ? `<td class="metric-win${Number(row.winRate) < 49.5 ? " is-low" : ""}">${percent(row.winRate)}</td><td class="metric-placement">${number(row.averagePlacement, 2)}</td>` : rankedMetrics ? `<td class="metric-win${Number(row.winRate) < 49.5 ? " is-low" : ""}">${percent(row.winRate)}</td><td class="metric-pick">${percent(row.pickRate)}</td><td class="metric-ban">${percent(row.banRate)}</td><td class="metric-games">${Number(row.play) > 0 ? compactNumber(row.play) : "—"}</td>` : ""}
     </tr>`;
   }
@@ -1590,7 +1663,14 @@
     const boards = pages.length ? `<div class="rune-board-panel" data-rune-page-panel="${active}">${renderRuneTree(pages[active])}</div>` : "";
     const allocated = allocateLoadoutSideRows(build);
     const metricSideCard = (title, rows) => {
-      const options = (rows || []).map((row) => `<div class="build-side-row"><div class="config-icons">${(row.assets || []).map((asset) => renderAssetButton(asset)).join("")}</div><dl class="side-stats"><div><dt>选用率</dt><dd class="metric-pick">${percent(row.pickRate)}</dd></div><div><dt>胜率</dt><dd class="metric-win">${percent(row.winRate)}</dd></div></dl></div>`).join("");
+      const hasMetric = (value) => value !== null && value !== undefined && String(value).trim() !== "" && Number.isFinite(Number(value));
+      const options = (rows || []).map((row) => {
+        const metrics = [["选用率", "metric-pick", row.pickRate], ["胜率", "metric-win", row.winRate]]
+          .filter(([, , value]) => hasMetric(value))
+          .map(([label, className, value]) => `<div><dt>${label}</dt><dd class="${className}">${percent(value)}</dd></div>`).join("");
+        const stats = metrics ? `<dl class="side-stats">${metrics}</dl>` : "";
+        return `<div class="build-side-row"><div class="config-icons">${(row.assets || []).map((asset) => renderAssetButton(asset)).join("")}</div>${stats}</div>`;
+      }).join("");
       return `<section class="recommendation-section side-card"><header><h3>${title}</h3></header><div class="side-build-options">${options || '<p class="muted side-empty">暂无样本</p>'}</div></section>`;
     };
     return `<div class="champion-loadout-row">
@@ -1624,13 +1704,16 @@
     const rows = (build.summonerSpells || []).slice(0, 2);
     const options = rows.map((row, index) => {
       const assets = (row.assets || []).slice(0, 2);
+      const hasMetric = (value) => value !== null && value !== undefined && String(value).trim() !== "" && Number.isFinite(Number(value));
+      const metrics = [
+        ["场次", "", row.games, compactNumber],
+        ["选用率", "metric-pick", row.pickRate, percent],
+        ["胜率", "metric-win", row.winRate, percent],
+      ].filter(([, , value]) => hasMetric(value)).map(([label, className, value, formatter]) => `<div><dt>${label}</dt><dd${className ? ` class="${className}"` : ""}>${formatter(value)}</dd></div>`).join("");
+      const stats = metrics ? `<dl class="spell-option-stats">${metrics}</dl>` : "";
       return `<div class="spell-option${index === 0 ? " is-primary" : ""}">
         <span class="spell-option-icons">${assets.map((asset) => assetImage(asset, "game-icon spell-option-icon", true)).join("")}</span>
-        <dl class="spell-option-stats">
-          <div><dt>场次</dt><dd>${compactNumber(row.games)}</dd></div>
-          <div><dt>选用率</dt><dd class="metric-pick">${percent(row.pickRate)}</dd></div>
-          <div><dt>胜率</dt><dd class="metric-win">${percent(row.winRate)}</dd></div>
-        </dl>
+        ${stats}
       </div>`;
     }).join("");
     return `<section class="recommendation-section side-card"><header><h3>召唤师技能</h3></header><div class="spell-options${rows.length === 1 ? " is-single" : ""}">${options || '<p class="muted side-empty">该模式暂无独立召唤师技能样本</p>'}</div></section>`;
@@ -1638,8 +1721,11 @@
 
   function renderSkillsCard(build) {
     const skills = (build.skills || [])[0];
-    const hasStats = skills && (Number(skills.pickRate) > 0 || Number(skills.winRate) > 0);
-    const stats = hasStats ? `<span class="skill-head-stats"><span>选用率 <b class="metric-pick">${percent(skills.pickRate)}</b></span><span>胜率 <b class="metric-win">${percent(skills.winRate)}</b></span></span>` : "";
+    const hasMetric = (value) => value !== null && value !== undefined && String(value).trim() !== "" && Number.isFinite(Number(value));
+    const metrics = [["选用率", "metric-pick", skills?.pickRate], ["胜率", "metric-win", skills?.winRate]]
+      .filter(([, , value]) => hasMetric(value))
+      .map(([label, className, value]) => `<span>${label} <b class="${className}">${percent(value)}</b></span>`).join("");
+    const stats = metrics ? `<span class="skill-head-stats">${metrics}</span>` : "";
     return `<section class="recommendation-section side-card"><header><h3>技能加点</h3>${stats}</header><div class="skill-plan side-skill-plan">${renderChampionSkillPlan(skills, false)}</div></section>`;
   }
 
@@ -1687,24 +1773,24 @@
     const depthCount = (depthGroups.match(/class="build-depth-column"/g) || []).length;
     if (!routes.length && !depthCount) return "";
     const routeRows = routes.map((row) => renderConfigOption(row, "route", null, renderDepthStats)).join("");
-    const sourceNote = [build?.itemSource, build?.itemWindow].filter(Boolean).map(escapeHTML).join(" · ");
-    return `<section class="recommendation-section champion-build-board build-workspace"><header><h3>出装</h3>${sourceNote ? `<span class="item-chain-source">${sourceNote}</span>` : ""}</header><div class="build-split"><div class="build-routes"><div class="build-item-row" data-depth-count="${depthCount}"><section class="build-core-column"><h4>核心装</h4><div class="config-option-list">${routeRows}</div>${routeRows ? "" : '<p class="muted">暂无出装路线样本</p>'}</section>${depthGroups}</div></div></div></section>`;
+    return `<section class="recommendation-section champion-build-board build-workspace"><header><h3>出装</h3><span class="build-primary-source">OP.GG · 当前版本</span></header><div class="build-split"><div class="build-routes"><div class="build-item-row" data-depth-count="${depthCount}"><section class="build-core-column"><h4>核心装</h4><div class="config-option-list">${routeRows}</div>${routeRows ? "" : '<p class="muted">暂无出装路线样本</p>'}</section>${depthGroups}</div></div></div></section>`;
   }
 
   function renderChampionSkillPlan(row, showStats = true) {
     if (!row) return '<p class="muted">暂无技能加点样本</p>';
     const priority = row.skillPriority || [];
     const icons = row.assets || [];
-    const labels = { 0: "主升", 1: "副升", 2: "最后" };
     let priorityHTML = priority.map((key, index) => {
       const asset = icons[index];
       const tooltip = championAbilityTooltip(key, asset);
-      return `<button class="skill-icon-button" type="button" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}" data-tooltip="${escapeHTML(tooltip)}">${asset ? assetImage(asset, "game-icon recommend-icon", false) : `<span class="skill-letter">${escapeHTML(key)}</span>`}<span>${labels[index] || "技能"}</span></button>`;
+      return `<button class="skill-icon-button" type="button" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}" data-tooltip="${escapeHTML(tooltip)}">${asset ? assetImage(asset, "game-icon recommend-icon", false) : `<span class="skill-letter">${escapeHTML(key)}</span>`}<span>${escapeHTML(key)}</span></button>`;
     }).join("");
     if (row.ultimate) {
       const tooltip = championAbilityTooltip("R", row.ultimate);
-      priorityHTML += `<button class="skill-icon-button is-ultimate" type="button" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}" data-tooltip="${escapeHTML(tooltip)}">${assetImage(row.ultimate, "game-icon recommend-icon", false)}<span>大招</span></button>`;
+      priorityHTML += `<button class="skill-icon-button is-ultimate" type="button" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}" data-tooltip="${escapeHTML(tooltip)}">${assetImage(row.ultimate, "game-icon recommend-icon", false)}<span>R</span></button>`;
     }
+    const mainSkills = [...new Set(priority.map(key => String(key).toUpperCase()).filter(key => ["Q", "W", "E"].includes(key)))];
+    if (mainSkills.length >= 2) priorityHTML += `<strong class="skill-priority-summary">主${mainSkills[0]}副${mainSkills[1]}</strong>`;
     const order = row.skillOrder || [];
     const skillWinRate = !showStats ? `<span class="skill-win-rate"><small>胜率</small><b>${percent(row.winRate)}</b></span>` : "";
     return `<div class="skill-plan-summary"><div class="skill-priority">${priorityHTML}</div>${skillWinRate}</div><div class="skill-order" data-skill-count="${Math.max(1, order.length)}" aria-label="技能升级顺序">${order.map((key, index) => `<span class="is-${String(key).toLowerCase()}"><b>${escapeHTML(key)}</b><small>${index + 1}</small></span>`).join("")}</div>${showStats ? renderOptionStats(row) : ""}`;
@@ -1740,7 +1826,8 @@
 
   function buildItemRoutes(build) {
     const cores = (build.coreItems || []).slice(0, CORE_RECOMMENDATION_LIMIT);
-    const routeLimit = String(state.selected?.position || state.position).toLowerCase() === "adc" ? ADC_ITEM_ROUTE_LIMIT : DEFAULT_ITEM_ROUTE_LIMIT;
+    const detailPosition = String(state.detail?.position || state.detailPosition || state.selected?.position || state.position).toLowerCase();
+    const routeLimit = ["adc", "bottom"].includes(detailPosition) ? ADC_ITEM_ROUTE_LIMIT : DEFAULT_ITEM_ROUTE_LIMIT;
     return cores.map((core) => {
       const seen = new Set();
       const assets = [];
@@ -1780,7 +1867,7 @@
     ].map(([label, rows, sample]) => [label, rows.filter((row) => (row?.assets || []).length), sample])
       // 第六件是逐英雄/逐分路独立缺失的（辅助位常年没有），上游没有这一层
       // 就整列不展示，而不是留一列空态文案占着位置。第四/第五件仍然保留
-      // 空态，因为它们缺失才是真正的「解析失败/暂不可用」信号。
+      // 空态，按读取状态区分上游没有样本与解析/网络失败。
       .filter(([label, rows]) => (label === "第六件" ? rows.length > 0 : hasChainStatus || rows.length));
     if (!groups.length) return "";
     return `<div class="item-depth-columns champion-item-depth-columns">${groups.map(([label, rows, sample]) => {
@@ -1818,7 +1905,7 @@
     const name = asset?.name || "装备";
     const tooltip = assetTooltip(asset, name);
     // Arena augments use the same button shell as items, but keep the
-    // augment-icon class so pure-white upstream masks receive rarity color.
+    // augment-icon class so neutral upstream glyphs receive metadata rarity color.
     const iconClass = /augment/i.test(String(asset?.kind || ""))
       ? "game-icon recommend-icon augment-icon"
       : "game-icon recommend-icon";
@@ -1833,6 +1920,8 @@
   }
 
   function renderDepthStats(row) {
+	// R60 cleanup marker: GamesUnavailable only exists for the retained QQ101
+	// fallback; OP.GG RSC rows always include a parsed game count.
     const gamesUnavailable = row?.gamesUnavailable === true;
     // QQ101 validates both rates before constructing a row, but Go omits a
     // numeric zero from JSON. Under this row-level marker, an absent rate is 0.
@@ -1927,6 +2016,14 @@
     return fuzzySubsequence(query, value) ? 10 : 0;
   }
 
+  function scoreChampionSelectOption(query, value, label) {
+	const normalizedQuery = normalizeSearch(query);
+	if (!normalizedQuery) return 0;
+	const meta = championMeta(value);
+	const values = [label, value, meta?.key, meta?.slug, meta?.nameZh, meta?.titleZh, meta?.nameEn, meta?.titleEn, ...(meta?.searchTerms || [])].map(normalizeSearch).filter(Boolean);
+	return Math.max(0, ...values.map((candidate) => searchScore(normalizedQuery, candidate)));
+  }
+
   function filteredAugments() {
     const query = normalizeSearch(state.augmentQuery);
     const rarityOrder = { prismatic: 0, gold: 1, silver: 2, unknown: 3 };
@@ -1949,7 +2046,7 @@
   function renderEmpty(title, copy) { return `<div class="champion-state"><span aria-hidden="true">◇</span><strong>${title}</strong><p>${copy}</p><button class="text-button" type="button" data-champion-clear>清除筛选</button></div>`; }
   function prepareImages() {
     for (const image of root.querySelectorAll("[data-champion-image]")) {
-      const loaded = () => image.parentElement?.classList.add("has-loaded-image");
+      const loaded = () => { image.parentElement?.classList.add("has-loaded-image"); window.deepLegendsAugmentArtwork?.prepare(image); };
       const failed = () => {
         const holder = image.parentElement;
         const artworkFallback = holder?.dataset.artworkFallback || image.dataset.artworkFallback;
@@ -2027,7 +2124,6 @@
     state.arenaDetailKey = 0;
     resetArenaControls();
     state.detailPosition = null;
-    state.detailCache.clear();
     if (restorePosition) state.position = normalizePosition(readSetting("champion-position", "all"));
   }
 
@@ -2035,6 +2131,7 @@
     const playerRow = event.target.closest("[data-player-name]");
     if (playerRow) {
       // 玩家榜数据来自韩服，点击后在当前页面以覆盖层展示韩服总览。
+      state.playerDetour = true;
       window.dispatchEvent(new CustomEvent("deep-legends:open-player", { detail: { gameName: playerRow.dataset.playerName, tagLine: playerRow.dataset.playerTag || "", region: "kr", source: "champions" } }));
       return;
     }
@@ -2048,11 +2145,7 @@
     }
     const mode = event.target.closest("[data-champion-mode]");
     if (mode) {
-      state.mode = normalizeMode(mode.dataset.championMode);
-	      writeSetting("champion-mode", state.mode);
-      resetTransientChampionState({ restorePosition: true });
-      state.rankings = null; state.augments = null;
-      loadWorkspace(true);
+      switchChampionMode(mode.dataset.championMode);
       return;
     }
     const position = event.target.closest("[data-champion-position]");
@@ -2136,12 +2229,23 @@
       else loadWorkspace(true);
       return;
     }
-	    if (event.target.closest("[data-champion-clear]")) { state.query = ""; state.augmentQuery = ""; state.augmentRarity = "all"; writeSetting("champion-query", ""); writeSetting("champion-augment-query", ""); render(); }
+    if (event.target.closest("[data-champion-clear]")) {
+      if (state.mode === "aram-mayhem" && state.mayhemView === "atlas") {
+        state.augmentQuery = "";
+        state.augmentRarity = "all";
+        writeSetting("champion-augment-query", "");
+      } else {
+        state.query = "";
+        writeSetting(`champion-query-${state.mode}`, "");
+      }
+      render();
+    }
   });
 
   root.addEventListener("change", (event) => {
     if (event.target.matches("[data-champion-tier]")) {
 	  const tier = normalizeTier(event.target.value);
+	  writeSetting("champion-tier", tier);
 	  if (state.mode === "ranked" && state.selected) switchDetailTier(tier);
 	  else {
 		state.tier = tier;
@@ -2177,7 +2281,7 @@
     const start = input.selectionStart ?? input.value.length;
     const end = input.selectionEnd ?? start;
 	    state.query = normalizeStoredSearch(input.value);
-	    writeSetting("champion-query", state.query);
+	    writeSetting(`champion-query-${state.mode}`, state.query);
     if (state.mode === "ranked" && normalizeSearch(state.query) && state.position !== "all") {
       state.position = "all";
       Promise.resolve(loadRankings()).finally(() => {
@@ -2217,7 +2321,6 @@
       state.requests.get("detail")?.abort();
 	      // 只清理详情与加载态；模式、搜索和页签属于用户偏好，返回时继续使用。
 	      resetTransientChampionState({ restorePosition: true });
-	      state.tier = "emerald_plus";
       return;
     }
     if (state.section === "champions" && previous !== "champions") {
@@ -2242,6 +2345,9 @@
     });
   }
 
+  window.deepLegendsChampionSearch = Object.freeze({ scoreOption: scoreChampionSelectOption });
+  window.deepLegendsChampionAsset = Object.freeze({ imageHTML: assetImage, imageURL });
   render();
   beginStartupPreload();
+  adoptCatalog(state.preload?.catalog);
 })();

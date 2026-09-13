@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -15,6 +17,10 @@ import (
 )
 
 type sgpRoundTripFunc func(*http.Request) (*http.Response, error)
+
+type sgpErrorReader struct{}
+
+func (sgpErrorReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
 func (fn sgpRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
 	return fn(request)
@@ -32,6 +38,16 @@ func captureSGPObservations(provider *sgpProvider) *[]map[string]any {
 	return &events
 }
 
+func captureSGPRequestObservations(provider *sgpProvider) *[]map[string]any {
+	events := make([]map[string]any, 0, 4)
+	provider.observe = func(event map[string]any) {
+		if event["event"] == "sgp_request" {
+			events = append(events, event)
+		}
+	}
+	return &events
+}
+
 func assertSGPRequestObservation(t *testing.T, event map[string]any, route string, status int) {
 	t.Helper()
 	if event["event"] != "sgp_request" || event["route"] != route || event["http_status"] != status {
@@ -41,6 +57,13 @@ func assertSGPRequestObservation(t *testing.T, event map[string]any, route strin
 		"event": true, "method": true, "route": true, "path": true,
 		"http_status": true, "duration_ms": true, "retried": true, "token_kind": true, "body_bytes": true,
 		"error_kind": true, "read_failed": true, "parse_failed": true, "payload_prefix_shape": true, "payload_sample_bytes": true,
+		"start_index": true, "count": true, "tags": true,
+		"credential_id":    true,
+		"auth_error_class": true, "auth_error_classes": true, "auth_body_shape": true, "auth_body_truncated": true,
+		"auth_json_valid": true, "auth_known_fields": true, "auth_field_details": true,
+		"auth_unknown_field_count": true, "auth_unknown_code_count": true, "auth_depth_limited_count": true,
+		"auth_unknown_field_shapes": true, "auth_unknown_field_size_buckets": true,
+		"token_claims_verified": true, "token_has_outer_whitespace": true, "token_jwt_shape": true, "token_present": true,
 	}
 	for key := range event {
 		if !allowedKeys[key] {
@@ -93,18 +116,35 @@ func TestSGPConnectionErrorsHaveStableKinds(t *testing.T) {
 			observed := captureSGPObservations(provider)
 			var payload map[string]any
 			err := provider.getJSON(context.Background(), client, "HN1", "RANKED", "/ranked/{player}", "https://ranked.invalid/private-player", &payload)
-			if err == nil || len(*observed) != 1 {
+			if err == nil || len(*observed) != 3 {
 				t.Fatalf("error=%v observations=%#v", err, *observed)
 			}
-			assertSGPRequestObservation(t, (*observed)[0], "RANKED", 0)
-			if (*observed)[0]["error_kind"] != test.want {
-				t.Fatalf("error_kind = %#v, want %q", (*observed)[0]["error_kind"], test.want)
+			for index, event := range *observed {
+				assertSGPRequestObservation(t, event, "RANKED", 0)
+				if event["error_kind"] != test.want || event["retried"] != (index > 0) {
+					t.Fatalf("observation %d = %#v, want kind %q", index, event, test.want)
+				}
 			}
 			encoded, _ := json.Marshal(observed)
 			if strings.Contains(string(encoded), "private") {
 				t.Fatalf("connection diagnostic leaked transport details: %s", encoded)
 			}
 		})
+	}
+}
+
+func TestSGPCanceledRequestIsNotRetriedAndHasCanceledKind(t *testing.T) {
+	client := &LCUClient{}
+	provider := newSGPProvider()
+	provider.http = &http.Client{Transport: sgpRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, context.Canceled
+	})}
+	provider.token, provider.tokenAt, provider.tokenClient = "test-entitlements", time.Now(), client
+	observed := captureSGPObservations(provider)
+	var payload map[string]any
+	err := provider.getJSON(context.Background(), client, "HN1", "RANKED", "/ranked/{player}", "https://ranked.invalid/player", &payload)
+	if !errors.Is(err, context.Canceled) || len(*observed) != 1 || (*observed)[0]["error_kind"] != "canceled" || (*observed)[0]["retried"] != false {
+		t.Fatalf("canceled request = error:%v observations:%#v", err, *observed)
 	}
 }
 
@@ -164,17 +204,19 @@ func TestMatchHistoryReturnsPartialErrorWhenLaterPageFails(t *testing.T) {
 
 	games, consumed, more, err := provider.matchHistoryOn(context.Background(), client, "HN1", puuid, 0, sgpPageSize+1, false)
 	var partial *sgpPartialHistoryError
-	if !errors.As(err, &partial) || len(games) != sgpPageSize || consumed != sgpPageSize || more || requests != 2 {
+	if !errors.As(err, &partial) || len(games) != sgpPageSize || consumed != sgpPageSize || !more || requests != 4 {
 		t.Fatalf("games=%d consumed=%d more=%v requests=%d error=%v", len(games), consumed, more, requests, err)
 	}
-	if len(*observed) != 3 {
+	if len(*observed) != 5 {
 		t.Fatalf("observations = %#v", *observed)
 	}
 	assertSGPRequestObservation(t, (*observed)[0], "SUMMARY", http.StatusOK)
 	if (*observed)[1]["event"] != "sgp_participant_keys" || strings.Join((*observed)[1]["keys"].([]string), ",") != "participantId" {
 		t.Fatalf("participant keys = %#v", (*observed)[1])
 	}
-	assertSGPRequestObservation(t, (*observed)[2], "SUMMARY", http.StatusBadGateway)
+	for _, event := range (*observed)[2:] {
+		assertSGPRequestObservation(t, event, "SUMMARY", http.StatusBadGateway)
+	}
 	encoded, _ := json.Marshal(observed)
 	if strings.Contains(string(encoded), puuid) || strings.Contains(string(encoded), "temporary failure") {
 		t.Fatalf("SGP diagnostics leaked an identifier or response body: %s", encoded)
@@ -249,6 +291,188 @@ func TestMatchHistoryCacheAvoidsDuplicateSummaryAndReportsHit(t *testing.T) {
 	}
 }
 
+func TestSGPRetriesTransient503TwiceThenSucceeds(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		if requests < 3 {
+			http.Error(w, "temporary", http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+	client := &LCUClient{}
+	provider := newSGPProvider()
+	provider.http = server.Client()
+	provider.token, provider.tokenAt, provider.tokenClient = "test-entitlements", time.Now(), client
+	observed := captureSGPObservations(provider)
+	var payload map[string]any
+	if err := provider.getJSON(context.Background(), client, "HN1", "SUMMARY", "/match-history-query/v1/products/lol/player/{puuid}/SUMMARY", server.URL+"?startIndex=40&count=10&tag=q_420", &payload); err != nil {
+		t.Fatalf("retry should recover from SGP 网关返回 HTTP 503: %v", err)
+	}
+	if requests != 3 || payload["ok"] != true || len(*observed) != 3 {
+		t.Fatalf("requests=%d payload=%#v observations=%#v", requests, payload, *observed)
+	}
+	for index, event := range *observed {
+		wantStatus := http.StatusServiceUnavailable
+		if index == 2 {
+			wantStatus = http.StatusOK
+		}
+		assertSGPRequestObservation(t, event, "SUMMARY", wantStatus)
+		if event["retried"] != (index > 0) || event["start_index"] != 40 || event["count"] != 10 || event["tags"] != "q_420" {
+			t.Fatalf("retry/page diagnostic %d = %#v", index, event)
+		}
+	}
+}
+
+func TestSGPRetryBudgetDoesNotConsumeAuthRefresh(t *testing.T) {
+	tokenRequests := 0
+	lcuServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		tokenRequests++
+		_, _ = io.WriteString(w, `{"accessToken":"refreshed-entitlements"}`)
+	}))
+	defer lcuServer.Close()
+	requests := 0
+	sgpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		switch requests {
+		case 1, 2:
+			http.Error(w, "temporary", http.StatusServiceUnavailable)
+		case 3:
+			http.Error(w, "expired", http.StatusUnauthorized)
+		default:
+			_, _ = io.WriteString(w, `{"ok":true}`)
+		}
+	}))
+	defer sgpServer.Close()
+	client := &LCUClient{baseURL: lcuServer.URL, token: "lcu-token", http: lcuServer.Client()}
+	provider := newSGPProvider()
+	provider.http = sgpServer.Client()
+	provider.token, provider.tokenAt, provider.tokenClient = "expired-entitlements", time.Now(), client
+	observed := captureSGPRequestObservations(provider)
+	var payload map[string]any
+	if err := provider.getJSON(context.Background(), client, "HN1", "RANKED", "/ranked/{player}", sgpServer.URL, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if requests != 4 || tokenRequests != 1 || payload["ok"] != true || len(*observed) != 4 || (*observed)[3]["retried"] != true {
+		t.Fatalf("independent budgets = requests:%d tokenRequests:%d payload:%#v observations:%#v", requests, tokenRequests, payload, *observed)
+	}
+}
+
+func TestSGPRetriesReadFailureTwiceThenSucceeds(t *testing.T) {
+	requests := 0
+	client := &LCUClient{}
+	provider := newSGPProvider()
+	provider.http = &http.Client{Transport: sgpRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		requests++
+		body := io.ReadCloser(io.NopCloser(strings.NewReader(`{"ok":true}`)))
+		if requests < 3 {
+			body = io.NopCloser(sgpErrorReader{})
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: body, Request: request}, nil
+	})}
+	provider.token, provider.tokenAt, provider.tokenClient = "test-entitlements", time.Now(), client
+	observed := captureSGPObservations(provider)
+	var payload map[string]any
+	if err := provider.getJSON(context.Background(), client, "HN1", "RANKED", "/ranked/{player}", "https://ranked.invalid/player", &payload); err != nil {
+		t.Fatal(err)
+	}
+	if requests != 3 || payload["ok"] != true || len(*observed) != 3 || (*observed)[0]["read_failed"] != true || (*observed)[1]["read_failed"] != true || (*observed)[2]["retried"] != true {
+		t.Fatalf("read retries = requests:%d payload:%#v observations:%#v", requests, payload, *observed)
+	}
+}
+
+func TestMatchHistoryPhysicalPageCacheReusesTwentyBeforeFifty(t *testing.T) {
+	requests := make([]string, 0, 3)
+	puuid := strings.Repeat("c", 48)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start, _ := strconv.Atoi(r.URL.Query().Get("startIndex"))
+		count, _ := strconv.Atoi(r.URL.Query().Get("count"))
+		requests = append(requests, fmt.Sprintf("%d:%d", start, count))
+		games := make([]map[string]any, 0, count)
+		for index := 0; index < count; index++ {
+			games = append(games, map[string]any{"json": map[string]any{"gameId": start + index + 1, "participants": []map[string]any{{"participantId": 1}}}})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"games": games})
+	}))
+	defer server.Close()
+	client := &LCUClient{}
+	provider := newSGPProvider()
+	provider.http = server.Client()
+	provider.serverBases["HN1"] = server.URL
+	provider.token, provider.tokenAt, provider.tokenClient = "test-entitlements", time.Now(), client
+	if _, _, _, err := provider.matchHistoryOn(context.Background(), client, "HN1", puuid, 0, 20, true); err != nil {
+		t.Fatal(err)
+	}
+	games, consumed, _, err := provider.matchHistoryOn(context.Background(), client, "HN1", puuid, 0, 50, true)
+	if err != nil || len(games) != 50 || consumed != 50 {
+		t.Fatalf("games=%d consumed=%d err=%v", len(games), consumed, err)
+	}
+	want := []string{"0:20", "20:20", "40:10"}
+	if strings.Join(requests, ",") != strings.Join(want, ",") {
+		t.Fatalf("physical page requests = %v, want %v (second logical request must add exactly 2 upstream calls)", requests, want)
+	}
+}
+
+func TestMatchHistoryPhysicalPageCacheSeparatesPageSizesAtSameStart(t *testing.T) {
+	provider := newSGPProvider()
+	puuid := strings.Repeat("p", 48)
+	tags := []string{"q_420"}
+	provider.cacheHistoryPage("HN1", puuid, 0, 20, tags, sgpHistoryCacheEntry{consumed: 20, more: true})
+	provider.cacheHistoryPage("HN1", puuid, 0, 50, tags, sgpHistoryCacheEntry{consumed: 50, more: false})
+
+	if len(provider.historyCache) != 2 {
+		t.Fatalf("physical cache entries = %d, want 2 (pageSize must be part of the key)", len(provider.historyCache))
+	}
+	small, smallPageSize, ok := provider.cachedHistoryPage("HN1", puuid, 0, 20, tags)
+	if !ok || smallPageSize != 20 || small.consumed != 20 || !small.more {
+		t.Fatalf("20-row physical page = entry:%#v pageSize:%d ok:%t", small, smallPageSize, ok)
+	}
+	large, largePageSize, ok := provider.cachedHistoryPage("HN1", puuid, 0, 50, tags)
+	if !ok || largePageSize != 50 || large.consumed != 50 || large.more {
+		t.Fatalf("50-row physical page = entry:%#v pageSize:%d ok:%t", large, largePageSize, ok)
+	}
+}
+
+func TestMatchHistoryColdFiftyUsesOneUpstreamRequestAndOneShapeSample(t *testing.T) {
+	requests := 0
+	puuid := strings.Repeat("f", 48)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.URL.Query().Get("startIndex") != "0" || r.URL.Query().Get("count") != "50" {
+			t.Fatalf("query = %q", r.URL.RawQuery)
+		}
+		games := make([]map[string]any, 0, 50)
+		for index := 0; index < 50; index++ {
+			games = append(games, map[string]any{"json": map[string]any{"gameId": index + 1, "participants": []map[string]any{{"participantId": 1, "teamId": 100}}}})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"games": games})
+	}))
+	defer server.Close()
+	client := &LCUClient{}
+	provider := newSGPProvider()
+	provider.http = server.Client()
+	provider.serverBases["HN1"] = server.URL
+	provider.token, provider.tokenAt, provider.tokenClient = "test-entitlements", time.Now(), client
+	observed := captureSGPObservations(provider)
+	if games, _, _, err := provider.matchHistoryOn(context.Background(), client, "HN1", puuid, 0, 50, false); err != nil || len(games) != 50 || requests != 1 {
+		t.Fatalf("games=%d requests=%d err=%v", len(games), requests, err)
+	}
+	shapeEvents := 0
+	for _, event := range *observed {
+		if event["event"] == "sgp_participant_keys" {
+			shapeEvents++
+			if event["sampled"] != true {
+				t.Fatalf("shape sample missing sampled=true: %#v", event)
+			}
+		}
+	}
+	if shapeEvents != 1 {
+		t.Fatalf("sgp_participant_keys events=%d, want exactly 1 for 50 matches: %#v", shapeEvents, *observed)
+	}
+}
+
 func TestMatchHistoryCacheEvictsLeastRecentlyUsed(t *testing.T) {
 	puuid := strings.Repeat("l", 48)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -262,7 +486,7 @@ func TestMatchHistoryCacheEvictsLeastRecentlyUsed(t *testing.T) {
 	provider.token, provider.tokenAt, provider.tokenClient = "test-entitlements", time.Now(), client
 	insertedAt := time.Now().Add(-time.Minute)
 	cacheKey := func(start int) string {
-		return sourceScopedKey(dataSourceSGP, fmt.Sprintf("HN1|%s|%d|20|", puuid, start))
+		return sgpHistoryPageCacheKey("HN1", puuid, start, 20, nil)
 	}
 	provider.mu.Lock()
 	for start := 0; start < sgpCacheMax; start++ {
@@ -363,7 +587,7 @@ func TestMatchHistoryKeepsEmptyRosterForDiagnostics(t *testing.T) {
 	provider.token = "test-entitlements"
 	provider.tokenAt = time.Now()
 	provider.tokenClient = client
-	observed := captureSGPObservations(provider)
+	observed := captureSGPRequestObservations(provider)
 
 	games, consumed, more, err := provider.matchHistoryOn(context.Background(), client, "HN1", puuid, 0, 20, false)
 	if err != nil || len(games) != 1 || len(games[0].Participants) != 0 || consumed != 1 || more {
@@ -402,7 +626,7 @@ func TestSGPRequestObservationTracksRetryAndSafeParseShape(t *testing.T) {
 	provider.token = "expired-entitlements"
 	provider.tokenAt = time.Now()
 	provider.tokenClient = client
-	observed := captureSGPObservations(provider)
+	observed := captureSGPRequestObservations(provider)
 
 	_, _, _, err := provider.matchHistoryOn(context.Background(), client, "HN1", strings.Repeat("z", 48), 0, 20, false)
 	if err == nil || len(*observed) != 2 {

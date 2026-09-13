@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	xhtml "golang.org/x/net/html"
 )
@@ -43,6 +44,7 @@ const (
 	// client's own pacing budget instead of queueing behind itself.
 	mayhemAugmentCopyConcurrency = 3
 	mayhemAugmentSlugFailureTTL  = time.Minute
+	mayhemAugmentCopyTTL         = 24 * time.Hour
 )
 
 func hexdataMeasurementTechnique(answer hexdataAnswerCards) string {
@@ -58,6 +60,7 @@ var (
 	hexdataDatePattern        = regexp.MustCompile(`数据日期\s*([0-9]{4}-[0-9]{2}-[0-9]{2})`)
 	hexdataTierPattern        = regexp.MustCompile(`层级\s*T([1-5])`)
 	hexdataGlobalMetric       = regexp.MustCompile(`globalHexScore\s*([0-9]+(?:\.[0-9]+)?)\s*[·，,]\s*胜率\s*([0-9]+(?:\.[0-9]+)?)%`)
+	hexdataAugmentWinRate     = regexp.MustCompile(`胜率\s*([0-9]+(?:\.[0-9]+)?)%`)
 	opggRSCVersionPattern     = regexp.MustCompile(`/meta/images/lol/([0-9]+\.[0-9]+(?:\.[0-9]+)?)/`)
 	opggRSCLinePattern        = regexp.MustCompile(`(?m)^([0-9a-f]+):(.*)$`)
 	opggRSCReferencePattern   = regexp.MustCompile(`"\$L([0-9a-f]+)"`)
@@ -196,6 +199,30 @@ type hexdataHeroDetail struct {
 	Tier     int
 	Augments []championMetricRow
 	Items    []championMetricRow
+}
+
+type hexdataAugmentParseStats struct {
+	SkipShortCells       int
+	SkipPathUnmatched    int
+	SkipMetricsUnmatched int
+	SkipEmptyName        int
+	SkipBadID            int
+	Col0LinkTextLen      int
+	Col0TextLen          int
+	Col2LinkTextLen      int
+	Col2TextLen          int
+}
+
+func (s hexdataAugmentParseStats) addToDiagnostic(event map[string]any) {
+	event["skip_short_cells"] = s.SkipShortCells
+	event["skip_path_unmatched"] = s.SkipPathUnmatched
+	event["skip_metrics_unmatched"] = s.SkipMetricsUnmatched
+	event["skip_empty_name"] = s.SkipEmptyName
+	event["skip_bad_id"] = s.SkipBadID
+	event["col0_link_text_len"] = s.Col0LinkTextLen
+	event["col0_text_len"] = s.Col0TextLen
+	event["col2_link_text_len"] = s.Col2LinkTextLen
+	event["col2_text_len"] = s.Col2TextLen
 }
 
 type hexdataAugmentDetail struct {
@@ -358,12 +385,14 @@ func inspectHexdataPayload(kind, requestPath string, data []byte, reporters ...f
 			return shape, firstError(err, errors.New("hexdata heroes citation is incomplete"))
 		}
 	case "augments":
-		rows, citation, err := parseHexdataAugments(data)
+		rows, citation, stats, err := parseHexdataAugmentsWithStats(data)
 		shape = hexdataPayloadShape{Rows: len(rows), Fields: hexdataTableFieldCount(data), BuildID: citation.BuildID}
 		if err != nil || !hexdataCitationComplete(citation) {
 			for _, report := range reporters {
 				if report != nil {
-					report(hexdataTableShapeDiagnostic("augments", data))
+					event := hexdataTableShapeDiagnostic("augments", data)
+					stats.addToDiagnostic(event)
+					report(event)
 				}
 			}
 			return shape, firstError(err, errors.New("hexdata augments citation is incomplete"))
@@ -1122,7 +1151,30 @@ func hexdataCitation(document *xhtml.Node, buildID, canonical string) championSo
 		patch = match[1]
 	}
 	if match := hexdataDatePattern.FindStringSubmatch(text); len(match) == 2 {
-		reportDate = match[1]
+		if _, err := time.Parse("2006-01-02", match[1]); err == nil {
+			reportDate = match[1]
+		}
+	}
+	// Current pages publish the date on their canonical Dataset instead of a
+	// visible “数据日期” label. Do not borrow dates from breadcrumbs/other datasets.
+	if reportDate == "" {
+		for _, script := range descendantElements(document, "script") {
+			if attribute(script, "type") != "application/ld+json" {
+				continue
+			}
+			var dataset struct {
+				Type         string `json:"@type"`
+				URL          string `json:"url"`
+				DateModified string `json:"dateModified"`
+			}
+			if json.Unmarshal([]byte(hexdataRawText(script)), &dataset) != nil || dataset.Type != "Dataset" || dataset.URL != "https://"+hexdataHost+canonical {
+				continue
+			}
+			if _, err := time.Parse("2006-01-02", dataset.DateModified); err == nil {
+				reportDate = dataset.DateModified
+				break
+			}
+		}
 	}
 	return championSourceCitation{Source: "Hexdata", Patch: patch, ReportDate: reportDate, BuildID: buildID, CanonicalURL: "https://" + hexdataHost + canonical}
 }
@@ -1295,36 +1347,78 @@ func parseHexdataHeroDetail(data []byte, canonical string) (hexdataHeroDetail, e
 }
 
 func parseHexdataAugments(data []byte) ([]championAugment, championSourceCitation, error) {
+	rows, citation, _, err := parseHexdataAugmentsWithStats(data)
+	return rows, citation, err
+}
+
+func parseHexdataAugmentsWithStats(data []byte) ([]championAugment, championSourceCitation, hexdataAugmentParseStats, error) {
 	document, buildID, err := parseHexdataDocument(data)
 	if err != nil {
-		return nil, championSourceCitation{}, err
+		return nil, championSourceCitation{}, hexdataAugmentParseStats{}, err
 	}
 	tables := primaryTables(document)
 	if len(tables) != 1 {
-		return nil, championSourceCitation{}, errors.New("hexdata augments table changed")
+		return nil, championSourceCitation{}, hexdataAugmentParseStats{}, errors.New("hexdata augments table changed")
 	}
 	rows := make([]championAugment, 0, 220)
-	for _, cells := range tableRows(tables[0]) {
+	stats := hexdataAugmentParseStats{}
+	for rowIndex, cells := range tableRows(tables[0]) {
+		if rowIndex == 0 {
+			stats.Col0LinkTextLen, stats.Col0TextLen = hexdataCellTextLengths(cells, 0)
+			stats.Col2LinkTextLen, stats.Col2TextLen = hexdataCellTextLengths(cells, 2)
+		}
 		if len(cells) < 2 {
+			stats.SkipShortCells++
 			continue
 		}
 		href, name := firstLink(cells[0])
 		path := hexdataAugmentPathPattern.FindStringSubmatch(hexdataLinkPath(href))
-		metrics := hexdataGlobalMetric.FindStringSubmatch(hexdataNodeText(cells[1]))
-		if len(path) != 3 || len(metrics) != 3 {
+		if len(path) != 3 {
+			stats.SkipPathUnmatched++
+			continue
+		}
+		performance, winRate, performanceUnavailable, ok := parseHexdataAugmentMetrics(hexdataNodeText(cells[1]))
+		if !ok {
+			stats.SkipMetricsUnmatched++
+			continue
+		}
+		if name == "" && len(cells) > 2 {
+			_, name = firstLink(cells[2])
+		}
+		if name == "" {
+			stats.SkipEmptyName++
 			continue
 		}
 		id, _ := strconv.Atoi(path[1])
-		if id <= 0 || name == "" {
+		if id <= 0 {
+			stats.SkipBadID++
 			continue
 		}
-		rows = append(rows, championAugment{ID: id, Key: path[2], Name: name, Performance: parseFloatText(metrics[1]), WinRate: parseFloatText(metrics[2])})
+		rows = append(rows, championAugment{ID: id, Key: path[2], Name: name, Performance: performance, PerformanceUnavailable: performanceUnavailable, WinRate: winRate})
 	}
 	citation := hexdataCitation(document, buildID, "/augments")
 	if len(rows) < 150 {
-		return rows, citation, errors.New("hexdata augments shape is incomplete")
+		return rows, citation, stats, errors.New("hexdata augments shape is incomplete")
 	}
-	return rows, citation, nil
+	return rows, citation, stats, nil
+}
+
+func parseHexdataAugmentMetrics(value string) (performance, winRate float64, performanceUnavailable, ok bool) {
+	if metrics := hexdataGlobalMetric.FindStringSubmatch(value); len(metrics) == 3 {
+		return parseFloatText(metrics[1]), parseFloatText(metrics[2]), false, true
+	}
+	if metrics := hexdataAugmentWinRate.FindStringSubmatch(value); len(metrics) == 2 {
+		return 0, parseFloatText(metrics[1]), true, true
+	}
+	return 0, 0, false, false
+}
+
+func hexdataCellTextLengths(cells []*xhtml.Node, index int) (linkTextLen, textLen int) {
+	if index < 0 || index >= len(cells) {
+		return 0, 0
+	}
+	_, linkText := firstLink(cells[index])
+	return utf8.RuneCountInString(linkText), utf8.RuneCountInString(hexdataNodeText(cells[index]))
 }
 
 func hexdataLinkPath(href string) string {
@@ -1427,22 +1521,28 @@ func parseHexdataRarity(data []byte) ([]hexdataRarityStage, championSourceCitati
 		return nil, championSourceCitation{}, errors.New("hexdata rarity table changed")
 	}
 	metricPattern := regexp.MustCompile(`白银\s*([0-9.]+)%\s*[·，,]\s*黄金\s*([0-9.]+)%\s*[·，,]\s*棱彩\s*([0-9.]+)%`)
+	stagePattern := regexp.MustCompile(`^第\s*([1-4])\s*阶段$`)
 	rows := make([]hexdataRarityStage, 0, 4)
 	for _, cells := range tableRows(tables[0]) {
 		if len(cells) != 3 {
 			continue
 		}
-		stageMatch := regexp.MustCompile(`[1-4]`).FindString(hexdataNodeText(cells[0]))
+		stageMatch := stagePattern.FindStringSubmatch(hexdataNodeText(cells[0]))
 		metrics := metricPattern.FindStringSubmatch(hexdataNodeText(cells[1]))
-		if stageMatch == "" || len(metrics) != 4 {
+		if len(stageMatch) != 2 || len(metrics) != 4 {
 			continue
 		}
-		stage, _ := strconv.Atoi(stageMatch)
+		stage, _ := strconv.Atoi(stageMatch[1])
 		rows = append(rows, hexdataRarityStage{Stage: stage, Silver: parseFloatText(metrics[1]), Gold: parseFloatText(metrics[2]), Prismatic: parseFloatText(metrics[3]), Games: parseCountText(hexdataNodeText(cells[2]))})
 	}
 	citation := hexdataCitation(document, buildID, "/augment-rarity")
 	if len(rows) != 4 {
 		return rows, citation, errors.New("hexdata rarity shape is incomplete")
+	}
+	for index, row := range rows {
+		if row.Stage != index+1 || row.Games <= 0 || row.Silver < 0 || row.Gold < 0 || row.Prismatic < 0 || row.Silver > 100 || row.Gold > 100 || row.Prismatic > 100 || math.Abs(row.Silver+row.Gold+row.Prismatic-100) > 0.21 {
+			return rows, citation, errors.New("hexdata rarity distribution is invalid")
+		}
 	}
 	return rows, citation, nil
 }
@@ -1583,6 +1683,13 @@ func (p *championProvider) decorateHexdataAugments(ctx context.Context, rows []c
 		}
 		asset := &rows[rowIndex].Assets[0]
 		asset.Description = augmentDescriptionWithOfflineGuidance(asset.ID, asset.Description)
+		// Drop Bear's colored 256px artwork has no size suffix. Its _small
+		// resource is a monochrome 64px HUD glyph, not prismatic card artwork.
+		if asset.ID == 2031 {
+			asset.Source = "communitydragon"
+			asset.Path = "/latest/game/assets/ux/cherry/augments/icons/drop_bear.png"
+			asset.FallbackPath = "/latest/game/assets/ux/cherry/augments/icons/drop_bear_small.png"
+		}
 	}
 }
 
@@ -1632,12 +1739,15 @@ func (p *championProvider) hydrateMayhemAugmentCopy(ctx context.Context, rows []
 
 func (p *championProvider) mayhemAugmentCopy(ctx context.Context, ids []int) map[int]string {
 	result := make(map[int]string, len(ids))
+	if p == nil || p.hexdata == nil {
+		return result
+	}
 	pending := make([]int, 0, len(ids))
 	p.augmentCopyMu.Lock()
 	for _, id := range ids {
-		if text, ok := p.augmentCopy[id]; ok {
-			if text != "" {
-				result[id] = text
+		if entry, ok := p.augmentCopy[id]; ok && time.Since(entry.FetchedAt) < mayhemAugmentCopyTTL {
+			if entry.Text != "" {
+				result[id] = entry.Text
 			}
 			continue
 		}
@@ -1677,7 +1787,7 @@ func (p *championProvider) mayhemAugmentCopy(ctx context.Context, ids []int) map
 	close(results)
 	p.augmentCopyMu.Lock()
 	if p.augmentCopy == nil {
-		p.augmentCopy = make(map[int]string, len(ids))
+		p.augmentCopy = make(map[int]augmentCopyCacheEntry, len(ids))
 	}
 	for item := range results {
 		// Only a successful parse is memoized. A transient failure must stay
@@ -1685,7 +1795,7 @@ func (p *championProvider) mayhemAugmentCopy(ctx context.Context, ids []int) map
 		if !item.ok {
 			continue
 		}
-		p.augmentCopy[item.id] = item.text
+		p.augmentCopy[item.id] = augmentCopyCacheEntry{Text: item.text, FetchedAt: time.Now()}
 		if item.text != "" {
 			result[item.id] = item.text
 		}

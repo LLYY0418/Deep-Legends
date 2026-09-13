@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -174,7 +178,7 @@ func TestEnrichLootItemsUsesChineseNamesAndCatalogSkinNames(t *testing.T) {
 		{LootID: "CHEST_promotion", Type: "CHEST", Count: 1},
 	}
 	items = enrichLootItems(items, []Skin{{ID: 143002, Name: "K/DA ALL OUT 萨勒芬妮 独立音乐人", ChampionID: 143, ChampionName: "萨勒芬妮", TilePath: "/lol-game-data/assets/skin.png", Owned: true}, {ID: 45000, Name: "维迦", ChampionID: 45, ChampionName: "维迦"}})
-	want := []string{"K/DA ALL OUT 萨勒芬妮 独立音乐人", "蓝色精粹", "橙色精粹", "战利品宝箱钥匙", "钥匙碎片", "维迦", "未识别材料", "战利品宝箱", "紫色宝箱"}
+	want := []string{"K/DA ALL OUT 萨勒芬妮 独立音乐人", "蓝色精粹", "橙色精粹", "战利品宝箱钥匙", "钥匙碎片", "维迦", "loot-box", "战利品宝箱", "紫色宝箱"}
 	for index, expected := range want {
 		if items[index].DisplayName != expected {
 			t.Fatalf("item %d name=%q want=%q", index, items[index].DisplayName, expected)
@@ -198,14 +202,229 @@ func TestEnrichLootItemsUsesChineseNamesAndCatalogSkinNames(t *testing.T) {
 	if items[5].Category != "英雄" {
 		t.Fatalf("champion enrichment=%#v", items[5])
 	}
-	if items[8].Asset != "/fe/lol-loot/assets/loot_item_icons/chest_promotion.png" || items[8].Category != "材料" {
+	if items[8].Asset != "/fe/lol-loot/assets/loot_item_icons/chest_promotion.png" || items[8].Category != "宝箱" {
 		t.Fatalf("promotion chest enrichment=%#v", items[8])
+	}
+}
+
+func TestEnrichLootItemsDropsOnlyTheLCUEmptyShell(t *testing.T) {
+	items := enrichLootItems([]LootItem{
+		{Count: 30, rawKeyEmpty: true},
+		{LootID: "CHEST_224", LocalizedName: "未命名战利品", Count: 1},
+		{LootName: "MATERIAL_REAL", Count: 1},
+	}, nil)
+	if len(items) != 2 {
+		t.Fatalf("empty-shell filtering dropped non-empty loot: %#v", items)
+	}
+	if items[0].DisplayName != "CHEST_224" || items[1].DisplayName != "MATERIAL_REAL" {
+		t.Fatalf("real loot identifiers were not preserved: %#v", items)
 	}
 }
 
 func TestPromotionChestUsesRequestedChineseName(t *testing.T) {
 	if got := lootChineseNames["CHEST_PROMOTION"]; got != "紫色宝箱" {
 		t.Fatalf("CHEST_PROMOTION name = %q, want 紫色宝箱", got)
+	}
+}
+
+func TestGenericAndPromotionChestsStayDistinctAndUseCurrentClientArtwork(t *testing.T) {
+	metadata := map[string]lootMetadata{
+		"CHEST_GENERIC": {Name: "海克斯科技宝箱", Image: "/lol-game-data/assets/ASSETS/Loot/chest_generic.png"},
+	}
+	items := enrichLootItemsWithMetadata([]LootItem{
+		{LootID: "CHEST_generic", Type: "CHEST", Count: 1},
+		{LootID: "CHEST_promotion", Type: "CHEST", Count: 1},
+	}, nil, metadata, nil)
+	if len(items) != 2 || items[0].LootID == items[1].LootID || items[0].Count != 1 || items[1].Count != 1 {
+		t.Fatalf("distinct chest entries were merged: %#v", items)
+	}
+	if items[0].DisplayName != "海克斯科技宝箱" || items[1].DisplayName != "紫色宝箱" {
+		t.Fatalf("chest names = %q / %q", items[0].DisplayName, items[1].DisplayName)
+	}
+	wantIcon := "/fe/lol-loot/assets/loot_item_icons/chest_promotion.png"
+	if items[0].Asset != wantIcon || items[1].Asset != wantIcon {
+		t.Fatalf("current client chest artwork = %q / %q, want %q", items[0].Asset, items[1].Asset, wantIcon)
+	}
+}
+
+func TestCommunityDragonLootMetadataNamesMasterworkChestAndKeepsPromotionFallback(t *testing.T) {
+	provider := newChampionProvider()
+	provider.clientMu.Lock()
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Host != communityDragonHost || request.URL.Path != "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/loot.json" {
+			t.Fatalf("unexpected loot catalog request: %s", request.URL.String())
+		}
+		body := `{"LootItems":[{"id":"CHEST_224","name":"杰作宝箱","description":"开启后获得战利品","image":"/lol-game-data/assets/v1/loot/chest_224.png"}]}`
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
+	})}
+	provider.clientMu.Unlock()
+	metadata, err := provider.loadCommunityDragonLootMetadata(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := enrichLootItemsWithMetadata([]LootItem{
+		{LootID: "CHEST_224", LocalizedName: "未命名战利品", Count: 1},
+		{LootID: "CHEST_PROMOTION", Count: 1},
+	}, nil, metadata, nil)
+	if items[0].DisplayName != "杰作宝箱" || items[0].Asset == "" || items[0].LocalizedDescription == "" {
+		t.Fatalf("CommunityDragon metadata was not applied: %#v", items[0])
+	}
+	if items[1].DisplayName != "紫色宝箱" || items[1].Asset != lootClientIcons["CHEST_PROMOTION"] {
+		t.Fatalf("hard-coded promotion fallback regressed: %#v", items[1])
+	}
+}
+
+func TestLootDiagnosticsAllPersistWithReviewedFields(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/lol-loot/v1/player-loot-map" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = io.WriteString(w, `{
+			"CHEST_224":{"localizedName":"未命名战利品","type":"CHEST","count":1},
+			"CHEST_SKIN_EVENT":{"displayCategories":"SKIN","type":"CHEST","count":2},
+			"":{"lootId":"","type":"","count":30},
+			"MATERIAL_EMPTY":{"type":"MATERIAL","count":0}
+		}`)
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	store := &localStore{root: t.TempDir()}
+	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a := &app{storage: store}
+	items, capability := NewObservedLootAPI(client, a.recordDiagnostic).PlayerLoot()
+	if capability.State != capabilityAvailable || len(items) != 3 {
+		t.Fatalf("loot fixture = items:%#v capability:%#v", items, capability)
+	}
+	items = enrichLootItemsWithMetadata(items, nil, nil, a.recordDiagnostic)
+	if len(items) != 2 || items[0].LootID == "" || items[1].LootID == "" {
+		t.Fatalf("loot enrichment must drop only the three-field-empty shell and preserve real loot: %#v", items)
+	}
+	data, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnosticLog := string(data)
+	if strings.Contains(diagnosticLog, "CHEST_224") {
+		t.Fatalf("diagnostics leaked full loot ID CHEST_224: %s", diagnosticLog)
+	}
+	events := make(map[string]map[string]any)
+	var emptyKeyFallback map[string]any
+	for _, line := range strings.Split(strings.TrimSpace(diagnosticLog), "\n") {
+		var event map[string]any
+		if json.Unmarshal([]byte(line), &event) == nil {
+			if name, _ := event["event"].(string); name != "" {
+				events[name] = event
+				if name == "loot_name_fallback" && event["raw_key_empty"] == true {
+					emptyKeyFallback = event
+				}
+			}
+		}
+	}
+	shape := events["loot_map_shape"]
+	if shape["raw_entries"] != float64(4) || shape["kept"] != float64(2) || shape["dropped_zero_count"] != float64(1) || shape["type_counts"] == nil || shape["id_prefix_counts"] == nil || shape["known_chest_counts"] == nil {
+		t.Fatalf("loot_map_shape = %#v", shape)
+	}
+	knownChests, _ := shape["known_chest_counts"].(map[string]any)
+	if knownChests["masterwork"] != float64(1) || knownChests["other"] != float64(1) {
+		t.Fatalf("loot_map_shape known_chest_counts = %#v", shape)
+	}
+	unnamed, _ := shape["unnamed_type_counts"].(map[string]any)
+	if unnamed[""] != float64(1) {
+		t.Fatalf("loot_map_shape unnamed_type_counts = %#v", shape)
+	}
+	fallback := emptyKeyFallback
+	if fallback["loot_id_prefix"] != "OTHER" || fallback["raw_key_empty"] != true || fallback["type_empty"] != true || fallback["display_categories"] != "" {
+		t.Fatalf("loot_name_fallback = %#v", fallback)
+	}
+	if _, ok := fallback["loot_id"]; ok {
+		t.Fatalf("loot_name_fallback retained a full loot_id field: %#v", fallback)
+	}
+	if _, ok := fallback["count"]; ok {
+		t.Fatalf("loot_name_fallback retained an unnecessary item count: %#v", fallback)
+	}
+	category := events["loot_category_assigned"]
+	if category["category"] != "宝箱" || category["id_prefix"] != "CHEST_" || category["type"] != "CHEST" {
+		t.Fatalf("loot_category_assigned = %#v", category)
+	}
+}
+
+func TestLootEmptyShellFilteringStillReportsItsShape(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/lol-loot/v1/player-loot-map" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = io.WriteString(w, `{"":{"lootId":"","type":"","count":30}}`)
+	}))
+	defer server.Close()
+	store := &localStore{root: t.TempDir()}
+	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a := &app{storage: store}
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	items, _ := NewObservedLootAPI(client, a.recordDiagnostic).PlayerLoot()
+	if items = enrichLootItemsWithMetadata(items, nil, nil, a.recordDiagnostic); len(items) != 0 {
+		t.Fatalf("empty-shell loot survived filtering: %#v", items)
+	}
+	data, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var shape map[string]any
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		var event map[string]any
+		if json.Unmarshal([]byte(line), &event) == nil && event["event"] == "loot_map_shape" {
+			shape = event
+		}
+	}
+	if shape["raw_entries"] != float64(1) || shape["kept"] != float64(0) {
+		t.Fatalf("filtered empty-shell shape = %#v; log=%s", shape, data)
+	}
+}
+
+func TestLootIDPrefixCoversKnownLCUTypes(t *testing.T) {
+	fixtures := map[string]string{
+		"CHEST_224": "CHEST_", "MATERIAL_KEY": "MATERIAL_", "CURRENCY_CHAMPION": "CURRENCY_",
+		"CHAMPION_266": "CHAMPION_", "SKIN_SHARD_266001": "SKIN_", "STATSTONE_1": "STATSTONE_",
+		"EMOTE_1": "EMOTE_", "WARD_1": "WARD_", "COMPANION_1": "COMPANION_", "TFT_ITEM_1": "TFT_",
+		"UNKNOWN_1": "OTHER",
+	}
+	for input, want := range fixtures {
+		if got := lootIDPrefix(input); got != want {
+			t.Fatalf("lootIDPrefix(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestLCURequestDiagnosticsCaptureRealTLSAndConnectionReuse(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{"queues":[]}`)
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	events := make([]map[string]any, 0, 1)
+	client.setDiagnosticObserver(func(event map[string]any) { events = append(events, event) })
+	for range 2 {
+		var payload map[string]any
+		if err := client.GetJSON("/lol-ranked/v1/ranked-stats/secret-player-reference", &payload); err != nil {
+			t.Fatal(err)
+		}
+	}
+	client.flushRequestDiagnostics()
+	if len(events) != 1 {
+		t.Fatalf("LCU request aggregates = %#v", events)
+	}
+	event := events[0]
+	tlsSummary, _ := event["tls_ms"].(map[string]int64)
+	if event["event"] != "lcu_request" || event["method"] != http.MethodGet || event["path"] != "/lol-ranked/v1/ranked-stats/{puuid}" || event["count"] != 2 {
+		t.Fatalf("LCU request diagnostic identity = %#v", event)
+	}
+	if event["conn_reused"] != true || tlsSummary["max"] <= 0 || event["conn_wait_ms"] == nil || event["ttfb_ms"] == nil || event["http_status"] == nil {
+		t.Fatalf("LCU httptrace fields are not real: %#v", event)
 	}
 }
 
@@ -230,6 +449,28 @@ func TestRewardTitleFiltersClientPlaceholders(t *testing.T) {
 	for _, fixture := range []string{"完成一场对局后领取。", "Includes one skin shard", "2026 SEASON REWARD"} {
 		if got := rewardDescription(fixture); got != fixture {
 			t.Fatalf("valid reward description %q was replaced with %q", fixture, got)
+		}
+	}
+}
+
+func TestPendingGrantPlaceholderDoesNotInventPassSource(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/lol-rewards/v1/grants" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = io.WriteString(w, `[{"info":{"id":"pass-a","status":"PENDING_SELECTION"},"rewardGroup":{"id":"group-a","localizations":{"title":"PLACEHOLDER_NAME_FOR_REWARD_GROUP"},"rewards":[{"id":"orange","itemId":"CURRENCY_orange","quantity":25}]}},{"info":{"id":"pass-b","status":"PENDING_SELECTION"},"rewardGroup":{"id":"group-b","localizations":{"title":"Placeholder Name for Reward Group DO NOT TRANSLATE"},"rewards":[{"id":"blue","itemId":"CURRENCY_blue","quantity":750}]}}]`)
+	}))
+	defer server.Close()
+
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	grants, capability := NewRewardsAPI(client).PendingGrants()
+	if capability.State != capabilityAvailable || len(grants) != 2 {
+		t.Fatalf("pending pass grants = %#v capability=%#v", grants, capability)
+	}
+	for _, grant := range grants {
+		if grant.Title != "待领取奖励" || grant.DisplayGroup != "" {
+			t.Fatalf("placeholder grant invented a pass source: %#v", grant)
 		}
 	}
 }

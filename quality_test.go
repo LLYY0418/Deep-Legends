@@ -417,11 +417,11 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 	if len(privacy.ExplicitWrites) != 9 {
 		t.Fatalf("explicit client writes = %#v", privacy.ExplicitWrites)
 	}
-	if len(privacy.AutomaticWrites) != 9 {
+	if len(privacy.AutomaticWrites) != 10 {
 		t.Fatalf("automatic client writes = %#v", privacy.AutomaticWrites)
 	}
 	automaticWrites := strings.Join(privacy.AutomaticWrites, "\n")
-	for _, expected := range []string{"默认关闭", "ReadyCheck", "EndOfGame", "Reconnect", "点赞", "任务庆祝", "阵营位置", "房主", "邀请", "匹配"} {
+	for _, expected := range []string{"默认关闭", "ReadyCheck", "EndOfGame", "Reconnect", "点赞", "任务庆祝", "阵营位置", "房主", "邀请", "匹配", "禁用", "选用"} {
 		if !strings.Contains(automaticWrites, expected) {
 			t.Fatalf("automatic write statement is missing %q: %s", expected, automaticWrites)
 		}
@@ -454,6 +454,26 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 		if !strings.Contains(strings.Join(privacy.NeverStores, "\n"), expected) {
 			t.Fatalf("reward storage privacy boundary is missing %q: %#v", expected, privacy.NeverStores)
 		}
+	}
+}
+
+func TestLootFallbackDiagnosticRuntimePayloadNeverStoresItemDetails(t *testing.T) {
+	events := make([]map[string]any, 0, 1)
+	items := enrichLootItemsWithMetadata([]LootItem{{
+		LootID: "CHAMPION_266", LocalizedName: "未命名战利品", Type: "CHAMPION_RENTAL", Count: 30,
+	}}, nil, nil, func(event map[string]any) { events = append(events, event) })
+	if len(items) != 1 || len(events) != 1 {
+		t.Fatalf("fallback runtime fixture = items:%#v events:%#v", items, events)
+	}
+	payload, err := json.Marshal(events[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(payload), "CHAMPION_266") || strings.Contains(string(payload), `"count"`) || strings.Contains(string(payload), `"loot_id"`) {
+		t.Fatalf("loot fallback diagnostic leaked item details: %s", payload)
+	}
+	if events[0]["loot_id_prefix"] != "CHAMPION_" || events[0]["type_empty"] != false {
+		t.Fatalf("loot fallback diagnostic lost safe diagnostic fields: %#v", events[0])
 	}
 }
 
@@ -500,7 +520,7 @@ func TestDiagnosticsExposeOnlyDiscoveryCounts(t *testing.T) {
 
 func TestDiagnosticSourcesExcludeStableIdentifiers(t *testing.T) {
 	forbidden := []string{
-		`"server_id":`, `"queue_type":`, `"queue_types":`,
+		`"queue_type":`, `"queue_types":`,
 		`"accountHash":`, `"puuid":`, `"requested_participant_id":`, `"event_participant_ids":`,
 		`"region": regionKey`,
 	}
@@ -515,14 +535,28 @@ func TestDiagnosticSourcesExcludeStableIdentifiers(t *testing.T) {
 			}
 		}
 	}
-	// R39 explicitly permits the game ID only on the roster-shape diagnostic;
-	// all other stable identity fields remain forbidden above.
+	// R39/R68 and the R74 item-set trace explicitly permit game ID on
+	// aggregate roster/position diagnostics and the bounded recommendation/apply
+	// chain. All player/account identity fields remain forbidden above.
 	gameplayData, err := os.ReadFile("gameplay.go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(string(gameplayData), `"game_id":`) != 1 || !strings.Contains(string(gameplayData), `"event": "live_roster_shape", "game_id":`) {
-		t.Errorf("gameplay.go game_id diagnostic is not scoped to live_roster_shape")
+	for _, required := range []string{
+		`"event": "live_roster_shape", "game_id":`,
+		`"game_mode": response.GameMode, "game_id": response.GameID`,
+		`"event": "live_recommendations_request"`,
+		`"event": "live_recommendations_response"`,
+		`"event": "item_set_apply"`,
+	} {
+		if !strings.Contains(string(gameplayData), required) {
+			t.Errorf("gameplay.go missing reviewed game_id diagnostic scope %s", required)
+		}
+	}
+	// R61 permits server_id only on the Tencent Riot-ID lookup outcome event;
+	// the value is the reviewed shard identifier, never a player identifier.
+	if strings.Count(string(gameplayData), `"server_id":`) != 1 || !strings.Contains(string(gameplayData), `"event": "tencent_riot_id_lookup"`) {
+		t.Errorf("gameplay.go server_id diagnostic is not scoped to tencent_riot_id_lookup")
 	}
 }
 
@@ -616,6 +650,40 @@ func TestDiagnosticLogRotationRemainsBounded(t *testing.T) {
 	}
 }
 
+func TestDiagnosticRotationImmediatelyRestoresBuildSnapshot(t *testing.T) {
+	root := t.TempDir()
+	logs := filepath.Join(root, "logs")
+	if err := os.MkdirAll(logs, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	store := &localStore{root: root}
+	a := &app{storage: store}
+	a.recordAppStartDiagnostic()
+	a.enableDiagnosticRotationSnapshot()
+	path := filepath.Join(logs, "diagnostics.jsonl")
+	if err := os.WriteFile(path, bytes.Repeat([]byte("x"), 2*1024*1024+1), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.appendDiagnostic(map[string]any{"event": "after_rotation"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("rotated log lines = %d, want marker + triggering event + build snapshot: %s", len(lines), data)
+	}
+	var snapshot map[string]any
+	if err := json.Unmarshal([]byte(lines[2]), &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot["event"] != "app_start" || snapshot["version"] != version || snapshot["build_fingerprint"] != buildFingerprint || snapshot["riot_key"] != riotKeyConfigured() {
+		t.Fatalf("post-rotation build snapshot = %#v", snapshot)
+	}
+}
+
 func TestAppStartDiagnosticIdentifiesBuild(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
@@ -659,9 +727,15 @@ func TestDiagnosticLogDownloadUsesTrustedFixedFile(t *testing.T) {
 	if disposition := recorder.Header().Get("Content-Disposition"); !diagnosticExportFilenamePattern.MatchString(disposition) {
 		t.Fatalf("unexpected disposition: %q", disposition)
 	}
-	var downloaded map[string]any
-	if err := json.Unmarshal(bytes.TrimSpace(recorder.Body.Bytes()), &downloaded); err != nil || downloaded["time"] == nil {
-		t.Fatalf("downloaded diagnostic line has no UTC time field: event=%#v err=%v", downloaded, err)
+	lines := bytes.Split(bytes.TrimSpace(recorder.Body.Bytes()), []byte{'\n'})
+	if len(lines) != 3 || !strings.Contains(recorder.Body.String(), `"event":"accept_focus_inspection_end"`) {
+		t.Fatalf("expected original event, export checkpoint, focus availability: %s", recorder.Body.String())
+	}
+	for _, line := range lines {
+		var downloaded map[string]any
+		if err := json.Unmarshal(line, &downloaded); err != nil || downloaded["time"] == nil {
+			t.Fatalf("downloaded diagnostic line has no UTC time field: event=%#v err=%v", downloaded, err)
+		}
 	}
 }
 

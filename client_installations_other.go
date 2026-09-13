@@ -4,8 +4,10 @@ package main
 
 import "errors"
 
-func detectClientInstallations() []clientInstallation { return nil }
+func detectClientInstallationsWithScan() ([]clientInstallation, clientInstallationScan) {
+	return nil, clientInstallationScan{}
+}
 
-func launchClientInstallation(clientInstallation) error {
-	return errors.New("client launching is only available on Windows")
+func launchClientInstallation(clientInstallation) (clientLaunchResult, error) {
+	return clientLaunchResult{}, errors.New("client launching is only available on Windows")
 }

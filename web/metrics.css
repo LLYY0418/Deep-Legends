@@ -1,0 +1,28 @@
+/* Shared numeric metric contract. Status/result colors remain independent;
+   a win rate is always the same type of measurement, including rates < 50%. */
+:root {
+  --metric-win-color: var(--success);
+  --metric-win-size: 13px;
+  --metric-win-weight: 700;
+}
+.win-rate-value,
+:is(td, dd, span, b).metric-win,
+.metric-win > strong,
+.skill-win-rate > b,
+.option-win-rate > b,
+.route-win-rate > b,
+.rank-history-winrate,
+.recent-ranked-ring > strong,
+.option-stats .is-win > dd,
+.champion-summary-stats .is-win > dd,
+.live-augment-stat.is-win > b,
+.arena-slim-grid span.is-win,
+.arena-synergy-grid span.is-win {
+  /* Deliberate component-level overrides of legacy page-specific rules. */
+  color: var(--metric-win-color) !important;
+  font-family: var(--font) !important;
+  font-size: var(--metric-win-size) !important;
+  font-weight: var(--metric-win-weight) !important;
+  font-variant-numeric: tabular-nums;
+}
+.rank-history-winrate > span { color: var(--muted); }

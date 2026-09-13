@@ -12,6 +12,7 @@
 	  "friends-updated": ["friends"],
 	  "season-progress": ["overview-season"],
 	  "historical-ranks": ["overview-ranks"],
+	  "summoner-updated": ["status", "overview-player"],
 	});
   const CN_SERVER_MERGE_NOTE = [
     "国服大区合并对照",
@@ -39,6 +40,9 @@
     controllers: new Map(),
     manualRefreshing: false,
     collectionRescanInFlight: false,
+    collectionEnsureInFlight: false,
+    collectionRequestAt: 0,
+    collectionRequestAttempt: "",
     skinLoadGeneration: 0,
     renderGeneration: 0,
     poolRenderGeneration: 0,
@@ -64,17 +68,22 @@
     destroyed: false,
     eventSource: null,
     liveUpdateTimer: 0,
+    liveUpdateSlices: new Set(),
     eventReconnectTimer: 0,
     eventReconnectDelay: 1000,
     detailGeneration: 0,
     detailMediaTimer: 0,
-    skinDetailCache: new Map(),
+    skinDetailCache: window.deepLegendsRuntime?.createCache({ max: 96, ttl: 600000 }) || new Map(),
     skinDetailPromises: new Map(),
-    artworkPrefetchCache: new Map(),
+    artworkPrefetchCache: window.deepLegendsRuntime?.createCache({ max: 128, ttl: 600000 }) || new Map(),
     acquisitionAvailable: null,
     acquisitionFallback: false,
     installations: [],
     installationsLoaded: false,
+    installationLoadError: "",
+    clientLaunchInFlight: "",
+    clientLaunched: null,
+    officialLoginMessage: "",
     themeTimer: 0,
     showUnownedChromas: true,
     showPrestigeChromas: true,
@@ -102,20 +111,25 @@
   const el = Object.fromEntries([
     "connection", "connection-avatar", "refresh", "quit", "owned-count", "chroma-count", "pool-count", "remaining-count", "notice",
     "search", "rarity-button", "rarity-menu", "sort", "sort-button", "sort-label", "sort-menu", "sort-direction", "list-meta", "retry-list", "skin-grid", "skin-card-template",
-    "pool-source", "setting-theme", "density-toggle", "account-content", "account-live-state", "diagnostics-content", "copy-diagnostics", "export-diagnostics", "diagnostic-log-meta", "history-content",
+    "pool-source", "setting-theme", "setting-ui-scale", "density-toggle", "account-content", "account-live-state", "diagnostics-content", "copy-diagnostics", "export-diagnostics", "diagnostic-log-meta", "history-content",
     "player-search-region", "player-search-region-label", "player-search-region-menu", "player-search-cn-toggle", "player-search-cn-info", "player-search-cn-options",
     "player-search-follow-client", "player-search-follow-status", "player-search-name", "player-search-tag", "player-search-go", "player-search-clear",
     "refresh-history", "pools-content", "pool-import", "pool-name", "pool-version", "pool-source-input", "pool-file", "pool-import-status",
     "privacy-content", "skin-dialog", "skin-dialog-close", "skin-dialog-image", "skin-dialog-fallback", "skin-dialog-status",
     "skin-dialog-title", "skin-dialog-hero", "skin-dialog-data", "skin-dialog-video", "copy-skin-id", "toast", "client-launchpad", "launcher-list",
+    "launchpad-eyebrow", "launchpad-title", "launchpad-description", "client-launch-reselect", "official-login-status",
     "sidebar-toggle", "settings-sidebar-toggle", "current-section-title", "topbar-subtitle", "page-intro", "settings-build-identity", "setting-share-directory", "setting-share-directory-change",
+    "settings-update-check", "settings-update-feedback",
     "chroma-unowned-control", "show-unowned-chromas", "chroma-prestige-control", "show-prestige-chromas",
     "startup-loading", "startup-loading-title", "startup-loading-copy", "startup-loading-meta", "startup-loading-retry", "app-frame",
     "pool-catalog-panel", "pool-upload-panel", "pool-history-panel", "pool-picker", "pool-search", "pool-quality", "pool-sort", "pool-list-meta", "pool-skin-grid",
     "favorites-collection-panel", "favorites-account-panel", "favorites-pools-panel",
     "skin-dialog-art", "skin-dialog-backdrop", "skin-dialog-artwork", "skin-dialog-fullscreen", "skin-dialog-previous", "skin-dialog-next", "app-main", "app-scroll", "back-to-top",
     "setting-proxy-mode", "setting-proxy-url", "setting-proxy-url-wrap", "setting-proxy-save", "setting-proxy-state",
+    "update-button", "update-dialog", "update-dialog-title", "update-notes", "update-meta", "update-progress", "update-progress-fill", "update-progress-percent", "update-progress-hint", "update-alert", "update-start", "update-later", "update-cancel", "update-apply", "update-release-link", "update-dialog-close",
   ].map((id) => [camel(id), document.getElementById(id)]));
+
+  const updateUI = { status: null, seen: preference("update-viewed", ""), announced: "", phase: "None", pending: false, checkPending: false, checkRequestPending: false, statusEventRevision: 0, feedbackTimer: 0 };
 
   el.grid = el.skinGrid;
   el.template = el.skinCardTemplate;
@@ -123,7 +137,7 @@
   el.showPrestigeChromas.checked = state.showPrestigeChromas;
 
   el.sectionTabs = [...document.querySelectorAll("[data-section]")];
-  el.sectionPanels = [...document.querySelectorAll("main > [role='tabpanel']")];
+  el.sectionPanels = [...document.querySelectorAll("main > [role='tabpanel'], main > [data-standalone-page]")];
   el.viewTabs = [...document.querySelectorAll("[data-view]")];
   el.favoritesTabs = [...document.querySelectorAll("[data-favorites-page]")];
   el.poolPageTabs = [...document.querySelectorAll("[data-pool-page]")];
@@ -135,22 +149,106 @@
   function preference(key, fallback) { try { return localStorage.getItem(`lol-loot-${key}`) ?? fallback; } catch (_) { return fallback; } }
   function savePreference(key, value) { try { localStorage.setItem(`lol-loot-${key}`, String(value)); } catch (_) {} }
 
+	const nativeSelectSearchThreshold = 20;
+
+	function normalizeNativeSelectSearch(value) {
+	  return String(value || "").normalize("NFKC").toLocaleLowerCase("zh-CN").replace(/[\s\p{P}\p{S}]+/gu, "");
+	}
+
+	function nativeSelectFuzzySubsequence(query, value) {
+	  if (query.length < 3 || value.length > Math.max(48, query.length * 8)) return false;
+	  let index = 0;
+	  for (const character of value) if (character === query[index]) index += 1;
+	  return index === query.length;
+	}
+
+	function nativeSelectSearchScore(query, value) {
+	  if (!query || !value) return 0;
+	  if (value === query) return 100;
+	  if (value.startsWith(query)) return 80 - Math.min(20, value.length - query.length);
+	  const index = value.indexOf(query);
+	  if (index >= 0) return 60 - Math.min(20, index);
+	  return nativeSelectFuzzySubsequence(query, value) ? 10 : 0;
+	}
+
+	function ensureNativeSelectSearch(root, enabled) {
+	  const menu = root.querySelector("[data-app-select-menu]");
+	  const optionsRoot = root.querySelector("[data-app-select-options]");
+	  const current = root.querySelector("[data-app-select-search]");
+	  if (!enabled) {
+		current?.remove();
+		root.classList.remove("has-search");
+		return;
+	  }
+	  if (!current) {
+		const label = document.createElement("label");
+		label.className = "app-select-search";
+		label.dataset.appSelectSearch = "";
+		label.innerHTML = '<svg class="app-select-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg><span class="sr-only">搜索选项</span><input type="search" placeholder="搜索中文、拼音、英文、缩写或外号" autocomplete="off" data-app-select-search-input>';
+		menu.insertBefore(label, optionsRoot);
+	  }
+	  root.classList.add("has-search");
+	}
+
+	function filterNativeSelectMenu(root, value) {
+	  const query = normalizeNativeSelectSearch(value);
+	  const buttons = [...root.querySelectorAll('[role="menuitemradio"]')];
+	  const scored = buttons.map((button, order) => {
+		const label = button.querySelector("span")?.textContent?.trim() || "";
+		let score = query ? nativeSelectSearchScore(query, normalizeNativeSelectSearch(label)) : 1;
+		if (query) {
+		  const exportedScore = Number(window.deepLegendsChampionSearch?.scoreOption?.(value, button.dataset.nativeSelectValue, label)) || 0;
+		  score = Math.max(score, exportedScore);
+		}
+		return { button, order, score };
+	  });
+	  const bestScore = Math.max(0, ...scored.map((entry) => entry.score));
+	  let visible = 0;
+	  scored.forEach(({ button, order, score }) => {
+		button.hidden = Boolean(query) && (score <= 0 || (bestScore === 100 && score !== 100));
+		button.style.order = String(query ? (100 - score) * 1000 + order : order);
+		if (!button.hidden) visible += 1;
+	  });
+	  const empty = root.querySelector("[data-app-select-empty]");
+	  if (empty) empty.hidden = !query || visible > 0;
+	}
+
+	function resetNativeSelectSearch(root) {
+	  const input = root?.querySelector("[data-app-select-search-input]");
+	  if (input) input.value = "";
+	  if (root) filterNativeSelectMenu(root, "");
+	}
+
+	function nativeSelectOptionsSignature(options) {
+	  return JSON.stringify(options.map((option) => [option.value, option.textContent.trim(), option.disabled]));
+	}
+
 	function syncNativeSelectMenu(select) {
 	  const root = select?._appSelectRoot;
 	  if (!root) return;
 	  const trigger = root.querySelector("[data-app-select-trigger]");
-	  const menu = root.querySelector("[data-app-select-menu]");
+	  const optionsRoot = root.querySelector("[data-app-select-options]");
 	  const options = [...select.options];
 	  const selected = options.find((option) => option.value === select.value) || options[0];
 	  trigger.disabled = select.disabled;
 	  trigger.querySelector("span").textContent = selected?.textContent?.trim() || select.getAttribute("aria-label") || "请选择";
-	  menu.innerHTML = options.map((option) => `<button type="button" role="menuitemradio" aria-checked="${option === selected}" data-native-select-value="${escapeHTML(option.value)}" ${option.disabled ? "disabled" : ""}><span>${escapeHTML(option.textContent.trim())}</span><span class="app-select-check" aria-hidden="true">✓</span></button>`).join("");
+	  ensureNativeSelectSearch(root, options.length > nativeSelectSearchThreshold);
+	  const signature = nativeSelectOptionsSignature(options);
+	  const buttons = [...optionsRoot.querySelectorAll('[role="menuitemradio"]')];
+	  if (root._nativeSelectOptionsSignature !== signature || buttons.length !== options.length) {
+		optionsRoot.innerHTML = options.map((option) => `<button type="button" role="menuitemradio" aria-checked="${option === selected}" data-native-select-value="${escapeHTML(option.value)}" ${option.disabled ? "disabled" : ""}><span>${escapeHTML(option.textContent.trim())}</span><span class="app-select-check" aria-hidden="true">✓</span></button>`).join("");
+		root._nativeSelectOptionsSignature = signature;
+		filterNativeSelectMenu(root, root.querySelector("[data-app-select-search-input]")?.value || "");
+		return;
+	  }
+	  buttons.forEach((button, index) => button.setAttribute("aria-checked", String(options[index] === selected)));
 	}
 
 	function closeNativeSelectMenu(root, restoreFocus = false) {
 	  const trigger = root?.querySelector("[data-app-select-trigger]");
 	  const menu = root?.querySelector("[data-app-select-menu]");
 	  if (!trigger || !menu) return;
+	  resetNativeSelectSearch(root);
 	  trigger.setAttribute("aria-expanded", "false");
 	  menu.hidden = true;
 	  if (restoreFocus) trigger.focus();
@@ -162,7 +260,7 @@
 	  if (!label) return;
 	  const root = document.createElement("div");
 	  root.className = "app-select native-select-menu";
-	  root.innerHTML = `<button class="app-select-trigger" type="button" aria-haspopup="menu" aria-expanded="false" data-app-select-trigger><span></span></button><div class="app-select-menu" role="menu" data-app-select-menu hidden></div>`;
+	  root.innerHTML = `<button class="app-select-trigger" type="button" aria-haspopup="menu" aria-expanded="false" data-app-select-trigger><span></span></button><div class="app-select-menu" role="menu" data-app-select-menu hidden><div class="app-select-options" data-app-select-options></div><div class="app-select-empty" data-app-select-empty hidden>没有匹配项</div></div>`;
 	  select.classList.add("sr-only");
 	  select.tabIndex = -1;
 	  select.setAttribute("aria-hidden", "true");
@@ -177,8 +275,24 @@
 		syncNativeSelectMenu(select);
 		trigger.setAttribute("aria-expanded", "true");
 		menu.hidden = false;
-		const options = [...menu.querySelectorAll('[role="menuitemradio"]:not(:disabled)')];
-		(options.find((option) => option.getAttribute("aria-checked") === "true") || options[focus === "last" ? options.length - 1 : 0])?.focus();
+		const options = [...menu.querySelectorAll('[role="menuitemradio"]:not(:disabled):not([hidden])')];
+		const selected = options.find((option) => option.getAttribute("aria-checked") === "true") || options[focus === "last" ? options.length - 1 : 0];
+		const optionsRoot = root.querySelector("[data-app-select-options]");
+		const pageScrollRoot = document.querySelector(".app-scroll");
+		const pageScrollTop = pageScrollRoot?.scrollTop;
+		const pageScrollLeft = pageScrollRoot?.scrollLeft;
+		if (selected) {
+			// Large lists such as the champion picker should open at the current value.
+			optionsRoot.scrollTop = Math.max(0, selected.offsetTop - optionsRoot.offsetTop - (optionsRoot.clientHeight - selected.offsetHeight) / 2);
+			selected.scrollIntoView?.({ block: "nearest" });
+		}
+		if (pageScrollRoot && pageScrollTop != null && pageScrollLeft != null) {
+			pageScrollRoot.scrollTop = pageScrollTop;
+			pageScrollRoot.scrollLeft = pageScrollLeft;
+		}
+		const search = root.querySelector("[data-app-select-search-input]");
+		if (search) search.focus({ preventScroll: true });
+		else selected?.focus();
 	  };
 	  trigger.addEventListener("click", () => trigger.getAttribute("aria-expanded") === "true" ? closeNativeSelectMenu(root) : open());
 	  trigger.addEventListener("keydown", (event) => {
@@ -195,14 +309,26 @@
 		closeNativeSelectMenu(root, true);
 	  });
 	  menu.addEventListener("keydown", (event) => {
-		const options = [...menu.querySelectorAll('[role="menuitemradio"]:not(:disabled)')];
+		const options = [...menu.querySelectorAll('[role="menuitemradio"]:not(:disabled):not([hidden])')];
 		const index = options.indexOf(document.activeElement);
 		if (event.key === "Escape" || event.key === "Tab") { closeNativeSelectMenu(root, event.key === "Escape"); return; }
+		if (event.target.matches("[data-app-select-search-input]")) {
+		  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+		  event.preventDefault();
+		  options[event.key === "ArrowUp" || event.key === "End" ? options.length - 1 : 0]?.focus();
+		  return;
+		}
 		if (event.key === "Enter" || event.key === " ") { event.preventDefault(); document.activeElement?.click(); return; }
 		if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
 		event.preventDefault();
 		const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
 		options[next]?.focus();
+	  });
+	  menu.addEventListener("input", (event) => {
+		if (event.target.matches("[data-app-select-search-input]") && !event.isComposing) filterNativeSelectMenu(root, event.target.value);
+	  });
+	  menu.addEventListener("compositionend", (event) => {
+		if (event.target.matches("[data-app-select-search-input]")) filterNativeSelectMenu(root, event.target.value);
 	  });
 	  select.addEventListener("change", () => syncNativeSelectMenu(select));
 	  new MutationObserver(() => syncNativeSelectMenu(select)).observe(select, { childList: true, subtree: true, attributes: true });
@@ -242,11 +368,21 @@
         const message = (await response.text()).trim();
         throw new Error(message || `本地服务返回 HTTP ${response.status}`);
       }
-      if (response.status === 202 || response.status === 204) return null;
-      return response.json();
+      const payload = response.status === 202 || response.status === 204 ? null : await response.json();
+      if (controller.signal.aborted || state.controllers.get(requestKey) !== controller || state.destroyed) {
+        const cancelled = new Error("请求已取消");
+        cancelled.name = "RequestCancelled";
+        throw cancelled;
+      }
+      return payload;
     } catch (error) {
+      if (state.controllers.get(requestKey) !== controller || state.destroyed) {
+        const cancelled = new Error("请求已取消");
+        cancelled.name = "RequestCancelled";
+        throw cancelled;
+      }
+      if (timedOut) throw new Error("本地请求超时，请重试");
       if (error.name === "AbortError") {
-        if (timedOut) throw new Error("本地请求超时，请重试");
         const cancelled = new Error("请求已取消");
         cancelled.name = "RequestCancelled";
         throw cancelled;
@@ -265,14 +401,21 @@
   }
 
   async function refreshStatus(loadItems = false) {
+    if (state.destroyed) return;
+    const token = state.statusRequestToken = Number(state.statusRequestToken || 0) + 1;
     try {
       const previous = state.status;
-      state.status = await api("/api/status", {}, "status", 8000);
-	  if (!state.status.connected || !state.status.collectionDirty) state.collectionRescanInFlight = false;
+      const nextStatus = await api("/api/status", {}, "status", 8000);
+      if (token !== state.statusRequestToken || state.destroyed) return;
+      state.status = nextStatus;
+	  if (!state.status.connected || (!state.status.syncing && ((state.status.snapshotReady && !state.status.collectionDirty) || state.status.lastAttempt !== state.collectionRequestAttempt || Date.now() - state.collectionRequestAt > 30000))) {
+        state.collectionRescanInFlight = false;
+        state.collectionEnsureInFlight = false;
+      }
 	  if (!state.status.connected) clearDisconnectedClientState();
       state.statusDelay = STATUS_INTERVAL;
       if (!previous?.connected && state.status.connected) state.overlaySuppressed = false;
-      const changed = !previous || previous.lastSync !== state.status.lastSync || previous.lastAttempt !== state.status.lastAttempt || previous.calculationOK !== state.status.calculationOK || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotRetryCount !== state.status.snapshotRetryCount || previous.snapshotRetryExhausted !== state.status.snapshotRetryExhausted || previous.snapshotFallback !== state.status.snapshotFallback;
+	  const changed = !previous || previous.lastSync !== state.status.lastSync || previous.lastAttempt !== state.status.lastAttempt || previous.calculationOK !== state.status.calculationOK || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.identityReady !== state.status.identityReady || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotRetryCount !== state.status.snapshotRetryCount || previous.snapshotRetryExhausted !== state.status.snapshotRetryExhausted || previous.snapshotFallback !== state.status.snapshotFallback || previous.collectionDirty !== state.status.collectionDirty;
       if (changed) {
         if (!(state.section === "favorites" && state.favoritesPage === "account")) state.accountLoaded = false;
         if (!(state.section === "favorites" && state.favoritesPage === "pools")) {
@@ -281,22 +424,34 @@
         }
       }
       updateReadingOverlay(loadItems || changed);
-      renderStatus();
-      if (!state.status.connected) await loadClientInstallations();
-      if (loadItems || changed) { state.skinsCache?.clear(); await loadSkins(true); }
+	  renderStatus();
+	  if (!state.status.connected) await loadClientInstallations();
+	  if (state.section === "favorites" && state.favoritesPage === "collection") {
+        if (!state.status.snapshotReady) void ensureCollection();
+        else triggerCollectionRescanIfDirty();
+      }
+      // Scan start/dirty/status messages do not change the collection payload.
+      const snapshotChanged = !previous || previous.lastSync !== state.status.lastSync || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotFallback !== state.status.snapshotFallback;
+      if (loadItems || snapshotChanged) {
+        state.skinsCache?.clear();
+        if (state.section === "favorites" && state.favoritesPage === "collection") await loadSkins(true);
+      }
       if (state.section === "favorites" && state.favoritesPage === "account" && (loadItems || changed)) await loadAccount();
       if (state.section === "favorites" && state.favoritesPage === "pools" && (loadItems || changed)) await loadPools();
       updateReadingOverlay();
     } catch (error) {
-      if (error.name === "RequestCancelled" || state.destroyed) return;
+      if (token !== state.statusRequestToken || error.name === "RequestCancelled" || state.destroyed) return;
       state.statusDelay = STATUS_INTERVAL;
       showFatal(error.message);
     } finally {
-      scheduleStatus();
+      if (token === state.statusRequestToken) scheduleStatus();
     }
   }
 
 	function clearDisconnectedClientState() {
+      state.skinLoadGeneration = Number(state.skinLoadGeneration || 0) + 1;
+      for (const key of ["skins", "account", "pools", "pool-catalog", "history"]) state.controllers.get(key)?.abort();
+      state.loading = false;
 	  state.account = null;
 	  state.accountLoaded = false;
 	  state.history = [];
@@ -322,8 +477,9 @@
   function updateReadingOverlay(willLoadItems = false) {
     if (!state.status) return;
     const data = state.status;
+    const identityReady = data.identityReady ?? data.snapshotReady;
     const attemptChanged = String(data.lastAttempt || "") !== state.overlayBaselineAttempt;
-    if (data.connected && data.snapshotReady && !state.loading && !willLoadItems && (!state.overlayForced || attemptChanged)) {
+    if (data.connected && identityReady && !state.loading && !willLoadItems && (!state.overlayForced || attemptChanged)) {
       state.overlaySuppressed = false;
       hideReadingOverlay();
       return;
@@ -334,8 +490,8 @@
     }
     // 快照已就绪后的后台皮肤重载（lastSync 变化触发）只在收藏页需要
     // 遮罩；停留在总览/对局等页面时静默完成，避免周期性闪烁。
-    const preparing = data.syncing && !data.snapshotReady
-      || (data.connected && !data.snapshotReady)
+	  const preparing = data.syncing && !identityReady
+	    || (data.connected && !identityReady)
       || (data.connected && data.snapshotReady && state.section === "favorites" && (state.loading || willLoadItems));
     if (!preparing) {
       state.overlaySuppressed = false;
@@ -347,7 +503,7 @@
       state.statusDelay = 900;
       return;
     }
-    showReadingOverlay(data.connected ? "正在读取收藏信息" : "正在连接英雄联盟客户端", data.connected ? (data.snapshotRetryExhausted ? "库存暂时不一致，将每 60 秒继续尝试。" : "正在整理皮肤、炫彩与账户物品。") : "检测到客户端正在启动，请稍候。", state.overlayForced);
+	  showReadingOverlay(data.connected ? "正在读取召唤师信息" : "正在连接英雄联盟客户端", data.connected ? "正在读取身份与总览数据。" : "检测到客户端正在启动，请稍候。", state.overlayForced);
     state.statusDelay = 900;
   }
 
@@ -399,21 +555,40 @@
     configureSortControls();
   }
 
+  async function ensureCollection() {
+    if (state.collectionEnsureInFlight || state.collectionRescanInFlight || state.status?.syncing || !state.status?.connected || state.status?.snapshotReady) return;
+    state.collectionEnsureInFlight = true;
+    state.collectionRequestAt = Date.now();
+    state.collectionRequestAttempt = state.status.lastAttempt;
+    try {
+      await api("/api/collection/ensure", { method: "POST" }, "collection-ensure", 8000);
+    } catch (error) {
+      if (error.name !== "RequestCancelled" && !state.destroyed) state.listError = error.message || "收藏读取未启动";
+      state.collectionEnsureInFlight = false;
+    }
+  }
+
   async function loadSkins(force = false) {
     const generation = ++state.skinLoadGeneration;
     state.listError = "";
     el.retryList.hidden = true;
-    const fallbackAvailable = state.status?.connected && state.status?.snapshotFallback && (state.view === "owned" || state.view === "remaining");
-    if (!state.status?.connected || (!state.status?.snapshotReady && !fallbackAvailable)) {
-      state.items = [];
-      state.staleSnapshot = false;
-      state.staleSnapshotAt = "";
-      state.loading = false;
-      state.listError = state.status?.connected && !state.status?.snapshotReady ? `客户端已连接，正在自动重试读取收藏${snapshotRetryText(state.status) ? `（${snapshotRetryText(state.status)}）` : ""}` : "";
-      renderItems();
-      return;
-    }
-    state.skinsCache ||= new Map();
+	  const fallbackAvailable = state.status?.connected && state.status?.snapshotFallback && (state.view === "owned" || state.view === "remaining");
+	  if (!state.status?.connected) {
+	      state.items = [];
+	      state.staleSnapshot = false;
+	      state.staleSnapshotAt = "";
+	      state.loading = false;
+	      state.listError = "";
+	      renderItems();
+	      return;
+	  }
+	  if (!state.status?.snapshotReady && !fallbackAvailable) {
+	    state.loading = true;
+	    renderItems();
+	    void ensureCollection();
+	    return;
+	  }
+	    state.skinsCache ||= new Map();
     const cached = force ? null : state.skinsCache.get(state.view);
     if (cached && Date.now() - cached.at < 10 * 60 * 1000) {
       applySkinsPayload(cached.items, cached.capability, cached.stale, cached.capturedAt);
@@ -468,7 +643,7 @@
       el.connectionAvatar.hidden = true;
       el.connectionAvatar.removeAttribute("src");
     }
-    if (data.connected && data.snapshotReady) {
+    if (data.connected && (data.identityReady ?? data.snapshotReady)) {
       el.connection.classList.add("is-connected");
       el.connection.lastElementChild.textContent = `${name}${tag}`;
     } else if (data.connected) {
@@ -494,6 +669,7 @@
     renderNotice(data);
     renderLaunchpad(data);
     updateWorkspaceAvailability(data);
+    renderUpdateStatus(data.update);
     window.dispatchEvent(new CustomEvent("deep-legends:status", { detail: data }));
   }
 
@@ -544,9 +720,13 @@
     el.notice.hidden = true;
   }
 
-  async function loadClientInstallations() {
+  async function loadClientInstallations(force = false) {
+    state.installationsLoaded = false;
+    state.installationLoadError = "";
+    state.officialLoginMessage = "";
+    renderLaunchpad(state.status || {});
     try {
-      const payload = await api("/api/client-installations", {}, "client-installations", 8000);
+      const payload = await api(`/api/client-installations${force ? "?force=1" : ""}`, {}, "client-installations", 8000);
       state.installations = Array.isArray(payload.items) ? payload.items : [];
       state.installationsLoaded = true;
       renderLaunchpad(state.status || {});
@@ -554,6 +734,7 @@
       if (error.name === "RequestCancelled") return;
       state.installations = [];
       state.installationsLoaded = true;
+      state.installationLoadError = error.message || "安装位置检查失败";
       renderLaunchpad(state.status || {});
     }
   }
@@ -561,32 +742,110 @@
   function renderLaunchpad(data) {
     // 启动入口卡只在总览页“当前召唤师”页签展示；搜索出的玩家页签（无论
     // 是否查到结果）都不展示，避免干扰查看他人战绩。
+    if (data.connected) {
+      state.clientLaunchInFlight = "";
+      state.clientLaunched = null;
+      state.officialLoginMessage = "";
+    }
     const visible = !data.connected && state.section === "overview" && state.overviewTabIsCurrent !== false;
     el.clientLaunchpad.hidden = !visible;
     if (!visible) return;
+    const launchedID = state.clientLaunched?.id === "tcls" || state.clientLaunched?.id === "riot" ? state.clientLaunched.id : "";
+    const launchedTCLS = launchedID === "tcls";
+    el.launchpadEyebrow.textContent = launchedID ? "已启动" : "英雄联盟客户端未登录";
+    el.launchpadTitle.textContent = launchedID ? (launchedTCLS ? "正在登录国服客户端" : "正在登录 Riot 客户端") : "选择登录入口";
+    el.launchpadDescription.textContent = launchedID
+      ? (launchedTCLS ? "请在弹出的腾讯窗口完成登录；登录并进入大厅后会自动连接。" : "请在弹出的 Riot 窗口完成登录；登录并进入大厅后会自动连接。")
+      : "密码、扫码与安全验证只在腾讯官方窗口完成，登录后自动连接。";
+    el.clientLaunchReselect.hidden = !launchedID;
+    el.clientLaunchReselect.disabled = false;
+    el.clientLaunchReselect.onclick = launchedID ? () => {
+      state.clientLaunchInFlight = "";
+      state.clientLaunched = null;
+      state.officialLoginMessage = "";
+      renderLaunchpad(state.status || {});
+    } : null;
+    el.officialLoginStatus.hidden = Boolean(launchedID);
+    if (launchedID) {
+      el.launcherList.hidden = true;
+      return;
+    }
+    const launchInFlight = Boolean(state.clientLaunchInFlight);
+    const installationFailed = Boolean(state.installationLoadError);
+    const installations = state.installations.filter((item) => item.available && (item.id === "tcls" || item.id === "riot"));
+    el.officialLoginStatus.textContent = installationFailed ? `无法检查客户端安装位置：${state.installationLoadError}` : !state.installationsLoaded ? "正在检查腾讯英雄联盟客户端安装位置。" : state.officialLoginMessage || (installations.length ? "登录并进入大厅后会自动连接。" : "未找到可启动的英雄联盟客户端入口。");
     if (!state.installationsLoaded) {
-      el.launcherList.innerHTML = '<span class="muted">正在检查 TCLS、WeGame 与 Riot 客户端…</span>';
+      el.launcherList.hidden = false;
+      el.launcherList.innerHTML = '<span class="muted">正在检查 TCLS 与 Riot 客户端…</span>';
       return;
     }
-    if (!state.installations.length) {
-      el.launcherList.innerHTML = '<div class="empty-state compact"><strong>没有检测到可启动入口</strong><p>请先从桌面启动 WeGame 或英雄联盟。助手会继续在后台等待连接。</p><button class="text-button scan-launchers" type="button">重新检查安装位置</button></div>';
-      el.launcherList.querySelector(".scan-launchers")?.addEventListener("click", loadClientInstallations);
+    if (installationFailed) {
+      el.launcherList.hidden = false;
+      el.launcherList.innerHTML = `<div class="empty-state compact"><strong>安装位置检查失败</strong><p>${escapeHTML(state.installationLoadError)}</p><button class="text-button scan-launchers" type="button">重新检查安装位置</button></div>`;
+      el.launcherList.querySelector(".scan-launchers")?.addEventListener("click", () => loadClientInstallations(true));
       return;
     }
-    el.launcherList.innerHTML = state.installations.map((item) => `<button class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"><span class="launcher-kind">${escapeHTML(item.kind === "riot" ? "R" : item.kind === "tcls" ? "L" : "W")}</span><span class="launcher-card-copy"><strong>${escapeHTML(item.name)}</strong><small data-tooltip="${escapeHTML(item.location || item.description)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(item.location || item.description)}</small></span><span class="launcher-arrow" aria-hidden="true">›</span></button>`).join("");
-    for (const button of el.launcherList.querySelectorAll("[data-client-id]")) button.addEventListener("click", () => launchDetectedClient(button));
+    if (!installations.length) {
+      el.launcherList.hidden = false;
+      el.launcherList.innerHTML = '<div class="empty-state compact"><strong>没有检测到可启动入口</strong><p>请先安装或从桌面启动英雄联盟客户端。助手会继续在后台等待连接。</p><button class="text-button scan-launchers" type="button">重新检查安装位置</button></div>';
+      el.launcherList.querySelector(".scan-launchers")?.addEventListener("click", () => loadClientInstallations(true));
+      return;
+    }
+    el.launcherList.hidden = false;
+    el.launcherList.innerHTML = installations.length ? installations.map((item) => {
+      const isTCLS = item.id === "tcls";
+      const label = isTCLS ? (state.clientLaunchInFlight === "tcls" ? "正在打开国服纯净入口" : "国服纯净入口") : item.name;
+      const description = isTCLS ? "跳过 WeGame，直连国服客户端" : item.location || item.description;
+      return `<button${isTCLS ? ' id="official-login"' : ""} class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"${launchInFlight ? " disabled" : ""}><span class="launcher-kind">${escapeHTML(isTCLS ? "L" : "R")}</span><span class="launcher-card-copy"><strong>${escapeHTML(label)}</strong><small data-tooltip="${escapeHTML(description)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(description)}</small></span><span class="launcher-arrow" aria-hidden="true">›</span></button>`;
+    }).join("") : "";
+    for (const button of el.launcherList.querySelectorAll("[data-client-id]")) {
+      button.addEventListener("click", () => button.dataset.clientId === "tcls" ? launchOfficialLogin(button) : launchDetectedClient(button));
+    }
+  }
+
+  async function launchOfficialLogin(button) {
+    if (state.clientLaunchInFlight || button?.disabled) return;
+    state.clientLaunchInFlight = "tcls";
+    state.clientLaunched = null;
+    state.officialLoginMessage = "正在打开国服纯净入口。";
+    renderLaunchpad(state.status || {});
+    try {
+      await api("/api/client-launch", { method: "POST", body: JSON.stringify({ id: "tcls" }) }, "official-login-launch", 8000);
+      state.clientLaunchInFlight = "";
+      state.clientLaunched = { id: "tcls", at: Date.now() };
+      state.officialLoginMessage = "";
+      renderLaunchpad(state.status || {});
+      showToast("国服客户端已打开");
+      setTimeout(() => refreshStatus(false), 1200);
+    } catch (error) {
+      state.clientLaunchInFlight = "";
+      state.clientLaunched = null;
+      state.officialLoginMessage = error.message;
+      renderLaunchpad(state.status || {});
+      showToast(error.message);
+    }
   }
 
   async function launchDetectedClient(button) {
-    for (const candidate of el.launcherList.querySelectorAll("button")) candidate.disabled = true;
+    const id = button?.dataset.clientId || "";
+    if (!id || state.clientLaunchInFlight || button.disabled) return;
+    state.clientLaunchInFlight = id;
+    state.clientLaunched = null;
+    state.officialLoginMessage = "";
+    renderLaunchpad(state.status || {});
     try {
-      await api("/api/client-launch", { method: "POST", body: JSON.stringify({ id: button.dataset.clientId }) }, "client-launch", 8000);
+      await api("/api/client-launch", { method: "POST", body: JSON.stringify({ id }) }, "client-launch", 8000);
+      state.clientLaunchInFlight = "";
+      state.clientLaunched = { id, at: Date.now() };
+      renderLaunchpad(state.status || {});
       showToast("客户端已启动，登录并进入大厅后会自动连接");
       setTimeout(() => refreshStatus(false), 3000);
     } catch (error) {
+      state.clientLaunchInFlight = "";
+      state.clientLaunched = null;
+      state.officialLoginMessage = error.message;
+      renderLaunchpad(state.status || {});
       showToast(error.message);
-    } finally {
-      for (const candidate of el.launcherList.querySelectorAll("button")) candidate.disabled = false;
     }
   }
 
@@ -703,6 +962,7 @@
     cancelRenderFrames();
     cancelDeferredImages(el.grid);
     const generation = ++state.renderGeneration;
+    if (state.section !== "favorites" || state.favoritesPage !== "collection") return;
     el.grid.classList.remove("is-sparse");
     el.grid.style.removeProperty("--sparse-columns");
     el.grid.style.removeProperty("--sparse-max-width");
@@ -1489,7 +1749,7 @@
       const summoner = payload.summoner || {};
       const account = payload.account || {};
       const loot = Array.isArray(account.loot) ? account.loot : [];
-      const displayLoot = loot.filter((item) => lootName(item) !== "未识别材料");
+      const displayLoot = [...loot];
       if (account.sanctumSparksKnown) displayLoot.push({
         lootId: "CURRENCY_ANCIENT_SPARK",
         displayName: "圣堂花火",
@@ -1500,7 +1760,7 @@
       });
       const rewards = Array.isArray(account.rewards) ? account.rewards : [];
       const capabilities = Array.isArray(account.capabilities) ? account.capabilities : [];
-      const categoryOrder = ["材料", "英雄", "皮肤", "小小英雄", "永恒星碑", "表情", "守卫", "图标"];
+      const categoryOrder = ["材料", "宝箱", "英雄", "皮肤", "小小英雄", "永恒星碑", "表情", "守卫", "图标"];
       const skinLoot = displayLoot.filter((item) => item.category === "皮肤");
       const skinLootQuantity = skinLoot.reduce((total, item) => total + Number(item.count || 0), 0);
       const rewardQuantity = rewards.reduce((total, grant) => total + (grant.items || []).reduce((subtotal, item) => subtotal + Number(item.quantity || 1), 0), 0);
@@ -1520,10 +1780,10 @@
 	  const profileName = playerName(summoner);
 	  const profileIcon = window.deepLegendsGameIcons?.iconFigure?.("profile", summoner.profileIconId, profileName, "summoner-avatar", false)
 		|| `<span class="game-icon is-summoner-avatar"><span aria-hidden="true">${escapeHTML(profileName.slice(0, 1) || "?")}</span></span>`;
-	  const backgroundArt = summoner.backgroundSource && summoner.backgroundPath
+	  const backgroundArt = window.deepLegendsOverviewArt?.render(summoner) || (summoner.backgroundSource && summoner.backgroundPath
 		? `<img class="summoner-strip-art account-hero-art" src="/api/champion-asset?source=${encodeURIComponent(summoner.backgroundSource)}&path=${encodeURIComponent(summoner.backgroundPath)}" alt="" aria-hidden="true" decoding="async" data-game-image>`
-		: "";
-	  el.accountContent.innerHTML = `<section class="account-hero">${backgroundArt}${profileIcon}<div class="account-identity"><p class="eyebrow">当前召唤师</p><h3>${escapeHTML(profileName)}</h3><p>等级 ${formatNumber(summoner.summonerLevel)} · 本机只读连接</p></div><dl class="account-facts"><div><dt>皮肤物品</dt><dd>${formatNumber(skinLoot.length)} 种 · ${formatNumber(skinLootQuantity)} 件</dd></div><div><dt>待领取</dt><dd>${formatNumber(rewards.length)} 组 · ${formatNumber(rewardQuantity)} 件</dd></div></dl></section>${categorySections || '<div class="empty-state"><strong>仓库当前没有可展示物品</strong></div>'}<section class="account-section"><div class="section-copy"><h3>待领取奖励</h3><span class="section-count">${formatNumber(rewards.length)} 组</span><button class="text-button" type="button" data-navigate-suite="sweep">去拾遗领取</button></div>${rewardCards ? `<div class="reward-grid">${rewardCards}</div>` : '<div class="empty-state compact"><strong>没有待领取奖励</strong><p>随行会扫描奖励账本、任务与事件中心。</p></div>'}</section><details class="capability-details"><summary>数据来源状态</summary><p>只读接口单独降级，不影响皮肤库存的双来源一致性核验。</p><div class="capability-list">${capabilityRows || '<p class="muted">尚无能力状态</p>'}</div></details>`;
+		: "");
+	  el.accountContent.innerHTML = `<section class="account-hero">${backgroundArt}${profileIcon}<div class="account-identity"><p class="eyebrow">当前召唤师</p><h3>${escapeHTML(profileName)}</h3><p>等级 ${formatNumber(summoner.summonerLevel)} · 本机只读连接</p></div><dl class="account-facts"><div><dt>皮肤物品</dt><dd>${formatNumber(skinLoot.length)} 种 · ${formatNumber(skinLootQuantity)} 件</dd></div><div><dt>待领取</dt><dd>${formatNumber(rewards.length)} 组 · ${formatNumber(rewardQuantity)} 件</dd></div></dl></section>${categorySections || '<div class="empty-state"><strong>仓库当前没有可展示物品</strong></div>'}<section class="account-section"><div class="section-copy"><h3>待领取奖励</h3><span class="section-count">${formatNumber(rewards.length)} 组</span><button class="text-button" type="button" data-navigate-suite="sweep">去领奖</button></div>${rewardCards ? `<div class="reward-grid">${rewardCards}</div>` : '<div class="empty-state compact"><strong>没有待领取奖励</strong><p>工具会扫描奖励账本、任务与事件中心。</p></div>'}</section><details class="capability-details"><summary>数据来源状态</summary><p>只读接口单独降级，不影响皮肤库存的双来源一致性核验。</p><div class="capability-list">${capabilityRows || '<p class="muted">尚无能力状态</p>'}</div></details>`;
       for (const image of el.accountContent.querySelectorAll(".loot-art img")) loadNextLootImage(image, true);
 	  window.deepLegendsGameIcons?.prepareImages?.(el.accountContent);
     } catch (error) {
@@ -1610,7 +1870,7 @@
       } else if (activePage === "catalog" || !activePage) {
         await loadPoolCatalog();
       }
-    } catch (error) { state.poolsLoaded = false; renderPanelError(el.poolsContent, "奖池读取失败", error.message, loadPools); }
+    } catch (error) { if (error.name === "RequestCancelled" || state.destroyed) return; state.poolsLoaded = false; renderPanelError(el.poolsContent, "奖池读取失败", error.message, loadPools); }
   }
 
   async function loadPoolCatalog() {
@@ -1720,8 +1980,7 @@
     el.privacyContent.innerHTML = '<p class="muted">正在读取隐私说明…</p>';
     try {
       const data = await api("/api/privacy", {}, "privacy");
-      const group = (title, values) => `<section><h3>${title}</h3><ul>${values.map((value) => `<li>${escapeHTML(value)}</li>`).join("")}</ul></section>`;
-      el.privacyContent.innerHTML = `<div class="stat-grid"><div class="stat"><span>账号数据处理</span><strong>${data.localOnly ? "仅限本机" : "包含网络服务"}</strong></div><div class="stat"><span>账号密码</span><strong>${data.requiresPassword ? "需要" : "不需要"}</strong></div><div class="stat"><span>收藏数据上传</span><strong>${data.uploadsData ? "会上传" : "不会上传"}</strong></div></div><div class="privacy-list">${group("默认读取", data.reads || [])}${group("明确点击后写入客户端", data.explicitWrites || [])}${group("设置开启后自动写入客户端", data.automaticWrites || [])}${group("外部读取", data.externalReads || [])}${group("本地保存", data.stores || [])}${group("绝不保存", data.neverStores || [])}</div>`;
+      el.privacyContent.innerHTML = `<div class="stat-grid"><div class="stat"><span>账号数据处理</span><strong>${data.localOnly ? "仅限本机" : "包含网络服务"}</strong></div><div class="stat"><span>账号密码</span><strong>${data.requiresPassword ? "需要" : "不需要"}</strong></div><div class="stat"><span>收藏数据上传</span><strong>${data.uploadsData ? "会上传" : "不会上传"}</strong></div></div><p class="muted">客户端操作需主动点击；自动规则仅在开启后执行。</p>`;
     } catch (error) { renderPanelError(el.privacyContent, "隐私说明读取失败", error.message, loadPrivacy); }
   }
 
@@ -1758,6 +2017,7 @@
   // 重试到真正滚到目标位置为止，并给一个时间上限，同时一旦用户自己动了滚轮／
   // 触摸／键盘就立刻放弃，绝不和用户抢滚动条。
   function restoreSectionScroll(name) {
+    if (name === "overview") return; // player workspace owns its scroll
     const sectionScrollRestoreBudget = 2000;
     const target = Number(state.sectionScroll[name] || 0);
     el.appScroll.scrollTo({ top: target, behavior: "instant" });
@@ -1779,27 +2039,46 @@
 
   function activateSection(name) {
     const tab = el.sectionTabs.find((item) => item.dataset.section === name);
-    if (!tab) return;
+    const standalonePanels = {
+      "pro-players": document.getElementById("pro-players-panel"),
+    };
+    const standalone = standalonePanels[name] || null;
+    if (!tab && !standalone) return;
+    window.dispatchEvent(new CustomEvent("deep-legends:before-section"));
     const previousSection = state.section;
     if (previousSection !== name) state.sectionScroll[previousSection] = el.appScroll.scrollTop;
-    if (name !== "favorites" && state.section === "favorites" && state.favoritesPage === "collection") cancelDeferredImages(el.grid);
+    if (name !== "favorites" && state.section === "favorites") {
+      cancelRenderFrames();
+      cancelPoolRenderFrames();
+      state.renderGeneration += 1;
+      state.poolRenderGeneration += 1;
+      cancelDeferredImages(el.grid);
+    }
     state.section = name;
-    const sectionTitles = { overview: ["总览", "召唤师生涯与最近对局"], champions: ["英雄", "韩服梯度、符文与构建推荐"], live: ["对局", "实时队伍与赛前配置"], favorites: ["收藏", "皮肤、物品与三合一奖池"], suite: ["随行", "托管流程 · 端侧整备 · 门面 · 拾遗"], settings: ["设置", "显示、对局行为与隐私"] };
+    const sectionTitles = { "pro-players": ["职业选手", "一队选手 · 公开韩服账号"], overview: ["总览", "召唤师生涯与最近对局"], champions: ["英雄", "韩服梯度、符文与构建推荐"], live: ["对局", "实时队伍与赛前配置"], favorites: ["收藏", "皮肤、物品与三合一奖池"], suite: ["工具", "自动 · 维护 · 生涯 · 领奖 · 征召"], settings: ["设置", "显示、对局行为与隐私"] };
     const title = sectionTitles[name] || ["Deep Legends", "战绩 · 英雄 · 对局 · 收藏"];
     el.currentSectionTitle.textContent = title[0];
     el.topbarSubtitle.textContent = title[1];
     el.pageIntro.hidden = name !== "favorites";
     const applyPanels = () => {
-      activateTab(tab, el.sectionTabs, (selected) => {
-        for (const panel of el.sectionPanels) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
-      });
+      if (standalone) {
+        for (const item of el.sectionTabs) {
+          item.classList.remove("is-active");
+          item.setAttribute("aria-selected", "false");
+          item.tabIndex = item.dataset.section === "overview" ? 0 : -1;
+        }
+        for (const panel of el.sectionPanels) panel.hidden = panel !== standalone;
+      } else {
+        activateTab(tab, el.sectionTabs, (selected) => {
+          for (const panel of el.sectionPanels) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
+        });
+      }
       if (previousSection !== name) restoreSectionScroll(name);
+      window.dispatchEvent(new CustomEvent("deep-legends:section", { detail: { name } }));
     };
-    if (previousSection !== name && typeof document.startViewTransition === "function" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      document.startViewTransition(applyPanels);
-    } else {
-      applyPanels();
-    }
+    // Snapshotting a large collection/match DOM delays the navigation callback
+    // itself. Switch panels synchronously; never photograph the outgoing page.
+    applyPanels();
     // 离开后重新进入的页面一律还原到默认页签与筛选项。
     if (name === "favorites") {
       const fresh = previousSection !== "favorites";
@@ -1813,7 +2092,6 @@
     }
     if (state.status) renderNotice(state.status);
     if (state.status) renderLaunchpad(state.status);
-    window.dispatchEvent(new CustomEvent("deep-legends:section", { detail: { name } }));
   }
 
   window.addEventListener("deep-legends:navigate", (event) => {
@@ -1853,6 +2131,13 @@
     const tab = el.favoritesTabs.find((item) => item.dataset.favoritesPage === name);
     if (!tab) return;
     const previous = state.favoritesPage;
+    if (previous !== name) {
+      cancelRenderFrames();
+      cancelPoolRenderFrames();
+      state.renderGeneration += 1;
+      state.poolRenderGeneration += 1;
+      cancelDeferredImages(el.grid);
+    }
     state.favoritesPage = name;
     activateTab(tab, el.favoritesTabs, (selected) => {
       for (const panel of [el.favoritesCollectionPanel, el.favoritesAccountPanel, el.favoritesPoolsPanel]) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
@@ -1865,7 +2150,7 @@
       resetCollectionControls("owned");
       if (ownedTab) activateTab(ownedTab, el.viewTabs, () => {});
       triggerCollectionRescanIfDirty();
-      loadSkins(true);
+      loadSkins(false);
     }
     if (name === "account" && !state.accountLoaded) loadAccount();
     if (name === "pools" && !state.poolsLoaded) loadPools();
@@ -1893,8 +2178,10 @@
   }
 
   function triggerCollectionRescanIfDirty() {
-    if (!state.status?.connected || !state.status?.collectionDirty || state.collectionRescanInFlight) return false;
+    if (!state.status?.connected || !state.status?.snapshotReady || state.status?.syncing || !state.status?.collectionDirty || state.collectionRescanInFlight || state.collectionEnsureInFlight) return false;
     state.collectionRescanInFlight = true;
+    state.collectionRequestAt = Date.now();
+    state.collectionRequestAttempt = state.status.lastAttempt;
     void api("/api/refresh", { method: "POST" }, "collection-rescan").catch((error) => {
       state.collectionRescanInFlight = false;
       if (error.name !== "RequestCancelled") showToast(`收藏后台补刷未启动：${error.message}`);
@@ -1905,6 +2192,7 @@
   function activateSettingsPage(name) {
     const tab = el.settingsTabs.find((item) => item.dataset.settingsPage === name);
     if (!tab) return;
+    if (state.settingsPage !== name) resetDiagnosticsExport();
     state.settingsPage = name;
     activateTab(tab, el.settingsTabs, (selected) => {
       for (const panel of el.settingsPanels) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
@@ -1957,6 +2245,112 @@
   const THEME_OPTIONS = ["auto", "light", "dark", "azure", "emerald", "violet", "crimson", "aurora", "oled"];
   const THEME_BACKGROUNDS = { light: "#ffffff", dark: "#0B0E14", azure: "#0A0F16", emerald: "#0B0E12", violet: "#0C0D14", crimson: "#0E0C0D", aurora: "#0A0F12", oled: "#000000" };
 
+  // ---------- 界面缩放 ----------
+  // 缩放做在前端（:root 上的 --ui-zoom + .app-frame 的 CSS zoom），而不是桌面外壳的
+  // webContents.setZoomFactor：后者只在 Electron 里生效，用浏览器直连后端预览时
+  // 一点效果都没有。前端方案两个环境都生效，桌面外壳只负责把 Windows 标题栏覆盖层
+  // 的高度和窗口最小尺寸跟着档位走。
+  //
+  // 自动缩放是**连续**的：倍率 = 窗口逻辑尺寸 ÷ 设计基准，不取档位。
+  // 1920×1080 恰好是基准，倍率 1.00，像素级等于设计稿；窗口再宽/再高就整体等比放大。
+  // ★下限是 1.00：只放大不自动缩小。窗口小于基准时不去压字号（1080p 上窗口占屏 92%，
+  // 真按比例算会缩到 0.92 倍、字号 10.5→9.66，比不做适配还糟），交给原有响应式断点。
+  // 想用更小的界面换更多内容，设置页里有手动 90% 档。
+  // CSS zoom 缩放的是整棵渲染树，字体、图标、间距、圆角、1px 描边全部同比例，
+  // 所以不需要把全站 px 改写成 rem——rem 反而漏掉硬编码 px 和 SVG 尺寸。
+  //
+  // ★UI_SCALE_STEPS 只是设置页里手动锁档的可选值；自动模式不受它约束。
+  // 档位表与基准必须与 desktop/ui-scale.cjs 一致，desktop/ui-scale.test.cjs 有断言。
+  const UI_SCALE_STEPS = [0.9, 1, 1.1, 1.25, 1.4, 1.5, 1.75, 2, 2.25, 2.5];
+  const UI_SCALE_BASE_WIDTH = 1920;
+  const UI_SCALE_BASE_HEIGHT = 900;
+  const UI_SCALE_MIN = 1;
+  const UI_SCALE_MAX = 2.5;
+  let uiScaleReady = false;
+  let uiScaleRevision = 0;
+  let appliedUiScale = 0;
+  let uiScaleFrame = 0;
+
+  function autoUiScale(width = window.innerWidth, height = window.innerHeight) {
+    const raw = Math.min(Number(width) / UI_SCALE_BASE_WIDTH, Number(height) / UI_SCALE_BASE_HEIGHT);
+    if (!Number.isFinite(raw)) return 1;
+    // 量化到 1%：拖窗口时避免每一个像素都触发一次整页重排。
+    return Math.min(UI_SCALE_MAX, Math.max(UI_SCALE_MIN, Math.round(raw * 100) / 100));
+  }
+
+  function preferredUiScale() {
+    const stored = preference("ui-scale", "auto");
+    const fixed = Number(stored);
+    return stored !== "auto" && UI_SCALE_STEPS.includes(fixed) ? fixed : 0;
+  }
+
+  // 缩放会触发整页重排，所以只在真正跨档时写 --ui-zoom。
+  function applyUiScale() {
+    const fixed = preferredUiScale();
+    const scale = fixed || autoUiScale();
+    if (scale === appliedUiScale) return scale;
+    appliedUiScale = scale;
+    document.documentElement.style.setProperty("--ui-zoom", String(scale));
+    document.documentElement.dataset.uiScale = String(scale);
+    // 桌面外壳据此把标题栏覆盖层高度改成 round(56 * scale)，否则系统三大按钮会和顶栏错位。
+    window.desktopScale?.applied?.(scale);
+    renderUiScaleAutoLabel();
+    return scale;
+  }
+
+  function scheduleUiScale() {
+    if (uiScaleFrame) return;
+    uiScaleFrame = requestAnimationFrame(() => { uiScaleFrame = 0; applyUiScale(); });
+  }
+
+  function renderUiScaleAutoLabel() {
+    const select = el.settingUiScale;
+    const autoOption = select?.querySelector('option[value="auto"]');
+    if (!autoOption) return;
+    autoOption.textContent = preferredUiScale() ? "自动" : `自动（当前 ${Math.round(appliedUiScale * 100)}%）`;
+    if (select.value === "auto") syncNativeSelectMenu(select);
+  }
+
+  function renderUiScaleSetting() {
+    const select = el.settingUiScale;
+    if (!select) return;
+    const stored = preference("ui-scale", "auto");
+    select.value = [...select.options].some((option) => option.value === stored) ? stored : "auto";
+    applyUiScale();
+    renderUiScaleAutoLabel();
+    syncNativeSelectMenu(select);
+    if (uiScaleReady) window.desktopScale?.set?.(select.value === "auto" ? "auto" : "fixed", select.value === "auto" ? undefined : Number(select.value));
+  }
+
+  // 桌面外壳持久化的档位优先于 localStorage：后端端口每次启动都变，
+  // localStorage 跟着 origin 一起丢，只靠它会把用户锁定的固定档退回自动。
+  function receiveUiScale(payload) {
+    const select = el.settingUiScale;
+    if (!select || !payload || !["auto", "fixed"].includes(payload.mode)) return;
+    const value = payload.mode === "auto" ? "auto" : String(payload.value);
+    if (![...select.options].some((option) => option.value === value)) return;
+    savePreference("ui-scale", value);
+    select.value = value;
+    applyUiScale();
+    renderUiScaleAutoLabel();
+    syncNativeSelectMenu(select);
+  }
+
+  async function setupUiScaleSetting() {
+    applyUiScale();
+    window.addEventListener("resize", scheduleUiScale, { passive: true });
+    if (!window.desktopScale || !el.settingUiScale) return;
+    const unsubscribe = window.desktopScale.onChanged?.(receiveUiScale);
+    window.addEventListener("deep-legends:dispose", () => unsubscribe?.(), { once: true });
+    const revision = uiScaleRevision;
+    try {
+      const stored = await window.desktopScale.get?.();
+      if (revision === uiScaleRevision) receiveUiScale(stored);
+    } catch (_) { /* Use the local preference when the bridge cannot read. */ }
+    uiScaleReady = true;
+    renderUiScaleSetting();
+  }
+
   function applyAppearance() {
     const stored = preference("theme", "dark");
     const theme = THEME_OPTIONS.includes(stored) ? stored : "dark";
@@ -1979,6 +2373,7 @@
     if (el.settingTheme) el.settingTheme.value = theme;
     el.densityToggle.textContent = density === "compact" ? "切换为舒适" : "切换为紧凑";
     el.densityToggle.setAttribute("aria-pressed", String(density === "compact"));
+    renderUiScaleSetting();
   }
 
   function resolvedTheme(theme, date = new Date()) {
@@ -2026,7 +2421,7 @@
       renderShareDirectorySetting(result?.directory || "");
     } catch (error) {
       renderShareDirectorySetting("", false);
-      showToast(error?.message || "分享图保存位置读取失败");
+      showToast(error?.message || "导出位置读取失败");
     }
   }
 
@@ -2042,10 +2437,10 @@
       const result = await bridge.chooseSaveDirectory();
       if (!result?.canceled) {
         renderShareDirectorySetting(result?.directory || "");
-        showToast("分享图保存位置已更新");
+        showToast("导出位置已更新");
       }
     } catch (error) {
-      showToast(error?.message || "分享图保存位置修改失败");
+      showToast(error?.message || "导出位置修改失败");
     } finally {
       el.settingShareDirectoryChange.disabled = false;
     }
@@ -2175,7 +2570,15 @@
   function discoveryResultLabel(value) { return ({ connected: "已连接", searching: "正在探测", "process-not-found": "未发现进程", "credentials-unreadable": "凭据不可读", "probe-failed": "接口未就绪", "process-query-failed": "进程查询失败", unsupported: "系统不支持" })[value] || value || "尚未探测"; }
   function capabilityName(value) { return ({ "summoner-profile": "玩家主页资料", "player-loot": "客户端战利品", "sanctum-sparks": "圣堂花火", "pending-rewards": "待领取奖励", "owned-champions": "已拥有英雄", "owned-chromas": "已拥有炫彩", "skin-acquisition-time": "皮肤获取时间", "champion-mastery": "英雄熟练度" })[value] || value || "未知能力"; }
   function lootToken(item) { return String(item?.lootId || item?.lootName || "").trim().replace(/[\s-]+/g, "_").toUpperCase(); }
-  function lootName(item) { return item.displayName || item.localizedName || item.lootName || item.lootId || "未识别材料"; }
+	  function lootName(item) {
+		const localized = String(item?.localizedName || "").trim();
+		return item?.displayName || (localized === "未命名战利品" ? "" : localized) || item?.lootName || item?.lootId || "客户端返回的空白条目";
+	  }
+  function lootNamePending(item) {
+    const name = String(lootName(item) || "").trim();
+    const rawID = String(item?.lootId || "").trim();
+	return Boolean(rawID && name.toUpperCase() === rawID.toUpperCase());
+  }
   function lootTypeLabel(item) {
     const type = String(item?.type || item?.displayCategories || "").toUpperCase();
     if (item?.kind) return item.kind;
@@ -2190,6 +2593,7 @@
       MATERIAL_KEY_FRAGMENT: "/loot-icons/key-fragment.png",
       CHEST_CHAMPION_MASTERY: "/loot-icons/hextech-chest-transparent.png",
 	  CHEST_PROMOTION: "/loot-icons/promotion-chest.png",
+	  CHEST_GENERIC: "/loot-icons/promotion-chest.png",
       CURRENCY_ANCIENT_SPARK: "/loot-icons/sanctum-spark.svg",
     };
     return [...new Set([fixed[token], item.tilePath, item.asset, item.splashPath].filter(Boolean))];
@@ -2216,17 +2620,18 @@
 	const ownership = category === "皮肤" && item.skinOwnedKnown
 	  ? `<small class="loot-ownership ${item.skinOwned ? "is-owned" : "is-unowned"}">${item.skinOwned ? "已拥有" : "可升级"}</small>`
       : "";
-    const description = category === "皮肤" ? "" : (item.localizedDescription || "");
 	const essenceIcon = '<img src="/loot-icons/orange-essence.png" alt="橙色精粹">';
 	const canUpgrade = !item.skinOwnedKnown || !item.skinOwned;
+	const namePending = lootNamePending(item);
 	const essence = category === "皮肤" && (Number(item.disenchantValue) > 0 || (canUpgrade && Number(item.upgradeEssenceValue) > 0))
 	  ? `<div class="loot-essence-values">${Number(item.disenchantValue) > 0 ? `<span>分解 <b>+ ${formatNumber(item.disenchantValue)}</b>${essenceIcon}</span>` : ""}${canUpgrade && Number(item.upgradeEssenceValue) > 0 ? `<span>升级 <b>− ${formatNumber(item.upgradeEssenceValue)}</b>${essenceIcon}</span>` : ""}</div>`
 	  : "";
-    return `<article class="loot-card category-${slug}${tokenClass ? ` loot-${tokenClass}` : ""}"><span class="loot-art" aria-hidden="true"><span>${lootCategoryIcon(category)}</span>${art}</span><div class="loot-card-copy"><span>${escapeHTML(lootTypeLabel(item))}</span><strong>${escapeHTML(lootName(item))}</strong>${ownership}${essence}${description ? `<small>${escapeHTML(description)}</small>` : ""}</div><div class="loot-card-end"><b>× ${formatNumber(item.count)}</b></div></article>`;
+    return `<article class="loot-card category-${slug}${tokenClass ? ` loot-${tokenClass}` : ""}${namePending ? " is-name-pending" : ""}"><span class="loot-art" aria-hidden="true"><span>${lootCategoryIcon(category)}</span>${art}</span><div class="loot-card-copy"><span>${escapeHTML(lootTypeLabel(item))}</span><strong>${escapeHTML(lootName(item))}</strong>${namePending ? '<small class="loot-name-pending">名称待补全</small>' : ""}${ownership}${essence}</div><div class="loot-card-end"><b>× ${formatNumber(item.count)}</b></div></article>`;
   }
-  function lootCategorySlug(category) { return ({ "材料": "material", "英雄": "champion", "皮肤": "skin", "小小英雄": "companion", "永恒星碑": "eternal", "表情": "emote", "守卫": "ward", "图标": "icon" })[category] || "material"; }
+  function lootCategorySlug(category) { return ({ "材料": "material", "宝箱": "chest", "英雄": "champion", "皮肤": "skin", "小小英雄": "companion", "永恒星碑": "eternal", "表情": "emote", "守卫": "ward", "图标": "icon" })[category] || "material"; }
   function lootCategoryIcon(category) {
     const paths = {
+      "宝箱": '<path d="M4 4h16l2 6v10H2V10l2-6Zm2 2-1 4h14l-1-4H6Zm-2 6v6h16v-6h-6v3h-4v-3H4Z"/>',
       "材料": '<path d="M6 3h12l3 5-3 13H6L3 8l3-5Zm2 3L6 9l2 9h8l2-9-2-3H8Zm1 4h6v2H9v-2Z"/>',
       "英雄": '<path d="m12 2 7 4v6c0 4.7-3 8-7 10-4-2-7-5.3-7-10V6l7-4Zm0 3L8 7.3v4.5c0 3 1.6 5.3 4 6.9 2.4-1.6 4-3.9 4-6.9V7.3L12 5Zm-3 4h6l-1 6h-4L9 9Z"/>',
       "皮肤": '<path d="M4 5.5 8.5 3 12 5l3.5-2L20 5.5V13c0 4.4-3.7 7.3-8 9-4.3-1.7-8-4.6-8-9V5.5Zm3 2V13c0 2.6 2 4.5 5 5.9 3-1.4 5-3.3 5-5.9V7.5l-1.5-.8L12 9 8.5 6.7 7 7.5Zm1.5 3.5 2 1 1.5-1.5 1.5 1.5 2-1v3.5l-3.5 2-3.5-2V11Z"/>',
@@ -2240,7 +2645,8 @@
   }
   function playerName(summoner) { const name = summoner.gameName || summoner.displayName || "当前召唤师"; return `${name}${summoner.tagLine ? `#${summoner.tagLine}` : ""}`; }
   function rewardStatusLabel(value) { return ({ PENDING_SELECTION: "待选择", PENDING: "待领取", CREATED: "待处理" })[String(value || "").toUpperCase()] || value || "待处理"; }
-  function formatNumber(value) { const number = Number(value); return Number.isFinite(number) ? new Intl.NumberFormat("zh-CN").format(number) : "—"; }
+  const integerFormatter = new Intl.NumberFormat("zh-CN");
+  function formatNumber(value) { const number = Number(value); return Number.isFinite(number) ? integerFormatter.format(number) : "—"; }
   function formatFileSize(value) { const bytes = Math.max(0, Number(value) || 0); if (bytes < 1024) return `${formatNumber(bytes)} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KiB`; return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`; }
   function formatDateTime(value) { const date = new Date(value); return Number.isNaN(date.valueOf()) ? "时间未知" : new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(date); }
   // 导出诊断日志的文件名带上日期时间（MMDD-HHmm），避免同名文件在反复导出/
@@ -2270,6 +2676,7 @@
     setupLiveUpdates();
     clearTimeout(state.statusTimer);
     clearTimeout(state.liveUpdateTimer);
+    state.liveUpdateSlices.clear();
     state.statusDelay = STATUS_INTERVAL;
     state.skinsCache?.clear();
     void refreshStatus(false);
@@ -2283,13 +2690,17 @@
     showToast("正在重新读取对局与总览");
     softResetShellState();
     try {
+	  let refreshError = null;
+	  try {
+		await api("/api/refresh", { method: "POST" }, "refresh-background");
+	  } catch (error) {
+		if (error.name !== "RequestCancelled") refreshError = error;
+	  }
       const waitFor = [];
       window.dispatchEvent(new CustomEvent("deep-legends:hard-refresh", { detail: { waitFor, reason: "manual" } }));
       await Promise.allSettled(waitFor);
-      void api("/api/refresh", { method: "POST" }, "refresh-background").catch((error) => {
-        if (error.name !== "RequestCancelled") showToast(`收藏后台补刷未启动：${error.message}`);
-      });
-      showToast("对局与总览已重新读取");
+	  if (refreshError) showToast(`收藏后台补刷未启动：${refreshError.message}`);
+	  else showToast("对局与总览已重新读取");
     } finally {
       state.manualRefreshing = false;
       if (state.status) renderStatus();
@@ -2300,8 +2711,14 @@
     }
   });
   el.startupLoadingRetry?.addEventListener("click", () => el.refresh.click());
-  el.quit.addEventListener("click", async () => { if (!confirm("退出 Deep Legends？")) return; state.destroyed = true; clearTimeout(state.statusTimer); clearTimeout(state.liveUpdateTimer); clearTimeout(state.eventReconnectTimer); state.eventSource?.close(); for (const controller of state.controllers.values()) controller.abort(); state.controllers.clear(); try { await fetch("/api/quit", { method: "POST" }); } catch (_) {} document.body.innerHTML = '<main class="shell"><section class="empty-state"><strong>Deep Legends 已退出</strong><p>现在可以关闭这个页面。</p></section></main>'; });
+  el.quit.addEventListener("click", async () => { if (!confirm("退出 Deep Legends？")) return; state.destroyed = true; window.dispatchEvent(new CustomEvent("deep-legends:dispose")); clearTimeout(state.statusTimer); clearTimeout(state.liveUpdateTimer); clearTimeout(state.eventReconnectTimer); state.eventSource?.close(); for (const controller of state.controllers.values()) controller.abort(); state.controllers.clear(); try { await fetch("/api/quit", { method: "POST" }); } catch (_) {} document.body.innerHTML = '<main class="shell"><section class="empty-state"><strong>Deep Legends 已退出</strong><p>现在可以关闭这个页面。</p></section></main>'; });
   el.settingTheme.addEventListener("change", () => { savePreference("theme", el.settingTheme.value); applyAppearance(); });
+  el.settingUiScale.addEventListener("change", () => {
+    uiScaleRevision += 1;
+    uiScaleReady = true;
+    savePreference("ui-scale", el.settingUiScale.value);
+    renderUiScaleSetting();
+  });
   el.densityToggle.addEventListener("click", toggleDensity);
   el.settingShareDirectoryChange.addEventListener("click", changeShareDirectory);
 
@@ -2353,6 +2770,10 @@
       return;
     }
     window.dispatchEvent(new CustomEvent("deep-legends:open-player", { detail: { gameName, tagLine, region, serverId, source: "search" } }));
+    // Clear only the submitted query, synchronously; a later response must not erase new input.
+    el.playerSearchName.value = "";
+    el.playerSearchTag.value = "";
+    updateSearchClear();
   }
 
   /* 自定义服务器下拉：一级选择区域，二级选择国服服务器。 */
@@ -2412,7 +2833,7 @@
   function closeRegionMenu() { el.playerSearchRegionMenu.hidden = true; el.playerSearchRegion.setAttribute("aria-expanded", "false"); }
   el.playerSearchRegion.addEventListener("click", () => {
     const opening = el.playerSearchRegionMenu.hidden;
-    if (opening) setCNRegionExpanded(el.playerSearchRegion.dataset.region === "cn");
+    if (opening) setCNRegionExpanded(false);
     el.playerSearchRegionMenu.hidden = !opening;
     el.playerSearchRegion.setAttribute("aria-expanded", String(opening));
     if (opening) {
@@ -2422,6 +2843,12 @@
   });
   el.playerSearchCnToggle.addEventListener("click", () => setCNRegionExpanded(el.playerSearchCnToggle.getAttribute("aria-expanded") !== "true"));
   el.playerSearchRegionMenu.addEventListener("click", (event) => {
+    if (event.target.closest("#player-search-pro")) {
+      closeRegionMenu();
+      activateSection("pro-players");
+      document.getElementById("pro-players-title")?.focus();
+      return;
+    }
     const option = event.target.closest("[data-region-option]");
     if (!option || option.disabled) return;
     applySearchRegion(option.dataset.regionOption, option.dataset.serverId ?? "");
@@ -2584,6 +3011,45 @@
   }
 
   el.refreshHistory.addEventListener("click", loadHistory);
+  let diagnosticsExportReady = false;
+  let diagnosticsExportPending = false;
+  function resetDiagnosticsExport() {
+    diagnosticsExportReady = false;
+    el.exportDiagnostics.textContent = "导出诊断日志";
+  }
+  window.desktopDiagnostics?.onCompleted(() => {
+    if (state.section !== "settings" || state.settingsPage !== "privacy") return;
+    diagnosticsExportReady = true;
+    el.exportDiagnostics.textContent = "打开日志文件夹";
+  });
+  window.addEventListener("deep-legends:section", (event) => {
+    if (event.detail?.name !== "settings") resetDiagnosticsExport();
+  });
+  el.exportDiagnostics.addEventListener("click", async (event) => {
+    if (!diagnosticsExportReady) {
+      if (typeof window.flushFlowDiagnostics !== "function") return;
+      event.preventDefault();
+      if (diagnosticsExportPending) return;
+      diagnosticsExportPending = true;
+      try { await window.flushFlowDiagnostics(); }
+      catch (_) { /* An unavailable diagnostic endpoint must not block export. */ }
+      finally {
+        diagnosticsExportPending = false;
+        const link = document.createElement("a");
+        link.href = "/api/diagnostics/log";
+        link.download = diagnosticExportFilename();
+        link.hidden = true;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+      return;
+    }
+    event.preventDefault();
+    try { await window.desktopDiagnostics.openFolder(); }
+    catch (_) { showToast("日志文件夹打开失败"); }
+    finally { resetDiagnosticsExport(); }
+  });
   el.copyDiagnostics.addEventListener("click", async () => { if (!state.diagnostics) await loadDiagnostics(); if (!state.diagnostics) { showToast("诊断信息尚不可用"); return; } try { await navigator.clipboard.writeText(JSON.stringify(state.diagnostics, null, 2)); showToast("诊断摘要已复制，不包含客户端令牌"); } catch (_) { showToast("浏览器未允许复制，请手动选择内容"); } });
 
   el.poolImport.addEventListener("submit", async (event) => {
@@ -2668,15 +3134,67 @@
 
   function debounce(callback, delay) { let timer = 0; return (...args) => { clearTimeout(timer); timer = setTimeout(() => callback(...args), delay); }; }
 
+  async function flushLiveUpdateSlices() {
+	const slices = new Set(state.liveUpdateSlices);
+	state.liveUpdateSlices.clear();
+	if (!slices.size || state.destroyed) return;
+	if (slices.has("status")) await refreshStatus(slices.has("resync"));
+	if (slices.has("overview-player") && state.status?.connected) {
+	  window.dispatchEvent(new CustomEvent("deep-legends:overview-player", { detail: { summoner: state.status.summoner || {} } }));
+	}
+	if (slices.has("collection") && !slices.has("status") && state.section === "favorites" && state.favoritesPage === "collection") await loadSkins(true);
+	if (slices.has("account") && !slices.has("resync") && state.section === "favorites" && state.favoritesPage === "account") await loadAccount();
+	if (slices.has("pools") && !slices.has("status") && state.section === "favorites" && state.favoritesPage === "pools") await loadPools();
+  }
+
+  function queueLiveUpdateSlices(slices) {
+	for (const slice of slices || []) state.liveUpdateSlices.add(slice);
+	if (!state.liveUpdateSlices.size) return;
+	if (state.liveUpdateTimer) return;
+	state.liveUpdateTimer = setTimeout(() => {
+	  state.liveUpdateTimer = 0;
+	  void flushLiveUpdateSlices();
+	}, 180);
+  }
+
+  function resyncLiveState() {
+    state.accountLoaded = false;
+    state.poolsLoaded = false;
+    state.skinsCache?.clear();
+    queueLiveUpdateSlices(["status", "resync"]);
+    for (const name of ["friends-updated", "claim-changed", "facade-changed", "resync"]) {
+      window.dispatchEvent(new CustomEvent(`deep-legends:${name}`));
+    }
+  }
+
   function setupLiveUpdates() {
     if (!("EventSource" in window) || state.destroyed) return;
     clearTimeout(state.eventReconnectTimer);
     state.eventSource?.close();
     const source = new EventSource("/api/events");
     state.eventSource = source;
+    source.addEventListener?.("update:status", (event) => {
+      if (state.destroyed || state.eventSource !== source) return;
+      try {
+        const status = JSON.parse(event.data);
+        updateUI.statusEventRevision++;
+        renderUpdateStatus(status);
+      } catch (_) {}
+    });
+    source.addEventListener?.("update:progress", (event) => {
+      if (state.destroyed || state.eventSource !== source || !updateUI.status) return;
+      try { renderUpdateStatus({ ...updateUI.status, progress: JSON.parse(event.data) }); } catch (_) {}
+    });
     source.onopen = () => { if (state.eventSource === source) state.eventReconnectDelay = 1000; };
     source.onmessage = (event) => {
-      if (event.data === "ready" || state.destroyed) return;
+      if (state.destroyed || state.eventSource !== source) return;
+      if (event.data === "ready") {
+        if (state.liveEventsReady) resyncLiveState();
+        state.liveEventsReady = true;
+        return;
+      }
+      if (event.data === "pro-runes") { window.dispatchEvent(new CustomEvent("deep-legends:pro-runes")); return; }
+      if (event.data === "resync-required") { resyncLiveState(); return; }
 	  if (typeof event.data === "string" && event.data.startsWith("{")) {
 		try {
 		  const detail = JSON.parse(event.data);
@@ -2695,6 +3213,10 @@
         window.dispatchEvent(new CustomEvent("deep-legends:claim-changed"));
         return;
       }
+	  if (event.data === "facade:changed") {
+		window.dispatchEvent(new CustomEvent("deep-legends:facade-changed"));
+		return;
+	  }
       // 对局阶段事件只转发给对局模块（“对局”页签的新对局提示灯），不触发全量刷新。
       if (typeof event.data === "string" && (event.data.startsWith("gameflow:") || event.data === "champselect:changed")) {
         const detail = event.data === "champselect:changed" ? { changed: true } : { phase: event.data.slice(9) };
@@ -2716,17 +3238,11 @@
 	  if (slices.includes("account")) state.accountLoaded = false;
       // 只在首次连接（快照尚未就绪）时展示全屏读取遮罩；客户端事件触发的
       // 后台刷新静默进行，避免总览等页面每隔几秒被遮罩闪一下。
-      if (event.data === "refresh-started" && state.status?.connected && !state.status?.snapshotReady) {
+      if (event.data === "refresh-started" && state.status?.connected && !(state.status?.identityReady ?? state.status?.snapshotReady)) {
         state.overlaySuppressed = false;
         showReadingOverlay("正在读取收藏信息", "正在整理皮肤、炫彩与账户物品…");
       }
-      clearTimeout(state.liveUpdateTimer);
-      state.liveUpdateTimer = setTimeout(async () => {
-		if (slices.includes("status")) await refreshStatus(false);
-		if (slices.includes("collection") && !slices.includes("status") && state.section === "favorites" && state.favoritesPage === "collection") await loadSkins(true);
-		if (slices.includes("account") && state.section === "favorites" && state.favoritesPage === "account") await loadAccount();
-		if (slices.includes("pools") && !slices.includes("status") && state.section === "favorites" && state.favoritesPage === "pools") await loadPools();
-      }, 180);
+	  queueLiveUpdateSlices(slices);
     };
 	source.onerror = () => {
 	  if (state.destroyed || state.eventSource !== source) return;
@@ -2736,8 +3252,7 @@
 		el.accountLiveState.className = "state-chip";
 	  }
 	  window.dispatchEvent(new CustomEvent("deep-legends:live-disconnected"));
-	  clearTimeout(state.liveUpdateTimer);
-	  state.liveUpdateTimer = setTimeout(() => refreshStatus(false), 180);
+	  queueLiveUpdateSlices(["status"]);
 	  if (source.readyState === EventSource.CLOSED) {
 		state.eventSource = null;
 		const delay = state.eventReconnectDelay;
@@ -2746,6 +3261,222 @@
 		state.eventReconnectTimer = setTimeout(setupLiveUpdates, delay);
 	  }
 	};
+  }
+
+  function renderUpdateNotes(notes) {
+    const escaped = escapeHTML(String(notes || ""));
+    const inline = (line) => line.split(/(`[^`\n]+`|\[[^\]\n]+\]\([^\s)\n]+\)|\*\*[^*\n]+\*\*)/g).map((part) => {
+      if (part.startsWith("`") && part.endsWith("`")) return `<code>${part.slice(1, -1)}</code>`;
+      if (part.startsWith("**") && part.endsWith("**")) return `<strong>${part.slice(2, -2)}</strong>`;
+      const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      if (link && /^https:\/\//i.test(link[2])) {
+        const href = link[2].replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+        return `<a href="${href}" target="_blank" rel="noopener noreferrer">${link[1]}</a>`;
+      }
+      return part;
+    }).join("");
+    const result = [];
+    let list = false;
+    for (const line of escaped.split(/\r?\n/)) {
+      const item = line.match(/^[-*] (.*)$/);
+      if (item) {
+        if (!list) result.push("<ul>");
+        list = true;
+        result.push(`<li>${inline(item[1])}</li>`);
+        continue;
+      }
+      if (list) { result.push("</ul>"); list = false; }
+      if (line.startsWith("### ")) result.push(`<h3>${inline(line.slice(4))}</h3>`);
+      else if (line) result.push(`<p>${inline(line)}</p>`);
+    }
+    if (list) result.push("</ul>");
+    return result.join("");
+  }
+
+  function updateBytes(value) {
+    const bytes = Math.max(0, Number(value) || 0);
+    return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function renderUpdateStatus(status) {
+    updateUI.status = status || { supported: false, state: "idle" };
+    const current = updateUI.status;
+    renderManualUpdateCheck();
+    const visible = current.supported && ["available", "downloading", "verifying", "ready", "applying", "failed"].includes(current.state) && !!current.latest;
+    el.updateButton.hidden = !visible;
+    if (!visible) { finishManualUpdateCheck(); return; }
+    const manual = current.portable || current.manualOnly;
+    const busy = ["downloading", "verifying"].includes(current.state);
+    const ready = current.state === "ready" || current.state === "applying";
+    const progress = current.progress || {};
+    const percent = Math.max(0, Math.min(100, Math.floor(100 * (Number(progress.receivedBytes) || 0) / (Number(progress.totalBytes) || current.sizeBytes || 1))));
+    el.updateButton.classList.toggle("busy", busy && !manual);
+    el.updateButton.classList.toggle("ready", ready && !manual);
+    if (current.state === "available" && updateUI.announced !== current.latest && updateUI.seen !== current.latest) {
+      el.updateButton.classList.add("fresh");
+      updateUI.announced = current.latest;
+    }
+    el.updateButton.querySelector(".dot").hidden = current.state !== "available" || updateUI.seen === current.latest;
+    el.updateButton.querySelector(".hex-progress").setAttribute("stroke-dashoffset", String(59 * (1 - percent / 100)));
+    const tooltip = manual ? `有新版本 ${current.latest}` : busy ? `正在下载 ${percent}%` : ready ? "已就绪，点击重启升级" : `有新版本 ${current.latest}`;
+    el.updateButton.dataset.tooltip = tooltip;
+    el.updateButton.setAttribute("aria-label", tooltip);
+    renderUpdateDialog();
+    finishManualUpdateCheck();
+  }
+
+  function manualUpdateCheckBlocked() {
+    const current = updateUI.status || {};
+    return current.supported !== true || updateUI.checkPending || updateUI.pending || current.checking
+      || ["checking", "downloading", "verifying", "applying"].includes(current.state);
+  }
+
+  function renderManualUpdateCheck() {
+    const current = updateUI.status || {};
+    el.settingsUpdateCheck.hidden = current.supported !== true;
+    el.settingsUpdateCheck.disabled = Boolean(manualUpdateCheckBlocked());
+    const checking = updateUI.checkPending || current.checking || current.state === "checking";
+    el.settingsUpdateCheck.textContent = checking ? "正在检查…" : "检查更新";
+    el.settingsUpdateCheck.setAttribute("aria-busy", String(Boolean(checking)));
+  }
+
+  function showUpdateCheckFeedback(message) {
+    clearTimeout(updateUI.feedbackTimer);
+    el.settingsUpdateFeedback.textContent = message;
+    if (message) updateUI.feedbackTimer = setTimeout(() => { el.settingsUpdateFeedback.textContent = ""; }, 5000);
+  }
+
+  function finishManualUpdateCheck() {
+    const current = updateUI.status || {};
+    if (!updateUI.checkPending || updateUI.checkRequestPending || current.checking || current.state === "checking") return;
+    updateUI.checkPending = false;
+    if (current.error) showUpdateCheckFeedback(current.error);
+    else if (current.supported && current.latest && ["available", "downloading", "verifying", "ready", "applying", "failed"].includes(current.state)) openUpdateDialog();
+    else if (current.supported && current.state === "idle") showUpdateCheckFeedback("已是最新版本");
+    renderManualUpdateCheck();
+    if (el.updateDialog.open) renderUpdateDialog();
+  }
+
+  async function checkForUpdates() {
+    if (manualUpdateCheckBlocked()) return;
+    updateUI.checkPending = true;
+    updateUI.checkRequestPending = true;
+    const revision = updateUI.statusEventRevision;
+    showUpdateCheckFeedback("");
+    renderManualUpdateCheck();
+    if (el.updateDialog.open) renderUpdateDialog();
+    try {
+      const result = await api("/api/update/check", { method: "POST" }, "update-check", 30000);
+      // Check() starts asynchronously. SSE may finish before this HTTP response;
+      // never replace that newer result with a late 'checking' acknowledgement.
+      if (result && updateUI.statusEventRevision === revision) renderUpdateStatus(result);
+    } catch (error) {
+      updateUI.checkPending = false;
+      if (!state.destroyed) showUpdateCheckFeedback(`检查失败：${error.message}`);
+    } finally {
+      updateUI.checkRequestPending = false;
+      finishManualUpdateCheck();
+      renderManualUpdateCheck();
+      if (el.updateDialog.open) renderUpdateDialog();
+    }
+  }
+
+  function openUpdateDialog() {
+    if (!updateUI.status?.supported) return;
+    updateUI.seen = updateUI.status.latest;
+    savePreference("update-viewed", updateUI.seen);
+    el.updateButton.classList.remove("fresh");
+    renderUpdateStatus(updateUI.status);
+    if (!el.updateDialog.open) el.updateDialog.showModal();
+    void api("/api/gameplay/phase", {}, "update-gameflow", 2000).then((value) => { updateUI.phase = value.phase; renderUpdateDialog(); }).catch(() => {});
+  }
+
+  function renderUpdateDialog() {
+    const current = updateUI.status || {};
+    const manual = current.portable || current.manualOnly;
+    const busy = ["downloading", "verifying"].includes(current.state);
+    const ready = current.state === "ready" || current.state === "applying";
+    const failed = current.state === "failed";
+    el.updateNotes.parentElement.hidden = failed && !manual;
+    el.updateDialogTitle.textContent = manual ? "发现新版本" : current.state === "applying" ? "正在重启升级" : ready ? "准备就绪" : current.state === "verifying" ? "正在校验安装包" : busy ? "正在下载新版本" : failed ? "升级未完成" : "发现新版本";
+    el.updateDialog.querySelector(".from").textContent = `当前 ${current.current || ""}`;
+    el.updateDialog.querySelector(".to").textContent = current.latest || "";
+    if (manual) {
+      el.updateNotes.innerHTML = `<p>${current.portable ? "便携版请从发布页下载新版程序。" : "当前版本较旧，请从发布页下载完整安装包。"}</p>${renderUpdateNotes(current.notes)}`;
+    } else if (busy) {
+      el.updateNotes.innerHTML = '<p class="muted">下载可以放着不管，完成后顶部按钮会变成「重启升级」。关掉这个窗口不会中断下载。</p>';
+    } else if (ready) {
+      el.updateNotes.innerHTML = '<p>安装包已下载并通过校验。点「立即重启升级」后，Deep Legends 会关闭，安装界面接管并显示进度，装完自动重新打开。</p>';
+    } else {
+      el.updateNotes.innerHTML = renderUpdateNotes(current.notes);
+    }
+    const date = new Date(current.publishedAt);
+    const published = Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }).replaceAll("/", "-");
+    el.updateMeta.innerHTML = ready && !manual ? `<span>已校验 <b>SHA-256</b></span><i class="sep"></i><span>${updateBytes(current.sizeBytes)}</span>` : `<span>安装包 <b>${updateBytes(current.sizeBytes)}</b></span><i class="sep"></i><span>发布于 <b>${published}</b></span><i class="sep"></i><span>来源 GitHub</span>`;
+    el.updateMeta.hidden = (busy || failed) && !manual;
+    el.updateProgress.hidden = !busy || manual;
+    const progress = current.progress || {};
+    const percent = Math.max(0, Math.min(100, Math.floor(100 * (Number(progress.receivedBytes) || 0) / (Number(progress.totalBytes) || current.sizeBytes || 1))));
+    el.updateProgressPercent.textContent = `${percent}%`;
+    el.updateProgressFill.style.width = `${percent}%`;
+    el.updateProgress.querySelector('[role="progressbar"]').setAttribute("aria-valuenow", String(percent));
+    const remaining = progress.bytesPerSecond > 0 ? `约剩 ${Math.max(0, Math.ceil(progress.etaSeconds || 0))} 秒` : "正在连接下载线路…";
+    el.updateProgressHint.textContent = current.state === "verifying" ? "下载完成，正在校验 SHA-256…" : `${updateBytes(progress.receivedBytes)} / ${updateBytes(progress.totalBytes || current.sizeBytes)} · ${updateBytes(progress.bytesPerSecond)}/s · ${remaining}`;
+    const warning = ["InProgress", "ChampSelect"].includes(updateUI.phase) ? "你正在对局中，建议打完再升级" : "";
+    el.updateAlert.textContent = [current.error, warning].filter(Boolean).join("\n");
+    el.updateAlert.hidden = !el.updateAlert.textContent;
+    el.updateStart.hidden = manual || ready;
+    el.updateStart.textContent = failed ? "重试" : "开始升级";
+    el.updateStart.disabled = busy || updateUI.pending || updateUI.checkPending;
+    el.updateCancel.hidden = !busy || manual;
+    el.updateCancel.disabled = updateUI.pending || updateUI.checkPending;
+    el.updateApply.hidden = !ready || manual;
+    el.updateApply.disabled = updateUI.pending || updateUI.checkPending || current.state === "applying";
+    el.updateLater.hidden = busy && !manual;
+    el.updateReleaseLink.hidden = !manual && (busy || ready);
+    el.updateReleaseLink.href = "https://github.com/LLYY0418/Deep-Legends/releases";
+  }
+
+  async function updateAction(action) {
+    if (updateUI.pending || updateUI.checkPending) return;
+    updateUI.pending = true;
+    renderManualUpdateCheck();
+    renderUpdateDialog();
+    try {
+      if (action === "apply") {
+        const wasInGame = ["InProgress", "ChampSelect"].includes(updateUI.phase);
+        try {
+          const phase = await api("/api/gameplay/phase", {}, "update-gameflow", 2000);
+          updateUI.phase = phase.phase;
+          // If a game started since opening the dialog, expose the warning
+          // before the user confirms again. The button remains enabled.
+          if (!wasInGame && ["InProgress", "ChampSelect"].includes(updateUI.phase)) return;
+        } catch (_) {}
+      }
+      const result = await api(`/api/update/${action}`, { method: "POST" }, "update-action", 30000);
+      if (result) renderUpdateStatus(result);
+    } catch (error) {
+      renderUpdateStatus({ ...updateUI.status, state: "failed", error: error.message });
+    } finally {
+      updateUI.pending = false;
+      renderManualUpdateCheck();
+      renderUpdateDialog();
+    }
+  }
+
+  function setupUpdateEvents() {
+    el.updateButton.addEventListener("animationend", () => el.updateButton.classList.remove("fresh"));
+    el.updateButton.addEventListener("click", openUpdateDialog);
+    el.settingsUpdateCheck.addEventListener("click", () => void checkForUpdates());
+    el.updateDialogClose.addEventListener("click", () => el.updateDialog.close());
+    el.updateLater.addEventListener("click", () => el.updateDialog.close());
+    el.updateStart.addEventListener("click", () => void updateAction("download"));
+    el.updateCancel.addEventListener("click", () => void updateAction("cancel"));
+    el.updateApply.addEventListener("click", () => void updateAction("apply"));
+    window.addEventListener("deep-legends:gameflow", (event) => {
+      if (event.detail?.phase) { updateUI.phase = event.detail.phase; if (el.updateDialog.open) renderUpdateDialog(); }
+    });
+    renderUpdateStatus(null);
   }
 
   function setupScrollControls() {
@@ -2857,8 +3588,39 @@
         bodyNode.textContent = body;
         children.push(bodyNode);
       }
+	  let roster = null;
+	  if (next.dataset.tooltipRoster) {
+		try {
+		  const parsed = JSON.parse(next.dataset.tooltipRoster);
+		  if (Array.isArray(parsed) && parsed.length >= 2 && parsed.length <= 18) roster = parsed;
+		} catch (_) {}
+	  }
+	  if (roster) {
+		const rosterNode = document.createElement("div");
+		rosterNode.className = "tooltip-roster";
+		for (const item of roster) {
+		  const playerNode = document.createElement("span");
+		  playerNode.className = "tooltip-roster-player";
+		  const icons = document.createElement("span");
+		  icons.className = "tooltip-roster-icons";
+		  for (const [kind, rawURL] of [["profile", item?.profileURL], ["champion", item?.championURL]]) {
+			const imageURL = String(rawURL || "");
+			if (!imageURL.startsWith("/api/image?path=")) continue;
+			const image = document.createElement("img");
+			image.className = `is-${kind}`;
+			image.src = imageURL;
+			image.alt = "";
+			icons.append(image);
+		  }
+		  const copy = document.createElement("span");
+		  copy.textContent = [item?.name, item?.champion].filter(Boolean).join(" · ");
+		  playerNode.append(icons, copy);
+		  rosterNode.append(playerNode);
+		}
+		children.push(rosterNode);
+	  }
       tooltip.replaceChildren(...children);
-      tooltip.dataset.layout = body ? "titled" : "single";
+	  tooltip.dataset.layout = roster ? "roster" : body ? "titled" : "single";
       tooltip.dataset.size = next.dataset.tooltipSize || "";
       delete tooltip.dataset.shown;
       tooltip.hidden = false;
@@ -2941,7 +3703,9 @@
   }
   applyAppearance();
   applySidebar();
+  void setupUiScaleSetting();
   void setupShareDirectorySetting();
+  setupUpdateEvents();
   setupLiveUpdates();
   setupScrollControls();
   setupFloatingTooltips();

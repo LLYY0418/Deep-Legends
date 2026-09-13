@@ -11,12 +11,18 @@
     <link rel="stylesheet" href="/build-item-row.css">
     <link rel="stylesheet" href="/gameplay.css">
     <link rel="stylesheet" href="/champions.css">
+    <link rel="stylesheet" href="/pro-players.css">
     <link rel="stylesheet" href="/friends.css">
     <link rel="stylesheet" href="/suite.css">
+    <link rel="stylesheet" href="/metrics.css">
+    <script src="/runtime.js" defer></script>
+    <script src="/overview-art.js" defer></script>
+    <script src="/augment-artwork.js" defer></script>
     <script src="/demo-data.js" defer></script>
     <script src="/app.js" defer></script>
     <script src="/gameplay.js" defer></script>
     <script src="/champions.js" defer></script>
+    <script src="/pro-players.js" defer></script>
     <script src="/friends.js" defer></script>
     <script src="/suite.js" defer></script>
   </head>
@@ -40,7 +46,7 @@
           <button id="section-champions" class="section-tab" type="button" role="tab" aria-label="英雄" aria-selected="false" aria-controls="champions-panel" tabindex="-1" data-section="champions" data-tooltip="英雄" data-sidebar-tooltip data-tooltip-side="menu" data-tooltip-size="compact"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 7.4a.9.9 0 0 1 1.47-.7L8.4 9.4l2.8-5.2a.92.92 0 0 1 1.62 0l2.8 5.2 3.32-2.7a.9.9 0 0 1 1.46.7l-1.2 9.2H4.8L3.6 7.4Z"/><path d="M4.8 18.2h14.4v.7a1.7 1.7 0 0 1-1.7 1.7H6.5a1.7 1.7 0 0 1-1.7-1.7v-.7Z"/></svg><span>英雄</span></button>
           <button id="section-live" class="section-tab" type="button" role="tab" aria-label="对局" aria-selected="false" aria-controls="live-panel" tabindex="-1" data-section="live" data-tooltip="对局" data-sidebar-tooltip data-tooltip-side="menu" data-tooltip-size="compact"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2.6 2.6 4.6 1 9.8 9.8 1.5-1.4 1.5 1.5-2.2 2.2 2.6 2.6-1.5 1.5-2.6-2.6-2.2 2.2-1.5-1.5 1.4-1.5L4.2 6.6l-1.6-4Zm18.8 0-1.6 4-4.6 4.7 2.2 2.2 5-5.9 1-4-2 1Zm-12.6 10-2.6 2.6-1.4-1.5-1.5 1.5 2.2 2.2-2.6 2.6 1.5 1.5 2.6-2.6 2.2 2.2 1.5-1.5-1.5-1.4 1.8-1.9-2.2-1.7Z"/></svg><span>对局</span></button>
           <button id="section-favorites" class="section-tab" type="button" role="tab" aria-label="收藏" aria-selected="false" aria-controls="favorites-panel" tabindex="-1" data-section="favorites" data-tooltip="收藏" data-sidebar-tooltip data-tooltip-side="menu" data-tooltip-size="compact"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M7.3 2.6h9.4l4.5 5.6L12 21.8 2.8 8.2l4.5-5.6Zm1 2L5.2 8.4 12 18.3l6.8-9.9-3.1-3.8H8.3Zm3.7 2.6 3 3.4-3 4.6-3-4.6 3-3.4Z"/></svg><span>收藏</span></button>
-          <button id="section-suite" class="section-tab" type="button" role="tab" aria-label="随行" aria-selected="false" aria-controls="suite-panel" tabindex="-1" data-section="suite" data-tooltip="随行" data-sidebar-tooltip data-tooltip-side="menu" data-tooltip-size="compact"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 19 6v5.3c0 4.5-2.8 8.3-7 10.2-4.2-1.9-7-5.7-7-10.2V6l7-3.5Z"/><path d="m8.6 12 2.1 2.1 4.8-5"/></svg><span>随行</span></button>
+          <button id="section-suite" class="section-tab" type="button" role="tab" aria-label="工具" aria-selected="false" aria-controls="suite-panel" tabindex="-1" data-section="suite" data-tooltip="工具" data-sidebar-tooltip data-tooltip-side="menu" data-tooltip-size="compact"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9Z"/><path d="M9 9V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M3 13h18"/></svg><span>工具</span></button>
         </nav>
 
         <div class="sidebar-footer">
@@ -80,6 +86,8 @@
                 <div class="region-menu-section region-menu-section-kr" role="none">
                   <button class="region-menu-kr" type="button" role="menuitemradio" aria-checked="false" data-region-option="kr" data-server-id="" data-region-menu-entry><b>韩服</b><span class="region-option-check" aria-hidden="true">✓</span></button>
                 </div>
+                <div class="region-menu-divider" role="separator"></div>
+                <button id="player-search-pro" class="region-menu-pro" type="button" role="menuitem" aria-controls="pro-players-panel" data-region-menu-entry><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v5a4 4 0 0 1-8 0V3Zm0 2H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 1v6m-4 3h8m-10 0h12"/></svg><b>职业选手</b><span aria-hidden="true">→</span></button>
               </div>
             </div>
             <div class="player-search-fields">
@@ -97,6 +105,13 @@
               <span id="friends-count" class="friends-count" hidden>0</span>
             </button>
             <button id="refresh" class="button button-primary" type="button" aria-label="重新读取" data-tooltip="重新读取"><span class="refresh-icon" aria-hidden="true">↻</span><span>重新读取</span></button>
+            <button id="update-button" class="icon-button control-icon-button update-icon-button" type="button" aria-label="有新版本可升级" aria-haspopup="dialog" data-tooltip="有新版本可升级" hidden>
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path class="hex-track" d="M12 2.4 20.6 7v10L12 21.6 3.4 17V7z"/>
+                <path class="hex-progress" pathLength="59" d="M12 2.4 20.6 7v10L12 21.6 3.4 17V7z" stroke-dashoffset="59"/>
+                <path class="arrow" d="M12 16.4V9.2"/><path class="arrow" d="M8.9 12.3 12 9.2l3.1 3.1"/>
+              </svg><span class="dot" aria-hidden="true"></span>
+            </button>
             <button id="quit" class="icon-button page-quit" type="button" aria-label="退出助手" data-tooltip="退出助手">×</button>
           </div>
         </header>
@@ -119,21 +134,40 @@
 
           <section id="client-launchpad" class="launchpad" hidden aria-labelledby="launchpad-title">
             <div class="launchpad-emblem"><img src="/app-icon.png" alt=""></div>
-            <div class="launchpad-copy"><p class="eyebrow">英雄联盟客户端未运行</p><h2 id="launchpad-title">选择一个入口开始</h2><p>登录并进入大厅后自动读取召唤师资料与收藏。</p></div>
-            <div id="launcher-list" class="launcher-list"><span class="muted">正在检查安装位置…</span></div>
+            <div class="launchpad-copy" aria-live="polite"><p id="launchpad-eyebrow" class="eyebrow">英雄联盟客户端未登录</p><h2 id="launchpad-title">选择登录入口</h2><p id="launchpad-description">密码、扫码与安全验证只在腾讯官方窗口完成，登录后自动连接。</p><button id="client-launch-reselect" class="text-button" type="button" hidden>重新选择入口</button></div>
+            <div id="launcher-list" class="launcher-list" aria-label="客户端登录入口"><span class="muted">正在检查安装位置…</span></div>
+            <p id="official-login-status" class="official-login-status" aria-live="polite">正在检查腾讯英雄联盟客户端安装位置。</p>
           </section>
 
           <section id="notice" class="notice" aria-live="polite">
             <div class="notice-symbol" aria-hidden="true">⋯</div><div><strong>正在准备数据</strong><p>首次读取通常只需要几秒。</p></div>
           </section>
 
+          <section id="pro-players-panel" class="pro-page" data-standalone-page role="region" aria-labelledby="pro-players-title" hidden>
+            <div class="pro-page-nav"><button id="pro-players-home" class="text-button pro-return" type="button">← 返回总览</button></div>
+            <header class="pro-header">
+              <div><p class="pro-eyebrow">PRO PLAYERS · KR</p><h1 id="pro-players-title" tabindex="-1">职业选手</h1></div>
+              <div class="pro-header-meta"><div id="pro-players-status" class="pro-status" role="status" aria-live="polite"></div><button id="pro-players-refresh" class="text-button" type="button"><span aria-hidden="true">↻</span> 刷新账号</button></div>
+            </header>
+            <div class="pro-toolbar">
+              <div id="pro-team-filters" class="pro-team-filters" role="group" aria-label="筛选战队"></div>
+              <div class="pro-toolbar-right"><button id="pro-primary-only" class="pro-primary-switch" type="button" role="switch" aria-checked="false"><span aria-hidden="true"></span>只看主账号</button><label class="pro-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="pro-players-search" type="search" placeholder="搜索选手或账号" aria-label="搜索职业选手或账号" maxlength="80" autocomplete="off"></label></div>
+            </div>
+            <div id="pro-players-content" class="pro-content" aria-busy="false"></div>
+          </section>
+
           <section id="overview-panel" class="panel gameplay-panel" role="tabpanel" tabindex="-1" aria-labelledby="section-overview">
             <div class="player-workspace-head">
+              <div id="player-groups" class="player-group-picker">
+                <button id="player-group-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="player-group-menu"></button>
+                <div id="player-group-menu" class="player-group-menu" role="menu" aria-label="玩家分组" hidden></div>
+              </div>
               <div class="player-tabs-shell">
                 <button id="player-tabs-prev" class="player-tabs-arrow" type="button" aria-label="向左滚动玩家标签" aria-controls="player-tabs" data-tooltip="向左滚动" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
                 <div id="player-tabs" class="player-tabs" role="tablist" aria-label="已打开的召唤师"><span class="player-tab-skeleton">正在读取当前召唤师…</span></div>
                 <button id="player-tabs-next" class="player-tabs-arrow" type="button" aria-label="向右滚动玩家标签" aria-controls="player-tabs" data-tooltip="向右滚动" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
               </div>
+              <button id="pro-players-return" class="text-button pro-return" type="button" hidden>返回职业选手 →</button>
               <button id="overview-refresh" class="text-button" type="button">刷新战绩</button>
             </div>
             <div id="overview-content" class="gameplay-content" aria-live="polite"><div class="gameplay-skeleton"><span></span><span></span><span></span></div></div>
@@ -222,29 +256,35 @@
 
           <section id="suite-panel" class="panel suite-panel" role="tabpanel" tabindex="-1" aria-labelledby="section-suite" hidden>
             <header class="suite-head">
-              <nav class="suite-tabs" role="tablist" aria-label="随行功能" aria-orientation="horizontal">
-                <button id="suite-tab-watch" class="suite-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="suite-watch-panel" tabindex="0" data-suite-tab="watch"><span aria-hidden="true">◉</span><span><strong>值守</strong><small>托管客户端流程</small></span></button>
-                <button id="suite-tab-rig" class="suite-tab" type="button" role="tab" aria-selected="false" aria-controls="suite-rig-panel" tabindex="-1" data-suite-tab="rig"><span aria-hidden="true">⬢</span><span><strong>整备</strong><small>游戏端与客户端维护</small></span></button>
-                <button id="suite-tab-facade" class="suite-tab" type="button" role="tab" aria-selected="false" aria-controls="suite-facade-panel" tabindex="-1" data-suite-tab="facade"><span aria-hidden="true">◈</span><span><strong>门面</strong><small>生涯展示与聊天身份</small></span></button>
-                <button id="suite-tab-sweep" class="suite-tab" type="button" role="tab" aria-selected="false" aria-controls="suite-sweep-panel" tabindex="-1" data-suite-tab="sweep"><span aria-hidden="true">✦</span><span><strong>拾遗</strong><small>未领取奖励清扫</small></span></button>
+              <nav class="suite-tabs" role="tablist" aria-label="工具功能" aria-orientation="horizontal">
+                <button id="suite-tab-watch" class="suite-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="suite-watch-panel" tabindex="0" data-suite-tab="watch"><span class="suite-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" focusable="false"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/></svg></span><span><strong>自动</strong><small>自动接受、重连与点赞</small></span></button>
+                <button id="suite-tab-rig" class="suite-tab" type="button" role="tab" aria-selected="false" aria-controls="suite-rig-panel" tabindex="-1" data-suite-tab="rig"><span class="suite-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" focusable="false"><path d="M12 2 22 7v10l-10 5L2 17V7Z"/></svg></span><span><strong>维护</strong><small>安装目录与客户端进程</small></span></button>
+                <button id="suite-tab-champselect" class="suite-tab" type="button" role="tab" aria-selected="false" aria-controls="suite-champselect-panel" tabindex="-1" data-suite-tab="champselect"><span class="suite-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" focusable="false"><circle cx="12" cy="12" r="6"/><path d="M12 2v7m0 6v7M2 12h7m6 0h7"/></svg></span><span><strong>征召</strong><small>禁用与选用的备选序列</small></span></button>
+                <button id="suite-tab-facade" class="suite-tab" type="button" role="tab" aria-selected="false" aria-controls="suite-facade-panel" tabindex="-1" data-suite-tab="facade"><span class="suite-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" focusable="false"><path d="m12 2 10 10-10 10L2 12Zm0 6-4 4 4 4 4-4Z"/></svg></span><span><strong>生涯</strong><small>背景、签名与展示</small></span></button>
+                <button id="suite-tab-sweep" class="suite-tab" type="button" role="tab" aria-selected="false" aria-controls="suite-sweep-panel" tabindex="-1" data-suite-tab="sweep"><span class="suite-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" focusable="false"><path d="m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z"/></svg></span><span><strong>领奖</strong><small>未领取奖励清扫</small></span></button>
               </nav>
-              <dl class="suite-metrics" aria-label="随行状态">
-                <div><dt>值守规则</dt><dd id="suite-watch-metric">—</dd></div>
+			  <dl class="suite-metrics" aria-label="工具状态" data-suite-standard-metrics>
+                <div><dt>自动规则</dt><dd id="suite-watch-metric">—</dd></div>
                 <div><dt>设置锁</dt><dd id="suite-rig-metric">—</dd></div>
                 <div><dt>待领取</dt><dd id="suite-claim-metric">—</dd></div>
               </dl>
+			  <dl class="suite-metrics" aria-label="征召状态" data-suite-champselect-metrics hidden>
+				<div><dt>已配模式</dt><dd id="suite-champselect-configured">0</dd></div>
+				<div><dt>本局命中</dt><dd id="suite-champselect-active">—</dd></div>
+			  </dl>
             </header>
             <section id="suite-offline" class="suite-offline" aria-live="polite" hidden>
-              <span class="suite-offline-mark" aria-hidden="true">◇</span><div><p class="eyebrow">英雄联盟客户端未连接</p><h2>登录并进入大厅后使用随行</h2><p>值守、整备、门面与拾遗都直接读取当前客户端；助手不会要求账号密码，也不会展示或保存客户端令牌。</p></div><button class="button button-primary" type="button" data-suite-retry>重新读取</button>
+              <span class="suite-offline-mark" aria-hidden="true">◇</span><div><p class="eyebrow">英雄联盟客户端未连接</p><h2>登录并进入大厅后使用工具</h2><p>自动、维护、生涯、领奖与征召都直接读取当前客户端；助手不会要求账号密码，也不会展示或保存客户端令牌。</p></div><button class="button button-primary" type="button" data-suite-retry>重新读取</button>
             </section>
-            <section id="suite-watch-panel" class="suite-subpanel" role="tabpanel" aria-labelledby="suite-tab-watch" data-suite-panel="watch"><div id="suite-watch-root" class="suite-loading" aria-live="polite">正在读取值守规则…</div></section>
-            <section id="suite-rig-panel" class="suite-subpanel" role="tabpanel" aria-labelledby="suite-tab-rig" data-suite-panel="rig" hidden><div id="suite-rig-root" class="suite-loading" aria-live="polite">正在读取客户端整备状态…</div></section>
-            <section id="suite-facade-panel" class="suite-subpanel" role="tabpanel" aria-labelledby="suite-tab-facade" data-suite-panel="facade" hidden><div id="suite-facade-root" class="suite-loading" aria-live="polite">正在读取生涯门面…</div></section>
+            <section id="suite-watch-panel" class="suite-subpanel" role="tabpanel" aria-labelledby="suite-tab-watch" data-suite-panel="watch"><div id="suite-watch-root" class="suite-loading" aria-live="polite">正在读取自动规则…</div></section>
+            <section id="suite-rig-panel" class="suite-subpanel" role="tabpanel" aria-labelledby="suite-tab-rig" data-suite-panel="rig" hidden><div id="suite-rig-root" class="suite-loading" aria-live="polite">正在读取客户端维护状态…</div></section>
+            <section id="suite-facade-panel" class="suite-subpanel" role="tabpanel" aria-labelledby="suite-tab-facade" data-suite-panel="facade" hidden><div id="suite-facade-root" class="suite-loading" aria-live="polite">正在读取生涯展示…</div></section>
             <section id="suite-sweep-panel" class="suite-subpanel" role="tabpanel" aria-labelledby="suite-tab-sweep" data-suite-panel="sweep" hidden><div id="suite-sweep-root" class="suite-loading" aria-live="polite">正在扫描未领取奖励…</div></section>
+			<section id="suite-champselect-panel" class="suite-subpanel" role="tabpanel" aria-labelledby="suite-tab-champselect" data-suite-panel="champselect" hidden><div id="suite-champselect-root" class="suite-loading" aria-live="polite">正在读取征召设置…</div></section>
           </section>
 
           <section id="settings-panel" class="panel settings-panel" role="tabpanel" tabindex="-1" aria-labelledby="section-settings" hidden>
-            <header class="settings-head"><h2>设置</h2><p>偏好保存在本机 · 不上传任何数据 · 修改立即生效</p><p id="settings-build-identity" class="settings-build-identity">版本信息读取中…</p></header>
+            <header class="settings-head"><h2>设置</h2><p>偏好保存在本机 · 不上传任何数据 · 修改立即生效</p><div class="settings-version-row"><p id="settings-build-identity" class="settings-build-identity">版本信息读取中…</p><button id="settings-update-check" class="text-button" type="button" aria-describedby="settings-update-feedback" hidden disabled>检查更新</button><span id="settings-update-feedback" class="settings-update-feedback" role="status" aria-live="polite"></span></div></header>
             <div class="settings-tabs" role="tablist" aria-label="设置分类" aria-orientation="vertical">
               <button id="settings-tab-appearance" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="settings-appearance-panel" data-settings-page="appearance">外观与导航</button>
               <button id="settings-tab-gameplay" class="tab" type="button" role="tab" aria-selected="false" aria-controls="settings-gameplay-panel" data-settings-page="gameplay">战绩与对局</button>
@@ -252,11 +292,12 @@
             </div>
             <section id="settings-appearance-panel" class="settings-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="settings-tab-appearance">
               <div class="settings-grid">
+                <section class="setting-card"><div><h3>界面缩放</h3><p>所有元素随窗口等比放大或缩小；自动档以 1920×1080 为基准。</p></div><label class="select-wrap"><span class="sr-only">界面缩放</span><select id="setting-ui-scale"><option value="auto">自动</option><option value="0.9">90%</option><option value="1">100%</option><option value="1.1">110%</option><option value="1.25">125%</option><option value="1.4">140%</option><option value="1.5">150%</option><option value="1.75">175%</option><option value="2">200%</option><option value="2.25">225%</option><option value="2.5">250%</option></select></label></section>
                 <section class="setting-card"><div><h3>界面密度</h3><p>舒适模式显示更大的卡片；紧凑模式适合小窗口。</p></div><button id="density-toggle" class="text-button" type="button" aria-label="切换界面密度">切换为紧凑</button></section>
                 <section class="setting-card"><div><h3>侧边栏</h3><p>可以随时收起，只保留功能图标和连接状态。</p></div><button id="settings-sidebar-toggle" class="text-button" type="button">收起侧边栏</button></section>
-                <section class="setting-card"><div><h3>主题</h3><p>自动模式按时段在浅色与海克斯黑金之间切换；其余主题使用固定配色。</p></div><label class="select-wrap"><span class="sr-only">主题</span><select id="setting-theme"><option value="auto">自动（昼夜切换）</option><option value="light">浅色</option><option value="dark">海克斯黑金</option><option value="azure">寒冰蓝</option><option value="emerald">翡翠绿</option><option value="violet">星域紫</option><option value="crimson">血月红</option><option value="aurora">极光青</option><option value="oled">纯黑 OLED</option></select></label></section>
-                <section class="setting-card"><div><h3>默认页面</h3><p>下次启动时优先打开常用功能。</p></div><label class="select-wrap"><span class="sr-only">默认页面</span><select id="setting-default-page"><option value="overview">总览</option><option value="champions">英雄</option><option value="live">对局</option><option value="favorites">收藏</option><option value="suite">随行</option></select></label></section>
-                <section class="setting-card setting-share-card"><div><h3>分享图保存位置</h3><p>首次生成时选择文件夹，之后的总览分享图会自动保存到这里。</p></div><div class="setting-share-controls"><span id="setting-share-directory" class="setting-share-path" data-tooltip-size="compact">首次生成时选择</span><button id="setting-share-directory-change" class="text-button setting-share-change" type="button"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3V7Zm0 0V5h7l2 2"/></svg><span>选择位置</span></button></div></section>
+                <section class="setting-card"><div><h3>主题</h3><p>自动主题随时段切换。</p></div><label class="select-wrap"><span class="sr-only">主题</span><select id="setting-theme"><option value="auto">自动（昼夜切换）</option><option value="light">浅色</option><option value="dark">海克斯黑金</option><option value="azure">寒冰蓝</option><option value="emerald">翡翠绿</option><option value="violet">星域紫</option><option value="crimson">血月红</option><option value="aurora">极光青</option><option value="oled">纯黑 OLED</option></select></label></section>
+                <section class="setting-card"><div><h3>默认页面</h3><p>下次启动时优先打开常用功能。</p></div><label class="select-wrap"><span class="sr-only">默认页面</span><select id="setting-default-page"><option value="overview">总览</option><option value="champions">英雄</option><option value="live">对局</option><option value="favorites">收藏</option><option value="suite">工具</option></select></label></section>
+                <section class="setting-card setting-share-card"><div><h3>导出位置</h3><p>分享图与诊断日志共用。</p></div><div class="setting-share-controls"><span id="setting-share-directory" class="setting-share-path" data-tooltip-size="compact">首次生成时选择</span><button id="setting-share-directory-change" class="text-button setting-share-change" type="button"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3V7Zm0 0V5h7l2 2"/></svg><span>选择位置</span></button></div></section>
               </div>
             </section>
             <section id="settings-gameplay-panel" class="settings-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="settings-tab-gameplay" hidden>
@@ -265,19 +306,20 @@
                 <section class="setting-card"><div><h3>默认战绩筛选</h3><p>打开召唤师总览时优先显示的游戏类型。</p></div><label class="select-wrap"><span class="sr-only">默认战绩筛选</span><select id="setting-default-match-filter"><option value="all">全部对局</option><option value="solo">单排/双排</option><option value="flex">灵活组排</option></select></label></section>
                 <section class="setting-card"><div><h3>英雄页默认位置</h3><p>打开英雄梯度时优先展示的位置。</p></div><label class="select-wrap"><span class="sr-only">英雄页默认位置</span><select id="setting-champion-position"><option value="all">全部</option><option value="top">上单</option><option value="jungle">打野</option><option value="mid">中单</option><option value="adc">下路</option><option value="support">辅助</option></select></label></section>
                 <section class="setting-card"><div><h3>对局玩家排序</h3><p>实时对局中，每支队伍内玩家卡片的排列方式。</p></div><label class="select-wrap"><span class="sr-only">对局玩家排序</span><select id="setting-live-order"><option value="team">客户端顺序</option><option value="position">按位置</option><option value="kda">按 KDA</option><option value="win-rate">按胜率</option></select></label></section>
+                <section class="setting-card"><div><h3>详情按位置对齐</h3><p>双方位置齐全时，按位置对齐。</p></div><label class="toggle-control"><input id="setting-detail-position-align" type="checkbox"><span>启用对齐</span></label></section>
                 <section class="setting-card"><div><h3>实时对局刷新</h3><p>停留在“对局”页时按选定间隔重新读取队伍状态。</p></div><div class="setting-actions"><label class="toggle-control"><input id="setting-live-refresh" type="checkbox" checked><span>自动刷新</span></label><label class="select-wrap"><span class="sr-only">实时对局刷新间隔</span><select id="setting-live-interval"><option value="3">3 秒</option><option value="5">5 秒</option><option value="10">10 秒</option><option value="15">15 秒</option><option value="30">30 秒</option><option value="60">60 秒</option></select></label></div></section>
                 <section class="setting-card"><div><h3>回放操作确认</h3><p>下载或启动回放前再次确认，避免误触。</p></div><label class="toggle-control"><input id="setting-confirm-replay" type="checkbox" checked><span>操作前确认</span></label></section>
-                <section class="setting-card"><div><h3>随行值守</h3><p>自动接受、快速下一把、断线重连及其他托管规则统一在随行中配置。</p></div><button class="text-button" type="button" data-navigate-suite="watch">打开值守</button></section>
+                <section class="setting-card"><div><h3>自动规则</h3><p>管理自动接受、下一把与重连。</p></div><button class="text-button" type="button" data-navigate-suite="watch">打开自动规则</button></section>
               </div>
             </section>
             <section id="settings-privacy-panel" class="settings-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="settings-tab-privacy" hidden>
               <div class="settings-grid">
                 <section class="setting-card"><div><h3>隐私遮罩</h3><p>在界面中隐藏其他玩家名称，适合直播或截图。</p></div><label class="toggle-control"><input id="setting-mask-names" type="checkbox"><span>隐藏名称</span></label></section>
-                <section class="setting-card setting-network-card"><div><h3>英雄数据网络</h3><p>自动模式跟随系统代理；直连适合可直接访问 OP.GG 的网络；手动模式可填写本机代理。</p><span id="setting-proxy-state" class="inline-status" role="status" aria-live="polite">正在读取网络设置…</span></div><div class="setting-network-controls"><label class="select-wrap"><span class="sr-only">英雄数据网络模式</span><select id="setting-proxy-mode"><option value="auto">自动检测</option><option value="direct">直接连接</option><option value="manual">手动代理</option></select></label><label id="setting-proxy-url-wrap" class="setting-proxy-url" hidden><span class="sr-only">代理地址</span><input id="setting-proxy-url" type="url" inputmode="url" maxlength="300" spellcheck="false" placeholder="http://127.0.0.1:7890"></label><button id="setting-proxy-save" class="text-button" type="button">保存</button></div></section>
+                <section class="setting-card setting-network-card"><div><h3>英雄数据网络</h3><p>无法加载英雄数据时，可切换网络模式。</p><span id="setting-proxy-state" class="inline-status" role="status" aria-live="polite">正在读取网络设置…</span></div><div class="setting-network-controls"><label class="select-wrap"><span class="sr-only">英雄数据网络模式</span><select id="setting-proxy-mode"><option value="auto">自动检测</option><option value="direct">直接连接</option><option value="manual">手动代理</option></select></label><label id="setting-proxy-url-wrap" class="setting-proxy-url" hidden><span class="sr-only">代理地址</span><input id="setting-proxy-url" type="url" inputmode="url" maxlength="300" spellcheck="false" placeholder="http://127.0.0.1:7890"></label><button id="setting-proxy-save" class="text-button" type="button">保存</button></div></section>
               </div>
               <section class="settings-capabilities"><div class="panel-heading compact-heading"><div><h2>对局能力</h2><p>国服客户端接口随版本变化；不支持的能力会单独降级。</p></div></div><div id="gameplay-settings-status" class="data-panel"><p class="muted">打开总览或对局后显示能力状态。</p></div></section>
               <div class="settings-privacy"><div class="panel-heading compact-heading"><div><h2>隐私与安全</h2><p>助手只连接本机客户端，不接受账号密码，也不会上传收藏数据。</p></div></div><div id="privacy-content" class="data-panel"><p class="muted">正在读取隐私说明…</p></div></div>
-              <section class="settings-diagnostics"><div class="panel-heading compact-heading"><div><h2>诊断与日志</h2><p>核对客户端连接与皮肤库存来源；日志已脱敏，不包含账号密码或客户端令牌。</p></div></div><div class="diagnostic-actions"><button id="copy-diagnostics" class="text-button" type="button">复制诊断摘要</button><a id="export-diagnostics" class="text-button" href="/api/diagnostics/log" download role="button">导出诊断日志</a><span id="diagnostic-log-meta" class="muted">正在读取日志信息…</span></div><p class="diagnostic-export-note muted">诊断日志达到 2 MiB 后会轮转且只保留一个备份；如果刚复现过问题，请立即导出。原始文件也可以在 <code>%LOCALAPPDATA%\LOLLootAssistant\logs\diagnostics.jsonl</code>（macOS 为 <code>~/Library/Caches/LOLLootAssistant/logs/diagnostics.jsonl</code>）中找到。</p><div id="diagnostics-content"></div></section>
+              <section class="settings-diagnostics"><div class="panel-heading compact-heading"><div><h2>诊断与日志</h2><p>核对客户端连接与皮肤库存来源；日志已脱敏，不包含账号密码或客户端令牌。</p></div></div><div class="diagnostic-actions"><button id="copy-diagnostics" class="text-button" type="button">复制诊断摘要</button><a id="export-diagnostics" class="text-button" href="/api/diagnostics/log" download role="button">导出诊断日志</a><span id="diagnostic-log-meta" class="muted">正在读取日志信息…</span></div><p class="diagnostic-export-note muted">复现问题后导出日志。</p><div id="diagnostics-content"></div></section>
             </section>
           </section>
 
@@ -311,6 +353,29 @@
     </div>
 
     <button id="back-to-top" class="back-to-top control-icon-button" type="button" aria-label="返回列表顶部" data-tooltip="返回顶部" hidden><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 14 7-7 7 7M12 7v11"/></svg></button>
+    <dialog id="update-dialog" class="update-dialog" aria-labelledby="update-dialog-title">
+      <div class="update-sheet">
+        <div class="update-head">
+          <div><h2 id="update-dialog-title">发现新版本</h2><div class="update-versions"><span class="from"></span><span class="arrow">→</span><span class="to"></span></div></div>
+          <button id="update-dialog-close" class="control-icon-button" type="button" aria-label="关闭更新窗口"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        </div>
+        <div class="update-body"><div id="update-notes" class="update-notes"></div></div>
+        <div id="update-meta" class="update-meta"></div>
+        <div id="update-progress" class="update-progress" hidden>
+          <div class="line"><span>正在下载安装包</span><b id="update-progress-percent">0%</b></div>
+          <div class="track" role="progressbar" aria-label="安装包下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="update-progress-fill" class="fill"></div></div>
+          <div id="update-progress-hint" class="hint"></div>
+        </div>
+        <div id="update-alert" class="update-alert" role="status" hidden></div>
+        <div class="update-foot">
+          <a id="update-release-link" class="text-button grow" href="https://github.com/LLYY0418/Deep-Legends/releases" target="_blank" rel="noopener noreferrer">打开发布页 ↗</a>
+          <button id="update-later" class="button button-secondary" type="button">稍后再说</button>
+          <button id="update-cancel" class="button button-secondary" type="button" hidden>取消下载</button>
+          <button id="update-start" class="button button-primary" type="button">开始升级</button>
+          <button id="update-apply" class="button button-primary" type="button" hidden>立即重启升级</button>
+        </div>
+      </div>
+    </dialog>
     <dialog id="career-dialog" class="career-dialog" aria-labelledby="career-dialog-title" aria-describedby="career-dialog-context"><section class="career-dialog-sheet"><header class="career-dialog-head"><div><h2 id="career-dialog-title">生涯统计</h2><p id="career-dialog-context"></p></div><button id="career-dialog-close" class="control-icon-button" type="button" aria-label="关闭生涯统计" data-tooltip="关闭"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div id="career-dialog-content" class="career-dialog-grid"></div></section></dialog>
     <dialog id="skin-dialog" class="skin-dialog" aria-labelledby="skin-dialog-title"><div class="dialog-art" id="skin-dialog-art"><img id="skin-dialog-backdrop" class="dialog-art-backdrop" alt="" hidden><video id="skin-dialog-video" muted loop playsinline preload="metadata" aria-hidden="true" hidden></video><img id="skin-dialog-image" class="dialog-art-primary" src="/image-unavailable.svg" alt=""><span id="skin-dialog-fallback">加载中</span><div class="dialog-toolbar"><button id="skin-dialog-artwork" class="dialog-action control-icon-button" type="button" aria-label="切换到臻彩原画" data-tooltip="切换到臻彩原画" hidden><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4V5Zm3 10 3-3 2 2 2-2 3 3M8 9h.01"/><path d="M17 2v3M14 3.5h6"/></svg></button><button id="skin-dialog-fullscreen" class="dialog-action control-icon-button" type="button" aria-label="全屏查看原画" data-tooltip="全屏查看原画"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg></button><button id="skin-dialog-close" class="dialog-action control-icon-button" type="button" aria-label="关闭详情" data-tooltip="关闭"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><button id="skin-dialog-previous" class="dialog-nav dialog-nav-previous control-icon-button" type="button" aria-label="查看上一款"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button><button id="skin-dialog-next" class="dialog-nav dialog-nav-next control-icon-button" type="button" aria-label="查看下一款"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></div><div class="dialog-copy"><p id="skin-dialog-status" class="account-label"></p><h2 id="skin-dialog-title"></h2><p id="skin-dialog-hero" class="dialog-hero"></p><dl id="skin-dialog-data" class="detail-list"></dl><button id="copy-skin-id" class="text-button" type="button">复制皮肤 ID</button></div></dialog>
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

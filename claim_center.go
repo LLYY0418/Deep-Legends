@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -23,14 +24,19 @@ type claimEntry struct {
 	ID             string       `json:"id"`
 	RewardGroupID  string       `json:"rewardGroupId,omitempty"`
 	RewardGroupIDs []string     `json:"rewardGroupIds,omitempty"`
+	DisplayGroup   string       `json:"displayGroup,omitempty"`
+	EventID        string       `json:"eventId,omitempty"`
+	EventName      string       `json:"eventName,omitempty"`
 	Title          string       `json:"title"`
 	Description    string       `json:"description,omitempty"`
+	Detail         string       `json:"detail,omitempty"`
 	DateCreated    string       `json:"dateCreated,omitempty"`
 	Items          []RewardItem `json:"items"`
 	MinSelections  int          `json:"minSelections,omitempty"`
 	MaxSelections  int          `json:"maxSelections,omitempty"`
 	Historical     bool         `json:"historical"`
 	NeedsChoice    bool         `json:"needsChoice"`
+	Actionable     bool         `json:"actionable"`
 	ChainID        string       `json:"chainId,omitempty"`
 	ChainIndex     int          `json:"chainIndex,omitempty"`
 	ChainCount     int          `json:"chainCount,omitempty"`
@@ -73,10 +79,14 @@ func (a *app) handleClaimScan(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, claimScanResponse{Items: []claimEntry{}, Sources: emptyClaimSources(), Reason: "未连接英雄联盟客户端"})
 		return
 	}
-	respondJSON(w, scanClaims(r.Context(), client))
+	respondJSON(w, scanClaimsObserved(r.Context(), client, a.recordDiagnostic))
 }
 
 func scanClaims(ctx context.Context, client *LCUClient) claimScanResponse {
+	return scanClaimsObserved(ctx, client, nil)
+}
+
+func scanClaimsObserved(ctx context.Context, client *LCUClient, observe func(map[string]any)) claimScanResponse {
 	response := claimScanResponse{Connected: true, ScannedAt: time.Now().UTC(), Items: []claimEntry{}, Sources: emptyClaimSources()}
 	grants, grantCapability := NewRewardsAPI(client).PendingGrantsContext(ctx)
 	grantState := claimSourceState{Count: len(grants), State: grantCapability.State, Detail: grantCapability.Detail}
@@ -84,10 +94,18 @@ func scanClaims(ctx context.Context, client *LCUClient) claimScanResponse {
 	for _, grant := range grants {
 		entry := claimEntry{
 			Key: "grant:" + grant.ID, Source: "grant", ID: grant.ID, RewardGroupID: grant.RewardGroupID,
-			Title: grant.Title, Description: grant.Description, DateCreated: grant.DateCreated, Items: grant.Items,
-			MinSelections: grant.MinSelections, MaxSelections: grant.MaxSelections,
+			DisplayGroup: grant.DisplayGroup, Title: grant.Title, Description: grant.Description, DateCreated: grant.DateCreated, Items: grant.Items,
+			MinSelections: grant.MinSelections, MaxSelections: grant.MaxSelections, Actionable: true,
 		}
-		entry.NeedsChoice = entry.MaxSelections > 0 && len(entry.Items) > 1
+		reason := grant.ValidationError
+		if reason == "" {
+			reason = grantValidationReason(entry)
+		}
+		if reason != "" {
+			entry.Actionable = false
+			entry.Detail = reason
+		}
+		entry.NeedsChoice = entry.MaxSelections > 0 && len(entry.Items) > entry.MaxSelections
 		entry.Historical = historicalDate(entry.DateCreated)
 		response.Items = append(response.Items, entry)
 	}
@@ -95,10 +113,11 @@ func scanClaims(ctx context.Context, client *LCUClient) claimScanResponse {
 	missionEntries, missionState := scanMissionClaims(ctx, client)
 	response.Sources["mission"] = missionState
 	response.Items = append(response.Items, missionEntries...)
-	eventEntries, eventState := scanEventClaims(ctx, client)
+	eventEntries, eventState := scanEventClaims(ctx, client, observe)
 	response.Sources["event"] = eventState
 	response.Items = append(response.Items, eventEntries...)
 	markClaimOverlaps(response.Items)
+	client.claimSettlements.filter(&response, time.Now())
 	for _, entry := range response.Items {
 		if entry.Historical {
 			response.HistoricalEvidence = true
@@ -114,7 +133,47 @@ func scanClaims(ctx context.Context, client *LCUClient) claimScanResponse {
 		}
 		return response.Items[i].Key < response.Items[j].Key
 	})
+	if observe != nil {
+		observe(claimScanShape(response))
+	}
 	return response
+}
+
+// Counts only: no grant IDs, localized names, account identifiers or raw payloads.
+func claimScanShape(response claimScanResponse) map[string]any {
+	sources := map[string]int{}
+	rows, positive, unknown, actionable, overlap, eventMapped := 0, 0, 0, 0, 0, 0
+	quantities := map[string]int{}
+	for _, entry := range response.Items {
+		sources[entry.Source]++
+		if entry.Source == "grant" && entry.EventID != "" {
+			eventMapped++
+		}
+		if entry.Actionable {
+			actionable++
+		}
+		if len(entry.OverlapWith) > 0 {
+			overlap++
+		}
+		for _, item := range entry.Items {
+			rows++
+			if item.Quantity > 0 {
+				positive++
+			} else {
+				unknown++
+			}
+			kind := strings.ToUpper(item.ItemType)
+			switch kind {
+			case "CURRENCY", "MATERIAL", "CHEST", "CHAMPION", "CHAMPION_SKIN", "EMOTE", "SUMMONER_ICON", "STATSTONE", "STATSTONE_SHARD":
+			default:
+				kind = "OTHER"
+			}
+			if item.Quantity > 0 {
+				quantities[kind] += item.Quantity
+			}
+		}
+	}
+	return map[string]any{"event": "claim_scan_shape", "source_entries": sources, "entry_count": len(response.Items), "actionable_entries": actionable, "reward_item_rows": rows, "quantity_positive_rows": positive, "quantity_unknown_rows": unknown, "quantity_by_type": quantities, "overlap_entries": overlap, "event_mapped_grants": eventMapped}
 }
 
 func emptyClaimSources() map[string]claimSourceState {
@@ -153,7 +212,11 @@ func scanMissionClaims(ctx context.Context, client *LCUClient) ([]claimEntry, cl
 		entry := claimEntry{
 			Key: "mission:" + id, Source: "mission", ID: id, RewardGroupIDs: groupIDs, Title: title,
 			Description: anyString(mission, "description", "shortDescription"), DateCreated: anyString(mission, "dateCreated", "completedDate"),
-			Items: items, ChainID: chainID, ChainIndex: chainIndex, ChainCount: chainCount,
+			Items: items, ChainID: chainID, ChainIndex: chainIndex, ChainCount: chainCount, Actionable: true,
+		}
+		if len(groupIDs) == 0 || len(groupIDs) != len(groups) {
+			entry.Actionable = false
+			entry.Detail = "客户端未提供完整、安全的任务奖励组标识，请在客户端领取"
 		}
 		entry.Historical = historicalDate(entry.DateCreated)
 		entries = append(entries, entry)
@@ -161,7 +224,11 @@ func scanMissionClaims(ctx context.Context, client *LCUClient) ([]claimEntry, cl
 	return entries, claimSourceState{Count: len(entries), State: "available"}
 }
 
-func scanEventClaims(ctx context.Context, client *LCUClient) ([]claimEntry, claimSourceState) {
+func scanEventClaims(ctx context.Context, client *LCUClient, observers ...func(map[string]any)) ([]claimEntry, claimSourceState) {
+	var observe func(map[string]any)
+	if len(observers) > 0 {
+		observe = observers[0]
+	}
 	var payload any
 	if err := client.RequestJSON(ctx, http.MethodGet, "/lol-event-hub/v1/events", nil, &payload); err != nil {
 		return []claimEntry{}, claimSourceError(err)
@@ -175,7 +242,7 @@ func scanEventClaims(ctx context.Context, client *LCUClient) ([]claimEntry, clai
 				continue
 			}
 		}
-		id := anyString(event, "id", "eventId")
+		id := anyString(event, "eventId", "id")
 		if safeLCUIdentifier(id) {
 			filtered = append(filtered, event)
 		}
@@ -184,6 +251,7 @@ func scanEventClaims(ctx context.Context, client *LCUClient) ([]claimEntry, clai
 	sem := make(chan struct{}, 4)
 	var wait sync.WaitGroup
 	var resultMu sync.Mutex
+	stateCounts := map[string]int{}
 	detailFailures := 0
 	var firstDetailError error
 	for index, event := range filtered {
@@ -197,8 +265,9 @@ func scanEventClaims(ctx context.Context, client *LCUClient) ([]claimEntry, clai
 			case <-ctx.Done():
 				return
 			}
-			id := anyString(event, "id", "eventId")
+			id := anyString(event, "eventId", "id")
 			items := []RewardItem{}
+			groups := []string{}
 			detailAvailable := false
 			var detailError error
 			for _, suffix := range []string{"items", "bonus-items"} {
@@ -206,7 +275,14 @@ func scanEventClaims(ctx context.Context, client *LCUClient) ([]claimEntry, clai
 				path := "/lol-event-hub/v1/events/" + id + "/reward-track/" + suffix
 				if err := client.RequestJSON(ctx, http.MethodGet, path, nil, &detail); err == nil {
 					detailAvailable = true
+					counts := eventRewardStateCounts(detail)
+					resultMu.Lock()
+					for state, count := range counts {
+						stateCounts[state] += count
+					}
+					resultMu.Unlock()
 					items = append(items, collectUnselectedEventItems(detail)...)
+					groups = append(groups, eventRewardGroupIDs(detail)...)
 				} else if detailError == nil {
 					detailError = err
 				}
@@ -220,17 +296,35 @@ func scanEventClaims(ctx context.Context, client *LCUClient) ([]claimEntry, clai
 				resultMu.Unlock()
 				return
 			}
+			seenItems := map[string]bool{}
+			uniqueItems := items[:0]
+			for _, item := range items {
+				raw, _ := json.Marshal(item)
+				key := string(raw)
+				if !seenItems[key] {
+					seenItems[key] = true
+					uniqueItems = append(uniqueItems, item)
+				}
+			}
+			items = uniqueItems
 			info, _ := event["eventInfo"].(map[string]any)
 			title := claimDisplayTitle(event, claimDisplayTitle(info, "未领取活动奖励"))
 			endDate := anyString(info, "endDate")
-			entries[index] = claimEntry{
-				Key: "event:" + id, Source: "event", ID: id, Title: title,
-				Description: anyString(info, "description"), DateCreated: anyString(info, "startDate"), Items: items,
-				Historical: historicalDate(endDate),
+			if len(items) == 0 && len(groups) == 0 {
+				return
 			}
+			entry := claimEntry{
+				Key: "event:" + id, Source: "event", ID: id, Title: title, EventID: id, EventName: title, RewardGroupIDs: groups,
+				Description: anyString(info, "description"), DateCreated: anyString(info, "startDate"), Items: items,
+				Historical: historicalDate(endDate), Actionable: len(items) > 0,
+			}
+			entries[index] = entry
 		}()
 	}
 	wait.Wait()
+	if observe != nil && len(stateCounts) > 0 {
+		observe(map[string]any{"event": "event_reward_state_shape", "state_counts": stateCounts})
+	}
 	if err := ctx.Err(); err != nil {
 		return []claimEntry{}, claimSourceError(err)
 	}
@@ -243,7 +337,13 @@ func scanEventClaims(ctx context.Context, client *LCUClient) ([]claimEntry, clai
 	if len(filtered) > 0 && len(compact) == 0 && firstDetailError != nil {
 		return []claimEntry{}, claimSourceError(firstDetailError)
 	}
-	state := claimSourceState{Count: len(compact), State: "available"}
+	actionableCount := 0
+	for _, entry := range compact {
+		if entry.Actionable {
+			actionableCount++
+		}
+	}
+	state := claimSourceState{Count: actionableCount, State: "available"}
 	if detailFailures > 0 {
 		state.State = "failed"
 		state.Detail = "部分活动奖励明细读取失败"
@@ -304,15 +404,17 @@ func collectClaimRewardItems(value any) []RewardItem {
 				walk(child)
 			}
 		case map[string]any:
-			id := anyString(typed, "id", "rewardId", "itemId")
+			id := anyString(typed, "id", "rewardId", "itemId", "rewardGroupId")
 			itemID := anyString(typed, "itemId")
 			title := claimDisplayTitle(typed, "")
 			if (id != "" || itemID != "") && (title != "" || anyInt(typed, "quantity", "count") > 0) {
-				key := id + ":" + itemID
+				icon := sanitizeClientImagePath(anyString(typed, "iconUrl", "thumbIconPath", "iconPath"))
+				item := RewardItem{ID: id, ItemID: itemID, ItemType: anyString(typed, "itemType", "type"), Title: title, Details: anyString(typed, "details", "description"), Quantity: int(anyInt(typed, "quantity", "count")), IconURL: icon}
+				encoded, _ := json.Marshal(item)
+				key := string(encoded)
 				if !seen[key] {
 					seen[key] = true
-					icon := sanitizeClientImagePath(anyString(typed, "iconUrl", "thumbIconPath", "iconPath"))
-					result = append(result, RewardItem{ID: id, ItemID: itemID, ItemType: anyString(typed, "itemType", "type"), Title: title, Details: anyString(typed, "details", "description"), Quantity: int(anyInt(typed, "quantity", "count")), IconURL: icon})
+					result = append(result, item)
 				}
 			}
 			for _, child := range typed {
@@ -348,8 +450,33 @@ func collectUnselectedEventItems(value any) []RewardItem {
 	return result
 }
 
+func eventRewardStateCounts(value any) map[string]int {
+	result := map[string]int{}
+	var walk func(any)
+	walk = func(node any) {
+		switch typed := node.(type) {
+		case []any:
+			for _, child := range typed {
+				walk(child)
+			}
+		case map[string]any:
+			if raw, ok := typed["state"].(string); ok {
+				state := strings.TrimSpace(raw)
+				if state != "" {
+					result[state]++
+				}
+			}
+			for _, child := range typed {
+				walk(child)
+			}
+		}
+	}
+	walk(value)
+	return result
+}
+
 func claimDisplayTitle(object map[string]any, fallback string) string {
-	for _, key := range []string{"title", "name", "displayName", "localizedName", "rewardName"} {
+	for _, key := range []string{"eventName", "title", "name", "displayName", "localizedName", "rewardName"} {
 		if value := strings.TrimSpace(anyString(object, key)); value != "" && !rewardLocalizationPlaceholder(value) {
 			return value
 		}
@@ -394,41 +521,84 @@ func historicalDate(value string) bool {
 	return err == nil && parsed.Before(time.Date(time.Now().Year(), 1, 1, 0, 0, 0, 0, time.Local))
 }
 
+// Reward amounts are not identities: two unrelated events can award 750 BE.
 func markClaimOverlaps(entries []claimEntry) {
-	grantSignatures := map[string]bool{}
-	for _, entry := range entries {
-		if entry.Source == "grant" {
-			grantSignatures[claimSignature(entry)] = true
+	owners := map[string][]int{}
+	for i, entry := range entries {
+		if entry.Source != "event" {
+			continue
 		}
-	}
-	for index := range entries {
-		if entries[index].Source == "event" && grantSignatures[claimSignature(entries[index])] {
-			entries[index].OverlapWith = "grant"
-			signature := claimSignature(entries[index])
-			for grantIndex := range entries {
-				if entries[grantIndex].Source == "grant" && claimSignature(entries[grantIndex]) == signature {
-					entries[grantIndex].OverlapWith = "event"
-				}
+		seen := map[string]bool{}
+		for _, group := range entry.RewardGroupIDs {
+			if group != "" && !seen[group] {
+				owners[group] = append(owners[group], i)
+				seen[group] = true
 			}
 		}
 	}
+	for i := range entries {
+		if entries[i].Source != "grant" {
+			continue
+		}
+		matches := owners[entries[i].RewardGroupID]
+		for _, index := range matches {
+			entries[index].OverlapWith = "grant"
+			entries[index].Actionable = false
+			entries[index].Detail = "奖励组已在奖励账本中逐项展示，避免重复领取"
+		}
+		if len(matches) != 1 {
+			continue
+		}
+		event := &entries[matches[0]]
+		entries[i].EventID, entries[i].EventName = event.EventID, event.EventName
+		entries[i].Title = event.EventName
+		// The event claim-all and the grant select act on the same entitlement.
+		// Prefer the existing per-grant selection path; never submit both.
+		event.OverlapWith = "grant"
+		event.Actionable = false
+		event.Detail = "同一活动奖励已在奖励账本中逐项展示"
+	}
+}
+
+func eventRewardGroupIDs(value any) []string {
+	result := []string{}
+	seen := map[string]bool{}
+	var walk func(any)
+	walk = func(value any) {
+		switch row := value.(type) {
+		case []any:
+			for _, child := range row {
+				walk(child)
+			}
+		case map[string]any:
+			if id := anyString(row, "rewardGroupId"); id != "" && !seen[id] {
+				seen[id] = true
+				result = append(result, id)
+			}
+			for _, child := range row {
+				walk(child)
+			}
+		}
+	}
+	walk(value)
+	return result
 }
 
 func claimSignature(entry claimEntry) string {
-	title := strings.ToLower(strings.Join(strings.Fields(entry.Title), ""))
-	itemIDs := make([]string, 0, len(entry.Items))
+	items := make([]string, 0, len(entry.Items))
 	for _, item := range entry.Items {
-		if item.ItemID != "" {
-			itemIDs = append(itemIDs, item.ItemID)
-		} else if item.ID != "" {
-			itemIDs = append(itemIDs, item.ID)
+		id := item.ItemID
+		if id == "" {
+			id = item.ID
 		}
+		if id == "" {
+			return ""
+		}
+		encoded, _ := json.Marshal([]any{id, strings.ToUpper(item.ItemType), item.Quantity})
+		items = append(items, string(encoded))
 	}
-	sort.Strings(itemIDs)
-	if len(itemIDs) > 0 {
-		return strings.Join(itemIDs, ",")
-	}
-	return title
+	sort.Strings(items)
+	return strings.Join(items, ",")
 }
 
 func (a *app) handleClaimExecute(w http.ResponseWriter, r *http.Request) {
@@ -448,15 +618,26 @@ func (a *app) handleClaimExecute(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "未连接英雄联盟客户端", http.StatusConflict)
 		return
 	}
-	canonical := scanClaims(r.Context(), client)
+	// Serialize canonical read + write across concurrent requests in this session.
+	client.claimExecutionMu.Lock()
+	defer client.claimExecutionMu.Unlock()
+	canonical := scanClaimsObserved(r.Context(), client, a.recordDiagnostic)
 	byKey := make(map[string]claimEntry, len(canonical.Items))
 	for _, entry := range canonical.Items {
 		byKey[entry.Key] = entry
 	}
+	seen := make(map[string]bool, len(request.Items))
 	response := claimExecuteResponse{Results: make([]claimExecuteResult, 0, len(request.Items))}
 	for _, selected := range request.Items {
 		entry, ok := byKey[selected.Key]
 		result := claimExecuteResult{Key: selected.Key}
+		if seen[selected.Key] {
+			result.Message = "本批次包含重复条目，已阻止重复领取"
+			response.Failed++
+			response.Results = append(response.Results, result)
+			continue
+		}
+		seen[selected.Key] = true
 		if !ok {
 			result.Message = "该条目已不存在，请重新扫描"
 			result.Consequence = "它可能已被客户端处理，不影响本批次其它条目。"
@@ -464,8 +645,18 @@ func (a *app) handleClaimExecute(w http.ResponseWriter, r *http.Request) {
 			response.Results = append(response.Results, result)
 			continue
 		}
-		err := executeClaimEntry(r.Context(), client, entry, selected.Selections)
+		var err error
+		if !entry.Actionable {
+			reason := entry.Detail
+			if reason == "" {
+				reason = "客户端未提供可安全领取的奖励明细"
+			}
+			err = errors.New(reason)
+		} else {
+			err = executeClaimEntry(r.Context(), client, entry, selected.Selections)
+		}
 		if err == nil {
+			client.claimSettlements.remember(entry, time.Now())
 			result.OK = true
 			response.Succeeded++
 		} else {
@@ -473,20 +664,48 @@ func (a *app) handleClaimExecute(w http.ResponseWriter, r *http.Request) {
 			response.Failed++
 		}
 		response.Results = append(response.Results, result)
+		a.recordDiagnostic(map[string]any{"event": "claim_action", "source": entry.Source, "ok": result.OK, "status_code": result.StatusCode, "reward_count": len(entry.Items)})
 	}
 	// A fresh scan exposes the next SELECT_REWARDS node in a mission chain, but
 	// never claims it automatically.
-	response.Scan = scanClaims(r.Context(), client)
+	response.Scan = scanClaimsObserved(r.Context(), client, a.recordDiagnostic)
 	respondJSON(w, response)
 }
 
+// Validate client metadata before advertising an action and again before writing.
+// Never repair an inconsistent selection strategy by silently changing its bounds.
+func grantValidationReason(entry claimEntry) string {
+	if !safeLCUIdentifier(entry.ID) || !safeLCUIdentifier(entry.RewardGroupID) {
+		return "客户端返回的奖励标识无法安全使用"
+	}
+	if len(entry.Items) == 0 {
+		return "客户端未提供奖励明细，请在客户端领取"
+	}
+	if entry.MinSelections < 0 || entry.MaxSelections < 0 || entry.MinSelections > entry.MaxSelections || entry.MaxSelections > len(entry.Items) {
+		return "客户端返回的奖励选择范围不完整，请在客户端领取"
+	}
+	if entry.MaxSelections > 0 {
+		seen := make(map[string]bool, len(entry.Items))
+		for _, item := range entry.Items {
+			if strings.TrimSpace(item.ID) == "" || seen[item.ID] {
+				return "客户端奖励选项标识缺失或重复，请在客户端领取"
+			}
+			seen[item.ID] = true
+		}
+	}
+	return ""
+}
+
 func executeClaimEntry(ctx context.Context, client *LCUClient, entry claimEntry, selections []string) error {
+	if entry.Source == "event" && !entry.Actionable {
+		return errors.New("该活动奖励客户端未提供可领取明细，请在游戏客户端内领取")
+	}
 	requestCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	switch entry.Source {
 	case "grant":
-		if !safeLCUIdentifier(entry.ID) || !safeLCUIdentifier(entry.RewardGroupID) {
-			return errors.New("客户端返回的奖励标识无法安全使用")
+		if reason := grantValidationReason(entry); reason != "" {
+			return errors.New(reason)
 		}
 		allowed := map[string]bool{}
 		for _, item := range entry.Items {
@@ -506,6 +725,15 @@ func executeClaimEntry(ctx context.Context, client *LCUClient, entry claimEntry,
 		minimum, maximum := entry.MinSelections, entry.MaxSelections
 		if maximum > len(entry.Items) {
 			maximum = len(entry.Items)
+		}
+		if maximum > 0 && len(entry.Items) == maximum && len(unique) == 0 {
+			for _, item := range entry.Items {
+				if item.ID == "" {
+					unique = nil
+					break
+				}
+				unique = append(unique, item.ID)
+			}
 		}
 		if maximum > 0 && (len(unique) < minimum || len(unique) > maximum) {
 			return fmt.Errorf("需要选择 %d 到 %d 项奖励", minimum, maximum)

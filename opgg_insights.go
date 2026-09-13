@@ -67,6 +67,8 @@ type opggHistoryFlight struct {
 
 // opggInsights 缓存按玩家抓取的 OP.GG 对局段位数据。
 type opggInsights struct {
+	seasons        map[string]opggSeasonEntry
+	seasonFlights  map[string]*opggSeasonFlight
 	mu             sync.Mutex
 	tiers          map[string]opggTierCacheEntry
 	flights        map[string]*opggTierFlight

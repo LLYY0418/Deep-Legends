@@ -91,6 +91,11 @@ func TestConvenienceReadyCheckPostsAcceptOnce(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.Copy(io.Discard, r.Body)
 		requests <- r.Method + " " + r.URL.Path
+		if r.Method == http.MethodGet && r.URL.Path == "/lol-gameflow/v1/session" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"phase":"ReadyCheck","gameData":{"queue":{"id":420,"gameMode":"CLASSIC","mapId":11,"type":"MATCHED_GAME"}}}`)
+			return
+		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	t.Cleanup(server.Close)
@@ -104,11 +109,19 @@ func TestConvenienceReadyCheckPostsAcceptOnce(t *testing.T) {
 	runner.handlePhase(client, "ReadyCheck")
 	select {
 	case got := <-requests:
+		if got != "GET /lol-gameflow/v1/session" {
+			t.Fatalf("got %q", got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("ready-check preflight was not requested")
+	}
+	select {
+	case got := <-requests:
 		if got != "POST /lol-matchmaking/v1/ready-check/accept" {
 			t.Fatalf("got %q", got)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("accept was not posted")
+		t.Fatal("accept was not posted after the non-custom preflight")
 	}
 	select {
 	case extra := <-requests:

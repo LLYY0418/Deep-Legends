@@ -12,10 +12,12 @@ const path = require("node:path");
 const { JSDOM } = require("jsdom");
 
 const WEB = path.join(__dirname, "..", "web");
-const SCRIPTS = ["demo-data.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
+const SCRIPTS = ["runtime.js", "demo-data.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
 const gameplaySource = fs.readFileSync(path.join(WEB, "gameplay.js"), "utf8");
+const suiteSource = fs.readFileSync(path.join(WEB, "suite.js"), "utf8");
 const appStyles = fs.readFileSync(path.join(WEB, "app.css"), "utf8");
 const gameplayStyles = fs.readFileSync(path.join(WEB, "gameplay.css"), "utf8");
+const suiteStyles = fs.readFileSync(path.join(WEB, "suite.css"), "utf8");
 
 function functionSource(source, name) {
   let start = source.indexOf(`function ${name}(`);
@@ -81,6 +83,7 @@ test("collapsed sidebar hides the label but keeps the live beacon rendered", () 
 function bootDemoApp(options = {}) {
   const html = fs.readFileSync(path.join(WEB, "index.html"), "utf8");
   const errors = [];
+	const eventSources = [];
   const dom = new JSDOM(html, { url: "http://127.0.0.1:1/?demo", runScripts: "outside-only", pretendToBeVisual: true });
   const w = dom.window;
   w.onerror = (message, source, line, column, error) => { errors.push(String((error && error.stack) || message)); };
@@ -97,18 +100,104 @@ function bootDemoApp(options = {}) {
   w.Response = globalThis.Response;
   w.Headers = globalThis.Headers;
   w.Request = globalThis.Request;
+	if (options.liveEvents) {
+	  w.EventSource = class MockEventSource {
+		static CLOSED = 2;
+		constructor(url) { this.url = url; this.readyState = 1; eventSources.push(this); }
+		close() { this.readyState = MockEventSource.CLOSED; }
+	  };
+	}
 	if (options.matchCount) w.localStorage.setItem("lol-loot-match-count", String(options.matchCount));
   // 渲染故障会被 renderOverviewBody 兜住并写进 console.error，这里一并收集。
   w.console.error = (...args) => { errors.push(args.map((value) => (value && value.stack) || String(value)).join(" ")); };
 
   for (const file of SCRIPTS) {
-    w.eval(fs.readFileSync(path.join(WEB, file), "utf8"));
+    let source = fs.readFileSync(path.join(WEB, file), "utf8");
+    if (file === "gameplay.js" && options.gameplaySourceTransform) source = options.gameplaySourceTransform(source);
+    w.eval(source);
+	if (file === "demo-data.js" && options.facadeStateTransform) {
+	  const demoFetch = w.fetch;
+	  w.fetch = async (input, init) => {
+		const url = typeof input === "string" ? input : input?.url || "";
+		if (!url.startsWith("/api/facade/state") || String(init?.method || "GET").toUpperCase() !== "GET") return demoFetch(input, init);
+		const response = await demoFetch(input, init);
+		const payload = options.facadeStateTransform(await response.json());
+		return new w.Response(JSON.stringify(payload), { status: response.status, headers: { "Content-Type": "application/json" } });
+	  };
+	}
   }
   w.document.dispatchEvent(new w.Event("DOMContentLoaded", { bubbles: true }));
-  return { window: w, errors };
+  return { window: w, errors, eventSources };
 }
 
 const settled = () => new Promise((resolve) => setTimeout(resolve, 1500));
+
+test("1110 征召默认值、时间输入、模式能力和总开关真实保存链", async () => {
+  const { window: w, errors } = bootDemoApp();
+  try {
+    await settled();
+    w.document.querySelector('[data-section="suite"]').click();
+    await settled();
+    w.document.querySelector('[data-suite-tab="champselect"]').click();
+    const root = w.document.querySelector("#suite-champselect-root");
+    const change = async (selector, value) => {
+      const input = root.querySelector(selector);
+      assert.ok(input, selector);
+      if (input.type === "checkbox") input.checked = value;
+      else input.value = value;
+      input.dispatchEvent(new w.Event("change", { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    };
+    const saved = async () => (await (await w.fetch("/api/watch/rules")).json()).champSelect;
+    root.querySelector('[data-cs-group="aram"]').click();
+    assert.equal(root.querySelector(".is-ban"), null, "大乱斗不能显示禁用卡");
+    assert.equal(root.querySelector("[data-cs-bench-enabled]").checked, true);
+    assert.equal(root.querySelector("[data-cs-bench-prefer]").checked, true);
+    assert.equal(root.querySelector('[data-cs-time="hold"]').value, "1");
+    root.querySelector('[data-cs-hold-delta="500"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.equal((await saved()).groups.aram.bench.holdMs, 1500);
+    root.querySelector('[data-cs-hold-delta="-500"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.equal((await saved()).groups.aram.bench.holdMs, 1000);
+    await change('[data-cs-time="hold"]', "1.75");
+    assert.equal((await saved()).groups.aram.bench.holdMs, 1750, "手输不强制对齐步长");
+    assert.equal(root.querySelector('[data-cs-time="hold"]').checkValidity(), true, "手输小数不能被原生 step 判无效");
+    await change('[data-cs-time="hold"]', "0.1");
+    assert.equal((await saved()).groups.aram.bench.holdMs, 1000);
+    await change('[data-cs-time="pick"]', "0.25");
+    assert.equal((await saved()).groups.aram.pick.delayMs, 250);
+    await change('[data-cs-time="pick"]', "");
+    assert.equal((await saved()).groups.aram.pick.delayMs, 250, "空值不得改写配置");
+    for (const id of ["ranked", "normal", "practice", "event"]) {
+      root.querySelector(`[data-cs-group="${id}"]`).click();
+      assert.equal(root.querySelector("[data-cs-bench-enabled]"), null, id);
+      assert.equal(root.querySelector("[data-cs-bench-prefer]").matches(":disabled"), false, id);
+    }
+    await change("[data-cs-bench-prefer]", true);
+    assert.equal((await saved()).groups.event.bench.preferFirst, true);
+    await change('[data-cs-time="ban"]', "1.25");
+    assert.equal((await saved()).groups.event.ban.delayMs, 1250);
+    await change('[data-cs-time="ban"]', "99");
+    assert.equal((await saved()).groups.event.ban.delayMs, 10000);
+    root.querySelector('[data-cs-group="arena"]').click();
+    assert.equal(root.querySelector(".cs-bench-card"), null, "无交换能力不显示空卡");
+    root.querySelector('[data-cs-group="aram"]').click();
+    const before = JSON.stringify((await saved()).groups);
+    await change("[data-cs-master]", false);
+    assert.ok(root.classList.contains("cs-master-off"));
+    assert.ok(root.querySelector(".cs-config-fields").disabled);
+    for (const element of root.querySelectorAll(".cs-config-fields input, .cs-config-fields button")) {
+      assert.ok(element.matches(":disabled"), element.outerHTML);
+    }
+    assert.equal(root.querySelector("[data-cs-master]").disabled, false);
+    assert.equal(JSON.stringify((await saved()).groups), before, "关闭总开关应保留子配置");
+    await change("[data-cs-master]", true);
+    assert.equal(root.querySelector("[data-cs-bench-enabled]").matches(":disabled"), false);
+    assert.equal(root.querySelector("[data-cs-bench-enabled]").checked, true);
+    assert.deepEqual(errors, []);
+  } finally { w.close(); }
+});
 
 async function bootLiveTab() {
   const boot = bootDemoApp();
@@ -176,6 +265,144 @@ test("平均段位只查询视口内卡片，并在分页加载期间停用", as
   w.close();
 });
 
+test("match-tier failures back off instead of retrying on the next render", async () => {
+  const dom = new JSDOM('<main id="app-scroll"><div id="matches"><article class="match-entry"><span data-match-tier-pending data-game-id="1"></span></article></div></main>', { url: "http://localhost/", pretendToBeVisual: true });
+  const w = dom.window;
+  const container = w.document.getElementById("matches");
+  const node = container.querySelector("[data-match-tier-pending]");
+  node.closest(".match-entry").getBoundingClientRect = () => ({ top: 0, left: 0, right: 10, bottom: 10, width: 10, height: 10 });
+  w.document.getElementById("app-scroll").getBoundingClientRect = () => ({ top: 0, left: 0, right: 100, bottom: 100, width: 100, height: 100 });
+  const state = { activeTab: "current", matchTiers: new Map(), matchTierFlights: new Set(), matchTierFailures: new Map() };
+  let requests = 0;
+  const functions = compileFunctions(gameplaySource, ["matchTierScrollRoot", "matchTierNodeIsVisible", "noteMatchTierFailure", "hydrateMatchTiers", "shouldHydrateMatchTiers"], {
+    window: w, document: w.document, state,
+    riotTab: () => false, connected: () => true,
+    matchTierCacheKey: () => "scope:1", applyMatchTierValue: () => {}, tabServerID: () => "HN1",
+    matchTierFromScores: () => null, MATCH_TIERS_MAX_REFS: 24,
+    MATCH_TIER_RETRY_BASE_MS: 1000, MATCH_TIER_MAX_BACKOFF_MS: 60000,
+    api: async () => { requests += 1; throw new Error("timeout"); },
+  });
+  const tab = { key: "current", data: { player: { playerRef: "player" }, matches: [{ gameId: 1, participants: [{ playerRef: "ref" }] }] } };
+  await functions.hydrateMatchTiers(container, tab, "scope", [node]);
+  await functions.hydrateMatchTiers(container, tab, "scope", [node]);
+  assert.equal(requests, 1);
+  assert.equal(state.matchTierFailures.get("scope:1")?.count, 1);
+  w.close();
+});
+
+test("match-tier overview diagnostics contain aggregate counts only", async () => {
+  const requests = [];
+  const { recordMatchTierOverviewBatch } = compileFunctions(gameplaySource, ["recordMatchTierOverviewBatch"], {
+    fetch: async (requestPath, options) => { requests.push([requestPath, JSON.parse(options.body)]); return { ok: true }; },
+  });
+  recordMatchTierOverviewBatch(36, 24, 19);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(requests, [["/api/diagnostics/client", {
+    event: "match_tiers_overview_batch", reason: "complete", totalRefs: 36, uniqueRefs: 24, cacheHits: 19,
+  }]]);
+  assert.doesNotMatch(JSON.stringify(requests), /playerRef|puuid|summoner/i);
+});
+
+test("non-match overview rerenders preserve the match-list node", () => {
+  const dom = new JSDOM('<div id="overview"></div>', { url: "http://localhost/", pretendToBeVisual: true });
+  const container = dom.window.document.getElementById("overview");
+  const state = { tabs: [{ key: "current" }], settings: { maskNames: false } };
+  const dependencies = {
+    state,
+    matchTierScope: () => "scope", filteredMatches: (matches) => matches,
+    maskedProfileIcon: () => "", iconFigure: () => "", playerLabel: () => "Player", riotTab: () => false,
+    emptyState: () => "", opggSummonerURL: () => "", loadOverview: () => {},
+    matchListEmptyContent: () => "empty", matchSentinelShouldHide: () => true,
+    summonerContextChip: () => "", summonerProChip: () => "", summonerRegionChip: () => "", renderSummonerHighlights: () => "",
+    scheduleOverviewCurrentGame: () => {},
+    paginationCopyFor: () => "", renderCareerSections: () => "", renderMatchFilters: () => "",
+    renderMatch: (match) => `<article class="match-entry">${match.gameId}</article>`, number: (value) => String(value),
+    escapeHTML: (value) => String(value ?? ""), bindOverviewContent: () => {}, applyRenderedMetricStyles: () => {},
+    prepareImages: () => {}, ensurePerks: () => {}, ensureItems: () => {}, ensureSummonerSpells: () => {}, observeMatchTierVisibility: () => {},
+    window: dom.window,
+  };
+  const { renderOverviewBodyContent } = compileFunctions(gameplaySource, ["renderOverviewBodyContent"], dependencies);
+  const matches = [{ gameId: 1 }];
+  const tab = { key: "current", matchFilter: "all", matchViewRevision: 0, openMatches: new Set(), data: { player: { playerRef: "ref" }, matches, pagination: {} } };
+  renderOverviewBodyContent(container, tab);
+  const firstList = container.querySelector(".match-list");
+  renderOverviewBodyContent(container, tab);
+  assert.equal(container.querySelector(".match-list"), firstList);
+
+  tab.openMatches.add("1");
+  tab.matchViewRevision += 1;
+  renderOverviewBodyContent(container, tab);
+  assert.notEqual(container.querySelector(".match-list"), firstList, "match UI state changes must rebuild the list");
+
+  const mutated = gameplaySource.replace("container._matchListViewRevision === Number(tab.matchViewRevision || 0)", "true");
+  assert.notEqual(mutated, gameplaySource);
+  const mutatedRender = compileFunctions(mutated, ["renderOverviewBodyContent"], dependencies).renderOverviewBodyContent;
+  const mutatedContainer = dom.window.document.createElement("div");
+  tab.openMatches.clear();
+  tab.matchViewRevision = 0;
+  mutatedRender(mutatedContainer, tab);
+  const mutatedFirst = mutatedContainer.querySelector(".match-list");
+  mutatedRender(mutatedContainer, tab);
+  assert.equal(mutatedContainer.querySelector(".match-list"), mutatedFirst);
+  tab.openMatches.add("1");
+  tab.matchViewRevision += 1;
+  mutatedRender(mutatedContainer, tab);
+  assert.equal(mutatedContainer.querySelector(".match-list"), mutatedFirst, "the mutation must reproduce the stale-list bug");
+  dom.window.close();
+});
+
+test("总览战绩卡：点击展开按钮后详情必须真的出现并可收起", async () => {
+  const { window: w, errors } = bootDemoApp();
+  await settled();
+  const d = w.document;
+  const button = d.querySelector(".match-list [data-toggle-match]:not([disabled])");
+  assert.ok(button, "找不到可用的展开按钮");
+  assert.equal(d.querySelectorAll(".match-detail").length, 0);
+  const gameID = button.dataset.toggleMatch;
+  button.click();
+  await settled();
+  assert.equal(d.querySelectorAll(".match-detail").length, 1, "点击展开后详情区没有出现");
+  const again = d.querySelector(`[data-toggle-match="${gameID}"]`);
+  assert.equal(again?.getAttribute("aria-expanded"), "true");
+  again.click();
+  await settled();
+  assert.equal(d.querySelectorAll(".match-detail").length, 0, "再次点击没有收起");
+  assert.deepEqual(errors, []);
+  w.close();
+
+  const mutated = bootDemoApp({
+    gameplaySourceTransform: (source) => source.replace(
+      "container._matchListViewRevision === Number(tab.matchViewRevision || 0)",
+      "true",
+    ),
+  });
+  await settled();
+  const mutatedButton = mutated.window.document.querySelector(".match-list [data-toggle-match]:not([disabled])");
+  assert.ok(mutatedButton, "变异副本找不到可用的展开按钮");
+  mutatedButton.click();
+  await settled();
+  assert.equal(mutated.window.document.querySelectorAll(".match-detail").length, 0, "变异没有复现 stale-list 回归");
+  mutated.window.close();
+});
+
+test("玩家覆盖层里的战绩详情也能展开", async () => {
+  const { window: w, errors } = bootDemoApp();
+  await settled();
+  w.dispatchEvent(new w.CustomEvent("deep-legends:open-player", {
+    detail: { source: "champions", playerRef: "player_00000000000000000000000000000001", gameName: "覆盖层玩家" },
+  }));
+  await settled();
+  const overlay = w.document.getElementById("player-overlay");
+  assert.equal(overlay.hidden, false, "玩家覆盖层没有打开");
+  const button = overlay.querySelector(".match-list [data-toggle-match]:not([disabled])");
+  assert.ok(button, "覆盖层里找不到可展开的战绩");
+  button.click();
+  await settled();
+  assert.equal(overlay.querySelectorAll(".match-detail").length, 1, "覆盖层战绩详情没有展开");
+  assert.deepEqual(errors, []);
+  w.close();
+});
+
 test("演示数据下总览页渲染出真实内容，且渲染期没有异常", async () => {
   const { window: w, errors } = bootDemoApp();
   await settled();
@@ -212,23 +439,36 @@ test("演示数据下总览页渲染出真实内容，且渲染期没有异常",
   w.close();
 });
 
-test("演示数据下随行四个页签都渲染完成", async () => {
+test("好友在线事件只更新状态 chip，不重建总览或战绩列表", async () => {
+  const { window: w, errors } = bootDemoApp();
+  await settled();
+  const overview = w.document.getElementById("overview-content");
+  const matchList = overview.querySelector(".match-list");
+	const summonerStrip = overview.querySelector(".summoner-strip");
+  w.dispatchEvent(new w.CustomEvent("deep-legends:friends-presence", { detail: { friends: [] } }));
+  assert.equal(overview.querySelector(".match-list"), matchList);
+	assert.equal(overview.querySelector(".summoner-strip"), summonerStrip, "好友事件触发了整页总览重建");
+  assert.deepEqual(errors, []);
+  w.close();
+});
+
+test("演示数据下工具五个页签都渲染完成", async () => {
   const { window: w, errors } = bootDemoApp();
   await settled();
   w.document.querySelector('[data-section="suite"]').click();
   await settled();
-  for (const name of ["watch", "rig", "facade", "sweep"]) {
+  for (const name of ["watch", "rig", "facade", "sweep", "champselect"]) {
     const root = w.document.getElementById(`suite-${name}-root`);
-    assert.ok(root, `随行缺少 ${name} 容器`);
+    assert.ok(root, `工具缺少 ${name} 容器`);
     assert.equal(root.classList.contains("suite-loading"), false, `${name} 永久停在加载态`);
     assert.ok(root.textContent.trim().length > 20, `${name} 没有渲染出内容`);
   }
   const watchCards = [...w.document.querySelectorAll("#suite-watch-root [data-watch-card]")];
-  assert.deepEqual(watchCards.map((card) => card.dataset.watchCard), ["accept", "promote-leader", "invitations", "auto-matchmaking", "reconnect", "position-broadcast", "play-again", "auto-honor", "skip-celebration"], "值守九张规则卡未按分类完整渲染");
-  assert.equal(w.document.querySelectorAll("#suite-watch-root [data-watch-toggle]").length, 9, "值守规则卡缺少独立开关");
+  assert.deepEqual(watchCards.map((card) => card.dataset.watchCard), ["accept", "promote-leader", "invitations", "auto-matchmaking", "reconnect", "position-broadcast", "play-again", "auto-honor", "skip-celebration"], "自动页九张规则卡未按分类完整渲染");
+  assert.equal(w.document.querySelectorAll("#suite-watch-root [data-watch-toggle]").length, 9, "自动规则卡缺少独立开关");
   assert.equal(w.document.querySelectorAll("#suite-watch-root .watch-rule.is-enabled").length, 6, "已启用规则卡缺少独立高亮背景");
   assert.equal(Number.parseFloat(w.document.querySelector('[data-watch-delay="autoAccept"]')?.style.getPropertyValue("--range-fill")), 15, "自动接受延时轨道未按当前值填充");
-  assert.ok(w.document.querySelector("#suite-watch-root .watch-rules-head"), "值守缺少设计稿中的规则标题区");
+  assert.ok(w.document.querySelector("#suite-watch-root .watch-rules-head"), "自动页缺少设计稿中的规则标题区");
   assert.equal(w.document.querySelectorAll('#suite-watch-root [data-watch-choice="autoHonor.strategy"]').length, 4, "点赞策略未按设计稿渲染为四个胶囊选项");
   assert.equal(w.document.querySelectorAll('#suite-watch-root [data-watch-choice="positionBroadcast.visibility"]').length, 2, "阵营播报范围未按设计稿渲染为两个胶囊选项");
   assert.equal(w.document.querySelectorAll("#suite-watch-root .watch-invite-summary > .watch-pill").length, 3, "邀请处理未保持三项紧凑摘要");
@@ -238,23 +478,166 @@ test("演示数据下随行四个页签都渲染完成", async () => {
   await settled();
   assert.equal(w.document.querySelector('.watch-invite-summary > [data-watch-policy-cycle="1700"]')?.textContent, "斗魂竞技场 · 接受", "接受策略保存后没有移到卡片外层展示");
   assert.match(w.document.querySelector('[data-watch-card="auto-matchmaking"]')?.textContent || "", /最少人数[\s\S]*延时/, "自动匹配卡缺少设计稿参数");
-  assert.ok(w.document.querySelector("#suite-rig-root .rig-layout"), "整备装置台未渲染");
-  assert.ok(w.document.querySelector("#suite-facade-root .facade-preview"), "门面预览未渲染");
-  assert.ok(w.document.querySelector("#suite-sweep-root .claim-row"), "拾遗合流清单未渲染");
-  assert.equal(w.document.querySelector("#suite-sweep-root > .suite-note.is-info"), null, "拾遗仍显示重新扫描下方的说明条");
-  assert.equal(w.document.querySelector("#suite-sweep-root .claim-sub"), null, "拾遗奖励标题下仍显示描述文字");
-  assert.deepEqual([...w.document.querySelectorAll(".suite-tab > span:first-child")].map((node) => node.textContent), ["◉", "⬢", "◈", "✦"], "随行页签未使用设计稿图形符号");
-  assert.equal(w.document.querySelectorAll("#suite-watch-root .phase-node").length, 6, "值守相位轨没有按设计稿收敛为六个主阶段");
-  assert.ok(w.document.querySelector("#suite-facade-root .facade-avatar-level"), "门面预览缺少头像等级牌");
-  assert.equal(w.document.querySelectorAll("#suite-facade-root .facade-slot").length, 3, "门面预览缺少三个勋章位");
-  assert.ok(w.document.querySelector("#suite-facade-root .facade-background-card"), "门面背景控制卡未渲染在右栏");
-  assert.ok(w.document.querySelector("#suite-facade-root .facade-chat-card"), "门面聊天身份控制卡未渲染在右栏");
-  assert.equal(w.document.querySelectorAll("#suite-facade-root .facade-film").length, 1, "门面背景应只保留一条皮肤胶片");
-  assert.equal(w.document.querySelectorAll("#suite-facade-root [data-facade-chroma]").length, 0, "门面背景仍提供炫彩选择");
-  assert.doesNotMatch(w.document.getElementById("suite-facade-root").textContent, /炫彩/, "门面背景仍宣称可以设置炫彩");
-  assert.doesNotMatch(w.document.getElementById("suite-watch-root").textContent, /这些我们不做/, "值守页仍显示已要求移除的说明模块");
-  assert.doesNotMatch(w.document.getElementById("suite-rig-root").textContent, /不做的能力/, "整备页仍显示已要求移除的说明模块");
-  assert.deepEqual(errors, [], `随行渲染期出现异常：\n${errors.join("\n")}`);
+  assert.ok(w.document.querySelector("#suite-rig-root .rig-layout"), "维护页未渲染");
+  assert.ok(w.document.querySelector("#suite-facade-root .facade-preview"), "生涯预览未渲染");
+  assert.ok(w.document.querySelector("#suite-sweep-root .claim-row"), "领奖清单未渲染");
+  assert.equal(w.document.querySelector("#suite-sweep-root > .suite-note.is-info"), null, "领奖页仍显示重新扫描下方的说明条");
+  assert.equal(w.document.querySelector("#suite-sweep-root .claim-sub"), null, "领奖标题下仍显示描述文字");
+  assert.deepEqual([...w.document.querySelectorAll(".suite-tab")].map((node) => node.dataset.suiteTab), ["watch", "rig", "champselect", "facade", "sweep"], "征召应紧跟维护");
+  const suiteIcons = [...w.document.querySelectorAll(".suite-tab-icon svg")];
+  assert.equal(suiteIcons.length, 5, "五个工具图标应统一使用 SVG");
+  for (const icon of suiteIcons) {
+    assert.equal(icon.getAttribute("viewBox"), "0 0 24 24");
+    assert.equal(icon.getAttribute("width"), "26");
+    assert.equal(icon.getAttribute("height"), "26");
+    assert.equal(icon.getAttribute("focusable"), "false");
+    assert.equal(icon.parentElement.getAttribute("aria-hidden"), "true");
+  }
+	assert.equal(w.document.querySelectorAll("#suite-champselect-root .cs-mode-item").length, 6, "征召页缺少六个模式分组");
+	assert.equal(w.document.querySelectorAll("#suite-champselect-root .cs-seq-card").length, 3, "征召页缺少禁用、选用和备战席三张序列卡");
+	assert.equal(w.document.querySelectorAll("#suite-champselect-root .cs-rail-slot.is-empty").length, 3, "征召传送带未按模式上限渲染空槽");
+  assert.equal(w.document.querySelectorAll("#suite-watch-root .phase-node").length, 6, "自动页相位轨没有按设计稿收敛为六个主阶段");
+  assert.ok(w.document.querySelector("#suite-facade-root .facade-avatar-level"), "生涯预览缺少头像等级牌");
+  assert.equal(w.document.querySelectorAll("#suite-facade-root .facade-slot").length, 3, "生涯预览缺少三个勋章位");
+	assert.equal(w.document.querySelector("#suite-facade-root .facade-signature")?.textContent, "峡谷先锋", "生涯预览没有显示挑战头衔");
+	assert.deepEqual([...w.document.querySelectorAll("#suite-facade-root [data-facade-challenge-slot]")].map((node) => node.textContent), ["不破不立", "峡谷收藏家", "团队之星"], "生涯预览没有渲染后端解析的三个勋章名称");
+	assert.doesNotMatch(w.document.getElementById("suite-facade-root").textContent, /勋章 1|勋章 2|勋章 3/, "生涯预览仍在显示勋章占位编号");
+	assert.ok(w.document.querySelector('[data-facade-availability="spectating"]'), "生涯页缺少观战中状态");
+	assert.ok(w.document.querySelector('[data-facade-clear="clear-title"]'), "展示清理缺少卸下头衔动作");
+  assert.ok(w.document.querySelector("#suite-facade-root .facade-background-card"), "生涯背景控制卡未渲染在右栏");
+  assert.ok(w.document.querySelector("#suite-facade-root .facade-chat-card"), "生涯聊天身份控制卡未渲染在右栏");
+  assert.equal(w.document.querySelectorAll("#suite-facade-root .facade-film").length, 1, "生涯背景应只保留一个皮肤网格");
+  assert.equal(w.document.querySelectorAll("#suite-facade-root [data-facade-chroma]").length, 0, "生涯背景仍提供炫彩选择");
+  assert.doesNotMatch(w.document.getElementById("suite-facade-root").textContent, /炫彩/, "生涯背景仍宣称可以设置炫彩");
+  assert.doesNotMatch(w.document.getElementById("suite-watch-root").textContent, /这些我们不做/, "自动页仍显示已要求移除的说明模块");
+  assert.doesNotMatch(w.document.getElementById("suite-rig-root").textContent, /不做的能力/, "维护页仍显示已要求移除的说明模块");
+  assert.deepEqual(errors, [], `工具页渲染期出现异常：\n${errors.join("\n")}`);
+  w.close();
+});
+
+test("2351 自定义暂停事件保留真实总开关和卡片高亮", async () => {
+  const { window: w, errors } = bootDemoApp();
+  try {
+    await settled();
+    w.document.querySelector('[data-section="suite"]').click();
+    await settled();
+    const root = w.document.getElementById("suite-watch-root");
+    const enabled = root.querySelectorAll(".watch-rule.is-enabled").length;
+    assert.ok(enabled > 0);
+    w.dispatchEvent(new w.CustomEvent("deep-legends:watch", { detail: "watch:session:paused_custom" }));
+    assert.equal(root.querySelector("[data-watch-master]").checked, true);
+    assert.equal(root.querySelectorAll(".watch-rule.is-enabled:not(.is-paused)").length, enabled);
+    assert.match(root.textContent, /自定义对局已暂停/);
+    assert.doesNotMatch(root.textContent, /总开关已关闭/);
+    w.dispatchEvent(new w.CustomEvent("deep-legends:watch", { detail: "watch:session:resumed" }));
+    assert.doesNotMatch(root.textContent, /自定义对局已暂停/);
+    assert.equal(root.querySelector("[data-watch-master]").checked, true);
+    await new Promise((resolve) => w.requestAnimationFrame(resolve));
+    assert.deepEqual(errors, []);
+  } finally { w.close(); }
+});
+
+test("R56 工具页状态、确认、下拉与领奖契约完整", async () => {
+  const { window: w, errors } = bootDemoApp();
+  await settled();
+  w.document.querySelector('[data-section="suite"]').click();
+  await settled();
+
+  const facadeSelects = [...w.document.querySelectorAll("#suite-facade-root .suite-select")];
+  assert.equal(facadeSelects.length, 4, "生涯页应保留英雄和三个段位下拉");
+  for (const select of facadeSelects) {
+    assert.ok(select.parentElement?.classList.contains("select-wrap"), "生涯下拉未包在 .select-wrap 中");
+    assert.ok(select.parentElement.querySelector(":scope > .native-select-menu .app-select-menu"), "生涯下拉未增强为应用菜单");
+  }
+
+  const facadeText = w.document.getElementById("suite-facade-root").textContent;
+  assert.match(facadeText, /只在你点击后执行/);
+  assert.match(facadeText, /“登录时重设”两项例外/);
+  assert.match(facadeText, /生涯背景[\s\S]*你生涯页顶部的那张大图/);
+  assert.match(facadeText, /好友悬浮卡[\s\S]*别人点你头像时看到的在线状态、签名和段位/);
+  assert.match(facadeText, /生涯页展示[\s\S]*头像框、挑战勋章、赛季旗帜、表情轮盘/);
+	assert.match(facadeText, /卸下全部勋章[\s\S]*保留旗帜和当前头衔[\s\S]*无法保留头衔，本次操作会中止并提示/);
+	assert.match(facadeText, /切换上赛季旗帜[\s\S]*保留勋章和当前头衔[\s\S]*无法保留头衔，本次操作会中止并提示/);
+	assert.doesNotMatch(facadeText, /头衔可能同时卸下/);
+  assert.doesNotMatch(facadeText, /展示位/);
+  assert.equal(w.document.querySelector("[data-facade-owned]").checked, false, "只显示已拥有不应默认开启");
+
+  const choiceRow = [...w.document.querySelectorAll("#suite-sweep-root .claim-row")].find((row) => row.querySelectorAll(".suite-tile").length === 3 && row.querySelector("[data-claim-choice]"));
+  assert.ok(choiceRow, "演示数据缺少三选一奖励");
+  assert.match(choiceRow.textContent, /3 选 1/);
+  assert.doesNotMatch(choiceRow.textContent, /1 选 1|1 - 1 选/);
+
+  const master = w.document.querySelector("[data-watch-master]");
+  master.checked = false;
+  master.dispatchEvent(new w.Event("change", { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.equal(w.document.getElementById("suite-watch-metric").textContent, "已暂停");
+  assert.match(w.document.getElementById("suite-watch-root").textContent, /自动规则已暂停/);
+  assert.ok(w.document.querySelector("#suite-watch-root .watch-rule.is-paused"));
+
+  let nativeConfirmCalls = 0;
+  w.confirm = () => { nativeConfirmCalls += 1; throw new Error("native confirm must not run"); };
+  const originalFetch = w.fetch;
+  const requests = [];
+  w.fetch = (...args) => { requests.push(String(args[0])); return originalFetch(...args); };
+  w.document.querySelector('[data-facade-clear="clear-emotes"]').click();
+  await new Promise((resolve) => w.requestAnimationFrame(resolve));
+  const confirmation = w.document.querySelector(".suite-confirm-card");
+  assert.ok(confirmation, "清空表情轮盘未打开应用内确认卡");
+  assert.equal(w.document.querySelector("[inert]"), null, "确认卡不应阻塞页面其它内容");
+  confirmation.querySelector("[data-suite-confirm-cancel]").click();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(nativeConfirmCalls, 0);
+	assert.equal(requests.filter((request) => request === "/api/facade/apply").length, 0, "取消确认后不应发出生涯写请求");
+	w.document.querySelector('[data-facade-clear="clear-title"]').click();
+	await new Promise((resolve) => w.requestAnimationFrame(resolve));
+	const titleConfirmation = w.document.querySelector(".suite-confirm-card");
+	assert.ok(titleConfirmation, "卸下头衔未打开应用内确认卡");
+	titleConfirmation.querySelector("[data-suite-confirm-cancel]").click();
+	await new Promise((resolve) => setTimeout(resolve, 20));
+	assert.equal(requests.filter((request) => request === "/api/facade/apply").length, 0, "取消卸下头衔后不应发出生涯写请求");
+
+  const clearObjectives = w.document.querySelector('[data-facade-clear="clear-objectives"]');
+  assert.equal(clearObjectives.closest(".facade-action").querySelector("p").textContent, "把当前未读任务与活动系列标记为已读，不领取奖励、不更改任务进度。");
+  assert.equal(w.document.querySelector("[data-objective-diagnostics]"), null);
+  const facadeWrites = [];
+  w.fetch = (...args) => {
+    if (String(args[0]) === "/api/facade/apply") facadeWrites.push(JSON.parse(args[1].body));
+    requests.push(String(args[0]));
+    return originalFetch(...args);
+  };
+  clearObjectives.click();
+  await settled();
+  assert.equal(w.document.querySelector(".suite-confirm-card"), null, "清空任务数量提示不应二次确认");
+  assert.equal(nativeConfirmCalls, 0);
+  assert.deepEqual(facadeWrites, [{ action: "clear-objectives" }], "点击清空任务数量提示应直接提交一次");
+
+  w.dispatchEvent(new w.CustomEvent("deep-legends:live-disconnected"));
+  assert.match(w.document.getElementById("suite-rig-root").textContent, /事件流已断开/);
+
+  requests.length = 0;
+  w.dispatchEvent(new w.CustomEvent("deep-legends:status", { detail: { connected: false, eventStream: false } }));
+  w.dispatchEvent(new w.CustomEvent("deep-legends:status", { detail: { connected: true, eventStream: true } }));
+  await new Promise((resolve) => setTimeout(resolve, 80));
+	const suiteEndpoints = ["/api/watch/rules", "/api/rig/status", "/api/facade/state?trigger=poll", "/api/claim/scan", "/api/champselect/groups", "/api/champselect/state", "/api/champions/catalog"];
+  const restoredRequests = requests.filter((request) => suiteEndpoints.includes(request));
+  assert.deepEqual(restoredRequests.sort(), [...suiteEndpoints].sort(), `离线恢复应强刷五个工具页所需接口，实际 ${requests.join(", ")}`);
+  w.dispatchEvent(new w.CustomEvent("deep-legends:status", { detail: { connected: true, eventStream: true } }));
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.equal(requests.filter((request) => suiteEndpoints.includes(request)).length, restoredRequests.length, "重复在线状态不应再次请求工具接口");
+
+  assert.match(appStyles, /\.button-danger\s*\{[^}]*background\s*:/s);
+  assert.match(appStyles, /\.app-select-menu\s*\{[^}]*display\s*:\s*flex[^}]*flex-direction\s*:\s*column[^}]*max-height\s*:\s*min\(320px,\s*50vh\)[^}]*overflow\s*:\s*hidden[^}]*overscroll-behavior\s*:\s*contain/s);
+  assert.match(appStyles, /\.app-select-options\s*\{[^}]*flex\s*:\s*1\s+1\s+auto[^}]*overflow-y\s*:\s*auto[^}]*overscroll-behavior\s*:\s*contain/s);
+  assert.match(fs.readFileSync(path.join(WEB, "app.js"), "utf8"), /selected\.offsetTop\s*-\s*optionsRoot\.offsetTop\s*-\s*\(optionsRoot\.clientHeight\s*-\s*selected\.offsetHeight\)\s*\/\s*2/);
+  assert.match(fs.readFileSync(path.join(WEB, "app.js"), "utf8"), /pageScrollRoot\.scrollTop\s*=\s*pageScrollTop/, "下拉打开后没有恢复页面主滚动位置");
+  assert.match(suiteStyles, /\.facade-film\s*\{[^}]*grid-template-columns\s*:\s*repeat\(auto-fill,[^}]*overflow-x\s*:\s*hidden[^}]*overflow-y\s*:\s*auto/s);
+  assert.match(suiteStyles, /\.facade-preview-art\s*\{[^}]*aspect-ratio\s*:\s*1215\s*\/\s*717[^}]*height\s*:\s*auto/s);
+  assert.match(suiteStyles, /@container suite-page \(max-width:\s*1060px\)\s*\{[^}]*\.facade-row\s*\{[^}]*grid-template-columns\s*:\s*1fr[^}]*\}/s, "中等宽度生涯设置行未切换为单列");
+  assert.match(suiteStyles, /@media \(max-width:\s*1250px\)\s*\{[^}]*\.facade-row\s*\{[^}]*grid-template-columns\s*:\s*1fr[^}]*\}/s, "1250px 以下生涯设置行未切换为单列");
+  assert.doesNotMatch(fs.readFileSync(path.join(WEB, "suite.js"), "utf8"), /\bconfirm\s*\(/);
+	assert.doesNotMatch(suiteSource, /requestedAvailability\s*===\s*["']dnd["']\s*&&/, "在线状态回弹仍只处理游戏中");
+  assert.deepEqual(errors, [], `R55 工具页渲染出现异常：\n${errors.join("\n")}`);
   w.close();
 });
 
@@ -290,6 +673,354 @@ test("全部原生下拉都增强为可键盘操作的应用菜单，包含动�
   assert.equal(menu.hidden, true);
   assert.deepEqual(errors, [], `下拉增强出现异常：\n${errors.join("\n")}`);
   w.close();
+});
+
+function assertR59FacadeTitleContracts(source) {
+	const { facadeTitleText } = compileFunctions(source, ["facadeTitleText"], {});
+	const dom = new JSDOM('<section class="facade-preview"><div class="facade-signature"></div></section>');
+	const preview = dom.window.document.querySelector(".facade-signature");
+	const uuid = "38a4e9d4-b2f2-2356-969f-e39316e18ede";
+	preview.textContent = facadeTitleText({ challengeSummary: { title: { name: "炫彩达人", contentId: uuid, itemId: 123 } } });
+	assert.equal(preview.textContent, "炫彩达人", "object title 没有使用可读的 name");
+	preview.textContent = facadeTitleText({ challengeSummary: { title: null }, chat: { lol: { playerTitleSelected: uuid } } });
+	assert.equal(preview.textContent, "未设置头衔", "缺少可读 title 时没有回退到未设置");
+	assert.doesNotMatch(dom.window.document.querySelector(".facade-preview").textContent, new RegExp(uuid), "UUID 泄漏到生涯预览");
+	assert.equal(facadeTitleText({ challengeSummary: { title: "峡谷先锋" } }), "峡谷先锋", "string title 回归");
+	assert.equal(facadeTitleText({ challengeSummary: { title: 123 } }), "123", "number title 回归");
+	dom.window.close();
+}
+
+test("R59 生涯头衔读取对象名称且绝不显示原始 UUID", () => {
+	assertR59FacadeTitleContracts(suiteSource);
+	const objectBranch = '\n\tif (summaryTitle && typeof summaryTitle === "object") {\n\t  const name = summaryTitle.name;\n\t  if (typeof name === "string" && name.trim()) return name.trim();\n\t}';
+	const mutated = suiteSource.replace(objectBranch, "");
+	assert.notEqual(mutated, suiteSource, "R59 object title mutation 未命中真实代码");
+	assert.throws(() => assertR59FacadeTitleContracts(mutated), /object title 没有使用可读的 name/, "删除 object 分支后测试必须失败");
+});
+
+test("R59 生涯预览完整渲染时不泄漏 playerTitleSelected UUID", async () => {
+	const uuid = "38a4e9d4-b2f2-2356-969f-e39316e18ede";
+	const { window: w, errors } = bootDemoApp({
+		facadeStateTransform: (facade) => {
+			facade.challengeSummary.title = null;
+			facade.chat.lol.playerTitleSelected = uuid;
+			return facade;
+		},
+	});
+	await settled();
+	w.document.querySelector('[data-section="suite"]').click();
+	await settled();
+	const facadeRoot = w.document.getElementById("suite-facade-root");
+	assert.equal(facadeRoot.querySelector(".facade-signature")?.textContent, "未设置头衔");
+	assert.doesNotMatch(facadeRoot.textContent, new RegExp(uuid), "完整生涯预览泄漏了 UUID");
+	assert.deepEqual(errors, [], `R59 UUID 回退渲染出现异常：\n${errors.join("\n")}`);
+	w.close();
+});
+
+test("R60 生涯事件刷新头衔、保护脏草稿且不在其它页签后台请求", async () => {
+	const { window: w, errors, eventSources } = bootDemoApp({ liveEvents: true });
+	await settled();
+	let nextTitle = "客户端新头衔";
+	let facadeRequests = 0;
+	const originalFetch = w.fetch;
+	w.fetch = async (input, init) => {
+	  const url = typeof input === "string" ? input : input?.url || "";
+	  if (!url.startsWith("/api/facade/state") || String(init?.method || "GET").toUpperCase() !== "GET") return originalFetch(input, init);
+	  facadeRequests += 1;
+	  const response = await originalFetch(input, init);
+	  const payload = await response.json();
+	  payload.challengeSummary.title = { name: nextTitle };
+	  return new w.Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
+	};
+
+	w.document.querySelector('[data-section="suite"]').click();
+	await settled();
+	w.document.querySelector('[data-suite-tab="facade"]').click();
+	await new Promise((resolve) => setTimeout(resolve, 80));
+	const source = eventSources.at(-1);
+	assert.ok(source?.onmessage, "应用没有建立可接收 facade:changed 的事件流");
+
+	facadeRequests = 0;
+	nextTitle = "胜利皮肤收藏家";
+	source.onmessage({ data: "facade:changed" });
+	await new Promise((resolve) => setTimeout(resolve, 900));
+	assert.equal(facadeRequests, 1, "干净草稿收到 facade:changed 后没有重新请求状态");
+	assert.equal(w.document.querySelector("#suite-facade-root .facade-signature")?.textContent, "胜利皮肤收藏家");
+
+	const status = w.document.querySelector("#suite-facade-root [data-facade-status]");
+	status.value = "这段正在编辑的签名不能丢";
+	status.dispatchEvent(new w.Event("input", { bubbles: true }));
+	facadeRequests = 0;
+	nextTitle = "焕然一新";
+	source.onmessage({ data: "facade:changed" });
+	await new Promise((resolve) => setTimeout(resolve, 900));
+	assert.equal(facadeRequests, 1, "脏草稿刷新没有请求最新 facade 状态");
+	assert.equal(w.document.querySelector("#suite-facade-root [data-facade-status]")?.value, "这段正在编辑的签名不能丢", "外部刷新覆盖了用户正在编辑的草稿");
+	assert.equal(w.document.querySelector("#suite-facade-root .facade-signature")?.textContent, "焕然一新", "保留脏草稿时没有刷新头衔");
+
+	w.document.querySelector('[data-suite-tab="watch"]').click();
+	facadeRequests = 0;
+	source.onmessage({ data: "facade:changed" });
+	await new Promise((resolve) => setTimeout(resolve, 900));
+	assert.equal(facadeRequests, 0, "不在生涯页时仍后台请求 facade 状态");
+	assert.match(suiteSource, /Date\.now\(\)\s*-\s*state\.facadeLoadedAt\s*<\s*30000/, "生涯页缺少 30 秒过期兜底");
+	assert.deepEqual(errors, [], `R60 生涯刷新出现异常：\n${errors.join("\n")}`);
+	w.close();
+});
+
+test("R65 生涯事件 20 连发只请求一次、仅时间戳变化不重建且按压期间不丢点击", async (t) => {
+	let facadeVersion = 0;
+	const { window: w, errors } = bootDemoApp({
+		facadeStateTransform: (facade) => {
+			facade.chat.lastSeenOnlineTimestamp = ++facadeVersion;
+			return facade;
+		},
+	});
+	t.after(() => w.close());
+	await settled();
+	w.document.querySelector('[data-section="suite"]').click();
+	await settled();
+	w.document.querySelector('[data-suite-tab="facade"]').click();
+	await new Promise((resolve) => setTimeout(resolve, 100));
+	const facadeRoot = w.document.getElementById("suite-facade-root");
+	const originalFetch = w.fetch;
+	let facadeRequests = 0;
+	w.fetch = (input, init) => {
+		const url = typeof input === "string" ? input : input?.url || "";
+		if (url.startsWith("/api/facade/state") && String(init?.method || "GET").toUpperCase() === "GET") facadeRequests += 1;
+		return originalFetch(input, init);
+	};
+	const stableNode = facadeRoot.querySelector(".facade-preview");
+	let rebuilds = 0;
+	const observer = new w.MutationObserver((mutations) => {
+		rebuilds += mutations.filter((mutation) => mutation.type === "childList").length;
+	});
+	observer.observe(facadeRoot, { childList: true });
+	for (let index = 0; index < 20; index += 1) w.dispatchEvent(new w.CustomEvent("deep-legends:facade-changed"));
+	await new Promise((resolve) => setTimeout(resolve, 900));
+	observer.disconnect();
+	assert.ok(facadeRequests <= 1, `20 次 facade 事件触发了 ${facadeRequests} 次请求`);
+	assert.equal(facadeRoot.querySelector(".facade-preview"), stableNode, "只有聊天时间戳变化时仍重建了 DOM");
+	assert.equal(rebuilds, 0, `只有聊天时间戳变化时发生了 ${rebuilds} 次 DOM 子树重建`);
+
+	const target = [...facadeRoot.querySelectorAll("[data-facade-skin]")].find((button) => !button.classList.contains("is-selected"));
+	assert.ok(target, "演示数据缺少可点击的第二张皮肤");
+	let clicked = 0;
+	target.addEventListener("click", () => { clicked += 1; });
+	const targetID = target.dataset.facadeSkin;
+	target.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true }));
+	w.dispatchEvent(new w.CustomEvent("deep-legends:facade-changed"));
+	await new Promise((resolve) => setTimeout(resolve, 850));
+	assert.equal(facadeRequests, 1, "鼠标仍按下时不应刷新 facade");
+	target.dispatchEvent(new w.MouseEvent("mouseup", { bubbles: true }));
+	target.click();
+	assert.equal(clicked, 1, "mousedown 到 mouseup 之间的 facade 事件吞掉了 click");
+	assert.equal(facadeRoot.querySelector("[data-facade-skin].is-selected")?.dataset.facadeSkin, targetID);
+	await new Promise((resolve) => setTimeout(resolve, 50));
+	assert.deepEqual(errors, [], `R64 facade 事件保护出现异常：\n${errors.join("\n")}`);
+	w.close();
+});
+
+test("R64 生涯皮肤与身份控件局部更新，皮肤图片延迟解码", async () => {
+	const { window: w, errors } = bootDemoApp();
+	await settled();
+	w.document.querySelector('[data-section="suite"]').click();
+	await settled();
+	w.document.querySelector('[data-suite-tab="facade"]').click();
+	await new Promise((resolve) => setTimeout(resolve, 100));
+	const root = w.document.getElementById("suite-facade-root");
+	const hero = root.querySelector("[data-facade-hero]");
+	const heroMenu = hero._appSelectRoot;
+	const buttons = [...root.querySelectorAll("[data-facade-skin]")];
+	const target = buttons.find((button) => !button.classList.contains("is-selected"));
+	const previewBefore = root.querySelector("[data-suite-facade-art]")?.src;
+	assert.ok(target && previewBefore, "演示数据不足以验证皮肤切换");
+	target.click();
+	const buttonsAfter = [...root.querySelectorAll("[data-facade-skin]")];
+	assert.equal(buttonsAfter.length, buttons.length);
+	buttonsAfter.forEach((button, index) => assert.equal(button, buttons[index], "点击皮肤重建了皮肤按钮"));
+	assert.equal(target.classList.contains("is-selected"), true);
+	assert.notEqual(root.querySelector("[data-suite-facade-art]")?.src, previewBefore, "皮肤预览图没有更新");
+	for (const image of root.querySelectorAll(".facade-film img")) {
+		assert.equal(image.getAttribute("loading"), "lazy");
+		assert.equal(image.getAttribute("decoding"), "async");
+	}
+
+	const availabilityNode = root.querySelector("[data-facade-preview-availability]");
+	root.querySelector('[data-facade-availability="away"]').click();
+	assert.equal(root.querySelector("[data-facade-preview-availability]"), availabilityNode, "在线状态切换重建了预览");
+	assert.equal(availabilityNode.textContent, "离开");
+	const rankNode = root.querySelector("[data-facade-preview-rank]");
+	const tier = root.querySelector('[data-facade-rank="tier"]');
+	tier.value = "MASTER";
+	tier.dispatchEvent(new w.Event("change", { bubbles: true }));
+	assert.equal(root.querySelector("[data-facade-preview-rank]"), rankNode, "段位切换重建了预览");
+	assert.match(rankNode.textContent, /大师/);
+
+	const nextHero = [...hero.options].find((option) => option.value !== hero.value);
+	assert.ok(nextHero, "演示数据缺少第二个英雄");
+	hero.value = nextHero.value;
+	hero.dispatchEvent(new w.Event("change", { bubbles: true }));
+	assert.equal(root.querySelector("[data-facade-hero]"), hero, "换英雄时重建了英雄 select");
+	assert.equal(hero._appSelectRoot, heroMenu, "换英雄时重建了增强下拉");
+	assert.deepEqual(errors, [], `R64 生涯局部更新出现异常：\n${errors.join("\n")}`);
+	w.close();
+});
+
+test("R64 生涯头衔和勋章仅在真实值上使用强调色", async () => {
+	const { window: w, errors } = bootDemoApp({
+		facadeStateTransform: (facade) => {
+			facade.challengeSummary.title = null;
+			facade.challenges = [{ id: "1", name: "真实勋章" }];
+			return facade;
+		},
+	});
+	await settled();
+	w.document.querySelector('[data-section="suite"]').click();
+	await settled();
+	const root = w.document.getElementById("suite-facade-root");
+	const title = root.querySelector(".facade-signature");
+	const slots = [...root.querySelectorAll("[data-facade-challenge-slot]")];
+	assert.equal(title.textContent, "未设置头衔");
+	assert.equal(title.classList.contains("is-filled"), false, "头衔占位态被当作真实值上色");
+	assert.equal(slots[0].classList.contains("is-filled"), true);
+	assert.equal(slots[1].classList.contains("is-filled"), false, "勋章占位态被当作真实值上色");
+	assert.match(suiteStyles, /\.facade-signature\s*\{[^}]*place-items:\s*center[^}]*text-align:\s*center/s);
+	assert.match(suiteStyles, /\.facade-signature\.is-filled\s*\{[^}]*color:\s*var\(--primary-strong\)/s);
+	assert.match(suiteStyles, /\.facade-slot\.is-filled\s*\{[^}]*color:\s*var\(--accent\)/s);
+	assert.deepEqual(errors, [], `R64 头衔勋章样式出现异常：\n${errors.join("\n")}`);
+	w.close();
+});
+
+test("R60 生涯勋章缺失槽位稳定回退为未设置", () => {
+	const { facadeChallengeSlots } = compileFunctions(suiteSource, ["facadeChallengeSlots"], {
+	  state: { facade: {} },
+	  escapeHTML: (value) => String(value),
+	});
+	const dom = new JSDOM(`<div>${facadeChallengeSlots({ challenges: [{ id: "1", name: "唯一勋章" }] })}</div>`);
+	assert.deepEqual([...dom.window.document.querySelectorAll("[data-facade-challenge-slot]")].map((node) => node.textContent), ["唯一勋章", "未设置", "未设置"]);
+	assert.doesNotMatch(dom.window.document.body.textContent, /undefined|null/);
+	dom.window.close();
+});
+
+test("R58 生涯英雄长下拉支持别名搜索，短下拉不显示搜索框", async () => {
+	const { window: w, errors } = bootDemoApp();
+	await settled();
+	w.document.querySelector('[data-section="suite"]').click();
+	await settled();
+	const heroSelect = w.document.querySelector("[data-facade-hero]");
+	assert.ok(heroSelect.options.length > 20, `演示英雄选项不足以触发长下拉：${heroSelect.options.length}`);
+	const root = heroSelect.parentElement.querySelector(":scope > .native-select-menu");
+	const trigger = root.querySelector("[data-app-select-trigger]");
+	const menu = root.querySelector("[data-app-select-menu]");
+	const optionsRoot = root.querySelector("[data-app-select-options]");
+	const search = root.querySelector("[data-app-select-search-input]");
+	assert.ok(search, "长下拉没有搜索输入框");
+	assert.ok(root.querySelector(".app-select-search-icon"), "长下拉没有应用内搜索图标");
+	assert.match(appStyles, /\.app-select-menu\s*\{[^}]*display:\s*flex[^}]*flex-direction:\s*column[^}]*overflow:\s*hidden/s, "搜索栏和选项必须使用纵向弹性布局与独立滚动层");
+	assert.match(appStyles, /\.app-select-options\s*\{[^}]*flex:\s*1\s+1\s+auto[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/s, "英雄名称列表缺少可收缩的独立滚动容器");
+	assert.match(appStyles, /\.app-select-search input\s*\{[^}]*font-size:\s*12px[^}]*font-weight:\s*400/s, "搜索提示语没有缩小并减轻字重");
+	trigger.click();
+	assert.equal(w.document.activeElement, search, "长下拉打开后没有自动聚焦搜索框");
+	assert.equal(menu.scrollTop, 0, "打开长下拉时不应把搜索栏卷出菜单");
+	assert.ok(optionsRoot.scrollTop >= 0, "长下拉应滚动选项列表而不是整个菜单");
+	search.value = "adk";
+	search.dispatchEvent(new w.Event("input", { bubbles: true }));
+	const buttons = [...root.querySelectorAll("[data-native-select-value]")];
+	const visible = buttons.filter((button) => !button.hidden).map((button) => button.querySelector("span")?.textContent);
+	assert.deepEqual(visible, ["阿卡丽"], `别名搜索结果不精确：${visible.join(", ")}`);
+	assert.ok(buttons.some((button) => button.hidden), "搜索过滤被短路，所有选项仍然可见");
+	w.document.body.dispatchEvent(new w.Event("pointerdown", { bubbles: true }));
+	assert.equal(trigger.getAttribute("aria-expanded"), "false");
+	assert.equal(search.value, "", "关闭长下拉后没有清空搜索词");
+	assert.ok(buttons.every((button) => !button.hidden), "关闭长下拉后没有恢复全部选项");
+	trigger.click();
+	const firstOpenButtons = [...optionsRoot.querySelectorAll('[role="menuitemradio"]')];
+	w.document.body.dispatchEvent(new w.Event("pointerdown", { bubbles: true }));
+	trigger.click();
+	const secondOpenButtons = [...optionsRoot.querySelectorAll('[role="menuitemradio"]')];
+	assert.equal(secondOpenButtons.length, firstOpenButtons.length);
+	secondOpenButtons.forEach((button, index) => assert.equal(button, firstOpenButtons[index], "相同英雄选项第二次打开时仍重建按钮"));
+	heroSelect.value = heroSelect.options[1].value;
+	w.deepLegendsSelects.sync(heroSelect);
+	assert.equal(optionsRoot.querySelector(`[data-native-select-value="${heroSelect.value}"]`)?.getAttribute("aria-checked"), "true", "未重建时没有同步选中态");
+
+	const queueSelect = w.document.querySelector('[data-facade-rank="queue"]');
+	const queueRoot = queueSelect.parentElement.querySelector(":scope > .native-select-menu");
+	assert.equal(queueSelect.options.length, 2);
+	assert.equal(queueRoot.querySelector("[data-app-select-search-input]"), null, "短下拉不应创建搜索框");
+	assert.deepEqual(errors, [], `长下拉搜索出现异常：\n${errors.join("\n")}`);
+	w.close();
+});
+
+test("R58 生涯空皮肤刷新保留草稿并在数据补齐后恢复", async (t) => {
+	const draft = { hero: "99", skinId: 99001, ownedOnly: false };
+	const state = { facadeDraft: draft, facade: { profile: {backgroundSkinId:99001}, skins: [], chat: {}, loginReset: {} } };
+	const { hydrateFacadeDraft } = compileFunctions(suiteSource, ["hydrateFacadeDraft"], { state });
+	hydrateFacadeDraft(true);
+	assert.equal(state.facadeDraft.hero, "99");
+	assert.equal(state.facadeDraft.skinId, 99001);
+	state.facade = { skins: [{ id: 103028, championId: 103, owned: true }], profile: { backgroundSkinId: 103028 }, chat: {}, loginReset: {} };
+	hydrateFacadeDraft(true);
+	assert.equal(state.facadeDraft.hero, "103");
+	assert.equal(state.facadeDraft.skinId, 103028);
+
+	const unknownState = { facadeDraft: { hero: "99", skinId: 99001 }, facade: { profileUnavailable:true, skins: [], chat: {}, loginReset: {} } };
+	compileFunctions(suiteSource, ["hydrateFacadeDraft"], { state: unknownState }).hydrateFacadeDraft(true);
+	assert.equal(unknownState.facadeDraft.hero, "", "unknown current profile must not be replaced by a stale draft");
+	assert.equal(unknownState.facadeDraft.skinId, 0);
+
+	const { window: w, errors } = bootDemoApp();
+	t.after(() => w.close());
+	await settled();
+	w.document.querySelector('[data-section="suite"]').click();
+	await settled();
+	const initial = await (await w.fetch("/api/facade/state")).json();
+	const originalFetch = w.fetch;
+	let skinsReady = false;
+	w.fetch = (input, init) => String(input).startsWith("/api/facade/state")
+		? Promise.resolve(new w.Response(JSON.stringify({ ...initial, skins: skinsReady ? initial.skins : [] }), { status: 200, headers: { "Content-Type": "application/json" } }))
+		: originalFetch(input, init);
+	const refreshFacade = async () => {
+		// Empty same-account snapshots must retain the draft; disconnect is a separate invalidation boundary.
+		w.dispatchEvent(new w.CustomEvent("deep-legends:facade-changed"));
+		await new Promise((resolve) => setTimeout(resolve, 1050));
+	};
+	const selectedBefore = w.document.querySelector("[data-facade-hero]").value;
+	await refreshFacade();
+	assert.equal(w.document.querySelector("[data-facade-hero]").value, selectedBefore, "同步未完成时背景英雄被清空");
+	assert.doesNotMatch(w.document.querySelector(".facade-art-label").textContent, /未设置/);
+	skinsReady = true;
+	await refreshFacade();
+	assert.equal(w.document.querySelector("[data-facade-hero]").value, selectedBefore, "皮肤数据补齐后背景没有恢复");
+	assert.match(w.document.querySelector(".facade-art-label").textContent, /星之守护者 拉克丝/);
+	assert.deepEqual(errors, [], `空皮肤恢复流程出现异常：\n${errors.join("\n")}`);
+	w.close();
+});
+
+test("顶部重新读取实际刷新生涯并丢弃未应用预览", async (t) => {
+  const {window:w,errors}=bootDemoApp();
+  t.after(()=>w.close());
+  await settled();
+  w.document.querySelector('[data-section="suite"]').click();
+  await settled();
+  w.document.querySelector('[data-suite-tab="facade"]').click();
+  const current=await (await w.fetch('/api/facade/state')).json();
+  const original=Number(current.profile.backgroundSkinId);
+  const choice=[...w.document.querySelectorAll('[data-facade-skin]')].find(b=>Number(b.dataset.facadeSkin)!==original);
+  assert.ok(choice);
+  choice.click();
+  assert.match(w.document.querySelector('.facade-art-label').textContent,/待应用预览/);
+  const requests=[], fetch=w.fetch;
+  w.fetch=(input,init)=>{requests.push(String(input));return fetch(input,init);};
+  const detail={waitFor:[],reason:'manual'};
+  w.dispatchEvent(new w.CustomEvent('deep-legends:hard-refresh',{detail}));
+  assert.ok(detail.waitFor.length>0);
+  await Promise.all(detail.waitFor);
+  assert.ok(requests.includes('/api/facade/state?trigger=manual'));
+  assert.equal(Number(w.document.querySelector('[data-facade-skin].is-selected')?.dataset.facadeSkin),original);
+  assert.match(w.document.querySelector('.facade-art-label').textContent,/当前背景/);
+  assert.deepEqual(errors,[]);
 });
 
 test("收藏账户条复用主页背景和圆头像，并只保留两项事实", async () => {
@@ -550,4 +1281,22 @@ test("英雄位置统计为空时显示明确说明，而不是三项破折号",
   assert.ok(summaries.every((summary) => summary.querySelector(".champion-stats-empty")?.textContent === "该英雄在这个位置没有统计样本"));
   assert.ok(summaries.every((summary) => !summary.querySelector(".champion-summary-main dl")), "空样本时仍渲染了三项破折号");
   w.close();
+});
+
+test("failed build timelines retry on reopening, successful timelines remain cached", async () => {
+  const state = {matchTimelines: new Map(), matchTimelineFlights:new Set()};
+  const tab = {data:{player:{playerRef:"safe-ref"}}};
+  const match = {gameId:42}, subject = {participantId:2};
+  let calls=0, renders=0;
+  const api=async()=>{ calls++; if(calls===1) throw Error("temporary timeout"); return {available:true,itemGroups:[{}],skillOrder:[1]}; };
+  const ensure = new Function("state","api","riotTab","connected","matchTimelineKey","tabServerID","rerenderTab","recordTimelineClient",
+    `return (${functionSource(gameplaySource,"ensureMatchTimeline")});`)(state,api,()=>true,()=>true,()=>"kr:42:2",()=>"",()=>renders++,()=>{});
+  await ensure(match,subject,tab);
+  assert.equal(state.matchTimelines.get("kr:42:2").available,false);
+  await ensure(match,subject,tab);
+  assert.equal(state.matchTimelines.get("kr:42:2").available,true);
+  await ensure(match,subject,tab);
+  assert.equal(calls,2);
+  assert.equal(renders,2);
+  assert.equal(state.matchTimelineFlights.size,0);
 });

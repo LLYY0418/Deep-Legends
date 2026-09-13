@@ -1,9 +1,7 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,12 +10,6 @@ import (
 	"strings"
 	"testing"
 )
-
-type spectatorProbeRoundTripper func(*http.Request) (*http.Response, error)
-
-func (roundTrip spectatorProbeRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
-	return roundTrip(request)
-}
 
 func TestSocialFriendsResponseUsesAnonymousPlayerReferences(t *testing.T) {
 	puuid := strings.Repeat("f", 48)
@@ -59,7 +51,7 @@ func TestSocialFriendsResponseUsesAnonymousPlayerReferences(t *testing.T) {
 	}
 }
 
-func TestSocialFriendsRunsOneRedactedGETSpectatorProbeForInGameFriends(t *testing.T) {
+func TestSocialFriendsNeverProbesSpectatorForInGameFriends(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
@@ -76,7 +68,7 @@ func TestSocialFriendsRunsOneRedactedGETSpectatorProbeForInGameFriends(t *testin
 			_, _ = io.WriteString(w, `[{"gameName":"对局好友","gameTag":"4321","puuid":"`+puuid+`","summonerId":9988,"availability":"chat","lol":{"gameStatus":"inGame","championId":"64","queueId":"1750","timeStamp":"1700000000000"}}]`)
 		case "/lol-game-data/assets/v1/queues.json":
 			_, _ = io.WriteString(w, `[]`)
-		case spectatorReadProbePath:
+		case "/lol-spectator/v1/spectate/launch":
 			spectatorRequests++
 			_, _ = io.WriteString(w, `{"canLaunch":false,"secret":"token-value","player":"`+puuid+`"}`)
 		default:
@@ -94,8 +86,8 @@ func TestSocialFriendsRunsOneRedactedGETSpectatorProbeForInGameFriends(t *testin
 			t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
 		}
 	}
-	if spectatorRequests != 1 {
-		t.Fatalf("spectator GET requests = %d, want one per app session", spectatorRequests)
+	if spectatorRequests != 0 {
+		t.Fatalf("spectator GET requests = %d, want none", spectatorRequests)
 	}
 	for _, method := range methods {
 		if method != http.MethodGet {
@@ -107,66 +99,12 @@ func TestSocialFriendsRunsOneRedactedGETSpectatorProbeForInGameFriends(t *testin
 		t.Fatal(err)
 	}
 	logText := string(diagnostics)
-	for _, expected := range []string{`"event":"lcu_spectator_read_probe"`, `"method":"GET"`, `"path":"/lol-spectator/v1/spectate/launch"`, `"state":"success"`, `"response_shape":"object"`, `"presence_fields":["championId","gameStatus","queueId","timeStamp"]`, `"response_fields":["canLaunch","player","secret"]`} {
-		if !strings.Contains(logText, expected) {
-			t.Fatalf("spectator diagnostic missing %s: %s", expected, logText)
-		}
+	if strings.Contains(logText, "lcu_spectator_read_probe") {
+		t.Fatal("removed probe still logged")
 	}
 	for _, secret := range []string{puuid, "token-value", "对局好友", "4321", "9988"} {
 		if strings.Contains(logText, secret) {
 			t.Fatalf("spectator diagnostic leaked %q: %s", secret, logText)
 		}
-	}
-}
-
-func TestFriendSpectatorReadProbeClassifiesReadOutcomes(t *testing.T) {
-	friends := []lcuChatFriend{{Lol: map[string]string{"gameStatus": "inGame"}}}
-	tests := []struct {
-		name       string
-		status     int
-		body       string
-		transport  http.RoundTripper
-		wantState  string
-		wantStatus int
-	}{
-		{name: "not found", status: http.StatusNotFound, wantState: "not-found", wantStatus: http.StatusNotFound},
-		{name: "method not allowed", status: http.StatusMethodNotAllowed, wantState: "method-not-allowed", wantStatus: http.StatusMethodNotAllowed},
-		{name: "invalid json", status: http.StatusOK, body: "not-json", wantState: "invalid-json"},
-		{name: "connection failure", transport: spectatorProbeRoundTripper(func(*http.Request) (*http.Response, error) {
-			return nil, errors.New("connection failed with secret-token")
-		}), wantState: "request-failed"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			method, requestPath := "", ""
-			transport := test.transport
-			var server *httptest.Server
-			if transport == nil {
-				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					method, requestPath = r.Method, r.URL.Path
-					w.WriteHeader(test.status)
-					_, _ = io.WriteString(w, test.body)
-				}))
-				defer server.Close()
-			}
-			client := &LCUClient{baseURL: "http://lcu.invalid", token: "test-token", http: &http.Client{Transport: transport}}
-			if server != nil {
-				client.baseURL = server.URL
-				client.http = server.Client()
-			}
-			event := friendSpectatorReadProbe(context.Background(), client, friends)
-			if event["state"] != test.wantState {
-				t.Fatalf("state = %#v", event)
-			}
-			if test.wantStatus > 0 && event["http_status"] != test.wantStatus {
-				t.Fatalf("status classification = %#v", event)
-			}
-			if server != nil && (method != http.MethodGet || requestPath != spectatorReadProbePath) {
-				t.Fatalf("probe request = %s %s", method, requestPath)
-			}
-			if test.name == "invalid json" && event["response_shape"] != "invalid-json" {
-				t.Fatalf("invalid JSON shape = %#v", event)
-			}
-		})
 	}
 }

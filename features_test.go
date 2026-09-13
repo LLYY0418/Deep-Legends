@@ -116,3 +116,33 @@ func TestClientDiagnosticWritesSanitizedEvent(t *testing.T) {
 		}
 	}
 }
+
+func TestMatchTierOverviewDiagnosticKeepsOnlyAggregateCounts(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a := &app{storage: &localStore{root: root}}
+	recorder := httptest.NewRecorder()
+	body := `{"event":"match_tiers_overview_batch","reason":"complete","totalRefs":36,"uniqueRefs":24,"cacheHits":19}`
+	a.handleClientDiagnostic(recorder, httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(body)))
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	data, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var event map[string]any
+	if err := json.Unmarshal(data, &event); err != nil {
+		t.Fatal(err)
+	}
+	if event["total_refs"] != float64(36) || event["unique_refs"] != float64(24) || event["cache_hits"] != float64(19) {
+		t.Fatalf("aggregate diagnostic = %#v", event)
+	}
+	for _, forbidden := range []string{"player_ref", "puuid", "account_id", "summoner_id"} {
+		if _, ok := event[forbidden]; ok {
+			t.Fatalf("aggregate diagnostic leaked %s: %#v", forbidden, event)
+		}
+	}
+}

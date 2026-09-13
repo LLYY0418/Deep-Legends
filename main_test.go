@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -299,11 +300,21 @@ func TestCommunityDragonImagePathsCoverPluginAndGameAssets(t *testing.T) {
 		t.Fatalf("external path was accepted: %#v", paths)
 	}
 	large := communityDragonImagePaths("/lol-game-data/assets/ASSETS/UX/Cherry/Augments/Icons/Deft_large.png")
-	if len(large) != 4 || !containsTestString(large, "/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/deft_small.png") || !containsTestString(large, "/latest/game/assets/ux/cherry/augments/icons/deft_small.png") {
+	wantLarge := []string{
+		"/latest/game/assets/ux/cherry/augments/icons/deft_large.png",
+		"/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/deft_large.png",
+		"/latest/game/assets/ux/cherry/augments/icons/deft.png",
+		"/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/deft.png",
+		"/latest/game/assets/ux/cherry/augments/icons/deft_small.png",
+		"/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/deft_small.png",
+	}
+	if len(large) != len(wantLarge) {
 		t.Fatalf("large asset fallbacks missing: %#v", large)
 	}
-	if !strings.HasSuffix(large[0], "deft_large.png") || !strings.HasSuffix(large[1], "deft_small.png") {
-		t.Fatalf("large asset priority changed: %#v", large)
+	for index := range wantLarge {
+		if large[index] != wantLarge[index] {
+			t.Fatalf("large asset priority %d = %q, want %q; all=%#v", index, large[index], wantLarge[index], large)
+		}
 	}
 	for _, path := range large {
 		if strings.Contains(path, "assets/assets") {
@@ -423,25 +434,429 @@ func TestClientLaunchRejectsUnknownInstallation(t *testing.T) {
 	}
 }
 
+func TestMergeClientLaunchCandidatePreservesOrderAndDeduplicates(t *testing.T) {
+	byID := make(map[string]clientInstallation)
+	installation := clientInstallation{ID: "tcls", Name: "TCLS", Kind: "tcls"}
+	candidates := []clientLaunchCandidate{
+		{Source: "shortcut", shortcut: `C:\Users\private\Desktop\英雄联盟.lnk`},
+		{Source: "launcher", executable: `D:\League\Launcher\Client.exe`},
+		{Source: "tcls", executable: `D:\League\TCLS\Client.exe`},
+	}
+	for _, candidate := range candidates {
+		mergeClientLaunchCandidate(byID, installation, candidate)
+	}
+	mergeClientLaunchCandidate(byID, installation, candidates[1])
+
+	merged := byID["tcls"]
+	if !merged.Available || len(merged.launchCandidates) != 3 {
+		t.Fatalf("merged installation = %#v", merged)
+	}
+	for index, source := range []string{"shortcut", "launcher", "tcls"} {
+		if merged.launchCandidates[index].Source != source {
+			t.Fatalf("candidate %d source = %q, want %q", index, merged.launchCandidates[index].Source, source)
+		}
+	}
+	if merged.shortcut != candidates[0].shortcut || merged.executable != "" {
+		t.Fatalf("primary candidate changed: %#v", merged)
+	}
+}
+
+func TestWindowsClientDetectionUsesOrderedProductionBuilder(t *testing.T) {
+	data, err := os.ReadFile("client_installations_windows.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	start := strings.Index(source, "func detectClientInstallationsWithScan()")
+	end := strings.Index(source, "func launchClientInstallation(")
+	if start < 0 || end <= start {
+		t.Fatal("detectClientInstallationsWithScan production body was not found")
+	}
+	body := source[start:end]
+	if !strings.Contains(body, "buildDetectedClientInstallations(uniquePaths(gameRoots), riotClientCandidates(), shortcuts, regularFile)") {
+		t.Fatal("Windows production detector does not use the ordered candidate builder")
+	}
+}
+
+func TestBuildDetectedClientInstallationsPutsShortcutsLast(t *testing.T) {
+	root := t.TempDir()
+	paths := []string{
+		filepath.Join(root, "Launcher", "Client.exe"),
+		filepath.Join(root, "TCLS", "Client.exe"),
+		filepath.Join(root, "LeagueClient", "LeagueClient.exe"),
+		filepath.Join(root, "LeagueClient.exe"),
+		filepath.Join(root, "RiotClientServices.exe"),
+		filepath.Join(root, "英雄联盟.lnk"),
+		filepath.Join(root, "Riot Client.lnk"),
+	}
+	for _, path := range paths {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("test"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items := buildDetectedClientInstallations(
+		[]string{root},
+		[]string{filepath.Join(root, "RiotClientServices.exe")},
+		[]clientInstallation{
+			{ID: "tcls", Name: "英雄联盟", Kind: "tcls", shortcut: filepath.Join(root, "英雄联盟.lnk")},
+			{ID: "riot", Name: "Riot 客户端", Kind: "riot", shortcut: filepath.Join(root, "Riot Client.lnk")},
+		},
+		func(path string) bool {
+			info, err := os.Stat(path)
+			return err == nil && info.Mode().IsRegular()
+		},
+	)
+	if len(items) != 2 || items[0].ID != "tcls" || items[1].ID != "riot" {
+		t.Fatalf("detected installations = %#v", items)
+	}
+	for index, source := range []string{"launcher", "tcls", "league-client", "league-client", "shortcut"} {
+		if got := items[0].launchCandidates[index].Source; got != source {
+			t.Fatalf("tcls candidate %d source = %q, want %q", index, got, source)
+		}
+	}
+	for index, source := range []string{"riot", "shortcut"} {
+		if got := items[1].launchCandidates[index].Source; got != source {
+			t.Fatalf("riot candidate %d source = %q, want %q", index, got, source)
+		}
+	}
+}
+
+func TestLaunchClientCandidatesFallsBackInOrderAndStopsOnSuccess(t *testing.T) {
+	installation := clientInstallation{launchCandidates: []clientLaunchCandidate{
+		{Source: "shortcut", shortcut: `C:\private\英雄联盟.lnk`},
+		{Source: "launcher", executable: `D:\private\Launcher\Client.exe`},
+		{Source: "tcls", executable: `D:\private\TCLS\Client.exe`},
+		{Source: "league-client", executable: `D:\private\LeagueClient\LeagueClient.exe`},
+	}}
+	attempted := make([]string, 0, 4)
+	result, err := launchClientCandidates(installation, func(candidate clientLaunchCandidate) (clientLaunchFailure, error) {
+		attempted = append(attempted, candidate.Source)
+		if candidate.Source == "tcls" {
+			return clientLaunchFailure{}, nil
+		}
+		return clientLaunchFailure{Stage: "shell-execute", ErrorCode: 740}, errors.New("private launch failure")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(attempted, ",") != "shortcut,launcher,tcls" {
+		t.Fatalf("attempted = %v", attempted)
+	}
+	if result.Source != "tcls" || len(result.Failures) != 2 || result.Failures[0].Source != "shortcut" || result.Failures[1].Source != "launcher" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestLaunchClientCandidatesReturnsSanitizedFailures(t *testing.T) {
+	installation := clientInstallation{launchCandidates: []clientLaunchCandidate{
+		{Source: "shortcut", shortcut: `C:\private\英雄联盟.lnk`},
+		{Source: `D:\private\Client.exe`, executable: `D:\private\Client.exe`},
+	}}
+	result, err := launchClientCandidates(installation, func(candidate clientLaunchCandidate) (clientLaunchFailure, error) {
+		return clientLaunchFailure{Stage: `D:\private\stage`, ErrorCode: 5}, errors.New("private launch failure")
+	})
+	if err == nil {
+		t.Fatal("all failed candidates returned nil error")
+	}
+	if len(result.Failures) != 2 || result.Failures[0].Source != "shortcut" || result.Failures[1].Source != "unknown" {
+		t.Fatalf("failures = %#v", result.Failures)
+	}
+	for _, failure := range result.Failures {
+		if failure.Stage != "unknown" || failure.ErrorCode != 5 {
+			t.Fatalf("unsafe failure = %#v", failure)
+		}
+	}
+}
+
+func TestOfficialLoginLaunchUsesOnlyDetectedTCLSAndRecordsSafeDiagnostics(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	store := &localStore{root: root}
+	launched := clientInstallation{}
+	refreshRequests := make(chan struct{}, 1)
+	a := &app{
+		storage:         store,
+		refreshRequests: refreshRequests,
+		clientInstallations: func() []clientInstallation {
+			return []clientInstallation{{
+				ID: "tcls", Name: "TCLS 客户端", Kind: "tcls", Available: true,
+				executable: `C:\private-account\Launcher\Client.exe`,
+			}}
+		},
+		clientLauncher: func(installation clientInstallation) (clientLaunchResult, error) {
+			launched = installation
+			return clientLaunchResult{Source: "tcls", Failures: []clientLaunchFailure{
+				{Source: "shortcut", Stage: "shell-execute", ErrorCode: 2},
+				{Source: "launcher", Stage: "shell-execute", ErrorCode: 740},
+			}}, nil
+		},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/client-launch", strings.NewReader(`{"id":"tcls"}`))
+	recorder := httptest.NewRecorder()
+	a.handleClientLaunch(recorder, request)
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d: %s", recorder.Code, http.StatusAccepted, recorder.Body.String())
+	}
+	if launched.ID != "tcls" || !strings.HasSuffix(launched.executable, `Launcher\Client.exe`) {
+		t.Fatalf("unexpected launched installation: %#v", launched)
+	}
+	select {
+	case <-refreshRequests:
+	default:
+		t.Fatal("official login launch did not wake client discovery")
+	}
+	data, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	logText := string(data)
+	if strings.Contains(logText, "private-account") || strings.Contains(logText, "Client.exe") {
+		t.Fatalf("official login diagnostic leaked installation details: %s", logText)
+	}
+	if !strings.Contains(logText, `"event":"official_login_launch"`) || !strings.Contains(logText, `"result":"requested"`) || !strings.Contains(logText, `"result":"attempt_failed"`) || !strings.Contains(logText, `"result":"started"`) || !strings.Contains(logText, `"source":"tcls"`) || !strings.Contains(logText, `"error_code":740`) {
+		t.Fatalf("official login diagnostic timeline is incomplete: %s", logText)
+	}
+}
+
+func TestOfficialLoginLaunchRejectsCredentialFieldsBeforeLaunching(t *testing.T) {
+	launched := false
+	a := &app{
+		clientInstallations: func() []clientInstallation {
+			return []clientInstallation{{ID: "tcls", Available: true, executable: `C:\League\Launcher\Client.exe`}}
+		},
+		clientLauncher: func(clientInstallation) (clientLaunchResult, error) {
+			launched = true
+			return clientLaunchResult{Source: "launcher"}, nil
+		},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/client-launch", strings.NewReader(`{"id":"tcls","password":"must-not-be-read"}`))
+	recorder := httptest.NewRecorder()
+	a.handleClientLaunch(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if launched {
+		t.Fatal("credential-bearing request reached the client launcher")
+	}
+	if strings.Contains(recorder.Body.String(), "must-not-be-read") {
+		t.Fatalf("credential leaked in response: %s", recorder.Body.String())
+	}
+}
+
+func TestOfficialLoginLaunchRejectsTrailingJSONBeforeLaunching(t *testing.T) {
+	launched := false
+	a := &app{
+		clientInstallations: func() []clientInstallation {
+			return []clientInstallation{{ID: "tcls", Available: true, executable: `C:\League\Launcher\Client.exe`}}
+		},
+		clientLauncher: func(clientInstallation) (clientLaunchResult, error) {
+			launched = true
+			return clientLaunchResult{Source: "launcher"}, nil
+		},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/client-launch", strings.NewReader(`{"id":"tcls"}{"password":"must-not-be-read"}`))
+	recorder := httptest.NewRecorder()
+	a.handleClientLaunch(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if launched {
+		t.Fatal("request with trailing JSON reached the client launcher")
+	}
+	if strings.Contains(recorder.Body.String(), "must-not-be-read") {
+		t.Fatalf("trailing content leaked in response: %s", recorder.Body.String())
+	}
+}
+
+func TestOfficialLoginLaunchRejectsOversizedBodyBeforeLaunching(t *testing.T) {
+	launched := false
+	a := &app{
+		clientInstallations: func() []clientInstallation {
+			return []clientInstallation{{ID: "tcls", Available: true, executable: `C:\League\Launcher\Client.exe`}}
+		},
+		clientLauncher: func(clientInstallation) (clientLaunchResult, error) {
+			launched = true
+			return clientLaunchResult{Source: "launcher"}, nil
+		},
+	}
+	body := `{"id":"tcls"}` + strings.Repeat(" ", 5000)
+	request := httptest.NewRequest(http.MethodPost, "/api/client-launch", strings.NewReader(body))
+	recorder := httptest.NewRecorder()
+	a.handleClientLaunch(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if launched {
+		t.Fatal("oversized request reached the client launcher")
+	}
+}
+
+func TestClientLaunchSerializesRequestsAndAppliesSuccessCooldown(t *testing.T) {
+	var launches atomic.Int32
+	started := make(chan struct{})
+	release := make(chan struct{})
+	a := &app{
+		clientInstallations: func() []clientInstallation {
+			return []clientInstallation{{ID: "tcls", Available: true, executable: `C:\League\Launcher\Client.exe`}}
+		},
+		clientLauncher: func(clientInstallation) (clientLaunchResult, error) {
+			if launches.Add(1) == 1 {
+				close(started)
+				<-release
+			}
+			return clientLaunchResult{Source: "launcher"}, nil
+		},
+	}
+	firstResult := make(chan int, 1)
+	go func() {
+		request := httptest.NewRequest(http.MethodPost, "/api/client-launch", strings.NewReader(`{"id":"tcls"}`))
+		recorder := httptest.NewRecorder()
+		a.handleClientLaunch(recorder, request)
+		firstResult <- recorder.Code
+	}()
+	<-started
+
+	secondRequest := httptest.NewRequest(http.MethodPost, "/api/client-launch", strings.NewReader(`{"id":"tcls"}`))
+	secondRecorder := httptest.NewRecorder()
+	a.handleClientLaunch(secondRecorder, secondRequest)
+	if secondRecorder.Code != http.StatusTooManyRequests || launches.Load() != 1 {
+		t.Fatalf("concurrent status/launches = %d/%d, want %d/1", secondRecorder.Code, launches.Load(), http.StatusTooManyRequests)
+	}
+
+	close(release)
+	if code := <-firstResult; code != http.StatusAccepted {
+		t.Fatalf("first status = %d, want %d", code, http.StatusAccepted)
+	}
+	thirdRequest := httptest.NewRequest(http.MethodPost, "/api/client-launch", strings.NewReader(`{"id":"tcls"}`))
+	thirdRecorder := httptest.NewRecorder()
+	a.handleClientLaunch(thirdRecorder, thirdRequest)
+	if thirdRecorder.Code != http.StatusTooManyRequests || launches.Load() != 1 {
+		t.Fatalf("cooldown status/launches = %d/%d, want %d/1", thirdRecorder.Code, launches.Load(), http.StatusTooManyRequests)
+	}
+}
+
+func TestClientLaunchFailureReleasesServerLock(t *testing.T) {
+	var launches atomic.Int32
+	a := &app{
+		clientInstallations: func() []clientInstallation {
+			return []clientInstallation{{ID: "tcls", Available: true, executable: `C:\League\Launcher\Client.exe`}}
+		},
+		clientLauncher: func(clientInstallation) (clientLaunchResult, error) {
+			if launches.Add(1) == 1 {
+				return clientLaunchResult{}, errors.New("first launch failed")
+			}
+			return clientLaunchResult{Source: "launcher"}, nil
+		},
+	}
+	for attempt, want := range []int{http.StatusInternalServerError, http.StatusAccepted} {
+		request := httptest.NewRequest(http.MethodPost, "/api/client-launch", strings.NewReader(`{"id":"tcls"}`))
+		recorder := httptest.NewRecorder()
+		a.handleClientLaunch(recorder, request)
+		if recorder.Code != want {
+			t.Fatalf("attempt %d status = %d, want %d", attempt+1, recorder.Code, want)
+		}
+	}
+	if launches.Load() != 2 {
+		t.Fatalf("launches = %d, want 2", launches.Load())
+	}
+}
+
+func TestOfficialLoginLaunchFailureDoesNotLogUnderlyingError(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	store := &localStore{root: root}
+	a := &app{
+		storage: store,
+		clientInstallations: func() []clientInstallation {
+			return []clientInstallation{{ID: "tcls", Available: true, executable: `C:\League\Launcher\Client.exe`}}
+		},
+		clientLauncher: func(clientInstallation) (clientLaunchResult, error) {
+			return clientLaunchResult{Failures: []clientLaunchFailure{{Source: "launcher", Stage: "shell-execute", ErrorCode: 740}}}, errors.New("private path and launcher-token must stay private")
+		},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/client-launch", strings.NewReader(`{"id":"tcls"}`))
+	recorder := httptest.NewRecorder()
+	a.handleClientLaunch(recorder, request)
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusInternalServerError)
+	}
+	data, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	combined := recorder.Body.String() + string(data)
+	if strings.Contains(combined, "private path") || strings.Contains(combined, "launcher-token") {
+		t.Fatalf("official login failure leaked underlying error: %s", combined)
+	}
+	if !strings.Contains(string(data), `"result":"failed"`) || !strings.Contains(string(data), `"result":"attempt_failed"`) || !strings.Contains(string(data), `"source":"launcher"`) || !strings.Contains(string(data), `"stage":"shell-execute"`) || !strings.Contains(string(data), `"error_code":740`) {
+		t.Fatalf("official login failure was not diagnosed: %s", data)
+	}
+}
+
 func TestClientInstallationsDoNotExposeExecutableField(t *testing.T) {
-	a := &app{token: "test-secret"}
+	a := &app{
+		token: "test-secret",
+		clientInstallations: func() []clientInstallation {
+			return []clientInstallation{{ID: "tcls", Name: "TCLS", Location: `C:\private\英雄联盟`, Available: true, executable: `C:\private\Client.exe`, shortcut: `C:\private\英雄联盟.lnk`, arguments: []string{"--private"}, launchCandidates: []clientLaunchCandidate{{Source: "launcher", executable: `C:\private\Launcher\Client.exe`, arguments: []string{"--candidate-private"}}}}}
+		},
+	}
 	request := httptest.NewRequest(http.MethodGet, "/api/client-installations", nil)
 	recorder := httptest.NewRecorder()
 	a.handleClientInstallations(recorder, request)
-	if strings.Contains(recorder.Body.String(), "executable") || strings.Contains(recorder.Body.String(), "shortcut") || strings.Contains(recorder.Body.String(), "arguments") {
+	response := recorder.Body.String()
+	if strings.Contains(response, "location") || strings.Contains(response, "executable") || strings.Contains(response, "shortcut") || strings.Contains(response, "arguments") || strings.Contains(response, "launchCandidates") || strings.Contains(response, `C:\private`) || strings.Contains(response, "candidate-private") || strings.Contains(response, "英雄联盟") {
 		t.Fatalf("private launch fields leaked: %s", recorder.Body.String())
+	}
+}
+
+func TestClientInstallationScanDiagnosticDoesNotExposePaths(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	store := &localStore{root: root}
+	a := &app{
+		storage: store,
+		clientInstallations: func() []clientInstallation {
+			return []clientInstallation{{ID: "tcls", Available: true, Location: `D:\private-account\英雄联盟`, executable: `D:\private-account\英雄联盟\Launcher\Client.exe`}}
+		},
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/client-installations", nil)
+	recorder := httptest.NewRecorder()
+	a.handleClientInstallations(recorder, request)
+	data, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	logText := string(data)
+	if strings.Contains(logText, "private-account") || strings.Contains(logText, "Client.exe") || strings.Contains(logText, "英雄联盟") {
+		t.Fatalf("installation scan diagnostic leaked paths: %s", logText)
+	}
+	if !strings.Contains(logText, `"event":"client_installations_scan"`) || !strings.Contains(logText, `"detected_ids":["tcls"]`) || !strings.Contains(logText, `"result":"detected"`) {
+		t.Fatalf("installation scan diagnostic is incomplete: %s", logText)
 	}
 }
 
 func TestClassifyClientShortcut(t *testing.T) {
 	tests := map[string]string{
+		"英雄联盟Wegame版.lnk":                   "",
+		"WeGame.lnk":                        "",
+		"wegame英雄联盟.lnk":                    "",
 		"英雄联盟.lnk":                          "tcls",
+		"TCLS.lnk":                          "tcls",
 		"League of Legends.lnk":             "tcls",
+		"卸载英雄联盟.lnk":                        "",
 		"英雄联盟卸载.lnk":                        "",
 		"英雄联盟 - 卸载.lnk":                     "",
 		"League of Legends Uninstaller.lnk": "",
 		"League of Legends uninstall.lnk":   "",
-		"WeGame.lnk":                        "wegame",
 		"Riot Client.lnk":                   "riot",
 		"其他工具.lnk":                          "",
 	}

@@ -1,13 +1,19 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 func TestLCUEventRefreshScopes(t *testing.T) {
@@ -18,7 +24,9 @@ func TestLCUEventRefreshScopes(t *testing.T) {
 		{uri: "/lol-champions/v1/inventories/123", want: "collection"},
 		{uri: "/lol-champion-mastery/v1/player/123", want: "collection"},
 		{uri: "/lol-inventory/v2/inventory/CHAMPION_SKIN", want: "collection"},
-		{uri: "/lol-summoner/v1/current-summoner", want: "full"},
+		{uri: "/lol-summoner/v1/current-summoner", want: "summoner"},
+		{uri: "/lol-summoner/v1/current-summoner/summoner-profile", want: "summoner-profile"},
+		{uri: "/lol-chat/v1/me", want: ""},
 		{uri: "/lol-loot/v1/player-loot-map/item", want: "account"},
 		{uri: "/lol-rewards/v1/grants/1", want: "account"},
 	}
@@ -28,6 +36,134 @@ func TestLCUEventRefreshScopes(t *testing.T) {
 				t.Fatalf("lcuEventRefreshScope(%q) = %q, want %q", test.uri, got, test.want)
 			}
 		})
+	}
+}
+
+func TestLCUEventStreamAcceptsMessageAboveOneMiB(t *testing.T) {
+	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		if _, _, err := conn.ReadMessage(); err != nil {
+			return
+		}
+		large := map[string]any{"uri": "/test/large", "eventType": "Update", "data": map[string]string{"payload": strings.Repeat("x", 2*1024*1024)}}
+		if err := conn.WriteJSON([]any{8, "OnJsonApiEvent", large}); err != nil {
+			return
+		}
+		if err := conn.WriteJSON([]any{8, "OnJsonApiEvent", map[string]any{"uri": "/test/after-large", "eventType": "Update", "data": map[string]any{"ok": true}}}); err != nil {
+			return
+		}
+		_, _, _ = conn.ReadMessage()
+	}))
+	t.Cleanup(server.Close)
+
+	host, portText, err := net.SplitHostPort(strings.TrimPrefix(server.URL, "https://"))
+	if err != nil || host != "127.0.0.1" {
+		t.Fatalf("TLS websocket fixture address = %q, err=%v", server.URL, err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &LCUClient{port: port, token: "test-token"}
+	ctx, cancel := context.WithCancel(context.Background())
+	ready := make(chan struct{}, 1)
+	events := make(chan LCUEvent, 2)
+	errorsSeen := make(chan error, 1)
+	go func() {
+		errorsSeen <- client.ListenEvents(ctx, func() { ready <- struct{}{} }, func(event LCUEvent) { events <- event })
+	}()
+
+	select {
+	case <-ready:
+	case err := <-errorsSeen:
+		t.Fatalf("event stream failed before ready: %v", err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("event stream did not become ready")
+	}
+	for _, want := range []string{"/test/large", "/test/after-large"} {
+		select {
+		case event := <-events:
+			if event.URI != want {
+				t.Fatalf("event URI = %q, want %q", event.URI, want)
+			}
+		case err := <-errorsSeen:
+			t.Fatalf("event stream dropped while reading %q: %v", want, err)
+		case <-time.After(3 * time.Second):
+			t.Fatalf("timed out waiting for %q", want)
+		}
+	}
+	cancel()
+	select {
+	case err := <-errorsSeen:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("ListenEvents after cancel = %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("event stream did not stop after cancel")
+	}
+}
+
+func TestLCUEventStreamReadLimitReportsRecentTopURIs(t *testing.T) {
+	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		if _, _, err := conn.ReadMessage(); err != nil {
+			return
+		}
+		large := map[string]any{"uri": "/lol-test/v1/recent-large", "eventType": "Update", "data": map[string]string{"payload": strings.Repeat("x", 2*1024*1024)}}
+		if err := conn.WriteJSON([]any{8, "OnJsonApiEvent", large}); err != nil {
+			return
+		}
+		oversize := map[string]any{"uri": "/lol-test/v1/oversize", "eventType": "Update", "data": map[string]string{"payload": strings.Repeat("y", 9*1024*1024)}}
+		_ = conn.WriteJSON([]any{8, "OnJsonApiEvent", oversize})
+	}))
+	t.Cleanup(server.Close)
+
+	_, portText, err := net.SplitHostPort(strings.TrimPrefix(server.URL, "https://"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &LCUClient{port: port, token: "test-token"}
+	events := make(chan LCUEvent, 1)
+	errorsSeen := make(chan error, 1)
+	go func() {
+		errorsSeen <- client.ListenEvents(t.Context(), nil, func(event LCUEvent) { events <- event })
+	}()
+	select {
+	case event := <-events:
+		if event.URI != "/lol-test/v1/recent-large" {
+			t.Fatalf("first event URI = %q", event.URI)
+		}
+	case err := <-errorsSeen:
+		t.Fatalf("stream failed before recording recent URI: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("large event was not delivered")
+	}
+	select {
+	case err := <-errorsSeen:
+		dropped, oversize := eventStreamDropDiagnostics(err)
+		top, ok := dropped["top_uris"].([]lcuEventURIStat)
+		if eventStreamDropReason(err) != "read-limit" || !ok || len(top) == 0 || top[0].URI != "/lol-test/v1/recent-large" || top[0].LastBytes <= 1024*1024 {
+			t.Fatalf("read-limit diagnostics = dropped:%#v oversize:%#v err:%v", dropped, oversize, err)
+		}
+		if oversize == nil || oversize["event"] != "lcu_event_stream_oversize" {
+			t.Fatalf("missing oversize event: %#v", oversize)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("oversized event did not trip the 8 MiB read limit")
 	}
 }
 

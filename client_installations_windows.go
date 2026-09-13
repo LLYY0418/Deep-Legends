@@ -6,106 +6,87 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"syscall"
+
+	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
-const (
-	createDetachedProcess = 0x00000008
-	createNewProcessGroup = 0x00000200
-)
-
-func detectClientInstallations() []clientInstallation {
-	byID := make(map[string]clientInstallation)
-	add := func(installation clientInstallation) {
-		validShortcut := installation.shortcut != "" && filepath.IsAbs(installation.shortcut) && regularFile(installation.shortcut)
-		validExecutable := installation.executable != "" && regularFile(installation.executable)
-		if installation.ID == "" || (!validShortcut && !validExecutable) {
-			return
-		}
-		installation.Available = true
-		if validShortcut {
-			installation.Location = "Windows 快捷方式 · " + strings.TrimSuffix(filepath.Base(installation.shortcut), filepath.Ext(installation.shortcut))
-		} else if installation.Location == "" {
-			installation.Location = filepath.Dir(installation.executable)
-		}
-		existing, exists := byID[installation.ID]
-		if !exists || (validShortcut && existing.shortcut == "") {
-			byID[installation.ID] = installation
-		}
-	}
-
-	for _, installation := range detectClientShortcuts() {
-		add(installation)
-	}
-
+func detectClientInstallationsWithScan() ([]clientInstallation, clientInstallationScan) {
+	report := clientInstallationScan{PlatformSupported: true}
 	gameRoots := make([]string, 0, 28)
-	if value := queryRegistryValue(`HKCU\Software\Tencent\LOL`, "InstallPath"); value != "" {
-		gameRoots = append(gameRoots, value)
+	for _, registryRoot := range queryRegistryValues(`HKCU\Software\Tencent\LOL`, "InstallPath") {
+		report.RegistryRootFound = true
+		report.RegistryLauncherFound = report.RegistryLauncherFound || regularFile(filepath.Join(registryRoot, "Launcher", "Client.exe"))
+		report.RegistryTCLSFound = report.RegistryTCLSFound || regularFile(filepath.Join(registryRoot, "TCLS", "Client.exe"))
+		report.RegistryLeagueClientFound = report.RegistryLeagueClientFound || regularFile(filepath.Join(registryRoot, "LeagueClient", "LeagueClient.exe")) || regularFile(filepath.Join(registryRoot, "LeagueClient.exe"))
+		gameRoots = append(gameRoots, registryRoot)
 	}
 	for drive := 'C'; drive <= 'Z'; drive++ {
 		gameRoots = append(gameRoots, string(drive)+`:\WeGameApps\英雄联盟`)
 	}
-	for _, root := range uniquePaths(gameRoots) {
-		add(clientInstallation{ID: "tcls", Name: "TCLS 客户端", Kind: "tcls", Description: "直接启动腾讯英雄联盟客户端", executable: filepath.Join(root, "Launcher", "Client.exe")})
-		add(clientInstallation{ID: "wegame-lol", Name: "WeGame 英雄联盟", Kind: "wegame", Description: "通过当前英雄联盟安装目录启动 WeGame", executable: filepath.Join(root, "WeGameLauncher", "launcher.exe")})
-	}
-
-	wegameCandidates := []string{parseExecutableValue(queryRegistryDefault(`HKCU\wegame\DefaultIcon`))}
-	for _, root := range []string{os.Getenv("ProgramFiles"), os.Getenv("ProgramFiles(x86)"), os.Getenv("LOCALAPPDATA")} {
-		if root == "" {
-			continue
-		}
-		wegameCandidates = append(wegameCandidates,
-			filepath.Join(root, "WeGame", "wegame.exe"),
-			filepath.Join(root, "Tencent", "WeGame", "wegame.exe"),
-		)
-	}
-	for _, candidate := range uniquePaths(wegameCandidates) {
-		add(clientInstallation{ID: "wegame", Name: "WeGame", Kind: "wegame", Description: "打开 WeGame 后从游戏库启动英雄联盟", executable: candidate})
-	}
-
-	for _, candidate := range riotClientCandidates() {
-		add(clientInstallation{ID: "riot", Name: "Riot 客户端", Kind: "riot", Description: "启动 Riot 英雄联盟客户端", executable: candidate, arguments: []string{"--launch-product=league_of_legends", "--launch-patchline=live"}})
-	}
-
-	order := map[string]int{"tcls": 0, "wegame-lol": 1, "wegame": 2, "riot": 3}
-	result := make([]clientInstallation, 0, len(byID))
-	for _, installation := range byID {
-		result = append(result, installation)
-	}
-	sort.Slice(result, func(left, right int) bool { return order[result[left].ID] < order[result[right].ID] })
-	return result
+	shortcuts := detectClientShortcuts()
+	report.ShortcutCandidates = len(shortcuts)
+	return buildDetectedClientInstallations(uniquePaths(gameRoots), riotClientCandidates(), shortcuts, regularFile), report
 }
 
-func launchClientInstallation(installation clientInstallation) error {
-	if installation.shortcut != "" {
-		if !filepath.IsAbs(installation.shortcut) || !regularFile(installation.shortcut) {
-			return errors.New("client shortcut is unavailable")
+func launchClientInstallation(installation clientInstallation) (clientLaunchResult, error) {
+	return launchClientCandidates(installation, launchWindowsClientCandidate)
+}
+
+func launchWindowsClientCandidate(candidate clientLaunchCandidate) (clientLaunchFailure, error) {
+	failure := clientLaunchFailure{Source: candidate.Source}
+	path := candidate.executable
+	if candidate.shortcut != "" {
+		path = candidate.shortcut
+	}
+	if path == "" || !filepath.IsAbs(path) || !regularFile(path) {
+		failure.Stage = "validate"
+		return failure, errors.New("client launch candidate is unavailable")
+	}
+	verb, err := windows.UTF16PtrFromString("open")
+	if err != nil {
+		failure.Stage = "encode"
+		return failure, err
+	}
+	file, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		failure.Stage = "encode"
+		return failure, err
+	}
+	cwd, err := windows.UTF16PtrFromString(filepath.Dir(path))
+	if err != nil {
+		failure.Stage = "encode"
+		return failure, err
+	}
+	var parameters *uint16
+	if len(candidate.arguments) != 0 {
+		parts := make([]string, len(candidate.arguments))
+		for index, argument := range candidate.arguments {
+			parts[index] = windows.EscapeArg(argument)
 		}
-		cmd := exec.Command("explorer.exe", installation.shortcut)
-		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createDetachedProcess | createNewProcessGroup}
-		if err := cmd.Start(); err != nil {
-			return err
+		parameters, err = windows.UTF16PtrFromString(strings.Join(parts, " "))
+		if err != nil {
+			failure.Stage = "encode"
+			return failure, err
 		}
-		return cmd.Process.Release()
 	}
-	if !regularFile(installation.executable) {
-		return errors.New("client executable is unavailable")
+	if err := windows.ShellExecute(0, verb, file, parameters, cwd, windows.SW_SHOWNORMAL); err != nil {
+		failure.Stage = "shell-execute"
+		failure.ErrorCode = windowsErrorCode(err)
+		return failure, err
 	}
-	cmd := exec.Command(installation.executable, installation.arguments...)
-	cmd.Dir = filepath.Dir(installation.executable)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: createDetachedProcess | createNewProcessGroup,
+	return failure, nil
+}
+
+func windowsErrorCode(err error) uint32 {
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return uint32(errno)
 	}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	return cmd.Process.Release()
+	return 0
 }
 
 func detectClientShortcuts() []clientInstallation {
@@ -153,64 +134,56 @@ func scanClientShortcutDirectory(root string, depth int, result *[]clientInstall
 	}
 }
 
-func queryRegistryValue(key, name string) string {
-	if key == "" || name == "" {
-		return ""
+func queryRegistryValues(path, name string) []string {
+	root, subkey, ok := splitRegistryPath(path)
+	if !ok {
+		return nil
 	}
-	cmd := exec.Command("reg.exe", "query", key, "/v", name)
-	hideCommandWindow(cmd)
-	output, err := cmd.Output()
-	if err != nil {
-		return ""
-	}
-	return parseRegistryOutput(string(output), name)
-}
-
-func queryRegistryDefault(key string) string {
-	cmd := exec.Command("reg.exe", "query", key, "/ve")
-	hideCommandWindow(cmd)
-	output, err := cmd.Output()
-	if err != nil {
-		return ""
-	}
-	return parseRegistryOutput(string(output), "")
-}
-
-func parseRegistryOutput(output, name string) string {
-	for _, line := range strings.Split(output, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || (!strings.Contains(line, "REG_SZ") && !strings.Contains(line, "REG_EXPAND_SZ")) {
+	values := make([]string, 0, 2)
+	seen := make(map[string]bool)
+	for _, access := range []uint32{
+		registry.QUERY_VALUE | registry.WOW64_64KEY,
+		registry.QUERY_VALUE | registry.WOW64_32KEY,
+		registry.QUERY_VALUE,
+	} {
+		key, err := registry.OpenKey(root, subkey, access)
+		if err != nil {
 			continue
 		}
-		if name != "" && !strings.HasPrefix(strings.ToLower(line), strings.ToLower(name)) {
-			continue
-		}
-		fields := strings.Fields(line)
-		for index, field := range fields {
-			if field != "REG_SZ" && field != "REG_EXPAND_SZ" {
-				continue
+		value, valueType, err := key.GetStringValue(name)
+		key.Close()
+		if err == nil && valueType == registry.EXPAND_SZ {
+			if expanded, expandErr := registry.ExpandString(value); expandErr == nil {
+				value = expanded
 			}
-			value := strings.Join(fields[index+1:], " ")
-			return strings.TrimSpace(os.ExpandEnv(value))
+		}
+		if err == nil && strings.TrimSpace(value) != "" {
+			value = strings.TrimSpace(value)
+			lookup := strings.ToLower(value)
+			if !seen[lookup] {
+				seen[lookup] = true
+				values = append(values, value)
+			}
 		}
 	}
-	return ""
+	return values
 }
 
-func parseExecutableValue(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
+func splitRegistryPath(path string) (registry.Key, string, bool) {
+	path = strings.TrimSpace(strings.ReplaceAll(path, "/", `\`))
+	separator := strings.Index(path, `\`)
+	if separator <= 0 || separator == len(path)-1 {
+		return 0, "", false
 	}
-	if strings.HasPrefix(value, `"`) {
-		if end := strings.Index(value[1:], `"`); end >= 0 {
-			return value[1 : end+1]
-		}
+	prefix, subkey := strings.ToUpper(path[:separator]), path[separator+1:]
+	switch prefix {
+	case "HKCU", "HKEY_CURRENT_USER":
+		return registry.CURRENT_USER, subkey, true
+	case "HKLM", "HKEY_LOCAL_MACHINE":
+		return registry.LOCAL_MACHINE, subkey, true
+	default:
+		return 0, "", false
 	}
-	if comma := strings.LastIndex(value, ","); comma > 0 {
-		value = value[:comma]
-	}
-	return strings.Trim(value, ` "`)
 }
 
 func riotClientCandidates() []string {

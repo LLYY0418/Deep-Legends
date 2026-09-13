@@ -29,6 +29,8 @@ type settingsLocation struct {
 	allowedRoot string
 }
 
+var errUnsafeSettingsFile = errors.New("设置文件不可安全操作")
+
 func locateGameSettings(ctx context.Context, client *LCUClient) (settingsLocation, error) {
 	if client == nil {
 		return settingsLocation{}, errors.New("未连接英雄联盟客户端")
@@ -75,6 +77,38 @@ func pathWithin(root, target string) bool {
 	return !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
+func safeSettingsFile(location settingsLocation) (string, os.FileInfo, error) {
+	if !pathWithin(location.allowedRoot, location.file) {
+		return "", nil, errUnsafeSettingsFile
+	}
+	entry, err := os.Lstat(location.file)
+	if err != nil {
+		return "", nil, err
+	}
+	if !entry.Mode().IsRegular() || entry.Mode()&os.ModeSymlink != 0 {
+		return "", nil, errUnsafeSettingsFile
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(location.allowedRoot)
+	if err != nil {
+		return "", nil, err
+	}
+	resolvedFile, err := filepath.EvalSymlinks(location.file)
+	if err != nil {
+		return "", nil, err
+	}
+	if !pathWithin(resolvedRoot, resolvedFile) {
+		return "", nil, errUnsafeSettingsFile
+	}
+	info, err := os.Stat(resolvedFile)
+	if err != nil {
+		return "", nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return "", nil, errUnsafeSettingsFile
+	}
+	return resolvedFile, info, nil
+}
+
 func readRigStatus(ctx context.Context, client *LCUClient) rigStatus {
 	status := rigStatus{}
 	if client == nil {
@@ -90,11 +124,11 @@ func readRigStatus(ctx context.Context, client *LCUClient) rigStatus {
 		status.InstallRoot = location.installRoot
 		status.ConfigRoot = location.configRoot
 		status.SettingsFile = location.file
-		info, statErr := os.Lstat(location.file)
-		if statErr == nil && info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
+		_, info, statErr := safeSettingsFile(location)
+		if statErr == nil {
 			status.SettingsKnown = true
 			status.SettingsLocked = info.Mode().Perm()&0o222 == 0
-		} else if statErr != nil {
+		} else if !errors.Is(statErr, errUnsafeSettingsFile) {
 			status.Reason = "设置文件尚未生成或无法读取"
 		} else {
 			status.Reason = "设置文件不是可操作的普通文件"
@@ -115,10 +149,17 @@ func readRigStatus(ctx context.Context, client *LCUClient) rigStatus {
 func (a *app) handleRigStatus(w http.ResponseWriter, r *http.Request) {
 	client, _, err := a.gameplayClient()
 	if err != nil {
+		a.recordDiagnostic(map[string]any{"event": "rig_status_read", "result": "not-connected"})
 		respondJSON(w, rigStatus{Reason: "未连接英雄联盟客户端"})
 		return
 	}
-	respondJSON(w, readRigStatus(r.Context(), client))
+	status := readRigStatus(r.Context(), client)
+	result := "ok"
+	if status.InstallRoot == "" {
+		result = "locate-failed"
+	}
+	a.recordDiagnostic(map[string]any{"event": "rig_status_read", "result": result})
+	respondJSON(w, status)
 }
 
 func (a *app) handleSettingsLock(w http.ResponseWriter, r *http.Request) {
@@ -131,16 +172,19 @@ func (a *app) handleSettingsLock(w http.ResponseWriter, r *http.Request) {
 	}
 	client, _, err := a.gameplayClient()
 	if err != nil {
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "not-connected"})
 		http.Error(w, "未连接英雄联盟客户端", http.StatusConflict)
 		return
 	}
 	location, err := locateGameSettings(r.Context(), client)
 	if err != nil {
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "locate-failed"})
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
-	info, err := os.Lstat(location.file)
-	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || !pathWithin(location.allowedRoot, location.file) {
+	resolvedFile, _, err := safeSettingsFile(location)
+	if err != nil {
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "unsafe-file"})
 		http.Error(w, "设置文件不可安全操作", http.StatusUnprocessableEntity)
 		return
 	}
@@ -148,9 +192,11 @@ func (a *app) handleSettingsLock(w http.ResponseWriter, r *http.Request) {
 	if request.Locked {
 		mode = 0o444
 	}
-	if err := os.Chmod(location.file, mode); err != nil {
+	if err := os.Chmod(resolvedFile, mode); err != nil {
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "failed"})
 		http.Error(w, "无法修改设置文件只读状态", http.StatusServiceUnavailable)
 		return
 	}
+	a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "ok"})
 	respondJSON(w, readRigStatus(r.Context(), client))
 }

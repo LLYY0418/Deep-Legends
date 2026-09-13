@@ -291,27 +291,9 @@ func mergeQQ101PositionShares(existing, official []championPositionOption) []cha
 		return existing
 	}
 	result := make([]championPositionOption, 0, len(existing)+len(official))
-	merged := make(map[string]bool, len(official))
+	merged := make(map[string]bool, len(existing))
 	for _, current := range existing {
-		if item, ok := findQQ101Position(official, current.Position); ok {
-			current.RoleRate = item.RoleRate
-			if current.WinRate == 0 {
-				current.WinRate = item.WinRate
-			}
-			if current.PickRate == 0 {
-				current.PickRate = item.PickRate
-			}
-			if current.BanRate == 0 {
-				current.BanRate = item.BanRate
-			}
-			if current.Tier == 0 {
-				current.Tier = item.Tier
-			}
-			if current.Rank == 0 {
-				current.Rank = item.Rank
-			}
-			merged[item.Position] = true
-		}
+		merged[current.Position] = true
 		result = append(result, current)
 	}
 	for _, item := range official {
@@ -468,6 +450,8 @@ func parseQQ101SpellCount(data []byte) (int, error) {
 }
 
 func (p *championProvider) startQQ101Probe(ctx context.Context, champion string, championID int, tier, position string) {
+	// R60 cleanup marker: _runeinfo and _skill below are diagnostic-only probes;
+	// their row counts never enter the UI model.
 	if p.diag == nil || !p.featureGates.enabled(featureGateQQ101) || championID <= 0 {
 		return
 	}

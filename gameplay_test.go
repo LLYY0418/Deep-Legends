@@ -8,17 +8,21 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 type gameplayRoundTripFunc func(*http.Request) (*http.Response, error)
@@ -176,16 +180,167 @@ func callGameplayOverviewForTest(t *testing.T, a *app, publicRef string) {
 	}
 }
 
+func TestGameplayOverviewTencentLookupHTTPErrorIsExplainedAndRecorded(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/lol-summoner/v1/alias/lookup") {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, "fixture failure", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client(), region: "TENCENT", rsoPlatform: "HN1", platformProbe: true}
+	store := &localStore{root: t.TempDir()}
+	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a := &app{connected: true, lcu: client, summoner: Summoner{PUUID: strings.Repeat("c", 48)}, storage: store}
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/gameplay/overview", strings.NewReader(`{"gameName":"测试玩家","tagLine":"12345","serverId":"HN1","count":20}`))
+	a.handleGameplayOverview(recorder, request)
+	if recorder.Code != http.StatusBadGateway || !strings.Contains(recorder.Body.String(), "HTTP 500") {
+		t.Fatalf("lookup response = status:%d body:%q", recorder.Code, recorder.Body.String())
+	}
+	diagnostics, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := string(diagnostics)
+	for _, field := range []string{`"event":"tencent_riot_id_lookup"`, `"outcome":"http-error"`, `"http_status":500`, `"remote_lookup":false`, `"server_id":"HN1"`} {
+		if !strings.Contains(line, field) {
+			t.Fatalf("lookup diagnostic missing %s: %s", field, line)
+		}
+	}
+	if strings.Contains(line, "测试玩家") || strings.Contains(line, "12345") {
+		t.Fatalf("lookup diagnostic leaked Riot ID: %s", line)
+	}
+}
+
+func TestTencentLookupRetriesOneTransportFailure(t *testing.T) {
+	var calls atomic.Int64
+	puuid := strings.Repeat("r", 48)
+	client := &LCUClient{
+		baseURL: "https://lcu.invalid", token: "test-token", region: "TENCENT", rsoPlatform: "HN1", platformProbe: true,
+		http: &http.Client{Transport: gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+			if calls.Add(1) == 1 {
+				return nil, &net.DNSError{Err: "temporary lookup failure", IsTemporary: true}
+			}
+			body := `[{"puuid":"` + puuid + `"}]`
+			return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
+		})},
+	}
+	resolved, err := (&app{}).resolveTencentRiotID(context.Background(), client, "测试玩家", "12345", "HN1")
+	if err != nil || resolved.PlayerRef != puuid || calls.Load() != 2 {
+		t.Fatalf("retried lookup = resolved:%#v calls:%d err:%v", resolved, calls.Load(), err)
+	}
+}
+
+func TestGameplayOverviewRecordsCompletePhaseTiming(t *testing.T) {
+	a, publicRef, _ := newGameplayOverviewSGPFixture(t, false)
+	store := &localStore{root: t.TempDir()}
+	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a.storage = store
+	a.sgp.observe = a.recordDiagnostic
+	callGameplayOverviewForTest(t, a, publicRef)
+	data, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var costDuration float64 = -1
+	var phases map[string]any
+	for _, line := range bytes.Split(bytes.TrimSpace(data), []byte("\n")) {
+		var event map[string]any
+		if json.Unmarshal(line, &event) != nil {
+			continue
+		}
+		switch event["event"] {
+		case "overview_load_cost":
+			costDuration, _ = event["duration_ms"].(float64)
+		case "overview_phases_ms":
+			phases, _ = event["load_phases_ms"].(map[string]any)
+		}
+	}
+	if costDuration < 0 || phases == nil {
+		t.Fatalf("missing overview timing diagnostics: %s", data)
+	}
+	phaseSum := 0.0
+	for _, name := range overviewPhaseNames {
+		value, ok := phases[name].(float64)
+		if !ok {
+			t.Fatalf("phase %q missing from %#v", name, phases)
+		}
+		phaseSum += value
+	}
+	total, ok := phases["total"].(float64)
+	if !ok || math.Abs(total-costDuration) >= 50 || math.Abs(phaseSum-total) >= 50 {
+		t.Fatalf("phase accounting = sum:%v total:%v cost:%v phases:%#v", phaseSum, total, costDuration, phases)
+	}
+}
+
+func TestGameplayOverviewReturnsPartialBeforeTwentySeconds(t *testing.T) {
+	a, publicRef, _ := newGameplayOverviewSGPFixture(t, true)
+	store := &localStore{root: t.TempDir()}
+	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a.storage = store
+	a.sgp.observe = a.recordDiagnostic
+	var summaryCalls atomic.Int64
+	a.sgp.http = &http.Client{Transport: sgpRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if !strings.HasSuffix(request.URL.Path, "/SUMMARY") {
+			return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`[]`)), Request: request}, nil
+		}
+		summaryCalls.Add(1)
+		select {
+		case <-time.After(8 * time.Second):
+		case <-request.Context().Done():
+			return nil, request.Context().Err()
+		}
+		start, _ := strconv.Atoi(request.URL.Query().Get("startIndex"))
+		games := make([]map[string]any, 0, 20)
+		for index := 0; index < 20; index++ {
+			games = append(games, map[string]any{"json": map[string]any{
+				"gameId": start + index + 1, "queueId": 420, "gameCreation": time.Now().UnixMilli(), "gameDuration": 1800,
+				"participants": []map[string]any{{"puuid": strings.Repeat("o", 48), "participantId": 1, "teamId": 100, "championId": 103, "win": true}},
+			}})
+		}
+		body, _ := json.Marshal(map[string]any{"games": games})
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(body)), ContentLength: int64(len(body)), Request: request}, nil
+	})}
+	requestContext, cancel := context.WithTimeout(context.Background(), 21*time.Second)
+	defer cancel()
+	request := httptest.NewRequest(http.MethodPost, "/api/gameplay/overview", strings.NewReader(`{"playerRef":"`+publicRef+`","count":50}`)).WithContext(requestContext)
+	recorder := httptest.NewRecorder()
+	started := time.Now()
+	a.handleGameplayOverview(recorder, request)
+	elapsed := time.Since(started)
+	var overview gameplayOverview
+	if err := json.Unmarshal(recorder.Body.Bytes(), &overview); err != nil {
+		t.Fatalf("partial overview response = status:%d body:%q err:%v", recorder.Code, recorder.Body.String(), err)
+	}
+	if recorder.Code != http.StatusOK || elapsed >= 20*time.Second || len(overview.Matches) == 0 || !overview.Pagination.Partial || !overview.Pagination.BudgetExceeded || !overview.Pagination.HasMore || summaryCalls.Load() < 3 {
+		t.Fatalf("budgeted overview = status:%d elapsed:%s matches:%d pagination:%#v calls:%d", recorder.Code, elapsed, len(overview.Matches), overview.Pagination, summaryCalls.Load())
+	}
+}
+
 func TestGameplayOverviewHistoryWindowUsesCacheAcrossRequests(t *testing.T) {
 	a, publicRef, summaryRequests := newGameplayOverviewSGPFixture(t, false)
 	callGameplayOverviewForTest(t, a, publicRef)
 	firstRequestCount := int(summaryRequests.Load())
-	if firstRequestCount != 4 {
-		t.Fatalf("first overview summary requests = %d, want the page, 30-day window, and two ranked samples", firstRequestCount)
+	if firstRequestCount != 3 {
+		t.Fatalf("first overview summary requests = %d, want one shared physical page and two ranked samples", firstRequestCount)
 	}
 	callGameplayOverviewForTest(t, a, publicRef)
 	if int(summaryRequests.Load()) != firstRequestCount {
 		t.Fatalf("cached overview sent another summary request: first=%d second=%d", firstRequestCount, summaryRequests.Load())
+	}
+	forceRecorder := httptest.NewRecorder()
+	forceBody := strings.NewReader(`{"playerRef":"` + publicRef + `","count":20,"force":true}`)
+	a.handleGameplayOverview(forceRecorder, httptest.NewRequest(http.MethodPost, "/api/gameplay/overview", forceBody))
+	if forceRecorder.Code != http.StatusOK || int(summaryRequests.Load()) != firstRequestCount {
+		t.Fatalf("force recompute bypassed physical SGP cache: status=%d first=%d afterForce=%d", forceRecorder.Code, firstRequestCount, summaryRequests.Load())
 	}
 }
 
@@ -1234,6 +1389,9 @@ func TestPlayerRankScoreCachesSGPFallbackUnderPreferredLCUKey(t *testing.T) {
 	if first.tier != "PLATINUM" || first.division != "II" || !first.winRateKnown || first.winRate != 60 || second.tier != first.tier || second.division != first.division || second.winRate != first.winRate {
 		t.Fatalf("cached fallback rank metadata = first:%#v second:%#v", first, second)
 	}
+	if len(first.ranks) != 1 || len(second.ranks) != 1 || first.capability.State != capabilityAvailable || second.capability.State != capabilityAvailable {
+		t.Fatalf("cached fallback lost the full rank payload: first:%#v second:%#v", first, second)
+	}
 	if lcuCalls != 1 || sgpCalls != 1 {
 		t.Fatalf("cached fallback repeated upstream requests: lcu=%d sgp=%d", lcuCalls, sgpCalls)
 	}
@@ -1241,6 +1399,50 @@ func TestPlayerRankScoreCachesSGPFallbackUnderPreferredLCUKey(t *testing.T) {
 	actual, actualOK := a.rankScores.get(rankScoreCacheKey(dataSourceSGP, "HN1", playerRef))
 	if !preferredOK || !actualOK || preferred.source != dataSourceSGP || actual.source != dataSourceSGP {
 		t.Fatalf("fallback cache provenance = preferred:%#v/%v actual:%#v/%v", preferred, preferredOK, actual, actualOK)
+	}
+}
+
+func TestLoadQueueLabelsCachesPerLCUClientInstance(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/lol-game-queues/v1/queues" {
+			http.NotFound(w, r)
+			return
+		}
+		calls.Add(1)
+		_, _ = io.WriteString(w, `[{"id":420,"shortName":"单双排"}]`)
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
+	first := loadQueueLabels(client)
+	first[420] = "mutated"
+	second := loadQueueLabels(client)
+	if calls.Load() != 1 || second[420] != "单双排" {
+		t.Fatalf("queue label session cache = calls:%d first:%#v second:%#v", calls.Load(), first, second)
+	}
+	other := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
+	_ = loadQueueLabels(other)
+	if calls.Load() != 2 {
+		t.Fatalf("a new LCU client did not get a fresh queue catalog: %d", calls.Load())
+	}
+}
+
+func TestRecentRankedSampleCacheEvictsOldestLargeEntries(t *testing.T) {
+	a := &app{}
+	now := time.Now()
+	for index := 0; index < recentRankedSampleCacheMax+1; index++ {
+		a.cacheRecentRankedSample(fmt.Sprintf("player-%03d", index), recentRankedSampleCacheEntry{
+			at: now, matches: []gameplayMatch{{GameID: int64(index + 1)}},
+		})
+	}
+	if len(a.recentRankedSamples) != recentRankedSampleCacheMax {
+		t.Fatalf("recent ranked sample cache size = %d, want %d", len(a.recentRankedSamples), recentRankedSampleCacheMax)
+	}
+	if _, exists := a.recentRankedSamples["player-000"]; exists {
+		t.Fatal("oldest recent ranked sample was not evicted")
+	}
+	if matches, ok := a.recentRankedSample(fmt.Sprintf("player-%03d", recentRankedSampleCacheMax), now); !ok || len(matches) != 1 {
+		t.Fatalf("newest recent ranked sample missing: %#v %v", matches, ok)
 	}
 }
 
@@ -1273,10 +1475,10 @@ func TestPlayerRankScoreUsesRiotForKROpponentAndCachesMetadata(t *testing.T) {
 	if !first.known || first.source != dataSourceRiot || first.tier != "diamond" || first.division != "I" || !first.winRateKnown || first.winRate != 63 {
 		t.Fatalf("riot rank metadata = %#v", first)
 	}
-	if second != first || requests.Load() != 1 {
+	if !reflect.DeepEqual(second, first) || requests.Load() != 1 {
 		t.Fatalf("riot rank cache = first:%#v second:%#v requests:%d", first, second, requests.Load())
 	}
-	if cached, ok := a.rankScores.get(rankScoreCacheKey(dataSourceRiot, "KR", puuid)); !ok || cached != first {
+	if cached, ok := a.rankScores.get(rankScoreCacheKey(dataSourceRiot, "KR", puuid)); !ok || !reflect.DeepEqual(cached, first) {
 		t.Fatalf("riot rank cache entry = %#v ok=%v", cached, ok)
 	}
 }
@@ -1365,6 +1567,17 @@ func TestRankedWinRateDiagnosticsRecordSGPAndLCUSources(t *testing.T) {
 		}
 		return &localStore{root: root}
 	}
+	rankedEvent := func(t *testing.T, data []byte) map[string]any {
+		t.Helper()
+		for _, line := range bytes.Split(data, []byte("\n")) {
+			var event map[string]any
+			if json.Unmarshal(line, &event) == nil && event["event"] == "ranked_winrate_resolved" {
+				return event
+			}
+		}
+		t.Fatalf("ranked aggregate missing from diagnostics: %s", data)
+		return nil
+	}
 	t.Run("lcu", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = w.Write([]byte(`{"queues":[{"queueType":"RANKED_SOLO_5x5","wins":107,"losses":0}]}`))
@@ -1375,9 +1588,14 @@ func TestRankedWinRateDiagnosticsRecordSGPAndLCUSources(t *testing.T) {
 		client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
 		playerRef := strings.Repeat("l", 48)
 		_, _ = a.loadGameplayRanks(client, playerRef, false)
+		a.flushRankedWinrateDiagnostics()
 		data, err := store.readDiagnosticLog()
-		wantHash := a.rankedWinRateDiagnosticPlayerHash(playerRef)
-		if err != nil || !strings.Contains(string(data), `"event":"ranked_winrate_resolved"`) || !strings.Contains(string(data), `"source":"lcu"`) || !strings.Contains(string(data), `"suppressed":true`) || !strings.Contains(string(data), `"wins":107`) || !strings.Contains(string(data), `"losses":0`) || !strings.Contains(string(data), `"player_ref_hash":"`+wantHash+`"`) || strings.Contains(string(data), playerRef) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		event := rankedEvent(t, data)
+		encoded, _ := json.Marshal(event)
+		if event["source"] != "lcu" || event["suppressed_count"] != float64(1) || event["complete_count"] != float64(0) || strings.Contains(string(encoded), `"wins"`) || strings.Contains(string(encoded), `"losses"`) || strings.Contains(string(encoded), "player_ref_hash") || strings.Contains(string(encoded), playerRef) {
 			t.Fatalf("LCU diagnostic=%s err=%v", data, err)
 		}
 	})
@@ -1397,9 +1615,14 @@ func TestRankedWinRateDiagnosticsRecordSGPAndLCUSources(t *testing.T) {
 		a := &app{storage: store, sgp: provider}
 		playerRef := strings.Repeat("s", 48)
 		_, _, _ = a.loadRanksWithFallback(context.Background(), client, playerRef, false, "HN1", "PUBLIC")
+		a.flushRankedWinrateDiagnostics()
 		data, err := store.readDiagnosticLog()
-		wantHash := a.rankedWinRateDiagnosticPlayerHash(playerRef)
-		if err != nil || !strings.Contains(string(data), `"event":"ranked_winrate_resolved"`) || !strings.Contains(string(data), `"source":"sgp"`) || !strings.Contains(string(data), `"suppressed":false`) || !strings.Contains(string(data), `"wins":12`) || !strings.Contains(string(data), `"losses":8`) || !strings.Contains(string(data), `"player_ref_hash":"`+wantHash+`"`) || strings.Contains(string(data), playerRef) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		event := rankedEvent(t, data)
+		encoded, _ := json.Marshal(event)
+		if event["source"] != "sgp" || event["suppressed_count"] != float64(0) || event["complete_count"] != float64(1) || strings.Contains(string(encoded), `"wins"`) || strings.Contains(string(encoded), `"losses"`) || strings.Contains(string(encoded), "player_ref_hash") || strings.Contains(string(encoded), playerRef) {
 			t.Fatalf("SGP diagnostic=%s err=%v", data, err)
 		}
 	})
@@ -1595,7 +1818,7 @@ func TestGameplayOverviewReturnsCoreBeforeSlowSeasonScan(t *testing.T) {
 			http.NotFound(w, r)
 			return
 		}
-		if r.URL.Query().Get("startIndex") == "20" {
+		if r.URL.Query().Get("startIndex") == "50" {
 			select {
 			case seasonPageStarted <- struct{}{}:
 			default:
@@ -1632,7 +1855,7 @@ func TestGameplayOverviewReturnsCoreBeforeSlowSeasonScan(t *testing.T) {
 	}
 	result := make(chan gameplayOverview, 1)
 	go func() {
-		result <- a.loadGameplayOverview(context.Background(), client, a.summoner, gameplayReference{PlayerRef: playerRef, ServerID: "HN1"}, 0, 20, "all")
+		result <- a.loadGameplayOverview(context.Background(), client, a.summoner, gameplayReference{PlayerRef: playerRef, ServerID: "HN1"}, 0, 20, "all", false)
 	}()
 	var overview gameplayOverview
 	select {
@@ -1658,12 +1881,12 @@ func TestGameplayOverviewReturnsCoreBeforeSlowSeasonScan(t *testing.T) {
 		running := len(a.seasonBackfills)
 		a.seasonBackfillMu.Unlock()
 		if running == 0 {
-			backgroundKey := sourceScopedKey(dataSourceSGP, fmt.Sprintf("HN1|%s|20|%d|", playerRef, sgpPageSize))
+			backgroundKey := sgpHistoryPageCacheKey("HN1", playerRef, 50, sgpPageSize, nil)
 			provider.mu.Lock()
-			_, polluted := provider.historyCache[backgroundKey]
+			_, cached := provider.historyCache[backgroundKey]
 			provider.mu.Unlock()
-			if polluted {
-				t.Fatal("season background scan polluted the foreground SGP history cache")
+			if !cached {
+				t.Fatal("season background scan did not retain its physical SGP history page")
 			}
 			return
 		}
@@ -1942,6 +2165,688 @@ func TestCurrentChampionFallbackDrivesRecommendationTarget(t *testing.T) {
 	}
 }
 
+func TestChampSelectActionsAreLastRecommendationChampionFallback(t *testing.T) {
+	localCellID := int64(7)
+	baseSession := lcuChampSelectSession{
+		LocalPlayerCellID: &localCellID,
+		MyTeam:            []lcuChampSelectPlayer{{CellID: &localCellID}},
+	}
+	currentPlayer := gameplayLivePlayer{gameplayPlayer: gameplayPlayer{IsCurrent: true}, Position: "other"}
+
+	fromActions := baseSession
+	fromActions.Actions = [][]lcuChampSelectAction{{
+		{ActorCellID: 3, ChampionID: 99, Type: "PICK"},
+		{ActorCellID: localCellID, ChampionID: 25, Type: "pick"},
+	}}
+	championID, position := gameplayLiveRecommendationTargetWithChampSelect([]gameplayLivePlayer{currentPlayer}, 0, fromActions)
+	if championID != 25 || position != "other" {
+		t.Fatalf("action fallback = %d/%q, want 25/other", championID, position)
+	}
+
+	sentinel := baseSession
+	sentinel.Actions = [][]lcuChampSelectAction{{{ActorCellID: localCellID, ChampionID: -3, Type: "PICK"}}}
+	championID, _ = gameplayLiveRecommendationTargetWithChampSelect([]gameplayLivePlayer{currentPlayer}, 0, sentinel)
+	if championID != 0 {
+		t.Fatalf("sentinel action champion leaked into recommendations: %d", championID)
+	}
+
+	lockedPlayer := currentPlayer
+	lockedPlayer.ChampionID = 100
+	higherPriority := baseSession
+	higherPriority.Actions = [][]lcuChampSelectAction{{{ActorCellID: localCellID, ChampionID: 200, Type: "PICK"}}}
+	championID, _ = gameplayLiveRecommendationTargetWithChampSelect([]gameplayLivePlayer{lockedPlayer}, 0, higherPriority)
+	if championID != 100 {
+		t.Fatalf("action fallback overrode locked champion: %d", championID)
+	}
+}
+
+func TestRecommendationPayloadSanitizesNegativePickIntent(t *testing.T) {
+	localCellID := int64(7)
+	merged := mergeChampSelectPlayers(nil, lcuChampSelectSession{
+		LocalPlayerCellID: &localCellID,
+		MyTeam:            []lcuChampSelectPlayer{{CellID: &localCellID, ChampionPickIntent: -3}},
+	}, 0)
+	if len(merged) != 1 {
+		t.Fatalf("merged players = %d, want 1", len(merged))
+	}
+	if merged[0].player.ChampionPickIntent != 0 {
+		t.Fatalf("negative pick intent leaked into payload source: %d", merged[0].player.ChampionPickIntent)
+	}
+	if !merged[0].player.ChampionPickPending {
+		t.Fatal("negative pick intent did not retain pending presentation state")
+	}
+	if got := championName(nil, -3); got != "随机待定" {
+		t.Fatalf("negative champion name = %q, want random-pending copy", got)
+	}
+	if got := championName(nil, 0); got != "未知英雄" {
+		t.Fatalf("zero champion name = %q, want unknown copy", got)
+	}
+	if got := championName(nil, 25); got != "英雄 25" {
+		t.Fatalf("positive champion name = %q, want fallback id copy", got)
+	}
+}
+
+func TestGameplayLiveResolvesRandomChampSelectActionWithout400(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		actionID    int64
+		wantID      int64
+		wantPending bool
+	}{
+		{name: "resolved pick", actionID: 25, wantID: 25},
+		{name: "still pending", actionID: -3, wantPending: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/lol-gameflow/v1/gameflow-phase":
+					_, _ = w.Write([]byte(`"ChampSelect"`))
+				case "/lol-gameflow/v1/session":
+					_, _ = w.Write([]byte(`{"gameData":{"gameId":42,"queue":{"id":1750,"mapId":30,"gameMode":"CHERRY"},"teamOne":[],"teamTwo":[]},"map":{"id":30,"gameMode":"CHERRY"}}`))
+				case "/lol-champ-select/v1/session":
+					fmt.Fprintf(w, `{"localPlayerCellId":7,"myTeam":[{"cellId":7,"puuid":"arena-player","championId":0,"championPickIntent":-3}],"theirTeam":[],"actions":[[{"actorCellId":7,"championId":%d,"type":"PICK"}]]}`, test.actionID)
+				case "/lol-champ-select/v1/current-champion":
+					_, _ = w.Write([]byte(`0`))
+				default:
+					// Recommendation and enrichment calls are optional for this shape.
+					http.Error(w, "not available in fixture", http.StatusNotFound)
+				}
+			}))
+			defer server.Close()
+			client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+			a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 123}}
+			recorder := httptest.NewRecorder()
+			a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
+			}
+			var response gameplayLiveResponse
+			if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+				t.Fatal(err)
+			}
+			if response.ResolvedChampionID != test.wantID {
+				t.Fatalf("resolved champion = %d, want %d; response=%s", response.ResolvedChampionID, test.wantID, recorder.Body.String())
+			}
+			if test.wantPending && response.ResolvedChampionID != 0 {
+				t.Fatalf("negative action became a recommendation: %#v", response)
+			}
+		})
+	}
+}
+
+func TestGameplayLiveSecondRefreshReusesRankedStatsCache(t *testing.T) {
+	playerRef := strings.Repeat("r", 48)
+	var rankedCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/lol-gameflow/v1/gameflow-phase":
+			_, _ = io.WriteString(w, `"ChampSelect"`)
+		case "/lol-gameflow/v1/session":
+			_, _ = io.WriteString(w, `{"gameData":{"gameId":42,"queue":{"id":420,"mapId":11,"gameMode":"CLASSIC"},"teamOne":[],"teamTwo":[]},"map":{"id":11,"gameMode":"CLASSIC"}}`)
+		case "/lol-champ-select/v1/session":
+			fmt.Fprintf(w, `{"localPlayerCellId":7,"myTeam":[{"cellId":7,"puuid":%q,"summonerId":123,"summonerName":"Player","championId":22}],"theirTeam":[],"actions":[]}`, playerRef)
+		case "/lol-champ-select/v1/current-champion":
+			_, _ = io.WriteString(w, `22`)
+		case "/lol-ranked/v1/current-ranked-stats":
+			rankedCalls.Add(1)
+			_, _ = io.WriteString(w, `{"queues":[{"queueType":"RANKED_SOLO_5x5","tier":"GOLD","division":"II","leaguePoints":55,"wins":12,"losses":8}]}`)
+		default:
+			http.Error(w, "not available in fixture", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client(), platformProbe: true}
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 123, PUUID: playerRef}, rankScores: newRankScoreCache()}
+	for range 2 {
+		recorder := httptest.NewRecorder()
+		a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
+		}
+	}
+	if rankedCalls.Load() != 1 {
+		t.Fatalf("two live refreshes made %d LCU ranked requests, want one cached round", rankedCalls.Load())
+	}
+}
+
+func r62ArenaFixturePlayers(t *testing.T, count int) ([]map[string]any, []byte) {
+	t.Helper()
+	gameflowPlayers := make([]map[string]any, count)
+	livePlayers := make([]map[string]any, count)
+	for index := range gameflowPlayers {
+		name := fmt.Sprintf("R62Arena%02d", index+1)
+		gameflowPlayers[index] = map[string]any{"summonerName": name, "championId": index + 1}
+		livePlayers[index] = map[string]any{"summonerName": name, "playerSubteamId": index/3 + 1, "team": "ORDER"}
+	}
+	raw, err := json.Marshal(livePlayers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return gameflowPlayers, raw
+}
+
+func r62ArenaGameflowServer(t *testing.T, phase *string, gameID *int64, players []map[string]any) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/lol-gameflow/v1/gameflow-phase":
+			_ = json.NewEncoder(w).Encode(*phase)
+		case "/lol-gameflow/v1/session":
+			_ = json.NewEncoder(w).Encode(map[string]any{"gameData": map[string]any{
+				"gameId": *gameID, "queue": map[string]any{"id": 1750, "mapId": 30, "gameMode": "CHERRY"},
+				"teamOne": players, "teamTwo": []any{},
+			}})
+		default:
+			http.Error(w, "not available in R62 fixture", http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func r62GameplayLiveResponse(t *testing.T, a *app) gameplayLiveResponse {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var response gameplayLiveResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	return response
+}
+
+func TestR58ChampSelectDropsStaleGameflowRoster(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	oldPlayers := make([]map[string]any, 18)
+	for index := range oldPlayers {
+		oldPlayers[index] = map[string]any{"summonerName": fmt.Sprintf("旧玩家%02d", index+1), "championId": index + 1}
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/lol-gameflow/v1/gameflow-phase":
+			_, _ = w.Write([]byte(`"ChampSelect"`))
+		case "/lol-gameflow/v1/session":
+			_ = json.NewEncoder(w).Encode(map[string]any{"gameData": map[string]any{
+				"gameId": int64(8962886592), "queue": map[string]any{"id": 3270, "mapId": 30, "gameMode": "CHERRY"},
+				"teamOne": oldPlayers[:9], "teamTwo": oldPlayers[9:],
+			}})
+		case "/lol-champ-select/v1/session":
+			_, _ = w.Write([]byte(`{"gameId":777,"localPlayerCellId":7,"myTeam":[{"cellId":7,"puuid":"new-player-identity-0001","summonerName":"新玩家","championId":64}],"theirTeam":[]}`))
+		case "/lol-lobby/v2/lobby":
+			_, _ = w.Write([]byte(`{"gameConfig":{"queueId":420,"mapId":11,"gameMode":"CLASSIC"}}`))
+		case "/lol-champ-select/v1/current-champion":
+			_, _ = w.Write([]byte(`64`))
+		default:
+			http.Error(w, "not available", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	a := &app{connected: true, lcu: client, storage: &localStore{root: root}, summoner: Summoner{PUUID: "new-player-identity-0001"}}
+	recorder := httptest.NewRecorder()
+	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var response gameplayLiveResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Players) != 1 || response.GameID != 777 || response.QueueID != 420 || !response.DroppedStaleGameData {
+		t.Fatalf("stale roster survived ChampSelect: %#v", response)
+	}
+	if response.Players[0].ChampionID != 64 || !response.Players[0].IsCurrent {
+		t.Fatalf("ChampSelect player = %#v", response.Players[0])
+	}
+	diagnostics, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(diagnostics)
+	for _, expected := range []string{`"event":"live_roster_shape"`, `"raw_count":0`, `"merge_appended":1`, `"dropped_stale_gamedata":true`} {
+		if !strings.Contains(text, expected) {
+			t.Fatalf("missing %s in diagnostics: %s", expected, text)
+		}
+	}
+	if strings.Contains(recorder.Body.String(), "旧玩家") {
+		t.Fatalf("old player leaked into response: %s", recorder.Body.String())
+	}
+}
+
+func TestR58InProgressKeepsGameflowRoster(t *testing.T) {
+	players := make([]map[string]any, 18)
+	for index := range players {
+		players[index] = map[string]any{"summonerName": fmt.Sprintf("进行中玩家%02d", index+1), "championId": index + 1}
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/lol-gameflow/v1/gameflow-phase":
+			_, _ = w.Write([]byte(`"InProgress"`))
+		case "/lol-gameflow/v1/session":
+			_ = json.NewEncoder(w).Encode(map[string]any{"gameData": map[string]any{
+				"gameId": int64(8962886592), "queue": map[string]any{"id": 420, "mapId": 11, "gameMode": "CLASSIC"},
+				"teamOne": players[:9], "teamTwo": players[9:],
+			}})
+		default:
+			http.Error(w, "not available", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	a := &app{connected: true, lcu: client}
+	recorder := httptest.NewRecorder()
+	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+	var response gameplayLiveResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Players) != 18 || response.GameID != 8962886592 || response.DroppedStaleGameData {
+		t.Fatalf("InProgress roster was altered: %#v", response)
+	}
+}
+
+func TestR58LiveClientPlayerListGroupsSixArenaTeamsAndRedactsDiagnostics(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	gameflowPlayers := make([]map[string]any, 18)
+	livePlayers := make([]map[string]any, 18)
+	for index := range gameflowPlayers {
+		name := fmt.Sprintf("ArenaSecret%02d", index+1)
+		gameflowPlayers[index] = map[string]any{"summonerName": name, "championId": index + 1}
+		livePlayers[index] = map[string]any{"summonerName": name, "championName": fmt.Sprintf("Hero%d", index+1), "playerSubteamId": index/3 + 1, "subteamName": fmt.Sprintf("客户端小队%d", index/3+1), "team": "ORDER"}
+	}
+	liveRaw, err := json.Marshal(livePlayers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/lol-gameflow/v1/gameflow-phase":
+			_, _ = w.Write([]byte(`"InProgress"`))
+		case "/lol-gameflow/v1/session":
+			_ = json.NewEncoder(w).Encode(map[string]any{"gameData": map[string]any{
+				"gameId": int64(9001), "queue": map[string]any{"id": 1750, "mapId": 30, "gameMode": "CHERRY"},
+				"teamOne": gameflowPlayers[:9], "teamTwo": gameflowPlayers[9:],
+			}})
+		default:
+			http.Error(w, "not available", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	var probes atomic.Int32
+	a := &app{
+		connected: true, lcu: client, storage: &localStore{root: root},
+		liveClientPlayerList: func(context.Context) ([]byte, int, error) {
+			probes.Add(1)
+			return liveRaw, http.StatusOK, nil
+		},
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		recorder := httptest.NewRecorder()
+		a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("attempt %d status = %d: %s", attempt, recorder.Code, recorder.Body.String())
+		}
+		var response gameplayLiveResponse
+		if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+			t.Fatal(err)
+		}
+		counts := make(map[string]int)
+		for _, player := range response.Players {
+			counts[player.ArenaGroup]++
+		}
+		if !response.ArenaGrouped || response.ArenaGroupSource != "live-client" || response.ArenaGroupNames["1"] != "客户端小队1" || len(response.Players) != 18 || len(counts) != 6 {
+			t.Fatalf("Arena grouping = grouped:%v players:%d counts:%#v", response.ArenaGrouped, len(response.Players), counts)
+		}
+		for group, count := range counts {
+			if group == "" || count != 3 {
+				t.Fatalf("invalid Arena group %q=%d", group, count)
+			}
+		}
+	}
+	if probes.Load() != 1 {
+		t.Fatalf("successful playerlist probe count = %d, want cached result after first request", probes.Load())
+	}
+	diagnostics, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(diagnostics)
+	if strings.Count(text, `"event":"live_client_playerlist_shape"`) != 1 || !strings.Contains(text, `"player_count":18`) || !strings.Contains(text, `"grouped":true`) || !strings.Contains(text, `"attempt":1`) || !strings.Contains(text, `"phase":"InProgress"`) || !strings.Contains(text, `"arena_group_source":"live-client"`) {
+		t.Fatalf("playerlist diagnostics = %s", text)
+	}
+	if strings.Contains(text, "ArenaSecret") || strings.Contains(text, "客户端小队") {
+		t.Fatalf("playerlist diagnostics leaked a player or team name: %s", text)
+	}
+}
+
+func TestR68LiveClientPlayerListPositionsOverrideGameflowForAllTenPlayers(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	positions := []string{"TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY", "TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"}
+	gameflowPlayers := make([]map[string]any, len(positions))
+	livePlayers := make([]map[string]any, len(positions))
+	for index, position := range positions {
+		gameName := fmt.Sprintf("PrivateLane%02d", index+1)
+		gameflowPlayers[index] = map[string]any{
+			"gameName": gameName, "tagLine": "CN1", "summonerName": fmt.Sprintf("Opaque%02d", index+1),
+			"championId": index + 1, "selectedPosition": "TOP",
+		}
+		livePlayers[index] = map[string]any{
+			"riotIdGameName": gameName, "riotIdTagLine": "CN1", "position": position, "team": []string{"ORDER", "CHAOS"}[index/5],
+		}
+	}
+	liveRaw, err := json.Marshal(livePlayers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/lol-gameflow/v1/gameflow-phase":
+			_, _ = w.Write([]byte(`"InProgress"`))
+		case "/lol-gameflow/v1/session":
+			_ = json.NewEncoder(w).Encode(map[string]any{"gameData": map[string]any{
+				"gameId": int64(68001), "queue": map[string]any{"id": 420, "mapId": 11, "gameMode": "CLASSIC"},
+				"teamOne": gameflowPlayers[:5], "teamTwo": gameflowPlayers[5:],
+			}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	a := &app{
+		connected: true, lcu: &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}, storage: &localStore{root: root},
+		liveClientPlayerList: func(context.Context) ([]byte, int, error) { return liveRaw, http.StatusOK, nil },
+	}
+	recorder := httptest.NewRecorder()
+	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var response gameplayLiveResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Players) != len(positions) {
+		t.Fatalf("players = %d, want %d", len(response.Players), len(positions))
+	}
+	for index, player := range response.Players {
+		want := strings.ToLower(positions[index])
+		if player.Position != want {
+			t.Fatalf("player %d position = %q, want Live Client %q (gameflow was TOP)", index, player.Position, want)
+		}
+	}
+	diagnostics, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(diagnostics)
+	for _, expected := range []string{`"event":"live_client_playerlist_shape"`, `"position_matched_count":10`, `"BOTTOM":2`, `"JUNGLE":2`, `"MIDDLE":2`, `"TOP":2`, `"UTILITY":2`} {
+		if !strings.Contains(text, expected) {
+			t.Fatalf("diagnostic missing %s: %s", expected, text)
+		}
+	}
+	for index := range positions {
+		for _, secret := range []string{fmt.Sprintf("PrivateLane%02d", index+1), fmt.Sprintf("Opaque%02d", index+1)} {
+			if strings.Contains(text, secret) {
+				t.Fatalf("playerlist diagnostic leaked %q: %s", secret, text)
+			}
+		}
+	}
+}
+
+func TestR68LiveClientPositionMatchedCountIsNotPlayerCount(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	raw := []byte(`[{"riotId":"Matched#CN1","position":"TOP"},{"riotId":"NotInRoster#CN1","position":"JUNGLE"}]`)
+	a := &app{
+		storage:              &localStore{root: root},
+		liveClientPlayerList: func(context.Context) ([]byte, int, error) { return raw, http.StatusOK, nil },
+	}
+	snapshot, _ := a.liveClientSnapshotForGame(context.Background(), 68002, "InProgress", 0)
+	position, source := liveClientPositionForIdentities(snapshot, nil, []string{"Matched#CN1"})
+	sources := liveClientPositionMatchSourceCounts(nil)
+	if position != "" {
+		sources[source]++
+	}
+	a.finalizeLiveClientPlayerListShape(68002, 1, sources)
+	diagnostics, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(diagnostics)
+	if !strings.Contains(text, `"player_count":2`) || !strings.Contains(text, `"position_matched_count":1`) {
+		t.Fatalf("matched count must describe roster matches, not playerlist size: %s", text)
+	}
+}
+
+func TestR58LiveClientPlayerListUnavailableFallsBackWithoutError(t *testing.T) {
+	players := make([]map[string]any, 18)
+	for index := range players {
+		players[index] = map[string]any{"summonerName": fmt.Sprintf("Fallback%02d", index+1), "championId": index + 1}
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/lol-gameflow/v1/gameflow-phase":
+			_, _ = w.Write([]byte(`"InProgress"`))
+		case "/lol-gameflow/v1/session":
+			_ = json.NewEncoder(w).Encode(map[string]any{"gameData": map[string]any{
+				"gameId": int64(9002), "queue": map[string]any{"id": 1750, "mapId": 30, "gameMode": "CHERRY"},
+				"teamOne": players[:9], "teamTwo": players[9:],
+			}})
+		default:
+			http.Error(w, "not available", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	a := &app{
+		connected: true, lcu: client,
+		liveClientPlayerList: func(context.Context) ([]byte, int, error) { return nil, 0, errors.New("offline") },
+	}
+	recorder := httptest.NewRecorder()
+	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var response gameplayLiveResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.ArenaGrouped || len(response.Players) != 18 {
+		t.Fatalf("playerlist failure did not preserve the flat roster: %#v", response)
+	}
+	for _, player := range response.Players {
+		if player.ArenaGroup != "" {
+			t.Fatalf("fallback response retained a partial group: %#v", player)
+		}
+	}
+}
+
+func TestArena1750UsesCorroboratedGameflowRosterOrderWhenPlayerListHasNoSubteams(t *testing.T) {
+	players := make([]map[string]any, 18)
+	for index := range players {
+		partyID := index + 1
+		if index%3 == 1 {
+			partyID = index
+		}
+		players[index] = map[string]any{
+			"summonerName": fmt.Sprintf("ArenaOrder%02d", index+1),
+			"championId":   index + 1, "teamParticipantId": partyID,
+		}
+	}
+	phase := "InProgress"
+	gameID := int64(9003)
+	server := r62ArenaGameflowServer(t, &phase, &gameID, players)
+	a := &app{
+		connected: true,
+		lcu:       &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()},
+		liveClientPlayerList: func(context.Context) ([]byte, int, error) {
+			return []byte(`[{"riotId":"PositionOnly#CN1","position":"TOP","team":"ORDER"}]`), http.StatusOK, nil
+		},
+	}
+	response := r62GameplayLiveResponse(t, a)
+	if !response.ArenaGrouped || !response.ArenaMascotMapping || response.ArenaGroupSource != "session-order" {
+		t.Fatalf("session-order Arena grouping = %#v", response)
+	}
+	counts := make(map[string]int)
+	for _, player := range response.Players {
+		counts[player.ArenaGroup]++
+	}
+	if len(counts) != 6 {
+		t.Fatalf("session-order group counts = %#v", counts)
+	}
+	for group, count := range counts {
+		if group == "" || count != 3 {
+			t.Fatalf("session-order group %q count = %d", group, count)
+		}
+	}
+}
+
+func TestR62ArenaPlayerListRetriesAndGroupsSeventeenPlayers(t *testing.T) {
+	gameflowPlayers, liveRaw := r62ArenaFixturePlayers(t, 17)
+	phase := "InProgress"
+	gameID := int64(6201)
+	server := r62ArenaGameflowServer(t, &phase, &gameID, gameflowPlayers)
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	var probes atomic.Int32
+	now := time.Unix(1_800_000_000, 0)
+	a := &app{
+		connected: true,
+		lcu:       client,
+		liveClientPlayerListNow: func() time.Time {
+			current := now
+			now = now.Add(liveClientRetryDelay + time.Second)
+			return current
+		},
+		liveClientPlayerList: func(context.Context) ([]byte, int, error) {
+			if probes.Add(1) == 1 {
+				return nil, 0, errors.New("game process is not listening yet")
+			}
+			return liveRaw, http.StatusOK, nil
+		},
+	}
+	knownAllies := make([]struct {
+		player lcuLivePlayer
+		team   int64
+	}, 3)
+	for index := range knownAllies {
+		knownAllies[index] = struct {
+			player lcuLivePlayer
+			team   int64
+		}{player: lcuLivePlayer{SummonerName: fmt.Sprintf("R62Arena%02d", index+1)}, team: 100}
+	}
+	a.rememberArenaAllies(knownAllies)
+
+	first := r62GameplayLiveResponse(t, a)
+	if first.ArenaGrouped {
+		t.Fatalf("first unavailable probe unexpectedly grouped players: %#v", first)
+	}
+	second := r62GameplayLiveResponse(t, a)
+	if !second.ArenaGrouped || !second.ArenaMascotMapping || len(second.Players) != 17 {
+		t.Fatalf("17-player Arena grouping = grouped:%v mascot:%v players:%d", second.ArenaGrouped, second.ArenaMascotMapping, len(second.Players))
+	}
+	counts := make(map[string]int)
+	for index, player := range second.Players {
+		counts[player.ArenaGroup]++
+		if index < 3 && !player.IsAlly {
+			t.Fatalf("remembered ally %d lost highlight: %#v", index, player)
+		}
+		if index >= 3 && player.IsAlly {
+			t.Fatalf("opponent %d was highlighted as ally: %#v", index, player)
+		}
+	}
+	if len(counts) != 6 || counts["6"] != 2 {
+		t.Fatalf("17-player Arena group counts = %#v", counts)
+	}
+	if probes.Load() != 2 {
+		t.Fatalf("playerlist probes = %d, want retry after initial failure", probes.Load())
+	}
+}
+
+func TestR62ArenaPlayerListProbesReconnectAndInvalidatesGameCache(t *testing.T) {
+	gameflowPlayers, liveRaw := r62ArenaFixturePlayers(t, 18)
+	phase := "Reconnect"
+	gameID := int64(6202)
+	server := r62ArenaGameflowServer(t, &phase, &gameID, gameflowPlayers)
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	var probes atomic.Int32
+	a := &app{
+		connected: true,
+		lcu:       client,
+		liveClientPlayerList: func(context.Context) ([]byte, int, error) {
+			probes.Add(1)
+			return liveRaw, http.StatusOK, nil
+		},
+	}
+	first := r62GameplayLiveResponse(t, a)
+	if !first.ArenaGrouped || probes.Load() != 1 {
+		t.Fatalf("Reconnect probe = grouped:%v probes:%d", first.ArenaGrouped, probes.Load())
+	}
+	second := r62GameplayLiveResponse(t, a)
+	if !second.ArenaGrouped || probes.Load() != 1 {
+		t.Fatalf("successful probe was not cached: grouped:%v probes:%d", second.ArenaGrouped, probes.Load())
+	}
+	gameID = 6203
+	third := r62GameplayLiveResponse(t, a)
+	if !third.ArenaGrouped || probes.Load() != 2 {
+		t.Fatalf("new game did not invalidate playerlist cache: grouped:%v probes:%d", third.ArenaGrouped, probes.Load())
+	}
+}
+
+func TestR62ArenaGroupValidationRejectsOversizedGroups(t *testing.T) {
+	players := []gameplayLivePlayer{
+		{ArenaGroup: "1"}, {ArenaGroup: "1"}, {ArenaGroup: "1"}, {ArenaGroup: "1"},
+		{ArenaGroup: "2"}, {ArenaGroup: "2"},
+	}
+	if validateArenaLiveGroups(players) {
+		t.Fatalf("four-player Arena group passed validation: %#v", players)
+	}
+	if liveClientArenaDistribution(map[string]int{"1": 9, "2": 9}, 18) {
+		t.Fatal("two coarse nine-player teams passed Arena distribution validation")
+	}
+}
+
+func TestLiveRecommendationRejectionRecordsOnlyInputShape(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a := &app{storage: &localStore{root: root}}
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/gameplay/recommendations?championId=-3", nil)
+	a.handleGameplayRecommendations(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", recorder.Code)
+	}
+	data, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	logText := string(data)
+	for _, want := range []string{`"event":"live_recommendations_rejected"`, `"stage":"championId"`, `"raw_length":2`, `"raw_first_character_class":"minus"`} {
+		if !strings.Contains(logText, want) {
+			t.Fatalf("rejection shape missing %s: %s", want, data)
+		}
+	}
+	if strings.Contains(logText, `"raw":"-3"`) {
+		t.Fatalf("rejection diagnostic leaked the raw input: %s", data)
+	}
+}
+
 func TestGameplayLiveUsesCurrentChampionWhenRosterIsUnavailable(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
@@ -2073,6 +2978,239 @@ func TestGameplayLiveArenaChampSelectFiltersAnonymousCells(t *testing.T) {
 	}
 	if response.ChampSelectNotice != arenaChampSelectNotice {
 		t.Fatalf("Arena champ-select notice = %q", response.ChampSelectNotice)
+	}
+}
+
+func TestGameplayLiveChampSelectDropsStaleGameflowRoster(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	oldPlayers := make([]map[string]any, 18)
+	for index := range oldPlayers {
+		oldPlayers[index] = map[string]any{"puuid": fmt.Sprintf("old-player-%d", index), "championId": 11}
+	}
+	gameflow, err := json.Marshal(map[string]any{"gameData": map[string]any{
+		"gameId": int64(999999), "queue": map[string]any{"id": 1750, "mapId": 30, "gameMode": "CHERRY"},
+		"teamOne": oldPlayers, "teamTwo": []any{},
+	}, "map": map[string]any{"id": 30, "gameMode": "CHERRY"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/lol-gameflow/v1/gameflow-phase":
+			_, _ = w.Write([]byte(`"ChampSelect"`))
+		case "/lol-gameflow/v1/session":
+			_, _ = w.Write(gameflow)
+		case "/lol-champ-select/v1/session":
+			_, _ = w.Write([]byte(`{"gameId":777777,"localPlayerCellId":7,"myTeam":[{"cellId":7,"puuid":"fresh-player"}],"theirTeam":[]}`))
+		case "/lol-champ-select/v1/current-champion":
+			_, _ = w.Write([]byte(`0`))
+		case "/lol-lobby/v2/lobby":
+			_, _ = w.Write([]byte(`{"gameConfig":{"queueId":420,"mapId":11,"gameMode":"CLASSIC"}}`))
+		default:
+			http.Error(w, "not available in fixture", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	a := &app{connected: true, lcu: client, summoner: Summoner{PUUID: "fresh-player"}, storage: &localStore{root: root}}
+	recorder := httptest.NewRecorder()
+	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var response gameplayLiveResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Players) != 1 || response.Players[0].PlayerRef == "old-player-0" {
+		t.Fatalf("stale roster was retained: %#v", response.Players)
+	}
+	if response.GameID != 777777 || response.GameID == 999999 || response.RawCount != 0 || !response.DroppedStaleGameData {
+		t.Fatalf("stale gameData contract = %#v", response)
+	}
+	diagnostics, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(diagnostics, []byte(`"dropped_stale_gamedata":true`)) {
+		t.Fatalf("stale gameData diagnostic missing: %s", diagnostics)
+	}
+}
+
+func TestGameplayLiveInProgressPreservesGameflowRoster(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/lol-gameflow/v1/gameflow-phase":
+			_, _ = w.Write([]byte(`"InProgress"`))
+		case "/lol-gameflow/v1/session":
+			_, _ = w.Write([]byte(`{"gameData":{"gameId":888888,"queue":{"id":420,"mapId":11,"gameMode":"CLASSIC"},"teamOne":[{"puuid":"kept-player","championId":64}],"teamTwo":[]}}`))
+		default:
+			http.Error(w, "not available in fixture", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	a := &app{connected: true, lcu: client, summoner: Summoner{PUUID: "kept-player"}}
+	recorder := httptest.NewRecorder()
+	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+	var response gameplayLiveResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.GameID != 888888 || len(response.Players) != 1 || response.Players[0].ChampionID != 64 || response.DroppedStaleGameData {
+		t.Fatalf("InProgress gameflow roster changed: %#v", response)
+	}
+}
+
+func TestArenaLiveClientPlayerListGroupingAndFallback(t *testing.T) {
+	entries := make([]map[string]any, 0, 18)
+	for group := 1; group <= 6; group++ {
+		for member := 1; member <= 3; member++ {
+			entries = append(entries, map[string]any{
+				"riotId":          fmt.Sprintf("Player-%d-%d#CN1", group, member),
+				"playerSubteamId": group,
+				"subteamName":     fmt.Sprintf("客户端队名 %d", group),
+				"team":            "ORDER",
+			})
+		}
+	}
+	raw, err := json.Marshal(entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, shape, err := parseLiveClientPlayerList(raw)
+	if err != nil || !shape.Grouped || shape.GroupField != "playerSubteamId" || shape.PlayerCount != 18 {
+		t.Fatalf("playerlist grouping = %#v/%#v, err=%v", snapshot.Grouping, shape, err)
+	}
+	if snapshot.Grouping.IdentifiedPlayers != 18 || snapshot.Grouping.NameByGroup["1"] != "客户端队名 1" {
+		t.Fatalf("playerlist group names = %#v", snapshot.Grouping)
+	}
+	counts := make(map[string]int)
+	for group := 1; group <= 6; group++ {
+		for member := 1; member <= 3; member++ {
+			player := lcuLivePlayer{GameName: fmt.Sprintf("Player-%d-%d", group, member), TagLine: "CN1"}
+			counts[liveClientGroupingForPlayer(snapshot.Grouping, player)]++
+		}
+	}
+	if len(counts) != 6 {
+		t.Fatalf("resolved groups = %#v", counts)
+	}
+	for group, count := range counts {
+		if group == "" || count != 3 {
+			t.Fatalf("resolved group %q count = %d", group, count)
+		}
+	}
+	_, fallbackShape, err := parseLiveClientPlayerList([]byte(`[{"riotId":"Only#CN1","team":"ORDER"}]`))
+	if err != nil || fallbackShape.Grouped {
+		t.Fatalf("invalid playerlist should fall back: %#v, err=%v", fallbackShape, err)
+	}
+	teamOnly := make([]map[string]any, 18)
+	for index := range teamOnly {
+		teamOnly[index] = map[string]any{"riotId": fmt.Sprintf("TeamOnly-%d#CN1", index), "team": []string{"ORDER", "CHAOS"}[index/9]}
+	}
+	teamRaw, err := json.Marshal(teamOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, teamShape, err := parseLiveClientPlayerList(teamRaw)
+	if err != nil || teamShape.Grouped {
+		t.Fatalf("team field must never be accepted as an Arena subteam: %#v, err=%v", teamShape, err)
+	}
+}
+
+func TestArenaPlayerListDoesNotCachePositionOnlySnapshotAsFinalGrouping(t *testing.T) {
+	now := time.Unix(1_900_000_000, 0)
+	entries := make([]map[string]any, 18)
+	for index := range entries {
+		entries[index] = map[string]any{"riotId": fmt.Sprintf("Retry-%02d#CN1", index+1), "playerSubteamId": index/3 + 1, "team": "ORDER"}
+	}
+	groupedRaw, err := json.Marshal(entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var probes atomic.Int32
+	a := &app{
+		liveClientPlayerListNow: func() time.Time { return now },
+		liveClientPlayerList: func(context.Context) ([]byte, int, error) {
+			if probes.Add(1) == 1 {
+				return []byte(`[{"riotId":"Retry-01#CN1","position":"TOP","team":"ORDER"}]`), http.StatusOK, nil
+			}
+			return groupedRaw, http.StatusOK, nil
+		},
+	}
+	if snapshot, _ := a.liveClientSnapshotForGame(context.Background(), 9901, "InProgress", 18); len(snapshot.Grouping.ByIdentity) != 0 {
+		t.Fatalf("position-only Arena snapshot was accepted: %#v", snapshot)
+	}
+	now = now.Add(liveClientRetryDelay + time.Second)
+	snapshot, _ := a.liveClientSnapshotForGame(context.Background(), 9901, "InProgress", 18)
+	if probes.Load() != 2 || len(snapshot.Grouping.ByIdentity) == 0 {
+		t.Fatalf("Arena playerlist did not retry to a grouped snapshot: probes=%d snapshot=%#v", probes.Load(), snapshot)
+	}
+}
+
+func TestArenaSessionOrderGroupingRejectsPartySplitAcrossSquads(t *testing.T) {
+	players := make([]lcuLivePlayer, 18)
+	for index := range players {
+		players[index].TeamParticipantID = int64(index + 1)
+	}
+	if groups, ok := arenaSessionOrderGroups(1750, players); !ok || len(groups) != 18 || groups[0] != "1" || groups[17] != "6" {
+		t.Fatalf("valid Arena session order = %#v/%v", groups, ok)
+	}
+	players[1].TeamParticipantID = players[0].TeamParticipantID
+	if groups, ok := arenaSessionOrderGroups(1750, players); !ok || groups[0] != groups[1] {
+		t.Fatalf("party contained within an Arena squad was rejected: %#v/%v", groups, ok)
+	}
+	players[3].TeamParticipantID = players[0].TeamParticipantID
+	if groups, ok := arenaSessionOrderGroups(1750, players); ok || groups != nil {
+		t.Fatalf("party split across Arena squads was accepted: %#v", groups)
+	}
+	if groups, ok := arenaSessionOrderGroups(1750, players[:17]); ok || groups != nil {
+		t.Fatalf("partial Arena roster was accepted as ordered: %#v", groups)
+	}
+}
+
+func TestLiveClientPlayerListDiagnosticIsStructuralAndDeduplicated(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	entries := make([]map[string]any, 0, 18)
+	for group := 1; group <= 6; group++ {
+		for member := 1; member <= 3; member++ {
+			entries = append(entries, map[string]any{
+				"summonerName": fmt.Sprintf("PRIVATE_PLAYER_%d_%d", group, member),
+				"team":         "ORDER",
+				"subteamId":    group,
+				"subteamName":  fmt.Sprintf("私密小队名称%d", group),
+			})
+		}
+	}
+	raw, err := json.Marshal(entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, shape, err := parseLiveClientPlayerList(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := &app{storage: &localStore{root: root}}
+	a.recordLiveClientPlayerListShape(123456, 0, liveClientPlayerListShape{}, "unavailable", 1, "InProgress")
+	a.recordLiveClientPlayerListShape(123456, 0, liveClientPlayerListShape{}, "unavailable", 2, "InProgress")
+	a.recordLiveClientPlayerListShape(123456, http.StatusOK, shape, "grouped", 3, "Reconnect")
+	a.recordLiveClientPlayerListShape(123456, http.StatusOK, shape, "grouped", 4, "Reconnect")
+	diagnostics, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(diagnostics)
+	if strings.Count(text, `"event":"live_client_playerlist_shape"`) != 2 || strings.Count(text, `"result":"unavailable"`) != 1 || strings.Count(text, `"result":"grouped"`) != 1 || !strings.Contains(text, `"attempt":1`) || !strings.Contains(text, `"phase":"InProgress"`) || !strings.Contains(text, `"attempt":3`) || !strings.Contains(text, `"phase":"Reconnect"`) || !strings.Contains(text, `"http_status":200`) || !strings.Contains(text, `"player_count":18`) || !strings.Contains(text, `"element_keys"`) || !strings.Contains(text, `"team_values"`) || !strings.Contains(text, `"subteam_field_values"`) {
+		t.Fatalf("playerlist shape diagnostic = %s", diagnostics)
+	}
+	if strings.Contains(text, "PRIVATE_PLAYER") || strings.Contains(text, "私密小队名称") {
+		t.Fatalf("playerlist diagnostic leaked player-visible text: %s", diagnostics)
 	}
 }
 
@@ -2787,6 +3925,7 @@ func TestGameplayRecommendationsAdaptCompleteOPGGData(t *testing.T) {
 			StarterItems: []championMetricRow{{Assets: []championAsset{{ID: 1054}, {ID: 2003}}}},
 			Boots:        []championMetricRow{{Assets: []championAsset{{ID: 3047}}}},
 			CoreItems:    []championMetricRow{{Assets: []championAsset{{ID: 6630}, {ID: 3071}, {ID: 3053}}, PickRate: 22.1, WinRate: 53.4, Games: 500}},
+			FourthItems:  []championMetricRow{{Assets: []championAsset{{ID: 3089}}, WinRate: 61.58, GamesUnavailable: true}},
 		},
 	}
 	result := gameplayRecommendationsFromChampionDetail(164, "top", detail)
@@ -2802,6 +3941,12 @@ func TestGameplayRecommendationsAdaptCompleteOPGGData(t *testing.T) {
 	if got := result.Build.CoreOptions[0].Stats.PickRate; got == nil || *got != 22.1 {
 		t.Fatalf("core distribution stats = %#v", result.Build.CoreOptions[0].Stats)
 	}
+	if !result.HasItemDepths {
+		t.Fatal("ranked recommendations lost the item-depth capability")
+	}
+	if len(result.Build.FourthOptions) != 1 || !result.Build.FourthOptions[0].GamesUnavailable {
+		t.Fatalf("unavailable depth sample flag was lost: %#v", result.Build.FourthOptions)
+	}
 	if len(result.ItemRanking) != 1 || result.ItemRanking[0].Assets[0].ID != 126697 || result.ItemRanking[0].WinRate != 55.4 || result.ItemRanking[0].Games != 321 || result.ItemRanking[0].Score != 88.6 {
 		t.Fatalf("item ranking was not passed through: %#v", result.ItemRanking)
 	}
@@ -2810,6 +3955,18 @@ func TestGameplayRecommendationsAdaptCompleteOPGGData(t *testing.T) {
 	}
 	if position, err := normalizeOPGGPosition(""); err != nil || position != "" {
 		t.Fatalf("empty position should stay unresolved: %q, %v", position, err)
+	}
+	if tier, err := gameplayRecommendationTier(opggModeSpecs["ranked"], ""); err != nil || tier != championCounterFallbackTier {
+		t.Fatalf("empty ranked tier = %q, %v", tier, err)
+	}
+	if tier, err := gameplayRecommendationTier(opggModeSpecs["ranked"], "diamond"); err != nil || tier != "diamond" {
+		t.Fatalf("ranked tier = %q, %v", tier, err)
+	}
+	if _, err := gameplayRecommendationTier(opggModeSpecs["ranked"], "not-a-tier"); err == nil {
+		t.Fatal("invalid ranked tier was accepted")
+	}
+	if tier, err := gameplayRecommendationTier(opggModeSpecs["arena"], "not-a-tier"); err != nil || tier != "" {
+		t.Fatalf("non-tier mode validated a tier: %q, %v", tier, err)
 	}
 	if position, source, err := resolveGameplayRecommendationPosition("jungle", []championPositionOption{{Position: "jungle", RoleRate: 87}}); err != nil || position != "jungle" || source != "requested" {
 		t.Fatalf("requested position resolution = %q/%q, %v", position, source, err)
@@ -2839,6 +3996,9 @@ func TestGameplayRecommendationsAdaptCompleteOPGGData(t *testing.T) {
 	arena := gameplayRecommendationsFromChampionDetail(164, "mid", arenaDetail)
 	if arena.Source != "arena" || len(arena.Augments) != 1 || arena.Hero.Tier == nil || *arena.Hero.Tier != 0 || arena.Hero.WinRate != 53.4 || len(arena.Runes.OPGG) != 0 || len(arena.Build.CoreOptions) != 1 || len(arena.Build.PrismOptions) != 1 {
 		t.Fatalf("arena recommendation = %#v", arena)
+	}
+	if arena.HasItemDepths {
+		t.Fatal("arena recommendations must not advertise item depths")
 	}
 	core, prism := arena.Build.CoreOptions[0], arena.Build.PrismOptions[0]
 	if core.Grade != "A" || prism.Grade != "B" || core.Stats.AveragePlacement == nil || *core.Stats.AveragePlacement != 2.88 || core.Stats.FirstPlaceRate == nil || *core.Stats.FirstPlaceRate != 25.1 {
@@ -3034,7 +4194,7 @@ func TestGameplayRecommendationsHandlerKeepsGameIDDiagnosticOnlyAndReturnsUseful
 		t.Fatal(err)
 	}
 	logText := string(data)
-	if !strings.Contains(logText, `"event":"recommendation_mode_resolved"`) || !strings.Contains(logText, `"event":"live_recommendations_rejected","stage":"gameId","status":400`) {
+	if !strings.Contains(logText, `"event":"recommendation_mode_resolved"`) || !strings.Contains(logText, `"event":"live_recommendations_rejected"`) || !strings.Contains(logText, `"stage":"gameId"`) || !strings.Contains(logText, `"status":400`) {
 		t.Fatalf("game ID diagnostics = %s", data)
 	}
 }
@@ -3046,24 +4206,28 @@ func TestGameplayRecommendationModeResolutionMatrix(t *testing.T) {
 		gameMode, wantMode string
 		wantFallback       bool
 		wantTopPlayers     bool
+		wantItemDepths     bool
 	}{
-		{"solo queue wins over payload", 420, 30, "CHERRY", "ranked", false, true},
-		{"flex queue", 440, 11, "CLASSIC", "ranked", false, true},
-		{"classic by shape before queue resolves", 0, 11, "CLASSIC", "ranked", false, true},
-		{"custom classic queue", -1, 11, "CLASSIC", "ranked", false, true},
-		{"custom queue 3100", 3100, 11, "CLASSIC", "ranked", false, true},
-		{"aram queue has no top players", 450, 12, "ARAM", "aram", false, false},
-		{"arena queue has no top players", 1700, 30, "CHERRY", "arena", false, false},
-		{"hextech queue", 2300, 12, "KIWI", "hextech-aram", false, false},
-		{"queue 2400 is ordinary hextech", 2400, 12, "KIWI", "hextech-aram", false, false},
-		{"queue 3270 is ordinary hextech", 3270, 12, "KIWI", "hextech-aram", false, false},
-		{"classic semantics win over queue 2400", 2400, 12, "ARAM_MAYHEM_CLASSIC", "aram", true, false},
-		{"classic semantics on a new queue", 2600, 12, "ARAM_MAYHEM_CLASSIC", "aram", true, false},
-		{"arena by shape", 0, 30, "CHERRY", "arena", false, false},
-		{"aram by shape", 0, 12, "ARAM", "aram", false, false},
-		{"urf by shape", 0, 11, "ARURF", "urf", false, false},
-		{"nexus by shape", 0, 21, "NEXUSBLITZ", "nexus-blitz", false, false},
-		{"unknown fallback", 9999, 99, "UNKNOWN", "unsupported", true, false},
+		{"solo queue wins over payload", 420, 30, "CHERRY", "ranked", false, true, true},
+		{"flex queue", 440, 11, "CLASSIC", "ranked", false, true, true},
+		{"normal queue", 400, 11, "CLASSIC", "ranked", false, true, true},
+		{"classic by shape before queue resolves", 0, 11, "CLASSIC", "ranked", false, true, true},
+		{"custom classic queue", -1, 11, "CLASSIC", "ranked", false, true, true},
+		{"custom queue 3100", 3100, 11, "CLASSIC", "ranked", false, true, true},
+		{"aram queue has no top players", 450, 12, "ARAM", "aram", false, false, false},
+		{"Tencent ARAM variant", 3220, 12, "ARAM", "aram", false, false, false},
+		{"arena queue has no top players", 1700, 30, "CHERRY", "arena", false, false, false},
+		{"hextech queue", 2300, 12, "KIWI", "hextech-aram", false, false, false},
+		{"queue 2400 is ordinary hextech", 2400, 12, "KIWI", "hextech-aram", false, false, false},
+		{"queue 3270 is ordinary hextech", 3270, 12, "KIWI", "hextech-aram", false, false, false},
+		{"classic semantics win over queue 2400", 2400, 12, "ARAM_MAYHEM_CLASSIC", "aram", true, false, false},
+		{"classic semantics on a new queue", 2600, 12, "ARAM_MAYHEM_CLASSIC", "aram", true, false, false},
+		{"arena by shape", 0, 30, "CHERRY", "arena", false, false, false},
+		{"aram by shape", 0, 12, "ARAM", "aram", false, false, false},
+		{"urf queue", 900, 11, "URF", "urf", false, false, false},
+		{"urf by shape", 0, 11, "ARURF", "urf", false, false, false},
+		{"nexus by shape", 0, 21, "NEXUSBLITZ", "nexus-blitz", false, false, false},
+		{"unknown fallback", 9999, 99, "UNKNOWN", "unsupported", true, false, false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -3074,7 +4238,390 @@ func TestGameplayRecommendationModeResolutionMatrix(t *testing.T) {
 			if hasTopPlayers := recommendationModeHasTopPlayers(got); hasTopPlayers != test.wantTopPlayers {
 				t.Fatalf("top-player capability = %v, want %v for %#v", hasTopPlayers, test.wantTopPlayers, got)
 			}
+			if hasItemDepths := opggModeSpecs[got.InternalMode].SupportsItemDepths; hasItemDepths != test.wantItemDepths {
+				t.Fatalf("item-depth capability = %v, want %v for %#v", hasItemDepths, test.wantItemDepths, got)
+			}
 		})
+	}
+}
+
+func TestR66LivePremadeAssignmentsUseSharedGameIDsAndUnionFind(t *testing.T) {
+	matches := func(ids ...int64) []gameplayMatch {
+		result := make([]gameplayMatch, 0, len(ids))
+		for _, id := range ids {
+			result = append(result, gameplayMatch{GameID: id})
+		}
+		return result
+	}
+	inputs := []livePremadeInput{
+		{TeamID: 100, TeamParticipantID: 7, Matches: matches(1, 2, 3, 4, 5)},
+		{TeamID: 100, TeamParticipantID: 7, Matches: matches(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)},
+		{TeamID: 100, TeamParticipantID: 8, Matches: matches(6, 7, 8, 9, 10)},
+		{TeamID: 100, TeamParticipantID: 99, Matches: matches(21)},
+		{TeamID: 100, TeamParticipantID: 99, Matches: matches(22)},
+	}
+	got := livePremadeAssignments(inputs, 5)
+	for index := 0; index < 3; index++ {
+		if got[index].Group != "1" || got[index].Size != 3 {
+			t.Fatalf("history-backed transitive group[%d] = %#v", index, got[index])
+		}
+	}
+	if !got[0].SessionSignal || !got[1].SessionSignal || got[2].SessionSignal {
+		t.Fatalf("session corroboration = %#v", got[:3])
+	}
+	if got[3].Group == "" || got[3].Group != got[4].Group || got[3].Source != "session" || got[4].Source != "session" {
+		t.Fatalf("teamParticipantId direct group = %#v", got[3:])
+	}
+}
+
+func TestR66LivePremadeAssignmentsFailClosedWhenHistoryCoverageIsLow(t *testing.T) {
+	shared := []gameplayMatch{{GameID: 1}, {GameID: 2}, {GameID: 3}, {GameID: 4}, {GameID: 5}}
+	got := livePremadeAssignments([]livePremadeInput{
+		{TeamID: 100, Matches: shared},
+		{TeamID: 100, Matches: shared},
+		{TeamID: 100}, {TeamID: 100}, {TeamID: 100}, {TeamID: 100},
+	}, 5)
+	for index, assignment := range got {
+		if assignment.Group != "" || assignment.Size != 0 {
+			t.Fatalf("low-coverage assignment[%d] = %#v", index, assignment)
+		}
+	}
+}
+
+func TestR68ArenaNeverAppliesSessionPremadeGroups(t *testing.T) {
+	shared := []gameplayMatch{{GameID: 1}, {GameID: 2}, {GameID: 3}, {GameID: 4}, {GameID: 5}}
+	players := make([]gameplayLivePlayer, 2)
+	inputs := []livePremadeInput{
+		{TeamID: 100, TeamParticipantID: 7, Matches: shared},
+		{TeamID: 100, TeamParticipantID: 7, Matches: shared},
+	}
+	applyLivePremadeAssignments(players, inputs, "InProgress", true)
+	for index, player := range players {
+		if player.PremadeGroup != "" || player.PremadeSize != 0 || player.PremadeSessionSignal {
+			t.Fatalf("CHERRY player %d received a session premade label: %#v", index, player)
+		}
+	}
+}
+
+func TestR69SessionPremadesSurviveEmptyHistoryCoverage(t *testing.T) {
+	inputs := make([]livePremadeInput, 10)
+	for index := range inputs {
+		inputs[index].TeamID = 100
+		inputs[index].TeamParticipantID = int64(index + 1)
+	}
+	inputs[5].TeamID, inputs[6].TeamID = 200, 200
+	inputs[5].TeamParticipantID, inputs[6].TeamParticipantID = 6, 6
+	inputs[7].TeamID, inputs[8].TeamID, inputs[9].TeamID = 200, 200, 200
+	inputs[7].TeamParticipantID, inputs[8].TeamParticipantID, inputs[9].TeamParticipantID = 7, 7, 8
+	got := livePremadeAssignments(inputs, livePremadeMinSharedGames)
+	for _, index := range []int{5, 6, 7, 8} {
+		if got[index].Size != 2 || got[index].Source != "session" {
+			t.Fatalf("session assignment[%d] = %#v", index, got[index])
+		}
+	}
+	if got[5].Group == got[7].Group || got[9].Group != "" {
+		t.Fatalf("independent session groups = %#v", got[5:])
+	}
+}
+
+func TestR69HistoryOnlyPremadeIsMarkedInferred(t *testing.T) {
+	shared := []gameplayMatch{{GameID: 1}, {GameID: 2}, {GameID: 3}, {GameID: 4}, {GameID: 5}, {GameID: 6}}
+	got := livePremadeAssignments([]livePremadeInput{
+		{TeamID: 100, Matches: shared}, {TeamID: 100, Matches: shared},
+		{TeamID: 100, Matches: []gameplayMatch{{GameID: 10}}},
+	}, livePremadeMinSharedGames)
+	if got[0].Size != 2 || got[1].Size != 2 || got[0].Source != "inferred" || got[1].Source != "inferred" {
+		t.Fatalf("inferred assignments = %#v", got)
+	}
+}
+
+func TestR69SessionPremadesNeverCrossTeams(t *testing.T) {
+	got := livePremadeAssignments([]livePremadeInput{
+		{TeamID: 100, TeamParticipantID: 9},
+		{TeamID: 200, TeamParticipantID: 9},
+	}, livePremadeMinSharedGames)
+	if got[0].Group != "" || got[1].Group != "" {
+		t.Fatalf("cross-team session signal formed a group: %#v", got)
+	}
+}
+
+func TestR69LiveHistoryStatesDistinguishUnavailableEmptyAndFailed(t *testing.T) {
+	if got := liveHistoryState(false, livePlayerMatchesResult{State: "ok"}); got != "unavailable" {
+		t.Fatalf("invalid player reference state = %q", got)
+	}
+	for _, test := range []struct {
+		name       string
+		status     int
+		body       string
+		want       string
+		wantCached bool
+	}{
+		{name: "empty", status: http.StatusOK, body: `{"games":{"gameCount":0,"games":[]}}`, want: "empty", wantCached: true},
+		{name: "failed", status: http.StatusInternalServerError, body: `{"message":"temporary"}`, want: "failed", wantCached: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(test.status)
+				_, _ = io.WriteString(w, test.body)
+			}))
+			defer server.Close()
+			client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+			a := &app{}
+			result := a.livePlayerMatches(context.Background(), client, gameplayReference{PlayerRef: "r69-history-ref-01"}, "r69-history-ref-01", false, nil)
+			if got := liveHistoryState(true, result); got != test.want {
+				t.Fatalf("history state = %q, want %q (%#v)", got, test.want, result)
+			}
+			a.livePlayerMatchesMu.Lock()
+			_, cached := a.livePlayerMatchCache["r69-history-ref-01\x00false"]
+			a.livePlayerMatchesMu.Unlock()
+			if cached != test.wantCached {
+				t.Fatalf("cached=%v, want %v", cached, test.wantCached)
+			}
+		})
+	}
+	t.Run("failed SGP fallback is not cached as empty", func(t *testing.T) {
+		playerRef := strings.Repeat("h", 48)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.Contains(r.URL.Path, "/match-history-query/") {
+				http.Error(w, "temporary", http.StatusTeapot)
+				return
+			}
+			_, _ = io.WriteString(w, `{"games":{"gameCount":0,"games":[]}}`)
+		}))
+		defer server.Close()
+		client := &LCUClient{
+			baseURL: server.URL, token: "test-token", http: server.Client(),
+			region: "TENCENT", rsoPlatform: "HN1", platformProbe: true,
+		}
+		provider := newSGPProvider()
+		provider.http = server.Client()
+		provider.serverBases["HN1"] = server.URL
+		provider.token, provider.tokenAt, provider.tokenClient = "entitlements", time.Now(), client
+		provider.sessionToken, provider.sessionAt, provider.sessionOwner = "league-session", time.Now(), client
+		a := &app{sgp: provider}
+		result := a.livePlayerMatches(context.Background(), client, gameplayReference{PlayerRef: playerRef, ServerID: "HN1"}, playerRef, false, nil)
+		if result.State != "failed" {
+			t.Fatalf("SGP fallback failure state = %q, want failed", result.State)
+		}
+		a.livePlayerMatchesMu.Lock()
+		_, cached := a.livePlayerMatchCache[playerRef+"\x00false"]
+		a.livePlayerMatchesMu.Unlock()
+		if cached {
+			t.Fatal("failed SGP fallback was cached")
+		}
+	})
+}
+
+func TestR69LivePositionSnapshotDiagnosticsExposeHitAndMiss(t *testing.T) {
+	a := &app{}
+	a.rememberLivePositionSnapshot(6901, []gameplayLivePlayer{
+		{gameplayPlayer: gameplayPlayer{PlayerRef: "player_1"}, Position: "top"},
+		{gameplayPlayer: gameplayPlayer{PlayerRef: "player_2"}, Position: "jungle"},
+	})
+	hitPlayers := []gameplayLivePlayer{{gameplayPlayer: gameplayPlayer{PlayerRef: "player_1"}}}
+	hit := a.applyLivePositionSnapshot(6901, hitPlayers)
+	if hit.GameID != 6901 || hit.Size != 2 || hit.AppliedCount != 1 || hitPlayers[0].Position != "top" {
+		t.Fatalf("snapshot hit = %#v players=%#v", hit, hitPlayers)
+	}
+	a.rememberLivePositionSnapshot(6901, []gameplayLivePlayer{
+		{gameplayPlayer: gameplayPlayer{PlayerRef: "player_1"}, Position: "top"},
+		{gameplayPlayer: gameplayPlayer{PlayerRef: "player_2"}, Position: "jungle"},
+	})
+	miss := a.applyLivePositionSnapshot(6902, []gameplayLivePlayer{{gameplayPlayer: gameplayPlayer{PlayerRef: "player_1"}}})
+	if miss.GameID != 6901 || miss.Size != 2 || miss.AppliedCount != 0 {
+		t.Fatalf("snapshot miss = %#v", miss)
+	}
+	diagnostic := livePositionShapeDiagnostic(gameplayLiveResponse{}, lcuGameflowSession{}, lcuChampSelectSession{}, Summoner{}, miss)
+	if diagnostic["snapshot_game_id"] != int64(6901) || diagnostic["snapshot_size"] != 2 || diagnostic["snapshot_applied_count"] != 0 {
+		t.Fatalf("snapshot diagnostic = %#v", diagnostic)
+	}
+}
+
+func TestR69GameflowShapeCountsOnlyNonzeroFields(t *testing.T) {
+	team := make([]map[string]any, 10)
+	for index := range team {
+		team[index] = map[string]any{"summonerName": "", "selectedPosition": ""}
+		if index < 5 {
+			team[index]["summonerName"] = fmt.Sprintf("private-%d", index)
+			team[index]["selectedPosition"] = "TOP"
+		}
+	}
+	raw, err := json.Marshal(map[string]any{"gameData": map[string]any{"teamOne": team[:5], "teamTwo": team[5:]}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := lcuGameflowSessionShapePayload(raw, "InProgress", "CLASSIC", 420)
+	teamOne, _ := payload["team_one_nonzero_counts"].(map[string]int)
+	teamTwo, _ := payload["team_two_nonzero_counts"].(map[string]int)
+	if teamOne["summonerName"] != 5 || teamOne["selectedPosition"] != 5 || teamTwo["summonerName"] != 0 || teamTwo["selectedPosition"] != 0 {
+		t.Fatalf("nonzero counts = teamOne:%#v teamTwo:%#v", teamOne, teamTwo)
+	}
+}
+
+func TestR69LiveClientPositionsUseEnrichedRiotIDs(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	positions := []string{"TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY", "TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"}
+	gameflowPlayers := make([]map[string]any, 10)
+	livePlayers := make([]map[string]any, 10)
+	renderNames := make(map[string]string, 10)
+	for index, position := range positions {
+		playerRef := fmt.Sprintf("r69-player-ref-%02d", index)
+		gameName := fmt.Sprintf("RiotOnly%02d", index)
+		renderNames[playerRef] = gameName
+		gameflowPlayers[index] = map[string]any{"puuid": playerRef, "summonerName": "", "championId": index + 1, "selectedPosition": "TOP"}
+		livePlayers[index] = map[string]any{"riotId": gameName + "#CN1", "position": position, "team": []string{"ORDER", "CHAOS"}[index/5]}
+	}
+	liveRaw, err := json.Marshal(livePlayers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		switch {
+		case request.URL.Path == "/lol-gameflow/v1/gameflow-phase":
+			_, _ = w.Write([]byte(`"InProgress"`))
+		case request.URL.Path == "/lol-gameflow/v1/session":
+			_ = json.NewEncoder(w).Encode(map[string]any{"gameData": map[string]any{"gameId": int64(6903), "queue": map[string]any{"id": 420, "mapId": 11, "gameMode": "CLASSIC"}, "teamOne": gameflowPlayers[:5], "teamTwo": gameflowPlayers[5:]}})
+		case strings.HasPrefix(request.URL.Path, "/lol-summoner/v2/summoners/puuid/"):
+			playerRef, _ := url.PathUnescape(strings.TrimPrefix(request.URL.Path, "/lol-summoner/v2/summoners/puuid/"))
+			_ = json.NewEncoder(w).Encode(Summoner{PUUID: playerRef, GameName: renderNames[playerRef], TagLine: "CN1"})
+		case strings.HasPrefix(request.URL.Path, "/lol-ranked/v1/ranked-stats/"):
+			_, _ = w.Write([]byte(`{"queues":[]}`))
+		case strings.HasPrefix(request.URL.Path, "/lol-match-history/v1/products/lol/"):
+			_, _ = w.Write([]byte(`{"games":{"gameCount":0,"games":[]}}`))
+		default:
+			http.NotFound(w, request)
+		}
+	}))
+	defer server.Close()
+	a := &app{
+		connected: true, lcu: &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}, storage: &localStore{root: root},
+		liveClientPlayerList: func(context.Context) ([]byte, int, error) { return liveRaw, http.StatusOK, nil },
+	}
+	recorder := httptest.NewRecorder()
+	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+	var response gameplayLiveResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	for index, player := range response.Players {
+		if player.Position != strings.ToLower(positions[index]) {
+			t.Fatalf("enriched position[%d] = %q, want %q", index, player.Position, strings.ToLower(positions[index]))
+		}
+	}
+	diagnostics, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(diagnostics)
+	if !strings.Contains(text, `"position_matched_count":10`) || !strings.Contains(text, `"riotId":10`) || !strings.Contains(text, `"summonerName":0`) {
+		t.Fatalf("enriched match diagnostics = %s", text)
+	}
+	for _, field := range []string{`"event":"live_load_cost"`, `"players":10`, `"concurrency":6`, `"ranks_ms":`, `"matches_ms":`, `"total_ms":`} {
+		if !strings.Contains(text, field) {
+			t.Fatalf("live load cost diagnostic missing %s: %s", field, text)
+		}
+	}
+	for _, name := range renderNames {
+		if strings.Contains(text, name) {
+			t.Fatalf("diagnostic leaked Riot ID %q: %s", name, text)
+		}
+	}
+}
+
+func TestR69MeasureLiveRosterConcurrency(t *testing.T) {
+	players := make([]map[string]any, 10)
+	for index := range players {
+		players[index] = map[string]any{"puuid": fmt.Sprintf("r69-cost-player-%02d", index), "summonerName": "", "championId": 0}
+	}
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		switch {
+		case request.URL.Path == "/lol-gameflow/v1/gameflow-phase":
+			_, _ = w.Write([]byte(`"InProgress"`))
+		case request.URL.Path == "/lol-gameflow/v1/session":
+			_ = json.NewEncoder(w).Encode(map[string]any{"gameData": map[string]any{"gameId": int64(6904), "queue": map[string]any{"id": 420, "mapId": 11, "gameMode": "CLASSIC"}, "teamOne": players[:5], "teamTwo": players[5:]}})
+		case strings.HasPrefix(request.URL.Path, "/lol-summoner/v2/summoners/puuid/"):
+			requests.Add(1)
+			time.Sleep(40 * time.Millisecond)
+			playerRef, _ := url.PathUnescape(strings.TrimPrefix(request.URL.Path, "/lol-summoner/v2/summoners/puuid/"))
+			_ = json.NewEncoder(w).Encode(Summoner{PUUID: playerRef, GameName: "Cost", TagLine: "CN1"})
+		case strings.HasPrefix(request.URL.Path, "/lol-ranked/v1/ranked-stats/"):
+			requests.Add(1)
+			time.Sleep(40 * time.Millisecond)
+			_, _ = w.Write([]byte(`{"queues":[]}`))
+		case strings.HasPrefix(request.URL.Path, "/lol-match-history/v1/products/lol/"):
+			requests.Add(1)
+			time.Sleep(40 * time.Millisecond)
+			_, _ = w.Write([]byte(`{"games":{"gameCount":0,"games":[]}}`))
+		default:
+			http.NotFound(w, request)
+		}
+	}))
+	defer server.Close()
+	for _, concurrency := range []int{4, 6, 8} {
+		a := &app{
+			connected: true,
+			lcu:       &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()},
+			liveClientPlayerList: func(context.Context) ([]byte, int, error) {
+				return nil, 0, errors.New("measurement fixture has no Live Client Data")
+			},
+			liveRosterConcurrencyOverride: concurrency,
+		}
+		requests.Store(0)
+		started := time.Now()
+		recorder := httptest.NewRecorder()
+		a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+		coldDuration, coldRequests := time.Since(started), requests.Load()
+		requests.Store(0)
+		started = time.Now()
+		recorder = httptest.NewRecorder()
+		a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
+		warmDuration, warmRequests := time.Since(started), requests.Load()
+		if recorder.Code != http.StatusOK || coldRequests != 30 || warmRequests != 10 {
+			t.Fatalf("concurrency=%d status=%d cold_requests=%d warm_requests=%d", concurrency, recorder.Code, coldRequests, warmRequests)
+		}
+		t.Logf("live concurrency=%d cold_ms=%d cold_lcu_requests=%d cold_req_per_s=%.1f warm_ms=%d warm_lcu_requests=%d warm_req_per_s=%.1f", concurrency, coldDuration.Milliseconds(), coldRequests, float64(coldRequests)/coldDuration.Seconds(), warmDuration.Milliseconds(), warmRequests, float64(warmRequests)/warmDuration.Seconds())
+	}
+}
+
+func TestR66LivePlayerMatchesCachePreventsRepeatedLCUReads(t *testing.T) {
+	var requests atomic.Int32
+	var history lcuMatchHistory
+	history.Games.Games = []lcuGame{{GameID: 701, QueueID: 420, GameMode: "CLASSIC"}}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/lol-match-history/v1/products/lol/cache-player/matches" {
+			http.NotFound(w, request)
+			return
+		}
+		requests.Add(1)
+		_ = json.NewEncoder(w).Encode(history)
+	}))
+	t.Cleanup(server.Close)
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	a := &app{}
+	reference := gameplayReference{PlayerRef: "cache-player"}
+	first := a.livePlayerMatches(context.Background(), client, reference, "cache-player", false, nil)
+	second := a.livePlayerMatches(context.Background(), client, reference, "cache-player", false, nil)
+	if len(first.Matches) != 1 || len(second.Matches) != 1 || requests.Load() != 1 {
+		t.Fatalf("cache calls=%d first=%#v second=%#v", requests.Load(), first, second)
+	}
+	first.Matches[0].GameID = 999
+	if second.Matches[0].GameID != 701 {
+		t.Fatalf("cache returned the shared slice: %#v", second)
+	}
+
+	key := "cache-player\x00false"
+	a.livePlayerMatchesMu.Lock()
+	stale := a.livePlayerMatchCache[key]
+	stale.FetchedAt = time.Now().Add(-livePlayerMatchesCacheTTL - time.Second)
+	a.livePlayerMatchCache[key] = stale
+	a.livePlayerMatchesMu.Unlock()
+	a.livePlayerMatches(context.Background(), client, reference, "cache-player", false, nil)
+	if requests.Load() != 2 {
+		t.Fatalf("expired cache did not reload: calls=%d", requests.Load())
 	}
 }
 
@@ -3177,8 +4724,25 @@ func TestRecommendationRequestDiagnosticRecordsInvalidArrival(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), `"event":"live_recommendations_request"`) || !strings.Contains(string(data), `"queue_id":1750`) || !strings.Contains(string(data), `"raw_position":"TOP"`) {
-		t.Fatalf("request diagnostic = %s", data)
+	events := map[string]map[string]any{}
+	for _, line := range bytes.Split(bytes.TrimSpace(data), []byte("\n")) {
+		var event map[string]any
+		if err := json.Unmarshal(line, &event); err != nil {
+			t.Fatalf("decode diagnostic %q: %v", line, err)
+		}
+		if name, _ := event["event"].(string); name != "" {
+			events[name] = event
+		}
+	}
+	requestEvent := events["live_recommendations_request"]
+	responseEvent := events["live_recommendations_response"]
+	requestTrace, _ := requestEvent["trace_id"].(string)
+	responseTrace, _ := responseEvent["trace_id"].(string)
+	if requestTrace == "" || responseTrace != requestTrace || requestEvent["queue_id"] != float64(1750) || requestEvent["raw_position"] != "TOP" {
+		t.Fatalf("request/response trace mismatch: request=%#v response=%#v", requestEvent, responseEvent)
+	}
+	if responseEvent["diagnostic_schema"] != float64(2) || responseEvent["status"] != "failed" || responseEvent["stage"] != "champion-validation" || responseEvent["requested_position"] != "top" || responseEvent["queue_id"] != float64(1750) {
+		t.Fatalf("failed response diagnostic = %#v", responseEvent)
 	}
 }
 
@@ -3235,41 +4799,47 @@ func TestDiagnosticRotationCallbackRunsOutsideGeneralStorageMutex(t *testing.T) 
 	}
 }
 
-func TestNoisyDiagnosticPayloadsDeduplicateAndCount(t *testing.T) {
+func TestRankedWinrateDiagnosticsAggregateByMinuteAndSource(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	store := &localStore{root: root}
 	a := &app{storage: store}
-	payload := map[string]any{"event": "ranked_winrate_resolved", "source": "lcu", "queue": "RANKED_SOLO_5x5", "wins": 0, "losses": 0}
-	for range 100 {
-		a.recordDiagnostic(payload)
+	for index := 0; index < 1000; index++ {
+		a.recordDiagnostic(map[string]any{
+			"event": "ranked_winrate_resolved", "source": "lcu", "complete": index%2 == 0,
+			"suppressed": index%2 != 0, "player_ref_hash": fmt.Sprintf("player-%d", index),
+		})
 	}
-	a.recordDiagnostic(map[string]any{"event": "ranked_winrate_resolved", "source": "lcu", "queue": "RANKED_FLEX_SR", "wins": 0, "losses": 0})
+	a.flushRankedWinrateDiagnostics()
 	data, err := store.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(string(data), `"event":"ranked_winrate_resolved"`) != 2 || !strings.Contains(string(data), `"event":"diagnostic_dedup"`) || !strings.Contains(string(data), `"repeat_count":100`) {
-		t.Fatalf("noisy diagnostic deduplication = %s", data)
+	if strings.Count(string(data), `"event":"ranked_winrate_resolved"`) != 1 || !strings.Contains(string(data), `"count":1000`) || !strings.Contains(string(data), `"complete_count":500`) || !strings.Contains(string(data), `"suppressed_count":500`) || strings.Contains(string(data), "player_ref_hash") {
+		t.Fatalf("ranked win-rate aggregation = %s", data)
 	}
 }
 
-func TestNoisyDiagnosticDeduplicationMapIsBounded(t *testing.T) {
+func TestRankedWinrateDiagnosticAggregationKeepsSourceDimensionBounded(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	a := &app{storage: &localStore{root: root}}
 	for index := 0; index < diagnosticDeduplicationLimit+73; index++ {
-		a.recordDiagnostic(map[string]any{"event": "ranked_winrate_resolved", "player_index": index})
+		source := "lcu"
+		if index%2 == 0 {
+			source = "sgp"
+		}
+		a.recordDiagnostic(map[string]any{"event": "ranked_winrate_resolved", "source": source})
 	}
-	a.diagnosticDedupMu.Lock()
-	size := len(a.diagnosticDedupCounts)
-	a.diagnosticDedupMu.Unlock()
-	if size == 0 || size > diagnosticDeduplicationLimit {
-		t.Fatalf("diagnostic deduplication size = %d, want 1..%d", size, diagnosticDeduplicationLimit)
+	a.rankedWinrateDiagnosticMu.Lock()
+	size := len(a.rankedWinrateDiagnosticBuckets)
+	a.rankedWinrateDiagnosticMu.Unlock()
+	if size != 2 {
+		t.Fatalf("ranked win-rate aggregation sources = %d, want 2", size)
 	}
 }
 
@@ -3284,6 +4854,7 @@ func TestDiagnosticEventShareStaysBelowThirtyPercent(t *testing.T) {
 	for range 100 {
 		a.recordDiagnostic(noisy)
 	}
+	a.flushRankedWinrateDiagnostics()
 	for index := 0; index < 10; index++ {
 		a.recordDiagnostic(map[string]any{"event": fmt.Sprintf("diagnostic_share_probe_%d", index)})
 	}
@@ -3317,7 +4888,7 @@ func TestDiagnosticEventShareStaysBelowThirtyPercent(t *testing.T) {
 	}
 }
 
-func TestDiagnosticEventShareReportsDistinctPayloadOverThirtyPercent(t *testing.T) {
+func TestDiagnosticEventShareAggregatesDistinctRankedPayloadsBelowThirtyPercent(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
@@ -3334,6 +4905,7 @@ func TestDiagnosticEventShareReportsDistinctPayloadOverThirtyPercent(t *testing.
 	for index := 0; index < 10; index++ {
 		a.recordDiagnostic(map[string]any{"event": fmt.Sprintf("diagnostic_distinct_share_probe_%d", index)})
 	}
+	a.flushRankedWinrateDiagnostics()
 	data, err := store.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)
@@ -3354,16 +4926,13 @@ func TestDiagnosticEventShareReportsDistinctPayloadOverThirtyPercent(t *testing.
 		counts[record.Event]++
 		total++
 	}
-	if total != 210 || counts["ranked_winrate_resolved"] != 200 {
+	if total != 11 || counts["ranked_winrate_resolved"] != 1 {
 		t.Fatalf("distinct-payload diagnostic counts = %#v total=%d", counts, total)
 	}
 	overLimit := counts["ranked_winrate_resolved"]*100 > total*30
-	if !overLimit {
-		t.Fatalf("distinct-payload diagnostic share unexpectedly stayed under 30%%: %d/%d", counts["ranked_winrate_resolved"], total)
+	if overLimit {
+		t.Fatalf("aggregated ranked diagnostic share exceeded 30%%: %d/%d", counts["ranked_winrate_resolved"], total)
 	}
-	// This is an intentional green observation test: until event-level rate
-	// limiting exists, make the over-limit condition explicit in test output.
-	t.Logf("ALERT: distinct ranked_winrate_resolved payloads occupy %d/%d records (%.1f%%); exact-payload deduplication does not cap event share", counts["ranked_winrate_resolved"], total, float64(counts["ranked_winrate_resolved"])*100/float64(total))
 }
 
 func TestNoisyDiagnosticDeduplicationResetsAfterLogRotation(t *testing.T) {
@@ -3419,12 +4988,50 @@ func TestLiveRosterShapeDiagnosticDeduplicatesByFingerprint(t *testing.T) {
 	changed.Players = append([]gameplayLivePlayer(nil), response.Players...)
 	changed.Players[3].ChampionID = 103
 	a.recordLiveRosterShape(changed)
+	progress := changed
+	progress.Players = append([]gameplayLivePlayer(nil), changed.Players...)
+	progress.Players[2].Rank = &gameplayRank{Tier: "silver"}
+	a.recordLiveRosterShape(progress)
+	complete := progress
+	complete.Players = append([]gameplayLivePlayer(nil), progress.Players...)
+	complete.Players[3].Rank = &gameplayRank{Tier: "bronze"}
+	a.recordLiveRosterShape(complete)
 	data, err := store.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(string(data), `"event":"live_roster_shape"`) != 2 || !strings.Contains(string(data), `"players":4`) || !strings.Contains(string(data), `"raw_count":4`) || !strings.Contains(string(data), `"with_stats":2`) || !strings.Contains(string(data), `"duplicate_player_refs":1`) || !strings.Contains(string(data), `"empty_ref_count":1`) || !strings.Contains(string(data), `"merge_appended":1`) {
+	if strings.Count(string(data), `"event":"live_roster_shape"`) != 4 || !strings.Contains(string(data), `"players":4`) || !strings.Contains(string(data), `"raw_count":4`) || !strings.Contains(string(data), `"with_stats":2`) || !strings.Contains(string(data), `"with_stats":3`) || !strings.Contains(string(data), `"with_stats":4`) || !strings.Contains(string(data), `"duplicate_player_refs":1`) || !strings.Contains(string(data), `"empty_ref_count":1`) || !strings.Contains(string(data), `"merge_appended":1`) {
 		t.Fatalf("roster diagnostic = %s", data)
+	}
+}
+
+func TestR68LiveRosterShapeRecordsStatsProgressFiveSevenTen(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a := &app{storage: &localStore{root: root}}
+	base := gameplayLiveResponse{Phase: "InProgress", GameID: 6810, Players: make([]gameplayLivePlayer, 10)}
+	for index := range base.Players {
+		base.Players[index].TeamID = []int64{100, 200}[index/5]
+		base.Players[index].ChampionID = int64(index + 1)
+		base.Players[index].gameplayPlayer.PlayerRef = fmt.Sprintf("player_%02d", index)
+	}
+	for _, withStats := range []int{5, 7, 10} {
+		frame := base
+		frame.Players = append([]gameplayLivePlayer(nil), base.Players...)
+		for index := 0; index < withStats; index++ {
+			frame.Players[index].Rank = &gameplayRank{Tier: "gold"}
+		}
+		a.recordLiveRosterShape(frame)
+	}
+	data, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if strings.Count(text, `"event":"live_roster_shape"`) != 3 || !strings.Contains(text, `"with_stats":5`) || !strings.Contains(text, `"with_stats":7`) || !strings.Contains(text, `"with_stats":10`) {
+		t.Fatalf("stats progress diagnostic = %s", text)
 	}
 }
 
@@ -3651,7 +5258,7 @@ func TestRecentRankedRecordDoesNotOverwriteSeasonRank(t *testing.T) {
 	}
 }
 
-func TestItemSetApplyPreservesUserSetsAndVerifiesIdempotently(t *testing.T) {
+func TestItemSetApplyPreservesUserSetsAndStoresIdempotently(t *testing.T) {
 	playerRef := strings.Repeat("p", 48)
 	document := lcuItemSetDocument{
 		"accountId":   json.RawMessage(`456`),
@@ -3689,8 +5296,10 @@ func TestItemSetApplyPreservesUserSetsAndVerifiesIdempotently(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 123, AccountID: 456, PUUID: playerRef}, storage: &localStore{root: root}}
-	body := `{"title":"李青 · 打野","championId":64,"mapId":11,"position":"jungle","selfPosition":"middle","blocks":[{"type":"出门装","items":[{"id":1055,"count":1}]},{"type":"出装路线","items":[{"id":6630,"count":1},{"id":3071,"count":1}]}]}`
+	provider := newChampionProvider()
+	provider.itemPurchasable[9999] = false
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 123, AccountID: 456, PUUID: playerRef}, storage: &localStore{root: root}, champions: provider}
+	body := `{"title":"李青 · 打野","championId":64,"mapId":11,"position":"jungle","selfPosition":"middle","blocks":[{"type":"出门装","items":[{"id":1055,"count":1}]},{"type":"出装路线","items":[{"id":6630,"count":1},{"id":3071,"count":1},{"id":9999,"count":1}]}]}`
 	for attempt := 0; attempt < 2; attempt++ {
 		recorder := httptest.NewRecorder()
 		a.handleGameplayItemSetApply(recorder, httptest.NewRequest(http.MethodPost, "/api/gameplay/item-sets/apply", strings.NewReader(body)))
@@ -3698,11 +5307,14 @@ func TestItemSetApplyPreservesUserSetsAndVerifiesIdempotently(t *testing.T) {
 			t.Fatalf("attempt %d status = %d: %s", attempt, recorder.Code, recorder.Body.String())
 		}
 		var response struct {
-			Applied  bool `json:"applied"`
-			Verified bool `json:"verified"`
+			Applied bool `json:"applied"`
+			Stored  bool `json:"stored"`
 		}
-		if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || !response.Applied || !response.Verified {
+		if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || !response.Applied || !response.Stored {
 			t.Fatalf("attempt %d response = %#v, %v", attempt, response, err)
+		}
+		if strings.Contains(recorder.Body.String(), `"verified"`) {
+			t.Fatalf("attempt %d response overstates round-trip semantics: %s", attempt, recorder.Body.String())
 		}
 	}
 	if putCount != 2 {
@@ -3720,7 +5332,7 @@ func TestItemSetApplyPreservesUserSetsAndVerifiesIdempotently(t *testing.T) {
 		t.Fatalf("user set was not preserved: %#v, %v", userSet, err)
 	}
 	created, found, err := findLCUItemSet(document, itemSetUID(64, "jungle"))
-	if err != nil || !found || created.Title != "DL · 李青 · 打野" || created.StartedFrom != "DL" || len(created.Blocks) != 2 || len(created.AssociatedChampions) != 1 || created.AssociatedChampions[0] != 64 {
+	if err != nil || !found || created.Title != "DL · 打野" || created.StartedFrom != "DL" || created.SortRank != 100 || len(created.Blocks) != 2 || len(created.AssociatedChampions) != 1 || created.AssociatedChampions[0] != 64 {
 		t.Fatalf("created item set = %#v, %v, %v", created, found, err)
 	}
 	if got := []string{created.Blocks[1].Items[0].ID, created.Blocks[1].Items[1].ID}; !reflect.DeepEqual(got, []string{"3071", "6630"}) {
@@ -3735,8 +5347,289 @@ func TestItemSetApplyPreservesUserSetsAndVerifiesIdempotently(t *testing.T) {
 	if err := json.Unmarshal(lines[len(lines)-1], &diagnostic); err != nil {
 		t.Fatal(err)
 	}
-	if diagnostic["event"] != "item_set_apply" || diagnostic["verified"] != true || diagnostic["position"] != "jungle" || diagnostic["self_position"] != "middle" || diagnostic["block_count"] != float64(2) || diagnostic["item_count"] != float64(3) {
+	if diagnostic["event"] != "item_set_apply" || diagnostic["stored"] != true || diagnostic["position"] != "jungle" || diagnostic["self_position"] != "middle" || diagnostic["block_count"] != float64(2) || diagnostic["item_count"] != float64(4) || diagnostic["normalized_count"] != float64(0) || diagnostic["unpurchasable_count"] != float64(1) {
 		t.Fatalf("item-set diagnostic = %#v", diagnostic)
+	}
+	if diagnostic["requested_item_count"] != float64(4) || diagnostic["removed_stale_count"] != float64(0) {
+		t.Fatalf("item-set count diagnostics = %#v", diagnostic)
+	}
+	blocks, ok := diagnostic["blocks"].([]any)
+	if !ok || len(blocks) != 2 || blocks[0].(map[string]any)["count"] != float64(1) || blocks[1].(map[string]any)["count"] != float64(3) {
+		t.Fatalf("written block diagnostics = %#v", diagnostic["blocks"])
+	}
+	if _, exists := diagnostic["verified"]; exists {
+		t.Fatalf("item-set diagnostic still exposes verified: %#v", diagnostic)
+	}
+	if !bytes.Contains(data, []byte(`"event":"item_set_unmapped_item"`)) || !bytes.Contains(data, []byte(`"id":9999`)) {
+		t.Fatalf("unmapped item diagnostic missing: %s", data)
+	}
+}
+
+func TestNewLCUItemSetNormalizesExplicitUnpurchasableIDsAndDeduplicates(t *testing.T) {
+	request := gameplayItemSetApplyRequest{
+		Title: "测试", ChampionID: 13, MapID: 11, Position: "middle",
+		Blocks: []gameplayItemSetBlockRequest{{Type: "核心装", Items: []gameplayItemSetItemRequest{
+			{ID: 3040, Count: 1}, {ID: 3003, Count: 1}, {ID: 3042, Count: 1}, {ID: 3157, Count: 1}, {ID: 9999, Count: 1},
+		}}},
+	}
+	itemSet, normalization := newLCUItemSet(request, map[int64]bool{3040: false, 3042: false, 3157: true, 9999: false})
+	if len(itemSet.Blocks) != 1 {
+		t.Fatalf("normalized blocks = %#v", itemSet.Blocks)
+	}
+	ids := make([]string, 0, len(itemSet.Blocks[0].Items))
+	for _, item := range itemSet.Blocks[0].Items {
+		ids = append(ids, item.ID)
+	}
+	if !reflect.DeepEqual(ids, []string{"3003", "3004", "3157", "9999"}) {
+		t.Fatalf("normalized item IDs = %#v", ids)
+	}
+	if normalization.NormalizedCount != 2 || normalization.UnpurchasableCount != 3 || !reflect.DeepEqual(normalization.UnmappedItemIDs, []int64{9999}) {
+		t.Fatalf("normalization diagnostics = %#v", normalization)
+	}
+}
+
+func TestItemSetNameUsesCompactPositionLabel(t *testing.T) {
+	for position, want := range map[string]string{"top": "DL · 上路", "jungle": "DL · 打野", "middle": "DL · 中路", "bottom": "DL · 下路", "utility": "DL · 辅助", "other": "DL · 通用", "unknown": "DL · 通用"} {
+		if got := itemSetName(position); got != want || !utf8.ValidString(got) {
+			t.Fatalf("item-set title for %q = %q, want %q", position, got, want)
+		}
+	}
+}
+
+func TestR58ItemSetUsesNonZeroSortRankAndRuneSafeTitleLimit(t *testing.T) {
+	request := gameplayItemSetApplyRequest{
+		Title: strings.Repeat("中", 80), ChampionID: 13, MapID: 11, Position: "middle",
+		Blocks: []gameplayItemSetBlockRequest{{Type: "核心装", Items: []gameplayItemSetItemRequest{{ID: 3003, Count: 1}}}},
+	}
+	itemSet, _ := newLCUItemSet(request, nil)
+	if itemSet.SortRank != 100 {
+		t.Fatalf("SortRank = %d, want 100", itemSet.SortRank)
+	}
+	if itemSet.Title != "DL · 中路" || !utf8.ValidString(itemSet.Title) {
+		t.Fatalf("item-set title must stay compact and ignore the request title: %q", itemSet.Title)
+	}
+}
+
+func TestItemSetApplyDecodeFailuresRecordStage(t *testing.T) {
+	cases := map[string]string{
+		"malformed":      `{`,
+		"unknown-field":  `{"future":true}`,
+		"trailing-value": `{}` + "\n{}",
+		"oversized":      `{"title":"` + strings.Repeat("x", 33*1024) + `"}`,
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			a := &app{storage: &localStore{root: root}}
+			recorder := httptest.NewRecorder()
+			a.handleGameplayItemSetApply(recorder, httptest.NewRequest(http.MethodPost, "/api/gameplay/item-sets/apply", strings.NewReader(body)))
+			if recorder.Code != http.StatusBadRequest || !strings.Contains(recorder.Body.String(), "装备方案无效") {
+				t.Fatalf("status/body = %d %q", recorder.Code, recorder.Body.String())
+			}
+			data, err := a.storage.readDiagnosticLog()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var event map[string]any
+			if err := json.Unmarshal(bytes.TrimSpace(data), &event); err != nil {
+				t.Fatalf("decode diagnostic: %v: %s", err, data)
+			}
+			traceID, _ := event["trace_id"].(string)
+			if event["event"] != "item_set_apply" || event["diagnostic_schema"] != float64(2) || traceID == "" || event["stored"] != false || event["apply_stage"] != "decode" || event["game_render_geometry"] != "unobservable" || event["game_loaded_recommendation"] != "unknown" {
+				t.Fatalf("decode failure diagnostic = %#v", event)
+			}
+		})
+	}
+}
+
+func TestItemSetNormalizationRecordsSortedReplacementAndDropOrder(t *testing.T) {
+	request := gameplayItemSetApplyRequest{
+		Title: "测试", ChampionID: 13, MapID: 11, Position: "middle",
+		Blocks: []gameplayItemSetBlockRequest{{Type: "核心装", Items: []gameplayItemSetItemRequest{
+			{ID: 3040, Count: 1}, {ID: 3003, Count: 1}, {ID: 6630, Count: 1}, {ID: 3071, Count: 1},
+		}}},
+	}
+	requested := diagnosticBlocksFromRequest(request.Blocks)
+	sortGameplayItemSetBlocksByPrice(request.Blocks, map[int64]int64{3040: 3000, 3003: 2600, 6630: 3300, 3071: 3100})
+	sorted := diagnosticBlocksFromRequest(request.Blocks)
+	itemSet, normalization := newLCUItemSet(request, nil)
+	normalization.RequestedBlocks = requested
+	normalization.SortedBlocks = sorted
+	normalization.RequestedOrderDigest = itemSetOrderDigest(requested)
+	normalization.SortedOrderDigest = itemSetOrderDigest(sorted)
+	if got := []string{itemSet.Blocks[0].Items[0].ID, itemSet.Blocks[0].Items[1].ID, itemSet.Blocks[0].Items[2].ID}; !reflect.DeepEqual(got, []string{"3003", "3071", "6630"}) {
+		t.Fatalf("written order = %v", got)
+	}
+	if normalization.RequestedOrderDigest == normalization.SortedOrderDigest || normalization.WrittenOrderDigest == "" {
+		t.Fatalf("missing order evidence: %+v", normalization)
+	}
+	if len(normalization.ItemMapping) != 4 {
+		t.Fatalf("mapping count = %d", len(normalization.ItemMapping))
+	}
+	var replacement, dropped *itemSetItemMapping
+	for index := range normalization.ItemMapping {
+		mapping := &normalization.ItemMapping[index]
+		if mapping.RequestedID == 3040 {
+			replacement = mapping
+		}
+		if mapping.Result == "duplicate-dropped" {
+			dropped = mapping
+		}
+	}
+	if replacement == nil || replacement.NormalizedID != 3003 || replacement.Result != "duplicate-dropped" || replacement.Reason != "replacement-duplicate" || replacement.WrittenIndex != -1 {
+		t.Fatalf("upgrade mapping = %+v; all=%+v", replacement, normalization.ItemMapping)
+	}
+	if dropped != replacement {
+		t.Fatalf("unexpected dropped mapping = %+v", dropped)
+	}
+}
+
+func TestItemSetNormalizationReportsWrittenCountsAfterUpgradeCollapse(t *testing.T) {
+	request := gameplayItemSetApplyRequest{
+		Title: "测试", ChampionID: 13, MapID: 11, Position: "middle",
+		Blocks: []gameplayItemSetBlockRequest{{Type: "核心装", Items: []gameplayItemSetItemRequest{
+			{ID: 3003, Count: 1}, {ID: 3040, Count: 1}, {ID: 3071, Count: 1}, {ID: 6630, Count: 1}, {ID: 3157, Count: 1},
+		}}},
+	}
+	itemSet, normalization := newLCUItemSet(request, nil)
+	stats, written := itemSetStats(itemSet)
+	if normalization.RequestedItemCount != 5 {
+		t.Fatalf("requested count = %d, want 5", normalization.RequestedItemCount)
+	}
+	if written != 4 || len(stats) != 1 || stats[0]["count"] != 4 {
+		t.Fatalf("written counts = %d/%#v, want 4/one block of 4", written, stats)
+	}
+	if !normalization.UpgradeReplacementCollapsed {
+		t.Fatal("upgrade replacement collapse was not reported")
+	}
+}
+
+func TestItemSetApplyHandlerReportsWrittenCountsAfterUpgradeCollapse(t *testing.T) {
+	playerRef := strings.Repeat("p", 48)
+	document := lcuItemSetDocument{
+		"accountId": json.RawMessage(`456`),
+		"itemSets":  json.RawMessage(`[]`),
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method + " " + r.URL.Path {
+		case "GET /lol-gameflow/v1/gameflow-phase":
+			_, _ = w.Write([]byte(`"ChampSelect"`))
+		case "GET /lol-champ-select/v1/session":
+			_, _ = w.Write([]byte(`{"myTeam":[{"summonerId":123,"puuid":"` + playerRef + `","championId":13}]}`))
+		case "GET /lol-game-data/assets/v1/items.json":
+			_, _ = w.Write([]byte(`[{"id":3003,"priceTotal":3000},{"id":3040,"priceTotal":3000},{"id":3071,"priceTotal":3000},{"id":6630,"priceTotal":3300},{"id":3157,"priceTotal":3250}]`))
+		case "GET /lol-item-sets/v1/item-sets/123/sets":
+			_ = json.NewEncoder(w).Encode(document)
+		case "PUT /lol-item-sets/v1/item-sets/123/sets":
+			if err := json.NewDecoder(r.Body).Decode(&document); err != nil {
+				t.Fatalf("decode item set PUT: %v", err)
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.Error(w, "unexpected endpoint", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	a := &app{
+		connected: true,
+		lcu:       client,
+		summoner:  Summoner{SummonerID: 123, AccountID: 456, PUUID: playerRef},
+		storage:   &localStore{root: root},
+	}
+	body := `{"title":"瑞兹 · 中路","championId":13,"mapId":11,"position":"middle","blocks":[{"type":"核心装","items":[{"id":3003,"count":1},{"id":3040,"count":1},{"id":3071,"count":1},{"id":6630,"count":1},{"id":3157,"count":1}]}]}`
+	recorder := httptest.NewRecorder()
+	a.handleGameplayItemSetApply(recorder, httptest.NewRequest(http.MethodPost, "/api/gameplay/item-sets/apply", strings.NewReader(body)))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var response struct {
+		Applied bool   `json:"applied"`
+		Stored  bool   `json:"stored"`
+		Notice  string `json:"notice"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || !response.Applied || !response.Stored || response.Notice == "" {
+		t.Fatalf("handler response = %#v, %v", response, err)
+	}
+
+	data, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := bytes.Split(bytes.TrimSpace(data), []byte("\n"))
+	var diagnostic map[string]any
+	if err := json.Unmarshal(lines[len(lines)-1], &diagnostic); err != nil {
+		t.Fatal(err)
+	}
+	if diagnostic["event"] != "item_set_apply" || diagnostic["stored"] != true || diagnostic["item_count"] != float64(4) || diagnostic["requested_item_count"] != float64(5) {
+		t.Fatalf("handler count diagnostic = %#v", diagnostic)
+	}
+	blocks, ok := diagnostic["blocks"].([]any)
+	if !ok || len(blocks) != 1 {
+		t.Fatalf("handler block diagnostics = %#v", diagnostic["blocks"])
+	}
+	block, ok := blocks[0].(map[string]any)
+	if !ok || block["type"] != "核心装" || block["count"] != float64(4) {
+		t.Fatalf("handler core block diagnostic = %#v", blocks[0])
+	}
+}
+
+func TestUpsertLCUItemSetRemovesOnlyStaleDeepLegendsSets(t *testing.T) {
+	item := func(uid, title, startedFrom string) map[string]any {
+		return map[string]any{"uid": uid, "title": title, "type": "custom", "startedFrom": startedFrom, "blocks": []any{}}
+	}
+	old := []any{
+		item("deep-legends-v1-64-top", "旧上路", "DL"),
+		item("user-alpha", "用户方案 A", ""),
+		item("legacy-r58-64-other", "DL · 瑞兹 · 位置未知", "DL"),
+		item("deep-legends-v1-64-middle", "旧中路", "DL"),
+		item("user-beta", "用户方案 B", "OTHER"),
+		item("deep-legends-v1-103-jungle", "旧打野", "DL"),
+	}
+	raw, err := json.Marshal(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	document := lcuItemSetDocument{"itemSets": raw}
+	target := lcuItemSet{UID: itemSetUID(64, "jungle"), Title: "DL · 新方案", Type: "custom", Map: "any", Mode: "any", StartedFrom: "DL", AssociatedChampions: []int64{64}, Blocks: []lcuItemSetBlock{}, PreferredItemSlots: []lcuPreferredItemSlot{}}
+	removed, err := upsertLCUItemSetWithCount(document, target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed != 4 {
+		t.Fatalf("removed stale count = %d, want 4", removed)
+	}
+	var sets []json.RawMessage
+	if err := json.Unmarshal(document["itemSets"], &sets); err != nil {
+		t.Fatal(err)
+	}
+	if len(sets) != 3 {
+		t.Fatalf("result set count = %d, want 3", len(sets))
+	}
+	var got []struct {
+		UID   string `json:"uid"`
+		Title string `json:"title"`
+	}
+	for _, encoded := range sets {
+		var value struct {
+			UID   string `json:"uid"`
+			Title string `json:"title"`
+		}
+		if err := json.Unmarshal(encoded, &value); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, value)
+	}
+	if got[0].UID != "user-alpha" || got[1].UID != "user-beta" || got[2].UID != target.UID || got[2].Title != target.Title {
+		t.Fatalf("set order/content = %#v", got)
 	}
 }
 
