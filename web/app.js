@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+  const escapeHTML = window.deepLegendsRuntime.escapeHTML;
+
   const STATUS_INTERVAL = 60 * 60 * 1000;
 	const LIVE_UPDATE_STATE_SLICES = Object.freeze({
 	  "refresh-started": ["status"],
@@ -2659,7 +2661,6 @@
     return `lol-loot-diagnostics-${stamp}.jsonl`;
   }
   function shortHash(value = "") { return value ? `${value.slice(0, 12)}…` : "—"; }
-  function escapeHTML(value) { const node = document.createElement("span"); node.textContent = String(value ?? ""); return node.innerHTML; }
   function safeHTTPURL(value) { try { const parsed = new URL(value); return parsed.protocol === "https:" || parsed.protocol === "http:"; } catch (_) { return false; } }
 
   function softResetShellState() {

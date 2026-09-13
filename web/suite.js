@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+  const escapeHTML = window.deepLegendsRuntime.escapeHTML;
+
   const panel = document.getElementById("suite-panel");
   if (!panel) return;
 
@@ -91,9 +93,6 @@
     try { return JSON.parse(localStorage.getItem(`lol-loot-${key}`) || "null") || fallback; } catch (_) { return fallback; }
   }
 
-  function escapeHTML(value) {
-    return String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
-  }
 
   function toast(message) {
     if (typeof window.deepLegendsToast === "function") window.deepLegendsToast(message);

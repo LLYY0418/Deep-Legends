@@ -52,7 +52,10 @@
     }
     clear() { for (const key of super.keys()) this.delete(key); }
   }
-  window.deepLegendsRuntime = Object.freeze({ createCache: (options) => new ResponseCache(options) });
+  const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[character]));
+  window.deepLegendsRuntime = Object.freeze({ createCache: (options) => new ResponseCache(options), escapeHTML });
   const flowSamples = new Map();
   const flowPending = new Set();
   const flowDelivery = { transportFailed: 0, transportDropped: 0, transportSuppressed: 0, transportHTTPStatus: 0, transportErrorKind: "none" };

@@ -108,3 +108,23 @@ test('R70 cache timer disposal runs once on eviction, not on same-object update'
  cache.set('b',{timer:2}); assert.deepEqual(disposed,[entry]);
  cache.clear(); cache.clear(); assert.equal(disposed.length,2);
 });
+
+test('shared escapeHTML is document-free and escapes all HTML delimiters', () => {
+ const context={window:{}};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'runtime.js'),'utf8'),context);
+ const escapeHTML=context.window.deepLegendsRuntime.escapeHTML;
+ assert.equal(escapeHTML(undefined),'');
+ assert.equal(escapeHTML(null),'');
+ assert.equal(escapeHTML('中文 😀'),'中文 😀');
+ assert.equal(escapeHTML(`& < > " '`), '&amp; &lt; &gt; &quot; &#39;');
+ assert.equal(escapeHTML('<img src=x onerror="alert(1)">'),'&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+ assert.equal(escapeHTML('&amp;'),'&amp;amp;');
+});
+
+test('business modules do not retain local escapeHTML implementations', () => {
+ for (const file of ['app.js','champions.js','gameplay.js','friends.js','suite.js']) {
+  const source=fs.readFileSync(path.join(__dirname,file),'utf8');
+  assert.doesNotMatch(source, /function escapeHTML\s*\(/, file);
+  assert.match(source, /window\.deepLegendsRuntime\.escapeHTML/, file);
+ }
+});

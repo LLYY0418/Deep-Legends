@@ -5,7 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("../desktop/node_modules/jsdom");
 const source = fs.readFileSync(path.join(__dirname, "friends.js"), "utf8");
-const helpers = Function(source.slice(source.indexOf("  function escapeHTML("), source.indexOf("  /* ---------- 数据")) + "\nreturn {presenceKind, statusHTML};")();
+const escapeHTML = (value) => String(value ?? "").replace(/[&<>\"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+const helpers = Function("escapeHTML", source.slice(source.indexOf("  function formatDuration("), source.indexOf("  /* ---------- 数据")) + "\nreturn {presenceKind, statusHTML};")(escapeHTML);
 const lobby = { availability: "chat", gameStatus: "lobby", partySize: 2, partyCapacity: 5, queueLabel: "海克斯大乱斗" };
 function status(friend) { return helpers.statusHTML(friend, helpers.presenceKind(friend)); }
 
@@ -57,6 +58,7 @@ test("real friend dock rerenders occupancy and removes old room details on every
     <aside id="friends-dock"><button id="friends-close"></button><input id="friends-search-input">
     <span id="friends-summary"></span><div id="friends-list"></div></aside>`, {url: "http://localhost", runScripts: "outside-only"});
   const {window} = dom;
+  window.deepLegendsRuntime = { escapeHTML };
   let payload = {...lobby, gameName: "房间好友", tagLine: "1234", playerRef: "anon", partySize: 1, groupId: 1};
   const requests = [];
   window.fetch = async (url) => {

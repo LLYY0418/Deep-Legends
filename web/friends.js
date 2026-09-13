@@ -3,6 +3,8 @@
 (() => {
   "use strict";
 
+  const escapeHTML = window.deepLegendsRuntime.escapeHTML;
+
   const el = {
     toggle: document.getElementById("friends-toggle"),
     count: document.getElementById("friends-count"),
@@ -35,9 +37,6 @@
   }
   function saveCollapsed() {
     try { localStorage.setItem("lol-loot-friends-collapsed", JSON.stringify(state.collapsed)); } catch (_) {}
-  }
-  function escapeHTML(value) {
-    return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
   }
   function profileIcon(icon) {
     if (!icon) return "/image-unavailable.svg";

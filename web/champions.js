@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+  const escapeHTML = window.deepLegendsRuntime.escapeHTML;
+
   // Shoes are rendered separately and do not count toward these route limits.
   const ADC_ITEM_ROUTE_LIMIT = 7;
   const DEFAULT_ITEM_ROUTE_LIMIT = 6;
@@ -133,7 +135,6 @@
     const key = String(value || "").replace(/^k/i, "").toLowerCase();
     return ["silver", "gold", "prismatic"].includes(key) ? key : "unknown";
   }
-  function escapeHTML(value) { const span = document.createElement("span"); span.textContent = String(value ?? ""); return span.innerHTML; }
   function normalizeSearch(value) { return String(value || "").normalize("NFKC").toLocaleLowerCase("zh-CN").replace(/[\s\p{P}\p{S}]+/gu, ""); }
   const numberFormatters = new Map();
   const integerFormatter = new Intl.NumberFormat("zh-CN");

@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+  const escapeHTML = window.deepLegendsRuntime.escapeHTML;
+
   const nodes = Object.fromEntries([
     "player-tabs", "player-tabs-prev", "player-tabs-next", "overview-content", "overview-refresh",
     "player-groups",
@@ -122,7 +124,6 @@
       ? tier
       : "emerald_plus";
   }
-  function escapeHTML(value) { const span = document.createElement("span"); span.textContent = String(value ?? ""); return span.innerHTML.replace(/"/g, "&quot;"); }
   const numberFormatter = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 });
   function number(value) { const parsed = Number(value); return Number.isFinite(parsed) ? numberFormatter.format(parsed) : "—"; }
   function plainInteger(value) { const parsed = Number(value); return Number.isFinite(parsed) ? String(Math.round(parsed)) : "—"; }
