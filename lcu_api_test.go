@@ -289,7 +289,7 @@ func TestLootDiagnosticsAllPersistWithReviewedFields(t *testing.T) {
 	}))
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +360,7 @@ func TestLootEmptyShellFilteringStillReportsItsShape(t *testing.T) {
 		_, _ = io.WriteString(w, `{"":{"lootId":"","type":"","count":30}}`)
 	}))
 	defer server.Close()
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}

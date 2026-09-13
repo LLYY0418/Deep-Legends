@@ -79,7 +79,7 @@ func Test1042ObjectiveClearOnlyUnreadIDsAndReadback(t *testing.T) {
 				w.Write([]byte(`[{"id":"private-mission","viewed":true,"isNew":true},{"id":"already-read","viewed":true},{"id":"unknown-state"}]`))
 			}))
 			defer server.Close()
-			store := &localStore{root: t.TempDir()}
+			store := trackTestStore(t, &localStore{root: t.TempDir()})
 			os.MkdirAll(filepath.Join(store.root, "logs"), 0755)
 			a := &app{storage: store}
 			client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}

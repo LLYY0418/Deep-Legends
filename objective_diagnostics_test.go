@@ -36,7 +36,7 @@ func TestObjectiveDiagnosticsReadonlyContractAndStateTransition(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0755); err != nil {
 		t.Fatal(err)
 	}

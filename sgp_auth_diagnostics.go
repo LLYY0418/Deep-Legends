@@ -133,33 +133,6 @@ func diagnosticJSONValueKind(raw []byte) string {
 	}
 }
 
-func sgpTokenIdentityDiagnostic(token, self, target string) map[string]any {
-	fields := map[string]any{"token_identity_comparison": "literal-only", "token_identity_claims_decodable": false}
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 || len(parts[1]) >= 16<<10 {
-		return fields
-	}
-	decoded, err := base64.RawURLEncoding.DecodeString(parts[1])
-	var claims map[string]json.RawMessage
-	if err != nil || json.Unmarshal(decoded, &claims) != nil || claims == nil {
-		return fields
-	}
-	fields["token_identity_claims_decodable"] = true
-	// sub may be an account ID, not a PUUID. A mismatch is NOT an account or
-	// authorization verdict. Log literal equality only, without either identity.
-	for _, key := range []string{"sub", "puuid"} {
-		raw, present := claims[key]
-		var value string
-		valid := present && json.Unmarshal(raw, &value) == nil && value != ""
-		detail := map[string]any{"present": present, "kind": diagnosticJSONValueKind(raw), "nonempty_string": valid}
-		if valid {
-			detail["equals_self"], detail["equals_target"] = self != "" && value == self, target != "" && value == target
-		}
-		fields["token_identity_"+key] = detail
-	}
-	return fields
-}
-
 // Specific causes precede generic HTTP categories, independent of JSON field order.
 var sgpAuthCategoryOrder = []string{"expired", "not-yet-valid", "audience", "issuer", "signature", "scope", "privacy", "permission", "region", "session", "invalid token", "missing-token", "method-not-allowed", "forbidden", "unauthorized"}
 

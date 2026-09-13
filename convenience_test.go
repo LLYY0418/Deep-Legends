@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -14,7 +15,7 @@ import (
 
 func TestConvenienceSettingsPersist(t *testing.T) {
 	root := t.TempDir()
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	want := convenienceSettings{AutoAccept: true, AutoReconnect: true}
 	if err := saveConvenienceSettings(store, want); err != nil {
 		t.Fatal(err)
@@ -30,7 +31,7 @@ func TestConvenienceSettingsPersist(t *testing.T) {
 
 func TestHandleGameplayConvenienceRoundTrip(t *testing.T) {
 	root := t.TempDir()
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{storage: store, convenience: newConvenienceRunner(store, nil)}
 
 	get := httptest.NewRequest(http.MethodGet, "/api/gameplay/convenience", nil)
@@ -154,6 +155,17 @@ func TestConvenienceReconnectPostsAndNotifies(t *testing.T) {
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	runner := newConvenienceRunner(nil, func(event string) { events <- event })
+	fire := make(chan struct{})
+	waiting := make(chan time.Duration, 1)
+	runner.wait = func(ctx context.Context, d time.Duration) error {
+		waiting <- d
+		select {
+		case <-fire:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 	settings := defaultWatchSettings()
 	settings.Rules.AutoReconnect.Enabled = true
 	settings.Rules.AutoReconnect.DelayMS = 3000
@@ -167,6 +179,15 @@ func TestConvenienceReconnectPostsAndNotifies(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("reconnect was not armed")
 	}
+	if delay := <-waiting; delay != 3*time.Second {
+		t.Fatalf("delay=%v", delay)
+	}
+	select {
+	case <-done:
+		t.Fatal("POST before timer fired")
+	default:
+	}
+	close(fire)
 	select {
 	case got := <-done:
 		if got != "POST /lol-gameflow/v1/reconnect" {

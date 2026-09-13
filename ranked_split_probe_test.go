@@ -16,7 +16,7 @@ func TestRankedSplitProbeRecordsOnlyShapeMetadata(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	client := &LCUClient{
 		baseURL: "https://lcu.test", token: "secret-token",
 		http: &http.Client{Transport: gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
@@ -26,7 +26,7 @@ func TestRankedSplitProbeRecordsOnlyShapeMetadata(t *testing.T) {
 	}
 	a := &app{storage: store}
 	a.probeRankedSplitEndpoints(context.Background(), client, "private-player", 123456)
-	data, err := os.ReadFile(filepath.Join(root, "logs", "diagnostics.jsonl"))
+	data, err := store.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)
 	}

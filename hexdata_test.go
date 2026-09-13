@@ -85,7 +85,7 @@ func newHexdataBudgetProvider(t *testing.T, root string, transport http.RoundTri
 	if err := os.MkdirAll(filepath.Join(root, championDataCacheDirectory), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	provider := newChampionProvider()
 	provider.cache = newChampionDataCache(store)
 	provider.hexdata = newHexdataClient(provider, store)
@@ -652,13 +652,13 @@ func TestHexdataCircuitStatePersistsAcrossRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := newChampionProvider()
-	client := newHexdataClient(provider, &localStore{root: root})
+	client := newHexdataClient(provider, trackTestStore(t, &localStore{root: root}))
 	now := time.Now().UTC()
 	client.now = func() time.Time { return now }
 	for range hexdataCircuitFailureLimit {
 		client.recordFailure("heroes", 429, true)
 	}
-	restarted := newHexdataClient(provider, &localStore{root: root})
+	restarted := newHexdataClient(provider, trackTestStore(t, &localStore{root: root}))
 	restarted.now = func() time.Time { return now.Add(30 * time.Second) }
 	circuit := restarted.circuitSnapshot("heroes")
 	if !circuit.Until.Equal(now.Add(time.Minute)) {
@@ -697,7 +697,7 @@ func TestHexdataRestartClearsLongLivedPersistedCircuit(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := newChampionProvider()
-	client := newHexdataClient(provider, &localStore{root: root})
+	client := newHexdataClient(provider, trackTestStore(t, &localStore{root: root}))
 	client.now = func() time.Time { return now }
 	client.loadState()
 	got := client.snapshot()
@@ -712,7 +712,7 @@ func TestHexdataShapeCircuitBacksOffAndSuccessResetsIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 8, 21, 12, 0, 0, 0, time.UTC)
-	client := newHexdataClient(newChampionProvider(), &localStore{root: root})
+	client := newHexdataClient(newChampionProvider(), trackTestStore(t, &localStore{root: root}))
 	client.now = func() time.Time { return now }
 
 	for failure := 1; failure < hexdataCircuitFailureLimit; failure++ {
@@ -1255,7 +1255,7 @@ func TestDecorateHexdataAugmentsKeepsOfflineDescriptionWhenAugmentsAreUnavailabl
 }
 
 func TestDecorateHexdataAugmentsPersistsMissingMetadataDiagnostic(t *testing.T) {
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}

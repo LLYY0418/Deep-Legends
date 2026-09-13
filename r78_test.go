@@ -144,7 +144,7 @@ func TestR78V2WatchMigrationPreservesRulesAndAddsDisabledChampSelect(t *testing.
 	if err := os.WriteFile(filepath.Join(root, convenienceSettingsFile), []byte(data), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	settings := loadWatchSettings(&localStore{root: root})
+	settings := loadWatchSettings(trackTestStore(t, &localStore{root: root}))
 	if settings.SchemaVersion != 3 || !settings.Rules.AutoAccept.Enabled || settings.Rules.AutoAccept.DelayMS != 777 || settings.Rules.AutoReconnect.DelayMS != 9000 {
 		t.Fatalf("migration changed existing rules: %#v", settings)
 	}

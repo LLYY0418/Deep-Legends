@@ -34,7 +34,7 @@ func updateTestManager(t *testing.T, data []byte) *updateManager {
 	if err := os.Mkdir(filepath.Join(root, "updates"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	u := newUpdateManager("0.11.2", &localStore{root: root}, nil)
+	u := newUpdateManager("0.11.2", trackTestStore(t, &localStore{root: root}), nil)
 	t.Cleanup(u.Close)
 	u.status.Portable = false
 	u.installDir = filepath.Join(root, "installed")
@@ -89,7 +89,7 @@ func TestUpdateVersions(t *testing.T) {
 	}
 }
 func TestUpdateDevDisabled(t *testing.T) {
-	u := newUpdateManager("dev", &localStore{root: t.TempDir()}, nil)
+	u := newUpdateManager("dev", trackTestStore(t, &localStore{root: t.TempDir()}), nil)
 	defer u.Close()
 	var calls atomic.Int32
 	u.client = &http.Client{Transport: updateRoundTrip(func(*http.Request) (*http.Response, error) { calls.Add(1); return nil, errors.New("unexpected") })}
@@ -592,14 +592,18 @@ func TestUpdateAfterUpgradeCleanupAndMinimum(t *testing.T) {
 }
 
 type updateSlowBody struct {
-	ctx   context.Context
-	left  int
-	delay time.Duration
+	ctx        context.Context
+	left       int
+	delay      time.Duration
+	beforeRead func()
 }
 
 func (b *updateSlowBody) Read(p []byte) (int, error) {
 	if b.left == 0 {
 		return 0, io.EOF
+	}
+	if b.beforeRead != nil {
+		b.beforeRead()
 	}
 	select {
 	case <-time.After(b.delay):
@@ -619,20 +623,43 @@ func TestUpdateProgressAndStalledSourceFallback(t *testing.T) {
 	u := updateTestManager(t, data)
 	u.mirrors = []string{"", "https://fallback.test/"}
 	var progress atomic.Int32
+	ticks := make(chan time.Time, 1)
+	progressSeen := make(chan struct{}, 1)
+	u.progressTicks = func() (<-chan time.Time, func()) { return ticks, func() {} }
+	var expireHeader func()
+	u.startSourceTimer = func(d time.Duration, expire func()) func() {
+		if d != 8*time.Second {
+			t.Errorf("source timeout=%v", d)
+		}
+		expireHeader = expire
+		return func() {}
+	}
 	u.notify = func(kind string, value any) {
 		if kind == "update:progress" {
 			progress.Add(1)
+			select {
+			case progressSeen <- struct{}{}:
+			default:
+			}
 		}
 	}
 	var requests atomic.Int32
 	u.client = &http.Client{Transport: updateRoundTrip(func(r *http.Request) (*http.Response, error) {
 		requests.Add(1)
 		if r.URL.Host == "github.com" {
+			expireHeader() // Manually fire the unchanged eight-second header deadline.
 			<-r.Context().Done()
 			return nil, r.Context().Err()
 		}
 		response := updateResponse(200, nil)
-		response.Body = &updateSlowBody{ctx: r.Context(), left: len(data), delay: 220 * time.Millisecond}
+		response.Body = &updateSlowBody{ctx: r.Context(), left: len(data), beforeRead: func() {
+			ticks <- time.Now()
+			select {
+			case <-progressSeen:
+			case <-time.After(time.Second):
+				t.Error("progress timer not observed")
+			}
+		}}
 		return response, nil
 	})}
 	if err := u.Download(); err != nil {

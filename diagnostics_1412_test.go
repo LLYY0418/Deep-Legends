@@ -25,7 +25,7 @@ func Test1412SavedBanSwitchReachesRunnerAndLCU(t *testing.T) {
 	group.Ban.Champions["default"] = []int64{141}
 	settings.ChampSelect.Groups["practice"] = group
 	payload, _ := json.Marshal(settings)
-	application := &app{watch: fixture.runner, storage: &localStore{root: t.TempDir()}}
+	application := &app{watch: fixture.runner, storage: trackTestStore(t, &localStore{root: t.TempDir()})}
 	response := httptest.NewRecorder()
 	application.handleWatchRules(response, httptest.NewRequest(http.MethodPost, "/api/watch/rules", bytes.NewReader(payload)))
 	if response.Code != http.StatusOK {

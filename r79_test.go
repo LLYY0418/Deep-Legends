@@ -76,7 +76,7 @@ func TestR79ItemSetApplyDiagnosticRecordsRejectedPhase(t *testing.T) {
 		connected: true,
 		lcu:       client,
 		summoner:  Summoner{SummonerID: 123, AccountID: 456, PUUID: playerRef},
-		storage:   &localStore{root: root},
+		storage:   trackTestStore(t, &localStore{root: root}),
 	}
 	body := `{"title":"瑞兹 · 中路","championId":13,"mapId":11,"position":"middle","storage":"recommended","blocks":[{"type":"核心装","items":[{"id":3003,"count":1}]}]}`
 	recorder := httptest.NewRecorder()

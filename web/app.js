@@ -2025,17 +2025,26 @@
     el.appScroll.scrollTo({ top: target, behavior: "instant" });
     if (target <= 0) return;
     const deadline = Date.now() + sectionScrollRestoreBudget;
-    let cancelled = false;
-    const abort = () => { cancelled = true; };
+    let cancelled = false, observer = null, timer = 0;
     const events = ["wheel", "touchstart", "keydown", "pointerdown"];
-    for (const type of events) window.addEventListener(type, abort, { once: true, passive: true });
-    const stop = () => { for (const type of events) window.removeEventListener(type, abort); };
-    const apply = () => {
-      if (cancelled || state.section !== name || Date.now() > deadline) { stop(); return; }
-      if (Math.abs(el.appScroll.scrollTop - target) <= 1) { stop(); return; }
-      el.appScroll.scrollTo({ top: target, behavior: "instant" });
-      requestAnimationFrame(apply);
+    const stop = () => {
+      cancelled = true;
+      observer?.disconnect();
+      clearTimeout(timer);
+      for (const type of events) window.removeEventListener(type, stop);
     };
+    const apply = () => {
+      if (cancelled || state.destroyed || state.section !== name || Date.now() > deadline) { stop(); return; }
+      el.appScroll.scrollTo({ top: target, behavior: "instant" });
+      if (Math.abs(el.appScroll.scrollTop - target) <= 1) stop();
+    };
+    for (const type of events) window.addEventListener(type, stop, { once: true, passive: true });
+    if ("ResizeObserver" in window) {
+      observer = new ResizeObserver(apply);
+      // Observe content, not the fixed-height viewport, to see skeleton growth.
+      for (const child of el.appScroll.children) observer.observe(child);
+    }
+    timer = setTimeout(stop, sectionScrollRestoreBudget);
     requestAnimationFrame(apply);
   }
 
@@ -3174,7 +3183,13 @@
     state.eventSource?.close();
     const source = new EventSource("/api/events");
     state.eventSource = source;
+    const liveFrame = () => {
+      if (state.destroyed || state.eventSource !== source) return;
+      window.dispatchEvent(new CustomEvent("deep-legends:live-frame"));
+    };
+    source.addEventListener?.("heartbeat", liveFrame);
     source.addEventListener?.("update:status", (event) => {
+      liveFrame();
       if (state.destroyed || state.eventSource !== source) return;
       try {
         const status = JSON.parse(event.data);
@@ -3183,12 +3198,14 @@
       } catch (_) {}
     });
     source.addEventListener?.("update:progress", (event) => {
+      liveFrame();
       if (state.destroyed || state.eventSource !== source || !updateUI.status) return;
       try { renderUpdateStatus({ ...updateUI.status, progress: JSON.parse(event.data) }); } catch (_) {}
     });
     source.onopen = () => { if (state.eventSource === source) state.eventReconnectDelay = 1000; };
     source.onmessage = (event) => {
       if (state.destroyed || state.eventSource !== source) return;
+      liveFrame();
       if (event.data === "ready") {
         if (state.liveEventsReady) resyncLiveState();
         state.liveEventsReady = true;

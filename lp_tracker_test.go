@@ -87,7 +87,7 @@ func assertLPObservationPrivacy(t *testing.T, events []map[string]any, forbidden
 
 func seededLPTracker(t *testing.T, playerRef, queueType string, baseline lpSnapshot) (*lpTracker, string) {
 	t.Helper()
-	store := &localStore{root: t.TempDir(), salt: bytes.Repeat([]byte{9}, 32)}
+	store := trackTestStore(t, &localStore{root: t.TempDir(), salt: bytes.Repeat([]byte{9}, 32)})
 	tracker := newLPTracker(store)
 	tracker.sleep = func(time.Duration) {}
 	accountHash := tracker.accountHash(playerRef)
@@ -361,7 +361,7 @@ func TestLPTrackerCaptureReportsEarlyExitReasons(t *testing.T) {
 
 func TestLPTrackerObserveAnnotatePersist(t *testing.T) {
 	root := t.TempDir()
-	store := &localStore{root: root, salt: bytes.Repeat([]byte{7}, 32)}
+	store := trackTestStore(t, &localStore{root: root, salt: bytes.Repeat([]byte{7}, 32)})
 	tracker := newLPTracker(store)
 	playerRef := strings.Repeat("a", 48)
 	accountHash := store.accountHash(Summoner{PUUID: playerRef})
@@ -416,7 +416,7 @@ func TestLPTrackerObserveAnnotatePersist(t *testing.T) {
 
 func TestLPTrackerInvalidatesLegacyPlaintextHistory(t *testing.T) {
 	root := t.TempDir()
-	store := &localStore{root: root, salt: bytes.Repeat([]byte{3}, 32)}
+	store := trackTestStore(t, &localStore{root: root, salt: bytes.Repeat([]byte{3}, 32)})
 	playerRef := strings.Repeat("p", 48)
 	legacy := []byte(`{"schemaVersion":1,"baselines":{"` + playerRef + `":{"RANKED_SOLO_5x5":{"tier":"GOLD","division":"I","leaguePoints":20,"wins":10,"losses":8}}},"games":{"42":{"accountHash":"` + playerRef + `","queueType":"RANKED_SOLO_5x5","delta":18,"recordedAt":1}}}`)
 	historyPath := filepath.Join(root, lpHistoryFile)

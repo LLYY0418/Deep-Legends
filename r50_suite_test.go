@@ -16,7 +16,7 @@ import (
 
 func TestWatchSettingsMigrateLegacyAndDefaultNewRulesOff(t *testing.T) {
 	root := t.TempDir()
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	if err := os.WriteFile(filepath.Join(root, convenienceSettingsFile), []byte(`{"autoAccept":true,"autoPlayAgain":false,"autoReconnect":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestWatchSettingsMigrateLegacyAndDefaultNewRulesOff(t *testing.T) {
 }
 
 func TestWatchSettingsFreshDefaultsAllAutomationOff(t *testing.T) {
-	settings := loadWatchSettings(&localStore{root: t.TempDir()})
+	settings := loadWatchSettings(trackTestStore(t, &localStore{root: t.TempDir()}))
 	rules := map[string]bool{
 		"autoAccept":        settings.Rules.AutoAccept.Enabled,
 		"autoReconnect":     settings.Rules.AutoReconnect.Enabled,
@@ -350,7 +350,7 @@ func TestFacadeRankAndLoginResetValidation(t *testing.T) {
 	if _, err := facadeRankPayload("RANKED_SOLO_5X5", "DIAMOND", "V"); err == nil {
 		t.Fatal("invalid division was accepted")
 	}
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	runner := newWatchRunner(store, nil)
 	a := &app{storage: store, watch: runner}
 	reset := facadeLoginResetSettings{

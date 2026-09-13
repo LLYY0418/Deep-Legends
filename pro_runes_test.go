@@ -65,7 +65,7 @@ func TestProRuneWhiteLists(t *testing.T) {
 	}
 }
 func TestProRuneExactIdentityAndPersistentMapping(t *testing.T) {
-	p := newProRuneProvider(proTestProvider(), &localStore{root: t.TempDir()}, nil)
+	p := newProRuneProvider(proTestProvider(), trackTestStore(t, &localStore{root: t.TempDir()}), nil)
 	for _, name := range []string{"NotFaker", "T1 Faker2", "T1 Test MID1", "FakeFaker", "T1 Painter"} {
 		if got := p.player("98767991853197861", proParticipant{SummonerName: name}); got != "" {
 			t.Fatal("V2/M8 non-roster name accepted", name, got)
@@ -80,7 +80,7 @@ func TestProRuneExactIdentityAndPersistentMapping(t *testing.T) {
 		}
 	}
 	p.saveIdentities()
-	q := newProRuneProvider(proTestProvider(), &localStore{root: filepath.Dir(p.root)}, nil)
+	q := newProRuneProvider(proTestProvider(), trackTestStore(t, &localStore{root: filepath.Dir(p.root)}), nil)
 	q.readDisk("identities", &q.identities)
 	if got := q.player("98767991853197861", proParticipant{PlayerID: "98767991747728851", SummonerName: "renamed"}); got != "Faker" {
 		t.Fatal("learned esports ID lost", got)
@@ -167,7 +167,7 @@ func TestProRunePublicTransportAndAlignedSupplement(t *testing.T) {
 		}
 		return &http.Response{StatusCode: status, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
 	})}
-	source := newProRuneProvider(p, &localStore{root: t.TempDir()}, nil)
+	source := newProRuneProvider(p, trackTestStore(t, &localStore{root: t.TempDir()}), nil)
 	if _, err := source.supplement(context.Background(), g); err != nil {
 		t.Fatal("M5 supplement failed (HTTP 400 expected for unaligned mutation)", err)
 	}
@@ -181,7 +181,7 @@ func TestProRunePublicTransportAndAlignedSupplement(t *testing.T) {
 	if calls.Load() != 2 || time.Since(start) >= 100*time.Millisecond {
 		t.Fatal("V7 cached fill exceeded 100ms or fetched again")
 	}
-	reloaded := newProRuneProvider(p, &localStore{root: filepath.Dir(source.root)}, nil)
+	reloaded := newProRuneProvider(p, trackTestStore(t, &localStore{root: filepath.Dir(source.root)}), nil)
 	if _, err := reloaded.supplement(context.Background(), g); err != nil || calls.Load() != 2 {
 		t.Fatal("immutable disk cache not reused", err)
 	}
@@ -189,7 +189,7 @@ func TestProRunePublicTransportAndAlignedSupplement(t *testing.T) {
 	corrupt := reloaded.details[g.ID]
 	corrupt.Frames[0].Timestamp = g.Start
 	reloaded.writeDisk("details-"+g.ID, corrupt)
-	fresh := newProRuneProvider(p, &localStore{root: filepath.Dir(source.root)}, nil)
+	fresh := newProRuneProvider(p, trackTestStore(t, &localStore{root: filepath.Dir(source.root)}), nil)
 	if _, err := fresh.supplement(context.Background(), g); err != nil || calls.Load() != 3 {
 		t.Fatal("nonterminal disk details were not refetched", err, calls.Load())
 	}

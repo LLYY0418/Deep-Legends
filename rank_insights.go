@@ -186,12 +186,12 @@ func (a *app) playerRankScore(ctx context.Context, client *LCUClient, playerRef 
 // upstream request. It never exposes the cache key or player reference to
 // diagnostics.
 func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID, privacy string) (rankScoreEntry, bool) {
-	a.mu.Lock()
-	if a.rankScores == nil {
-		a.rankScores = newRankScoreCache()
-	}
+	a.rankScoresOnce.Do(func() {
+		if a.rankScores == nil {
+			a.rankScores = newRankScoreCache()
+		}
+	})
 	cache := a.rankScores
-	a.mu.Unlock()
 	serverID = strings.ToUpper(strings.TrimSpace(serverID))
 	useRiot := serverID == "KR" && a.riot != nil && validPlayerReference(playerRef)
 	preferredSource := dataSourceRiot

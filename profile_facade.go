@@ -909,11 +909,6 @@ func facadeSummaryHasTitle(summary map[string]any) bool {
 	return hasTitle
 }
 
-func facadeTitleRestoreCandidates(summary, chatLOL map[string]any) []facadeTitleRestoreCandidate {
-	candidates, _ := facadeTitleRestorePlan(summary, chatLOL)
-	return candidates
-}
-
 // facadeTitleRestorePlan is intentionally broader than projectFacadeTitle:
 // the latter requires a displayable name for the UI, while this plan preserves
 // every verified identifier and treats a name-only title as real but unsafe to
@@ -1092,17 +1087,6 @@ func (a *app) scheduleFacadeLoginReset(ctx context.Context, client *LCUClient) {
 			}
 		}
 	}()
-}
-
-func facadeImagePath(value string) string {
-	if value == "" {
-		return ""
-	}
-	return "/api/image?path=" + value
-}
-
-func facadeLevelLabel(level int64) string {
-	return strconv.FormatInt(level, 10)
 }
 
 // The career editor must work before the user opens Collection. This cache

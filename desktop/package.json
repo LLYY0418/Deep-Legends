@@ -36,6 +36,7 @@
       "preload.cjs",
       "share-export.cjs",
       "diagnostics-export.cjs",
+      "desktop-log.cjs",
       "proxy-resolution.cjs",
       "window-bounds.cjs",
       "window-bounds-store.cjs",

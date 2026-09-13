@@ -987,6 +987,7 @@
     ["/api/chromas", () => ({ items: chromas, count: chromas.length, ownedCount: 2, capability: { name: "chromas", state: "available", count: chromas.length } })],
     ["/api/account", () => account],
     ["/api/gameplay/overview", () => overview],
+    ["/api/gameplay/phase", () => ({ phase: "None" })],
     ["/api/gameplay/current-game", () => currentGame],
     ["/api/gameplay/live", () => hextechLiveDemo ? hextechLive : arenaFullDemo ? arenaFullLive : arenaLiveDemo ? arenaLive : live],
     ["/api/gameplay/perks", () => perksCatalog],
@@ -1000,7 +1001,7 @@
     ["/api/facade/state", () => structuredClone(suiteFacade)],
     ["/api/claim/scan", () => structuredClone(suiteClaims)],
   ]);
-  const nativeFetch = window.fetch.bind(window);
+  const nativeFetch = window.deepLegendsDemoNativeFetch || window.fetch.bind(window);
   window.fetch = (input, init) => {
     const url = typeof input === "string" ? input : input?.url || "";
     const pathname = url.startsWith("/") ? url.split("?")[0] : "";
@@ -1097,4 +1098,7 @@
   flag.textContent = "演示数据 · 仅样式预览";
   if (document.body) document.body.appendChild(flag);
   else document.addEventListener("DOMContentLoaded", () => document.body.appendChild(flag));
+  window.deepLegendsDemoReady?.();
+  delete window.deepLegendsDemoReady;
+  delete window.deepLegendsDemoNativeFetch;
 })();

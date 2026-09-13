@@ -130,5 +130,5 @@ func newStartupTestStore(t *testing.T) *localStore {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatalf("prepare logs directory: %v", err)
 	}
-	return &localStore{root: root}
+	return trackTestStore(t, &localStore{root: root})
 }

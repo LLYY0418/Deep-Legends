@@ -107,6 +107,8 @@ func TestSGPConnectionErrorsHaveStableKinds(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := &LCUClient{}
 			provider := newSGPProvider()
+			var waits []time.Duration
+			provider.retryWait = func(ctx context.Context, d time.Duration) error { waits = append(waits, d); return ctx.Err() }
 			provider.http = &http.Client{Transport: sgpRoundTripFunc(func(*http.Request) (*http.Response, error) {
 				return nil, test.err
 			})}
@@ -116,6 +118,9 @@ func TestSGPConnectionErrorsHaveStableKinds(t *testing.T) {
 			observed := captureSGPObservations(provider)
 			var payload map[string]any
 			err := provider.getJSON(context.Background(), client, "HN1", "RANKED", "/ranked/{player}", "https://ranked.invalid/private-player", &payload)
+			if len(waits) != 2 || waits[0] != 250*time.Millisecond || waits[1] != 750*time.Millisecond {
+				t.Fatalf("retry delays=%v", waits)
+			}
 			if err == nil || len(*observed) != 3 {
 				t.Fatalf("error=%v observations=%#v", err, *observed)
 			}
@@ -409,9 +414,9 @@ func TestMatchHistoryPhysicalPageCacheReusesTwentyBeforeFifty(t *testing.T) {
 	if err != nil || len(games) != 50 || consumed != 50 {
 		t.Fatalf("games=%d consumed=%d err=%v", len(games), consumed, err)
 	}
-	want := []string{"0:20", "20:20", "40:10"}
+	want := []string{"0:20", "20:30"}
 	if strings.Join(requests, ",") != strings.Join(want, ",") {
-		t.Fatalf("physical page requests = %v, want %v (second logical request must add exactly 2 upstream calls)", requests, want)
+		t.Fatalf("physical page requests = %v, want %v (second logical request must add exactly 1 upstream call)", requests, want)
 	}
 }
 
@@ -875,5 +880,27 @@ func TestSGPSummonerSuccessIsCached(t *testing.T) {
 	}
 	if requests != 1 {
 		t.Fatalf("SUMMONER requests = %d, want 1", requests)
+	}
+}
+
+func TestMatchHistoryCacheEvictsByBytes(t *testing.T) {
+	provider := newSGPProvider()
+	puuid := strings.Repeat("b", 48)
+	for start := 0; start < 3; start++ {
+		provider.cacheHistoryPage("HN1", puuid, start, 50, nil, sgpHistoryCacheEntry{
+			consumed: 50,
+			bytes:    10 << 20,
+		})
+	}
+	provider.mu.Lock()
+	defer provider.mu.Unlock()
+	if len(provider.historyCache) != 2 {
+		t.Fatalf("history cache entries = %d, want 2", len(provider.historyCache))
+	}
+	if provider.historyBytes > sgpCacheMaxBytes {
+		t.Fatalf("history cache bytes = %d, want <= %d", provider.historyBytes, sgpCacheMaxBytes)
+	}
+	if _, ok := provider.historyCache[sgpHistoryPageCacheKey("HN1", puuid, 0, 50, nil)]; ok {
+		t.Fatal("oldest byte-heavy history page was not evicted")
 	}
 }

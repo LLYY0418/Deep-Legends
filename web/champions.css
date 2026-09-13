@@ -97,8 +97,8 @@
 .tier-badge.is-metric { width: 24px; height: 27px; }
 .tier-badge.topcard-tier { position: absolute; top: 10px; left: 14px; z-index: 2; width: 28px; height: 32px; }
 .tier-badge-fallback { color: var(--muted); font-size: 12px; font-weight: 800; }
-.champion-table td.metric-win, .champion-detail-metrics .metric-win strong, .champion-detail-positions .metric-win, .rune-page-card dd.metric-win { color: var(--success); font-weight: 800; }
-.champion-table td.metric-pick, .champion-detail-metrics .metric-pick strong, .champion-detail-positions .metric-pick, .rune-page-card dd.metric-pick { color: var(--accent); font-weight: 800; }
+.champion-table td.metric-win, .champion-detail-metrics .metric-win strong, .champion-detail-positions .metric-win { color: var(--success); font-weight: 800; }
+.champion-table td.metric-pick, .champion-detail-metrics .metric-pick strong, .champion-detail-positions .metric-pick { color: var(--accent); font-weight: 800; }
 .champion-table td.metric-ban, .champion-detail-metrics .metric-ban strong { color: var(--danger); font-weight: 800; }
 .champion-table th.metric-win, .champion-table th.metric-pick, .champion-table th.metric-ban { color: var(--muted); }
 .position-pill { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); }
@@ -156,10 +156,10 @@
 .arena-team-faces .champion-portrait { width: 34px; height: 34px; margin-left: -8px; border: 2px solid var(--surface); border-radius: 9px; }
 .arena-team-faces.is-large { min-width: 132px; padding-left: 12px; }
 .arena-team-faces.is-large .champion-portrait { width: 48px; height: 48px; margin-left: -12px; border-width: 3px; border-radius: 11px; }
-.arena-detail-team-grid dt, .arena-augment-podium dt { color: var(--muted); font-size: 8px; }
-.arena-detail-team-grid dd, .arena-augment-podium dd { margin: 0; color: var(--ink); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.arena-detail-team-grid dd.metric-win, .arena-augment-podium dd.metric-win { color: var(--success); }
-.arena-detail-team-grid dd.metric-pick, .arena-augment-podium dd.metric-pick { color: var(--accent); }
+.arena-detail-team-grid dt { color: var(--muted); font-size: 8px; }
+.arena-detail-team-grid dd { margin: 0; color: var(--ink); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.arena-detail-team-grid dd.metric-win { color: var(--success); }
+.arena-detail-team-grid dd.metric-pick { color: var(--accent); }
 .augment-rarity-tabs { display: grid; grid-template-columns: repeat(4,minmax(72px,1fr)); padding: 7px; gap: 4px; border-bottom: 1px solid var(--line); }
 .augment-rarity-tabs button { min-height: 36px; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 8px; font-size: 12px; }
 .augment-rarity-tabs button:hover { color: var(--ink); background: var(--surface-strong); }
@@ -567,16 +567,6 @@
   .build-core-column .config-option { align-items: stretch; flex-direction: column; gap: 6px; padding-block: 7px; }
   .champion-build-board .build-core-column .option-stats { width: 100%; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0; text-align: left; }
 }
-.augment-podium { display: grid; min-height: 198px; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: end; gap: 8px; padding: 16px 18px 0; }
-.podium-place { position: relative; display: grid; min-height: 148px; place-items: center; align-content: center; gap: 7px; padding: 14px 10px; background: var(--surface-strong); border: 1px solid var(--line); border-bottom: 0; border-radius: 11px 11px 0 0; text-align: center; }
-.podium-place.is-1 { min-height: 182px; grid-column: 2; grid-row: 1; background: var(--primary-soft); border-color: color-mix(in oklab,var(--primary) 38%,var(--line)); }
-.podium-place.is-2 { grid-column: 1; grid-row: 1; }
-.podium-place.is-3 { min-height: 132px; grid-column: 3; grid-row: 1; }
-.podium-place > .hex-rank { position: absolute; top: 9px; left: 10px; }
-.podium-place.is-1 > .hex-rank { font-size: 16px; }
-.podium-place .augment-icon { width: 58px; height: 58px; }
-.podium-place strong { max-width: 100%; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.podium-place > span:last-child { color: var(--muted); font-size: 9px; }
 .recommended-augment-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
 .recommended-augment-list > div { display: grid; grid-template-columns: 24px 46px minmax(0,1fr) auto; min-height: 66px; align-items: center; gap: 9px; padding: 8px 12px; background: var(--bg); border-top: 1px solid var(--line); }
 .recommended-augment-list > div:nth-child(odd) { border-right: 1px solid var(--line); }
@@ -592,16 +582,7 @@
 .arena-detail-team-grid dl { display: grid; width: 100%; grid-template-columns: repeat(4,minmax(0,1fr)); margin: 2px 0 0; }
 .arena-detail-team-grid dl > div { display: grid; gap: 1px; padding-inline: 5px; border-left: 1px solid var(--line); }
 .arena-detail-team-grid dl > div:first-child { border-left: 0; }
-.arena-augment-podium .podium-place { min-width: 0; }
-.arena-augment-podium .podium-place dl { display: grid; width: 100%; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0; }
-.arena-augment-podium .podium-place dl > div { display: grid; gap: 1px; padding-inline: 5px; border-left: 1px solid var(--line); }
-.arena-augment-podium .podium-place dl > div:first-child { border-left: 0; }
 .arena-augment-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
-.arena-augment-podium .podium-place { --arena-augment-quality: #7E8896; --arena-augment-quality-color: #7E8896; }
-.arena-augment-podium .podium-place.is-silver { --arena-augment-quality: #9AA7B8; --arena-augment-quality-color: #9AA7B8; border-color: color-mix(in oklab,#9AA7B8 42%,var(--line)); }
-.arena-augment-podium .podium-place.is-gold { --arena-augment-quality: #E3B341; --arena-augment-quality-color: #E3B341; border-color: color-mix(in oklab,#E3B341 42%,var(--line)); }
-.arena-augment-podium .podium-place.is-prismatic { --arena-augment-quality: linear-gradient(180deg,#C77DFF,#5AA9FF,#FF8AC7); --arena-augment-quality-color: #9C86D8; border-color: color-mix(in oklab,#9C86D8 45%,var(--line)); }
-.arena-augment-podium .podium-place::after { position: absolute; inset: auto 0 0; height: 4px; background: var(--arena-augment-quality); content: ""; }
 .arena-augment-list > article { --arena-augment-quality: #7E8896; --arena-augment-quality-color: #7E8896; position: relative; display: grid; min-height: 66px; grid-template-columns: 24px 46px minmax(0,1fr) 66px 66px; align-items: center; gap: 8px; padding: 8px 12px 8px 16px; border-top: 1px solid var(--line); }
 .arena-augment-list > article::before { position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--arena-augment-quality); content: ""; }
 .arena-augment-list > article.is-silver { --arena-augment-quality: #9AA7B8; --arena-augment-quality-color: #9AA7B8; }
@@ -692,7 +673,6 @@
   .augment-grid { grid-template-columns: minmax(0,1fr); }
   .mayhem-atlas { grid-template-columns: 1fr; --atlas-column-height: calc(100vh / var(--ui-zoom, 1) - 260px); }
   .mayhem-recommend-grid { grid-template-columns: 1fr; }
-  .counter-groups { grid-template-columns: 1fr; }
   .counter-group + .counter-group { border-top: 1px solid var(--line); border-left: 0; }
   .arena-team-faces .champion-portrait { width: 30px; height: 30px; }
   .arena-augment-list { grid-template-columns: 1fr; }
@@ -744,13 +724,6 @@
   .champion-position-tabs button { min-width: 68px; }
   .champion-table { min-width: 700px; }
   .aram-champions .champion-table { min-width: 340px; }
-  .augment-podium { min-height: 0; grid-template-columns: 1fr; align-items: stretch; padding: 10px; }
-  .podium-place, .podium-place.is-1, .podium-place.is-2, .podium-place.is-3 { min-height: 82px; grid-column: 1; grid-row: auto; grid-template-columns: 34px 48px minmax(0,1fr) auto; justify-items: start; padding: 10px; border-bottom: 1px solid var(--line); border-radius: 9px; text-align: left; }
-  .podium-place.is-1 { grid-row: 1; }
-  .podium-place.is-2 { grid-row: 2; }
-  .podium-place.is-3 { grid-row: 3; }
-  .podium-place > .hex-rank { position: static; }
-  .podium-place .augment-icon { width: 48px; height: 48px; }
   .arena-augment-list > article { grid-template-columns: 22px 42px minmax(0,1fr) 58px 58px; padding-inline: 9px; }
   .arena-augment-list .augment-icon { width: 42px; height: 42px; }
 }
@@ -877,9 +850,6 @@
 .arena-option-card .is-placement dd, .arena-slim-row .is-placement { color: var(--primary-strong); }
 .arena-option-card .is-first dd { color: var(--accent); }
 .arena-option-card .is-score dd { color: var(--ink); font-variant-numeric: tabular-nums; }
-.arena-option-card .arena-core-meta { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
-.arena-option-card .arena-core-meta .is-win { color: var(--success); font-weight: 800; }
-.arena-option-card .arena-core-meta small { color: var(--muted); font-weight: 700; }
 .arena-core-option .arena-option-main { min-height: 48px; }
 .arena-augment-section .arena-option-card .item-option-button, .arena-augment-section .arena-option-card .recommend-icon { width: 48px; height: 48px; flex-basis: 48px; }
 .arena-augment-section .arena-option-card .config-icons { --option-icon-size: 48px; }
@@ -958,3 +928,6 @@
 .mayhem-ranking-list article > strong { font-size: 14px; }
 .arena-option-main > strong { font-size: 15px; }
 .arena-core-option, .arena-core-option:hover, .arena-core-option:focus-within { opacity: 1; }
+
+/* Keep result tables as flex children of the existing list cards. */
+[data-champion-results] { display: contents; }

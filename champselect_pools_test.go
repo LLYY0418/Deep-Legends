@@ -13,7 +13,7 @@ import (
 )
 
 func Test1129RankedBanMigrationPreservesLegacyAndPickPools(t *testing.T) {
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	s := defaultWatchSettings()
 	s.ChampSelect.Enabled = true
 	g := s.ChampSelect.Groups["ranked"]

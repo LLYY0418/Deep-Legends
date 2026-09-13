@@ -121,7 +121,7 @@ func TestR68CanceledWatchActionIsRecorded(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	runner := newWatchRunner(nil, nil)
 	runner.observe = func(event map[string]any) {
 		a.recordDiagnostic(event)
@@ -469,7 +469,7 @@ func TestR68PositionBroadcastModesTeamLookupAndRetryGate(t *testing.T) {
 				if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 					t.Fatal(err)
 				}
-				diagnosticStore = &localStore{root: root}
+				diagnosticStore = trackTestStore(t, &localStore{root: root})
 			}
 			runner.observe = func(event map[string]any) {
 				if diagnosticStore != nil {
@@ -668,7 +668,7 @@ func TestR68LivePositionShapeDistributionAndPrivacy(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	a.recordDiagnostic(diagnostic)
 	logged, err := a.storage.readDiagnosticLog()
 	if err != nil {

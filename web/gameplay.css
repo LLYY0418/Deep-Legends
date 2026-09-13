@@ -698,7 +698,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-team-list { display: grid; gap: 1px; }
 .match-team-list button { display: flex; min-width: 0; align-items: center; gap: 5px; padding: 0; overflow: hidden; color: var(--muted); background: transparent; border: 0; font-size: 10.5px; text-align: left; }
 .match-team-list button:hover:not(:disabled) { color: var(--ink); }
-.match-team-list button:disabled { cursor: not-allowed; }
+.match-team-list button:disabled { cursor: not-allowed; opacity: .62; }
 .match-team-list button span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 斗魂竞技场：卡片正面按名次预览前四队，展开详情展示全部队伍。 */
 .match-players.is-arena { display: grid; width: var(--match-roster-width,clamp(150px,18cqi,190px)); max-height: 98px; min-width: 0; grid-template-columns: minmax(0,1fr); gap: 2px; align-content: center; overflow: hidden; }
@@ -834,7 +834,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-detail-tabs button { min-height: 36px; padding: 0 11px; color: var(--muted); background: transparent; border: 0; border-radius: 8px; }
 .match-detail-tabs button:hover, .match-detail-tabs button.is-active { color: var(--ink); background: var(--surface-strong); }
 .match-detail-tabs button.is-active { font-weight: 700; }
-.match-detail-head .replay-button { min-height: 36px; padding: 0 12px; color: var(--primary-strong); background: var(--primary-soft); border: 0; border-radius: 8px; }
+
 .match-overview-teams { display: grid; gap: 7px; }
 .arena-match-detail { display: grid; gap: 0; }
 .arena-match-detail > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 2px 4px 6px; }
@@ -1326,11 +1326,11 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
   .live-teams.is-insight:not(.is-arena) .live-player { min-height: 76px; }
   .live-teams.is-insight:not(.is-arena) .insight-match-row { min-height: 70px; }
 }
-.live-teams.is-insight.force-no-subgrid:not(.is-arena) { grid-template-rows: none; }
-.live-teams.is-insight.force-no-subgrid:not(.is-arena) > .live-team { display: block; grid-row: auto; }
-.live-teams.is-insight.force-no-subgrid:not(.is-arena) .live-player-list.is-insight { display: grid; }
-.live-teams.is-insight.force-no-subgrid:not(.is-arena) .live-player { min-height: 76px; }
-.live-teams.is-insight.force-no-subgrid:not(.is-arena) .insight-match-row { min-height: 70px; }
+
+
+
+
+
 
 /* 队伍分析：逐人伤害与承伤 */
 .damage-compare { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin-top: 7px; }
@@ -1406,7 +1406,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .shell:has(#live-panel:not([hidden]) .recommendation-panel:not([hidden]) > .recommendation-action) { padding-bottom: 0; }
 .recommendation-action > div { display: grid; }
 .recommendation-action span { color: var(--muted); font-size: 10px; }
-.recommendation-action .item-set-manual-note { max-width: 62ch; margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+
 .build-recommendation { overflow: hidden; container: build-recommendation / inline-size; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .live-augment-recommendations + .build-recommendation { position: relative; margin-top: 20px; }
 .live-augment-recommendations + .build-recommendation::before { position: absolute; top: -11px; right: 0; left: 0; height: 1px; background: var(--line); content: ""; }

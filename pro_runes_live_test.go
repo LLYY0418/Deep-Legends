@@ -63,7 +63,7 @@ func TestProRuneLiveCaptureReplay(t *testing.T) {
 		}
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(string(data))), Header: http.Header{}}, nil
 	})}
-	p := newProRuneProvider(cp, &localStore{root: t.TempDir()}, nil)
+	p := newProRuneProvider(cp, trackTestStore(t, &localStore{root: t.TempDir()}), nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	p.refresh(ctx, time.Date(2026, 9, 9, 4, 16, 0, 0, time.UTC))
@@ -218,7 +218,7 @@ func TestProRuneLiveIndex(t *testing.T) {
 		data, _ := json.Marshal(cp.championMeta)
 		os.WriteFile(filepath.Join(root, "champion-metadata.json"), data, 0600)
 	}
-	p := newProRuneProvider(cp, &localStore{root: filepath.Join(os.TempDir(), "r75-production-cache")}, nil)
+	p := newProRuneProvider(cp, trackTestStore(t, &localStore{root: filepath.Join(os.TempDir(), "r75-production-cache")}), nil)
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	p.refresh(ctx, time.Now())

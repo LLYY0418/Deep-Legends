@@ -22,7 +22,8 @@ jobs:
           node-version: "22"
       - name: Check formatting
         shell: bash
-        run: test -z "$(gofmt -l .)"
+        run: |
+          test -z "$(find . -type d \( -name .git -o -name .gomodcache -o -name .gocache -o -name .tmpbuild -o -name node_modules \) -prune -o -type f -name '*.go' -print0 | xargs -0 gofmt -l)"
       - name: Vet
         run: go vet ./...
       - name: Test with race detector
@@ -59,12 +60,14 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: desktop/package-lock.json
+      - name: Install Windows test dependencies
+        run: npm ci --prefix desktop
       - name: Build desktop client and checksums
         shell: pwsh
         run: |
           $version = node -p "require('./desktop/package.json').version"
           if ($LASTEXITCODE -ne 0) { throw "Unable to read desktop package version" }
-          ./build-desktop-windows.ps1 -Version $version
+          ./build-desktop-windows.ps1 -Version $version -KeyMode public
           if ($LASTEXITCODE -ne 0) { throw "Desktop build failed" }
       - name: Verify checksums
         shell: pwsh

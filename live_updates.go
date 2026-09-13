@@ -79,7 +79,7 @@ func (a *app) handleEvents(w http.ResponseWriter, r *http.Request) {
 			}
 			flusher.Flush()
 		case <-heartbeat.C:
-			if _, err := fmt.Fprint(w, ": keepalive\n\n"); err != nil {
+			if _, err := fmt.Fprint(w, ": keepalive\n\nevent: heartbeat\ndata: ready\n\n"); err != nil {
 				return
 			}
 			flusher.Flush()

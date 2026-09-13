@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.12.1",
+    [string]$Version = "",
     [string]$CertificateFile = "",
     [string]$CertificatePassword = "",
     [string]$RiotAPIKeyCipher = "",
@@ -12,10 +12,12 @@ $desktopRoot = Join-Path $projectRoot "desktop"
 $backendRoot = Join-Path $desktopRoot "backend"
 $backendOutput = Join-Path $backendRoot "loot-service.exe"
 
+$package = Get-Content -Raw (Join-Path $desktopRoot "package.json") | ConvertFrom-Json
+if (-not $Version) { $Version = $package.version }
+
 if ($Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$') {
     throw "Version must use semantic version syntax"
 }
-$package = Get-Content -Raw (Join-Path $desktopRoot "package.json") | ConvertFrom-Json
 if ($package.version -ne $Version) {
     throw "Version mismatch: package.json is $($package.version), requested build is $Version"
 }
@@ -39,6 +41,7 @@ if ($KeyMode -eq "public") {
             Push-Location $projectRoot
             try {
                 $RiotAPIKeyCipher = (go run . -encrypt-riot-key $plainKey | Select-Object -Last 1).Trim()
+                if ($LASTEXITCODE -ne 0) { throw "Riot key encryption failed" }
             } finally {
                 Pop-Location
             }
@@ -65,7 +68,10 @@ try {
     $staleUnpacked = Join-Path $projectRoot "dist\desktop\win-unpacked"
     if (Test-Path $staleUnpacked) { Remove-Item -Recurse -Force $staleUnpacked }
     New-Item -ItemType Directory -Force -Path $backendRoot | Out-Null
-    $unformatted = @(gofmt -l .)
+    $goSources = @(Get-ChildItem -Recurse -File -Filter '*.go' | Where-Object { $_.FullName -notmatch '[\\/](\.git|\.gomodcache|\.gocache|\.tmpbuild|node_modules)[\\/]' } | ForEach-Object { $_.FullName })
+    if ($goSources.Count -eq 0) { throw "No project Go sources found" }
+    $unformatted = @(gofmt -l $goSources)
+    if ($LASTEXITCODE -ne 0) { throw "Go formatting check failed" }
     if ($unformatted.Count -gt 0) { throw "Go files are not formatted: $($unformatted -join ', ')" }
     go test ./...
     if ($LASTEXITCODE -ne 0) { throw "Root tests failed" }
@@ -99,6 +105,7 @@ try {
     $previousGoarch = $env:GOARCH
     $previousCgo = $env:CGO_ENABLED
     $sourceFingerprint = (& node (Join-Path $desktopRoot "source-fingerprint.cjs")).Trim()
+    if ($LASTEXITCODE -ne 0) { throw "Source fingerprint calculation failed" }
     if ($sourceFingerprint -notmatch '^[0-9a-f]{12}$') { throw "Invalid source fingerprint: $sourceFingerprint" }
     try {
         $env:GOOS = "windows"
@@ -106,6 +113,7 @@ try {
         $env:CGO_ENABLED = "0"
         $ldflags = "-s -w -H=windowsgui -buildid= -X main.version=$Version -X main.buildFingerprint=$sourceFingerprint -X main.riotAPIKey= -X main.riotAPIKeyCipher=$RiotAPIKeyCipher"
         go build -buildvcs=false -trimpath -ldflags $ldflags -o $backendOutput .
+        if ($LASTEXITCODE -ne 0) { throw "Backend build failed" }
     } finally {
         $env:GOOS = $previousGoos
         $env:GOARCH = $previousGoarch
@@ -131,6 +139,7 @@ try {
     Push-Location $desktopRoot
     try {
         if (Test-Path "package-lock.json") { npm ci } else { npm install }
+        if ($LASTEXITCODE -ne 0) { throw "Desktop dependencies install failed" }
 
         # 文件名使用版本号；诊断与构建核验仍保留源码指纹。
         $env:DEEP_LEGENDS_FINGERPRINT = $sourceFingerprint

@@ -434,30 +434,6 @@ func (a *app) opggGameTiers(ctx context.Context, gameName, tagLine, puuid string
 	return append([]opggGameTier(nil), games...)
 }
 
-// annotateOPGGAverageTiers 给韩服战绩补充平均段位：OP.GG 的对局 id
-// 无法对应 Riot gameId，按「开局时间 ±3 分钟 + 时长 ±20 秒」匹配。
-func (a *app) annotateOPGGAverageTiers(ctx context.Context, gameName, tagLine, puuid string, matches []gameplayMatch) {
-	if len(matches) == 0 {
-		return
-	}
-	boundedCtx, cancel := context.WithTimeout(ctx, 9*time.Second)
-	defer cancel()
-	oldest := int64(0)
-	for _, match := range matches {
-		if match.CreatedAt > 0 && (oldest == 0 || match.CreatedAt < oldest) {
-			oldest = match.CreatedAt
-		}
-	}
-	games := a.opggGameTiers(boundedCtx, gameName, tagLine, puuid, oldest)
-	if len(games) == 0 {
-		return
-	}
-	for index := range matches {
-		match := &matches[index]
-		match.AverageTier = matchOPGGAverageTier(match.CreatedAt, match.Duration, games)
-	}
-}
-
 // matchOPGGAverageTier 按时间和时长把一场 Riot 对局映射到 OP.GG 的
 // 不透明对局记录。返回副本，避免调用方持有缓存切片内部字段的地址。
 func matchOPGGAverageTier(createdAt, duration int64, games []opggGameTier) *matchTiersResponse {

@@ -223,9 +223,9 @@ func (u *updateManager) downloadSource(parent context.Context, asset updateAsset
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
 	}
 	req.Header.Set("Accept-Encoding", "identity")
-	headerTimer := time.AfterFunc(updateSourceTimeout, cancel)
+	stopHeaderTimer := u.sourceTimer(updateSourceTimeout, cancel)
 	response, err := u.client.Do(req)
-	headerTimer.Stop()
+	stopHeaderTimer()
 	if err != nil {
 		return err
 	}
@@ -266,8 +266,8 @@ func (u *updateManager) downloadSource(parent context.Context, asset updateAsset
 	u.publish()
 	go func() {
 		defer close(watchStopped)
-		ticker := time.NewTicker(200 * time.Millisecond)
-		defer ticker.Stop()
+		ticks, stopTicks := u.downloadProgressTicks()
+		defer stopTicks()
 		window := updateSpeedWindow{}
 		window.speed(time.Now(), offset)
 		for {
@@ -276,7 +276,7 @@ func (u *updateManager) downloadSource(parent context.Context, asset updateAsset
 				return
 			case <-ctx.Done():
 				return
-			case <-ticker.C:
+			case <-ticks:
 			case <-pulses:
 			}
 			if time.Since(time.Unix(0, activity.Load())) >= updateSourceTimeout {
@@ -385,4 +385,19 @@ func (u *updateManager) Apply() error {
 		u.publish()
 	}
 	return err
+}
+
+func (u *updateManager) sourceTimer(d time.Duration, expire func()) func() {
+	if u.startSourceTimer != nil {
+		return u.startSourceTimer(d, expire)
+	}
+	timer := time.AfterFunc(d, expire)
+	return func() { timer.Stop() }
+}
+func (u *updateManager) downloadProgressTicks() (<-chan time.Time, func()) {
+	if u.progressTicks != nil {
+		return u.progressTicks()
+	}
+	ticker := time.NewTicker(200 * time.Millisecond)
+	return ticker.C, ticker.Stop
 }

@@ -3,8 +3,8 @@ set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$project_root"
-version="${1:-0.12.1}"
 package_version="$(node -p 'require("./desktop/package.json").version')"
+version="${1:-$package_version}"
 [[ "$version" == "$package_version" ]] || { echo "Version mismatch: package.json is $package_version, requested build is $version" >&2; exit 1; }
 export DEEP_LEGENDS_KEY_MODE="${DEEP_LEGENDS_KEY_MODE:-private}"
 case "$DEEP_LEGENDS_KEY_MODE" in public|private) ;; *) echo "DEEP_LEGENDS_KEY_MODE must be public or private" >&2; exit 1 ;; esac
@@ -12,7 +12,8 @@ rm -f "$project_root/dist/desktop/release-build.json"
 find "$project_root/dist/desktop" -maxdepth 1 -type f \( -name 'Deep Legends*.exe' -o -name 'Deep Legends*.zip' -o -name 'SHA256SUMS.txt' \) -delete 2>/dev/null || true
 rm -rf "$project_root/dist/desktop/win-unpacked"
 
-unformatted="$(gofmt -l .)"
+# Ignore dependency/build caches, not project source or untracked Go changes.
+unformatted="$(find . -type d \( -name .git -o -name .gomodcache -o -name .gocache -o -name .tmpbuild -o -name node_modules \) -prune -o -type f -name '*.go' -print0 | xargs -0 gofmt -l)"
 [[ -z "$unformatted" ]] || { echo "Go files are not formatted:" >&2; printf '%s\n' "$unformatted" >&2; exit 1; }
 go test ./...
 go vet ./...

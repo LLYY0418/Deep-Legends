@@ -26,6 +26,7 @@ function harness(script = source, respond) {
     emit(name,data){this.listeners.get(name)?.({data:JSON.stringify(data)});}
   };
   try {
+    w.eval(fs.readFileSync(path.join(__dirname, "runtime.js"), "utf8"));
     w.eval(script.replace(/\}\)\(\);\s*$/, 'window.updateProbe = { renderUpdateStatus, renderUpdateNotes, updateUI, renderUpdateDialog, showUpdateCheckFeedback };})();'));
   } catch(error) {dom.window.close();throw error;}
   return { w, dom, requests, streams, probe:w.updateProbe, get:id=>w.document.getElementById(id), close:()=>w.close() };

@@ -43,7 +43,7 @@ func TestHandleChampionAssetCommunityDragonFallsBackFromLargeToSmall(t *testing.
 			Body: io.NopCloser(bytes.NewReader(body)), ContentLength: int64(len(body)), Request: request,
 		}, nil
 	})}
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestChampionDataCacheReportsLoadState(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(root, championDataCacheDirectory), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	key := championCacheKey(dataDragonHost, "/api/versions.json", "", "application/json")
 	first := newChampionDataCache(store)
 	result, err := first.loadWithStatus(context.Background(), key, time.Hour, time.Hour, true, func(context.Context) ([]byte, error) {
@@ -593,7 +593,7 @@ func TestChampionDataCachePersistsAcrossInstances(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(root, championDataCacheDirectory), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	first := newChampionDataCache(store)
 	key := championCacheKey(dataDragonHost, "/api/versions.json", "", "application/json")
 	data, err := first.load(context.Background(), key, time.Hour, time.Hour, true, func(context.Context) ([]byte, error) { return []byte(`{"cached":true}`), nil })
@@ -637,7 +637,7 @@ func TestChampionDataCacheKeepsYourGGMemoryOnly(t *testing.T) {
 	if err := os.Mkdir(cacheDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	cache := newChampionDataCache(store)
 	key := championCacheKey(yourGGArenaHost, "/kr/api/arena/champions/799/top-builds", "limit=10", "application/json")
 	loaderCalls := 0
@@ -697,7 +697,7 @@ func TestChampionDataCachePurgesLegacyYourGGDiskEntry(t *testing.T) {
 	if err := os.WriteFile(path, encoded, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_ = newChampionDataCache(&localStore{root: root})
+	_ = newChampionDataCache(trackTestStore(t, &localStore{root: root}))
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("legacy YOUR.GG cache was not removed: %v", err)
 	}

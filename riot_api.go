@@ -149,6 +149,12 @@ type riotAccountFlight struct {
 	err     error
 }
 
+type riotMatchFlight struct {
+	done  chan struct{}
+	match *riotMatch
+	err   error
+}
+
 type riotProvider struct {
 	champions *championProvider
 
@@ -159,6 +165,7 @@ type riotProvider struct {
 	cacheMu        sync.Mutex
 	matchCache     map[string]*riotMatch
 	matchOrder     []string
+	matchFlights   map[string]*riotMatchFlight
 	accountMu      sync.Mutex
 	accountCache   map[string]riotAccountCacheEntry
 	accountFlights map[string]*riotAccountFlight
@@ -181,7 +188,7 @@ type riotOverviewCostTracker struct {
 }
 
 func (t *riotOverviewCostTracker) recordMatchFailure(err error) {
-	if t == nil || err == nil {
+	if t == nil || err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return
 	}
 	t.mu.Lock()
@@ -263,6 +270,10 @@ func (p *riotProvider) wait(ctx context.Context) error {
 			return err
 		}
 		p.limitMu.Lock()
+		if err := ctx.Err(); err != nil {
+			p.limitMu.Unlock()
+			return err
+		}
 		now := time.Now()
 		p.shortWindow = pruneTimestamps(p.shortWindow, now.Add(-shortPeriod))
 		p.longWindow = pruneTimestamps(p.longWindow, now.Add(-longPeriod))
@@ -289,6 +300,9 @@ func (p *riotProvider) wait(ctx context.Context) error {
 		// Report the quota recovery, rather than timing out identity resolution
 		// and then caching that timeout as though the account lookup had failed.
 		if deadline, ok := ctx.Deadline(); ok && sleep >= time.Until(deadline) {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			seconds := int(math.Ceil(sleep.Seconds()))
 			riotOverviewCostTrackerFromContext(ctx).recordRateLimit()
 			if p.champions != nil && p.champions.diag != nil {
@@ -355,9 +369,6 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		return errors.New("尚未配置 Riot API Key：请用 -encrypt-riot-key 生成密文，构建时通过 -ldflags \"-X main.riotAPIKeyCipher=<密文>\" 注入（临时调试可用环境变量 RIOT_API_KEY）")
 	}
 	for attempt := 0; attempt < 3; attempt++ {
-		if err := p.wait(ctx); err != nil {
-			return err
-		}
 		// requestPath 已由调用方用 url.PathEscape 逐段转义，这里必须按
 		// 字符串拼接后交给 http.NewRequest 解析；若赋值给 url.URL.Path，
 		// 序列化时 % 会被二次转义，带空格或韩文的 Riot ID 会全部 404。
@@ -372,7 +383,12 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		request.Header.Set("X-Riot-Token", riotKey())
 		request.Header.Set("Accept", "application/json")
 		request.Header.Set("User-Agent", "Deep-Legends/"+version)
-		response, err := p.champions.httpClient().Do(request)
+		client := p.champions.httpClient()
+		// Reserve quota only after building the request, immediately before I/O.
+		if err := p.wait(ctx); err != nil {
+			return err
+		}
+		response, err := client.Do(request)
 		if err != nil {
 			return fmt.Errorf("无法连接 Riot 官方接口（可在设置中调整“英雄数据网络”代理）：%w", err)
 		}
@@ -684,13 +700,38 @@ func (p *riotProvider) matchByID(ctx context.Context, matchID string) (*riotMatc
 	return match, err
 }
 
-func (p *riotProvider) matchByIDWithCache(ctx context.Context, matchID string) (*riotMatch, string, error) {
+func (p *riotProvider) matchByIDWithCache(ctx context.Context, matchID string) (result *riotMatch, status string, resultErr error) {
 	p.cacheMu.Lock()
 	if cached, ok := p.matchCache[matchID]; ok {
 		p.cacheMu.Unlock()
 		return cached, "hit", nil
 	}
+	if flight := p.matchFlights[matchID]; flight != nil {
+		p.cacheMu.Unlock()
+		select {
+		case <-ctx.Done():
+			return nil, "miss", ctx.Err()
+		case <-flight.done:
+			// A departing leader must not poison another caller's live request.
+			if ctx.Err() == nil && (errors.Is(flight.err, context.Canceled) || errors.Is(flight.err, context.DeadlineExceeded)) {
+				return p.matchByIDWithCache(ctx, matchID)
+			}
+			return flight.match, "hit", flight.err
+		}
+	}
+	if p.matchFlights == nil {
+		p.matchFlights = make(map[string]*riotMatchFlight)
+	}
+	flight := &riotMatchFlight{done: make(chan struct{})}
+	p.matchFlights[matchID] = flight
 	p.cacheMu.Unlock()
+	defer func() {
+		p.cacheMu.Lock()
+		flight.match, flight.err = result, resultErr
+		delete(p.matchFlights, matchID)
+		close(flight.done)
+		p.cacheMu.Unlock()
+	}()
 	var match riotMatch
 	if err := p.get(ctx, riotClusterHost, "/lol/match/v5/matches/"+url.PathEscape(matchID), nil, &match); err != nil {
 		return nil, "miss", err
@@ -699,13 +740,14 @@ func (p *riotProvider) matchByIDWithCache(ctx context.Context, matchID string) (
 		return nil, "miss", errors.New("Riot 战绩详情缺少必要字段，可能接口已变更")
 	}
 	p.cacheMu.Lock()
-	if _, exists := p.matchCache[matchID]; !exists {
-		p.matchCache[matchID] = &match
-		p.matchOrder = append(p.matchOrder, matchID)
-		for len(p.matchOrder) > riotMatchCacheMax {
-			delete(p.matchCache, p.matchOrder[0])
-			p.matchOrder = p.matchOrder[1:]
-		}
+	if p.matchCache == nil {
+		p.matchCache = make(map[string]*riotMatch)
+	}
+	p.matchCache[matchID] = &match
+	p.matchOrder = append(p.matchOrder, matchID)
+	for len(p.matchOrder) > riotMatchCacheMax {
+		delete(p.matchCache, p.matchOrder[0])
+		p.matchOrder = p.matchOrder[1:]
 	}
 	p.cacheMu.Unlock()
 	return &match, "miss", nil
@@ -1033,7 +1075,11 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		wait.Add(1)
 		go func(index int) {
 			defer wait.Done()
-			semaphore <- struct{}{}
+			select {
+			case semaphore <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
 			defer func() { <-semaphore }()
 			detail, detailErr := provider.matchByID(ctx, ids[index])
 			if detailErr != nil {
@@ -1276,13 +1322,32 @@ func (p *championProvider) httpClient() *http.Client {
 // 加载一次（带磁盘缓存），失败则返回空映射并由调用方降级显示。
 func (p *championProvider) championNamesZH(ctx context.Context) map[int64]string {
 	p.mu.Lock()
-	loaded := len(p.championMeta) > 0
-	p.mu.Unlock()
-	if !loaded {
-		loadContext, cancel := context.WithTimeout(ctx, 10*time.Second)
-		_, _ = p.loadCatalog(loadContext)
-		cancel()
+	loaded := len(p.championMeta) > 0 || time.Now().Before(p.catalogNamesFailUntil)
+	flight := p.catalogNamesFlight
+	leader := !loaded && flight == nil
+	if leader {
+		flight = make(chan struct{})
+		p.catalogNamesFlight = flight
 	}
+	p.mu.Unlock()
+	if leader {
+		loadContext, cancel := context.WithTimeout(ctx, 10*time.Second)
+		_, err := p.loadCatalog(loadContext)
+		cancel()
+		p.mu.Lock()
+		if err != nil && ctx.Err() == nil {
+			p.catalogNamesFailUntil = time.Now().Add(time.Minute)
+		}
+		p.catalogNamesFlight = nil
+		close(flight)
+		p.mu.Unlock()
+	} else if !loaded && flight != nil {
+		select {
+		case <-flight:
+		case <-ctx.Done():
+		}
+	}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	result := make(map[int64]string, len(p.championMeta))

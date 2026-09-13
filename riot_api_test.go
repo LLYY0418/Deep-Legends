@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -190,5 +191,16 @@ func TestRiotOverviewCapsMatchDetailConcurrencyAtFour(t *testing.T) {
 	}
 	if got := maxInFlight.Load(); got == 0 || got > 4 {
 		t.Fatalf("maximum concurrent Riot match detail requests = %d, want 1..4", got)
+	}
+}
+
+func TestRiotOverviewCostTrackerIgnoresCancellation(t *testing.T) {
+	tracker := &riotOverviewCostTracker{}
+	tracker.recordMatchFailure(context.Canceled)
+	tracker.recordMatchFailure(context.DeadlineExceeded)
+	tracker.recordMatchFailure(errors.New("upstream failed"))
+	failed, kind := tracker.matchFailureSnapshot()
+	if failed != 1 || kind == "" {
+		t.Fatalf("failure snapshot = (%d, %q), want one non-cancellation failure", failed, kind)
 	}
 }

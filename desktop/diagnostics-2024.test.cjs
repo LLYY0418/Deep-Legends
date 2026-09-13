@@ -10,6 +10,7 @@ function workspace(stored = {}) {
   const dom = new JSDOM('<div id="champions-root"></div><div id="champions-panel"></div>', {url:"http://localhost/", runScripts:"outside-only", pretendToBeVisual:true});
   const w = dom.window;
   for (const [key, value] of Object.entries(stored)) w.localStorage.setItem(key, value);
+  w.eval(fs.readFileSync(path.join(__dirname, "../web/runtime.js"), "utf8"));
   w.eval(source.replace('  render();\n  beginStartupPreload();\n  adoptCatalog(state.preload?.catalog);', `
     render = () => {};
     loadWorkspace = async () => {};
@@ -129,5 +130,24 @@ test("2024 rarity UI says selection distribution, retains all stages, hides fail
     assert.doesNotMatch(html,/海克斯品质概率|查看四阶段/);
     state.mayhemRarityData=null; state.mayhemRarityError="invalid source";
     assert.equal(render(),"");
+  } finally { dom.window.close(); }
+});
+
+test("R86 search keeps the input and exposes all-position request failures", async () => {
+  const dom = workspace();
+  try {
+    const w = dom.window, api = w.testWorkspace, s = api.state;
+    s.catalog = {};
+    s.rankings = { rows: [{ championId: 103, name: "阿狸" }] };
+    s.position = "all";
+    const root = w.document.getElementById("champions-root");
+    root.innerHTML = '<input data-champion-search><span class="champion-result-count"></span><div data-champion-results></div>';
+    const input = root.querySelector("input");
+    api.setAPI(async () => { throw Error("R86 catalog unavailable"); });
+    await api.loadRankings(true);
+    assert.equal(root.querySelector("input"), input);
+    assert.match(root.querySelector(".is-error").textContent, /R86 catalog unavailable/);
+    assert.ok(root.querySelector("[data-champion-retry]"));
+    assert.equal(s.loading, false);
   } finally { dom.window.close(); }
 });

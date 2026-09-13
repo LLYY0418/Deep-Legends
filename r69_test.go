@@ -145,7 +145,7 @@ func TestR69FacadeLoadCostWritesDurationsAndTrigger(t *testing.T) {
 	if err := os.MkdirAll(root+"/logs", 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a.storage = &localStore{root: root}
+	a.storage = trackTestStore(t, &localStore{root: root})
 	a.loadFacadeStateTriggered(context.Background(), "sse")
 	event, _ := r69ReadDiagnosticEvent(t, a.storage, "facade_load_cost")
 	if event["trigger"] != "sse" {
@@ -197,7 +197,7 @@ func newR69FacadeDiagnosticFixture(t *testing.T, summary string, postStatus int)
 	}))
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}, storage: &localStore{root: root}}
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}, storage: trackTestStore(t, &localStore{root: root})}
 	return a, &postCount
 }
 

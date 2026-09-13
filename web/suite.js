@@ -201,8 +201,7 @@
     if (champSelectMetrics) champSelectMetrics.hidden = name !== "champselect";
     if (state.active && subtitle) subtitle.textContent = tabCopy[name];
     requestAnimationFrame(() => appScroll?.scrollTo({ top: Number(state.scroll[name] || 0), behavior: "instant" }));
-	if (state.active && state.connected && name === "facade") void loadFacade(false);
-	if (state.active && state.connected && name === "champselect") void loadChampSelect(false);
+	if (state.active && state.connected) void loadActiveTab(false);
   }
 
   function setupTabs() {
@@ -220,18 +219,19 @@
     activateTab(state.tab);
   }
 
+  function loadActiveTab(force = false) {
+    const loader = { watch: loadWatch, rig: loadRig, facade: loadFacade, sweep: loadClaims, champselect: loadChampSelect }[state.tab] || loadWatch;
+    return loader(force);
+  }
+
   async function loadAll(force = false) {
     if (state.loading && !force) return;
     state.loading = true;
-    const tasks = [
-      loadWatch(force),
-      loadRig(force),
-      loadFacade(force),
-      loadClaims(force),
-      loadChampSelect(force),
-    ];
-    await Promise.allSettled(tasks);
-    state.loading = false;
+    try {
+      const tasks = [loadActiveTab(force)];
+      if (state.tab !== "rig") tasks.push(loadRig(force));
+      await Promise.allSettled(tasks);
+    } finally { state.loading = false; }
   }
 
   const watchDefinitions = [

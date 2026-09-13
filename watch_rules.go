@@ -87,6 +87,7 @@ type watchSettings struct {
 }
 
 type watchPendingAction struct {
+	fireAt time.Time
 	cancel context.CancelFunc
 }
 
@@ -99,6 +100,8 @@ type convenienceSettings struct {
 }
 
 type watchRunner struct {
+	now                    func() time.Time
+	wait                   func(context.Context, time.Duration) error
 	champDiagnosticSession string
 	champDiagnosticSamples map[string]diagnosticSample
 	writeContext           context.Context
@@ -548,6 +551,17 @@ func (r *watchRunner) schedulePlayAgain(client *LCUClient, delayMS int) {
 }
 
 func (r *watchRunner) schedule(client *LCUClient, action string, delayMS int, method, path string, body any) bool {
+	// A later settlement phase can advance the same pending action. Deduping
+	// phase notifications must not preserve an obsolete ten-second deadline.
+	if action == "play-again" {
+		r.mu.Lock()
+		previous := r.pending[action]
+		earlier := previous != nil && r.clockNow().Add(time.Duration(delayMS)*time.Millisecond).Before(previous.fireAt)
+		r.mu.Unlock()
+		if earlier {
+			return r.scheduleMarked(client, action, delayMS, method, path, body)
+		}
+	}
 	if !r.markRun(action, 3*time.Second) {
 		return false
 	}
@@ -578,7 +592,7 @@ func (r *watchRunner) scheduleAccept(client *LCUClient, delayMS int) {
 
 func (r *watchRunner) scheduleMarked(client *LCUClient, action string, delayMS int, method, path string, body any) bool {
 	ctx, cancel := context.WithCancel(context.Background())
-	pending := &watchPendingAction{cancel: cancel}
+	pending := &watchPendingAction{cancel: cancel, fireAt: r.clockNow().Add(time.Duration(delayMS) * time.Millisecond)}
 	r.mu.Lock()
 	if r.customSession {
 		r.mu.Unlock()
@@ -586,6 +600,11 @@ func (r *watchRunner) scheduleMarked(client *LCUClient, action string, delayMS i
 		return false
 	}
 	if previous := r.pending[action]; previous != nil {
+		if action == "play-again" && !pending.fireAt.Before(previous.fireAt) {
+			r.mu.Unlock()
+			cancel()
+			return false
+		}
 		previous.cancel()
 	}
 	r.pending[action] = pending
@@ -612,15 +631,15 @@ func (r *watchRunner) scheduleMarked(client *LCUClient, action string, delayMS i
 			r.mu.Unlock()
 		}()
 		if delayMS > 0 {
-			timer := time.NewTimer(time.Duration(delayMS) * time.Millisecond)
-			defer timer.Stop()
-			select {
-			case <-ctx.Done():
+			wait := r.wait
+			if wait == nil {
+				wait = waitContext
+			}
+			if err := wait(ctx, time.Duration(delayMS)*time.Millisecond); err != nil {
 				outcome = "canceled-during-delay"
 				r.record(map[string]any{"event": "watch_action", "action": action, "result": "canceled"})
 				r.emit("watch:canceled:" + action)
 				return
-			case <-timer.C:
 			}
 		}
 		if ctx.Err() != nil || r.customPaused() {
@@ -972,24 +991,16 @@ func (r *watchRunner) record(event map[string]any) {
 	}
 }
 
-func (r *watchRunner) run(client *LCUClient, action, method, path string) {
-	delay := 0
-	if action == "play-again" {
-		delay = 1200
-	}
-	r.schedule(client, action, delay, method, path, nil)
-}
-
 func (r *watchRunner) markRun(action string, window time.Duration) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.customSession {
 		return false
 	}
-	if last, ok := r.lastRun[action]; ok && time.Since(last) < window {
+	if last, ok := r.lastRun[action]; ok && r.clockNow().Sub(last) < window {
 		return false
 	}
-	r.lastRun[action] = time.Now()
+	r.lastRun[action] = r.clockNow()
 	return true
 }
 
@@ -1000,19 +1011,6 @@ func (r *watchRunner) cancelPending(action string) {
 	r.mu.Unlock()
 	if pending != nil {
 		pending.cancel()
-	}
-}
-
-func (r *watchRunner) cancelAllPending() {
-	r.mu.Lock()
-	cancels := make([]context.CancelFunc, 0, len(r.pending))
-	for action, pending := range r.pending {
-		cancels = append(cancels, pending.cancel)
-		delete(r.pending, action)
-	}
-	r.mu.Unlock()
-	for _, cancel := range cancels {
-		cancel()
 	}
 }
 
@@ -1641,4 +1639,21 @@ func (r *watchRunner) requestWatchJSON(ctx context.Context, client *LCUClient, m
 		return err
 	}
 	return client.RequestJSON(requestCtx, method, path, body, nil)
+}
+
+func (r *watchRunner) clockNow() time.Time {
+	if r.now != nil {
+		return r.now()
+	}
+	return time.Now()
+}
+func waitContext(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }

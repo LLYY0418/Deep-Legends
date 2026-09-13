@@ -28,6 +28,14 @@ func TestR56ReadyCheckAcceptIsOncePerWindowAndResetsForNextRound(t *testing.T) {
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	runner := newWatchRunner(nil, nil)
+	var clockMillis atomic.Int64
+	runner.now = func() time.Time { return time.UnixMilli(100000 + clockMillis.Load()) }
+	fired := make(chan struct{}, 10)
+	runner.notify = func(event string) {
+		if event == "watch:fired:accept" {
+			fired <- struct{}{}
+		}
+	}
 	settings := defaultWatchSettings()
 	settings.Rules.AutoAccept.Enabled = true
 	settings.Rules.AutoAccept.DelayMS = 0
@@ -35,9 +43,14 @@ func TestR56ReadyCheckAcceptIsOncePerWindowAndResetsForNextRound(t *testing.T) {
 
 	for index := 0; index < 10; index++ {
 		runner.handleEvent(client, LCUEvent{URI: "/lol-matchmaking/v1/ready-check", Data: []byte(`{"state":"InProgress"}`)}, Summoner{})
-		if index < 9 {
-			time.Sleep(500 * time.Millisecond)
+		if index == 0 {
+			select {
+			case <-fired:
+			case <-time.After(time.Second):
+				t.Fatal("initial accept not fired")
+			}
 		}
+		clockMillis.Add(500)
 	}
 	if got := requests.Load(); got != 1 {
 		t.Fatalf("accept requests during one ready-check = %d, want 1", got)
@@ -85,7 +98,7 @@ func TestR56FacadeIdentityShapeIsRecordedOnceWithoutValues(t *testing.T) {
 	if err := os.MkdirAll(root+"/logs", 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	client := &LCUClient{}
 	chat := map[string]any{"availability": "chat", "statusMessage": "SECRET_NAME", "lol": map[string]any{"rankedLeagueTier": "DIAMOND", "title": "SECRET_TITLE", "playerTitleSelected": float64(321), "gameStatus": "inGame"}}
 	regalia := map[string]any{"preferredCrestType": "SECRET_CREST", "selectedPrestigeCrest": 22}
@@ -98,7 +111,7 @@ func TestR56FacadeIdentityShapeIsRecordedOnceWithoutValues(t *testing.T) {
 	if a.claimFacadeIdentityShape(client) {
 		t.Fatal("same connection produced a second facade shape claim")
 	}
-	data, err := os.ReadFile(root + "/logs/diagnostics.jsonl")
+	data, err := a.storage.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +169,7 @@ func TestR56FacadeSummaryLoadsForStateAndShapeDiagnosticIsOncePerConnection(t *t
 	}))
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	a := &app{connected: true, lcu: client, storage: &localStore{root: root}, summoner: Summoner{SummonerID: 1}}
+	a := &app{connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: root}), summoner: Summoner{SummonerID: 1}}
 	first := a.loadFacadeState(context.Background())
 	second := a.loadFacadeState(context.Background())
 	if !first.Connected || first.Reason != "" || !second.Connected || second.Reason != "" {
@@ -168,7 +181,7 @@ func TestR56FacadeSummaryLoadsForStateAndShapeDiagnosticIsOncePerConnection(t *t
 	if first.ChallengeSummary["title"] != "峡谷先锋" || second.ChallengeSummary["title"] != "峡谷先锋" {
 		t.Fatalf("challenge summary was not returned to the renderer: first=%#v second=%#v", first.ChallengeSummary, second.ChallengeSummary)
 	}
-	data, err := os.ReadFile(root + "/logs/diagnostics.jsonl")
+	data, err := a.storage.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)
 	}

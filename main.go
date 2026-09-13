@@ -50,6 +50,7 @@ const diagnosticDeduplicationLimit = 512
 var embedded embed.FS
 
 type app struct {
+	overviewTimeout                 func(context.Context, time.Duration) (context.Context, context.CancelFunc)
 	updates                         *updateManager
 	runtimeCancel                   context.CancelFunc
 	quitOnce                        sync.Once
@@ -156,6 +157,7 @@ type app struct {
 	convenience                     *convenienceRunner // legacy alias; points at watch
 	lpTracker                       *lpTracker
 	rankScores                      *rankScoreCache
+	rankScoresOnce                  sync.Once
 	opgg                            *opggInsights
 	overviewQueries                 *overviewQueryCache
 	matchTimelines                  *matchTimelineCache
@@ -340,8 +342,10 @@ func main() {
 	if storageErr != nil {
 		log.Printf("本地历史与自定义奖池不可用：%v", storageErr)
 	}
+	defer closeDiagnosticStore(store)
 	token, err := loadOrCreateSessionToken(store)
 	if err != nil {
+		closeDiagnosticStore(store)
 		log.Fatal(err)
 	}
 	pools := map[string]PoolManifest{builtInPool.ID: builtInPool}
@@ -439,6 +443,7 @@ func main() {
 
 	webFS, err := fs.Sub(embedded, "web")
 	if err != nil {
+		closeDiagnosticStore(store)
 		log.Fatal(err)
 	}
 	if *selfTest {
@@ -451,6 +456,7 @@ func main() {
 	// 类型不对时浏览器有权拒绝加载字体，字标就会静默掉回退字体——而且这种问题
 	// 只在打包后的真机上出现，本地未必复现。这里显式登记，跨平台结果一致。
 	if err := mime.AddExtensionType(".woff2", "font/woff2"); err != nil {
+		closeDiagnosticStore(store)
 		log.Fatal(err)
 	}
 	// Content-based validators survive process restarts and change with the
@@ -541,10 +547,12 @@ func main() {
 
 	listener, err := net.Listen("tcp", *listenAddress)
 	if err != nil {
+		closeDiagnosticStore(store)
 		log.Fatal(err)
 	}
 	if tcpAddress, ok := listener.Addr().(*net.TCPAddr); !ok || !tcpAddress.IP.IsLoopback() {
 		_ = listener.Close()
+		closeDiagnosticStore(store)
 		log.Fatal("本地界面只能监听回环地址")
 	}
 	baseAddress := "http://" + listener.Addr().String()
@@ -552,6 +560,7 @@ func main() {
 	if *desktopMode {
 		if readyErr := writeDesktopReady(os.Stdout, baseAddress, address, token); readyErr != nil {
 			_ = listener.Close()
+			closeDiagnosticStore(store)
 			log.Fatal(readyErr)
 		}
 	}
@@ -576,6 +585,7 @@ func main() {
 	}
 	log.Printf("Deep Legends %s 正在运行：%s", version, baseAddress)
 	if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		closeDiagnosticStore(store)
 		log.Fatal(err)
 	}
 }
@@ -1005,17 +1015,6 @@ func (a *app) handleMedia(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Cache-Control", "private, max-age=3600")
 	http.ServeContent(w, r, pathpkg.Base(assetPath), time.Time{}, bytes.NewReader(data))
-}
-
-func (a *app) refresh() {
-	a.mu.RLock()
-	client := a.lcu
-	a.mu.RUnlock()
-	if client == nil {
-		a.requestRefresh()
-		return
-	}
-	_ = a.refreshWithClient(client)
 }
 
 func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
@@ -1615,7 +1614,7 @@ func loadOrCreateSessionToken(store *localStore) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(path, []byte(token+"\n"), 0o600); err != nil {
+	if err := atomicWriteFile(path, []byte(token+"\n"), 0o600); err != nil {
 		log.Printf("会话令牌未能持久化，服务重启后需要重新打开页面：%v", err)
 	}
 	return token, nil
@@ -1733,4 +1732,10 @@ func ensureWindows() error {
 		return fmt.Errorf("LeagueClient discovery is only available on Windows")
 	}
 	return nil
+}
+
+func closeDiagnosticStore(store *localStore) {
+	if err := store.Close(); err != nil {
+		log.Print("诊断日志关闭失败，最后一批事件可能未写入")
+	}
 }

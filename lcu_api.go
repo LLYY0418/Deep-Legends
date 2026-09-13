@@ -623,7 +623,7 @@ func (api ChampionMasteryAPI) AllContext(ctx context.Context, puuid string) (map
 		capability.Detail = "当前客户端未提供玩家 PUUID"
 		return map[int64]ChampionMastery{}, capability
 	}
-	data, err := api.client.GetBytes(path)
+	data, err := api.client.GetBytesContext(ctx, path)
 	if err != nil {
 		return map[int64]ChampionMastery{}, optionalCapabilityError(capability, err)
 	}

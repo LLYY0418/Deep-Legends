@@ -256,16 +256,7 @@ function applyUiScale(window, scale, force = false) {
 }
 
 function appendDesktopLog(message) {
-  const safe = String(message || "")
-    .replace(/bootstrap=[^\s&]+/gi, "bootstrap=[redacted]")
-    .replace(/(?:token|authorization)["'\s:=]+[^\s,"']+/gi, "$1=[redacted]")
-    .trim();
-  if (!safe) return;
-  try {
-    const directory = path.join(app.getPath("userData"), "logs");
-    fs.mkdirSync(directory, { recursive: true });
-    fs.appendFileSync(path.join(directory, "desktop.log"), `${new Date().toISOString()} ${safe.slice(0, 2000)}\n`, "utf8");
-  } catch (_) {}
+  try { require("./desktop-log.cjs").appendDesktopLogFile(path.join(app.getPath("userData"), "logs"), message); } catch (_) {}
 }
 
 // Spawning the backend is NOT free on the main thread: libuv runs CreateProcessW
@@ -533,6 +524,7 @@ function createMainWindow() {
     getBaseURL: () => backendReady?.baseUrl || "",
     getDirectory: () => windowShareExportController.getSaveDirectory({ sender: mainWindow?.webContents }).directory,
     fileSystem: fs,
+    getDesktopLog: () => require("./desktop-log.cjs").desktopLogForExport(path.join(app.getPath("userData"), "logs")),
     onCompleted(file) {
       lastDiagnosticsFile = file;
       if (!mainWindow?.webContents.isDestroyed()) mainWindow.webContents.send("desktop-diagnostics-completed");

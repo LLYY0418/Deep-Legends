@@ -78,7 +78,7 @@ func TestSocialFriendsNeverProbesSpectatorForInGameFriends(t *testing.T) {
 	defer server.Close()
 
 	client := &LCUClient{baseURL: server.URL, token: "lcu-secret", http: server.Client()}
-	a := &app{token: "session-secret", connected: true, lcu: client, storage: &localStore{root: root}}
+	a := &app{token: "session-secret", connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: root})}
 	for range 2 {
 		recorder := httptest.NewRecorder()
 		a.handleSocialFriends(recorder, httptest.NewRequest(http.MethodGet, "/api/social/friends", nil))

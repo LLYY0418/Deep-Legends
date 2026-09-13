@@ -76,7 +76,7 @@ func TestDesktopStartupStageHTTPValidationAndDiskWrite(t *testing.T) {
 }
 
 func TestDesktopStartupStageMissingLogDirectoryCannotAcknowledgeSuccess(t *testing.T) {
-	server := startupStageServer(t, &localStore{root: t.TempDir()}) // Intentionally no logs directory.
+	server := startupStageServer(t, trackTestStore(t, &localStore{root: t.TempDir()})) // Intentionally no logs directory.
 	request, _ := http.NewRequest(http.MethodPost, server.URL+"/api/diagnostics/startup-stage", strings.NewReader(`{"stage":"backend_ready"}`))
 	request.Header.Set("X-Local-Token", startupStageTestToken)
 	response, err := server.Client().Do(request)
@@ -112,7 +112,7 @@ func TestDesktopStartupStageShellAndExportEndToEnd(t *testing.T) {
 			}
 			// Reopening the app uses the same directory and a new run_id. Export
 			// must still include the previous incomplete startup after a restart.
-			reopened := &localStore{root: store.root}
+			reopened := trackTestStore(t, &localStore{root: store.root})
 			if err := reopened.appendDiagnostic(map[string]any{"event": "app_start", "build_fingerprint": "a84b00000001"}); err != nil {
 				t.Fatal(err)
 			}

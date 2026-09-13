@@ -255,7 +255,7 @@ func TestSnapshotPersistenceIsRedacted(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	store := &localStore{root: root, salt: bytes.Repeat([]byte{1}, 32)}
+	store := trackTestStore(t, &localStore{root: root, salt: bytes.Repeat([]byte{1}, 32)})
 	pool, _ := validatePoolManifest(PoolManifest{Name: "测试", Version: "1", Names: []string{"测试皮肤"}})
 	snapshot := Snapshot{Summoner: Summoner{SummonerID: 7, PUUID: "private-puuid", GameName: "玩家"}, Owned: []Skin{{ID: 1001, Name: "测试皮肤"}}, Remaining: []Skin{}}
 	record, err := store.saveSnapshot(snapshot, pool)
@@ -280,7 +280,7 @@ func TestLatestMatchingSnapshotRequiresAccountAndPoolIdentity(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	store := &localStore{root: root, salt: bytes.Repeat([]byte{7}, 32)}
+	store := trackTestStore(t, &localStore{root: root, salt: bytes.Repeat([]byte{7}, 32)})
 	pool, err := validatePoolManifest(PoolManifest{Name: "历史奖池", Version: "1", Names: []string{"一", "二"}})
 	if err != nil {
 		t.Fatal(err)
@@ -316,7 +316,7 @@ func TestSnapshotExportUsesSelectedHistoryRecord(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	store := &localStore{root: root, salt: bytes.Repeat([]byte{3}, 32)}
+	store := trackTestStore(t, &localStore{root: root, salt: bytes.Repeat([]byte{3}, 32)})
 	pool, err := validatePoolManifest(PoolManifest{Name: "历史奖池", Version: "14.5", Names: []string{"已拥有皮肤", "剩余皮肤"}})
 	if err != nil {
 		t.Fatal(err)
@@ -518,6 +518,9 @@ func TestDiagnosticsExposeOnlyDiscoveryCounts(t *testing.T) {
 	}
 }
 
+// Historical whole-file guard: add any new diagnostic-emitting file here.
+// TestR86DiagnosticEmittersAreDiscoveredAcrossSourceFiles also discovers direct
+// emitters automatically; neither guard replaces runtime schema/privacy review.
 func TestDiagnosticSourcesExcludeStableIdentifiers(t *testing.T) {
 	forbidden := []string{
 		`"queue_type":`, `"queue_types":`,
@@ -567,7 +570,7 @@ func TestConcurrentIdenticalSnapshotsAreDeduplicated(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	store := &localStore{root: root, salt: bytes.Repeat([]byte{2}, 32)}
+	store := trackTestStore(t, &localStore{root: root, salt: bytes.Repeat([]byte{2}, 32)})
 	pool, _ := validatePoolManifest(PoolManifest{Name: "测试", Version: "1", Names: []string{"测试皮肤"}})
 	snapshot := Snapshot{Summoner: Summoner{PUUID: "private"}}
 	const count = 12
@@ -622,7 +625,7 @@ func TestDiagnosticLogRotationRemainsBounded(t *testing.T) {
 	if err := os.WriteFile(backup, []byte("old"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	if err := store.appendDiagnostic(map[string]any{"event": "test"}); err != nil {
 		t.Fatal(err)
 	}
@@ -656,10 +659,16 @@ func TestDiagnosticRotationImmediatelyRestoresBuildSnapshot(t *testing.T) {
 	if err := os.MkdirAll(logs, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{storage: store}
 	a.recordAppStartDiagnostic()
 	a.enableDiagnosticRotationSnapshot()
+	// Release the writer before an external fixture replaces its file.
+	store.diagnosticMu.Lock()
+	if err := store.releaseDiagnosticLocked(); err != nil {
+		t.Fatal(err)
+	}
+	store.diagnosticMu.Unlock()
 	path := filepath.Join(logs, "diagnostics.jsonl")
 	if err := os.WriteFile(path, bytes.Repeat([]byte("x"), 2*1024*1024+1), 0o600); err != nil {
 		t.Fatal(err)
@@ -689,7 +698,7 @@ func TestAppStartDiagnosticIdentifiesBuild(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	a.recordAppStartDiagnostic()
 	data, err := a.storage.readDiagnosticLog()
 	if err != nil {
@@ -714,7 +723,7 @@ func TestDiagnosticLogDownloadUsesTrustedFixedFile(t *testing.T) {
 	if err := os.MkdirAll(logs, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	if err := store.appendDiagnostic(map[string]any{"event": "lcu_discovery", "result": "process-not-found"}); err != nil {
 		t.Fatal(err)
 	}
@@ -761,7 +770,7 @@ func TestDiagnosticsExposeCurrentLogSizeAndEventCount(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	for _, event := range []string{"first", "second"} {
 		if err := store.appendDiagnostic(map[string]any{"event": event}); err != nil {
 			t.Fatal(err)
@@ -792,7 +801,7 @@ func TestDiagnosticLogReaderRejectsSymlink(t *testing.T) {
 	if err := os.Symlink(target, filepath.Join(logs, "diagnostics.jsonl")); err != nil {
 		t.Skipf("symlink unavailable: %v", err)
 	}
-	if _, err := (&localStore{root: root}).readDiagnosticLog(); err == nil {
+	if _, err := (trackTestStore(t, &localStore{root: root})).readDiagnosticLog(); err == nil {
 		t.Fatal("diagnostic reader accepted a symlink")
 	}
 }
@@ -810,7 +819,7 @@ func TestDiagnosticLogWriterRejectsSymlink(t *testing.T) {
 	if err := os.Symlink(target, filepath.Join(logs, "diagnostics.jsonl")); err != nil {
 		t.Skipf("symlink unavailable: %v", err)
 	}
-	if err := (&localStore{root: root}).appendDiagnostic(map[string]any{"event": "test"}); err == nil {
+	if err := (trackTestStore(t, &localStore{root: root})).appendDiagnostic(map[string]any{"event": "test"}); err == nil {
 		t.Fatal("diagnostic writer accepted a symlink")
 	}
 }

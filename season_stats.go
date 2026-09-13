@@ -734,7 +734,7 @@ func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference
 			seen[id] = true
 		}
 		scan := &seasonScanState{cache: cache, stats: stats, queueStats: queueStats, seen: seen, seasonStartMillis: seasonStart.UnixMilli()}
-		a.seasonScanPagesWithHistoryCache(ctx, client, serverID, playerRef, scan, seasonScanBackgroundPages, true)
+		a.seasonScanPagesWithHistoryCache(ctx, client, serverID, playerRef, scan, seasonScanBackgroundPages, false)
 		a.finishSeasonScan(scan, names, accountHash)
 		a.recordDiagnostic(map[string]any{
 			"event": "season_backfill_round", "season": season, "scanned": scan.scanned,

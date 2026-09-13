@@ -132,14 +132,6 @@ type CatalogStats struct {
 	Fingerprint   string `json:"fingerprint"`
 }
 
-func loadSnapshot(pool PoolManifest) (Snapshot, error) {
-	client, err := discoverLCU()
-	if err != nil {
-		return Snapshot{}, err
-	}
-	return loadSnapshotWithClient(client, pool)
-}
-
 func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, error) {
 	return loadSnapshotWithClientProvider(client, pool, nil, nil)
 }

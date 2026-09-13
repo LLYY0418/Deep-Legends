@@ -19,7 +19,9 @@ func newFlowDiagnosticStore(t *testing.T) *localStore {
 	if err := os.Mkdir(filepath.Join(root, "logs"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	return &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
+	t.Cleanup(func() { _ = store.Close() })
+	return store
 }
 
 func TestFlowDiagnosticsPreflightReasonsAndNoWrites(t *testing.T) {

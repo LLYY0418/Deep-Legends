@@ -40,7 +40,7 @@ func TestClientDiagnosticRejectsAndLogsUnknownEvent(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{storage: store}
 	recorder := httptest.NewRecorder()
 	a.handleClientDiagnostic(recorder, httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(`{"event":"future_event","reason":"cached"}`)))
@@ -65,7 +65,7 @@ func TestClientDiagnosticTruncatesKeyBeforeWriting(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{storage: store}
 	key := strings.Repeat("k", clientDiagnosticTextLimit+20)
 	recorder := httptest.NewRecorder()
@@ -91,7 +91,7 @@ func TestClientDiagnosticWritesSanitizedEvent(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{storage: store}
 	recorder := httptest.NewRecorder()
 	body := `{"event":"specialist_runes_client_skip","reason":"in-flight","championId":13,"queueId":0,"position":"MIDDLE"}`
@@ -122,7 +122,7 @@ func TestMatchTierOverviewDiagnosticKeepsOnlyAggregateCounts(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	recorder := httptest.NewRecorder()
 	body := `{"event":"match_tiers_overview_batch","reason":"complete","totalRefs":36,"uniqueRefs":24,"cacheHits":19}`
 	a.handleClientDiagnostic(recorder, httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(body)))

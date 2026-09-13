@@ -72,13 +72,13 @@ func TestR58ClearTitleFailureDiagnosticIncludesOnlyHTTPStatus(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	a := &app{connected: true, lcu: client, storage: &localStore{root: root}}
+	a := &app{connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: root})}
 	recorder := httptest.NewRecorder()
 	a.handleFacadeApply(recorder, httptest.NewRequest(http.MethodPost, "/api/facade/apply", strings.NewReader(`{"action":"clear-title"}`)))
 	if recorder.Code != http.StatusBadGateway {
 		t.Fatalf("clear-title response = %d %q", recorder.Code, recorder.Body.String())
 	}
-	data, err := os.ReadFile(root + "/logs/diagnostics.jsonl")
+	data, err := a.storage.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)
 	}

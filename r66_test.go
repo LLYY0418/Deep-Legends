@@ -174,13 +174,13 @@ func TestR66FacadeApplyLogsIntermediateStatusesWithoutCandidateValues(t *testing
 		},
 	)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}, storage: &localStore{root: root}}
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}, storage: trackTestStore(t, &localStore{root: root})}
 	recorder := httptest.NewRecorder()
 	a.handleFacadeApply(recorder, httptest.NewRequest(http.MethodPost, "/api/facade/apply", strings.NewReader(`{"action":"clear-challenges"}`)))
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("response = %d %q", recorder.Code, recorder.Body.String())
 	}
-	data, err := os.ReadFile(root + "/logs/diagnostics.jsonl")
+	data, err := a.storage.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)
 	}

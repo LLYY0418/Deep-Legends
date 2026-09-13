@@ -1,0 +1,34 @@
+package main
+
+func main() {
+	startupWarmup := flag.Bool("startup-warmup", false, "exit before services, networking or user storage initialization")
+	selfTest := flag.Bool("self-test", false, "validate embedded resources and exit")
+	selfCheckRiotKey := flag.Bool("self-check-riot-key", false, "validate the embedded Riot API key and exit")
+	noBrowser := flag.Bool("no-browser", false, "do not open the default browser")
+	desktopMode := flag.Bool("desktop", false, "emit a desktop-shell bootstrap event and do not open a browser")
+	listenAddress := flag.String("listen", "127.0.0.1:0", "loopback address for the local UI")
+	encryptRiotKeyFlag := flag.String("encrypt-riot-key", "", "encrypt a Riot API key for embedding in riot_api.go and exit")
+	flag.Parse()
+	// Execution-only warmup must precede every persistent/service initializer.
+	// --self-test below also validates user/provider state and is not read-only.
+	if *startupWarmup {
+		return
+	}
+	if strings.TrimSpace(*encryptRiotKeyFlag) != "" {
+		cipherText, err := encryptRiotKey(*encryptRiotKeyFlag)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(cipherText)
+		return
+	}
+	if *selfCheckRiotKey {
+		if !riotKeyConfigured() {
+			log.Fatal("Riot API key is not embedded")
+		}
+		fmt.Println("embedded Riot API key is configured")
+		if !*selfTest {
+			return
+		}
+	}
+}

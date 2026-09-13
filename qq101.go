@@ -304,15 +304,6 @@ func mergeQQ101PositionShares(existing, official []championPositionOption) []cha
 	return result
 }
 
-func findQQ101Position(values []championPositionOption, position string) (championPositionOption, bool) {
-	for _, item := range values {
-		if item.Position == position {
-			return item, true
-		}
-	}
-	return championPositionOption{}, false
-}
-
 func splitQQ101Records(value string) []string {
 	parts := strings.Split(strings.TrimSpace(value), "#")
 	result := parts[:0]

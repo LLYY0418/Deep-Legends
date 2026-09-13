@@ -76,31 +76,33 @@ var (
 )
 
 type championProvider struct {
-	clientMu          sync.RWMutex
-	client            *http.Client
-	network           championNetworkSettings
-	activeProxy       string
-	cache             *championDataCache
-	diag              func(event map[string]any)
-	mu                sync.Mutex
-	patch             string
-	static            map[string]championAssetDescription
-	itemPurchasable   map[int64]bool
-	championKeys      map[string]string
-	championIDs       map[string]int
-	championMeta      map[int]championMetadata
-	abilities         map[string]map[string]championAssetDescription
-	diagLast          map[string]time.Time
-	yourGGMu          sync.Mutex
-	yourGGLast        time.Time
-	arenaItemsAt      time.Time
-	arenaItems        []gameplayItem
-	hexdata           *hexdataClient
-	featureGates      *featureGates
-	qq101ProbeMu      sync.Mutex
-	qq101ProbeRunning map[string]bool
-	qq101ProbeAt      map[string]time.Time
-	qq101Wait         time.Duration
+	clientMu              sync.RWMutex
+	client                *http.Client
+	network               championNetworkSettings
+	activeProxy           string
+	cache                 *championDataCache
+	diag                  func(event map[string]any)
+	mu                    sync.Mutex
+	patch                 string
+	static                map[string]championAssetDescription
+	itemPurchasable       map[int64]bool
+	championKeys          map[string]string
+	championIDs           map[string]int
+	championMeta          map[int]championMetadata
+	catalogNamesFailUntil time.Time
+	catalogNamesFlight    chan struct{}
+	abilities             map[string]map[string]championAssetDescription
+	diagLast              map[string]time.Time
+	yourGGMu              sync.Mutex
+	yourGGLast            time.Time
+	arenaItemsAt          time.Time
+	arenaItems            []gameplayItem
+	hexdata               *hexdataClient
+	featureGates          *featureGates
+	qq101ProbeMu          sync.Mutex
+	qq101ProbeRunning     map[string]bool
+	qq101ProbeAt          map[string]time.Time
+	qq101Wait             time.Duration
 	// Mayhem augment copy resolved from Hexdata detail pages, keyed by augment
 	// ID. Riot ships no description for these, so the page is the only source;
 	// caching the parsed text keeps repeat renders free.
@@ -476,9 +478,13 @@ func newChampionProvider() *championProvider {
 func newChampionHTTPClient(proxy func(*http.Request) (*url.URL, error)) *http.Client {
 	dialer := &net.Dialer{Timeout: 3 * time.Second, KeepAlive: 30 * time.Second}
 	transport := &http.Transport{
-		Proxy:           proxy,
-		DialContext:     dialer.DialContext,
-		TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12},
+		MaxIdleConns:        32,
+		MaxIdleConnsPerHost: 8,
+		IdleConnTimeout:     90 * time.Second,
+		ForceAttemptHTTP2:   true,
+		Proxy:               proxy,
+		DialContext:         dialer.DialContext,
+		TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12},
 	}
 	return &http.Client{
 		Timeout:   12 * time.Second,
@@ -1880,18 +1886,6 @@ func (p *championProvider) loadStructuredModeRankings(ctx context.Context, mode 
 	return championRankingResponse{Mode: mode, Region: spec.Region, Patch: payload.Meta.Version, Source: "OP.GG JSON", FetchedAt: time.Now(), Rows: rows}, nil
 }
 
-func (p *championProvider) loadArenaPage(ctx context.Context) ([]byte, string, error) {
-	data, err := p.fetch(ctx, opggPageHost, "/zh-cn/lol/modes/arena", nil, championHTMLMax, "text/html,application/xhtml+xml")
-	if err != nil {
-		return nil, "", err
-	}
-	decoded := decodeNextFlight(data)
-	if decoded == "" {
-		return nil, "", errors.New("OP.GG Arena page data changed")
-	}
-	return data, decoded, nil
-}
-
 // Arena's list must use the same provider and region as the YOUR.GG page,
 // not OP.GG's global sample with a locally re-sorted ranking.
 func (p *championProvider) loadArenaRankings(ctx context.Context) (championRankingResponse, error) {
@@ -1900,13 +1894,6 @@ func (p *championProvider) loadArenaRankings(ctx context.Context) (championRanki
 		return championRankingResponse{}, err
 	}
 	return parseYourGGArenaRankings(data, at)
-}
-
-func arenaTierValue(value *int) int {
-	if value == nil {
-		return -1
-	}
-	return *value
 }
 
 func ratePercent(value float64) float64 {
@@ -2738,19 +2725,6 @@ func remoteAsset(rawURL, name string) (championAsset, bool) {
 		asset.ID, _ = strconv.Atoi(strings.TrimSuffix(pathpkg.Base(path), pathpkg.Ext(path)))
 	}
 	return asset, true
-}
-
-func patchFromOPGGPath(value string) string {
-	marker := "/meta/images/lol/"
-	index := strings.Index(value, marker)
-	if index < 0 {
-		return ""
-	}
-	rest := value[index+len(marker):]
-	if slash := strings.IndexByte(rest, '/'); slash >= 0 {
-		return rest[:slash]
-	}
-	return ""
 }
 
 func descendantElements(node *xhtml.Node, name string) []*xhtml.Node {

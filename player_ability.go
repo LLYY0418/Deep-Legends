@@ -60,19 +60,6 @@ func abilityTeam(match gameplayMatch, teamID int64) gameplayTeam {
 	return team
 }
 
-func gameplayAbilityRank(ranks []gameplayRank, queueID int64) *gameplayRank {
-	queueType := "RANKED_SOLO_5x5"
-	if queueID == 440 {
-		queueType = "RANKED_FLEX_SR"
-	}
-	for index := range ranks {
-		if ranks[index].QueueType == queueType && strings.TrimSpace(ranks[index].Tier) != "" {
-			return &ranks[index]
-		}
-	}
-	return nil
-}
-
 func buildGameplayAbilityProfile(matches []gameplayMatch, playerRef string, ranks []gameplayRank, region string) *gameplayAbilityProfile {
 	// 每个队列单独建立样本：单双排达到最低要求时优先采用；确实没有
 	// 足够完整对局时再整体回退到灵活组排，不能把两个队列混成一张雷达图。
@@ -273,19 +260,4 @@ func abilityGrade(ratioToBaseline float64) string {
 	default:
 		return "C-"
 	}
-}
-
-func gameplayRankTitleZH(rank gameplayRank) string {
-	tier := strings.ToUpper(strings.TrimSpace(rank.Tier))
-	name := map[string]string{
-		"IRON": "黑铁", "BRONZE": "青铜", "SILVER": "白银", "GOLD": "黄金", "PLATINUM": "铂金",
-		"EMERALD": "翡翠", "DIAMOND": "钻石", "MASTER": "大师", "GRANDMASTER": "宗师", "CHALLENGER": "王者",
-	}[tier]
-	if name == "" {
-		name = rank.Tier
-	}
-	if rank.Division != "" && tier != "MASTER" && tier != "GRANDMASTER" && tier != "CHALLENGER" {
-		name += " " + rank.Division
-	}
-	return strings.TrimSpace(name)
 }

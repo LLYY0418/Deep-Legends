@@ -108,6 +108,7 @@
   function switchChampionMode(value) {
     const mode = normalizeMode(value);
     if (mode === state.mode) return;
+    flushChampionSearch();
     resetTransientChampionState({ restorePosition: true });
     state.mode = mode;
     writeSetting("champion-mode", mode);
@@ -180,11 +181,24 @@
     return percentile >= 0.9 ? "S" : percentile >= 0.7 ? "A" : "B";
   }
   function catalogTiers() { return objectRows(state.catalog?.tiers); }
-  function catalogChampions() { return objectRows(state.catalog?.champions); }
+  function championIndex() {
+    const source = state.catalog?.champions;
+    if (state.championIndex && state.championIndex.source === source) return state.championIndex;
+    const rows = objectRows(source), ids = new Map(), keys = new Map();
+    for (const item of rows) {
+      const id = Number(item.id);
+      if (!Number.isNaN(id) && !ids.has(id)) ids.set(id, item);
+      for (const key of [String(item.slug || item.key || "").toLowerCase(), String(item.key || "").toLowerCase()]) {
+        if (!keys.has(key)) keys.set(key, item);
+      }
+    }
+    return state.championIndex = { source, rows, ids, keys, terms: new WeakMap() };
+  }
+  function catalogChampions() { return championIndex().rows; }
   function rankingRows() { return objectRows(state.rankings?.rows); }
   function tierLabel(value) { return catalogTiers().find((item) => item.value === value)?.label || fallbackTiers.find((item) => item.value === value)?.label || value; }
-  function championMeta(id) { return catalogChampions().find((item) => Number(item.id) === Number(id)) || null; }
-  function championMetaByKey(key) { const value = String(key || "").toLowerCase(); return catalogChampions().find((item) => String(item.slug || item.key || "").toLowerCase() === value || String(item.key || "").toLowerCase() === value) || null; }
+  function championMeta(id) { return championIndex().ids.get(Number(id)) || null; }
+  function championMetaByKey(key) { return championIndex().keys.get(String(key || "").toLowerCase()) || null; }
   function imageURL(source, path) { return source && path ? `/api/champion-asset?source=${encodeURIComponent(source)}&path=${encodeURIComponent(path)}${/\/augments\/icons\//i.test(path) ? "&art=2" : ""}` : "/image-unavailable.svg"; }
   function heroArtworkURL(meta, fallbackSource, fallbackPath) {
     if (meta?.artworkSource && meta?.artworkPath) return imageURL(meta.artworkSource, meta.artworkPath);
@@ -413,15 +427,14 @@
     }
   }
 
-  async function loadRankings() {
+  async function loadRankings(preserveSearch = false) {
     if (state.mode !== "ranked") return;
     const token = ++state.workspaceRequestToken;
     const tier = state.tier, position = state.position;
     const current = () => state.mode === "ranked" && state.workspaceRequestToken === token && state.tier === tier && state.position === position;
     state.loading = true;
     state.error = "";
-    state.rankings = null;
-    render();
+    if (!preserveSearch) { state.rankings = null; render(); }
     try {
       if (!state.catalog) state.catalog = await api("/api/champions/catalog", "catalog");
       if (!current()) return;
@@ -434,7 +447,7 @@
     } finally {
       if (!current()) return;
       state.loading = false;
-      render();
+      if (preserveSearch) renderChampionSearchResults(); else render();
     }
   }
 
@@ -926,7 +939,7 @@
         <div class="champion-position-tabs" role="tablist" aria-label="英雄位置">${positionOptions.map((item) => `<button type="button" role="tab" aria-label="${item.label}" aria-selected="${item.value === state.position}" class="${item.value === state.position ? "is-active" : ""}" data-champion-position="${item.value}">${positionIcon(item.value)}<span>${item.label}</span></button>`).join("")}</div>
         <span class="champion-result-count" role="status">${rows.length} 位英雄</span>
       </div>
-      ${rows.length ? (state.query.trim() || rows.length <= 3 ? renderChampionTable(rows, true) : renderTopThree(rows.slice(0, 3)) + renderChampionTable(rows.slice(3), true, 3)) : renderEmpty("没有匹配的英雄", "试试中文名、英文名、拼音首字母或常用外号。")}
+      <div data-champion-results>${renderChampionResults(rows)}</div>
     </section>`;
   }
 
@@ -970,7 +983,7 @@
     const list = `<section class="champion-list-card mayhem-champions">
       <div class="aram-champion-head"><div><h3>英雄梯度</h3><p>胜率与海克斯 · ${escapeHTML(currentModePatch())}</p></div><span class="champion-result-count">${rows.length} 位</span></div>
       <label class="champion-search compact"><span aria-hidden="true">⌕</span><span class="sr-only">搜索英雄</span><input type="search" value="${escapeHTML(state.query)}" placeholder="搜索英雄" autocomplete="off" data-champion-search></label>
-      ${rows.length ? renderChampionTable(rows, "mayhem") : renderEmpty("没有匹配的英雄", "清除搜索词后查看全部梯度。")}
+      <div data-champion-results>${renderChampionResults(rows)}</div>
     </section>`;
     return `<div class="mayhem-workspace">
       ${list}<span data-mayhem-list-marker hidden></span>
@@ -1124,7 +1137,7 @@
     const list = `<section class="champion-list-card aram-champions arena-champions">
       <div class="aram-champion-head"><div><h3>英雄梯度</h3><p>胜率与海克斯 · ${escapeHTML(currentModePatch())}</p></div><span class="champion-result-count">${rows.length} 位</span></div>
       <label class="champion-search compact"><span aria-hidden="true">⌕</span><span class="sr-only">搜索英雄</span><input type="search" value="${escapeHTML(state.query)}" placeholder="搜索英雄" autocomplete="off" data-champion-search></label>
-      ${rows.length ? renderChampionTable(rows, "arena") : renderEmpty("没有匹配的英雄", "清除搜索词后查看全部梯度。")}
+      <div data-champion-results>${renderChampionResults(rows)}</div>
     </section>`;
     return `<div class="arena-redesign-workspace">
       ${list}<span data-arena-list-marker hidden></span>
@@ -2001,7 +2014,13 @@
     if (!query) return rows;
     const scored = rows.map((row, order) => {
       const meta = championMeta(row.championId);
-      const values = [row.name, row.key, meta?.nameZh, meta?.titleZh, meta?.nameEn, meta?.titleEn, ...(meta?.searchTerms || [])].map(normalizeSearch).filter(Boolean);
+      const cache = championIndex().terms;
+      let cached = cache.get(row);
+      if (!cached || cached.name !== row.name || cached.key !== row.key) {
+        cached = { name: row.name, key: row.key, values: [row.name, row.key, meta?.nameZh, meta?.titleZh, meta?.nameEn, meta?.titleEn, ...(meta?.searchTerms || [])].map(normalizeSearch).filter(Boolean) };
+        cache.set(row, cached);
+      }
+      const values = cached.values;
       const score = Math.max(0, ...values.map((value) => searchScore(query, value)));
       return { row, order, score };
     });
@@ -2045,8 +2064,8 @@
   function renderDetailSkeleton() { return `<div class="champion-detail-skeleton" aria-label="正在读取英雄详情"><span></span><span></span><span></span></div>`; }
   function renderError(message, detail = false) { return `<div class="champion-state is-error"><span aria-hidden="true">!</span><strong>${detail ? "详情读取失败" : "数据读取失败"}</strong><p>${escapeHTML(message)}</p><button class="text-button" type="button" data-champion-retry>${detail ? "重新读取详情" : "重试"}</button></div>`; }
   function renderEmpty(title, copy) { return `<div class="champion-state"><span aria-hidden="true">◇</span><strong>${title}</strong><p>${copy}</p><button class="text-button" type="button" data-champion-clear>清除筛选</button></div>`; }
-  function prepareImages() {
-    for (const image of root.querySelectorAll("[data-champion-image]")) {
+  function prepareImages(container = root) {
+    for (const image of container.querySelectorAll("[data-champion-image]")) {
       const loaded = () => { image.parentElement?.classList.add("has-loaded-image"); window.deepLegendsAugmentArtwork?.prepare(image); };
       const failed = () => {
         const holder = image.parentElement;
@@ -2261,7 +2280,7 @@
 	    if (event.target.matches("[data-augment-search]")) preserveSearchInput(event.target, "[data-augment-search]", () => { state.augmentQuery = normalizeStoredSearch(event.target.value); writeSetting("champion-augment-query", state.augmentQuery); });
   });
 
-  root.addEventListener("compositionstart", () => { searchComposing = true; });
+  root.addEventListener("compositionstart", () => { searchComposing = true; clearTimeout(state.searchTimer); });
   root.addEventListener("compositionend", (event) => {
     searchComposing = false;
     if (event.target.matches("[data-champion-search]")) updateChampionSearch(event.target);
@@ -2278,21 +2297,49 @@
     next?.setSelectionRange(Math.min(start, next.value.length), Math.min(end, next.value.length));
   }
 
-  function updateChampionSearch(input) {
-    const start = input.selectionStart ?? input.value.length;
-    const end = input.selectionEnd ?? start;
-	    state.query = normalizeStoredSearch(input.value);
-	    writeSetting(`champion-query-${state.mode}`, state.query);
-    if (state.mode === "ranked" && normalizeSearch(state.query) && state.position !== "all") {
-      state.position = "all";
-      Promise.resolve(loadRankings()).finally(() => {
-        const next = root.querySelector("[data-champion-search]");
-        next?.focus({ preventScroll: true });
-        next?.setSelectionRange(Math.min(start, next.value.length), Math.min(end, next.value.length));
-      });
-      return;
+  function renderChampionResults(rows) {
+    if (!rows.length) return renderEmpty("没有匹配的英雄", "清除搜索词后查看全部梯度。");
+    if (state.mode === "arena") return renderChampionTable(rows, "arena");
+    if (state.mode === "aram-mayhem") return renderChampionTable(rows, "mayhem");
+    return state.query.trim() || rows.length <= 3 ? renderChampionTable(rows, true)
+      : renderTopThree(rows.slice(0, 3)) + renderChampionTable(rows.slice(3), true, 3);
+  }
+
+  function renderChampionSearchResults() {
+    const results = root.querySelector("[data-champion-results]");
+    if (!results) return;
+    const rows = filteredChampionRows();
+    results.innerHTML = (state.error ? renderError(state.error) : "") + renderChampionResults(rows);
+    const count = root.querySelector(".champion-result-count");
+    if (count) count.textContent = `${rows.length} 位英雄`;
+    for (const button of root.querySelectorAll("[data-champion-position]")) {
+      const active = button.dataset.championPosition === state.position;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-selected", String(active));
     }
-    preserveSearchInput(input, "[data-champion-search]", () => {});
+    prepareImages(results);
+  }
+
+  function flushChampionSearch() {
+    clearTimeout(state.searchTimer);
+    const pending = state.pendingSearch;
+    state.pendingSearch = null;
+    if (pending && pending.mode === state.mode && pending.query === state.query) writeSetting(`champion-query-${pending.mode}`, pending.query);
+  }
+
+  function updateChampionSearch(input) {
+    clearTimeout(state.searchTimer);
+    const mode = state.mode, query = normalizeStoredSearch(input.value);
+    state.query = query;
+    state.pendingSearch = { mode, query };
+    state.searchTimer = setTimeout(() => {
+      if (state.mode !== mode || !input.isConnected || searchComposing) return;
+      flushChampionSearch();
+      if (mode === "ranked" && normalizeSearch(query) && state.position !== "all") {
+        state.position = "all";
+        void loadRankings(true);
+      } else renderChampionSearchResults();
+    }, 150);
   }
 
   root.addEventListener("keydown", (event) => {
@@ -2346,6 +2393,7 @@
     });
   }
 
+  window.addEventListener("pagehide", flushChampionSearch);
   window.deepLegendsChampionSearch = Object.freeze({ scoreOption: scoreChampionSelectOption });
   window.deepLegendsChampionAsset = Object.freeze({ imageHTML: assetImage, imageURL });
   render();

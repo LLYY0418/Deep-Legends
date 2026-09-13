@@ -144,11 +144,6 @@ func (a *app) detectedClientInstallationsWithScanCached(force bool) ([]clientIns
 	return detected, scan
 }
 
-func detectClientInstallations() []clientInstallation {
-	items, _ := detectClientInstallationsWithScan()
-	return items
-}
-
 func (a *app) handleClientLaunch(w http.ResponseWriter, r *http.Request) {
 	var request struct {
 		ID string `json:"id"`
@@ -425,13 +420,4 @@ func classifyClientShortcut(name string) (id, displayName, kind, description str
 	default:
 		return "", "", "", ""
 	}
-}
-
-func findClientInstallation(id string) (clientInstallation, bool) {
-	for _, installation := range detectClientInstallations() {
-		if installation.ID == id {
-			return installation, true
-		}
-	}
-	return clientInstallation{}, false
 }

@@ -58,19 +58,26 @@ type championCacheLoadResult struct {
 }
 
 type championDataCache struct {
-	dir     string
-	mu      sync.Mutex
-	entries map[string]championCacheEnvelope
-	order   []string
-	bytes   int
-	flights map[string]*championCacheFlight
+	readFile          func(string) ([]byte, error)
+	dir               string
+	mu                sync.Mutex
+	entries           map[string]championCacheEnvelope
+	order             []string
+	bytes             int
+	flights           map[string]*championCacheFlight
+	diskMu            sync.Mutex
+	pruneMu           sync.Mutex
+	pruneDone         chan struct{}
+	lastPrune         time.Time
+	writtenSincePrune int64
+	migrationErr      error
 }
 
 func newChampionDataCache(store *localStore) *championDataCache {
 	cache := &championDataCache{entries: make(map[string]championCacheEnvelope), flights: make(map[string]*championCacheFlight)}
 	if store != nil {
 		cache.dir = filepath.Join(store.root, championDataCacheDirectory)
-		_ = cache.purgeDiskHost(yourGGArenaHost)
+		cache.migrationErr = cache.purgeDiskHost(yourGGArenaHost)
 	}
 	return cache
 }
@@ -217,7 +224,11 @@ func (c *championDataCache) storeMemoryLocked(key string, entry championCacheEnv
 
 func (c *championDataCache) pathFor(key string) string {
 	hash := sha256.Sum256([]byte(key))
-	return filepath.Join(c.dir, hex.EncodeToString(hash[:])+".json")
+	name := hex.EncodeToString(hash[:]) + ".json"
+	if strings.HasPrefix(key, "hexdata-") {
+		name = "hexdata-" + name
+	}
+	return filepath.Join(c.dir, name)
 }
 
 func (c *championDataCache) readDisk(key string) (championCacheEnvelope, error) {
@@ -226,10 +237,15 @@ func (c *championDataCache) readDisk(key string) (championCacheEnvelope, error) 
 	}
 	path := c.pathFor(key)
 	info, err := os.Lstat(path)
+	// Failed startup migration must not make existing recovery data invisible.
+	if errors.Is(err, os.ErrNotExist) && strings.HasPrefix(key, "hexdata-") {
+		path = filepath.Join(c.dir, strings.TrimPrefix(filepath.Base(path), "hexdata-"))
+		info, err = os.Lstat(path)
+	}
 	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > championCacheMaxEntry*2 {
 		return championCacheEnvelope{}, errors.New("cache miss")
 	}
-	data, err := os.ReadFile(path)
+	data, err := c.readCacheFile(path)
 	if err != nil {
 		return championCacheEnvelope{}, err
 	}
@@ -247,6 +263,10 @@ func (c *championDataCache) readDisk(key string) (championCacheEnvelope, error) 
 }
 
 func (c *championDataCache) writeDisk(entry championCacheEnvelope) error {
+	// Do not grow a cache whose recovery data could not be classified safely.
+	if c.migrationErr != nil {
+		return c.migrationErr
+	}
 	if c.dir == "" || len(entry.Data) > championCacheMaxEntry || !championCacheDiskAllowed(entry.Key) {
 		return nil
 	}
@@ -254,10 +274,34 @@ func (c *championDataCache) writeDisk(entry championCacheEnvelope) error {
 	if err != nil {
 		return err
 	}
-	if err := atomicWriteFile(c.pathFor(entry.Key), data, 0o600); err != nil {
+	c.diskMu.Lock()
+	err = atomicWriteFile(c.pathFor(entry.Key), data, 0o600)
+	c.diskMu.Unlock()
+	if err != nil {
 		return err
 	}
-	return c.pruneDisk()
+	c.scheduleDiskPrune(int64(len(data)))
+	return nil
+}
+
+// Keep directory maintenance off request latency and coalesce concurrent writers.
+func (c *championDataCache) scheduleDiskPrune(written int64) {
+	c.pruneMu.Lock()
+	defer c.pruneMu.Unlock()
+	c.writtenSincePrune += written
+	if c.migrationErr != nil || c.pruneDone != nil || (c.writtenSincePrune < 8<<20 && time.Since(c.lastPrune) < 5*time.Minute) {
+		return
+	}
+	c.lastPrune, c.writtenSincePrune = time.Now(), 0
+	done := make(chan struct{})
+	c.pruneDone = done
+	go func() {
+		_ = c.pruneDisk()
+		c.pruneMu.Lock()
+		c.pruneDone = nil
+		close(done)
+		c.pruneMu.Unlock()
+	}()
 }
 
 func championCacheDiskAllowed(key string) bool {
@@ -290,21 +334,60 @@ func (c *championDataCache) purgeDiskHost(host string) error {
 			continue
 		}
 		path := filepath.Join(c.dir, item.Name())
-		data, readErr := os.ReadFile(path)
+		data, readErr := c.readCacheFile(path)
 		if readErr != nil {
-			continue
+			return readErr
 		}
 		var header struct {
 			Key string `json:"key"`
 		}
-		if json.Unmarshal(data, &header) == nil && strings.HasPrefix(header.Key, prefix) {
+		if json.Unmarshal(data, &header) != nil {
+			continue
+		}
+		if strings.HasPrefix(header.Key, prefix) {
 			_ = os.Remove(path)
+			continue
+		}
+		// This existing one-time startup scan also migrates old hashed Hexdata
+		// names before any generic LRU pruning is allowed to run.
+		if strings.HasPrefix(header.Key, "hexdata-") && !strings.HasPrefix(item.Name(), "hexdata-") {
+			hash := sha256.Sum256([]byte(header.Key))
+			if item.Name() != hex.EncodeToString(hash[:])+".json" {
+				continue
+			}
+			target := c.pathFor(header.Key)
+			if _, err := os.Lstat(target); err == nil {
+				if _, validErr := c.readDisk(header.Key); validErr == nil {
+					// A validated current-format value supersedes its duplicate.
+					if err := os.Remove(path); err != nil {
+						return err
+					}
+					continue
+				}
+				// readDisk removes malformed regular files; never replace an
+				// untrusted target (e.g. a symlink) or discard the valid legacy copy.
+				if _, err := os.Lstat(target); !errors.Is(err, os.ErrNotExist) {
+					return errors.New("hexdata migration target is not replaceable")
+				}
+			}
+			if _, err := os.Lstat(target); errors.Is(err, os.ErrNotExist) {
+				if err := os.Rename(path, target); err != nil {
+					return err
+				}
+			} else if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
 func (c *championDataCache) pruneDisk() error {
+	c.diskMu.Lock()
+	defer c.diskMu.Unlock()
+	if c.migrationErr != nil {
+		return c.migrationErr
+	}
 	entries, err := os.ReadDir(c.dir)
 	if err != nil {
 		return err
@@ -324,17 +407,7 @@ func (c *championDataCache) pruneDisk() error {
 		path := filepath.Join(c.dir, item.Name())
 		// Hexdata正文 and its validator state are user-facing recovery data.
 		// They must not be selected as generic LRU victims based on mtime.
-		protected := item.Name() == "hexdata-state.json"
-		if !protected {
-			if data, readErr := os.ReadFile(path); readErr == nil {
-				var header struct {
-					Key string `json:"key"`
-				}
-				if json.Unmarshal(data, &header) == nil && strings.HasPrefix(header.Key, "hexdata-") {
-					protected = true
-				}
-			}
-		}
+		protected := strings.HasPrefix(item.Name(), "hexdata-")
 		if protected {
 			continue
 		}
@@ -342,7 +415,7 @@ func (c *championDataCache) pruneDisk() error {
 		total += info.Size()
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].mod.Before(items[j].mod) })
-	for len(items) > championCacheMaxEntries || total > championCacheMaxBytes {
+	for len(items) > 0 && (len(items) > championCacheMaxEntries || total > championCacheMaxBytes) {
 		oldest := items[0]
 		items = items[1:]
 		if os.Remove(oldest.path) == nil {
@@ -388,4 +461,11 @@ func containsChampionDetailPath(requestPath string) bool {
 		}
 	}
 	return parts >= 6 || (parts >= 5 && strings.HasPrefix(requestPath, "/api/global/champions/arena/"))
+}
+
+func (c *championDataCache) readCacheFile(path string) ([]byte, error) {
+	if c.readFile != nil {
+		return c.readFile(path)
+	}
+	return os.ReadFile(path)
 }

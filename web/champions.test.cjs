@@ -685,7 +685,7 @@ test("champion layouts keep responsive and reduced-motion fallbacks", () => {
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.match(styles, /\.augment-tier-groups\s*\{[^}]*display:\s*grid/s);
   assert.match(styles, /\.champion-rune-board\s*\{[^}]*grid-template-columns:/s);
-  assert.match(styles, /\.augment-podium\s*\{[^}]*grid-template-columns:/s);
+  assert.doesNotMatch(styles, /\.augment-podium\s*\{/); // Retired podium; current augment tier groups above retain responsive coverage.
   assert.match(styles, /\.champion-table-scroll\s*\{[^}]*overflow-x:\s*auto/s);
   assert.match(styles, /\.champion-filter-bar\s*\{[^}]*grid-template-columns:/s);
   assertMayhemCSSContract(styles);
@@ -1299,7 +1299,7 @@ test("arena keeps the champion list on wide screens and renders the redesigned d
   assert.match(mainSource, /GET \/api\/champions\/arena\/match\/\{matchId\}[^\n]+a\.authorized\(a\.handleArenaMatchDetail\)/);
   assert.match(yourGGArenaSource, /\/kr\/api\/arena\/champions\//);
   assert.match(yourGGArenaSource, /sameYourGGArenaPlayer/);
-  assert.match(backend, /\/zh-cn\/lol\/modes\/arena/);
+  assert.match(backend, /\/kr\/api\/arena\/champions/);
   assert.match(backend, /fetchWithMetadata\(ctx, yourGGArenaHost, "\/kr\/api\/arena\/champions"/);
   assert.match(structuredBackend, /response\.TeamCompositions = p\.structuredSynergies\(id, payload\.Data\.Synergies\)/);
   assert.match(fs.readFileSync(path.join(root, "yourgg_arena_rankings.go"), "utf8"), /Region:\s*"KR"/);
@@ -1863,7 +1863,7 @@ test("summoner banner and recent ranked summary expose verified profile highligh
 	assert.match(gameplayScript, /killParticipationGames/);
 	assert.match(gameplayScript, /平均 K \/ D \/ A/);
 	assert.match(gameplayScript, /位置胜率/);
-	assert.match(gameplayScript, /ring\.style\.setProperty\("--recent-win-rate", `\$\{winRate\}%`\)/);
+	assert.match(gameplayScript, /node\.style\.setProperty\("--recent-win-rate", percent\(node\.dataset\.winRate\)\)/);
 	assert.doesNotMatch(gameplayScript, /recent-ranked-ring[^>]+style=/);
 	assert.match(gameplayStyles, /\.recent-ranked-ring\s*\{[^}]*conic-gradient/s);
 	// 圆环必须永远和「平均 K/D/A」同一行；只有「KDA」+「击杀参与率」这一对
@@ -3134,6 +3134,7 @@ test("round 9 section navigation restores each page scroll position after panel 
     sectionPanels: panels,
     appScroll: {
       scrollTop: 240,
+      children: [{}],
       scrollTo(options) {
         scrollCalls.push({ ...options, panelsReady: panels[0].hidden && !panels[1].hidden });
       },
@@ -3144,6 +3145,8 @@ test("round 9 section navigation restores each page scroll position after panel 
   };
   state.sectionScroll.live = 75;
   const frames = [];
+  let resize;
+  class ResizeObserver { constructor(fn) { resize=fn; } observe() {} disconnect() { resize=null; } }
   const { activateSection } = compileFunctions(appScript, ["activateSection", "restoreSectionScroll"], {
     state,
     el,
@@ -3156,8 +3159,10 @@ test("round 9 section navigation restores each page scroll position after panel 
     renderNotice: () => {},
     renderLaunchpad: () => {},
 		document: { getElementById: () => null },
+    ResizeObserver,
+    setTimeout: () => 1, clearTimeout: () => {},
     requestAnimationFrame: (callback) => frames.push(callback),
-    window: { dispatchEvent: () => {}, matchMedia: () => ({ matches: false }), addEventListener: () => {}, removeEventListener: () => {} },
+    window: { ResizeObserver, dispatchEvent: () => {}, matchMedia: () => ({ matches: false }), addEventListener: () => {}, removeEventListener: () => {} },
     CustomEvent: class CustomEvent { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
   });
   activateSection("live");
@@ -3169,9 +3174,11 @@ test("round 9 section navigation restores each page scroll position after panel 
   scrollCalls.length = 0;
   el.appScroll.scrollTop = 0;
   while (frames.length) frames.shift()();
+  resize(); // content grows after the initial clamped frame
   assert.ok(scrollCalls.length >= 2, "被夹回 0 之后必须继续重试");
   assert.ok(scrollCalls.every((call) => call.top === 75));
   el.appScroll.scrollTop = 75;
+  resize(); // reaches target and disconnects
   scrollCalls.length = 0;
   while (frames.length) frames.shift()();
   assert.equal(scrollCalls.length, 0, "已经到位就必须停手，不能一直和用户抢滚动条");
@@ -5753,7 +5760,8 @@ test("R61 every mandatory contract rejects its documented production mutation", 
 		assert.match(historyPageKey, /fmt\.Sprintf\("%s\|%s\|%d\|%d\|%s", serverID, puuid, startIndex, pageSize, strings\.Join\(tags, ","\)\)/);
 		assert.match(sources.sgp, /cachedHistoryPage\(serverID, puuid, pageStart, pageSize, tags\)/);
 		assert.match(sources.sgp, /cacheHistoryPage\(serverID, puuid, pageStart, pageSize, tags/);
-		assert.match(sources.gameplayGo, /context\.WithTimeout\(r\.Context\(\), overviewSoftBudget\)/); // A-3
+		assert.match(sources.gameplayGo, /if timeout == nil\s*\{\s*timeout = context\.WithTimeout/);
+		assert.match(sources.gameplayGo, /timeout\(r\.Context\(\), overviewSoftBudget\)/); // A-3
 		assert.match(sources.sgp, /sgpPageSize\s+= 50/); // A-4
 		assert.match(sources.sgp, /shouldSample = cost\.claimParticipantShapeSample\(\)/); // A-5
 		assert.match(sources.gameplayGo, /"event": "tencent_riot_id_lookup"/); // A-6
@@ -5811,7 +5819,7 @@ test("R61 every mandatory contract rejects its documented production mutation", 
 	const mutations = [
 		["A-1 retry budget", "sgp", "for retry := 0; retry <= 2; retry++", "for retry := 0; retry < 1; retry++"],
 		["A-2 pageSize key dimension", "sgp", 'fmt.Sprintf("%s|%s|%d|%d|%s", serverID, puuid, startIndex, pageSize, strings.Join(tags, ","))', 'fmt.Sprintf("%s|%s|%d|%s", serverID, puuid, startIndex, strings.Join(tags, ","))'],
-		["A-3 overview deadline", "gameplayGo", "context.WithTimeout(r.Context(), overviewSoftBudget)", "context.WithCancel(r.Context())"],
+		["A-3 overview deadline", "gameplayGo", "timeout(r.Context(), overviewSoftBudget)", "context.WithCancel(r.Context())"],
 		["A-4 50-row cold page", "sgp", "sgpPageSize         = 50", "sgpPageSize         = 20"],
 		["A-5 one-shot participant sample", "sgp", "shouldSample = cost.claimParticipantShapeSample()", "shouldSample = true"],
 		["A-6 lookup diagnostic", "gameplayGo", '"event": "tencent_riot_id_lookup"', '"event": "tencent_lookup_removed"'],
@@ -5870,9 +5878,9 @@ test("R63 mandatory contracts reject every documented production regression", ()
 
 		assert.match(goFunctionSource(sources.lcuGo, "RequestJSON"), /httptrace\.WithClientTrace\(ctx, requestTrace\.clientTrace\(\)\)/); // B-1
 		assert.match(goFunctionSource(sources.lcuGo, "getBytes"), /httptrace\.WithClientTrace\(ctx, requestTrace\.clientTrace\(\)\)/);
-		assert.match(sources.gameplayGo, /rankEntry := a\.playerRankScore\(ctx,/); // B-2a overview
+		assert.match(sources.gameplayGo, /value := a\.playerRankScore\(ctx,/); // B-2a overview
 		assert.match(sources.gameplayGo, /a\.playerRankScore\(r\.Context\(\), client, playerRef/); // B-2a live
-		assert.match(goFunctionSource(sources.gameplayGo, "loadQueueLabels"), /client\.queueLabelsLoaded[\s\S]*cloneQueueLabels/); // B-2b
+		assert.match(goFunctionSource(sources.gameplayGo, "loadQueueLabelsContext"), /if client\.queueLabelsLoaded \{\s*result := cloneQueueLabels\(client\.queueLabels\)\s*client\.queueLabelsMu\.Unlock\(\)\s*return result/); // B-2b
 		assert.doesNotMatch(sources.gameplayJS, /deep-legends:friends-presence|updateFriendPresenceChips/); // CN overview integration retired
 		const tierScope = functionSource(sources.gameplayJS, "matchTierScope");
 		assert.match(tierScope, /return `\$\{region\}:\$\{serverID\}:\$\{playerRef\}`/); // B-3
@@ -5909,7 +5917,7 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		["A-3 honest oldest timestamp", "structured", "depthFetchedAt.Before(response.FetchedAt)", "depthFetchedAt.After(response.FetchedAt)"],
 		["A-4 one source label", "championsJS", '<section class="build-depth-column"><h4><span>${label}</span></h4>', '<section class="build-depth-column"><span class="item-chain-source">${sourceNote}</span><h4><span>${label}</span></h4>'],
 		["B-1 request trace", "lcuGo", "ctx = httptrace.WithClientTrace(ctx, requestTrace.clientTrace())", "// trace attachment removed"],
-		["B-2a overview rank cache", "gameplayGo", "rankEntry := a.playerRankScore(ctx,", "rankEntry := directRankLookup(ctx,"],
+		["B-2a overview rank cache", "gameplayGo", "value := a.playerRankScore(ctx,", "value := directRankLookup(ctx,"],
 		["B-2a live rank cache", "gameplayGo", "a.playerRankScore(r.Context(), client, playerRef", "a.directRankLookup(r.Context(), client, playerRef"],
 		["B-2b queue cache", "gameplayGo", "if client.queueLabelsLoaded {", "if false {"],
 		["B-3 stable tier scope", "gameplayJS", "return `${region}:${serverID}:${playerRef}`;", "return `${region}:${tab.key}:${serverID}:${playerRef}`;"],
@@ -6511,4 +6519,32 @@ test("Arena equipment sorting retains low samples, missing metadata and ungraded
   const rows = [{tier:"A",score:99,games:1,id:1},{tier:"A",score:10,games:100,id:2},{tier:"S",games:0,id:3},{games:50,id:4}];
   assert.deepEqual(sortedArenaItemRows(rows).map(row=>row.id), [3,2,1,4]);
   assert.deepEqual(rows.map(row=>row.id),[1,2,3,4],"do not mutate source array");
+});
+
+test("R86 champion index preserves numeric/first-match/key semantics and invalidates catalogs", () => {
+  const first = { id: 1, slug: "Ahri", key: "狐", nameZh: "阿狸" };
+  const zero = { id: 0, key: "ZERO" };
+  const state = { catalog: { champions: [null, false, 7, first, { id: "01", slug: "other", key: "Ahri" }, zero, { id: "NaN", key: "É" }] } };
+  let arrays = 0;
+  const { championMeta, championMetaByKey } = compileFunctions(script, ["championIndex", "championMeta", "championMetaByKey"], {
+    state, objectRows: (value) => { arrays++; return Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : []; },
+  });
+  for (const id of [1, "01", " 1 ", "1.0"]) assert.equal(championMeta(id), first);
+  assert.equal(championMeta(null), zero);
+  assert.equal(championMeta(""), zero);
+  assert.equal(championMeta(NaN), null);
+  assert.equal(championMeta(999), null);
+  assert.equal(championMetaByKey("AHRI"), first);
+  assert.equal(championMetaByKey("狐"), first);
+  assert.equal(championMetaByKey(" Ahri "), null);
+  assert.equal(championMetaByKey("ＡＨＲＩ"), null);
+  assert.equal(championMetaByKey("é").key, "É");
+  assert.equal(arrays, 1);
+  const replacement = { id: 1, key: "NEW" };
+  state.catalog = { champions: [replacement] };
+  assert.equal(championMeta(1), replacement);
+  assert.equal(championMetaByKey("Ahri"), null);
+  assert.equal(arrays, 2);
+  state.catalog = null;
+  assert.equal(championMeta(1), null);
 });

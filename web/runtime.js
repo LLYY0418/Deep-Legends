@@ -1,6 +1,28 @@
 (() => {
   "use strict";
 
+  // Production never downloads demo fixtures. Gate demo API calls until the
+  // dynamically loaded interceptor is installed; do not fall through to live
+  // endpoints if loading the explicit demo fails.
+  if (typeof document !== "undefined" && typeof location !== "undefined" && typeof window.fetch === "function") {
+    const demo = new URLSearchParams(location.search).has("demo") || location.hash.includes("demo") || (() => {
+      try { return localStorage.getItem("lol-loot-demo") === "1"; } catch (_) { return false; }
+    })();
+    if (demo) {
+      window.deepLegendsDemoNativeFetch = window.fetch.bind(window);
+      let finish, fail;
+      const ready = new Promise((resolve, reject) => { finish = resolve; fail = reject; });
+      // A failed demo may have no API callers yet.
+      ready.catch(() => {});
+      window.deepLegendsDemoReady = finish;
+      window.fetch = (...args) => ready.then(() => window.fetch(...args));
+      const script = document.createElement("script");
+      script.src = "/demo-data.js";
+      script.onerror = () => fail(new Error("演示数据加载失败，请刷新重试"));
+      document.head.appendChild(script);
+    }
+  }
+
   // Bounded, access-ordered response caches. In-flight requests deliberately use
   // ordinary Maps: evicting a flight would permit duplicate network work.
   class ResponseCache extends Map {

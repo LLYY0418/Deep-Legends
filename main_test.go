@@ -233,7 +233,7 @@ func TestBootstrapIgnoresCrossSiteAndNonNavigationRequests(t *testing.T) {
 }
 
 func TestSessionTokenPersistsAcrossRestarts(t *testing.T) {
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	first, err := loadOrCreateSessionToken(store)
 	if err != nil {
 		t.Fatal(err)
@@ -576,7 +576,7 @@ func TestOfficialLoginLaunchUsesOnlyDetectedTCLSAndRecordsSafeDiagnostics(t *tes
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	launched := clientInstallation{}
 	refreshRequests := make(chan struct{}, 1)
 	a := &app{
@@ -771,7 +771,7 @@ func TestOfficialLoginLaunchFailureDoesNotLogUnderlyingError(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{
 		storage: store,
 		clientInstallations: func() []clientInstallation {
@@ -821,7 +821,7 @@ func TestClientInstallationScanDiagnosticDoesNotExposePaths(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{
 		storage: store,
 		clientInstallations: func() []clientInstallation {

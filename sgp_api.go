@@ -81,6 +81,7 @@ const (
 	sgpFailureDelay     = 45 * time.Second
 	sgpCacheTTL         = 5 * time.Minute
 	sgpCacheMax         = 256
+	sgpCacheMaxBytes    = 24 << 20
 )
 
 type overviewLoadCostContextKey struct{}
@@ -153,6 +154,7 @@ func overviewCostFromContext(ctx context.Context) *overviewLoadCost {
 }
 
 type sgpProvider struct {
+	retryWait       func(context.Context, time.Duration) error
 	http            *http.Client
 	observe         func(map[string]any)
 	rankedShapeOnce sync.Once
@@ -171,6 +173,7 @@ type sgpProvider struct {
 	sessionOwner       *LCUClient
 	failUntil          time.Time
 	historyCache       map[string]sgpHistoryCacheEntry
+	historyBytes       int
 	summonerCache      map[string]sgpSummonerCacheEntry
 	credentialVersions map[sgpCredentialIdentity]string
 	credentialOrder    []sgpCredentialIdentity
@@ -182,6 +185,7 @@ type sgpHistoryCacheEntry struct {
 	games    []*riotMatchInfo
 	consumed int
 	more     bool
+	bytes    int
 }
 
 type sgpSummonerCacheEntry struct {
@@ -190,13 +194,17 @@ type sgpSummonerCacheEntry struct {
 }
 
 func newSGPProvider() *sgpProvider {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.MaxIdleConns = 32
+	transport.MaxIdleConnsPerHost = 8
+	transport.IdleConnTimeout = 90 * time.Second
 	serverBases := make(map[string]string, len(tencentSGPServers))
 	for serverID, base := range tencentSGPServers {
 		serverBases[serverID] = base
 	}
 	return &sgpProvider{
 		// SGP 网关是国内直连域名，不走“英雄数据网络”的代理设置。
-		http:          &http.Client{Timeout: 20 * time.Second},
+		http:          &http.Client{Timeout: 20 * time.Second, Transport: transport},
 		serverBases:   serverBases,
 		historyCache:  make(map[string]sgpHistoryCacheEntry),
 		summonerCache: make(map[string]sgpSummonerCacheEntry),
@@ -331,12 +339,6 @@ func (e *sgpPartialHistoryError) Error() string {
 }
 
 func (e *sgpPartialHistoryError) Unwrap() error { return e.Cause }
-
-// leagueSessionToken 读取 league-session 令牌：段位（leagues-ledge）与
-// 召唤师（summoner-ledge）接口要求这种令牌，与战绩用的 entitlements 不同。
-func (p *sgpProvider) leagueSessionToken(client *LCUClient, force bool) (string, error) {
-	return p.leagueSessionTokenContext(context.Background(), client, force)
-}
 
 func (p *sgpProvider) leagueSessionTokenContext(ctx context.Context, client *LCUClient, force bool) (string, error) {
 	p.mu.Lock()
@@ -593,19 +595,16 @@ func mergeDiagnosticFields(event map[string]any, fields map[string]any) map[stri
 	return event
 }
 
-func waitSGPRetry(ctx context.Context, retry int) error {
+func (p *sgpProvider) waitSGPRetry(ctx context.Context, retry int) error {
 	delays := [...]time.Duration{250 * time.Millisecond, 750 * time.Millisecond}
 	if retry <= 0 || retry > len(delays) {
 		return nil
 	}
-	timer := time.NewTimer(delays[retry-1])
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
+	wait := p.retryWait
+	if wait == nil {
+		wait = waitContext
 	}
+	return wait(ctx, delays[retry-1])
 }
 
 func retryableSGPStatus(status int) bool {
@@ -648,7 +647,7 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 		}
 		authRejected := false
 		for retry := 0; retry <= 2; retry++ {
-			if err := waitSGPRetry(ctx, retry); err != nil {
+			if err := p.waitSGPRetry(ctx, retry); err != nil {
 				return err
 			}
 			request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
@@ -773,6 +772,7 @@ func (p *sgpProvider) cachedHistoryPage(serverID, puuid string, startIndex, maxP
 			continue
 		}
 		if now.Sub(entry.at) >= sgpCacheTTL {
+			p.historyBytes -= entry.bytes
 			delete(p.historyCache, key)
 			continue
 		}
@@ -793,13 +793,18 @@ func (p *sgpProvider) cacheHistoryPage(serverID, puuid string, startIndex, pageS
 	if p.historyCache == nil {
 		p.historyCache = make(map[string]sgpHistoryCacheEntry)
 	}
+	if previous, ok := p.historyCache[key]; ok {
+		p.historyBytes -= previous.bytes
+	}
 	p.historyCache[key] = entry
+	p.historyBytes += entry.bytes
 	for candidate, cached := range p.historyCache {
 		if now.Sub(cached.at) >= sgpCacheTTL {
+			p.historyBytes -= cached.bytes
 			delete(p.historyCache, candidate)
 		}
 	}
-	for len(p.historyCache) > sgpCacheMax {
+	for len(p.historyCache) > sgpCacheMax || p.historyBytes > sgpCacheMaxBytes {
 		oldestKey := ""
 		var oldestAt time.Time
 		for candidate, cached := range p.historyCache {
@@ -815,7 +820,11 @@ func (p *sgpProvider) cacheHistoryPage(serverID, puuid string, startIndex, pageS
 		if oldestKey == "" {
 			break
 		}
+		p.historyBytes -= p.historyCache[oldestKey].bytes
 		delete(p.historyCache, oldestKey)
+	}
+	if p.historyBytes < 0 {
+		p.historyBytes = 0
 	}
 }
 
@@ -836,7 +845,6 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 	fetched := 0
 	lastPageFull := false
 	var partialErr error
-	cacheHit := false
 	downgraded := false
 	localShapeSampled := false
 	for len(games) < count && fetched < count+sgpPageSize {
@@ -844,13 +852,12 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 		if pageSize > sgpPageSize {
 			pageSize = sgpPageSize
 		}
-		if cacheHit || downgraded {
+		if downgraded {
 			pageSize = min(pageSize, sgpFallbackPageSize)
 		}
 		pageStart := start + fetched
 		if useCache {
 			if cached, cachedPageSize, ok := p.cachedHistoryPage(serverID, puuid, pageStart, pageSize, tags); ok {
-				cacheHit = true
 				overviewCostFromContext(ctx).addHistoryCacheHit()
 				games = append(games, cached.games...)
 				fetched += cached.consumed
@@ -858,7 +865,9 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 				if cached.consumed <= 0 || !lastPageFull || len(tags) > 0 {
 					break
 				}
-				_ = cachedPageSize
+				if cachedPageSize > sgpFallbackPageSize && cached.consumed == sgpFallbackPageSize {
+					downgraded = true
+				}
 				continue
 			}
 		}
@@ -928,8 +937,12 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 		clippedToFallbackPage := pageSize > sgpFallbackPageSize && consumed == sgpFallbackPageSize
 		lastPageFull = consumed >= pageSize || clippedToFallbackPage
 		if useCache {
+			pageBytes := 0
+			for _, game := range page.Games {
+				pageBytes += len(game.JSON)
+			}
 			p.cacheHistoryPage(serverID, puuid, pageStart, pageSize, tags, sgpHistoryCacheEntry{
-				games: append([]*riotMatchInfo(nil), parsedPageGames...), consumed: consumed, more: lastPageFull,
+				games: append([]*riotMatchInfo(nil), parsedPageGames...), consumed: consumed, more: lastPageFull, bytes: pageBytes,
 			})
 		}
 		fetched += consumed
@@ -1036,15 +1049,6 @@ type sgpRankedStats struct {
 	HighestPreviousSeasonEndRank      string           `json:"highestPreviousSeasonEndRank"`
 	HighestPreviousSeasonAchievedTier string           `json:"highestPreviousSeasonAchievedTier"`
 	HighestPreviousSeasonAchievedRank string           `json:"highestPreviousSeasonAchievedRank"`
-}
-
-// rankedStats 读取玩家的排位数据（当前服务器；该接口无法跨服）。
-func (p *sgpProvider) rankedStats(ctx context.Context, client *LCUClient, puuid string) (sgpRankedStats, error) {
-	serverID, _, ok := p.available(client)
-	if !ok {
-		return sgpRankedStats{}, errors.New("SGP 服务器不可用")
-	}
-	return p.rankedStatsOn(ctx, client, serverID, puuid, true, "")
 }
 
 // rankedStatsOn 在当前登录的国服子服务器读取排位。接口路径虽然接受

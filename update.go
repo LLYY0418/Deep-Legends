@@ -149,25 +149,27 @@ type updateSettings struct {
 }
 
 type updateManager struct {
-	mu             sync.Mutex
-	status         updateStatus
-	manifest       *updateManifest
-	cache          updateCache
-	lastManual     time.Time
-	store          *localStore
-	directory      string
-	installDir     string
-	mirrors        []string
-	client         *http.Client
-	now            func() time.Time
-	freeBytes      func(string) (int64, error)
-	launch         func(string, string) error
-	notify         func(string, any)
-	ctx            context.Context
-	stop           context.CancelFunc
-	downloadCancel context.CancelFunc
-	downloadDone   chan struct{}
-	checkDone      chan struct{}
+	startSourceTimer func(time.Duration, func()) func()
+	progressTicks    func() (<-chan time.Time, func())
+	mu               sync.Mutex
+	status           updateStatus
+	manifest         *updateManifest
+	cache            updateCache
+	lastManual       time.Time
+	store            *localStore
+	directory        string
+	installDir       string
+	mirrors          []string
+	client           *http.Client
+	now              func() time.Time
+	freeBytes        func(string) (int64, error)
+	launch           func(string, string) error
+	notify           func(string, any)
+	ctx              context.Context
+	stop             context.CancelFunc
+	downloadCancel   context.CancelFunc
+	downloadDone     chan struct{}
+	checkDone        chan struct{}
 }
 
 func newUpdateManager(current string, store *localStore, notify func(string, any)) *updateManager {

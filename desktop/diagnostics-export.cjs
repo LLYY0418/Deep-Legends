@@ -3,7 +3,7 @@
 const path = require("node:path");
 
 // Narrow download hook: no renderer-supplied paths, URLs or arbitrary writes.
-function attachDiagnosticsExport({ session, sender, getBaseURL, getDirectory, fileSystem, now = () => new Date(), onCompleted = () => {} }) {
+function attachDiagnosticsExport({ session, sender, getBaseURL, getDirectory, fileSystem, now = () => new Date(), onCompleted = () => {}, getDesktopLog }) {
   const pending = new Set();
   const onDownload = (_event, item, contents) => {
     if (contents !== sender) return;
@@ -27,7 +27,25 @@ function attachDiagnosticsExport({ session, sender, getBaseURL, getDirectory, fi
     pending.add(destination);
     item.once("done", (_event, state) => {
       pending.delete(destination);
-      if (state === "completed") onCompleted(destination);
+      if (state === "completed") {
+        if (getDesktopLog) {
+          let fd;
+          try {
+            const extra = getDesktopLog();
+            if (extra) {
+              const stat = fileSystem.lstatSync(destination);
+              if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 12 * 1024 * 1024) throw Error("untrusted export file");
+              fd = fileSystem.openSync(destination, fileSystem.constants.O_WRONLY | fileSystem.constants.O_APPEND | (fileSystem.constants.O_NOFOLLOW || 0));
+              const opened = fileSystem.fstatSync(fd);
+              if (!opened.isFile() || opened.ino !== stat.ino || opened.dev !== stat.dev) throw Error("export file changed");
+              fileSystem.appendFileSync(fd, "\n" + extra, "utf8");
+            }
+          } catch (_) {
+            // Backend evidence remains usable if shell evidence is unavailable.
+          } finally { if (fd !== undefined) fileSystem.closeSync(fd); }
+        }
+        onCompleted(destination);
+      }
     });
     try { item.setSavePath(destination); } catch (_) { pending.delete(destination); }
   };

@@ -80,12 +80,23 @@ test("collapsed sidebar hides the label but keeps the live beacon rendered", () 
   regression.dom.window.close();
 });
 
+const openDemoWindows = new Set();
+test.afterEach(() => {
+  for (const w of openDemoWindows) {
+    try { w.dispatchEvent(new w.CustomEvent("deep-legends:dispose")); w.close(); } catch (_) {}
+  }
+  openDemoWindows.clear();
+});
+
 function bootDemoApp(options = {}) {
   const html = fs.readFileSync(path.join(WEB, "index.html"), "utf8");
   const errors = [];
 	const eventSources = [];
   const dom = new JSDOM(html, { url: "http://127.0.0.1:1/?demo", runScripts: "outside-only", pretendToBeVisual: true });
   const w = dom.window;
+  openDemoWindows.add(w);
+  const closeWindow = w.close.bind(w);
+  w.close = () => { openDemoWindows.delete(w); closeWindow(); };
   w.onerror = (message, source, line, column, error) => { errors.push(String((error && error.stack) || message)); };
   w.addEventListener("unhandledrejection", (event) => { errors.push(String((event.reason && event.reason.stack) || event.reason)); });
   // jsdom 未实现的浏览器能力，用最小替身补齐（只影响可见性/尺寸，不影响渲染分支）。
@@ -113,8 +124,26 @@ function bootDemoApp(options = {}) {
 
   for (const file of SCRIPTS) {
     let source = fs.readFileSync(path.join(WEB, file), "utf8");
+    if (file === "suite.js" && options.suiteSourceTransform) source = options.suiteSourceTransform(source);
+    if (file === "champions.js" && options.championsSourceTransform) source = options.championsSourceTransform(source);
     if (file === "gameplay.js" && options.gameplaySourceTransform) source = options.gameplaySourceTransform(source);
+    if (file === "app.js" && options.championRankings) {
+      const originalFetch = w.fetch;
+      w.fetch = (url, ...args) => String(url).startsWith("/api/champions/rankings")
+        ? Promise.resolve(new w.Response(JSON.stringify({ rows: options.championRankings }))) : originalFetch(url, ...args);
+    }
     w.eval(source);
+    if (file === "demo-data.js" && options.matchCount > 17) {
+      const demoFetch = w.fetch;
+      w.fetch = async (url, ...args) => {
+        const response = await demoFetch(url, ...args);
+        if (!String(url).startsWith('/api/gameplay/overview')) return response;
+        const payload = await response.json(), original = payload.matches;
+        payload.matches = Array.from({length:options.matchCount}, (_,index) => ({...JSON.parse(JSON.stringify(original[index % original.length])),gameId:1000000+index}));
+        payload.pagination = {begIndex:0,count:options.matchCount,hasMore:false};
+        return new w.Response(JSON.stringify(payload), {status:200});
+      };
+    }
 	if (file === "demo-data.js" && options.facadeStateTransform) {
 	  const demoFetch = w.fetch;
 	  w.fetch = async (input, init) => {
@@ -131,6 +160,15 @@ function bootDemoApp(options = {}) {
 }
 
 const settled = () => new Promise((resolve) => setTimeout(resolve, 1500));
+async function visitTool(w, name) {
+  w.document.querySelector(`[data-suite-tab="${name}"]`).click();
+  const root = w.document.getElementById(`suite-${name}-root`);
+  const deadline = Date.now() + 2500;
+  while (root.classList.contains("suite-loading") && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(root.classList.contains("suite-loading"), false, `${name} did not load`);
+  await new Promise((resolve) => setTimeout(resolve, 40));
+}
+
 
 test("1110 征召默认值、时间输入、模式能力和总开关真实保存链", async () => {
   const { window: w, errors } = bootDemoApp();
@@ -138,7 +176,7 @@ test("1110 征召默认值、时间输入、模式能力和总开关真实保存
     await settled();
     w.document.querySelector('[data-section="suite"]').click();
     await settled();
-    w.document.querySelector('[data-suite-tab="champselect"]').click();
+    await visitTool(w, "champselect");
     const root = w.document.querySelector("#suite-champselect-root");
     const change = async (selector, value) => {
       const input = root.querySelector(selector);
@@ -316,12 +354,12 @@ test("non-match overview rerenders preserve the match-list node", () => {
     summonerContextChip: () => "", summonerProChip: () => "", summonerRegionChip: () => "", renderSummonerHighlights: () => "",
     scheduleOverviewCurrentGame: () => {},
     paginationCopyFor: () => "", renderCareerSections: () => "", renderMatchFilters: () => "",
-    renderMatch: (match) => `<article class="match-entry">${match.gameId}</article>`, number: (value) => String(value),
+    renderMatch: (match) => `<article data-match-id="${match.gameId}" class="match-entry">${match.gameId}</article>`, number: (value) => String(value),
     escapeHTML: (value) => String(value ?? ""), bindOverviewContent: () => {}, applyRenderedMetricStyles: () => {},
     prepareImages: () => {}, ensurePerks: () => {}, ensureItems: () => {}, ensureSummonerSpells: () => {}, observeMatchTierVisibility: () => {},
-    window: dom.window,
+    window: dom.window, document:dom.window.document,
   };
-  const { renderOverviewBodyContent } = compileFunctions(gameplaySource, ["renderOverviewBodyContent"], dependencies);
+  const { renderOverviewBodyContent } = compileFunctions(gameplaySource, ["renderOverviewBodyContent", "reconcileFilteredMatchList"], dependencies);
   const matches = [{ gameId: 1 }];
   const tab = { key: "current", matchFilter: "all", matchViewRevision: 0, openMatches: new Set(), data: { player: { playerRef: "ref" }, matches, pagination: {} } };
   renderOverviewBodyContent(container, tab);
@@ -336,7 +374,7 @@ test("non-match overview rerenders preserve the match-list node", () => {
 
   const mutated = gameplaySource.replace("container._matchListViewRevision === Number(tab.matchViewRevision || 0)", "true");
   assert.notEqual(mutated, gameplaySource);
-  const mutatedRender = compileFunctions(mutated, ["renderOverviewBodyContent"], dependencies).renderOverviewBodyContent;
+  const mutatedRender = compileFunctions(mutated, ["renderOverviewBodyContent", "reconcileFilteredMatchList"], dependencies).renderOverviewBodyContent;
   const mutatedContainer = dom.window.document.createElement("div");
   tab.openMatches.clear();
   tab.matchViewRevision = 0;
@@ -496,6 +534,7 @@ test("演示数据下工具五个页签都渲染完成", async () => {
   w.document.querySelector('[data-section="suite"]').click();
   await settled();
   for (const name of ["watch", "rig", "facade", "sweep", "champselect"]) {
+    await visitTool(w, name);
     const root = w.document.getElementById(`suite-${name}-root`);
     assert.ok(root, `工具缺少 ${name} 容器`);
     assert.equal(root.classList.contains("suite-loading"), false, `${name} 永久停在加载态`);
@@ -579,6 +618,8 @@ test("R56 工具页状态、确认、下拉与领奖契约完整", async () => {
   const { window: w, errors } = bootDemoApp();
   await settled();
   w.document.querySelector('[data-section="suite"]').click();
+  await visitTool(w, "facade");
+  await visitTool(w, "sweep");
   await settled();
 
   const facadeSelects = [...w.document.querySelectorAll("#suite-facade-root .suite-select")];
@@ -659,13 +700,13 @@ test("R56 工具页状态、确认、下拉与领奖契约完整", async () => {
   await new Promise((resolve) => setTimeout(resolve, 80));
 	const suiteEndpoints = ["/api/watch/rules", "/api/rig/status", "/api/facade/state?trigger=poll", "/api/claim/scan", "/api/champselect/groups", "/api/champselect/state", "/api/champions/catalog"];
   const restoredRequests = requests.filter((request) => suiteEndpoints.includes(request));
-  assert.deepEqual(restoredRequests.sort(), [...suiteEndpoints].sort(), `离线恢复应强刷五个工具页所需接口，实际 ${requests.join(", ")}`);
+  assert.deepEqual(restoredRequests.sort(), ["/api/claim/scan", "/api/rig/status"], `离线恢复应强刷当前领奖页和 rig，实际 ${requests.join(", ")}`);
   w.dispatchEvent(new w.CustomEvent("deep-legends:status", { detail: { connected: true, eventStream: true } }));
   await new Promise((resolve) => setTimeout(resolve, 80));
   assert.equal(requests.filter((request) => suiteEndpoints.includes(request)).length, restoredRequests.length, "重复在线状态不应再次请求工具接口");
 
   assert.match(appStyles, /\.button-danger\s*\{[^}]*background\s*:/s);
-  assert.match(appStyles, /\.app-select-menu\s*\{[^}]*display\s*:\s*flex[^}]*flex-direction\s*:\s*column[^}]*max-height\s*:\s*min\(320px,\s*50vh\)[^}]*overflow\s*:\s*hidden[^}]*overscroll-behavior\s*:\s*contain/s);
+  assert.match(appStyles, /\.app-select-menu\s*\{[^}]*display\s*:\s*flex[^}]*flex-direction\s*:\s*column[^}]*max-height\s*:\s*min\(320px,\s*calc\(50vh\s*\/\s*var\(--ui-zoom,\s*1\)\)\)[^}]*overflow\s*:\s*hidden[^}]*overscroll-behavior\s*:\s*contain/s);
   assert.match(appStyles, /\.app-select-options\s*\{[^}]*flex\s*:\s*1\s+1\s+auto[^}]*overflow-y\s*:\s*auto[^}]*overscroll-behavior\s*:\s*contain/s);
   assert.match(fs.readFileSync(path.join(WEB, "app.js"), "utf8"), /selected\.offsetTop\s*-\s*optionsRoot\.offsetTop\s*-\s*\(optionsRoot\.clientHeight\s*-\s*selected\.offsetHeight\)\s*\/\s*2/);
   assert.match(fs.readFileSync(path.join(WEB, "app.js"), "utf8"), /pageScrollRoot\.scrollTop\s*=\s*pageScrollTop/, "下拉打开后没有恢复页面主滚动位置");
@@ -747,6 +788,7 @@ test("R59 生涯预览完整渲染时不泄漏 playerTitleSelected UUID", async 
 	});
 	await settled();
 	w.document.querySelector('[data-section="suite"]').click();
+  await visitTool(w, "facade");
 	await settled();
 	const facadeRoot = w.document.getElementById("suite-facade-root");
 	assert.equal(facadeRoot.querySelector(".facade-signature")?.textContent, "未设置头衔");
@@ -915,6 +957,7 @@ test("R64 生涯头衔和勋章仅在真实值上使用强调色", async () => {
 	});
 	await settled();
 	w.document.querySelector('[data-section="suite"]').click();
+  await visitTool(w, "facade");
 	await settled();
 	const root = w.document.getElementById("suite-facade-root");
 	const title = root.querySelector(".facade-signature");
@@ -945,6 +988,7 @@ test("R58 生涯英雄长下拉支持别名搜索，短下拉不显示搜索框"
 	const { window: w, errors } = bootDemoApp();
 	await settled();
 	w.document.querySelector('[data-section="suite"]').click();
+  await visitTool(w, "facade");
 	await settled();
 	const heroSelect = w.document.querySelector("[data-facade-hero]");
 	assert.ok(heroSelect.options.length > 20, `演示英雄选项不足以触发长下拉：${heroSelect.options.length}`);
@@ -1012,6 +1056,7 @@ test("R58 生涯空皮肤刷新保留草稿并在数据补齐后恢复", async (
 	t.after(() => w.close());
 	await settled();
 	w.document.querySelector('[data-section="suite"]').click();
+  await visitTool(w, "facade");
 	await settled();
 	const initial = await (await w.fetch("/api/facade/state")).json();
 	const originalFetch = w.fetch;
@@ -1337,4 +1382,198 @@ test("failed build timelines retry on reopening, successful timelines remain cac
   assert.equal(calls,2);
   assert.equal(renders,2);
   assert.equal(state.matchTimelineFlights.size,0);
+});
+
+test("R86 hero search preserves input and coalesces five keystrokes (including bypass mutation)", async () => {
+  async function check(mutate = false) {
+    const { window: w, errors } = bootDemoApp({ championRankings: Array.from({ length: 170 }, (_, index) => ({ championId: index + 1, name: index === 102 ? "Ahri" : `Hero ${index + 1}`, key: `Hero${index + 1}`, winRate: 50, tier: 2 })), championsSourceTransform: (source) => {
+      source = source.replace('function render() {', 'function render() { window.__r86Renders = (window.__r86Renders || 0) + 1;');
+      source = source.replace('function objectRows(value) {', 'function objectRows(value) { window.__r86Rows = (window.__r86Rows || 0) + 1;');
+      if (mutate) source = source.replace('root.addEventListener("input", (event) => {', 'root.addEventListener("input", () => { root.innerHTML = root.innerHTML; });\n  root.addEventListener("input", (event) => {');
+      return source;
+    } });
+    try {
+      await settled();
+      w.document.querySelector('[data-section="champions"]').click();
+      await settled();
+      const input = w.document.querySelector('[data-champion-search]');
+      assert.ok(input);
+      input.focus();
+      const start = w.__r86Renders || 0;
+      w.__r86Rows = 0;
+      for (const value of ["a", "ah", "ahr", "ahri", "Ahri"]) {
+        input.value = value;
+        input.dispatchEvent(new w.Event("input", { bubbles: true }));
+        assert.equal(w.document.querySelector('[data-champion-search]'), input);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      assert.equal(w.document.querySelector('[data-champion-search]'), input);
+      assert.equal(w.document.activeElement, input);
+      assert.ok((w.__r86Renders || 0) - start <= 2);
+      assert.ok(w.__r86Rows <= 5, `objectRows calls: ${w.__r86Rows}`);
+      assert.equal(w.localStorage.getItem('lol-loot-champion-query-ranked'), "Ahri");
+      assert.ok(w.document.querySelector('[data-champion-results] [data-champion-row]'));
+      assert.deepEqual(errors, []);
+    } finally { w.close(); }
+  }
+  await check();
+  await assert.rejects(check(true), { name: "AssertionError" });
+});
+
+test("R86 tools fetch only active tab plus rig, then load claims on demand", async () => {
+ async function check(mutate=false) {
+  const { window: w, errors } = bootDemoApp({suiteSourceTransform:mutate ? source=>source.replace('function loadActiveTab(force = false) {','function loadActiveTab(force = false) { void api("/api/claim/scan").catch(()=>{});') : undefined});
+  try {
+    await settled();
+    const urls = [], original = w.fetch;
+    w.fetch = (url, ...args) => { urls.push(String(url)); return original(url, ...args); };
+    w.document.querySelector('[data-section="suite"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    for (const forbidden of ["/api/claim/scan", "/api/facade/state", "/api/champions/catalog", "/api/champselect/state"]) {
+      assert.ok(!urls.some((url) => url.startsWith(forbidden)), `${forbidden} was loaded eagerly`);
+    }
+    w.document.querySelector('[data-suite-tab="sweep"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    assert.ok(urls.some((url) => url.startsWith("/api/claim/scan")));
+    assert.deepEqual(errors, []);
+  } finally { w.close(); }
+ }
+ await check();await assert.rejects(check(true),{name:"AssertionError"});
+});
+
+// Advance browser time without sleeping or shortening production intervals.
+function r86Clock(w) {
+  let now = Date.now(), id = 100000;
+  const timers = new Map();
+  const originalClear = w.clearTimeout.bind(w);
+  w.Date.now = () => now;
+  w.setTimeout = (fn, delay = 0) => { const key = ++id; timers.set(key, { at: now + Number(delay), fn }); return key; };
+  w.clearTimeout = (key) => { timers.delete(key); originalClear(key); };
+  return async (ms) => {
+    const end = now + ms;
+    for (let safety = 0; safety < 2000; safety++) {
+      const next = [...timers].filter(([,t]) => t.at <= end).sort((a,b) => a[1].at-b[1].at)[0];
+      if (!next) break;
+      now = next[1].at; timers.delete(next[0]); next[1].fn();
+      for (let i=0;i<30;i++) await Promise.resolve();
+    }
+    now = end;
+  };
+}
+
+test("R86 healthy SSE reduces phase polling while closed SSE retains one-second fallback", async () => {
+  for (const mutate of [false, true]) {
+    const {window:w,eventSources}=bootDemoApp({liveEvents:true,gameplaySourceTransform: mutate ? s => s.replace('  let beaconPollTimer = 0;', '  window.addEventListener("deep-legends:live-frame", () => { void api("/api/gameplay/phase").catch(() => {}); });\n  let beaconPollTimer = 0;') : undefined});
+    try {
+      await settled();
+      const source=eventSources.at(-1);
+      assert.ok(source);
+      const advance=r86Clock(w), original=w.fetch;
+      let calls=0;
+      w.fetch=(url,...args)=>{if(String(url).startsWith('/api/gameplay/phase')){calls++;return Promise.resolve(new w.Response(JSON.stringify({phase:'None'})))}return original(url,...args)};
+      w.dispatchEvent(new w.CustomEvent('deep-legends:live-disconnected'));
+      for(let i=0;i<30;i++){source.onmessage({data:'keepalive'});await advance(1000)}
+      if(mutate){assert.ok(calls>4,'independent eager path must exceed budget');continue}
+      assert.ok(calls<=4,`healthy polls=${calls}`);
+      calls=0;source.readyState=2;source.onerror();
+      await advance(30000);
+      assert.ok(calls>=20,`closed polls=${calls}`);
+    } finally {w.dispatchEvent(new w.CustomEvent('deep-legends:dispose'));w.close()}
+  }
+});
+
+test("R86 external match expansion preserves unrelated cards", async () => {
+ async function check(mutate=false) {
+  const {window:w}=bootDemoApp({gameplaySourceTransform:mutate ? source=>source.replace('render(id = "") {','render(id = "") { id = "";') : undefined});
+  try {
+    await settled();
+    const data=await (await w.fetch('/api/gameplay/overview')).json();
+    const host=w.document.createElement('div');w.document.body.append(host);
+    w.deepLegendsMatchCards.mount(host,{matches:data.matches,playerRef:data.player.playerRef});
+    const before=[...host.querySelectorAll('.match-entry')];assert.ok(before.length>1);
+    before[0].querySelector('[data-toggle-match]').click();
+    const after=[...host.querySelectorAll('.match-entry')];
+    assert.notEqual(after[0],before[0]);assert.equal(after[1],before[1]);
+  }finally{w.dispatchEvent(new w.CustomEvent('deep-legends:dispose'));w.close()}
+ }
+ await check();await assert.rejects(check(true),{name:"AssertionError"});
+});
+
+test('R86 filtering 200 loaded matches hides entries without rebuilding or refetching', async () => {
+ async function check(mutate=false) {
+  const {window:w,errors}=bootDemoApp({matchCount:200,gameplaySourceTransform:mutate ? source=>source.replace('function reconcileFilteredMatchList(list, tab) {','function reconcileFilteredMatchList(list, tab) { list.innerHTML = list.innerHTML;') : undefined});
+  try {
+    await settled();
+    const d=w.document, before=[...d.querySelectorAll('.match-list .match-entry')];
+    assert.equal(before.length,200);
+    let creates=0,requests=0;
+    const create=d.createElement.bind(d), fetch=w.fetch;
+    d.createElement=(...args)=>{creates++;return create(...args)};
+    w.fetch=(url,...args)=>{if(String(url).startsWith('/api/gameplay/overview'))requests++;return fetch(url,...args)};
+    d.querySelector('[data-match-filter="arena"]').click();
+    await Promise.resolve();
+    const hidden=before.filter(entry=>entry.hidden);
+    assert.ok(hidden.length>0 && hidden.length<200);
+    d.querySelector('[data-match-filter="all"]').click();
+    await Promise.resolve();
+    assert.deepEqual([...d.querySelectorAll('.match-list .match-entry')],before);
+    assert.ok(before.every(entry=>!entry.hidden));
+    assert.ok(creates<200,`created ${creates}`);
+    assert.equal(requests,0,'complete unfiltered dataset needs no first-page request');
+    assert.deepEqual(errors,[]);
+  } finally {w.close()}
+ }
+ await check();await assert.rejects(check(true),{name:"AssertionError"});
+});
+
+test('R86 image listeners and tab scroll remain bounded including independent image-listener bypass', async () => {
+  async function check(mutate=false) {
+    const {window:w,errors}=bootDemoApp({matchCount:200,gameplaySourceTransform:source=>{
+      source=source.replace('function renderOverviewBodyContent(container, tab) {',`function renderOverviewBodyContent(container, tab) {
+        const oldAdd=window.EventTarget.prototype.addEventListener;
+        let calls=0;
+        window.EventTarget.prototype.addEventListener=function(...args){calls++;return oldAdd.apply(this,args)};
+        try { return r86OriginalRender(container,tab); } finally {window.EventTarget.prototype.addEventListener=oldAdd;window.__r86ListenerMax=Math.max(window.__r86ListenerMax||0,calls);}
+      }
+      function r86OriginalRender(container, tab) {`);
+      if(mutate)source=source.replace('function prepareImages(container) {','function prepareImages(container) { for(const image of container.querySelectorAll("img")){image.addEventListener("load",()=>{});image.addEventListener("error",()=>{});}');
+      return source;
+    }});
+    try {
+      await settled();
+      assert.equal(w.document.querySelectorAll('.match-list .match-entry').length,200);
+      assert.ok(w.__r86ListenerMax<1000,`listeners=${w.__r86ListenerMax}`);
+      let styles=0;const original=w.getComputedStyle.bind(w);w.getComputedStyle=(...args)=>{styles++;return original(...args)};
+      const tabs=w.document.querySelector('#player-tabs');
+      for(let i=0;i<20;i++)tabs.dispatchEvent(new w.Event('scroll'));
+      await new Promise(resolve=>w.requestAnimationFrame(()=>resolve()));
+      assert.ok(styles<=2,`computed styles=${styles}`);
+      assert.deepEqual(errors,[]);
+    }finally{w.close()}
+  }
+  await check();await assert.rejects(check(true),{name:'AssertionError'});
+});
+
+test('R86 scroll restoration is resize-driven, restores clamped position and yields to user input', () => {
+  const source=fs.readFileSync(path.join(WEB,'app.js'),'utf8');
+  function check(mutate=false, userCancels=false) {
+    const w=new JSDOM('<div></div>').window;
+    try {
+      let resize, max=0, top=0, frames=0;const queue=[];
+      const appScroll={children:[{}],scrollTo({top:value}){top=Math.min(max,value)},get scrollTop(){return top}};
+      class RO {constructor(fn){resize=fn}observe(){}disconnect(){}}
+      w.ResizeObserver=RO;
+      let body=functionSource(source,'restoreSectionScroll');
+      if(mutate)body=body.replace('requestAnimationFrame(apply);','requestAnimationFrame(apply); requestAnimationFrame(function churn(){if(!cancelled)requestAnimationFrame(churn)});');
+      const run=new Function('window','ResizeObserver','requestAnimationFrame','setTimeout','clearTimeout','state','el',`return (${body});`)(w,RO,fn=>{queue.push(fn);return queue.length},()=>1,()=>{}, {section:'champions',sectionScroll:{champions:600}}, {appScroll});
+      run('champions');
+      for(let i=0;i<20&&queue.length;i++){queue.shift()();frames++}
+      assert.ok(frames<=3,`restore ran ${frames} frames while height unchanged`);
+      assert.equal(top,0,'short skeleton clamps the target');
+      if(userCancels)w.dispatchEvent(new w.Event('wheel'));
+      max=1200;resize();
+      assert.equal(top,userCancels?0:600);
+    }finally{w.close()}
+  }
+  check();check(false,true);assert.throws(()=>check(true),{name:'AssertionError'});
 });

@@ -96,6 +96,9 @@ func (a *app) scheduleQuit(delay time.Duration, reason string) {
 			if client != nil {
 				client.Close()
 			}
+			// Flush before announcing quit: the shell may terminate the backend
+			// as soon as it receives the stdout protocol message.
+			closeDiagnosticStore(a.storage)
 			// Electron consumes this on its existing trusted backend stdout channel.
 			fmt.Fprintf(os.Stdout, "LOOT_QUIT %s\n", reason)
 			os.Exit(0)

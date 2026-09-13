@@ -95,7 +95,7 @@ func TestGameplayOverviewRejectsUnregisteredStablePlayerID(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{token: "session-secret", gameplayRefs: make(map[string]string), storage: store}
 	request := httptest.NewRequest(http.MethodPost, "/api/gameplay/overview", strings.NewReader(`{"playerRef":"`+strings.Repeat("p", 48)+`","count":20}`))
 	recorder := httptest.NewRecorder()
@@ -190,7 +190,7 @@ func TestGameplayOverviewTencentLookupHTTPErrorIsExplainedAndRecorded(t *testing
 	}))
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client(), region: "TENCENT", rsoPlatform: "HN1", platformProbe: true}
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestTencentLookupRetriesOneTransportFailure(t *testing.T) {
 
 func TestGameplayOverviewRecordsCompletePhaseTiming(t *testing.T) {
 	a, publicRef, _ := newGameplayOverviewSGPFixture(t, false)
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ func TestGameplayOverviewRecordsCompletePhaseTiming(t *testing.T) {
 
 func TestGameplayOverviewOverlapsIndependentUpstreams(t *testing.T) {
 	a, publicRef, _ := newGameplayOverviewSGPFixture(t, true)
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -345,21 +345,29 @@ func TestGameplayOverviewOverlapsIndependentUpstreams(t *testing.T) {
 
 func TestGameplayOverviewReturnsPartialBeforeTwentySeconds(t *testing.T) {
 	a, publicRef, _ := newGameplayOverviewSGPFixture(t, true)
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	a.storage = store
 	a.sgp.observe = a.recordDiagnostic
+	var expire context.CancelFunc
+	a.overviewTimeout = func(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+		if d != 18*time.Second {
+			t.Fatalf("budget=%v", d)
+		}
+		ctx, cancel := context.WithCancel(parent)
+		expire = cancel
+		return r86DeadlineContext{ctx}, cancel
+	}
 	var summaryCalls atomic.Int64
 	a.sgp.http = &http.Client{Transport: sgpRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		if !strings.HasSuffix(request.URL.Path, "/SUMMARY") {
 			return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`[]`)), Request: request}, nil
 		}
-		summaryCalls.Add(1)
-		select {
-		case <-time.After(8 * time.Second):
-		case <-request.Context().Done():
+		if summaryCalls.Add(1) >= 3 {
+			expire() // Drive the real cancellation route after two completed pages.
+			<-request.Context().Done()
 			return nil, request.Context().Err()
 		}
 		start, _ := strconv.Atoi(request.URL.Query().Get("startIndex"))
@@ -384,7 +392,7 @@ func TestGameplayOverviewReturnsPartialBeforeTwentySeconds(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &overview); err != nil {
 		t.Fatalf("partial overview response = status:%d body:%q err:%v", recorder.Code, recorder.Body.String(), err)
 	}
-	if recorder.Code != http.StatusOK || elapsed >= 20*time.Second || len(overview.Matches) == 0 || !overview.Pagination.Partial || !overview.Pagination.BudgetExceeded || !overview.Pagination.HasMore || summaryCalls.Load() < 3 {
+	if recorder.Code != http.StatusOK || elapsed >= time.Second || len(overview.Matches) == 0 || !overview.Pagination.Partial || !overview.Pagination.BudgetExceeded || !overview.Pagination.HasMore || summaryCalls.Load() < 3 {
 		t.Fatalf("budgeted overview = status:%d elapsed:%s matches:%d pagination:%#v calls:%d", recorder.Code, elapsed, len(overview.Matches), overview.Pagination, summaryCalls.Load())
 	}
 }
@@ -1299,7 +1307,7 @@ func TestLCURankedShapeDiagnosticIsProcessScoped(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
 	for index := 0; index < 2; index++ {
 		if _, _, _, err := a.loadGameplayRanksContext(context.Background(), client, strings.Repeat("p", 48), false); err != nil {
@@ -1401,7 +1409,7 @@ func TestRankedStatsCompletionGateStopsOnlyUnproductiveLCUFallbacks(t *testing.T
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{sgp: provider, storage: &localStore{root: root}}
+	a := &app{sgp: provider, storage: trackTestStore(t, &localStore{root: root})}
 	provider.observe = a.recordDiagnostic
 	for index := 0; index < sgpCompletionFailureLimit+1; index++ {
 		ranks, _, _ := a.loadRanksWithFallback(context.Background(), client, playerRef, false, "HN1", "PUBLIC")
@@ -1552,7 +1560,7 @@ func TestCanceledRankedRequestIsSilent(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	client := &LCUClient{baseURL: "http://127.0.0.1:1", token: "test", http: http.DefaultClient}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -1606,7 +1614,7 @@ func TestCanceledPartialSGPHistoryIsSilent(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{sgp: provider, storage: &localStore{root: root}}
+	a := &app{sgp: provider, storage: trackTestStore(t, &localStore{root: root})}
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		<-secondPageStarted
@@ -1629,7 +1637,7 @@ func TestRankedWinRateDiagnosticsRecordSGPAndLCUSources(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		return &localStore{root: root}
+		return trackTestStore(t, &localStore{root: root})
 	}
 	rankedEvent := func(t *testing.T, data []byte) map[string]any {
 		t.Helper()
@@ -1693,7 +1701,7 @@ func TestRankedWinRateDiagnosticsRecordSGPAndLCUSources(t *testing.T) {
 }
 
 func TestRankedWinRateDiagnosticPlayerHashIsStableAndDistinct(t *testing.T) {
-	store := &localStore{salt: bytes.Repeat([]byte{0x5a}, 32)}
+	store := trackTestStore(t, &localStore{salt: bytes.Repeat([]byte{0x5a}, 32)})
 	a := &app{storage: store}
 	firstRef := strings.Repeat("a", 48)
 	secondRef := strings.Repeat("b", 48)
@@ -1711,7 +1719,7 @@ func TestRankedWinRateDiagnosticPlayerHashIsStableAndDistinct(t *testing.T) {
 	if strings.Contains(first, firstRef) || strings.Contains(second, secondRef) {
 		t.Fatalf("player hash leaked its input: first=%q second=%q", first, second)
 	}
-	otherInstall := (&app{storage: &localStore{salt: bytes.Repeat([]byte{0x6b}, 32)}}).rankedWinRateDiagnosticPlayerHash(firstRef)
+	otherInstall := (&app{storage: trackTestStore(t, &localStore{salt: bytes.Repeat([]byte{0x6b}, 32)})}).rankedWinRateDiagnosticPlayerHash(firstRef)
 	if otherInstall == first {
 		t.Fatalf("different install salts produced the same player hash: %q", first)
 	}
@@ -1757,7 +1765,7 @@ func TestSeasonRankFallbackAppearsAfterRefreshSnapshotCompletes(t *testing.T) {
 	playerRef := strings.Repeat("r", 48)
 	player := Summoner{PUUID: playerRef}
 	reference := gameplayReference{PlayerRef: playerRef, ServerID: "HN1"}
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	a := &app{storage: store, sgp: newSGPProvider()}
 	incomplete := []gameplayRank{{QueueType: "RANKED_SOLO_5x5", Wins: 107, Losses: 0, WinRate: -1}}
 	capability := EndpointCapability{Path: "/lol-ranked/v1/ranked-stats/{player}", Detail: "客户端未返回排位负场，胜率暂不展示"}
@@ -1819,7 +1827,7 @@ func TestGameplayOverviewAppliesSeasonFallbackToIncompleteSGPRanks(t *testing.T)
 	provider.serverBases["HN1"] = "https://sgp.invalid"
 	provider.token, provider.tokenAt, provider.tokenClient = "entitlements", time.Now(), client
 	provider.sessionToken, provider.sessionAt, provider.sessionOwner = "league-session", time.Now(), client
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	a := &app{
 		token: "session-secret", connected: true, lcu: client, sgp: provider, storage: store,
 		summoner:     Summoner{PUUID: currentRef, GameName: "当前玩家"},
@@ -1913,7 +1921,7 @@ func TestGameplayOverviewReturnsCoreBeforeSlowSeasonScan(t *testing.T) {
 	provider.token, provider.tokenAt, provider.tokenClient = "entitlements", time.Now(), client
 	provider.sessionToken, provider.sessionAt, provider.sessionOwner = "league-session", time.Now(), client
 	a := &app{
-		sgp: provider, lcu: client, connected: true, storage: &localStore{root: t.TempDir()},
+		sgp: provider, lcu: client, connected: true, storage: trackTestStore(t, &localStore{root: t.TempDir()}),
 		summoner: Summoner{PUUID: playerRef, GameName: "当前玩家"}, lpTracker: newLPTracker(nil),
 		gameplayRefs: make(map[string]string), gameplayRefDetails: make(map[string]gameplayReference),
 	}
@@ -2030,8 +2038,11 @@ func TestHiddenPlayerUsesTheSameRankAndMatchHistoryLoaders(t *testing.T) {
 	history.Games.Games = []lcuGame{game}
 
 	requested := make(map[string]int)
+	var requestedMu sync.Mutex
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestedMu.Lock()
 		requested[r.URL.Path]++
+		requestedMu.Unlock()
 		switch {
 		case r.URL.Path == "/lol-summoner/v2/summoners/puuid/"+hiddenPUUID:
 			http.Error(w, "profile hidden", http.StatusNotFound)
@@ -2078,6 +2089,8 @@ func TestHiddenPlayerUsesTheSameRankAndMatchHistoryLoaders(t *testing.T) {
 	if len(response.Matches[0].Participants) != 1 || !response.Matches[0].Participants[0].Hidden || response.Matches[0].Participants[0].PlayerRef == "" {
 		t.Fatalf("hidden participant was not kept queryable: %#v", response.Matches[0].Participants)
 	}
+	requestedMu.Lock()
+	defer requestedMu.Unlock()
 	for _, path := range []string{
 		"/lol-ranked/v1/ranked-stats/" + hiddenPUUID,
 		"/lol-match-history/v1/products/lol/" + hiddenPUUID + "/matches",
@@ -2452,7 +2465,7 @@ func TestR58ChampSelectDropsStaleGameflowRoster(t *testing.T) {
 	}))
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	a := &app{connected: true, lcu: client, storage: &localStore{root: root}, summoner: Summoner{PUUID: "new-player-identity-0001"}}
+	a := &app{connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: root}), summoner: Summoner{PUUID: "new-player-identity-0001"}}
 	recorder := httptest.NewRecorder()
 	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
 	if recorder.Code != http.StatusOK {
@@ -2548,7 +2561,7 @@ func TestR58LiveClientPlayerListGroupsSixArenaTeamsAndRedactsDiagnostics(t *test
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	var probes atomic.Int32
 	a := &app{
-		connected: true, lcu: client, storage: &localStore{root: root},
+		connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: root}),
 		liveClientPlayerList: func(context.Context) ([]byte, int, error) {
 			probes.Add(1)
 			return liveRaw, http.StatusOK, nil
@@ -2630,7 +2643,7 @@ func TestR68LiveClientPlayerListPositionsOverrideGameflowForAllTenPlayers(t *tes
 	}))
 	defer server.Close()
 	a := &app{
-		connected: true, lcu: &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}, storage: &localStore{root: root},
+		connected: true, lcu: &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}, storage: trackTestStore(t, &localStore{root: root}),
 		liveClientPlayerList: func(context.Context) ([]byte, int, error) { return liveRaw, http.StatusOK, nil },
 	}
 	recorder := httptest.NewRecorder()
@@ -2677,7 +2690,7 @@ func TestR68LiveClientPositionMatchedCountIsNotPlayerCount(t *testing.T) {
 	}
 	raw := []byte(`[{"riotId":"Matched#CN1","position":"TOP"},{"riotId":"NotInRoster#CN1","position":"JUNGLE"}]`)
 	a := &app{
-		storage:              &localStore{root: root},
+		storage:              trackTestStore(t, &localStore{root: root}),
 		liveClientPlayerList: func(context.Context) ([]byte, int, error) { return raw, http.StatusOK, nil },
 	}
 	snapshot, _ := a.liveClientSnapshotForGame(context.Background(), 68002, "InProgress", 0)
@@ -2889,7 +2902,7 @@ func TestLiveRecommendationRejectionRecordsOnlyInputShape(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/gameplay/recommendations?championId=-3", nil)
 	a.handleGameplayRecommendations(recorder, request)
@@ -2936,7 +2949,7 @@ func TestGameplayLiveUsesCurrentChampionWhenRosterIsUnavailable(t *testing.T) {
 	}))
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	a := &app{connected: true, lcu: client, storage: &localStore{root: root}}
+	a := &app{connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: root})}
 	recorder := httptest.NewRecorder()
 	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
 	if recorder.Code != http.StatusOK {
@@ -2985,7 +2998,7 @@ func TestGameplayLiveMarksCurrentPlayerFromChampSelectCellIdentity(t *testing.T)
 	defer server.Close()
 
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	a := &app{connected: true, lcu: client, storage: &localStore{root: root}}
+	a := &app{connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: root})}
 	recorder := httptest.NewRecorder()
 	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
 	if recorder.Code != http.StatusOK {
@@ -3027,7 +3040,7 @@ func TestGameplayLiveArenaChampSelectFiltersAnonymousCells(t *testing.T) {
 	defer server.Close()
 
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	a := &app{connected: true, lcu: client, storage: &localStore{root: root}}
+	a := &app{connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: root})}
 	recorder := httptest.NewRecorder()
 	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
 	if recorder.Code != http.StatusOK {
@@ -3079,7 +3092,7 @@ func TestGameplayLiveChampSelectDropsStaleGameflowRoster(t *testing.T) {
 	}))
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	a := &app{connected: true, lcu: client, summoner: Summoner{PUUID: "fresh-player"}, storage: &localStore{root: root}}
+	a := &app{connected: true, lcu: client, summoner: Summoner{PUUID: "fresh-player"}, storage: trackTestStore(t, &localStore{root: root})}
 	recorder := httptest.NewRecorder()
 	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
 	if recorder.Code != http.StatusOK {
@@ -3260,7 +3273,7 @@ func TestLiveClientPlayerListDiagnosticIsStructuralAndDeduplicated(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	a.recordLiveClientPlayerListShape(123456, 0, liveClientPlayerListShape{}, "unavailable", 1, "InProgress")
 	a.recordLiveClientPlayerListShape(123456, 0, liveClientPlayerListShape{}, "unavailable", 2, "InProgress")
 	a.recordLiveClientPlayerListShape(123456, http.StatusOK, shape, "grouped", 3, "Reconnect")
@@ -3895,7 +3908,7 @@ func TestRuneApplyHandlerReturnsAndRecordsAppliedPerks(t *testing.T) {
 	}))
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{connected: true, lcu: client, storage: store}
 	perkIDs := []int64{8001, 8002, 8003, 8004, 8101, 8102, 5001, 5008, 5011}
 	body := `{"championName":"李青","source":"OPGG","championId":64,"primaryStyleId":8000,"subStyleId":8100,"selectedPerkIds":[8001,8002,8003,8004,8101,8102,5001,5008,5011]}`
@@ -4224,7 +4237,7 @@ func TestGameplayRecommendationsHandlerKeepsGameIDDiagnosticOnlyAndReturnsUseful
 		}
 		return &http.Response{StatusCode: http.StatusOK, Status: http.StatusText(http.StatusOK), Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body)), ContentLength: int64(len(body)), Request: request}, nil
 	})}
-	a := &app{champions: provider, storage: &localStore{root: root}}
+	a := &app{champions: provider, storage: trackTestStore(t, &localStore{root: root})}
 	provider.diag = a.recordDiagnostic
 
 	queries := []struct {
@@ -4561,7 +4574,7 @@ func TestR69LiveClientPositionsUseEnrichedRiotIDs(t *testing.T) {
 	}))
 	defer server.Close()
 	a := &app{
-		connected: true, lcu: &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}, storage: &localStore{root: root},
+		connected: true, lcu: &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}, storage: trackTestStore(t, &localStore{root: root}),
 		liveClientPlayerList: func(context.Context) ([]byte, int, error) { return liveRaw, http.StatusOK, nil },
 	}
 	recorder := httptest.NewRecorder()
@@ -4745,7 +4758,7 @@ func TestRecommendationModeDiagnosticIsRecordedOncePerGame(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	resolution := resolveGameplayRecommendationMode(-1, "CLASSIC", 11)
 	a.recordRecommendationModeResolution(987, -1, "CLASSIC", 11, resolution)
 	a.recordRecommendationModeResolution(987, -1, "CLASSIC", 11, resolution)
@@ -4760,7 +4773,7 @@ func TestUnknownQueueDiagnosticIsRecordedOncePerQueueID(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	a.recordUnknownQueue(9999, "UNKNOWN", 99)
 	a.recordUnknownQueue(9999, "CHANGED", 11)
 	a.recordUnknownQueue(3270, "KIWI", 12)
@@ -4778,7 +4791,7 @@ func TestRecommendationRequestDiagnosticRecordsInvalidArrival(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	recorder := httptest.NewRecorder()
 	a.handleGameplayRecommendations(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/recommendations?championId=0&queueId=1750&position=TOP", nil))
 	if recorder.Code != http.StatusBadRequest {
@@ -4815,7 +4828,7 @@ func TestDiagnosticDeduplicationResetsAfterLogRotation(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{storage: store}
 	store.onDiagnosticRotation = a.resetDiagnosticDeduplication
 	resolution := resolveGameplayRecommendationMode(420, "CLASSIC", 11)
@@ -4842,7 +4855,7 @@ func TestDiagnosticRotationCallbackRunsOutsideGeneralStorageMutex(t *testing.T) 
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	callbackBlocked := false
 	store.onDiagnosticRotation = func() {
 		if !store.mu.TryLock() {
@@ -4868,7 +4881,7 @@ func TestRankedWinrateDiagnosticsAggregateByMinuteAndSource(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{storage: store}
 	for index := 0; index < 1000; index++ {
 		a.recordDiagnostic(map[string]any{
@@ -4891,7 +4904,7 @@ func TestRankedWinrateDiagnosticAggregationKeepsSourceDimensionBounded(t *testin
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	for index := 0; index < diagnosticDeduplicationLimit+73; index++ {
 		source := "lcu"
 		if index%2 == 0 {
@@ -4912,7 +4925,7 @@ func TestDiagnosticEventShareStaysBelowThirtyPercent(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{storage: store}
 	noisy := map[string]any{"event": "ranked_winrate_resolved", "source": "lcu", "queue": "RANKED_SOLO_5x5", "wins": 0, "losses": 0}
 	for range 100 {
@@ -4957,7 +4970,7 @@ func TestDiagnosticEventShareAggregatesDistinctRankedPayloadsBelowThirtyPercent(
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{storage: store}
 	// These payloads intentionally differ on every call, so H-1's exact-byte
 	// deduplication cannot hide an event-level share-limit blind spot.
@@ -5004,11 +5017,16 @@ func TestNoisyDiagnosticDeduplicationResetsAfterLogRotation(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{storage: store}
 	store.onDiagnosticRotation = a.resetDiagnosticDeduplication
 	payload := map[string]any{"event": "ranked_data_source_decision", "selected": "lcu", "reason": "local-client-connected"}
 	a.recordDiagnostic(payload)
+	store.diagnosticMu.Lock()
+	if err := store.releaseDiagnosticLocked(); err != nil {
+		t.Fatal(err)
+	}
+	store.diagnosticMu.Unlock()
 	path := filepath.Join(root, "logs", "diagnostics.jsonl")
 	prefix := []byte(`{"event":"ranked_data_source_decision","selected":"lcu","reason":"local-client-connected"}` + "\n")
 	if err := os.WriteFile(path, append(prefix, bytes.Repeat([]byte("x"), 2*1024*1024+1)...), 0o600); err != nil {
@@ -5034,7 +5052,7 @@ func TestLiveRosterShapeDiagnosticDeduplicatesByFingerprint(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{storage: store}
 	response := gameplayLiveResponse{Phase: "ChampSelect", GameID: 123, RawCount: 4, MergeAppended: 1, Players: []gameplayLivePlayer{
 		{TeamID: 100, gameplayPlayer: gameplayPlayer{PlayerRef: "one"}, ModeStats: gameplayAggregate{Games: 2}},
@@ -5074,7 +5092,7 @@ func TestR68LiveRosterShapeRecordsStatsProgressFiveSevenTen(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{storage: &localStore{root: root}}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	base := gameplayLiveResponse{Phase: "InProgress", GameID: 6810, Players: make([]gameplayLivePlayer, 10)}
 	for index := range base.Players {
 		base.Players[index].TeamID = []int64{100, 200}[index/5]
@@ -5204,7 +5222,7 @@ func TestLCUSessionShapeDiagnosticsDeduplicateByModeAndRotate(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store := &localStore{root: root}
+	store := trackTestStore(t, &localStore{root: root})
 	a := &app{storage: store}
 	gameflowRaw := []byte(`{"gameData":{"teamOne":[],"teamTwo":[]}}`)
 	champSelectRaw := []byte(`{"myTeam":[],"theirTeam":[]}`)
@@ -5362,7 +5380,7 @@ func TestItemSetApplyPreservesUserSetsAndStoresIdempotently(t *testing.T) {
 	}
 	provider := newChampionProvider()
 	provider.itemPurchasable[9999] = false
-	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 123, AccountID: 456, PUUID: playerRef}, storage: &localStore{root: root}, champions: provider}
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 123, AccountID: 456, PUUID: playerRef}, storage: trackTestStore(t, &localStore{root: root}), champions: provider}
 	body := `{"title":"李青 · 打野","championId":64,"mapId":11,"position":"jungle","selfPosition":"middle","blocks":[{"type":"出门装","items":[{"id":1055,"count":1}]},{"type":"出装路线","items":[{"id":6630,"count":1},{"id":3071,"count":1},{"id":9999,"count":1}]}]}`
 	for attempt := 0; attempt < 2; attempt++ {
 		recorder := httptest.NewRecorder()
@@ -5487,7 +5505,7 @@ func TestItemSetApplyDecodeFailuresRecordStage(t *testing.T) {
 			if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			a := &app{storage: &localStore{root: root}}
+			a := &app{storage: trackTestStore(t, &localStore{root: root})}
 			recorder := httptest.NewRecorder()
 			a.handleGameplayItemSetApply(recorder, httptest.NewRequest(http.MethodPost, "/api/gameplay/item-sets/apply", strings.NewReader(body)))
 			if recorder.Code != http.StatusBadRequest || !strings.Contains(recorder.Body.String(), "装备方案无效") {
@@ -5607,7 +5625,7 @@ func TestItemSetApplyHandlerReportsWrittenCountsAfterUpgradeCollapse(t *testing.
 		connected: true,
 		lcu:       client,
 		summoner:  Summoner{SummonerID: 123, AccountID: 456, PUUID: playerRef},
-		storage:   &localStore{root: root},
+		storage:   trackTestStore(t, &localStore{root: root}),
 	}
 	body := `{"title":"瑞兹 · 中路","championId":13,"mapId":11,"position":"middle","blocks":[{"type":"核心装","items":[{"id":3003,"count":1},{"id":3040,"count":1},{"id":3071,"count":1},{"id":6630,"count":1},{"id":3157,"count":1}]}]}`
 	recorder := httptest.NewRecorder()
@@ -5739,4 +5757,15 @@ func TestSecurityHeadersRemainStrictForGameplayPages(t *testing.T) {
 	if recorder.Header().Get("Content-Security-Policy") != wantCSP || recorder.Header().Get("Referrer-Policy") != "no-referrer" || recorder.Header().Get("Cache-Control") != "no-store" || recorder.Header().Get("X-Content-Type-Options") != "nosniff" {
 		t.Fatalf("security headers changed: %#v", recorder.Header())
 	}
+}
+
+// A manually fired deadline, not a shortened sleep. Child contexts observe the
+// same DeadlineExceeded value as context.WithTimeout in production.
+type r86DeadlineContext struct{ context.Context }
+
+func (c r86DeadlineContext) Err() error {
+	if c.Context.Err() != nil {
+		return context.DeadlineExceeded
+	}
+	return nil
 }

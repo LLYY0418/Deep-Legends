@@ -75,7 +75,7 @@ func (a *app) refreshCollectionWithClient(client *LCUClient) bool {
 		}
 		ready, attempts := probe(context.Background(), client, summonerID)
 		if !ready {
-			a.recordDiagnostic(map[string]any{"event": "collection_probe_exhausted", "attempts": attempts, "summoner_id": summonerID})
+			a.recordDiagnostic(map[string]any{"event": "collection_probe_exhausted", "attempts": attempts, "has_summoner_id": summonerID > 0})
 		}
 	}
 	if refresh != nil {
@@ -117,7 +117,20 @@ func waitForCollectionEndpoint(ctx context.Context, client *LCUClient, summonerI
 	}
 }
 
+type connectionLoopOps struct {
+	discover func() (*LCUClient, LCUDiscoveryStatus, error)
+	identity func(*LCUClient) bool
+	session  func(context.Context, *LCUClient) error
+	wait     func(context.Context, time.Duration) bool
+}
+
 func (a *app) runConnectionManager(ctx context.Context) {
+	a.runConnectionManagerWith(ctx, connectionLoopOps{discoverLCUDetailed, a.refreshIdentityWithClient, a.runConnectedSession, a.waitForDiscovery})
+}
+
+// Dependencies are explicit so tests drive the same loop without sleeping
+// through its production backoff or querying processes on the developer machine.
+func (a *app) runConnectionManagerWith(ctx context.Context, ops connectionLoopOps) {
 	backoff := minimumDiscoveryBackoff
 	for ctx.Err() == nil {
 		a.mu.RLock()
@@ -133,11 +146,11 @@ func (a *app) runConnectionManager(ctx context.Context) {
 			}
 		}
 		a.setConnectionPhase("connecting", false)
-		client, report, err := discoverLCUDetailed()
+		client, report, err := ops.discover()
 		a.updateDiscovery(report)
 		if err != nil {
 			a.markDisconnected(friendlyError(err))
-			if !a.waitForDiscovery(ctx, backoff) {
+			if !ops.wait(ctx, backoff) {
 				return
 			}
 			backoff *= 2
@@ -146,10 +159,10 @@ func (a *app) runConnectionManager(ctx context.Context) {
 			}
 			continue
 		}
-		if !a.refreshIdentityWithClient(client) {
+		if !ops.identity(client) {
 			client.Close()
 			a.setConnectionPhase("error", false)
-			if !a.waitForDiscovery(ctx, backoff) {
+			if !ops.wait(ctx, backoff) {
 				return
 			}
 			backoff *= 2
@@ -160,7 +173,7 @@ func (a *app) runConnectionManager(ctx context.Context) {
 		}
 		backoff = minimumDiscoveryBackoff
 		a.setSnapshotPhase(client)
-		if err := a.runConnectedSession(ctx, client); err != nil && !errors.Is(err, context.Canceled) {
+		if err := ops.session(ctx, client); err != nil && !errors.Is(err, context.Canceled) {
 			a.disconnectClient(client, friendlyError(err))
 		}
 	}

@@ -391,11 +391,6 @@ type Summoner struct {
 	Privacy string `json:"privacy,omitempty"`
 }
 
-func discoverLCU() (*LCUClient, error) {
-	client, _, err := discoverLCUDetailed()
-	return client, err
-}
-
 func discoverLCUDetailed() (*LCUClient, LCUDiscoveryStatus, error) {
 	report := LCUDiscoveryStatus{AttemptAt: time.Now(), Result: "searching"}
 	if err := ensureWindows(); err != nil {
@@ -404,6 +399,11 @@ func discoverLCUDetailed() (*LCUClient, LCUDiscoveryStatus, error) {
 		return nil, report, err
 	}
 	query, commandErr := leagueProcessCommands()
+	return discoverLCUFromProcesses(query, commandErr, lockfileCandidates)
+}
+
+func discoverLCUFromProcesses(query processQueryResult, commandErr error, candidates func([]string) []string) (*LCUClient, LCUDiscoveryStatus, error) {
+	report := LCUDiscoveryStatus{AttemptAt: time.Now(), Result: "searching"}
 	lines := query.CommandLines
 	report.Method = query.Method
 	report.ProcessCount = query.ProcessCount
@@ -423,7 +423,12 @@ func discoverLCUDetailed() (*LCUClient, LCUDiscoveryStatus, error) {
 		}
 	}
 
-	lockfiles := lockfileCandidates(lines)
+	var lockfiles []string
+	// Only a successful, unambiguous empty process snapshot may skip disk I/O.
+	// Permission/query failures must retain the lockfile recovery path.
+	if commandErr != nil || query.ProcessCount > 0 || query.Unreadable > 0 || len(lines) > 0 {
+		lockfiles = candidates(lines)
+	}
 	report.LockfilesChecked = len(lockfiles)
 	for _, path := range lockfiles {
 		if info, err := os.Lstat(path); err == nil && info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
@@ -663,7 +668,10 @@ func newLCUClient(port int, token string) *LCUClient {
 			InsecureSkipVerify: true, // LCU uses a self-signed certificate on loopback only.
 			MinVersion:         tls.VersionTLS12,
 		},
-		DisableKeepAlives: false,
+		DisableKeepAlives:   false,
+		MaxIdleConns:        32,
+		MaxIdleConnsPerHost: 8,
+		IdleConnTimeout:     90 * time.Second,
 	}
 	return &LCUClient{
 		baseURL: fmt.Sprintf("https://127.0.0.1:%d", port),

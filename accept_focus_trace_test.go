@@ -60,7 +60,7 @@ func TestAcceptFocusHistoryBoundedAndRedacted(t *testing.T) {
 }
 
 func TestAcceptFocusExportRetainsRotationAndRejectsSymlink(t *testing.T) {
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	dir := filepath.Join(store.root, "logs")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
@@ -192,7 +192,7 @@ func TestAcceptFocusExportInspectionReadOnlyAndRedacted(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	os.MkdirAll(filepath.Join(store.root, "logs"), 0755)
 	a := &app{storage: store}
 	client := &LCUClient{baseURL: server.URL, token: "PRIVATEAUTH", http: server.Client()}

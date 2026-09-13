@@ -626,7 +626,11 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	loadStarted := time.Now()
 	loadCost := &overviewLoadCost{}
 	phases := newOverviewPhaseTimings(loadStarted)
-	budgetContext, cancelBudget := context.WithTimeout(r.Context(), overviewSoftBudget)
+	timeout := a.overviewTimeout
+	if timeout == nil {
+		timeout = context.WithTimeout
+	}
+	budgetContext, cancelBudget := timeout(r.Context(), overviewSoftBudget)
 	defer cancelBudget()
 	requestContext := context.WithValue(budgetContext, overviewLoadCostContextKey{}, loadCost)
 	requestContext = context.WithValue(requestContext, overviewPhasesContextKey{}, phases)
@@ -4755,11 +4759,6 @@ func liveClientGroupingForPlayer(grouping liveClientArenaGrouping, player lcuLiv
 	return ""
 }
 
-func liveClientPositionForPlayer(snapshot liveClientSnapshot, player lcuLivePlayer) string {
-	position, _ := liveClientPositionForIdentities(snapshot, []string{player.SummonerName}, []string{player.GameName, strings.TrimSpace(player.GameName) + "#" + strings.TrimSpace(player.TagLine)})
-	return position
-}
-
 func liveClientPositionForIdentities(snapshot liveClientSnapshot, summonerNames, riotIDs []string) (string, string) {
 	for _, candidate := range []struct {
 		source string
@@ -7503,11 +7502,6 @@ func itemSetName(position string) string {
 	return "DL · " + label
 }
 
-func upsertLCUItemSet(document lcuItemSetDocument, itemSet lcuItemSet) error {
-	_, err := upsertLCUItemSetWithCount(document, itemSet)
-	return err
-}
-
 func upsertLCUItemSetWithCount(document lcuItemSetDocument, itemSet lcuItemSet) (int, error) {
 	rawSets, ok := document["itemSets"]
 	if !ok {
@@ -8381,10 +8375,6 @@ func queueLabel(queueID int64, mode string, labels map[int64]string) string {
 		return fmt.Sprintf("模式 %d", queueID)
 	}
 	return "自定义对局"
-}
-
-func queueModeGroup(queueID int64) string {
-	return queueModeGroupFor(queueID, "", 0)
 }
 
 func queueModeGroupFor(queueID int64, gameMode string, mapID int64) string {

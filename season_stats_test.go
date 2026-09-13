@@ -250,7 +250,7 @@ func TestUnavailableSeasonStatsDoesNotClaimComplete(t *testing.T) {
 }
 
 func TestSeasonStatsRejectOldCacheSchema(t *testing.T) {
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	cache := seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion - 1, Source: seasonStatsSource, Season: "S26", AccountHash: "account"}
 	if err := store.saveSeasonStats(cache); err != nil {
 		t.Fatal(err)
@@ -268,7 +268,7 @@ func TestSeasonStatsRejectOldCacheSchema(t *testing.T) {
 }
 
 func TestSeasonStatsCacheDoesNotCrossReadSources(t *testing.T) {
-	store := &localStore{root: t.TempDir()}
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	cache := seasonStatsCache{
 		SchemaVersion: seasonStatsCacheSchemaVersion, Source: dataSourceSGP,
 		Season: "S26", AccountHash: "same-account", Complete: true,

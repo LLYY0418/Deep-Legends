@@ -624,11 +624,12 @@
       sentinel.className = `match-pagination${tab.loadingMore ? " is-loading" : ""}`;
       sentinel.setAttribute("aria-live", "polite");
       sentinel.innerHTML = paginationCopyFor(tab);
-      sentinel.hidden = matchSentinelShouldHide(tab, Boolean(list?.querySelector(".match-entry")));
+      sentinel.hidden = matchSentinelShouldHide(tab, Boolean(list?.querySelector(".match-entry:not([hidden])")));
       sentinel.querySelector("[data-load-more]")?.addEventListener("click", () => loadOverview(tab, false, true, true));
     }
     observeMatchTierVisibility(container, tab, container.dataset.matchTierScope || matchTierScope(tab));
     bindMatchSentinel(container, tab);
+    if (list) list._matchData = new Map((tab.data?.matches || []).map(match => [String(match.gameId), match]));
     container._matchListMatches = tab.data?.matches;
     container._matchListFilter = tab.matchFilter;
     container._matchListViewRevision = Number(tab.matchViewRevision || 0);
@@ -1476,8 +1477,7 @@
     const matches = filteredMatches(rawMatches, tab);
     const retainedMatchList = container.querySelector(".match-list");
     const preserveMatchList = Boolean(retainedMatchList
-      && container._matchListMatches === rawMatches
-      && container._matchListFilter === tab.matchFilter
+      && ((container._matchListMatches === rawMatches && container._matchListFilter === tab.matchFilter) || tab.filterPaging)
       && container._matchListViewRevision === Number(tab.matchViewRevision || 0));
     if (preserveMatchList) retainedMatchList.remove();
     const playerIndex = Math.max(1, state.tabs.findIndex((item) => item.key === tab.key));
@@ -1532,7 +1532,12 @@
     bindOverviewContent(container, tab);
     applyRenderedMetricStyles(container);
     prepareImages(container);
-    if (preserveMatchList) container.querySelector(".match-list")?.replaceWith(retainedMatchList);
+    if (preserveMatchList) {
+      container.querySelector(".match-list")?.replaceWith(retainedMatchList);
+      reconcileFilteredMatchList(retainedMatchList, tab);
+    }
+    const renderedList = container.querySelector(".match-list");
+    if (renderedList) renderedList._matchData = new Map(rawMatches.map(match => [String(match.gameId), match]));
     container._matchListMatches = rawMatches;
     container._matchListFilter = tab.matchFilter;
     container._matchListViewRevision = Number(tab.matchViewRevision || 0);
@@ -3220,6 +3225,14 @@
 	}
 	const token = Number(tab.filterPagingToken || 0) + 1;
 	tab.filterPagingToken = token;
+    // A complete unfiltered dataset needs no new server pagination coordinate.
+    // Partial/server-filtered datasets retain their existing server request path.
+    if (tab.data?.pagination && !tab.data.pagination.hasMore && !tab.data.pagination.partial && !tab.data.pagination.serverFiltered) {
+      tab.filterPaging = false;
+      tab.filterPagingPage = 0;
+      renderFilteredMatchView(tab, true);
+      return;
+    }
 	tab.filterPaging = true;
 	tab.filterPagingPage = 1;
 	renderFilteredMatchView(tab, true);
@@ -3295,21 +3308,49 @@
     bindMatchFilterControls(container, tab);
     const list = container.querySelector(".match-list");
     if (list) {
-      const matches = filteredMatches(data.matches || [], tab);
-      const playerRef = data.player?.playerRef || tab.playerRef || "";
-      const historyCapability = (data.capabilities || []).find((item) => item.name === "match-history");
-      const specialModeEmpty = tab.matchFilter === "more:special"
-        ? "自定义对局不会展示；这里只保留客户端实际返回的其他特殊模式。"
-        : "可以切换上方游戏类型，或刷新读取最新战绩。";
-	  list.innerHTML = matches.length
-		? matches.map((match) => renderMatch(match, playerRef, tab)).join("")
-		: matchListEmptyContent(tab, historyCapability, specialModeEmpty);
-      bindOverviewContent(list, tab);
-      applyRenderedMetricStyles(list);
-      prepareImages(list);
+      reconcileFilteredMatchList(list, tab);
     }
     appendOverviewMatches(tab, []);
     if (restoreScroll) restoreMatchScrollTop(tab);
+  }
+
+  function reconcileFilteredMatchList(list, tab) {
+    const raw = tab.data?.matches || [];
+    const previous = list._matchData || new Map(raw.map(match => [String(match.gameId), match]));
+    const current = new Map(raw.map(match => [String(match.gameId), match]));
+    const visible = filteredMatches(raw, tab);
+    const visibleIDs = new Set(visible.map(match => String(match.gameId)));
+    const entries = new Map([...list.querySelectorAll(":scope > .match-entry")].map(entry => [entry.dataset.matchId, entry]));
+    for (const [id, entry] of entries) {
+      if (!current.has(id)) { entry.remove(); entries.delete(id); continue; }
+      entry.hidden = !visibleIDs.has(id);
+    }
+    const playerRef = tab.data?.player?.playerRef || tab.playerRef || "";
+    for (const match of visible) {
+      const id = String(match.gameId), entry = entries.get(id), old = previous.get(id);
+      const changed = old !== match && JSON.stringify(old) !== JSON.stringify(match);
+      const wasOpen = entry?.querySelector('[data-toggle-match][aria-expanded="true"]');
+      if (entry && !changed && (!wasOpen || tab.openMatches.has(id))) continue;
+      const template = document.createElement("template");
+      template.innerHTML = renderMatch(match, playerRef, tab);
+      const replacement = template.content.firstElementChild;
+      bindOverviewContent(replacement, tab);
+      applyRenderedMetricStyles(replacement);
+      prepareImages(replacement);
+      if (entry) entry.replaceWith(replacement); else list.appendChild(replacement);
+      entries.set(id, replacement);
+    }
+    // Reordering existing nodes preserves identity, handlers and loaded images.
+    for (const match of raw) { const entry = entries.get(String(match.gameId)); if (entry) list.appendChild(entry); }
+    for (const child of [...list.children]) if (!child.matches('.match-entry')) child.remove();
+    if (!visible.length) {
+      const empty = document.createElement('div');
+      const capability = (tab.data?.capabilities || []).find(item => item.name === 'match-history');
+      empty.innerHTML = matchListEmptyContent(tab, capability, tab.matchFilter === 'more:special'
+        ? '自定义对局不会展示；这里只保留客户端实际返回的其他特殊模式。' : '可以切换上方游戏类型，或刷新读取最新战绩。');
+      list.appendChild(empty);
+    }
+    list._matchData = current;
   }
 
 	function bindMatchDetailControls(container, tab, rerender) {
@@ -5361,45 +5402,49 @@
     return wrapAugmentIcon(icon, details, id);
   }
   function renderItemIcons(items, size = "") { const valid = items.filter((id) => Number(id) > 0); return valid.map((id) => itemIconFigure(id, size)).join(""); }
+  function gameImageLoaded(image) {
+    image.parentElement?.classList.add("has-loaded-image");
+    window.deepLegendsAugmentArtwork?.prepare(image);
+  }
+  function gameImageFailed(image) {
+    if (image.dataset.retryPending) return;
+    const holder = image.parentElement;
+    const fallback = holder?.dataset.augmentFallback;
+    if (fallback && !image.dataset.augmentFallbackUsed) {
+      image.dataset.augmentFallbackUsed = "1";
+      image.hidden = false;
+      image.src = fallback;
+      return;
+    }
+    if (!image.dataset.retried) {
+      image.dataset.retried = "1";
+      image.dataset.retryPending = "1";
+      const source = image.src;
+      setTimeout(() => {
+        delete image.dataset.retryPending;
+        if (!image.isConnected) return;
+        image.src = source;
+      }, 1200);
+      return;
+    }
+    image.hidden = true;
+    holder?.classList.remove("has-loaded-image");
+  }
+  // load/error do not bubble, but document capture covers all locally replaced
+  // cards too; no per-image listeners or repeated listener installation.
+  document.addEventListener("load", event => {
+    if (event.target.matches?.("[data-game-image]")) gameImageLoaded(event.target);
+  }, true);
+  document.addEventListener("error", event => {
+    if (event.target.matches?.("[data-game-image]")) gameImageFailed(event.target);
+  }, true);
   function prepareImages(container) {
     window.deepLegendsOverviewArt?.prepare(container);
     for (const image of container.querySelectorAll("[data-game-image]")) {
-      const loaded = () => { image.parentElement?.classList.add("has-loaded-image"); window.deepLegendsAugmentArtwork?.prepare(image); };
-      // 失败后延迟重试一次：客户端在对局中偶发拒绝资源请求，直接放弃
-      // 会让图标“时有时无”；两次都失败才回落到字母占位。
-      const failed = () => {
-        const holder = image.parentElement;
-        const fallback = holder?.dataset.augmentFallback;
-        if (fallback && !image.dataset.augmentFallbackUsed) {
-          image.dataset.augmentFallbackUsed = "1";
-          image.hidden = false;
-          image.addEventListener("load", loaded, { once: true });
-          image.addEventListener("error", failed, { once: true });
-          image.src = fallback;
-          return;
-        }
-        if (!image.dataset.retried) {
-          image.dataset.retried = "1";
-          const source = image.src;
-          setTimeout(() => {
-            if (!image.isConnected) return;
-            image.addEventListener("load", loaded, { once: true });
-            image.addEventListener("error", () => { image.hidden = true; image.parentElement?.classList.remove("has-loaded-image"); }, { once: true });
-            image.src = "";
-            image.src = source;
-          }, 1200);
-          return;
-        }
-        image.hidden = true;
-        image.parentElement?.classList.remove("has-loaded-image");
-      };
-      if (image.complete) image.naturalWidth > 0 ? loaded() : failed();
-      else {
-        image.addEventListener("load", loaded, { once: true });
-        image.addEventListener("error", failed, { once: true });
-      }
+      if (image.complete) image.naturalWidth > 0 ? gameImageLoaded(image) : gameImageFailed(image);
     }
   }
+
 	window.deepLegendsGameIcons = { iconFigure, prepareImages };
 
   // 页面 CSP 禁止 HTML 内联 style。百分比条与动态网格先以 data 属性
@@ -5407,21 +5452,12 @@
   // 伤害条都会退化成同样的满宽，蓝红对比也会固定成 50/50。
   function applyRenderedMetricStyles(container) {
     if (!container) return;
-    for (const fill of container.querySelectorAll("[data-bar-width]")) {
-      const width = Math.max(0, Math.min(100, Number(fill.dataset.barWidth) || 0));
-      fill.style.width = `${width}%`;
-    }
-    for (const fill of container.querySelectorAll("[data-blue-share]")) {
-      const share = Math.max(0, Math.min(100, Number(fill.dataset.blueShare) || 0));
-      fill.style.setProperty("--blue-share", `${share}%`);
-    }
-    for (const ring of container.querySelectorAll("[data-win-rate]")) {
-      const winRate = Math.max(0, Math.min(100, Number(ring.dataset.winRate) || 0));
-      ring.style.setProperty("--recent-win-rate", `${winRate}%`);
-    }
-    for (const grid of container.querySelectorAll("[data-skill-count]")) {
-      const count = Math.max(1, Math.min(18, Number(grid.dataset.skillCount) || 1));
-      grid.style.setProperty("--skill-count", String(count));
+    for (const node of container.querySelectorAll("[data-bar-width], [data-blue-share], [data-win-rate], [data-skill-count]")) {
+      const percent = value => `${Math.max(0, Math.min(100, Number(value) || 0))}%`;
+      if (node.dataset.barWidth !== undefined) node.style.width = percent(node.dataset.barWidth);
+      if (node.dataset.blueShare !== undefined) node.style.setProperty("--blue-share", percent(node.dataset.blueShare));
+      if (node.dataset.winRate !== undefined) node.style.setProperty("--recent-win-rate", percent(node.dataset.winRate));
+      if (node.dataset.skillCount !== undefined) node.style.setProperty("--skill-count", String(Math.max(1, Math.min(18, Number(node.dataset.skillCount) || 1))));
     }
   }
 
@@ -5496,7 +5532,7 @@
         if (tab.openMatches.has(id)) {
           tab.openMatches.delete(id);
           tab.matchDetailTabs.delete(id);
-          view.render();
+          view.render(id);
           return;
         }
         const index = matches.findIndex((match) => String(match.gameId) === id);
@@ -5504,7 +5540,7 @@
         if (!match) return;
         if (loadMatchDetails && !matchHasCompleteParticipantStats(match)) {
           detailStates.set(id, { status: "loading", message: "正在读取完整详情" });
-          view.render();
+          view.render(id);
           try {
             const loaded = hydratedExternalMatch(match, await loadMatchDetails(match), playerRef);
             if (!loaded) throw new Error("Riot 返回的完整详情无法与当前样本匹配");
@@ -5519,21 +5555,31 @@
             detailStates.set(id, { status: "failed", message });
             tab.openMatches.delete(id);
           }
-          view.render();
+          view.render(id);
           return;
         }
         tab.openMatches.add(id);
-        view.render();
+        view.render(id);
       },
-      render() {
+      render(id = "") {
         if (!container.isConnected) { externalMatchViews.delete(container); return; }
-        container.innerHTML = matches.map((match) => renderMatch(match, playerRef, tab)).join("");
-		for (const button of container.querySelectorAll("[data-toggle-match]:not(:disabled), [data-retry-match-detail]")) button.addEventListener("click", () => view.toggleMatch(button.dataset.toggleMatch || button.dataset.retryMatchDetail));
-        bindMatchDetailControls(container, tab, () => view.render());
-        for (const button of container.querySelectorAll("[data-replay]:not(:disabled)")) button.addEventListener("click", () => replay(button));
-        bindPlayerLinks(container, tab);
-        applyRenderedMetricStyles(container);
-        prepareImages(container);
+        let scope = container;
+        if (id) {
+          const match = matches.find((item) => String(item.gameId) === id);
+          const entry = [...container.querySelectorAll(".match-entry")].find((item) => item.querySelector("[data-toggle-match]")?.dataset.toggleMatch === id);
+          if (!match || !entry) return;
+          const template = document.createElement("template");
+          template.innerHTML = renderMatch(match, playerRef, tab).trim();
+          scope = template.content.firstElementChild;
+          if (!scope) return;
+          entry.replaceWith(scope);
+        } else container.innerHTML = matches.map((match) => renderMatch(match, playerRef, tab)).join("");
+		for (const button of scope.querySelectorAll("[data-toggle-match]:not(:disabled), [data-retry-match-detail]")) button.addEventListener("click", () => view.toggleMatch(button.dataset.toggleMatch || button.dataset.retryMatchDetail));
+        bindMatchDetailControls(scope, tab, () => view.render(id));
+        for (const button of scope.querySelectorAll("[data-replay]:not(:disabled)")) button.addEventListener("click", () => replay(button));
+        bindPlayerLinks(scope, tab);
+        applyRenderedMetricStyles(scope);
+        prepareImages(scope);
       },
     };
     externalMatchViews.get(container)?.destroy?.();
@@ -5622,7 +5668,14 @@
     };
     prev?.addEventListener("click", () => scrollTabs(-1));
     next?.addEventListener("click", () => scrollTabs(1));
-    tabs.addEventListener("scroll", () => updatePlayerTabScrollControls(overviewGroupForSection()), { passive: true });
+    let scrollFrame = 0;
+    tabs.addEventListener("scroll", () => {
+      if (scrollFrame) return;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = 0;
+        if (!state.destroyed) updatePlayerTabScrollControls(overviewGroupForSection());
+      });
+    }, { passive: true });
     if ("ResizeObserver" in window) new ResizeObserver(() => updatePlayerTabScrollControls(overviewGroupForSection())).observe(tabs);
     else window.addEventListener("resize", () => updatePlayerTabScrollControls(overviewGroupForSection()), { passive: true });
     refresh?.addEventListener("click", async () => {
@@ -5871,6 +5924,15 @@
   const BEACON_DISCONNECTED_POLL_MS = 1_000;
   const BEACON_IDLE_POLL_MS = 12_000;
   let beaconPollTimer = 0;
+  let lastLiveFrame = 0;
+  window.addEventListener("deep-legends:live-frame", () => { lastLiveFrame = Date.now(); });
+  window.addEventListener("deep-legends:live-disconnected", () => {
+    lastLiveFrame = 0;
+    scheduleBeaconPoll(0);
+  });
+  function beaconPollDelay() {
+    return lastLiveFrame > 0 && Date.now() - lastLiveFrame < 45_000 ? BEACON_IDLE_POLL_MS : BEACON_FAST_POLL_MS;
+  }
   function scheduleBeaconPoll(delay = BEACON_FAST_POLL_MS) {
     clearTimeout(beaconPollTimer);
     if (state.destroyed) return;
@@ -5883,7 +5945,7 @@
     api("/api/gameplay/phase", {}, "gameflow-phase", 8000)
       .then((payload) => updateBeacon(String(payload?.phase || "")))
       .catch(() => {})
-      .finally(() => scheduleBeaconPoll(state.beacon.active ? BEACON_IDLE_POLL_MS : BEACON_FAST_POLL_MS));
+      .finally(() => scheduleBeaconPoll(beaconPollDelay()));
   }
   scheduleBeaconPoll(0);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { scheduleBeaconPoll(0); if (state.section === "overview" && activeTab()) scheduleOverviewCurrentGame(activeTab()); } });

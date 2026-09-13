@@ -371,11 +371,6 @@ func (a *app) loadMatchTimelineCNDecision(ctx context.Context, client *LCUClient
 	return nil, "", attempts, fallbackReason, sgpErr
 }
 
-func (a *app) loadMatchTimelineCN(ctx context.Context, client *LCUClient, serverID string, gameID int64) ([]timelineFrame, string, error) {
-	frames, source, _, _, err := a.loadMatchTimelineCNDecision(ctx, client, serverID, gameID)
-	return frames, source, err
-}
-
 /* ---------- 缓存与 HTTP 端点 ---------- */
 
 const matchTimelineCacheMax = 120
