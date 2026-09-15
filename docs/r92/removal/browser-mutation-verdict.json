@@ -1,0 +1,6 @@
+{
+  "mutation": "restore prior overview renderer",
+  "exit": 1,
+  "killed": true,
+  "assertion": "unexpected block before recent matches"
+}

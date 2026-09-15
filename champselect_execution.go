@@ -60,10 +60,10 @@ func champSelectExecutableAction(session lcuChampSelectSession, intent bool) (lc
 	return lcuChampSelectAction{}, false
 }
 
-// [-1] is never a wildcard. The narrowly scoped 3110 compatibility path can
-// only propose a positive, fresh-grid candidate for an UNLOCKED ban hover.
+// The [-1] sentinel can only propose a positive, fresh-grid candidate for
+// an UNLOCKED ban hover during the local active ban turn.
 // The candidate must survive fresh preflight and be echoed by the session
-// before a lock is permitted. Other queues and failed/empty reads stay closed.
+// before a lock is permitted. Failed/empty reads stay closed.
 func (r *watchRunner) champSelectBanAvailability(session lcuChampSelectSession, api string, raw []int64, grid map[int64]champSelectGridChampion) (map[int64]struct{}, string) {
 	ids := champSelectIDSet(raw)
 	cell := int64(-1)
@@ -83,11 +83,11 @@ func (r *watchRunner) champSelectBanAvailability(session lcuChampSelectSession, 
 	r.mu.Unlock()
 	source := "client-bannable"
 	action, active := champSelectExecutableAction(session, false)
-	if len(raw) == 1 && raw[0] == -1 && session.QueueID == 3110 && active && action.Type == "ban" {
+	if len(raw) == 1 && raw[0] == -1 && active && action.Type == "ban" {
 		ids = map[int64]struct{}{}
-		source = "custom-grid-hover"
+		source = "wildcard-grid-hover"
 		if len(evidence) > 0 {
-			source = "custom-session-evidence-hover"
+			source = "wildcard-session-evidence-hover"
 		}
 		for id, champion := range grid {
 			if id <= 0 || champion.SelectionStatus.IsBanned || champion.SelectionStatus.PickedByOtherOrBanned || champion.TeammatePicked || champion.LocalIntent {
@@ -101,7 +101,7 @@ func (r *watchRunner) champSelectBanAvailability(session lcuChampSelectSession, 
 			ids[id] = struct{}{}
 		}
 	}
-	r.champDiagnostic("availability", source, champSelectDecision{}, map[string]any{"timer_phase": session.Timer.Phase, "queue_id": session.QueueID, "raw_count": len(raw), "raw_positive_count": len(champSelectIDSet(raw)), "evidence_count": len(evidence), "effective_count": len(ids), "requires_hover_confirmation": strings.HasPrefix(source, "custom-")})
+	r.champDiagnostic("availability", source, champSelectDecision{}, map[string]any{"timer_phase": session.Timer.Phase, "queue_id": session.QueueID, "raw_count": len(raw), "raw_positive_count": len(champSelectIDSet(raw)), "evidence_count": len(evidence), "effective_count": len(ids), "requires_hover_confirmation": strings.HasPrefix(source, "wildcard-")})
 	return ids, source
 }
 
@@ -142,6 +142,7 @@ func (r *watchRunner) reconcileChampSelectSubmissions(session lcuChampSelectSess
 		attempts := r.champSelect.attempts[d.Key]
 		if applied {
 			current.Confirmed = true
+			current.ConfirmedAt = time.Now()
 			r.champSelect.submitted[id] = current
 			if record.Completed && r.champSelect.decision[d.Action].TraceID == d.TraceID {
 				delete(r.champSelect.decision, d.Action)
@@ -199,7 +200,7 @@ func (r *watchRunner) champSelectFreshCandidate(ctx context.Context, client *LCU
 	if side == "ban" {
 		var source string
 		available, source = r.champSelectBanAvailability(session, d.SessionAPI, raw, grid)
-		if strings.HasPrefix(source, "custom-") && d.Completed {
+		if strings.HasPrefix(source, "wildcard-") && d.Completed {
 			r.mu.Lock()
 			last := r.champSelect.submitted[d.ActionID]
 			r.mu.Unlock()
@@ -209,7 +210,10 @@ func (r *watchRunner) champSelectFreshCandidate(ctx context.Context, client *LCU
 		}
 	}
 	r.champDiagnostic("preflight-candidate", "fresh-snapshot", d, map[string]any{"timer_phase": session.Timer.Phase, "raw_count": len(raw), "effective_count": len(available), "grid_count": len(grid), "avoid_teammate_intent": config.AvoidTeammateIntent})
-	candidate, reasons := chooseChampSelectCandidate(side, []int64{d.ChampionID}, available, grid, config.AvoidTeammateIntent, session.QueueID == 1700 || session.QueueID == 1710)
+	r.mu.Lock()
+	arena := r.champSelect.groupID == "arena"
+	r.mu.Unlock()
+	candidate, reasons := chooseChampSelectCandidate(side, []int64{d.ChampionID}, available, grid, config.AvoidTeammateIntent, arena)
 	if candidate != d.ChampionID {
 		if reason := reasons[d.ChampionID]; reason != "" {
 			return reason

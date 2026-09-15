@@ -7,7 +7,7 @@ test('one event card preserves separate choice owners, partial selection, failur
  try{
   const source=read('suite.js'),functions=source.slice(source.indexOf('  function claimSelectionKeys('),source.indexOf('  async function loadClaims('));
   w.eval(`const state={claims:{items:[]},claimFilter:'all',selectedClaims:new Set(),claimFailures:new Map(),claimChoices:new Map(),claiming:false,claimProgress:{done:0,total:0,failed:0}},roots={sweep:document.getElementById('sweep')},metrics={claim:document.createElement('span')},escapeHTML=x=>String(x||''),checked=x=>x?' checked':'',relativeTime=()=>'',imageURL=x=>x,sourceNames={grant:'奖励账本'},toast=()=>{};
-   const requests=[];async function api(path,req){requests.push(JSON.parse(req.body));return {results:[{ok:true}]};}
+   const fetch=async()=>({}),loadClaims=()=>{};const requests=[];async function api(path,req){requests.push(JSON.parse(req.body));return {results:[{ok:true}]};}
    ${functions};window.probe={state,renderClaims,executeClaims,requests};`);
   const {state,renderClaims,executeClaims,requests}=w.probe;
   state.claims.items=[

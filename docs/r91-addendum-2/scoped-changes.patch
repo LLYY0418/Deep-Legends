@@ -1,0 +1,337 @@
+--- a/DESIGN.md
++++ b/DESIGN.md
+@@ -193,5 +193,5 @@
+ - GameStart 读取 session 后立即独立强制记录一次 shape（按 gameId；无 ID 时每次进入阶段重置）。GameStart 纯 session-order 分组，不探测 2999。InProgress / Reconnect 优先游戏进程名单；缺失时可复用同客户端、账号、区服、队列和有效 gameId 的 Loading 分组，身份映射保留原边界，不对 17 人重新按三人硬切。完整顺序推断继续接受记忆队友核验，算法无新增猜测。
+ - 每条分组拒绝都设置 unavailable，并记录 phase、source、reason、人数、队伍大小；暂缺名单可重试，队友跨组冲突停止自动重试。已知斗魂阶段结束且没有尝试时记录 phase-not-attempted。选人完整名单按 CellID 保留英雄顺序，仅作后续与 session/playerlist 顺序比对取证；诊断不输出原始玩家身份。
+ - 已读战绩在同局同队列的 pending 刷新中保留，pending 状态继续驱动后续读取；推荐内容未变化只更新刷新状态区，保留原 DOM。首次没有数据仍显示骨架。
+-- 确认亮出后客户端把 action championId 清零只记一次 hover-cleared-by-client；已 armed 锁定继续受会话、回合、候选可用性和配置保护。改成其他非零英雄仍触发手动让位。
++- 只有提交记录的 Decision.ForceHover 为 true（evaluation 识别的 wildcard 禁用确认路径）时，已确认亮出被清零才记一次 hover-cleared-by-client 并保留锁定。普通路径的已确认、未完成 hover 清零必须让位，保留队友已选/已禁用时的顺延豁免。已 armed 锁定继续受会话、回合、候选可用性和配置保护；改成其他非零英雄始终触发手动让位。
+ - 保存 watch 设置后读取当前阶段并调用既有 handlePhase，接受对局、再来一局、自动重连共用既有幂等与阶段保护；不改接受对局的前台窗口逻辑。
+--- a/README.md
++++ b/README.md
+@@ -259,4 +259,4 @@
+ 
+ ### R91 工单与加载阶段补充
+ 
+-生涯段位缺省为未定级；斗魂统计使用整数伤害/承伤和独立颜色，玩家行隐藏段位。实时战绩刷新保留已读内容与未变化的 DOM，首次加载仍显示骨架。客户端清空已确认的亮出英雄不会取消锁定，主动换成其他英雄仍立即让位。保存自动规则后按当前阶段立即重评估。逐项实现、测试、截图和仍需真实客户端验证的项目见 [R91 补充执行账本](docs/r91-addendum-execution-ledger.md)。
++生涯段位缺省为未定级；斗魂统计使用整数伤害/承伤和独立颜色，玩家行隐藏段位。实时战绩刷新保留已读内容与未变化的 DOM，首次加载仍显示骨架。只有 wildcard 禁用必须先确认亮出的路径，客户端清空已确认英雄才保留锁定；普通路径清零会让位，队友已选/已禁用的不可用候选仍可顺延，主动换成其他英雄也立即让位。保存自动规则后按当前阶段立即重评估。逐项实现、测试、截图和仍需真实客户端验证的项目见 [R91 补充执行账本](docs/r91-addendum-execution-ledger.md)。
+--- a/champselect_takeover.go
++++ b/champselect_takeover.go
+@@ -98,7 +98,7 @@
+ 			if championID == 0 {
+ 				championID = pending.ChampionID
+ 			}
+-			cleared := action.ChampionID == 0 && submitted && last.Confirmed && !last.Completed && last.ChampionID > 0 && !last.HoverCleared
++			cleared := action.ChampionID == 0 && submitted && last.Confirmed && !last.Completed && last.ChampionID > 0 && last.Decision.ForceHover && !last.HoverCleared
+ 			if cleared {
+ 				last.HoverCleared = true
+ 				r.champSelect.submitted[action.ID] = last
+@@ -119,9 +119,21 @@
+ 	if action.ChampionID != 0 {
+ 		return !submitted || action.ChampionID != last.ChampionID
+ 	}
+-	// A zero action is also emitted by the client when it clears a hover.
+-	// Only a different nonzero champion proves a manual change.
+-	return false
++	if !submitted || !last.Confirmed || last.Completed || last.ChampionID <= 0 {
++		return false
++	}
++	// Evaluation sets ForceHover only for wildcard bans requiring session
++	// confirmation. The submitted decision retains that evidence for polling
++	// and delayed-write preflight; a queue or mode alone is not sufficient.
++	if last.Decision.ForceHover {
++		return false
++	}
++	// An ordinary confirmed hover cleared by the player must yield. Preserve
++	// recovery when the client clears a champion taken or banned by others.
++	grid := map[int64]champSelectGridChampion{last.ChampionID: {ID: last.ChampionID}}
++	mergeChampSelectTeamState(grid, session)
++	champion := grid[last.ChampionID]
++	return !champion.TeammatePicked && !champion.SelectionStatus.IsBanned
+ }
+ 
+ func (r *watchRunner) observeChampSelectBench(session lcuChampSelectSession, definition champSelectGroupDefinition, group champSelectGroupConfig, position, runtimeID string) bool {
+--- a/champselect_takeover_test.go
++++ b/champselect_takeover_test.go
+@@ -140,30 +140,50 @@
+ 	}
+ }
+ 
+-func TestTakeoverClearingHoverPreservesLockButUnavailableHeroCanRecover(t *testing.T) {
+-	for _, allyTook := range []bool{false, true} {
+-		f := prepareTakeoverPick(t, "arena", 1700, nil)
+-		f.tick(t)
+-		f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
+-		f.mu.Lock()
+-		f.session.Actions[0][0].ChampionID = 0
+-		if allyTook {
+-			f.session.MyTeam[1].ChampionID = 5
+-		}
+-		f.mu.Unlock()
+-		f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
+-		if allyTook {
+-			waitTakeoverIdle(t, f)
+-			if f.count() != 2 || f.last().Body["championId"] != float64(804) {
+-				t.Fatal("client removal of unavailable hero prevented fallback")
+-			}
+-		} else {
+-			f.r.mu.Lock()
+-			yielded, pending := f.r.champSelect.takeover["pick"], f.r.pending["champselect-pick"]
+-			f.r.mu.Unlock()
+-			if yielded || pending == nil {
+-				t.Fatal("client hover clear canceled lock")
+-			}
++func TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover(t *testing.T) {
++	for group, queue := range map[string]int64{"ranked": 420, "normal": 400, "arena": 1700} {
++		for _, removal := range []string{"manual", "teammate-picked", "banned"} {
++			t.Run(group+"/"+removal, func(t *testing.T) {
++				f := prepareTakeoverPick(t, group, queue, nil)
++				f.tick(t)
++				f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
++				f.r.mu.Lock()
++				last, armed := f.r.champSelect.submitted[5], f.r.pending[champSelectActionPick] != nil
++				f.r.mu.Unlock()
++				if !last.Confirmed || last.Decision.ForceHover || !armed {
++					t.Fatalf("fixture must have a confirmed non-wildcard hover and armed lock: %+v armed=%t", last, armed)
++				}
++				f.mu.Lock()
++				f.session.Actions[0][0].ChampionID = 0
++				f.session.MyTeam[0].ChampionPickIntent = 0
++				switch removal {
++				case "teammate-picked":
++					f.session.MyTeam[1].ChampionID = 5
++				case "banned":
++					f.session.Actions = append(f.session.Actions, []lcuChampSelectAction{{ID: 10, Type: "ban", ActorCellID: 8, ChampionID: 5, Completed: true}})
++				}
++				f.mu.Unlock()
++				f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
++				if removal == "manual" {
++					f.assertTakeover(t, "5")
++					f.tick(t)
++					if f.count() != 1 {
++						t.Fatal("tool overwrote the player's cleared hover")
++					}
++				} else {
++					waitTakeoverIdle(t, f)
++					if f.count() != 2 || f.last().Body["championId"] != float64(804) || f.r.champSelectSnapshot().PickStates["5"] == "manual-takeover" {
++						t.Fatal("client removal of unavailable hero prevented fallback")
++					}
++				}
++				f.mu.Lock()
++				defer f.mu.Unlock()
++				for _, event := range f.events {
++					if event["reason"] == "hover-cleared-by-client" {
++						t.Fatal("non-wildcard clear was mislabeled as compatibility hover clear")
++					}
++				}
++			})
+ 		}
+ 	}
+ }
+--- a/docs/r91-addendum-execution-ledger.md
++++ b/docs/r91-addendum-execution-ledger.md
+@@ -1,6 +1,10 @@
+ # R91 主工单与 Loading / 静默额度补充执行账本
+ 
+ 2026-09-14。覆盖 `WORKLIST-R91-KR-QUOTA-ARENA-BAN-FLICKER-GROUPING.md` 的 P1–P9，以及 `WORKLIST-R91-ADDENDUM-LOADING-GROUPING-SILENT-QUOTA.md`。额度提示以补充工单为准：仅 429 完全静默，500/503 保留可见失败。以下为代码与本地模拟验收；真实 Windows 客户端的验收单独列在末尾。
++
++## 2026-09-15 更正
++
++独立验收发现 P4 清零豁免范围过大，以及最后的 CSS 对齐调整未同步到 R87 Go 基线。这两项已按第二份补充工单修复；当前结论与完整逐项测试日志以 [ADDENDUM-2 执行账本](r91-addendum-2-execution-ledger.md) 为准。下方保留上轮历史证据，不再将最后一次 CSS 修改前的 race 结果视为最终源码全量通过。
+ 
+ ## 逐项交付
+ 
+@@ -11,7 +15,7 @@
+ | P1 补充静默 429 | JSON/HTTP 头与已开始流的 error 帧携带类型、Retry-After。首屏和翻页保留数据，不写 warning/moreError、不 toast、不 autoPaused；按期限后台重试。页签关闭、请求替换、重置、筛选/场数变化使旧重试失效。连续上游 429 保留最后一次 Retry-After。 | fake timer 验证 4999ms 无请求、5000ms 自动重试；500/503 首屏和翻页继续显示错误；截断流仍可见；删除短路 return 必须失败。 |
+ | P2 伤害/承伤 | 普通和斗魂主区从相同顶部开始，斗魂复用三行统计轨道；统一窄列行距。卡片及详情使用整数，伤害为 danger、承伤为 muted。 | Chromium 三种宽度首行 top 完全一致；四种宽度的斗魂详情展开/收起与滚动通过；单位、颜色和布局断言通过。 |
+ | P3 生涯默认值 | draft、rankLabel 和未保存判断统一 UNRANKED / I；缺字段显示“未定级 · 单双排”。 | jsdom + Chromium 下拉值、预览与未编辑状态一致，无 undefined。 |
+-| P4 亮出被清零 | 已确认 hover 被客户端清零时不判定手动切换，保留 armed 锁定并记录一次 `hover-cleared-by-client`；另一非零英雄仍立即让位。执行前保留回合、会话、设置与候选可用性校验。 | 模拟 wildcard ban 真实 PATCH，0 时继续锁定、104 时让位；恢复旧判据或旧 preflight 都变红。 |
++| P4 亮出被清零 | 仅已确认 hover 的提交决策 `ForceHover=true`（wildcard 禁用确认路径）被清零时保留 armed 锁定并记录一次 `hover-cleared-by-client`；普通路径清零恢复手动让位及队友已选/已禁用豁免，另一非零英雄仍立即让位。执行前保留回合、会话、设置与候选可用性校验。 | 模拟 wildcard ban 真实 PATCH，0 时继续锁定、104 时让位；恢复旧判据或旧 preflight 都变红。 |
+ | P5 刷新闪烁 | 同局同队列 pending 结果保留已读战绩，pending 仍可后续补齐。内容未变时只更新刷新状态，名单 DOM 节点不替换。首次无数据继续显示骨架。 | jsdom 文本与节点身份断言；Chromium 刷新前后战绩一致；恢复骨架覆盖/无条件重绘均失败。 |
+ | P6 分组与取证 | GameStart 走纯 session-order，不探测 2999；InProgress / Reconnect 保留游戏进程优先。每次 Loading 的首份 session 独立强制 shape 采样；无 gameId 时新阶段仍可采样。所有实际分组拒绝带 reason/unavailable，可重试情况单独标记；未尝试的已知斗魂阶段结束记录 `phase-not-attempted`。 | Loading 18 人分组成功且 0 次 2999；同局丢失中间一人仍保留原边界，新 gameId 不借用。强制采样、漏尝试与失败原因均有行为测试及变异。 |
+ | P6 首分钟与沿用 | 仅沿用同客户端/账号/区服/队列/有效 gameId 的 Loading 成功分组；17 人没有完整边界时不硬切。各游戏阶段前 60 秒未分组每 5 秒探测，之后保持 20 秒 × 8 次，完整结果停止。后端短缓存避免吞掉早期探测。选人按 CellID 保存完整英雄顺序，与 session/playerlist 比对，仅记录统计。 | 前端模拟 12 次短探测不消耗后续 8 次预算；后端 4 秒后能够再次探测；原 17 人 gameflow + 18 人 playerlist 边界测试继续通过。 |
+@@ -23,7 +27,7 @@
+ 
+ ## 测试与证据
+ 
+-- `GOCACHE=/tmp/deep-legends-go-cache go test -race ./...`：通过，117.454 秒。见 [Go race 输出](r91-addendum/go-race.txt)。
++- 历史运行：`GOCACHE=/tmp/deep-legends-go-cache go test -race ./...` 曾通过，117.454 秒，见 [当时的 Go race 输出](r91-addendum/go-race.txt)。该运行早于最终 CSS 顶部对齐修改，之后只重跑了前端布局测试，漏掉 `r87_test.go` 的旧字符串断言；此前将其表述为最终源码全量通过不准确。最终修复后的非 race / race 完整输出见上方 ADDENDUM-2 账本。
+ - `node --test web/*.test.cjs desktop/*.test.cjs`：677 项，676 通过、0 失败、1 项 Windows PowerShell 专用检查跳过。见 [全量前端输出](r91-addendum/frontend.txt)。
+ - 最后的 CSS 顶部对齐/窄列行距改动后，相关 `web/champions.test.cjs` + `web/r88.test.cjs` 243 项全部通过。见 [布局回归输出](r91-addendum/layout-tests.txt)。R88 样式基线只更新本工单批准修改的主区顶部、行距与 Arena 三行统计规则。
+ - `go vet ./...`、JS 语法检查、`git diff --check`：通过。
+@@ -42,4 +46,4 @@
+ 3. 选人停留 30 秒观察战绩不闪，完成一次自动禁用确认实际锁定；检查 hover 清零诊断且没有错误的手动接管。
+ 4. 在掉线前开启自动重连，再验证真实客户端触发。当前测试覆盖保存后处于 Reconnect 的即时调度，不代替客户端操作效果。
+ 
+-本次未打包、发布或执行真实客户端对局操作。原工作区已有大量 R87–R94 修改，均保留；[本轮独立补丁](r91-addendum/scoped-changes.patch) 以开始本轮时的文件副本为基线，便于与已有修改区分。最终来源指纹见 [SHA-256 清单](r91-addendum/source-sha256.json)。
++本次未打包、发布或执行真实客户端对局操作。原工作区已有大量 R87–R94 修改，均保留；[本轮独立补丁](r91-addendum/scoped-changes.patch) 以开始本轮时的文件副本为基线，便于与已有修改区分。本轮当时的来源指纹见 [历史 SHA-256 清单](r91-addendum/source-sha256.json)。
+--- a/r87_test.go
++++ b/r87_test.go
+@@ -253,7 +253,7 @@
+ 		t.Fatal(err)
+ 	}
+ 	for _, rule := range []string{
+-		".match-main { display: grid; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }",
++		".match-main { display: grid; align-self: start; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }",
+ 		".match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }",
+ 	} {
+ 		if !strings.Contains(string(css), rule) {
+--- a/scripts/r91-addendum-mutations.py
++++ b/scripts/r91-addendum-mutations.py
+@@ -2,7 +2,7 @@
+ """Mutate isolated source copies; require behavioral test failures, never build failures."""
+ import json, os, pathlib, subprocess, tempfile
+ ROOT = pathlib.Path(__file__).resolve().parent.parent
+-OUT = ROOT / 'docs/r91-addendum/mutations'
++OUT = pathlib.Path(os.environ.get('R91_MUTATION_OUTPUT', str(ROOT / 'docs/r91-addendum/mutations')))
+ OUT.mkdir(parents=True, exist_ok=True)
+ cases = [
+  ('quota-short-return', 'web/gameplay.js', '        return false;\n      }\n      if (error.name !== "RequestCancelled")', '      }\n      if (error.name !== "RequestCancelled")', 'js', '429 stays silent'),
+@@ -20,7 +20,7 @@
+  ('playerlist-rejection-event', 'arena_live_grouping.go', 'a.recordArenaOrderRejected(response, "live-client", "playerlist-unavailable")', '// event removed', 'go', 'TestR91AddendumGameStartGroupingAndCarryover'),
+  ('roster-rejection-event', 'arena_live_grouping.go', 'a.recordArenaOrderRejected(response, "session-order", reason)', '_ = reason', 'go', 'TestR91AddendumGameStartGroupingAndCarryover'),
+  ('loading-carryover', 'arena_live_grouping.go', 'groups, ok = a.carriedArenaSessionGroups(client, current, response)', 'groups, ok = arenaSessionOrderGroups(response.QueueID, raw)', 'go', 'TestR91AddendumGameStartGroupingAndCarryover'),
+- ('hover-cleared-takeover', 'champselect_takeover.go', '// Only a different nonzero champion proves a manual change.\n\treturn false', '// Only a different nonzero champion proves a manual change.\n\treturn true', 'go', 'TestR91AddendumWildcardHoverClearKeepsArmedLock'),
++ ('hover-cleared-takeover', 'champselect_takeover.go', 'if last.Decision.ForceHover {\n\t\treturn false\n\t}', 'if last.Decision.ForceHover {\n\t\treturn true\n\t}', 'go', 'TestR91AddendumWildcardHoverClearKeepsArmedLock'),
+  ('hover-clear-lock-rejected', 'champselect.go', 'last.Confirmed && action.ChampionID != 0 && action.ChampionID != decision.ChampionID', 'last.Confirmed && action.ChampionID != decision.ChampionID', 'go', 'TestR91AddendumWildcardHoverClearKeepsArmedLock'),
+  ('watch-save-phase', 'watch_rules.go', 'runner.handlePhase(client, phase)', '_ = phase', 'go', 'TestR91AddendumSaveReevaluatesCurrentPhase'),
+  ('retryable-cache-ttl', 'gameplay_refresh.go', 'phase == "ChampSelect" || phase == "GameStart" || c.response.ArenaGroupingRetryable', 'phase == "ChampSelect" || phase == "GameStart"', 'go', 'TestR91AddendumRetryableRosterDoesNotBlockEarlyProbe'),
+@@ -29,6 +29,10 @@
+  ('arena-damage-unit', 'web/gameplay.js', '${plainInteger(subject.damage)}</b></span>', '${number(subject.damage / 10000)}万</b></span>', 'browser', 'damage-integer'),
+  ('arena-warning-restored', 'web/suite.js', '${champSelectPoolHelpHTML(definition, runtime)}<fieldset', '${champSelectPoolHelpHTML(definition, runtime)}${definition.groupId === "arena" ? \'<div class="suite-note is-warning">斗魂禁用环节需真机确认</div>\' : ""}<fieldset', 'browser', 'arena-warning'),
+ 
++ ('hover-clear-global-exemption-ban', 'champselect_takeover.go', 'if last.Decision.ForceHover {', 'if true {', 'go', 'TestR91Addendum2NonWildcardBanClearYields'),
++ ('hover-clear-global-exemption-pick', 'champselect_takeover.go', 'if last.Decision.ForceHover {', 'if true {', 'go', 'TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover'),
++ ('hover-clear-unavailable-exemptions', 'champselect_takeover.go', 'return !champion.TeammatePicked && !champion.SelectionStatus.IsBanned', 'return !champion.TeammatePicked || !champion.SelectionStatus.IsBanned', 'go', 'TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover'),
++ ('hover-clear-diagnostic-scope', 'champselect_takeover.go', '&& last.Decision.ForceHover && !last.HoverCleared', '&& !last.HoverCleared', 'go', 'TestR91Addendum2NonWildcardBanClearYields'),
+ ]
+ results=[]
+ if os.environ.get('R91_MUTATION_NAMES'):
+--- /dev/null
++++ b/r91_addendum2_test.go
+@@ -0,0 +1,61 @@
++package main
++
++import "testing"
++
++func TestR91Addendum2NonWildcardBanClearYields(t *testing.T) {
++	for group, queue := range map[string]int64{"ranked": 420, "arena": 1750} {
++		for _, entry := range []string{"poll", "preflight"} {
++			t.Run(group+"/"+entry, func(t *testing.T) {
++				f := newExecutionFixture(t)
++				f.session.QueueID = queue
++				f.session.Timer.Phase = "BAN_PICK"
++				f.bans = []int64{141, 104} // Real IDs, no wildcard confirmation path.
++				s := f.r.currentWatch()
++				g := s.ChampSelect.Groups[group]
++				g.Ban.Enabled, g.Ban.DelayMS, g.Ban.Strategy = true, 0, "show-then-lock"
++				g.Ban.Champions["default"] = []int64{141, 104}
++				s.ChampSelect.Groups[group] = g
++				f.r.apply(s)
++				f.tick(t)
++				if f.count() != 1 || f.last().Body["completed"] != false {
++					t.Fatal("initial non-wildcard hover missing")
++				}
++				s = f.r.currentWatch()
++				g = s.ChampSelect.Groups[group]
++				g.Ban.DelayMS = 120
++				s.ChampSelect.Groups[group] = g
++				f.r.apply(s)
++				f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
++				f.r.mu.Lock()
++				last, armed := f.r.champSelect.submitted[0], f.r.pending[champSelectActionBan] != nil
++				f.r.mu.Unlock()
++				if !last.Confirmed || last.Decision.ForceHover || !armed {
++					t.Fatalf("fixture must confirm ordinary hover and arm lock: %+v armed=%t", last, armed)
++				}
++				f.mu.Lock()
++				f.session.Actions[0][0].ChampionID = 0
++				f.mu.Unlock()
++				if entry == "poll" {
++					f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
++				}
++				// With no intervening poll, the actual delayed write must reject the clear.
++				waitTakeoverIdle(t, f)
++				state := f.r.champSelectSnapshot()
++				if f.count() != 1 || state.BanStates["141"] != "manual-takeover" {
++					t.Fatalf("cleared non-wildcard ban was not respected: patches=%d state=%+v", f.count(), state)
++				}
++				f.tick(t)
++				if f.count() != 1 {
++					t.Fatal("later poll rearmed the canceled ban")
++				}
++				f.mu.Lock()
++				defer f.mu.Unlock()
++				for _, event := range f.events {
++					if event["reason"] == "hover-cleared-by-client" {
++						t.Fatal("manual clear was mislabeled as client compatibility")
++					}
++				}
++			})
++		}
++	}
++}
+--- /dev/null
++++ b/docs/r91-addendum-2-execution-ledger.md
+@@ -0,0 +1,61 @@
++# R91 ADDENDUM-2 独立验收缺口执行账本
++
++2026-09-15。本轮只处理 [补充工单 2](../WORKLIST-R91-ADDENDUM-2-INDEPENDENT-VERIFICATION-GAPS.md) 指出的 P4 清零豁免范围和 R87 样式保护断言两个缺口。
++
++## 实现与验证
++
++| 工单项 | 修复 | 行为证据 |
++|---|---|---|
++| P4 限定清零豁免 | `champSelectManualActionChanged` 读取已提交记录的 `Decision.ForceHover`。只有实际 wildcard 禁用确认路径可以保留已清零的确认 hover。非 wildcard 恢复原判定：已确认、未完成、正英雄 ID 的 hover 清零应让位；队友已选或已禁用则继续允许候选顺延。`hover-cleared-by-client` 诊断也受相同信号限定。 | ranked / normal / arena 三种模式的普通 pick，分别覆盖手动清零、队友选走、已禁用。真实 ban PATCH 在 ranked / arena 两种模式下分别经 polling 与无中间轮询的 delayed preflight 验证清零后不再锁定，且以后轮询不能重启该操作。 |
++| wildcard 正例保留 | 沿用已有实际决策信号，不根据 queue/group 名字判定。原 wildcard 清零后继续锁定、改成其他非零英雄必须让位两条用例保留。 | `TestR91AddendumWildcardHoverClearKeepsArmedLock` 的 0 / 104 两个子用例持续通过。 |
++| R87 基线 | 仅把保护字符串更新成现有 `.match-main` 的 `align-self: start;`，接受上轮 P2 的合法样式调整。 | 修复前旧保护断言真实失败；更新后完整非 race / race 均覆盖并通过。业务 CSS 本轮未改。 |
++| ChampSelect 阴性用例 | 保留独立验收已正式加入的 `TestR91AddendumSaveDuringChampSelectArmsNoUnrelatedRule`。 | 定向与两轮全量持续通过；`r91_addendum_test.go` 与本轮开始时副本完全相同，未删减该用例。空 `adhoc_watchrules_champselect_test.go` 保持原样。 |
++
++信号链已核实：`champselect.go` evaluation 只在 `side == "ban" && strings.HasPrefix(banSource, "wildcard-")` 时设置 `ForceHover`；实际提交记录保存整个 `Decision`；polling 和 delayed preflight 均调用修复后的判定函数。因此 arena 的普通 pick / 非 wildcard ban 清零仍会让位，不能仅因模式是 arena 就豁免。
++
++## 可复跑证据
++
++运行环境：`go version go1.24.5 darwin/arm64`，缓存目录 `/tmp/deep-legends-go-cache`。全量命令均含 `-count=1` 禁用测试结果缓存，`-v` 保存每个测试及子用例输出。下面的链接都是完整日志，不是截取成功结论。
++
++| 检查 | 结果 | 完整日志 |
++|---|---|---|
++| 修复前复现：新增普通 hover 清零用例 + R87 基线 | 如预期失败，观察到普通 ban 仍发出完成 PATCH、pick pending 未取消和旧 CSS 基线失败 | [修复前完整输出](r91-addendum-2/before-fix.txt) |
++| 定向：全部 TestTakeover、ADDENDUM-2、原 wildcard、ChampSelect 阴性与 R87 | 13 个顶层用例、含子用例 36 个通过，0 失败，12.038 秒 | [定向完整输出](r91-addendum-2/targeted.txt) |
++| `GOCACHE=/tmp/deep-legends-go-cache go test -count=1 -v .` | 1137 个顶层用例通过，含子用例 1766 个通过；0 失败，17 项跳过，87.829 秒 | [非 race 全量完整输出](r91-addendum-2/go-full.txt) |
++| `GOCACHE=/tmp/deep-legends-go-cache go test -race -count=1 -v ./...` | 1137 个顶层用例通过，含子用例 1766 个通过；0 失败、无数据竞争，17 项跳过，110.849 秒 | [race 全量完整输出](r91-addendum-2/go-race-full.txt) |
++| `go vet ./...` / `git diff --check` | 通过 | [vet 输出](r91-addendum-2/go-vet.txt)、[diff 检查输出](r91-addendum-2/diff-check.txt) |
++
++17 项跳过均为仓库已有的 opt-in 公网探测或需要本地捕获文件的用例。本轮未启用这些额外来源；它们不计为通过，具体名称和原因完整保留在日志中。这里的全量零失败指默认完整测试套件的实际结果。
++
++race 运行前保存了所有仓库 Go 文件、go.mod/go.sum 和运行时布局 CSS 的 [输入 SHA-256](r91-addendum-2/go-input-sha256.json)，运行后逐项核对未变化。[运行元信息](r91-addendum-2/go-race-run.json) 记录命令、开始时间、环境和最终结果。
++
++## 变异验证
++
++只执行与本轮 P4 改动相关的 6 条，不重审其它工单项。使用 [现有隔离变异脚本](../scripts/r91-addendum-mutations.py)，为旧 wildcard 变异更新源码锚点，并补入相反方向的护栏；用 `R91_MUTATION_OUTPUT` 将新输出与上轮历史结果分开。
++
++| 变异 | 捕获它的行为 |
++|---|---|
++| wildcard 清零也判定接管 | 原 wildcard 正例不能完成锁定，变红 |
++| preflight 恢复对零值的一律拒绝 | 原 wildcard 延迟锁定正例变红 |
++| 删除 ForceHover 限定，恢复全局豁免（ban） | 普通 ban 清零后仍发出锁定 PATCH，新增测试变红 |
++| 删除 ForceHover 限定，恢复全局豁免（pick） | 普通 pick 清零后 pending 未取消，新增矩阵变红 |
++| 去掉队友选走/已禁用豁免 | 正常顺延被错误判定为手动接管，新增矩阵变红 |
++| 清零诊断恢复全局记录 | 普通手动清零被误记成客户端兼容清零，新增测试变红 |
++
++6/6 均由实际断言失败拦截。编译失败、超时或启动失败不计入通过。真实源码不改写；变异文件只放临时目录并用 Go overlay 加载。
++
++完整 [变异结果 JSON](r91-addendum-2/mutations/results.json)、[执行摘要](r91-addendum-2/mutations.txt) 和各项输出位于同目录。复跑命令：
++
++```bash
++R91_MUTATION_OUTPUT="$PWD/docs/r91-addendum-2/mutations" \
++R91_MUTATION_NAMES=hover-cleared-takeover,hover-clear-lock-rejected,hover-clear-global-exemption-ban,hover-clear-global-exemption-pick,hover-clear-unavailable-exemptions,hover-clear-diagnostic-scope \
++python3 scripts/r91-addendum-mutations.py
++```
++
++只读独立复核还顺着 evaluation → Decision → submit record → polling/preflight 核验了信号传播及测试路径，未发现本轮两个缺口的阻断问题。最终测试与变异结果由主代理核对。
++
++## 上轮结论更正与范围
++
++[上轮执行账本](r91-addendum-execution-ledger.md) 已更正：117.454 秒的 Go race 运行早于最后 CSS 主区顶部对齐修改，后续只复跑了前端布局测试，因此不能代表最终源码全量通过。该历史输出保留，本轮的 `-count=1 -v` 非 race / race 输出取代其最终验收结论。P4 原先的全局清零豁免描述也已收窄，README / DESIGN 同步说明实际条件。
++
++没有重新审查或修改 P1/P2/P3/P5/P6/P7/P8/P9 业务逻辑，没有回退 P2 CSS，也没有改变 P6 两条独立拒绝 reason 的口径。未打包、发布或操作真实客户端。已有工作区修改均保留；[本轮独立补丁](r91-addendum-2/scoped-changes.patch) 以本轮开始副本为基线，[来源指纹](r91-addendum-2/source-sha256.json) 标记本轮最终文件。

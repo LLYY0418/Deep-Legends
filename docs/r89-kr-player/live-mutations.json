@@ -1,0 +1,133 @@
+[
+  {
+    "id": "binary-memory-and-policy",
+    "killed": true,
+    "measurements": [
+      {
+        "catalog": {
+          "status": 200,
+          "items": 868,
+          "duration_ms": 2679.953166982159
+        },
+        "same": [
+          {
+            "status": 200,
+            "duration_ms": 181.87949992716312
+          },
+          {
+            "status": 200,
+            "duration_ms": 184.44183398969471
+          },
+          {
+            "status": 200,
+            "duration_ms": 187.19979200977832
+          }
+        ],
+        "rounds": [
+          {
+            "count": 100,
+            "duration_ms": 6181.294291978702,
+            "p50_ms": 295.5905420240015,
+            "p90_ms": 573.543458012864,
+            "failures": 0
+          },
+          {
+            "count": 100,
+            "duration_ms": 4148.4599999384955,
+            "p50_ms": 193.00950004253536,
+            "p90_ms": 226.68970900122076,
+            "failures": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "binary-persistence",
+    "killed": true,
+    "measurements": [
+      {
+        "catalog": {
+          "status": 200,
+          "items": 868,
+          "duration_ms": 1757.3740840889513
+        },
+        "same": [
+          {
+            "status": 200,
+            "duration_ms": 374.5982919353992
+          },
+          {
+            "status": 200,
+            "duration_ms": 0.8365000830963254
+          },
+          {
+            "status": 200,
+            "duration_ms": 0.4765000194311142
+          }
+        ],
+        "rounds": [
+          {
+            "count": 100,
+            "duration_ms": 5899.176083970815,
+            "p50_ms": 189.55066695343703,
+            "p90_ms": 711.0543750459328,
+            "failures": 0
+          },
+          {
+            "count": 100,
+            "duration_ms": 25.235667009837925,
+            "p50_ms": 1.1168339988216758,
+            "p90_ms": 1.8559169257059693,
+            "failures": 0
+          }
+        ]
+      },
+      {
+        "catalog": {
+          "status": 200,
+          "items": 868,
+          "duration_ms": 29.79883400257677
+        },
+        "same": [
+          {
+            "status": 200,
+            "duration_ms": 573.0371669633314
+          },
+          {
+            "status": 200,
+            "duration_ms": 2.1846250165253878
+          },
+          {
+            "status": 200,
+            "duration_ms": 1.4409160939976573
+          }
+        ],
+        "rounds": [
+          {
+            "count": 100,
+            "duration_ms": 7513.250082964078,
+            "p50_ms": 202.88200001232326,
+            "p90_ms": 513.6202499270439,
+            "failures": 0
+          },
+          {
+            "count": 100,
+            "duration_ms": 69.68087493441999,
+            "p50_ms": 3.778375103138387,
+            "p90_ms": 5.4923329735174775,
+            "failures": 0
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "chromium-parallel",
+    "killed": true
+  },
+  {
+    "id": "chromium-catalog-redraw",
+    "killed": true
+  }
+]

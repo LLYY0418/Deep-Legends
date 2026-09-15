@@ -1,0 +1,993 @@
+✔ built backend must contain the exact source fingerprint (7.857417ms)
+✔ R70 fingerprint tracks embedded assets/build inputs but excludes tests and generated binaries (860.691959ms)
+✔ R86 ADD2 fingerprint fixture prunes large caches without changing the fingerprint (1147.695458ms)
+ℹ {"unfiltered":{"milliseconds":418.591541,"files":826,"bytes":7971297},"filtered":{"milliseconds":191.77591699999994,"files":308,"bytes":7834081},"fingerprint":"7e477a6a3aa2"}
+✔ R86 desktop logs stay within five two-MiB generations and export only reviewed fields (1038.830958ms)
+✔ R86 desktop rotation rejects untrusted archive paths without deleting evidence (4.305041ms)
+✔ R86 desktop log byte guard rejects an independent unbounded append path (17.10825ms)
+✔ one event card preserves separate choice owners, partial selection, failures and POST keys (345.248917ms)
+✔ offline national group remains reachable from a pro tab (4.152833ms)
+✔ ordinary and centered artwork use different face coordinates, including load failure (131.313333ms)
+✔ unknown reward quantities are not manufactured as one (1.634458ms)
+✔ 2024 real mode buttons isolate champion and search memories across all modes and reload (249.569792ms)
+✔ 2024 legacy memory migrates only to its saved mode, once (20.993083ms)
+✔ 2024 fast ranked filters supersede requests without stuck loading or cross-mode writes (12.336917ms)
+✔ 2024 neutral glyph coloring preserves alpha and never recolors colored/opaque/unknown art (12.202958ms)
+✔ 2024 rarity UI says selection distribution, retains all stages, hides failed empty data (11.531583ms)
+✔ R86 search keeps the input and exposes all-position request failures (17.301125ms)
+✔ 2135 actual search buttons clear submitted fields, keep invalid input, and retain new typing (687.022541ms)
+✔ 2135 glyph tone map preserves dark rim, raises highlights, and retains original colored artwork (11.616208ms)
+✔ 2244 skill summary uses real main/sub priorities after R, without repeated labels (145.657625ms)
+✔ 2244 banner exact animation, no video for unknown skin or reduced motion (36.195834ms)
+✔ event cards group presentation but retain all entitlement rows; unknown events stay separate (10.372292ms)
+✔ 2244 installer uses the actual STM_SETIMAGE constant and distribution is automatic (1.0055ms)
+✔ R87 diagnostics support an optional independent export directory with bounded collision-free names (5.712375ms)
+✔ R71 diagnostics do not redirect foreign downloads, redirects, or missing directory selections (0.995917ms)
+✔ R71 interrupted downloads release reservations and the hook is packaged and disposed (2.550417ms)
+✔ only completed diagnostics downloads enable opening the exported file folder (1.53525ms)
+✔ R87 P8 first export and unusable directories still report the actual Save dialog path (3.412125ms)
+✔ R87 P8 cancellation, invalid save paths and disposed windows never emit completion (0.718458ms)
+✔ N-1 every visible custom text control receives font (1.059291ms)
+✔ N-2 MUI branding stays hidden (0.683625ms)
+✔ N-3 instfiles hook scoped to preceding custom page (0.109834ms)
+✔ N-4 stock headers never reappear (0.106417ms)
+✔ N-5 gold progress uses BGR (0.108042ms)
+✔ N-6 buttons stay stock and sit on a light footer instead of unreadable dark (0.155625ms)
+✔ N-7 progress track colour has visible contrast against the page background (0.065625ms)
+✔ N-8 Core fallback keeps stock system styling (0.120958ms)
+✔ N-9 finish page hides the wizard before the blocking launch call (0.124708ms)
+✔ R74 installer opts out of bitmap DPI virtualization and has a visible progress track (0.894291ms)
+✔ R80 customInstall swaps the executable without changing registry or removal logic (0.989333ms)
+✔ R74 Browse appends Deep Legends once without creating directories prematurely (0.755166ms)
+✔ N-1..5 mutation guards reject each broken contract (14.763208ms)
+✔ 2135 white setup and larger native text/icons without bitmap scaling (0.442459ms)
+✔ installer build embeds the actual NSIS artifact and publishes only a verified GUI shell (5.461541ms)
+✔ installer build cleans payload and rejects compiler (4.285792ms)
+✔ installer build cleans payload and rejects missing-payload (3.489459ms)
+✔ installer build cleans payload and rejects wrong-format (3.719042ms)
+✔ both release entry points wrap NSIS before hashes and before deleting win-unpacked (0.572792ms)
+✔ small uninstaller builds independently before NSIS without embedding payload (3.709333ms)
+✔ uninstaller build removes partial artifact after compiler (5.1575ms)
+✔ uninstaller build removes partial artifact after payload (5.825334ms)
+✔ uninstaller build removes partial artifact after invalid PE (4.682083ms)
+✔ uninstaller design supports retain/delete data, every bridge request and all progress states (398.775833ms)
+✔ installer design executes all bridge interactions, terms, progress and failure without changing layout (445.766084ms)
+✔ installer reports ready only after real template initialization with inline state (431.920292ms)
+✔ installer reports script failure instead of readiness after broken application bootstrap (103.471458ms)
+✔ uninstaller reports ready only after real template initialization with inline state (78.067042ms)
+✔ uninstaller reports script failure instead of readiness after broken application bootstrap (30.76325ms)
+✔ collapsed sidebar hides the label but keeps the live beacon rendered (1058.253917ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 DOM teardown disconnects pending observers without disabling live callbacks (1876.480792ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 1110 征召默认值、时间输入、模式能力和总开关真实保存链 (4749.508459ms)
+✔ 平均段位只查询视口内卡片，并在分页加载期间停用 (17.224167ms)
+✔ match-tier failures back off instead of retrying on the next render (24.154875ms)
+✔ match-tier overview diagnostics contain aggregate counts only (7.36425ms)
+✔ non-match overview rerenders preserve the match-list node (46.089417ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 总览战绩卡：点击展开按钮只替换目标卡片并可收起 (15733.125208ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 玩家覆盖层里的战绩详情也能展开 (4722.640083ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 演示数据下总览页渲染出真实内容，且渲染期没有异常 (1605.059833ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 好友真实数据恢复横条模式与计时，SSE 更新不重建战绩或串到其他玩家 (3980.152209ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 演示数据下工具五个页签都渲染完成 (5177.50475ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 2351 自定义暂停事件保留真实总开关和卡片高亮 (3134.501666ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R56 工具页状态、确认、下拉与领奖契约完整 (5321.567292ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 全部原生下拉都增强为可键盘操作的应用菜单，包含动态英雄段位 (3177.051416ms)
+✔ R59 生涯头衔读取对象名称且绝不显示原始 UUID (13.991667ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R59 生涯预览完整渲染时不泄漏 playerTitleSelected UUID (3223.164459ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R60 生涯事件刷新头衔、保护脏草稿且不在其它页签后台请求 (5958.615667ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R65 生涯事件 20 连发只请求一次、仅时间戳变化不重建且按压期间不丢点击 (5093.286166ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R64 生涯皮肤与身份控件局部更新，皮肤图片延迟解码 (3262.41425ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R64 生涯头衔和勋章仅在真实值上使用强调色 (3240.95925ms)
+✔ R60 生涯勋章缺失槽位稳定回退为未设置 (15.522166ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R58 生涯英雄长下拉支持别名搜索，短下拉不显示搜索框 (3439.458875ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R58 生涯空皮肤刷新保留草稿并在数据补齐后恢复 (5546.506125ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 顶部重新读取实际刷新生涯并丢弃未应用预览 (3501.571583ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 收藏账户条复用主页背景和圆头像，并只保留两项事实 (3139.811041ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 游戏时间分布下方提供等栏宽分享按钮，并在选定路径后生成桌面双列长图 (1868.978625ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 分享图按 50 场设置截断当前已加载战绩 (2006.386583ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 排位分区在负场缺失时也能渲染出胜率提示 (1594.995ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 渲染异常会切到可重试的错误态，而不是永远停在骨架屏 (3183.167584ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 已有总览刷新时保留当前内容，不退回整页骨架 (3190.45525ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 客户端退出后总览显示可重试提示，不退回空白页 (3115.994584ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'cached',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 推荐请求期间遮罩只覆盖 tab 下方面板，并按内容提示 (3598.757167ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 对局页出装推荐渲染，且不再出现「后期备选」 (3338.530708ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 核心装只展示胜率与场次，不再展示选取率 (3417.678875ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 技能加点的选取率/胜率/场次与技能图标同一行 (3547.8975ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 对抗样本为空时给出说明文案，而不是一个「—」 (3519.740958ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 英雄位置统计为空时显示明确说明，而不是三项破折号 (3427.207542ms)
+✔ failed build timelines retry on reopening, successful timelines remain cached (0.928042ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 ADD-1 card detail, metric, legacy damage controls and timeline stay local at 200 matches (99803.8675ms)
+✔ R86 ADD optional cs-dialog computed zoom stays one inside the zoomed app frame (166.995875ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 ADD-1 failed timelines wait for explicit retry and keep unrelated cards (3596.790833ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 ADD-1 late timeline cannot reveal a filtered-out card (11033.397292ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 hero search preserves input and coalesces five keystrokes (including bypass mutation) (6732.861708ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 tools fetch only active tab plus rig, then load claims on demand (4037.182875ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 healthy SSE reduces phase polling while closed SSE retains one-second fallback (3242.762708ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 external match expansion preserves unrelated cards (3799.496625ms)
+✔ R86 filtering 200 loaded matches hides entries without rebuilding or refetching (11446.605ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 image listeners and tab scroll remain bounded including independent image-listener bypass (11582.793625ms)
+✔ R86 scroll restoration is resize-driven, restores clamped position and yields to user input (15.60225ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R87 P9 external champselect events preserve modal scroll, input and composition (7209.865875ms)
+✔ 定制便携版模板存在且保留缓存秒开的关键行为 (0.644291ms)
+✔ 打包配置与模板配套：asarUnpack 后端、不再使用解压期启动图 (0.522917ms)
+✔ 所有桌面运行时本地模块都进入 app.asar 和源码指纹 (1.225125ms)
+✔ Shell 只构建 setup 并复用 Electron 下载缓存 (0.433459ms)
+✔ 历史 portable 模板工具替换指纹占位符并拒绝过期模板 (22.908667ms)
+✔ 模板前置校验拒绝未替换占位符，后端内容变化会改变指纹 (11.672625ms)
+✔ 模板指纹仅读取指定工作目录的四个输入 (4.126042ms)
+✔ 交错执行破坏性模板测试不会污染另一个构建的后端和模板 (11.551584ms)
+✔ 默认只有 setup 目标，安装选项和外观资源保持完整 (0.244459ms)
+✔ R71 executable resource editing stays enabled and branded setup has exactly two choices (1.102958ms)
+✔ NSIS page functions wait until standard builder plugins are available (0.218334ms)
+✔ 职业页懒加载、所有分组/账号、缺失状态、筛选缓存与安全转义 (606.556709ms)
+✔ 加载互斥、失败保留旧表、恢复与来源不可用名单 (272.579958ms)
+✔ 国服每次打开折叠；韩服下方入口可键盘聚焦且不修改大区 (1806.109917ms)
+✔ 统一总览按国服、韩服、职业分组，同一账号跨组隔离且保留滚动和目录焦点 (4767.78425ms)
+✔ 补充来源未更新保留提示，重新进入不重复阻塞整页，手动刷新可重试 (252.08425ms)
+✔ 职业列表后台补充自动更新，离开页面停止轮询 (5158.732708ms)
+✔ R73 主号、历史折叠、只看主号及会话核验 (233.305917ms)
+▶ R73 真正点击后才核验：差异与404标记，502不误判
+  ✔ {"proMismatch":true} (1266.203166ms)
+  ✔ {"overviewStatus":404} (912.454584ms)
+  ✔ {"overviewStatus":502} (876.752ms)
+✔ R73 真正点击后才核验：差异与404标记，502不误判 (3056.12475ms)
+✔ 职业目录仅保留返回总览，返回后保留全部已打开页签 (2514.891833ms)
+✔ 未知更新时间的补充账号保持展示，不出现120天未玩的断言 (95.107375ms)
+✔ 玩家页签各自保留纵向位置，跨页面返回也不串位 (2943.035125ms)
+✔ R87 导出完成状态跨页面保留，打开文件夹后还原 (588.185458ms)
+✔ OPGG season summary actually replaces recent sample in both overview workspaces without a history reload (1478.617416ms)
+✔ 当前对局独立置顶、两队十人、无评分和多余标记，分组后不会污染玩家战绩 (1092.197875ms)
+✔ R74 零战绩当前对局也加载技能目录，未加载时不伪造技能名称 (1147.254834ms)
+✔ R74 菜单键盘跳过空组、异步重绘保焦、离开总览关闭菜单 (930.409625ms)
+✔ 国服总览保留战绩但不渲染或请求当前对局和观战 (407.314917ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '69:mid:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R75/R76 actual page: pro rows, degradation capture, incomplete and offline (6036.604166ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '69:mid:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R75/R76 actual page: pro rows, degradation 1/99, incomplete and offline (5581.471125ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '69:mid:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R75/R76 actual page: pro rows, degradation 10/30, incomplete and offline (5178.016208ms)
+✔ parses Chromium proxy resolution without accepting credentials (1.109958ms)
+✔ system proxy resolution times out or falls back to direct safely (5.647333ms)
+✔ desktop/r87-p8-independent-verify.test.cjs (38.1005ms)
+✔ R88 crash hooks write synchronous reviewed records without swallowing fatal exceptions (67.448625ms)
+✔ R88 seven-day desktop export excludes old records in every generation and keeps crash fields private (7.167666ms)
+✔ manual reread recovers a stuck overview and refreshes overview plus live without forcing the overlay (2951.05875ms)
+✔ gameplay soft reset clears stalled pagination and recommendation failures while preserving touched tabs (1.342ms)
+✔ collection-dirty is accepted by the SSE whitelist and refreshes status (1195.51375ms)
+✔ dirty collection rescans on entry and view changes without duplicate refresh requests (1615.540166ms)
+✔ R70 app and gameplay retain cancellation ownership until body parsing completes (5.835334ms)
+✔ R70 cached collection reentry avoids a request and never uses outgoing DOM snapshots (1115.4935ms)
+✔ R70 SSE overflow and reconnect resync refresh visible collection even with unchanged status (1350.535959ms)
+✔ R70 gameflow burst uses one fixed window and one non-aborting trailing request (0.7545ms)
+✔ R70 hidden gameplay pages do not construct DOM, and destroyed pages remain inert (1.082833ms)
+✔ R70 superseded status completion cannot overwrite current state or reschedule polling (1.7425ms)
+✔ R71 collection startup issues one ensure across accepted requests, status events and scan start (0.928ms)
+✔ R71 a failed or lost collection acceptance can retry without a permanent gate (0.8275ms)
+✔ public policy rejects encrypted and plaintext keys; private requires a valid key (7.483667ms)
+✔ build receipt rejects a stale packaged backend and clears obsolete approval (100.211916ms)
+✔ R86 bash release stops on a real failing Go test, including an independent early-build mutation (3775.088333ms)
+✔ R86 CI uses the package version, installs test dependencies and needs no private Riot key (0.450417ms)
+﹣ R86 Windows release stops on a real failing Go test and rejects an independent early build (0.060958ms) # requires Windows and PowerShell
+✔ format gates exclude local GOPATH modules while retaining untracked project source (74.19125ms)
+✔ 分享图文件名会清理路径字符并固定为 PNG (1.507916ms)
+✔ 分享图载荷限制令牌、根节点、大小和主题 (0.732209ms)
+✔ 导出样式固定标准桌面双列并强制恢复生涯栏和水印 (0.910875ms)
+✔ 常规总览保持 2x，超长总览按像素预算安全降采样 (0.154792ms)
+✔ 首次选择目录后持久化，后续自动保存且不覆盖同名 PNG (1.056083ms)
+✔ 取消保存不会创建截图窗口或写文件 (0.598542ms)
+✔ 保存令牌只能使用一次，写入失败会记录脱敏错误 (0.396084ms)
+✔ 不受信任的 renderer 不能选择路径或提交截图 (0.210458ms)
+✔ 设置接口读取并更改主进程保存目录 (0.986334ms)
+✔ preload 只暴露受校验的分享接口，不暴露 ipcRenderer (1.294291ms)
+✔ 分享图独立窗口不携带主窗口 zoom，且使用独立内存会话 (0.416583ms)
+✔ live specialist right overview button opens exact KR overview while rune selection and return remain independent (4384.239209ms)
+✔ R86 initial CSS and JS gzip budget excludes dynamic demo data (374.66425ms)
+✔ R86 demo loads only on demand, queues calls, shows badge, and preserves native fallback (383.980791ms)
+✔ R86 demo-only loading rejects an independent production script route (218.264333ms)
+✔ R77 backend spawn waits for the splash to paint (1.920083ms)
+✔ R77 splash keeps the cheap single-frame logo (0.179791ms)
+✔ R77 the instance lock still gates the backend (0.110125ms)
+✔ R77 mutation guards reject each broken boot order (4.199792ms)
+✔ R82 splash appears only when painted and reports its actual show time (4.074792ms)
+✔ R82 closed splash cannot be resurrected by late readiness (0.651375ms)
+✔ R82 fallback boots a stalled splash; quitting cancels all startup triggers (1.080084ms)
+✔ R82 all four requested splash mutations fail real event-driven checks (8.35875ms)
+✔ summoner-updated is whitelisted for status and overview-player (0.946667ms)
+✔ live-update debounce accumulates both events and updates the current overview in place (102.013708ms)
+✔ updateStatus refreshes a connected current-tab header without resetting catalogs (0.389125ms)
+✔ forced overview aborts a loading request and starts a newer request (1.135167ms)
+✔ overview-player changes only five identity fields on the current tab (0.3745ms)
+✔ overview-player identity slice also updates background fields in place (0.163959ms)
+✔ identity-ready status removes the global startup lock while snapshot loads (41.362125ms)
+✔ overview refresh button exposes a stable disabled loading state (19.465584ms)
+✔ manual reread awaits the backend identity refresh before hard-refresh dispatch (0.177792ms)
+✔ appearance scale options exactly match the desktop steps and precede density (265.215042ms)
+✔ scaling applies without the desktop bridge and follows the window size (983.366166ms)
+✔ desktop preference wins on startup; changes persist and auto labels update the visible custom select (153.923ms)
+✔ a delayed get cannot undo a user selection made during startup (107.203ms)
+✔ auto 1366x768 = 1 (1.493583ms)
+✔ auto 1600x900 = 1 (0.091041ms)
+✔ auto 1920x1080 = 1 (0.0525ms)
+✔ auto 2304x1318 = 1.2 (0.074042ms)
+✔ auto 2560x1440 = 1.33 (0.062666ms)
+✔ auto 2560x1600 = 1.33 (0.051959ms)
+✔ auto 3440x1440 = 1.6 (0.064292ms)
+✔ auto 3840x2160 = 2 (0.050208ms)
+✔ auto 3840x1600 = 1.78 (0.054458ms)
+✔ auto 5120x2880 = 2.5 (0.095ms)
+✔ auto 7680x4320 = 2.5 (0.050833ms)
+✔ auto 1024x600 = 1 (0.052334ms)
+✔ continuous scale, quantization, clamps and manual-step normalization (1.337292ms)
+✔ scale mutants turn the corresponding geometry guards red (3.362959ms)
+✔ titlebar, minimum size, reload, resize and display events run through the real main module (5.22575ms)
+✔ IPC restores independent preferences, normalizes fixed values and rejects untrusted senders (3.710084ms)
+✔ main behavior guards reject titlebar, minimum size, trust, reload, debounce and export mutants (18.915333ms)
+✔ preload exposes scale IPC without leaking the Electron event (0.614833ms)
+✔ packaged runtime includes the scaling module (0.195334ms)
+✔ upgrade stdout may arrive after exit but before close without a false startup error (3.180292ms)
+✔ user quit shares the graceful path; unexpected backend death still reports (1.947459ms)
+✔ window bounds store writes and restores visible bounds (2.183042ms)
+✔ window bounds store rejects bounds that no longer intersect a display (0.959708ms)
+✔ window bounds store silently falls back on corrupt or unwritable data (0.800958ms)
+✔ desktop window opens at 72/80 percent of the work area on roomy screens (0.812583ms)
+✔ small screens fall back to the design-width floor instead of 72 percent (0.089709ms)
+✔ desktop window clamps each dimension independently (0.075625ms)
+✔ desktop main and topbar keep the shared sizing and drag-region callers (0.289792ms)
+✔ R47 desktop caller and high-resolution mutation probes fail (8.107625ms)
+✔ current-game API errors distinguish local HTTP, network, decode and body read failures (18.847708ms)
+✔ current-game timeout remains distinct from cancellation by a newer request (4.269667ms)
+✔ R86 ADD-4 retired synergy panel selector stays absent without removing shared card styles (365.823208ms)
+✔ R69 career-column reentry preserves match width through the 1600 DIP band (0.29825ms)
+✔ R15 performance, fingerprint, and shared build CSS contracts (2.085208ms)
+✔ R15 mutation probes fail for every new guard (10.091ms)
+✔ champion intelligence is a first-level accessible workspace (0.219167ms)
+✔ diagnostics panel exports the active structured log with concise guidance (0.308875ms)
+✔ R39 diagnostic event whitelist mutation is caught (0.434625ms)
+✔ exported diagnostic log filename is timestamped so repeat exports never collide (0.496042ms)
+✔ renderer only calls the authenticated local champion API (0.212792ms)
+✔ position-aware recommendation contracts kill documented mutations (46.96875ms)
+✔ summoner spell card renders the first two real recommendations without placeholders (0.559ms)
+✔ ranked loadout side uses a balanced two-two-two height budget (0.6375ms)
+✔ summoner spell recommendations do not add a low-sample badge (0.335791ms)
+✔ ranked recommendation rows never dim low sample sizes (0.496625ms)
+✔ backend pins Korean data and restricts remote image paths (0.152208ms)
+✔ champion layouts keep responsive and reduced-motion fallbacks (1.654625ms)
+✔ mayhem redesign keeps the two-column workspace, atlas, and R6 recommendations (1.4855ms)
+✔ Mayhem recommendation and item ranking never request a guessed image URL (0.78625ms)
+✔ Mayhem and Arena augment cards render the same card shell (0.542708ms)
+✔ Mayhem augment cards carry the augment copy in the tooltip (0.922084ms)
+✔ live recommendation panels do not render upstream provenance footers (0.595625ms)
+✔ mayhem narrow layout moves the one champion list into an accessible dialog (0.559459ms)
+✔ arena narrow layout moves the champion list into an accessible dialog (0.872125ms)
+✔ mayhem CSS contract catches breakpoint and hidden-column mutations on a true copy (3.211458ms)
+✔ R6 A B C contracts reject recommendation, spell, and item-route mutations on true copies (85.480916ms)
+✔ R13 item column contract kills wrapping and equal-width mutations on a true copy (141.265709ms)
+✔ R6 win rates, spell fallback, patch fallback, and subtitles are explicit (1.546ms)
+✔ R7 prism grades, compact arena overview, recoverable match details, and clean names are explicit (1.368375ms)
+✔ R8 arena augment icons preserve semantic first-place tone without fabricated masks (0.319708ms)
+✔ R8 augment assets render as ordinary artwork (0.322334ms)
+✔ icon hotfix prefers Riot large artwork and carries a small fallback (0.238042ms)
+✔ icon hotfix fallback handler switches to small artwork (0.082042ms)
+✔ R8 rendered metric styles do not apply augment masks (0.037625ms)
+✔ R8 mayhem item configuration hides win rate when requested (0.239166ms)
+✔ R7 repeated disconnected status events preserve fallback item and augment catalogs (0.44725ms)
+✔ disconnection drops Tencent player identity while preserving Korean tabs (0.270334ms)
+✔ R7 contracts reject UI, parser, backend grade, and retry mutations on true copies (84.407666ms)
+✔ mayhem atlas normalizes Riot rarity enums before filtering (0.396542ms)
+✔ search keeps its caret and IME state when the workspace rerenders (0.241417ms)
+✔ full Riot ID paste keeps the tag caret without selecting the tag (0.079167ms)
+✔ champion detail uses complete build, matchup, and augment ranking layouts (1.036459ms)
+✔ arena keeps the champion list on wide screens and renders the redesigned data workspace (1.448042ms)
+✔ YOUR.GG champion grades preserve all six source letters in project-style badges (0.357417ms)
+✔ arena round 8 removals stay scoped to the arena workspace (0.556ms)
+✔ arena tolerates a missing catalog and formats unknown tiers correctly (0.467917ms)
+✔ match history keeps arena summaries compact and arena details purpose-built (5.86825ms)
+✔ arena match detail uses a validated Riot route and fail-closed hydration (0.294167ms)
+✔ demo mode serves complete arena fixtures without stable account identifiers (0.230375ms)
+✔ demo overview includes a match for every selectable game mode (0.301917ms)
+✔ demo mode exposes a dedicated Hextech ARAM live session (1.045167ms)
+✔ demo mode exposes a complete six-team Arena live session (0.514542ms)
+✔ small overviews move career statistics into an accessible modal sheet (3.398209ms)
+✔ rank history and ability comparison stay inside the shared career surface (6.543208ms)
+✔ career ranked queue switches use one recent sample and ignore season scan state (1.891542ms)
+✔ season progress refreshes the active overview without resetting queue choices or scroll (0.4155ms)
+✔ live updates target explicit state slices and clear client state on disconnect (0.452166ms)
+✔ structured data-source attempts are visible while cancellations stay silent (0.592291ms)
+✔ historical rank increments refresh only the matching active overview (0.700208ms)
+✔ summoner banner and recent ranked summary expose verified profile highlights (5.218333ms)
+✔ ranked payload shape probes are one-shot and retain raw win-loss samples (0.644875ms)
+✔ champion square icons crop out the baked-in vignette without eating the face (0.211709ms)
+✔ mastery and peak rank columns share row tracks so their labels, names and values line up (0.484958ms)
+✔ demo data routes champion icons through the same asset shape production actually serves (0.25475ms)
+✔ ranked queue cards stay visible so empty-season copy follows the selected mode (0.4855ms)
+✔ expanded sidebar stays compact without the old navigation subtitle (1.263834ms)
+✔ match history surfaces SGP failures and uses an accessible custom mode menu (0.865125ms)
+✔ player tabs use arrow scrolling, hide the native scrollbar, and deduplicate searches (0.491042ms)
+✔ player tab avatars have no tooltip while overflowing names retain their own hint (13.660541ms)
+✔ player overlays add durable tabs and non-self tabs can be reordered (1.571958ms)
+✔ damage analysis sorts by a real metric and shows full colored values (0.89575ms)
+✔ team analysis compares both sides across every requested metric (1.409417ms)
+✔ team analysis exposes only metrics supported by each map and mode (1.772459ms)
+✔ match tier hydration is asynchronous and isolated by stable region, server, player and container (1.022375ms)
+✔ top search and player navigation preserve the selected Chinese server (2.499334ms)
+✔ Chinese server merge guidance uses one scoped tooltip constant (2.433708ms)
+✔ cross-server ranked data is an explicit unsupported state (0.333917ms)
+✔ privacy UI separates explicit and opt-in automatic writes (0.2755ms)
+✔ live recommendations render and select every returned option (4.575375ms)
+✔ current champion endpoint keeps live recommendations usable without a roster identity (0.4805ms)
+✔ champion and live recommendations share the persisted tier (0.716ms)
+✔ live recommendation requests recover from stale flights and empty payloads (1.46725ms)
+✔ recommendation tabs reset only when the champion changes (0.223166ms)
+✔ live game scoped state resets on a new game or champion select entry (0.755291ms)
+✔ round 9 recommendation percentages preserve backend units and hide empty statistics (0.912ms)
+✔ live QQ101 depth rows preserve unavailable sample metadata (0.52225ms)
+✔ live build item cards keep icon tooltips without visible item names (0.254ms)
+✔ round 9 match summaries show only placement while details align it beside scores (0.594958ms)
+✔ round 9 match scores assign overall ranks and replace side leaders with MVP and SVP (0.577917ms)
+✔ round 9 match score ranks use hidden precision and keep exact ties deterministic (0.430709ms)
+✔ round 9 augment rendering uses upstream images, descriptions, and all rarity tones (1.07325ms)
+✔ round 9 recommendation modes drive tabs, fallbacks, and ranked-only sources (1.831792ms)
+✔ OPGG only uses the client fallback when no upstream positions exist (0.505166ms)
+✔ live recommendations can temporarily use a champ-select pick intent (0.987ms)
+✔ live recommendation champion ids reject negative pick sentinels and use resolved live fallback (0.47125ms)
+✔ random pick pending state has distinct empty-state copy (0.592ms)
+✔ rune application creates or recycles only Deep Legends pages (3.461917ms)
+✔ friend navigation uses only session-scoped player references (0.697625ms)
+✔ position filters use icons and transient search state is reset (0.970083ms)
+✔ rune shards use crisp login-independent Data Dragon assets (1.274916ms)
+✔ server-filtered flex switch makes one fresh first-page request (6.554708ms)
+✔ client-filter fallback alone may automatically page until flex appears (0.621958ms)
+✔ filtered empty state stays loading until fallback pagination is exhausted (0.165583ms)
+✔ filtered empty state renders the pagination copy only once (0.584ms)
+✔ ranked matches omit unavailable local LP records (0.642459ms)
+✔ perk stat mod slots are separated from rune styles (1.349333ms)
+✔ perk catalogs supply icons while entertainment recommendations come from the current hero (1.416792ms)
+✔ match statistic labels have an explicit faint tone in both themes (0.33875ms)
+✔ tooltips use one viewport-aware portal instead of clipped pseudo elements (0.89ms)
+✔ tooltips use the layered hextech surface in every theme (1.222208ms)
+✔ floating tooltip content is structured safely and shown only after placement (1.29475ms)
+✔ round 9 section navigation restores each page scroll position after panel activation (0.709667ms)
+✔ round 9 tooltip pointer suppression survives the click focus event (0.890708ms)
+✔ round 9 friend refreshes and redundant static icon tooltips stay disabled (0.189792ms)
+✔ player-name tooltips are gated by the actual ellipsized text (1.208833ms)
+✔ champion detail tooltips include static numerical metadata and player aliases (0.360792ms)
+✔ network preload excludes Hexdata and starts only ranked and arena work (0.312708ms)
+✔ champion data survives section switches and re-entry renders instantly while fresh (1.003125ms)
+✔ champion mode, searches, and tabs persist while transient detail state resets (1.173209ms)
+✔ ranked detail always keeps matchup and top-player cards (0.540792ms)
+✔ watch settings replace the legacy convenience controls and frontend writer (0.7155ms)
+✔ disconnected collection, account, live and pool pages hide filters (0.559375ms)
+✔ account page removes the duplicate title and sizes facts to unwrapped content (0.850667ms)
+✔ optional themes keep a neutral background and accent-only primary (0.2725ms)
+✔ mayhem atlas description comes from the guide paragraph, not the SEO blurb (0.607584ms)
+✔ mayhem atlas columns share one height cap and scroll independently (0.830625ms)
+✔ mayhem rarity panel disappears when the read fails (0.173834ms)
+✔ augment metadata is looked up by ID without an icon-directory filter (0.32425ms)
+✔ augment icons survive a client asset miss and never render as a solid tile (0.897834ms)
+✔ arena augment descriptions drop runtime counters and render calculations (1.233208ms)
+✔ mayhem augments without upstream copy do not promise the client has it (0.331834ms)
+✔ specialist rune loading never blocks the outer OPGG rune panel (0.561541ms)
+✔ live session shows the current position only when position capability exists (2.73125ms)
+✔ live position choices sort by role share and derive missing shares from play (0.883166ms)
+✔ live build recommendations use a wide core column and only the available depth columns (1.816333ms)
+✔ live rune source tabs keep stable widths when the contextual note appears (0.363334ms)
+✔ disabled controls use the not-allowed cursor throughout the web UI (0.258375ms)
+✔ arena live build aligns prism and core cards with the three Arena metrics (1.991833ms)
+✔ live core routes render at most five rows without an expansion control (1.178541ms)
+✔ live recommendation option groups keep the upstream order and never re-sort by win rate (0.857834ms)
+✔ mayhem opening sections follow actual data instead of the augment capability (0.958875ms)
+✔ item set payload uses three core routes, removes cross-group duplicates, and follows recommendation position (0.608709ms)
+✔ item set payload preserves recommendation trace and resolved position context (0.384625ms)
+✔ item set drops an empty post-core block and reports applied group and item counts (0.631333ms)
+✔ item set apply tooltip carries the in-game shop clipping workaround without repeating it in the toast (0.3215ms)
+✔ item set apply failure records the same trace and item counts (0.273417ms)
+✔ live mayhem item ranking renders the passed-through rows without a new request (0.568875ms)
+✔ live Mayhem builds keep only core equipment beside a two-column ranking (2.003958ms)
+✔ overview re-entry keeps its pages for the two minute freshness window (0.1595ms)
+✔ R63 forced overview refresh merges its first page into already loaded pages (2.945042ms)
+✔ R63 match-tier scope ignores transient tab keys (0.128875ms)
+✔ R61 append uses an independent controller and queues timed revalidation (1.021375ms)
+✔ R61 partial and budget-limited pagination stays resumable (0.27125ms)
+✔ desktop packaging has a static embedded Riot ciphertext gate (0.068083ms)
+✔ champion detail keeps conditional fourth/fifth items out of core routes (10.469875ms)
+✔ mayhem champion detail uses the same five-row core recommendation limit (0.2835ms)
+✔ hero detail rune workspace renders only the active rune board (2.457167ms)
+✔ champion list rerenders preserve the inner table scroll position (1.040209ms)
+✔ ranked, arena, and mayhem champion rows all expose selected state (1.217416ms)
+✔ match loadout follows the OPGG mode matrix instead of trusting stray augment data (3.008083ms)
+✔ match filters keep ordinary, qualifier, and classic Hextech ARAM mutually exclusive (2.996834ms)
+✔ remade matches use a neutral result instead of win or loss (1.545959ms)
+✔ live rune matchups occupy the champion strip right side without wrapping their facts (1.320542ms)
+✔ live match statistics keep fixed geometry across modes (0.331541ms)
+✔ live matchup rows use equal-width three-column grids (0.094208ms)
+✔ live recommendation capability flags hide unsupported matchup and ban-rate blocks (1.387792ms)
+✔ live skill plan distinguishes primary, secondary, final, and ultimate controls (0.728542ms)
+✔ live skill plan keeps four distinct controls on narrow screens (0.405667ms)
+✔ live augments sort each rarity by grade, cap the whole list at nine, and then group by rarity (2.25ms)
+✔ arena detail augments use the shared three-column option grid (0.431708ms)
+✔ live rune choices use the keystone title and make the whole card selectable (0.766083ms)
+✔ specialist matchups place the colored result dot beside the opponent (1.283ms)
+✔ specialist second game selection redraws and applies that game's exact runes (9.474459ms)
+✔ specialist opponent lives in the selectable head and the rune content is single-column (0.65525ms)
+✔ live rune style icons preserve their 4:5 artwork ratio (0.74575ms)
+✔ arena medium cards keep one-line identities and compact recommendation icons (0.549459ms)
+✔ mayhem and arena hero strips match the ranked artwork treatment (0.3495ms)
+✔ build rows keep a fixed 42px icon size and wrap whole depth groups (1.996083ms)
+✔ session summary uses a generic auto refresh status (0.360041ms)
+✔ live page defaults to a 3 second refresh and resets recommendations to runes on re-entry (0.265708ms)
+✔ live beacon reacts to active phase changes and has a one second fallback (2.225208ms)
+✔ R46 live refresh delays follow the game phase (0.192708ms)
+✖ R46 TFT live sessions render one explicit unsupported state (0.444167ms)
+✔ R47 Arena live insights use one honest roster with phase-specific context (8.33375ms)
+✔ R58 Arena live playerlist groups six teams and malformed shapes fall back to one roster (3.040458ms)
+✔ R49 Arena player cards use the current champion fallback, hide lane copy, and put self first (34.479583ms)
+✔ R66 live premade hints cluster players and render a rich, fail-closed tag (1.162291ms)
+✔ R66 premade backend guards reject cache and inference mutations (4.884583ms)
+✔ Arena random champion IDs use the official unselected champion icon (0.649542ms)
+✔ R56 recommendation loading is centered by its overlay without viewport overflow (1.756458ms)
+✔ R56 missing recommendation metrics remove the whole metric item and empty wrappers (12.71125ms)
+✔ player header retains region and uses friend presence without CN spectator probes (0.35ms)
+✔ R46 restores only a persisted champion ID and clears unavailable selections (0.542542ms)
+✔ R61 champion re-entry renders persisted detail on the first frame (17.746ms)
+✔ R61 stale rankings re-entry runs loadWorkspace(true) without flashing the list (55.098959ms)
+✔ R61 detail cache survives leaving and prevents a second detail request (0.759834ms)
+✔ same champion route click overrides the previous detail position (0.579ms)
+✔ item route limit follows the active bottom or adc detail before the selected row (0.284833ms)
+✔ R61 detail tier persists and keeps the refreshed rankings cache fresh (0.441292ms)
+✔ R70 section event runs after synchronous panel activation without snapshot delay (0.1395ms)
+✔ R47 ranked detail recovers to the list when champion metadata is unavailable (0.306875ms)
+✔ champion detail core routes hide pick rate and retain win rate with games (0.333708ms)
+✔ R63 keeps the OP.GG source only in the build header (0.372917ms)
+✔ QQ101 item depths disclose unavailable samples and flag extreme rates (0.265833ms)
+✔ R61 unnamed loot remains visible by raw ID with a completion hint (1.821292ms)
+✔ 0912 named ward, icon and legacy loot render their resolved names (2.734041ms)
+✔ R61 account renderer directly retains unnamed loot and kills the old filter (1.286792ms)
+✔ R61 every mandatory contract rejects its documented production mutation (21.583084ms)
+✔ R63 mandatory contracts reject every documented production regression (20.599708ms)
+✔ live rune secondary style row stays aligned beneath the primary keystone row (0.487708ms)
+✔ R16 build, rune, skill, and Korean overview guards preserve the corrected contracts (1.41475ms)
+✔ R16 addendum guards reject every documented regression on true copies (216.688875ms)
+✔ R45 contracts cover desktop Arena geometry, build layout, and cell identity wiring (0.902292ms)
+✔ R45 mutation probes reject every documented A, B, and C regression (3.747458ms)
+✔ R46 contracts cover cache eviction, parsing, beacon, refresh, and TFT handling (0.541833ms)
+✔ R46 mutation probes reject all six required regressions (2.683875ms)
+✔ R47 contracts cover Arena champ-select filtering and the single-roster layout (1.806958ms)
+✔ R47 A-group mutation probes reject mode and single-roster regressions (2.217042ms)
+✔ R49 all seven required mutation probes fail on true copied files (61.7515ms)
+✔ R47 addendum scopes recommendation breakpoints to its inline-size container (0.45475ms)
+✔ R47 addendum mutation probes reject media-query regressions (0.586458ms)
+✔ R45 item-set branding uses DL in demo and LCU metadata (0.288667ms)
+✔ R71 item-set action uses game recommendations without verbose manual-cleanup notes (0.452166ms)
+✔ R58 mutation probes reject stale-roster and Arena fallback regressions (1.558666ms)
+✔ the duplicated 30-day ranked card is gone from every layer (0.681584ms)
+✔ ranked queue switchers drop the redundant text label (0.920459ms)
+✔ specialist rune client skips are observable and stale cooldowns recover (0.93ms)
+✔ specialist upstream failures remain retryable and are never cached as empty samples (0.526916ms)
+✔ specialist retryable outcomes have accurate copy and a retry control (1.0145ms)
+✔ queues without top-player data keep an explicit specialist empty state (0.792625ms)
+✔ collection status wording is timeless and promotion chests use dedicated artwork (0.438666ms)
+✔ returning to a section restores its scroll position past the loading skeleton (0.189584ms)
+✔ captured Arena equipment matches YOUR.GG preview order and expands to every source item (114.024625ms)
+✔ Arena equipment sorting retains low samples, missing metadata and ungraded items (0.331084ms)
+✔ R86 champion index preserves numeric/first-match/key semantics and invalidates catalogs (0.311125ms)
+✔ diagnostic export waits for telemetry and prevents duplicate download clicks (1.355917ms)
+✔ telemetry failure never blocks export and open-folder action does not export again (0.636ms)
+✔ online friend party shows real occupancy and mode, including TFT (0.623375ms)
+✔ partial or invalid occupancy is not invented as 1/5 (0.126167ms)
+✔ game phase wins over chat availability and stale lobby data (0.206167ms)
+✔ offline, mobile, away and other product never reuse the LoL lobby text (0.147125ms)
+✔ real friend dock rerenders occupancy and removes old room details on every phase change (170.187916ms)
+✔ friend banner matches opaque aliases, escapes labels and rejects stale or foreign presence (2.474417ms)
+✔ flow render diagnostics follow displayed data and explain skipped mounts (2.074834ms)
+✔ flow loader logs invalid response without inventing an idle state (1.06075ms)
+✔ 2351 failed current game probe does not render a misleading status row (0.445125ms)
+✔ manual roster retry reaches the backend and diagnostics without exporting identity (0.527959ms)
+✔ 2326 manual and automatic current-game failures retain their own trigger (0.64175ms)
+✔ R68 specialist request uses OPGG-resolved position unless the user overrides it (0.820375ms)
+✔ R68 live insight labels are relative to the current player's absolute team (1.537166ms)
+✔ R68 optional insight alignment sorts complete positions and fails closed on duplicates (0.5895ms)
+✔ R68 rendered-roster diagnostic carries queueId and absolute counts (0.318334ms)
+✔ R68 gameplay mutation probes execute real position and team logic (6.074709ms)
+✔ R69 premade tags distinguish direct session groups from inferred groups (1.532125ms)
+✔ R69 history rows distinguish unavailable failed empty and pending states (1.073833ms)
+✔ R69 current-position chip preserves client position and discloses specialist fallback (1.5175ms)
+✔ R71 ranked recent-position samples stay inside the player card, without an extra grid row (421.747375ms)
+✔ R72 role badges use explicit lane names, deduplicate and hide unknown or empty samples (1.018167ms)
+✔ R73 demo ranked players expose recent-position samples used by role badges (0.300667ms)
+✔ R73 classic ranked details stay side-by-side at medium widths and safely stack only when narrow (1.740334ms)
+✔ OPGG season query is tab-scoped, single-flight and never reloads Riot history (1.3535ms)
+✔ OPGG late response cannot overwrite another account and failure has no crawl fallback (1.186916ms)
+✔ OPGG career rendering uses full season total and only the matching KR tab (1.207334ms)
+✔ current-game queries are single-flight, account scoped, and reject late identity changes (2.326ms)
+✔ R75 pro target is independent of specialist rankings and rejects non-SR modes (0.51875ms)
+✔ R75 pro rows use shared game renderer, neutral unknown, real event and sample threshold (1.854625ms)
+✔ R75 incomplete pro disables actual action markup and refuses POST (1.00575ms)
+✔ R75 async pro retains marked cache on failure and prevents old generation overwrite (0.937834ms)
+✔ R76 pro degradation uses game failure ratio, not a nonempty reason (0.849125ms)
+✔ pro tabs keep every player and display latest five games per player without relative dates (1.767ms)
+✔ rune source order is OPGG, professional, specialist with no specialist subtitle (0.558167ms)
+✔ professional request follows the displayed position and explicit selection wins over fallback (0.260917ms)
+✔ unknown pro outcomes are not presented as a zero-game performance record (0.346541ms)
+✔ cached overview re-enters independent season and current-game loaders without requesting history (0.545709ms)
+✔ live specialist overview uses full identity without merging tags or enabling tournament names (1.055333ms)
+✔ TheShy Camille official eight-perk response shows known shards without inventing slots (0.506375ms)
+✔ KR unavailable season never renders recent20 as champion season statistics (0.258ms)
+✔ resolved repeated pro shards render in both legal rows, not in the bottom strip (0.452917ms)
+✔ 总览未连接态只提供客户端入口且不提供密码输入 (3.35725ms)
+✔ 国服纯净入口动作只提交固定 tcls id 并进入等待登录状态 (0.812542ms)
+✔ 所有客户端入口共享启动锁并在失败后立即解锁 (0.565917ms)
+✔ Riot 入口成功后进入对应等待状态并只安排状态刷新 (0.228208ms)
+✔ 启动成功后隐藏入口并按客户端显示等待登录状态 (110.4785ms)
+✔ 启动入口只渲染可用的 TCLS 与 Riot 客户端并使用统一卡片 (0.306416ms)
+✔ 安装扫描失败与未安装状态分开显示并允许重试 (0.290625ms)
+✔ filter deadline aborts fetch and records a retryable timeout (0.800417ms)
+✔ all five modal lane values match the real backend ranking whitelist (1.34875ms)
+✔ stale success cannot overwrite all, newer lane, or a reopened dialog (2.030375ms)
+✔ stale failure is quiet, current failure resets and is retryable (0.798291ms)
+✔ malformed rows are not cached as a successful empty list (0.558625ms)
+✔ closing the dialog prevents old response application (0.309ms)
+✔ R87 P9 disposal aborts filtering and late success cannot update the dialog (0.748875ms)
+✔ web/r87-p2p3-verify.test.cjs (65.956541ms)
+✔ web/r87-p5-independent-verify.test.cjs (51.659ms)
+✔ web/r87-p8-independent-verify.test.cjs (43.591875ms)
+✔ R87 hidden SSE phase is loaded when visibility resumes with overview resync pending (6.515333ms)
+✔ R87 phase poll independently loads once and repeated unchanged phase causes no roster polling (6.1065ms)
+✔ R87 all tabs become dirty, inactive players stay off network, retry is bounded and delayed (3.622208ms)
+✔ R87 suite fetch and stalled response bodies time out at 15 seconds (4.968292ms)
+✔ R87 claim timeout advances progress, continues remaining claims and clears watchdog (1.70175ms)
+✔ R87 pending loot is distinguished from pool matching, and all end phases share settlement display (5.024708ms)
+✔ R88 thirteen ChampSelect events per second cause at most two actual diagnostic POSTs (24.164917ms)
+✔ R88 slow sampled diagnostics hold one slot and never retry (7.797917ms)
+✔ R88 local request timing is sampled globally and strips paths and identifiers (19.652833ms)
+✔ R88 real status timeout is silent twice, fatal on third, and success resets failures (22.250834ms)
+✔ R88 replaced status requests and explicit abort do not count toward fatal threshold (1.965584ms)
+✔ R88 helper failure label does not blame the League client (6.59625ms)
+✔ R88 arena names omit tags but preserve full tooltips, normal tags and masking (2.132333ms)
+✔ R88 OP uses gold badge above source S (3.375708ms)
+✔ R88 protected active match-main and match-stats rules remain byte-identical (2.522083ms)
+✔ R89 parallel supplements start before first overview resolves and survive ref adoption without duplicates (12.1225ms)
+✔ R89 catalog failure retries once after backoff and missing IDs report once within a bound (4.410542ms)
+✔ R89 recommendations choose one main champion and that champion main role from at most 20 matches; empty has no shell (1.7495ms)
+✔ R89 catalog arrival invalidates retained match DOM in all open tabs (1.080375ms)
+✔ R89 completion failure preserves first five and exposes a retry that completes recommendations (1.987333ms)
+✔ R89 an older overlay recommendation cannot overwrite the active player and closing aborts it (1.138958ms)
+✔ R90 complete snapshots never schedule another in-game timer (2.206958ms)
+✔ R90 completeness requires availability, roster, settled history and arena verdict (0.339709ms)
+✔ R90 incomplete snapshots stop after eight retries with a visible refresh exit (28.7985ms)
+✔ R90 inactive tabs and repeated in-game SSE do not reload the roster; phase transitions do (1.054083ms)
+✔ R90 stopped UI has an operable manual refresh and foreground wake checks phase (12.0525ms)
+✔ R90 actual loader bypasses cache for manual refresh and preserves queued manual actions (0.900625ms)
+✔ R91 new game removes old recommendations and summary before the deferred response (202.984958ms)
+✔ R91 same game refresh and active phase progression preserve the current content (104.822792ms)
+✔ R91 clicking refresh during a request visibly queues exactly one forced reload (35.24725ms)
+✔ R91 boundary cancels the old request and its late settlement cannot own the new state (34.976041ms)
+✔ R91 failed, timed out and cancelled new-game requests have an explicit working retry (61.290583ms)
+✔ R91 empty new-game snapshots stay explicit and bounded instead of showing an empty recommendation panel (17.30025ms)
+✔ R91 soft reset invalidates the aborted loader before a replacement starts (7.990125ms)
+✔ R91 direct loader detects a boundary already observed by the beacon (9.541ms)
+✔ R91 hidden phase transitions invalidate immediately and preserve the deferred refresh (10.635417ms)
+✔ R91 event-stream disconnection cancels stale work and offers recovery (20.409958ms)
+✔ R91 lagging inactive responses cannot erase a new-game signal; leaving the game settles the transition (48.6325ms)
+✔ R91 an empty available roster stays pending; unsupported mode and known gameId changes settle safely (15.38425ms)
+✔ R91 cancellation without a replacement cannot leave the first load blank (7.599125ms)
+✔ 青年瑞兹与海克斯科技安妮在奖池中归入限定 (0.560333ms)
+✔ 奖池限定排在传说之前，其余按奖池品质顺序比较 (0.131708ms)
+✔ 自动主题严格按本地时间在 06:00 和 18:00 切换 (1.775959ms)
+✔ 品质与数量排序默认从高到低 (0.131709ms)
+✔ 普通炫彩始终平铺且不再提示悬停展开 (0.600708ms)
+✔ 炫彩横栏保留页面纵向滚动，仅在 Shift 滚轮时横移 (0.418917ms)
+✔ 炫彩横栏包含臻彩并只显示去掉所属皮肤后的短名称 (0.358708ms)
+✔ 臻彩详情可在普通炫彩图与独立原画之间切换 (0.296833ms)
+✔ 卡片等待图片时显示加载中，失败后才显示暂无预览 (0.263708ms)
+✔ 详情与炫彩导航共用全局图标尺寸令牌 (2.267833ms)
+✔ 奖池不再使用三合一优先层级并在切换拥有状态时重置品质 (0.525667ms)
+✔ 主滚动区域从顶部栏下方开始且不显示滚动条箭头 (0.521334ms)
+✔ 收藏临时筛选会恢复默认值，奖池详情按实际展示顺序导航 (0.230292ms)
+✔ 皮肤详情只在英雄分组时按英雄切换，其余视图按当前展示顺序 (0.199042ms)
+✔ 最小窗口使用应用内排序菜单并在工具栏内换行 (0.404417ms)
+✔ 炫彩显隐不再扫描整棵 DOM 或触发布局测量 (0.29225ms)
+✔ 大量炫彩的显隐统计保持线性且远低于一帧交互预算 (4.677583ms)
+✔ 卡片资源采用可视区延迟加载且远程臻彩受独立并发限制 (1.287417ms)
+✔ diagnostic timeouts stop after one retry and remain visible to export (6.260917ms)
+✔ export flush records latest delivery counters even when no later game event arrives (1.204583ms)
+✔ diagnostic delivery observes HTTP failure, retries once and reports recovery counters (3.035875ms)
+✔ failed transport does not poison duplicate suppression and strips new arbitrary text (3.056708ms)
+✔ diagnostic in-flight limit is bounded and exposes dropped events (7.619ms)
+✔ flow diagnostics whitelist fields, deduplicate repeats and tolerate offline transport (2.471833ms)
+✔ R70 response cache is access-ordered and bounded over 100000 inserts (99.914083ms)
+✔ current game diagnostics retain KR fields but drop retired CN source and failure fields (1.433042ms)
+✔ R70 cache reads never extend freshness; idle expiry is pruned on access (1.404083ms)
+✔ R70 cache timer disposal runs once on eviction, not on same-object update (2.405792ms)
+✔ shared escapeHTML is document-free and escapes all HTML delimiters (1.617584ms)
+✔ business modules do not retain local escapeHTML implementations (2.710791ms)
+✔ career manual reread resets stale preview even when server payload is unchanged (2.007166ms)
+✔ global reread joins the active career refresh and does not refresh hidden tools (0.673125ms)
+✔ career SSE updates a clean background while preserving edited chat fields (0.708083ms)
+✔ career filtering never silently selects another background (0.420459ms)
+✔ career apply invalidates an older GET and reports unconfirmed writes honestly (2.326875ms)
+✔ career missing catalog never substitutes another champion and new undated MF skin stays first (9.004417ms)
+✔ 1405 rail drag swaps exactly two champions and persists the active pool (604.856459ms)
+✔ 1405 invalid, canceled and stale rail drags never change or save settings (219.704833ms)
+✔ 1405 time unit is inside the field and immutable while seconds remain editable (10.959958ms)
+✔ manual takeover stays visible beneath the relinquished champion (9.556ms)
+✔ pick show-then-lock edits a separate default ten-second lock wait (53.357417ms)
+✔ 1505 timeline resolves champion names without changing delays, attempts or diagnostic IDs (0.446417ms)
+✔ 1505 timeline escapes catalog names and preserves reverse chronological order (8.465542ms)
+✔ 1129 ranked ban has five shared slots while picks keep lane-specific pools (34.558875ms)
+✔ 1129 ban dialog saves and clears only shared pool without dropping migration backup (17.501708ms)
+✔ 0911 preselection follows auto-pick without an extra toggle and distinguishes planning (0.579084ms)
+✔ 2351 custom pause retains enabled highlighting and never reports master off (1.936625ms)
+✔ 2351 teammate picks and empty client ban list have distinct explanations (0.21525ms)
+✔ 1412 settings saves serialize and stale GET never undoes a ban toggle (2.17525ms)
+✔ 1412 enabled master keeps cards bright without hover (0.918ms)
+✔ 2143 capabilities only show supported highlighted tags and avoidance is unified (0.418875ms)
+✔ R74 missing skin catalog preserves the actual background ID, not an unset claim (0.196417ms)
+✔ R74 missing career catalog renders a retry state across the grid (0.169083ms)
+✔ R74 successful career mutations render their response, including a missing catalog (0.560541ms)
+✔ fixed play-again delay shows only the wait time without a progress meter (0.264834ms)
+✔ R68 matchmaking conflict note appears only when both rules are enabled (0.103917ms)
+✔ claim scan artifacts and failures stay out of the default reward list (0.42ms)
+✔ independent grants stay independent even when their item type and display group match (0.250875ms)
+✔ R68 canceled watch event clears the armed countdown state (0.24775ms)
+✔ R68 suite mutation probes execute the real helper logic (2.479417ms)
+✔ R69 facade load diagnostics distinguish poll, SSE, and manual retries (0.165875ms)
+✔ career skins retain dates and quest tiers without sinking new undated skins (0.267333ms)
+✔ Ashe verified 2026 release precedes Spirit Blossom and base skin (0.557375ms)
+✔ suite champselect tab after maintenance activates the real panel (0.264083ms)
+✔ R78 conveyor renders one fixed ghost slot when four of five are configured (0.393083ms)
+✔ R78 watch persistence includes champSelect without dropping existing settings (0.100042ms)
+✔ R78 UI keeps CSP-safe markup and container responsiveness (0.305167ms)
+✔ R78 exchange checkbox is independent from bench controls in every mode (38.372ms)
+✔ R78 exchange control regression probe rejects the old bench capability gate (6.47725ms)
+✔ R78 ranked pick renders an editable sixth unassigned-position pool (9.328458ms)
+✔ real app bootstrap registers every updater element and renders every state (413.813958ms)
+✔ existing SSE drives progress and persists it across close/reopen without polling (112.51075ms)
+✔ portable, minimum supported, offline, game warning and no-update behavior (75.149625ms)
+✔ notes allow only escaped whitelist Markdown (65.915292ms)
+✔ all 18 missing registry ids are killed by the real renderer (1267.969292ms)
+✔ escaping, https whitelist and unsupported-button mutants fail the same checks (186.943542ms)
+✔ manual update check posts through api and opens the existing notification dialog (131.488875ms)
+✔ manual check waits beyond the HTTP acknowledgement for SSE completion (97.301458ms)
+✔ late checking acknowledgement cannot overwrite an earlier SSE result (138.868792ms)
+✔ no-update feedback expires and a new check clears the previous timer (121.492292ms)
+✔ HTTP, network and asynchronous check failures show errors instead of latest-version success (705.801917ms)
+✔ unsupported, updater busy and manual in-flight checks cannot issue duplicate requests (86.819584ms)
+✔ manual-check request, shared-dialog, support and busy mutations are all detected (660.492625ms)
+ℹ tests 649
+ℹ suites 0
+ℹ pass 647
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 287904.464166
+
+✖ failing tests:
+
+test at web/champions.test.cjs:5012:1
+✖ R46 TFT live sessions render one explicit unsupported state (0.444167ms)
+  TypeError: nodes.liveRefresh.setAttribute is not a function
+      at renderLive (eval at compileFunctions (/Users/ly/personal/personal-work/deep-legends/web/champions.test.cjs:189:19), <anonymous>:18:25)
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/champions.test.cjs:5027:2)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)

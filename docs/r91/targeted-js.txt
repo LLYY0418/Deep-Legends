@@ -1,0 +1,42 @@
+✔ R87 hidden SSE phase is loaded when visibility resumes with overview resync pending (10.258041ms)
+✔ R87 phase poll independently loads once and repeated unchanged phase causes no roster polling (7.962083ms)
+✔ R87 all tabs become dirty, inactive players stay off network, retry is bounded and delayed (3.581042ms)
+✔ R87 suite fetch and stalled response bodies time out at 15 seconds (3.515042ms)
+✔ R87 claim timeout advances progress, continues remaining claims and clears watchdog (1.151166ms)
+✔ R87 pending loot is distinguished from pool matching, and all end phases share settlement display (3.56675ms)
+✔ R88 thirteen ChampSelect events per second cause at most two actual diagnostic POSTs (29.191375ms)
+✔ R88 slow sampled diagnostics hold one slot and never retry (4.062167ms)
+✔ R88 local request timing is sampled globally and strips paths and identifiers (5.958917ms)
+✔ R88 real status timeout is silent twice, fatal on third, and success resets failures (14.101792ms)
+✔ R88 replaced status requests and explicit abort do not count toward fatal threshold (1.687291ms)
+✔ R88 helper failure label does not blame the League client (1.434042ms)
+✔ R88 arena names omit tags but preserve full tooltips, normal tags and masking (1.283334ms)
+✔ R88 OP uses gold badge above source S (0.922542ms)
+✔ R88 protected active match-main and match-stats rules remain byte-identical (2.6505ms)
+✔ R90 complete snapshots never schedule another in-game timer (2.715333ms)
+✔ R90 completeness requires availability, roster, settled history and arena verdict (0.474792ms)
+✔ R90 incomplete snapshots stop after eight retries with a visible refresh exit (2.7375ms)
+✔ R90 inactive tabs and repeated in-game SSE do not reload the roster; phase transitions do (3.402667ms)
+✔ R90 stopped UI has an operable manual refresh and foreground wake checks phase (3.365959ms)
+✔ R90 actual loader bypasses cache for manual refresh; R91 supersedes the former manual queue (0.815542ms)
+✔ R91 new game removes old recommendations and summary before the deferred response (122.689541ms)
+✔ R91 same game refresh and active phase progression preserve the current content (70.327375ms)
+✔ R91 repeated manual refresh immediately aborts and replaces only the live request with visible feedback (32.619708ms)
+✔ R91 boundary cancels the old request and its late settlement cannot own the new state (58.399666ms)
+✔ R91 failed, timed out and cancelled new-game requests have an explicit working retry (46.95325ms)
+✔ R91 empty new-game snapshots stay explicit and bounded instead of showing an empty recommendation panel (10.278959ms)
+✔ R91 soft reset invalidates the aborted loader before a replacement starts (11.466209ms)
+✔ R91 direct loader detects a boundary already observed by the beacon (11.160125ms)
+✔ R91 hidden phase transitions invalidate immediately and preserve the deferred refresh (17.92775ms)
+✔ R91 event-stream disconnection cancels stale work and offers recovery (17.650042ms)
+✔ R91 lagging inactive responses cannot erase a new-game signal; leaving the game settles the transition (14.774917ms)
+✔ R91 an empty available roster stays pending; unsupported mode and known gameId changes settle safely (22.223834ms)
+✔ R91 cancellation without a replacement cannot leave the first load blank (8.9315ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1028.926625

@@ -1,0 +1,1465 @@
+--- before/web/gameplay.js
++++ after/web/gameplay.js
+@@ -49,6 +49,8 @@
+     live: null,
+     liveLoading: false,
+     liveAwaitingGame: false,
++    liveExpectedGameId: 0,
++    liveGameRefreshQueued: false,
+     liveError: "",
+     liveTimer: 0,
+     liveRecommendations: new Map(),
+@@ -134,8 +136,9 @@
+     return "";
+   }
+   function renderLiveRefreshStatus(data) {
+-    const message = state.liveLoading
+-      ? "正在刷新…"
++    const message = data?.phase && liveGamePhase(data.phase) && data.phase !== state.beacon.phase
++      ? "对局阶段已变化，正在同步当前对局…"
++      : state.liveLoading ? "正在刷新…"
+       : liveAutoRefreshStopped(data);
+     return message ? `<div class="live-refresh-status" role="status"><span>${escapeHTML(message)}</span><button type="button" class="text-button" data-live-refresh>刷新</button></div>` : "";
+   }
+@@ -415,6 +418,8 @@
+       state.liveLoading = false;
+       state.live = null;
+       state.liveAwaitingGame = false;
++      state.liveExpectedGameId = 0;
++      state.liveGameRefreshQueued = false;
+       state.liveError = "";
+       resetLiveGameScopedState();
+       // 只在连接状态真正切换时更换目录。周期性的未连接状态事件不能
+@@ -3692,13 +3697,14 @@
+     recordLiveRefresh("load", source);
+     if (state.destroyed) return;
+     if (!connected()) { renderLive(); return; }
+-    invalidateLiveForNewGame(state.live?.phase, state.beacon.phase);
++    invalidateLiveForNewGame(state.live?.phase, state.beacon.phase, state.liveExpectedGameId, source);
+     if (state.liveLoading && !force) return;
+     // Manual refresh replaces only this request; other pages and recommendation
+     // selections keep their state. The token below fences off the old finalizer.
+     if (state.liveLoading) state.controllers.get("live")?.abort();
+     state.liveRefreshQueued = false;
+     state.livePhaseRefreshQueued = false;
++    state.liveGameRefreshQueued = false;
+     if (force) state.liveRetryAttempts = 0;
+     state.liveLoadStartedAt = Date.now();
+     const requestToken = state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
+@@ -3706,17 +3712,24 @@
+     state.liveError = "";
+     renderLive();
+     try {
+-      const previousLive = state.live;
++      let previousLive = state.live;
+       const nextLive = await api(force ? "/api/gameplay/live?refresh=1" : "/api/gameplay/live", {}, "live", 45000);
+       if (state.liveRequestToken !== requestToken || !connected()) return;
+-      if (state.livePhaseRefreshQueued && nextLive.phase !== state.beacon.phase) return;
++      if (state.liveAwaitingGame && normalizeLiveGameId(state.liveExpectedGameId)
++          && normalizeLiveGameId(nextLive.gameId) !== normalizeLiveGameId(state.liveExpectedGameId)) {
++        recordLiveObservation("stale-response", nextLive.phase, nextLive.gameId, source);
++        return;
++      }
++      if (liveSnapshotBehindPhase(nextLive) || state.livePhaseRefreshQueued && nextLive.phase !== state.beacon.phase) return;
+       // The phase signal can arrive before the live endpoint catches up. Keep
+       // the new-game transition visible rather than accepting an old lobby snapshot.
+       if (state.liveAwaitingGame && liveGamePhase(state.beacon.phase) && !liveGamePhase(nextLive.phase)) return;
++      if (invalidateLiveForNewGame(previousLive?.phase, nextLive.phase, nextLive.gameId, source, requestToken)) previousLive = null;
+       if (shouldResetLiveGameScopedState(previousLive, nextLive)) resetLiveGameScopedState();
+       resetLivePositionOverrides(previousLive, nextLive);
+       resetRecommendationTabsOnChampionChange(previousLive, nextLive);
+       state.live = nextLive;
++      state.liveExpectedGameId = normalizeLiveGameId(nextLive.gameId);
+       state.liveAwaitingGame = state.liveAwaitingGame && liveGamePhase(nextLive.phase) && !nextLive.unsupported
+         && !(nextLive.available && (nextLive.players?.length || Number(nextLive.currentChampionId) > 0 || Number(nextLive.resolvedChampionId) > 0));
+       updateBeacon(String(state.live?.phase || ""));
+@@ -3746,25 +3759,64 @@
+     return ["ChampSelect", "GameStart", "InProgress", "Reconnect"].includes(phase);
+   }
+ 
+-  function invalidateLiveForNewGame(previousPhase, nextPhase) {
+-    if (!previousPhase || previousPhase === nextPhase || !liveGamePhase(nextPhase)) return;
+-    if (liveGamePhase(previousPhase) && nextPhase !== "ChampSelect") return;
+-    // Invalidate at the phase boundary, even while hidden or an old request is
+-    // in flight. Only the replacement request may update loading/data state.
+-    state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
+-    state.controllers.get("live")?.abort();
++  function normalizeLiveGameId(value) {
++    const id = Number(value);
++    return Number.isSafeInteger(id) && id > 0 ? id : 0;
++  }
++
++  function liveGameIdComparison(gameId) {
++    const current = normalizeLiveGameId(gameId);
++    const cached = normalizeLiveGameId(state.live?.gameId);
++    return !current ? "unavailable" : !cached ? "first" : current === cached ? "same" : "different";
++  }
++
++  function recordLiveObservation(reason, phase, gameId, source, invalidated = false) {
++    window.reportFlowDiagnostic?.("gameflow_phase_client", reason, {
++      phase: String(phase || ""), previousPhase: String(state.beacon.phase || ""), source,
++      gameId: normalizeLiveGameId(gameId), cachedGameId: normalizeLiveGameId(state.live?.gameId),
++      gameIdComparison: liveGameIdComparison(gameId), phaseChanged: Boolean(phase) && phase !== state.beacon.phase,
++      invalidated, receivedAt: Date.now(),
++    });
++  }
++
++  function liveSnapshotBehindPhase(data) {
++    const cachedId = normalizeLiveGameId(state.live?.gameId);
++    const incomingId = normalizeLiveGameId(data?.gameId);
++    if (cachedId && incomingId && cachedId !== incomingId) return false;
++    return ["InProgress", "Reconnect"].includes(state.beacon.phase)
++      && ["ChampSelect", "GameStart"].includes(data?.phase);
++  }
++
++  function invalidateLiveForNewGame(previousPhase, nextPhase, gameId = 0, source = "direct", owningRequest = 0) {
++    const previousId = normalizeLiveGameId(state.live?.gameId) || normalizeLiveGameId(state.liveExpectedGameId);
++    const nextId = normalizeLiveGameId(gameId);
++    const gameChanged = previousId > 0 && nextId > 0 && previousId !== nextId;
++    const phaseBoundary = Boolean(previousPhase) && previousPhase !== nextPhase && liveGamePhase(nextPhase)
++      && (!liveGamePhase(previousPhase) || nextPhase === "ChampSelect");
++    const invalidated = gameChanged || phaseBoundary;
++    recordLiveObservation("invalidate", nextPhase, gameId, source, invalidated);
++    if (!invalidated) return false;
++    // A completed current response may clear the old snapshot before publishing
++    // its new data, without aborting itself or losing ownership of its finally.
++    if (!owningRequest || owningRequest !== state.liveRequestToken) {
++      state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
++      state.controllers.get("live")?.abort();
++      state.liveLoading = false;
++      state.liveGameRefreshQueued = gameChanged;
++    }
+     clearTimeout(state.liveTimer);
+     clearTimeout(state.liveEventTimer);
+     state.liveTimer = 0;
+     state.liveEventTimer = 0;
+-    state.liveLoading = false;
+     state.live = null;
++    state.liveExpectedGameId = nextId;
+     state.liveAwaitingGame = true;
+     state.liveRetryAttempts = 0;
+     state.liveRetryKey = "";
+     state.liveError = "";
+     resetLiveGameScopedState();
+     renderLive();
++    return true;
+   }
+ 
+   function resetDisconnectedLive() {
+@@ -3773,6 +3825,8 @@
+     state.liveLoading = false;
+     state.live = null;
+     state.liveAwaitingGame = false;
++    state.liveExpectedGameId = 0;
++    state.liveGameRefreshQueued = false;
+     state.liveError = "实时连接已中断，请重试。";
+     resetLiveGameScopedState();
+     renderLive();
+@@ -5466,7 +5520,7 @@
+     if (!["ChampSelect", "InProgress", "Reconnect"].includes(phase)) return;
+     syncLiveRetryBudget();
+     const inGame = phase === "InProgress" || phase === "Reconnect";
+-    if (inGame && (liveSnapshotComplete(state.live) || Number(state.liveRetryAttempts || 0) >= 8)) return;
++    if (inGame && (liveSnapshotComplete(state.live) && state.live?.phase === phase || Number(state.liveRetryAttempts || 0) >= 8)) return;
+     const delay = inGame ? 20_000 : state.liveError ? 60_000 : liveRefreshDelayMs(phase, state.settings.liveInterval);
+     state.liveTimer = setTimeout(() => {
+       state.liveTimer = 0;
+@@ -6136,7 +6190,7 @@
+     state.liveEventTimer = setTimeout(() => {
+       state.liveEventTimer = 0;
+       if (state.destroyed || !connected() || document.hidden || state.liveLoading) return;
+-      void loadLive(false, source);
++      void loadLive(Boolean(state.liveGameRefreshQueued), source);
+     }, Math.max(180, 1000 - (Date.now() - Number(state.liveLoadStartedAt || 0))));
+   }
+   window.addEventListener("deep-legends:pro-runes", () => {
+@@ -6156,23 +6210,30 @@
+       hidden: document.hidden, section: state.section, phaseChanged, liveRefreshQueued: Boolean(state.liveRefreshQueued) });
+   }
+ 
+-  function handleGameplayPhase(phase, source = "sse", changed = false) {
++  function handleGameplayPhase(phase, source = "sse", changed = false, gameId = 0) {
+     if (state.destroyed) return;
+     const phaseChanged = Boolean(phase) && phase !== state.beacon.phase;
+-    if (phaseChanged) {
++    const nextId = normalizeLiveGameId(gameId);
++    const previousId = normalizeLiveGameId(state.live?.gameId) || normalizeLiveGameId(state.liveExpectedGameId);
++    const gameChanged = nextId > 0 && previousId > 0 && nextId !== previousId;
++    if (phase || nextId) recordLiveObservation("received", phase, gameId, source);
++    if (phaseChanged || gameChanged) {
+       recordLiveRefresh("phase", source, phaseChanged);
+-      invalidateLiveForNewGame(state.beacon.phase || state.live?.phase, phase);
+-    }
++      invalidateLiveForNewGame(state.beacon.phase || state.live?.phase, phase || state.beacon.phase, gameId, source);
++    }
++    if (nextId) state.liveExpectedGameId = nextId;
++    else if (phaseChanged && (!liveGamePhase(phase) || phase === "ChampSelect")) state.liveExpectedGameId = 0;
+     if (phase) {
+       updateBeacon(phase);
+       markOverviewAfterGame(phase);
+-    } else scheduleBeaconPoll(0);
+-    if (phaseChanged || changed) queueLiveEventRefresh(source, phaseChanged);
++    } else if (!nextId) scheduleBeaconPoll(0);
++    if (phaseChanged || gameChanged) renderLive();
++    if (phaseChanged || gameChanged || changed) queueLiveEventRefresh(source, phaseChanged || gameChanged);
+   }
+   window.addEventListener("deep-legends:gameflow", (event) => {
+-    handleGameplayPhase(String(event.detail?.phase || ""), "sse", Boolean(event.detail?.changed));
++    handleGameplayPhase(String(event.detail?.phase || ""), "sse", Boolean(event.detail?.changed), event.detail?.gameId);
+   });
+-  // Phase polling only triggers a roster request on a real transition.
++  // Identity polling detects a missed phase window without polling the full roster.
+   const BEACON_FAST_POLL_MS = 1_000;
+   const BEACON_DISCONNECTED_POLL_MS = 1_000;
+   const BEACON_IDLE_POLL_MS = 12_000;
+@@ -6195,8 +6256,19 @@
+     if (state.destroyed) return;
+     if (document.hidden) { scheduleBeaconPoll(BEACON_IDLE_POLL_MS); return; }
+     if (!connected()) { scheduleBeaconPoll(BEACON_DISCONNECTED_POLL_MS); return; }
++    const observedPhase = state.beacon.phase;
++    const observedGeneration = state.liveGameGeneration;
++    const observedId = state.liveExpectedGameId;
+     api("/api/gameplay/phase", {}, "gameflow-phase", 8000)
+-      .then((payload) => handleGameplayPhase(String(payload?.phase || ""), "poll"))
++      .then((payload) => {
++        // An SSE signal or live response received during this probe is newer
++        // evidence. Do not let the outstanding poll restore the old identity.
++        if (observedPhase !== state.beacon.phase || observedGeneration !== state.liveGameGeneration || observedId !== state.liveExpectedGameId) {
++          recordLiveObservation("stale-response", payload?.phase, payload?.gameId, "poll");
++          return;
++        }
++        handleGameplayPhase(String(payload?.phase || ""), "poll", false, payload?.gameId);
++      })
+       .catch(() => {})
+       .finally(() => scheduleBeaconPoll(beaconPollDelay()));
+   }
+--- before/web/app.js
++++ after/web/app.js
+@@ -3189,6 +3189,19 @@
+     }
+   }
+ 
++  function gameplayEventDetail(payload) {
++    if (payload === "champselect:changed") return { changed: true };
++    if (typeof payload !== "string" || !payload.startsWith("gameflow:")) return null;
++    const value = payload.slice(9);
++    if (!value.startsWith("{")) return { phase: value };
++    try {
++      const detail = JSON.parse(value);
++      if (typeof detail.phase !== "string") return null;
++      const gameId = Number(detail.gameId);
++      return { phase: detail.phase, gameId: Number.isSafeInteger(gameId) && gameId > 0 ? gameId : 0 };
++    } catch (_) { return null; }
++  }
++
+   function setupLiveUpdates() {
+     if (!("EventSource" in window) || state.destroyed) return;
+     clearTimeout(state.eventReconnectTimer);
+@@ -3249,7 +3262,8 @@
+ 	  }
+       // 对局阶段事件只转发给对局模块（“对局”页签的新对局提示灯），不触发全量刷新。
+       if (typeof event.data === "string" && (event.data.startsWith("gameflow:") || event.data === "champselect:changed")) {
+-        const detail = event.data === "champselect:changed" ? { changed: true } : { phase: event.data.slice(9) };
++        const detail = gameplayEventDetail(event.data);
++        if (!detail) return;
+         window.dispatchEvent(new CustomEvent("deep-legends:gameflow", { detail }));
+         return;
+       }
+--- before/web/runtime.js
++++ after/web/runtime.js
+@@ -116,16 +116,61 @@
+       sampledPending.delete(body.event);
+     }
+   };
++  // Keep individual phase observations (including identical polls), but send
++  // bounded batches through one slot so telemetry cannot crowd out live reads.
++  const gameflowQueue = [];
++  let gameflowTimer = null, gameflowSending = false;
++  const flushGameflowDiagnostics = async () => {
++    if (gameflowSending || !gameflowQueue.length) return;
++    if (gameflowTimer !== null) { clearTimeout(gameflowTimer); gameflowTimer = null; }
++    gameflowSending = true;
++    const body = { event: "gameflow_phase_client", reason: "batch", observations: gameflowQueue.splice(0, 8) };
++    const encoded = JSON.stringify(body);
++    flowPending.add(encoded);
++    try { await sendFlowDiagnostic(body, encoded, 1); }
++    finally {
++      gameflowSending = false;
++      if (gameflowQueue.length) scheduleGameflowDiagnostics();
++    }
++  };
++  const scheduleGameflowDiagnostics = () => {
++    if (gameflowTimer !== null || gameflowSending) return;
++    gameflowTimer = setTimeout(() => { gameflowTimer = null; void flushGameflowDiagnostics(); }, 1000);
++    gameflowTimer?.unref?.();
++  };
++  const queueGameflowDiagnostic = (reason, fields) => {
++    if (!["received", "invalidate", "stale-response"].includes(reason)) return;
++    if (!["direct", "event", "sse", "poll", "resync", "interval", "manual"].includes(fields.source)) return;
++    const rawPhase = value => typeof value === "string" && (value === "" || /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(value)) ? value : "";
++    const id = value => Number.isSafeInteger(value) && value > 0 ? value : 0;
++    const observation = {
++      reason, phase: rawPhase(fields.phase), previousPhase: rawPhase(fields.previousPhase), source: fields.source,
++      gameId: id(fields.gameId), cachedGameId: id(fields.cachedGameId),
++      gameIdComparison: ["same", "different", "first", "unavailable"].includes(fields.gameIdComparison) ? fields.gameIdComparison : "unavailable",
++      phaseChanged: fields.phaseChanged === true, invalidated: fields.invalidated === true,
++      receivedAt: Number.isFinite(fields.receivedAt) ? Math.max(0, Math.min(1e13, Math.floor(fields.receivedAt))) : Date.now(),
++    };
++    if (gameflowQueue.length >= 64) {
++      // Prefer retaining new identity transitions over repeated unchanged polls.
++      const unchanged = gameflowQueue.findIndex(row => !row.invalidated && row.gameIdComparison !== "different");
++      gameflowQueue.splice(unchanged < 0 ? 0 : unchanged, 1);
++      increment("transportDropped");
++    }
++    gameflowQueue.push(observation);
++    scheduleGameflowDiagnostics();
++  };
+   let exportSequence = 0;
+   window.flushFlowDiagnostics = async () => {
+     // Export must not race a just-clicked filter's telemetry. Wait briefly,
+     // then record remaining pending work rather than claiming a complete drain.
++    void flushGameflowDiagnostics();
+     const deadline = Date.now() + 1000;
+-    while (flowPending.size && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+-    const body = { event: "diagnostic_delivery_client", reason: "export", requestId: ++exportSequence, transportPending: flowPending.size };
++    while ((flowPending.size || gameflowQueue.length) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
++    const body = { event: "diagnostic_delivery_client", reason: "export", requestId: ++exportSequence, transportPending: flowPending.size + gameflowQueue.length };
+     await sendFlowDiagnostic(body, JSON.stringify(body), 1, 1500);
+   };
+   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
++    if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
+     if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client"].includes(event)) return;
+     // Background observations share one in-flight slot and never retry. A slow
+     // diagnostics endpoint must not occupy the connections needed by the UI.
+--- before/web/r87.test.cjs
++++ after/web/r87.test.cjs
+@@ -39,7 +39,7 @@
+     activeTab: () => state.tabs[0], overviewGroupForSection: () => 'cn', loadOverview: async () => true,
+     window: { reportFlowDiagnostic: (event, reason, fields) => reports.push({event, reason, ...fields}), addEventListener: (event, fn) => listeners.set(event, fn) },
+   };
+-  const context = compile('gameplay.js', ['recordLiveRefresh', 'queueLiveEventRefresh', 'loadLive', 'liveGamePhase', 'invalidateLiveForNewGame', 'syncLiveRetryBudget', 'handleGameplayPhase', 'refreshAfterResync', 'pollGameflowPhase'], deps);
++  const context = compile('gameplay.js', ['recordLiveRefresh', 'queueLiveEventRefresh', 'loadLive', 'liveGamePhase', 'normalizeLiveGameId', 'liveGameIdComparison', 'recordLiveObservation', 'liveSnapshotBehindPhase', 'invalidateLiveForNewGame', 'syncLiveRetryBudget', 'handleGameplayPhase', 'refreshAfterResync', 'pollGameflowPhase'], deps);
+   context.BEACON_IDLE_POLL_MS = 12000; context.BEACON_DISCONNECTED_POLL_MS = 1000; context.beaconPollDelay = () => 12000;
+   const source = read('gameplay.js'); const start = source.indexOf('  window.addEventListener("deep-legends:gameflow",');
+   vm.runInNewContext(source.slice(start, source.indexOf('\n  });', start) + 6), context);
+--- before/web/r88.test.cjs
++++ after/web/r88.test.cjs
+@@ -5,7 +5,7 @@
+ function compile(file,names,deps={}){const c={...deps};vm.runInNewContext(names.map(n=>extract(file,n)).join('\n'),c);return c;}
+ const settle=()=>new Promise(setImmediate);
+ function clock(){let now=100000,id=0;const jobs=new Map();return{Date:{now:()=>now},setTimeout:(fn,ms)=>{jobs.set(++id,{fn,at:now+ms});return id;},clearTimeout:i=>jobs.delete(i),advance:async ms=>{now+=ms;for(const [i,j]of [...jobs])if(j.at<=now){jobs.delete(i);j.fn()}await settle();}}}
+-function live(mutate=s=>s,slow=false){const timer=clock(),posts=[],state={section:'live',beacon:{phase:'ChampSelect'}};const c={...timer,window:{},AbortController,document:{hidden:false},state,connected:()=>true,updateBeacon:p=>state.beacon.phase=p,markOverviewAfterGame(){},invalidateLiveForNewGame(){},scheduleBeaconPoll(){},loadLive(){},fetch:async(url,o)=>{posts.push(JSON.parse(o.body));if(slow)await new Promise((_,reject)=>o.signal?.addEventListener('abort',()=>reject(Error('timeout'))));return{status:204}}};vm.runInNewContext(mutate(read('runtime.js')),c);vm.runInNewContext(['recordLiveRefresh','queueLiveEventRefresh','handleGameplayPhase'].map(n=>extract('gameplay.js',n)).join('\n'),c);return{c,timer,posts,state};}
++function live(mutate=s=>s,slow=false){const timer=clock(),posts=[],state={section:'live',beacon:{phase:'ChampSelect'}};const c={...timer,window:{},AbortController,document:{hidden:false},state,connected:()=>true,updateBeacon:p=>state.beacon.phase=p,markOverviewAfterGame(){},invalidateLiveForNewGame(){},normalizeLiveGameId:()=>0,recordLiveObservation(){},renderLive(){},scheduleBeaconPoll(){},loadLive(){},fetch:async(url,o)=>{posts.push(JSON.parse(o.body));if(slow)await new Promise((_,reject)=>o.signal?.addEventListener('abort',()=>reject(Error('timeout'))));return{status:204}}};vm.runInNewContext(mutate(read('runtime.js')),c);vm.runInNewContext(['recordLiveRefresh','queueLiveEventRefresh','handleGameplayPhase'].map(n=>extract('gameplay.js',n)).join('\n'),c);return{c,timer,posts,state};}
+ test('R88 thirteen ChampSelect events per second cause at most two actual diagnostic POSTs',async()=>{
+  const h=live();for(let i=0;i<13;i++){h.state.liveRefreshQueued=false;h.c.handleGameplayPhase('ChampSelect','sse',true);h.c.recordLiveRefresh('load','event');await h.timer.advance(75)}assert.ok(h.posts.length>0&&h.posts.length<=2,h.posts.length);assert.ok(h.posts.every(p=>p.section==='live'));
+  const bad=live(s=>s.replace('if (sampled && (sampledPending.size','if (false && (sampledPending.size'));for(let i=0;i<13;i++){bad.c.recordLiveRefresh('phase','sse',i%2===0);await bad.timer.advance(75);bad.c.recordLiveRefresh('load','event',i%2===0)}
+--- before/web/r90.test.cjs
++++ after/web/r90.test.cjs
+@@ -34,7 +34,7 @@
+  let serial=0;const timers=new Map();const calls=[];
+  const state={section,beacon:{phase:data.phase},live:data,settings:{liveRefresh:true,liveInterval:60}};
+  const document={hidden:false};
+- const deps={state,document,connected:()=>true,liveAugmentRecommendationSource:d=>d?.gameMode==="CHERRY"?"arena":"",escapeHTML:String,
++ const deps={state,document,connected:()=>true,liveGamePhase:p=>["ChampSelect","GameStart","InProgress","Reconnect"].includes(p),liveAugmentRecommendationSource:d=>d?.gameMode==="CHERRY"?"arena":"",escapeHTML:String,
+  setTimeout:(fn,delay)=>{timers.set(++serial,{fn,delay});return serial},clearTimeout:id=>timers.delete(id),loadLive:(...args)=>calls.push(args),recordLiveRefresh:()=>{}};
+  const functions=compile(["liveSnapshotComplete","syncLiveRetryBudget","liveAutoRefreshStopped","renderLiveRefreshStatus","normalizeLiveInterval","liveRefreshDelayMs","scheduleLiveRefresh","queueLiveEventRefresh"],deps);
+  return {state,document,timers,calls,...functions,fire(){const [id,timer]=timers.entries().next().value;timers.delete(id);timer.fn();return timer.delay}};
+@@ -82,7 +82,7 @@
+ });
+ test("R90 actual loader bypasses cache for manual refresh; R91 supersedes the former manual queue",async()=>{
+  const state={beacon:{phase:"InProgress"},live:full(),settings:{},controllers:new Map(),liveRetryAttempts:8};const requests=[];const noop=()=>{};
+- const deps={state,connected:()=>true,recordLiveRefresh:noop,invalidateLiveForNewGame:noop,liveGamePhase:()=>true,renderLive:noop,api:async(url)=>{requests.push(url);return full()},shouldResetLiveGameScopedState:()=>false,resetLiveGameScopedState:noop,resetLivePositionOverrides:noop,resetRecommendationTabsOnChampionChange:noop,updateBeacon:noop,renderCapabilitySettings:noop,liveRecommendationsFor:()=>null,ensureLiveRecommendations:noop,ensureSpecialistRunes:noop,ensureProRunes:noop,syncLiveRetryBudget:noop,scheduleLiveRefresh:noop,queueLiveEventRefresh:noop};
++ const deps={state,connected:()=>true,recordLiveRefresh:noop,normalizeLiveGameId:v=>Number(v)||0,liveSnapshotBehindPhase:()=>false,recordLiveObservation:noop,invalidateLiveForNewGame:noop,liveGamePhase:()=>true,renderLive:noop,api:async(url)=>{requests.push(url);return full()},shouldResetLiveGameScopedState:()=>false,resetLiveGameScopedState:noop,resetLivePositionOverrides:noop,resetRecommendationTabsOnChampionChange:noop,updateBeacon:noop,renderCapabilitySettings:noop,liveRecommendationsFor:()=>null,ensureLiveRecommendations:noop,ensureSpecialistRunes:noop,ensureProRunes:noop,syncLiveRetryBudget:noop,scheduleLiveRefresh:noop,queueLiveEventRefresh:noop};
+  const {loadLive}=compile(["loadLive"],deps);await loadLive(true,"manual");assert.deepEqual(requests,["/api/gameplay/live?refresh=1"]);assert.equal(state.liveRetryAttempts,0);
+  const releases=[];let aborted=0;state.controllers.set("live",{abort:()=>aborted++});
+  deps.api=async(url)=>{requests.push(url);await new Promise(resolve=>releases.push(resolve));return full()};
+--- before/web/r91.test.cjs
++++ after/web/r91.test.cjs
+@@ -21,7 +21,7 @@
+   let serial = 0;
+   const jobs = new Map(), requests = [];
+   const noop = () => {};
+-  const context = { state, nodes, document, Date: { now: () => 100000 }, connected: () => true,
++  const context = { window: {}, state, nodes, document, Date: { now: () => 100000 }, connected: () => true,
+     setTimeout: (fn, delay) => { jobs.set(++serial, { fn, delay }); return serial; }, clearTimeout: id => jobs.delete(id),
+     api: url => new Promise((resolve, reject) => {
+       const controller = new AbortController(); state.controllers.set("live", controller);
+@@ -37,7 +37,7 @@
+     bindLiveContent: noop, applyRenderedMetricStyles: noop, prepareImages: noop,
+   };
+   const names = ["loadLive", "renderLive", "handleGameplayPhase", "queueLiveEventRefresh", "shouldResetLiveGameScopedState", "resetLiveGameScopedState", "softResetGameplayState", "syncLiveRetryBudget", "liveSnapshotComplete", "liveAutoRefreshStopped", "renderLiveRefreshStatus", "scheduleLiveRefresh", "normalizeLiveInterval", "liveRefreshDelayMs"];
+-  for (const name of ["liveGamePhase", "invalidateLiveForNewGame", "resetDisconnectedLive"]) if (source.includes(`function ${name}(`)) names.push(name);
++  for (const name of ["liveGamePhase", "invalidateLiveForNewGame", "resetDisconnectedLive", "normalizeLiveGameId", "liveGameIdComparison", "recordLiveObservation", "liveSnapshotBehindPhase"]) if (source.includes(`function ${name}(`)) names.push(name);
+   vm.runInNewContext(names.map(extract).join("\n"), context);
+   nodes.liveRefresh.addEventListener("click", () => context.loadLive(true, "manual"));
+   context.renderLive();
+--- before/connection_manager.go
++++ after/connection_manager.go
+@@ -221,6 +221,7 @@
+ 			}, func(event LCUEvent) {
+ 				client.rememberAcceptFocusEvent(event)
+ 				recordObjectiveEvent(event)
++				a.broadcastGameplayIdentity(event)
+ 				// 对局阶段变化直接推送给界面（“对局”页签的新对局提示灯），
+ 				// 并触发便捷设置的自动动作（自动接受、再来一局、断线重连）。
+ 				if strings.EqualFold(event.URI, "/lol-gameflow/v1/gameflow-phase") {
+--- before/gameplay.go
++++ after/gameplay.go
+@@ -5651,18 +5651,15 @@
+ 	return visible, filtered
+ }
+ 
+-func (a *app) handleGameplayPhase(w http.ResponseWriter, _ *http.Request) {
++func (a *app) handleGameplayPhase(w http.ResponseWriter, r *http.Request) {
+ 	client, _, err := a.gameplayClient()
+ 	if err != nil {
+-		respondJSON(w, map[string]any{"phase": "None", "connected": false})
++		respondJSON(w, gameplayPhaseIdentity{Phase: "None", Connected: false})
+ 		return
+ 	}
+-	var phase string
+-	if err := client.GetJSON("/lol-gameflow/v1/gameflow-phase", &phase); err != nil {
+-		respondJSON(w, map[string]any{"phase": "None", "connected": true})
+-		return
+-	}
+-	respondJSON(w, map[string]any{"phase": phase, "connected": true})
++	ctx, cancel := context.WithTimeout(r.Context(), 6*time.Second)
++	defer cancel()
++	respondJSON(w, readGameplayPhaseIdentity(ctx, client))
+ }
+ 
+ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
+--- before/features.go
++++ after/features.go
+@@ -63,61 +63,62 @@
+ }
+ 
+ type clientDiagnosticRequest struct {
+-	ItemID                 int64  `json:"itemId,omitempty"`
+-	Endpoint               string `json:"endpoint,omitempty"`
+-	StartedAt              int64  `json:"startedAt,omitempty"`
+-	CompletedAt            int64  `json:"completedAt,omitempty"`
+-	Section                string `json:"section,omitempty"`
+-	PhaseChanged           bool   `json:"phaseChanged,omitempty"`
+-	LiveRefreshQueued      bool   `json:"liveRefreshQueued,omitempty"`
+-	Claiming               bool   `json:"claiming,omitempty"`
+-	Done                   int    `json:"done,omitempty"`
+-	Total                  int    `json:"total,omitempty"`
+-	Event                  string `json:"event"`
+-	Reason                 string `json:"reason"`
+-	Key                    string `json:"key,omitempty"`
+-	TraceID                string `json:"traceId,omitempty"`
+-	RequestedPosition      string `json:"requestedPosition,omitempty"`
+-	ResolvedPosition       string `json:"resolvedPosition,omitempty"`
+-	PositionSource         string `json:"positionSource,omitempty"`
+-	GameMode               string `json:"gameMode,omitempty"`
+-	Tier                   string `json:"tier,omitempty"`
+-	MapID                  int64  `json:"mapId,omitempty"`
+-	BlockCount             int    `json:"blockCount,omitempty"`
+-	ItemCount              int    `json:"itemCount,omitempty"`
+-	ChampionID             int64  `json:"championId,omitempty"`
+-	QueueID                int64  `json:"queueId,omitempty"`
+-	Position               string `json:"position,omitempty"`
+-	Phase                  string `json:"phase,omitempty"`
+-	GameID                 int64  `json:"gameId,omitempty"`
+-	PlayersReceived        int    `json:"playersReceived,omitempty"`
+-	Rendered100            int    `json:"rendered100,omitempty"`
+-	Rendered200            int    `json:"rendered200,omitempty"`
+-	TotalRefs              int    `json:"totalRefs,omitempty"`
+-	UniqueRefs             int    `json:"uniqueRefs,omitempty"`
+-	CacheHits              int    `json:"cacheHits,omitempty"`
+-	Revision               int    `json:"revision,omitempty"`
+-	DurationMS             int    `json:"durationMs,omitempty"`
+-	MasterEnabled          bool   `json:"masterEnabled,omitempty"`
+-	CustomPaused           bool   `json:"customPaused,omitempty"`
+-	ChampSelectEnabled     bool   `json:"champSelectEnabled,omitempty"`
+-	AutoMatchmakingEnabled bool   `json:"autoMatchmakingEnabled,omitempty"`
+-	PendingSaves           int    `json:"pendingSaves,omitempty"`
+-	ForceRefresh           bool   `json:"forceRefresh,omitempty"`
+-	Hidden                 bool   `json:"hidden,omitempty"`
+-	TeamsReceived          int    `json:"teamsReceived,omitempty"`
+-	CacheAgeMS             int    `json:"cacheAgeMs,omitempty"`
+-	HTTPStatus             int    `json:"httpStatus,omitempty"`
+-	Source                 string `json:"source,omitempty"`
+-	Gate                   string `json:"gate,omitempty"`
+-	ErrorKind              string `json:"errorKind,omitempty"`
+-	RequestID              int    `json:"requestId,omitempty"`
+-	TransportFailed        int    `json:"transportFailed,omitempty"`
+-	TransportDropped       int    `json:"transportDropped,omitempty"`
+-	TransportSuppressed    int    `json:"transportSuppressed,omitempty"`
+-	TransportPending       int    `json:"transportPending,omitempty"`
+-	TransportHTTPStatus    int    `json:"transportHTTPStatus,omitempty"`
+-	TransportErrorKind     string `json:"transportErrorKind,omitempty"`
++	Observations           []gameflowClientObservation `json:"observations,omitempty"`
++	ItemID                 int64                       `json:"itemId,omitempty"`
++	Endpoint               string                      `json:"endpoint,omitempty"`
++	StartedAt              int64                       `json:"startedAt,omitempty"`
++	CompletedAt            int64                       `json:"completedAt,omitempty"`
++	Section                string                      `json:"section,omitempty"`
++	PhaseChanged           bool                        `json:"phaseChanged,omitempty"`
++	LiveRefreshQueued      bool                        `json:"liveRefreshQueued,omitempty"`
++	Claiming               bool                        `json:"claiming,omitempty"`
++	Done                   int                         `json:"done,omitempty"`
++	Total                  int                         `json:"total,omitempty"`
++	Event                  string                      `json:"event"`
++	Reason                 string                      `json:"reason"`
++	Key                    string                      `json:"key,omitempty"`
++	TraceID                string                      `json:"traceId,omitempty"`
++	RequestedPosition      string                      `json:"requestedPosition,omitempty"`
++	ResolvedPosition       string                      `json:"resolvedPosition,omitempty"`
++	PositionSource         string                      `json:"positionSource,omitempty"`
++	GameMode               string                      `json:"gameMode,omitempty"`
++	Tier                   string                      `json:"tier,omitempty"`
++	MapID                  int64                       `json:"mapId,omitempty"`
++	BlockCount             int                         `json:"blockCount,omitempty"`
++	ItemCount              int                         `json:"itemCount,omitempty"`
++	ChampionID             int64                       `json:"championId,omitempty"`
++	QueueID                int64                       `json:"queueId,omitempty"`
++	Position               string                      `json:"position,omitempty"`
++	Phase                  string                      `json:"phase,omitempty"`
++	GameID                 int64                       `json:"gameId,omitempty"`
++	PlayersReceived        int                         `json:"playersReceived,omitempty"`
++	Rendered100            int                         `json:"rendered100,omitempty"`
++	Rendered200            int                         `json:"rendered200,omitempty"`
++	TotalRefs              int                         `json:"totalRefs,omitempty"`
++	UniqueRefs             int                         `json:"uniqueRefs,omitempty"`
++	CacheHits              int                         `json:"cacheHits,omitempty"`
++	Revision               int                         `json:"revision,omitempty"`
++	DurationMS             int                         `json:"durationMs,omitempty"`
++	MasterEnabled          bool                        `json:"masterEnabled,omitempty"`
++	CustomPaused           bool                        `json:"customPaused,omitempty"`
++	ChampSelectEnabled     bool                        `json:"champSelectEnabled,omitempty"`
++	AutoMatchmakingEnabled bool                        `json:"autoMatchmakingEnabled,omitempty"`
++	PendingSaves           int                         `json:"pendingSaves,omitempty"`
++	ForceRefresh           bool                        `json:"forceRefresh,omitempty"`
++	Hidden                 bool                        `json:"hidden,omitempty"`
++	TeamsReceived          int                         `json:"teamsReceived,omitempty"`
++	CacheAgeMS             int                         `json:"cacheAgeMs,omitempty"`
++	HTTPStatus             int                         `json:"httpStatus,omitempty"`
++	Source                 string                      `json:"source,omitempty"`
++	Gate                   string                      `json:"gate,omitempty"`
++	ErrorKind              string                      `json:"errorKind,omitempty"`
++	RequestID              int                         `json:"requestId,omitempty"`
++	TransportFailed        int                         `json:"transportFailed,omitempty"`
++	TransportDropped       int                         `json:"transportDropped,omitempty"`
++	TransportSuppressed    int                         `json:"transportSuppressed,omitempty"`
++	TransportPending       int                         `json:"transportPending,omitempty"`
++	TransportHTTPStatus    int                         `json:"transportHTTPStatus,omitempty"`
++	TransportErrorKind     string                      `json:"transportErrorKind,omitempty"`
+ }
+ 
+ var specialistRuneClientReasons = map[string]bool{
+@@ -127,6 +128,7 @@
+ }
+ 
+ var clientDiagnosticEvents = map[string]map[string]bool{
++	"gameflow_phase_client":        {"batch": true},
+ 	"catalog_client":               {"failed": true, "loaded": true},
+ 	"item_id_not_in_catalog":       {"missing": true},
+ 	"champselect_dialog_client":    {"open": true, "rerender-while-open": true, "close": true},
+@@ -195,6 +197,15 @@
+ 		http.Error(w, "invalid client diagnostic", http.StatusBadRequest)
+ 		return
+ 	}
++	if request.Event == "gameflow_phase_client" {
++		if !a.recordGameflowClientObservations(request) {
++			a.recordClientDiagnosticRejected("invalid-observations", request.Event)
++			http.Error(w, "invalid gameflow observations", http.StatusBadRequest)
++			return
++		}
++		w.WriteHeader(http.StatusNoContent)
++		return
++	}
+ 	event := map[string]any{"event": request.Event, "reason": request.Reason}
+ 	if request.Event == "catalog_client" || request.Event == "item_id_not_in_catalog" {
+ 		switch request.Endpoint {
+@@ -277,7 +288,7 @@
+ 			event[key] = min(1000000, max(0, value))
+ 		}
+ 		if request.Event == "diagnostic_delivery_client" {
+-			event["transport_pending"] = min(32, max(0, request.TransportPending))
++			event["transport_pending"] = min(97, max(0, request.TransportPending))
+ 			event["request_id"] = min(1000000, max(0, request.RequestID))
+ 		}
+ 		if request.TransportHTTPStatus >= 100 && request.TransportHTTPStatus <= 599 {
+--- before/DESIGN.md
++++ after/DESIGN.md
+@@ -171,6 +171,14 @@
+ - 用户手动刷新只中断 `live` 请求并立即穿透缓存重发，按钮及页面显示“正在刷新…”。不重置其他页请求、分页或推荐选项；全局“重新获取”仍负责整体重置。后台刷新合并正在执行的读取。R90 的手动排队策略由此替代。
+ - 新局切换、实时事件连接中断及全局重置都会使旧 live 请求 token 失效。旧请求不能写回数据或结束新请求的加载状态；无替代请求的取消及连接中断必须显示明确错误和可操作重试。
+ 
++### R94 同阶段 gameId 跳变
++
++- 实时页把已知正数 gameId 的变化视为新局边界，与 R91 的阶段边界共用旧快照失效、局内缓存重置和过渡态。同阶段同 ID 以及未知 ID 不触发新局清空；当前请求直接返回新 ID 时也先执行失效再发布新快照。目标身份已确定后，旧 ID 的迟到数据不能退出过渡态。
++- `/api/gameplay/phase` 在 GameStart / InProgress / Reconnect 附带会话中的 gameId，额外会话读取最多 1.5 秒；ChampSelect 不信任可能残留上一局的 gameData。LCU session SSE 直接透传有效身份，兼容原 phase 字符串消息。轻量身份轮询仍为事件活跃时 12 秒、否则 1 秒；完整名单停止刷新后仍能发现身份变化，并触发一次穿透缓存的完整刷新。已在飞行中的旧轮询不能覆盖较新 SSE / live 观察。
++- 同局 ChampSelect → InProgress 等推进保留推荐，但明确显示阶段正在同步；迟到的同局选人快照不能回退 beacon，旧阶段的完整快照不能提前停止同步重试。隐藏时新局身份立即失效旧数据，回到前台继续排队刷新。
++- `gameflow_phase_client` 分别记录 received / invalidate / stale-response，包括原始 phase、previous_phase、source、game_id、cached_game_id、比较结果及 received_at。诊断独立于旧的一秒采样去重：每批最多 8 条、排队最多 64 条、仅一个发送请求，每次发送完成后至少间隔一秒再发下一批；慢请求和离线时仍有界，溢出优先保留身份变化并记录丢弃计数。后端限制 4 KiB、校验字段并重算比较结果。
++- 此修复不判断是否重开，不修改 `isRemakeGame`；该函数继续只服务于赛后统计。自动化和真机验证边界见 `docs/r94-execution-ledger.md`。
++
+ ### R92 公共资源与玩家总览验收收尾（2026-09-14）
+ 
+ - 按用户最终决定，总览页不提供出装推荐；相关界面、专用后端接口、状态、样式及专用测试全部撤销。英雄页和对局页保留各自推荐功能。
+--- before/diagnostics_2055_test.go
++++ after/diagnostics_2055_test.go
+@@ -97,7 +97,7 @@
+ 		}
+ 	}
+ 	data, _ := a.storage.readDiagnosticLog()
+-	if !strings.Contains(string(data), `"transport_pending":32`) {
++	if !strings.Contains(string(data), `"transport_pending":97`) {
+ 		t.Fatal("missing bounded export pending count")
+ 	}
+ 	if strings.Contains(string(data), "secret") || !strings.Contains(string(data), `"error_kind":"timeout"`) || !strings.Contains(string(data), `"transport_suppressed":1000000`) || !strings.Contains(string(data), `"resolved_position":"mid"`) {
+--- before/scripts/r90-mutation-check.py
++++ after/scripts/r90-mutation-check.py
+@@ -38,6 +38,6 @@
+ probe('incomplete-not-cached','gameplay_refresh.go','if loadCtx.Err() == nil {','if loadCtx.Err() == nil && gameplayLiveSnapshotComplete(response) {','^TestR90LiveSnapshotCacheLayersAndManualRefresh/false$')
+ probe('complete-short-ttl','gameplay_refresh.go','(wholeGame || time.Since(c.at) < ttl)','(wholeGame && false || time.Since(c.at) < ttl)','^TestR90LiveSnapshotCacheLayersAndManualRefresh/true$')
+ probe('complete-always-false','web/gameplay.js','function liveSnapshotComplete(data) {','function liveSnapshotComplete(data) { return false;','R90 complete snapshots never',True)
+-probe('no-retry-limit','web/gameplay.js','if (inGame && (liveSnapshotComplete(state.live) || Number(state.liveRetryAttempts || 0) >= 8)) return;','if (inGame && liveSnapshotComplete(state.live)) return;','R90 incomplete snapshots stop',True)
++probe('no-retry-limit','web/gameplay.js','if (inGame && (liveSnapshotComplete(state.live) && state.live?.phase === phase || Number(state.liveRetryAttempts || 0) >= 8)) return;','if (inGame && liveSnapshotComplete(state.live)) return;','R90 incomplete snapshots stop',True)
+ probe('truth-partition-forced','arena_live_grouping.go','"partition_match": partition,','"partition_match": true,','^TestR90TruthDiagnosticSeparatesPartitionAndBlockIdentity/wrong$')
+ probe('queue-literal','arena_live_grouping.go','func arenaSessionOrderGroups(queueID int64, players []lcuLivePlayer) ([]string, bool) {','func arenaSessionOrderGroups(queueID int64, players []lcuLivePlayer) ([]string, bool) { if queueID == 1750 { return nil, false };','^TestR90QueueGuardScansNewGroupingModule$')
+--- before/scripts/r91-mutation-check.py
++++ after/scripts/r91-mutation-check.py
+@@ -12,13 +12,10 @@
+ OUTPUT.mkdir(parents=True, exist_ok=True)
+ MUTATIONS = {
+     'keep-old-game': [
+-        ('    invalidateLiveForNewGame(state.live?.phase, state.beacon.phase);', ''),
+-        ('      invalidateLiveForNewGame(state.beacon.phase || state.live?.phase, phase);', ''),
++        ('    const invalidated = gameChanged || phaseBoundary;', '    const invalidated = false;'),
+     ],
+     'clear-on-same-game-refresh': [
+-        ('    if (!previousPhase || previousPhase === nextPhase || !liveGamePhase(nextPhase)) return;',
+-         '    if (!previousPhase || !liveGamePhase(nextPhase)) return;'),
+-        ('    if (liveGamePhase(previousPhase) && nextPhase !== "ChampSelect") return;', ''),
++        ('    const invalidated = gameChanged || phaseBoundary;', '    const invalidated = liveGamePhase(nextPhase);'),
+     ],
+     'wait-for-stalled-request': [
+         ('    if (state.liveLoading && !force) return;', '    if (state.liveLoading) return;'),
+@@ -33,13 +30,21 @@
+         ('      if (state.liveRequestToken !== requestToken) return;', ''),
+     ],
+     'hide-loading-feedback': [
+-        ('    const message = state.liveLoading\n      ? "正在刷新…"\n      : liveAutoRefreshStopped(data);',
++        ('    const message = data?.phase && liveGamePhase(data.phase) && data.phase !== state.beacon.phase\n      ? "对局阶段已变化，正在同步当前对局…"\n      : state.liveLoading ? "正在刷新…"\n      : liveAutoRefreshStopped(data);',
+          '    const message = liveAutoRefreshStopped(data);'),
+         ('      nodes.liveRefresh.textContent = state.liveLoading\n        ? "正在刷新…" : "刷新对局";',
+          '      nodes.liveRefresh.textContent = "刷新对局";'),
+     ],
+ }
+ results = []
++TESTS = {
++    'keep-old-game': 'R91 new game removes old recommendations',
++    'clear-on-same-game-refresh': 'R91 same game refresh and active phase progression',
++    'wait-for-stalled-request': 'R91 repeated manual refresh',
++    'abort-other-pages': 'R91 repeated manual refresh',
++    'accept-abandoned-response': 'R91 boundary cancels the old request',
++    'hide-loading-feedback': 'R91 repeated manual refresh',
++}
+ with tempfile.TemporaryDirectory(prefix='r91-mutants-') as directory:
+     for name, replacements in MUTATIONS.items():
+         mutated = SOURCE
+@@ -50,10 +55,11 @@
+         file = Path(directory) / f'{name}.js'
+         file.write_text(mutated)
+         env = dict(os.environ, R91_GAMEPLAY_SOURCE=str(file))
+-        result = subprocess.run(['node', '--test', 'web/r91.test.cjs'], cwd=ROOT, env=env,
++        result = subprocess.run(['node', '--test', '--test-name-pattern', TESTS[name], 'web/r91.test.cjs'], cwd=ROOT, env=env,
+                                 capture_output=True, text=True, timeout=30)
+         (OUTPUT / f'mutation-{name}.txt').write_text(result.stdout + result.stderr)
+-        results.append({'mutation': name, 'killed': result.returncode != 0, 'exitCode': result.returncode})
++        killed = result.returncode != 0 and 'AssertionError' in result.stdout + result.stderr
++        results.append({'mutation': name, 'killed': killed, 'exitCode': result.returncode})
+ (OUTPUT / 'mutations.json').write_text(json.dumps(results, indent=2) + '\n')
+ print(json.dumps(results, indent=2))
+ raise SystemExit(0 if all(result['killed'] for result in results) else 1)
+--- before/features_test.go
++++ after/features_test.go
+@@ -14,7 +14,11 @@
+ 	for event, reasons := range clientDiagnosticEvents {
+ 		for reason := range reasons {
+ 			recorder := httptest.NewRecorder()
+-			request := httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(`{"event":"`+event+`","reason":"`+reason+`","key":"13:middle:CLASSIC:11:4-12","championId":13,"queueId":420,"position":"MID"}`))
++			body := `{"event":"` + event + `","reason":"` + reason + `","key":"13:middle:CLASSIC:11:4-12","championId":13,"queueId":420,"position":"MID"}`
++			if event == "gameflow_phase_client" {
++				body = `{"event":"gameflow_phase_client","reason":"batch","observations":[{"reason":"received","phase":"InProgress","source":"poll","gameId":8980574903}]}`
++			}
++			request := httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(body))
+ 			(&app{}).handleClientDiagnostic(recorder, request)
+ 			if recorder.Code != http.StatusNoContent {
+ 				t.Fatalf("whitelisted event=%q reason=%q returned %d: %s", event, reason, recorder.Code, recorder.Body.String())
+--- /dev/null
++++ after/gameplay_identity.go
+@@ -0,0 +1,119 @@
++package main
++
++import (
++	"context"
++	"encoding/json"
++	"net/http"
++	"regexp"
++	"strings"
++	"time"
++)
++
++type gameplayPhaseIdentity struct {
++	Phase     string `json:"phase"`
++	Connected bool   `json:"connected"`
++	GameID    int64  `json:"gameId,omitempty"`
++}
++
++func gameplayIdentityPhase(phase string) bool {
++	return phase == "InProgress" || phase == "Reconnect" || phase == "GameStart"
++}
++
++// This probe reads identity only, never players/recommendations. A fresh gameId
++// survives a missed phase window even after the full live roster stops polling.
++func readGameplayPhaseIdentity(ctx context.Context, client *LCUClient) gameplayPhaseIdentity {
++	result := gameplayPhaseIdentity{Phase: "None", Connected: true}
++	if client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/gameflow-phase", nil, &result.Phase) != nil {
++		return result
++	}
++	if !gameplayIdentityPhase(result.Phase) {
++		return result // ChampSelect gameData may still identify the previous match.
++	}
++	probeCtx, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
++	defer cancel()
++	var session lcuGameflowSession
++	if client.RequestJSON(probeCtx, http.MethodGet, "/lol-gameflow/v1/session", nil, &session) == nil {
++		if session.Phase != "" {
++			result.Phase = session.Phase
++		}
++		if gameplayIdentityPhase(result.Phase) && session.GameData.GameID > 0 {
++			result.GameID = session.GameData.GameID
++		}
++	}
++	return result
++}
++
++// Reuse session event data; do not block the LCU event reader on an extra HTTP
++// request. Legacy phase-only events remain available for all other consumers.
++func (a *app) broadcastGameplayIdentity(event LCUEvent) {
++	if !strings.EqualFold(event.URI, "/lol-gameflow/v1/session") {
++		return
++	}
++	var session lcuGameflowSession
++	if json.Unmarshal(event.Data, &session) != nil || !gameplayIdentityPhase(session.Phase) || session.GameData.GameID <= 0 {
++		return
++	}
++	payload, _ := json.Marshal(gameplayPhaseIdentity{Phase: session.Phase, Connected: true, GameID: session.GameData.GameID})
++	a.broadcastEvent("gameflow:" + string(payload))
++}
++
++type gameflowClientObservation struct {
++	Reason           string `json:"reason"`
++	Phase            string `json:"phase"`
++	PreviousPhase    string `json:"previousPhase"`
++	GameID           int64  `json:"gameId"`
++	CachedGameID     int64  `json:"cachedGameId"`
++	GameIDComparison string `json:"gameIdComparison"`
++	Source           string `json:"source"`
++	PhaseChanged     bool   `json:"phaseChanged"`
++	Invalidated      bool   `json:"invalidated"`
++	ReceivedAt       int64  `json:"receivedAt"`
++}
++
++var gameflowPhaseDiagnosticPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,63}$`)
++
++func (a *app) recordGameflowClientObservations(request clientDiagnosticRequest) bool {
++	observations := request.Observations
++	if len(observations) == 0 || len(observations) > 8 {
++		return false
++	}
++	for _, observation := range observations {
++		if observation.Phase != "" && !gameflowPhaseDiagnosticPattern.MatchString(observation.Phase) || observation.PreviousPhase != "" && !gameflowPhaseDiagnosticPattern.MatchString(observation.PreviousPhase) {
++			return false
++		}
++		switch observation.Source {
++		case "direct", "event", "sse", "poll", "resync", "interval", "manual":
++		default:
++			return false
++		}
++		switch observation.Reason {
++		case "received", "invalidate", "stale-response":
++		default:
++			return false
++		}
++		if observation.GameID < 0 || observation.CachedGameID < 0 || observation.GameID > 9007199254740991 || observation.CachedGameID > 9007199254740991 {
++			return false
++		}
++	}
++	for _, observation := range observations {
++		comparison := "same"
++		switch {
++		case observation.GameID == 0:
++			comparison = "unavailable"
++		case observation.CachedGameID == 0:
++			comparison = "first"
++		case observation.GameID != observation.CachedGameID:
++			comparison = "different"
++		}
++		a.recordDiagnostic(map[string]any{
++			"event": "gameflow_phase_client", "reason": observation.Reason,
++			"phase": observation.Phase, "previous_phase": observation.PreviousPhase, "source": observation.Source,
++			"game_id": observation.GameID, "cached_game_id": observation.CachedGameID, "game_id_comparison": comparison,
++			"phase_changed": observation.PhaseChanged, "invalidated": observation.Invalidated,
++			"received_at":       min(int64(1e13), max(int64(0), observation.ReceivedAt)),
++			"transport_failed":  min(1000000, max(0, request.TransportFailed)),
++			"transport_dropped": min(1000000, max(0, request.TransportDropped)),
++		})
++	}
++	return true
++}
+--- /dev/null
++++ after/r94_test.go
+@@ -0,0 +1,288 @@
++package main
++
++import (
++	"context"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"net/url"
++	"strconv"
++
++	"github.com/gorilla/websocket"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++	"time"
++)
++
++func r94Client(read func(*http.Request) (string, error)) *LCUClient {
++	return &LCUClient{baseURL: "https://lcu.invalid", token: "test", http: &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
++		body, err := read(r)
++		if err != nil {
++			return nil, err
++		}
++		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
++	})}}
++}
++
++func TestR94PhaseEndpointFindsSamePhaseIdentityJumpsWithoutRosterReads(t *testing.T) {
++	var paths []string
++	gameID := int64(8980574903)
++	client := r94Client(func(r *http.Request) (string, error) {
++		paths = append(paths, r.URL.Path)
++		switch r.URL.Path {
++		case "/lol-gameflow/v1/gameflow-phase":
++			return `"InProgress"`, nil
++		case "/lol-gameflow/v1/session":
++			return fmt.Sprintf(`{"phase":"InProgress","gameData":{"gameId":%d}}`, gameID), nil
++		default:
++			t.Fatalf("identity probe read full live data: %s", r.URL.Path)
++			return "", nil
++		}
++	})
++	a := &app{connected: true, lcu: client}
++	for _, id := range []int64{8980574903, 8980593274, 8980593274} {
++		gameID = id
++		recorder := httptest.NewRecorder()
++		a.handleGameplayPhase(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/phase", nil))
++		var got gameplayPhaseIdentity
++		if err := json.Unmarshal(recorder.Body.Bytes(), &got); err != nil {
++			t.Fatal(err)
++		}
++		if got.Phase != "InProgress" || got.GameID != id || !got.Connected {
++			t.Fatalf("identity = %+v", got)
++		}
++	}
++	if !reflect.DeepEqual(paths, []string{"/lol-gameflow/v1/gameflow-phase", "/lol-gameflow/v1/session", "/lol-gameflow/v1/gameflow-phase", "/lol-gameflow/v1/session", "/lol-gameflow/v1/gameflow-phase", "/lol-gameflow/v1/session"}) {
++		t.Fatal(paths)
++	}
++}
++
++func TestR94IdentityProbePhaseFallbackAndCancellation(t *testing.T) {
++	for _, tc := range []struct {
++		name, phase, session string
++		fail                 bool
++		wantPhase            string
++		wantID               int64
++		probes               int
++	}{
++		{"selection ignores previous game", "ChampSelect", `{"phase":"ChampSelect","gameData":{"gameId":90}}`, false, "ChampSelect", 0, 0},
++		{"inactive has no identity", "Lobby", ``, false, "Lobby", 0, 0},
++		{"session failure retains phase", "InProgress", ``, true, "InProgress", 0, 1},
++		{"session sees newer phase", "InProgress", `{"phase":"ChampSelect","gameData":{"gameId":90}}`, false, "ChampSelect", 0, 1},
++		{"reconnect identity", "Reconnect", `{"phase":"Reconnect","gameData":{"gameId":91}}`, false, "Reconnect", 91, 1},
++		{"missing identity", "GameStart", `{"phase":"GameStart","gameData":{}}`, false, "GameStart", 0, 1},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			probes := 0
++			client := r94Client(func(r *http.Request) (string, error) {
++				if strings.HasSuffix(r.URL.Path, "gameflow-phase") {
++					return `"` + tc.phase + `"`, nil
++				}
++				probes++
++				deadline, ok := r.Context().Deadline()
++				if !ok || time.Until(deadline) > 1500*time.Millisecond {
++					t.Fatal("identity probe must be bounded to 1.5s")
++				}
++				if tc.fail {
++					return "", errors.New("session unavailable")
++				}
++				return tc.session, nil
++			})
++			got := readGameplayPhaseIdentity(context.Background(), client)
++			if got.Phase != tc.wantPhase || got.GameID != tc.wantID || probes != tc.probes {
++				t.Fatalf("identity=%+v probes=%d", got, probes)
++			}
++		})
++	}
++	t.Run("request cancellation reaches session probe", func(t *testing.T) {
++		ctx, cancel := context.WithCancel(context.Background())
++		defer cancel()
++		client := r94Client(func(r *http.Request) (string, error) {
++			if strings.HasSuffix(r.URL.Path, "gameflow-phase") {
++				return `"InProgress"`, nil
++			}
++			cancel()
++			<-r.Context().Done()
++			return "", r.Context().Err()
++		})
++		got := readGameplayPhaseIdentity(ctx, client)
++		if got.Phase != "InProgress" || got.GameID != 0 {
++			t.Fatal(got)
++		}
++	})
++}
++
++func TestR94SessionSSECarriesIdentityAndRejectsOldSelectionData(t *testing.T) {
++	updates := make(chan string, 32)
++	a := &app{eventSubscribers: map[chan string]struct{}{updates: {}}}
++	for _, id := range []int64{8980574903, 8980593274} {
++		a.broadcastGameplayIdentity(LCUEvent{URI: "/lol-gameflow/v1/session", Data: json.RawMessage(fmt.Sprintf(`{"phase":"InProgress","gameData":{"gameId":%d}}`, id))})
++		select {
++		case message := <-updates:
++			if !strings.HasPrefix(message, "gameflow:") {
++				t.Fatal(message)
++			}
++			var got gameplayPhaseIdentity
++			if err := json.Unmarshal([]byte(strings.TrimPrefix(message, "gameflow:")), &got); err != nil {
++				t.Fatal(err)
++			}
++			if got.Phase != "InProgress" || got.GameID != id {
++				t.Fatal(got)
++			}
++		default:
++			t.Fatal("identity event missing")
++		}
++	}
++	for _, data := range []string{`{"phase":"ChampSelect","gameData":{"gameId":90}}`, `{"gameData":{"gameId":90}}`, `{"phase":"InProgress"}`, `malformed`} {
++		a.broadcastGameplayIdentity(LCUEvent{URI: "/lol-gameflow/v1/session", Data: json.RawMessage(data)})
++	}
++	a.broadcastGameplayIdentity(LCUEvent{URI: "/unrelated", Data: json.RawMessage(`{"phase":"InProgress","gameData":{"gameId":90}}`)})
++	if len(updates) != 0 {
++		t.Fatal("untrusted session identity forwarded")
++	}
++	a.broadcastEvent("gameflow:ChampSelect")
++	if got := <-updates; got != "gameflow:ChampSelect" {
++		t.Fatal(got)
++	}
++}
++
++func TestR94DiagnosticBatchPersistsRawPhaseSourceAndIdentityComparisons(t *testing.T) {
++	root := t.TempDir()
++	if err := os.MkdirAll(filepath.Join(root, "logs"), 0700); err != nil {
++		t.Fatal(err)
++	}
++	a := &app{storage: trackTestStore(t, &localStore{root: root})}
++	body := clientDiagnosticRequest{Event: "gameflow_phase_client", Reason: "batch", TransportDropped: 3, TransportFailed: 1}
++	for _, id := range []int64{8980574903, 8980593274, 0} {
++		body.Observations = append(body.Observations, gameflowClientObservation{Reason: "received", Phase: "InProgress", PreviousPhase: "InProgress", Source: "poll", GameID: id, CachedGameID: 8980574903, GameIDComparison: "deliberately incorrect", ReceivedAt: 1789370200123})
++	}
++	body.Observations = append(body.Observations, gameflowClientObservation{Reason: "invalidate", Phase: "Reconnect", PreviousPhase: "InProgress", Source: "sse", GameID: 8980593274, Invalidated: true, PhaseChanged: true})
++	encoded, err := json.Marshal(body)
++	if err != nil {
++		t.Fatal(err)
++	}
++	recorder := httptest.NewRecorder()
++	a.handleClientDiagnostic(recorder, httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(string(encoded))))
++	if recorder.Code != 204 {
++		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
++	}
++	log, err := a.storage.readDiagnosticLog()
++	if err != nil {
++		t.Fatal(err)
++	}
++	var rows []map[string]any
++	for _, line := range strings.Split(strings.TrimSpace(string(log)), "\n") {
++		var row map[string]any
++		if err := json.Unmarshal([]byte(line), &row); err != nil {
++			t.Fatal(err)
++		}
++		if row["event"] == "gameflow_phase_client" {
++			rows = append(rows, row)
++		}
++	}
++	if len(rows) != 4 {
++		t.Fatalf("rows=%s", log)
++	}
++	for i, comparison := range []string{"same", "different", "unavailable", "first"} {
++		if rows[i]["game_id_comparison"] != comparison {
++			t.Fatal(rows[i])
++		}
++	}
++	if rows[1]["phase"] != "InProgress" || rows[1]["source"] != "poll" || rows[1]["game_id"] != float64(8980593274) || rows[1]["cached_game_id"] != float64(8980574903) || rows[1]["received_at"] != float64(1789370200123) || rows[1]["transport_dropped"] != float64(3) {
++		t.Fatal(rows[1])
++	}
++	if rows[3]["source"] != "sse" || rows[3]["phase"] != "Reconnect" || rows[3]["invalidated"] != true {
++		t.Fatal(rows[3])
++	}
++}
++
++func TestR94DiagnosticBatchRejectsMalformedObservations(t *testing.T) {
++	valid := gameflowClientObservation{Reason: "received", Phase: "InProgress", Source: "poll", GameID: 8980574903}
++	for name, observations := range map[string][]gameflowClientObservation{
++		"empty": {}, "too many": {valid, valid, valid, valid, valid, valid, valid, valid, valid},
++		"invalid phase":  {{Reason: "received", Phase: "private player name", Source: "poll"}},
++		"invalid source": {{Reason: "received", Phase: "InProgress", Source: "private"}},
++		"invalid ID":     {{Reason: "received", Phase: "InProgress", Source: "poll", GameID: 9007199254740992}},
++	} {
++		t.Run(name, func(t *testing.T) {
++			body, err := json.Marshal(clientDiagnosticRequest{Event: "gameflow_phase_client", Reason: "batch", Observations: observations})
++			if err != nil {
++				t.Fatal(err)
++			}
++			recorder := httptest.NewRecorder()
++			(&app{}).handleClientDiagnostic(recorder, httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(string(body))))
++			if recorder.Code != 400 {
++				t.Fatalf("status=%d", recorder.Code)
++			}
++		})
++	}
++}
++
++func TestR94ConnectedSessionForwardsIdentityThroughLCUEventCallback(t *testing.T) {
++	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
++	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		if !websocket.IsWebSocketUpgrade(r) {
++			http.Error(w, "fixture endpoint unavailable", http.StatusNotFound)
++			return
++		}
++		connection, err := upgrader.Upgrade(w, r, nil)
++		if err != nil {
++			return
++		}
++		defer connection.Close()
++		if _, _, err := connection.ReadMessage(); err != nil {
++			return
++		}
++		for _, id := range []int64{8980574903, 8980593274} {
++			event := map[string]any{"uri": "/lol-gameflow/v1/session", "eventType": "Update", "data": map[string]any{"phase": "InProgress", "gameData": map[string]any{"gameId": id}}}
++			if err := connection.WriteJSON([]any{8, "OnJsonApiEvent", event}); err != nil {
++				return
++			}
++		}
++		event := map[string]any{"uri": "/lol-gameflow/v1/gameflow-phase", "eventType": "Update", "data": "InProgress"}
++		if err := connection.WriteJSON([]any{8, "OnJsonApiEvent", event}); err != nil {
++			return
++		}
++		_, _, _ = connection.ReadMessage()
++	}))
++	defer server.Close()
++	address, _ := url.Parse(server.URL)
++	port, _ := strconv.Atoi(address.Port())
++	client := newLCUClient(port, "fixture")
++	defer client.Close()
++	updates := make(chan string, 32)
++	a := &app{lcu: client, connected: true, refreshRequests: make(chan struct{}, 1), eventSubscribers: map[chan string]struct{}{updates: {}}}
++	ctx, cancel := context.WithCancel(context.Background())
++	done := make(chan error, 1)
++	go func() { done <- a.runConnectedSession(ctx, client) }()
++	defer func() {
++		cancel()
++		select {
++		case <-done:
++		case <-time.After(time.Second):
++			t.Error("session failed to stop")
++		}
++	}()
++	var got []string
++	deadline := time.NewTimer(3 * time.Second)
++	defer deadline.Stop()
++	for len(got) < 3 {
++		select {
++		case message := <-updates:
++			if strings.HasPrefix(message, "gameflow:") {
++				got = append(got, message)
++			}
++		case <-deadline.C:
++			t.Fatalf("missing actual callback broadcasts: %v", got)
++		}
++	}
++	if !strings.Contains(got[0], `"gameId":8980574903`) || !strings.Contains(got[1], `"gameId":8980593274`) || got[2] != "gameflow:InProgress" {
++		t.Fatal(got)
++	}
++}
+--- /dev/null
++++ after/web/r94.test.cjs
+@@ -0,0 +1,250 @@
++"use strict";
++const test = require("node:test");
++const assert = require("node:assert/strict");
++const fs = require("node:fs");
++const path = require("node:path");
++const vm = require("node:vm");
++const { JSDOM } = require("../desktop/node_modules/jsdom");
++const source = fs.readFileSync(process.env.R94_GAMEPLAY_SOURCE || path.join(__dirname, "gameplay.js"), "utf8");
++const extract = name => {
++  let start = source.indexOf(`function ${name}(`);
++  assert.ok(start >= 0, name);
++  if (source.slice(start - 6, start) === "async ") start -= 6;
++  return source.slice(start, source.indexOf("\n  }", start) + 4);
++};
++const snapshot = (gameId = 90, phase = "InProgress") => ({ gameId, phase, available: true, currentChampionId: gameId, players: [{ isCurrent: true, championId: gameId, historyState: "ok" }] });
++function harness() {
++  const dom = new JSDOM('<div class="live-toolbar"><div id="summary"></div><button id="refresh">刷新对局</button></div><div id="content"></div>', { pretendToBeVisual: true });
++  const document = dom.window.document;
++  const nodes = { liveContent: document.querySelector("#content"), liveRefresh: document.querySelector("#refresh"), liveSessionSummary: document.querySelector("#summary") };
++  const state = { section: "live", beacon: { phase: "InProgress" }, live: snapshot(), settings: { liveRefresh: true }, controllers: new Map(), tabs: [], liveGameGeneration: 0, liveRecommendations: new Map([["old", {}]]), specialistRunes: new Map([["old", {}]]), proRunes: new Map([["old", {}]]) };
++  let serial = 0;
++  const jobs = new Map(), requests = [], observations = [], renders = [];
++  const noop = () => {};
++  const context = { window: { reportFlowDiagnostic: (event, reason, fields) => observations.push({ event, reason, ...fields }) }, state, nodes, document, Date: { now: () => 100000 }, connected: () => true,
++    setTimeout: (fn, delay) => { jobs.set(++serial, { fn, delay }); return serial; }, clearTimeout: id => jobs.delete(id),
++    api: (url, _options, key) => new Promise((resolve, reject) => {
++      const controller = new AbortController(); state.controllers.set(key || "live", controller);
++      requests.push({ url, resolve, reject, controller });
++    }),
++    recordLiveRefresh: noop, updateBeacon: phase => { state.beacon.phase = phase; }, markOverviewAfterGame: noop, scheduleBeaconPoll: noop,
++    resetLivePositionOverrides: noop, resetRecommendationTabsOnChampionChange: noop, renderCapabilitySettings: noop,
++    liveRecommendationsFor: () => null, ensureLiveRecommendations: noop, ensureSpecialistRunes: noop, ensureProRunes: noop,
++    liveAugmentRecommendationSource: () => "", escapeHTML: String,
++    renderSessionSummary: data => { nodes.liveSessionSummary.textContent = data ? `game-${data.gameId}` : ""; },
++    renderRecommendationArea: data => `<article>recommendation-${data.gameId || "empty"}</article>`,
++    emptyState: (title, copy, retry) => `<div>${title}<p>${copy}</p>${retry ? '<button data-gameplay-retry>重试</button>' : ''}</div>`,
++    bindLiveContent: noop, applyRenderedMetricStyles: noop, prepareImages: noop,
++  };
++  const names = ["loadLive", "renderLive", "handleGameplayPhase", "queueLiveEventRefresh", "shouldResetLiveGameScopedState", "resetLiveGameScopedState", "softResetGameplayState", "syncLiveRetryBudget", "liveSnapshotComplete", "liveAutoRefreshStopped", "renderLiveRefreshStatus", "scheduleLiveRefresh", "normalizeLiveInterval", "liveRefreshDelayMs"];
++  for (const name of ["liveGamePhase", "invalidateLiveForNewGame", "resetDisconnectedLive", "normalizeLiveGameId", "liveGameIdComparison", "recordLiveObservation", "liveSnapshotBehindPhase"]) if (source.includes(`function ${name}(`)) names.push(name);
++  vm.runInNewContext(names.map(extract).join("\n") + "\n" + extract("pollGameflowPhase"), context);
++  context.beaconPollDelay = () => 12000;
++  const render = context.renderLive;
++  context.renderLive = () => { renders.push({ live: state.live, awaiting: state.liveAwaitingGame, loading: state.liveLoading }); render(); };
++  nodes.liveRefresh.addEventListener("click", () => context.loadLive(true, "manual"));
++  context.renderLive();
++  return { ...context, requests, jobs, observations, renders, close: () => dom.window.close(), text: () => nodes.liveContent.textContent,
++    async fire() { const entry = [...jobs.entries()].find(([, job]) => job.delay <= 1000); assert.ok(entry, "queued phase refresh"); jobs.delete(entry[0]); entry[1].fn(); await Promise.resolve(); },
++  };
++}
++const flush = () => new Promise(setImmediate);
++
++test("R94 same-phase live responses with changed gameId invoke the transition before replacement", async () => {
++  const h = harness();
++  try {
++    const pending = h.loadLive();
++    h.requests[0].resolve(snapshot(91)); await pending;
++    assert.ok(h.renders.some(render => render.live === null && render.awaiting), "gameId jump must pass through the R91 transition");
++    assert.equal(h.state.live.gameId, 91); assert.equal(h.state.liveLoading, false);
++    assert.ok(h.state.liveGameGeneration > 0);
++    const diagnostic = h.observations.find(row => row.reason === "invalidate" && row.gameIdComparison === "different");
++    assert.ok(diagnostic); assert.equal(diagnostic.phase, "InProgress");
++    assert.equal(diagnostic.cachedGameId, 90); assert.equal(diagnostic.gameId, 91);
++  } finally { h.close(); }
++});
++
++test("R94 unchanged phase and gameId preserve content and recommendation generation", async () => {
++  const h = harness();
++  try {
++    h.handleGameplayPhase("InProgress", "poll", false, 90);
++    const pending = h.loadLive(); h.requests[0].resolve(snapshot()); await pending;
++    assert.equal(h.state.liveGameGeneration, 0);
++    assert.equal(h.renders.some(render => render.live === null), false);
++    assert.ok(h.observations.some(row => row.reason === "received" && row.gameIdComparison === "same"));
++  } finally { h.close(); }
++});
++
++test("R94 identity polling catches a game jump even when all intermediate phases were missed", async () => {
++  const h = harness();
++  try {
++    h.scheduleLiveRefresh(); assert.equal(h.jobs.size, 0, "R90 completed roster has stopped full refreshes");
++    h.pollGameflowPhase(); assert.equal(h.requests[0].url, "/api/gameplay/phase");
++    h.requests[0].resolve({ phase: "InProgress", gameId: 91 }); await flush();
++    assert.equal(h.state.live, null); assert.match(h.text(), /正在识别新对局/);
++    await h.fire(); assert.equal(h.requests[1].url, "/api/gameplay/live?refresh=1");
++    h.handleGameplayPhase("InProgress", "sse", false, 91);
++    assert.equal(h.requests[1].controller.signal.aborted, false, "repeated identity cannot keep restarting the new request");
++    h.requests[1].resolve(snapshot(91)); await flush();
++    assert.match(h.text(), /recommendation-91/);
++    assert.equal(h.jobs.size, 0, "complete new game returns to stopped refresh policy");
++  } finally { h.close(); }
++});
++
++test("R94 SSE game identity aborts a pending old game; stale replacement data cannot undo it", async () => {
++  const h = harness();
++  try {
++    const old = h.loadLive();
++    h.handleGameplayPhase("InProgress", "sse", false, 91);
++    assert.equal(h.requests[0].controller.signal.aborted, true);
++    await h.fire();
++    h.requests[0].resolve(snapshot()); await old;
++    assert.equal(h.state.liveLoading, true); assert.equal(h.state.live, null);
++    h.requests[1].resolve(snapshot()); await flush();
++    assert.equal(h.state.live, null); assert.equal(h.state.liveExpectedGameId, 91);
++    assert.match(h.text(), /正在识别新对局/);
++    const retry = h.loadLive(true); h.requests[2].resolve(snapshot(91)); await retry;
++    assert.equal(h.state.live.gameId, 91);
++  } finally { h.close(); }
++});
++
++test("R94 unknown IDs do not clear a known game and diagnostics distinguish first observations", () => {
++  const h = harness();
++  try {
++    for (const id of [undefined, 0, -1, "bad"]) h.handleGameplayPhase("InProgress", "sse", false, id);
++    assert.equal(h.state.live.gameId, 90); assert.equal(h.state.liveGameGeneration, 0);
++    assert.ok(h.observations.some(row => row.gameIdComparison === "unavailable"));
++    h.state.live = null; h.handleGameplayPhase("InProgress", "poll", false, 91);
++    assert.ok(h.observations.some(row => row.gameIdComparison === "first"));
++  } finally { h.close(); }
++});
++
++test("R94 same-game phase advance labels the retained snapshot and rejects a late selection response", async () => {
++  const h = harness();
++  try {
++    h.state.live = snapshot(90, "ChampSelect"); h.state.beacon.phase = "ChampSelect";
++    const pending = h.loadLive(); h.handleGameplayPhase("InProgress", "sse", false, 90);
++    assert.equal(h.state.liveGameGeneration, 0); assert.match(h.text(), /同步当前对局/);
++    h.requests[0].resolve(snapshot(90, "ChampSelect")); await pending;
++    assert.equal(h.state.beacon.phase, "InProgress");
++  } finally { h.close(); }
++});
++
++test("R94 a delayed poll cannot reverse a newer SSE identity or phase", async () => {
++  for (const next of [{ phase: "InProgress", gameId: 91 }, { phase: "ChampSelect", gameId: 0 }]) {
++    const h = harness();
++    try {
++      h.pollGameflowPhase();
++      h.handleGameplayPhase(next.phase, "sse", false, next.gameId);
++      h.requests[0].resolve({ phase: "InProgress", gameId: 90 }); await flush();
++      assert.equal(h.state.beacon.phase, next.phase); assert.equal(h.state.liveExpectedGameId, next.gameId);
++      assert.equal(h.state.live, null);
++      assert.ok(h.observations.some(row => row.reason === "stale-response" && row.source === "poll"));
++    } finally { h.close(); }
++  }
++});
++
++test("R94 a changed identity in a new selection snapshot is not mistaken for a late same-game response", async () => {
++  const h = harness();
++  try {
++    const pending = h.loadLive(); h.requests[0].resolve(snapshot(91, "ChampSelect")); await pending;
++    assert.equal(h.state.live.gameId, 91); assert.equal(h.state.beacon.phase, "ChampSelect");
++    assert.ok(h.renders.some(row => row.live === null && row.awaiting));
++  } finally { h.close(); }
++});
++
++test("R94 SSE decoder retains legacy phase events and game identity payloads", () => {
++  const appSource = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
++  const start = appSource.indexOf("function gameplayEventDetail(");
++  const context = {};
++  vm.runInNewContext(appSource.slice(start, appSource.indexOf("\n  }", start) + 4), context);
++  const decode = payload => JSON.parse(JSON.stringify(context.gameplayEventDetail(payload)));
++  assert.deepEqual(decode('gameflow:{"phase":"InProgress","gameId":8980593274}'), { phase: "InProgress", gameId: 8980593274 });
++  assert.deepEqual(decode("gameflow:ChampSelect"), { phase: "ChampSelect" });
++  assert.deepEqual(decode("champselect:changed"), { changed: true });
++  for (const payload of ['gameflow:{bad', 'gameflow:{"gameId":91}', 'ready']) assert.equal(decode(payload), null);
++});
++
++function diagnosticRuntime(slow = false) {
++  const sent = [], jobs = new Map(), pending = []; let id = 0;
++  const context = { window: {},
++    setTimeout: (fn, ms) => { jobs.set(++id, { fn, ms }); return id; }, clearTimeout: id => jobs.delete(id),
++    fetch: (_url, options) => { const body = JSON.parse(options.body); sent.push(body); return slow ? new Promise(resolve => pending.push(resolve)) : Promise.resolve({ status: 204 }); },
++  };
++  vm.runInNewContext(fs.readFileSync(process.env.R94_RUNTIME_SOURCE || path.join(__dirname, "runtime.js"), "utf8"), context);
++  return { ...context.window, sent, jobs, pending,
++    async tick() { const entry = [...jobs].find(([, job]) => job.ms === 1000); assert.ok(entry); jobs.delete(entry[0]); entry[1].fn(); await flush(); },
++  };
++}
++const observation = (gameId = 8980593274, cachedGameId = 8980574903) => ({ phase: "InProgress", previousPhase: "InProgress", source: "poll", gameId, cachedGameId, gameIdComparison: gameId === cachedGameId ? "same" : "different", phaseChanged: false, invalidated: false, receivedAt: 1789370200123 });
++
++test("R94 diagnostics preserve every repeated phase and identity comparison in bounded batches", async () => {
++  const h = diagnosticRuntime();
++  for (let i = 0; i < 17; i++) h.reportFlowDiagnostic("gameflow_phase_client", "received", observation(i < 12 ? 8980574903 : 8980593274));
++  assert.equal(h.sent.length, 0);
++  await h.tick(); await h.tick(); await h.tick();
++  assert.deepEqual(h.sent.map(body => body.observations.length), [8, 8, 1]);
++  const rows = h.sent.flatMap(body => body.observations);
++  assert.equal(rows.length, 17); assert.equal(rows.filter(row => row.gameIdComparison === "same").length, 12);
++  assert.equal(rows[12].gameId, 8980593274); assert.equal(rows[12].cachedGameId, 8980574903);
++  assert.equal(rows[12].phase, "InProgress"); assert.equal(rows[12].source, "poll");
++  assert.equal(rows[12].receivedAt, 1789370200123);
++});
++
++test("R94 diagnostics use one request during a stall and expose queue overflow while retaining transitions", async () => {
++  const h = diagnosticRuntime(true);
++  h.reportFlowDiagnostic("gameflow_phase_client", "received", observation()); await h.tick();
++  for (let i = 0; i < 80; i++) h.reportFlowDiagnostic("gameflow_phase_client", "received", observation(8980574903));
++  h.reportFlowDiagnostic("gameflow_phase_client", "invalidate", { ...observation(), invalidated: true });
++  assert.equal(h.sent.length, 1); assert.equal(h.jobs.size, 0);
++  h.pending.shift()({ status: 204 }); await flush();
++  for (let i = 0; i < 8; i++) { await h.tick(); h.pending.shift()({ status: 204 }); await flush(); }
++  assert.equal(h.sent.length, 9); assert.equal(h.sent[1].transportDropped, 17);
++  assert.equal(h.sent.slice(1).flatMap(row => row.observations).length, 64);
++  assert.ok(h.sent.at(-1).observations.some(row => row.invalidated));
++  assert.equal(h.jobs.size, 0);
++});
++
++test("R94 largest diagnostic batch fits backend limit and strips unrelated data; export sends queued observations", async () => {
++  const h = diagnosticRuntime();
++  for (let i = 0; i < 8; i++) h.reportFlowDiagnostic("gameflow_phase_client", "stale-response", { ...observation(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER - 1), phase: "P".repeat(64), previousPhase: "Q".repeat(64), source: "interval", playerRef: "private", token: "secret", receivedAt: 1e13 });
++  await h.tick();
++  assert.ok(Buffer.byteLength(JSON.stringify(h.sent[0])) < 4096);
++  assert.doesNotMatch(JSON.stringify(h.sent), /private|secret/);
++  // Flush invokes the pending batch immediately, before the one-second timer.
++  h.reportFlowDiagnostic("gameflow_phase_client", "received", observation());
++  const flushing = h.flushFlowDiagnostics(); await flush();
++  const waiter = [...h.jobs.values()].find(job => job.ms === 25); assert.ok(waiter); waiter.fn(); await flushing;
++  assert.equal(h.sent.at(-2).observations[0].gameId, 8980593274);
++  assert.equal(h.sent.at(-1).event, "diagnostic_delivery_client"); assert.equal(h.sent.at(-1).transportPending, 0);
++});
++
++test("R94 hidden same-phase SSE identity jump resumes one forced refresh when visible", async () => {
++  const h = harness();
++  try {
++    const context = { state: h.state, document: h.document, window: { addEventListener: (_name, fn) => { context.receive = fn; } }, handleGameplayPhase: h.handleGameplayPhase,
++      clearTimeout: h.clearTimeout, queueLiveEventRefresh: h.queueLiveEventRefresh, scheduleBeaconPoll() {}, refreshAfterResync() {} };
++    const sseStart = source.indexOf('  window.addEventListener("deep-legends:gameflow",');
++    const visibleStart = source.indexOf('  document.addEventListener("visibilitychange",');
++    vm.runInNewContext(source.slice(sseStart, source.indexOf('\n  });', sseStart) + 6), context);
++    vm.runInNewContext(source.slice(visibleStart, source.indexOf('\n  });', visibleStart) + 6), context);
++    Object.defineProperty(h.document, "hidden", { configurable: true, value: true });
++    context.receive({ detail: { phase: "InProgress", gameId: 91 } });
++    assert.equal(h.state.live, null); assert.equal(h.requests.length, 0); assert.match(h.text(), /正在识别新对局/);
++    Object.defineProperty(h.document, "hidden", { configurable: true, value: false });
++    h.document.dispatchEvent(new h.document.defaultView.Event("visibilitychange"));
++    await h.fire(); assert.equal(h.requests[0].url, "/api/gameplay/live?refresh=1");
++    h.requests[0].resolve(snapshot(91)); await flush(); assert.equal(h.state.live.gameId, 91);
++  } finally { h.close(); }
++});
++
++test("R94 failed diagnostic batches release their slot without retries and recover on the next batch", async () => {
++  const h = diagnosticRuntime(true);
++  h.reportFlowDiagnostic("gameflow_phase_client", "received", observation()); await h.tick();
++  h.reportFlowDiagnostic("gameflow_phase_client", "received", observation());
++  h.pending.shift()({ status: 503 }); await flush();
++  assert.equal(h.sent.length, 1); assert.equal([...h.jobs.values()].filter(job => job.ms === 750).length, 0);
++  await h.tick(); assert.equal(h.sent[1].transportFailed, 1); assert.equal(h.sent[1].transportDropped, 1);
++  h.pending.shift()({ status: 204 }); await flush();
++  assert.equal(h.jobs.size, 0);
++});
+--- /dev/null
++++ after/scripts/r94-mutation-check.py
+@@ -0,0 +1,49 @@
++#!/usr/bin/env python3
++"""R94 semantic regression checks on temporary copies; production is never edited."""
++import json
++import os
++from pathlib import Path
++import subprocess
++import tempfile
++
++ROOT = Path(__file__).resolve().parent.parent
++OUT = ROOT / 'docs/r94'
++OUT.mkdir(parents=True, exist_ok=True)
++CASES = [
++    ('ignore-gameid-invalidation', 'web/gameplay.js', 'const invalidated = gameChanged || phaseBoundary;', 'const invalidated = phaseBoundary;', 'R94 same-phase live responses', 'R94_GAMEPLAY_SOURCE'),
++    ('phase-only-event-trigger', 'web/gameplay.js', 'if (phaseChanged || gameChanged) {', 'if (phaseChanged) {', 'R94 identity polling', 'R94_GAMEPLAY_SOURCE'),
++    ('omit-poll-gameid', 'web/gameplay.js', 'handleGameplayPhase(String(payload?.phase || ""), "poll", false, payload?.gameId);', 'handleGameplayPhase(String(payload?.phase || ""), "poll", false);', 'R94 identity polling', 'R94_GAMEPLAY_SOURCE'),
++    ('omit-forced-refresh', 'web/gameplay.js', 'loadLive(Boolean(state.liveGameRefreshQueued), source)', 'loadLive(false, source)', 'R94 identity polling', 'R94_GAMEPLAY_SOURCE'),
++    ('accept-old-game-response', 'web/gameplay.js', 'if (state.liveAwaitingGame && normalizeLiveGameId(state.liveExpectedGameId)', 'if (false && normalizeLiveGameId(state.liveExpectedGameId)', 'R94 SSE game identity', 'R94_GAMEPLAY_SOURCE'),
++    ('accept-stale-poll', 'web/gameplay.js', 'if (observedPhase !== state.beacon.phase || observedGeneration !== state.liveGameGeneration || observedId !== state.liveExpectedGameId)', 'if (false)', 'R94 a delayed poll', 'R94_GAMEPLAY_SOURCE'),
++    ('omit-live-event-gameid', 'web/gameplay.js', 'Boolean(event.detail?.changed), event.detail?.gameId', 'Boolean(event.detail?.changed)', 'R94 hidden same-phase', 'R94_GAMEPLAY_SOURCE'),
++    ('drop-identical-diagnostics', 'web/runtime.js', 'gameflowQueue.push(observation);', 'if (!gameflowQueue.some(row => JSON.stringify(row) === JSON.stringify(observation))) gameflowQueue.push(observation);', 'R94 diagnostics preserve every', 'R94_RUNTIME_SOURCE'),
++    ('omit-identity-probe', 'gameplay_identity.go', 'result.GameID = session.GameData.GameID', 'result.GameID = 0', '^TestR94PhaseEndpointFinds', None),
++    ('omit-sse-connection-wire', 'connection_manager.go', 'a.broadcastGameplayIdentity(event)', '', '^TestR94ConnectedSessionForwards', None),
++    ('omit-diagnostic-gameid', 'gameplay_identity.go', '"game_id": observation.GameID', '"game_id": int64(0)', '^TestR94DiagnosticBatchPersists', None),
++]
++results = []
++with tempfile.TemporaryDirectory(prefix='r94-mutants-') as temporary:
++    for name, file, before, after, pattern, js_env in CASES:
++        source = (ROOT / file).read_text()
++        if source.count(before) != 1:
++            raise RuntimeError(f'{name}: anchor count {source.count(before)}')
++        mutant = Path(temporary) / Path(file).name
++        mutant.write_text(source.replace(before, after, 1))
++        env = dict(os.environ, GOCACHE=str(ROOT / '.gocache'), GOPATH=str(ROOT / '.gopath'))
++        if js_env:
++            env[js_env] = str(mutant)
++            command = ['node', '--test', '--test-name-pattern', pattern, 'web/r94.test.cjs']
++        else:
++            overlay = Path(temporary) / 'overlay.json'
++            overlay.write_text(json.dumps({'Replace': {str(ROOT / file): str(mutant)}}))
++            command = ['go', 'test', '-overlay', str(overlay), '-count=1', '-timeout=30s', '-run', pattern, '.']
++        result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True, timeout=90)
++        output = result.stdout + result.stderr
++        killed = result.returncode != 0 and ('AssertionError' in output or 'FAIL: TestR94' in output) and 'build failed' not in output and 'test timed out' not in output
++        (OUT / f'mutation-{name}.txt').write_text(output)
++        results.append({'mutation': name, 'killed': killed, 'test': pattern, 'exitCode': result.returncode})
++        (OUT / 'mutations.json').write_text(json.dumps(results, indent=2) + '\n')
++        print(name, 'KILLED' if killed else 'SURVIVED/INVALID', flush=True)
++        if not killed:
++            raise RuntimeError(output[-3000:])
+--- /dev/null
++++ after/docs/r94-execution-ledger.md
+@@ -0,0 +1,52 @@
++# R94 执行记录
++
++日期：2026-09-14。对应 `WORKLIST-R94-LIVE-GAMEID-JUMP-MISSED.md`。在工作区已有 R87–R93 等改动上增量执行，沿用 R91 的新局过渡态及局部取消规则。
++
++## 逐项交付
++
++| 工单要求 | 实现与验收证据 |
++| --- | --- |
++| 同阶段 gameId 跳变也失效旧局 | `handleGameplayPhase` 独立比较 ID；`loadLive` 直接取得新 ID 时同样调用 `invalidateLiveForNewGame`，清 live、摘要及推荐缓存、渲染过渡态，再发布新数据。`web/r94.test.cjs` 连续两次 InProgress / 不同 ID 测试直接断言中间 null + awaiting 渲染和缓存 generation 变化。 |
++| 同局正常刷新不闪烁 | 同阶段、同 ID 不失效；未知、零值和非法 ID 不伪造换局。R94 测试检查内容、generation 和渲染记录；R91 的正常阶段推进断言保留。 |
++| 排查并弥补短暂阶段窗口 | 已确认轮询及事件队列盲区，详见下一节。阶段 API 附带有效 session gameId，SSE 透传 session 身份，发现跳变后强制完整刷新。R94 测试先确认 R90 完整名单已停刷，再只返回相同 phase / 新 ID，验证立即清空、发出 `?refresh=1`，新局完整后恢复停止策略。 |
++| 补诊断 | `received` / `invalidate` / `stale-response` 记录 phase 原始值、来源、缓存 ID、收到的 ID、same / different / first / unavailable、是否清空及客户端接收时间。前端实际 runtime 测试验证重复观察不被采样丢弃；Go HTTP handler 测试验证 89 亿级 gameId 原样落盘、比较结果重算及来源字段。 |
++| R91 回归及统计口径边界 | R91 13 项测试、6 个隔离变异通过。本轮未修改 `isRemakeGame`，未将它接入实时页。函数与执行前快照逐字节比对，见 `r94/remake-unchanged.json`。 |
++
++## 采样盲区与补偿机制
++
++- `connection_manager.go` 原 phase 事件回调直接转发，未发现该分支自身节流。`live_updates.go` 的每个订阅者队列容量 32；慢消费者溢出会清队列并发 `resync-required`，因此连续阶段可能被合并。
++- `web/gameplay.js` 在最近 45 秒收到事件帧时每 12 秒轮询一次阶段，否则每秒轮询；隐藏页面暂停轮询。短于轮询间隔的 EndOfGame / Lobby / ChampSelect 窗口可以完全跨过。R90 完整名单停止定时刷新，不能只依赖下一次名单请求自行发现 ID 变化。
++- 现在阶段接口从原 phase 读取加一次 session 身份读取（仅 GameStart / InProgress / Reconnect；子请求预算 1.5 秒，整体遵循 6 秒请求上下文）。不读取玩家名单或推荐。session 暂不可用仍返回阶段；ChampSelect 不采用可能残留上一局的 gameData。
++- 新增 SSE session 身份消息复用已收到的事件载荷，不在事件线程再发 HTTP 请求。真实 TLS/WebSocket fixture 经 `runConnectedSession` 回调验证两条同阶段不同 ID 消息及原 phase-only 消息都到达订阅者。
++- ID 跳变立即失效旧请求；事件刷新队列在既有 180–1000ms 合并窗口内触发完整强制读取。隐藏页面先失效，回到前台再加载；测试执行实际 SSE listener 和 visibility listener 验证此路径。
++- 已飞行的旧 phase 轮询通过请求开始时的 phase / generation / expectedId 检查，不能覆盖较新 SSE 或 live 响应；新局读取返回旧 ID 时保持过渡态并走原有有界重试或手动刷新。
++
++## 延迟窗口核实
++
++同局 ChampSelect → InProgress 原本允许保留推荐，且 `/api/gameplay/live` 请求预算为 45 秒，因此日志中 37 秒窗口不能单凭渲染时间判为重开局。现在阶段推进立即显示“对局阶段已变化，正在同步当前对局…”，拒绝迟到的同局选人快照回退 beacon，并让旧阶段的完整快照继续同步重试。新 ID 的正常选人响应则仍能开启新局，避免把所有选人响应误当旧数据。
++
++若新快照已经到达，清空与替换会在同一 JS 执行段完成；测试验证过渡态渲染调用，不为制造闪屏而强加等待。若先收到 SSE / poll 身份，网络等待期间会实际保留新局过渡态。
++
++## 诊断传输边界
++
++- 独立 gameflow 批量队列保留重复观察，不受原 `live_refresh_client` 一秒采样 / 30 秒去重影响。每批最多 8 条，每次发送完成后至少间隔一秒再发下一批，只有一个该类请求在飞行，队列上限 64；请求失败不重试，避免挤占业务请求。
++- 达到容量时优先丢普通未变化观察；无可丢普通观察时淘汰最旧记录。`transport_dropped` 可由队列丢弃或失败批次产生（批次失败按一次传输计数，不等同于丢失观察数）；`transport_failed`、客户端 `received_at` 与服务端写入时间帮助判断缺口和延迟。离线及异常高频情况下不承诺无损。
++- 导出会立即尝试发送排队 batch，在原有一秒窗口内等待，并记录尚未发送数量。通用 pending 上限同步为 97（最多 32 个既有请求 + 1 个 gameflow 请求 + 64 条排队观察），旧边界断言更新为新容量；不宣称导出总能排空全部队列。
++- 后端保持 4 KiB 总请求限制和未知字段拒绝，接受最多 8 条合法观察；最大允许字段长度的前端 batch 实测小于 4 KiB。仅保留阶段及枚举、ID、时间、布尔值，不记录玩家名称、令牌或任意文本。
++
++## 验证记录
++
++- 首批 6 个 R94 场景在旧实现上均失败，见 [before-js.txt](r94/before-js.txt)。执行前相关测试基线通过，见 [baseline-js.txt](r94/baseline-js.txt)。
++- 最终针对性 JS：60 项全部通过，包含 R94 14 项及 R91 / R90 / R88 / R87 / runtime 回归，见 [targeted-js.txt](r94/targeted-js.txt)。
++- 完整前端与桌面回归：660 项，659 通过、0 失败、1 跳过（Windows 门禁），见 [full-js.txt](r94/full-js.txt)。此后只补充了隐藏页面及诊断失败测试，已纳入最终针对性运行；生产 JS 与该完整运行一致。
++- Go 针对性、完整回归、R94 race 及 `go vet ./...` 结果分别见 [targeted-go.txt](r94/targeted-go.txt)、[full-go.txt](r94/full-go.txt)、[race-go.txt](r94/race-go.txt)、[vet.txt](r94/vet.txt)。首轮完整 Go 唯一失败为导出 pending 上限的旧 32 断言，保留于 [full-go-initial.txt](r94/full-go-initial.txt)。
++- 11 个 R94 隔离变异全部被语义断言拦截，见 [mutations.json](r94/mutations.json)：删除 ID 清空、phase-only 触发、漏传 poll / SSE ID、漏强制刷新、接受旧局响应 / 旧轮询、去重丢观察、缺身份探针 / 后端 SSE 接线 / 日志 ID。变异不修改生产工作区；编译失败或超时不算拦截。
++- 适配 R90 / R91 变异脚本中随本次实现改变的锚点。R91 六个变异复跑通过，见 [r91-mutations-rerun.txt](r94/r91-mutations-rerun.txt)。首次扩大清空变异会使无关的合并请求测试等待，记录在 `r91-mutations-initial.txt`；复跑改为每个变异只执行对应语义测试，并要求 AssertionError，未将超时算作成功。
++- 两份独立只读复核分别检查前端竞态与后端/诊断链路，无确认缺陷；建议的隐藏页面、传输失败、真实回调接线测试已补齐。
++- `node --check` 三个生产 JS 文件及 `git diff --check` 通过。起始快照差异与最终文件哈希见 `r94/scoped-changes.patch`、`r94/source-sha256.json`。
++
++复跑：`node --test web/r94.test.cjs web/r91.test.cjs web/r90.test.cjs web/r88.test.cjs web/r87.test.cjs web/runtime.test.cjs`；`go test ./...`；`go test -race -run TestR94 .`；`python3 scripts/r94-mutation-check.py`。
++
++## 真机验证边界
++
++尚未在 Windows 国服客户端实际重开或连续快速结束对局验证。本轮证明同阶段 ID 跳变的检测、清空及刷新路径与异常恢复，不证明用户三段日志中的对局均为重开，也不宣称真实客户端延迟已经消失。实际 SSE 若缺 session 身份事件，仍由轻量轮询兜底；需要下一轮真机诊断核对 `source`、`game_id_comparison=different`、`invalidated=true` 与后续新局渲染。

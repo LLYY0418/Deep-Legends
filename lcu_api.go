@@ -39,6 +39,7 @@ type SummonerProfile struct {
 }
 
 type LootItem struct {
+	DataPending          bool   `json:"dataPending,omitempty"`
 	LootID               string `json:"lootId"`
 	LootName             string `json:"lootName,omitempty"`
 	LocalizedName        string `json:"localizedName,omitempty"`
@@ -167,7 +168,6 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 	kept := items[:0]
 	for index := range items {
 		item := &items[index]
-		drop := false
 		// A real localized inventory name is more specific than a public catalog.
 		if lootNameMissing(*item, item.DisplayName) && !lootNameMissing(*item, item.LocalizedName) {
 			item.DisplayName = strings.TrimSpace(item.LocalizedName)
@@ -254,12 +254,11 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 				item.DisplayName = strings.TrimSpace(item.LootName)
 			}
 			if item.DisplayName == "" {
-				drop = true
+				item.DataPending = true
+				item.DisplayName = "客户端数据暂未同步，可稍后重试"
 			}
 		}
-		if !drop {
-			kept = append(kept, *item)
-		}
+		kept = append(kept, *item)
 	}
 	items = kept
 	if shape != nil {
@@ -451,7 +450,18 @@ type SummonerAPI struct {
 	ctx    context.Context
 }
 type SkinCatalogAPI struct{ client *LCUClient }
-type InventoryAPI struct{ client *LCUClient }
+type InventoryAPI struct {
+	client *LCUClient
+	reads  *collectionReads
+}
+
+func (api InventoryAPI) get(path string) ([]byte, error) {
+	if api.reads != nil {
+		return api.reads.get(path)
+	}
+	return api.client.GetBytes(path)
+}
+
 type LootAPI struct {
 	client  *LCUClient
 	observe func(map[string]any)
@@ -528,7 +538,7 @@ func (api SkinCatalogAPI) Load() ([]Skin, error) {
 }
 
 func (api InventoryAPI) OwnedSkinIDs(summonerID int64, catalog []Skin) (map[int64]bool, []OwnershipSourceStatus, error) {
-	return loadOwnedSkinInventory(api.client, summonerID, catalog)
+	return loadOwnedSkinInventory(api.client, summonerID, catalog, api.reads)
 }
 
 func (api InventoryAPI) OwnedChampionIDs(summonerID int64) (map[int64]bool, EndpointCapability) {
@@ -538,7 +548,7 @@ func (api InventoryAPI) OwnedChampionIDs(summonerID int64) (map[int64]bool, Endp
 	}
 	capability := EndpointCapability{Name: "owned-champions", Path: paths[0]}
 	for _, path := range paths {
-		data, err := api.client.GetBytes(path)
+		data, err := api.get(path)
 		if err != nil {
 			capability = optionalCapabilityError(EndpointCapability{Name: capability.Name, Path: path}, err)
 			continue
@@ -570,7 +580,13 @@ func (api InventoryAPI) SkinAcquisitionDates(summonerID int64, ownedIDs map[int6
 	supported := 0
 	invalid := 0
 	for _, path := range paths {
-		data, err := api.client.GetBytes(path)
+		var data []byte
+		var err error
+		if api.reads != nil {
+			data, err = api.reads.captured(path)
+		} else {
+			data, err = api.get(path)
+		}
 		if err != nil {
 			continue
 		}
@@ -746,6 +762,10 @@ func (api LootAPI) PlayerLoot() ([]LootItem, EndpointCapability) {
 	})
 	capability.State = capabilityAvailable
 	capability.Count = len(items)
+	if len(lootMap) == 0 {
+		capability.State = "pending"
+		capability.Detail = "客户端数据暂未同步，可稍后重试"
+	}
 	if api.observe != nil && len(items) == 0 {
 		api.observe(map[string]any{
 			"event": "loot_map_shape", "raw_entries": len(lootMap), "kept": len(items),

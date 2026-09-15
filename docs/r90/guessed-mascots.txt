@@ -1,0 +1,5 @@
+--- FAIL: TestR90RealShapeGroups (0.01s)
+    r90_test.go:28: real shape grouping: grouped=true mascot=true source="live-client-order-unverified"
+FAIL
+FAIL	lol-loot-assistant	0.370s
+FAIL

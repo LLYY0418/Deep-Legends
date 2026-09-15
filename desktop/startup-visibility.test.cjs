@@ -27,7 +27,7 @@ function harness(text = source) {
   electron.ipcMain.handle = () => {};
   const context = vm.createContext({ __dirname, URL, Buffer, console,
     Date: class extends Date { static now() { return now; } },
-    process: { platform: "win32", env: {}, resourcesPath: "/test/resources", getCreationTime: () => 900 },
+    process: { on() {}, platform: "win32", env: {}, resourcesPath: "/test/resources", getCreationTime: () => 900 },
     setTimeout(fn, delay) { const id = ++timerID; timers.set(id, { fn, delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
     require(name) {

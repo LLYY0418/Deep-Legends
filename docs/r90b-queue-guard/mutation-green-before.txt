@@ -1,0 +1,55 @@
+{"ImportPath":"internal/byteorder","Action":"build-output","Output":"# internal/byteorder\n"}
+{"ImportPath":"internal/byteorder","Action":"build-output","Output":"compile: writing output: write $WORK/b013/_pkg_.a: no space left on device\n"}
+{"ImportPath":"internal/byteorder","Action":"build-fail"}
+{"ImportPath":"internal/coverage/rtcov","Action":"build-output","Output":"internal/coverage/rtcov: mkdir /tmp/go-build108831330/b015/: no space left on device\n"}
+{"ImportPath":"internal/coverage/rtcov","Action":"build-fail"}
+{"ImportPath":"internal/godebugs","Action":"build-output","Output":"internal/godebugs: mkdir /tmp/go-build108831330/b016/: no space left on device\n"}
+{"ImportPath":"internal/godebugs","Action":"build-fail"}
+{"ImportPath":"internal/goexperiment","Action":"build-output","Output":"internal/goexperiment: mkdir /tmp/go-build108831330/b017/: no space left on device\n"}
+{"ImportPath":"internal/goexperiment","Action":"build-fail"}
+{"ImportPath":"internal/goos","Action":"build-output","Output":"internal/goos: mkdir /tmp/go-build108831330/b018/: no space left on device\n"}
+{"ImportPath":"internal/goos","Action":"build-fail"}
+{"ImportPath":"internal/profilerecord","Action":"build-output","Output":"internal/profilerecord: mkdir /tmp/go-build108831330/b019/: no space left on device\n"}
+{"ImportPath":"internal/profilerecord","Action":"build-fail"}
+{"ImportPath":"internal/asan","Action":"build-output","Output":"internal/asan: mkdir /tmp/go-build108831330/b023/: no space left on device\n"}
+{"ImportPath":"internal/asan","Action":"build-fail"}
+{"ImportPath":"internal/msan","Action":"build-output","Output":"internal/msan: mkdir /tmp/go-build108831330/b024/: no space left on device\n"}
+{"ImportPath":"internal/msan","Action":"build-fail"}
+{"ImportPath":"internal/cpu","Action":"build-output","Output":"# internal/cpu\n"}
+{"ImportPath":"internal/cpu","Action":"build-output","Output":"compile: writing output: write $WORK/b012/_pkg_.a: no space left on device\n"}
+{"ImportPath":"internal/cpu","Action":"build-fail"}
+{"ImportPath":"internal/runtime/syscall","Action":"build-output","Output":"internal/runtime/syscall: mkdir /tmp/go-build108831330/b028/: no space left on device\n"}
+{"ImportPath":"internal/runtime/syscall","Action":"build-fail"}
+{"ImportPath":"sync/atomic","Action":"build-output","Output":"sync/atomic: mkdir /tmp/go-build108831330/b036/: no space left on device\n"}
+{"ImportPath":"sync/atomic","Action":"build-fail"}
+{"ImportPath":"unicode/utf8","Action":"build-output","Output":"unicode/utf8: mkdir /tmp/go-build108831330/b038/: no space left on device\n"}
+{"ImportPath":"unicode/utf8","Action":"build-fail"}
+{"ImportPath":"cmp","Action":"build-output","Output":"cmp: mkdir /tmp/go-build108831330/b040/: no space left on device\n"}
+{"ImportPath":"cmp","Action":"build-fail"}
+{"ImportPath":"math/bits","Action":"build-output","Output":"math/bits: mkdir /tmp/go-build108831330/b042/: no space left on device\n"}
+{"ImportPath":"math/bits","Action":"build-fail"}
+{"ImportPath":"internal/itoa","Action":"build-output","Output":"internal/itoa: mkdir /tmp/go-build108831330/b047/: no space left on device\n"}
+{"ImportPath":"internal/itoa","Action":"build-fail"}
+{"ImportPath":"encoding","Action":"build-output","Output":"encoding: mkdir /tmp/go-build108831330/b060/: no space left on device\n"}
+{"ImportPath":"encoding","Action":"build-fail"}
+{"ImportPath":"unicode","Action":"build-output","Output":"unicode: mkdir /tmp/go-build108831330/b055/: no space left on device\n"}
+{"ImportPath":"unicode","Action":"build-fail"}
+{"ImportPath":"crypto/internal/fips140/alias","Action":"build-output","Output":"crypto/internal/fips140/alias: mkdir /tmp/go-build108831330/b080/: no space left on device\n"}
+{"ImportPath":"crypto/internal/fips140/alias","Action":"build-fail"}
+{"ImportPath":"crypto/internal/boring/sig","Action":"build-output","Output":"crypto/internal/boring/sig: mkdir /tmp/go-build108831330/b098/: no space left on device\n"}
+{"ImportPath":"crypto/internal/boring/sig","Action":"build-fail"}
+{"ImportPath":"unicode/utf16","Action":"build-output","Output":"unicode/utf16: mkdir /tmp/go-build108831330/b102/: no space left on device\n"}
+{"ImportPath":"unicode/utf16","Action":"build-fail"}
+{"ImportPath":"internal/goversion","Action":"build-output","Output":"internal/goversion: mkdir /tmp/go-build108831330/b128/: no space left on device\n"}
+{"ImportPath":"internal/goversion","Action":"build-fail"}
+{"ImportPath":"internal/platform","Action":"build-output","Output":"internal/platform: mkdir /tmp/go-build108831330/b129/: no space left on device\n"}
+{"ImportPath":"internal/platform","Action":"build-fail"}
+{"ImportPath":"internal/syslist","Action":"build-output","Output":"internal/syslist: mkdir /tmp/go-build108831330/b130/: no space left on device\n"}
+{"ImportPath":"internal/syslist","Action":"build-fail"}
+{"ImportPath":"internal/runtime/math","Action":"build-output","Output":"internal/runtime/math: mkdir /tmp/go-build108831330/b026/: no space left on device\n"}
+{"ImportPath":"internal/runtime/math","Action":"build-fail"}
+{"ImportPath":"internal/abi","Action":"build-output","Output":"internal/abi: mkdir /tmp/go-build108831330/b006/: no space left on device\n"}
+{"ImportPath":"internal/abi","Action":"build-fail"}
+{"Time":"2026-09-14T15:31:19.034463129+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T15:31:19.034543004+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments [build failed]\n"}
+{"Time":"2026-09-14T15:31:19.034547879+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0,"FailedBuild":"internal/abi"}

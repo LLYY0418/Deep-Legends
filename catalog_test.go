@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -109,7 +110,7 @@ func TestLoadSnapshotIndependentRefreshesOverlap(t *testing.T) {
 	}
 }
 
-func TestLoadCollectionSnapshotRunsAcquisitionAndChromaInParallel(t *testing.T) {
+func TestR87LoadCollectionSnapshotReusesOwnershipPayloads(t *testing.T) {
 	type chromaEntry struct {
 		ID   int64  `json:"id"`
 		Name string `json:"name"`
@@ -154,9 +155,14 @@ func TestLoadCollectionSnapshotRunsAcquisitionAndChromaInParallel(t *testing.T) 
 		parts := strings.Split(source.clientPath, "/")
 		lootCatalogs[source.clientPath] = lootNamingCatalogFixture(t, parts[len(parts)-1])
 	}
+	var inventoryCalls sync.Map
 	var active atomic.Int32
 	var maxActive atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "inventor") {
+			counter, _ := inventoryCalls.LoadOrStore(r.URL.RequestURI(), &atomic.Int32{})
+			counter.(*atomic.Int32).Add(1)
+		}
 		if body, ok := lootCatalogs[r.URL.Path]; ok {
 			_, _ = w.Write(body)
 			return
@@ -207,9 +213,12 @@ func TestLoadCollectionSnapshotRunsAcquisitionAndChromaInParallel(t *testing.T) 
 		t.Fatalf("loadCollectionSnapshot failed: %v", err)
 	}
 	assertLootNamingFixture(t, snapshot.Account.Loot)
-	if got := maxActive.Load(); got < 2 {
-		t.Fatalf("acquisition and chroma requests did not overlap: max active = %d", got)
-	}
+	inventoryCalls.Range(func(key, value any) bool {
+		if value.(*atomic.Int32).Load() != 1 {
+			t.Errorf("%s requested %d times", key, value.(*atomic.Int32).Load())
+		}
+		return true
+	})
 }
 
 func TestEmbeddedPoolMapsOneToOneWithoutOmissions(t *testing.T) {

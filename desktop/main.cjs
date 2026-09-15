@@ -13,6 +13,19 @@ const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 
+function installDesktopCrashDiagnostics() {
+  const record = (kind, details) => {
+    const { desktopCrashEvent } = require("./desktop-log.cjs");
+    appendDesktopLog("进程异常 " + JSON.stringify(desktopCrashEvent(kind, details)));
+  };
+  app.on("render-process-gone", (_event, _contents, details) => record("render-process-gone", details));
+  app.on("child-process-gone", (_event, details) => record("child-process-gone", details));
+  // Monitoring writes synchronously without swallowing the uncaught exception
+  // or replacing Node/Electron's fatal-exception behavior.
+  process.on("uncaughtExceptionMonitor", error => record("uncaughtException", { name: error?.name }));
+}
+installDesktopCrashDiagnostics();
+
 // Deliberately NOT required at module scope: none of these are needed before
 // the splash window exists, and every require() resolved out of the asar
 // archive delays the first frame the user sees.
@@ -522,7 +535,7 @@ function createMainWindow() {
     session: mainWindow.webContents.session,
     sender: mainWindow.webContents,
     getBaseURL: () => backendReady?.baseUrl || "",
-    getDirectory: () => windowShareExportController.getSaveDirectory({ sender: mainWindow?.webContents }).directory,
+    getDefaultDirectory: () => app.getPath("downloads"),
     fileSystem: fs,
     getDesktopLog: () => require("./desktop-log.cjs").desktopLogForExport(path.join(app.getPath("userData"), "logs")),
     onCompleted(file) {

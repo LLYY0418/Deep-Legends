@@ -1,0 +1,56 @@
+{
+  "guard_sha256": "3e54ef7bfa7a7d2eae4bcd829f9bc971aeda4149f79c0e016cec1c3a33712fa3",
+  "baseline_passed": true,
+  "restored_passed": true,
+  "source_unchanged": true,
+  "mutations": [
+    {
+      "mutation": "channel-select",
+      "test": "TestR90BQueueGuardRequired/channel-select",
+      "exit": 1,
+      "killed": true,
+      "old": "bindFacts(n.Chan, isInteger(n.Value), isQueue(n.Value))",
+      "new": "bindFacts(n.Chan, isInteger(n.Value), false)"
+    },
+    {
+      "mutation": "channel-receive",
+      "test": "TestR90BQueueGuardRequired/channel-receive",
+      "exit": 1,
+      "killed": true,
+      "old": "bindFacts(n.Chan, isInteger(n.Value), isQueue(n.Value))",
+      "new": "bindFacts(n.Chan, isInteger(n.Value), false)"
+    },
+    {
+      "mutation": "struct-field",
+      "test": "TestR90BQueueGuardRequired/struct-field",
+      "exit": 1,
+      "killed": true,
+      "old": "queue && !queueFields[field]",
+      "new": "false && queue && !queueFields[field]"
+    },
+    {
+      "mutation": "json-marshal",
+      "test": "TestR90BQueueGuardRequired/json-marshal",
+      "exit": 1,
+      "killed": true,
+      "old": "bind(lhs[0], rhs[0]) // First returned value, never the error/status.",
+      "new": "// Disabled first-return-value propagation."
+    },
+    {
+      "mutation": "binary-buffer",
+      "test": "TestR90BQueueGuardRequired/binary-buffer",
+      "exit": 1,
+      "killed": true,
+      "old": "bindFacts(n.Args[0], isInteger(n.Args[1]), isQueue(n.Args[1]))",
+      "new": "bindFacts(n.Args[0], isInteger(n.Args[1]), false)"
+    },
+    {
+      "mutation": "generic-comparator",
+      "test": "TestR90BQueueGuardRequired/generic-comparator",
+      "exit": 1,
+      "killed": true,
+      "old": "case \"queueguard.generic-comparison\":",
+      "new": "case \"ignored.generic-comparison\":"
+    }
+  ]
+}

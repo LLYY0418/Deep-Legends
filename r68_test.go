@@ -400,7 +400,7 @@ func TestR68WatchActionLifecycleHasNoArmedOrphans(t *testing.T) {
 	runner.scheduleMarked(client, "failure", 0, http.MethodPost, "/failed", nil)
 	runner.scheduleMarked(client, "cancellation", 5_000, http.MethodPost, "/never", nil)
 	runner.cancelPending("cancellation")
-	runner.scheduleMarked(client, "auto-matchmaking", 0, http.MethodPost, "/lol-lobby/v2/lobby/matchmaking/search", nil)
+	runner.scheduleAutoMatchmaking(client, 0)
 	armed, terminal := 0, 0
 	deadline := time.NewTimer(3 * time.Second)
 	defer deadline.Stop()

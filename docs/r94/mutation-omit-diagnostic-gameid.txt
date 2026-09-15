@@ -1,0 +1,5 @@
+--- FAIL: TestR94DiagnosticBatchPersistsRawPhaseSourceAndIdentityComparisons (0.00s)
+    r94_test.go:198: map[build_fingerprint:dev cached_game_id:8.980574903e+09 event:gameflow_phase_client game_id:0 game_id_comparison:different invalidated:false log_seq:2 phase:InProgress phase_changed:false previous_phase:InProgress reason:received received_at:1.789370200123e+12 run_id:2911a5ddd50eeb3eee85b09e source:poll time:2026-09-14T08:58:42.098122Z transport_dropped:3 transport_failed:1]
+FAIL
+FAIL	lol-loot-assistant	0.387s
+FAIL

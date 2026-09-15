@@ -1,0 +1,36 @@
+TAP version 13
+# Subtest: R91 addendum existing history remains readable during polling; new history still skeletons; arena hides rank
+not ok 1 - R91 addendum existing history remains readable during polling; new history still skeletons; arena hides rank
+  ---
+  duration_ms: 2.37775
+  type: 'test'
+  location: '/sessions/youthful-determined-volta/mnt/deep-legends/web/r91-addendum.test.cjs:82:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + '<div class="insight-match-row is-history-pending" aria-label="战绩读取中"><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span></div><article class="live-player"><img><div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" data-player-ref="p" data-tooltip="Player" data-tooltip-overflow="self" data-tooltip-size="compact">Player</button></div></div><dl><div><dt>当前模式</dt><dd>1胜 undefined负</dd></div><div><dt>胜率</dt><dd class="win-rate-value">undefined</dd></div><div><dt>KDA</dt><dd>3:1</dd></div></dl></article>'
+    - '<div class="insight-match-row" aria-label="当前模式最近战绩，从左到右由新到旧"><span class="insight-match is-win" data-tooltip="英雄 · 3/1/0 · 胜利" data-tooltip-size="compact"><img><b>3/1/0</b><i class="insight-score is-good">3.0</i></span></div><article class="live-player"><img><div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" data-player-ref="p" data-tooltip="Player" data-tooltip-overflow="self" data-tooltip-size="compact">Player</button></div></div><dl><div><dt>当前模式</dt><dd>1胜 undefined负</dd></div><div><dt>胜率</dt><dd class="win-rate-value">undefined</dd></div><div><dt>KDA</dt><dd>3:1</dd></div></dl></article>'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '<div class="insight-match-row" aria-label="当前模式最近战绩，从左到右由新到旧"><span class="insight-match is-win" data-tooltip="英雄 · 3/1/0 · 胜利" data-tooltip-size="compact"><img><b>3/1/0</b><i class="insight-score is-good">3.0</i></span></div><article class="live-player"><img><div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" data-player-ref="p" data-tooltip="Player" data-tooltip-overflow="self" data-tooltip-size="compact">Player</button></div></div><dl><div><dt>当前模式</dt><dd>1胜 undefined负</dd></div><div><dt>胜率</dt><dd class="win-rate-value">undefined</dd></div><div><dt>KDA</dt><dd>3:1</dd></div></dl></article>'
+  actual: '<div class="insight-match-row is-history-pending" aria-label="战绩读取中"><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span></div><article class="live-player"><img><div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" data-player-ref="p" data-tooltip="Player" data-tooltip-overflow="self" data-tooltip-size="compact">Player</button></div></div><dl><div><dt>当前模式</dt><dd>1胜 undefined负</dd></div><div><dt>胜率</dt><dd class="win-rate-value">undefined</dd></div><div><dt>KDA</dt><dd>3:1</dd></div></dl></article>'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/sessions/youthful-determined-volta/mnt/deep-legends/web/r91-addendum.test.cjs:87:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2018.976251

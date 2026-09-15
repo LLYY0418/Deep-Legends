@@ -1,0 +1,8 @@
+--- FAIL: TestR91AddendumWildcardHoverClearKeepsArmedLock (0.00s)
+    --- FAIL: TestR91AddendumWildcardHoverClearKeepsArmedLock/0 (0.00s)
+        r91_addendum_test.go:253: lock not armed
+    --- FAIL: TestR91AddendumWildcardHoverClearKeepsArmedLock/104 (0.00s)
+        r91_addendum_test.go:253: lock not armed
+FAIL
+FAIL	lol-loot-assistant	0.011s
+FAIL

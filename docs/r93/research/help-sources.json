@@ -1,0 +1,21 @@
+{
+  "archived_at_utc": "2026-09-14T08:17:37.757166+00:00",
+  "retrieved_on": "2026-09-14",
+  "method": "web.open successfully extracted official help article text",
+  "numeric_http_status": null,
+  "direct_http_note": "Python direct HTTP was 403 for both; preserved separately in responses.json; not evidence of absent data.",
+  "articles": [
+    {
+      "url": "https://help.op.gg/hc/en-us/articles/60909599637657-How-to-Check-ARAM-Mayhem-Match-History",
+      "updated_at_on_page": "2026-08-07 14:49",
+      "excerpt": "You cannot view the ARAM:Mayhem match history of other users.",
+      "findings": "OP.GG says Mayhem requires its Desktop app to save history and only the linked logged-in account can read its own history."
+    },
+    {
+      "url": "https://help.op.gg/hc/en-us/articles/31089445595033-I-want-to-view-my-stats-for-custom-games",
+      "updated_at_on_page": "2025-07-17 16:50",
+      "excerpt": "stats for custom games are not available on OP.GG.",
+      "findings": "OP.GG explicitly excludes custom-game stats from its service; does not establish a universal restriction on all Riot APIs or data providers."
+    }
+  ]
+}

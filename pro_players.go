@@ -218,9 +218,16 @@ func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, ti
 			if err != nil {
 				return
 			}
+			// Start known directory accounts while the three independent supplements
+			// resolve. Newly discovered accounts join the same bounded worker pool.
+			ladderStarted := time.Now()
+			ladder := newProLadderPipeline(loadCtx, provider)
+			ladder.submit(teams)
 			// Every published snapshot is immutable, including nested accounts.
 			supplements := retainProSupplements(loadProSupplements(loadCtx, provider, func(partial []opggProTeam) {
 				snapshot := append(cloneProTeams(base), retainProSupplements(partial, previous, time.Now())...)
+				ladder.submit(snapshot)
+				ladder.apply(snapshot)
 				c.mu.Lock()
 				c.teams = snapshot
 				c.mu.Unlock()
@@ -230,11 +237,14 @@ func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, ti
 			c.teams = cloneProTeams(completed)
 			c.mu.Unlock()
 			a.recordDiagnostic(map[string]any{"event": "pro_directory_cost", "stage": "supplements", "duration_ms": time.Since(started).Milliseconds(), "partial": proSupplementsIncomplete(completed)})
-			enrichProLadderRanks(loadCtx, provider, completed)
+			ladder.submit(completed)
+			waitStarted := time.Now()
+			ladder.finish()
+			ladder.apply(completed)
 			c.mu.Lock()
 			c.teams, c.updating = completed, false
 			c.mu.Unlock()
-			a.recordDiagnostic(map[string]any{"event": "pro_directory_cost", "stage": "ladder", "duration_ms": time.Since(started).Milliseconds()})
+			a.recordDiagnostic(map[string]any{"event": "pro_directory_cost", "stage": "ladder", "duration_ms": time.Since(started).Milliseconds(), "stage_duration_ms": time.Since(ladderStarted).Milliseconds(), "wait_after_supplements_ms": time.Since(waitStarted).Milliseconds()})
 		}()
 		select {
 		case <-done:

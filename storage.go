@@ -634,11 +634,15 @@ func (s *localStore) appendDiagnostic(event map[string]any) error {
 }
 
 func marshalDiagnosticRecord(event map[string]any, recordedAt time.Time) ([]byte, error) {
-	record := make(map[string]any, len(event)+1)
+	record := make(map[string]any, len(event)+2)
 	for key, value := range event {
 		record[key] = value
 	}
 	record["time"] = recordedAt
+	// Every JSONL write, including early startup/provider events and the
+	// storage-generated rotation marker, passes through this encoder. Stamp
+	// the running build here rather than trusting individual event producers.
+	record["build_fingerprint"] = buildFingerprint
 	data, err := json.Marshal(record)
 	if err != nil {
 		return nil, err

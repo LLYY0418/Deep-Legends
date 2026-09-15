@@ -1,0 +1,22 @@
+✔ R94 same-phase live responses with changed gameId invoke the transition before replacement (67.993292ms)
+✔ R94 unchanged phase and gameId preserve content and recommendation generation (11.787208ms)
+✔ R94 identity polling catches a game jump even when all intermediate phases were missed (22.402875ms)
+✔ R94 SSE game identity aborts a pending old game; stale replacement data cannot undo it (13.088625ms)
+✔ R94 unknown IDs do not clear a known game and diagnostics distinguish first observations (14.943833ms)
+✔ R94 same-game phase advance labels the retained snapshot and rejects a late selection response (12.062833ms)
+✔ R94 a delayed poll cannot reverse a newer SSE identity or phase (34.507125ms)
+✔ R94 a changed identity in a new selection snapshot is not mistaken for a late same-game response (13.994791ms)
+✔ R94 SSE decoder retains legacy phase events and game identity payloads (2.759916ms)
+✔ R94 diagnostics preserve every repeated phase and identity comparison in bounded batches (2.572042ms)
+✔ R94 diagnostics use one request during a stall and expose queue overflow while retaining transitions (1.924125ms)
+✔ R94 largest diagnostic batch fits backend limit and strips unrelated data; export sends queued observations (1.347083ms)
+✔ R94 hidden same-phase SSE identity jump resumes one forced refresh when visible (12.071417ms)
+✔ R94 failed diagnostic batches release their slot without retries and recover on the next batch (1.350875ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 777.489541

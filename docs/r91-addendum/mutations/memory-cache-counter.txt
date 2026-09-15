@@ -1,0 +1,5 @@
+--- FAIL: TestR91AddendumCacheThreeStates (0.00s)
+    r91_addendum_test.go:56: calls=1 tracker=&{profileQuotaError:<nil> mu:{_:{} mu:{state:0 sema:0}} rateLimitedCount:0 matchesFailed:0 firstErrorKind: queueWait:0 matchesFromMemory:0 matchesFromNetwork:1 matchesFromDisk:1 inFlight:0 peakInFlight:1}
+FAIL
+FAIL	lol-loot-assistant	0.008s
+FAIL

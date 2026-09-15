@@ -63,6 +63,20 @@ func newExecutionFixture(t *testing.T) *executionFixture {
 			}
 			return response2351(f.bans), nil
 		}
+		if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, champSelectAPI+"/session/bench/swap/") {
+			id, _ := strconv.ParseInt(req.URL.Path[strings.LastIndex(req.URL.Path, "/")+1:], 10, 64)
+			f.patches = append(f.patches, executionPatch{Path: req.URL.Path})
+			if f.applyWrites {
+				old := f.session.MyTeam[0].ChampionID
+				f.session.MyTeam[0].ChampionID = id
+				for i := range f.session.BenchChampions {
+					if f.session.BenchChampions[i].ChampionID == id {
+						f.session.BenchChampions[i].ChampionID = old
+					}
+				}
+			}
+			return &http.Response{StatusCode: f.status, Body: io.NopCloser(strings.NewReader(""))}, nil
+		}
 		if req.Method != "PATCH" || !strings.HasPrefix(req.URL.Path, champSelectAPI+"/session/actions/") {
 			t.Errorf("unexpected request %s %s", req.Method, req.URL.Path)
 			return response2351(nil), nil
@@ -103,6 +117,8 @@ func (f *executionFixture) configure(ban, pick, avoid bool, strategy string) {
 	g := s.ChampSelect.Groups["practice"]
 	g.Ban.Enabled, g.Pick.Enabled = ban, pick
 	g.Ban.DelayMS, g.Pick.DelayMS = 0, 0
+	lockDelay := 0 // These legacy execution tests exercise writes, not the user-facing wait.
+	g.Pick.LockDelayMS = &lockDelay
 	g.Ban.Strategy, g.Pick.Strategy = strategy, strategy
 	g.Ban.AvoidTeammateIntent, g.Pick.AvoidTeammateIntent = avoid, avoid
 	g.Ban.Champions["default"], g.Pick.Champions["default"] = []int64{141, 104}, []int64{5, 804}
@@ -267,7 +283,7 @@ func TestExecutionCustomCompatibilityAlwaysConfirmsHoverEvenLockNow(t *testing.T
 }
 
 func TestExecutionCompatibilityIsNotAWildcard(t *testing.T) {
-	for _, kind := range []string{"other-custom", "empty", "read-failed", "no-action", "planning", "unknown-phase", "banned", "own-intent", "ally-selected", "unknown-hero"} {
+	for _, kind := range []string{"empty", "read-failed", "no-action", "planning", "unknown-phase", "banned", "own-intent", "ally-selected", "unknown-hero"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newExecutionFixture(t)
 			f.configure(true, false, true, "lock-now")
@@ -278,8 +294,6 @@ func TestExecutionCompatibilityIsNotAWildcard(t *testing.T) {
 			s.ChampSelect.Groups["practice"] = g
 			f.r.apply(s)
 			switch kind {
-			case "other-custom":
-				f.session.QueueID = 3100
 			case "empty":
 				f.bans = []int64{}
 			case "read-failed":
@@ -431,12 +445,12 @@ func TestExecutionOldBanEvidenceDoesNotLeakBetweenSessions(t *testing.T) {
 	f.r.champSelectBanAvailability(f.session, champSelectAPI, []int64{141}, g)
 	f.session.Timer.Phase = "BAN_PICK"
 	ids, source := f.r.champSelectBanAvailability(f.session, champSelectAPI, []int64{-1}, g)
-	if len(ids) != 1 || source != "custom-session-evidence-hover" {
+	if len(ids) != 1 || source != "wildcard-session-evidence-hover" {
 		t.Fatal(ids, source)
 	}
 	f.session.GameID++
 	ids, source = f.r.champSelectBanAvailability(f.session, champSelectAPI, []int64{-1}, g)
-	if len(ids) != 2 || source != "custom-grid-hover" {
+	if len(ids) != 2 || source != "wildcard-grid-hover" {
 		t.Fatal("old evidence leaked", ids, source)
 	}
 }

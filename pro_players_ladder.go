@@ -23,12 +23,6 @@ const (
 	proLadderMaxRank     = 100_000_000
 )
 
-type proLadderResult struct {
-	key  string
-	rank int
-	err  error
-}
-
 func proLadderAccountKey(gameName, tagLine string) string {
 	return strings.ToLower(strings.TrimSpace(gameName) + "#" + strings.TrimSpace(tagLine))
 }
@@ -59,59 +53,91 @@ func proRankedLadderAccounts(teams []opggProTeam) []proAccount {
 // position. Its public KR leaderboard can locate one Riot ID and renders the
 // authoritative position in the first cell of that account's highlighted row.
 func enrichProLadderRanks(ctx context.Context, provider *championProvider, teams []opggProTeam) {
-	accounts := proRankedLadderAccounts(teams)
-	if len(accounts) == 0 || ctx.Err() != nil {
-		return
-	}
+	pipeline := newProLadderPipeline(ctx, provider)
+	pipeline.submit(teams)
+	pipeline.finish()
+	pipeline.apply(teams)
+}
 
-	jobs := make(chan proAccount)
-	results := make(chan proLadderResult, len(accounts))
-	workerCount := proLadderConcurrency
-	if len(accounts) < workerCount {
-		workerCount = len(accounts)
-	}
-	var workers sync.WaitGroup
-	workers.Add(workerCount)
-	for i := 0; i < workerCount; i++ {
+// The directory and each completed supplement can discover new accounts. Queue
+// only reviewed identities, without waiting for unrelated supplements. Workers
+// keep results separate from the immutable snapshots published to readers.
+type proLadderPipeline struct {
+	mu      sync.Mutex
+	ready   *sync.Cond
+	workers sync.WaitGroup
+	pending []proAccount
+	seen    map[string]bool
+	known   map[string]int
+	closed  bool
+}
+
+func newProLadderPipeline(ctx context.Context, provider *championProvider) *proLadderPipeline {
+	p := &proLadderPipeline{seen: make(map[string]bool), known: make(map[string]int)}
+	p.ready = sync.NewCond(&p.mu)
+	p.workers.Add(proLadderConcurrency)
+	for i := 0; i < proLadderConcurrency; i++ {
 		go func() {
-			defer workers.Done()
-			for account := range jobs {
-				rank, err := fetchOPGGLadderRank(ctx, provider, account.GameName, account.TagLine)
-				result := proLadderResult{key: proLadderAccountKey(account.GameName, account.TagLine), rank: rank, err: err}
-				select {
-				case results <- result:
-				case <-ctx.Done():
+			defer p.workers.Done()
+			for {
+				p.mu.Lock()
+				for len(p.pending) == 0 && !p.closed {
+					p.ready.Wait()
+				}
+				if len(p.pending) == 0 {
+					p.mu.Unlock()
 					return
+				}
+				account := p.pending[0]
+				p.pending[0] = proAccount{}
+				p.pending = p.pending[1:]
+				p.mu.Unlock()
+				if ctx.Err() != nil {
+					continue
+				}
+				rank, err := fetchOPGGLadderRank(ctx, provider, account.GameName, account.TagLine)
+				if err == nil && rank > 0 {
+					p.mu.Lock()
+					p.known[proLadderAccountKey(account.GameName, account.TagLine)] = rank
+					p.mu.Unlock()
 				}
 			}
 		}()
 	}
-	go func() {
-		defer close(jobs)
-		for _, account := range accounts {
-			select {
-			case jobs <- account:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	go func() {
-		workers.Wait()
-		close(results)
-	}()
+	return p
+}
 
-	known := make(map[string]int, len(accounts))
-	for result := range results {
-		if result.err == nil && result.rank > 0 {
-			known[result.key] = result.rank
+func (p *proLadderPipeline) submit(teams []opggProTeam) {
+	accounts := proRankedLadderAccounts(teams)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, account := range accounts {
+		key := proLadderAccountKey(account.GameName, account.TagLine)
+		if !p.seen[key] {
+			p.seen[key] = true
+			p.pending = append(p.pending, account)
 		}
 	}
+	p.ready.Broadcast()
+}
+
+func (p *proLadderPipeline) finish() {
+	p.mu.Lock()
+	p.closed = true
+	p.ready.Broadcast()
+	p.mu.Unlock()
+	p.workers.Wait()
+}
+
+// Call only with a private snapshot; never mutate an already-published slice.
+func (p *proLadderPipeline) apply(teams []opggProTeam) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	for teamIndex := range teams {
 		for memberIndex := range teams[teamIndex].Members {
 			for accountIndex := range teams[teamIndex].Members[memberIndex].Summoners {
 				account := &teams[teamIndex].Members[memberIndex].Summoners[accountIndex]
-				if rank := known[proLadderAccountKey(account.GameName, account.TagLine)]; rank > 0 {
+				if rank := p.known[proLadderAccountKey(account.GameName, account.TagLine)]; rank > 0 {
 					account.LadderRank = rank
 					account.LadderRankKnown = true
 				}

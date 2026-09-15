@@ -1,0 +1,13 @@
+{
+  "web/gameplay.js": "ec3dc452ded3b1065e7a8dd404767b8b471dc1c91aa384b64ce565f03ae0b0d1",
+  "web/gameplay.css": "ac814330be7ae93d2a3ce70f0ea3ae47b57158fe8b7a5cbabaca2bac7321bf3e",
+  "web/r87.test.cjs": "71d9c5e7d303c612b557f56c78246ba6389747874db25f60b21e3947de020e3b",
+  "web/r90.test.cjs": "a55ce85f56ddbd9278b7175fee537d0ea39a41864d5ce507c74becb4e7d79948",
+  "web/champions.test.cjs": "f8729cd244dfbef2fe38991e52552841c21837147c687591d581a54d89d46c30",
+  "desktop/refresh-orchestration.test.cjs": "c9434e47aa913991194e86fa541b9ca3e5462a48ad88ef9e70cad6487b4e60d5",
+  "DESIGN.md": "8971034aba8e260d2186cbefd1d54fc9a5bffba0bc1091116f30da95c4d4f6f6",
+  "web/r88.test.cjs": "4beb103b5865abcfb063548a1613f69c69d5aa2844139c36d594cb446403846a",
+  "web/r91.test.cjs": "4467f8ab8234300461833e9fa28f306f395e08c3646b1e5dbbe5ca8283db8183",
+  "scripts/r91-mutation-check.py": "8086ad1a9d30d150d1fcc8f00318c32c44bc6b54d3dfe06d442b048d46e53751",
+  "WORKLIST-R91-LIVE-STALE-DATA.md": "70d380b9ab6b78038a8a2229cccd0801ece735b5ea33fece0d2cbef5339292af"
+}

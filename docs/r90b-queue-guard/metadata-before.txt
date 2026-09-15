@@ -1,0 +1,6 @@
+--- FAIL: TestR90BQueueGuardAllowsLegalFlows (0.00s)
+    --- FAIL: TestR90BQueueGuardAllowsLegalFlows/registry-metadata-pipeline (0.00s)
+        r90b_queue_guard_test.go:45: legal R90B flow rejected: registry-metadata-pipeline: [487]
+FAIL
+FAIL	command-line-arguments	0.924s
+FAIL

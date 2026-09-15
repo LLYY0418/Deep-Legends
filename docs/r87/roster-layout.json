@@ -1,0 +1,285 @@
+{
+  "clippingPolicy": "strict",
+  "results": [
+    {
+      "viewport": 1920,
+      "measurements": [
+        {
+          "length": 4,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 290,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 6,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 248,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 8,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 206,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 12,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 122,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 16,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 38,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 20,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "truncated": 10,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 6,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 248,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 16,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 38,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        }
+      ]
+    },
+    {
+      "viewport": 2560,
+      "measurements": [
+        {
+          "length": 4,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 290,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 6,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 248,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 8,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 206,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 12,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 122,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 16,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 38,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 20,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "truncated": 10,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 6,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 248,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 16,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 38,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        }
+      ]
+    },
+    {
+      "viewport": 3840,
+      "measurements": [
+        {
+          "length": 4,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 290,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 6,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 248,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 8,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 206,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 12,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 122,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 16,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 38,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 20,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "truncated": 10,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 6,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 248,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        },
+        {
+          "length": 16,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 38,
+          "truncated": 0,
+          "overflow": false,
+          "namesOverflow": false
+        }
+      ]
+    }
+  ],
+  "failures": []
+}

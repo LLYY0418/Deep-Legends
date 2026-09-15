@@ -1,0 +1,5 @@
+--- FAIL: TestR91AddendumGameStartGroupingAndCarryover (0.00s)
+    r91_addendum_test.go:186: map[roster-not-divisible:true]
+FAIL
+FAIL	lol-loot-assistant	0.012s
+FAIL

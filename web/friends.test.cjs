@@ -61,6 +61,8 @@ test("real friend dock rerenders occupancy and removes old room details on every
   window.deepLegendsRuntime = { escapeHTML };
   let payload = {...lobby, gameName: "房间好友", tagLine: "1234", playerRef: "anon", partySize: 1, groupId: 1};
   const requests = [];
+  const snapshots = [];
+  window.addEventListener("deep-legends:friends-presence", event => snapshots.push(event.detail.friends));
   window.fetch = async (url) => {
     requests.push(url);
     return {ok: true, json: async () => ({groups: [{id: 1, name: "默认分组"}], friends: [{...payload}]})};
@@ -73,6 +75,7 @@ test("real friend dock rerenders occupancy and removes old room details on every
     window.document.getElementById("friends-toggle").click();
     await flush();
     assert.equal(window.document.querySelector(".friend-status").textContent, "1/5 海克斯大乱斗");
+    assert.equal(snapshots.at(-1)[0].playerRef, "anon", "loaded presence is also available before opening a player");
     for (const [changes, expected] of [
       [{partySize: 2}, "2/5 海克斯大乱斗"],
       [{gameStatus: "inQueue"}, "匹配中 · 海克斯大乱斗"],
@@ -95,8 +98,29 @@ test("real friend dock rerenders occupancy and removes old room details on every
     assert.equal(window.document.querySelector(".friend-status.online"), null);
     assert.ok(requests.length >= 8);
     assert.ok(requests.every(url => url === "/api/social/friends"), "no roster or probe endpoints");
+    window.dispatchEvent(new window.CustomEvent("deep-legends:status", {detail:{connected:false}}));
+    assert.equal(snapshots.at(-1).length,0,"disconnect clears banner presence");
   } finally {
     window.dispatchEvent(new window.CustomEvent("deep-legends:dispose"));
     window.close();
   }
+});
+
+test("friend banner matches opaque aliases, escapes labels and rejects stale or foreign presence", () => {
+  const gameplay = fs.readFileSync(path.join(__dirname,"gameplay.js"),"utf8");
+  const state={friendPresence:new Map()};
+  const now=Date.now();
+  const source=gameplay.slice(gameplay.indexOf("  function friendPresenceForTab("),gameplay.indexOf('  window.addEventListener("deep-legends:friends-presence"'));
+  const render=Function("state","riotTab","escapeHTML","Date",`${source}\nreturn friendPresenceMarkup;`)(state,tab=>tab.region==='kr',escapeHTML,{now:()=>now});
+  const friend={playerRef:"friend_cn_ref",availability:"dnd",product:"league_of_legends",gameStatus:"inGame",queueLabel:"灵活排位",championName:"虚空掠夺者",gameStartedAt:now-852000};
+  state.friendPresence.set(friend.playerRef,friend);
+  const tab={playerRef:"canonical_cn_ref",playerRefs:new Set([friend.playerRef]),region:"cn"};
+  assert.match(render(tab),/灵活排位 · 虚空掠夺者.*已进行 14:12/);
+  assert.equal(render({...tab,region:"kr"}),"");
+  assert.equal(render({playerRef:"other_cn_server_ref",gameName:"same name",region:"cn"}),"");
+  for(const changes of [{availability:"offline"},{availability:"away"},{gameStatus:"outOfGame"},{product:"valorant"}]) {
+    state.friendPresence.set(friend.playerRef,{...friend,...changes});assert.equal(render(tab),"");
+  }
+  state.friendPresence.set(friend.playerRef,{...friend,queueLabel:'<img src=x onerror="alert(1)">',gameStartedAt:NaN});
+  assert.match(render(tab),/&lt;img/);assert.doesNotMatch(render(tab),/<img|<time/);
 });

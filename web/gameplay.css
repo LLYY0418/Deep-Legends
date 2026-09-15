@@ -189,6 +189,8 @@
 .summoner-strip-copy p { margin: 4px 0 0; font-size: 13px; }
 .summoner-level-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 7px; }
 .summoner-level-row .player-tab-hidden { margin-top: 0; color: var(--warning); }
+.summoner-strip-copy .player-live-chip { color: var(--accent); overflow-wrap: anywhere; }
+.player-live-chip time { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* 熟练度与最高段位两列必须逐行对齐：标签行、图像行、名称行、数值行各自共用一条行轨。
    用 subgrid 而不是给每个元素写死高度——两列的图像本来就不一样高（熟练度是头像+徽章
@@ -613,11 +615,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-detail-failure strong { color: var(--ink); font-size: 11px; }
 .match-detail-failure small { overflow-wrap: anywhere; font-size: 10px; }
 .match-detail-failure .text-button { min-height: 30px; flex: 0 0 auto; }
-/* 名单那一列按内容收缩（max-content），不要钉死成 --match-roster-width：
-   钉死的话名字短时名单块在自己的轨道里右对齐，轨道左半边就空成一条缝——
-   用户看到的"右侧凭空多出来的间隙"就是它。--match-roster-width 现在只作为
-   .match-players 的上限，控制名字最多能长到多宽。 */
-.match-summary { display: grid; grid-template-columns: 108px minmax(0,1fr) minmax(0,max-content) 40px; align-items: center; gap: 8px; min-height: 118px; padding: 10px 10px 10px 14px; }
+/* 名单轨道在同一容器内统一宽度，沿用现有断点与最大宽度。 */
+.match-summary { display: grid; grid-template-columns: 108px minmax(0,1fr) var(--match-roster-width,clamp(150px,18cqi,190px)) 40px; align-items: center; gap: 8px; min-height: 118px; padding: 10px 10px 10px 14px; }
 .match-summary.is-arena { grid-template-columns: 108px minmax(220px,1fr) var(--match-roster-width,clamp(150px,18cqi,190px)) 40px; }
 .match-result-meta { display: grid; align-self: stretch; align-content: center; padding-right: 10px; border-right: 1px solid var(--line); }
 .match-result-meta strong { min-width: 0; overflow: hidden; color: var(--accent); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
@@ -633,8 +632,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 /* 中部主区：第一行 英雄+技能符文 / KDA / 数据列，第二行装备栏 + 徽章。
    中列弹性伸缩：宽度变化时 KDA 居中、数据列贴住右侧玩家名单，
    多余空间均匀分布在块之间，而不是堆在数据列右侧。 */
-.match-main { display: grid; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }
-.match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); row-gap: 5px; }
+.match-main { display: grid; align-self: start; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }
+.match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); }
 .match-champion { position: relative; display: grid; min-width: 0; min-height: 63px; grid-template-columns: 58px minmax(0,auto); align-items: center; gap: 7px; }
 .champion-level { position: absolute; top: 44px; left: 40px; display: grid; width: 22px; height: 22px; place-items: center; color: white; background: #171717; border-radius: 50%; font-size: 10px; }
 /* 召唤师技能一列、主副系符文一列（各上下两格） */
@@ -648,7 +647,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 /* 数据列：按模式展示参团、补刀、段位或伤害数据，悬停有完整说明；
    固定最小宽度并靠右，保证多张卡片的左右边缘对齐 */
 .match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }
-.match-stats.is-arena { align-content: center; grid-template-rows: repeat(2,18px); min-height: 41px; }
+.match-stats.is-arena { align-content: start; grid-template-rows: repeat(3,18px); min-height: 54px; }
 .match-stat { display: grid; min-width: 0; grid-template-columns: 72px minmax(0,1fr); align-items: baseline; gap: 8px; font-size: 11px; cursor: help; white-space: nowrap; }
 .match-stat > em { min-width: 0; color: var(--faint); font-size: 10.5px; font-style: normal; }
 .match-stat > b { min-width: 0; justify-self: end; overflow: hidden; color: var(--muted); font-weight: 700; text-align: right; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
@@ -657,7 +656,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-stat-tier { align-items: center; }
 .match-stat-tier .match-tier-value { display: flex; min-width: 0; justify-self: end; align-items: center; gap: 4px; min-height: 19px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .match-stat-tier .match-tier-value b { color: var(--muted); font-size: 11px; font-weight: 700; }
-.match-stat-damage > b { display: inline-flex; align-items: baseline; gap: 3px; }
+.match-stat-damage > b, .match-stat-taken > b { display: inline-flex; align-items: baseline; gap: 3px; }
 .match-tier-crest { width: 19px; height: 19px; object-fit: contain; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .35)); }
 .match-tier-unknown { color: var(--faint); font-weight: 600; }
 .match-build { display: flex; min-width: 0; grid-column: 1 / -1; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
@@ -690,11 +689,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-score-value, .match-score-badge { display: grid; min-width: 0; justify-items: end; }
 .match-score-badge { min-height: 18px; }
 .match-build > .match-score-cell { flex: 0 0 86px; justify-content: center; }
-/* 对局玩家名单：两列（蓝方 / 红方），紧贴右侧操作按钮。
-   两列按内容宽度收缩并整体右对齐——名字短的时候不会在列尾留出大片空转，
-   名字长的时候才吃掉 --match-roster-width 给的额度。用 1fr 等分是错的：
-   它把多出来的宽度平均塞进两列的尾巴，看上去就是"把间隙拉大了"。 */
-.match-players { display: grid; width: auto; max-width: var(--match-roster-width,clamp(150px,18cqi,190px)); min-width: 0; grid-template-columns: repeat(2,minmax(0,max-content)); justify-content: end; justify-self: end; gap: 2px 14px; align-self: center; }
+/* 两队等分固定名单宽度；列间距保持 14px。 */
+.match-players { display: grid; width: 100%; min-width: 0; grid-template-columns: repeat(2,minmax(0,1fr)); justify-self: end; gap: 2px 14px; align-self: center; }
 .match-team-list { display: grid; gap: 1px; }
 .match-team-list button { display: flex; min-width: 0; align-items: center; gap: 5px; padding: 0; overflow: hidden; color: var(--muted); background: transparent; border: 0; font-size: 10.5px; text-align: left; }
 .match-team-list button:hover:not(:disabled) { color: var(--ink); }
@@ -771,7 +767,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 	.match-main, .match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,1fr); }
 	.match-stats { display: grid; grid-column: 1 / -1; grid-row: 2; min-height: 54px; padding-left: 10px; border-left: 0; border-top: 1px solid var(--line); padding-top: 6px; }
 	.match-build { column-gap: 4px; }
-	.match-stats.is-arena { align-content: center; grid-template-rows: repeat(2,18px); min-height: 41px; }
+	.match-stats.is-arena { align-content: start; grid-template-rows: repeat(3,18px); min-height: 54px; }
 	.item-slot.is-trinket { margin-left: 0; }
 }
 
@@ -798,33 +794,11 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 		min-height: 116px;
 	}
 	.match-main, .match-main.is-arena { row-gap: 0; }
+	.match-summary.is-arena { min-height: 118px; }
 }
 
 @container matches-column (min-width: 1080px) {
-	.match-summary { --match-roster-width: clamp(300px,36cqi,420px); }
-}
-
-@container arena-first (max-width: 720px) {
-	.match-summary.is-arena { --match-roster-width: clamp(146px,20cqi,180px); grid-template-columns: 108px minmax(0,1fr) 40px; align-items: center; }
-	.match-players, .match-players.is-arena { display: none; }
-	.match-summary.is-arena .match-result-meta { grid-column: 1; grid-row: 1; }
-	.match-summary.is-arena .match-main { grid-column: 2; grid-row: 1; gap: 5px 12px; }
-	.match-summary.is-arena .match-build { column-gap: 4px; }
-	.match-summary.is-arena .item-slot.is-trinket { margin-left: 0; }
-	.match-summary.is-arena .match-actions { grid-column: 3; grid-row: 1; }
-	.match-stats { padding-left: 10px; }
-}
-
-@container arena-first (max-width: 520px) {
-	.match-summary.is-arena { --match-roster-width: clamp(150px,24cqi,210px); grid-template-columns: minmax(0,1fr) 34px; gap: 8px; padding: 10px; }
-	.match-summary.is-arena .match-result-meta { grid-column: 1; grid-row: 1; align-self: center; padding: 0; border-right: 0; }
-	.match-summary.is-arena .match-main { grid-column: 1 / -1; grid-row: 2; grid-template-columns: minmax(0,auto) minmax(0,1fr); gap: 7px 4px; }
-	.match-summary.is-arena .match-stats { display: grid; }
-	.match-summary.is-arena .match-actions { grid-column: 2; grid-row: 1; width: 34px; min-height: 64px; }
-}
-
-@container arena-first (max-width: 420px) {
-	.match-summary.is-arena { --match-roster-width: 100%; }
+	.match-summary { --match-roster-width: 370px; }
 }
 
 .match-detail { padding: 0 8px 8px; border-top: 1px solid var(--line); }
@@ -867,10 +841,6 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .arena-detail-player .match-score-value, .arena-detail-player .match-score-badge, .match-table .match-score-value, .match-table .match-score-badge { justify-items: center; }
 .arena-detail-player .match-score-badge:empty, .match-table .match-score-badge:empty { display: none; }
 @container matches-column (max-width: 720px) {
-	.arena-match-detail { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-gutter: stable; }
-	.arena-detail-columns, .arena-detail-team { min-width: 860px; }
-}
-@container arena-first (max-width: 640px) {
 	.arena-match-detail { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-gutter: stable; }
 	.arena-detail-columns, .arena-detail-team { min-width: 860px; }
 }
@@ -1857,3 +1827,17 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .overview-art > video { opacity: 0; }
 .overview-art > video.is-playing { opacity: 1; }
 .summoner-strip.has-loaded-image .overview-art, .account-hero.has-loaded-image .overview-art { opacity: .8; }
+
+.live-refresh-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.match-stat-damage > b, .match-damage-value { color: var(--danger); }
+.match-stat-taken > b, .match-taken-value { color: var(--muted); }

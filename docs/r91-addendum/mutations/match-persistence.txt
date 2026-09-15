@@ -1,0 +1,5 @@
+--- FAIL: TestR91AddendumCacheThreeStates (0.00s)
+    r91_addendum_test.go:52: disk miss <nil>
+FAIL
+FAIL	lol-loot-assistant	0.009s
+FAIL

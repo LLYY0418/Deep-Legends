@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T14:19:38.760009+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:19:38.994061+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations"}
+{"Time":"2026-09-14T14:19:38.994146+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations","Output":"=== RUN   TestR90QueueGuardCombinations\n"}
+{"Time":"2026-09-14T14:19:38.994163+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-map-key"}
+{"Time":"2026-09-14T14:19:38.994168+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-map-key","Output":"=== RUN   TestR90QueueGuardCombinations/range-map-key\n"}
+{"Time":"2026-09-14T14:19:38.994575+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-map-key","Output":"    r90_queue_guard_test.go:107: missed combined queue literal: range-map-key\n"}
+{"Time":"2026-09-14T14:19:38.994595+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-map-key","Output":"--- FAIL: TestR90QueueGuardCombinations/range-map-key (0.00s)\n"}
+{"Time":"2026-09-14T14:19:38.994602+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-map-key","Elapsed":0}
+{"Time":"2026-09-14T14:19:38.994713+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations","Output":"--- FAIL: TestR90QueueGuardCombinations (0.00s)\n"}
+{"Time":"2026-09-14T14:19:38.99472+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations","Elapsed":0}
+{"Time":"2026-09-14T14:19:38.994771+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:19:38.994973+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.235s\n"}
+{"Time":"2026-09-14T14:19:38.994982+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.235}

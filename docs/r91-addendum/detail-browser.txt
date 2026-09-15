@@ -1,0 +1,1 @@
+R89 Chromium Arena detail: expand/collapse, 21 players, 7 teams, horizontal scroll, stable sibling cards PASS

@@ -1,0 +1,38 @@
+=== RUN   TestR90RealShapeGroups
+--- PASS: TestR90RealShapeGroups (0.01s)
+=== RUN   TestR90OrderInferenceNeverEnablesMascotMapping
+=== RUN   TestR90OrderInferenceNeverEnablesMascotMapping/subteamId
+=== RUN   TestR90OrderInferenceNeverEnablesMascotMapping/subteamId/inferred-blocks
+=== RUN   TestR90OrderInferenceNeverEnablesMascotMapping/subteamId/explicit-client-subteams
+=== RUN   TestR90OrderInferenceNeverEnablesMascotMapping/subteamId/ungrouped-client-subteams
+=== RUN   TestR90OrderInferenceNeverEnablesMascotMapping/playerSubteamId
+=== RUN   TestR90OrderInferenceNeverEnablesMascotMapping/playerSubteamId/inferred-blocks
+=== RUN   TestR90OrderInferenceNeverEnablesMascotMapping/playerSubteamId/explicit-client-subteams
+=== RUN   TestR90OrderInferenceNeverEnablesMascotMapping/playerSubteamId/ungrouped-client-subteams
+--- PASS: TestR90OrderInferenceNeverEnablesMascotMapping (0.00s)
+    --- PASS: TestR90OrderInferenceNeverEnablesMascotMapping/subteamId (0.00s)
+        --- PASS: TestR90OrderInferenceNeverEnablesMascotMapping/subteamId/inferred-blocks (0.00s)
+        --- PASS: TestR90OrderInferenceNeverEnablesMascotMapping/subteamId/explicit-client-subteams (0.00s)
+        --- PASS: TestR90OrderInferenceNeverEnablesMascotMapping/subteamId/ungrouped-client-subteams (0.00s)
+    --- PASS: TestR90OrderInferenceNeverEnablesMascotMapping/playerSubteamId (0.00s)
+        --- PASS: TestR90OrderInferenceNeverEnablesMascotMapping/playerSubteamId/inferred-blocks (0.00s)
+        --- PASS: TestR90OrderInferenceNeverEnablesMascotMapping/playerSubteamId/explicit-client-subteams (0.00s)
+        --- PASS: TestR90OrderInferenceNeverEnablesMascotMapping/playerSubteamId/ungrouped-client-subteams (0.00s)
+=== RUN   TestR90AlliesVerifyAndRejectScrambledPlayerlist
+=== RUN   TestR90AlliesVerifyAndRejectScrambledPlayerlist/false
+=== RUN   TestR90AlliesVerifyAndRejectScrambledPlayerlist/true
+--- PASS: TestR90AlliesVerifyAndRejectScrambledPlayerlist (0.01s)
+    --- PASS: TestR90AlliesVerifyAndRejectScrambledPlayerlist/false (0.01s)
+    --- PASS: TestR90AlliesVerifyAndRejectScrambledPlayerlist/true (0.01s)
+=== RUN   TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries
+=== RUN   TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries/1
+=== RUN   TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries/7
+=== RUN   TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries/17
+--- PASS: TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries (0.02s)
+    --- PASS: TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries/1 (0.01s)
+    --- PASS: TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries/7 (0.01s)
+    --- PASS: TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries/17 (0.01s)
+=== RUN   TestR90QueueSquadSizesAndSessionFallback
+--- PASS: TestR90QueueSquadSizesAndSessionFallback (0.01s)
+PASS
+ok  	lol-loot-assistant	0.834s

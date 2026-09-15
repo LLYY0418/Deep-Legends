@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T14:19:37.528131+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:19:37.773714+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra"}
+{"Time":"2026-09-14T14:19:37.773832+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra","Output":"=== RUN   TestR90QueueGuardExtra\n"}
+{"Time":"2026-09-14T14:19:37.773917+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/slice-membership"}
+{"Time":"2026-09-14T14:19:37.773922+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/slice-membership","Output":"=== RUN   TestR90QueueGuardExtra/slice-membership\n"}
+{"Time":"2026-09-14T14:19:37.848459+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/slice-membership","Output":"    r90_queue_guard_test.go:68: missed additional queue literal: slice-membership\n"}
+{"Time":"2026-09-14T14:19:37.848508+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/slice-membership","Output":"--- FAIL: TestR90QueueGuardExtra/slice-membership (0.07s)\n"}
+{"Time":"2026-09-14T14:19:37.848511+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/slice-membership","Elapsed":0.07}
+{"Time":"2026-09-14T14:19:37.848526+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra","Output":"--- FAIL: TestR90QueueGuardExtra (0.07s)\n"}
+{"Time":"2026-09-14T14:19:37.848534+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra","Elapsed":0.07}
+{"Time":"2026-09-14T14:19:37.848537+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:19:37.848863+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.320s\n"}
+{"Time":"2026-09-14T14:19:37.848873+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.321}

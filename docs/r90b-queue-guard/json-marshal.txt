@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T15:10:16.546969+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T15:10:16.798158+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired"}
+{"Time":"2026-09-14T15:10:16.79831+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"=== RUN   TestR90BQueueGuardRequired\n"}
+{"Time":"2026-09-14T15:10:16.798332+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/json-marshal"}
+{"Time":"2026-09-14T15:10:16.798335+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/json-marshal","Output":"=== RUN   TestR90BQueueGuardRequired/json-marshal\n"}
+{"Time":"2026-09-14T15:10:16.867332+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/json-marshal","Output":"    r90b_queue_guard_test.go:17: missed R90B queue literal: json-marshal\n"}
+{"Time":"2026-09-14T15:10:16.867392+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/json-marshal","Output":"--- FAIL: TestR90BQueueGuardRequired/json-marshal (0.07s)\n"}
+{"Time":"2026-09-14T15:10:16.867715+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/json-marshal","Elapsed":0.07}
+{"Time":"2026-09-14T15:10:16.867784+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"--- FAIL: TestR90BQueueGuardRequired (0.07s)\n"}
+{"Time":"2026-09-14T15:10:16.867787+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Elapsed":0.07}
+{"Time":"2026-09-14T15:10:16.867789+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T15:10:16.868333+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.321s\n"}
+{"Time":"2026-09-14T15:10:16.868384+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.321}

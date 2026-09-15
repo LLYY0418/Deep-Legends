@@ -1,0 +1,17 @@
+Error: spawn chromium ENOENT
+    at ChildProcess._handle.onexit (node:internal/child_process:285:19)
+    at onErrorNT (node:internal/child_process:483:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'spawn chromium',
+  path: 'chromium',
+  spawnargs: [
+    '--headless=new',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--remote-debugging-port=0',
+    '--user-data-dir=/dev/shm/gotmp/r91-addendum-browser-0cA8Lt',
+    'about:blank'
+  ]
+}

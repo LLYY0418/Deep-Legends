@@ -216,10 +216,12 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 				case eventReady <- struct{}{}:
 				default:
 				}
+				go a.primeGameplayState(sessionCtx, client)
 				go a.primeWatchState(client)
 			}, func(event LCUEvent) {
 				client.rememberAcceptFocusEvent(event)
 				recordObjectiveEvent(event)
+				a.broadcastGameplayIdentity(event)
 				// 对局阶段变化直接推送给界面（“对局”页签的新对局提示灯），
 				// 并触发便捷设置的自动动作（自动接受、再来一局、断线重连）。
 				if strings.EqualFold(event.URI, "/lol-gameflow/v1/gameflow-phase") {
@@ -228,6 +230,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 						if phase == "Matchmaking" {
 							go a.collectAcceptFocusInspectionAt(sessionCtx, client, "matchmaking-not-at-accept")
 						}
+						a.observeGameplayPhase(sessionCtx, client, phase)
 						a.broadcastEvent("gameflow:" + phase)
 						if watch := a.activeWatch(); watch != nil {
 							watch.handlePhase(client, phase)

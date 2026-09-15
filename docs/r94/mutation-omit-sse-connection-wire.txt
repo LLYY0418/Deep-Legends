@@ -1,0 +1,5 @@
+--- FAIL: TestR94ConnectedSessionForwardsIdentityThroughLCUEventCallback (3.00s)
+    r94_test.go:282: missing actual callback broadcasts: [gameflow:InProgress]
+FAIL
+FAIL	lol-loot-assistant	3.388s
+FAIL

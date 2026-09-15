@@ -279,7 +279,7 @@ test("R70 app and gameplay retain cancellation ownership until body parsing comp
     const state = { controllers: new Map() };
     let calls = 0;
     const { api } = compileFunctions(source, ["api"], {
-      state, fetch: async () => ({ ok: true, status: 200, json: () => (++calls === 1 ? oldBody.promise : newBody.promise) }),
+      state, window: {}, fetch: async () => ({ ok: true, status: 200, json: () => (++calls === 1 ? oldBody.promise : newBody.promise) }),
     });
     const old = api("/test", {}, "same");
     const outcome = old.then(() => "unexpected-success", (e) => e.name);
@@ -336,11 +336,11 @@ test("R70 SSE overflow and reconnect resync refresh visible collection even with
 });
 
 test("R70 gameflow burst uses one fixed window and one non-aborting trailing request", async () => {
-  const state = { liveLoading: false, liveEventTimer: 0, liveRefreshQueued: false };
+  const state = { section: "live", beacon: {phase:"ChampSelect"}, liveLoading: false, liveEventTimer: 0, liveRefreshQueued: false };
   const callbacks = [];
   let requests = 0;
   const { queueLiveEventRefresh } = compileFunctions(gameplaySource, ["queueLiveEventRefresh"], {
-    state, document: { hidden: false }, connected: () => true,
+    state, document: { hidden: false }, connected: () => true, recordLiveRefresh: () => {},
     setTimeout: (callback) => { callbacks.push(callback); return callbacks.length; },
     loadLive: (force) => { assert.notEqual(force, true); requests++; state.liveLoading = true; },
   });

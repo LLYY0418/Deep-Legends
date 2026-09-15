@@ -1,0 +1,2295 @@
+--- a/DESIGN.md
++++ b/DESIGN.md
+@@ -141,7 +141,7 @@
+ 
+ - 大屏总览名单固定 370px，普通两队等分，间距 14px；斗魂每队三列等分，只在名单可见文本去掉编号，悬停保留完整身份，隐私遮罩仍有效。普通卡片 116px、斗魂 118px；中部四轨及统计块靠左规则保持不变。
+ - live 刷新诊断每秒至多一次，与本地请求耗时采样共用一个后台在途槽位且不重试。请求耗时每十秒最多采样一次，记录经过白名单处理的端点类别、开始/完成时间与耗时。状态查询连续三次失败才显示本地助手错误，取消不计入，成功清零。
+-- live 快照在英雄选择阶段缓存 3 秒。InProgress / Reconnect 的完整快照按 gameId 整局有效，阶段变化、游戏变化或手动刷新会失效；未完成快照也缓存 20 秒，每次命中核对 gameId。对局页完整快照停止定时刷新，未完成快照每 20 秒重试、最多 8 次，停止后显示状态与手动刷新按钮。非对局页不做同阶段名单重载，切回前台只核对阶段；阶段心跳保持原有 1 秒 / 12 秒。玩家身份按客户端隔离，缓存五分钟、最多 256 项，同一身份的并发查询合并。
++- live 快照在英雄选择阶段缓存 3 秒。InProgress / Reconnect 的完整快照按 gameId 整局有效，阶段变化、游戏变化或手动刷新会失效；未完成快照一般缓存 20 秒；GameStart 及斗魂可重试分组缓存 3 秒，避免压住早期探测。每次命中核对 gameId。对局页完整快照停止定时刷新，斗魂未分组时每个 GameStart / InProgress / Reconnect 阶段的前 60 秒每 5 秒探测，不消耗后续预算；之后未完成快照每 20 秒重试、最多 8 次，停止后显示状态与手动刷新按钮。非对局页不做同阶段名单重载，切回前台只核对阶段；阶段心跳保持原有 1 秒 / 12 秒。玩家身份按客户端隔离，缓存五分钟、最多 256 项，同一身份的并发查询合并。
+ - 后端 `diagnostics*.jsonl` 的新增记录由唯一编码器 `marshalDiagnosticRecord` 附加当前 build fingerprint，包含早期 provider、启动阶段、聚合/去重事件和存储轮转标记；历史归档保持原值，独立桌面日志不在此保证范围。app_start 标记日志轮转。桌面异常退出只记录审核过的字段，未捕获异常监控不吞异常；桌面日志导出限定最近七天。
+ 
+ ### 征召手动选择优先（2026-09-14）
+@@ -154,7 +154,7 @@
+ ### 韩服查询首屏与公共资源（2026-09-14，R89）
+ 
+ - 已知完整 Riot ID 时，总览、当前对局、赛季汇总共用一个入口并行发起；补充接口兼容原 playerRef 且仍以它为准。原始名称与解析后引用使用同一身份去重，纠错或改名后才重新取补充数据。
+-- 总览首屏请求 5 场，随后请求完整最近样本，复用不可变详情缓存并重算汇总。Riot 详情默认并发 8，不绕过本地限速；生产部署的更高并发显式配置。英雄中文目录与详情独立加载；OP.GG 历史赛段从缓存立即返回、通过原有后台事件补齐。
++- 总览一次请求设置的最近样本数（默认 20），NDJSON 在同一流水线取得 5 场后发布预览，完成后发布完整汇总；分页沿用同一协议，预览不推进游标。不可变详情缓存复用内存与磁盘，分别计数 memory/disk/network。Riot 详情默认并发 8，不绕过本地限速；生产部署的更高并发显式配置。英雄中文目录与详情独立加载；OP.GG 历史赛段从缓存立即返回、通过原有后台事件补齐。
+ - 三类静态目录会记录成功、失败和来源，装备目录失败 30 秒后重试。目录到达必须使保留的战绩卡 DOM 失效，否则同一 match 对象会继续保留空图标。
+ - 公共图标持久化有容量限制，预热只请求真实最终补丁 URL 且可抢占。公开 Riot match 与短期身份缓存的保留范围、上限与清理方法见 README；客户端令牌、请求头与 API Key 不落盘。
+ 
+@@ -186,3 +186,12 @@
+ - `/api/image` 的 CommunityDragon 回退使用独立 `community-images` 磁盘实例：512 条 / 16 MiB，7 天新鲜期、再保留 30 天 stale，复用公共二进制缓存的哈希校验、singleflight 与严格淘汰。39 张真实头像/技能/符文约 706 KB；配额独立于 `champion-images` 的 64 MiB。只保存通过图片类型检查的成功响应；LCU 本机分支不落此盘。
+ - 职业目录发布后立即启动已核验账号的排名查询；补充来源每完成一项就加入同一个 8 worker 队列。结果独立存储，仅写入发布前的私有快照。`pro_directory_cost.duration_ms` 保持从目录开始计算，新增 `stage_duration_ms` 与 `wait_after_supplements_ms` 解释重叠阶段，不能把累计时间改成单段时间冒充提速。
+ - 战绩磁盘的具体 600 条 / 128 MiB 实例由参数断言、605 条写入、超过 128 MiB 的实际写入和重启后的字节统计共同保护。验收结果及未达成项见 `docs/r92-execution-ledger.md`。
++
++### R91 Loading 分组、静默额度与刷新（2026-09-14）
++
++- KR 浏览器总览使用流式协议，后端预算 180 秒、浏览器 190 秒，非流式调用保留原预算。progress/complete/error 均走同一响应；中断流作为真实错误处理。429 错误 JSON 带 kind=rate-limited、retryAfter，HTTP 头同步携带 Retry-After；流已开始时用 error 帧携带同样字段。只有 429 静默，500/503 仍走原可见失败路径。重试绑定页签、请求代次、筛选和场数，关闭、替换、重置后不得再发旧请求。本地配额 15 次/秒、90 次/2分钟不变。
++- GameStart 读取 session 后立即独立强制记录一次 shape（按 gameId；无 ID 时每次进入阶段重置）。GameStart 纯 session-order 分组，不探测 2999。InProgress / Reconnect 优先游戏进程名单；缺失时可复用同客户端、账号、区服、队列和有效 gameId 的 Loading 分组，身份映射保留原边界，不对 17 人重新按三人硬切。完整顺序推断继续接受记忆队友核验，算法无新增猜测。
++- 每条分组拒绝都设置 unavailable，并记录 phase、source、reason、人数、队伍大小；暂缺名单可重试，队友跨组冲突停止自动重试。已知斗魂阶段结束且没有尝试时记录 phase-not-attempted。选人完整名单按 CellID 保留英雄顺序，仅作后续与 session/playerlist 顺序比对取证；诊断不输出原始玩家身份。
++- 已读战绩在同局同队列的 pending 刷新中保留，pending 状态继续驱动后续读取；推荐内容未变化只更新刷新状态区，保留原 DOM。首次没有数据仍显示骨架。
++- 确认亮出后客户端把 action championId 清零只记一次 hover-cleared-by-client；已 armed 锁定继续受会话、回合、候选可用性和配置保护。改成其他非零英雄仍触发手动让位。
++- 保存 watch 设置后读取当前阶段并调用既有 handlePhase，接受对局、再来一局、自动重连共用既有幂等与阶段保护；不改接受对局的前台窗口逻辑。
+--- a/README.md
++++ b/README.md
+@@ -38,7 +38,7 @@
+ - 平均段位：当前登录的国服服务器通过本机客户端逐人查询本场参与者的排位后取平均，界面按卡片懒加载回填并在本机缓存 10 分钟；跨服不受排位接口支持，显示“—”。韩服逐人查询会超出 Riot 接口配额，改为按开局时间与时长匹配 OP.GG 公开对局数据里的平均段位。大师及以上附带平均胜点。取不到时该行显示“—”，不以推断值代替。
+ - 斗魂竞技场按 21 人、3 人一队完整展示：战绩卡右侧按小队分列全部玩家、第一名小队高亮，左侧显示本队名次而非胜负；展开后概览与队伍分析都按名次分组呈现七支小队。击杀参与率与评分中的参团维度按本小队三人的击杀合计计算，不使用在该模式下无意义的红蓝方汇总。
+ - 顶栏“好友”按钮打开右侧只读好友面板：分组、顺序、折叠初始态与备注完全来自本机客户端，离线好友统一归入底部“离线”组并显示最近在线时间，组内按游戏中、在线、离开、手机在线排序；游戏中的好友显示队列、英雄与实时时长，点击任意好友即在总览页打开其战绩。面板不提供好友增删改或消息功能，未连接客户端时按钮禁用。
+-- “对局”在英雄选择或游戏进行时展示双方玩家、当前队列的近期胜负/胜率/KDA，英雄选择阶段每 3 秒自动刷新；游戏开始后数据齐全就停止自动刷新，数据未齐时每 20 秒重试、最多 8 次，页面保留停止状态与“刷新”按钮，并支持按位置、KDA 或胜率排列玩家。“详情”页签中每名玩家的最近战绩只统计当前队列；单双排和灵活组排的玩家卡片还显示已读取的最近 10 场内各位置的使用场数，1 场也展示，无有效位置记录则隐藏，不为此额外拉取战绩。点击玩家名称跳转到总览页查看完整生涯。OP.GG 综合符文已经接入；绝活哥符文使用独立懒加载链路：取 OP.GG 韩服专家榜前两名玩家，经 Riot 官方接口在每人最近 10 场对局中最多检查 8 场，只返回目标英雄且主系、副系和符文完整的真实配置，同时标注玩家、段位、英雄场次、对局时间与胜负；结果按英雄在进程内缓存 6 小时，取不到时保持空态，不用其它英雄或聚合数据冒充。职业选手符文使用 LoL Esports 官方公开赛事接口，仅收录已核对六支一队在 LPL/LCK/First Stand/MSI/Worlds 近 30 天的比赛；每英雄最多 5 套，最新在前，展示同路对位、赛事标签、已确认战绩和最终装备。未知胜负不计入胜率，少于 3 场不显示百分比；属性碎片不完整时禁止应用。后台索引与按英雄懒补齐使用独立公开传输，缓存过期或失败明确标记并提供重试。客户端自身返回的推荐符文可作为备用。英雄选择阶段点击“应用到客户端”会直接新建一页以“[DL] 英雄名 · 推荐来源”命名的符文并设为当前页；若客户端页数已满，只读取页面名称、删除许可、修改时间与 ID，并最多删除 5 个本工具此前创建的、名称带精确“[DL] ”前缀且未显式标记为不可删除的最旧页面来腾位，绝不删除、更新或覆盖其它符文页。没有可回收页面时停止并提示玩家手动删除一页；改版前没有前缀的旧页面不会迁移或回收。出装推荐旁的“应用装备方案”只在英雄选择阶段启用；点击后写入游戏 `Config/Global/Recommended` 下本工具固定 UID 的推荐文件，采用与 LeagueAkari 对齐的精简结构，并保留一份上次内容备份。写后核验成功才尝试清理精确匹配本工具旧 UID 的账号方案；清理前再次核对账号与原文档，有变化就保留现有方案。不会清理用户自建方案或修改游戏 HUD、`game.cfg`、`PersistedSettings.json`；实际游戏内商店布局仍需 Windows 实机验收。
++- “对局”在英雄选择或游戏进行时展示双方玩家、当前队列的近期胜负/胜率/KDA，英雄选择阶段每 3 秒自动刷新；游戏开始后数据齐全就停止自动刷新，斗魂尚未分组时先在每个加载/游戏阶段的前 60 秒每 5 秒探测，随后数据未齐每 20 秒重试、最多 8 次，页面保留停止状态与“刷新”按钮，并支持按位置、KDA 或胜率排列玩家。“详情”页签中每名玩家的最近战绩只统计当前队列；单双排和灵活组排的玩家卡片还显示已读取的最近 10 场内各位置的使用场数，1 场也展示，无有效位置记录则隐藏，不为此额外拉取战绩。点击玩家名称跳转到总览页查看完整生涯。OP.GG 综合符文已经接入；绝活哥符文使用独立懒加载链路：取 OP.GG 韩服专家榜前两名玩家，经 Riot 官方接口在每人最近 10 场对局中最多检查 8 场，只返回目标英雄且主系、副系和符文完整的真实配置，同时标注玩家、段位、英雄场次、对局时间与胜负；结果按英雄在进程内缓存 6 小时，取不到时保持空态，不用其它英雄或聚合数据冒充。职业选手符文使用 LoL Esports 官方公开赛事接口，仅收录已核对六支一队在 LPL/LCK/First Stand/MSI/Worlds 近 30 天的比赛；每英雄最多 5 套，最新在前，展示同路对位、赛事标签、已确认战绩和最终装备。未知胜负不计入胜率，少于 3 场不显示百分比；属性碎片不完整时禁止应用。后台索引与按英雄懒补齐使用独立公开传输，缓存过期或失败明确标记并提供重试。客户端自身返回的推荐符文可作为备用。英雄选择阶段点击“应用到客户端”会直接新建一页以“[DL] 英雄名 · 推荐来源”命名的符文并设为当前页；若客户端页数已满，只读取页面名称、删除许可、修改时间与 ID，并最多删除 5 个本工具此前创建的、名称带精确“[DL] ”前缀且未显式标记为不可删除的最旧页面来腾位，绝不删除、更新或覆盖其它符文页。没有可回收页面时停止并提示玩家手动删除一页；改版前没有前缀的旧页面不会迁移或回收。出装推荐旁的“应用装备方案”只在英雄选择阶段启用；点击后写入游戏 `Config/Global/Recommended` 下本工具固定 UID 的推荐文件，采用与 LeagueAkari 对齐的精简结构，并保留一份上次内容备份。写后核验成功才尝试清理精确匹配本工具旧 UID 的账号方案；清理前再次核对账号与原文档，有变化就保留现有方案。不会清理用户自建方案或修改游戏 HUD、`game.cfg`、`PersistedSettings.json`；实际游戏内商店布局仍需 Windows 实机验收。
+ - 兼容性边界：Riot Client 的 `aliases/v1/lookup`、腾讯 SGP 的 `summoner-ledge` 和 League Client 的 `lol-item-sets` 都是没有官方稳定性承诺的客户端私有契约。目前只有 macOS 上的本地 mock 自动测试，尚未完成 Windows 国服客户端真机验证；在三条链路逐项通过真机烟雾测试前，它们都按实验性能力处理，不能作为已完成的发布验收项。读取失败会明确降级，跨服失败不会回退到当前服务器数据；装备方案写入仍要求英雄选择阶段和玩家明确点击。
+ - 收藏页提供已拥有、全部皮肤和全部炫彩三个视图；已拥有默认首先展示。
+ - 战绩展示数量可设为每批 10 / 20 / 30 / 40 / 50 场；滚动到列表末尾会按同一批次自动继续读取。
+@@ -245,7 +245,7 @@
+ 
+ ### 韩服查询与资源缓存（R89）
+ 
+-韩服总览、当前对局和赛季汇总在已知完整 Riot ID 时同时发起。首次总览先显示 5 场，再读取完整设置场数（默认 20），期间保留首屏。历史赛段通过既有后台事件补齐。目录请求失败后 30 秒重试；目录到达会更新已经存在的战绩卡图标。总览页只展示玩家、生涯与战绩信息，装备推荐通过英雄页或对局页查看。
++韩服总览、当前对局和赛季汇总在已知完整 Riot ID 时同时发起。首次总览只发起一轮设置场数（默认 20）的请求，通过同一个 NDJSON 响应先显示已就绪的 5 场，再补齐其余场次。429 保留现有战绩，按 Retry-After 静默重试；500/503 仍显示真实失败。诊断分别记录详情来自内存、磁盘和网络的数量。历史赛段通过既有后台事件补齐。目录请求失败后 30 秒重试；目录到达会更新已经存在的战绩卡图标。总览页只展示玩家、生涯与战绩信息，装备推荐通过英雄页或对局页查看。
+ 
+ `DEEP_LEGENDS_RIOT_MATCH_CONCURRENCY` 默认 8，个人 Key 最多 8；仅配置 `DEEP_LEGENDS_RIOT_KEY_TIER=production` 后允许最高 20，并不会放宽本地 15 次/秒、90 次/2分钟护栏。`DEEP_LEGENDS_ITEM_PREWARM=0` 可关闭后台图标预热。身份缓存有时效，因此刚改名或更新等级、头像后可能短暂显示缓存内容。
+ 
+@@ -253,6 +253,10 @@
+ 
+ ### 斗魂实时分组与对局刷新（R90）
+ 
+-进入游戏后优先按游戏进程名单顺序分组，并用选人阶段记住的自身小队核对；中途打开应用时允许未核验的顺序分组。列表显示“小队 1、2……”，暂不使用吉祥物名。游戏进程有 18 人、客户端只有 17 人时保留完整名单的队伍边界，可显示一队 2 人、其余各 3 人。
++Loading（GameStart）即按客户端 session 顺序尝试小队分组，不依赖 2999；进入游戏后优先按游戏进程名单顺序分组，并用选人阶段记住的自身小队核对；中途打开应用时允许未核验的顺序分组。列表显示“小队 1、2……”，暂不使用吉祥物名。游戏进程有 18 人、客户端只有 17 人时保留完整名单的队伍边界，可显示一队 2 人、其余各 3 人。Loading 已获得的有效分组也可在同局缺人时按玩家身份沿用；没有完整边界依据的 17 人名单不硬切。
+ 
+ 完整实时快照整局复用；手动刷新、游戏变化和阶段变化会失效。不在对局页时不再因同阶段事件重载名单。切回前台仍核对客户端阶段。赛后写入 `arena_group_truth_check`，分别检验队友划分与小队编号映射，供后续真机核验使用。实现、变异测试及尚待真机验证的项目见 [R90 执行账本](docs/r90-execution-ledger.md)。
++
++### R91 工单与加载阶段补充
++
++生涯段位缺省为未定级；斗魂统计使用整数伤害/承伤和独立颜色，玩家行隐藏段位。实时战绩刷新保留已读内容与未变化的 DOM，首次加载仍显示骨架。客户端清空已确认的亮出英雄不会取消锁定，主动换成其他英雄仍立即让位。保存自动规则后按当前阶段立即重评估。逐项实现、测试、截图和仍需真实客户端验证的项目见 [R91 补充执行账本](docs/r91-addendum-execution-ledger.md)。
+--- a/arena_live_grouping.go
++++ b/arena_live_grouping.go
+@@ -3,6 +3,7 @@
+ import (
+ 	"context"
+ 	"maps"
++	"slices"
+ 	"strconv"
+ 	"strings"
+ 	"sync"
+@@ -47,6 +48,8 @@
+ func arenaSessionOrderGroups(queueID int64, players []lcuLivePlayer) ([]string, bool) {
+ 	return arenaOrderGroups(len(players), arenaSquadSize(queueID))
+ }
++
++func arenaRosterDivisible(count, squadSize int) bool { return squadSize > 0 && count%squadSize == 0 }
+ 
+ func arenaOrderGroups(count, squadSize int) ([]string, bool) {
+ 	if squadSize < 2 || count < 6 || count > 18 || count%squadSize != 0 {
+@@ -218,13 +221,23 @@
+ 		source, order = "live-client-order", true
+ 	} else {
+ 		var ok bool
+-		groups, ok = arenaSessionOrderGroups(response.QueueID, raw)
++		groups, ok = a.carriedArenaSessionGroups(client, current, response)
+ 		if !ok {
++			groups, ok = arenaSessionOrderGroups(response.QueueID, raw)
++		}
++		if !ok {
++			a.recordArenaOrderRejected(response, "live-client", "playerlist-unavailable")
++			reason := "invalid-blocks"
++			if !arenaRosterDivisible(len(raw), squadSize) {
++				reason = "roster-not-divisible"
++			}
++			a.recordArenaOrderRejected(response, "session-order", reason)
+ 			return
+ 		}
+ 		source, order = "session-order", true
+ 	}
+ 	if !validArenaGroupAssignments(groups, squadSize) {
++		a.recordArenaOrderRejected(response, source, "invalid-blocks")
+ 		return
+ 	}
+ 	verified, rejected := arenaAlliesCorroborate(groups, response.Players, remembered, squadSize, grouping, current.PUUID)
+@@ -262,14 +275,24 @@
+ }
+ 
+ func (a *app) recordArenaOrderRejected(response *gameplayLiveResponse, source, reason string) {
+-	a.appendDiagnosticEvent(map[string]any{"event": "arena_group_order_rejected", "game_id": response.GameID, "queue_id": response.QueueID, "source": source, "reason": reason, "player_count": len(response.Players), "squad_size": arenaSquadSize(response.QueueID)})
++	response.ArenaGroupingUnavailable = true
++	response.ArenaGroupingRetryable = reason != "allies-cross-blocks"
++	a.appendDiagnosticEvent(map[string]any{"event": "arena_group_order_rejected", "game_id": response.GameID, "queue_id": response.QueueID, "phase": response.Phase, "source": source, "reason": reason, "player_count": len(response.Players), "squad_size": arenaSquadSize(response.QueueID)})
+ }
+ 
+ type arenaTruthState struct {
+-	mu      sync.Mutex
+-	records []arenaInference
++	mu                    sync.Mutex
++	records               []arenaInference
++	phaseClient           *LCUClient
++	phase                 string
++	phaseQueue, phaseGame int64
++	attempted             bool
++	champClient           *LCUClient
++	champGame             int64
++	champions             []int64
+ }
+ type arenaInference struct {
++	fromLoading                       bool
+ 	selfPUUID                         string
+ 	client                            *LCUClient
+ 	gameID                            int64
+@@ -282,7 +305,7 @@
+ }
+ 
+ func (a *app) rememberArenaInference(client *LCUClient, current Summoner, response *gameplayLiveResponse, grouping liveClientArenaGrouping, verified bool, squadSize int) {
+-	record := arenaInference{selfPUUID: current.PUUID, client: client, gameID: response.GameID, queueID: response.QueueID, serverID: clientTencentServerID(client), source: response.ArenaGroupSource, grouping: cloneLiveClientArenaGrouping(grouping), byPUUID: map[string]string{}, playerCount: len(response.Players), squadSize: squadSize, verified: verified}
++	record := arenaInference{fromLoading: response.Phase == "GameStart", selfPUUID: current.PUUID, client: client, gameID: response.GameID, queueID: response.QueueID, serverID: clientTencentServerID(client), source: response.ArenaGroupSource, grouping: cloneLiveClientArenaGrouping(grouping), byPUUID: map[string]string{}, playerCount: len(response.Players), squadSize: squadSize, verified: verified}
+ 	if grouping.IdentifiedPlayers > 0 {
+ 		record.playerCount = grouping.IdentifiedPlayers
+ 	}
+@@ -298,7 +321,12 @@
+ 	defer a.arenaTruth.mu.Unlock()
+ 	for i, old := range a.arenaTruth.records {
+ 		if old.client == client && old.gameID == record.gameID {
++			// A partial frame cannot erase complete boundaries captured while loading.
++			if old.source == "session-order" && record.source == "session-order" && len(old.byPUUID) > len(record.byPUUID) {
++				return
++			}
+ 			record.checked = old.checked
++			record.fromLoading = record.fromLoading || old.fromLoading
+ 			a.arenaTruth.records[i] = record
+ 			return
+ 		}
+@@ -425,3 +453,137 @@
+ 		}
+ 	}
+ }
++
++// Reuse established boundaries by identity; never cut a shortened roster again.
++func (a *app) carriedArenaSessionGroups(client *LCUClient, current Summoner, response *gameplayLiveResponse) ([]string, bool) {
++	a.arenaTruth.mu.Lock()
++	defer a.arenaTruth.mu.Unlock()
++	for _, record := range a.arenaTruth.records {
++		if response.GameID == 0 || record.client != client || record.gameID != response.GameID || record.queueID != response.QueueID || record.selfPUUID != current.PUUID || record.source != "session-order" || !record.fromLoading || !strings.EqualFold(record.serverID, clientTencentServerID(client)) {
++			continue
++		}
++		groups := make([]string, len(response.Players))
++		for i, player := range response.Players {
++			groups[i] = record.byPUUID[player.reference.PlayerRef]
++		}
++		if validArenaGroupAssignments(groups, record.squadSize) {
++			return groups, true
++		}
++	}
++	return nil, false
++}
++
++func (a *app) observeArenaGroupingPhase(client *LCUClient, phase string) {
++	t := &a.arenaTruth
++	t.mu.Lock()
++	previous := gameplayLiveResponse{Phase: t.phase, QueueID: t.phaseQueue, GameID: t.phaseGame}
++	missed := t.phaseClient == client && t.phase != phase && (t.phase == "GameStart" || t.phase == "InProgress" || t.phase == "Reconnect") && isArenaQueue(t.phaseQueue, "") && !t.attempted
++	changed := t.phaseClient != client || t.phase != phase
++	if t.phaseClient != client || changed && phase == "ChampSelect" {
++		t.phaseQueue, t.phaseGame = 0, 0
++	}
++	if changed {
++		t.phaseClient, t.phase, t.attempted = client, phase, false
++	}
++	t.mu.Unlock()
++	if changed && phase == "GameStart" {
++		a.lcuGameflowShapeDiagnosticMu.Lock()
++		delete(a.lcuGameflowShapeDiagnosticKeys, "GameStart-first:0")
++		a.lcuGameflowShapeDiagnosticMu.Unlock()
++	}
++	if missed {
++		a.recordArenaOrderRejected(&previous, "phase", "phase-not-attempted")
++	}
++}
++func (a *app) noteArenaPhaseRoster(client *LCUClient, response *gameplayLiveResponse) {
++	t := &a.arenaTruth
++	t.mu.Lock()
++	defer t.mu.Unlock()
++	if t.phaseClient == nil {
++		t.phaseClient, t.phase = client, response.Phase
++	}
++	if t.phaseClient == client && t.phase == response.Phase {
++		t.phaseQueue, t.phaseGame = response.QueueID, response.GameID
++	}
++}
++func (a *app) markArenaGroupingAttempt(client *LCUClient, response *gameplayLiveResponse) {
++	a.noteArenaPhaseRoster(client, response)
++	t := &a.arenaTruth
++	t.mu.Lock()
++	defer t.mu.Unlock()
++	if t.phaseClient == client && t.phase == response.Phase {
++		t.attempted = true
++	}
++}
++func (a *app) rememberArenaChampOrder(client *LCUClient, session lcuChampSelectSession) {
++	players := append([]lcuChampSelectPlayer(nil), session.MyTeam...)
++	slices.SortStableFunc(players, func(a, b lcuChampSelectPlayer) int {
++		if a.CellID == nil || b.CellID == nil {
++			return 0
++		}
++		return int(*a.CellID - *b.CellID)
++	})
++	ids := make([]int64, len(players))
++	for i, p := range players {
++		ids[i] = p.ChampionID
++	}
++	t := &a.arenaTruth
++	t.mu.Lock()
++	defer t.mu.Unlock()
++	t.champClient, t.champGame, t.champions = client, session.GameID, ids
++}
++func (a *app) compareArenaChampOrder(client *LCUClient, response *gameplayLiveResponse, raw []lcuLivePlayer, snapshot liveClientSnapshot) {
++	if response.Phase != "InProgress" {
++		return
++	}
++	t := &a.arenaTruth
++	t.mu.Lock()
++	ids := append([]int64(nil), t.champions...)
++	valid := t.champClient == client && (t.champGame == 0 || t.champGame == response.GameID)
++	t.mu.Unlock()
++	if !valid || len(ids) == 0 {
++		return
++	}
++	emit := func(source string, observed []int64) {
++		matched, comparable := 0, 0
++		counts := map[int64]int{}
++		for _, id := range ids {
++			counts[id]++
++		}
++		for i, id := range observed {
++			if id <= 0 || counts[id] != 1 {
++				continue
++			}
++			comparable++
++			if i < len(ids) && ids[i] == id {
++				matched++
++			}
++		}
++		ratio := float64(0)
++		if comparable > 0 {
++			ratio = float64(matched) / float64(comparable)
++		}
++		a.recordDiagnostic(map[string]any{"event": "arena_champ_select_order_check", "game_id": response.GameID, "source": source, "champ_select_count": len(ids), "player_count": len(observed), "comparable_count": comparable, "matched_count": matched, "agreement": ratio})
++	}
++	observed := make([]int64, len(raw))
++	for i, p := range raw {
++		observed[i] = p.ChampionID
++	}
++	emit("session", observed)
++	if len(snapshot.OrderedIdentities) > 0 {
++		observed = make([]int64, len(snapshot.OrderedIdentities))
++		for i, keys := range snapshot.OrderedIdentities {
++			for j, p := range response.Players {
++				g := liveClientArenaGrouping{ByIdentity: map[string]string{}}
++				for _, key := range keys {
++					g.ByIdentity[key] = "match"
++				}
++				if liveClientGroupingForPlayer(g, raw[j], p) != "" {
++					observed[i] = raw[j].ChampionID
++					break
++				}
++			}
++		}
++		emit("playerlist", observed)
++	}
++}
+--- a/champselect.go
++++ b/champselect.go
+@@ -70,13 +70,14 @@
+ }
+ 
+ type champSelectSubmitRecord struct {
+-	ChampionID  int64
+-	Completed   bool
+-	At          time.Time
+-	TraceID     string
+-	Confirmed   bool
+-	ConfirmedAt time.Time
+-	Decision    champSelectDecision
++	ChampionID   int64
++	Completed    bool
++	At           time.Time
++	TraceID      string
++	Confirmed    bool
++	ConfirmedAt  time.Time
++	HoverCleared bool
++	Decision     champSelectDecision
+ }
+ 
+ type champSelectGridChampion struct {
+@@ -970,9 +971,14 @@
+ 		}
+ 		return
+ 	}
+-	completed := champSelectActionCompleted(config.Strategy, action.ChampionID, candidate, submitted, lastSubmission)
++	confirmedHover := submitted && lastSubmission.Confirmed && !lastSubmission.Completed && lastSubmission.ChampionID == candidate
++	observedChampion := action.ChampionID
++	if observedChampion == 0 && confirmedHover {
++		observedChampion = candidate
++	}
++	completed := champSelectActionCompleted(config.Strategy, observedChampion, candidate, submitted, lastSubmission)
+ 	forceHover := side == "ban" && strings.HasPrefix(banSource, "wildcard-")
+-	if intent || forceHover && !(submitted && lastSubmission.Confirmed && action.ChampionID == candidate) {
++	if intent || forceHover && !confirmedHover {
+ 		completed = false
+ 	}
+ 	if submitted && lastSubmission.ChampionID == candidate && lastSubmission.Completed == completed {
+@@ -1341,10 +1347,6 @@
+ 		why = "local-action-changed"
+ 		return false
+ 	}
+-	if decision.ForceHover && decision.Completed && action.ChampionID != decision.ChampionID {
+-		why = "compatibility-hover-disappeared"
+-		return false
+-	}
+ 	r.mu.Lock()
+ 	config := r.settings.ChampSelect.Groups[r.champSelect.groupID].Pick
+ 	if decision.Action == champSelectActionBan {
+@@ -1370,7 +1372,11 @@
+ 		why = "manual-takeover"
+ 		return false
+ 	}
+-	if !allowed || decision.Completed && submitted && last.Confirmed && action.ChampionID != decision.ChampionID {
++	if decision.ForceHover && decision.Completed && !(submitted && last.Confirmed && last.ChampionID == decision.ChampionID) {
++		why = "compatibility-hover-unconfirmed"
++		return false
++	}
++	if !allowed || decision.Completed && submitted && last.Confirmed && action.ChampionID != 0 && action.ChampionID != decision.ChampionID {
+ 		why = "disabled-or-manual-takeover"
+ 		return false
+ 	}
+--- a/champselect_takeover.go
++++ b/champselect_takeover.go
+@@ -98,8 +98,16 @@
+ 			if championID == 0 {
+ 				championID = pending.ChampionID
+ 			}
++			cleared := action.ChampionID == 0 && submitted && last.Confirmed && !last.Completed && last.ChampionID > 0 && !last.HoverCleared
++			if cleared {
++				last.HoverCleared = true
++				r.champSelect.submitted[action.ID] = last
++			}
+ 			changed = changed && r.yieldChampSelectLocked(side, championID)
+ 			r.mu.Unlock()
++			if cleared {
++				r.champDiagnostic("hover", "hover-cleared-by-client", last.Decision, map[string]any{"side": side, "champion_id": last.ChampionID, "since_confirmed_ms": max(0, time.Since(last.ConfirmedAt).Milliseconds())})
++			}
+ 			if changed {
+ 				r.reportChampSelectTakeover(side, championID)
+ 			}
+@@ -111,15 +119,9 @@
+ 	if action.ChampionID != 0 {
+ 		return !submitted || action.ChampionID != last.ChampionID
+ 	}
+-	if !submitted || !last.Confirmed || last.Completed || last.ChampionID <= 0 {
+-		return false
+-	}
+-	// Clearing a confirmed hover also yields, unless the client had to clear
+-	// it because another player locked/banned that champion.
+-	grid := map[int64]champSelectGridChampion{last.ChampionID: {ID: last.ChampionID}}
+-	mergeChampSelectTeamState(grid, session)
+-	champion := grid[last.ChampionID]
+-	return !champion.TeammatePicked && !champion.SelectionStatus.IsBanned
++	// A zero action is also emitted by the client when it clears a hover.
++	// Only a different nonzero champion proves a manual change.
++	return false
+ }
+ 
+ func (r *watchRunner) observeChampSelectBench(session lcuChampSelectSession, definition champSelectGroupDefinition, group champSelectGroupConfig, position, runtimeID string) bool {
+--- a/champselect_takeover_test.go
++++ b/champselect_takeover_test.go
+@@ -140,7 +140,7 @@
+ 	}
+ }
+ 
+-func TestTakeoverClearingHoverYieldsButClientRemovalCanRecover(t *testing.T) {
++func TestTakeoverClearingHoverPreservesLockButUnavailableHeroCanRecover(t *testing.T) {
+ 	for _, allyTook := range []bool{false, true} {
+ 		f := prepareTakeoverPick(t, "arena", 1700, nil)
+ 		f.tick(t)
+@@ -158,7 +158,12 @@
+ 				t.Fatal("client removal of unavailable hero prevented fallback")
+ 			}
+ 		} else {
+-			f.assertTakeover(t, "5")
++			f.r.mu.Lock()
++			yielded, pending := f.r.champSelect.takeover["pick"], f.r.pending["champselect-pick"]
++			f.r.mu.Unlock()
++			if yielded || pending == nil {
++				t.Fatal("client hover clear canceled lock")
++			}
+ 		}
+ 	}
+ }
+--- a/gameplay.go
++++ b/gameplay.go
+@@ -632,7 +632,11 @@
+ 	if timeout == nil {
+ 		timeout = context.WithTimeout
+ 	}
+-	budgetContext, cancelBudget := timeout(r.Context(), overviewSoftBudget)
++	budget := overviewSoftBudget
++	if strings.Contains(r.Header.Get("Accept"), "application/x-ndjson") {
++		budget = 180 * time.Second
++	}
++	budgetContext, cancelBudget := timeout(r.Context(), budget)
+ 	budgetContext = context.WithValue(budgetContext, overviewRequestContextKey{}, r.Context())
+ 	defer cancelBudget()
+ 	requestContext := context.WithValue(budgetContext, overviewLoadCostContextKey{}, loadCost)
+@@ -721,12 +725,39 @@
+ 			reference = gameplayReference{GameName: request.GameName, TagLine: request.TagLine, Region: riotRegionKR}
+ 		}
+ 		phases.mark("identity")
++		stream := strings.Contains(r.Header.Get("Accept"), "application/x-ndjson")
++		streamStarted := false
++		emit := func(value any) {
++			if !streamStarted {
++				w.Header().Set("Content-Type", "application/x-ndjson")
++				w.Header().Set("Cache-Control", "no-store")
++				streamStarted = true
++			}
++			_ = json.NewEncoder(w).Encode(value)
++			if flusher, ok := w.(http.Flusher); ok {
++				flusher.Flush()
++			}
++		}
++		if stream {
++			r = r.WithContext(context.WithValue(r.Context(), riotOverviewProgressKey{}, func(partial gameplayOverview) {
++				partial.Pagination.Filter = request.MatchFilter
++				emit(map[string]any{"type": "progress", "overview": partial})
++			}))
++		}
+ 		response, err := a.loadRiotOverviewDeduplicated(r.Context(), reference, request.BegIndex, request.Count, request.Force)
+ 		phases.mu.Lock()
+ 		phases.last = time.Now()
+ 		phases.mu.Unlock()
+ 		if err != nil {
+-			writeRiotHTTPError(w, err)
++			if streamStarted {
++				emit(struct {
++					riotHTTPError
++					Type   string `json:"type"`
++					Status int    `json:"status"`
++				}{riotHTTPErrorBody(err), "error", riotErrorStatus(err)})
++			} else {
++				writeRiotHTTPError(w, err)
++			}
+ 			return
+ 		}
+ 		response.Pagination.Filter = request.MatchFilter
+@@ -735,10 +766,15 @@
+ 			response.Pagination.FilterFallbackReason = "韩服战绩接口未启用 SGP tag，已使用客户端筛选"
+ 		}
+ 		// Comparison is request-local: never mutate the shared overview cache.
+-		respondJSON(w, struct {
++		payload := struct {
+ 			gameplayOverview
+ 			ProMismatch bool `json:"proMismatch,omitempty"`
+-		}{response, proOverviewMismatch(request.ExpectedTier, response.Ranks)})
++		}{response, proOverviewMismatch(request.ExpectedTier, response.Ranks)}
++		if stream {
++			emit(map[string]any{"type": "complete", "overview": payload})
++		} else {
++			respondJSON(w, payload)
++		}
+ 		phases.mark("serialize")
+ 		return
+ 	}
+@@ -3538,6 +3574,7 @@
+ 	CurrentChampionID        int64                     `json:"currentChampionId,omitempty"`
+ 	ResolvedChampionID       int64                     `json:"resolvedChampionId,omitempty"`
+ 	ChampSelectNotice        string                    `json:"champSelectNotice,omitempty"`
++	ArenaGroupingRetryable   bool                      `json:"arenaGroupingRetryable,omitempty"`
+ 	ArenaGroupingUnavailable bool                      `json:"arenaGroupingUnavailable,omitempty"`
+ 	ArenaGrouped             bool                      `json:"arenaGrouped,omitempty"`
+ 	ArenaMascotMapping       bool                      `json:"arenaMascotMapping,omitempty"`
+@@ -4332,6 +4369,7 @@
+ 	Succeeded     bool
+ 	InFlight      bool
+ 	Attempt       int
++	FirstAttempt  time.Time
+ 	LastAttempt   time.Time
+ }
+ 
+@@ -4668,9 +4706,13 @@
+ 		return liveClientSnapshot{}, false
+ 	}
+ 	a.liveClientProbe.InFlight = true
++	if a.liveClientProbe.FirstAttempt.IsZero() {
++		a.liveClientProbe.FirstAttempt = now
++	}
+ 	a.liveClientProbe.Attempt++
+ 	a.liveClientProbe.LastAttempt = now
+ 	attempt := a.liveClientProbe.Attempt
++	firstAttempt := a.liveClientProbe.FirstAttempt
+ 	a.liveClientProbeMu.Unlock()
+ 
+ 	raw, status, fetchErr := a.loadLiveClientPlayerList(ctx)
+@@ -4698,6 +4740,7 @@
+ 	}
+ 	succeeded := fetchErr == nil && parseErr == nil && usable
+ 	mascotMapping := succeeded && arenaLiveClientMascotMapping(snapshot.Grouping)
++	a.appendDiagnosticEvent(map[string]any{"event": "live_client_probe_timing", "game_id": gameID, "phase": phase, "attempt": attempt, "success": succeeded, "elapsed_ms": now.Sub(firstAttempt).Milliseconds(), "player_count": shape.PlayerCount})
+ 	if !succeeded {
+ 		a.recordLiveClientPlayerListShape(gameID, status, shape, result, attempt, phase)
+ 	}
+@@ -4877,6 +4920,18 @@
+ }
+ 
+ func (a *app) recordLCUGameflowSessionShape(raw []byte, phase, gameMode string, queueID int64) {
++	if a != nil && phase == "GameStart" {
++		var session lcuGameflowSession
++		if json.Unmarshal(raw, &session) == nil {
++			key := "GameStart-first:" + strconv.FormatInt(session.GameData.GameID, 10)
++			if claimBoundedDiagnosticKey(&a.lcuGameflowShapeDiagnosticMu, &a.lcuGameflowShapeDiagnosticKeys, key, lcuSessionShapeDiagnosticLimit) {
++				event := lcuGameflowSessionShapePayload(raw, phase, gameMode, queueID)
++				event["game_id"], event["forced_sample"] = session.GameData.GameID, true
++				a.appendDiagnosticEvent(event)
++			}
++		}
++		return
++	}
+ 	if a == nil || !claimBoundedDiagnosticKey(&a.lcuGameflowShapeDiagnosticMu, &a.lcuGameflowShapeDiagnosticKeys, lcuSessionShapeDiagnosticKey(phase, gameMode, queueID), lcuSessionShapeDiagnosticLimit) {
+ 		return
+ 	}
+@@ -4923,11 +4978,12 @@
+ 	teamOne := rawArrayField(gameData["teamOne"])
+ 	teamTwo := rawArrayField(gameData["teamTwo"])
+ 	return map[string]any{
+-		"event":                               "lcu_gameflow_session_shape",
+-		"phase":                               strings.TrimSpace(phase),
+-		"game_mode":                           strings.ToUpper(strings.TrimSpace(gameMode)),
+-		"queue_id":                            queueID,
+-		"top_level_keys":                      diagnosticKeySet(json.RawMessage(raw)),
++		"event":           "lcu_gameflow_session_shape",
++		"phase":           strings.TrimSpace(phase),
++		"game_mode":       strings.ToUpper(strings.TrimSpace(gameMode)),
++		"queue_id":        queueID,
++		"top_level_keys":  diagnosticKeySet(json.RawMessage(raw)),
++		"team_one_length": len(teamOne), "team_two_length": len(teamTwo),
+ 		"team_one_player_keys":                diagnosticKeyUnion(teamOne),
+ 		"team_two_player_keys":                diagnosticKeyUnion(teamTwo),
+ 		"team_one_nonzero_counts":             diagnosticNonZeroKeyCounts(teamOne),
+@@ -5698,6 +5754,13 @@
+ 	if sessionErr == nil {
+ 		sessionErr = json.Unmarshal(sessionRaw, &session)
+ 	}
++	if sessionErr == nil && phase == "GameStart" {
++		mode := session.GameData.Queue.GameMode
++		if mode == "" {
++			mode = session.Map.GameMode
++		}
++		a.recordLCUGameflowSessionShape(sessionRaw, phase, mode, session.GameData.Queue.ID)
++	}
+ 	if sessionErr != nil {
+ 		// 国服部分版本在英雄选择阶段不返回 gameflow session，
+ 		// 继续尝试 champ-select 会话，不要直接放弃整页数据。
+@@ -5787,6 +5850,7 @@
+ 				response.QueueLabel = queueLabel(response.QueueID, response.GameMode, nil)
+ 			}
+ 			if isArenaChampSelectMode(response.GameMode) {
++				a.rememberArenaChampOrder(client, champSelect)
+ 				rawPlayers, _ = filterArenaChampSelectPlayers(rawPlayers)
+ 				response.ChampSelectNotice = arenaChampSelectNotice
+ 				a.rememberArenaAllies(rawPlayers)
+@@ -5827,6 +5891,9 @@
+ 	}
+ 	response.Available = true
+ 	arenaMode := isArenaChampSelectMode(response.GameMode)
++	if arenaMode {
++		a.noteArenaPhaseRoster(client, &response)
++	}
+ 	a.arenaAlliesMu.RLock()
+ 	staleAllies := a.arenaAllyGameID != 0 && a.arenaAllyGameID != response.GameID
+ 	a.arenaAlliesMu.RUnlock()
+@@ -5955,11 +6022,13 @@
+ 	}
+ 	a.finalizeLiveClientPlayerListShape(response.GameID, positionMatchSources["summonerName"]+positionMatchSources["riotId"], positionMatchSources)
+ 	applyLivePremadeAssignments(response.Players, premadeInputs, phase, arenaMode)
+-	if arenaMode && (phase == "InProgress" || phase == "Reconnect") {
++	if arenaMode && (phase == "GameStart" || phase == "InProgress" || phase == "Reconnect") {
+ 		sessionPlayers := make([]lcuLivePlayer, len(rawPlayers))
+ 		for i := range rawPlayers {
+ 			sessionPlayers[i] = rawPlayers[i].player
+ 		}
++		a.markArenaGroupingAttempt(client, &response)
++		a.compareArenaChampOrder(client, &response, sessionPlayers, liveClientSnapshotValue)
+ 		a.applyArenaLiveGrouping(client, current, &response, sessionPlayers, liveClientSnapshotValue)
+ 	}
+ 
+--- a/gameplay_refresh.go
++++ b/gameplay_refresh.go
+@@ -57,6 +57,7 @@
+ 	if !changed {
+ 		return
+ 	}
++	a.observeArenaGroupingPhase(client, phase)
+ 	a.liveSnapshots.invalidate()
+ 	if isEndOfGamePhase(phase) {
+ 		go func() {
+@@ -65,7 +66,7 @@
+ 			a.finishArenaGroupTruth(truthCtx, client)
+ 		}()
+ 	}
+-	if phase != "ChampSelect" && phase != "InProgress" && phase != "Reconnect" {
++	if phase != "ChampSelect" && phase != "GameStart" && phase != "InProgress" && phase != "Reconnect" {
+ 		return
+ 	}
+ 	a.mu.RLock()
+@@ -133,7 +134,7 @@
+ 		c.generation++
+ 	}
+ 	ttl := 20 * time.Second
+-	if phase == "ChampSelect" {
++	if phase == "ChampSelect" || phase == "GameStart" || c.response.ArenaGroupingRetryable {
+ 		ttl = 3 * time.Second
+ 	}
+ 	// Complete in-game data is immutable for this game. Incomplete snapshots
+@@ -284,5 +285,5 @@
+ 			return false
+ 		}
+ 	}
+-	return !isArenaQueue(response.QueueID, response.GameMode) || response.ArenaGrouped || response.ArenaGroupingUnavailable
+-}
++	return !isArenaQueue(response.QueueID, response.GameMode) || response.ArenaGrouped || response.ArenaGroupingUnavailable && !response.ArenaGroupingRetryable
++}
+--- a/opgg_insights_test.go
++++ b/opgg_insights_test.go
+@@ -727,7 +727,8 @@
+ 	defer cancel()
+ 	var payload map[string]any
+ 	err := provider.getLimited(ctx, "kr.api.riotgames.com", "/lol/match/v5/matches/KR_123", nil, &payload, riotResponseMax)
+-	if !errors.Is(err, context.DeadlineExceeded) {
++	var quota *riotStatusError
++	if !errors.As(err, &quota) || quota.status != 429 || quota.retryAfter != 3 {
+ 		t.Fatalf("rate limit error = %v", err)
+ 	}
+ 	if tracker.rateLimitCount() != 1 {
+--- a/r87_additional_test.go
++++ b/r87_additional_test.go
+@@ -51,7 +51,7 @@
+ 	// Non-loading phases exercise the same lifetime transition without launching IO.
+ 	a.observeGameplayPhase(context.Background(), c, "Lobby")
+ 	oldPhase := a.gameplayFlow.ctx
+-	a.observeGameplayPhase(context.Background(), c, "GameStart")
++	a.observeGameplayPhase(context.Background(), c, "Matchmaking")
+ 	if oldPhase.Err() != context.Canceled {
+ 		t.Fatal("previous phase lifetime survived a transition")
+ 	}
+--- a/riot_api.go
++++ b/riot_api.go
+@@ -186,14 +186,17 @@
+ type riotOverviewCostTrackerKey struct{}
+ 
+ type riotOverviewCostTracker struct {
+-	mu               sync.Mutex
+-	rateLimitedCount int
+-	matchesFailed    int
+-	firstErrorKind   string
+-	queueWait        time.Duration
+-	matchesFromDisk  int
+-	inFlight         int
+-	peakInFlight     int
++	profileQuotaError  error
++	mu                 sync.Mutex
++	rateLimitedCount   int
++	matchesFailed      int
++	firstErrorKind     string
++	queueWait          time.Duration
++	matchesFromMemory  int
++	matchesFromNetwork int
++	matchesFromDisk    int
++	inFlight           int
++	peakInFlight       int
+ }
+ 
+ func (t *riotOverviewCostTracker) recordMatchFailure(err error) {
+@@ -444,7 +447,7 @@
+ 			return &riotStatusError{message: "Riot API Key 无效、过期或无权访问：请到 developer.riotgames.com 检查后重新生成密文并在构建时注入", status: response.StatusCode}
+ 		case http.StatusTooManyRequests:
+ 			retryAfter := time.Duration(3) * time.Second
+-			if seconds, parseErr := strconv.Atoi(response.Header.Get("Retry-After")); parseErr == nil && seconds > 0 && seconds <= 30 {
++			if seconds, parseErr := strconv.Atoi(response.Header.Get("Retry-After")); parseErr == nil && seconds > 0 && seconds <= 86400 {
+ 				retryAfter = time.Duration(seconds) * time.Second
+ 			}
+ 			rioTracker := riotOverviewCostTrackerFromContext(ctx)
+@@ -455,7 +458,15 @@
+ 					"retry_after_ms": retryAfter.Milliseconds(), "attempt": attempt + 1,
+ 				})
+ 			}
++			quotaError := &riotStatusError{message: "Riot 接口限流中（HTTP 429），请稍后重试", status: http.StatusTooManyRequests, retryAfter: int(retryAfter / time.Second)}
++			deadline, bounded := ctx.Deadline()
++			if attempt == 2 || retryAfter > 30*time.Second || bounded && time.Until(deadline) <= retryAfter {
++				return quotaError
++			}
+ 			if err := waitRiotDelay(ctx, retryAfter); err != nil {
++				if errors.Is(err, context.DeadlineExceeded) {
++					return quotaError
++				}
+ 				return err
+ 			}
+ 		default:
+@@ -741,6 +752,22 @@
+ }
+ 
+ func (p *riotProvider) matchByIDWithCache(ctx context.Context, matchID string) (result *riotMatch, status string, resultErr error) {
++	defer func() {
++		tracker, _ := ctx.Value(riotOverviewCostTrackerKey{}).(*riotOverviewCostTracker)
++		if tracker == nil || resultErr != nil {
++			return
++		}
++		tracker.mu.Lock()
++		defer tracker.mu.Unlock()
++		switch status {
++		case "hit":
++			tracker.matchesFromMemory++
++		case "disk":
++			tracker.matchesFromDisk++
++		case "miss":
++			tracker.matchesFromNetwork++
++		}
++	}()
+ 	p.cacheMu.Lock()
+ 	if cached, ok := p.matchCache[matchID]; ok {
+ 		p.cacheMu.Unlock()
+@@ -1037,6 +1064,7 @@
+ 			"matches_failed": matchesFailed, "first_error_kind": firstErrorKind,
+ 			"rate_limited_count": tracker.rateLimitCount(),
+ 			"limiter_queue_ms":   tracker.queueWait.Milliseconds(), "matches_from_disk": tracker.matchesFromDisk,
++			"matches_from_memory": tracker.matchesFromMemory, "matches_from_network": tracker.matchesFromNetwork,
+ 			"details_inflight_peak": tracker.peakInFlight, "detail_concurrency": provider.detailConcurrency(),
+ 		})
+ 	}()
+@@ -1162,24 +1190,52 @@
+ 	semaphore := make(chan struct{}, provider.detailConcurrency())
+ 	detailsStarted := time.Now()
+ 	details := make([]*riotMatch, len(ids))
++	progress, _ := ctx.Value(riotOverviewProgressKey{}).(func(gameplayOverview))
++	completedDetails := make(chan struct{}, len(ids))
++	var detailLoadErr error
++	publishPartial := func() {
++		if progress == nil {
++			return
++		}
++		championNamesRead.Wait()
++		loadMu.Lock()
++		ready := append([]*riotMatch(nil), details...)
++		loadMu.Unlock()
++		partial := gameplayOverview{Player: gameplayPlayer{PlayerRef: puuid, DisplayName: gameName, GameName: gameName, TagLine: tagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Region: riotRegionKR, reference: reference}, Pagination: gameplayPagination{BegIndex: begIndex, Count: len(ids), HasMore: len(ids) == count}}
++		for _, detail := range ready {
++			if detail != nil {
++				match := riotConvertMatch(detail, puuid, names)
++				if !isCustomGameplayMatch(match) {
++					partial.Matches = append(partial.Matches, match)
++				}
++			}
++		}
++		if len(partial.Matches) == 0 {
++			return
++		}
++		a.publicizeOverviewReferences(&partial)
++		progress(partial)
++	}
+ 	for index := range ids {
+ 		wait.Add(1)
+ 		go func(index int) {
+ 			defer wait.Done()
++			defer func() { completedDetails <- struct{}{} }()
+ 			select {
+ 			case semaphore <- struct{}{}:
+ 			case <-ctx.Done():
+ 				return
+ 			}
+ 			defer func() { <-semaphore }()
+-			detail, cacheState, detailErr := provider.matchByIDWithCache(ctx, ids[index])
+-			if cacheState == "disk" {
+-				tracker.mu.Lock()
+-				tracker.matchesFromDisk++
+-				tracker.mu.Unlock()
+-			}
++			detail, _, detailErr := provider.matchByIDWithCache(ctx, ids[index])
+ 			if detailErr != nil {
+ 				tracker.recordMatchFailure(detailErr)
++				loadMu.Lock()
++				// Real failures take precedence over quota errors; don't silence them.
++				if detailLoadErr == nil || riotErrorStatus(detailLoadErr) == http.StatusTooManyRequests {
++					detailLoadErr = detailErr
++				}
++				loadMu.Unlock()
+ 				return
+ 			}
+ 			loadMu.Lock()
+@@ -1188,9 +1244,26 @@
+ 			loadMu.Unlock()
+ 		}(index)
+ 	}
++	previewSent := false
++	for range ids {
++		<-completedDetails
++		loadMu.Lock()
++		loaded := loadedDetails
++		loadMu.Unlock()
++		if !previewSent && loaded >= 5 {
++			publishPartial()
++			previewSent = true
++		}
++	}
+ 	wait.Wait()
++	if progress != nil && (detailLoadErr != nil || ctx.Err() != nil) {
++		publishPartial()
++	}
+ 	phases.markSpan("details", detailsStarted, time.Now())
+ 	if ctx.Err() != nil {
++		if errors.Is(ctx.Err(), context.DeadlineExceeded) && detailLoadErr != nil && riotErrorStatus(detailLoadErr) == http.StatusTooManyRequests {
++			return gameplayOverview{}, detailLoadErr
++		}
+ 		return gameplayOverview{}, ctx.Err()
+ 	}
+ 	matchesLoaded = loadedDetails
+@@ -1239,9 +1312,19 @@
+ 	}
+ 	if begIndex > 0 {
+ 		a.publicizeOverviewReferences(&response)
++		if progress != nil {
++			return response, detailLoadErr
++		}
+ 		return response, nil
+ 	}
+ 	profileWait.Wait()
++	if progress != nil && tracker.profileQuotaError != nil {
++		publishPartial()
++		if detailLoadErr != nil && riotErrorStatus(detailLoadErr) != http.StatusTooManyRequests {
++			return response, detailLoadErr
++		}
++		return response, tracker.profileQuotaError
++	}
+ 	if ctx.Err() != nil {
+ 		return gameplayOverview{}, ctx.Err()
+ 	}
+@@ -1269,6 +1352,9 @@
+ 	response.ActivityHours = activityHours(matches)
+ 	response.RecentPlayers = recentPlayers(matches, puuid, recentWindowAfter)
+ 	a.publicizeOverviewReferences(&response)
++	if progress != nil {
++		return response, detailLoadErr
++	}
+ 	return response, nil
+ }
+ 
+@@ -1354,6 +1440,13 @@
+ func (p *riotProvider) loadRiotRanks(ctx context.Context, puuid string) ([]gameplayRank, EndpointCapability) {
+ 	capability := EndpointCapability{Name: "ranked-stats", Path: "riot: /lol/league/v4/entries/by-puuid"}
+ 	entries, err := p.leagueEntries(ctx, puuid)
++	if err != nil && riotErrorStatus(err) == http.StatusTooManyRequests {
++		if tracker, ok := ctx.Value(riotOverviewCostTrackerKey{}).(*riotOverviewCostTracker); ok {
++			tracker.mu.Lock()
++			tracker.profileQuotaError = err
++			tracker.mu.Unlock()
++		}
++	}
+ 	if isCancellation(err) {
+ 		capability.State = capabilityCanceled
+ 		return nil, capability
+@@ -1391,6 +1484,13 @@
+ func (p *riotProvider) loadRiotMasteries(ctx context.Context, puuid string, names map[int64]string) ([]gameplayMastery, EndpointCapability) {
+ 	capability := EndpointCapability{Name: "champion-mastery", Path: "riot: /lol/champion-mastery/v4/by-puuid/top"}
+ 	entries, err := p.topMasteries(ctx, puuid, 6)
++	if err != nil && riotErrorStatus(err) == http.StatusTooManyRequests {
++		if tracker, ok := ctx.Value(riotOverviewCostTrackerKey{}).(*riotOverviewCostTracker); ok {
++			tracker.mu.Lock()
++			tracker.profileQuotaError = err
++			tracker.mu.Unlock()
++		}
++	}
+ 	if isCancellation(err) {
+ 		capability.State = capabilityCanceled
+ 		return nil, capability
+@@ -1459,14 +1559,33 @@
+ }
+ 
+ // Preserve a useful backoff hint through the local API without exposing keys.
++type riotHTTPError struct {
++	Error      string `json:"error"`
++	Kind       string `json:"kind"`
++	RetryAfter int    `json:"retryAfter,omitempty"`
++}
++
++func riotHTTPErrorBody(err error) riotHTTPError {
++	body := riotHTTPError{Error: err.Error(), Kind: "http"}
++	var statusErr *riotStatusError
++	if errors.As(err, &statusErr) {
++		body.RetryAfter = statusErr.retryAfter
++	}
++	if riotErrorStatus(err) == http.StatusTooManyRequests {
++		body.Kind = "rate-limited"
++		body.RetryAfter = max(1, body.RetryAfter)
++	}
++	if errors.Is(err, context.DeadlineExceeded) {
++		body.Error = "韩服数据读取超时，请稍后重试"
++	}
++	return body
++}
+ func writeRiotHTTPError(w http.ResponseWriter, err error) {
+-	var statusErr *riotStatusError
+-	if errors.As(err, &statusErr) && statusErr.retryAfter > 0 {
+-		w.Header().Set("Retry-After", strconv.Itoa(statusErr.retryAfter))
+-	}
+-	message := err.Error()
+-	if errors.Is(err, context.DeadlineExceeded) {
+-		message = "韩服数据读取超时，请稍后重试"
+-	}
+-	http.Error(w, message, riotErrorStatus(err))
+-}
++	body := riotHTTPErrorBody(err)
++	if body.RetryAfter > 0 {
++		w.Header().Set("Retry-After", strconv.Itoa(body.RetryAfter))
++	}
++	w.Header().Set("Content-Type", "application/json; charset=utf-8")
++	w.WriteHeader(riotErrorStatus(err))
++	_ = json.NewEncoder(w).Encode(body)
++}
+--- a/testdata/r88/protected-layout-rules.json
++++ b/testdata/r88/protected-layout-rules.json
+@@ -1,14 +1,14 @@
+ [
+-  ".match-main { display: grid; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }",
+-  ".match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); row-gap: 5px; }",
++  ".match-main { display: grid; align-self: start; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }",
++  ".match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); }",
+   ".match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }",
+-  ".match-stats.is-arena { align-content: center; grid-template-rows: repeat(2,18px); min-height: 41px; }",
++  ".match-stats.is-arena { align-content: start; grid-template-rows: repeat(3,18px); min-height: 54px; }",
+   "\t.match-main { gap: 8px 12px; }",
+   "\t.match-stats { padding-left: 10px; }",
+   "\t.match-summary.is-arena .match-main { grid-column: 2; grid-row: 1; }",
+   "\t.match-main, .match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,1fr); }",
+   "\t.match-stats { display: grid; grid-column: 1 / -1; grid-row: 2; min-height: 54px; padding-left: 10px; border-left: 0; border-top: 1px solid var(--line); padding-top: 6px; }",
+-  "\t.match-stats.is-arena { align-content: center; grid-template-rows: repeat(2,18px); min-height: 41px; }",
++  "\t.match-stats.is-arena { align-content: start; grid-template-rows: repeat(3,18px); min-height: 54px; }",
+   "\t.match-main, .match-main.is-arena, .match-summary.is-arena .match-main { grid-column: 1 / -1; grid-row: 2; grid-template-columns: minmax(0,1fr) minmax(88px,auto); gap: 7px 4px; }",
+   "\t.match-stats { gap: 8px; }",
+   "\t.match-main, .match-main.is-arena { row-gap: 0; }"
+--- a/watch_rules.go
++++ b/watch_rules.go
+@@ -1510,6 +1510,12 @@
+ 	runner.apply(request)
+ 	runner.record(map[string]any{"event": "watch_settings_saved", "master_enabled": request.MasterEnabled, "custom_paused": runner.customPaused(), "rules": request.Rules})
+ 	if client, _, err := a.gameplayClient(); err == nil {
++		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
++		var phase string
++		if err := client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/gameflow-phase", nil, &phase); err == nil {
++			runner.handlePhase(client, phase)
++		}
++		cancel()
+ 		runner.handleChampSelectAutomation(client)
+ 	}
+ 	for id, group := range request.ChampSelect.Groups {
+--- a/web/champions.test.cjs
++++ b/web/champions.test.cjs
+@@ -199,9 +199,9 @@
+   const matchBase = css.slice(0, matchBaseEnd);
+   assert.match(cssBlockAfter(matchBase, ".match-stats {"), /align-content:\s*start/);
+   const arenaStats = cssBlockAfter(matchBase, ".match-stats.is-arena {");
+-  assert.match(arenaStats, /align-content:\s*center/);
+-  assert.match(arenaStats, /grid-template-rows:\s*repeat\(2,18px\)/);
+-  assert.match(arenaStats, /min-height:\s*41px/);
++  assert.match(arenaStats, /align-content:\s*start/);
++  assert.match(arenaStats, /grid-template-rows:\s*repeat\(3,18px\)/);
++  assert.match(arenaStats, /min-height:\s*54px/);
+ 
+   const separatedBuild = cssBlockAfter(css, ".live-augment-recommendations + .build-recommendation {");
+   assert.match(separatedBuild, /margin-top:\s*20px/);
+@@ -1406,7 +1406,7 @@
+ 	assert.match(gameplayScript, /detailStates\.set\(id, \{ status: "failed", message \}\)/);
+ 	assert.match(gameplayScript, /for \(const mountedContainer of externalMatchViews\.keys\(\)\)/);
+ 	assert.match(gameplayStyles, /\.match-stat-participation > b\s*\{[^}]*var\(--success\)/);
+-	assert.doesNotMatch(gameplayStyles, /\.match-taken-value\s*\{/);
++	assert.match(gameplayStyles, /\.match-taken-value\s*\{[^}]*var\(--muted\)/);
+ 	assert.match(gameplayStyles, /\.match-loadout-mini\s*\{[^}]*grid-template-columns:\s*repeat\(2,26px\)/);
+ 	assert.match(gameplayStyles, /\.match-summary\.is-arena\s*\{[^}]*minmax\(220px,1fr\)[^}]*var\(--match-roster-width(?:,\s*clamp\([^)]*\))?\)[^}]*40px/s);
+ 	assert.match(gameplayStyles, /:root\s*\{[^}]*--match-roster-width:\s*clamp\(/s);
+@@ -1429,7 +1429,7 @@
+   assert.match(gameplayStyles, /\.match-main\s*\{[^}]*minmax\(0,96px\)/s);
+ 	assert.match(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*minmax\(0,96px\)/s);
+ 	assert.match(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*minmax\(0,1fr\)/s);
+-	assert.match(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*row-gap:\s*5px/);
++	assert.doesNotMatch(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*row-gap:\s*5px/);
+ 	assert.match(gameplayStyles, /\.match-players\.is-arena\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
+ 	assert.match(gameplayStyles, /\.arena-detail-columns\s*\{[^}]*grid-template-columns:\s*minmax\(140px,\.9fr\) 104px 96px 100px 116px 200px[^}]*justify-items:\s*center[^}]*column-gap:\s*12px[^}]*text-align:\s*center/s);
+ 	assert.match(gameplayStyles, /\.arena-detail-player\s*\{[^}]*grid-template-columns:\s*minmax\(140px,\.9fr\) 104px 96px 100px 116px 200px[^}]*justify-items:\s*center[^}]*column-gap:\s*12px[^}]*text-align:\s*center/s);
+@@ -2204,8 +2204,8 @@
+ 	assert.match(gameplayScript, /function applyRenderedMetricStyles\(container\)/);
+ 	assert.doesNotMatch(gameplayScript, /<i style="width:/);
+ 	assert.match(gameplayStyles, /\.damage-bar\s*\{[^}]*background:\s*color-mix/s);
+-	  assert.doesNotMatch(gameplayStyles, /\.match-damage-value\s*\{/);
+-  assert.match(gameplayStyles, /\.match-stat-damage\s*>\s*b\s*\{[^}]*display:\s*inline-flex/);
++	  assert.match(gameplayStyles, /\.match-damage-value\s*\{[^}]*var\(--danger\)/);
++  assert.match(gameplayStyles, /\.match-stat-damage\s*>\s*b,\s*\.match-stat-taken > b\s*\{[^}]*display:\s*inline-flex/);
+   assert.match(gameplayStyles, /\.match-stat\s*\{[^}]*minmax\(0,1fr\)/s);
+   assert.match(gameplayStyles, /\.match-list\s*\{[^}]*overflow-anchor:\s*auto/s);
+ 	assert.match(gameplayScript, /tab\.paginationStalls = upstreamAdditions > 0 \? 0/);
+@@ -4448,11 +4448,11 @@
+   assert.match(stats, /align-content:\s*start/);
+   assert.match(stats, /grid-template-rows:\s*repeat\(3,18px\)/);
+ 	const arenaStats = cssBlockAfter(matchBase, ".match-stats.is-arena {");
+-	assert.match(arenaStats, /align-content:\s*center/);
+-	assert.match(arenaStats, /grid-template-rows:\s*repeat\(2,18px\)/);
+-	assert.match(arenaStats, /min-height:\s*41px/);
++	assert.match(arenaStats, /align-content:\s*start/);
++	assert.match(arenaStats, /grid-template-rows:\s*repeat\(3,18px\)/);
++	assert.match(arenaStats, /min-height:\s*54px/);
+ 	assert.match(gameplayScript, /class="match-stats\$\{modeKind === "arena" \? " is-arena" : ""\}"/);
+-	assert.match(gameplayStyles, /@container matches-column \(max-width: 640px\)[\s\S]{0,320}\.match-stats\.is-arena\s*\{[^}]*repeat\(2,18px\)[^}]*min-height:\s*41px/s);
++	assert.match(gameplayStyles, /@container matches-column \(max-width: 640px\)[\s\S]{0,320}\.match-stats\.is-arena\s*\{[^}]*repeat\(3,18px\)[^}]*min-height:\s*54px/s);
+   const tier = cssBlockAfter(gameplayStyles, ".match-stat-tier .match-tier-value");
+   assert.equal(cssNumber(gameplayStyles, ".match-stat-tier .match-tier-value", "min-height"), 19);
+   assert.equal(cssNumber(gameplayStyles, ".match-champion", "min-height"), 63);
+@@ -5129,7 +5129,7 @@
+   const selfCard = renderLivePlayer({ id: "self", isCurrent: true, championId: 0, championPickIntent: 0, position: "" }, 0, true, 64);
+   const teammateCard = renderLivePlayer({ id: "mate", isCurrent: false, isAlly: true, championId: 0, championPickIntent: 0, position: "" }, 1, true, 64);
+   assert.deepEqual(renderedChampionIds, [64, 0]);
+-  assert.match(selfCard, />未定级<\/span>/);
++  assert.doesNotMatch(selfCard, /未定级|白银/);
+   assert.doesNotMatch(selfCard, /位置未知| · /);
+   assert.doesNotMatch(teammateCard, /data-id="64"/);
+ 	assert.match(selfCard, /class="live-player is-self"[\s\S]*class="live-player-copy"[\s\S]*class="self-chip">自己<\/span>[\s\S]*<\/div><dl>/);
+@@ -5779,7 +5779,7 @@
+ 		assert.match(sources.sgp, /cachedHistoryPage\(serverID, puuid, pageStart, pageSize, tags\)/);
+ 		assert.match(sources.sgp, /cacheHistoryPage\(serverID, puuid, pageStart, pageSize, tags/);
+ 		assert.match(sources.gameplayGo, /if timeout == nil\s*\{\s*timeout = context\.WithTimeout/);
+-		assert.match(sources.gameplayGo, /timeout\(r\.Context\(\), overviewSoftBudget\)/); // A-3
++		assert.match(sources.gameplayGo, /timeout\(r\.Context\(\), budget\)/); // A-3
+ 		assert.match(sources.sgp, /sgpPageSize\s+= 50/); // A-4
+ 		assert.match(sources.sgp, /shouldSample = cost\.claimParticipantShapeSample\(\)/); // A-5
+ 		assert.match(sources.gameplayGo, /"event": "tencent_riot_id_lookup"/); // A-6
+@@ -5837,7 +5837,7 @@
+ 	const mutations = [
+ 		["A-1 retry budget", "sgp", "for retry := 0; retry <= 2; retry++", "for retry := 0; retry < 1; retry++"],
+ 		["A-2 pageSize key dimension", "sgp", 'fmt.Sprintf("%s|%s|%d|%d|%s", serverID, puuid, startIndex, pageSize, strings.Join(tags, ","))', 'fmt.Sprintf("%s|%s|%d|%s", serverID, puuid, startIndex, strings.Join(tags, ","))'],
+-		["A-3 overview deadline", "gameplayGo", "timeout(r.Context(), overviewSoftBudget)", "context.WithCancel(r.Context())"],
++		["A-3 overview deadline", "gameplayGo", "timeout(r.Context(), budget)", "context.WithCancel(r.Context())"],
+ 		["A-4 50-row cold page", "sgp", "sgpPageSize         = 50", "sgpPageSize         = 20"],
+ 		["A-5 one-shot participant sample", "sgp", "shouldSample = cost.claimParticipantShapeSample()", "shouldSample = true"],
+ 		["A-6 lookup diagnostic", "gameplayGo", '"event": "tencent_riot_id_lookup"', '"event": "tencent_lookup_removed"'],
+@@ -5987,7 +5987,7 @@
+   assert.match(functionSource(script, "renderRankedBuild"), /renderConfigOption\(row, "route", null, renderDepthStats\)/);
+   assert.match(styles, /\.champion-build-board \.config-option\s*\{[^}]*min-height:\s*var\(--build-row-height,\s*60px\)[^}]*flex-wrap:\s*nowrap/s);
+   assert.match(gameplayStyles, /\.config-option\s*\{[^}]*min-height:\s*var\(--build-row-height,\s*60px\)/s);
+-	  assert.match(gameplayScript, /const timeout = 25_000;/);
++	  assert.match(gameplayScript, /const timeout = riotTab\(tab\) \? 190_000 : 25_000;/);
+   for (const slot of ["fourth", "fifth"]) {
+     assert.match(gameplayScript, new RegExp(`inUpstreamOrder\\(build\\.${slot}Options \\|\\| \\[\\], 5\\)`));
+   }
+@@ -6064,8 +6064,8 @@
+     fs.writeFileSync(path.join(webCopy, "build-item-row.css"), originals["build-item-row.css"].replace("--build-row-height: 64px", "--build-row-height: 40px"));
+     assert.throws(() => assert.match(read("build-item-row.css"), /--build-row-height:\s*64px/));
+ 
+-		fs.writeFileSync(path.join(webCopy, "gameplay.js"), originals["gameplay.js"].replace("const timeout = 25_000;", "const timeout = 10_000;"));
+-		assert.throws(() => assert.match(read("gameplay.js"), /const timeout = 25_000;/));
++		fs.writeFileSync(path.join(webCopy, "gameplay.js"), originals["gameplay.js"].replace("const timeout = riotTab(tab) ? 190_000 : 25_000;", "const timeout = 10_000;"));
++		assert.throws(() => assert.match(read("gameplay.js"), /const timeout = riotTab\(tab\) \? 190_000 : 25_000;/));
+ 
+ 		const compileMilestones = (source) => compileFunctions(source, ["renderRankMilestones"], {
+ 			escapeHTML: (value) => String(value),
+@@ -6100,7 +6100,7 @@
+       "false",
+     ))],
+     ["B desktop Arena rows", () => assertR45Contracts(gameplayScript, gameplayStyles.replace(
+-      ".match-stats.is-arena { align-content: center; grid-template-rows: repeat(2,18px); min-height: 41px; }",
++      ".match-stats.is-arena { align-content: start; grid-template-rows: repeat(3,18px); min-height: 54px; }",
+       "",
+     ))],
+     ["C1 title spacing", () => assertR45Contracts(gameplayScript, gameplayStyles.replace(
+--- a/web/gameplay.css
++++ b/web/gameplay.css
+@@ -632,8 +632,8 @@
+ /* 中部主区：第一行 英雄+技能符文 / KDA / 数据列，第二行装备栏 + 徽章。
+    中列弹性伸缩：宽度变化时 KDA 居中、数据列贴住右侧玩家名单，
+    多余空间均匀分布在块之间，而不是堆在数据列右侧。 */
+-.match-main { display: grid; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }
+-.match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); row-gap: 5px; }
++.match-main { display: grid; align-self: start; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }
++.match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); }
+ .match-champion { position: relative; display: grid; min-width: 0; min-height: 63px; grid-template-columns: 58px minmax(0,auto); align-items: center; gap: 7px; }
+ .champion-level { position: absolute; top: 44px; left: 40px; display: grid; width: 22px; height: 22px; place-items: center; color: white; background: #171717; border-radius: 50%; font-size: 10px; }
+ /* 召唤师技能一列、主副系符文一列（各上下两格） */
+@@ -647,7 +647,7 @@
+ /* 数据列：按模式展示参团、补刀、段位或伤害数据，悬停有完整说明；
+    固定最小宽度并靠右，保证多张卡片的左右边缘对齐 */
+ .match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }
+-.match-stats.is-arena { align-content: center; grid-template-rows: repeat(2,18px); min-height: 41px; }
++.match-stats.is-arena { align-content: start; grid-template-rows: repeat(3,18px); min-height: 54px; }
+ .match-stat { display: grid; min-width: 0; grid-template-columns: 72px minmax(0,1fr); align-items: baseline; gap: 8px; font-size: 11px; cursor: help; white-space: nowrap; }
+ .match-stat > em { min-width: 0; color: var(--faint); font-size: 10.5px; font-style: normal; }
+ .match-stat > b { min-width: 0; justify-self: end; overflow: hidden; color: var(--muted); font-weight: 700; text-align: right; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+@@ -656,7 +656,7 @@
+ .match-stat-tier { align-items: center; }
+ .match-stat-tier .match-tier-value { display: flex; min-width: 0; justify-self: end; align-items: center; gap: 4px; min-height: 19px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ .match-stat-tier .match-tier-value b { color: var(--muted); font-size: 11px; font-weight: 700; }
+-.match-stat-damage > b { display: inline-flex; align-items: baseline; gap: 3px; }
++.match-stat-damage > b, .match-stat-taken > b { display: inline-flex; align-items: baseline; gap: 3px; }
+ .match-tier-crest { width: 19px; height: 19px; object-fit: contain; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .35)); }
+ .match-tier-unknown { color: var(--faint); font-weight: 600; }
+ .match-build { display: flex; min-width: 0; grid-column: 1 / -1; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+@@ -767,7 +767,7 @@
+ 	.match-main, .match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,1fr); }
+ 	.match-stats { display: grid; grid-column: 1 / -1; grid-row: 2; min-height: 54px; padding-left: 10px; border-left: 0; border-top: 1px solid var(--line); padding-top: 6px; }
+ 	.match-build { column-gap: 4px; }
+-	.match-stats.is-arena { align-content: center; grid-template-rows: repeat(2,18px); min-height: 41px; }
++	.match-stats.is-arena { align-content: start; grid-template-rows: repeat(3,18px); min-height: 54px; }
+ 	.item-slot.is-trinket { margin-left: 0; }
+ }
+ 
+@@ -1838,3 +1838,6 @@
+   color: var(--muted);
+   font-size: 12px;
+ }
++
++.match-stat-damage > b, .match-damage-value { color: var(--danger); }
++.match-stat-taken > b, .match-taken-value { color: var(--muted); }
+--- a/web/gameplay.js
++++ b/web/gameplay.js
+@@ -123,14 +123,15 @@
+   function liveSnapshotComplete(data) {
+     if (!data?.available || !Array.isArray(data.players) || !data.players.length) return false;
+     if (data.players.some((player) => player.historyState === "pending")) return false;
+-    return liveAugmentRecommendationSource(data) !== "arena" || data.arenaGrouped === true || data.arenaGroupingUnavailable === true;
++    return liveAugmentRecommendationSource(data) !== "arena" || data.arenaGrouped === true || data.arenaGroupingUnavailable === true && data.arenaGroupingRetryable !== true;
+   }
+   function syncLiveRetryBudget() {
+     const key = `${state.beacon.phase || state.live?.phase || ""}:${state.live?.gameId || 0}`;
+-    if (state.liveRetryKey !== key) { state.liveRetryKey = key; state.liveRetryAttempts = 0; }
++    if (state.liveRetryKey !== key) { state.liveRetryKey = key; state.liveRetryAttempts = 0; state.liveRetryStartedAt = Date.now(); }
+   }
+   function liveAutoRefreshStopped(data) {
+     if (!["InProgress", "Reconnect"].includes(data?.phase)) return "";
++    if (data?.arenaGroupingUnavailable && !data?.arenaGrouped && Number(state.liveRetryAttempts || 0) < 8) return data.arenaGroupingRetryable ? "小队数据尚未完整，正在自动重试" : "暂时无法确认小队，可手动刷新";
+     if (liveSnapshotComplete(data)) return "对局中数据不再变化，已停止自动刷新";
+     if (Number(state.liveRetryAttempts || 0) >= 8) return "数据尚未完整，已停止自动重试，可手动刷新";
+     return "";
+@@ -191,10 +192,22 @@
+     let responseStatus = 0;
+     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeout);
+     try {
++      const { onProgress, ...requestOptions } = options;
+       const headers = new Headers(options.headers || {});
+-      headers.set("Accept", "application/json");
++      headers.set("Accept", onProgress ? "application/x-ndjson" : "application/json");
++      const responseError = (status, body, retryHeader) => {
++        let payload = {};
++        try { payload = typeof body === "string" ? JSON.parse(body) : body; } catch (_) {}
++        const error = new Error(payload?.error || (typeof body === "string" ? body.trim() : "") || `本地服务返回 HTTP ${status}`);
++        error.status = status;
++        error.errorKind = status === 429 ? "rate-limited" : "http";
++        const rawRetry = payload?.retryAfter ?? retryHeader;
++        const seconds = Number(rawRetry);
++        error.retryAfter = Math.max(1, Number.isFinite(seconds) && seconds > 0 ? seconds : (Date.parse(rawRetry) - Date.now()) / 1000 || 5);
++        return error;
++      };
+       if (options.body) headers.set("Content-Type", "application/json");
+-      const response = await fetch(path, { ...options, headers, signal: controller.signal });
++      const response = await fetch(path, { ...requestOptions, headers, signal: controller.signal });
+       responseStatus = response.status;
+       errorStage = "read";
+       if (response.status === 401) {
+@@ -204,13 +217,32 @@
+         throw error;
+       }
+       if (!response.ok) {
+-        const error = new Error((await response.text()).trim() || `本地服务返回 HTTP ${response.status}`);
+-        error.status = response.status;
+-        error.errorKind = "http";
+-        throw error;
++        throw responseError(response.status, await response.text(), response.headers?.get("Retry-After"));
+       }
+       errorStage = "decode";
+-      const payload = response.status === 204 ? null : await response.json();
++      let payload;
++      if (onProgress && response.headers?.get("Content-Type")?.includes("application/x-ndjson")) {
++        const reader = response.body.getReader(), decoder = new TextDecoder();
++        let buffer = "", complete = false;
++        const receive = line => {
++          if (!line.trim()) return;
++          if (controller.signal.aborted || state.controllers.get(key) !== controller || state.destroyed) { const error = new Error("请求已取消"); error.name = "RequestCancelled"; throw error; }
++          const frame = JSON.parse(line);
++          if (frame.type === "error") throw responseError(frame.status, frame, frame.retryAfter);
++          if (frame.type === "progress") onProgress(frame.overview);
++          else if (frame.type === "complete") { payload = frame.overview; complete = true; }
++        };
++        try {
++          while (true) {
++            const { value, done } = await reader.read();
++            buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
++            let split;
++            while ((split = buffer.indexOf("\n")) >= 0) { const line = buffer.slice(0, split); buffer = buffer.slice(split + 1); receive(line); }
++            if (done) { receive(buffer); break; }
++          }
++          if (!complete) throw new Error("战绩读取中断，请重试补齐");
++        } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
++      } else payload = response.status === 204 ? null : await response.json();
+       if (controller.signal.aborted || state.controllers.get(key) !== controller || state.destroyed) {
+         const aborted = new Error("请求已取消");
+         aborted.name = "RequestCancelled";
+@@ -665,6 +697,8 @@
+   }
+ 
+   async function loadOverview(tab, force = false, append = false, manual = false, quiet = false) {
++    if (tab.closed || state.destroyed) return false;
++    if (tab.quotaRetry && !force && !manual) return false;
+ 	if (!tabReady(tab)) { rerenderTab(tab); return false; }
+ 	if (force) {
+       // Successful immutable timelines remain cached; failed attempts must be
+@@ -703,16 +737,19 @@
+       }
+       tab.loading = true;
+ 	}
++    clearTimeout(tab.quotaRetry?.timer);
++    tab.quotaRetry = null;
+     const requestToken = Number(tab.overviewRequestToken || 0) + 1;
+     tab.overviewRequestToken = requestToken;
+     tab.error = "";
+     if (!append) tab.initialPageError = "";
+ 	let appendAdditions = [];
+ 	let loaded = false;
++    const baseMatches = [...(tab.data?.matches || [])];
+     if (append) showLoadingMoreState(tab);
+     else if (!quiet) rerenderTab(tab);
+     const initialKRPage = !append && !tab.data && riotTab(tab) && Number(state.settings.matchCount) > 5;
+-    const requestCount = initialKRPage ? 5 : state.settings.matchCount;
++    const requestCount = state.settings.matchCount;
+     if (initialKRPage) tab.initialPagePending = true;
+     try {
+       const begIndex = append ? Math.max(0, Number(tab.nextBegIndex ?? (Number(tab.data?.pagination?.begIndex || 0) + Number(tab.data?.pagination?.count || 0)))) : 0;
+@@ -720,7 +757,23 @@
+       const body = tab.current ? null : JSON.stringify(tab.riotId && !tab.playerRef
+ 		? { ...verification, gameName: tab.riotId.gameName, tagLine: tab.riotId.tagLine, region: tab.region || "", serverId: tab.serverId || "", count: requestCount, begIndex, force, matchFilter: tab.matchFilter }
+ 		: { ...verification, playerRef: tab.playerRef, serverId: tab.serverId || "", count: requestCount, begIndex, force, matchFilter: tab.matchFilter });
+-      const timeout = 25_000;
++      const timeout = riotTab(tab) ? 190_000 : 25_000;
++      const onProgress = riotTab(tab) ? partial => {
++        if (tab.overviewRequestToken !== requestToken || tab.closed || state.destroyed) return;
++        if (!partial?.player || !Array.isArray(partial.matches)) return;
++        const previous = tab.data;
++        const incoming = new Set(partial.matches.map(match => String(match.gameId)));
++        const matches = append
++          ? [...(previous?.matches || []).filter(match => !incoming.has(String(match.gameId))), ...partial.matches]
++          : [...partial.matches, ...(previous?.matches || []).filter(match => !incoming.has(String(match.gameId)))];
++        tab.data = { ...previous, ...partial, matches, pagination: previous?.pagination || partial.pagination };
++        // Partial pages do not advance the cursor; a retry fills this same page.
++        tab.initialPagePending = !append;
++        const ref = partial.player.playerRef;
++        if (ref) { rememberTabPlayerRef(tab, ref); tab.playerRef = ref; }
++        tab.label = playerLabel(partial.player);
++        rerenderTab(tab);
++      } : undefined;
+       const requestKey = `${append ? "overview-more" : "overview"}:${tab.key}`;
+       if (!append) {
+         void loadOPGGSeasonSummary(tab, force && !quiet);
+@@ -728,11 +781,11 @@
+       }
+       const payload = tab.current
+ 		? await api(`/api/gameplay/overview?count=${requestCount}&begIndex=${begIndex}&force=${force ? 1 : 0}&matchFilter=${encodeURIComponent(tab.matchFilter || "all")}`, {}, requestKey, timeout)
+-        : await api("/api/gameplay/overview", { method: "POST", body }, requestKey, timeout);
++        : await api("/api/gameplay/overview", { method: "POST", body, onProgress }, requestKey, timeout);
+       if (tab.overviewRequestToken !== requestToken) return false;
+       if (payload.proMismatch) markProMismatch(tab);
+       if (append) {
+-        const seen = new Set((tab.data.matches || []).map((match) => String(match.gameId)));
++        const seen = new Set(baseMatches.map((match) => String(match.gameId)));
+         const additions = (payload.matches || []).filter((match) => {
+           const gameID = String(match.gameId);
+           if (seen.has(gameID)) return false;
+@@ -748,7 +801,7 @@
+         }
+         tab.nextBegIndex = pagination.nextBegIndex;
+         delete pagination.nextBegIndex;
+-        tab.data = { ...tab.data, matches: [...(tab.data.matches || []), ...additions], pagination: { ...pagination, moreError: "" } };
++        tab.data = { ...tab.data, matches: [...baseMatches, ...additions], pagination: { ...pagination, moreError: "" } };
+         appendAdditions = additions;
+         tab.paginationBackoffMs = 0;
+         tab.nextAutoAppendAt = Date.now() + AUTO_PAGE_DELAY_MS;
+@@ -774,6 +827,7 @@
+ 		tab.nextAutoAppendAt = Date.now() + AUTO_PAGE_DELAY_MS;
+ 	  }
+ 	  loaded = true;
++      if (!append) tab.initialPagePending = false;
+       const resolvedPlayerRef = payload.player?.playerRef || "";
+       syncOverviewSupplementRefs(tab);
+       rememberTabPlayerRef(tab, resolvedPlayerRef);
+@@ -790,6 +844,20 @@
+ 		}
+     } catch (error) {
+       if (tab.overviewRequestToken !== requestToken) return false;
++      if (error.errorKind === "rate-limited") {
++        tab.error = "";
++        tab.initialPageError = "";
++        const filter = tab.matchFilter, count = state.settings.matchCount;
++        const retry = { timer: 0 };
++        tab.quotaRetry = retry;
++        retry.timer = setTimeout(() => {
++          if (tab.quotaRetry !== retry) return;
++          tab.quotaRetry = null;
++          if (tab.closed || state.destroyed || tab.overviewRequestToken !== requestToken || tab.matchFilter !== filter || state.settings.matchCount !== count) return;
++          void loadOverview(tab, !append, append, false, true);
++        }, Math.max(1000, Number(error.retryAfter || 5) * 1000));
++        return false;
++      }
+       if (error.name !== "RequestCancelled") {
+         // 玩家引用极少数情况下会失效（例如切换登录账号）；搜索打开的页签
+         // 还留有 Riot ID，直接改用 Riot ID 重新查询一次。
+@@ -813,7 +881,7 @@
+           tab.data.pagination = { ...(tab.data.pagination || {}), hasMore: true, autoPaused: true, pauseReason: "", moreError: retryCopy };
+           showToast(`更多战绩加载失败：${error.message}`);
+         }
+-        else if (quiet && tab.initialPagePending && tab.data) tab.initialPageError = error.message || "请求失败";
++        else if (tab.initialPagePending && tab.data) tab.initialPageError = error.message || "请求失败";
+         else if (!quiet) tab.error = error.message;
+       }
+ 	} finally {
+@@ -834,13 +902,7 @@
+       void loadOPGGSeasonSummary(tab);
+       void loadOverviewCurrentGame(tab);
+     }
+-    if (loaded && initialKRPage && tab.overviewRequestToken === requestToken && !tab.closed && !state.destroyed && tab.data?.pagination?.hasMore) {
+-      // The second snapshot reuses the five immutable details already cached on
+-      // the server, and recomputes all career aggregates over the complete page.
+-      void loadOverview(tab, true, false, false, true);
+-    } else if (loaded && !append) {
+-      tab.initialPagePending = false;
+-    }
++    if (loaded && !append) tab.initialPagePending = false;
+     return loaded;
+   }
+ 
+@@ -1309,6 +1371,7 @@
+     const closed = state.overlay.pop();
+     if (closed) {
+       closed.closed = true;
++      clearTimeout(closed.quotaRetry?.timer);
+       state.controllers.get(`overview:${closed.key}`)?.abort();
+     }
+     renderOverlay();
+@@ -1318,6 +1381,7 @@
+     while (state.overlay.length) {
+       const closed = state.overlay.pop();
+       closed.closed = true;
++      clearTimeout(closed.quotaRetry?.timer);
+       state.controllers.get(`overview:${closed.key}`)?.abort();
+     }
+     if (nodes.playerOverlay) renderOverlay();
+@@ -1395,6 +1459,7 @@
+     const index = state.tabs.findIndex((tab) => tab.key === key && !tab.current);
+     if (index < 0) return;
+     state.tabs[index].closed = true;
++    clearTimeout(state.tabs[index].quotaRetry?.timer);
+     state.controllers.get(`overview:${key}`)?.abort();
+     state.controllers.get(`overview-more:${key}`)?.abort();
+     state.controllers.get(`opgg-season:${key}`)?.abort();
+@@ -2694,8 +2759,8 @@
+     const participationRow = `<span class="match-stat match-stat-participation" data-tooltip="${escapeHTML(participationTitle)}" data-tooltip-size="compact"><em>击杀参与率</em><b>${participation === null ? "—" : percent(participation)}</b></span>`;
+     const csRow = `<span class="match-stat" data-tooltip="${escapeHTML(csTitle)}" data-tooltip-size="compact"><em>CS</em><b>${number(subject.cs)} <span class="match-stat-secondary">(${number(subject.csPerMinute)})</span></b></span>`;
+     const tierRow = `<span class="match-stat match-stat-tier" data-match-tier data-game-id="${match.gameId}"${tierPending} data-tooltip="${escapeHTML(matchTierTitle(tierValue))}" data-tooltip-size="compact"><em>平均段位</em><span class="match-tier-value">${tierValue === undefined ? '<b class="match-tier-unknown">…</b>' : matchTierContent(tierValue)}</span></span>`;
+-    const damageRow = `<span class="match-stat match-stat-damage" data-tooltip="对英雄造成的总伤害" data-tooltip-size="compact"><em>伤害</em><b>${compactNumber(subject.damage)}</b></span>`;
+-    const takenRow = `<span class="match-stat match-stat-damage" data-tooltip="承受的总伤害" data-tooltip-size="compact"><em>承伤</em><b>${compactNumber(subject.damageTaken)}</b></span>`;
++    const damageRow = `<span class="match-stat match-stat-damage" data-tooltip="对英雄造成的总伤害" data-tooltip-size="compact"><em>伤害</em><b>${plainInteger(subject.damage)}</b></span>`;
++    const takenRow = `<span class="match-stat match-stat-taken" data-tooltip="承受的总伤害" data-tooltip-size="compact"><em>承伤</em><b>${plainInteger(subject.damageTaken)}</b></span>`;
+     // 斗魂竞技场用伤害/承伤替代召唤师峡谷的参团率、CS、平均段位；
+     // 数据缺失时保留明确占位，避免卡片列高度随模式变化而漂移。
+     const statRows = modeKind === "arena" ? `${damageRow}${takenRow}` : `${participationRow}${csRow}${tierRow}`;
+@@ -3728,6 +3793,16 @@
+       if (shouldResetLiveGameScopedState(previousLive, nextLive)) resetLiveGameScopedState();
+       resetLivePositionOverrides(previousLive, nextLive);
+       resetRecommendationTabsOnChampionChange(previousLive, nextLive);
++      // Keep known history from the same game when a refresh returns a pending cell.
++      if (previousLive && previousLive.queueId === nextLive.queueId) {
++        const histories = new Map((previousLive.players || []).filter(p => p.playerRef).map(p => [p.playerRef, p]));
++        for (const player of nextLive.players || []) {
++          const old = histories.get(player.playerRef);
++          if (player.historyState === "pending" && old && old.historyState !== "pending") {
++            for (const field of ["recentGames", "modeStats", "recentRankedRecord", "recentPositions"]) player[field] = old[field];
++          }
++        }
++      }
+       state.live = nextLive;
+       state.liveExpectedGameId = normalizeLiveGameId(nextLive.gameId);
+       state.liveAwaitingGame = state.liveAwaitingGame && liveGamePhase(nextLive.phase) && !nextLive.unsupported
+@@ -3885,6 +3960,10 @@
+   }
+ 
+   function softResetGameplayState() {
++    for (const tab of [...(state.tabs || []), ...(state.overlay || [])]) {
++      clearTimeout(tab.quotaRetry?.timer); tab.quotaRetry = null;
++      tab.overviewRequestToken = Number(tab.overviewRequestToken || 0) + 1;
++    }
+     state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
+     for (const controller of state.controllers.values()) controller.abort();
+     state.controllers.clear();
+@@ -4377,7 +4456,19 @@
+       bindLiveContent();
+       return;
+     }
+-    nodes.liveContent.innerHTML = renderLiveRefreshStatus(data) + renderRecommendationArea(data);
++    const markup = renderRecommendationArea(data);
++    const statusMarkup = renderLiveRefreshStatus(data);
++    // Refresh feedback changes independently of the roster and recommendation DOM.
++    if (nodes.liveContent._recommendationMarkup === markup && nodes.liveContent.querySelector("[data-live-body]")) {
++      const status = nodes.liveContent.querySelector("[data-live-status]");
++      if (status.innerHTML !== statusMarkup) {
++        status.innerHTML = statusMarkup;
++        status.querySelector("[data-live-refresh]")?.addEventListener("click", () => loadLive(true, "manual"));
++      }
++      return;
++    }
++    nodes.liveContent._recommendationMarkup = markup;
++    nodes.liveContent.innerHTML = `<div data-live-status>${statusMarkup}</div><div data-live-body>${markup}</div>`;
+     bindLiveContent();
+     applyRenderedMetricStyles(nodes.liveContent);
+     prepareImages(nodes.liveContent);
+@@ -4447,16 +4538,16 @@
+     const displayName = maskedPlayerName(player, index);
+     const championId = liveDisplayedChampionId(player, currentChampionId);
+ 	const historyState = String(player?.historyState || "empty").trim().toLowerCase();
+-	const historyPending = state.liveLoading === true;
++	const historyPending = state.liveLoading === true && !player.recentGames?.length && !Number(stats.games) && !["ready", "empty", "unavailable", "failed"].includes(player.historyState);
+     const rankCopy = rank?.tier ? rankTitle(rank) : "未定级";
+-    const contextCopy = arenaMode ? rankCopy : `${positionLabel(player.position)} · ${rankCopy}`;
++    const contextCopy = arenaMode ? "" : `${positionLabel(player.position)} · ${rankCopy}`;
+     const rowTone = player.isCurrent ? " is-self" : player.isAlly ? " is-ally" : "";
+     const premadeTag = renderLivePremadeTag(player, premadePlayers, currentChampionId);
+ 	const emptySummary = historyState === "unavailable" ? "客户端未公开该玩家" : historyState === "failed" ? "读取失败" : "暂无样本";
+ 	const historySummary = historyPending
+ 	  ? '<dl class="is-history-pending" aria-label="战绩读取中"><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div></dl>'
+ 	  : `<dl><div><dt>${recordGames ? `近 ${number(recordGames)} 局` : "当前模式"}</dt><dd>${displayStats.games ? `${number(displayStats.wins)}胜 ${number(displayStats.losses)}负` : emptySummary}</dd></div><div><dt>胜率</dt><dd class="win-rate-value">${displayStats.games ? percent(displayStats.winRate) : "—"}</dd></div><div><dt>KDA</dt><dd>${displayStats.games ? `${kda(displayStats.kda)}:1` : "—"}</dd></div></dl>`;
+-	return `<article class="live-player${rowTone}">${iconFigure("champion", championId, player.championName, "live")}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}"` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${premadeTag}</div><span>${escapeHTML(contextCopy)}</span>${recentPositions}</div>${historySummary}</article>`;
++	return `<article class="live-player${rowTone}">${iconFigure("champion", championId, player.championName, "live")}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}"` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${premadeTag}</div>${contextCopy ? `<span>${escapeHTML(contextCopy)}</span>` : ""}${recentPositions}</div>${historySummary}</article>`;
+   }
+ 
+ 	  function orderLivePlayers(players, groupByTeam = true) {
+@@ -4698,7 +4789,7 @@
+   }
+ 
+   function renderInsightMatches(player) {
+-	if (state.liveLoading === true) return '<div class="insight-match-row is-history-pending" aria-label="战绩读取中"><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span></div>';
++	if (state.liveLoading === true && !player.recentGames?.length && !["ready", "empty", "unavailable", "failed"].includes(player.historyState)) return '<div class="insight-match-row is-history-pending" aria-label="战绩读取中"><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span></div>';
+     const games = (player.recentGames || []).slice(0, 8);
+ 	if (!games.length) {
+ 	  const historyState = String(player?.historyState || "empty").trim().toLowerCase();
+@@ -4721,7 +4812,7 @@
+   }
+ 
+ 	  function arenaLivePlayerGroups(data, players) {
+-	    if (!["InProgress", "Reconnect"].includes(data?.phase) || data?.arenaGrouped !== true || players.length < 6 || players.length > 18) return [];
++	    if (!["GameStart", "InProgress", "Reconnect"].includes(data?.phase) || data?.arenaGrouped !== true || players.length < 6 || players.length > 18) return [];
+ 	    const grouped = new Map();
+ 	    for (const player of players) {
+ 	      const key = String(player?.arenaGroup || "").trim();
+@@ -5517,14 +5608,15 @@
+     state.liveTimer = 0;
+     if (state.destroyed || !state.settings.liveRefresh || document.hidden || !connected() || state.section !== "live") return;
+     const phase = state.beacon.phase || state.live?.phase;
+-    if (!["ChampSelect", "InProgress", "Reconnect"].includes(phase)) return;
++    if (!["ChampSelect", "GameStart", "InProgress", "Reconnect"].includes(phase)) return;
+     syncLiveRetryBudget();
+-    const inGame = phase === "InProgress" || phase === "Reconnect";
++    const inGame = phase === "GameStart" || phase === "InProgress" || phase === "Reconnect";
+     if (inGame && (liveSnapshotComplete(state.live) && state.live?.phase === phase || Number(state.liveRetryAttempts || 0) >= 8)) return;
+-    const delay = inGame ? 20_000 : state.liveError ? 60_000 : liveRefreshDelayMs(phase, state.settings.liveInterval);
++    const loadingProbe = inGame && liveAugmentRecommendationSource(state.live) === "arena" && !state.live?.arenaGrouped && Date.now() - Number(state.liveRetryStartedAt || 0) < 60_000;
++    const delay = loadingProbe ? 5_000 : inGame ? 20_000 : state.liveError ? 60_000 : liveRefreshDelayMs(phase, state.settings.liveInterval);
+     state.liveTimer = setTimeout(() => {
+       state.liveTimer = 0;
+-      if (inGame) state.liveRetryAttempts = Number(state.liveRetryAttempts || 0) + 1;
++      if (inGame && !loadingProbe) state.liveRetryAttempts = Number(state.liveRetryAttempts || 0) + 1;
+       void loadLive(false, "interval");
+     }, delay);
+   }
+@@ -6336,6 +6428,7 @@
+   });
+   function disposeGameplay() {
+     state.destroyed = true;
++    for (const tab of [...state.tabs, ...state.overlay]) clearTimeout(tab.quotaRetry?.timer);
+     for (const tab of state.tabs) clearTimeout(tab.dirtyTimer);
+     clearInterval(playerDurationTimer);
+     clearTimeout(beaconPollTimer);
+--- a/web/gameplay.test.cjs
++++ b/web/gameplay.test.cjs
+@@ -289,7 +289,7 @@
+   assert.match(failed, /读取失败/);
+   assert.match(failed, /data-live-history-retry/);
+   assert.match(render(false, "empty"), /该玩家当前模式暂无最近战绩/);
+-  const pending = render(true, "empty");
++  const pending = render(true, "pending");
+   assert.match(pending, /live-history-skeleton/);
+   assert.doesNotMatch(pending, /未公开|读取失败|暂无最近战绩/);
+ });
+--- a/web/r89.test.cjs
++++ b/web/r89.test.cjs
+@@ -22,25 +22,24 @@
+     updateCurrentGameCard:noop,ensurePerks:noop,ensureSummonerSpells:noop,
+     normalizedPagination:(p,beg)=>({...p.pagination,nextBegIndex:beg+p.pagination.count}),
+     AUTO_PAGE_DELAY_MS:1200,MAX_BROWSE_MATCHES:200,markProMismatch:noop,
+-    api:(url,options)=>new Promise(resolve=>{calls.push({url,body:JSON.parse(options.body),at:performance.now()});pending.push({url,resolve});})
++    api:(url,options)=>new Promise(resolve=>{calls.push({url,body:JSON.parse(options.body),at:performance.now()});pending.push({url,resolve,onProgress:options.onProgress});})
+   });
+   const first=helpers.loadOverview(tab);
+   assert.equal(calls.length,3,'all three requests must already be in flight');
+   assert.ok(Math.max(...calls.map(c=>c.at))-Math.min(...calls.map(c=>c.at))<300);
+-  assert.equal(calls.find(c=>c.url.endsWith('/overview')).body.count,5);
++  assert.equal(calls.find(c=>c.url.endsWith('/overview')).body.count,20);
+   assert.deepEqual(calls.find(c=>c.url.endsWith('/season-summary')).body,{gameName:'Fixture',tagLine:'KR1',region:'kr',force:false});
+   pending.find(c=>c.url.endsWith('/season-summary')).resolve({source:'OP.GG',queue:'RANKED',season:'S2026',champions:[],overall:{games:20}});
+   pending.find(c=>c.url.endsWith('/current-game')).resolve({source:'OP.GG',status:'none'});
+   await new Promise(r=>setImmediate(r));
+   const payload=n=>({player:{playerRef:'opaque-ref',gameName:'Fixture',tagLine:'KR1',region:'kr'},matches:Array.from({length:n},(_,i)=>({gameId:i})),pagination:{count:n,hasMore:true},overall:{games:n}});
+-  pending.find(c=>c.url.endsWith('/overview')).resolve(payload(5));
+-  await first;
++  pending.find(c=>c.url.endsWith('/overview')).onProgress(payload(5));
+   assert.equal(tab.data.matches.length,5,'first screen remains visible during completion');
+-  assert.equal(tab.opggSeason.playerRef,'opaque-ref');assert.equal(tab.currentGame.ref,'opaque-ref');
++  // Supplement references are adopted when the complete snapshot arrives.
+   assert.equal(calls.filter(c=>c.url.endsWith('/season-summary')).length,1);
+   assert.equal(calls.filter(c=>c.url.endsWith('/current-game')).length,1);
+   assert.equal(calls.at(-1).body.count,20);
+-  pending.at(-1).resolve(payload(20));await new Promise(r=>setImmediate(r));
++  pending.find(c=>c.url.endsWith('/overview')).resolve(payload(20));await first;assert.equal(calls.filter(c=>c.url.endsWith('/overview')).length,1);assert.equal(tab.opggSeason.playerRef,'opaque-ref');assert.equal(tab.currentGame.ref,'opaque-ref');
+   assert.equal(tab.data.matches.length,20);assert.equal(tab.data.overall.games,20);assert.equal(tab.initialPagePending,false);
+ });
+ test('R89 catalog failure retries once after backoff and missing IDs report once within a bound',async()=>{
+--- a/web/r90.test.cjs
++++ b/web/r90.test.cjs
+@@ -56,6 +56,7 @@
+ });
+ test("R90 incomplete snapshots stop after eight retries with a visible refresh exit",()=>{
+  const h=harness({...full("InProgress",true),arenaGrouped:false});
++ h.syncLiveRetryBudget();h.state.liveRetryStartedAt=Date.now()-60001;
+  for(let i=0;i<8;i++){h.scheduleLiveRefresh();assert.equal(h.timers.size,1);assert.equal(h.fire(),20000)}
+  h.scheduleLiveRefresh();assert.equal(h.calls.length,8);assert.equal(h.timers.size,0);
+  assert.match(h.renderLiveRefreshStatus(h.state.live),/已停止自动重试/);assert.match(h.renderLiveRefreshStatus(h.state.live),/data-live-refresh>刷新/);
+--- a/web/suite.js
++++ b/web/suite.js
+@@ -370,7 +370,7 @@
+       : event?.kind === "failed" ? '<span class="suite-chip is-danger">上次触发失败</span>'
+       : event?.kind === "fired" ? '<span>上次触发 · 刚刚</span>'
+       : event?.kind === "canceled" ? '<span>已被更高优先级动作取消 · 准备下次触发</span>'
+-      : '<span>未触发过</span>';
++      : current ? `<span>${rule.enabled ? '正在评估当前阶段' : '已到触发阶段 · 规则尚未开启'}</span>` : '<span>尚未到触发阶段</span>';
+     const status = masterEnabled ? eventStatus : '<span class="suite-chip is-warning">总开关已关闭 · 已暂停</span>';
+     const control = watchRuleControl(definition, rule);
+     return `<article class="suite-card watch-rule${statusClass}" data-watch-card="${definition.action}"><div class="watch-rule-top"><div class="watch-rule-title"><h3>${definition.title}</h3><small>触发于 <b>${definition.phase}</b></small></div><label class="suite-switch watch-rule-toggle"><input type="checkbox" aria-label="启用${definition.title}" data-watch-toggle="${definition.key}"${checked(rule.enabled)}><span class="sr-only">启用</span></label></div><p>${definition.description}</p>${watchConflictNote(definition, rules)}${control ? `<div class="watch-control-row">${control}</div>` : ""}<div class="watch-rule-foot">${status}</div></article>`;
+@@ -819,7 +819,7 @@
+     const capabilities = champSelectCapabilitiesHTML(definition, runtime) + `<label class="suite-switch cs-avoid-global" title="同时用于本组禁用、提前预选和选用。开启时避让队友预选；关闭时允许选择队友仅预选的英雄。队友已经选择的英雄始终跳过。"><span>避让队友预选</span><input type="checkbox" data-cs-avoid${checked(config.ban?.avoidTeammateIntent !== false || config.pick?.avoidTeammateIntent !== false)}${settings.enabled ? "" : " disabled"}></label>`;
+     roots.champselect.className = settings.enabled ? "" : "cs-master-off";
+     champSelectPanelRoot().innerHTML = `<section class="suite-card cs-master"><div class="cs-master-id"><span class="cs-master-ring" aria-hidden="true">⌖</span><div><h2>征召托管</h2><p>仅在英雄选择阶段生效；总开关同步控制各模式的禁用与选用</p></div><label class="suite-switch"><input type="checkbox" data-cs-master${checked(settings.enabled)}><span>总开关</span></label></div><div class="cs-master-right"><span class="cs-live-pill"><i></i>${escapeHTML(liveLabel)}</span><button class="button button-secondary" type="button" data-cs-pause${runtime.active && settings.enabled ? "" : " disabled"}>${runtime.sessionPaused ? "恢复本局" : "本局暂停"}</button></div></section>
+-      <div class="cs-body"><nav class="cs-mode-list" aria-label="征召模式分组"><span class="cs-mode-title">模式分组</span>${state.champSelectGroups.map((group) => { const value = settings.groups?.[group.groupId] || {}; const banCount = champSelectConfiguredCount(value, "ban"); const pickCount = champSelectConfiguredCount(value, "pick"); return `<button class="cs-mode-item${definition.groupId === group.groupId ? " is-active" : ""}" type="button" data-cs-group="${group.groupId}"><span aria-hidden="true">${({ranked:"◈",normal:"◇",aram:"❄",arena:"⚔",event:"✧",practice:"▤"})[group.groupId] || "◇"}</span><span><strong>${escapeHTML(group.name)}</strong><small><i class="${banCount ? "on" : ""}">${group.hasBan ? `禁 ${banCount}` : "无禁用"}</i><i class="${pickCount ? "on" : ""}">选 ${pickCount}</i></small></span></button>`; }).join("")}</nav><div class="cs-stack"><div class="cs-capabilities"><h3>${escapeHTML(definition.name)}</h3>${capabilities}</div>${champSelectPoolHelpHTML(definition, runtime)}<fieldset class="cs-config-fields" data-cs-config-group="${definition.groupId}"${settings.enabled ? "" : " disabled"} aria-label="征召配置">${renderChampSelectSideCard("ban", definition, config, runtime)}${renderChampSelectSideCard("pick", definition, config, runtime)}${renderChampSelectBenchCard(definition, config, runtime)}</fieldset>${renderChampSelectTimeline(runtime)}${definition.groupId === "arena" ? '<div class="suite-note is-warning"><span aria-hidden="true">!</span><span><strong>斗魂禁用环节需真机确认</strong><br>若当前会话没有 ban action，禁用卡会自动置灰，后端也不会发送禁用请求。</span></div>' : ""}</div></div>`;
++      <div class="cs-body"><nav class="cs-mode-list" aria-label="征召模式分组"><span class="cs-mode-title">模式分组</span>${state.champSelectGroups.map((group) => { const value = settings.groups?.[group.groupId] || {}; const banCount = champSelectConfiguredCount(value, "ban"); const pickCount = champSelectConfiguredCount(value, "pick"); return `<button class="cs-mode-item${definition.groupId === group.groupId ? " is-active" : ""}" type="button" data-cs-group="${group.groupId}"><span aria-hidden="true">${({ranked:"◈",normal:"◇",aram:"❄",arena:"⚔",event:"✧",practice:"▤"})[group.groupId] || "◇"}</span><span><strong>${escapeHTML(group.name)}</strong><small><i class="${banCount ? "on" : ""}">${group.hasBan ? `禁 ${banCount}` : "无禁用"}</i><i class="${pickCount ? "on" : ""}">选 ${pickCount}</i></small></span></button>`; }).join("")}</nav><div class="cs-stack"><div class="cs-capabilities"><h3>${escapeHTML(definition.name)}</h3>${capabilities}</div>${champSelectPoolHelpHTML(definition, runtime)}<fieldset class="cs-config-fields" data-cs-config-group="${definition.groupId}"${settings.enabled ? "" : " disabled"} aria-label="征召配置">${renderChampSelectSideCard("ban", definition, config, runtime)}${renderChampSelectSideCard("pick", definition, config, runtime)}${renderChampSelectBenchCard(definition, config, runtime)}</fieldset>${renderChampSelectTimeline(runtime)}</div></div>`;
+     bindChampSelectControls();
+     syncChampSelectDialog();
+   }
+@@ -1260,7 +1260,7 @@
+     state.facadeDraft = {
+       hero: String(firstSkin.championId || (Number(value.profile?.backgroundSkinId) > 0 ? Math.floor(Number(value.profile.backgroundSkinId) / 1000) : "")), skinId: Number(firstSkin.id || value.profile?.backgroundSkinId || 0), ownedOnly: false,
+       availability: chat.availability || "chat", statusMessage: chat.statusMessage || "",
+-      queue: lol.rankedLeagueQueue || "RANKED_SOLO_5X5", tier: lol.rankedLeagueTier || "DIAMOND", division: lol.rankedLeagueDivision || "II",
++      queue: lol.rankedLeagueQueue || "RANKED_SOLO_5X5", tier: lol.rankedLeagueTier || "UNRANKED", division: lol.rankedLeagueDivision || "I",
+       resetStatus: Boolean(value.loginReset?.statusMessageEnabled), resetRank: Boolean(value.loginReset?.rankEnabled),
+     };
+   }
+@@ -1367,8 +1367,8 @@
+     return String(chat.availability || "chat") !== String(draft.availability || "chat")
+       || String(chat.statusMessage || "") !== String(draft.statusMessage || "")
+       || String(lol.rankedLeagueQueue || "RANKED_SOLO_5X5") !== String(draft.queue || "")
+-      || String(lol.rankedLeagueTier || "DIAMOND") !== String(draft.tier || "")
+-      || (!["MASTER", "GRANDMASTER", "CHALLENGER", "UNRANKED"].includes(draft.tier) && String(lol.rankedLeagueDivision || "II") !== String(draft.division || ""));
++      || String(lol.rankedLeagueTier || "UNRANKED") !== String(draft.tier || "")
++      || (!["MASTER", "GRANDMASTER", "CHALLENGER", "UNRANKED"].includes(draft.tier) && String(lol.rankedLeagueDivision || "I") !== String(draft.division || ""));
+   }
+ 
+   function facadeResetDirty() {
+@@ -1408,10 +1408,11 @@
+     return values.map(([value, label]) => `<option value="${value}"${selected(current, value)}>${label}</option>`).join("");
+   }
+ 
+-  function rankLabel(draft) {
+-    const tier = { UNRANKED: "未定级", IRON: "黑铁", BRONZE: "黄铜", SILVER: "白银", GOLD: "黄金", PLATINUM: "铂金", EMERALD: "翡翠", DIAMOND: "钻石", MASTER: "大师", GRANDMASTER: "宗师", CHALLENGER: "王者" }[draft.tier] || draft.tier;
++  function rankLabel(draft = {}) {
++    const tierKey = draft.tier || "UNRANKED";
++    const tier = { UNRANKED: "未定级", IRON: "黑铁", BRONZE: "黄铜", SILVER: "白银", GOLD: "黄金", PLATINUM: "铂金", EMERALD: "翡翠", DIAMOND: "钻石", MASTER: "大师", GRANDMASTER: "宗师", CHALLENGER: "王者" }[tierKey] || tierKey;
+     const queue = draft.queue === "RANKED_FLEX_SR" ? "灵活组排" : "单双排";
+-    return `${tier}${["MASTER","GRANDMASTER","CHALLENGER","UNRANKED"].includes(draft.tier) ? "" : ` ${draft.division}`} · ${queue}`;
++    return `${tier}${["MASTER","GRANDMASTER","CHALLENGER","UNRANKED"].includes(tierKey) || !draft.division ? "" : ` ${draft.division}`} · ${queue}`;
+   }
+ 
+   function facadeAvailabilityLabel(value) {
+--- /dev/null
++++ b/riot_overview_stream.go
+@@ -0,0 +1,5 @@
++package main
++
++// Only the request owning the shared overview flight publishes progress. Other
++// callers join that flight and receive its final snapshot without extra reads.
++type riotOverviewProgressKey struct{}
+--- /dev/null
++++ b/r91_addendum_test.go
+@@ -0,0 +1,365 @@
++package main
++
++import (
++	"bufio"
++	"bytes"
++	"context"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"strconv"
++	"strings"
++	"sync/atomic"
++	"testing"
++	"time"
++)
++
++func TestR91AddendumRateLimitJSON(t *testing.T) {
++	for _, status := range []int{429, 500, 503} {
++		w := httptest.NewRecorder()
++		writeRiotHTTPError(w, &riotStatusError{status: status, message: "fixture", retryAfter: 5})
++		var body riotHTTPError
++		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
++			t.Fatal(err)
++		}
++		if w.Code != status || body.RetryAfter != 5 || w.Header().Get("Retry-After") != "5" || (body.Kind == "rate-limited") != (status == 429) {
++			t.Fatalf("status=%d body=%+v", w.Code, body)
++		}
++	}
++}
++
++func TestR91AddendumCacheThreeStates(t *testing.T) {
++	t.Setenv("RIOT_API_KEY", "fixture")
++	c := newChampionProvider()
++	c.cache = newChampionDataCache(&localStore{root: t.TempDir()})
++	var calls atomic.Int32
++	c.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
++		calls.Add(1)
++		return proHTTPBody([]byte(`{"metadata":{"matchId":"KR_123"},"info":{"gameId":123,"participants":[{"puuid":"fixture"}]}}`)), nil
++	})}
++	tracker := &riotOverviewCostTracker{}
++	ctx := context.WithValue(context.Background(), riotOverviewCostTrackerKey{}, tracker)
++	p := newRiotProvider(c)
++	for _, want := range []string{"miss", "hit", "disk"} {
++		if want == "disk" {
++			p = newRiotProvider(c)
++		}
++		_, status, err := p.matchByIDWithCache(ctx, "KR_123")
++		if err != nil || status != want {
++			t.Fatalf("%s %s %v", want, status, err)
++		}
++	}
++	if calls.Load() != 1 || tracker.matchesFromMemory != 1 || tracker.matchesFromDisk != 1 || tracker.matchesFromNetwork != 1 {
++		t.Fatalf("calls=%d tracker=%+v", calls.Load(), tracker)
++	}
++}
++
++// The slow details cannot finish until the HTTP client has received a preview.
++// This proves one 20-ID pipeline actually streams, rather than two JSON requests.
++func TestR91AddendumOneRequestStreamsFiveThenTwenty(t *testing.T) {
++	t.Setenv("RIOT_API_KEY", "fixture")
++	c := newChampionProvider()
++	c.cache = newChampionDataCache(nil)
++	c.championMeta = map[int]championMetadata{1: {NameZH: "安妮"}}
++	gate := make(chan struct{})
++	defer func() {
++		select {
++		case <-gate:
++		default:
++			close(gate)
++		}
++	}()
++	var details, lists atomic.Int32
++	c.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
++		body := "[]"
++		switch {
++		case strings.Contains(r.URL.Path, "/summoner/"):
++			body = `{"puuid":"r91-subject-identity","summonerLevel":100}`
++		case strings.HasSuffix(r.URL.Path, "/ids"):
++			lists.Add(1)
++			if r.URL.Query().Get("count") != "20" {
++				t.Errorf("wrong count %s", r.URL.RawQuery)
++			}
++			ids := []string{}
++			for i := 1; i <= 20; i++ {
++				ids = append(ids, fmt.Sprintf("KR_%d", i))
++			}
++			raw, _ := json.Marshal(ids)
++			body = string(raw)
++		case strings.Contains(r.URL.Path, "/lol/match/v5/matches/"):
++			n := details.Add(1)
++			if n > 5 {
++				select {
++				case <-gate:
++				case <-r.Context().Done():
++					return nil, r.Context().Err()
++				}
++			}
++			id := strings.TrimPrefix(r.URL.Path, "/lol/match/v5/matches/KR_")
++			body = fmt.Sprintf(`{"metadata":{"matchId":"KR_%s"},"info":{"gameId":%s,"queueId":420,"gameDuration":1800,"participants":[{"puuid":"r91-subject-identity","participantId":1,"teamId":100,"championId":1}]}}`, id, id)
++		case strings.Contains(r.URL.Path, "/league/"), strings.Contains(r.URL.Path, "/champion-mastery/"):
++		default:
++			t.Errorf("unexpected path %s", r.URL.Path)
++		}
++		return proHTTPBody([]byte(body)), nil
++	})}
++	a := &app{riot: newRiotProvider(c), overviewQueries: newOverviewQueryCache()}
++	ref := a.registerGameplayReferenceDetails(gameplayReference{PlayerRef: "r91-subject-identity", GameName: "Fixture", TagLine: "KR1", Region: "kr", Privacy: "PRIVATE"})
++	server := httptest.NewServer(http.HandlerFunc(a.handleGameplayOverview))
++	defer server.Close()
++	req, _ := http.NewRequest("POST", server.URL, strings.NewReader(fmt.Sprintf(`{"playerRef":%q,"count":20}`, ref)))
++	req.Header.Set("Accept", "application/x-ndjson")
++	client := server.Client()
++	client.Timeout = 10 * time.Second
++	res, err := client.Do(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer res.Body.Close()
++	scanner := bufio.NewScanner(res.Body)
++	scanner.Buffer(make([]byte, 4096), 2<<20)
++	if !scanner.Scan() {
++		t.Fatalf("preview missing: %v", scanner.Err())
++	}
++	var frame struct {
++		Type     string           `json:"type"`
++		Overview gameplayOverview `json:"overview"`
++	}
++	if err := json.Unmarshal(scanner.Bytes(), &frame); err != nil {
++		t.Fatalf("%v: status=%d body=%s", err, res.StatusCode, scanner.Bytes())
++	}
++	if frame.Type != "progress" || len(frame.Overview.Matches) != 5 {
++		t.Fatalf("preview %s count=%d", frame.Type, len(frame.Overview.Matches))
++	}
++	if bytes.Contains(scanner.Bytes(), []byte(`"puuid"`)) || frame.Overview.Player.PlayerRef == "r91-subject-identity" {
++		t.Fatal("private identity leaked in stream")
++	}
++	close(gate)
++	if !scanner.Scan() {
++		t.Fatal("completion missing", scanner.Err())
++	}
++	if err := json.Unmarshal(scanner.Bytes(), &frame); err != nil {
++		t.Fatalf("%v: status=%d body=%s", err, res.StatusCode, scanner.Bytes())
++	}
++	if frame.Type != "complete" || len(frame.Overview.Matches) != 20 || details.Load() != 20 || lists.Load() != 1 {
++		t.Fatalf("type=%s matches=%d details=%d lists=%d", frame.Type, len(frame.Overview.Matches), details.Load(), lists.Load())
++	}
++}
++
++func TestR91AddendumGameStartGroupingAndCarryover(t *testing.T) {
++	players, raw := r62ArenaFixturePlayers(t, 18)
++	a := r90Fixture(t, players, raw)
++	var probes atomic.Int32
++	a.liveClientPlayerList = func(context.Context) ([]byte, int, error) { probes.Add(1); return nil, 0, errors.New("loading") }
++	got := a.loadGameplayLive(context.Background(), a.lcu, a.summoner, "GameStart")
++	if !got.ArenaGrouped || got.ArenaGroupSource != "session-order" || probes.Load() != 0 {
++		t.Fatalf("GameStart grouping=%t source=%s probes=%d", got.ArenaGrouped, got.ArenaGroupSource, probes.Load())
++	}
++	// Remove the middle member, retaining original identity-to-block assignments.
++	next := got
++	next.Phase = "InProgress"
++	next.ArenaGrouped = false
++	next.Players = append(append([]gameplayLivePlayer{}, got.Players[:4]...), got.Players[5:]...)
++	rawPlayers := make([]lcuLivePlayer, len(next.Players))
++	for i := range next.Players {
++		next.Players[i].ArenaGroup = ""
++		rawPlayers[i].PUUID = next.Players[i].reference.PlayerRef
++	}
++	a.applyArenaLiveGrouping(a.lcu, a.summoner, &next, rawPlayers, liveClientSnapshot{})
++	if !next.ArenaGrouped || next.Players[4].ArenaGroup != got.Players[5].ArenaGroup || next.Players[5].ArenaGroup != got.Players[6].ArenaGroup {
++		t.Fatal("carryover lost boundaries")
++	}
++	next.GameID++
++	next.ArenaGrouped = false
++	a.applyArenaLiveGrouping(a.lcu, a.summoner, &next, rawPlayers, liveClientSnapshot{})
++	if next.ArenaGrouped || !next.ArenaGroupingUnavailable || !next.ArenaGroupingRetryable {
++		t.Fatal("new game borrowed old grouping or missing failure")
++	}
++	reasons := map[string]bool{}
++	for _, e := range r90Events(t, a, "arena_group_order_rejected") {
++		reasons[fmt.Sprint(e["reason"])] = true
++	}
++	if !reasons["playerlist-unavailable"] || !reasons["roster-not-divisible"] {
++		t.Fatal(reasons)
++	}
++	if gameplayLiveSnapshotComplete(next) {
++		t.Fatal("retryable failure stopped probing")
++	}
++}
++
++func TestR91AddendumForcedShapeAndUnattemptedPhase(t *testing.T) {
++	players, raw := r62ArenaFixturePlayers(t, 18)
++	a := r90Fixture(t, players, raw)
++	a.lcuGameflowShapeDiagnosticKeys = map[string]struct{}{lcuSessionShapeDiagnosticKey("GameStart", "CHERRY", 1750): {}}
++	for _, id := range []int{901, 901, 902} {
++		a.recordLCUGameflowSessionShape([]byte(fmt.Sprintf(`{"gameData":{"gameId":%d,"teamOne":[{"puuid":"private","teamParticipantId":1}]}}`, id)), "GameStart", "CHERRY", 1750)
++	}
++	events := r90Events(t, a, "lcu_gameflow_session_shape")
++	if len(events) != 2 || events[0]["forced_sample"] != true || events[0]["team_one_length"] != float64(1) {
++		t.Fatal(events)
++	}
++	// Missing game IDs still receive one forced sample on each GameStart entry.
++	for range 2 {
++		a.observeArenaGroupingPhase(a.lcu, "ChampSelect")
++		a.observeArenaGroupingPhase(a.lcu, "GameStart")
++		a.recordLCUGameflowSessionShape([]byte(`{"gameData":{}}`), "GameStart", "CHERRY", 1750)
++	}
++	if len(r90Events(t, a, "lcu_gameflow_session_shape")) != 4 {
++		t.Fatal("zero game ID suppressed a later Loading sample")
++	}
++	a.observeArenaGroupingPhase(a.lcu, "ChampSelect")
++	a.noteArenaPhaseRoster(a.lcu, &gameplayLiveResponse{Phase: "ChampSelect", QueueID: 1750, GameID: 901})
++	a.observeArenaGroupingPhase(a.lcu, "GameStart")
++	a.observeArenaGroupingPhase(a.lcu, "InProgress")
++	rejected := r90Events(t, a, "arena_group_order_rejected")
++	if len(rejected) != 1 || rejected[0]["reason"] != "phase-not-attempted" {
++		t.Fatal(rejected)
++	}
++	a.markArenaGroupingAttempt(a.lcu, &gameplayLiveResponse{Phase: "InProgress", QueueID: 1750, GameID: 901})
++	a.observeArenaGroupingPhase(a.lcu, "Reconnect")
++	if len(r90Events(t, a, "arena_group_order_rejected")) != 1 {
++		t.Fatal("attempted phase misreported")
++	}
++}
++
++func TestR91AddendumWildcardHoverClearKeepsArmedLock(t *testing.T) {
++	for _, newID := range []int64{0, 104} {
++		t.Run(strconv.FormatInt(newID, 10), func(t *testing.T) {
++			f := newExecutionFixture(t)
++			f.session.QueueID = 1750
++			f.session.Timer.Phase = "BAN_PICK"
++			s := f.r.currentWatch()
++			g := s.ChampSelect.Groups["arena"]
++			g.Ban.Enabled = true
++			g.Ban.DelayMS = 0
++			g.Ban.Strategy = "lock-now"
++			g.Ban.Champions["default"] = []int64{141}
++			s.ChampSelect.Groups["arena"] = g
++			f.r.apply(s)
++			f.tick(t) // wildcard must hover first
++			s = f.r.currentWatch()
++			g = s.ChampSelect.Groups["arena"]
++			g.Ban.DelayMS = 120
++			s.ChampSelect.Groups["arena"] = g
++			f.r.apply(s)
++			f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
++			f.r.mu.Lock()
++			pending := f.r.pending["champselect-ban"]
++			f.r.mu.Unlock()
++			if pending == nil {
++				t.Fatal("lock not armed")
++			}
++			f.mu.Lock()
++			f.session.Actions[0][0].ChampionID = newID
++			f.mu.Unlock()
++			f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
++			waitTakeoverIdle(t, f)
++			if newID == 0 {
++				if f.count() != 2 || f.last().Body["completed"] != true {
++					t.Fatalf("lock lost: %+v", f.patches)
++				}
++			} else if f.count() != 1 || f.r.champSelectSnapshot().BanStates["141"] != "manual-takeover" {
++				t.Fatal("different nonzero choice ignored")
++			}
++			if newID == 0 {
++				f.mu.Lock()
++				found := false
++				for _, e := range f.events {
++					if e["reason"] == "hover-cleared-by-client" || e["result"] == "hover-cleared-by-client" {
++						found = true
++					}
++				}
++				f.mu.Unlock()
++				if !found {
++					t.Fatal("clear diagnostic missing")
++				}
++			}
++		})
++	}
++}
++
++func TestR91AddendumSaveReevaluatesCurrentPhase(t *testing.T) {
++	for _, phase := range []string{"Reconnect", "ReadyCheck", "EndOfGame"} {
++		t.Run(phase, func(t *testing.T) {
++			runner := newWatchRunner(nil, nil)
++			defer runner.apply(defaultWatchSettings())
++			var reads atomic.Int32
++			client := &LCUClient{baseURL: "https://127.0.0.1:2999", token: "fixture", http: &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
++				if r.URL.Path == "/lol-gameflow/v1/gameflow-phase" {
++					reads.Add(1)
++					return proHTTPBody([]byte(strconv.Quote(phase))), nil
++				}
++				return &http.Response{StatusCode: 404, Body: io.NopCloser(strings.NewReader("{}"))}, nil
++			})}}
++			runner.handlePhase(client, phase)
++			settings := runner.currentWatch()
++			settings.MasterEnabled = true
++			settings.Rules.AutoReconnect.Enabled = true
++			settings.Rules.AutoReconnect.DelayMS = 10000
++			settings.Rules.AutoAccept.Enabled = true
++			settings.Rules.AutoAccept.DelayMS = 10000
++			settings.Rules.AutoPlayAgain.Enabled = true
++			a := &app{watch: runner, connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: t.TempDir()})}
++			raw, _ := json.Marshal(settings)
++			w := httptest.NewRecorder()
++			a.handleWatchRules(w, httptest.NewRequest("POST", "/api/watch/rules", bytes.NewReader(raw)))
++			action := map[string]string{"Reconnect": "reconnect", "ReadyCheck": "accept", "EndOfGame": "play-again"}[phase]
++			runner.mu.Lock()
++			armed := runner.pending[action] != nil
++			runner.mu.Unlock()
++			if w.Code != 200 || reads.Load() == 0 || !armed {
++				t.Fatalf("status=%d reads=%d action=%s armed=%t", w.Code, reads.Load(), action, armed)
++			}
++		})
++	}
++}
++
++func TestR91AddendumUpstreamRetryAfterSurvives(t *testing.T) {
++	t.Setenv("RIOT_API_KEY", "fixture")
++	c := newChampionProvider()
++	var calls atomic.Int32
++	c.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
++		n := calls.Add(1)
++		delay := "1"
++		if n == 3 {
++			delay = "30"
++		}
++		return &http.Response{StatusCode: 429, Header: http.Header{"Retry-After": []string{delay}}, Body: io.NopCloser(strings.NewReader("quota"))}, nil
++	})}
++	p := newRiotProvider(c)
++	var out any
++	err := p.getLimited(context.Background(), riotClusterHost, "/fixture", nil, &out, 1024)
++	var quota *riotStatusError
++	if !errors.As(err, &quota) || quota.retryAfter != 30 || calls.Load() != 3 {
++		t.Fatalf("calls=%d err=%+v", calls.Load(), err)
++	}
++	w := httptest.NewRecorder()
++	writeRiotHTTPError(w, err)
++	if w.Header().Get("Retry-After") != "30" {
++		t.Fatal(w.Header())
++	}
++}
++
++func TestR91AddendumRetryableRosterDoesNotBlockEarlyProbe(t *testing.T) {
++	players, raw := r62ArenaFixturePlayers(t, 18)
++	a := r90Fixture(t, players[:17], raw)
++	var calls atomic.Int32
++	a.liveClientPlayerList = func(context.Context) ([]byte, int, error) { calls.Add(1); return nil, 0, errors.New("loading") }
++	first := a.cachedGameplayLive(context.Background(), a.lcu, a.summoner, "InProgress")
++	if !first.ArenaGroupingRetryable {
++		t.Fatal("fixture not retryable")
++	}
++	a.liveSnapshots.mu.Lock()
++	a.liveSnapshots.at = time.Now().Add(-4 * time.Second)
++	a.liveSnapshots.mu.Unlock()
++	a.liveClientProbeMu.Lock()
++	a.liveClientProbe.LastAttempt = time.Now().Add(-4 * time.Second)
++	a.liveClientProbeMu.Unlock()
++	a.cachedGameplayLive(context.Background(), a.lcu, a.summoner, "InProgress")
++	if calls.Load() != 2 {
++		t.Fatal("20 second roster cache suppressed early probe", calls.Load())
++	}
++}
+--- /dev/null
++++ b/web/r91-addendum.test.cjs
+@@ -0,0 +1,110 @@
++'use strict';
++const test=require('node:test'), assert=require('node:assert/strict'), fs=require('node:fs'), vm=require('node:vm'), path=require('node:path');
++const {JSDOM}=require('../desktop/node_modules/jsdom');
++const src=fs.readFileSync(process.env.R91_ADDENDUM_GAMEPLAY_SOURCE||path.join(__dirname,'gameplay.js'),'utf8');
++const suite=fs.readFileSync(process.env.R91_ADDENDUM_SUITE_SOURCE||path.join(__dirname,'suite.js'),'utf8');
++function extract(name,source=src){let start=source.indexOf(`function ${name}(`);assert.ok(start>=0,name);if(source.slice(start-6,start)==='async ')start-=6;return source.slice(start,source.indexOf('\n  }',start)+4);}
++const flush=()=>new Promise(setImmediate);
++const payload=(n=20,beg=0)=>({player:{playerRef:'opaque',region:'kr',gameName:'Fixture',tagLine:'KR1'},matches:Array.from({length:n},(_,i)=>({gameId:beg+i+1})),pagination:{begIndex:beg,count:n,hasMore:true}});
++function harness(responses){
++ const jobs=new Map(),requests=[],toasts=[];let sequence=0,now=0;
++ const state={controllers:new Map(),settings:{matchCount:20},tabs:[],overlay:[]};
++ const dom=new JSDOM('<main></main>'),root=dom.window.document.querySelector('main');
++ const render=tab=>{root.innerHTML=`<div>${(tab.data?.matches||[]).map(m=>`<article>${m.gameId}</article>`).join('')}</div>`+(tab.error?`<div class="notice is-warning">${tab.error}</div>`:'')+(tab.initialPageError?`<div class="notice is-warning">${tab.initialPageError}</div>`:'')+(tab.data?.pagination?.moreError?`<div class="notice is-warning">${tab.data.pagination.moreError}</div>`:'');};
++ const noop=()=>{};
++ const context={state,Headers,AbortController,TextDecoder,Uint8Array,Date,MAX_BROWSE_MATCHES:1000,AUTO_PAGE_DELAY_MS:400,AUTO_PAGE_MAX_BACKOFF_MS:8000,
++  setTimeout:(fn,ms)=>{jobs.set(++sequence,{fn,ms,at:now+ms});return sequence;},clearTimeout:id=>jobs.delete(id),
++  fetch:async(url,options)=>{requests.push({url,options});const next=responses.shift();assert.ok(next,'unexpected request');return typeof next==='function'?next(options):next;},
++  tabReady:()=>true,riotTab:()=>true,tabGroup:()=> 'kr',rerenderTab:render,appendOverviewMatches:render,showLoadingMoreState:noop,
++  showToast:x=>toasts.push(x),loadOPGGSeasonSummary:noop,loadOverviewCurrentGame:noop,syncOverviewSupplementRefs:noop,rememberTabPlayerRef:noop,playerLabel:()=> 'Fixture',renderCapabilitySettings:noop,
++  normalizedPagination:(p,beg)=>({...p.pagination,nextBegIndex:beg+p.pagination.count}),
++ };
++ vm.runInNewContext(['api','loadOverview'].map(n=>extract(n)).join('\n'),context);
++ return {...context,root,jobs,requests,toasts,close:()=>dom.window.close(),async advance(ms){now+=ms;for(const [id,job] of [...jobs])if(job.at<=now){jobs.delete(id);job.fn();}await flush();}};
++}
++const response=(status,body,headers={})=>new Response(typeof body==='string'?body:JSON.stringify(body),{status,headers});
++for(const append of [false,true]){
++ test(`R91 addendum ${append?'append':'first partial'} 429 stays silent and retries after Retry-After`,async()=>{
++  const h=harness([response(429,{error:'额度恢复',kind:'rate-limited',retryAfter:5},{'Retry-After':'5'}),response(200,payload(20,append?20:0))]);
++  try{
++   const tab={key:'fixture',region:'kr',data:payload(5),nextBegIndex:20,initialPagePending:!append};h.state.tabs=[tab];const old=tab.data;
++   assert.equal(await h.loadOverview(tab,!append,append,false,true),false);
++   assert.equal(tab.initialPageError,'');assert.equal(tab.error,'');assert.equal(tab.data,old);assert.equal(tab.data.pagination.autoPaused,undefined);assert.equal(tab.data.pagination.moreError,undefined);
++   assert.equal(h.toasts.length,0);assert.equal(h.root.querySelector('.notice'),null);
++   assert.ok([...h.jobs.values()].some(x=>x.ms===5000));await h.advance(4999);assert.equal(h.requests.length,1);await h.advance(1);assert.equal(h.requests.length,2);
++   assert.equal(tab.quotaRetry,null);assert.equal(tab.initialPageError,'');assert.equal(tab.data.matches.length,append?25:20);
++  }finally{h.close();}
++ });
++ for(const status of [500,503]) test(`R91 addendum ${append?'append':'first partial'} ${status} remains visible`,async()=>{
++  const h=harness([response(status,{error:'真实失败',kind:'rate-limited',retryAfter:5})]);
++  try{const tab={key:'fixture',region:'kr',data:payload(5),initialPagePending:!append};await h.loadOverview(tab,!append,append,false,true);
++   assert.match(append?tab.data.pagination.moreError:tab.initialPageError,/真实失败/);assert.ok(h.root.querySelector('.notice'));assert.equal(h.toasts.length,append?1:0);assert.equal(tab.quotaRetry,null);
++  }finally{h.close();}
++ });
++}
++test('R91 addendum header-only 429 and JSON fallback parse while 503 stays HTTP',async()=>{
++ const h=harness([response(429,'wait',{'Retry-After':'5'}),response(429,{error:'wait',retryAfter:7}),response(503,{error:'busy',kind:'rate-limited',retryAfter:5})]);
++ try{for(const [seconds,kind] of [[5,'rate-limited'],[7,'rate-limited'],[5,'http']])await assert.rejects(h.api('/fixture'),e=>e.retryAfter===seconds&&e.errorKind===kind);}finally{h.close();}
++});
++test('R91 addendum stream displays five before completion with exactly one count-20 request',async()=>{
++ let controller;
++ const stream=new ReadableStream({start(c){controller=c;}}),encode=x=>new TextEncoder().encode(JSON.stringify(x)+'\n');
++ const h=harness([new Response(stream,{headers:{'Content-Type':'application/x-ndjson'}})]);
++ try{const tab={key:'fixture',region:'kr',riotId:{gameName:'Fixture',tagLine:'KR1'}};const pending=h.loadOverview(tab);await flush();
++  assert.equal(JSON.parse(h.requests[0].options.body).count,20);
++  controller.enqueue(encode({type:'progress',overview:payload(5)}));await flush();assert.equal(tab.data.matches.length,5);assert.equal(h.root.querySelectorAll('article').length,5);assert.equal(tab.loading,true);
++  controller.enqueue(encode({type:'complete',overview:payload(20)}));controller.close();assert.equal(await pending,true);assert.equal(tab.data.matches.length,20);assert.equal(tab.initialPagePending,false);assert.equal(h.requests.length,1);
++ }finally{h.close();}
++});
++test('R91 addendum streaming append preserves cursor until completion without stalling',async()=>{
++ let controller;const stream=new ReadableStream({start(c){controller=c;}});const h=harness([new Response(stream,{headers:{'Content-Type':'application/x-ndjson'}})]);
++ try{const tab={key:'fixture',region:'kr',data:payload(20),nextBegIndex:20,paginationStalls:1};const pending=h.loadOverview(tab,false,true);await flush();
++  const send=(type,n)=>controller.enqueue(new TextEncoder().encode(JSON.stringify({type,overview:payload(n,20)})+'\n'));
++  send('progress',5);await flush();assert.equal(tab.nextBegIndex,20);assert.equal(tab.data.matches.length,25);
++  send('complete',20);controller.close();await pending;assert.equal(tab.data.matches.length,40);assert.equal(tab.nextBegIndex,40);assert.equal(tab.paginationStalls,0);assert.notEqual(tab.data.pagination.autoPaused,true);
++ }finally{h.close();}
++});
++test('R91 addendum stream quota after partial data is silent; a truncated stream is visible',async()=>{
++ for(const quota of [true,false]){const frames=[{type:'progress',overview:payload(5)}];if(quota)frames.push({type:'error',status:429,error:'quota',kind:'rate-limited',retryAfter:5});
++  const h=harness([response(200,frames.map(x=>JSON.stringify(x)).join('\n')+'\n',{'Content-Type':'application/x-ndjson'})]);
++  try{const tab={key:'fixture',region:'kr',riotId:{gameName:'Fixture',tagLine:'KR1'}};await h.loadOverview(tab);assert.equal(tab.data.matches.length,5);assert.equal(h.toasts.length,0);if(quota){assert.equal(tab.initialPageError,'');assert.ok(tab.quotaRetry);}else assert.match(tab.initialPageError,/中断/);}finally{h.close();}
++ }
++});
++test('R91 addendum closed, replaced, reset and changed-filter retries cannot issue stale reads',async()=>{
++ for(const action of ['close','replace','filter','reset']){
++  const h=harness([response(429,'quota',{'Retry-After':'5'}),response(200,payload())]);
++  try{const tab={key:'fixture',region:'kr',data:payload(5),matchFilter:'all'};h.state.tabs=[tab];await h.loadOverview(tab,true);
++   if(action==='close')tab.closed=true;else if(action==='filter')tab.matchFilter='solo';else if(action==='reset')tab.overviewRequestToken++;else await h.loadOverview(tab,true);
++   const count=h.requests.length;await h.advance(5000);assert.equal(h.requests.length,count);
++  }finally{h.close();}
++ }
++});
++test('R91 addendum existing history remains readable during polling; new history still skeletons; arena hides rank',()=>{
++ const state={liveLoading:false,settings:{}};const deps={state,number:String,percent:String,kda:String,escapeHTML:String,iconFigure:()=>'<img>',maskedPlayerName:()=> 'Player',liveDisplayedChampionId:()=>1,renderLivePremadeTag:()=>'',rankTitle:()=> '白银 I',positionLabel:()=> '上单'};
++ vm.runInNewContext(['renderInsightMatches','insightScore','renderLivePlayer'].map(n=>extract(n)).join('\n'),deps);
++ const player={playerRef:'p',historyState:'ok',rank:{tier:'SILVER'},modeStats:{games:1,wins:1,kda:3},recentGames:[{championId:1,kills:3,deaths:1,assists:0,win:true}]};
++ const before=deps.renderInsightMatches(player)+deps.renderLivePlayer(player,0,true);state.liveLoading=true;
++ assert.equal(deps.renderInsightMatches(player)+deps.renderLivePlayer(player,0,true),before);assert.doesNotMatch(before,/白银|未定级/);assert.match(deps.renderLivePlayer(player,0,false),/白银 I/);
++ assert.match(deps.renderInsightMatches({historyState:'pending',recentGames:[]}),/skeleton/);
++});
++test('R91 addendum facade defaults and missing rank fields agree with controls',()=>{
++ const state={facade:{}};const h={state};vm.runInNewContext(['rankLabel','hydrateFacadeDraft','facadeIdentityDirty'].map(n=>extract(n,suite)).join('\n'),h);
++ assert.equal(h.rankLabel({}),'未定级 · 单双排');h.hydrateFacadeDraft();assert.equal(state.facadeDraft.tier,'UNRANKED');assert.equal(state.facadeDraft.division,'I');assert.equal(h.facadeIdentityDirty(),false);assert.doesNotMatch(h.rankLabel({tier:'GOLD'}),/undefined/);
++});
++test('R91 addendum unchanged polling preserves roster DOM nodes',()=>{
++ const dom=new JSDOM('<button id="refresh"></button><div id="content"></div>');const doc=dom.window.document;
++ const state={section:'live',beacon:{phase:'ChampSelect'},live:{available:true,phase:'ChampSelect'},settings:{}};
++ const h={state,nodes:{liveRefresh:doc.querySelector('button'),liveContent:doc.querySelector('div')},connected:()=>true,renderSessionSummary:()=>{},renderLiveRefreshStatus:()=>state.liveLoading?'<span>正在刷新</span>':'',renderRecommendationArea:()=>'<article>known match</article>',bindLiveContent:()=>{},applyRenderedMetricStyles:()=>{},prepareImages:()=>{}};
++ vm.runInNewContext(extract('renderLive'),h);h.renderLive();const row=h.nodes.liveContent.querySelector('article');state.liveLoading=true;h.renderLive();assert.equal(h.nodes.liveContent.querySelector('article'),row);state.liveLoading=false;h.renderLive();assert.equal(h.nodes.liveContent.querySelector('article'),row);dom.window.close();
++});
++test('R91 addendum Loading and early incomplete arena poll every five seconds then converge',()=>{
++ for(const phase of ['GameStart','InProgress','Reconnect']){
++  const state={section:'live',beacon:{phase},live:{phase,gameId:91,available:true,gameMode:'CHERRY',arenaGrouped:false,arenaGroupingUnavailable:true,arenaGroupingRetryable:true,players:[{historyState:'ok'}]},settings:{liveRefresh:true}};
++  let job;const h={state,document:{hidden:false},Date,connected:()=>true,liveGamePhase:p=>['GameStart','InProgress','Reconnect'].includes(p),liveAugmentRecommendationSource:()=> 'arena',clearTimeout:()=>{job=null;},setTimeout:(fn,delay)=>{job={fn,delay};return 1;},loadLive:()=>{}};
++  vm.runInNewContext(['syncLiveRetryBudget','liveSnapshotComplete','scheduleLiveRefresh'].map(n=>extract(n)).join('\n'),h);
++  for(let i=0;i<12;i++){h.scheduleLiveRefresh();assert.equal(job.delay,5000);job.fn();assert.equal(state.liveRetryAttempts,0);}
++  state.liveRetryStartedAt=Date.now()-60001;
++  for(let i=0;i<8;i++){h.scheduleLiveRefresh();assert.equal(job.delay,20000);job.fn();}
++  h.scheduleLiveRefresh();assert.equal(job,null);state.liveRetryAttempts=0;state.live.arenaGrouped=true;h.scheduleLiveRefresh();assert.equal(job,null);
++ }
++});
+--- /dev/null
++++ b/desktop/r91-addendum-browser.cjs
+@@ -0,0 +1,67 @@
++// Real Chromium layout guard. No jsdom measurements or external npm dependency.
++// CHROME_BIN=/path/to/chrome node desktop/current-game-layout.cjs
++'use strict';
++const {spawn} = require('node:child_process');
++const fs = require('node:fs');
++const os = require('node:os');
++const path = require('node:path');
++const assert = require('node:assert/strict');
++const root=path.resolve(__dirname,'..'), web=path.join(root,'web');
++const chrome=process.env.CHROME_BIN || (process.platform==='darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium');
++const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r91-addendum-browser-'));
++let proc,ws,server;
++async function main(){
++ proc=spawn(chrome,['--headless=new','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${temp}`,'about:blank'],{stdio:['ignore','ignore','pipe']});
++ const url=await new Promise((resolve,reject)=>{let output=''; const timer=setTimeout(()=>reject(Error('Chrome startup timeout')),20000);proc.once('error',reject);proc.stderr.on('data',chunk=>{output+=chunk;const m=output.match(/DevTools listening on (ws:\/\/[^\s]+)/);if(m){clearTimeout(timer);resolve(m[1]);}});proc.once('exit',code=>reject(Error(`Chrome exited ${code}: ${output.slice(-1000)}`)));});
++ ws=new WebSocket(url); await new Promise((res,rej)=>{ws.addEventListener('open',res,{once:true});ws.addEventListener('error',rej,{once:true});});
++ let seq=0;const pending=new Map();ws.addEventListener('message',e=>{const msg=JSON.parse(e.data);if(pending.has(msg.id)){const [resolve,reject]=pending.get(msg.id);pending.delete(msg.id);msg.error?reject(Error(JSON.stringify(msg.error))):resolve(msg.result);}});
++ const send=(method,params={},sessionId)=>new Promise((resolve,reject)=>{const id=++seq;const timer=setTimeout(()=>{pending.delete(id);reject(Error('CDP timeout '+method));},45000);pending.set(id,[value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)}]);ws.send(JSON.stringify({id,method,params,sessionId}));});
++ console.log('CDP connected');
++ const {targetId}=await send('Target.createTarget',{url:'about:blank'});
++ const {sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});
++ const call=(m,p)=>send(m,p,sessionId);
++ const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
++ await call('Page.enable');
++ await call('Runtime.enable');
++ const output=process.env.R91_BROWSER_OUTPUT||path.join(root,'docs/r91-addendum/browser');fs.mkdirSync(output,{recursive:true});
++ server=require('node:http').createServer((req,res)=>{
++   const pathname=new URL(req.url,'http://localhost').pathname;
++   if(pathname==='/api/image'||pathname==='/api/champion-asset'){res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#364558"/><path d="M10 26L20 11L30 26Z" fill="#7790ac"/></svg>');return;}
++   if(pathname.startsWith('/api/')){res.statusCode=204;res.end();return;}
++   const file=path.resolve(web,pathname==='/'?'index.html':'.'+pathname);
++   if(!file.startsWith(web+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.statusCode=404;res.end();return;}
++   res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png'})[path.extname(file)]||'application/octet-stream');
++   const override=pathname==='/gameplay.css'?process.env.R91_ADDENDUM_CSS_SOURCE:pathname==='/gameplay.js'?process.env.R91_ADDENDUM_GAMEPLAY_SOURCE:pathname==='/suite.js'?process.env.R91_ADDENDUM_SUITE_SOURCE:null;
++   let content=fs.readFileSync(override||file);
++   if(pathname==='/gameplay.js')content=String(content).replace('window.deepLegendsMatchCards = Object.freeze','window.__r91Gameplay={state,nodes,renderLive,renderLivePlayer,renderInsightMatches};\n window.deepLegendsMatchCards = Object.freeze');
++   if(pathname==='/suite.js')content=String(content).replace('  setupTabs();','  window.__r91Suite={state,roots,hydrateFacadeDraft,rankLabel,renderFacade,renderChampSelect,loadChampSelect,loadFacade};\n  setupTabs();');
++   res.end(content);
++ });
++ await new Promise(r=>server.listen(0,'127.0.0.1',r));
++ await call('Emulation.setDeviceMetricsOverride',{width:1500,height:1050,deviceScaleFactor:1,mobile:false});
++ await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'}]});
++ await call('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/?demo'});
++ const until=async expression=>{const started=Date.now();while(Date.now()-started<15000){if(await evaluate('Boolean('+expression+')'))return;await new Promise(r=>setTimeout(r,50));}throw Error('condition timeout: '+expression);};
++ await until(`window.__r91Suite && document.querySelector('.match-entry:has(.match-summary.is-arena)') && document.querySelector('.match-entry:has(.match-summary:not(.is-arena))')`);
++ await evaluate(`{const style=document.createElement('style');style.textContent='*,*::before,*::after{animation:none!important;transition:none!important}#r91-proof{position:fixed;inset:0;z-index:999999;background:var(--bg,#15191c);padding:30px;overflow:auto}#r91-pair{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}';document.head.append(style);const area=document.createElement('main');area.id='r91-proof';area.innerHTML='<h1>R91 · 战绩数值与首行对齐</h1><p>普通战绩与斗魂战绩，使用同一组生产组件和样式。</p><div id="r91-pair"></div>';document.body.append(area);for(const selector of ['.match-entry:has(.match-summary:not(.is-arena))','.match-entry:has(.match-summary.is-arena)']){const column=document.createElement('div');column.className='matches-column';column.append(document.querySelector(selector).cloneNode(true));document.querySelector('#r91-pair').append(column);}}`);
++ const cards=[];
++ for(const width of [2400,1500,1280]){
++   await call('Emulation.setDeviceMetricsOverride',{width,height:750,deviceScaleFactor:1,mobile:false});
++   await evaluate('document.fonts.ready');
++   const row=await evaluate(`(()=>{const cards=[...document.querySelectorAll('#r91-pair .match-entry')];return cards.map(e=>{const stats=e.querySelector('.match-stats'),first=stats.firstElementChild;return {arena:!!e.querySelector('.is-arena'),top:first.getBoundingClientRect().top,text:stats.textContent,damage:e.querySelector('.match-stat-damage b')?getComputedStyle(e.querySelector('.match-stat-damage b')).color:null,taken:e.querySelector('.match-stat-taken b')?getComputedStyle(e.querySelector('.match-stat-taken b')).color:null,rows:getComputedStyle(stats).gridTemplateRows};});})()`);
++   assert.equal(row[0].top,row[1].top,JSON.stringify(row));assert.doesNotMatch(row[1].text,/万/);assert.notEqual(row[1].damage,row[1].taken);cards.push({width,rows:row});
++   const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(output,`cards-${width}.png`),Buffer.from(shot.data,'base64'));
++ }
++ const facade=await evaluate(`(async()=>{const s=window.__r91Suite;await s.loadFacade(true);s.state.facade.chat={lol:{}};s.hydrateFacadeDraft(true);s.renderFacade();document.querySelector('#r91-proof').innerHTML='<h1>R91 · 缺省段位</h1>'+s.roots.facade.innerHTML;return {label:s.rankLabel({}),tier:s.roots.facade.querySelector('[data-facade-rank="tier"]').value,division:s.roots.facade.querySelector('[data-facade-rank="division"]').value,commitHidden:s.roots.facade.querySelector('[data-facade-commit]').hidden};})()`);
++ assert.equal(facade.label,'未定级 · 单双排');assert.equal(facade.tier,'UNRANKED');assert.equal(facade.division,'I');assert.equal(facade.commitHidden,true);
++ let shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(output,'facade-default.png'),Buffer.from(shot.data,'base64'));
++ const arena=await evaluate(`(async()=>{const s=window.__r91Suite;await s.loadChampSelect(true);s.state.champSelectGroup='arena';s.renderChampSelect();const warning=[...s.roots.champselect.querySelectorAll('.suite-note.is-warning')].map(e=>e.textContent);document.querySelector('#r91-proof').innerHTML='<h1>R91 · 斗魂征召</h1>'+s.roots.champselect.innerHTML;return {warning,text:s.roots.champselect.textContent};})()`);
++ assert.deepEqual(arena.warning,[]);assert.doesNotMatch(arena.text,/斗魂禁用环节需真机确认/);
++ shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(output,'arena-config.png'),Buffer.from(shot.data,'base64'));
++ const live=await evaluate(`(()=>{const g=window.__r91Gameplay,p={playerRef:'fixture',gameName:'测试召唤师',championId:1,championName:'安妮',rank:{tier:'SILVER',division:'I'},historyState:'ok',modeStats:{games:3,wins:2,kda:3},recentGames:[{championId:1,kills:3,deaths:1,assists:4,win:true}]};g.state.liveLoading=false;const a=g.renderLivePlayer(p,0,true)+g.renderInsightMatches(p);g.state.liveLoading=true;const b=g.renderLivePlayer(p,0,true)+g.renderInsightMatches(p);const ordinary=g.renderLivePlayer(p,0,false);document.querySelector('#r91-proof').innerHTML='<h1>R91 · 刷新时保留斗魂战绩</h1><div style="max-width:800px">'+b+'</div>';return {stable:a===b,text:document.querySelector('#r91-proof').textContent,ordinary};})()`);
++ assert.equal(live.stable,true);assert.doesNotMatch(live.text,/白银|未定级/);assert.match(live.ordinary,/白银/);
++ shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(output,'arena-history.png'),Buffer.from(shot.data,'base64'));
++ fs.writeFileSync(path.join(output,'measurements.json'),JSON.stringify({cards,facade,arenaWarningCount:arena.warning.length,live:{stable:live.stable,arenaRankHidden:true,ordinaryRankVisible:true}},null,2)+'\n');
++ console.log('R91 Chromium PASS: cards, integer damage, colors, facade defaults, arena warning removed, stable history, ranks');
++}
++main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{ws?.close();proc?.kill();server?.close();fs.rmSync(temp,{recursive:true,force:true,maxRetries:8,retryDelay:100});});
+--- /dev/null
++++ b/scripts/r91-addendum-mutations.py
+@@ -0,0 +1,61 @@
++#!/usr/bin/env python3
++"""Mutate isolated source copies; require behavioral test failures, never build failures."""
++import json, os, pathlib, subprocess, tempfile
++ROOT = pathlib.Path(__file__).resolve().parent.parent
++OUT = ROOT / 'docs/r91-addendum/mutations'
++OUT.mkdir(parents=True, exist_ok=True)
++cases = [
++ ('quota-short-return', 'web/gameplay.js', '        return false;\n      }\n      if (error.name !== "RequestCancelled")', '      }\n      if (error.name !== "RequestCancelled")', 'js', '429 stays silent'),
++ ('quota-classification', 'web/gameplay.js', 'status === 429 ? "rate-limited" : "http"', '"http"', 'js', 'header-only'),
++ ('duplicate-five-first', 'web/gameplay.js', 'const requestCount = state.settings.matchCount;', 'const requestCount = 5;', 'js', 'exactly one count-20'),
++ ('history-skeleton-flicker', 'web/gameplay.js', 'state.liveLoading === true && !player.recentGames?.length && !["ready", "empty", "unavailable", "failed"].includes(player.historyState)', 'state.liveLoading === true', 'js', 'existing history'),
++ ('roster-dom-replaced', 'web/gameplay.js', 'nodes.liveContent._recommendationMarkup === markup &&', 'false &&', 'js', 'preserves roster DOM'),
++ ('rank-default', 'web/suite.js', 'tier: lol.rankedLeagueTier || "UNRANKED"', 'tier: lol.rankedLeagueTier || "DIAMOND"', 'js', 'facade defaults'),
++ ('loading-probe-interval', 'web/gameplay.js', 'loadingProbe ? 5_000 :', 'loadingProbe ? 20_000 :', 'js', 'Loading and early'),
++ ('match-persistence', 'riot_api.go', 'p.persistRiotMatch(key, &match)', '// persistence removed', 'go', 'TestR91AddendumCacheThreeStates'),
++ ('memory-cache-counter', 'riot_api.go', 'tracker.matchesFromMemory++', '// counter removed', 'go', 'TestR91AddendumCacheThreeStates'),
++ ('loading-grouping', 'gameplay.go', 'if arenaMode && (phase == "GameStart" || phase == "InProgress" || phase == "Reconnect")', 'if arenaMode && (phase == "InProgress" || phase == "Reconnect")', 'go', 'TestR91AddendumGameStartGroupingAndCarryover'),
++ ('loading-shape-sample', 'gameplay.go', 'event["game_id"], event["forced_sample"] = session.GameData.GameID, true\n\t\t\t\ta.appendDiagnosticEvent(event)', 'event["game_id"], event["forced_sample"] = session.GameData.GameID, true', 'go', 'TestR91AddendumForcedShapeAndUnattemptedPhase'),
++ ('phase-not-attempted', 'arena_live_grouping.go', 'a.recordArenaOrderRejected(&previous, "phase", "phase-not-attempted")', '_ = previous', 'go', 'TestR91AddendumForcedShapeAndUnattemptedPhase'),
++ ('playerlist-rejection-event', 'arena_live_grouping.go', 'a.recordArenaOrderRejected(response, "live-client", "playerlist-unavailable")', '// event removed', 'go', 'TestR91AddendumGameStartGroupingAndCarryover'),
++ ('roster-rejection-event', 'arena_live_grouping.go', 'a.recordArenaOrderRejected(response, "session-order", reason)', '_ = reason', 'go', 'TestR91AddendumGameStartGroupingAndCarryover'),
++ ('loading-carryover', 'arena_live_grouping.go', 'groups, ok = a.carriedArenaSessionGroups(client, current, response)', 'groups, ok = arenaSessionOrderGroups(response.QueueID, raw)', 'go', 'TestR91AddendumGameStartGroupingAndCarryover'),
++ ('hover-cleared-takeover', 'champselect_takeover.go', '// Only a different nonzero champion proves a manual change.\n\treturn false', '// Only a different nonzero champion proves a manual change.\n\treturn true', 'go', 'TestR91AddendumWildcardHoverClearKeepsArmedLock'),
++ ('hover-clear-lock-rejected', 'champselect.go', 'last.Confirmed && action.ChampionID != 0 && action.ChampionID != decision.ChampionID', 'last.Confirmed && action.ChampionID != decision.ChampionID', 'go', 'TestR91AddendumWildcardHoverClearKeepsArmedLock'),
++ ('watch-save-phase', 'watch_rules.go', 'runner.handlePhase(client, phase)', '_ = phase', 'go', 'TestR91AddendumSaveReevaluatesCurrentPhase'),
++ ('retryable-cache-ttl', 'gameplay_refresh.go', 'phase == "ChampSelect" || phase == "GameStart" || c.response.ArenaGroupingRetryable', 'phase == "ChampSelect" || phase == "GameStart"', 'go', 'TestR91AddendumRetryableRosterDoesNotBlockEarlyProbe'),
++ ('arena-rank-restored', 'web/gameplay.js', 'const contextCopy = arenaMode ? "" :', 'const contextCopy = arenaMode ? rankCopy :', 'js', 'existing history'),
++ ('arena-first-row-offset', 'web/gameplay.css', '.match-main { display: grid; align-self: start;', '.match-main { display: grid; align-self: center;', 'browser', 'card-first-row'),
++ ('arena-damage-unit', 'web/gameplay.js', '${plainInteger(subject.damage)}</b></span>', '${number(subject.damage / 10000)}万</b></span>', 'browser', 'damage-integer'),
++ ('arena-warning-restored', 'web/suite.js', '${champSelectPoolHelpHTML(definition, runtime)}<fieldset', '${champSelectPoolHelpHTML(definition, runtime)}${definition.groupId === "arena" ? \'<div class="suite-note is-warning">斗魂禁用环节需真机确认</div>\' : ""}<fieldset', 'browser', 'arena-warning'),
++
++]
++results=[]
++if os.environ.get('R91_MUTATION_NAMES'):
++ cases=[c for c in cases if c[0] in os.environ['R91_MUTATION_NAMES'].split(',')]
++with tempfile.TemporaryDirectory(prefix='r91-mutations-') as temp:
++ for name, file, before, after, kind, pattern in cases:
++  source=(ROOT/file).read_text()
++  if source.count(before)!=1:
++   raise RuntimeError(f'{name}: anchor count {source.count(before)}')
++  mutant=pathlib.Path(temp)/(name+pathlib.Path(file).suffix)
++  mutant.write_text(source.replace(before,after,1))
++  env=dict(os.environ,GOCACHE='/tmp/deep-legends-go-cache')
++  if kind=='js':
++   env['R91_ADDENDUM_SUITE_SOURCE' if file.endswith('suite.js') else 'R91_ADDENDUM_GAMEPLAY_SOURCE']=str(mutant)
++   cmd=['node','--test','--test-name-pattern='+pattern,'web/r91-addendum.test.cjs']
++  elif kind=='browser':
++   env[{'web/gameplay.css':'R91_ADDENDUM_CSS_SOURCE','web/gameplay.js':'R91_ADDENDUM_GAMEPLAY_SOURCE','web/suite.js':'R91_ADDENDUM_SUITE_SOURCE'}[file]]=str(mutant)
++   env['R91_BROWSER_OUTPUT']=str(pathlib.Path(temp)/name)
++   cmd=['node','desktop/r91-addendum-browser.cjs']
++  else:
++   overlay=pathlib.Path(temp)/'overlay.json';overlay.write_text(json.dumps({'Replace':{str(ROOT/file):str(mutant)}}))
++   cmd=['go','test','-overlay',str(overlay),'-run','^'+pattern+'$','-count=1','-timeout=30s','.']
++  proc=subprocess.run(cmd,cwd=ROOT,env=env,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=90)
++  (OUT/(name+'.txt')).write_text(proc.stdout)
++  killed=proc.returncode!=0 and ('AssertionError' in proc.stdout if kind in ['js','browser'] else '--- FAIL: '+pattern in proc.stdout) and 'build failed' not in proc.stdout and 'test timed out' not in proc.stdout
++  results.append({'name':name,'source':file,'test':pattern,'exitCode':proc.returncode,'killed':killed})
++  (OUT/'results.json').write_text(json.dumps(results,indent=2)+'\n')
++  print(f'{name}: '+('KILLED' if killed else 'INVALID OR SURVIVED'),flush=True)
++  if not killed: raise SystemExit(1)
++print(f'{len(results)}/{len(results)} behavioral mutations killed',flush=True)
+--- /dev/null
++++ b/docs/r91-addendum-execution-ledger.md
+@@ -0,0 +1,45 @@
++# R91 主工单与 Loading / 静默额度补充执行账本
++
++2026-09-14。覆盖 `WORKLIST-R91-KR-QUOTA-ARENA-BAN-FLICKER-GROUPING.md` 的 P1–P9，以及 `WORKLIST-R91-ADDENDUM-LOADING-GROUPING-SILENT-QUOTA.md`。额度提示以补充工单为准：仅 429 完全静默，500/503 保留可见失败。以下为代码与本地模拟验收；真实 Windows 客户端的验收单独列在末尾。
++
++## 逐项交付
++
++| 项目 | 最终实现 | 验证 |
++|---|---|---|
++| P1 合并查询 | 默认 20 场只走一次 ID / 详情流水线，同一 NDJSON 响应先发布 5 场、再发布完整汇总。分页预览不提前推进游标。关闭或替换请求取消流读取。 | Go 真实 HTTP 流测试在收到 5 场前锁住后续详情，最终断言 1 次 IDs / 20 次详情；JS 断言 1 次 count=20 请求、5→20 和 20→25→40。 |
++| P1 缓存 | 成功详情分别计入 `matches_from_memory`、`matches_from_disk`、`matches_from_network`，沿用不可变详情持久化。 | 同一 ID 网络→内存；重建 provider 后磁盘命中，累计仅 1 次网络请求；删除持久化或计数的变异失败。 |
++| P1 补充静默 429 | JSON/HTTP 头与已开始流的 error 帧携带类型、Retry-After。首屏和翻页保留数据，不写 warning/moreError、不 toast、不 autoPaused；按期限后台重试。页签关闭、请求替换、重置、筛选/场数变化使旧重试失效。连续上游 429 保留最后一次 Retry-After。 | fake timer 验证 4999ms 无请求、5000ms 自动重试；500/503 首屏和翻页继续显示错误；截断流仍可见；删除短路 return 必须失败。 |
++| P2 伤害/承伤 | 普通和斗魂主区从相同顶部开始，斗魂复用三行统计轨道；统一窄列行距。卡片及详情使用整数，伤害为 danger、承伤为 muted。 | Chromium 三种宽度首行 top 完全一致；四种宽度的斗魂详情展开/收起与滚动通过；单位、颜色和布局断言通过。 |
++| P3 生涯默认值 | draft、rankLabel 和未保存判断统一 UNRANKED / I；缺字段显示“未定级 · 单双排”。 | jsdom + Chromium 下拉值、预览与未编辑状态一致，无 undefined。 |
++| P4 亮出被清零 | 已确认 hover 被客户端清零时不判定手动切换，保留 armed 锁定并记录一次 `hover-cleared-by-client`；另一非零英雄仍立即让位。执行前保留回合、会话、设置与候选可用性校验。 | 模拟 wildcard ban 真实 PATCH，0 时继续锁定、104 时让位；恢复旧判据或旧 preflight 都变红。 |
++| P5 刷新闪烁 | 同局同队列 pending 结果保留已读战绩，pending 仍可后续补齐。内容未变时只更新刷新状态，名单 DOM 节点不替换。首次无数据继续显示骨架。 | jsdom 文本与节点身份断言；Chromium 刷新前后战绩一致；恢复骨架覆盖/无条件重绘均失败。 |
++| P6 分组与取证 | GameStart 走纯 session-order，不探测 2999；InProgress / Reconnect 保留游戏进程优先。每次 Loading 的首份 session 独立强制 shape 采样；无 gameId 时新阶段仍可采样。所有实际分组拒绝带 reason/unavailable，可重试情况单独标记；未尝试的已知斗魂阶段结束记录 `phase-not-attempted`。 | Loading 18 人分组成功且 0 次 2999；同局丢失中间一人仍保留原边界，新 gameId 不借用。强制采样、漏尝试与失败原因均有行为测试及变异。 |
++| P6 首分钟与沿用 | 仅沿用同客户端/账号/区服/队列/有效 gameId 的 Loading 成功分组；17 人没有完整边界时不硬切。各游戏阶段前 60 秒未分组每 5 秒探测，之后保持 20 秒 × 8 次，完整结果停止。后端短缓存避免吞掉早期探测。选人按 CellID 保存完整英雄顺序，与 session/playerlist 比对，仅记录统计。 | 前端模拟 12 次短探测不消耗后续 8 次预算；后端 4 秒后能够再次探测；原 17 人 gameflow + 18 人 playerlist 边界测试继续通过。 |
++| P7 斗魂玩家段位 | Arena 玩家行不输出段位，普通模式保留。 | jsdom + Chromium，恢复段位变异失败。 |
++| P8 征召说明 | 删除 arena 分组下“斗魂禁用环节需真机确认”的 warning。 | Chromium arena 页面无该 warning，恢复变异失败。 |
++| P9 保存后重评估 | 保存 watch 设置后读取当前 phase 并调用既有阶段调度，支持重连、接受、再来一局。UI 区分尚未到阶段和已到阶段但未开规则。 | Reconnect / ReadyCheck / EndOfGame 保存后立即出现对应 pending；删除重评估变异失败。 |
++
++补充口径：完整 18 人且身份有效的 session-order 仍应成功。17 人且无有效完整边界时同时记录 `playerlist-unavailable` 和 `roster-not-divisible`；不能为满足主工单中人数/原因对应不一致的文字而把完整有效名单强行判失败。
++
++## 测试与证据
++
++- `GOCACHE=/tmp/deep-legends-go-cache go test -race ./...`：通过，117.454 秒。见 [Go race 输出](r91-addendum/go-race.txt)。
++- `node --test web/*.test.cjs desktop/*.test.cjs`：677 项，676 通过、0 失败、1 项 Windows PowerShell 专用检查跳过。见 [全量前端输出](r91-addendum/frontend.txt)。
++- 最后的 CSS 顶部对齐/窄列行距改动后，相关 `web/champions.test.cjs` + `web/r88.test.cjs` 243 项全部通过。见 [布局回归输出](r91-addendum/layout-tests.txt)。R88 样式基线只更新本工单批准修改的主区顶部、行距与 Arena 三行统计规则。
++- `go vet ./...`、JS 语法检查、`git diff --check`：通过。
++- 隔离源码变异：23/23 个均被行为断言拦截。运行 [变异脚本](../scripts/r91-addendum-mutations.py)，结果与每个实际断言失败输出见 [结果](r91-addendum/mutations/results.json)。不以编译错误、超时或启动失败冒充变异通过，真实源码不被改写。
++- [Chromium 验收脚本](../desktop/r91-addendum-browser.cjs) 使用生产 JS/CSS 和本地模拟数据；测试接口注入仅存在于 fixture HTTP 响应，不进入生产源码。卡片图标为明确的本地占位，截图不用于证明远端资源连通性。
++- [布局数值](r91-addendum/browser/measurements.json)：2400/1500px 下两种卡片首行均为 123.59375px；1280px 下均为 201.59375px。伤害 `rgb(224,92,92)`，承伤 `rgb(139,147,166)`。
++- [大屏卡片](r91-addendum/browser/cards-2400.png)、[窄列卡片](r91-addendum/browser/cards-1280.png)、[生涯默认段位](r91-addendum/browser/facade-default.png)、[斗魂征召](r91-addendum/browser/arena-config.png)、[斗魂刷新战绩](r91-addendum/browser/arena-history.png)。
++- 斗魂详情另用现有 Chromium runner 验证 1920/1280/820/620px、21 玩家、7 队、窄屏横向滚动与稳定兄弟卡片：[数值](r91-addendum/browser/detail/measurements.json)、[1280px 截图](r91-addendum/browser/detail/arena-detail-1280.png)。此处仅为 demo 布局样本，不代表真实斗魂人数结论。
++
++修正过的旧测试契约：429 无法在当前预算内等完时保留实际 429/Retry-After，旧“必然 DeadlineExceeded”断言随之更新；旧预热取消测试的“非预热阶段”从现在已支持预热的 GameStart 改成 Matchmaking。未关闭 race 检查或削弱取消/缓存隔离断言。
++
++## 真实客户端待验收
++
++1. 正常完成一局斗魂，观察 Loading 或稍后的 InProgress 是否出现小队；导出强制 `lcu_gameflow_session_shape`、`arena_group_order_rejected`、`live_roster_shape` 与赛后顺序核验记录。模拟数据不证明当前客户端真实名单顺序稳定。
++2. 连开三个韩服选手页并重启应用重查，确认没有 429 可见提示，诊断中有磁盘命中。模拟测试已证明缓存跨 provider 重建；这里还需核对打包后的真实存储路径与上游行为。
++3. 选人停留 30 秒观察战绩不闪，完成一次自动禁用确认实际锁定；检查 hover 清零诊断且没有错误的手动接管。
++4. 在掉线前开启自动重连，再验证真实客户端触发。当前测试覆盖保存后处于 Reconnect 的即时调度，不代替客户端操作效果。
++
++本次未打包、发布或执行真实客户端对局操作。原工作区已有大量 R87–R94 修改，均保留；[本轮独立补丁](r91-addendum/scoped-changes.patch) 以开始本轮时的文件副本为基线，便于与已有修改区分。最终来源指纹见 [SHA-256 清单](r91-addendum/source-sha256.json)。

@@ -252,7 +252,9 @@ func (a *app) startOPGGHistoricalRanks(reference gameplayReference, gameName, ta
 		}()
 		ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
 		defer cancel()
+		started := time.Now()
 		ranks := a.opggHistoricalRanks(ctx, gameName, tagLine, puuid, privacy)
+		a.recordDiagnostic(map[string]any{"event": "opgg_historical_cost", "duration_ms": time.Since(started).Milliseconds(), "background": true, "count": len(ranks)})
 		if len(ranks) == 0 {
 			return
 		}

@@ -149,6 +149,15 @@ function bootDemoApp(options = {}) {
         ? Promise.resolve(new w.Response(JSON.stringify({ rows: options.championRankings }))) : originalFetch(url, ...args);
     }
     w.eval(source);
+    if (file === "demo-data.js" && options.friendsPayload) {
+      const demoFetch = w.fetch;
+      w.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : input?.url || "";
+        options.onRequest?.(url);
+        return url.startsWith("/api/social/friends")
+          ? Promise.resolve(new w.Response(JSON.stringify(options.friendsPayload()))) : demoFetch(input, init);
+      };
+    }
     if (file === "demo-data.js" && options.matchCount > 17) {
       const demoFetch = w.fetch;
       w.fetch = async (url, ...args) => {
@@ -240,10 +249,15 @@ test("1110 征召默认值、时间输入、模式能力和总开关真实保存
     assert.equal(root.querySelector('[data-cs-time="hold"]').checkValidity(), true, "手输小数不能被原生 step 判无效");
     await change('[data-cs-time="hold"]', "0.1");
     assert.equal((await saved()).groups.aram.bench.holdMs, 1000);
-    await change('[data-cs-time="pick"]', "0.25");
-    assert.equal((await saved()).groups.aram.pick.delayMs, 250);
-    await change('[data-cs-time="pick"]', "");
-    assert.equal((await saved()).groups.aram.pick.delayMs, 250, "空值不得改写配置");
+    assert.equal(root.querySelector('[data-cs-time="lock"]').value, "10");
+    await change('[data-cs-time="lock"]', "0.25");
+    assert.equal((await saved()).groups.aram.pick.lockDelayMs, 250);
+    assert.equal((await saved()).groups.aram.pick.delayMs, 500, "锁定等待不得改写亮出前延时");
+    await change('[data-cs-time="lock"]', "");
+    assert.equal((await saved()).groups.aram.pick.lockDelayMs, 250, "空值不得改写配置");
+    root.querySelector('[data-cs-delay-key="lockDelayMs"][data-cs-delay-delta="500"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.equal((await saved()).groups.aram.pick.lockDelayMs, 750, "步进按钮保存独立锁定等待");
     for (const id of ["ranked", "normal", "practice", "event"]) {
       root.querySelector(`[data-cs-group="${id}"]`).click();
       assert.equal(root.querySelector("[data-cs-bench-enabled]"), null, id);
@@ -258,7 +272,11 @@ test("1110 征召默认值、时间输入、模式能力和总开关真实保存
     root.querySelector('[data-cs-group="arena"]').click();
     assert.equal(root.querySelector(".cs-bench-card"), null, "无交换能力不显示空卡");
     root.querySelector('[data-cs-group="aram"]').click();
-    const before = JSON.stringify((await saved()).groups);
+    const expectedGroups = JSON.parse(JSON.stringify((await saved()).groups));
+    for (const config of Object.values(expectedGroups)) {
+      config.ban.enabled = false;
+      config.pick.enabled = false;
+    }
     await change("[data-cs-master]", false);
     assert.ok(root.classList.contains("cs-master-off"));
     assert.ok(root.querySelector(".cs-config-fields").disabled);
@@ -266,10 +284,24 @@ test("1110 征召默认值、时间输入、模式能力和总开关真实保存
       assert.ok(element.matches(":disabled"), element.outerHTML);
     }
     assert.equal(root.querySelector("[data-cs-master]").disabled, false);
-    assert.equal(JSON.stringify((await saved()).groups), before, "关闭总开关应保留子配置");
+    assert.equal(JSON.stringify((await saved()).groups), JSON.stringify(expectedGroups), "关闭总开关同步关闭所有禁用/选用，保留英雄序列和其它配置");
+    assert.equal(root.querySelector('[data-cs-side-enabled="pick"]').checked, false);
     await change("[data-cs-master]", true);
+    const definitions = await (await w.fetch("/api/champselect/groups")).json();
+    for (const definition of definitions) {
+      expectedGroups[definition.groupId].ban.enabled = definition.hasBan;
+      expectedGroups[definition.groupId].pick.enabled = true;
+    }
+    assert.equal(JSON.stringify((await saved()).groups), JSON.stringify(expectedGroups), "开启总开关同步开启所有可用禁用/选用，大乱斗保持无禁用");
+    assert.equal(root.querySelector('[data-cs-side-enabled="pick"]').checked, true);
     assert.equal(root.querySelector("[data-cs-bench-enabled]").matches(":disabled"), false);
     assert.equal(root.querySelector("[data-cs-bench-enabled]").checked, true);
+    root.querySelector('[data-cs-group="normal"]').click();
+    assert.equal(root.querySelector('[data-cs-side-enabled="ban"]').checked, true);
+    assert.equal(root.querySelector('[data-cs-side-enabled="pick"]').checked, true);
+    await change('[data-cs-side-enabled="pick"]', false);
+    assert.equal((await saved()).groups.normal.pick.enabled, false, "总开关开启后仍可分别调整子开关");
+    assert.equal((await saved()).enabled, true);
     assert.deepEqual(errors, []);
   } finally { w.close(); }
 });
@@ -389,7 +421,7 @@ test("non-match overview rerenders preserve the match-list node", () => {
     emptyState: () => "", opggSummonerURL: () => "", loadOverview: () => {},
     matchListEmptyContent: () => "empty", matchSentinelShouldHide: () => true,
     summonerContextChip: () => "", summonerProChip: () => "", summonerRegionChip: () => "", renderSummonerHighlights: () => "",
-    scheduleOverviewCurrentGame: () => {},
+    scheduleOverviewCurrentGame: () => {}, updateFriendPresenceChips: () => {},
     paginationCopyFor: () => "", renderCareerSections: () => "", renderMatchFilters: () => "",
     renderMatch: (match) => `<article data-match-id="${match.gameId}" class="match-entry">${match.gameId}</article>`, number: (value) => String(value),
     escapeHTML: (value) => String(value ?? ""), bindOverviewContent: () => {}, applyRenderedMetricStyles: () => {},
@@ -552,17 +584,53 @@ test("演示数据下总览页渲染出真实内容，且渲染期没有异常",
   w.close();
 });
 
-test("好友在线事件只更新状态 chip，不重建总览或战绩列表", async () => {
-  const { window: w, errors } = bootDemoApp();
-  await settled();
-  const overview = w.document.getElementById("overview-content");
-  const matchList = overview.querySelector(".match-list");
-	const summonerStrip = overview.querySelector(".summoner-strip");
-  w.dispatchEvent(new w.CustomEvent("deep-legends:friends-presence", { detail: { friends: [] } }));
-  assert.equal(overview.querySelector(".match-list"), matchList);
-	assert.equal(overview.querySelector(".summoner-strip"), summonerStrip, "好友事件触发了整页总览重建");
-  assert.deepEqual(errors, []);
-  w.close();
+test("好友真实数据恢复横条模式与计时，SSE 更新不重建战绩或串到其他玩家", async () => {
+  const now = Date.now(), requests = [];
+  let friend = {playerRef:"player_friend_123456789",gameName:"好友",tagLine:"1234",icon:1,groupId:1,
+    availability:"dnd",product:"league_of_legends",gameStatus:"inGame",queueLabel:"排位赛 灵活排位",championName:"虚空掠夺者",gameStartedAt:now-852000};
+  const { window: w, errors } = bootDemoApp({friendsPayload:()=>({groups:[{id:1,name:"默认分组"}],friends:[friend]}),onRequest:url=>requests.push(url)});
+  w.Date.now = () => now;
+  const waitFor = async predicate => {
+    const deadline=Date.now()+10000;
+    while(!predicate() && Date.now()<deadline) await new Promise(resolve=>setTimeout(resolve,20));
+    assert.ok(predicate(),"expected friend UI state did not arrive");
+  };
+  try {
+    await settled();
+    w.document.getElementById("friends-toggle").click();
+    await waitFor(()=>w.document.querySelector('[data-player-ref="player_friend_123456789"]'));
+    w.document.querySelector('[data-player-ref="player_friend_123456789"]').click();
+    const overview=w.document.getElementById("overview-content");
+    await waitFor(()=>overview.querySelector('[data-friend-presence]:not([hidden])'));
+    const strip=overview.querySelector(".summoner-strip"), list=overview.querySelector(".match-list"), chip=strip.querySelector("[data-friend-presence]");
+    assert.equal(chip.textContent,"排位赛 灵活排位 · 虚空掠夺者 · 已进行 14:12");
+    assert.equal(w.document.getElementById("friends-dock").classList.contains("is-open"),false);
+    const historyRequests=()=>requests.filter(url=>url.startsWith('/api/gameplay/overview')).length;
+    const reads=historyRequests();
+    w.document.getElementById("app-scroll").scrollTop=330;
+    w.Date.now=()=>now+5000;
+    await waitFor(()=>chip.textContent.endsWith("14:17"));
+    const refresh=async changes=>{
+      friend={...friend,...changes};
+      const before=requests.filter(url=>url.startsWith('/api/social/friends')).length;
+      w.dispatchEvent(new w.CustomEvent("deep-legends:friends-updated"));
+      await waitFor(()=>requests.filter(url=>url.startsWith('/api/social/friends')).length>before);
+      await new Promise(resolve=>setTimeout(resolve,20));
+    };
+    await refresh({queueLabel:"海克斯大乱斗"});
+    assert.match(chip.textContent,/海克斯大乱斗.*14:17/);
+    assert.equal(overview.querySelector(".summoner-strip"),strip);
+    assert.equal(overview.querySelector(".match-list"),list);
+    assert.equal(w.document.getElementById("app-scroll").scrollTop,330);
+    assert.equal(historyRequests(),reads,"presence must not reload history");
+    assert.equal(requests.some(url=>url.startsWith('/api/gameplay/current-game')),false,"CN friend status needs no spectator probe");
+    await refresh({gameStatus:"outOfGame"});assert.equal(chip.hidden,true);assert.equal(chip.querySelector("time"),null);
+    await refresh({gameStatus:"inGame",availability:"offline"});assert.equal(chip.hidden,true);
+    await refresh({availability:"dnd",playerRef:"player_different_server"});assert.equal(chip.hidden,true,"same display name with another reference must not match");
+    await refresh({playerRef:"player_friend_123456789"});assert.equal(chip.hidden,false);
+    w.dispatchEvent(new w.CustomEvent("deep-legends:friends-presence",{detail:{friends:[]}}));assert.equal(chip.hidden,true,"empty/disconnected snapshot clears old game");
+    assert.deepEqual(errors,[]);
+  } finally {w.close();}
 });
 
 test("演示数据下工具五个页签都渲染完成", async () => {
@@ -1127,6 +1195,7 @@ test("顶部重新读取实际刷新生涯并丢弃未应用预览", async (t) =
   w.document.querySelector('[data-suite-tab="facade"]').click();
   const current=await (await w.fetch('/api/facade/state')).json();
   const original=Number(current.profile.backgroundSkinId);
+  for (let attempt=0;attempt<50 && !w.document.querySelector("[data-facade-skin]");attempt++) await new Promise(resolve=>setTimeout(resolve,10));
   const choice=[...w.document.querySelectorAll('[data-facade-skin]')].find(b=>Number(b.dataset.facadeSkin)!==original);
   assert.ok(choice);
   choice.click();
@@ -1799,4 +1868,43 @@ test('R86 scroll restoration is resize-driven, restores clamped position and yie
     }finally{w.close()}
   }
   check();check(false,true);assert.throws(()=>check(true),{name:'AssertionError'});
+});
+
+test('R87 P9 external champselect events preserve modal scroll, input and composition', async () => {
+  async function check(mutate = source => source, scrollOnly = false) {
+    const {window:w,errors}=bootDemoApp({suiteSourceTransform:mutate});
+    try {
+      let shows=0;
+      w.HTMLDialogElement.prototype.showModal=function(){shows++;this.setAttribute('open','');this.querySelector('button')?.focus();};
+      w.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
+      await settled();w.document.querySelector('[data-section="suite"]').click();await visitTool(w,'champselect');
+      const root=w.document.querySelector('#suite-champselect-root');
+      root.querySelector('[data-cs-open-dialog="pick"]').click();await new Promise(r=>setTimeout(r,40));
+      const modal=root.querySelector('.cs-dialog'), input=modal.querySelector('[data-cs-dialog-search]');
+      modal.scrollTop=200;input.focus();input.setSelectionRange(0,0);
+      const external=async () => {
+        w.dispatchEvent(new w.CustomEvent('deep-legends:gameflow',{detail:{phase:'ChampSelect',changed:true}}));
+        await new Promise(r=>setTimeout(r,45));
+      };
+      await external();
+      if(scrollOnly) {assert.equal(root.querySelector('.cs-dialog').scrollTop,200,'modal scroll reset');return;}
+      input.dispatchEvent(new w.CompositionEvent('compositionstart',{bubbles:true}));
+      for(let i=0;i<6;i++) {
+        if(i<4) {input.value+='ahri'[i];input.dispatchEvent(new w.InputEvent('input',{bubbles:true,isComposing:true}));input.setSelectionRange(input.value.length,input.value.length);}
+        await external();
+      }
+      input.dispatchEvent(new w.CompositionEvent('compositionend',{bubbles:true,data:'ahri'}));
+      assert.equal(root.querySelector('[data-cs-dialog-search]').value,'ahri','typed text was replaced');
+      assert.equal(w.document.activeElement,input,'search focus was lost');
+      assert.equal(root.querySelector('.cs-dialog'),modal,'modal subtree was replaced');
+      assert.equal(modal.scrollTop,200);assert.equal(input.selectionStart,4);assert.equal(shows,1,'open modal was shown again');
+      modal.querySelector('[data-cs-dialog-close]').click();assert.equal(root.querySelector('.cs-dialog'),null);
+      assert.deepEqual(errors,[]);
+    } finally {w.close();}
+  }
+  await check();
+  const reset = source => source.replace('if (existing) {\n      // Runtime events', 'if (existing) { existing.remove(); return syncChampSelectDialog();\n      // Runtime events');
+  assert.notEqual(reset(suiteSource),suiteSource);
+  await assert.rejects(check(reset,true),error=>error.name==='AssertionError' && /modal scroll reset/.test(error.message));
+  await assert.rejects(check(reset),error=>error.name==='AssertionError' && /typed text|search focus/.test(error.message));
 });

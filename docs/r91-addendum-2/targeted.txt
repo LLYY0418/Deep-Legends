@@ -1,0 +1,74 @@
+=== RUN   TestTakeoverBenchManualSwapStopsOnceAndNextGameResets
+--- PASS: TestTakeoverBenchManualSwapStopsOnceAndNextGameResets (0.01s)
+=== RUN   TestTakeoverBenchPendingSwapRechecksManualChoiceAndSession
+=== RUN   TestTakeoverBenchPendingSwapRechecksManualChoiceAndSession/manual
+=== RUN   TestTakeoverBenchPendingSwapRechecksManualChoiceAndSession/new-game
+=== RUN   TestTakeoverBenchPendingSwapRechecksManualChoiceAndSession/target-gone
+--- PASS: TestTakeoverBenchPendingSwapRechecksManualChoiceAndSession (0.46s)
+    --- PASS: TestTakeoverBenchPendingSwapRechecksManualChoiceAndSession/manual (0.15s)
+    --- PASS: TestTakeoverBenchPendingSwapRechecksManualChoiceAndSession/new-game (0.15s)
+    --- PASS: TestTakeoverBenchPendingSwapRechecksManualChoiceAndSession/target-gone (0.15s)
+=== RUN   TestTakeoverBenchUnappliedSwapDoesNotBlockNewTargets
+--- PASS: TestTakeoverBenchUnappliedSwapDoesNotBlockNewTargets (0.00s)
+=== RUN   TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover
+=== RUN   TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/ranked/manual
+=== RUN   TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/ranked/teammate-picked
+=== RUN   TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/ranked/banned
+=== RUN   TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/normal/manual
+=== RUN   TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/normal/teammate-picked
+=== RUN   TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/normal/banned
+=== RUN   TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/arena/manual
+=== RUN   TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/arena/teammate-picked
+=== RUN   TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/arena/banned
+--- PASS: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover (0.04s)
+    --- PASS: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/ranked/manual (0.00s)
+    --- PASS: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/ranked/teammate-picked (0.00s)
+    --- PASS: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/ranked/banned (0.00s)
+    --- PASS: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/normal/manual (0.00s)
+    --- PASS: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/normal/teammate-picked (0.00s)
+    --- PASS: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/normal/banned (0.01s)
+    --- PASS: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/arena/manual (0.00s)
+    --- PASS: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/arena/teammate-picked (0.00s)
+    --- PASS: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/arena/banned (0.00s)
+=== RUN   TestTakeoverBenchOwnEchoBeforeLateAckAndAutomaticUpgrade
+--- PASS: TestTakeoverBenchOwnEchoBeforeLateAckAndAutomaticUpgrade (0.01s)
+=== RUN   TestTakeoverPickTenSecondsAfterHoverAndManualChangeYields
+=== RUN   TestTakeoverPickTenSecondsAfterHoverAndManualChangeYields/ranked
+=== RUN   TestTakeoverPickTenSecondsAfterHoverAndManualChangeYields/normal
+=== RUN   TestTakeoverPickTenSecondsAfterHoverAndManualChangeYields/arena
+--- PASS: TestTakeoverPickTenSecondsAfterHoverAndManualChangeYields (0.01s)
+    --- PASS: TestTakeoverPickTenSecondsAfterHoverAndManualChangeYields/ranked (0.00s)
+    --- PASS: TestTakeoverPickTenSecondsAfterHoverAndManualChangeYields/normal (0.00s)
+    --- PASS: TestTakeoverPickTenSecondsAfterHoverAndManualChangeYields/arena (0.00s)
+=== RUN   TestTakeoverPickLockTimerActuallyWaitsAndPreflightLatches
+=== RUN   TestTakeoverPickLockTimerActuallyWaitsAndPreflightLatches/lock
+=== RUN   TestTakeoverPickLockTimerActuallyWaitsAndPreflightLatches/manual-before-lock
+--- PASS: TestTakeoverPickLockTimerActuallyWaitsAndPreflightLatches (0.25s)
+    --- PASS: TestTakeoverPickLockTimerActuallyWaitsAndPreflightLatches/lock (0.12s)
+    --- PASS: TestTakeoverPickLockTimerActuallyWaitsAndPreflightLatches/manual-before-lock (0.12s)
+=== RUN   TestTakeoverLockDelayMigrationAndTimeAnchor
+--- PASS: TestTakeoverLockDelayMigrationAndTimeAnchor (0.00s)
+=== RUN   TestTakeoverDefaultPickWaitsTenRealSecondsBeforeLock
+--- PASS: TestTakeoverDefaultPickWaitsTenRealSecondsBeforeLock (10.01s)
+=== RUN   TestR87RosterLayoutPreservesMainAndStats
+--- PASS: TestR87RosterLayoutPreservesMainAndStats (0.00s)
+=== RUN   TestR91Addendum2NonWildcardBanClearYields
+=== RUN   TestR91Addendum2NonWildcardBanClearYields/ranked/poll
+=== RUN   TestR91Addendum2NonWildcardBanClearYields/ranked/preflight
+=== RUN   TestR91Addendum2NonWildcardBanClearYields/arena/poll
+=== RUN   TestR91Addendum2NonWildcardBanClearYields/arena/preflight
+--- PASS: TestR91Addendum2NonWildcardBanClearYields (0.26s)
+    --- PASS: TestR91Addendum2NonWildcardBanClearYields/ranked/poll (0.00s)
+    --- PASS: TestR91Addendum2NonWildcardBanClearYields/ranked/preflight (0.12s)
+    --- PASS: TestR91Addendum2NonWildcardBanClearYields/arena/poll (0.00s)
+    --- PASS: TestR91Addendum2NonWildcardBanClearYields/arena/preflight (0.12s)
+=== RUN   TestR91AddendumWildcardHoverClearKeepsArmedLock
+=== RUN   TestR91AddendumWildcardHoverClearKeepsArmedLock/0
+=== RUN   TestR91AddendumWildcardHoverClearKeepsArmedLock/104
+--- PASS: TestR91AddendumWildcardHoverClearKeepsArmedLock (0.13s)
+    --- PASS: TestR91AddendumWildcardHoverClearKeepsArmedLock/0 (0.12s)
+    --- PASS: TestR91AddendumWildcardHoverClearKeepsArmedLock/104 (0.00s)
+=== RUN   TestR91AddendumSaveDuringChampSelectArmsNoUnrelatedRule
+--- PASS: TestR91AddendumSaveDuringChampSelectArmsNoUnrelatedRule (0.02s)
+PASS
+ok  	lol-loot-assistant	12.038s

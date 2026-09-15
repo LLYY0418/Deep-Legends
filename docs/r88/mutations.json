@@ -1,0 +1,116 @@
+[
+  {
+    "mutation": "P3-live-post",
+    "test": "R88 thirteen ChampSelect events",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P3-status",
+    "test": "R88 real status timeout",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P3-cache",
+    "test": "TestR88OrdinaryLiveLoadsCacheAndReuseWithoutExtendingTTL",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P3-identities",
+    "test": "TestR88SummonerCacheCoalescesExpiresAndIsolatesClients",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P2-queue-gate",
+    "test": "TestR88ArenaBanWildcardActuallyPatches",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P2-hover-prefix",
+    "test": "TestR88ArenaBanWildcardActuallyPatches",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P2-guard-direct",
+    "test": "TestR88QueueGuardMutations",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P2-guard-alias",
+    "test": "TestR88QueueGuardMutations",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P2-guard-switch",
+    "test": "TestR88QueueGuardMutations",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P4-OP",
+    "test": "TestR88ArenaRankingsOPAndPartialSchema",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P4-whole-table",
+    "test": "TestR88ArenaRankingsOPAndPartialSchema",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "A5-live-fields",
+    "test": "TestR88DiagnosticContractsAndBuildMarker",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "build-marker",
+    "test": "TestR88DiagnosticContractsAndBuildMarker",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P2-raw-head",
+    "test": "TestR88ArenaBanWildcardActuallyPatches",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P1-tooltip",
+    "test": "R88 arena names omit tags",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "P1-protected-layout",
+    "test": "R88 protected active",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "A4-crash-hook",
+    "test": "R88 crash hooks",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "A6-log-window",
+    "test": "R88 seven-day desktop export",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "A4-rotation",
+    "test": "TestR88DiagnosticContractsAndBuildMarker",
+    "exit": 1,
+    "killed": true
+  }
+]

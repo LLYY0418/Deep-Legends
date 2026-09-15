@@ -1,0 +1,10 @@
+--- FAIL: TestR91AddendumSaveReevaluatesCurrentPhase (0.00s)
+    --- FAIL: TestR91AddendumSaveReevaluatesCurrentPhase/Reconnect (0.00s)
+        r91_addendum_test.go:314: status=200 reads=1 action=reconnect armed=false
+    --- FAIL: TestR91AddendumSaveReevaluatesCurrentPhase/ReadyCheck (0.00s)
+        r91_addendum_test.go:314: status=200 reads=1 action=accept armed=false
+    --- FAIL: TestR91AddendumSaveReevaluatesCurrentPhase/EndOfGame (0.00s)
+        r91_addendum_test.go:314: status=200 reads=1 action=play-again armed=false
+FAIL
+FAIL	lol-loot-assistant	0.008s
+FAIL

@@ -1,0 +1,11 @@
+--- FAIL: TestOverviewCurrentGameReadOnlyCacheAndPrivacy (0.00s)
+    overview_current_game_test.go:116: 502 当前对局暂时无法确认，请稍后重试
+        
+--- FAIL: TestR86RiotQueuedDetailsExitWhileActiveRequestsHoldSlots (2.00s)
+    r86_cache_test.go:289: detail workers=8, want 4 while all four active slots remain held; total labeled=9, want 5
+    r86_cache_test.go:233: active requests did not finish normally after release: completed=8 err=context canceled
+--- FAIL: TestRiotOverviewCapsMatchDetailConcurrencyAtFour (0.08s)
+    riot_api_test.go:193: maximum concurrent Riot match detail requests = 8, want 1..4
+FAIL
+FAIL	lol-loot-assistant	97.467s
+FAIL

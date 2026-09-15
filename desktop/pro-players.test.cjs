@@ -307,27 +307,38 @@ test("玩家页签各自保留纵向位置，跨页面返回也不串位", async
   const {w,d,errors} = boot(t, {full:true});
   await tick(180);
   const open = (name) => w.dispatchEvent(new w.CustomEvent("deep-legends:open-player", {detail:{gameName:name,tagLine:"KR1",region:"kr",source:"search"}}));
-  open("First"); await tick(180);
+  const ready = async (name) => {
+    const deadline = Date.now() + 20000;
+    while (Date.now() < deadline) {
+      const tab = d.querySelector('#player-tabs [aria-selected="true"]');
+      if (tab?.textContent.includes(name) && !tab.querySelector('.mini-loading') && d.querySelector('#overview-content .summoner-strip')) {
+        // Scroll restoration runs in rAF after the loaded content is rendered.
+        // A fixed delay can expire in the skeleton phase under suite contention.
+        await new Promise(resolve => w.requestAnimationFrame(() => w.requestAnimationFrame(resolve)));
+        return tab.dataset.playerTab;
+      }
+      await tick(20);
+    }
+    assert.fail(`player ${name} did not finish loading`);
+  };
+  open("First"); const firstKey = await ready("First");
   const root=d.getElementById("app-scroll");
-  const first=d.querySelector("#player-tabs [data-player-tab].is-active") || d.querySelector('#player-tabs [aria-selected="true"]');
-  const firstKey=first.dataset.playerTab;
   root.scrollTop=640;
-  open("Second"); await tick(180);
+  open("Second"); const secondKey = await ready("Second");
   assert.equal(root.scrollTop,0);
-  const secondKey=d.querySelector('#player-tabs [aria-selected="true"]').dataset.playerTab;
   root.scrollTop=210;
-  d.querySelector(`[data-player-tab="${firstKey}"]`).click(); await tick();
+  d.querySelector(`[data-player-tab="${firstKey}"]`).click(); await ready("First");
   assert.equal(root.scrollTop,640);
-  d.querySelector(`[data-player-tab="${secondKey}"]`).click(); await tick();
+  d.querySelector(`[data-player-tab="${secondKey}"]`).click(); await ready("Second");
   assert.equal(root.scrollTop,210);
   w.dispatchEvent(new w.CustomEvent("deep-legends:navigate",{detail:{section:"pro-players"}})); await tick();
   root.scrollTop=50;
-  d.getElementById("pro-players-home").click(); await tick();
+  d.getElementById("pro-players-home").click(); await ready("Second");
   assert.equal(root.scrollTop,210);
   assert.deepEqual(errors,[]);
 });
 
- test("导出完成后打开文件夹，打开或离开设置子页后还原", async(t)=>{
+ test("R87 导出完成状态跨页面保留，打开文件夹后还原", async(t)=>{
   let done, opened=0;
   const {w,d,errors}=boot(t,{full:true,diagnosticsBridge:{onCompleted(fn){done=fn},async openFolder(){opened++;return true}}});
   await tick(150);
@@ -336,8 +347,12 @@ test("玩家页签各自保留纵向位置，跨页面返回也不串位", async
   const button=d.getElementById("export-diagnostics");
   done(); assert.equal(button.textContent,"打开日志文件夹");
   button.click();await tick();assert.equal(opened,1);assert.equal(button.textContent,"导出诊断日志");
-  done();d.getElementById("settings-tab-gameplay").click();assert.equal(button.textContent,"导出诊断日志");
-  done();assert.equal(button.textContent,"导出诊断日志","离开后完成的下载不改变按钮");
+  d.getElementById("settings-tab-gameplay").click();
+  done();assert.equal(button.textContent,"打开日志文件夹","离开后完成的下载仍保存状态");
+  d.getElementById("settings-tab-privacy").click();assert.equal(button.textContent,"打开日志文件夹");
+  w.dispatchEvent(new w.CustomEvent("deep-legends:navigate",{detail:{section:"overview"}}));
+  done();w.dispatchEvent(new w.CustomEvent("deep-legends:navigate",{detail:{section:"settings"}}));
+  d.getElementById("settings-tab-privacy").click();assert.equal(button.textContent,"打开日志文件夹");
   assert.deepEqual(errors,[]);
  });
 

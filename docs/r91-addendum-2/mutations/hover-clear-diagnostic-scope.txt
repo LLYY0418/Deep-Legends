@@ -1,0 +1,12 @@
+--- FAIL: TestR91Addendum2NonWildcardBanClearYields (0.26s)
+    --- FAIL: TestR91Addendum2NonWildcardBanClearYields/ranked/poll (0.00s)
+        r91_addendum2_test.go:55: manual clear was mislabeled as client compatibility
+    --- FAIL: TestR91Addendum2NonWildcardBanClearYields/ranked/preflight (0.12s)
+        r91_addendum2_test.go:55: manual clear was mislabeled as client compatibility
+    --- FAIL: TestR91Addendum2NonWildcardBanClearYields/arena/poll (0.00s)
+        r91_addendum2_test.go:55: manual clear was mislabeled as client compatibility
+    --- FAIL: TestR91Addendum2NonWildcardBanClearYields/arena/preflight (0.13s)
+        r91_addendum2_test.go:55: manual clear was mislabeled as client compatibility
+FAIL
+FAIL	lol-loot-assistant	0.631s
+FAIL

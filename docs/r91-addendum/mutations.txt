@@ -1,0 +1,24 @@
+quota-short-return: KILLED
+quota-classification: KILLED
+duplicate-five-first: KILLED
+history-skeleton-flicker: KILLED
+roster-dom-replaced: KILLED
+rank-default: KILLED
+loading-probe-interval: KILLED
+match-persistence: KILLED
+memory-cache-counter: KILLED
+loading-grouping: KILLED
+loading-shape-sample: KILLED
+phase-not-attempted: KILLED
+playerlist-rejection-event: KILLED
+roster-rejection-event: KILLED
+loading-carryover: KILLED
+hover-cleared-takeover: KILLED
+hover-clear-lock-rejected: KILLED
+watch-save-phase: KILLED
+retryable-cache-ttl: KILLED
+arena-rank-restored: KILLED
+arena-first-row-offset: KILLED
+arena-damage-unit: KILLED
+arena-warning-restored: KILLED
+23/23 behavioral mutations killed

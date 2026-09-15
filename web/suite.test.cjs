@@ -230,6 +230,47 @@ test("1405 time unit is inside the field and immutable while seconds remain edit
   dom.window.close();
 });
 
+test("manual takeover stays visible beneath the relinquished champion", () => {
+  const { JSDOM } = require("../desktop/node_modules/jsdom");
+  const helpers = compile(["champSelectSideName", "champSelectChampionMeta", "champSelectChampionImage", "champSelectStatusCopy", "champSelectSlotsHTML"], { window: {}, escapeHTML });
+  const html = helpers.champSelectSlotsHTML("pick", [5, 804], 3, { pickStates: { 5: "manual-takeover", 804: "available" } }, { champions: [] });
+  const dom = new JSDOM(html);
+  const first = dom.window.document.querySelector('[data-cs-champion-id="5"]');
+  assert.equal(first.querySelector(".cs-champion-state").textContent, "玩家主动切换");
+  assert.match(first.querySelector(".cs-champion-state").title, /本轮已停止自动操作.*下一局恢复/);
+  assert.equal(first.classList.contains("is-live"), false);
+  assert.equal(dom.window.document.querySelector('[data-cs-champion-id="804"] .cs-champion-state').textContent, "可选");
+  dom.window.close();
+});
+
+test("pick show-then-lock edits a separate default ten-second lock wait", async () => {
+  const { JSDOM } = require("../desktop/node_modules/jsdom");
+  const config = { pick: { enabled: true, strategy: "show-then-lock", delayMs: 500 }, ban: {}, bench: {} };
+  const saved = [];
+  const helpers = compile(["renderChampSelectSideCard", "champSelectTimeInputHTML", "champSelectSideName", "bindChampSelectTimeInputs"], {
+    state: { champSelectCatalog: {} }, checked, champSelectPoolFor: () => [5], champSelectStrategyHTML: () => "", champSelectLaneTabsHTML: () => "", champSelectSlotsHTML: () => "",
+    champSelectSettings: () => ({ enabled: true }), champSelectSelectedConfig: () => config, toast() {}, saveChampSelect: async () => saved.push(true),
+  });
+  for (const groupId of ["ranked", "normal", "arena"]) {
+    const dom = new JSDOM(helpers.renderChampSelectSideCard("pick", { groupId, pickLimit: 5 }, config, {}));
+    const input = dom.window.document.querySelector('[data-cs-time="lock"]');
+    assert.equal(input.value, "10");
+    assert.match(input.getAttribute("aria-label"), /亮出后锁定等待/);
+    assert.equal(dom.window.document.querySelector("[data-cs-delay]").dataset.csDelayKey, "lockDelayMs");
+    dom.window.close();
+  }
+  const dom = new JSDOM(helpers.champSelectTimeInputHTML("lock", 10000));
+  helpers.bindChampSelectTimeInputs(dom.window.document.body);
+  const input = dom.window.document.querySelector("input");
+  input.value = "7.5";
+  input.dispatchEvent(new dom.window.Event("change"));
+  await new Promise(setImmediate);
+  assert.equal(config.pick.lockDelayMs, 7500);
+  assert.equal(config.pick.delayMs, 500, "changing lock wait must not delay initial hover");
+  assert.equal(saved.length, 1);
+  dom.window.close();
+});
+
 test("1505 timeline resolves champion names without changing delays, attempts or diagnostic IDs", () => {
   const catalog = { champions: [
     { id: 141, nameZh: "影流之镰", nameEn: "Kayn" },
@@ -319,13 +360,13 @@ test("1129 ban dialog saves and clears only shared pool without dropping migrati
   const definition = { groupId: "ranked", name: "排位", positions: ["top", "middle", "default"], banLimit: 5, pickLimit: 5 };
   const backup = { top: [11, 56] };
   const config = { ban: { champions: { default: [141] }, legacyLaneChampions: backup }, pick: { champions: { middle: [804] } } };
-  const state = { champSelectDialog: { side: "ban", lane: "default", draft: [141], query: "" }, champSelectPosition: "all" };
+  const state = { champSelectGroups: [definition], champSelectDialog: { group: "ranked", side: "ban", lane: "default", draft: [141], query: "" }, champSelectPosition: "all" };
   let saved = 0;
   const dom = new JSDOM('<div id="root"></div>');
   const root = dom.window.document.querySelector("#root");
   const helpers = compile(["renderChampSelectDialog", "bindChampSelectDialog", "champSelectSideName", "champSelectLaneName"], {
     state, roots: { champselect: root }, escapeHTML, champSelectSelectedDefinition: () => definition, champSelectSelectedConfig: () => config,
-    champSelectFilteredChampions: () => [], champSelectChampionMeta: () => ({ nameZh: "影流之镰" }), champSelectChampionImage: () => "", renderChampSelect: () => {}, saveChampSelect: async () => { saved++; },
+    champSelectFilteredChampions: () => [], champSelectChampionMeta: () => ({ nameZh: "影流之镰" }), champSelectChampionImage: () => "", updateChampSelectDialog: () => {}, closeChampSelectDialog: () => { state.champSelectDialog = null; }, champSelectSettings: () => ({ groups: { ranked: config } }), saveChampSelect: async () => { saved++; },
   });
   root.innerHTML = helpers.renderChampSelectDialog();
   assert.equal(root.querySelector("h3").textContent, "编辑禁用序列 · 排位");

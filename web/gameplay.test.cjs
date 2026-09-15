@@ -120,6 +120,8 @@ function functionSource(script, name) {
 }
 
 function compile(names, dependencies = {}, script = source) {
+  names = [...names];
+  if (!names.includes("overviewSupplementTarget") && names.some(name => functionSource(script, name).includes("overviewSupplementTarget("))) names.push("overviewSupplementTarget");
   dependencies = { riotTab: tab => tab?.region === "kr", ...dependencies };
   const keys = Object.keys(dependencies);
   return Function(...keys, `"use strict";\n${names.map((name) => functionSource(script, name)).join("\n")}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
@@ -287,7 +289,7 @@ test("R69 history rows distinguish unavailable failed empty and pending states",
   assert.match(failed, /读取失败/);
   assert.match(failed, /data-live-history-retry/);
   assert.match(render(false, "empty"), /该玩家当前模式暂无最近战绩/);
-  const pending = render(true, "empty");
+  const pending = render(true, "pending");
   assert.match(pending, /live-history-skeleton/);
   assert.doesNotMatch(pending, /未公开|读取失败|暂无最近战绩/);
 });

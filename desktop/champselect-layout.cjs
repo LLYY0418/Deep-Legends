@@ -58,6 +58,20 @@ exports.verify = async ({call, evaluate, output}) => {
   }
   await evaluate(`document.querySelector('.cs-dialog header [data-cs-dialog-close]').click()`);
   await waitFor(`!document.querySelector('.cs-dialog')`);
+  // Exercise the real runtime refresh/render path for manual bench takeover.
+  await evaluate(`{const base=window.fetch;window.fetch=async(input,init)=>{const response=await base(input,init);if(String(input)!=='/api/champselect/state')return response;const runtime=await response.json();return new Response(JSON.stringify({...runtime,groupId:'aram',benchEnabled:true,hasBanAction:false,activeBanId:0,activePickId:0,pickStates:{222:'manual-takeover'},records:[{at:new Date().toISOString(),kind:'warn',championId:222,message:'玩家主动切换，本轮已停止自动换人'}]}));};document.querySelector('[data-cs-group="aram"]').click();window.dispatchEvent(new CustomEvent('deep-legends:watch',{detail:'watch:canceled:champselect-bench'}));}`);
+  await waitFor(`document.querySelector('[data-cs-champion-id="222"] .cs-champion-state')?.textContent === '玩家主动切换'`);
+  await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+  await evaluate(`document.querySelector('[data-cs-champion-id="222"]').scrollIntoView({block:'center',behavior:'instant'})`);
+  await evaluate(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
+  const takeover = await evaluate(`(()=>{const slot=document.querySelector('[data-cs-champion-id="222"]');const label=slot.querySelector('.cs-champion-state');return {text:label.textContent,title:label.title,overflow:label.scrollWidth>label.clientWidth,active:slot.classList.contains('is-live'),lockDelay:document.querySelector('[data-cs-time="lock"]').value};})()`);
+  assert.equal(takeover.overflow,false);assert.equal(takeover.active,false);assert.equal(takeover.lockDelay,'10');assert.match(takeover.title,/本轮已停止自动操作/);
+  const takeoverShot=await call('Page.captureScreenshot',{format:'png'});
+  fs.writeFileSync(path.join(output,'champselect-manual-takeover.png'),Buffer.from(takeoverShot.data,'base64'));
+  for (const group of ['normal','arena']) {
+    await evaluate(`document.querySelector('[data-cs-group="${group}"]').click()`);
+    assert.equal(await evaluate(`document.querySelector('[data-cs-time="lock"]').value`),'10');
+  }
   fs.writeFileSync(path.join(output,'champselect-layout.json'),JSON.stringify({before,after,results},null,2));
   console.log('1505 champselect PASS: named records, real mouse swap, centered editable seconds + fixed unit, close icon, 3 viewport layouts');
 };

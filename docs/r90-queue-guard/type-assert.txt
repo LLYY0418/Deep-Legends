@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T14:19:34.660512+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:19:34.907616+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired"}
+{"Time":"2026-09-14T14:19:34.907661+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired","Output":"=== RUN   TestR90QueueGuardRequired\n"}
+{"Time":"2026-09-14T14:19:34.907696+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/type-assert"}
+{"Time":"2026-09-14T14:19:34.907699+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/type-assert","Output":"=== RUN   TestR90QueueGuardRequired/type-assert\n"}
+{"Time":"2026-09-14T14:19:34.908076+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/type-assert","Output":"    r90_queue_guard_test.go:51: missed R90 queue literal: type-assert\n"}
+{"Time":"2026-09-14T14:19:34.908126+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/type-assert","Output":"--- FAIL: TestR90QueueGuardRequired/type-assert (0.00s)\n"}
+{"Time":"2026-09-14T14:19:34.908137+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/type-assert","Elapsed":0}
+{"Time":"2026-09-14T14:19:34.908146+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired","Output":"--- FAIL: TestR90QueueGuardRequired (0.00s)\n"}
+{"Time":"2026-09-14T14:19:34.908148+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired","Elapsed":0}
+{"Time":"2026-09-14T14:19:34.908152+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:19:34.908396+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.248s\n"}
+{"Time":"2026-09-14T14:19:34.908409+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.248}

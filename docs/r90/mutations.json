@@ -1,0 +1,57 @@
+[
+  {
+    "id": "wrong-block-size",
+    "killed": true,
+    "test": "^TestR90AlliesVerifyAndRejectScrambledPlayerlist/false$"
+  },
+  {
+    "id": "removed-ally-check",
+    "killed": true,
+    "test": "^TestR90AlliesVerifyAndRejectScrambledPlayerlist/true$"
+  },
+  {
+    "id": "raw-identity-only",
+    "killed": true,
+    "test": "^TestR90RealShapeGroups$"
+  },
+  {
+    "id": "session-instead-of-playerlist",
+    "killed": true,
+    "test": "^TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries$"
+  },
+  {
+    "id": "guessed-mascots",
+    "killed": true,
+    "test": "^TestR90RealShapeGroups$"
+  },
+  {
+    "id": "incomplete-not-cached",
+    "killed": true,
+    "test": "^TestR90LiveSnapshotCacheLayersAndManualRefresh/false$"
+  },
+  {
+    "id": "complete-short-ttl",
+    "killed": true,
+    "test": "^TestR90LiveSnapshotCacheLayersAndManualRefresh/true$"
+  },
+  {
+    "id": "complete-always-false",
+    "killed": true,
+    "test": "R90 complete snapshots never"
+  },
+  {
+    "id": "no-retry-limit",
+    "killed": true,
+    "test": "R90 incomplete snapshots stop"
+  },
+  {
+    "id": "truth-partition-forced",
+    "killed": true,
+    "test": "^TestR90TruthDiagnosticSeparatesPartitionAndBlockIdentity/wrong$"
+  },
+  {
+    "id": "queue-literal",
+    "killed": true,
+    "test": "^TestR90QueueGuardScansNewGroupingModule$"
+  }
+]

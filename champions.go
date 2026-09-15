@@ -76,6 +76,10 @@ var (
 )
 
 type championProvider struct {
+	imageCache            *championDataCache
+	communityImageCache   *championDataCache
+	assetStats            assetFetchStats
+	imageWarm             imageWarmState
 	clientMu              sync.RWMutex
 	client                *http.Client
 	network               championNetworkSettings
@@ -548,7 +552,11 @@ func (p *championProvider) fetchWithMetadataCacheKey(ctx context.Context, host, 
 func (p *championProvider) fetchWithMetadataCacheKeyLoader(ctx context.Context, host, requestPath string, query url.Values, maxBytes int64, accept, explicitKey string, loader func(context.Context) ([]byte, error)) ([]byte, time.Time, error) {
 	started := time.Now()
 	ttl, staleFor, persistDisk := championCachePolicy(host, requestPath, accept)
-	if ttl <= 0 || p.cache == nil {
+	cache := p.cache
+	if strings.HasPrefix(accept, "image/") && p.imageCache != nil {
+		cache = p.imageCache
+	}
+	if ttl <= 0 || cache == nil {
 		data, err := loader(ctx)
 		fetchedAt := time.Time{}
 		cacheState := championCacheStateMiss
@@ -557,6 +565,7 @@ func (p *championProvider) fetchWithMetadataCacheKeyLoader(ctx context.Context, 
 		} else {
 			fetchedAt = started
 		}
+		recordAssetCacheState(ctx, cacheState)
 		p.reportChampionUpstream(host, accept, data, err, cacheState, started)
 		return data, fetchedAt, err
 	}
@@ -564,7 +573,8 @@ func (p *championProvider) fetchWithMetadataCacheKeyLoader(ctx context.Context, 
 	if key == "" {
 		key = championCacheKey(host, requestPath, query.Encode(), accept)
 	}
-	result, err := p.cache.loadWithStatus(ctx, key, ttl, staleFor, persistDisk, loader)
+	result, err := cache.loadWithStatus(ctx, key, ttl, staleFor, persistDisk, loader)
+	recordAssetCacheState(ctx, result.state)
 	observedErr := err
 	if observedErr == nil && result.upstreamErr != nil {
 		observedErr = result.upstreamErr
@@ -808,6 +818,7 @@ func writeArenaFirstPlacesError(w http.ResponseWriter, err error) {
 }
 
 func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
+	a.scheduleItemIconWarmup(false)
 	source := strings.TrimSpace(r.URL.Query().Get("source"))
 	requestPath := strings.TrimSpace(r.URL.Query().Get("path"))
 	host, ok := validateChampionAssetPath(source, requestPath)
@@ -815,7 +826,6 @@ func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid champion asset", http.StatusBadRequest)
 		return
 	}
-	const acceptImages = "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8"
 	provider := a.championDataProvider()
 	if source == "communitydragon" {
 		candidates := communityDragonChampionAssetCandidates(requestPath)
@@ -825,7 +835,7 @@ func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
 				writeChampionAssetImage(w, data)
 				return
 			}
-			data, err := provider.fetch(r.Context(), host, candidatePath, nil, championImageMax, acceptImages)
+			data, err := a.loadChampionRemoteAsset(r.Context(), provider, source, host, candidatePath)
 			if err == nil && writeChampionAssetImage(w, data) {
 				provider.reportAugmentIconFetch(requestPath, http.StatusOK, index, index > 0)
 				return
@@ -839,10 +849,10 @@ func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
 		writeChampionAssetImage(w, data)
 		return
 	}
-	data, err := provider.fetch(r.Context(), host, requestPath, nil, championImageMax, acceptImages)
+	data, err := a.loadChampionRemoteAsset(r.Context(), provider, source, host, requestPath)
 	if err != nil {
 		if fallbackHost, fallbackPath, ok := provider.championAssetFallback(source, requestPath); ok {
-			data, err = provider.fetch(r.Context(), fallbackHost, fallbackPath, nil, championImageMax, acceptImages)
+			data, err = a.loadChampionRemoteAsset(r.Context(), provider, "fallback", fallbackHost, fallbackPath)
 		}
 	}
 	if err != nil || !writeChampionAssetImage(w, data) {
@@ -1893,7 +1903,7 @@ func (p *championProvider) loadArenaRankings(ctx context.Context) (championRanki
 	if err != nil {
 		return championRankingResponse{}, err
 	}
-	return parseYourGGArenaRankings(data, at)
+	return parseYourGGArenaRankings(data, at, p.diag)
 }
 
 func ratePercent(value float64) float64 {

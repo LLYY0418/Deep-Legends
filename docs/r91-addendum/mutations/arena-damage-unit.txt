@@ -1,0 +1,13 @@
+CDP connected
+AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /万/. Input:
+
+'伤害1.6万承伤15137'
+
+    at main (/Users/ly/personal/personal-work/deep-legends/desktop/r91-addendum-browser.cjs:52:76) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: '伤害1.6万承伤15137',
+  expected: /万/,
+  operator: 'doesNotMatch',
+  diff: 'simple'
+}

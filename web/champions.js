@@ -2393,6 +2393,15 @@
     });
   }
 
+  window.addEventListener("deep-legends:open-champion", event => {
+    const detail = event.detail || {};
+    const championId = normalizeChampionDetailID(detail.championId);
+    if (!championId || !/^[a-z0-9-]+$/.test(String(detail.key || ""))) return;
+    state.mode = "ranked";
+    state.playerDetour = false;
+    void openDetail({ championId, key: detail.key, position: normalizePosition(detail.position) });
+  });
+
   window.addEventListener("pagehide", flushChampionSearch);
   window.deepLegendsChampionSearch = Object.freeze({ scoreOption: scoreChampionSelectOption });
   window.deepLegendsChampionAsset = Object.freeze({ imageHTML: assetImage, imageURL });

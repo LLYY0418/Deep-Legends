@@ -1,0 +1,36 @@
+{
+  "commands": [
+    {
+      "command": "go test -run TestR87ArenaLiteralBoundary|TestR88QueueGuard|TestR89QueueGuard|TestR90QueueGuard -count=1 .",
+      "exit": 0,
+      "output": "after.txt"
+    },
+    {
+      "command": "go test -race -run TestR87ArenaLiteralBoundary|TestR88QueueGuard|TestR89QueueGuard|TestR90QueueGuard -count=1 .",
+      "exit": 0,
+      "output": "race.txt"
+    },
+    {
+      "command": "go vet ./...",
+      "exit": 0,
+      "output": "vet.txt"
+    },
+    {
+      "command": "git diff --check",
+      "exit": 0
+    },
+    {
+      "command": "gofmt -l r88_queue_guard_test.go r90_queue_guard_test.go",
+      "exit": 0,
+      "unformatted_files": []
+    }
+  ],
+  "r90_subtests_passed": 49,
+  "mutations_killed": 22,
+  "sha256": {
+    "r88_queue_guard_test.go": "eceb128b9d2077f5ab2dd46055c057c2100bc81354bb7c299e7c52075e34f983",
+    "r90_queue_guard_test.go": "d25106a532c9c7038fd9639036fa03375ad7b181301eca96d57fdcddd25c493c",
+    "scripts/r90-queue-guard-mutations.py": "b9717d1eca6d0ec6f66a8024fb9c0a0a280b50b1b051fcd0c84a970c3f72ab36"
+  },
+  "guard_before_sha256": "f82069c4342157347cfcb06e82d6f10ade9b0a75f620ac0df7cb469ab2a35f1f"
+}

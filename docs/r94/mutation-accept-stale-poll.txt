@@ -1,0 +1,28 @@
+✖ R94 a delayed poll cannot reverse a newer SSE identity or phase (62.286792ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 431.914334
+
+✖ failing tests:
+
+test at web/r94.test.cjs:133:1
+✖ R94 a delayed poll cannot reverse a newer SSE identity or phase (62.286792ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  90 !== 91
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r94.test.cjs:140:62)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 90,
+    expected: 91,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

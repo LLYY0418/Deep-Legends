@@ -56,7 +56,7 @@ func assertSGPRequestObservation(t *testing.T, event map[string]any, route strin
 	allowedKeys := map[string]bool{
 		"event": true, "method": true, "route": true, "path": true,
 		"http_status": true, "duration_ms": true, "retried": true, "token_kind": true, "body_bytes": true,
-		"error_kind": true, "read_failed": true, "parse_failed": true, "payload_prefix_shape": true, "payload_sample_bytes": true,
+		"error_kind": true, "cancel_scope": true, "read_failed": true, "parse_failed": true, "payload_prefix_shape": true, "payload_sample_bytes": true,
 		"start_index": true, "count": true, "tags": true,
 		"credential_id":    true,
 		"auth_error_class": true, "auth_error_classes": true, "auth_body_shape": true, "auth_body_truncated": true,
@@ -68,6 +68,11 @@ func assertSGPRequestObservation(t *testing.T, event map[string]any, route strin
 	for key := range event {
 		if !allowedKeys[key] {
 			t.Fatalf("SGP request observation used unreviewed field %q: %#v", key, event)
+		}
+	}
+	if scope, ok := event["cancel_scope"]; ok {
+		if scope != "client-canceled" && scope != "budget-timeout" && scope != "loader-canceled" && scope != "request-canceled" && scope != "transport" {
+			t.Fatalf("unexpected cancellation scope: %v", scope)
 		}
 	}
 	for _, key := range []string{"duration_ms", "retried", "token_kind", "body_bytes", "path"} {

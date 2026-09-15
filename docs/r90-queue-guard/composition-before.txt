@@ -1,0 +1,10 @@
+--- FAIL: TestR90QueueGuardCombinations (0.12s)
+    --- FAIL: TestR90QueueGuardCombinations/range-cast-target (0.00s)
+        r90_queue_guard_test.go:107: missed combined queue literal: range-cast-target
+    --- FAIL: TestR90QueueGuardCombinations/range-string-target (0.11s)
+        r90_queue_guard_test.go:107: missed combined queue literal: range-string-target
+    --- FAIL: TestR90QueueGuardCombinations/range-arithmetic-target (0.00s)
+        r90_queue_guard_test.go:107: missed combined queue literal: range-arithmetic-target
+FAIL
+FAIL	lol-loot-assistant	1.490s
+FAIL

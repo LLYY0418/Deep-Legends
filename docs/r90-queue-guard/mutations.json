@@ -1,0 +1,184 @@
+{
+  "guard_sha256": "eceb128b9d2077f5ab2dd46055c057c2100bc81354bb7c299e7c52075e34f983",
+  "baseline_passed": true,
+  "restored_passed": true,
+  "source_unchanged": true,
+  "mutations": [
+    {
+      "mutation": "literal-map",
+      "test": "TestR90QueueGuardRequired/literal-map",
+      "exit": 1,
+      "killed": true,
+      "old": "if isQueue(n.Index) && collectionOf(n.X)&queueGuardNumericKeys != 0 {",
+      "new": "if false && isQueue(n.Index) && collectionOf(n.X)&queueGuardNumericKeys != 0 {"
+    },
+    {
+      "mutation": "handler-map",
+      "test": "TestR90QueueGuardRequired/handler-map",
+      "exit": 1,
+      "killed": true,
+      "old": "return collections[e.Obj]",
+      "new": "return 0"
+    },
+    {
+      "mutation": "range-slice",
+      "test": "TestR90QueueGuardRequired/range-slice",
+      "exit": 1,
+      "killed": true,
+      "old": "facts := collectionOf(n.X)",
+      "new": "facts := queueGuardCollection(0)"
+    },
+    {
+      "mutation": "type-assert",
+      "test": "TestR90QueueGuardRequired/type-assert",
+      "exit": 1,
+      "killed": true,
+      "old": "case *ast.TypeAssertExpr:\n\t\t\treturn isQueue(e.X)",
+      "new": "case *ast.TypeAssertExpr:\n\t\t\treturn false"
+    },
+    {
+      "mutation": "pointer",
+      "test": "TestR90QueueGuardExtra/pointer",
+      "exit": 1,
+      "killed": true,
+      "old": "case *ast.StarExpr:\n\t\t\treturn isQueue(e.X)",
+      "new": "case *ast.StarExpr:\n\t\t\treturn false"
+    },
+    {
+      "mutation": "closure-capture",
+      "test": "TestR90QueueGuardExtra/closure-capture",
+      "exit": 1,
+      "killed": true,
+      "old": "var found []token.Pos\n\tast.Inspect(f, func(n ast.Node) bool {\n\t\tswitch n := n.(type) {",
+      "new": "var found []token.Pos\n\tast.Inspect(f, func(n ast.Node) bool {\n\t\tswitch n := n.(type) {\n\t\tcase *ast.FuncLit: return false"
+    },
+    {
+      "mutation": "type-switch",
+      "test": "TestR90QueueGuardExtra/type-switch",
+      "exit": 1,
+      "killed": true,
+      "old": "case *ast.TypeAssertExpr:\n\t\t\treturn isQueue(e.X)",
+      "new": "case *ast.TypeAssertExpr:\n\t\t\treturn false"
+    },
+    {
+      "mutation": "iota-inheritance",
+      "test": "TestR90QueueGuardExtra/iota-inheritance",
+      "exit": 1,
+      "killed": true,
+      "old": "ok && typed.Value != nil",
+      "new": "ok && false && typed.Value != nil"
+    },
+    {
+      "mutation": "slice-membership",
+      "test": "TestR90QueueGuardExtra/slice-membership",
+      "exit": 1,
+      "killed": true,
+      "old": "case \"slices.Contains\",",
+      "new": "case \"ignored.Contains\","
+    },
+    {
+      "mutation": "assert-comma-ok",
+      "test": "TestR90QueueGuardCombinations/assert-comma-ok",
+      "exit": 1,
+      "killed": true,
+      "old": "len(lhs) == 2 && len(rhs) == 1",
+      "new": "false && len(lhs) == 2 && len(rhs) == 1"
+    },
+    {
+      "mutation": "range-map-key",
+      "test": "TestR90QueueGuardCombinations/range-map-key",
+      "exit": 1,
+      "killed": true,
+      "old": "bindFacts(n.Key, facts&queueGuardNumericKeys != 0, facts&queueGuardQueueKeys != 0)",
+      "new": "bindFacts(n.Key, false, false)"
+    },
+    {
+      "mutation": "generic-membership-alias",
+      "test": "TestR90QueueGuardCombinations/membership-alias",
+      "exit": 1,
+      "killed": true,
+      "old": "return functionName(e.X) // e.g. slices.Contains[[]int64, int64].",
+      "new": "return \"\" // Disabled generic function alias."
+    },
+    {
+      "mutation": "range-cast-target",
+      "test": "TestR90QueueGuardCombinations/range-cast-target",
+      "exit": 1,
+      "killed": true,
+      "old": "return isInteger(valueArgument(e))",
+      "new": "return false"
+    },
+    {
+      "mutation": "range-string-target",
+      "test": "TestR90QueueGuardCombinations/range-string-target",
+      "exit": 1,
+      "killed": true,
+      "old": "return isInteger(valueArgument(e))",
+      "new": "return false"
+    },
+    {
+      "mutation": "range-arithmetic-target",
+      "test": "TestR90QueueGuardCombinations/range-arithmetic-target",
+      "exit": 1,
+      "killed": true,
+      "old": "queueGuardArithmetic(e.Op) && isInteger(e.X) && isInteger(e.Y)",
+      "new": "false && queueGuardArithmetic(e.Op) && isInteger(e.X) && isInteger(e.Y)"
+    },
+    {
+      "mutation": "original-direct",
+      "test": "TestR88QueueGuardMutations",
+      "exit": 1,
+      "killed": true,
+      "old": "return constant.ToInt(value).Kind() == constant.Int",
+      "new": "return constant.ToInt(value).Kind() == constant.Int && value.ExactString() != \"3110\""
+    },
+    {
+      "mutation": "original-alias",
+      "test": "TestR88QueueGuardMutations",
+      "exit": 1,
+      "killed": true,
+      "old": "e.Obj != nil && aliases[e.Obj]",
+      "new": "false && e.Obj != nil && aliases[e.Obj]"
+    },
+    {
+      "mutation": "original-switch",
+      "test": "TestR88QueueGuardMutations",
+      "exit": 1,
+      "killed": true,
+      "old": "if isQueue(n.Tag) {",
+      "new": "if false && isQueue(n.Tag) {"
+    },
+    {
+      "mutation": "numeric-string",
+      "test": "TestR89QueueGuardEquivalentMutations",
+      "exit": 1,
+      "killed": true,
+      "old": "return err == nil",
+      "new": "return err == nil && false"
+    },
+    {
+      "mutation": "stringify-call",
+      "test": "TestR89QueueGuardEquivalentMutations",
+      "exit": 1,
+      "killed": true,
+      "old": "case *ast.CallExpr:\n\t\t\tfor _, arg := range e.Args {",
+      "new": "case *ast.CallExpr:\n\t\t\tif len(e.Args) != 1 { return false }; for _, arg := range e.Args {"
+    },
+    {
+      "mutation": "reassigned-literal",
+      "test": "TestR89QueueGuardEquivalentMutations",
+      "exit": 1,
+      "killed": true,
+      "old": "ok && numericAliases[id.Obj]",
+      "new": "ok && false && numericAliases[id.Obj]"
+    },
+    {
+      "mutation": "equality-helper",
+      "test": "TestR89QueueGuardEquivalentMutations",
+      "exit": 1,
+      "killed": true,
+      "old": "case \"reflect.DeepEqual\",",
+      "new": "case \"ignored.DeepEqual\","
+    }
+  ]
+}

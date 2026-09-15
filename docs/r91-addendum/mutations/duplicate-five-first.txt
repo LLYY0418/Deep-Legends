@@ -1,0 +1,32 @@
+TAP version 13
+# Subtest: R91 addendum stream displays five before completion with exactly one count-20 request
+not ok 1 - R91 addendum stream displays five before completion with exactly one count-20 request
+  ---
+  duration_ms: 59.728291
+  type: 'test'
+  location: '/sessions/youthful-determined-volta/mnt/deep-legends/web/r91-addendum.test.cjs:49:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    5 !== 20
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 20
+  actual: 5
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/sessions/youthful-determined-volta/mnt/deep-legends/web/r91-addendum.test.cjs:54:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2188.407626

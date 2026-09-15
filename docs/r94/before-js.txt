@@ -1,0 +1,141 @@
+✖ R94 same-phase live responses with changed gameId invoke the transition before replacement (62.20775ms)
+✖ R94 unchanged phase and gameId preserve content and recommendation generation (15.007708ms)
+✖ R94 identity polling catches a game jump even when all intermediate phases were missed (14.390958ms)
+✖ R94 SSE game identity aborts a pending old game; stale replacement data cannot undo it (9.760584ms)
+✖ R94 unknown IDs do not clear a known game and diagnostics distinguish first observations (7.74575ms)
+✖ R94 same-game phase advance labels the retained snapshot and rejects a late selection response (8.112833ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 0
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 716.213917
+
+✖ failing tests:
+
+test at web/r94.test.cjs:53:1
+✖ R94 same-phase live responses with changed gameId invoke the transition before replacement (62.20775ms)
+  AssertionError [ERR_ASSERTION]: gameId jump must pass through the R91 transition
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r94.test.cjs:58:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at web/r94.test.cjs:67:1
+✖ R94 unchanged phase and gameId preserve content and recommendation generation (15.007708ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(h.observations.some(row => row.reason === "received" && row.gameIdComparison === "same"))
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r94.test.cjs:74:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at web/r94.test.cjs:78:1
+✖ R94 identity polling catches a game jump even when all intermediate phases were missed (14.390958ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + {
+  +   available: true,
+  +   currentChampionId: 90,
+  +   gameId: 90,
+  +   phase: 'InProgress',
+  +   players: [
+  +     {
+  +       championId: 90,
+  +       historyState: 'ok',
+  +       isCurrent: true
+  +     }
+  +   ]
+  + }
+  - null
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r94.test.cjs:84:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { gameId: 90, phase: 'InProgress', available: true, currentChampionId: 90, players: [ [Object] ] },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at web/r94.test.cjs:94:1
+✖ R94 SSE game identity aborts a pending old game; stale replacement data cannot undo it (9.760584ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r94.test.cjs:99:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at web/r94.test.cjs:111:1
+✖ R94 unknown IDs do not clear a known game and diagnostics distinguish first observations (7.74575ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(h.observations.some(row => row.gameIdComparison === "unavailable"))
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r94.test.cjs:116:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at web/r94.test.cjs:122:1
+✖ R94 same-game phase advance labels the retained snapshot and rejects a late selection response (8.112833ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /同步当前对局/. Input:
+  
+  '正在刷新…刷新recommendation-90'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r94.test.cjs:127:57)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '正在刷新…刷新recommendation-90',
+    expected: /同步当前对局/,
+    operator: 'match',
+    diff: 'simple'
+  }

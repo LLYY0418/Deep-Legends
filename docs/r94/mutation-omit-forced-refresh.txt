@@ -1,0 +1,31 @@
+✖ R94 identity polling catches a game jump even when all intermediate phases were missed (64.925792ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 417.809542
+
+✖ failing tests:
+
+test at web/r94.test.cjs:78:1
+✖ R94 identity polling catches a game jump even when all intermediate phases were missed (64.925792ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '/api/gameplay/live'
+  - '/api/gameplay/live?refresh=1'
+                       ^
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r94.test.cjs:85:28)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '/api/gameplay/live',
+    expected: '/api/gameplay/live?refresh=1',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

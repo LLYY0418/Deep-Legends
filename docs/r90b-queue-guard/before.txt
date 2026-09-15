@@ -1,0 +1,82 @@
+{"Time":"2026-09-14T14:59:27.369044+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:59:28.218347+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired"}
+{"Time":"2026-09-14T14:59:28.2184+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"=== RUN   TestR90BQueueGuardRequired\n"}
+{"Time":"2026-09-14T14:59:28.218585+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-select"}
+{"Time":"2026-09-14T14:59:28.218595+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-select","Output":"=== RUN   TestR90BQueueGuardRequired/channel-select\n"}
+{"Time":"2026-09-14T14:59:28.218841+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-select","Output":"    r90b_queue_guard_test.go:17: missed R90B queue literal: channel-select\n"}
+{"Time":"2026-09-14T14:59:28.218859+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-select","Output":"--- FAIL: TestR90BQueueGuardRequired/channel-select (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.218865+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-select","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.218876+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-receive"}
+{"Time":"2026-09-14T14:59:28.21888+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-receive","Output":"=== RUN   TestR90BQueueGuardRequired/channel-receive\n"}
+{"Time":"2026-09-14T14:59:28.218916+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-receive","Output":"    r90b_queue_guard_test.go:17: missed R90B queue literal: channel-receive\n"}
+{"Time":"2026-09-14T14:59:28.218923+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-receive","Output":"--- FAIL: TestR90BQueueGuardRequired/channel-receive (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.218927+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-receive","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.218931+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/struct-field"}
+{"Time":"2026-09-14T14:59:28.218935+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/struct-field","Output":"=== RUN   TestR90BQueueGuardRequired/struct-field\n"}
+{"Time":"2026-09-14T14:59:28.218982+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/struct-field","Output":"    r90b_queue_guard_test.go:17: missed R90B queue literal: struct-field\n"}
+{"Time":"2026-09-14T14:59:28.218987+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/struct-field","Output":"--- FAIL: TestR90BQueueGuardRequired/struct-field (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.218992+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/struct-field","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.218996+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/json-marshal"}
+{"Time":"2026-09-14T14:59:28.219+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/json-marshal","Output":"=== RUN   TestR90BQueueGuardRequired/json-marshal\n"}
+{"Time":"2026-09-14T14:59:28.281353+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/json-marshal","Output":"    r90b_queue_guard_test.go:17: missed R90B queue literal: json-marshal\n"}
+{"Time":"2026-09-14T14:59:28.281388+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/json-marshal","Output":"--- FAIL: TestR90BQueueGuardRequired/json-marshal (0.06s)\n"}
+{"Time":"2026-09-14T14:59:28.281419+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/json-marshal","Elapsed":0.06}
+{"Time":"2026-09-14T14:59:28.281442+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/binary-buffer"}
+{"Time":"2026-09-14T14:59:28.281447+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/binary-buffer","Output":"=== RUN   TestR90BQueueGuardRequired/binary-buffer\n"}
+{"Time":"2026-09-14T14:59:28.375319+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/binary-buffer","Output":"    r90b_queue_guard_test.go:17: missed R90B queue literal: binary-buffer\n"}
+{"Time":"2026-09-14T14:59:28.37535+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/binary-buffer","Output":"--- FAIL: TestR90BQueueGuardRequired/binary-buffer (0.09s)\n"}
+{"Time":"2026-09-14T14:59:28.375368+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/binary-buffer","Elapsed":0.09}
+{"Time":"2026-09-14T14:59:28.375375+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/generic-comparator"}
+{"Time":"2026-09-14T14:59:28.375379+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/generic-comparator","Output":"=== RUN   TestR90BQueueGuardRequired/generic-comparator\n"}
+{"Time":"2026-09-14T14:59:28.375457+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/generic-comparator","Output":"    r90b_queue_guard_test.go:17: missed R90B queue literal: generic-comparator\n"}
+{"Time":"2026-09-14T14:59:28.375464+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/generic-comparator","Output":"--- FAIL: TestR90BQueueGuardRequired/generic-comparator (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.375469+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/generic-comparator","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.375478+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"--- FAIL: TestR90BQueueGuardRequired (0.16s)\n"}
+{"Time":"2026-09-14T14:59:28.375483+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Elapsed":0.16}
+{"Time":"2026-09-14T14:59:28.375487+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows"}
+{"Time":"2026-09-14T14:59:28.375491+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows","Output":"=== RUN   TestR90BQueueGuardAllowsLegalFlows\n"}
+{"Time":"2026-09-14T14:59:28.375496+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/channel-unrelated"}
+{"Time":"2026-09-14T14:59:28.375499+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/channel-unrelated","Output":"=== RUN   TestR90BQueueGuardAllowsLegalFlows/channel-unrelated\n"}
+{"Time":"2026-09-14T14:59:28.375551+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/channel-unrelated","Output":"--- PASS: TestR90BQueueGuardAllowsLegalFlows/channel-unrelated (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.375556+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/channel-unrelated","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.37556+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/channel-registry"}
+{"Time":"2026-09-14T14:59:28.375564+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/channel-registry","Output":"=== RUN   TestR90BQueueGuardAllowsLegalFlows/channel-registry\n"}
+{"Time":"2026-09-14T14:59:28.375621+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/channel-registry","Output":"--- PASS: TestR90BQueueGuardAllowsLegalFlows/channel-registry (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.37565+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/channel-registry","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.375655+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/struct-other-field"}
+{"Time":"2026-09-14T14:59:28.375659+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/struct-other-field","Output":"=== RUN   TestR90BQueueGuardAllowsLegalFlows/struct-other-field\n"}
+{"Time":"2026-09-14T14:59:28.375687+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/struct-other-field","Output":"--- PASS: TestR90BQueueGuardAllowsLegalFlows/struct-other-field (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.375692+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/struct-other-field","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.375696+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/struct-other-type"}
+{"Time":"2026-09-14T14:59:28.3757+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/struct-other-type","Output":"=== RUN   TestR90BQueueGuardAllowsLegalFlows/struct-other-type\n"}
+{"Time":"2026-09-14T14:59:28.375753+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/struct-other-type","Output":"--- PASS: TestR90BQueueGuardAllowsLegalFlows/struct-other-type (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.375759+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/struct-other-type","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.375764+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/struct-registry"}
+{"Time":"2026-09-14T14:59:28.375767+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/struct-registry","Output":"=== RUN   TestR90BQueueGuardAllowsLegalFlows/struct-registry\n"}
+{"Time":"2026-09-14T14:59:28.375806+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/struct-registry","Output":"--- PASS: TestR90BQueueGuardAllowsLegalFlows/struct-registry (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.37581+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/struct-registry","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.375815+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/json-unrelated"}
+{"Time":"2026-09-14T14:59:28.375818+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/json-unrelated","Output":"=== RUN   TestR90BQueueGuardAllowsLegalFlows/json-unrelated\n"}
+{"Time":"2026-09-14T14:59:28.376529+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/json-unrelated","Output":"--- PASS: TestR90BQueueGuardAllowsLegalFlows/json-unrelated (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.376534+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/json-unrelated","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.376538+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/json-error-only"}
+{"Time":"2026-09-14T14:59:28.376542+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/json-error-only","Output":"=== RUN   TestR90BQueueGuardAllowsLegalFlows/json-error-only\n"}
+{"Time":"2026-09-14T14:59:28.377535+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/json-error-only","Output":"--- PASS: TestR90BQueueGuardAllowsLegalFlows/json-error-only (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.377555+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/json-error-only","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.377559+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/binary-unrelated"}
+{"Time":"2026-09-14T14:59:28.377563+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/binary-unrelated","Output":"=== RUN   TestR90BQueueGuardAllowsLegalFlows/binary-unrelated\n"}
+{"Time":"2026-09-14T14:59:28.378039+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/binary-unrelated","Output":"--- PASS: TestR90BQueueGuardAllowsLegalFlows/binary-unrelated (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.378045+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/binary-unrelated","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.37805+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/generic-unrelated"}
+{"Time":"2026-09-14T14:59:28.378054+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/generic-unrelated","Output":"=== RUN   TestR90BQueueGuardAllowsLegalFlows/generic-unrelated\n"}
+{"Time":"2026-09-14T14:59:28.378128+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/generic-unrelated","Output":"--- PASS: TestR90BQueueGuardAllowsLegalFlows/generic-unrelated (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.378135+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/generic-unrelated","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.37814+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/generic-registry"}
+{"Time":"2026-09-14T14:59:28.378144+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/generic-registry","Output":"=== RUN   TestR90BQueueGuardAllowsLegalFlows/generic-registry\n"}
+{"Time":"2026-09-14T14:59:28.378199+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/generic-registry","Output":"--- PASS: TestR90BQueueGuardAllowsLegalFlows/generic-registry (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.378204+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows/generic-registry","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.378209+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows","Output":"--- PASS: TestR90BQueueGuardAllowsLegalFlows (0.00s)\n"}
+{"Time":"2026-09-14T14:59:28.378213+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR90BQueueGuardAllowsLegalFlows","Elapsed":0}
+{"Time":"2026-09-14T14:59:28.378217+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:59:28.378608+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t1.009s\n"}
+{"Time":"2026-09-14T14:59:28.378625+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":1.01}

@@ -1,0 +1,486 @@
+[
+  {
+    "label": "cold",
+    "wall_ms": 1169.1373330540955,
+    "count": 39,
+    "bytes": 705907,
+    "rows": [
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/0.jpg",
+        "status": 200,
+        "bytes": 7885,
+        "ms": 292.76558302808553
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/1.jpg",
+        "status": 200,
+        "bytes": 6351,
+        "ms": 336.81045891717076
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/2.jpg",
+        "status": 200,
+        "bytes": 6285,
+        "ms": 309.66420797631145
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/3.jpg",
+        "status": 200,
+        "bytes": 5542,
+        "ms": 327.59050000458956
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/4.jpg",
+        "status": 200,
+        "bytes": 6722,
+        "ms": 300.4614170640707
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/5.jpg",
+        "status": 200,
+        "bytes": 6982,
+        "ms": 318.3151250705123
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/6.jpg",
+        "status": 200,
+        "bytes": 4214,
+        "ms": 93.41179102193564
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/7.jpg",
+        "status": 200,
+        "bytes": 16804,
+        "ms": 93.06191594805568
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/8.jpg",
+        "status": 200,
+        "bytes": 6676,
+        "ms": 92.26674993988127
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/9.jpg",
+        "status": 200,
+        "bytes": 6654,
+        "ms": 93.04004197474569
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/10.jpg",
+        "status": 200,
+        "bytes": 7657,
+        "ms": 92.10916701704264
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/11.jpg",
+        "status": 200,
+        "bytes": 6092,
+        "ms": 90.18237493000925
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/12.jpg",
+        "status": 200,
+        "bytes": 6492,
+        "ms": 88.03854195866734
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/13.jpg",
+        "status": 200,
+        "bytes": 6112,
+        "ms": 89.01966700796038
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/14.jpg",
+        "status": 200,
+        "bytes": 6639,
+        "ms": 95.99283302668482
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/15.jpg",
+        "status": 200,
+        "bytes": 6235,
+        "ms": 96.63375001400709
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/16.jpg",
+        "status": 200,
+        "bytes": 5688,
+        "ms": 95.92274995520711
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/17.jpg",
+        "status": 200,
+        "bytes": 7031,
+        "ms": 98.22054102551192
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/18.jpg",
+        "status": 200,
+        "bytes": 5992,
+        "ms": 221.45920805633068
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/19.jpg",
+        "status": 200,
+        "bytes": 6375,
+        "ms": 170.6159170717001
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_boost.png",
+        "status": 200,
+        "bytes": 4532,
+        "ms": 165.8806250197813
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_exhaust.png",
+        "status": 200,
+        "bytes": 4427,
+        "ms": 176.60666699521244
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_flash.png",
+        "status": 200,
+        "bytes": 4574,
+        "ms": 187.8871249500662
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_haste.png",
+        "status": 200,
+        "bytes": 3834,
+        "ms": 148.58791697770357
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_heal.png",
+        "status": 200,
+        "bytes": 4190,
+        "ms": 87.18475000932813
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_smite.png",
+        "status": 200,
+        "bytes": 4636,
+        "ms": 86.6657089209184
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_Teleport_New.png",
+        "status": 200,
+        "bytes": 4352,
+        "ms": 85.90841700788587
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/SummonerIgnite.png",
+        "status": 200,
+        "bytes": 4348,
+        "ms": 82.59195904247463
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/SummonerBarrier.png",
+        "status": 200,
+        "bytes": 4639,
+        "ms": 98.0469579808414
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Precision/PressTheAttack/PressTheAttack.png",
+        "status": 200,
+        "bytes": 84222,
+        "ms": 176.41812504734844
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Precision/LethalTempo/LethalTempoTemp.png",
+        "status": 200,
+        "bytes": 47889,
+        "ms": 296.7562499688938
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Precision/FleetFootwork/FleetFootwork.png",
+        "status": 200,
+        "bytes": 73107,
+        "ms": 296.0040000034496
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Precision/Conqueror/Conqueror.png",
+        "status": 200,
+        "bytes": 42737,
+        "ms": 300.80104095395654
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Domination/Electrocute/Electrocute.png",
+        "status": 200,
+        "bytes": 49371,
+        "ms": 285.8760840026662
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Domination/DarkHarvest/DarkHarvest.png",
+        "status": 200,
+        "bytes": 44308,
+        "ms": 283.3676249720156
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Sorcery/SummonAery/SummonAery.png",
+        "status": 200,
+        "bytes": 41453,
+        "ms": 187.4525840394199
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Sorcery/ArcaneComet/ArcaneComet.png",
+        "status": 200,
+        "bytes": 37258,
+        "ms": 100.15845799352974
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Resolve/GraspOfTheUndying/GraspOfTheUndying.png",
+        "status": 200,
+        "bytes": 67649,
+        "ms": 105.18341697752476
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Inspiration/FirstStrike/FirstStrike.png",
+        "status": 200,
+        "bytes": 39953,
+        "ms": 107.33837506268173
+      }
+    ]
+  },
+  {
+    "label": "restart",
+    "wall_ms": 18.44675000756979,
+    "count": 39,
+    "bytes": 705907,
+    "rows": [
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/0.jpg",
+        "status": 200,
+        "bytes": 7885,
+        "ms": 2.378000062890351
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/1.jpg",
+        "status": 200,
+        "bytes": 6351,
+        "ms": 3.33724997472018
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/2.jpg",
+        "status": 200,
+        "bytes": 6285,
+        "ms": 2.6820419589057565
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/3.jpg",
+        "status": 200,
+        "bytes": 5542,
+        "ms": 3.6077089607715607
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/4.jpg",
+        "status": 200,
+        "bytes": 6722,
+        "ms": 3.097458044067025
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/5.jpg",
+        "status": 200,
+        "bytes": 6982,
+        "ms": 1.7950419569388032
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/6.jpg",
+        "status": 200,
+        "bytes": 4214,
+        "ms": 2.2481250343844295
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/7.jpg",
+        "status": 200,
+        "bytes": 16804,
+        "ms": 3.3607910154387355
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/8.jpg",
+        "status": 200,
+        "bytes": 6676,
+        "ms": 2.4677079636603594
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/9.jpg",
+        "status": 200,
+        "bytes": 6654,
+        "ms": 1.9410420209169388
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/10.jpg",
+        "status": 200,
+        "bytes": 7657,
+        "ms": 2.5255419313907623
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/11.jpg",
+        "status": 200,
+        "bytes": 6092,
+        "ms": 2.814791980199516
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/12.jpg",
+        "status": 200,
+        "bytes": 6492,
+        "ms": 2.476042020134628
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/13.jpg",
+        "status": 200,
+        "bytes": 6112,
+        "ms": 1.6002919292077422
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/14.jpg",
+        "status": 200,
+        "bytes": 6639,
+        "ms": 2.5212500477209687
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/15.jpg",
+        "status": 200,
+        "bytes": 6235,
+        "ms": 2.3029170697554946
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/16.jpg",
+        "status": 200,
+        "bytes": 5688,
+        "ms": 1.8675420433282852
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/17.jpg",
+        "status": 200,
+        "bytes": 7031,
+        "ms": 1.7537910025566816
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/18.jpg",
+        "status": 200,
+        "bytes": 5992,
+        "ms": 1.9384169718250632
+      },
+      {
+        "path": "/lol-game-data/assets/v1/profile-icons/19.jpg",
+        "status": 200,
+        "bytes": 6375,
+        "ms": 2.5624589761719108
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_boost.png",
+        "status": 200,
+        "bytes": 4532,
+        "ms": 1.9319580169394612
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_exhaust.png",
+        "status": 200,
+        "bytes": 4427,
+        "ms": 1.5316249337047338
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_flash.png",
+        "status": 200,
+        "bytes": 4574,
+        "ms": 2.5954170851036906
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_haste.png",
+        "status": 200,
+        "bytes": 3834,
+        "ms": 1.6549580032005906
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_heal.png",
+        "status": 200,
+        "bytes": 4190,
+        "ms": 1.5511249657720327
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_smite.png",
+        "status": 200,
+        "bytes": 4636,
+        "ms": 2.3662090534344316
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_Teleport_New.png",
+        "status": 200,
+        "bytes": 4352,
+        "ms": 1.7784580122679472
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/SummonerIgnite.png",
+        "status": 200,
+        "bytes": 4348,
+        "ms": 3.3713330049067736
+      },
+      {
+        "path": "/lol-game-data/assets/DATA/Spells/Icons2D/SummonerBarrier.png",
+        "status": 200,
+        "bytes": 4639,
+        "ms": 3.5979589447379112
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Precision/PressTheAttack/PressTheAttack.png",
+        "status": 200,
+        "bytes": 84222,
+        "ms": 3.2415420282632113
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Precision/LethalTempo/LethalTempoTemp.png",
+        "status": 200,
+        "bytes": 47889,
+        "ms": 1.8896670080721378
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Precision/FleetFootwork/FleetFootwork.png",
+        "status": 200,
+        "bytes": 73107,
+        "ms": 3.320916905067861
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Precision/Conqueror/Conqueror.png",
+        "status": 200,
+        "bytes": 42737,
+        "ms": 3.7260419921949506
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Domination/Electrocute/Electrocute.png",
+        "status": 200,
+        "bytes": 49371,
+        "ms": 2.8534160228446126
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Domination/DarkHarvest/DarkHarvest.png",
+        "status": 200,
+        "bytes": 44308,
+        "ms": 2.1852910285815597
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Sorcery/SummonAery/SummonAery.png",
+        "status": 200,
+        "bytes": 41453,
+        "ms": 1.4659579610452056
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Sorcery/ArcaneComet/ArcaneComet.png",
+        "status": 200,
+        "bytes": 37258,
+        "ms": 1.7332920106127858
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Resolve/GraspOfTheUndying/GraspOfTheUndying.png",
+        "status": 200,
+        "bytes": 67649,
+        "ms": 1.9887919770553708
+      },
+      {
+        "path": "/lol-game-data/assets/v1/perk-images/Styles/Inspiration/FirstStrike/FirstStrike.png",
+        "status": 200,
+        "bytes": 39953,
+        "ms": 1.611832994967699
+      }
+    ]
+  }
+]

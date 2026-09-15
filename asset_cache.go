@@ -23,21 +23,27 @@ type assetFlight struct {
 func (a *app) loadAsset(ctx context.Context, key string, maxEntrySize int, negativeTTL time.Duration, loader func(context.Context) ([]byte, error)) ([]byte, error) {
 	a.assetCacheMu.Lock()
 	if data, ok := a.assetCache[key]; ok {
+		recordAssetCacheState(ctx, "memory")
 		a.assetCacheMu.Unlock()
 		return data, nil
 	}
 	if until := a.assetFailureUntil[key]; !until.IsZero() {
 		if time.Now().Before(until) {
+			recordAssetCacheState(ctx, "negative")
 			a.assetCacheMu.Unlock()
 			return nil, errCachedAssetFailure
 		}
 		delete(a.assetFailureUntil, key)
 	}
 	if flight := a.assetFlights[key]; flight != nil {
+		recordAssetCacheState(ctx, "shared")
 		done := flight.done
 		a.assetCacheMu.Unlock()
 		select {
 		case <-done:
+			if ctx.Err() == nil && (errors.Is(flight.err, context.Canceled) || errors.Is(flight.err, context.DeadlineExceeded)) {
+				return a.loadAsset(ctx, key, maxEntrySize, negativeTTL, loader)
+			}
 			return flight.data, flight.err
 		case <-ctx.Done():
 			return nil, ctx.Err()

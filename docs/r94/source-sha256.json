@@ -1,0 +1,22 @@
+{
+  "web/gameplay.js": "2eede265ebd08c7c7ca39064d9ddc496635247262cfdefffa7aecd26a48c4ce1",
+  "web/app.js": "45f3be2671dba2739d88f4263bcd94ddd14fdc4aa544dc1026261c039b58a9fb",
+  "web/runtime.js": "a2c76ae77bd8f13fe9f026da1e9a17d436b8305030496a04d1aaada20a3a5329",
+  "web/r87.test.cjs": "089225d5bf1bd71e3f7c8b638483e92896f723e75d740a3f44f0fc528a6200a6",
+  "web/r88.test.cjs": "079725a397af25abec1cac9fb2374d3d10e30efb6cf9382fb3aade867ea37738",
+  "web/r90.test.cjs": "d6cd091877b72d22a42dcc0075c7f2263fe261e1ece321f29fae57f9bfe90875",
+  "web/r91.test.cjs": "1eddc4474eae5acb57fe896c67375a089c562adca46133caca94bb32525aa441",
+  "connection_manager.go": "df58a5c3a22918607cdecdbe2fa8b865b32e0430fe2483aa1a9b6b2305b287fd",
+  "gameplay.go": "b94222a497ff9165c6765889b515fa057aefcac9ec0125449f569411e752601a",
+  "features.go": "f1305cbc123892516561dc174e53e9e353aaced321991cd1b98b6b49c2d60a3b",
+  "DESIGN.md": "43ec4e7cad08dc55a2a49910e58b9e5b09aae88ff723b5140f486ee889d3772f",
+  "diagnostics_2055_test.go": "c8db39e632781cab364bf8d34a83bf263416003b60b1a211f45746c8fc89380c",
+  "scripts/r90-mutation-check.py": "8028e98b32b9806ce5d7b9e0639dde92f2a496a6c3ff62af64b01f1b395f4162",
+  "scripts/r91-mutation-check.py": "07109a01df9e97e6db4e4b4191c4e0a09dc6725c0d4447b856d62636f81b1849",
+  "features_test.go": "2e8b25e7877819850a6c64d0918dbba2d2eca1655594d50d2065df9d835e1c00",
+  "gameplay_identity.go": "14e23ebf215413a16d7b1f3ea30746016c9e74e5d944c9cd26cb4fa6eac7e284",
+  "r94_test.go": "676b0a83e2027abcfa87d21cd083a8f661882dc940a40a7a2b09340be1c12b42",
+  "web/r94.test.cjs": "c9c6efc4bec6c59a464bc4040e606772b4a6bd5e6596f089eafad68ac1e366ac",
+  "scripts/r94-mutation-check.py": "328b3eeca2357ea3beb03a6d55c88fc030b36071530d8b2b19953e312058a261",
+  "docs/r94-execution-ledger.md": "7e98fa06cde647dd3f051cac7c6a5a411e805087f5693dc958e0b0d6f872cfea"
+}

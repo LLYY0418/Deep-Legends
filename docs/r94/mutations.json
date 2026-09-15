@@ -1,0 +1,68 @@
+[
+  {
+    "mutation": "ignore-gameid-invalidation",
+    "killed": true,
+    "test": "R94 same-phase live responses",
+    "exitCode": 1
+  },
+  {
+    "mutation": "phase-only-event-trigger",
+    "killed": true,
+    "test": "R94 identity polling",
+    "exitCode": 1
+  },
+  {
+    "mutation": "omit-poll-gameid",
+    "killed": true,
+    "test": "R94 identity polling",
+    "exitCode": 1
+  },
+  {
+    "mutation": "omit-forced-refresh",
+    "killed": true,
+    "test": "R94 identity polling",
+    "exitCode": 1
+  },
+  {
+    "mutation": "accept-old-game-response",
+    "killed": true,
+    "test": "R94 SSE game identity",
+    "exitCode": 1
+  },
+  {
+    "mutation": "accept-stale-poll",
+    "killed": true,
+    "test": "R94 a delayed poll",
+    "exitCode": 1
+  },
+  {
+    "mutation": "omit-live-event-gameid",
+    "killed": true,
+    "test": "R94 hidden same-phase",
+    "exitCode": 1
+  },
+  {
+    "mutation": "drop-identical-diagnostics",
+    "killed": true,
+    "test": "R94 diagnostics preserve every",
+    "exitCode": 1
+  },
+  {
+    "mutation": "omit-identity-probe",
+    "killed": true,
+    "test": "^TestR94PhaseEndpointFinds",
+    "exitCode": 1
+  },
+  {
+    "mutation": "omit-sse-connection-wire",
+    "killed": true,
+    "test": "^TestR94ConnectedSessionForwards",
+    "exitCode": 1
+  },
+  {
+    "mutation": "omit-diagnostic-gameid",
+    "killed": true,
+    "test": "^TestR94DiagnosticBatchPersists",
+    "exitCode": 1
+  }
+]

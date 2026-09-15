@@ -1,0 +1,6 @@
+--- FAIL: TestR91AddendumWildcardHoverClearKeepsArmedLock (0.13s)
+    --- FAIL: TestR91AddendumWildcardHoverClearKeepsArmedLock/0 (0.12s)
+        r91_addendum_test.go:262: lock lost: [{Path:/lol-champ-select/v1/session/actions/0 Body:map[championId:141 completed:false type:ban]}]
+FAIL
+FAIL	lol-loot-assistant	0.494s
+FAIL

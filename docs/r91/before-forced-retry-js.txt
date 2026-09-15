@@ -1,0 +1,40 @@
+✔ R91 new game removes old recommendations and summary before the deferred response (128.182417ms)
+✔ R91 same game refresh and active phase progression preserve the current content (45.031875ms)
+✖ R91 repeated manual refresh immediately aborts and replaces only the live request with visible feedback (24.27425ms)
+✔ R91 boundary cancels the old request and its late settlement cannot own the new state (21.993042ms)
+✔ R91 failed, timed out and cancelled new-game requests have an explicit working retry (27.032625ms)
+✔ R91 empty new-game snapshots stay explicit and bounded instead of showing an empty recommendation panel (8.186041ms)
+✔ R91 soft reset invalidates the aborted loader before a replacement starts (7.882209ms)
+✔ R91 direct loader detects a boundary already observed by the beacon (7.1275ms)
+✔ R91 hidden phase transitions invalidate immediately and preserve the deferred refresh (8.36325ms)
+✔ R91 event-stream disconnection cancels stale work and offers recovery (7.415791ms)
+✔ R91 lagging inactive responses cannot erase a new-game signal; leaving the game settles the transition (9.293334ms)
+✔ R91 an empty available roster stays pending; unsupported mode and known gameId changes settle safely (9.223042ms)
+✔ R91 cancellation without a replacement cannot leave the first load blank (8.324125ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 12
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 932.804083
+
+✖ failing tests:
+
+test at web/r91.test.cjs:87:1
+✖ R91 repeated manual refresh immediately aborts and replaces only the live request with visible feedback (24.27425ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r91.test.cjs:101:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

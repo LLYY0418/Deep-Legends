@@ -27,10 +27,19 @@ function appendDesktopLogFile(directory, message) {
 // Export only structured startup timings and known event labels. stderr and
 // exception text are not a privacy-reviewed schema and must never leave as raw
 // text (redacting a few token spellings is not a sufficient privacy boundary).
-function desktopLogForExport(directory) {
+function desktopCrashEvent(kind, details = {}) {
+  if (!["render-process-gone", "child-process-gone", "uncaughtException"].includes(kind)) return null;
+  const event = { event: "desktop_process_failure", kind };
+  if (["clean-exit", "abnormal-exit", "killed", "crashed", "oom", "launch-failed", "integrity-failure"].includes(details.reason)) event.reason = details.reason;
+  if (Number.isInteger(details.exitCode)) event.exitCode = Math.max(-2147483648, Math.min(2147483647, details.exitCode));
+  if (["GPU", "Utility", "Zygote", "Sandbox helper", "Renderer", "Browser"].includes(details.type)) event.processType = details.type;
+  if (["Error", "TypeError", "RangeError", "ReferenceError", "SyntaxError", "URIError", "EvalError"].includes(details.name)) event.errorType = details.name;
+  return event;
+}
+function desktopLogForExport(directory, now = Date.now()) {
   let info;try{info=fs.lstatSync(directory)}catch(e){if(e.code==='ENOENT')return '';throw e}
   if(!info.isDirectory()||info.isSymbolicLink())throw Error('untrusted log directory');
-  const rows=[];let omitted=0;
+  const rows=[];let omitted=0, expired=0;
   const timingKeys=['processToJs','jsToReady','readyToSplash','splashPaint','splashWindowShown','spawnToReady','readyToWindow','total'];
   const labels=['启动标识读取失败','启动页加载失败','启动阶段记录失败','启动阶段发送失败','系统代理下发失败','界面缩放偏好保存失败','自动截图失败'];
   for(const name of ['desktop.4.log','desktop.3.log','desktop.2.log','desktop.1.log','desktop.log']){
@@ -40,6 +49,14 @@ function desktopLogForExport(directory) {
       if(!line)continue;
       const match=line.match(/^(\d{4}-\d{2}-\d{2}T[\d:.]+Z) (.*)$/);if(!match){omitted++;continue}
       const [,time,message]=match;
+      const at=Date.parse(time);
+      if (!Number.isFinite(at)) { omitted++; continue; }
+      if (at < now - 7*24*60*60*1000 || at > now) { expired++; continue; }
+      if(message.startsWith('进程异常 ')) {
+        try { const raw=JSON.parse(message.slice(5));const event=desktopCrashEvent(raw.kind, {reason:raw.reason,exitCode:raw.exitCode,type:raw.processType,name:raw.errorType});
+          if(event){rows.push(JSON.stringify({...event,time}));continue;}
+        } catch {}
+      }
       if(message.startsWith('启动耗时 ')){
         try{const raw=JSON.parse(message.slice(5)),timings={};for(const key of timingKeys)if(Number.isFinite(raw[key]))timings[key]=Math.max(0,Math.min(3600000,Math.round(raw[key])));
           rows.push(JSON.stringify({event:'desktop_startup',time,message:'启动耗时',...timings}));continue;
@@ -50,6 +67,7 @@ function desktopLogForExport(directory) {
     }
   }
   if(omitted)rows.push(JSON.stringify({event:'desktop_export_redacted',omittedLines:omitted}));
+  if(expired)rows.push(JSON.stringify({event:'desktop_export_window',time:new Date(now).toISOString(),windowDays:7,expiredLines:expired}));
   return rows.length ? rows.join('\n')+'\n' : '';
 }
-module.exports={appendDesktopLogFile,desktopLogForExport,MAX_BYTES};
+module.exports={appendDesktopLogFile,desktopLogForExport,desktopCrashEvent,MAX_BYTES};

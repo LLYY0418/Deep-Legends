@@ -1,0 +1,5 @@
+--- FAIL: TestR91AddendumGameStartGroupingAndCarryover (0.01s)
+    r91_addendum_test.go:159: GameStart grouping=false source= probes=0
+FAIL
+FAIL	lol-loot-assistant	0.013s
+FAIL

@@ -1,0 +1,107 @@
+[
+  {
+    "name": "P2-no-prewarm",
+    "test": "TestR87PhasePrewarmMakesFirstLiveResponseFast",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "P2-no-prewarm.log"
+  },
+  {
+    "name": "P2-short-warm-ttl",
+    "test": "TestR87PrewarmSurvivesLongHiddenWindow",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "P2-short-warm-ttl.log"
+  },
+  {
+    "name": "P3-no-end-invalidation",
+    "test": "TestR87WaitingForStatsInvalidatesOnlySubjectAndDetachesFlight",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "P3-no-end-invalidation.log"
+  },
+  {
+    "name": "P3-force-keeps-sgp-cache",
+    "test": "TestGameplayOverviewHistoryWindowUsesCacheAcrossRequests",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "P3-force-keeps-sgp-cache.log"
+  },
+  {
+    "name": "P4-no-early-exit",
+    "test": "TestR87CollectionSharesPayloadsAndDoesNotCacheEmptyAcrossRefreshes",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "P4-no-early-exit.log"
+  },
+  {
+    "name": "P4-no-payload-sharing",
+    "test": "TestR87CollectionSharesPayloadsAndDoesNotCacheEmptyAcrossRefreshes",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "P4-no-payload-sharing.log"
+  },
+  {
+    "name": "P5-double-scan",
+    "test": "TestR87NineClaimsScanOnceEachAndTimeoutBudgetIncludesLock",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "P5-double-scan.log"
+  },
+  {
+    "name": "P5-no-budget",
+    "test": "TestR87ClaimHandlerSuppliesOwnBudget",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "P5-no-budget.log"
+  },
+  {
+    "name": "P6-old-arena-check",
+    "test": "TestR87ArenaSentinelActuallyPatches",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "P6-old-arena-check.log"
+  },
+  {
+    "name": "A1-no-failure-reason",
+    "test": "TestR87PositionBroadcastEveryFailureReason",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "A1-no-failure-reason.log"
+  },
+  {
+    "name": "A3-no-phase-preflight",
+    "test": "TestR87ReconnectPreflightRejectsLostEndEvent",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "A3-no-phase-preflight.log"
+  },
+  {
+    "name": "P2-resync-drops-queue",
+    "test": "R87 hidden SSE",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "P2-resync-drops-queue.log"
+  },
+  {
+    "name": "P3-only-active-tab-dirty",
+    "test": "R87 all tabs",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "P3-only-active-tab-dirty.log"
+  },
+  {
+    "name": "P5-no-15-second-timeout",
+    "test": "R87 suite fetch",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "P5-no-15-second-timeout.log"
+  },
+  {
+    "name": "A2-only-EndOfGame-display",
+    "test": "R87 pending loot",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "log": "A2-only-EndOfGame-display.log"
+  }
+]

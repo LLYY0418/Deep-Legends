@@ -1,0 +1,13 @@
+{
+  "arena_live_grouping.go": "1861edd969e502a52c57e5d79b8ee48336a29221e694d897ff09c8d7a32a6cce",
+  "gameplay.go": "0d0c1a16318a5e539a99ca2faba2a6c0f2caea2090003f314dd51c48199cbc90",
+  "gameplay_refresh.go": "567f485a443629e75ff436dd6d01cb5c1c3588ae868c07474e9d6edce59b375c",
+  "queue_groups.go": "ec3df7deeb2bf212ebb885d6e9c9014799dbd72c2729fb73adaeef11d9b75787",
+  "main.go": "aac9c27b75fff4147d62813995cdd2f9a814b9ec73c45e15e1e4a6ffc5b86cae",
+  "web/gameplay.js": "94d795522f97428c0fc89d3c991a1977ac35beb7d1518a659d24fa2fa04c991d",
+  "web/gameplay.css": "ac814330be7ae93d2a3ce70f0ea3ae47b57158fe8b7a5cbabaca2bac7321bf3e",
+  "storage.go": "45cb2c8d49519f4421a9991beff7b18ea36b6c8fa5430467052fbf22bd4ebd1b",
+  "r90_test.go": "f20ddcffb5fbecc1f4e44b7570f96bb9074513033a18332b2904240618ac27cf",
+  "web/r90.test.cjs": "11ff8e7a00aafff759e4fe1f2f8bcb301cb53e898fa567018a1e90dfab871a0e",
+  "scripts/r90-mutation-check.py": "02dd8fd007be9165cca036bc86c309d674073362cdf881deef64bfe6e6363502"
+}

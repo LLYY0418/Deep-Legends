@@ -139,6 +139,7 @@
       state.groups = Array.isArray(data.groups) ? data.groups : [];
       state.friends = Array.isArray(data.friends) ? data.friends : [];
       state.stale = false;
+      publishFriendPresence();
     } catch (error) {
       if (generation !== state.requestGeneration || state.destroyed || (error.name === "AbortError" && !timedOut)) return;
       state.error = timedOut ? "好友列表读取超时，请重试" : error?.message || "读取好友列表失败";
@@ -154,6 +155,10 @@
         void loadFriends();
       }
     }
+  }
+
+  function publishFriendPresence() {
+    window.dispatchEvent(new CustomEvent("deep-legends:friends-presence", { detail: { friends: state.friends } }));
   }
 
   function matchesFilter(friend) {
@@ -383,6 +388,7 @@
       state.refreshTimer = 0;
       state.groups = [];
       state.friends = [];
+      publishFriendPresence();
       state.error = "";
       updateBadge();
       if (state.open) render();

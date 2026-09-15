@@ -186,6 +186,7 @@ func TestR86RiotOverviewCancellationStopsQueuedDetails(t *testing.T) {
 }
 
 func TestR86RiotQueuedDetailsExitWhileActiveRequestsHoldSlots(t *testing.T) {
+	t.Setenv("DEEP_LEGENDS_RIOT_MATCH_CONCURRENCY", "4")
 	t.Setenv("RIOT_API_KEY", "RGAPI-test")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

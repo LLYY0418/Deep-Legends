@@ -1,0 +1,10 @@
+{
+  "baseline_cold_ms": 1007.9413329949602,
+  "baseline_restart_ms": 658.6015829816461,
+  "count": 39,
+  "bytes": 705907,
+  "disk_entries": 512,
+  "disk_bytes": 16777216,
+  "restart_max_ms": 150,
+  "restart_to_cold_max_ratio": 0.25
+}

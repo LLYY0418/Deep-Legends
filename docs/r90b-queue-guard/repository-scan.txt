@@ -1,0 +1,5 @@
+--- FAIL: TestR87ArenaLiteralBoundary (0.01s)
+    r87_test.go:56: champselect.go literal queue comparisons: [32245 34041 34301]
+FAIL
+FAIL	lol-loot-assistant	0.651s
+FAIL

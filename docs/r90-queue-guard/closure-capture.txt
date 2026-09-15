@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T14:19:35.930161+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:19:36.17184+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra"}
+{"Time":"2026-09-14T14:19:36.171876+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra","Output":"=== RUN   TestR90QueueGuardExtra\n"}
+{"Time":"2026-09-14T14:19:36.171912+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/closure-capture"}
+{"Time":"2026-09-14T14:19:36.171914+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/closure-capture","Output":"=== RUN   TestR90QueueGuardExtra/closure-capture\n"}
+{"Time":"2026-09-14T14:19:36.17228+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/closure-capture","Output":"    r90_queue_guard_test.go:68: missed additional queue literal: closure-capture\n"}
+{"Time":"2026-09-14T14:19:36.172311+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/closure-capture","Output":"--- FAIL: TestR90QueueGuardExtra/closure-capture (0.00s)\n"}
+{"Time":"2026-09-14T14:19:36.172317+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/closure-capture","Elapsed":0}
+{"Time":"2026-09-14T14:19:36.172329+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra","Output":"--- FAIL: TestR90QueueGuardExtra (0.00s)\n"}
+{"Time":"2026-09-14T14:19:36.172338+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra","Elapsed":0}
+{"Time":"2026-09-14T14:19:36.172339+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:19:36.172611+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.242s\n"}
+{"Time":"2026-09-14T14:19:36.172621+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.242}

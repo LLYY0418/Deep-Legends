@@ -1,0 +1,11 @@
+{
+  "DESIGN.md": "b2fef8028492a252db3d346e49ff796f054aada3fb64e6d7e0129cd1d2414154",
+  "README.md": "cf40ba0a0911726ce39fd8835c4e69f42883b069b2df86dffe46d7d7988e0672",
+  "champselect_takeover.go": "f513783af54411017230676e2303d156963ed9aaf465cbb41447f62a66e7e819",
+  "champselect_takeover_test.go": "3c35fe4d40b18c5ca8b68dc95a4352a3b809176e3be2da2df67b054065c24bac",
+  "docs/r91-addendum-execution-ledger.md": "ac1630f0f3648703d4a215c4c5065e0c8a36846b629458de525d49b9ee55f0b7",
+  "r87_test.go": "fe334a4811843f9628306afc50237adc96cd380da750aa77a270a988aad5c555",
+  "scripts/r91-addendum-mutations.py": "2b1d9147b9012ccfac2c7046c4d96ce026652f03ee247f77366038ae11c3286a",
+  "r91_addendum2_test.go": "747f4f056baaed3d7196a87b300339e4285d863088ef165049f1bd589ce03442",
+  "docs/r91-addendum-2-execution-ledger.md": "e24ed4ba8542b7bac8c891bb4cc623b500ba9ead61815d5d83b3e88c0bc4e0de"
+}

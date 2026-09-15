@@ -343,6 +343,9 @@ func (r *watchRunner) apply(value any) {
 		if strings.HasPrefix(action, "champselect-") || !normalized.MasterEnabled || !watchActionEnabled(normalized, action) {
 			cancels = append(cancels, pending.cancel)
 			delete(r.pending, action)
+			if action == "auto-matchmaking" {
+				r.autoMatchInFlight = false
+			}
 		}
 	}
 	for action := range r.champSelect.decision {
@@ -384,11 +387,21 @@ func (r *watchRunner) handlePhase(client *LCUClient, phase string) {
 	settings := r.currentWatch()
 	if phase == "None" {
 		r.setCustomSession(false)
+		r.cancelPending("auto-matchmaking")
 		r.mu.Lock()
 		if previousPhase != "None" {
 			r.autoMatchExhausted = false
 		}
 		r.autoMatchStarted = false
+		r.mu.Unlock()
+	}
+	if isEndOfGamePhase(phase) {
+		r.cancelPending("auto-matchmaking")
+		r.mu.Lock()
+		r.autoMatchStarted = false
+		r.autoMatchExhausted = false
+		r.promotedForLobby = false
+		r.broadcastForSession = false
 		r.mu.Unlock()
 	}
 	if r.customPaused() {
@@ -400,6 +413,9 @@ func (r *watchRunner) handlePhase(client *LCUClient, phase string) {
 			if !strings.HasPrefix(action, "champselect-") {
 				pending.cancel()
 				delete(r.pending, action)
+				if action == "auto-matchmaking" {
+					r.autoMatchInFlight = false
+				}
 			}
 		}
 		r.mu.Unlock()
@@ -430,17 +446,10 @@ func (r *watchRunner) handlePhase(client *LCUClient, phase string) {
 			r.scheduleAccept(client, settings.Rules.AutoAccept.DelayMS)
 		}
 	case "WaitingForStats", "PreEndOfGame", "EndOfGame":
+		r.record(map[string]any{"event": "endgame_trigger", "phase": phase, "play_again_enabled": settings.Rules.AutoPlayAgain.Enabled, "honor_enabled": settings.Rules.AutoHonor.Enabled})
 		if settings.Rules.AutoPlayAgain.Enabled {
 			delay := map[string]int{"WaitingForStats": 10000, "PreEndOfGame": 3250, "EndOfGame": 1575}[phase]
 			r.schedulePlayAgain(client, delay)
-		}
-		if phase == "EndOfGame" {
-			r.cancelPending("auto-matchmaking")
-			r.mu.Lock()
-			r.autoMatchStarted = false
-			r.promotedForLobby = false
-			r.broadcastForSession = false
-			r.mu.Unlock()
 		}
 	case "Reconnect":
 		if settings.Rules.AutoReconnect.Enabled {
@@ -473,6 +482,7 @@ func (r *watchRunner) handleEvent(client *LCUClient, event LCUEvent, current Sum
 			r.scheduleAccept(client, settings.Rules.AutoAccept.DelayMS)
 		}
 	case strings.HasPrefix(uri, "/lol-honor-v2/v1/ballot") && settings.Rules.AutoHonor.Enabled:
+		r.record(map[string]any{"event": "endgame_trigger", "source": "honor-ballot", "honor_enabled": true})
 		go r.handleHonor(client, event.Data, current, settings.Rules.AutoHonor)
 	case strings.HasPrefix(uri, "/lol-pre-end-of-game/v1/currentsequenceevent") && settings.Rules.SkipCelebration.Enabled:
 		var payload struct {
@@ -650,14 +660,19 @@ func (r *watchRunner) scheduleMarked(client *LCUClient, action string, delayMS i
 			outcome = "custom-ready-check"
 			return
 		}
-		if action == "auto-matchmaking" && r.skipNonLeaderMatchmaking(ctx, client) {
-			return
-		}
 		requestCtx, requestCancel := context.WithTimeout(ctx, 8*time.Second)
 		defer requestCancel()
 		if focusTrace != nil {
 			focusTrace.beforeRequest()
 			requestCtx = context.WithValue(requestCtx, acceptFocusStatusKey{}, &focusTrace.httpStatus)
+		}
+		if action == "reconnect" {
+			var phase string
+			if client.RequestJSON(requestCtx, http.MethodGet, "/lol-gameflow/v1/gameflow-phase", nil, &phase) != nil || phase != "Reconnect" {
+				r.record(map[string]any{"event": "watch_action", "action": action, "result": "canceled", "reason": "reconnect-no-longer-active"})
+				r.emit("watch:canceled:" + action)
+				return
+			}
 		}
 		requestStarted := time.Now()
 		attempted = true
@@ -719,22 +734,6 @@ func (r *watchRunner) skipCustomReadyCheck(ctx context.Context, client *LCUClien
 	return true
 }
 
-// skipNonLeaderMatchmaking revalidates the delayed action against a fresh
-// lobby snapshot. A leader-transfer rule may have invalidated the snapshot
-// that originally armed matchmaking, and custom lobbies cannot search.
-func (r *watchRunner) skipNonLeaderMatchmaking(ctx context.Context, client *LCUClient) bool {
-	ready, terminal := r.matchmakingPreflight(ctx, client)
-	if terminal {
-		return true
-	}
-	if !ready {
-		r.record(map[string]any{"event": "watch_action", "action": "auto-matchmaking", "result": "skipped_not_ready"})
-		r.emit("watch:canceled:auto-matchmaking")
-		return true
-	}
-	return false
-}
-
 // matchmakingPreflight returns ready=false, terminal=false while the lobby is
 // still settling. The caller retries that state without issuing matchmaking.
 // We deliberately do not consume guessed readiness fields: lcu_lobby_shape
@@ -749,22 +748,22 @@ func (r *watchRunner) matchmakingPreflight(ctx context.Context, client *LCUClien
 	r.recordLobbyShape(lobby)
 	r.observeCustomSession(lobby, true)
 	if r.customPaused() {
-		r.record(map[string]any{"event": "watch_action", "action": "auto-matchmaking", "result": "skipped_custom"})
-		r.emit("watch:canceled:auto-matchmaking")
+		r.record(map[string]any{"event": "watch_action", "action": "auto-matchmaking", "result": "skipped_custom", "reason": "custom"})
+		r.emit("watch:skipped:auto-matchmaking:custom")
 		return false, true
 	}
 	local, _ := lobby["localMember"].(map[string]any)
 	leader, _ := anyBool(local, "isLeader")
 	if !leader {
-		r.record(map[string]any{"event": "watch_action", "action": "auto-matchmaking", "result": "skipped_not_leader"})
-		r.emit("watch:canceled:auto-matchmaking")
+		r.record(map[string]any{"event": "watch_action", "action": "auto-matchmaking", "result": "skipped_not_leader", "reason": "not-leader"})
+		r.emit("watch:skipped:auto-matchmaking:not-leader")
 		return false, true
 	}
 	config, _ := lobby["gameConfig"].(map[string]any)
 	custom, _ := anyBool(config, "isCustom")
 	if custom {
-		r.record(map[string]any{"event": "watch_action", "action": "auto-matchmaking", "result": "skipped_custom"})
-		r.emit("watch:canceled:auto-matchmaking")
+		r.record(map[string]any{"event": "watch_action", "action": "auto-matchmaking", "result": "skipped_custom", "reason": "custom"})
+		r.emit("watch:skipped:auto-matchmaking:custom")
 		return false, true
 	}
 	if anyInt(config, "queueId", "queueID") <= 0 {
@@ -848,9 +847,24 @@ func (r *watchRunner) scheduleAutoMatchmaking(client *LCUClient, delayMS int) bo
 	ctx, cancel := context.WithCancel(context.Background())
 	pending := &watchPendingAction{cancel: cancel}
 	r.mu.Lock()
-	if r.customSession || r.autoMatchStarted || r.autoMatchInFlight || r.autoMatchExhausted {
+	reason := ""
+	switch {
+	case r.customSession:
+		reason = "custom"
+	case r.autoMatchStarted:
+		reason = "started"
+	case r.autoMatchInFlight:
+		reason = "inflight"
+	case r.autoMatchExhausted:
+		reason = "exhausted"
+	}
+	if reason != "" {
 		r.mu.Unlock()
 		cancel()
+		r.record(map[string]any{"event": "watch_action", "action": "auto-matchmaking", "result": "skipped_state", "reason": reason})
+		if reason == "custom" {
+			r.emit("watch:skipped:auto-matchmaking:custom")
+		}
 		return false
 	}
 	if r.pending == nil {
@@ -866,8 +880,8 @@ func (r *watchRunner) scheduleAutoMatchmaking(client *LCUClient, delayMS int) bo
 			r.mu.Lock()
 			if r.pending["auto-matchmaking"] == pending {
 				delete(r.pending, "auto-matchmaking")
+				r.autoMatchInFlight = false
 			}
-			r.autoMatchInFlight = false
 			r.mu.Unlock()
 		}()
 		canceled := func() {
@@ -877,6 +891,16 @@ func (r *watchRunner) scheduleAutoMatchmaking(client *LCUClient, delayMS int) bo
 		if !waitWatchDelay(ctx, time.Duration(delayMS)*time.Millisecond) {
 			canceled()
 			return
+		}
+		// A canceled older job must not overwrite a new game's reset state.
+		finish := func(exhausted bool) bool {
+			r.mu.Lock()
+			defer r.mu.Unlock()
+			if r.pending["auto-matchmaking"] != pending || ctx.Err() != nil {
+				return false
+			}
+			r.autoMatchStarted, r.autoMatchExhausted = !exhausted, exhausted
+			return true
 		}
 		lastStatusCode := 0
 		for attempt := 1; attempt <= autoMatchMaxAttempts; attempt++ {
@@ -900,9 +924,10 @@ func (r *watchRunner) scheduleAutoMatchmaking(client *LCUClient, delayMS int) bo
 					return
 				}
 				if err == nil {
-					r.mu.Lock()
-					r.autoMatchStarted = true
-					r.mu.Unlock()
+					if !finish(false) {
+						canceled()
+						return
+					}
 					r.record(map[string]any{"event": "watch_action", "action": "auto-matchmaking", "result": "fired", "attempts": attempt})
 					r.emit("watch:fired:auto-matchmaking")
 					return
@@ -910,9 +935,10 @@ func (r *watchRunner) scheduleAutoMatchmaking(client *LCUClient, delayMS int) bo
 				statusCode, errorCode, message := watchFailureDetail(err)
 				lastStatusCode = statusCode
 				if statusCode != http.StatusBadRequest {
-					r.mu.Lock()
-					r.autoMatchExhausted = true
-					r.mu.Unlock()
+					if !finish(true) {
+						canceled()
+						return
+					}
 					diagnostic := map[string]any{"event": "watch_action", "action": "auto-matchmaking", "result": "failed", "attempts": attempt}
 					if statusCode > 0 {
 						diagnostic["status_code"] = statusCode
@@ -929,9 +955,10 @@ func (r *watchRunner) scheduleAutoMatchmaking(client *LCUClient, delayMS int) bo
 				}
 			}
 			if attempt == autoMatchMaxAttempts {
-				r.mu.Lock()
-				r.autoMatchExhausted = true
-				r.mu.Unlock()
+				if !finish(true) {
+					canceled()
+					return
+				}
 				diagnostic := map[string]any{"event": "watch_action", "action": "auto-matchmaking", "result": "gave_up", "attempts": attempt}
 				if lastStatusCode > 0 {
 					diagnostic["status_code"] = lastStatusCode
@@ -1008,6 +1035,9 @@ func (r *watchRunner) cancelPending(action string) {
 	r.mu.Lock()
 	pending := r.pending[action]
 	delete(r.pending, action)
+	if action == "auto-matchmaking" {
+		r.autoMatchInFlight = false
+	}
 	r.mu.Unlock()
 	if pending != nil {
 		pending.cancel()
@@ -1257,12 +1287,12 @@ func (r *watchRunner) handleInvitations(client *LCUClient, rule watchInvitationR
 }
 
 func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rule watchBroadcastRule) string {
-	if r.customPaused() {
-		return "skipped_custom"
-	}
-	finish := func(result string) string {
-		r.record(map[string]any{"event": "watch_action", "action": "position-broadcast", "result": result})
+	finish := func(result, reason string) string {
+		r.record(map[string]any{"event": "watch_action", "action": "position-broadcast", "result": result, "reason": reason})
 		return result
+	}
+	if r.customPaused() {
+		return finish("skipped_custom", "custom-paused")
 	}
 	r.record(map[string]any{"event": "watch_action", "action": "position-broadcast", "result": "armed"})
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
@@ -1270,7 +1300,7 @@ func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rul
 	var session map[string]any
 	if err := client.RequestJSON(ctx, http.MethodGet, "/lol-champ-select/v1/session", nil, &session); err != nil {
 		r.emit("watch:failed:position-broadcast")
-		return finish("failed")
+		return finish("failed", "session-read-failed")
 	}
 	queueID := anyInt(session, "queueId", "queueID")
 	modeGroup := queueModeGroupFor(queueID, "", 0)
@@ -1278,7 +1308,7 @@ func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rul
 		var gameflow lcuGameflowSession
 		if err := client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/session", nil, &gameflow); err != nil {
 			r.emit("watch:failed:position-broadcast")
-			return finish("failed")
+			return finish("failed", "gameflow-read-failed")
 		}
 		mode := strings.ToUpper(strings.TrimSpace(gameflow.GameData.Queue.GameMode))
 		mapID := gameflow.GameData.Queue.MapID
@@ -1287,12 +1317,12 @@ func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rul
 		}
 		modeGroup = queueModeGroupFor(gameflow.GameData.Queue.ID, mode, mapID)
 		if !isARAMFamilyGameMode(mode) && modeGroup != "aram" && modeGroup != "hextech-aram" && modeGroup != "hextech-classic" {
-			return finish("skipped_mode")
+			return finish("skipped_mode", "unsupported-mode")
 		}
 	}
 	bench, _ := anyBool(session, "benchEnabled")
 	if !bench {
-		return finish("skipped_no_bench")
+		return finish("skipped_no_bench", "bench-unavailable")
 	}
 	localCellID := anyInt(session, "localPlayerCellId")
 	team := ""
@@ -1314,13 +1344,13 @@ func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rul
 		label = "红色方"
 	default:
 		r.emit("watch:failed:position-broadcast")
-		return finish("skipped_no_team")
+		return finish("skipped_no_team", "team-unavailable")
 	}
 	var me map[string]any
 	var conversations []map[string]any
 	if client.RequestJSON(ctx, http.MethodGet, "/lol-chat/v1/me", nil, &me) != nil || client.RequestJSON(ctx, http.MethodGet, "/lol-chat/v1/conversations", nil, &conversations) != nil {
 		r.emit("watch:failed:position-broadcast")
-		return finish("failed")
+		return finish("failed", "chat-read-failed")
 	}
 	conversationID := ""
 	for _, conversation := range conversations {
@@ -1332,7 +1362,7 @@ func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rul
 	}
 	if !safeLCUIdentifier(conversationID) {
 		r.emit("watch:failed:position-broadcast")
-		return finish("failed")
+		return finish("failed", "conversation-unavailable")
 	}
 	messageType := "celebration"
 	if rule.Visibility == "team" {
@@ -1343,18 +1373,18 @@ func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rul
 		"fromSummonerId": current.SummonerID, "id": "", "isHistorical": false, "timestamp": "", "type": messageType,
 	}
 	if r.customPaused() {
-		return finish("skipped_custom")
+		return finish("skipped_custom", "custom-paused")
 	}
 	path := "/lol-chat/v1/conversations/" + conversationID + "/messages"
 	if err := r.requestWatchJSON(ctx, client, http.MethodPost, path, body); err != nil {
 		if r.customPaused() {
-			return finish("skipped_custom")
+			return finish("skipped_custom", "custom-paused")
 		}
 		r.emit("watch:failed:position-broadcast")
-		return finish("failed")
+		return finish("failed", "message-write-failed")
 	} else {
 		r.emit("watch:fired:position-broadcast")
-		return finish("fired")
+		return finish("fired", "sent")
 	}
 }
 
@@ -1480,6 +1510,12 @@ func (a *app) handleWatchRules(w http.ResponseWriter, r *http.Request) {
 	runner.apply(request)
 	runner.record(map[string]any{"event": "watch_settings_saved", "master_enabled": request.MasterEnabled, "custom_paused": runner.customPaused(), "rules": request.Rules})
 	if client, _, err := a.gameplayClient(); err == nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		var phase string
+		if err := client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/gameflow-phase", nil, &phase); err == nil {
+			runner.handlePhase(client, phase)
+		}
+		cancel()
 		runner.handleChampSelectAutomation(client)
 	}
 	for id, group := range request.ChampSelect.Groups {
@@ -1545,6 +1581,7 @@ func (r *watchRunner) setCustomSession(custom bool) {
 			pending.cancel()
 			delete(r.pending, key)
 		}
+		r.autoMatchInFlight = false
 		r.deferredPlayAgain = false
 		r.promotedForLobby = false
 		r.autoMatchStarted = false

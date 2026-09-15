@@ -4,6 +4,7 @@ dist/
 *.test
 *.log
 .gocache/
+.gocache-*/
 /.gomodcache
 /.tmpbuild/
 /lol-loot-assistant
@@ -44,3 +45,4 @@ riot_key.local.*
 /installer/payload/files/*
 !/installer/payload/files/.gitkeep
 /desktop/uninstall-shell.exe
+.gopath/

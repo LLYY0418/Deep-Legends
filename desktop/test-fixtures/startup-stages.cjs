@@ -5,13 +5,14 @@ const assert = require("node:assert/strict"), fs = require("node:fs"), path = re
 const http = require("node:http"), { EventEmitter } = require("node:events");
 const { collectRecord, parseLines } = require("../../scripts/r82-startup-ab-report.cjs");
 const desktop = path.resolve(__dirname, "..");
-const [baseUrl, token, directory, mode, sourcePath] = process.argv.slice(2);
+const [baseUrl, token, directory, mode, sourcePath, buildFingerprint] = process.argv.slice(2);
+assert.ok(buildFingerprint, "Go test must supply the running build fingerprint");
 const source = fs.readFileSync(sourcePath || path.join(desktop, "main.cjs"), "utf8");
 const pending = new Set(), responses = [], windows = [], timers = new Map(), logs = [];
 let boot, child, now = 1000, timerID = 0;
 const app = new EventEmitter(), ipcMain = new EventEmitter(), screen = new EventEmitter(), nativeTheme = new EventEmitter();
 Object.assign(app, { isPackaged: true, setAppUserModelId() {}, requestSingleInstanceLock: () => true,
-  whenReady: () => ({ then(fn) { boot = fn; } }), getPath: () => path.join(directory, "existing-user-data"), quit() {} });
+  whenReady: () => ({ then(fn) { boot = fn; } }), getPath: name => name === "downloads" ? directory : path.join(directory, "existing-user-data"), quit() {} });
 ipcMain.handle = ipcMain.removeHandler = () => {};
 Object.assign(screen, { getPrimaryDisplay: () => ({ workAreaSize: { width: 1440, height: 900 } }), getAllDisplays: () => [] });
 class Window extends EventEmitter {
@@ -51,7 +52,7 @@ const trackedHTTP = {
 };
 const context = vm.createContext({ __dirname: desktop, URL, Buffer, console,
   Date: class extends Date { static now() { return now; } },
-  process: { platform: "win32", env: {}, resourcesPath: "/synthetic/resources", getCreationTime: () => 900 },
+  process: { on() {}, platform: "win32", env: {}, resourcesPath: "/synthetic/resources", getCreationTime: () => 900 },
   setTimeout(fn, delay) { const id = ++timerID; timers.set(id, { fn, delay }); return id; },
   clearTimeout(id) { timers.delete(id); }, setImmediate,
   require(name) {
@@ -90,11 +91,15 @@ async function exportedEvents() {
     }).on("error", reject);
   });
   // Exercise the real hook attached by createMainWindow. Electron's file write
-  // is simulated with the exact response bytes and the hook-selected path.
+  // is simulated with the exact response bytes and the native Save dialog path.
   const main = windows[1], item = new EventEmitter();
   item.getURL = () => url; item.setSavePath = file => { item.savedPath = file; };
+  item.setSaveDialogOptions = options => { item.dialogOptions = options; };
+  item.getSavePath = () => item.savedPath;
   main.webContents.session.emit("will-download", {}, item, main.webContents);
-  assert.equal(path.dirname(item.savedPath || ""), directory, "real diagnostics download hook did not select a file");
+  assert.equal(item.savedPath, undefined, "native Save dialog must choose the file");
+  assert.equal(path.dirname(item.dialogOptions?.defaultPath || ""), directory, "diagnostic default must use downloads");
+  item.savedPath = item.dialogOptions.defaultPath;
   fs.writeFileSync(item.savedPath, body); item.emit("done", {}, "completed");
   return parseLines(fs.readFileSync(item.savedPath, "utf8"));
 }
@@ -104,6 +109,7 @@ async function checkSnapshot(expected) {
   assert.deepEqual(stages.map(event => event.stage), expected, "export must contain stages before main window visibility");
   const appStart = events.find(event => event.event === "app_start");
   assert.ok(appStart);
+  assert.ok(events.every(event => event.build_fingerprint === buildFingerprint), "export must retain the running build fingerprint on every event");
   assert.ok(stages.every(event => event.run_id === appStart.run_id && Number.isInteger(event.elapsed_ms) && event.elapsed_ms >= 0));
   for (let i = 1; i < stages.length; i++) assert.ok(stages[i].log_seq > stages[i - 1].log_seq, "stage sequence must retain event order");
   return events;
@@ -127,7 +133,7 @@ async function run() {
       now = 1800; main.emit("ready-to-show"); expected.push("main_window_ready_to_show");
       events = await checkSnapshot(expected);
       assert.equal(main.visible, true); assert.equal(splash.visible, false);
-      const fixture = { records: [], group: "prewarm", fingerprint: "a84b00000001", pid: "321", since: 0, diagnostics: events,
+      const fixture = { records: [], group: "prewarm", fingerprint: buildFingerprint, pid: "321", since: 0, diagnostics: events,
         startupLog: "[pid=321] startup prewarm enabled=true files=2 failures=0 timed_out=false elapsed_ms=55\n[pid=321] application handoff visible=true elapsed_ms=2100" };
       const record = collectRecord(fixture); assert.ok(record, "legacy collector lost the successful startup summary");
       assert.equal(record.phases_ms.spawn_to_ready, 200); assert.equal(record.phases_ms.total, 900);

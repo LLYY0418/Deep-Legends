@@ -6,7 +6,7 @@ function harness(){
  Object.assign(app,{isPackaged:false,setAppUserModelId(){},requestSingleInstanceLock:()=>true,whenReady:()=>({then(){}}),getPath:()=>"/test",quit(){quits++;}});
  child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdout.setEncoding=child.stderr.setEncoding=()=>{};child.kill=()=>kills++;
  const electron={app,BrowserWindow:class{},dialog:{showMessageBox(value){messages.push(value);return Promise.resolve();}},ipcMain:new EventEmitter(),nativeTheme:{},session:{},shell:{}};
- const context=vm.createContext({require(name){if(name==="electron")return electron;if(name==="node:child_process")return {spawn:()=>child};if(name==="node:fs")return {mkdirSync(){},appendFileSync(){}};return require(name);},__dirname,process:{platform:"win32",env:{}},URL,Buffer,console,setTimeout:()=>1,clearTimeout(){}});
+ const context=vm.createContext({require(name){if(name==="electron")return electron;if(name==="node:child_process")return {spawn:()=>child};if(name==="node:fs")return {mkdirSync(){},appendFileSync(){}};return require(name);},__dirname,process:{on(){},platform:"win32",env:{}},URL,Buffer,console,setTimeout:()=>1,clearTimeout(){}});
  vm.runInContext(source+'\nglobalThis.probe={startBackend,onBackendStdout,ready(){backendReady={baseUrl:"http://127.0.0.1:8787",token:"x"};},state(){return {quitting,shutdownStarted}}};',context);
  context.probe.startBackend();context.probe.ready();
  return {child,app,probe:context.probe,messages,get quits(){return quits},get kills(){return kills}};

@@ -116,7 +116,7 @@ function harness({source=mainSource, stored, width=1920, height=1080}={}) {
       if(name==="./window-bounds-store.cjs")return {readWindowBounds:()=>null,writeWindowBounds(){}};
       if(name.startsWith("./"))return require(name);
       return require(name);
-    },__dirname,process:{platform:"win32",env:{}},URL,Buffer,console,
+    },__dirname,process:{on(){},platform:"win32",env:{}},URL,Buffer,console,
     setTimeout(fn,delay){const id=++seq;timers.set(id,{fn,time:now+delay});return id;},
     clearTimeout(id){timers.delete(id);},setImmediate(fn){fn();},
   });

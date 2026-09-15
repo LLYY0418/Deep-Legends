@@ -1,0 +1,28 @@
+✖ R91 repeated manual refresh immediately aborts and replaces only the live request with visible feedback (97.645209ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 453.88125
+
+✖ failing tests:
+
+test at web/r91.test.cjs:87:1
+✖ R91 repeated manual refresh immediately aborts and replaces only the live request with visible feedback (97.645209ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r91.test.cjs:107:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

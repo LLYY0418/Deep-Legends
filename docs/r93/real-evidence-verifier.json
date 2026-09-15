@@ -1,0 +1,57 @@
+[
+  {
+    "case": "normal",
+    "expected_pass": true,
+    "exit": 0,
+    "result": {
+      "matches_from_disk": 20,
+      "duration_ms": 1070,
+      "acceptance": "20-complete-disk-matches",
+      "passed": true
+    }
+  },
+  {
+    "case": "high-rtt",
+    "expected_pass": true,
+    "exit": 0,
+    "result": {
+      "matches_from_disk": 20,
+      "duration_ms": 9000,
+      "acceptance": "20-complete-disk-matches",
+      "passed": true
+    }
+  },
+  {
+    "case": "missing-disk",
+    "expected_pass": false,
+    "exit": 1,
+    "result": {
+      "matches_from_disk": 19,
+      "duration_ms": 100,
+      "acceptance": "20-complete-disk-matches",
+      "passed": false
+    }
+  },
+  {
+    "case": "http-error",
+    "expected_pass": false,
+    "exit": 1,
+    "result": {
+      "matches_from_disk": 20,
+      "duration_ms": 100,
+      "acceptance": "20-complete-disk-matches",
+      "passed": false
+    }
+  },
+  {
+    "case": "detail-error",
+    "expected_pass": false,
+    "exit": 1,
+    "result": {
+      "matches_from_disk": 20,
+      "duration_ms": 100,
+      "acceptance": "20-complete-disk-matches",
+      "passed": false
+    }
+  }
+]

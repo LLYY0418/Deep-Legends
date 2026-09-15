@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T14:19:32.946834+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:19:33.190377+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired"}
+{"Time":"2026-09-14T14:19:33.191148+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired","Output":"=== RUN   TestR90QueueGuardRequired\n"}
+{"Time":"2026-09-14T14:19:33.191202+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/literal-map"}
+{"Time":"2026-09-14T14:19:33.191204+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/literal-map","Output":"=== RUN   TestR90QueueGuardRequired/literal-map\n"}
+{"Time":"2026-09-14T14:19:33.191212+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/literal-map","Output":"    r90_queue_guard_test.go:51: missed R90 queue literal: literal-map\n"}
+{"Time":"2026-09-14T14:19:33.191218+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/literal-map","Output":"--- FAIL: TestR90QueueGuardRequired/literal-map (0.00s)\n"}
+{"Time":"2026-09-14T14:19:33.191223+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/literal-map","Elapsed":0}
+{"Time":"2026-09-14T14:19:33.191228+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired","Output":"--- FAIL: TestR90QueueGuardRequired (0.00s)\n"}
+{"Time":"2026-09-14T14:19:33.19123+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired","Elapsed":0}
+{"Time":"2026-09-14T14:19:33.191231+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:19:33.191264+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.244s\n"}
+{"Time":"2026-09-14T14:19:33.191271+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.244}

@@ -618,57 +618,119 @@ func (a *app) handleClaimExecute(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "未连接英雄联盟客户端", http.StatusConflict)
 		return
 	}
-	// Serialize canonical read + write across concurrent requests in this session.
-	client.claimExecutionMu.Lock()
+	// Include waiting for another batch in the handler's total budget.
+	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
+	defer cancel()
+	traceID := newDiagnosticTrace("claim")
+	itemStarted := make([]time.Time, len(request.Items))
+	itemEnded := make([]bool, len(request.Items))
+	for index := range request.Items {
+		itemStarted[index] = time.Now()
+		a.recordDiagnostic(map[string]any{"event": "claim_item", "trace_id": traceID, "stage": "begin", "index": index})
+	}
+	finishItem := func(index int, timedOut bool) {
+		if itemEnded[index] {
+			return
+		}
+		itemEnded[index] = true
+		a.recordDiagnostic(map[string]any{"event": "claim_item", "trace_id": traceID, "stage": "end", "index": index, "duration_ms": time.Since(itemStarted[index]).Milliseconds(), "timed_out": timedOut || errors.Is(ctx.Err(), context.DeadlineExceeded)})
+	}
+	// Include mutex wait and the canonical scan, where the observed stalls occur.
+	defer func() {
+		for index := range request.Items {
+			finishItem(index, false)
+		}
+	}()
+	if err := lockClaimsContext(ctx, &client.claimExecutionMu); err != nil {
+		http.Error(w, "领取等待超时，请重新扫描后重试", http.StatusGatewayTimeout)
+		return
+	}
 	defer client.claimExecutionMu.Unlock()
-	canonical := scanClaimsObserved(r.Context(), client, a.recordDiagnostic)
+	canonical := scanClaimsObserved(ctx, client, a.recordDiagnostic)
+	if ctx.Err() != nil {
+		http.Error(w, "领取扫描超时，请重新扫描后重试", http.StatusGatewayTimeout)
+		return
+	}
 	byKey := make(map[string]claimEntry, len(canonical.Items))
 	for _, entry := range canonical.Items {
 		byKey[entry.Key] = entry
 	}
 	seen := make(map[string]bool, len(request.Items))
 	response := claimExecuteResponse{Results: make([]claimExecuteResult, 0, len(request.Items))}
-	for _, selected := range request.Items {
-		entry, ok := byKey[selected.Key]
-		result := claimExecuteResult{Key: selected.Key}
-		if seen[selected.Key] {
-			result.Message = "本批次包含重复条目，已阻止重复领取"
-			response.Failed++
-			response.Results = append(response.Results, result)
-			continue
-		}
-		seen[selected.Key] = true
-		if !ok {
-			result.Message = "该条目已不存在，请重新扫描"
-			result.Consequence = "它可能已被客户端处理，不影响本批次其它条目。"
-			response.Failed++
-			response.Results = append(response.Results, result)
-			continue
-		}
-		var err error
-		if !entry.Actionable {
-			reason := entry.Detail
-			if reason == "" {
-				reason = "客户端未提供可安全领取的奖励明细"
+	for index, selected := range request.Items {
+		itemTimedOut := false
+		func() {
+			defer func() {
+				finishItem(index, itemTimedOut)
+			}()
+			entry, ok := byKey[selected.Key]
+			result := claimExecuteResult{Key: selected.Key}
+			if seen[selected.Key] {
+				result.Message = "本批次包含重复条目，已阻止重复领取"
+				response.Failed++
+				response.Results = append(response.Results, result)
+				return
 			}
-			err = errors.New(reason)
-		} else {
-			err = executeClaimEntry(r.Context(), client, entry, selected.Selections)
-		}
-		if err == nil {
-			client.claimSettlements.remember(entry, time.Now())
-			result.OK = true
-			response.Succeeded++
-		} else {
-			populateClaimError(&result, err)
-			response.Failed++
-		}
-		response.Results = append(response.Results, result)
-		a.recordDiagnostic(map[string]any{"event": "claim_action", "source": entry.Source, "ok": result.OK, "status_code": result.StatusCode, "reward_count": len(entry.Items)})
+			seen[selected.Key] = true
+			if !ok {
+				result.Message = "该条目已不存在，请重新扫描"
+				result.Consequence = "它可能已被客户端处理，不影响本批次其它条目。"
+				response.Failed++
+				response.Results = append(response.Results, result)
+				return
+			}
+			var err error
+			if ctx.Err() != nil {
+				populateClaimError(&result, ctx.Err())
+				response.Failed++
+				response.Results = append(response.Results, result)
+				return
+			}
+			if !entry.Actionable {
+				reason := entry.Detail
+				if reason == "" {
+					reason = "客户端未提供可安全领取的奖励明细"
+				}
+				err = errors.New(reason)
+			} else {
+				err = executeClaimEntry(ctx, client, entry, selected.Selections)
+			}
+			if err == nil {
+				client.claimSettlements.remember(entry, time.Now())
+				result.OK = true
+				response.Succeeded++
+			} else {
+				itemTimedOut = diagnosticErrorKind(err) == "timeout"
+				populateClaimError(&result, err)
+				response.Failed++
+			}
+			response.Results = append(response.Results, result)
+			a.recordDiagnostic(map[string]any{"event": "claim_action", "source": entry.Source, "ok": result.OK, "status_code": result.StatusCode, "reward_count": len(entry.Items)})
+		}()
 	}
-	// A fresh scan exposes the next SELECT_REWARDS node in a mission chain, but
-	// never claims it automatically.
-	response.Scan = scanClaimsObserved(r.Context(), client, a.recordDiagnostic)
+	// Confirm only the affected mission source to expose its next chain node.
+	// Settlements suppress successful grant/event writes until the final UI scan.
+	response.Scan = canonical
+	for _, selected := range request.Items {
+		if byKey[selected.Key].Source == "mission" && ctx.Err() == nil {
+			missions, source := scanMissionClaims(ctx, client)
+			if source.State == "available" {
+				kept := []claimEntry{}
+				for _, entry := range response.Scan.Items {
+					if entry.Source != "mission" {
+						kept = append(kept, entry)
+					}
+				}
+				response.Scan.Items = append(kept, missions...)
+				response.Scan.Sources["mission"] = source
+			}
+			break
+		}
+	}
+	client.claimSettlements.filter(&response.Scan, time.Now())
+	if ctx.Err() != nil {
+		response.Scan.Reason = "领取超时，列表状态待重新扫描确认"
+	}
 	respondJSON(w, response)
 }
 
@@ -761,6 +823,16 @@ func executeClaimEntry(ctx context.Context, client *LCUClient, entry claimEntry,
 func populateClaimError(result *claimExecuteResult, err error) {
 	result.Message = "领取失败，请重新扫描后再试"
 	result.Consequence = "本项失败不会中断其它条目。"
+	if errors.Is(err, context.DeadlineExceeded) {
+		result.Message = "领取超时，请重新扫描确认后重试"
+		result.ErrorCode = "timeout"
+		return
+	}
+	if errors.Is(err, context.Canceled) {
+		result.Message = "领取请求已取消，请重新扫描确认状态"
+		result.ErrorCode = "canceled"
+		return
+	}
 	var httpErr *LCUHTTPError
 	if !errors.As(err, &httpErr) {
 		if strings.TrimSpace(err.Error()) != "" {
@@ -777,5 +849,23 @@ func populateClaimError(result *claimExecuteResult, err error) {
 	}
 	if strings.Contains(strings.ToLower(result.ErrorCode+" "+result.Message), "fulfilled") || strings.Contains(strings.ToLower(result.ErrorCode+" "+result.Message), "already") {
 		result.Consequence = "该条目可能已被处理，重新扫描后会消失；本批次其它条目未受影响。"
+	}
+}
+
+func lockClaimsContext(ctx context.Context, mu *sync.Mutex) error {
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if mu.TryLock() {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
 	}
 }

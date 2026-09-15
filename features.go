@@ -63,50 +63,62 @@ type diagnosticsResponse struct {
 }
 
 type clientDiagnosticRequest struct {
-	Event               string `json:"event"`
-	Reason              string `json:"reason"`
-	Key                 string `json:"key,omitempty"`
-	TraceID             string `json:"traceId,omitempty"`
-	RequestedPosition   string `json:"requestedPosition,omitempty"`
-	ResolvedPosition    string `json:"resolvedPosition,omitempty"`
-	PositionSource      string `json:"positionSource,omitempty"`
-	GameMode            string `json:"gameMode,omitempty"`
-	Tier                string `json:"tier,omitempty"`
-	MapID               int64  `json:"mapId,omitempty"`
-	BlockCount          int    `json:"blockCount,omitempty"`
-	ItemCount           int    `json:"itemCount,omitempty"`
-	ChampionID          int64  `json:"championId,omitempty"`
-	QueueID             int64  `json:"queueId,omitempty"`
-	Position            string `json:"position,omitempty"`
-	Phase               string `json:"phase,omitempty"`
-	GameID              int64  `json:"gameId,omitempty"`
-	PlayersReceived     int    `json:"playersReceived,omitempty"`
-	Rendered100         int    `json:"rendered100,omitempty"`
-	Rendered200         int    `json:"rendered200,omitempty"`
-	TotalRefs           int    `json:"totalRefs,omitempty"`
-	UniqueRefs          int    `json:"uniqueRefs,omitempty"`
-	CacheHits           int    `json:"cacheHits,omitempty"`
-	Revision            int    `json:"revision,omitempty"`
-	DurationMS          int    `json:"durationMs,omitempty"`
-	MasterEnabled       bool   `json:"masterEnabled,omitempty"`
-	CustomPaused        bool   `json:"customPaused,omitempty"`
-	ChampSelectEnabled  bool   `json:"champSelectEnabled,omitempty"`
-	PendingSaves        int    `json:"pendingSaves,omitempty"`
-	ForceRefresh        bool   `json:"forceRefresh,omitempty"`
-	Hidden              bool   `json:"hidden,omitempty"`
-	TeamsReceived       int    `json:"teamsReceived,omitempty"`
-	CacheAgeMS          int    `json:"cacheAgeMs,omitempty"`
-	HTTPStatus          int    `json:"httpStatus,omitempty"`
-	Source              string `json:"source,omitempty"`
-	Gate                string `json:"gate,omitempty"`
-	ErrorKind           string `json:"errorKind,omitempty"`
-	RequestID           int    `json:"requestId,omitempty"`
-	TransportFailed     int    `json:"transportFailed,omitempty"`
-	TransportDropped    int    `json:"transportDropped,omitempty"`
-	TransportSuppressed int    `json:"transportSuppressed,omitempty"`
-	TransportPending    int    `json:"transportPending,omitempty"`
-	TransportHTTPStatus int    `json:"transportHTTPStatus,omitempty"`
-	TransportErrorKind  string `json:"transportErrorKind,omitempty"`
+	Observations           []gameflowClientObservation `json:"observations,omitempty"`
+	ItemID                 int64                       `json:"itemId,omitempty"`
+	Endpoint               string                      `json:"endpoint,omitempty"`
+	StartedAt              int64                       `json:"startedAt,omitempty"`
+	CompletedAt            int64                       `json:"completedAt,omitempty"`
+	Section                string                      `json:"section,omitempty"`
+	PhaseChanged           bool                        `json:"phaseChanged,omitempty"`
+	LiveRefreshQueued      bool                        `json:"liveRefreshQueued,omitempty"`
+	Claiming               bool                        `json:"claiming,omitempty"`
+	Done                   int                         `json:"done,omitempty"`
+	Total                  int                         `json:"total,omitempty"`
+	Event                  string                      `json:"event"`
+	Reason                 string                      `json:"reason"`
+	Key                    string                      `json:"key,omitempty"`
+	TraceID                string                      `json:"traceId,omitempty"`
+	RequestedPosition      string                      `json:"requestedPosition,omitempty"`
+	ResolvedPosition       string                      `json:"resolvedPosition,omitempty"`
+	PositionSource         string                      `json:"positionSource,omitempty"`
+	GameMode               string                      `json:"gameMode,omitempty"`
+	Tier                   string                      `json:"tier,omitempty"`
+	MapID                  int64                       `json:"mapId,omitempty"`
+	BlockCount             int                         `json:"blockCount,omitempty"`
+	ItemCount              int                         `json:"itemCount,omitempty"`
+	ChampionID             int64                       `json:"championId,omitempty"`
+	QueueID                int64                       `json:"queueId,omitempty"`
+	Position               string                      `json:"position,omitempty"`
+	Phase                  string                      `json:"phase,omitempty"`
+	GameID                 int64                       `json:"gameId,omitempty"`
+	PlayersReceived        int                         `json:"playersReceived,omitempty"`
+	Rendered100            int                         `json:"rendered100,omitempty"`
+	Rendered200            int                         `json:"rendered200,omitempty"`
+	TotalRefs              int                         `json:"totalRefs,omitempty"`
+	UniqueRefs             int                         `json:"uniqueRefs,omitempty"`
+	CacheHits              int                         `json:"cacheHits,omitempty"`
+	Revision               int                         `json:"revision,omitempty"`
+	DurationMS             int                         `json:"durationMs,omitempty"`
+	MasterEnabled          bool                        `json:"masterEnabled,omitempty"`
+	CustomPaused           bool                        `json:"customPaused,omitempty"`
+	ChampSelectEnabled     bool                        `json:"champSelectEnabled,omitempty"`
+	AutoMatchmakingEnabled bool                        `json:"autoMatchmakingEnabled,omitempty"`
+	PendingSaves           int                         `json:"pendingSaves,omitempty"`
+	ForceRefresh           bool                        `json:"forceRefresh,omitempty"`
+	Hidden                 bool                        `json:"hidden,omitempty"`
+	TeamsReceived          int                         `json:"teamsReceived,omitempty"`
+	CacheAgeMS             int                         `json:"cacheAgeMs,omitempty"`
+	HTTPStatus             int                         `json:"httpStatus,omitempty"`
+	Source                 string                      `json:"source,omitempty"`
+	Gate                   string                      `json:"gate,omitempty"`
+	ErrorKind              string                      `json:"errorKind,omitempty"`
+	RequestID              int                         `json:"requestId,omitempty"`
+	TransportFailed        int                         `json:"transportFailed,omitempty"`
+	TransportDropped       int                         `json:"transportDropped,omitempty"`
+	TransportSuppressed    int                         `json:"transportSuppressed,omitempty"`
+	TransportPending       int                         `json:"transportPending,omitempty"`
+	TransportHTTPStatus    int                         `json:"transportHTTPStatus,omitempty"`
+	TransportErrorKind     string                      `json:"transportErrorKind,omitempty"`
 }
 
 var specialistRuneClientReasons = map[string]bool{
@@ -116,6 +128,13 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
+	"gameflow_phase_client":        {"batch": true},
+	"catalog_client":               {"failed": true, "loaded": true},
+	"item_id_not_in_catalog":       {"missing": true},
+	"champselect_dialog_client":    {"open": true, "rerender-while-open": true, "close": true},
+	"live_refresh_client":          {"load": true, "queue": true, "phase": true},
+	"local_request_client":         {"complete": true},
+	"claim_progress_client":        {"begin": true, "heartbeat": true, "end": true, "item-timeout": true},
 	"diagnostic_delivery_client":   {"export": true},
 	"champ_select_filter_client":   {"request": true, "all": true, "cached": true, "received": true, "stale": true, "failed": true},
 	"current_game_client":          {"request": true, "received": true, "rendered": true, "failed": true, "canceled": true, "stale": true, "cached": true, "in-flight": true, "gated": true, "render-failed": true, "render-no-root": true, "render-scope-mismatch": true, "invalid-response": true},
@@ -178,7 +197,80 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid client diagnostic", http.StatusBadRequest)
 		return
 	}
+	if request.Event == "gameflow_phase_client" {
+		if !a.recordGameflowClientObservations(request) {
+			a.recordClientDiagnosticRejected("invalid-observations", request.Event)
+			http.Error(w, "invalid gameflow observations", http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	event := map[string]any{"event": request.Event, "reason": request.Reason}
+	if request.Event == "catalog_client" || request.Event == "item_id_not_in_catalog" {
+		switch request.Endpoint {
+		case "items", "perks", "summoner-spells":
+			event["endpoint"] = request.Endpoint
+		}
+		event["http_status"] = min(599, max(0, request.HTTPStatus))
+		event["items"] = min(10000, max(0, request.ItemCount))
+		event["id"] = min(int64(1000000), max(int64(0), request.ItemID))
+		switch request.ErrorKind {
+		case "none", "http", "timeout", "network", "decode", "canceled", "empty":
+			event["error_kind"] = request.ErrorKind
+		}
+		a.recordDiagnostic(event)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	if request.Event == "champselect_dialog_client" {
+		event["revision"] = min(1000000, max(0, request.Revision))
+		a.recordDiagnostic(event)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if request.Event == "local_request_client" {
+		switch request.Endpoint {
+		case "status", "gameplay", "champions", "collection", "other":
+			event["endpoint"] = request.Endpoint
+		}
+		event["started_at"] = min(int64(1e13), max(0, request.StartedAt))
+		event["completed_at"] = min(int64(1e13), max(0, request.CompletedAt))
+		event["duration_ms"] = min(1000000, max(0, request.DurationMS))
+		event["http_status"] = min(599, max(0, request.HTTPStatus))
+		switch request.ErrorKind {
+		case "none", "http", "timeout", "network", "decode", "canceled":
+			event["error_kind"] = request.ErrorKind
+		}
+		a.recordDiagnostic(event)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if request.Event == "live_refresh_client" {
+		event["hidden"], event["phase_changed"], event["live_refresh_queued"] = request.Hidden, request.PhaseChanged, request.LiveRefreshQueued
+		switch request.Section {
+		case "overview", "live", "champions", "favorites", "suite", "collection", "tools":
+			event["section"] = request.Section
+		}
+		switch request.Source {
+		case "direct", "event", "sse", "poll", "resync", "interval":
+			event["source"] = request.Source
+		}
+		event["transport_suppressed"] = min(1000000, max(0, request.TransportSuppressed))
+		a.recordDiagnostic(event)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if request.Event == "claim_progress_client" {
+		event["hidden"] = request.Hidden
+		event["claiming"], event["done"], event["total"] = request.Claiming, min(100, max(0, request.Done)), min(100, max(0, request.Total))
+		event["duration_ms"] = min(3600000, max(0, request.DurationMS))
+		a.recordDiagnostic(event)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	if request.Event == "current_game_client" || request.Event == "watch_settings_client" || request.Event == "champ_select_filter_client" || request.Event == "diagnostic_delivery_client" {
 		// Dedicated allowlist: ignore every general-purpose text/identity field.
 		event["diagnostic_schema"] = 4
@@ -196,7 +288,7 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 			event[key] = min(1000000, max(0, value))
 		}
 		if request.Event == "diagnostic_delivery_client" {
-			event["transport_pending"] = min(32, max(0, request.TransportPending))
+			event["transport_pending"] = min(97, max(0, request.TransportPending))
 			event["request_id"] = min(1000000, max(0, request.RequestID))
 		}
 		if request.TransportHTTPStatus >= 100 && request.TransportHTTPStatus <= 599 {
@@ -215,6 +307,7 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		if request.Event == "watch_settings_client" {
 			event["revision"] = min(1000000, max(0, request.Revision))
 			event["master_enabled"], event["custom_paused"], event["champselect_enabled"] = request.MasterEnabled, request.CustomPaused, request.ChampSelectEnabled
+			event["auto_matchmaking_enabled"] = request.AutoMatchmakingEnabled
 			event["pending_saves"] = min(1000, max(0, request.PendingSaves))
 		} else {
 			event["manual_refresh"], event["hidden"] = request.ForceRefresh, request.Hidden
@@ -338,6 +431,9 @@ func (a *app) handleDiagnostics(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (a *app) handleDiagnosticLog(w http.ResponseWriter, r *http.Request) {
+	if a.champions != nil {
+		a.champions.flushAssetFetch()
+	}
 	if a.storage == nil {
 		http.Error(w, "本地诊断日志不可用", http.StatusServiceUnavailable)
 		return

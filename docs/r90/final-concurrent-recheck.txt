@@ -1,0 +1,20 @@
+✔ R89 parallel supplements start before first overview resolves and survive ref adoption without duplicates (7.320083ms)
+✔ R89 catalog failure retries once after backoff and missing IDs report once within a bound (1.713208ms)
+✔ R89 recommendations choose one main champion and that champion main role from at most 20 matches; empty has no shell (0.602583ms)
+✔ R89 catalog arrival invalidates retained match DOM in all open tabs (0.392417ms)
+✔ R89 completion failure preserves first five and exposes a retry that completes recommendations (0.704417ms)
+✔ R89 an older overlay recommendation cannot overwrite the active player and closing aborts it (0.468917ms)
+✔ R90 complete snapshots never schedule another in-game timer (2.08025ms)
+✔ R90 completeness requires availability, roster, settled history and arena verdict (0.331084ms)
+✔ R90 incomplete snapshots stop after eight retries with a visible refresh exit (1.0205ms)
+✔ R90 inactive tabs and repeated in-game SSE do not reload the roster; phase transitions do (0.351625ms)
+✔ R90 stopped UI has an operable manual refresh and foreground wake checks phase (1.4235ms)
+✔ R90 actual loader bypasses cache for manual refresh and preserves queued manual actions (0.619875ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 56.093208

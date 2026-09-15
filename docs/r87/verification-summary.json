@@ -1,0 +1,46 @@
+{
+  "base": "2a5a0a7c9109e46683dfff32ae7b2b6ddfcd346d",
+  "scope": [
+    "P1",
+    "P2",
+    "P3",
+    "P4",
+    "P5",
+    "P6",
+    "P7",
+    "P8",
+    "P9",
+    "A1",
+    "A2",
+    "A3"
+  ],
+  "go_full": "passed",
+  "js_total": 605,
+  "js_pass": 604,
+  "js_fail": 0,
+  "js_skip": 1,
+  "race": "passed",
+  "windows_amd64_build": "passed",
+  "chromium_widths": [
+    1920,
+    2560,
+    3840
+  ],
+  "dialog_chromium": {
+    "viewport": [
+      480,
+      700
+    ],
+    "scroll_before": 198,
+    "scroll_after": 198,
+    "typed": "ahri",
+    "focused": true,
+    "mutant_scroll_after": 0,
+    "mutant_typed": "a",
+    "mutant_focused": false
+  },
+  "mutations_detected": 25,
+  "mutations_total": 25,
+  "integration": "46 source/test files byte-identical, 6 focused tests passed",
+  "real_lcu_validation": "pending as listed in execution ledger"
+}

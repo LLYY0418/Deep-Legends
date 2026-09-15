@@ -14,7 +14,11 @@ func TestClientDiagnosticAcceptsMultipleEventWhitelists(t *testing.T) {
 	for event, reasons := range clientDiagnosticEvents {
 		for reason := range reasons {
 			recorder := httptest.NewRecorder()
-			request := httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(`{"event":"`+event+`","reason":"`+reason+`","key":"13:middle:CLASSIC:11:4-12","championId":13,"queueId":420,"position":"MID"}`))
+			body := `{"event":"` + event + `","reason":"` + reason + `","key":"13:middle:CLASSIC:11:4-12","championId":13,"queueId":420,"position":"MID"}`
+			if event == "gameflow_phase_client" {
+				body = `{"event":"gameflow_phase_client","reason":"batch","observations":[{"reason":"received","phase":"InProgress","source":"poll","gameId":8980574903}]}`
+			}
+			request := httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(body))
 			(&app{}).handleClientDiagnostic(recorder, request)
 			if recorder.Code != http.StatusNoContent {
 				t.Fatalf("whitelisted event=%q reason=%q returned %d: %s", event, reason, recorder.Code, recorder.Body.String())

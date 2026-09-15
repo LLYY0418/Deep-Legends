@@ -1,0 +1,32 @@
+[
+  {
+    "mutation": "keep-old-game",
+    "killed": true,
+    "exitCode": 1
+  },
+  {
+    "mutation": "clear-on-same-game-refresh",
+    "killed": true,
+    "exitCode": 1
+  },
+  {
+    "mutation": "wait-for-stalled-request",
+    "killed": true,
+    "exitCode": 1
+  },
+  {
+    "mutation": "abort-other-pages",
+    "killed": true,
+    "exitCode": 1
+  },
+  {
+    "mutation": "accept-abandoned-response",
+    "killed": true,
+    "exitCode": 1
+  },
+  {
+    "mutation": "hide-loading-feedback",
+    "killed": true,
+    "exitCode": 1
+  }
+]

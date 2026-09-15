@@ -149,6 +149,10 @@ func TestConvenienceReconnectPostsAndNotifies(t *testing.T) {
 	done := make(chan string, 1)
 	events := make(chan string, 4)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/lol-gameflow/v1/gameflow-phase" {
+			_, _ = w.Write([]byte(`"Reconnect"`))
+			return
+		}
 		done <- r.Method + " " + r.URL.Path
 		w.WriteHeader(http.StatusNoContent)
 	}))

@@ -1,0 +1,5 @@
+--- FAIL: TestR91AddendumRetryableRosterDoesNotBlockEarlyProbe (0.00s)
+    r91_addendum_test.go:363: 20 second roster cache suppressed early probe 1
+FAIL
+FAIL	lol-loot-assistant	0.013s
+FAIL

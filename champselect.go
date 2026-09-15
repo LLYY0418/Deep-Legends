@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -34,6 +35,7 @@ type champSelectSideConfig struct {
 	Enabled             bool               `json:"enabled"`
 	Strategy            string             `json:"strategy"`
 	DelayMS             int                `json:"delayMs"`
+	LockDelayMS         *int               `json:"lockDelayMs,omitempty"`
 	AvoidTeammateIntent bool               `json:"avoidTeammateIntent"`
 	Champions           map[string][]int64 `json:"champions"`
 	// Migration backup only; never used as an executable pool.
@@ -68,12 +70,14 @@ var champSelectGroupDefinitions = []champSelectGroupDefinition{
 }
 
 type champSelectSubmitRecord struct {
-	ChampionID int64
-	Completed  bool
-	At         time.Time
-	TraceID    string
-	Confirmed  bool
-	Decision   champSelectDecision
+	ChampionID   int64
+	Completed    bool
+	At           time.Time
+	TraceID      string
+	Confirmed    bool
+	ConfirmedAt  time.Time
+	HoverCleared bool
+	Decision     champSelectDecision
 }
 
 type champSelectGridChampion struct {
@@ -117,6 +121,7 @@ type champSelectDecision struct {
 	ForceHover         bool
 	AvailabilitySource string
 	RuntimeID          string
+	FromChampionID     int64
 }
 
 type champSelectRuntimeRecord struct {
@@ -151,6 +156,10 @@ type champSelectRuntimeStore struct {
 	submitted        map[int64]champSelectSubmitRecord
 	inFlight         map[int64]bool
 	takeover         map[string]bool
+	takeoverChampion map[string]int64
+	benchObserved    bool
+	benchChampionID  int64
+	benchSwap        *champSelectBenchSubmission
 	exhausted        map[string]bool
 	benchFirstSeen   map[int64]time.Time
 	records          []champSelectRuntimeRecord
@@ -194,18 +203,19 @@ type champSelectOngoingSwap struct {
 
 func newChampSelectRuntimeStore() champSelectRuntimeStore {
 	return champSelectRuntimeStore{
-		runtimeID:      newDiagnosticTrace("cs-runtime"),
-		attempts:       map[string]int{},
-		banEvidence:    map[int64]struct{}{},
-		grid:           map[int64]champSelectGridChampion{},
-		pickable:       map[int64]struct{}{},
-		bannable:       map[int64]struct{}{},
-		decision:       map[string]champSelectDecision{},
-		submitted:      map[int64]champSelectSubmitRecord{},
-		inFlight:       map[int64]bool{},
-		takeover:       map[string]bool{},
-		exhausted:      map[string]bool{},
-		benchFirstSeen: map[int64]time.Time{},
+		runtimeID:        newDiagnosticTrace("cs-runtime"),
+		attempts:         map[string]int{},
+		banEvidence:      map[int64]struct{}{},
+		grid:             map[int64]champSelectGridChampion{},
+		pickable:         map[int64]struct{}{},
+		bannable:         map[int64]struct{}{},
+		decision:         map[string]champSelectDecision{},
+		submitted:        map[int64]champSelectSubmitRecord{},
+		inFlight:         map[int64]bool{},
+		takeover:         map[string]bool{},
+		takeoverChampion: map[string]int64{},
+		exhausted:        map[string]bool{},
+		benchFirstSeen:   map[int64]time.Time{},
 	}
 }
 
@@ -230,9 +240,10 @@ func champSelectGroupDefinitionsForClient() []champSelectGroupDefinition {
 func defaultChampSelectSettings() champSelectSettings {
 	settings := champSelectSettings{Groups: make(map[string]champSelectGroupConfig, len(champSelectGroupDefinitions))}
 	for _, definition := range champSelectGroupDefinitions {
+		lockDelay := 10000
 		settings.Groups[definition.GroupID] = champSelectGroupConfig{
 			Ban:   champSelectSideConfig{Strategy: "show-then-lock", DelayMS: 2000, AvoidTeammateIntent: true, Champions: map[string][]int64{"default": {}}},
-			Pick:  champSelectSideConfig{Strategy: "show-then-lock", DelayMS: 500, AvoidTeammateIntent: true, Champions: emptyChampSelectPools(definition)},
+			Pick:  champSelectSideConfig{Strategy: "show-then-lock", DelayMS: 500, LockDelayMS: &lockDelay, AvoidTeammateIntent: true, Champions: emptyChampSelectPools(definition)},
 			Bench: champSelectBenchConfig{Enabled: definition.HasBench, HoldMS: 1000, PreferFirst: definition.HasBench},
 		}
 	}
@@ -293,6 +304,12 @@ func normalizeChampSelectSide(side, fallback champSelectSideConfig, definition c
 		limit = definition.PickLimit
 	}
 	side.DelayMS = clampInt(side.DelayMS, 0, 10000, 0)
+	if kind == "pick" {
+		lockDelay := champSelectLockDelay(side)
+		side.LockDelayMS = &lockDelay
+	} else {
+		side.LockDelayMS = nil
+	}
 	if kind == "ban" && len(definition.Positions) > 1 {
 		side = migrateChampSelectSharedBan(side, definition)
 	} else {
@@ -339,6 +356,10 @@ func cloneChampSelectSettings(settings champSelectSettings) champSelectSettings 
 		group.Ban.Champions = cloneChampSelectPools(group.Ban.Champions)
 		group.Ban.LegacyLaneChampions = cloneChampSelectPools(group.Ban.LegacyLaneChampions)
 		group.Pick.Champions = cloneChampSelectPools(group.Pick.Champions)
+		if group.Pick.LockDelayMS != nil {
+			delay := *group.Pick.LockDelayMS
+			group.Pick.LockDelayMS = &delay
+		}
 		clone.Groups[groupID] = group
 	}
 	return clone
@@ -354,16 +375,8 @@ func cloneChampSelectPools(pools map[string][]int64) map[string][]int64 {
 
 func champSelectGroupID(queueID int64, gameMode string, mapID int64) string {
 	mode := strings.ToUpper(strings.TrimSpace(gameMode))
-	// Observed custom draft queue in diagnostics 0910-1110. Never borrow the
-	// normal matchmaking pool for a custom game.
-	if queueID == 3110 {
-		return "practice"
-	}
-	if queueID == 3200 {
-		return "aram"
-	}
-	if queueID == 420 || queueID == 440 {
-		return "ranked"
+	if group := champSelectQueueOverride(queueID, mode); group != "" {
+		return group
 	}
 	if isARAMFamilyGameMode(mode) {
 		return "aram"
@@ -389,10 +402,7 @@ func champSelectGroupID(queueID int64, gameMode string, mapID int64) string {
 	case "BOT", "TUTORIAL", "PRACTICETOOL", "CUSTOM", "CUSTOM_GAME":
 		return "practice"
 	case "CLASSIC":
-		if queueID == 400 || queueID == 700 {
-			return "normal"
-		}
-		if queueID <= 0 {
+		if missingQueueID(queueID) {
 			return "practice"
 		}
 	}
@@ -552,7 +562,7 @@ func firstLocalChampSelectAction(session lcuChampSelectSession) (lcuChampSelectA
 // use that module when the client explicitly marks it active and its session
 // is the same game/player. Never substitute pickable IDs for bannable IDs.
 func champSelectSessionSource(ctx context.Context, client *LCUClient, session lcuChampSelectSession) (lcuChampSelectSession, string, string) {
-	if session.QueueID != 3110 {
+	if !queueUsesLegacyChampSelect(session.QueueID) {
 		return session, champSelectAPI, "standard-queue"
 	}
 	if session.GameID <= 0 || session.LocalPlayerCellID == nil {
@@ -570,7 +580,7 @@ func champSelectSessionSource(ctx context.Context, client *LCUClient, session lc
 		return session, champSelectAPI, "legacy-session-failed"
 	}
 	if legacy.GameID != session.GameID || legacy.LocalPlayerCellID == nil || *legacy.LocalPlayerCellID != *session.LocalPlayerCellID ||
-		(legacy.QueueID != 0 && legacy.QueueID != session.QueueID) {
+		(!unspecifiedQueueID(legacy.QueueID) && legacy.QueueID != session.QueueID) {
 		return session, champSelectAPI, "legacy-session-mismatch"
 	}
 	legacy.QueueID = session.QueueID
@@ -768,6 +778,8 @@ func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelec
 		r.resetChampSelectRuntimeLocked()
 	}
 	r.mu.Unlock()
+	r.observeChampSelectManualActions(session)
+	r.observeChampSelectBench(session, definition, group, champSelectPoolPosition(definition, champSelectAssignedPosition(session)), "")
 	r.recordChampSelectPostflight(session)
 	r.reconcileChampSelectSubmissions(session)
 	r.mu.Lock()
@@ -806,12 +818,22 @@ func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelec
 		pickableReady = false
 	}
 	bannableIDs := []int64{}
-	if definition.HasBan && champSelectSessionHasActionType(session, "ban") {
-		if err := client.RequestJSON(ctx, http.MethodGet, sessionAPI+"/bannable-champion-ids", nil, &bannableIDs); err != nil {
+	hasBanAction := champSelectSessionHasActionType(session, "ban")
+	banProbe := map[string]any{"event": "champselect_ban_probe", "queue_id": session.QueueID, "has_ban_action": hasBanAction, "requested": definition.HasBan && hasBanAction, "status_code": 0, "raw_count": 0, "raw_head": []int64{}}
+	if definition.HasBan && hasBanAction {
+		var status atomic.Int64
+		err := client.RequestJSON(context.WithValue(ctx, lcuResponseStatusKey{}, &status), http.MethodGet, sessionAPI+"/bannable-champion-ids", nil, &bannableIDs)
+		banProbe["raw_count"] = len(bannableIDs)
+		banProbe["raw_head"] = append([]int64{}, bannableIDs[:min(3, len(bannableIDs))]...)
+		banProbe["status_code"] = status.Load()
+		if err != nil {
+			banProbe["error_class"] = diagnosticErrorKind(err)
+			r.record(banProbe)
 			r.champSelectReadFailed("bannable-champion-ids", err)
 			return
 		}
 	}
+	r.record(banProbe)
 	pickable := champSelectIDSet(pickableIDs)
 	bannable := champSelectIDSet(bannableIDs)
 	r.recordChampSelectSource(sessionAPI, sourceReason, session, pickableIDs, bannableIDs)
@@ -911,12 +933,11 @@ func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelec
 		return
 	}
 	if action.ChampionID != 0 && (!submitted || lastSubmission.ChampionID != action.ChampionID) {
-		r.mu.Lock()
-		r.champSelect.takeover[side] = true
-		r.mu.Unlock()
-		r.cancelPending(actionName)
-		r.champSelectLog("warn", fmt.Sprintf("检测到手动%s，已让位", champSelectSideName(side)))
-		r.emit("watch:canceled:" + actionName)
+		championID := lastSubmission.ChampionID
+		if championID == 0 {
+			championID = pendingDecision.ChampionID
+		}
+		r.yieldChampSelect(side, championID, "")
 		return
 	}
 	if submitted && !lastSubmission.Confirmed {
@@ -950,15 +971,23 @@ func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelec
 		}
 		return
 	}
-	completed := champSelectActionCompleted(config.Strategy, action.ChampionID, candidate, submitted, lastSubmission)
-	forceHover := side == "ban" && strings.HasPrefix(banSource, "custom-")
-	if intent || forceHover && !(submitted && lastSubmission.Confirmed && action.ChampionID == candidate) {
+	confirmedHover := submitted && lastSubmission.Confirmed && !lastSubmission.Completed && lastSubmission.ChampionID == candidate
+	observedChampion := action.ChampionID
+	if observedChampion == 0 && confirmedHover {
+		observedChampion = candidate
+	}
+	completed := champSelectActionCompleted(config.Strategy, observedChampion, candidate, submitted, lastSubmission)
+	forceHover := side == "ban" && strings.HasPrefix(banSource, "wildcard-")
+	if intent || forceHover && !confirmedHover {
 		completed = false
 	}
 	if submitted && lastSubmission.ChampionID == candidate && lastSubmission.Completed == completed {
 		return
 	}
 	delay := champSelectDelay(config.DelayMS, remaining)
+	if side == "pick" && completed && config.Strategy == "show-then-lock" {
+		delay = champSelectHoverLockDelay(config, lastSubmission, time.Now())
+	}
 	body := map[string]any{"type": side, "championId": candidate, "completed": completed}
 	if intent {
 		body = map[string]any{"championId": candidate}
@@ -1170,7 +1199,7 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 			return
 		}
 		r.mu.Lock()
-		if r.champSelect.sessionPaused || r.champSelect.runtimeID != decision.RuntimeID {
+		if r.champSelect.sessionPaused || r.champSelect.runtimeID != decision.RuntimeID || r.champSelect.takeover[strings.TrimPrefix(decision.Action, "champselect-")] {
 			r.mu.Unlock()
 			r.champDiagnostic("delay", "session-paused", decision, nil)
 			return
@@ -1190,7 +1219,7 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 		}
 		r.mu.Unlock()
 		requestCtx, requestCancel := context.WithTimeout(ctx, 8*time.Second)
-		if isBanPick && !r.champSelectRequestStillCurrent(requestCtx, client, decision) {
+		if (isBanPick && !r.champSelectRequestStillCurrent(requestCtx, client, decision)) || (decision.Action == champSelectActionBench && !r.champSelectBenchRequestStillCurrent(requestCtx, client, decision)) {
 			requestCancel()
 			r.mu.Lock()
 			if r.champSelect.decision[decision.Action] == decision {
@@ -1202,7 +1231,7 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 		}
 		writeStarted := time.Now()
 		r.mu.Lock()
-		if r.champSelect.runtimeID != decision.RuntimeID {
+		if r.champSelect.runtimeID != decision.RuntimeID || r.champSelect.takeover[strings.TrimPrefix(decision.Action, "champselect-")] || ctx.Err() != nil {
 			r.mu.Unlock()
 			requestCancel()
 			return
@@ -1210,12 +1239,22 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 		if isBanPick {
 			r.champSelect.attempts[decision.Key]++
 		}
+		if decision.Action == champSelectActionBench || (decision.Action == champSelectActionTrade && decision.Completed) {
+			r.champSelect.benchSwap = &champSelectBenchSubmission{Decision: decision}
+		}
 		attempt := r.champSelect.attempts[decision.Key]
 		r.mu.Unlock()
 		r.champDiagnostic("write", "started", decision, map[string]any{"attempt": attempt, "attempt_limit": champSelectMaxWriteAttempts})
 		err := r.requestChampSelectJSON(requestCtx, client, method, path, body)
 		requestCancel()
 		r.champDiagnostic("write-result", diagnosticStageError(err, "http-success"), decision, map[string]any{"duration_ms": time.Since(writeStarted).Milliseconds()})
+		if !isBanPick {
+			r.mu.Lock()
+			if swap := r.champSelect.benchSwap; r.champSelect.runtimeID == decision.RuntimeID && swap != nil && swap.Decision.TraceID == decision.TraceID {
+				swap.SettledAt = time.Now()
+			}
+			r.mu.Unlock()
+		}
 		if isBanPick {
 			r.mu.Lock()
 			current := r.champSelect.runtimeID == decision.RuntimeID && r.champSelect.decision[decision.Action].TraceID == decision.TraceID
@@ -1241,11 +1280,19 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 			}
 			return
 		}
+		r.mu.Lock()
+		current := r.champSelect.runtimeID == decision.RuntimeID && !r.champSelect.takeover[strings.TrimPrefix(decision.Action, "champselect-")]
+		r.mu.Unlock()
+		if !current || ctx.Err() != nil {
+			return
+		}
 		if err != nil {
 			if ctx.Err() == nil {
 				status, code, message := watchFailureDetail(err)
 				r.mu.Lock()
-				delete(r.champSelect.decision, decision.Action)
+				if r.champSelect.decision[decision.Action].TraceID == decision.TraceID {
+					delete(r.champSelect.decision, decision.Action)
+				}
 				r.mu.Unlock()
 				r.record(map[string]any{"event": "watch_action", "action": decision.Action, "result": "failed", "status_code": status, "error_code": code})
 				r.champSelectLog("fail", fmt.Sprintf("%s失败：%s", champSelectActionVerb(decision.Action), message))
@@ -1289,7 +1336,7 @@ func (r *watchRunner) champSelectRequestStillCurrent(ctx context.Context, client
 	checks["observed_queue_id"], checks["expected_queue_id"] = session.QueueID, decision.QueueID
 	if session.GameID != decision.GameID ||
 		session.LocalPlayerCellID == nil || *session.LocalPlayerCellID != decision.LocalCellID ||
-		(session.QueueID != decision.QueueID && !(decision.SessionAPI == champSelectLegacyAPI && session.QueueID == 0)) {
+		(session.QueueID != decision.QueueID && !(decision.SessionAPI == champSelectLegacyAPI && unspecifiedQueueID(session.QueueID))) {
 		why = "session-identity-changed"
 		return false
 	}
@@ -1298,10 +1345,6 @@ func (r *watchRunner) champSelectRequestStillCurrent(ctx context.Context, client
 	checks["unique_local_action"], checks["observed_action_id"], checks["observed_champion_id"] = found, action.ID, action.ChampionID
 	if !found || action.ID != decision.ActionID || "champselect-"+strings.ToLower(action.Type) != decision.Action {
 		why = "local-action-changed"
-		return false
-	}
-	if decision.ForceHover && decision.Completed && action.ChampionID != decision.ChampionID {
-		why = "compatibility-hover-disappeared"
 		return false
 	}
 	r.mu.Lock()
@@ -1324,7 +1367,16 @@ func (r *watchRunner) champSelectRequestStillCurrent(ctx context.Context, client
 	r.mu.Unlock()
 	// Replacing our own hover after an ally takes it is allowed; replacing a
 	// manual hover remains forbidden.
-	if !allowed || action.ChampionID != 0 && action.ChampionID != decision.ChampionID && (!submitted || last.Completed || last.ChampionID != action.ChampionID) {
+	if champSelectManualActionChanged(session, action, last, submitted) {
+		r.yieldChampSelect(side, decision.ChampionID, decision.RuntimeID)
+		why = "manual-takeover"
+		return false
+	}
+	if decision.ForceHover && decision.Completed && !(submitted && last.Confirmed && last.ChampionID == decision.ChampionID) {
+		why = "compatibility-hover-unconfirmed"
+		return false
+	}
+	if !allowed || decision.Completed && submitted && last.Confirmed && action.ChampionID != 0 && action.ChampionID != decision.ChampionID {
 		why = "disabled-or-manual-takeover"
 		return false
 	}
@@ -1374,6 +1426,21 @@ func champSelectActionVerb(action string) string {
 }
 
 func (r *watchRunner) evaluateChampSelectBench(client *LCUClient, session lcuChampSelectSession, definition champSelectGroupDefinition, group champSelectGroupConfig, position string) {
+	if r.observeChampSelectBench(session, definition, group, position, "") {
+		return
+	}
+	r.mu.Lock()
+	awaitingSwap := false
+	if swap := r.champSelect.benchSwap; swap != nil && !swap.Observed {
+		awaitingSwap = swap.SettledAt.IsZero() || time.Since(swap.SettledAt) < 2*time.Second
+		if !awaitingSwap {
+			r.champSelect.benchSwap = nil
+		}
+	}
+	r.mu.Unlock()
+	if awaitingSwap {
+		return
+	}
 	if !definition.HasBench || !session.BenchEnabled || !group.Bench.Enabled || len(session.BenchChampions) == 0 {
 		r.champDiagnostic("bench-gate", "unavailable-or-disabled", champSelectDecision{}, map[string]any{"has_bench": definition.HasBench, "client_bench": session.BenchEnabled, "enabled": group.Bench.Enabled, "bench_count": len(session.BenchChampions)})
 		r.clearChampSelectDecision(champSelectActionBench)
@@ -1415,7 +1482,10 @@ func (r *watchRunner) evaluateChampSelectBench(client *LCUClient, session lcuCha
 	elapsed := int(now.Sub(firstSeen[target]) / time.Millisecond)
 	delay := champSelectDelay(max(0, group.Bench.HoldMS-elapsed), champSelectRemainingMS(session))
 	path := fmt.Sprintf("/lol-champ-select/v1/session/bench/swap/%d", target)
-	decision := champSelectDecision{Key: fmt.Sprintf("bench:%d", target), Action: champSelectActionBench, ChampionID: target}
+	if session.LocalPlayerCellID == nil {
+		return
+	}
+	decision := champSelectDecision{Key: fmt.Sprintf("bench:%d", target), Action: champSelectActionBench, ChampionID: target, FromChampionID: current, SessionAPI: champSelectAPI, GameID: session.GameID, QueueID: session.QueueID, LocalCellID: *session.LocalPlayerCellID}
 	r.scheduleChampSelectRequest(client, decision, delay, http.MethodPost, path, nil)
 }
 
@@ -1458,7 +1528,7 @@ func (r *watchRunner) handleChampSelectTrade(client *LCUClient) {
 		groupID := r.champSelect.groupID
 		position := r.champSelect.position
 		session := r.champSelect.lastSession
-		paused := r.champSelect.sessionPaused
+		paused := r.champSelect.sessionPaused || r.champSelect.takeover["trade"]
 		r.mu.Unlock()
 		if groupID == "" || groupID == "unsupported" || paused {
 			r.champDiagnostic("trade-gate", "mode-or-pause", champSelectDecision{}, nil)
@@ -1477,7 +1547,7 @@ func (r *watchRunner) handleChampSelectTrade(client *LCUClient) {
 			outcome = "accept"
 		}
 		path := fmt.Sprintf("/lol-champ-select/v1/session/champion-swaps/%d/%s", swap.ID, outcome)
-		decision := champSelectDecision{Key: fmt.Sprintf("trade:%d:%s", swap.ID, outcome), Action: champSelectActionTrade, ChampionID: swap.RequesterChampionID}
+		decision := champSelectDecision{Key: fmt.Sprintf("trade:%d:%s", swap.ID, outcome), Action: champSelectActionTrade, ChampionID: swap.RequesterChampionID, FromChampionID: champSelectCurrentChampion(session), Completed: accept}
 		r.scheduleChampSelectRequest(client, decision, 0, http.MethodPost, path, nil)
 	}()
 }
@@ -1630,7 +1700,7 @@ func (r *watchRunner) champSelectSnapshot() champSelectRuntimeResponse {
 		key := fmt.Sprintf("%d", championID)
 		response.Owned[key] = champion.Owned
 		response.BanStates[key] = champSelectChampionState("ban", championID, r.champSelect.bannable, champion)
-		if response.BanStates[key] == "available" && strings.HasPrefix(response.BanSource, "custom-") {
+		if response.BanStates[key] == "available" && strings.HasPrefix(response.BanSource, "wildcard-") {
 			response.BanStates[key] = "verify-hover"
 		}
 		response.PickStates[key] = champSelectChampionState("pick", championID, r.champSelect.pickable, champion)
@@ -1640,6 +1710,16 @@ func (r *watchRunner) champSelectSnapshot() champSelectRuntimeResponse {
 	}
 	if decision, ok := r.champSelect.decision[champSelectActionPick]; ok {
 		response.ActivePickID = decision.ChampionID
+	}
+	for side, championID := range r.champSelect.takeoverChampion {
+		if championID <= 0 {
+			continue
+		}
+		states := response.PickStates
+		if side == "ban" {
+			states = response.BanStates
+		}
+		states[fmt.Sprint(championID)] = "manual-takeover"
 	}
 	return response
 }

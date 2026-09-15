@@ -1,0 +1,5 @@
+--- FAIL: TestR91AddendumGameStartGroupingAndCarryover (0.01s)
+    r91_addendum_test.go:173: carryover lost boundaries
+FAIL
+FAIL	lol-loot-assistant	0.013s
+FAIL

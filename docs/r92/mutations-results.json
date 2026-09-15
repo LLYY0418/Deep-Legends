@@ -1,0 +1,82 @@
+[
+  {
+    "id": "G1-default-four",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "G1-effective-four",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "G2-no-match-persistence",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "G3-widen-both",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "G3-widen-bytes-only",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "G3-remove-eviction",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "H1-source",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "H1-depths",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "H2-host",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "H-shared-cache",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "I1-serial",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "I1-dropped-new",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "I2-persist-off",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "H3-empty-shell",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "H-recent20",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "H4-first-screen-blocked",
+    "killed": true,
+    "exit": 1
+  }
+]

@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T15:10:17.164249+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T15:10:17.413147+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired"}
+{"Time":"2026-09-14T15:10:17.413212+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"=== RUN   TestR90BQueueGuardRequired\n"}
+{"Time":"2026-09-14T15:10:17.413281+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/binary-buffer"}
+{"Time":"2026-09-14T15:10:17.413285+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/binary-buffer","Output":"=== RUN   TestR90BQueueGuardRequired/binary-buffer\n"}
+{"Time":"2026-09-14T15:10:17.646784+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/binary-buffer","Output":"    r90b_queue_guard_test.go:17: missed R90B queue literal: binary-buffer\n"}
+{"Time":"2026-09-14T15:10:17.646861+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/binary-buffer","Output":"--- FAIL: TestR90BQueueGuardRequired/binary-buffer (0.23s)\n"}
+{"Time":"2026-09-14T15:10:17.646872+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/binary-buffer","Elapsed":0.23}
+{"Time":"2026-09-14T15:10:17.646881+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"--- FAIL: TestR90BQueueGuardRequired (0.23s)\n"}
+{"Time":"2026-09-14T15:10:17.646888+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Elapsed":0.23}
+{"Time":"2026-09-14T15:10:17.64689+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T15:10:17.647565+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.483s\n"}
+{"Time":"2026-09-14T15:10:17.647589+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.483}

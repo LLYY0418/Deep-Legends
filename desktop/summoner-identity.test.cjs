@@ -180,6 +180,8 @@ test("forced overview aborts a loading request and starts a newer request", asyn
     state,
     loadOPGGSeasonSummary: async () => false,
     loadOverviewCurrentGame: async () => false,
+    syncOverviewSupplementRefs: () => {},
+    riotTab: () => false,
     tabGroup: () => "players",
     tabReady: () => true,
     rerenderTab: () => { renders += 1; },

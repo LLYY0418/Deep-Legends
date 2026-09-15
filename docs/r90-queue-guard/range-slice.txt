@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T14:19:34.07655+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:19:34.326794+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired"}
+{"Time":"2026-09-14T14:19:34.326898+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired","Output":"=== RUN   TestR90QueueGuardRequired\n"}
+{"Time":"2026-09-14T14:19:34.327045+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/range-slice"}
+{"Time":"2026-09-14T14:19:34.32705+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/range-slice","Output":"=== RUN   TestR90QueueGuardRequired/range-slice\n"}
+{"Time":"2026-09-14T14:19:34.329738+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/range-slice","Output":"    r90_queue_guard_test.go:51: missed R90 queue literal: range-slice\n"}
+{"Time":"2026-09-14T14:19:34.329782+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/range-slice","Output":"--- FAIL: TestR90QueueGuardRequired/range-slice (0.00s)\n"}
+{"Time":"2026-09-14T14:19:34.329795+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired/range-slice","Elapsed":0}
+{"Time":"2026-09-14T14:19:34.329803+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired","Output":"--- FAIL: TestR90QueueGuardRequired (0.00s)\n"}
+{"Time":"2026-09-14T14:19:34.329805+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardRequired","Elapsed":0}
+{"Time":"2026-09-14T14:19:34.329806+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:19:34.33111+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.254s\n"}
+{"Time":"2026-09-14T14:19:34.331128+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.255}

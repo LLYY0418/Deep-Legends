@@ -81,48 +81,49 @@ type queueDefinition struct {
 	ModeGroup          string
 	Filter             string
 	RecommendationMode string
+	SquadSize          int
 }
 
 var supportedQueueDefinitions = []queueDefinition{
-	{400, "匹配模式（征召）", "match", "more:match", "ranked"},
-	{420, "单排/双排", "solo", "solo", "ranked"},
-	{430, "匹配模式（盲选）", "match", "more:match", "ranked"},
-	{440, "灵活组排", "flex", "flex", "ranked"},
-	{450, "极地大乱斗", "aram", "more:aram", "aram"},
-	{480, "快速模式", "match", "more:match", "ranked"},
-	{490, "匹配模式（快速）", "match", "more:match", "ranked"},
-	{700, "召唤师峡谷冠军杯赛", "clash", "more:clash", "ranked"},
-	{720, "极地大乱斗冠军杯赛", "clash", "more:clash", "aram"},
-	{820, "人机对战（新手）", "bots", "more:bots", "bots"},
-	{830, "人机对战（入门）", "bots", "more:bots", "bots"},
-	{840, "人机对战（新手）", "bots", "more:bots", "bots"},
-	{850, "人机对战（一般）", "bots", "more:bots", "bots"},
-	{860, "人机对战", "bots", "more:bots", "bots"},
-	{870, "人机对战", "bots", "more:bots", "bots"},
-	{880, "人机对战", "bots", "more:bots", "bots"},
-	{890, "人机对战", "bots", "more:bots", "bots"},
-	{900, "无限火力", "urf", "more:urf", "urf"},
-	{930, "极地大乱斗冠军杯赛", "aram", "more:aram", "aram"},
-	{950, "末日人工智能（投票）", "doombots", "more:doombots", "bots"},
-	{960, "末日人工智能", "doombots", "more:doombots", "bots"},
-	{1300, "极限闪击", "nexus-blitz", "more:nexus-blitz", "nexus-blitz"},
-	{1700, "斗魂竞技场", "arena", "arena", "arena"},
-	{1710, "斗魂竞技场", "arena", "arena", "arena"},
-	{1750, "斗魂竞技场", "arena", "arena", "arena"},
-	{1900, "无限火力", "urf", "more:urf", "urf"},
-	{2300, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram"},
-	{2400, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram"},
-	{3100, "召唤师峡谷自选自定义", "custom", "excluded", "ranked"},
-	{3220, "极地大乱斗", "aram", "more:aram", "aram"},
-	{3270, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram"},
+	{400, "匹配模式（征召）", "match", "more:match", "ranked", 0},
+	{420, "单排/双排", "solo", "solo", "ranked", 0},
+	{430, "匹配模式（盲选）", "match", "more:match", "ranked", 0},
+	{440, "灵活组排", "flex", "flex", "ranked", 0},
+	{450, "极地大乱斗", "aram", "more:aram", "aram", 0},
+	{480, "快速模式", "match", "more:match", "ranked", 0},
+	{490, "匹配模式（快速）", "match", "more:match", "ranked", 0},
+	{700, "召唤师峡谷冠军杯赛", "clash", "more:clash", "ranked", 0},
+	{720, "极地大乱斗冠军杯赛", "clash", "more:clash", "aram", 0},
+	{820, "人机对战（新手）", "bots", "more:bots", "bots", 0},
+	{830, "人机对战（入门）", "bots", "more:bots", "bots", 0},
+	{840, "人机对战（新手）", "bots", "more:bots", "bots", 0},
+	{850, "人机对战（一般）", "bots", "more:bots", "bots", 0},
+	{860, "人机对战", "bots", "more:bots", "bots", 0},
+	{870, "人机对战", "bots", "more:bots", "bots", 0},
+	{880, "人机对战", "bots", "more:bots", "bots", 0},
+	{890, "人机对战", "bots", "more:bots", "bots", 0},
+	{900, "无限火力", "urf", "more:urf", "urf", 0},
+	{930, "极地大乱斗冠军杯赛", "aram", "more:aram", "aram", 0},
+	{950, "末日人工智能（投票）", "doombots", "more:doombots", "bots", 0},
+	{960, "末日人工智能", "doombots", "more:doombots", "bots", 0},
+	{1300, "极限闪击", "nexus-blitz", "more:nexus-blitz", "nexus-blitz", 0},
+	{1700, "斗魂竞技场", "arena", "arena", "arena", 2},
+	{1710, "斗魂竞技场", "arena", "arena", "arena", 2},
+	{1750, "斗魂竞技场", "arena", "arena", "arena", 3},
+	{1900, "无限火力", "urf", "more:urf", "urf", 0},
+	{2300, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram", 0},
+	{2400, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram", 0},
+	{3100, "召唤师峡谷自选自定义", "custom", "excluded", "ranked", 0},
+	{3220, "极地大乱斗", "aram", "more:aram", "aram", 0},
+	{3270, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram", 0},
 	// Tencent SGP snapshots identify these queues as the RUBY family. Riot's
 	// localized queue catalog supplies the visible name when the client is
 	// connected; keeping them explicit prevents CLASSIC/map-11 fallthrough.
-	{4210, "RUBY", "other", "more:special", "unsupported"},
-	{4220, "RUBY", "other", "more:special", "unsupported"},
-	{4240, "RUBY 试炼 1", "other", "more:special", "unsupported"},
-	{4250, "RUBY 试炼 2", "other", "more:special", "unsupported"},
-	{4260, "RUBY 试炼 3", "other", "more:special", "unsupported"},
+	{4210, "RUBY", "other", "more:special", "unsupported", 0},
+	{4220, "RUBY", "other", "more:special", "unsupported", 0},
+	{4240, "RUBY 试炼 1", "other", "more:special", "unsupported", 0},
+	{4250, "RUBY 试炼 2", "other", "more:special", "unsupported", 0},
+	{4260, "RUBY 试炼 3", "other", "more:special", "unsupported", 0},
 }
 
 var supportedQueueDefinitionsByID = func() map[int64]queueDefinition {
@@ -243,4 +244,40 @@ func (spec matchHistoryFilterSpec) acceptsAll(infos []*riotMatchInfo) bool {
 		}
 	}
 	return true
+}
+
+// Arena queue IDs belong only in the shared registration table.
+func isArenaQueue(queueID int64, gameMode string) bool {
+	definition, ok := supportedQueueDefinition(queueID)
+	return (ok && definition.ModeGroup == "arena") || strings.EqualFold(strings.TrimSpace(gameMode), "CHERRY") || strings.EqualFold(strings.TrimSpace(gameMode), "ARENA")
+}
+
+// Queue-specific champ-select compatibility belongs in the queue registry.
+// Legacy probing is limited to the observed custom draft implementation.
+var champSelectQueueCompatibility = map[int64]struct {
+	group, mode string
+	legacy      bool
+}{
+	3110: {group: "practice", legacy: true},
+	3200: {group: "aram"},
+	420:  {group: "ranked"}, 440: {group: "ranked"},
+	400: {group: "normal", mode: "CLASSIC"}, 700: {group: "normal", mode: "CLASSIC"},
+}
+
+func champSelectQueueOverride(queueID int64, mode string) string {
+	entry := champSelectQueueCompatibility[queueID]
+	if entry.mode == "" || entry.mode == mode {
+		return entry.group
+	}
+	return ""
+}
+func queueUsesLegacyChampSelect(queueID int64) bool {
+	return champSelectQueueCompatibility[queueID].legacy
+}
+func missingQueueID(queueID int64) bool     { return queueID <= 0 }
+func unspecifiedQueueID(queueID int64) bool { return queueID == 0 }
+
+func arenaSquadSize(queueID int64) int {
+	definition, _ := supportedQueueDefinition(queueID)
+	return definition.SquadSize
 }

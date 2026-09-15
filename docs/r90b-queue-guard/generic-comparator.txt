@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T15:10:18.496312+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T15:10:18.746675+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired"}
+{"Time":"2026-09-14T15:10:18.746702+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"=== RUN   TestR90BQueueGuardRequired\n"}
+{"Time":"2026-09-14T15:10:18.746732+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/generic-comparator"}
+{"Time":"2026-09-14T15:10:18.746738+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/generic-comparator","Output":"=== RUN   TestR90BQueueGuardRequired/generic-comparator\n"}
+{"Time":"2026-09-14T15:10:18.747153+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/generic-comparator","Output":"    r90b_queue_guard_test.go:17: missed R90B queue literal: generic-comparator\n"}
+{"Time":"2026-09-14T15:10:18.747164+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/generic-comparator","Output":"--- FAIL: TestR90BQueueGuardRequired/generic-comparator (0.00s)\n"}
+{"Time":"2026-09-14T15:10:18.747174+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/generic-comparator","Elapsed":0}
+{"Time":"2026-09-14T15:10:18.747181+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"--- FAIL: TestR90BQueueGuardRequired (0.00s)\n"}
+{"Time":"2026-09-14T15:10:18.747182+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Elapsed":0}
+{"Time":"2026-09-14T15:10:18.747184+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T15:10:18.747402+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.251s\n"}
+{"Time":"2026-09-14T15:10:18.747408+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.251}

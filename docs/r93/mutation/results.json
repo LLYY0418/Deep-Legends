@@ -1,0 +1,10 @@
+{
+  "checked_at_utc": "2026-09-14T08:12:46.369586+00:00",
+  "test": "TestR93TwentyMatchDetailsFromDiskAfterRestart",
+  "baseline": "passed",
+  "mutation": "disk read disabled via Go overlay",
+  "mutant": "failed: disk_hits=0 network_calls=20",
+  "restored": "passed",
+  "production_source_sha256": "33413950ca1df4939ebaeec6da36d598b89c368a21536df72f9909923997cc5b",
+  "production_source_unchanged": true
+}

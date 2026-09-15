@@ -16,7 +16,7 @@ function harness(script = source, respond) {
   w.HTMLElement.prototype.scrollTo = function(){};
   w.HTMLDialogElement.prototype.showModal = function(){this.open=true;};
   w.HTMLDialogElement.prototype.close = function(){this.open=false;};
-  w.fetch = (url, options) => { requests.push([url,options]);return respond?.(url, options) || new Promise(()=>{}); };
+  w.fetch = (url, options) => { requests.push([url,options]);if(url === "/api/diagnostics/client")return Promise.resolve({ok:true,status:204});return respond?.(url, options) || new Promise(()=>{}); };
   w.Headers = Headers;
   w.EventSource = class {
     static CLOSED = 2;

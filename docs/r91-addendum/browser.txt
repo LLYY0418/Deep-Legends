@@ -1,0 +1,2 @@
+CDP connected
+R91 Chromium PASS: cards, integer damage, colors, facade defaults, arena warning removed, stable history, ranks

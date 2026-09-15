@@ -411,8 +411,8 @@ func TestGameplayOverviewHistoryWindowUsesCacheAcrossRequests(t *testing.T) {
 	forceRecorder := httptest.NewRecorder()
 	forceBody := strings.NewReader(`{"playerRef":"` + publicRef + `","count":20,"force":true}`)
 	a.handleGameplayOverview(forceRecorder, httptest.NewRequest(http.MethodPost, "/api/gameplay/overview", forceBody))
-	if forceRecorder.Code != http.StatusOK || int(summaryRequests.Load()) != firstRequestCount {
-		t.Fatalf("force recompute bypassed physical SGP cache: status=%d first=%d afterForce=%d", forceRecorder.Code, firstRequestCount, summaryRequests.Load())
+	if forceRecorder.Code != http.StatusOK || int(summaryRequests.Load()) <= firstRequestCount {
+		t.Fatalf("force refresh did not bypass physical SGP cache: status=%d first=%d afterForce=%d", forceRecorder.Code, firstRequestCount, summaryRequests.Load())
 	}
 }
 
@@ -2389,11 +2389,14 @@ func TestGameplayLiveSecondRefreshReusesRankedStatsCache(t *testing.T) {
 func r62ArenaFixturePlayers(t *testing.T, count int) ([]map[string]any, []byte) {
 	t.Helper()
 	gameflowPlayers := make([]map[string]any, count)
-	livePlayers := make([]map[string]any, count)
-	for index := range gameflowPlayers {
+	livePlayers := make([]map[string]any, 18)
+	parties := []int{1, 1, 2, 2, 3, 4, 4, 5, 5, 5, 5, 5, 5, 6, 7, 8, 9, 10}
+	for index := range livePlayers {
 		name := fmt.Sprintf("R62Arena%02d", index+1)
-		gameflowPlayers[index] = map[string]any{"summonerName": name, "championId": index + 1}
-		livePlayers[index] = map[string]any{"summonerName": name, "playerSubteamId": index/3 + 1, "team": "ORDER"}
+		if index < count {
+			gameflowPlayers[index] = map[string]any{"puuid": fmt.Sprintf("r90-player-identity-%02d", index+1), "summonerId": index + 1, "profileIconId": 1, "championId": index + 1, "selectedPosition": "Invalid", "selectedRole": "NONE", "teamParticipantId": parties[index], "summonerName": ""}
+		}
+		livePlayers[index] = map[string]any{"championName": "Hero", "isBot": false, "isDead": false, "items": []any{}, "level": 1, "position": "", "rawChampionName": "Hero", "rawSkinName": "Skin", "respawnTimer": 0, "riotId": name + "#CN1", "riotIdGameName": name, "riotIdTagLine": "CN1", "runes": map[string]any{}, "scores": map[string]any{}, "skinID": 0, "skinName": "Skin", "summonerName": name + "#CN1", "summonerSpells": map[string]any{}, "team": "ORDER"}
 	}
 	raw, err := json.Marshal(livePlayers)
 	if err != nil {
@@ -2414,6 +2417,15 @@ func r62ArenaGameflowServer(t *testing.T, phase *string, gameID *int64, players 
 				"teamOne": players, "teamTwo": []any{},
 			}})
 		default:
+			if strings.HasPrefix(r.URL.Path, "/lol-game-data/assets/v1/champions/") {
+				_, _ = io.WriteString(w, `{"spells":[{"name":"Q","description":"fixture"}]}`)
+				return
+			}
+			if strings.HasPrefix(r.URL.Path, "/lol-summoner/v2/summoners/puuid/r90-player-identity-") {
+				id, _ := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/lol-summoner/v2/summoners/puuid/r90-player-identity-"))
+				_ = json.NewEncoder(w).Encode(Summoner{PUUID: fmt.Sprintf("r90-player-identity-%02d", id), SummonerID: int64(id), GameName: fmt.Sprintf("R62Arena%02d", id), TagLine: "CN1"})
+				return
+			}
 			http.Error(w, "not available in R62 fixture", http.StatusNotFound)
 		}
 	}))
@@ -2743,28 +2755,13 @@ func TestR58LiveClientPlayerListUnavailableFallsBackWithoutError(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
-	if response.ArenaGrouped || len(response.Players) != 18 {
-		t.Fatalf("playerlist failure did not preserve the flat roster: %#v", response)
-	}
-	for _, player := range response.Players {
-		if player.ArenaGroup != "" {
-			t.Fatalf("fallback response retained a partial group: %#v", player)
-		}
+	if !response.ArenaGrouped || response.ArenaMascotMapping || response.ArenaGroupSource != "session-order" || len(response.Players) != 18 {
+		t.Fatal("session order fallback failed")
 	}
 }
 
 func TestArena1750UsesCorroboratedGameflowRosterOrderWhenPlayerListHasNoSubteams(t *testing.T) {
-	players := make([]map[string]any, 18)
-	for index := range players {
-		partyID := index + 1
-		if index%3 == 1 {
-			partyID = index
-		}
-		players[index] = map[string]any{
-			"summonerName": fmt.Sprintf("ArenaOrder%02d", index+1),
-			"championId":   index + 1, "teamParticipantId": partyID,
-		}
-	}
+	players, _ := r62ArenaFixturePlayers(t, 18)
 	phase := "InProgress"
 	gameID := int64(9003)
 	server := r62ArenaGameflowServer(t, &phase, &gameID, players)
@@ -2776,7 +2773,7 @@ func TestArena1750UsesCorroboratedGameflowRosterOrderWhenPlayerListHasNoSubteams
 		},
 	}
 	response := r62GameplayLiveResponse(t, a)
-	if !response.ArenaGrouped || !response.ArenaMascotMapping || response.ArenaGroupSource != "session-order" {
+	if !response.ArenaGrouped || response.ArenaMascotMapping || response.ArenaGroupSource != "session-order" {
 		t.Fatalf("session-order Arena grouping = %#v", response)
 	}
 	counts := make(map[string]int)
@@ -2804,6 +2801,7 @@ func TestR62ArenaPlayerListRetriesAndGroupsSeventeenPlayers(t *testing.T) {
 	a := &app{
 		connected: true,
 		lcu:       client,
+		summoner:  Summoner{PUUID: "r90-player-identity-01"},
 		liveClientPlayerListNow: func() time.Time {
 			current := now
 			now = now.Add(liveClientRetryDelay + time.Second)
@@ -2824,7 +2822,7 @@ func TestR62ArenaPlayerListRetriesAndGroupsSeventeenPlayers(t *testing.T) {
 		knownAllies[index] = struct {
 			player lcuLivePlayer
 			team   int64
-		}{player: lcuLivePlayer{SummonerName: fmt.Sprintf("R62Arena%02d", index+1)}, team: 100}
+		}{player: lcuLivePlayer{PUUID: fmt.Sprintf("r90-player-identity-%02d", index+1)}, team: 100}
 	}
 	a.rememberArenaAllies(knownAllies)
 
@@ -2832,8 +2830,11 @@ func TestR62ArenaPlayerListRetriesAndGroupsSeventeenPlayers(t *testing.T) {
 	if first.ArenaGrouped {
 		t.Fatalf("first unavailable probe unexpectedly grouped players: %#v", first)
 	}
+	a.liveSnapshots.mu.Lock()
+	a.liveSnapshots.at = time.Now().Add(-21 * time.Second)
+	a.liveSnapshots.mu.Unlock()
 	second := r62GameplayLiveResponse(t, a)
-	if !second.ArenaGrouped || !second.ArenaMascotMapping || len(second.Players) != 17 {
+	if !second.ArenaGrouped || second.ArenaMascotMapping || len(second.Players) != 17 {
 		t.Fatalf("17-player Arena grouping = grouped:%v mascot:%v players:%d", second.ArenaGrouped, second.ArenaMascotMapping, len(second.Players))
 	}
 	counts := make(map[string]int)
@@ -2889,10 +2890,10 @@ func TestR62ArenaGroupValidationRejectsOversizedGroups(t *testing.T) {
 		{ArenaGroup: "1"}, {ArenaGroup: "1"}, {ArenaGroup: "1"}, {ArenaGroup: "1"},
 		{ArenaGroup: "2"}, {ArenaGroup: "2"},
 	}
-	if validateArenaLiveGroups(players) {
+	if validateArenaLiveGroups(players, 3) {
 		t.Fatalf("four-player Arena group passed validation: %#v", players)
 	}
-	if liveClientArenaDistribution(map[string]int{"1": 9, "2": 9}, 18) {
+	if liveClientArenaDistribution(map[string]int{"1": 9, "2": 9}, 18, 3) {
 		t.Fatal("two coarse nine-player teams passed Arena distribution validation")
 	}
 }
@@ -3169,7 +3170,7 @@ func TestArenaLiveClientPlayerListGroupingAndFallback(t *testing.T) {
 	for group := 1; group <= 6; group++ {
 		for member := 1; member <= 3; member++ {
 			player := lcuLivePlayer{GameName: fmt.Sprintf("Player-%d-%d", group, member), TagLine: "CN1"}
-			counts[liveClientGroupingForPlayer(snapshot.Grouping, player)]++
+			counts[liveClientGroupingForPlayer(snapshot.Grouping, player, gameplayLivePlayer{})]++
 		}
 	}
 	if len(counts) != 6 {
@@ -3228,7 +3229,7 @@ func TestArenaPlayerListDoesNotCachePositionOnlySnapshotAsFinalGrouping(t *testi
 	}
 }
 
-func TestArenaSessionOrderGroupingRejectsPartySplitAcrossSquads(t *testing.T) {
+func TestArenaSessionOrderGroupingIgnoresPremadePartyBoundaries(t *testing.T) {
 	players := make([]lcuLivePlayer, 18)
 	for index := range players {
 		players[index].TeamParticipantID = int64(index + 1)
@@ -3241,8 +3242,8 @@ func TestArenaSessionOrderGroupingRejectsPartySplitAcrossSquads(t *testing.T) {
 		t.Fatalf("party contained within an Arena squad was rejected: %#v/%v", groups, ok)
 	}
 	players[3].TeamParticipantID = players[0].TeamParticipantID
-	if groups, ok := arenaSessionOrderGroups(1750, players); ok || groups != nil {
-		t.Fatalf("party split across Arena squads was accepted: %#v", groups)
+	if groups, ok := arenaSessionOrderGroups(1750, players); !ok || len(groups) != 18 {
+		t.Fatalf("premade IDs incorrectly rejected order: %#v", groups)
 	}
 	if groups, ok := arenaSessionOrderGroups(1750, players[:17]); ok || groups != nil {
 		t.Fatalf("partial Arena roster was accepted as ordered: %#v", groups)
@@ -4657,7 +4658,7 @@ func TestR69MeasureLiveRosterConcurrency(t *testing.T) {
 		recorder = httptest.NewRecorder()
 		a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
 		warmDuration, warmRequests := time.Since(started), requests.Load()
-		if recorder.Code != http.StatusOK || coldRequests != 30 || warmRequests != 10 {
+		if recorder.Code != http.StatusOK || coldRequests != 30 || warmRequests != 0 {
 			t.Fatalf("concurrency=%d status=%d cold_requests=%d warm_requests=%d", concurrency, recorder.Code, coldRequests, warmRequests)
 		}
 		t.Logf("live concurrency=%d cold_ms=%d cold_lcu_requests=%d cold_req_per_s=%.1f warm_ms=%d warm_lcu_requests=%d warm_req_per_s=%.1f", concurrency, coldDuration.Milliseconds(), coldRequests, float64(coldRequests)/coldDuration.Seconds(), warmDuration.Milliseconds(), warmRequests, float64(warmRequests)/warmDuration.Seconds())

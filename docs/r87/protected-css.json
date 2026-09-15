@@ -1,0 +1,46 @@
+[
+  {
+    "selector": ".match-main",
+    "blocks": 6,
+    "before": [
+      ".match-main { display: grid; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }",
+      ".match-main { gap: 8px 12px; }",
+      ".match-main { grid-column: 2; grid-row: 1; }",
+      ".match-main { grid-column: 1 / -1; grid-row: 2; grid-template-columns: minmax(0,1fr) minmax(88px,auto); gap: 7px 4px; }",
+      ".match-main { grid-column: 2; grid-row: 1; gap: 5px 12px; }",
+      ".match-main { grid-column: 1 / -1; grid-row: 2; grid-template-columns: minmax(0,auto) minmax(0,1fr); gap: 7px 4px; }"
+    ],
+    "after": [
+      ".match-main { display: grid; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }",
+      ".match-main { gap: 8px 12px; }",
+      ".match-main { grid-column: 2; grid-row: 1; }",
+      ".match-main { grid-column: 1 / -1; grid-row: 2; grid-template-columns: minmax(0,1fr) minmax(88px,auto); gap: 7px 4px; }",
+      ".match-main { grid-column: 2; grid-row: 1; gap: 5px 12px; }",
+      ".match-main { grid-column: 1 / -1; grid-row: 2; grid-template-columns: minmax(0,auto) minmax(0,1fr); gap: 7px 4px; }"
+    ],
+    "diff": "",
+    "sha256": "3704585aa93a9de34ae13b97c61da065cbb94b518d8fa1294794c207c4089228"
+  },
+  {
+    "selector": ".match-stats",
+    "blocks": 6,
+    "before": [
+      ".match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }",
+      ".match-stats { padding-left: 10px; }",
+      ".match-stats { display: grid; grid-column: 1 / -1; grid-row: 2; min-height: 54px; padding-left: 10px; border-left: 0; border-top: 1px solid var(--line); padding-top: 6px; }",
+      ".match-stats { gap: 8px; }",
+      ".match-stats { padding-left: 10px; }",
+      ".match-stats { display: grid; }"
+    ],
+    "after": [
+      ".match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }",
+      ".match-stats { padding-left: 10px; }",
+      ".match-stats { display: grid; grid-column: 1 / -1; grid-row: 2; min-height: 54px; padding-left: 10px; border-left: 0; border-top: 1px solid var(--line); padding-top: 6px; }",
+      ".match-stats { gap: 8px; }",
+      ".match-stats { padding-left: 10px; }",
+      ".match-stats { display: grid; }"
+    ],
+    "diff": "",
+    "sha256": "c655a54637d0d9252fc38454fcf364f5b040cdf7f47060e50eeaa8e6c444f044"
+  }
+]

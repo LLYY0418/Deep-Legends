@@ -220,7 +220,7 @@ func (a *app) opggSeasonSummary(ctx context.Context, ref gameplayReference, forc
 	if a.opgg == nil || a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) || strings.EqualFold(ref.Privacy, "PRIVATE") || !strings.EqualFold(ref.Region, riotRegionKR) || !validPlayerReference(ref.PlayerRef) || ref.GameName == "" || ref.TagLine == "" {
 		return nil, errors.New("OP.GG 赛季汇总不可用")
 	}
-	key := sourceScopedKey(dataSourceOPGG, "season-summary:kr:"+ref.PlayerRef)
+	key := sourceScopedKey(dataSourceOPGG, "season-summary:"+overviewSupplementCacheIdentity(ref))
 	a.opgg.mu.Lock()
 	if a.opgg.seasons == nil {
 		a.opgg.seasons = map[string]opggSeasonEntry{}
@@ -276,6 +276,9 @@ func (a *app) opggSeasonSummary(ctx context.Context, ref gameplayReference, forc
 
 func (a *app) handleOPGGSeasonSummary(w http.ResponseWriter, r *http.Request) {
 	var request struct {
+		GameName  string `json:"gameName"`
+		TagLine   string `json:"tagLine"`
+		Region    string `json:"region"`
 		PlayerRef string `json:"playerRef"`
 		Force     bool   `json:"force"`
 	}
@@ -283,9 +286,12 @@ func (a *app) handleOPGGSeasonSummary(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "请求无效", 400)
 		return
 	}
-	ref, ok := a.resolveGameplayReferenceDetails(request.PlayerRef)
-	if !ok || !strings.EqualFold(ref.Region, riotRegionKR) {
-		http.Error(w, "玩家引用无效或已过期", 404)
+	ref, status := a.resolveOverviewSupplement(request.PlayerRef, request.GameName, request.TagLine, request.Region)
+	if status != 0 || !strings.EqualFold(ref.Region, riotRegionKR) {
+		if status == 0 {
+			status = http.StatusBadRequest
+		}
+		http.Error(w, "玩家引用无效或查询参数不完整", status)
 		return
 	}
 	if strings.EqualFold(strings.TrimSpace(ref.Privacy), "PRIVATE") {

@@ -1,0 +1,30 @@
+✖ R91 new game removes old recommendations and summary before the deferred response (65.3415ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 728.226542
+
+✖ failing tests:
+
+test at web/r91.test.cjs:50:1
+✖ R91 new game removes old recommendations and summary before the deferred response (65.3415ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /recommendation-90/. Input:
+  
+  '对局阶段已变化，正在同步当前对局…刷新recommendation-90'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r91.test.cjs:56:14)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '对局阶段已变化，正在同步当前对局…刷新recommendation-90',
+    expected: /recommendation-90/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }

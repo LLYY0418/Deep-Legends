@@ -113,7 +113,8 @@ func TestOverviewCurrentGameReadOnlyCacheAndPrivacy(t *testing.T) {
 		r := httptest.NewRequest("POST", "/api/gameplay/current-game", strings.NewReader(`{"playerRef":"`+opaque+`"}`))
 		a.handleOverviewCurrentGame(w, r)
 		if w.Code != 200 {
-			t.Fatal(w.Code, w.Body.String())
+			_, detailErr := a.fetchOPGGCurrentGame(context.Background(), ref)
+			t.Fatal(w.Code, w.Body.String(), detailErr)
 		}
 	}
 	if calls.Load() != 2 {

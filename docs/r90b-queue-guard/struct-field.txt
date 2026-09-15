@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T15:10:15.920067+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T15:10:16.182558+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired"}
+{"Time":"2026-09-14T15:10:16.182598+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"=== RUN   TestR90BQueueGuardRequired\n"}
+{"Time":"2026-09-14T15:10:16.182646+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/struct-field"}
+{"Time":"2026-09-14T15:10:16.182648+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/struct-field","Output":"=== RUN   TestR90BQueueGuardRequired/struct-field\n"}
+{"Time":"2026-09-14T15:10:16.183087+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/struct-field","Output":"    r90b_queue_guard_test.go:17: missed R90B queue literal: struct-field\n"}
+{"Time":"2026-09-14T15:10:16.183104+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/struct-field","Output":"--- FAIL: TestR90BQueueGuardRequired/struct-field (0.00s)\n"}
+{"Time":"2026-09-14T15:10:16.183109+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/struct-field","Elapsed":0}
+{"Time":"2026-09-14T15:10:16.183124+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"--- FAIL: TestR90BQueueGuardRequired (0.00s)\n"}
+{"Time":"2026-09-14T15:10:16.183125+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Elapsed":0}
+{"Time":"2026-09-14T15:10:16.183127+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T15:10:16.183473+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.263s\n"}
+{"Time":"2026-09-14T15:10:16.183483+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.263}

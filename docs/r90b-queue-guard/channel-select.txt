@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T15:10:14.856508+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T15:10:15.107246+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired"}
+{"Time":"2026-09-14T15:10:15.10734+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"=== RUN   TestR90BQueueGuardRequired\n"}
+{"Time":"2026-09-14T15:10:15.107384+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-select"}
+{"Time":"2026-09-14T15:10:15.107389+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-select","Output":"=== RUN   TestR90BQueueGuardRequired/channel-select\n"}
+{"Time":"2026-09-14T15:10:15.107682+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-select","Output":"    r90b_queue_guard_test.go:17: missed R90B queue literal: channel-select\n"}
+{"Time":"2026-09-14T15:10:15.107721+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-select","Output":"--- FAIL: TestR90BQueueGuardRequired/channel-select (0.00s)\n"}
+{"Time":"2026-09-14T15:10:15.107726+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-select","Elapsed":0}
+{"Time":"2026-09-14T15:10:15.107765+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"--- FAIL: TestR90BQueueGuardRequired (0.00s)\n"}
+{"Time":"2026-09-14T15:10:15.10777+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Elapsed":0}
+{"Time":"2026-09-14T15:10:15.107774+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T15:10:15.108086+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.251s\n"}
+{"Time":"2026-09-14T15:10:15.108097+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.252}

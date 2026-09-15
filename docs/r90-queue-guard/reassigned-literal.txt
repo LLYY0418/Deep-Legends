@@ -1,0 +1,137 @@
+{"Time":"2026-09-14T14:19:44.718022+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:19:44.967995+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations"}
+{"Time":"2026-09-14T14:19:44.968099+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations","Output":"=== RUN   TestR89QueueGuardEquivalentMutations\n"}
+{"Time":"2026-09-14T14:19:44.968207+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/format"}
+{"Time":"2026-09-14T14:19:44.968219+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/format","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/format\n"}
+{"Time":"2026-09-14T14:19:44.968292+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/format","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/format (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.968313+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/format","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.968319+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reflect-string"}
+{"Time":"2026-09-14T14:19:44.96832+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reflect-string","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/reflect-string\n"}
+{"Time":"2026-09-14T14:19:44.968326+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reflect-string","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/reflect-string (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.968335+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reflect-string","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979198+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/compare"}
+{"Time":"2026-09-14T14:19:44.979208+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/compare","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/compare\n"}
+{"Time":"2026-09-14T14:19:44.979214+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/compare","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/compare (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979216+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/compare","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979221+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/original-switch"}
+{"Time":"2026-09-14T14:19:44.979223+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/original-switch","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/original-switch\n"}
+{"Time":"2026-09-14T14:19:44.979225+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/original-switch","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/original-switch (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979227+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/original-switch","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979228+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-alias"}
+{"Time":"2026-09-14T14:19:44.979229+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-alias","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/string-alias\n"}
+{"Time":"2026-09-14T14:19:44.979233+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-alias","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/string-alias (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979235+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-alias","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979236+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/sprint"}
+{"Time":"2026-09-14T14:19:44.979237+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/sprint","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/sprint\n"}
+{"Time":"2026-09-14T14:19:44.979239+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/sprint","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/sprint (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.97924+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/sprint","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979242+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/shift-literal"}
+{"Time":"2026-09-14T14:19:44.979243+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/shift-literal","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/shift-literal\n"}
+{"Time":"2026-09-14T14:19:44.979244+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/shift-literal","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/shift-literal (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979246+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/shift-literal","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979247+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/float-exponent"}
+{"Time":"2026-09-14T14:19:44.97925+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/float-exponent","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/float-exponent\n"}
+{"Time":"2026-09-14T14:19:44.979252+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/float-exponent","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/float-exponent (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979253+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/float-exponent","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979255+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/bytes"}
+{"Time":"2026-09-14T14:19:44.979256+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/bytes","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/bytes\n"}
+{"Time":"2026-09-14T14:19:44.979257+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/bytes","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/bytes (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979258+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/bytes","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.97926+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/constant-switch"}
+{"Time":"2026-09-14T14:19:44.979261+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/constant-switch","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/constant-switch\n"}
+{"Time":"2026-09-14T14:19:44.979262+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/constant-switch","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/constant-switch (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979264+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/constant-switch","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979265+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/original-alias"}
+{"Time":"2026-09-14T14:19:44.979266+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/original-alias","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/original-alias\n"}
+{"Time":"2026-09-14T14:19:44.979268+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/original-alias","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/original-alias (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979269+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/original-alias","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979271+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/constant-alias"}
+{"Time":"2026-09-14T14:19:44.979286+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/constant-alias","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/constant-alias\n"}
+{"Time":"2026-09-14T14:19:44.979287+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/constant-alias","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/constant-alias (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979289+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/constant-alias","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.97929+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reflect"}
+{"Time":"2026-09-14T14:19:44.979291+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reflect","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/reflect\n"}
+{"Time":"2026-09-14T14:19:44.979295+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reflect","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/reflect (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979296+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reflect","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979298+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/generic-compare"}
+{"Time":"2026-09-14T14:19:44.979299+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/generic-compare","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/generic-compare\n"}
+{"Time":"2026-09-14T14:19:44.9793+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/generic-compare","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/generic-compare (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979302+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/generic-compare","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979303+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/itoa"}
+{"Time":"2026-09-14T14:19:44.979311+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/itoa","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/itoa\n"}
+{"Time":"2026-09-14T14:19:44.979312+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/itoa","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/itoa (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979314+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/itoa","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979315+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-constant"}
+{"Time":"2026-09-14T14:19:44.979316+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-constant","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/string-constant\n"}
+{"Time":"2026-09-14T14:19:44.979318+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-constant","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/string-constant (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979319+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-constant","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979333+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reassigned-literal"}
+{"Time":"2026-09-14T14:19:44.979335+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reassigned-literal","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/reassigned-literal\n"}
+{"Time":"2026-09-14T14:19:44.979336+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reassigned-literal","Output":"    r89_queue_guard_test.go:43: missed equivalent queue literal comparison: code := \"arena\"; code = \"3110\"; alias := code; return fmt.Sprint(session.QueueID) == alias\n"}
+{"Time":"2026-09-14T14:19:44.979355+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reassigned-literal","Output":"--- FAIL: TestR89QueueGuardEquivalentMutations/reassigned-literal (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979356+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reassigned-literal","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979357+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/cast-literal"}
+{"Time":"2026-09-14T14:19:44.979359+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/cast-literal","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/cast-literal\n"}
+{"Time":"2026-09-14T14:19:44.97936+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/cast-literal","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/cast-literal (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979361+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/cast-literal","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979363+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/unsigned-format"}
+{"Time":"2026-09-14T14:19:44.979364+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/unsigned-format","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/unsigned-format\n"}
+{"Time":"2026-09-14T14:19:44.979366+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/unsigned-format","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/unsigned-format (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979367+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/unsigned-format","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979368+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/wrapper"}
+{"Time":"2026-09-14T14:19:44.979369+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/wrapper","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/wrapper\n"}
+{"Time":"2026-09-14T14:19:44.979374+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/wrapper","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/wrapper (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979375+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/wrapper","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979377+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/wrapper-extra-args"}
+{"Time":"2026-09-14T14:19:44.979378+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/wrapper-extra-args","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/wrapper-extra-args\n"}
+{"Time":"2026-09-14T14:19:44.97938+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/wrapper-extra-args","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/wrapper-extra-args (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979381+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/wrapper-extra-args","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979382+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reflect-alias"}
+{"Time":"2026-09-14T14:19:44.979383+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reflect-alias","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/reflect-alias\n"}
+{"Time":"2026-09-14T14:19:44.979385+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reflect-alias","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/reflect-alias (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979387+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/reflect-alias","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979388+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/float-conversion"}
+{"Time":"2026-09-14T14:19:44.979389+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/float-conversion","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/float-conversion\n"}
+{"Time":"2026-09-14T14:19:44.979417+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/float-conversion","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/float-conversion (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979418+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/float-conversion","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979419+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/receiver-string"}
+{"Time":"2026-09-14T14:19:44.979421+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/receiver-string","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/receiver-string\n"}
+{"Time":"2026-09-14T14:19:44.979422+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/receiver-string","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/receiver-string (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979423+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/receiver-string","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979425+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/arithmetic"}
+{"Time":"2026-09-14T14:19:44.979426+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/arithmetic","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/arithmetic\n"}
+{"Time":"2026-09-14T14:19:44.979428+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/arithmetic","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/arithmetic (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979429+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/arithmetic","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979436+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/equal-fold"}
+{"Time":"2026-09-14T14:19:44.979437+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/equal-fold","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/equal-fold\n"}
+{"Time":"2026-09-14T14:19:44.979438+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/equal-fold","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/equal-fold (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.97944+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/equal-fold","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979441+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/original-direct"}
+{"Time":"2026-09-14T14:19:44.979442+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/original-direct","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/original-direct\n"}
+{"Time":"2026-09-14T14:19:44.979444+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/original-direct","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/original-direct (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979445+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/original-direct","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979446+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/named-queue-root"}
+{"Time":"2026-09-14T14:19:44.979447+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/named-queue-root","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/named-queue-root\n"}
+{"Time":"2026-09-14T14:19:44.979449+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/named-queue-root","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/named-queue-root (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.97945+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/named-queue-root","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979452+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/format-alias"}
+{"Time":"2026-09-14T14:19:44.979453+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/format-alias","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/format-alias\n"}
+{"Time":"2026-09-14T14:19:44.979454+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/format-alias","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/format-alias (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979461+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/format-alias","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979462+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/numeric-string-rhs"}
+{"Time":"2026-09-14T14:19:44.979464+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/numeric-string-rhs","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/numeric-string-rhs\n"}
+{"Time":"2026-09-14T14:19:44.979465+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/numeric-string-rhs","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/numeric-string-rhs (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979467+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/numeric-string-rhs","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979468+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-switch"}
+{"Time":"2026-09-14T14:19:44.979469+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-switch","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/string-switch\n"}
+{"Time":"2026-09-14T14:19:44.97947+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-switch","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/string-switch (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979472+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-switch","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979473+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-direct"}
+{"Time":"2026-09-14T14:19:44.979474+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-direct","Output":"=== RUN   TestR89QueueGuardEquivalentMutations/string-direct\n"}
+{"Time":"2026-09-14T14:19:44.979475+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-direct","Output":"--- PASS: TestR89QueueGuardEquivalentMutations/string-direct (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.979477+08:00","Action":"pass","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations/string-direct","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979478+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations","Output":"--- FAIL: TestR89QueueGuardEquivalentMutations (0.00s)\n"}
+{"Time":"2026-09-14T14:19:44.97948+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR89QueueGuardEquivalentMutations","Elapsed":0}
+{"Time":"2026-09-14T14:19:44.979481+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:19:44.988365+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.270s\n"}
+{"Time":"2026-09-14T14:19:44.988385+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.27}

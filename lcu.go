@@ -57,6 +57,7 @@ type LCUDiscoveryStatus struct {
 }
 
 type LCUClient struct {
+	gameplaySummoners     gameplaySummonerCache
 	acceptFocusSampling   atomic.Bool
 	acceptFocusLastTrace  atomic.Value
 	acceptFocusInspection acceptFocusInspection
@@ -737,6 +738,9 @@ func (c *LCUClient) RequestJSON(ctx context.Context, method, path string, body, 
 	ctx = httptrace.WithClientTrace(ctx, requestTrace.clientTrace())
 	httpStatus := 0
 	defer func() {
+		if status, ok := ctx.Value(lcuResponseStatusKey{}).(*atomic.Int64); ok {
+			status.Store(int64(httpStatus))
+		}
 		if status, ok := ctx.Value(acceptFocusStatusKey{}).(*atomic.Int64); ok {
 			status.Store(int64(httpStatus))
 		}
@@ -877,3 +881,6 @@ func (c *LCUClient) Close() {
 		transport.CloseIdleConnections()
 	}
 }
+
+// Optional status sink includes successful HTTP responses with invalid JSON.
+type lcuResponseStatusKey struct{}

@@ -1,0 +1,44 @@
+[
+  {
+    "name": "hover-cleared-takeover",
+    "source": "champselect_takeover.go",
+    "test": "TestR91AddendumWildcardHoverClearKeepsArmedLock",
+    "exitCode": 1,
+    "killed": true
+  },
+  {
+    "name": "hover-clear-lock-rejected",
+    "source": "champselect.go",
+    "test": "TestR91AddendumWildcardHoverClearKeepsArmedLock",
+    "exitCode": 1,
+    "killed": true
+  },
+  {
+    "name": "hover-clear-global-exemption-ban",
+    "source": "champselect_takeover.go",
+    "test": "TestR91Addendum2NonWildcardBanClearYields",
+    "exitCode": 1,
+    "killed": true
+  },
+  {
+    "name": "hover-clear-global-exemption-pick",
+    "source": "champselect_takeover.go",
+    "test": "TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover",
+    "exitCode": 1,
+    "killed": true
+  },
+  {
+    "name": "hover-clear-unavailable-exemptions",
+    "source": "champselect_takeover.go",
+    "test": "TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover",
+    "exitCode": 1,
+    "killed": true
+  },
+  {
+    "name": "hover-clear-diagnostic-scope",
+    "source": "champselect_takeover.go",
+    "test": "TestR91Addendum2NonWildcardBanClearYields",
+    "exitCode": 1,
+    "killed": true
+  }
+]

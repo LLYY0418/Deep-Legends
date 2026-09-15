@@ -1,0 +1,39 @@
+[
+  {
+    "name": "24cqi",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "failed_checks": [
+      "420-cap",
+      "names"
+    ]
+  },
+  {
+    "name": "300px",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "failed_checks": [
+      "420-cap",
+      "names"
+    ]
+  },
+  {
+    "name": "players-1fr",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "failed_checks": [
+      "content-columns"
+    ]
+  },
+  {
+    "name": "content-width",
+    "exit_code": 1,
+    "caught_by_assertion": true,
+    "failed_checks": [
+      "420-cap",
+      "content-columns",
+      "equal-edges",
+      "equal-width"
+    ]
+  }
+]

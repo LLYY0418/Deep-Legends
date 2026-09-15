@@ -1,0 +1,134 @@
+✖ R91 new game removes old recommendations and summary before the deferred response (58.843917ms)
+✔ R91 same game refresh and active phase progression preserve the current content (45.436208ms)
+✖ R91 clicking refresh during a request visibly queues exactly one forced reload (7.980041ms)
+✖ R91 boundary cancels the old request and its late settlement cannot own the new state (8.002375ms)
+✖ R91 failed, timed out and cancelled new-game requests have an explicit working retry (50.524959ms)
+✖ R91 empty new-game snapshots stay explicit and bounded instead of showing an empty recommendation panel (7.189209ms)
+✔ R91 soft reset invalidates the aborted loader before a replacement starts (6.833333ms)
+✖ R91 direct loader detects a boundary already observed by the beacon (6.633709ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 2
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 736.842834
+
+✖ failing tests:
+
+test at web/r91.test.cjs:50:1
+✖ R91 new game removes old recommendations and summary before the deferred response (58.843917ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /recommendation-90/. Input:
+  
+  '对局中数据不再变化，已停止自动刷新刷新recommendation-90'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r91.test.cjs:56:14)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '对局中数据不再变化，已停止自动刷新刷新recommendation-90',
+    expected: /recommendation-90/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at web/r91.test.cjs:87:1
+✖ R91 clicking refresh during a request visibly queues exactly one forced reload (7.980041ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /排队|正在刷新/. Input:
+  
+  '刷新对局'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r91.test.cjs:93:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '刷新对局',
+    expected: /排队|正在刷新/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at web/r91.test.cjs:105:1
+✖ R91 boundary cancels the old request and its late settlement cannot own the new state (8.002375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r91.test.cjs:111:14)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at web/r91.test.cjs:125:1
+✖ R91 failed, timed out and cancelled new-game requests have an explicit working retry (50.524959ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /读取失败/. Input:
+  
+  '对局中数据不再变化，已停止自动刷新刷新recommendation-90'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r91.test.cjs:131:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '对局中数据不再变化，已停止自动刷新刷新recommendation-90',
+    expected: /读取失败/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at web/r91.test.cjs:140:1
+✖ R91 empty new-game snapshots stay explicit and bounded instead of showing an empty recommendation panel (7.189209ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /正在识别新对局/. Input:
+  
+  'recommendation-empty'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r91.test.cjs:145:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'recommendation-empty',
+    expected: /正在识别新对局/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at web/r91.test.cjs:165:1
+✖ R91 direct loader detects a boundary already observed by the beacon (6.633709ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /recommendation-90/. Input:
+  
+  'recommendation-90'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r91.test.cjs:170:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'recommendation-90',
+    expected: /recommendation-90/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }

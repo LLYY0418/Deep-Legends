@@ -50,10 +50,11 @@ type currentGameRecent struct {
 	Spells       []int64 `json:"spells,omitempty"`
 }
 type currentGameEntry struct {
-	traceID string
-	at      time.Time
-	value   *currentGame
-	err     error
+	playerRef string
+	traceID   string
+	at        time.Time
+	value     *currentGame
+	err       error
 }
 type currentGameFlight struct {
 	traceID string
@@ -422,12 +423,21 @@ func (a *app) loadCurrentGame(ctx context.Context, ref gameplayReference) (*curr
 	if !strings.EqualFold(ref.Region, "kr") || ref.ServerID != "" || a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) {
 		return nil, errors.New("韩服当前对局来源不可用")
 	}
-	key := sourceScopedKey("current-game", ref.Region+":"+ref.ServerID+":"+ref.PlayerRef)
+	key := sourceScopedKey("current-game", overviewSupplementCacheIdentity(ref))
 	cache := &a.currentGames
 	cache.mu.Lock()
 	if cache.entries == nil {
 		cache.entries = map[string]currentGameEntry{}
 		cache.flights = map[string]*currentGameFlight{}
+	}
+	// Roster hydration may refresh the spelling of this same stable player.
+	// Keep the original ten-second identity cache valid without a second page
+	// read; name-only prefetches still join via the canonical Riot-ID key above.
+	for cachedKey, entry := range cache.entries {
+		if entry.playerRef == ref.PlayerRef && entry.playerRef != "" && time.Since(entry.at) < 10*time.Second {
+			key = cachedKey
+			break
+		}
 	}
 	if entry, ok := cache.entries[key]; ok && time.Since(entry.at) < 10*time.Second && !currentGameManualRefresh(ctx) {
 		cache.mu.Unlock()
@@ -468,7 +478,7 @@ func (a *app) loadCurrentGame(ctx context.Context, ref gameplayReference) (*curr
 	}
 	cacheable := !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
 	if cacheable {
-		cache.entries[key] = currentGameEntry{at: time.Now(), value: value, err: err, traceID: currentGameTrace(ctx)}
+		cache.entries[key] = currentGameEntry{at: time.Now(), value: value, err: err, traceID: currentGameTrace(ctx), playerRef: ref.PlayerRef}
 	}
 	flight.value, flight.err = value, err
 	delete(cache.flights, key)
@@ -479,6 +489,9 @@ func (a *app) loadCurrentGame(ctx context.Context, ref gameplayReference) (*curr
 }
 func (a *app) handleOverviewCurrentGame(w http.ResponseWriter, r *http.Request) {
 	var input struct {
+		GameName     string `json:"gameName"`
+		TagLine      string `json:"tagLine"`
+		Region       string `json:"region"`
 		PlayerRef    string `json:"playerRef"`
 		TraceID      string `json:"traceId"`
 		ForceRefresh bool   `json:"forceRefresh"`
@@ -498,10 +511,10 @@ func (a *app) handleOverviewCurrentGame(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "请求无效", 400)
 		return
 	}
-	ref, ok := a.resolveGameplayReferenceDetails(input.PlayerRef)
-	if !ok {
+	ref, status := a.resolveOverviewSupplement(input.PlayerRef, input.GameName, input.TagLine, input.Region)
+	if status != 0 {
 		a.currentGameDiagnostic(ctx, "request", "reference-expired", nil)
-		http.Error(w, "玩家引用已失效", 404)
+		http.Error(w, "玩家引用已失效或查询参数不完整", status)
 		return
 	}
 	if !strings.EqualFold(ref.Region, "kr") {

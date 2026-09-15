@@ -1,0 +1,13 @@
+.match-main { display: grid; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }
+.match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); row-gap: 5px; }
+.match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }
+.match-stats.is-arena { align-content: center; grid-template-rows: repeat(2,18px); min-height: 41px; }
+	.match-main { gap: 8px 12px; }
+	.match-stats { padding-left: 10px; }
+	.match-summary.is-arena .match-main { grid-column: 2; grid-row: 1; }
+	.match-main, .match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,1fr); }
+	.match-stats { display: grid; grid-column: 1 / -1; grid-row: 2; min-height: 54px; padding-left: 10px; border-left: 0; border-top: 1px solid var(--line); padding-top: 6px; }
+	.match-stats.is-arena { align-content: center; grid-template-rows: repeat(2,18px); min-height: 41px; }
+	.match-main, .match-main.is-arena, .match-summary.is-arena .match-main { grid-column: 1 / -1; grid-row: 2; grid-template-columns: minmax(0,1fr) minmax(88px,auto); gap: 7px 4px; }
+	.match-stats { gap: 8px; }
+	.match-main, .match-main.is-arena { row-gap: 0; }

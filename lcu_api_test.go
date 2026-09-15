@@ -207,16 +207,16 @@ func TestEnrichLootItemsUsesChineseNamesAndCatalogSkinNames(t *testing.T) {
 	}
 }
 
-func TestEnrichLootItemsDropsOnlyTheLCUEmptyShell(t *testing.T) {
+func TestEnrichLootItemsRetainsTheLCUPendingShell(t *testing.T) {
 	items := enrichLootItems([]LootItem{
 		{Count: 30, rawKeyEmpty: true},
 		{LootID: "CHEST_224", LocalizedName: "未命名战利品", Count: 1},
 		{LootName: "MATERIAL_REAL", Count: 1},
 	}, nil)
-	if len(items) != 2 {
+	if len(items) != 3 || !items[0].DataPending || items[0].DisplayName != "客户端数据暂未同步，可稍后重试" {
 		t.Fatalf("empty-shell filtering dropped non-empty loot: %#v", items)
 	}
-	if items[0].DisplayName != "CHEST_224" || items[1].DisplayName != "MATERIAL_REAL" {
+	if items[1].DisplayName != "CHEST_224" || items[2].DisplayName != "MATERIAL_REAL" {
 		t.Fatalf("real loot identifiers were not preserved: %#v", items)
 	}
 }
@@ -299,8 +299,8 @@ func TestLootDiagnosticsAllPersistWithReviewedFields(t *testing.T) {
 		t.Fatalf("loot fixture = items:%#v capability:%#v", items, capability)
 	}
 	items = enrichLootItemsWithMetadata(items, nil, nil, a.recordDiagnostic)
-	if len(items) != 2 || items[0].LootID == "" || items[1].LootID == "" {
-		t.Fatalf("loot enrichment must drop only the three-field-empty shell and preserve real loot: %#v", items)
+	if len(items) != 3 || !items[1].DataPending || items[0].LootID == "" || items[2].LootID == "" {
+		t.Fatalf("loot enrichment must label the pending shell and preserve real loot: %#v", items)
 	}
 	data, err := store.readDiagnosticLog()
 	if err != nil {
@@ -324,7 +324,7 @@ func TestLootDiagnosticsAllPersistWithReviewedFields(t *testing.T) {
 		}
 	}
 	shape := events["loot_map_shape"]
-	if shape["raw_entries"] != float64(4) || shape["kept"] != float64(2) || shape["dropped_zero_count"] != float64(1) || shape["type_counts"] == nil || shape["id_prefix_counts"] == nil || shape["known_chest_counts"] == nil {
+	if shape["raw_entries"] != float64(4) || shape["kept"] != float64(3) || shape["dropped_zero_count"] != float64(1) || shape["type_counts"] == nil || shape["id_prefix_counts"] == nil || shape["known_chest_counts"] == nil {
 		t.Fatalf("loot_map_shape = %#v", shape)
 	}
 	knownChests, _ := shape["known_chest_counts"].(map[string]any)
@@ -367,7 +367,7 @@ func TestLootEmptyShellFilteringStillReportsItsShape(t *testing.T) {
 	a := &app{storage: store}
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	items, _ := NewObservedLootAPI(client, a.recordDiagnostic).PlayerLoot()
-	if items = enrichLootItemsWithMetadata(items, nil, nil, a.recordDiagnostic); len(items) != 0 {
+	if items = enrichLootItemsWithMetadata(items, nil, nil, a.recordDiagnostic); len(items) != 1 || !items[0].DataPending {
 		t.Fatalf("empty-shell loot survived filtering: %#v", items)
 	}
 	data, err := store.readDiagnosticLog()
@@ -381,7 +381,7 @@ func TestLootEmptyShellFilteringStillReportsItsShape(t *testing.T) {
 			shape = event
 		}
 	}
-	if shape["raw_entries"] != float64(1) || shape["kept"] != float64(0) {
+	if shape["raw_entries"] != float64(1) || shape["kept"] != float64(1) {
 		t.Fatalf("filtered empty-shell shape = %#v; log=%s", shape, data)
 	}
 }

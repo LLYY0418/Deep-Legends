@@ -10,7 +10,7 @@ function fixture(api, clock = {setTimeout, clearTimeout}) {
   const state = { champSelectDialog: {}, champSelectPositionCache: new Map() };
   const reports = [], messages = [];
   let renders = 0;
-  const load = Function("state", "api", "renderChampSelect", "toast", "window", "setTimeout", "clearTimeout", `${filterSource};return loadChampSelectPositionFilter;`)(state, api, () => renders++, msg => messages.push(msg), {reportFlowDiagnostic: (...args) => reports.push(args)}, clock.setTimeout, clock.clearTimeout);
+  const load = Function("state", "api", "updateChampSelectDialog", "toast", "window", "setTimeout", "clearTimeout", `${filterSource};return loadChampSelectPositionFilter;`)(state, api, () => renders++, msg => messages.push(msg), {reportFlowDiagnostic: (...args) => reports.push(args)}, clock.setTimeout, clock.clearTimeout);
   return {state, load, reports, messages, renders: () => renders};
 }
 function deferred() { let resolve, reject; const promise = new Promise((a,b) => {resolve=a; reject=b;}); return {promise,resolve,reject}; }
@@ -64,4 +64,19 @@ test("closing the dialog prevents old response application",async()=>{
  const d=deferred();const f=fixture(()=>d.promise);const pending=f.load("top");
  f.state.champSelectDialog=null;f.state.champSelectPositionController.abort();d.resolve(row(1));await pending;
  assert.equal(f.renders(),0);assert.equal(f.messages.length,0);
+});
+
+test("R87 P9 disposal aborts filtering and late success cannot update the dialog", async () => {
+ const d=deferred();const f=fixture(()=>d.promise);const pending=f.load("top");
+ const signal=f.state.champSelectPositionController.signal;
+ let closes=0;
+ const closeStart=source.indexOf("  function closeChampSelectDialog(");
+ const closeSource=source.slice(closeStart,source.indexOf("  function champSelectFilteredChampions(",closeStart));
+ const disposeStart=source.indexOf("  function disposeSuite(");
+ const disposeSource=source.slice(disposeStart,source.indexOf('  window.addEventListener("deep-legends:dispose"',disposeStart));
+ const dispose=Function("state","syncChampSelectDialog","clearTimeout",`${closeSource}\n${disposeSource};return disposeSuite;`)(f.state,()=>closes++,clearTimeout);
+ dispose();assert.equal(signal.aborted,true);assert.equal(f.state.champSelectDialog,null);assert.equal(closes,1);
+ d.resolve(row(1));await pending;
+ assert.equal(f.renders(),0);assert.equal(f.messages.length,0);assert.equal(f.state.champSelectPositionCache.size,0);
+ await f.load("bottom");assert.equal(f.state.champSelectPositionController,null);
 });

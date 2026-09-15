@@ -1,0 +1,5 @@
+--- FAIL: Test2055ClientDiagnosticNewFieldsAreAllowlisted (0.00s)
+    diagnostics_2055_test.go:101: missing bounded export pending count
+FAIL
+FAIL	lol-loot-assistant	79.525s
+FAIL

@@ -1,0 +1,9 @@
+{"Time":"2026-09-14T14:19:42.113118+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:19:42.35255+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR88QueueGuardMutations"}
+{"Time":"2026-09-14T14:19:42.352617+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR88QueueGuardMutations","Output":"=== RUN   TestR88QueueGuardMutations\n"}
+{"Time":"2026-09-14T14:19:42.354606+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR88QueueGuardMutations","Output":"    r88_queue_guard_test.go:432: missed mutation: q := session.QueueID; return q == 1700\n"}
+{"Time":"2026-09-14T14:19:42.354677+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR88QueueGuardMutations","Output":"--- FAIL: TestR88QueueGuardMutations (0.00s)\n"}
+{"Time":"2026-09-14T14:19:42.354684+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR88QueueGuardMutations","Elapsed":0}
+{"Time":"2026-09-14T14:19:42.354693+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:19:42.354894+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.241s\n"}
+{"Time":"2026-09-14T14:19:42.354918+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.242}

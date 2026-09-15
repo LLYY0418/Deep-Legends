@@ -1,0 +1,17 @@
+✔ R88 thirteen ChampSelect events per second cause at most two actual diagnostic POSTs (44.017584ms)
+✔ R88 slow sampled diagnostics hold one slot and never retry (6.254917ms)
+✔ R88 local request timing is sampled globally and strips paths and identifiers (5.221083ms)
+✔ R88 real status timeout is silent twice, fatal on third, and success resets failures (15.643833ms)
+✔ R88 replaced status requests and explicit abort do not count toward fatal threshold (1.735583ms)
+✔ R88 helper failure label does not blame the League client (1.442458ms)
+✔ R88 arena names omit tags but preserve full tooltips, normal tags and masking (2.404292ms)
+✔ R88 OP uses gold badge above source S (0.915292ms)
+✔ R88 protected active match-main and match-stats rules remain byte-identical (2.818ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 169.720375

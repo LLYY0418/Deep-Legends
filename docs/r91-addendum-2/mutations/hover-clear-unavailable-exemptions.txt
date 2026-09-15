@@ -1,0 +1,16 @@
+--- FAIL: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover (0.02s)
+    --- FAIL: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/ranked/teammate-picked (0.00s)
+        champselect_takeover_test.go:176: client removal of unavailable hero prevented fallback
+    --- FAIL: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/ranked/banned (0.00s)
+        champselect_takeover_test.go:176: client removal of unavailable hero prevented fallback
+    --- FAIL: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/normal/teammate-picked (0.00s)
+        champselect_takeover_test.go:176: client removal of unavailable hero prevented fallback
+    --- FAIL: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/normal/banned (0.00s)
+        champselect_takeover_test.go:176: client removal of unavailable hero prevented fallback
+    --- FAIL: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/arena/teammate-picked (0.00s)
+        champselect_takeover_test.go:176: client removal of unavailable hero prevented fallback
+    --- FAIL: TestTakeoverClearingNonWildcardHoverYieldsButUnavailableHeroCanRecover/arena/banned (0.00s)
+        champselect_takeover_test.go:176: client removal of unavailable hero prevented fallback
+FAIL
+FAIL	lol-loot-assistant	0.417s
+FAIL

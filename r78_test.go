@@ -385,6 +385,8 @@ func (fixture *r78ChampSelectFixture) enableLane(groupID, side, lane string, cha
 	}
 	config.Enabled = true
 	config.DelayMS = 0
+	lockDelay := 0 // This fixture tests request sequencing; dedicated tests cover the real default wait.
+	config.LockDelayMS = &lockDelay
 	config.Champions[lane] = append([]int64(nil), champions...)
 	settings.ChampSelect.Groups[groupID] = group
 	fixture.runner.apply(settings)

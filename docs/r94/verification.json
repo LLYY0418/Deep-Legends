@@ -1,0 +1,14 @@
+{
+  "fullGoExitCode": 0,
+  "targetedGoExitCode": 0,
+  "raceGoExitCode": 0,
+  "goVetExitCode": 0,
+  "targetedJSTests": 60,
+  "targetedJSPass": 60,
+  "fullJSTests": 660,
+  "fullJSPass": 659,
+  "fullJSSkipped": 1,
+  "r94MutationsKilled": 11,
+  "r91MutationsKilled": 6,
+  "realClientVerified": false
+}

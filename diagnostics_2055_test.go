@@ -97,7 +97,7 @@ func Test2055ClientDiagnosticNewFieldsAreAllowlisted(t *testing.T) {
 		}
 	}
 	data, _ := a.storage.readDiagnosticLog()
-	if !strings.Contains(string(data), `"transport_pending":32`) {
+	if !strings.Contains(string(data), `"transport_pending":97`) {
 		t.Fatal("missing bounded export pending count")
 	}
 	if strings.Contains(string(data), "secret") || !strings.Contains(string(data), `"error_kind":"timeout"`) || !strings.Contains(string(data), `"transport_suppressed":1000000`) || !strings.Contains(string(data), `"resolved_position":"mid"`) {

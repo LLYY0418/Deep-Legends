@@ -354,6 +354,8 @@
 	});
 
   async function api(path, options = {}, requestKey = path, timeout = 10000) {
+    const startedAt = Date.now();
+    let httpStatus = 0, errorKind = "none";
     const previous = state.controllers.get(requestKey);
     if (previous) previous.abort();
     const controller = new AbortController();
@@ -365,6 +367,7 @@
       headers.set("Accept", "application/json");
       if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
       const response = await fetch(path, { ...options, headers, signal: controller.signal });
+      httpStatus = response.status;
       if (!response.ok) {
         if (response.status === 401) throw new Error("页面会话已过期，刷新页面即可重新连接");
         const message = (await response.text()).trim();
@@ -378,6 +381,7 @@
       }
       return payload;
     } catch (error) {
+      errorKind = timedOut ? "timeout" : error.name === "AbortError" || error.name === "RequestCancelled" ? "canceled" : httpStatus >= 400 ? "http" : httpStatus ? "decode" : "network";
       if (state.controllers.get(requestKey) !== controller || state.destroyed) {
         const cancelled = new Error("请求已取消");
         cancelled.name = "RequestCancelled";
@@ -393,6 +397,11 @@
     } finally {
       clearTimeout(timer);
       if (state.controllers.get(requestKey) === controller) state.controllers.delete(requestKey);
+      if (!path.startsWith("/api/diagnostics/")) {
+        const completedAt = Date.now();
+        const endpoint = path === "/api/status" ? "status" : path.startsWith("/api/gameplay/") ? "gameplay" : path.startsWith("/api/champions/") ? "champions" : /^\/api\/(skins|collection)(\/|\?|$)/.test(path) ? "collection" : "other";
+        window.reportFlowDiagnostic?.("local_request_client", "complete", { endpoint, startedAt, completedAt, durationMs: completedAt - startedAt, httpStatus, errorKind });
+      }
     }
   }
 
@@ -404,12 +413,16 @@
 
   async function refreshStatus(loadItems = false) {
     if (state.destroyed) return;
+    clearTimeout(state.statusTimer);
+    let statusReceived = false;
     const token = state.statusRequestToken = Number(state.statusRequestToken || 0) + 1;
     try {
       const previous = state.status;
       const nextStatus = await api("/api/status", {}, "status", 8000);
       if (token !== state.statusRequestToken || state.destroyed) return;
+      statusReceived = true;
       state.status = nextStatus;
+      state.statusFailures = 0;
 	  if (!state.status.connected || (!state.status.syncing && ((state.status.snapshotReady && !state.status.collectionDirty) || state.status.lastAttempt !== state.collectionRequestAttempt || Date.now() - state.collectionRequestAt > 30000))) {
         state.collectionRescanInFlight = false;
         state.collectionEnsureInFlight = false;
@@ -443,8 +456,10 @@
       updateReadingOverlay();
     } catch (error) {
       if (token !== state.statusRequestToken || error.name === "RequestCancelled" || state.destroyed) return;
-      state.statusDelay = STATUS_INTERVAL;
-      showFatal(error.message);
+      if (statusReceived) return;
+      state.statusFailures = Number(state.statusFailures || 0) + 1;
+      state.statusDelay = Math.min(10000, state.statusFailures * 1000);
+      if (state.statusFailures >= 3) showFatal(error.message);
     } finally {
       if (token === state.statusRequestToken) scheduleStatus();
     }
@@ -653,7 +668,7 @@
       el.connection.lastElementChild.textContent = `${name}${tag}`;
     } else {
       el.connection.classList.add(data.connectionState === "connecting" ? "is-connecting" : "is-error");
-      el.connection.lastElementChild.textContent = data.syncing || data.connectionState === "connecting" ? "正在检查客户端" : "未检测到客户端";
+      el.connection.lastElementChild.textContent = data.syncing || data.connectionState === "connecting" ? "正在检查客户端" : "未检测到英雄联盟客户端";
     }
     el.connection.dataset.tooltip = el.connection.lastElementChild.textContent;
     el.connection.dataset.tooltipOverflow = ".connection-label";
@@ -715,7 +730,7 @@
       const issues = data.poolIssues || [];
       const issueRows = issues.slice(0, 100).map((item) => `<li>${escapeHTML(item.name)}：${escapeHTML(item.reason)}</li>`).join("");
       const detail = !data.snapshotReady ? `${stale ? `实时库存暂不可用，当前显示 ${formatDateTime(data.snapshotFallbackAt)} 保存的历史快照（可能不是最新）。` : "正在读取收藏信息。"} ${snapshotRetryText(data)}${data.lastError ? ` 原因：${data.lastError}` : ""}` : `奖池共 ${formatNumber(data.poolTotal)} 款，已经确认 ${formatNumber(data.poolMatched)} 款；数据完整后会自动显示结果。`;
-	  el.notice.innerHTML = `<div class="notice-symbol" aria-hidden="true">!</div><div><strong>${data.connected ? (stale ? "显示历史收藏快照" : "部分收藏信息暂时不可用") : "奖池结果暂不可用"}</strong><p>${escapeHTML(detail)}</p>${issues.length ? `<details><summary>查看未识别条目</summary><ul class="issue-list">${issueRows}</ul></details>` : ""}${data.connected && !data.snapshotReady ? '<button class="text-button retry-inline" type="button">立即重新读取</button>' : ""}</div>`;
+	  el.notice.innerHTML = `<div class="notice-symbol" aria-hidden="true">!</div><div><strong>${data.connected ? (stale ? "显示历史收藏快照" : "部分收藏信息暂时不可用") : "奖池结果暂不可用"}</strong><p>${escapeHTML(detail)}</p>${issues.length ? `<details><summary>查看皮肤池匹配失败条目</summary><ul class="issue-list">${issueRows}</ul></details>` : ""}${data.connected && !data.snapshotReady ? '<button class="text-button retry-inline" type="button">立即重新读取</button>' : ""}</div>`;
 	  el.notice.querySelector(".retry-inline")?.addEventListener("click", () => el.refresh.click());
       return;
     }
@@ -1752,6 +1767,7 @@
       const account = payload.account || {};
       const loot = Array.isArray(account.loot) ? account.loot : [];
       const displayLoot = [...loot];
+      const lootPending = loot.some(item => item.dataPending) || (account.capabilities || []).some(item => item.name === "player-loot" && item.state === "pending");
       if (account.sanctumSparksKnown) displayLoot.push({
         lootId: "CURRENCY_ANCIENT_SPARK",
         displayName: "圣堂花火",
@@ -1785,7 +1801,7 @@
 	  const backgroundArt = window.deepLegendsOverviewArt?.render(summoner) || (summoner.backgroundSource && summoner.backgroundPath
 		? `<img class="summoner-strip-art account-hero-art" src="/api/champion-asset?source=${encodeURIComponent(summoner.backgroundSource)}&path=${encodeURIComponent(summoner.backgroundPath)}" alt="" aria-hidden="true" decoding="async" data-game-image>`
 		: "");
-	  el.accountContent.innerHTML = `<section class="account-hero">${backgroundArt}${profileIcon}<div class="account-identity"><p class="eyebrow">当前召唤师</p><h3>${escapeHTML(profileName)}</h3><p>等级 ${formatNumber(summoner.summonerLevel)} · 本机只读连接</p></div><dl class="account-facts"><div><dt>皮肤物品</dt><dd>${formatNumber(skinLoot.length)} 种 · ${formatNumber(skinLootQuantity)} 件</dd></div><div><dt>待领取</dt><dd>${formatNumber(rewards.length)} 组 · ${formatNumber(rewardQuantity)} 件</dd></div></dl></section>${categorySections || '<div class="empty-state"><strong>仓库当前没有可展示物品</strong></div>'}<section class="account-section"><div class="section-copy"><h3>待领取奖励</h3><span class="section-count">${formatNumber(rewards.length)} 组</span><button class="text-button" type="button" data-navigate-suite="sweep">去领奖</button></div>${rewardCards ? `<div class="reward-grid">${rewardCards}</div>` : '<div class="empty-state compact"><strong>没有待领取奖励</strong><p>工具会扫描奖励账本、任务与事件中心。</p></div>'}</section><details class="capability-details"><summary>数据来源状态</summary><p>只读接口单独降级，不影响皮肤库存的双来源一致性核验。</p><div class="capability-list">${capabilityRows || '<p class="muted">尚无能力状态</p>'}</div></details>`;
+	  el.accountContent.innerHTML = `<section class="account-hero">${backgroundArt}${profileIcon}<div class="account-identity"><p class="eyebrow">当前召唤师</p><h3>${escapeHTML(profileName)}</h3><p>等级 ${formatNumber(summoner.summonerLevel)} · 本机只读连接</p></div><dl class="account-facts"><div><dt>皮肤物品</dt><dd>${formatNumber(skinLoot.length)} 种 · ${formatNumber(skinLootQuantity)} 件</dd></div><div><dt>待领取</dt><dd>${formatNumber(rewards.length)} 组 · ${formatNumber(rewardQuantity)} 件</dd></div></dl></section>${lootPending ? '<div class="notice" role="status">客户端数据暂未同步，可稍后重试</div>' : ""}${categorySections || '<div class="empty-state"><strong>仓库当前没有可展示物品</strong></div>'}<section class="account-section"><div class="section-copy"><h3>待领取奖励</h3><span class="section-count">${formatNumber(rewards.length)} 组</span><button class="text-button" type="button" data-navigate-suite="sweep">去领奖</button></div>${rewardCards ? `<div class="reward-grid">${rewardCards}</div>` : '<div class="empty-state compact"><strong>没有待领取奖励</strong><p>工具会扫描奖励账本、任务与事件中心。</p></div>'}</section><details class="capability-details"><summary>数据来源状态</summary><p>只读接口单独降级，不影响皮肤库存核验。</p><div class="capability-list">${capabilityRows || '<p class="muted">尚无能力状态</p>'}</div></details>`;
       for (const image of el.accountContent.querySelectorAll(".loot-art img")) loadNextLootImage(image, true);
 	  window.deepLegendsGameIcons?.prepareImages?.(el.accountContent);
     } catch (error) {
@@ -2203,7 +2219,6 @@
   function activateSettingsPage(name) {
     const tab = el.settingsTabs.find((item) => item.dataset.settingsPage === name);
     if (!tab) return;
-    if (state.settingsPage !== name) resetDiagnosticsExport();
     state.settingsPage = name;
     activateTab(tab, el.settingsTabs, (selected) => {
       for (const panel of el.settingsPanels) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
@@ -2507,7 +2522,8 @@
   // 只保留一张与各页面空状态同风格的居中提示卡；恢复由 renderStatus 完成。
   function showFatal(message) {
     el.connection.className = "connection is-error";
-    el.connection.lastElementChild.textContent = "未检测到客户端";
+    el.connection.lastElementChild.textContent = "本地助手无响应";
+    el.connection.dataset.tooltip = "本地助手无响应";
     const expired = /会话已过期/.test(String(message || ""));
     el.notice.className = "notice is-fatal";
     el.notice.hidden = false;
@@ -2588,7 +2604,7 @@
   function lootNamePending(item) {
     const name = String(lootName(item) || "").trim();
     const rawID = String(item?.lootId || "").trim();
-	return Boolean(rawID && name.toUpperCase() === rawID.toUpperCase());
+	return Boolean(item?.dataPending || rawID && name.toUpperCase() === rawID.toUpperCase());
   }
   function lootTypeLabel(item) {
     const type = String(item?.type || item?.displayCategories || "").toUpperCase();
@@ -2637,7 +2653,7 @@
 	const essence = category === "皮肤" && (Number(item.disenchantValue) > 0 || (canUpgrade && Number(item.upgradeEssenceValue) > 0))
 	  ? `<div class="loot-essence-values">${Number(item.disenchantValue) > 0 ? `<span>分解 <b>+ ${formatNumber(item.disenchantValue)}</b>${essenceIcon}</span>` : ""}${canUpgrade && Number(item.upgradeEssenceValue) > 0 ? `<span>升级 <b>− ${formatNumber(item.upgradeEssenceValue)}</b>${essenceIcon}</span>` : ""}</div>`
 	  : "";
-    return `<article class="loot-card category-${slug}${tokenClass ? ` loot-${tokenClass}` : ""}${namePending ? " is-name-pending" : ""}"><span class="loot-art" aria-hidden="true"><span>${lootCategoryIcon(category)}</span>${art}</span><div class="loot-card-copy"><span>${escapeHTML(lootTypeLabel(item))}</span><strong>${escapeHTML(lootName(item))}</strong>${namePending ? '<small class="loot-name-pending">名称待补全</small>' : ""}${ownership}${essence}</div><div class="loot-card-end"><b>× ${formatNumber(item.count)}</b></div></article>`;
+    return `<article class="loot-card category-${slug}${tokenClass ? ` loot-${tokenClass}` : ""}${namePending ? " is-name-pending" : ""}"><span class="loot-art" aria-hidden="true"><span>${lootCategoryIcon(category)}</span>${art}</span><div class="loot-card-copy"><span>${escapeHTML(lootTypeLabel(item))}</span><strong>${escapeHTML(lootName(item))}</strong>${namePending ? '<small class="loot-name-pending">客户端数据暂未同步，可稍后重试</small>' : ""}${ownership}${essence}</div><div class="loot-card-end"><b>× ${formatNumber(item.count)}</b></div></article>`;
   }
   function lootCategorySlug(category) { return ({ "材料": "material", "宝箱": "chest", "英雄": "champion", "皮肤": "skin", "小小英雄": "companion", "永恒星碑": "eternal", "表情": "emote", "守卫": "ward", "图标": "icon" })[category] || "material"; }
   function lootCategoryIcon(category) {
@@ -3028,12 +3044,8 @@
     el.exportDiagnostics.textContent = "导出诊断日志";
   }
   window.desktopDiagnostics?.onCompleted(() => {
-    if (state.section !== "settings" || state.settingsPage !== "privacy") return;
     diagnosticsExportReady = true;
     el.exportDiagnostics.textContent = "打开日志文件夹";
-  });
-  window.addEventListener("deep-legends:section", (event) => {
-    if (event.detail?.name !== "settings") resetDiagnosticsExport();
   });
   el.exportDiagnostics.addEventListener("click", async (event) => {
     if (!diagnosticsExportReady) {
@@ -3177,6 +3189,19 @@
     }
   }
 
+  function gameplayEventDetail(payload) {
+    if (payload === "champselect:changed") return { changed: true };
+    if (typeof payload !== "string" || !payload.startsWith("gameflow:")) return null;
+    const value = payload.slice(9);
+    if (!value.startsWith("{")) return { phase: value };
+    try {
+      const detail = JSON.parse(value);
+      if (typeof detail.phase !== "string") return null;
+      const gameId = Number(detail.gameId);
+      return { phase: detail.phase, gameId: Number.isSafeInteger(gameId) && gameId > 0 ? gameId : 0 };
+    } catch (_) { return null; }
+  }
+
   function setupLiveUpdates() {
     if (!("EventSource" in window) || state.destroyed) return;
     clearTimeout(state.eventReconnectTimer);
@@ -3237,7 +3262,8 @@
 	  }
       // 对局阶段事件只转发给对局模块（“对局”页签的新对局提示灯），不触发全量刷新。
       if (typeof event.data === "string" && (event.data.startsWith("gameflow:") || event.data === "champselect:changed")) {
-        const detail = event.data === "champselect:changed" ? { changed: true } : { phase: event.data.slice(9) };
+        const detail = gameplayEventDetail(event.data);
+        if (!detail) return;
         window.dispatchEvent(new CustomEvent("deep-legends:gameflow", { detail }));
         return;
       }

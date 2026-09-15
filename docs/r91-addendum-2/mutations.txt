@@ -1,0 +1,7 @@
+hover-cleared-takeover: KILLED
+hover-clear-lock-rejected: KILLED
+hover-clear-global-exemption-ban: KILLED
+hover-clear-global-exemption-pick: KILLED
+hover-clear-unavailable-exemptions: KILLED
+hover-clear-diagnostic-scope: KILLED
+6/6 behavioral mutations killed

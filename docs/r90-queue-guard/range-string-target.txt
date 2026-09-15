@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T14:19:40.398161+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:19:40.616706+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations"}
+{"Time":"2026-09-14T14:19:40.616825+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations","Output":"=== RUN   TestR90QueueGuardCombinations\n"}
+{"Time":"2026-09-14T14:19:40.617114+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-string-target"}
+{"Time":"2026-09-14T14:19:40.617151+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-string-target","Output":"=== RUN   TestR90QueueGuardCombinations/range-string-target\n"}
+{"Time":"2026-09-14T14:19:40.698918+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-string-target","Output":"    r90_queue_guard_test.go:107: missed combined queue literal: range-string-target\n"}
+{"Time":"2026-09-14T14:19:40.698964+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-string-target","Output":"--- FAIL: TestR90QueueGuardCombinations/range-string-target (0.08s)\n"}
+{"Time":"2026-09-14T14:19:40.69897+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-string-target","Elapsed":0.08}
+{"Time":"2026-09-14T14:19:40.699063+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations","Output":"--- FAIL: TestR90QueueGuardCombinations (0.08s)\n"}
+{"Time":"2026-09-14T14:19:40.699082+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations","Elapsed":0.08}
+{"Time":"2026-09-14T14:19:40.699094+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:19:40.699448+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.301s\n"}
+{"Time":"2026-09-14T14:19:40.699464+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.301}

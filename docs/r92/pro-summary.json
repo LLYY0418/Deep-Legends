@@ -1,0 +1,20 @@
+{
+  "old_complete_samples_ms": [
+    12282,
+    23684,
+    8575
+  ],
+  "new_complete_samples_ms": [
+    12550,
+    7857,
+    10834
+  ],
+  "old_median_ms": 12282,
+  "new_median_ms": 10834,
+  "reduction_percent": 11.789610812571238,
+  "excluded_incomplete_directory_samples": 2,
+  "quality_matched_pairs": {
+    "account_count": 90,
+    "known_ladder_ranks": 27
+  }
+}

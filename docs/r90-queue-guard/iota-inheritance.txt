@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T14:19:36.973862+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:19:37.219635+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra"}
+{"Time":"2026-09-14T14:19:37.219703+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra","Output":"=== RUN   TestR90QueueGuardExtra\n"}
+{"Time":"2026-09-14T14:19:37.219757+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/iota-inheritance"}
+{"Time":"2026-09-14T14:19:37.219761+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/iota-inheritance","Output":"=== RUN   TestR90QueueGuardExtra/iota-inheritance\n"}
+{"Time":"2026-09-14T14:19:37.220068+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/iota-inheritance","Output":"    r90_queue_guard_test.go:68: missed additional queue literal: iota-inheritance\n"}
+{"Time":"2026-09-14T14:19:37.220092+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/iota-inheritance","Output":"--- FAIL: TestR90QueueGuardExtra/iota-inheritance (0.00s)\n"}
+{"Time":"2026-09-14T14:19:37.220106+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/iota-inheritance","Elapsed":0}
+{"Time":"2026-09-14T14:19:37.220155+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra","Output":"--- FAIL: TestR90QueueGuardExtra (0.00s)\n"}
+{"Time":"2026-09-14T14:19:37.220167+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra","Elapsed":0}
+{"Time":"2026-09-14T14:19:37.220171+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:19:37.220704+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.247s\n"}
+{"Time":"2026-09-14T14:19:37.220717+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.247}

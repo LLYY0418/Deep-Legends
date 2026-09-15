@@ -1,0 +1,17 @@
+[
+  {
+    "endpoint": "items",
+    "status": 200,
+    "items": 868
+  },
+  {
+    "endpoint": "perks",
+    "status": 200,
+    "items": 62
+  },
+  {
+    "endpoint": "summoner-spells",
+    "status": 200,
+    "items": 34
+  }
+]

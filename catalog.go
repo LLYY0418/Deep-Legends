@@ -227,6 +227,8 @@ func loadCollectionSnapshotWithProvider(client *LCUClient, pool PoolManifest, id
 	}
 
 	summoner := identity.Summoner
+	reads := newCollectionReads(client)
+	inventory := InventoryAPI{client: client, reads: reads}
 	var err error
 
 	var all []Skin
@@ -271,13 +273,13 @@ func loadCollectionSnapshotWithProvider(client *LCUClient, pool PoolManifest, id
 	go func() {
 		defer independent.Done()
 		measure("skin_ownership", func() {
-			ownedIDs, ownershipSources, ownershipErr = NewInventoryAPI(client).OwnedSkinIDs(summoner.SummonerID, all)
+			ownedIDs, ownershipSources, ownershipErr = inventory.OwnedSkinIDs(summoner.SummonerID, all)
 		})
 	}()
 	go func() {
 		defer independent.Done()
 		measure("champion_ownership", func() {
-			ownedChampionIDs, championCapability = NewInventoryAPI(client).OwnedChampionIDs(summoner.SummonerID)
+			ownedChampionIDs, championCapability = inventory.OwnedChampionIDs(summoner.SummonerID)
 		})
 	}()
 	go func() {
@@ -315,23 +317,18 @@ func loadCollectionSnapshotWithProvider(client *LCUClient, pool PoolManifest, id
 		chromaState           = EndpointCapability{Name: "owned-chromas", Path: "本机炫彩目录与库存"}
 	)
 	var chromaDates map[int64]string
-	skinAcquisitionLoader := func() {
-		measure("skin_acquisition_dates", func() {
-			acquiredAt, acquisitionCapability = NewInventoryAPI(client).SkinAcquisitionDates(summoner.SummonerID, ownedIDs)
-		})
-	}
 	if chromaCatalogErr == nil {
-		runParallelLoaders(skinAcquisitionLoader, func() {
-			measure("chroma_ownership", func() { chromaOwnedIDs, chromaState = loadOwnedChromaIDs(client, summoner.SummonerID, chromas) })
-			if chromaState.State == capabilityAvailable {
-				measure("chroma_acquisition_dates", func() {
-					chromaDates, _ = NewInventoryAPI(client).SkinAcquisitionDates(summoner.SummonerID, chromaOwnedIDs)
-				})
-			}
-		})
-	} else {
-		skinAcquisitionLoader()
+		measure("chroma_ownership", func() { chromaOwnedIDs, chromaState = loadOwnedChromaIDs(client, summoner.SummonerID, chromas, reads) })
 	}
+	runParallelLoaders(func() {
+		measure("skin_acquisition_dates", func() {
+			acquiredAt, acquisitionCapability = inventory.SkinAcquisitionDates(summoner.SummonerID, ownedIDs)
+		})
+	}, func() {
+		if chromaState.State == capabilityAvailable {
+			measure("chroma_acquisition_dates", func() { chromaDates, _ = inventory.SkinAcquisitionDates(summoner.SummonerID, chromaOwnedIDs) })
+		}
+	})
 
 	for i := range all {
 		if all[i].Owned {
@@ -697,7 +694,13 @@ func stringValues(value any) []string {
 	return result
 }
 
-func loadOwnedChromaIDs(client *LCUClient, summonerID int64, catalog []Chroma) (map[int64]bool, EndpointCapability) {
+func loadOwnedChromaIDs(client *LCUClient, summonerID int64, catalog []Chroma, shared ...*collectionReads) (map[int64]bool, EndpointCapability) {
+	get := client.GetBytes
+	fast := len(shared) > 0 && shared[0] != nil
+	if fast {
+		get = shared[0].get
+	}
+
 	valid := make(map[int64]bool, len(catalog))
 	for _, chroma := range catalog {
 		valid[chroma.ID] = true
@@ -717,7 +720,7 @@ func loadOwnedChromaIDs(client *LCUClient, summonerID int64, catalog []Chroma) (
 	supported := 0
 	invalid := 0
 	for _, candidate := range sources {
-		data, err := client.GetBytes(candidate.path)
+		data, err := get(candidate.path)
 		if err != nil {
 			continue
 		}
@@ -736,6 +739,18 @@ func loadOwnedChromaIDs(client *LCUClient, summonerID int64, catalog []Chroma) (
 		for id := range ids {
 			if valid[id] {
 				owned[id] = true
+			}
+		}
+		if fast && !candidate.presence {
+			evidence := extractOwnedEvidence(root, false)
+			complete := len(valid) > 0
+			for id := range valid {
+				if !evidence.DecidedIDs[id] {
+					complete = false
+				}
+			}
+			if complete {
+				break
 			}
 		}
 	}
@@ -932,7 +947,13 @@ func loadOwnedSkinIDs(client *LCUClient, summonerID int64, catalog []Skin) (map[
 	return ids, details
 }
 
-func loadOwnedSkinInventory(client *LCUClient, summonerID int64, catalog []Skin) (map[int64]bool, []OwnershipSourceStatus, error) {
+func loadOwnedSkinInventory(client *LCUClient, summonerID int64, catalog []Skin, shared ...*collectionReads) (map[int64]bool, []OwnershipSourceStatus, error) {
+	get := client.GetBytes
+	fast := len(shared) > 0 && shared[0] != nil
+	if fast {
+		get = shared[0].get
+	}
+
 	sources := []ownershipSourceSpec{
 		{path: fmt.Sprintf("/lol-champions/v1/inventories/%d/skins-minimal", summonerID), authoritative: true},
 		{path: fmt.Sprintf("/lol-champions/v1/inventories/%d/champions", summonerID), authoritative: true},
@@ -961,7 +982,7 @@ func loadOwnedSkinInventory(client *LCUClient, summonerID int64, catalog []Skin)
 			statuses = append(statuses, OwnershipSourceStatus{Path: statusPath, State: "unsupported", Detail: "endpoint disabled after repeated failures"})
 			continue
 		}
-		data, err := client.GetBytes(source.path)
+		data, err := get(source.path)
 		if err != nil {
 			if strings.HasPrefix(source.path, "/lol-inventory/v1/") {
 				_, disabled := client.noteInventoryV1Failure()
@@ -1032,6 +1053,11 @@ func loadOwnedSkinInventory(client *LCUClient, summonerID int64, catalog []Skin)
 		result := ownershipResult{source: source, ids: validated, statusIndex: statusIndex}
 		if source.authoritative {
 			authoritative = append(authoritative, result)
+			// Early exit requires complete explicit coverage, not a presence-only
+			// subset or an empty/incomplete response. Legacy audit calls stay exhaustive.
+			if fast && validatedEvidence == len(validCatalogIDs) {
+				break
+			}
 		} else {
 			presence = append(presence, result)
 		}
@@ -1091,6 +1117,9 @@ func loadOwnedSkinInventory(client *LCUClient, summonerID int64, catalog []Skin)
 		return map[int64]bool{}, statuses, fmt.Errorf("owned skin inventory needs an explicit full-coverage source or two agreeing presence sources; got %d presence sources", len(presence))
 	}
 	baseline := presence[0]
+	if len(baseline.ids) == 0 {
+		return map[int64]bool{}, statuses, errCollectionNotSynced
+	}
 	for _, candidate := range presence[1:] {
 		if !equalIDSets(baseline.ids, candidate.ids) {
 			missing, extra := idSetDifferenceCounts(baseline.ids, candidate.ids)

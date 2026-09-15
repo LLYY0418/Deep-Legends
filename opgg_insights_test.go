@@ -647,8 +647,8 @@ func TestLoadRiotOverviewLoadsOPGGHistoryWithoutMatchTierRequests(t *testing.T) 
 	champions.mu.Lock()
 	champions.championMeta[1] = championMetadata{ID: 1, NameZH: "黑暗之女"}
 	champions.mu.Unlock()
-	events := make([]map[string]any, 0, 1)
-	champions.diag = func(event map[string]any) { events = append(events, event) }
+	events := make(chan map[string]any, 16)
+	champions.diag = func(event map[string]any) { events <- event }
 	champions.clientMu.Lock()
 	champions.client = &http.Client{Transport: gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		if request.URL.Host == "op.gg" {
@@ -685,6 +685,11 @@ func TestLoadRiotOverviewLoadsOPGGHistoryWithoutMatchTierRequests(t *testing.T) 
 	if len(overview.Matches) != 1 || overview.Matches[0].GameID != 301 {
 		t.Fatalf("matches = %#v", overview.Matches)
 	}
+	deadline := time.Now().Add(time.Second)
+	for len(a.cachedOPGGHistoricalRanks(puuid)) == 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	overview.HistoricalRanks = a.cachedOPGGHistoricalRanks(puuid)
 	if opggCalls.Load() != 1 {
 		t.Fatalf("overview requested OP.GG %d time(s), want one history request", opggCalls.Load())
 	}
@@ -692,7 +697,8 @@ func TestLoadRiotOverviewLoadsOPGGHistoryWithoutMatchTierRequests(t *testing.T) 
 		t.Fatalf("historical ranks = %#v", overview.HistoricalRanks)
 	}
 	var cost map[string]any
-	for _, event := range events {
+	for len(events) > 0 {
+		event := <-events
 		if event["event"] == "riot_overview_cost" {
 			cost = event
 			break
@@ -721,7 +727,8 @@ func TestRiotRateLimitRecordsDiagnosticAndRequestScopedCount(t *testing.T) {
 	defer cancel()
 	var payload map[string]any
 	err := provider.getLimited(ctx, "kr.api.riotgames.com", "/lol/match/v5/matches/KR_123", nil, &payload, riotResponseMax)
-	if !errors.Is(err, context.DeadlineExceeded) {
+	var quota *riotStatusError
+	if !errors.As(err, &quota) || quota.status != 429 || quota.retryAfter != 3 {
 		t.Fatalf("rate limit error = %v", err)
 	}
 	if tracker.rateLimitCount() != 1 {

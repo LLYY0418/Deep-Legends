@@ -35,6 +35,7 @@
     tabHistories: { players: [], kr: [], pro: [] },
     // 覆盖层栈：在非总览页点击玩家名称时，于当前页面之上展示该玩家的总览。
     overlay: [],
+    friendPresence: new Map(),
     playerTabOrder: readPlayerTabOrder(),
     draggedPlayerTab: "",
     controllers: new Map(),
@@ -47,6 +48,9 @@
     summonerSpellsLoading: false,
     live: null,
     liveLoading: false,
+    liveAwaitingGame: false,
+    liveExpectedGameId: 0,
+    liveGameRefreshQueued: false,
     liveError: "",
     liveTimer: 0,
     liveRecommendations: new Map(),
@@ -114,8 +118,30 @@
   function liveRefreshDelayMs(phase, configuredSeconds) {
     const normalized = String(phase || "").trim();
     if (normalized === "ChampSelect") return 3_000;
-    if (normalized === "InProgress" || normalized === "Reconnect") return 20_000;
     return normalizeLiveInterval(configuredSeconds) * 1_000;
+  }
+  function liveSnapshotComplete(data) {
+    if (!data?.available || !Array.isArray(data.players) || !data.players.length) return false;
+    if (data.players.some((player) => player.historyState === "pending")) return false;
+    return liveAugmentRecommendationSource(data) !== "arena" || data.arenaGrouped === true || data.arenaGroupingUnavailable === true && data.arenaGroupingRetryable !== true;
+  }
+  function syncLiveRetryBudget() {
+    const key = `${state.beacon.phase || state.live?.phase || ""}:${state.live?.gameId || 0}`;
+    if (state.liveRetryKey !== key) { state.liveRetryKey = key; state.liveRetryAttempts = 0; state.liveRetryStartedAt = Date.now(); }
+  }
+  function liveAutoRefreshStopped(data) {
+    if (!["InProgress", "Reconnect"].includes(data?.phase)) return "";
+    if (data?.arenaGroupingUnavailable && !data?.arenaGrouped && Number(state.liveRetryAttempts || 0) < 8) return data.arenaGroupingRetryable ? "小队数据尚未完整，正在自动重试" : "暂时无法确认小队，可手动刷新";
+    if (liveSnapshotComplete(data)) return "对局中数据不再变化，已停止自动刷新";
+    if (Number(state.liveRetryAttempts || 0) >= 8) return "数据尚未完整，已停止自动重试，可手动刷新";
+    return "";
+  }
+  function renderLiveRefreshStatus(data) {
+    const message = data?.phase && liveGamePhase(data.phase) && data.phase !== state.beacon.phase
+      ? "对局阶段已变化，正在同步当前对局…"
+      : state.liveLoading ? "正在刷新…"
+      : liveAutoRefreshStopped(data);
+    return message ? `<div class="live-refresh-status" role="status"><span>${escapeHTML(message)}</span><button type="button" class="text-button" data-live-refresh>刷新</button></div>` : "";
   }
   function normalizeLiveOrder(value) { return ["team", "position", "kda", "win-rate"].includes(value) ? value : "team"; }
   function liveRecommendationTier() {
@@ -166,10 +192,22 @@
     let responseStatus = 0;
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeout);
     try {
+      const { onProgress, ...requestOptions } = options;
       const headers = new Headers(options.headers || {});
-      headers.set("Accept", "application/json");
+      headers.set("Accept", onProgress ? "application/x-ndjson" : "application/json");
+      const responseError = (status, body, retryHeader) => {
+        let payload = {};
+        try { payload = typeof body === "string" ? JSON.parse(body) : body; } catch (_) {}
+        const error = new Error(payload?.error || (typeof body === "string" ? body.trim() : "") || `本地服务返回 HTTP ${status}`);
+        error.status = status;
+        error.errorKind = status === 429 ? "rate-limited" : "http";
+        const rawRetry = payload?.retryAfter ?? retryHeader;
+        const seconds = Number(rawRetry);
+        error.retryAfter = Math.max(1, Number.isFinite(seconds) && seconds > 0 ? seconds : (Date.parse(rawRetry) - Date.now()) / 1000 || 5);
+        return error;
+      };
       if (options.body) headers.set("Content-Type", "application/json");
-      const response = await fetch(path, { ...options, headers, signal: controller.signal });
+      const response = await fetch(path, { ...requestOptions, headers, signal: controller.signal });
       responseStatus = response.status;
       errorStage = "read";
       if (response.status === 401) {
@@ -179,13 +217,32 @@
         throw error;
       }
       if (!response.ok) {
-        const error = new Error((await response.text()).trim() || `本地服务返回 HTTP ${response.status}`);
-        error.status = response.status;
-        error.errorKind = "http";
-        throw error;
+        throw responseError(response.status, await response.text(), response.headers?.get("Retry-After"));
       }
       errorStage = "decode";
-      const payload = response.status === 204 ? null : await response.json();
+      let payload;
+      if (onProgress && response.headers?.get("Content-Type")?.includes("application/x-ndjson")) {
+        const reader = response.body.getReader(), decoder = new TextDecoder();
+        let buffer = "", complete = false;
+        const receive = line => {
+          if (!line.trim()) return;
+          if (controller.signal.aborted || state.controllers.get(key) !== controller || state.destroyed) { const error = new Error("请求已取消"); error.name = "RequestCancelled"; throw error; }
+          const frame = JSON.parse(line);
+          if (frame.type === "error") throw responseError(frame.status, frame, frame.retryAfter);
+          if (frame.type === "progress") onProgress(frame.overview);
+          else if (frame.type === "complete") { payload = frame.overview; complete = true; }
+        };
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+            let split;
+            while ((split = buffer.indexOf("\n")) >= 0) { const line = buffer.slice(0, split); buffer = buffer.slice(split + 1); receive(line); }
+            if (done) { receive(buffer); break; }
+          }
+          if (!complete) throw new Error("战绩读取中断，请重试补齐");
+        } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+      } else payload = response.status === 204 ? null : await response.json();
       if (controller.signal.aborted || state.controllers.get(key) !== controller || state.destroyed) {
         const aborted = new Error("请求已取消");
         aborted.name = "RequestCancelled";
@@ -329,7 +386,7 @@
   }
 
   function shouldReloadOverview(tab, now = Date.now()) {
-    return !tab?.data || now - Number(tab.loadedAt || 0) >= 120_000;
+    return Boolean(tab?.dirty) || !tab?.data || now - Number(tab.loadedAt || 0) >= 120_000;
   }
 
   function matchTierScope(tab) {
@@ -368,7 +425,8 @@
         if (shouldReloadOverview(tab) && tab.loadingMore) {
           tab.reloadAfterAppend = true;
           renderOverview(group);
-        } else if (shouldReloadOverview(tab)) loadOverview(tab, true);
+        } else if (tab.dirty) { renderOverview(group); scheduleDirtyOverview(tab); }
+        else if (shouldReloadOverview(tab)) loadOverview(tab, true);
         else renderOverview(group);
       } else renderOverview(group);
     }
@@ -391,6 +449,9 @@
       state.controllers.get("live")?.abort();
       state.liveLoading = false;
       state.live = null;
+      state.liveAwaitingGame = false;
+      state.liveExpectedGameId = 0;
+      state.liveGameRefreshQueued = false;
       state.liveError = "";
       resetLiveGameScopedState();
       // 只在连接状态真正切换时更换目录。周期性的未连接状态事件不能
@@ -571,7 +632,7 @@
     state[observerKey]?.disconnect();
     state[observerKey] = null;
     const sentinel = container?.querySelector("[data-match-sentinel]");
-	if (!sentinel || !tab.data?.pagination?.hasMore || tab.data.pagination.autoPaused || tab.loadingMore || tab.filterPaging || !("IntersectionObserver" in window)) return;
+	if (!sentinel || !tab.data?.pagination?.hasMore || tab.data.pagination.autoPaused || tab.loadingMore || tab.initialPagePending || tab.filterPaging || !("IntersectionObserver" in window)) return;
     const scrollRoot = container.closest(".player-overlay-scroll") || document.getElementById("app-scroll");
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting) || tab.appendFramePending) return;
@@ -636,6 +697,8 @@
   }
 
   async function loadOverview(tab, force = false, append = false, manual = false, quiet = false) {
+    if (tab.closed || state.destroyed) return false;
+    if (tab.quotaRetry && !force && !manual) return false;
 	if (!tabReady(tab)) { rerenderTab(tab); return false; }
 	if (force) {
       // Successful immutable timelines remain cached; failed attempts must be
@@ -674,28 +737,55 @@
       }
       tab.loading = true;
 	}
+    clearTimeout(tab.quotaRetry?.timer);
+    tab.quotaRetry = null;
     const requestToken = Number(tab.overviewRequestToken || 0) + 1;
     tab.overviewRequestToken = requestToken;
     tab.error = "";
+    if (!append) tab.initialPageError = "";
 	let appendAdditions = [];
 	let loaded = false;
+    const baseMatches = [...(tab.data?.matches || [])];
     if (append) showLoadingMoreState(tab);
     else if (!quiet) rerenderTab(tab);
+    const initialKRPage = !append && !tab.data && riotTab(tab) && Number(state.settings.matchCount) > 5;
+    const requestCount = state.settings.matchCount;
+    if (initialKRPage) tab.initialPagePending = true;
     try {
       const begIndex = append ? Math.max(0, Number(tab.nextBegIndex ?? (Number(tab.data?.pagination?.begIndex || 0) + Number(tab.data?.pagination?.count || 0)))) : 0;
       const verification = tabGroup(tab) === "pro" && !append ? { expectedTier: tab.expectedTier || "" } : {};
       const body = tab.current ? null : JSON.stringify(tab.riotId && !tab.playerRef
-		? { ...verification, gameName: tab.riotId.gameName, tagLine: tab.riotId.tagLine, region: tab.region || "", serverId: tab.serverId || "", count: state.settings.matchCount, begIndex, force, matchFilter: tab.matchFilter }
-		: { ...verification, playerRef: tab.playerRef, serverId: tab.serverId || "", count: state.settings.matchCount, begIndex, force, matchFilter: tab.matchFilter });
-      const timeout = 25_000;
+		? { ...verification, gameName: tab.riotId.gameName, tagLine: tab.riotId.tagLine, region: tab.region || "", serverId: tab.serverId || "", count: requestCount, begIndex, force, matchFilter: tab.matchFilter }
+		: { ...verification, playerRef: tab.playerRef, serverId: tab.serverId || "", count: requestCount, begIndex, force, matchFilter: tab.matchFilter });
+      const timeout = riotTab(tab) ? 190_000 : 25_000;
+      const onProgress = riotTab(tab) ? partial => {
+        if (tab.overviewRequestToken !== requestToken || tab.closed || state.destroyed) return;
+        if (!partial?.player || !Array.isArray(partial.matches)) return;
+        const previous = tab.data;
+        const incoming = new Set(partial.matches.map(match => String(match.gameId)));
+        const matches = append
+          ? [...(previous?.matches || []).filter(match => !incoming.has(String(match.gameId))), ...partial.matches]
+          : [...partial.matches, ...(previous?.matches || []).filter(match => !incoming.has(String(match.gameId)))];
+        tab.data = { ...previous, ...partial, matches, pagination: previous?.pagination || partial.pagination };
+        // Partial pages do not advance the cursor; a retry fills this same page.
+        tab.initialPagePending = !append;
+        const ref = partial.player.playerRef;
+        if (ref) { rememberTabPlayerRef(tab, ref); tab.playerRef = ref; }
+        tab.label = playerLabel(partial.player);
+        rerenderTab(tab);
+      } : undefined;
       const requestKey = `${append ? "overview-more" : "overview"}:${tab.key}`;
+      if (!append) {
+        void loadOPGGSeasonSummary(tab, force && !quiet);
+        void loadOverviewCurrentGame(tab, force && !quiet);
+      }
       const payload = tab.current
-		? await api(`/api/gameplay/overview?count=${state.settings.matchCount}&begIndex=${begIndex}&force=${force ? 1 : 0}&matchFilter=${encodeURIComponent(tab.matchFilter || "all")}`, {}, requestKey, timeout)
-        : await api("/api/gameplay/overview", { method: "POST", body }, requestKey, timeout);
+		? await api(`/api/gameplay/overview?count=${requestCount}&begIndex=${begIndex}&force=${force ? 1 : 0}&matchFilter=${encodeURIComponent(tab.matchFilter || "all")}`, {}, requestKey, timeout)
+        : await api("/api/gameplay/overview", { method: "POST", body, onProgress }, requestKey, timeout);
       if (tab.overviewRequestToken !== requestToken) return false;
       if (payload.proMismatch) markProMismatch(tab);
       if (append) {
-        const seen = new Set((tab.data.matches || []).map((match) => String(match.gameId)));
+        const seen = new Set(baseMatches.map((match) => String(match.gameId)));
         const additions = (payload.matches || []).filter((match) => {
           const gameID = String(match.gameId);
           if (seen.has(gameID)) return false;
@@ -711,7 +801,7 @@
         }
         tab.nextBegIndex = pagination.nextBegIndex;
         delete pagination.nextBegIndex;
-        tab.data = { ...tab.data, matches: [...(tab.data.matches || []), ...additions], pagination: { ...pagination, moreError: "" } };
+        tab.data = { ...tab.data, matches: [...baseMatches, ...additions], pagination: { ...pagination, moreError: "" } };
         appendAdditions = additions;
         tab.paginationBackoffMs = 0;
         tab.nextAutoAppendAt = Date.now() + AUTO_PAGE_DELAY_MS;
@@ -737,7 +827,9 @@
 		tab.nextAutoAppendAt = Date.now() + AUTO_PAGE_DELAY_MS;
 	  }
 	  loaded = true;
+      if (!append) tab.initialPagePending = false;
       const resolvedPlayerRef = payload.player?.playerRef || "";
+      syncOverviewSupplementRefs(tab);
       rememberTabPlayerRef(tab, resolvedPlayerRef);
       tab.playerRef = resolvedPlayerRef || tab.playerRef;
       tab.region = payload.player?.region || tab.region || "";
@@ -752,6 +844,20 @@
 		}
     } catch (error) {
       if (tab.overviewRequestToken !== requestToken) return false;
+      if (error.errorKind === "rate-limited") {
+        tab.error = "";
+        tab.initialPageError = "";
+        const filter = tab.matchFilter, count = state.settings.matchCount;
+        const retry = { timer: 0 };
+        tab.quotaRetry = retry;
+        retry.timer = setTimeout(() => {
+          if (tab.quotaRetry !== retry) return;
+          tab.quotaRetry = null;
+          if (tab.closed || state.destroyed || tab.overviewRequestToken !== requestToken || tab.matchFilter !== filter || state.settings.matchCount !== count) return;
+          void loadOverview(tab, !append, append, false, true);
+        }, Math.max(1000, Number(error.retryAfter || 5) * 1000));
+        return false;
+      }
       if (error.name !== "RequestCancelled") {
         // 玩家引用极少数情况下会失效（例如切换登录账号）；搜索打开的页签
         // 还留有 Riot ID，直接改用 Riot ID 重新查询一次。
@@ -775,6 +881,7 @@
           tab.data.pagination = { ...(tab.data.pagination || {}), hasMore: true, autoPaused: true, pauseReason: "", moreError: retryCopy };
           showToast(`更多战绩加载失败：${error.message}`);
         }
+        else if (tab.initialPagePending && tab.data) tab.initialPageError = error.message || "请求失败";
         else if (!quiet) tab.error = error.message;
       }
 	} finally {
@@ -792,34 +899,53 @@
 	  }
 	}
 	if (loaded && !append) {
-      void loadOPGGSeasonSummary(tab, force && !quiet);
-      void loadOverviewCurrentGame(tab, force && !quiet);
+      void loadOPGGSeasonSummary(tab);
+      void loadOverviewCurrentGame(tab);
     }
-	return loaded;
+    if (loaded && !append) tab.initialPagePending = false;
+    return loaded;
+  }
+
+  function overviewSupplementTarget(tab) {
+    const player = tab?.data?.player;
+    if (String(player?.region || tab?.region || "").toLowerCase() !== "kr" || player?.privateHistory || tab?.closed) return null;
+    const playerRef = player?.playerRef || tab?.playerRef || "";
+    const gameName = player?.gameName || tab?.riotId?.gameName || "";
+    const tagLine = player?.tagLine || tab?.riotId?.tagLine || "";
+    if (!playerRef && (!gameName || !tagLine)) return null;
+    const key = gameName && tagLine ? `kr:${gameName.toLowerCase()}#${tagLine.toLowerCase()}` : playerRef;
+    return { key, body: playerRef ? { playerRef } : { gameName, tagLine, region: "kr" } };
+  }
+
+  function syncOverviewSupplementRefs(tab) {
+    const target = overviewSupplementTarget(tab), ref = tab.data?.player?.playerRef;
+    if (!target || !ref) return;
+    if (tab.opggSeason?.key === target.key) tab.opggSeason.playerRef = ref;
+    if (tab.currentGame?.key === target.key) tab.currentGame.ref = ref;
   }
 
   // One aggregated OP.GG query, independent of Riot history and pagination.
   // Keep its result on this tab; never refresh the entire overview on completion.
   async function loadOPGGSeasonSummary(tab, force = false) {
-    const player = tab?.data?.player;
-    const ref = String(player?.playerRef || "");
-    if (String(player?.region || "").toLowerCase() !== "kr" || player?.privateHistory || !ref || state.destroyed) return false;
+    const target = overviewSupplementTarget(tab);
+    if (!target || state.destroyed) return false;
+    const ref = target.key;
     if (tab.opggSeasonPending === ref) return false;
-    const same = tab.opggSeason?.playerRef === ref;
+    const same = tab.opggSeason?.key === ref;
     const age = Date.now() - Number(tab.opggSeasonAttemptAt || 0);
     if (!force && tab.opggSeasonAttemptRef === ref && age < (same ? 600_000 : 30_000)) return false;
     tab.opggSeasonPending = ref;
     tab.opggSeasonAttemptRef = ref;
     tab.opggSeasonAttemptAt = Date.now();
     try {
-      const summary = await api("/api/gameplay/season-summary", { method: "POST", body: JSON.stringify({ playerRef: ref, force }) }, `opgg-season:${tab.key}`, 17_000);
-      if (state.destroyed || tab.data?.player?.playerRef !== ref) return false;
+      const summary = await api("/api/gameplay/season-summary", { method: "POST", body: JSON.stringify({ ...target.body, force }) }, `opgg-season:${tab.key}`, 17_000);
+      if (state.destroyed || overviewSupplementTarget(tab)?.key !== ref) return false;
       if (summary?.source !== "OP.GG" || summary?.queue !== "RANKED" || !summary?.season || !Array.isArray(summary.champions) || !Number.isFinite(summary.overall?.games)) return false;
-      tab.opggSeason = { playerRef: ref, data: summary };
+      tab.opggSeason = { key: ref, playerRef: tab.data?.player?.playerRef || ref, data: summary };
       tab.opggSeasonStale = false;
       return true;
     } catch (error) {
-      if (error.name !== "RequestCancelled" && tab.data?.player?.playerRef === ref) {
+      if (error.name !== "RequestCancelled" && overviewSupplementTarget(tab)?.key === ref) {
         tab.opggSeasonStale = same;
         // Retain an available season aggregate, otherwise show unavailable;
         // never replace season statistics with a recent-match sample.
@@ -827,7 +953,7 @@
       return false;
     } finally {
       if (tab.opggSeasonPending === ref) tab.opggSeasonPending = "";
-      if (!state.destroyed && tab.data?.player?.playerRef === ref) rerenderTab(tab);
+      if (!state.destroyed && overviewSupplementTarget(tab)?.key === ref) rerenderTab(tab);
     }
   }
 
@@ -1170,7 +1296,8 @@
     // 每个页签的筛选、展开状态与详情页签独立保留：来回切换玩家页签
     // 离开主页面再返回也保留，避免内容高度变化破坏滚动位置。
     renderPlayerTabs();
-    if (!tab.data && !tab.loading) loadOverview(tab);
+    if (tab.dirty) scheduleDirtyOverview(tab);
+    else if (!tab.data && !tab.loading) loadOverview(tab);
     else renderOverview(group);
   }
 
@@ -1242,13 +1369,19 @@
 
   function overlayBack() {
     const closed = state.overlay.pop();
-    if (closed) state.controllers.get(`overview:${closed.key}`)?.abort();
+    if (closed) {
+      closed.closed = true;
+      clearTimeout(closed.quotaRetry?.timer);
+      state.controllers.get(`overview:${closed.key}`)?.abort();
+    }
     renderOverlay();
   }
 
   function closeOverlay() {
     while (state.overlay.length) {
       const closed = state.overlay.pop();
+      closed.closed = true;
+      clearTimeout(closed.quotaRetry?.timer);
       state.controllers.get(`overview:${closed.key}`)?.abort();
     }
     if (nodes.playerOverlay) renderOverlay();
@@ -1325,6 +1458,8 @@
     savePlayerScroll();
     const index = state.tabs.findIndex((tab) => tab.key === key && !tab.current);
     if (index < 0) return;
+    state.tabs[index].closed = true;
+    clearTimeout(state.tabs[index].quotaRetry?.timer);
     state.controllers.get(`overview:${key}`)?.abort();
     state.controllers.get(`overview-more:${key}`)?.abort();
     state.controllers.get(`opgg-season:${key}`)?.abort();
@@ -1510,7 +1645,7 @@
       <section class="summoner-strip">
         ${backgroundArt}
         ${profileIcon}
-        <div class="summoner-strip-copy"><div><h2 data-tooltip="${escapeHTML(profileName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(profileName)}</h2>${nameMeta}</div><p class="summoner-level-row"><span>召唤师等级 ${number(player.summonerLevel)}${player.hidden ? " · 身份已隐藏" : ""}</span>${regionChip}${hiddenChip}</p></div>
+        <div class="summoner-strip-copy"><div><h2 data-tooltip="${escapeHTML(profileName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(profileName)}</h2>${nameMeta}</div><p class="summoner-level-row"><span>召唤师等级 ${number(player.summonerLevel)}${player.hidden ? " · 身份已隐藏" : ""}</span>${regionChip}${hiddenChip}</p><p class="player-live-chip" data-friend-presence="${escapeHTML(tab.key)}" hidden></p></div>
         ${highlights}
       </section>
       <div class="overview-layout">
@@ -1521,6 +1656,7 @@
           <div class="overview-career-entry"><button class="career-dialog-trigger" type="button" aria-haspopup="dialog" aria-controls="career-dialog" data-open-career-dialog><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg><span>生涯统计</span></button></div>
           ${renderMatchFilters(tab)}
           ${matchDetailsWarning}
+          ${tab.initialPageError ? `<div class="notice is-warning" role="alert"><p>已保留前 ${number(rawMatches.length)} 场，完整战绩暂未补齐：${escapeHTML(tab.initialPageError)}</p><button class="text-button" type="button" data-complete-overview>重试补齐</button></div>` : ""}
           ${riotTab(tab) ? '<div data-current-game hidden></div>' : ""}
           <div class="match-list">${preserveMatchList ? "" : (matches.length ? matches.map((match) => renderMatch(match, player.playerRef, tab)).join("") : emptyMatches)}</div>
           <div class="match-pagination${tab.loadingMore ? " is-loading" : ""}" data-match-sentinel aria-live="polite"${sentinelHidden}>${paginationCopy}</div>
@@ -1541,9 +1677,55 @@
     container._matchListMatches = rawMatches;
     container._matchListFilter = tab.matchFilter;
     container._matchListViewRevision = Number(tab.matchViewRevision || 0);
+    updateFriendPresenceChips();
     scheduleOverviewCurrentGame(tab);
     if ((data.matches || []).length || tab.currentGame?.data?.status === "active") { ensurePerks(); ensureItems(); ensureSummonerSpells(); observeMatchTierVisibility(container, tab, tierScope); }
   }
+
+  function friendPresenceForTab(tab) {
+    if (!tab || riotTab(tab)) return null;
+    // Match only server-scoped opaque references, never a shared display name.
+    for (const ref of [tab.playerRef, ...(tab.playerRefs || []), tab.data?.player?.playerRef]) {
+      const friend = state.friendPresence.get(ref);
+      if (friend) return friend;
+    }
+    return null;
+  }
+
+  function friendGameDuration(started) {
+    const seconds = Math.max(0, Math.floor((Date.now() - started) / 1000));
+    const minutes = Math.floor(seconds / 60);
+    const clock = minutes >= 60 ? `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}` : String(minutes);
+    return `已进行 ${clock}:${String(seconds % 60).padStart(2, "0")}`;
+  }
+
+  function friendPresenceMarkup(tab) {
+    const friend = friendPresenceForTab(tab);
+    if (!friend || !["chat", "dnd"].includes(friend.availability) || friend.gameStatus !== "inGame"
+      || (friend.product && friend.product !== "league_of_legends")) return "";
+    const label = [friend.queueLabel || "游戏中", friend.championName].filter(Boolean).join(" · ");
+    const started = Number(friend.gameStartedAt);
+    const clock = Number.isFinite(started) && started > 0
+      ? ` · <time data-player-game-start="${started}">${friendGameDuration(started)}</time>` : "";
+    return `${escapeHTML(label)}${clock}`;
+  }
+
+  function updateFriendPresenceChips() {
+    if (state.destroyed) return;
+    const tabs = new Map([...state.tabs, ...state.overlay].map(tab => [tab.key, tab]));
+    for (const node of document.querySelectorAll("[data-friend-presence]")) {
+      const markup = friendPresenceMarkup(tabs.get(node.dataset.friendPresence));
+      if (node.innerHTML !== markup) node.innerHTML = markup;
+      node.hidden = !markup;
+    }
+  }
+
+  window.addEventListener("deep-legends:friends-presence", (event) => {
+    if (state.destroyed) return;
+    const friends = Array.isArray(event.detail?.friends) ? event.detail.friends : [];
+    state.friendPresence = new Map(friends.filter(friend => friend?.playerRef).map(friend => [friend.playerRef, friend]));
+    updateFriendPresenceChips();
+  });
 
   function currentGameMarkup(tab) {
     if (!riotTab(tab)) return "";
@@ -1612,10 +1794,11 @@
     if (!riotTab(tab)) return;
     let traceID = tab?.currentGameTrace;
     const report = (reason, fields = {}) => { if (typeof window !== "undefined") window.reportFlowDiagnostic?.("current_game_client", reason, { traceId: traceID, forceRefresh: force, ...fields }); };
-    const ref = tab?.data?.player?.playerRef;
-    if (!ref || tab.data.player.privateHistory && riotTab(tab) || tab.externalRender || state.destroyed) { report("gated", { gate: !ref ? "no-reference" : state.destroyed ? "destroyed" : tab.externalRender ? "external-render" : "private-kr" }); return; }
+    const target = overviewSupplementTarget(tab);
+    const ref = target?.key;
+    if (!ref || tab.data?.player?.privateHistory && riotTab(tab) || tab.externalRender || state.destroyed) { report("gated", { gate: !ref ? "no-reference" : state.destroyed ? "destroyed" : tab.externalRender ? "external-render" : "private-kr" }); return; }
     if (tab.currentGamePending === ref) { report("in-flight"); return; }
-    if (!force && tab.currentGame?.ref === ref && Date.now() - tab.currentGame.at < 30_000) { report("cached", { cacheAgeMs: Date.now() - tab.currentGame.at, phase: tab.currentGame.error ? "error" : tab.currentGame.data?.status }); return; }
+    if (!force && (tab.currentGame?.key || tab.currentGame?.ref) === ref && Date.now() - tab.currentGame.at < 30_000) { report("cached", { cacheAgeMs: Date.now() - tab.currentGame.at, phase: tab.currentGame.error ? "error" : tab.currentGame.data?.status }); return; }
     tab.currentGamePending = ref;
     state.currentGameTraceSequence = ((state.currentGameTraceSequence || 0) + 1) % 1000000;
     tab.currentGameTrace = `cg-${Date.now()}-${state.currentGameTraceSequence}`;
@@ -1623,20 +1806,20 @@
     const started = Date.now();
     report("request", { forceRefresh: force });
     try {
-      const data = await api("/api/gameplay/current-game", { method: "POST", body: JSON.stringify({ playerRef: ref, traceId: tab.currentGameTrace, forceRefresh: force }) }, `current-game:${tab.key}`, 14_000);
+      const data = await api("/api/gameplay/current-game", { method: "POST", body: JSON.stringify({ ...target.body, traceId: tab.currentGameTrace, forceRefresh: force }) }, `current-game:${tab.key}`, 14_000);
       if (!["active", "none", "unsupported"].includes(data?.status) || data.status === "active" && !Array.isArray(data.teams)) {
         report("invalid-response");
         const error = new Error("当前对局响应无效");
         error.errorKind = "invalid-response";
         throw error;
       }
-      if (tab.data?.player?.playerRef !== ref || state.destroyed) { report("stale", { gate: state.destroyed ? "destroyed" : "reference-changed" }); return; }
-      tab.currentGame = { ref, at: Date.now(), data, traceId: traceID, forceRefresh: force };
+      if (overviewSupplementTarget(tab)?.key !== ref || state.destroyed) { report("stale", { gate: state.destroyed ? "destroyed" : "reference-changed" }); return; }
+      tab.currentGame = { key: ref, ref: tab.data?.player?.playerRef || ref, at: Date.now(), data, traceId: traceID, forceRefresh: force };
       report("received", { phase: data.status, source: data.source, teamsReceived: (data.teams || []).length, durationMs: Date.now()-started, playersReceived: (data.teams || []).reduce((sum, team) => sum + (team.players || []).length, 0) });
       if (data.status === "active") { ensurePerks(); ensureSummonerSpells(); }
     } catch (error) {
       report(error.name === "RequestCancelled" ? "canceled" : "failed", { durationMs: Date.now()-started, httpStatus: error.status || 0, errorKind: error.errorKind || "other" });
-      if (error.name !== "RequestCancelled" && tab.data?.player?.playerRef === ref && !state.destroyed) tab.currentGame = { ref, at: Date.now(), error: true, traceId: traceID, forceRefresh: force };
+      if (error.name !== "RequestCancelled" && overviewSupplementTarget(tab)?.key === ref && !state.destroyed) tab.currentGame = { key: ref, ref: tab.data?.player?.playerRef || ref, at: Date.now(), error: true, traceId: traceID, forceRefresh: force };
     } finally {
       if (tab.currentGamePending === ref) tab.currentGamePending = "";
       updateCurrentGameCard(tab);
@@ -2426,7 +2609,11 @@
   // 斗魂竞技场按名次预览前四支队伍，完整队伍在展开详情中展示。
   function renderMatchPlayers(match) {
     const grouping = matchPlayerGroups(match);
-    const playerButton = (item, index) => `<button type="button" ${item.playerRef ? `data-player-ref="${escapeHTML(item.playerRef)}"` : "disabled"} data-tooltip="${escapeHTML(playerParticipantName(item, index))}" data-tooltip-overflow=".match-player-name" data-tooltip-size="compact">${iconFigure("champion", item.championId, item.championName, "tiny")}<span class="match-player-name">${escapeHTML(playerParticipantName(item, index))}</span></button>`;
+    const playerButton = (item, index) => {
+      const fullName = playerParticipantName(item, index);
+      const visibleName = grouping.arena && !state.settings.maskNames ? (item.gameName || item.displayName || "隐藏玩家").split("#")[0] : fullName;
+      return `<button type="button" ${item.playerRef ? `data-player-ref="${escapeHTML(item.playerRef)}"` : "disabled"} data-tooltip="${escapeHTML(fullName)}" ${grouping.arena ? "" : 'data-tooltip-overflow=".match-player-name"'} data-tooltip-size="compact">${iconFigure("champion", item.championId, item.championName, "tiny")}<span class="match-player-name">${escapeHTML(visibleName)}</span></button>`;
+    };
     if (grouping.arena) {
       const rows = grouping.groups.slice(0, 4).map((group) => {
         const placement = Number(group.placement) || 0;
@@ -2572,8 +2759,8 @@
     const participationRow = `<span class="match-stat match-stat-participation" data-tooltip="${escapeHTML(participationTitle)}" data-tooltip-size="compact"><em>击杀参与率</em><b>${participation === null ? "—" : percent(participation)}</b></span>`;
     const csRow = `<span class="match-stat" data-tooltip="${escapeHTML(csTitle)}" data-tooltip-size="compact"><em>CS</em><b>${number(subject.cs)} <span class="match-stat-secondary">(${number(subject.csPerMinute)})</span></b></span>`;
     const tierRow = `<span class="match-stat match-stat-tier" data-match-tier data-game-id="${match.gameId}"${tierPending} data-tooltip="${escapeHTML(matchTierTitle(tierValue))}" data-tooltip-size="compact"><em>平均段位</em><span class="match-tier-value">${tierValue === undefined ? '<b class="match-tier-unknown">…</b>' : matchTierContent(tierValue)}</span></span>`;
-    const damageRow = `<span class="match-stat match-stat-damage" data-tooltip="对英雄造成的总伤害" data-tooltip-size="compact"><em>伤害</em><b>${compactNumber(subject.damage)}</b></span>`;
-    const takenRow = `<span class="match-stat match-stat-damage" data-tooltip="承受的总伤害" data-tooltip-size="compact"><em>承伤</em><b>${compactNumber(subject.damageTaken)}</b></span>`;
+    const damageRow = `<span class="match-stat match-stat-damage" data-tooltip="对英雄造成的总伤害" data-tooltip-size="compact"><em>伤害</em><b>${plainInteger(subject.damage)}</b></span>`;
+    const takenRow = `<span class="match-stat match-stat-taken" data-tooltip="承受的总伤害" data-tooltip-size="compact"><em>承伤</em><b>${plainInteger(subject.damageTaken)}</b></span>`;
     // 斗魂竞技场用伤害/承伤替代召唤师峡谷的参团率、CS、平均段位；
     // 数据缺失时保留明确占位，避免卡片列高度随模式变化而漂移。
     const statRows = modeKind === "arena" ? `${damageRow}${takenRow}` : `${participationRow}${csRow}${tierRow}`;
@@ -3102,6 +3289,11 @@
   }
 
   function rerenderCatalogViews() {
+    // Catalog arrival changes every icon even when the match objects are the
+    // same. Invalidate retained match DOM before the normal scoped redraw.
+    for (const tab of new Set([...(state.tabs || []), ...(state.overlay || [])])) {
+      tab.matchViewRevision = Number(tab.matchViewRevision || 0) + 1;
+    }
     if (state.section === "overview") renderOverview();
     if (state.section === "live") renderLive();
     if (state.overlay.length) renderOverlay();
@@ -3135,16 +3327,29 @@
   }
 
   async function ensureItems() {
-    if (state.items || state.itemsLoading) return;
+    if (state.destroyed || state.items || state.itemsLoading || Date.now() < Number(state.itemsRetryAt || 0)) return;
     state.itemsLoading = true;
     try {
       const result = await api("/api/gameplay/items", {}, "items", 15000);
-      state.items = Array.isArray(result?.items) && result.items.length ? result : null;
+      if (!Array.isArray(result?.items) || !result.items.length) throw Object.assign(new Error("empty catalog"), { kind: "empty" });
+      state.items = result;
+      state.itemsMissingIDs = new Set();
+      recordItemSetClientDiagnostic("catalog_client", "loaded", { endpoint: "items", httpStatus: 200, itemCount: result.items.length, errorKind: "none" });
     }
-    catch (_) { state.items = null; }
+    catch (error) {
+      state.items = null;
+      recordItemSetClientDiagnostic("catalog_client", "failed", { endpoint: "items", httpStatus: Number(error?.status || 0), errorKind: error?.errorKind || error?.kind || (error?.name === "AbortError" ? "timeout" : error?.status ? "http" : "network") });
+    }
     finally {
       state.itemsLoading = false;
-      if (state.items) rerenderCatalogViews();
+      if (state.items) {
+        state.itemsRetryAt = 0;
+        rerenderCatalogViews();
+      } else {
+        state.itemsRetryAt = Date.now() + 30_000;
+        clearTimeout(state.itemsRetryTimer);
+        state.itemsRetryTimer = setTimeout(() => { void ensureItems(); }, 30_000);
+      }
     }
   }
 
@@ -3475,6 +3680,7 @@
   }
 
   function bindOverviewContent(container, tab) {
+    container.querySelector("[data-complete-overview]")?.addEventListener("click", () => loadOverview(tab, true, false, true, true));
     const rerender = () => rerenderTab(tab);
     bindPlayerLinks(container, tab);
     bindOverviewShareControls(container, container, tab);
@@ -3552,22 +3758,55 @@
     showToast("回放仍在下载，可稍后再点一次回放按钮");
   }
 
-  async function loadLive(force = false) {
+  async function loadLive(force = false, source = "direct") {
+    recordLiveRefresh("load", source);
     if (state.destroyed) return;
     if (!connected()) { renderLive(); return; }
+    invalidateLiveForNewGame(state.live?.phase, state.beacon.phase, state.liveExpectedGameId, source);
     if (state.liveLoading && !force) return;
+    // Manual refresh replaces only this request; other pages and recommendation
+    // selections keep their state. The token below fences off the old finalizer.
+    if (state.liveLoading) state.controllers.get("live")?.abort();
+    state.liveRefreshQueued = false;
+    state.livePhaseRefreshQueued = false;
+    state.liveGameRefreshQueued = false;
+    if (force) state.liveRetryAttempts = 0;
+    state.liveLoadStartedAt = Date.now();
     const requestToken = state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
     state.liveLoading = true;
     state.liveError = "";
     renderLive();
     try {
-      const previousLive = state.live;
-      const nextLive = await api("/api/gameplay/live", {}, "live", 45000);
+      let previousLive = state.live;
+      const nextLive = await api(force ? "/api/gameplay/live?refresh=1" : "/api/gameplay/live", {}, "live", 45000);
       if (state.liveRequestToken !== requestToken || !connected()) return;
+      if (state.liveAwaitingGame && normalizeLiveGameId(state.liveExpectedGameId)
+          && normalizeLiveGameId(nextLive.gameId) !== normalizeLiveGameId(state.liveExpectedGameId)) {
+        recordLiveObservation("stale-response", nextLive.phase, nextLive.gameId, source);
+        return;
+      }
+      if (liveSnapshotBehindPhase(nextLive) || state.livePhaseRefreshQueued && nextLive.phase !== state.beacon.phase) return;
+      // The phase signal can arrive before the live endpoint catches up. Keep
+      // the new-game transition visible rather than accepting an old lobby snapshot.
+      if (state.liveAwaitingGame && liveGamePhase(state.beacon.phase) && !liveGamePhase(nextLive.phase)) return;
+      if (invalidateLiveForNewGame(previousLive?.phase, nextLive.phase, nextLive.gameId, source, requestToken)) previousLive = null;
       if (shouldResetLiveGameScopedState(previousLive, nextLive)) resetLiveGameScopedState();
       resetLivePositionOverrides(previousLive, nextLive);
       resetRecommendationTabsOnChampionChange(previousLive, nextLive);
+      // Keep known history from the same game when a refresh returns a pending cell.
+      if (previousLive && previousLive.queueId === nextLive.queueId) {
+        const histories = new Map((previousLive.players || []).filter(p => p.playerRef).map(p => [p.playerRef, p]));
+        for (const player of nextLive.players || []) {
+          const old = histories.get(player.playerRef);
+          if (player.historyState === "pending" && old && old.historyState !== "pending") {
+            for (const field of ["recentGames", "modeStats", "recentRankedRecord", "recentPositions"]) player[field] = old[field];
+          }
+        }
+      }
       state.live = nextLive;
+      state.liveExpectedGameId = normalizeLiveGameId(nextLive.gameId);
+      state.liveAwaitingGame = state.liveAwaitingGame && liveGamePhase(nextLive.phase) && !nextLive.unsupported
+        && !(nextLive.available && (nextLive.players?.length || Number(nextLive.currentChampionId) > 0 || Number(nextLive.resolvedChampionId) > 0));
       updateBeacon(String(state.live?.phase || ""));
       state.lastCapabilities = state.live.capabilities || state.lastCapabilities;
       renderCapabilitySettings();
@@ -3578,14 +3817,95 @@
       ensureSpecialistRunes(state.live);
       void ensureProRunes(state.live);
     } catch (error) {
-      if (state.liveRequestToken === requestToken && error.name !== "RequestCancelled") state.liveError = error.message;
+      if (state.liveRequestToken === requestToken && (error.name !== "RequestCancelled" || !state.live || state.liveAwaitingGame)) {
+        state.liveError = error.name === "RequestCancelled" ? "读取已中断，请重试。" : (error.message || "未能读取对局，请重试。");
+      }
     } finally {
       if (state.liveRequestToken !== requestToken) return;
       state.liveLoading = false;
+      syncLiveRetryBudget();
       renderLive();
       scheduleLiveRefresh();
-      if (state.liveRefreshQueued) queueLiveEventRefresh();
+      if (state.liveRefreshQueued) queueLiveEventRefresh("event", Boolean(state.livePhaseRefreshQueued));
     }
+  }
+
+  function liveGamePhase(phase) {
+    return ["ChampSelect", "GameStart", "InProgress", "Reconnect"].includes(phase);
+  }
+
+  function normalizeLiveGameId(value) {
+    const id = Number(value);
+    return Number.isSafeInteger(id) && id > 0 ? id : 0;
+  }
+
+  function liveGameIdComparison(gameId) {
+    const current = normalizeLiveGameId(gameId);
+    const cached = normalizeLiveGameId(state.live?.gameId);
+    return !current ? "unavailable" : !cached ? "first" : current === cached ? "same" : "different";
+  }
+
+  function recordLiveObservation(reason, phase, gameId, source, invalidated = false) {
+    window.reportFlowDiagnostic?.("gameflow_phase_client", reason, {
+      phase: String(phase || ""), previousPhase: String(state.beacon.phase || ""), source,
+      gameId: normalizeLiveGameId(gameId), cachedGameId: normalizeLiveGameId(state.live?.gameId),
+      gameIdComparison: liveGameIdComparison(gameId), phaseChanged: Boolean(phase) && phase !== state.beacon.phase,
+      invalidated, receivedAt: Date.now(),
+    });
+  }
+
+  function liveSnapshotBehindPhase(data) {
+    const cachedId = normalizeLiveGameId(state.live?.gameId);
+    const incomingId = normalizeLiveGameId(data?.gameId);
+    if (cachedId && incomingId && cachedId !== incomingId) return false;
+    return ["InProgress", "Reconnect"].includes(state.beacon.phase)
+      && ["ChampSelect", "GameStart"].includes(data?.phase);
+  }
+
+  function invalidateLiveForNewGame(previousPhase, nextPhase, gameId = 0, source = "direct", owningRequest = 0) {
+    const previousId = normalizeLiveGameId(state.live?.gameId) || normalizeLiveGameId(state.liveExpectedGameId);
+    const nextId = normalizeLiveGameId(gameId);
+    const gameChanged = previousId > 0 && nextId > 0 && previousId !== nextId;
+    const phaseBoundary = Boolean(previousPhase) && previousPhase !== nextPhase && liveGamePhase(nextPhase)
+      && (!liveGamePhase(previousPhase) || nextPhase === "ChampSelect");
+    const invalidated = gameChanged || phaseBoundary;
+    recordLiveObservation("invalidate", nextPhase, gameId, source, invalidated);
+    if (!invalidated) return false;
+    // A completed current response may clear the old snapshot before publishing
+    // its new data, without aborting itself or losing ownership of its finally.
+    if (!owningRequest || owningRequest !== state.liveRequestToken) {
+      state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
+      state.controllers.get("live")?.abort();
+      state.liveLoading = false;
+      state.liveGameRefreshQueued = gameChanged;
+    }
+    clearTimeout(state.liveTimer);
+    clearTimeout(state.liveEventTimer);
+    state.liveTimer = 0;
+    state.liveEventTimer = 0;
+    state.live = null;
+    state.liveExpectedGameId = nextId;
+    state.liveAwaitingGame = true;
+    state.liveRetryAttempts = 0;
+    state.liveRetryKey = "";
+    state.liveError = "";
+    resetLiveGameScopedState();
+    renderLive();
+    return true;
+  }
+
+  function resetDisconnectedLive() {
+    state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
+    state.controllers.get("live")?.abort();
+    state.liveLoading = false;
+    state.live = null;
+    state.liveAwaitingGame = false;
+    state.liveExpectedGameId = 0;
+    state.liveGameRefreshQueued = false;
+    state.liveError = "实时连接已中断，请重试。";
+    resetLiveGameScopedState();
+    renderLive();
+    scheduleLiveRefresh();
   }
 
   function liveDisplayedChampionId(player, currentChampionId = 0) {
@@ -3640,6 +3960,11 @@
   }
 
   function softResetGameplayState() {
+    for (const tab of [...(state.tabs || []), ...(state.overlay || [])]) {
+      clearTimeout(tab.quotaRetry?.timer); tab.quotaRetry = null;
+      tab.overviewRequestToken = Number(tab.overviewRequestToken || 0) + 1;
+    }
+    state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
     for (const controller of state.controllers.values()) controller.abort();
     state.controllers.clear();
     for (const tab of state.tabs) {
@@ -3786,6 +4111,8 @@
       resolvedPosition: String(context.resolvedPosition || ""), positionSource: String(context.positionSource || ""),
       gameMode: String(context.gameMode || ""), tier: String(context.tier || ""),
       blockCount: Number(context.blockCount || 0), itemCount: Number(context.itemCount || 0),
+      endpoint: String(context.endpoint || ""), itemId: Number(context.itemId || 0),
+      httpStatus: Number(context.httpStatus || 0), errorKind: String(context.errorKind || ""),
     };
     void fetch("/api/diagnostics/client", {
       method: "POST", credentials: "same-origin",
@@ -4075,7 +4402,7 @@
       return;
     }
     const phase = phaseLabel(data.phase);
-	    const note = state.settings.liveRefresh ? "自动刷新已开启" : "手动刷新";
+	    const note = liveAutoRefreshStopped(data) || (state.settings.liveRefresh ? "自动刷新已开启" : "手动刷新");
     nodes.liveSessionSummary.hidden = false;
 	    nodes.liveSessionSummary.innerHTML = data.available
 	      ? `<span class="state-chip success">${escapeHTML(phase)}</span><div class="live-session-copy"><strong>${escapeHTML(data.queueLabel || "当前对局")}</strong><span>${escapeHTML(liveModeLabel(data))} · ${escapeHTML(liveMapLabel(data.mapId))} · ${escapeHTML(note)}</span></div>${liveCurrentPositionChip(data)}`
@@ -4093,14 +4420,29 @@
       return;
     }
     if (toolbar) toolbar.hidden = false;
-    if (state.liveLoading && !state.live) {
-      nodes.liveContent.innerHTML = '<div class="gameplay-skeleton"><span></span><span></span><span></span></div>';
-      return;
+    if (nodes.liveRefresh) {
+      nodes.liveRefresh.textContent = state.liveLoading
+        ? "正在刷新…" : "刷新对局";
+      nodes.liveRefresh.setAttribute("aria-busy", String(Boolean(state.liveLoading)));
     }
     if (state.liveError) {
       renderSessionSummary(null);
-      nodes.liveContent.innerHTML = emptyState("实时对局读取失败", state.liveError, true);
-      nodes.liveContent.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadLive(true));
+      nodes.liveContent.innerHTML = renderLiveRefreshStatus(state.live) + emptyState("实时对局读取失败", state.liveError, true);
+      nodes.liveContent.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadLive(true, "manual"));
+      nodes.liveContent.querySelector("[data-live-refresh]")?.addEventListener("click", () => loadLive(true, "manual"));
+      return;
+    }
+    if (state.liveAwaitingGame) {
+      renderSessionSummary(null);
+      nodes.liveContent.innerHTML = renderLiveRefreshStatus(state.live || { phase: state.beacon.phase })
+        + `<div role="status">${emptyState("正在识别新对局…", "新对局数据尚未就绪，读取完成后会自动显示。也可点击刷新重试。", true)}</div>`;
+      nodes.liveContent.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadLive(true, "manual"));
+      nodes.liveContent.querySelector("[data-live-refresh]")?.addEventListener("click", () => loadLive(true, "manual"));
+      return;
+    }
+    if (state.liveLoading && !state.live) {
+      renderSessionSummary(null);
+      nodes.liveContent.innerHTML = '<div class="gameplay-skeleton"><span></span><span></span><span></span></div>';
       return;
     }
     const data = state.live;
@@ -4110,11 +4452,23 @@
       return;
     }
     if (!data?.available) {
-      nodes.liveContent.innerHTML = renderRecommendationArea(data || {});
+      nodes.liveContent.innerHTML = renderLiveRefreshStatus(data) + renderRecommendationArea(data || {});
       bindLiveContent();
       return;
     }
-    nodes.liveContent.innerHTML = renderRecommendationArea(data);
+    const markup = renderRecommendationArea(data);
+    const statusMarkup = renderLiveRefreshStatus(data);
+    // Refresh feedback changes independently of the roster and recommendation DOM.
+    if (nodes.liveContent._recommendationMarkup === markup && nodes.liveContent.querySelector("[data-live-body]")) {
+      const status = nodes.liveContent.querySelector("[data-live-status]");
+      if (status.innerHTML !== statusMarkup) {
+        status.innerHTML = statusMarkup;
+        status.querySelector("[data-live-refresh]")?.addEventListener("click", () => loadLive(true, "manual"));
+      }
+      return;
+    }
+    nodes.liveContent._recommendationMarkup = markup;
+    nodes.liveContent.innerHTML = `<div data-live-status>${statusMarkup}</div><div data-live-body>${markup}</div>`;
     bindLiveContent();
     applyRenderedMetricStyles(nodes.liveContent);
     prepareImages(nodes.liveContent);
@@ -4184,16 +4538,16 @@
     const displayName = maskedPlayerName(player, index);
     const championId = liveDisplayedChampionId(player, currentChampionId);
 	const historyState = String(player?.historyState || "empty").trim().toLowerCase();
-	const historyPending = state.liveLoading === true;
+	const historyPending = state.liveLoading === true && !player.recentGames?.length && !Number(stats.games) && !["ready", "empty", "unavailable", "failed"].includes(player.historyState);
     const rankCopy = rank?.tier ? rankTitle(rank) : "未定级";
-    const contextCopy = arenaMode ? rankCopy : `${positionLabel(player.position)} · ${rankCopy}`;
+    const contextCopy = arenaMode ? "" : `${positionLabel(player.position)} · ${rankCopy}`;
     const rowTone = player.isCurrent ? " is-self" : player.isAlly ? " is-ally" : "";
     const premadeTag = renderLivePremadeTag(player, premadePlayers, currentChampionId);
 	const emptySummary = historyState === "unavailable" ? "客户端未公开该玩家" : historyState === "failed" ? "读取失败" : "暂无样本";
 	const historySummary = historyPending
 	  ? '<dl class="is-history-pending" aria-label="战绩读取中"><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div></dl>'
 	  : `<dl><div><dt>${recordGames ? `近 ${number(recordGames)} 局` : "当前模式"}</dt><dd>${displayStats.games ? `${number(displayStats.wins)}胜 ${number(displayStats.losses)}负` : emptySummary}</dd></div><div><dt>胜率</dt><dd class="win-rate-value">${displayStats.games ? percent(displayStats.winRate) : "—"}</dd></div><div><dt>KDA</dt><dd>${displayStats.games ? `${kda(displayStats.kda)}:1` : "—"}</dd></div></dl>`;
-	return `<article class="live-player${rowTone}">${iconFigure("champion", championId, player.championName, "live")}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}"` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${premadeTag}</div><span>${escapeHTML(contextCopy)}</span>${recentPositions}</div>${historySummary}</article>`;
+	return `<article class="live-player${rowTone}">${iconFigure("champion", championId, player.championName, "live")}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}"` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${premadeTag}</div>${contextCopy ? `<span>${escapeHTML(contextCopy)}</span>` : ""}${recentPositions}</div>${historySummary}</article>`;
   }
 
 	  function orderLivePlayers(players, groupByTeam = true) {
@@ -4435,7 +4789,7 @@
   }
 
   function renderInsightMatches(player) {
-	if (state.liveLoading === true) return '<div class="insight-match-row is-history-pending" aria-label="战绩读取中"><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span></div>';
+	if (state.liveLoading === true && !player.recentGames?.length && !["ready", "empty", "unavailable", "failed"].includes(player.historyState)) return '<div class="insight-match-row is-history-pending" aria-label="战绩读取中"><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span></div>';
     const games = (player.recentGames || []).slice(0, 8);
 	if (!games.length) {
 	  const historyState = String(player?.historyState || "empty").trim().toLowerCase();
@@ -4458,7 +4812,7 @@
   }
 
 	  function arenaLivePlayerGroups(data, players) {
-	    if (!["InProgress", "Reconnect"].includes(data?.phase) || data?.arenaGrouped !== true || players.length < 6 || players.length > 18) return [];
+	    if (!["GameStart", "InProgress", "Reconnect"].includes(data?.phase) || data?.arenaGrouped !== true || players.length < 6 || players.length > 18) return [];
 	    const grouped = new Map();
 	    for (const player of players) {
 	      const key = String(player?.arenaGroup || "").trim();
@@ -5114,6 +5468,7 @@
   }
 
   function bindLiveContent() {
+ nodes.liveContent.querySelector("[data-live-refresh]")?.addEventListener("click", () => loadLive(true, "manual"));
 	nodes.liveContent.querySelector("[data-live-history-retry]")?.addEventListener("click", () => loadLive(true));
     // 对局页里点击玩家名称：在当前页面上以覆盖层打开该玩家的总览，
     // 不再跳转到总览页；对局数据来自本机客户端，必然是国服玩家。
@@ -5250,9 +5605,20 @@
 
   function scheduleLiveRefresh() {
     clearTimeout(state.liveTimer);
-    clearTimeout(state.currentGameTimer);
-    if (!state.settings.liveRefresh || state.section !== "live" || document.hidden) return;
-    state.liveTimer = setTimeout(() => loadLive(true), liveRefreshDelayMs(state.live?.phase, state.settings.liveInterval));
+    state.liveTimer = 0;
+    if (state.destroyed || !state.settings.liveRefresh || document.hidden || !connected() || state.section !== "live") return;
+    const phase = state.beacon.phase || state.live?.phase;
+    if (!["ChampSelect", "GameStart", "InProgress", "Reconnect"].includes(phase)) return;
+    syncLiveRetryBudget();
+    const inGame = phase === "GameStart" || phase === "InProgress" || phase === "Reconnect";
+    if (inGame && (liveSnapshotComplete(state.live) && state.live?.phase === phase || Number(state.liveRetryAttempts || 0) >= 8)) return;
+    const loadingProbe = inGame && liveAugmentRecommendationSource(state.live) === "arena" && !state.live?.arenaGrouped && Date.now() - Number(state.liveRetryStartedAt || 0) < 60_000;
+    const delay = loadingProbe ? 5_000 : inGame ? 20_000 : state.liveError ? 60_000 : liveRefreshDelayMs(phase, state.settings.liveInterval);
+    state.liveTimer = setTimeout(() => {
+      state.liveTimer = 0;
+      if (inGame && !loadingProbe) state.liveRetryAttempts = Number(state.liveRetryAttempts || 0) + 1;
+      void loadLive(false, "interval");
+    }, delay);
   }
 
   function bindSettings() {
@@ -5388,7 +5754,14 @@
   function itemIconFigure(id, size = "") {
     if (!state.items) return pendingCatalogIcon(`装备 ${id}`, size, false);
     const item = (state.items.items || []).find((candidate) => Number(candidate.id) === Number(id));
-    if (!item) return pendingCatalogIcon(`装备 ${id}`, size, false);
+    if (!item) {
+      state.itemsMissingIDs ||= new Set();
+      if (Number(id) > 0 && state.itemsMissingIDs.size < 20 && !state.itemsMissingIDs.has(Number(id))) {
+        state.itemsMissingIDs.add(Number(id));
+        recordItemSetClientDiagnostic("item_id_not_in_catalog", "missing", { endpoint: "items", itemId: Number(id), itemCount: state.items.items.length, errorKind: "none" });
+      }
+      return pendingCatalogIcon(`装备 ${id}`, size, false);
+    }
     const name = item.name || `装备 ${id}`;
     const description = plainText(item.description || "");
     const tooltip = [name, description].filter(Boolean).join("\n");
@@ -5765,7 +6138,7 @@
   }
   document.addEventListener("pointerdown", closePlayerGroupOnOutsidePointer);
   window.addEventListener("deep-legends:player-group", event => selectPlayerGroup(event.detail?.group));
-  nodes.liveRefresh.addEventListener("click", () => loadLive(true));
+  nodes.liveRefresh.addEventListener("click", () => loadLive(true, "manual"));
   window.addEventListener("deep-legends:hard-refresh", (event) => {
     const detail = event.detail || {};
     const task = handleHardRefresh(detail);
@@ -5777,12 +6150,7 @@
 	window.addEventListener("deep-legends:season-progress", (event) => { void handleSeasonProgress(event.detail || {}); });
 	window.addEventListener("deep-legends:overview-incremental", (event) => { void handleOverviewIncremental(event.detail || {}); });
 
-	window.addEventListener("deep-legends:live-disconnected", () => {
-	  resetLiveGameScopedState();
-	  state.live = null;
-	  state.liveError = "";
-	  if (state.section === "live") renderLive();
-	});
+  window.addEventListener("deep-legends:live-disconnected", resetDisconnectedLive);
   window.addEventListener("deep-legends:open-player", (event) => {
     const playerRef = String(event.detail?.playerRef || "").trim();
     const gameName = String(event.detail?.gameName || "").trim();
@@ -5863,7 +6231,7 @@
       refreshAfterResync();
     } else if (state.liveRefreshQueued) {
       queueLiveEventRefresh();
-    } else if (state.section === "live") loadLive(true);
+    } else { scheduleBeaconPoll(0); }
   });
 
   /* ---------- 新对局提示灯：客户端进入英雄选择/对局时点亮“对局”页签 ---------- */
@@ -5901,16 +6269,21 @@
   }
   // A fixed window plus one trailing refresh prevents event storms from
   // repeatedly aborting the full roster request before its body can arrive.
-  function queueLiveEventRefresh() {
+  function queueLiveEventRefresh(source = "event", phaseChanged = false) {
     if (state.destroyed || !connected()) return;
+    phaseChanged = phaseChanged || Boolean(state.livePhaseRefreshQueued);
+    if (state.section !== "live" && !phaseChanged) return;
+    // In-game retries use the bounded timer; repeated same-phase SSE is not a retry clock.
+    if (!phaseChanged && ["InProgress", "Reconnect"].includes(state.beacon.phase)) return;
+    if (phaseChanged) state.livePhaseRefreshQueued = true;
+    if (!state.liveRefreshQueued) recordLiveRefresh("queue", source, phaseChanged);
     state.liveRefreshQueued = true;
     if (document.hidden || state.liveLoading || state.liveEventTimer) return;
     state.liveEventTimer = setTimeout(() => {
       state.liveEventTimer = 0;
       if (state.destroyed || !connected() || document.hidden || state.liveLoading) return;
-      state.liveRefreshQueued = false;
-      void loadLive();
-    }, 180);
+      void loadLive(Boolean(state.liveGameRefreshQueued), source);
+    }, Math.max(180, 1000 - (Date.now() - Number(state.liveLoadStartedAt || 0))));
   }
   window.addEventListener("deep-legends:pro-runes", () => {
     const target = proRequestTarget(state.live);
@@ -5924,20 +6297,35 @@
     if (state.section === "live") renderLive();
   });
   window.addEventListener("online", () => { if (state.section === "live") void ensureProRunes(state.live, true); });
-  window.addEventListener("deep-legends:gameflow", (event) => {
+  function recordLiveRefresh(reason, source, phaseChanged = false) {
+    window.reportFlowDiagnostic?.("live_refresh_client", reason, { source,
+      hidden: document.hidden, section: state.section, phaseChanged, liveRefreshQueued: Boolean(state.liveRefreshQueued) });
+  }
+
+  function handleGameplayPhase(phase, source = "sse", changed = false, gameId = 0) {
     if (state.destroyed) return;
-    const phase = String(event.detail?.phase || "");
     const phaseChanged = Boolean(phase) && phase !== state.beacon.phase;
-    if (phase) updateBeacon(phase);
-    else scheduleBeaconPoll(0);
-    if (phaseChanged && !document.hidden && connected()) {
-      clearTimeout(state.liveEventTimer);
-      state.liveEventTimer = 0;
-      state.liveRefreshQueued = false;
-      void loadLive(true);
-    } else if (event.detail?.changed || phase) queueLiveEventRefresh();
+    const nextId = normalizeLiveGameId(gameId);
+    const previousId = normalizeLiveGameId(state.live?.gameId) || normalizeLiveGameId(state.liveExpectedGameId);
+    const gameChanged = nextId > 0 && previousId > 0 && nextId !== previousId;
+    if (phase || nextId) recordLiveObservation("received", phase, gameId, source);
+    if (phaseChanged || gameChanged) {
+      recordLiveRefresh("phase", source, phaseChanged);
+      invalidateLiveForNewGame(state.beacon.phase || state.live?.phase, phase || state.beacon.phase, gameId, source);
+    }
+    if (nextId) state.liveExpectedGameId = nextId;
+    else if (phaseChanged && (!liveGamePhase(phase) || phase === "ChampSelect")) state.liveExpectedGameId = 0;
+    if (phase) {
+      updateBeacon(phase);
+      markOverviewAfterGame(phase);
+    } else if (!nextId) scheduleBeaconPoll(0);
+    if (phaseChanged || gameChanged) renderLive();
+    if (phaseChanged || gameChanged || changed) queueLiveEventRefresh(source, phaseChanged || gameChanged);
+  }
+  window.addEventListener("deep-legends:gameflow", (event) => {
+    handleGameplayPhase(String(event.detail?.phase || ""), "sse", Boolean(event.detail?.changed), event.detail?.gameId);
   });
-  // SSE 负责即时通知；1 秒轮询只兜底读取本机轻量阶段接口，不读取完整对局。
+  // Identity polling detects a missed phase window without polling the full roster.
   const BEACON_FAST_POLL_MS = 1_000;
   const BEACON_DISCONNECTED_POLL_MS = 1_000;
   const BEACON_IDLE_POLL_MS = 12_000;
@@ -5960,28 +6348,75 @@
     if (state.destroyed) return;
     if (document.hidden) { scheduleBeaconPoll(BEACON_IDLE_POLL_MS); return; }
     if (!connected()) { scheduleBeaconPoll(BEACON_DISCONNECTED_POLL_MS); return; }
+    const observedPhase = state.beacon.phase;
+    const observedGeneration = state.liveGameGeneration;
+    const observedId = state.liveExpectedGameId;
     api("/api/gameplay/phase", {}, "gameflow-phase", 8000)
-      .then((payload) => updateBeacon(String(payload?.phase || "")))
+      .then((payload) => {
+        // An SSE signal or live response received during this probe is newer
+        // evidence. Do not let the outstanding poll restore the old identity.
+        if (observedPhase !== state.beacon.phase || observedGeneration !== state.liveGameGeneration || observedId !== state.liveExpectedGameId) {
+          recordLiveObservation("stale-response", payload?.phase, payload?.gameId, "poll");
+          return;
+        }
+        handleGameplayPhase(String(payload?.phase || ""), "poll", false, payload?.gameId);
+      })
       .catch(() => {})
       .finally(() => scheduleBeaconPoll(beaconPollDelay()));
   }
   scheduleBeaconPoll(0);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) { scheduleBeaconPoll(0); if (state.section === "overview" && activeTab()) scheduleOverviewCurrentGame(activeTab()); } });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) {
+    for (const tab of state.tabs) if (tab.dirty && (tab.current || tab === activeTab())) scheduleDirtyOverview(tab);
+    scheduleLiveRefresh(); scheduleBeaconPoll(0); if (state.section === "overview" && activeTab()) scheduleOverviewCurrentGame(activeTab()); } });
   const playerDurationTimer = setInterval(() => {
+    if (!document.hidden) for (const node of document.querySelectorAll("[data-player-game-start]")) {
+      node.textContent = friendGameDuration(Number(node.dataset.playerGameStart));
+    }
     if (!document.hidden && state.section === "overview") for (const node of document.querySelectorAll("[data-current-game-start]")) {
       const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(node.dataset.currentGameStart)) / 1000));
       if (Number.isFinite(seconds)) node.textContent = `已进行 ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
     }
   }, 1_000);
+  function markOverviewAfterGame(phase) {
+    if (["ChampSelect", "InProgress"].includes(phase)) state.overviewEndHandled = false;
+    if (!["WaitingForStats", "PreEndOfGame", "EndOfGame"].includes(phase) || state.overviewEndHandled) return;
+    state.overviewEndHandled = true;
+    for (const tab of state.tabs) {
+      clearTimeout(tab.dirtyTimer);
+      tab.dirty = true;
+      tab.dirtyAttempts = 0;
+      tab.dirtyDueAt = Date.now() + 7000;
+      tab.dirtyBaseline = String(tab.data?.matches?.[0]?.gameId || "");
+      if (tab.current || (state.section === "overview" && tab === activeTab())) scheduleDirtyOverview(tab);
+    }
+  }
+
+  function scheduleDirtyOverview(tab) {
+    if (!tab?.dirty || state.destroyed || document.hidden || !connected() || tab.dirtyTimer || Number(tab.dirtyAttempts || 0) >= 3) return;
+    tab.dirtyTimer = setTimeout(async () => {
+      tab.dirtyTimer = 0;
+      if (state.destroyed || document.hidden || !state.tabs.includes(tab) || !connected()) return;
+      if (!tab.current && (state.section !== "overview" || tab !== activeTab())) return;
+      if (tab.loading || tab.loadingMore) { tab.dirtyDueAt = Date.now() + 1000; scheduleDirtyOverview(tab); return; }
+      tab.dirtyAttempts = Number(tab.dirtyAttempts || 0) + 1;
+      // Existing refreshing bar retains the current list while the request runs.
+      const loaded = await loadOverview(tab, true);
+      const newest = String(tab.data?.matches?.[0]?.gameId || "");
+      if (loaded && newest && newest !== tab.dirtyBaseline) { tab.dirty = false; return; }
+      tab.dirtyDueAt = Date.now() + 8000;
+      scheduleDirtyOverview(tab);
+    }, Math.max(0, Number(tab.dirtyDueAt || 0) - Date.now()));
+  }
+
   function refreshAfterResync() {
     if (state.destroyed || document.hidden) return;
     state.resyncPending = false;
-    state.liveRefreshQueued = false;
     if (state.section === "overview") {
       const tab = activeTab(overviewGroupForSection());
       if (tab) void loadOverview(tab, true);
     }
-    if (state.section === "live") void loadLive(true);
+    if (state.section === "live") void loadLive(true, "resync");
+    else if (state.liveRefreshQueued) queueLiveEventRefresh("resync");
     scheduleBeaconPoll(0);
   }
   window.addEventListener("deep-legends:resync", () => {
@@ -5993,6 +6428,8 @@
   });
   function disposeGameplay() {
     state.destroyed = true;
+    for (const tab of [...state.tabs, ...state.overlay]) clearTimeout(tab.quotaRetry?.timer);
+    for (const tab of state.tabs) clearTimeout(tab.dirtyTimer);
     clearInterval(playerDurationTimer);
     clearTimeout(beaconPollTimer);
     clearTimeout(state.liveTimer);

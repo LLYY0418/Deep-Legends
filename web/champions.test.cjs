@@ -162,6 +162,12 @@ function cssNumber(source, marker, property) {
 function compileFunctions(source, names, dependencies = {}) {
   const bodies = names.map((name) => functionSource(source, name));
   const compiledDependencies = { ...dependencies };
+  if (source.includes("function loadOverview(")) {
+    compiledDependencies.riotTab ||= tab => tab?.region === "kr";
+    for (const name of ["syncOverviewSupplementRefs", "overviewSupplementTarget"]) {
+      if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
+    }
+  }
   // Older focused tests deliberately compile only the function under test.
   // Keep their injected target semantics while production routes through the
   // R68 request target, which has its own dedicated behavioral tests.
@@ -193,9 +199,9 @@ function assertR45Contracts(js = gameplayScript, css = gameplayStyles, goSource 
   const matchBase = css.slice(0, matchBaseEnd);
   assert.match(cssBlockAfter(matchBase, ".match-stats {"), /align-content:\s*start/);
   const arenaStats = cssBlockAfter(matchBase, ".match-stats.is-arena {");
-  assert.match(arenaStats, /align-content:\s*center/);
-  assert.match(arenaStats, /grid-template-rows:\s*repeat\(2,18px\)/);
-  assert.match(arenaStats, /min-height:\s*41px/);
+  assert.match(arenaStats, /align-content:\s*start/);
+  assert.match(arenaStats, /grid-template-rows:\s*repeat\(3,18px\)/);
+  assert.match(arenaStats, /min-height:\s*54px/);
 
   const separatedBuild = cssBlockAfter(css, ".live-augment-recommendations + .build-recommendation {");
   assert.match(separatedBuild, /margin-top:\s*20px/);
@@ -217,7 +223,7 @@ function assertR45Contracts(js = gameplayScript, css = gameplayStyles, goSource 
   // cell-identity check now lives in the phase-reporting variant.
   const validationSource = goFunctionSource(goSource, "validateGameplayItemSetContextPhase");
   assert.match(validationSource, /gameplayLivePlayerIsCurrent\(playerReference, current\.PUUID, player\.CellID, session\.LocalPlayerCellID\)/);
-  const liveHandlerSource = goFunctionSource(goSource, "handleGameplayLive");
+  const liveHandlerSource = goFunctionSource(goSource, "loadGameplayLive");
   assert.match(liveHandlerSource, /localPlayerCellID = champSelect\.LocalPlayerCellID/);
   assert.match(liveHandlerSource, /gameplayLivePlayerIsCurrent\(reference, current\.PUUID, raw\.player\.CellID, localPlayerCellID\)/);
 }
@@ -244,7 +250,7 @@ function assertR46Contracts({
 	assert.equal((appCSS.match(/\.section-tab > span:not\(\.live-beacon\)/g) || []).length, 2);
 	const refreshDelay = functionSource(js, "liveRefreshDelayMs");
 	assert.match(refreshDelay, /normalized === "ChampSelect"\) return 3_000/);
-	assert.match(refreshDelay, /normalized === "InProgress" \|\| normalized === "Reconnect"\) return 20_000/);
+	assert.doesNotMatch(refreshDelay, /return 20_000/);
 	assert.match(goFunctionSource(goSource, "gameplayLiveUnsupportedReason"), /strings\.EqualFold\(strings\.TrimSpace\(gameMode\), "TFT"\)/);
 }
 
@@ -252,7 +258,7 @@ function assertR47Contracts({ js = gameplayScript, css = gameplayStyles, goSourc
   const arenaMode = goFunctionSource(goSource, "isArenaChampSelectMode");
   assert.match(arenaMode, /strings\.EqualFold\(strings\.TrimSpace\(gameMode\), "CHERRY"\)/);
   assert.match(goSource, /func filterArenaChampSelectPlayers[\s\S]{0,1200}puuid == "" \|\| strings\.EqualFold\(puuid, emptyLCUPlayerPUUID\)/);
-  const liveHandler = goFunctionSource(goSource, "handleGameplayLive");
+  const liveHandler = goFunctionSource(goSource, "loadGameplayLive");
   assert.match(liveHandler, /if isArenaChampSelectMode\(response\.GameMode\)\s*\{[\s\S]*filterArenaChampSelectPlayers\(rawPlayers\)[\s\S]*ChampSelectNotice = arenaChampSelectNotice/);
 
   const insights = functionSource(js, "renderLiveInsights");
@@ -1400,33 +1406,30 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.match(gameplayScript, /detailStates\.set\(id, \{ status: "failed", message \}\)/);
 	assert.match(gameplayScript, /for \(const mountedContainer of externalMatchViews\.keys\(\)\)/);
 	assert.match(gameplayStyles, /\.match-stat-participation > b\s*\{[^}]*var\(--success\)/);
-	assert.doesNotMatch(gameplayStyles, /\.match-taken-value\s*\{/);
+	assert.match(gameplayStyles, /\.match-taken-value\s*\{[^}]*var\(--muted\)/);
 	assert.match(gameplayStyles, /\.match-loadout-mini\s*\{[^}]*grid-template-columns:\s*repeat\(2,26px\)/);
 	assert.match(gameplayStyles, /\.match-summary\.is-arena\s*\{[^}]*minmax\(220px,1fr\)[^}]*var\(--match-roster-width(?:,\s*clamp\([^)]*\))?\)[^}]*40px/s);
 	assert.match(gameplayStyles, /:root\s*\{[^}]*--match-roster-width:\s*clamp\(/s);
-	// 名单那一列按内容收缩，--match-roster-width 只当 .match-players 的宽度上限：
-	// 把轨道钉死成变量宽度会在名字短时留出一条空缝（见 desktop/ui-scale-layout.cjs 的 gap 判据）。
-	assert.match(gameplayStyles, /\.match-summary\s*\{[^}]*grid-template-columns:\s*108px minmax\(0,1fr\) minmax\(0,max-content\) 40px/s);
-	assert.match(gameplayStyles, /\.match-players\s*\{[^}]*max-width:\s*var\(--match-roster-width,\s*clamp\(/s);
-	assert.match(gameplayStyles, /\.match-players\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,max-content\)\)/s);
+	// R88：名单等宽收窄，两队等分且间距固定。
+	assert.match(gameplayStyles, /\.match-summary\s*\{[^}]*grid-template-columns:\s*108px minmax\(0,1fr\) var\(--match-roster-width,clamp\(150px,18cqi,190px\)\) 40px/s);
+	assert.match(gameplayStyles, /\.match-players\s*\{[^}]*width:\s*100%;[^}]*gap:\s*2px 14px/s);
+	assert.doesNotMatch(gameplayStyles, /\.match-players\s*\{[^}]*justify-content:\s*space-between/s);
+	assert.doesNotMatch(gameplayStyles, /@container arena-first \(max-width: (?:720|520|420)px\)/);
+	assert.match(gameplayStyles, /\.match-players\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/s);
 	// ★战绩条左半边（英雄 / KDA / 击杀·CS·段位）的排布是设计基准，加宽玩家名单不许动它：
 	// 第四条空的 1fr 轨道负责吃掉富余宽度，统计块靠左，KDA 保持在第二条 96px 轨道上。
 	assert.match(gameplayStyles, /\.match-main\s*\{[^}]*grid-template-columns:\s*minmax\(0,auto\) minmax\(0,96px\) minmax\(0,auto\) minmax\(0,1fr\)/s);
 	assert.doesNotMatch(gameplayStyles, /\.match-main\s*\{[^}]*justify-content:/s);
 	assert.match(gameplayStyles, /\.match-stats\s*\{[^}]*justify-self:\s*start/s);
 	assert.doesNotMatch(gameplayStyles, /\.match-stats\s*\{[^}]*(?:max-)?width:\s*min\(/s);
-	assert.match(gameplayStyles, /@container arena-first \(max-width: 720px\)[\s\S]{0,180}\.match-summary\.is-arena\s*\{[^}]*--match-roster-width:\s*clamp\(/s);
-	assert.match(gameplayStyles, /@container arena-first \(max-width: 520px\)[\s\S]{0,180}\.match-summary\.is-arena\s*\{[^}]*--match-roster-width:\s*clamp\(/s);
-	assert.match(gameplayStyles, /@container arena-first \(max-width: 420px\)[\s\S]{0,100}\.match-summary\.is-arena\s*\{[^}]*--match-roster-width:\s*100%/s);
 	assert.doesNotMatch(gameplayStyles, /var\(--match-roster-width\)/);
 	assert.match(gameplayStyles, /\.match-players\.is-arena\s*\{[^}]*max-height:\s*98px[^}]*overflow:\s*hidden/);
 	assert.match(gameplayStyles, /\.arena-team-row-compact\s*\{[^}]*padding:\s*1px 5px/);
 	assert.match(gameplayStyles, /@container matches-column \(max-width: 720px\)[\s\S]{0,260}\.match-players, \.match-players\.is-arena\s*\{\s*display:\s*none/);
-	assert.match(gameplayStyles, /@container arena-first \(max-width: 720px\)[\s\S]{0,220}\.match-players, \.match-players\.is-arena\s*\{\s*display:\s*none/);
   assert.match(gameplayStyles, /\.match-main\s*\{[^}]*minmax\(0,96px\)/s);
 	assert.match(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*minmax\(0,96px\)/s);
 	assert.match(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*minmax\(0,1fr\)/s);
-	assert.match(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*row-gap:\s*5px/);
+	assert.doesNotMatch(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*row-gap:\s*5px/);
 	assert.match(gameplayStyles, /\.match-players\.is-arena\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
 	assert.match(gameplayStyles, /\.arena-detail-columns\s*\{[^}]*grid-template-columns:\s*minmax\(140px,\.9fr\) 104px 96px 100px 116px 200px[^}]*justify-items:\s*center[^}]*column-gap:\s*12px[^}]*text-align:\s*center/s);
 	assert.match(gameplayStyles, /\.arena-detail-player\s*\{[^}]*grid-template-columns:\s*minmax\(140px,\.9fr\) 104px 96px 100px 116px 200px[^}]*justify-items:\s*center[^}]*column-gap:\s*12px[^}]*text-align:\s*center/s);
@@ -1442,7 +1445,8 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.match(gameplayStyles, /\.match-table \.table-items\s*\{[^}]*justify-content:\s*flex-start/s);
 	assert.match(gameplayStyles, /\.matches-column\s*\{[^}]*container:\s*matches-column \/ inline-size/);
 	assert.match(gameplayStyles, /@container matches-column \(max-width: 720px\)[\s\S]{0,260}\.arena-detail-columns, \.arena-detail-team\s*\{[^}]*min-width:\s*860px/);
-	assert.match(gameplayStyles, /@container arena-first \(max-width: 640px\)[\s\S]{0,260}\.arena-detail-columns, \.arena-detail-team\s*\{[^}]*min-width:\s*860px/);
+	// Arena records now own the same matches-column container as player history.
+	assert.doesNotMatch(gameplayStyles, /@container arena-first \(max-width: 640px\)/);
 	assert.doesNotMatch(gameplayStyles, /\.arena-column-(?:augments|damage|items|score)[^}]*display:\s*none|\.arena-detail-(?:augments|damage|items)[^}]*display:\s*none/);
 	assert.doesNotMatch(gameplayStyles, /@container matches-column \(max-width: 1080px\)[\s\S]{0,700}\.match-player-name\s*\{\s*display:\s*none/);
 	assert.doesNotMatch(gameplayStyles, /@container arena-first[\s\S]{0,700}\.match-player-name\s*\{\s*display:\s*none/);
@@ -1450,10 +1454,7 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.match(gameplayStyles, /@container matches-column \(max-width: 640px\)[\s\S]{0,220}\.match-stats\s*\{\s*display:\s*grid/);
 	assert.match(gameplayStyles, /\.match-stats\s*\{[^}]*display:\s*grid/);
 	assert.match(gameplayStyles, /@container matches-column \(max-width: 640px\)[\s\S]{0,320}\.match-build\s*\{[^}]*column-gap:\s*4px/);
-	assert.match(gameplayStyles, /@container arena-first \(max-width: 720px\)[\s\S]{0,420}\.match-summary\.is-arena \.match-main\s*\{[^}]*gap:\s*5px 12px/);
 	assert.match(gameplayStyles, /@container matches-column \(max-width: 420px\)[\s\S]{0,520}\.match-summary\.is-arena \.match-main\s*\{[^}]*grid-column:\s*1 \/ -1[^}]*grid-row:\s*2/);
-	assert.match(gameplayStyles, /@container arena-first \(max-width: 520px\)[\s\S]+\.match-main\s*\{[^}]*grid-column:\s*1 \/ -1/);
-	assert.match(gameplayStyles, /@container arena-first \(max-width: 520px\)[\s\S]{0,520}\.match-summary\.is-arena \.match-stats\s*\{\s*display:\s*grid/);
 	assert.match(gameplayStyles, /\.match-entry\s*\{[^}]*min-height:\s*118px[^}]*contain-intrinsic-size:\s*118px/);
 	assert.match(gameplayStyles, /\.arena-team-row-compact\s*\{[^}]*grid-template-columns:\s*18px minmax\(0,1fr\)/);
 	assert.match(gameplayStyles, /\.arena-rank-chip\s*\{[^}]*width:\s*18px[^}]*height:\s*18px/);
@@ -2203,8 +2204,8 @@ test("damage analysis sorts by a real metric and shows full colored values", () 
 	assert.match(gameplayScript, /function applyRenderedMetricStyles\(container\)/);
 	assert.doesNotMatch(gameplayScript, /<i style="width:/);
 	assert.match(gameplayStyles, /\.damage-bar\s*\{[^}]*background:\s*color-mix/s);
-	  assert.doesNotMatch(gameplayStyles, /\.match-damage-value\s*\{/);
-  assert.match(gameplayStyles, /\.match-stat-damage\s*>\s*b\s*\{[^}]*display:\s*inline-flex/);
+	  assert.match(gameplayStyles, /\.match-damage-value\s*\{[^}]*var\(--danger\)/);
+  assert.match(gameplayStyles, /\.match-stat-damage\s*>\s*b,\s*\.match-stat-taken > b\s*\{[^}]*display:\s*inline-flex/);
   assert.match(gameplayStyles, /\.match-stat\s*\{[^}]*minmax\(0,1fr\)/s);
   assert.match(gameplayStyles, /\.match-list\s*\{[^}]*overflow-anchor:\s*auto/s);
 	assert.match(gameplayScript, /tab\.paginationStalls = upstreamAdditions > 0 \? 0/);
@@ -3075,9 +3076,9 @@ test("perk catalogs supply icons while entertainment recommendations come from t
   assert.match(gameplayScript, /queueGroups: \[\]/);
   assert.doesNotMatch(gameplayScript, /new Set\(\[2300, 2400\]\)/);
   assert.doesNotMatch(gameplayScript, /new Set\(\[1700, 1710\]\)/);
-  assert.match(queueGroupsBackend, /\{1750, "斗魂竞技场", "arena", "arena", "arena"\}/);
-  const queueMutation = queueGroupsBackend.replace(/\s*\{1750, "斗魂竞技场", "arena", "arena", "arena"\},/, "");
-  assert.throws(() => assert.match(queueMutation, /\{1750, "斗魂竞技场", "arena", "arena", "arena"\}/));
+  assert.match(queueGroupsBackend, /\{1750, "斗魂竞技场", "arena", "arena", "arena", 3\}/);
+  const queueMutation = queueGroupsBackend.replace(/\s*\{1750, "斗魂竞技场", "arena", "arena", "arena", 3\},/, "");
+  assert.throws(() => assert.match(queueMutation, /\{1750, "斗魂竞技场", "arena", "arena", "arena", 3\}/));
 	assert.match(gameplayScript, /function liveAugmentRecommendationSource\(data\)/);
 	assert.match(gameplayScript, /queueId: String\(target\.queueId\), gameMode: target\.gameMode, mapId: String\(target\.mapId\)/);
 	assert.match(gameplayScript, /query\.set\("source", "mayhem"\)/);
@@ -4447,11 +4448,11 @@ test("live match statistics keep fixed geometry across modes", () => {
   assert.match(stats, /align-content:\s*start/);
   assert.match(stats, /grid-template-rows:\s*repeat\(3,18px\)/);
 	const arenaStats = cssBlockAfter(matchBase, ".match-stats.is-arena {");
-	assert.match(arenaStats, /align-content:\s*center/);
-	assert.match(arenaStats, /grid-template-rows:\s*repeat\(2,18px\)/);
-	assert.match(arenaStats, /min-height:\s*41px/);
+	assert.match(arenaStats, /align-content:\s*start/);
+	assert.match(arenaStats, /grid-template-rows:\s*repeat\(3,18px\)/);
+	assert.match(arenaStats, /min-height:\s*54px/);
 	assert.match(gameplayScript, /class="match-stats\$\{modeKind === "arena" \? " is-arena" : ""\}"/);
-	assert.match(gameplayStyles, /@container matches-column \(max-width: 640px\)[\s\S]{0,320}\.match-stats\.is-arena\s*\{[^}]*repeat\(2,18px\)[^}]*min-height:\s*41px/s);
+	assert.match(gameplayStyles, /@container matches-column \(max-width: 640px\)[\s\S]{0,320}\.match-stats\.is-arena\s*\{[^}]*repeat\(3,18px\)[^}]*min-height:\s*54px/s);
   const tier = cssBlockAfter(gameplayStyles, ".match-stat-tier .match-tier-value");
   assert.equal(cssNumber(gameplayStyles, ".match-stat-tier .match-tier-value", "min-height"), 19);
   assert.equal(cssNumber(gameplayStyles, ".match-champion", "min-height"), 63);
@@ -4924,7 +4925,7 @@ test("build rows keep a fixed 42px icon size and wrap whole depth groups", () =>
 test("session summary uses a generic auto refresh status", () => {
 	  const summary = { hidden: true, innerHTML: "" };
 	  const state = { liveLoading: false, settings: { liveRefresh: true, liveInterval: 3 } };
-	  const { renderSessionSummary } = compileFunctions(gameplayScript, ["renderSessionSummary"], {
+	  const { renderSessionSummary } = compileFunctions(gameplayScript, ["renderSessionSummary", "liveAutoRefreshStopped"], {
 	    nodes: { liveSessionSummary: summary },
 	    state,
 	    connected: () => true,
@@ -5002,8 +5003,8 @@ test("live beacon reacts to active phase changes and has a one second fallback",
 test("R46 live refresh delays follow the game phase", () => {
 	const { liveRefreshDelayMs } = compileFunctions(gameplayScript, ["normalizeLiveInterval", "liveRefreshDelayMs"]);
 	assert.equal(liveRefreshDelayMs("ChampSelect", 60), 3_000);
-	assert.equal(liveRefreshDelayMs("InProgress", 3), 20_000);
-	assert.equal(liveRefreshDelayMs("Reconnect", 5), 20_000);
+	assert.equal(liveRefreshDelayMs("InProgress", 3), 3_000);
+	assert.equal(liveRefreshDelayMs("Reconnect", 5), 5_000);
 	assert.equal(liveRefreshDelayMs("Lobby", 15), 15_000);
 	assert.equal(liveRefreshDelayMs("", 999), 3_000);
 });
@@ -5018,7 +5019,7 @@ test("R46 TFT live sessions render one explicit unsupported state", () => {
 	const toolbar = { hidden: true };
 	const { renderLive } = compileFunctions(gameplayScript, ["renderLive"], {
 		state,
-		nodes: { liveRefresh: { closest: () => toolbar }, liveContent: content },
+		nodes: { liveRefresh: { closest: () => toolbar, setAttribute() {} }, liveContent: content },
 		connected: () => true,
 		renderSessionSummary: () => {},
 		emptyState: (title, detail) => `<empty><strong>${title}</strong><p>${detail}</p></empty>`,
@@ -5128,7 +5129,7 @@ test("R49 Arena player cards use the current champion fallback, hide lane copy, 
   const selfCard = renderLivePlayer({ id: "self", isCurrent: true, championId: 0, championPickIntent: 0, position: "" }, 0, true, 64);
   const teammateCard = renderLivePlayer({ id: "mate", isCurrent: false, isAlly: true, championId: 0, championPickIntent: 0, position: "" }, 1, true, 64);
   assert.deepEqual(renderedChampionIds, [64, 0]);
-  assert.match(selfCard, />未定级<\/span>/);
+  assert.doesNotMatch(selfCard, /未定级|白银/);
   assert.doesNotMatch(selfCard, /位置未知| · /);
   assert.doesNotMatch(teammateCard, /data-id="64"/);
 	assert.match(selfCard, /class="live-player is-self"[\s\S]*class="live-player-copy"[\s\S]*class="self-chip">自己<\/span>[\s\S]*<\/div><dl>/);
@@ -5206,7 +5207,7 @@ test("R66 premade backend guards reject cache and inference mutations", () => {
 		assert.match(goFunctionSource(source, "livePremadeAssignments"), /shared >= threshold/);
 		assert.match(goFunctionSource(source, "livePremadeAssignments"), /union\(left, right\)/);
 		assert.match(goFunctionSource(source, "livePlayerMatches"), /return a\.cachedLivePlayerMatches/);
-		assert.match(goFunctionSource(source, "handleGameplayLive"), /applyLivePremadeAssignments\(response\.Players, premadeInputs, phase, arenaMode\)/);
+		assert.match(goFunctionSource(source, "loadGameplayLive"), /applyLivePremadeAssignments\(response\.Players, premadeInputs, phase, arenaMode\)/);
 		assert.match(goFunctionSource(source, "applyLivePremadeAssignments"), /if arenaMode \|\| \(phase != "InProgress" && phase != "Reconnect"\)/);
 	};
 	assertContracts(gameplayBackend);
@@ -5355,11 +5356,12 @@ test("R56 missing recommendation metrics remove the whole metric item and empty 
 	assert.doesNotMatch(emptySkills, /skill-head-stats|选用率|—/);
 });
 
-test("player header retains region but removes CN current-game presence integration", () => {
+test("player header retains region and uses friend presence without CN spectator probes", () => {
  const functions = compileFunctions(gameplayScript, ["summonerRegionChip"], {riotTab:()=>false,escapeHTML:String,tabServerTitle:()=>"黑色玫瑰 HN10",tabServerLabel:()=>"黑色玫瑰"});
  assert.match(functions.summonerRegionChip({}), /黑色玫瑰/);
- assert.doesNotMatch(gameplayScript, /friendPresenceForTab|player-live-chip|deep-legends:friends-presence/);
- assert.doesNotMatch(gameplayStyles, /player-live-chip/);
+ assert.match(gameplayScript, /friendPresenceForTab|player-live-chip|deep-legends:friends-presence/);
+ assert.match(gameplayStyles, /player-live-chip/);
+ assert.doesNotMatch(functionSource(gameplayScript, "updateFriendPresenceChips"), /loadOverview|loadOverviewCurrentGame|renderOverview|\bapi\(/);
 });
 
 test("R46 restores only a persisted champion ID and clears unavailable selections", () => {
@@ -5685,7 +5687,7 @@ test("R61 unnamed loot remains visible by raw ID with a completion hint", () => 
 	});
 	const markup = functions.lootCard({ lootId: "CHEST_224", localizedName: "未命名战利品", count: 1 });
 	assert.match(markup, /CHEST_224/);
-	assert.match(markup, /名称待补全/);
+	assert.match(markup, /客户端数据暂未同步，可稍后重试/);
 	assert.match(markup, /is-name-pending/);
 	assert.doesNotMatch(markup, />未命名战利品</);
 	const emptyShell = functions.lootCard({ lootId: "", lootName: "", type: "", localizedDescription: "不得展示的说明", count: 30 });
@@ -5777,7 +5779,7 @@ test("R61 every mandatory contract rejects its documented production mutation", 
 		assert.match(sources.sgp, /cachedHistoryPage\(serverID, puuid, pageStart, pageSize, tags\)/);
 		assert.match(sources.sgp, /cacheHistoryPage\(serverID, puuid, pageStart, pageSize, tags/);
 		assert.match(sources.gameplayGo, /if timeout == nil\s*\{\s*timeout = context\.WithTimeout/);
-		assert.match(sources.gameplayGo, /timeout\(r\.Context\(\), overviewSoftBudget\)/); // A-3
+		assert.match(sources.gameplayGo, /timeout\(r\.Context\(\), budget\)/); // A-3
 		assert.match(sources.sgp, /sgpPageSize\s+= 50/); // A-4
 		assert.match(sources.sgp, /shouldSample = cost\.claimParticipantShapeSample\(\)/); // A-5
 		assert.match(sources.gameplayGo, /"event": "tencent_riot_id_lookup"/); // A-6
@@ -5835,7 +5837,7 @@ test("R61 every mandatory contract rejects its documented production mutation", 
 	const mutations = [
 		["A-1 retry budget", "sgp", "for retry := 0; retry <= 2; retry++", "for retry := 0; retry < 1; retry++"],
 		["A-2 pageSize key dimension", "sgp", 'fmt.Sprintf("%s|%s|%d|%d|%s", serverID, puuid, startIndex, pageSize, strings.Join(tags, ","))', 'fmt.Sprintf("%s|%s|%d|%s", serverID, puuid, startIndex, strings.Join(tags, ","))'],
-		["A-3 overview deadline", "gameplayGo", "timeout(r.Context(), overviewSoftBudget)", "context.WithCancel(r.Context())"],
+		["A-3 overview deadline", "gameplayGo", "timeout(r.Context(), budget)", "context.WithCancel(r.Context())"],
 		["A-4 50-row cold page", "sgp", "sgpPageSize         = 50", "sgpPageSize         = 20"],
 		["A-5 one-shot participant sample", "sgp", "shouldSample = cost.claimParticipantShapeSample()", "shouldSample = true"],
 		["A-6 lookup diagnostic", "gameplayGo", '"event": "tencent_riot_id_lookup"', '"event": "tencent_lookup_removed"'],
@@ -5895,9 +5897,9 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		assert.match(goFunctionSource(sources.lcuGo, "RequestJSON"), /httptrace\.WithClientTrace\(ctx, requestTrace\.clientTrace\(\)\)/); // B-1
 		assert.match(goFunctionSource(sources.lcuGo, "getBytes"), /httptrace\.WithClientTrace\(ctx, requestTrace\.clientTrace\(\)\)/);
 		assert.match(sources.gameplayGo, /value := a\.playerRankScore\(ctx,/); // B-2a overview
-		assert.match(sources.gameplayGo, /a\.playerRankScore\(r\.Context\(\), client, playerRef/); // B-2a live
+		assert.match(sources.gameplayGo, /a\.playerRankScore\(ctx, client, playerRef/); // B-2a live
 		assert.match(goFunctionSource(sources.gameplayGo, "loadQueueLabelsContext"), /if client\.queueLabelsLoaded \{\s*result := cloneQueueLabels\(client\.queueLabels\)\s*client\.queueLabelsMu\.Unlock\(\)\s*return result/); // B-2b
-		assert.doesNotMatch(sources.gameplayJS, /deep-legends:friends-presence|updateFriendPresenceChips/); // CN overview integration retired
+		assert.doesNotMatch(functionSource(sources.gameplayJS, "updateFriendPresenceChips"), /loadOverview|renderOverview|\bapi\(/); // presence updates only its own fragment
 		const tierScope = functionSource(sources.gameplayJS, "matchTierScope");
 		assert.match(tierScope, /return `\$\{region\}:\$\{serverID\}:\$\{playerRef\}`/); // B-3
 		assert.doesNotMatch(tierScope, /tab\?\.key|tab\.key/);
@@ -5934,7 +5936,7 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		["A-4 one source label", "championsJS", '<section class="build-depth-column"><h4><span>${label}</span></h4>', '<section class="build-depth-column"><span class="item-chain-source">${sourceNote}</span><h4><span>${label}</span></h4>'],
 		["B-1 request trace", "lcuGo", "ctx = httptrace.WithClientTrace(ctx, requestTrace.clientTrace())", "// trace attachment removed"],
 		["B-2a overview rank cache", "gameplayGo", "value := a.playerRankScore(ctx,", "value := directRankLookup(ctx,"],
-		["B-2a live rank cache", "gameplayGo", "a.playerRankScore(r.Context(), client, playerRef", "a.directRankLookup(r.Context(), client, playerRef"],
+		["B-2a live rank cache", "gameplayGo", "a.playerRankScore(ctx, client, playerRef", "a.directRankLookup(ctx, client, playerRef"],
 		["B-2b queue cache", "gameplayGo", "if client.queueLabelsLoaded {", "if false {"],
 		["B-3 stable tier scope", "gameplayJS", "return `${region}:${serverID}:${playerRef}`;", "return `${region}:${tab.key}:${serverID}:${playerRef}`;"],
 		["B-4 negative cache", "rankGo", "entry.negative = true\n\t\tcache.put(cacheKey, entry)", "entry.negative = true"],
@@ -5985,7 +5987,7 @@ test("R16 build, rune, skill, and Korean overview guards preserve the corrected 
   assert.match(functionSource(script, "renderRankedBuild"), /renderConfigOption\(row, "route", null, renderDepthStats\)/);
   assert.match(styles, /\.champion-build-board \.config-option\s*\{[^}]*min-height:\s*var\(--build-row-height,\s*60px\)[^}]*flex-wrap:\s*nowrap/s);
   assert.match(gameplayStyles, /\.config-option\s*\{[^}]*min-height:\s*var\(--build-row-height,\s*60px\)/s);
-	  assert.match(gameplayScript, /const timeout = 25_000;/);
+	  assert.match(gameplayScript, /const timeout = riotTab\(tab\) \? 190_000 : 25_000;/);
   for (const slot of ["fourth", "fifth"]) {
     assert.match(gameplayScript, new RegExp(`inUpstreamOrder\\(build\\.${slot}Options \\|\\| \\[\\], 5\\)`));
   }
@@ -6062,8 +6064,8 @@ test("R16 addendum guards reject every documented regression on true copies", ()
     fs.writeFileSync(path.join(webCopy, "build-item-row.css"), originals["build-item-row.css"].replace("--build-row-height: 64px", "--build-row-height: 40px"));
     assert.throws(() => assert.match(read("build-item-row.css"), /--build-row-height:\s*64px/));
 
-		fs.writeFileSync(path.join(webCopy, "gameplay.js"), originals["gameplay.js"].replace("const timeout = 25_000;", "const timeout = 10_000;"));
-		assert.throws(() => assert.match(read("gameplay.js"), /const timeout = 25_000;/));
+		fs.writeFileSync(path.join(webCopy, "gameplay.js"), originals["gameplay.js"].replace("const timeout = riotTab(tab) ? 190_000 : 25_000;", "const timeout = 10_000;"));
+		assert.throws(() => assert.match(read("gameplay.js"), /const timeout = riotTab\(tab\) \? 190_000 : 25_000;/));
 
 		const compileMilestones = (source) => compileFunctions(source, ["renderRankMilestones"], {
 			escapeHTML: (value) => String(value),
@@ -6098,7 +6100,7 @@ test("R45 mutation probes reject every documented A, B, and C regression", () =>
       "false",
     ))],
     ["B desktop Arena rows", () => assertR45Contracts(gameplayScript, gameplayStyles.replace(
-      ".match-stats.is-arena { align-content: center; grid-template-rows: repeat(2,18px); min-height: 41px; }",
+      ".match-stats.is-arena { align-content: start; grid-template-rows: repeat(3,18px); min-height: 54px; }",
       "",
     ))],
     ["C1 title spacing", () => assertR45Contracts(gameplayScript, gameplayStyles.replace(
@@ -6161,8 +6163,8 @@ test("R46 mutation probes reject all six required regressions", () => {
 		})],
 		["G-2 phase refresh delay", () => assertR46Contracts({
 			js: gameplayScript.replace(
-				'if (normalized === "InProgress" || normalized === "Reconnect") return 20_000;',
-				'if (normalized === "InProgress" || normalized === "Reconnect") return 3_000;',
+				'if (normalized === "ChampSelect") return 3_000;',
+				'if (normalized === "ChampSelect") return 20_000;',
 			),
 		})],
 		["H semantic TFT detection", () => assertR46Contracts({
@@ -6276,7 +6278,7 @@ test("R71 item-set action uses game recommendations without verbose manual-clean
 
 test("R58 mutation probes reject stale-roster and Arena fallback regressions", () => {
 	const assertStaleGuard = (source) => {
-		const handler = goFunctionSource(source, "handleGameplayLive");
+		const handler = goFunctionSource(source, "loadGameplayLive");
 		assert.match(handler, /if phase == "ChampSelect" \{\s*\/\/ gameData remains populated with the previous match[\s\S]*response\.DroppedStaleGameData = sessionErr == nil\s*\} else \{\s*response\.GameID = session\.GameData\.GameID/);
 	};
 	assertStaleGuard(gameplayBackend);

@@ -1,0 +1,5 @@
+--- FAIL: TestR94PhaseEndpointFindsSamePhaseIdentityJumpsWithoutRosterReads (0.00s)
+    r94_test.go:58: identity = {Phase:InProgress Connected:true GameID:0}
+FAIL
+FAIL	lol-loot-assistant	0.397s
+FAIL

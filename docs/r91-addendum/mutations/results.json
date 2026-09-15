@@ -1,0 +1,9 @@
+[
+  {
+    "name": "arena-first-row-offset",
+    "source": "web/gameplay.css",
+    "test": "card-first-row",
+    "exitCode": 1,
+    "killed": false
+  }
+]

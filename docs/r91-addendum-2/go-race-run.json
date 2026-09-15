@@ -1,0 +1,16 @@
+{
+  "command": "GOCACHE=/tmp/deep-legends-go-cache go test -race -count=1 -v ./...",
+  "startedAt": "2026-09-14T16:15:47.198331+00:00",
+  "goVersion": "go version go1.24.5 darwin/arm64",
+  "inputHashes": "go-input-sha256.json",
+  "completedAt": "2026-09-14T16:18:27.306081+00:00",
+  "exitCode": 0,
+  "results": {
+    "topLevelPass": 1137,
+    "allPassIncludingSubtests": 1766,
+    "skipped": 17,
+    "failed": 0,
+    "elapsedSeconds": 110.849
+  },
+  "inputHashesVerifiedAfterRun": true
+}

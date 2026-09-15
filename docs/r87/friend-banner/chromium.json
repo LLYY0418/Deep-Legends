@@ -1,0 +1,39 @@
+{
+  "before": "已进行 7:00",
+  "after": "已进行 7:01",
+  "retained": true,
+  "layouts": [
+    {
+      "width": 747.84375,
+      "text": "极地大乱斗 · 奥莉安娜 · 已进行 7:02",
+      "display": "block",
+      "scroll": 748,
+      "left": 379.078125,
+      "right": 1126.921875,
+      "bottom": 277.25,
+      "strip": {
+        "left": 272.078125,
+        "right": 1378.921875,
+        "bottom": 305,
+        "height": 140
+      },
+      "viewportWidth": 1440
+    },
+    {
+      "width": 459.625,
+      "text": "极地大乱斗 · 奥莉安娜 · 已进行 7:02",
+      "display": "block",
+      "scroll": 460,
+      "left": 359.1875,
+      "right": 818.8125,
+      "bottom": 277.75,
+      "strip": {
+        "left": 261.1875,
+        "right": 1049.8125,
+        "bottom": 306,
+        "height": 141
+      },
+      "viewportWidth": 1100
+    }
+  ]
+}

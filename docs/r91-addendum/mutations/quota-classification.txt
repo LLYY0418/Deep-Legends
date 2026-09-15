@@ -1,0 +1,30 @@
+TAP version 13
+# Subtest: R91 addendum header-only 429 and JSON fallback parse while 503 stays HTTP
+not ok 1 - R91 addendum header-only 429 and JSON fallback parse while 503 stays HTTP
+  ---
+  duration_ms: 58.480625
+  type: 'test'
+  location: '/sessions/youthful-determined-volta/mnt/deep-legends/web/r91-addendum.test.cjs:45:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The validation function is expected to return "true". Received false
+    
+    Caught error:
+    
+    Error: wait
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  stack: |-
+    async TestContext.<anonymous> (/sessions/youthful-determined-volta/mnt/deep-legends/web/r91-addendum.test.cjs:47:85)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2204.519168

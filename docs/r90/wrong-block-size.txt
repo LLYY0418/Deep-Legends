@@ -1,0 +1,6 @@
+--- FAIL: TestR90AlliesVerifyAndRejectScrambledPlayerlist (0.02s)
+    --- FAIL: TestR90AlliesVerifyAndRejectScrambledPlayerlist/false (0.02s)
+        r90_test.go:133: verified real fixture: false  false
+FAIL
+FAIL	lol-loot-assistant	0.816s
+FAIL

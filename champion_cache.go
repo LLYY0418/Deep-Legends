@@ -58,6 +58,11 @@ type championCacheLoadResult struct {
 }
 
 type championDataCache struct {
+	strictDisk        bool
+	diskMaxEntries    int
+	diskMaxBytes      int64
+	strictEntries     map[string]binaryDiskEntry
+	strictBytes       int64
 	readFile          func(string) ([]byte, error)
 	dir               string
 	mu                sync.Mutex
@@ -111,6 +116,9 @@ func (c *championDataCache) loadWithStatus(ctx context.Context, key string, ttl,
 		c.mu.Unlock()
 		select {
 		case <-done:
+			if ctx.Err() == nil && (errors.Is(flight.err, context.Canceled) || errors.Is(flight.err, context.DeadlineExceeded)) {
+				return c.loadWithStatus(ctx, key, ttl, staleFor, persistDisk, loader)
+			}
 			return championCacheLoadResult{data: append([]byte(nil), flight.data...), fetchedAt: flight.fetchedAt, state: flight.state, upstreamErr: flight.upstreamErr}, flight.err
 		case <-ctx.Done():
 			return championCacheLoadResult{state: championCacheStateError}, ctx.Err()
@@ -134,6 +142,9 @@ func (c *championDataCache) loadWithStatus(ctx context.Context, key string, ttl,
 		c.mu.Unlock()
 		select {
 		case <-done:
+			if ctx.Err() == nil && (errors.Is(existing.err, context.Canceled) || errors.Is(existing.err, context.DeadlineExceeded)) {
+				return c.loadWithStatus(ctx, key, ttl, staleFor, persistDisk, loader)
+			}
 			return championCacheLoadResult{data: append([]byte(nil), existing.data...), fetchedAt: existing.fetchedAt, state: existing.state, upstreamErr: existing.upstreamErr}, existing.err
 		case <-ctx.Done():
 			return championCacheLoadResult{state: championCacheStateError}, ctx.Err()
@@ -275,12 +286,20 @@ func (c *championDataCache) writeDisk(entry championCacheEnvelope) error {
 		return err
 	}
 	c.diskMu.Lock()
+	if c.strictDisk {
+		c.initBinaryDiskIndexLocked()
+	}
 	err = atomicWriteFile(c.pathFor(entry.Key), data, 0o600)
+	if err == nil && c.strictDisk {
+		err = c.accountBinaryDiskWriteLocked(c.pathFor(entry.Key), int64(len(data)))
+	}
 	c.diskMu.Unlock()
 	if err != nil {
 		return err
 	}
-	c.scheduleDiskPrune(int64(len(data)))
+	if !c.strictDisk {
+		c.scheduleDiskPrune(int64(len(data)))
+	}
 	return nil
 }
 
@@ -305,7 +324,7 @@ func (c *championDataCache) scheduleDiskPrune(written int64) {
 }
 
 func championCacheDiskAllowed(key string) bool {
-	if strings.HasPrefix(key, "hexdata-") || strings.HasPrefix(key, "bootstrap|") || strings.HasPrefix(key, "v2|opgg-rsc|") || strings.HasPrefix(key, "v3|opgg-detail|") {
+	if strings.HasPrefix(key, "riot-identity-v1|") || strings.HasPrefix(key, "riot-match-v1|KR_") || strings.HasPrefix(key, "hexdata-") || strings.HasPrefix(key, "bootstrap|") || strings.HasPrefix(key, "v2|opgg-rsc|") || strings.HasPrefix(key, "v3|opgg-detail|") {
 		return true
 	}
 	for _, host := range []string{dataDragonHost, communityDragonHost, opggChampionHost, opggPageHost, qq101Host} {
@@ -385,6 +404,10 @@ func (c *championDataCache) purgeDiskHost(host string) error {
 func (c *championDataCache) pruneDisk() error {
 	c.diskMu.Lock()
 	defer c.diskMu.Unlock()
+	return c.pruneDiskLocked()
+}
+
+func (c *championDataCache) pruneDiskLocked() error {
 	if c.migrationErr != nil {
 		return c.migrationErr
 	}
@@ -415,7 +438,14 @@ func (c *championDataCache) pruneDisk() error {
 		total += info.Size()
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].mod.Before(items[j].mod) })
-	for len(items) > 0 && (len(items) > championCacheMaxEntries || total > championCacheMaxBytes) {
+	maxEntries, maxBytes := c.diskMaxEntries, c.diskMaxBytes
+	if maxEntries <= 0 {
+		maxEntries = championCacheMaxEntries
+	}
+	if maxBytes <= 0 {
+		maxBytes = championCacheMaxBytes
+	}
+	for len(items) > 0 && (len(items) > maxEntries || total > maxBytes) {
 		oldest := items[0]
 		items = items[1:]
 		if os.Remove(oldest.path) == nil {
@@ -426,6 +456,9 @@ func (c *championDataCache) pruneDisk() error {
 }
 
 func championCachePolicy(host, requestPath, accept string) (time.Duration, time.Duration, bool) {
+	if strings.HasPrefix(accept, "image/") && allowedChampionHost(host) {
+		return 7 * 24 * time.Hour, 30 * 24 * time.Hour, true
+	}
 	if accept != "application/json" && accept != "text/html,application/xhtml+xml" {
 		return 0, 0, false
 	}

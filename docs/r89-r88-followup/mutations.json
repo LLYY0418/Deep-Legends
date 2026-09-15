@@ -1,0 +1,50 @@
+[
+  {
+    "mutation": "original-direct",
+    "test": "TestR88QueueGuardMutations",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "original-alias",
+    "test": "TestR88QueueGuardMutations",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "original-switch",
+    "test": "TestR88QueueGuardMutations",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "numeric-string",
+    "test": "TestR89QueueGuardEquivalentMutations",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "stringify-call",
+    "test": "TestR89QueueGuardEquivalentMutations",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "reassigned-literal",
+    "test": "TestR89QueueGuardEquivalentMutations",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "equality-helper",
+    "test": "TestR89QueueGuardEquivalentMutations",
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "mutation": "storage-fingerprint",
+    "test": "TestR89Diagnostic",
+    "exit": 1,
+    "killed": true
+  }
+]

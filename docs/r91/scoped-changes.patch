@@ -1,0 +1,247 @@
+--- before-r91/web/gameplay.js
++++ after-r91/web/gameplay.js
+@@ -48,6 +48,7 @@
+     summonerSpellsLoading: false,
+     live: null,
+     liveLoading: false,
++    liveAwaitingGame: false,
+     liveError: "",
+     liveTimer: 0,
+     liveRecommendations: new Map(),
+@@ -133,7 +134,9 @@
+     return "";
+   }
+   function renderLiveRefreshStatus(data) {
+-    const message = liveAutoRefreshStopped(data);
++    const message = state.liveLoading
++      ? "正在刷新…"
++      : liveAutoRefreshStopped(data);
+     return message ? `<div class="live-refresh-status" role="status"><span>${escapeHTML(message)}</span><button type="button" class="text-button" data-live-refresh>刷新</button></div>` : "";
+   }
+   function normalizeLiveOrder(value) { return ["team", "position", "kda", "win-rate"].includes(value) ? value : "team"; }
+@@ -411,6 +414,7 @@
+       state.controllers.get("live")?.abort();
+       state.liveLoading = false;
+       state.live = null;
++      state.liveAwaitingGame = false;
+       state.liveError = "";
+       resetLiveGameScopedState();
+       // 只在连接状态真正切换时更换目录。周期性的未连接状态事件不能
+@@ -3748,7 +3752,11 @@
+     recordLiveRefresh("load", source);
+     if (state.destroyed) return;
+     if (!connected()) { renderLive(); return; }
+-    if (state.liveLoading) { if (force) state.liveForceRefreshQueued = true; return; }
++    invalidateLiveForNewGame(state.live?.phase, state.beacon.phase);
++    if (state.liveLoading && !force) return;
++    // Manual refresh replaces only this request; other pages and recommendation
++    // selections keep their state. The token below fences off the old finalizer.
++    if (state.liveLoading) state.controllers.get("live")?.abort();
+     state.liveRefreshQueued = false;
+     state.livePhaseRefreshQueued = false;
+     if (force) state.liveRetryAttempts = 0;
+@@ -3762,10 +3770,15 @@
+       const nextLive = await api(force ? "/api/gameplay/live?refresh=1" : "/api/gameplay/live", {}, "live", 45000);
+       if (state.liveRequestToken !== requestToken || !connected()) return;
+       if (state.livePhaseRefreshQueued && nextLive.phase !== state.beacon.phase) return;
++      // The phase signal can arrive before the live endpoint catches up. Keep
++      // the new-game transition visible rather than accepting an old lobby snapshot.
++      if (state.liveAwaitingGame && liveGamePhase(state.beacon.phase) && !liveGamePhase(nextLive.phase)) return;
+       if (shouldResetLiveGameScopedState(previousLive, nextLive)) resetLiveGameScopedState();
+       resetLivePositionOverrides(previousLive, nextLive);
+       resetRecommendationTabsOnChampionChange(previousLive, nextLive);
+       state.live = nextLive;
++      state.liveAwaitingGame = state.liveAwaitingGame && liveGamePhase(nextLive.phase) && !nextLive.unsupported
++        && !(nextLive.available && (nextLive.players?.length || Number(nextLive.currentChampionId) > 0 || Number(nextLive.resolvedChampionId) > 0));
+       updateBeacon(String(state.live?.phase || ""));
+       state.lastCapabilities = state.live.capabilities || state.lastCapabilities;
+       renderCapabilitySettings();
+@@ -3776,16 +3789,54 @@
+       ensureSpecialistRunes(state.live);
+       void ensureProRunes(state.live);
+     } catch (error) {
+-      if (state.liveRequestToken === requestToken && error.name !== "RequestCancelled") state.liveError = error.message;
++      if (state.liveRequestToken === requestToken && (error.name !== "RequestCancelled" || !state.live || state.liveAwaitingGame)) {
++        state.liveError = error.name === "RequestCancelled" ? "读取已中断，请重试。" : (error.message || "未能读取对局，请重试。");
++      }
+     } finally {
+       if (state.liveRequestToken !== requestToken) return;
+       state.liveLoading = false;
+       syncLiveRetryBudget();
+       renderLive();
+       scheduleLiveRefresh();
+-      if (state.liveForceRefreshQueued) { state.liveForceRefreshQueued = false; void loadLive(true, "manual"); }
+-      else if (state.liveRefreshQueued) queueLiveEventRefresh("event", Boolean(state.livePhaseRefreshQueued));
+-    }
++      if (state.liveRefreshQueued) queueLiveEventRefresh("event", Boolean(state.livePhaseRefreshQueued));
++    }
++  }
++
++  function liveGamePhase(phase) {
++    return ["ChampSelect", "GameStart", "InProgress", "Reconnect"].includes(phase);
++  }
++
++  function invalidateLiveForNewGame(previousPhase, nextPhase) {
++    if (!previousPhase || previousPhase === nextPhase || !liveGamePhase(nextPhase)) return;
++    if (liveGamePhase(previousPhase) && nextPhase !== "ChampSelect") return;
++    // Invalidate at the phase boundary, even while hidden or an old request is
++    // in flight. Only the replacement request may update loading/data state.
++    state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
++    state.controllers.get("live")?.abort();
++    clearTimeout(state.liveTimer);
++    clearTimeout(state.liveEventTimer);
++    state.liveTimer = 0;
++    state.liveEventTimer = 0;
++    state.liveLoading = false;
++    state.live = null;
++    state.liveAwaitingGame = true;
++    state.liveRetryAttempts = 0;
++    state.liveRetryKey = "";
++    state.liveError = "";
++    resetLiveGameScopedState();
++    renderLive();
++  }
++
++  function resetDisconnectedLive() {
++    state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
++    state.controllers.get("live")?.abort();
++    state.liveLoading = false;
++    state.live = null;
++    state.liveAwaitingGame = false;
++    state.liveError = "实时连接已中断，请重试。";
++    resetLiveGameScopedState();
++    renderLive();
++    scheduleLiveRefresh();
+   }
+ 
+   function liveDisplayedChampionId(player, currentChampionId = 0) {
+@@ -3840,6 +3891,7 @@
+   }
+ 
+   function softResetGameplayState() {
++    state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
+     for (const controller of state.controllers.values()) controller.abort();
+     state.controllers.clear();
+     for (const tab of state.tabs) {
+@@ -4295,14 +4347,29 @@
+       return;
+     }
+     if (toolbar) toolbar.hidden = false;
+-    if (state.liveLoading && !state.live) {
+-      nodes.liveContent.innerHTML = '<div class="gameplay-skeleton"><span></span><span></span><span></span></div>';
+-      return;
++    if (nodes.liveRefresh) {
++      nodes.liveRefresh.textContent = state.liveLoading
++        ? "正在刷新…" : "刷新对局";
++      nodes.liveRefresh.setAttribute("aria-busy", String(Boolean(state.liveLoading)));
+     }
+     if (state.liveError) {
+       renderSessionSummary(null);
+       nodes.liveContent.innerHTML = renderLiveRefreshStatus(state.live) + emptyState("实时对局读取失败", state.liveError, true);
+-      nodes.liveContent.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadLive(true));
++      nodes.liveContent.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadLive(true, "manual"));
++      nodes.liveContent.querySelector("[data-live-refresh]")?.addEventListener("click", () => loadLive(true, "manual"));
++      return;
++    }
++    if (state.liveAwaitingGame) {
++      renderSessionSummary(null);
++      nodes.liveContent.innerHTML = renderLiveRefreshStatus(state.live || { phase: state.beacon.phase })
++        + `<div role="status">${emptyState("正在识别新对局…", "新对局数据尚未就绪，读取完成后会自动显示。也可点击刷新重试。", true)}</div>`;
++      nodes.liveContent.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadLive(true, "manual"));
++      nodes.liveContent.querySelector("[data-live-refresh]")?.addEventListener("click", () => loadLive(true, "manual"));
++      return;
++    }
++    if (state.liveLoading && !state.live) {
++      renderSessionSummary(null);
++      nodes.liveContent.innerHTML = '<div class="gameplay-skeleton"><span></span><span></span><span></span></div>';
+       return;
+     }
+     const data = state.live;
+@@ -5997,12 +6064,7 @@
+ 	window.addEventListener("deep-legends:season-progress", (event) => { void handleSeasonProgress(event.detail || {}); });
+ 	window.addEventListener("deep-legends:overview-incremental", (event) => { void handleOverviewIncremental(event.detail || {}); });
+ 
+-	window.addEventListener("deep-legends:live-disconnected", () => {
+-	  resetLiveGameScopedState();
+-	  state.live = null;
+-	  state.liveError = "";
+-	  if (state.section === "live") renderLive();
+-	});
++  window.addEventListener("deep-legends:live-disconnected", resetDisconnectedLive);
+   window.addEventListener("deep-legends:open-player", (event) => {
+     const playerRef = String(event.detail?.playerRef || "").trim();
+     const gameName = String(event.detail?.gameName || "").trim();
+@@ -6157,7 +6219,10 @@
+   function handleGameplayPhase(phase, source = "sse", changed = false) {
+     if (state.destroyed) return;
+     const phaseChanged = Boolean(phase) && phase !== state.beacon.phase;
+-    if (phaseChanged) recordLiveRefresh("phase", source, phaseChanged);
++    if (phaseChanged) {
++      recordLiveRefresh("phase", source, phaseChanged);
++      invalidateLiveForNewGame(state.beacon.phase || state.live?.phase, phase);
++    }
+     if (phase) {
+       updateBeacon(phase);
+       markOverviewAfterGame(phase);
+--- before-r91/web/r87.test.cjs
++++ after-r91/web/r87.test.cjs
+@@ -34,12 +34,12 @@
+   const deps = { ...timer, state, document, connected: () => true, fetch: async (_url, options) => { reports.push(JSON.parse(options.body)); },
+     api: async url => { calls.push(url); return { phase: 'InProgress', players: [] }; },
+     updateBeacon: phase => { state.beacon.phase = phase; }, scheduleBeaconPoll() {}, markOverviewAfterGame() {},
+-    renderLive() {}, shouldResetLiveGameScopedState: () => false, resetLivePositionOverrides() {}, resetRecommendationTabsOnChampionChange() {},
++    renderLive() {}, resetLiveGameScopedState() {}, shouldResetLiveGameScopedState: () => false, resetLivePositionOverrides() {}, resetRecommendationTabsOnChampionChange() {},
+     renderCapabilitySettings() {}, liveRecommendationsFor: () => null, ensureLiveRecommendations() {}, ensureSpecialistRunes() {}, ensureProRunes() {}, scheduleLiveRefresh() {},
+     activeTab: () => state.tabs[0], overviewGroupForSection: () => 'cn', loadOverview: async () => true,
+     window: { reportFlowDiagnostic: (event, reason, fields) => reports.push({event, reason, ...fields}), addEventListener: (event, fn) => listeners.set(event, fn) },
+   };
+-  const context = compile('gameplay.js', ['recordLiveRefresh', 'queueLiveEventRefresh', 'loadLive', 'syncLiveRetryBudget', 'handleGameplayPhase', 'refreshAfterResync', 'pollGameflowPhase'], deps);
++  const context = compile('gameplay.js', ['recordLiveRefresh', 'queueLiveEventRefresh', 'loadLive', 'liveGamePhase', 'invalidateLiveForNewGame', 'syncLiveRetryBudget', 'handleGameplayPhase', 'refreshAfterResync', 'pollGameflowPhase'], deps);
+   context.BEACON_IDLE_POLL_MS = 12000; context.BEACON_DISCONNECTED_POLL_MS = 1000; context.beaconPollDelay = () => 12000;
+   const source = read('gameplay.js'); const start = source.indexOf('  window.addEventListener("deep-legends:gameflow",');
+   vm.runInNewContext(source.slice(start, source.indexOf('\n  });', start) + 6), context);
+--- before-r91/web/r90.test.cjs
++++ after-r91/web/r90.test.cjs
+@@ -80,10 +80,13 @@
+  assert.doesNotMatch(visibility,/loadLive\(true/);assert.match(visibility,/scheduleBeaconPoll\(0\)/);
+  assert.match(source,/const BEACON_FAST_POLL_MS = 1_000/);assert.match(source,/const BEACON_IDLE_POLL_MS = 12_000/);
+ });
+-test("R90 actual loader bypasses cache for manual refresh and preserves queued manual actions",async()=>{
+- const state={beacon:{phase:"InProgress"},live:full(),settings:{},liveRetryAttempts:8};const requests=[];const noop=()=>{};
+- const deps={state,connected:()=>true,recordLiveRefresh:noop,renderLive:noop,api:async(url)=>{requests.push(url);return full()},shouldResetLiveGameScopedState:()=>false,resetLiveGameScopedState:noop,resetLivePositionOverrides:noop,resetRecommendationTabsOnChampionChange:noop,updateBeacon:noop,renderCapabilitySettings:noop,liveRecommendationsFor:()=>null,ensureLiveRecommendations:noop,ensureSpecialistRunes:noop,ensureProRunes:noop,syncLiveRetryBudget:noop,scheduleLiveRefresh:noop,queueLiveEventRefresh:noop};
++test("R90 actual loader bypasses cache for manual refresh; R91 supersedes the former manual queue",async()=>{
++ const state={beacon:{phase:"InProgress"},live:full(),settings:{},controllers:new Map(),liveRetryAttempts:8};const requests=[];const noop=()=>{};
++ const deps={state,connected:()=>true,recordLiveRefresh:noop,invalidateLiveForNewGame:noop,liveGamePhase:()=>true,renderLive:noop,api:async(url)=>{requests.push(url);return full()},shouldResetLiveGameScopedState:()=>false,resetLiveGameScopedState:noop,resetLivePositionOverrides:noop,resetRecommendationTabsOnChampionChange:noop,updateBeacon:noop,renderCapabilitySettings:noop,liveRecommendationsFor:()=>null,ensureLiveRecommendations:noop,ensureSpecialistRunes:noop,ensureProRunes:noop,syncLiveRetryBudget:noop,scheduleLiveRefresh:noop,queueLiveEventRefresh:noop};
+  const {loadLive}=compile(["loadLive"],deps);await loadLive(true,"manual");assert.deepEqual(requests,["/api/gameplay/live?refresh=1"]);assert.equal(state.liveRetryAttempts,0);
+- let release;deps.api=async(url)=>{requests.push(url);await new Promise(resolve=>{release=resolve});return full()};
+- const loader=compile(["loadLive"],deps).loadLive;const pending=loader(false);await loader(true,"manual");assert.equal(state.liveForceRefreshQueued,true);release();await pending;assert.equal(requests.at(-1),"/api/gameplay/live?refresh=1");release();
++ const releases=[];let aborted=0;state.controllers.set("live",{abort:()=>aborted++});
++ deps.api=async(url)=>{requests.push(url);await new Promise(resolve=>releases.push(resolve));return full()};
++ const loader=compile(["loadLive"],deps).loadLive;const pending=loader(false);const forced=loader(true,"manual");
++ assert.equal(aborted,1);assert.equal(releases.length,2);assert.equal(requests.at(-1),"/api/gameplay/live?refresh=1");
++ releases[0]();await pending;assert.equal(state.liveLoading,true);releases[1]();await forced;assert.equal(state.liveLoading,false);
+ });
+--- before-r91/web/champions.test.cjs
++++ after-r91/web/champions.test.cjs
+@@ -5019,7 +5019,7 @@
+ 	const toolbar = { hidden: true };
+ 	const { renderLive } = compileFunctions(gameplayScript, ["renderLive"], {
+ 		state,
+-		nodes: { liveRefresh: { closest: () => toolbar }, liveContent: content },
++		nodes: { liveRefresh: { closest: () => toolbar, setAttribute() {} }, liveContent: content },
+ 		connected: () => true,
+ 		renderSessionSummary: () => {},
+ 		emptyState: (title, detail) => `<empty><strong>${title}</strong><p>${detail}</p></empty>`,
+--- before-r91/DESIGN.md
++++ after-r91/DESIGN.md
+@@ -164,3 +164,10 @@
+ - 仅 InProgress / Reconnect 输出小队分组；英雄选择仍只展示已公开的己方成员。队伍人数取共享 queue 登记表（1700/1710 为 2，1750 为 3），使用游戏进程 playerlist 完整数组切块；gameflow 缺少成员时按解析后的身份映射，不重新切块。游戏进程数据暂不可用时才使用 gameflow 顺序。
+ - 顺序推断必须核对记住的自身小队；跨块拒绝并记录结构化诊断，无选人记录时标为 unverified。已记住但无法解析的完整小队暂缓分组，继续有界重试。premade party ID 不作为小队证据。顺序推断仅显示“小队 N”，不启用吉祥物映射。
+ - 在线推断只保存在内存，最多五局并按客户端/游戏/服务器隔离。结束阶段使用既有 SGP 历史详情回查，最多四次、每个阶段上下文最多 35 秒；下一阶段取消旧任务并确保新任务，已检查的对局不重查。普通 SGP 详情读取同样检查并去重。诊断通过 appendDiagnosticEvent 只写分区结果、块编号和人数，不写玩家身份；不完整赛后详情不当作错误真值。
++
++### R91 新局数据与局部刷新
++
++- 前端在已知非对局阶段进入 ChampSelect / GameStart / InProgress / Reconnect，或从其他阶段重新进入 ChampSelect 时立即失效旧快照及推荐缓存，显示“正在识别新对局…”与重试入口。普通同局刷新以及选人、加载、进行中、重连之间的正常推进保留内容；返回不同 gameId 时仍重置局内缓存。
++- 新局数据未就绪时保留明确过渡态，不能回退到上一局推荐；比 phase 信号落后的大厅响应不能抹掉新局信号。已有的有界自动重试和手动退出入口继续有效。
++- 用户手动刷新只中断 `live` 请求并立即穿透缓存重发，按钮及页面显示“正在刷新…”。不重置其他页请求、分页或推荐选项；全局“重新获取”仍负责整体重置。后台刷新合并正在执行的读取。R90 的手动排队策略由此替代。
++- 新局切换、实时事件连接中断及全局重置都会使旧 live 请求 token 失效。旧请求不能写回数据或结束新请求的加载状态；无替代请求的取消及连接中断必须显示明确错误和可操作重试。

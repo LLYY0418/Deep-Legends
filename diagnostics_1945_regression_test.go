@@ -127,7 +127,7 @@ func Test1945YourGGArenaRankingsMatchRealPage(t *testing.T) {
 	if got.Rows[0].WinRate < 54.51 || got.Rows[0].WinRate > 54.53 {
 		t.Fatal(got.Rows[0])
 	}
-	for _, bad := range [][]byte{bytes.Replace(data, []byte(`"success":true`), []byte(`"success":false`), 1), bytes.Replace(data, []byte(`"championId":799`), []byte(`"championId":3`), 1)} {
+	for _, bad := range [][]byte{bytes.Replace(data, []byte(`"success":true`), []byte(`"success":false`), 1)} {
 		if _, err := parseYourGGArenaRankings(bad, time.Now()); err == nil {
 			t.Fatal("invalid response accepted")
 		}

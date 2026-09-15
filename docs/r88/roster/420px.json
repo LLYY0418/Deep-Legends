@@ -1,0 +1,4447 @@
+{
+  "clippingPolicy": "strict",
+  "results": [
+    {
+      "viewport": 1920,
+      "scenario": "lengths",
+      "measurements": [
+        {
+          "length": 4,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 6,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 8,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 12,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 16,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 20,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 6,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 16,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        }
+      ]
+    },
+    {
+      "viewport": 1920,
+      "scenario": "mixed",
+      "measurements": [
+        {
+          "length": 4,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 6,
+          "arena": true,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 118,
+          "columnGap": 5,
+          "names": [
+            {
+              "name": "是谢啊",
+              "tooltip": "是谢啊#20492",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "不畏人知畏己",
+              "tooltip": "不畏人知畏己#59696",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "竹子还有吗",
+              "tooltip": "竹子还有吗#37849",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "Maarkuz",
+              "tooltip": "Maarkuz#47394",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我的锐雯爱吃假酒",
+              "tooltip": "我的锐雯爱吃假酒#65231",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "谢業川",
+              "tooltip": "谢業川#10991",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "群众的希望",
+              "tooltip": "群众的希望#24585",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "历劫成衣z",
+              "tooltip": "历劫成衣z#58876",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FAKER",
+              "tooltip": "FAKER#54656",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "懒大王丿",
+              "tooltip": "懒大王丿#52552",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "峡谷攻略",
+              "tooltip": "峡谷攻略#80881",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 8,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 12,
+          "arena": true,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 118,
+          "columnGap": 5,
+          "names": [
+            {
+              "name": "至今未知无垢湖光",
+              "tooltip": "至今未知无垢湖光#62110",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "葛上亭韵",
+              "tooltip": "葛上亭韵#23307",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "五人逮狗腿",
+              "tooltip": "五人逮狗腿#16499",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "胡永祥",
+              "tooltip": "胡永祥#00520",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "还有许多遗憾",
+              "tooltip": "还有许多遗憾#75899",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "Sky绝迹",
+              "tooltip": "Sky绝迹#30047",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我的生命热忠于党",
+              "tooltip": "我的生命热忠于党#86112",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "一盏青灯魂渡我何",
+              "tooltip": "一盏青灯魂渡我何#46113",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "无敌江流儿",
+              "tooltip": "无敌江流儿#71113",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "BigRose丶Rengar",
+              "tooltip": "BigRose丶Rengar#25311",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "MilesBridges",
+              "tooltip": "MilesBridges#36838",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "是谢啊",
+              "tooltip": "是谢啊#20492",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 16,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 20,
+          "arena": true,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 118,
+          "columnGap": 5,
+          "names": [
+            {
+              "name": "不畏人知畏己",
+              "tooltip": "不畏人知畏己#59696",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "竹子还有吗",
+              "tooltip": "竹子还有吗#37849",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "Maarkuz",
+              "tooltip": "Maarkuz#47394",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我的锐雯爱吃假酒",
+              "tooltip": "我的锐雯爱吃假酒#65231",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "谢業川",
+              "tooltip": "谢業川#10991",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "群众的希望",
+              "tooltip": "群众的希望#24585",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "历劫成衣z",
+              "tooltip": "历劫成衣z#58876",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FAKER",
+              "tooltip": "FAKER#54656",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "懒大王丿",
+              "tooltip": "懒大王丿#52552",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "峡谷攻略",
+              "tooltip": "峡谷攻略#80881",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "至今未知无垢湖光",
+              "tooltip": "至今未知无垢湖光#62110",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 6,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 16,
+          "arena": true,
+          "playersWidth": 420,
+          "left": 1374,
+          "right": 1794,
+          "height": 118,
+          "columnGap": 5,
+          "names": [
+            {
+              "name": "葛上亭韵",
+              "tooltip": "葛上亭韵#23307",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "五人逮狗腿",
+              "tooltip": "五人逮狗腿#16499",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "胡永祥",
+              "tooltip": "胡永祥#00520",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "还有许多遗憾",
+              "tooltip": "还有许多遗憾#75899",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "Sky绝迹",
+              "tooltip": "Sky绝迹#30047",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我的生命热忠于党",
+              "tooltip": "我的生命热忠于党#86112",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "一盏青灯魂渡我何",
+              "tooltip": "一盏青灯魂渡我何#46113",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "无敌江流儿",
+              "tooltip": "无敌江流儿#71113",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "BigRose丶Rengar",
+              "tooltip": "BigRose丶Rengar#25311",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "MilesBridges",
+              "tooltip": "MilesBridges#36838",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "是谢啊",
+              "tooltip": "是谢啊#20492",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "不畏人知畏己",
+              "tooltip": "不畏人知畏己#59696",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        }
+      ]
+    },
+    {
+      "viewport": 2560,
+      "scenario": "lengths",
+      "measurements": [
+        {
+          "length": 4,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 6,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 8,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 12,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 16,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 20,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 6,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 16,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        }
+      ]
+    },
+    {
+      "viewport": 2560,
+      "scenario": "mixed",
+      "measurements": [
+        {
+          "length": 4,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 6,
+          "arena": true,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 118,
+          "columnGap": 5,
+          "names": [
+            {
+              "name": "是谢啊",
+              "tooltip": "是谢啊#20492",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "不畏人知畏己",
+              "tooltip": "不畏人知畏己#59696",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "竹子还有吗",
+              "tooltip": "竹子还有吗#37849",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "Maarkuz",
+              "tooltip": "Maarkuz#47394",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我的锐雯爱吃假酒",
+              "tooltip": "我的锐雯爱吃假酒#65231",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "谢業川",
+              "tooltip": "谢業川#10991",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "群众的希望",
+              "tooltip": "群众的希望#24585",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "历劫成衣z",
+              "tooltip": "历劫成衣z#58876",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FAKER",
+              "tooltip": "FAKER#54656",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "懒大王丿",
+              "tooltip": "懒大王丿#52552",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "峡谷攻略",
+              "tooltip": "峡谷攻略#80881",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 8,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 12,
+          "arena": true,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 118,
+          "columnGap": 5,
+          "names": [
+            {
+              "name": "至今未知无垢湖光",
+              "tooltip": "至今未知无垢湖光#62110",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "葛上亭韵",
+              "tooltip": "葛上亭韵#23307",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "五人逮狗腿",
+              "tooltip": "五人逮狗腿#16499",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "胡永祥",
+              "tooltip": "胡永祥#00520",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "还有许多遗憾",
+              "tooltip": "还有许多遗憾#75899",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "Sky绝迹",
+              "tooltip": "Sky绝迹#30047",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我的生命热忠于党",
+              "tooltip": "我的生命热忠于党#86112",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "一盏青灯魂渡我何",
+              "tooltip": "一盏青灯魂渡我何#46113",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "无敌江流儿",
+              "tooltip": "无敌江流儿#71113",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "BigRose丶Rengar",
+              "tooltip": "BigRose丶Rengar#25311",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "MilesBridges",
+              "tooltip": "MilesBridges#36838",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "是谢啊",
+              "tooltip": "是谢啊#20492",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 16,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 20,
+          "arena": true,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 118,
+          "columnGap": 5,
+          "names": [
+            {
+              "name": "不畏人知畏己",
+              "tooltip": "不畏人知畏己#59696",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "竹子还有吗",
+              "tooltip": "竹子还有吗#37849",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "Maarkuz",
+              "tooltip": "Maarkuz#47394",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我的锐雯爱吃假酒",
+              "tooltip": "我的锐雯爱吃假酒#65231",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "谢業川",
+              "tooltip": "谢業川#10991",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "群众的希望",
+              "tooltip": "群众的希望#24585",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "历劫成衣z",
+              "tooltip": "历劫成衣z#58876",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FAKER",
+              "tooltip": "FAKER#54656",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "懒大王丿",
+              "tooltip": "懒大王丿#52552",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "峡谷攻略",
+              "tooltip": "峡谷攻略#80881",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "至今未知无垢湖光",
+              "tooltip": "至今未知无垢湖光#62110",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 6,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 16,
+          "arena": true,
+          "playersWidth": 420,
+          "left": 1734.5,
+          "right": 2154.5,
+          "height": 118,
+          "columnGap": 5,
+          "names": [
+            {
+              "name": "葛上亭韵",
+              "tooltip": "葛上亭韵#23307",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "五人逮狗腿",
+              "tooltip": "五人逮狗腿#16499",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "胡永祥",
+              "tooltip": "胡永祥#00520",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "还有许多遗憾",
+              "tooltip": "还有许多遗憾#75899",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "Sky绝迹",
+              "tooltip": "Sky绝迹#30047",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我的生命热忠于党",
+              "tooltip": "我的生命热忠于党#86112",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "一盏青灯魂渡我何",
+              "tooltip": "一盏青灯魂渡我何#46113",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "无敌江流儿",
+              "tooltip": "无敌江流儿#71113",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "BigRose丶Rengar",
+              "tooltip": "BigRose丶Rengar#25311",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "MilesBridges",
+              "tooltip": "MilesBridges#36838",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "是谢啊",
+              "tooltip": "是谢啊#20492",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "不畏人知畏己",
+              "tooltip": "不畏人知畏己#59696",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        }
+      ]
+    },
+    {
+      "viewport": 3840,
+      "scenario": "lengths",
+      "measurements": [
+        {
+          "length": 4,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月#12345",
+              "tooltip": "春江花月#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 6,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 8,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星#12345",
+              "tooltip": "春江花月夜山河星#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 12,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云#12345",
+              "tooltip": "春江花月夜山河星辰流光云#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 16,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 20,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明天地日月#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 6,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山#12345",
+              "tooltip": "春江花月夜山#12345",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 16,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            },
+            {
+              "name": "春江花月夜山河星辰流光云海清风明#12345",
+              "tooltip": "春江花月夜山河星辰流光云海清风明#12345",
+              "fontSize": "10.5px",
+              "truncated": true,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        }
+      ]
+    },
+    {
+      "viewport": 3840,
+      "scenario": "mixed",
+      "measurements": [
+        {
+          "length": 4,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 6,
+          "arena": true,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 118,
+          "columnGap": 5,
+          "names": [
+            {
+              "name": "是谢啊",
+              "tooltip": "是谢啊#20492",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "不畏人知畏己",
+              "tooltip": "不畏人知畏己#59696",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "竹子还有吗",
+              "tooltip": "竹子还有吗#37849",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "Maarkuz",
+              "tooltip": "Maarkuz#47394",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我的锐雯爱吃假酒",
+              "tooltip": "我的锐雯爱吃假酒#65231",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "谢業川",
+              "tooltip": "谢業川#10991",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "群众的希望",
+              "tooltip": "群众的希望#24585",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "历劫成衣z",
+              "tooltip": "历劫成衣z#58876",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FAKER",
+              "tooltip": "FAKER#54656",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "懒大王丿",
+              "tooltip": "懒大王丿#52552",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "峡谷攻略",
+              "tooltip": "峡谷攻略#80881",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 8,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 12,
+          "arena": true,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 118,
+          "columnGap": 5,
+          "names": [
+            {
+              "name": "至今未知无垢湖光",
+              "tooltip": "至今未知无垢湖光#62110",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "葛上亭韵",
+              "tooltip": "葛上亭韵#23307",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "五人逮狗腿",
+              "tooltip": "五人逮狗腿#16499",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "胡永祥",
+              "tooltip": "胡永祥#00520",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "还有许多遗憾",
+              "tooltip": "还有许多遗憾#75899",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "Sky绝迹",
+              "tooltip": "Sky绝迹#30047",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我的生命热忠于党",
+              "tooltip": "我的生命热忠于党#86112",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "一盏青灯魂渡我何",
+              "tooltip": "一盏青灯魂渡我何#46113",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "无敌江流儿",
+              "tooltip": "无敌江流儿#71113",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "BigRose丶Rengar",
+              "tooltip": "BigRose丶Rengar#25311",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "MilesBridges",
+              "tooltip": "MilesBridges#36838",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "是谢啊",
+              "tooltip": "是谢啊#20492",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 16,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 20,
+          "arena": true,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 118,
+          "columnGap": 5,
+          "names": [
+            {
+              "name": "不畏人知畏己",
+              "tooltip": "不畏人知畏己#59696",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "竹子还有吗",
+              "tooltip": "竹子还有吗#37849",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "Maarkuz",
+              "tooltip": "Maarkuz#47394",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我的锐雯爱吃假酒",
+              "tooltip": "我的锐雯爱吃假酒#65231",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "谢業川",
+              "tooltip": "谢業川#10991",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "群众的希望",
+              "tooltip": "群众的希望#24585",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "历劫成衣z",
+              "tooltip": "历劫成衣z#58876",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FAKER",
+              "tooltip": "FAKER#54656",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "懒大王丿",
+              "tooltip": "懒大王丿#52552",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "峡谷攻略",
+              "tooltip": "峡谷攻略#80881",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "至今未知无垢湖光",
+              "tooltip": "至今未知无垢湖光#62110",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 6,
+          "arena": false,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 116,
+          "columnGap": 14,
+          "names": [
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "梦短梦长俱是梦#11401",
+              "tooltip": "梦短梦长俱是梦#11401",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我听见风的颜色#26247",
+              "tooltip": "我听见风的颜色#26247",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "这一波我是总编剧#55673",
+              "tooltip": "这一波我是总编剧#55673",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "名字比以前更难取#13668",
+              "tooltip": "名字比以前更难取#13668",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "FLAGGED 54895549#28336",
+              "tooltip": "FLAGGED 54895549#28336",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "欧美风情#60098",
+              "tooltip": "欧美风情#60098",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "尼玛派过来的1#83655",
+              "tooltip": "尼玛派过来的1#83655",
+              "fontSize": "10.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        },
+        {
+          "length": 16,
+          "arena": true,
+          "playersWidth": 420,
+          "left": 2374.5,
+          "right": 2794.5,
+          "height": 118,
+          "columnGap": 5,
+          "names": [
+            {
+              "name": "葛上亭韵",
+              "tooltip": "葛上亭韵#23307",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "五人逮狗腿",
+              "tooltip": "五人逮狗腿#16499",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "胡永祥",
+              "tooltip": "胡永祥#00520",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "还有许多遗憾",
+              "tooltip": "还有许多遗憾#75899",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "Sky绝迹",
+              "tooltip": "Sky绝迹#30047",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "我的生命热忠于党",
+              "tooltip": "我的生命热忠于党#86112",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "一盏青灯魂渡我何",
+              "tooltip": "一盏青灯魂渡我何#46113",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "无敌江流儿",
+              "tooltip": "无敌江流儿#71113",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "BigRose丶Rengar",
+              "tooltip": "BigRose丶Rengar#25311",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "MilesBridges",
+              "tooltip": "MilesBridges#36838",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "是谢啊",
+              "tooltip": "是谢啊#20492",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            },
+            {
+              "name": "不畏人知畏己",
+              "tooltip": "不畏人知畏己#59696",
+              "fontSize": "9.5px",
+              "truncated": false,
+              "clippedByParent": false
+            }
+          ],
+          "overflow": false
+        }
+      ]
+    }
+  ],
+  "failures": [
+    {
+      "viewport": 1920,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "lengths",
+      "name": "reference-edges",
+      "message": "Expected values to be strictly equal:\n\n1374 !== 1424\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 1920,
+      "scenario": "mixed",
+      "name": "reference-edges",
+      "message": "Expected values to be strictly equal:\n\n1374 !== 1424\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 2560,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "lengths",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    },
+    {
+      "viewport": 3840,
+      "scenario": "mixed",
+      "name": "370-cap",
+      "message": "Expected values to be strictly equal:\n\n420 !== 370\n"
+    }
+  ]
+}

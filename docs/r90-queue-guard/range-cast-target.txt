@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T14:19:39.923889+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:19:40.163044+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations"}
+{"Time":"2026-09-14T14:19:40.163321+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations","Output":"=== RUN   TestR90QueueGuardCombinations\n"}
+{"Time":"2026-09-14T14:19:40.163375+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-cast-target"}
+{"Time":"2026-09-14T14:19:40.163394+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-cast-target","Output":"=== RUN   TestR90QueueGuardCombinations/range-cast-target\n"}
+{"Time":"2026-09-14T14:19:40.163821+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-cast-target","Output":"    r90_queue_guard_test.go:107: missed combined queue literal: range-cast-target\n"}
+{"Time":"2026-09-14T14:19:40.163862+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-cast-target","Output":"--- FAIL: TestR90QueueGuardCombinations/range-cast-target (0.00s)\n"}
+{"Time":"2026-09-14T14:19:40.163886+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations/range-cast-target","Elapsed":0}
+{"Time":"2026-09-14T14:19:40.163953+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations","Output":"--- FAIL: TestR90QueueGuardCombinations (0.00s)\n"}
+{"Time":"2026-09-14T14:19:40.163977+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardCombinations","Elapsed":0}
+{"Time":"2026-09-14T14:19:40.164011+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:19:40.164614+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.240s\n"}
+{"Time":"2026-09-14T14:19:40.164625+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.241}

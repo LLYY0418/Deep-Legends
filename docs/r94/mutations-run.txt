@@ -1,0 +1,11 @@
+ignore-gameid-invalidation KILLED
+phase-only-event-trigger KILLED
+omit-poll-gameid KILLED
+omit-forced-refresh KILLED
+accept-old-game-response KILLED
+accept-stale-poll KILLED
+omit-live-event-gameid KILLED
+drop-identical-diagnostics KILLED
+omit-identity-probe KILLED
+omit-sse-connection-wire KILLED
+omit-diagnostic-gameid KILLED

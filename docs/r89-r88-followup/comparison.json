@@ -1,0 +1,41 @@
+{
+  "measurements_identical": true,
+  "screenshots": [
+    {
+      "width": 1920,
+      "before_sha256": "3b9f847db341bd64da2cc5a2117b884f41a7ebf91631dd343eba60a5a668948b",
+      "after_sha256": "3b9f847db341bd64da2cc5a2117b884f41a7ebf91631dd343eba60a5a668948b",
+      "byte_identical": true
+    },
+    {
+      "width": 1280,
+      "before_sha256": "5066b576139d686c6c0bb859b0de2a88129e497255181b0bbc66cf7d6ef7271e",
+      "after_sha256": "5066b576139d686c6c0bb859b0de2a88129e497255181b0bbc66cf7d6ef7271e",
+      "byte_identical": true
+    },
+    {
+      "width": 820,
+      "before_sha256": "bfa90450dce09f621e271ac6c251e8a1cde02695b6cedb6521655eda5239c7de",
+      "after_sha256": "34547e19506b81c31fb69df9e4dbbf137fbc656a7856161dae3ad5800946d066",
+      "byte_identical": false,
+      "changed_pixels": 1,
+      "pixel_identical": false,
+      "image_size": {
+        "width": 664,
+        "height": 1044
+      },
+      "changed_pixel_bounds": {
+        "x": 206,
+        "y": 988,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "width": 620,
+      "before_sha256": "274f7c3e1eb2abc6e1b30f7c4363eb1bc2ba97f7248a87ecbaeb44c408a6ad0c",
+      "after_sha256": "274f7c3e1eb2abc6e1b30f7c4363eb1bc2ba97f7248a87ecbaeb44c408a6ad0c",
+      "byte_identical": true
+    }
+  ]
+}

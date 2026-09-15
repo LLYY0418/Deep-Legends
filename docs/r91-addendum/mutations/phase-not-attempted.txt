@@ -1,0 +1,5 @@
+--- FAIL: TestR91AddendumForcedShapeAndUnattemptedPhase (0.00s)
+    r91_addendum_test.go:219: []
+FAIL
+FAIL	lol-loot-assistant	0.008s
+FAIL

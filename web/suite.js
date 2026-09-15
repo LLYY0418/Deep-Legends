@@ -138,22 +138,39 @@
     }
   });
 
-  async function api(path, options = {}) {
-    let response;
-    try { response = await fetch(path, {
-      ...options,
-      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    }); } catch (error) { error.errorKind = error.name === "AbortError" ? "canceled" : "network"; throw error; }
-    const text = await response.text();
-    let payload = null;
-    try { payload = text ? JSON.parse(text) : {}; } catch (_) { payload = null; }
-    if (!response.ok) {
-      const error = new Error(payload?.message || text.trim() || `请求失败（${response.status}）`);
-      error.status = response.status;
-      error.errorKind = "http";
+  async function api(path, options = {}, timeout = 15000) {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (options.signal?.aborted) abort();
+    options.signal?.addEventListener("abort", abort, { once: true });
+    let timer;
+    try {
+      return await Promise.race([
+        (async () => {
+          const response = await fetch(path, { ...options, signal: controller.signal,
+            headers: { "Content-Type": "application/json", ...(options.headers || {}) } });
+          const text = await response.text();
+          let payload = null;
+          try { payload = text ? JSON.parse(text) : {}; } catch (_) {}
+          if (!response.ok) {
+            const error = new Error(payload?.message || text.trim() || `请求失败（${response.status}）`);
+            error.status = response.status; error.errorKind = response.status === 504 ? "timeout" : "http"; throw error;
+          }
+          return payload ?? {};
+        })(),
+        new Promise((_, reject) => { timer = setTimeout(() => {
+          const error = new Error("请求超时，可重新扫描后重试；本项失败不影响其它条目。");
+          error.name = "TimeoutError"; error.errorKind = "timeout";
+          reject(error); controller.abort();
+        }, timeout); }),
+      ]);
+    } catch (error) {
+      error.errorKind ||= error.name === "AbortError" ? "canceled" : "network";
       throw error;
+    } finally {
+      clearTimeout(timer);
+      options.signal?.removeEventListener("abort", abort);
     }
-    return payload ?? {};
   }
 
   function imageURL(path) {
@@ -237,7 +254,7 @@
   const watchDefinitions = [
     { key: "autoAccept", action: "accept", group: "排队与房间", title: "自动接受对局", phase: "确认对局 · ReadyCheck", phaseKey: "ReadyCheck", description: "匹配到对局时替你点“接受”。延时设为 0 会在毫秒内响应，建议留 1 - 2 秒更接近手动节奏。", control: "delay", min: 0, max: 10000, step: 100, countdownVerb: "接受" },
     { key: "autoReconnect", action: "reconnect", group: "英雄选择与游戏中", title: "断线自动重连", phase: "掉线 · Reconnect", phaseKey: "Reconnect", description: "检测到掉线状态时自动重连正在进行的对局。只尝试一次，失败后交还给你手动处理。", control: "delay", min: 3000, max: 30000, step: 500, countdownVerb: "重连" },
-    { key: "autoPlayAgain", action: "play-again", group: "结算", title: "快速下一把", phase: "结算 · EndOfGame", phaseKey: "EndOfGame", description: "结算后自动回到房间。若同时开启了自动点赞，会等点赞投票完成再返回。", control: "fixed-delay", displayDelayMs: 1575, countdownVerb: "返回" },
+    { key: "autoPlayAgain", action: "play-again", group: "结算", title: "快速下一把", phase: "对局结束后", phaseKey: "EndOfGame", description: "结算后自动回到房间。若同时开启了自动点赞，会等点赞投票完成再返回。", control: "fixed-delay", displayDelayMs: 1575, countdownVerb: "返回" },
     { key: "autoHonor", action: "auto-honor", group: "结算", title: "结算自动点赞", phase: "结算 · 出现点赞票", phaseKey: "EndOfGame", description: "把点赞票投给同一房间的队友。找不到队友时按下方策略处理，任何情况下都不会投给敌方。", control: "honor", countdownVerb: "点赞" },
     { key: "skipCelebration", action: "skip-celebration", group: "结算", title: "跳过任务庆祝", phase: "结算前 · PreEndOfGame", phaseKey: "EndOfGame", description: "结算前的任务庆祝动画会拖慢回到房间的速度，开启后自动跳过这一段。", countdownVerb: "跳过" },
     { key: "positionBroadcast", action: "position-broadcast", group: "英雄选择与游戏中", title: "阵营位置播报", phase: "英雄选择 · 大乱斗类模式", phaseKey: "ChampSelect", description: "在极地大乱斗、海克斯大乱斗里告诉你当前是蓝色方还是红色方。", control: "visibility", countdownVerb: "播报" },
@@ -315,8 +332,8 @@
       </section>
       ${settings.masterEnabled ? "" : '<div class="suite-note is-warning watch-paused-note"><span aria-hidden="true">!</span><span><strong>自动规则已暂停</strong><br>下方开关仍可预先配置；重新打开总开关后才会触发。</span></div>'}
       <div class="phase-track" aria-label="客户端相位">${phaseOrder.map((phase, index) => {
-        const current = phase === state.phase;
-        const currentIndex = phaseOrder.indexOf(state.phase);
+        const current = phase === suiteDisplayPhase(state.phase);
+        const currentIndex = phaseOrder.indexOf(suiteDisplayPhase(state.phase));
         return `<div class="phase-node${current ? " is-current" : ""}${currentIndex > index ? " is-complete" : ""}" data-watch-phase="${phase}"><i aria-hidden="true"></i><span>${phaseNames[phase]}</span></div>`;
       }).join("")}</div>
       ${state.watchPriority ? '<div class="suite-note is-warning watch-priority"><span aria-hidden="true">!</span><span><strong>点赞中 · 下一把已顺延</strong><br>点赞完成后才会执行快速下一把，两条规则不会互抢。</span></div>' : ""}
@@ -347,13 +364,13 @@
     rules ||= {};
     const customPaused = state.watch?.customPaused === true;
     const event = customPaused ? null : state.watchEvents.get(definition.action);
-    const current = !customPaused && (definition.phaseKey === state.phase || (definition.phaseKey === "Reconnect" && state.phase === "Reconnect"));
+    const current = !customPaused && (definition.phaseKey === suiteDisplayPhase(state.phase) || (definition.phaseKey === "Reconnect" && state.phase === "Reconnect"));
     const statusClass = `${rule.enabled ? " is-enabled" : ""}${masterEnabled ? "" : " is-paused"}${event?.kind === "failed" ? " is-failed" : current ? " is-current" : ""}`;
     const eventStatus = customPaused ? '<span>自定义对局已暂停</span>' : event?.kind === "armed" ? `<span>等待触发</span><span class="watch-countdown" data-watch-countdown="${definition.action}" data-watch-verb="${definition.countdownVerb || "触发"}"><b>准备触发</b></span>`
       : event?.kind === "failed" ? '<span class="suite-chip is-danger">上次触发失败</span>'
       : event?.kind === "fired" ? '<span>上次触发 · 刚刚</span>'
       : event?.kind === "canceled" ? '<span>已被更高优先级动作取消 · 准备下次触发</span>'
-      : '<span>未触发过</span>';
+      : current ? `<span>${rule.enabled ? '正在评估当前阶段' : '已到触发阶段 · 规则尚未开启'}</span>` : '<span>尚未到触发阶段</span>';
     const status = masterEnabled ? eventStatus : '<span class="suite-chip is-warning">总开关已关闭 · 已暂停</span>';
     const control = watchRuleControl(definition, rule);
     return `<article class="suite-card watch-rule${statusClass}" data-watch-card="${definition.action}"><div class="watch-rule-top"><div class="watch-rule-title"><h3>${definition.title}</h3><small>触发于 <b>${definition.phase}</b></small></div><label class="suite-switch watch-rule-toggle"><input type="checkbox" aria-label="启用${definition.title}" data-watch-toggle="${definition.key}"${checked(rule.enabled)}><span class="sr-only">启用</span></label></div><p>${definition.description}</p>${watchConflictNote(definition, rules)}${control ? `<div class="watch-control-row">${control}</div>` : ""}<div class="watch-rule-foot">${status}</div></article>`;
@@ -445,7 +462,7 @@
   }
 
   function watchDiagnostic(reason) {
-    window.reportFlowDiagnostic?.("watch_settings_client", reason, { revision: state.watchRevision || 0, pendingSaves: state.watchPendingSaves || 0, masterEnabled: state.watch?.masterEnabled === true, customPaused: state.watch?.customPaused === true, champSelectEnabled: state.watch?.champSelect?.enabled === true });
+    window.reportFlowDiagnostic?.("watch_settings_client", reason, { revision: state.watchRevision || 0, pendingSaves: state.watchPendingSaves || 0, masterEnabled: state.watch?.masterEnabled === true, customPaused: state.watch?.customPaused === true, champSelectEnabled: state.watch?.champSelect?.enabled === true, autoMatchmakingEnabled: state.watch?.rules?.autoMatchmaking?.enabled === true });
   }
 
   async function persistWatchSettings() {
@@ -524,6 +541,7 @@
   }
 
   function champSelectStatusCopy(status, side, active, pickIntent = false) {
+    if (status === "manual-takeover") return "玩家主动切换";
     if (active) return side === "ban" ? "即将禁用" : pickIntent ? "提前预选中" : "即将选用";
     return ({ available: side === "ban" ? "可禁用" : "可选", "verify-hover": "待亮出验证", "own-intent": "自己准备选用", "list-empty": "等待禁用列表", "teammate-picked": "队友已经选择", intent: "队友预选中", gone: "已被禁用或拿走", unavailable: side === "ban" ? "不在客户端可禁用列表" : "不在客户端可选列表" })[status] || "备用";
   }
@@ -544,12 +562,12 @@
       const brave = championID === -3;
       const status = brave ? "available" : states[String(championID)] || "";
       const active = championID === activeID;
-      const statusClass = ({ available: " st-ok", "verify-hover": " st-intent", "own-intent": " st-intent", "list-empty": " st-intent", "teammate-picked": " st-gone", intent: " st-intent", gone: " st-gone", unavailable: " st-gone" })[status] || "";
+      const statusClass = ({ available: " st-ok", "manual-takeover": " st-intent", "verify-hover": " st-intent", "own-intent": " st-intent", "list-empty": " st-intent", "teammate-picked": " st-gone", intent: " st-intent", gone: " st-gone", unavailable: " st-gone" })[status] || "";
       const name = brave ? "勇敢举动" : champion?.nameZh || champion?.nameEn || `英雄 ${championID}`;
       const artwork = brave ? '<span class="cs-avatar cs-brave-avatar" aria-hidden="true">⚔</span>' : champSelectChampionImage(champion);
-      parts.push(`<div class="cs-rail-slot${statusClass}${active ? " is-live" : ""}" data-cs-champion-id="${championID}" data-cs-rail-side="${side}" data-cs-rail-index="${index}" draggable="true" title="拖动到同序列的另一位英雄上交换位置"><span class="cs-slot-order">${index + 1}</span><button class="cs-slot-open" type="button" data-cs-open-dialog="${side}" aria-label="编辑${champSelectSideName(side)}序列">${artwork}<span class="cs-champion-name">${escapeHTML(name)}</span><span class="cs-champion-state">${escapeHTML(champSelectStatusCopy(status, side, active, runtime?.pickIntent))}</span></button><button class="cs-slot-remove" type="button" data-cs-remove="${side}" data-cs-remove-index="${index}" aria-label="移除${escapeHTML(name)}">×</button></div>`);
+      parts.push(`<div class="cs-rail-slot${statusClass}${active ? " is-live" : ""}" data-cs-champion-id="${championID}" data-cs-rail-side="${side}" data-cs-rail-index="${index}" draggable="true" title="拖动到同序列的另一位英雄上交换位置"><span class="cs-slot-order">${index + 1}</span><button class="cs-slot-open" type="button" data-cs-open-dialog="${side}" aria-label="编辑${champSelectSideName(side)}序列">${artwork}<span class="cs-champion-name">${escapeHTML(name)}</span><span class="cs-champion-state"${status === "manual-takeover" ? ' title="玩家主动切换，本轮已停止自动操作；下一局恢复"' : ""}>${escapeHTML(champSelectStatusCopy(status, side, active, runtime?.pickIntent))}</span></button><button class="cs-slot-remove" type="button" data-cs-remove="${side}" data-cs-remove-index="${index}" aria-label="移除${escapeHTML(name)}">×</button></div>`);
     }
-    parts.push(`<span class="cs-rail-tail">${side === "ban" ? "全部不可用时不发送请求，并在本局记录说明原因" : "你手动亮出别的英雄时，本局自动选用会立即让位"}</span>`);
+    parts.push(`<span class="cs-rail-tail">${side === "ban" ? "全部不可用时不发送请求，并在本局记录说明原因" : "你主动换成别的英雄后，本轮停止自动选用和换人，下一局恢复"}</span>`);
     return parts.join("");
   }
 
@@ -570,14 +588,17 @@
     const runtimeNoBan = isBan && definition.groupId === runtime?.groupId && runtime?.banCapabilityKnown && !runtime?.hasBanAction;
     const blocked = isBan && (!definition.hasBan || runtimeNoBan);
     const sideConfig = config?.[side] || {};
+    const lockWait = !isBan && (sideConfig.strategy || "show-then-lock") === "show-then-lock";
+    const delayKey = lockWait ? "lockDelayMs" : "delayMs";
+    const yielded = runtime.active && runtime.groupId === definition.groupId && Object.values(isBan ? runtime.banStates || {} : runtime.pickStates || {}).includes("manual-takeover");
     const limit = isBan ? definition.banLimit : definition.pickLimit;
     const pool = champSelectPoolFor(side, definition, config);
     const blockedCopy = !definition.hasBan ? "本模式无禁用环节" : runtimeNoBan ? "客户端会话未发现禁用环节" : "";
     return `<section class="suite-card cs-seq-card is-${side}${sideConfig.enabled ? "" : " is-off"}${blocked ? " is-blocked" : ""}">
       <header class="cs-seq-head"><div class="cs-seq-title"><span class="cs-seq-mark">${isBan ? "禁" : "选"}</span><div><h3>${champSelectSideName(side)}序列</h3><p>${blocked ? blockedCopy : isBan ? definition.positions?.length > 1 ? "所有位置共用 5 个禁用备选，按顺序尝试" : "正式禁用阶段按顺序尝试；自定义兼容时先验证亮出" : "预选阶段自动提前亮出；轮到自己时按策略亮出或锁定"}</p></div></div>
-      <div class="cs-seq-controls"><span class="cs-control-label">策略</span>${champSelectStrategyHTML(side, sideConfig.strategy || "show-then-lock", blocked)}<span class="cs-control-label">延时</span><div class="cs-stepper"><button type="button" data-cs-delay="${side}" data-cs-delay-delta="-500"${blocked ? " disabled" : ""}>−</button>${champSelectTimeInputHTML(side, sideConfig.delayMs, blocked)}<button type="button" data-cs-delay="${side}" data-cs-delay-delta="500"${blocked ? " disabled" : ""}>＋</button></div><label class="suite-switch"><input type="checkbox" aria-label="启用自动${champSelectSideName(side)}" data-cs-side-enabled="${side}"${checked(sideConfig.enabled && !blocked)}${blocked ? " disabled" : ""}><span class="sr-only">启用</span></label></div></header>
+      <div class="cs-seq-controls"><span class="cs-control-label">策略</span>${champSelectStrategyHTML(side, sideConfig.strategy || "show-then-lock", blocked)}<span class="cs-control-label">${lockWait ? "锁定等待" : "延时"}</span><div class="cs-stepper"><button type="button" data-cs-delay="${side}" data-cs-delay-key="${delayKey}" data-cs-delay-delta="-500"${blocked ? " disabled" : ""}>−</button>${champSelectTimeInputHTML(lockWait ? "lock" : side, sideConfig[delayKey] ?? (lockWait ? 10000 : 0), blocked)}<button type="button" data-cs-delay="${side}" data-cs-delay-key="${delayKey}" data-cs-delay-delta="500"${blocked ? " disabled" : ""}>＋</button></div><label class="suite-switch"><input type="checkbox" aria-label="启用自动${champSelectSideName(side)}" data-cs-side-enabled="${side}"${checked(sideConfig.enabled && !blocked)}${blocked ? " disabled" : ""}><span class="sr-only">启用</span></label></div></header>
       ${champSelectLaneTabsHTML(side, definition, config)}
-      <p class="cs-execution-state">${sideConfig.enabled && !blocked ? `自动${champSelectSideName(side)}已开启 · ${runtime.active && runtime.groupId === definition.groupId ? runtime.pickIntent ? isBan ? "等待正式禁用阶段" : "预选阶段，自动提前亮出序列英雄" : runtime.actionType === side ? "当前为自己的操作回合" : "等待自己的操作回合" : "等待英雄选择"}` : `自动${champSelectSideName(side)}未开启，配置的英雄不会自动提交`}</p>
+      <p class="cs-execution-state">${yielded ? `玩家主动切换，本轮已停止自动${isBan ? "禁用" : "选用和换人"}，下一局恢复` : sideConfig.enabled && !blocked ? `自动${champSelectSideName(side)}已开启 · ${runtime.active && runtime.groupId === definition.groupId ? runtime.pickIntent ? isBan ? "等待正式禁用阶段" : "预选阶段，自动提前亮出序列英雄" : runtime.actionType === side ? "当前为自己的操作回合" : "等待自己的操作回合" : "等待英雄选择"}` : `自动${champSelectSideName(side)}未开启，配置的英雄不会自动提交`}</p>
       <div class="cs-rail">${champSelectSlotsHTML(side, pool, limit, runtime, state.champSelectCatalog)}</div>
     </section>`;
   }
@@ -585,7 +606,7 @@
   function champSelectTimeInputHTML(kind, milliseconds, disabled = false) {
     const minimum = kind === "hold" ? 1 : 0;
     const seconds = Math.max(minimum, Math.min(10, Number(milliseconds ?? minimum * 1000) / 1000));
-    const label = kind === "hold" ? "备战席停留时间（秒）" : `${champSelectSideName(kind)}延时（秒）`;
+    const label = kind === "hold" ? "备战席停留时间（秒）" : kind === "lock" ? "亮出后锁定等待时间（秒）" : `${champSelectSideName(kind)}延时（秒）`;
     return `<label class="cs-time-field"><input class="cs-time-input" type="number" inputmode="decimal" min="${minimum}" max="10" step="any" value="${seconds}" aria-label="${label}" data-cs-time="${kind}"${disabled ? " disabled" : ""}><span class="cs-time-unit" aria-hidden="true">s</span></label>`;
   }
 
@@ -598,7 +619,7 @@
     return `<section class="suite-card cs-seq-card cs-bench-card">
       <header class="cs-seq-head"><div class="cs-seq-title"><span class="cs-seq-mark">换</span><div><h3>${applicable ? "备战席与交换" : "英雄交换"}</h3><p>${applicable ? liveUnavailable ? "当前会话没有备战席，配置将在支持时生效" : "自动争取序列内英雄，并按优先级处理队友交换" : "按选用序列处理队友英雄交换请求"}</p></div></div><span class="suite-chip">${applicable ? liveUnavailable ? "本局无备战席" : "可配置" : "支持英雄交换"}</span></header>
       <div class="cs-bench-grid">
-        ${applicable ? `<div class="cs-bench-row"><span><strong>自动从备战席换英雄</strong><small>目标累计停留达到阈值后发起交换；可输入秒数，范围 1–10 秒。</small></span><div class="cs-bench-control"><div class="cs-stepper"><button type="button" data-cs-hold-delta="-500" aria-label="备战席停留时间减少 0.5 秒">−</button>${champSelectTimeInputHTML("hold", bench.holdMs)}<button type="button" data-cs-hold-delta="500" aria-label="备战席停留时间增加 0.5 秒">＋</button></div><label class="suite-switch"><input type="checkbox" data-cs-bench-enabled${checked(bench.enabled)}><span class="sr-only">自动从备战席换英雄</span></label></div></div>` : ""}
+        ${applicable ? `<div class="cs-bench-row"><span><strong>自动从备战席换英雄</strong><small>目标停留达到阈值后交换（1–10 秒）；你主动换成别的英雄后，本轮停止自动换人。</small></span><div class="cs-bench-control"><div class="cs-stepper"><button type="button" data-cs-hold-delta="-500" aria-label="备战席停留时间减少 0.5 秒">−</button>${champSelectTimeInputHTML("hold", bench.holdMs)}<button type="button" data-cs-hold-delta="500" aria-label="备战席停留时间增加 0.5 秒">＋</button></div><label class="suite-switch"><input type="checkbox" data-cs-bench-enabled${checked(bench.enabled)}><span class="sr-only">自动从备战席换英雄</span></label></div></div>` : ""}
         <div class="cs-bench-row"><span><strong>优先选用序列靠前的英雄</strong><small>${applicable ? "备战席换取和队友交换均遵循此优先级；" : "启用自动处理换英雄请求后生效；"}手上已有序列英雄时，只换取排序更靠前的目标。</small></span><label class="suite-switch"><input type="checkbox" data-cs-bench-prefer${checked(bench.preferFirst)}><span class="sr-only">优先靠前英雄</span></label></div>
         <div class="cs-bench-row"><span><strong>自动处理换英雄请求</strong><small>适用于队友发起的英雄交换请求，与备战席无关；按选用序列判断接受或拒绝。默认关闭。</small></span><label class="suite-switch"><input type="checkbox" data-cs-bench-trade${checked(bench.handleTrade)}${tradeApplicable ? "" : " disabled"}><span class="sr-only">自动处理换英雄请求</span></label></div>
       </div></section>`;
@@ -631,7 +652,7 @@
   function renderChampSelectDialog() {
     const dialog = state.champSelectDialog;
     if (!dialog) return "";
-    const definition = champSelectSelectedDefinition();
+    const definition = state.champSelectGroups.find(group => group.groupId === dialog.group) || champSelectSelectedDefinition();
     const limit = dialog.side === "ban" ? definition.banLimit : definition.pickLimit;
     const selectedIDs = new Set(dialog.draft.map(Number));
     const rows = champSelectFilteredChampions(dialog, state.champSelectCatalog, state.champSelectPositionIDs);
@@ -649,6 +670,68 @@
     }).join("");
     const ghost = dialog.draft.length < limit ? `<div class="cs-chosen-ghost"><span>${dialog.draft.length + 1}</span><span>＋</span><span>还可再加 ${limit - dialog.draft.length} 个</span></div>` : "";
     return `<dialog class="cs-dialog" aria-labelledby="cs-dialog-title"><div class="cs-dialog-sheet"><header><div><h3 id="cs-dialog-title">编辑${champSelectSideName(dialog.side)}序列 · ${escapeHTML(definition.name)}${dialog.side === "pick" && definition.positions.length > 1 ? ` › ${champSelectLaneName(dialog.lane)}` : ""}</h3><p>点击左侧添加到末尾，拖动右侧手柄调整优先级</p></div><button class="icon-button control-icon-button" type="button" data-cs-dialog-close aria-label="关闭"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></header><div class="cs-dialog-body"><div class="cs-dialog-left"><label class="cs-search"><span aria-hidden="true">⌕</span><input type="search" value="${escapeHTML(dialog.query || "")}" placeholder="搜索中文、拼音、英文、缩写或外号" data-cs-dialog-search></label><div class="cs-filter-row">${[["all", "全部"], ["top", "上单"], ["jungle", "打野"], ["middle", "中单"], ["bottom", "下路"], ["utility", "辅助"]].map(([value, label]) => `<button class="suite-chip${state.champSelectPosition === value ? " is-gold" : ""}" type="button" data-cs-dialog-position="${value}">${label}</button>`).join("")}</div><div class="cs-champion-grid">${grid || '<p class="cs-dialog-empty">没有符合条件的英雄</p>'}</div></div><aside class="cs-dialog-right"><div class="cs-chosen-head"><strong>已选序列</strong><span>${dialog.draft.length} / ${limit}</span></div><div class="cs-chosen-list">${chosen}${ghost}</div><button class="text-button cs-dialog-clear" type="button" data-cs-dialog-clear>清空全部</button></aside></div><footer><span>${dialog.side === "ban" ? "灰显表示当前账号未拥有，仍可加入禁用序列" : "实际选用时会自动跳过不可用英雄"}</span><div><button class="button button-secondary" type="button" data-cs-dialog-close>取消</button><button class="button button-primary" type="button" data-cs-dialog-save>保存序列</button></div></footer></div></dialog>`;
+  }
+
+  function champSelectPanelRoot() {
+    let body = roots.champselect.querySelector(":scope > [data-cs-panel-body]");
+    if (!body) {
+      body = document.createElement("div");
+      body.dataset.csPanelBody = "";
+      body.style.display = "contents";
+      roots.champselect.replaceChildren(body);
+    }
+    return body;
+  }
+
+  function champSelectDialogDiagnostic(reason) {
+    const revision = state.champSelectDialogRevision = (state.champSelectDialogRevision || 0) + 1;
+    window.reportFlowDiagnostic?.("champselect_dialog_client", reason, { revision });
+  }
+
+  function syncChampSelectDialog() {
+    const existing = roots.champselect.querySelector(".cs-dialog");
+    const draft = state.champSelectDialog;
+    if (!draft || state.destroyed) {
+      if (existing) {
+        existing.close();
+        existing.remove();
+        champSelectDialogDiagnostic("close");
+      }
+      return;
+    }
+    if (existing) {
+      // Runtime events update the panel only. Preserve the open modal subtree.
+      champSelectDialogDiagnostic("rerender-while-open");
+      return;
+    }
+    roots.champselect.insertAdjacentHTML("beforeend", renderChampSelectDialog());
+    const dialogElement = roots.champselect.querySelector(".cs-dialog");
+    bindChampSelectDialog();
+    champSelectDialogDiagnostic("open");
+    requestAnimationFrame(() => {
+      if (!state.destroyed && state.champSelectDialog === draft && dialogElement.isConnected && !dialogElement.open) dialogElement.showModal();
+    });
+  }
+
+  function updateChampSelectDialog() {
+    const existing = roots.champselect.querySelector(".cs-dialog");
+    if (state.destroyed || !existing || !state.champSelectDialog) return;
+    const template = document.createElement("template");
+    template.innerHTML = renderChampSelectDialog();
+    // Only explicit edits/filter completions update these fragments. The native
+    // search input, selection, composition and modal scroll position stay mounted.
+    for (const selector of [".cs-champion-grid", ".cs-chosen-head", ".cs-chosen-list", ".cs-filter-row"]) {
+      const current = existing.querySelector(selector);
+      const next = template.content.querySelector(selector);
+      if (current.innerHTML !== next.innerHTML) current.innerHTML = next.innerHTML;
+    }
+  }
+
+  function closeChampSelectDialog() {
+    state.champSelectPositionController?.abort();
+    state.champSelectPositionController = null;
+    state.champSelectDialog = null;
+    syncChampSelectDialog();
   }
 
   function champSelectFilteredChampions(dialog, catalog, positionIDs) {
@@ -685,11 +768,11 @@
       input.addEventListener("change", async () => {
         if (!champSelectSettings()?.enabled || input.matches(":disabled")) return;
         const kind = input.dataset.csTime;
-        const config = kind === "hold" ? champSelectSelectedConfig().bench : champSelectSelectedConfig()[kind];
-        const key = kind === "hold" ? "holdMs" : "delayMs";
+        const config = kind === "hold" ? champSelectSelectedConfig().bench : champSelectSelectedConfig()[kind === "lock" ? "pick" : kind];
+        const key = kind === "hold" ? "holdMs" : kind === "lock" ? "lockDelayMs" : "delayMs";
         const seconds = Number(input.value);
         if (!input.value.trim() || !Number.isFinite(seconds)) {
-          input.value = String(config[key] / 1000);
+          input.value = String((config[key] ?? (kind === "lock" ? 10000 : 0)) / 1000);
           toast("请输入有效秒数");
           return;
         }
@@ -735,14 +818,14 @@
     const liveLabel = runtime.active ? runtime.unsupported ? "当前模式无对应分组，本局不接管" : `${(state.champSelectGroups.find((group) => group.groupId === runtime.groupId)?.name || runtime.groupId)}${runtime.position && runtime.position !== "default" ? ` · ${champSelectLaneName(runtime.position)}` : ""}` : "等待英雄选择";
     const capabilities = champSelectCapabilitiesHTML(definition, runtime) + `<label class="suite-switch cs-avoid-global" title="同时用于本组禁用、提前预选和选用。开启时避让队友预选；关闭时允许选择队友仅预选的英雄。队友已经选择的英雄始终跳过。"><span>避让队友预选</span><input type="checkbox" data-cs-avoid${checked(config.ban?.avoidTeammateIntent !== false || config.pick?.avoidTeammateIntent !== false)}${settings.enabled ? "" : " disabled"}></label>`;
     roots.champselect.className = settings.enabled ? "" : "cs-master-off";
-    roots.champselect.innerHTML = `<section class="suite-card cs-master"><div class="cs-master-id"><span class="cs-master-ring" aria-hidden="true">⌖</span><div><h2>征召托管</h2><p>仅在英雄选择阶段生效，逐条开启后才会向本机客户端写入</p></div><label class="suite-switch"><input type="checkbox" data-cs-master${checked(settings.enabled)}><span>总开关</span></label></div><div class="cs-master-right"><span class="cs-live-pill"><i></i>${escapeHTML(liveLabel)}</span><button class="button button-secondary" type="button" data-cs-pause${runtime.active && settings.enabled ? "" : " disabled"}>${runtime.sessionPaused ? "恢复本局" : "本局暂停"}</button></div></section>
-      <div class="cs-body"><nav class="cs-mode-list" aria-label="征召模式分组"><span class="cs-mode-title">模式分组</span>${state.champSelectGroups.map((group) => { const value = settings.groups?.[group.groupId] || {}; const banCount = champSelectConfiguredCount(value, "ban"); const pickCount = champSelectConfiguredCount(value, "pick"); return `<button class="cs-mode-item${definition.groupId === group.groupId ? " is-active" : ""}" type="button" data-cs-group="${group.groupId}"><span aria-hidden="true">${({ranked:"◈",normal:"◇",aram:"❄",arena:"⚔",event:"✧",practice:"▤"})[group.groupId] || "◇"}</span><span><strong>${escapeHTML(group.name)}</strong><small><i class="${banCount ? "on" : ""}">${group.hasBan ? `禁 ${banCount}` : "无禁用"}</i><i class="${pickCount ? "on" : ""}">选 ${pickCount}</i></small></span></button>`; }).join("")}</nav><div class="cs-stack"><div class="cs-capabilities"><h3>${escapeHTML(definition.name)}</h3>${capabilities}</div>${champSelectPoolHelpHTML(definition, runtime)}<fieldset class="cs-config-fields" data-cs-config-group="${definition.groupId}"${settings.enabled ? "" : " disabled"} aria-label="征召配置">${renderChampSelectSideCard("ban", definition, config, runtime)}${renderChampSelectSideCard("pick", definition, config, runtime)}${renderChampSelectBenchCard(definition, config, runtime)}</fieldset>${renderChampSelectTimeline(runtime)}${definition.groupId === "arena" ? '<div class="suite-note is-warning"><span aria-hidden="true">!</span><span><strong>斗魂禁用环节需真机确认</strong><br>若当前会话没有 ban action，禁用卡会自动置灰，后端也不会发送禁用请求。</span></div>' : ""}</div></div>${renderChampSelectDialog()}`;
+    champSelectPanelRoot().innerHTML = `<section class="suite-card cs-master"><div class="cs-master-id"><span class="cs-master-ring" aria-hidden="true">⌖</span><div><h2>征召托管</h2><p>仅在英雄选择阶段生效；总开关同步控制各模式的禁用与选用</p></div><label class="suite-switch"><input type="checkbox" data-cs-master${checked(settings.enabled)}><span>总开关</span></label></div><div class="cs-master-right"><span class="cs-live-pill"><i></i>${escapeHTML(liveLabel)}</span><button class="button button-secondary" type="button" data-cs-pause${runtime.active && settings.enabled ? "" : " disabled"}>${runtime.sessionPaused ? "恢复本局" : "本局暂停"}</button></div></section>
+      <div class="cs-body"><nav class="cs-mode-list" aria-label="征召模式分组"><span class="cs-mode-title">模式分组</span>${state.champSelectGroups.map((group) => { const value = settings.groups?.[group.groupId] || {}; const banCount = champSelectConfiguredCount(value, "ban"); const pickCount = champSelectConfiguredCount(value, "pick"); return `<button class="cs-mode-item${definition.groupId === group.groupId ? " is-active" : ""}" type="button" data-cs-group="${group.groupId}"><span aria-hidden="true">${({ranked:"◈",normal:"◇",aram:"❄",arena:"⚔",event:"✧",practice:"▤"})[group.groupId] || "◇"}</span><span><strong>${escapeHTML(group.name)}</strong><small><i class="${banCount ? "on" : ""}">${group.hasBan ? `禁 ${banCount}` : "无禁用"}</i><i class="${pickCount ? "on" : ""}">选 ${pickCount}</i></small></span></button>`; }).join("")}</nav><div class="cs-stack"><div class="cs-capabilities"><h3>${escapeHTML(definition.name)}</h3>${capabilities}</div>${champSelectPoolHelpHTML(definition, runtime)}<fieldset class="cs-config-fields" data-cs-config-group="${definition.groupId}"${settings.enabled ? "" : " disabled"} aria-label="征召配置">${renderChampSelectSideCard("ban", definition, config, runtime)}${renderChampSelectSideCard("pick", definition, config, runtime)}${renderChampSelectBenchCard(definition, config, runtime)}</fieldset>${renderChampSelectTimeline(runtime)}</div></div>`;
     bindChampSelectControls();
-    if (state.champSelectDialog) requestAnimationFrame(() => { const dialog = roots.champselect.querySelector(".cs-dialog"); if (dialog && !dialog.open) dialog.showModal(); });
+    syncChampSelectDialog();
   }
 
   async function loadChampSelect(force = false) {
-    if (!roots.champselect) return;
+    if (state.destroyed || !roots.champselect) return;
     if (!force && state.watch && state.champSelectGroups && state.champSelectCatalog && state.champSelectRuntime) {
       renderChampSelect();
       return;
@@ -754,13 +837,15 @@
       if (!state.champSelectCatalog || force) tasks.push(api("/api/champions/catalog").then((value) => { state.champSelectCatalog = value; }));
       tasks.push(api("/api/champselect/state").then((value) => { state.champSelectRuntime = value; }));
       await Promise.all(tasks);
-      if (state.champSelectRuntime?.active && !state.champSelectRuntime.unsupported && state.champSelectGroups.some((group) => group.groupId === state.champSelectRuntime.groupId)) {
+      if (state.destroyed) return;
+      if (!state.champSelectDialog && state.champSelectRuntime?.active && !state.champSelectRuntime.unsupported && state.champSelectGroups.some((group) => group.groupId === state.champSelectRuntime.groupId)) {
         state.champSelectGroup = state.champSelectRuntime.groupId;
         if (state.champSelectRuntime.position) state.champSelectLane = { ban: state.champSelectRuntime.position, pick: state.champSelectRuntime.position };
       }
       renderChampSelect();
     } catch (error) {
-      roots.champselect.innerHTML = errorCard("征召设置读取失败", error.message, "champselect");
+      if (state.destroyed) return;
+      champSelectPanelRoot().innerHTML = errorCard("征召设置读取失败", error.message, "champselect");
     }
   }
 
@@ -776,9 +861,16 @@
   }
 
   function bindChampSelectControls() {
-    const root = roots.champselect;
+    const root = champSelectPanelRoot();
     root.querySelector("[data-cs-master]")?.addEventListener("change", async (event) => {
-      champSelectSettings().enabled = event.target.checked;
+      const settings = champSelectSettings();
+      settings.enabled = event.target.checked;
+      for (const definition of state.champSelectGroups) {
+        const config = settings.groups[definition.groupId];
+        if (!config) continue;
+        config.ban.enabled = settings.enabled && Boolean(definition.hasBan);
+        config.pick.enabled = settings.enabled;
+      }
       renderChampSelect();
       await saveChampSelect();
     });
@@ -799,7 +891,8 @@
     });
     for (const button of root.querySelectorAll("[data-cs-delay]")) button.addEventListener("click", async () => {
       const config = champSelectSelectedConfig()[button.dataset.csDelay];
-      config.delayMs = Math.max(0, Math.min(10000, Number(config.delayMs || 0) + Number(button.dataset.csDelayDelta || 0)));
+      const key = button.dataset.csDelayKey === "lockDelayMs" ? "lockDelayMs" : "delayMs";
+      config[key] = Math.max(0, Math.min(10000, Number(config[key] ?? (key === "lockDelayMs" ? 10000 : 0)) + Number(button.dataset.csDelayDelta || 0)));
       await saveChampSelect();
     });
     for (const input of root.querySelectorAll("[data-cs-avoid]")) input.addEventListener("change", async () => {
@@ -835,7 +928,6 @@
         toast(state.champSelectRuntime.sessionPaused ? "本局征召托管已暂停" : "本局征召托管已恢复");
       } catch (error) { toast(error.message); }
     });
-    bindChampSelectDialog();
   }
 
   function bindChampSelectRailDrag(root) {
@@ -895,7 +987,7 @@
     state.champSelectPositionController?.abort();
     const definition = champSelectSelectedDefinition();
     const lane = champSelectPoolLane(side, definition);
-    state.champSelectDialog = { side, lane, draft: [...champSelectPoolFor(side)], query: "", dragIndex: -1 };
+    state.champSelectDialog = { side, lane, group: definition.groupId, draft: [...champSelectPoolFor(side)], query: "", dragIndex: -1 };
     state.champSelectPosition = "all";
     state.champSelectPositionIDs = null;
     renderChampSelect();
@@ -905,71 +997,73 @@
     const dialogElement = roots.champselect.querySelector(".cs-dialog");
     const dialog = state.champSelectDialog;
     if (!dialogElement || !dialog) return;
-    const close = () => { state.champSelectPositionController?.abort(); state.champSelectDialog = null; renderChampSelect(); };
-    dialogElement.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
-    dialogElement.addEventListener("click", (event) => { if (event.target === dialogElement) close(); });
-    for (const button of dialogElement.querySelectorAll("[data-cs-dialog-close]")) button.addEventListener("click", close);
+    dialogElement.addEventListener("cancel", (event) => { event.preventDefault(); closeChampSelectDialog(); });
     dialogElement.querySelector("[data-cs-dialog-search]")?.addEventListener("input", (event) => {
       dialog.query = event.target.value;
-      const cursor = event.target.selectionStart;
-      renderChampSelect();
-      requestAnimationFrame(() => {
-        const input = roots.champselect.querySelector("[data-cs-dialog-search]");
-        input?.focus();
-        input?.setSelectionRange(cursor, cursor);
-      });
+      updateChampSelectDialog();
     });
-    for (const button of dialogElement.querySelectorAll("[data-cs-dialog-position]")) button.addEventListener("click", async () => {
-      await loadChampSelectPositionFilter(button.dataset.csDialogPosition);
+    dialogElement.addEventListener("click", async (event) => {
+      if (event.target === dialogElement) { closeChampSelectDialog(); return; }
+      const button = event.target.closest("button");
+      if (!button || button.disabled) return;
+      const data = button.dataset;
+      if ("csDialogClose" in data) { closeChampSelectDialog(); return; }
+      if ("csDialogPosition" in data) { await loadChampSelectPositionFilter(data.csDialogPosition); return; }
+      if ("csDialogSave" in data) {
+        const config = champSelectSettings().groups?.[dialog.group]?.[dialog.side];
+        if (!config) { toast("当前模式配置已变化，请重新打开编辑序列"); return; }
+        config.champions[dialog.lane] = [...dialog.draft];
+        closeChampSelectDialog();
+        await saveChampSelect("英雄序列已保存");
+        return;
+      }
+      if ("csDialogAdd" in data) {
+        const id = Number(data.csDialogAdd);
+        const definition = state.champSelectGroups.find(group => group.groupId === dialog.group);
+        const limit = dialog.side === "ban" ? definition.banLimit : definition.pickLimit;
+        if (!dialog.draft.includes(id) && dialog.draft.length < limit) dialog.draft.push(id);
+      } else if ("csDialogRemove" in data) {
+        dialog.draft.splice(Number(data.csDialogRemove), 1);
+      } else if ("csDialogClear" in data) {
+        dialog.draft = [];
+      } else return;
+      updateChampSelectDialog();
     });
-    for (const button of dialogElement.querySelectorAll("[data-cs-dialog-add]")) button.addEventListener("click", () => {
-      const id = Number(button.dataset.csDialogAdd);
-      const definition = champSelectSelectedDefinition();
-      const limit = dialog.side === "ban" ? definition.banLimit : definition.pickLimit;
-      if (!dialog.draft.includes(id) && dialog.draft.length < limit) dialog.draft.push(id);
-      renderChampSelect();
+    dialogElement.addEventListener("dragstart", (event) => {
+      const row = event.target.closest("[data-cs-drag-index]");
+      if (!row) return;
+      dialog.dragIndex = Number(row.dataset.csDragIndex);
+      event.dataTransfer?.setData("text/plain", row.dataset.csDragIndex);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
     });
-    for (const button of dialogElement.querySelectorAll("[data-cs-dialog-remove]")) button.addEventListener("click", () => {
-      dialog.draft.splice(Number(button.dataset.csDialogRemove), 1);
-      renderChampSelect();
+    dialogElement.addEventListener("dragover", (event) => {
+      if (!event.target.closest("[data-cs-drag-index]")) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
     });
-    dialogElement.querySelector("[data-cs-dialog-clear]")?.addEventListener("click", () => { dialog.draft = []; renderChampSelect(); });
-    dialogElement.querySelector("[data-cs-dialog-save]")?.addEventListener("click", async () => {
-      const config = champSelectSelectedConfig()[dialog.side];
-      config.champions[dialog.lane] = [...dialog.draft];
-      state.champSelectPositionController?.abort();
-      state.champSelectDialog = null;
-      await saveChampSelect("英雄序列已保存");
+    dialogElement.addEventListener("drop", (event) => {
+      const row = event.target.closest("[data-cs-drag-index]");
+      if (!row) return;
+      event.preventDefault();
+      const from = Number(event.dataTransfer?.getData("text/plain") || dialog.dragIndex);
+      const to = Number(row.dataset.csDragIndex);
+      if (!Number.isInteger(from) || !Number.isInteger(to) || from === to || from < 0 || from >= dialog.draft.length) return;
+      const [value] = dialog.draft.splice(from, 1);
+      dialog.draft.splice(to, 0, value);
+      dialog.dragIndex = -1;
+      updateChampSelectDialog();
     });
-    for (const row of dialogElement.querySelectorAll("[data-cs-drag-index]")) {
-      row.addEventListener("dragstart", (event) => {
-        dialog.dragIndex = Number(row.dataset.csDragIndex);
-        event.dataTransfer?.setData("text/plain", row.dataset.csDragIndex);
-        if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
-      });
-      row.addEventListener("dragover", (event) => { event.preventDefault(); if (event.dataTransfer) event.dataTransfer.dropEffect = "move"; });
-      row.addEventListener("drop", (event) => {
-        event.preventDefault();
-        const from = Number(event.dataTransfer?.getData("text/plain") || dialog.dragIndex);
-        const to = Number(row.dataset.csDragIndex);
-        if (!Number.isInteger(from) || !Number.isInteger(to) || from === to || from < 0 || from >= dialog.draft.length) return;
-        const [value] = dialog.draft.splice(from, 1);
-        dialog.draft.splice(to, 0, value);
-        dialog.dragIndex = -1;
-        renderChampSelect();
-      });
-    }
   }
 
   async function loadChampSelectPositionFilter(position) {
     const dialog = state.champSelectDialog;
-    if (!dialog) return;
+    if (state.destroyed || !dialog) return;
     // Keep LCU pool names in the UI; rankings has a different API vocabulary.
     const apiPosition = { all: "all", top: "top", jungle: "jungle", middle: "mid", bottom: "adc", utility: "support" }[position];
     if (!apiPosition) return;
     const requestId = state.champSelectPositionRequest = (state.champSelectPositionRequest || 0) + 1;
     state.champSelectPositionController?.abort();
-    const current = () => state.champSelectDialog === dialog && state.champSelectPositionRequest === requestId;
+    const current = () => !state.destroyed && state.champSelectDialog === dialog && state.champSelectPositionRequest === requestId;
     const started = Date.now();
     const report = (reason, fields = {}) => {
       if (typeof window !== "undefined") window.reportFlowDiagnostic?.("champ_select_filter_client", reason, { requestId, requestedPosition: position, resolvedPosition: apiPosition, durationMs: Date.now() - started, ...fields });
@@ -978,13 +1072,13 @@
     if (position === "all") {
       state.champSelectPositionIDs = null;
       report("all");
-      renderChampSelect();
+      updateChampSelectDialog();
       return;
     }
     if (state.champSelectPositionCache.has(position)) {
       state.champSelectPositionIDs = state.champSelectPositionCache.get(position);
       report("cached", { itemCount: state.champSelectPositionIDs.size });
-      renderChampSelect();
+      updateChampSelectDialog();
       return;
     }
     const controller = new AbortController();
@@ -1014,7 +1108,7 @@
       clearTimeout(timer);
       if (state.champSelectPositionController === controller) state.champSelectPositionController = null;
     }
-    renderChampSelect();
+    updateChampSelectDialog();
   }
 
   function handleWatchEvent(value) {
@@ -1039,6 +1133,16 @@
     }
     const kind = parts[1];
     const action = parts[2];
+    if (kind === "skipped" && action === "auto-matchmaking") {
+      const reason = parts[3];
+      const message = { "not-leader": "你不是房主，自动开始匹配已跳过", custom: "当前为自定义房间，自动开始匹配已跳过" }[reason];
+      if (!message) return;
+      const previous = state.watchEvents.get(action);
+      if (previous?.reason !== reason || Date.now() - previous.start >= 30000) toast(message);
+      state.watchEvents.set(action, { kind: "canceled", reason, start: Date.now(), message });
+      renderWatch();
+      return;
+    }
     if (!action || !["armed", "fired", "failed", "canceled"].includes(kind)) return;
     if (kind === "failed" && action.startsWith("facade-")) {
       toast(action === "facade-rank" ? "登录时重设展示段位失败" : "登录时重设个性签名失败");
@@ -1156,7 +1260,7 @@
     state.facadeDraft = {
       hero: String(firstSkin.championId || (Number(value.profile?.backgroundSkinId) > 0 ? Math.floor(Number(value.profile.backgroundSkinId) / 1000) : "")), skinId: Number(firstSkin.id || value.profile?.backgroundSkinId || 0), ownedOnly: false,
       availability: chat.availability || "chat", statusMessage: chat.statusMessage || "",
-      queue: lol.rankedLeagueQueue || "RANKED_SOLO_5X5", tier: lol.rankedLeagueTier || "DIAMOND", division: lol.rankedLeagueDivision || "II",
+      queue: lol.rankedLeagueQueue || "RANKED_SOLO_5X5", tier: lol.rankedLeagueTier || "UNRANKED", division: lol.rankedLeagueDivision || "I",
       resetStatus: Boolean(value.loginReset?.statusMessageEnabled), resetRank: Boolean(value.loginReset?.rankEnabled),
     };
   }
@@ -1263,8 +1367,8 @@
     return String(chat.availability || "chat") !== String(draft.availability || "chat")
       || String(chat.statusMessage || "") !== String(draft.statusMessage || "")
       || String(lol.rankedLeagueQueue || "RANKED_SOLO_5X5") !== String(draft.queue || "")
-      || String(lol.rankedLeagueTier || "DIAMOND") !== String(draft.tier || "")
-      || (!["MASTER", "GRANDMASTER", "CHALLENGER", "UNRANKED"].includes(draft.tier) && String(lol.rankedLeagueDivision || "II") !== String(draft.division || ""));
+      || String(lol.rankedLeagueTier || "UNRANKED") !== String(draft.tier || "")
+      || (!["MASTER", "GRANDMASTER", "CHALLENGER", "UNRANKED"].includes(draft.tier) && String(lol.rankedLeagueDivision || "I") !== String(draft.division || ""));
   }
 
   function facadeResetDirty() {
@@ -1304,10 +1408,11 @@
     return values.map(([value, label]) => `<option value="${value}"${selected(current, value)}>${label}</option>`).join("");
   }
 
-  function rankLabel(draft) {
-    const tier = { UNRANKED: "未定级", IRON: "黑铁", BRONZE: "黄铜", SILVER: "白银", GOLD: "黄金", PLATINUM: "铂金", EMERALD: "翡翠", DIAMOND: "钻石", MASTER: "大师", GRANDMASTER: "宗师", CHALLENGER: "王者" }[draft.tier] || draft.tier;
+  function rankLabel(draft = {}) {
+    const tierKey = draft.tier || "UNRANKED";
+    const tier = { UNRANKED: "未定级", IRON: "黑铁", BRONZE: "黄铜", SILVER: "白银", GOLD: "黄金", PLATINUM: "铂金", EMERALD: "翡翠", DIAMOND: "钻石", MASTER: "大师", GRANDMASTER: "宗师", CHALLENGER: "王者" }[tierKey] || tierKey;
     const queue = draft.queue === "RANKED_FLEX_SR" ? "灵活组排" : "单双排";
-    return `${tier}${["MASTER","GRANDMASTER","CHALLENGER","UNRANKED"].includes(draft.tier) ? "" : ` ${draft.division}`} · ${queue}`;
+    return `${tier}${["MASTER","GRANDMASTER","CHALLENGER","UNRANKED"].includes(tierKey) || !draft.division ? "" : ` ${draft.division}`} · ${queue}`;
   }
 
   function facadeAvailabilityLabel(value) {
@@ -1757,12 +1862,22 @@
     roots.sweep.querySelector("[data-claim-run]")?.addEventListener("click", executeClaims);
   }
 
+  function recordClaimProgress(reason, started) {
+    void fetch("/api/diagnostics/client", {method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({event:"claim_progress_client", reason, claiming: state.claiming,
+        done: state.claimProgress?.done || 0, total: state.claimProgress?.total || 0, durationMs: Date.now() - started})}).catch(() => {});
+  }
+
   async function executeClaims() {
     const queue = [...state.selectedClaims];
     if (!queue.length || state.claiming) return;
     state.claiming = true;
     state.claimProgress = { done: 0, total: queue.length, failed: 0 };
     renderClaims();
+    const started = Date.now();
+    recordClaimProgress("begin", started);
+    const watchdog = setInterval(() => recordClaimProgress("heartbeat", started), 5000);
+    try {
     for (const key of queue) {
       const selections = [...(state.claimChoices.get(key) || [])];
       try {
@@ -1777,14 +1892,20 @@
         }
         if (response.scan) state.claims = response.scan;
       } catch (error) {
+        if (error.errorKind === "timeout") recordClaimProgress("item-timeout", started);
         state.claimFailures.set(key, { message: error.message, consequence: "本项失败不会中断其它条目。" });
         state.claimProgress.failed += 1;
       }
       state.claimProgress.done += 1;
       renderClaims();
     }
-    state.claiming = false;
-    renderClaims();
+    } finally {
+      clearInterval(watchdog);
+      state.claiming = false;
+      recordClaimProgress("end", started);
+      renderClaims();
+    }
+    void loadClaims(true);
     toast(`领取完成：成功 ${state.claimProgress.total - state.claimProgress.failed} 项，失败 ${state.claimProgress.failed} 项`);
   }
 
@@ -1796,6 +1917,10 @@
       for (const key of [...state.selectedClaims]) if (!state.claims.items?.some((item) => item.key === key)) state.selectedClaims.delete(key);
       renderClaims();
     } catch (error) { roots.sweep.innerHTML = errorCard("未领取奖励扫描失败", error.message, "sweep"); }
+  }
+
+  function suiteDisplayPhase(phase) {
+    return ["WaitingForStats", "PreEndOfGame", "EndOfGame"].includes(phase) ? "EndOfGame" : phase;
   }
 
   function relativeTime(value) {
@@ -1879,6 +2004,7 @@
 
   function disposeSuite() {
     state.destroyed = true;
+    closeChampSelectDialog();
     state.facadeRequestToken = Number(state.facadeRequestToken || 0) + 1;
     state.facadeController?.abort();
     clearTimeout(state.facadeRefreshTimer);

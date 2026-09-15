@@ -1,0 +1,16 @@
+{
+  "url": "https://c-lol-web.op.gg/app-router/releases/production-263-1-560a16e7/_next/static/chunks/app/%5Blocale%5D/lol/modes/%5Bmode%5D/page-29612b83c9af6602.js",
+  "requested_at_utc": "2026-09-14T08:14:07.138427+00:00",
+  "status": 200,
+  "content_type": "text/javascript",
+  "bytes": 210,
+  "sha256": "7405859f7fc2f803726fbc4b2e8741b0413d08eea2d4d9b169f5516e83de240b",
+  "literal_routes": [],
+  "literal_terms": {
+    "summoner": 0,
+    "leaderboard": 0,
+    "top_players": 0,
+    "champion": 0,
+    "synerg": 0
+  }
+}

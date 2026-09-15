@@ -1,0 +1,10 @@
+--- FAIL: TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries (0.02s)
+    --- FAIL: TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries/1 (0.01s)
+        r90_test.go:149: partial roster not grouped: false 
+    --- FAIL: TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries/7 (0.01s)
+        r90_test.go:149: partial roster not grouped: false 
+    --- FAIL: TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries/17 (0.01s)
+        r90_test.go:149: partial roster not grouped: false 
+FAIL
+FAIL	lol-loot-assistant	0.387s
+FAIL

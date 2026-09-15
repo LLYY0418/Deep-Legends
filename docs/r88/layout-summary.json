@@ -1,0 +1,151 @@
+{
+  "activeProtectedRules": 13,
+  "diffBytes": 0,
+  "layouts": [
+    {
+      "viewport": 1920,
+      "scenario": "lengths",
+      "cards": 8,
+      "widths": [
+        370
+      ],
+      "edges": [
+        [
+          1424,
+          1794
+        ]
+      ],
+      "normalGaps": [
+        14
+      ],
+      "normalHeights": [
+        116
+      ],
+      "arenaHeights": [],
+      "uniqueArenaNames": 0,
+      "arenaTruncated": 0
+    },
+    {
+      "viewport": 1920,
+      "scenario": "mixed",
+      "cards": 8,
+      "widths": [
+        370
+      ],
+      "edges": [
+        [
+          1424,
+          1794
+        ]
+      ],
+      "normalGaps": [
+        14
+      ],
+      "normalHeights": [
+        116
+      ],
+      "arenaHeights": [
+        118
+      ],
+      "uniqueArenaNames": 23,
+      "arenaTruncated": 0
+    },
+    {
+      "viewport": 2560,
+      "scenario": "lengths",
+      "cards": 8,
+      "widths": [
+        370
+      ],
+      "edges": [
+        [
+          1784.5,
+          2154.5
+        ]
+      ],
+      "normalGaps": [
+        14
+      ],
+      "normalHeights": [
+        116
+      ],
+      "arenaHeights": [],
+      "uniqueArenaNames": 0,
+      "arenaTruncated": 0
+    },
+    {
+      "viewport": 2560,
+      "scenario": "mixed",
+      "cards": 8,
+      "widths": [
+        370
+      ],
+      "edges": [
+        [
+          1784.5,
+          2154.5
+        ]
+      ],
+      "normalGaps": [
+        14
+      ],
+      "normalHeights": [
+        116
+      ],
+      "arenaHeights": [
+        118
+      ],
+      "uniqueArenaNames": 23,
+      "arenaTruncated": 0
+    },
+    {
+      "viewport": 3840,
+      "scenario": "lengths",
+      "cards": 8,
+      "widths": [
+        370
+      ],
+      "edges": [
+        [
+          2424.5,
+          2794.5
+        ]
+      ],
+      "normalGaps": [
+        14
+      ],
+      "normalHeights": [
+        116
+      ],
+      "arenaHeights": [],
+      "uniqueArenaNames": 0,
+      "arenaTruncated": 0
+    },
+    {
+      "viewport": 3840,
+      "scenario": "mixed",
+      "cards": 8,
+      "widths": [
+        370
+      ],
+      "edges": [
+        [
+          2424.5,
+          2794.5
+        ]
+      ],
+      "normalGaps": [
+        14
+      ],
+      "normalHeights": [
+        116
+      ],
+      "arenaHeights": [
+        118
+      ],
+      "uniqueArenaNames": 23,
+      "arenaTruncated": 0
+    }
+  ],
+  "failures": []
+}

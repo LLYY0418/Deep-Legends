@@ -1,0 +1,30 @@
+{
+  "commands": [
+    {
+      "command": "go test -count=1 -run 'TestR87ArenaLiteralBoundary|TestR88QueueGuard|TestR89QueueGuard|TestR90QueueGuard|TestR90BQueueGuard' .",
+      "exit": 0,
+      "log": "repository-scan-fixed.txt"
+    },
+    {
+      "command": "python3 scripts/r90b-queue-guard-mutations.py",
+      "exit": 0,
+      "log": "mutation-run.txt"
+    },
+    {
+      "command": "go vet ./...",
+      "exit": 0,
+      "log": "vet.txt"
+    }
+  ],
+  "go_environment": {
+    "GOCACHE": "$PWD/.gocache",
+    "GOPATH": "$PWD/.gopath"
+  },
+  "sha256": {
+    "r88_queue_guard_test.go": "3e54ef7bfa7a7d2eae4bcd829f9bc971aeda4149f79c0e016cec1c3a33712fa3",
+    "r90b_queue_guard_test.go": "0290d0fad75a7ff69c11d84cc15814099527207115c132f91f9c896171e5213f",
+    "scripts/r90b-queue-guard-mutations.py": "433ac213e6f0b949eee5b52723cb2ef70c27e368e34035f073732908d0f668f4",
+    "scripts/r90-queue-guard-mutations.py": "47a6038bd0d69bf7b9086f5ad3f6bb81d9ab5aab6732037831ee9bffb26aac07",
+    "WORKLIST-R90B-QUEUE-GUARD-GAPS.md": "fe1bebf7d65a13afa29d06a4274d308d8d6791175afe22852d384d9cabfc459c"
+  }
+}

@@ -1,0 +1,34 @@
+TAP version 13
+# Subtest: R91 addendum Loading and early incomplete arena poll every five seconds then converge
+not ok 1 - R91 addendum Loading and early incomplete arena poll every five seconds then converge
+  ---
+  duration_ms: 1.967208
+  type: 'test'
+  location: '/sessions/youthful-determined-volta/mnt/deep-legends/web/r91-addendum.test.cjs:100:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    20000 !== 5000
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 5000
+  actual: 20000
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/sessions/youthful-determined-volta/mnt/deep-legends/web/r91-addendum.test.cjs:105:56)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2149.237418

@@ -1,0 +1,177 @@
+[
+  {
+    "id": "A1-image-policy",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "A3-persistence",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "A4-singleflight",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "A5-disk-budget",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "A-negative-cache",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "A-warm-final-resources",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "A-warm-preemption",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "B2-raw-identity",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "B3-ref-priority",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "C1-personal-guard",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "C1-actual-concurrency",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "C2-match-disk",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "C2-identity-disk",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "C3-short-limit",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "C3-long-limit",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "D1-source",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "D1-six-sections",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "D2-host-allowlist",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "E1-details-phase",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "E2-asset-disk-event",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "E3-queue-duration",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "E4-catalog-disk-event",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "E4-participant-items",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "B1-parallel",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "B3-dedup",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "C-first-five",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "A-catalog-retry",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "D-recent20",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "D3-empty-card",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "E4-client-failure",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "E4-missing-id",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "E4-retained-dom",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "C-completion-retry",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "D-overlay-late",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "D-overlay-close",
+    "killed": true,
+    "exit": 1
+  }
+]

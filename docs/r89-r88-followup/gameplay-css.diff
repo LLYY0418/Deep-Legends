@@ -1,0 +1,13 @@
+--- before/web/gameplay.css
++++ after/web/gameplay.css
+@@ -844,10 +844,6 @@
+ 	.arena-match-detail { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-gutter: stable; }
+ 	.arena-detail-columns, .arena-detail-team { min-width: 860px; }
+ }
+-@container arena-first (max-width: 640px) {
+-	.arena-match-detail { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-gutter: stable; }
+-	.arena-detail-columns, .arena-detail-team { min-width: 860px; }
+-}
+ .team-overview { overflow: hidden; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 10px; }
+ .team-overview.is-blue > header strong { color: var(--accent); }
+ .team-overview.is-red > header strong { color: var(--danger); }

@@ -1,0 +1,1037 @@
+{
+  "records": [
+    {
+      "source": "search",
+      "requests": [
+        {
+          "url": "/api/gameplay/season-summary",
+          "at": 243.79999995231628
+        },
+        {
+          "url": "/api/gameplay/current-game",
+          "at": 244.70000004768372
+        },
+        {
+          "url": "/api/gameplay/overview",
+          "at": 244.79999995231628,
+          "completed": 1447.7000000476837,
+          "count": 5
+        },
+        {
+          "url": "/api/gameplay/overview",
+          "at": 1457.5,
+          "completed": 2667.7999999523163,
+          "count": 20
+        }
+      ]
+    },
+    {
+      "source": "pro-players",
+      "requests": [
+        {
+          "url": "/api/gameplay/season-summary",
+          "at": 2758.5
+        },
+        {
+          "url": "/api/gameplay/current-game",
+          "at": 2758.7000000476837
+        },
+        {
+          "url": "/api/gameplay/overview",
+          "at": 2758.7999999523163,
+          "completed": 3963.5,
+          "count": 5
+        },
+        {
+          "url": "/api/gameplay/overview",
+          "at": 3979.100000023842,
+          "completed": 5191.5,
+          "count": 20
+        }
+      ]
+    },
+    {
+      "source": "champions",
+      "requests": [
+        {
+          "url": "/api/gameplay/season-summary",
+          "at": 5285.600000023842
+        },
+        {
+          "url": "/api/gameplay/current-game",
+          "at": 5285.799999952316
+        },
+        {
+          "url": "/api/gameplay/overview",
+          "at": 5285.799999952316,
+          "completed": 6488.100000023842,
+          "count": 5
+        },
+        {
+          "url": "/api/gameplay/overview",
+          "at": 6502,
+          "completed": 7713.799999952316,
+          "count": 20
+        }
+      ]
+    }
+  ],
+  "evidence": {
+    "diagnostics": [
+      {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 35,
+        "httpStatus": 200,
+        "endpoint": "status",
+        "startedAt": 1789370482272,
+        "completedAt": 1789370482307,
+        "errorKind": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "request",
+        "forceRefresh": false,
+        "traceId": "cg-1789370482400-1",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 2,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "received",
+        "durationMs": 102,
+        "playersReceived": 0,
+        "teamsReceived": 0,
+        "forceRefresh": false,
+        "source": "OP.GG",
+        "traceId": "cg-1789370482400-1",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 4,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "render-no-root",
+        "forceRefresh": false,
+        "traceId": "cg-1789370482400-1",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 4,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "rendered",
+        "rendered100": 0,
+        "rendered200": 0,
+        "forceRefresh": false,
+        "hidden": true,
+        "source": "OP.GG",
+        "traceId": "cg-1789370482400-1",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 6,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "cached",
+        "cacheAgeMs": 1111,
+        "forceRefresh": false,
+        "traceId": "cg-1789370482400-1",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 6,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "cached",
+        "cacheAgeMs": 1112,
+        "forceRefresh": false,
+        "traceId": "cg-1789370482400-1",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 6,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "catalog_client",
+        "reason": "loaded",
+        "key": "",
+        "traceId": "",
+        "championId": 0,
+        "queueId": 0,
+        "mapId": 0,
+        "gameId": 0,
+        "position": "",
+        "requestedPosition": "",
+        "resolvedPosition": "",
+        "positionSource": "",
+        "gameMode": "",
+        "tier": "",
+        "blockCount": 0,
+        "itemCount": 1,
+        "endpoint": "items",
+        "itemId": 0,
+        "httpStatus": 200,
+        "errorKind": "none"
+      },
+      {
+        "event": "item_id_not_in_catalog",
+        "reason": "missing",
+        "key": "",
+        "traceId": "",
+        "championId": 0,
+        "queueId": 0,
+        "mapId": 0,
+        "gameId": 0,
+        "position": "",
+        "requestedPosition": "",
+        "resolvedPosition": "",
+        "positionSource": "",
+        "gameMode": "",
+        "tier": "",
+        "blockCount": 0,
+        "itemCount": 1,
+        "endpoint": "items",
+        "itemId": 99999,
+        "httpStatus": 0,
+        "errorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "cached",
+        "cacheAgeMs": 1119,
+        "forceRefresh": false,
+        "traceId": "cg-1789370482400-1",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 8,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "cached",
+        "cacheAgeMs": 2353,
+        "forceRefresh": false,
+        "traceId": "cg-1789370482400-1",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 9,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "cached",
+        "cacheAgeMs": 2399,
+        "forceRefresh": false,
+        "traceId": "cg-1789370482400-1",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 11,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "request",
+        "forceRefresh": false,
+        "traceId": "cg-1789370484915-2",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 11,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "received",
+        "durationMs": 102,
+        "playersReceived": 0,
+        "teamsReceived": 0,
+        "forceRefresh": false,
+        "source": "OP.GG",
+        "traceId": "cg-1789370484915-2",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 11,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "render-no-root",
+        "forceRefresh": false,
+        "traceId": "cg-1789370484915-2",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 11,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "rendered",
+        "rendered100": 0,
+        "rendered200": 0,
+        "forceRefresh": false,
+        "hidden": true,
+        "source": "OP.GG",
+        "traceId": "cg-1789370484915-2",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 13,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "cached",
+        "cacheAgeMs": 1118,
+        "forceRefresh": false,
+        "traceId": "cg-1789370484915-2",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 13,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "cached",
+        "cacheAgeMs": 2367,
+        "forceRefresh": false,
+        "traceId": "cg-1789370484915-2",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 16,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "cached",
+        "cacheAgeMs": 2368,
+        "forceRefresh": false,
+        "traceId": "cg-1789370484915-2",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 16,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "request",
+        "forceRefresh": false,
+        "traceId": "cg-1789370487442-3",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 16,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "received",
+        "durationMs": 101,
+        "playersReceived": 0,
+        "teamsReceived": 0,
+        "forceRefresh": false,
+        "source": "OP.GG",
+        "traceId": "cg-1789370487442-3",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 16,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "render-no-root",
+        "forceRefresh": false,
+        "traceId": "cg-1789370487442-3",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 16,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "rendered",
+        "rendered100": 0,
+        "rendered200": 0,
+        "forceRefresh": false,
+        "hidden": true,
+        "source": "OP.GG",
+        "traceId": "cg-1789370487442-3",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 16,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "cached",
+        "cacheAgeMs": 1115,
+        "forceRefresh": false,
+        "traceId": "cg-1789370487442-3",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 16,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "cached",
+        "cacheAgeMs": 4486,
+        "forceRefresh": false,
+        "traceId": "cg-1789370484915-2",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 19,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      },
+      {
+        "event": "current_game_client",
+        "reason": "cached",
+        "cacheAgeMs": 2362,
+        "forceRefresh": false,
+        "traceId": "cg-1789370487442-3",
+        "phase": "none",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 22,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    ],
+    "images": [
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      },
+      {
+        "loaded": true
+      }
+    ],
+    "completionRetry": true,
+    "removedOverviewBuild": true
+  },
+  "transportDiagnostics": [
+    {
+      "event": "local_request_client",
+      "reason": "complete",
+      "durationMs": 35,
+      "httpStatus": 200,
+      "endpoint": "status",
+      "startedAt": 1789370482272,
+      "completedAt": 1789370482307,
+      "errorKind": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 0,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "request",
+      "forceRefresh": false,
+      "traceId": "cg-1789370482400-1",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 2,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "received",
+      "durationMs": 102,
+      "playersReceived": 0,
+      "teamsReceived": 0,
+      "forceRefresh": false,
+      "source": "OP.GG",
+      "traceId": "cg-1789370482400-1",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 4,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "render-no-root",
+      "forceRefresh": false,
+      "traceId": "cg-1789370482400-1",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 4,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "rendered",
+      "rendered100": 0,
+      "rendered200": 0,
+      "forceRefresh": false,
+      "hidden": true,
+      "source": "OP.GG",
+      "traceId": "cg-1789370482400-1",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 6,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 1111,
+      "forceRefresh": false,
+      "traceId": "cg-1789370482400-1",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 6,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 1112,
+      "forceRefresh": false,
+      "traceId": "cg-1789370482400-1",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 6,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "catalog_client",
+      "reason": "loaded",
+      "key": "",
+      "traceId": "",
+      "championId": 0,
+      "queueId": 0,
+      "mapId": 0,
+      "gameId": 0,
+      "position": "",
+      "requestedPosition": "",
+      "resolvedPosition": "",
+      "positionSource": "",
+      "gameMode": "",
+      "tier": "",
+      "blockCount": 0,
+      "itemCount": 1,
+      "endpoint": "items",
+      "itemId": 0,
+      "httpStatus": 200,
+      "errorKind": "none"
+    },
+    {
+      "event": "item_id_not_in_catalog",
+      "reason": "missing",
+      "key": "",
+      "traceId": "",
+      "championId": 0,
+      "queueId": 0,
+      "mapId": 0,
+      "gameId": 0,
+      "position": "",
+      "requestedPosition": "",
+      "resolvedPosition": "",
+      "positionSource": "",
+      "gameMode": "",
+      "tier": "",
+      "blockCount": 0,
+      "itemCount": 1,
+      "endpoint": "items",
+      "itemId": 99999,
+      "httpStatus": 0,
+      "errorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 1119,
+      "forceRefresh": false,
+      "traceId": "cg-1789370482400-1",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 8,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 2353,
+      "forceRefresh": false,
+      "traceId": "cg-1789370482400-1",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 9,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 2399,
+      "forceRefresh": false,
+      "traceId": "cg-1789370482400-1",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 11,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "request",
+      "forceRefresh": false,
+      "traceId": "cg-1789370484915-2",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 11,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "received",
+      "durationMs": 102,
+      "playersReceived": 0,
+      "teamsReceived": 0,
+      "forceRefresh": false,
+      "source": "OP.GG",
+      "traceId": "cg-1789370484915-2",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 11,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "render-no-root",
+      "forceRefresh": false,
+      "traceId": "cg-1789370484915-2",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 11,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "rendered",
+      "rendered100": 0,
+      "rendered200": 0,
+      "forceRefresh": false,
+      "hidden": true,
+      "source": "OP.GG",
+      "traceId": "cg-1789370484915-2",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 13,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 1118,
+      "forceRefresh": false,
+      "traceId": "cg-1789370484915-2",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 13,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 2367,
+      "forceRefresh": false,
+      "traceId": "cg-1789370484915-2",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 16,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 2368,
+      "forceRefresh": false,
+      "traceId": "cg-1789370484915-2",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 16,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "request",
+      "forceRefresh": false,
+      "traceId": "cg-1789370487442-3",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 16,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "received",
+      "durationMs": 101,
+      "playersReceived": 0,
+      "teamsReceived": 0,
+      "forceRefresh": false,
+      "source": "OP.GG",
+      "traceId": "cg-1789370487442-3",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 16,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "render-no-root",
+      "forceRefresh": false,
+      "traceId": "cg-1789370487442-3",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 16,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "rendered",
+      "rendered100": 0,
+      "rendered200": 0,
+      "forceRefresh": false,
+      "hidden": true,
+      "source": "OP.GG",
+      "traceId": "cg-1789370487442-3",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 16,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 1115,
+      "forceRefresh": false,
+      "traceId": "cg-1789370487442-3",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 16,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 4486,
+      "forceRefresh": false,
+      "traceId": "cg-1789370484915-2",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 19,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 2362,
+      "forceRefresh": false,
+      "traceId": "cg-1789370487442-3",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 22,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "request",
+      "forceRefresh": false,
+      "traceId": "cg-1789370489952-4",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 22,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "received",
+      "durationMs": 102,
+      "playersReceived": 0,
+      "teamsReceived": 0,
+      "forceRefresh": false,
+      "source": "OP.GG",
+      "traceId": "cg-1789370489952-4",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 22,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "render-no-root",
+      "forceRefresh": false,
+      "traceId": "cg-1789370489952-4",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 22,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "rendered",
+      "rendered100": 0,
+      "rendered200": 0,
+      "forceRefresh": false,
+      "hidden": true,
+      "source": "OP.GG",
+      "traceId": "cg-1789370489952-4",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 22,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 1124,
+      "forceRefresh": false,
+      "traceId": "cg-1789370489952-4",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 22,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 1260,
+      "forceRefresh": false,
+      "traceId": "cg-1789370489952-4",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 24,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 2502,
+      "forceRefresh": false,
+      "traceId": "cg-1789370489952-4",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 25,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "request",
+      "forceRefresh": false,
+      "traceId": "cg-1789370492607-5",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 25,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "received",
+      "durationMs": 102,
+      "playersReceived": 0,
+      "teamsReceived": 0,
+      "forceRefresh": false,
+      "source": "OP.GG",
+      "traceId": "cg-1789370492607-5",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 25,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "render-no-root",
+      "forceRefresh": false,
+      "traceId": "cg-1789370492607-5",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 25,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "rendered",
+      "rendered100": 0,
+      "rendered200": 0,
+      "forceRefresh": false,
+      "hidden": true,
+      "source": "OP.GG",
+      "traceId": "cg-1789370492607-5",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 25,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    },
+    {
+      "event": "current_game_client",
+      "reason": "cached",
+      "cacheAgeMs": 1119,
+      "forceRefresh": false,
+      "traceId": "cg-1789370492607-5",
+      "phase": "none",
+      "transportFailed": 0,
+      "transportDropped": 0,
+      "transportSuppressed": 25,
+      "transportHTTPStatus": 0,
+      "transportErrorKind": "none"
+    }
+  ]
+}

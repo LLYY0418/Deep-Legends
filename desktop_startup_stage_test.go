@@ -65,7 +65,7 @@ func TestDesktopStartupStageHTTPValidationAndDiskWrite(t *testing.T) {
 			}
 			events := readDiagnosticEvents(t, store, "desktop_startup_stage")
 			if tc.status == 204 {
-				if len(events) != 1 || events[0]["elapsed_ms"] != tc.elapsed || events[0]["run_id"] == "" || events[0]["log_seq"] != float64(1) {
+				if len(events) != 1 || events[0]["elapsed_ms"] != tc.elapsed || events[0]["run_id"] == "" || events[0]["log_seq"] != float64(1) || events[0]["build_fingerprint"] != buildFingerprint {
 					t.Fatalf("successful HTTP did not persist the bounded event: %#v", events)
 				}
 			} else if len(events) != 0 {
@@ -92,18 +92,24 @@ func TestDesktopStartupStageMissingLogDirectoryCannotAcknowledgeSuccess(t *testi
 func runDesktopStageShell(t *testing.T, mode, source string) (string, error, *localStore) {
 	t.Helper()
 	store := newStartupTestStore(t)
-	if err := store.appendDiagnostic(map[string]any{"event": "app_start", "build_fingerprint": "a84b00000001"}); err != nil {
+	if err := store.appendDiagnostic(map[string]any{"event": "app_start"}); err != nil {
 		t.Fatal(err)
 	}
 	server := startupStageServer(t, store)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	command := exec.CommandContext(ctx, "node", "desktop/test-fixtures/startup-stages.cjs", server.URL, startupStageTestToken, t.TempDir(), mode, source)
+	command := exec.CommandContext(ctx, "node", "desktop/test-fixtures/startup-stages.cjs", server.URL, startupStageTestToken, t.TempDir(), mode, source, buildFingerprint)
 	output, err := command.CombinedOutput()
 	return string(output), err, store
 }
 
 func TestDesktopStartupStageShellAndExportEndToEnd(t *testing.T) {
+	// The historical A/B collector accepts release hashes only, not "dev".
+	// Model a release build in this serial test; the storage encoder, rather
+	// than an event payload override, must supply this value on disk.
+	originalFingerprint := buildFingerprint
+	buildFingerprint = "a84b00000001"
+	t.Cleanup(func() { buildFingerprint = originalFingerprint })
 	for _, mode := range []string{"normal", "stuck-created", "stuck-loaded"} {
 		t.Run(mode, func(t *testing.T) {
 			output, err, store := runDesktopStageShell(t, mode, os.Getenv("R84_STAGE_SOURCE"))
@@ -113,7 +119,7 @@ func TestDesktopStartupStageShellAndExportEndToEnd(t *testing.T) {
 			// Reopening the app uses the same directory and a new run_id. Export
 			// must still include the previous incomplete startup after a restart.
 			reopened := trackTestStore(t, &localStore{root: store.root})
-			if err := reopened.appendDiagnostic(map[string]any{"event": "app_start", "build_fingerprint": "a84b00000001"}); err != nil {
+			if err := reopened.appendDiagnostic(map[string]any{"event": "app_start"}); err != nil {
 				t.Fatal(err)
 			}
 			server := startupStageServer(t, reopened)

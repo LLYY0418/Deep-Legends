@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T15:10:15.323869+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T15:10:15.537003+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired"}
+{"Time":"2026-09-14T15:10:15.537062+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"=== RUN   TestR90BQueueGuardRequired\n"}
+{"Time":"2026-09-14T15:10:15.537118+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-receive"}
+{"Time":"2026-09-14T15:10:15.53713+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-receive","Output":"=== RUN   TestR90BQueueGuardRequired/channel-receive\n"}
+{"Time":"2026-09-14T15:10:15.537764+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-receive","Output":"    r90b_queue_guard_test.go:17: missed R90B queue literal: channel-receive\n"}
+{"Time":"2026-09-14T15:10:15.537788+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-receive","Output":"--- FAIL: TestR90BQueueGuardRequired/channel-receive (0.00s)\n"}
+{"Time":"2026-09-14T15:10:15.537792+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired/channel-receive","Elapsed":0}
+{"Time":"2026-09-14T15:10:15.537824+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Output":"--- FAIL: TestR90BQueueGuardRequired (0.00s)\n"}
+{"Time":"2026-09-14T15:10:15.537829+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90BQueueGuardRequired","Elapsed":0}
+{"Time":"2026-09-14T15:10:15.537833+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T15:10:15.538134+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.214s\n"}
+{"Time":"2026-09-14T15:10:15.538142+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.214}

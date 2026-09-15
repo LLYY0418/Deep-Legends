@@ -135,6 +135,7 @@ func TestOpggParseSearchResultReadsSummoners(t *testing.T) {
 }
 
 func TestRiotOverviewCapsMatchDetailConcurrencyAtFour(t *testing.T) {
+	t.Setenv("DEEP_LEGENDS_RIOT_MATCH_CONCURRENCY", "4")
 	t.Setenv("RIOT_API_KEY", "RGAPI-test")
 	const detailCount = 8
 	var inFlight atomic.Int32

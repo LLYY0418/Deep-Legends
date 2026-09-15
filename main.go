@@ -50,6 +50,11 @@ const diagnosticDeduplicationLimit = 512
 var embedded embed.FS
 
 type app struct {
+	collectionDataRetry             *time.Timer
+	collectionDataRetryCount        int
+	collectionDataRetryClient       *LCUClient
+	liveSnapshots                   liveSnapshotCache
+	gameplayFlow                    gameplayFlowState
 	overviewTimeout                 func(context.Context, time.Duration) (context.Context, context.CancelFunc)
 	updates                         *updateManager
 	runtimeCancel                   context.CancelFunc
@@ -208,6 +213,9 @@ type app struct {
 	liveClientProbe                     liveClientProbeState
 	arenaAlliesMu                       sync.RWMutex
 	arenaAllyKeys                       map[string]struct{}
+	arenaAllyPlayers                    []lcuLivePlayer
+	arenaAllyGameID                     int64
+	arenaTruth                          arenaTruthState
 	unknownQueueDiagnosticMu            sync.Mutex
 	unknownQueueDiagnosticIDs           map[int64]struct{}
 	diagnosticDedupMu                   sync.Mutex
@@ -356,6 +364,8 @@ func main() {
 	}
 	championProvider := newChampionProvider()
 	championProvider.cache = newChampionDataCache(store)
+	championProvider.imageCache = newPublicBinaryCache(store, "champion-images", 2048, 64<<20)
+	championProvider.communityImageCache = newCommunityImageCache(store)
 	championProvider.hexdata = newHexdataClient(championProvider, store)
 	if store != nil {
 		championProvider.diag = func(event map[string]any) { _ = store.appendDiagnostic(event) }
@@ -924,9 +934,7 @@ func (a *app) serveCommunityDragonImage(w http.ResponseWriter, r *http.Request, 
 	}
 	var data []byte
 	for _, remotePath := range remotePaths {
-		loaded, err := a.loadAsset(r.Context(), "cdragon:"+remotePath, 2*1024*1024, 0, func(ctx context.Context) ([]byte, error) {
-			return a.champions.fetchDirect(ctx, communityDragonHost, remotePath, nil, 2*1024*1024, "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8")
-		})
+		loaded, err := a.loadCommunityDragonAsset(r.Context(), remotePath)
 		if err == nil && strings.HasPrefix(http.DetectContentType(loaded), "image/") {
 			data = loaded
 			break
@@ -1080,11 +1088,13 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 	a.mu.Lock()
 	if a.syncing {
 		a.mu.Unlock()
+		a.recordDiagnostic(map[string]any{"event": "collection_refresh_lifecycle", "stage": "coalesced"})
 		return true
 	}
 	a.syncing = true
 	a.collectionRefreshPending = true
 	generation := a.poolGeneration
+	initialClient := a.lcu
 	pool := a.pools[a.poolID]
 	a.mu.Unlock()
 	defer func() {
@@ -1092,6 +1102,7 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 		a.collectionRefreshPending = false
 		a.mu.Unlock()
 	}()
+	a.recordDiagnostic(map[string]any{"event": "collection_refresh_lifecycle", "stage": "begin"})
 	a.broadcastEvent("refresh-started")
 
 	result, err := loadSnapshotWithClientProvider(client, pool, a.champions, a.recordDiagnostic)
@@ -1118,9 +1129,16 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 	previousRemaining := append([]Skin(nil), a.remaining...)
 	previousSnapshotAt := a.lastSync
 	previousSnapshotUsable := a.snapshotReady && a.calculationOKLocked()
+	if a.manualDisconnected || (a.lcu != initialClient && a.lcu != client) {
+		a.syncing = false
+		a.mu.Unlock()
+		a.recordDiagnostic(map[string]any{"event": "collection_refresh_lifecycle", "stage": "canceled", "reason": "client-changed", "duration_ms": time.Since(started).Milliseconds()})
+		return false
+	}
 	if generation != a.poolGeneration {
 		a.syncing = false
 		a.mu.Unlock()
+		a.recordDiagnostic(map[string]any{"event": "collection_refresh_lifecycle", "stage": "canceled", "reason": "pool-changed", "duration_ms": time.Since(started).Milliseconds()})
 		a.requestRefresh()
 		return true
 	}
@@ -1164,6 +1182,7 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 		}
 		a.mu.Unlock()
 		a.clearAssetCache()
+		a.recordDiagnostic(map[string]any{"event": "collection_refresh_lifecycle", "stage": "failed", "error_kind": diagnosticErrorKind(err), "duration_ms": time.Since(started).Milliseconds()})
 		a.recordDiagnostic(map[string]any{"event": "refresh_failed", "error": message, "client_alive": clientAlive, "duration_ms": time.Since(started).Milliseconds(), "load_phases_ms": result.LoadPhases, "phase_group": result.PhaseGroup, "pool_id": pool.ID, "pool_hash": pool.Hash, "catalog": result.Catalog, "ownership_sources": result.Ownership})
 		a.broadcastEvent("refresh-failed")
 		return clientAlive
@@ -1210,6 +1229,7 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 			a.recordDiagnostic(map[string]any{"event": "snapshot_save_failed", "error": "local write failed"})
 		}
 	}
+	a.scheduleCollectionDataRetry(client, result.Account)
 	a.broadcastEvent("snapshot-updated")
 	return true
 }
@@ -1255,6 +1275,12 @@ func (a *app) clearCollectionDirtyThroughLocked(refreshStartedAt time.Time) {
 }
 
 func (a *app) clearSnapshotLocked(message string) {
+	if a.collectionDataRetry != nil {
+		a.collectionDataRetry.Stop()
+		a.collectionDataRetry = nil
+	}
+	a.collectionDataRetryCount = 0
+	a.collectionDataRetryClient = nil
 	a.connected = false
 	a.identityReady = false
 	a.snapshotReady = false
@@ -1463,8 +1489,8 @@ func (a *app) appendDiagnosticEvent(event map[string]any) {
 	if a == nil || a.storage == nil {
 		return
 	}
-	// appendDiagnostic adds its timestamp to the map it receives. Keep that
-	// mutation on a private copy so callers can safely reuse a payload.
+	// Add write-failure context on a private copy; callers may reuse payloads.
+	// The storage encoder supplies the timestamp and current build fingerprint.
 	toWrite := make(map[string]any, len(event))
 	for key, value := range event {
 		toWrite[key] = value
@@ -1537,10 +1563,11 @@ func (a *app) resetDiagnosticDeduplication() {
 	a.diagnosticDedupMu.Unlock()
 }
 
-func (a *app) recordAppStartDiagnostic() {
+func (a *app) recordAppStartDiagnostic(rotation ...bool) {
 	a.recordDiagnostic(map[string]any{
 		"event": "app_start", "version": version,
 		"build_fingerprint": buildFingerprint, "riot_key": riotKeyConfigured(),
+		"log_rotation": len(rotation) > 0 && rotation[0],
 	})
 }
 
@@ -1550,7 +1577,7 @@ func (a *app) enableDiagnosticRotationSnapshot() {
 	}
 	a.storage.onDiagnosticRotation = func() {
 		a.resetDiagnosticDeduplication()
-		a.recordAppStartDiagnostic()
+		a.recordAppStartDiagnostic(true)
 	}
 }
 
@@ -1662,6 +1689,9 @@ func openBrowser(target string) error {
 }
 
 func friendlyError(err error) string {
+	if errors.Is(err, errCollectionNotSynced) {
+		return errCollectionNotSynced.Error()
+	}
 	if errors.Is(err, errLCUCredentialsUnreadable) {
 		return "已检测到英雄联盟客户端进程，但无法读取连接凭据。请确认客户端已进入大厅；如果英雄联盟以管理员身份运行，请也以管理员身份启动本助手。"
 	}

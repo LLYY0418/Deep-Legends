@@ -1,0 +1,13 @@
+{"Time":"2026-09-14T14:19:36.415045+08:00","Action":"start","Package":"command-line-arguments"}
+{"Time":"2026-09-14T14:19:36.653006+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra"}
+{"Time":"2026-09-14T14:19:36.653047+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra","Output":"=== RUN   TestR90QueueGuardExtra\n"}
+{"Time":"2026-09-14T14:19:36.653084+08:00","Action":"run","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/type-switch"}
+{"Time":"2026-09-14T14:19:36.653086+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/type-switch","Output":"=== RUN   TestR90QueueGuardExtra/type-switch\n"}
+{"Time":"2026-09-14T14:19:36.653448+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/type-switch","Output":"    r90_queue_guard_test.go:68: missed additional queue literal: type-switch\n"}
+{"Time":"2026-09-14T14:19:36.653489+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/type-switch","Output":"--- FAIL: TestR90QueueGuardExtra/type-switch (0.00s)\n"}
+{"Time":"2026-09-14T14:19:36.653495+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra/type-switch","Elapsed":0}
+{"Time":"2026-09-14T14:19:36.653547+08:00","Action":"output","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra","Output":"--- FAIL: TestR90QueueGuardExtra (0.00s)\n"}
+{"Time":"2026-09-14T14:19:36.653554+08:00","Action":"fail","Package":"command-line-arguments","Test":"TestR90QueueGuardExtra","Elapsed":0}
+{"Time":"2026-09-14T14:19:36.653556+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\n"}
+{"Time":"2026-09-14T14:19:36.653825+08:00","Action":"output","Package":"command-line-arguments","Output":"FAIL\tcommand-line-arguments\t0.238s\n"}
+{"Time":"2026-09-14T14:19:36.653835+08:00","Action":"fail","Package":"command-line-arguments","Elapsed":0.239}

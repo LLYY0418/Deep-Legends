@@ -173,6 +173,7 @@ type sgpProvider struct {
 	sessionOwner       *LCUClient
 	failUntil          time.Time
 	historyCache       map[string]sgpHistoryCacheEntry
+	historyGeneration  uint64
 	historyBytes       int
 	summonerCache      map[string]sgpSummonerCacheEntry
 	credentialVersions map[sgpCredentialIdentity]string
@@ -624,6 +625,9 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 		if credentialID != "" {
 			event["credential_id"] = credentialID
 		}
+		if event["error_kind"] == "canceled" || event["error_kind"] == "timeout" {
+			event["cancel_scope"] = gameplayCancellationScope(ctx)
+		}
 		p.recordObservation(event)
 	}
 	lastAuthStatus := http.StatusUnauthorized
@@ -783,13 +787,16 @@ func (p *sgpProvider) cachedHistoryPage(serverID, puuid string, startIndex, maxP
 	return sgpHistoryCacheEntry{}, 0, false
 }
 
-func (p *sgpProvider) cacheHistoryPage(serverID, puuid string, startIndex, pageSize int, tags []string, entry sgpHistoryCacheEntry) {
+func (p *sgpProvider) cacheHistoryPage(serverID, puuid string, startIndex, pageSize int, tags []string, entry sgpHistoryCacheEntry, expectedGeneration ...uint64) {
 	now := time.Now()
 	entry.at = now
 	entry.lastUsed = now
 	key := sgpHistoryPageCacheKey(serverID, puuid, startIndex, pageSize, tags)
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if len(expectedGeneration) > 0 && expectedGeneration[0] != p.historyGeneration {
+		return
+	}
 	if p.historyCache == nil {
 		p.historyCache = make(map[string]sgpHistoryCacheEntry)
 	}
@@ -833,6 +840,9 @@ func (p *sgpProvider) cacheHistoryPage(serverID, puuid string, startIndex, pageS
 // caller validates the returned queues before treating the filter as supported.
 func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUClient, serverID, puuid string, start, count int, tags []string, useCache bool) ([]*riotMatchInfo, int, bool, error) {
 	overviewCostFromContext(ctx).addHistoryCall()
+	p.mu.Lock()
+	generation := p.historyGeneration
+	p.mu.Unlock()
 	serverID = strings.ToUpper(strings.TrimSpace(serverID))
 	base, ok := p.serverBaseOn(ctx, client, serverID)
 	if !ok {
@@ -943,7 +953,7 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 			}
 			p.cacheHistoryPage(serverID, puuid, pageStart, pageSize, tags, sgpHistoryCacheEntry{
 				games: append([]*riotMatchInfo(nil), parsedPageGames...), consumed: consumed, more: lastPageFull, bytes: pageBytes,
-			})
+			}, generation)
 		}
 		fetched += consumed
 		if clippedToFallbackPage {

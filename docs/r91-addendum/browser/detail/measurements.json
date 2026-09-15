@@ -1,0 +1,234 @@
+[
+  {
+    "width": 1920,
+    "detail": {
+      "width": 1205,
+      "height": 1935.25
+    },
+    "columns": {
+      "width": 1205,
+      "height": 30.75
+    },
+    "teams": [
+      {
+        "width": 1205,
+        "height": 269
+      },
+      {
+        "width": 1205,
+        "height": 269
+      },
+      {
+        "width": 1205,
+        "height": 269
+      },
+      {
+        "width": 1205,
+        "height": 269
+      },
+      {
+        "width": 1205,
+        "height": 269
+      },
+      {
+        "width": 1205,
+        "height": 269
+      },
+      {
+        "width": 1205,
+        "height": 269
+      }
+    ],
+    "players": 21,
+    "ancestors": [
+      {
+        "name": "matches-column",
+        "width": 1223
+      },
+      {
+        "name": "gameplay-page",
+        "width": 1575
+      }
+    ],
+    "overflowX": "visible",
+    "canScroll": false,
+    "expanded": "true",
+    "controls": "match-detail-90004",
+    "detailId": "match-detail-90004",
+    "otherCardsStable": true
+  },
+  {
+    "width": 1280,
+    "detail": {
+      "width": 939.09375,
+      "height": 1935.25
+    },
+    "columns": {
+      "width": 939.09375,
+      "height": 30.75
+    },
+    "teams": [
+      {
+        "width": 939.09375,
+        "height": 269
+      },
+      {
+        "width": 939.09375,
+        "height": 269
+      },
+      {
+        "width": 939.09375,
+        "height": 269
+      },
+      {
+        "width": 939.09375,
+        "height": 269
+      },
+      {
+        "width": 939.09375,
+        "height": 269
+      },
+      {
+        "width": 939.09375,
+        "height": 269
+      },
+      {
+        "width": 939.09375,
+        "height": 269
+      }
+    ],
+    "players": 21,
+    "ancestors": [
+      {
+        "name": "matches-column",
+        "width": 957
+      },
+      {
+        "name": "gameplay-page",
+        "width": 957
+      }
+    ],
+    "overflowX": "visible",
+    "canScroll": false,
+    "expanded": "true",
+    "controls": "match-detail-90004",
+    "detailId": "match-detail-90004",
+    "otherCardsStable": true
+  },
+  {
+    "width": 820,
+    "detail": {
+      "width": 664.53125,
+      "height": 1946.25
+    },
+    "columns": {
+      "width": 860,
+      "height": 30.75
+    },
+    "teams": [
+      {
+        "width": 860,
+        "height": 269
+      },
+      {
+        "width": 860,
+        "height": 269
+      },
+      {
+        "width": 860,
+        "height": 269
+      },
+      {
+        "width": 860,
+        "height": 269
+      },
+      {
+        "width": 860,
+        "height": 269
+      },
+      {
+        "width": 860,
+        "height": 269
+      },
+      {
+        "width": 860,
+        "height": 269
+      }
+    ],
+    "players": 21,
+    "ancestors": [
+      {
+        "name": "matches-column",
+        "width": 683
+      },
+      {
+        "name": "gameplay-page",
+        "width": 683
+      }
+    ],
+    "overflowX": "auto",
+    "canScroll": true,
+    "expanded": "true",
+    "controls": "match-detail-90004",
+    "detailId": "match-detail-90004",
+    "otherCardsStable": true
+  },
+  {
+    "width": 620,
+    "detail": {
+      "width": 477.34375,
+      "height": 1946.25
+    },
+    "columns": {
+      "width": 860,
+      "height": 30.75
+    },
+    "teams": [
+      {
+        "width": 860,
+        "height": 269
+      },
+      {
+        "width": 860,
+        "height": 269
+      },
+      {
+        "width": 860,
+        "height": 269
+      },
+      {
+        "width": 860,
+        "height": 269
+      },
+      {
+        "width": 860,
+        "height": 269
+      },
+      {
+        "width": 860,
+        "height": 269
+      },
+      {
+        "width": 860,
+        "height": 269
+      }
+    ],
+    "players": 21,
+    "ancestors": [
+      {
+        "name": "matches-column",
+        "width": 495
+      },
+      {
+        "name": "gameplay-page",
+        "width": 495
+      }
+    ],
+    "overflowX": "auto",
+    "canScroll": true,
+    "expanded": "true",
+    "controls": "match-detail-90004",
+    "detailId": "match-detail-90004",
+    "otherCardsStable": true
+  }
+]

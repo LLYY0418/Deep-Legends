@@ -1,0 +1,13 @@
+{
+  "go_full": "passed",
+  "go_targeted_race": "passed",
+  "end_phase_transition_race": "passed",
+  "go_vet": "passed",
+  "windows_amd64_backend_build": "passed",
+  "javascript_syntax": "passed",
+  "diff_whitespace": "passed",
+  "frontend": {"tests": 636, "passed": 635, "failed": 0, "skipped": 1},
+  "isolated_mutations": {"total": 11, "killed": 11},
+  "windows_real_game_checks": "pending: four worklist checks",
+  "setup_built": false
+}

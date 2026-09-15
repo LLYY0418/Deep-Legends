@@ -1,0 +1,79 @@
+{
+  "cards": [
+    {
+      "width": 2400,
+      "rows": [
+        {
+          "arena": false,
+          "top": 123.59375,
+          "text": "击杀参与率66%CS187 (5.7)平均段位翡翠 II",
+          "damage": null,
+          "taken": null,
+          "rows": "18px 18px 18px"
+        },
+        {
+          "arena": true,
+          "top": 123.59375,
+          "text": "伤害16300承伤15137",
+          "damage": "rgb(224, 92, 92)",
+          "taken": "rgb(139, 147, 166)",
+          "rows": "18px 18px 18px"
+        }
+      ]
+    },
+    {
+      "width": 1500,
+      "rows": [
+        {
+          "arena": false,
+          "top": 123.59375,
+          "text": "击杀参与率66%CS187 (5.7)平均段位翡翠 II",
+          "damage": null,
+          "taken": null,
+          "rows": "18px 18px 18px"
+        },
+        {
+          "arena": true,
+          "top": 123.59375,
+          "text": "伤害16300承伤15137",
+          "damage": "rgb(224, 92, 92)",
+          "taken": "rgb(139, 147, 166)",
+          "rows": "18px 18px 18px"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "rows": [
+        {
+          "arena": false,
+          "top": 201.59375,
+          "text": "击杀参与率66%CS187 (5.7)平均段位翡翠 II",
+          "damage": null,
+          "taken": null,
+          "rows": "18px 18px 18px"
+        },
+        {
+          "arena": true,
+          "top": 201.59375,
+          "text": "伤害16300承伤15137",
+          "damage": "rgb(224, 92, 92)",
+          "taken": "rgb(139, 147, 166)",
+          "rows": "18px 18px 18px"
+        }
+      ]
+    }
+  ],
+  "facade": {
+    "label": "未定级 · 单双排",
+    "tier": "UNRANKED",
+    "division": "I",
+    "commitHidden": true
+  },
+  "arenaWarningCount": 0,
+  "live": {
+    "stable": true,
+    "arenaRankHidden": true,
+    "ordinaryRankVisible": true
+  }
+}

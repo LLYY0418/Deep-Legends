@@ -1,0 +1,286 @@
+[
+  {
+    "sample": "pro-before",
+    "label": "cold",
+    "events": [
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 2184,
+        "event": "pro_directory_cost",
+        "log_seq": 3,
+        "run_id": "3c7724b81b3640d7e4f698c1",
+        "stage": "directory",
+        "success": true,
+        "time": "2026-09-14T06:38:53.755496Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 4259,
+        "event": "pro_directory_cost",
+        "log_seq": 7,
+        "partial": false,
+        "run_id": "3c7724b81b3640d7e4f698c1",
+        "stage": "supplements",
+        "time": "2026-09-14T06:38:55.829804Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 12282,
+        "event": "pro_directory_cost",
+        "log_seq": 8,
+        "run_id": "3c7724b81b3640d7e4f698c1",
+        "stage": "ladder",
+        "time": "2026-09-14T06:39:03.852723Z"
+      }
+    ]
+  },
+  {
+    "sample": "pro-pair-1-new",
+    "label": "cold",
+    "events": [
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 2026,
+        "event": "pro_directory_cost",
+        "log_seq": 3,
+        "run_id": "4540cbd4ee5b1b3887383e60",
+        "stage": "directory",
+        "success": true,
+        "time": "2026-09-14T06:55:45.653436Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 3409,
+        "event": "pro_directory_cost",
+        "log_seq": 7,
+        "partial": false,
+        "run_id": "4540cbd4ee5b1b3887383e60",
+        "stage": "supplements",
+        "time": "2026-09-14T06:55:47.036555Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 7857,
+        "event": "pro_directory_cost",
+        "log_seq": 8,
+        "run_id": "4540cbd4ee5b1b3887383e60",
+        "stage": "ladder",
+        "stage_duration_ms": 5830,
+        "time": "2026-09-14T06:55:51.485097Z",
+        "wait_after_supplements_ms": 4445
+      }
+    ],
+    "quality": {
+      "updating": false,
+      "partial": false,
+      "unavailable": false,
+      "playerCount": 33,
+      "accountCount": 90,
+      "ladderRankPartial": true,
+      "knownRanks": 27
+    }
+  },
+  {
+    "sample": "pro-pair-2-new",
+    "label": "cold",
+    "events": [
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 3387,
+        "event": "pro_directory_cost",
+        "log_seq": 3,
+        "run_id": "c905b2a5dfa71d4325b256ad",
+        "stage": "directory",
+        "success": true,
+        "time": "2026-09-14T06:55:55.360088Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 4754,
+        "event": "pro_directory_cost",
+        "log_seq": 7,
+        "partial": false,
+        "run_id": "c905b2a5dfa71d4325b256ad",
+        "stage": "supplements",
+        "time": "2026-09-14T06:55:56.727439Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 10834,
+        "event": "pro_directory_cost",
+        "log_seq": 8,
+        "run_id": "c905b2a5dfa71d4325b256ad",
+        "stage": "ladder",
+        "stage_duration_ms": 7446,
+        "time": "2026-09-14T06:56:02.806923Z",
+        "wait_after_supplements_ms": 6076
+      }
+    ],
+    "quality": {
+      "updating": false,
+      "partial": false,
+      "unavailable": false,
+      "playerCount": 33,
+      "accountCount": 90,
+      "ladderRankPartial": true,
+      "knownRanks": 27
+    }
+  },
+  {
+    "sample": "pro-after",
+    "label": "cold",
+    "events": [
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 12001,
+        "event": "pro_directory_cost",
+        "log_seq": 3,
+        "run_id": "f8d58b43a0a1762fce4f691b",
+        "stage": "directory",
+        "success": false,
+        "time": "2026-09-14T06:46:46.530383Z"
+      }
+    ]
+  },
+  {
+    "sample": "pro-after-3",
+    "label": "cold",
+    "events": [
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 3603,
+        "event": "pro_directory_cost",
+        "log_seq": 3,
+        "run_id": "e4dad27f3baa1153c9611f65",
+        "stage": "directory",
+        "success": true,
+        "time": "2026-09-14T06:53:20.3773Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 5377,
+        "event": "pro_directory_cost",
+        "log_seq": 7,
+        "partial": false,
+        "run_id": "e4dad27f3baa1153c9611f65",
+        "stage": "supplements",
+        "time": "2026-09-14T06:53:22.1512Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 12550,
+        "event": "pro_directory_cost",
+        "log_seq": 8,
+        "run_id": "e4dad27f3baa1153c9611f65",
+        "stage": "ladder",
+        "stage_duration_ms": 8947,
+        "time": "2026-09-14T06:53:29.324974Z",
+        "wait_after_supplements_ms": 7171
+      }
+    ]
+  },
+  {
+    "sample": "pro-after-retry",
+    "label": "cold",
+    "events": [
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 3001,
+        "event": "pro_directory_cost",
+        "log_seq": 3,
+        "run_id": "a49d6f15dec9b79b7aee68bd",
+        "stage": "directory",
+        "success": false,
+        "time": "2026-09-14T06:49:37.219094Z"
+      }
+    ]
+  },
+  {
+    "sample": "pro-pair-1-old",
+    "label": "cold",
+    "events": [
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 7591,
+        "event": "pro_directory_cost",
+        "log_seq": 3,
+        "run_id": "6cb9c8149ada77e373d859ea",
+        "stage": "directory",
+        "success": true,
+        "time": "2026-09-14T06:55:27.07281Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 10894,
+        "event": "pro_directory_cost",
+        "log_seq": 7,
+        "partial": false,
+        "run_id": "6cb9c8149ada77e373d859ea",
+        "stage": "supplements",
+        "time": "2026-09-14T06:55:30.375316Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 23684,
+        "event": "pro_directory_cost",
+        "log_seq": 8,
+        "run_id": "6cb9c8149ada77e373d859ea",
+        "stage": "ladder",
+        "time": "2026-09-14T06:55:43.164896Z"
+      }
+    ],
+    "quality": {
+      "updating": false,
+      "partial": false,
+      "unavailable": false,
+      "playerCount": 33,
+      "accountCount": 90,
+      "ladderRankPartial": true,
+      "knownRanks": 27
+    }
+  },
+  {
+    "sample": "pro-pair-2-old",
+    "label": "cold",
+    "events": [
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 1903,
+        "event": "pro_directory_cost",
+        "log_seq": 3,
+        "run_id": "f129b5d669b521b480c45460",
+        "stage": "directory",
+        "success": true,
+        "time": "2026-09-14T06:56:05.336537Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 3245,
+        "event": "pro_directory_cost",
+        "log_seq": 7,
+        "partial": false,
+        "run_id": "f129b5d669b521b480c45460",
+        "stage": "supplements",
+        "time": "2026-09-14T06:56:06.67913Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 8575,
+        "event": "pro_directory_cost",
+        "log_seq": 8,
+        "run_id": "f129b5d669b521b480c45460",
+        "stage": "ladder",
+        "time": "2026-09-14T06:56:12.00858Z"
+      }
+    ],
+    "quality": {
+      "updating": false,
+      "partial": false,
+      "unavailable": false,
+      "playerCount": 33,
+      "accountCount": 90,
+      "ladderRankPartial": true,
+      "knownRanks": 27
+    }
+  }
+]

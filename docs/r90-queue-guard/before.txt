@@ -1,0 +1,64 @@
+--- FAIL: TestR90QueueGuardRequired (0.00s)
+    --- FAIL: TestR90QueueGuardRequired/literal-map (0.00s)
+        r90_queue_guard_test.go:51: missed R90 queue literal: literal-map
+    --- FAIL: TestR90QueueGuardRequired/handler-map (0.00s)
+        r90_queue_guard_test.go:51: missed R90 queue literal: handler-map
+    --- FAIL: TestR90QueueGuardRequired/range-slice (0.00s)
+        r90_queue_guard_test.go:51: missed R90 queue literal: range-slice
+    --- FAIL: TestR90QueueGuardRequired/type-assert (0.00s)
+        r90_queue_guard_test.go:51: missed R90 queue literal: type-assert
+--- FAIL: TestR90QueueGuardExtra (0.08s)
+    --- FAIL: TestR90QueueGuardExtra/pointer (0.00s)
+        r90_queue_guard_test.go:68: missed additional queue literal: pointer
+    --- FAIL: TestR90QueueGuardExtra/type-switch (0.00s)
+        r90_queue_guard_test.go:68: missed additional queue literal: type-switch
+    --- FAIL: TestR90QueueGuardExtra/iota-inheritance (0.00s)
+        r90_queue_guard_test.go:68: missed additional queue literal: iota-inheritance
+    --- FAIL: TestR90QueueGuardExtra/slice-membership (0.08s)
+        r90_queue_guard_test.go:68: missed additional queue literal: slice-membership
+--- FAIL: TestR90QueueGuardCombinations (0.05s)
+    --- FAIL: TestR90QueueGuardCombinations/map-alias (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: map-alias
+    --- FAIL: TestR90QueueGuardCombinations/map-comma-ok (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: map-comma-ok
+    --- FAIL: TestR90QueueGuardCombinations/map-named-type (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: map-named-type
+    --- FAIL: TestR90QueueGuardCombinations/string-map (0.05s)
+        r90_queue_guard_test.go:102: missed combined queue literal: string-map
+    --- FAIL: TestR90QueueGuardCombinations/literal-slice-index (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: literal-slice-index
+    --- FAIL: TestR90QueueGuardCombinations/sparse-array-index (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: sparse-array-index
+    --- FAIL: TestR90QueueGuardCombinations/slice-alias-index (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: slice-alias-index
+    --- FAIL: TestR90QueueGuardCombinations/slice-element-comparison (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: slice-element-comparison
+    --- FAIL: TestR90QueueGuardCombinations/range-alias (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: range-alias
+    --- FAIL: TestR90QueueGuardCombinations/range-assignment (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: range-assignment
+    --- FAIL: TestR90QueueGuardCombinations/range-map-key (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: range-map-key
+    --- FAIL: TestR90QueueGuardCombinations/range-map-value (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: range-map-value
+    --- FAIL: TestR90QueueGuardCombinations/range-queue-element (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: range-queue-element
+    --- FAIL: TestR90QueueGuardCombinations/assert-comma-ok (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: assert-comma-ok
+    --- FAIL: TestR90QueueGuardCombinations/assert-var-comma-ok (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: assert-var-comma-ok
+    --- FAIL: TestR90QueueGuardCombinations/boxed-numeric (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: boxed-numeric
+    --- FAIL: TestR90QueueGuardCombinations/numeric-pointer (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: numeric-pointer
+    --- FAIL: TestR90QueueGuardCombinations/inherited-constant (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: inherited-constant
+    --- FAIL: TestR90QueueGuardCombinations/iota-arithmetic (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: iota-arithmetic
+    --- FAIL: TestR90QueueGuardCombinations/membership-alias (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: membership-alias
+    --- FAIL: TestR90QueueGuardCombinations/membership-search (0.00s)
+        r90_queue_guard_test.go:102: missed combined queue literal: membership-search
+FAIL
+FAIL	lol-loot-assistant	0.947s
+FAIL

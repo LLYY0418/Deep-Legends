@@ -1,0 +1,1513 @@
+{
+  "base": "a26c41ffc2d373836c15c73bee45178610c14e4e",
+  "files": [
+    {
+      "path": "accept_focus_history.go",
+      "sha256": "59a0718eb6c16c106d15d5a4ede6c3bb560283fe6a482385169aba3cd7eea6e6"
+    },
+    {
+      "path": "accept_focus_inspect.go",
+      "sha256": "c44efe134594fce8949923c6de9c2e447daa6dcb55a48274c1152cff600e4955"
+    },
+    {
+      "path": "accept_focus_trace.go",
+      "sha256": "f909a3fb8d0081a1724534e297bfe74adfc3d232ce0d17947fc0e55b33452554"
+    },
+    {
+      "path": "accept_focus_trace_test.go",
+      "sha256": "8c2a8e02b2132ef53e4c70e0c688c7b425edcdbabef72cd7fcc94348e734bf56"
+    },
+    {
+      "path": "accept_window_diagnostics.go",
+      "sha256": "30a55bfef75145f0379bcef0900c66978192b8f2b557a68633f69ced4fdf645a"
+    },
+    {
+      "path": "accept_window_other.go",
+      "sha256": "8e9c2c0f380fa911479075cc128ea7c5a42c7d169e925de3de160adc37df19a1"
+    },
+    {
+      "path": "accept_window_windows.go",
+      "sha256": "c851e03b144bfe1b48500a90db8349a31725f0220b9d370dc47a3bb422ffb557"
+    },
+    {
+      "path": "arena_items_completeness_test.go",
+      "sha256": "13fd793c7f4c4d922d7d70633fad9d3e6b11cb3995ec37ea0b9c913b45d08a0e"
+    },
+    {
+      "path": "arena_match_detail.go",
+      "sha256": "813d0546c5cc3a2945b3523376b590d699cf001976d826618b32ede6a4392993"
+    },
+    {
+      "path": "arena_match_detail_test.go",
+      "sha256": "1b7915a8852625dbf7d2003330f09c82df992d744c0fe9d2704091eadb7b67f4"
+    },
+    {
+      "path": "asset_cache.go",
+      "sha256": "e8b0c023ad57c4a9456aecb71dfb5880a30bdb2933a3dc17afd4f8e0b9d89728"
+    },
+    {
+      "path": "asset_cache_test.go",
+      "sha256": "a4dd067488b77bd6e970dd1a9057bcd7d5ffc8a9cdbb0ff72a316650b74c37b6"
+    },
+    {
+      "path": "cancellation.go",
+      "sha256": "98a3461cf0221536798503b47dea92df431fe2f9bff81fbd85d5082c87eef96d"
+    },
+    {
+      "path": "catalog.go",
+      "sha256": "17b2164991e74691dcebddd8acdb666a5c534bc5ff8b6d9fb2af9688fe3c9088"
+    },
+    {
+      "path": "catalog_test.go",
+      "sha256": "e446442edc5c8983c49725d0361e9276c6290c59531f27b8e58c61cb004d317c"
+    },
+    {
+      "path": "champion_cache.go",
+      "sha256": "c7d3a66a5a2ab5216452719b9863e210f8f4a7920d556e95979e0c022e5376c3"
+    },
+    {
+      "path": "champion_network.go",
+      "sha256": "f3b53544249cb21e8dc330fd5e48cb1d65bcf8ad7596b23ab214492ecb1e9737"
+    },
+    {
+      "path": "champion_network_test.go",
+      "sha256": "36f6582d783103235a3c58fdac9843707b857356a31cccee39622c75153a18a4"
+    },
+    {
+      "path": "champions.go",
+      "sha256": "02a24b35ddab705db972731115494f6f3f51e1df9d59ad78afe9c314b0a40b29"
+    },
+    {
+      "path": "champions_structured.go",
+      "sha256": "2b5db6a7b49845e936f6c1bf9914227088fa5d215cfbea3dd2c3248c3913ab0f"
+    },
+    {
+      "path": "champions_test.go",
+      "sha256": "fc4b0bbdb79a7385f626c4ee2cae8332e9879c32259c8a5746ba1d91307afd7b"
+    },
+    {
+      "path": "champselect.go",
+      "sha256": "79455bc10b98d3c765bcb37d02b96e3fdda17cebd0f6d319a7abf77a8426f822"
+    },
+    {
+      "path": "champselect_execution.go",
+      "sha256": "c11793c8664ef82219258eb85bbf2431cde0c4e35bfa16161e20429cb2212ff3"
+    },
+    {
+      "path": "champselect_execution_test.go",
+      "sha256": "a389a7724169ad01ffa58542e0b65bb6a2325ef6bfb2b3c8419034296324e93c"
+    },
+    {
+      "path": "champselect_pools.go",
+      "sha256": "9d349849bdab9bcff1567b443fa8262230bccdaff684995ac7d35294631d5fea"
+    },
+    {
+      "path": "champselect_pools_test.go",
+      "sha256": "33c8a1690709ab4ee4fc29cc3e87f8912b20391442c9828f4d66872761ab601f"
+    },
+    {
+      "path": "claim_center.go",
+      "sha256": "ca60c2c105a278a993fb4ce2bae305cc9219adfb6bb2acfe036e9b6f45b3fce7"
+    },
+    {
+      "path": "claim_settlement.go",
+      "sha256": "348bb3e082cb51141655de22886271655814bfec9c352cfdcd07bcc436b4c8e7"
+    },
+    {
+      "path": "client_installations_other.go",
+      "sha256": "4310a327d8304f0689a828c51f791afe5972b1c0b2bb5f75362d29b073a37550"
+    },
+    {
+      "path": "client_installations_windows.go",
+      "sha256": "1bd2ef6d19a6ecc9b6ffc1c35edb176b397e03091acf0f7b7fed20924de047f3"
+    },
+    {
+      "path": "client_installations_windows_test.go",
+      "sha256": "74e257c1c5c2354c102f051676aaaea1dbee48cbc7c30949c6ad60085ba10672"
+    },
+    {
+      "path": "client_launcher.go",
+      "sha256": "ea024dac48590957ab96051422ce44e2ca811cf8cff095f17875eab0fe65433c"
+    },
+    {
+      "path": "client_maintenance.go",
+      "sha256": "bbe9925164906548147be3dca8e6710021d5b4cf08a4469511a0470c78812d79"
+    },
+    {
+      "path": "connection_manager.go",
+      "sha256": "8f43d8b724793e752d5a3838047d5d34f021d57676ed799a39e4617d144117b3"
+    },
+    {
+      "path": "connection_manager_test.go",
+      "sha256": "093892aa26edb09af8d1896ed8d44270c6725c3666224d899d23917b8ab27e40"
+    },
+    {
+      "path": "convenience_test.go",
+      "sha256": "bb88c2cc04a977cbf30833e42da9b99e25d21ad309410759ec85500c29a19a06"
+    },
+    {
+      "path": "current_game_diagnostics.go",
+      "sha256": "423a7d66201637425613c3de9df704f068ab433bda4d75b6a2b9d0c06f33f1dd"
+    },
+    {
+      "path": "data_sources.go",
+      "sha256": "c9288ebe9edea63386271938a5740abd520e944cea406f7486db72a6cc03fc71"
+    },
+    {
+      "path": "data_sources_test.go",
+      "sha256": "91b92b379eeecf730d2b43032af6cb271487ae508210792cc6333180e537f3e4"
+    },
+    {
+      "path": "desktop/apply-portable-template.cjs",
+      "sha256": "437c287608a16c3240234e7f6945f012f7b1cac42b49b5ffa532b1ca4b3f3ee0"
+    },
+    {
+      "path": "desktop/build-fingerprint.test.cjs",
+      "sha256": "cdccc428f5a5c6459335512d3afc64a9b45920bc83dcd1f5ec731847daec5714"
+    },
+    {
+      "path": "desktop/build-icon.cjs",
+      "sha256": "03e54ec1a8ae7e7424849355d8d7e7cbc12f25301c71199c3bdd861b23b1e869"
+    },
+    {
+      "path": "desktop/champselect-layout.cjs",
+      "sha256": "9a411a11c6874672202e9ee97e05cef20e62f9adb2df60edf9dda5cf96b4c6d5"
+    },
+    {
+      "path": "desktop/current-game-layout.cjs",
+      "sha256": "7758c23fe2d9ae54d293de29822d62a82f65c88bd6dd65e49ce44a84441479ff"
+    },
+    {
+      "path": "desktop/desktop-log.cjs",
+      "sha256": "81dd360d476fae00403bdea3f79445fefaa3915c92926da4116329e64f8326b7"
+    },
+    {
+      "path": "desktop/desktop-log.test.cjs",
+      "sha256": "f98cc4a557bf450c877d9d0c602ecae68e178b035bb903053eef5b9455698fd3"
+    },
+    {
+      "path": "desktop/diagnostics-0006.test.cjs",
+      "sha256": "e60d966febd61d954ce4af1484e8161ff62c629c3858635a83328d263933b9fc"
+    },
+    {
+      "path": "desktop/diagnostics-1042-render.cjs",
+      "sha256": "4230e0eed37dc758684b14ed992b7891d92c52c66c75bd0e21ac46aeb51b49d8"
+    },
+    {
+      "path": "desktop/diagnostics-1042.test.cjs",
+      "sha256": "070bbb8f7420db19f3b3c522f358e37a82976f93f21b997b6b109f00350fe462"
+    },
+    {
+      "path": "desktop/diagnostics-1555-layout.cjs",
+      "sha256": "70b7bb04109ae096ee7e35093e8defe10ea82a4a16d10626957c7e51b02a6925"
+    },
+    {
+      "path": "desktop/diagnostics-2024-render.cjs",
+      "sha256": "3c4f69bf02db985bd79a6963cbe1fe18ae6860465fd8e8a2cd240c3fd5d7611f"
+    },
+    {
+      "path": "desktop/diagnostics-2024.test.cjs",
+      "sha256": "f1e61711e8ce1201914028f917231bd0b95716f560893bd57eb95a4568000e2c"
+    },
+    {
+      "path": "desktop/diagnostics-2135-render.cjs",
+      "sha256": "dc782609830a5a3a09379495a61904cb66546cc05663367d9d88c204e7b6c896"
+    },
+    {
+      "path": "desktop/diagnostics-2135.test.cjs",
+      "sha256": "56273058c248f3f21103cf529efa83c60f7d29ff62ae63dca6b9a589e4b5857a"
+    },
+    {
+      "path": "desktop/diagnostics-2244-render.cjs",
+      "sha256": "5fb55452f7c25ce0cf13965d3b91b63e0d1512aa85d1cf97f4fe38371e4260fc"
+    },
+    {
+      "path": "desktop/diagnostics-2244.test.cjs",
+      "sha256": "aec55424678fb9bcd08dd37ac689eb8e56135e0220a0a2add1614748729b921e"
+    },
+    {
+      "path": "desktop/diagnostics-export.cjs",
+      "sha256": "10b2f1be6c347261b1ccb4b4f661260c2e16646776fdbfead93b0de33eb91f87"
+    },
+    {
+      "path": "desktop/diagnostics-export.test.cjs",
+      "sha256": "d3a81ea8b6b99d3da64d36d6a29990eb6b3e407e323ac2bc303ea17f3c33a10d"
+    },
+    {
+      "path": "desktop/installer-nsh.test.cjs",
+      "sha256": "7ccc6dccfe38f9e046d1d2cae7a0ed91916483280a7f2671991eb4e60cfe9e31"
+    },
+    {
+      "path": "desktop/installer-shell.test.cjs",
+      "sha256": "f1845d778869b1843e878a76ac62f57e8946941a6d71b0c2ed1ba35bc5274c11"
+    },
+    {
+      "path": "desktop/installer-startup.test.cjs",
+      "sha256": "36a6e1cb385fc2f212f77c8f9e8975f8160d47ca4914defe57f20e3abde0077a"
+    },
+    {
+      "path": "desktop/main.cjs",
+      "sha256": "bccb05db92ef7311e64a5cccea9cbb5764c320cc8cfcb91e9a2d9bbf91fbd242"
+    },
+    {
+      "path": "desktop/overview-banner-layout.cjs",
+      "sha256": "10e84488f90c2bfa0be3bfa7d71c29d171c253afa0ebd8025332f0458d718d15"
+    },
+    {
+      "path": "desktop/overview-render.test.cjs",
+      "sha256": "c879c8188129bb064affcfe351cf377724c35c7de73ae4bc73ecb3dc450e07e4"
+    },
+    {
+      "path": "desktop/player-group-layout.cjs",
+      "sha256": "232b6e1d25b06815e8145730caf03b6d7fd7aa3ff9c4be474904fedd4427307e"
+    },
+    {
+      "path": "desktop/portable-template.test.cjs",
+      "sha256": "231144b853661c48d8f01ecf9efb8a4ef13e4f517ef9a7c261b2afb31db76d2b"
+    },
+    {
+      "path": "desktop/preload.cjs",
+      "sha256": "dc13e1343b3cf9a849f9cf38bc8215692a14be56b71cd94c13d6e46013c6aab3"
+    },
+    {
+      "path": "desktop/pro-players-layout.cjs",
+      "sha256": "e328aa167474b7f36043f5d7e7dd55f7cc7a6adde2abb985f8342c7a00fa891f"
+    },
+    {
+      "path": "desktop/pro-players.test.cjs",
+      "sha256": "22df9aaaaaaaa4c265cf48ea41adb3d832ec70a5f69ef45d864282d9a19a3b9c"
+    },
+    {
+      "path": "desktop/pro-runes-render.test.cjs",
+      "sha256": "00452dd79c29802ca2e7edd5b38df7335f17b0d4627e01602bee5455cdebcfdc"
+    },
+    {
+      "path": "desktop/proxy-resolution.cjs",
+      "sha256": "54a5492b2eda3cf80fb3909a1b583e654020ef8f6295ef04a8437a278a774fd1"
+    },
+    {
+      "path": "desktop/proxy-resolution.test.cjs",
+      "sha256": "34648a67689b51bed4aa12e6ff847a3a6eebea53aae19500074e6c0f784d3ecd"
+    },
+    {
+      "path": "desktop/r65-select-layout-probe.js",
+      "sha256": "6af85f9da5b3e50161ed245d770038bb9db30cc86af1f2af7277c78d18a87036"
+    },
+    {
+      "path": "desktop/r74-current-game-checks.cjs",
+      "sha256": "d589068ecf923a14dd40ae93337fa084ac4c6de13d56e061926819cb469c8bec"
+    },
+    {
+      "path": "desktop/r74-mutations.cjs",
+      "sha256": "d03d38a38f01f269ce8b38653850859382ab9d2ff45aec00a3e4e215b4d44f3a"
+    },
+    {
+      "path": "desktop/refresh-orchestration.test.cjs",
+      "sha256": "2d31e4d1395393e031e4da9772c13cfb3b55acc7f3b11323fc956564bebe9d69"
+    },
+    {
+      "path": "desktop/release-build.cjs",
+      "sha256": "274928ce89d6e10951efd1dea50ab8d0c14ce387452a86c32d6700a90473a864"
+    },
+    {
+      "path": "desktop/release-build.test.cjs",
+      "sha256": "9aad6c2ccac29fd5ec575f2af418ee79942343361d65cf056239f5a2bf2b2cfc"
+    },
+    {
+      "path": "desktop/release-quality-gates.test.cjs",
+      "sha256": "4a5781c70f149c96cef60b693c23238babbf6e31ed6f1dcb9fe9f9ea5738530e"
+    },
+    {
+      "path": "desktop/share-export.cjs",
+      "sha256": "c5ce78042dee3facf43e8dfbdceffba988d4fe8ff182de977ff70d6feb9e956f"
+    },
+    {
+      "path": "desktop/share-export.test.cjs",
+      "sha256": "4e81750c8b8e2c1157bec51002cd5e73da4f98dae6581b71d3186f93070344d6"
+    },
+    {
+      "path": "desktop/source-fingerprint.cjs",
+      "sha256": "051bb4168996573058f484f39c0000d3001d664d4642188578fa96f67d5092fa"
+    },
+    {
+      "path": "desktop/specialist-overview-render.test.cjs",
+      "sha256": "f962fe32055a6ca44445ce0f0db7267db322fde7ddef26f9725c5e3a1c8a9bee"
+    },
+    {
+      "path": "desktop/startup-assets.test.cjs",
+      "sha256": "9b77cc450e1cf688d0d523a2f7f08af92d69d1a7a046f71c86e6f8a8ad78440a"
+    },
+    {
+      "path": "desktop/startup-sequence.test.cjs",
+      "sha256": "b4edd408da84acf0fa280b456caadf9244b93b61d0f6304ccd16d2ac61f65b3c"
+    },
+    {
+      "path": "desktop/startup-visibility.test.cjs",
+      "sha256": "adab74ae37d9ffe112eac0cc58369e9d588839a563e62d790f5002140fb3be00"
+    },
+    {
+      "path": "desktop/suite-tabs-layout.cjs",
+      "sha256": "5904c5ef2aa1dc0231f2b049a584cfcfd670a9cc66ab8014bcd8a0fafc0c8555"
+    },
+    {
+      "path": "desktop/summoner-identity.test.cjs",
+      "sha256": "81ccda1f3ab3ea9a56bc08f9abc712eb15c4298207710007e42808802c90f297"
+    },
+    {
+      "path": "desktop/test-fixtures/startup-stages.cjs",
+      "sha256": "289b5a98605810db0de30cdfed3f37bd6c5fd8ac0025b34c554f8b37ee7e9cd7"
+    },
+    {
+      "path": "desktop/ui-scale-electron.cjs",
+      "sha256": "816b625c967980f3cd38c1b8a2b022d03cc84f115af25ccec07f78200e0685f8"
+    },
+    {
+      "path": "desktop/ui-scale-layout.cjs",
+      "sha256": "04570c28f7a6824e591bbd21bb08ceb0ba9389fef674776c5f984e906a03ded1"
+    },
+    {
+      "path": "desktop/ui-scale-render.test.cjs",
+      "sha256": "d4230fdfd8ae40ad1e0a1a2bf33fe79ddfb950f90b628c8d10dccc9147274f87"
+    },
+    {
+      "path": "desktop/ui-scale.cjs",
+      "sha256": "b725c3e0f39b9ac32b37e4860264f7a501b41ffb3f7ef2b86f41971cc4660b8d"
+    },
+    {
+      "path": "desktop/ui-scale.test.cjs",
+      "sha256": "4a97e716438d0b33f60f829276da3a3af7b098164da4bb1413033fdb7716df35"
+    },
+    {
+      "path": "desktop/update-lifecycle.test.cjs",
+      "sha256": "28060ba623973d484808098633c3064fbc27702e5fb48f164fe42929296bc983"
+    },
+    {
+      "path": "desktop/verify-build-fingerprint.cjs",
+      "sha256": "f0975ab29ba37a8de09afda61864114c8e5bf416a693f1e0904650104a38c9a1"
+    },
+    {
+      "path": "desktop/verify-embedded-riot-key.cjs",
+      "sha256": "c5ebc3db32c056c064ca7c98c6cda2c959336ef648153b053cbc1aaa96636841"
+    },
+    {
+      "path": "desktop/verify-packaged-runtime.cjs",
+      "sha256": "7685f5c35db33b362903ff7621f2bbb38967a1882d226c591185d82e1c6ff541"
+    },
+    {
+      "path": "desktop/window-bounds-store.cjs",
+      "sha256": "3974331f0a1e0f24fb6657933627ff585d74b0fc00a191c73bf64c48eab32d7c"
+    },
+    {
+      "path": "desktop/window-bounds-store.test.cjs",
+      "sha256": "7949b1a0578da81567e0c8996e1fd345c12850e84f625838168ff3ed8fc45a22"
+    },
+    {
+      "path": "desktop/window-bounds.cjs",
+      "sha256": "11d2957a81ad1b879caadcf8c0cf129a048dede861cb4bfaa896f870d631eece"
+    },
+    {
+      "path": "desktop/window-bounds.test.cjs",
+      "sha256": "5f9cc940ef3825a9979ff3e60d34fb9bec0a6d0cad85396c8b69069e6a8b9158"
+    },
+    {
+      "path": "desktop_startup.go",
+      "sha256": "21d6b7d675ae52da8a292540095e34936eeb8b7a5ca85b7c2b155e4d6fadf39c"
+    },
+    {
+      "path": "desktop_startup_stage.go",
+      "sha256": "c5bdb51cf0ab40b9055245657e8c9d4f6ca0ac7e77597a46523c515f2c228baf"
+    },
+    {
+      "path": "desktop_startup_stage_test.go",
+      "sha256": "ed2232e0bdc15c17051525386d4e9dc3ffa97278442bff4ed7289d727968791b"
+    },
+    {
+      "path": "desktop_startup_test.go",
+      "sha256": "628e878347b3b2f8f60da6a4e99d5c1d16606c0ab6b04c75f0bc88eab20a0255"
+    },
+    {
+      "path": "diagnostic_source_guard_test.go",
+      "sha256": "8636deaca3607b4e1a37edfdff54939c64ba39b27f93b316265ab809e7d4534e"
+    },
+    {
+      "path": "diagnostics_1042_test.go",
+      "sha256": "dea199566f569f345d59c9e14d147f88e76c5e5c4d76c1a421723fffc712f7ec"
+    },
+    {
+      "path": "diagnostics_1110_test.go",
+      "sha256": "a47826c8d5fce7f68c211dd4b44b29a96db311a3e7d196e17458ab368603e39f"
+    },
+    {
+      "path": "diagnostics_1412_test.go",
+      "sha256": "2088bfa96fb7b3829aa092e85a752b112c66a36292047f14aaa87528be12d4cf"
+    },
+    {
+      "path": "diagnostics_1555_test.go",
+      "sha256": "db4a463f9e3becebe9e899e75fc4a2df361823fd25df70a32a698f8956c0c585"
+    },
+    {
+      "path": "diagnostics_1945_regression_test.go",
+      "sha256": "5b1a6241b99d64440dbf97e0666291cfbeeeb9ae71af972530563f60233916c4"
+    },
+    {
+      "path": "diagnostics_2024_regression_test.go",
+      "sha256": "8202ef9640934d0bdb0ca0bc7c03961d958ede8a297845a9647cd21bdca08756"
+    },
+    {
+      "path": "diagnostics_2055_test.go",
+      "sha256": "05dcadf8c97fb618da5fb75a7062e842b71de8df4909f21521dc8d5f47f28c79"
+    },
+    {
+      "path": "diagnostics_2135_test.go",
+      "sha256": "2ba3b8e247e7af3a4b0532812bb96e2a188e8ef20d62c586d0aa156bf2e35ee1"
+    },
+    {
+      "path": "diagnostics_2143_test.go",
+      "sha256": "7dcb4efad44a7f7d048fa7b65459de26e68279ccb195d7f7f740b7226ce1f5b4"
+    },
+    {
+      "path": "diagnostics_2244_test.go",
+      "sha256": "bb8afc1726b81d9f07c9aef4a4b49f8efdd979890038c4587537cc9e172fb2fd"
+    },
+    {
+      "path": "diagnostics_2253_test.go",
+      "sha256": "8c456657b6264e952cf48ca807d1fad320c13bb346834595dbb4feb18bf74f5f"
+    },
+    {
+      "path": "diagnostics_2351_test.go",
+      "sha256": "85da1fb915c4ec8a362fe86b8d7e5e3537db25e2fdcaaa8de3000d0a7b459a59"
+    },
+    {
+      "path": "feature_gates.go",
+      "sha256": "e8dc964ecbe6d216f05cb5ac3ef61dc1ef97fe1c1fe10505ea3bcb6a356dc58f"
+    },
+    {
+      "path": "feature_gates_test.go",
+      "sha256": "239d46b4b3a291e82066dfa2f274743de67c301c8e6ce04c7f23fa5947cf6505"
+    },
+    {
+      "path": "features.go",
+      "sha256": "87dd7721e4b7b7a0e4ed5140a636e03a2341acf6d080f07ad70c92a4afdfbc05"
+    },
+    {
+      "path": "features_test.go",
+      "sha256": "6b8ed75152ca49334a493706d3422c1d40580095e02278a46c7c5e44d608bce9"
+    },
+    {
+      "path": "flow_diagnostics.go",
+      "sha256": "d54f434a49fdce47c7ea560985a8815124d10d384e252437e6c0691397c2f314"
+    },
+    {
+      "path": "flow_diagnostics_test.go",
+      "sha256": "35be9930720fa959bdcfb5ff47630db57d8364bfd0eada0ee4ce7b7445b29a9a"
+    },
+    {
+      "path": "game_settings_lock.go",
+      "sha256": "9114879c74d80c9353428fdf35461cba2c4c827e58f7481ea61e4e223164adf6"
+    },
+    {
+      "path": "gameplay.go",
+      "sha256": "bba30726ab59306762293d8d0476e72978af18456a56ed7e1018cf570797f145"
+    },
+    {
+      "path": "gameplay_test.go",
+      "sha256": "2f56a35fe0470b4caf1b58ba8bf67be437b49154863a21b9698ff09c9b8289fc"
+    },
+    {
+      "path": "hexdata.go",
+      "sha256": "d76a90b3f4721ba20e5367b1cc06d86ac0fea8051429e136d1d38e2eb2655bae"
+    },
+    {
+      "path": "hexdata_test.go",
+      "sha256": "9732ab8779a2b9a3d984a3002b4c6fe4f8e625e05d850f3e1f65e163f8e26b53"
+    },
+    {
+      "path": "installer/application_launch.go",
+      "sha256": "ce14428d0865f80abc2d6a6691d3272f096e475aa5a3d6d62968e6ce742f5a87"
+    },
+    {
+      "path": "installer/application_launch_test.go",
+      "sha256": "d561f05351ad3b6798439cc9bc2a7ce94d9bfb4c55aed711d7f751d805f2a00d"
+    },
+    {
+      "path": "installer/build-shell.cjs",
+      "sha256": "733f7b6bcaad6958bf868f9825181ec47ff144dcc193fddd0efdac9f38fe519b"
+    },
+    {
+      "path": "installer/completion.go",
+      "sha256": "5ea65282488e751f39426634ba3bc71a46e5d13922b338058817fbffdc13d0e7"
+    },
+    {
+      "path": "installer/completion_test.go",
+      "sha256": "11747aad7329a690b6abd9b3d995c2c3f826034ee2c66fa36ec2c2b89d0a1fba"
+    },
+    {
+      "path": "installer/completion_wiring_test.go",
+      "sha256": "f94560cbcc2f65dbfd1457f7fed9568d54664fdf69e193b5a04b063c28a35b7a"
+    },
+    {
+      "path": "installer/dialog_windows.go",
+      "sha256": "6084b37b4ed72c48678bfee9179eba08df66934e62dd445b9dfe89d4a87b8c7b"
+    },
+    {
+      "path": "installer/execute_command.go",
+      "sha256": "c8ace94d72f9bcb47829e5c0740e2a28cbc4cf6dc848a602816de9b4c7df5419"
+    },
+    {
+      "path": "installer/execute_command_other.go",
+      "sha256": "c430e033becd380b4edea50e74615facb534d8e391f1fbf4a2d3751c3a7407f3"
+    },
+    {
+      "path": "installer/execute_command_windows.go",
+      "sha256": "4b703c70303f6e88e3eb2b3987afbe3ac77cec630eef70a1102a0ef34a580b44"
+    },
+    {
+      "path": "installer/execute_prewarm.go",
+      "sha256": "22ec9d195500ac79ef5ec4b476c7af2f337053d42f4a6df5f4e24731691da1c8"
+    },
+    {
+      "path": "installer/execute_prewarm_test.go",
+      "sha256": "8af2c801a9d0d013533214c17de63b878a60c5f51b63dcb69190f9408ee0ad03"
+    },
+    {
+      "path": "installer/execute_warm_config_test.go",
+      "sha256": "bdc38b1a4f180ed5fcdc65a01a3ff47ea4bcf20f10a48d89eab1d7dee304ca0b"
+    },
+    {
+      "path": "installer/handoff.go",
+      "sha256": "6493155e7eedc70fe29d8c06ef4edb7fcc9130457fda762542db69fdf5b0767a"
+    },
+    {
+      "path": "installer/handoff_test.go",
+      "sha256": "116d5f5aea168d0761090e4a55e4b34769f0ff13e76b4ea47469fca07dd99aff"
+    },
+    {
+      "path": "installer/handoff_windows.go",
+      "sha256": "9baeee6d9e53e5ba805e3717f28aecdecfff600f6527d14fe6bb4d200cd72502"
+    },
+    {
+      "path": "installer/handoff_windows_test.go",
+      "sha256": "782ab631d887a32a4239316a850953d0ba7288a9c1d7e50cd5cf37143bc27973"
+    },
+    {
+      "path": "installer/install_windows.go",
+      "sha256": "c2fad76c19c2e7b803374253eba6d07caac2f84b7c2528c88741e363bdb93161"
+    },
+    {
+      "path": "installer/internal/webviewhost/abi.go",
+      "sha256": "f7ae805a42ae933b9be23ecaf74c4c688ad9df2c916d4b36c55c8cfcca676113"
+    },
+    {
+      "path": "installer/internal/webviewhost/abi_test.go",
+      "sha256": "85280e363bff32d4ee283b5a5274c5d7720a0946a19f7f9f7941b54773c105b8"
+    },
+    {
+      "path": "installer/internal/webviewhost/failure_windows.go",
+      "sha256": "cea57663f35a5ac6b275ad5a41f953048c78735c278fbaa89ade450070f37b94"
+    },
+    {
+      "path": "installer/internal/webviewhost/runtime_windows.go",
+      "sha256": "e83fc66d3f77ab7b5714c19b8773637f3dc19ac43727d143f0f6c3664fcebf93"
+    },
+    {
+      "path": "installer/internal/webviewhost/settings_windows.go",
+      "sha256": "0a13a15ec368c84d8077353d631e155b817cb1b82c75f975c71318f66f6e26eb"
+    },
+    {
+      "path": "installer/internal/webviewhost/settings_windows_test.go",
+      "sha256": "182d866ecc1679ad20da3e15ad208191e53d3148ecca357e2a6bf872812a92e7"
+    },
+    {
+      "path": "installer/internal/webviewhost/startup.go",
+      "sha256": "1fb4401583fa66b0003e1284d5d26fcfac6a643abb3d9fa2ba2ed4c164cc35dc"
+    },
+    {
+      "path": "installer/internal/webviewhost/startup.js",
+      "sha256": "89267b85bf11ff4b2e17c6603e89fd5b5934ba668d60f7184a250a9b83c63a46"
+    },
+    {
+      "path": "installer/internal/webviewhost/startup_log_test.go",
+      "sha256": "d8d023301afd0dfba162dfbfc731fc63a9adf5d7f7e986ecf768a5ca34de2d61"
+    },
+    {
+      "path": "installer/internal/webviewhost/startup_test.go",
+      "sha256": "6c66ac1a6fd0c0c85ad174dc9c11c8da6833e25e4ec01a64e5718cc214c8e208"
+    },
+    {
+      "path": "installer/internal/webviewhost/surface_windows.go",
+      "sha256": "52ffe3424b525d27982b8b182ab3dd9ac6c4655cb307ca02706b1d43fca1911f"
+    },
+    {
+      "path": "installer/internal/webviewhost/surface_windows_test.go",
+      "sha256": "d68bd2afb82ae01b470b8dd8fa62ba7de0d056fbb819fba15f198ffdaa98eedc"
+    },
+    {
+      "path": "installer/main.go",
+      "sha256": "6794b55f7c7de9feeef5923de5f947e14f6add7afa2d2b4fa0f661475401342c"
+    },
+    {
+      "path": "installer/main_other.go",
+      "sha256": "0277d1af3fc37f03a053dbf431aaaa99f742b84ced351266c445949acdf055d8"
+    },
+    {
+      "path": "installer/main_windows.go",
+      "sha256": "4be41ee2319631434d943bfd707d36b9b61e6a9c13464dddec2be08a51eda962"
+    },
+    {
+      "path": "installer/message_wiring_test.go",
+      "sha256": "62328f170d9b21f500c2c613858cb457ad2331d2a91789080ee6e456925bf1e1"
+    },
+    {
+      "path": "installer/pathrules.go",
+      "sha256": "213fdca8f94b3dee2e547ee9364c7e50dda1d038e196e828c0a663192bebba3f"
+    },
+    {
+      "path": "installer/pathrules_test.go",
+      "sha256": "60d3c055a931a54a24c33f641292faac38cb37986fee68fbcaf048799470bf37"
+    },
+    {
+      "path": "installer/payload/payload.go",
+      "sha256": "790c959fac93f72eca1fa46be1aa62e8b80cb3039179df430caeb6014a5a6ba4"
+    },
+    {
+      "path": "installer/prewarm.go",
+      "sha256": "cdbda732808e4bd8f2a1c11a341827e9af8a82ac0a8375d14e504094801dcd91"
+    },
+    {
+      "path": "installer/prewarm_completion.go",
+      "sha256": "8058a3e852e4464173b6d2582548ef88a4f44702026d8d9ec2a8ba4b47975c22"
+    },
+    {
+      "path": "installer/prewarm_completion_test.go",
+      "sha256": "c7e032fccd770caef3ae14144cfe5301d3c3e03c13389ae16ba36fbc84dbc173"
+    },
+    {
+      "path": "installer/prewarm_test.go",
+      "sha256": "0dcc1a9f4dbcf8d88a0aa3f61539b4e129f899fa75adc8b5eef6700221bfc9a9"
+    },
+    {
+      "path": "installer/progress.go",
+      "sha256": "d9c85e9f331f7110be6a8883d393e005a07c1ce64274b4ef7a03f2688869fe9c"
+    },
+    {
+      "path": "installer/progress_test.go",
+      "sha256": "baf55320d6a4417fe84c36976c77e3f07a9e6605fcb1354200ce4ea548032f1e"
+    },
+    {
+      "path": "installer/r86_smoke_windows_test.go",
+      "sha256": "d92c38661c3a73ecfca15110d92edafd1996d8ff12dd94b1d6099a3ecbcb6e6d"
+    },
+    {
+      "path": "installer/resources_test.go",
+      "sha256": "48c82ab3c05ceeca8d9bc47c786951200400b489fd1c52112b05e0751704e36a"
+    },
+    {
+      "path": "installer/startup_log_contract_test.go",
+      "sha256": "d7957d4a7bc160c0cb5371987659feb4a498d29dcf910edd09d85bea8c67edd5"
+    },
+    {
+      "path": "installer/ui.go",
+      "sha256": "d4ad77d831f162e8532a7d198295bf75ea1f9d4de3dd531c1955236c27dbc902"
+    },
+    {
+      "path": "installer/ui/uninstaller.go",
+      "sha256": "eae93a95eee5d9743087d8a81dda0c08a4fe41fd2af423deae57fcb707c25485"
+    },
+    {
+      "path": "installer/ui_test.go",
+      "sha256": "18844e6a54985ee74cffff337c1f191cdb69675e9122b31b37babbedf92f12a9"
+    },
+    {
+      "path": "installer/uninstall/finish.go",
+      "sha256": "884deb3e5ddb1448f3d9d616bf8f7fcb9a939d7254cafce26c0e72817fc4634e"
+    },
+    {
+      "path": "installer/uninstall/launch_windows.go",
+      "sha256": "e528754401428cb093333d2435f0c6ab366b1ea016e86f10ee8a6ebf13841a7b"
+    },
+    {
+      "path": "installer/uninstall/main.go",
+      "sha256": "1bc8071695b92d623ffe9a4e85181414b428f0f2be2f27eefa6369d58e7a5f3d"
+    },
+    {
+      "path": "installer/uninstall/main_other.go",
+      "sha256": "0277d1af3fc37f03a053dbf431aaaa99f742b84ced351266c445949acdf055d8"
+    },
+    {
+      "path": "installer/uninstall/main_windows.go",
+      "sha256": "c301c223c0f825d977d7fe745d2bde1b9b279b724b617da06f24cc2efb604dbe"
+    },
+    {
+      "path": "installer/uninstall/pathrules.go",
+      "sha256": "232348b654d11cbc97bd46c49ece238d1e89a486ecc0dfaa6d0b6c654c043660"
+    },
+    {
+      "path": "installer/uninstall/prepare.go",
+      "sha256": "f71faa874293da7ddebc297a5350bbb93c4ae5ef86fe9e249c26e8a7948d521a"
+    },
+    {
+      "path": "installer/uninstall/prepare_test.go",
+      "sha256": "34db5adf41ba12bb86acbf47a287ebe6355a0ceb39745faeda34ec7b9adf5be6"
+    },
+    {
+      "path": "installer/uninstall/progress.go",
+      "sha256": "0dae4a9cb75190497e16ae3c5d134f43d75278ddd1f74e432585bb1f034e49bd"
+    },
+    {
+      "path": "installer/uninstall/resources_test.go",
+      "sha256": "48c82ab3c05ceeca8d9bc47c786951200400b489fd1c52112b05e0751704e36a"
+    },
+    {
+      "path": "installer/uninstall/settings_windows.go",
+      "sha256": "4a0f29d27966e4370cb675b51a95e7b7d3f2c5e03b734cb683b91ae6309337b5"
+    },
+    {
+      "path": "installer/uninstall/uninstall_test.go",
+      "sha256": "f4c1697295a343f2f98c706805ca4896519079234a3c77e5f298332e79765435"
+    },
+    {
+      "path": "installer/uninstall/webview_windows.go",
+      "sha256": "8b4049a2636431fe9fab108928bc2f1b64cef36385daf0c1f7b3e83ab5b8ffaf"
+    },
+    {
+      "path": "installer/uninstall/window_windows.go",
+      "sha256": "e85884785c4ba1431a4cd468357df102500ab9fffc0384a76542e2f42127c5d4"
+    },
+    {
+      "path": "installer/update.go",
+      "sha256": "5042917b93758b0a571a7a92ab5b27889830aca0d360a758608bc79f97487455"
+    },
+    {
+      "path": "installer/update_test.go",
+      "sha256": "b9c07dfeb46b42024271bda24f00ab556a9a2edac077564d3cb0bb53b3f4ec48"
+    },
+    {
+      "path": "installer/webview_windows.go",
+      "sha256": "9e4bfc8057cc62db55cd122bd4c84efd4a83eb4eec028f0ada16a8956704cdb9"
+    },
+    {
+      "path": "installer/window_windows.go",
+      "sha256": "4611ccc44fc89c31dba8abf17a137ce768a83ea4c92981c4ecf5e665aa878752"
+    },
+    {
+      "path": "item_depth_completeness_test.go",
+      "sha256": "cd7cb59bf2d10bf1864ff4ea4a35665d107a8fc8f441c9286b6e5a764759ecec"
+    },
+    {
+      "path": "item_set_authorized_cleanup.go",
+      "sha256": "ad55df993247072c63daba98da3bdc10b144c3646f163168429c7972bc4ee8ba"
+    },
+    {
+      "path": "item_set_diagnostics.go",
+      "sha256": "9dcabfa3f0b81872f49ec93f7f8904176b23e8f432bd879e517d079d0f9314d7"
+    },
+    {
+      "path": "item_set_migration.go",
+      "sha256": "4733a21a01ce8018801eec54e4748fd9e7006205506b991961949cc887c81d92"
+    },
+    {
+      "path": "item_set_migration_test.go",
+      "sha256": "69b17f6629af89ee958f074f39bfd4343fda34b0246a9472a300c77b40c69b0c"
+    },
+    {
+      "path": "item_set_recommended.go",
+      "sha256": "92301daffca3c9fc4b620b604cc145173a5b7e1427680e2980d8474fa595a87a"
+    },
+    {
+      "path": "lcu.go",
+      "sha256": "6d42d0d40b6f37a23b24835b9b36ddd007efb0773524136a98e8cddff9ec75dc"
+    },
+    {
+      "path": "lcu_api.go",
+      "sha256": "f9f6e4b672742bbe82be7aa5cbdfabd434fc6f96222416cb8d42d880f207f590"
+    },
+    {
+      "path": "lcu_api_test.go",
+      "sha256": "b576ad4c9eb37e75a49ba4891c44e5dec74a9f673eff5a400f08411c80ee9551"
+    },
+    {
+      "path": "lcu_events.go",
+      "sha256": "2387ffe5066aae2eeb3798b8cbb18a95523e9d5f488d057d68bce3e6cd2b439d"
+    },
+    {
+      "path": "lcu_events_test.go",
+      "sha256": "7b829305825128dee301b1a51b439b53ea797879194cc3a12b8b90a528b2191d"
+    },
+    {
+      "path": "live_updates.go",
+      "sha256": "6ccda1cab001e35df7f5c79f47f8bd56b09f6ce67182a490b232153522798530"
+    },
+    {
+      "path": "loot_metadata.go",
+      "sha256": "51ccce89ec42a9cc002acefdc7156c516096633bfbac688e3d34cb7118164507"
+    },
+    {
+      "path": "loot_metadata_test.go",
+      "sha256": "c938cda38943bf78243fa44def04efe890731c9266e4662c179e4daf35af2195"
+    },
+    {
+      "path": "lp_tracker.go",
+      "sha256": "619337ebac4e809e9b6ee43b704b6b2d5aed30c8524afe1157a5d626d1c2c2f7"
+    },
+    {
+      "path": "lp_tracker_test.go",
+      "sha256": "fbaf1d54acbaca82bcdf4ee6ae3a04b445efc2a3901a1ced3cdbf83291020782"
+    },
+    {
+      "path": "main.go",
+      "sha256": "6df2c3c43711da3d163a9c1b27e66b0f9fff32eb2e349f4f29a9475d4b6a1cb7"
+    },
+    {
+      "path": "main_test.go",
+      "sha256": "7f741931a043bd6f49d93a4533425b8dfa7fa339c76d7f49241cf0bcbfb1250c"
+    },
+    {
+      "path": "match_timeline.go",
+      "sha256": "8e62665376c21712672e89337c86838a3418c274dd22dfa65ca98417e77bef39"
+    },
+    {
+      "path": "match_timeline_test.go",
+      "sha256": "8266bc9c38742eb27ba4b5ccdecdf65eccc107b4ca2afd6b7fcdcfeb8fbe5928"
+    },
+    {
+      "path": "objective_clear.go",
+      "sha256": "adf0aa6e8fec0b3b25ce77b29f2adb8831e1f12a76330bf53b5266eea742e0d0"
+    },
+    {
+      "path": "objective_diagnostics.go",
+      "sha256": "c360c4236bca9d776e376f66f61fc0e58240f5d03ea6fa0efe647bce57c7e804"
+    },
+    {
+      "path": "objective_diagnostics_test.go",
+      "sha256": "6f48d25a237f0b7f984b98fd70f3f9e0b2a606e250d5d924febbebafcaaa5c5b"
+    },
+    {
+      "path": "opgg_insights.go",
+      "sha256": "43317eb0147ef7e2f1f5dbaf6f89ed94be1617dd8a81ec127ca575f5c20aa1a2"
+    },
+    {
+      "path": "opgg_insights_test.go",
+      "sha256": "35c0099bb99a3536ce67f0d1197c597e7e195c88183253a38ef7c3a01496b473"
+    },
+    {
+      "path": "opgg_player_page.go",
+      "sha256": "60c77c747da26942139e296abe704d58b57059d4d3d17cac47dabfdc23d9d523"
+    },
+    {
+      "path": "opgg_player_page_test.go",
+      "sha256": "e9782ad7d8a53d19f9f7ad212fbd8196e81e1487e6aa63e9615dbaa5075e1bd8"
+    },
+    {
+      "path": "opgg_season_summary.go",
+      "sha256": "c5f51da60e0b1dca931e7262e10e6144dc984f335542c8c34856e465043fe8a7"
+    },
+    {
+      "path": "opgg_season_summary_test.go",
+      "sha256": "2e7ec1e73d5652f596d7ee37e31e7b190600d888d0b6192f7a429e0d1478763f"
+    },
+    {
+      "path": "overview_art.go",
+      "sha256": "e851e1e6bcf3c77a0f22fbfd341665378eae3f1eb248ed9ee0369a3a8ef29f1e"
+    },
+    {
+      "path": "overview_cache.go",
+      "sha256": "fd322e112f23339358afbc395937049de9cebdfc7cc24832fadf43efc5d2ebc8"
+    },
+    {
+      "path": "overview_cache_test.go",
+      "sha256": "1fc3c29a2f1de96176099183162c4b03c47c3ed21d46b365196f814e62a5f695"
+    },
+    {
+      "path": "overview_current_game.go",
+      "sha256": "7174d7533f43565d8f44e10f23dca34d2e3f06664a0daf795eba46615eac3e6b"
+    },
+    {
+      "path": "overview_current_game_test.go",
+      "sha256": "f49e11f0d1e9ca9115d2603dccb06fac6b41b990f071c2db766632af52dc0443"
+    },
+    {
+      "path": "overview_supplement_cold_test.go",
+      "sha256": "dab9311b4a01b1c333803ed1ac7f2fc99593f05347cee4abdc5ac8abd3cf69fd"
+    },
+    {
+      "path": "overview_supplement_diagnostics.go",
+      "sha256": "441b04186545f12ec5bda236fddb1f420200bbadb6175b3a375ed920fcdb56da"
+    },
+    {
+      "path": "player_ability.go",
+      "sha256": "75db4a3d573cb8d18851008d1c7a7ced1b817495bdf41921ea5be27506be4f8f"
+    },
+    {
+      "path": "player_ability_test.go",
+      "sha256": "6f15c438353691da8ac56523e023620b9ef6a0a586b5419bbaa59bb3f8c3966d"
+    },
+    {
+      "path": "prestige.go",
+      "sha256": "06822d8a9c6013cf2af99aa65a030bffff390b48bb469910e8096b80b03e876b"
+    },
+    {
+      "path": "prestige_cache.go",
+      "sha256": "8320360295fc96c26ec4be25d0f93367550f072018a7a3de3b5c45bf84fc3925"
+    },
+    {
+      "path": "prestige_cache_test.go",
+      "sha256": "99d38b2d59dcbead4ef7470d28533d414bde4641f1b0a5bc9f71237f5542afab"
+    },
+    {
+      "path": "pro_players.go",
+      "sha256": "af946056352fb24c210f52666f8bd8018599779fe2bb4dbffce8529ba7b49baa"
+    },
+    {
+      "path": "pro_players_ladder.go",
+      "sha256": "116402fb2f2513b3d1f4301b4d47a73cd56ac40548e5f4969c6e06a430d309f5"
+    },
+    {
+      "path": "pro_players_supplement.go",
+      "sha256": "a4295c5a89d1037d6d497729692c3b7262bd6d893913174c90723166d34089bc"
+    },
+    {
+      "path": "pro_players_supplement_test.go",
+      "sha256": "3c0c9d5758f48cfe708d370f73919bbb636f7da0109dda83f6d846a18a00b2d3"
+    },
+    {
+      "path": "pro_players_test.go",
+      "sha256": "ba93e7306b7f667769f0cb60ef2d7c2870d7ae868bc96aedf11296eaf39a5792"
+    },
+    {
+      "path": "pro_roster.go",
+      "sha256": "45217cb6faf08c1568a5e611910d7747e40c46c63c1f4f7692df918f03e63323"
+    },
+    {
+      "path": "pro_runes.go",
+      "sha256": "e9fec57ac408ed6cdd1aa52c7d057620cf695c9d52fde5c721e05513da4e1ebf"
+    },
+    {
+      "path": "pro_runes_live_test.go",
+      "sha256": "7ec28e1f13c75c5f77ce07447905e28497c19161966f59df79e540a95daf4c2e"
+    },
+    {
+      "path": "pro_runes_recommendations.go",
+      "sha256": "d8a76705b72ed9ab7a5ef2a1a42097b7de759b3e23d121fa80342b29d2a3a119"
+    },
+    {
+      "path": "pro_runes_test.go",
+      "sha256": "c1a991caaf69fa2694b1e492b19cb986dc41fb9826065027eeebeb82c365ed4c"
+    },
+    {
+      "path": "process_other.go",
+      "sha256": "226131e1339c477a832c21ffbbef4bf91059d26f9a2e05179fd79108ee44bd7c"
+    },
+    {
+      "path": "process_windows.go",
+      "sha256": "31ec322d6be7da47f0d0c730c45bb4ac0538f992be6b4d5900ac55fc0c453b9e"
+    },
+    {
+      "path": "profile_facade.go",
+      "sha256": "36afa1232193556ca0a8f8119ec478e1680c72d43f0b7614d719c5dfd4b38b56"
+    },
+    {
+      "path": "qq101.go",
+      "sha256": "0f25dfd9fcc69d567269564b8572e57d5474395e608aecc9707bfb95dbf34ed5"
+    },
+    {
+      "path": "qq101_test.go",
+      "sha256": "5898eaddb8587811dbc33d4b009a4e16a30899216d78f46d15a4f45f2fa03a52"
+    },
+    {
+      "path": "quality_test.go",
+      "sha256": "deb94c1b011783ef54db1cdaad0472d4cadc0ad8f83352d32e296a35e719cd55"
+    },
+    {
+      "path": "queue_groups.go",
+      "sha256": "2cea9bb8d43a380202514a29903c8c224e8334b908c51c03387a78e5b70d70e4"
+    },
+    {
+      "path": "queue_groups_test.go",
+      "sha256": "75dd6207270ff7cb09e666feef74dd12fd3db7b114a201bddeac35743e169e34"
+    },
+    {
+      "path": "r29_test.go",
+      "sha256": "55ffe34d1d9e6e86ed0851196acf1b6141ba34a96116279182b8eee2c075f08f"
+    },
+    {
+      "path": "r50_suite_test.go",
+      "sha256": "5fa8f84701a0940c20ca0b52147346ee830c20fe7e6edf158f194bd74acfc875"
+    },
+    {
+      "path": "r54_suite_test.go",
+      "sha256": "ab3e98d0314f6b928686280af1d07a38a98cf5eb6855f09f258a217e42144c27"
+    },
+    {
+      "path": "r55_test.go",
+      "sha256": "1cfb186de5448cea60fc6c3059d082f83d631d376d239a663356a43ee305827a"
+    },
+    {
+      "path": "r56_test.go",
+      "sha256": "6bccd1147c814611f340cb3077559abe3b140b6444b5d7b58fd0b66d9553d2d9"
+    },
+    {
+      "path": "r58_test.go",
+      "sha256": "591a08e1a0df0c9622d7d4fa634c852e267791eaa350044afe99e71166461fa6"
+    },
+    {
+      "path": "r60_test.go",
+      "sha256": "26971788233ed5c2bcf7a001950493fc40afae59f1d184c189d230f4ababb22e"
+    },
+    {
+      "path": "r64_test.go",
+      "sha256": "7068f7a09e50f4760009ba8e48dee6832228b1ea0b910af3e9a54944d5213bb6"
+    },
+    {
+      "path": "r65_test.go",
+      "sha256": "d1b3c16726c90c6109794efe92cb2b759ed34cac539c9e1c8fd2918ec88249d1"
+    },
+    {
+      "path": "r66_test.go",
+      "sha256": "722a6abf300be2414d19ace1f524dbe5ec44291258bf5ccc48df20233a53b2c8"
+    },
+    {
+      "path": "r68_test.go",
+      "sha256": "9c75ba0dbf1b321db2b78912a3020ef171a5b8b4c08ce1b8055ae04c2841d546"
+    },
+    {
+      "path": "r69_test.go",
+      "sha256": "c211bdef8ec72736fb607884f69c1a5587a5cf8571875c6580639fc52bfffbe7"
+    },
+    {
+      "path": "r70_test.go",
+      "sha256": "d56eed4af1dda4a13bde37c8dd7ddc9d722fe4139631381cb4617c83b0e47870"
+    },
+    {
+      "path": "r71_test.go",
+      "sha256": "9ada745be0bbe24b5b68dd451133274c65e104bcffe22b99de4ab7c09c06e8a3"
+    },
+    {
+      "path": "r72_test.go",
+      "sha256": "0ac51b34fbb2d50684cbc73a335f0eda62acd2925f7517d4f60d94a98da9c739"
+    },
+    {
+      "path": "r73_test.go",
+      "sha256": "530b0906645ad3fea6207129b992abb3401ed446457e91a35e90d08f0e72276b"
+    },
+    {
+      "path": "r74_regression_test.go",
+      "sha256": "8eeaef7bf99ae570c68c2d8a7caf06bab2546cfac5c982e6e838cee41761b031"
+    },
+    {
+      "path": "r78_test.go",
+      "sha256": "2cc23f84f09bfdfa1d0048d754b1095e2c8eae9e69adae7dd7d2be73feb436e5"
+    },
+    {
+      "path": "r79_test.go",
+      "sha256": "ea2faf321e458569b55192cc426025a1e20944137edeafd99be6aba0e2f6dbe6"
+    },
+    {
+      "path": "r86_cache_test.go",
+      "sha256": "943eebf35abd5c09148f1dd684400d76eb3622dd2b99bf194e8f1b65ba1361c8"
+    },
+    {
+      "path": "r86_diagnostics_test.go",
+      "sha256": "cc17f6feccaed5c2d799428cdc3fcf595dda2557d7bb132022ea2aaaa1d4df0e"
+    },
+    {
+      "path": "r86_disk_test.go",
+      "sha256": "26274b7eeb701855498a069c00e21bebe03f940663e63cad4dc22e2d16cc138b"
+    },
+    {
+      "path": "r86_paging_test.go",
+      "sha256": "aaacf8a96bd98eec296f2ade491ee27579c71946a5a90e180b8aac8c76088b55"
+    },
+    {
+      "path": "r86_storage_test.go",
+      "sha256": "f89ca64b1caad7fc50db86e3707200d2c834777972847782ce97d0f1c9c40170"
+    },
+    {
+      "path": "rank_insights.go",
+      "sha256": "ff218f6046b7901dcfe7fbd53378dfc24d983822377c25c621d5d604996bd959"
+    },
+    {
+      "path": "rank_insights_test.go",
+      "sha256": "e5db8cd2f7d7e3a2578252d8c6848dbc680d95929a84ede18c8683358df9a019"
+    },
+    {
+      "path": "ranked_split_probe.go",
+      "sha256": "98789e5c5f934e11e9ab15a832877743ea3547e037ac87d1721e79db2c4475af"
+    },
+    {
+      "path": "ranked_split_probe_test.go",
+      "sha256": "105cfd1cadb662acc6a435f606861132e3d33e93204ca1f921e539ff6c3aef90"
+    },
+    {
+      "path": "riot_api.go",
+      "sha256": "837150786d1221c5a886971cc013ba04db8ede4b4d8c289df038f335aece3b07"
+    },
+    {
+      "path": "riot_api_test.go",
+      "sha256": "b264b4e216c7f80746dacc515d2632beeb2c63ac47ed080e873899676a3fbc30"
+    },
+    {
+      "path": "riot_client.go",
+      "sha256": "934db3e54811e6b033fc3a6de8306eb71bb87b57e2e27d297270339557ba36b4"
+    },
+    {
+      "path": "riot_client_test.go",
+      "sha256": "d495311a3d5995f4032e0e7ae0274c1ce1bd7d547aaf30244ec399bfdfa784cc"
+    },
+    {
+      "path": "riot_key_test.go",
+      "sha256": "6f8f532c56e322e1d516d98b82895b13eb28a6bfb0017dd9d701d9e337f033ba"
+    },
+    {
+      "path": "scripts/build-stage.cjs",
+      "sha256": "afe5bd87fbd4b56fb9df39bdc85ae44f98e03d053946cae23a2ba7353e89f536"
+    },
+    {
+      "path": "scripts/build-stage.test.cjs",
+      "sha256": "510e45c90dfb87fd354accba89feb3a83c2368affa7af2d0ae2de38460883084"
+    },
+    {
+      "path": "scripts/make-release.cjs",
+      "sha256": "25971ae0e3d4b141d56c0d187bc7bf69b5c2b8e3ab10fe6a2907ecd2da482dbd"
+    },
+    {
+      "path": "scripts/make-release.test.cjs",
+      "sha256": "c5dba16d5481930029edc9c57b4f3c503be9ed966d6aa835ae92b37b4a531b83"
+    },
+    {
+      "path": "scripts/r82-startup-ab-report.cjs",
+      "sha256": "b66bbc9d0c369a86955fc438a84933c5da41b337ce3dd1d8e6e8ca6ed5fcdbfa"
+    },
+    {
+      "path": "scripts/r82-startup-ab-report.test.cjs",
+      "sha256": "ca97e5f6b77f2b9b434a445afd720847d8fbead3d768896d2d36240bdef6b678"
+    },
+    {
+      "path": "scripts/r82-startup-ab-script.test.cjs",
+      "sha256": "6e0bcc05baa4f83ef0a420ac86fb0243389f526ac75faadc3fbf71e8a6b05e37"
+    },
+    {
+      "path": "scripts/setup-only-build.test.cjs",
+      "sha256": "eb346e5321c42520213cd4ac7fcb656cfc395eca6594905d9d018e8ddb3df40f"
+    },
+    {
+      "path": "season_stats.go",
+      "sha256": "4563f0603cab5b94290afb6df28c3ee8a04cdaef9c4f18f8e941458d7c97b685"
+    },
+    {
+      "path": "season_stats_test.go",
+      "sha256": "3b59c1beed019243da2d9189e40c05f07e1d9652c1a5a9aa3102545199372ead"
+    },
+    {
+      "path": "sgp_api.go",
+      "sha256": "a1f44f00af120550ca96a90aca76d18869ef6e5b3e0e72698ecfea8c78f9e08d"
+    },
+    {
+      "path": "sgp_api_test.go",
+      "sha256": "09f257a77e3d68f4732bf45d8d3ee4c5a3b7834a395fb52479f0ad6b347e3931"
+    },
+    {
+      "path": "sgp_auth_diagnostics.go",
+      "sha256": "90a85186b5f3618fdfa481545acd49297f8e93135f4c4ce26397bcd0c5603fd5"
+    },
+    {
+      "path": "sgp_auth_diagnostics_test.go",
+      "sha256": "5e3fe91fad8968871b7106dba10a8a51802a4e9a3a903953f1029fafab1f9a94"
+    },
+    {
+      "path": "sgp_credential_diagnostics.go",
+      "sha256": "18b770d4e22026e19b43109b22b751aec5c6d1aab004a3cfdf1a6d3bd452e431"
+    },
+    {
+      "path": "sgp_gateway.go",
+      "sha256": "6a375a915c35fde1a959d30fb0c13155e73a503ea66fd6ac0578bc020e4d81f8"
+    },
+    {
+      "path": "sgp_gateway_test.go",
+      "sha256": "6d19e04c37ab6452fff196e233ed5698fb91f0dc59b032d5e0a7b5da211517b5"
+    },
+    {
+      "path": "skin_release_dates.go",
+      "sha256": "403598161c97650717890b21d1a597e7ea095ea19c03e0cfa40e7f38b502dfa0"
+    },
+    {
+      "path": "skin_release_dates_test.go",
+      "sha256": "593ac48fd767722862fbe11c957ac5530d001c0040362fe46e64655430e3af16"
+    },
+    {
+      "path": "social.go",
+      "sha256": "31faa08d2f42172eddc281c632ea669c03751517221b65857647253c1d483b89"
+    },
+    {
+      "path": "social_presence.go",
+      "sha256": "dd207a59ef1c7f7c7440eda643af247dcb48d887d01611c76b8960b51bddafa3"
+    },
+    {
+      "path": "social_presence_test.go",
+      "sha256": "cf5e4006f1b0c04a472099717e9b6ee15c01318e047c0f7c3f31e8b1233025ba"
+    },
+    {
+      "path": "social_test.go",
+      "sha256": "f10688d95caadae7e6b098ed5441eec9dcc2e9b5142697ee87baa6c0471fd614"
+    },
+    {
+      "path": "specialist_runes.go",
+      "sha256": "5070e73eac5c5e86c28735a1138f3fe1c2b67c36c166997debe017d267902e63"
+    },
+    {
+      "path": "specialist_runes_test.go",
+      "sha256": "1076def87240ae0707b036f0ba60eedfaa14e45a7e582b926b65bc71cbd616c9"
+    },
+    {
+      "path": "startup_warmup_test.go",
+      "sha256": "636940c1e08a2899646b14973c921296fd6eab0b6842681f760700dd8b1bcf13"
+    },
+    {
+      "path": "static_assets.go",
+      "sha256": "6e005e24629e11e65cdf52eaa53d92ff4d6297bcb7837747a11c8a5948ae8c2e"
+    },
+    {
+      "path": "static_assets_test.go",
+      "sha256": "77ad68453b13016f56a20a8c4b856db69889238ad6af61c8c673f41dc61085d4"
+    },
+    {
+      "path": "storage.go",
+      "sha256": "e6667c3d168aac2dd27276f2b4129ab6d55b79807cf3c64e3920832c1e4831f9"
+    },
+    {
+      "path": "summoner_identity.go",
+      "sha256": "68e683b9e19392f1207124386fc29a6de94547dab34d5d8e67f322be0261d821"
+    },
+    {
+      "path": "summoner_identity_test.go",
+      "sha256": "15da18bc6dd8d31c12f370b20d10af5811c62ab31895014ed2543982a9965982"
+    },
+    {
+      "path": "tools/window-focus-probe/abi_windows_test.go",
+      "sha256": "fed1711330aaf7ef2b9288c822f15aaf74d065df9b42ab737ca260df2369db77"
+    },
+    {
+      "path": "tools/window-focus-probe/actor_windows.go",
+      "sha256": "349a69e89f8d101bcf3d947ace0fc0c8b9daf3c54bd618f1684dee9cdf69d7ea"
+    },
+    {
+      "path": "tools/window-focus-probe/cleanup_order_test.go",
+      "sha256": "86540c53ba657141e48b1c68a3ab4572f1b16a76e6f37bab0b59110b8fb7f8fe"
+    },
+    {
+      "path": "tools/window-focus-probe/controller_windows.go",
+      "sha256": "13b3b807eb505ec522a49b27501d78020a94ec2b76771b85acdc86b5613aa992"
+    },
+    {
+      "path": "tools/window-focus-probe/main_other.go",
+      "sha256": "ce8b7b31dcab52ed35dec69446ce70b88ca15f75e814dd545d1e9aa927979d82"
+    },
+    {
+      "path": "tools/window-focus-probe/main_windows.go",
+      "sha256": "572e4963d396a637bb3cc7e3dbb104fe193aeba40c0b45235bd0ff431ffe31f2"
+    },
+    {
+      "path": "tools/window-focus-probe/model.go",
+      "sha256": "7ad171a9400eca90068236d712e12eb996ddea42e8f1075cbd0077d67784138f"
+    },
+    {
+      "path": "tools/window-focus-probe/model_test.go",
+      "sha256": "564c28a40c7e83c9f049436e9459d05943538edc2e9abf91c7e6a5596a8ab9e2"
+    },
+    {
+      "path": "tools/window-focus-probe/report.go",
+      "sha256": "f24940b7b1b1ec817f1f1e511c94abed87dd9dc7101f0225962693efdf23232d"
+    },
+    {
+      "path": "tools/window-focus-probe/report_test.go",
+      "sha256": "18d4bee5ee5c204292a8c671d15c468c9e1b2eb5883fde6ab8abce381f62f0d2"
+    },
+    {
+      "path": "tools/window-focus-probe/win32_windows.go",
+      "sha256": "8184d1dff25a5cda6a0599e89cffd3ae1aaf71c67bd97fc56c889ff36e4a6f5c"
+    },
+    {
+      "path": "transport_pool_test.go",
+      "sha256": "c9e7baf0215ebb970f05e78cba77be2930c0eb10d8f7100b0e9ab0f9083e6844"
+    },
+    {
+      "path": "update.go",
+      "sha256": "f23ec70da1a8e7c82a35f20740710f27eeddacd9b336e694b7e5facbbb7692e2"
+    },
+    {
+      "path": "update_download.go",
+      "sha256": "0e3c615793c8ec62fe547ab8dc820d92b18151124583c8e37b5048e28ebeb2dd"
+    },
+    {
+      "path": "update_http.go",
+      "sha256": "bc5cfd677b6fe653e62bc85af8fa7e14e8309f0d28047dd93e8892b4686f77b4"
+    },
+    {
+      "path": "update_platform.go",
+      "sha256": "3830f7028a10d45ab9077b108b6e47dab97e7cbf261a473bd3bad69215180fc3"
+    },
+    {
+      "path": "update_platform_other.go",
+      "sha256": "c86013a99ca1ce1f3e62dea6a8a1b76ddee3989891b3ce258c82a2c4e7fce696"
+    },
+    {
+      "path": "update_platform_windows.go",
+      "sha256": "d10919ecc3c467ab92061e0382d437a0c58ec78e164060bb142d78a409397526"
+    },
+    {
+      "path": "update_test.go",
+      "sha256": "56f935558b97ffe73aeb4fc38f5cbe2e194507c0bfa4afcdbe409b3bb9f48df9"
+    },
+    {
+      "path": "watch_rules.go",
+      "sha256": "aebbd1dae87c64b168342e4466970b16d0ac889457c71f4675eda42dfc9f859a"
+    },
+    {
+      "path": "web/api-diagnostics.test.cjs",
+      "sha256": "5a7bdd8c3d8cc7d441a605c2d22e21ce436af579756a29ef75d8a576b6d11308"
+    },
+    {
+      "path": "web/app.css",
+      "sha256": "346f2de13b30ef82807e15ba295bb7d81a74fcde2b4adf89c64a12753ec72ccb"
+    },
+    {
+      "path": "web/app.js",
+      "sha256": "8ddf69e1ae959e1be660dd5dfff214069d7dac40be597ab8d3c7baa0558ad26f"
+    },
+    {
+      "path": "web/augment-artwork.js",
+      "sha256": "81ea3b23b9b16f71c1e341daca6dac61bee03417eac4c1be69428a79b4e63baf"
+    },
+    {
+      "path": "web/build-item-row.css",
+      "sha256": "17895f9611f3bf3cc1917c5e138b8a84bb03711d3d213f7174245813caa1adb1"
+    },
+    {
+      "path": "web/champions.css",
+      "sha256": "b82a148ddf1ce7ae1d621f861124516123409049f7730e0d34f6658daa8f5dbc"
+    },
+    {
+      "path": "web/champions.js",
+      "sha256": "04149aba083c03ed952c900c9c73c1ea5df725435526d0932e26442b893d28d1"
+    },
+    {
+      "path": "web/champions.test.cjs",
+      "sha256": "40aa5ee15dcc94aa8fb46fb093df910e450214fdb96fdf4f5efc5efb8db61180"
+    },
+    {
+      "path": "web/demo-data.js",
+      "sha256": "238396921a4802adaf33e83ad1f51d75b8936171ce775eb0112ff80875f79a71"
+    },
+    {
+      "path": "web/export-diagnostics.test.cjs",
+      "sha256": "828e4d93432f6625582c437bf66f4816e957d4c9f45bcccbcd1bab8b7c62820c"
+    },
+    {
+      "path": "web/friends.css",
+      "sha256": "89eebc3e838e16221f2ce6f0daa56d2e49dcb8bc93b68e813399d6d001b4551c"
+    },
+    {
+      "path": "web/friends.js",
+      "sha256": "26edf43436a556ad3cddd68b3799d92dfd53a8265251c49e60e725d0935b7bbc"
+    },
+    {
+      "path": "web/friends.test.cjs",
+      "sha256": "e06ead402ae48720caa645d77ccb31c3b51b0c235d5de6cdd6f8eca1ac851e30"
+    },
+    {
+      "path": "web/gameplay.css",
+      "sha256": "b4fff13cb62aaca7db73bc69abf23c70c5ba2bfdc2921f29346414a3c8881699"
+    },
+    {
+      "path": "web/gameplay.js",
+      "sha256": "da42dbd3663c912b71fab60f88ab70f6f6d6bfa8a33d75908ea3c86e92de1869"
+    },
+    {
+      "path": "web/gameplay.test.cjs",
+      "sha256": "1173e8cdd2a4862d33f80dac092dda8b4a9de3ea667f0864662e653a1e253045"
+    },
+    {
+      "path": "web/metrics.css",
+      "sha256": "1622384c6d9ed3d01b16caecf8a7bd9705951b384eeb78580a0c7e8ee029a30d"
+    },
+    {
+      "path": "web/official-login.test.cjs",
+      "sha256": "eaa5db7e7f85c7bd43137ed8106b40094a460ba4c064bb1252bc30180c11dba5"
+    },
+    {
+      "path": "web/overview-art.js",
+      "sha256": "2042e2d96d3765c24b337e5f2aff711fea0d47b29b42275b19d067b68d98ed1c"
+    },
+    {
+      "path": "web/position-filter.test.cjs",
+      "sha256": "708460ce9328c90d74852789f7e4dac70a652051c5fd315ee47788ff88dd481b"
+    },
+    {
+      "path": "web/pro-players.css",
+      "sha256": "7c3a3d60e643e19086b28866059dacbd6927d85dc239419acd1b50b4305c15ea"
+    },
+    {
+      "path": "web/pro-players.js",
+      "sha256": "13b0f608d2320f753e5128217cb9ef44d2bf010c277f81a654cf41366be15373"
+    },
+    {
+      "path": "web/remaining-sort.test.cjs",
+      "sha256": "eb8fb7915e8b152614c8105de38a31d386043deaf48c5d6f0ae62dfaedbaa8bb"
+    },
+    {
+      "path": "web/runtime.js",
+      "sha256": "95e05622a3dde07d03a434831c768543327ce98b53118ee2d595d2c4b9b1a73c"
+    },
+    {
+      "path": "web/runtime.test.cjs",
+      "sha256": "0c291ca735edbecf9ced2ab11f4a19e0c73efa75bc0a18a4ab7b996b79b6a206"
+    },
+    {
+      "path": "web/suite.css",
+      "sha256": "9a4d0fc923b1bb28eb3c34f2d3d5ef059e092963f9a36c5ae455e55d9df94e0c"
+    },
+    {
+      "path": "web/suite.js",
+      "sha256": "b9d31d43f1111cf3d5366662d551746e891efe8d61c665f9a70340e95e3d1eb4"
+    },
+    {
+      "path": "web/suite.test.cjs",
+      "sha256": "c29555e6cdaed4d26bcfdff9b10fb227b4732290b2d798d2f2e8e892b2c52b74"
+    },
+    {
+      "path": "web/update.test.cjs",
+      "sha256": "3b89022d1f5b2bc89b5285dc15c4d64fa3692e5531316fd74916d585b7a59adb"
+    },
+    {
+      "path": "yourgg_arena.go",
+      "sha256": "a215205406740012a74639cf188a5ef4fc7e7f055041c5df9e607f76f171dee4"
+    },
+    {
+      "path": "yourgg_arena_rankings.go",
+      "sha256": "51a74141694b474592ce5ce5012639a97c3c55a78dc9a6309875b3be75620b9b"
+    },
+    {
+      "path": "yourgg_arena_test.go",
+      "sha256": "51db490326b487531895cf9a300c9b88809ee67ceececc904fdc383be09ced38"
+    },
+    {
+      "path": "collection_reads.go",
+      "sha256": "56170961311d78b7e84b42f1e1fe84cb67e22ba93f9a7759b346dabb6a54a586"
+    },
+    {
+      "path": "gameplay_refresh.go",
+      "sha256": "57a624aa51eddea7d538336e72496fc0c599e4bd33e45c1ef52af6b590f63c6e"
+    },
+    {
+      "path": "r87_test.go",
+      "sha256": "717560064a59612ccec4c48b0dca767f6cfedde65be8f9fd22ad84a660220ded"
+    },
+    {
+      "path": "r87_additional_test.go",
+      "sha256": "2fb9702b9b6db6475c0548597ab1ab4499a45a89f4da907d06a206eb198e5656"
+    },
+    {
+      "path": "web/r87.test.cjs",
+      "sha256": "707a10a871be6319ed47ab354e2defa7f286b2cd2e5907d12519bc087a3d8428"
+    }
+  ]
+}

@@ -1,0 +1,244 @@
+[
+  {
+    "label": "baseline",
+    "http_status": 200,
+    "duration_ms": 8834.417709033005,
+    "matches": 20,
+    "diagnostics": [
+      {
+        "build_fingerprint": "dev",
+        "duration_ms": 8807,
+        "event": "riot_overview_cost",
+        "first_error_kind": "",
+        "log_seq": 7,
+        "matches_failed": 0,
+        "matches_loaded": 20,
+        "matches_requested": 20,
+        "rate_limited_count": 0,
+        "run_id": "13352acac2a8dff6b0ea3e44",
+        "time": "2026-09-14T04:19:49.826518Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "event": "overview_phases_ms",
+        "load_phases_ms": {
+          "champion_names": 0,
+          "detailed_matches": 0,
+          "identity": 0,
+          "mastery": 0,
+          "queue_labels": 0,
+          "ranks": 0,
+          "recent_players": 0,
+          "recent_ranked": 0,
+          "season_snapshot": 0,
+          "serialize": 8809,
+          "spans": {},
+          "total": 8810
+        },
+        "log_seq": 9,
+        "run_id": "13352acac2a8dff6b0ea3e44",
+        "time": "2026-09-14T04:19:49.827701Z"
+      }
+    ]
+  },
+  {
+    "label": "current",
+    "http_status": 200,
+    "duration_ms": 3073.528292006813,
+    "matches": 20,
+    "diagnostics": [
+      {
+        "build_fingerprint": "dev",
+        "detail_concurrency": 8,
+        "details_inflight_peak": 8,
+        "duration_ms": 3067,
+        "event": "riot_overview_cost",
+        "first_error_kind": "",
+        "limiter_queue_ms": 3566,
+        "log_seq": 27,
+        "matches_failed": 0,
+        "matches_from_disk": 0,
+        "matches_loaded": 20,
+        "matches_requested": 20,
+        "rate_limited_count": 0,
+        "run_id": "c23461aa2f9149143fb8f670",
+        "time": "2026-09-14T04:19:54.751232Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "event": "overview_phases_ms",
+        "load_phases_ms": {
+          "account": 339,
+          "champion_names": 1212,
+          "detailed_matches": 0,
+          "details": 1512,
+          "identity": 0,
+          "mastery": 186,
+          "matchIDs": 190,
+          "opgg-historical": 0,
+          "queue_labels": 0,
+          "ranks": 172,
+          "recent_players": 0,
+          "recent_ranked": 0,
+          "season_snapshot": 0,
+          "serialize": 0,
+          "spans": {
+            "account": [
+              [
+                0,
+                339
+              ]
+            ],
+            "champion_names": [
+              [
+                339,
+                1552
+              ]
+            ],
+            "details": [
+              [
+                1552,
+                3064
+              ]
+            ],
+            "mastery": [
+              [
+                1552,
+                1738
+              ]
+            ],
+            "matchIDs": [
+              [
+                339,
+                529
+              ]
+            ],
+            "opgg-historical": [
+              [
+                1552,
+                1552
+              ]
+            ],
+            "ranks": [
+              [
+                1552,
+                1724
+              ]
+            ],
+            "summoner": [
+              [
+                339,
+                707
+              ]
+            ]
+          },
+          "summoner": 367,
+          "total": 3068
+        },
+        "log_seq": 29,
+        "run_id": "c23461aa2f9149143fb8f670",
+        "time": "2026-09-14T04:19:54.751967Z"
+      }
+    ]
+  },
+  {
+    "label": "restart",
+    "http_status": 200,
+    "duration_ms": 1925.1372499857098,
+    "matches": 20,
+    "diagnostics": [
+      {
+        "build_fingerprint": "dev",
+        "detail_concurrency": 8,
+        "details_inflight_peak": 0,
+        "duration_ms": 1914,
+        "event": "riot_overview_cost",
+        "first_error_kind": "",
+        "limiter_queue_ms": 0,
+        "log_seq": 27,
+        "matches_failed": 0,
+        "matches_from_disk": 20,
+        "matches_loaded": 20,
+        "matches_requested": 20,
+        "rate_limited_count": 0,
+        "run_id": "6ae75a1d79af85a19808bdd4",
+        "time": "2026-09-14T04:19:57.699623Z"
+      },
+      {
+        "build_fingerprint": "dev",
+        "event": "overview_phases_ms",
+        "load_phases_ms": {
+          "account": 736,
+          "champion_names": 6,
+          "detailed_matches": 0,
+          "details": 5,
+          "identity": 0,
+          "mastery": 311,
+          "matchIDs": 332,
+          "opgg-historical": 0,
+          "queue_labels": 0,
+          "ranks": 298,
+          "recent_players": 0,
+          "recent_ranked": 0,
+          "season_snapshot": 0,
+          "serialize": 1,
+          "spans": {
+            "account": [
+              [
+                0,
+                736
+              ]
+            ],
+            "champion_names": [
+              [
+                736,
+                743
+              ]
+            ],
+            "details": [
+              [
+                1596,
+                1602
+              ]
+            ],
+            "mastery": [
+              [
+                1596,
+                1908
+              ]
+            ],
+            "matchIDs": [
+              [
+                736,
+                1068
+              ]
+            ],
+            "opgg-historical": [
+              [
+                1596,
+                1596
+              ]
+            ],
+            "ranks": [
+              [
+                1596,
+                1895
+              ]
+            ],
+            "summoner": [
+              [
+                736,
+                1596
+              ]
+            ]
+          },
+          "summoner": 860,
+          "total": 1915
+        },
+        "log_seq": 29,
+        "run_id": "6ae75a1d79af85a19808bdd4",
+        "time": "2026-09-14T04:19:57.700792Z"
+      }
+    ]
+  }
+]

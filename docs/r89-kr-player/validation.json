@@ -1,0 +1,75 @@
+{
+  "date": "2026-09-14",
+  "platform": "macOS arm64; no LCU",
+  "go_all": {
+    "command": "go test ./...",
+    "result": "ok  \tlol-loot-assistant\t81.870s",
+    "exit": 0
+  },
+  "go_race": {
+    "command": "go test -race -run 'TestR89|TestOverviewCurrentGame|TestLoadRiotOverview|TestRiotOverview|TestR86' -count=1",
+    "result": "PASS\nok  \tlol-loot-assistant\t41.032s",
+    "exit": 0
+  },
+  "go_vet": {
+    "command": "go vet ./...",
+    "exit": 0
+  },
+  "javascript_all": {
+    "command": "node --test web/*.test.cjs desktop/*.test.cjs",
+    "tests": 628,
+    "passed": 627,
+    "failed": 0,
+    "skipped": 1,
+    "milliseconds": 241043.537
+  },
+  "javascript_final_targeted": {
+    "command": "node --test web/r89.test.cjs desktop/summoner-identity.test.cjs",
+    "tests": 15,
+    "passed": 15,
+    "failed": 0
+  },
+  "windows_compile": {
+    "command": "CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build",
+    "result": "passed; not a Windows runtime test"
+  },
+  "prior_load_sensitive_failure": {
+    "test": "TestHydrateMayhemAugmentCopyUsesBoundedParallelismAndCache",
+    "elapsed_ms": 705.09,
+    "limit_ms": 700,
+    "resolved_by": "standalone complete rerun passed; production code unchanged"
+  },
+  "mutations": {
+    "unit_behavioral": 35,
+    "live_binary_and_chromium": 4,
+    "killed": 39
+  },
+  "builds": {
+    "baseline": {
+      "sha256": "44efe1ba8de5d1ddc8436bdded36b6bc78c6f761315151828ba27c99049a69df",
+      "bytes": 23488706,
+      "embedded_riot_key": false
+    },
+    "current-final": {
+      "sha256": "1080e0fb616e22d6ebf43e95391f50251469c2002506f972e45d6f509a8579ac",
+      "bytes": 23576466,
+      "embedded_riot_key": false
+    },
+    "loot-service-windows.exe": {
+      "sha256": "886ff3e2ab4e4ef3fb793a3f601c66df118b5fa19cfcd3825a6990c2b3da9440",
+      "bytes": 24935424,
+      "embedded_riot_key": false
+    }
+  },
+  "chromium_final": {
+    "exit": 0,
+    "entries": [
+      "search",
+      "pro-players",
+      "champions"
+    ],
+    "catalog_retry": true,
+    "completion_retry": true,
+    "empty_build_hidden": true
+  }
+}

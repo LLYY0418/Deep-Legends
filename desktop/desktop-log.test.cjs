@@ -14,7 +14,7 @@ test('R86 desktop logs stay within five two-MiB generations and export only revi
  const data=desktopLogForExport(logs);assert.match(data,/"total":123/);assert.match(data,/启动页加载失败/);assert.doesNotMatch(data,/secret|private-id|puuid/);
  const session=new EventEmitter(),sender={},item=new EventEmitter();let completed;
  const detach=attachDiagnosticsExport({session,sender,getBaseURL:()=> 'http://127.0.0.1:1',getDirectory:()=>root,fileSystem:fs,getDesktopLog:()=>desktopLogForExport(logs),onCompleted:p=>completed=p});
- item.getURL=()=> 'http://127.0.0.1:1/api/diagnostics/log';item.setSavePath=p=>{item.destination=p;fs.writeFileSync(p,'{"event":"backend"}\n')};
+ item.getSavePath=()=>item.destination;item.getURL=()=> 'http://127.0.0.1:1/api/diagnostics/log';item.setSavePath=p=>{item.destination=p;fs.writeFileSync(p,'{"event":"backend"}\n')};
  session.emit('will-download',{},item,sender);item.emit('done',{},'completed');detach();
  const exported=fs.readFileSync(completed,'utf8');assert.match(exported,/"event":"backend"/);assert.match(exported,/"event":"desktop_startup"/);
  assert.doesNotMatch(exported,/secret|private-id/);

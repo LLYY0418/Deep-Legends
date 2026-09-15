@@ -1,0 +1,55 @@
+TAP version 13
+# Subtest: R91 addendum first partial 429 stays silent and retries after Retry-After
+not ok 1 - R91 addendum first partial 429 stays silent and retries after Retry-After
+  ---
+  duration_ms: 60.313417
+  type: 'test'
+  location: '/sessions/youthful-determined-volta/mnt/deep-legends/web/r91-addendum.test.cjs:27:2'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    '额度恢复' !== ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ''
+  actual: '额度恢复'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/sessions/youthful-determined-volta/mnt/deep-legends/web/r91-addendum.test.cjs:32:11)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: R91 addendum append 429 stays silent and retries after Retry-After
+not ok 2 - R91 addendum append 429 stays silent and retries after Retry-After
+  ---
+  duration_ms: 9.1305
+  type: 'test'
+  location: '/sessions/youthful-determined-volta/mnt/deep-legends/web/r91-addendum.test.cjs:27:2'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + true
+    - undefined
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/sessions/youthful-determined-volta/mnt/deep-legends/web/r91-addendum.test.cjs:32:103)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2187.09146

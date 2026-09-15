@@ -1,0 +1,6 @@
+--- FAIL: TestR90AlliesVerifyAndRejectScrambledPlayerlist (0.01s)
+    --- FAIL: TestR90AlliesVerifyAndRejectScrambledPlayerlist/true (0.01s)
+        r90_test.go:126: contradictory allies accepted: grouped=true unavailable=false
+FAIL
+FAIL	lol-loot-assistant	0.365s
+FAIL
