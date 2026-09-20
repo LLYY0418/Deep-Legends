@@ -1,0 +1,38 @@
+✔ R91 new game removes old recommendations and summary before the deferred response (105.52725ms)
+✔ R91 same game refresh and active phase progression preserve the current content (55.310291ms)
+✔ R91 repeated manual refresh immediately aborts and replaces only the live request with visible feedback (18.884625ms)
+✔ R91 boundary cancels the old request and its late settlement cannot own the new state (19.581083ms)
+✔ R91 failed, timed out and cancelled new-game requests have an explicit working retry (37.414042ms)
+✔ R91 empty new-game snapshots stay explicit and bounded instead of showing an empty recommendation panel (9.9945ms)
+✔ R91 soft reset invalidates the aborted loader before a replacement starts (8.587084ms)
+✔ R91 direct loader detects a boundary already observed by the beacon (10.79675ms)
+✔ R91 hidden phase transitions invalidate immediately and preserve the deferred refresh (8.911417ms)
+✔ R91 event-stream disconnection cancels stale work and offers recovery (9.887542ms)
+✔ R91 lagging inactive responses cannot erase a new-game signal; leaving the game settles the transition (10.884292ms)
+✔ R91 an empty available roster stays pending; unsupported mode and known gameId changes settle safely (9.879709ms)
+✔ R91 cancellation without a replacement cannot leave the first load blank (7.359833ms)
+✔ R95 P1 progress preserves career, append=true, noise=null (60.2155ms)
+✔ R95 P1 progress preserves career, append=true, noise=[] (14.591791ms)
+✔ R95 P1 progress preserves career, append=true, noise=undefined (8.449542ms)
+✔ R95 P1 progress preserves career, append=false, noise=null (8.546375ms)
+✔ R95 P1 progress preserves career, append=false, noise=[] (7.7895ms)
+✔ R95 P1 progress preserves career, append=false, noise=undefined (8.19175ms)
+✔ R95 P1 first five and complete explicit empty arrays are authoritative (18.466958ms)
+✔ R95 P2 slow interval/false loading eligibility (15.288208ms)
+✔ R95 P2 slow sse/false loading eligibility (11.224167ms)
+✔ R95 P2 slow event/false loading eligibility (9.825167ms)
+✔ R95 P2 slow manual/true loading eligibility (8.336792ms)
+✔ R95 P2 slow direct/true loading eligibility (8.932042ms)
+✔ R95 P2 slow manual/false loading eligibility (10.5725ms)
+✔ R95 P2 fast 10ms manual response never shows status, including zero-delay timers (17.461792ms)
+✔ R95 P3 both sides only show lock wait for show-then-lock (38.861625ms)
+✔ R95 P4 badge respects mask, secondary and professional click context (23.234542ms)
+✔ R95 P5 exact Chinese titles, unknown fallback, relative time and champselect fired count (0.939375ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 666.38

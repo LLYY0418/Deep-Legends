@@ -30,6 +30,12 @@ contextBridge.exposeInMainWorld("desktopTheme", {
 });
 
 contextBridge.exposeInMainWorld("desktopShare", {
+  onDirectoryChanged(callback) {
+    if (typeof callback !== "function") return;
+    const listener = (_event, value) => callback(value);
+    ipcRenderer.on("desktop-export-directory-changed", listener);
+    return () => ipcRenderer.removeListener("desktop-export-directory-changed", listener);
+  },
   preparePngSave(suggestedName) {
     const name = typeof suggestedName === "string" ? suggestedName.slice(0, 160) : "";
     return ipcRenderer.invoke("desktop-share-prepare-save", name);
@@ -54,9 +60,24 @@ contextBridge.exposeInMainWorld("desktopShare", {
 
 
 contextBridge.exposeInMainWorld("desktopDiagnostics", {
+  getSaveDirectory() { return ipcRenderer.invoke("desktop-diagnostics-get-directory"); },
+  chooseSaveDirectory() { return ipcRenderer.invoke("desktop-diagnostics-choose-directory"); },
+  onError(callback) { if (typeof callback === "function") ipcRenderer.on("desktop-diagnostics-error", (_event, message) => callback(String(message))); },
   onCompleted(callback) {
     if (typeof callback !== "function") return;
-    ipcRenderer.on("desktop-diagnostics-completed", () => callback());
+    ipcRenderer.on("desktop-diagnostics-completed", (_event, exportID) => callback(String(exportID || "")));
   },
-  openFolder() { return ipcRenderer.invoke("desktop-diagnostics-open-folder"); },
+  openFolder(exportID) { return ipcRenderer.invoke("desktop-diagnostics-open-folder", String(exportID || "")); },
+});
+
+// Independent of the browser HTTP connection pool; expose no process or token.
+contextBridge.exposeInMainWorld("desktopBackend", {
+  getState() { return ipcRenderer.invoke("desktop-backend-state"); },
+  restart() { return ipcRenderer.invoke("desktop-backend-restart"); },
+  onStateChanged(callback) {
+    if (typeof callback !== "function") return;
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("desktop-backend-state", listener);
+    return () => ipcRenderer.removeListener("desktop-backend-state", listener);
+  },
 });

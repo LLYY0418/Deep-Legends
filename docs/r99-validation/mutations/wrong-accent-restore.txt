@@ -1,0 +1,5 @@
+--- FAIL: TestR99WriteProbeFreshIconAndAccentRestore (0.00s)
+    r99_test.go:145: restore missing: [GET /lol-summoner/v1/current-summoner PUT /lol-summoner/v1/current-summoner/icon GET /lol-loadouts/v4/loadouts/scope/account PATCH /lol-loadouts/v4/loadouts/loadout-safe PATCH /lol-loadouts/v4/loadouts/loadout-safe PATCH /lol-loadouts/v4/loadouts/loadout-safe PATCH /lol-loadouts/v4/loadouts/loadout-safe PATCH /lol-loadouts/v4/loadouts/loadout-safe PATCH /lol-loadouts/v4/loadouts/loadout-safe PATCH /lol-loadouts/v4/loadouts/loadout-safe GET /lol-chat/v1/me GET /lol-challenges/v1/summary-player-data/local-player GET /lol-chat/v1/me POST /lol-challenges/v1/update-player-preferences/ GET /lol-chat/v1/me GET /lol-challenges/v1/summary-player-data/local-player GET /lol-chat/v1/me POST /lol-challenges/v1/update-player-preferences/] 6
+FAIL
+FAIL	lol-loot-assistant	0.532s
+FAIL

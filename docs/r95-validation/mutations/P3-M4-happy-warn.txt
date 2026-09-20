@@ -1,0 +1,9 @@
+$ go test -overlay /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r95-mutants-x_hnqccn/overlay.json -count=1 -run TestR95LockStrategiesUseOnlyVisibleWait .
+--- FAIL: TestR95LockStrategiesUseOnlyVisibleWait (0.06s)
+    --- FAIL: TestR95LockStrategiesUseOnlyVisibleWait/lock-now (0.00s)
+        r95_test.go:345: happy path must be ok {2026-09-16 09:47:38.891565 +0800 CST m=+0.009170917 warn 已发送亮出禁用英雄 141，等待客户端确认 141}
+    --- FAIL: TestR95LockStrategiesUseOnlyVisibleWait/show-then-lock (0.05s)
+        r95_test.go:345: happy path must be ok {2026-09-16 09:47:38.896029 +0800 CST m=+0.013634917 warn 已发送亮出禁用英雄 141，等待客户端确认 141}
+FAIL
+FAIL	lol-loot-assistant	0.563s
+FAIL

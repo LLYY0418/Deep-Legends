@@ -1,0 +1,8 @@
+--- FAIL: TestR96ExplicitSubteamGuard (0.04s)
+    --- FAIL: TestR96ExplicitSubteamGuard/subteamId/conflict=false (0.02s)
+        r96_test.go:71: explicit group changed 0 1
+    --- FAIL: TestR96ExplicitSubteamGuard/playerSubteamId/conflict=false (0.02s)
+        r96_test.go:71: explicit group changed 0 1
+FAIL
+FAIL	lol-loot-assistant	0.544s
+FAIL

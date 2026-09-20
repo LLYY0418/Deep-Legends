@@ -1,0 +1,28 @@
+✖ R105 all banners are selectable and a click reaches the write route (115.054625ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 618.118958
+
+✖ failing tests:
+
+test at web/r105.test.cjs:48:1
+✖ R105 all banners are selectable and a click reaches the write route (115.054625ms)
+  AssertionError [ERR_ASSERTION]: some banners are disabled
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r105.test.cjs:54:72)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

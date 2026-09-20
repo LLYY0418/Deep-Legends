@@ -238,7 +238,7 @@ func champSelectGroupDefinitionsForClient() []champSelectGroupDefinition {
 }
 
 func defaultChampSelectSettings() champSelectSettings {
-	settings := champSelectSettings{Groups: make(map[string]champSelectGroupConfig, len(champSelectGroupDefinitions))}
+	settings := champSelectSettings{Enabled: true, Groups: make(map[string]champSelectGroupConfig, len(champSelectGroupDefinitions))}
 	for _, definition := range champSelectGroupDefinitions {
 		lockDelay := 10000
 		settings.Groups[definition.GroupID] = champSelectGroupConfig{
@@ -304,12 +304,8 @@ func normalizeChampSelectSide(side, fallback champSelectSideConfig, definition c
 		limit = definition.PickLimit
 	}
 	side.DelayMS = clampInt(side.DelayMS, 0, 10000, 0)
-	if kind == "pick" {
-		lockDelay := champSelectLockDelay(side)
-		side.LockDelayMS = &lockDelay
-	} else {
-		side.LockDelayMS = nil
-	}
+	lockDelay := champSelectLockDelay(side)
+	side.LockDelayMS = &lockDelay
 	if kind == "ban" && len(definition.Positions) > 1 {
 		side = migrateChampSelectSharedBan(side, definition)
 	} else {
@@ -356,6 +352,10 @@ func cloneChampSelectSettings(settings champSelectSettings) champSelectSettings 
 		group.Ban.Champions = cloneChampSelectPools(group.Ban.Champions)
 		group.Ban.LegacyLaneChampions = cloneChampSelectPools(group.Ban.LegacyLaneChampions)
 		group.Pick.Champions = cloneChampSelectPools(group.Pick.Champions)
+		if group.Ban.LockDelayMS != nil {
+			delay := *group.Ban.LockDelayMS
+			group.Ban.LockDelayMS = &delay
+		}
 		if group.Pick.LockDelayMS != nil {
 			delay := *group.Pick.LockDelayMS
 			group.Pick.LockDelayMS = &delay
@@ -644,6 +644,11 @@ func (r *watchRunner) handleChampSelectPhase(phase string) {
 	entering := strings.EqualFold(phase, "ChampSelect") && !strings.EqualFold(previous, "ChampSelect")
 	leaving := !strings.EqualFold(phase, "ChampSelect") && strings.EqualFold(previous, "ChampSelect")
 	if entering || leaving {
+		if pending := r.pending["position-broadcast"]; pending != nil {
+			pending.cancel()
+			delete(r.pending, "position-broadcast")
+		}
+		r.broadcastForSession = false
 		if entering {
 			r.champDiagnosticSession = newDiagnosticTrace("cs-session")
 		}
@@ -984,9 +989,16 @@ func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelec
 	if submitted && lastSubmission.ChampionID == candidate && lastSubmission.Completed == completed {
 		return
 	}
-	delay := champSelectDelay(config.DelayMS, remaining)
-	if side == "pick" && completed && config.Strategy == "show-then-lock" {
-		delay = champSelectHoverLockDelay(config, lastSubmission, time.Now())
+	delay := 0
+	switch {
+	case intent:
+		delay = champSelectDelay(config.DelayMS, remaining)
+	case config.Strategy == "lock-now":
+		delay = 0
+	case !completed:
+		delay = 0
+	default:
+		delay = champSelectDelay(champSelectHoverLockDelay(config, lastSubmission, time.Now()), remaining)
 	}
 	body := map[string]any{"type": side, "championId": candidate, "completed": completed}
 	if intent {
@@ -1276,7 +1288,7 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 			}
 			r.champDiagnostic("write-disposition", disposition, decision, nil)
 			if current && ctx.Err() == nil {
-				r.champSelectChampionLog("warn", fmt.Sprintf("已发送%s英雄 %d，等待客户端确认", verb, decision.ChampionID), decision.ChampionID)
+				r.champSelectChampionLog("ok", fmt.Sprintf("已发送%s英雄 %d，等待客户端确认", verb, decision.ChampionID), decision.ChampionID)
 			}
 			return
 		}

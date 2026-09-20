@@ -1,6 +1,35 @@
 package main
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
+
+// Remote profiles do not expose their selected client background, and some
+// servers do not expose mastery. Reuse this player's latest loaded match as a
+// final artwork fallback; never query more matches just to decorate the header.
+func (a *app) completeOverviewBackground(overview *gameplayOverview, playerRef string) {
+	player := &overview.Player
+	applyMasteryBackgroundFallback(player, overview.Masteries)
+	if player.BackgroundPath == "" {
+		var latest int64
+		for _, match := range overview.Matches {
+			for _, participant := range match.Participants {
+				isSubject := (playerRef != "" && participant.PlayerRef == playerRef) ||
+					(match.SubjectParticipantID > 0 && participant.ParticipantID == match.SubjectParticipantID)
+				if !isSubject || participant.ChampionID <= 0 || (player.BackgroundPath != "" && match.CreatedAt <= latest) {
+					continue
+				}
+				latest = match.CreatedAt
+				player.BackgroundSkinID = participant.ChampionID * 1000
+				player.BackgroundSkinName = participant.ChampionName
+				player.BackgroundSource = "gtimg"
+				player.BackgroundPath = fmt.Sprintf("%s%d.jpg", gtimgSkinArtworkPrefix, player.BackgroundSkinID)
+			}
+		}
+	}
+	a.applyOverviewSkinMedia(player)
+}
 
 // Prefer the catalog's centered splash/animation, exactly as the skin collection
 // does. Only use the selected skin ID; never substitute a sibling quest stage.

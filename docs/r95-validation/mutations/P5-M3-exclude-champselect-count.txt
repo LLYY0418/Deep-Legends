@@ -1,0 +1,51 @@
+$ node --test --test-name-pattern R95 web/r95.test.cjs
+✔ R95 P1 progress preserves career, append=true, noise=null (60.801ms)
+✔ R95 P1 progress preserves career, append=true, noise=[] (13.430583ms)
+✔ R95 P1 progress preserves career, append=true, noise=undefined (8.46275ms)
+✔ R95 P1 progress preserves career, append=false, noise=null (8.363583ms)
+✔ R95 P1 progress preserves career, append=false, noise=[] (8.250917ms)
+✔ R95 P1 progress preserves career, append=false, noise=undefined (7.7225ms)
+✔ R95 P1 first five and complete explicit empty arrays are authoritative (18.02125ms)
+✔ R95 P2 slow interval/false loading eligibility (14.4465ms)
+✔ R95 P2 slow sse/false loading eligibility (9.731875ms)
+✔ R95 P2 slow event/false loading eligibility (9.004458ms)
+✔ R95 P2 slow manual/true loading eligibility (8.472792ms)
+✔ R95 P2 slow direct/true loading eligibility (8.281333ms)
+✔ R95 P2 slow manual/false loading eligibility (8.232084ms)
+✔ R95 P2 fast 10ms manual response never shows status, including zero-delay timers (12.793958ms)
+✔ R95 P3 both sides only show lock wait for show-then-lock (32.6125ms)
+✔ R95 P4 badge respects mask, secondary and professional click context (18.857583ms)
+✖ R95 P5 exact Chinese titles, unknown fallback, relative time and champselect fired count (1.292416ms)
+✔ R95 P3 typed lock wait targets its own side (6.828666ms)
+✔ R95 P4 match player clicks enter professional context even without directory source (5.866375ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 18
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 600.238917
+
+✖ failing tests:
+
+test at web/r95.test.cjs:49:1
+✖ R95 P5 exact Chinese titles, unknown fallback, relative time and champselect fired count (1.292416ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:53:92)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

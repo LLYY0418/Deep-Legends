@@ -1,0 +1,6 @@
+=== RUN   TestR98OverviewQueueBudgetReturnsRateLimit
+    r98_test.go:275: overview queue escape missing; stuck waiting for quota
+--- FAIL: TestR98OverviewQueueBudgetReturnsRateLimit (1.50s)
+FAIL
+FAIL	lol-loot-assistant	2.018s
+FAIL

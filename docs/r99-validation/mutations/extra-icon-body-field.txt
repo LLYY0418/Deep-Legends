@@ -1,0 +1,5 @@
+--- FAIL: TestR99IconWriteAccepts201AndRefreshesSnapshot (0.00s)
+    r99_test.go:245: invalid write: PUT map[inventoryToken: profileIconId:71]
+FAIL
+FAIL	lol-loot-assistant	0.546s
+FAIL

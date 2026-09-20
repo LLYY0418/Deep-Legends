@@ -55,7 +55,7 @@ test("常规总览保持 2x，超长总览按像素预算安全降采样", () =>
   assert.throws(() => screenshotScale(200, 300), /尺寸无效/);
 });
 
-function createHarness({ canceled = false, trusted = true, writeError = null, storedDirectory = "", selectedDirectory = "/tmp", existingFiles = [] } = {}) {
+function createHarness({ canceled = false, trusted = true, writeError = null, storedDirectory = "", selectedDirectory = "/tmp", existingFiles = [], directoryController } = {}) {
   const events = [];
   const writes = [];
   const files = new Map();
@@ -123,6 +123,7 @@ function createHarness({ canceled = false, trusted = true, writeError = null, st
   const logs = [];
   const controller = createShareExportController({
     BrowserWindow: FakeBrowserWindow,
+    directoryController,
     app: { getPath(name) { return name === "userData" ? "/user-data" : "/tmp"; } },
     dialog,
     fileSystem,
@@ -234,4 +235,23 @@ test("分享图独立窗口不携带主窗口 zoom，且使用独立内存会话
   assert.equal(options.width, SHARE_EXPORT_SURFACE_WIDTH);
   const source = fs.readFileSync(path.join(__dirname, "share-export.cjs"), "utf8");
   assert.doesNotMatch(source, /applyUiScale|mainWindow\.webContents\.capturePage/);
+});
+
+
+test("R110 share capture writes through the common validated staging controller", async () => {
+  const calls=[];
+  const directoryController={
+    getSaveDirectory(){return {directory:"/tmp"};},
+    prepareFile(destination){calls.push(["prepare",destination]);return "/user-data/stage.png";},
+    async finalizeFile(file){calls.push(["finalize",file]);return "/tmp/shared-final.png";},
+    discardFile(file){calls.push(["discard",file]);},
+  };
+  const harness=createHarness({directoryController});
+  const prepared=await harness.controller.prepareSave(harness.event,"share");
+  const result=await harness.controller.captureAndSave(harness.event,{token:prepared.token,markup:validMarkup});
+  assert.equal(harness.writes[0].filePath,"/user-data/stage.png");
+  assert.equal(result.fileName,"shared-final.png");
+  assert.deepEqual(calls.map(row=>row[0]),["prepare","finalize","discard"]);
+  await harness.controller.prepareSave(harness.event,"canceled");
+  harness.controller.clear();assert.equal(calls.at(-1)[0],"discard");
 });

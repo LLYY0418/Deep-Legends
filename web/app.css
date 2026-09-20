@@ -1060,3 +1060,8 @@ body.is-demo .toast { bottom: 52px; }
   .update-icon-button.fresh .control-icon { animation: none; }
   .update-icon-button.busy .hex-progress, .update-progress .fill { transition: none; }
 }
+
+.local-status-recovery { position: fixed; z-index: 10000; top: 8px; left: 50%; transform: translateX(-50%); max-width: 90vw; padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel, #19222e); color: var(--text, #e0e6ed); font-size: 13px; }
+
+/* Queued images keep their geometry while waiting/retrying, without broken-image glyphs. */
+img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }

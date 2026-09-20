@@ -1,0 +1,8 @@
+--- FAIL: TestR96ExplicitSubteamGuard (0.02s)
+    --- FAIL: TestR96ExplicitSubteamGuard/subteamId/conflict=false (0.01s)
+        r96_test.go:67: consistent explicit groups were rejected [map[build_fingerprint:dev event:arena_group_order_rejected game_id:90001 log_seq:23 phase:InProgress player_count:18 queue_id:1750 reason:invalid-subteams run_id:838fbbe46df61de02a59afbf source:live-client squad_size:3 time:2026-09-16T04:08:10.523832Z]]
+    --- FAIL: TestR96ExplicitSubteamGuard/playerSubteamId/conflict=false (0.01s)
+        r96_test.go:67: consistent explicit groups were rejected [map[build_fingerprint:dev event:arena_group_order_rejected game_id:90001 log_seq:23 phase:InProgress player_count:18 queue_id:1750 reason:invalid-subteams run_id:276a9c5237fc2fe561b16bbc source:live-client squad_size:3 time:2026-09-16T04:08:10.531821Z]]
+FAIL
+FAIL	lol-loot-assistant	0.512s
+FAIL

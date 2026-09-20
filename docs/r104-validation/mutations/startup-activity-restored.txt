@@ -1,0 +1,5 @@
+--- FAIL: TestR104ColdStartupDripProtectsForegroundTwentyMatches (0.57s)
+    r104_test.go:266: startup unexpectedly called Riot: bg=15 fg=0 directory=1
+FAIL
+FAIL	lol-loot-assistant	1.037s
+FAIL

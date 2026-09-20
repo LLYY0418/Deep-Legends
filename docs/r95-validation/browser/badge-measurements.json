@@ -1,0 +1,296 @@
+[
+  {
+    "width": 1500,
+    "nameWithBadge": 163,
+    "nameWithoutBadge": 163,
+    "nameScroll": 163,
+    "text": "HLE Gumayusi#0298自己预组 ×3我的小队HLE Gumayusi",
+    "row": {
+      "left": 21,
+      "right": 744,
+      "top": 185,
+      "bottom": 257,
+      "width": 723
+    },
+    "identity": {
+      "left": 89,
+      "right": 504,
+      "top": 200.75,
+      "bottom": 224.75,
+      "width": 415
+    },
+    "badges": [
+      {
+        "text": "自己",
+        "left": 259.0625,
+        "right": 279.0625,
+        "top": 205.25,
+        "bottom": 220.25,
+        "width": 20
+      },
+      {
+        "text": "预组 ×3",
+        "left": 286.0625,
+        "right": 336.890625,
+        "top": 203.75,
+        "bottom": 221.75,
+        "width": 50.828125
+      },
+      {
+        "text": "HLE Gumayusi",
+        "left": 386.890625,
+        "right": 493.1875,
+        "top": 200.75,
+        "bottom": 224.75,
+        "width": 106.296875
+      }
+    ],
+    "scroll": 723,
+    "client": 723
+  },
+  {
+    "width": 1280,
+    "nameWithBadge": 163,
+    "nameWithoutBadge": 163,
+    "nameScroll": 163,
+    "text": "HLE Gumayusi#0298自己预组 ×3我的小队HLE Gumayusi",
+    "row": {
+      "left": 21,
+      "right": 634,
+      "top": 185,
+      "bottom": 264.5,
+      "width": 613
+    },
+    "identity": {
+      "left": 89,
+      "right": 394,
+      "top": 194,
+      "bottom": 239,
+      "width": 305
+    },
+    "badges": [
+      {
+        "text": "自己",
+        "left": 259.0625,
+        "right": 279.0625,
+        "top": 197,
+        "bottom": 212,
+        "width": 20
+      },
+      {
+        "text": "预组 ×3",
+        "left": 286.0625,
+        "right": 336.890625,
+        "top": 195.5,
+        "bottom": 213.5,
+        "width": 50.828125
+      },
+      {
+        "text": "HLE Gumayusi",
+        "left": 89,
+        "right": 195.296875,
+        "top": 215,
+        "bottom": 239,
+        "width": 106.296875
+      }
+    ],
+    "scroll": 613,
+    "client": 613
+  },
+  {
+    "width": 900,
+    "nameWithBadge": 115,
+    "nameWithoutBadge": 115,
+    "nameScroll": 163,
+    "text": "HLE Gumayusi#0298自己预组 ×3我的小队HLE Gumayusi",
+    "row": {
+      "left": 21,
+      "right": 444,
+      "top": 185,
+      "bottom": 301.5,
+      "width": 423
+    },
+    "identity": {
+      "left": 89,
+      "right": 204,
+      "top": 194,
+      "bottom": 276,
+      "width": 115
+    },
+    "badges": [
+      {
+        "text": "自己",
+        "left": 96,
+        "right": 116,
+        "top": 216.5,
+        "bottom": 231.5,
+        "width": 20
+      },
+      {
+        "text": "预组 ×3",
+        "left": 123,
+        "right": 173.828125,
+        "top": 215,
+        "bottom": 233,
+        "width": 50.828125
+      },
+      {
+        "text": "HLE Gumayusi",
+        "left": 89,
+        "right": 195.296875,
+        "top": 252,
+        "bottom": 276,
+        "width": 106.296875
+      }
+    ],
+    "scroll": 423,
+    "client": 423
+  },
+  {
+    "width": 700,
+    "nameWithBadge": 163,
+    "nameWithoutBadge": 163,
+    "nameScroll": 163,
+    "text": "HLE Gumayusi#0298自己预组 ×3我的小队HLE Gumayusi",
+    "row": {
+      "left": 21,
+      "right": 679,
+      "top": 175,
+      "bottom": 284.5,
+      "width": 658
+    },
+    "identity": {
+      "left": 83,
+      "right": 668,
+      "top": 187.75,
+      "bottom": 211.75,
+      "width": 585
+    },
+    "badges": [
+      {
+        "text": "自己",
+        "left": 253.0625,
+        "right": 273.0625,
+        "top": 192.25,
+        "bottom": 207.25,
+        "width": 20
+      },
+      {
+        "text": "预组 ×3",
+        "left": 280.0625,
+        "right": 330.890625,
+        "top": 190.75,
+        "bottom": 208.75,
+        "width": 50.828125
+      },
+      {
+        "text": "HLE Gumayusi",
+        "left": 380.890625,
+        "right": 487.1875,
+        "top": 187.75,
+        "bottom": 211.75,
+        "width": 106.296875
+      }
+    ],
+    "scroll": 658,
+    "client": 658
+  },
+  {
+    "width": 620,
+    "nameWithBadge": 163,
+    "nameWithoutBadge": 163,
+    "nameScroll": 163,
+    "text": "HLE Gumayusi#0298自己预组 ×3我的小队HLE Gumayusi",
+    "row": {
+      "left": 21,
+      "right": 599,
+      "top": 175,
+      "bottom": 284.5,
+      "width": 578
+    },
+    "identity": {
+      "left": 83,
+      "right": 588,
+      "top": 187.75,
+      "bottom": 211.75,
+      "width": 505
+    },
+    "badges": [
+      {
+        "text": "自己",
+        "left": 253.0625,
+        "right": 273.0625,
+        "top": 192.25,
+        "bottom": 207.25,
+        "width": 20
+      },
+      {
+        "text": "预组 ×3",
+        "left": 280.0625,
+        "right": 330.890625,
+        "top": 190.75,
+        "bottom": 208.75,
+        "width": 50.828125
+      },
+      {
+        "text": "HLE Gumayusi",
+        "left": 380.890625,
+        "right": 487.1875,
+        "top": 187.75,
+        "bottom": 211.75,
+        "width": 106.296875
+      }
+    ],
+    "scroll": 578,
+    "client": 578
+  },
+  {
+    "width": 619,
+    "nameWithBadge": 163,
+    "nameWithoutBadge": 163,
+    "nameScroll": 163,
+    "text": "HLE Gumayusi#0298自己预组 ×3我的小队HLE Gumayusi",
+    "row": {
+      "left": 21,
+      "right": 598,
+      "top": 175,
+      "bottom": 284.5,
+      "width": 577
+    },
+    "identity": {
+      "left": 83,
+      "right": 587,
+      "top": 187.75,
+      "bottom": 211.75,
+      "width": 504
+    },
+    "badges": [
+      {
+        "text": "自己",
+        "left": 253.0625,
+        "right": 273.0625,
+        "top": 192.25,
+        "bottom": 207.25,
+        "width": 20
+      },
+      {
+        "text": "预组 ×3",
+        "left": 280.0625,
+        "right": 330.890625,
+        "top": 190.75,
+        "bottom": 208.75,
+        "width": 50.828125
+      },
+      {
+        "text": "HLE Gumayusi",
+        "left": 380.890625,
+        "right": 487.1875,
+        "top": 187.75,
+        "bottom": 211.75,
+        "width": 106.296875
+      }
+    ],
+    "scroll": 577,
+    "client": 577
+  }
+]

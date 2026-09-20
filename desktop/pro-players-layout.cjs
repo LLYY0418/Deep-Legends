@@ -23,7 +23,7 @@ async function main(){
  await call('Page.enable');
  // Use the production shell and every production stylesheet. Fixtures have no
  // personal IDs, no network dependency, long account names and missing rows.
- const data={teams:['BLG','IG','T1','HLE','GEN','DK'].map(code=>({code,name:code,league:'LCK',players:[{key:`${code}/fixture`,name:'Fixture',position:'middle',status:'partial',accounts:[{gameName:'A very long Korean account name '.repeat(3),tagLine:'KR1',tier:'CHALLENGER',rankStatus:'ranked',lp:1432,primary:true,ladderRank:17,ladderRankKnown:true,updatedAt:'2026-09-08T10:00:00Z'},{gameName:'Short',tagLine:'KR2',tier:'MASTER',rankStatus:'ranked',lp:400,updatedAt:'2026-09-08T10:00:00Z'},{gameName:'Historical',tagLine:'KR3',dormant:true}]},{key:`${code}/missing`,name:'Missing',position:'top',status:'missing',accounts:[]}]})),warnings:['测试来源提示'],fetchedAt:'2026-09-08T11:00:00Z',rosterVerifiedAt:'2026-09-08'};
+ const data={teams:['BLG','IG','T1','HLE','GEN','DK'].map(code=>({code,name:code,league:'LCK',players:[{key:`${code}/fixture`,name:'Fixture',position:'middle',status:'partial',accounts:[{gameName:'A very long Korean account name '.repeat(3),tagLine:'KR1',tier:'CHALLENGER',rankStatus:'ranked',lp:1432,ladderRank:17,ladderRankKnown:true,updatedAt:'2026-09-08T10:00:00Z'},{gameName:'Short',tagLine:'KR2',tier:'MASTER',rankStatus:'ranked',lp:400,updatedAt:'2026-09-08T10:00:00Z'},{gameName:'Historical',tagLine:'KR3',dormant:true}]},{key:`${code}/missing`,name:'Missing',position:'top',status:'missing',accounts:[]}]})),warnings:['测试来源提示'],fetchedAt:'2026-09-08T11:00:00Z',rosterVerifiedAt:'2026-09-08'};
  server=require('node:http').createServer((req,res)=>{
    const pathname=new URL(req.url,'http://localhost').pathname;
    if(pathname==='/api/pro-players'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(data));return;}
@@ -59,6 +59,14 @@ async function main(){
   if(width>1000){assert.ok(Math.max(...alignment.headers.map(e=>e.width))-Math.min(...alignment.headers.map(e=>e.width))<=1,'last three columns must be equal width');assert.ok(Math.abs((alignment.headers[1].center-alignment.headers[0].center)-(alignment.headers[2].center-alignment.headers[1].center))<=1,'last three columns must have equal spacing');}
   assert.ok(Math.abs(alignment.nav[0]-alignment.nav[1])<=1,'overview actions must be on one row');
   assert.equal(alignment.warnings,false);assert.equal(alignment.marks,false);
+
+  // R102: measure the actual collapsed view with all production styles loaded.
+  const latest=await evaluate(`(()=>{const toggle=document.querySelector('#pro-primary-only');toggle.click();const rows=[...document.querySelectorAll('[data-pro-account]')];return {label:toggle.textContent.trim(),count:rows.length,badges:document.querySelectorAll('.pro-main-badge').length,first:rows.every(e=>e.textContent.includes('A very long Korean account name')&&e.closest('tr').classList.contains('pro-primary')),nameInsets:rows.map(e=>{const line=e.querySelector('.pro-account-line'),name=e.querySelector('.pro-account-name');return {inset:name.getBoundingClientRect().left-line.getBoundingClientRect().left,children:line.children.length};}),overflow:[...document.querySelectorAll('.pro-table')].map(t=>t.scrollWidth-t.parentElement.clientWidth)};})()`);
+  assert.equal(latest.label,'只看最新账号');assert.equal(latest.count,6);assert.equal(latest.badges,0);assert.equal(latest.first,true);
+  assert.ok(latest.nameInsets.every(m=>Math.abs(m.inset)<=1&&m.children===1),'removed badge must not reserve an empty slot');
+  assert.ok(latest.overflow.every(n=>n<=1),'collapsed accounts must not overflow');
+  console.log('R102 latest-only',width,JSON.stringify(latest));
+  await evaluate(`document.querySelector('#pro-primary-only').click()`);
 
   if(process.env.R73_SCREENSHOT_DIR){fs.mkdirSync(process.env.R73_SCREENSHOT_DIR,{recursive:true});const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(process.env.R73_SCREENSHOT_DIR,`pro-players-${width}.png`),Buffer.from(shot.data,'base64'));}
  }

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "01-unprotected-proseed",
+    "file": "binary_disk_budget.go",
+    "test": "TestR103ProseedEntriesNeverSelectedForEviction",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "02-protected-budget-error-removed",
+    "file": "binary_disk_budget.go",
+    "test": "TestR103AllCandidatesProtectedReturnsErrorNotEviction",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  }
+]

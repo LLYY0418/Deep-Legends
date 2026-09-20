@@ -1,0 +1,4 @@
+=== RUN   TestR101IconOwnershipParsedFromInventory
+--- PASS: TestR101IconOwnershipParsedFromInventory (0.05s)
+PASS
+ok  	lol-loot-assistant	0.757s

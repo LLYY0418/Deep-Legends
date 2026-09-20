@@ -1,0 +1,126 @@
+$ node --test --test-name-pattern R95 web/r95.test.cjs
+✔ R95 P1 progress preserves career, append=true, noise=null (68.37025ms)
+✔ R95 P1 progress preserves career, append=true, noise=[] (15.247417ms)
+✔ R95 P1 progress preserves career, append=true, noise=undefined (9.72825ms)
+✔ R95 P1 progress preserves career, append=false, noise=null (9.898292ms)
+✔ R95 P1 progress preserves career, append=false, noise=[] (8.93275ms)
+✔ R95 P1 progress preserves career, append=false, noise=undefined (8.17825ms)
+✔ R95 P1 first five and complete explicit empty arrays are authoritative (20.949625ms)
+✔ R95 P2 slow interval/false loading eligibility (15.522292ms)
+✔ R95 P2 slow sse/false loading eligibility (11.839584ms)
+✔ R95 P2 slow event/false loading eligibility (9.658042ms)
+✖ R95 P2 slow manual/true loading eligibility (8.621542ms)
+✖ R95 P2 slow direct/true loading eligibility (8.611666ms)
+✖ R95 P2 slow manual/false loading eligibility (8.789125ms)
+✖ R95 P2 fast 10ms manual response never shows status, including zero-delay timers (19.520208ms)
+✔ R95 P3 both sides only show lock wait for show-then-lock (33.632542ms)
+✔ R95 P4 badge respects mask, secondary and professional click context (19.685292ms)
+✔ R95 P5 exact Chinese titles, unknown fallback, relative time and champselect fired count (0.982625ms)
+✔ R95 P3 typed lock wait targets its own side (7.165917ms)
+✔ R95 P4 match player clicks enter professional context even without directory source (5.924458ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 15
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 665.784875
+
+✖ failing tests:
+
+test at web/r95.test.cjs:35:170
+✖ R95 P2 slow manual/true loading eligibility (8.621542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + HTMLDivElement {
+  +   Symbol(SameObject caches): [Object: null prototype] {
+  +     attributes: NamedNodeMap {},
+  +     classList: DOMTokenList {}
+  +   }
+  + }
+  - null
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:36:191)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {},
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at web/r95.test.cjs:35:170
+✖ R95 P2 slow direct/true loading eligibility (8.611666ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + HTMLDivElement {
+  +   Symbol(SameObject caches): [Object: null prototype] {
+  +     attributes: NamedNodeMap {},
+  +     classList: DOMTokenList {}
+  +   }
+  + }
+  - null
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:36:191)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {},
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at web/r95.test.cjs:35:170
+✖ R95 P2 slow manual/false loading eligibility (8.789125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + HTMLDivElement {
+  +   Symbol(SameObject caches): [Object: null prototype] {
+  +     attributes: NamedNodeMap {},
+  +     classList: DOMTokenList {}
+  +   }
+  + }
+  - null
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:36:191)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {},
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at web/r95.test.cjs:38:1
+✖ R95 P2 fast 10ms manual response never shows status, including zero-delay timers (19.520208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + HTMLDivElement {
+  +   Symbol(SameObject caches): [Object: null prototype] {
+  +     attributes: NamedNodeMap {},
+  +     classList: DOMTokenList {}
+  +   }
+  + }
+  - null
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:39:175)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {},
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

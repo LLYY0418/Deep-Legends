@@ -1,0 +1,24 @@
+--- FAIL: TestR105_BannerPATCHPreservesEntireSlot (0.00s)
+    --- FAIL: TestR105_BannerPATCHPreservesEntireSlot/200/numeric=true (0.00s)
+        r105_test.go:257: slot fields lost or unrelated slot overwritten map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:new-content futureField:keep-too inventoryType:REGALIA_BANNER itemId:4]]]
+    --- FAIL: TestR105_BannerPATCHPreservesEntireSlot/200/numeric=false (0.00s)
+        r105_test.go:257: slot fields lost or unrelated slot overwritten map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:new-content futureField:keep-too inventoryType:REGALIA_BANNER itemId:4]]]
+    --- FAIL: TestR105_BannerPATCHPreservesEntireSlot/201/numeric=true (0.00s)
+        r105_test.go:257: slot fields lost or unrelated slot overwritten map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:new-content futureField:keep-too inventoryType:REGALIA_BANNER itemId:4]]]
+    --- FAIL: TestR105_BannerPATCHPreservesEntireSlot/201/numeric=false (0.00s)
+        r105_test.go:257: slot fields lost or unrelated slot overwritten map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:new-content futureField:keep-too inventoryType:REGALIA_BANNER itemId:4]]]
+    --- FAIL: TestR105_BannerPATCHPreservesEntireSlot/204/numeric=true (0.00s)
+        r105_test.go:257: slot fields lost or unrelated slot overwritten map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:new-content futureField:keep-too inventoryType:REGALIA_BANNER itemId:4]]]
+    --- FAIL: TestR105_BannerPATCHPreservesEntireSlot/204/numeric=false (0.00s)
+        r105_test.go:257: slot fields lost or unrelated slot overwritten map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:new-content futureField:keep-too inventoryType:REGALIA_BANNER itemId:4]]]
+    --- FAIL: TestR105_BannerPATCHPreservesEntireSlot/400/numeric=true (0.00s)
+        r105_test.go:257: slot fields lost or unrelated slot overwritten map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:new-content futureField:keep-too inventoryType:REGALIA_BANNER itemId:4]]]
+    --- FAIL: TestR105_BannerPATCHPreservesEntireSlot/400/numeric=false (0.00s)
+        r105_test.go:257: slot fields lost or unrelated slot overwritten map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:new-content futureField:keep-too inventoryType:REGALIA_BANNER itemId:4]]]
+    --- FAIL: TestR105_BannerPATCHPreservesEntireSlot/500/numeric=true (0.00s)
+        r105_test.go:257: slot fields lost or unrelated slot overwritten map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:new-content futureField:keep-too inventoryType:REGALIA_BANNER itemId:4]]]
+    --- FAIL: TestR105_BannerPATCHPreservesEntireSlot/500/numeric=false (0.00s)
+        r105_test.go:257: slot fields lost or unrelated slot overwritten map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:new-content futureField:keep-too inventoryType:REGALIA_BANNER itemId:4]]]
+FAIL
+FAIL	lol-loot-assistant	0.492s
+FAIL

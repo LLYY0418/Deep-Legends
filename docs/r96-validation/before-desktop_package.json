@@ -1,0 +1,84 @@
+{
+  "name": "deep-legends-desktop",
+  "version": "0.12.1",
+  "description": "英雄联盟国服生涯战绩、实时对局与收藏本地助手",
+  "author": "Deep Legends Contributors",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "pack:win": "npm run pack:win-setup --",
+    "pack:win-setup": "electron-builder --win nsis --x64",
+    "pack:win-dir": "electron-builder --win dir --x64"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.7",
+    "jsdom": "^30.0.1"
+  },
+  "build": {
+    "appId": "cn.hexcore.lootassistant",
+    "productName": "Deep Legends",
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "backend/loot-service.exe"
+    ],
+    "directories": {
+      "output": "../dist/desktop"
+    },
+    "toolsets": {
+      "nsis": "1.2.1"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "share-export.cjs",
+      "diagnostics-export.cjs",
+      "desktop-log.cjs",
+      "proxy-resolution.cjs",
+      "window-bounds.cjs",
+      "window-bounds-store.cjs",
+      "ui-scale.cjs",
+      "backend/loot-service.exe",
+      "assets/hexcore-icon.ico",
+      "assets/splash-mark.png"
+    ],
+    "beforePack": "verify-embedded-riot-key.cjs",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/hexcore-icon.ico",
+      "executableName": "Deep Legends",
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "artifactName": "Deep Legends Setup ${version}.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Deep Legends",
+      "uninstallDisplayName": "Deep Legends",
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ],
+      "differentialPackage": false,
+      "include": "nsis/installer.nsh",
+      "installerIcon": "assets/hexcore-icon.ico",
+      "uninstallerIcon": "assets/hexcore-icon.ico"
+    }
+  }
+}

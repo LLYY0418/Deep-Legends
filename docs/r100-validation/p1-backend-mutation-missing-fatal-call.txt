@@ -1,0 +1,80 @@
+✖ confirmed child close traverses main IPC + preload + renderer, offers a real app restart (65.528375ms)
+✖ process exit before renderer subscription is recovered from retained snapshot (16.318209ms)
+✖ late successful status and old running snapshot cannot erase a confirmed exit (8.963959ms)
+✔ unknown, absent or rejected bridge and repeated HTTP errors never prove death (27.348334ms)
+✔ lifecycle bridge cleans listeners and ignores async results after disposal (8.485541ms)
+✔ graceful update/user shutdown does not publish fatal; foreign renderers cannot query or restart (2.376042ms)
+✔ renderer bootstrap actually installs lifecycle subscription (0.292708ms)
+✖ restart IPC failure tells the user to reopen manually instead of reloading a dead service (8.034667ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 4
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 596.685125
+
+✖ failing tests:
+
+test at desktop/backend-lifecycle.test.cjs:69:1
+✖ confirmed child close traverses main IPC + preload + renderer, offers a real app restart (65.528375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/desktop/backend-lifecycle.test.cjs:80:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at desktop/backend-lifecycle.test.cjs:90:1
+✖ process exit before renderer subscription is recovered from retained snapshot (16.318209ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /重启软件/. Input:
+  
+  ''
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/desktop/backend-lifecycle.test.cjs:93:76)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /重启软件/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at desktop/backend-lifecycle.test.cjs:97:1
+✖ late successful status and old running snapshot cannot erase a confirmed exit (8.963959ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/desktop/backend-lifecycle.test.cjs:107:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at desktop/backend-lifecycle.test.cjs:155:1
+✖ restart IPC failure tells the user to reopen manually instead of reloading a dead service (8.034667ms)
+  TypeError: Cannot read properties of null (reading 'click')
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/desktop/backend-lifecycle.test.cjs:159:74)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)

@@ -1,0 +1,51 @@
+$ node --test --test-name-pattern R95 web/r95.test.cjs
+✔ R95 P1 progress preserves career, append=true, noise=null (62.64325ms)
+✔ R95 P1 progress preserves career, append=true, noise=[] (13.554667ms)
+✔ R95 P1 progress preserves career, append=true, noise=undefined (9.369709ms)
+✔ R95 P1 progress preserves career, append=false, noise=null (9.574459ms)
+✔ R95 P1 progress preserves career, append=false, noise=[] (9.331125ms)
+✔ R95 P1 progress preserves career, append=false, noise=undefined (8.629208ms)
+✔ R95 P1 first five and complete explicit empty arrays are authoritative (27.184458ms)
+✔ R95 P2 slow interval/false loading eligibility (16.850666ms)
+✔ R95 P2 slow sse/false loading eligibility (10.478875ms)
+✔ R95 P2 slow event/false loading eligibility (10.320791ms)
+✔ R95 P2 slow manual/true loading eligibility (9.4645ms)
+✔ R95 P2 slow direct/true loading eligibility (8.867625ms)
+✔ R95 P2 slow manual/false loading eligibility (9.989667ms)
+✔ R95 P2 fast 10ms manual response never shows status, including zero-delay timers (14.325375ms)
+✔ R95 P3 both sides only show lock wait for show-then-lock (40.825459ms)
+✔ R95 P4 badge respects mask, secondary and professional click context (19.245917ms)
+✖ R95 P5 exact Chinese titles, unknown fallback, relative time and champselect fired count (1.11175ms)
+✔ R95 P3 typed lock wait targets its own side (6.9025ms)
+✔ R95 P4 match player clicks enter professional context even without directory source (5.951708ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 18
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 648.245417
+
+✖ failing tests:
+
+test at web/r95.test.cjs:49:1
+✖ R95 P5 exact Chinese titles, unknown fallback, relative time and champselect fired count (1.11175ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /自动规则 · 12分钟前/. Input:
+  
+  'champselect-foo · 12分钟前'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:52:267)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'champselect-foo · 12分钟前',
+    expected: /自动规则 · 12分钟前/,
+    operator: 'match',
+    diff: 'simple'
+  }

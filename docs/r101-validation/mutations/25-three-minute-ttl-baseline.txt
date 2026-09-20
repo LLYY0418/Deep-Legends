@@ -1,0 +1,4 @@
+=== RUN   TestR101SeedRankSixHourCacheSeparateFromOverview
+--- PASS: TestR101SeedRankSixHourCacheSeparateFromOverview (0.04s)
+PASS
+ok  	lol-loot-assistant	0.433s

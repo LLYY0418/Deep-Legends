@@ -1,0 +1,29 @@
+✖ R99 icon dialog is body mounted, sliced, CSP safe, and restores focus on every exit (490.680458ms)
+✔ R99 disconnect closes the picker and invalidates the catalog (0.327708ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 581.552167
+
+✖ failing tests:
+
+test at web/suite.test.cjs:701:1
+✖ R99 icon dialog is body mounted, sliced, CSP safe, and restores focus on every exit (490.680458ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/suite.test.cjs:720:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

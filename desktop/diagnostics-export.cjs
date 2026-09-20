@@ -3,7 +3,7 @@
 const path = require("node:path");
 
 // Narrow download hook: no renderer-supplied paths, URLs or arbitrary writes.
-function attachDiagnosticsExport({ session, sender, getBaseURL, getDirectory = () => "", getDefaultDirectory = () => "", fileSystem, now = () => new Date(), onCompleted = () => {}, getDesktopLog }) {
+function attachDiagnosticsExport({ session, sender, getBaseURL, getDirectory = () => "", getDefaultDirectory = () => "", fileSystem, now = () => new Date(), onCompleted = () => {}, getDesktopLog, prepareFile, finalizeFile, discardFile = () => {}, onError = () => {} }) {
   const pending = new Set();
   const listeners = new Map();
   let active = true;
@@ -12,16 +12,25 @@ function attachDiagnosticsExport({ session, sender, getBaseURL, getDirectory = (
     let expected;
     try { expected = new URL("/api/diagnostics/log", getBaseURL()).href; } catch (_) { return; }
     const chain = item.getURLChain?.() || [item.getURL()];
-    if (!chain.length || chain.some((url) => url !== expected)) return;
-    let reserved;
+    if (!chain.length) return;
+    let exportID = "";
+    try {
+      const downloadURL = new URL(chain[0]);
+      exportID = downloadURL.searchParams.get("exportId") || "";
+      // Only an opaque correlation ID is allowed, never paths or arbitrary URLs.
+      if (downloadURL.search && !/^\?exportId=[A-Za-z0-9-]{1,64}$/.test(downloadURL.search)) return;
+      downloadURL.search = "";
+      if (downloadURL.href !== expected || chain.some(url => url !== chain[0])) return;
+    } catch (_) { return; }
+    let reserved, stagedFile;
     // Subscribe before selecting a destination, including Electron's Save dialog.
-    const done = (_event, state) => {
+    const done = async (_event, state) => {
       listeners.delete(item);
       pending.delete(reserved);
-      if (!active || state !== "completed") return;
+      if (!active || state !== "completed") { discardFile(stagedFile); return; }
       let destination;
-      try { destination = item.getSavePath(); } catch (_) { return; }
-      if (!destination || !path.isAbsolute(destination)) return;
+      try { destination = item.getSavePath(); } catch (_) { discardFile(stagedFile); return; }
+      if (!destination || !path.isAbsolute(destination)) { discardFile(stagedFile); return; }
       if (getDesktopLog) {
         let fd;
         try {
@@ -38,7 +47,7 @@ function attachDiagnosticsExport({ session, sender, getBaseURL, getDirectory = (
           // Backend evidence remains usable if shell evidence is unavailable.
         } finally { if (fd !== undefined) fileSystem.closeSync(fd); }
       }
-      onCompleted(destination);
+      try { if (finalizeFile) destination = await finalizeFile(destination); onCompleted(destination, exportID); } catch (error) { onError(error); }
     };
     listeners.set(item, done);
     item.once("done", done);
@@ -61,13 +70,13 @@ function attachDiagnosticsExport({ session, sender, getBaseURL, getDirectory = (
     }
     if (!reserved) return;
     pending.add(reserved);
-    try { item.setSavePath(reserved); } catch (_) { pending.delete(reserved); }
+    try { stagedFile = prepareFile ? prepareFile(reserved) : reserved; item.setSavePath(stagedFile); } catch (_) { pending.delete(reserved); discardFile(stagedFile); }
   };
   session.on("will-download", onDownload);
   return () => {
     active = false;
     session.removeListener("will-download", onDownload);
-    for (const [item, done] of listeners) item.removeListener("done", done);
+    for (const [item, done] of listeners) { item.removeListener("done", done); try { discardFile(item.getSavePath()); } catch (_) {} }
     listeners.clear();
     pending.clear();
   };

@@ -1,0 +1,5 @@
+AssertionError [ERR_ASSERTION]: lost block image
+
+'inline' !== 'block'
+
+    at main (/Users/ly/personal/personal-work/deep-legends/desktop/r99-facade-picker-layout.cjs:84:12)

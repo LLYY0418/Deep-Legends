@@ -56,9 +56,11 @@ test(`R75/R76 actual page: pro rows, degradation ${coverage ? coverage.failedGam
     await settle();
     const tab = w.document.querySelector('[data-rune-source="pro"]');
     assert.ok(tab, "hasTopPlayers=false must not hide pro");
-    tab.click();
-    await settle();
     const live = w.document.querySelector("#live-content");
+    const stableHeader = live.querySelector(".recommendation-champion-summary");
+    tab.click();
+    assert.equal(live.querySelector(".recommendation-champion-summary"), stableHeader, "source switch must not remount the recommendation header");
+    await settle();
     assert.match(live.textContent, /T1 Faker/);
     assert.match(live.textContent, /LCK · 2026-09-06/);
     assert.match(live.textContent, /DK ShowMaker/);
@@ -79,6 +81,7 @@ test(`R75/R76 actual page: pro rows, degradation ${coverage ? coverage.failedGam
     }
     const zeka = [...live.querySelectorAll("[data-specialist-player]")].find(el => el.textContent.includes("Zeka"));
     assert.ok(zeka); zeka.click();
+    assert.equal(live.querySelector(".recommendation-champion-summary"), stableHeader, "player switch must keep the recommendation header mounted");
     const incomplete = capture.pros.find(row => row.selectedComplete === false);
     const choice = live.querySelector(`[data-rune-choice="${incomplete.key}"]`);
     assert.ok(choice, "captured eight-perk game must render"); choice.click();

@@ -1,0 +1,35 @@
+missing-inventory-quadrant KILLED
+automatic-write-probe KILLED
+raw-chat-diagnostic KILLED
+wrong-accent-restore KILLED
+stale-icon-probe KILLED
+extra-icon-body-field KILLED
+unknown-icon-write KILLED
+missing-icon-reread KILLED
+swallowed-identity-event KILLED
+private-icon-projection KILLED
+client-cache-crossing KILLED
+rank-crest-overwrite KILLED
+seed-zero-ttl KILLED
+seed-old-name-lookup KILLED
+seed-no-budget INVALID/SURVIVED
+Traceback (most recent call last):
+  File "/Users/ly/personal/personal-work/deep-legends/scripts/r99-mutation-check.py", line 43, in <module>
+    probe('seed-no-budget','pro_seed_accounts.go','ctx = withRiotQueueLimit(ctx, 100*time.Millisecond)','// mutation: omit queue budget','^TestR99SeedRespectsQuotaBudget$')
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ly/personal/personal-work/deep-legends/scripts/r99-mutation-check.py", line 28, in probe
+    assert killed,log[-2400:]
+           ^^^^^^
+AssertionError: ok  	lol-loot-assistant	0.550s
+
+seed-no-budget KILLED
+seed-missing-partial KILLED
+seed-copied-id KILLED
+seed-lru-evicted KILLED
+modal-theme-not-restored KILLED
+dialog-in-root KILLED
+unsliced-grid KILLED
+inline-style KILLED
+no-aspect-ratio KILLED
+no-block-image KILLED
+quota-identity-path-leak KILLED

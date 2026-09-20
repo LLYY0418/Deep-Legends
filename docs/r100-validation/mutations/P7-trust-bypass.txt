@@ -1,0 +1,32 @@
+✔ R100 P7 first native save persists independently; second and restart save without prompt; no overwrite (37.848167ms)
+✔ R100 P7 deleted/replaced directory re-prompts at actual write; cancel cleans staging (25.625125ms)
+✖ R100 P7 rejects foreign renderer and symbolic link files; packaged controller (9.2625ms)
+✔ R100 P7 failed SavePath access and window disposal remove private staged downloads (65.233ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 3
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 194.316917
+
+✖ failing tests:
+
+test at desktop/r100.test.cjs:34:1
+✖ R100 P7 rejects foreign renderer and symbolic link files; packaged controller (9.2625ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/desktop/r100.test.cjs:35:41)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /untrusted/,
+    operator: 'throws',
+    diff: 'simple'
+  }

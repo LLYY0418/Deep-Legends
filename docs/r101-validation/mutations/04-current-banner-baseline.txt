@@ -1,0 +1,4 @@
+=== RUN   TestR101BannerProbeSwitchesToDifferentOwnedBanner
+--- PASS: TestR101BannerProbeSwitchesToDifferentOwnedBanner (0.00s)
+PASS
+ok  	lol-loot-assistant	0.436s

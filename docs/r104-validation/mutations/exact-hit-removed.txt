@@ -1,0 +1,5 @@
+--- FAIL: TestR104ExactDirectoryMatchAvoidsRiotAndMissFallsBack (0.10s)
+    r104_test.go:138: hit/miss fallback: [{SeedKey:proseed:v1:IG/rookie/0 LastMatchAt:2025-09-16T00:00:00.123Z LastMatchAtKnown:true PUUID:id-fixture0 Source:seed Inactive:false Stale:false GameName:fixture0 TagLine:KR1 Region:kr UpdatedAt:2026-09-17T12:00:59Z RevisionAt: Level:0 Rank:[110 117 108 108] LadderRank:0 LadderRankKnown:false} {SeedKey:proseed:v1:IG/rookie/1 LastMatchAt:2025-09-16T00:00:00.123Z LastMatchAtKnown:true PUUID:id-fixture1 Source:seed Inactive:false Stale:false GameName:fixture1 TagLine:KR1 Region:kr UpdatedAt:2026-09-17T12:00:59Z RevisionAt: Level:0 Rank:[110 117 108 108] LadderRank:0 LadderRankKnown:false}]
+FAIL
+FAIL	lol-loot-assistant	0.565s
+FAIL

@@ -407,23 +407,28 @@
 
   function scheduleStatus() {
     clearTimeout(state.statusTimer);
-    if (document.hidden || state.destroyed) return;
+    if (document.hidden || state.destroyed || state.backendExited) return;
     state.statusTimer = setTimeout(() => refreshStatus(false), state.statusDelay);
   }
 
   async function refreshStatus(loadItems = false) {
-    if (state.destroyed) return;
+    if (state.destroyed || state.backendExited) return;
     clearTimeout(state.statusTimer);
     let statusReceived = false;
     const token = state.statusRequestToken = Number(state.statusRequestToken || 0) + 1;
     try {
       const previous = state.status;
       const nextStatus = await api("/api/status", {}, "status", 8000);
-      if (token !== state.statusRequestToken || state.destroyed) return;
+      if (token !== state.statusRequestToken || state.destroyed || state.backendExited) return;
       statusReceived = true;
       state.status = nextStatus;
       state.statusFailures = 0;
-	  if (!state.status.connected || (!state.status.syncing && ((state.status.snapshotReady && !state.status.collectionDirty) || state.status.lastAttempt !== state.collectionRequestAttempt || Date.now() - state.collectionRequestAt > 30000))) {
+      window.deepLegendsStatusRecovery?.(false);
+	  // A changed lastAttempt means the accepted scan started; it is not proof that
+	  // the scan finished. Keep the gate until a clean snapshot arrives or the
+	  // bounded recovery timeout expires, otherwise every status event can enqueue
+	  // the same collection rescan again.
+	  if (!state.status.connected || (!state.status.syncing && ((state.status.snapshotReady && !state.status.collectionDirty) || Date.now() - state.collectionRequestAt > 30000))) {
         state.collectionRescanInFlight = false;
         state.collectionEnsureInFlight = false;
       }
@@ -455,11 +460,11 @@
       if (state.section === "favorites" && state.favoritesPage === "pools" && (loadItems || changed)) await loadPools();
       updateReadingOverlay();
     } catch (error) {
-      if (token !== state.statusRequestToken || error.name === "RequestCancelled" || state.destroyed) return;
+      if (token !== state.statusRequestToken || error.name === "RequestCancelled" || state.destroyed || state.backendExited) return;
       if (statusReceived) return;
       state.statusFailures = Number(state.statusFailures || 0) + 1;
       state.statusDelay = Math.min(10000, state.statusFailures * 1000);
-      if (state.statusFailures >= 3) showFatal(error.message);
+      window.deepLegendsStatusRecovery?.(true);
     } finally {
       if (token === state.statusRequestToken) scheduleStatus();
     }
@@ -585,6 +590,15 @@
     }
   }
 
+  function sameCollectionItems(left, right) {
+    if (left === right) return true;
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    for (let index = 0; index < left.length; index++) {
+      if (JSON.stringify(left[index]) !== JSON.stringify(right[index])) return false;
+    }
+    return true;
+  }
+
   async function loadSkins(force = false) {
     const generation = ++state.skinLoadGeneration;
     state.listError = "";
@@ -613,15 +627,27 @@
       renderItems();
       return;
     }
-    state.loading = true;
-    renderItems();
+    // Keep a usable collection on screen while a snapshot event is verified.
+    // Replacing thousands of cards with skeletons for every identical refresh
+    // caused the collection page to flash even when nothing had changed.
+    const keepVisible = force && state.items.length > 0;
+    state.loading = !keepVisible;
+    if (state.loading) renderItems();
+    let shouldRender = !keepVisible;
     try {
       const endpoint = state.view === "chromas" ? "/api/chromas" : `/api/skins?view=${encodeURIComponent(state.view)}`;
       const payload = await api(endpoint, {}, "skins", 15000);
       if (generation !== state.skinLoadGeneration || state.destroyed) return;
       const items = Array.isArray(payload.items) ? payload.items : [];
+      const sameStaleContext = Boolean(state.staleSnapshot) === Boolean(payload.stale)
+        && (!payload.stale || String(state.staleSnapshotAt || "") === String(payload.capturedAt || ""));
+      const unchanged = keepVisible && sameCollectionItems(state.items, items) && sameStaleContext;
+      window.reportFlowDiagnostic?.("collection_render_client", unchanged ? "unchanged-suppressed" : "updated", {
+        view: state.view, force: Boolean(force), itemCount: items.length, keptVisible: keepVisible,
+      });
       applySkinsPayload(items, payload.capability || null, payload.stale, payload.capturedAt);
       state.skinsCache.set(state.view, { items, capability: payload.capability || null, stale: Boolean(payload.stale), capturedAt: payload.capturedAt || "", at: Date.now() });
+      shouldRender ||= !unchanged;
     } catch (error) {
       if (generation !== state.skinLoadGeneration || error.name === "RequestCancelled" || state.destroyed) return;
       // 保留已经渲染的实时/历史列表，避免一次瞬时请求失败把可用内容清空。
@@ -632,6 +658,7 @@
         state.staleSnapshot = false;
         state.staleSnapshotAt = "";
         state.listError = error.message;
+        shouldRender = true;
       } else {
         state.listError = "";
       }
@@ -639,11 +666,12 @@
     } finally {
       if (generation !== state.skinLoadGeneration || state.destroyed) return;
       state.loading = false;
-      renderItems();
+      if (shouldRender) renderItems();
     }
   }
 
   function renderStatus() {
+    if (state.backendExited) return;
     const data = state.status;
     document.body.classList.remove("is-fatal");
     el.refresh.disabled = data.syncing || state.manualRefreshing;
@@ -654,10 +682,11 @@
     const tag = summoner.tagLine ? `#${summoner.tagLine}` : "";
     if (data.connected && summoner.profileIconId) {
       el.connectionAvatar.hidden = false;
-      el.connectionAvatar.src = `/api/image?path=${encodeURIComponent(`/lol-game-data/assets/v1/profile-icons/${summoner.profileIconId}.jpg`)}`;
+      el.connectionAvatar.setAttribute("data-queued-src", `/api/image?path=${encodeURIComponent(`/lol-game-data/assets/v1/profile-icons/${summoner.profileIconId}.jpg`)}`);
       el.connectionAvatar.onerror = () => { el.connectionAvatar.hidden = true; };
     } else {
       el.connectionAvatar.hidden = true;
+      el.connectionAvatar.removeAttribute("data-queued-src");
       el.connectionAvatar.removeAttribute("src");
     }
     if (data.connected && (data.identityReady ?? data.snapshotReady)) {
@@ -1405,7 +1434,7 @@
     if (!path) return;
     image.onload = () => { image.hidden = false; };
     image.onerror = () => { image.hidden = true; image.removeAttribute("src"); };
-    image.src = `/api/image?path=${encodeURIComponent(path)}`;
+    image.setAttribute("data-queued-src", `/api/image?path=${encodeURIComponent(path)}`);
   }
 
   function prefetchAdjacentChromaArtwork(generation) {
@@ -1420,7 +1449,7 @@
       state.artworkPrefetchCache.set(source, image);
       image.decoding = "async";
       image.onload = image.onerror = () => trimArtworkPrefetchCache();
-      image.src = source;
+      window.deepLegendsQueueImage?.(image, source);
     }, 1200);
   }
 
@@ -1518,7 +1547,7 @@
     fallback.hidden = false;
     const next = () => {
       if (index >= sources.length) { image.hidden = true; fallback.textContent = fallback.dataset.emptyText || "暂无预览"; fallback.hidden = false; complete(); return; }
-      image.src = sources[index++];
+      image.setAttribute("data-queued-src", sources[index++]);
     };
     image.onload = () => { image.classList.add("is-loaded"); fallback.hidden = true; complete(); };
     image.onerror = next;
@@ -1799,7 +1828,7 @@
 	  const profileIcon = window.deepLegendsGameIcons?.iconFigure?.("profile", summoner.profileIconId, profileName, "summoner-avatar", false)
 		|| `<span class="game-icon is-summoner-avatar"><span aria-hidden="true">${escapeHTML(profileName.slice(0, 1) || "?")}</span></span>`;
 	  const backgroundArt = window.deepLegendsOverviewArt?.render(summoner) || (summoner.backgroundSource && summoner.backgroundPath
-		? `<img class="summoner-strip-art account-hero-art" src="/api/champion-asset?source=${encodeURIComponent(summoner.backgroundSource)}&path=${encodeURIComponent(summoner.backgroundPath)}" alt="" aria-hidden="true" decoding="async" data-game-image>`
+		? `<img class="summoner-strip-art account-hero-art" data-queued-src="/api/champion-asset?source=${encodeURIComponent(summoner.backgroundSource)}&path=${encodeURIComponent(summoner.backgroundPath)}" alt="" aria-hidden="true" decoding="async" data-game-image>`
 		: "");
 	  el.accountContent.innerHTML = `<section class="account-hero">${backgroundArt}${profileIcon}<div class="account-identity"><p class="eyebrow">当前召唤师</p><h3>${escapeHTML(profileName)}</h3><p>等级 ${formatNumber(summoner.summonerLevel)} · 本机只读连接</p></div><dl class="account-facts"><div><dt>皮肤物品</dt><dd>${formatNumber(skinLoot.length)} 种 · ${formatNumber(skinLootQuantity)} 件</dd></div><div><dt>待领取</dt><dd>${formatNumber(rewards.length)} 组 · ${formatNumber(rewardQuantity)} 件</dd></div></dl></section>${lootPending ? '<div class="notice" role="status">客户端数据暂未同步，可稍后重试</div>' : ""}${categorySections || '<div class="empty-state"><strong>仓库当前没有可展示物品</strong></div>'}<section class="account-section"><div class="section-copy"><h3>待领取奖励</h3><span class="section-count">${formatNumber(rewards.length)} 组</span><button class="text-button" type="button" data-navigate-suite="sweep">去领奖</button></div>${rewardCards ? `<div class="reward-grid">${rewardCards}</div>` : '<div class="empty-state compact"><strong>没有待领取奖励</strong><p>工具会扫描奖励账本、任务与事件中心。</p></div>'}</section><details class="capability-details"><summary>数据来源状态</summary><p>只读接口单独降级，不影响皮肤库存核验。</p><div class="capability-list">${capabilityRows || '<p class="muted">尚无能力状态</p>'}</div></details>`;
       for (const image of el.accountContent.querySelectorAll(".loot-art img")) loadNextLootImage(image, true);
@@ -1998,7 +2027,7 @@
     el.privacyContent.innerHTML = '<p class="muted">正在读取隐私说明…</p>';
     try {
       const data = await api("/api/privacy", {}, "privacy");
-      el.privacyContent.innerHTML = `<div class="stat-grid"><div class="stat"><span>账号数据处理</span><strong>${data.localOnly ? "仅限本机" : "包含网络服务"}</strong></div><div class="stat"><span>账号密码</span><strong>${data.requiresPassword ? "需要" : "不需要"}</strong></div><div class="stat"><span>收藏数据上传</span><strong>${data.uploadsData ? "会上传" : "不会上传"}</strong></div></div><p class="muted">客户端操作需主动点击；自动规则仅在开启后执行。</p>`;
+      el.privacyContent.innerHTML = `<div class="stat-grid"><div class="stat"><span>账号数据处理</span><strong>${data.localOnly ? "仅限本机" : "包含公开数据查询"}</strong></div><div class="stat"><span>账号密码</span><strong>${data.requiresPassword ? "需要" : "不需要"}</strong></div><div class="stat"><span>收藏数据上传</span><strong>${data.uploadsData ? "会上传" : "不会上传"}</strong></div></div><p class="muted">${escapeHTML(data.mayhemRatingDisclosure || "")} 客户端操作需主动点击；自动规则仅在开启后执行。</p>`;
     } catch (error) { renderPanelError(el.privacyContent, "隐私说明读取失败", error.message, loadPrivacy); }
   }
 
@@ -2073,6 +2102,7 @@
     if (!tab && !standalone) return;
     window.dispatchEvent(new CustomEvent("deep-legends:before-section"));
     const previousSection = state.section;
+    if (previousSection === "settings" && name !== "settings") resetDiagnosticsExport();
     if (previousSection !== name) state.sectionScroll[previousSection] = el.appScroll.scrollTop;
     if (name !== "favorites" && state.section === "favorites") {
       cancelRenderFrames();
@@ -2106,6 +2136,7 @@
     // Snapshotting a large collection/match DOM delays the navigation callback
     // itself. Switch panels synchronously; never photograph the outgoing page.
     applyPanels();
+    void window.deepLegendsSections?.activate(name);
     // 离开后重新进入的页面一律还原到默认页签与筛选项。
     if (name === "favorites") {
       const fresh = previousSection !== "favorites";
@@ -2128,6 +2159,31 @@
 	  if (name === "settings" && event.detail?.page) activateSettingsPage(event.detail.page);
 	}
   });
+
+  // Links from collection must work before the tools module has ever loaded.
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("[data-navigate-suite]");
+    if (link) window.dispatchEvent(new CustomEvent("deep-legends:navigate", { detail: { section: "suite", tab: link.dataset.navigateSuite || "watch" } }));
+  });
+  document.getElementById("pro-players-return")?.addEventListener("click", () => activateSection("pro-players"));
+  let openFriendsFromLink = false;
+  window.addEventListener("deep-legends:status", (event) => {
+    if (openFriendsFromLink && event.detail?.connected) {
+      openFriendsFromLink = false;
+      queueMicrotask(() => document.getElementById("friends-toggle")?.click());
+    }
+  });
+  function activateSectionLink() {
+    const name = new URLSearchParams(location.search).get("section") || location.hash.slice(1);
+    if (name === "friends") {
+      const toggle = document.getElementById("friends-toggle");
+      if (toggle?.disabled) openFriendsFromLink = true;
+      else toggle?.click();
+    }
+    else if (name) activateSection(name);
+  }
+  window.addEventListener("hashchange", activateSectionLink);
+  document.addEventListener("DOMContentLoaded", activateSectionLink, { once: true });
 
   // 总览页切换玩家页签时同步启动入口卡的可见性（只对当前召唤师展示）。
   window.addEventListener("deep-legends:overview-tab", (event) => {
@@ -2219,6 +2275,7 @@
   function activateSettingsPage(name) {
     const tab = el.settingsTabs.find((item) => item.dataset.settingsPage === name);
     if (!tab) return;
+    if (state.settingsPage === "privacy" && name !== "privacy") resetDiagnosticsExport();
     state.settingsPage = name;
     activateTab(tab, el.settingsTabs, (selected) => {
       for (const panel of el.settingsPanels) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
@@ -2451,6 +2508,8 @@
     }
   }
 
+  window.desktopShare?.onDirectoryChanged?.((value) => renderShareDirectorySetting(value?.directory || ""));
+
   window.addEventListener("deep-legends:share-directory-changed", (event) => {
     renderShareDirectorySetting(event.detail?.directory || "");
   });
@@ -2518,23 +2577,59 @@
     }
   }
 
-  // 本地服务不可达（或会话失效）时的全局兜底：隐藏页面主体与筛选控件，
-  // 只保留一张与各页面空状态同风格的居中提示卡；恢复由 renderStatus 完成。
-  function showFatal(message) {
+  function setupBackendLifecycle() {
+    const bridge = window.desktopBackend;
+    if (!bridge) return; // Browsers cannot prove process death from HTTP errors.
+    let disposed = false;
+    const receive = snapshot => {
+      if (disposed || state.destroyed || state.backendExited || snapshot?.state !== "exited") return;
+      state.backendExited = true;
+      state.statusRequestToken = Number(state.statusRequestToken || 0) + 1;
+      clearTimeout(state.statusTimer);
+      clearTimeout(state.liveUpdateTimer);
+      clearTimeout(state.eventReconnectTimer);
+      state.controllers.get("status")?.abort();
+      state.eventSource?.close();
+      state.eventSource = null;
+      window.deepLegendsStatusRecovery?.(false);
+      showFatal("本地数据服务已退出，自动重试无法恢复。请重启软件；收藏与设置不会丢失。", true);
+    };
+    // Subscribe before reading the snapshot, covering exit during page startup.
+    const unsubscribe = bridge.onStateChanged?.(receive);
+    Promise.resolve().then(() => bridge.getState?.()).then(receive).catch(() => {});
+    const dispose = () => {
+      disposed = true;
+      unsubscribe?.();
+      window.removeEventListener("deep-legends:dispose", dispose);
+      window.removeEventListener("beforeunload", dispose);
+    };
+    window.addEventListener("deep-legends:dispose", dispose, { once: true });
+    window.addEventListener("beforeunload", dispose, { once: true });
+  }
+
+  // Full-page failure is driven by confirmed shell process exit, not poll counts.
+  function showFatal(message, backendExited = false) {
     el.connection.className = "connection is-error";
     el.connection.lastElementChild.textContent = "本地助手无响应";
     el.connection.dataset.tooltip = "本地助手无响应";
     const expired = /会话已过期/.test(String(message || ""));
     el.notice.className = "notice is-fatal";
     el.notice.hidden = false;
-    el.notice.innerHTML = `<div class="notice-symbol" aria-hidden="true">!</div><div><strong>${expired ? "需要重新连接本地助手" : "无法连接本地助手"}</strong><p>${escapeHTML(expired ? "本地服务重启后页面授权已失效，重新连接即可继续使用，收藏与设置都不会丢失。" : message)}</p></div><button class="text-button" type="button" data-fatal-reload>重新连接</button>`;
-    el.notice.querySelector("[data-fatal-reload]")?.addEventListener("click", () => location.reload());
+    el.notice.innerHTML = `<div class="notice-symbol" aria-hidden="true">!</div><div><strong>${backendExited ? "本地数据服务已退出" : expired ? "需要重新连接本地助手" : "无法连接本地助手"}</strong><p>${escapeHTML(expired ? "本地服务重启后页面授权已失效，重新连接即可继续使用，收藏与设置都不会丢失。" : message)}</p></div><button class="text-button" type="button" data-fatal-reload>${backendExited ? "重启软件" : "重新连接"}</button>`;
+    el.notice.querySelector("[data-fatal-reload]")?.addEventListener("click", async () => {
+      if (!backendExited) { location.reload(); return; }
+      try {
+        if (await window.desktopBackend?.restart?.()) return;
+      } catch (_) {}
+      showToast("自动重启未成功，请关闭软件后重新打开。");
+    });
     el.clientLaunchpad.hidden = true;
     updateWorkspaceAvailability({ connected: false });
     document.body.classList.add("is-fatal");
     hideReadingOverlay();
   }
 
+  window.desktopDiagnostics?.onError?.(message => showToast(`诊断日志保存失败：${message}`));
   let toastTimer = 0;
   function showToast(message) { clearTimeout(toastTimer); el.toast.textContent = message; el.toast.hidden = false; toastTimer = setTimeout(() => { el.toast.hidden = true; }, 3200); }
   window.deepLegendsToast = showToast;
@@ -2636,7 +2731,7 @@
     if (index >= paths.length) { image.hidden = true; image.closest(".loot-art")?.classList.remove("has-image"); return; }
     image.hidden = false;
     image.dataset.index = String(index + 1);
-    image.src = paths[index].startsWith("/loot-icons/") ? paths[index] : `/api/image?path=${encodeURIComponent(paths[index])}`;
+    image.setAttribute("data-queued-src", paths[index].startsWith("/loot-icons/") ? paths[index] : `/api/image?path=${encodeURIComponent(paths[index])}`);
   }
   function lootCard(item) {
     const category = item.category || "材料";
@@ -3039,26 +3134,31 @@
   el.refreshHistory.addEventListener("click", loadHistory);
   let diagnosticsExportReady = false;
   let diagnosticsExportPending = false;
+  let diagnosticsExportID = "";
+  let diagnosticsExportSequence = 0;
   function resetDiagnosticsExport() {
     diagnosticsExportReady = false;
+    diagnosticsExportID = "";
     el.exportDiagnostics.textContent = "导出诊断日志";
   }
-  window.desktopDiagnostics?.onCompleted(() => {
+  window.desktopDiagnostics?.onCompleted((exportID) => {
+    if (!exportID || exportID !== diagnosticsExportID || state.section !== "settings" || state.settingsPage !== "privacy") return;
     diagnosticsExportReady = true;
     el.exportDiagnostics.textContent = "打开日志文件夹";
   });
   el.exportDiagnostics.addEventListener("click", async (event) => {
     if (!diagnosticsExportReady) {
-      if (typeof window.flushFlowDiagnostics !== "function") return;
       event.preventDefault();
       if (diagnosticsExportPending) return;
       diagnosticsExportPending = true;
-      try { await window.flushFlowDiagnostics(); }
+      const exportID = `${Date.now().toString(36)}-${++diagnosticsExportSequence}`;
+      diagnosticsExportID = exportID;
+      try { await window.flushFlowDiagnostics?.(); }
       catch (_) { /* An unavailable diagnostic endpoint must not block export. */ }
       finally {
         diagnosticsExportPending = false;
         const link = document.createElement("a");
-        link.href = "/api/diagnostics/log";
+        link.href = `/api/diagnostics/log?exportId=${encodeURIComponent(exportID)}`;
         link.download = diagnosticExportFilename();
         link.hidden = true;
         document.body.appendChild(link);
@@ -3068,9 +3168,10 @@
       return;
     }
     event.preventDefault();
-    try { await window.desktopDiagnostics.openFolder(); }
+    const exportID = diagnosticsExportID;
+    try { await window.desktopDiagnostics.openFolder(exportID); }
     catch (_) { showToast("日志文件夹打开失败"); }
-    finally { resetDiagnosticsExport(); }
+    finally { if (diagnosticsExportID === exportID) resetDiagnosticsExport(); }
   });
   el.copyDiagnostics.addEventListener("click", async () => { if (!state.diagnostics) await loadDiagnostics(); if (!state.diagnostics) { showToast("诊断信息尚不可用"); return; } try { await navigator.clipboard.writeText(JSON.stringify(state.diagnostics, null, 2)); showToast("诊断摘要已复制，不包含客户端令牌"); } catch (_) { showToast("浏览器未允许复制，请手动选择内容"); } });
 
@@ -3203,7 +3304,7 @@
   }
 
   function setupLiveUpdates() {
-    if (!("EventSource" in window) || state.destroyed) return;
+    if (!("EventSource" in window) || state.destroyed || state.backendExited) return;
     clearTimeout(state.eventReconnectTimer);
     state.eventSource?.close();
     const source = new EventSource("/api/events");
@@ -3652,7 +3753,7 @@
 			if (!imageURL.startsWith("/api/image?path=")) continue;
 			const image = document.createElement("img");
 			image.className = `is-${kind}`;
-			image.src = imageURL;
+			image.setAttribute("data-queued-src", imageURL);
 			image.alt = "";
 			icons.append(image);
 		  }
@@ -3750,6 +3851,7 @@
   void setupUiScaleSetting();
   void setupShareDirectorySetting();
   setupUpdateEvents();
+  setupBackendLifecycle();
   setupLiveUpdates();
   setupScrollControls();
   setupFloatingTooltips();

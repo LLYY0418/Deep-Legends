@@ -1,0 +1,493 @@
+"use strict";
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { JSDOM } = require("jsdom");
+const WEB = path.join(__dirname, "..", "web");
+const PRO_CSS = fs.readFileSync(path.join(WEB, "pro-players.css"), "utf8");
+const GAMEPLAY_CSS = fs.readFileSync(path.join(WEB, "gameplay.css"), "utf8");
+const tick = (ms = 60) => new Promise((resolve) => setTimeout(resolve, ms));
+function fixture() {
+  return { teams: ["BLG", "IG", "T1", "HLE", "GEN", "DK"].map((code) => ({ code, name: code, league: ["BLG", "IG"].includes(code) ? "LPL" : "LCK", players: [
+    { key: `${code}/fixture`, name: `${code} Fixture`, position: "middle", status: "available", accounts: [
+      { gameName: `${code} One`, tagLine: "KR1", rankStatus: "ranked", tier: "CHALLENGER", lp: 1000, ladderRank: 42, ladderRankKnown: true, updatedAt: "2026-09-08T10:00:00Z" },
+      { gameName: `${code} Two`, tagLine: "KR2", rankStatus: "unavailable", lp: 0 },
+    ] }, { key: `${code}/missing`, name: `${code} Missing`, position: "top", status: "missing", accounts: [] },
+  ] })), playerCount: 12, accountCount: 12, missingCount: 6, warnings: [], fetchedAt: "2026-09-08T11:00:00Z", rosterVerifiedAt: "2026-09-08" };
+}
+function boot(t, { full = false, response = async () => fixture(), overviewStatus = 200, proMismatch = false, diagnosticsBridge, seasonSummary, currentGame, demoCurrentGame = false, noMatches = false, spellCatalog = async () => ({spells: [{id: 4, name: "闪现"}, {id: 11, name: "惩戒"}]}) } = {}) {
+  const dom = new JSDOM(fs.readFileSync(path.join(WEB, "index.html"), "utf8"), { url: demoCurrentGame ? "http://localhost/?demo=current-game" : "http://localhost/?demo", runScripts: "outside-only", pretendToBeVisual: true });
+  const w = dom.window, requests = [], errors = [];
+  t.after(() => w.close());
+  w.desktopDiagnostics = diagnosticsBridge;
+  w.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
+  w.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  w.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  w.scrollTo = () => {};
+  w.HTMLElement.prototype.scrollIntoView = () => {};
+  w.Element.prototype.scrollTo = function (options) { this.scrollTop = options?.top || 0; };
+  w.structuredClone = globalThis.structuredClone;
+  for (const name of ["Response", "Headers", "Request"]) w[name] = globalThis[name];
+  w.onerror = (message) => errors.push(message);
+  w.console.error = (...args) => errors.push(args.map(String).join(" "));
+  w.fetch = async () => new w.Response("{}", { status: 200 });
+  const scripts = full ? ["runtime.js", "demo-data.js", "app.js", "gameplay.js", "pro-players.js"] : ["pro-players.js"];
+  for (const file of scripts) {
+    if (file === "pro-players.js" || file === "app.js") {
+      const original = w.fetch;
+      w.fetch = async (input, init) => {
+        const url = String(input);
+        if (url.startsWith("/api/pro-players")) {
+          requests.push({ url, init });
+          const data = await response();
+          return new w.Response(JSON.stringify(data));
+        }
+        if (file === "app.js") requests.push({ url, init });
+        if (file === "app.js" && url === "/api/gameplay/summoner-spells") return new w.Response(JSON.stringify(await spellCatalog()));
+        if (file === "app.js" && url === "/api/gameplay/current-game") return new w.Response(JSON.stringify(currentGame || {status:"none",source:"OP.GG"}));
+        if (file === "app.js" && url === "/api/gameplay/season-summary" && seasonSummary) return new w.Response(JSON.stringify(seasonSummary));
+        let reply = await original(input, init);
+        if (file === "app.js" && url.startsWith("/api/gameplay/overview") && noMatches) {
+          const data = await reply.json(); data.matches = [];
+          reply = new w.Response(JSON.stringify(data));
+        }
+        if (file === "app.js" && url === "/api/gameplay/overview" && init?.method === "POST") {
+          if (overviewStatus !== 200) return new w.Response("账号不存在或来源失败", {status: overviewStatus});
+          const identity = JSON.parse(init.body), data = await reply.json();
+          data.proMismatch = proMismatch;
+          data.player = { ...data.player, ...identity, playerRef: "fixture-private-ref", displayName: identity.gameName, isCurrent: false };
+          data.region = "kr";
+          return new w.Response(JSON.stringify(data));
+        }
+        return reply;
+      };
+    }
+    w.eval(fs.readFileSync(file === "pro-players.js" && process.env.R97_PRO_PLAYERS_SOURCE || path.join(WEB, file), "utf8"));
+  }
+  if (full) w.document.dispatchEvent(new w.Event("DOMContentLoaded", { bubbles: true }));
+  const section = () => w.dispatchEvent(new w.CustomEvent("deep-legends:section", { detail: { name: "pro-players" } }));
+  return { w, d: w.document, requests, errors, section };
+}
+
+test("职业页懒加载、所有分组/账号、缺失状态、筛选缓存与安全转义", async (t) => {
+  const data = fixture();
+  Object.assign(data.teams[0].players[0].accounts[1], { source: "TrackingThePros", inactive: true, stale: true, rankStatus: "ranked", tier: "DIAMOND", division: 2, lpKnown: false });
+  data.teams[0].players[0].accounts[0].gameName = '<img src=x onerror="alert(1)">';
+  const { w, d, requests, section, errors } = boot(t, { response: async () => data });
+  assert.equal(requests.length, 0);
+  section(); await tick();
+  assert.equal(requests.length, 1);
+  assert.equal(d.querySelectorAll(".pro-team").length, 6);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 12);
+  assert.equal(d.querySelectorAll(".pro-missing").length, 6);
+  assert.equal(d.querySelector(".pro-description"), null);
+  assert.equal(d.querySelector(".pro-footer"), null);
+  assert.doesNotMatch(d.body.textContent, /账号与单双排段位以 OP\.GG 韩服目录为主/);
+  assert.doesNotMatch(d.querySelector("#pro-players-status").textContent, /12 位一队选手|12 个公开账号|6 位选手尚未/);
+  assert.match(d.querySelector("#pro-players-status").textContent, /目录读取.*名单核对/);
+  assert.match(PRO_CSS, /\.pro-player-name\s*\{[^}]*color:\s*var\(--primary-strong\)/s);
+  assert.match(PRO_CSS, /\.pro-lp-value\s*\{[^}]*color:\s*var\(--primary-strong\)/s);
+  assert.match(PRO_CSS, /\.pro-ladder-rank\s*\{[^}]*color:\s*var\(--accent\)/s);
+  assert.equal(d.querySelector(".pro-account img"), null);
+  const supplemental = d.querySelectorAll(".pro-account")[1];
+  assert.match(supplemental.textContent, /缓存.*不活跃.*TTP/);
+  assert.equal(supplemental.closest("tr").querySelector(".pro-lp").textContent, "—");
+  const firstRow = d.querySelector(".pro-table tbody tr");
+  assert.equal(firstRow.querySelector(".pro-lp-value").textContent, "1,000");
+  assert.equal(firstRow.querySelector(".pro-ladder-rank").textContent, "#42");
+  assert.deepEqual([...d.querySelectorAll(".pro-table thead th")].slice(0, 5).map((cell) => cell.textContent.trim().replace(/\s+/g, " ")), ["选手", "韩服账号", "单双排段位 ↓", "胜点", "天梯"]);
+  assert.equal(d.querySelector(".pro-table thead th[aria-sort]").getAttribute("aria-sort"), "descending");
+  assert.match(d.querySelector(".pro-account").textContent, /<img src=x/);
+  assert.match(d.querySelector("#pro-players-content").textContent, /段位暂不可用/);
+  d.querySelector('[data-pro-team="T1"]').click();
+  const search = d.querySelector("#pro-players-search");
+  search.value = "two"; search.dispatchEvent(new w.Event("input"));
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 1);
+  section(); await tick();
+  assert.equal(requests.length, 1);
+  assert.equal(search.value, "two");
+  assert.equal(d.querySelector('[data-pro-team="T1"]').getAttribute("aria-pressed"), "true");
+  search.value = "no such player"; search.dispatchEvent(new w.Event("input"));
+  assert.match(d.querySelector("#pro-players-content").textContent, /没有匹配/);
+  assert.deepEqual(errors, []);
+});
+
+test("加载互斥、失败保留旧表、恢复与来源不可用名单", async (t) => {
+  let fail = false, release;
+  const { d, requests, section } = boot(t, { response: () => fail ? Promise.reject(new Error("network")) : new Promise((resolve) => { release = resolve; }) });
+  section(); section();
+  assert.equal(requests.length, 1);
+  assert.equal(d.querySelector("#pro-players-refresh").disabled, true);
+  release(fixture()); await tick();
+  fail = true; d.querySelector("#pro-players-refresh").click(); await tick();
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 12);
+  assert.match(d.querySelector("#pro-players-status").textContent, /刷新失败.*上次读取/);
+  assert.equal(d.querySelector("#pro-players-refresh").disabled, false);
+  fail = false; d.querySelector("#pro-players-refresh").click();
+  const unavailable = fixture(); unavailable.unavailable = true; unavailable.accountCount = 0;
+  unavailable.warnings = ["OP.GG 账号来源暂不可用"];
+  for (const team of unavailable.teams) for (const player of team.players) { player.accounts = []; player.status = "unavailable"; }
+  release(unavailable); await tick();
+  assert.equal(d.querySelectorAll(".pro-player").length, 12);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 0);
+  assert.match(d.querySelector("#pro-players-content").textContent, /账号来源暂不可用/);
+});
+
+test("国服每次打开折叠；韩服下方入口可键盘聚焦且不修改大区", async (t) => {
+  const { w, d, requests, errors } = boot(t, { full: true });
+  await tick(250);
+  const trigger = d.querySelector("#player-search-region"), cn = d.querySelector("#player-search-cn-toggle"), options = d.querySelector("#player-search-cn-options");
+  trigger.click(); assert.equal(options.hidden, true);
+  cn.click(); assert.equal(options.hidden, false);
+  d.querySelector('[data-region-option="cn"][data-server-id="HN1"]').click();
+  assert.equal(trigger.dataset.serverId, "HN1");
+  trigger.click(); assert.equal(options.hidden, true); assert.equal(cn.getAttribute("aria-expanded"), "false");
+  cn.click(); trigger.click(); trigger.click(); assert.equal(options.hidden, true);
+  cn.focus(); cn.dispatchEvent(new w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+  assert.equal(d.activeElement.dataset.regionOption, "kr");
+  d.activeElement.dispatchEvent(new w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+  assert.equal(d.activeElement.id, "player-search-pro");
+  d.activeElement.click(); await tick();
+  assert.equal(d.querySelector("#pro-players-panel").hidden, false);
+  assert.equal(d.querySelector("#overview-panel").hidden, true);
+  assert.equal(d.querySelector("#pro-overview-panel"), null);
+  assert.equal(d.querySelector("#pro-players-home").hidden, false);
+  assert.equal(trigger.dataset.region, "cn"); assert.equal(trigger.dataset.serverId, "HN1");
+  assert.equal(d.querySelectorAll('.section-tab[data-section="pro-players"]').length, 0);
+  assert.equal(requests.filter((r) => r.url.startsWith("/api/pro-players")).length, 1);
+  d.querySelector("#pro-players-home").click(); await tick();
+  assert.equal(d.querySelector("#overview-panel").hidden, false);
+  assert.equal(d.querySelector("#pro-players-panel").hidden, true);
+  assert.equal(d.querySelector("#pro-overview-panel"), null);
+  assert.equal(d.querySelector("#overview-panel #pro-players-return").hidden, true);
+  assert.deepEqual(errors, []);
+});
+
+test("统一总览按国服、韩服、职业分组，同一账号跨组隔离且保留滚动和目录焦点", async t => {
+ const {w,d,errors}=boot(t,{full:true});await tick(250);
+ const group=()=>d.querySelector('#player-group-button')?.dataset.playerGroup;
+ const choose=key=>{d.querySelector('#player-group-button').click();d.querySelector(`#player-group-menu [data-player-group="${key}"]`).click();};
+ assert.equal(d.querySelector('#player-group-menu [data-player-group="kr"]').getAttribute('aria-disabled'),'true');
+ assert.equal(d.querySelector('#player-group-menu [data-player-group="pro"]').getAttribute('aria-disabled'),'true');
+ const open=(source)=>w.dispatchEvent(new w.CustomEvent('deep-legends:open-player',{detail:{gameName:'T1 One',tagLine:'KR1',region:'kr',source,teamCode:'T1',playerName:'T1 Fixture'}}));
+ w.dispatchEvent(new w.CustomEvent('deep-legends:navigate',{detail:{section:'pro-players'}}));await tick();
+ d.querySelector('[data-pro-team="T1"]').click();
+ const search=d.querySelector('#pro-players-search');search.value='one';search.dispatchEvent(new w.Event('input'));
+ const root=d.querySelector('#app-scroll');root.scrollTop=123;
+ const account=d.querySelector('[data-pro-account]');account.click();await tick(250);
+ assert.equal(d.querySelector('#pro-overview-panel'),null);
+ assert.equal(d.querySelector('#overview-panel').hidden,false);
+ assert.equal(group(),'pro');assert.equal(d.querySelector('#overview-content .pro-identity-chip').textContent,'T1 T1 Fixture');
+ const proKey=d.querySelector('#player-tabs [aria-selected="true"]').dataset.playerTab;
+ open('pro-players');await tick();assert.equal(d.querySelectorAll('#player-tabs [data-player-tab]').length,1);
+ root.scrollTop=410;open('search');await tick(250);
+ assert.equal(group(),'kr');assert.equal(root.scrollTop,0);
+ const krKey=d.querySelector('#player-tabs [aria-selected="true"]').dataset.playerTab;
+ assert.notEqual(krKey,proKey);assert.equal(d.querySelectorAll('#player-tabs [data-player-tab]').length,1);
+ assert.equal(d.querySelector('#overview-content .pro-identity-chip'),null);
+ assert.equal(d.querySelector('#pro-players-return').hidden,true);
+ root.scrollTop=220;choose('pro');await tick();
+ assert.equal(root.scrollTop,410);assert.equal(d.querySelector('#player-tabs [aria-selected="true"]').dataset.playerTab,proKey);
+ assert.equal(d.querySelector('#pro-players-return').textContent.trim(),'返回职业选手 →');
+ d.querySelector('#pro-players-return').click();await tick();
+ assert.equal(d.querySelector('#pro-players-panel').hidden,false);assert.equal(root.scrollTop,123);assert.equal(search.value,'one');assert.equal(d.activeElement.dataset.proAccount,account.dataset.proAccount);
+ d.querySelector('#pro-players-home').click();await tick();
+ assert.equal(group(),'pro');choose('kr');await tick();assert.equal(root.scrollTop,220);
+ d.querySelector('#player-tabs [data-close-player]').click();await tick();assert.equal(d.querySelector('#player-group-menu [data-player-group="kr"]').getAttribute('aria-disabled'),'true');
+ choose('pro');await tick();d.querySelector('#player-tabs [data-close-player]').click();await tick();assert.equal(d.querySelector('#player-group-menu [data-player-group="pro"]').getAttribute('aria-disabled'),'true');
+ assert.equal(d.querySelector('#overview-panel').hidden,false);assert.deepEqual(errors,[]);
+});
+
+
+test("补充来源未更新保留提示，重新进入不重复阻塞整页，手动刷新可重试", async (t) => {
+  const data = fixture(); data.partial = true;
+  const { d, requests, section } = boot(t, { response: async () => data });
+  section(); await tick();
+  assert.match(d.querySelector("#pro-players-status").textContent, /部分来源未更新/);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 12);
+  section(); await tick();
+  assert.equal(requests.length, 1);
+  d.querySelector("#pro-players-refresh").click(); await tick();
+  assert.equal(requests.length, 2);
+});
+
+test("职业列表后台补充自动更新，离开页面停止轮询", async t => {
+  let calls = 0;
+  const {w,d,requests,section} = boot(t,{response:async()=>({...fixture(),updating:++calls<2})});
+  section();await tick();
+  assert.equal(d.querySelectorAll("[data-pro-account]").length,12);
+  await tick(1650);
+  assert.equal(requests.length,2);
+  await tick(1650);
+  assert.equal(requests.length,2,"finished enrichment must stop polling");
+  calls=0;d.querySelector("#pro-players-refresh").click();await tick();
+  w.dispatchEvent(new w.CustomEvent("deep-legends:section",{detail:{name:"overview"}}));
+  await tick(1650);assert.equal(requests.length,3,"inactive page must not poll");
+});
+
+
+test("R73 主号、历史折叠、只看主号及会话核验", async t => {
+  const data = fixture();
+  for (const team of data.teams) {
+    team.players[0].accounts[0].primary = true;
+    team.players[0].accounts[1].dormant = true;
+  }
+  data.warnings = ["第一条提示", "第二条提示"];
+  const {w, d, section, requests} = boot(t, {response: async () => data});
+  section(); await tick();
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 6);
+  assert.equal(d.querySelectorAll(".pro-main-badge").length, 6);
+  assert.equal(d.querySelector(".pro-warnings"), null);
+  assert.equal(d.querySelector("#pro-players-warnings"), null);
+  assert.equal(d.querySelector(".pro-team-filter i"), null);
+  assert.equal(d.querySelectorAll("[data-pro-history]").length, 6);
+  d.querySelector("[data-pro-history]").click();
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 7);
+  assert.equal(d.querySelector("[data-pro-history]").getAttribute("aria-expanded"), "true");
+  d.querySelector("#pro-primary-only").click();
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 6);
+  assert.equal(d.querySelectorAll("[data-pro-history]").length, 0);
+  for (const body of d.querySelectorAll(".pro-table tbody")) assert.ok(body.querySelectorAll("[data-pro-account]").length <= 1);
+  let detail;
+  w.addEventListener("deep-legends:open-player", e => {detail = e.detail;});
+  d.querySelector("[data-pro-account]").click();
+  assert.equal(detail.expectedTier, "CHALLENGER");
+  w.dispatchEvent(new w.CustomEvent("deep-legends:pro-verification", {detail: {...detail, mismatch: true}}));
+  assert.equal(d.querySelectorAll(".pro-review").length, 1);
+  assert.equal(requests.length, 1, "核验标记不得额外预查账号");
+  assert.equal(w.localStorage.length, 0, "身份信息不得落本地存储");
+});
+
+
+test("R73 真正点击后才核验：差异与404标记，502不误判", async t => {
+ for (const options of [{proMismatch:true},{overviewStatus:404},{overviewStatus:502}]) {
+  await t.test(JSON.stringify(options), async t => {
+   const {w,d,requests} = boot(t,{full:true,...options}); await tick(250);
+   w.dispatchEvent(new w.CustomEvent("deep-legends:navigate", {detail:{section:"pro-players"}})); await tick();
+   assert.equal(d.querySelectorAll(".pro-review").length,0);
+   const before=requests.filter(r=>r.url==="/api/gameplay/overview"&&r.init?.method==="POST").length;
+   d.querySelector("[data-pro-account]").click(); await tick(250);
+   const marked=options.overviewStatus!==502;
+   assert.equal(d.querySelectorAll(".pro-review").length,marked?1:0);
+   assert.equal(Boolean(d.querySelector("#overview-content .pro-verification-warning")),marked);
+   assert.equal(requests.filter(r=>r.url==="/api/gameplay/overview"&&r.init?.method==="POST").length,before+1);
+   for(let i=0;i<w.localStorage.length;i++) assert.doesNotMatch(w.localStorage.getItem(w.localStorage.key(i)),/puuid|expectedTier|proMismatch|BLG One/);
+  });
+ }
+});
+
+
+test("职业目录仅保留返回总览，返回后保留全部已打开页签", async t => {
+ const {w,d,errors}=boot(t,{full:true});await tick(250);
+ assert.equal(d.querySelector('#pro-players-overview'),null);
+ w.dispatchEvent(new w.CustomEvent('deep-legends:navigate',{detail:{section:'pro-players'}}));await tick();
+ d.querySelector('[data-pro-account]').click();await tick(250);
+ d.querySelector('#pro-players-return').click();await tick();
+ d.querySelectorAll('[data-pro-account]')[1].click();await tick(250);
+ d.querySelector('#pro-players-return').click();await tick();
+ const keys=[...d.querySelectorAll('#player-tabs [data-player-tab]')].map(e=>e.dataset.playerTab);
+ assert.equal(keys.length,2);
+ d.querySelector('#pro-players-home').click();await tick();
+ assert.equal(d.querySelector('#pro-overview-panel'),null);
+ assert.equal(d.querySelector('#overview-panel').hidden,false);
+ assert.deepEqual([...d.querySelectorAll('#player-tabs [data-player-tab]')].map(e=>e.dataset.playerTab),keys);
+ assert.deepEqual(errors,[]);
+});
+
+test("未知更新时间的补充账号保持展示，不出现120天未玩的断言",async t=>{
+ const data=fixture();Object.assign(data.teams[0].players[0].accounts[0],{source:'TrackingThePros',updatedAt:'',dormant:false,primary:true});
+ const {d,section}=boot(t,{response:async()=>data});section();await tick();
+ assert.match(d.querySelector('.pro-account').textContent,/BLG One.*TTP.*来源未提供更新时间/);
+ assert.equal(d.querySelector('.pro-history'),null);
+ assert.doesNotMatch(d.querySelector('#pro-players-content').textContent,/120 天未更新|120天未玩/);
+});
+
+test("玩家页签各自保留纵向位置，跨页面返回也不串位", async (t) => {
+  const {w,d,errors} = boot(t, {full:true});
+  await tick(180);
+  const open = (name) => w.dispatchEvent(new w.CustomEvent("deep-legends:open-player", {detail:{gameName:name,tagLine:"KR1",region:"kr",source:"search"}}));
+  const ready = async (name) => {
+    const deadline = Date.now() + 20000;
+    while (Date.now() < deadline) {
+      const tab = d.querySelector('#player-tabs [aria-selected="true"]');
+      if (tab?.textContent.includes(name) && !tab.querySelector('.mini-loading') && d.querySelector('#overview-content .summoner-strip')) {
+        // Scroll restoration runs in rAF after the loaded content is rendered.
+        // A fixed delay can expire in the skeleton phase under suite contention.
+        await new Promise(resolve => w.requestAnimationFrame(() => w.requestAnimationFrame(resolve)));
+        return tab.dataset.playerTab;
+      }
+      await tick(20);
+    }
+    assert.fail(`player ${name} did not finish loading`);
+  };
+  open("First"); const firstKey = await ready("First");
+  const root=d.getElementById("app-scroll");
+  root.scrollTop=640;
+  open("Second"); const secondKey = await ready("Second");
+  assert.equal(root.scrollTop,0);
+  root.scrollTop=210;
+  d.querySelector(`[data-player-tab="${firstKey}"]`).click(); await ready("First");
+  assert.equal(root.scrollTop,640);
+  d.querySelector(`[data-player-tab="${secondKey}"]`).click(); await ready("Second");
+  assert.equal(root.scrollTop,210);
+  w.dispatchEvent(new w.CustomEvent("deep-legends:navigate",{detail:{section:"pro-players"}})); await tick();
+  root.scrollTop=50;
+  d.getElementById("pro-players-home").click(); await ready("Second");
+  assert.equal(root.scrollTop,210);
+  assert.deepEqual(errors,[]);
+});
+
+ test("R87 导出完成状态跨页面保留，打开文件夹后还原", async(t)=>{
+  let done, opened=0;
+  const {w,d,errors}=boot(t,{full:true,diagnosticsBridge:{onCompleted(fn){done=fn},async openFolder(){opened++;return true}}});
+  await tick(150);
+  w.dispatchEvent(new w.CustomEvent("deep-legends:navigate",{detail:{section:"settings"}}));
+  d.getElementById("settings-tab-privacy").click();
+  const button=d.getElementById("export-diagnostics");
+  done(); assert.equal(button.textContent,"打开日志文件夹");
+  button.click();await tick();assert.equal(opened,1);assert.equal(button.textContent,"导出诊断日志");
+  d.getElementById("settings-tab-gameplay").click();
+  done();assert.equal(button.textContent,"打开日志文件夹","离开后完成的下载仍保存状态");
+  d.getElementById("settings-tab-privacy").click();assert.equal(button.textContent,"打开日志文件夹");
+  w.dispatchEvent(new w.CustomEvent("deep-legends:navigate",{detail:{section:"overview"}}));
+  done();w.dispatchEvent(new w.CustomEvent("deep-legends:navigate",{detail:{section:"settings"}}));
+  d.getElementById("settings-tab-privacy").click();assert.equal(button.textContent,"打开日志文件夹");
+  assert.deepEqual(errors,[]);
+ });
+
+test('OPGG season summary actually replaces recent sample in both overview workspaces without a history reload',async(t)=>{
+ const seasonSummary={source:'OP.GG',season:'S2026',seasonId:33,queue:'RANKED',overall:{games:573,wins:323,losses:250,winRate:56,kills:6.1,deaths:5.3,assists:9.3,kda:2.93,cs:147,csPerMinute:5.7},champions:[{championId:126,championName:'杰斯',games:81,wins:42,winRate:52,kills:8.8,deaths:5,assists:7.6,kda:3.29,cs:198,csPerMinute:7.5}]};
+ const {w,d,requests,errors}=boot(t,{full:true,seasonSummary});await tick(250);
+ for(const source of ['search','pro-players']) {
+  const before=requests.filter(r=>r.url==='/api/gameplay/overview'&&r.init?.method==='POST').length;
+  w.dispatchEvent(new w.CustomEvent('deep-legends:open-player',{detail:{gameName:'Fixture',tagLine:'KR1',region:'kr',source,teamCode:'T1',playerName:'Fixture'}}));await tick(350);
+  const content=d.querySelector(source==='search'?'#overview-content':'#overview-content');
+  const stats=content.querySelector('.champion-performance');
+  assert.match(stats.textContent,/S2026.*573 场排位/);
+  assert.doesNotMatch(stats.textContent,/OP\.?GG/);
+  assert.match(stats.querySelector('.is-overall').textContent,/573 场/);
+  assert.match(stats.textContent,/8.8 \/ 5 \/ 7.6/);
+  assert.equal(requests.filter(r=>r.url==='/api/gameplay/overview'&&r.init?.method==='POST').length,before+1,'aggregate completion must not requery Riot overview');
+ }
+ assert.equal(requests.filter(r=>r.url==='/api/gameplay/season-summary').length,2);
+ assert.deepEqual(errors,[]);
+});
+
+test('当前对局独立置顶、两队十人、无评分和多余标记，分组后不会污染玩家战绩',async t=>{
+ const currentGame={status:'active',source:'OP.GG',checkedAt:new Date().toISOString(),startedAt:new Date(Date.now()-180000).toISOString(),gameId:'fixture-game',queue:'单双排',map:'召唤师峡谷',teams:['blue','red'].map((side,j)=>({side,averageRank:{tier:'CHALLENGER'},players:Array.from({length:5},(_,i)=>({playerRef:`fixture-${j}-${i}`,gameName:`Player ${j}-${i}`,tagLine:'KR1',region:'kr',championId:64,championName:'李青',summonerLevel:400,spells:[4,11],runes:[8005,8100],rank:{tier:'CHALLENGER',leaguePoints:1700},preferredPosition:'jungle',streak:i===0?'win':i===1?'loss':'',recent:[{championId:64,championName:'李青',win:true,spells:[4,11]}]}))}))};
+ const {w,d,requests,errors}=boot(t,{full:true,currentGame});await tick(250);
+ w.dispatchEvent(new w.CustomEvent('deep-legends:open-player',{detail:{gameName:'Fixture',tagLine:'KR1',region:'kr',source:'search'}}));await tick(350);
+ const card=d.querySelector('#overview-content .current-game-card');assert.ok(card);
+ const opened=[]; w.open=(...args)=>opened.push(args);
+ const spectate=card.querySelector('[data-current-game-spectate]');
+ assert.equal(spectate.textContent,'前往OPGG观战');spectate.click();
+ assert.deepEqual(opened,[['https://op.gg/zh-cn/lol/summoners/kr/Fixture-KR1/ingame','_blank','noopener,noreferrer']]);
+ assert.equal(requests.filter(r=>r.url==='/api/gameplay/spectate').length,0);
+ assert.equal(card.querySelector('h3').textContent,'正在进行的游戏');assert.equal(card.querySelectorAll('.current-game-player').length,10);
+ assert.ok(card.compareDocumentPosition(d.querySelector('#overview-content .match-list')) & w.Node.DOCUMENT_POSITION_FOLLOWING);
+ assert.doesNotMatch(card.textContent,/OP Score|LN Score|MVP|ACE|当前对局公开数据/);
+ assert.equal(card.querySelector('footer'),null);
+ assert.equal(card.querySelectorAll('.current-game-recent-spells').length,0);
+ assert.equal(card.querySelectorAll('.current-game-streak svg').length,4);
+ assert.match(card.querySelector('time').textContent,/已进行 \d+:\d{2}/);
+ assert.match(card.querySelector('.current-game-recent-item').dataset.tooltip,/李青 · 胜利 · 闪现 \/ 惩戒/);
+ assert.match(GAMEPLAY_CSS,/--cg-recent-w:\s*197px/);
+ assert.match(GAMEPLAY_CSS,/@container current-game-team \(max-width:\s*372px\)/);
+ assert.match(GAMEPLAY_CSS,/\.current-game-recent\s*\{[^}]*overflow:\s*hidden/);
+ assert.match(GAMEPLAY_CSS,/\.current-game-recent-item.is-win\s*\{[^}]*var\(--success\)/);
+
+ assert.equal(card.querySelectorAll('.current-game-position').length,10);assert.equal(card.querySelectorAll('.current-game-streak').length,4);
+ const first=card.querySelector('.current-game-player');
+ assert.deepEqual([...first.children].map(node=>node.className),['current-game-player-line','current-game-recent','current-game-badges','current-game-rank']);
+ assert.equal(first.querySelector('.current-game-position').dataset.tooltip,'首选位置：打野');
+ assert.equal(first.querySelector('.current-game-streak').dataset.tooltip,'最近处于连胜状态');
+ assert.equal(card.querySelectorAll('.current-game-streak')[1].dataset.tooltip,'最近处于连败状态');
+ assert.doesNotMatch(card.innerHTML,/OP\.GG 来源标记/);
+ assert.match(GAMEPLAY_CSS,/grid-template-areas:\s*"profile profile rank"\s*"recent badges rank"/,'badges must share the recent-history row between history and rank');
+ assert.match(GAMEPLAY_CSS,/\.current-game-badges\s*\{[^}]*justify-self:\s*start;[^}]*justify-content:\s*flex-start;/,'badges must be left aligned');
+ assert.match(GAMEPLAY_CSS,/\.current-game-rank\s*\{[^}]*gap:\s*8px;/,'rank crest and score copy need visible spacing');
+ const count=requests.filter(r=>r.url==='/api/gameplay/overview').length;
+ card.querySelector('[data-current-game-retry]').click();await tick();
+ assert.equal(requests.filter(r=>r.url==='/api/gameplay/overview').length,count,'live refresh must not request history');
+ assert.deepEqual(errors,[]);
+});
+
+test('R74 零战绩当前对局也加载技能目录，未加载时不伪造技能名称', async t => {
+ let release;
+ const pending = new Promise(resolve => { release = resolve; });
+ const player = {gameName:'Fixture',championId:64,championName:'李青',spells:[4,11],recent:[{championId:64,championName:'李青',win:true,spells:[4,11]}]};
+ const currentGame = {status:'active',source:'OP.GG',teams:[{side:'blue',players:[player]}]};
+ const {w,d,requests,errors}=boot(t,{full:true,currentGame,noMatches:true,spellCatalog:()=>pending});
+ await tick(250);
+ w.dispatchEvent(new w.CustomEvent('deep-legends:open-player',{detail:{gameName:'No history',tagLine:'KR1',region:'kr',source:'search'}}));await tick(300);
+ assert.ok(requests.some(r=>r.url==='/api/gameplay/summoner-spells'),'active card independently loads the catalog');
+ assert.equal(d.querySelector('.current-game-recent-item').dataset.tooltip,'李青 · 胜利');
+ release({spells:[{id:4,name:'闪现'},{id:11,name:'惩戒'}]});await tick(120);
+ assert.equal(d.querySelector('.current-game-recent-item').dataset.tooltip,'李青 · 胜利 · 闪现 / 惩戒');
+ assert.deepEqual(errors,[]);
+});
+
+test('R74 菜单键盘跳过空组、异步重绘保焦、离开总览关闭菜单', async t => {
+ const {w,d,errors}=boot(t,{full:true});await tick(250);
+ const button=d.querySelector('#player-group-button');
+ const key=value=>d.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:value,bubbles:true}));
+ button.focus();key('Enter');await tick();
+ assert.equal(d.activeElement.dataset.playerGroup,'players');
+ key('ArrowDown');assert.equal(d.activeElement.dataset.playerGroup,'players');
+ assert.equal(d.querySelector('[data-player-group="kr"]').disabled,true);
+ // A second render must resolve focus against the current menu, not a detached node.
+ d.querySelector('#overview-refresh').click();await tick(250);
+ assert.equal(d.activeElement.dataset.playerGroup,'players');
+ assert.equal(button.getAttribute('aria-expanded'),'true');
+ key('Escape');assert.equal(d.activeElement,button);assert.equal(button.getAttribute('aria-expanded'),'false');
+ key(' ');await tick();assert.equal(button.getAttribute('aria-expanded'),'true');
+ w.dispatchEvent(new w.CustomEvent('deep-legends:section',{detail:{name:'pro-players'}}));
+ assert.equal(button.getAttribute('aria-expanded'),'false');
+ assert.deepEqual(errors,[]);
+});
+
+
+test('国服总览保留战绩但不渲染或请求当前对局和观战', async t => {
+ const {d,requests,errors}=boot(t,{full:true,currentGame:{status:'active',source:'LCU',gameId:'321',teams:[]},demoCurrentGame:true});
+ await tick(300);
+ assert.ok(d.querySelector('#overview-content .summoner-strip'));
+ assert.equal(d.querySelector('#overview-content [data-current-game]'),null);
+ assert.equal(requests.filter(r=>r.url==='/api/gameplay/current-game'||r.url==='/api/gameplay/spectate').length,0);
+ assert.deepEqual(errors,[]);
+});
+
+
+test("R97 management filters and rows exclude expanded and academy teams", async (t) => {
+  const data = fixture();
+  const extras = ["Winners", "Young Miracles", "Machi Esports", "Suning Gaming-S", "Anyone's Legend.Young", "Suning", "VSG", "T1 Academy"];
+  for (const code of extras) {
+    const team = structuredClone(data.teams[0]);
+    Object.assign(team, {code, name: code, secondary: code.includes("Academy") || code.includes("Young")});
+    team.players[0].name = `Excluded ${code}`;
+    team.players[0].accounts[0].gameName = `Excluded ${code}`;
+    data.teams.push(team);
+  }
+  const invalidSecondary = structuredClone(data.teams[2]);
+  Object.assign(invalidSecondary, {name: "Excluded secondary T1", secondary: true});
+  data.teams.push(invalidSecondary);
+  const {w, d, section, errors} = boot(t, {response: async () => data});
+  const expected = ["all", "BLG", "IG", "T1", "HLE", "GEN", "DK"];
+  const filters = () => Array.from(d.querySelectorAll("[data-pro-team]"), b => b.dataset.proTeam);
+  assert.deepEqual(filters(), expected, "six filters exist before loading");
+  section(); await tick();
+  assert.deepEqual(filters(), expected);
+  assert.deepEqual(Array.from(d.querySelectorAll(".pro-team h2"), n => n.textContent), expected.slice(1));
+  const content = d.querySelector("#pro-players-content");
+  for (const code of extras) assert.equal(content.textContent.includes(code), false, code);
+  assert.doesNotMatch(content.textContent, /二队|学院队|Excluded/);
+  assert.equal(content.querySelectorAll("[data-pro-account]").length, 12);
+  let selected;
+  w.addEventListener("deep-legends:open-player", event => { selected = event.detail; });
+  d.querySelector('[data-pro-team="T1"]').click();
+  assert.equal(d.querySelectorAll(".pro-team").length, 1);
+  d.querySelector("[data-pro-account]").click();
+  assert.equal(selected.teamCode, "T1");
+  assert.equal(selected.secondary, false);
+  assert.deepEqual(errors, []);
+});

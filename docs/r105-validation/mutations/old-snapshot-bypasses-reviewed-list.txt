@@ -1,0 +1,5 @@
+--- FAIL: TestR105_ReviewedPageSurvivesOldSnapshotAndWrongOwner (0.01s)
+    r105_test.go:126: page totals: 33/0/6
+FAIL
+FAIL	lol-loot-assistant	0.504s
+FAIL

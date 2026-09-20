@@ -39,6 +39,8 @@ type facadeSummoner struct {
 }
 
 type facadeProfile struct {
+	BackgroundPath     string `json:"backgroundPath,omitempty"`
+	BackgroundType     string `json:"backgroundType,omitempty"`
 	BackgroundSkinID   int64  `json:"backgroundSkinId,omitempty"`
 	BackgroundSkinName string `json:"backgroundSkinName,omitempty"`
 }
@@ -50,12 +52,16 @@ type facadeChatLOL struct {
 }
 
 type facadeChat struct {
+	Icon          int64         `json:"icon,omitempty"`
 	Availability  string        `json:"availability,omitempty"`
 	StatusMessage string        `json:"statusMessage,omitempty"`
 	LOL           facadeChatLOL `json:"lol"`
 }
 
 type facadeState struct {
+	IconApplyScope           string                   `json:"iconApplyScope,omitempty"`
+	RankBanner               string                   `json:"rankBanner,omitempty"`
+	BannerAccent             string                   `json:"bannerAccent,omitempty"`
 	SkinsUnavailable         bool                     `json:"skinsUnavailable,omitempty"`
 	SkinOwnershipUnavailable bool                     `json:"skinOwnershipUnavailable,omitempty"`
 	ProfileUnavailable       bool                     `json:"profileUnavailable,omitempty"`
@@ -72,6 +78,10 @@ type facadeState struct {
 }
 
 type facadeApplyRequest struct {
+	IconID        int64                     `json:"iconId,omitempty"`
+	BannerID      string                    `json:"bannerId,omitempty"`
+	RankBanner    string                    `json:"rankBanner,omitempty"`
+	BannerAccent  string                    `json:"bannerAccent,omitempty"`
 	Action        string                    `json:"action"`
 	SkinID        int64                     `json:"skinId,omitempty"`
 	Availability  string                    `json:"availability,omitempty"`
@@ -83,6 +93,7 @@ type facadeApplyRequest struct {
 }
 
 type facadeApplyResult struct {
+	IconScope           string
 	TitleRestore        string
 	TitleAttemptStatus  []int
 	TitleHasTitle       bool
@@ -131,7 +142,7 @@ func (a *app) loadFacadeStateTriggered(ctx context.Context, trigger string) faca
 		return facadeState{Reason: "未连接英雄联盟客户端"}
 	}
 	state := facadeState{Connected: true, Summoner: projectFacadeSummoner(current), ChallengeSummary: map[string]any{"title": nil}, Challenges: []facadeChallenge{}, ChallengesReady: true, Skins: []facadeSkin{}}
-	profile, profileCapability := (SummonerAPI{client: client, ctx: ctx}).Profile()
+	profile, profileCapability := a.loadFacadeProfile(ctx, client, current)
 	state.ProfileUnavailable = profileCapability.State != capabilityAvailable
 	state.Profile = projectFacadeProfile(profile)
 	chatRaw := map[string]any{}
@@ -140,11 +151,17 @@ func (a *app) loadFacadeStateTriggered(ctx context.Context, trigger string) faca
 	chatMS = time.Since(chatStarted).Milliseconds()
 	state.Chat = projectFacadeChat(chatRaw)
 	identityShapeDiagnostic := a.claimFacadeIdentityShape(client)
-	regaliaRaw := map[string]any{}
-	var regaliaErr error
 	if identityShapeDiagnostic {
-		regaliaErr = client.RequestJSON(ctx, http.MethodGet, "/lol-regalia/v2/current-summoner/regalia", nil, &regaliaRaw)
+		go func() {
+			probeCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+			defer cancel()
+			a.recordR99SurfaceShape(probeCtx, client)
+		}()
 	}
+	regaliaRaw := map[string]any{}
+	regaliaErr := client.RequestJSON(ctx, http.MethodGet, "/lol-regalia/v2/current-summoner/regalia", nil, &regaliaRaw)
+	state.RankBanner = anyString(regaliaRaw, "preferredBannerType")
+	state.BannerAccent = anyString(anyMap(chatRaw["lol"]), "bannerIdSelected")
 	var challengeSummaryRaw json.RawMessage
 	challengesStarted := time.Now()
 	challengeSummaryErr := client.RequestJSON(ctx, http.MethodGet, "/lol-challenges/v1/summary-player-data/local-player", nil, &challengeSummaryRaw)
@@ -152,6 +169,9 @@ func (a *app) loadFacadeStateTriggered(ctx context.Context, trigger string) faca
 	challengeSummary := map[string]any{}
 	if challengeSummaryErr == nil {
 		_ = json.Unmarshal(challengeSummaryRaw, &challengeSummary)
+	}
+	if accent, ok := challengeSummary["bannerId"]; ok {
+		state.BannerAccent = facadeBannerIdentity(accent)
 	}
 	state.ChallengeSummary["title"] = projectFacadeTitle(challengeSummary["title"])
 	catalogStarted := time.Now()
@@ -174,14 +194,15 @@ func (a *app) loadFacadeStateTriggered(ctx context.Context, trigger string) faca
 		}
 		state.Skins = append(state.Skins, projectFacadeSkin(skin))
 	}
+	a.applyFacadeBackdrop(ctx, client, current, &state)
 	backgroundInCatalog := false
 	for _, skin := range state.Skins {
-		if skin.ID == profile.BackgroundSkinID {
+		if skin.ID == state.Profile.BackgroundSkinID {
 			backgroundInCatalog = true
 			break
 		}
 	}
-	a.recordDiagnostic(map[string]any{"event": "facade_skin_state", "trigger": facadeLoadTrigger(trigger), "source": source, "skin_count": len(state.Skins), "unavailable": state.SkinsUnavailable, "profile_available": !state.ProfileUnavailable, "background_skin_id": profile.BackgroundSkinID, "background_in_catalog": backgroundInCatalog})
+	a.recordDiagnostic(map[string]any{"event": "facade_skin_state", "trigger": facadeLoadTrigger(trigger), "source": source, "skin_count": len(state.Skins), "unavailable": state.SkinsUnavailable, "profile_available": !state.ProfileUnavailable, "configured_skin_id": profile.BackgroundSkinID, "background_skin_id": state.Profile.BackgroundSkinID, "background_in_catalog": backgroundInCatalog})
 	if watch := a.activeWatch(); watch != nil {
 		state.LoginReset = watch.currentWatch().Facade
 	}
@@ -202,6 +223,7 @@ func projectFacadeProfile(value SummonerProfile) facadeProfile {
 func projectFacadeChat(value map[string]any) facadeChat {
 	lol := anyMap(value["lol"])
 	return facadeChat{
+		Icon:          firstInt(value, "icon"),
 		Availability:  anyString(value, "availability"),
 		StatusMessage: anyString(value, "statusMessage"),
 		LOL: facadeChatLOL{
@@ -637,7 +659,14 @@ func facadeLoadTrigger(value string) string {
 }
 
 func (a *app) handleFacadeState(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, a.loadFacadeStateTriggered(r.Context(), r.URL.Query().Get("trigger")))
+	trigger := facadeLoadTrigger(r.URL.Query().Get("trigger"))
+	value, err := a.cachedFacadeState(r.Context(), trigger != "poll", trigger)
+	if err != nil {
+		http.Error(w, "生涯资料暂时读取失败，请重试", http.StatusGatewayTimeout)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	respondJSON(w, value)
 }
 
 func (a *app) handleFacadeApply(w http.ResponseWriter, r *http.Request) {
@@ -652,7 +681,14 @@ func (a *app) handleFacadeApply(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "未连接英雄联盟客户端", http.StatusConflict)
 		return
 	}
+	if !a.facadeProbeMu.TryLock() {
+		http.Error(w, "生涯操作正在进行", http.StatusConflict)
+		return
+	}
+	defer a.facadeProbeMu.Unlock()
 	a.noteFacadeManualAction()
+	a.invalidateFacadeView()
+	defer a.invalidateFacadeView()
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	applyResult, err := a.applyFacadeActionResultDetails(ctx, client, current, request)
@@ -664,6 +700,10 @@ func (a *app) handleFacadeApply(w http.ResponseWriter, r *http.Request) {
 			result = "invalid"
 		}
 		diagnostic := facadeApplyDiagnostic(request.Action, result, applyResult)
+		if request.Action == "banner" {
+			diagnostic["requested_banner_id"] = request.BannerID
+			diagnostic["banner_contract"] = "catalog-id"
+		}
 		var httpErr *LCUHTTPError
 		if errors.As(err, &httpErr) {
 			diagnostic["status_code"] = httpErr.StatusCode
@@ -673,7 +713,15 @@ func (a *app) handleFacadeApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	diagnostic := facadeApplyDiagnostic(request.Action, "ok", applyResult)
+	if request.Action == "banner" {
+		diagnostic["requested_banner_id"] = request.BannerID
+		diagnostic["banner_contract"] = "catalog-id"
+	}
 	next := a.loadFacadeStateTriggered(r.Context(), "manual")
+	next.IconApplyScope = applyResult.IconScope
+	if applyResult.IconScope != "" {
+		diagnostic["icon_scope"] = applyResult.IconScope
+	}
 	if request.Action == "background" {
 		diagnostic["requested_skin_id"] = request.SkinID
 		diagnostic["observed_skin_id"] = next.Profile.BackgroundSkinID
@@ -688,7 +736,7 @@ var errFacadeInvalid = errors.New("生涯操作参数无效")
 
 func facadeDiagnosticAction(action string) string {
 	switch action {
-	case "background", "chat", "rank", "login-reset", "clear-border", "clear-challenges", "clear-title", "previous-banner", "clear-emotes", "clear-objectives":
+	case "icon", "banner", "rank-banner", "background", "chat", "rank", "login-reset", "clear-border", "clear-challenges", "clear-title", "clear-emotes", "clear-objectives":
 		return action
 	default:
 		return "unknown"
@@ -721,6 +769,13 @@ func (a *app) applyFacadeActionResult(ctx context.Context, client *LCUClient, cu
 
 func (a *app) applyFacadeActionResultDetails(ctx context.Context, client *LCUClient, current Summoner, request facadeApplyRequest) (facadeApplyResult, error) {
 	switch request.Action {
+	case "icon":
+		scope, err := a.writeFacadeIconResult(ctx, client, request.IconID)
+		return facadeApplyResult{IconScope: scope}, err
+	case "banner":
+		return facadeApplyResult{}, writeFacadeBanner(ctx, client, request.BannerID)
+	case "rank-banner":
+		return facadeApplyResult{}, writeFacadeRankBanner(ctx, client, request.RankBanner)
 	case "clear-objectives":
 		return facadeApplyResult{}, a.clearObjectiveBadge(ctx, client)
 	case "background":
@@ -787,8 +842,6 @@ func (a *app) applyFacadeActionResultDetails(ctx context.Context, client *LCUCli
 		return a.writeChallengePreferences(ctx, client, map[string]any{"challengeIds": []any{}})
 	case "clear-title":
 		return a.writeChallengePreferences(ctx, client, map[string]any{"title": ""})
-	case "previous-banner":
-		return a.writeChallengePreferences(ctx, client, map[string]any{"bannerAccent": "2"})
 	case "clear-emotes":
 		return facadeApplyResult{}, clearFacadeEmotes(ctx, client)
 	default:
@@ -823,6 +876,15 @@ func (a *app) writeChallengePreferences(ctx context.Context, client *LCUClient, 
 	body := map[string]any{
 		"challengeIds": challengeIDs,
 		"bannerAccent": anyString(lol, "bannerIdSelected"),
+	}
+	if accent, ok := summary["bannerId"]; ok {
+		body["bannerAccent"] = accent
+	}
+	if value, ok := summary["crestId"]; ok {
+		body["crestBorder"] = value
+	}
+	if value, ok := summary["prestigeCrestBorderLevel"]; ok {
+		body["prestigeCrestBorderLevel"] = value
 	}
 	_, changesTitle := changes["title"]
 	for key, value := range changes {
@@ -1116,10 +1178,15 @@ func (a *app) loadFacadeSkins(ctx context.Context, client *LCUClient) ([]Skin, s
 	catalogCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	skins, err := loadSkinCatalogContext(catalogCtx, client)
+	// A superseded UI request must not poison the cache for the next request.
+	if ctx.Err() != nil {
+		return a.facadeSkinCatalog, "lcu-catalog", ctx.Err()
+	}
 	a.facadeSkinCatalogAt = time.Now()
 	a.facadeSkinCatalogErr = err
 	if err == nil {
 		a.facadeSkinCatalog = skins
 	}
+	a.recordDiagnostic(map[string]any{"event": "facade_skin_catalog", "count": len(skins), "success": err == nil, "cancelled": errors.Is(err, context.Canceled), "timeout": errors.Is(err, context.DeadlineExceeded)})
 	return a.facadeSkinCatalog, "lcu-catalog", err
 }

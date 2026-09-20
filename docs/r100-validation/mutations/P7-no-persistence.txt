@@ -1,0 +1,33 @@
+✖ R100 P7 first native save persists independently; second and restart save without prompt; no overwrite (11.479ms)
+✔ R100 P7 deleted/replaced directory re-prompts at actual write; cancel cleans staging (20.683416ms)
+✔ R100 P7 rejects foreign renderer and symbolic link files; packaged controller (9.830292ms)
+✔ R100 P7 failed SavePath access and window disposal remove private staged downloads (47.525417ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 3
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 134.130125
+
+✖ failing tests:
+
+test at desktop/r100.test.cjs:14:1
+✖ R100 P7 first native save persists independently; second and restart save without prompt; no overwrite (11.479ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + ''
+  - '/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r100-export-YE8pOr/downloads'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/desktop/r100.test.cjs:20:61)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: '/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r100-export-YE8pOr/downloads',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

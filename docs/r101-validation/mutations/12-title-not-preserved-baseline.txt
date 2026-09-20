@@ -1,0 +1,4 @@
+=== RUN   TestR101ClearChallengesStillPreservesTitle
+--- PASS: TestR101ClearChallengesStillPreservesTitle (0.00s)
+PASS
+ok  	lol-loot-assistant	0.411s

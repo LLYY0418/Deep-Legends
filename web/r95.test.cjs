@@ -1,0 +1,67 @@
+'use strict';
+const test=require('node:test'), assert=require('node:assert/strict'), fs=require('node:fs'), path=require('node:path'), vm=require('node:vm');
+const {JSDOM}=require('../desktop/node_modules/jsdom');
+const gameplay=fs.readFileSync(process.env.R95_GAMEPLAY_SOURCE||path.join(__dirname,'gameplay.js'),'utf8');
+const suite=fs.readFileSync(process.env.R95_SUITE_SOURCE||path.join(__dirname,'suite.js'),'utf8');
+const flush=()=>new Promise(setImmediate);
+function extract(src,name){let start=src.indexOf(`function ${name}(`);assert.ok(start>=0,name);if(src.slice(start-6,start)==='async ')start-=6;return src.slice(start,src.indexOf('\n  }',start)+4);}
+// Reuse the existing real api/loadOverview and loadLive/renderLive harnesses;
+// only their declarations, never their tests, are evaluated here.
+function fixture(file,names){const text=fs.readFileSync(path.join(__dirname,file),'utf8');const end=file==='r91-addendum.test.cjs'?text.indexOf('for(const append of'):text.indexOf('\ntest(');const context={require,__dirname,process:{env:{...process.env,R91_GAMEPLAY_SOURCE:process.env.R95_GAMEPLAY_SOURCE,R91_ADDENDUM_GAMEPLAY_SOURCE:process.env.R95_GAMEPLAY_SOURCE}},module:{exports:{}},Headers,Response,ReadableStream,TextEncoder,TextDecoder,Uint8Array,AbortController,setImmediate,console};vm.runInNewContext(text.slice(0,end)+`\nmodule.exports={${names}};`,context);return context.module.exports;}
+const streaming=fixture('r91-addendum.test.cjs','harness,payload,response');
+const live=fixture('r91.test.cjs','harness,snapshot');
+const career={ranks:[{tier:'MASTER'}],masteries:[{championId:1,championPoints:99}],recentPlayers:[{playerRef:'old'}],historicalRanks:[{season:2025}]};
+for(const append of [true,false])for(const noise of [null,[],undefined])test(`R95 P1 progress preserves career, append=${append}, noise=${JSON.stringify(noise)}`,async()=>{
+ let controller;const stream=new ReadableStream({start(c){controller=c;}});const h=streaming.harness([new Response(stream,{headers:{'Content-Type':'application/x-ndjson'}})]);
+ try{const old={...streaming.payload(20),...career};const tab={key:'fixture',region:'kr',data:old,nextBegIndex:20};const promise=h.loadOverview(tab,!append,append);await flush();
+ // Explicit null is the actual Go JSON failure mode; missing keys alone falsely pass.
+ const partial={...streaming.payload(5,append?20:0),ranks:noise,masteries:noise,recentPlayers:noise};
+ controller.enqueue(new TextEncoder().encode(JSON.stringify({type:'progress',overview:partial})+'\n'));await flush();
+ for(const key of Object.keys(career))assert.deepEqual(tab.data[key],career[key],key);
+ if(append){controller.enqueue(new TextEncoder().encode(JSON.stringify({type:'complete',overview:streaming.payload(20,20)})+'\n'));}
+ else controller.enqueue(new TextEncoder().encode(JSON.stringify({type:'error',status:429,error:'quota',kind:'rate-limited',retryAfter:5})+'\n'));
+ controller.close();await promise;for(const key of Object.keys(career))assert.deepEqual(tab.data[key],career[key],key);
+ }finally{h.close();}
+});
+test('R95 P1 first five and complete explicit empty arrays are authoritative',async()=>{
+ for(const existing of [false,true]){let controller;const h=streaming.harness([new Response(new ReadableStream({start(c){controller=c;}}),{headers:{'Content-Type':'application/x-ndjson'}})]);
+ try{const tab={key:'fixture',region:'kr',data:existing?{...streaming.payload(),...career}:null,riotId:{gameName:'Fixture',tagLine:'KR1'}};const pending=h.loadOverview(tab,true);await flush();const send=(type,overview)=>controller.enqueue(new TextEncoder().encode(JSON.stringify({type,overview})+'\n'));
+ send('progress',{...streaming.payload(5),ranks:null,masteries:null,recentPlayers:null});await flush();assert.equal(tab.data.matches.length,existing?20:5);
+ send('complete',{...streaming.payload(20),ranks:[],masteries:[],recentPlayers:[]});controller.close();await pending;
+ for(const key of ['ranks','masteries','recentPlayers'])assert.equal(tab.data[key].length,0,key);
+ }finally{h.close();}}
+});
+async function advance(h,ms){for(const [id,job] of [...h.jobs]){if(job.delay<=ms){h.jobs.delete(id);job.fn();}else job.delay-=ms;}await flush();}
+for(const [force,source,visible] of [[false,'interval',false],[false,'sse',false],[false,'event',false],[true,'manual',true],[true,'direct',true],[false,'manual',true]])test(`R95 P2 slow ${source}/${force} loading eligibility`,async()=>{
+ const h=live.harness();try{h.state.live=live.snapshot(90,'ChampSelect');h.state.beacon.phase='ChampSelect';h.renderLive();const pending=h.loadLive(force,source);await advance(h,239);assert.equal(h.nodes.liveContent.querySelector('.live-refresh-status'),null);await advance(h,1);assert.equal(!!h.nodes.liveContent.querySelector('.live-refresh-status'),visible);h.requests[0].resolve(live.snapshot(90,'ChampSelect'));await pending;assert.equal(h.nodes.liveContent.querySelector('.live-refresh-status'),null);}finally{h.close();}
+});
+test('R95 P2 fast 10ms manual response never shows status, including zero-delay timers',async()=>{
+ const h=live.harness();try{h.state.live=live.snapshot(90,'ChampSelect');h.state.beacon.phase='ChampSelect';const pending=h.loadLive(true,'manual');await advance(h,0);assert.equal(h.nodes.liveContent.querySelector('.live-refresh-status'),null);await advance(h,10);assert.equal(h.nodes.liveContent.querySelector('.live-refresh-status'),null);h.requests[0].resolve(live.snapshot(90,'ChampSelect'));await pending;await advance(h,240);assert.equal(h.nodes.liveContent.querySelector('.live-refresh-status'),null);}finally{h.close();}
+});
+test('R95 P3 / R101 both sides keep lock wait visible with strategy-dependent editing',()=>{
+ const context={state:{champSelectCatalog:{}},checked:()=>'',escapeHTML:String,champSelectPoolFor:()=>[],champSelectStrategyHTML:()=>'',champSelectLaneTabsHTML:()=>'',champSelectSlotsHTML:()=>''};vm.runInNewContext(['renderChampSelectSideCard','champSelectTimeInputHTML','champSelectSideName'].map(n=>extract(suite,n)).join('\n'),context);
+ for(const side of ['ban','pick'])for(const strategy of ['show-only','show-then-lock','lock-now']){const dom=new JSDOM(context.renderChampSelectSideCard(side,{hasBan:true,groupId:'arena',banLimit:5,pickLimit:5},{[side]:{strategy,enabled:true,lockDelayMs:2500}},{}));try{const field=dom.window.document.querySelector('[data-cs-time]');assert.ok(field);if(field){assert.equal(field.dataset.csTime,'lock');assert.equal(field.disabled,strategy!=='show-then-lock');assert.equal(field.value,strategy==='show-then-lock'?'2.5':'0');assert.match(dom.window.document.body.textContent,/锁定等待/);}}finally{dom.window.close();}}
+});
+test('R95 P4 badge respects mask, secondary and professional click context',()=>{
+ const context={state:{settings:{}},escapeHTML:s=>String(s).replaceAll('<','&lt;')};vm.runInNewContext(['proBadgeAttributes','proContextFromButton','renderProIdentityBadge'].map(n=>extract(gameplay,n)).join('\n'),context);
+ for(const secondary of [false,true]){const p={proPlayer:{playerName:'Guti',teamCode:'T1 Academy',teamName:'T1 Esports Academy',secondary}};let dom=new JSDOM(`<button ${context.proBadgeAttributes(p)}>${context.renderProIdentityBadge(p)}</button>`);assert.match(dom.window.document.body.textContent,/Guti/);assert.equal(context.proContextFromButton(dom.window.document.querySelector('button')).group,'pro');if(secondary)assert.match(dom.window.document.body.textContent,/二队/);dom.window.close();context.state.settings.maskNames=true;dom=new JSDOM(`<button ${context.proBadgeAttributes(p)}>${context.renderProIdentityBadge(p)}</button>`);assert.doesNotMatch(dom.window.document.body.innerHTML,/Guti|T1 Academy/);assert.equal(context.proContextFromButton(dom.window.document.querySelector('button')).group,'pro');dom.window.close();context.state.settings.maskNames=false;}
+});
+test('R95 P5 exact Chinese titles, unknown fallback, relative time and champselect fired count',()=>{
+ let now=720000;const state={watchEvents:new Map(),watchFired:0};const context={state,Date:{now:()=>now},watchDefinitions:[],renderWatch:()=>{},toast:()=>{}};
+ const start=suite.indexOf('const watchActionNames ='),end=suite.indexOf('\n  };',start)+5;vm.runInNewContext(suite.slice(start,end)+'\n'+['watchActionTitle','watchActionElapsed','latestWatchAction','handleWatchEvent'].map(n=>extract(suite,n)).join('\n'),context);
+ for(const [action,title] of Object.entries({'champselect-ban':'自动禁用','champselect-pick':'自动选用','champselect-bench':'备战席换英雄','champselect-trade':'英雄交换','champselect-foo':'自动规则'})){state.watchEvents.clear();state.watchEvents.set(action,{kind:'fired',start:0});assert.match(context.latestWatchAction(),new RegExp(title+' · 12分钟前'));assert.doesNotMatch(context.latestWatchAction(),/champselect|[a-z]+-[a-z]+/);}
+ state.watchEvents.clear();context.handleWatchEvent('watch:fired:champselect-pick');assert.equal(state.watchFired,1);assert.match(context.latestWatchAction(),/自动选用 · 刚刚/);now+=65000;assert.match(context.latestWatchAction(),/1分钟前/);
+});
+test('R95 P3 typed lock wait targets its own side',async()=>{
+ const dom=new JSDOM('<section class="cs-seq-card is-ban"><input data-cs-time="lock" value="1.25"></section><section class="cs-seq-card is-pick"><input data-cs-time="lock" value="2.5"></section>');
+ const config={ban:{lockDelayMs:10000},pick:{lockDelayMs:10000}};
+ const context={champSelectSettings:()=>({enabled:true}),champSelectSelectedConfig:()=>config,saveChampSelect:async()=>{},toast:()=>{}};
+ vm.runInNewContext(extract(suite,'bindChampSelectTimeInputs'),context);context.bindChampSelectTimeInputs(dom.window.document);
+ const inputs=dom.window.document.querySelectorAll('input');inputs[0].dispatchEvent(new dom.window.Event('change'));assert.equal(config.ban.lockDelayMs,1250);assert.equal(config.pick.lockDelayMs,10000);inputs[1].dispatchEvent(new dom.window.Event('change'));assert.equal(config.pick.lockDelayMs,2500);dom.window.close();
+});
+test('R95 P4 match player clicks enter professional context even without directory source',()=>{
+ const dom=new JSDOM('<button data-player-ref="opaque" data-pro-team="HLE" data-pro-player="Gumayusi"><span class="participant-name">Name</span></button>');
+ let opened;const context={tabServerID:()=>'',playerButtonLabel:()=> 'Name',openPlayer:(...args)=>{opened=args},openPlayerOverlay:args=>{opened=args}};
+ vm.runInNewContext(['proContextFromButton','bindPlayerLinks'].map(n=>extract(gameplay,n)).join('\n'),context);
+ context.bindPlayerLinks(dom.window.document,{region:'kr'});dom.window.document.querySelector('button').click();assert.equal(opened[2],'kr');assert.equal(opened[4].group,'pro');assert.equal(opened[4].proPlayer,'Gumayusi');dom.window.close();
+});

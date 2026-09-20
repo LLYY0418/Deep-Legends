@@ -1,0 +1,3 @@
+CDP connected
+{"section":"live","live":true,"html":"<div data-live-status=\"\"></div><div data-live-body=\"\"><section class=\"recommendation-area\"><div class=\"recommendation-tab-row\"><div class=\"recommendation-tabs\" role=\"tablist\" aria-label=\"推荐类型\"><button type=\"button\" role=\"tab\" id=\"recommendation-tab-runes\" aria-controls=\"recommendation-panel-runes\" a"}
+R95 Chromium PASS: real loadLive, 3.1s continuous body top invariant; professional row at six breakpoints

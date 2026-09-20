@@ -1,0 +1,7 @@
+func (a *app) matchProIdentity( byte-identical SHA256 cf973940323dd114afc66f65fd229bf212f72075f547cd6fd612d270b3994fec
+func proDirectoryRoster( byte-identical SHA256 1eb1d4c09114f7891d7660fdca95f0efc755f53f3a6821976476a750c28b3736
+User desktop/package.json preserved
+Original six-team proRoster entries unchanged
+No production call to proDirectoryRoster
+Ladder remains on unchanged reviewed roster path
+All five mutations assertion-killed with green baselines

@@ -1,0 +1,5 @@
+--- FAIL: TestR99WriteProbeFreshIconAndAccentRestore (0.00s)
+    r99_test.go:108: stale icon: map[profileIconId:99]
+FAIL
+FAIL	lol-loot-assistant	0.578s
+FAIL

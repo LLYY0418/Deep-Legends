@@ -1,0 +1,177 @@
+[
+  {
+    "id": "01-current-icon",
+    "file": "r101_probe.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "02-no-icon-restore",
+    "file": "r101_probe.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "03-log-icon-id",
+    "file": "r101_probe.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "04-current-banner",
+    "file": "r101_probe.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "05-drop-data",
+    "file": "r101_probe.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "06-status-means-changed",
+    "file": "r101_probe.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "07-no-banner-restore",
+    "file": "r101_probe.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "08-owned-always",
+    "file": "facade_icons.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "09-style-only-unowned",
+    "file": "web/suite.js",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "10-owned-default-off",
+    "file": "web/suite.js",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "11-wrong-banner-inventory",
+    "file": "facade_banners.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "12-title-not-preserved",
+    "file": "profile_facade.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "13-previous-banner-remains",
+    "file": "profile_facade.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "14-save-zero",
+    "file": "web/suite.js",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "15-hide-time",
+    "file": "web/suite.js",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "16-disabled-change-guard",
+    "file": "web/suite.js",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "17-overwrite-saved-false",
+    "file": "watch_rules.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "18-empty-pool-writes",
+    "file": "champselect.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "19-no-nowrap",
+    "file": "web/suite.css",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "20-cards-right",
+    "file": "web/suite.js",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "21-commit-copy-deleted",
+    "file": "web/suite.js",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "22-first-entry",
+    "file": "pro_seed_accounts.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "23-division-one",
+    "file": "pro_seed_accounts.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "24-default-unranked",
+    "file": "pro_seed_accounts.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "25-three-minute-ttl",
+    "file": "pro_seed_accounts.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  }
+]

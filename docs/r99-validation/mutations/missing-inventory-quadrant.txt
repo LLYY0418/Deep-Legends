@@ -1,0 +1,5 @@
+--- FAIL: TestR99ProbeReadMatrixAndPrivacy (0.00s)
+    r99_test.go:57: matrix=[/lol-banners/v1/current-summoner/flags /lol-banners/v1/current-summoner/flags/equipped /lol-banners/v1/current-summoner/frames/equipped /lol-game-data/assets/v1/regalia.json /lol-game-data/assets/v1/summoner-icon-sets.json /lol-game-data/assets/v1/summoner-icons.json /lol-inventory/v2/inventory/REGALIA_BANNER /lol-inventory/v2/inventory/SUMMONER_ICON /lol-loadouts/v4/loadouts/scope/account /lol-regalia/v2/current-summoner/regalia /lol-regalia/v3/inventory/REGALIA_BANNER /lol-regalia/v3/inventory/REGALIA_BORDER] writes=0
+FAIL
+FAIL	lol-loot-assistant	0.560s
+FAIL

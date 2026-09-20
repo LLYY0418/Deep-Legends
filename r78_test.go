@@ -138,7 +138,7 @@ func TestR78PickableFailureStillSwapsBench(t *testing.T) {
 	}
 }
 
-func TestR78V2WatchMigrationPreservesRulesAndAddsDisabledChampSelect(t *testing.T) {
+func TestR78V2WatchMigrationPreservesRulesAndAddsEmptyChampSelect(t *testing.T) {
 	root := t.TempDir()
 	data := `{"schemaVersion":2,"masterEnabled":true,"rules":{"autoAccept":{"enabled":true,"delayMs":777},"autoReconnect":{"enabled":true,"delayMs":9000}}}`
 	if err := os.WriteFile(filepath.Join(root, convenienceSettingsFile), []byte(data), 0o600); err != nil {
@@ -148,7 +148,7 @@ func TestR78V2WatchMigrationPreservesRulesAndAddsDisabledChampSelect(t *testing.
 	if settings.SchemaVersion != 3 || !settings.Rules.AutoAccept.Enabled || settings.Rules.AutoAccept.DelayMS != 777 || settings.Rules.AutoReconnect.DelayMS != 9000 {
 		t.Fatalf("migration changed existing rules: %#v", settings)
 	}
-	if settings.ChampSelect.Enabled || len(settings.ChampSelect.Groups) != len(champSelectGroupDefinitions) {
+	if !settings.ChampSelect.Enabled || len(settings.ChampSelect.Groups) != len(champSelectGroupDefinitions) {
 		t.Fatalf("champ select migration = %#v", settings.ChampSelect)
 	}
 	for id, group := range settings.ChampSelect.Groups {

@@ -1,0 +1,645 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"path/filepath"
+	"reflect"
+	"regexp"
+	"sort"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+func r99Client(t *testing.T, handler http.HandlerFunc) *LCUClient {
+	t.Helper()
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	return &LCUClient{baseURL: server.URL, token: "fixture", http: server.Client()}
+}
+func TestR99ProbeReadMatrixAndPrivacy(t *testing.T) {
+	var mu sync.Mutex
+	paths := []string{}
+	writes := 0
+	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		if r.Method != "GET" {
+			writes++
+		}
+		mu.Unlock()
+		if strings.Contains(r.URL.Path, "/inventory/") && !strings.Contains(r.URL.Path, "SUMMONER_ICON") {
+			fmt.Fprint(w, `{"SECRET-INVENTORY-KEY":{"puuid":"SECRET","summonerId":4,"accountId":5,"uuid":"SECRET","contentId":"SECRET","itemId":3,"purchaseDate":"SECRET","gameName":"SECRET","isOwned":true}}`)
+		} else {
+			fmt.Fprint(w, `[{"title":"Title","puuid":"SECRET","summonerId":4,"accountId":5,"uuid":"SECRET","contentId":"SECRET","itemId":3,"purchaseDate":"SECRET","gameName":"SECRET","owned":true}]`)
+		}
+	})
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
+	a.recordR99SurfaceShape(context.Background(), client)
+	want := []string{
+		"/lol-game-data/assets/v1/summoner-icons.json", "/lol-game-data/assets/v1/summoner-icon-sets.json", "/lol-game-data/assets/v1/regalia.json", "/lol-inventory/v2/inventory/SUMMONER_ICON", "/lol-regalia/v3/inventory/REGALIA_BANNER", "/lol-regalia/v3/inventory/REGALIA_CREST", "/lol-regalia/v3/inventory/REGALIA_BORDER", "/lol-inventory/v2/inventory/REGALIA_BANNER", "/lol-loadouts/v4/loadouts/scope/account", "/lol-regalia/v2/current-summoner/regalia", "/lol-banners/v1/current-summoner/flags", "/lol-banners/v1/current-summoner/flags/equipped", "/lol-banners/v1/current-summoner/frames/equipped"}
+	sort.Strings(want)
+	sort.Strings(paths)
+	if !reflect.DeepEqual(paths, want) || writes != 0 {
+		t.Fatalf("matrix=%v writes=%d", paths, writes)
+	}
+	raw, err := a.storage.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{"puuid", "summonerId", "accountId", "uuid", "contentId", "itemId", "purchaseDate", "gameName", "SECRET"} {
+		if strings.Contains(string(raw), bad) {
+			t.Fatalf("probe leaked %s: %s", bad, raw)
+		}
+	}
+	if strings.Count(string(raw), `"event":"r99_read_probe"`) != 13 {
+		t.Fatalf("missing probe event: %s", raw)
+	}
+}
+func TestR99ConnectionNeverWritesAndProbesOnce(t *testing.T) {
+	var writes, reads atomic.Int32
+	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			writes.Add(1)
+		}
+		if r.URL.Path == r99ReadPaths[3] {
+			reads.Add(1)
+		}
+		if r.URL.Path == "/lol-summoner/v1/current-summoner" {
+			fmt.Fprint(w, `{"profileIconId":71}`)
+		} else {
+			fmt.Fprint(w, `{}`)
+		}
+	})
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}}
+	a.loadFacadeState(context.Background())
+	a.loadFacadeState(context.Background())
+	if writes.Load() != 0 || reads.Load() != 1 {
+		t.Fatalf("writes=%d probes=%d", writes.Load(), reads.Load())
+	}
+}
+func TestR99WriteProbeFreshIconAndAccentRestore(t *testing.T) {
+	var calls []string
+	var patches []map[string]any
+	var preferenceBodies []map[string]any
+	accent := "5"
+	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		switch r.URL.Path {
+		case "/lol-summoner/v1/current-summoner":
+			fmt.Fprint(w, `{"profileIconId":71}`)
+		case "/lol-summoner/v1/current-summoner/icon":
+			var body map[string]any
+			json.NewDecoder(r.Body).Decode(&body)
+			if len(body) != 1 || body["profileIconId"] != float64(71) {
+				t.Errorf("stale icon: %v", body)
+			}
+			w.WriteHeader(201)
+		case "/lol-loadouts/v4/loadouts/scope/account":
+			fmt.Fprint(w, `[{"id":"loadout-safe","loadout":{"REGALIA_BANNER_SLOT":{"inventoryType":"REGALIA_BANNER","itemId":3,"contentId":"opaque"},"WARD_SKIN_SLOT":{"itemId":9}}}]`)
+		case "/lol-loadouts/v4/loadouts/loadout-safe":
+			var body map[string]any
+			json.NewDecoder(r.Body).Decode(&body)
+			patches = append(patches, body)
+			w.WriteHeader(204)
+		case "/lol-chat/v1/me":
+			fmt.Fprintf(w, `{"puuid":"SECRET","lol":{"bannerIdSelected":%q}}`, accent)
+		case "/lol-challenges/v1/summary-player-data/local-player":
+			fmt.Fprint(w, `{"selectedChallengesString":"1,2","title":{"itemId":77}}`)
+		case "/lol-challenges/v1/update-player-preferences/":
+			var body map[string]any
+			json.NewDecoder(r.Body).Decode(&body)
+			preferenceBodies = append(preferenceBodies, body)
+			accent = body["bannerAccent"].(string)
+			w.WriteHeader(204)
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+			http.NotFound(w, r)
+		}
+	})
+	a := &app{summoner: Summoner{ProfileIconID: 99}}
+	results := a.runR99WriteProbe(context.Background(), client)
+	raw, _ := json.Marshal(results)
+	for _, bad := range []string{"puuid", "summonerId", "accountId", "uuid", "contentId", "itemId", "purchaseDate", "gameName", "SECRET"} {
+		if strings.Contains(string(raw), bad) {
+			t.Fatalf("write diagnostic leaked %s", bad)
+		}
+	}
+	if calls[0] != "GET /lol-summoner/v1/current-summoner" {
+		t.Fatal(calls)
+	}
+	if calls[len(calls)-1] != "POST /lol-challenges/v1/update-player-preferences/" || accent != "5" || len(preferenceBodies) != 2 {
+		t.Fatalf("restore missing: %v %s", calls, accent)
+	}
+	for _, body := range preferenceBodies {
+		if !reflect.DeepEqual(body["challengeIds"], []any{float64(1), float64(2)}) || body["title"] != "77" {
+			t.Fatalf("preferences lost: %v", body)
+		}
+	}
+	if len(patches) != 7 {
+		t.Fatalf("patches=%d", len(patches))
+	}
+	for _, body := range patches {
+		if len(body) != 1 || len(anyMap(body["loadout"])) != 1 || anyMap(body["loadout"])["REGALIA_BANNER_SLOT"] == nil {
+			t.Fatal(body)
+		}
+	}
+	if results[0]["status"] != 201 || results[len(results)-1]["restored"] != true {
+		t.Fatal(results)
+	}
+}
+func TestR99AccentProbeRestoresAfterCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var bodies []map[string]any
+	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/lol-chat/v1/me":
+			fmt.Fprint(w, `{"lol":{"bannerIdSelected":"5"}}`)
+		case "/lol-challenges/v1/summary-player-data/local-player":
+			fmt.Fprint(w, `{"selectedChallengesString":"","title":null}`)
+		case "/lol-challenges/v1/update-player-preferences/":
+			var b map[string]any
+			json.NewDecoder(r.Body).Decode(&b)
+			bodies = append(bodies, b)
+			if len(bodies) == 1 {
+				cancel()
+			}
+			w.WriteHeader(204)
+		}
+	})
+	(&app{}).r99ProbeAccent(ctx, client, func(map[string]any) {})
+	if len(bodies) != 2 || bodies[1]["bannerAccent"] != "5" {
+		t.Fatalf("cancel prevented recovery: %v", bodies)
+	}
+}
+
+const r99IconsFixture = `[{"id":71,"title":"星之守护者","yearReleased":2026,"imagePath":"/lol-game-data/assets/v1/profile-icons/71.jpg","rarities":[{"region":"tencent"}],"uuid":"SECRET","contentId":"SECRET"},{"id":72,"title":"停用","yearReleased":2020,"imagePath":"/lol-game-data/assets/v1/profile-icons/72.jpg","disabledRegions":["TENCENT"]},{"id":73,"title":"空图","imagePath":""}]`
+
+func TestR99IconCatalogProjectionCachingAndClientSwitch(t *testing.T) {
+	var gets, terms atomic.Int32
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case r99ReadPaths[0]:
+			gets.Add(1)
+			fmt.Fprint(w, r99IconsFixture)
+		case r99ReadPaths[1]:
+			fmt.Fprint(w, `[{"displayName":"星之守护者","icons":[71]}]`)
+		default:
+			http.Error(w, `{"owned":true,"uuid":"SECRET","purchaseDate":"SECRET","ownershipType":"SECRET","contentId":"SECRET"}`, 500)
+		}
+	}
+	client := r99Client(t, handler)
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}}
+	a.facadeIcons.terms = func(s string) []string { terms.Add(1); return championPinyinTerms(s) }
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		a.handleFacadeIcons(w, httptest.NewRequest("GET", "/api/facade/icons", nil))
+		if w.Code != 200 {
+			t.Fatal(w.Body.String())
+		}
+		for _, bad := range []string{"uuid", "purchaseDate", "ownershipType", "contentId", "imagePath", "SECRET"} {
+			if strings.Contains(w.Body.String(), bad) {
+				t.Fatalf("leaked %s", bad)
+			}
+		}
+		var body struct {
+			Icons       []facadeIcon `json:"icons"`
+			Unavailable bool         `json:"iconOwnershipUnavailable"`
+		}
+		json.Unmarshal(w.Body.Bytes(), &body)
+		if !body.Unavailable || len(body.Icons) != 2 || body.Icons[0].Year != 2026 || len(body.Icons[0].Sets) != 1 || !body.Icons[1].Disabled {
+			t.Fatalf("projection=%+v", body)
+		}
+	}
+	if gets.Load() != 1 || terms.Load() != 2 {
+		t.Fatalf("uncached terms=%d requests=%d", terms.Load(), gets.Load())
+	}
+	a.lcu = r99Client(t, handler)
+	a.loadIconCatalog(context.Background(), a.lcu)
+	if gets.Load() != 2 || terms.Load() != 4 {
+		t.Fatal("client switch reused cache")
+	}
+}
+func TestR99IconWriteAccepts201AndRefreshesSnapshot(t *testing.T) {
+	var puts atomic.Int32
+	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/lol-summoner/v1/current-summoner/icon":
+			var b map[string]any
+			json.NewDecoder(r.Body).Decode(&b)
+			if r.Method != "PUT" || len(b) != 1 || b["profileIconId"] != float64(71) {
+				t.Errorf("invalid write: %s %v", r.Method, b)
+			}
+			puts.Add(1)
+			w.WriteHeader(201)
+		case "/lol-summoner/v1/current-summoner":
+			fmt.Fprint(w, `{"summonerId":1,"profileIconId":71}`)
+		default:
+			fmt.Fprint(w, `{}`)
+		}
+	})
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1, ProfileIconID: 5}}
+	a.facadeIcons = facadeIconCache{client: client, at: time.Now(), icons: []facadeIcon{{ID: 71}}}
+	a.facadeIdentityShapeDiagnosticClient = client
+	w := httptest.NewRecorder()
+	a.handleFacadeApply(w, httptest.NewRequest("POST", "/api/facade/apply", strings.NewReader(`{"action":"icon","iconId":71}`)))
+	if w.Code != 200 || puts.Load() != 1 || a.summoner.ProfileIconID != 71 {
+		t.Fatalf("code=%d body=%s puts=%d snapshot=%d", w.Code, w.Body.String(), puts.Load(), a.summoner.ProfileIconID)
+	}
+	a.clearFacadeEventThrottle()
+}
+func TestR99IconRejectsUnknownOrDisabledWithoutWrite(t *testing.T) {
+	var calls atomic.Int32
+	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) { calls.Add(1) })
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}}
+	a.facadeIcons = facadeIconCache{client: client, at: time.Now(), icons: []facadeIcon{{ID: 71}, {ID: 72, Disabled: true}}}
+	for _, id := range []int64{0, 72, 999} {
+		w := httptest.NewRecorder()
+		a.handleFacadeApply(w, httptest.NewRequest("POST", "/api/facade/apply", strings.NewReader(fmt.Sprintf(`{"action":"icon","iconId":%d}`, id))))
+		if w.Code != 400 {
+			t.Fatal(w.Code)
+		}
+	}
+	if calls.Load() != 0 {
+		t.Fatal("invalid selection made requests")
+	}
+}
+func TestR99SummonerEventStillUpdatesIdentity(t *testing.T) {
+	client := &LCUClient{}
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1, ProfileIconID: 5}}
+	event := LCUEvent{URI: "/lol-summoner/v1/current-summoner", Data: json.RawMessage(`{"summonerId":1,"profileIconId":71}`)}
+	if a.handleFacadeLCUEvent(event) {
+		t.Fatal("facade swallowed summoner identity event")
+	}
+	if !a.handleSummonerIdentityEvent(client, event.Data) {
+		t.Fatal("identity rejected event")
+	}
+	defer a.clearFacadeEventThrottle()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		a.mu.RLock()
+		id := a.summoner.ProfileIconID
+		a.mu.RUnlock()
+		if id == 71 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("identity never updated")
+}
+func TestR99RankBannerPreservesCrestAndRejectsUnknown(t *testing.T) {
+	calls := 0
+	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.Method == "GET" {
+			fmt.Fprint(w, `{"preferredCrestType":"ranked","selectedPrestigeCrest":7}`)
+			return
+		}
+		var b map[string]any
+		json.NewDecoder(r.Body).Decode(&b)
+		if r.Method != "PUT" || b["preferredCrestType"] != "ranked" || b["selectedPrestigeCrest"] != float64(7) || b["preferredBannerType"] != "blank" {
+			t.Errorf("crest overwritten: %v", b)
+		}
+		w.WriteHeader(204)
+	})
+	if err := writeFacadeRankBanner(context.Background(), client, "hextech"); !errors.Is(err, errFacadeInvalid) || calls != 0 {
+		t.Fatal("invalid banner made request")
+	}
+	if err := writeFacadeRankBanner(context.Background(), client, "blank"); err != nil || calls != 2 {
+		t.Fatalf("write=%v calls=%d", err, calls)
+	}
+}
+
+func r99SeedProvider(t *testing.T, root string, handler func(*http.Request) (*http.Response, error)) *riotProvider {
+	t.Helper()
+	t.Setenv("RIOT_API_KEY", "RGAPI-fixture")
+	cp := newChampionProvider()
+	cp.cache = newChampionDataCache(&localStore{root: root})
+	cp.client = &http.Client{Transport: gameplayRoundTripFunc(handler)}
+	return newRiotProvider(cp)
+}
+func r99Response(body string) *http.Response {
+	return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(body))}
+}
+func r99Rookie(result proPlayersResponse) proPlayer {
+	for _, team := range result.Teams {
+		if team.Code == "IG" {
+			for _, player := range team.Players {
+				if player.Name == "Rookie" {
+					return player
+				}
+			}
+		}
+	}
+	return proPlayer{}
+}
+func TestR99SeedRenameSurvivesRestartAndTTL(t *testing.T) {
+	root := t.TempDir()
+	seed := proSeedAccounts[0]
+	byName, byStable := 0, 0
+	handler := func(r *http.Request) (*http.Response, error) {
+		if strings.Contains(r.URL.Path, "by-riot-id") {
+			byName++
+			if byName > 1 {
+				return nil, errors.New("old name no longer exists")
+			}
+			return r99Response(`{"puuid":"fixture-stable","gameName":"모든일은같이","tagLine":"KR1"}`), nil
+		}
+		byStable++
+		return r99Response(`{"puuid":"fixture-stable","gameName":"Renamed","tagLine":"KR2"}`), nil
+	}
+	p := r99SeedProvider(t, root, handler)
+	account, err := p.resolveProSeed(context.Background(), seed)
+	if err != nil || account.PUUID != "fixture-stable" {
+		t.Fatal(err)
+	}
+	p = r99SeedProvider(t, root, handler)
+	clock := time.Now().Add(29 * 24 * time.Hour)
+	p.identityDisk.now = func() time.Time { return clock }
+	account, err = p.resolveProSeed(context.Background(), seed)
+	if err != nil || account.GameName != "Renamed" || byName != 1 || byStable != 1 {
+		t.Fatalf("restart=%+v %v name=%d stable=%d", account, err, byName, byStable)
+	}
+	_, err = p.resolveProSeed(context.Background(), seed)
+	if err != nil || byStable != 1 {
+		t.Fatal("6h cache not used")
+	}
+	clock = clock.Add(6*time.Hour + time.Second)
+	_, err = p.resolveProSeed(context.Background(), seed)
+	if err != nil || byStable != 2 {
+		t.Fatalf("6h cache not expired: %v %d", err, byStable)
+	}
+}
+func TestR99SeedAnchorSurvivesLRUAndHasOnlyStableField(t *testing.T) {
+	root := t.TempDir()
+	p := r99SeedProvider(t, root, func(*http.Request) (*http.Response, error) {
+		return r99Response(`{"puuid":"fixture-stable","gameName":"Fixture","tagLine":"KR1"}`), nil
+	})
+	_, err := p.resolveProSeed(context.Background(), proSeedAccounts[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths, _ := filepath.Glob(filepath.Join(root, "riot-identities", "proseed-*.json"))
+	if len(paths) != 1 {
+		t.Fatal(paths)
+	}
+	var envelope championCacheEnvelope
+	raw, _ := os.ReadFile(paths[0])
+	json.Unmarshal(raw, &envelope)
+	var body map[string]any
+	json.Unmarshal(envelope.Data, &body)
+	if len(body) != 1 || body["puuid"] != "fixture-stable" {
+		t.Fatal(body)
+	}
+	for i := 0; i < 260; i++ {
+		value := map[string]int{"n": i}
+		if err := p.cachedPublicIdentity(context.Background(), fmt.Sprintf("other:%d", i), time.Hour, &value, func(context.Context) error { return nil }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := os.Stat(paths[0]); err != nil {
+		t.Fatal("anchor evicted", err)
+	}
+	if len(p.identityDisk.strictEntries) > 256 {
+		t.Fatal("cache budget grew")
+	}
+}
+func TestR99SeedAppearsMergesAndNeverLeaks(t *testing.T) {
+	p := r99SeedProvider(t, t.TempDir(), func(*http.Request) (*http.Response, error) {
+		return r99Response(`{"puuid":"fixture-stable","gameName":"Renamed","tagLine":"KR1"}`), nil
+	})
+	a := &app{riot: p}
+	seeds := a.loadProSeeds(context.Background(), nil)
+	rows := withProSeed(nil, seeds)
+	result := a.buildProPlayers(rows, proRoster)
+	rookie := r99Rookie(result)
+	if len(rookie.Accounts) != 1 || rookie.Status == "missing" || rookie.Accounts[0].Source != "人工核对" || rookie.Accounts[0].Confidence != "" || result.Partial {
+		t.Fatalf("seed missing: %+v", rookie)
+	}
+	upstream := cloneProTeams(seeds)
+	upstream[0].Members[0].Summoners[0].GameName = "Old"
+	upstream[0].Members[0].Summoners[0].Source = ""
+	upstream[0].Members[0].Summoners[0].UpdatedAt = time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	result = a.buildProPlayers(withProSeed(upstream, seeds), proRoster)
+	rookie = r99Rookie(result)
+	if len(rookie.Accounts) != 1 || rookie.Accounts[0].GameName != "Renamed" {
+		t.Fatalf("merge: %+v", rookie)
+	}
+	a.proPlayers.teams = rows
+	a.proPlayers.fetchedAt = time.Now()
+	w := httptest.NewRecorder()
+	a.handleProPlayers(w, httptest.NewRequest("GET", "/api/pro-players", nil))
+	for _, bad := range []string{"puuid", "fixture-stable"} {
+		if strings.Contains(w.Body.String(), bad) {
+			t.Fatalf("leaked %s", bad)
+		}
+	}
+}
+func TestR99SeedRespectsQuotaBudget(t *testing.T) {
+	var calls atomic.Int32
+	p := r99SeedProvider(t, t.TempDir(), func(*http.Request) (*http.Response, error) { calls.Add(1); return nil, errors.New("must not request") })
+	p.limitSleep = func(context.Context, time.Duration) error {
+		t.Error("seed waited beyond queue budget")
+		return context.DeadlineExceeded
+	}
+	for i := 0; i < 15; i++ {
+		p.shortWindow = append(p.shortWindow, time.Now())
+	}
+	previous := []opggProTeam{{ID: 371, Members: []opggProMember{{Nickname: "Rookie", Summoners: []opggProAccount{{Source: "seed", PUUID: "fixture-stable", GameName: "Previous", TagLine: "KR1"}}}}}}
+	started := time.Now()
+	rows := (&app{riot: p}).loadProSeeds(context.Background(), previous)
+	if time.Since(started) > 300*time.Millisecond || calls.Load() != 0 || len(rows) != 1 || rows[0].Members[0].Summoners[0].GameName != "Previous" {
+		t.Fatal("quota blocked or lost snapshot")
+	}
+}
+func TestR99SeedSourceHasNoCopiedStableID(t *testing.T) {
+	source := os.Getenv("R99_SEED_SOURCE")
+	if source == "" {
+		source = "pro_seed_accounts.go"
+	}
+	raw, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if regexp.MustCompile(`[A-Za-z0-9_-]{40,}`).Match(raw) {
+		t.Fatal("copied opaque ID in seed source")
+	}
+}
+
+func TestR99SeedPresentInEveryPipelinePublication(t *testing.T) {
+	releases := map[string]chan struct{}{}
+	for _, name := range proSupplementPlayers {
+		releases[name] = make(chan struct{})
+	}
+	closedFirst := false
+	var releaseOnce sync.Once
+	releaseAll := func() {
+		releaseOnce.Do(func() {
+			for name, ch := range releases {
+				if name != "TheShy" || !closedFirst {
+					close(ch)
+				}
+			}
+		})
+	}
+	defer releaseAll()
+	p := r99SeedProvider(t, t.TempDir(), func(r *http.Request) (*http.Response, error) {
+		if r.URL.Host == riotClusterHost {
+			return r99Response(`{"puuid":"fixture-stable","gameName":"Seed","tagLine":"KR1"}`), nil
+		}
+		if r.URL.Host == proSupplementHost {
+			name := strings.TrimPrefix(r.URL.Path, "/player/")
+			select {
+			case <-releases[name]:
+			case <-r.Context().Done():
+				return nil, r.Context().Err()
+			}
+			_, player, _ := proSupplementPlayer(name)
+			return proHTTPBody([]byte(fmt.Sprintf(`<h1>%s</h1><table><tr><td>Name</td><td>%s</td></tr></table><div><h4>Accounts</h4><table><tr><td>[KR] fixture-%s#KR1</td><td>Unranked</td></tr></table></div>`, name, player.Names[0], name))), nil
+		}
+		if strings.Contains(r.URL.Path, "pro-gamer") {
+			return proHTTPBody(proFixtureHTML("kr")), nil
+		}
+		return nil, errors.New("no fixture ladder")
+	})
+	a := &app{riot: p, champions: p.champions}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	rows, _, err := a.loadProPlayers(ctx, false)
+	if err != nil || len(r99Rookie(a.buildProPlayers(rows, proRoster)).Accounts) != 1 {
+		t.Fatal("directory seed missing", err)
+	}
+	// Release one source only, observing its partial publication before completion.
+	close(releases["TheShy"])
+	closedFirst = true
+	deadline := time.Now().Add(2 * time.Second)
+	seen := false
+	for time.Now().Before(deadline) {
+		a.proPlayers.mu.Lock()
+		snapshot := cloneProTeams(a.proPlayers.teams)
+		a.proPlayers.mu.Unlock()
+		for _, team := range snapshot {
+			for _, member := range team.Members {
+				if member.Nickname == "TheShy" && member.Supplement && !member.Incomplete {
+					seen = true
+				}
+			}
+		}
+		if seen {
+			if len(r99Rookie(a.buildProPlayers(snapshot, proRoster)).Accounts) != 1 {
+				t.Fatal("partial publication lost seed")
+			}
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if !seen {
+		t.Fatal("partial fixture did not publish")
+	}
+	releaseAll()
+	waitProEnrichment(t, a)
+	a.proPlayers.mu.Lock()
+	snapshot := cloneProTeams(a.proPlayers.teams)
+	a.proPlayers.mu.Unlock()
+	result := a.buildProPlayers(snapshot, proRoster)
+	if result.Partial || len(r99Rookie(result).Accounts) != 1 {
+		t.Fatal("completed seed missing or partial")
+	}
+}
+
+func TestR99ProbeHandlesAlternativeInventoryShape(t *testing.T) {
+	value := []any{map[string]any{"isOwned": true, "itemId": 3, "contentId": "secret"}}
+	e := r99ReadShape(7, value)
+	if e["json_type"] != "array" || e["count"] != 1 || e["owned_count"] != 1 {
+		t.Fatal(e)
+	}
+	raw, _ := json.Marshal(e)
+	if strings.Contains(string(raw), "secret") || strings.Contains(string(raw), "itemId") {
+		t.Fatal(string(raw))
+	}
+}
+func TestR99WriteProbeRejectsUnsafeLoadoutIDs(t *testing.T) {
+	for _, id := range []string{"bad/path", "..", "foo..bar", " spaced "} {
+		t.Run(id, func(t *testing.T) {
+			writes := 0
+			client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "GET" {
+					writes++
+				}
+				if r.URL.Path == "/lol-loadouts/v4/loadouts/scope/account" {
+					json.NewEncoder(w).Encode([]any{map[string]any{"id": id, "loadout": map[string]any{"REGALIA_BANNER_SLOT": map[string]any{"itemId": 3}}}})
+				} else {
+					fmt.Fprint(w, `{}`)
+				}
+			})
+			(&app{}).runR99WriteProbe(context.Background(), client)
+			if writes != 0 {
+				t.Fatal("unsafe loadout generated writes", writes)
+			}
+		})
+	}
+}
+func TestR99WriteProbeReportsErrorCodeWithoutMessage(t *testing.T) {
+	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/lol-loadouts/v4/loadouts/scope/account":
+			fmt.Fprint(w, `[{"id":"safe","loadout":{"REGALIA_BANNER_SLOT":{"inventoryType":"REGALIA_BANNER","itemId":3,"contentId":"private"}}}]`)
+		case "/lol-loadouts/v4/loadouts/safe":
+			http.Error(w, `{"errorCode":"UnsupportedSlot","message":"SECRET"}`, 400)
+		default:
+			fmt.Fprint(w, `{}`)
+		}
+	})
+	rows := (&app{}).runR99WriteProbe(context.Background(), client)
+	found := false
+	for _, row := range rows {
+		if row["probe"] == "W2" {
+			found = true
+			if row["status"] != 400 || row["error_code"] != "UnsupportedSlot" {
+				t.Fatal(row)
+			}
+		}
+	}
+	raw, _ := json.Marshal(rows)
+	if !found || strings.Contains(string(raw), "SECRET") {
+		t.Fatal(string(raw))
+	}
+}
+
+func TestR99SeedQuotaDiagnosticsNeverContainIdentity(t *testing.T) {
+	p := r99SeedProvider(t, t.TempDir(), func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 429, Header: http.Header{"Retry-After": []string{"60"}}, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+	})
+	var events []map[string]any
+	p.champions.diag = func(e map[string]any) { events = append(events, e) }
+	if _, err := p.resolveProSeed(context.Background(), proSeedAccounts[0]); err == nil {
+		t.Fatal("expected quota rejection")
+	}
+	if _, err := p.fetchAccountByPUUID(context.Background(), "SECRET-STABLE-ID"); err == nil {
+		t.Fatal("expected quota rejection")
+	}
+	raw, _ := json.Marshal(events)
+	if len(events) != 2 {
+		t.Fatalf("missing 429 diagnostics: %s", raw)
+	}
+	for _, bad := range []string{"SECRET-STABLE-ID", proSeedAccounts[0].GameName, url.PathEscape(proSeedAccounts[0].GameName)} {
+		if strings.Contains(string(raw), bad) {
+			t.Fatalf("quota diagnostic leaked %s", bad)
+		}
+	}
+}

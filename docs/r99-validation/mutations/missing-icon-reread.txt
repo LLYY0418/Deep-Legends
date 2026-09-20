@@ -1,0 +1,6 @@
+--- FAIL: TestR99IconWriteAccepts201AndRefreshesSnapshot (0.00s)
+    r99_test.go:261: code=200 body={"skinsUnavailable":true,"skinOwnershipUnavailable":true,"connected":true,"summoner":{"profileIconId":5},"profile":{},"chat":{"lol":{}},"challengeSummary":{"title":null},"challenges":null,"challengesReady":false,"skins":[],"loginReset":{"statusMessageEnabled":false,"statusMessage":"","rankEnabled":false}}
+         puts=1 snapshot=5
+FAIL
+FAIL	lol-loot-assistant	0.611s
+FAIL

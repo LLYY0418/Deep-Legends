@@ -1,0 +1,24 @@
+{
+  "source_fingerprint": "0a9ffb2f0c10",
+  "go_test": {
+    "exit_code": 0,
+    "seconds": 72.144
+  },
+  "go_race": {
+    "exit_code": 0,
+    "seconds": 88.618
+  },
+  "node": {
+    "exit_code": 0,
+    "tests": 696,
+    "pass": 695,
+    "fail": 0,
+    "skipped": 1
+  },
+  "mutations": {
+    "total": 21,
+    "kill": 20,
+    "expected_survive": 1
+  },
+  "real_lol_game_verified": false
+}

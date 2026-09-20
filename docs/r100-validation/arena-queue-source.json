@@ -1,0 +1,50 @@
+{
+  "source": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/queues.json",
+  "queues": [
+    {
+      "id": 1700,
+      "name": "Arena",
+      "description": "Arena"
+    },
+    {
+      "id": 1701,
+      "name": "1v0 (Arena)",
+      "description": "1v0 (Arena)"
+    },
+    {
+      "id": 1704,
+      "name": "Arena (PBE 2v2)",
+      "description": "Arena (PBE 2v2)"
+    },
+    {
+      "id": 1710,
+      "name": "Arena",
+      "description": "Arena"
+    },
+    {
+      "id": 1720,
+      "name": "Arena internal",
+      "description": "Arena internal"
+    },
+    {
+      "id": 1731,
+      "name": "1v0 (Arena)",
+      "description": "1v0 (Arena)"
+    },
+    {
+      "id": 1732,
+      "name": "1v0 (Arena)",
+      "description": "1v0 (Arena)"
+    },
+    {
+      "id": 1740,
+      "name": "Bravery Arena",
+      "description": "Bravery Arena"
+    },
+    {
+      "id": 1750,
+      "name": "Arena 3x6",
+      "description": "Arena 3x6"
+    }
+  ]
+}

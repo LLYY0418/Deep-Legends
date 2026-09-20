@@ -1,0 +1,6 @@
+=== RUN   TestR97ManagementAndBadgesShareReviewedSixTeams
+    pro_players_test.go:567: badge inputs exceed whitelist 16
+--- FAIL: TestR97ManagementAndBadgesShareReviewedSixTeams (0.00s)
+FAIL
+FAIL	lol-loot-assistant	0.009s
+FAIL

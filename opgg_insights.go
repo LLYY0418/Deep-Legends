@@ -9,12 +9,13 @@ package main
 // lol-web-api.op.gg 不可达），走 championProvider 的 HTTP 通道以继承
 // “英雄数据网络”的代理设置。OP.GG 返回的对局 id 是不透明哈希，无法
 // 直接对应 Riot 的 gameId，这里按「开局时间 + 对局时长」匹配。
-// 任一环节失败都静默降级：界面上该行显示“—”，不影响战绩本身。
+// 暂时失败与来源未提供段位分开处理，避免将失败缓存成无段位。
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -32,6 +33,7 @@ const (
 	opggGamesPageSize    = 20
 	opggGamesMaxPages    = 4
 	opggTierCacheTTL     = 90 * time.Second
+	opggTierFailureTTL   = 30 * time.Second
 	opggTierCacheMax     = 32
 	opggGamesTimeSlack   = 180 * 1000 // 开局时间匹配容差（毫秒）
 	opggGamesSpanSlack   = 20         // 时长匹配容差（秒）
@@ -50,6 +52,11 @@ type opggTierCacheEntry struct {
 	at            time.Time
 	games         []opggGameTier
 	coveredOldest int64
+	cursor        string
+	profileID     string
+	exhausted     bool
+	err           error
+	attemptedAt   time.Time
 }
 
 type opggTierFlight struct {
@@ -260,7 +267,7 @@ func (a *app) startOPGGHistoricalRanks(reference gameplayReference, gameName, ta
 		}
 		payload, _ := json.Marshal(map[string]any{
 			"type": "historical-ranks", "account": a.registerGameplayReferenceDetails(mergeGameplayReferences(reference, gameplayReference{PlayerRef: puuid})),
-			"count": len(ranks),
+			"count": len(ranks), "historicalRanks": ranks,
 		})
 		a.clearOverviewQuerySnapshots()
 		a.broadcastEvent(string(payload))
@@ -300,140 +307,186 @@ func opggRomanDivision(division int) string {
 	return ""
 }
 
-// opggFetchGamesPage 请求一页对局，返回解析后的段位行与下一页游标。
-func (a *app) opggFetchGamesPage(ctx context.Context, slug, puuid, endedAt string) ([]opggGameTier, string) {
-	body, err := json.Marshal([]opggGamesRequest{{Locale: "zh-cn", Region: "kr", PUUID: puuid, GameType: "TOTAL", EndedAt: endedAt, Champion: ""}})
-	if err != nil {
-		return nil, ""
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://op.gg/zh-cn/lol/summoners/kr/"+slug, bytes.NewReader(body))
-	if err != nil {
-		return nil, ""
-	}
-	request.Header.Set("Next-Action", opggGamesAction)
-	request.Header.Set("Content-Type", "text/plain;charset=UTF-8")
-	request.Header.Set("Accept", "text/x-component")
-	request.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36")
-	response, err := a.champions.httpClient().Do(request)
-	if err != nil {
-		return nil, ""
-	}
-	data, readErr := readLimited(response.Body, opggGamesResponseMax)
-	response.Body.Close()
-	if response.StatusCode != http.StatusOK || readErr != nil {
-		return nil, ""
-	}
-	// Server Action 返回 text/x-component 流，每行形如 “<id>:<JSON>”；
-	// 对局数组在包含 average_tier 的那一行。
-	for _, line := range strings.Split(string(data), "\n") {
-		colon := strings.Index(line, ":")
-		if colon <= 0 || !strings.Contains(line, `"average_tier"`) {
-			continue
+// Parse only the action result and the three fields needed for matching. A page
+// may mix average_tier objects with "$undefined" or Flight references; an absent
+// tier on one game must not invalidate all the other games in the page.
+func parseOPGGGamesPage(data []byte) ([]opggGameTier, string, error) {
+	p := &opggPlayerPage{rows: map[string]any{}}
+	for _, line := range bytes.Split(data, []byte("\n")) {
+		id, raw, ok := bytes.Cut(line, []byte(":"))
+		var value any
+		if ok && json.Unmarshal(raw, &value) == nil {
+			p.rows[string(id)] = value
 		}
-		var payload struct {
-			Data []opggGameRow `json:"data"`
-		}
-		if json.Unmarshal([]byte(line[colon+1:]), &payload) != nil || len(payload.Data) == 0 {
-			return nil, ""
-		}
-		games := make([]opggGameTier, 0, len(payload.Data))
-		cursor := ""
-		for _, row := range payload.Data {
-			cursor = row.CreatedAt
-			started, parseErr := time.Parse(time.RFC3339, row.CreatedAt)
-			tier := strings.ToUpper(strings.TrimSpace(row.AverageTier.Tier))
-			if parseErr != nil || tier == "" {
-				continue
-			}
-			games = append(games, opggGameTier{
-				createdAt: started.UnixMilli(),
-				duration:  row.GameLength,
-				tier:      matchTiersResponse{Tier: tier, Division: opggRomanDivision(row.AverageTier.Division), LP: row.AverageTier.LP},
-			})
-		}
-		if len(payload.Data) < opggGamesPageSize {
-			cursor = ""
-		}
-		return games, cursor
 	}
-	return nil, ""
+	root, _ := p.rows["0"].(map[string]any)
+	action, _ := root["a"].(string)
+	if !strings.HasPrefix(action, "$@") {
+		return nil, "", errors.New("opgg-games-action")
+	}
+	payload, _ := p.rows[strings.TrimPrefix(action, "$@")].(map[string]any)
+	rows, ok := payload["data"].([]any)
+	if !ok || len(rows) > 100 {
+		return nil, "", errors.New("opgg-games-data")
+	}
+	games := make([]opggGameTier, 0, len(rows))
+	cursor := ""
+	for _, value := range rows {
+		node, ok := value.(map[string]any)
+		if !ok {
+			return nil, "", errors.New("opgg-games-row")
+		}
+		budget := 200
+		selected, err := p.resolve(map[string]any{"created_at": node["created_at"], "game_length": node["game_length"], "average_tier": node["average_tier"]}, 0, &budget)
+		if err != nil {
+			return nil, "", err
+		}
+		encoded, _ := json.Marshal(selected)
+		var row opggGameRow
+		if json.Unmarshal(encoded, &row) != nil {
+			return nil, "", errors.New("opgg-games-tier")
+		}
+		started, err := time.Parse(time.RFC3339, row.CreatedAt)
+		if err != nil || row.GameLength <= 0 {
+			return nil, "", errors.New("opgg-games-time")
+		}
+		cursor = row.CreatedAt
+		tier := strings.ToUpper(strings.TrimSpace(row.AverageTier.Tier))
+		division := opggRomanDivision(row.AverageTier.Division)
+		if _, valid := rankTierBases[tier]; !valid {
+			tier, division = "", ""
+		}
+		if tier == "MASTER" || tier == "GRANDMASTER" || tier == "CHALLENGER" {
+			division = ""
+		}
+		games = append(games, opggGameTier{createdAt: started.UnixMilli(), duration: row.GameLength,
+			tier: matchTiersResponse{Tier: tier, Division: division, LP: row.AverageTier.LP}})
+	}
+	if len(rows) < opggGamesPageSize {
+		cursor = ""
+	}
+	return games, cursor, nil
 }
 
-// opggGameTiers 从最新一页开始翻对局，直到覆盖 oldest（毫秒）之前的
-// 场次或达到页数上限；结果按玩家短期缓存。
-func (a *app) opggGameTiers(ctx context.Context, gameName, tagLine, puuid string, oldest int64) []opggGameTier {
-	if a.champions == nil || a.opgg == nil || strings.TrimSpace(gameName) == "" || !validPlayerReference(puuid) {
-		return nil
+func (a *app) opggFetchGamesPage(ctx context.Context, ref gameplayReference, profileID, endedAt string) ([]opggGameTier, string, error) {
+	body, _ := json.Marshal([]opggGamesRequest{{Locale: "zh-cn", Region: "kr", PUUID: profileID, GameType: "TOTAL", EndedAt: endedAt, Champion: ""}})
+	data, err := a.readOPGGPlayerPage(ctx, ref, http.MethodPost, opggGamesAction, body)
+	if err != nil {
+		return nil, "", err
 	}
-	var stale []opggGameTier
+	return parseOPGGGamesPage(data)
+}
+
+// Resolve the provider-specific ID once per fresh cache, then reuse the page
+// cursor for older visible matches. Unknown tiers still count toward coverage.
+func (a *app) opggGameTiers(ctx context.Context, gameName, tagLine, puuid string, oldest int64) (result []opggGameTier, resultErr error) {
+	if a.champions == nil || a.opgg == nil || !a.champions.featureGates.enabled(featureGateOPGG) || strings.TrimSpace(gameName) == "" || !validPlayerReference(puuid) {
+		return nil, errors.New("opgg-games-unavailable")
+	}
+	started := time.Now()
+	stage, pages, cacheHit := "cache", 0, false
+	defer func() {
+		a.recordDiagnostic(map[string]any{"event": "opgg_match_tiers_cost", "duration_ms": time.Since(started).Milliseconds(), "stage": stage, "pages": pages, "cache_hit": cacheHit, "rows": len(result), "success": resultErr == nil, "failure": supplementFailureCode(resultErr)})
+	}()
+	// Bind cached identities to both the trusted Riot ID and our internal ID.
+	key := sourceScopedKey(dataSourceOPGG, puuid+":"+strings.ToLower(gameName+"#"+tagLine))
+	var entry opggTierCacheEntry
 	for {
 		a.opgg.mu.Lock()
-		entry, cached := a.opgg.tiers[puuid]
-		if cached {
-			stale = append(stale[:0], entry.games...)
-		}
-		fresh := cached && time.Since(entry.at) < opggTierCacheTTL
-		covered := entry.coveredOldest == 0 || oldest > 0 && oldest >= entry.coveredOldest
+		entry = a.opgg.tiers[key]
+		fresh := !entry.at.IsZero() && time.Since(entry.at) < opggTierCacheTTL
+		covered := entry.exhausted || oldest > 0 && entry.coveredOldest > 0 && oldest >= entry.coveredOldest
 		if fresh && covered {
-			games := append([]opggGameTier(nil), entry.games...)
 			a.opgg.mu.Unlock()
-			return games
+			cacheHit = true
+			return append([]opggGameTier(nil), entry.games...), nil
 		}
-		if flight := a.opgg.flights[puuid]; flight != nil {
+		if entry.err != nil && time.Since(entry.attemptedAt) < opggTierFailureTTL {
+			a.opgg.mu.Unlock()
+			cacheHit = true
+			return append([]opggGameTier(nil), entry.games...), entry.err
+		}
+		if flight := a.opgg.flights[key]; flight != nil {
 			done := flight.done
 			a.opgg.mu.Unlock()
 			select {
 			case <-done:
 				continue
 			case <-ctx.Done():
-				return stale
+				return nil, ctx.Err()
 			}
 		}
-		a.opgg.flights[puuid] = &opggTierFlight{done: make(chan struct{})}
+		a.opgg.flights[key] = &opggTierFlight{done: make(chan struct{})}
 		a.opgg.mu.Unlock()
+		if !fresh {
+			entry = opggTierCacheEntry{}
+		}
 		break
 	}
-
-	slug := url.PathEscape(gameName + "-" + tagLine)
-	games := make([]opggGameTier, 0, opggGamesPageSize)
-	cursor := ""
-	for page := 0; page < opggGamesMaxPages && ctx.Err() == nil; page++ {
-		pageGames, nextCursor := a.opggFetchGamesPage(ctx, slug, puuid, cursor)
-		if len(pageGames) == 0 {
+	ref := gameplayReference{Region: riotRegionKR, GameName: gameName, TagLine: tagLine}
+	entry.err = nil
+	if entry.profileID == "" {
+		stage = "page-identity"
+		data, err := a.readOPGGPlayerPage(ctx, ref, http.MethodGet, "", nil)
+		entry.err = err
+		if err == nil {
+			profile, parseErr := parseOPGGPlayerPage(data, ref)
+			entry.err = parseErr
+			if parseErr == nil {
+				entry.profileID = profile.puuid
+			}
+		}
+	}
+	for page := 0; entry.err == nil && page < opggGamesMaxPages; page++ {
+		stage = "games-page"
+		games, cursor, err := a.opggFetchGamesPage(ctx, ref, entry.profileID, entry.cursor)
+		pages++
+		if err != nil {
+			entry.err = err
 			break
 		}
-		games = append(games, pageGames...)
-		oldestFetched := pageGames[len(pageGames)-1].createdAt
-		if nextCursor == "" || (oldest > 0 && oldestFetched < oldest) {
+		if cursor != "" && cursor == entry.cursor {
+			entry.err = errors.New("opgg-games-cursor")
 			break
 		}
-		cursor = nextCursor
+		entry.games = append(entry.games, games...)
+		entry.cursor, entry.exhausted = cursor, cursor == ""
+		if len(games) > 0 {
+			entry.coveredOldest = games[len(games)-1].createdAt
+		}
+		if entry.at.IsZero() {
+			entry.at = time.Now()
+		}
+		if entry.exhausted || oldest > 0 && entry.coveredOldest <= oldest {
+			break
+		}
+	}
+	entry.attemptedAt = time.Now()
+	// Restart after a large window instead of retaining an unbounded history
+	// or falsely marking discarded newer rows as covered.
+	if len(entry.games) > 1000 {
+		entry.at = time.Time{}
 	}
 	a.opgg.mu.Lock()
-	if len(games) > 0 {
-		if _, exists := a.opgg.tiers[puuid]; !exists && len(a.opgg.tiers) >= opggTierCacheMax {
-			oldestKey := ""
-			oldestAt := time.Now()
-			for key, entry := range a.opgg.tiers {
-				if entry.at.Before(oldestAt) {
-					oldestAt = entry.at
-					oldestKey = key
-				}
+	if _, exists := a.opgg.tiers[key]; !exists && len(a.opgg.tiers) >= opggTierCacheMax {
+		oldestKey := ""
+		oldestAt := time.Now()
+		for k, v := range a.opgg.tiers {
+			if v.attemptedAt.Before(oldestAt) {
+				oldestAt, oldestKey = v.attemptedAt, k
 			}
-			delete(a.opgg.tiers, oldestKey)
 		}
-		a.opgg.tiers[puuid] = opggTierCacheEntry{at: time.Now(), games: games, coveredOldest: oldest}
+		delete(a.opgg.tiers, oldestKey)
 	}
-	flight := a.opgg.flights[puuid]
-	delete(a.opgg.flights, puuid)
-	if flight != nil {
-		close(flight.done)
-	}
+	a.opgg.tiers[key] = entry
+	flight := a.opgg.flights[key]
+	delete(a.opgg.flights, key)
+	close(flight.done)
 	a.opgg.mu.Unlock()
-	if len(games) == 0 {
-		return stale
+	if entry.err == nil {
+		stage = "complete"
 	}
-	return append([]opggGameTier(nil), games...)
+	return append([]opggGameTier(nil), entry.games...), entry.err
 }
 
 // matchOPGGAverageTier 按时间和时长把一场 Riot 对局映射到 OP.GG 的
@@ -458,7 +511,7 @@ func matchOPGGAverageTier(createdAt, duration int64, games []opggGameTier) *matc
 			best, bestGap = candidate, gap
 		}
 	}
-	if best == nil {
+	if best == nil || best.tier.Tier == "" {
 		return nil
 	}
 	value := best.tier

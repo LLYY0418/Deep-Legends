@@ -1,0 +1,13 @@
+CDP connected
+AssertionError [ERR_ASSERTION]: error restores pre-refresh snapshot
+
+false !== true
+
+    at main (/Users/ly/personal/personal-work/deep-legends/desktop/r98-browser.cjs:83:9) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

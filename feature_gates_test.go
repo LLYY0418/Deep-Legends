@@ -34,3 +34,14 @@ func TestFeatureGateMapsQQ101Host(t *testing.T) {
 		t.Fatal("QQ101 gate override did not apply")
 	}
 }
+
+func TestFeatureGateMapsARAMKitHost(t *testing.T) {
+	if got := featureGateForChampionHost(aramkitRatingHost); got != featureGateAramkit {
+		t.Fatalf("ARAMKit host gate = %q", got)
+	}
+	gates := newFeatureGates()
+	gates.apply(map[string]bool{featureGateAramkit: false})
+	if gates.enabled(featureGateAramkit) {
+		t.Fatal("ARAMKit gate override did not apply")
+	}
+}

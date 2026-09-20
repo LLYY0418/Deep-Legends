@@ -1,0 +1,42 @@
+✔ R91 addendum first partial 429 stays silent and retries after Retry-After (69.169417ms)
+✔ R91 addendum first partial 500 remains visible (8.755958ms)
+✔ R91 addendum first partial 503 remains visible (7.353625ms)
+✔ R91 addendum append 429 stays silent and retries after Retry-After (9.193084ms)
+✔ R91 addendum append 500 remains visible (9.492ms)
+✔ R91 addendum append 503 remains visible (7.785667ms)
+✔ R91 addendum header-only 429 and JSON fallback parse while 503 stays HTTP (8.182208ms)
+✔ R91 addendum stream displays five before completion with exactly one count-20 request (26.161ms)
+✔ R91 addendum streaming append preserves cursor until completion without stalling (11.391375ms)
+✔ R91 addendum stream quota after partial data is silent; a truncated stream is visible (18.974875ms)
+✔ R91 addendum closed, replaced, reset and changed-filter retries cannot issue stale reads (31.932209ms)
+✔ R91 addendum existing history remains readable during polling; new history still skeletons; arena hides rank (1.175416ms)
+✔ R91 addendum facade defaults and missing rank fields agree with controls (0.543458ms)
+✔ R91 addendum unchanged polling preserves roster DOM nodes (8.863125ms)
+✔ R91 addendum Loading and early incomplete arena poll every five seconds then converge (1.65125ms)
+✔ R95 P1 progress preserves career, append=true, noise=null (68.197917ms)
+✔ R95 P1 progress preserves career, append=true, noise=[] (10.007125ms)
+✔ R95 P1 progress preserves career, append=true, noise=undefined (8.899875ms)
+✔ R95 P1 progress preserves career, append=false, noise=null (11.201375ms)
+✔ R95 P1 progress preserves career, append=false, noise=[] (9.110292ms)
+✔ R95 P1 progress preserves career, append=false, noise=undefined (24.613542ms)
+✔ R95 P1 first five and complete explicit empty arrays are authoritative (32.158125ms)
+✔ R95 P2 slow interval/false loading eligibility (15.04375ms)
+✔ R95 P2 slow sse/false loading eligibility (11.126208ms)
+✔ R95 P2 slow event/false loading eligibility (9.15025ms)
+✔ R95 P2 slow manual/true loading eligibility (7.999875ms)
+✔ R95 P2 slow direct/true loading eligibility (8.66925ms)
+✔ R95 P2 slow manual/false loading eligibility (8.522041ms)
+✔ R95 P2 fast 10ms manual response never shows status, including zero-delay timers (7.577125ms)
+✔ R95 P3 both sides only show lock wait for show-then-lock (32.087583ms)
+✔ R95 P4 badge respects mask, secondary and professional click context (18.758042ms)
+✔ R95 P5 exact Chinese titles, unknown fallback, relative time and champselect fired count (0.946583ms)
+✔ R95 P3 typed lock wait targets its own side (14.035375ms)
+✔ R95 P4 match player clicks enter professional context even without directory source (5.820208ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 715.450125

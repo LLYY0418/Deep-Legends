@@ -58,6 +58,9 @@ func TestR88OrdinaryLiveLoadsCacheAndReuseWithoutExtendingTTL(t *testing.T) {
 			identities.Add(1)
 			return response2351(Summoner{PUUID: ref, GameName: "test", SummonerID: 88}), nil
 		}
+		if strings.Contains(r.URL.Path, "/lol-match-history/") {
+			return response2351(map[string]any{"games": map[string]any{"gameCount": 0, "games": []any{}}}), nil
+		}
 		return response2351([]any{}), nil
 	})}}
 	a := &app{liveClientPlayerList: func(context.Context) ([]byte, int, error) { return nil, 0, errors.New("fixture") }}

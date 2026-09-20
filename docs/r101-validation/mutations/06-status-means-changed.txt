@@ -1,0 +1,6 @@
+=== RUN   TestR101BannerProbeReadsBackBeforeClaimingSuccess
+    r101_test.go:196: [map[changed:true error_code: ok:true probe:W6 status:200] map[error_code: ok:true probe:W6-restore restored:true status:200]]
+--- FAIL: TestR101BannerProbeReadsBackBeforeClaimingSuccess (0.00s)
+FAIL
+FAIL	lol-loot-assistant	0.510s
+FAIL

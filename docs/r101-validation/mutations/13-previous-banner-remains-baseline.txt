@@ -1,0 +1,4 @@
+=== RUN   TestR101PreviousBannerActionRemoved
+--- PASS: TestR101PreviousBannerActionRemoved (0.00s)
+PASS
+ok  	lol-loot-assistant	0.509s

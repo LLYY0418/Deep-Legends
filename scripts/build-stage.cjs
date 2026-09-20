@@ -6,7 +6,7 @@ const { constants } = require("node:os");
 
 // Timing only: preserve the command, environment, output and failure status.
 // Never print arguments; build commands may carry private configuration.
-function runStage({ label, command, args = [], intervalMs = 15000, log = console.log }) {
+function runStage({ label, command, args = [], intervalMs = 10000, log = console.error }) {
   const started = performance.now();
   const report = status => log(`[build ${new Date().toISOString()}] ${label}: ${status} (${((performance.now() - started) / 1000).toFixed(1)}s)`);
   report("started");

@@ -1,0 +1,6 @@
+=== RUN   TestR101IconOwnershipParsedFromInventory
+    r101_test.go:260: owned=5099 counts=478/5099 unknown=false
+--- FAIL: TestR101IconOwnershipParsedFromInventory (0.07s)
+FAIL
+FAIL	lol-loot-assistant	0.562s
+FAIL

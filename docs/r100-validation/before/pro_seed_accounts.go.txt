@@ -1,0 +1,93 @@
+package main
+
+import (
+	"context"
+	"strings"
+	"time"
+)
+
+// 人工核对的种子账号。只登记 Riot ID，绝不登记 PUUID：
+// 第三方站点公布的标识互相矛盾，唯一可信来源是自己的 by-riot-id 解析。
+type proSeedAccount struct {
+	TeamCode string
+	Player   string
+	OPGGID   int
+	GameName string
+	TagLine  string
+	Reviewed string
+}
+
+var proSeedAccounts = []proSeedAccount{
+	{TeamCode: "IG", Player: "Rookie", OPGGID: 371, GameName: "모든일은같이", TagLine: "KR1", Reviewed: "2026-09-16"},
+}
+
+func (p *riotProvider) resolveProSeed(ctx context.Context, seed proSeedAccount) (riotAccount, error) {
+	var anchor struct {
+		PUUID string `json:"puuid"`
+	}
+	var initial riotAccount
+	// A background seed must leave the FIFO quickly when foreground quota is busy.
+	ctx = withRiotQueueLimit(ctx, 100*time.Millisecond)
+	err := p.cachedPublicIdentity(ctx, "proseed:v1:"+seed.TeamCode+"/"+strings.ToLower(seed.Player), 30*24*time.Hour, &anchor, func(ctx context.Context) error {
+		account, err := p.accountByRiotID(ctx, seed.GameName, seed.TagLine)
+		if err != nil {
+			return err
+		}
+		anchor.PUUID = account.PUUID
+		initial = account
+		return nil
+	})
+	if err != nil {
+		return riotAccount{}, err
+	}
+	if initial.PUUID != "" {
+		return initial, nil
+	}
+	if anchor.PUUID == "" {
+		return riotAccount{}, errRiotNotFound
+	}
+	return p.fetchAccountByPUUID(ctx, anchor.PUUID)
+}
+
+// Resolve once per directory refresh, then inject the same immutable seed rows
+// into all three publications. Identity/badge reads never initiate HTTP.
+func (a *app) loadProSeeds(ctx context.Context, previous []opggProTeam) []opggProTeam {
+	var rows []opggProTeam
+	for _, seed := range proSeedAccounts {
+		var fallback []opggProAccount
+		for _, team := range previous {
+			if team.ID != seed.OPGGID {
+				continue
+			}
+			for _, member := range team.Members {
+				if member.Nickname == seed.Player {
+					for _, account := range member.Summoners {
+						if account.Source == "seed" {
+							fallback = append(fallback, account)
+						}
+					}
+				}
+			}
+		}
+		accounts := fallback
+		if a.riot != nil && riotKeyConfigured() {
+			seedCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			account, err := a.riot.resolveProSeed(seedCtx, seed)
+			cancel()
+			if err == nil {
+				accounts = []opggProAccount{{PUUID: account.PUUID, GameName: account.GameName, TagLine: account.TagLine, Region: "kr", Source: "seed", UpdatedAt: time.Now().UTC().Format(time.RFC3339)}}
+				if account.GameName != seed.GameName || account.TagLine != seed.TagLine {
+					a.recordDiagnostic(map[string]any{"event": "pro_seed_renamed", "changed": true, "player": seed.Player})
+				}
+			}
+		}
+		if len(accounts) > 0 {
+			rows = append(rows, opggProTeam{ID: seed.OPGGID, ShortName: seed.TeamCode, Members: []opggProMember{{TeamID: seed.OPGGID, Nickname: seed.Player, RealName: "Song Eui-jin", Position: "middle", Authority: "PROGAMER", Summoners: accounts}}})
+		}
+	}
+	return rows
+}
+
+func withProSeed(base []opggProTeam, seeds []opggProTeam) []opggProTeam {
+	return append(cloneProTeams(base), cloneProTeams(seeds)...)
+}

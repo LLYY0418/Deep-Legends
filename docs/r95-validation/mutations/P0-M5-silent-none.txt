@@ -1,0 +1,6 @@
+$ go test -overlay /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r95-mutants-x_hnqccn/overlay.json -count=1 -run TestR95TruthNoneAndRiotSource .
+--- FAIL: TestR95TruthNoneAndRiotSource (0.01s)
+    r95_test.go:150: []
+FAIL
+FAIL	lol-loot-assistant	0.515s
+FAIL

@@ -1,0 +1,5 @@
+--- FAIL: TestR105_SpecialCharacters (0.00s)
+    r105_test.go:73: Canyon spelling/case/space mismatch
+FAIL
+FAIL	lol-loot-assistant	0.487s
+FAIL

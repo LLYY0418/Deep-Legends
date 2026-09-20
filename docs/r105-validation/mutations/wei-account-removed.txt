@@ -1,0 +1,5 @@
+--- FAIL: TestR105_CriticalAccountFixes (0.00s)
+    r105_test.go:59: Wei missing dyjkbysb#KR1
+FAIL
+FAIL	lol-loot-assistant	0.489s
+FAIL

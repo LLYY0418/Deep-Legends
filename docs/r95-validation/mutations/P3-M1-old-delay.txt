@@ -1,0 +1,7 @@
+$ go test -overlay /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r95-mutants-x_hnqccn/overlay.json -count=1 -run TestR95LockStrategiesUseOnlyVisibleWait .
+--- FAIL: TestR95LockStrategiesUseOnlyVisibleWait (0.06s)
+    --- FAIL: TestR95LockStrategiesUseOnlyVisibleWait/lock-now (0.00s)
+        r95_test.go:294: first hover/lock delay must be zero: map[action:champselect-ban action_id:0 availability_source:wildcard-grid-hover champion_id:141 champselect_enabled:true completed:false custom_paused:false delay_ms:2000 diagnostic_schema:3 endpoint:champ-select event:champselect_trace group_id:practice intent:false method:PATCH phase:ChampSelect previous_repeats:0 reason:armed replaced_pending:false requires_hover_confirmation:true session_paused:false session_trace:cs-session-2 stage:schedule timer_phase:BAN_PICK trace_id:cs-write-4 watch_master_enabled:true write_step:hover]
+FAIL
+FAIL	lol-loot-assistant	0.563s
+FAIL

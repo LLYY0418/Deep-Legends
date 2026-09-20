@@ -40,8 +40,8 @@ func Test1110RankedPickUsesOnlyAssignedLaneNotTopFirst(t *testing.T) {
 
 func Test1110ARAMDefaultsAndSavedPreferences(t *testing.T) {
 	settings := defaultChampSelectSettings()
-	if settings.Enabled {
-		t.Fatal("master must remain off")
+	if !settings.Enabled {
+		t.Fatal("R101 fresh master defaults on; side pools remain empty")
 	}
 	for _, definition := range champSelectGroupDefinitions {
 		group := settings.Groups[definition.GroupID]

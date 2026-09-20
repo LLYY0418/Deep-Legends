@@ -1,0 +1,202 @@
+[
+  {
+    "name": "missing-inventory-quadrant",
+    "file": "r99_probe.go",
+    "test": "^TestR99ProbeReadMatrixAndPrivacy$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "automatic-write-probe",
+    "file": "r99_probe.go",
+    "test": "^TestR99ConnectionNeverWritesAndProbesOnce$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "raw-chat-diagnostic",
+    "file": "r99_probe.go",
+    "test": "^TestR99WriteProbeFreshIconAndAccentRestore$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "wrong-accent-restore",
+    "file": "r99_probe.go",
+    "test": "^TestR99WriteProbeFreshIconAndAccentRestore$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "stale-icon-probe",
+    "file": "r99_probe.go",
+    "test": "^TestR99WriteProbeFreshIconAndAccentRestore$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "extra-icon-body-field",
+    "file": "facade_icons.go",
+    "test": "^TestR99IconWriteAccepts201AndRefreshesSnapshot$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "unknown-icon-write",
+    "file": "facade_icons.go",
+    "test": "^TestR99IconRejectsUnknownOrDisabledWithoutWrite$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "missing-icon-reread",
+    "file": "facade_icons.go",
+    "test": "^TestR99IconWriteAccepts201AndRefreshesSnapshot$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "swallowed-identity-event",
+    "file": "connection_manager.go",
+    "test": "^TestR99SummonerEventStillUpdatesIdentity$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "private-icon-projection",
+    "file": "facade_icons.go",
+    "test": "^TestR99IconCatalogProjectionCachingAndClientSwitch$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "client-cache-crossing",
+    "file": "facade_icons.go",
+    "test": "^TestR99IconCatalogProjectionCachingAndClientSwitch$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "rank-crest-overwrite",
+    "file": "facade_icons.go",
+    "test": "^TestR99RankBannerPreservesCrestAndRejectsUnknown$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "seed-zero-ttl",
+    "file": "pro_seed_accounts.go",
+    "test": "^TestR99SeedRenameSurvivesRestartAndTTL$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "seed-old-name-lookup",
+    "file": "pro_seed_accounts.go",
+    "test": "^TestR99SeedRenameSurvivesRestartAndTTL$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "seed-no-budget",
+    "file": "pro_seed_accounts.go",
+    "test": "^TestR99SeedRespectsQuotaBudget$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "seed-missing-partial",
+    "file": "pro_players.go",
+    "test": "^TestR99SeedPresentInEveryPipelinePublication$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "seed-copied-id",
+    "file": "pro_seed_accounts.go",
+    "test": "^TestR99SeedSourceHasNoCopiedStableID$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "seed-lru-evicted",
+    "file": "binary_disk_budget.go",
+    "test": "^TestR99SeedAnchorSurvivesLRUAndHasOnlyStableField$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "modal-theme-not-restored",
+    "file": "web/suite.js",
+    "test": "R99",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "dialog-in-root",
+    "file": "web/suite.js",
+    "test": "R99",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "unsliced-grid",
+    "file": "web/suite.js",
+    "test": "R99",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "inline-style",
+    "file": "web/suite.js",
+    "test": "R99",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "no-aspect-ratio",
+    "file": "web/suite.css",
+    "test": "R99",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "no-block-image",
+    "file": "web/suite.css",
+    "test": "R99",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  },
+  {
+    "name": "quota-identity-path-leak",
+    "file": "riot_api.go",
+    "test": "^TestR99SeedQuotaDiagnosticsNeverContainIdentity$",
+    "baseline": 0,
+    "exit": 1,
+    "killed": true
+  }
+]

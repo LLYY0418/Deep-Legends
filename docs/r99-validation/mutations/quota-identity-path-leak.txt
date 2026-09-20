@@ -1,0 +1,5 @@
+--- FAIL: TestR99SeedQuotaDiagnosticsNeverContainIdentity (0.00s)
+    r99_test.go:642: quota diagnostic leaked SECRET-STABLE-ID
+FAIL
+FAIL	lol-loot-assistant	0.569s
+FAIL

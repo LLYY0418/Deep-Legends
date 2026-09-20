@@ -1,0 +1,26 @@
+=== RUN   TestR100OverviewLongRoundUsesFreshSingleWaitBudget
+--- PASS: TestR100OverviewLongRoundUsesFreshSingleWaitBudget (6.48s)
+=== RUN   TestR100QueueCallersKeepDistinctSemantics
+--- PASS: TestR100QueueCallersKeepDistinctSemantics (0.00s)
+=== RUN   TestR100SuccessfulDetailSurvivesCallerCancellation
+--- PASS: TestR100SuccessfulDetailSurvivesCallerCancellation (0.01s)
+=== RUN   TestR98OverviewQueueBudgetReturnsRateLimit
+--- PASS: TestR98OverviewQueueBudgetReturnsRateLimit (0.00s)
+=== RUN   TestR99SeedRenameSurvivesRestartAndTTL
+--- PASS: TestR99SeedRenameSurvivesRestartAndTTL (0.04s)
+=== RUN   TestR99SeedAnchorSurvivesLRUAndHasOnlyStableField
+--- PASS: TestR99SeedAnchorSurvivesLRUAndHasOnlyStableField (2.61s)
+=== RUN   TestR99SeedAppearsMergesAndNeverLeaks
+--- PASS: TestR99SeedAppearsMergesAndNeverLeaks (0.02s)
+=== RUN   TestR99SeedRespectsQuotaBudget
+--- PASS: TestR99SeedRespectsQuotaBudget (0.00s)
+=== RUN   TestR99SeedSourceHasNoCopiedStableID
+--- PASS: TestR99SeedSourceHasNoCopiedStableID (0.00s)
+=== RUN   TestR99SeedPresentInEveryPipelinePublication
+--- PASS: TestR99SeedPresentInEveryPipelinePublication (0.02s)
+=== RUN   TestR99SeedQuotaDiagnosticsNeverContainIdentity
+--- PASS: TestR99SeedQuotaDiagnosticsNeverContainIdentity (0.00s)
+=== RUN   TestRiotSpecialistQueueLimitReturnsThrottled
+--- PASS: TestRiotSpecialistQueueLimitReturnsThrottled (0.00s)
+PASS
+ok  	lol-loot-assistant	12.682s

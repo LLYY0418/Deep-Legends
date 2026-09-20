@@ -32,10 +32,13 @@ func TestHandleChampionAssetCommunityDragonFallsBackFromLargeToSmall(t *testing.
 	smallImage := []byte("\x89PNG\r\n\x1a\nsmall-image")
 	provider := newChampionProvider()
 	var requested []string
+	var requestedMu sync.Mutex
 	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		requestedMu.Lock()
 		requested = append(requested, request.URL.Path)
+		requestedMu.Unlock()
 		status, body := http.StatusNotFound, []byte("missing")
-		if strings.HasSuffix(request.URL.Path, "_small.png") {
+		if request.URL.Path == "/latest/game/assets/ux/cherry/augments/icons/drop_bear_small.png" {
 			status, body = http.StatusOK, smallImage
 		}
 		return &http.Response{
@@ -54,16 +57,23 @@ func TestHandleChampionAssetCommunityDragonFallsBackFromLargeToSmall(t *testing.
 	if recorder.Code != http.StatusOK || !bytes.Equal(recorder.Body.Bytes(), smallImage) {
 		t.Fatalf("large-to-small response = status %d body %q", recorder.Code, recorder.Body.Bytes())
 	}
-	wantRequests := []string{
-		"/latest/game/assets/ux/cherry/augments/icons/drop_bear_large.png",
-		"/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/drop_bear_large.png",
-		"/latest/game/assets/ux/cherry/augments/icons/drop_bear.png",
-		"/latest/plugins/rcp-be-lol-game-data/global/default/assets/ux/cherry/augments/icons/drop_bear.png",
-		"/latest/game/assets/ux/cherry/augments/icons/drop_bear_small.png",
+	requestedMu.Lock()
+	allowed := communityDragonChampionAssetCandidates("/latest/game/assets/ux/cherry/augments/icons/drop_bear_large.png")
+	for _, request := range requested {
+		found := false
+		for _, candidate := range allowed {
+			if request == candidate {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("unexpected racing candidate: %s", request)
+		}
 	}
-	if !reflect.DeepEqual(requested, wantRequests) {
-		t.Fatalf("CommunityDragon candidate order = %#v, want %#v", requested, wantRequests)
+	if len(requested) > len(allowed) {
+		t.Error("candidate retried")
 	}
+	requestedMu.Unlock()
 	data, err := store.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)

@@ -1,0 +1,96 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"math"
+	"net/http"
+	"time"
+)
+
+// Only the FIFO head sleeps on quota recovery. Followers wait for their own
+// turn, not a shared expiry timer; canceled waiters consume no quota tokens.
+type riotLimitWaiter struct{ turn chan struct{} }
+
+func riotQueueDeadline(ctx context.Context) (time.Time, bool) {
+	deadline, ok := ctx.Deadline()
+	if queued, exists := ctx.Value(riotQueueDeadlineKey{}).(time.Time); exists && (!ok || queued.Before(deadline)) {
+		return queued, true
+	}
+	return deadline, ok
+}
+
+func (p *riotProvider) enterRiotLimitQueue(ctx context.Context) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	started := time.Now()
+	waiter := &riotLimitWaiter{turn: make(chan struct{})}
+	p.limitMu.Lock()
+	p.limitQueue = append(p.limitQueue, waiter)
+	if len(p.limitQueue) == 1 {
+		close(waiter.turn)
+	}
+	p.limitMu.Unlock()
+	release := func() {
+		p.limitMu.Lock()
+		defer p.limitMu.Unlock()
+		for i, queued := range p.limitQueue {
+			if queued == waiter {
+				p.limitQueue = append(p.limitQueue[:i], p.limitQueue[i+1:]...)
+				if i == 0 && len(p.limitQueue) > 0 {
+					close(p.limitQueue[0].turn)
+				}
+				return
+			}
+		}
+	}
+	// No queue delay on the uncontended fast path, even for a long-running HTTP
+	// request whose queue budget has elapsed but which still has free quota.
+	select {
+	case <-waiter.turn:
+		return release, nil
+	default:
+	}
+	defer func() {
+		if tracker := riotOverviewCostTrackerFromContext(ctx); tracker != nil {
+			tracker.mu.Lock()
+			tracker.queueWait += time.Since(started)
+			tracker.mu.Unlock()
+		}
+	}()
+	var deadline <-chan time.Time
+	if at, ok := riotQueueDeadline(ctx); ok {
+		timer := time.NewTimer(time.Until(at))
+		defer timer.Stop()
+		deadline = timer.C
+	}
+	select {
+	case <-waiter.turn:
+		return release, nil
+	case <-ctx.Done():
+		release()
+		return nil, ctx.Err()
+	case <-deadline:
+		release()
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		p.limitMu.Lock()
+		now := time.Now()
+		if p.limitNow != nil {
+			now = p.limitNow()
+		}
+		delay := time.Second
+		if len(p.shortWindow) >= 15 {
+			delay = max(delay, p.shortWindow[0].Add(time.Second).Sub(now))
+		}
+		if len(p.longWindow) >= 90 {
+			delay = max(delay, p.longWindow[0].Add(2*time.Minute).Sub(now))
+		}
+		p.limitMu.Unlock()
+		seconds := int(math.Ceil(delay.Seconds()))
+		riotOverviewCostTrackerFromContext(ctx).recordRateLimit()
+		return nil, fmt.Errorf("%w: %w", errThrottled, &riotStatusError{status: http.StatusTooManyRequests, retryAfter: seconds, message: fmt.Sprintf("韩服查询额度正在恢复，请约 %d 秒后重试；已加载的战绩仍可查看", seconds)})
+	}
+}

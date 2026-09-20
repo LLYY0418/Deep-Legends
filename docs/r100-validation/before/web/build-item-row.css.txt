@@ -1,0 +1,33 @@
+/* Shared horizontal item columns used by champion detail and live recommendations. */
+/* 出装区两侧共用行高：左侧核心装单条路线与右侧第四/第五/第六件每格必须等高。 */
+/* 装备图标保持固定尺寸；空间不足时由深度列换行，不压缩或拆散图标排。 */
+.build-item-row { --build-row-height: 64px; --option-icon-size: 42px; display: grid; min-width: 0; align-items: stretch; grid-template-columns: minmax(0,1.6fr) repeat(3,minmax(0,1fr)); border-top: 1px solid var(--line); }
+.build-item-row[data-depth-count="0"] { grid-template-columns: minmax(0,1fr); }
+.build-item-row[data-depth-count="1"] { grid-template-columns: minmax(0,1.6fr) minmax(0,1fr); }
+.build-item-row[data-depth-count="2"] { grid-template-columns: minmax(0,1.6fr) repeat(2,minmax(0,1fr)); }
+.build-item-row[data-depth-count="3"] { grid-template-columns: minmax(0,1.6fr) repeat(3,minmax(0,1fr)); }
+.build-core-column, .item-core-column, .build-depth-column, .item-depth-columns > section { min-width: 0; padding: 12px 14px; }
+.build-item-row > .item-depth-columns { display: contents; }
+.build-core-column + .build-depth-column, .build-depth-column + .build-depth-column { border-left: 1px solid var(--line); }
+.build-core-column + .item-depth-columns > section:first-child, .item-core-column + .item-depth-columns > section:first-child, .item-depth-columns > section + section { border-left: 1px solid var(--line); border-top: 0; }
+.build-core-column h4, .item-core-column h3, .build-depth-column h4, .item-depth-columns > section h4 { min-height: 18px; margin: 0 0 10px; color: var(--ink); font-size: 13px; font-weight: 700; line-height: 18px; }
+
+@container (max-width: 980px) {
+  .build-item-row,
+  .build-item-row[data-depth-count="1"],
+  .build-item-row[data-depth-count="2"],
+  .build-item-row[data-depth-count="3"] { grid-template-columns: minmax(0,1fr); }
+  .build-item-row > .item-depth-columns { display: grid; min-width: 0; grid-template-columns: repeat(2,minmax(0,1fr)); border-top: 1px solid var(--line); }
+  .build-core-column + .item-depth-columns > section:first-child, .item-core-column + .item-depth-columns > section:first-child { border-left: 0; }
+}
+
+@container (max-width: 760px) {
+  .build-item-row > .item-depth-columns { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .item-depth-columns > section:nth-child(odd) { border-left: 0; }
+  .item-depth-columns > section:nth-child(n+3) { border-top: 1px solid var(--line); }
+}
+
+@container (max-width: 500px) {
+  .build-item-row > .item-depth-columns { grid-template-columns: minmax(0,1fr); }
+  .item-depth-columns > section + section { border-top: 1px solid var(--line); border-left: 0; }
+}

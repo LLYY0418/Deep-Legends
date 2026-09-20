@@ -132,28 +132,87 @@ func shouldRefreshForLCUEvent(event LCUEvent) bool {
 	return lcuEventRefreshScope(event) != ""
 }
 
-func lcuEventRefreshScope(event LCUEvent) string {
-	uri := strings.ToLower(event.URI)
-	if strings.HasPrefix(uri, "/lol-champ-select/v1/session") {
-		return "champselect"
+// URI services and prefixes are ASCII. Fold only the compared bytes; the usual
+// lowercase path needs neither a copy nor a scan of an unrelated suffix. Keep
+// the old Unicode ToLower semantics on the rare non-ASCII comparison path.
+func lcuPrefixFold(uri, prefix string) bool {
+	if strings.HasPrefix(uri, prefix) {
+		return true
 	}
-	for _, prefix := range []string{
-		"/lol-champions/v1/inventories/",
-		"/lol-champion-mastery/",
-		"/lol-inventory/",
-	} {
-		if strings.HasPrefix(uri, prefix) {
-			return "collection"
+	for i := 0; i < len(prefix); i++ {
+		if i >= len(uri) {
+			return false
+		}
+		c := uri[i]
+		if c >= 0x80 {
+			return strings.HasPrefix(strings.ToLower(uri), prefix)
+		}
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		if c != prefix[i] {
+			return false
 		}
 	}
-	if strings.HasPrefix(uri, "/lol-summoner/v1/current-summoner/summoner-profile") {
-		return "summoner-profile"
+	return true
+}
+
+func lcuEventRefreshScope(event LCUEvent) string {
+	uri := event.URI
+	if len(uri) == 0 || uri[0] != '/' {
+		return ""
 	}
-	if strings.HasPrefix(uri, "/lol-summoner/v1/current-summoner") {
-		return "summoner"
+	end := strings.IndexByte(uri[1:], '/')
+	if end < 0 {
+		return ""
 	}
-	for _, prefix := range []string{"/lol-loot/v1/player-loot-map", "/lol-rewards/v1/grants"} {
-		if strings.HasPrefix(uri, prefix) {
+	service := uri[:end+2]
+	// Fold a bounded first segment on the stack, instead of lowercasing the URI.
+	var folded [64]byte
+	if len(service) > len(folded) {
+		return ""
+	}
+	ascii := true
+	for i := range len(service) {
+		c := service[i]
+		if c >= 0x80 {
+			ascii = false
+			break
+		}
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		folded[i] = c
+	}
+	if ascii {
+		service = string(folded[:len(service)])
+	} else {
+		service = strings.ToLower(service)
+	}
+	switch service {
+	case "/lol-champ-select/":
+		if lcuPrefixFold(uri, "/lol-champ-select/v1/session") {
+			return "champselect"
+		}
+	case "/lol-champions/":
+		if lcuPrefixFold(uri, "/lol-champions/v1/inventories/") {
+			return "collection"
+		}
+	case "/lol-champion-mastery/", "/lol-inventory/":
+		return "collection"
+	case "/lol-summoner/":
+		if lcuPrefixFold(uri, "/lol-summoner/v1/current-summoner/summoner-profile") {
+			return "summoner-profile"
+		}
+		if lcuPrefixFold(uri, "/lol-summoner/v1/current-summoner") {
+			return "summoner"
+		}
+	case "/lol-loot/":
+		if lcuPrefixFold(uri, "/lol-loot/v1/player-loot-map") {
+			return "account"
+		}
+	case "/lol-rewards/":
+		if lcuPrefixFold(uri, "/lol-rewards/v1/grants") {
 			return "account"
 		}
 	}

@@ -1,0 +1,10 @@
+{
+  "version": "0.12.3",
+  "sourceFingerprint": "92c3a70c3cd4",
+  "receiptVerified": true,
+  "size": 103399424,
+  "sha256": "205829aed277f2f40ba102a6497c191c1dd04742da99e37dcaecdbc677693626",
+  "installer": "/Users/ly/personal/personal-work/deep-legends/dist/desktop/Deep Legends Setup 0.12.3.exe",
+  "backendSHA256": "6fd7103249b2a6b545ab4c928a0f0ee5f527f276563ee426b9950956a494fd1f",
+  "buildMode": "private"
+}

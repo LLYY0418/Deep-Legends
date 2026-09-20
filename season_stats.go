@@ -262,7 +262,7 @@ func seasonRankedAbilitySideFor(info *riotMatchInfo, participant riotParticipant
 // 缺少位置或时长时返回 nil——没有对位就没有基线，宁可这一场不参与统计。
 func seasonRankedAbilitySampleFor(info *riotMatchInfo, participant riotParticipant, position string) *seasonRankedAbilitySample {
 	duration := riotMatchDurationSeconds(info)
-	if position == "" || position == "other" || duration <= 0 {
+	if !abilityPositionKnown(position) || duration <= 0 {
 		return nil
 	}
 	sample := &seasonRankedAbilitySample{Duration: duration, Player: seasonRankedAbilitySideFor(info, participant)}
@@ -277,9 +277,11 @@ func seasonRankedAbilitySampleFor(info *riotMatchInfo, participant riotParticipa
 		if candidatePosition != position {
 			continue
 		}
+		if sample.Opponent != nil {
+			return nil
+		}
 		opponent := seasonRankedAbilitySideFor(info, candidate)
 		sample.Opponent = &opponent
-		break
 	}
 	return sample
 }

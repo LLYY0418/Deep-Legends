@@ -31,6 +31,12 @@ func TestSupportedQueueDefinitionsMatchCanonicalGroups(t *testing.T) {
 		{1300, "极限闪击", "nexus-blitz", "more:nexus-blitz", "nexus-blitz", 0},
 		{1700, "斗魂竞技场", "arena", "arena", "arena", 2},
 		{1710, "斗魂竞技场", "arena", "arena", "arena", 2},
+		{1701, "斗魂竞技场（单人训练）", "arena", "arena", "arena", 1},
+		{1704, "斗魂竞技场（双人测试）", "arena", "arena", "arena", 2},
+		{1720, "斗魂竞技场", "arena", "arena", "arena", 2},
+		{1731, "斗魂竞技场（单人训练）", "arena", "arena", "arena", 1},
+		{1732, "斗魂竞技场（单人训练）", "arena", "arena", "arena", 1},
+		{1740, "勇气斗魂", "arena", "arena", "arena", 2},
 		{1750, "斗魂竞技场", "arena", "arena", "arena", 3},
 		{1900, "无限火力", "urf", "more:urf", "urf", 0},
 		{2300, "海克斯大乱斗", "hextech-aram", "hextech-aram", "hextech-aram", 0},
@@ -87,7 +93,7 @@ func TestMatchHistoryFilterSpecsUseDocumentedSGPTags(t *testing.T) {
 		{"more:nexus-blitz", "q_1300"},
 		{"more:doombots", "q_950,q_960"},
 		{"hextech-aram", "q_2300,q_2400,q_3270"},
-		{"arena", "q_1700,q_1710,q_1750"},
+		{"arena", "q_1700,q_1701,q_1704,q_1710,q_1720,q_1731,q_1732,q_1740,q_1750"},
 		{"ranked", "ranked"},
 	}
 	for _, test := range tests {

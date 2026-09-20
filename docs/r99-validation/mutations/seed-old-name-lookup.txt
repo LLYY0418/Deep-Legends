@@ -1,0 +1,5 @@
+--- FAIL: TestR99SeedRenameSurvivesRestartAndTTL (0.02s)
+    r99_test.go:375: restart={PUUID: GameName: TagLine:} 无法连接 Riot 官方接口（可在设置中调整“英雄数据网络”代理）：Get "https://asia.api.riotgames.com/riot/account/v1/accounts/by-riot-id/%EB%AA%A8%EB%93%A0%EC%9D%BC%EC%9D%80%EA%B0%99%EC%9D%B4/KR1": old name no longer exists name=2 stable=0
+FAIL
+FAIL	lol-loot-assistant	0.570s
+FAIL

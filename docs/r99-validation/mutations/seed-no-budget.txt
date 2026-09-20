@@ -1,0 +1,5 @@
+--- FAIL: TestR99SeedRespectsQuotaBudget (0.00s)
+    r99_test.go:456: seed waited beyond queue budget
+FAIL
+FAIL	lol-loot-assistant	0.534s
+FAIL

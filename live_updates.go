@@ -40,6 +40,7 @@ func (a *app) handleAccount(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (a *app) handleEvents(w http.ResponseWriter, r *http.Request) {
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "event streaming unavailable", http.StatusInternalServerError)

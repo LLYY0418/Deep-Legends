@@ -1,0 +1,5 @@
+--- FAIL: TestR99ConnectionNeverWritesAndProbesOnce (0.01s)
+    r99_test.go:91: writes=1 probes=1
+FAIL
+FAIL	lol-loot-assistant	0.553s
+FAIL

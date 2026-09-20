@@ -1,0 +1,6 @@
+--- FAIL: TestR105_SuccessStatusWithoutChangeIsNotSuccess (0.00s)
+    --- FAIL: TestR105_SuccessStatusWithoutChangeIsNotSuccess/icon (0.00s)
+        r105_test.go:317: no-op accepted: writes=1 err=summoner identity belongs to an inactive client session
+FAIL
+FAIL	lol-loot-assistant	0.495s
+FAIL

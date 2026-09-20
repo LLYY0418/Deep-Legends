@@ -1,0 +1,6 @@
+--- FAIL: TestR105_CriticalAccountFixes (0.00s)
+    r105_test.go:59: Rookie missing 벼락식혜#0070
+    r105_test.go:59: Rookie missing EmberKnight#KR0
+FAIL
+FAIL	lol-loot-assistant	0.492s
+FAIL

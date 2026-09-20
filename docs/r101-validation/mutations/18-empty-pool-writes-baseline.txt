@@ -1,0 +1,20 @@
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/normalban
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/normalpick
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/rankedban
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/rankedpick
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/aramban
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/arampick
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/arenaban
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/arenapick
+--- PASS: TestR101EnabledWithEmptySequencesSendsNothing (0.43s)
+    --- PASS: TestR101EnabledWithEmptySequencesSendsNothing/normalban (0.05s)
+    --- PASS: TestR101EnabledWithEmptySequencesSendsNothing/normalpick (0.05s)
+    --- PASS: TestR101EnabledWithEmptySequencesSendsNothing/rankedban (0.05s)
+    --- PASS: TestR101EnabledWithEmptySequencesSendsNothing/rankedpick (0.05s)
+    --- PASS: TestR101EnabledWithEmptySequencesSendsNothing/aramban (0.05s)
+    --- PASS: TestR101EnabledWithEmptySequencesSendsNothing/arampick (0.05s)
+    --- PASS: TestR101EnabledWithEmptySequencesSendsNothing/arenaban (0.05s)
+    --- PASS: TestR101EnabledWithEmptySequencesSendsNothing/arenapick (0.05s)
+PASS
+ok  	lol-loot-assistant	0.873s

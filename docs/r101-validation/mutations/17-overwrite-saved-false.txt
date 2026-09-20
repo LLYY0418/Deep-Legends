@@ -1,0 +1,6 @@
+=== RUN   TestR101ExistingProfileKeepsItsOwnSetting
+    r101_test.go:351: saved false overwritten
+--- FAIL: TestR101ExistingProfileKeepsItsOwnSetting (0.00s)
+FAIL
+FAIL	lol-loot-assistant	0.525s
+FAIL

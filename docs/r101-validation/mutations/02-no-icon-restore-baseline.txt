@@ -1,0 +1,10 @@
+=== RUN   TestR101IconProbeRestoresOnFailure
+=== RUN   TestR101IconProbeRestoresOnFailure/{401_false}
+=== RUN   TestR101IconProbeRestoresOnFailure/{500_false}
+=== RUN   TestR101IconProbeRestoresOnFailure/{500_true}
+--- PASS: TestR101IconProbeRestoresOnFailure (0.08s)
+    --- PASS: TestR101IconProbeRestoresOnFailure/{401_false} (0.01s)
+    --- PASS: TestR101IconProbeRestoresOnFailure/{500_false} (0.01s)
+    --- PASS: TestR101IconProbeRestoresOnFailure/{500_true} (0.07s)
+PASS
+ok  	lol-loot-assistant	0.518s

@@ -1,0 +1,14 @@
+=== RUN   TestGameplayPerkStylesAcceptClientWrapperAndBareArray
+=== RUN   TestGameplayPerkStylesAcceptClientWrapperAndBareArray/wrapped
+=== RUN   TestGameplayPerkStylesAcceptClientWrapperAndBareArray/array
+=== RUN   TestGameplayPerkStylesAcceptClientWrapperAndBareArray/objects
+--- PASS: TestGameplayPerkStylesAcceptClientWrapperAndBareArray (0.00s)
+    --- PASS: TestGameplayPerkStylesAcceptClientWrapperAndBareArray/wrapped (0.00s)
+    --- PASS: TestGameplayPerkStylesAcceptClientWrapperAndBareArray/array (0.00s)
+    --- PASS: TestGameplayPerkStylesAcceptClientWrapperAndBareArray/objects (0.00s)
+=== RUN   TestGameplayPerkCatalogCachesLCUFiles
+--- PASS: TestGameplayPerkCatalogCachesLCUFiles (0.00s)
+=== RUN   TestR100PerksNeverWaitForOptionalAugmentsAndPersist
+--- PASS: TestR100PerksNeverWaitForOptionalAugmentsAndPersist (3.02s)
+PASS
+ok  	lol-loot-assistant	4.129s

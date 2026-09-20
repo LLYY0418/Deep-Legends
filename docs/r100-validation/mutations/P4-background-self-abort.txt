@@ -1,0 +1,30 @@
+✔ R100 progress updates ready profile fields but null and empty never wipe career (66.093083ms)
+✖ R100 historical enrichment defers while foreground overview is in flight (0.905625ms)
+✔ R100 image admission covers lazy DOM images and detached prefetch without same-URL retries (13.301667ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 414.670042
+
+✖ failing tests:
+
+test at web/r100.test.cjs:28:1
+✖ R100 historical enrichment defers while foreground overview is in flight (0.905625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r100.test.cjs:34:9)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

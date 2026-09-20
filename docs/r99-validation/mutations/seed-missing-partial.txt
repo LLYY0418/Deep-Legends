@@ -1,0 +1,5 @@
+--- FAIL: TestR99SeedPresentInEveryPipelinePublication (0.03s)
+    r99_test.go:544: partial publication lost seed
+FAIL
+FAIL	lol-loot-assistant	0.556s
+FAIL

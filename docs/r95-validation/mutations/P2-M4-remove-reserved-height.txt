@@ -1,0 +1,15 @@
+$ node desktop/r95-browser.cjs
+CDP connected
+{"section":"live","live":true,"html":"<div data-live-status=\"\"></div><div data-live-body=\"\"><section class=\"recommendation-area\"><div class=\"recommendation-tab-row\"><div class=\"recommendation-tabs\" role=\"tablist\" aria-label=\"推荐类型\"><button type=\"button\" role=\"tab\" id=\"recommendation-tab-runes\" aria-controls=\"recommendation-panel-runes\" a"}
+AssertionError [ERR_ASSERTION]: R95 body top changed during 3-second cycle
+
+46 !== 0
+
+    at main (/Users/ly/personal/personal-work/deep-legends/desktop/r95-browser.cjs:60:160) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 46,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

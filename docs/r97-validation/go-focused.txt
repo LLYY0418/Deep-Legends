@@ -1,0 +1,161 @@
+=== RUN   TestPromotionChestUsesRequestedChineseName
+--- PASS: TestPromotionChestUsesRequestedChineseName (0.00s)
+=== RUN   TestProSupplementIdentityAllKRAccountsAndRank
+--- PASS: TestProSupplementIdentityAllKRAccountsAndRank (0.00s)
+=== RUN   TestProSupplementFailureDoesNotEraseOPGG
+--- PASS: TestProSupplementFailureDoesNotEraseOPGG (0.00s)
+=== RUN   TestProCapturedSupplements
+    pro_players_supplement_test.go:71: set PRO_PLAYERS_SUPPLEMENT_CAPTURE to directory containing locally captured identity HTML
+--- SKIP: TestProCapturedSupplements (0.00s)
+=== RUN   TestProIdentityGraphDeduplicatesRenameChainsAndTransitiveConflicts
+--- PASS: TestProIdentityGraphDeduplicatesRenameChainsAndTransitiveConflicts (0.00s)
+=== RUN   TestProSupplementRetainsOnlyBoundedIdentitySnapshot
+--- PASS: TestProSupplementRetainsOnlyBoundedIdentitySnapshot (0.00s)
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttps://op.gg:8443/
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttps://example.com/
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttp://op.gg/
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttps://op.gg/other
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttps://op.gg/zh-cn/lol/spectate/list/pro-gamer?region=na
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttps://www.trackingthepros.com/player/Other
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttps://www.trackingthepros.com:8443/player/TheShy
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttps://op.gg:8443/
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttps://example.com/
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttp://op.gg/
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttps://op.gg/other
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttps://op.gg/zh-cn/lol/spectate/list/pro-gamer?region=na
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttps://www.trackingthepros.com/player/Other
+=== RUN   TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttps://www.trackingthepros.com:8443/player/TheShy
+--- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttps://op.gg:8443/ (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttps://example.com/ (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttp://op.gg/ (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttps://op.gg/other (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttps://op.gg/zh-cn/lol/spectate/list/pro-gamer?region=na (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttps://www.trackingthepros.com/player/Other (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/directoryhttps://www.trackingthepros.com:8443/player/TheShy (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttps://op.gg:8443/ (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttps://example.com/ (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttp://op.gg/ (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttps://op.gg/other (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttps://op.gg/zh-cn/lol/spectate/list/pro-gamer?region=na (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttps://www.trackingthepros.com/player/Other (0.00s)
+    --- PASS: TestProPublicFetchRejectsUnsafeRedirectsAndCookies/supplementhttps://www.trackingthepros.com:8443/player/TheShy (0.00s)
+=== RUN   TestProDirectoryParsesAllFlightRecordsAndRequiresKR
+--- PASS: TestProDirectoryParsesAllFlightRecordsAndRequiresKR (0.00s)
+=== RUN   TestProRosterIdentityMergeExcludesAcademyCoachesHistoricalAndCollisions
+--- PASS: TestProRosterIdentityMergeExcludesAcademyCoachesHistoricalAndCollisions (0.00s)
+=== RUN   TestProAccountRankingAndMissingRank
+--- PASS: TestProAccountRankingAndMissingRank (0.00s)
+=== RUN   TestProCacheSingleflightRefreshBackoffAndStale
+--- PASS: TestProCacheSingleflightRefreshBackoffAndStale (0.02s)
+=== RUN   TestProDirectoryPublishesBeforeSlowSupplements
+--- PASS: TestProDirectoryPublishesBeforeSlowSupplements (0.00s)
+=== RUN   TestProDirectoryFailureRetainsRosterAndAuth
+--- PASS: TestProDirectoryFailureRetainsRosterAndAuth (0.00s)
+=== RUN   TestProCapturedDirectory
+    pro_players_test.go:377: set PRO_PLAYERS_CAPTURE to a locally captured OP.GG KR HTML file
+--- SKIP: TestProCapturedDirectory (0.00s)
+=== RUN   TestProCapturedLadder
+    pro_players_test.go:407: set PRO_LADDER_CAPTURE, PRO_LADDER_GAME_NAME and PRO_LADDER_TAG_LINE to a local OP.GG leaderboard capture
+--- SKIP: TestProCapturedLadder (0.00s)
+=== RUN   TestR97ProAccountOptionalRegionSurvivesKRDirectory
+=== RUN   TestR97ProAccountOptionalRegionSurvivesKRDirectory/null
+=== RUN   TestR97ProAccountOptionalRegionSurvivesKRDirectory/missing
+=== RUN   TestR97ProAccountOptionalRegionSurvivesKRDirectory/empty
+=== RUN   TestR97ProAccountOptionalRegionSurvivesKRDirectory/whitespace
+=== RUN   TestR97ProAccountOptionalRegionSurvivesKRDirectory/KR
+=== RUN   TestR97ProAccountOptionalRegionSurvivesKRDirectory/non-KR
+--- PASS: TestR97ProAccountOptionalRegionSurvivesKRDirectory (0.00s)
+    --- PASS: TestR97ProAccountOptionalRegionSurvivesKRDirectory/null (0.00s)
+    --- PASS: TestR97ProAccountOptionalRegionSurvivesKRDirectory/missing (0.00s)
+    --- PASS: TestR97ProAccountOptionalRegionSurvivesKRDirectory/empty (0.00s)
+    --- PASS: TestR97ProAccountOptionalRegionSurvivesKRDirectory/whitespace (0.00s)
+    --- PASS: TestR97ProAccountOptionalRegionSurvivesKRDirectory/KR (0.00s)
+    --- PASS: TestR97ProAccountOptionalRegionSurvivesKRDirectory/non-KR (0.00s)
+=== RUN   TestR97ManagementAndBadgesShareReviewedSixTeams
+--- PASS: TestR97ManagementAndBadgesShareReviewedSixTeams (0.00s)
+=== RUN   TestProRuneLiveCaptureReplay
+    pro_runes_live_test.go:22: set R75_CAPTURE to the public capture directory
+--- SKIP: TestProRuneLiveCaptureReplay (0.00s)
+=== RUN   TestProRuneLiveSupplementLatency
+    pro_runes_live_test.go:126: set R75_LIVE=1 for public network requests
+--- SKIP: TestProRuneLiveSupplementLatency (0.00s)
+=== RUN   TestProRuneLiveIndex
+    pro_runes_live_test.go:193: set R75_LIVE=1 for public index validation
+--- SKIP: TestProRuneLiveIndex (0.00s)
+=== RUN   TestProRuneWhiteLists
+--- PASS: TestProRuneWhiteLists (0.00s)
+=== RUN   TestProRuneExactIdentityAndPersistentMapping
+--- PASS: TestProRuneExactIdentityAndPersistentMapping (0.24s)
+=== RUN   TestProRuneNewestAndShards
+--- PASS: TestProRuneNewestAndShards (0.00s)
+=== RUN   TestProRuneWinnerConstraints
+--- PASS: TestProRuneWinnerConstraints (0.00s)
+=== RUN   TestProRunePublicTransportAndAlignedSupplement
+--- PASS: TestProRunePublicTransportAndAlignedSupplement (0.08s)
+=== RUN   TestProRuneColdIndexNonblockingAndConcurrency
+--- PASS: TestProRuneColdIndexNonblockingAndConcurrency (0.00s)
+=== RUN   TestProRuneRecommendationUnknownRecordAndOffline
+--- PASS: TestProRuneRecommendationUnknownRecordAndOffline (0.00s)
+=== RUN   TestProRuneCapturedAllSeries
+    pro_runes_test.go:332: R75 official capture: indexed=104 unknown=4 missing=1 rejected=0 unknown-rate=3.85%
+--- PASS: TestProRuneCapturedAllSeries (0.01s)
+=== RUN   TestProRuneCapturedLivestatsSides
+--- PASS: TestProRuneCapturedLivestatsSides (0.01s)
+=== RUN   TestProRuneHandlerValidation
+--- PASS: TestProRuneHandlerValidation (0.00s)
+=== RUN   TestProRuneOpponentCatalogFailureIsBounded
+--- PASS: TestProRuneOpponentCatalogFailureIsBounded (0.00s)
+=== RUN   TestProRuneCacheWriteFailureRemainsVisible
+--- PASS: TestProRuneCacheWriteFailureRemainsVisible (0.00s)
+=== RUN   TestProRuneIndexGameRejectsLivestatsTeamMismatch
+=== RUN   TestProRuneIndexGameRejectsLivestatsTeamMismatch/valid
+=== RUN   TestProRuneIndexGameRejectsLivestatsTeamMismatch/valid_reversed
+=== RUN   TestProRuneIndexGameRejectsLivestatsTeamMismatch/unrelated_blue
+=== RUN   TestProRuneIndexGameRejectsLivestatsTeamMismatch/unrelated_red
+=== RUN   TestProRuneIndexGameRejectsLivestatsTeamMismatch/same_A
+=== RUN   TestProRuneIndexGameRejectsLivestatsTeamMismatch/same_B
+--- PASS: TestProRuneIndexGameRejectsLivestatsTeamMismatch (0.00s)
+    --- PASS: TestProRuneIndexGameRejectsLivestatsTeamMismatch/valid (0.00s)
+    --- PASS: TestProRuneIndexGameRejectsLivestatsTeamMismatch/valid_reversed (0.00s)
+    --- PASS: TestProRuneIndexGameRejectsLivestatsTeamMismatch/unrelated_blue (0.00s)
+    --- PASS: TestProRuneIndexGameRejectsLivestatsTeamMismatch/unrelated_red (0.00s)
+    --- PASS: TestProRuneIndexGameRejectsLivestatsTeamMismatch/same_A (0.00s)
+    --- PASS: TestProRuneIndexGameRejectsLivestatsTeamMismatch/same_B (0.00s)
+=== RUN   TestProRunePartialFailureCounts
+=== RUN   TestProRunePartialFailureCounts/1-of-99
+=== RUN   TestProRunePartialFailureCounts/10-of-30
+=== RUN   TestProRunePartialFailureCounts/1-of-10
+=== RUN   TestProRunePartialFailureCounts/0-of-0
+--- PASS: TestProRunePartialFailureCounts (0.05s)
+    --- PASS: TestProRunePartialFailureCounts/1-of-99 (0.03s)
+    --- PASS: TestProRunePartialFailureCounts/10-of-30 (0.02s)
+    --- PASS: TestProRunePartialFailureCounts/1-of-10 (0.00s)
+    --- PASS: TestProRunePartialFailureCounts/0-of-0 (0.00s)
+=== RUN   TestProRuneFailureCountsDeduplicateDetailAndTerminal
+--- PASS: TestProRuneFailureCountsDeduplicateDetailAndTerminal (0.00s)
+=== RUN   TestProRuneFailureCountsAcrossIndexTerminalAndDetail
+--- PASS: TestProRuneFailureCountsAcrossIndexTerminalAndDetail (0.01s)
+=== RUN   TestProRunePerPlayerLimitAndStrictPosition
+--- PASS: TestProRunePerPlayerLimitAndStrictPosition (0.00s)
+=== RUN   TestProRuneMultiPlayerRecommendationKeepsFullRecord
+--- PASS: TestProRuneMultiPlayerRecommendationKeepsFullRecord (0.00s)
+=== RUN   TestProHitParallelProcessesAllSelectedGames
+--- PASS: TestProHitParallelProcessesAllSelectedGames (0.01s)
+=== RUN   TestProBackgroundWorkersLeaveForegroundSlot
+--- PASS: TestProBackgroundWorkersLeaveForegroundSlot (0.02s)
+=== RUN   TestR95ProExactIdentityPrivacyAndNoFetch
+--- PASS: TestR95ProExactIdentityPrivacyAndNoFetch (0.00s)
+=== RUN   TestR95ProDirectoryBadgeConsistencyAndConflict
+--- PASS: TestR95ProDirectoryBadgeConsistencyAndConflict (0.00s)
+=== RUN   TestProviderTransportPoolsReuseEightConnections
+=== RUN   TestProviderTransportPoolsReuseEightConnections/champion
+=== RUN   TestProviderTransportPoolsReuseEightConnections/sgp
+=== RUN   TestProviderTransportPoolsReuseEightConnections/lcu
+--- PASS: TestProviderTransportPoolsReuseEightConnections (0.03s)
+    --- PASS: TestProviderTransportPoolsReuseEightConnections/champion (0.02s)
+    --- PASS: TestProviderTransportPoolsReuseEightConnections/sgp (0.01s)
+    --- PASS: TestProviderTransportPoolsReuseEightConnections/lcu (0.01s)
+PASS
+ok  	lol-loot-assistant	1.985s

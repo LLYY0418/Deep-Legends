@@ -1,0 +1,6 @@
+=== RUN   TestR100PerksNeverWaitForOptionalAugmentsAndPersist
+    r100_test.go:200: perks waited for augments 200 3.01230875s
+--- FAIL: TestR100PerksNeverWaitForOptionalAugmentsAndPersist (3.01s)
+FAIL
+FAIL	lol-loot-assistant	3.485s
+FAIL

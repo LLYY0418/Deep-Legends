@@ -1,0 +1,14 @@
+=== RUN   TestR101BannerProbeAlwaysRestores
+=== RUN   TestR101BannerProbeAlwaysRestores/ok
+=== RUN   TestR101BannerProbeAlwaysRestores/noop
+=== RUN   TestR101BannerProbeAlwaysRestores/reject
+=== RUN   TestR101BannerProbeAlwaysRestores/read-error
+=== RUN   TestR101BannerProbeAlwaysRestores/cancel
+--- PASS: TestR101BannerProbeAlwaysRestores (0.01s)
+    --- PASS: TestR101BannerProbeAlwaysRestores/ok (0.00s)
+    --- PASS: TestR101BannerProbeAlwaysRestores/noop (0.00s)
+    --- PASS: TestR101BannerProbeAlwaysRestores/reject (0.00s)
+    --- PASS: TestR101BannerProbeAlwaysRestores/read-error (0.00s)
+    --- PASS: TestR101BannerProbeAlwaysRestores/cancel (0.00s)
+PASS
+ok  	lol-loot-assistant	0.432s

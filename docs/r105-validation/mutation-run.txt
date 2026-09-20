@@ -1,0 +1,13 @@
+wei-account-removed KILLED
+rookie-new-accounts-removed KILLED
+total-reduced-to-52 KILLED
+canyon-uppercase-i KILLED
+icon-ownership-gate-restored KILLED
+icon-put-removed KILLED
+banner-ownership-gate-restored KILLED
+banner-data-discarded KILLED
+banner-patch-removed KILLED
+old-snapshot-bypasses-reviewed-list KILLED
+reviewed-dormant-accounts-hidden KILLED
+banner-opaque-number-rounded KILLED
+icon-readback-guard-removed KILLED

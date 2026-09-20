@@ -1,0 +1,84 @@
+{
+  "baseline": true,
+  "scope": "adopted R115 changes only; deferred sections are not claimed tested",
+  "mutations": [
+    {
+      "id": "route-case",
+      "file": "lcu_events.go",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "route-session",
+      "file": "lcu_events.go",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "singleflight",
+      "file": "asset_cache.go",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "broadcast-default",
+      "file": "watch_rules.go",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "broadcast-visibility",
+      "file": "watch_rules.go",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "broadcast-safe-id",
+      "file": "watch_rules.go",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "broadcast-pause",
+      "file": "watch_rules.go",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "broadcast-retry",
+      "file": "watch_rules.go",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "broadcast-double",
+      "file": "watch_rules.go",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "lineup-self",
+      "file": "watch_broadcast.go",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "load-dedup",
+      "file": "web/section-loader.js",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "load-failure",
+      "file": "web/section-loader.js",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "load-stale",
+      "file": "web/section-loader.js",
+      "killed": true,
+      "exitCode": 1
+    }
+  ]
+}

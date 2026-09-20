@@ -3,6 +3,7 @@ package main
 import (
 	"container/list"
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,42 +31,49 @@ type overviewQueryFlight struct {
 	err      error
 }
 
-func riotOverviewQuerySnapshotKey(reference gameplayReference, begIndex, count int) string {
+func riotOverviewQuerySnapshotKey(reference gameplayReference, begIndex, count int, filters ...string) string {
 	identity := strings.TrimSpace(reference.PlayerRef)
 	if identity == "" {
 		identity = strings.ToLower(strings.TrimSpace(reference.GameName)) + "#" + strings.ToLower(strings.TrimSpace(reference.TagLine))
 	}
-	return sourceScopedKey(dataSourceRiot, strings.Join([]string{identity, strconv.Itoa(begIndex), strconv.Itoa(count), strings.ToUpper(strings.TrimSpace(reference.Privacy))}, "|"))
+	return sourceScopedKey(dataSourceRiot, strings.Join([]string{identity, strconv.Itoa(begIndex), strconv.Itoa(count), riotOverviewFilter(filters), strings.ToUpper(strings.TrimSpace(reference.Privacy))}, "|"))
 }
 
-func (a *app) loadRiotOverviewDeduplicated(ctx context.Context, reference gameplayReference, begIndex, count int, force bool) (gameplayOverview, error) {
-	if force || a.overviewQueries == nil {
-		return a.loadRiotOverview(ctx, reference, begIndex, count)
+func (a *app) loadRiotOverviewDeduplicated(ctx context.Context, reference gameplayReference, begIndex, count int, force bool, filters ...string) (gameplayOverview, error) {
+	if a.overviewQueries == nil {
+		return a.loadRiotOverview(ctx, reference, begIndex, count, filters...)
 	}
-	key := riotOverviewQuerySnapshotKey(reference, begIndex, count)
-	a.overviewQueries.mu.Lock()
-	if cached, ok := a.overviewQueries.getLocked(key, time.Now()); ok {
-		response := cached.response
-		a.overviewQueries.mu.Unlock()
-		return response, nil
-	}
-	if flight := a.overviewQueries.flights[key]; flight != nil {
-		done := flight.done
-		a.overviewQueries.mu.Unlock()
-		select {
-		case <-done:
-			return flight.response, flight.err
-		case <-ctx.Done():
-			return gameplayOverview{}, ctx.Err()
+	key := riotOverviewQuerySnapshotKey(reference, begIndex, count, filters...)
+	for {
+		a.overviewQueries.mu.Lock()
+		if cached, ok := a.overviewQueries.getLocked(key, time.Now()); ok && !force {
+			response := cached.response
+			a.overviewQueries.mu.Unlock()
+			return response, nil
 		}
-	}
-	flight := &overviewQueryFlight{done: make(chan struct{})}
-	a.overviewQueries.flights[key] = flight
-	a.overviewQueries.mu.Unlock()
+		if flight := a.overviewQueries.flights[key]; flight != nil {
+			done := flight.done
+			a.overviewQueries.mu.Unlock()
+			select {
+			case <-done:
+				// A new refresh can supersede and cancel the flight owner. Its active
+				// waiter must restart, rather than inherit that abandoned request's error.
+				if ctx.Err() == nil && (errors.Is(flight.err, context.Canceled) || errors.Is(flight.err, context.DeadlineExceeded)) {
+					continue
+				}
+				return flight.response, flight.err
+			case <-ctx.Done():
+				return gameplayOverview{}, ctx.Err()
+			}
+		}
+		flight := &overviewQueryFlight{done: make(chan struct{})}
+		a.overviewQueries.flights[key] = flight
+		a.overviewQueries.mu.Unlock()
 
-	response, err := a.loadRiotOverview(ctx, reference, begIndex, count)
-	a.overviewQueries.complete(key, flight, response, err)
-	return response, err
+		response, err := a.loadRiotOverview(ctx, reference, begIndex, count, filters...)
+		a.overviewQueries.complete(key, flight, response, err)
+		return response, err
+	}
 }
 
 type overviewQueryCache struct {
@@ -85,7 +93,7 @@ func (cache *overviewQueryCache) getLocked(key string, now time.Time) (overviewQ
 		return overviewQueryCacheEntry{}, false
 	}
 	item := element.Value.(overviewQueryCacheItem)
-	if now.Sub(item.entry.at) >= overviewQuerySnapshotTTL {
+	if now.Sub(item.entry.at) >= overviewSnapshotTTL(item.entry) {
 		cache.removeElementLocked(element)
 		return overviewQueryCacheEntry{}, false
 	}
@@ -110,7 +118,7 @@ func (cache *overviewQueryCache) removeExpiredLocked(now time.Time) {
 	for element := cache.recent.Back(); element != nil; {
 		previous := element.Prev()
 		item := element.Value.(overviewQueryCacheItem)
-		if now.Sub(item.entry.at) >= overviewQuerySnapshotTTL {
+		if now.Sub(item.entry.at) >= overviewSnapshotTTL(item.entry) {
 			cache.removeElementLocked(element)
 		}
 		element = previous
@@ -129,7 +137,7 @@ func (cache *overviewQueryCache) removeElementLocked(element *list.Element) {
 func (cache *overviewQueryCache) complete(key string, flight *overviewQueryFlight, response gameplayOverview, err error) {
 	cache.mu.Lock()
 	flight.response, flight.err = response, err
-	if err == nil && cache.flights[key] == flight {
+	if err == nil && overviewHeaderCacheable(response) && cache.flights[key] == flight {
 		cache.putLocked(key, overviewQueryCacheEntry{at: time.Now(), response: response})
 	}
 	if cache.flights[key] == flight {
@@ -137,6 +145,19 @@ func (cache *overviewQueryCache) complete(key string, flight *overviewQueryFligh
 	}
 	close(flight.done)
 	cache.mu.Unlock()
+}
+
+func overviewHeaderCacheable(response gameplayOverview) bool {
+	if response.ProfilePending || response.Pagination.Partial {
+		return false
+	}
+	for _, capability := range response.Capabilities {
+		if (capability.Name == "ranked-stats" || capability.Name == "champion-mastery") &&
+			(capability.State == capabilityFailed || capability.State == capabilityCanceled) {
+			return false
+		}
+	}
+	return true
 }
 
 func overviewQuerySnapshotKey(client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, begIndex, count int, matchFilter string) string {
@@ -203,4 +224,11 @@ func (a *app) clearOverviewQuerySnapshots() {
 	// join them, and completion must not repopulate an invalidated snapshot.
 	a.overviewQueries.flights = make(map[string]*overviewQueryFlight)
 	a.overviewQueries.mu.Unlock()
+}
+
+func overviewSnapshotTTL(entry overviewQueryCacheEntry) time.Duration {
+	if entry.response.Player.Region == riotRegionKR {
+		return time.Minute
+	}
+	return overviewQuerySnapshotTTL
 }

@@ -1,0 +1,155 @@
+{
+  "samples": [
+    {
+      "viewport": 1500,
+      "zoom": 1,
+      "parent": "BODY",
+      "x": 190,
+      "y": 60,
+      "width": 1120,
+      "height": 780,
+      "dialogScroll": 0,
+      "sideScroll": 100,
+      "gridScroll": 100,
+      "cell": 70,
+      "pictureHeight": 70,
+      "aspect": "1 / 1",
+      "display": "block",
+      "styles": 0,
+      "footer": [
+        {
+          "clipped": false
+        },
+        {
+          "clipped": false
+        }
+      ]
+    },
+    {
+      "viewport": 1500,
+      "zoom": 1.25,
+      "parent": "BODY",
+      "x": 50,
+      "y": 16,
+      "width": 1400,
+      "height": 868,
+      "dialogScroll": 0,
+      "sideScroll": 100,
+      "gridScroll": 100,
+      "cell": 70,
+      "pictureHeight": 70,
+      "aspect": "1 / 1",
+      "display": "block",
+      "styles": 0,
+      "footer": [
+        {
+          "clipped": false
+        },
+        {
+          "clipped": false
+        }
+      ]
+    },
+    {
+      "viewport": 1180,
+      "zoom": 1,
+      "parent": "BODY",
+      "x": 30,
+      "y": 60,
+      "width": 1120,
+      "height": 780,
+      "dialogScroll": 0,
+      "sideScroll": 100,
+      "gridScroll": 100,
+      "cell": 70,
+      "pictureHeight": 70,
+      "aspect": "1 / 1",
+      "display": "block",
+      "styles": 0,
+      "footer": [
+        {
+          "clipped": false
+        },
+        {
+          "clipped": false
+        }
+      ]
+    },
+    {
+      "viewport": 1180,
+      "zoom": 1.25,
+      "parent": "BODY",
+      "x": 16,
+      "y": 16,
+      "width": 1148,
+      "height": 868,
+      "dialogScroll": 0,
+      "sideScroll": 100,
+      "gridScroll": 100,
+      "cell": 68,
+      "pictureHeight": 68,
+      "aspect": "1 / 1",
+      "display": "block",
+      "styles": 0,
+      "footer": [
+        {
+          "clipped": false
+        },
+        {
+          "clipped": false
+        }
+      ]
+    },
+    {
+      "viewport": 980,
+      "zoom": 1,
+      "parent": "BODY",
+      "x": 16,
+      "y": 60,
+      "width": 948,
+      "height": 780,
+      "dialogScroll": 0,
+      "sideScroll": 100,
+      "gridScroll": 100,
+      "cell": 71,
+      "pictureHeight": 71,
+      "aspect": "1 / 1",
+      "display": "block",
+      "styles": 0,
+      "footer": [
+        {
+          "clipped": false
+        },
+        {
+          "clipped": false
+        }
+      ]
+    },
+    {
+      "viewport": 980,
+      "zoom": 1.25,
+      "parent": "BODY",
+      "x": 16,
+      "y": 16,
+      "width": 948,
+      "height": 868,
+      "dialogScroll": 0,
+      "sideScroll": 100,
+      "gridScroll": 100,
+      "cell": 71,
+      "pictureHeight": 71,
+      "aspect": "1 / 1",
+      "display": "block",
+      "styles": 0,
+      "footer": [
+        {
+          "clipped": false
+        },
+        {
+          "clipped": false
+        }
+      ]
+    }
+  ],
+  "banner": "blocked pending real P0 evidence"
+}

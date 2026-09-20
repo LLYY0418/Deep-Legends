@@ -1,0 +1,7 @@
+=== RUN   TestR101BannerOwnershipUsesRegaliaV3Only
+    r101_test.go:286: R8 is not authoritative
+    r101_test.go:319: <nil> true
+--- FAIL: TestR101BannerOwnershipUsesRegaliaV3Only (0.00s)
+FAIL
+FAIL	lol-loot-assistant	0.476s
+FAIL

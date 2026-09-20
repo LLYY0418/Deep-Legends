@@ -1,0 +1,5 @@
+--- FAIL: TestR99RankBannerPreservesCrestAndRejectsUnknown (0.00s)
+    r99_test.go:315: crest overwritten: map[preferredBannerType:blank preferredCrestType:prestige selectedPrestigeCrest:7]
+FAIL
+FAIL	lol-loot-assistant	0.619s
+FAIL

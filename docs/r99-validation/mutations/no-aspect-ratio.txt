@@ -1,0 +1,2 @@
+AssertionError [ERR_ASSERTION]: collapsed icon
+    at main (/Users/ly/personal/personal-work/deep-legends/desktop/r99-facade-picker-layout.cjs:82:12)

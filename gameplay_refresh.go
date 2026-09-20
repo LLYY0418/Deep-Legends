@@ -281,7 +281,7 @@ func gameplayLiveSnapshotComplete(response gameplayLiveResponse) bool {
 		return false
 	}
 	for _, p := range response.Players {
-		if p.HistoryState == "pending" {
+		if p.HistoryState == "pending" || p.HistoryState == "failed" {
 			return false
 		}
 	}

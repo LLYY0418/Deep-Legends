@@ -1,0 +1,5 @@
+--- FAIL: TestR99SeedSourceHasNoCopiedStableID (0.00s)
+    r99_test.go:479: copied opaque ID in seed source
+FAIL
+FAIL	lol-loot-assistant	0.510s
+FAIL

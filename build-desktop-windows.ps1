@@ -68,7 +68,8 @@ try {
     $staleUnpacked = Join-Path $projectRoot "dist\desktop\win-unpacked"
     if (Test-Path $staleUnpacked) { Remove-Item -Recurse -Force $staleUnpacked }
     New-Item -ItemType Directory -Force -Path $backendRoot | Out-Null
-    $goSources = @(Get-ChildItem -Recurse -File -Filter '*.go' | Where-Object { $_.FullName -notmatch '[\\/](\.git|\.gopath|\.gotoolchain|\.gomodcache|\.gocache|\.tmpbuild|node_modules)[\\/]' } | ForEach-Object { $_.FullName })
+    # Match relative paths so a hidden ancestor of the checkout does not hide source.
+    $goSources = @(Get-ChildItem -Recurse -File -Filter '*.go' | Where-Object { $_.FullName.Substring($projectRoot.Length) -notmatch '[\\/](\.[^\\/]+|node_modules|vendor|dist)[\\/]' } | ForEach-Object { $_.FullName })
     if ($goSources.Count -eq 0) { throw "No project Go sources found" }
     $unformatted = @(gofmt -l $goSources)
     if ($LASTEXITCODE -ne 0) { throw "Go formatting check failed" }

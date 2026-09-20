@@ -1,0 +1,305 @@
+{
+  "samples": [
+    {
+      "viewport": 1500,
+      "zoom": 1,
+      "parent": "BODY",
+      "x": 190,
+      "y": 60,
+      "width": 1120,
+      "height": 780,
+      "dialogScroll": 0,
+      "sideScroll": 100,
+      "gridScroll": 100,
+      "cell": 70,
+      "pictureHeight": 70,
+      "aspect": "1 / 1",
+      "display": "block",
+      "unownedDisabled": true,
+      "unownedCount": 3399,
+      "styles": 0,
+      "footer": [
+        {
+          "clipped": false
+        },
+        {
+          "clipped": false
+        }
+      ],
+      "facade": {
+        "left": {
+          "left": 274,
+          "right": 666
+        },
+        "cards": [
+          {
+            "left": 274,
+            "right": 666,
+            "parent": "facade-left"
+          },
+          {
+            "left": 274,
+            "right": 666,
+            "parent": "facade-left"
+          }
+        ],
+        "scroll": 146,
+        "client": 146,
+        "height": 34,
+        "pressureHeight": 34,
+        "overflow": 0
+      }
+    },
+    {
+      "viewport": 1500,
+      "zoom": 1.25,
+      "parent": "BODY",
+      "x": 50,
+      "y": 16,
+      "width": 1400,
+      "height": 868,
+      "dialogScroll": 0,
+      "sideScroll": 100,
+      "gridScroll": 100,
+      "cell": 70,
+      "pictureHeight": 70,
+      "aspect": "1 / 1",
+      "display": "block",
+      "unownedDisabled": true,
+      "unownedCount": 3399,
+      "styles": 0,
+      "footer": [
+        {
+          "clipped": false
+        },
+        {
+          "clipped": false
+        }
+      ],
+      "facade": {
+        "left": {
+          "left": 342.5,
+          "right": 832.5
+        },
+        "cards": [
+          {
+            "left": 342.5,
+            "right": 832.5,
+            "parent": "facade-left"
+          },
+          {
+            "left": 342.5,
+            "right": 832.5,
+            "parent": "facade-left"
+          }
+        ],
+        "scroll": 146,
+        "client": 146,
+        "height": 34,
+        "pressureHeight": 34,
+        "overflow": 0
+      }
+    },
+    {
+      "viewport": 1180,
+      "zoom": 1,
+      "parent": "BODY",
+      "x": 30,
+      "y": 60,
+      "width": 1120,
+      "height": 780,
+      "dialogScroll": 0,
+      "sideScroll": 100,
+      "gridScroll": 100,
+      "cell": 70,
+      "pictureHeight": 70,
+      "aspect": "1 / 1",
+      "display": "block",
+      "unownedDisabled": true,
+      "unownedCount": 3399,
+      "styles": 0,
+      "footer": [
+        {
+          "clipped": false
+        },
+        {
+          "clipped": false
+        }
+      ],
+      "facade": {
+        "left": {
+          "left": 263.75,
+          "right": 655.75
+        },
+        "cards": [
+          {
+            "left": 263.75,
+            "right": 655.75,
+            "parent": "facade-left"
+          },
+          {
+            "left": 263.75,
+            "right": 655.75,
+            "parent": "facade-left"
+          }
+        ],
+        "scroll": 146,
+        "client": 146,
+        "height": 34,
+        "pressureHeight": 34,
+        "overflow": 0
+      }
+    },
+    {
+      "viewport": 1180,
+      "zoom": 1.25,
+      "parent": "BODY",
+      "x": 16,
+      "y": 16,
+      "width": 1148,
+      "height": 868,
+      "dialogScroll": 0,
+      "sideScroll": 100,
+      "gridScroll": 100,
+      "cell": 68,
+      "pictureHeight": 68,
+      "aspect": "1 / 1",
+      "display": "block",
+      "unownedDisabled": true,
+      "unownedCount": 3399,
+      "styles": 0,
+      "footer": [
+        {
+          "clipped": false
+        },
+        {
+          "clipped": false
+        }
+      ],
+      "facade": {
+        "left": {
+          "left": 329.6875,
+          "right": 1117.8125
+        },
+        "cards": [
+          {
+            "left": 329.6875,
+            "right": 1117.8125,
+            "parent": "facade-left"
+          },
+          {
+            "left": 329.6875,
+            "right": 1117.8125,
+            "parent": "facade-left"
+          }
+        ],
+        "scroll": 146,
+        "client": 146,
+        "height": 34,
+        "pressureHeight": 34,
+        "overflow": 0
+      }
+    },
+    {
+      "viewport": 980,
+      "zoom": 1,
+      "parent": "BODY",
+      "x": 16,
+      "y": 60,
+      "width": 948,
+      "height": 780,
+      "dialogScroll": 0,
+      "sideScroll": 100,
+      "gridScroll": 100,
+      "cell": 71,
+      "pictureHeight": 71,
+      "aspect": "1 / 1",
+      "display": "block",
+      "unownedDisabled": true,
+      "unownedCount": 3399,
+      "styles": 0,
+      "footer": [
+        {
+          "clipped": false
+        },
+        {
+          "clipped": false
+        }
+      ],
+      "facade": {
+        "left": {
+          "left": 257.359375,
+          "right": 933.640625
+        },
+        "cards": [
+          {
+            "left": 257.359375,
+            "right": 933.640625,
+            "parent": "facade-left"
+          },
+          {
+            "left": 257.359375,
+            "right": 933.640625,
+            "parent": "facade-left"
+          }
+        ],
+        "scroll": 146,
+        "client": 146,
+        "height": 34,
+        "pressureHeight": 34,
+        "overflow": 0
+      }
+    },
+    {
+      "viewport": 980,
+      "zoom": 1.25,
+      "parent": "BODY",
+      "x": 16,
+      "y": 16,
+      "width": 948,
+      "height": 868,
+      "dialogScroll": 0,
+      "sideScroll": 100,
+      "gridScroll": 100,
+      "cell": 71,
+      "pictureHeight": 71,
+      "aspect": "1 / 1",
+      "display": "block",
+      "unownedDisabled": true,
+      "unownedCount": 3399,
+      "styles": 0,
+      "footer": [
+        {
+          "clipped": false
+        },
+        {
+          "clipped": false
+        }
+      ],
+      "facade": {
+        "left": {
+          "left": 321.6875,
+          "right": 925.8125
+        },
+        "cards": [
+          {
+            "left": 321.6875,
+            "right": 925.8125,
+            "parent": "facade-left"
+          },
+          {
+            "left": 321.6875,
+            "right": 925.8125,
+            "parent": "facade-left"
+          }
+        ],
+        "scroll": 146,
+        "client": 146,
+        "height": 34,
+        "pressureHeight": 34,
+        "overflow": 0
+      }
+    }
+  ],
+  "banner": "35 fixture entries; ownership read-only; write pending real W6"
+}

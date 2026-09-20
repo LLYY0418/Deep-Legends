@@ -36,7 +36,7 @@ function harness() {
     emptyState: (title, copy, retry) => `<div>${title}<p>${copy}</p>${retry ? '<button data-gameplay-retry>重试</button>' : ''}</div>`,
     bindLiveContent: noop, applyRenderedMetricStyles: noop, prepareImages: noop,
   };
-  const names = ["loadLive", "renderLive", "handleGameplayPhase", "queueLiveEventRefresh", "shouldResetLiveGameScopedState", "resetLiveGameScopedState", "softResetGameplayState", "syncLiveRetryBudget", "liveSnapshotComplete", "liveAutoRefreshStopped", "renderLiveRefreshStatus", "scheduleLiveRefresh", "normalizeLiveInterval", "liveRefreshDelayMs"];
+  const names = ["updateLiveLoadingVisibility", "loadLive", "liveRecommendationMarkup", "renderLive", "handleGameplayPhase", "queueLiveEventRefresh", "shouldResetLiveGameScopedState", "resetLiveGameScopedState", "softResetGameplayState", "syncLiveRetryBudget", "liveSnapshotComplete", "liveAutoRefreshStopped", "renderLiveRefreshStatus", "scheduleLiveRefresh", "normalizeLiveInterval", "liveRefreshDelayMs"];
   for (const name of ["liveGamePhase", "invalidateLiveForNewGame", "resetDisconnectedLive", "normalizeLiveGameId", "liveGameIdComparison", "recordLiveObservation", "liveSnapshotBehindPhase"]) if (source.includes(`function ${name}(`)) names.push(name);
   vm.runInNewContext(names.map(extract).join("\n"), context);
   nodes.liveRefresh.addEventListener("click", () => context.loadLive(true, "manual"));
@@ -103,6 +103,9 @@ test("R91 repeated manual refresh immediately aborts and replaces only the live 
       assert.equal(h.requests[1].url, "/api/gameplay/live?refresh=1");
       assert.match(h.nodes.liveRefresh.textContent, /正在刷新/);
       assert.equal(h.nodes.liveRefresh.getAttribute("aria-busy"), "true");
+      assert.doesNotMatch(h.nodes.liveContent.querySelector("[data-live-status]").textContent, /正在刷新/);
+      const delayed = [...h.jobs.entries()].find(([, job]) => job.delay === 240);
+      assert.ok(delayed); h.jobs.delete(delayed[0]); delayed[1].fn();
       assert.match(h.text(), /正在刷新/); assert.match(h.text(), /recommendation-90/);
       assert.equal(overview.signal.aborted, false); assert.equal(collection.signal.aborted, false);
       assert.equal(h.state.controllers.get("overview:current"), overview); assert.equal(h.state.controllers.get("collection"), collection);
@@ -191,16 +194,17 @@ test("R91 direct loader detects a boundary already observed by the beacon", asyn
   } finally { h.close(); }
 });
 
-test("R91 hidden phase transitions invalidate immediately and preserve the deferred refresh", async () => {
+test("R91 hidden phase transitions invalidate immediately and preload before foregrounding", async () => {
   const h = harness();
   try {
     Object.defineProperty(h.document, "hidden", { value: true, configurable: true });
     h.handleGameplayPhase("ChampSelect");
     assert.equal(h.state.live, null); assert.equal(h.state.liveRefreshQueued, true);
-    assert.equal(h.requests.length, 0); assert.equal(h.jobs.size, 0);
+    assert.equal(h.requests.length, 0); assert.equal(h.jobs.size, 1);
+    await h.fire(); assert.equal(h.requests.length, 1);
     Object.defineProperty(h.document, "hidden", { value: false });
     h.renderLive(); assert.match(h.text(), /正在识别新对局/);
-    h.queueLiveEventRefresh("visibility"); await h.fire();
+    h.queueLiveEventRefresh("visibility");
     h.requests[0].resolve(snapshot(91, "ChampSelect")); await flush();
     assert.match(h.text(), /recommendation-91/);
   } finally { h.close(); }

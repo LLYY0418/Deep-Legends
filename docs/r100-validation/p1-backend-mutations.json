@@ -1,0 +1,22 @@
+[
+  {
+    "id": "missing-fatal-call",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "missing-exit-delivery",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "missing-retained-snapshot",
+    "killed": true,
+    "exit": 1
+  },
+  {
+    "id": "restart-trust-bypass",
+    "killed": true,
+    "exit": 1
+  }
+]

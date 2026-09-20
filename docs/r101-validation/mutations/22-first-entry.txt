@@ -1,0 +1,6 @@
+=== RUN   TestR101SeedResolvesSoloQueueRank
+    r101_test.go:433: {LastMatchAt: LastMatchAtKnown:false Dormant:false Confidence: GameName:Seed Source:人工核对 Inactive:false Stale:false LPKnown:true TagLine:KR1 RankStatus:ranked Tier:IRON Division:4 LP:1 UpdatedAt:2026-09-17T03:45:45Z LadderRank:0 LadderRankKnown:false}
+--- FAIL: TestR101SeedResolvesSoloQueueRank (0.04s)
+FAIL
+FAIL	lol-loot-assistant	0.502s
+FAIL

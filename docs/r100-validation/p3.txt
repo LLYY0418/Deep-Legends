@@ -1,0 +1,5 @@
+--- FAIL: TestR100ProSnapshotAndLadderSurviveRestart (0.01s)
+    r100_test.go:255: ladder refetched after restart 2
+FAIL
+FAIL	lol-loot-assistant	1.115s
+FAIL

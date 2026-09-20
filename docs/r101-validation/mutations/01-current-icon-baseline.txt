@@ -1,0 +1,4 @@
+=== RUN   TestR101IconProbePicksOwnedNonCurrentIcon
+--- PASS: TestR101IconProbePicksOwnedNonCurrentIcon (0.02s)
+PASS
+ok  	lol-loot-assistant	1.306s

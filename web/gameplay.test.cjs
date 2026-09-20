@@ -121,8 +121,9 @@ function functionSource(script, name) {
 
 function compile(names, dependencies = {}, script = source) {
   names = [...names];
+  for (const name of ["proBadgeAttributes", "renderProIdentityBadge", "proContextFromButton"]) if (!names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
   if (!names.includes("overviewSupplementTarget") && names.some(name => functionSource(script, name).includes("overviewSupplementTarget("))) names.push("overviewSupplementTarget");
-  dependencies = { riotTab: tab => tab?.region === "kr", ...dependencies };
+  dependencies = { riotTab: tab => tab?.region === "kr", isARAMRelatedMatch: () => false, ...dependencies };
   const keys = Object.keys(dependencies);
   return Function(...keys, `"use strict";\n${names.map((name) => functionSource(script, name)).join("\n")}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
 }
@@ -315,7 +316,7 @@ test("R69 current-position chip preserves client position and discloses speciali
 test("R71 ranked recent-position samples stay inside the player card, without an extra grid row", () => {
   const { JSDOM } = require("../desktop/node_modules/jsdom");
   const functions = compile(["renderLiveRecentPositions", "renderLivePlayer"], {
-    state: {}, number: String, escapeHTML: (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;"),
+    state: {settings:{}}, number: String, escapeHTML: (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;"),
     maskedPlayerName: () => "Player", liveDisplayedChampionId: () => 13,
     rankTitle: () => "黄金", positionLabel: () => "中路", renderLivePremadeTag: () => "",
     iconFigure: () => "", percent: (value) => `${value}%`, kda: String,
@@ -338,7 +339,7 @@ test("R71 ranked recent-position samples stay inside the player card, without an
   assert.equal(functions.renderLiveRecentPositions(player, 450), "");
   assert.equal(functions.renderLiveRecentPositions({ recentPositions: [] }, 420), "");
   const insights = functionSource(source, "renderLiveInsights");
-  assert.match(insights, /orderedPlayers, renderLiveRecentPositions\(player, data.queueId\)\)/);
+  assert.match(insights, /orderedPlayers, renderLiveRecentPositions\(player, data.queueId\),/);
 });
 
 
@@ -586,9 +587,9 @@ test('unknown pro outcomes are not presented as a zero-game performance record',
 test('cached overview re-enters independent season and current-game loaders without requesting history',async()=>{
  const tab={data:{player:{region:'kr',playerRef:'cached'}},loading:false};
  const calls=[];
- const {loadOverview}=compile(['loadOverview'],{tabReady:()=>true,activeTab:()=>tab,rerenderTab:()=>calls.push('render'),loadOPGGSeasonSummary:()=>calls.push('season'),loadOverviewCurrentGame:()=>calls.push('current'),state:{},api:()=>assert.fail('cached overview must not request history')});
+ const {loadOverview}=compile(['loadOverview'],{tabReady:()=>true,activeTab:()=>tab,rerenderTab:()=>calls.push('render'),loadOPGGSeasonSummary:()=>calls.push('season'),loadOverviewCurrentGame:()=>calls.push('current'),loadMayhemRating:()=>calls.push('mayhem'),state:{},api:()=>assert.fail('cached overview must not request history')});
  await loadOverview(tab);
- assert.deepEqual(calls,['render','season','current']);
+ assert.deepEqual(calls,['render','season','current','mayhem']);
 });
 
 test("live specialist overview uses full identity without merging tags or enabling tournament names", () => {

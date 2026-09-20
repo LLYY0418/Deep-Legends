@@ -1,6 +1,6 @@
 {
   "name": "deep-legends-desktop",
-  "version": "0.12.1",
+  "version": "0.12.7",
   "description": "英雄联盟国服生涯战绩、实时对局与收藏本地助手",
   "author": "Deep Legends Contributors",
   "private": true,
@@ -31,11 +31,15 @@
     "directories": {
       "output": "../dist/desktop"
     },
+    "toolsets": {
+      "nsis": "1.2.1"
+    },
     "files": [
       "main.cjs",
       "preload.cjs",
       "share-export.cjs",
       "diagnostics-export.cjs",
+      "diagnostics-directory.cjs",
       "desktop-log.cjs",
       "proxy-resolution.cjs",
       "window-bounds.cjs",

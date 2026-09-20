@@ -1,0 +1,6 @@
+=== RUN   TestR101IconProbePicksOwnedNonCurrentIcon
+    r101_test.go:63: writes=[71 71]
+--- FAIL: TestR101IconProbePicksOwnedNonCurrentIcon (0.01s)
+FAIL
+FAIL	lol-loot-assistant	0.598s
+FAIL

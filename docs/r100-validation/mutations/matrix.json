@@ -1,0 +1,72 @@
+[
+  {
+    "id": "P0-absolute-round-deadline",
+    "file": "riot_api.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "P1-six-image-sockets",
+    "file": "web/image-queue.js",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "P1-status-fatal",
+    "file": "web/app.js",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "P2-wait-for-optional-augments",
+    "file": "gameplay.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "P4-null-overwrites-profile",
+    "file": "web/gameplay.js",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "P4-background-self-abort",
+    "file": "web/gameplay.js",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "P5-raw-mode-fallback",
+    "file": "gameplay.go",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "P7-no-persistence",
+    "file": "desktop/diagnostics-directory.cjs",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "P7-trust-bypass",
+    "file": "desktop/diagnostics-directory.cjs",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  },
+  {
+    "id": "P7-inode-revalidation-removed",
+    "file": "desktop/diagnostics-directory.cjs",
+    "killed": true,
+    "baseline_exit": 0,
+    "exit": 1
+  }
+]

@@ -1,0 +1,11 @@
+$ go test -overlay /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r95-mutants-x_hnqccn/overlay.json -count=1 -run TestR95LockStrategiesUseOnlyVisibleWait .
+--- FAIL: TestR95LockStrategiesUseOnlyVisibleWait (0.00s)
+    --- FAIL: TestR95LockStrategiesUseOnlyVisibleWait/lock-now (0.00s)
+        r95_test.go:281: ban lock wait discarded <nil>
+    --- FAIL: TestR95LockStrategiesUseOnlyVisibleWait/show-only (0.00s)
+        r95_test.go:281: ban lock wait discarded <nil>
+    --- FAIL: TestR95LockStrategiesUseOnlyVisibleWait/show-then-lock (0.00s)
+        r95_test.go:281: ban lock wait discarded <nil>
+FAIL
+FAIL	lol-loot-assistant	0.508s
+FAIL

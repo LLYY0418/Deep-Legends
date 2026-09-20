@@ -13,7 +13,7 @@ const { JSDOM } = require("jsdom");
 
 const WEB = path.join(__dirname, "..", "web");
 const SCRIPTS = ["runtime.js", "demo-data.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
-const gameplaySource = fs.readFileSync(path.join(WEB, "gameplay.js"), "utf8");
+const gameplaySource = fs.readFileSync(process.env.R104_GAMEPLAY_SOURCE || path.join(WEB, "gameplay.js"), "utf8");
 const suiteSource = fs.readFileSync(path.join(WEB, "suite.js"), "utf8");
 const appStyles = fs.readFileSync(path.join(WEB, "app.css"), "utf8");
 const gameplayStyles = fs.readFileSync(path.join(WEB, "gameplay.css"), "utf8");
@@ -265,10 +265,13 @@ test("1110 征召默认值、时间输入、模式能力和总开关真实保存
     }
     await change("[data-cs-bench-prefer]", true);
     assert.equal((await saved()).groups.event.bench.preferFirst, true);
-    await change('[data-cs-time="ban"]', "1.25");
-    assert.equal((await saved()).groups.event.ban.delayMs, 1250);
-    await change('[data-cs-time="ban"]', "99");
-    assert.equal((await saved()).groups.event.ban.delayMs, 10000);
+    assert.equal(root.querySelector('[data-cs-time="ban"]'), null, "立即锁定不显示等待框");
+    root.querySelector('[data-cs-strategy="ban"][data-cs-strategy-value="show-then-lock"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    await change('.cs-seq-card.is-ban [data-cs-time="lock"]', "1.25");
+    assert.equal((await saved()).groups.event.ban.lockDelayMs, 1250);
+    await change('.cs-seq-card.is-ban [data-cs-time="lock"]', "99");
+    assert.equal((await saved()).groups.event.ban.lockDelayMs, 10000);
     root.querySelector('[data-cs-group="arena"]').click();
     assert.equal(root.querySelector(".cs-bench-card"), null, "无交换能力不显示空卡");
     root.querySelector('[data-cs-group="aram"]').click();
@@ -337,7 +340,7 @@ test("平均段位只查询视口内卡片，并在分页加载期间停用", as
   const requests = [];
   const state = { activeTab: "current", matchTiers: new Map(), matchTierFlights: new Set() };
   const { hydrateMatchTiers } = compileFunctions(gameplaySource, [
-    "matchTierScrollRoot", "matchTierNodeIsVisible", "hydrateMatchTiers", "shouldHydrateMatchTiers",
+    "matchTierScrollRoot", "matchTierNodeIsVisible", "hydrateMatchTiers", "shouldHydrateMatchTiers", "scheduleMatchTierRetry",
   ], {
     window: w,
     document: w.document,
@@ -414,6 +417,7 @@ test("non-match overview rerenders preserve the match-list node", () => {
   const dom = new JSDOM('<div id="overview"></div>', { url: "http://localhost/", pretendToBeVisual: true });
   const container = dom.window.document.getElementById("overview");
   const state = { tabs: [{ key: "current" }], settings: { maskNames: false } };
+  let preparedStrip;
   const dependencies = {
     state,
     matchTierScope: () => "scope", filteredMatches: (matches) => matches,
@@ -425,16 +429,33 @@ test("non-match overview rerenders preserve the match-list node", () => {
     paginationCopyFor: () => "", renderCareerSections: () => "", renderMatchFilters: () => "",
     renderMatch: (match) => `<article data-match-id="${match.gameId}" class="match-entry">${match.gameId}</article>`, number: (value) => String(value),
     escapeHTML: (value) => String(value ?? ""), bindOverviewContent: () => {}, applyRenderedMetricStyles: () => {},
-    prepareImages: () => {}, ensurePerks: () => {}, ensureItems: () => {}, ensureSummonerSpells: () => {}, observeMatchTierVisibility: () => {},
+    prepareImages: root => { preparedStrip = root.querySelector(".summoner-strip"); }, ensurePerks: () => {}, ensureItems: () => {}, ensureSummonerSpells: () => {}, observeMatchTierVisibility: () => {},
     window: dom.window, document:dom.window.document,
   };
   const { renderOverviewBodyContent } = compileFunctions(gameplaySource, ["renderOverviewBodyContent", "reconcileFilteredMatchList"], dependencies);
   const matches = [{ gameId: 1 }];
-  const tab = { key: "current", matchFilter: "all", matchViewRevision: 0, openMatches: new Set(), data: { player: { playerRef: "ref" }, matches, pagination: {} } };
+  const tab = { key: "current", matchFilter: "all", matchViewRevision: 0, openMatches: new Set(), data: { player: { playerRef: "ref", backgroundSource: "gtimg", backgroundPath: "/skin.jpg" }, matches, pagination: {} } };
   renderOverviewBodyContent(container, tab);
   const firstList = container.querySelector(".match-list");
   renderOverviewBodyContent(container, tab);
   assert.equal(container.querySelector(".match-list"), firstList);
+
+  const firstEntry = firstList.querySelector(".match-entry");
+  const firstStrip = container.querySelector(".summoner-strip");
+  tab.data.matches = [{ gameId: 1 }, { gameId: 2 }];
+  tab.data.historicalRanks = [{ season: "S2025", tier: "MASTER" }];
+  renderOverviewBodyContent(container, tab);
+  assert.equal(container.querySelector(".match-list"), firstList);
+  assert.equal(container.querySelector(".match-entry"), firstEntry, "streamed arrays must not recreate already loaded cards");
+  assert.equal(container.querySelector(".summoner-strip"), firstStrip, "unchanged profile must retain image nodes");
+  assert.equal(preparedStrip, firstStrip, "image initialization must see the final retained strip");
+  assert.equal(firstList.querySelectorAll(".match-entry").length, 2);
+
+  const artwork = firstStrip.querySelector(".summoner-strip-art");
+  tab.data.player.summonerLevel = 300;
+  renderOverviewBodyContent(container, tab);
+  assert.notEqual(container.querySelector(".summoner-strip"), firstStrip);
+  assert.equal(container.querySelector(".summoner-strip-art"), artwork, "profile metadata must not restart the same artwork");
 
   tab.openMatches.add("1");
   tab.matchViewRevision += 1;
@@ -741,7 +762,8 @@ test("R56 工具页状态、确认、下拉与领奖契约完整", async () => {
   assert.match(facadeText, /好友悬浮卡[\s\S]*别人点你头像时看到的在线状态、签名和段位/);
   assert.match(facadeText, /生涯页展示[\s\S]*头像框、挑战勋章、赛季旗帜、表情轮盘/);
 	assert.match(facadeText, /卸下全部勋章[\s\S]*保留旗帜和当前头衔[\s\S]*无法保留头衔，本次操作会中止并提示/);
-	assert.match(facadeText, /切换上赛季旗帜[\s\S]*保留勋章和当前头衔[\s\S]*无法保留头衔，本次操作会中止并提示/);
+	assert.doesNotMatch(facadeText, /切换上赛季旗帜|挑战旗帜配色/);
+  assert.ok(w.document.querySelector(".facade-left [data-facade-banners]"), "R101 保留旗帜只读入口");
 	assert.doesNotMatch(facadeText, /头衔可能同时卸下/);
   assert.doesNotMatch(facadeText, /展示位/);
   assert.equal(w.document.querySelector("[data-facade-owned]").checked, false, "只显示已拥有不应默认开启");
@@ -805,7 +827,7 @@ test("R56 工具页状态、确认、下拉与领奖契约完整", async () => {
   await new Promise((resolve) => setTimeout(resolve, 80));
 	const suiteEndpoints = ["/api/watch/rules", "/api/rig/status", "/api/facade/state?trigger=poll", "/api/claim/scan", "/api/champselect/groups", "/api/champselect/state", "/api/champions/catalog"];
   const restoredRequests = requests.filter((request) => suiteEndpoints.includes(request));
-  assert.deepEqual(restoredRequests.sort(), ["/api/claim/scan", "/api/rig/status"], `离线恢复应强刷当前领奖页和 rig，实际 ${requests.join(", ")}`);
+  assert.deepEqual(restoredRequests.sort(), ["/api/claim/scan", "/api/facade/state?trigger=poll", "/api/rig/status"], `离线恢复应强刷当前领奖页和 rig，并预加载生涯，实际 ${requests.join(", ")}`);
   w.dispatchEvent(new w.CustomEvent("deep-legends:status", { detail: { connected: true, eventStream: true } }));
   await new Promise((resolve) => setTimeout(resolve, 80));
   assert.equal(requests.filter((request) => suiteEndpoints.includes(request)).length, restoredRequests.length, "重复在线状态不应再次请求工具接口");
@@ -1007,7 +1029,7 @@ test("R65 生涯事件 20 连发只请求一次、仅时间戳变化不重建且
 });
 
 test("R64 生涯皮肤与身份控件局部更新，皮肤图片延迟解码", async () => {
-	const { window: w, errors } = bootDemoApp();
+	const { window: w, errors } = bootDemoApp({facadeStateTransform: facade => ({...facade, skins: facade.skins.map(skin => ({...skin, splashPath: `/lol-game-data/assets/demo/${skin.id}/splash.jpg`}))})});
 	await settled();
 	w.document.querySelector('[data-section="suite"]').click();
 	await settled();
@@ -1018,14 +1040,14 @@ test("R64 生涯皮肤与身份控件局部更新，皮肤图片延迟解码", a
 	const heroMenu = hero._appSelectRoot;
 	const buttons = [...root.querySelectorAll("[data-facade-skin]")];
 	const target = buttons.find((button) => !button.classList.contains("is-selected"));
-	const previewBefore = root.querySelector("[data-suite-facade-art]")?.src;
+	const previewBefore = root.querySelector("[data-suite-facade-art]")?.getAttribute("data-queued-src");
 	assert.ok(target && previewBefore, "演示数据不足以验证皮肤切换");
 	target.click();
 	const buttonsAfter = [...root.querySelectorAll("[data-facade-skin]")];
 	assert.equal(buttonsAfter.length, buttons.length);
 	buttonsAfter.forEach((button, index) => assert.equal(button, buttons[index], "点击皮肤重建了皮肤按钮"));
 	assert.equal(target.classList.contains("is-selected"), true);
-	assert.notEqual(root.querySelector("[data-suite-facade-art]")?.src, previewBefore, "皮肤预览图没有更新");
+	assert.equal(root.querySelector("[data-suite-facade-art]")?.getAttribute("data-queued-src"), previewBefore, "未应用时当前背景不应改变");
 	for (const image of root.querySelectorAll(".facade-film img")) {
 		assert.equal(image.getAttribute("loading"), "lazy");
 		assert.equal(image.getAttribute("decoding"), "async");
@@ -1048,6 +1070,7 @@ test("R64 生涯皮肤与身份控件局部更新，皮肤图片延迟解码", a
 	hero.dispatchEvent(new w.Event("change", { bubbles: true }));
 	assert.equal(root.querySelector("[data-facade-hero]"), hero, "换英雄时重建了英雄 select");
 	assert.equal(hero._appSelectRoot, heroMenu, "换英雄时重建了增强下拉");
+	assert.equal(root.querySelector("[data-suite-facade-art]")?.getAttribute("data-queued-src"), previewBefore, "换英雄时当前背景不应改变或清空");
 	assert.deepEqual(errors, [], `R64 生涯局部更新出现异常：\n${errors.join("\n")}`);
 	w.close();
 });
@@ -1199,7 +1222,8 @@ test("顶部重新读取实际刷新生涯并丢弃未应用预览", async (t) =
   const choice=[...w.document.querySelectorAll('[data-facade-skin]')].find(b=>Number(b.dataset.facadeSkin)!==original);
   assert.ok(choice);
   choice.click();
-  assert.match(w.document.querySelector('.facade-art-label').textContent,/待应用预览/);
+  assert.match(w.document.querySelector('.facade-art-label').textContent,/当前背景/);
+  assert.equal(choice.classList.contains('is-selected'),true);
   const requests=[], fetch=w.fetch;
   w.fetch=(input,init)=>{requests.push(String(input));return fetch(input,init);};
   const detail={waitFor:[],reason:'manual'};
@@ -1651,7 +1675,7 @@ test("R86 ADD-1 failed timelines wait for explicit retry and keep unrelated card
 test("R86 ADD-1 late timeline cannot reveal a filtered-out card", async () => {
   async function check(mutate = false) {
     const { window: w } = bootDemoApp({ matchCount: 200, gameplaySourceTransform: source => mutate
-      ? source.replace("replacement.hidden = entry.hidden;", "replacement.hidden = false;") : source });
+      ? source.replace("function replaceMatchEntry(entry, tab, rerender) {", "function replaceMatchEntry(entry, tab, rerender) { entry.hidden = false;") : source });
     try {
       await settled();
       const d = w.document, list = d.querySelector(".match-list");
@@ -1907,4 +1931,75 @@ test('R87 P9 external champselect events preserve modal scroll, input and compos
   assert.notEqual(reset(suiteSource),suiteSource);
   await assert.rejects(check(reset,true),error=>error.name==='AssertionError' && /modal scroll reset/.test(error.message));
   await assert.rejects(check(reset),error=>error.name==='AssertionError' && /typed text|search focus/.test(error.message));
+});
+
+test('R104 quota recovery keeps the first-load skeleton and existing matches visible', () => {
+  const dom = new JSDOM('<div id="overview"></div>', { url: 'http://localhost/' });
+  const container = dom.window.document.getElementById('overview');
+  const dependencies = {
+    state: { tabs: [{ key: 'current' }], settings: { maskNames: false } },
+    matchTierScope: () => 'scope', filteredMatches: (matches) => matches,
+    maskedProfileIcon: () => '', iconFigure: () => '', playerLabel: () => 'Player', riotTab: () => false,
+    emptyState: () => '', opggSummonerURL: () => '', loadOverview: () => {},
+    matchListEmptyContent: () => 'empty', matchSentinelShouldHide: () => true,
+    summonerContextChip: () => '', summonerProChip: () => '', summonerRegionChip: () => '', renderSummonerHighlights: () => '',
+    scheduleOverviewCurrentGame: () => {}, updateFriendPresenceChips: () => {},
+    paginationCopyFor: () => '', renderCareerSections: () => '', renderMatchFilters: () => '',
+    renderMatch: (match) => `<article data-match-id="${match.gameId}" class="match-entry">${match.gameId}</article>`, number: (value) => String(value),
+    escapeHTML: (value) => String(value ?? ''), bindOverviewContent: () => {}, applyRenderedMetricStyles: () => {},
+    prepareImages: () => {}, ensurePerks: () => {}, ensureItems: () => {}, ensureSummonerSpells: () => {}, observeMatchTierVisibility: () => {},
+    window: dom.window, document: dom.window.document,
+  };
+  const { renderOverviewBodyContent } = compileFunctions(gameplaySource, ['renderOverviewBodyContent'], dependencies);
+  const retry = { retryAt: Date.now() + 5000, timer: 0 };
+  const emptyTab = { key: 'current', matchFilter: 'all', quotaRetry: retry, data: null, error: '' };
+  renderOverviewBodyContent(container, emptyTab);
+  assert.ok(container.querySelector('[data-quota-recovery]'));
+  assert.ok(container.querySelector('.gameplay-skeleton'));
+
+  const dataTab = {
+    key: 'current', matchFilter: 'all', matchViewRevision: 0, openMatches: new Set(), quotaRetry: retry, error: '',
+    data: { player: { playerRef: 'ref' }, matches: [{ gameId: 1 }], pagination: { hasMore: false } },
+  };
+  renderOverviewBodyContent(container, dataTab);
+  assert.ok(container.querySelector('[data-quota-recovery]'));
+  assert.ok(container.querySelector('.match-list .match-entry'));
+  dom.window.close();
+});
+
+test("R112 KR average-tier errors retry only visible active cards, then cache real values", async () => {
+ const dom=new JSDOM('<main id="app-scroll"><div id="matches" data-match-tier-scope="scope"><article class="match-entry"><span data-match-tier data-match-tier-pending data-game-id="1"><span class="match-tier-value"></span></span></article></div></main>',{url:"http://localhost/"});
+ const w=dom.window,d=w.document,container=d.getElementById("matches"),node=container.querySelector('[data-match-tier]');
+ const rect=()=>({top:0,left:0,right:100,bottom:100,width:100,height:100});
+ node.closest('.match-entry').getBoundingClientRect=rect;d.getElementById('app-scroll').getBoundingClientRect=rect;
+ const state={activeTab:'current',matchTiers:new Map(),matchTierFlights:new Set(),matchTierFailures:new Map()};
+ const tab={key:'current',data:{player:{playerRef:'public-player'},matches:[{gameId:1,createdAt:100,duration:1800}]}};
+ let timer, delay, calls=0, fail=true;
+ w.setTimeout=(fn,ms)=>{timer=fn;delay=ms;return 1;};
+ const f=compileFunctions(gameplaySource,['matchTierScrollRoot','matchTierNodeIsVisible','noteMatchTierFailure','hydrateMatchTiers','shouldHydrateMatchTiers','scheduleMatchTierRetry','applyMatchTierValue'],{
+  window:w,document:d,state,riotTab:()=>true,connected:()=>false,matchTierCacheKey:()=> 'scope:1',matchTierContent:value=>value?.tier||'—',matchTierTitle:()=>'',MATCH_TIER_RETRY_BASE_MS:1000,MATCH_TIER_MAX_BACKOFF_MS:60000,
+  api:async()=>{calls++;if(fail)throw Error('503');return {'1':{tier:'CHALLENGER',lp:2100}};},
+ });
+ try {
+  await f.hydrateMatchTiers(container,tab,'scope');
+  assert.equal(calls,1);assert.equal(state.matchTiers.has('scope:1'),false);assert.equal(node.hasAttribute('data-match-tier-pending'),true);assert.ok(delay>=29000 && delay<=31000);
+  await f.hydrateMatchTiers(container,tab,'scope');assert.equal(calls,1,'cooldown survives rerender');
+  state.activeTab='other';timer();await Promise.resolve();assert.equal(calls,1,'inactive tab does not retry');
+  state.activeTab='current';state.matchTierFailures.get('scope:1').nextRetryAt=0;
+  fail=false;await f.hydrateMatchTiers(container,tab,'scope');
+  assert.equal(calls,2);assert.equal(state.matchTiers.get('scope:1').tier,'CHALLENGER');assert.equal(node.querySelector('.match-tier-value').textContent,'CHALLENGER');assert.equal(node.hasAttribute('data-match-tier-pending'),false);
+  await f.hydrateMatchTiers(container,tab,'scope',[node]);assert.equal(calls,2,'successful tier must not be queried twice');
+  // A new failed row gets at most two automatic retries (three attempts total).
+  state.matchTiers.clear();state.matchTierFailures.clear();node.setAttribute('data-match-tier-pending','');fail=true;tab.matchTierRetryTimer=null;timer=null;
+  for(let attempt=1;attempt<=3;attempt++) {
+   await f.hydrateMatchTiers(container,tab,'scope');
+   assert.equal(state.matchTierFailures.get('scope:1').count,attempt);
+   if(attempt<3){assert.ok(timer);state.matchTierFailures.get('scope:1').nextRetryAt=0;tab.matchTierRetryTimer=null;timer=null;}
+  }
+  assert.equal(timer,null,'no endless background retries');
+  const settledCalls=calls;state.matchTierFailures.get('scope:1').nextRetryAt=0;
+  node.setAttribute('data-match-tier-pending','');
+  await f.hydrateMatchTiers(container,tab,'scope',[node]);
+  assert.equal(calls,settledCalls,'rerender does not bypass the retry limit');
+ } finally {w.close();}
 });

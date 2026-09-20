@@ -1,0 +1,5 @@
+--- FAIL: TestR99WriteProbeFreshIconAndAccentRestore (0.00s)
+    r99_test.go:138: write diagnostic leaked puuid
+FAIL
+FAIL	lol-loot-assistant	0.590s
+FAIL

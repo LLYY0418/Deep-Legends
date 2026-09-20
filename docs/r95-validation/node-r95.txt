@@ -1,0 +1,44 @@
+✔ R95 P1 progress preserves career, append=true, noise=null (57.400041ms)
+✔ R95 P1 progress preserves career, append=true, noise=[] (12.903834ms)
+✔ R95 P1 progress preserves career, append=true, noise=undefined (8.115459ms)
+✔ R95 P1 progress preserves career, append=false, noise=null (7.6855ms)
+✔ R95 P1 progress preserves career, append=false, noise=[] (7.464292ms)
+✔ R95 P1 progress preserves career, append=false, noise=undefined (7.338208ms)
+✖ R95 P1 first five and complete explicit empty arrays are authoritative (17.630334ms)
+✔ R95 P2 slow interval/false loading eligibility (13.30125ms)
+✔ R95 P2 slow sse/false loading eligibility (9.523417ms)
+✔ R95 P2 slow event/false loading eligibility (8.437208ms)
+✔ R95 P2 slow manual/true loading eligibility (7.594292ms)
+✔ R95 P2 slow direct/true loading eligibility (7.342959ms)
+✔ R95 P2 slow manual/false loading eligibility (7.509792ms)
+✔ R95 P2 fast 10ms manual response never shows status, including zero-delay timers (11.96225ms)
+✔ R95 P3 both sides only show lock wait for show-then-lock (29.790458ms)
+✔ R95 P4 badge respects mask, secondary and professional click context (16.68875ms)
+✔ R95 P5 exact Chinese titles, unknown fallback, relative time and champselect fired count (0.862667ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 16
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 548.417125
+
+✖ failing tests:
+
+test at web/r95.test.cjs:26:1
+✖ R95 P1 first five and complete explicit empty arrays are authoritative (17.630334ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  20 !== 5
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:29:111)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 20,
+    expected: 5,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

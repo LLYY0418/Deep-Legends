@@ -1,0 +1,59 @@
+TAP version 13
+# Subtest: R97 management filters and rows exclude expanded and academy teams
+not ok 1 - R97 management filters and rows exclude expanded and academy teams
+  ---
+  duration_ms: 171.878625
+  type: 'test'
+  location: '/sessions/youthful-determined-volta/mnt/deep-legends/desktop/pro-players.test.cjs:461:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    six filters exist before loading
+    + actual - expected
+    ... Skipped lines
+    
+      [
+        'all',
+        'BLG',
+        'IG',
+        'T1',
+    ...
+        'DK',
+    +   'Winners'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'all'
+    1: 'BLG'
+    2: 'IG'
+    3: 'T1'
+    4: 'HLE'
+    5: 'GEN'
+    6: 'DK'
+  actual:
+    0: 'all'
+    1: 'BLG'
+    2: 'IG'
+    3: 'T1'
+    4: 'HLE'
+    5: 'GEN'
+    6: 'DK'
+    7: 'Winners'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/sessions/youthful-determined-volta/mnt/deep-legends/desktop/pro-players.test.cjs:477:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2403.950834

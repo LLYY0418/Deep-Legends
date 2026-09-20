@@ -1,0 +1,2 @@
+AssertionError [ERR_ASSERTION]: rank segment must not overflow or wrap {"width":1500,"zoom":1,"left":{"left":274,"right":666},"cards":[{"left":274,"right":666,"parent":"facade-left"},{"left":274,"right":666,"parent":"facade-left"}],"scroll":146,"client":146,"height":34,"pressureHeight":50,"overflow":0}
+    at main (/Users/ly/personal/personal-work/deep-legends/desktop/r99-facade-picker-layout.cjs:107:12)

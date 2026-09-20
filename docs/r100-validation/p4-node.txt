@@ -1,0 +1,10 @@
+✔ R100 progress updates ready profile fields but null and empty never wipe career (59.221541ms)
+✔ R100 historical enrichment defers while foreground overview is in flight (0.647375ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 456.185625

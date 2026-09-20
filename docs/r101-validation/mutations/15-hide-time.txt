@@ -1,0 +1,54 @@
+✔ R101 icons default to owned and disable unowned including apply (94.326125ms)
+✔ R101 unknown icon ownership keeps full catalog read only (18.411708ms)
+✔ R101 banner catalog groups localized names and owns no write action (42.361792ms)
+✖ R101 lock wait stays visible and disabled in all strategies (55.303208ms)
+✖ R101 strategy switch never saves a zero lock wait, even synthetic disabled change (69.451083ms)
+✔ R101 facade moves cards left and removes only obsolete explanation and accent (25.002375ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 4
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 768.541958
+
+✖ failing tests:
+
+test at web/r101.test.cjs:68:1
+✖ R101 lock wait stays visible and disabled in all strategies (55.303208ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(input)
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r101.test.cjs:69:305)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at web/r101.test.cjs:71:1
+✖ R101 strategy switch never saves a zero lock wait, even synthetic disabled change (69.451083ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(input)
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r101.test.cjs:72:263)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

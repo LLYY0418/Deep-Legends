@@ -23,7 +23,7 @@ func proFixtureAccount(name, puuid, tier string, division, lp int) opggProAccoun
 	if tier != "" {
 		rank = json.RawMessage(fmt.Sprintf(`{"tier":%q,"division":%d,"lp":%d}`, tier, division, lp))
 	}
-	return opggProAccount{PUUID: puuid, GameName: name, TagLine: "KR1", UpdatedAt: "2026-09-08T10:00:00+09:00", Rank: rank}
+	return opggProAccount{Region: "kr", PUUID: puuid, GameName: name, TagLine: "KR1", UpdatedAt: "2026-09-08T10:00:00+09:00", Rank: rank}
 }
 func proFixtureMember(team int, name, realName string, accounts ...opggProAccount) opggProMember {
 	return opggProMember{TeamID: team, Nickname: name, RealName: realName, Authority: "PROGAMER", Position: "MID", Summoners: accounts}
@@ -227,6 +227,9 @@ func TestProCacheSingleflightRefreshBackoffAndStale(t *testing.T) {
 	var calls atomic.Int32
 	var fail atomic.Bool
 	a := newProMockApp(t, func(r *http.Request) (*http.Response, error) {
+		if r.URL.Host == "op.gg" && strings.HasPrefix(r.URL.Path, "/zh-cn/lol/summoners/kr/") {
+			return proHTTPBody([]byte("<html>profile unavailable</html>")), nil
+		}
 		calls.Add(1)
 		if r.URL.Host != opggPageHost || r.URL.Path != proPlayersPath || r.URL.Query().Get("region") != "kr" {
 			t.Errorf("unexpected upstream: %s", r.URL)
@@ -246,7 +249,7 @@ func TestProCacheSingleflightRefreshBackoffAndStale(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			teams, _, err := a.loadProPlayers(context.Background(), true)
-			if err != nil || len(teams) != 9 {
+			if err != nil || len(teams) != 42 {
 				t.Errorf("load=%d err=%v", len(teams), err)
 			}
 		}()
@@ -266,7 +269,7 @@ func TestProCacheSingleflightRefreshBackoffAndStale(t *testing.T) {
 	a.proPlayers.fetchedAt = time.Now().Add(-proPlayersTTL - time.Minute)
 	a.proPlayers.mu.Unlock()
 	teams, at, err := a.loadProPlayers(context.Background(), false)
-	if err == nil || len(teams) != 9 || time.Since(at) < proPlayersTTL {
+	if err == nil || len(teams) != 42 || time.Since(at) < proPlayersTTL {
 		t.Fatal("failed load didn't retain explicitly stale data")
 	}
 	w := httptest.NewRecorder()
@@ -322,7 +325,7 @@ func TestProDirectoryPublishesBeforeSlowSupplements(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	teams, _, err := a.loadProPlayers(ctx, false)
-	if err != nil || len(teams) != 9 {
+	if err != nil || len(teams) != 42 {
 		t.Fatalf("directory waited for supplement: %v", err)
 	}
 	a.proPlayers.mu.Lock()
@@ -349,7 +352,7 @@ func TestProDirectoryFailureRetainsRosterAndAuth(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.Unavailable || result.PlayerCount != 33 || len(result.Teams) != 6 || result.Teams[0].Players[0].Status != "unavailable" {
+	if !result.Unavailable || result.PlayerCount != 33 || result.AccountCount != 53 || len(result.Teams) != 6 || result.Teams[0].Players[0].Status != "available" {
 		t.Fatal("failed source erased roster")
 	}
 	if w.Header().Get("Cache-Control") != "no-store" {
@@ -424,5 +427,167 @@ func writeProPublicCapture(t *testing.T, result proPlayersResponse, out string) 
 	data, _ := json.MarshalIndent(result, "", "  ")
 	if err := os.WriteFile(out, data, 0600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Real Flight shape: account.region may be null, absent or empty while the
+// containing team's directory region remains explicitly KR.
+func proR97RegionHTML(t *testing.T, region any, present bool, overrides ...opggProTeam) []byte {
+	t.Helper()
+	teams := map[int]opggProTeam{}
+	for _, team := range proRoster {
+		teams[team.OPGGID] = opggProTeam{ID: team.OPGGID, Name: team.Name, ShortName: team.Code, Members: []opggProMember{}}
+	}
+	for _, team := range overrides {
+		teams[team.ID] = team
+	}
+	var flight strings.Builder
+	for id, team := range teams {
+		raw, err := json.Marshal(team)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var object map[string]any
+		if err := json.Unmarshal(raw, &object); err != nil {
+			t.Fatal(err)
+		}
+		for _, member := range object["members"].([]any) {
+			for _, account := range member.(map[string]any)["summoners"].([]any) {
+				fields := account.(map[string]any)
+				delete(fields, "region")
+				if present {
+					fields["region"] = region
+				}
+			}
+		}
+		record, err := json.Marshal([]any{"$", "$L1", fmt.Sprint(id), map[string]any{"region": "kr", "team": object}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Fprintf(&flight, "%x:%s\n", id, record)
+	}
+	// Split the Flight stream as the actual Next.js transport does.
+	stream := flight.String()
+	var html strings.Builder
+	for _, part := range []string{stream[:len(stream)/2], stream[len(stream)/2:]} {
+		quoted, _ := json.Marshal(part)
+		fmt.Fprintf(&html, "<script>self.__next_f.push([1,%s])</script>", quoted)
+	}
+	return []byte(html.String())
+}
+
+func TestR97ProAccountOptionalRegionSurvivesKRDirectory(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		region            any
+		present, accepted bool
+	}{
+		{"null", nil, true, true}, {"missing", nil, false, true}, {"empty", "", true, true},
+		{"whitespace", "  ", true, true}, {"KR", " KR ", true, true}, {"non-KR", "na", true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			team := opggProTeam{ID: 385, Name: "T1", ShortName: "T1", Members: []opggProMember{}}
+			for _, p := range proRoster[2].Players {
+				team.Members = append(team.Members, proFixtureMember(team.ID, p.Name, p.Names[0], proFixtureAccount("R97"+p.Name, "private-"+p.Name, "CHALLENGER", 1, 1000)))
+			}
+			teams, err := parseOPGGProPlayers(proR97RegionHTML(t, tc.region, tc.present, team))
+			if err != nil {
+				t.Fatal(err)
+			}
+			a := &app{}
+			result := a.buildProPlayers(teams, proRoster)
+			a.proPlayers.teams = teams
+			index := a.proIdentitySnapshot()
+			want := 0
+			if tc.accepted {
+				want = 5
+			}
+			if result.AccountCount != want {
+				t.Fatalf("T1 accounts cleared: got %d want %d", result.AccountCount, want)
+			}
+			for _, player := range result.Teams[2].Players {
+				badge := a.matchProIdentity(index, "test", gameplayReference{Region: "kr", GameName: "R97" + player.Name, TagLine: "KR1"})
+				if tc.accepted {
+					if player.Status != "available" || len(player.Accounts) != 1 || badge == nil || badge.TeamCode != "T1" || badge.PlayerName != player.Name {
+						t.Fatalf("optional region regressed: player=%+v badge=%+v", player, badge)
+					}
+				} else if len(player.Accounts) != 0 || badge != nil {
+					t.Fatal("explicit foreign region accepted")
+				}
+			}
+		})
+	}
+}
+
+func TestR97ManagementAndBadgesShareReviewedSixTeams(t *testing.T) {
+	var source []opggProTeam
+	for _, team := range proRoster {
+		p := team.Players[0]
+		source = append(source, opggProTeam{ID: team.OPGGID, Name: team.Name, ShortName: team.Code, Members: []opggProMember{proFixtureMember(team.OPGGID, p.Name, p.Names[0], proFixtureAccount("R97"+p.Name, "private-"+p.Name, "CHALLENGER", 1, 1000))}})
+	}
+	for i, name := range []string{"Winners", "Young Miracles", "Machi Esports", "Suning Gaming-S", "Anyone's Legend.Young", "Suning", "VSG", "T1 Academy"} {
+		id := 9900 + i
+		source = append(source, opggProTeam{ID: id, Name: name, ShortName: name, Members: []opggProMember{proFixtureMember(id, "Extra", "Extra", proFixtureAccount(name, "private-extra-"+name, "CHALLENGER", 1, 1))}})
+	}
+	// An unreviewed member even on an approved team must not widen the roster.
+	source[2].Members = append(source[2].Members, proFixtureMember(385, "Painter", "Unreviewed", proFixtureAccount("OutsideRoster", "private-outside", "", 0, 0)))
+	// Reviewed historical team exceptions retain the current IG affiliation.
+	source = append(source, opggProTeam{ID: 858, Name: "NIP", ShortName: "NIP", Members: []opggProMember{proFixtureMember(858, "Rookie", "Song Eui-jin", proFixtureAccount("R97Rookie", "private-rookie", "CHALLENGER", 1, 1000))}})
+	teams, err := parseOPGGProPlayers(proR97RegionHTML(t, nil, true, source...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := &app{}
+	a.proPlayers.teams, a.proPlayers.fetchedAt, a.proPlayers.attemptedAt = teams, time.Now(), time.Now()
+	w := httptest.NewRecorder()
+	a.handleProPlayers(w, httptest.NewRequest(http.MethodGet, "/api/pro-players", nil))
+	if w.Code != http.StatusOK {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	var data proPlayersResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &data); err != nil {
+		t.Fatal(err)
+	}
+	codes := []string{"BLG", "IG", "T1", "HLE", "GEN", "DK"}
+	if len(data.Teams) != 6 || data.PlayerCount != 33 || data.AccountCount != 53 {
+		t.Fatalf("scope widened: %+v", data)
+	}
+	index := a.proIdentitySnapshot()
+	for i, team := range data.Teams {
+		if team.Code != codes[i] || team.Secondary {
+			t.Fatal("unexpected team", team)
+		}
+		// R105 fixes page membership to the 53 reviewed accounts. The badge
+		// index still validates the seven independent upstream fixture rows.
+		for _, p := range a.buildProPlayers(teams, proRoster).Teams[i].Players {
+			for _, account := range p.Accounts {
+				badge := a.matchProIdentity(index, "management", gameplayReference{Region: "kr", GameName: account.GameName, TagLine: account.TagLine})
+				if badge == nil || badge.TeamCode != team.Code || badge.PlayerName != p.Name || badge.Secondary {
+					t.Fatal("management/badge scope drift", p, badge)
+				}
+			}
+		}
+	}
+	if index.candidates != 7 {
+		t.Fatal("badge inputs exceed whitelist", index.candidates)
+	}
+	for _, team := range source[6 : len(source)-1] {
+		account := team.Members[0].Summoners[0]
+		for _, surface := range []string{"match", "live", "overview", "current-game"} {
+			if a.matchProIdentity(index, surface, gameplayReference{Region: "kr", GameName: account.GameName, TagLine: account.TagLine, PlayerRef: account.PUUID}) != nil {
+				t.Fatal("expanded team badge", team.Name, surface)
+			}
+		}
+	}
+	if a.matchProIdentity(index, "overview", gameplayReference{Region: "kr", GameName: "OutsideRoster", TagLine: "KR1"}) != nil {
+		t.Fatal("unreviewed player accepted")
+	}
+	if len(proDirectoryRoster(teams, proRoster)) <= 6 {
+		t.Fatal("generic expansion infrastructure was removed")
+	}
+	for _, account := range proRankedLadderAccounts(teams) {
+		if !strings.HasPrefix(account.GameName, "R97") {
+			t.Fatal("ladder scope widened", account)
+		}
 	}
 }

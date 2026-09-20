@@ -1,0 +1,1 @@
+node --check web/pro-players.js exit=0

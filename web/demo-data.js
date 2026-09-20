@@ -308,13 +308,13 @@
       sampleGames: 14, baselineGames: 14, queueId: 420, queueLabel: "单双排", position: "top", positionLabel: "上路",
       baselineLabel: "近期同位置对手样本", sourceLabel: "七项指标参考 OP.GG · 本机国服对局计算",
       metrics: [
-        { key: "kda", label: "KDA", description: "平均击杀与助攻相对于死亡的比例。", player: 3.42, baseline: 2.71, playerScore: 78.2, grade: "A+" },
-        { key: "killParticipation", label: "参团率", description: "参与击杀数占所在队伍总击杀的比例。", unit: "%", player: 57.4, baseline: 51.8, playerScore: 68.7, grade: "A" },
-        { key: "damageShare", label: "伤害占比", description: "对英雄伤害占所在队伍英雄总伤害的比例。", unit: "%", player: 26.8, baseline: 24.9, playerScore: 66.7, grade: "A" },
-        { key: "dpm", label: "DPM", description: "每分钟对英雄造成的平均伤害。", player: 724, baseline: 638, playerScore: 70.3, grade: "A" },
-        { key: "csm", label: "CSM", description: "每分钟获得的小兵与野怪补刀数。", player: 7.12, baseline: 6.58, playerScore: 67.1, grade: "A" },
-        { key: "gpm", label: "GPM", description: "每分钟获得的平均金币。", player: 438, baseline: 412, playerScore: 65.9, grade: "A-" },
-        { key: "vspm", label: "VSPM", description: "每分钟获得的平均视野得分。", player: 1.08, baseline: 1.21, playerScore: 55.3, grade: "B-" },
+        { key: "kda", label: "KDA", description: "平均击杀与助攻相对于死亡的比例。", player: 3.42, baseline: 2.71, playerScore: 52.9, grade: "A+" },
+        { key: "killParticipation", label: "参团率", description: "参与击杀数占所在队伍总击杀的比例。", unit: "%", player: 57.4, baseline: 51.8, playerScore: 51.3, grade: "A" },
+        { key: "damageShare", label: "伤害占比", description: "对英雄伤害占所在队伍英雄总伤害的比例。", unit: "%", player: 26.8, baseline: 24.9, playerScore: 50.9, grade: "A-" },
+        { key: "dpm", label: "DPM", description: "每分钟对英雄造成的平均伤害。", player: 724, baseline: 638, playerScore: 51.6, grade: "A" },
+        { key: "csm", label: "CSM", description: "每分钟获得的小兵与野怪补刀数。", player: 7.12, baseline: 6.58, playerScore: 51.0, grade: "A-" },
+        { key: "gpm", label: "GPM", description: "每分钟获得的平均金币。", player: 438, baseline: 412, playerScore: 50.8, grade: "A-" },
+        { key: "vspm", label: "VSPM", description: "每分钟获得的平均视野得分。", player: 1.08, baseline: 1.21, playerScore: 48.6, grade: "B-" },
       ],
     },
     recentRanked: {
@@ -917,12 +917,14 @@
     [222000, "金克丝", true], [222002, "爆竹 金克丝", true],
 	].map(([id, name, owned]) => ({ id, name, championId: id < 100000 ? 99 : id < 200000 ? 103 : 222, championName: id < 100000 ? "拉克丝" : id < 200000 ? "阿狸" : "金克丝", splashPath: `/lol-game-data/assets/v1/champion-icons/${id < 100000 ? 99 : id < 200000 ? 103 : 222}.png`, tilePath: `/lol-game-data/assets/v1/champion-icons/${id < 100000 ? 99 : id < 200000 ? 103 : 222}.png`, owned }))
 	  .concat(championsCatalogFixture.champions.filter((champion) => ![99, 103, 222].includes(champion.id)).map((champion) => ({ id: champion.id * 1000, name: champion.nameZh, championId: champion.id, championName: champion.nameZh, splashPath: `/lol-game-data/assets/v1/champion-icons/${champion.id}.png`, tilePath: `/lol-game-data/assets/v1/champion-icons/${champion.id}.png`, owned: true })));
+  const facadeIcons = Array.from({ length: 5099 }, (_, index) => ({ id: index + 1, title: `${["星之守护者", "灵魂莲华", "K/DA", "峡谷纪念"][index % 4]} 图标 ${index + 1}`, year: 2009 + index % 18, legacy: index % 4 === 0, disabled: index === 500, owned: index % 3 === 0, sets: [`系列 ${index % 81 + 1}`], searchTerms: ["xingzhishouhuzhe", "xzshz"] }));
   let suiteFacade = {
     connected: true,
     summoner: { ...summoner, summonerLevel: 452 },
     profile: { backgroundSkinId: 99001, backgroundSkinName: "星之守护者 拉克丝" },
 	chat: { availability: "chat", statusMessage: "今晚九点峡谷见", lol: { rankedLeagueQueue: "RANKED_SOLO_5X5", rankedLeagueTier: "DIAMOND", rankedLeagueDivision: "II", playerTitleSelected: 101, gameStatus: "outOfGame" } },
 	regalia: { preferredBannerType: "lastSeasonHighestRank" },
+    rankBanner: "lastSeasonHighestRank", bannerAccent: "2",
 	challengeSummary: { title: { name: "峡谷先锋", contentId: "demo-title-content-id", itemId: 101 }, topChallenges: [], selectedChallengesString: "", categoryProgress: [] },
 	challenges: [{ id: "101", name: "不破不立" }, { id: "202", name: "峡谷收藏家" }, { id: "303", name: "团队之星" }],
 	challengesReady: true,
@@ -998,6 +1000,9 @@
 	["/api/champselect/groups", () => structuredClone(suiteChampSelectGroups)],
 	["/api/champselect/state", () => structuredClone(suiteChampSelectState)],
     ["/api/rig/status", () => structuredClone(suiteRig)],
+    ["/api/facade/banners", () => ({ banners: Array.from({length:35},(_,i)=>({id:String(i+3),idSecondary:"",localizedName:`示例旗帜 ${String(i+1).padStart(2,"0")}`,owned:i<4,isTencentOnly:i<3})), bannerOwnershipUnavailable:false,writeSupported:false,writeStatus:"awaiting-probe" })],
+    ["/api/facade/icons", () => ({ icons: facadeIcons, iconOwnershipUnavailable: false, total: facadeIcons.length, ownedCount: facadeIcons.filter(icon => icon.owned).length })],
+    ["/api/facade/probe", () => ({ results: [{ probe: "demo", skipped: true }] })],
     ["/api/facade/state", () => structuredClone(suiteFacade)],
     ["/api/claim/scan", () => structuredClone(suiteClaims)],
   ]);
@@ -1069,6 +1074,8 @@
     if (pathname === "/api/facade/apply") {
       let request = {};
       try { request = JSON.parse(init?.body || "{}"); } catch (_) {}
+      if (request.action === "icon") suiteFacade.summoner.profileIconId = request.iconId;
+      if (request.action === "rank-banner") suiteFacade.rankBanner = request.rankBanner;
       if (request.action === "background") suiteFacade.profile.backgroundSkinId = request.skinId;
       if (request.action === "chat") { suiteFacade.chat.availability = request.availability || suiteFacade.chat.availability; suiteFacade.chat.statusMessage = request.statusMessage ?? suiteFacade.chat.statusMessage; }
       if (request.action === "rank") suiteFacade.chat.lol = { rankedLeagueQueue: request.queue, rankedLeagueTier: request.tier, rankedLeagueDivision: request.division };

@@ -1,0 +1,5 @@
+--- FAIL: TestR105_EmbeddedAccountCounts (0.00s)
+    r105_test.go:33: total accounts = 52, want 53
+FAIL
+FAIL	lol-loot-assistant	0.506s
+FAIL

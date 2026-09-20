@@ -1,0 +1,4 @@
+=== RUN   TestR100OverviewLongRoundUsesFreshSingleWaitBudget
+--- PASS: TestR100OverviewLongRoundUsesFreshSingleWaitBudget (6.47s)
+PASS
+ok  	lol-loot-assistant	6.947s

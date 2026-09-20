@@ -1,0 +1,14 @@
+=== RUN   TestR101IconProbeRestoresOnFailure
+=== RUN   TestR101IconProbeRestoresOnFailure/{401_false}
+    r101_test.go:77: restore missing: [72]
+=== RUN   TestR101IconProbeRestoresOnFailure/{500_false}
+    r101_test.go:77: restore missing: [72]
+=== RUN   TestR101IconProbeRestoresOnFailure/{500_true}
+    r101_test.go:77: restore missing: [72]
+--- FAIL: TestR101IconProbeRestoresOnFailure (0.01s)
+    --- FAIL: TestR101IconProbeRestoresOnFailure/{401_false} (0.00s)
+    --- FAIL: TestR101IconProbeRestoresOnFailure/{500_false} (0.00s)
+    --- FAIL: TestR101IconProbeRestoresOnFailure/{500_true} (0.00s)
+FAIL
+FAIL	lol-loot-assistant	0.603s
+FAIL

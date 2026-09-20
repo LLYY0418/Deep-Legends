@@ -1,0 +1,4 @@
+=== RUN   TestR101BannerOwnershipUsesRegaliaV3Only
+--- PASS: TestR101BannerOwnershipUsesRegaliaV3Only (0.00s)
+PASS
+ok  	lol-loot-assistant	0.508s

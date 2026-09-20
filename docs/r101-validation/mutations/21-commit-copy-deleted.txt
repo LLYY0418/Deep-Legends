@@ -1,0 +1,37 @@
+✔ R101 icons default to owned and disable unowned including apply (175.115417ms)
+✔ R101 unknown icon ownership keeps full catalog read only (15.199ms)
+✔ R101 banner catalog groups localized names and owns no write action (31.673209ms)
+✔ R101 lock wait stays visible and disabled in all strategies (41.20175ms)
+✔ R101 strategy switch never saves a zero lock wait, even synthetic disabled change (50.733625ms)
+✖ R101 facade moves cards left and removes only obsolete explanation and accent (12.963ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1353.193
+
+✖ failing tests:
+
+test at web/r101.test.cjs:74:1
+✖ R101 facade moves cards left and removes only obsolete explanation and accent (12.963ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /改动只在左侧预览，确认后才写入客户端。/. Input:
+  
+  '保存登录重设确认并应用'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r101.test.cjs:77:322)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '保存登录重设确认并应用',
+    expected: /改动只在左侧预览，确认后才写入客户端。/,
+    operator: 'match',
+    diff: 'simple'
+  }

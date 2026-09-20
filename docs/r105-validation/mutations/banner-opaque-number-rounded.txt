@@ -1,0 +1,7 @@
+--- FAIL: TestR105_BannerOpaqueNumbersRemainExact (0.00s)
+    r105_test.go:337: opaque field rounded: {"loadout":{"REGALIA_BANNER_SLOT":{"contentId":"new","data":{"large":9007199254740992,"precise":0.12345678901234568},"future":9007199254740996,"inventoryType":"REGALIA_BANNER","itemId":4}}}
+    r105_test.go:337: opaque field rounded: {"loadout":{"REGALIA_BANNER_SLOT":{"contentId":"new","data":{"large":9007199254740992,"precise":0.12345678901234568},"future":9007199254740996,"inventoryType":"REGALIA_BANNER","itemId":4}}}
+    r105_test.go:337: opaque field rounded: {"loadout":{"REGALIA_BANNER_SLOT":{"contentId":"new","data":{"large":9007199254740992,"precise":0.12345678901234568},"future":9007199254740996,"inventoryType":"REGALIA_BANNER","itemId":4}}}
+FAIL
+FAIL	lol-loot-assistant	0.483s
+FAIL

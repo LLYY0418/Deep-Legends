@@ -1,0 +1,53 @@
+ok  	lol-loot-assistant	118.393s
+ok  	deeplegends/installer	(cached)
+ok  	deeplegends/installer/internal/webviewhost	(cached)
+?   	deeplegends/installer/payload	[no test files]
+?   	deeplegends/installer/ui	[no test files]
+ok  	deeplegends/installer/uninstall	(cached)
+verified build fingerprint=92c3a70c3cd4
+Reusing cached Electron distribution: /Users/ly/Library/Caches/electron/85f2b7422cd2141b6caa99bac0fc0658b0f22b533b571f6a2ec9a49f2ac23c0a/electron-v43.3.0-win32-x64.zip
+[build 2026-09-17T15:49:10.868Z] uninstaller-shell: started (0.0s)
+Uninstaller shell built: uninstall-shell.exe
+[build 2026-09-17T15:49:11.148Z] uninstaller-shell: completed (0.3s)
+[build 2026-09-17T15:49:11.188Z] nsis: started (0.0s)
+npm warn Unknown user config "scripts-prepend-node-path". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> deep-legends-desktop@0.12.3 pack:win-setup
+> electron-builder --win nsis --x64 --config.win.signExecutable=false --config.electronDist=/Users/ly/Library/Caches/electron/85f2b7422cd2141b6caa99bac0fc0658b0f22b533b571f6a2ec9a49f2ac23c0a/electron-v43.3.0-win32-x64.zip
+
+  • electron-builder  version=26.15.7 os=27.0.0
+  • loaded configuration  file=package.json ("build" field)
+Setup compression: 7z level 9 (default 9)
+  • executing @electron/rebuild  electronVersion=43.3.0 arch=x64 buildFromSource=false workspaceRoot=/Users/ly/personal/personal-work/deep-legends/desktop projectDir=./ appDir=./
+  • installing native dependencies  arch=x64
+  • completed installing native dependencies
+  • packaging       platform=win32 arch=x64 electron=43.3.0 appOutDir=/Users/ly/personal/personal-work/deep-legends/dist/desktop/win-unpacked
+  • using custom electronDist zip file  zipFile=/Users/ly/Library/Caches/electron/85f2b7422cd2141b6caa99bac0fc0658b0f22b533b571f6a2ec9a49f2ac23c0a/electron-v43.3.0-win32-x64.zip
+  • searching for node modules  pm=npm searchDir=/Users/ly/personal/personal-work/deep-legends/desktop
+  • no node modules found in collection, trying next search directory  pm=npm searchDir=/Users/ly/personal/personal-work/deep-legends/desktop
+  • searching for node modules  pm=traversal searchDir=/Users/ly/personal/personal-work/deep-legends/desktop
+  • using manual traversal of node_modules to build dependency tree
+  • no node modules found in collection, trying next search directory  pm=traversal searchDir=/Users/ly/personal/personal-work/deep-legends/desktop
+  • no node modules returned while searching directories  searchDirectories=[""]
+  • updating asar integrity executable resource  executablePath=/Users/ly/personal/personal-work/deep-legends/dist/desktop/win-unpacked/Deep Legends.exe
+  • file signing skipped via signExecutable configuration  file=/Users/ly/personal/personal-work/deep-legends/dist/desktop/win-unpacked/Deep Legends.exe
+  • building        target=nsis file=/Users/ly/personal/personal-work/deep-legends/dist/desktop/Deep Legends Setup 0.12.3.exe archs=x64 oneClick=false perMachine=false
+[build 2026-09-17T15:49:26.195Z] nsis: still running (15.0s)
+[build 2026-09-17T15:49:41.198Z] nsis: still running (30.0s)
+[build 2026-09-17T15:49:56.199Z] nsis: still running (45.0s)
+[build 2026-09-17T15:50:11.201Z] nsis: still running (60.0s)
+[build 2026-09-17T15:50:26.201Z] nsis: still running (75.0s)
+[build 2026-09-17T15:50:41.203Z] nsis: still running (90.0s)
+[build 2026-09-17T15:50:56.204Z] nsis: still running (105.0s)
+[build 2026-09-17T15:51:11.205Z] nsis: still running (120.0s)
+[build 2026-09-17T15:51:26.207Z] nsis: still running (135.0s)
+  • file signing skipped via signExecutable configuration  file=/Users/ly/personal/personal-work/deep-legends/dist/desktop/Deep Legends Setup 0.12.3.__uninstaller.exe
+  • file signing skipped via signExecutable configuration  file=/Users/ly/personal/personal-work/deep-legends/dist/desktop/Deep Legends Setup 0.12.3.exe
+[build 2026-09-17T15:51:35.466Z] nsis: completed (144.3s)
+[build 2026-09-17T15:51:35.508Z] installer-shell: started (0.0s)
+Installer shell built: Deep Legends Setup 0.12.3.exe (336434847 installed bytes)
+[build 2026-09-17T15:51:37.050Z] installer-shell: completed (1.5s)
+packaged desktop runtime verified: desktop-log.cjs, diagnostics-directory.cjs, diagnostics-export.cjs, main.cjs, preload.cjs, proxy-resolution.cjs, share-export.cjs, ui-scale.cjs, window-bounds-store.cjs, window-bounds.cjs
+verified build fingerprint=92c3a70c3cd4
+Build distribution verified: private · 92c3a70c3cd4
+Setup build complete: Deep Legends Setup 0.12.3.exe

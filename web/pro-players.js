@@ -63,7 +63,7 @@
     const query = normalize(state.query);
     const html = [];
     for (const team of data.teams) {
-      if (!teams.includes(team.code) || state.team !== "all" && state.team !== team.code) continue;
+      if (!teams.includes(team.code) || team.secondary === true || state.team !== "all" && state.team !== team.code) continue;
       const playerGroups = [];
       let shownAccounts = 0;
       for (const player of team.players || []) {
@@ -72,32 +72,33 @@
         const visibleAccounts = playerMatches ? accounts : accounts.filter((account) => normalize(account.gameName + "#" + account.tagLine).includes(query));
         if (!playerMatches && !visibleAccounts.length) continue;
         shownAccounts += visibleAccounts.length;
-        const history = visibleAccounts.filter(account => account.dormant);
+        const collapsed = account => account.rankStatus !== "ranked";
+        const history = visibleAccounts.filter(collapsed);
         const expanded = state.expanded.has(player.key);
-        const shown = state.primaryOnly ? visibleAccounts.filter(account => account.primary).slice(0, 1) : visibleAccounts.filter(account => !account.dormant);
+        const shown = state.primaryOnly ? visibleAccounts.slice(0, 1) : visibleAccounts.filter(account => !collapsed(account));
         const rows = [];
         const accountRow = (account) => {
           const key = `${player.key}:${account.gameName}#${account.tagLine}`;
-          links.set(key, { account, teamCode: team.code, playerName: player.name });
+          links.set(key, { account, teamCode: team.code, playerName: player.name, secondary: team.secondary === true });
           const name = `${account.gameName}#${account.tagLine}`;
           const lp = account.rankStatus === "ranked" && account.lpKnown !== false && Number.isFinite(Number(account.lp)) ? `<span class="pro-lp-value">${escape(integer(account.lp))}</span>` : '<span class="pro-muted">—</span>';
-          const updated = account.source === "TrackingThePros" || !account.updatedAt ? "来源未提供更新时间" : `更新 ${stamp(account.updatedAt)}`;
-          return `<tr class="${account.primary ? "pro-primary" : ""}" data-pro-row="${escape(key)}"><td class="pro-account"><button type="button" data-pro-account="${escape(key)}" aria-label="查看 ${escape(player.name)} 的账号 ${escape(name)} 总览"><span class="pro-account-line"><span class="pro-account-name" title="${escape(name)}">${escape(account.gameName)}<small>#${escape(account.tagLine)}</small></span>${account.primary ? '<small class="pro-main-badge">主号</small>' : ""}${account.stale ? '<small class="pro-cached">缓存</small>' : ""}${account.inactive ? '<small class="pro-inactive">不活跃</small>' : ""}${account.source === "TrackingThePros" ? '<small class="pro-ttp">TTP</small>' : ""}${state.mismatches.has(identityKey(name)) ? '<small class="pro-review">待核验</small>' : ""}</span><span class="pro-account-meta">${escape(updated)}</span></button></td><td class="pro-rank-cell">${rank(account)}<span class="pro-ladder-inline">${ladderRank(account)}</span></td><td class="pro-lp">${lp}</td><td class="pro-ladder">${ladderRank(account)}</td></tr>`;
+          const updated = account.lastMatchAtKnown && account.lastMatchAt ? `最近对局 ${stamp(account.lastMatchAt)}` : (data.updating ? "正在读取最近对局…" : "最近对局时间暂不可用");
+          return `<tr class="${accounts.indexOf(account) === 0 ? "pro-primary" : ""}" data-pro-row="${escape(key)}"><td class="pro-account"><button type="button" data-pro-account="${escape(key)}" aria-label="查看 ${escape(player.name)} 的账号 ${escape(name)} 总览"><span class="pro-account-line"><span class="pro-account-name" title="${escape(name)}">${escape(account.gameName)}<small>#${escape(account.tagLine)}</small></span>${account.stale ? '<small class="pro-cached">缓存</small>' : ""}${account.inactive ? '<small class="pro-inactive">不活跃</small>' : ""}${account.source === "TrackingThePros" ? '<small class="pro-ttp">TTP</small>' : ""}${state.mismatches.has(identityKey(name)) ? '<small class="pro-review">待核验</small>' : ""}</span><span class="pro-account-meta">${escape(updated)}</span></button></td><td class="pro-rank-cell">${rank(account)}<span class="pro-ladder-inline">${ladderRank(account)}</span></td><td class="pro-lp">${lp}</td><td class="pro-ladder">${ladderRank(account)}</td></tr>`;
         };
         rows.push(...shown.map(accountRow));
         if (!state.primaryOnly && history.length) {
-          rows.push(`<tr class="pro-history"><td colspan="4"><button type="button" title="仅依据来源明确的不活跃标记或超过 120 天的记录更新时间折叠；不代表最近游戏时间" data-pro-history="${escape(player.key)}" aria-expanded="${expanded}">${expanded ? "▾" : "▸"} ${history.length} 个较旧或来源标记不活跃的账号</button></td></tr>`);
+          rows.push(`<tr class="pro-history"><td colspan="4"><button type="button" title="展开查看未定级和段位暂不可用的账号；读取失败不会被判为未定级" data-pro-history="${escape(player.key)}" aria-expanded="${expanded}">${expanded ? "▾" : "▸"} ${history.length} 个无段位或待确认账号</button></td></tr>`);
           if (expanded) rows.push(...history.map(accountRow));
         }
         if (!rows.length) {
-          const message = state.primaryOnly && accounts.length ? "暂无可确认的主账号" : data.updating ? "正在读取选手账号…" : data.unavailable ? "账号来源暂不可用，稍后重试" : player.status === "partial" ? "账号来源暂不可用或记录待核验，请刷新重试" : "公开来源暂未收录可核验的韩服账号";
+          const message = state.primaryOnly && accounts.length ? "暂无匹配的最新账号" : data.updating ? "正在读取选手账号…" : data.unavailable ? "账号来源暂不可用，稍后重试" : player.status === "partial" ? "账号来源暂不可用或记录待核验，请刷新重试" : "公开来源暂未收录可核验的韩服账号";
           rows.push(`<tr><td colspan="4" class="pro-missing">${message}</td></tr>`);
         }
         rows[0] = rows[0].replace(/(<tr[^>]*>)/, "$1" + playerCell(player, accounts.length, rows.length));
         playerGroups.push(`<tbody>${rows.join("")}</tbody>`);
       }
       if (!playerGroups.length) continue;
-      html.push(`<section class="pro-team" aria-labelledby="pro-team-${team.code}"><header class="pro-team-heading"><div><span class="pro-league">${escape(team.league)}</span><h2 id="pro-team-${team.code}">${escape(team.code)}</h2><span class="pro-team-name">${escape(team.name)}</span></div><span>${playerGroups.length} 位选手 · ${shownAccounts} 个账号</span></header><div class="pro-table-wrap"><table class="pro-table"><caption class="sr-only">${escape(team.name)} 一队选手账号及韩服单双排段位、胜点和天梯排名</caption><colgroup><col class="pro-col-player"><col class="pro-col-account"><col class="pro-col-rank"><col class="pro-col-lp"><col class="pro-col-ladder"></colgroup><thead><tr><th scope="col">选手</th><th scope="col">韩服账号</th><th scope="col" aria-sort="descending">单双排段位 ↓</th><th scope="col" class="pro-lp">胜点</th><th scope="col" class="pro-ladder">天梯</th></tr></thead>${playerGroups.join("")}</table></div></section>`);
+      html.push(`<section class="pro-team" aria-labelledby="pro-team-${escape(team.code)}"><header class="pro-team-heading"><div><span class="pro-league">${escape(team.league)}</span><h2 id="pro-team-${escape(team.code)}">${escape(team.code)}</h2><span class="pro-team-name">${escape(team.name)}${team.secondary ? " · 二队 / 学院队" : ""}</span></div><span>${playerGroups.length} 位选手 · ${shownAccounts} 个账号</span></header><div class="pro-table-wrap"><table class="pro-table"><caption class="sr-only">${escape(team.name)} ${team.secondary ? "二队" : "一队"}选手账号及韩服单双排段位、胜点和天梯排名</caption><colgroup><col class="pro-col-player"><col class="pro-col-account"><col class="pro-col-rank"><col class="pro-col-lp"><col class="pro-col-ladder"></colgroup><thead><tr><th scope="col">选手</th><th scope="col">韩服账号</th><th scope="col">单双排段位</th><th scope="col" class="pro-lp">胜点</th><th scope="col" class="pro-ladder">天梯</th></tr></thead>${playerGroups.join("")}</table></div></section>`);
     }
     content.innerHTML = html.join("") || '<div class="pro-empty"><strong>没有匹配的选手或账号</strong><p>试试其他关键词，或切换到“全部战队”。</p></div>';
   }
@@ -116,7 +117,7 @@
       const response = await fetch(`/api/pro-players${force ? "?refresh=1" : ""}`, { credentials: "same-origin", cache: "no-store", signal: controller.signal });
       if (!response.ok) throw new Error("source unavailable");
       const data = await response.json();
-      if (!Array.isArray(data.teams) || data.teams.length !== 6 || !teams.every((code) => data.teams.some((team) => team.code === code && Array.isArray(team.players)))) throw new Error("invalid response");
+      if (!Array.isArray(data.teams) || !data.teams.every((team) => typeof team.code === "string" && team.code && Array.isArray(team.players))) throw new Error("invalid response");
       changed ||= JSON.stringify(state.data) !== JSON.stringify(data);
       state.data = data;
       state.loadedAt = Date.now();
@@ -160,19 +161,20 @@
     const button = event.target.closest("[data-pro-account]") || event.target.closest("[data-pro-row]")?.querySelector("[data-pro-account]");
     const target = button && links.get(button.dataset.proAccount);
     if (!target) return;
-    const { account, teamCode, playerName } = target;
+    const { account, teamCode, playerName, secondary } = target;
     state.returnKey = button.dataset.proAccount;
-    window.dispatchEvent(new CustomEvent("deep-legends:open-player", { detail: { gameName: account.gameName, tagLine: account.tagLine, region: "kr", serverId: "", source: "pro-players", expectedTier: account.tier || "", teamCode, playerName } }));
+    window.dispatchEvent(new CustomEvent("deep-legends:open-player", { detail: { gameName: account.gameName, tagLine: account.tagLine, region: "kr", serverId: "", source: "pro-players", expectedTier: account.tier || "", teamCode, playerName, secondary } }));
   });
   home.addEventListener("click", () => navigate("overview"));
   back.addEventListener("click", () => {
-    navigate("pro-players");
     const previous = [...content.querySelectorAll("[data-pro-account]")].find((button) => button.dataset.proAccount === state.returnKey);
     (previous || document.getElementById("pro-players-title"))?.focus({ preventScroll: true });
   });
-  window.addEventListener("deep-legends:section", (event) => {
+  function handleLazySection(event) {
     visible = event.detail?.name === "pro-players";
     clearTimeout(pollTimer);
     if (visible) void load();
-  });
+  }
+  window.addEventListener("deep-legends:section", handleLazySection);
+  window.deepLegendsSections?.register("pro-players", handleLazySection);
 })();

@@ -1,0 +1,6 @@
+=== RUN   TestR98SummonerDoesNotGateProgressAndPreviewKeepsAdvancing
+    r98_test.go:244: one-shot preview latch remains []
+--- FAIL: TestR98SummonerDoesNotGateProgressAndPreviewKeepsAdvancing (0.84s)
+FAIL
+FAIL	lol-loot-assistant	1.389s
+FAIL

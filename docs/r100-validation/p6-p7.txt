@@ -1,0 +1,53 @@
+✔ 职业页懒加载、所有分组/账号、缺失状态、筛选缓存与安全转义 (251.42025ms)
+✔ 加载互斥、失败保留旧表、恢复与来源不可用名单 (246.976375ms)
+✔ 国服每次打开折叠；韩服下方入口可键盘聚焦且不修改大区 (696.681959ms)
+✔ 统一总览按国服、韩服、职业分组，同一账号跨组隔离且保留滚动和目录焦点 (2495.5975ms)
+✔ 补充来源未更新保留提示，重新进入不重复阻塞整页，手动刷新可重试 (218.681042ms)
+✔ 职业列表后台补充自动更新，离开页面停止轮询 (5131.076709ms)
+✔ R73 主号、历史折叠、只看主号及会话核验 (183.821667ms)
+▶ R73 真正点击后才核验：差异与404标记，502不误判
+  ✔ {"proMismatch":true} (1892.261625ms)
+  ✔ {"overviewStatus":404} (1410.286167ms)
+  ✔ {"overviewStatus":502} (1204.787167ms)
+✔ R73 真正点击后才核验：差异与404标记，502不误判 (4507.933416ms)
+✔ 职业目录仅保留返回总览，返回后保留全部已打开页签 (1976.14475ms)
+✔ 未知更新时间的补充账号保持展示，不出现120天未玩的断言 (86.566292ms)
+✔ 玩家页签各自保留纵向位置，跨页面返回也不串位 (2592.937958ms)
+✔ R87 导出完成状态跨页面保留，打开文件夹后还原 (777.8205ms)
+✔ OPGG season summary actually replaces recent sample in both overview workspaces without a history reload (1395.704792ms)
+✔ 当前对局独立置顶、两队十人、无评分和多余标记，分组后不会污染玩家战绩 (862.667625ms)
+✔ R74 零战绩当前对局也加载技能目录，未加载时不伪造技能名称 (778.283666ms)
+✖ R74 菜单键盘跳过空组、异步重绘保焦、离开总览关闭菜单 (426.162ms)
+✔ 国服总览保留战绩但不渲染或请求当前对局和观战 (391.876416ms)
+✔ R97 management filters and rows exclude expanded and academy teams (93.951458ms)
+✔ R100 empty national/KR/pro groups stay selectable and preserve distinct empty states (991.599209ms)
+✔ R100 P7 first native save persists independently; second and restart save without prompt; no overwrite (8.054875ms)
+✔ R100 P7 deleted/replaced directory re-prompts at actual write; cancel cleans staging (4.146125ms)
+✔ R100 P7 rejects foreign renderer and symbolic link files; packaged controller (2.631042ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 24
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24666.507292
+
+✖ failing tests:
+
+test at desktop/pro-players.test.cjs:431:1
+✖ R74 菜单键盘跳过空组、异步重绘保焦、离开总览关闭菜单 (426.162ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'kr' !== 'players'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/desktop/pro-players.test.cjs:437:26)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'kr',
+    expected: 'players',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

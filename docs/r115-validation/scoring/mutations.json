@@ -1,0 +1,40 @@
+{
+  "baseline": true,
+  "mutations": [
+    {
+      "id": "paired-games",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "zero-death-kda",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "missing-axis",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "role-reference",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "outlier-reference",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "assist-credit",
+      "killed": true,
+      "exitCode": 1
+    },
+    {
+      "id": "missing-baseline-polygon",
+      "killed": true,
+      "exitCode": 1
+    }
+  ]
+}

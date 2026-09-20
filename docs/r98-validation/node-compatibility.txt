@@ -1,0 +1,13 @@
+✔ forced overview aborts a loading request and starts a newer request (1.934792ms)
+✔ R63 forced overview refresh merges its first page into already loaded pages (3.292083ms)
+✔ R61 append uses an independent controller and queues timed revalidation (1.614541ms)
+✔ R63 mandatory contracts reject every documented production regression (21.883375ms)
+✔ cached overview re-enters independent season and current-game loaders without requesting history (5.632917ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 612.0285

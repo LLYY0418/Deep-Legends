@@ -1,0 +1,4 @@
+=== RUN   TestR100PerksNeverWaitForOptionalAugmentsAndPersist
+--- PASS: TestR100PerksNeverWaitForOptionalAugmentsAndPersist (3.01s)
+PASS
+ok  	lol-loot-assistant	3.476s

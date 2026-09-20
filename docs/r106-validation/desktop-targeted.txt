@@ -1,0 +1,22 @@
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R56 工具页状态、确认、下拉与领奖契约完整 (5591.177042ms)
+✔ 职业页懒加载、所有分组/账号、缺失状态、筛选缓存与安全转义 (328.30425ms)
+✔ 加载互斥、失败保留旧表、恢复与来源不可用名单 (323.550083ms)
+✔ 补充来源未更新保留提示，重新进入不重复阻塞整页，手动刷新可重试 (257.5415ms)
+✔ 职业列表后台补充自动更新，离开页面停止轮询 (5137.952166ms)
+✔ 未知更新时间的补充账号保持展示，不出现120天未玩的断言 (100.315916ms)
+✔ R97 management filters and rows exclude expanded and academy teams (111.384834ms)
+✔ TestR102LatestOnlyTogglesShowsFirstAccountOnly (146.178583ms)
+✔ TestR102HighlightUsesOriginalAccountIndex (129.736334ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7217.126542

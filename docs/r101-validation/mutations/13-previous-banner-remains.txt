@@ -1,0 +1,6 @@
+=== RUN   TestR101PreviousBannerActionRemoved
+    r101_test.go:335: 502 1
+--- FAIL: TestR101PreviousBannerActionRemoved (0.00s)
+FAIL
+FAIL	lol-loot-assistant	0.530s
+FAIL

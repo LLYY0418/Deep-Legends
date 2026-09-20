@@ -388,6 +388,7 @@ func TestGameplayMatchTiersPropagatesReferencePrivacy(t *testing.T) {
 func TestGameplayMatchTiersBatchesKRWithoutLCU(t *testing.T) {
 	created := time.Date(2026, time.August, 18, 12, 0, 0, 0, time.UTC)
 	puuid := strings.Repeat("k", 48)
+	providerID := strings.Repeat("o", 48)
 	var calls atomic.Int32
 	champions := newChampionProvider()
 	champions.clientMu.Lock()
@@ -396,14 +397,17 @@ func TestGameplayMatchTiersBatchesKRWithoutLCU(t *testing.T) {
 		if request.URL.Host != "op.gg" || !strings.Contains(request.URL.Path, "/Trusted-KR1") {
 			t.Fatalf("untrusted OP.GG route: %s", request.URL.String())
 		}
+		if request.Method == http.MethodGet {
+			return testHTTPResponse(request, http.StatusOK, r112ProfilePage("Trusted", "KR1", providerID)), nil
+		}
 		if request.Header.Get("Next-Action") != opggGamesAction {
 			t.Fatalf("Next-Action = %q", request.Header.Get("Next-Action"))
 		}
 		data, _ := io.ReadAll(request.Body)
-		if !strings.Contains(string(data), puuid) || strings.Contains(string(data), "Attacker") {
+		if !strings.Contains(string(data), providerID) || strings.Contains(string(data), puuid) || strings.Contains(string(data), "Attacker") {
 			t.Fatalf("unexpected request body: %s", data)
 		}
-		payload := fmt.Sprintf("0:{\"data\":[{\"created_at\":%q,\"game_length\":1800,\"average_tier\":{\"tier\":\"emerald\",\"division\":2,\"lp\":37}}]}\n", created.Format(time.RFC3339))
+		payload := fmt.Sprintf("0:{\"a\":\"$@1\"}\n1:{\"data\":[{\"created_at\":%q,\"game_length\":1800,\"average_tier\":{\"tier\":\"emerald\",\"division\":2,\"lp\":37}}]}\n", created.Format(time.RFC3339))
 		return testHTTPResponse(request, http.StatusOK, payload), nil
 	})}
 	champions.clientMu.Unlock()
@@ -438,8 +442,8 @@ func TestGameplayMatchTiersBatchesKRWithoutLCU(t *testing.T) {
 	if got, exists := response["102"]; !exists || got != nil {
 		t.Fatalf("unmatched tier = %#v, exists=%v", got, exists)
 	}
-	if calls.Load() != 1 {
-		t.Fatalf("OP.GG calls = %d, want 1", calls.Load())
+	if calls.Load() != 2 {
+		t.Fatalf("OP.GG calls = %d, want 2 (identity + games)", calls.Load())
 	}
 	if strings.Contains(recorder.Body.String(), puuid) {
 		t.Fatal("response leaked the stable PUUID")
@@ -483,15 +487,8 @@ func TestGameplayMatchTiersKRFailureAndCancellationDegrade(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("cancelled OP.GG request blocked the handler")
 	}
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
-	}
-	var response map[string]*matchTiersResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatal(err)
-	}
-	if got, exists := response["201"]; !exists || got != nil {
-		t.Fatalf("cancelled result = %#v, exists=%v", got, exists)
+	if recorder.Code != http.StatusServiceUnavailable || recorder.Header().Get("Retry-After") != "30" {
+		t.Fatalf("cancelled source must be retryable: %d %s", recorder.Code, recorder.Body.String())
 	}
 }
 
@@ -517,15 +514,14 @@ func TestGameplayMatchTiersKRHTTPFailureAndExpiredReference(t *testing.T) {
 	}
 	recorder := httptest.NewRecorder()
 	a.handleGameplayMatchTiers(recorder, httptest.NewRequest(http.MethodPost, "/api/gameplay/match-tiers", strings.NewReader(makeBody(publicRef))))
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("upstream failure status = %d: %s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusServiceUnavailable || recorder.Header().Get("Retry-After") != "30" {
+		t.Fatalf("failed source must be retryable: %d %s", recorder.Code, recorder.Body.String())
 	}
-	var response map[string]*matchTiersResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
-		t.Fatal(err)
-	}
-	if got, exists := response["211"]; !exists || got != nil {
-		t.Fatalf("failed result = %#v, exists=%v", got, exists)
+	// The failed lookup is shared across repeated visible-card batches.
+	retry := httptest.NewRecorder()
+	a.handleGameplayMatchTiers(retry, httptest.NewRequest(http.MethodPost, "/api/gameplay/match-tiers", strings.NewReader(makeBody(publicRef))))
+	if retry.Code != http.StatusServiceUnavailable || calls.Load() != 1 {
+		t.Fatalf("failure backoff: %d calls %d", retry.Code, calls.Load())
 	}
 
 	recorder = httptest.NewRecorder()
@@ -546,6 +542,9 @@ func TestOPGGGameTiersCacheExpandsForOlderPages(t *testing.T) {
 	champions.clientMu.Lock()
 	champions.client = &http.Client{Transport: gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		calls.Add(1)
+		if request.Method == http.MethodGet {
+			return testHTTPResponse(request, http.StatusOK, r112ProfilePage("Cache", "KR1", strings.Repeat("o", 48))), nil
+		}
 		var payload []opggGamesRequest
 		data, _ := io.ReadAll(request.Body)
 		if err := json.Unmarshal(data, &payload); err != nil || len(payload) != 1 {
@@ -565,21 +564,21 @@ func TestOPGGGameTiersCacheExpandsForOlderPages(t *testing.T) {
 			}
 		}
 		encoded, _ := json.Marshal(map[string]any{"data": rows})
-		return testHTTPResponse(request, http.StatusOK, "0:"+string(encoded)+"\n"), nil
+		return testHTTPResponse(request, http.StatusOK, "0:{\"a\":\"$@1\"}\n1:"+string(encoded)+"\n"), nil
 	})}
 	champions.clientMu.Unlock()
 	a := &app{champions: champions, opgg: newOPGGInsights()}
 
-	first := a.opggGameTiers(context.Background(), "Cache", "KR1", puuid, base.Add(-10*time.Minute).UnixMilli())
-	if len(first) != opggGamesPageSize || calls.Load() != 1 {
+	first, err := a.opggGameTiers(context.Background(), "Cache", "KR1", puuid, base.Add(-10*time.Minute).UnixMilli())
+	if err != nil || len(first) != opggGamesPageSize || calls.Load() != 2 {
 		t.Fatalf("first load: games=%d calls=%d", len(first), calls.Load())
 	}
-	older := a.opggGameTiers(context.Background(), "Cache", "KR1", puuid, base.Add(-30*time.Minute).UnixMilli())
-	if len(older) != 2*opggGamesPageSize || calls.Load() != 3 {
+	older, err := a.opggGameTiers(context.Background(), "Cache", "KR1", puuid, base.Add(-30*time.Minute).UnixMilli())
+	if err != nil || len(older) != 2*opggGamesPageSize || calls.Load() != 3 {
 		t.Fatalf("older load: games=%d calls=%d", len(older), calls.Load())
 	}
-	again := a.opggGameTiers(context.Background(), "Cache", "KR1", puuid, base.Add(-30*time.Minute).UnixMilli())
-	if len(again) != len(older) || calls.Load() != 3 {
+	again, err := a.opggGameTiers(context.Background(), "Cache", "KR1", puuid, base.Add(-30*time.Minute).UnixMilli())
+	if err != nil || len(again) != len(older) || calls.Load() != 3 {
 		t.Fatalf("cache hit: games=%d calls=%d", len(again), calls.Load())
 	}
 }
@@ -597,19 +596,34 @@ func TestOPGGGameTiersCoalescesConcurrentRequests(t *testing.T) {
 			close(started)
 		}
 		<-release
-		payload := fmt.Sprintf("0:{\"data\":[{\"created_at\":%q,\"game_length\":1800,\"average_tier\":{\"tier\":\"gold\",\"division\":1}}]}\n", base.Format(time.RFC3339))
+		if request.Method == http.MethodGet {
+			return testHTTPResponse(request, http.StatusOK, r112ProfilePage("Flight", "KR1", strings.Repeat("o", 48))), nil
+		}
+		payload := fmt.Sprintf("0:{\"a\":\"$@1\"}\n1:{\"data\":[{\"created_at\":%q,\"game_length\":1800,\"average_tier\":{\"tier\":\"gold\",\"division\":1}}]}\n", base.Format(time.RFC3339))
 		return testHTTPResponse(request, http.StatusOK, payload), nil
 	})}
 	champions.clientMu.Unlock()
 	a := &app{champions: champions, opgg: newOPGGInsights()}
 	results := make(chan []opggGameTier, 2)
-	go func() { results <- a.opggGameTiers(context.Background(), "Flight", "KR1", puuid, base.UnixMilli()) }()
+	go func() {
+		games, err := a.opggGameTiers(context.Background(), "Flight", "KR1", puuid, base.UnixMilli())
+		if err != nil {
+			t.Error(err)
+		}
+		results <- games
+	}()
 	select {
 	case <-started:
 	case <-time.After(time.Second):
 		t.Fatal("first request did not start")
 	}
-	go func() { results <- a.opggGameTiers(context.Background(), "Flight", "KR1", puuid, base.UnixMilli()) }()
+	go func() {
+		games, err := a.opggGameTiers(context.Background(), "Flight", "KR1", puuid, base.UnixMilli())
+		if err != nil {
+			t.Error(err)
+		}
+		results <- games
+	}()
 	time.Sleep(20 * time.Millisecond)
 	close(release)
 	for range 2 {
@@ -622,8 +636,8 @@ func TestOPGGGameTiersCoalescesConcurrentRequests(t *testing.T) {
 			t.Fatal("coalesced request did not finish")
 		}
 	}
-	if calls.Load() != 1 {
-		t.Fatalf("OP.GG calls = %d, want 1", calls.Load())
+	if calls.Load() != 2 {
+		t.Fatalf("OP.GG calls = %d, want 2 (identity + games)", calls.Load())
 	}
 }
 

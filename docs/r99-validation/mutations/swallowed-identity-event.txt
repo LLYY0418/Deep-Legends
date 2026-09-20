@@ -1,0 +1,5 @@
+--- FAIL: TestR99SummonerEventStillUpdatesIdentity (0.00s)
+    r99_test.go:286: facade swallowed summoner identity event
+FAIL
+FAIL	lol-loot-assistant	0.537s
+FAIL

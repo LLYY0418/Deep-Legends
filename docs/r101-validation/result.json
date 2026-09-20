@@ -1,0 +1,35 @@
+{
+  "go_full": {
+    "passed": 1206,
+    "skipped": 17,
+    "seconds": 108.585
+  },
+  "go_race": {
+    "passed": true,
+    "seconds": 157.308
+  },
+  "r101_focused_race": {
+    "top_level_tests": 26,
+    "seconds": 3.496
+  },
+  "node_full": {
+    "tests": 713,
+    "passed": 712,
+    "failed": 0,
+    "skipped": 1,
+    "seconds": 302.948
+  },
+  "mutations": {
+    "killed": 25,
+    "total": 25
+  },
+  "browser": {
+    "samples": 6,
+    "passed": true
+  },
+  "real_client": {
+    "W5": "pending",
+    "W6": "pending",
+    "W5c_token_write": "gated on real schema"
+  }
+}

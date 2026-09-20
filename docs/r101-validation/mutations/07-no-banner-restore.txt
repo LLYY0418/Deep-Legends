@@ -1,0 +1,20 @@
+=== RUN   TestR101BannerProbeAlwaysRestores
+=== RUN   TestR101BannerProbeAlwaysRestores/ok
+    r101_test.go:202: restore missing: [map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:inventory-content data:map[nested:[keep 9]] inventoryType:REGALIA_BANNER itemId:4]]]]
+=== RUN   TestR101BannerProbeAlwaysRestores/noop
+    r101_test.go:202: restore missing: [map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:inventory-content data:map[nested:[keep 9]] inventoryType:REGALIA_BANNER itemId:4]]]]
+=== RUN   TestR101BannerProbeAlwaysRestores/reject
+    r101_test.go:202: restore missing: [map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:inventory-content data:map[nested:[keep 9]] inventoryType:REGALIA_BANNER itemId:4]]]]
+=== RUN   TestR101BannerProbeAlwaysRestores/read-error
+    r101_test.go:202: restore missing: [map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:inventory-content data:map[nested:[keep 9]] inventoryType:REGALIA_BANNER itemId:4]]]]
+=== RUN   TestR101BannerProbeAlwaysRestores/cancel
+    r101_test.go:202: restore missing: [map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:inventory-content data:map[nested:[keep 9]] inventoryType:REGALIA_BANNER itemId:4]]]]
+--- FAIL: TestR101BannerProbeAlwaysRestores (0.01s)
+    --- FAIL: TestR101BannerProbeAlwaysRestores/ok (0.00s)
+    --- FAIL: TestR101BannerProbeAlwaysRestores/noop (0.00s)
+    --- FAIL: TestR101BannerProbeAlwaysRestores/reject (0.00s)
+    --- FAIL: TestR101BannerProbeAlwaysRestores/read-error (0.00s)
+    --- FAIL: TestR101BannerProbeAlwaysRestores/cancel (0.00s)
+FAIL
+FAIL	lol-loot-assistant	0.607s
+FAIL

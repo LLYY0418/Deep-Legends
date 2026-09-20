@@ -466,11 +466,19 @@ func (a *app) handleRiotMatchTiers(w http.ResponseWriter, r *http.Request, reque
 
 	ctx, cancel := context.WithTimeout(r.Context(), matchTiersOPGGTimeout)
 	defer cancel()
-	games := a.opggGameTiers(ctx, gameName, tagLine, reference.PlayerRef, oldest)
+	games, err := a.opggGameTiers(ctx, gameName, tagLine, reference.PlayerRef, oldest)
+	if err != nil {
+		w.Header().Set("Retry-After", "30")
+		http.Error(w, "平均段位来源暂不可用，请稍后重试", http.StatusServiceUnavailable)
+		return
+	}
+	matched := 0
 	for _, match := range matches {
 		if value := matchOPGGAverageTier(match.CreatedAt, match.Duration, games); value != nil {
 			response[strconv.FormatInt(match.GameID, 10)] = value
+			matched++
 		}
 	}
+	a.recordDiagnostic(map[string]any{"event": "opgg_match_tiers_result", "matches": len(matches), "matched": matched, "missing": len(matches) - matched})
 	respondJSON(w, response)
 }

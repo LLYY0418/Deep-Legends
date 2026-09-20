@@ -1,0 +1,73 @@
+{
+  "player": {
+    "proPlayer": {
+      "playerName": "Chovy",
+      "teamCode": "GEN",
+      "teamName": "Gen.G",
+      "secondary": false
+    },
+    "playerRef": "player_41ed50139128335e5d74627f0b53d1c5",
+    "displayName": "",
+    "gameName": "허거덩",
+    "tagLine": "0303",
+    "summonerLevel": 760,
+    "region": "kr",
+    "hidden": false,
+    "isCurrent": false
+  },
+  "ranks": null,
+  "recentRanked": {
+    "games": 0,
+    "wins": 0,
+    "losses": 0,
+    "winRate": 0,
+    "kills": 0,
+    "deaths": 0,
+    "assists": 0,
+    "kda": 0,
+    "killParticipation": 0,
+    "killParticipationGames": 0,
+    "positions": null
+  },
+  "overall": {
+    "games": 0,
+    "wins": 0,
+    "losses": 0,
+    "winRate": 0,
+    "kills": 0,
+    "deaths": 0,
+    "assists": 0,
+    "kda": 0,
+    "cs": 0,
+    "csPerMinute": 0
+  },
+  "championStats": null,
+  "seasonStatsProgress": {
+    "season": "",
+    "scanned": 0,
+    "complete": false
+  },
+  "seasonOverall": {
+    "games": 0,
+    "wins": 0,
+    "losses": 0,
+    "winRate": 0,
+    "kills": 0,
+    "deaths": 0,
+    "assists": 0,
+    "kda": 0,
+    "cs": 0,
+    "csPerMinute": 0
+  },
+  "positions": null,
+  "masteries": null,
+  "recentPlayers": null,
+  "activityHours": null,
+  "matches": null,
+  "pagination": {
+    "begIndex": 0,
+    "count": 0,
+    "hasMore": false
+  },
+  "capabilities": null
+}

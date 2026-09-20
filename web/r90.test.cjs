@@ -29,7 +29,7 @@ function functionSource(script, name) {
   assert.fail(`unbalanced ${name}`);
 }
 
-function compile(names,deps={}) {return Function(...Object.keys(deps),names.map(n=>functionSource(source,n)).join("\n")+`\nreturn {${names.join(",")}}`)(...Object.values(deps))}
+function compile(names,deps={}) {deps={updateLiveLoadingVisibility(){},...deps};return Function(...Object.keys(deps),names.map(n=>functionSource(source,n)).join("\n")+`\nreturn {${names.join(",")}}`)(...Object.values(deps))}
 function harness(data,section="live") {
  let serial=0;const timers=new Map();const calls=[];
  const state={section,beacon:{phase:data.phase},live:data,settings:{liveRefresh:true,liveInterval:60}};
@@ -52,7 +52,7 @@ test("R90 completeness requires availability, roster, settled history and arena 
  const h=harness(full());
  for(const d of [null,{}, {...full(),available:false},{...full(),players:[]},{...full(),players:[{historyState:"pending"}]},{...full("InProgress",true),arenaGrouped:false}]) assert.equal(h.liveSnapshotComplete(d),false);
  assert.equal(h.liveSnapshotComplete({...full("InProgress",true),arenaGrouped:false,arenaGroupingUnavailable:true}),true);
- for(const historyState of ["failed","empty","unavailable"]) assert.equal(h.liveSnapshotComplete({...full(),players:[{historyState}]}),true);
+ for(const historyState of ["empty","unavailable"]) assert.equal(h.liveSnapshotComplete({...full(),players:[{historyState}]}),true);
 });
 test("R90 incomplete snapshots stop after eight retries with a visible refresh exit",()=>{
  const h=harness({...full("InProgress",true),arenaGrouped:false});
@@ -69,13 +69,13 @@ test("R90 inactive tabs and repeated in-game SSE do not reload the roster; phase
  h.state.section="live";h.state.livePhaseRefreshQueued=false;h.state.liveRefreshQueued=false;
  h.queueLiveEventRefresh("sse",false);assert.equal(h.timers.size,0);
  h.state.live.arenaGrouped=false;h.state.live.gameMode="CHERRY";h.queueLiveEventRefresh("sse",false);assert.equal(h.timers.size,0,"same-phase events must not bypass bounded retry budget");
- h.document.hidden=true;h.queueLiveEventRefresh("sse",true);assert.equal(h.timers.size,0);assert.equal(h.state.livePhaseRefreshQueued,true);
+ h.document.hidden=true;h.queueLiveEventRefresh("sse",true);assert.equal(h.timers.size,1);assert.equal(h.state.livePhaseRefreshQueued,true);
  h.document.hidden=false;h.queueLiveEventRefresh();assert.equal(h.timers.size,1);
 });
 test("R90 stopped UI has an operable manual refresh and foreground wake checks phase",()=>{
  const h=harness(full());assert.match(h.renderLiveRefreshStatus(h.state.live),/对局中数据不再变化，已停止自动刷新/);
  const calls=[];let handler;const button={addEventListener:(event,fn)=>{if(event==="click")handler=fn}};
- const {bindLiveContent}=compile(["bindLiveContent"],{state:h.state,nodes:{liveContent:{querySelector:s=>s==="[data-live-refresh]"?button:null,querySelectorAll:()=>[]}},bindRuneChoiceButtons:()=>{},loadLive:(...args)=>calls.push(args),bindPlayerLinks:()=>{},bindInsightMatchExpand:()=>{},applyRunes:()=>{},applyItemSet:()=>{}});
+ const {bindLiveContent}=compile(["bindLiveContent"],{state:h.state,nodes:{liveContent:{querySelector:s=>s==="[data-live-refresh]"?button:null,querySelectorAll:()=>[]}},bindRuneWorkspaceControls:()=>{},bindRuneChoiceButtons:()=>{},loadLive:(...args)=>calls.push(args),bindPlayerLinks:()=>{},bindInsightMatchExpand:()=>{},applyRunes:()=>{},applyItemSet:()=>{}});
  bindLiveContent();handler();assert.deepEqual(calls,[[true,"manual"]]);
  const visibility=source.slice(source.indexOf('document.addEventListener("visibilitychange", () => {\n    if (state.destroyed)'),source.indexOf('/* ---------- 新对局提示灯'));
  assert.doesNotMatch(visibility,/loadLive\(true/);assert.match(visibility,/scheduleBeaconPoll\(0\)/);

@@ -27,7 +27,7 @@ test('R89 parallel supplements start before first overview resolves and survive 
   const first=helpers.loadOverview(tab);
   assert.equal(calls.length,3,'all three requests must already be in flight');
   assert.ok(Math.max(...calls.map(c=>c.at))-Math.min(...calls.map(c=>c.at))<300);
-  assert.equal(calls.find(c=>c.url.endsWith('/overview')).body.count,20);
+  assert.equal(calls.find(c=>c.url.endsWith('/overview')).body.count,10);
   assert.deepEqual(calls.find(c=>c.url.endsWith('/season-summary')).body,{gameName:'Fixture',tagLine:'KR1',region:'kr',force:false});
   pending.find(c=>c.url.endsWith('/season-summary')).resolve({source:'OP.GG',queue:'RANKED',season:'S2026',champions:[],overall:{games:20}});
   pending.find(c=>c.url.endsWith('/current-game')).resolve({source:'OP.GG',status:'none'});
@@ -38,7 +38,7 @@ test('R89 parallel supplements start before first overview resolves and survive 
   // Supplement references are adopted when the complete snapshot arrives.
   assert.equal(calls.filter(c=>c.url.endsWith('/season-summary')).length,1);
   assert.equal(calls.filter(c=>c.url.endsWith('/current-game')).length,1);
-  assert.equal(calls.at(-1).body.count,20);
+  assert.equal(calls.at(-1).body.count,10);
   pending.find(c=>c.url.endsWith('/overview')).resolve(payload(20));await first;assert.equal(calls.filter(c=>c.url.endsWith('/overview')).length,1);assert.equal(tab.opggSeason.playerRef,'opaque-ref');assert.equal(tab.currentGame.ref,'opaque-ref');
   assert.equal(tab.data.matches.length,20);assert.equal(tab.data.overall.games,20);assert.equal(tab.initialPagePending,false);
 });

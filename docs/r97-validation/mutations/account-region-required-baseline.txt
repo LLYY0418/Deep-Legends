@@ -1,0 +1,10 @@
+=== RUN   TestR97ProAccountOptionalRegionSurvivesKRDirectory
+=== RUN   TestR97ProAccountOptionalRegionSurvivesKRDirectory/null
+=== RUN   TestR97ProAccountOptionalRegionSurvivesKRDirectory/missing
+=== RUN   TestR97ProAccountOptionalRegionSurvivesKRDirectory/empty
+--- PASS: TestR97ProAccountOptionalRegionSurvivesKRDirectory (0.00s)
+    --- PASS: TestR97ProAccountOptionalRegionSurvivesKRDirectory/null (0.00s)
+    --- PASS: TestR97ProAccountOptionalRegionSurvivesKRDirectory/missing (0.00s)
+    --- PASS: TestR97ProAccountOptionalRegionSurvivesKRDirectory/empty (0.00s)
+PASS
+ok  	lol-loot-assistant	0.010s

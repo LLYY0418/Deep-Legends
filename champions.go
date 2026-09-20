@@ -624,6 +624,11 @@ func championProviderErrorKind(err error) string {
 }
 
 func (p *championProvider) fetchDirect(ctx context.Context, host, requestPath string, query url.Values, maxBytes int64, accept string) ([]byte, error) {
+	if strings.HasPrefix(accept, "image/") {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, publicImageTimeout)
+		defer cancel()
+	}
 	if gate := featureGateForChampionHost(host); gate != "" && !p.featureGates.enabled(gate) {
 		return nil, fmt.Errorf("%s data source disabled by feature gate", gate)
 	}
@@ -818,6 +823,9 @@ func writeArenaFirstPlacesError(w http.ResponseWriter, err error) {
 }
 
 func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), publicImageTimeout)
+	defer cancel()
+	r = r.WithContext(ctx)
 	a.scheduleItemIconWarmup(false)
 	source := strings.TrimSpace(r.URL.Query().Get("source"))
 	requestPath := strings.TrimSpace(r.URL.Query().Get("path"))
@@ -829,16 +837,44 @@ func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
 	provider := a.championDataProvider()
 	if source == "communitydragon" {
 		candidates := communityDragonChampionAssetCandidates(requestPath)
+		// Exhaust cheap local choices first; remote variants race under ONE deadline.
 		for index, candidatePath := range candidates {
-			if data, ok := a.loadChampionAssetFromClient(r.Context(), provider, source, candidatePath); ok {
+			if data, ok := a.loadChampionAssetFromClient(ctx, provider, source, candidatePath); ok {
 				provider.reportAugmentIconFetch(requestPath, http.StatusOK, index, index > 0)
 				writeChampionAssetImage(w, data)
 				return
 			}
-			data, err := a.loadChampionRemoteAsset(r.Context(), provider, source, host, candidatePath)
-			if err == nil && writeChampionAssetImage(w, data) {
-				provider.reportAugmentIconFetch(requestPath, http.StatusOK, index, index > 0)
-				return
+		}
+		type assetResult struct {
+			data  []byte
+			index int
+		}
+		// Keep colored large/unsuffixed artwork ahead of small monochrome icons.
+		// Race equivalent variants in each quality tier within the same deadline.
+		for _, small := range []bool{false, true} {
+			results := make(chan assetResult, len(candidates))
+			count := 0
+			for index, candidatePath := range candidates {
+				if strings.HasSuffix(candidatePath, "_small.png") != small {
+					continue
+				}
+				count++
+				go func(index int, candidatePath string) {
+					data, _ := a.loadChampionRemoteAsset(ctx, provider, source, host, candidatePath)
+					results <- assetResult{data, index}
+				}(index, candidatePath)
+			}
+			for n := 0; n < count; n++ {
+				select {
+				case result := <-results:
+					if len(result.data) > 0 && writeChampionAssetImage(w, result.data) {
+						provider.reportAugmentIconFetch(requestPath, http.StatusOK, result.index, result.index > 0)
+						return
+					}
+				case <-ctx.Done():
+					http.NotFound(w, r)
+					return
+				}
 			}
 		}
 		provider.reportAugmentIconFetch(requestPath, http.StatusNotFound, -1, len(candidates) > 1)

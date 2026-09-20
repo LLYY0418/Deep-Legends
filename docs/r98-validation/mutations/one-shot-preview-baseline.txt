@@ -1,0 +1,4 @@
+=== RUN   TestR98SummonerDoesNotGateProgressAndPreviewKeepsAdvancing
+--- PASS: TestR98SummonerDoesNotGateProgressAndPreviewKeepsAdvancing (0.82s)
+PASS
+ok  	lol-loot-assistant	1.288s

@@ -1,0 +1,10 @@
+CDP connected
+AssertionError [ERR_ASSERTION]: browser image connection cap exceeded: 6
+    at main (/Users/ly/personal/personal-work/deep-legends/desktop/r100-browser.cjs:60:9) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}

@@ -1,0 +1,6 @@
+=== RUN   TestR101BannerProbePreservesDataField
+    r101_test.go:189: map[loadout:map[REGALIA_BANNER_SLOT:map[contentId:inventory-content inventoryType:REGALIA_BANNER itemId:4]]]
+--- FAIL: TestR101BannerProbePreservesDataField (0.02s)
+FAIL
+FAIL	lol-loot-assistant	0.541s
+FAIL

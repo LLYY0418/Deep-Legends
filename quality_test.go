@@ -410,11 +410,12 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 		ExternalReads   []string `json:"externalReads"`
 		Stores          []string `json:"stores"`
 		NeverStores     []string `json:"neverStores"`
+		Disclosure      string   `json:"mayhemRatingDisclosure"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &privacy); err != nil {
 		t.Fatal(err)
 	}
-	if len(privacy.ExplicitWrites) != 9 {
+	if len(privacy.ExplicitWrites) != 11 {
 		t.Fatalf("explicit client writes = %#v", privacy.ExplicitWrites)
 	}
 	if len(privacy.AutomaticWrites) != 10 {
@@ -427,7 +428,7 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 		}
 	}
 	writes := strings.Join(privacy.ExplicitWrites, "\n")
-	for _, expected := range []string{"符文", "装备方案", "英雄选择", "[DL] ", "页数已满", "最旧符文页", "最多回收 5 页", "绝不删除其它符文页", "回放", "生涯背景", "个性签名", "头像框", "逐项领取", "客户端界面", "只读属性", "符号链接"} {
+	for _, expected := range []string{"头像", "旗帜", "不动表情", "符文", "装备方案", "英雄选择", "[DL] ", "页数已满", "最旧符文页", "最多回收 5 页", "绝不删除其它符文页", "回放", "生涯背景", "个性签名", "头像框", "逐项领取", "客户端界面", "只读属性", "符号链接"} {
 		if !strings.Contains(writes, expected) {
 			t.Fatalf("privacy statement is missing %q: %s", expected, writes)
 		}
@@ -441,6 +442,14 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 			t.Fatalf("specialist external-read statement is missing %q: %s", expected, externalReads)
 		}
 	}
+	for _, expected := range []string{"ARAMKit", "国服玩家总览", "昵称与 Tag", "第三方估算分", "10 分钟", "失败缓存 5 分钟", "韩服不发送"} {
+		if !strings.Contains(externalReads, expected) {
+			t.Fatalf("ARAMKit external-read statement is missing %q: %s", expected, externalReads)
+		}
+	}
+	if !strings.Contains(privacy.Disclosure, "打开国服玩家总览") || !strings.Contains(privacy.Disclosure, "ARAMKit") {
+		t.Fatalf("ARAMKit visible disclosure = %q", privacy.Disclosure)
+	}
 	reads := strings.Join(privacy.Reads, "\n")
 	for _, expected := range []string{"League Client", "RiotClientServices", "aliases/v1/lookup", "独立端口和令牌", "PUUID"} {
 		if !strings.Contains(reads, expected) {
@@ -449,6 +458,9 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(privacy.Stores, "\n"), "脱敏账号标识") || !strings.Contains(strings.Join(privacy.NeverStores, "\n"), "PUUID") {
 		t.Fatalf("LP storage privacy boundary is incomplete: stores=%#v never=%#v", privacy.Stores, privacy.NeverStores)
+	}
+	if !strings.Contains(strings.Join(privacy.NeverStores, "\n"), "不外发") || !strings.Contains(strings.Join(privacy.Stores, "\n"), "锚点") {
+		t.Fatal("R99 privacy boundary missing")
 	}
 	for _, expected := range []string{"战利品", "待领取奖励", "任务", "活动奖励"} {
 		if !strings.Contains(strings.Join(privacy.NeverStores, "\n"), expected) {

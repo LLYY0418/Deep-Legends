@@ -1,0 +1,9 @@
+✔ R105 all banners are selectable and a click reaches the write route (144.044417ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 787.289

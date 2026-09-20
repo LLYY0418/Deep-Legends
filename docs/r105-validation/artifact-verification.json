@@ -1,0 +1,22 @@
+{
+  "version": "0.12.2",
+  "fingerprint": "de34e1b67412",
+  "backendSHA256": "d1fe7eebb1cd023c9a6eb237f0f8a26ab1fd404df8ef14a34fb58c40f4671296",
+  "setupSHA256": "6cdb96627679f6fa61753aa8cdb1f80204ea92e4b18c07d1e9350101782ac15d",
+  "setupBytes": 103385088,
+  "setupBuiltAt": "2026-09-17T14:02:55.202Z",
+  "embeddedMarkers": [
+    "0.12.2",
+    "main.(*app).buildReviewedProPlayers",
+    "main.writeFacadeBanner",
+    "main.facadeBannerSlot",
+    "点击头像立即更改",
+    "点击旗帜立即更改",
+    "EmberKnight",
+    "我累铜泥丸",
+    "JUGKlNG"
+  ],
+  "mutations": 13,
+  "verified": true,
+  "windowsGameClientRevalidated": false
+}

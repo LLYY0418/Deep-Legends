@@ -183,6 +183,9 @@
     offline.hidden = state.connected;
     for (const subpanel of panels) subpanel.hidden = !state.connected || subpanel.dataset.suitePanel !== state.tab;
     if (!state.connected) {
+      state.facadeIconCatalog = null;
+      state.facadeIconDialog?.close();
+      state.facadeBannerDialog?.close();
       clearTimeout(state.facadeRefreshTimer);
       clearTimeout(state.facadeChallengeRetryTimer);
       state.facadeRefreshTimer = 0;
@@ -201,6 +204,8 @@
   function activateTab(name, focus = false) {
     if (!tabCopy[name]) name = "watch";
     if (state.tab !== name) {
+      state.facadeIconDialog?.close();
+      state.facadeBannerDialog?.close();
       state.scroll[state.tab] = Number(appScroll?.scrollTop || 0);
       writePreference("suite-scroll", JSON.stringify(state.scroll));
     }
@@ -257,7 +262,7 @@
     { key: "autoPlayAgain", action: "play-again", group: "结算", title: "快速下一把", phase: "对局结束后", phaseKey: "EndOfGame", description: "结算后自动回到房间。若同时开启了自动点赞，会等点赞投票完成再返回。", control: "fixed-delay", displayDelayMs: 1575, countdownVerb: "返回" },
     { key: "autoHonor", action: "auto-honor", group: "结算", title: "结算自动点赞", phase: "结算 · 出现点赞票", phaseKey: "EndOfGame", description: "把点赞票投给同一房间的队友。找不到队友时按下方策略处理，任何情况下都不会投给敌方。", control: "honor", countdownVerb: "点赞" },
     { key: "skipCelebration", action: "skip-celebration", group: "结算", title: "跳过任务庆祝", phase: "结算前 · PreEndOfGame", phaseKey: "EndOfGame", description: "结算前的任务庆祝动画会拖慢回到房间的速度，开启后自动跳过这一段。", countdownVerb: "跳过" },
-    { key: "positionBroadcast", action: "position-broadcast", group: "英雄选择与游戏中", title: "阵营位置播报", phase: "英雄选择 · 大乱斗类模式", phaseKey: "ChampSelect", description: "在极地大乱斗、海克斯大乱斗里告诉你当前是蓝色方还是红色方。", control: "visibility", countdownVerb: "播报" },
+    { key: "positionBroadcast", action: "position-broadcast", group: "英雄选择与游戏中", title: "阵营位置播报", phase: "英雄选择 · 大乱斗类模式", phaseKey: "ChampSelect", description: "在极地大乱斗、海克斯大乱斗的英雄选择聊天中发送。每局一次，多项合为一条；缺失项省略，发送失败不重发。", control: "visibility", countdownVerb: "播报" },
     { key: "promoteLeader", action: "promote-leader", group: "排队与房间", title: "房主自动转交", phase: "房间 · 自己是房主", phaseKey: "Lobby", description: "组队时把房主让给别人。优先转给已准备的成员，全员未准备时才随机挑一个。", countdownVerb: "转交" },
     { key: "invitations", action: "invitations", group: "排队与房间", title: "房间邀请处理", phase: "收到邀请", phaseKey: "Lobby", description: "按队列类型分别设定接受 / 拒绝 / 不处理。默认全部“不处理”，需要你逐个队列开。", control: "invitations", countdownVerb: "处理" },
     { key: "autoMatchmaking", action: "auto-matchmaking", group: "排队与房间", title: "自动开始匹配", phase: "房间 · 满足人数且可开始", phaseKey: "Lobby", description: "作为房主时自动开始匹配。不提供“排队超时自动重排”，避免形成无人干预的循环排队。", control: "matchmaking", countdownVerb: "匹配" },
@@ -281,7 +286,12 @@
       return watchChoiceButtons("autoHonor.strategy", rule.strategy, [["prefer-party", "优先房间队友"], ["party-only", "仅房间队友"], ["any-teammate", "任意队友"], ["abstain", "弃票"]], "点赞策略");
     }
     if (definition.control === "visibility") {
-      return watchChoiceButtons("positionBroadcast.visibility", rule.visibility, [["self", "仅自己可见"], ["team", "发到队伍频道"]], "播报范围");
+      const options = (state.watch?.broadcastOptions || []).map(option => {
+        const fixed = option.key === "camp";
+        const disabled = fixed || (option.teamOnly && rule.visibility !== "team");
+        return `<label class="watch-broadcast-option"><input type="checkbox" data-watch-broadcast="${escapeHTML(option.key)}"${fixed || rule[option.key] ? " checked" : ""}${disabled ? " disabled" : ""}> ${escapeHTML(option.label)}<small>发送格式：${escapeHTML(option.template)}</small></label>`;
+      }).join("");
+      return watchChoiceButtons("positionBroadcast.visibility", rule.visibility, [["self", "仅自己可见"], ["team", "发到队伍频道"]], "播报范围") + `<div class="watch-broadcast-options">${options}</div>`;
     }
     if (definition.control === "matchmaking") {
       return `<div class="watch-parameter-fields"><label><span>最少人数</span><span class="select-wrap"><select class="suite-select watch-compact-select" data-watch-number="autoMatchmaking.minPartySize">${[1,2,3,4,5].map((value) => `<option value="${value}"${selected(Number(rule.minPartySize), value)}>${value}</option>`).join("")}</select></span></label><label><span>延时</span><span class="select-wrap"><select class="suite-select watch-compact-select" data-watch-number="autoMatchmaking.delayMs">${[0,1000,3000,5000,10000,15000,30000].map((value) => `<option value="${value}"${selected(Number(rule.delayMs), value)}>${formatDelay(value)}</option>`).join("")}</select></span></label></div>`;
@@ -344,6 +354,29 @@
     updateCountdowns();
   }
 
+  const watchActionNames = {
+    "champselect-ban": "自动禁用",
+    "champselect-pick": "自动选用",
+    "champselect-bench": "备战席换英雄",
+    "champselect-trade": "英雄交换",
+  };
+
+  function watchActionTitle(action) {
+    return watchDefinitions.find((definition) => definition.action === action)?.title
+      || watchActionNames[action]
+      || "自动规则";
+  }
+
+  function watchActionElapsed(start) {
+    const elapsed = Math.max(0, Date.now() - Number(start ?? Date.now()));
+    if (elapsed < 5000) return "刚刚";
+    const seconds = Math.floor(elapsed / 1000);
+    if (seconds < 60) return `${seconds}秒前`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}分钟前`;
+    return `${Math.floor(minutes / 60)}小时前`;
+  }
+
   function latestWatchAction() {
     let latest = null;
     for (const [action, event] of state.watchEvents) {
@@ -351,8 +384,7 @@
       latest = { action, event };
     }
     if (!latest) return "暂无触发";
-    const title = watchDefinitions.find((definition) => definition.action === latest.action)?.title || latest.action;
-    return `${title} · 刚刚`;
+    return `${watchActionTitle(latest.action)} · ${watchActionElapsed(latest.event.start)}`;
   }
 
   function watchConflictNote(definition, rules) {
@@ -368,6 +400,7 @@
     const statusClass = `${rule.enabled ? " is-enabled" : ""}${masterEnabled ? "" : " is-paused"}${event?.kind === "failed" ? " is-failed" : current ? " is-current" : ""}`;
     const eventStatus = customPaused ? '<span>自定义对局已暂停</span>' : event?.kind === "armed" ? `<span>等待触发</span><span class="watch-countdown" data-watch-countdown="${definition.action}" data-watch-verb="${definition.countdownVerb || "触发"}"><b>准备触发</b></span>`
       : event?.kind === "failed" ? '<span class="suite-chip is-danger">上次触发失败</span>'
+      : event?.kind === "skipped" ? `<span>${escapeHTML(event.message)}</span>`
       : event?.kind === "fired" ? '<span>上次触发 · 刚刚</span>'
       : event?.kind === "canceled" ? '<span>已被更高优先级动作取消 · 准备下次触发</span>'
       : current ? `<span>${rule.enabled ? '正在评估当前阶段' : '已到触发阶段 · 规则尚未开启'}</span>` : '<span>尚未到触发阶段</span>';
@@ -383,6 +416,11 @@
     });
     for (const input of roots.watch.querySelectorAll("[data-watch-toggle]")) input.addEventListener("change", async () => {
       state.watch.rules[input.dataset.watchToggle].enabled = input.checked;
+      await saveWatch();
+    });
+    for (const input of roots.watch.querySelectorAll("[data-watch-broadcast]")) input.addEventListener("change", async () => {
+      if (!["teamComposition", "assignedPosition"].includes(input.dataset.watchBroadcast)) return;
+      state.watch.rules.positionBroadcast[input.dataset.watchBroadcast] = input.checked;
       await saveWatch();
     });
     for (const input of roots.watch.querySelectorAll("[data-watch-delay]")) {
@@ -588,15 +626,18 @@
     const runtimeNoBan = isBan && definition.groupId === runtime?.groupId && runtime?.banCapabilityKnown && !runtime?.hasBanAction;
     const blocked = isBan && (!definition.hasBan || runtimeNoBan);
     const sideConfig = config?.[side] || {};
-    const lockWait = !isBan && (sideConfig.strategy || "show-then-lock") === "show-then-lock";
-    const delayKey = lockWait ? "lockDelayMs" : "delayMs";
+    const strategy = sideConfig.strategy || "show-then-lock";
+    const lockWait = strategy === "show-then-lock";
+    const delayKey = "lockDelayMs";
+    const timingDisabled = blocked || !lockWait;
+    const timingControls = `<span class="cs-control-label">锁定等待</span><div class="cs-stepper"><button type="button" data-cs-delay="${side}" data-cs-delay-key="${delayKey}" data-cs-delay-delta="-500"${timingDisabled ? " disabled" : ""}>−</button>${champSelectTimeInputHTML("lock", lockWait ? sideConfig[delayKey] ?? 10000 : 0, timingDisabled)}<button type="button" data-cs-delay="${side}" data-cs-delay-key="${delayKey}" data-cs-delay-delta="500"${timingDisabled ? " disabled" : ""}>＋</button></div>`;
     const yielded = runtime.active && runtime.groupId === definition.groupId && Object.values(isBan ? runtime.banStates || {} : runtime.pickStates || {}).includes("manual-takeover");
     const limit = isBan ? definition.banLimit : definition.pickLimit;
     const pool = champSelectPoolFor(side, definition, config);
     const blockedCopy = !definition.hasBan ? "本模式无禁用环节" : runtimeNoBan ? "客户端会话未发现禁用环节" : "";
     return `<section class="suite-card cs-seq-card is-${side}${sideConfig.enabled ? "" : " is-off"}${blocked ? " is-blocked" : ""}">
       <header class="cs-seq-head"><div class="cs-seq-title"><span class="cs-seq-mark">${isBan ? "禁" : "选"}</span><div><h3>${champSelectSideName(side)}序列</h3><p>${blocked ? blockedCopy : isBan ? definition.positions?.length > 1 ? "所有位置共用 5 个禁用备选，按顺序尝试" : "正式禁用阶段按顺序尝试；自定义兼容时先验证亮出" : "预选阶段自动提前亮出；轮到自己时按策略亮出或锁定"}</p></div></div>
-      <div class="cs-seq-controls"><span class="cs-control-label">策略</span>${champSelectStrategyHTML(side, sideConfig.strategy || "show-then-lock", blocked)}<span class="cs-control-label">${lockWait ? "锁定等待" : "延时"}</span><div class="cs-stepper"><button type="button" data-cs-delay="${side}" data-cs-delay-key="${delayKey}" data-cs-delay-delta="-500"${blocked ? " disabled" : ""}>−</button>${champSelectTimeInputHTML(lockWait ? "lock" : side, sideConfig[delayKey] ?? (lockWait ? 10000 : 0), blocked)}<button type="button" data-cs-delay="${side}" data-cs-delay-key="${delayKey}" data-cs-delay-delta="500"${blocked ? " disabled" : ""}>＋</button></div><label class="suite-switch"><input type="checkbox" aria-label="启用自动${champSelectSideName(side)}" data-cs-side-enabled="${side}"${checked(sideConfig.enabled && !blocked)}${blocked ? " disabled" : ""}><span class="sr-only">启用</span></label></div></header>
+      <div class="cs-seq-controls"><span class="cs-control-label">策略</span>${champSelectStrategyHTML(side, strategy, blocked)}${timingControls}<label class="suite-switch"><input type="checkbox" aria-label="启用自动${champSelectSideName(side)}" data-cs-side-enabled="${side}"${checked(sideConfig.enabled && !blocked)}${blocked ? " disabled" : ""}><span class="sr-only">启用</span></label></div></header>
       ${champSelectLaneTabsHTML(side, definition, config)}
       <p class="cs-execution-state">${yielded ? `玩家主动切换，本轮已停止自动${isBan ? "禁用" : "选用和换人"}，下一局恢复` : sideConfig.enabled && !blocked ? `自动${champSelectSideName(side)}已开启 · ${runtime.active && runtime.groupId === definition.groupId ? runtime.pickIntent ? isBan ? "等待正式禁用阶段" : "预选阶段，自动提前亮出序列英雄" : runtime.actionType === side ? "当前为自己的操作回合" : "等待自己的操作回合" : "等待英雄选择"}` : `自动${champSelectSideName(side)}未开启，配置的英雄不会自动提交`}</p>
       <div class="cs-rail">${champSelectSlotsHTML(side, pool, limit, runtime, state.champSelectCatalog)}</div>
@@ -768,7 +809,8 @@
       input.addEventListener("change", async () => {
         if (!champSelectSettings()?.enabled || input.matches(":disabled")) return;
         const kind = input.dataset.csTime;
-        const config = kind === "hold" ? champSelectSelectedConfig().bench : champSelectSelectedConfig()[kind === "lock" ? "pick" : kind];
+        const side = input.closest(".cs-seq-card.is-ban") ? "ban" : "pick";
+        const config = kind === "hold" ? champSelectSelectedConfig().bench : champSelectSelectedConfig()[kind === "lock" ? side : kind];
         const key = kind === "hold" ? "holdMs" : kind === "lock" ? "lockDelayMs" : "delayMs";
         const seconds = Number(input.value);
         if (!input.value.trim() || !Number.isFinite(seconds)) {
@@ -890,6 +932,7 @@
       await saveChampSelect();
     });
     for (const button of root.querySelectorAll("[data-cs-delay]")) button.addEventListener("click", async () => {
+      if (button.matches(":disabled")) return;
       const config = champSelectSelectedConfig()[button.dataset.csDelay];
       const key = button.dataset.csDelayKey === "lockDelayMs" ? "lockDelayMs" : "delayMs";
       config[key] = Math.max(0, Math.min(10000, Number(config[key] ?? (key === "lockDelayMs" ? 10000 : 0)) + Number(button.dataset.csDelayDelta || 0)));
@@ -1133,13 +1176,13 @@
     }
     const kind = parts[1];
     const action = parts[2];
-    if (kind === "skipped" && action === "auto-matchmaking") {
+    if (kind === "skipped" && ["auto-matchmaking", "position-broadcast"].includes(action)) {
       const reason = parts[3];
-      const message = { "not-leader": "你不是房主，自动开始匹配已跳过", custom: "当前为自定义房间，自动开始匹配已跳过" }[reason];
+      const message = action === "position-broadcast" ? "客户端尚未提供阵营或选人聊天会话，本次播报已跳过" : { "not-leader": "需要你是房主才能自动开始匹配", custom: "自定义房间不自动开始匹配", "not-ready": "房间尚未就绪，需满足人数和可开始匹配条件" }[reason];
       if (!message) return;
-      const previous = state.watchEvents.get(action);
-      if (previous?.reason !== reason || Date.now() - previous.start >= 30000) toast(message);
-      state.watchEvents.set(action, { kind: "canceled", reason, start: Date.now(), message });
+      // Preconditions belong on the rule card; repeated lobby events must not
+      // generate failure toasts or claim that a higher-priority action canceled it.
+      state.watchEvents.set(action, { kind: "skipped", reason, start: Date.now(), message });
       renderWatch();
       return;
     }
@@ -1153,18 +1196,19 @@
     const message = parts.slice(5).join(":");
     const delay = Number(parts[3] || 0);
     state.watchEvents.set(action, { kind, start: Date.now(), end: Date.now() + delay, delay, statusCode, errorCode, message });
-	if (action.startsWith("champselect-")) {
-	  state.champSelectRuntime = null;
-	  if (state.active && state.connected) void loadChampSelect(false);
-	  return;
-	}
     if (kind === "fired") {
       state.watchFired += 1;
       if (action === "auto-honor") state.watchPriority = false;
     }
+	if (action.startsWith("champselect-")) {
+	  state.champSelectRuntime = null;
+	  if (state.active && state.connected) void loadChampSelect(false);
+	  renderWatch();
+	  return;
+	}
     if (kind === "failed" && action === "auto-honor") state.watchPriority = false;
     if (kind === "failed") {
-      const title = watchDefinitions.find((definition) => definition.action === action)?.title || "自动规则";
+      const title = watchActionTitle(action);
       const detail = message || errorCode || (statusCode ? `客户端返回 HTTP ${statusCode}` : "本机客户端请求失败");
       toast(`${title}失败：${detail}`);
     }
@@ -1248,6 +1292,175 @@
     catch (error) { roots.rig.innerHTML = errorCard("维护状态读取失败", error.message, "rig"); }
   }
 
+  function facadeIconImage(icon) {
+    return imageURL(`/lol-game-data/assets/v1/profile-icons/${Number(icon.id)}.jpg`);
+  }
+
+  async function openFacadeIconPicker(opener) {
+    if (!state.facade?.connected || state.facadeApplying) return;
+    if (state.facadeIconDialog?.open) return;
+    const dialog = document.createElement("dialog");
+    dialog.className = "facade-picker";
+    dialog.setAttribute("aria-labelledby", "facade-icon-title");
+    dialog.innerHTML = `<div class="facade-picker-sheet"><header class="facade-picker-head"><div><h2 id="facade-icon-title">选择头像</h2><p>名称、拼音或首字母搜索；未拥有头像可用于聊天与好友栏，生涯头像需已解锁</p></div><button type="button" class="button button-secondary" data-picker-close aria-label="关闭头像选择">关闭</button></header><div class="facade-picker-loading" role="status">正在读取头像目录…</div></div>`;
+    document.body.append(dialog);
+    state.facadeIconDialog = dialog;
+    const close = () => dialog.close();
+    dialog.querySelector("[data-picker-close]").addEventListener("click", close);
+    dialog.addEventListener("click", event => { if (event.target === dialog) close(); });
+    dialog.addEventListener("cancel", event => { event.preventDefault(); close(); });
+    dialog.addEventListener("keydown", event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); } });
+    dialog.addEventListener("close", () => {
+      dialog.renderGeneration = (dialog.renderGeneration || 0) + 1;
+      clearTimeout(dialog.searchTimer);
+      state.facadeIconDialog = null;
+      window.desktopTheme?.setModalOpen?.(false);
+      dialog.remove();
+      requestAnimationFrame(() => (opener?.isConnected ? opener : roots.facade.querySelector("[data-facade-icons]"))?.focus({ preventScroll: true }));
+    }, { once: true });
+    dialog.showModal();
+    window.desktopTheme?.setModalOpen?.(true);
+    try {
+      const result = state.facadeIconCatalog || await api("/api/facade/icons");
+      if (!dialog.open) return;
+      if (!state.facade?.connected) { close(); return; }
+      state.facadeIconCatalog = result;
+      const icons = Array.isArray(result.icons) ? result.icons : [];
+      const sets = [...new Set(icons.flatMap(icon => icon.sets || []))].sort((a, b) => a.localeCompare(b, "zh-CN"));
+      const filters = { query: "", group: "all", set: "", sort: "new" };
+      let selectedIcon = icons.find(icon => Number(icon.id) === Number(state.facade?.summoner?.profileIconId));
+      const sheet = dialog.querySelector(".facade-picker-sheet");
+      sheet.querySelector(".facade-picker-loading").remove();
+      sheet.insertAdjacentHTML("beforeend", `<div class="facade-picker-tools"><input class="suite-input" type="search" data-picker-search placeholder="搜索名称 / 拼音 / 首字母" aria-label="搜索头像"><select class="suite-select" data-picker-set aria-label="头像系列"><option value="">全部系列</option>${sets.map(set => `<option value="${escapeHTML(set)}">${escapeHTML(set)}</option>`).join("")}</select><select class="suite-select" data-picker-sort aria-label="头像排序"><option value="new">最新在前</option><option value="old">最早在前</option><option value="name">按名称</option></select><span class="suite-chip" data-picker-count aria-live="polite"></span></div><div class="facade-picker-body"><nav class="facade-picker-side" aria-label="头像分类"><button type="button" data-picker-group="all" class="is-active">全部头像</button><button type="button" data-picker-group="recent">近三年新增</button>${sets.map(set => `<button type="button" data-picker-series="${escapeHTML(set)}">${escapeHTML(set)}</button>`).join("")}</nav><div class="facade-picker-scroll"><div class="facade-icon-grid" data-picker-grid></div></div></div><footer class="facade-picker-footer"><div class="facade-picker-selection" data-picker-selection></div><p>选择头像后，点击“设为头像”确认</p><button type="button" class="button button-primary" data-picker-apply>设为头像</button></footer>`);
+      const grid = dialog.querySelector("[data-picker-grid]");
+      const apply = dialog.querySelector("[data-picker-apply]");
+      const preview = () => {
+        dialog.querySelector("[data-picker-selection]").innerHTML = selectedIcon ? `<img data-queued-src="${facadeIconImage(selectedIcon)}" alt=""><strong>${escapeHTML(selectedIcon.title)}</strong>` : "请选择一个头像";
+        dialog.querySelector(".facade-picker-footer p").textContent = !selectedIcon ? "请选择头像" : result.iconOwnershipUnavailable ? "拥有状态未读取；点击“设为头像”后核对客户端结果" : selectedIcon.owned ? "已拥有；点击“设为头像”确认" : "未拥有；当前客户端可能只允许更换聊天与好友栏头像";
+        apply.disabled = !selectedIcon || state.facadeApplying;
+        for (const button of grid.querySelectorAll("[data-picker-icon]")) button.setAttribute("aria-pressed", String(Number(button.dataset.pickerIcon) === Number(selectedIcon?.id)));
+      };
+      const render = () => {
+        const generation = dialog.renderGeneration = (dialog.renderGeneration || 0) + 1;
+        const query = filters.query.trim().toLowerCase();
+        const score = icon => window.deepLegendsChampionSearch?.scoreOption?.(query, "", [icon.title, ...(icon.searchTerms || [])].join(" ")) || 0;
+        const rows = icons.filter(icon => (filters.group !== "recent" || Number(icon.year) >= new Date().getFullYear() - 2) && (!filters.set || icon.sets?.includes(filters.set)) && (!query || score(icon) > 0 || [icon.title, ...(icon.searchTerms || [])].join(" ").toLowerCase().includes(query)));
+        rows.sort((a, b) => filters.sort === "name" ? a.title.localeCompare(b.title, "zh-CN") : (filters.sort === "old" ? 1 : -1) * (Number(a.year) - Number(b.year) || Number(a.id) - Number(b.id)));
+        grid.replaceChildren();
+        dialog.querySelector(".facade-picker-scroll").scrollTop = 0;
+        const count = dialog.querySelector("[data-picker-count]");
+        let index = 0;
+        const chunk = () => {
+          if (!dialog.open || generation !== dialog.renderGeneration) return;
+          const started = performance.now();
+          let added = 0;
+          const fragment = document.createDocumentFragment();
+          // Hard per-frame cap as well as the 7ms budget, including fast machines.
+          while (index < rows.length && added < 72 && performance.now() - started < 7) {
+            const icon = rows[index++]; added++;
+            const button = document.createElement("button");
+            button.type = "button"; button.dataset.pickerIcon = String(icon.id);
+            button.className = "facade-icon-option";
+            button.disabled = Boolean(state.facadeApplying);
+            button.setAttribute("aria-label", icon.title);
+            button.setAttribute("aria-pressed", String(Number(icon.id) === Number(selectedIcon?.id)));
+            button.innerHTML = `<span class="facade-icon-picture"><img data-queued-src="${facadeIconImage(icon)}" alt="" loading="lazy" decoding="async"></span><span class="facade-icon-name">${escapeHTML(icon.title)}</span>`;
+            button.addEventListener("click", () => { selectedIcon = icon; preview(); });
+            fragment.append(button);
+          }
+          grid.append(fragment);
+          count.textContent = `共 ${result.total ?? icons.length} · 已显示 ${index}`;
+          if (index < rows.length) requestAnimationFrame(chunk);
+          else if (!rows.length) grid.textContent = "没有符合条件的头像";
+        };
+        chunk();
+      };
+      let composing = false;
+      const search = dialog.querySelector("[data-picker-search]");
+      const queueSearch = () => { clearTimeout(dialog.searchTimer); dialog.searchTimer = setTimeout(() => { filters.query = search.value; render(); }, 150); };
+      search.addEventListener("compositionstart", () => { composing = true; clearTimeout(dialog.searchTimer); });
+      search.addEventListener("compositionend", () => { composing = false; queueSearch(); });
+      search.addEventListener("input", () => { if (!composing) queueSearch(); });
+      const series = dialog.querySelector("[data-picker-set]");
+      const syncSidebar = () => { for (const button of dialog.querySelectorAll(".facade-picker-side button")) button.classList.toggle("is-active", button.dataset.pickerSeries ? button.dataset.pickerSeries === filters.set : !filters.set && button.dataset.pickerGroup === filters.group); };
+      series.addEventListener("change", () => { filters.set = series.value; filters.group = "all"; syncSidebar(); render(); });
+      dialog.querySelector("[data-picker-sort]").addEventListener("change", event => { filters.sort = event.target.value; render(); });
+      for (const button of dialog.querySelectorAll(".facade-picker-side button")) button.addEventListener("click", () => { filters.group = button.dataset.pickerGroup || "all"; filters.set = button.dataset.pickerSeries || ""; series.value = filters.set; syncSidebar(); render(); });
+      apply.addEventListener("click", async () => {
+        if (!selectedIcon || state.facadeApplying) return;
+        const id = Number(selectedIcon.id);
+        state.facadeDraft.iconId = id;
+        apply.disabled = true;
+        const ok = await applyFacade({ action: "icon", iconId: id }, "头像已应用");
+        if (ok) close(); else { preview(); dialog.querySelector(".facade-picker-footer p").textContent = state.facadeApplyError || "客户端尚未确认更改"; }
+      });
+      render(); preview(); search.focus();
+    } catch (error) {
+      if (dialog.open) dialog.querySelector(".facade-picker-loading").textContent = `${error.message}。请关闭后重试。`;
+    }
+  }
+
+  async function openFacadeBannerPicker(opener) {
+    if (!state.facade?.connected || state.facadeApplying || state.facadeBannerDialog?.open) return;
+    const dialog = document.createElement("dialog");
+    dialog.className = "facade-picker facade-banner-picker";
+    dialog.setAttribute("aria-labelledby", "facade-banner-title");
+    dialog.innerHTML = `<div class="facade-picker-sheet"><header class="facade-picker-head"><div><h2 id="facade-banner-title">选择旗帜</h2><p>点击旗帜立即更改</p></div><button class="button button-secondary" type="button" data-banner-close>关闭</button></header><div class="facade-picker-loading" role="status">正在读取旗帜目录…</div></div>`;
+    document.body.append(dialog); state.facadeBannerDialog = dialog;
+    const close = () => dialog.close();
+    dialog.querySelector("[data-banner-close]").addEventListener("click", close);
+    dialog.addEventListener("click", event => { if (event.target === dialog) close(); });
+    dialog.addEventListener("cancel", event => { event.preventDefault(); close(); });
+    dialog.addEventListener("keydown", event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); } });
+    dialog.addEventListener("close", () => {
+      state.facadeBannerDialog = null; dialog.remove(); window.desktopTheme?.setModalOpen?.(false);
+      requestAnimationFrame(() => (opener?.isConnected ? opener : roots.facade.querySelector("[data-facade-banners]"))?.focus({preventScroll:true}));
+    }, {once:true});
+    dialog.showModal(); window.desktopTheme?.setModalOpen?.(true);
+    try {
+      const result = await api("/api/facade/banners");
+      if (!dialog.open) return;
+      if (!state.facade?.connected) { close(); return; }
+      const banners = (result.banners || []).slice().sort((a,b) => a.localizedName.localeCompare(b.localizedName,"zh-CN"));
+      const sheet = dialog.querySelector(".facade-picker-sheet");
+      sheet.querySelector(".facade-picker-loading").remove();
+      sheet.insertAdjacentHTML("beforeend", `<div class="facade-picker-tools"><input type="search" class="suite-input" data-banner-search placeholder="搜索旗帜名称 / 拼音 / 编号" aria-label="搜索旗帜"></div><div class="facade-picker-body"><nav class="facade-picker-side" aria-label="旗帜分类">${[["all","全部"],["owned","已拥有"],["tencent","国服专属"]].map(([key,label]) => `<button type="button" data-banner-group="${key}" class="${key === "all" ? "is-active" : ""}">${label}</button>`).join("")}</nav><div class="facade-picker-scroll"><div class="facade-banner-grid" data-banner-grid></div></div></div><footer class="facade-picker-footer"><p data-banner-selection>共 ${banners.length} 个旗帜 · 未拥有旗帜可能被客户端拒绝装备</p></footer>`);
+      let currentGroup = "all";
+      const render = group => {
+        currentGroup = group;
+        const query = dialog.querySelector("[data-banner-search]").value.trim().toLowerCase();
+        const matches = item => [item.localizedName, item.id, ...(item.searchTerms || [])].join(" ").toLowerCase().includes(query);
+        const grid = dialog.querySelector("[data-banner-grid]");
+        grid.innerHTML = banners.filter(item => (group === "all" || (group === "owned" ? item.owned : item.isTencentOnly)) && matches(item)).map(item => `<button type="button" class="facade-banner-option" data-banner-id="${escapeHTML(item.id)}" >${item.imagePath ? `<img data-queued-src="${imageURL(item.imagePath)}" alt="" class="facade-banner-picture">` : `<span class="facade-banner-placeholder" aria-hidden="true">⚑</span>`}<strong>${escapeHTML(item.localizedName)}</strong><span>${result.bannerOwnershipUnavailable ? "拥有状态未知" : item.owned ? "已拥有" : "未拥有"}${item.isTencentOnly ? " · 国服专属" : ""}</span></button>`).join("");
+        for (const button of grid.querySelectorAll("[data-banner-id]")) button.addEventListener("click", async () => {
+          if (state.facadeApplying) return;
+          button.disabled = true;
+          const ok = await applyFacade({ action: "banner", bannerId: button.dataset.bannerId }, "旗帜已应用");
+          if (ok) close(); else { button.disabled = false; dialog.querySelector("[data-banner-selection]").textContent = state.facadeApplyError || "客户端尚未确认更改"; }
+        });
+      };
+      for (const button of dialog.querySelectorAll("[data-banner-group]")) button.addEventListener("click", () => {
+        for (const sibling of dialog.querySelectorAll("[data-banner-group]")) sibling.classList.toggle("is-active", sibling === button);
+        render(button.dataset.bannerGroup);
+      });
+      dialog.querySelector("[data-banner-search]").addEventListener("input", () => render(currentGroup));
+      render("all"); dialog.querySelector("[data-banner-search]").focus();
+    } catch (error) { if (dialog.open) dialog.querySelector(".facade-picker-loading").textContent = `${error.message}。请关闭后重试。`; }
+  }
+
+  async function runFacadeProbe(button) {
+    if (state.facadeApplying) return;
+    state.facadeApplying = true; button.disabled = true;
+    state.facadeRequestToken = Number(state.facadeRequestToken || 0) + 1;
+    state.facadeController?.abort();
+    state.facadeController = null;
+    try {
+      const result = await api("/api/facade/probe", { method: "POST", body: "{}" });
+      toast(result.mode === "read-only" ? "只读检测完成，未改动生涯设置；接口与拥有状态已写入诊断日志" : "检测完成，请导出诊断日志用于核对支持情况");
+    } catch (error) { toast(error.message); }
+    finally { state.facadeApplying = false; button.disabled = false; }
+  }
+
   function hydrateFacadeDraft(force = false) {
     if (state.facadeDraft && !force) return;
     const value = state.facade || {};
@@ -1258,7 +1471,8 @@
 	const actualID = Number(value.profile?.backgroundSkinId || 0);
 	const firstSkin = skins.find((skin) => Number(skin.id) === actualID) || {};
     state.facadeDraft = {
-      hero: String(firstSkin.championId || (Number(value.profile?.backgroundSkinId) > 0 ? Math.floor(Number(value.profile.backgroundSkinId) / 1000) : "")), skinId: Number(firstSkin.id || value.profile?.backgroundSkinId || 0), ownedOnly: false,
+      hero: String(firstSkin.championId || (actualID > 0 ? Math.floor(actualID / 1000) : skins[0]?.championId || "")), skinId: Number(firstSkin.id || value.profile?.backgroundSkinId || 0), ownedOnly: false,
+      iconId: Number(value.summoner?.profileIconId || 0), bannerId: String(value.bannerId || ""), rankBanner: value.rankBanner || "", bannerAccent: value.bannerAccent || "",
       availability: chat.availability || "chat", statusMessage: chat.statusMessage || "",
       queue: lol.rankedLeagueQueue || "RANKED_SOLO_5X5", tier: lol.rankedLeagueTier || "UNRANKED", division: lol.rankedLeagueDivision || "I",
       resetStatus: Boolean(value.loginReset?.statusMessageEnabled), resetRank: Boolean(value.loginReset?.rankEnabled),
@@ -1318,10 +1532,14 @@
     const ownershipUnknown = state.facade?.skinOwnershipUnavailable === true;
     if (state.facade?.skinsUnavailable && !visibleSkins.length) return '<div class="facade-catalog-empty">皮肤目录暂时读取失败，不代表没有皮肤。<button type="button" class="text-button" data-facade-catalog-retry>重试读取</button></div>';
 
-	return visibleSkins.map((skin) => `<button type="button" class="${Number(skin.id) === Number(draft.skinId) ? "is-selected" : ""}" data-facade-skin="${skin.id}" aria-label="${escapeHTML(skin.name)}${ownershipUnknown ? "，拥有状态未读取" : skin.owned ? "" : "，未拥有"}" aria-pressed="${Number(skin.id) === Number(draft.skinId)}" title="${escapeHTML(skin.name)}${ownershipUnknown ? " · 拥有状态未读取" : skin.owned ? "" : " · 未拥有"}"><img src="${imageURL(skin.tilePath || skin.splashPath)}" alt="" loading="lazy" decoding="async"><span class="sr-only">${escapeHTML(skin.name)}</span></button>`).join("") || '<span class="muted facade-catalog-empty">没有符合筛选条件的皮肤</span>';
+	return visibleSkins.map((skin) => `<button type="button" class="${Number(skin.id) === Number(draft.skinId) ? "is-selected" : ""}" data-facade-skin="${skin.id}" aria-label="${escapeHTML(skin.name)}${ownershipUnknown ? "，拥有状态未读取" : skin.owned ? "" : "，未拥有"}" aria-pressed="${Number(skin.id) === Number(draft.skinId)}" title="${escapeHTML(skin.name)}${ownershipUnknown ? " · 拥有状态未读取" : skin.owned ? "" : " · 未拥有"}"><img data-queued-src="${imageURL(skin.tilePath || skin.splashPath)}" alt="" loading="lazy" decoding="async"><span class="sr-only">${escapeHTML(skin.name)}</span></button>`).join("") || '<span class="muted facade-catalog-empty">没有符合筛选条件的皮肤</span>';
   }
 
   function renderFacade() {
+    if (!state.facade) {
+      roots.facade.innerHTML = `<div class="facade-layout" aria-busy="true"><section class="suite-card facade-preview"><div class="facade-preview-art"></div><p>正在同步当前生涯…</p></section><section class="suite-card"><h3>生涯背景与展示</h3><p>正在读取当前账号，资料就绪后即可编辑。</p></section></div>`;
+      return;
+    }
     const value = state.facade || {};
     hydrateFacadeDraft();
     const draft = state.facadeDraft;
@@ -1332,31 +1550,46 @@
     const visibleSkins = facadeVisibleSkins(skins, draft);
 
     const selectedSkin = skins.find((skin) => Number(skin.id) === Number(draft.skinId)) || {};
+    const currentSkin = skins.find(skin => Number(skin.id) === Number(value.profile?.backgroundSkinId)) || {};
+    const actualBackgroundPath = value.profile?.backgroundPath || currentSkin.splashPath;
+    const backgroundURL = actualBackgroundPath ? imageURL(actualBackgroundPath) : (Number(value.profile?.backgroundSkinId) > 0 ? `/api/skin-art?id=${Number(value.profile.backgroundSkinId)}` : "");
     const displayName = summoner.gameName || summoner.displayName || "当前召唤师";
     const tagLine = summoner.tagLine ? `#${summoner.tagLine}` : "";
 	const availabilityLabels = { chat: "在线", away: "离开", dnd: "游戏中", spectating: "观战中", offline: "离线" };
     const highTier = ["MASTER", "GRANDMASTER", "CHALLENGER", "UNRANKED"].includes(draft.tier);
     const backgroundApplied = !value.profileUnavailable && Number(draft.skinId) > 0 && Number(value.profile?.backgroundSkinId) === Number(draft.skinId);
-    const previewName = selectedSkin.name || (Number(value.profile?.backgroundSkinId || 0) === Number(draft.skinId || 0)
-      ? (value.profileUnavailable ? "读取失败" : value.profile?.backgroundSkinName || (draft.skinId ? "当前背景资料暂不可用" : "未设置"))
-      : "所选皮肤资料暂不可用");
+    const previewName = value.profile?.backgroundSkinName || currentSkin.name || (value.profileUnavailable ? "读取失败" : "客户端默认背景");
 	const title = facadeTitleText(value);
 	const titleFilled = facadeTitleFilled(value);
     const identityDirty = facadeIdentityDirty();
     const resetDirty = facadeResetDirty();
     roots.facade.className = "";
 	// `.facade-signature` 保留既有样式类名，但这里承载的是生涯头衔而不是个性签名。
-	roots.facade.innerHTML = `<div class="facade-layout"><div class="facade-left"><section class="suite-card facade-preview"><div class="facade-preview-art">${selectedSkin.splashPath ? `<img src="${imageURL(selectedSkin.splashPath)}" alt="" data-suite-facade-art>` : ""}<span class="facade-art-label">${Number(value.profile?.backgroundSkinId || 0) === Number(draft.skinId || 0) ? "当前背景" : "待应用预览"} · ${escapeHTML(previewName)}</span></div><div class="facade-preview-body"><span class="facade-avatar">${summoner.profileIconId ? `<img src="${imageURL(`/lol-game-data/assets/v1/profile-icons/${summoner.profileIconId}.jpg`)}" alt="">` : escapeHTML(displayName.slice(0, 1))}<small class="facade-avatar-level">${Number(summoner.summonerLevel || 0)}</small></span><div class="facade-identity"><h2>${escapeHTML(displayName)}</h2><p>${escapeHTML(tagLine || "当前账号")}</p></div><div class="facade-tags"><span class="suite-chip is-gold" data-facade-preview-rank>${escapeHTML(rankLabel(draft))}</span><span class="suite-chip" data-facade-preview-availability>${escapeHTML(availabilityLabels[draft.availability] || draft.availability)}</span><span class="suite-chip">上赛季旗帜</span></div><div class="facade-signature${titleFilled ? " is-filled" : ""}">${escapeHTML(title)}</div><div class="facade-slots">${facadeChallengeSlots(value)}</div><p>这是好友悬浮卡与生涯页的示意预览。右侧任何改动都会先反映在这里，确认后才写入客户端。</p></div></section><section class="suite-card facade-write-card"><div class="suite-card-head"><div><h3>这一页会改什么</h3></div></div><dl class="facade-write-list"><dt>生涯背景</dt><dd>你生涯页顶部的那张大图</dd><dt>好友悬浮卡</dt><dd>别人点你头像时看到的在线状态、签名和段位</dd><dt>生涯页展示</dt><dd>头像框、挑战勋章、赛季旗帜、表情轮盘</dd></dl><div class="suite-note facade-write-note"><span aria-hidden="true">⚑</span><span>以上全部<strong>只在你点击后执行</strong>，没有任何自动写入。只有“登录时重设”两项例外，它们默认关闭，开启后也只重放你保存过的值。</span></div></section></div>
+	const markup = `<div class="facade-layout"><div class="facade-left"><section class="suite-card facade-preview"><div class="facade-preview-art">${backgroundURL ? `<img data-queued-src="${backgroundURL}" alt="" data-suite-facade-art>` : ""}<span class="facade-art-label">当前背景 · ${escapeHTML(previewName)}</span></div><div class="facade-preview-body"><span class="facade-avatar">${summoner.profileIconId ? `<img data-queued-src="${imageURL(`/lol-game-data/assets/v1/profile-icons/${summoner.profileIconId}.jpg`)}" alt="">` : escapeHTML(displayName.slice(0, 1))}<small class="facade-avatar-level">${Number(summoner.summonerLevel || 0)}</small></span><div class="facade-identity"><h2>${escapeHTML(displayName)}</h2><p>${escapeHTML(tagLine || "当前账号")}</p></div><div class="facade-tags"><span class="suite-chip is-gold" data-facade-preview-rank>${escapeHTML(rankLabel(draft))}</span><span class="suite-chip" data-facade-preview-availability>${escapeHTML(availabilityLabels[draft.availability] || draft.availability)}</span><span class="suite-chip">上赛季旗帜</span></div><div class="facade-signature${titleFilled ? " is-filled" : ""}">${escapeHTML(title)}</div><div class="facade-slots">${facadeChallengeSlots(value)}</div></div></section><section class="suite-card facade-icon-card" ${value.connected ? "" : "hidden"}><div class="suite-card-head"><h3>头像</h3></div><div class="icon-current"><img class="icon-thumb" data-queued-src="${facadeIconImage({id:summoner.profileIconId})}" alt="当前头像"><div class="meta"><strong>生涯头像</strong><span>${Number(value.chat?.icon) > 0 && Number(value.chat.icon) !== Number(summoner.profileIconId) ? `聊天与好友栏另用头像 #${Number(value.chat.icon)}` : "名称与拼音搜索"}</span></div><button class="button button-secondary" type="button" data-facade-icons>选择头像</button></div></section>
+      <section class="suite-card facade-banner-card" ${value.connected ? "" : "hidden"}><div class="suite-card-head"><h3>旗帜</h3></div><div class="facade-stack-row"><h4>生涯旗帜</h4><p>点击更改生涯旗帜</p><div class="ctl"><button class="button button-secondary" type="button" data-facade-banners>选择旗帜</button></div></div><div class="facade-stack-row"><h4>段位旗</h4><p>保留当前头像框偏好</p><div class="ctl"><div class="suite-segment">${[["lastSeasonHighestRank", "上赛季段位"], ["blank", "空白"]].map(([key, label]) => `<button type="button" data-facade-rank-banner="${key}" aria-pressed="${value.rankBanner === key}" class="${value.rankBanner === key ? "is-active" : ""}">${label}</button>`).join("")}</div></div></div></section><section class="suite-card facade-write-card"><div class="suite-card-head"><div><h3>这一页会改什么</h3></div></div><dl class="facade-write-list"><dt>生涯背景</dt><dd>你生涯页顶部的那张大图</dd><dt>好友悬浮卡</dt><dd>别人点你头像时看到的在线状态、签名和段位</dd><dt>生涯页展示</dt><dd>头像框、挑战勋章、赛季旗帜、表情轮盘</dd></dl><div class="suite-note facade-write-note"><span aria-hidden="true">⚑</span><span>以上全部<strong>只在你点击后执行</strong>，没有任何自动写入。只有“登录时重设”两项例外，它们默认关闭，开启后也只重放你保存过的值。</span></div></section></div>
       <div class="facade-controls"><section class="suite-card facade-background-card"><div class="suite-card-head"><div><h3>生涯背景</h3></div><span class="suite-chip" data-facade-background-applied ${backgroundApplied ? "" : "hidden"}>已应用</span><button class="button button-primary" type="button" data-facade-apply-background ${backgroundApplied ? "hidden" : ""} ${selectedSkin.id ? "" : "disabled"}>应用背景</button></div><div class="facade-selections"><label class="select-wrap"><span class="sr-only">英雄</span><select class="suite-select" data-facade-hero>${champions.map(([id, name]) => `<option value="${escapeHTML(id)}"${selected(draft.hero, id)}>${escapeHTML(name)}</option>`).join("")}</select></label><label class="suite-switch"><input type="checkbox" data-facade-owned${checked(draft.ownedOnly)}${value.skinOwnershipUnavailable ? ' disabled title="拥有状态尚未读取"' : ""}><span>只显示已拥有</span></label></div><div class="facade-film" aria-label="皮肤网格">${facadeFilmHTML(visibleSkins, draft)}</div><p class="facade-background-note">客户端接口<strong>不校验皮肤是否拥有</strong>——关掉上面的开关就能设置未拥有的皮肤，但它可能在下次登录时被服务端还原。</p></section>
+
 	  <section class="suite-card facade-chat-card"><div class="suite-card-head"><div><h3>聊天身份</h3></div></div><div class="facade-row"><div><h4>在线状态</h4><p>部分状态只在特定情况下可用；客户端只会在实际进入对局或观战时保留对应状态</p></div><div class="suite-segment">${Object.entries(availabilityLabels).map(([key, label]) => `<button type="button" class="${draft.availability === key ? "is-active" : ""}" data-facade-availability="${key}">${label}</button>`).join("")}</div></div><div class="facade-row"><div><h4>个性签名</h4><p>留空即删除签名。开启“登录时重设”后每次客户端登录都会重新应用</p></div><div class="facade-row-control"><input class="suite-input facade-status-input" type="text" maxlength="200" value="${escapeHTML(draft.statusMessage)}" placeholder="输入签名…" data-facade-status><label class="suite-switch facade-reset-switch" data-tooltip="登录时重设个性签名"><input type="checkbox" aria-label="登录时重设个性签名" data-facade-reset-status${checked(draft.resetStatus)}><span class="sr-only">登录时重设</span></label></div></div><div class="facade-row"><div><h4>展示段位</h4><p>只改好友悬浮卡上的段位显示，不影响你的真实段位、战绩与匹配。大师及以上不需要选分段</p></div><div class="facade-row-control"><div class="facade-rank-fields"><span class="select-wrap"><select class="suite-select" aria-label="展示段位队列" data-facade-rank="queue"><option value="RANKED_SOLO_5X5"${selected(draft.queue, "RANKED_SOLO_5X5")}>单双排</option><option value="RANKED_FLEX_SR"${selected(draft.queue, "RANKED_FLEX_SR")}>灵活组排</option></select></span><span class="select-wrap"><select class="suite-select" aria-label="展示段位" data-facade-rank="tier">${rankOptions(draft.tier)}</select></span><span class="select-wrap"><select class="suite-select" aria-label="展示分段" data-facade-rank="division" ${highTier ? "disabled" : ""}>${["I","II","III","IV"].map((division) => `<option value="${division}"${selected(draft.division, division)}>${division}</option>`).join("")}</select></span></div><label class="suite-switch facade-reset-switch" data-tooltip="登录时重设展示段位"><input type="checkbox" aria-label="登录时重设展示段位" data-facade-reset-rank${checked(draft.resetRank)}><span class="sr-only">登录时重设</span></label></div></div><div class="facade-commit" data-facade-commit ${identityDirty || resetDirty ? "" : "hidden"}><span>改动只在左侧预览，确认后才写入客户端。</span><div><button class="button button-secondary" type="button" data-facade-save-reset ${resetDirty ? "" : "hidden"}>保存登录重设</button><button class="button button-primary" type="button" data-facade-apply-chat ${identityDirty ? "" : "hidden"}>确认并应用</button></div></div></section>
-      <section class="suite-card"><div class="suite-card-head"><div><h3>展示清理</h3><p>任务数量提示点击即清空，其余操作执行前会二次确认。</p></div></div><div class="facade-actions">${[
+      <section class="suite-card"><div class="suite-card-head"><div><h3>展示清理</h3><p>任务数量提示点击即清空，其余操作执行前会二次确认。</p></div><button class="button button-secondary" type="button" data-facade-probe title="只读检查接口与拥有状态，不切换头像、旗帜或背景；结果写入诊断日志" ${value.connected ? "" : "disabled"}>检测客户端支持</button></div><div class="facade-actions">${[
 		["clear-border", "卸下头像框", "换成固定的典藏边框；需要召唤师等级 ≥ 526", Number(summoner.summonerLevel || 0) < 526, "卸下"],
 		["clear-title", "卸下头衔", "仅清空当前展示头衔，保留已选勋章和赛季旗帜", false, "卸下"],
 		["clear-challenges", "卸下全部勋章", "清空挑战勋章并保留旗帜和当前头衔；如果客户端无法保留头衔，本次操作会中止并提示", false, "卸下"],
-		["previous-banner", "切换上赛季旗帜", "保留勋章和当前头衔并换回上赛季旗帜；如果客户端无法保留头衔，本次操作会中止并提示", false, "切换"],
         ["clear-objectives", "清空右下角任务数量提示", "把当前未读任务与活动系列标记为已读，不领取奖励、不更改任务进度。", false, "清空"],
         ["clear-emotes", "清空表情轮盘", "一次性清掉所有表情位，需要重新自行配置", false, "清空"],
       ].map(([action, title, copy, disabled, label]) => `<div class="facade-action"><div><strong>${title}</strong><p>${copy}</p></div>${disabled ? `<span class="suite-chip">${action === "clear-objectives" ? "暂不支持" : "等级不足"}</span>` : `<button class="button ${action === "clear-emotes" ? "button-danger" : "button-secondary"}" type="button" data-facade-clear="${action}">${label}</button>`}</div>`).join("")}</div></section></div></div>`;
+    if (roots.facade._facadeMarkup === markup && roots.facade.querySelector(".facade-controls")) return;
+    const images = new Map();
+    for (const image of roots.facade.querySelectorAll("img[data-queued-src]")) {
+      const key = image.dataset.queuedSrc;
+      if (!images.has(key)) images.set(key, []);
+      images.get(key).push(image);
+    }
+    roots.facade.innerHTML = markup;
+    for (const fresh of roots.facade.querySelectorAll("img[data-queued-src]")) {
+      const image = images.get(fresh.dataset.queuedSrc)?.shift();
+      if (image) { image.className = fresh.className; fresh.replaceWith(image); }
+    }
+    roots.facade._facadeMarkup = markup;
     bindFacadeControls();
   }
 
@@ -1393,6 +1626,7 @@
   }
 
   function syncFacadeCommitActions() {
+    roots.facade._facadeMarkup = "";
     const identityDirty = facadeIdentityDirty();
     const resetDirty = facadeResetDirty();
     const commit = roots.facade.querySelector("[data-facade-commit]");
@@ -1420,6 +1654,7 @@
   }
 
   function updateFacadeBackgroundPreview() {
+    roots.facade._facadeMarkup = "";
     const draft = state.facadeDraft || {};
     const skins = Array.isArray(state.facade?.skins) ? state.facade.skins : [];
     const selectedSkin = skins.find((skin) => Number(skin.id) === Number(draft.skinId));
@@ -1428,23 +1663,9 @@
       button.classList.toggle("is-selected", selected);
       button.setAttribute("aria-pressed", String(selected));
     }
-    const art = roots.facade.querySelector(".facade-preview-art");
-    let image = art?.querySelector("[data-suite-facade-art]");
-    if (selectedSkin?.splashPath) {
-      if (!image) {
-        image = document.createElement("img");
-        image.alt = "";
-        image.dataset.suiteFacadeArt = "";
-        art?.prepend(image);
-      }
-      image.src = imageURL(selectedSkin.splashPath);
-    } else {
-      image?.remove();
-    }
-    const label = roots.facade.querySelector(".facade-art-label");
+    // The left card shows the committed client background. Choosing a hero
+    // or skin only edits the selection until Apply succeeds and is read back.
     const sameID = Number(state.facade?.profile?.backgroundSkinId || 0) === Number(draft.skinId || 0);
-    const previewName = selectedSkin?.name || (sameID ? (state.facade?.profileUnavailable ? "读取失败" : state.facade?.profile?.backgroundSkinName || (draft.skinId ? "当前背景资料暂不可用" : "未设置")) : "所选皮肤资料暂不可用");
-    if (label) label.textContent = `${sameID ? "当前背景" : "待应用预览"} · ${previewName}`;
     const applied = !state.facade?.profileUnavailable && Number(draft.skinId) > 0 && sameID;
     const appliedChip = roots.facade.querySelector("[data-facade-background-applied]");
     const applyButton = roots.facade.querySelector("[data-facade-apply-background]");
@@ -1491,6 +1712,10 @@
   }
 
   function bindFacadeControls() {
+    roots.facade.querySelector("[data-facade-banners]")?.addEventListener("click", event => openFacadeBannerPicker(event.currentTarget));
+    roots.facade.querySelector("[data-facade-icons]")?.addEventListener("click", event => openFacadeIconPicker(event.currentTarget));
+    roots.facade.querySelector("[data-facade-probe]")?.addEventListener("click", event => runFacadeProbe(event.currentTarget));
+    for (const button of roots.facade.querySelectorAll("[data-facade-rank-banner]")) button.addEventListener("click", () => applyFacade({ action: "rank-banner", rankBanner: button.dataset.facadeRankBanner }));
     roots.facade.querySelector("[data-facade-catalog-retry]")?.addEventListener("click", () => loadFacade(true, true, "manual"));
     roots.facade.querySelector("[data-facade-hero]")?.addEventListener("change", (event) => { state.facadeDraft.hero = event.target.value; state.facadeDraft.skinId = 0; rebuildFacadeFilm(); });
     roots.facade.querySelector("[data-facade-owned]")?.addEventListener("change", (event) => { state.facadeDraft.ownedOnly = event.target.checked; rebuildFacadeFilm(); });
@@ -1513,6 +1738,7 @@
   async function applyFacadeIdentity() {
     if (state.facadeApplying) return;
     state.facadeApplying = true;
+    state.facadeApplyError = "";
     state.facadeRequestToken = Number(state.facadeRequestToken || 0) + 1;
     state.facadeController?.abort();
     try {
@@ -1538,6 +1764,7 @@
   async function applyFacade(body, success = "生涯设置已应用") {
     if (state.facadeApplying) return;
     state.facadeApplying = true;
+    state.facadeApplyError = "";
     state.facadeRequestToken = Number(state.facadeRequestToken || 0) + 1;
     state.facadeController?.abort();
     try {
@@ -1545,20 +1772,22 @@
 	  state.facadeLoadedAt = state.facade.skinsUnavailable ? 0 : Date.now();
       hydrateFacadeDraft(true);
       renderFacade();
+      const chatIconApplied = body.action === "icon" && state.facade.iconApplyScope === "chat" && Number(state.facade.chat?.icon) === Number(body.iconId);
+      const iconConfirmed = body.action !== "icon" || chatIconApplied || Number(state.facade.summoner?.profileIconId) === Number(body.iconId);
       const backgroundConfirmed = body.action !== "background" || (!state.facade.profileUnavailable && Number(state.facade.profile?.backgroundSkinId) === Number(body.skinId));
-      toast(backgroundConfirmed ? success : "背景请求已提交，但客户端尚未确认所选背景，请重新读取核对");
-    } catch (error) { toast(error.message); }
+      toast(chatIconApplied ? "已更换聊天与好友栏头像；生涯头像仍显示已拥有头像" : !iconConfirmed ? "头像请求已提交，但客户端尚未确认，请重新读取核对" : backgroundConfirmed ? success : "背景请求已提交，但客户端尚未确认所选背景，请重新读取核对");
+      return iconConfirmed && backgroundConfirmed;
+    } catch (error) { state.facadeApplyError = error.message; toast(error.message); return false; }
     finally { state.facadeApplying = false; }
   }
 
   function scheduleFacadeChallengeRetry() {
-	if (state.facade?.challengesReady !== false || state.facadeChallengeRetryUsed) return;
-	state.facadeChallengeRetryUsed = true;
+	if ((!state.facade?.skinsUnavailable && state.facade?.challengesReady !== false) || Number(state.facadeChallengeRetryUsed) >= 3) return;
+	state.facadeChallengeRetryUsed = Number(state.facadeChallengeRetryUsed || 0) + 1;
 	clearTimeout(state.facadeChallengeRetryTimer);
 	state.facadeChallengeRetryTimer = setTimeout(() => {
 	  state.facadeChallengeRetryTimer = 0;
 	  if (!state.active || state.tab !== "facade" || !state.connected) {
-		state.facade = null;
 		state.facadeLoadedAt = 0;
 		return;
 	  }
@@ -1581,6 +1810,7 @@
 	else if (rawTitle && typeof rawTitle === "object") title = { name: typeof rawTitle.name === "string" ? rawTitle.name.trim() : "" };
 	return {
 	  connected: value.connected === true,
+      rankBanner: value.rankBanner || "", bannerAccent: value.bannerAccent || "",
       skinsUnavailable: value.skinsUnavailable === true,
       skinOwnershipUnavailable: value.skinOwnershipUnavailable === true,
       profileUnavailable: value.profileUnavailable === true,
@@ -1589,9 +1819,9 @@
 		displayName: String(summoner.displayName || ""), gameName: String(summoner.gameName || ""), tagLine: String(summoner.tagLine || ""),
 		profileIconId: Number(summoner.profileIconId || 0), summonerLevel: Number(summoner.summonerLevel || 0),
 	  },
-	  profile: { backgroundSkinId: Number(profile.backgroundSkinId || 0), backgroundSkinName: String(profile.backgroundSkinName || "") },
+	  profile: { backgroundSkinId: Number(profile.backgroundSkinId || 0), backgroundSkinName: String(profile.backgroundSkinName || ""), backgroundPath: String(profile.backgroundPath || ""), backgroundType: String(profile.backgroundType || "") },
 	  chat: {
-		availability: String(chat.availability || ""), statusMessage: String(chat.statusMessage || ""),
+		icon: Number(chat.icon || 0), availability: String(chat.availability || ""), statusMessage: String(chat.statusMessage || ""),
 		lol: {
 		  rankedLeagueQueue: String(lol.rankedLeagueQueue || ""), rankedLeagueTier: String(lol.rankedLeagueTier || ""), rankedLeagueDivision: String(lol.rankedLeagueDivision || ""),
 		},
@@ -1617,6 +1847,8 @@
 
   async function loadFacade(force = false, preserveDraft = false, trigger = "poll") {
     if (state.connected === false || state.destroyed || state.facadeApplying) return;
+    if (state.facadeController && !force) { if (state.facade) renderFacade(); return; }
+    if (!state.facade) renderFacade();
 	const fresh = state.facade && state.facadeLoadedAt > 0 && Date.now() - state.facadeLoadedAt < 30000;
 	if (!force && fresh) { renderFacade(); return; }
     const token = state.facadeRequestToken = Number(state.facadeRequestToken || 0) + 1;
@@ -1629,7 +1861,7 @@
 	  const loadTrigger = ["manual", "sse", "poll"].includes(trigger) ? trigger : "poll";
 	  const next = await api(`/api/facade/state?trigger=${encodeURIComponent(loadTrigger)}`, { signal: controller.signal });
       if (token !== state.facadeRequestToken || controller.signal.aborted) return;
-	  if (next.connected === true && Array.isArray(next.skins) && next.skins.length === 0 && state.facadeDraft?.hero && state.facadeDraft?.skinId && previousSkins.length) next.skins = previousSkins;
+	  if (next.connected === true && Array.isArray(next.skins) && next.skins.length === 0 && previousSkins.length) next.skins = previousSkins;
 	  const unchanged = Boolean(state.facade) && JSON.stringify(facadeRenderSignature(next)) === JSON.stringify(facadeRenderSignature(state.facade));
 	  state.facadeLoadedAt = next.skinsUnavailable ? 0 : Date.now();
 	  if (unchanged && (preserveDraft || loadTrigger !== "manual")) {
@@ -1649,7 +1881,12 @@
 	  scheduleFacadeChallengeRetry();
 	}
     catch (error) {
-      if (token === state.facadeRequestToken && error.name !== "AbortError") roots.facade.innerHTML = errorCard("生涯读取失败", error.message, "facade");
+      if (token === state.facadeRequestToken && error.name !== "AbortError") {
+        // A failed refresh must not tear down the last confirmed background,
+        // loaded images, or an in-progress selection.
+        if (!state.facade) roots.facade.innerHTML = errorCard("生涯读取失败", error.message, "facade");
+        else if (trigger === "manual") toast(`生涯刷新失败，已保留当前内容：${error.message}`);
+      }
     } finally {
       clearTimeout(timeout);
       if (token === state.facadeRequestToken) state.facadeController = null;
@@ -1666,7 +1903,6 @@
   async function refreshFacadeFromEvent() {
     if (!state.connected || state.destroyed) return;
 	if (!state.active || state.tab !== "facade") {
-	  state.facade = null;
 	  state.facadeLoadedAt = 0;
 	  return;
 	}
@@ -1695,7 +1931,6 @@
     clearTimeout(state.facadeRefreshTimer);
     state.facadeRefreshTimer = 0;
     if (!state.active || state.tab !== "facade") {
-      state.facade = null;
       state.facadeLoadedAt = 0;
       state.facadeRefreshDeferred = false;
       return;
@@ -1820,7 +2055,7 @@
     const chosen = choices.has(id);
     const quantity = Number(reward.quantity);
     const quantityLabel = Number.isFinite(quantity) && quantity > 0 ? `×${quantity}` : "数量待客户端确认";
-    const content = `${reward.iconUrl ? `<img src="${imageURL(reward.iconUrl)}" alt="">` : '<span class="suite-tile-icon" aria-hidden="true">◇</span>'}<span><strong>${escapeHTML(reward.title || reward.itemType || reward.itemId || "奖励")}</strong><small>${quantityLabel}</small></span>`;
+    const content = `${reward.iconUrl ? `<img data-queued-src="${imageURL(reward.iconUrl)}" alt="">` : '<span class="suite-tile-icon" aria-hidden="true">◇</span>'}<span><strong>${escapeHTML(reward.title || reward.itemType || reward.itemId || "奖励")}</strong><small>${quantityLabel}</small></span>`;
     if (!item.needsChoice) return `<span class="suite-tile">${content}</span>`;
     return `<button class="suite-tile${chosen ? " is-selected" : ""}" type="button" aria-pressed="${chosen}" data-claim-choice="${escapeHTML(item.key)}" data-reward-id="${escapeHTML(id)}" data-choice-max="${maximum}" ${state.claiming ? "disabled" : ""}>${content}</button>`;
   }
@@ -1942,37 +2177,42 @@
     ({ watch: loadWatch, rig: loadRig, facade: () => loadFacade(true, false, "manual"), sweep: loadClaims, champselect: loadChampSelect }[reload.dataset.suiteReload])?.(true);
   });
 
-  document.addEventListener("click", (event) => {
-    const navigate = event.target.closest("[data-navigate-suite]");
-    if (!navigate) return;
-    window.dispatchEvent(new CustomEvent("deep-legends:navigate", { detail: { section: "suite", tab: navigate.dataset.navigateSuite || "watch" } }));
-  });
+
 
   panel.querySelector("[data-suite-retry]")?.addEventListener("click", () => document.getElementById("refresh")?.click());
-  window.addEventListener("deep-legends:section", (event) => {
+  function handleLazySection(event) {
     state.active = event.detail?.name === "suite";
     if (!state.active) {
+      state.facadeIconDialog?.close();
+      state.facadeBannerDialog?.close();
       clearTimeout(state.facadeChallengeRetryTimer);
       state.facadeChallengeRetryTimer = 0;
       return;
     }
+    if (event.detail?.navigation?.section === "suite" && event.detail.navigation.tab) activateTab(event.detail.navigation.tab);
     subtitle.textContent = tabCopy[state.tab];
     loadAll();
-  });
+  }
+  window.addEventListener("deep-legends:section", handleLazySection);
+  window.deepLegendsSections?.register("suite", handleLazySection);
   window.addEventListener("deep-legends:navigate", (event) => { if (event.detail?.section === "suite" && event.detail?.tab) activateTab(event.detail.tab); });
-  window.addEventListener("deep-legends:status", (event) => {
+  (window.deepLegendsSections?.listen || window.addEventListener.bind(window))("deep-legends:status", (event) => {
     const wasConnected = state.connected;
     if (typeof event.detail?.eventStream === "boolean") state.eventStream = event.detail.eventStream;
+    const identity = event.detail?.summoner;
+    const account = identity ? `${identity.gameName || identity.displayName || ""}#${identity.tagLine || ""}` : "";
+    if (account && state.facadeAccount && account !== state.facadeAccount) { setConnected(false); state.facadeDraft = null; }
+    if (account) state.facadeAccount = account;
     setConnected(Boolean(event.detail?.connected));
-	if (state.connected && wasConnected === false) state.facadeChallengeRetryUsed = false;
-    if (state.connected && state.active) loadAll(wasConnected === false);
+	if (state.connected && !wasConnected) { state.facadeChallengeRetryUsed = false; void loadFacade(false, false, "poll"); }
+    if (state.connected && state.active) loadAll(!wasConnected && state.tab !== "facade");
     else if (state.rig) renderRig();
   });
   window.addEventListener("deep-legends:live-disconnected", () => {
     state.eventStream = false;
     if (state.rig) renderRig();
   });
-  window.addEventListener("deep-legends:gameflow", (event) => {
+  (window.deepLegendsSections?.listen || window.addEventListener.bind(window))("deep-legends:gameflow", (event) => {
 	state.phase = event.detail?.phase || state.phase;
 	if (state.watch) renderWatch();
 	if ((event.detail?.changed || event.detail?.phase) && state.active && state.connected) {
@@ -2004,6 +2244,9 @@
 
   function disposeSuite() {
     state.destroyed = true;
+    state.facadeIconCatalog = null;
+    state.facadeIconDialog?.close();
+      state.facadeBannerDialog?.close();
     closeChampSelectDialog();
     state.facadeRequestToken = Number(state.facadeRequestToken || 0) + 1;
     state.facadeController?.abort();

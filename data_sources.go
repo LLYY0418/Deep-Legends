@@ -3,11 +3,12 @@ package main
 import "strings"
 
 const (
-	dataSourceLCU   = "lcu"
-	dataSourceSGP   = "sgp"
-	dataSourceRiot  = "riot"
-	dataSourceOPGG  = "opgg"
-	dataSourceQQ101 = "qq101"
+	dataSourceLCU     = "lcu"
+	dataSourceSGP     = "sgp"
+	dataSourceRiot    = "riot"
+	dataSourceOPGG    = "opgg"
+	dataSourceQQ101   = "qq101"
+	dataSourceARAMKit = "aramkit"
 
 	dataSourceSuccess         = "success"
 	dataSourceFailed          = "failed"

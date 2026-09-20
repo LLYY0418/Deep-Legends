@@ -1,0 +1,227 @@
+package main
+
+import (
+	"strconv"
+	"strings"
+	"time"
+)
+
+type proIdentityBadge struct {
+	PlayerName string `json:"playerName"`
+	TeamCode   string `json:"teamCode"`
+	TeamName   string `json:"teamName"`
+	Secondary  bool   `json:"secondary"`
+}
+
+func proDirectoryMemberValid(team opggProTeam, m opggProMember) bool {
+	for _, t := range proRoster {
+		for _, p := range t.Players {
+			allowed := team.ID == t.OPGGID
+			for _, id := range p.AllowTeams {
+				allowed = allowed || team.ID == id
+			}
+			if allowed && !proSecondaryTeam(team) && strings.EqualFold(strings.TrimSpace(m.Nickname), p.Name) && !proIdentityMatches(m, p) {
+				return false
+			}
+		}
+	}
+	return (m.TeamID == 0 || m.TeamID == team.ID) && strings.EqualFold(m.Authority, "PROGAMER") && !strings.Contains(strings.ToUpper(m.Position), "COACH") && strings.TrimSpace(m.Nickname) != ""
+}
+func proSourceTeamCode(team opggProTeam) string {
+	code := strings.TrimSpace(team.ShortName)
+	if code == "" {
+		code = strings.TrimSpace(team.Name)
+	}
+	if code == "" {
+		code = "OPGG-" + strconv.Itoa(team.ID)
+	}
+	return code
+}
+
+// Allocate the same stable, unambiguous code for directory rows and badges.
+func proSourceTeamCodes(source []opggProTeam) map[int]string {
+	codes, owners := map[int]string{}, map[string]int{}
+	for _, t := range proRoster {
+		codes[t.OPGGID] = t.Code
+		owners[t.Code] = t.OPGGID
+	}
+	for _, team := range source {
+		if codes[team.ID] != "" {
+			continue
+		}
+		code := proSourceTeamCode(team)
+		collision := owners[code] != 0 && owners[code] != team.ID
+		for _, other := range source {
+			collision = collision || other.ID != team.ID && proSourceTeamCode(other) == code
+		}
+		if collision {
+			code += "-" + strconv.Itoa(team.ID)
+		}
+		codes[team.ID] = code
+	}
+	return codes
+}
+
+// Preserve reviewed transfers; all other affiliations are explicitly source-reported.
+func proMemberBadge(team opggProTeam, m opggProMember, codes map[int]string) proIdentityBadge {
+	for _, t := range proRoster {
+		for _, p := range t.Players {
+			if !proIdentityMatches(m, p) {
+				continue
+			}
+			allowed := team.ID == t.OPGGID
+			for _, id := range p.AllowTeams {
+				allowed = allowed || team.ID == id
+			}
+			if allowed && !proSecondaryTeam(team) {
+				return proIdentityBadge{p.Name, t.Code, t.Name, false}
+			}
+		}
+	}
+	return proIdentityBadge{strings.TrimSpace(m.Nickname), codes[team.ID], team.Name, proSecondaryTeam(team)}
+}
+
+// Retain the reviewed rows (including missing accounts) and extend with the
+// entire source directory. Added rows are not claimed to be officially reviewed.
+func proDirectoryRoster(source []opggProTeam, reviewed []proRosterTeam) []proRosterTeam {
+	codes := proSourceTeamCodes(source)
+	roster := make([]proRosterTeam, len(reviewed))
+	for i, t := range reviewed {
+		roster[i] = t
+		roster[i].Players = append([]proRosterPlayer(nil), t.Players...)
+	}
+	for _, team := range source {
+		for _, m := range team.Members {
+			if !proDirectoryMemberValid(team, m) {
+				continue
+			}
+			badge := proMemberBadge(team, m, codes)
+			found := false
+			for _, t := range roster {
+				for _, p := range t.Players {
+					if t.Code == badge.TeamCode && strings.EqualFold(p.Name, badge.PlayerName) {
+						found = true
+					}
+				}
+			}
+			if found {
+				continue
+			}
+			index := -1
+			for i, t := range roster {
+				if t.OPGGID == team.ID {
+					index = i
+					break
+				}
+			}
+			if index < 0 {
+				code := badge.TeamCode
+				roster = append(roster, proRosterTeam{Code: code, Name: team.Name, League: "OP.GG", OPGGID: team.ID})
+				index = len(roster) - 1
+			}
+			roster[index].Players = append(roster[index].Players, proRosterPlayer{Name: m.Nickname, Position: strings.ToLower(m.Position), Names: []string{m.RealName}, Directory: true})
+		}
+	}
+	return roster
+}
+
+type proIdentityIndex struct {
+	byKey      map[string]*proIdentityBadge
+	candidates int
+}
+
+func (a *app) proIdentitySnapshot() proIdentityIndex {
+	a.proPlayers.mu.Lock()
+	var teams []opggProTeam
+	if a.proPlayers.fetchedAt.IsZero() || time.Since(a.proPlayers.fetchedAt) <= proPlayersMaxStale {
+		teams = cloneProTeams(a.proPlayers.teams)
+	}
+	a.proPlayers.mu.Unlock()
+	codes := proSourceTeamCodes(teams)
+	index := proIdentityIndex{byKey: map[string]*proIdentityBadge{}}
+	type candidate struct {
+		keys  []string
+		badge proIdentityBadge
+	}
+	rows := []candidate{}
+	parent := map[string]string{}
+	var root func(string) string
+	root = func(k string) string {
+		p, ok := parent[k]
+		if !ok {
+			parent[k] = k
+			return k
+		}
+		if p != k {
+			parent[k] = root(p)
+		}
+		return parent[k]
+	}
+	for _, team := range teams {
+		for _, m := range team.Members {
+			if !proDirectoryMemberValid(team, m) {
+				continue
+			}
+			badge := proMemberBadge(team, m, codes)
+			for _, account := range m.Summoners {
+				if !strings.EqualFold(strings.TrimSpace(account.Region), "kr") || strings.TrimSpace(account.GameName) == "" || strings.TrimSpace(account.TagLine) == "" {
+					continue
+				}
+				keys := proAccountKeys(account)
+				rows = append(rows, candidate{keys, badge})
+				for _, k := range keys[1:] {
+					parent[root(k)] = root(keys[0])
+				}
+			}
+		}
+	}
+	owners := map[string]proIdentityBadge{}
+	ambiguous := map[string]bool{}
+	for _, row := range rows {
+		key := root(row.keys[0])
+		if old, ok := owners[key]; ok && old != row.badge {
+			ambiguous[key] = true
+		}
+		owners[key] = row.badge
+	}
+	for _, row := range rows {
+		key := root(row.keys[0])
+		for _, k := range row.keys {
+			index.byKey[k] = nil
+			if !ambiguous[key] {
+				badge := owners[key]
+				index.byKey[k] = &badge
+			}
+		}
+	}
+	index.candidates = len(rows)
+	return index
+}
+func (a *app) matchProIdentity(index proIdentityIndex, surface string, reference gameplayReference) *proIdentityBadge {
+	var badge *proIdentityBadge
+	matchedBy := "none"
+	if strings.EqualFold(strings.TrimSpace(reference.Region), "kr") {
+		if reference.PlayerRef != "" {
+			if value, exists := index.byKey["puuid:"+strings.TrimSpace(reference.PlayerRef)]; exists {
+				badge = value
+				if badge != nil {
+					matchedBy = "puuid"
+				}
+				goto emit
+			}
+		}
+		if strings.TrimSpace(reference.GameName) != "" && strings.TrimSpace(reference.TagLine) != "" {
+			badge = index.byKey["name:"+strings.ToLower(strings.TrimSpace(reference.GameName)+"#"+strings.TrimSpace(reference.TagLine))]
+			if badge != nil {
+				matchedBy = "riotid"
+			}
+		}
+	}
+emit:
+	a.recordDiagnostic(map[string]any{"event": "pro_identity_match", "surface": surface, "region": reference.Region, "candidates": index.candidates, "matched_by": matchedBy, "secondary": badge != nil && badge.Secondary})
+	if badge == nil {
+		return nil
+	}
+	copy := *badge
+	return &copy
+}

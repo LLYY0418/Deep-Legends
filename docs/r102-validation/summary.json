@@ -1,0 +1,169 @@
+{
+  "worklist": "WORKLIST-R102-PRO-ACCOUNT-RECENCY-AND-SEED-EMBED.md",
+  "date": "2026-09-17",
+  "status": "implementation_and_local_validation_complete",
+  "players": 33,
+  "accounts": 53,
+  "go": {
+    "passed_top_level": 1232,
+    "passed_subtests": 662,
+    "r102_passed_top_level": 23,
+    "skipped": [
+      "Test1945LivePublicSources",
+      "Test2135LivePublicCurrentGame",
+      "TestParseMayhemRSCRealFixture",
+      "TestCapturedChampionItemDepthPages",
+      "TestOPGGUserReportCapture",
+      "TestOPGGSeasonSummaryObservedResponse",
+      "TestOverviewCurrentGamePublicProbe",
+      "TestProCapturedSupplements",
+      "TestProCapturedDirectory",
+      "TestProCapturedLadder",
+      "TestProRuneLiveCaptureReplay",
+      "TestProRuneLiveSupplementLatency",
+      "TestProRuneLiveIndex",
+      "TestR73CapturedTeamGateAudit",
+      "TestR92LivePublicDiagnosis",
+      "TestR92LiveBackground",
+      "TestR92LiveProDirectory"
+    ],
+    "duration_seconds": 117.899,
+    "log": "go-test.log",
+    "exit": 0
+  },
+  "race": {
+    "passed_top_level": 1232,
+    "passed_subtests": 662,
+    "r102_passed_top_level": 23,
+    "skipped": [
+      "Test1945LivePublicSources",
+      "Test2135LivePublicCurrentGame",
+      "TestParseMayhemRSCRealFixture",
+      "TestCapturedChampionItemDepthPages",
+      "TestOPGGUserReportCapture",
+      "TestOPGGSeasonSummaryObservedResponse",
+      "TestOverviewCurrentGamePublicProbe",
+      "TestProCapturedSupplements",
+      "TestProCapturedDirectory",
+      "TestProCapturedLadder",
+      "TestProRuneLiveCaptureReplay",
+      "TestProRuneLiveSupplementLatency",
+      "TestProRuneLiveIndex",
+      "TestR73CapturedTeamGateAudit",
+      "TestR92LivePublicDiagnosis",
+      "TestR92LiveBackground",
+      "TestR92LiveProDirectory"
+    ],
+    "duration_seconds": 144.03,
+    "log": "go-race.log",
+    "exit": 0
+  },
+  "node": {
+    "tests": 725,
+    "pass": 724,
+    "fail": 0,
+    "skipped": 1,
+    "log": "node-test.log",
+    "exit": 0
+  },
+  "pro_players_node_after_harness_fix": {
+    "tests": 26,
+    "pass": 26,
+    "fail": 0,
+    "skipped": 0,
+    "log": "pro-players-node-test.log",
+    "exit": 0
+  },
+  "build_vet": {
+    "build": {
+      "command": "/opt/homebrew/bin/go build -o /tmp/deep-legends-r102 .",
+      "exit": 0,
+      "duration_seconds": 1.371
+    },
+    "vet": {
+      "command": "/opt/homebrew/bin/go vet ./...",
+      "exit": 0,
+      "duration_seconds": 0.906
+    }
+  },
+  "mutations": {
+    "r102_killed": 26,
+    "r102_total": 26,
+    "r101_migrated_killed": 4,
+    "r101_migrated_total": 4
+  },
+  "chromium": {
+    "pass": true,
+    "widths": [
+      820,
+      1100,
+      1440,
+      1920
+    ],
+    "log": "chromium-layout.log",
+    "known_historical_note": "R73 short-name density warning; R102 badge-slot and overflow assertions passed"
+  },
+  "git_diff_check_pass": true,
+  "documentation_links": {
+    "files_inspected": [
+      "docs/r99-probe-results.md",
+      "docs/r101-execution-ledger.md",
+      "docs/pro-players-sources.md"
+    ],
+    "references": [
+      {
+        "source": "docs/pro-players-sources.md",
+        "line": 93,
+        "target": "pro-accounts-verification-2026-09-17.md",
+        "exists": true,
+        "kind": "markdown-link"
+      },
+      {
+        "source": "docs/pro-players-sources.md",
+        "line": 133,
+        "target": "pro-accounts-verification-2026-09-17.md",
+        "exists": true,
+        "kind": "markdown-link"
+      },
+      {
+        "source": "docs/pro-players-sources.md",
+        "line": 138,
+        "target": "pro-accounts-verification-2026-09-17.md",
+        "exists": true,
+        "kind": "markdown-link"
+      }
+    ],
+    "pass": true
+  },
+  "credentials": {
+    "RIOT_API_KEY_present": false,
+    "RIOT_API_KEY_CIPHER_present": false
+  },
+  "pending_live_validation": [
+    "Real Riot gameStartTimestamp response and unit",
+    "53-account live refresh latency and quota consumption",
+    "Windows League-client verification"
+  ],
+  "final_source_sha256": {
+    "pro_seed_accounts.go": "dfcef8f89f6aabafce9d9e6c06b40d7878744719e9a528f936b06e8d170b400e",
+    "pro_activity.go": "b4ac66c68162419d1e08a00a691f0586f36e08dc86a7b4e100ddc8c56dfbd1ed",
+    "pro_players.go": "d42a1c07aea10ce14ef2fdbdb06ac288b7d3120fdc8eea948886da40b14449ae",
+    "pro_snapshot_cache.go": "ec29762bbb0ca4b194f3034a0f094e9d5fb0f4e522f253faa12f04be3f6a1c61",
+    "riot_api.go": "6695f50e0849b202781cba23cf8e87b60a170178cd52f55986d73a6cffc1a1b5",
+    "riot_identity_cache.go": "6e128155c1c39d96b0c1b4496b98e8b611152ff3038929fce76bb6a176ec7ba4",
+    "champion_cache.go": "5db749572e5178245e30df19076ce52b55807a6bc36890736b0a95850e4d27fc",
+    "web/pro-players.js": "142c6cf3ded35f252628aad823f0d59b30d0bfa3075833cc5b73c8540bbc6d12",
+    "web/pro-players.css": "6c9eaf52f1afd5195550ac57858f7aa8f456db091617dad87ab9cd3bc93202f9",
+    "web/index.html": "4d75ca07408588e95fb6fb0d2ffe46513b3fb13c898080ad61533d92c8cbbac0",
+    "r102_test.go": "dd3ed7ba4c5578bc40b57b81b89d34f705c28452cd65fc7d86fe86037c1fbc1f",
+    "r99_test.go": "b072897ab7fe6df8541e4f95a0d2496bf234f113bb984a81af37ebdcc15409af",
+    "r100_test.go": "cb6077f29b0f245f593b9b4c5ee21675015099ced26cf2411fd7648055a8a21a",
+    "r101_test.go": "41f627b9bf7f17c622e44fd06469257633865db2e9af254460618fd5b36a8d6e",
+    "r73_test.go": "667347e29f8f50a1f120a574f5cd4c516dca410fcd5fd536f892067a90ab7378",
+    "pro_players_test.go": "447c51f197f24ff4ce08f1255fa8c57b87958e9675c2ca1b52c0a2f3b6bc9bfd",
+    "desktop/pro-players.test.cjs": "3288a7cf772313226b6fef5aab496d6a3f0eb3ea82cf908335f334babdd5a4d0",
+    "desktop/pro-players-layout.cjs": "0c8eb3785fd9fae5d69896608ee83d319afbd0f8b77c8ec1c73713d5fee70d7c",
+    "scripts/r101-mutation-check.py": "16ddd29f9460033a8f1a426e0c9dcb007db1c57f818e8cd946a34e8bbd6a2000",
+    "scripts/r102-mutation-check.py": "a6b2827cef00880c430134361cf164d7ca5df079ca6cd755341785878790ec0e"
+  }
+}

@@ -1,0 +1,35 @@
+✖ R99 icon dialog is body mounted, sliced, CSP safe, and restores focus on every exit (506.26075ms)
+✔ R99 disconnect closes the picker and invalidates the catalog (0.376292ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 570.316666
+
+✖ failing tests:
+
+test at web/suite.test.cjs:701:1
+✖ R99 icon dialog is body mounted, sliced, CSP safe, and restores focus on every exit (506.26075ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be reference-equal to "expected":
+  + actual - expected
+  
+  + HTMLElement {
+  - HTMLBodyElement {
+      Symbol(SameObject caches): [Object: null prototype] {
+        classList: DOMTokenList {}
+      }
+    }
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/suite.test.cjs:718:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {},
+    expected: {},
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

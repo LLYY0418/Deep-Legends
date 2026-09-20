@@ -1,0 +1,4 @@
+=== RUN   TestR101SeedResolvesSoloQueueRank
+--- PASS: TestR101SeedResolvesSoloQueueRank (0.05s)
+PASS
+ok  	lol-loot-assistant	0.447s

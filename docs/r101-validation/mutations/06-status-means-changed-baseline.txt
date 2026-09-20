@@ -1,0 +1,4 @@
+=== RUN   TestR101BannerProbeReadsBackBeforeClaimingSuccess
+--- PASS: TestR101BannerProbeReadsBackBeforeClaimingSuccess (0.00s)
+PASS
+ok  	lol-loot-assistant	0.505s

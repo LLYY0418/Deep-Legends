@@ -1,0 +1,7 @@
+=== RUN   TestR101BannerProbeSwitchesToDifferentOwnedBanner
+    r101_test.go:167: unexpected /lol-game-data/assets/v1/regalia.json
+    r101_test.go:178: restore missing: []
+--- FAIL: TestR101BannerProbeSwitchesToDifferentOwnedBanner (0.00s)
+FAIL
+FAIL	lol-loot-assistant	0.478s
+FAIL

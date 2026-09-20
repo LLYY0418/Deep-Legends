@@ -1,0 +1,210 @@
+[
+  {
+    "id": "01-hardcoded-metadata",
+    "file": "pro_seed_accounts.go",
+    "test": "TestR102SeedRealNameAndPositionComeFromRoster",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "02-shared-anchor",
+    "file": "pro_seed_accounts.go",
+    "test": "TestR102SeedAnchorKeysAreUniquePerAccount",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "03-creation-time",
+    "file": "pro_activity.go",
+    "test": "TestR102LastMatchStartParsesGameStartTimestamp",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "04-empty-detail",
+    "file": "pro_activity.go",
+    "test": "TestR102LastMatchStartHandlesNoMatches",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "05-short-activity-ttl",
+    "file": "pro_activity.go",
+    "test": "TestR102LastMatchStartCachedSixHours",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "06-fixed-budget",
+    "file": "pro_seed_accounts.go",
+    "test": "TestR102SeedBudgetScalesWithAccountCount",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "07-return-on-account-failure",
+    "file": "pro_seed_accounts.go",
+    "test": "TestR102SeedOneAccountFailureDoesNotBlockOthers",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "08-drop-old-snapshot",
+    "file": "pro_seed_accounts.go",
+    "test": "TestR102SeedKeepsPerAccountLastSnapshotOnQuotaExhausted",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "09-rank-before-time",
+    "file": "pro_players.go",
+    "test": "TestR102SortsByLastMatchTimeDescending",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "10-dormant-before-known",
+    "file": "pro_players.go",
+    "test": "TestR102KnownAlwaysBeforeUnknown",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "11-legacy-lp-ascending",
+    "file": "pro_players.go",
+    "test": "TestR102UnknownLastMatchFallsBackToRankOrder",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "12-primary-field",
+    "file": "pro_players.go",
+    "test": "TestR102PrimaryFieldRemoved",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "13-badge-restored",
+    "file": "web/pro-players.js",
+    "test": "TestR102NoPrimaryBadgeRendered",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "14-primary-filter",
+    "file": "web/pro-players.js",
+    "test": "TestR102LatestOnlyTogglesShowsFirstAccountOnly",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "15-old-button-label",
+    "file": "web/index.html",
+    "test": "TestR102ButtonLabelSaysLatestNotPrimary",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "16-primary-highlight",
+    "file": "web/pro-players.js",
+    "test": "TestR102LatestOnlyTogglesShowsFirstAccountOnly",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "17-missing-player",
+    "file": "pro_seed_accounts.go",
+    "test": "TestR102AllThirtyThreePlayersHaveSeeds",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "18-wrong-wei-owner",
+    "file": "pro_seed_accounts.go",
+    "test": "TestR102DyjkbysbBelongsToWei",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "19-duplicate-account",
+    "file": "pro_seed_accounts.go",
+    "test": "TestR102SeedAccountsMatchVerificationDoc",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "20-error-is-unranked",
+    "file": "pro_seed_accounts.go",
+    "test": "TestR102FailedQueryDoesNotTriggerBackoff",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "21-activity-backs-off",
+    "file": "pro_activity.go",
+    "test": "TestR102UnrankedBackoffDoesNotAffectLastMatchQuery",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "22-observed-rank-keeps-backoff",
+    "file": "pro_seed_accounts.go",
+    "test": "TestR102NewlyRankedAccountResetsToNormalTTL",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "23-no-unranked-backoff",
+    "file": "pro_seed_accounts.go",
+    "test": "TestR102UnrankedAccountBacksOffRankQuery",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "24-drop-activity-snapshot",
+    "file": "pro_snapshot_cache.go",
+    "test": "TestR102UpstreamActivityAndSnapshotRemainPrivate",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "25-filter-ranked-only",
+    "file": "pro_activity.go",
+    "test": "TestR102LastMatchStartParsesGameStartTimestamp",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  },
+  {
+    "id": "26-swap-account-owners",
+    "file": "pro_seed_accounts.go",
+    "test": "TestR102SeedAccountsMatchVerificationDoc",
+    "baseline_exit": 0,
+    "mutant_exit": 1,
+    "killed": true
+  }
+]

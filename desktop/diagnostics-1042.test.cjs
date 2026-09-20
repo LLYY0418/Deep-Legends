@@ -6,9 +6,9 @@ test('offline national group remains reachable from a pro tab',()=>{
  const src=read('gameplay.js');
  const functions=src.slice(src.indexOf('  function visiblePlayerGroups('),src.indexOf('  function playerGroupButton('));
  let selected='';const current={key:'current',current:true};
- new Function('PLAYER_GROUPS','playerGroupCount','connected','state','activeTab','selectPlayerTab','assert',`${functions};assert.deepEqual(visiblePlayerGroups(),['players','pro']);selectPlayerGroup('players');`)({players:'国服',kr:'韩服',pro:'职业'},group=>group==='pro'?1:0,()=>false,{tabs:[current]},()=>null,key=>selected=key,assert);
+ new Function('PLAYER_GROUPS','playerGroupCount','connected','state','activeTab','selectPlayerTab','assert',`${functions};assert.deepEqual(visiblePlayerGroups(),['players','kr','pro']);selectPlayerGroup('players');`)({players:'国服',kr:'韩服',pro:'职业'},group=>group==='pro'?1:0,()=>false,{tabs:[current]},()=>null,key=>selected=key,assert);
  assert.equal(selected,'current');
- assert.match(src,/const disabled = key !== "players" && itemCount === 0/);
+ assert.match(src,/const disabled = false/);
 });
 test('ordinary and centered artwork use different face coordinates, including load failure',()=>{
  const dom=new JSDOM('',{runScripts:'outside-only'}),w=dom.window;

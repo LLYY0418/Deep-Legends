@@ -13,13 +13,14 @@ import (
 const (
 	featureGateOPGG        = "opgg"
 	featureGateHexdata     = "hexdata"
+	featureGateAramkit     = "aramkit-rating"
 	featureGateLolalytics  = "lolalytics"
 	featureGateQQ101       = "qq101"
 	featureGateResponseMax = 64 << 10
 )
 
 var defaultFeatureGateValues = map[string]bool{
-	featureGateOPGG: true, featureGateHexdata: true, featureGateLolalytics: true, featureGateQQ101: true,
+	featureGateOPGG: true, featureGateHexdata: true, featureGateAramkit: true, featureGateLolalytics: true, featureGateQQ101: true,
 }
 
 type featureGates struct {
@@ -104,6 +105,8 @@ func featureGateForChampionHost(host string) string {
 		return featureGateOPGG
 	case hexdataHost:
 		return featureGateHexdata
+	case aramkitRatingHost:
+		return featureGateAramkit
 	case qq101Host:
 		return featureGateQQ101
 	default:

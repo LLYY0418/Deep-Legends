@@ -58,6 +58,7 @@ type championCacheLoadResult struct {
 }
 
 type championDataCache struct {
+	now               func() time.Time
 	strictDisk        bool
 	diskMaxEntries    int
 	diskMaxBytes      int64
@@ -101,7 +102,11 @@ func (c *championDataCache) load(ctx context.Context, key string, ttl, staleFor 
 }
 
 func (c *championDataCache) loadWithStatus(ctx context.Context, key string, ttl, staleFor time.Duration, persistDisk bool, loader func(context.Context) ([]byte, error)) (championCacheLoadResult, error) {
-	now := time.Now()
+	return c.loadWithResultTTL(ctx, key, ttl, staleFor, persistDisk, nil, loader)
+}
+
+func (c *championDataCache) loadWithResultTTL(ctx context.Context, key string, ttl, staleFor time.Duration, persistDisk bool, resultTTL func([]byte) time.Duration, loader func(context.Context) ([]byte, error)) (championCacheLoadResult, error) {
+	now := c.cacheNow()
 	c.mu.Lock()
 	if entry, ok := c.entries[key]; ok {
 		if now.Before(entry.ExpiresAt) {
@@ -117,7 +122,7 @@ func (c *championDataCache) loadWithStatus(ctx context.Context, key string, ttl,
 		select {
 		case <-done:
 			if ctx.Err() == nil && (errors.Is(flight.err, context.Canceled) || errors.Is(flight.err, context.DeadlineExceeded)) {
-				return c.loadWithStatus(ctx, key, ttl, staleFor, persistDisk, loader)
+				return c.loadWithResultTTL(ctx, key, ttl, staleFor, persistDisk, resultTTL, loader)
 			}
 			return championCacheLoadResult{data: append([]byte(nil), flight.data...), fetchedAt: flight.fetchedAt, state: flight.state, upstreamErr: flight.upstreamErr}, flight.err
 		case <-ctx.Done():
@@ -131,7 +136,7 @@ func (c *championDataCache) loadWithStatus(ctx context.Context, key string, ttl,
 		diskEntry, _ = c.readDisk(key)
 	}
 	c.mu.Lock()
-	if entry, ok := c.entries[key]; ok && time.Now().Before(entry.ExpiresAt) {
+	if entry, ok := c.entries[key]; ok && c.cacheNow().Before(entry.ExpiresAt) {
 		c.touchLocked(key)
 		data := append([]byte(nil), entry.Data...)
 		c.mu.Unlock()
@@ -143,7 +148,7 @@ func (c *championDataCache) loadWithStatus(ctx context.Context, key string, ttl,
 		select {
 		case <-done:
 			if ctx.Err() == nil && (errors.Is(existing.err, context.Canceled) || errors.Is(existing.err, context.DeadlineExceeded)) {
-				return c.loadWithStatus(ctx, key, ttl, staleFor, persistDisk, loader)
+				return c.loadWithResultTTL(ctx, key, ttl, staleFor, persistDisk, resultTTL, loader)
 			}
 			return championCacheLoadResult{data: append([]byte(nil), existing.data...), fetchedAt: existing.fetchedAt, state: existing.state, upstreamErr: existing.upstreamErr}, existing.err
 		case <-ctx.Done():
@@ -165,6 +170,9 @@ func (c *championDataCache) loadWithStatus(ctx context.Context, key string, ttl,
 
 	data, err := loader(ctx)
 	if err == nil && len(data) > 0 {
+		if resultTTL != nil {
+			ttl = resultTTL(data)
+		}
 		hash := sha256.Sum256(data)
 		entry := championCacheEnvelope{
 			Schema: championCacheSchema, Key: key, FetchedAt: now, ExpiresAt: now.Add(ttl),
@@ -238,6 +246,9 @@ func (c *championDataCache) pathFor(key string) string {
 	name := hex.EncodeToString(hash[:]) + ".json"
 	if strings.HasPrefix(key, "hexdata-") {
 		name = "hexdata-" + name
+	}
+	if strings.HasPrefix(key, "riot-identity-v1|proseed:") {
+		name = "proseed-" + name
 	}
 	return filepath.Join(c.dir, name)
 }
@@ -324,7 +335,10 @@ func (c *championDataCache) scheduleDiskPrune(written int64) {
 }
 
 func championCacheDiskAllowed(key string) bool {
-	if strings.HasPrefix(key, "riot-identity-v1|") || strings.HasPrefix(key, "riot-match-v1|KR_") || strings.HasPrefix(key, "hexdata-") || strings.HasPrefix(key, "bootstrap|") || strings.HasPrefix(key, "v2|opgg-rsc|") || strings.HasPrefix(key, "v3|opgg-detail|") {
+	if strings.HasPrefix(key, "public-profile-icon|") || strings.HasPrefix(key, "pro-profile-v1|") || strings.HasPrefix(key, "pro-profile-v2|") {
+		return true
+	}
+	if strings.HasPrefix(key, "public-pro-snapshot-v1|") || strings.HasPrefix(key, "normalized-perks-v1|") || strings.HasPrefix(key, "normalized-augments-v1|") || strings.HasPrefix(key, "riot-identity-v1|") || strings.HasPrefix(key, "riot-match-v1|KR_") || strings.HasPrefix(key, "hexdata-") || strings.HasPrefix(key, "bootstrap|") || strings.HasPrefix(key, "v2|opgg-rsc|") || strings.HasPrefix(key, "v3|opgg-detail|") {
 		return true
 	}
 	for _, host := range []string{dataDragonHost, communityDragonHost, opggChampionHost, opggPageHost, qq101Host} {
@@ -430,7 +444,7 @@ func (c *championDataCache) pruneDiskLocked() error {
 		path := filepath.Join(c.dir, item.Name())
 		// Hexdata正文 and its validator state are user-facing recovery data.
 		// They must not be selected as generic LRU victims based on mtime.
-		protected := strings.HasPrefix(item.Name(), "hexdata-")
+		protected := strings.HasPrefix(item.Name(), "hexdata-") || strings.HasPrefix(item.Name(), "proseed-")
 		if protected {
 			continue
 		}
@@ -474,6 +488,9 @@ func championCachePolicy(host, requestPath, accept string) (time.Duration, time.
 	if host == qq101Host {
 		return 30 * time.Minute, 24 * time.Hour, true
 	}
+	if host == opggPageHost && requestPath == proLadderPath {
+		return 24 * time.Hour, 0, true
+	}
 	if host == opggPageHost {
 		return 30 * time.Minute, 24 * time.Hour, true
 	}
@@ -501,4 +518,11 @@ func (c *championDataCache) readCacheFile(path string) ([]byte, error) {
 		return c.readFile(path)
 	}
 	return os.ReadFile(path)
+}
+
+func (c *championDataCache) cacheNow() time.Time {
+	if c.now != nil {
+		return c.now()
+	}
+	return time.Now()
 }

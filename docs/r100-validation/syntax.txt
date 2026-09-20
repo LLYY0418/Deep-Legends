@@ -1,0 +1,7 @@
+web/app.js PASS
+web/gameplay.js PASS
+web/suite.js PASS
+web/image-queue.js PASS
+desktop/main.cjs PASS
+desktop/preload.cjs PASS
+desktop/diagnostics-directory.cjs PASS

@@ -7,8 +7,11 @@ import (
 
 const minimumAbilitySampleGames = 3
 
+const abilityBaselineScore = 50
+
 type gameplayAbilityAccumulator struct {
 	games                    int
+	kdaTotal                 float64
 	kills, deaths, assists   int
 	damage, cs, gold, vision int
 	teamKills, teamDamage    int
@@ -17,6 +20,7 @@ type gameplayAbilityAccumulator struct {
 
 func (a *gameplayAbilityAccumulator) add(player gameplayParticipant, team gameplayTeam, duration int64) {
 	a.games++
+	a.kdaTotal += ratio(player.Kills+player.Assists, player.Deaths)
 	a.kills += player.Kills
 	a.deaths += player.Deaths
 	a.assists += player.Assists
@@ -31,6 +35,7 @@ func (a *gameplayAbilityAccumulator) add(player gameplayParticipant, team gamepl
 
 func (a *gameplayAbilityAccumulator) addSide(side seasonRankedAbilitySide, duration int64) {
 	a.games++
+	a.kdaTotal += ratio(side.Kills+side.Assists, side.Deaths)
 	a.kills += side.Kills
 	a.deaths += side.Deaths
 	a.assists += side.Assists
@@ -94,18 +99,16 @@ func seasonAbilityStatsForQueue(cached []seasonRankedMatch, queueID int64) (game
 	var playerStats, baselineStats gameplayAbilityAccumulator
 	positions := make(map[string]int)
 	for _, item := range cached {
-		if item.QueueID != queueID || item.Ability == nil || item.Ability.Duration <= 0 {
+		if item.QueueID != queueID || item.Ability == nil || item.Ability.Duration <= 0 || item.Ability.Opponent == nil {
 			continue
 		}
 		position := strings.ToLower(strings.TrimSpace(item.Position))
-		if position == "" || position == "other" {
+		if !abilityPositionKnown(position) {
 			continue
 		}
 		playerStats.addSide(item.Ability.Player, item.Ability.Duration)
 		positions[position]++
-		if item.Ability.Opponent != nil {
-			baselineStats.addSide(*item.Ability.Opponent, item.Ability.Duration)
-		}
+		baselineStats.addSide(*item.Ability.Opponent, item.Ability.Duration)
 	}
 	return playerStats, baselineStats, positions
 }
@@ -117,7 +120,7 @@ func abilityProfileFrom(playerStats, baselineStats gameplayAbilityAccumulator, p
 
 	position := ""
 	for key, count := range positions {
-		if position == "" || count > positions[position] {
+		if position == "" || count > positions[position] || count == positions[position] && key < position {
 			position = key
 		}
 	}
@@ -151,18 +154,26 @@ func gameplayAbilityStatsForQueue(matches []gameplayMatch, playerRef string, que
 		}
 		subject, ok := matchSubject(match, playerRef)
 		position := strings.ToLower(strings.TrimSpace(subject.Position))
-		if !ok || position == "" || position == "other" {
+		if !ok || !abilityPositionKnown(position) {
 			continue
 		}
-		playerStats.add(subject, abilityTeam(match, subject.TeamID), match.Duration)
-		positions[position]++
+		var opponent gameplayParticipant
+		counterparts := 0
 		for _, candidate := range match.Participants {
 			if candidate.TeamID == subject.TeamID || strings.ToLower(strings.TrimSpace(candidate.Position)) != position {
 				continue
 			}
-			baselineStats.add(candidate, abilityTeam(match, candidate.TeamID), match.Duration)
-			break
+			opponent = candidate
+			counterparts++
 		}
+		// Both sides must come from exactly the same games. Ambiguous roles
+		// are not resolved using participant array order.
+		if counterparts != 1 {
+			continue
+		}
+		playerStats.add(subject, abilityTeam(match, subject.TeamID), match.Duration)
+		baselineStats.add(opponent, abilityTeam(match, opponent.TeamID), match.Duration)
+		positions[position]++
 	}
 	return playerStats, baselineStats, positions
 }
@@ -201,7 +212,7 @@ func abilityMetrics(player, baseline gameplayAbilityAccumulator) []gameplayAbili
 		precision                     int
 	}
 	specs := []spec{
-		{"kda", "KDA", "平均击杀与助攻相对于死亡的比例。", "", ratio(player.kills+player.assists, player.deaths), ratio(baseline.kills+baseline.assists, baseline.deaths), 2},
+		{"kda", "KDA", "逐场计算 (击杀+助攻)/max(1,死亡) 后取平均。", "", player.kdaTotal / float64(player.games), baseline.kdaTotal / float64(baseline.games), 2},
 		{"killParticipation", "参团率", "参与击杀数占所在队伍总击杀的比例。", "%", abilityRatio(player.kills+player.assists, player.teamKills, 100), abilityRatio(baseline.kills+baseline.assists, baseline.teamKills, 100), 1},
 		{"damageShare", "伤害占比", "对英雄伤害占所在队伍英雄总伤害的比例。", "%", abilityRatio(player.damage, player.teamDamage, 100), abilityRatio(baseline.damage, baseline.teamDamage, 100), 1},
 		{"dpm", "DPM", "每分钟对英雄造成的平均伤害。", "", perMinute(player.damage, player.duration), perMinute(baseline.damage, baseline.duration), 0},
@@ -211,23 +222,34 @@ func abilityMetrics(player, baseline gameplayAbilityAccumulator) []gameplayAbili
 	}
 	metrics := make([]gameplayAbilityMetric, 0, len(specs))
 	for _, item := range specs {
-		if item.baseline <= 0 || math.IsNaN(item.player) || math.IsInf(item.player, 0) {
-			continue
+		metric := gameplayAbilityMetric{Key: item.key, Label: item.label, Description: item.description, Unit: item.unit}
+		valid := func(value float64) bool { return value >= 0 && !math.IsNaN(value) && !math.IsInf(value, 0) }
+		if valid(item.player) {
+			metric.Player = abilityRound(item.player, item.precision)
 		}
-		ratioToBaseline := item.player / item.baseline
-		metrics = append(metrics, gameplayAbilityMetric{
-			Key: item.key, Label: item.label, Description: item.description, Unit: item.unit,
-			Player: abilityRound(item.player, item.precision), Baseline: abilityRound(item.baseline, item.precision),
-			PlayerScore: abilityRound(math.Max(16, math.Min(100, 62*ratioToBaseline)), 1),
-			Grade:       abilityGrade(ratioToBaseline),
-		})
+		if valid(item.baseline) {
+			metric.Baseline = abilityRound(item.baseline, item.precision)
+		}
+		if !valid(item.player) || !valid(item.baseline) || item.baseline == 0 {
+			metric.Unavailable = true
+			metric.Grade = "—"
+			metric.Description += " 数据或有效对手基准不足，本项不评分。"
+		} else {
+			// Symmetric bounded comparison: equal=50, real zero=0.
+			// Square-root compression limits extreme ratios without a fake floor.
+			p, b := math.Sqrt(item.player), math.Sqrt(item.baseline)
+			metric.PlayerScore = abilityRound(2*abilityBaselineScore*p/(p+b), 1)
+			metric.Grade = abilityGrade(item.player / item.baseline)
+			metric.Description += " 图形值=100×√本人/(√本人+√对手)，对手基线50；等级按原始比值分档，均非全服百分位。"
+		}
+		metrics = append(metrics, metric)
 	}
 	return metrics
 }
 
 func abilityRatio(numerator, denominator int, scale float64) float64 {
 	if denominator <= 0 {
-		return 0
+		return math.NaN()
 	}
 	return float64(numerator) * scale / float64(denominator)
 }
@@ -260,4 +282,12 @@ func abilityGrade(ratioToBaseline float64) string {
 	default:
 		return "C-"
 	}
+}
+
+func abilityPositionKnown(position string) bool {
+	switch position {
+	case "top", "jungle", "middle", "bottom", "utility":
+		return true
+	}
+	return false
 }

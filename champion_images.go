@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const publicImageTimeout = 8 * time.Second
+
 const championImageAccept = "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8"
 
 func newPublicBinaryCache(store *localStore, directory string, entries int, bytes int64) *championDataCache {
@@ -42,7 +44,7 @@ func (a *app) loadChampionRemoteAsset(ctx context.Context, p *championProvider, 
 	started := time.Now()
 	observation := &assetCacheObservation{state: "memory"}
 	ctx = context.WithValue(ctx, assetCacheObservationKey{}, observation)
-	data, err := a.loadAsset(ctx, "champion-asset:"+source+":"+host+":"+path, championImageMax, time.Minute, func(ctx context.Context) ([]byte, error) {
+	data, err := a.loadAsset(ctx, "champion-asset:"+source+":"+host+":"+path, championImageMax, 5*time.Second, func(ctx context.Context) ([]byte, error) {
 		observation.state = "miss"
 		return p.fetch(ctx, host, path, nil, championImageMax, championImageAccept)
 	})

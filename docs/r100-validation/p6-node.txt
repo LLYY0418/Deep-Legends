@@ -1,0 +1,43 @@
+✔ 职业页懒加载、所有分组/账号、缺失状态、筛选缓存与安全转义 (286.341333ms)
+✔ 加载互斥、失败保留旧表、恢复与来源不可用名单 (258.766833ms)
+✔ 国服每次打开折叠；韩服下方入口可键盘聚焦且不修改大区 (916.04175ms)
+✔ 统一总览按国服、韩服、职业分组，同一账号跨组隔离且保留滚动和目录焦点 (4915.382041ms)
+✔ 补充来源未更新保留提示，重新进入不重复阻塞整页，手动刷新可重试 (292.123333ms)
+✔ 职业列表后台补充自动更新，离开页面停止轮询 (5199.272875ms)
+✔ R73 主号、历史折叠、只看主号及会话核验 (155.846709ms)
+▶ R73 真正点击后才核验：差异与404标记，502不误判
+  ✔ {"proMismatch":true} (915.497708ms)
+  ✔ {"overviewStatus":404} (772.845208ms)
+  ✔ {"overviewStatus":502} (849.321333ms)
+✔ R73 真正点击后才核验：差异与404标记，502不误判 (2538.454375ms)
+✔ 职业目录仅保留返回总览，返回后保留全部已打开页签 (1443.53575ms)
+✔ 未知更新时间的补充账号保持展示，不出现120天未玩的断言 (86.228458ms)
+✔ 玩家页签各自保留纵向位置，跨页面返回也不串位 (1869.824417ms)
+✔ R87 导出完成状态跨页面保留，打开文件夹后还原 (483.268959ms)
+✔ OPGG season summary actually replaces recent sample in both overview workspaces without a history reload (1170.243083ms)
+✔ 当前对局独立置顶、两队十人、无评分和多余标记，分组后不会污染玩家战绩 (834.329167ms)
+✔ R74 零战绩当前对局也加载技能目录，未加载时不伪造技能名称 (820.774916ms)
+✔ R100 菜单键盘可达空组、异步重绘保焦、离开总览关闭菜单 (785.129125ms)
+✔ 国服总览保留战绩但不渲染或请求当前对局和观战 (390.635666ms)
+✔ R97 management filters and rows exclude expanded and academy teams (97.668208ms)
+✔ R100 empty national/KR/pro groups stay selectable and preserve distinct empty states (997.563291ms)
+✔ manual reread recovers a stuck overview and refreshes overview plus live without forcing the overlay (1821.929708ms)
+✔ gameplay soft reset clears stalled pagination and recommendation failures while preserving touched tabs (2.022583ms)
+✔ collection-dirty is accepted by the SSE whitelist and refreshes status (1166.474708ms)
+✔ dirty collection rescans on entry and view changes without duplicate refresh requests (1603.945416ms)
+✔ R70 app and gameplay retain cancellation ownership until body parsing completes (1.203334ms)
+✔ R70 cached collection reentry avoids a request and never uses outgoing DOM snapshots (1628.28425ms)
+✔ R70 SSE overflow and reconnect resync refresh visible collection even with unchanged status (1603.37175ms)
+✔ R70 gameflow burst uses one fixed window and one non-aborting trailing request (1.906333ms)
+✔ R70 hidden gameplay pages do not construct DOM, and destroyed pages remain inert (4.82125ms)
+✔ R70 superseded status completion cannot overwrite current state or reschedule polling (1.676834ms)
+✔ R71 collection startup issues one ensure across accepted requests, status events and scan start (0.907417ms)
+✔ R71 a failed or lost collection acceptance can retry without a permanent gate (0.610292ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24000.668667

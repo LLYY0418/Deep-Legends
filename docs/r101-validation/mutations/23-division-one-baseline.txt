@@ -1,0 +1,4 @@
+=== RUN   TestR101SeedRankMapsRomanDivision
+--- PASS: TestR101SeedRankMapsRomanDivision (0.21s)
+PASS
+ok  	lol-loot-assistant	0.604s

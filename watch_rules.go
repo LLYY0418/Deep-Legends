@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -44,8 +45,10 @@ type watchHonorRule struct {
 }
 
 type watchBroadcastRule struct {
-	Enabled    bool   `json:"enabled"`
-	Visibility string `json:"visibility"`
+	Enabled          bool   `json:"enabled"`
+	Visibility       string `json:"visibility"`
+	TeamComposition  bool   `json:"teamComposition"`
+	AssignedPosition bool   `json:"assignedPosition"`
 }
 
 type watchInvitationRule struct {
@@ -100,6 +103,8 @@ type convenienceSettings struct {
 }
 
 type watchRunner struct {
+	// Snapshot-only lookup. Never load a catalog to compose a chat message.
+	broadcastChampionNames func() map[int64]string
 	now                    func() time.Time
 	wait                   func(context.Context, time.Duration) error
 	champDiagnosticSession string
@@ -189,7 +194,7 @@ func loadWatchSettings(store *localStore) watchSettings {
 			}
 		}
 	}
-	// Version 2 had no champSelect object. Keep its master switch disabled,
+	// Version 2 had no champSelect object. Use the current empty-sequence default,
 	// while initializing the current per-mode defaults and preserving old rules.
 	if _, current := keys["champSelect"]; !current {
 		settings.ChampSelect = defaultChampSelectSettings()
@@ -371,6 +376,8 @@ func watchActionEnabled(settings watchSettings, action string) bool {
 		return settings.Rules.PromoteLeader.Enabled
 	case "auto-matchmaking":
 		return settings.Rules.AutoMatchmaking.Enabled
+	case "position-broadcast":
+		return settings.Rules.PositionBroadcast.Enabled
 	default:
 		return true
 	}
@@ -522,22 +529,43 @@ func (r *watchRunner) handleChampSelect(client *LCUClient, current Summoner) {
 	settings := r.currentWatch()
 	if settings.MasterEnabled && settings.Rules.PositionBroadcast.Enabled && !r.customPaused() {
 		r.mu.Lock()
-		alreadyBroadcasting := r.broadcastForSession
+		alreadyBroadcasting := r.broadcastForSession || (r.champSelect.phase != "" && r.champSelect.phase != "ChampSelect")
+		ctx, cancel := context.WithCancel(context.Background())
+		pending := &watchPendingAction{cancel: cancel}
 		if !alreadyBroadcasting {
 			r.broadcastForSession = true
+			if r.pending == nil {
+				r.pending = make(map[string]*watchPendingAction)
+			}
+			r.pending["position-broadcast"] = pending
 		}
 		r.mu.Unlock()
-		if !alreadyBroadcasting {
+		if alreadyBroadcasting {
+			cancel()
+		} else {
 			go func() {
-				result := r.broadcastPosition(client, current, settings.Rules.PositionBroadcast)
-				// A successful broadcast and a confirmed non-ARAM mode are terminal for
-				// this champion-select session. Transient/incomplete frames may retry.
-				if result == "fired" || result == "skipped_mode" {
-					return
+				defer cancel()
+				defer func() {
+					r.mu.Lock()
+					if r.pending["position-broadcast"] == pending {
+						delete(r.pending, "position-broadcast")
+					}
+					r.mu.Unlock()
+				}()
+				// Retry incomplete first frames on a bounded clock, never on every
+				// websocket event. Leaving champion select cancels reads and writes.
+				for attempt := 0; attempt < 3; attempt++ {
+					if !waitWatchDelay(ctx, time.Duration(attempt)*time.Second) {
+						return
+					}
+					result := r.broadcastPositionContext(ctx, client, current, settings.Rules.PositionBroadcast)
+					if ctx.Err() != nil || result == "fired" || result == "skipped_mode" || result == "skipped_custom" || result == "write_failed" {
+						return
+					}
 				}
-				r.mu.Lock()
-				r.broadcastForSession = false
-				r.mu.Unlock()
+				if ctx.Err() == nil {
+					r.emit("watch:skipped:position-broadcast:unavailable")
+				}
 			}()
 		}
 	}
@@ -964,7 +992,11 @@ func (r *watchRunner) scheduleAutoMatchmaking(client *LCUClient, delayMS int) bo
 					diagnostic["status_code"] = lastStatusCode
 				}
 				r.record(diagnostic)
-				r.emit(fmt.Sprintf("watch:failed:auto-matchmaking:%d::retry-exhausted", lastStatusCode))
+				if lastStatusCode == 0 {
+					r.emit("watch:skipped:auto-matchmaking:not-ready")
+				} else {
+					r.emit(fmt.Sprintf("watch:failed:auto-matchmaking:%d::retry-exhausted", lastStatusCode))
+				}
 				return
 			}
 			if !waitWatchDelay(ctx, r.autoMatchBackoff(attempt)) {
@@ -1287,6 +1319,10 @@ func (r *watchRunner) handleInvitations(client *LCUClient, rule watchInvitationR
 }
 
 func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rule watchBroadcastRule) string {
+	return r.broadcastPositionContext(context.Background(), client, current, rule)
+}
+
+func (r *watchRunner) broadcastPositionContext(parent context.Context, client *LCUClient, current Summoner, rule watchBroadcastRule) string {
 	finish := func(result, reason string) string {
 		r.record(map[string]any{"event": "watch_action", "action": "position-broadcast", "result": result, "reason": reason})
 		return result
@@ -1295,11 +1331,10 @@ func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rul
 		return finish("skipped_custom", "custom-paused")
 	}
 	r.record(map[string]any{"event": "watch_action", "action": "position-broadcast", "result": "armed"})
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 8*time.Second)
 	defer cancel()
 	var session map[string]any
 	if err := client.RequestJSON(ctx, http.MethodGet, "/lol-champ-select/v1/session", nil, &session); err != nil {
-		r.emit("watch:failed:position-broadcast")
 		return finish("failed", "session-read-failed")
 	}
 	queueID := anyInt(session, "queueId", "queueID")
@@ -1307,7 +1342,6 @@ func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rul
 	if modeGroup != "aram" && modeGroup != "hextech-aram" && modeGroup != "hextech-classic" {
 		var gameflow lcuGameflowSession
 		if err := client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/session", nil, &gameflow); err != nil {
-			r.emit("watch:failed:position-broadcast")
 			return finish("failed", "gameflow-read-failed")
 		}
 		mode := strings.ToUpper(strings.TrimSpace(gameflow.GameData.Queue.GameMode))
@@ -1343,13 +1377,11 @@ func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rul
 	case "2", "TWO", "RED", "200":
 		label = "红色方"
 	default:
-		r.emit("watch:failed:position-broadcast")
 		return finish("skipped_no_team", "team-unavailable")
 	}
 	var me map[string]any
 	var conversations []map[string]any
 	if client.RequestJSON(ctx, http.MethodGet, "/lol-chat/v1/me", nil, &me) != nil || client.RequestJSON(ctx, http.MethodGet, "/lol-chat/v1/conversations", nil, &conversations) != nil {
-		r.emit("watch:failed:position-broadcast")
 		return finish("failed", "chat-read-failed")
 	}
 	conversationID := ""
@@ -1360,8 +1392,7 @@ func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rul
 			break
 		}
 	}
-	if !safeLCUIdentifier(conversationID) {
-		r.emit("watch:failed:position-broadcast")
+	if !safeLCUChatIdentifier(conversationID) {
 		return finish("failed", "conversation-unavailable")
 	}
 	messageType := "celebration"
@@ -1369,19 +1400,22 @@ func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rul
 		messageType = "chat"
 	}
 	body := map[string]any{
-		"body": "当前阵营位置：" + label, "fromId": anyString(me, "id"), "fromPid": "",
+		"body": r.positionBroadcastMessage(label, session, rule), "fromId": anyString(me, "id"), "fromPid": "",
 		"fromSummonerId": current.SummonerID, "id": "", "isHistorical": false, "timestamp": "", "type": messageType,
 	}
 	if r.customPaused() {
 		return finish("skipped_custom", "custom-paused")
 	}
-	path := "/lol-chat/v1/conversations/" + conversationID + "/messages"
+	path := "/lol-chat/v1/conversations/" + url.PathEscape(conversationID) + "/messages"
 	if err := r.requestWatchJSON(ctx, client, http.MethodPost, path, body); err != nil {
 		if r.customPaused() {
 			return finish("skipped_custom", "custom-paused")
 		}
-		r.emit("watch:failed:position-broadcast")
-		return finish("failed", "message-write-failed")
+		if ctx.Err() == nil {
+			r.emit("watch:failed:position-broadcast")
+		}
+		// Do not retry a POST with an uncertain outcome: it could duplicate chat.
+		return finish("write_failed", "message-write-failed")
 	} else {
 		r.emit("watch:fired:position-broadcast")
 		return finish("fired", "sent")
@@ -1471,6 +1505,20 @@ func safeLCUIdentifier(value string) bool {
 	return true
 }
 
+// Chat conversation IDs can be XMPP JIDs (room@conference.domain).
+// Keep the stricter identifier contract for all other LCU routes.
+func safeLCUChatIdentifier(value string) bool {
+	if value != strings.TrimSpace(value) || strings.Count(value, "@") > 1 {
+		return false
+	}
+	for _, part := range strings.Split(value, "@") {
+		if !safeLCUIdentifier(part) {
+			return false
+		}
+	}
+	return len(value) <= 256
+}
+
 func (a *app) activeWatch() *watchRunner {
 	if a == nil {
 		return nil
@@ -1491,8 +1539,9 @@ func (a *app) handleWatchRules(w http.ResponseWriter, r *http.Request) {
 		runner.champDiagnostic("settings-read", "served", champSelectDecision{}, nil)
 		respondJSON(w, struct {
 			watchSettings
-			CustomPaused bool `json:"customPaused"`
-		}{runner.currentWatch(), runner.customPaused()})
+			CustomPaused     bool                   `json:"customPaused"`
+			BroadcastOptions []watchBroadcastOption `json:"broadcastOptions"`
+		}{runner.currentWatch(), runner.customPaused(), positionBroadcastOptions()})
 		return
 	}
 	var request watchSettings
@@ -1523,8 +1572,9 @@ func (a *app) handleWatchRules(w http.ResponseWriter, r *http.Request) {
 	}
 	respondJSON(w, struct {
 		watchSettings
-		CustomPaused bool `json:"customPaused"`
-	}{request, runner.customPaused()})
+		CustomPaused     bool                   `json:"customPaused"`
+		BroadcastOptions []watchBroadcastOption `json:"broadcastOptions"`
+	}{request, runner.customPaused(), positionBroadcastOptions()})
 }
 
 func (a *app) handleGameplayConvenience(w http.ResponseWriter, r *http.Request) {

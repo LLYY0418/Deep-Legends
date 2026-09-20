@@ -47,7 +47,8 @@ func (a *app) handleArenaMatchDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	match := riotConvertMatch(raw, "", a.riotChampionNames(r.Context()))
+	a.checkArenaRiotMatchTruth(raw)
+	match := riotConvertMatch(raw, "", a.riotChampionNames(r.Context()), a.riotQueueLabels(r.Context()))
 	if match.GameID <= 0 || len(match.Participants) < 2 || (match.ModeGroup != "arena" && !strings.EqualFold(match.GameMode, "CHERRY")) {
 		report(http.StatusBadGateway, cacheState, "error", "invalid-response")
 		http.Error(w, "Riot 返回的竞技场详情不完整", http.StatusBadGateway)

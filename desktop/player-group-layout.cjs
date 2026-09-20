@@ -11,8 +11,8 @@ exports.verify=async({call,evaluate,output})=>{
  await focusButton();await key('Enter');
  assert.equal((await state()).open,'true','keyboard Enter opens the group menu');
  assert.equal((await state()).focus,'players','keyboard Enter moves focus into menu');
- assert.deepEqual(await evaluate(`[...document.querySelectorAll('#player-group-menu [aria-disabled="true"]')].map(e=>({group:e.dataset.playerGroup,disabled:e.disabled,count:e.querySelector('small').textContent}))`),[{group:'kr',disabled:true,count:'0'},{group:'pro',disabled:true,count:'0'}]);
- await key('ArrowDown');assert.equal((await state()).focus,'players','empty groups skipped');
+ assert.deepEqual(await evaluate(`[...document.querySelectorAll('#player-group-menu [aria-disabled="true"]')].map(e=>({group:e.dataset.playerGroup,disabled:e.disabled,count:e.querySelector('small').textContent}))`),[]);
+ await key('ArrowDown');assert.equal((await state()).focus,'kr','empty groups remain keyboard reachable');
  await key('Escape');assert.equal((await state()).focus,'player-group-button');
  await key(' ', 'Space');assert.equal((await state()).open,'true');await key('Escape');
  // Exercise native sequential focus, rather than synthesizing a DOM keydown.

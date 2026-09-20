@@ -1,0 +1,122 @@
+$ node --test --test-name-pattern R95 web/r95.test.cjs
+✖ R95 P1 progress preserves career, append=true, noise=null (56.752208ms)
+✖ R95 P1 progress preserves career, append=true, noise=[] (12.968584ms)
+✔ R95 P1 progress preserves career, append=true, noise=undefined (9.869541ms)
+✖ R95 P1 progress preserves career, append=false, noise=null (7.445917ms)
+✖ R95 P1 progress preserves career, append=false, noise=[] (7.770167ms)
+✔ R95 P1 progress preserves career, append=false, noise=undefined (8.312167ms)
+✔ R95 P1 first five and complete explicit empty arrays are authoritative (18.872458ms)
+✔ R95 P2 slow interval/false loading eligibility (12.88625ms)
+✔ R95 P2 slow sse/false loading eligibility (8.892083ms)
+✔ R95 P2 slow event/false loading eligibility (9.150708ms)
+✔ R95 P2 slow manual/true loading eligibility (8.400458ms)
+✔ R95 P2 slow direct/true loading eligibility (8.402541ms)
+✔ R95 P2 slow manual/false loading eligibility (8.55825ms)
+✔ R95 P2 fast 10ms manual response never shows status, including zero-delay timers (7.625125ms)
+✔ R95 P3 both sides only show lock wait for show-then-lock (35.2535ms)
+✔ R95 P4 badge respects mask, secondary and professional click context (17.212792ms)
+✔ R95 P5 exact Chinese titles, unknown fallback, relative time and champselect fired count (0.870792ms)
+✔ R95 P3 typed lock wait targets its own side (6.24425ms)
+✔ R95 P4 match player clicks enter professional context even without directory source (5.834334ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 15
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 610.849708
+
+✖ failing tests:
+
+test at web/r95.test.cjs:14:73
+✖ R95 P1 progress preserves career, append=true, noise=null (56.752208ms)
+  AssertionError [ERR_ASSERTION]: ranks
+  + actual - expected
+  
+  + null
+  - [
+  -   {
+  -     tier: 'MASTER'
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:20:46)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: [ { tier: 'MASTER' } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at web/r95.test.cjs:14:73
+✖ R95 P1 progress preserves career, append=true, noise=[] (12.968584ms)
+  AssertionError [ERR_ASSERTION]: ranks
+  + actual - expected
+  
+  + []
+  - [
+  -   {
+  -     tier: 'MASTER'
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:20:46)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ { tier: 'MASTER' } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at web/r95.test.cjs:14:73
+✖ R95 P1 progress preserves career, append=false, noise=null (7.445917ms)
+  AssertionError [ERR_ASSERTION]: ranks
+  + actual - expected
+  
+  + null
+  - [
+  -   {
+  -     tier: 'MASTER'
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:20:46)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: [ { tier: 'MASTER' } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at web/r95.test.cjs:14:73
+✖ R95 P1 progress preserves career, append=false, noise=[] (7.770167ms)
+  AssertionError [ERR_ASSERTION]: ranks
+  + actual - expected
+  
+  + []
+  - [
+  -   {
+  -     tier: 'MASTER'
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:20:46)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ { tier: 'MASTER' } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,28 @@
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/normalban
+    r101_test.go:389: empty pool wrote to LCU
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/normalpick
+    r101_test.go:389: empty pool wrote to LCU
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/rankedban
+    r101_test.go:389: empty pool wrote to LCU
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/rankedpick
+    r101_test.go:389: empty pool wrote to LCU
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/aramban
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/arampick
+    r101_test.go:389: empty pool wrote to LCU
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/arenaban
+    r101_test.go:389: empty pool wrote to LCU
+=== RUN   TestR101EnabledWithEmptySequencesSendsNothing/arenapick
+    r101_test.go:389: empty pool wrote to LCU
+--- FAIL: TestR101EnabledWithEmptySequencesSendsNothing (0.43s)
+    --- FAIL: TestR101EnabledWithEmptySequencesSendsNothing/normalban (0.05s)
+    --- FAIL: TestR101EnabledWithEmptySequencesSendsNothing/normalpick (0.06s)
+    --- FAIL: TestR101EnabledWithEmptySequencesSendsNothing/rankedban (0.05s)
+    --- FAIL: TestR101EnabledWithEmptySequencesSendsNothing/rankedpick (0.05s)
+    --- PASS: TestR101EnabledWithEmptySequencesSendsNothing/aramban (0.05s)
+    --- FAIL: TestR101EnabledWithEmptySequencesSendsNothing/arampick (0.05s)
+    --- FAIL: TestR101EnabledWithEmptySequencesSendsNothing/arenaban (0.05s)
+    --- FAIL: TestR101EnabledWithEmptySequencesSendsNothing/arenapick (0.05s)
+FAIL
+FAIL	lol-loot-assistant	0.998s
+FAIL

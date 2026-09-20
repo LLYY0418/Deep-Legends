@@ -1,0 +1,5 @@
+--- FAIL: TestR99SeedAnchorSurvivesLRUAndHasOnlyStableField (2.72s)
+    r99_test.go:415: anchor evicted stat /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR99SeedAnchorSurvivesLRUAndHasOnlyStableField2937319078/001/riot-identities/proseed-dfd496e8baae003730c5862024d87aaa53d8de72ccab2e0df5b5f0266e92d1bd.json: no such file or directory
+FAIL
+FAIL	lol-loot-assistant	3.291s
+FAIL

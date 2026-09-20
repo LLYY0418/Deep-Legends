@@ -46,3 +46,8 @@ riot_key.local.*
 !/installer/payload/files/.gitkeep
 /desktop/uninstall-shell.exe
 .gopath/
+
+# R115: local mutation-test toolchains and obsolete sandbox environment files
+.mut102gopath/
+.gotoolchain/
+.r90env*

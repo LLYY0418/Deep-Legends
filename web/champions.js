@@ -229,7 +229,7 @@
     const fallbackPath = asset?.fallbackPath || asset?.imageFallbackPath || "";
     const fallbackImage = isLargeAugment && asset?.source && fallbackPath ? imageURL(asset.source, fallbackPath) : "";
     const fallbackData = fallbackImage ? ` data-augment-fallback="${escapeHTML(fallbackImage)}"` : "";
-    return `<span class="champion-asset ${className}"${fallbackData}${withTooltip ? ` tabindex="0" data-tooltip="${escapeHTML(tooltip)}" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}"` : ""}><img src="${image}" alt="${escapeHTML(name)}" loading="lazy" decoding="async" data-champion-image><span aria-hidden="true">${escapeHTML(name.slice(0, 1))}</span></span>`;
+    return `<span class="champion-asset ${className}"${fallbackData}${withTooltip ? ` tabindex="0" data-tooltip="${escapeHTML(tooltip)}" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}"` : ""}><img data-queued-src="${image}" alt="${escapeHTML(name)}" loading="lazy" decoding="async" data-champion-image><span aria-hidden="true">${escapeHTML(name.slice(0, 1))}</span></span>`;
   }
 
   async function api(path, key = path) {
@@ -953,7 +953,7 @@
       const path = row.imagePath || meta?.imagePath;
       const position = state.position === "all" && row.position ? ` · ${positionLabel(row.position)}` : "";
       return `<article class="champion-topcard${index === 0 ? " is-first" : ""}" role="button" tabindex="0" data-champion-row="${Number(row.championId)}" aria-label="查看${escapeHTML(name)}详情">
-        <img class="topcard-art" src="${heroArtworkURL(meta, source, path)}" alt="" loading="lazy" decoding="async" data-champion-image>
+        <img class="topcard-art" data-queued-src="${heroArtworkURL(meta, source, path)}" alt="" loading="lazy" decoding="async" data-champion-image>
         <div class="topcard-shade" aria-hidden="true"></div>
         ${tierBadge(row.tier, "topcard-tier")}
         <div class="topcard-copy">
@@ -1004,9 +1004,9 @@
     const source = row.imageSource || meta?.imageSource;
     const path = row.imagePath || meta?.imagePath;
     const overview = `<section class="mayhem-overview-strip">
-      <img class="mayhem-overview-art" src="${heroArtworkURL(meta, source, path)}" data-artwork-fallback="${escapeHTML(heroArtworkFallbackURL(meta))}" alt="" aria-hidden="true" decoding="async" data-champion-image>
+      <img class="mayhem-overview-art" data-queued-src="${heroArtworkURL(meta, source, path)}" data-artwork-fallback="${escapeHTML(heroArtworkFallbackURL(meta))}" alt="" aria-hidden="true" decoding="async" data-champion-image>
       <span class="mayhem-overview-shade" aria-hidden="true"></span>
-      <div class="mayhem-overview-identity"><span class="champion-detail-portrait"><img src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span><div><h2>${escapeHTML(title)} ${tierBadge(row.tier, "arena-title-tier")}</h2><small>${escapeHTML(subtitle)} · 总榜第 ${Number(row.rank) || "—"} 位</small></div></div>
+      <div class="mayhem-overview-identity"><span class="champion-detail-portrait"><img data-queued-src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span><div><h2>${escapeHTML(title)} ${tierBadge(row.tier, "arena-title-tier")}</h2><small>${escapeHTML(subtitle)} · 总榜第 ${Number(row.rank) || "—"} 位</small></div></div>
       <div class="mayhem-overview-metrics">${metric("胜率", percent(detail?.stats?.winRate ?? row.winRate))}${metric("样本", compactNumber(row.play))}${metric("梯度", `T${Number(row.tier) || "—"}`)}</div>
     </section>`;
     if (state.mayhemDetailLoading && !detail) return overview + renderDetailSkeleton();
@@ -1167,9 +1167,9 @@
       ["样本", "", stats.games ?? row.play, compactNumber, " 场"],
     ].filter(([, , value]) => hasMetric(value)).map(([label, className, value, formatter, suffix]) => `<span>${label} <b${className ? ` class="${className}"` : ""}>${formatter(value)}</b>${suffix}</span>`).join("");
     const overview = `<section class="arena-overview-strip">
-      <img class="arena-overview-art" src="${heroArtworkURL(meta, source, path)}" data-artwork-fallback="${escapeHTML(heroArtworkFallbackURL(meta))}" alt="" aria-hidden="true" decoding="async" data-champion-image>
+      <img class="arena-overview-art" data-queued-src="${heroArtworkURL(meta, source, path)}" data-artwork-fallback="${escapeHTML(heroArtworkFallbackURL(meta))}" alt="" aria-hidden="true" decoding="async" data-champion-image>
       <span class="arena-overview-shade" aria-hidden="true"></span>
-      <div class="arena-overview-identity"><span class="champion-detail-portrait"><img src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span><div><h2>${escapeHTML(title)} ${tierBadge(tier, "arena-title-tier")}</h2><small>${escapeHTML(subtitle)}${rank ? ` · 总榜第 ${rank} 位` : ""}</small></div></div>
+      <div class="arena-overview-identity"><span class="champion-detail-portrait"><img data-queued-src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span><div><h2>${escapeHTML(title)} ${tierBadge(tier, "arena-title-tier")}</h2><small>${escapeHTML(subtitle)}${rank ? ` · 总榜第 ${rank} 位` : ""}</small></div></div>
       <div class="arena-overview-metrics">
         ${arenaOverviewMetric("梯度", tierBadge(tier, "is-metric"), "tier", tierDisplay(tier) === "—" ? "暂无梯度" : `${tierDisplay(tier)} 档`)}
         ${arenaOverviewMetric("胜率", percent(stats.winRate || row.winRate), "win", rank ? `总榜第 ${rank} 名` : "全球样本")}
@@ -1468,12 +1468,13 @@
   }
 
   function renderArenaTeamFaces(champions, large = false) {
-    return `<div class="arena-team-faces${large ? " is-large" : ""}">${(champions || []).slice(0, 3).map((champion) => `<span class="champion-portrait"><img src="${imageURL(champion.imageSource, champion.imagePath)}" alt="${escapeHTML(champion.name || "英雄")}" loading="lazy" decoding="async" data-champion-image><span>${escapeHTML((champion.name || "?").slice(0, 1))}</span></span>`).join("")}</div>`;
+    return `<div class="arena-team-faces${large ? " is-large" : ""}">${(champions || []).slice(0, 3).map((champion) => `<span class="champion-portrait"><img data-queued-src="${imageURL(champion.imageSource, champion.imagePath)}" alt="${escapeHTML(champion.name || "英雄")}" loading="lazy" decoding="async" data-champion-image><span>${escapeHTML((champion.name || "?").slice(0, 1))}</span></span>`).join("")}</div>`;
   }
 
   function renderArenaTeamNames(team) {
     const names = (team?.champions || []).map((champion) => String(champion?.name || "").trim()).filter(Boolean).slice(0, 2);
-    return names.map((name) => `<span class="arena-team-name">${escapeHTML(name)}</span>`).join("") || '<span class="arena-team-name">未知英雄</span>';
+    const label = names.join(" + ") || "未知英雄";
+    return `<span class="arena-team-name" data-tooltip="${escapeHTML(label)}" data-tooltip-size="compact">${escapeHTML(label)}</span>`;
   }
 
   function teamName(team) {
@@ -1516,10 +1517,10 @@
     const rank = Number(row.rank) > 0 ? row.rank : index + 1;
     const selected = Number(state.selected?.championId) === Number(row.championId);
     const rowClass = selected ? "is-selected" : "";
-    const artwork = arena ? `<img class="champion-row-art" src="${heroArtworkURL(meta, source, path)}" alt="" aria-hidden="true" loading="lazy" decoding="async" data-champion-image>` : "";
+    const artwork = arena ? `<img class="champion-row-art" data-queued-src="${heroArtworkURL(meta, source, path)}" alt="" aria-hidden="true" loading="lazy" decoding="async" data-champion-image>` : "";
     return `<tr class="champion-row${rowClass ? ` ${rowClass}` : ""}" tabindex="0" role="button" data-champion-row="${Number(row.championId)}" aria-label="查看${escapeHTML(name)}详情"${selected ? ' aria-current="true"' : ""}>
       <td class="champion-rank">${rank}</td>
-      <td class="champion-name-cell">${artwork}<span class="champion-identity"><span class="champion-portrait"><img src="${imageURL(source, path)}" alt="" loading="lazy" decoding="async" data-champion-image><span>${escapeHTML(name.slice(0, 1))}</span></span><span><strong>${escapeHTML(name)}</strong>${subname ? `<small>${escapeHTML(subname)}</small>` : ""}</span></span></td>
+      <td class="champion-name-cell">${artwork}<span class="champion-identity"><span class="champion-portrait"><img data-queued-src="${imageURL(source, path)}" alt="" loading="lazy" decoding="async" data-champion-image><span>${escapeHTML(name.slice(0, 1))}</span></span><span><strong>${escapeHTML(name)}</strong>${subname ? `<small>${escapeHTML(subname)}</small>` : ""}</span></span></td>
       <td>${tierBadge(row.tier, "", arena ? row.grade : "")}</td>
       ${showPosition ? `<td><span class="position-pill">${positionIcon(row.position)}${positionLabel(row.position)}</span></td>` : ""}${mayhem ? `<td class="metric-win" data-tooltip="样本 ${escapeHTML(compactNumber(row.play))}">${percent(row.winRate)}</td>` : arena ? `<td class="metric-win${Number(row.winRate) < 49.5 ? " is-low" : ""}">${percent(row.winRate)}</td><td class="metric-placement">${number(row.averagePlacement, 2)}</td>` : rankedMetrics ? `<td class="metric-win${Number(row.winRate) < 49.5 ? " is-low" : ""}">${percent(row.winRate)}</td><td class="metric-pick">${percent(row.pickRate)}</td><td class="metric-ban">${percent(row.banRate)}</td><td class="metric-games">${Number(row.play) > 0 ? compactNumber(row.play) : "—"}</td>` : ""}
     </tr>`;
@@ -1566,9 +1567,9 @@
 	const detailTierSelect = state.mode === "ranked" ? `<label class="champion-tier-select select-wrap champion-detail-tier-select"><span>段位</span><select data-champion-tier aria-label="切换英雄详情段位">${renderTierOptions()}</select></label>` : "";
     root.innerHTML = `<div class="champion-detail-toolbar"><button class="champion-back" type="button" data-champion-back><span aria-hidden="true">←</span> 返回${modeLabel}</button>${detailTierSelect}</div>
       <header class="champion-detail-hero${hasPositions ? " has-positions" : ""}">
-        <img class="champion-detail-art" src="${heroArtworkURL(meta, source, path)}" alt="" aria-hidden="true" decoding="async" data-champion-image>
+        <img class="champion-detail-art" data-queued-src="${heroArtworkURL(meta, source, path)}" alt="" aria-hidden="true" decoding="async" data-champion-image>
         <div class="champion-detail-art-shade" aria-hidden="true"></div>
-        <span class="champion-detail-portrait"><img src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span>
+        <span class="champion-detail-portrait"><img data-queued-src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span>
         <div class="champion-detail-title"><p>${state.mode === "ranked" ? `韩服 · ${tierLabel(state.tier)} · ${positionLabel(activePosition)}` : state.mode === "arena" ? "斗魂竞技场" : "海克斯大乱斗"}</p><h2>${escapeHTML(title)}</h2><span>${escapeHTML(name)}${detail?.patch ? ` · 版本 ${escapeHTML(detail.patch)}` : ""}</span></div>
         <div class="champion-detail-side"><div class="champion-detail-metrics${state.mode === "aram-mayhem" ? " is-compact" : state.mode === "arena" ? " is-arena" : ""}">${state.mode === "ranked" ? metric("梯度", tierBadge(tier, "is-metric")) + metric("胜率", percent(winRate)) + metric("选用率", percent(pickRate)) + metric("禁用率", percent(banRate)) : state.mode === "arena" ? metric("平均名次", number(arenaStats.averagePlacement, 2)) + metric("第一名", percent(arenaStats.firstPlaceRate)) + metric("胜率", percent(arenaStats.winRate || row.winRate)) + metric("选用率", percent(arenaStats.pickRate || row.pickRate)) + metric("禁用率", percent(arenaStats.banRate)) : metric("排名", `#${row.rank || "—"}`) + metric("梯度", tierBadge(row.tier, "is-metric"))}</div>${positionsMarkup}</div>
       </header>
@@ -1592,7 +1593,13 @@
   }
 
   function renderRecommendedAugments(items, citation) {
-    const visible = items.slice(0, 9);
+    const counts = new Map();
+    const visible = items.filter(item => {
+      const rarity = augmentMetaForAsset(item.assets?.[0])?.rarity || augmentRarityKey(item.rarity || item.assets?.[0]?.rarity);
+      const count = counts.get(rarity) || 0;
+      counts.set(rarity, count + 1);
+      return count < 3;
+    });
     const scores = visible.map((item) => item.score);
     const entries = visible.map((item) => {
       const catalogMeta = augmentMetaForAsset(item.assets?.[0]);
@@ -1600,7 +1607,7 @@
       const meta = catalogMeta || { ...asset, rarity: augmentRarityKey(item.rarity), imageSource: asset.source, imagePath: asset.path };
       return { item, meta, grade: augmentGrade(item.grade, item.score, scores) };
     });
-    return `<section class="recommendation-section mayhem-augment-ranking"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✦</span>海克斯推荐</h3><p>按综合评分、胜率与样本展示前九项</p></div><span class="section-count">${entries.length} 个</span></header><div class="arena-option-grid mayhem-recommend-grid">${entries.map(renderMayhemRecommendedAugment).join("")}</div></section>`;
+    return `<section class="recommendation-section mayhem-augment-ranking"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✦</span>海克斯推荐</h3><p>按综合评分、胜率与样本展示各品质前三项</p></div><span class="section-count">${entries.length} 个</span></header><div class="arena-option-grid mayhem-recommend-grid">${entries.map(renderMayhemRecommendedAugment).join("")}</div></section>`;
   }
 
   function renderMayhemRecommendedAugment(entry, index) {
@@ -1974,7 +1981,7 @@
     }
     return `<section class="recommendation-section counter-group is-${kind}"><header><div><h4>${title}</h4><p>${copy}</p></div><span class="section-count">${escapeHTML(sampleNote)}</span></header><div>${rows.slice(0, 5).map((row) => {
       const width = Math.min(100, Math.max(4, Number(row.winRate) || 0));
-      return `<button type="button" class="counter-champion" data-counter-champion="${escapeHTML(row.key)}"><span class="champion-portrait"><img src="${imageURL(row.imageSource, row.imagePath)}" alt="" loading="lazy" decoding="async" data-champion-image><span>${escapeHTML((row.name || "?").slice(0, 1))}</span></span><span><strong>${escapeHTML(row.name || row.key)}</strong><small>${compactNumber(row.games)} 场</small></span><span class="counter-meter" aria-hidden="true"><i data-bar-width="${width}"></i></span><b>${percent(row.winRate)}</b><i aria-hidden="true">›</i></button>`;
+      return `<button type="button" class="counter-champion" data-counter-champion="${escapeHTML(row.key)}"><span class="champion-portrait"><img data-queued-src="${imageURL(row.imageSource, row.imagePath)}" alt="" loading="lazy" decoding="async" data-champion-image><span>${escapeHTML((row.name || "?").slice(0, 1))}</span></span><span><strong>${escapeHTML(row.name || row.key)}</strong><small>${compactNumber(row.games)} 场</small></span><span class="counter-meter" aria-hidden="true"><i data-bar-width="${width}"></i></span><b>${percent(row.winRate)}</b><i aria-hidden="true">›</i></button>`;
     }).join("")}</div></section>`;
   }
 
@@ -1996,7 +2003,7 @@
       const tierText = [playerTierLabel(player.tier), player.lp ? `${player.lp} LP` : ""].filter(Boolean).join(" · ");
       return `<button type="button" class="player-row${index === 0 ? " is-top" : ""}" data-player-name="${escapeHTML(player.name)}" data-player-tag="${escapeHTML(player.tagline || "")}" aria-label="查看 ${escapeHTML(player.name)} 的战绩">
         <b class="player-rank">${Number(player.rank) || index + 1}</b>
-        <span class="player-avatar">${player.iconPath ? `<img src="${imageURL(player.iconSource, player.iconPath)}" alt="" loading="lazy" decoding="async">` : ""}</span>
+        <span class="player-avatar">${player.iconPath ? `<img data-queued-src="${imageURL(player.iconSource, player.iconPath)}" alt="" loading="lazy" decoding="async">` : ""}</span>
         <span class="player-copy"><strong>${escapeHTML(player.name)}${player.tagline ? ` <small>#${escapeHTML(player.tagline)}</small>` : ""}</strong><small>${crest}${escapeHTML(tierText || "段位未知")}</small></span>
         <span class="player-games"><b class="metric-win">${percent(player.winRate)}</b><small>${escapeHTML(player.games || "—")} 场</small></span>
       </button>`;
@@ -2066,7 +2073,7 @@
   function renderEmpty(title, copy) { return `<div class="champion-state"><span aria-hidden="true">◇</span><strong>${title}</strong><p>${copy}</p><button class="text-button" type="button" data-champion-clear>清除筛选</button></div>`; }
   function prepareImages(container = root) {
     for (const image of container.querySelectorAll("[data-champion-image]")) {
-      const loaded = () => { image.parentElement?.classList.add("has-loaded-image"); window.deepLegendsAugmentArtwork?.prepare(image); };
+      const loaded = () => { image.hidden = false; image.parentElement?.classList.add("has-loaded-image"); window.deepLegendsAugmentArtwork?.prepare(image); };
       const failed = () => {
         const holder = image.parentElement;
         const artworkFallback = holder?.dataset.artworkFallback || image.dataset.artworkFallback;
@@ -2075,7 +2082,7 @@
           image.hidden = false;
           image.addEventListener("load", loaded, { once: true });
           image.addEventListener("error", failed, { once: true });
-          image.src = artworkFallback;
+          image.setAttribute("data-queued-src", artworkFallback);
           return;
         }
         const fallback = holder?.dataset.augmentFallback;
@@ -2084,13 +2091,13 @@
           image.hidden = false;
           image.addEventListener("load", loaded, { once: true });
           image.addEventListener("error", failed, { once: true });
-          image.src = fallback;
+          image.setAttribute("data-queued-src", fallback);
           return;
         }
         image.hidden = true;
         holder?.classList.remove("has-loaded-image");
       };
-      if (image.complete) image.naturalWidth > 0 ? loaded() : failed();
+      if (image.getAttribute("src") && image.complete) image.naturalWidth > 0 ? loaded() : failed();
       else {
         image.addEventListener("load", loaded, { once: true });
         image.addEventListener("error", failed, { once: true });
@@ -2360,7 +2367,7 @@
     if (event.key === "Escape" && state.selected && state.mode === "ranked") { event.preventDefault(); closeDetail(); }
   });
 
-  window.addEventListener("deep-legends:section", (event) => {
+  function handleLazySection(event) {
     const previous = state.section;
     state.section = event.detail?.name || "overview";
     if (previous === "champions" && state.section !== "champions") {
@@ -2382,7 +2389,9 @@
       state.listScrollRestorePending = (state.listScrollInner || 0) > 0;
       enterChampionSection();
     }
-  });
+  }
+  window.addEventListener("deep-legends:section", handleLazySection);
+  window.deepLegendsSections?.register("champions", handleLazySection);
 
   if (settingPosition) {
     settingPosition.value = state.position;

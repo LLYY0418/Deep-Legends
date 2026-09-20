@@ -1,0 +1,27 @@
+✔ confirmed child close traverses main IPC + preload + renderer, offers a real app restart (76.271125ms)
+✔ process exit before renderer subscription is recovered from retained snapshot (17.645ms)
+✔ late successful status and old running snapshot cannot erase a confirmed exit (23.523334ms)
+✔ unknown, absent or rejected bridge and repeated HTTP errors never prove death (22.993084ms)
+✔ lifecycle bridge cleans listeners and ignores async results after disposal (8.0195ms)
+✔ graceful update/user shutdown does not publish fatal; foreign renderers cannot query or restart (2.488542ms)
+✔ renderer bootstrap actually installs lifecycle subscription (0.307416ms)
+✔ restart IPC failure tells the user to reopen manually instead of reloading a dead service (8.997625ms)
+✔ upgrade stdout may arrive after exit but before close without a false startup error (11.999084ms)
+✔ user quit shares the graceful path; unexpected backend death still reports (2.585875ms)
+✔ R88 thirteen ChampSelect events per second cause at most two actual diagnostic POSTs (23.0035ms)
+✔ R88 slow sampled diagnostics hold one slot and never retry (4.63825ms)
+✔ R88 local request timing is sampled globally and strips paths and identifiers (7.32175ms)
+✔ R100 status timeouts remain recoverable and success resets failures (34.552417ms)
+✔ R88 replaced status requests and explicit abort do not count toward fatal threshold (2.109583ms)
+✔ R88 helper failure label does not blame the League client (2.280416ms)
+✔ R88 arena names omit tags but preserve full tooltips, normal tags and masking (2.208375ms)
+✔ R88 OP uses gold badge above source S (1.121292ms)
+✔ R88 protected active match-main and match-stats rules remain byte-identical (3.820125ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 844.265917

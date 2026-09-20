@@ -46,12 +46,12 @@ test('R91 addendum header-only 429 and JSON fallback parse while 503 stays HTTP'
  const h=harness([response(429,'wait',{'Retry-After':'5'}),response(429,{error:'wait',retryAfter:7}),response(503,{error:'busy',kind:'rate-limited',retryAfter:5})]);
  try{for(const [seconds,kind] of [[5,'rate-limited'],[7,'rate-limited'],[5,'http']])await assert.rejects(h.api('/fixture'),e=>e.retryAfter===seconds&&e.errorKind===kind);}finally{h.close();}
 });
-test('R91 addendum stream displays five before completion with exactly one count-20 request',async()=>{
+test('R91 addendum stream displays five before completion with exactly one count-10 cold request',async()=>{
  let controller;
  const stream=new ReadableStream({start(c){controller=c;}}),encode=x=>new TextEncoder().encode(JSON.stringify(x)+'\n');
  const h=harness([new Response(stream,{headers:{'Content-Type':'application/x-ndjson'}})]);
  try{const tab={key:'fixture',region:'kr',riotId:{gameName:'Fixture',tagLine:'KR1'}};const pending=h.loadOverview(tab);await flush();
-  assert.equal(JSON.parse(h.requests[0].options.body).count,20);
+  assert.equal(JSON.parse(h.requests[0].options.body).count,10);
   controller.enqueue(encode({type:'progress',overview:payload(5)}));await flush();assert.equal(tab.data.matches.length,5);assert.equal(h.root.querySelectorAll('article').length,5);assert.equal(tab.loading,true);
   controller.enqueue(encode({type:'complete',overview:payload(20)}));controller.close();assert.equal(await pending,true);assert.equal(tab.data.matches.length,20);assert.equal(tab.initialPagePending,false);assert.equal(h.requests.length,1);
  }finally{h.close();}
@@ -60,7 +60,7 @@ test('R91 addendum streaming append preserves cursor until completion without st
  let controller;const stream=new ReadableStream({start(c){controller=c;}});const h=harness([new Response(stream,{headers:{'Content-Type':'application/x-ndjson'}})]);
  try{const tab={key:'fixture',region:'kr',data:payload(20),nextBegIndex:20,paginationStalls:1};const pending=h.loadOverview(tab,false,true);await flush();
   const send=(type,n)=>controller.enqueue(new TextEncoder().encode(JSON.stringify({type,overview:payload(n,20)})+'\n'));
-  send('progress',5);await flush();assert.equal(tab.nextBegIndex,20);assert.equal(tab.data.matches.length,25);
+  send('progress',5);await flush();assert.equal(tab.nextBegIndex,20);assert.equal(tab.data.matches.length,20,"pagination preview must retain the committed page until completion");
   send('complete',20);controller.close();await pending;assert.equal(tab.data.matches.length,40);assert.equal(tab.nextBegIndex,40);assert.equal(tab.paginationStalls,0);assert.notEqual(tab.data.pagination.autoPaused,true);
  }finally{h.close();}
 });
@@ -81,7 +81,7 @@ test('R91 addendum closed, replaced, reset and changed-filter retries cannot iss
 });
 test('R91 addendum existing history remains readable during polling; new history still skeletons; arena hides rank',()=>{
  const state={liveLoading:false,settings:{}};const deps={state,number:String,percent:String,kda:String,escapeHTML:String,iconFigure:()=>'<img>',maskedPlayerName:()=> 'Player',liveDisplayedChampionId:()=>1,renderLivePremadeTag:()=>'',rankTitle:()=> '白银 I',positionLabel:()=> '上单'};
- vm.runInNewContext(['renderInsightMatches','insightScore','renderLivePlayer'].map(n=>extract(n)).join('\n'),deps);
+ vm.runInNewContext(['renderInsightMatches','insightScore','renderLivePlayer','proBadgeAttributes','renderProIdentityBadge'].map(n=>extract(n)).join('\n'),deps);
  const player={playerRef:'p',historyState:'ok',rank:{tier:'SILVER'},modeStats:{games:1,wins:1,kda:3},recentGames:[{championId:1,kills:3,deaths:1,assists:0,win:true}]};
  const before=deps.renderInsightMatches(player)+deps.renderLivePlayer(player,0,true);state.liveLoading=true;
  assert.equal(deps.renderInsightMatches(player)+deps.renderLivePlayer(player,0,true),before);assert.doesNotMatch(before,/白银|未定级/);assert.match(deps.renderLivePlayer(player,0,false),/白银 I/);
@@ -95,6 +95,7 @@ test('R91 addendum unchanged polling preserves roster DOM nodes',()=>{
  const dom=new JSDOM('<button id="refresh"></button><div id="content"></div>');const doc=dom.window.document;
  const state={section:'live',beacon:{phase:'ChampSelect'},live:{available:true,phase:'ChampSelect'},settings:{}};
  const h={state,nodes:{liveRefresh:doc.querySelector('button'),liveContent:doc.querySelector('div')},connected:()=>true,renderSessionSummary:()=>{},renderLiveRefreshStatus:()=>state.liveLoading?'<span>正在刷新</span>':'',renderRecommendationArea:()=>'<article>known match</article>',bindLiveContent:()=>{},applyRenderedMetricStyles:()=>{},prepareImages:()=>{}};
+ h.liveRecommendationMarkup=data=>h.renderRecommendationArea(data);
  vm.runInNewContext(extract('renderLive'),h);h.renderLive();const row=h.nodes.liveContent.querySelector('article');state.liveLoading=true;h.renderLive();assert.equal(h.nodes.liveContent.querySelector('article'),row);state.liveLoading=false;h.renderLive();assert.equal(h.nodes.liveContent.querySelector('article'),row);dom.window.close();
 });
 test('R91 addendum Loading and early incomplete arena poll every five seconds then converge',()=>{

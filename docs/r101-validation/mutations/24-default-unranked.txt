@@ -1,0 +1,6 @@
+=== RUN   TestR101SeedWithoutSoloQueueStaysUnavailable
+    r101_test.go:464: { false false  Seed 人工核对 false false false KR1 unranked  0 0 2026-09-17T03:45:59Z 0 false}
+--- FAIL: TestR101SeedWithoutSoloQueueStaysUnavailable (0.05s)
+FAIL
+FAIL	lol-loot-assistant	0.545s
+FAIL

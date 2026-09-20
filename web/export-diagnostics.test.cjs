@@ -9,13 +9,13 @@ function fixture(flush) {
  const link={click:()=>downloads++,remove:()=>{}};
  const window={flushFlowDiagnostics:flush,desktopDiagnostics:{openFolder:async()=>folders++}};
  const document={createElement:()=>link,body:{appendChild:()=>{}}};
- const setReady=Function("el","window","document","diagnosticExportFilename","showToast",`let diagnosticsExportReady=false,diagnosticsExportPending=false;function resetDiagnosticsExport(){diagnosticsExportReady=false;} ${code}; return value=>diagnosticsExportReady=value;`)(el,window,document,()=>"fixture.jsonl",()=>{});
+ const setReady=Function("el","window","document","diagnosticExportFilename","showToast",`let diagnosticsExportReady=false,diagnosticsExportPending=false,diagnosticsExportID="",diagnosticsExportSequence=0;function resetDiagnosticsExport(){diagnosticsExportReady=false;} ${code}; return value=>diagnosticsExportReady=value;`)(el,window,document,()=>"fixture.jsonl",()=>{});
  return {click:()=>handler({preventDefault:()=>{}}),setReady,downloads:()=>downloads,folders:()=>folders,link};
 }
 test("diagnostic export waits for telemetry and prevents duplicate download clicks",async()=>{
  let resolve;const f=fixture(()=>new Promise(r=>resolve=r));
  const pending=f.click();await f.click();assert.equal(f.downloads(),0);
- resolve();await pending;assert.equal(f.downloads(),1);assert.equal(f.link.href,"/api/diagnostics/log");assert.equal(f.link.download,"fixture.jsonl");
+ resolve();await pending;assert.equal(f.downloads(),1);assert.match(f.link.href,/^\/api\/diagnostics\/log\?exportId=[a-z0-9]+-1$/);assert.equal(f.link.download,"fixture.jsonl");
 });
 test("telemetry failure never blocks export and open-folder action does not export again",async()=>{
  let calls=0;const f=fixture(async()=>{calls++;throw Error("offline");});

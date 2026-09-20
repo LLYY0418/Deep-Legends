@@ -1,0 +1,5 @@
+--- FAIL: TestR90QueueGuardScansNewGroupingModule (0.00s)
+    r90_test.go:367: arena_live_grouping.go: queue literals at [1221]
+FAIL
+FAIL	lol-loot-assistant	0.486s
+FAIL

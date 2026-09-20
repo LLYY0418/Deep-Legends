@@ -1,0 +1,27 @@
+{
+  "version": "0.12.7",
+  "goFull": "passed",
+  "race": "passed",
+  "goVet": "passed",
+  "frontendFocused": {
+    "tests": 242,
+    "passed": 242
+  },
+  "frontendFull": {
+    "tests": 530,
+    "passed": 530,
+    "failed": 0,
+    "fixtureFailuresFixed": 31
+  },
+  "mutations": {
+    "total": 7,
+    "killed": 7
+  },
+  "builds": [
+    "darwin native",
+    "windows amd64 CGO_ENABLED=0"
+  ],
+  "selfTest": "passed, 554 embedded records",
+  "windowsLiveClientVerified": false,
+  "installerPackaged": false
+}

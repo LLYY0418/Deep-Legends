@@ -172,6 +172,23 @@ func newGameplayOverviewSGPFixture(t *testing.T, withMatch bool) (*app, string, 
 
 func callGameplayOverviewForTest(t *testing.T, a *app, publicRef string) {
 	t.Helper()
+	// Register after the caller's store/TempDir cleanups so background cache
+	// writes finish before the store closes and its directory is removed.
+	t.Cleanup(func() {
+		deadline := time.Now().Add(3 * time.Second)
+		for {
+			a.seasonBackfillMu.Lock()
+			running := len(a.seasonBackfills)
+			a.seasonBackfillMu.Unlock()
+			if running == 0 {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("overview cleanup: %d season tasks did not finish", running)
+			}
+			time.Sleep(time.Millisecond)
+		}
+	})
 	body := strings.NewReader(`{"playerRef":"` + publicRef + `","count":20}`)
 	recorder := httptest.NewRecorder()
 	a.handleGameplayOverview(recorder, httptest.NewRequest(http.MethodPost, "/api/gameplay/overview", body))
@@ -506,6 +523,7 @@ func TestGameplayPerkStylesAcceptClientWrapperAndBareArray(t *testing.T) {
 			a := &app{connected: true, lcu: client}
 			recorder := httptest.NewRecorder()
 			a.handleGameplayPerks(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/perks", nil))
+			waitR100PerkEnrichment(t, a, "lcu")
 			if recorder.Code != http.StatusOK {
 				t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
 			}
@@ -555,6 +573,7 @@ func TestGameplayPerkCatalogCachesLCUFiles(t *testing.T) {
 	for index := 0; index < 2; index++ {
 		recorder := httptest.NewRecorder()
 		a.handleGameplayPerks(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/perks", nil))
+		waitR100PerkEnrichment(t, a, "lcu")
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("request %d status = %d: %s", index+1, recorder.Code, recorder.Body.String())
 		}
@@ -2755,7 +2774,7 @@ func TestR58LiveClientPlayerListUnavailableFallsBackWithoutError(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
-	if !response.ArenaGrouped || response.ArenaMascotMapping || response.ArenaGroupSource != "session-order" || len(response.Players) != 18 {
+	if response.ArenaGrouped || response.ArenaMascotMapping || !response.ArenaGroupingUnavailable || len(response.Players) != 18 {
 		t.Fatal("session order fallback failed")
 	}
 }
@@ -2773,19 +2792,12 @@ func TestArena1750UsesCorroboratedGameflowRosterOrderWhenPlayerListHasNoSubteams
 		},
 	}
 	response := r62GameplayLiveResponse(t, a)
-	if !response.ArenaGrouped || response.ArenaMascotMapping || response.ArenaGroupSource != "session-order" {
-		t.Fatalf("session-order Arena grouping = %#v", response)
+	if response.ArenaGrouped || response.ArenaMascotMapping || !response.ArenaGroupingUnavailable {
+		t.Fatal("session order must not infer squads")
 	}
-	counts := make(map[string]int)
 	for _, player := range response.Players {
-		counts[player.ArenaGroup]++
-	}
-	if len(counts) != 6 {
-		t.Fatalf("session-order group counts = %#v", counts)
-	}
-	for group, count := range counts {
-		if group == "" || count != 3 {
-			t.Fatalf("session-order group %q count = %d", group, count)
+		if player.ArenaGroup != "" {
+			t.Fatal("guessed group")
 		}
 	}
 }
@@ -2834,7 +2846,7 @@ func TestR62ArenaPlayerListRetriesAndGroupsSeventeenPlayers(t *testing.T) {
 	a.liveSnapshots.at = time.Now().Add(-21 * time.Second)
 	a.liveSnapshots.mu.Unlock()
 	second := r62GameplayLiveResponse(t, a)
-	if !second.ArenaGrouped || second.ArenaMascotMapping || len(second.Players) != 17 {
+	if second.ArenaGrouped || second.ArenaMascotMapping || len(second.Players) != 17 {
 		t.Fatalf("17-player Arena grouping = grouped:%v mascot:%v players:%d", second.ArenaGrouped, second.ArenaMascotMapping, len(second.Players))
 	}
 	counts := make(map[string]int)
@@ -2847,7 +2859,7 @@ func TestR62ArenaPlayerListRetriesAndGroupsSeventeenPlayers(t *testing.T) {
 			t.Fatalf("opponent %d was highlighted as ally: %#v", index, player)
 		}
 	}
-	if len(counts) != 6 || counts["6"] != 2 {
+	if len(counts) != 1 || counts[""] != 17 {
 		t.Fatalf("17-player Arena group counts = %#v", counts)
 	}
 	if probes.Load() != 2 {
@@ -2871,16 +2883,16 @@ func TestR62ArenaPlayerListProbesReconnectAndInvalidatesGameCache(t *testing.T) 
 		},
 	}
 	first := r62GameplayLiveResponse(t, a)
-	if !first.ArenaGrouped || probes.Load() != 1 {
+	if first.ArenaGrouped || probes.Load() != 1 {
 		t.Fatalf("Reconnect probe = grouped:%v probes:%d", first.ArenaGrouped, probes.Load())
 	}
 	second := r62GameplayLiveResponse(t, a)
-	if !second.ArenaGrouped || probes.Load() != 1 {
+	if second.ArenaGrouped || probes.Load() != 1 {
 		t.Fatalf("successful probe was not cached: grouped:%v probes:%d", second.ArenaGrouped, probes.Load())
 	}
 	gameID = 6203
 	third := r62GameplayLiveResponse(t, a)
-	if !third.ArenaGrouped || probes.Load() != 2 {
+	if third.ArenaGrouped || probes.Load() != 2 {
 		t.Fatalf("new game did not invalidate playerlist cache: grouped:%v probes:%d", third.ArenaGrouped, probes.Load())
 	}
 }

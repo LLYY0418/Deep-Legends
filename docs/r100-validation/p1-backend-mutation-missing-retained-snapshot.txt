@@ -1,0 +1,37 @@
+✔ confirmed child close traverses main IPC + preload + renderer, offers a real app restart (79.011541ms)
+✖ process exit before renderer subscription is recovered from retained snapshot (14.842208ms)
+✔ late successful status and old running snapshot cannot erase a confirmed exit (9.843958ms)
+✔ unknown, absent or rejected bridge and repeated HTTP errors never prove death (21.956125ms)
+✔ lifecycle bridge cleans listeners and ignores async results after disposal (8.406667ms)
+✔ graceful update/user shutdown does not publish fatal; foreign renderers cannot query or restart (2.339958ms)
+✔ renderer bootstrap actually installs lifecycle subscription (0.302ms)
+✔ restart IPC failure tells the user to reopen manually instead of reloading a dead service (10.201959ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 573.300292
+
+✖ failing tests:
+
+test at desktop/backend-lifecycle.test.cjs:90:1
+✖ process exit before renderer subscription is recovered from retained snapshot (14.842208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/desktop/backend-lifecycle.test.cjs:93:31)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

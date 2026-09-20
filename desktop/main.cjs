@@ -57,6 +57,7 @@ let mainWindow = null;
 let splashWindow = null;
 let backend = null;
 let backendReady = null;
+let backendExit = null;
 let readyTimer = null;
 let stdoutBuffer = "";
 let quitting = false;
@@ -320,10 +321,41 @@ function startBackend() {
   backend.stderr.on("data", appendDesktopLog);
   backend.on("error", (error) => failStartup(`本地数据服务无法启动：${error.message}`));
   // close follows stdout EOF; exit may precede the final LOOT_QUIT message.
-  backend.on("close", (code, signal) => {
-    clearTimeout(readyTimer);
-    backend = null;
-    if (!quitting && !shutdownStarted) failStartup(`本地数据服务已退出（${signal || code || "未知原因"}）。`);
+  backend.on("close", onBackendClosed);
+}
+
+// Only the child-process lifecycle confirms death, never HTTP polling failures.
+// Keep close (rather than exit) so a final LOOT_QUIT line can mark intentional exit.
+function onBackendClosed(code, signal) {
+  clearTimeout(readyTimer);
+  backend = null;
+  if (quitting || shutdownStarted) return;
+  backendExit = { state: "exited", code, signal: signal || null };
+  const message = `本地数据服务已退出（${signal || (code ?? "未知原因")}）。`;
+  if (!backendReady || !mainWindow || mainWindow.isDestroyed()) {
+    failStartup(message);
+    return;
+  }
+  appendDesktopLog(message);
+  // Retain the snapshot: the renderer may still be loading or reloading.
+  if (isTrustedRenderer(mainWindow.webContents)) mainWindow.webContents.send("desktop-backend-state", backendExit);
+}
+
+function setupBackendIPC() {
+  const trusted = event => event.sender === mainWindow?.webContents && isTrustedRenderer(event.sender);
+  ipcMain.removeHandler("desktop-backend-state");
+  ipcMain.handle("desktop-backend-state", event => {
+    if (!trusted(event)) return null;
+    return backendExit || { state: backend && backendReady ? "running" : "unknown" };
+  });
+  ipcMain.removeHandler("desktop-backend-restart");
+  ipcMain.handle("desktop-backend-restart", event => {
+    if (!trusted(event) || !backendExit || quitting || shutdownStarted) return false;
+    // A dead backend cannot serve /api/quit or be revived by location.reload().
+    app.relaunch();
+    quitting = true;
+    app.quit();
+    return true;
   });
 }
 
@@ -490,6 +522,7 @@ function createMainWindow() {
   screen.on("display-metrics-changed", onDisplayMetricsChanged);
   const onThemeUpdated = () => syncTitleBar();
   nativeTheme.on("updated", onThemeUpdated);
+  setupBackendIPC();
   ipcMain.removeHandler("desktop-scale-get");
   ipcMain.handle("desktop-scale-get", (event) => {
     if (!isTrustedRenderer(event.sender) || event.sender !== mainWindow?.webContents) return null;
@@ -520,7 +553,9 @@ function createMainWindow() {
     applyUiScale(mainWindow, step, true);
   });
   shareExportController?.clear();
+  const diagnosticsDirectory = require("./diagnostics-directory.cjs").createDiagnosticsDirectoryController({app,dialog,fileSystem:fs,isTrustedRenderer,getMainWindow:()=>mainWindow,onChanged:payload=>{if(!mainWindow?.webContents.isDestroyed())mainWindow.webContents.send("desktop-export-directory-changed",payload);}});
   const windowShareExportController = createShareExportController({
+    directoryController: diagnosticsDirectory,
     BrowserWindow,
     app,
     dialog,
@@ -530,24 +565,38 @@ function createMainWindow() {
     log: appendDesktopLog,
   });
   shareExportController = windowShareExportController;
-  let lastDiagnosticsFile = "";
+  for (const [channel, method] of [["desktop-diagnostics-get-directory", "getSaveDirectory"], ["desktop-diagnostics-choose-directory", "chooseSaveDirectory"]]) {
+    ipcMain.removeHandler(channel);
+    ipcMain.handle(channel, event => {
+      if (event.sender !== mainWindow?.webContents || !isTrustedRenderer(event.sender)) throw Error("untrusted renderer");
+      return diagnosticsDirectory[method](event);
+    });
+  }
+  const diagnosticsFiles = new Map();
   const removeDiagnosticsExport = attachDiagnosticsExport({
     session: mainWindow.webContents.session,
     sender: mainWindow.webContents,
     getBaseURL: () => backendReady?.baseUrl || "",
     getDefaultDirectory: () => app.getPath("downloads"),
+    getDirectory: diagnosticsDirectory.getDirectory,
+    prepareFile: diagnosticsDirectory.prepareFile,
+    finalizeFile: diagnosticsDirectory.finalizeFile,
+    discardFile: diagnosticsDirectory.discardFile,
+    onError: error => mainWindow?.webContents.send("desktop-diagnostics-error", error.message),
     fileSystem: fs,
     getDesktopLog: () => require("./desktop-log.cjs").desktopLogForExport(path.join(app.getPath("userData"), "logs")),
-    onCompleted(file) {
-      lastDiagnosticsFile = file;
-      if (!mainWindow?.webContents.isDestroyed()) mainWindow.webContents.send("desktop-diagnostics-completed");
+    onCompleted(file, exportID) {
+      if (!diagnosticsDirectory.getDirectory()) diagnosticsDirectory.rememberFile(file);
+      diagnosticsFiles.set(exportID, file);
+      while (diagnosticsFiles.size > 8) diagnosticsFiles.delete(diagnosticsFiles.keys().next().value);
+      if (!mainWindow?.webContents.isDestroyed()) mainWindow.webContents.send("desktop-diagnostics-completed", exportID);
     },
   });
   ipcMain.removeHandler("desktop-diagnostics-open-folder");
-  ipcMain.handle("desktop-diagnostics-open-folder", (event) => {
-    if ((event.sender !== mainWindow?.webContents || !isTrustedRenderer(event.sender)) || !lastDiagnosticsFile) return false;
-    shell.showItemInFolder(lastDiagnosticsFile);
-    lastDiagnosticsFile = "";
+  ipcMain.handle("desktop-diagnostics-open-folder", (event, exportID) => {
+    if (event.sender !== mainWindow?.webContents || !isTrustedRenderer(event.sender) || typeof exportID !== "string" || !diagnosticsFiles.has(exportID)) return false;
+    shell.showItemInFolder(diagnosticsFiles.get(exportID));
+    diagnosticsFiles.delete(exportID);
     return true;
   });
   mainWindow.webContents.once("destroyed", removeDiagnosticsExport);
@@ -606,6 +655,8 @@ function createMainWindow() {
     clearTimeout(boundsWriteTimer);
     nativeTheme.removeListener("updated", onThemeUpdated);
     screen.removeListener("display-metrics-changed", onDisplayMetricsChanged);
+    ipcMain.removeHandler("desktop-backend-state");
+    ipcMain.removeHandler("desktop-backend-restart");
     ipcMain.removeHandler("desktop-scale-get");
     ipcMain.removeAllListeners("desktop-scale-set");
     windowShareExportController.clear();

@@ -1,0 +1,6 @@
+$ go test -overlay /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r95-mutants-x_hnqccn/overlay.json -count=1 -run TestR95ProExactIdentityPrivacyAndNoFetch .
+--- FAIL: TestR95ProExactIdentityPrivacyAndNoFetch (0.00s)
+    r95_test.go:238: false positive {Faker different kr   false} &{Guti T1 Academy T1 Esports Academy true}
+FAIL
+FAIL	lol-loot-assistant	0.484s
+FAIL

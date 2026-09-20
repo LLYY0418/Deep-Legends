@@ -54,10 +54,15 @@ type app struct {
 	collectionDataRetryCount        int
 	collectionDataRetryClient       *LCUClient
 	liveSnapshots                   liveSnapshotCache
+	liveClientAllGameData           func(context.Context) ([]byte, int, error)
+	liveClientAllGameDataMu         sync.Mutex
+	liveClientAllGameDataKeys       map[string]struct{}
 	gameplayFlow                    gameplayFlowState
 	overviewTimeout                 func(context.Context, time.Duration) (context.Context, context.CancelFunc)
 	updates                         *updateManager
 	runtimeCancel                   context.CancelFunc
+	proRefreshContext               context.Context
+	proProfiles                     proProfileCache
 	quitOnce                        sync.Once
 	currentGames                    currentGameStore
 	proPlayers                      proPlayersCache
@@ -156,6 +161,7 @@ type app struct {
 	itemSetPrices                   map[int64]int64
 	itemSetPricesAt                 time.Time
 	champions                       *championProvider
+	liveRecommendationPrewarmer     *liveRecommendationPrewarmer
 	riot                            *riotProvider
 	sgp                             *sgpProvider
 	watch                           *watchRunner
@@ -166,8 +172,12 @@ type app struct {
 	opgg                            *opggInsights
 	overviewQueries                 *overviewQueryCache
 	matchTimelines                  *matchTimelineCache
+	mayhemRatings                   *aramkitRatingClient
 	facadeMu                        sync.Mutex
 	facadeManualVersion             uint64
+	perkCatalogDisk                 *championDataCache
+	perkAugmentJobs                 map[string]chan struct{}
+	perkAugmentAttempts             map[string]time.Time
 	perkCatalogMu                   sync.Mutex
 	perkCatalog                     map[string]gameplayPerkCatalogCacheEntry
 	// 赛季统计后台回补的单飞登记表：key 是 accountHash|season。
@@ -228,6 +238,10 @@ type app struct {
 	lcuChampSelectShapeDiagnosticKeys   map[string]struct{}
 	facadeIdentityShapeDiagnosticMu     sync.Mutex
 	facadeIdentityShapeDiagnosticClient *LCUClient
+	facadeProbeMu                       sync.Mutex
+	facadeIcons                         facadeIconCache
+	facadeView                          facadeViewCache
+	profileIconImages                   *championDataCache
 	facadeSkinCatalogMu                 sync.Mutex
 	facadeSkinCatalogClient             *LCUClient
 	facadeSkinCatalog                   []Skin
@@ -427,6 +441,7 @@ func main() {
 		return loadGameplayAugmentsFromClient(client)
 	}
 	a.sgp.observe = a.recordDiagnostic
+	a.liveRecommendationPrewarmer = newLiveRecommendationPrewarmer(championProvider, a.recordDiagnostic)
 	a.sgp.gatewayAccount = func(client *LCUClient) string {
 		a.mu.RLock()
 		defer a.mu.RUnlock()
@@ -437,6 +452,7 @@ func main() {
 	}
 	a.watch = newWatchRunner(store, a.broadcastEvent)
 	a.watch.observe = a.recordDiagnostic
+	a.watch.broadcastChampionNames = a.championNames
 	a.convenience = a.watch
 	a.lpTracker = newLPTracker(store)
 	a.lpTracker.observeEvent = a.recordDiagnostic
@@ -448,6 +464,7 @@ func main() {
 	a.opgg = newOPGGInsights()
 	a.overviewQueries = newOverviewQueryCache()
 	a.matchTimelines = newMatchTimelineCache()
+	a.mayhemRatings = newAramkitRatingClient(championProvider, a.recordDiagnostic, a.aramkitRatingIdentityHash)
 	a.recordAppStartDiagnostic()
 	a.enableDiagnosticRotationSnapshot()
 
@@ -484,6 +501,7 @@ func main() {
 	mux.HandleFunc("GET /api/gameplay/overview", a.authorized(a.handleGameplayOverview))
 	mux.HandleFunc("POST /api/gameplay/overview", a.authorized(a.handleGameplayOverview))
 	mux.HandleFunc("GET /api/gameplay/live", a.authorized(a.handleGameplayLive))
+	mux.HandleFunc("GET /api/gameplay/mayhem-rating", a.authorized(a.handleGameplayMayhemRating))
 	mux.HandleFunc("GET /api/gameplay/recommendations", a.authorized(a.handleGameplayRecommendations))
 	mux.HandleFunc("GET /api/gameplay/specialist-runes", a.authorized(a.handleGameplaySpecialistRunes))
 	mux.HandleFunc("GET /api/gameplay/pro-runes", a.authorized(a.handleGameplayProRunes))
@@ -503,6 +521,9 @@ func main() {
 	mux.HandleFunc("POST /api/rig/settings-lock", a.authorized(a.handleSettingsLock))
 	mux.HandleFunc("POST /api/rig/maintenance", a.authorized(a.handleClientMaintenance))
 	mux.HandleFunc("GET /api/facade/state", a.authorized(a.handleFacadeState))
+	mux.HandleFunc("GET /api/facade/icons", a.authorized(a.handleFacadeIcons))
+	mux.HandleFunc("GET /api/facade/banners", a.authorized(a.handleFacadeBanners))
+	mux.HandleFunc("POST /api/facade/probe", a.authorized(a.handleFacadeProbe))
 	mux.HandleFunc("POST /api/facade/apply", a.authorized(a.handleFacadeApply))
 	mux.HandleFunc("GET /api/claim/scan", a.authorized(a.handleClaimScan))
 	mux.HandleFunc("POST /api/claim/execute", a.authorized(a.handleClaimExecute))
@@ -577,7 +598,9 @@ func main() {
 
 	runtimeContext, runtimeCancel := context.WithCancel(context.Background())
 	a.runtimeCancel = runtimeCancel
+	a.proRefreshContext = runtimeContext
 	go a.runConnectionManager(runtimeContext)
+	go func() { _, _, _ = a.loadProPlayers(runtimeContext, true) }()
 	a.updates.Start()
 	if !*noBrowser && !*desktopMode {
 		go func() {
@@ -592,6 +615,7 @@ func main() {
 		Handler:           securityHeaders(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       45 * time.Second,
+		WriteTimeout:      30 * time.Second,
 	}
 	log.Printf("Deep Legends %s 正在运行：%s", version, baseAddress)
 	if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -886,6 +910,9 @@ func (a *app) handleQuit(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (a *app) handleImage(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), publicImageTimeout)
+	defer cancel()
+	r = r.WithContext(ctx)
 	assetPath := r.URL.Query().Get("path")
 	cleanPath := pathpkg.Clean(assetPath)
 	if cleanPath != assetPath || sanitizeClientImagePath(assetPath) == "" {
@@ -903,7 +930,7 @@ func (a *app) handleImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data, err := a.loadAsset(r.Context(), assetPath, 2*1024*1024, 0, func(ctx context.Context) ([]byte, error) {
-		return client.GetBytesContext(ctx, assetPath)
+		return a.loadClientIcon(ctx, client, assetPath)
 	})
 	if err != nil {
 		// 客户端只随包发布 rcp-be-lol-game-data 里的那一份资源，海克斯的
@@ -1063,6 +1090,13 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 	a.recordDiagnostic(map[string]any{"event": "identity_refresh_succeeded", "duration_ms": result.LoadPhases["total"], "load_phases_ms": result.LoadPhases, "phase_group": "identity"})
 	a.broadcastEvent("summoner-updated")
 	a.broadcastEvent("connection-state")
+	if a.proRefreshContext != nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			_, _ = a.cachedFacadeState(ctx, false, "poll")
+		}()
+	}
 	return true
 }
 
@@ -1523,7 +1557,7 @@ func (a *app) appendDiagnosticEvent(event map[string]any) {
 
 func isNoisyDiagnosticEvent(event string) bool {
 	switch event {
-	case "ranked_winrate_resolved", "ranked_data_source_decision", "specialist_runes_client_skip", "client_installations_scan", "lcu_discovery", "live_position_shape", "social_presence_resolved":
+	case "pro_identity_match", "ranked_winrate_resolved", "ranked_data_source_decision", "specialist_runes_client_skip", "client_installations_scan", "lcu_discovery", "live_position_shape", "social_presence_resolved":
 		return true
 	default:
 		return false

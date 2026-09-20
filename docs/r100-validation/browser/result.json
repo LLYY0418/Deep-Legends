@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "statusMilliseconds": 2,
+  "peakImages": 2,
+  "recovered": true,
+  "confirmedExitFatal": true,
+  "restartRequested": true
+}

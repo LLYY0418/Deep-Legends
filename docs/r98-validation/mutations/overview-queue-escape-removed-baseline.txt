@@ -1,0 +1,4 @@
+=== RUN   TestR98OverviewQueueBudgetReturnsRateLimit
+--- PASS: TestR98OverviewQueueBudgetReturnsRateLimit (0.00s)
+PASS
+ok  	lol-loot-assistant	0.443s

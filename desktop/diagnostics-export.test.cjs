@@ -98,7 +98,7 @@ test("R87 P8 first export and unusable directories still report the actual Save 
   }
   check();
   const source=fs.readFileSync(path.join(__dirname,"diagnostics-export.cjs"),"utf8");
-  const changed=source.replace('    let reserved;', '    if (!getDirectory()) return;\n    let reserved;');
+  const changed=source.replace('    let reserved, stagedFile;', '    if (!getDirectory()) return;\n    let reserved, stagedFile;');
   assert.notEqual(changed,source,"first-export mutation must apply");
   const module={exports:{}};Function("require","module",changed)(require,module);
   assert.throws(()=>check(module.exports.attachDiagnosticsExport),{name:"AssertionError"});
@@ -113,4 +113,18 @@ test("R87 P8 cancellation, invalid save paths and disposed windows never emit co
     item.emit('done',{},['cancelled','interrupted'].includes(mode)?mode:'completed');
     assert.deepEqual(completed,[],mode);assert.equal(item.listenerCount('done'),0);h.detach();
   }
+});
+
+
+test("R112 correlated exports preserve IDs and still reject foreign/redirected query URLs", () => {
+ const completed=[];const h=harness((file,id)=>completed.push({file,id}));
+ const first=h.download({urls:[h.endpoint+"?exportId=first-1"]});
+ const second=h.download({urls:[h.endpoint+"?exportId=second-2"]});
+ second.emit("done",{},"completed");first.emit("done",{},"completed");
+ assert.deepEqual(completed,[{file:second.destination,id:"second-2"},{file:first.destination,id:"first-1"}]);
+ for(const suffix of ["?exportId=", "?exportId=../private", "?exportId=ok&path=private", "?exportId=a&exportId=b", "?exportId="+"x".repeat(65), "?other=1"]){
+  const item=h.download({urls:[h.endpoint+suffix]});assert.equal(item.destination,undefined,suffix);assert.equal(item.listenerCount("done"),0);
+ }
+ assert.equal(h.download({urls:[h.endpoint+"?exportId=a",h.endpoint+"?exportId=b"]}).destination,undefined);
+ h.detach();
 });

@@ -270,6 +270,41 @@ test("dirty collection rescans on entry and view changes without duplicate refre
   }
 });
 
+test("accepted dirty rescan stays gated until clean status or timeout", async () => {
+  const h = r71RefreshHarness();
+  h.state.status = { ...h.state.status, syncing: false, identityReady: true, snapshotReady: true, collectionDirty: true, lastAttempt: "before" };
+  h.state.collectionRescanInFlight = true;
+  h.state.collectionRequestAttempt = "before";
+  h.state.collectionRequestAt = Date.now();
+  h.next = { syncing: false, identityReady: true, snapshotReady: true, collectionDirty: true, lastAttempt: "scan-started" };
+  await h.methods.refreshStatus();
+  await h.methods.refreshStatus();
+  assert.equal(h.requests.filter((url) => url === "/api/refresh").length, 0, "lastAttempt changes must not enqueue the accepted rescan again");
+  assert.equal(h.state.collectionRescanInFlight, true);
+  h.next = { collectionDirty: false, lastAttempt: "scan-finished", lastSync: "scan-finished" };
+  await h.methods.refreshStatus();
+  assert.equal(h.state.collectionRescanInFlight, false, "clean snapshot releases the rescan gate");
+});
+
+test("identical forced collection refresh keeps rendered cards mounted", async () => {
+  const items = [{ id: 1, name: "皮肤", owned: true }];
+  const state = {
+    skinLoadGeneration: 0, items: structuredClone(items), status: { connected: true, snapshotReady: true },
+    view: "owned", skinsCache: new Map(), staleSnapshot: false, staleSnapshotAt: "", sort: "name",
+    loading: false, listError: "", acquisitionAvailable: true, acquisitionFallback: false, destroyed: false,
+  };
+  const el = { retryList: { hidden: false } };
+  let renders = 0;
+  const { loadSkins } = compileFunctions(appSourceR70, ["sameCollectionItems", "applySkinsPayload", "loadSkins"], {
+    state, el, window: {},
+    api: async () => ({ items: structuredClone(items), stale: false, capturedAt: new Date().toISOString() }),
+    acquisitionTime: () => null, configureSortControls() {}, renderItems() { renders += 1; }, ensureCollection() {},
+  });
+  await loadSkins(true);
+  assert.equal(renders, 0, "unchanged background refresh must not replace the collection grid");
+  assert.equal(state.loading, false);
+});
+
 const appSourceR70 = fs.readFileSync(path.join(WEB, "app.js"), "utf8");
 function deferredR70() { let resolve; const promise = new Promise((r) => { resolve = r; }); return { promise, resolve }; }
 
@@ -397,7 +432,7 @@ function r71RefreshHarness() {
   let next = { ...state.status }, failEnsure = false;
   const requests = [], loads = [];
   const methods = compileFunctions(appSourceR70, ["refreshStatus", "ensureCollection", "triggerCollectionRescanIfDirty"], {
-    state, STATUS_INTERVAL: 5000,
+    state, STATUS_INTERVAL: 5000, window: {},
     api: async (url) => { requests.push(url); if (url === "/api/status") return { ...next }; if (failEnsure && url === "/api/collection/ensure") throw Error("offline"); return null; },
     clearDisconnectedClientState() {}, updateReadingOverlay() {}, renderStatus() {}, loadClientInstallations() {},
     loadSkins: async () => loads.push("skins"), loadAccount() {}, loadPools() {}, showFatal(message) { throw Error(message); }, showToast() {}, scheduleStatus() {},

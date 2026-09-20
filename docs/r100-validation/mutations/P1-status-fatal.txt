@@ -1,0 +1,13 @@
+CDP connected
+AssertionError [ERR_ASSERTION]: poll failure must not be a fatal page
+
+true !== false
+
+    at main (/Users/ly/personal/personal-work/deep-legends/desktop/r100-browser.cjs:62:9) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: true,
+  expected: false,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

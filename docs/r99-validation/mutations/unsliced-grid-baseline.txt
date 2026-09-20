@@ -1,0 +1,10 @@
+✔ R99 icon dialog is body mounted, sliced, CSP safe, and restores focus on every exit (1497.025792ms)
+✔ R99 disconnect closes the picker and invalidates the catalog (0.259667ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1638.067334

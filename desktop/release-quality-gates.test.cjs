@@ -85,7 +85,7 @@ test("format gates exclude local toolchains and GOPATH modules while retaining u
   const build = fs.readFileSync(path.join(root, "build-desktop.sh"), "utf8");
   const ci = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
   const scan = build.match(/^unformatted="\$\((.*)\)"$/m)[1];
-  const ciScan = ci.match(/test -z "\$\((.*)\)"/)[1];
+  const ciScan = ci.match(/unformatted="\$\((.*)\)"/)[1];
   assert.equal(scan, ciScan, "local and CI format checks must agree");
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "format-gopath-"));
   try {
@@ -100,13 +100,29 @@ test("format gates exclude local toolchains and GOPATH modules while retaining u
       return result.stdout.trim();
     };
     assert.equal(run(scan), "", "toolchain fixtures and dependency formatting must not block a build");
-    assert.match(run(scan.replace("-name .gopath -o ", "")), /\.gopath\/pkg\/mod\/dependency@v1\.0\.0\/doc\.go/, "old scan reproduces the reported failure");
-    const oldToolchainScan = spawnSync("bash", ["-e", "-o", "pipefail", "-c", scan.replace("-name .gotoolchain -o ", "")], { cwd: directory, encoding: "utf8", timeout: 10000 });
-    assert.notEqual(oldToolchainScan.status, 0, "including toolchain tests must reproduce the parser failure");
-    assert.match(oldToolchainScan.stderr, /\.gotoolchain\/test\/char_lit1\.go.*invalid Unicode code point/);
+    // Different task numbers and future cache names must follow the same rule.
+    for (const cache of [".mut102gopath", ".mut999gopath", ".future-toolchain", "nested/.cache", "node_modules", "vendor", "dist"]) {
+      const fixture = path.join(directory, cache, "pkg/mod/toolchain/test/invalid.go");
+      fs.mkdirSync(path.dirname(fixture), { recursive: true });
+      fs.writeFileSync(fixture, "intentionally invalid compiler fixture");
+    }
+    assert.equal(run(scan), "", "new cache names must not enter the format gate");
+    const unfiltered = spawnSync("gofmt", ["-l", ".mut102gopath/pkg/mod/toolchain/test/invalid.go"], { cwd: directory, encoding: "utf8" });
+    assert.notEqual(unfiltered.status, 0, "the reported cache fixture must fail if scanned");
+    const windows = fs.readFileSync(path.join(root, "build-desktop-windows.ps1"), "utf8");
+    const excluded = new RegExp(windows.split("\n").find(line => line.includes("$goSources = @(")).match(/-notmatch '([^']+)'/)[1]);
+    for (const separator of ["/", "\\"]) {
+      for (const name of [".mut102gopath", ".mut999gopath", ".future-toolchain", "node_modules", "vendor", "dist"]) {
+        assert.ok(excluded.test(`${separator}${name}${separator}invalid.go`), name);
+      }
+      assert.ok(!excluded.test(`${separator}new source${separator}untracked.go`));
+    }
     // No git repository: newly added source must still be checked, including spaces.
     fs.mkdirSync(path.join(directory, "new source"));
     fs.writeFileSync(path.join(directory, "new source/untracked.go"), "package source\nfunc f( ){ }\n");
     assert.equal(run(scan), "./new source/untracked.go");
+    fs.writeFileSync(path.join(directory, "new source/untracked.go"), "invalid project syntax");
+    const invalidSource = spawnSync("bash", ["-e", "-o", "pipefail", "-c", scan], { cwd: directory, encoding: "utf8", timeout: 10000 });
+    assert.notEqual(invalidSource.status, 0, "real project syntax errors must still fail");
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });

@@ -22,16 +22,22 @@ const (
 	proPlayersMaxBytes     = 8 << 20
 )
 
-// Directory contents and stable account IDs live only in bounded process memory.
-// Do not use the generic OP.GG disk cache for this endpoint.
+// Normalized public directory snapshots have a bounded, private-permission 24h cache.
+// Raw directory HTML is still excluded from the generic OP.GG cache.
 type proPlayersCache struct {
-	mu          sync.Mutex
-	teams       []opggProTeam
-	fetchedAt   time.Time
-	attemptedAt time.Time
-	err         error
-	flight      chan struct{}
-	updating    bool
+	disk             *championDataCache
+	diskChecked      bool
+	mu               sync.Mutex
+	teams            []opggProTeam
+	fetchedAt        time.Time
+	attemptedAt      time.Time
+	err              error
+	flight           chan struct{}
+	updating         bool
+	refreshStarted   bool
+	refreshWait      func(context.Context, time.Duration) error
+	refreshNow       func() time.Time
+	refreshAttempted map[string]time.Time
 }
 
 type opggProTeam struct {
@@ -52,17 +58,25 @@ type opggProMember struct {
 	FetchedAt  time.Time        `json:"-"`
 }
 type opggProAccount struct {
-	PUUID           string          `json:"puuid"`
-	Source          string          `json:"-"`
-	Inactive        bool            `json:"-"`
-	Stale           bool            `json:"-"`
-	GameName        string          `json:"game_name"`
-	TagLine         string          `json:"tagline"`
-	Region          string          `json:"region"`
-	UpdatedAt       string          `json:"updated_at"`
-	Rank            json.RawMessage `json:"solo_tier_info"`
-	LadderRank      int             `json:"-"`
-	LadderRankKnown bool            `json:"-"`
+	ActivityFailed   bool            `json:"activity_failed,omitempty"`
+	CheckedAt        string          `json:"checked_at,omitempty"`
+	CheckFailed      bool            `json:"check_failed,omitempty"`
+	SeedKey          string          `json:"-"`
+	LastMatchAt      string          `json:"-"`
+	LastMatchAtKnown bool            `json:"-"`
+	PUUID            string          `json:"puuid"`
+	Source           string          `json:"-"`
+	Inactive         bool            `json:"-"`
+	Stale            bool            `json:"-"`
+	GameName         string          `json:"game_name"`
+	TagLine          string          `json:"tagline"`
+	Region           string          `json:"region"`
+	UpdatedAt        string          `json:"updated_at"`
+	RevisionAt       string          `json:"revision_at,omitempty"`
+	Level            int             `json:"level,omitempty"`
+	Rank             json.RawMessage `json:"solo_tier_info"`
+	LadderRank       int             `json:"-"`
+	LadderRankKnown  bool            `json:"-"`
 }
 
 type proPlayersResponse struct {
@@ -82,10 +96,11 @@ type proPlayersResponse struct {
 	LadderRankPartial bool      `json:"ladderRankPartial"`
 }
 type proTeam struct {
-	Code    string      `json:"code"`
-	Name    string      `json:"name"`
-	League  string      `json:"league"`
-	Players []proPlayer `json:"players"`
+	Secondary bool        `json:"secondary"`
+	Code      string      `json:"code"`
+	Name      string      `json:"name"`
+	League    string      `json:"league"`
+	Players   []proPlayer `json:"players"`
 }
 type proPlayer struct {
 	Key      string       `json:"key"`
@@ -95,22 +110,26 @@ type proPlayer struct {
 	Accounts []proAccount `json:"accounts"`
 }
 type proAccount struct {
-	Primary         bool   `json:"primary"`
-	Dormant         bool   `json:"dormant"`
-	Confidence      string `json:"confidence,omitempty"`
-	GameName        string `json:"gameName"`
-	Source          string `json:"source"`
-	Inactive        bool   `json:"inactive,omitempty"`
-	Stale           bool   `json:"stale,omitempty"`
-	LPKnown         bool   `json:"lpKnown"`
-	TagLine         string `json:"tagLine"`
-	RankStatus      string `json:"rankStatus"`
-	Tier            string `json:"tier,omitempty"`
-	Division        int    `json:"division,omitempty"`
-	LP              int    `json:"lp"`
-	UpdatedAt       string `json:"updatedAt,omitempty"`
-	LadderRank      int    `json:"ladderRank"`
-	LadderRankKnown bool   `json:"ladderRankKnown"`
+	CheckedAt        string `json:"checkedAt,omitempty"`
+	CheckFailed      bool   `json:"checkFailed,omitempty"`
+	Reviewed         bool   `json:"reviewed,omitempty"`
+	LastMatchAt      string `json:"lastMatchAt,omitempty"`
+	LastMatchAtKnown bool   `json:"lastMatchAtKnown"`
+	Dormant          bool   `json:"dormant"`
+	Confidence       string `json:"confidence,omitempty"`
+	GameName         string `json:"gameName"`
+	Source           string `json:"source"`
+	Inactive         bool   `json:"inactive,omitempty"`
+	Stale            bool   `json:"stale,omitempty"`
+	LPKnown          bool   `json:"lpKnown"`
+	TagLine          string `json:"tagLine"`
+	RankStatus       string `json:"rankStatus"`
+	Tier             string `json:"tier,omitempty"`
+	Division         int    `json:"division,omitempty"`
+	LP               int    `json:"lp"`
+	UpdatedAt        string `json:"updatedAt,omitempty"`
+	LadderRank       int    `json:"ladderRank"`
+	LadderRankKnown  bool   `json:"ladderRankKnown"`
 }
 
 func (a *app) handleProPlayers(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +150,7 @@ func (a *app) handleProPlayers(w http.ResponseWriter, r *http.Request) {
 	}
 	updating := a.proPlayers.updating
 	a.proPlayers.mu.Unlock()
-	result := a.buildProPlayers(teams, proRoster)
+	result := a.buildReviewedProPlayers(teams)
 	result.Updating = updating
 	result.FetchedAt = fetchedAt
 	result.RosterVerifiedAt = proRosterVerifiedAt
@@ -153,12 +172,25 @@ func (a *app) handleProPlayers(w http.ResponseWriter, r *http.Request) {
 		result.Warnings = append(result.Warnings, "部分韩服天梯排名暂不可用，未返回名次的账号显示“—”。")
 	}
 	w.Header().Set("Cache-Control", "no-store")
+	a.recordDiagnostic(map[string]any{"event": "pro_players", "teams": result.Teams, "playerCount": result.PlayerCount, "accountCount": result.AccountCount})
 	respondJSON(w, result)
 }
 
 func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, time.Time, error) {
 	provider := a.championDataProvider()
 	c := &a.proPlayers
+	c.mu.Lock()
+	restored := a.restoreProSnapshotLocked()
+	if restored && force {
+		c.attemptedAt = time.Time{}
+	}
+	if restored && !force {
+		teams, at := c.teams, c.fetchedAt
+		c.mu.Unlock()
+		a.startProSeedRefresh()
+		return teams, at, nil
+	}
+	c.mu.Unlock()
 	for {
 		c.mu.Lock()
 		if c.flight != nil {
@@ -190,7 +222,11 @@ func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, ti
 		// One caller leaving a page must not cancel another caller's shared load.
 		go func() {
 			started := time.Now()
-			loadCtx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+			background := a.proRefreshContext
+			if background == nil {
+				background = context.Background()
+			}
+			loadCtx, cancel := context.WithTimeout(background, 90*time.Second)
 			defer cancel()
 			directoryCtx, directoryCancel := context.WithTimeout(loadCtx, 12*time.Second)
 			body, err := fetchProDirectory(directoryCtx, provider)
@@ -200,39 +236,89 @@ func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, ti
 				teams, err = parseOPGGProPlayers(body)
 			}
 			base := teams
+			var seeds []opggProTeam
+			if err == nil {
+				// Publish reviewed IDs and old seed snapshots without waiting for Riot.
+				seeds = new(app).loadProSeeds(loadCtx, previous, base)
+				a.rememberProDirectoryAnchors(loadCtx, seeds)
+			}
 			if err == nil {
 				// Publish verified directory rows immediately; supplemental sources
 				// and per-account ladder requests must not hold the entire page.
-				teams = append(cloneProTeams(base), retainProSupplements(pendingProSupplements(), previous, time.Now())...)
+				teams = withProSeed(append(cloneProTeams(base), retainProSupplements(pendingProSupplements(), previous, time.Now())...), seeds)
 			}
 			c.mu.Lock()
 			if err == nil {
 				c.teams, c.fetchedAt = teams, time.Now()
 				c.updating = true
+				a.persistProSnapshotLocked()
 			}
 			c.err = err
+			c.updating = true
 			c.flight = nil
 			close(done)
 			c.mu.Unlock()
 			a.recordDiagnostic(map[string]any{"event": "pro_directory_cost", "stage": "directory", "duration_ms": time.Since(started).Milliseconds(), "success": err == nil})
 			if err != nil {
+				// The reviewed list remains queryable when the directory is down.
+				// Missing accounts must not wait minutes for the Riot fallback.
+				c.mu.Lock()
+				c.updating = true
+				c.mu.Unlock()
+				fallback := new(app).loadProSeeds(loadCtx, previous, previous)
+				fallback = a.enrichProProfiles(loadCtx, fallback)
+				c.mu.Lock()
+				// Replace old seed rows instead of appending another copy on every
+				// failed directory refresh.
+				base := cloneProTeams(previous)
+				retained := base[:0]
+				for ti := range base {
+					hadSeed, hasOther := false, false
+					for mi := range base[ti].Members {
+						rows := base[ti].Members[mi].Summoners[:0]
+						for _, row := range base[ti].Members[mi].Summoners {
+							if row.Source != "seed" {
+								rows = append(rows, row)
+								hasOther = true
+							} else {
+								hadSeed = true
+							}
+						}
+						base[ti].Members[mi].Summoners = rows
+					}
+					if !hadSeed || hasOther {
+						retained = append(retained, base[ti])
+					}
+				}
+				c.teams, c.updating = withProSeed(retained, fallback), false
+				if c.fetchedAt.IsZero() {
+					c.fetchedAt = time.Now()
+				}
+				a.persistProSnapshotLocked()
+				c.mu.Unlock()
 				return
 			}
 			// Start known directory accounts while the three independent supplements
 			// resolve. Newly discovered accounts join the same bounded worker pool.
 			ladderStarted := time.Now()
+			profiles := make(chan []opggProTeam, 1)
+			go func() { profiles <- a.enrichProProfiles(loadCtx, seeds) }()
 			ladder := newProLadderPipeline(loadCtx, provider)
 			ladder.submit(teams)
 			// Every published snapshot is immutable, including nested accounts.
 			supplements := retainProSupplements(loadProSupplements(loadCtx, provider, func(partial []opggProTeam) {
-				snapshot := append(cloneProTeams(base), retainProSupplements(partial, previous, time.Now())...)
+				snapshot := withProSeed(append(cloneProTeams(base), retainProSupplements(partial, previous, time.Now())...), seeds)
 				ladder.submit(snapshot)
 				ladder.apply(snapshot)
 				c.mu.Lock()
 				c.teams = snapshot
+				a.persistProSnapshotLocked()
 				c.mu.Unlock()
 			}), previous, time.Now())
-			completed := append(cloneProTeams(base), supplements...)
+			// All reviewed accounts are checked in one bounded batch, including
+			// accounts absent from the pro directory. This uses no Riot quota.
+			seeds = <-profiles
+			completed := withProSeed(append(cloneProTeams(base), supplements...), seeds)
 			c.mu.Lock()
 			c.teams = cloneProTeams(completed)
 			c.mu.Unlock()
@@ -243,8 +329,10 @@ func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, ti
 			ladder.apply(completed)
 			c.mu.Lock()
 			c.teams, c.updating = completed, false
+			a.persistProSnapshotLocked()
 			c.mu.Unlock()
 			a.recordDiagnostic(map[string]any{"event": "pro_directory_cost", "stage": "ladder", "duration_ms": time.Since(started).Milliseconds(), "stage_duration_ms": time.Since(ladderStarted).Milliseconds(), "wait_after_supplements_ms": time.Since(waitStarted).Milliseconds()})
+			a.startProSeedRefresh()
 		}()
 		select {
 		case <-done:
@@ -339,6 +427,14 @@ func parseOPGGProPlayers(body []byte) ([]opggProTeam, error) {
 				memberCount += len(team.Members)
 				if memberCount > 10000 || len(teams[team.ID].Members)+len(team.Members) > 1000 {
 					return errors.New("pro directory member limit")
+				}
+				for mi := range team.Members {
+					for ai := range team.Members[mi].Summoners {
+						row := &team.Members[mi].Summoners[ai]
+						if at, err := time.Parse(time.RFC3339Nano, row.RevisionAt); err == nil && !at.IsZero() {
+							setProLastMatch(row, at, true)
+						}
+					}
 				}
 				// Repeated SSR components are reconciled by account identity later.
 				if previous, ok := teams[team.ID]; ok {
@@ -438,14 +534,19 @@ func proSecondaryTeam(team opggProTeam) bool {
 var proTierOrder = map[string]int{"IRON": 1, "BRONZE": 2, "SILVER": 3, "GOLD": 4, "PLATINUM": 5, "EMERALD": 6, "DIAMOND": 7, "MASTER": 8, "GRANDMASTER": 9, "CHALLENGER": 10}
 
 func normalizeProAccount(raw opggProAccount) (proAccount, bool) {
-	account := proAccount{GameName: strings.TrimSpace(raw.GameName), TagLine: strings.TrimSpace(raw.TagLine), RankStatus: "unavailable", Source: "OP.GG", Inactive: raw.Inactive, Dormant: raw.Inactive, Stale: raw.Stale, LadderRank: raw.LadderRank, LadderRankKnown: raw.LadderRankKnown}
+	account := proAccount{LastMatchAt: raw.LastMatchAt, LastMatchAtKnown: raw.LastMatchAtKnown, GameName: strings.TrimSpace(raw.GameName), TagLine: strings.TrimSpace(raw.TagLine), RankStatus: "unavailable", Source: "OP.GG", Inactive: raw.Inactive, Dormant: raw.Inactive, Stale: raw.Stale, LadderRank: raw.LadderRank, LadderRankKnown: raw.LadderRankKnown}
+	account.CheckedAt, account.CheckFailed = raw.CheckedAt, raw.CheckFailed
 	if raw.PUUID == "" {
 		account.Confidence = "low"
+	}
+	if raw.Source == "seed" {
+		account.Source = "人工核对"
 	}
 	if raw.Source == "TrackingThePros" {
 		account.Source = raw.Source
 	}
-	if raw.Region != "" && !strings.EqualFold(raw.Region, "kr") {
+	// Account region is optional; the containing directory establishes KR provenance.
+	if region := strings.TrimSpace(raw.Region); region != "" && !strings.EqualFold(region, "kr") {
 		return account, false
 	}
 	if account.GameName == "" || account.TagLine == "" || len(account.GameName) > 128 || len(account.TagLine) > 32 || strings.ContainsAny(account.GameName+account.TagLine, "#") || strings.ContainsFunc(account.GameName+account.TagLine, unicode.IsControl) {
@@ -488,6 +589,16 @@ func normalizeProAccount(raw opggProAccount) (proAccount, bool) {
 	return account, true
 }
 func proAccountLess(a, b proAccount) bool {
+	if a.LastMatchAtKnown != b.LastMatchAtKnown {
+		return a.LastMatchAtKnown
+	}
+	if a.LastMatchAtKnown {
+		aa, _ := time.Parse(time.RFC3339Nano, a.LastMatchAt)
+		bb, _ := time.Parse(time.RFC3339Nano, b.LastMatchAt)
+		if !aa.Equal(bb) {
+			return aa.After(bb)
+		}
+	}
 	if a.Dormant != b.Dormant {
 		return !a.Dormant
 	}
@@ -527,7 +638,7 @@ func (a *app) buildProPlayers(source []opggProTeam, roster []proRosterTeam) proP
 			key := team.Code + "/" + strings.ToLower(player.Name)
 			out.Players = append(out.Players, proPlayer{Key: key, Name: player.Name, Position: player.Position, Accounts: []proAccount{}})
 			for _, sourceTeam := range source {
-				if proSecondaryTeam(sourceTeam) {
+				if proSecondaryTeam(sourceTeam) && !player.Directory {
 					continue
 				}
 				for _, member := range sourceTeam.Members {
@@ -537,7 +648,7 @@ func (a *app) buildProPlayers(source []opggProTeam, roster []proRosterTeam) proP
 					if !strings.EqualFold(strings.TrimSpace(member.Nickname), player.Name) {
 						continue
 					}
-					if !proIdentityMatches(member, player) {
+					if !player.Directory && !proIdentityMatches(member, player) {
 						issues[key] = true
 						continue
 					}
@@ -562,6 +673,12 @@ func (a *app) buildProPlayers(source []opggProTeam, roster []proRosterTeam) proP
 						candidates = append(candidates, candidate{raw, account, key})
 					}
 				}
+			}
+		}
+		for _, sourceTeam := range source {
+			if sourceTeam.ID == team.OPGGID {
+				out.Secondary = proSecondaryTeam(sourceTeam)
+				break
 			}
 		}
 		result.Teams = append(result.Teams, out)
@@ -622,15 +739,10 @@ func (a *app) buildProPlayers(source []opggProTeam, roster []proRosterTeam) proP
 				player.Accounts = rows
 			}
 			sort.SliceStable(player.Accounts, func(i, j int) bool { return proAccountLess(player.Accounts[i], player.Accounts[j]) })
-			primarySet := false
 			for i := range player.Accounts {
 				account := &player.Accounts[i]
 				if account.Dormant {
 					result.DormantCount++
-				}
-				if !primarySet && !account.Dormant && account.RankStatus == "ranked" {
-					account.Primary = true
-					primarySet = true
 				}
 			}
 			player.Status = "available"
@@ -685,7 +797,7 @@ func proOverviewMismatch(expected string, ranks []gameplayRank) bool {
 func proAccountKeys(raw opggProAccount) []string {
 	k := []string{"name:" + strings.ToLower(strings.TrimSpace(raw.GameName)+"#"+strings.TrimSpace(raw.TagLine))}
 	if raw.PUUID != "" {
-		k = append([]string{"puuid:" + raw.PUUID}, k...)
+		k = append([]string{"puuid:" + strings.TrimSpace(raw.PUUID)}, k...)
 	}
 	return k
 }

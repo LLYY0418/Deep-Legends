@@ -19,7 +19,7 @@ func (a *app) loadCommunityDragonAsset(ctx context.Context, remotePath string) (
 	p := a.champions
 	started := time.Now()
 	state := "memory"
-	data, err := a.loadAsset(ctx, "cdragon:"+remotePath, 2<<20, time.Minute, func(ctx context.Context) ([]byte, error) {
+	data, err := a.loadAsset(ctx, "cdragon:"+remotePath, 2<<20, 5*time.Second, func(ctx context.Context) ([]byte, error) {
 		state = "miss"
 		loader := func(ctx context.Context) ([]byte, error) {
 			data, err := p.fetchDirect(ctx, communityDragonHost, remotePath, nil, 2<<20, championImageAccept)

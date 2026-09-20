@@ -1,0 +1,14 @@
+--- FAIL: TestR105_IconClickRouteWritesUnownedAndHandlesStatuses (0.00s)
+    --- FAIL: TestR105_IconClickRouteWritesUnownedAndHandlesStatuses/201 (0.00s)
+        r105_test.go:206: invalid PUT GET map[profileIconId:72]
+    --- FAIL: TestR105_IconClickRouteWritesUnownedAndHandlesStatuses/200 (0.00s)
+        r105_test.go:206: invalid PUT GET map[profileIconId:72]
+    --- FAIL: TestR105_IconClickRouteWritesUnownedAndHandlesStatuses/204 (0.00s)
+        r105_test.go:206: invalid PUT GET map[profileIconId:72]
+    --- FAIL: TestR105_IconClickRouteWritesUnownedAndHandlesStatuses/401 (0.00s)
+        r105_test.go:206: invalid PUT GET map[profileIconId:72]
+    --- FAIL: TestR105_IconClickRouteWritesUnownedAndHandlesStatuses/500 (0.00s)
+        r105_test.go:206: invalid PUT GET map[profileIconId:72]
+FAIL
+FAIL	lol-loot-assistant	0.498s
+FAIL

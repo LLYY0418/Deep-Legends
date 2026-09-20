@@ -1,0 +1,6 @@
+=== RUN   TestR101SeedRankSixHourCacheSeparateFromOverview
+    r101_test.go:479: seed cache expired after overview TTL: 2
+--- FAIL: TestR101SeedRankSixHourCacheSeparateFromOverview (0.03s)
+FAIL
+FAIL	lol-loot-assistant	0.497s
+FAIL

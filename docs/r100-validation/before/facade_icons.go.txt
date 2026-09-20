@@ -1,0 +1,165 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+)
+
+type facadeIcon struct {
+	ID          int64    `json:"id"`
+	Title       string   `json:"title"`
+	Year        int      `json:"year"`
+	Legacy      bool     `json:"legacy"`
+	Disabled    bool     `json:"disabled"`
+	Owned       bool     `json:"owned"`
+	Sets        []string `json:"sets"`
+	SearchTerms []string `json:"searchTerms"`
+	ImagePath   string   `json:"-"`
+}
+type facadeIconCache struct {
+	mu     sync.Mutex
+	client *LCUClient
+	at     time.Time
+	icons  []facadeIcon
+	err    error
+	// Per-cache seam verifies expensive transliteration is only done on a miss.
+	terms func(string) []string
+}
+
+func (a *app) loadIconCatalog(ctx context.Context, client *LCUClient) ([]facadeIcon, error) {
+	c := &a.facadeIcons
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.client != client {
+		c.client = client
+		c.at = time.Time{}
+		c.icons = nil
+		c.err = nil
+	}
+	ttl := 15 * time.Minute
+	if c.err != nil || len(c.icons) == 0 {
+		ttl = 5 * time.Second
+	}
+	if !c.at.IsZero() && time.Since(c.at) < ttl {
+		return c.icons, c.err
+	}
+	c.icons, c.err = a.fetchIconCatalog(ctx, client, c.terms)
+	c.at = time.Now()
+	return c.icons, c.err
+}
+func (a *app) fetchIconCatalog(ctx context.Context, client *LCUClient, terms func(string) []string) ([]facadeIcon, error) {
+	raw, err := client.GetBytesContext(ctx, r99ReadPaths[0])
+	if err != nil {
+		return nil, err
+	}
+	var rows []struct {
+		ID              int64    `json:"id"`
+		Title           string   `json:"title"`
+		Year            int      `json:"yearReleased"`
+		Legacy          bool     `json:"isLegacy"`
+		ImagePath       string   `json:"imagePath"`
+		DisabledRegions []string `json:"disabledRegions"`
+	}
+	if err = json.Unmarshal(raw, &rows); err != nil {
+		return nil, err
+	}
+	sets := map[int64][]string{}
+	raw, err = client.GetBytesContext(ctx, r99ReadPaths[1])
+	if err == nil {
+		var groups []struct {
+			Name        string  `json:"name"`
+			DisplayName string  `json:"displayName"`
+			Icons       []int64 `json:"icons"`
+		}
+		if json.Unmarshal(raw, &groups) == nil {
+			for _, group := range groups {
+				name := group.DisplayName
+				if name == "" {
+					name = group.Name
+				}
+				if name != "" {
+					for _, id := range group.Icons {
+						sets[id] = append(sets[id], name)
+					}
+				}
+			}
+		}
+	}
+	if terms == nil {
+		terms = championPinyinTerms
+	}
+	icons := make([]facadeIcon, 0, len(rows))
+	for _, row := range rows {
+		if row.ID <= 0 || strings.TrimSpace(row.ImagePath) == "" {
+			continue
+		}
+		icons = append(icons, facadeIcon{ID: row.ID, Title: row.Title, Year: row.Year, Legacy: row.Legacy, Disabled: len(row.DisabledRegions) > 0, ImagePath: row.ImagePath, Sets: append([]string{}, sets[row.ID]...), SearchTerms: terms(row.Title)})
+	}
+	sort.Slice(icons, func(i, j int) bool { return icons[i].ID < icons[j].ID })
+	if len(icons) == 0 {
+		return icons, errors.New("头像目录暂不可用")
+	}
+	return icons, nil
+}
+func (a *app) knownFacadeIcon(ctx context.Context, client *LCUClient, id int64) bool {
+	icons, err := a.loadIconCatalog(ctx, client)
+	if err != nil {
+		return false
+	}
+	for _, icon := range icons {
+		if icon.ID == id {
+			return !icon.Disabled
+		}
+	}
+	return false
+}
+func (a *app) handleFacadeIcons(w http.ResponseWriter, r *http.Request) {
+	client, _, err := a.gameplayClient()
+	if err != nil {
+		http.Error(w, "未连接英雄联盟客户端", http.StatusConflict)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	icons, err := a.loadIconCatalog(ctx, client)
+	if err != nil {
+		http.Error(w, "头像目录暂时读取失败，请稍后重试", http.StatusBadGateway)
+		return
+	}
+	// Ownership parsing remains gated on real P0-R4 evidence. Unknown is not false.
+	w.Header().Set("Cache-Control", "no-store")
+	respondJSON(w, map[string]any{"icons": icons, "iconOwnershipUnavailable": true})
+}
+func (a *app) writeFacadeIcon(ctx context.Context, client *LCUClient, id int64) error {
+	if id <= 0 || !a.knownFacadeIcon(ctx, client, id) {
+		return errFacadeInvalid
+	}
+	if err := client.RequestJSON(ctx, http.MethodPut, "/lol-summoner/v1/current-summoner/icon", map[string]any{"profileIconId": id}, nil); err != nil {
+		return err
+	}
+	next, err := (SummonerAPI{client: client, ctx: ctx}).Current()
+	if err != nil {
+		return errors.New("头像请求已提交，客户端资料暂时无法回读，请重新读取核对")
+	}
+	_, err = a.applySummonerIdentity(client, next, time.Now())
+	return err
+}
+func writeFacadeRankBanner(ctx context.Context, client *LCUClient, value string) error {
+	if value != "lastSeasonHighestRank" && value != "blank" {
+		return errFacadeInvalid
+	}
+	var current map[string]any
+	if err := client.RequestJSON(ctx, http.MethodGet, "/lol-regalia/v2/current-summoner/regalia", nil, &current); err != nil {
+		return err
+	}
+	if current["preferredCrestType"] == nil || current["selectedPrestigeCrest"] == nil {
+		return errors.New("客户端边框偏好无法读取，已停止修改段位旗")
+	}
+	return client.RequestJSON(ctx, http.MethodPut, "/lol-regalia/v2/current-summoner/regalia", map[string]any{"preferredBannerType": value, "preferredCrestType": current["preferredCrestType"], "selectedPrestigeCrest": current["selectedPrestigeCrest"]}, nil)
+}

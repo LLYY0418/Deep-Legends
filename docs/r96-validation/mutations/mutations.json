@@ -1,0 +1,106 @@
+[
+  {
+    "id": "wrong-block-size",
+    "killed": true,
+    "test": "^TestR96ExplicitSubteamGuard/.*/conflict=false$",
+    "file": "arena_live_grouping.go",
+    "anchor_count": 1,
+    "exit_code": 1
+  },
+  {
+    "id": "removed-ally-check",
+    "killed": true,
+    "test": "^TestR96ExplicitSubteamGuard/.*/conflict=true$",
+    "file": "arena_live_grouping.go",
+    "anchor_count": 1,
+    "exit_code": 1
+  },
+  {
+    "id": "raw-identity-only",
+    "killed": true,
+    "test": "^TestR96ExplicitSubteamGuard/.*/conflict=false$",
+    "file": "arena_live_grouping.go",
+    "anchor_count": 1,
+    "exit_code": 1
+  },
+  {
+    "id": "session-instead-of-playerlist",
+    "killed": true,
+    "test": "^TestR96ExplicitSubteamGuard/.*/conflict=false$",
+    "file": "arena_live_grouping.go",
+    "anchor_count": 1,
+    "exit_code": 1
+  },
+  {
+    "id": "guessed-mascots",
+    "killed": true,
+    "test": "^TestR90OrderInferenceNeverEnablesMascotMapping$",
+    "file": "arena_live_grouping.go",
+    "anchor_count": 1,
+    "exit_code": 1
+  },
+  {
+    "id": "removed-order-mascot-guard",
+    "killed": true,
+    "test": "^TestR90OrderInferenceNeverEnablesMascotMapping$",
+    "file": "arena_live_grouping.go",
+    "anchor_count": 1,
+    "exit_code": 1
+  },
+  {
+    "id": "incomplete-not-cached",
+    "killed": true,
+    "test": "^TestR90LiveSnapshotCacheLayersAndManualRefresh/false$",
+    "file": "gameplay_refresh.go",
+    "anchor_count": 1,
+    "exit_code": 1
+  },
+  {
+    "id": "complete-short-ttl",
+    "killed": true,
+    "test": "^TestR90LiveSnapshotCacheLayersAndManualRefresh/true$",
+    "file": "gameplay_refresh.go",
+    "anchor_count": 1,
+    "exit_code": 1
+  },
+  {
+    "id": "complete-always-false",
+    "killed": true,
+    "test": "R90 complete snapshots never",
+    "file": "web/gameplay.js",
+    "anchor_count": 1,
+    "exit_code": 1
+  },
+  {
+    "id": "no-retry-limit",
+    "killed": true,
+    "test": "R90 incomplete snapshots stop",
+    "file": "web/gameplay.js",
+    "anchor_count": 1,
+    "exit_code": 1
+  },
+  {
+    "id": "truth-partition-forced",
+    "killed": true,
+    "test": "^TestR90TruthDiagnosticSeparatesPartitionAndBlockIdentity/wrong$",
+    "file": "arena_truth_diagnostics.go",
+    "anchor_count": 1,
+    "exit_code": 1
+  },
+  {
+    "id": "queue-literal",
+    "killed": true,
+    "test": "^TestR90QueueGuardScansNewGroupingModule$",
+    "file": "arena_live_grouping.go",
+    "anchor_count": 1,
+    "exit_code": 1
+  },
+  {
+    "id": "partial-truth-reported-none",
+    "killed": true,
+    "test": "^TestR96PartialTruthDoesNotEndAsNone$",
+    "file": "arena_truth_diagnostics.go",
+    "anchor_count": 1,
+    "exit_code": 1
+  }
+]

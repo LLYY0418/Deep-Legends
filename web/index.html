@@ -16,14 +16,13 @@
     <link rel="stylesheet" href="/suite.css">
     <link rel="stylesheet" href="/metrics.css">
     <script src="/runtime.js" defer></script>
+    <script src="/image-queue.js" defer></script>
     <script src="/overview-art.js" defer></script>
     <script src="/augment-artwork.js" defer></script>
+    <script src="/section-loader.js" defer></script>
     <script src="/app.js" defer></script>
     <script src="/gameplay.js" defer></script>
-    <script src="/champions.js" defer></script>
-    <script src="/pro-players.js" defer></script>
     <script src="/friends.js" defer></script>
-    <script src="/suite.js" defer></script>
   </head>
   <body>
     <div id="startup-loading" class="startup-loading" role="status" aria-live="polite" aria-label="正在读取英雄联盟客户端信息">
@@ -150,7 +149,7 @@
             </header>
             <div class="pro-toolbar">
               <div id="pro-team-filters" class="pro-team-filters" role="group" aria-label="筛选战队"></div>
-              <div class="pro-toolbar-right"><button id="pro-primary-only" class="pro-primary-switch" type="button" role="switch" aria-checked="false"><span aria-hidden="true"></span>只看主账号</button><label class="pro-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="pro-players-search" type="search" placeholder="搜索选手或账号" aria-label="搜索职业选手或账号" maxlength="80" autocomplete="off"></label></div>
+              <div class="pro-toolbar-right"><button id="pro-primary-only" class="pro-primary-switch" type="button" role="switch" aria-checked="false"><span aria-hidden="true"></span>只看最新账号</button><label class="pro-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="pro-players-search" type="search" placeholder="搜索选手或账号" aria-label="搜索职业选手或账号" maxlength="80" autocomplete="off"></label></div>
             </div>
             <div id="pro-players-content" class="pro-content" aria-busy="false"></div>
           </section>
@@ -296,12 +295,12 @@
                 <section class="setting-card"><div><h3>侧边栏</h3><p>可以随时收起，只保留功能图标和连接状态。</p></div><button id="settings-sidebar-toggle" class="text-button" type="button">收起侧边栏</button></section>
                 <section class="setting-card"><div><h3>主题</h3><p>自动主题随时段切换。</p></div><label class="select-wrap"><span class="sr-only">主题</span><select id="setting-theme"><option value="auto">自动（昼夜切换）</option><option value="light">浅色</option><option value="dark">海克斯黑金</option><option value="azure">寒冰蓝</option><option value="emerald">翡翠绿</option><option value="violet">星域紫</option><option value="crimson">血月红</option><option value="aurora">极光青</option><option value="oled">纯黑 OLED</option></select></label></section>
                 <section class="setting-card"><div><h3>默认页面</h3><p>下次启动时优先打开常用功能。</p></div><label class="select-wrap"><span class="sr-only">默认页面</span><select id="setting-default-page"><option value="overview">总览</option><option value="champions">英雄</option><option value="live">对局</option><option value="favorites">收藏</option><option value="suite">工具</option></select></label></section>
-                <section class="setting-card setting-share-card"><div><h3>导出位置</h3><p>分享图保存位置；诊断日志在导出时选择位置。</p></div><div class="setting-share-controls"><span id="setting-share-directory" class="setting-share-path" data-tooltip-size="compact">首次生成时选择</span><button id="setting-share-directory-change" class="text-button setting-share-change" type="button"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3V7Zm0 0V5h7l2 2"/></svg><span>选择位置</span></button></div></section>
+                <section class="setting-card setting-share-card"><div><h3>导出位置</h3><p>分享图和诊断日志共用此保存位置；首次导出选择后自动记住。</p></div><div class="setting-share-controls"><span id="setting-share-directory" class="setting-share-path" data-tooltip-size="compact">首次生成时选择</span><button id="setting-share-directory-change" class="text-button setting-share-change" type="button"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3V7Zm0 0V5h7l2 2"/></svg><span>选择位置</span></button></div></section>
               </div>
             </section>
             <section id="settings-gameplay-panel" class="settings-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="settings-tab-gameplay" hidden>
               <div class="settings-grid">
-                <section class="setting-card"><div><h3>战绩展示数量</h3><p>首次展示及滚动到底后的每次追加数量。</p></div><label class="select-wrap"><span class="sr-only">战绩展示数量</span><select id="setting-match-count"><option value="10">每次 10 场</option><option value="20">每次 20 场</option><option value="30">每次 30 场</option><option value="40">每次 40 场</option><option value="50">每次 50 场</option></select></label></section>
+                <section class="setting-card"><div><h3>战绩展示数量</h3><p>滚动到底后的追加数量；韩服首次先显示 10 场，减少等待。</p></div><label class="select-wrap"><span class="sr-only">战绩展示数量</span><select id="setting-match-count"><option value="10">每次 10 场</option><option value="20">每次 20 场</option><option value="30">每次 30 场</option><option value="40">每次 40 场</option><option value="50">每次 50 场</option></select></label></section>
                 <section class="setting-card"><div><h3>默认战绩筛选</h3><p>打开召唤师总览时优先显示的游戏类型。</p></div><label class="select-wrap"><span class="sr-only">默认战绩筛选</span><select id="setting-default-match-filter"><option value="all">全部对局</option><option value="solo">单排/双排</option><option value="flex">灵活组排</option></select></label></section>
                 <section class="setting-card"><div><h3>英雄页默认位置</h3><p>打开英雄梯度时优先展示的位置。</p></div><label class="select-wrap"><span class="sr-only">英雄页默认位置</span><select id="setting-champion-position"><option value="all">全部</option><option value="top">上单</option><option value="jungle">打野</option><option value="mid">中单</option><option value="adc">下路</option><option value="support">辅助</option></select></label></section>
                 <section class="setting-card"><div><h3>对局玩家排序</h3><p>实时对局中，每支队伍内玩家卡片的排列方式。</p></div><label class="select-wrap"><span class="sr-only">对局玩家排序</span><select id="setting-live-order"><option value="team">客户端顺序</option><option value="position">按位置</option><option value="kda">按 KDA</option><option value="win-rate">按胜率</option></select></label></section>
@@ -317,7 +316,7 @@
                 <section class="setting-card setting-network-card"><div><h3>英雄数据网络</h3><p>无法加载英雄数据时，可切换网络模式。</p><span id="setting-proxy-state" class="inline-status" role="status" aria-live="polite">正在读取网络设置…</span></div><div class="setting-network-controls"><label class="select-wrap"><span class="sr-only">英雄数据网络模式</span><select id="setting-proxy-mode"><option value="auto">自动检测</option><option value="direct">直接连接</option><option value="manual">手动代理</option></select></label><label id="setting-proxy-url-wrap" class="setting-proxy-url" hidden><span class="sr-only">代理地址</span><input id="setting-proxy-url" type="url" inputmode="url" maxlength="300" spellcheck="false" placeholder="http://127.0.0.1:7890"></label><button id="setting-proxy-save" class="text-button" type="button">保存</button></div></section>
               </div>
               <section class="settings-capabilities"><div class="panel-heading compact-heading"><div><h2>对局能力</h2><p>国服客户端接口随版本变化；不支持的能力会单独降级。</p></div></div><div id="gameplay-settings-status" class="data-panel"><p class="muted">打开总览或对局后显示能力状态。</p></div></section>
-              <div class="settings-privacy"><div class="panel-heading compact-heading"><div><h2>隐私与安全</h2><p>助手只连接本机客户端，不接受账号密码，也不会上传收藏数据。</p></div></div><div id="privacy-content" class="data-panel"><p class="muted">正在读取隐私说明…</p></div></div>
+              <div class="settings-privacy"><div class="panel-heading compact-heading"><div><h2>隐私与安全</h2><p>助手不接受账号密码，也不会上传收藏数据；公开玩家查询的数据边界见下方说明。</p></div></div><div id="privacy-content" class="data-panel"><p class="muted">正在读取隐私说明…</p></div></div>
               <section class="settings-diagnostics"><div class="panel-heading compact-heading"><div><h2>诊断与日志</h2><p>核对客户端连接与皮肤库存来源；日志已脱敏，不包含账号密码或客户端令牌。</p></div></div><div class="diagnostic-actions"><button id="copy-diagnostics" class="text-button" type="button">复制诊断摘要</button><a id="export-diagnostics" class="text-button" href="/api/diagnostics/log" download role="button">导出诊断日志</a><span id="diagnostic-log-meta" class="muted">正在读取日志信息…</span></div><p class="diagnostic-export-note muted">复现问题后导出日志。</p><div id="diagnostics-content"></div></section>
             </section>
           </section>

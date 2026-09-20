@@ -1,0 +1,3432 @@
+[
+  {
+    "region": "kr",
+    "team": {
+      "id": 632,
+      "name": "Bilibili Gaming",
+      "short_name": "BLG",
+      "image_url": "https://s-qwer.op.gg/images/lol/teams/632_1672191537262.png",
+      "image_url_light_mode": "https://s-qwer.op.gg/images/lol/teams/632_1672191537262.png",
+      "image_url_dark_mode": "https://s-qwer.op.gg/images/lol/teams/632_1672191537262.png",
+      "members": [
+        {
+          "team_id": 632,
+          "position": null,
+          "nickname": "Bin",
+          "authority": "PROGAMER",
+          "real_name": "Chen Ze-Bin (陈泽彬)",
+          "summoners": [
+            {
+              "id": 81062931,
+              "summoner_id": "8E3Fzl6o-bd9HLHXUNobzp4pK9KFyV8ViiQOa8iQliMXe7U",
+              "acct_id": "HMvmffhiwgegn41put3-BnSteCBJ5cGE4wmDernL1-bD9r_Q972DcI3G",
+              "puuid": "djNcnoYudWviPBud-SgJTRt7KxFlm8oLa2Jv9uXLCjHdENLSDht4h0Z0PuON_dljtq3Ho68bEKBeKQ",
+              "game_name": "81062931del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "81062931del",
+              "internal_name": "81062931del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon3879.jpg",
+              "level": 198,
+              "updated_at": "2026-09-17T16:09:42+09:00",
+              "renewable_at": "2026-09-17T16:11:42+09:00",
+              "revision_at": "2023-08-26T18:15:40+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 84475423,
+              "summoner_id": "VRxIPtGm8Z-fgtEc5ICX9wu0Yd_OtH5ub-zjGV7wbt1iGx4",
+              "acct_id": "u-JDegaQs9Q8bNKipu2wYFzt-ZIFAHBWB6Wn4VDCvk7lMcQDoJoVkUPh",
+              "puuid": "lZ2Ps04uUicjTQH34yJMa4sBoyIaNHpvc6RG460_HKrYEDYDal4xdkCU_9_akwHljpigiNJlyMDgmQ",
+              "game_name": "95300230del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "95300230del",
+              "internal_name": "95300230del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon10.jpg",
+              "level": 115,
+              "updated_at": "2026-09-17T16:09:44+09:00",
+              "renewable_at": "2026-09-17T16:11:44+09:00",
+              "revision_at": "2021-01-19T17:08:19+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 90460816,
+              "summoner_id": "8YAOZjnjkb0TBqnaGQKb0lndIiMaqo1xCGyXWptt9N67Op-4rhqI_Kr5HA",
+              "acct_id": "tVkP7jgabuvxJ8ZTjbAkktxmlRIZUjZDkJmW1KXZc9nrAGuDoFNSP5vM",
+              "puuid": "fcI4Nt4-G-6CH8f5hQPhmAIaYB_2cE_4jYchpX08OCpMi-zk3zb4wKXKhHgAOSYZ4ev5wdZWAQwfbg",
+              "game_name": "빈 스토리",
+              "tagline": "KR1",
+              "region": null,
+              "name": "빈 스토리",
+              "internal_name": "빈스토리",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon6.jpg",
+              "level": 347,
+              "updated_at": "2026-09-17T16:58:58+09:00",
+              "renewable_at": "2026-09-17T17:00:58+09:00",
+              "revision_at": "2026-09-17T16:41:41+09:00",
+              "solo_tier_info": {
+                "tier": "MASTER",
+                "division": 1,
+                "lp": 907,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 443,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 253,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "bilibiligaming,bin,chenze-bin(陈泽彬),81062931del,95300230del,빈스토리"
+        },
+        {
+          "team_id": 632,
+          "position": "TOP",
+          "nickname": "Flandre",
+          "authority": "PROGAMER",
+          "real_name": "Li Xuan-Jun (李炫君)",
+          "summoners": [
+            {
+              "id": 56591955,
+              "summoner_id": "vYrwUmeYM0oSletUAKXZ87FmoP7CXccI7N6NbDQItqJYlAI",
+              "acct_id": "UJBO3iX-o1IK4a28qfl1WSYD-Z46QrKsBA-ZD4VLCKMNchs",
+              "puuid": "h5EbG3QJyY-rviER2aKazVf1oaRawSeRzVGu3Ynl9FsUMuosP_zyn8iGfgdLTfa3FM9AeeUjxwcbQA",
+              "game_name": "aierlanlaozhu",
+              "tagline": "KR1",
+              "region": null,
+              "name": "aierlanlaozhu",
+              "internal_name": "aierlanlaozhu",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon16.jpg",
+              "level": 449,
+              "updated_at": "2026-09-17T16:09:45+09:00",
+              "renewable_at": "2026-09-17T16:11:45+09:00",
+              "revision_at": "2026-09-17T04:57:27+09:00",
+              "solo_tier_info": {
+                "tier": "MASTER",
+                "division": 1,
+                "lp": 1172,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 686,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 473,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 77060238,
+              "summoner_id": "7g60bTS_Je572AEwEJu1ItHkbo6VL5y2OXfLEZKGn2e1i3M",
+              "acct_id": "iXvFzblU1R51H66W5pKRRHceTzCUzM8VplPMXpSGY4czwq9qRNo07jQq",
+              "puuid": "WQ01VVUJMRcNhw4tn6Y7u6fcTUP0LD-R5jcflzAZYrAM8451MSWjw4GJNdj0mliwC85iHIGv8DsROg",
+              "game_name": "77060238del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "77060238del",
+              "internal_name": "77060238del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon16.jpg",
+              "level": 86,
+              "updated_at": "2026-09-17T16:09:47+09:00",
+              "renewable_at": "2026-09-17T16:11:47+09:00",
+              "revision_at": "2022-01-31T10:32:34+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 84473287,
+              "summoner_id": "TtJYbE1f6CJoYThfXX1TURNXk_FYe_6sq2eCKtkvujhOADM",
+              "acct_id": "_9owTd9cE-8z8fs4EL2XZctksVeqVkcjun5QQ4NaJ_5C2Ex_0unHlgxU",
+              "puuid": "AxDNr7OWn6PoYVJYhDhkXCH4oYSpe4Irl6rRQ3mVhe16IxSxTYGs5bKtxx9-By3K_5vh6leajSAr7g",
+              "game_name": "95310226del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "95310226del",
+              "internal_name": "95310226del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon16.jpg",
+              "level": 147,
+              "updated_at": "2026-09-17T16:09:50+09:00",
+              "renewable_at": "2026-09-17T16:11:50+09:00",
+              "revision_at": "2021-01-19T17:06:22+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "bilibiligaming,flandre,lixuan-jun(李炫君),aierlanlaozhu,77060238del,95310226del"
+        },
+        {
+          "team_id": 632,
+          "position": "SUPPORT",
+          "nickname": "Mark",
+          "authority": "PROGAMER",
+          "real_name": "Ling Xu (凌旭)",
+          "summoners": [
+            {
+              "id": 83459580,
+              "summoner_id": "JI_LX1lQKE3aRtV1h0G_MkybQlmbz8gQqJSwYSIfoOIzwQ4",
+              "acct_id": "B1zZKS4ON_22-nUQVQ67_pn9KZ3JPM9e6RZvktIsznzqhXFS6TMIIDPS",
+              "puuid": "RFOThZzQFLx-g-ZbcJ_dGoQWAwKXU9MYjVszGfB4z16GEMFI8e1awAb6IlsMa8t0RJZ38QFBKB7PHw",
+              "game_name": "WE 77",
+              "tagline": "KR1",
+              "region": null,
+              "name": "WE 77",
+              "internal_name": "we77",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7145.jpg",
+              "level": 233,
+              "updated_at": "2026-09-14T20:30:31+09:00",
+              "renewable_at": "2026-09-14T20:32:31+09:00",
+              "revision_at": "2026-09-13T22:20:50+09:00",
+              "solo_tier_info": {
+                "tier": "EMERALD",
+                "division": 3,
+                "lp": 13,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/emerald.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/emerald.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "GOLD",
+                    "division": 3,
+                    "lp": 44,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/gold.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/gold.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "bilibiligaming,mark,lingxu(凌旭),we77"
+        },
+        {
+          "team_id": 632,
+          "position": "SUPPORT",
+          "nickname": "ON",
+          "authority": "PROGAMER",
+          "real_name": "Luo Wen-Jun (骆文俊)",
+          "summoners": [
+            {
+              "id": 11450723,
+              "summoner_id": "tbWEZTCEbZDltFm9cR3A88a3hCsUpA8MNQ5fCjROPPSRmtc",
+              "acct_id": "Nn24cidq21nbGTyQvUr_xwtle0dj6sldTFKlyqu6bRD9Plo",
+              "puuid": "R4hkQbWQ33uqKSpuaVA63GfEpIvjLyMD6pZRCffG3qi_o7XgHKcmSCN7OS2woCopN-9UozJdGPH-Ow",
+              "game_name": "키보드에음료쏟아서고장내는이도윤",
+              "tagline": "KR1",
+              "region": null,
+              "name": "키보드에음료쏟아서고장내는이도윤",
+              "internal_name": "키보드에음료쏟아서고장내는이도윤",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon3165.jpg",
+              "level": 521,
+              "updated_at": "2026-09-17T16:47:23+09:00",
+              "renewable_at": "2026-09-17T16:49:23+09:00",
+              "revision_at": "2026-09-13T03:17:09+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 1977,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "GRANDMASTER",
+                    "division": 1,
+                    "lp": 1092,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/grandmaster.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/grandmaster.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "GRANDMASTER",
+                    "division": 1,
+                    "lp": 761,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/grandmaster.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/grandmaster.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "bilibiligaming,on,luowen-jun(骆文俊),키보드에음료쏟아서고장내는이도윤"
+        },
+        {
+          "team_id": 632,
+          "position": "ADC",
+          "nickname": "Viper",
+          "authority": "PROGAMER",
+          "real_name": "Park Do-hyeon (박도현)",
+          "summoners": [
+            {
+              "id": 57541180,
+              "summoner_id": "tHroZE9oKIfKHLHcsIgCE2nHgv994p6gSyzVSuXLgG-Re_Q",
+              "acct_id": "0uBpuif0o3f_Do-wYDmP8lyhhw2NlEmli0N_DURtUOt9JlQ",
+              "puuid": "7KAvAHlBlUQMF2j4ObPtI1aKR95Mv6nC7K_WsOc6xlI0UIEbhOhVSSuSJUznr7e29PtO6OSSPSunEg",
+              "game_name": "Blue",
+              "tagline": "KR33",
+              "region": null,
+              "name": "viper3",
+              "internal_name": "viper3",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon2076.jpg",
+              "level": 922,
+              "updated_at": "2026-09-17T16:10:11+09:00",
+              "renewable_at": "2026-09-17T16:12:11+09:00",
+              "revision_at": "2026-09-13T03:39:26+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2205,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "GRANDMASTER",
+                    "division": 1,
+                    "lp": 1145,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/grandmaster.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/grandmaster.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "GRANDMASTER",
+                    "division": 1,
+                    "lp": 616,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/grandmaster.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/grandmaster.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 70910217,
+              "summoner_id": "1eHoadCZ-kR1Aq2eLEnVTo4HMuv-Kj5thOMI-mJ5R01VHgw",
+              "acct_id": "OI00a-t6pHAMQMbAlsIdzzsmOUXhOSDhGwKg6ojTUMu2rbU",
+              "puuid": "SHvchSlbAGfrZ2OLoXRQTMeTbqJRsz4-PsRB1Ll-bn3P4GO-GDZyzJ6hC9g7XQoOtHeT9UCZ7POeWQ",
+              "game_name": "Viscose",
+              "tagline": "KR1",
+              "region": null,
+              "name": "Viscose",
+              "internal_name": "viscose",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon939.jpg",
+              "level": 74,
+              "updated_at": "2026-09-17T16:10:15+09:00",
+              "renewable_at": "2026-09-17T16:12:15+09:00",
+              "revision_at": "2019-01-06T03:19:03+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 81220617,
+              "summoner_id": "C2OWSt9AwGF61xE372-7RyKiuxT2LvU1kHmtMwPVMgIT50w",
+              "acct_id": "BxsR-_m0_DB1Xsmv4dJJNsJGlky8LcXpevuUIrd59S_409T1A2zk60_3",
+              "puuid": "uyMh5TUBAO1CnP5ebleHFdWSypFOeWeeUy0u5Jy4tN8gcwAGiYoPSw9rJO-8XjAEGiILQ1warebdeQ",
+              "game_name": "Bot01",
+              "tagline": "KR1",
+              "region": null,
+              "name": "Bot01",
+              "internal_name": "bot01",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon29.jpg",
+              "level": 85,
+              "updated_at": "2026-09-17T16:10:17+09:00",
+              "renewable_at": "2026-09-17T16:12:17+09:00",
+              "revision_at": "2020-01-06T00:51:05+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "bilibiligaming,viper,parkdo-hyeon(박도현),blue,viscose,bot01"
+        },
+        {
+          "team_id": 632,
+          "position": "JUNGLE",
+          "nickname": "Xun",
+          "authority": "PROGAMER",
+          "real_name": "Peng Lixun (彭立勋)",
+          "summoners": [
+            {
+              "id": 93131956,
+              "summoner_id": "k4J5lewUcohifCflBfzLHQ56AeF_bt68EcAuxoBqE6Fnmbc3elNewiXRgw",
+              "acct_id": "N25gBxQ9AJ1l4kNMSrWYa1gd_a2hiVAT2NJlL6Z9S-ydyrh8CT0wZlCq",
+              "puuid": "A5bV_wJedp_KbjjBsY8QNUOgMQ30M0sxTywXKSoTtoGrj0qmSqVhtp6IWeUEVxMcpWp2Ttx7HqeTUw",
+              "game_name": "Xun",
+              "tagline": "OOK",
+              "region": null,
+              "name": "",
+              "internal_name": "",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon1115.jpg",
+              "level": 222,
+              "updated_at": "2026-09-17T16:09:53+09:00",
+              "renewable_at": "2026-09-17T16:11:53+09:00",
+              "revision_at": "2026-08-19T08:03:45+09:00",
+              "solo_tier_info": {
+                "tier": "MASTER",
+                "division": 1,
+                "lp": 369,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 825,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 385,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "bilibiligaming,xun,penglixun(彭立勋),xun"
+        },
+        {
+          "team_id": 632,
+          "position": null,
+          "nickname": "Biubiu",
+          "authority": "PROGAMER",
+          "real_name": "Yu Lei-Xin (于磊鑫)",
+          "summoners": [
+            {
+              "id": 83684790,
+              "summoner_id": "dJOsjpwGkCctvFAkCTZ871vX5L_m4G8IOgLYiU60Mq-NUsg",
+              "acct_id": "OMXZab7Mrtp5ESPVosiXDjzgVBK7-itvO6Ap_xyEcMxUmuovz1_axFmK",
+              "puuid": "RltNO05MFtZ9jO6P27DX141LTx5DoH82l5O89ztKc_KC77R1PmKrA1CjoWNaS65FfKRL17wp4dJspA",
+              "game_name": "90921278del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "90921278del",
+              "internal_name": "90921278del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon22.jpg",
+              "level": 109,
+              "updated_at": "2026-08-23T14:52:02+09:00",
+              "renewable_at": "2026-08-23T14:54:02+09:00",
+              "revision_at": "2022-05-02T06:39:24+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "bilibiligaming,biubiu,yulei-xin(于磊鑫),90921278del"
+        },
+        {
+          "team_id": 632,
+          "position": "JUNGLE",
+          "nickname": "Meteor",
+          "authority": "PROGAMER",
+          "real_name": "Zeng Guo-Hao (曾国豪)",
+          "summoners": [
+            {
+              "id": 76120352,
+              "summoner_id": "IuddFjm7XzUTO0xaLFfJtZWCk_HPBdEo0eUeYnAeZpZAEuA",
+              "acct_id": "oZd_RD4811jfNkvdXDLW31VvRLPbpXF8eapToe79ykxvv2H7UR_FpqKF",
+              "puuid": "D4ql5oraK98zAFpOXjoZUThXno6R9w3-9upBM_-f3fPjnUreynx5Ses9Bt6_NVlsc6obyCGeW6cRQQ",
+              "game_name": "76120352del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "76120352del",
+              "internal_name": "76120352del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4379.jpg",
+              "level": 135,
+              "updated_at": "2026-09-11T01:14:43+09:00",
+              "renewable_at": "2026-09-11T01:16:43+09:00",
+              "revision_at": "2021-12-10T08:54:11+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 83366730,
+              "summoner_id": "27AFbhaRiiKjqVDSXaAdWpVIUxo6KwEcBMAe31xBLvTnOmM",
+              "acct_id": "9UWdR7kBAh461cqPsmxDyNlHb1lYKcHW_YPTVgl5lOxchCmyA0ImyhOk",
+              "puuid": "IxHURbnGZeHXATHRydm0HGjh9ZQEKhtmNp1GJSZGnHjnZO3Z7cXEfGfttihDccnEsoDNvN8kpiGl5g",
+              "game_name": "BLG Meteor",
+              "tagline": "KR1",
+              "region": null,
+              "name": "BLG Meteor",
+              "internal_name": "blgmeteor",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4379.jpg",
+              "level": 46,
+              "updated_at": "2026-09-16T22:58:33+09:00",
+              "renewable_at": "2026-09-16T23:00:33+09:00",
+              "revision_at": "2019-11-19T14:20:57+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 84150379,
+              "summoner_id": "VXrbYvqFQcS6xQ-BGveN0jih4RtsO30JHFY1rTx1lrL6F48",
+              "acct_id": "vhSn_sr3bZufPLSd5axDTvWKg3bxfPPrUiZy6KJhHvSgfLjGc0StYJnz",
+              "puuid": "N9i-RyeFEx2g8bxUtyHq0mBpHg81rp_nAoBdJaDwWZm_O5nO1RfudX6cRohKMxutmauyVSWWi_889Q",
+              "game_name": "94160373del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "94160373del",
+              "internal_name": "94160373del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon19.jpg",
+              "level": 80,
+              "updated_at": "2026-09-02T02:31:53+09:00",
+              "renewable_at": "2026-09-02T02:33:53+09:00",
+              "revision_at": "2021-12-10T05:40:39+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "bilibiligaming,meteor,zengguo-hao(曾国豪),76120352del,blgmeteor,94160373del"
+        },
+        {
+          "team_id": 632,
+          "position": "MID",
+          "nickname": "knight",
+          "authority": "PROGAMER",
+          "real_name": "Zhuo Ding (卓定)",
+          "summoners": [
+            {
+              "id": 61790294,
+              "summoner_id": "XKNXCmpY2nqkaX695uS1z-zD5b01Qv1ks22Ti6V76n3xq24",
+              "acct_id": "Pi2OI2eU8WsuGzL238ccxh2wvfBJLd43TH58oDC0otCoRRw",
+              "puuid": "xVOsgfwviVPRdJ4mD5fuVkBRQUyhk1IW3gbNhPBXhWWFaj4dkJ7M8tSwfGg1Vn8UZNyI0vOdGNGMLQ",
+              "game_name": "이센스God",
+              "tagline": "KR1",
+              "region": null,
+              "name": "이센스God",
+              "internal_name": "이센스god",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon5212.jpg",
+              "level": 136,
+              "updated_at": "2026-09-17T16:10:12+09:00",
+              "renewable_at": "2026-09-17T16:12:12+09:00",
+              "revision_at": "2023-06-13T19:55:10+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 82545404,
+              "summoner_id": "jj-6s933vu55W_y6TDfm0ZVDjQgNVUovauinp4ZAQ0sOtiI",
+              "acct_id": "drYp1fNng83ACvxFwLOJKN-E9l01n26YiOTtkwCCXcfJPJsGOe5Qhef9",
+              "puuid": "APmrt5-Y_6PWmWH3YxfP6v5MOvxzuEfiEwKC7oN0PXkDvanRRIXc2yS5GDxOUX-dH1mIJ2_EwMxWGw",
+              "game_name": "kk9qwq",
+              "tagline": "KR1",
+              "region": null,
+              "name": "kk9qwq",
+              "internal_name": "kk9qwq",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4293.jpg",
+              "level": 117,
+              "updated_at": "2026-09-17T16:10:16+09:00",
+              "renewable_at": "2026-09-17T16:12:16+09:00",
+              "revision_at": "2020-01-09T14:32:34+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 84473350,
+              "summoner_id": "88HgXT991PWNnXEevNw7Py2cv6gOR5vSQMDGuZOTemTWhgE",
+              "acct_id": "pxrL7Mdd1H57Ov46cIeqkGWgGWOKI8_wLmVr3DMGRTrgdX8pBe9M_Yds",
+              "puuid": "q_Gt8BnbdBiwR3lxFF75UQqmtdcisMZcFG2fz_lE2-mU7Tggah0War3uuQRgmy1Z_ts_HrvCcNQOpQ",
+              "game_name": "95150221del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "95150221del",
+              "internal_name": "95150221del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4637.jpg",
+              "level": 133,
+              "updated_at": "2026-09-17T16:10:14+09:00",
+              "renewable_at": "2026-09-17T16:12:14+09:00",
+              "revision_at": "2021-01-19T17:01:26+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "bilibiligaming,knight,zhuoding(卓定),이센스god,kk9qwq,95150221del"
+        },
+        {
+          "team_id": 632,
+          "position": "MID",
+          "nickname": "Knight",
+          "authority": "PROGAMER",
+          "real_name": "Zhuo Ding (卓定)",
+          "summoners": [
+            {
+              "id": 8337151,
+              "summoner_id": "fD6L2XOV6gV_lWXeAxk1cqHXWyjvmZeCJko2qgaVpy_wyw",
+              "acct_id": "b4FLEaQsc5EeT4DNBGeqA0Uzu0Et5LExugnRcl-nf5VY",
+              "puuid": "HMgXfbPL1yktgctbTMKelBcmTZMpx39jnuu4HwMf9PrYH07xc5rysQAKiqjAcZ7qM_Qs7FMznj13QQ",
+              "game_name": "BLG 온",
+              "tagline": "KR1",
+              "region": null,
+              "name": "BLG 온",
+              "internal_name": "blg온",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7178.jpg",
+              "level": 524,
+              "updated_at": "2026-09-17T16:10:09+09:00",
+              "renewable_at": "2026-09-17T16:12:09+09:00",
+              "revision_at": "2026-09-13T02:40:28+09:00",
+              "solo_tier_info": {
+                "tier": "MASTER",
+                "division": 1,
+                "lp": 590,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 600,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "bilibiligaming,knight,zhuoding(卓定),blg온"
+        }
+      ],
+      "searchFilterText": "bilibiligaming,aierlanlaozhu,lixuan-jun(李炫君),flandre,77060238del,95310226del,blue,parkdo-hyeon(박도현),viper,viscose,bot01,이센스god,zhuoding(卓定),knight,kk9qwq,95150221del,76120352del,zengguo-hao(曾国豪),meteor,blgmeteor,94160373del,81062931del,chenze-bin(陈泽彬),bin,95300230del,we77,lingxu(凌旭),mark,90921278del,yulei-xin(于磊鑫),biubiu,빈스토리,blg온,xun,penglixun(彭立勋),키보드에음료쏟아서고장내는이도윤,luowen-jun(骆文俊),on"
+    }
+  },
+  {
+    "region": "kr",
+    "team": {
+      "id": 1681,
+      "name": "Dplus KIA",
+      "short_name": "DK",
+      "image_url": "https://s-qwer.op.gg/images/lol/teams/1681_1768047411120.png",
+      "image_url_light_mode": "https://s-qwer.op.gg/images/lol/teams/1681_1768047411120.png",
+      "image_url_dark_mode": "https://s-qwer.op.gg/images/lol/teams/1681_dark_1768048358692.png",
+      "members": [
+        {
+          "team_id": 1681,
+          "position": "SUPPORT",
+          "nickname": "BeryL",
+          "authority": "PROGAMER",
+          "real_name": "Cho Geon-hee (조건희)",
+          "summoners": [
+            {
+              "id": 16910609,
+              "summoner_id": "uIZ9NtvX7u5lhwQJbC84Yn2HJYfY4TqDVwPRI1gnXRBI-zc",
+              "acct_id": "tBZFOeOmQvv-6Nc0SBFjC_1Q4HHHBWFuuuDVA7XRI3L-OOs",
+              "puuid": "aP9Zjf1M1yFXXoS-psNwPV1bbIgApbHVsuq-nb7lJBswX3eUoPMOOWvdSuZjNJGimOtgzCZ0iPPuvA",
+              "game_name": "QQQ BeryL",
+              "tagline": "000",
+              "region": null,
+              "name": "DRX B2ryL",
+              "internal_name": "drxb2ryl",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4932.jpg",
+              "level": 650,
+              "updated_at": "2026-09-17T10:23:02+09:00",
+              "renewable_at": "2026-09-17T10:25:02+09:00",
+              "revision_at": "2026-06-30T20:16:00+09:00",
+              "solo_tier_info": {
+                "tier": "DIAMOND",
+                "division": 1,
+                "lp": 25,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "DIAMOND",
+                    "division": 2,
+                    "lp": 75,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 482,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "dpluskia,beryl,chogeon-hee(조건희),qqqberyl"
+        },
+        {
+          "team_id": 1681,
+          "position": "JUNGLE",
+          "nickname": "Lucid",
+          "authority": "PROGAMER",
+          "real_name": "Choi Yong-hyeok (최용혁)",
+          "summoners": [
+            {
+              "id": 85674226,
+              "summoner_id": "yzxx26rVEO6AdqEF4em9coKurkgXjzqBeG0hZgaUfP1h80Ns",
+              "acct_id": "dZe2sVmqzVYiqDWvnzgXvZpy3fkHPC8xxYWQPk83Y8I0MrS0stQ5U-7a",
+              "puuid": "Xn2JFXvCuma41bl8t9orCvlM8N2Jo1Ak9KQKHo1ulbZ151DsPV82ZX9IKc0-9PUVD6dser8J3HHKWw",
+              "game_name": "DK Lucid",
+              "tagline": "KR1",
+              "region": null,
+              "name": "DK Lucid",
+              "internal_name": "dklucid",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4151.jpg",
+              "level": 806,
+              "updated_at": "2026-09-17T16:16:51+09:00",
+              "renewable_at": "2026-09-17T16:18:51+09:00",
+              "revision_at": "2026-09-09T22:46:39+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2615,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 1721,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 1328,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 90358053,
+              "summoner_id": "23KeywkghanLZY2L2jskxkBJ0wuhSQneQN32yPHKBrJzzlo-NRcAtBX8Dg",
+              "acct_id": "b9MOoU6o2Cn1d53mgU3m9cVJSje33ZkrYpkkqxavS-dbxhxlFYkJRLam",
+              "puuid": "wUn2DCCcd2236ZnKhw4UCw9eTwcXOCRxRLyCzA9H00V-RCD6OLhNNjeDL4ZSfOaxLdDwW8yqNJIjsQ",
+              "game_name": "너무재미있겠다",
+              "tagline": "KR1",
+              "region": null,
+              "name": "너무재미있겠다",
+              "internal_name": "너무재미있겠다",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon1437.jpg",
+              "level": 81,
+              "updated_at": "2026-09-17T16:16:53+09:00",
+              "renewable_at": "2026-09-17T16:18:53+09:00",
+              "revision_at": "2026-09-09T23:10:07+09:00",
+              "solo_tier_info": {
+                "tier": "DIAMOND",
+                "division": 1,
+                "lp": 75,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+              },
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "dpluskia,lucid,choiyong-hyeok(최용혁),dklucid,너무재미있겠다"
+        },
+        {
+          "team_id": 1681,
+          "position": "MID",
+          "nickname": "ShowMaker",
+          "authority": "PROGAMER",
+          "real_name": "Heo Su (허수)",
+          "summoners": [
+            {
+              "id": 41913808,
+              "summoner_id": "Si87Fzj_37hGYvOnJJzUafEDkLXtpLNIMZkA-N-ml4twp3U",
+              "acct_id": "vKR29DO3Ck8l1MwoJ7nkhIXkTbVrTJE35xXhnwuG3nXSV3w",
+              "puuid": "O-cvjpHlf2NZR3Cz-64Gn1K3belm6d4WI-XhPgYVKMVWlZCWfaFUphIdwPCgq_03OGYIFjCWDGK4_g",
+              "game_name": "DK ShowMaker",
+              "tagline": "KR1",
+              "region": null,
+              "name": "DK ShowMaker",
+              "internal_name": "dkshowmaker",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4933.jpg",
+              "level": 663,
+              "updated_at": "2026-09-17T16:32:05+09:00",
+              "renewable_at": "2026-09-17T16:34:05+09:00",
+              "revision_at": "2026-09-15T02:16:21+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2410,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 1589,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "GRANDMASTER",
+                    "division": 1,
+                    "lp": 842,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/grandmaster.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/grandmaster.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 54692988,
+              "summoner_id": "RjofVmYswl9VZkicaVbUy-w-OBOEXOoII4Oeycxytzbys0g",
+              "acct_id": "uSrvQ4Z1t645VU6I5-VcHyy2clJ13Iq5h_6FQ6v8oIw0_gY",
+              "puuid": "SBjCKJExhRBbykwu-CDJ90se8cWWtqz_aZAsfojhYW8s5IbPGKQbd8x1_6E9fFoDeiwwOf9_kMNGWg",
+              "game_name": "DWG KIA",
+              "tagline": "KR1",
+              "region": null,
+              "name": "DWG KIA",
+              "internal_name": "dwgkia",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon5507.jpg",
+              "level": 273,
+              "updated_at": "2026-09-17T16:17:04+09:00",
+              "renewable_at": "2026-09-17T16:19:04+09:00",
+              "revision_at": "2026-04-14T03:02:45+09:00",
+              "solo_tier_info": {
+                "tier": "EMERALD",
+                "division": 1,
+                "lp": 75,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/emerald.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/emerald.png"
+              },
+              "previous_seasons": []
+            },
+            {
+              "id": 64670611,
+              "summoner_id": "UE4Az6MQz6r9H3DNitCP2hQsDtz8euTmahxkva3uL056p2Q",
+              "acct_id": "pxswwk2FHaXBTzsQ9k9qnGEagLBvGoTYWBBChav3yfgDNo0",
+              "puuid": "8FinY8wO4iXAtsELqYhdcV2gKvcAm_71nufTKzMY6JAve0iTsOM9f_0lobAY6RUduDG70ydhP2_6Fg",
+              "game_name": "MIDKING",
+              "tagline": "asd",
+              "region": null,
+              "name": "빠쿠쌉꿀바",
+              "internal_name": "빠쿠쌉꿀바",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4832.jpg",
+              "level": 409,
+              "updated_at": "2026-09-17T16:17:01+09:00",
+              "renewable_at": "2026-09-17T16:19:01+09:00",
+              "revision_at": "2026-09-14T01:20:15+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2394,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "DIAMOND",
+                    "division": 3,
+                    "lp": 25,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "dpluskia,showmaker,heosu(허수),dkshowmaker,dwgkia,midking"
+        },
+        {
+          "team_id": 1681,
+          "position": "TOP",
+          "nickname": "Siwoo",
+          "authority": "PROGAMER",
+          "real_name": "Jeon Si-woo (전시우)",
+          "summoners": [
+            {
+              "id": 88588166,
+              "summoner_id": "RSBZXOEp9dWRtHvV6lKWA-QqtG-4t0xrWOBApmbMyOBGQ5SgVsWndEVzWw",
+              "acct_id": "zRHCUQb0gIrMO-1GSSsCMd4MCjH4jUQPn7MW7iyJ9eb6FLREa4PbsEN7",
+              "puuid": "pgnt-KZ1pEV0JFQJw894ow_z3pNdgrd4O6Wa4PA29ER0iu4yYpYXqox0syBjHq5uPkTFt65ZOsXnzw",
+              "game_name": "TOPKING",
+              "tagline": "asd",
+              "region": null,
+              "name": "DK Slwoo",
+              "internal_name": "dkslwoo",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon6978.jpg",
+              "level": 892,
+              "updated_at": "2026-09-17T16:16:50+09:00",
+              "renewable_at": "2026-09-17T16:18:50+09:00",
+              "revision_at": "2026-09-16T23:44:07+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2402,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 1537,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "GRANDMASTER",
+                    "division": 1,
+                    "lp": 780,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/grandmaster.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/grandmaster.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 92305691,
+              "summoner_id": "BDTk1AUyz981StzcMZW_N7nXErG271hReF0SsFiJhQPxGkcDnW-24U4-5A",
+              "acct_id": "BTKb1M1u_nitLXx3-TCM97Pm7p3kn7bpEOnfBSyVlCbMKheqYuRiIpVD",
+              "puuid": "XVxVZrepInp1GU1kd9HsIQxlpuRWcedEDGmcOzcS-w02EmT5IxZ_vs2c-w2znb0BWsYrdl821ZdzeA",
+              "game_name": "일조오리탕",
+              "tagline": "1124",
+              "region": null,
+              "name": "",
+              "internal_name": "",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon2076.jpg",
+              "level": 149,
+              "updated_at": "2025-01-03T21:19:37+09:00",
+              "renewable_at": "2025-01-03T21:21:37+09:00",
+              "revision_at": "2024-12-31T01:15:32+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": [
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "DIAMOND",
+                    "division": 1,
+                    "lp": 75,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 89580285,
+              "summoner_id": "zQ5E9-gNtwtauJCaw-3NCI2b-W_y8FMyL6nzTlohUj58c-gS77u0NT8G8Q",
+              "acct_id": "eUUW8dEbNypczfHb9VJU5NI9-9KQ73xe9-VLp-KTCsKXIaEY-QukHbdf",
+              "puuid": "wevFZ60ubbrbxwJMJgLf6c6dFUVEvT0Qv4M2yZhVU05N8wZeunBpxHAHcNb4d3PM4VsEwhGPcEZakw",
+              "game_name": "아무것도 몰라요",
+              "tagline": "12345",
+              "region": null,
+              "name": "DK Canna",
+              "internal_name": "dkcanna",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon5488.jpg",
+              "level": 185,
+              "updated_at": "2026-09-17T16:16:52+09:00",
+              "renewable_at": "2026-09-17T16:18:52+09:00",
+              "revision_at": "2026-02-13T01:07:45+09:00",
+              "solo_tier_info": {
+                "tier": "DIAMOND",
+                "division": 2,
+                "lp": 75,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "EMERALD",
+                    "division": 1,
+                    "lp": 75,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/emerald.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/emerald.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "DIAMOND",
+                    "division": 2,
+                    "lp": 75,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "dpluskia,siwoo,jeonsi-woo(전시우),topking,일조오리탕,아무것도몰라요"
+        },
+        {
+          "team_id": 1681,
+          "position": "SUPPORT",
+          "nickname": "Career",
+          "authority": "PROGAMER",
+          "real_name": "Oh Hyung-seok (오형석)",
+          "summoners": [
+            {
+              "id": 90925908,
+              "summoner_id": "Ocls0PSARP8-pgkAAwjBX2J9OwQf8Ssfg3UnVn_8I5EA0eP17v983oTXhg",
+              "acct_id": "57Xou7EBn9EXu44XBMVcU-N6R9xO6V3Se9qXFn60OMv4YdpF38lbZSxD",
+              "puuid": "jl23hjsyIRjeiXlAgcPfblWH79Jyj2O9PIDzwEZFb7efyHs-5M-Z8KvNy_PdAYzzi0ARcpGccl5hgw",
+              "game_name": "팽도리",
+              "tagline": "1015",
+              "region": null,
+              "name": "천안 대하건설",
+              "internal_name": "천안대하건설",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon6631.jpg",
+              "level": 486,
+              "updated_at": "2026-09-17T16:17:17+09:00",
+              "renewable_at": "2026-09-17T16:19:17+09:00",
+              "revision_at": "2026-09-15T22:28:03+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2064,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 1583,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 1426,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "dpluskia,career,ohhyung-seok(오형석),팽도리"
+        },
+        {
+          "team_id": 1681,
+          "position": "ADC",
+          "nickname": "Smash",
+          "authority": "PROGAMER",
+          "real_name": "Shin Geum-jae (신금재)",
+          "summoners": [
+            {
+              "id": 86012772,
+              "summoner_id": "Y4UjhXxKN9K-tv037wOpZH0bEO5MZDMXAouRzkOWJPSBmJoR",
+              "acct_id": "pO4tJen0ex1TxQCxlEqj7Dz8u333PFr67zLJEZQDeX5-aGI7aTEkLbGZ",
+              "puuid": "zrmdXWW785KdF-yHMbNZleQw3Adft2BGaPJ-7UAL5QSOTNTupKX_pzLkg5ULg3DC1b53h1x0yu0WCg",
+              "game_name": "DK Smash",
+              "tagline": "KR7",
+              "region": null,
+              "name": "T1 Smash1",
+              "internal_name": "t1smash1",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7057_community.jpg",
+              "level": 621,
+              "updated_at": "2026-09-17T16:17:13+09:00",
+              "renewable_at": "2026-09-17T16:19:13+09:00",
+              "revision_at": "2026-09-15T01:11:55+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2506,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 1789,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 1224,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 90606784,
+              "summoner_id": "BWFVzKyr9hrrGYARe6WUdr3zanJJlWPSjR3GYaVaETHe5Aeb-g5b6w-pbg",
+              "acct_id": "yEwO8EhBosK12V3yLhWf9eOT4N1agmPAmp7GnDrEcZFgeQ_B91XV-egq",
+              "puuid": "xndeq_i4pcrnkUvFFDqiGWhMN8IuEOCPLKveaH-4CaKL_WUw-I2djwudKQ3dxWPgl3gCqv0Mg2OfVg",
+              "game_name": "사옥 지박령",
+              "tagline": "KR4",
+              "region": null,
+              "name": "집에가라 걍",
+              "internal_name": "집에가라걍",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon6878.jpg",
+              "level": 136,
+              "updated_at": "2026-09-17T16:17:16+09:00",
+              "renewable_at": "2026-09-17T16:19:16+09:00",
+              "revision_at": "2026-01-02T04:19:10+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 1511,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "dpluskia,smash,shingeum-jae(신금재),dksmash,사옥지박령"
+        },
+        {
+          "team_id": 1681,
+          "position": "COACH",
+          "nickname": "Zefa",
+          "authority": "PROGAMER",
+          "real_name": "Lee Jae-min (이재민)",
+          "summoners": [
+            {
+              "id": 1419353,
+              "summoner_id": "qA7tvy6TIXk64OJmGUbvLT1OHg3vtsuQvs-wskXPttLUQg",
+              "acct_id": "-e45MEh0gNqjQwLosNm-igtxXkY2Ah6PRCWhI7ehuD0",
+              "puuid": "dkVAyfuHSx6DMUa8Xrplm0WvWOHxHyTy6DOYIftyrolVHmz8CyzrNXyy0LP3lYiT4sOx0ToLa6Z8TA",
+              "game_name": "Zerofire",
+              "tagline": "KR1",
+              "region": null,
+              "name": "Zerofire",
+              "internal_name": "zerofire",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon1114.jpg",
+              "level": 32,
+              "updated_at": "2026-09-08T08:35:45+09:00",
+              "renewable_at": "2026-09-08T08:37:45+09:00",
+              "revision_at": "2026-07-19T00:12:07+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "dpluskia,zefa,leejae-min(이재민),zerofire"
+        }
+      ],
+      "searchFilterText": "dpluskia,zerofire,leejae-min(이재민),zefa,qqqberyl,chogeon-hee(조건희),beryl,dkshowmaker,heosu(허수),showmaker,dwgkia,midking,dklucid,choiyong-hyeok(최용혁),lucid,너무재미있겠다,dksmash,shingeum-jae(신금재),smash,topking,jeonsi-woo(전시우),siwoo,일조오리탕,사옥지박령,팽도리,ohhyung-seok(오형석),career,아무것도몰라요"
+    }
+  },
+  {
+    "region": "kr",
+    "team": {
+      "id": 416,
+      "name": "Gen.G",
+      "short_name": "GEN",
+      "image_url": "https://s-qwer.op.gg/images/lol/teams/416_1768047425763.png",
+      "image_url_light_mode": "https://s-qwer.op.gg/images/lol/teams/416_1768047425763.png",
+      "image_url_dark_mode": "https://s-qwer.op.gg/images/lol/teams/416_dark_1768048277267.png",
+      "members": [
+        {
+          "team_id": 416,
+          "position": "MID",
+          "nickname": "Chovy",
+          "authority": "PROGAMER",
+          "real_name": "Jeong Ji-hoon (정지훈)",
+          "summoners": [
+            {
+              "id": 56951349,
+              "summoner_id": "N5WUq1gl4wiKI32CmTCkUsbGi8FlHHsv34obZWSFoSD-Pic",
+              "acct_id": "Ak81MduiMBwnrWfzqn_3oG9DlfBDr0Z3tWJ0r94gu4u5qTs",
+              "puuid": "Z85l8VA9a9ivlhHHhZc9BNPYr-ijPLmTr1WY8M96PeimMHXkWoh5gOrPNGKs18qFspNvJIGIz35sdA",
+              "game_name": "허거덩",
+              "tagline": "0303",
+              "region": null,
+              "name": "스트레스유발협곡",
+              "internal_name": "스트레스유발협곡",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7091.jpg",
+              "level": 760,
+              "updated_at": "2026-09-17T16:43:30+09:00",
+              "renewable_at": "2026-09-17T16:45:30+09:00",
+              "revision_at": "2026-09-12T22:53:43+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2251,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "DIAMOND",
+                    "division": 1,
+                    "lp": 65,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 151,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 70990217,
+              "summoner_id": "7mneesK-wAEm4F6ryJs1uIsF3Y0yQkv7qw7m-LEf6kvMLnQ",
+              "acct_id": "jnWNYRxP2kAdqtnxCyv_leqRugoabZNYYAbdcEVY6zCPF7I",
+              "puuid": "Qpb9Q-VQazxwUfNmaJ9yYBKwQl8J4-cVzJ4m_0XFTX09YlAvKtVUoBBh1zCMInoGIWuZud_2r47uSw",
+              "game_name": "1일2이3삼4사",
+              "tagline": "KR1",
+              "region": null,
+              "name": "1일2이3삼4사",
+              "internal_name": "1일2이3삼4사",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon3838.jpg",
+              "level": 49,
+              "updated_at": "2026-09-17T16:11:37+09:00",
+              "renewable_at": "2026-09-17T16:13:37+09:00",
+              "revision_at": "2019-01-04T20:40:56+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "gen.g,chovy,jeongji-hoon(정지훈),허거덩,1일2이3삼4사"
+        },
+        {
+          "team_id": 416,
+          "position": "SUPPORT",
+          "nickname": "Duro",
+          "authority": "PROGAMER",
+          "real_name": "Joo Min-kyu (주민규)",
+          "summoners": [
+            {
+              "id": 87961936,
+              "summoner_id": "sEX46B4O-V7P4hrp0_Bt_8tTB_GczV9bXISyPBRjb_Utz6XCxgIQbt9J5A",
+              "acct_id": "n0vlcMUvTl5kc4wgHXDQ0OFOcTzL2FNOzJ5aAhqacB0u3Js7h1t5Z5r1",
+              "puuid": "_wgrq7ssHC9YJAFwYLK7SjNK1PELOs19mMl-cfYt6PEXqicfqkGBbC1iu8Rs72CbxSJUvW4wGccmDQ",
+              "game_name": "Duro",
+              "tagline": "Gen",
+              "region": null,
+              "name": "노장 두티",
+              "internal_name": "노장두티",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon3150.jpg",
+              "level": 544,
+              "updated_at": "2026-09-17T16:10:24+09:00",
+              "renewable_at": "2026-09-17T16:12:24+09:00",
+              "revision_at": "2026-09-12T21:50:34+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2400,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 215,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 1211,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "gen.g,duro,joomin-kyu(주민규),duro"
+        },
+        {
+          "team_id": 416,
+          "position": "JUNGLE",
+          "nickname": "Canyon",
+          "authority": "PROGAMER",
+          "real_name": "Kim Geon-bu (김건부)",
+          "summoners": [
+            {
+              "id": 43862013,
+              "summoner_id": "e-d9l4A-SKNb1WBUFV2ZN9saD88oaAU0TzI65BYAG5R5ctA",
+              "acct_id": "ASEA2nwJ9OmsIfTsWrz9JmMPMl8oLtuN_mXXd4tfIvcF4hk",
+              "puuid": "IlKH14Huo4REPtVL418Gdhr7VW9zguf8wxntwWMr1jmq7VtDu_EG-ceeff4EQ23kdZH5lUh0ihloMQ",
+              "game_name": "JUGKlNG",
+              "tagline": "kr",
+              "region": null,
+              "name": "JUGKlNG",
+              "internal_name": "jugklng",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon3554.jpg",
+              "level": 798,
+              "updated_at": "2026-09-17T16:44:30+09:00",
+              "renewable_at": "2026-09-17T16:46:30+09:00",
+              "revision_at": "2026-09-16T23:01:27+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2432,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 320,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 124,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 76100166,
+              "summoner_id": "DzwlidrzB-8h5bjEmmC7azVgQGjcEyInv96Bh_AIn-M8J_k",
+              "acct_id": "3YkKMYzC65hbVdg5QVZoFBjTUP1M6IZPM7FriyB3zIlbc4aAxuyvgRPu",
+              "puuid": "OvQG7qCrWjyd9ThYq0feZ0FhqsSNF0PFr93wWUoWC2MqE9fbndI7HLHo97koXvw28btBI04SdkVTqw",
+              "game_name": "그어살",
+              "tagline": "KR1",
+              "region": null,
+              "name": "그어살",
+              "internal_name": "그어살",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon5912.jpg",
+              "level": 404,
+              "updated_at": "2026-09-17T16:11:21+09:00",
+              "renewable_at": "2026-09-17T16:13:21+09:00",
+              "revision_at": "2026-04-27T02:07:34+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 81290629,
+              "summoner_id": "EJtp6jN5E3-KdGff492t2tYjN_QPtc4JUFg-6mZIQbzRY6A",
+              "acct_id": "o8XJYEeADIXpUMhsHcuCBaym1wuQsoXnbbmfWdqHK4q6WNMEMTk4NUtc",
+              "puuid": "7y7qIBsnf-62BpcMzaZRDl5vL9LCRy_CSi1lbEVkHVUsanl4Zy3YtUGoKb_U5ZW5A9FwqwXWy7je4Q",
+              "game_name": "HUANG TONG DAYE",
+              "tagline": "KR1",
+              "region": null,
+              "name": "HUANG TONG DAYE",
+              "internal_name": "huangtongdaye",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon3153.jpg",
+              "level": 111,
+              "updated_at": "2026-09-17T16:11:23+09:00",
+              "renewable_at": "2026-09-17T16:13:23+09:00",
+              "revision_at": "2020-01-09T19:35:46+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "gen.g,canyon,kimgeon-bu(김건부),jugklng,그어살,huangtongdaye"
+        },
+        {
+          "team_id": 416,
+          "position": "TOP",
+          "nickname": "Kiin",
+          "authority": "PROGAMER",
+          "real_name": "Kim Gi-in (김기인)",
+          "summoners": [
+            {
+              "id": 18971354,
+              "summoner_id": "JKQS477UTCs81W2TFcRRheKoEiguio62goNRLQSB4ImYE-I",
+              "acct_id": "0em6KfotHrpuOt2biMEZ0ygTBNQ9QnOuK4VPgXNaXOawsQM",
+              "puuid": "UpTEIkbu9sHyGoVF8WjxOJrZ3oVUR8irZbAczo_57YfEqW-g72GrxHwQjwv2Vi7yw6Lyjdbkh8PTYQ",
+              "game_name": "kiin",
+              "tagline": "KR1",
+              "region": null,
+              "name": "kiin",
+              "internal_name": "kiin",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon977.jpg",
+              "level": 620,
+              "updated_at": "2026-09-17T16:11:01+09:00",
+              "renewable_at": "2026-09-17T16:13:01+09:00",
+              "revision_at": "2026-09-12T22:37:29+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2437,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 60,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 515,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 60790393,
+              "summoner_id": "pMyKNDJk7ojC0sNKrj8RRhW9b5e2nq8XV0_3doC-HHk2b3c",
+              "acct_id": "yPiTn7nxZRMUMZ_m-0Zzq0MnNWhZgmxunA1nERQXQAIij9k",
+              "puuid": "ihviA0lEyQazbX5Cqk2dvNw_tXmClvsK2J2gMEyJu835M16u_Ugh60yVtv6CGrPkXEQ757A1X_CeUQ",
+              "game_name": "아정글맘에안드네",
+              "tagline": "KR1",
+              "region": null,
+              "name": "아정글맘에안드네",
+              "internal_name": "아정글맘에안드네",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon2094.jpg",
+              "level": 117,
+              "updated_at": "2026-09-17T16:11:07+09:00",
+              "renewable_at": "2026-09-17T16:13:07+09:00",
+              "revision_at": "2022-06-12T03:00:02+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 60860180,
+              "summoner_id": "lGHjB4UKWsWD1Az9eYXSUIzYVM4ltETzeTeRErup91v8tws",
+              "acct_id": "YFqIn-v7IER9gsUVLqllnFIQKtvnc7ffN2HSgPbSUKEv1DU",
+              "puuid": "hV6BYVFYRF-nqqjfh-cW68Pq9bOjmNmsk13cgxPIXraAMeJcq5C13guB6lIQ6h0uPrKeAZ7l4lBQPA",
+              "game_name": "빅파이초코파이",
+              "tagline": "KR1",
+              "region": null,
+              "name": "빅파이초코파이",
+              "internal_name": "빅파이초코파이",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon2094.jpg",
+              "level": 54,
+              "updated_at": "2026-09-17T16:11:05+09:00",
+              "renewable_at": "2026-09-17T16:13:05+09:00",
+              "revision_at": "2018-01-04T23:52:24+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 82950234,
+              "summoner_id": "xJ-05Tn1YpxnWmJxVFbdlUItNoaYI-hOfuIsMq0l2yj2hVs",
+              "acct_id": "ARLIDxQTonr5ga9KHJsZy8N_kOFH58C6pJoDJfjYE0j2Roes_CuR-ZLn",
+              "puuid": "6-wXYyOUgkURP3rWPl6V98QiTztjZq52cWLqOs1NiYhPvJ-2fe1VOP15fup_HbRmQCwcTKG_W59FQg",
+              "game_name": "나는돌거북",
+              "tagline": "KR1",
+              "region": null,
+              "name": "나는돌거북",
+              "internal_name": "나는돌거북",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4200.jpg",
+              "level": 165,
+              "updated_at": "2026-09-17T16:11:10+09:00",
+              "renewable_at": "2026-09-17T16:13:10+09:00",
+              "revision_at": "2024-09-02T02:50:33+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "gen.g,kiin,kimgi-in(김기인),kiin,아정글맘에안드네,빅파이초코파이,나는돌거북"
+        },
+        {
+          "team_id": 416,
+          "position": "ADC",
+          "nickname": "Ruler",
+          "authority": "PROGAMER",
+          "real_name": "Park Jae-hyuk (박재혁)",
+          "summoners": [
+            {
+              "id": 38160601,
+              "summoner_id": "yBNcRsqkimP5f8aKJazZvD1suNut-xfsberHsqBoeXM0mNI",
+              "acct_id": "njRQVUQ1LM3dC4V1oHEf221hAZ1Q7OoseKz8kz3RATY09_k",
+              "puuid": "wL-7DulacXINX4DbvYNc5YO0fMOc8OdT0Mi8WOojB1eCK546FAND75IkuuPW8-MHGux3_6W6etTVgA",
+              "game_name": "강 철",
+              "tagline": "샤 넬",
+              "region": null,
+              "name": "Gen G Ruler",
+              "internal_name": "gengruler",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon983.jpg",
+              "level": 1023,
+              "updated_at": "2026-09-17T16:11:57+09:00",
+              "renewable_at": "2026-09-17T16:13:57+09:00",
+              "revision_at": "2026-09-16T01:48:10+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2124,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 255,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 533,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 46190129,
+              "summoner_id": "5St6Fhho3jYu29VnHnQxETUOr4WDNDsR4IvUhc-40ojXsjk",
+              "acct_id": "sQrtXFkzsLhdSJqRqxV6L5SIyWt4WCTNIn2FuvvWBOB5xeY",
+              "puuid": "bn_eTh468cP3APE6CUF6M47yDtADDZjziIzQvqEYFCt2W3BDGwMXCpX85Gb4yE_3iUYrlN19tNTolw",
+              "game_name": "케빈추 Ruler",
+              "tagline": "KR1",
+              "region": null,
+              "name": "케빈추 Ruler",
+              "internal_name": "케빈추ruler",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon3021.jpg",
+              "level": 42,
+              "updated_at": "2026-09-17T16:11:59+09:00",
+              "renewable_at": "2026-09-17T16:13:59+09:00",
+              "revision_at": "2018-01-10T21:25:16+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 66820149,
+              "summoner_id": "avAxDj2d1-Oiu2ra22uNvJS2dLC8LRyrvk-u0Pqbl5_TuAE",
+              "acct_id": "claxs6qxemrDop_9v6M2PXZ85-VmdE9Kd2IX0J3mfqsgmAU",
+              "puuid": "_7Hbi5dHc0mq5cjlMGbn7mSDaobluDQUIhuAimZnL45d_cM-GOhsIgySPdOOCdfLVdW07pxhS4m0hw",
+              "game_name": "잘해야해",
+              "tagline": "KR1",
+              "region": null,
+              "name": "잘해야해",
+              "internal_name": "잘해야해",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon3524.jpg",
+              "level": 80,
+              "updated_at": "2026-09-17T16:12:02+09:00",
+              "renewable_at": "2026-09-17T16:14:02+09:00",
+              "revision_at": "2018-09-29T00:10:42+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 81380614,
+              "summoner_id": "u2VfK6uy-UCCBxEqQ3M6Ln9DzpG_L1WiygmDgbjBfnOdzzo",
+              "acct_id": "tC-eBVzt9msTFuDP65n9rvtUz8C_CVvXLRC1jBsMshUDGztubtjX8Cin",
+              "puuid": "beadHKma6Uv4V6x9FyB-lthaqaocSXQl4bEhEDdncDTrplX-vLC2_x0X4tyHnjmRLGmBt4pRTSx_1Q",
+              "game_name": "황금고블린1",
+              "tagline": "KR1",
+              "region": null,
+              "name": "황금고블린1",
+              "internal_name": "황금고블린1",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4025.jpg",
+              "level": 90,
+              "updated_at": "2026-09-17T16:12:04+09:00",
+              "renewable_at": "2026-09-17T16:14:04+09:00",
+              "revision_at": "2020-01-08T00:49:35+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 87234416,
+              "summoner_id": "A5G5MBqXwKf5hVHotSubLbK5I3onDeZilYGQfIOJAHI9EOI4O2NVnFF3Ig",
+              "acct_id": "qHKFvqM9AT0lR11ML8LTZU3HCE14B1XMD2xH6xwxa_B55ypcYV2xUD_l",
+              "puuid": "UzBmITLwV0xpUrX35tZpA-Bq9T37RTbklyzYJceY7clsA8dqdXsMwmt4CK6gQijNsacxosw6OrpU0Q",
+              "game_name": "2633833696306720",
+              "tagline": "KR1",
+              "region": null,
+              "name": "2633833696306720",
+              "internal_name": "2633833696306720",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon5184.jpg",
+              "level": 43,
+              "updated_at": "2026-09-17T16:12:07+09:00",
+              "renewable_at": "2026-09-17T16:14:07+09:00",
+              "revision_at": "2022-01-12T13:35:41+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "gen.g,ruler,parkjae-hyuk(박재혁),강철,케빈추ruler,잘해야해,황금고블린1,2633833696306720"
+        },
+        {
+          "team_id": 416,
+          "position": "COACH",
+          "nickname": "Helper",
+          "authority": "PROGAMER",
+          "real_name": "Kwon Yeong-jae (권영재)",
+          "summoners": [
+            {
+              "id": 4621403,
+              "summoner_id": "LvmNtx5yJ-XVd75GdeXge1TZ2rbYVZx5qY_0kqD6GoTc9w",
+              "acct_id": "vQkFzt-HD7dF59wY42oVQgaBoQj0xNp_DF_ntUJsmr4r",
+              "puuid": "otu1MgIecbtw11Zplymn5U3yaAEQTQfL458idLq--wzOON-kQnzJbtTelwNNFhBUfP5YiQ_IgppngQ",
+              "game_name": "Helper",
+              "tagline": "0324",
+              "region": null,
+              "name": "오늘은느낌이좋아",
+              "internal_name": "오늘은느낌이좋아",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon6502.jpg",
+              "level": 656,
+              "updated_at": "2026-09-17T11:38:30+09:00",
+              "renewable_at": "2026-09-17T11:40:30+09:00",
+              "revision_at": "2026-09-17T04:06:12+09:00",
+              "solo_tier_info": {
+                "tier": "MASTER",
+                "division": 1,
+                "lp": 711,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "DIAMOND",
+                    "division": 1,
+                    "lp": 75,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 10,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 23064588,
+              "summoner_id": "GaEyWabJlG0BmL8wvB5vRmfMn0rNVO1Ra8fVM5fGc6YojdU",
+              "acct_id": "HAWWAHYEnpLrd9fSI2NgK_xPDCMr5Nau55Hjj_8xVFSUcZk",
+              "puuid": "4BdmLNWJrqZ48ZNWfuY93FZ8LnhC4yBWhbjt7BhIGAwrTg0bvLG_pzX9LRZjZcPSEp7HHsla3Xh5Yw",
+              "game_name": "헤르퍼",
+              "tagline": "0324",
+              "region": null,
+              "name": "세고 강한 키위쿤",
+              "internal_name": "세고강한키위쿤",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon774.jpg",
+              "level": 370,
+              "updated_at": "2026-09-11T04:39:06+09:00",
+              "renewable_at": "2026-09-11T04:41:06+09:00",
+              "revision_at": "2026-09-11T00:22:17+09:00",
+              "solo_tier_info": {
+                "tier": "MASTER",
+                "division": 1,
+                "lp": 326,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+              },
+              "previous_seasons": []
+            },
+            {
+              "id": 31171991,
+              "summoner_id": "S9Y9AZ9VIkEYaYtbBhQm9Li0mdQAHE_ks7rkDhER5WrlApQ",
+              "acct_id": "93r7R0ZyP7lyKJmHvTr8Ch1HNad9xrEzhpwxgc09zGuSk7Q",
+              "puuid": "olcgC_7ULVdC7EkKyLY7eAzi83hPDpvv5Ekt5OEx8BGY_BVJOr7X6aHkygw0LHwBWXnQIHqjSZFKMw",
+              "game_name": "모쏠아싸히키백수",
+              "tagline": "KR1",
+              "region": null,
+              "name": "모쏠아싸히키백수",
+              "internal_name": "모쏠아싸히키백수",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7.jpg",
+              "level": 203,
+              "updated_at": "2026-09-10T01:32:04+09:00",
+              "renewable_at": "2026-09-10T01:34:04+09:00",
+              "revision_at": "2026-04-23T02:35:11+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 37180130,
+              "summoner_id": "sABnf9sinUKmmXnf1hZ-Qro2SSojny70R5zxafkZWGxhs7U",
+              "acct_id": "AAmlfN4kE_i5xgqUMNNU7jAQo8Y1LqtsBz0Eqbpd0diUFuM",
+              "puuid": "zK-CECopNkU8cOxtd6iWho8uAHy6l-LzVzaMBo0fomz79Ndv4FfJuFCnBp10yrEB-Pjk2TBzLzvseA",
+              "game_name": "도데채 외않돼죠",
+              "tagline": "KR1",
+              "region": null,
+              "name": "도데채 외않돼죠",
+              "internal_name": "도데채외않돼죠",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon1234.jpg",
+              "level": 30,
+              "updated_at": "2026-09-07T23:41:18+09:00",
+              "renewable_at": "2026-09-07T23:43:18+09:00",
+              "revision_at": "2017-05-26T06:33:59+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "gen.g,helper,kwonyeong-jae(권영재),helper,헤르퍼,모쏠아싸히키백수,도데채외않돼죠"
+        }
+      ],
+      "searchFilterText": "gen.g,helper,kwonyeong-jae(권영재),헤르퍼,모쏠아싸히키백수,도데채외않돼죠,kiin,kimgi-in(김기인),아정글맘에안드네,빅파이초코파이,나는돌거북,강철,parkjae-hyuk(박재혁),ruler,케빈추ruler,잘해야해,황금고블린1,2633833696306720,jugklng,kimgeon-bu(김건부),canyon,그어살,huangtongdaye,허거덩,jeongji-hoon(정지훈),chovy,1일2이3삼4사,duro,joomin-kyu(주민규)"
+    }
+  },
+  {
+    "region": "kr",
+    "team": {
+      "id": 591,
+      "name": "Hanwha Life Esports",
+      "short_name": "HLE",
+      "image_url": "https://s-qwer.op.gg/images/lol/teams/591_1672191709194.png",
+      "image_url_light_mode": "https://s-qwer.op.gg/images/lol/teams/591_1672191709194.png",
+      "image_url_dark_mode": "https://s-qwer.op.gg/images/lol/teams/591_1672191709194.png",
+      "members": [
+        {
+          "team_id": 591,
+          "position": "TOP",
+          "nickname": "Zeus",
+          "authority": "PROGAMER",
+          "real_name": "Choi Woo-je (최우제)",
+          "summoners": [
+            {
+              "id": 69060421,
+              "summoner_id": "YIDp4ZOdDXNXCg8VoCgwEjaMtpGFPouJh1RNmk9nUG7Oyv4",
+              "acct_id": "4Mn70PrbN0-nOkI-CkFsiTtK07-vfFclTUDfq21rNVANZVw",
+              "puuid": "b4WObiG_z55flFo9jrjOXvgWJxTPnK1GxboujUCp-lD7i039vjDrDd9b4r0WgXHisi3QPdzSlNxzLw",
+              "game_name": "Athene",
+              "tagline": "lll",
+              "region": null,
+              "name": "God Thunder",
+              "internal_name": "godthunder",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon6243.jpg",
+              "level": 813,
+              "updated_at": "2026-09-17T16:59:45+09:00",
+              "renewable_at": "2026-09-17T17:01:45+09:00",
+              "revision_at": "2026-09-16T21:56:36+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2158,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 845,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 341,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 79670696,
+              "summoner_id": "LauuDpo3C7SCz5ELu5xFuKEiWDUEqgizLEPjNE6wU6__OxY",
+              "acct_id": "g1fvyvNNi7vwiTumbpLByR7vYaIeo8g6rCUymZN8NeAN-s2OB_ZQAKTV",
+              "puuid": "6x4obGyrMDeEL_1TIOJgS6jhLoXsXbHzDNvnBAaTfKus1ah2n8sMSkdVEZ-lorgVDhSNAl55HGslZw",
+              "game_name": "굿뉴스",
+              "tagline": "000",
+              "region": null,
+              "name": "Too Cool To Die",
+              "internal_name": "toocooltodie",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4763.jpg",
+              "level": 153,
+              "updated_at": "2026-09-17T16:12:29+09:00",
+              "renewable_at": "2026-09-17T16:14:29+09:00",
+              "revision_at": "2026-02-09T01:36:17+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "EMERALD",
+                    "division": 2,
+                    "lp": 55,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/emerald.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/emerald.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 84749482,
+              "summoner_id": "uC_xcx0pSZJcAh1MiUmVeRoGr1gjrzmzR51b2ttuesmX1Is",
+              "acct_id": "K5jhz4cNO6PUfXHbPDHY_yVXU64m5uYtNJDXEqISn6uJdRJg87If5cpJ",
+              "puuid": "P7osLxsSkdPbEOWcQUsm7Eu12vEjzv6abbiz5c-eSaxQ87YitrwvoJFra3wPiPc5qOG8O0wgRRF1Jw",
+              "game_name": "95873761del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "95873761del",
+              "internal_name": "95873761del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4636.jpg",
+              "level": 107,
+              "updated_at": "2026-09-17T16:12:27+09:00",
+              "renewable_at": "2026-09-17T16:14:27+09:00",
+              "revision_at": "2021-01-19T16:45:16+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "hanwhalifeesports,zeus,choiwoo-je(최우제),athene,굿뉴스,95873761del"
+        },
+        {
+          "team_id": 591,
+          "position": "JUNGLE",
+          "nickname": "Peanut",
+          "authority": "PROGAMER",
+          "real_name": "Han Wang-ho (한왕호)",
+          "summoners": [
+            {
+              "id": 27971322,
+              "summoner_id": "3brPeGoLMea-WrejXst8Tf07hruy2l0OvDCOeyorlfxZDJU",
+              "acct_id": "t8pPS1DG4BqtQR5semu16gR4Z9ZEM9pOdmD80a5pMtmY7bc",
+              "puuid": "qF3VFUg8FhIKo9IdyH4hmt9GzrPICnZQ_sPa4aPTBloA29cIzyuRy9AMavJ1Tx8HXtFHddHa7ufRpA",
+              "game_name": "Peanut",
+              "tagline": "kr11",
+              "region": null,
+              "name": "XiaoHuaSheng7",
+              "internal_name": "xiaohuasheng7",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon1439.jpg",
+              "level": 774,
+              "updated_at": "2026-09-16T01:16:29+09:00",
+              "renewable_at": "2026-09-16T01:18:29+09:00",
+              "revision_at": "2026-09-13T00:14:54+09:00",
+              "solo_tier_info": {
+                "tier": "DIAMOND",
+                "division": 2,
+                "lp": 75,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 90,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 104,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 34490129,
+              "summoner_id": "7Hci4kfPBGR3HUX1zzdaB77MViEJNzxm3kfeeWBnjz3nnD8",
+              "acct_id": "opqj-tOHmjqHt9Q5F09-MHIBl0v8Rq9V5SqIrmWcXOatZ5o",
+              "puuid": "GqaYReT3eB1k5mJtZQqLxrvFVaN7iCWVMTPCfp8oBY361AGs6lIjnIxy6apesR7_fLdnKGV4o2K4AA",
+              "game_name": "언차티D",
+              "tagline": "KR1",
+              "region": null,
+              "name": "언차티D",
+              "internal_name": "언차티d",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon1116.jpg",
+              "level": 30,
+              "updated_at": "2026-09-15T01:39:58+09:00",
+              "renewable_at": "2026-09-15T01:41:58+09:00",
+              "revision_at": "2017-05-26T06:33:20+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 46540124,
+              "summoner_id": "d65RYPWvVi8HdK6EDLzC7FrBd5OFBaaXCHWC39zL1VXtvXs",
+              "acct_id": "no5rb1OxmoFNnorC541bdmDdkLJA8GloLoixiU74JZ4H3I0",
+              "puuid": "7lmA8FzmBl8hKR-hiDT2Bko6InsXmuoH3ukMmldtrd3102a9kQBN_Y5JoA6EBalQ4A99MVwyw5Q88w",
+              "game_name": "Hari2y Quinn",
+              "tagline": "KR1",
+              "region": null,
+              "name": "Hari2y Quinn",
+              "internal_name": "hari2yquinn",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon1298.jpg",
+              "level": 30,
+              "updated_at": "2026-09-15T01:39:59+09:00",
+              "renewable_at": "2026-09-15T01:41:59+09:00",
+              "revision_at": "2017-05-26T06:36:43+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 54870579,
+              "summoner_id": "NsOna5VrW-90doXL3aA9G4iF8I4KyD6UoduT650tBpL059Y",
+              "acct_id": "RhD4Mt_vqIFyl43wzY8Z_bUkAAM_TVnPZd1xNfnA1y9LzHk",
+              "puuid": "UFZ1coHY6z89WQh9VFK2kmxgU7aotytCBKPE8GJoK2x6ZD3karR45HJBZT2lywzArv39ViatH9CdFA",
+              "game_name": "Jon Sn0w",
+              "tagline": "KR1",
+              "region": null,
+              "name": "Jon Sn0w",
+              "internal_name": "jonsn0w",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon1439.jpg",
+              "level": 37,
+              "updated_at": "2026-09-15T01:40:00+09:00",
+              "renewable_at": "2026-09-15T01:42:00+09:00",
+              "revision_at": "2018-01-11T02:40:53+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "hanwhalifeesports,peanut,hanwang-ho(한왕호),peanut,언차티d,hari2yquinn,jonsn0w"
+        },
+        {
+          "team_id": 591,
+          "position": "MID",
+          "nickname": "Zeka",
+          "authority": "PROGAMER",
+          "real_name": "Kim Geon-woo (김건우)",
+          "summoners": [
+            {
+              "id": 80401147,
+              "summoner_id": "v2EIWNcM-mHGPpiBGVBY5n3RP9Ni4OJ6b_GitVTvXCtb7So",
+              "acct_id": "a9XdXZpxYXv4aGVR87altiGFj1nQETR681kZReTZMMLAGZ0AeODc8lXH",
+              "puuid": "rEgJ8Pnh1kcyu2sCxWdocRJqQ0p5je0CFppRmgvu0GV3Mc1ZbPDKfKFRtJltXYkOrTwTFtr8uvRcIg",
+              "game_name": "Kiruru",
+              "tagline": "kr7",
+              "region": null,
+              "name": "나는 준일하다",
+              "internal_name": "나는준일하다",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon23.jpg",
+              "level": 396,
+              "updated_at": "2026-09-17T16:13:09+09:00",
+              "renewable_at": "2026-09-17T16:15:09+09:00",
+              "revision_at": "2026-08-08T16:30:17+09:00",
+              "solo_tier_info": {
+                "tier": "DIAMOND",
+                "division": 2,
+                "lp": 75,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "EMERALD",
+                    "division": 1,
+                    "lp": 17,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/emerald.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/emerald.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 81870965,
+              "summoner_id": "8FHqcNB0Zm8AU4GGe88wluCdoImQ-6Mnt18x99PCaZvza2w",
+              "acct_id": "4lEGq-fjaqlZ_yVXRxW2Gevo0phxeFxrlFk_cZr7J21fzop_OMR-kBPW",
+              "puuid": "ccNI9AxVsmQjsEVL_yzJEnsotz_i9AnC25OTsu_eWVb40_xMTSuVYWj6ieB8XVHKL3yV4iZYbe-0EQ",
+              "game_name": "suis",
+              "tagline": "kr7",
+              "region": null,
+              "name": "dlwlrma22",
+              "internal_name": "dlwlrma22",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon29.jpg",
+              "level": 740,
+              "updated_at": "2026-09-17T16:35:09+09:00",
+              "renewable_at": "2026-09-17T16:37:09+09:00",
+              "revision_at": "2026-09-16T17:37:37+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2394,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "GRANDMASTER",
+                    "division": 1,
+                    "lp": 950,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/grandmaster.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/grandmaster.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "GRANDMASTER",
+                    "division": 1,
+                    "lp": 660,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/grandmaster.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/grandmaster.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 83450005,
+              "summoner_id": "eJU3ZU20Jr9nd2XF7r0oyCc-Xd_ohf-eO7tYbTF24McqAfA",
+              "acct_id": "RzUx2f8mrYOBEvrUOVe_nbv2c9MVy2SoQHBWL4xTzLjQHgmTS-zouqmv",
+              "puuid": "jG4-WF4fg_UPHmjKPSUpHw241TC6B0Vrre90HkjYQ31pRa-_eVzvWEB8tx3cutLDTxBFMxcp_cqjxg",
+              "game_name": "Wpdpzkdk",
+              "tagline": "KR1",
+              "region": null,
+              "name": "Wpdpzkdk",
+              "internal_name": "wpdpzkdk",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon23.jpg",
+              "level": 49,
+              "updated_at": "2026-09-17T16:13:15+09:00",
+              "renewable_at": "2026-09-17T16:15:15+09:00",
+              "revision_at": "2023-08-18T17:22:02+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "hanwhalifeesports,zeka,kimgeon-woo(김건우),kiruru,suis,wpdpzkdk"
+        },
+        {
+          "team_id": 591,
+          "position": "ADC",
+          "nickname": "Gumayusi",
+          "authority": "PROGAMER",
+          "real_name": "Lee Min-hyeong (이민형)",
+          "summoners": [
+            {
+              "id": 8377903,
+              "summoner_id": "vFZEs_Bh3-kFVox5nqiQRXWJyZ9lg51xNAhZ_cJYwrfsww",
+              "acct_id": "w9wadbQvqdbBvnmcziR9xVsnoVza8Dh_mRIFl-HYf-rA",
+              "puuid": "iZ1jv8jjfYC8sR0n653v9lNiZeBZLk9kZotXiZJXhZb591NAitYUjj8IPjMUaleO-TQoLEZ60wfKxw",
+              "game_name": "JXN1MVc6dAdqVY1I",
+              "tagline": "KR1",
+              "region": null,
+              "name": "JXN1MVc6dAdqVY1I",
+              "internal_name": "jxn1mvc6dadqvy1i",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon3381.jpg",
+              "level": 390,
+              "updated_at": "2026-09-17T16:13:14+09:00",
+              "renewable_at": "2026-09-17T16:15:14+09:00",
+              "revision_at": "2022-08-13T08:29:14+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 58820334,
+              "summoner_id": "7ejXVqCNGxHcHlhPhzpvZGlsc4e97JJyXXCuZ4Xq8knknHM",
+              "acct_id": "NSGO64t2aY3MB1hFigWEDKhQ6R0tiypeWuts5QNLeRYASAw",
+              "puuid": "vIJ_qGVgeBuO0wAIUrKEbxyT0JJ8RiM_noZHrpLpbT42CGc2E1GKgUo3O-CP3LG_DuQWtAJ0JvGyYA",
+              "game_name": "HLE Gumayusi",
+              "tagline": "0298",
+              "region": null,
+              "name": "T1 Gumayusi",
+              "internal_name": "t1gumayusi",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7172.jpg",
+              "level": 914,
+              "updated_at": "2026-09-17T16:56:24+09:00",
+              "renewable_at": "2026-09-17T16:58:24+09:00",
+              "revision_at": "2026-09-16T15:41:24+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2443,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 580,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 600,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 93390356,
+              "summoner_id": "ysP7BgtCl-ntIST3B6e3THc-unIDagSTyhe0ZhCwOnvxL06mxYXIDe_PIQ",
+              "acct_id": "bkK5suPVJ6ZVm5Ix9gQmkFIuNbt8PPk4CNbKZFTDiUrOA__wlBhnsw27",
+              "puuid": "-sUeqskdNqr6N4Z0p-35qJI1UjAAmMUGIqakf_Bidta6v26ChFXXJoeFIO4bEuzhzOnRIr_t5WRFyA",
+              "game_name": "구르시",
+              "tagline": "녹서스",
+              "region": null,
+              "name": "",
+              "internal_name": "",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon29.jpg",
+              "level": 71,
+              "updated_at": "2026-01-02T08:56:47+09:00",
+              "renewable_at": "2026-01-02T08:58:47+09:00",
+              "revision_at": "2025-12-05T01:24:35+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "DIAMOND",
+                    "division": 2,
+                    "lp": 65,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 94378402,
+              "summoner_id": null,
+              "acct_id": null,
+              "puuid": "2KdsmAMrUYT1YwjwOgn9eFIpHpNB40d42SPfEKgtCxE04-J6YqfIAPc3832OyiV3fk8b5sOwoQx21w",
+              "game_name": "thsorre",
+              "tagline": "2830",
+              "region": null,
+              "name": "",
+              "internal_name": "",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon29.jpg",
+              "level": 35,
+              "updated_at": "2026-09-17T16:13:12+09:00",
+              "renewable_at": "2026-09-17T16:15:12+09:00",
+              "revision_at": "2026-09-11T14:11:11+09:00",
+              "solo_tier_info": {
+                "tier": "MASTER",
+                "division": 1,
+                "lp": 275,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+              },
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "hanwhalifeesports,gumayusi,leemin-hyeong(이민형),jxn1mvc6dadqvy1i,hlegumayusi,구르시,thsorre"
+        },
+        {
+          "team_id": 591,
+          "position": "JUNGLE",
+          "nickname": "Kanavi",
+          "authority": "PROGAMER",
+          "real_name": "Seo Jin-hyeok (서진혁)",
+          "summoners": [
+            {
+              "id": 38801035,
+              "summoner_id": "jZKgcwT6qTSIgGzY3vOoJwHR3d12ciqph945vQaE-xLTqOE",
+              "acct_id": "hn_57RagevMV-oODXigO1xDwwJ8Jnd5NNllzrmGRBY4N1y8",
+              "puuid": "qz2pQk1JchAGjbB0TmY-F6VKg6u7znO8SZYi4tPG0oYYXgrRxzjMtDyBKUncJYcURkQ5j14y06KAvw",
+              "game_name": "38801035del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "38801035del",
+              "internal_name": "38801035del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon29.jpg",
+              "level": 277,
+              "updated_at": "2026-09-17T16:12:31+09:00",
+              "renewable_at": "2026-09-17T16:14:31+09:00",
+              "revision_at": "2022-05-13T00:25:04+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 74330653,
+              "summoner_id": "YsPEkYKfFnpXloBi0gR1BXtLhTq2c4ykzzb2M0ttLUMfav0",
+              "acct_id": "zVP9zx-sKriDhh3LSTiaMGwV29W-d9DQNJdUezWEPRu66ALgderMb3T8",
+              "puuid": "XFUDpquwqFUvlY3iQGfXeojr3q4uEnP4FekupAxX3JFyQf-YuV_0YP2pxlTgLy8EdYSZmrshbc-0VA",
+              "game_name": "vinaka",
+              "tagline": "KR1",
+              "region": null,
+              "name": "vinaka",
+              "internal_name": "vinaka",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7090.jpg",
+              "level": 704,
+              "updated_at": "2026-09-17T16:30:20+09:00",
+              "renewable_at": "2026-09-17T16:32:20+09:00",
+              "revision_at": "2026-09-17T02:37:52+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 1977,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 457,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 95,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 83180823,
+              "summoner_id": "C18KbYBN8YhRJVNhpOxrNpiUYrHVet98TpWNEu6A5qvhlzo",
+              "acct_id": "ANsZCQswTrKFYmwz6TB58N00lX6MPN4sfJi6LkiP7AkStpVmhKTPQj6_",
+              "puuid": "nbrIL_fzcwIMvyIGB9SqA2xXjmULUBJ0b2NxZa_oX2hNeoDQBJSMn4wbnU3npWYVZbqBx8be7N-ctA",
+              "game_name": "lqslqslqslqs",
+              "tagline": "KR1",
+              "region": null,
+              "name": "lqslqslqslqs",
+              "internal_name": "lqslqslqslqs",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon29.jpg",
+              "level": 63,
+              "updated_at": "2026-09-17T16:12:28+09:00",
+              "renewable_at": "2026-09-17T16:14:28+09:00",
+              "revision_at": "2019-09-06T13:10:25+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 84473421,
+              "summoner_id": "5KQ1fUIqO232KWqH6gnyyClUIg5bkBhO5BK7QyRPqGouJgA",
+              "acct_id": "dGLUsAXG3avwgAjszt6RyCnM4wOfBCqB5lEFQr5UfPDHqi8JtI_D8m3p",
+              "puuid": "6B7fkPHzZQhqhFxdT3mpxwbMZKJ3jFEHPIVwzAapN-U9LfUJ9SuFDUYcJlX_FcVAe1XKHkXHT7vbKg",
+              "game_name": "95360218del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "95360218del",
+              "internal_name": "95360218del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon29.jpg",
+              "level": 96,
+              "updated_at": "2026-09-17T16:12:29+09:00",
+              "renewable_at": "2026-09-17T16:14:29+09:00",
+              "revision_at": "2021-01-19T16:59:25+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "hanwhalifeesports,kanavi,seojin-hyeok(서진혁),38801035del,vinaka,lqslqslqslqs,95360218del"
+        },
+        {
+          "team_id": 591,
+          "position": "SUPPORT",
+          "nickname": "Delight",
+          "authority": "PROGAMER",
+          "real_name": "Yoo Hwan-joong (유환중)",
+          "summoners": [
+            {
+              "id": 77070143,
+              "summoner_id": "MqpsJPBhHlUWaXS1io7uwt42nXF1rpdxCm5BJdOJDdhDTiw",
+              "acct_id": "aw7mZx8DpNWDMNsNXl-plpnwhKgS4qSHKxPEM00ZjqMc86_eNMJV50ur",
+              "puuid": "5atM9dE4OYka1eEJZZKi1hy2EhxMbClC8eJW7IUmy8wlkGALFWUbMDbZFJXck_JuSlxM4ZRbkY5XWA",
+              "game_name": "플레이리스트겨울",
+              "tagline": "KR1",
+              "region": null,
+              "name": "플레이리스트겨울",
+              "internal_name": "플레이리스트겨울",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7236.jpg",
+              "level": 1077,
+              "updated_at": "2026-09-17T16:13:26+09:00",
+              "renewable_at": "2026-09-17T16:15:26+09:00",
+              "revision_at": "2026-09-12T22:34:34+09:00",
+              "solo_tier_info": {
+                "tier": "GRANDMASTER",
+                "division": 1,
+                "lp": 1589,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/grandmaster.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/grandmaster.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 560,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 269,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "hanwhalifeesports,delight,yoohwan-joong(유환중),플레이리스트겨울"
+        },
+        {
+          "team_id": 591,
+          "position": "COACH",
+          "nickname": "Mowgli",
+          "authority": "PROGAMER",
+          "real_name": "Lee Jae-ha (이재하)",
+          "summoners": [
+            {
+              "id": 28951157,
+              "summoner_id": "P0gzsl824MgceSluN4FfeZlDzOfGYQLG7kz2qQCsvQRshp4",
+              "acct_id": "cCYai-aPGeHIPyZ6WniTHCq9toUsCGlytR1yTEWCmxHnTIc",
+              "puuid": "6DtO9JHMitlXw6yxXiaP5L53H69H-SrM8lJm5E8fAfaWwBNBhBadeAykDZj2QHonJZTj4Kfg4JnuSw",
+              "game_name": "Spring sonata",
+              "tagline": "KR1",
+              "region": null,
+              "name": "Spring sonata",
+              "internal_name": "springsonata",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7174.jpg",
+              "level": 421,
+              "updated_at": "2026-09-14T17:20:43+09:00",
+              "renewable_at": "2026-09-14T17:22:43+09:00",
+              "revision_at": "2026-08-15T02:25:18+09:00",
+              "solo_tier_info": {
+                "tier": "DIAMOND",
+                "division": 2,
+                "lp": 75,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "EMERALD",
+                    "division": 1,
+                    "lp": 75,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/emerald.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/emerald.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "EMERALD",
+                    "division": 1,
+                    "lp": 18,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/emerald.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/emerald.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 48570621,
+              "summoner_id": "mwONVYIcDXGoo9yGXY8WqsikdVLCLooZS0XgC5zZebkHTcU",
+              "acct_id": "9Eqj8j7HKFLRoWDZIrEHAYlyFa8CKkyHW0V8q682yNMxgRk",
+              "puuid": "h7FhVVD_MY57fF8bkj9EM7xSGt6uyLbqPZ0MB-yKZpmrFRXCJGAmF_dsQsdN3IPwtO2pYsjvA9BZTg",
+              "game_name": "coldoutside",
+              "tagline": "KR1",
+              "region": null,
+              "name": "coldoutside",
+              "internal_name": "coldoutside",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4568.jpg",
+              "level": 149,
+              "updated_at": "2026-09-16T17:26:19+09:00",
+              "renewable_at": "2026-09-16T17:28:19+09:00",
+              "revision_at": "2025-02-22T02:25:58+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "EMERALD",
+                    "division": 2,
+                    "lp": 50,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/emerald.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/emerald.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "hanwhalifeesports,mowgli,leejae-ha(이재하),springsonata,coldoutside"
+        }
+      ],
+      "searchFilterText": "hanwhalifeesports,jxn1mvc6dadqvy1i,leemin-hyeong(이민형),gumayusi,hlegumayusi,peanut,hanwang-ho(한왕호),언차티d,hari2yquinn,jonsn0w,springsonata,leejae-ha(이재하),mowgli,coldoutside,38801035del,seojin-hyeok(서진혁),kanavi,vinaka,lqslqslqslqs,95360218del,athene,choiwoo-je(최우제),zeus,굿뉴스,95873761del,플레이리스트겨울,yoohwan-joong(유환중),delight,kiruru,kimgeon-woo(김건우),zeka,suis,wpdpzkdk,구르시,thsorre"
+    }
+  },
+  {
+    "region": "kr",
+    "team": {
+      "id": 371,
+      "name": "Invictus Gaming",
+      "short_name": "IG",
+      "image_url": "https://s-qwer.op.gg/images/lol/teams/371_1768047411633.png",
+      "image_url_light_mode": "https://s-qwer.op.gg/images/lol/teams/371_1768047411633.png",
+      "image_url_dark_mode": "https://s-qwer.op.gg/images/lol/teams/371_dark_1768048372644.png",
+      "members": [
+        {
+          "team_id": 371,
+          "position": "ADC",
+          "nickname": "Puff",
+          "authority": "PROGAMER",
+          "real_name": "Ding Wang (丁旺)",
+          "summoners": [
+            {
+              "id": 83679040,
+              "summoner_id": "H3Bcl2URn91RAL2sEip2MiqU8p--zC9FQiwvEOQMVFq4F-I",
+              "acct_id": "RlciOvnaQQrQqY0CbpItvNe8b9dt0oZm8RBVy7zlwqz0KvoxiNo62tep",
+              "puuid": "FknFRTLeMcXkHHHC-KZ5SfWd7r2QKHcJ5yeLnXln-0hKqnBzWeL3wrEtsLXFP179bFVczWkzRJebZw",
+              "game_name": "wzywzyzzz",
+              "tagline": "KR1",
+              "region": null,
+              "name": "wzywzyzzz",
+              "internal_name": "wzywzyzzz",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon20.jpg",
+              "level": 104,
+              "updated_at": "2026-09-12T14:36:42+09:00",
+              "renewable_at": "2026-09-12T14:38:42+09:00",
+              "revision_at": "2020-08-18T04:36:55+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 84473617,
+              "summoner_id": "JFyOYh13huOyd6mxijr3S51-aNhxjLHExNoWRwV-QSJWeCY",
+              "acct_id": "ZL1A1EhrtHeEI-C4EeAK7nhsB4OrAHe7GDd8ev86kDwh6uVA-2KEzRl1",
+              "puuid": "wEwVDej-9_-ccgsd3NlnfBkbm89O5SJ2_uHg2CnkS9hITc33Kx1xlSUg4Vg0Is3C1oUl6WsOG2GOQQ",
+              "game_name": "95140222del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "95140222del",
+              "internal_name": "95140222del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4754.jpg",
+              "level": 177,
+              "updated_at": "2026-09-01T11:07:38+09:00",
+              "renewable_at": "2026-09-01T11:09:38+09:00",
+              "revision_at": "2021-01-19T17:03:05+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "invictusgaming,puff,dingwang(丁旺),wzywzyzzz,95140222del"
+        },
+        {
+          "team_id": 371,
+          "position": "SUPPORT",
+          "nickname": "Lucas",
+          "authority": "PROGAMER",
+          "real_name": "Li-Tan Pan-Ao (李谭潘奥)",
+          "summoners": [
+            {
+              "id": 82792974,
+              "summoner_id": "EzAuE8JNbUFh3BbHKRkdTjDkLzMIrmNk9cY8yq0EnEGmU60",
+              "acct_id": "6VTjiX4z9erhmwGf7veDUYdAIzCtj86BodDGPHw0-NXfPdlcT_TdivFf",
+              "puuid": "Th2sZFqr8c7kAXqMXuF6qUgDR29taF6YqmMkhWBX1Go3hIaDCxWFvxmLb7AkzCQpMiMTth9ol-ZRsQ",
+              "game_name": "78470735del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "78470735del",
+              "internal_name": "78470735del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4413.jpg",
+              "level": 301,
+              "updated_at": "2026-09-06T10:29:13+09:00",
+              "renewable_at": "2026-09-06T10:31:13+09:00",
+              "revision_at": "2022-11-28T12:08:56+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "invictusgaming,lucas,li-tanpan-ao(李谭潘奥),78470735del"
+        },
+        {
+          "team_id": 371,
+          "position": "SUPPORT",
+          "nickname": "Southwind",
+          "authority": "PROGAMER",
+          "real_name": "Su Zhi-Lin (苏志林)",
+          "summoners": [
+            {
+              "id": 82566732,
+              "summoner_id": "2FF8vO0ySd1RLMvNALmhQk9LGv4Qg4NgOaT_GN2_b2iD-ws",
+              "acct_id": "K3Rhmwd9bwx4CargKlZoLAmHBfDfSrcw4TI7NCCpBTBhTTspWCln7UZU",
+              "puuid": "fvJM9jVyfPmaHgkAbTogwD96Xk6_2h5czctbr7vR40whKx_VMIFgBinB4L-JbCE74YsFwtNbNUZnlg",
+              "game_name": "buyaozhuawo1",
+              "tagline": "KR1",
+              "region": null,
+              "name": "buyaozhuawo1",
+              "internal_name": "buyaozhuawo1",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4470.jpg",
+              "level": 99,
+              "updated_at": "2026-09-13T02:53:49+09:00",
+              "renewable_at": "2026-09-13T02:55:49+09:00",
+              "revision_at": "2020-01-09T22:32:19+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "invictusgaming,southwind,suzhi-lin(苏志林),buyaozhuawo1"
+        },
+        {
+          "team_id": 371,
+          "position": "JUNGLE",
+          "nickname": "Wei",
+          "authority": "PROGAMER",
+          "real_name": "Yan Yang-Wei (闫扬威)",
+          "summoners": [
+            {
+              "id": 90675942,
+              "summoner_id": "PUjVYES4TcAkBj_DAQt6aIpK7BDRefOfRfTZsE1waKdbErcA7--13BFrGA",
+              "acct_id": "Iza9saIcejPZwHhI9V4uCoXfP5_5MCuvt2ZB4kslOn7Tj4qi6tUx6sYD",
+              "puuid": "Sw0pVBwv5I_EuT9cQpxPRKmVbreskIXEfBx_e-xD8YjNi5uTYfxMruqSWe1P_QFFZkbPqM3jh6IpUw",
+              "game_name": "Deftones",
+              "tagline": "12121",
+              "region": null,
+              "name": "fuyugakurumade",
+              "internal_name": "fuyugakurumade",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon2076.jpg",
+              "level": 259,
+              "updated_at": "2026-09-17T16:26:38+09:00",
+              "renewable_at": "2026-09-17T16:28:38+09:00",
+              "revision_at": "2026-09-17T15:59:15+09:00",
+              "solo_tier_info": {
+                "tier": "DIAMOND",
+                "division": 2,
+                "lp": 13,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "DIAMOND",
+                    "division": 1,
+                    "lp": 0,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "DIAMOND",
+                    "division": 1,
+                    "lp": 56,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 85653274,
+              "summoner_id": "nGrlM_0VL1LavyRGD4oAI0P_5r-DOf9JXBAenipF_7rXzZW7",
+              "acct_id": "jhM-o5q9eqyZ-UCX7C_yw6dSceoIvrQ2Ky5JfYcADgVt6bVNR94TaiYl",
+              "puuid": "ias6HwfAwwjR6DnfCCa-crzYORrBX6PwxgP5ZAf5JLwB7ujHFHpLB7FcYkTZxYo14x_qZoaxlaNxAQ",
+              "game_name": "Kimman",
+              "tagline": "zxfkk",
+              "region": null,
+              "name": "Gimman",
+              "internal_name": "gimman",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon5089.jpg",
+              "level": 415,
+              "updated_at": "2026-09-17T16:09:01+09:00",
+              "renewable_at": "2026-09-17T16:11:01+09:00",
+              "revision_at": "2026-09-17T03:56:23+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2394,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 1397,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "GRANDMASTER",
+                    "division": 1,
+                    "lp": 920,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/grandmaster.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/grandmaster.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "invictusgaming,wei,yanyang-wei(闫扬威),deftones,kimman"
+        },
+        {
+          "team_id": 371,
+          "position": "MID",
+          "nickname": "Cryin",
+          "authority": "PROGAMER",
+          "real_name": "Yuan Cheng-Wei (袁成伟)",
+          "summoners": [
+            {
+              "id": 76240968,
+              "summoner_id": "3CLzferR8UNuw_FY84Rp51Hjwvsdk47_c0LQWTSgCPJKi9E",
+              "acct_id": "VJn6OyMhLfw-yD4O7H95LsCG_wtkvTu8MjVBsk72AUR4QGzoWwnyg7FL",
+              "puuid": "Yr6l5srv-xup2h4N0OljTRJIQPuBw-Td92VHYKVYoAjKf_N03En6lx2__egaQzXu7P6mqxDGZlot_w",
+              "game_name": "76240968del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "76240968del",
+              "internal_name": "76240968del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4779.jpg",
+              "level": 282,
+              "updated_at": "2026-09-13T01:06:06+09:00",
+              "renewable_at": "2026-09-13T01:08:06+09:00",
+              "revision_at": "2022-01-22T15:14:26+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "invictusgaming,cryin,yuancheng-wei(袁成伟),76240968del"
+        },
+        {
+          "team_id": 371,
+          "position": "ADC",
+          "nickname": "Wink",
+          "authority": "PROGAMER",
+          "real_name": "Zhang Rui (张锐)",
+          "summoners": [
+            {
+              "id": 84488849,
+              "summoner_id": "XsRn2Xict4v7IIu1XCxeOFgL4V0Cov2bKIm1qulXFXeosi4",
+              "acct_id": "f5l5tkyfgEW4Z-lWHZ7F7xPNPmlBnxQA1DiyU8hccgDH0SoE7JZkTyYm",
+              "puuid": "CkvvF4e1DSZHmgHrZluE4UwlHnrq-qEwcNRBDOI27Q8XyE5Pht_FbhGa18_gnwAZWqMOUvDcxYmi8A",
+              "game_name": "95120226del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "95120226del",
+              "internal_name": "95120226del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7.jpg",
+              "level": 134,
+              "updated_at": "2026-09-11T05:41:31+09:00",
+              "renewable_at": "2026-09-11T05:43:31+09:00",
+              "revision_at": "2021-01-20T10:56:55+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "invictusgaming,wink,zhangrui(张锐),95120226del"
+        }
+      ],
+      "searchFilterText": "invictusgaming,76240968del,yuancheng-wei(袁成伟),cryin,buyaozhuawo1,suzhi-lin(苏志林),southwind,78470735del,li-tanpan-ao(李谭潘奥),lucas,wzywzyzzz,dingwang(丁旺),puff,95140222del,95120226del,zhangrui(张锐),wink,deftones,yanyang-wei(闫扬威),wei,kimman"
+    }
+  },
+  {
+    "region": "kr",
+    "team": {
+      "id": 385,
+      "name": "T1",
+      "short_name": "T1",
+      "image_url": "https://s-qwer.op.gg/images/lol/teams/385_1672191948431.png",
+      "image_url_light_mode": "https://s-qwer.op.gg/images/lol/teams/385_1672191948431.png",
+      "image_url_dark_mode": "https://s-qwer.op.gg/images/lol/teams/385_1672191948431.png",
+      "members": [
+        {
+          "team_id": 385,
+          "position": "SUPPORT",
+          "nickname": "Mata",
+          "authority": "COACH",
+          "real_name": "Cho Se-hyeong (조세형)",
+          "summoners": [
+            {
+              "id": 1091187,
+              "summoner_id": "gNS9AL4w8DoeTEV0UA5A6rD4a2PidCcFfEF3BENNrzuUHA",
+              "acct_id": "_FR-v-_dMu727QniompabX3ZdAyn-buDgIC1mvjNacE",
+              "puuid": "G6_OBZmMIhDbA5UNklKfyXfsFJCzIrsK42wsFXtaNL-moi9NZ3sWLzW_VkM2DtJFWSBTslkvhRtvIA",
+              "game_name": "Mata",
+              "tagline": "0227",
+              "region": null,
+              "name": "94마타",
+              "internal_name": "94마타",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7173.jpg",
+              "level": 487,
+              "updated_at": "2026-09-16T16:18:27+09:00",
+              "renewable_at": "2026-09-16T16:20:27+09:00",
+              "revision_at": "2026-09-16T14:41:12+09:00",
+              "solo_tier_info": {
+                "tier": "MASTER",
+                "division": 1,
+                "lp": 1046,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "DIAMOND",
+                    "division": 2,
+                    "lp": 75,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 1555704,
+              "summoner_id": "Qm-5HcPa29fZZPC6wthpsz4GfRJIa17cM1_UuqZi6RIsTA",
+              "acct_id": "g7jkQ24G8j8iZGS83KHsDiW2D-Llg7kSYI-Z_T17bXlJ",
+              "puuid": "9LxQNoBzR2kBCdy8TihzUnuu0IACYR1Ilf-2Sd_jqdLAmapWmuMww6RH0bMOJXNl8PU7rSRsTNAr2A",
+              "game_name": "1555704del",
+              "tagline": "KR1",
+              "region": null,
+              "name": "1555704del",
+              "internal_name": "1555704del",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon18.jpg",
+              "level": 34,
+              "updated_at": "2026-09-16T06:51:27+09:00",
+              "renewable_at": "2026-09-16T06:53:27+09:00",
+              "revision_at": "2021-08-07T09:46:01+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 11641191,
+              "summoner_id": "Dwdpa0fSWSBNGpZboXBQEynCGRDmqHFS7DcSt983lWfdQcI",
+              "acct_id": "hI3ZZPv3PJ4P805CgoWEt0LTRsmvW7AN9mmFD8jQTLe4FZ0",
+              "puuid": "Bg5_oomt8sKiKpAZO1D-KzINGRhMTvEJIzeO0dzMH3txesekzzwIB8EFGaQHsOMaEJhS8IPFffOFaw",
+              "game_name": "복복복복복",
+              "tagline": "55555",
+              "region": null,
+              "name": "마따마타",
+              "internal_name": "마따마타",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4568.jpg",
+              "level": 188,
+              "updated_at": "2026-09-06T23:33:37+09:00",
+              "renewable_at": "2026-09-06T23:35:37+09:00",
+              "revision_at": "2026-06-07T01:03:31+09:00",
+              "solo_tier_info": {
+                "tier": "EMERALD",
+                "division": 1,
+                "lp": 27,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/emerald.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/emerald.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "DIAMOND",
+                    "division": 4,
+                    "lp": 89,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/diamond.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/diamond.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 54990750,
+              "summoner_id": "tL3yeC2cWPKYaEww77Skyu7e-yYpvgiQepEaD6JYRXhiAvE",
+              "acct_id": "yeymh5KhHvfxRRWc7j3UXXvkNPjJSsAcWjEXZlN-AA7esL4",
+              "puuid": "Q2X3WIyMt7eUhBVqhSHRaDxQsi4cR-UKrWC36cpO2OlS5x8JgqiG57heZ6pfIBA11Vpp3e854ddSqw",
+              "game_name": "MataMataMata",
+              "tagline": "KR1",
+              "region": null,
+              "name": "MataMataMata",
+              "internal_name": "matamatamata",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon1630.jpg",
+              "level": 42,
+              "updated_at": "2026-09-11T05:10:39+09:00",
+              "renewable_at": "2026-09-11T05:12:39+09:00",
+              "revision_at": "2018-01-01T22:40:47+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 66820148,
+              "summoner_id": "kAPfWZunOerAk3YT-oPDC-7s8iCGdvr0buqqi96Nosc0Xiw",
+              "acct_id": "Ewwu3uXgP0jHWwpo9NikXEplyFFmZaEtRkM8wtKAgfXkn0Y",
+              "puuid": "GcMsXagntksdlZCH-5Bqte1VbhwBzT5Vng0byOhJ4mFB-9nolZUlPsauG3UgqAyI6U2r3mn_QQ5RJA",
+              "game_name": "Iehendz",
+              "tagline": "KR1",
+              "region": null,
+              "name": "Iehendz",
+              "internal_name": "iehendz",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon3791.jpg",
+              "level": 91,
+              "updated_at": "2026-09-10T14:44:28+09:00",
+              "renewable_at": "2026-09-10T14:46:28+09:00",
+              "revision_at": "2019-01-14T03:34:54+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "t1,mata,chose-hyeong(조세형),mata,1555704del,복복복복복,matamatamata,iehendz"
+        },
+        {
+          "team_id": 385,
+          "position": "TOP",
+          "nickname": "Doran",
+          "authority": "PROGAMER",
+          "real_name": "Choi Hyeon-joon (최현준)",
+          "summoners": [
+            {
+              "id": 60811200,
+              "summoner_id": "Zlw1MpnJ4tYb7goRXppDZBjWIPdxZHBea2ROTuJNHcefBVQ",
+              "acct_id": "8d7IY-0P4EaS7A4kg7E02MNLX92sk9QRZ3sXxO89IhvRV5E",
+              "puuid": "jdfphSemGScWG3OOs_1m45fkJUZNmyc0-ZB_G5j5NYPU6kaGceaBq4y9pRRoQ00a3HpiuQRXHuJWIA",
+              "game_name": "어리고싶다",
+              "tagline": "KR1",
+              "region": null,
+              "name": "어리고싶다",
+              "internal_name": "어리고싶다",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7169.jpg",
+              "level": 1414,
+              "updated_at": "2026-09-17T16:58:34+09:00",
+              "renewable_at": "2026-09-17T17:00:34+09:00",
+              "revision_at": "2026-09-17T12:19:41+09:00",
+              "solo_tier_info": {
+                "tier": "MASTER",
+                "division": 1,
+                "lp": 1317,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 661,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 486,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 83119988,
+              "summoner_id": "rp7T49GEWF6mQ1lkS1oxCa-oQjHu4w2zqw68KoLMXs1R6-Y",
+              "acct_id": "anXDMCDsGVXDxoNDNc--PC6oi9KBOxnYf3BFXvKQAMJbVjGzqn8LuK8Z",
+              "puuid": "bUAFWzy-R2qqo6VohnoufaC9bpx12EdolSDEf3gnhA1EX9yVcaECmKv2_hHrcEaf0Y7hVhP_61GaRg",
+              "game_name": "123123123213213",
+              "tagline": "KR1",
+              "region": null,
+              "name": "123123123213213",
+              "internal_name": "123123123213213",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4379.jpg",
+              "level": 98,
+              "updated_at": "2026-09-17T16:14:09+09:00",
+              "renewable_at": "2026-09-17T16:16:09+09:00",
+              "revision_at": "2019-12-02T15:47:19+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 87169957,
+              "summoner_id": "XkOZQbF7woO_Y1Ies8TddiBdYfXlTwhzd2ODtnGbUwD1zJhuEN_B0gcHQQ",
+              "acct_id": "Pq-YKjj_-gtDGJyRZ9p6BtPMusVBZuY6LFP5SfgHcLXWn_tds-o-fKOz",
+              "puuid": "GT22ZBzXg1tbEqfz1K-RN08cyxFOdsZEWoph9JYRCl5sCGewLmlepwfeywyBBnCMLam50jc2CE97mA",
+              "game_name": "2633831929956160",
+              "tagline": "KR1",
+              "region": null,
+              "name": "2633831929956160",
+              "internal_name": "2633831929956160",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4896.jpg",
+              "level": 134,
+              "updated_at": "2026-09-17T16:14:12+09:00",
+              "renewable_at": "2026-09-17T16:16:12+09:00",
+              "revision_at": "2022-01-12T13:34:58+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 93600604,
+              "summoner_id": "CjDlOohlAfCPgic44k5OGf_xm4TAnKg0jzkKmnBiZWYoKutHgBW4sUbeQw",
+              "acct_id": "tJkH-aK_YR42NJM026kGAl4DOFmLc27VqQBL7Ww-ivem2H19R7V_QPEd",
+              "puuid": "ry3JA8MqkbvcmGQ0fFS91k7BAsKTfIaW1dvNYn3FV-LtagdTY8QfXt1dwyO3VEAPat8Ot0CnCDf0EQ",
+              "game_name": "사과게임",
+              "tagline": "kr11",
+              "region": null,
+              "name": "",
+              "internal_name": "",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon29.jpg",
+              "level": 31,
+              "updated_at": "2026-01-03T01:05:47+09:00",
+              "renewable_at": "2026-01-03T01:07:47+09:00",
+              "revision_at": "2025-10-08T17:08:31+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "t1,doran,choihyeon-joon(최현준),어리고싶다,123123123213213,2633831929956160,사과게임"
+        },
+        {
+          "team_id": 385,
+          "position": "ADC",
+          "nickname": "Peyz",
+          "authority": "PROGAMER",
+          "real_name": "Kim Su-hwan (김수환)",
+          "summoners": [
+            {
+              "id": 83864288,
+              "summoner_id": "Z-vPb-RFufyo5od7IkHDkUBEYlvD0aIT0aVwi2KX-oREDig",
+              "acct_id": "wLKHrSaDnwMMOk3yU4tCctQympvgLZKLWUh_yGOCB0ots0Eb0WuSn7gP",
+              "puuid": "E8Cf3iMYnCeaxm0fpQ_I85duu4Sylo0wgC67RxLMQPkGnCTn4UW8cIhOUc7y5p-sHGkvlPU93lLbJw",
+              "game_name": "Peyz",
+              "tagline": "KR11",
+              "region": null,
+              "name": "으끄으끄",
+              "internal_name": "으끄으끄",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon6269.jpg",
+              "level": 953,
+              "updated_at": "2026-09-17T16:42:16+09:00",
+              "renewable_at": "2026-09-17T16:44:16+09:00",
+              "revision_at": "2026-09-11T15:13:22+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2304,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 1529,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "CHALLENGER",
+                    "division": 1,
+                    "lp": 978,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "t1,peyz,kimsu-hwan(김수환),peyz"
+        },
+        {
+          "team_id": 385,
+          "position": "MID",
+          "nickname": "Faker",
+          "authority": "PROGAMER",
+          "real_name": "Lee Sang-hyeok (이상혁)",
+          "summoners": [
+            {
+              "id": 4460427,
+              "summoner_id": "4b4tvMrpRRDLvXAiQ_Vmh5yMOsD0R3GPGTUVfIanp1Httg",
+              "acct_id": "O219YcoOZLt1fZoiuCX02gjYuxqk9GESea5tTSjzEYWg",
+              "puuid": "XbXYoWgmpJEwCvxzt9B5vtVZCf6HyqDKd1vSLULuOzKY22q2NMirjt3u75JjyUZumP7RMXU07pPNGQ",
+              "game_name": "Hide on bush",
+              "tagline": "KR1",
+              "region": null,
+              "name": "Hide on bush",
+              "internal_name": "hideonbush",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon6.jpg",
+              "level": 935,
+              "updated_at": "2026-09-17T16:59:48+09:00",
+              "renewable_at": "2026-09-17T17:01:48+09:00",
+              "revision_at": "2026-09-17T16:59:07+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2089,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 285,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 83,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            }
+          ],
+          "searchFilterText": "t1,faker,leesang-hyeok(이상혁),hideonbush"
+        },
+        {
+          "team_id": 385,
+          "position": "JUNGLE",
+          "nickname": "Oner",
+          "authority": "PROGAMER",
+          "real_name": "Moon Hyeon-joon (문현준)",
+          "summoners": [
+            {
+              "id": 42055197,
+              "summoner_id": "w7bm8JifRpy7KfLWTU7z6qpUtQ6NsV0IfxNz-94K9CNinTo",
+              "acct_id": "6P1RDi3Gt0kWr-Oo6GspuFN-Yd8lwzIYsG1RHTYbbZNW4aI",
+              "puuid": "GRhdc0o1qt6G8Dm5cTkXAe1F09w5SKuiHH74tvkIJtG555fixXqcaQiy2KKPIMvW7jcBBwB5hTZ2aA",
+              "game_name": "오 너",
+              "tagline": "111",
+              "region": null,
+              "name": "대머리 까까랏",
+              "internal_name": "대머리까까랏",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon7171.jpg",
+              "level": 661,
+              "updated_at": "2026-09-17T16:45:46+09:00",
+              "renewable_at": "2026-09-17T16:47:46+09:00",
+              "revision_at": "2026-09-11T23:57:51+09:00",
+              "solo_tier_info": {
+                "tier": "CHALLENGER",
+                "division": 1,
+                "lp": 2219,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/challenger.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/challenger.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 665,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 200,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 87082734,
+              "summoner_id": "eF-1QwnwfF5oKLlJhQhYuv4AnqRc2ZBKDPt_S0btJ6A9QDAqI4jFQ3mXvA",
+              "acct_id": "QLYnMtjgpy7jmOT1i5hl0fc7oYtLKOb0g6eBGhLrtb4UMwlui_VrtQKw",
+              "puuid": "t3sRjxpV1AYtsYvMkhQfaGpqb8e3--UYymyiiy_et9ARLrkP6KBoyMGD7PEZT1jhkZrYZTQ5sQAqNQ",
+              "game_name": "T1 Oner",
+              "tagline": "KR1",
+              "region": null,
+              "name": "T1 Oner",
+              "internal_name": "t1oner",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon5582.jpg",
+              "level": 87,
+              "updated_at": "2026-09-17T16:14:20+09:00",
+              "renewable_at": "2026-09-17T16:16:20+09:00",
+              "revision_at": "2026-01-08T23:44:38+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 87186082,
+              "summoner_id": "fs1hZQZlI4I28cJWgw7odAqR8i0lTmbNlZYzUtZN0ZAY9fSFMP9nsz6llQ",
+              "acct_id": "9djXkixoWRLN0ds69nwKZMeiXaC6Psh8DdIOYRg34hhr_YOR0tMx6KPT",
+              "puuid": "DmLBfLkDBAI4gly4mMAhaYx4voLke0p8gVSFOQOhhE0vSRLJj_9BkknBxicOFDfw0G8DYUrKqQyWGQ",
+              "game_name": "2633830994978784",
+              "tagline": "KR1",
+              "region": null,
+              "name": "2633830994978784",
+              "internal_name": "2633830994978784",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon1640.jpg",
+              "level": 83,
+              "updated_at": "2026-09-17T16:14:22+09:00",
+              "renewable_at": "2026-09-17T16:16:22+09:00",
+              "revision_at": "2022-01-12T13:34:37+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            },
+            {
+              "id": 93574998,
+              "summoner_id": "ekTjawy6u4Kn7pVg52OSI8dxn1WtUhIRgCzOIP7-34Cq50vPfKYQs-X_KQ",
+              "acct_id": "_q1sq359MbTQE27ncCA01IZ0021Q-qvcORNyzO3J3ZIpmku7-j_P4GaU",
+              "puuid": "iqebvXuQiUa7iHbh0YUY9LV8tkKXlC1cg5xU_rb9JD6-Df2N7grP7vTQc63R90Q-g_k9moK-CFpiTw",
+              "game_name": "나는 악마다",
+              "tagline": "4444",
+              "region": null,
+              "name": "",
+              "internal_name": "",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon29.jpg",
+              "level": 46,
+              "updated_at": "2026-01-04T03:30:24+09:00",
+              "renewable_at": "2026-01-04T03:32:24+09:00",
+              "revision_at": "2025-12-14T02:16:44+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "t1,oner,moonhyeon-joon(문현준),오너,t1oner,2633830994978784,나는악마다"
+        },
+        {
+          "team_id": 385,
+          "position": "SUPPORT",
+          "nickname": "Keria",
+          "authority": "PROGAMER",
+          "real_name": "Ryu Min-seok (류민석)",
+          "summoners": [
+            {
+              "id": 47820563,
+              "summoner_id": "2Tj6WTB5fnsNPaIbcW37qen9X5lsd0V89NccyVRkUb_TWyI",
+              "acct_id": "cipmSxrJ70_KiEe5nb5esLdDxtZzmSf12Z0vphaTF74-LKc",
+              "puuid": "AToz6JbPGPbH9sdnLaCKMNzwloT7WD7jgQnxQE3kFilFLf-PXHaoEb1sU9B-i2Dbux378ymmhZZq6w",
+              "game_name": "Ciro",
+              "tagline": "KR10",
+              "region": null,
+              "name": "역천괴",
+              "internal_name": "역천괴",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon4856.jpg",
+              "level": 1002,
+              "updated_at": "2026-09-17T16:54:52+09:00",
+              "renewable_at": "2026-09-17T16:56:52+09:00",
+              "revision_at": "2026-09-16T17:37:37+09:00",
+              "solo_tier_info": {
+                "tier": "GRANDMASTER",
+                "division": 1,
+                "lp": 1826,
+                "level": null,
+                "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/grandmaster.png",
+                "border_image_url": "https://opgg-static.akamaized.net/images/border_new/grandmaster.png"
+              },
+              "previous_seasons": [
+                {
+                  "season_id": 31,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 280,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                },
+                {
+                  "season_id": 29,
+                  "tier_info": {
+                    "tier": "MASTER",
+                    "division": 1,
+                    "lp": 115,
+                    "level": null,
+                    "tier_image_url": "https://opgg-static.akamaized.net/images/medals_new/master.png",
+                    "border_image_url": "https://opgg-static.akamaized.net/images/border_new/master.png"
+                  }
+                }
+              ]
+            },
+            {
+              "id": 65030157,
+              "summoner_id": "YKgpzwhmA5vKMzd2cxA1tBxngIOdYs_1pbYQcBolHo2zmvk",
+              "acct_id": "BtLAMY8ErnDcDx63gcUt33oJXJyHPE0QSTkrqREDaE1qblw",
+              "puuid": "gtwHlorzBkBdkiv9atZ3poREQ8ST9w1CdVMIzlUYDpW3sVMA9HXBt6FfbImO2C4CbYJwQXv6BuEIGQ",
+              "game_name": "credit",
+              "tagline": "kk123",
+              "region": null,
+              "name": "유사매",
+              "internal_name": "유사매",
+              "profile_image_url": "https://opgg-static.akamaized.net/meta/images/profile_icons/profileIcon29.jpg",
+              "level": 225,
+              "updated_at": "2026-09-17T16:15:08+09:00",
+              "renewable_at": "2026-09-17T16:17:08+09:00",
+              "revision_at": "2026-03-06T16:16:08+09:00",
+              "solo_tier_info": null,
+              "previous_seasons": []
+            }
+          ],
+          "searchFilterText": "t1,keria,ryumin-seok(류민석),ciro,credit"
+        }
+      ],
+      "searchFilterText": "t1,mata,chose-hyeong(조세형),1555704del,복복복복복,matamatamata,iehendz,hideonbush,leesang-hyeok(이상혁),faker,오너,moonhyeon-joon(문현준),oner,t1oner,2633830994978784,ciro,ryumin-seok(류민석),keria,credit,어리고싶다,choihyeon-joon(최현준),doran,123123123213213,2633831929956160,peyz,kimsu-hwan(김수환),나는악마다,사과게임"
+    }
+  }
+]

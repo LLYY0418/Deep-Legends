@@ -1,0 +1,4 @@
+=== RUN   TestR98OverviewEndpointCachesAndKeys
+--- PASS: TestR98OverviewEndpointCachesAndKeys (0.17s)
+PASS
+ok  	lol-loot-assistant	0.621s

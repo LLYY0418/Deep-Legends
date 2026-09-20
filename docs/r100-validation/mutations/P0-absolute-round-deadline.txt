@@ -1,0 +1,6 @@
+=== RUN   TestR100OverviewLongRoundUsesFreshSingleWaitBudget
+    r100_test.go:40: successful slow round aborted: matches=0 err=<nil>
+--- FAIL: TestR100OverviewLongRoundUsesFreshSingleWaitBudget (5.22s)
+FAIL
+FAIL	lol-loot-assistant	5.731s
+FAIL

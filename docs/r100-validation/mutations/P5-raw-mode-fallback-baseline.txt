@@ -1,0 +1,4 @@
+=== RUN   TestR100QueueLabelsAndArenaRegistry
+--- PASS: TestR100QueueLabelsAndArenaRegistry (0.00s)
+PASS
+ok  	lol-loot-assistant	0.436s

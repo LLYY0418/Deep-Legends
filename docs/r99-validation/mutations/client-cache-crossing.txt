@@ -1,0 +1,5 @@
+--- FAIL: TestR99IconCatalogProjectionCachingAndClientSwitch (0.00s)
+    r99_test.go:234: client switch reused cache
+FAIL
+FAIL	lol-loot-assistant	0.602s
+FAIL

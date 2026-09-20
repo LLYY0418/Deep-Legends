@@ -1,0 +1,11 @@
+✔ R100 progress updates ready profile fields but null and empty never wipe career (62.695833ms)
+✔ R100 historical enrichment defers while foreground overview is in flight (0.766791ms)
+✔ R100 image admission covers lazy DOM images and detached prefetch without same-URL retries (15.73525ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 420.503125

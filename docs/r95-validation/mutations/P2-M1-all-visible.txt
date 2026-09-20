@@ -1,0 +1,81 @@
+$ node --test --test-name-pattern R95 web/r95.test.cjs
+✔ R95 P1 progress preserves career, append=true, noise=null (62.599166ms)
+✔ R95 P1 progress preserves career, append=true, noise=[] (12.945125ms)
+✔ R95 P1 progress preserves career, append=true, noise=undefined (8.666959ms)
+✔ R95 P1 progress preserves career, append=false, noise=null (8.578375ms)
+✔ R95 P1 progress preserves career, append=false, noise=[] (8.141708ms)
+✔ R95 P1 progress preserves career, append=false, noise=undefined (7.68525ms)
+✔ R95 P1 first five and complete explicit empty arrays are authoritative (18.896333ms)
+✖ R95 P2 slow interval/false loading eligibility (14.944375ms)
+✖ R95 P2 slow sse/false loading eligibility (10.551ms)
+✖ R95 P2 slow event/false loading eligibility (9.352333ms)
+✔ R95 P2 slow manual/true loading eligibility (8.814792ms)
+✔ R95 P2 slow direct/true loading eligibility (8.08025ms)
+✔ R95 P2 slow manual/false loading eligibility (8.34875ms)
+✔ R95 P2 fast 10ms manual response never shows status, including zero-delay timers (12.652333ms)
+✔ R95 P3 both sides only show lock wait for show-then-lock (31.797833ms)
+✔ R95 P4 badge respects mask, secondary and professional click context (18.980083ms)
+✔ R95 P5 exact Chinese titles, unknown fallback, relative time and champselect fired count (0.918958ms)
+✔ R95 P3 typed lock wait targets its own side (6.725416ms)
+✔ R95 P4 match player clicks enter professional context even without directory source (5.768083ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 16
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 625.006333
+
+✖ failing tests:
+
+test at web/r95.test.cjs:35:170
+✖ R95 P2 slow interval/false loading eligibility (14.944375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:36:287)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at web/r95.test.cjs:35:170
+✖ R95 P2 slow sse/false loading eligibility (10.551ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:36:287)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at web/r95.test.cjs:35:170
+✖ R95 P2 slow event/false loading eligibility (9.352333ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r95.test.cjs:36:287)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

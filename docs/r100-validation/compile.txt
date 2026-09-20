@@ -1,0 +1,1 @@
+ok  	lol-loot-assistant	1.176s [no tests to run]

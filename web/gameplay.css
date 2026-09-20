@@ -29,7 +29,7 @@
 /* 页面内容作为命名容器：总览布局按实际可用宽度自适应，不再依赖视口断点（避免侧边栏挤压时出现横向滚动条） */
 .gameplay-content { padding-top: 16px; container: gameplay-page / inline-size; }
 .gameplay-panel.is-disconnected { min-height: 0; }
-.gameplay-panel.is-disconnected .player-workspace-head { display: none; }
+/* Player group navigation stays reachable even without a connected client. */
 
 .player-workspace-head {
   position: sticky;
@@ -284,6 +284,7 @@
 
 .career-column, .matches-column { display: grid; min-width: 0; gap: 10px; }
 .career-section { overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.career-section.rank-career-section { position: relative; z-index: 3; overflow: visible; }
 .career-section > header, .team-overview > header, .build-detail > section > header, .live-team > header {
   display: flex;
   align-items: center;
@@ -295,6 +296,26 @@
 .career-section > header h3, .build-detail > section > header h4, .live-team h3 { margin: 0; font-size: 14px; }
 .career-section > header span, .team-overview > header span, .build-detail > section > header span, .live-team > header span { color: var(--muted); font-size: 11px; }
 .career-section-tools { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 8px; }
+.rank-header-tools { display: flex; align-items: center; gap: 8px; }
+.rank-mmr-control { position: relative; display: inline-flex; }
+.rank-mmr-trigger { display: grid; width: 27px; height: 27px; padding: 0; place-items: center; color: var(--primary-strong); background: color-mix(in oklab,var(--primary) 12%,var(--surface-strong)); border: 1px solid color-mix(in oklab,var(--primary) 42%,var(--line)); border-radius: 50%; }
+.rank-mmr-trigger:hover, .rank-mmr-trigger:focus-visible, .rank-mmr-trigger[aria-expanded="true"] { color: var(--ink); background: color-mix(in oklab,var(--primary) 22%,var(--surface)); border-color: var(--primary); }
+.rank-mmr-trigger svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.rank-mmr-popover { position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: min(320px,calc(100vw - 32px)); padding: 11px; visibility: hidden; opacity: 0; pointer-events: none; transform: translateY(-4px); background: color-mix(in oklab,var(--surface) 94%,var(--bg)); border: 1px solid color-mix(in oklab,var(--primary) 30%,var(--line)); border-radius: 10px; box-shadow: 0 14px 36px rgb(0 0 0 / .42); transition: opacity 160ms ease, transform 160ms ease, visibility 160ms; }
+.rank-mmr-control:hover .rank-mmr-popover, .rank-mmr-control:focus-within .rank-mmr-popover { visibility: visible; opacity: 1; pointer-events: auto; transform: translateY(0); }
+.rank-mmr-popover > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.rank-mmr-popover > header strong { color: var(--ink); font-size: 12px; }
+.rank-mmr-popover > header span { color: var(--muted); font-size: 9px; }
+.rank-mmr-popover dl { display: grid; gap: 6px; margin: 9px 0; }
+.rank-mmr-popover dl > div { --mmr-accent: var(--primary-strong); display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 12px; min-height: 31px; padding: 6px 8px; background: color-mix(in oklab,var(--mmr-accent) 9%,transparent); border-left: 3px solid var(--mmr-accent); border-radius: 5px; }
+.rank-mmr-popover dl > .is-mayhem { --mmr-accent: light-dark(#6f42b5,#c6a1ff); }
+.rank-mmr-popover dt { color: var(--mmr-accent); font-size: 10.5px; font-weight: 750; }
+.rank-mmr-popover dd { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; margin: 0; color: var(--ink); font-size: 10.5px; font-weight: 700; }
+.rank-mmr-popover dd strong { color: var(--mmr-accent); font-size: 15px; font-variant-numeric: tabular-nums; }
+.rank-mmr-popover dd small { color: var(--muted); font-size: 9px; }
+.rank-mmr-popover > p { margin: 0; color: var(--muted); font-size: 9.5px; line-height: 1.55; }
+.rank-mmr-loading { display: inline-flex; align-items: center; gap: 5px; color: var(--mmr-accent); }
+.rank-mmr-loading .mini-loading { width: 11px; height: 11px; }
 .season-progress-badge { flex: 0 1 auto; overflow: hidden; padding: 3px 6px; color: var(--warning-ink,var(--ink)); background: color-mix(in oklab,var(--warning,#d49b32) 14%,var(--surface)); border: 1px solid color-mix(in oklab,var(--warning,#d49b32) 38%,var(--line)); border-radius: 4px; font-size: 10px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .ranked-queue-switcher { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; padding: 2px; background: color-mix(in oklab,var(--surface-strong) 74%,transparent); border: 1px solid var(--line); border-radius: 6px; }
 .ranked-queue-button { min-height: 25px; padding: 3px 7px; color: var(--muted); background: transparent; border: 0; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; }
@@ -1003,7 +1024,10 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-player dt { color: var(--muted); font-size: 10px; }
 .live-player dd { margin: 0; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .live-player.is-self dt, .live-player.is-self .live-player-copy > span { color: var(--ink); }
-.live-player.is-self dd { color: var(--ink); }
+.live-player.is-self .live-player-name { color: var(--primary-strong); }
+.live-player dd.live-record-value { color: var(--accent); }
+.live-player dd.win-rate-value { color: var(--success); }
+.live-player dd.live-kda-value { color: light-dark(#7746ab, #c3a2ed); }
 .self-chip { flex: 0 0 auto; margin-left: 7px; color: var(--primary-strong); font-size: 10px; font-weight: 750; }
 .premade-team-tag { display: inline-flex; min-height: 18px; flex: 0 0 auto; align-items: center; margin-left: 7px; padding: 1px 5px; color: var(--premade-color,#fff); background: var(--premade-bg,#555); border: 1px solid var(--premade-border,#555555d0); border-radius: 4px; font-size: 10px; font-weight: 800; line-height: 1; white-space: nowrap; cursor: help; }
 .premade-team-tag:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -1828,6 +1852,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .overview-art > video.is-playing { opacity: 1; }
 .summoner-strip.has-loaded-image .overview-art, .account-hero.has-loaded-image .overview-art { opacity: .8; }
 
+[data-live-status] { min-height: 40px; }
+
 .live-refresh-status {
   display: flex;
   align-items: center;
@@ -1841,3 +1867,11 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 
 .match-stat-damage > b, .match-damage-value { color: var(--danger); }
 .match-stat-taken > b, .match-taken-value { color: var(--muted); }
+
+/* R95: badges stay in the existing flex identity row; grid geometry is unchanged. */
+.live-player-identity { flex-wrap: wrap; }
+.live-player-identity .pro-identity-chip, .my-squad-chip { flex: 0 0 auto; max-width: 100%; }
+.live-player-identity .pro-identity-chip { white-space: normal; overflow-wrap: anywhere; }
+.pro-identity-chip.is-secondary { color: var(--text-muted, #a0a6ad); background: rgba(128,128,128,.12); }
+.my-squad-chip { font-size: 10px; color: #70cbb4; border: 1px solid currentColor; border-radius: 4px; padding: 1px 4px; }
+.arena-my-squad-notice { margin: 0 0 12px; color: var(--text-muted, #a0a6ad); font-size: 12px; }

@@ -1,0 +1,46 @@
+{
+  "date": "2026-09-16",
+  "real_lcu_probe": "pending",
+  "gated_work": [
+    "P1 ownership",
+    "P3 banners",
+    "P4 banner picker",
+    "P5-C accent"
+  ],
+  "go_all": "PASS",
+  "go_race_all": "PASS",
+  "go_final_focused_race": "PASS",
+  "node": {
+    "tests": 699,
+    "passed": 698,
+    "failed": 0,
+    "skipped": 1
+  },
+  "mutations": {
+    "killed": 25,
+    "total": 25
+  },
+  "sha256": {
+    "r99_probe.go": "4ab3d3b29dc0bd167fb00e95e347ac33625b63f20852b020c5495266c652f4c7",
+    "facade_icons.go": "d6086ec4a1bf39c64cff46030a83d3810d34cbc0e4a2d2d1488dd14377dda1d9",
+    "pro_seed_accounts.go": "0839781de1fa49858ad74e1db2da417da17d822b462765b6d03e52ad28395c58",
+    "profile_facade.go": "5c57134ffab7e2ee4ab636565890670b1e56dcf08daf327a32f189d03e60b05f",
+    "summoner_identity.go": "e5091b8918cb77be8bfa34328ce3bea8e40a1f7943a431efba306ff2f9b86f75",
+    "riot_api.go": "d180044bb6697e1481d009215dee732f99dd800dbfd56f2214a5f92dfefee1d7",
+    "riot_identity_cache.go": "f9bd57501301ec4de049c97f838d49217ba51d831b7f16b843cfe2edba26cfa6",
+    "champion_cache.go": "e945924d541b47ad5f3d63c634cef22eaad9c5a7eef4fe891a878131e9ae8f38",
+    "binary_disk_budget.go": "6ee16d16df64faa04a94f3b9b586f1782ff85b04fb8f71cd82baa70009929d91",
+    "pro_players.go": "b03bb56c3d9ff5a92eb9ce3f45961aa47aaad1a8e51eb18c1bb0341d18fff721",
+    "main.go": "acdad845dfc17f792911afa0d065f0da5335e4e81fadd97f5594b82afa4c7b25",
+    "lcu.go": "5cb109f66a56877abba037bf14b10a83517310465d0dc945f1c36ee459d64d41",
+    "features.go": "1b389ad1b741c1a73e6548de297bb64875eb07efcecffed62079637923d2f64a",
+    "quality_test.go": "d3aa864e02142172ad5a61762c51f9361071728aa68baa8dbf8ca4599cd2f412",
+    "r99_test.go": "750636446d931920ca7af70eee889581ca0ada7953bf22c3bc9a89e629a243ab",
+    "web/suite.js": "e4fed3629fe4a148dd75afae6ae5d53183abb9303d10286a12019cb9afb02595",
+    "web/suite.css": "a7e2bd4e49143d94c3e0c010aa1289079cf41683230f39c013499749f592199b",
+    "web/suite.test.cjs": "8f376778e0f7155def4d1cccf3e3e7112513f2b3867c7e1aebba269e1e4f5555",
+    "web/demo-data.js": "e8fad5823a35ff8865a9a341008209713c681d4899d52f2435477881189a9df2",
+    "desktop/r99-facade-picker-layout.cjs": "c9af1c63e4af8c3b91745688456513232dd1e53ff0e9aff8ee8f6b42073f1c55",
+    "scripts/r99-mutation-check.py": "d8b444104afc5dbd65782c33bd102e2e31cc5b86d9b3796681b991d056428068"
+  }
+}

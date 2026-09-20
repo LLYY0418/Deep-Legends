@@ -37,6 +37,7 @@ const (
 	livePlayerMatchesCacheTTL = 45 * time.Second
 	liveRosterConcurrency     = 6
 	liveClientPlayerListURL   = "https://127.0.0.1:2999/liveclientdata/playerlist"
+	liveClientAllGameDataURL  = "https://127.0.0.1:2999/liveclientdata/allgamedata"
 	liveClientRetryDelay      = 3 * time.Second
 )
 
@@ -198,6 +199,7 @@ type participantCompletenessSummary struct {
 }
 
 type gameplayOverview struct {
+	ProfilePending  bool                     `json:"profilePending,omitempty"`
 	Player          gameplayPlayer           `json:"player"`
 	Ranks           []gameplayRank           `json:"ranks"`
 	HistoricalRanks []gameplayHistoricalRank `json:"historicalRanks,omitempty"`
@@ -230,18 +232,19 @@ type gameplayRankedQueueStats struct {
 }
 
 type gameplayPlayer struct {
-	PlayerRef            string `json:"playerRef,omitempty"`
-	DisplayName          string `json:"displayName"`
-	GameName             string `json:"gameName,omitempty"`
-	TagLine              string `json:"tagLine,omitempty"`
-	ProfileIconID        int64  `json:"profileIconId,omitempty"`
-	SummonerLevel        int64  `json:"summonerLevel,omitempty"`
-	BackgroundSkinID     int64  `json:"backgroundSkinId,omitempty"`
-	BackgroundSkinName   string `json:"backgroundSkinName,omitempty"`
-	BackgroundSource     string `json:"backgroundSource,omitempty"`
-	BackgroundPath       string `json:"backgroundPath,omitempty"`
-	BackgroundPosterPath string `json:"backgroundPosterPath,omitempty"`
-	BackgroundVideoPath  string `json:"backgroundVideoPath,omitempty"`
+	ProPlayer            *proIdentityBadge `json:"proPlayer,omitempty"`
+	PlayerRef            string            `json:"playerRef,omitempty"`
+	DisplayName          string            `json:"displayName"`
+	GameName             string            `json:"gameName,omitempty"`
+	TagLine              string            `json:"tagLine,omitempty"`
+	ProfileIconID        int64             `json:"profileIconId,omitempty"`
+	SummonerLevel        int64             `json:"summonerLevel,omitempty"`
+	BackgroundSkinID     int64             `json:"backgroundSkinId,omitempty"`
+	BackgroundSkinName   string            `json:"backgroundSkinName,omitempty"`
+	BackgroundSource     string            `json:"backgroundSource,omitempty"`
+	BackgroundPath       string            `json:"backgroundPath,omitempty"`
+	BackgroundPosterPath string            `json:"backgroundPosterPath,omitempty"`
+	BackgroundVideoPath  string            `json:"backgroundVideoPath,omitempty"`
 	// Region 标注该玩家所属服务器："kr" 表示韩服（Riot 官方 API），
 	// 空值表示国服（本机客户端）。两个服务器的玩家互不相通。
 	Region string `json:"region,omitempty"`
@@ -326,6 +329,7 @@ type gameplayAbilityProfile struct {
 }
 
 type gameplayAbilityMetric struct {
+	Unavailable bool    `json:"unavailable,omitempty"`
 	Key         string  `json:"key"`
 	Label       string  `json:"label"`
 	Description string  `json:"description"`
@@ -436,29 +440,30 @@ type gameplayMatch struct {
 }
 
 type gameplayParticipant struct {
-	ParticipantID  int64   `json:"participantId"`
-	TeamID         int64   `json:"teamId"`
-	PlayerRef      string  `json:"playerRef,omitempty"`
-	DisplayName    string  `json:"displayName"`
-	GameName       string  `json:"gameName,omitempty"`
-	TagLine        string  `json:"tagLine,omitempty"`
-	ProfileIconID  int64   `json:"profileIconId,omitempty"`
-	ChampionID     int64   `json:"championId"`
-	ChampionName   string  `json:"championName"`
-	ChampionLevel  int     `json:"championLevel"`
-	Spell1ID       int64   `json:"spell1Id,omitempty"`
-	Spell2ID       int64   `json:"spell2Id,omitempty"`
-	PrimaryStyleID int64   `json:"primaryStyleId,omitempty"`
-	SubStyleID     int64   `json:"subStyleId,omitempty"`
-	PerkIDs        []int64 `json:"perkIds"`
-	AugmentIDs     []int64 `json:"augmentIds,omitempty"`
-	ItemIDs        []int64 `json:"itemIds"`
-	Position       string  `json:"position,omitempty"`
-	Kills          int     `json:"kills"`
-	Deaths         int     `json:"deaths"`
-	Assists        int     `json:"assists"`
-	KDA            float64 `json:"kda"`
-	CS             int     `json:"cs"`
+	ProPlayer      *proIdentityBadge `json:"proPlayer,omitempty"`
+	ParticipantID  int64             `json:"participantId"`
+	TeamID         int64             `json:"teamId"`
+	PlayerRef      string            `json:"playerRef,omitempty"`
+	DisplayName    string            `json:"displayName"`
+	GameName       string            `json:"gameName,omitempty"`
+	TagLine        string            `json:"tagLine,omitempty"`
+	ProfileIconID  int64             `json:"profileIconId,omitempty"`
+	ChampionID     int64             `json:"championId"`
+	ChampionName   string            `json:"championName"`
+	ChampionLevel  int               `json:"championLevel"`
+	Spell1ID       int64             `json:"spell1Id,omitempty"`
+	Spell2ID       int64             `json:"spell2Id,omitempty"`
+	PrimaryStyleID int64             `json:"primaryStyleId,omitempty"`
+	SubStyleID     int64             `json:"subStyleId,omitempty"`
+	PerkIDs        []int64           `json:"perkIds"`
+	AugmentIDs     []int64           `json:"augmentIds,omitempty"`
+	ItemIDs        []int64           `json:"itemIds"`
+	Position       string            `json:"position,omitempty"`
+	Kills          int               `json:"kills"`
+	Deaths         int               `json:"deaths"`
+	Assists        int               `json:"assists"`
+	KDA            float64           `json:"kda"`
+	CS             int               `json:"cs"`
 	// LaneCS / JungleCS 把补刀拆成小兵与野怪，供“分均补刀”提示展示。
 	LaneCS      int     `json:"laneCs"`
 	JungleCS    int     `json:"jungleCs"`
@@ -626,6 +631,8 @@ type lcuTeam struct {
 func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	a.scheduleItemIconWarmup(true)
 	loadStarted := time.Now()
+	request := gameplayOverviewRequest{Count: defaultMatchCount}
+	stream := false
 	loadCost := &overviewLoadCost{}
 	phases := newOverviewPhaseTimings(loadStarted)
 	timeout := a.overviewTimeout
@@ -635,6 +642,7 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	budget := overviewSoftBudget
 	if strings.Contains(r.Header.Get("Accept"), "application/x-ndjson") {
 		budget = 180 * time.Second
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 	}
 	budgetContext, cancelBudget := timeout(r.Context(), budget)
 	budgetContext = context.WithValue(budgetContext, overviewRequestContextKey{}, r.Context())
@@ -646,13 +654,12 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		finishedAt := time.Now()
 		requests, bytes, historyCalls, historyCacheHits := loadCost.snapshot()
 		a.recordDiagnostic(map[string]any{
-			"event": "overview_load_cost", "sgp_requests": requests, "sgp_bytes": bytes,
+			"event": "overview_load_cost", "beg_index": request.BegIndex, "stream": stream, "sgp_requests": requests, "sgp_bytes": bytes,
 			"sgp_history_calls": historyCalls, "sgp_history_cache_hits": historyCacheHits,
 			"duration_ms": finishedAt.Sub(loadStarted).Milliseconds(),
 		})
-		a.recordDiagnostic(map[string]any{"event": "overview_phases_ms", "load_phases_ms": phases.snapshot(finishedAt)})
+		a.recordDiagnostic(map[string]any{"event": "overview_phases_ms", "beg_index": request.BegIndex, "stream": stream, "load_phases_ms": phases.snapshot(finishedAt)})
 	}()
-	request := gameplayOverviewRequest{Count: defaultMatchCount}
 	if r.Method == http.MethodPost {
 		r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
 		decoder := json.NewDecoder(r.Body)
@@ -725,7 +732,7 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 			reference = gameplayReference{GameName: request.GameName, TagLine: request.TagLine, Region: riotRegionKR}
 		}
 		phases.mark("identity")
-		stream := strings.Contains(r.Header.Get("Accept"), "application/x-ndjson")
+		stream = strings.Contains(r.Header.Get("Accept"), "application/x-ndjson")
 		streamStarted := false
 		emit := func(value any) {
 			if !streamStarted {
@@ -744,7 +751,7 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 				emit(map[string]any{"type": "progress", "overview": partial})
 			}))
 		}
-		response, err := a.loadRiotOverviewDeduplicated(r.Context(), reference, request.BegIndex, request.Count, request.Force)
+		response, err := a.loadRiotOverviewDeduplicated(r.Context(), reference, request.BegIndex, request.Count, request.Force, request.MatchFilter)
 		phases.mu.Lock()
 		phases.last = time.Now()
 		phases.mu.Unlock()
@@ -761,10 +768,6 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response.Pagination.Filter = request.MatchFilter
-		if request.MatchFilter != "all" {
-			response.Pagination.FilterFallback = true
-			response.Pagination.FilterFallbackReason = "韩服战绩接口未启用 SGP tag，已使用客户端筛选"
-		}
 		// Comparison is request-local: never mutate the shared overview cache.
 		payload := struct {
 			gameplayOverview
@@ -1331,7 +1334,30 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		response.Pagination.BudgetExceeded = true
 		response.Pagination.Partial = true
 		response.Pagination.HasMore = true
-		response.Capabilities = append(response.Capabilities, overviewBudgetCapabilities()...)
+		// A slow match page must not discard profile requests that already
+		// finished. Drain only ready results, without extending the budget.
+		ready := map[string]bool{}
+		select {
+		case result := <-rankCh:
+			response.Ranks, result.value.capability = a.applySeasonRankWinRateFallback(result.value.ranks, result.value.capability, seasonByQueue)
+			response.RankMilestones = rankMilestonesForRegion(reference.Region, result.value.milestones)
+			response.Capabilities = append(response.Capabilities, result.value.capability)
+			ready["ranked-stats"] = true
+		default:
+		}
+		select {
+		case result := <-masteryCh:
+			response.Masteries = normalizeMasteries(result.value, names, 6)
+			response.Capabilities = append(response.Capabilities, result.capability)
+			ready["champion-mastery"] = true
+		default:
+		}
+		for _, capability := range overviewBudgetCapabilities() {
+			if !ready[capability.Name] {
+				response.Capabilities = append(response.Capabilities, capability)
+			}
+		}
+		a.completeOverviewBackground(&response, playerRef)
 		phases.mark("ranks")
 		phases.mark("mastery")
 		phases.mark("recent_ranked")
@@ -1476,8 +1502,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	masteries := normalizeMasteries(masteryMap, names, 6)
 	response.Ranks = ranks
 	response.Masteries = masteries
-	applyMasteryBackgroundFallback(&response.Player, masteries)
-	a.applyOverviewSkinMedia(&response.Player)
+	a.completeOverviewBackground(&response, playerRef)
 	response.Capabilities = capabilities
 	response.Overall = aggregateMatches(matches, playerRef, nil)
 	recentWindowAfter := time.Now().Add(-recentWindowDays * 24 * time.Hour).UnixMilli()
@@ -1529,7 +1554,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 func overviewBudgetCapabilities() []EndpointCapability {
 	detail := "overview 18 秒软预算已用尽；保留已读取结果，点击继续可补齐"
 	return []EndpointCapability{
-		{Name: "ranks", State: capabilityFailed, Detail: detail},
+		{Name: "ranked-stats", State: capabilityFailed, Detail: detail},
 		{Name: "champion-mastery", State: capabilityFailed, Detail: detail},
 		{Name: "recent-ranked", State: capabilityFailed, Detail: detail},
 		{Name: "recent-players", State: capabilityFailed, Detail: detail},
@@ -2411,9 +2436,11 @@ func (a *app) clearGameplayReferences() {
 
 func (a *app) publicizeOverviewReferences(response *gameplayOverview) {
 	playerReference := mergeGameplayReferences(response.Player.reference, gameplayReference{PlayerRef: response.Player.PlayerRef, DisplayName: response.Player.DisplayName, GameName: response.Player.GameName, TagLine: response.Player.TagLine, ProfileIconID: response.Player.ProfileIconID, SummonerLevel: response.Player.SummonerLevel, Region: response.Player.Region, ServerID: response.Player.ServerID})
+	index := a.proIdentitySnapshot()
+	response.Player.ProPlayer = a.matchProIdentity(index, "overview", playerReference)
 	response.Player.PlayerRef = a.registerGameplayReferenceDetails(playerReference)
 	for matchIndex := range response.Matches {
-		a.publicizeMatchReferences(&response.Matches[matchIndex])
+		a.publicizeMatchReferencesWithProIndex(&response.Matches[matchIndex], index)
 	}
 	for index := range response.RecentPlayers {
 		player := &response.RecentPlayers[index]
@@ -2422,15 +2449,21 @@ func (a *app) publicizeOverviewReferences(response *gameplayOverview) {
 }
 
 func (a *app) publicizeMatchReferences(match *gameplayMatch) {
+	a.publicizeMatchReferencesWithProIndex(match, a.proIdentitySnapshot())
+}
+
+func (a *app) publicizeMatchReferencesWithProIndex(match *gameplayMatch, index proIdentityIndex) {
 	if match == nil {
 		return
 	}
 	for playerIndex := range match.Participants {
 		participant := &match.Participants[playerIndex]
-		participant.PlayerRef = a.registerGameplayReferenceDetails(mergeGameplayReferences(participant.reference, gameplayReference{
+		reference := mergeGameplayReferences(participant.reference, gameplayReference{
 			PlayerRef: participant.PlayerRef, DisplayName: participant.DisplayName, GameName: participant.GameName,
 			TagLine: participant.TagLine, ProfileIconID: participant.ProfileIconID,
-		}))
+		})
+		participant.ProPlayer = a.matchProIdentity(index, "match", reference)
+		participant.PlayerRef = a.registerGameplayReferenceDetails(reference)
 	}
 }
 
@@ -3576,6 +3609,7 @@ type gameplayLiveResponse struct {
 	ChampSelectNotice        string                    `json:"champSelectNotice,omitempty"`
 	ArenaGroupingRetryable   bool                      `json:"arenaGroupingRetryable,omitempty"`
 	ArenaGroupingUnavailable bool                      `json:"arenaGroupingUnavailable,omitempty"`
+	ArenaMySquadNotice       string                    `json:"arenaMySquadNotice,omitempty"`
 	ArenaGrouped             bool                      `json:"arenaGrouped,omitempty"`
 	ArenaMascotMapping       bool                      `json:"arenaMascotMapping,omitempty"`
 	ArenaGroupSource         string                    `json:"arenaGroupSource,omitempty"`
@@ -5013,6 +5047,8 @@ func lcuChampSelectSessionShapePayload(raw []byte, phase, gameMode string, queue
 		"my_team_keys":                        diagnosticKeyUnion(myTeam),
 		"their_team_keys":                     diagnosticKeyUnion(theirTeam),
 		"my_team_length":                      len(myTeam),
+		"my_team_unhidden_cell_ids":           diagnosticCellIDs(myTeam, true),
+		"my_team_cell_id_sequence":            diagnosticCellIDs(myTeam, false),
 		"their_team_length":                   len(theirTeam),
 		"my_team_nonzero_counts":              diagnosticNonZeroKeyCounts(myTeam),
 		"their_team_nonzero_counts":           diagnosticNonZeroKeyCounts(theirTeam),
@@ -5450,6 +5486,7 @@ type gameplayLivePlayer struct {
 	gameplayPlayer
 	TeamID               int64  `json:"teamId"`
 	ArenaGroup           string `json:"arenaGroup,omitempty"`
+	MySquad              bool   `json:"mySquad,omitempty"`
 	PremadeGroup         string `json:"premadeGroup,omitempty"`
 	PremadeSize          int    `json:"premadeSize,omitempty"`
 	PremadeSource        string `json:"premadeSource,omitempty"`
@@ -5676,7 +5713,7 @@ type lcuChampSelectPlayer struct {
 }
 
 const (
-	arenaChampSelectNotice = "斗魂英雄选择阶段只展示小队玩家信息"
+	arenaChampSelectNotice = "我的小队：英雄选择阶段客户端只提供本小队信息，其余小队进入对局后仍不提供小队归属"
 	emptyLCUPlayerPUUID    = "00000000-0000-0000-0000-000000000000"
 )
 
@@ -5890,7 +5927,25 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		return response
 	}
 	response.Available = true
+	// Begin recommendations before the ten-player identity/history fan-out.
+	seed := liveRecommendationSeed{ChampionID: response.CurrentChampionID, QueueID: response.QueueID, MapID: response.MapID, GameMode: response.GameMode}
+	for _, raw := range rawPlayers {
+		ref := gameplayReference{PlayerRef: visibleLivePlayerReference(raw.player), SummonerID: raw.player.SummonerID}
+		if gameplayLivePlayerIsCurrent(ref, current.PUUID, raw.player.CellID, localPlayerCellID) {
+			if seed.ChampionID <= 0 {
+				seed.ChampionID = raw.player.ChampionID
+			}
+			seed.Position = normalizePosition(raw.player.SelectedPosition, raw.player.SelectedRole)
+			break
+		}
+	}
+	a.liveRecommendationPrewarmer.warm(seed)
 	arenaMode := isArenaChampSelectMode(response.GameMode)
+	aramMode := isARAMFamilyGameMode(response.GameMode)
+	switch queueModeGroupFor(response.QueueID, response.GameMode, response.MapID) {
+	case "aram", "hextech-aram", "hextech-classic":
+		aramMode = true
+	}
 	if arenaMode {
 		a.noteArenaPhaseRoster(client, &response)
 	}
@@ -5955,6 +6010,9 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 				enrichment.Add(2)
 				go func() {
 					defer enrichment.Done()
+					if aramMode {
+						return // ARAM details do not display ranked tiers.
+					}
 					ranks = append([]gameplayRank(nil), a.playerRankScore(ctx, client, playerRef, isCurrent, reference.ServerID, summoner.Privacy).ranks...)
 					ranksFinishedAt[index] = time.Now()
 				}()
@@ -6021,6 +6079,10 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		}
 	}
 	a.finalizeLiveClientPlayerListShape(response.GameID, positionMatchSources["summonerName"]+positionMatchSources["riotId"], positionMatchSources)
+	if arenaMode {
+		response.ArenaMySquadNotice = arenaChampSelectNotice
+		a.markRememberedArenaSquad(&response)
+	}
 	applyLivePremadeAssignments(response.Players, premadeInputs, phase, arenaMode)
 	if arenaMode && (phase == "GameStart" || phase == "InProgress" || phase == "Reconnect") {
 		sessionPlayers := make([]lcuLivePlayer, len(rawPlayers))
@@ -6029,11 +6091,15 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		}
 		a.markArenaGroupingAttempt(client, &response)
 		a.compareArenaChampOrder(client, &response, sessionPlayers, liveClientSnapshotValue)
+		a.recordArenaMissingSession(current, &response, liveClientSnapshotValue)
 		a.applyArenaLiveGrouping(client, current, &response, sessionPlayers, liveClientSnapshotValue)
+		go a.sampleArenaAllGameData(ctx, response.GameID)
 	}
 
+	proIndex := a.proIdentitySnapshot()
 	for index := range response.Players {
 		player := &response.Players[index]
+		player.ProPlayer = a.matchProIdentity(proIndex, "live", player.reference)
 		player.PlayerRef = a.registerGameplayReferenceDetails(player.reference)
 	}
 	snapshotStats := livePositionSnapshotStats{}
@@ -7812,11 +7878,12 @@ type gameplayAugmentRaw struct {
 const gameplayPerkCatalogTTL = 30 * time.Minute
 
 type gameplayPerkCatalogResponse struct {
-	source       string
-	Styles       []gameplayPerkStyle `json:"styles"`
-	StatModSlots []gameplayPerkSlot  `json:"statModSlots"`
-	Perks        []gameplayPerk      `json:"perks"`
-	Augments     []gameplayAugment   `json:"augments"`
+	AugmentsPending bool `json:"augmentsPending,omitempty"`
+	source          string
+	Styles          []gameplayPerkStyle `json:"styles"`
+	StatModSlots    []gameplayPerkSlot  `json:"statModSlots"`
+	Perks           []gameplayPerk      `json:"perks"`
+	Augments        []gameplayAugment   `json:"augments"`
 }
 
 type gameplayPerkCatalogCacheEntry struct {
@@ -7832,9 +7899,12 @@ func (a *app) handleGameplayPerks(w http.ResponseWriter, r *http.Request) {
 		client = nil
 		cacheKey = "ddragon"
 	}
-	payload, err := a.cachedGameplayPerkCatalog(cacheKey, func() (gameplayPerkCatalogResponse, error) {
+	payload, err := a.cachedGameplayPerkCatalog(r.Context(), cacheKey, func() (gameplayPerkCatalogResponse, error) {
 		return a.loadGameplayPerkCatalog(r.Context(), client)
 	})
+	if err == nil {
+		payload = a.enrichPerkAugments(cacheKey, client, payload)
+	}
 	source := payload.source
 	if source == "" {
 		source = cacheKey
@@ -7847,18 +7917,40 @@ func (a *app) handleGameplayPerks(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, payload)
 }
 
-func (a *app) cachedGameplayPerkCatalog(key string, loader func() (gameplayPerkCatalogResponse, error)) (gameplayPerkCatalogResponse, error) {
+func (a *app) cachedGameplayPerkCatalog(ctx context.Context, key string, loader func() (gameplayPerkCatalogResponse, error)) (gameplayPerkCatalogResponse, error) {
 	a.perkCatalogMu.Lock()
-	defer a.perkCatalogMu.Unlock()
 	if entry, ok := a.perkCatalog[key]; ok && time.Since(entry.loadedAt) < gameplayPerkCatalogTTL {
+		a.perkCatalogMu.Unlock()
 		return entry.payload, nil
 	}
-	payload, err := loader()
+	if a.perkCatalogDisk == nil {
+		a.perkCatalogDisk = newPublicBinaryCache(a.storage, "perk-catalog", 8, 4<<20)
+	}
+	cache := a.perkCatalogDisk
+	a.perkCatalogMu.Unlock()
+	data, err := cache.load(ctx, "normalized-perks-v1|"+key, gameplayPerkCatalogTTL, 24*time.Hour, true, func(context.Context) ([]byte, error) {
+		payload, err := loader()
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(payload)
+	})
 	if err != nil {
 		return gameplayPerkCatalogResponse{}, err
 	}
+	var payload gameplayPerkCatalogResponse
+	if err = json.Unmarshal(data, &payload); err != nil {
+		return payload, err
+	}
+	payload.source = key
+	a.perkCatalogMu.Lock()
+	defer a.perkCatalogMu.Unlock()
 	if a.perkCatalog == nil {
 		a.perkCatalog = make(map[string]gameplayPerkCatalogCacheEntry)
+	}
+	// Do not overwrite enrichment already published by an overlapping request.
+	if entry, ok := a.perkCatalog[key]; ok && time.Since(entry.loadedAt) < gameplayPerkCatalogTTL {
+		return entry.payload, nil
 	}
 	a.perkCatalog[key] = gameplayPerkCatalogCacheEntry{loadedAt: time.Now(), payload: payload}
 	return payload, nil
@@ -7884,10 +7976,9 @@ func (a *app) loadGameplayPerkCatalog(ctx context.Context, client *LCUClient) (g
 			"event": "perk_catalog_loaded", "source": "ddragon", "styles": len(styles), "perks": len(perks),
 			"enriched_from_perks_json": enriched, "missing_icon_path": missingIcons,
 		})
-		augments, _ := a.fallbackGameplayAugments(ctx)
-		return gameplayPerkCatalogResponse{source: "ddragon", Styles: styles, StatModSlots: statModSlots, Perks: perks, Augments: augments}, nil
+		return gameplayPerkCatalogResponse{source: "ddragon", Styles: styles, StatModSlots: statModSlots, Perks: perks}, nil
 	}
-	styleData, styleErr := client.GetBytes("/lol-game-data/assets/v1/perkstyles.json")
+	styleData, styleErr := client.GetBytesContext(ctx, "/lol-game-data/assets/v1/perkstyles.json")
 	var styles []gameplayPerkStyle
 	if styleErr == nil {
 		styles, styleErr = parseGameplayPerkStyles(styleData)
@@ -7945,11 +8036,7 @@ func (a *app) loadGameplayPerkCatalog(ctx context.Context, client *LCUClient) (g
 		"event": "perk_catalog_loaded", "source": source, "styles": len(styles), "perks": len(perks),
 		"enriched_from_perks_json": enriched, "missing_icon_path": missingIcons,
 	})
-	augments, augmentErr := loadGameplayAugmentsFromClient(client)
-	if augmentErr != nil {
-		augments, _ = a.fallbackGameplayAugments(ctx)
-	}
-	return gameplayPerkCatalogResponse{source: source, Styles: styles, StatModSlots: statModSlots, Perks: perks, Augments: augments}, nil
+	return gameplayPerkCatalogResponse{source: source, Styles: styles, StatModSlots: statModSlots, Perks: perks}, nil
 }
 
 func normalizeGameplayPerkCatalog(styles []gameplayPerkStyle, perks []gameplayPerk) ([]gameplayPerkStyle, []gameplayPerk, int, int) {
@@ -8060,9 +8147,9 @@ func loadGameplayAugmentsFromClient(client *LCUClient) ([]gameplayAugment, error
 }
 
 func (a *app) fallbackGameplayAugments(ctx context.Context) ([]gameplayAugment, error) {
-	loadCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	loadCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	catalog, err := a.champions.loadCommunityDragonAugments(loadCtx)
+	catalog, err := a.championDataProvider().loadCommunityDragonAugments(loadCtx)
 	// This catalog backs ID-to-icon lookups, so it must retain both Kiwi and
 	// Cherry namespaces just like the LCU catalog path.
 	return catalog, err
@@ -8386,19 +8473,35 @@ func cloneQueueLabels(labels map[int64]string) map[int64]string {
 }
 
 func queueLabel(queueID int64, mode string, labels map[int64]string) string {
-	if label := strings.TrimSpace(labels[queueID]); label != "" {
+	if label := strings.TrimSpace(labels[queueID]); containsChineseQueueLabel(label) {
 		return label
 	}
-	if definition, ok := supportedQueueDefinition(queueID); ok {
+	if definition, ok := supportedQueueDefinition(queueID); ok && containsChineseQueueLabel(definition.Name) {
 		return definition.Name
 	}
-	if strings.TrimSpace(mode) != "" {
-		return mode
+	if label := gameModeLabelsZH[strings.ToUpper(strings.TrimSpace(mode))]; label != "" {
+		return label
 	}
-	if queueID > 0 {
-		return fmt.Sprintf("模式 %d", queueID)
+	if queueID == 0 && strings.TrimSpace(mode) == "" {
+		return "自定义对局"
 	}
-	return "自定义对局"
+	return "其他模式"
+}
+
+func containsChineseQueueLabel(label string) bool {
+	for _, r := range label {
+		if r >= '一' && r <= '鿿' {
+			return true
+		}
+	}
+	return false
+}
+
+var gameModeLabelsZH = map[string]string{
+	"CHERRY": "斗魂竞技场", "ARENA": "斗魂竞技场", "CLASSIC": "召唤师峡谷", "ARAM": "极地大乱斗",
+	"KIWI": "海克斯大乱斗", "ARAM_MAYHEM": "海克斯大乱斗", "ARAM_MAYHEM_CLASSIC": "海克斯大乱斗（经典模式版）",
+	"STRAWBERRY": "无尽狂潮", "ONEFORALL": "克隆大作战", "ULTBOOK": "终极魔典", "NEXUSBLITZ": "极限闪击",
+	"KINGPORO": "魄罗大乱斗", "TUTORIAL": "新手教程", "TFT": "云顶之弈", "URF": "无限火力", "DOOMBOTSTEEMO": "末日人工智能",
 }
 
 func queueModeGroupFor(queueID int64, gameMode string, mapID int64) string {

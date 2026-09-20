@@ -1,0 +1,27 @@
+✔ R95 P1 progress preserves career, append=true, noise=null (72.131208ms)
+✔ R95 P1 progress preserves career, append=true, noise=[] (16.920792ms)
+✔ R95 P1 progress preserves career, append=true, noise=undefined (14.620958ms)
+✔ R95 P1 progress preserves career, append=false, noise=null (12.516542ms)
+✔ R95 P1 progress preserves career, append=false, noise=[] (9.58975ms)
+✔ R95 P1 progress preserves career, append=false, noise=undefined (9.787833ms)
+✔ R95 P1 first five and complete explicit empty arrays are authoritative (34.01575ms)
+✔ R95 P2 slow interval/false loading eligibility (19.753667ms)
+✔ R95 P2 slow sse/false loading eligibility (18.258917ms)
+✔ R95 P2 slow event/false loading eligibility (14.565292ms)
+✔ R95 P2 slow manual/true loading eligibility (10.86025ms)
+✔ R95 P2 slow direct/true loading eligibility (10.595875ms)
+✔ R95 P2 slow manual/false loading eligibility (9.996292ms)
+✔ R95 P2 fast 10ms manual response never shows status, including zero-delay timers (7.828375ms)
+✔ R95 P3 both sides only show lock wait for show-then-lock (36.08475ms)
+✔ R95 P4 badge respects mask, secondary and professional click context (21.639542ms)
+✔ R95 P5 exact Chinese titles, unknown fallback, relative time and champselect fired count (1.461666ms)
+✔ R95 P3 typed lock wait targets its own side (9.44225ms)
+✔ R95 P4 match player clicks enter professional context even without directory source (7.237959ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1082.475167

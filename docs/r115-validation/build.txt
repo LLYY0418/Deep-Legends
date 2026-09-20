@@ -1,0 +1,14 @@
+/tmp/r115-build/loot-service.exe: go1.24.5
+	path	lol-loot-assistant
+	mod	lol-loot-assistant	(devel)	
+	dep	github.com/gorilla/websocket	v1.5.3	h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
+	dep	github.com/mozillazg/go-pinyin	v0.21.0	h1:Wo8/NT45z7P3er/9YSLHA3/kjZzbLz5hR7i+jGeIGao=
+	dep	golang.org/x/net	v0.43.0	h1:lat02VYK2j4aLzMzecihNvTlJNQUq316m2Mr9rnM6YE=
+	dep	golang.org/x/sys	v0.35.0	h1:vz1N37gP5bs89s7He8XuIYXpyY0+QlsKmzipCbUtyxI=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	-trimpath=true
+	build	CGO_ENABLED=0
+	build	GOARCH=amd64
+	build	GOOS=windows
+	build	GOAMD64=v1

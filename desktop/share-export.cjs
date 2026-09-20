@@ -183,7 +183,7 @@ async function renderOverviewPng(BrowserWindow, baseURL, payload) {
   }
 }
 
-function createShareExportController({ BrowserWindow, app, dialog, fileSystem, isTrustedRenderer, getBaseURL, log, now = Date.now, randomToken }) {
+function createShareExportController({ BrowserWindow, app, dialog, fileSystem, isTrustedRenderer, getBaseURL, log, now = Date.now, randomToken, directoryController }) {
   const pending = new Map();
   const makeToken = randomToken || (() => crypto.randomBytes(24).toString("base64url"));
   const settingsPath = path.join(app.getPath("userData"), SHARE_SETTINGS_FILE);
@@ -196,7 +196,7 @@ function createShareExportController({ BrowserWindow, app, dialog, fileSystem, i
 
   function prune() {
     const current = now();
-    for (const [senderID, entry] of pending) if (entry.expiresAt <= current) pending.delete(senderID);
+    for (const [senderID, entry] of pending) if (entry.expiresAt <= current) clear(senderID);
   }
 
   function usableDirectory(directory) {
@@ -217,6 +217,7 @@ function createShareExportController({ BrowserWindow, app, dialog, fileSystem, i
   }
 
   async function requestDirectory(event, title) {
+    if (directoryController) return directoryController.chooseSaveDirectory(event);
     const options = {
       title,
       buttonLabel: "选择文件夹",
@@ -232,6 +233,7 @@ function createShareExportController({ BrowserWindow, app, dialog, fileSystem, i
 
   function getSaveDirectory(event) {
     if (!isTrustedRenderer(event?.sender)) throw new Error("不受信任的页面不能读取分享图设置。");
+    if (directoryController) return directoryController.getSaveDirectory(event);
     if (!usableDirectory(saveDirectory)) saveDirectory = "";
     return { directory: saveDirectory };
   }
@@ -239,7 +241,7 @@ function createShareExportController({ BrowserWindow, app, dialog, fileSystem, i
   async function chooseSaveDirectory(event) {
     if (!isTrustedRenderer(event?.sender)) throw new Error("不受信任的页面不能修改分享图设置。");
     const result = await requestDirectory(event, "选择导出位置");
-    if (!result.canceled) pending.delete(event.sender.id);
+    if (!result.canceled) clear(event.sender.id);
     return result;
   }
 
@@ -247,14 +249,19 @@ function createShareExportController({ BrowserWindow, app, dialog, fileSystem, i
     if (!isTrustedRenderer(event?.sender)) throw new Error("不受信任的页面不能保存分享图。");
     prune();
     let prompted = false;
+    if (directoryController) saveDirectory = directoryController.getSaveDirectory(event).directory;
     if (!usableDirectory(saveDirectory)) {
       saveDirectory = "";
       const selected = await requestDirectory(event, "首次生成分享图：选择保存位置");
       if (selected.canceled) return selected;
+      saveDirectory = selected.directory;
       prompted = true;
     }
     const token = makeToken();
-    pending.set(event.sender.id, { token, filePath: uniquePngPath(fileSystem, saveDirectory, suggestedName), expiresAt: now() + SHARE_SAVE_TTL_MS });
+    clear(event.sender.id);
+    const destination = uniquePngPath(fileSystem, saveDirectory, suggestedName);
+    const filePath = directoryController ? directoryController.prepareFile(destination) : destination;
+    pending.set(event.sender.id, { token, filePath, expiresAt: now() + SHARE_SAVE_TTL_MS });
     return { canceled: false, token, directory: saveDirectory, prompted };
   }
 
@@ -268,21 +275,27 @@ function createShareExportController({ BrowserWindow, app, dialog, fileSystem, i
     try {
       const result = await renderOverviewPng(BrowserWindow, getBaseURL(), payload);
       fileSystem.writeFileSync(entry.filePath, result.png);
+      const savedPath = directoryController ? await directoryController.finalizeFile(entry.filePath) : entry.filePath;
       return {
         ok: true,
-        fileName: path.basename(entry.filePath),
+        fileName: path.basename(savedPath),
         pixelWidth: Math.round(result.width * result.scale),
         pixelHeight: Math.round(result.height * result.scale),
       };
     } catch (error) {
       log?.(`分享图导出失败：${error?.message || error}`);
       throw new Error("分享图生成失败，请重试。");
+    } finally {
+      directoryController?.discardFile(entry.filePath);
     }
   }
 
   function clear(senderID) {
-    if (senderID === undefined) pending.clear();
-    else pending.delete(senderID);
+    for (const [id, entry] of pending) {
+      if (senderID !== undefined && senderID !== id) continue;
+      directoryController?.discardFile(entry.filePath);
+      pending.delete(id);
+    }
   }
 
   return { prepareSave, getSaveDirectory, chooseSaveDirectory, captureAndSave, clear };

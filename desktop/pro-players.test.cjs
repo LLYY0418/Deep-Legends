@@ -17,7 +17,7 @@ function fixture() {
   ] })), playerCount: 12, accountCount: 12, missingCount: 6, warnings: [], fetchedAt: "2026-09-08T11:00:00Z", rosterVerifiedAt: "2026-09-08" };
 }
 function boot(t, { full = false, response = async () => fixture(), overviewStatus = 200, proMismatch = false, diagnosticsBridge, seasonSummary, currentGame, demoCurrentGame = false, noMatches = false, spellCatalog = async () => ({spells: [{id: 4, name: "闪现"}, {id: 11, name: "惩戒"}]}) } = {}) {
-  const dom = new JSDOM(fs.readFileSync(path.join(WEB, "index.html"), "utf8"), { url: demoCurrentGame ? "http://localhost/?demo=current-game" : "http://localhost/?demo", runScripts: "outside-only", pretendToBeVisual: true });
+  const dom = new JSDOM(fs.readFileSync(process.env.R102_INDEX_SOURCE || path.join(WEB, "index.html"), "utf8"), { url: demoCurrentGame ? "http://localhost/?demo=current-game" : "http://localhost/?demo", runScripts: "outside-only", pretendToBeVisual: true });
   const w = dom.window, requests = [], errors = [];
   t.after(() => w.close());
   w.desktopDiagnostics = diagnosticsBridge;
@@ -63,7 +63,7 @@ function boot(t, { full = false, response = async () => fixture(), overviewStatu
         return reply;
       };
     }
-    w.eval(fs.readFileSync(path.join(WEB, file), "utf8"));
+    w.eval(fs.readFileSync(file === "pro-players.js" && (process.env.R102_PRO_SOURCE || process.env.R97_PRO_PLAYERS_SOURCE) || path.join(WEB, file), "utf8"));
   }
   if (full) w.document.dispatchEvent(new w.Event("DOMContentLoaded", { bubbles: true }));
   const section = () => w.dispatchEvent(new w.CustomEvent("deep-legends:section", { detail: { name: "pro-players" } }));
@@ -79,7 +79,7 @@ test("职业页懒加载、所有分组/账号、缺失状态、筛选缓存与�
   section(); await tick();
   assert.equal(requests.length, 1);
   assert.equal(d.querySelectorAll(".pro-team").length, 6);
-  assert.equal(d.querySelectorAll("[data-pro-account]").length, 12);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 7);
   assert.equal(d.querySelectorAll(".pro-missing").length, 6);
   assert.equal(d.querySelector(".pro-description"), null);
   assert.equal(d.querySelector(".pro-footer"), null);
@@ -96,11 +96,12 @@ test("职业页懒加载、所有分组/账号、缺失状态、筛选缓存与�
   const firstRow = d.querySelector(".pro-table tbody tr");
   assert.equal(firstRow.querySelector(".pro-lp-value").textContent, "1,000");
   assert.equal(firstRow.querySelector(".pro-ladder-rank").textContent, "#42");
-  assert.deepEqual([...d.querySelectorAll(".pro-table thead th")].slice(0, 5).map((cell) => cell.textContent.trim().replace(/\s+/g, " ")), ["选手", "韩服账号", "单双排段位 ↓", "胜点", "天梯"]);
-  assert.equal(d.querySelector(".pro-table thead th[aria-sort]").getAttribute("aria-sort"), "descending");
+  assert.deepEqual([...d.querySelectorAll(".pro-table thead th")].slice(0, 5).map((cell) => cell.textContent.trim().replace(/\s+/g, " ")), ["选手", "韩服账号", "单双排段位", "胜点", "天梯"]);
+  assert.equal(d.querySelector(".pro-table thead th[aria-sort]"), null);
   assert.match(d.querySelector(".pro-account").textContent, /<img src=x/);
-  assert.match(d.querySelector("#pro-players-content").textContent, /段位暂不可用/);
+  assert.match(d.querySelector("#pro-players-content").textContent, /无段位或待确认账号/);
   d.querySelector('[data-pro-team="T1"]').click();
+  d.querySelector('[data-pro-history]').click();
   const search = d.querySelector("#pro-players-search");
   search.value = "two"; search.dispatchEvent(new w.Event("input"));
   assert.equal(d.querySelectorAll("[data-pro-account]").length, 1);
@@ -121,7 +122,7 @@ test("加载互斥、失败保留旧表、恢复与来源不可用名单", async
   assert.equal(d.querySelector("#pro-players-refresh").disabled, true);
   release(fixture()); await tick();
   fail = true; d.querySelector("#pro-players-refresh").click(); await tick();
-  assert.equal(d.querySelectorAll("[data-pro-account]").length, 12);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 6);
   assert.match(d.querySelector("#pro-players-status").textContent, /刷新失败.*上次读取/);
   assert.equal(d.querySelector("#pro-players-refresh").disabled, false);
   fail = false; d.querySelector("#pro-players-refresh").click();
@@ -168,8 +169,8 @@ test("统一总览按国服、韩服、职业分组，同一账号跨组隔离�
  const {w,d,errors}=boot(t,{full:true});await tick(250);
  const group=()=>d.querySelector('#player-group-button')?.dataset.playerGroup;
  const choose=key=>{d.querySelector('#player-group-button').click();d.querySelector(`#player-group-menu [data-player-group="${key}"]`).click();};
- assert.equal(d.querySelector('#player-group-menu [data-player-group="kr"]').getAttribute('aria-disabled'),'true');
- assert.equal(d.querySelector('#player-group-menu [data-player-group="pro"]').getAttribute('aria-disabled'),'true');
+ assert.equal(d.querySelector('#player-group-menu [data-player-group="kr"]').getAttribute('aria-disabled'),'false');
+ assert.equal(d.querySelector('#player-group-menu [data-player-group="pro"]').getAttribute('aria-disabled'),'false');
  const open=(source)=>w.dispatchEvent(new w.CustomEvent('deep-legends:open-player',{detail:{gameName:'T1 One',tagLine:'KR1',region:'kr',source,teamCode:'T1',playerName:'T1 Fixture'}}));
  w.dispatchEvent(new w.CustomEvent('deep-legends:navigate',{detail:{section:'pro-players'}}));await tick();
  d.querySelector('[data-pro-team="T1"]').click();
@@ -194,8 +195,8 @@ test("统一总览按国服、韩服、职业分组，同一账号跨组隔离�
  assert.equal(d.querySelector('#pro-players-panel').hidden,false);assert.equal(root.scrollTop,123);assert.equal(search.value,'one');assert.equal(d.activeElement.dataset.proAccount,account.dataset.proAccount);
  d.querySelector('#pro-players-home').click();await tick();
  assert.equal(group(),'pro');choose('kr');await tick();assert.equal(root.scrollTop,220);
- d.querySelector('#player-tabs [data-close-player]').click();await tick();assert.equal(d.querySelector('#player-group-menu [data-player-group="kr"]').getAttribute('aria-disabled'),'true');
- choose('pro');await tick();d.querySelector('#player-tabs [data-close-player]').click();await tick();assert.equal(d.querySelector('#player-group-menu [data-player-group="pro"]').getAttribute('aria-disabled'),'true');
+ d.querySelector('#player-tabs [data-close-player]').click();await tick();assert.equal(d.querySelector('#player-group-menu [data-player-group="kr"]').getAttribute('aria-disabled'),'false');
+ choose('pro');await tick();d.querySelector('#player-tabs [data-close-player]').click();await tick();assert.equal(d.querySelector('#player-group-menu [data-player-group="pro"]').getAttribute('aria-disabled'),'false');
  assert.equal(d.querySelector('#overview-panel').hidden,false);assert.deepEqual(errors,[]);
 });
 
@@ -205,7 +206,7 @@ test("补充来源未更新保留提示，重新进入不重复阻塞整页，�
   const { d, requests, section } = boot(t, { response: async () => data });
   section(); await tick();
   assert.match(d.querySelector("#pro-players-status").textContent, /部分来源未更新/);
-  assert.equal(d.querySelectorAll("[data-pro-account]").length, 12);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 6);
   section(); await tick();
   assert.equal(requests.length, 1);
   d.querySelector("#pro-players-refresh").click(); await tick();
@@ -216,7 +217,7 @@ test("职业列表后台补充自动更新，离开页面停止轮询", async t 
   let calls = 0;
   const {w,d,requests,section} = boot(t,{response:async()=>({...fixture(),updating:++calls<2})});
   section();await tick();
-  assert.equal(d.querySelectorAll("[data-pro-account]").length,12);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length,6);
   await tick(1650);
   assert.equal(requests.length,2);
   await tick(1650);
@@ -227,17 +228,16 @@ test("职业列表后台补充自动更新，离开页面停止轮询", async t 
 });
 
 
-test("R73 主号、历史折叠、只看主号及会话核验", async t => {
+test("R73 最近账号、历史折叠、只看最新账号及会话核验", async t => {
   const data = fixture();
   for (const team of data.teams) {
-    team.players[0].accounts[0].primary = true;
     team.players[0].accounts[1].dormant = true;
   }
   data.warnings = ["第一条提示", "第二条提示"];
   const {w, d, section, requests} = boot(t, {response: async () => data});
   section(); await tick();
   assert.equal(d.querySelectorAll("[data-pro-account]").length, 6);
-  assert.equal(d.querySelectorAll(".pro-main-badge").length, 6);
+  assert.equal(d.querySelectorAll(".pro-main-badge").length, 0);
   assert.equal(d.querySelector(".pro-warnings"), null);
   assert.equal(d.querySelector("#pro-players-warnings"), null);
   assert.equal(d.querySelector(".pro-team-filter i"), null);
@@ -248,7 +248,10 @@ test("R73 主号、历史折叠、只看主号及会话核验", async t => {
   d.querySelector("#pro-primary-only").click();
   assert.equal(d.querySelectorAll("[data-pro-account]").length, 6);
   assert.equal(d.querySelectorAll("[data-pro-history]").length, 0);
-  for (const body of d.querySelectorAll(".pro-table tbody")) assert.ok(body.querySelectorAll("[data-pro-account]").length <= 1);
+  for (const [i, body] of [...d.querySelectorAll(".pro-table tbody")].filter(body => body.querySelector("[data-pro-account]")).entries()) {
+    assert.equal(body.querySelectorAll("[data-pro-account]").length, 1);
+    assert.ok(body.querySelector("[data-pro-account]").textContent.includes(data.teams[i].players[0].accounts[0].gameName));
+  }
   let detail;
   w.addEventListener("deep-legends:open-player", e => {detail = e.detail;});
   d.querySelector("[data-pro-account]").click();
@@ -296,10 +299,10 @@ test("职业目录仅保留返回总览，返回后保留全部已打开页签",
 });
 
 test("未知更新时间的补充账号保持展示，不出现120天未玩的断言",async t=>{
- const data=fixture();Object.assign(data.teams[0].players[0].accounts[0],{source:'TrackingThePros',updatedAt:'',dormant:false,primary:true});
+ const data=fixture();Object.assign(data.teams[0].players[0].accounts[0],{source:'TrackingThePros',updatedAt:'',dormant:false});
  const {d,section}=boot(t,{response:async()=>data});section();await tick();
- assert.match(d.querySelector('.pro-account').textContent,/BLG One.*TTP.*来源未提供更新时间/);
- assert.equal(d.querySelector('.pro-history'),null);
+ assert.match(d.querySelector('.pro-account').textContent,/BLG One.*TTP.*最近对局时间暂不可用/);
+ assert.equal(d.querySelectorAll('[data-pro-history]').length,6);
  assert.doesNotMatch(d.querySelector('#pro-players-content').textContent,/120 天未更新|120天未玩/);
 });
 
@@ -338,23 +341,39 @@ test("玩家页签各自保留纵向位置，跨页面返回也不串位", async
   assert.deepEqual(errors,[]);
 });
 
- test("R87 导出完成状态跨页面保留，打开文件夹后还原", async(t)=>{
-  let done, opened=0;
-  const {w,d,errors}=boot(t,{full:true,diagnosticsBridge:{onCompleted(fn){done=fn},async openFolder(){opened++;return true}}});
+test("R112 导出状态只属于当前诊断页；离开、迟到和乱序完成均不污染新页面", async(t)=>{
+  let done, holdFolder=false, finishFolder;
+  const opened=[], downloads=[];
+  const {w,d,errors}=boot(t,{full:true,diagnosticsBridge:{onCompleted(fn){done=fn},async openFolder(id){opened.push(id);if(holdFolder)await new Promise(resolve=>{finishFolder=resolve});return true}}});
   await tick(150);
-  w.dispatchEvent(new w.CustomEvent("deep-legends:navigate",{detail:{section:"settings"}}));
-  d.getElementById("settings-tab-privacy").click();
+  // Telemetry flushing is covered independently in web/export-diagnostics;
+  // keep this DOM lifecycle test independent of the demo network delay.
+  w.flushFlowDiagnostics=async()=>{};
+  const originalClick=w.HTMLAnchorElement.prototype.click;
+  w.HTMLAnchorElement.prototype.click=function(){
+    if(this.hidden){downloads.push(new URL(this.href).searchParams.get("exportId"));return;}
+    return originalClick.call(this);
+  };
+  const enter=()=>{w.dispatchEvent(new w.CustomEvent("deep-legends:navigate",{detail:{section:"settings"}}));d.getElementById("settings-tab-privacy").click();};
+  const leave=()=>w.dispatchEvent(new w.CustomEvent("deep-legends:navigate",{detail:{section:"overview"}}));
   const button=d.getElementById("export-diagnostics");
-  done(); assert.equal(button.textContent,"打开日志文件夹");
-  button.click();await tick();assert.equal(opened,1);assert.equal(button.textContent,"导出诊断日志");
-  d.getElementById("settings-tab-gameplay").click();
-  done();assert.equal(button.textContent,"打开日志文件夹","离开后完成的下载仍保存状态");
-  d.getElementById("settings-tab-privacy").click();assert.equal(button.textContent,"打开日志文件夹");
-  w.dispatchEvent(new w.CustomEvent("deep-legends:navigate",{detail:{section:"overview"}}));
-  done();w.dispatchEvent(new w.CustomEvent("deep-legends:navigate",{detail:{section:"settings"}}));
-  d.getElementById("settings-tab-privacy").click();assert.equal(button.textContent,"打开日志文件夹");
+  const exportLog=async()=>{const before=downloads.length;button.click();await tick();assert.equal(downloads.length,before+1);assert.ok(downloads.at(-1));return downloads.at(-1);};
+  enter();const first=await exportLog();done(first);assert.equal(button.textContent,"打开日志文件夹");
+  button.click();await tick();assert.deepEqual(opened,[first]);assert.equal(button.textContent,"导出诊断日志");
+  const second=await exportLog();done(second);
+  d.getElementById("settings-tab-gameplay").click();assert.equal(button.textContent,"导出诊断日志");
+  d.getElementById("settings-tab-privacy").click();done(second);assert.equal(button.textContent,"导出诊断日志");
+  const late=await exportLog();leave();done(late);enter();done(late);assert.equal(button.textContent,"导出诊断日志");
+  const current=await exportLog();done(late);assert.equal(button.textContent,"导出诊断日志");
+  done(current);assert.equal(button.textContent,"打开日志文件夹");done(late);
+  button.click();await tick();assert.deepEqual(opened,[first,current]);
+  const final=await exportLog();done(final);leave();enter();assert.equal(button.textContent,"导出诊断日志");
+  const outgoing=await exportLog();done(outgoing);holdFolder=true;button.click();
+  leave();enter();const incoming=await exportLog();done(incoming);
+  finishFolder();await tick();assert.equal(button.textContent,"打开日志文件夹","旧的打开文件夹回调不能清除新导出状态");
+  holdFolder=false;button.click();await tick();assert.deepEqual(opened.slice(-2),[outgoing,incoming]);
   assert.deepEqual(errors,[]);
- });
+});
 
 test('OPGG season summary actually replaces recent sample in both overview workspaces without a history reload',async(t)=>{
  const seasonSummary={source:'OP.GG',season:'S2026',seasonId:33,queue:'RANKED',overall:{games:573,wins:323,losses:250,winRate:56,kills:6.1,deaths:5.3,assists:9.3,kda:2.93,cs:147,csPerMinute:5.7},champions:[{championId:126,championName:'杰斯',games:81,wins:42,winRate:52,kills:8.8,deaths:5,assists:7.6,kda:3.29,cs:198,csPerMinute:7.5}]};
@@ -428,17 +447,17 @@ test('R74 零战绩当前对局也加载技能目录，未加载时不伪造技�
  assert.deepEqual(errors,[]);
 });
 
-test('R74 菜单键盘跳过空组、异步重绘保焦、离开总览关闭菜单', async t => {
+test('R100 菜单键盘可达空组、异步重绘保焦、离开总览关闭菜单', async t => {
  const {w,d,errors}=boot(t,{full:true});await tick(250);
  const button=d.querySelector('#player-group-button');
  const key=value=>d.activeElement.dispatchEvent(new w.KeyboardEvent('keydown',{key:value,bubbles:true}));
  button.focus();key('Enter');await tick();
  assert.equal(d.activeElement.dataset.playerGroup,'players');
- key('ArrowDown');assert.equal(d.activeElement.dataset.playerGroup,'players');
- assert.equal(d.querySelector('[data-player-group="kr"]').disabled,true);
+ key('ArrowDown');assert.equal(d.activeElement.dataset.playerGroup,'kr');
+ assert.equal(d.querySelector('[data-player-group="kr"]').disabled,false);
  // A second render must resolve focus against the current menu, not a detached node.
  d.querySelector('#overview-refresh').click();await tick(250);
- assert.equal(d.activeElement.dataset.playerGroup,'players');
+ assert.equal(d.activeElement.dataset.playerGroup,'kr');
  assert.equal(button.getAttribute('aria-expanded'),'true');
  key('Escape');assert.equal(d.activeElement,button);assert.equal(button.getAttribute('aria-expanded'),'false');
  key(' ');await tick();assert.equal(button.getAttribute('aria-expanded'),'true');
@@ -455,4 +474,84 @@ test('国服总览保留战绩但不渲染或请求当前对局和观战', async
  assert.equal(d.querySelector('#overview-content [data-current-game]'),null);
  assert.equal(requests.filter(r=>r.url==='/api/gameplay/current-game'||r.url==='/api/gameplay/spectate').length,0);
  assert.deepEqual(errors,[]);
+});
+
+
+test("R97 management filters and rows exclude expanded and academy teams", async (t) => {
+  const data = fixture();
+  const extras = ["Winners", "Young Miracles", "Machi Esports", "Suning Gaming-S", "Anyone's Legend.Young", "Suning", "VSG", "T1 Academy"];
+  for (const code of extras) {
+    const team = structuredClone(data.teams[0]);
+    Object.assign(team, {code, name: code, secondary: code.includes("Academy") || code.includes("Young")});
+    team.players[0].name = `Excluded ${code}`;
+    team.players[0].accounts[0].gameName = `Excluded ${code}`;
+    data.teams.push(team);
+  }
+  const invalidSecondary = structuredClone(data.teams[2]);
+  Object.assign(invalidSecondary, {name: "Excluded secondary T1", secondary: true});
+  data.teams.push(invalidSecondary);
+  const {w, d, section, errors} = boot(t, {response: async () => data});
+  const expected = ["all", "BLG", "IG", "T1", "HLE", "GEN", "DK"];
+  const filters = () => Array.from(d.querySelectorAll("[data-pro-team]"), b => b.dataset.proTeam);
+  assert.deepEqual(filters(), expected, "six filters exist before loading");
+  section(); await tick();
+  assert.deepEqual(filters(), expected);
+  assert.deepEqual(Array.from(d.querySelectorAll(".pro-team h2"), n => n.textContent), expected.slice(1));
+  const content = d.querySelector("#pro-players-content");
+  for (const code of extras) assert.equal(content.textContent.includes(code), false, code);
+  assert.doesNotMatch(content.textContent, /二队|学院队|Excluded/);
+  assert.equal(content.querySelectorAll("[data-pro-account]").length, 6);
+  let selected;
+  w.addEventListener("deep-legends:open-player", event => { selected = event.detail; });
+  d.querySelector('[data-pro-team="T1"]').click();
+  assert.equal(d.querySelectorAll(".pro-team").length, 1);
+  d.querySelector("[data-pro-account]").click();
+  assert.equal(selected.teamCode, "T1");
+  assert.equal(selected.secondary, false);
+  assert.deepEqual(errors, []);
+});
+
+test('R100 empty national/KR/pro groups stay selectable and preserve distinct empty states', async t => {
+ const {w,d,errors}=boot(t,{full:true});await tick(250);
+ const choose=key=>{d.querySelector('#player-group-button').click();d.querySelector(`#player-group-menu [data-player-group="${key}"]`).click();};
+ assert.deepEqual([...d.querySelectorAll('#player-group-menu [data-player-group]')].map(e=>e.dataset.playerGroup),['players','kr','pro']);
+ for(const key of ['kr','pro','kr']) {
+  assert.equal(d.querySelector(`#player-group-menu [data-player-group="${key}"]`).getAttribute('aria-disabled'),'false');
+  choose(key);await tick();assert.equal(d.querySelector('#player-group-button').dataset.playerGroup,key);
+  assert.match(d.querySelector('#overview-content').textContent,key==='kr'?/顶部搜索框/:/职业选手目录/);
+  if(key==='pro'){assert.equal(d.querySelector('#pro-players-return').hidden,false);d.querySelector('#pro-players-return').click();await tick();assert.equal(d.querySelector('#pro-players-panel').hidden,false);d.querySelector('#pro-players-home').click();await tick();}
+ }
+ choose('players');await tick();assert.equal(d.querySelector('#player-group-button').dataset.playerGroup,'players');
+ assert.deepEqual(errors,[]);
+});
+
+
+test("TestR102NoPrimaryBadgeRendered", async t => {
+ const data=fixture();
+ // A stale server property must not revive the removed UI semantics.
+ data.teams[0].players[0].accounts[1].primary=true;
+ const {d,section}=boot(t,{response:async()=>data});section();await tick();
+ assert.equal(d.querySelectorAll('.pro-main-badge').length,0);
+ assert.doesNotMatch(d.querySelector('#pro-players-content').textContent,/主号|主账号/);
+});
+test("TestR102LatestOnlyTogglesShowsFirstAccountOnly", async t => {
+ const data=fixture();
+ for(const team of data.teams) { const accounts=team.players[0].accounts; accounts[0].tier='IRON';accounts[1].rankStatus='ranked';accounts[1].tier='CHALLENGER';accounts[1].primary=true; }
+ const {d,section}=boot(t,{response:async()=>data});section();await tick();
+ assert.equal(d.querySelectorAll('[data-pro-account]').length,12);
+ assert.equal(d.querySelectorAll('tr.pro-primary').length,6);
+ d.querySelector('#pro-primary-only').click();
+ const rendered=[...d.querySelectorAll('[data-pro-account]')];assert.equal(rendered.length,6);
+ rendered.forEach((account,i)=> {assert.ok(account.textContent.includes(data.teams[i].players[0].accounts[0].gameName));assert.ok(account.closest('tr').classList.contains('pro-primary'));});
+ d.querySelector('#pro-primary-only').click();assert.equal(d.querySelectorAll('[data-pro-account]').length,12);
+});
+test("TestR102ButtonLabelSaysLatestNotPrimary", async t => {
+ const {d}=boot(t);assert.equal(d.querySelector('#pro-primary-only').textContent.trim(),'只看最新账号');
+});
+test("TestR102HighlightUsesOriginalAccountIndex", async t => {
+ const data=fixture();data.teams[0].players[0].accounts[0].rankStatus='unranked';data.teams[0].players[0].accounts[1].rankStatus='ranked';
+ const {d,section}=boot(t,{response:async()=>data});section();await tick();
+ const first=d.querySelector('[data-pro-account]');assert.match(first.textContent,/BLG Two/);assert.equal(first.closest('tr').classList.contains('pro-primary'),false);
+ d.querySelector('[data-pro-history]').click();assert.match(d.querySelector('tr.pro-primary').textContent,/BLG One/);
+ d.querySelector('#pro-primary-only').click();assert.match(d.querySelector('[data-pro-account]').textContent,/BLG One/);
 });

@@ -1,0 +1,83 @@
+ M arena_live_grouping.go
+ M arena_match_detail.go
+ M binary_disk_budget.go
+ M champion_cache.go
+ M champselect.go
+ M champselect_execution_test.go
+ M champselect_takeover_test.go
+ M desktop/overview-render.test.cjs
+ M desktop/package.json
+ M desktop/pro-players.test.cjs
+ M docs/pro-players-sources.md
+ M features.go
+ M gameplay.go
+ M gameplay_test.go
+ M lcu.go
+ M main.go
+ M overview_current_game.go
+ M pro_players.go
+ M pro_players_supplement_test.go
+ M pro_players_test.go
+ M pro_roster.go
+ M profile_facade.go
+ M quality_test.go
+ M r90_test.go
+ M r91_addendum2_test.go
+ M r91_addendum_test.go
+ M riot_api.go
+ M riot_identity_cache.go
+ M scripts/r90-mutation-check.py
+ M summoner_identity.go
+ M summoner_identity_test.go
+ M web/champions.test.cjs
+ M web/demo-data.js
+ M web/gameplay.css
+ M web/gameplay.js
+ M web/gameplay.test.cjs
+ M web/pro-players.js
+ M web/r87.test.cjs
+ M web/r88.test.cjs
+ M web/r90.test.cjs
+ M web/r91-addendum.test.cjs
+ M web/r91.test.cjs
+ M web/r94.test.cjs
+ M web/suite.css
+ M web/suite.js
+ M web/suite.test.cjs
+?? .tmp-playwright/
+?? WORKLIST-R100-REGRESSION-QUOTA-BUDGET-SOCKET-STARVATION.md
+?? WORKLIST-R95-ARENA-TRUTH-REFRESH-WIPE-FLICKER-PRO.md
+?? WORKLIST-R96-ARENA-GUARDRAIL-RECONNECT.md
+?? WORKLIST-R97-PRO-ACCOUNT-REGION-REGRESSION-AND-SCOPE-REVERT.md
+?? WORKLIST-R98-KR-REFRESH-CHURN-AND-SLOW-LOADING.md
+?? WORKLIST-R99-FACADE-ICON-BANNER-AND-PRO-SEED-ACCOUNT.md
+?? arena_truth_diagnostics.go
+?? desktop/r95-browser.cjs
+?? desktop/r98-browser.cjs
+?? desktop/r99-facade-picker-layout.cjs
+?? docs/pro-accounts-verification-2026-09-17.md
+?? docs/r100-validation/
+?? docs/r95-execution-ledger.md
+?? docs/r95-validation/
+?? docs/r96-execution-ledger.md
+?? docs/r96-validation/
+?? docs/r97-execution-ledger.md
+?? docs/r97-validation/
+?? docs/r98-execution-ledger.md
+?? docs/r98-validation/
+?? docs/r99-execution-ledger.md
+?? docs/r99-probe-results.md
+?? docs/r99-validation/
+?? facade_icons.go
+?? pro_identity.go
+?? pro_seed_accounts.go
+?? r95_test.go
+?? r96_test.go
+?? r98_test.go
+?? r99_probe.go
+?? r99_test.go
+?? riot_limiter_queue.go
+?? scripts/r97-mutation-check.py
+?? scripts/r98-mutation-check.py
+?? scripts/r99-mutation-check.py
+?? web/r95.test.cjs

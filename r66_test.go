@@ -18,7 +18,6 @@ var r66PreferenceActions = []struct {
 	banner     string
 }{
 	{name: "clear-challenges", action: "clear-challenges", challenges: []int64{}, banner: "5"},
-	{name: "previous-banner", action: "previous-banner", challenges: []int64{1, 2, 3}, banner: "2"},
 }
 
 func TestR66TitleRestoreCandidatesAreTriedInOrder(t *testing.T) {

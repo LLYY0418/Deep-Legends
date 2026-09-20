@@ -1917,6 +1917,16 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 		slug = metadata.Slug
 	}
 	canonical := "/hero/" + strconv.Itoa(id) + "-" + slug
+	// Independent providers used to run serially on the recommendation path.
+	type rscResult struct {
+		detail mayhemRSCDetail
+		err    error
+	}
+	rscReady := make(chan rscResult, 1)
+	go func() {
+		detail, err := p.loadMayhemRSC(ctx, metadata.Slug)
+		rscReady <- rscResult{detail, err}
+	}()
 	var primary hexdataHeroDetail
 	var primaryErr error
 	page, pageErr := p.hexdata.load(ctx, "hero", strconv.Itoa(id), canonical, "text/html,application/xhtml+xml", false)
@@ -1939,7 +1949,8 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 		primaryErr = pageErr
 		p.reportHexdataFallback("hero-detail", pageErr)
 	}
-	rsc, rscErr := p.loadMayhemRSC(ctx, metadata.Slug)
+	loadedRSC := <-rscReady
+	rsc, rscErr := loadedRSC.detail, loadedRSC.err
 	if primaryErr != nil && rscErr != nil {
 		return championDetailResponse{}, primaryErr
 	}
@@ -1964,7 +1975,9 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 			response.Source, response.Patch, response.FetchedAt = "OP.GG RSC", rsc.Citation.Patch, rsc.FetchedAt
 			response.Citation = &rsc.Citation
 		}
-		response.RecommendedAugments = mergeMayhemAugmentRows(response.RecommendedAugments, rsc.Augments, 9)
+		// Keep the source rows until rarity metadata has been applied. A global
+		// top-nine cut can discard every silver recommendation before grouping.
+		response.RecommendedAugments = mergeMayhemAugmentRows(response.RecommendedAugments, rsc.Augments, 0)
 		p.decorateHexdataAugments(ctx, response.RecommendedAugments)
 		p.decorateDetailAssets(ctx, metadata.Slug, &response)
 	}
@@ -1977,7 +1990,11 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 }
 
 func mergeMayhemAugmentRows(primary, fallback []championMetricRow, limit int) []championMetricRow {
-	result := make([]championMetricRow, 0, min(limit, len(primary)+len(fallback)))
+	capacity := len(primary) + len(fallback)
+	if limit > 0 {
+		capacity = min(limit, capacity)
+	}
+	result := make([]championMetricRow, 0, capacity)
 	seen := make(map[int]bool, len(primary)+len(fallback))
 	for _, rows := range [][]championMetricRow{primary, fallback} {
 		for _, row := range rows {
@@ -2384,9 +2401,6 @@ func parseMayhemRSC(data []byte, slug string) (mayhemRSCDetail, error) {
 		seen[id] = true
 		asset := rscAssetMetadata(expanded, id, "augment")
 		result.Augments = append(result.Augments, championMetricRow{Assets: []championAsset{asset}, Rarity: rscAssetRarity(expanded, id)})
-		if len(result.Augments) == 12 {
-			break
-		}
 	}
 	if len(result.Build.CoreItems) == 0 || len(result.Build.StarterItems) == 0 || len(result.Build.Boots) == 0 || len(result.Build.Skills) == 0 || len(result.Build.SummonerSpells) == 0 {
 		return result, errors.New("OP.GG mayhem RSC is incomplete")

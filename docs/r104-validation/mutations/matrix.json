@@ -1,0 +1,74 @@
+[
+  {
+    "mutation": "background-priority-removed",
+    "test": "TestR104ColdStartupDripProtectsForegroundTwentyMatches",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "drip-restored-to-full-batch",
+    "test": "TestR104ColdStartupDripProtectsForegroundTwentyMatches",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "startup-activity-restored",
+    "test": "TestR104ColdStartupDripProtectsForegroundTwentyMatches",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "exact-hit-removed",
+    "test": "TestR104ExactDirectoryMatchAvoidsRiotAndMissFallsBack",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "cancel-poisons-url",
+    "test": "R104 image cancellation during repeated rerender is not URL failure poisoning",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "cooldown-does-not-pump",
+    "test": "R104 real image error retries automatically after cooldown",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "quota-hides-skeleton",
+    "test": "R104 quota recovery keeps the first-load skeleton and existing matches visible",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "background-uses-full-long-window",
+    "test": "TestR104BackgroundAdmissionYieldsAtThirtyOrForegroundQueue",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "startup-warmup-removed",
+    "test": "TestR104ColdStartupDripProtectsForegroundTwentyMatches",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "rank-ttl-restored-six-hours",
+    "test": "TestR104SeedRank24HourCacheSeparateFromOverview",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "activity-ttl-restored-six-hours",
+    "test": "TestR102LastMatchStartCachedSevenDays",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "unbounded-total-context",
+    "test": "TestR104SeedTotalBudgetIsBoundedRegardlessOfAccountCount",
+    "baseline": "pass",
+    "killed": true
+  }
+]

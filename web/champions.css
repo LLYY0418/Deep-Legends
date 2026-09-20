@@ -866,9 +866,9 @@
 .arena-slim-grid article > span { font-size: 10px; font-weight: 800; white-space: nowrap; }
 .arena-slim-grid article > small { min-width: 0; overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .arena-synergy-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding: 12px; }
-.arena-synergy-grid article { display: grid; min-width: 0; min-height: 62px; grid-template-columns: 22px auto minmax(0,1fr) minmax(0,1fr) 54px 54px 110px; align-items: center; gap: 4px; padding: 8px 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+.arena-synergy-grid article { display: grid; min-width: 0; min-height: 62px; grid-template-columns: 22px auto minmax(90px,1fr) 54px 54px 110px; align-items: center; gap: 6px; padding: 8px 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
 .arena-synergy-grid article > b { width: 22px; color: var(--muted); font-size: 9px; text-align: center; font-variant-numeric: tabular-nums; }
-.arena-synergy-grid article > .arena-team-name { min-width: 0; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.arena-synergy-grid article > .arena-team-name { min-width: 0; overflow: hidden; color: var(--ink); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .arena-synergy-grid article > span { font-size: 10px; font-weight: 800; }
 .arena-synergy-grid article > small { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .arena-synergy-grid .is-win { color: var(--success); }
@@ -902,7 +902,7 @@
   .arena-option-grid, .arena-augment-section .arena-option-grid { grid-template-columns: 1fr; }
   .arena-slim-grid article { grid-template-columns: 18px auto auto auto; }
   .arena-slim-grid article > small { grid-column: 2/-1; }
-  .arena-synergy-grid article { grid-template-columns: 22px auto minmax(0,1fr) minmax(0,1fr) 54px 54px; }
+	.arena-synergy-grid article { grid-template-columns: 22px auto minmax(90px,1fr) 54px 54px; }
 	.arena-synergy-grid article > small { grid-column: 3/-1; }
 }
 

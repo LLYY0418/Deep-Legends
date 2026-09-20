@@ -1,0 +1,80 @@
+[
+  {
+    "mutation": "wei-account-removed",
+    "test": "TestR105_CriticalAccountFixes",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "rookie-new-accounts-removed",
+    "test": "TestR105_CriticalAccountFixes",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "total-reduced-to-52",
+    "test": "TestR105_EmbeddedAccountCounts",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "canyon-uppercase-i",
+    "test": "TestR105_SpecialCharacters",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "icon-ownership-gate-restored",
+    "test": "R105 all icons are selectable and a click reaches the write route",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "icon-put-removed",
+    "test": "TestR105_IconClickRouteWritesUnownedAndHandlesStatuses",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "banner-ownership-gate-restored",
+    "test": "R105 all banners are selectable and a click reaches the write route",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "banner-data-discarded",
+    "test": "TestR105_BannerPATCHPreservesEntireSlot",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "banner-patch-removed",
+    "test": "TestR105_BannerPATCHPreservesEntireSlot",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "old-snapshot-bypasses-reviewed-list",
+    "test": "TestR105_ReviewedPageSurvivesOldSnapshotAndWrongOwner",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "reviewed-dormant-accounts-hidden",
+    "test": "R105 all 53 reviewed accounts render including dormant accounts",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "banner-opaque-number-rounded",
+    "test": "TestR105_BannerOpaqueNumbersRemainExact",
+    "baseline": "pass",
+    "killed": true
+  },
+  {
+    "mutation": "icon-readback-guard-removed",
+    "test": "TestR105_SuccessStatusWithoutChangeIsNotSuccess",
+    "baseline": "pass",
+    "killed": true
+  }
+]

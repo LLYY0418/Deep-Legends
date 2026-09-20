@@ -1,0 +1,14 @@
+✔ R101 icons default to owned and disable unowned including apply (76.403667ms)
+✔ R101 unknown icon ownership keeps full catalog read only (13.786542ms)
+✔ R101 banner catalog groups localized names and owns no write action (36.110416ms)
+✔ R101 lock wait stays visible and disabled in all strategies (39.116083ms)
+✔ R101 strategy switch never saves a zero lock wait, even synthetic disabled change (47.719292ms)
+✔ R101 facade moves cards left and removes only obsolete explanation and accent (13.184667ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 886.89775

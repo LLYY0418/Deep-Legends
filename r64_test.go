@@ -37,23 +37,23 @@ func TestR64FacadeEventBurstIsThrottled(t *testing.T) {
 	}
 }
 
-func TestR64PreviousBannerPreservesChallengesAndTitle(t *testing.T) {
+func TestR64ClearChallengesPreservesTitle(t *testing.T) {
 	var posted map[string]json.RawMessage
 	server := newR64PreferenceServer(t, func(w http.ResponseWriter, r *http.Request, body map[string]json.RawMessage) {
 		posted = body
 		w.WriteHeader(http.StatusNoContent)
 	})
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	restore, err := (&app{}).applyFacadeActionResult(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "previous-banner"})
+	restore, err := (&app{}).applyFacadeActionResult(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "clear-challenges"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if restore != "item-id-string" {
 		t.Fatalf("title_restore = %q, want item-id-string", restore)
 	}
-	assertR64PreferenceBody(t, posted, []int64{1, 2, 3}, "2")
+	assertR64PreferenceBody(t, posted, []int64{}, "5")
 	if string(posted["title"]) != `"77"` {
-		t.Fatalf("previous-banner title = %s, want string itemId 77", posted["title"])
+		t.Fatalf("clear-challenges title = %s, want string itemId 77", posted["title"])
 	}
 }
 

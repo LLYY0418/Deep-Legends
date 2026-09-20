@@ -25,7 +25,7 @@ test('2244 banner exact animation, no video for unknown skin or reduced motion',
    w.document.body.innerHTML=w.deepLegendsOverviewArt.render(player);
    assert.equal(w.document.querySelectorAll('video').length,reduced?0:1);
    assert.equal(w.document.querySelector('.overview-art').dataset.focusSkin,'103086');
-   assert.equal(w.document.querySelector('[data-overview-poster]').getAttribute('src'),'/api/image?path=%2Flol-game-data%2Fassets%2Fahri_centered_86.jpg');
+   assert.equal(w.document.querySelector('[data-overview-poster]').getAttribute('data-queued-src'),'/api/image?path=%2Flol-game-data%2Fassets%2Fahri_centered_86.jpg');
    assert.equal(w.deepLegendsOverviewArt.render({backgroundSkinId:123456}), '');
   }finally{w.close();}
  }

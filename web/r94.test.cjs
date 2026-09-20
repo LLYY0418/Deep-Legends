@@ -36,7 +36,7 @@ function harness() {
     emptyState: (title, copy, retry) => `<div>${title}<p>${copy}</p>${retry ? '<button data-gameplay-retry>重试</button>' : ''}</div>`,
     bindLiveContent: noop, applyRenderedMetricStyles: noop, prepareImages: noop,
   };
-  const names = ["loadLive", "renderLive", "handleGameplayPhase", "queueLiveEventRefresh", "shouldResetLiveGameScopedState", "resetLiveGameScopedState", "softResetGameplayState", "syncLiveRetryBudget", "liveSnapshotComplete", "liveAutoRefreshStopped", "renderLiveRefreshStatus", "scheduleLiveRefresh", "normalizeLiveInterval", "liveRefreshDelayMs"];
+  const names = ["updateLiveLoadingVisibility", "loadLive", "liveRecommendationMarkup", "renderLive", "handleGameplayPhase", "queueLiveEventRefresh", "shouldResetLiveGameScopedState", "resetLiveGameScopedState", "softResetGameplayState", "syncLiveRetryBudget", "liveSnapshotComplete", "liveAutoRefreshStopped", "renderLiveRefreshStatus", "scheduleLiveRefresh", "normalizeLiveInterval", "liveRefreshDelayMs"];
   for (const name of ["liveGamePhase", "invalidateLiveForNewGame", "resetDisconnectedLive", "normalizeLiveGameId", "liveGameIdComparison", "recordLiveObservation", "liveSnapshotBehindPhase"]) if (source.includes(`function ${name}(`)) names.push(name);
   vm.runInNewContext(names.map(extract).join("\n") + "\n" + extract("pollGameflowPhase"), context);
   context.beaconPollDelay = () => 12000;

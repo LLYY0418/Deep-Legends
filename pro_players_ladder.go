@@ -166,34 +166,36 @@ func fetchOPGGLadderRank(ctx context.Context, provider *championProvider, gameNa
 		return 0, errors.New("invalid pro ladder account")
 	}
 	query := url.Values{"type": {"ladder"}, "region": {"kr"}, "summoner": {gameName + "-" + tagLine}, "tier": {"all"}}
-	target := &url.URL{Scheme: "https", Host: opggPageHost, Path: proLadderPath, RawQuery: query.Encode()}
-	requestContext, cancel := context.WithTimeout(ctx, proLadderRequestTTL)
-	defer cancel()
-	request, err := http.NewRequestWithContext(requestContext, http.MethodGet, target.String(), nil)
-	if err != nil {
-		return 0, err
-	}
-	request.Header.Set("Accept", "text/html,application/xhtml+xml")
-	request.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.6")
-	request.Header.Set("User-Agent", "Deep-Legends/"+version)
-
-	client := *provider.httpClient()
-	client.Jar = nil
-	client.CheckRedirect = func(request *http.Request, via []*http.Request) error {
-		if len(via) >= 3 || !validProLadderURL(request.URL) {
-			return errors.New("pro ladder redirect rejected")
+	body, _, err := provider.fetchWithMetadataCacheKeyLoader(ctx, opggPageHost, proLadderPath, query, proLadderMaxBytes, "text/html,application/xhtml+xml", "", func(ctx context.Context) ([]byte, error) {
+		target := &url.URL{Scheme: "https", Host: opggPageHost, Path: proLadderPath, RawQuery: query.Encode()}
+		requestContext, cancel := context.WithTimeout(ctx, proLadderRequestTTL)
+		defer cancel()
+		request, err := http.NewRequestWithContext(requestContext, http.MethodGet, target.String(), nil)
+		if err != nil {
+			return nil, err
 		}
-		return nil
-	}
-	response, err := client.Do(request)
-	if err != nil {
-		return 0, err
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("pro ladder HTTP %d", response.StatusCode)
-	}
-	body, err := readLimited(response.Body, proLadderMaxBytes)
+		request.Header.Set("Accept", "text/html,application/xhtml+xml")
+		request.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.6")
+		request.Header.Set("User-Agent", "Deep-Legends/"+version)
+
+		client := *provider.httpClient()
+		client.Jar = nil
+		client.CheckRedirect = func(request *http.Request, via []*http.Request) error {
+			if len(via) >= 3 || !validProLadderURL(request.URL) {
+				return errors.New("pro ladder redirect rejected")
+			}
+			return nil
+		}
+		response, err := client.Do(request)
+		if err != nil {
+			return nil, err
+		}
+		defer response.Body.Close()
+		if response.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("pro ladder HTTP %d", response.StatusCode)
+		}
+		return readLimited(response.Body, proLadderMaxBytes)
+	})
 	if err != nil {
 		return 0, err
 	}

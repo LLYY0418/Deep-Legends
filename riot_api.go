@@ -164,8 +164,11 @@ type riotProvider struct {
 	champions        *championProvider
 
 	limitMu     sync.Mutex
+	limitQueue  []*riotLimitWaiter
 	shortWindow []time.Time
 	longWindow  []time.Time
+	rateHosts   map[string]*riotHostRate
+	rateFlights map[riotRateScope]int
 
 	cacheMu        sync.Mutex
 	matchCache     map[string]*riotMatch
@@ -269,9 +272,20 @@ func riotKeyConfigured() bool {
 	return strings.TrimSpace(riotAPIKey) != ""
 }
 
-// wait 在本地执行保守限速（Personal Key 上限 20 次/秒、100 次/2 分钟，
-// 这里各留出安全余量），超过预算时阻塞等待而不是直接失败。
+// wait uses Riot response quotas when available, retaining conservative defaults
+// until the server advertises the key's actual regional and method limits.
 func (p *riotProvider) wait(ctx context.Context) error {
+	if isRiotBackground(ctx) {
+		return p.admitRiotBackground(ctx)
+	}
+	if limit, ok := ctx.Value(riotSingleWaitKey{}).(time.Duration); ok {
+		ctx = withRiotQueueLimit(ctx, limit)
+	}
+	release, err := p.enterRiotLimitQueue(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	const (
 		shortLimit  = 15
 		shortPeriod = time.Second
@@ -291,21 +305,28 @@ func (p *riotProvider) wait(ctx context.Context) error {
 		if p.limitNow != nil {
 			now = p.limitNow()
 		}
-		p.shortWindow = pruneTimestamps(p.shortWindow, now.Add(-shortPeriod))
-		p.longWindow = pruneTimestamps(p.longWindow, now.Add(-longPeriod))
-		if len(p.shortWindow) < shortLimit && len(p.longWindow) < longLimit {
-			p.shortWindow = append(p.shortWindow, now)
-			p.longWindow = append(p.longWindow, now)
+		sleep, scoped := p.scopedRiotDelay(ctx, now, true, false)
+		if scoped && sleep == 0 {
 			p.limitMu.Unlock()
 			return nil
 		}
-		var sleep time.Duration
-		if len(p.shortWindow) >= shortLimit {
-			sleep = p.shortWindow[0].Add(shortPeriod).Sub(now)
-		}
-		if len(p.longWindow) >= longLimit {
-			if wait := p.longWindow[0].Add(longPeriod).Sub(now); wait > sleep {
-				sleep = wait
+		if !scoped {
+			p.shortWindow = pruneTimestamps(p.shortWindow, now.Add(-shortPeriod))
+			p.longWindow = pruneTimestamps(p.longWindow, now.Add(-longPeriod))
+			if len(p.shortWindow) < shortLimit && len(p.longWindow) < longLimit {
+				p.shortWindow = append(p.shortWindow, now)
+				p.longWindow = append(p.longWindow, now)
+				p.limitMu.Unlock()
+				return nil
+			}
+
+			if len(p.shortWindow) >= shortLimit {
+				sleep = p.shortWindow[0].Add(shortPeriod).Sub(now)
+			}
+			if len(p.longWindow) >= longLimit {
+				if wait := p.longWindow[0].Add(longPeriod).Sub(now); wait > sleep {
+					sleep = wait
+				}
 			}
 		}
 		p.limitMu.Unlock()
@@ -315,16 +336,16 @@ func (p *riotProvider) wait(ctx context.Context) error {
 		// A local budget wait longer than the entire request cannot succeed.
 		// Report the quota recovery, rather than timing out identity resolution
 		// and then caching that timeout as though the account lookup had failed.
-		if deadline, ok := ctx.Deadline(); ok && sleep >= time.Until(deadline) {
+		if deadline, ok := riotQueueDeadline(ctx); ok && sleep >= time.Until(deadline) {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
 			seconds := int(math.Ceil(sleep.Seconds()))
 			riotOverviewCostTrackerFromContext(ctx).recordRateLimit()
 			if p.champions != nil && p.champions.diag != nil {
-				p.champions.diag(map[string]any{"event": "riot_local_rate_limited", "retry_after_seconds": seconds})
+				p.champions.diag(p.riotQuotaDiagnostic(ctx, seconds))
 			}
-			return &riotStatusError{status: http.StatusTooManyRequests, retryAfter: seconds, message: fmt.Sprintf("韩服查询额度正在恢复，请约 %d 秒后重试；已加载的战绩仍可查看", seconds)}
+			return fmt.Errorf("%w: %w", errThrottled, &riotStatusError{status: http.StatusTooManyRequests, retryAfter: seconds, message: fmt.Sprintf("韩服查询额度正在恢复，请约 %d 秒后重试；已加载的战绩仍可查看", seconds)})
 		}
 		queuedAt := time.Now()
 		sleepFn := p.limitSleep
@@ -351,6 +372,9 @@ func withRiotQueueLimit(ctx context.Context, limit time.Duration) context.Contex
 }
 
 func waitRiotDelay(ctx context.Context, delay time.Duration) error {
+	if limit, ok := ctx.Value(riotSingleWaitKey{}).(time.Duration); ok && delay > limit {
+		return errThrottled
+	}
 	if deadline, ok := ctx.Value(riotQueueDeadlineKey{}).(time.Time); ok {
 		remaining := time.Until(deadline)
 		if remaining <= 0 {
@@ -395,6 +419,8 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 	if !riotKeyConfigured() {
 		return errors.New("尚未配置 Riot API Key：请用 -encrypt-riot-key 生成密文，构建时通过 -ldflags \"-X main.riotAPIKeyCipher=<密文>\" 注入（临时调试可用环境变量 RIOT_API_KEY）")
 	}
+	scope := riotRequestRateScope(host, requestPath)
+	ctx = context.WithValue(ctx, riotRateScopeKey{}, scope)
 	for attempt := 0; attempt < 3; attempt++ {
 		// requestPath 已由调用方用 url.PathEscape 逐段转义，这里必须按
 		// 字符串拼接后交给 http.NewRequest 解析；若赋值给 url.URL.Path，
@@ -420,13 +446,19 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		if isDetail {
 			tracker.detailInFlight(1)
 		}
+		if cost := proRefreshCostFromContext(ctx); cost != nil {
+			cost.requests.Add(1)
+		}
+		p.beginRiotRateRequest(scope)
 		response, err := client.Do(request)
 		if err != nil {
+			p.observeRiotRate(scope, nil, 0)
 			if isDetail {
 				tracker.detailInFlight(-1)
 			}
 			return fmt.Errorf("无法连接 Riot 官方接口（可在设置中调整“英雄数据网络”代理）：%w", err)
 		}
+		p.observeRiotRate(scope, response.Header, response.StatusCode)
 		body, readErr := readLimited(response.Body, responseMax)
 		response.Body.Close()
 		if isDetail {
@@ -454,7 +486,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			rioTracker.recordRateLimit()
 			if p.champions != nil && p.champions.diag != nil {
 				p.champions.diag(map[string]any{
-					"event": "riot_rate_limited", "host": host, "path": requestPath,
+					"event": "riot_rate_limited", "host": host, "path": riotDiagnosticPath(requestPath),
 					"retry_after_ms": retryAfter.Milliseconds(), "attempt": attempt + 1,
 				})
 			}
@@ -464,6 +496,9 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 				return quotaError
 			}
 			if err := waitRiotDelay(ctx, retryAfter); err != nil {
+				if errors.Is(err, errThrottled) {
+					return fmt.Errorf("%w: %w", errThrottled, quotaError)
+				}
 				if errors.Is(err, context.DeadlineExceeded) {
 					return quotaError
 				}
@@ -474,6 +509,18 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		}
 	}
 	return &riotStatusError{message: "Riot 接口限流中（HTTP 429），请稍后重试", status: http.StatusTooManyRequests}
+}
+
+// Keep route categories, never identity path arguments, in quota diagnostics.
+func riotDiagnosticPath(requestPath string) string {
+	parts := strings.Split(requestPath, "/")
+	for i, part := range parts {
+		switch part {
+		case "by-puuid", "by-riot-id", "by-summoner", "by-account":
+			return strings.Join(parts[:i+1], "/") + "/[redacted]"
+		}
+	}
+	return requestPath
 }
 
 // riotStatusError 携带面向用户的中文提示与对应的 HTTP 状态码。
@@ -621,16 +668,17 @@ type riotTeam struct {
 // riotMatchInfo 是 Match-V5 风格的单场对局数据；Riot 官方接口与
 // 国服 SGP 网关（见 sgp_api.go）返回的结构一致，双方共用同一套转换逻辑。
 type riotMatchInfo struct {
-	GameID           int64             `json:"gameId"`
-	GameCreation     int64             `json:"gameCreation"`
-	GameDuration     int64             `json:"gameDuration"`
-	GameEndTimestamp int64             `json:"gameEndTimestamp"`
-	QueueID          int64             `json:"queueId"`
-	GameMode         string            `json:"gameMode"`
-	GameType         string            `json:"gameType"`
-	MapID            int64             `json:"mapId"`
-	Participants     []riotParticipant `json:"participants"`
-	Teams            []riotTeam        `json:"teams"`
+	GameID             int64             `json:"gameId"`
+	GameCreation       int64             `json:"gameCreation"`
+	GameStartTimestamp int64             `json:"gameStartTimestamp"`
+	GameDuration       int64             `json:"gameDuration"`
+	GameEndTimestamp   int64             `json:"gameEndTimestamp"`
+	QueueID            int64             `json:"queueId"`
+	GameMode           string            `json:"gameMode"`
+	GameType           string            `json:"gameType"`
+	MapID              int64             `json:"mapId"`
+	Participants       []riotParticipant `json:"participants"`
+	Teams              []riotTeam        `json:"teams"`
 }
 
 type riotMatch struct {
@@ -706,6 +754,21 @@ func (p *riotProvider) fetchAccountByRiotID(ctx context.Context, gameName, tagLi
 	return account, err
 }
 
+// Only reviewed pro seeds call this stable-identity lookup.
+func (p *riotProvider) fetchAccountByPUUID(ctx context.Context, puuid string) (riotAccount, error) {
+	var account riotAccount
+	err := p.cachedPublicIdentity(ctx, "account-by-puuid:"+puuid, 6*time.Hour, &account, func(ctx context.Context) error {
+		if err := p.get(ctx, riotClusterHost, "/riot/account/v1/accounts/by-puuid/"+url.PathEscape(puuid), nil, &account); err != nil {
+			return err
+		}
+		if account.PUUID != puuid || account.GameName == "" || account.TagLine == "" {
+			return errRiotNotFound
+		}
+		return nil
+	})
+	return account, err
+}
+
 func (p *riotProvider) summonerByPUUID(ctx context.Context, puuid string) (riotSummoner, error) {
 	var summoner riotSummoner
 	err := p.cachedPublicIdentity(ctx, "summoner:"+puuid, 5*time.Minute, &summoner, func(ctx context.Context) error {
@@ -716,14 +779,22 @@ func (p *riotProvider) summonerByPUUID(ctx context.Context, puuid string) (riotS
 
 func (p *riotProvider) leagueEntries(ctx context.Context, puuid string) ([]riotLeagueEntry, error) {
 	var entries []riotLeagueEntry
-	err := p.get(ctx, riotPlatformHost, "/lol/league/v4/entries/by-puuid/"+url.PathEscape(puuid), nil, &entries)
+	err := p.cachedPublicIdentity(ctx, "ranks:"+puuid, 3*time.Minute, &entries, func(ctx context.Context) error {
+		err := p.get(ctx, riotPlatformHost, "/lol/league/v4/entries/by-puuid/"+url.PathEscape(puuid), nil, &entries)
+		if err == nil {
+			p.observeProSeedRank(puuid, entries)
+		}
+		return err
+	})
 	return entries, err
 }
 
 func (p *riotProvider) topMasteries(ctx context.Context, puuid string, count int) ([]riotMasteryEntry, error) {
 	var entries []riotMasteryEntry
 	query := url.Values{"count": {strconv.Itoa(count)}}
-	err := p.get(ctx, riotPlatformHost, "/lol/champion-mastery/v4/champion-masteries/by-puuid/"+url.PathEscape(puuid)+"/top", query, &entries)
+	err := p.cachedPublicIdentity(ctx, "mastery:"+puuid+"|"+query.Encode(), 30*time.Minute, &entries, func(ctx context.Context) error {
+		return p.get(ctx, riotPlatformHost, "/lol/champion-mastery/v4/champion-masteries/by-puuid/"+url.PathEscape(puuid)+"/top", query, &entries)
+	})
 	return entries, err
 }
 
@@ -740,7 +811,9 @@ func (p *riotProvider) matchIDsFiltered(ctx context.Context, puuid string, start
 	if strings.TrimSpace(matchType) != "" {
 		query.Set("type", strings.TrimSpace(matchType))
 	}
-	err := p.get(ctx, riotClusterHost, "/lol/match/v5/matches/by-puuid/"+url.PathEscape(puuid)+"/ids", query, &ids)
+	err := p.cachedPublicIdentity(ctx, "matchIDs:"+puuid+"|"+query.Encode(), time.Minute, &ids, func(ctx context.Context) error {
+		return p.get(ctx, riotClusterHost, "/lol/match/v5/matches/by-puuid/"+url.PathEscape(puuid)+"/ids", query, &ids)
+	})
 	return ids, err
 }
 
@@ -896,8 +969,12 @@ func riotMatchInfoIsRemake(info *riotMatchInfo) bool {
 	return isRemakeGame(explicitRemake, surrendered, riotMatchDurationSeconds(info), info.QueueID, info.GameMode, info.GameType, hasWinner)
 }
 
-func riotConvertMatch(match *riotMatch, subjectPUUID string, names map[int64]string) gameplayMatch {
-	return convertRiotMatchInfo(&match.Info, subjectPUUID, names, nil, riotRegionKR, "")
+func riotConvertMatch(match *riotMatch, subjectPUUID string, names map[int64]string, catalogs ...map[int64]string) gameplayMatch {
+	var labels map[int64]string
+	if len(catalogs) > 0 {
+		labels = catalogs[0]
+	}
+	return convertRiotMatchInfo(&match.Info, subjectPUUID, names, labels, riotRegionKR, "")
 }
 
 // convertRiotMatchInfo 把 Match-V5 风格的对局转换为界面模型；region 标注
@@ -1042,11 +1119,13 @@ func (a *app) riotChampionNames(ctx context.Context) map[int64]string {
 	return names
 }
 
-func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference, begIndex, count int) (gameplayOverview, error) {
+func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference, begIndex, count int, filters ...string) (gameplayOverview, error) {
+	matchFilter := riotOverviewFilter(filters)
 	if a.riot == nil {
 		return gameplayOverview{}, errors.New("Riot 查询通道未初始化")
 	}
 	provider := a.riot
+	ctx = withRiotSingleWaitLimit(ctx, 5*time.Second)
 	started := time.Now()
 	tracker := &riotOverviewCostTracker{}
 	ctx = context.WithValue(ctx, riotOverviewCostTrackerKey{}, tracker)
@@ -1110,52 +1189,38 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	capabilities := make([]EndpointCapability, 0, 5)
 	// Once the account is known these reads are independent. In particular,
 	// restart hits should not serialize match IDs behind public metadata.
+	summonerReady, ranksReady, masteriesReady := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	var summoner riotSummoner
-	var names map[int64]string
+	var names, queueLabels map[int64]string
 	var ids []string
 	var summonerErr, idsErr error
 	var identityReads, championNamesRead sync.WaitGroup
-	identityReads.Add(2)
+	identityReads.Add(1)
+	profileWait.Add(1)
 	championNamesRead.Add(1)
 	defer championNamesRead.Wait()
 	go func() {
-		defer identityReads.Done()
+		defer profileWait.Done()
 		started := time.Now()
 		summoner, summonerErr = provider.summonerByPUUID(ctx, puuid)
+		close(summonerReady)
 		phases.markSpan("summoner", started, time.Now())
 	}()
 	go func() {
 		defer championNamesRead.Done()
 		started := time.Now()
 		names = a.riotChampionNames(ctx)
+		queueLabels = a.riotQueueLabels(ctx)
 		phases.markSpan("champion_names", started, time.Now())
 	}()
 	go func() {
 		defer identityReads.Done()
 		started := time.Now()
-		ids, idsErr = provider.matchIDs(ctx, puuid, begIndex, count)
+		ids, idsErr = provider.matchIDsForOverview(ctx, puuid, begIndex, count, matchFilter)
 		phases.markSpan("matchIDs", started, time.Now())
 	}()
-	identityReads.Wait()
-	err := summonerErr
-	if errors.Is(err, errRiotNotFound) {
-		return gameplayOverview{}, riotNotFoundError("「%s#%s」不在韩服（该 Riot ID 属于其他大区）", gameName, tagLine)
-	}
-	if err != nil {
-		return gameplayOverview{}, err
-	}
-	capabilities = append(capabilities, EndpointCapability{Name: "summoner", Path: "riot: /lol/summoner/v4/summoners/by-puuid", State: capabilityAvailable, Count: 1})
-	reference = mergeGameplayReferences(gameplayReference{
-		PlayerRef: puuid, GameName: gameName, TagLine: tagLine,
-		ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Region: riotRegionKR,
-	}, reference)
-	err = idsErr
-	if err != nil && !errors.Is(err, errRiotNotFound) {
-		return gameplayOverview{}, err
-	}
-	matchesRequested = len(ids)
-	// 段位与熟练度和对局详情并行读取：串行时一次搜索要等 20 多个请求
-	// 依次返回，是“韩服搜索慢”的主要来源之一。
+	// Ranks/masteries need only the resolved account, not the match ID list.
+	// Launch them now so a slow history request cannot delay the profile header.
 	var ranks []gameplayRank
 	var rankCapability EndpointCapability
 	var masteries []gameplayMastery
@@ -1167,6 +1232,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			defer profileWait.Done()
 			started := time.Now()
 			ranks, rankCapability = provider.loadRiotRanks(ctx, puuid)
+			close(ranksReady)
 			phases.markSpan("ranks", started, time.Now())
 		}()
 		go func() {
@@ -1174,8 +1240,18 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			started := time.Now()
 			championNamesRead.Wait()
 			masteries, masteryCapability = provider.loadRiotMasteries(ctx, puuid, names)
+			close(masteriesReady)
 			phases.markSpan("mastery", started, time.Now())
 		}()
+	}
+	identityReads.Wait()
+	reference = mergeGameplayReferences(gameplayReference{PlayerRef: puuid, GameName: gameName, TagLine: tagLine, Region: riotRegionKR}, reference)
+	err := idsErr
+	if err != nil && !errors.Is(err, errRiotNotFound) {
+		return gameplayOverview{}, err
+	}
+	matchesRequested = len(ids)
+	if begIndex == 0 {
 		if !strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE") {
 			started := time.Now()
 			historicalRanks = a.cachedOPGGHistoricalRanks(puuid)
@@ -1201,18 +1277,40 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		loadMu.Lock()
 		ready := append([]*riotMatch(nil), details...)
 		loadMu.Unlock()
-		partial := gameplayOverview{Player: gameplayPlayer{PlayerRef: puuid, DisplayName: gameName, GameName: gameName, TagLine: tagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Region: riotRegionKR, reference: reference}, Pagination: gameplayPagination{BegIndex: begIndex, Count: len(ids), HasMore: len(ids) == count}}
+		partial := gameplayOverview{Player: gameplayPlayer{PlayerRef: puuid, DisplayName: gameName, GameName: gameName, TagLine: tagLine, ProfileIconID: reference.ProfileIconID, SummonerLevel: reference.SummonerLevel, Region: riotRegionKR, reference: reference}, Pagination: riotOverviewPagination(begIndex, len(ids), count, matchFilter)}
+		partial.Matches = make([]gameplayMatch, 0, len(ready))
+		partial.ProfilePending = true
+		select {
+		case <-summonerReady:
+			if summonerErr == nil {
+				partial.Player.ProfileIconID = summoner.ProfileIconID
+				partial.Player.SummonerLevel = summoner.SummonerLevel
+				partial.ProfilePending = false
+			}
+		default:
+		}
+		select {
+		case <-ranksReady:
+			partial.Ranks = ranks
+			partial.Capabilities = append(partial.Capabilities, rankCapability)
+		default:
+		}
+		select {
+		case <-masteriesReady:
+			partial.Masteries = masteries
+			partial.Capabilities = append(partial.Capabilities, masteryCapability)
+		default:
+		}
 		for _, detail := range ready {
 			if detail != nil {
-				match := riotConvertMatch(detail, puuid, names)
+				a.checkArenaRiotMatchTruth(detail)
+				match := riotConvertMatch(detail, puuid, names, queueLabels)
 				if !isCustomGameplayMatch(match) {
 					partial.Matches = append(partial.Matches, match)
 				}
 			}
 		}
-		if len(partial.Matches) == 0 {
-			return
-		}
+		a.completeOverviewBackground(&partial, puuid)
 		a.publicizeOverviewReferences(&partial)
 		progress(partial)
 	}
@@ -1244,15 +1342,15 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			loadMu.Unlock()
 		}(index)
 	}
-	previewSent := false
+	previewLoaded := 0
 	for range ids {
 		<-completedDetails
 		loadMu.Lock()
 		loaded := loadedDetails
 		loadMu.Unlock()
-		if !previewSent && loaded >= 5 {
+		if loaded > previewLoaded && (loaded >= 5 && (previewLoaded == 0 || loaded-previewLoaded >= 2) || loaded == len(ids)) {
 			publishPartial()
-			previewSent = true
+			previewLoaded = loaded
 		}
 	}
 	wait.Wait()
@@ -1260,20 +1358,32 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		publishPartial()
 	}
 	phases.markSpan("details", detailsStarted, time.Now())
+	matchesLoaded = loadedDetails
 	if ctx.Err() != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) && detailLoadErr != nil && riotErrorStatus(detailLoadErr) == http.StatusTooManyRequests {
 			return gameplayOverview{}, detailLoadErr
 		}
 		return gameplayOverview{}, ctx.Err()
 	}
-	matchesLoaded = loadedDetails
+	profileWait.Wait()
+	publishPartial() // Flush metadata even when the final frame becomes an error.
+	if errors.Is(summonerErr, errRiotNotFound) {
+		return gameplayOverview{}, riotNotFoundError("「%s#%s」不在韩服（该 Riot ID 属于其他大区）", gameName, tagLine)
+	}
+	if summonerErr != nil {
+		return gameplayOverview{}, summonerErr
+	}
+	capabilities = append(capabilities, EndpointCapability{Name: "summoner", Path: "riot: /lol/summoner/v4/summoners/by-puuid", State: capabilityAvailable, Count: 1})
+	reference.ProfileIconID, reference.SummonerLevel = summoner.ProfileIconID, summoner.SummonerLevel
 	championNamesRead.Wait()
 	for _, detail := range details {
 		if detail == nil {
 			continue
 		}
-		match := riotConvertMatch(detail, puuid, names)
+		a.checkArenaRiotMatchTruth(detail)
+		match := riotConvertMatch(detail, puuid, names, queueLabels)
 		a.recordDiagnostic(riotMatchItemsDiagnostic(match))
+		a.recordDiagnostic(map[string]any{"event": "riot_match_mode", "queue_id": detail.Info.QueueID, "game_mode": detail.Info.GameMode, "queue_label": match.QueueLabel})
 		if !isCustomGameplayMatch(match) {
 			matches = append(matches, match)
 		}
@@ -1296,7 +1406,6 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		detailCapability.Detail = "对局详情读取失败，请稍后重试"
 	}
 	capabilities = append(capabilities, detailCapability)
-	hasMore := len(ids) == count
 	response := gameplayOverview{
 		Player: gameplayPlayer{
 			PlayerRef: puuid, DisplayName: gameName, GameName: gameName, TagLine: tagLine,
@@ -1308,7 +1417,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		Capabilities: capabilities,
 		// Count 使用服务器返回的 ID 数（个别对局详情读取失败时 matches 会
 		// 少于 ids），保证前端推进下一页偏移量时不会与本页重叠。
-		Pagination: gameplayPagination{BegIndex: begIndex, Count: len(ids), HasMore: hasMore},
+		Pagination: riotOverviewPagination(begIndex, len(ids), count, matchFilter),
 	}
 	if begIndex > 0 {
 		a.publicizeOverviewReferences(&response)
@@ -1337,8 +1446,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	response.HistoricalRanks = historicalRanks
 	response.Masteries = masteries
 	// 韩服拿不到客户端个人主页背景（Riot API 无此字段），退回最高熟练度英雄原画。
-	applyMasteryBackgroundFallback(&response.Player, masteries)
-	a.applyOverviewSkinMedia(&response.Player)
+	a.completeOverviewBackground(&response, puuid)
 	response.Capabilities = capabilities
 	response.Overall = aggregateMatches(matches, puuid, nil)
 	recentWindowAfter := time.Now().Add(-recentWindowDays * 24 * time.Hour).UnixMilli()
@@ -1588,4 +1696,14 @@ func writeRiotHTTPError(w http.ResponseWriter, err error) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(riotErrorStatus(err))
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+func (a *app) riotQueueLabels(ctx context.Context) map[int64]string {
+	a.mu.RLock()
+	client, connected := a.lcu, a.connected
+	a.mu.RUnlock()
+	if !connected || client == nil {
+		return nil
+	}
+	return loadQueueLabelsContext(ctx, client)
 }

@@ -1,0 +1,31 @@
+{
+  "files_inspected": [
+    "docs/r99-probe-results.md",
+    "docs/r101-execution-ledger.md",
+    "docs/pro-players-sources.md"
+  ],
+  "references": [
+    {
+      "source": "docs/pro-players-sources.md",
+      "line": 93,
+      "target": "pro-accounts-verification-2026-09-17.md",
+      "exists": true,
+      "kind": "markdown-link"
+    },
+    {
+      "source": "docs/pro-players-sources.md",
+      "line": 133,
+      "target": "pro-accounts-verification-2026-09-17.md",
+      "exists": true,
+      "kind": "markdown-link"
+    },
+    {
+      "source": "docs/pro-players-sources.md",
+      "line": 138,
+      "target": "pro-accounts-verification-2026-09-17.md",
+      "exists": true,
+      "kind": "markdown-link"
+    }
+  ],
+  "pass": true
+}

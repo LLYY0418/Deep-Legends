@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -24,19 +23,12 @@ func TestR90RealShapeGroups(t *testing.T) {
 	server := r62ArenaGameflowServer(t, &phase, &id, players)
 	a := &app{connected: true, lcu: &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}, liveClientPlayerList: func(context.Context) ([]byte, int, error) { return raw, http.StatusOK, nil }}
 	got := r62GameplayLiveResponse(t, a)
-	if !got.ArenaGrouped || got.ArenaMascotMapping || got.ArenaGroupSource != "live-client-order-unverified" {
-		t.Fatalf("real shape grouping: grouped=%v mascot=%v source=%q", got.ArenaGrouped, got.ArenaMascotMapping, got.ArenaGroupSource)
+	if got.ArenaGrouped || got.ArenaMascotMapping || !got.ArenaGroupingUnavailable {
+		t.Fatal("order is not squad evidence")
 	}
-	counts := map[string]int{}
 	for _, p := range got.Players {
-		counts[p.ArenaGroup]++
-	}
-	if len(counts) != 6 {
-		t.Fatal(counts)
-	}
-	for _, n := range counts {
-		if n != 3 {
-			t.Fatal(counts)
+		if p.ArenaGroup != "" {
+			t.Fatal("guessed group", p.ArenaGroup)
 		}
 	}
 }
@@ -155,16 +147,24 @@ func TestR90AlliesVerifyAndRejectScrambledPlayerlist(t *testing.T) {
 			a := r90Fixture(t, players, raw)
 			r90RememberAllies(a, 0, 3)
 			got := r62GameplayLiveResponse(t, a)
-			if scrambled {
-				if got.ArenaGrouped || !got.ArenaGroupingUnavailable {
-					t.Fatalf("contradictory allies accepted: grouped=%v unavailable=%v", got.ArenaGrouped, got.ArenaGroupingUnavailable)
+			if got.ArenaGrouped || !got.ArenaGroupingUnavailable {
+				t.Fatal("order inference must stay disabled")
+			}
+			marked := 0
+			for _, p := range got.Players {
+				if p.MySquad {
+					marked++
 				}
-				events := r90Events(t, a, "arena_group_order_rejected")
-				if len(events) != 1 || events[0]["reason"] != "allies-cross-blocks" {
-					t.Fatal(events)
+				if p.ArenaGroup != "" {
+					t.Fatal("guessed group")
 				}
-			} else if !got.ArenaGrouped || got.ArenaGroupSource != "live-client-order" || got.ArenaMascotMapping {
-				t.Fatalf("verified real fixture: %v %s %v", got.ArenaGrouped, got.ArenaGroupSource, got.ArenaMascotMapping)
+			}
+			if marked != 3 {
+				t.Fatal("known squad lost", marked)
+			}
+			events := r90Events(t, a, "arena_group_order_rejected")
+			if len(events) != 1 || events[0]["reason"] != "order-inference-disabled" {
+				t.Fatal(events)
 			}
 		})
 	}
@@ -178,28 +178,13 @@ func TestR90SeventeenGameflowUsesEighteenPlayerlistBoundaries(t *testing.T) {
 			a := r90Fixture(t, players, raw)
 			r90RememberAllies(a, 0, 3)
 			got := r62GameplayLiveResponse(t, a)
-			counts := map[string]int{}
-			if !got.ArenaGrouped || got.ArenaGroupSource != "live-client-order" || got.ArenaMascotMapping {
-				t.Fatalf("partial roster not grouped: %v %s", got.ArenaGrouped, got.ArenaGroupSource)
+			if got.ArenaGrouped || got.ArenaMascotMapping {
+				t.Fatal("partial roster guessed groups")
 			}
-			for i, p := range got.Players {
-				original := i
-				if i >= missing {
-					original++
+			for _, p := range got.Players {
+				if p.ArenaGroup != "" {
+					t.Fatal("guessed group", p.ArenaGroup)
 				}
-				want := fmt.Sprint(original/3 + 1)
-				if p.ArenaGroup != want {
-					t.Fatalf("player %d group=%s want=%s", original, p.ArenaGroup, want)
-				}
-				counts[p.ArenaGroup]++
-			}
-			sizes := []int{}
-			for _, n := range counts {
-				sizes = append(sizes, n)
-			}
-			sort.Ints(sizes)
-			if !reflect.DeepEqual(sizes, []int{2, 3, 3, 3, 3, 3}) {
-				t.Fatal(sizes)
 			}
 		})
 	}
@@ -238,7 +223,7 @@ func TestR90QueueSquadSizesAndSessionFallback(t *testing.T) {
 	r90RememberAllies(a, 0, 3)
 	a.liveClientPlayerList = func(context.Context) ([]byte, int, error) { return nil, 0, errors.New("offline") }
 	got := r62GameplayLiveResponse(t, a)
-	if !got.ArenaGrouped || got.ArenaGroupSource != "session-order" || got.ArenaMascotMapping {
+	if got.ArenaGrouped || !got.ArenaGroupingUnavailable || got.ArenaMascotMapping {
 		t.Fatal("fallback", got.ArenaGroupSource)
 	}
 	players[2], players[3] = players[3], players[2]
@@ -257,6 +242,18 @@ func TestR90LiveSnapshotCacheLayersAndManualRefresh(t *testing.T) {
 				players = players[:17]
 			}
 			a := r90Fixture(t, players, raw)
+			// This test exercises complete/partial roster caching, not a failed
+			// history read. Transient errors now correctly keep a snapshot retryable.
+			transport := a.lcu.http.Transport
+			if transport == nil {
+				transport = http.DefaultTransport
+			}
+			a.lcu.http.Transport = gameplayRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+				if strings.Contains(req.URL.Path, "/lol-match-history/") {
+					return response2351(map[string]any{"games": map[string]any{"gameCount": 0, "games": []any{}}}), nil
+				}
+				return transport.RoundTrip(req)
+			})
 			var probes atomic.Int32
 			a.liveClientPlayerList = func(context.Context) ([]byte, int, error) {
 				probes.Add(1)
@@ -266,7 +263,7 @@ func TestR90LiveSnapshotCacheLayersAndManualRefresh(t *testing.T) {
 				return raw, 200, nil
 			}
 			first := r62GameplayLiveResponse(t, a)
-			if first.ArenaGrouped != complete {
+			if first.ArenaGrouped {
 				t.Fatal("unexpected grouping")
 			}
 			r62GameplayLiveResponse(t, a)
@@ -332,18 +329,22 @@ func TestR90TruthDiagnosticSeparatesPartitionAndBlockIdentity(t *testing.T) {
 				partial := *info
 				partial.Participants = info.Participants[:17]
 				a.checkArenaGroupTruth(a.lcu, "", &partial)
-				if len(r90Events(t, a, "arena_group_truth_check")) != 0 {
-					t.Fatal("partial stats marked checked")
+				if events := r90Events(t, a, "arena_group_truth_check"); len(events) != 1 || events[0]["conclusive"] != false {
+					t.Fatal("partial stats must be inconclusive")
 				}
 			}
 			a.checkArenaGroupTruth(a.lcu, "", info)
 			a.checkArenaGroupTruth(a.lcu, "", info)
 			events := r90Events(t, a, "arena_group_truth_check")
-			if len(events) != 1 {
+			wantEvents := 1
+			if mode == "partial" {
+				wantEvents = 2
+			}
+			if len(events) != wantEvents {
 				t.Fatal(events)
 			}
-			e := events[0]
-			if e["partition_match"] != (mode != "wrong") || e["block_to_subteam_identity"] != (mode == "identity" || mode == "partial") || e["player_count"] != float64(18) || e["verified_by_allies"] != true || e["self_block"] != float64(1) {
+			e := events[len(events)-1]
+			if e["partition_match"] != (mode != "wrong") || e["block_to_subteam_identity"] != (mode == "identity" || mode == "partial") || e["player_count"] != float64(18) || e["verified_by_allies"] != false || e["my_squad_correct"] != (mode != "wrong") {
 				t.Fatal(e)
 			}
 			if e["build_fingerprint"] != buildFingerprint {
@@ -411,7 +412,15 @@ func TestR90EndPhaseReadsSGPTruthOnce(t *testing.T) {
 	defer cancel()
 	a.observeGameplayPhase(ctx, a.lcu, "EndOfGame")
 	deadline := time.Now().Add(2 * time.Second)
-	for len(r90Events(t, a, "arena_group_truth_check")) == 0 && time.Now().Before(deadline) {
+	hasTruth := func() bool {
+		for _, e := range r90Events(t, a, "arena_group_truth_check") {
+			if e["truth_source"] == "sgp" && e["conclusive"] == true {
+				return true
+			}
+		}
+		return false
+	}
+	for !hasTruth() && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}
 	if len(r90Events(t, a, "arena_group_truth_check")) != 1 {
@@ -495,10 +504,18 @@ func TestR90EndPhaseTransitionRestartsCanceledTruthRead(t *testing.T) {
 	}
 	a.observeGameplayPhase(ctx, a.lcu, "EndOfGame")
 	deadline := time.Now().Add(2 * time.Second)
-	for len(r90Events(t, a, "arena_group_truth_check")) == 0 && time.Now().Before(deadline) {
+	hasTruth := func() bool {
+		for _, e := range r90Events(t, a, "arena_group_truth_check") {
+			if e["truth_source"] == "sgp" && e["conclusive"] == true {
+				return true
+			}
+		}
+		return false
+	}
+	for !hasTruth() && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}
-	if len(r90Events(t, a, "arena_group_truth_check")) != 1 || requests.Load() != 2 {
+	if !hasTruth() || requests.Load() != 2 {
 		t.Fatal("end phase canceled truth without resuming", requests.Load())
 	}
 }

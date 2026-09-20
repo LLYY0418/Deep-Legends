@@ -1,0 +1,33 @@
+✖ R101 icons default to owned and disable unowned including apply (94.467167ms)
+✔ R101 unknown icon ownership keeps full catalog read only (16.786417ms)
+✔ R101 banner catalog groups localized names and owns no write action (34.984667ms)
+✔ R101 lock wait stays visible and disabled in all strategies (45.136167ms)
+✔ R101 strategy switch never saves a zero lock wait, even synthetic disabled change (59.653125ms)
+✔ R101 facade moves cards left and removes only obsolete explanation and accent (12.901791ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 662.972791
+
+✖ failing tests:
+
+test at web/r101.test.cjs:44:1
+✖ R101 icons default to owned and disable unowned including apply (94.467167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/web/r101.test.cjs:49:9)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -14,7 +14,7 @@ function extract(source, name) {
 }
 function compile(file, names, deps = {}, mutation = s => s) {
   const source = mutation(read(file));
-  const context = { ...deps };
+  const context = { updateLiveLoadingVisibility() {}, ...deps };
   vm.runInNewContext(names.map(n => extract(source, n)).join('\n') + `\nObject.assign(globalThis,{${names.join(',')}});`, context);
   return context;
 }
@@ -65,11 +65,11 @@ test('R87 phase poll independently loads once and repeated unchanged phase cause
   assert.equal(h.calls.filter(c => c === '/api/gameplay/live').length, 1);
 });
 
-test('R87 all tabs become dirty, inactive players stay off network, retry is bounded and delayed', async () => {
+test('R87 participants become dirty, inactive players stay off network, retry is bounded and delayed', async () => {
   const timer = timers(), calls = [];
-  const self = { current: true, data: { matches: [{ gameId: 1 }] } }, other = { data: { matches: [{ gameId: 2 }] } };
-  const state = { section: 'overview', tabs: [self, other] }; let active = self;
-  const h = compile('gameplay.js', ['markOverviewAfterGame', 'scheduleDirtyOverview'], { ...timer, state, document: { hidden: false }, connected: () => true,
+  const self = { current: true, data: { matches: [{ gameId: 1 }] } }, other = { playerRef: "peer", data: { matches: [{ gameId: 2 }] } };
+  const state = { section: 'overview', tabs: [self, other], live:{players:[{playerRef:'peer'}]} }; let active = self;
+  const h = compile('gameplay.js', ['markOverviewAfterGame', 'scheduleDirtyOverview'], { ...timer, state, riotTab:()=>false, document: { hidden: false }, connected: () => true,
     activeTab: () => active, loadOverview: async (tab, force) => { assert.equal(force, true); calls.push(tab); return true; } });
   h.markOverviewAfterGame('WaitingForStats'); h.markOverviewAfterGame('PreEndOfGame'); h.markOverviewAfterGame('EndOfGame');
   assert.equal(other.dirty, true); assert.equal(other.dirtyTimer, undefined); assert.equal(calls.length, 0);

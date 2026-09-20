@@ -1,0 +1,12 @@
+{
+  "build": {
+    "command": "/opt/homebrew/bin/go build -o /tmp/deep-legends-r102 .",
+    "exit": 0,
+    "duration_seconds": 1.371
+  },
+  "vet": {
+    "command": "/opt/homebrew/bin/go vet ./...",
+    "exit": 0,
+    "duration_seconds": 0.906
+  }
+}

@@ -85,7 +85,7 @@ func TestSocialQueueLabels(t *testing.T) {
 		{2400, "", "海克斯大乱斗"}, {1100, "", "排位赛（云顶之弈）"},
 		{1090, "", "匹配模式（云顶之弈）"}, {0, "RANKED_TFT", "排位赛（云顶之弈）"},
 		{0, "ARAM_UNRANKED_5x5", "极地大乱斗"}, {0, "", ""},
-		{0, "unknown-or-private-value", ""}, {99999, "RANKED_TFT", "模式 99999"},
+		{0, "unknown-or-private-value", ""}, {99999, "RANKED_TFT", "其他模式"},
 	} {
 		label, _ := socialQueueLabel(tt.id, tt.kind, nil)
 		if label != tt.label {

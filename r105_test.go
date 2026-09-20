@@ -1,0 +1,312 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+)
+
+func r105PlayerAccounts(name string) []proSeedAccountRef {
+	for _, seed := range proSeedAccounts {
+		if seed.Player == name {
+			return seed.Accounts
+		}
+	}
+	return nil
+}
+
+func TestR105_EmbeddedAccountCounts(t *testing.T) {
+	total := 0
+	for _, seed := range proSeedAccounts {
+		total += len(seed.Accounts)
+	}
+	if total != 53 {
+		t.Fatalf("total accounts = %d, want 53", total)
+	}
+	TestR102SeedAccountsMatchVerificationDoc(t)
+}
+
+func TestR105_PlayerAccountCounts(t *testing.T) {
+	want := map[string]int{"Bin": 1, "Wenbo": 1, "Flandre": 1, "Xun": 2, "knight": 2, "Viper": 1, "ON": 1, "TheShy": 5, "Wei": 2, "Rookie": 4, "Assum": 1, "JiaQi": 2, "Meiko": 1, "Doran": 1, "Oner": 1, "Faker": 1, "Peyz": 1, "Keria": 1, "Zeus": 1, "Kanavi": 2, "Zeka": 2, "Gumayusi": 2, "Delight": 1, "Kiin": 1, "Canyon": 1, "Chovy": 1, "Ruler": 1, "Duro": 1, "Siwoo": 2, "Lucid": 2, "ShowMaker": 2, "Smash": 3, "Career": 2}
+	if len(proSeedAccounts) != 33 {
+		t.Fatal("want 33 players")
+	}
+	for name, count := range want {
+		if got := len(r105PlayerAccounts(name)); got != count {
+			t.Errorf("%s: got %d accounts, want %d", name, got, count)
+		}
+	}
+}
+
+func TestR105_CriticalAccountFixes(t *testing.T) {
+	want := map[string][]proSeedAccountRef{"Wei": {{"dyjkbysb", "KR1"}}, "Rookie": {{"벼락식혜", "0070"}, {"EmberKnight", "KR0"}}, "Xun": {{"我累铜泥丸", "小重o"}}, "knight": {{"BLG 온", "KR1"}}, "TheShy": {{"은여하", "1103"}}, "Smash": {{"Smash", "KR2"}}}
+	for player, refs := range want {
+		for _, ref := range refs {
+			found := false
+			for _, actual := range r105PlayerAccounts(player) {
+				found = found || actual == ref
+			}
+			if !found {
+				t.Errorf("%s missing %s#%s", player, ref.GameName, ref.TagLine)
+			}
+		}
+	}
+	for _, ref := range r105PlayerAccounts("Rookie") {
+		if ref.GameName == "dyjkbysb" {
+			t.Error("dyjkbysb belongs to Wei")
+		}
+	}
+}
+
+func TestR105_SpecialCharacters(t *testing.T) {
+	for name, ref := range map[string]proSeedAccountRef{"Canyon": {"JUGKlNG", "kr"}, "Ruler": {"강 철", "샤 넬"}} {
+		if !reflect.DeepEqual(r105PlayerAccounts(name), []proSeedAccountRef{ref}) {
+			t.Fatalf("%s spelling/case/space mismatch", name)
+		}
+	}
+}
+
+func r105AssertPage(t *testing.T, result proPlayersResponse) {
+	t.Helper()
+	if result.PlayerCount != 33 || result.AccountCount != 53 || len(result.Teams) != 6 {
+		t.Fatalf("page totals: %d/%d/%d", result.PlayerCount, result.AccountCount, len(result.Teams))
+	}
+	for _, team := range result.Teams {
+		for _, player := range team.Players {
+			want := r105PlayerAccounts(player.Name)
+			if len(player.Accounts) != len(want) {
+				t.Errorf("%s page count %d want %d", player.Name, len(player.Accounts), len(want))
+			}
+			for _, ref := range want {
+				found := false
+				for _, account := range player.Accounts {
+					found = found || account.Reviewed && account.GameName == ref.GameName && account.TagLine == ref.TagLine
+				}
+				if !found {
+					t.Errorf("%s page missing %s#%s", player.Name, ref.GameName, ref.TagLine)
+				}
+			}
+		}
+	}
+}
+
+func TestR105_ReviewedPageSurvivesOldSnapshotAndWrongOwner(t *testing.T) {
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
+	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	a := &app{storage: store}
+	a.proPlayers.mu.Lock()
+	a.restoreProSnapshotLocked()
+	// Historical index and PUUID claim must not steal Wei or remove Rookie.
+	wrong := opggProAccount{GameName: "dyjkbysb", TagLine: "KR1", PUUID: "old-puuid", Source: "seed", SeedKey: "proseed:v1:IG/rookie/0", UpdatedAt: time.Now().UTC().Format(time.RFC3339)}
+	a.proPlayers.teams = []opggProTeam{{ID: 28, Members: []opggProMember{{Nickname: "Rookie", Authority: "PROGAMER", Summoners: []opggProAccount{wrong}}}}}
+	a.proPlayers.fetchedAt = time.Now().Add(-time.Hour)
+	a.persistProSnapshotLocked()
+	a.proPlayers.mu.Unlock()
+	reboot := &app{storage: store}
+	w := httptest.NewRecorder()
+	reboot.handleProPlayers(w, httptest.NewRequest("GET", "/api/pro-players", nil))
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	var result proPlayersResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	r105AssertPage(t, result)
+	if output := os.Getenv("R105_PUBLIC_OUTPUT"); output != "" {
+		if err := os.WriteFile(output, w.Body.Bytes(), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	log, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var event struct {
+		Event    string    `json:"event"`
+		Teams    []proTeam `json:"teams"`
+		Players  int       `json:"playerCount"`
+		Accounts int       `json:"accountCount"`
+	}
+	for _, line := range strings.Split(string(log), "\n") {
+		var e = event
+		if json.Unmarshal([]byte(line), &e) == nil && e.Event == "pro_players" {
+			event = e
+		}
+	}
+	r105AssertPage(t, proPlayersResponse{Teams: event.Teams, PlayerCount: event.Players, AccountCount: event.Accounts})
+	if strings.Contains(string(log), "old-puuid") {
+		t.Fatal("private upstream PUUID leaked")
+	}
+}
+
+func TestR105_AllPublicationsAndOfflineKeepReviewedAccounts(t *testing.T) {
+	directory, err := parseOPGGProPlayers(r104FixtureFlight(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := new(app)
+	seeds := a.loadProSeeds(context.Background(), nil, directory)
+	for _, source := range [][]opggProTeam{nil, directory, withProSeed(directory, seeds), withProSeed(append(cloneProTeams(directory), pendingProSupplements()...), seeds)} {
+		r105AssertPage(t, a.buildReviewedProPlayers(source))
+	}
+	// Unknown activity preserves document order, independent of LP. Known
+	// lower-ranked Smash#KR2 wins once a valid activity time is supplied.
+	result := a.buildReviewedProPlayers(nil)
+	for _, team := range result.Teams {
+		for _, player := range team.Players {
+			for i, ref := range r105PlayerAccounts(player.Name) {
+				if player.Accounts[i].GameName != ref.GameName || player.Accounts[i].TagLine != ref.TagLine {
+					t.Fatal("document order changed", player.Name)
+				}
+			}
+		}
+	}
+	rows := []opggProTeam{{Members: []opggProMember{{Summoners: []opggProAccount{{GameName: "Smash", TagLine: "KR2", LastMatchAtKnown: true, LastMatchAt: "2026-09-17T12:00:00Z"}, {GameName: "DK Smash", TagLine: "KR7", LastMatchAtKnown: true, LastMatchAt: "2026-09-16T12:00:00Z", Rank: json.RawMessage(`{"tier":"CHALLENGER","division":1,"lp":999}`)}}}}}}
+	for _, team := range a.buildReviewedProPlayers(rows).Teams {
+		for _, p := range team.Players {
+			if p.Name == "Smash" && p.Accounts[0].GameName != "Smash" {
+				t.Fatal("LP displaced activity ordering")
+			}
+		}
+	}
+}
+
+// Run the real app handler and LCU RequestJSON with an in-memory transport.
+// No localhost listener or network dependency is needed for these assertions.
+func r105LCU(handler http.HandlerFunc) *LCUClient {
+	return &LCUClient{baseURL: "https://fixture.invalid", token: "fixture", http: &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		w := httptest.NewRecorder()
+		handler(w, r)
+		return w.Result(), nil
+	})}}
+}
+
+func TestR105_IconClickRouteWritesUnownedAndHandlesStatuses(t *testing.T) {
+	for _, status := range []int{201, 200, 204, 401, 500} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			puts := 0
+			client := r105LCU(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/lol-summoner/v1/current-summoner/icon":
+					var body map[string]any
+					json.NewDecoder(r.Body).Decode(&body)
+					if r.Method != "PUT" || !reflect.DeepEqual(body, map[string]any{"profileIconId": float64(72)}) {
+						t.Error("invalid PUT", r.Method, body)
+					}
+					puts++
+					w.WriteHeader(status)
+				case "/lol-summoner/v1/current-summoner":
+					fmt.Fprint(w, `{"summonerId":1,"profileIconId":72}`)
+				default:
+					fmt.Fprint(w, `{}`)
+				}
+			})
+			a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}}
+			a.facadeIdentityShapeDiagnosticClient = client
+			a.facadeIcons = facadeIconCache{client: client, at: time.Now(), catalog: facadeIconCatalog{Icons: []facadeIcon{{ID: 72, Owned: false, Disabled: true}}}}
+			defer a.clearFacadeEventThrottle()
+			w := httptest.NewRecorder()
+			a.handleFacadeApply(w, httptest.NewRequest("POST", "/api/facade/apply", strings.NewReader(`{"action":"icon","iconId":72}`)))
+			if puts != 1 || (w.Code == 200) != (status == 201) {
+				t.Fatalf("PUTs=%d LCU=%d app=%d %s", puts, status, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestR108_BannerWritesClientPreferencesAndPreservesOtherSelections(t *testing.T) {
+	for _, status := range []int{200, 201, 204, 400, 500} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			equipped := "old-accent"
+			writes := 0
+			client := r105LCU(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/lol-game-data/assets/v1/regalia.json":
+					fmt.Fprint(w, `[{"id":"4","idSecondary":"","regaliaType":"kBanner","isSelectable":true,"assetPath":"/lol-game-data/assets/banner.png"}]`)
+				case facadeBannerInventoryPath:
+					fmt.Fprint(w, `{"4":{"isOwned":false}}`)
+				case facadeChallengeSummaryPath:
+					fmt.Fprintf(w, `{"bannerId":%q,"selectedChallengesString":"101,102","title":{"itemId":42},"crestId":"prestige","prestigeCrestBorderLevel":500}`, equipped)
+				case facadeChallengePreferencesPath:
+					writes++
+					var body map[string]any
+					json.NewDecoder(r.Body).Decode(&body)
+					if r.Method != "POST" || body["bannerAccent"] != "4" || body["title"] != "42" || body["crestBorder"] != "prestige" || body["prestigeCrestBorderLevel"] != float64(500) || !reflect.DeepEqual(body["challengeIds"], []any{float64(101), float64(102), float64(-1)}) {
+						t.Errorf("incorrect client preference contract: %v", body)
+					}
+					if status < 300 {
+						equipped = "4"
+					}
+					w.WriteHeader(status)
+				default:
+					t.Errorf("unexpected endpoint %s", r.URL.Path)
+				}
+			})
+			err := writeFacadeBanner(context.Background(), client, "4")
+			if writes != 1 || (err == nil) != (status < 300) {
+				t.Fatalf("writes=%d status=%d err=%v", writes, status, err)
+			}
+			banners, _, err := loadFacadeBanners(context.Background(), client)
+			if err != nil || len(banners) != 1 || banners[0].Owned || banners[0].ImagePath == "" {
+				t.Fatal("unowned catalog selection lost", banners, err)
+			}
+		})
+	}
+}
+
+func TestR105_SuccessStatusWithoutChangeIsNotSuccess(t *testing.T) {
+	for _, kind := range []string{"icon", "banner"} {
+		t.Run(kind, func(t *testing.T) {
+			writes := 0
+			client := r105LCU(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case facadeBannerInventoryPath:
+					fmt.Fprint(w, `{}`)
+				case "/lol-game-data/assets/v1/regalia.json":
+					fmt.Fprint(w, `[{"id":"4","idSecondary":"","regaliaType":"kBanner","isSelectable":true}]`)
+				case facadeChallengeSummaryPath:
+					fmt.Fprint(w, `{"bannerId":"old-accent","selectedChallengesString":"","title":null}`)
+				case facadeChallengePreferencesPath:
+					writes++
+					w.WriteHeader(200)
+				case "/lol-summoner/v1/current-summoner/icon":
+					writes++
+					w.WriteHeader(201)
+				case "/lol-summoner/v1/current-summoner":
+					fmt.Fprint(w, `{"summonerId":1,"profileIconId":1}`)
+				default:
+					t.Error("unexpected request", r.URL.Path)
+				}
+			})
+			a := &app{}
+			a.facadeIcons = facadeIconCache{client: client, at: time.Now(), catalog: facadeIconCatalog{Icons: []facadeIcon{{ID: 72}}}}
+			err := a.applyFacadeAction(context.Background(), client, Summoner{}, facadeApplyRequest{Action: kind, IconID: 72, BannerID: "4"})
+			if writes != 1 || err == nil || !strings.Contains(err.Error(), "尚未确认") {
+				t.Fatalf("no-op accepted: writes=%d err=%v", writes, err)
+			}
+		})
+	}
+}
+
+func TestR110_BannerRejectsContentIDAsCatalogID(t *testing.T) {
+	client := r105LCU(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/lol-game-data/assets/v1/regalia.json" {
+			t.Errorf("unexpected %s", r.URL.Path)
+		}
+		fmt.Fprint(w, `[{"id":"4","contentId":"not-a-banner-accent","regaliaType":"kBanner","isSelectable":true}]`)
+	})
+	if err := writeFacadeBanner(context.Background(), client, "not-a-banner-accent"); err == nil {
+		t.Fatal("accepted wrong identity namespace")
+	}
+}

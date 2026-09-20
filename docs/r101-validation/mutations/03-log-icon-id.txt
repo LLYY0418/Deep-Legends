@@ -1,0 +1,7 @@
+=== RUN   TestR101IconProbeNeverLogsIconID
+    r101_test.go:86: leaked profileIconId: {"build_fingerprint":"dev","error_code":"","event":"r99_write_probe","log_seq":1,"ok":true,"probe":"W5","profileIconId":72,"run_id":"0019c1bb6f82bfb5f1a86969","status":201,"time":"2026-09-17T01:37:42.933048Z"}
+        {"build_fingerprint":"dev","error_code":"","event":"r99_write_probe","log_seq":2,"ok":true,"probe":"W5-restore","restored":true,"run_id":"0019c1bb6f82bfb5f1a86969","status":201,"time":"2026-09-17T01:37:42.933433Z"}
+--- FAIL: TestR101IconProbeNeverLogsIconID (0.00s)
+FAIL
+FAIL	lol-loot-assistant	0.483s
+FAIL

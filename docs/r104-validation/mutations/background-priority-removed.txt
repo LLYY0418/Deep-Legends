@@ -1,0 +1,6 @@
+--- FAIL: TestR104ColdStartupDripProtectsForegroundTwentyMatches (0.62s)
+    r104_test.go:310: background inserted requests ahead of waiting foreground: 4 -> 7
+    r104_test.go:331: cold startup: 0 Riot; first minute: 4 background; second minute yields; foreground: 20/20, 25 requests
+FAIL
+FAIL	lol-loot-assistant	0.886s
+FAIL

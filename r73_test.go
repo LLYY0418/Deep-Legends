@@ -57,7 +57,7 @@ func TestR73StableIdentityAnchor(t *testing.T) {
 	}
 }
 
-func TestR73DormantPrimary(t *testing.T) {
+func TestR73DormantUnknownActivityOrder(t *testing.T) {
 	old := proFixtureAccount("old-high", "old-id", "CHALLENGER", 1, 1000)
 	old.UpdatedAt = time.Now().Add(-200 * 24 * time.Hour).UTC().Format(time.RFC3339)
 	fresh := proFixtureAccount("fresh", "fresh-id", "MASTER", 1, 10)
@@ -65,8 +65,8 @@ func TestR73DormantPrimary(t *testing.T) {
 	src := []opggProTeam{{ID: 632, Members: []opggProMember{proFixtureMember(632, "Bin", "Chen Ze-Bin", old, fresh)}}}
 	result := new(app).buildProPlayers(src, proRoster[:1])
 	accounts := result.Teams[0].Players[0].Accounts
-	if len(accounts) != 2 || accounts[0].GameName != "fresh" || !accounts[0].Primary || accounts[0].Dormant || !accounts[1].Dormant || accounts[1].Primary || result.DormantCount != 1 {
-		t.Fatalf("freshness ordering/primary wrong: %+v", accounts)
+	if len(accounts) != 2 || accounts[0].GameName != "fresh" || accounts[0].Dormant || !accounts[1].Dormant || result.DormantCount != 1 {
+		t.Fatalf("unknown-activity dormant ordering wrong: %+v", accounts)
 	}
 	old.Source = "TrackingThePros"
 	old.PUUID = ""

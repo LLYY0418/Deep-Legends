@@ -33,7 +33,7 @@
     const animation = player.backgroundVideoPath && !reduced?.matches ? `<video class="overview-art-focus" data-overview-video="${escape(player.backgroundVideoPath)}" muted loop playsinline preload="none" aria-hidden="true"></video>` : "";
     const focusID = player.backgroundSkinId || "";
     const composition = player.backgroundPosterPath?.toLowerCase().includes("_centered_") ? "centered" : "ordinary";
-    return `<div class="summoner-strip-art overview-art" data-focus-skin="${escape(focusID)}" data-composition="${composition}" aria-hidden="true"><img class="overview-art-focus" data-overview-poster data-fallback="${escape(fallback)}" src="${escape(poster)}" alt="" decoding="async">${animation}</div>`;
+    return `<div class="summoner-strip-art overview-art" data-focus-skin="${escape(focusID)}" data-composition="${composition}" aria-hidden="true"><img class="overview-art-focus" data-overview-poster data-fallback="${escape(fallback)}" data-queued-src="${escape(poster)}" alt="" decoding="async">${animation}</div>`;
   }
   function sync() {
     for (const [video, visible] of videos) {
@@ -50,16 +50,16 @@
   function prepare(root) {
     for (const holder of holders) if (!holder.isConnected) { resize?.unobserve(holder); holders.delete(holder); }
     for (const image of root.querySelectorAll("[data-overview-poster]")) {
+      const holder = image.closest(".overview-art");
+      if (!holders.has(holder)) { holders.add(holder); resize?.observe(holder); }
+      const loaded = () => { image.closest(".summoner-strip,.account-hero")?.classList.add("has-loaded-image"); position(holder); };
+      if (image.complete && image.naturalWidth) loaded();
       if (image.dataset.bound) continue;
       image.dataset.bound = "1";
-      const holder = image.closest(".overview-art");
-      holders.add(holder); resize?.observe(holder);
-      const loaded = () => { image.closest(".summoner-strip,.account-hero")?.classList.add("has-loaded-image"); position(holder); };
       image.addEventListener("load", loaded);
       image.addEventListener("error", () => {
-        if (image.dataset.fallback && !image.dataset.retried) { image.dataset.retried = "1"; holder.dataset.composition = "ordinary"; image.removeAttribute("style"); image.src = image.dataset.fallback; }
+        if (image.dataset.fallback && !image.dataset.retried) { image.dataset.retried = "1"; holder.dataset.composition = "ordinary"; image.removeAttribute("style"); image.setAttribute("data-queued-src", image.dataset.fallback); }
       });
-      if (image.complete && image.naturalWidth) loaded();
     }
     for (const video of root.querySelectorAll("[data-overview-video]")) {
       if (videos.has(video)) continue;

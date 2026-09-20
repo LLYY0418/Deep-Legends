@@ -515,7 +515,8 @@ func eventStreamDropDiagnostics(err error) (map[string]any, map[string]any) {
 
 func isFacadeLCUEvent(event LCUEvent) bool {
 	uri := strings.ToLower(event.URI)
-	return hasLCUEventPrefix(uri, "/lol-challenges/v1/summary-player-data") ||
+	return (strings.HasPrefix(uri, "/lol-collections/v1/inventories/") && strings.HasSuffix(uri, "/backdrop")) ||
+		hasLCUEventPrefix(uri, "/lol-challenges/v1/summary-player-data") ||
 		hasLCUEventPrefix(uri, "/lol-chat/v1/me") ||
 		hasLCUEventPrefix(uri, "/lol-regalia/v2/current-summoner/regalia")
 }

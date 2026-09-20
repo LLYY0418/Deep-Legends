@@ -1,0 +1,6 @@
+=== RUN   TestR101SeedRankMapsRomanDivision
+    r101_test.go:457: DIAMOND 1
+--- FAIL: TestR101SeedRankMapsRomanDivision (0.03s)
+FAIL
+FAIL	lol-loot-assistant	0.483s
+FAIL
