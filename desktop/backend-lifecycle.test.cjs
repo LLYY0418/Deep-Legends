@@ -8,7 +8,7 @@ const { EventEmitter } = require("node:events");
 const { JSDOM } = require("jsdom");
 const mainSource = fs.readFileSync(process.env.R100_BACKEND_MAIN_SOURCE || path.join(__dirname, "main.cjs"), "utf8");
 const preloadSource = fs.readFileSync(path.join(__dirname, "preload.cjs"), "utf8");
-const appSource = fs.readFileSync(process.env.R100_BACKEND_APP_SOURCE || path.join(__dirname, "../web/app.js"), "utf8");
+const appSource = fs.readFileSync(process.env.R100_BACKEND_APP_SOURCE || path.join(__dirname, "../backend/web/app.js"), "utf8");
 const flush = () => new Promise(setImmediate);
 function extract(name) {
   let start = appSource.indexOf(`function ${name}(`);

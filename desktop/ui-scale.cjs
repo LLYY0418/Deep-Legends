@@ -1,6 +1,6 @@
 "use strict";
 
-// ★ 这几个常量必须与 web/app.js 里的同名常量逐字一致：真正执行缩放的是渲染进程
+// ★ 这几个常量必须与 backend/web/app.js 里的同名常量逐字一致：真正执行缩放的是渲染进程
 // （:root 的 --ui-zoom + .app-frame 的 CSS zoom），外壳这份只用来在渲染进程汇报之前
 // 先给标题栏覆盖层一个正确的初值，并校验渲染进程送上来的倍率。
 // desktop/ui-scale.test.cjs 里有断言防止两边漂移。

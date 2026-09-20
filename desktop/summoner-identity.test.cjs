@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
 
-const WEB = path.join(__dirname, "..", "web");
+const WEB = path.join(__dirname, "..", "backend", "web");
 const appSource = fs.readFileSync(path.join(WEB, "app.js"), "utf8");
 const gameplaySource = fs.readFileSync(path.join(WEB, "gameplay.js"), "utf8");
 const gameplayStyles = fs.readFileSync(path.join(WEB, "gameplay.css"), "utf8");

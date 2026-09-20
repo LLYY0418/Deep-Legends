@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {JSDOM}=require('jsdom');
-const read=f=>fs.readFileSync(path.join(__dirname,'../web',f),'utf8');
+const read=f=>fs.readFileSync(path.join(__dirname,'../backend/web',f),'utf8');
 test('2244 skill summary uses real main/sub priorities after R, without repeated labels',()=>{
  const dom=new JSDOM('',{runScripts:'outside-only'}),w=dom.window;
  try {

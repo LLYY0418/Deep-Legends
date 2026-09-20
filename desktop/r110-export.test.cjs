@@ -32,7 +32,7 @@ test('R110 migrates most recent valid old choice once and does not resurrect cle
  fs.rmSync(f.pictures,{recursive:true});assert.equal(f.create().getDirectory(),'');assert.equal(f.create().getDirectory(),'');
 });
 test('R110 settings exposes a single export directory',()=>{
- const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
+ const html=fs.readFileSync(path.join(__dirname,'../backend/web/index.html'),'utf8');
  assert.equal((html.match(/id="setting-share-directory"/g)||[]).length,1);
  assert.equal(html.includes('id="setting-diagnostics-directory"'),false);
 });

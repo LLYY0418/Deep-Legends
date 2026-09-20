@@ -23,12 +23,12 @@ function copyFingerprintFixture(project, root) {
   const source = fs.readFileSync(path.join(__dirname, "source-fingerprint.cjs"), "utf8");
   const inputs = [...source.match(/const buildInputs = \[([\s\S]*?)\]/)[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
   const runtime = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"))).build.files.filter((name) => name.endsWith(".cjs")).map((name) => `desktop/${name}`);
-  const go = fs.readdirSync(project).filter((name) => name.endsWith(".go") && !name.endsWith("_test.go"));
+  const go = fs.readdirSync(path.join(project, "backend")).filter((name) => name.endsWith(".go") && !name.endsWith("_test.go")).map((name) => `backend/${name}`);
   for (const relative of new Set([...inputs, ...runtime, ...go])) {
     fs.mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
     fs.copyFileSync(path.join(project, relative), path.join(root, relative));
   }
-  copySourceTree(path.join(project, "web"), path.join(root, "web"));
+  copySourceTree(path.join(project, "backend", "web"), path.join(root, "backend", "web"));
   copySourceTree(path.join(project, "installer"), path.join(root, "installer"));
 }
 
@@ -54,7 +54,7 @@ test("R70 fingerprint tracks embedded assets/build inputs but excludes tests and
     assert.notEqual(sourceFingerprint(root), original, `${name} must invalidate the build`);
     fs.writeFileSync(file, bytes);
   }
-  for (const name of ["prestige_chromas.json", "go.mod", "desktop/package-lock.json", "data/reroll_pool_14_5.json", "data/skin_release_dates.json", "data/skin_release_overrides.json", "web/app.js", "web/runtime.js", "desktop/nsis/portable.nsi", "installer/main_windows.go", "installer/ui/installer.html", "installer/ui/notice.html", "installer/go.sum", "installer/rsrc_windows_amd64.syso", "installer/build-shell.cjs"]) {
+  for (const name of ["backend/prestige_chromas.json", "go.mod", "desktop/package-lock.json", "backend/data/reroll_pool_14_5.json", "backend/data/skin_release_dates.json", "backend/data/skin_release_overrides.json", "backend/web/app.js", "backend/web/runtime.js", "desktop/nsis/portable.nsi", "installer/main_windows.go", "installer/ui/installer.html", "installer/ui/notice.html", "installer/go.sum", "installer/rsrc_windows_amd64.syso", "installer/build-shell.cjs"]) {
     const file = path.join(root, name);
     const bytes = fs.readFileSync(file);
     fs.appendFileSync(file, "\n");
@@ -62,7 +62,7 @@ test("R70 fingerprint tracks embedded assets/build inputs but excludes tests and
     fs.writeFileSync(file, bytes);
   }
   fs.writeFileSync(path.join(root, "r70_test.go"), "package main\n");
-  fs.appendFileSync(path.join(root, "web", "runtime.test.cjs"), "\n// test only");
+  fs.appendFileSync(path.join(root, "backend", "web", "runtime.test.cjs"), "\n// test only");
   fs.mkdirSync(path.join(root, "desktop", "backend"), { recursive: true });
   fs.writeFileSync(path.join(root, "desktop", "backend", "loot-service.exe"), "generated");
   fs.writeFileSync(path.join(root, "desktop", "uninstall-shell.exe"), "generated uninstaller");

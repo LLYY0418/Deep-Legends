@@ -8,7 +8,8 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-GUARD = ROOT / 'r88_queue_guard_test.go'
+BACKEND = ROOT / 'backend'
+GUARD = BACKEND / 'r88_queue_guard_test.go'
 OUTPUT = ROOT / 'docs/r90-queue-guard'
 FILES = ['r88_queue_guard_test.go', 'r89_queue_guard_test.go', 'r90_queue_guard_test.go']
 INDEX = 'if isQueue(n.Index) && collectionOf(n.X)&queueGuardNumericKeys != 0 {'
@@ -52,7 +53,7 @@ def run(pattern, overlay=None):
     if overlay:
         command += ['-overlay', str(overlay)]
     command += FILES + ['-run', pattern, '-count=1']
-    result = subprocess.run(command, cwd=ROOT,
+    result = subprocess.run(command, cwd=BACKEND,
                             env=dict(os.environ, GOCACHE=str(ROOT / '.gocache'), GOPATH=str(ROOT / '.gopath')),
                             capture_output=True, text=True, timeout=120)
     events = []

@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
+BACKEND = ROOT / 'backend'
 OUT = ROOT / "docs/r103-validation/mutations"
 OUT.mkdir(parents=True, exist_ok=True)
 TMP = Path("/tmp/deep-legends-go-tmp")
@@ -20,7 +21,7 @@ RESULTS = [result for result in RESULTS if result["id"] < START] if START else [
 def probe(name, file, old, new, test):
     if START and name < START:
         return
-    source_path = ROOT / file
+    source_path = BACKEND / file
     source = source_path.read_text()
     assert source.count(old) == 1, (name, source.count(old))
 
@@ -32,7 +33,7 @@ def probe(name, file, old, new, test):
         "-timeout=40s",
         "-run",
         "^" + test + "$",
-        ".",
+        "./backend",
     ]
     baseline = subprocess.run(
         command,

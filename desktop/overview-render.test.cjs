@@ -11,7 +11,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
 
-const WEB = path.join(__dirname, "..", "web");
+const WEB = path.join(__dirname, "..", "backend", "web");
 const SCRIPTS = ["runtime.js", "demo-data.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
 const gameplaySource = fs.readFileSync(process.env.R104_GAMEPLAY_SOURCE || path.join(WEB, "gameplay.js"), "utf8");
 const suiteSource = fs.readFileSync(path.join(WEB, "suite.js"), "utf8");

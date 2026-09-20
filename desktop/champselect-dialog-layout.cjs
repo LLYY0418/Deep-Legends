@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const assert = require('node:assert/strict');
-const web = path.resolve(__dirname, '../web');
+const web = path.resolve(__dirname, '../backend/web');
 const output = path.resolve(__dirname, '../docs/r87/addendum');
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'r87-dialog-'));
 let chrome, socket, server;

@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
-const WEB = path.join(__dirname, "..", "web");
+const WEB = path.join(__dirname, "..", "backend", "web");
 const PRO_CSS = fs.readFileSync(path.join(WEB, "pro-players.css"), "utf8");
 const GAMEPLAY_CSS = fs.readFileSync(path.join(WEB, "gameplay.css"), "utf8");
 const tick = (ms = 60) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -346,7 +346,7 @@ test("R112 导出状态只属于当前诊断页；离开、迟到和乱序完成
   const opened=[], downloads=[];
   const {w,d,errors}=boot(t,{full:true,diagnosticsBridge:{onCompleted(fn){done=fn},async openFolder(id){opened.push(id);if(holdFolder)await new Promise(resolve=>{finishFolder=resolve});return true}}});
   await tick(150);
-  // Telemetry flushing is covered independently in web/export-diagnostics;
+  // Telemetry flushing is covered independently in backend/web/export-diagnostics;
   // keep this DOM lifecycle test independent of the demo network delay.
   w.flushFlowDiagnostics=async()=>{};
   const originalClick=w.HTMLAnchorElement.prototype.click;

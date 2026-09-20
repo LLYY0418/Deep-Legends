@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
-const WEB = path.join(__dirname, "..", "web");
+const WEB = path.join(__dirname, "..", "backend", "web");
 const settle = () => new Promise(resolve => setTimeout(resolve, 250));
 
 test("live specialist right overview button opens exact KR overview while rune selection and return remain independent", async () => {

@@ -5,11 +5,11 @@ const root=path.resolve(__dirname,'..');
 app.setPath('userData','/private/tmp/deep-legends-2135-render-profile');
 app.whenReady().then(async()=>{
  const win=new BrowserWindow({show:false,width:1100,height:500,webPreferences:{sandbox:true,contextIsolation:true}});
- const css=['app.css','gameplay.css','champions.css'].map(f=>fs.readFileSync(path.join(root,'web',f),'utf8')).join('\n');
+ const css=['app.css','gameplay.css','champions.css'].map(f=>fs.readFileSync(path.join(root, "backend", "web",f),'utf8')).join('\n');
  const img=f=>'data:image/png;base64,'+fs.readFileSync(path.join(root,'testdata',f)).toString('base64');
  await win.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(`<html><head><style>${css}body{display:block;padding:24px;overflow:auto}.icons{display:flex;gap:30px;margin:24px}.augment-icon{width:96px!important;height:96px!important}.icons p{margin:6px 0;color:var(--muted)}</style></head><body><div id="tabs"></div><div class="icons"><div class="is-gold"><span class="augment-icon"><img id="bonk" src="${img('diagnostics-2024/bonk-large.png')}"></span><p>邦！</p></div><div class="is-gold"><span class="augment-icon"><img id="reference" src="${img('diagnostics-2135/criticalmissile-large.png')}"></span><p>暴击飞弹（原图）</p></div><div class="is-prismatic"><span class="augment-icon"><img id="bear" src="${img('diagnostics-2024/drop-bear.png')}"></span><p>空投熊（原图）</p></div></div></body></html>`));
- await win.webContents.executeJavaScript(fs.readFileSync(path.join(root,'web/augment-artwork.js'),'utf8'));
- const source=fs.readFileSync(path.join(root,'web/gameplay.js'),'utf8');
+ await win.webContents.executeJavaScript(fs.readFileSync(path.join(root,'backend/web/augment-artwork.js'),'utf8'));
+ const source=fs.readFileSync(path.join(root,'backend/web/gameplay.js'),'utf8');
  const funcs=source.slice(source.indexOf('  function renderSpecialistPlayers('),source.indexOf('  function runeConfigurationTitle('));
  const result=await win.webContents.executeJavaScript(`(async()=>{
   ${funcs}

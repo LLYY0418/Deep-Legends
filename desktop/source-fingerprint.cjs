@@ -30,17 +30,17 @@ function sourceFingerprint(projectRoot = root) {
   // Include build inputs, not test fixtures or generated binaries (the latter
   // contain this fingerprint and would create a circular dependency).
   const buildInputs = [
-    "go.mod", "go.sum", "prestige_chromas.json", "desktop/package.json", "desktop/package-lock.json",
+    "go.mod", "go.sum", "backend/prestige_chromas.json", "desktop/package.json", "desktop/package-lock.json",
     "build-desktop.sh", "build-desktop-windows.ps1", "build-windows.ps1", "scripts/build-stage.cjs", "scripts/go-test-shards.cjs",
     "desktop/source-fingerprint.cjs", "desktop/apply-portable-template.cjs",
     "desktop/verify-embedded-riot-key.cjs", "desktop/verify-build-fingerprint.cjs", "desktop/release-build.cjs",
     "desktop/verify-packaged-runtime.cjs", "desktop/nsis/portable.nsi", "desktop/nsis/installer.nsh",
-    "desktop/assets/hexcore-icon.ico", "data/reroll_pool_14_5.txt", "data/reroll_pool_14_5.json",
-    "data/skin_release_dates.json", "data/skin_release_overrides.json",
+    "desktop/assets/hexcore-icon.ico", "backend/data/reroll_pool_14_5.txt", "backend/data/reroll_pool_14_5.json",
+    "backend/data/skin_release_dates.json", "backend/data/skin_release_overrides.json",
   ].map((name) => path.join(projectRoot, name));
   const files = [...new Set([
-    ...filesUnder("web", projectRoot).filter((name) => !name.endsWith(".cjs")),
-    ...fs.readdirSync(projectRoot).filter((name) => name.endsWith(".go") && !name.endsWith("_test.go")).map((name) => path.join(projectRoot, name)),
+    ...filesUnder("backend/web", projectRoot).filter((name) => !name.endsWith(".cjs")),
+    ...filesUnder("backend", projectRoot).filter((name) => name.endsWith(".go") && !name.endsWith("_test.go")),
     ...desktopRuntimeFiles,
     ...filesUnder("installer", projectRoot).filter((file) => {
       const relative = path.relative(path.join(projectRoot, "installer"), file).replaceAll(path.sep, "/");

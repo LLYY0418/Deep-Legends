@@ -8,7 +8,7 @@ const { windowBoundsForWorkArea } = require("./window-bounds.cjs");
 
 const boundsSource = fs.readFileSync(path.join(__dirname, "window-bounds.cjs"), "utf8");
 const mainSource = fs.readFileSync(path.join(__dirname, "main.cjs"), "utf8");
-const appStyles = fs.readFileSync(path.join(__dirname, "..", "web", "app.css"), "utf8");
+const appStyles = fs.readFileSync(path.join(__dirname, "..", "backend", "web", "app.css"), "utf8");
 
 function loadBoundsModule(source) {
   const module = { exports: {} };

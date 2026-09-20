@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 report_dir="docs/r115-validation/bench"
 mkdir -p "$report_dir"
 report_base="$report_dir/$(date +%Y%m%d-%H%M%S)"
-GOCACHE="${GOCACHE:-$PWD/.gocache}" go test -run '^$' -bench '^BenchmarkR115' -benchmem -benchtime=200ms -count=5 . > "$report_base.txt"
+GOCACHE="${GOCACHE:-$PWD/.gocache}" go test -run '^$' -bench '^BenchmarkR115' -benchmem -benchtime=200ms -count=5 ./backend > "$report_base.txt"
 python3 - "$report_base.txt" "${1:-}" <<'PY'
 from pathlib import Path
 from collections import defaultdict

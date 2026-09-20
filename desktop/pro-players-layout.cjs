@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const root=path.resolve(__dirname,'..'), web=path.join(root,'web');
+const root=path.resolve(__dirname,'..'), web=path.join(root,'backend','web');
 const chrome=process.env.CHROME_BIN || (process.platform==='darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r73-layout-'));
 let proc,ws,server;

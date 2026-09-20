@@ -7,9 +7,9 @@ app.whenReady().then(async()=>{try {
  const win=new BrowserWindow({show:false,width:1280,height:1100,webPreferences:{sandbox:true,contextIsolation:true}});
  const samples=[['ahri-centered',103086,.31,true],['ahri-ordinary',103086,.16,false],['xerath-centered',101000,.29,true],['xerath-ordinary',101000,.20,false]];
  const media=samples.map(([file,id,y,centered])=>({file,id,y,centered,img:fs.readFileSync(path.join(root,`testdata/diagnostics-2244/${file}.jpg`)).toString('base64')}));
- const css=['app.css','gameplay.css'].map(file=>fs.readFileSync(path.join(root,'web',file),'utf8')).join('\n');
+ const css=['app.css','gameplay.css'].map(file=>fs.readFileSync(path.join(root, "backend", "web",file),'utf8')).join('\n');
  await win.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(`<html><head><style>${css}body{display:block;padding:24px;overflow:auto}.summoner-strip{height:140px;margin:20px 0}</style></head><body></body></html>`));
- await win.webContents.executeJavaScript(fs.readFileSync(path.join(root,'web/overview-art.js'),'utf8'));
+ await win.webContents.executeJavaScript(fs.readFileSync(path.join(root,'backend/web/overview-art.js'),'utf8'));
  await win.webContents.executeJavaScript(`{
   const samples=${JSON.stringify(media)};
   document.body.innerHTML=samples.map(m=>'<section class="summoner-strip">'+deepLegendsOverviewArt.render({backgroundSkinId:m.id,backgroundPosterPath:m.centered?'/splash_centered_0.jpg':'',backgroundSource:'gtimg',backgroundPath:'/ordinary.jpg'})+'<h3>'+m.file+'</h3></section>').join('');

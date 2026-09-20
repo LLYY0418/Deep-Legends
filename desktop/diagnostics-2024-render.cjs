@@ -7,14 +7,14 @@ const root = path.resolve(__dirname,"..");
 app.setPath("userData", "/private/tmp/deep-legends-2024-render-profile");
 app.whenReady().then(async () => {
   const win = new BrowserWindow({show:false,width:1450,height:1050,webPreferences:{sandbox:true,contextIsolation:true}});
-  const css = ["app.css","gameplay.css","champions.css"].map(file=>fs.readFileSync(path.join(root,"web",file),"utf8")).join("\n");
-  const gameplay = fs.readFileSync(path.join(root,"web/gameplay.js"),"utf8");
+  const css = ["app.css","gameplay.css","champions.css"].map(file=>fs.readFileSync(path.join(root, "backend", "web",file),"utf8")).join("\n");
+  const gameplay = fs.readFileSync(path.join(root,"backend/web/gameplay.js"),"utf8");
   const shell = gameplay.slice(gameplay.indexOf("  function matchTableShell("),gameplay.indexOf("  function renderMatchOverview("));
   const fixture = file => `data:image/png;base64,${fs.readFileSync(path.join(root,"testdata/diagnostics-2024",file)).toString("base64")}`;
   await win.loadURL("data:text/html;charset=utf-8,"+encodeURIComponent(`<html><head><style>${css}
     body{display:block;padding:24px;overflow:auto} #teams{display:grid;gap:12px} .icons{display:flex;gap:20px;margin:20px}.icons .augment-icon{width:100px;height:100px}
   </style></head><body><div id="teams"></div><div class="icons"><div class="is-gold"><span class="augment-icon"><img id="bonk" src="${fixture("bonk-large.png")}"></span></div><div class="is-prismatic"><span class="augment-icon"><img id="bear" src="${fixture("drop-bear.png")}"></span></div></div></body></html>`));
-  await win.webContents.executeJavaScript(fs.readFileSync(path.join(root,"web/augment-artwork.js"),"utf8"));
+  await win.webContents.executeJavaScript(fs.readFileSync(path.join(root,"backend/web/augment-artwork.js"),"utf8"));
   const results = await win.webContents.executeJavaScript(`(async()=>{
     ${shell}
     const row=(name,items,score=true)=>'<tr><td><button class="participant-link"><span class="game-icon is-small"></span><span class="participant-name">'+name+'</span></button></td><td><div class="match-score-cell">'+(score?'9.2 MVP':'')+'</div></td><td>17 / 4 / 11<small>7.00:1</small></td><td>35,823<small>承伤 125,114</small></td><td>12 / 2</td><td>257<small>8.4/分钟</small></td><td><div class="table-items">'+Array.from({length:items},()=>'<span class="item-tooltip"><span class="game-icon is-small"></span></span>').join('')+'</div></td></tr>';

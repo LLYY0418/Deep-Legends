@@ -8,16 +8,17 @@ import tempfile
 from datetime import datetime, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+BACKEND = ROOT / 'backend'
 OUTPUT = pathlib.Path(os.environ.get("R93_MUTATION_OUTPUT", "/tmp/deep-legends-r93/mutation"))
 OUTPUT.mkdir(parents=True, exist_ok=True)
 ENV = dict(os.environ, GOCACHE=os.environ.get("GOCACHE", "/tmp/deep-legends-r89/go-cache"))
 TEST = "TestR93TwentyMatchDetailsFromDiskAfterRestart"
-SOURCE = ROOT / "riot_api.go"
+SOURCE = BACKEND / "riot_api.go"
 original = SOURCE.read_bytes()
 
 
 def run(name, overlay=None):
-    command = ["go", "test", ".", "-run", "^" + TEST + "$", "-count=1", "-v", "-timeout=60s"]
+    command = ["go", "test", "./backend", "-run", "^" + TEST + "$", "-count=1", "-v", "-timeout=60s"]
     if overlay:
         command.extend(["-overlay", str(overlay)])
     result = subprocess.run(command, cwd=ROOT, env=ENV, capture_output=True, text=True, timeout=90)

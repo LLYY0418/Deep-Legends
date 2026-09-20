@@ -5,8 +5,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
-const WEB = path.join(__dirname, "..", "web");
-const capture = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "testdata/r75/pro-response.json"), "utf8"));
+const WEB = path.join(__dirname, "..", "backend", "web");
+const capture = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "backend", "testdata/r75/pro-response.json"), "utf8"));
 const settle = () => new Promise(resolve => setTimeout(resolve, 1000));
 
 for (const coverage of [null, {totalGames:99,failedGames:1}, {totalGames:30,failedGames:10}]) {

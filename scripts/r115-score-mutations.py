@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 
 root = Path(__file__).resolve().parent.parent
+backend = root / 'backend'
 out = root / 'docs/r115-validation/scoring'
 out.mkdir(parents=True, exist_ok=True)
 env = dict(os.environ, GOCACHE=str(root / '.gocache'))
@@ -26,22 +27,22 @@ def run(name, command, variables=env):
     (out / (name + '.log')).write_text(output)
     return result.returncode, output
 
-go_test = ['go', 'test', '-run', 'TestR115.*Ability', '-count=1', '.']
-web_test = ['node', '--test', 'web/r115-scoring.test.cjs']
+go_test = ['go', 'test', '-run', 'TestR115.*Ability', '-count=1', './backend']
+web_test = ['node', '--test', 'backend/web/r115-scoring.test.cjs']
 for name, command in [('baseline-go', go_test), ('baseline-web', web_test)]:
     if run(name, command)[0]:
         raise SystemExit(name + ' failed')
 results = []
 with tempfile.TemporaryDirectory(prefix='r115-score-mutations-') as directory:
     for name, filename, old, new in checks:
-        source = (root / filename).read_text()
+        source = (backend / filename).read_text()
         assert old in source, name
         replacement = Path(directory) / Path(filename).name
         replacement.write_text(source.replace(old, new))
         if filename.endswith('.go'):
             overlay = Path(directory) / 'overlay.json'
-            overlay.write_text(json.dumps({'Replace': {str(root / filename): str(replacement)}}))
-            command = ['go', 'test', '-overlay', str(overlay), '-vet=off', '-run', 'TestR115.*Ability', '-count=1', '.']
+            overlay.write_text(json.dumps({'Replace': {str(backend / filename): str(replacement)}}))
+            command = ['go', 'test', '-overlay', str(overlay), '-vet=off', '-run', 'TestR115.*Ability', '-count=1', './backend']
             code, output = run(name, command)
         else:
             code, output = run(name, web_test, dict(env, R115_SCORING_SOURCE=str(replacement)))

@@ -1,7 +1,7 @@
 'use strict';
 // Real Chromium, offline demo fixtures; this is not a Windows/LCU validation.
 const {spawn}=require('node:child_process'), fs=require('node:fs'), path=require('node:path'), os=require('node:os'),assert=require('node:assert/strict');
-const root=path.resolve(__dirname,'..'),web=path.join(root,'web'),out=path.join(root,'docs/r115-validation');
+const root=path.resolve(__dirname,'..'),web=path.join(root, "backend", "web"),out=path.join(root,'docs/r115-validation');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r115-browser-'));let proc,ws,server;
 async function main(){
  const chrome=process.env.CHROME_BIN||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';

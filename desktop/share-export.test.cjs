@@ -39,7 +39,7 @@ test("分享图载荷限制令牌、根节点、大小和主题", () => {
 });
 
 test("导出样式固定标准桌面双列并强制恢复生涯栏和水印", () => {
-  const css = fs.readFileSync(path.join(__dirname, "..", "web", "gameplay.css"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "..", "backend", "web", "gameplay.css"), "utf8");
   assert.match(css, /\.overview-share-surface\s*\{[^}]*width:\s*1488px/s);
   assert.match(css, /\.overview-share-surface \.overview-share-content\s*\{[^}]*width:\s*1440px[^}]*container:\s*gameplay-page\s*\/\s*inline-size/s);
   assert.match(css, /\.overview-share-surface \.overview-layout\s*\{[^}]*grid-template-columns:\s*minmax\(300px,340px\)\s+minmax\(0,1fr\)\s*!important/s);

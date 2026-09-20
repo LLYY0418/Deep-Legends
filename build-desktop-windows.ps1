@@ -40,7 +40,7 @@ if ($KeyMode -eq "public") {
         if ($plainKey) {
             Push-Location $projectRoot
             try {
-                $RiotAPIKeyCipher = (go run . -encrypt-riot-key $plainKey | Select-Object -Last 1).Trim()
+                $RiotAPIKeyCipher = (go run ./backend -encrypt-riot-key $plainKey | Select-Object -Last 1).Trim()
                 if ($LASTEXITCODE -ne 0) { throw "Riot key encryption failed" }
             } finally {
                 Pop-Location
@@ -87,11 +87,11 @@ try {
     } finally {
         Pop-Location
     }
-    node --check web/app.js
-    if ($LASTEXITCODE -ne 0) { throw "web/app.js syntax check failed" }
-    node --check web/champions.js
-    if ($LASTEXITCODE -ne 0) { throw "web/champions.js syntax check failed" }
-    $webTests = @(Get-ChildItem (Join-Path $projectRoot "web\*.test.cjs") | ForEach-Object { $_.FullName })
+    node --check backend/web/app.js
+    if ($LASTEXITCODE -ne 0) { throw "backend/web/app.js syntax check failed" }
+    node --check backend/web/champions.js
+    if ($LASTEXITCODE -ne 0) { throw "backend/web/champions.js syntax check failed" }
+    $webTests = @(Get-ChildItem (Join-Path $projectRoot "backend\web\*.test.cjs") | ForEach-Object { $_.FullName })
     node --test $webTests
     if ($LASTEXITCODE -ne 0) { throw "Web tests failed" }
     node --check desktop/main.cjs
@@ -113,7 +113,7 @@ try {
         $env:GOARCH = "amd64"
         $env:CGO_ENABLED = "0"
         $ldflags = "-s -w -H=windowsgui -buildid= -X main.version=$Version -X main.buildFingerprint=$sourceFingerprint -X main.riotAPIKey= -X main.riotAPIKeyCipher=$RiotAPIKeyCipher"
-        go build -buildvcs=false -trimpath -ldflags $ldflags -o $backendOutput .
+        go build -buildvcs=false -trimpath -ldflags $ldflags -o $backendOutput ./backend
         if ($LASTEXITCODE -ne 0) { throw "Backend build failed" }
     } finally {
         $env:GOOS = $previousGoos

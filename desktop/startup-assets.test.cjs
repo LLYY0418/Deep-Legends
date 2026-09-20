@@ -1,7 +1,7 @@
 "use strict";
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
 const {JSDOM}=require('jsdom');
-const web=path.join(__dirname,'../web'),html=fs.readFileSync(path.join(web,'index.html'),'utf8');
+const web=path.join(__dirname,'../backend/web'),html=fs.readFileSync(path.join(web,'index.html'),'utf8');
 test('R86 initial CSS and JS gzip budget excludes dynamic demo data',()=>{
  const dom=new JSDOM(html);try{
  const scripts=[...dom.window.document.querySelectorAll('script[src]')].map(n=>n.getAttribute('src'));

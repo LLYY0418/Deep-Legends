@@ -3,6 +3,7 @@
 from pathlib import Path
 import json,os,subprocess,tempfile
 root=Path(__file__).resolve().parent.parent
+backend=root/'backend'
 out=root/'docs/r115-validation/mutations';out.mkdir(parents=True,exist_ok=True)
 env=dict(os.environ,GOCACHE=str(root/'.gocache'))
 checks=[
@@ -25,18 +26,18 @@ def run(name,args,variables=env):
  result=subprocess.run(args,cwd=root,env=variables,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=90)
  (out/(name+'.log')).write_text(result.stdout)
  return result
-base=run('baseline-go',['go','test','-run','TestR115','-count=1','.'])
-web=run('baseline-web',['node','--test','web/r115.test.cjs'])
+base=run('baseline-go',['go','test','-run','TestR115','-count=1','./backend'])
+web=run('baseline-web',['node','--test','backend/web/r115.test.cjs'])
 if base.returncode or web.returncode:raise SystemExit('baseline failed')
 with tempfile.TemporaryDirectory(prefix='r115-mutations-') as tmp:
  for name,file,old,new,pattern in checks:
-  source=(root/file).read_text()
+  source=(backend/file).read_text()
   if old not in source:raise SystemExit('anchor absent: '+name)
   replacement=Path(tmp)/(name+Path(file).suffix);replacement.write_text(source.replace(old,new))
-  if pattern=='web':result=run(name,['node','--test','web/r115.test.cjs'],dict(env,R115_LOADER_SOURCE=str(replacement)))
+  if pattern=='web':result=run(name,['node','--test','backend/web/r115.test.cjs'],dict(env,R115_LOADER_SOURCE=str(replacement)))
   else:
-   overlay=Path(tmp)/(name+'.json');overlay.write_text(json.dumps({'Replace':{str(root/file):str(replacement)}}))
-   result=run(name,['go','test','-overlay',str(overlay),'-vet=off','-run',pattern,'-timeout','8s','-count=1','.'])
+   overlay=Path(tmp)/(name+'.json');overlay.write_text(json.dumps({'Replace':{str(backend/file):str(replacement)}}))
+   result=run(name,['go','test','-overlay',str(overlay),'-vet=off','-run',pattern,'-timeout','8s','-count=1','./backend'])
   killed=result.returncode!=0 and ('--- FAIL:' in result.stdout or 'AssertionError' in result.stdout or '✖' in result.stdout) and '[build failed]' not in result.stdout
   results.append({'id':name,'file':file,'killed':killed,'exitCode':result.returncode})
   print(name,'KILLED' if killed else 'SURVIVED/ERROR',flush=True)

@@ -1,6 +1,7 @@
 """Isolated regression mutations; never rewrite production workspace files."""
 import json, os, pathlib, subprocess, tempfile
 root = pathlib.Path(__file__).resolve().parent.parent
+backend = root / 'backend'
 out = pathlib.Path(os.environ.get('R90_MUTATION_OUTPUT', root / 'docs/r90'))
 out.mkdir(parents=True, exist_ok=True)
 env = dict(os.environ)
@@ -10,9 +11,9 @@ pathlib.Path(env['GOTMPDIR']).mkdir(parents=True, exist_ok=True)
 baselines = set()
 results = []
 def probe(name, file, old, new, test, javascript=False):
-    source = (root / file).read_text()
+    source = (backend / file).read_text()
     assert source.count(old) == 1, (name, source.count(old))
-    baseline = ['node', '--test', '--test-name-pattern', test, 'web/r90.test.cjs'] if javascript else ['go', 'test', '-count=1', '-timeout=60s', '-run', test, '.']
+    baseline = ['node', '--test', '--test-name-pattern', test, 'backend/web/r90.test.cjs'] if javascript else ['go', 'test', '-count=1', '-timeout=60s', '-run', test, './backend']
     if tuple(baseline) not in baselines:
         clean = subprocess.run(baseline, cwd=root, env=env, capture_output=True, text=True, timeout=90)
         output = clean.stdout + clean.stderr
@@ -27,11 +28,11 @@ def probe(name, file, old, new, test, javascript=False):
         if name == "queue-literal": runenv["R90_QUEUE_GUARD_SOURCE"] = str(modified)
         if javascript:
             runenv['R90_GAMEPLAY_SOURCE'] = str(modified)
-            cmd = ['node', '--test', '--test-name-pattern', test, 'web/r90.test.cjs']
+            cmd = ['node', '--test', '--test-name-pattern', test, 'backend/web/r90.test.cjs']
         else:
             overlay = tmp / 'overlay.json'
-            overlay.write_text(json.dumps({'Replace': {str(root/file): str(modified)}}))
-            cmd = ['go', 'test', '-overlay', str(overlay), '-count=1', '-timeout=60s', '-run', test, '.']
+            overlay.write_text(json.dumps({'Replace': {str(backend/file): str(modified)}}))
+            cmd = ['go', 'test', '-overlay', str(overlay), '-count=1', '-timeout=60s', '-run', test, './backend']
         result = subprocess.run(cmd, cwd=root, env=runenv, capture_output=True, text=True, timeout=90)
         output = result.stdout + result.stderr
         killed = result.returncode != 0 and ('FAIL: Test' in output or 'AssertionError' in output) and 'build failed' not in output and 'test timed out' not in output

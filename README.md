@@ -29,7 +29,7 @@ Windows 本地英雄联盟助手。无需启动游戏客户端即可联网查看
 
 - “英雄”无需登录客户端即可按需联网读取 OP.GG 韩服单/双排梯度及详情，并提供全部、上单、打野、中单、下路、辅助位置和最强王者至铂金及以上段位切换。搜索支持中文、英文、拼音、首字母缩写与常见外号；海克斯大乱斗页展示英雄梯度、完整强化符文目录、描述和适合英雄，详情优先呈现推荐海克斯，再复用召唤师技能、技能顺序和出装组件；斗魂竞技场页展示英雄梯度与三人队伍协同榜（平均名次、第一名率、选用率、胜率），详情提供推荐三人队伍与推荐海克斯。最强王者等高分段样本不足时，整页或仅对抗数据回退到翡翠以上并在界面标注实际口径。
 - “总览”按当前召唤师和新打开的玩家标签展示单排/双排、灵活组排、英雄胜率、位置偏好、熟练度、过去 30 天排位、最近 30 天同场玩家、活跃时段及最近战绩；排位使用官方段位徽章，当前登录账号的标签固定第一并以金色高亮。战绩卡与对局详情附带单场相对评分和 MVP / SVP 标记：按 KDA、参团率、伤害、经济、补刀和视野相对同场玩家加权计算，仅供参考，不代表官方口径。在总览页点击玩家名称会打开可关闭的新标签；在对局页或英雄详情页点击玩家名称则在当前页面以覆盖层展示总览，左上角“返回”回到原页面。国服已结束对局的详情通过腾讯官方 SGP 网关读取，令牌来自本机已登录客户端。国服玩家总览不再查询或展示当前对局、好友游戏状态卡及对照探测；韩服当前对局保留。本机“对局”页和好友列表状态不受影响。
-- 顶部搜索框支持国服具体子服务器与韩服：国服先通过本机 `RiotClientServices` 的全局 aliases 接口把精确 `游戏名#编号` 解析为内部 PUUID，再使用当前已登录 League Client 提供的 league-session 令牌向所选腾讯 SGP 子服读取召唤师和战绩；两套本地服务的端口与令牌彼此独立，不会写盘或返回渲染页。国服排位接口只能读取当前登录服务器，打开其他子服玩家时排位卡会明确显示“跨服暂不支持排位”。韩服玩家通过 Riot 官方开发者 API 精确查询，段位、熟练度、最近战绩与国服玩家使用同一套总览界面。韩服允许只填名称：官方接口找不到时，本机服务会向 OP.GG 公开搜索补全编号，再回到 Riot 查询。API Key 以密文形式内嵌：先运行 `go run . -encrypt-riot-key "RGAPI-你的key"`，再用 `-RiotAPIKeyCipher` 参数（或环境变量 `RIOT_API_KEY_CIPHER`）在构建时注入，源码中的 `riotAPIKeyCipher` 变量本身永远留空，不会提交到仓库（密文只能防止从源码中直接扫出明文，不能阻止拿到 EXE 后抓包或逆向提取，请自行评估分发范围；泄露后可到开发者门户重置）。官方 API 不覆盖国服；汇总统计基于当前已读取的战绩样本，单场详情在本机内存缓存以节省接口配额。
+- 顶部搜索框支持国服具体子服务器与韩服：国服先通过本机 `RiotClientServices` 的全局 aliases 接口把精确 `游戏名#编号` 解析为内部 PUUID，再使用当前已登录 League Client 提供的 league-session 令牌向所选腾讯 SGP 子服读取召唤师和战绩；两套本地服务的端口与令牌彼此独立，不会写盘或返回渲染页。国服排位接口只能读取当前登录服务器，打开其他子服玩家时排位卡会明确显示“跨服暂不支持排位”。韩服玩家通过 Riot 官方开发者 API 精确查询，段位、熟练度、最近战绩与国服玩家使用同一套总览界面。韩服允许只填名称：官方接口找不到时，本机服务会向 OP.GG 公开搜索补全编号，再回到 Riot 查询。API Key 以密文形式内嵌：先运行 `go run ./backend -encrypt-riot-key "RGAPI-你的key"`，再用 `-RiotAPIKeyCipher` 参数（或环境变量 `RIOT_API_KEY_CIPHER`）在构建时注入，源码中的 `riotAPIKeyCipher` 变量本身永远留空，不会提交到仓库（密文只能防止从源码中直接扫出明文，不能阻止拿到 EXE 后抓包或逆向提取，请自行评估分发范围；泄露后可到开发者门户重置）。官方 API 不覆盖国服；汇总统计基于当前已读取的战绩样本，单场详情在本机内存缓存以节省接口配额。
 - 搜索大区下拉中，国服子服务器每次打开默认折叠；韩服下方的“职业选手”是独立页面入口，不改变搜索服务器，也不新增侧栏菜单。仅展示 BLG、IG、T1、HLE、GEN、DK 已核对的一队选手，按选手分组、单双排段位/小段/LP降序列出可核验韩服账号。支持队伍/选手/账号筛选、主题切换和进入现有韩服总览后返回。账号来自 OP.GG 完整韩服目录与已审查的 TrackingThePros 实名页，缺失、未知、不活跃与旧缓存明确标注；名单日期与来源边界见 `docs/pro-players-sources.md`。这不等同于“对局”页的职业选手符文推荐功能。
 - 服务器归属规则：韩服与每个国服子服务器互不相通。搜索栏按所选服务器查询；点击页面内出现的玩家名称时沿用当前页面所属的具体服务器，时间线、分页和异步缓存也保持相同作用域；跨服排位与依赖逐人排位的平均段位不受客户端接口支持，分别明确显示能力边界或“—”。英雄详情页的玩家榜来自 OP.GG 韩服数据、固定按韩服打开。玩家页签与总览头部会标注“艾欧尼亚”“黑色玫瑰”等具体子服或“韩服”。隐藏名称和主播模式只遮罩身份显示；英雄选择阶段的标准 `obfuscatedPuuid` 在后端本地恢复为内部引用，然后与普通玩家使用相同的可用数据管线。
 - 国服玩家总览的“排位”卡右上角只展示海克斯大乱斗隐藏分：总览打开时自动向 ARAMKit 发送该玩家的昵称与 Tag，展示其第三方估算分并标注估算／推算与误差；单双排与灵活组排没有可靠、合规的数据源，因此不展示隐藏分。请求不携带本机账号凭据、Cookie 或客户端令牌，成功结果在内存缓存 10 分钟、失败缓存 5 分钟；同一身份并发合并，全局请求至少间隔 300ms。韩服不发送；未收录与失败显示明确空态，不以 0 分代替。
@@ -87,7 +87,7 @@ Windows 本地英雄联盟助手。无需启动游戏客户端即可联网查看
 三合一剩余 = 国服公告奖池皮肤 ID 集合 − 当前账号已拥有皮肤 ID 集合
 ```
 
-奖池来源和原图位于 [`data/README.md`](data/README.md)。
+奖池来源和原图位于 [`backend/data/README.md`](backend/data/README.md)。
 
 ## 从源码构建桌面客户端
 
@@ -105,7 +105,7 @@ Windows PowerShell：
 ./build-desktop-windows.ps1 -Version "0.11.2" -CertificateFile "你的代码签名证书.pfx" -CertificatePassword "证书密码"
 ```
 
-带上真实 Riot API Key（先用 `go run . -encrypt-riot-key "RGAPI-你的key"` 生成密文，只在自己本机构建时使用，不要提交到仓库）：
+带上真实 Riot API Key（先用 `go run ./backend -encrypt-riot-key "RGAPI-你的key"` 生成密文，只在自己本机构建时使用，不要提交到仓库）：
 
 ```powershell
 ./build-desktop-windows.ps1 -RiotAPIKeyCipher "上一步生成的密文"
@@ -141,8 +141,8 @@ R84 起，“设置 → 诊断与日志 → 导出诊断日志”也包含外壳
 仅构建隐藏后台服务（不含桌面窗口）：
 
 ```bash
-export RIOT_KEY_CIPHER="$(go run . -encrypt-riot-key "$(tr -d '\r\n' < riot_key.local.txt)")"
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags="-s -w -H=windowsgui -X main.riotAPIKeyCipher=${RIOT_KEY_CIPHER}" -o "desktop/backend/loot-service.exe" .
+export RIOT_KEY_CIPHER="$(go run ./backend -encrypt-riot-key "$(tr -d '\r\n' < riot_key.local.txt)")"
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags="-s -w -H=windowsgui -X main.riotAPIKeyCipher=${RIOT_KEY_CIPHER}" -o "desktop/backend/loot-service.exe" ./backend
 ```
 
 测试：
@@ -151,11 +151,11 @@ GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldfl
 npm ci --prefix desktop
 go test -race ./...
 go vet ./...
-node --check web/app.js
-node --check web/gameplay.js
-node --check web/champions.js
+node --check backend/web/app.js
+node --check backend/web/gameplay.js
+node --check backend/web/champions.js
 node --check desktop/main.cjs
-node --test web/*.test.cjs desktop/*.test.cjs
+node --test backend/web/*.test.cjs desktop/*.test.cjs
 ```
 
 源码目录不保留编译缓存、已安装的 Node 依赖、EXE/ZIP、截图或历史验收日志。完整构建脚本会重新安装依赖并生成 `desktop/backend/loot-service.exe` 和 `dist/desktop/`；直接运行桌面开发壳前，也需先安装依赖并按上文编译后台服务。功能所需的图片、字体、内嵌数据、测试夹具和发布所用的 `CHANGELOG.md` 均随源码保留。
@@ -192,39 +192,44 @@ node --test web/*.test.cjs desktop/*.test.cjs
 
 ```text
 .
-├── main.go              隐藏本地服务、桌面握手、鉴权和页面入口
-├── client_launcher.go   已检测客户端的只读列表与固定 ID 启动接口
-├── client_installations_windows.go  TCLS 与 Riot 安装探测
-├── lcu.go               国服客户端发现、只读请求与受限 JSON 操作
-├── riot_client.go       Riot Client 独立发现与国服全局 Riot ID 解析
-├── lcu_api.go           玩家、目录、库存、战利品和奖励只读接口层
-├── gameplay.go          生涯、战绩、实时对局、符文与回放适配层
-├── sgp_api.go           腾讯官方 SGP 网关（国服资料与已结束对局详情）
-├── riot_api.go          Riot 官方 API 适配层（韩服玩家查询；API Key 密文在构建时通过 -ldflags 注入，源码中留空）
-├── specialist_runes.go  韩服专家榜玩家最近对局中的目标英雄符文提取、限流与缓存
-├── rank_insights.go     段位分数换算与对局平均段位（国服逐人查询）
-├── opgg_insights.go     韩服对局平均段位（OP.GG 公开对局数据）
-├── lp_tracker.go        本机记录每场排位的胜点变化
-├── social.go            本机客户端好友分组与在线状态（只读）
-├── watch_rules.go       流程自动规则、征召托管、相位状态机、兼容迁移与本地持久化
-├── game_settings_lock.go 当前安装目录定位与游戏设置文件只读锁
-├── client_maintenance.go 客户端界面维护、关闭与手动断开动作
-├── profile_facade.go    生涯背景、聊天身份、登录重设与展示清理
-├── claim_center.go      奖励账本、任务与事件中心的内存扫描和逐项领取
-├── champions.go         韩服英雄梯度、构建、海克斯目录与受限静态资源代理
-├── lcu_events.go        LCU WebSocket 事件订阅
-├── connection_manager.go 连接状态机、自动重连与收藏更新
-├── catalog.go           皮肤目录、库存解析与差集计算
-├── prestige.go          国服臻彩清单校验、官方插画代理与皮肤原画降级
-├── prestige_chromas.json 腾讯官方臻彩 CMS 的离线 ID 快照
-├── features.go          诊断、导出、奖池、历史和隐私 API
-├── storage.go           脱敏本地存储、清单哈希和快照差异
-├── data/                奖池原图、转录和来源说明
-├── web/                 桌面渲染界面
+├── backend/             Go 本地服务、业务实现、测试与全部内嵌资源
+│   ├── main.go              隐藏本地服务、桌面握手、鉴权和页面入口
+│   ├── client_launcher.go   已检测客户端的只读列表与固定 ID 启动接口
+│   ├── client_installations_windows.go  TCLS 与 Riot 安装探测
+│   ├── lcu.go               国服客户端发现、只读请求与受限 JSON 操作
+│   ├── riot_client.go       Riot Client 独立发现与国服全局 Riot ID 解析
+│   ├── lcu_api.go           玩家、目录、库存、战利品和奖励只读接口层
+│   ├── gameplay.go          生涯、战绩、实时对局、符文与回放适配层
+│   ├── sgp_api.go           腾讯官方 SGP 网关（国服资料与已结束对局详情）
+│   ├── riot_api.go          Riot 官方 API 适配层（韩服玩家查询；API Key 密文在构建时通过 -ldflags 注入，源码中留空）
+│   ├── specialist_runes.go  韩服专家榜玩家最近对局中的目标英雄符文提取、限流与缓存
+│   ├── rank_insights.go     段位分数换算与对局平均段位（国服逐人查询）
+│   ├── opgg_insights.go     韩服对局平均段位（OP.GG 公开对局数据）
+│   ├── lp_tracker.go        本机记录每场排位的胜点变化
+│   ├── social.go            本机客户端好友分组与在线状态（只读）
+│   ├── watch_rules.go       流程自动规则、征召托管、相位状态机、兼容迁移与本地持久化
+│   ├── game_settings_lock.go 当前安装目录定位与游戏设置文件只读锁
+│   ├── client_maintenance.go 客户端界面维护、关闭与手动断开动作
+│   ├── profile_facade.go    生涯背景、聊天身份、登录重设与展示清理
+│   ├── claim_center.go      奖励账本、任务与事件中心的内存扫描和逐项领取
+│   ├── champions.go         韩服英雄梯度、构建、海克斯目录与受限静态资源代理
+│   ├── lcu_events.go        LCU WebSocket 事件订阅
+│   ├── connection_manager.go 连接状态机、自动重连与收藏更新
+│   ├── catalog.go           皮肤目录、库存解析与差集计算
+│   ├── prestige.go          国服臻彩清单校验、官方插画代理与皮肤原画降级
+│   ├── prestige_chromas.json 腾讯官方臻彩 CMS 的离线 ID 快照
+│   ├── features.go          诊断、导出、奖池、历史和隐私 API
+│   ├── storage.go           脱敏本地存储、清单哈希和快照差异
+│   ├── data/                奖池原图、转录和来源说明
+│   ├── web/                 桌面渲染界面与前端测试
+│   ├── testdata/            脱敏测试夹具
+│   └── *_test.go            数据、安全与计算测试
 ├── desktop/             Electron 原生窗口、图标与发布配置
+├── installer/           独立安装/卸载 Go 模块（单独 go.mod）
+├── docs/                执行账本、验证证据与历史工单（历史工单在 docs/history/worklists/）
+├── scripts/             变异校验、基准与验证脚本
 ├── build-desktop-windows.ps1  完整桌面发布脚本
-├── dist/desktop/        Windows 安装版与便携版 EXE、ZIP 与哈希
-└── *_test.go            数据、安全与计算测试
+└── dist/desktop/        Windows 安装版 EXE、构建收据与哈希
 ```
 
 ### R75 公开赛事数据边界

@@ -5,7 +5,12 @@ project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$project_root"
 
 run_stage() {
-  node "$project_root/scripts/build-stage.cjs" "$@"
+  if [[ -f "$project_root/scripts/build-stage.cjs" ]]; then
+    node "$project_root/scripts/build-stage.cjs" "$@"
+  else
+    shift
+    "$@"
+  fi
 }
 
 export GOCACHE="${GOCACHE:-$project_root/.gocache}"
@@ -25,11 +30,15 @@ run_stage cleanup bash -c '
 
 # Hidden directories are local tooling, not Go package trees. Keep untracked source.
 # Also prune dependencies and generated output, regardless of cache directory names.
-unformatted="$(run_stage format-check bash -c 'find . -type d \( -name '\''.*'\'' ! -name . -o -name node_modules -o -name vendor -o -name dist \) -prune -o -type f -name '\''*.go'\'' -print0 | xargs -0 gofmt -l')"
+unformatted="$(find . -type d \( -name '.*' ! -name . -o -name node_modules -o -name vendor -o -name dist \) -prune -o -type f -name '*.go' -print0 | xargs -0 gofmt -l)"
 [[ -z "$unformatted" ]] || { echo "Go files are not formatted:" >&2; printf '%s\n' "$unformatted" >&2; exit 1; }
 # Full vet runs immediately after each test suite, so do not run Go's smaller
 # built-in vet subset a second time inside `go test`.
-run_stage go-test node scripts/go-test-shards.cjs
+if [[ -f "$project_root/scripts/go-test-shards.cjs" ]]; then
+  run_stage go-test bash -c 'cd "$1" && node "$2"' bash "$project_root/backend" "$project_root/scripts/go-test-shards.cjs"
+else
+  go test ./...
+fi
 run_stage go-vet go vet ./...
 (
   cd installer
@@ -45,7 +54,7 @@ if [[ "$DEEP_LEGENDS_KEY_MODE" == "private" ]]; then
   fi
   plain_key="$(tr -d '\r\n' < "$key_file")"
   [[ -n "$plain_key" ]] || { echo "Riot API key is empty" >&2; exit 1; }
-  cipher="$(run_stage key-encryption env GOCACHE="${GOCACHE:-$project_root/.gocache}" GOTMPDIR="${GOTMPDIR:-/private/tmp}" go run . -encrypt-riot-key "$plain_key")"
+  cipher="$(run_stage key-encryption env GOCACHE="${GOCACHE:-$project_root/.gocache}" GOTMPDIR="${GOTMPDIR:-/private/tmp}" go run ./backend -encrypt-riot-key "$plain_key")"
   [[ -n "$cipher" ]] || { echo "Failed to encrypt Riot API key" >&2; exit 1; }
 else
   echo "Public build: no embedded Riot API key; KR queries require RIOT_API_KEY at runtime."
@@ -54,7 +63,7 @@ source_fingerprint="$(run_stage source-fingerprint node desktop/source-fingerpri
 [[ "$source_fingerprint" =~ ^[0-9a-f]{12}$ ]] || { echo "Invalid source fingerprint" >&2; exit 1; }
 run_stage backend-build env GOCACHE="${GOCACHE:-$project_root/.gocache}" GOTMPDIR="${GOTMPDIR:-/private/tmp}" GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -trimpath \
   -ldflags="-s -w -H=windowsgui -buildid= -X main.version=$version -X main.buildFingerprint=$source_fingerprint -X main.riotAPIKey= -X main.riotAPIKeyCipher=$cipher" \
-  -o desktop/backend/loot-service.exe .
+  -o desktop/backend/loot-service.exe ./backend
 run_stage backend-fingerprint node desktop/verify-build-fingerprint.cjs desktop/backend/loot-service.exe "$source_fingerprint"
 
 # `npm ci` deletes and recreates all dependencies. Cache only a successful

@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+BACKEND = ROOT / 'backend'
 CASES = [
     ("legacy phase field renamed", "desktop_startup.go", '"spawn_to_ready":', '"spawn_to_ready_changed":',
      "TestDesktopStartupStageShellAndExportEndToEnd/normal$", "Missing/invalid measured phase: spawn_to_ready"),
@@ -29,7 +30,7 @@ def main():
             args = ["go", "test", "-count=1", "-timeout=45s", "-run", "^" + pattern]
             if overlay:
                 args += ["-overlay", str(overlay)]
-            return subprocess.run(args + ["."], cwd=ROOT, env=env, text=True,
+            return subprocess.run(args + ["./backend"], cwd=ROOT, env=env, text=True,
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=90)
 
         baseline = run("TestDesktopStartup")
@@ -38,14 +39,14 @@ def main():
         print("PASS real HTTP/shell/export baseline", flush=True)
         evidence = []
         for name, relative, before, after, pattern, message in CASES:
-            original = (ROOT / relative).read_text()
+            original = (BACKEND / relative).read_text()
             if original.count(before) != 1:
                 raise SystemExit("Mutation target changed: " + name)
             changed = work / relative
             changed.parent.mkdir(parents=True, exist_ok=True)
             changed.write_text(original.replace(before, after))
             overlay = work / "overlay.json"
-            overlay.write_text(json.dumps({"Replace": {str(ROOT / relative): str(changed)}}))
+            overlay.write_text(json.dumps({"Replace": {str(BACKEND / relative): str(changed)}}))
             result = run(pattern, overlay)
             if not result.returncode or "--- FAIL:" not in result.stdout or message not in result.stdout:
                 raise SystemExit(f"SURVIVED or invalid mutation: {name}\n{result.stdout}")

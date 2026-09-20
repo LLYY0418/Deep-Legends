@@ -23,8 +23,8 @@ test("continuous scale, quantization, clamps and manual-step normalization", () 
   assert.equal(scale.UI_SCALE_BASE_HEIGHT, 900);
   assert.equal(scale.UI_SCALE_MIN, 1);
   assert.equal(scale.UI_SCALE_MAX, 2.5);
-  // ★真正执行缩放的是 web/app.js，两边的常量必须逐字一致。
-  const appSource = fs.readFileSync(path.join(__dirname, "..", "web", "app.js"), "utf8");
+  // ★真正执行缩放的是 backend/web/app.js，两边的常量必须逐字一致。
+  const appSource = fs.readFileSync(path.join(__dirname, "..", "backend", "web", "app.js"), "utf8");
   assert.match(appSource, /const UI_SCALE_STEPS = \[0\.9, 1, 1\.1, 1\.25, 1\.4, 1\.5, 1\.75, 2, 2\.25, 2\.5\];/);
   assert.match(appSource, /const UI_SCALE_BASE_WIDTH = 1920;/);
   assert.match(appSource, /const UI_SCALE_BASE_HEIGHT = 900;/);

@@ -6,7 +6,7 @@ const path=require('node:path');
 const assert=require('node:assert/strict');
 const {spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
-const files=['web/gameplay.css','web/gameplay.js'];
+const files=['backend/web/gameplay.css','backend/web/gameplay.js'];
 const original=Object.fromEntries(files.map(f=>[f,fs.readFileSync(path.join(root,f),'utf8')]));
 const output=path.join(root,'output/playwright/r74');fs.mkdirSync(output,{recursive:true});
 let active;
@@ -21,15 +21,15 @@ const restore=()=>{
 };
 const replace=(text,from,to)=>{assert.equal(text.split(from).length,2,'mutation target must be unique: '+from);return text.replace(from,to);};
 const cases=[
- ['M1','web/gameplay.css','minmax(0, var(--cg-recent-w)) minmax(var(--cg-badges-w), 1fr)','minmax(0, 1fr) minmax(var(--cg-badges-w), 1fr)','recentOverflow|fixed recent track geometry contract|badges between recent and rank|badge left edge'],
- ['M2','web/gameplay.css','align-self: center; justify-self: start; justify-content: flex-start; gap: 3px','align-self: center; justify-self: end; justify-content: flex-start; gap: 3px','badge start alignment contract|badges between recent and rank|badge left edge'],
- ['M3','web/gameplay.css','justify-self: start; width: 100%; gap: 8px; min-width: 0; font-size: 12px','justify-self: end; gap: 8px; min-width: 0; font-size: 12px','rank left edge|rank start alignment contract'],
- ['M4','web/gameplay.css','grid-area: recent; display: flex; min-width: 0; gap: 3px; overflow: hidden','grid-area: recent; display: flex; min-width: 0; gap: 3px; overflow: auto','recent must not create a scrolling surface|recentOverflow|row height'],
- ['M5','web/gameplay.css','@container current-game-team (max-width: 372px)','@container current-game-team (max-width: 0px)','recentOverflow|hidden clipping audit|container whole-item count'],
- ['M6','web/gameplay.css','.current-game-recent-item.is-win { border-color: var(--success); }','.current-game-recent-item.is-win { border-color: var(--accent); }','current-game wins must be success green'],
- ['M7','web/gameplay.js','${iconFigure("champion", recent.championId, recent.championName, "small", false)}</span>','${iconFigure("champion", recent.championId, recent.championName, "small", false)}<span class="current-game-recent-spells">${(recent.spells || []).map(id => spellIconFigure(id, "small")).join("")}</span></span>','recent items must not contain spell icons|hidden clipping audit|recentOverflow'],
- ['M8','web/gameplay.css','.player-group-menu button[aria-checked="true"]','.player-group-menu button[aria-selected="true"]','aria-checked selection must have visible highlight','groups'],
- ['M9','web/gameplay.js','nodes.playerGroups?.addEventListener("keydown", event => {','nodes.playerGroups?.addEventListener("r74-disabled-keydown", event => {','keyboard Enter opens the group menu|keyboard Enter moves focus into menu','groups']
+ ['M1','backend/web/gameplay.css','minmax(0, var(--cg-recent-w)) minmax(var(--cg-badges-w), 1fr)','minmax(0, 1fr) minmax(var(--cg-badges-w), 1fr)','recentOverflow|fixed recent track geometry contract|badges between recent and rank|badge left edge'],
+ ['M2','backend/web/gameplay.css','align-self: center; justify-self: start; justify-content: flex-start; gap: 3px','align-self: center; justify-self: end; justify-content: flex-start; gap: 3px','badge start alignment contract|badges between recent and rank|badge left edge'],
+ ['M3','backend/web/gameplay.css','justify-self: start; width: 100%; gap: 8px; min-width: 0; font-size: 12px','justify-self: end; gap: 8px; min-width: 0; font-size: 12px','rank left edge|rank start alignment contract'],
+ ['M4','backend/web/gameplay.css','grid-area: recent; display: flex; min-width: 0; gap: 3px; overflow: hidden','grid-area: recent; display: flex; min-width: 0; gap: 3px; overflow: auto','recent must not create a scrolling surface|recentOverflow|row height'],
+ ['M5','backend/web/gameplay.css','@container current-game-team (max-width: 372px)','@container current-game-team (max-width: 0px)','recentOverflow|hidden clipping audit|container whole-item count'],
+ ['M6','backend/web/gameplay.css','.current-game-recent-item.is-win { border-color: var(--success); }','.current-game-recent-item.is-win { border-color: var(--accent); }','current-game wins must be success green'],
+ ['M7','backend/web/gameplay.js','${iconFigure("champion", recent.championId, recent.championName, "small", false)}</span>','${iconFigure("champion", recent.championId, recent.championName, "small", false)}<span class="current-game-recent-spells">${(recent.spells || []).map(id => spellIconFigure(id, "small")).join("")}</span></span>','recent items must not contain spell icons|hidden clipping audit|recentOverflow'],
+ ['M8','backend/web/gameplay.css','.player-group-menu button[aria-checked="true"]','.player-group-menu button[aria-selected="true"]','aria-checked selection must have visible highlight','groups'],
+ ['M9','backend/web/gameplay.js','nodes.playerGroups?.addEventListener("keydown", event => {','nodes.playerGroups?.addEventListener("r74-disabled-keydown", event => {','keyboard Enter opens the group menu|keyboard Enter moves focus into menu','groups']
 ];
 const results=[];
 try {

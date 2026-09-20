@@ -6,9 +6,9 @@ app.setPath('userData','/private/tmp/deep-legends-2244-render-profile');
 app.whenReady().then(async()=>{
  try{
   const win=new BrowserWindow({show:false,width:1280,height:1100,webPreferences:{sandbox:true,contextIsolation:true}});
-  const css=['app.css','gameplay.css','champions.css','suite.css'].map(f=>fs.readFileSync(path.join(root,'web',f),'utf8')).join('\n');
+  const css=['app.css','gameplay.css','champions.css','suite.css'].map(f=>fs.readFileSync(path.join(root, "backend", "web",f),'utf8')).join('\n');
   await win.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(`<html><head><style>${css}body{display:block;padding:24px;overflow:auto}.summoner-strip{height:150px;margin:16px 0}.probe-copy{color:var(--ink);font-weight:700;font-size:24px}h3{margin:20px 0;color:var(--primary-strong)}.skill-priority{max-width:950px}</style></head><body><h3>实际居中原画 · 阿狸不朽 / 杰斯</h3><div id="banners"></div><h3>技能加点</h3><div id="skills"></div></body></html>`));
-  await win.webContents.executeJavaScript(fs.readFileSync(path.join(root,'web/overview-art.js'),'utf8'));
+  await win.webContents.executeJavaScript(fs.readFileSync(path.join(root,'backend/web/overview-art.js'),'utf8'));
   const media=[{id:103086,name:'我听见风的颜色',img:fs.readFileSync(path.join(root,'testdata/diagnostics-2244/ahri-centered.jpg')).toString('base64')},{id:126000,name:'kiin · GEN Kiin',img:fs.readFileSync(path.join(root,'testdata/diagnostics-2244/jayce-centered.jpg')).toString('base64')},{id:68000,name:'BLG Bin · 兰博',img:fs.readFileSync(path.join(root,'testdata/diagnostics-2244/rumble-centered.jpg')).toString('base64')}];
   await win.webContents.executeJavaScript(`{
    const media=${JSON.stringify(media)};
@@ -16,7 +16,7 @@ app.whenReady().then(async()=>{
    document.querySelectorAll('.overview-art').forEach((holder,i)=>holder.querySelectorAll('img').forEach(img=>img.src='data:image/jpeg;base64,'+media[i].img));
    deepLegendsOverviewArt.prepare(document);
   }`);
-  const source=fs.readFileSync(path.join(root,'web/gameplay.js'),'utf8');
+  const source=fs.readFileSync(path.join(root,'backend/web/gameplay.js'),'utf8');
   const fn=source.slice(source.indexOf('  function renderSkillPlan('),source.indexOf('  function abilityTooltip('));
   await win.webContents.executeJavaScript(`{const escapeHTML=x=>String(x),assetIcon=()=>'',abilityTooltip=()=>'';${fn};skills.innerHTML=renderSkillPlan({skillPriority:['Q','E','W'],skillOrder:['Q','E','W','Q','Q','R','Q','E']},[]);}`);
   await new Promise(r=>setTimeout(r,400));
@@ -26,7 +26,7 @@ app.whenReady().then(async()=>{
    for(const row of rows){assert(row.covers && Math.abs(row.faceY-row.height/2)<1,JSON.stringify({width,row}));}
    console.log(JSON.stringify({width,faces:rows}));
   }
-  const suite=fs.readFileSync(path.join(root,'web/suite.js'),'utf8');
+  const suite=fs.readFileSync(path.join(root,'backend/web/suite.js'),'utf8');
   const claims=suite.slice(suite.indexOf('  function claimSelectionKeys('),suite.indexOf('  async function executeClaims('));
   await win.webContents.executeJavaScript(`{const state={selectedClaims:new Set(),claimFailures:new Map(),claimChoices:new Map()},escapeHTML=x=>String(x),checked=x=>x?' checked':'',imageURL=x=>x,sourceNames={grant:'奖励账本'};${claims};const sample=document.createElement('div');sample.innerHTML='<h3>活动奖励 · 同一张卡片</h3>'+claimEventGroups(Array.from({length:5},(_,i)=>({eventId:'test',eventName:'第3赛季：第1幕',key:'grant:'+i,source:'grant',items:[{id:'reward'+i,title:i===2?'25橙色精萃':'750蓝色精萃',quantity:i===2?25:750}]})));document.body.append(sample);}`);
   win.setSize(1280,1100);await new Promise(r=>setTimeout(r,150));

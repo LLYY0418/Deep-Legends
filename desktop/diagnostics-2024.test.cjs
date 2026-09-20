@@ -4,13 +4,13 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
-const source = fs.readFileSync(path.join(__dirname, "../web/champions.js"), "utf8");
+const source = fs.readFileSync(path.join(__dirname, "../backend/web/champions.js"), "utf8");
 
 function workspace(stored = {}) {
   const dom = new JSDOM('<div id="champions-root"></div><div id="champions-panel"></div>', {url:"http://localhost/", runScripts:"outside-only", pretendToBeVisual:true});
   const w = dom.window;
   for (const [key, value] of Object.entries(stored)) w.localStorage.setItem(key, value);
-  w.eval(fs.readFileSync(path.join(__dirname, "../web/runtime.js"), "utf8"));
+  w.eval(fs.readFileSync(path.join(__dirname, "../backend/web/runtime.js"), "utf8"));
   w.eval(source.replace('  render();\n  beginStartupPreload();\n  adoptCatalog(state.preload?.catalog);', `
     render = () => {};
     loadWorkspace = async () => {};
@@ -98,7 +98,7 @@ test("2024 fast ranked filters supersede requests without stuck loading or cross
 test("2024 neutral glyph coloring preserves alpha and never recolors colored/opaque/unknown art", () => {
   const dom = new JSDOM("",{runScripts:"outside-only"});
   try {
-    dom.window.eval(fs.readFileSync(path.join(__dirname,"../web/augment-artwork.js"),"utf8"));
+    dom.window.eval(fs.readFileSync(path.join(__dirname,"../backend/web/augment-artwork.js"),"utf8"));
     const {tintPixels} = dom.window.deepLegendsAugmentArtwork;
     const pixels = new Uint8ClampedArray(10*10*4);
     for(let i=0;i<60;i++) pixels.set([120,145,149,255],i*4);

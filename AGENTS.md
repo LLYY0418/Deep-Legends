@@ -5,7 +5,9 @@
 1. `docs/assistant-conversation-digest.md` — 2026-08-04 至 09-18 用户与 Codex/Claude 全部开发对话的汇总（编年时间线、用户原则与偏好、问题→工单因果链、原始记录定位方法）。执行工单前建议先查对应日期的上下文。
 2. `docs/pro-accounts-verification-2026-09-17.md` — 职业页 6 队、33 人、53 个账号的唯一归属来源；修改身份前必须核对该文件，保留大小写、空格和原始顺序。动态目录只补充账号数据，不覆盖人工归属。
 
-当前版本：0.12.5。R107 的视频/日志分析、真实数据验证与 Windows 真机验证边界见 `docs/r107-execution-ledger.md`。
+当前版本：0.12.7（以 `desktop/package.json` 为准）。R107 的视频/日志分析、真实数据验证与 Windows 真机验证边界见 `docs/r107-execution-ledger.md`。
+
+目录布局：Go 源码、内嵌资源（`web/`、`data/`、`prestige_chromas.json`）与测试夹具（`testdata/`）统一位于 `backend/`；构建 `go build ./backend`，测试 `go test ./backend`，前端测试在 `backend/web/`。`installer/` 与 `tools/` 仍是独立 Go 模块。历史工单已从根目录归档到 `docs/history/worklists/`，新一轮工单与验证证据继续写入 `docs/`。
 
 ## 执行纪律（来自用户反复强调的原则，详见 digest）
 

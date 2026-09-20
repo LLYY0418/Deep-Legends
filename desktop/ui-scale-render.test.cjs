@@ -5,7 +5,7 @@ const fs=require("node:fs");
 const path=require("node:path");
 const {JSDOM}=require("jsdom");
 const {UI_SCALE_STEPS}=require("./ui-scale.cjs");
-const web=path.join(__dirname,"..","web");
+const web=path.join(__dirname,"..","backend","web");
 const appSource=fs.readFileSync(path.join(web,"app.js"),"utf8");
 function boot({bridge,preference,source=appSource}={}) {
   const dom=new JSDOM(fs.readFileSync(path.join(web,"index.html"),"utf8"),{url:"http://127.0.0.1:1/?demo",runScripts:"outside-only",pretendToBeVisual:true});

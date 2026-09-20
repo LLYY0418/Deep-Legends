@@ -6,12 +6,13 @@ root = Path(__file__).resolve().parents[1]
 out = root / 'output/playwright/r76/mutations'
 out.mkdir(parents=True, exist_ok=True)
 clone = Path(tempfile.mkdtemp(prefix='r76-mutation-', dir='/private/tmp'))
-for f in root.glob('*.go'):
+for f in (root / 'backend').glob('*.go'):
     shutil.copy2(f, clone / f.name)
-for f in ['go.mod', 'go.sum', 'prestige_chromas.json']:
+for f in ['go.mod', 'go.sum']:
     shutil.copy2(root / f, clone / f)
+shutil.copy2(root / 'backend' / 'prestige_chromas.json', clone / 'prestige_chromas.json')
 for d in ['web', 'data', 'testdata']:
-    shutil.copytree(root / d, clone / d)
+    shutil.copytree(root / 'backend' / d, clone / d)
 env = dict(os.environ, GOCACHE=str(root / '.gocache'), GOTMPDIR='/private/tmp')
 go = ['go', 'test', '-count=1', '-v', '-run', '^TestProRune', '.']
 js = ['node', '--test', '--test-name-pattern=R76 pro degradation', 'web/gameplay.test.cjs']
@@ -33,7 +34,7 @@ mutations = [
      ['go', 'test', '-count=1', '-v', '-run', '^TestProRuneFailureCountsDeduplicateDetailAndTerminal$', '.'],
      'duplicate game or falsely stale'),
 ]
-original = {file: (root / file).read_bytes() for _, file, *_ in mutations}
+original = {file: (root / 'backend' / file).read_bytes() for _, file, *_ in mutations}
 results = []
 def run(name, cmd):
     proc = subprocess.run(cmd, cwd=clone, env=env, capture_output=True, text=True, timeout=120)
@@ -61,5 +62,5 @@ finally:
     for file, data in original.items():
         (clone / file).write_bytes(data)
     (out / 'results.json').write_text(json.dumps({'clone':str(clone),'results':results}, indent=2))
-    assert all((root / file).read_bytes() == data for file, data in original.items()), 'worktree changed during verification; review before accepting results'
+    assert all((root / 'backend' / file).read_bytes() == data for file, data in original.items()), 'worktree changed during verification; review before accepting results'
 print('All mutants killed by assertions; live sources unchanged.', flush=True)

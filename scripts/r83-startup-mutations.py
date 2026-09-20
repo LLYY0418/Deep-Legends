@@ -86,15 +86,15 @@ def main():
 
         # Mutate the real main entry with Go's overlay support, without editing
         # source or copying embedded assets/caches into the mutation workspace.
-        original = (ROOT / "main.go").read_text()
+        original = (ROOT / "backend" / "main.go").read_text()
         before = "if *startupWarmup {\n\t\treturn\n\t}"
         if original.count(before) != 1:
             raise SystemExit("Root warmup mutation target changed")
         changed = work / "main.go"
         changed.write_text(original.replace(before, "if *startupWarmup { /* wrongly continue into storage/services */ }"))
         overlay = work / "overlay.json"
-        overlay.write_text(json.dumps({"Replace": {str(ROOT / "main.go"): str(changed)}}))
-        result = subprocess.run(["go", "test", "-overlay", str(overlay), "-count=1", "-timeout=15s", "-run", "^TestStartupWarmupProcess", "."],
+        overlay.write_text(json.dumps({"Replace": {str(ROOT / "backend" / "main.go"): str(changed)}}))
+        result = subprocess.run(["go", "test", "-overlay", str(overlay), "-count=1", "-timeout=15s", "-run", "^TestStartupWarmupProcess", "./backend"],
                                 cwd=ROOT, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=45)
         failures = [line.strip() for line in result.stdout.splitlines() if "--- FAIL:" in line]
         if not result.returncode or not failures:

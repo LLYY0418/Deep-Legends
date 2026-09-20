@@ -6,7 +6,7 @@ const fs=require("node:fs"),os=require("node:os"),path=require("node:path"),http
 const {createRequire}=require("node:module");
 const {once}=require("node:events");
 const {renderOverviewPng}=require("./share-export.cjs");
-const root=path.resolve(__dirname,".."),web=path.join(root,"web");
+const root=path.resolve(__dirname,".."),web=path.join(root,"backend","web");
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),"r79-electron-"));
 app.setPath("userData",temp);
 let server,main;
