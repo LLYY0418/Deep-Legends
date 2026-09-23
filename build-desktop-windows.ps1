@@ -71,6 +71,16 @@ try {
     $staleUnpacked = Join-Path $projectRoot "dist\desktop\win-unpacked"
     if (Test-Path $staleUnpacked) { Remove-Item -Recurse -Force $staleUnpacked }
     New-Item -ItemType Directory -Force -Path $backendRoot | Out-Null
+
+    # Install test dependencies before the long Go test run.
+    Push-Location $desktopRoot
+    try {
+        if (Test-Path "package-lock.json") { npm ci } else { npm install }
+        if ($LASTEXITCODE -ne 0) { throw "Desktop dependencies install failed" }
+    } finally {
+        Pop-Location
+    }
+
     # Match relative paths so a hidden ancestor of the checkout does not hide source.
     $goSources = @(Get-ChildItem -Recurse -File -Filter '*.go' | Where-Object { $_.FullName.Substring($projectRoot.Length) -notmatch '[\\/](\.[^\\/]+|node_modules|vendor|dist)[\\/]' } | ForEach-Object { $_.FullName })
     if ($goSources.Count -eq 0) { throw "No project Go sources found" }
@@ -87,15 +97,6 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Installer tests failed" }
         go vet ./...
         if ($LASTEXITCODE -ne 0) { throw "Installer vet failed" }
-    } finally {
-        Pop-Location
-    }
-
-    # Web and desktop tests import jsdom from desktop/node_modules.
-    Push-Location $desktopRoot
-    try {
-        if (Test-Path "package-lock.json") { npm ci } else { npm install }
-        if ($LASTEXITCODE -ne 0) { throw "Desktop dependencies install failed" }
     } finally {
         Pop-Location
     }
