@@ -31,7 +31,7 @@ function sourceFingerprint(projectRoot = root) {
   // contain this fingerprint and would create a circular dependency).
   const buildInputs = [
     "go.mod", "go.sum", "backend/prestige_chromas.json", "desktop/package.json", "desktop/package-lock.json",
-    "build-desktop.sh", "build-desktop-windows.ps1", "build-windows.ps1", "scripts/build-stage.cjs", "scripts/go-test-shards.cjs",
+    "build-desktop.sh", "build-desktop-windows.ps1", "build-windows.ps1", "scripts/build-stage.cjs", "scripts/normalize-source-line-endings.cjs", "scripts/go-test-shards.cjs",
     "desktop/source-fingerprint.cjs", "desktop/apply-portable-template.cjs",
     "desktop/verify-embedded-riot-key.cjs", "desktop/verify-build-fingerprint.cjs", "desktop/release-build.cjs",
     "desktop/verify-packaged-runtime.cjs", "desktop/nsis/portable.nsi", "desktop/nsis/installer.nsh",

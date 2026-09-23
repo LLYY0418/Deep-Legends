@@ -84,7 +84,7 @@ jobs:
       - name: Verify checksums
         shell: pwsh
         run: |
-          Get-Content dist/desktop/SHA256SUMS.txt | ForEach-Object {
+          Get-Content dist/desktop/SHA256SUMS-public.txt | ForEach-Object {
             $parts = $_ -split '  ', 2
             $actual = (Get-FileHash -Algorithm SHA256 (Join-Path dist/desktop $parts[1])).Hash.ToLowerInvariant()
             if ($actual -ne $parts[0]) { throw "Checksum mismatch: $($parts[1])" }
@@ -95,5 +95,5 @@ jobs:
           path: |
             dist/desktop/*.exe
             dist/desktop/*.zip
-            dist/desktop/SHA256SUMS.txt
+            dist/desktop/SHA256SUMS-public.txt
           if-no-files-found: error

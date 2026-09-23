@@ -12,6 +12,9 @@ $desktopRoot = Join-Path $projectRoot "desktop"
 $backendRoot = Join-Path $desktopRoot "backend"
 $backendOutput = Join-Path $backendRoot "loot-service.exe"
 
+& node (Join-Path $projectRoot "scripts\normalize-source-line-endings.cjs")
+if ($LASTEXITCODE -ne 0) { throw "Source line ending normalization failed" }
+
 $package = Get-Content -Raw -Encoding UTF8 (Join-Path $desktopRoot "package.json") | ConvertFrom-Json
 if (-not $Version) { $Version = $package.version }
 
