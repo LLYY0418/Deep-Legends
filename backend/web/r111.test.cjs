@@ -13,7 +13,7 @@ test('R111 admitted lazy thumbnails start eagerly and all visible images drain t
  const h=queue(t),images=Array.from({length:18},(_,i)=>h.add(`/skin-${i}`,true));await flush();
  assert.equal(images.filter(i=>i.hasAttribute('src')).length,0,'offscreen assets stay lazy');
  h.observer.cb(images.map(target=>({target,isIntersecting:true})));
- assert.equal(images.filter(i=>i.hasAttribute('src')).length,6);
+ assert.equal(images.filter(i=>i.hasAttribute('src')).length,h.w.deepLegendsImageQueueLimit);
  for(const img of images){assert.equal(img.loading,'eager','native lazy must not occupy an active slot');assert.ok(img.hasAttribute('src'));img.dispatchEvent(new h.w.Event('load'))}
  assert.ok(images.every(i=>i.dataset.imageReady==='true'));
 });

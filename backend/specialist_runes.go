@@ -18,18 +18,19 @@ const (
 	specialistRuneMatchScanMax = 10
 	specialistRunePerPlayerMax = 3
 	// Account, filtered match list, and up to ten details for each of three players.
-	specialistRuneRequestBudget   = specialistRunePlayerLimit * (2 + specialistRuneMatchScanMax)
-	specialistRuneRequestTimeout  = 25 * time.Second
-	specialistRunePartialCacheTTL = 30 * time.Minute
-	specialistRuneEmptyCacheTTL   = 30 * time.Minute
-	specialistAccountTimeout      = 5 * time.Second
-	specialistMatchIDsTimeout     = 5 * time.Second
-	specialistMatchDetailTimeout  = 4 * time.Second
-	specialistRiotQueueTimeout    = 3 * time.Second
-	specialistSlotQueueTimeout    = 3 * time.Second
-	specialistMatchConcurrency    = 3
-	specialistRecentSummaryTTL    = 30 * time.Minute
-	specialistMatchFailureLimit   = 3
+	specialistRuneRequestBudget    = specialistRunePlayerLimit * (2 + specialistRuneMatchScanMax)
+	specialistRuneRequestTimeout   = 25 * time.Second
+	specialistRunePartialCacheTTL  = 30 * time.Minute
+	specialistRuneEmptyCacheTTL    = 30 * time.Minute
+	specialistRuneNegativeCacheTTL = 90 * time.Second
+	specialistAccountTimeout       = 5 * time.Second
+	specialistMatchIDsTimeout      = 5 * time.Second
+	specialistMatchDetailTimeout   = 4 * time.Second
+	specialistRiotQueueTimeout     = 3 * time.Second
+	specialistSlotQueueTimeout     = 3 * time.Second
+	specialistMatchConcurrency     = 3
+	specialistRecentSummaryTTL     = 30 * time.Minute
+	specialistMatchFailureLimit    = 3
 )
 
 type specialistOutcome string
@@ -198,7 +199,10 @@ func (p *riotProvider) specialistRunes(ctx context.Context, championID int64, ch
 	flight := &specialistRuneFlight{done: make(chan struct{}), position: position}
 	p.specialistFlights[key] = flight
 	p.specialistMu.Unlock()
-
+	if ctx.Err() != nil {
+		p.finishSpecialistRuneFlight(key, flight, nil, specialistOutcomeTimeout, time.Now())
+		return []gameplayRecommendationRune{}, specialistOutcomeTimeout
+	}
 	if err := acquireSpecialistSlot(ctx, p.specialistSlots, specialistSlotQueueTimeout); err != nil {
 		if errors.Is(err, errThrottled) {
 			p.recordSpecialistDiagnostic(map[string]any{"event": "specialist_runes_step_failed", "step": "flight_slot", "errorKind": "rate-limit", "budget_remaining": specialistRuneRequestBudget})
@@ -217,10 +221,13 @@ func (p *riotProvider) specialistRunes(ctx context.Context, championID int64, ch
 func (p *riotProvider) finishSpecialistRuneFlight(key string, flight *specialistRuneFlight, runes []gameplayRecommendationRune, outcome specialistOutcome, fetchedAt time.Time) {
 	result := cloneSpecialistRunes(runes)
 	p.specialistMu.Lock()
-	if len(result) > 0 || outcome == specialistOutcomeNoPositionSample {
+	if len(result) > 0 || outcome == specialistOutcomeNoPositionSample || outcome == specialistOutcomeThrottled || outcome == specialistOutcomeTimeout {
 		ttl := specialistRuneCacheTTL
 		if len(result) == 0 {
 			ttl = specialistRuneEmptyCacheTTL
+			if outcome == specialistOutcomeThrottled || outcome == specialistOutcomeTimeout {
+				ttl = specialistRuneNegativeCacheTTL
+			}
 		} else if len(result) < specialistRunePlayerLimit*specialistRunePerPlayerMax {
 			ttl = specialistRunePartialCacheTTL
 		}

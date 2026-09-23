@@ -39,7 +39,8 @@ function liveHarness() {
     activeTab: () => state.tabs[0], overviewGroupForSection: () => 'cn', loadOverview: async () => true,
     window: { reportFlowDiagnostic: (event, reason, fields) => reports.push({event, reason, ...fields}), addEventListener: (event, fn) => listeners.set(event, fn) },
   };
-  const context = compile('gameplay.js', ['recordLiveRefresh', 'queueLiveEventRefresh', 'loadLive', 'liveGamePhase', 'normalizeLiveGameId', 'liveGameIdComparison', 'recordLiveObservation', 'liveSnapshotBehindPhase', 'invalidateLiveForNewGame', 'syncLiveRetryBudget', 'handleGameplayPhase', 'refreshAfterResync', 'pollGameflowPhase'], deps);
+  // R131 §2.1-1：loadLive 开头会记一次触发来源，把纯函数 liveRenderTriggerLabel 一并抽取。
+  const context = compile('gameplay.js', ['recordLiveRefresh', 'queueLiveEventRefresh', 'loadLive', 'liveRenderTriggerLabel', 'liveGamePhase', 'normalizeLiveGameId', 'liveGameIdComparison', 'recordLiveObservation', 'liveSnapshotBehindPhase', 'invalidateLiveForNewGame', 'syncLiveRetryBudget', 'handleGameplayPhase', 'refreshAfterResync', 'pollGameflowPhase'], deps);
   context.BEACON_IDLE_POLL_MS = 12000; context.BEACON_DISCONNECTED_POLL_MS = 1000; context.beaconPollDelay = () => 12000;
   const source = read('gameplay.js'); const start = source.indexOf('  window.addEventListener("deep-legends:gameflow",');
   vm.runInNewContext(source.slice(start, source.indexOf('\n  });', start) + 6), context);

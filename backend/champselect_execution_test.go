@@ -28,6 +28,10 @@ type executionFixture struct {
 	applyWrites bool
 	status      int
 	failBanRead bool
+	// P1-1（R120 复测）：可选的写冻结闸。非 nil 时，action PATCH 在传输层先等这个
+	// channel 放行（或请求 ctx 取消——取消优先于放行，放行后还会复查 ctx，保证
+	// 「已取消的写绝不落地」是确定性的）。不设置它的测试完全不受影响。
+	patchGate chan struct{}
 }
 
 func newExecutionFixture(t *testing.T) *executionFixture {
@@ -46,6 +50,20 @@ func newExecutionFixture(t *testing.T) *executionFixture {
 	f.r.handleChampSelectPhase("ChampSelect")
 	f.configure(true, true, true, "show-then-lock")
 	f.c = &LCUClient{baseURL: "https://127.0.0.1:2999", token: "fixture", http: &http.Client{Transport: gameplayRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.Method == http.MethodPatch {
+			f.mu.Lock()
+			gate := f.patchGate
+			f.mu.Unlock()
+			if gate != nil {
+				select {
+				case <-gate:
+				case <-req.Context().Done():
+				}
+				if err := req.Context().Err(); err != nil {
+					return nil, err
+				}
+			}
+		}
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		switch req.URL.Path {

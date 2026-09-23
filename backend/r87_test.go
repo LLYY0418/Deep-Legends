@@ -254,7 +254,7 @@ func TestR87RosterLayoutPreservesMainAndStats(t *testing.T) {
 	}
 	for _, rule := range []string{
 		".match-main { display: grid; align-self: start; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }",
-		".match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }",
+		".match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; width: 188px; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }",
 	} {
 		if !strings.Contains(string(css), rule) {
 			t.Fatalf("protected rule changed: %s", rule)

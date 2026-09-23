@@ -28,6 +28,9 @@ async function main(){
 
  const output=process.env.R100_BROWSER_OUTPUT||path.join(root,'docs/r100-validation/browser');fs.mkdirSync(output,{recursive:true});
  const appSource=fs.readFileSync(process.env.R100_APP_SOURCE||path.join(web,'app.js'),'utf8');
+ const queueSource=fs.readFileSync(process.env.R100_QUEUE_SOURCE||path.join(web,'image-queue.js'),'utf8');
+ const imageQueueLimit=Number(queueSource.match(/const IMAGE_QUEUE_LIMIT\s*=\s*(\d+)/)?.[1]);
+ assert.ok(Number.isInteger(imageQueueLimit)&&imageQueueLimit>0,'image queue limit must be statically exported');
  const status=appSource.slice(appSource.indexOf('  async function refreshStatus('),appSource.indexOf('function clearDisconnectedClientState('));
  assert.ok(status.includes('scheduleStatus()'));
  const lifecycle=appSource.slice(appSource.indexOf('  function setupBackendLifecycle('),appSource.indexOf('  window.desktopDiagnostics?.onError'));
@@ -35,7 +38,7 @@ async function main(){
  let activeImages=0,peakImages=0,failStatus=false;
  server=require('node:http').createServer((req,res)=>{
   const pathname=new URL(req.url,'http://localhost').pathname;
-  if(pathname==='/image-queue.js'){res.setHeader('Content-Type','text/javascript');res.end(fs.readFileSync(process.env.R100_QUEUE_SOURCE||path.join(web,'image-queue.js')));return;}
+  if(pathname==='/image-queue.js'){res.setHeader('Content-Type','text/javascript');res.end(queueSource);return;}
   if(pathname==='/app.css'){res.end(fs.readFileSync(path.join(web,'app.css')));return;}
   if(pathname==='/api/champion-asset'){
    activeImages++;peakImages=Math.max(peakImages,activeImages);
@@ -64,7 +67,7 @@ async function main(){
  await new Promise(r=>setTimeout(r,250));
  const elapsed=await evaluate('(async()=>{const t=performance.now();await refreshStatus();return performance.now()-t})()');
  assert.ok(elapsed<8000,'status starved behind images: '+elapsed);
- assert.ok(peakImages<=2,'browser image connection cap exceeded: '+peakImages);
+ assert.ok(peakImages<=imageQueueLimit,'browser image connection cap exceeded: '+peakImages+' > '+imageQueueLimit);
  failStatus=true;await evaluate('(async()=>{for(let i=0;i<3;i++)await refreshStatus()})()');
  assert.equal(await evaluate('document.body.classList.contains("is-fatal")'),false,'poll failure must not be a fatal page');
  assert.equal(await evaluate('document.querySelector("#local-status-recovery").hidden'),false);
@@ -82,4 +85,23 @@ async function main(){
  fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,statusMilliseconds:elapsed,peakImages,recovered:true,confirmedExitFatal:true,restartRequested:true},null,2));
  console.log('R100 Chromium PASS',JSON.stringify({elapsed,peakImages}));
 }
-main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{ws?.close();proc?.kill();server?.closeAllConnections();server?.close();fs.rmSync(temp,{recursive:true,force:true,maxRetries:8,retryDelay:100});});
+// 收尾清理必须尽力而为：proc.kill() 之后 Chrome 子进程还在写 profile 目录，立刻
+// rmSync 会偶发 ENOTEMPTY。它从 .finally 里抛出去就是未处理拒绝、退出码 1——护栏
+// 实际通过也会把 CI 变红，人就会习惯性加 || true，正是护栏最该防的事。所以这里先
+// 等进程真的退出（带超时）再删目录，删除失败只打一行清理警告；主流程失败的退出码
+// 仍由上面的 catch 决定，绝不被清理路径掩盖。
+async function cleanup(){
+ try{ws?.close();}catch(error){}
+ if(proc&&proc.exitCode===null&&proc.signalCode===null){
+  const exited=new Promise(resolve=>{const timer=setTimeout(resolve,5000);const done=()=>{clearTimeout(timer);resolve();};proc.once('exit',done);proc.once('error',done);});
+  try{proc.kill();}catch(error){}
+  await exited;
+ }
+ try{server?.closeAllConnections();}catch(error){}
+ await new Promise(resolve=>{const timer=setTimeout(resolve,2000);if(!server){clearTimeout(timer);resolve();return;}server.close(()=>{clearTimeout(timer);resolve();});});
+ for(let attempt=1;attempt<=8;attempt++){
+  try{fs.rmSync(temp,{recursive:true,force:true});return;}
+  catch(error){if(attempt===8){console.error(`cleanup warning: ${temp} left behind (${error.message})`);return;}await new Promise(resolve=>setTimeout(resolve,150));}
+ }
+}
+main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{cleanup().catch(error=>console.error('cleanup warning:',error&&error.message));});

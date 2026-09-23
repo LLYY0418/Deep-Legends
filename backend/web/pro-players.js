@@ -121,9 +121,10 @@
       changed ||= JSON.stringify(state.data) !== JSON.stringify(data);
       state.data = data;
       state.loadedAt = Date.now();
-    } catch (_) {
+    } catch (error) {
       changed = true;
       state.error = state.data ? "刷新失败，当前显示上次读取的数据，不代表最新账号、段位和排名。" : "账号与排名读取失败，请检查网络后重试。";
+      window.reportFlowDiagnostic?.("local_request_client", "failed", { endpoint: "pro-players", httpStatus: Number(error?.status || 0), errorKind: error?.name === "AbortError" ? "timeout" : error?.errorKind || (error?.status ? "http" : "network") });
     } finally {
       clearTimeout(timeout);
       state.loading = false;

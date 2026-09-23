@@ -140,9 +140,13 @@
       state.friends = Array.isArray(data.friends) ? data.friends : [];
       state.stale = false;
       publishFriendPresence();
+      if (state.open) startTick();
     } catch (error) {
       if (generation !== state.requestGeneration || state.destroyed || (error.name === "AbortError" && !timedOut)) return;
+      state.stale = true;
+      stopTick();
       state.error = timedOut ? "好友列表读取超时，请重试" : error?.message || "读取好友列表失败";
+      window.reportFlowDiagnostic?.("local_request_client", "failed", { endpoint: "friends", httpStatus: Number(error?.status || 0), errorKind: timedOut ? "timeout" : error?.errorKind || (error?.status ? "http" : "network") });
     } finally {
       clearTimeout(timeout);
       if (generation !== state.requestGeneration) return;
@@ -250,7 +254,7 @@
     if (state.error && !state.friends.length) { renderEmpty("empty", escapeHTML(state.error), true); updateSummary(); return; }
     if (state.loading && !state.friends.length) { renderSkeleton(); return; }
     const sections = buildSections();
-    const parts = [];
+    const parts = state.stale && state.friends.length ? [`<div class="friends-stale-notice" role="alert"><strong>好友列表可能已过期</strong><span>${escapeHTML(state.error || "上次读取结果仍可查看，正在等待更新")}</span><button id="friends-retry" class="text-button" type="button">重试</button></div>`] : [];
     let visibleTotal = 0;
     for (const section of sections) {
       const members = section.members.filter(matchesFilter);
@@ -398,7 +402,7 @@
   window.addEventListener("deep-legends:friends-updated", () => {
     if (!state.connected) return;
     if (state.refreshTimer) return;
-    state.refreshTimer = setTimeout(() => { state.refreshTimer = 0; state.stale = true; void loadFriends(); }, 300);
+    state.refreshTimer = setTimeout(() => { state.refreshTimer = 0; state.stale = true; if (state.open) render(); void loadFriends(); }, 300);
   });
 
   function disposeFriends() {

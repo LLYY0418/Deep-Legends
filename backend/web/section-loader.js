@@ -2,33 +2,60 @@
   "use strict";
 
   const modules = { champions: ["champions"], "pro-players": ["pro-players"], suite: ["champions", "suite"], settings: ["champions"] };
+  const styles = { champions: ["champions"], "pro-players": ["pro-players"], suite: ["champions", "suite"], settings: ["champions"] };
   const flights = new Map(), ready = new Set(), callbacks = new Map(), snapshots = new Map();
+  const styleFlights = new Map(), styleReady = new Set();
   let current = "overview", navigation = {}, generation = 0;
   for (const type of ["deep-legends:status", "deep-legends:gameflow"]) {
     window.addEventListener(type, event => snapshots.set(type, event.detail));
   }
   window.addEventListener("deep-legends:navigate", event => { navigation = event.detail || {}; });
 
+  function loadStyle(name) {
+    if (styleReady.has(name)) return Promise.resolve();
+    if (styleFlights.has(name)) return styleFlights.get(name);
+    const task = new Promise((resolve, reject) => {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = `/${name}.css`;
+      link.dataset.sectionStyle = name;
+      link.onload = () => { styleReady.add(name); styleFlights.delete(name); link.onload = link.onerror = null; resolve(); };
+      link.onerror = () => {
+        link.remove();
+        styleFlights.delete(name);
+        window.reportFlowDiagnostic?.("local_request_client", "failed", { endpoint: "section-loader", httpStatus: 0, errorKind: "network" });
+        reject(new Error("页面样式加载失败，请重试"));
+      };
+      document.head.append(link);
+    });
+    styleFlights.set(name, task);
+    return task;
+  }
+
   function load(name) {
     if (ready.has(name)) return Promise.resolve();
     if (flights.has(name)) return flights.get(name);
-    const task = new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = `/${name}.js`;
-      script.dataset.sectionModule = name;
-      script.onload = () => {
-        if (!callbacks.has(name)) { script.onerror(); return; }
-        ready.add(name);
-        script.onload = script.onerror = null;
-        resolve();
-      };
-      script.onerror = () => {
-        script.remove();
-        flights.delete(name);
-        reject(new Error("页面资源加载失败，请重试"));
-      };
-      document.head.append(script);
-    });
+    const task = (async () => {
+      await Promise.all((styles[name] || []).map(loadStyle));
+      await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = `/${name}.js`;
+        script.dataset.sectionModule = name;
+        script.onload = () => {
+          if (!callbacks.has(name)) { script.onerror(); return; }
+          ready.add(name);
+          script.onload = script.onerror = null;
+          resolve();
+        };
+        script.onerror = () => {
+          script.remove();
+          flights.delete(name);
+          window.reportFlowDiagnostic?.("local_request_client", "failed", { endpoint: "section-loader", httpStatus: 0, errorKind: "network" });
+          reject(new Error("页面资源加载失败，请重试"));
+        };
+        document.head.append(script);
+      });
+    })().catch(error => { flights.delete(name); throw error; });
     flights.set(name, task);
     return task;
   }

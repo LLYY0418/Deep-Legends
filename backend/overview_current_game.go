@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -140,6 +141,102 @@ func currentPosition(raw string) string {
 	}
 	return ""
 }
+
+// currentGameRoleOrder 是展示顺序：上、野、中、下、辅。
+var currentGameRoleOrder = []string{"top", "jungle", "middle", "bottom", "utility"}
+
+// currentGameRoleAffinity 给「某名玩家打某个位置」打分。OP.GG 的实时阵容按
+// 它自己的顺序返回，不带本局分路（participants[].role 是 PROGAMER 之类的身份
+// 标签），R132 P4 实测出现过辅助排第一、上单排最后。可用的依据只有：
+// 惩戒（几乎只有打野带）、近期主玩位置 most_position，以及召唤师技能倾向。
+func currentGameRoleAffinity(player currentGamePlayer, role string) int {
+	score := 0
+	smite := false
+	for _, spell := range player.Spells {
+		switch spell {
+		case 11: // 惩戒
+			smite = true
+		case 7, 21, 1: // 治疗 / 屏障 / 净化
+			if role == "bottom" {
+				score += 15
+			}
+		case 12: // 传送
+			if role == "top" {
+				score += 15
+			} else if role == "middle" {
+				score += 5
+			}
+		case 3: // 虚弱
+			if role == "utility" {
+				score += 15
+			}
+		case 14: // 点燃
+			if role == "utility" || role == "middle" || role == "top" {
+				score += 4
+			}
+		}
+	}
+	if role == "jungle" {
+		if smite {
+			score += 100
+		} else {
+			score -= 60
+		}
+	} else if smite {
+		score -= 100
+	}
+	if player.PreferredPosition == role {
+		score += 40
+	}
+	return score
+}
+
+// orderCurrentGamePlayersByRole 按上野中下辅重排一队（最多 5 人），用全排列
+// 取总分最高的分配；分不出高下时保持来源顺序，不打乱已经合理的阵容。
+func orderCurrentGamePlayersByRole(players []currentGamePlayer) []currentGamePlayer {
+	count := len(players)
+	if count < 2 || count > len(currentGameRoleOrder) {
+		return players
+	}
+	best := -1 << 30
+	var bestSlots []int
+	slots := make([]int, count) // slots[i] = 分给第 i 名玩家的位置下标
+	used := make([]bool, len(currentGameRoleOrder))
+	var walk func(index, total int)
+	walk = func(index, total int) {
+		if index == count {
+			if total > best {
+				best = total
+				bestSlots = append(bestSlots[:0], slots...)
+			}
+			return
+		}
+		for role := range currentGameRoleOrder {
+			if used[role] {
+				continue
+			}
+			used[role] = true
+			slots[index] = role
+			walk(index+1, total+currentGameRoleAffinity(players[index], currentGameRoleOrder[role]))
+			used[role] = false
+		}
+	}
+	walk(0, 0)
+	if best <= 0 {
+		return players
+	}
+	ordered := append([]currentGamePlayer(nil), players...)
+	index := make([]int, count)
+	for i := range index {
+		index[i] = i
+	}
+	sort.SliceStable(index, func(i, j int) bool { return bestSlots[index[i]] < bestSlots[index[j]] })
+	for position, source := range index {
+		ordered[position] = players[source]
+	}
+	return ordered
+}
+
 func currentActionResult(data []byte) (json.RawMessage, error) {
 	records := map[string]json.RawMessage{}
 	for _, line := range bytes.Split(data, []byte("\n")) {
@@ -330,6 +427,9 @@ func (a *app) parseOPGGCurrentGameValue(raw json.RawMessage, ref gameplayReferen
 				player.Recent = append(player.Recent, game)
 			}
 			output.Players = append(output.Players, player)
+		}
+		if input.Map == "SUMMONERS_RIFT" {
+			output.Players = orderCurrentGamePlayersByRole(output.Players)
 		}
 		// LP is comparable across the three apex tiers. Lower tiers reset LP
 		// per division, so a raw LP mean there would misrepresent team strength.

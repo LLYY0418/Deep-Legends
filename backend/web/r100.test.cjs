@@ -41,10 +41,10 @@ test('R100 image admission covers lazy DOM images and detached prefetch without 
  try{
   w.eval(fs.readFileSync(path.join(__dirname,'image-queue.js'),'utf8'));
   const imgs=Array.from({length:7},(_,i)=>{const img=w.document.createElement('img');img.setAttribute('data-queued-src','/api/image?'+i);w.document.body.append(img);return img});
-  await flush();assert.equal(imgs.filter(i=>i.hasAttribute('src')).length,6);
+  await flush();assert.equal(imgs.filter(i=>i.hasAttribute('src')).length,w.deepLegendsImageQueueLimit);
   const prefetch=new w.Image();w.deepLegendsQueueImage(prefetch,'/api/image?prefetch');assert.equal(prefetch.hasAttribute('src'),false);
-  imgs[0].dispatchEvent(new w.Event('error'));await flush();assert.equal(imgs[6].getAttribute('src'),'/api/image?6');
-  imgs[1].dispatchEvent(new w.Event('load'));await flush();assert.equal(prefetch.getAttribute('src'),'/api/image?prefetch');
+  imgs[0].dispatchEvent(new w.Event('error'));await flush();assert.equal(imgs[5].getAttribute('src'),'/api/image?5');
+  imgs[1].dispatchEvent(new w.Event('load'));await flush();assert.equal(imgs[6].getAttribute('src'),'/api/image?6');imgs[6].dispatchEvent(new w.Event('load'));await flush();assert.equal(prefetch.getAttribute('src'),'/api/image?prefetch');
   prefetch.dispatchEvent(new w.Event('load'));for(const img of imgs.slice(2))img.dispatchEvent(new w.Event('load'));
   imgs[0].removeAttribute('src');imgs[0].setAttribute('data-queued-src','/api/image?0');await flush();assert.equal(imgs[0].hasAttribute('src'),false);
   imgs[1].removeAttribute('src');imgs[1].setAttribute('data-queued-src','/api/image?1');await flush();assert.equal(imgs[1].getAttribute('src'),'/api/image?1');imgs[1].dispatchEvent(new w.Event('load'));

@@ -1,0 +1,31 @@
+ 11G	.gocache
+663M	.git
+152M	desktop
+ 97M	dist
+ 54M	Claude outputs
+ 50M	docs
+ 34M	backend
+ 23M	lol-loot-assistant
+ 23M	.gopath
+ 21M	.gomodcache
+788K	installer
+356K	output
+264K	scripts
+196K	tools
+ 52K	README.md
+ 36K	DESIGN.md
+ 12K	build-desktop.sh
+ 12K	build-desktop-windows.ps1
+ 12K	.github
+ 12K	.DS_Store
+8.0K	PRODUCT.md
+8.0K	CHANGELOG.md
+4.0K	riot_key.local.txt
+4.0K	go.sum
+4.0K	go.mod
+4.0K	build-windows.ps1
+4.0K	CLAUDE.md
+4.0K	AGENTS.md
+4.0K	.r90env.sh
+4.0K	.r90env
+4.0K	.gitignore

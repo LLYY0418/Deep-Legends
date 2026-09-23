@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "firstScreenStylesheets": [
+    "/app.css",
+    "/build-item-row.css",
+    "/gameplay.css",
+    "/friends.css",
+    "/metrics.css"
+  ],
+  "sharedGeometry": {
+    "display": "grid",
+    "tracks": "581.5px 581.5px",
+    "columns": 2,
+    "sideBySide": true,
+    "minHeight": "70px"
+  },
+  "championsFrames": 61,
+  "suiteFrames": 35,
+  "suiteLoadingFramesObserved": 3,
+  "unstyledFrames": 0
+}

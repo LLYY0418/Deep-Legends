@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -461,5 +462,96 @@ func TestStructuredDetailReportsBothItemDepthFailures(t *testing.T) {
 	}
 	if detail.Build.ItemAttempts[0].Source != dataSourceOPGG || detail.Build.ItemAttempts[0].Outcome != dataSourceFailed || detail.Build.ItemAttempts[1].Source != dataSourceQQ101 || detail.Build.ItemAttempts[1].Outcome != dataSourceFailed {
 		t.Fatalf("double failure attempts = %#v", detail.Build.ItemAttempts)
+	}
+}
+
+// r120SettledGoroutines 等 goroutine 数量连续几次不再变化后返回，最多等 5 秒。
+// 前面测试留下的 HTTP/2 空闲连接会自己收掉，不等就会把余波误报成泄漏。
+func r120SettledGoroutines(t *testing.T) int {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	previous, stable := -1, 0
+	for time.Now().Before(deadline) {
+		now := runtime.NumGoroutine()
+		if now == previous {
+			if stable++; stable >= 5 {
+				return now
+			}
+		} else {
+			stable = 0
+		}
+		previous = now
+		time.Sleep(20 * time.Millisecond)
+	}
+	return runtime.NumGoroutine()
+}
+
+func r120GoroutineDump() string {
+	buffer := make([]byte, 1<<16)
+	return string(buffer[:runtime.Stack(buffer, true)])
+}
+
+// P2-1（R120）：QQ101 超时路径不许泄漏 goroutine，也不许有数据竞争。
+//
+// 原来两个 QQ101 goroutine 的闭包直接引用外层的 qq101PositionsC / qq101BuildC，
+// 而父协程在等待预算耗尽后会把这两个变量置为 nil：晚到的 goroutine 读到 nil 通道，
+// 向 nil 通道发送会永久阻塞——每次超时都漏掉两个 goroutine 并丢掉结果，同时
+// `-race` 会报「置空处写、发送处读」的数据竞争（champions_structured.go）。
+//
+// 这里让 QQ101 上游一直阻塞到父协程放弃并 cancelQQ101() 才返回，确保「结果必然
+// 晚到」，然后断言 runtime.NumGoroutine() 在有限窗口内回到调用前的基线。
+func TestStructuredDetailQQ101TimeoutDoesNotLeakGoroutines(t *testing.T) {
+	var qq101Hits atomic.Int32
+	provider := newChampionProvider()
+	provider.cache = newChampionDataCache(nil)
+	provider.qq101Wait = 10 * time.Millisecond
+	provider.patch = "16.17.1"
+	provider.championMeta[13] = championMetadata{ID: 13, Key: "Ryze", Slug: "ryze"}
+	provider.championIDs["ryze"] = 13
+	provider.static["item/6657.png"] = championAssetDescription{Name: "时光之杖"}
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		switch request.URL.Host {
+		case qq101Host:
+			if request.URL.Path == qq101VersionPath {
+				return qq101HTTPResponse(request, http.StatusOK, []byte(`{"code":0,"data":[{"name":"16.17"}]}`)), nil
+			}
+			// 只有父协程放弃并 cancel 之后这个请求才会返回，
+			// 所以两个 goroutine 的发送一定晚于父协程的置空。
+			qq101Hits.Add(1)
+			<-request.Context().Done()
+			return nil, request.Context().Err()
+		case opggChampionHost:
+			if strings.HasSuffix(request.URL.Path, "/versions") {
+				return qq101HTTPResponse(request, http.StatusOK, []byte(`{"data":["16.17"]}`)), nil
+			}
+			return qq101HTTPResponse(request, http.StatusOK, []byte(`{"data":{"summary":{"id":13},"core_items":[{"ids":[6657],"play":100,"win":50}]},"meta":{"version":"16.17"}}`)), nil
+		case opggPageHost:
+			return qq101HTTPResponse(request, http.StatusOK, opggItemDepthFixture()), nil
+		}
+		return nil, errors.New("unexpected goroutine-leak probe request")
+	})}
+
+	baseline := r120SettledGoroutines(t)
+	detail, err := provider.loadStructuredDetail(t.Context(), "ranked", "ryze", "mid", "emerald_plus")
+	if err != nil {
+		t.Fatalf("超时兜底路径不该报错：%v", err)
+	}
+	if detail.Build.ItemSource != "OP.GG" {
+		t.Fatalf("QQ101 超时后必须回落到 OP.GG：%#v", detail.Build)
+	}
+	if qq101Hits.Load() == 0 {
+		t.Fatal("QQ101 上游一次都没被命中，fixture 根本没走到超时路径")
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if now := runtime.NumGoroutine(); now <= baseline {
+			t.Logf("P2-1 无泄漏：baseline=%d now=%d qq101Hits=%d", baseline, now, qq101Hits.Load())
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("QQ101 超时路径泄漏了 goroutine：baseline=%d now=%d qq101Hits=%d（晚到的结果发进了 nil 通道）\n%s",
+				baseline, runtime.NumGoroutine(), qq101Hits.Load(), r120GoroutineDump())
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }

@@ -35,6 +35,7 @@ func proProfileTTL(row opggProAccount) time.Duration {
 
 func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAccount {
 	key := "pro-profile-v2|" + proLadderAccountKey(old.GameName, old.TagLine)
+	old.LastMatchAt, old.LastMatchAtKnown = proRealLastMatchAt(old)
 	// Directory rows may have a rank but no timestamp/PUUID and therefore do
 	// not qualify as Riot anchors. Keep that exact account's known rank if the
 	// independent public-page read fails.
@@ -58,12 +59,25 @@ func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAcc
 		c.disk = newPublicBinaryCache(a.storage, "pro-profiles", 64, 4<<20)
 	}
 	cached, found := c.entries[key]
+	directoryRevision := proDirectoryRevisionAt(old)
+	directoryRevisionLegacy := old.RevisionAt
 	if !found && c.disk != nil {
 		if entry, err := c.disk.readDisk(key); err == nil {
 			var stored proProfileSnapshot
 			found = json.Unmarshal(entry.Data, &stored) == nil
 			cached = stored.Account
 			cached.LastMatchAt, cached.LastMatchAtKnown = stored.LastMatchAt, stored.LastMatchAtKnown
+			cached.DirectoryRevisionAt = stored.DirectoryRevisionAt
+			if cached.DirectoryRevisionAt == "" {
+				cached.DirectoryRevisionAt = stored.RevisionAt
+			}
+			if cached.DirectoryRevisionAt == "" {
+				cached.DirectoryRevisionAt = proDirectoryRevisionAt(cached)
+			}
+			// Older snapshots used directory revision_at as LastMatchAt.
+			if stored.DirectoryRevisionAt == "" && cached.LastMatchAtKnown && cached.LastMatchAt == cached.DirectoryRevisionAt {
+				setProLastMatch(&cached, time.Time{}, false)
+			}
 		}
 	}
 	at, _ := time.Parse(time.RFC3339Nano, cached.CheckedAt)
@@ -71,18 +85,23 @@ func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAcc
 		c.entries[key] = cached
 		c.mu.Unlock()
 		cached.SeedKey, cached.Source, cached.PUUID = old.SeedKey, old.Source, old.PUUID
-		if old.LastMatchAtKnown && old.LastMatchAt > cached.LastMatchAt {
-			cached.LastMatchAt, cached.LastMatchAtKnown = old.LastMatchAt, true
+		if directoryRevision != "" {
+			cached.DirectoryRevisionAt = directoryRevision
+			if directoryRevisionLegacy != "" {
+				cached.RevisionAt = directoryRevisionLegacy
+			}
 		}
 		return cached
 	}
 	c.mu.Unlock()
 	if found && cached.CheckedAt > old.CheckedAt {
-		cached.SeedKey, cached.Source, cached.PUUID = old.SeedKey, old.Source, old.PUUID
-		if old.LastMatchAtKnown && old.LastMatchAt > cached.LastMatchAt {
-			cached.LastMatchAt, cached.LastMatchAtKnown = old.LastMatchAt, true
-		}
 		old = cached
+		if directoryRevision != "" {
+			old.DirectoryRevisionAt = directoryRevision
+			if directoryRevisionLegacy != "" {
+				old.RevisionAt = directoryRevisionLegacy
+			}
+		}
 	}
 	ref := gameplayReference{Region: "kr", GameName: old.GameName, TagLine: old.TagLine}
 	requestCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
@@ -94,26 +113,40 @@ func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAcc
 	}
 	if err == nil {
 		old.Rank, old.UpdatedAt = next.Rank, next.UpdatedAt
-		if next.LastMatchAtKnown && (!old.LastMatchAtKnown || next.LastMatchAt > old.LastMatchAt) {
+		// JSON-LD startTime is the authoritative public activity timestamp;
+		// directory revision_at is never compared with it.
+		if next.LastMatchAtKnown {
 			old.LastMatchAt, old.LastMatchAtKnown = next.LastMatchAt, true
 		}
 		old.ActivityFailed = false
+		old.ActivityPending = false
 		account, _ := normalizeProAccount(next)
 		// Public pages omit older histories for some ranked accounts. Only
 		// those missing histories use the shared, foreground-reserving Riot
 		// limiter; never issue a second rank lookup or reuse OP.GG's PUUID.
+		var activityErr error
 		if !next.LastMatchAtKnown && account.RankStatus == "ranked" && a.riot != nil && riotKeyConfigured() {
 			activityCtx, stop := context.WithTimeout(withRiotBackground(ctx), 6*time.Second)
-			identity, activityErr := a.riot.accountByRiotID(activityCtx, old.GameName, old.TagLine)
-			if activityErr == nil {
+			identity, lookupErr := a.riot.accountByRiotID(activityCtx, old.GameName, old.TagLine)
+			activityErr = lookupErr
+			if lookupErr == nil {
 				at, known, readErr := a.riot.lastMatchStartCached(activityCtx, identity.PUUID, "proprofile-lastmatch:v2:", 15*time.Minute)
 				activityErr = readErr
 				if readErr == nil && known {
+					// Riot match-v5 is a real game start and unconditionally
+					// replaces any older cached activity value.
 					setProLastMatch(&old, at, true)
 				}
 			}
 			stop()
-			old.ActivityFailed = activityErr != nil
+			switch {
+			case activityErr == nil:
+				old.ActivityFailed, old.ActivityPending = false, false
+			case errors.Is(activityErr, errThrottled):
+				old.ActivityFailed, old.ActivityPending = false, true
+			default:
+				old.ActivityFailed, old.ActivityPending = true, false
+			}
 		}
 		if next.LadderRankKnown {
 			old.LadderRank, old.LadderRankKnown = next.LadderRank, true
@@ -130,7 +163,7 @@ func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAcc
 	if c.disk != nil && err == nil {
 		safe := old
 		safe.PUUID = ""
-		body, _ := json.Marshal(proProfileSnapshot{Account: safe, LastMatchAt: safe.LastMatchAt, LastMatchAtKnown: safe.LastMatchAtKnown})
+		body, _ := json.Marshal(proProfileSnapshot{Account: safe, LastMatchAt: safe.LastMatchAt, LastMatchAtKnown: safe.LastMatchAtKnown, DirectoryRevisionAt: safe.DirectoryRevisionAt, RevisionAt: safe.RevisionAt})
 		hash := sha256.Sum256(body)
 		now := time.Now()
 		_ = c.disk.writeDisk(championCacheEnvelope{Schema: championCacheSchema, Key: key, FetchedAt: now, ExpiresAt: now.Add(proProfileTTL(old)), StaleUntil: now.Add(7 * 24 * time.Hour), Hash: hex.EncodeToString(hash[:]), Data: body})

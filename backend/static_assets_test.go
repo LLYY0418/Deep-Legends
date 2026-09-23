@@ -106,7 +106,8 @@ func TestR70EmbeddedTextTransferBudget(t *testing.T) {
 	}
 	handler := newStaticAssetHandler(files)
 	var rawTotal, gzipTotal int
-	for _, name := range []string{"index.html", "runtime.js", "demo-data.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js", "app.css", "gameplay.css", "champions.css", "suite.css", "metrics.css"} {
+	// R128 §2.3：统计口径说明已从 UI 移除，shared.js 随之删除，不再出现在嵌入清单里。
+	for _, name := range []string{"index.html", "runtime.js", "demo-data.js", "app.js", "favorites-facade.js", "gameplay.js", "champions.js", "friends.js", "suite.js", "app.css", "gameplay.css", "champions.css", "suite.css", "metrics.css"} {
 		body, err := fs.ReadFile(files, name)
 		if err != nil {
 			t.Fatal(err)
@@ -123,4 +124,35 @@ func TestR70EmbeddedTextTransferBudget(t *testing.T) {
 		t.Logf("%s raw=%d gzip=%d", name, len(body), w.Body.Len())
 	}
 	t.Logf("TOTAL raw=%d gzip=%d saved=%.2f%%", rawTotal, gzipTotal, 100*(1-float64(gzipTotal)/float64(rawTotal)))
+}
+
+func TestR117StaticAssetSecurityHeadersPreserveRevalidation(t *testing.T) {
+	handler := securityHeaders(newStaticAssetHandler(fstest.MapFS{"app.js": {Data: []byte("const ready = true;\n")}}))
+	request := func(tag string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+		if tag != "" {
+			r.Header.Set("If-None-Match", tag)
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		return w
+	}
+	first := request("")
+	if first.Code != http.StatusOK || first.Header().Get("Cache-Control") != "no-cache" {
+		t.Fatalf("static cache policy through security headers: status=%d cache=%q", first.Code, first.Header().Get("Cache-Control"))
+	}
+	if first.Header().Get("X-Content-Type-Options") != "nosniff" || first.Header().Get("Content-Security-Policy") == "" {
+		t.Fatalf("security headers missing: %v", first.Header())
+	}
+	if tag := first.Header().Get("ETag"); tag == "" {
+		t.Fatal("static response omitted ETag")
+	} else {
+		cached := request(tag)
+		if cached.Code != http.StatusNotModified || cached.Body.Len() != 0 {
+			t.Fatalf("revalidation through security headers: status=%d body=%d", cached.Code, cached.Body.Len())
+		}
+		if cached.Header().Get("Cache-Control") != "no-cache" {
+			t.Fatalf("304 cache policy = %q", cached.Header().Get("Cache-Control"))
+		}
+	}
 }

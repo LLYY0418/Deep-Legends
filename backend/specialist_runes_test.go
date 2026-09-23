@@ -963,3 +963,27 @@ func TestSpecialistRunesRecordsStartFailureAndDoneDiagnostics(t *testing.T) {
 		t.Fatalf("failure budget missing: %#v", specialistEvents[1])
 	}
 }
+
+func TestSpecialistRunesTimeoutNegativeCacheAvoidsSecondUpstreamAttempt(t *testing.T) {
+	t.Setenv("RIOT_API_KEY", "RGAPI-test")
+	var requests atomic.Int64
+	provider := specialistTestProvider(gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		requests.Add(1)
+		return specialistTestResponse(request, http.StatusOK, `{}`)
+	}))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if runes, outcome := provider.specialistRunes(ctx, 64, "leesin", "李青", "mid"); len(runes) != 0 || outcome != specialistOutcomeTimeout {
+		t.Fatalf("first timeout result = %#v, outcome=%q", runes, outcome)
+	}
+	if runes, outcome := provider.specialistRunes(context.Background(), 64, "leesin", "李青", "mid"); len(runes) != 0 || outcome != specialistOutcomeTimeout {
+		t.Fatalf("cached timeout result = %#v, outcome=%q", runes, outcome)
+	}
+	if requests.Load() != 0 {
+		t.Fatalf("timeout negative cache allowed upstream request: %d", requests.Load())
+	}
+	entry := provider.specialistCache[specialistRuneKey(64, "mid")]
+	if entry.expiresAt.Sub(time.Now()) > specialistRuneNegativeCacheTTL || entry.expiresAt.Before(time.Now()) {
+		t.Fatalf("timeout negative cache expiry = %s", entry.expiresAt)
+	}
+}

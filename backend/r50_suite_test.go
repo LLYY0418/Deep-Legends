@@ -416,7 +416,7 @@ func TestFacadeBackgroundWritesOnlySkinID(t *testing.T) {
 	}))
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	a := &app{allSkins: []Skin{{ID: 99001}}}
+	a := &app{allSkinsWithBase: []Skin{{ID: 99001}}}
 	if err := a.applyFacadeAction(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "background", SkinID: 99001}); err != nil {
 		t.Fatal(err)
 	}

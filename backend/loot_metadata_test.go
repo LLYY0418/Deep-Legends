@@ -186,7 +186,10 @@ func TestLootNamingPreservesLocalNamesAndReportsUnresolvedRawIDs(t *testing.T) {
 	var events []map[string]any
 	items := enrichLootItemsWithMetadata([]LootItem{
 		{LootID: "SUMMONER_ICON_782", LocalizedName: "客户端专属名称", Count: 1, Type: "SUMMONERICON"},
-		{LootID: "WARD_SKIN_RENTAL_99999", LootName: "WARD_SKIN_RENTAL_99999", Count: 2, Type: "WARDSKIN_RENTAL", shapeDiagnostics: shape},
+		// P2-2（R120 复测）：泄漏哨兵不能用纯数字——「99999」这类五位数字子串会被
+		// 时间戳/计数偶然包含而误报。ZQ7XK 含 a–f 之外的字母，十六进制 run_id 与
+		// 纯数字字段都拼不出它。前缀匹配（WARD_）与回退语义不受影响。
+		{LootID: "WARD_SKIN_RENTAL_ZQ7XK", LootName: "WARD_SKIN_RENTAL_ZQ7XK", Count: 2, Type: "WARDSKIN_RENTAL", shapeDiagnostics: shape},
 	}, nil, map[string]lootMetadata{"SUMMONER_ICON_782": {Name: "公开目录名称"}}, func(event map[string]any) { events = append(events, event) })
 	if len(items) != 2 || items[0].DisplayName != "客户端专属名称" || items[1].DisplayName != items[1].LootID || items[1].Count != 2 {
 		t.Fatalf("local names or unresolved inventory were overwritten: %#v", items)
@@ -195,7 +198,7 @@ func TestLootNamingPreservesLocalNamesAndReportsUnresolvedRawIDs(t *testing.T) {
 		t.Fatalf("raw-ID fallback was absent from diagnostics: %#v / %#v", events, shape)
 	}
 	log, _ := json.Marshal(events)
-	if strings.Contains(string(log), "99999") {
+	if strings.Contains(string(log), "ZQ7XK") {
 		t.Fatal("fallback diagnostics leaked full ID")
 	}
 }

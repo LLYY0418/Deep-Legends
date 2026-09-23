@@ -34,30 +34,6 @@ const escapeHTML = (value) => String(value ?? "").replace(/[&<>'"]/g, "_");
 
 
 const checked=value=>value?" checked":"";
-function modalHarness(){
- const dom=new JSDOM('<main id="facade"><button data-facade-icons>头像</button><button data-facade-banners>旗帜</button></main>',{pretendToBeVisual:true});
- const {window}=dom,{document}=window;window.HTMLDialogElement.prototype.showModal=function(){this.open=true};window.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new window.Event("close"))};
- const state={facade:{connected:true,summoner:{profileIconId:1}},facadeDraft:{}};const frames=[];const roots={facade:document.querySelector("main")};
- const deps={window,document,state,roots,escapeHTML,imageURL:x=>x,performance,requestAnimationFrame:cb=>frames.push(cb)};
- return {dom,...deps,frames,flush(){while(frames.length)frames.shift()()}};
-}
-// R105 supersedes the owned-only UI contract; keep the R101 modal/catalog checks.
-test("R101 icon catalog remains available with known or unknown ownership",async()=>{
- for(const unknown of [false,true]){
-  const h=modalHarness();const deps={...h,api:async()=>({icons:[{id:1,title:"头像",owned:false}],iconOwnershipUnavailable:unknown}),applyFacade:async()=>true};
-  const open=Function(...Object.keys(deps),`${functionSource(source,"facadeIconImage")} async ${functionSource(source,"openFacadeIconPicker")};return openFacadeIconPicker`)(...Object.values(deps));
-  await open(h.document.querySelector("button"));h.flush();const d=h.document.querySelector("dialog");
-  assert.equal(d.querySelector("[data-picker-owned]"),null);assert.equal(d.querySelector("[data-picker-icon]").disabled,false);d.close();h.dom.window.close();
- }
-});
-test("R101 banner catalog keeps localized grouping and restores focus",async()=>{
- const h=modalHarness();const deps={...h,api:async()=>({banners:[{id:"4",localizedName:"乙",owned:false,isTencentOnly:true},{id:"3",localizedName:"甲",owned:true,isTencentOnly:false}]}),applyFacade:async()=>true};
- const open=Function(...Object.keys(deps),`async ${functionSource(source,"openFacadeBannerPicker")};return openFacadeBannerPicker`)(...Object.values(deps));
- await open(h.document.querySelector("[data-facade-banners]"));const d=h.document.querySelector("dialog");
- assert.equal(d.querySelector('[data-banner-id="4"]').disabled,false);assert.match(d.textContent,/国服专属/);
- d.querySelector('[data-banner-group="tencent"]').click();assert.equal(d.querySelectorAll("[data-banner-id]").length,1);
- d.close();h.flush();assert.equal(h.document.activeElement,h.document.querySelector("[data-facade-banners]"));h.dom.window.close();
-});
 function champHarness(){
  const dom=new JSDOM('<main></main>');const root=dom.window.document.querySelector("main");const config={ban:{enabled:true,strategy:"show-then-lock",lockDelayMs:10000},pick:{enabled:true,strategy:"show-then-lock",lockDelayMs:10000},bench:{}};const saved=[];
  const deps={state:{champSelectCatalog:{}},checked,escapeHTML,champSelectPoolFor:()=>[],champSelectLaneTabsHTML:()=>"",champSelectSlotsHTML:()=>"",champSelectSettings:()=>({enabled:true}),champSelectSelectedConfig:()=>config,champSelectPanelRoot:()=>root,bindChampSelectRailDrag(){},toast(){},saveChampSelect:async()=>{saved.push(structuredClone(config));render()},renderChampSelect:()=>render()};

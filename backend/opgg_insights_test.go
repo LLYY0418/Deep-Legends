@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -657,6 +658,13 @@ func TestLoadRiotOverviewLoadsOPGGHistoryWithoutMatchTierRequests(t *testing.T) 
 	match.Info.Teams = []riotTeam{{TeamID: 100, Win: true}}
 	matchJSON, _ := json.Marshal(match)
 	var opggCalls atomic.Int32
+	var postCalls atomic.Int32
+	// 真实抓包：20 行、游标非空，正好用来验证「预热只取第一页」。
+	gamesPayload, gamesErr := os.ReadFile("testdata/r112-opgg-average-tiers.txt")
+	if gamesErr != nil {
+		t.Fatal(gamesErr)
+	}
+	providerPUUID := strings.Repeat("o", 48)
 	champions := newChampionProvider()
 	champions.mu.Lock()
 	champions.championMeta[1] = championMetadata{ID: 1, NameZH: "黑暗之女"}
@@ -667,10 +675,14 @@ func TestLoadRiotOverviewLoadsOPGGHistoryWithoutMatchTierRequests(t *testing.T) 
 	champions.client = &http.Client{Transport: gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		if request.URL.Host == "op.gg" {
 			opggCalls.Add(1)
-			if request.Method != http.MethodGet {
-				t.Fatalf("overview sent unexpected OP.GG %s request", request.Method)
+			if request.Method == http.MethodPost {
+				postCalls.Add(1)
+				return testHTTPResponse(request, http.StatusOK, string(gamesPayload)), nil
 			}
-			return testHTTPResponse(request, http.StatusOK, `{"season":"S2025 S3","rank_entries":{"rank_info":{"tier":"diamond","value":"DIAMOND","division":1,"lp":"70"}}`), nil
+			// 同一个公开页既要能解析出历史段位，也要能解析出 OP.GG 侧的身份 ID：
+			// 只给段位片段时预热会在取对局列表之前就失败，POST 那条路径根本盖不到。
+			return testHTTPResponse(request, http.StatusOK,
+				r112ProfilePage("Fast", "KR1", providerPUUID)+`{"season":"S2025 S3","rank_entries":{"rank_info":{"tier":"diamond","value":"DIAMOND","division":1,"lp":"70"}}}`), nil
 		}
 		switch {
 		case strings.Contains(request.URL.Path, "/lol/summoner/v4/summoners/by-puuid/"):
@@ -704,8 +716,29 @@ func TestLoadRiotOverviewLoadsOPGGHistoryWithoutMatchTierRequests(t *testing.T) 
 		time.Sleep(time.Millisecond)
 	}
 	overview.HistoricalRanks = a.cachedOPGGHistoricalRanks(puuid)
-	if opggCalls.Load() != 1 {
-		t.Fatalf("overview requested OP.GG %d time(s), want one history request", opggCalls.Load())
+	// R127 P1-c.4：总览会并行预热 OP.GG 对局列表。预热是后台 goroutine，总览本身
+	// 不等它、返回值里也不带平均段位；先等它落定再数请求，否则会与历史段位
+	// goroutine 竞态而偶发失败。
+	prefetchDeadline := time.Now().Add(2 * time.Second)
+	for {
+		a.opgg.mu.Lock()
+		settled := false
+		for _, entry := range a.opgg.tiers {
+			settled = settled || !entry.attemptedAt.IsZero()
+		}
+		a.opgg.mu.Unlock()
+		if settled || time.Now().After(prefetchDeadline) {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if opggCalls.Load() != 3 {
+		t.Fatalf("overview requested OP.GG %d time(s), want history GET + prefetch identity GET + prefetch games POST", opggCalls.Load())
+	}
+	// 预热只允许取第一页：抓包有 20 行、游标非空，不限页数就会连拉 4 页，而前台
+	// 请求要等同一个 flight，等于把总览的平均段位又拖慢一轮。
+	if postCalls.Load() != 1 {
+		t.Fatalf("prefetch fetched %d games page(s), want exactly 1", postCalls.Load())
 	}
 	if len(overview.HistoricalRanks) != 1 || overview.HistoricalRanks[0].Season != "S2025 S3" || overview.HistoricalRanks[0].LeaguePoints == nil || *overview.HistoricalRanks[0].LeaguePoints != 70 {
 		t.Fatalf("historical ranks = %#v", overview.HistoricalRanks)
@@ -764,4 +797,52 @@ func testHTTPResponse(request *http.Request, status int, body string) *http.Resp
 		Body:       io.NopCloser(strings.NewReader(body)),
 		Request:    request,
 	}
+}
+
+func TestR117OPGGHistoricalRanksCachesConfirmedEmptyButNotFailure(t *testing.T) {
+	puuid := strings.Repeat("p", 48)
+	t.Run("confirmed-empty", func(t *testing.T) {
+		var calls atomic.Int32
+		champions := newChampionProvider()
+		champions.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			calls.Add(1)
+			return proHTTPBody([]byte("<html>no historical ranks</html>")), nil
+		})}
+		a := &app{champions: champions, opgg: newOPGGInsights()}
+		for i := 0; i < 2; i++ {
+			if ranks := a.opggHistoricalRanks(context.Background(), "Player", "KR1", puuid, "PUBLIC"); len(ranks) != 0 {
+				t.Fatalf("empty historical ranks = %#v", ranks)
+			}
+		}
+		if calls.Load() != 1 {
+			t.Fatalf("confirmed empty result was not cached: calls=%d", calls.Load())
+		}
+		entry := a.opgg.histories[sourceScopedKey(dataSourceOPGG, puuid)]
+		if !entry.empty || entry.expiresAt.Sub(entry.at) != opggHistoryEmptyTTL {
+			t.Fatalf("empty cache semantics = %+v", entry)
+		}
+		if ranks := a.cachedOPGGHistoricalRanks(puuid); ranks != nil {
+			t.Fatalf("cached empty lookup = %#v, want nil", ranks)
+		}
+	})
+
+	t.Run("failure-not-cached", func(t *testing.T) {
+		var calls atomic.Int32
+		champions := newChampionProvider()
+		champions.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			calls.Add(1)
+			response := proHTTPBody([]byte("upstream unavailable"))
+			response.StatusCode = http.StatusServiceUnavailable
+			return response, nil
+		})}
+		a := &app{champions: champions, opgg: newOPGGInsights()}
+		for i := 0; i < 2; i++ {
+			if ranks := a.opggHistoricalRanks(context.Background(), "Player", "KR1", puuid, "PUBLIC"); len(ranks) != 0 {
+				t.Fatalf("failed historical ranks = %#v", ranks)
+			}
+		}
+		if calls.Load() != 2 || len(a.opgg.histories) != 0 {
+			t.Fatalf("failure polluted empty cache: calls=%d cache=%d", calls.Load(), len(a.opgg.histories))
+		}
+	})
 }

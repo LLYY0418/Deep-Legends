@@ -34,10 +34,21 @@ jobs:
           node --check backend/web/app.js
           node --check backend/web/suite.js
           node --check desktop/main.cjs
+      - name: Validate frontend styles and assets
+        run: node --test backend/web/r117-style.test.cjs
       - name: Install desktop test dependencies
         run: npm ci --prefix desktop
       - name: Test frontend and desktop renderers
         run: node --test backend/web/*.test.cjs desktop/*.test.cjs
+      # P1-2：这两个脚本以前从不在任何流程里执行，护栏失效了半年没人发现。
+      # 找不到浏览器时直接失败，不允许静默跳过。
+      - name: Real Chromium image-queue and lazy-CSS guards
+        run: |
+          chrome="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
+          test -n "$chrome" || { echo "no Chrome/Chromium binary on the runner; browser guards must not silently skip" >&2; exit 1; }
+          echo "using $chrome"
+          CHROME_BIN="$chrome" R100_BROWSER_OUTPUT="$RUNNER_TEMP/r100-browser" node desktop/r100-browser.cjs
+          CHROME_BIN="$chrome" R117_BROWSER_OUTPUT="$RUNNER_TEMP/r117-browser" node desktop/r117-browser.cjs
       - name: Test installer module
         working-directory: installer
         run: go test ./...

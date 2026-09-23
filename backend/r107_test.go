@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	xhtml "golang.org/x/net/html"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -46,58 +47,6 @@ func TestR107ProfileCacheRestoresActivityAfterRestart(t *testing.T) {
 	second := (&app{storage: store, champions: &championProvider{client: client}}).readProProfile(context.Background(), old)
 	if !first.LastMatchAtKnown || second.LastMatchAt != first.LastMatchAt || !second.LastMatchAtKnown || calls != 1 {
 		t.Fatalf("activity lost across restart: %s %s calls=%d", first.LastMatchAt, second.LastMatchAt, calls)
-	}
-}
-
-func TestR107RejectedOfficialIconUsesVerifiedChatScope(t *testing.T) {
-	for _, retain := range []bool{true, false} {
-		t.Run(fmt.Sprint(retain), func(t *testing.T) {
-			chatIcon := int64(1)
-			var writes []string
-			client := r105LCU(func(w http.ResponseWriter, r *http.Request) {
-				switch r.URL.Path {
-				case "/lol-game-data/assets/v1/summoner-icons.json":
-					fmt.Fprint(w, `[{"id":99,"title":"Fixture","imagePath":"/lol-game-data/assets/v1/profile-icons/99.jpg"}]`)
-				case "/lol-game-data/assets/v1/summoner-icon-sets.json":
-					fmt.Fprint(w, `[]`)
-				case "/lol-inventory/v2/inventory/SUMMONER_ICON":
-					fmt.Fprint(w, `[{"itemId":1,"owned":true}]`)
-				case "/lol-summoner/v1/current-summoner/icon":
-					writes = append(writes, "profile")
-					w.WriteHeader(401)
-				case "/lol-chat/v1/me":
-					if r.Method == http.MethodPut {
-						writes = append(writes, "chat")
-						var b map[string]int64
-						json.NewDecoder(r.Body).Decode(&b)
-						if len(b) != 1 || b["icon"] != 99 {
-							t.Error("unexpected chat mutation")
-						}
-						if retain {
-							chatIcon = b["icon"]
-						}
-					} else {
-						fmt.Fprintf(w, `{"icon":%d}`, chatIcon)
-					}
-				default:
-					fmt.Fprint(w, `{}`)
-				}
-			})
-			a := &app{lcu: client, summoner: Summoner{SummonerID: 1, ProfileIconID: 1}}
-			scope, err := a.writeFacadeIconResult(context.Background(), client, 99)
-			if retain && (err != nil || scope != "chat") {
-				t.Fatalf("scope=%s err=%v", scope, err)
-			}
-			if !retain && err == nil {
-				t.Fatal("unconfirmed chat write reported success")
-			}
-			if a.summoner.ProfileIconID != 1 {
-				t.Fatal("chat-only icon overwritten official identity")
-			}
-			if strings.Join(writes, ",") != "profile,chat" {
-				t.Fatalf("writes=%v", writes)
-			}
-		})
 	}
 }
 
@@ -179,35 +128,6 @@ func TestR107MissingPublicActivityUsesOwnRiotIdentityAndCaches(t *testing.T) {
 	}
 }
 
-func TestR108BannerWaitsForCareerSummaryReadback(t *testing.T) {
-	reads, writes := 0, 0
-	equipped := "old-accent"
-	client := r105LCU(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/lol-game-data/assets/v1/regalia.json":
-			fmt.Fprint(w, `[{"id":"4","idSecondary":"","regaliaType":"kBanner","isSelectable":true}]`)
-		case facadeChallengeSummaryPath:
-			reads++
-			if writes > 0 && reads >= 6 {
-				equipped = "4"
-			}
-			fmt.Fprintf(w, `{"bannerId":%q,"selectedChallengesString":"","title":null}`, equipped)
-		case facadeChallengePreferencesPath:
-			writes++
-			var body map[string]any
-			json.NewDecoder(r.Body).Decode(&body)
-			if body["bannerAccent"] != "4" {
-				t.Error("wrong banner identity", body)
-			}
-		default:
-			t.Fatalf("unexpected endpoint %s", r.URL.Path)
-		}
-	})
-	if err := writeFacadeBanner(context.Background(), client, "4"); err != nil || writes != 1 || reads != 6 {
-		t.Fatalf("reads=%d writes=%d err=%v", reads, writes, err)
-	}
-}
-
 // Opt-in read-only verification against the configured public sources.
 func TestR107LiveProfileActivityBatch(t *testing.T) {
 	output := os.Getenv("R107_LIVE_PROFILE_OUTPUT")
@@ -260,8 +180,12 @@ func TestR107ImageBudgetReachesUnderlyingTransport(t *testing.T) {
 				calls++
 				deadline, ok := r.Context().Deadline()
 				remaining := time.Until(deadline)
-				if !ok || remaining < 7*time.Second || remaining > 8100*time.Millisecond {
-					t.Errorf("inner image timeout truncated budget: %s", remaining)
+				// R127 P1-a.3：远程小图标预算从 8 秒收紧到 3 秒（原画仍是 8 秒）。
+				// 这条护栏盯的仍然是「外层预算必须真的传到底层 Transport」，只是
+				// 基准换成按路径计算的 remoteImageBudget。
+				budget := remoteImageBudget(r.URL.Path)
+				if !ok || remaining < budget-time.Second || remaining > budget+100*time.Millisecond {
+					t.Errorf("inner image timeout truncated budget: %s (want ~%s)", remaining, budget)
 				}
 				return r99Response("\x89PNG\r\n\x1a\n" + strings.Repeat("\x00", 60)), nil
 			})}
@@ -331,5 +255,172 @@ func TestR107LiveImagesWithoutClient(t *testing.T) {
 			t.Error("restart did not reuse image disk cache")
 		}
 		p.client.CloseIdleConnections()
+	}
+}
+
+func TestR117ImageETagRevalidation(t *testing.T) {
+	p := newChampionProvider()
+	p.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return r99Response("\x89PNG\r\n\x1a\n" + strings.Repeat("\x00", 60)), nil
+	})}
+	a := &app{champions: p}
+	first := httptest.NewRecorder()
+	a.handleImage(first, httptest.NewRequest(http.MethodGet, "/api/image?path=/lol-game-data/assets/v1/champion-icons/103.png", nil))
+	if first.Code != http.StatusOK || first.Header().Get("ETag") == "" {
+		t.Fatalf("initial image response: status=%d headers=%v", first.Code, first.Header())
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/image?path=/lol-game-data/assets/v1/champion-icons/103.png", nil)
+	request.Header.Set("If-None-Match", first.Header().Get("ETag"))
+	cached := httptest.NewRecorder()
+	a.handleImage(cached, request)
+	if cached.Code != http.StatusNotModified || cached.Body.Len() != 0 {
+		t.Fatalf("image revalidation: status=%d body=%d", cached.Code, cached.Body.Len())
+	}
+}
+
+// P3-5：一个 assetPath 最多扇出 6 个 CommunityDragon 候选（_large.png 缺图时逐个 404）。
+// 负缓存必须按分钟级、并且「全部候选均失败」要按 assetPath 单独记一条，否则同一个
+// 资源每 5 秒就把整组扇出重放一遍（657 个海克斯里有 60 个只有 _small）。
+func TestR117CommunityImageFanoutNegativeCacheIsPerAssetPathAndMinuteLevel(t *testing.T) {
+	if communityImageCandidateNegativeTTL < time.Minute {
+		t.Fatalf("candidate negative TTL = %v, want >= 1m", communityImageCandidateNegativeTTL)
+	}
+	if communityImageResolveNegativeTTL < time.Minute {
+		t.Fatalf("resolve negative TTL = %v, want >= 1m", communityImageResolveNegativeTTL)
+	}
+	const assetPath = "/lol-game-data/assets/v1/champion-tiles/103/103000_large.png"
+	if got := len(communityDragonImagePaths(assetPath)); got != 6 {
+		t.Fatalf("candidate fan-out = %d, want 6", got)
+	}
+	missing := func() *http.Response {
+		return &http.Response{StatusCode: http.StatusNotFound, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("missing"))}
+	}
+	png := []byte("\x89PNG\r\n\x1a\n" + strings.Repeat("\x00", 60))
+	request := func(a *app) *httptest.ResponseRecorder {
+		t.Helper()
+		w := httptest.NewRecorder()
+		a.serveCommunityDragonImage(w, httptest.NewRequest(http.MethodGet, "/api/image?path="+url.QueryEscape(assetPath), nil), assetPath)
+		return w
+	}
+	rewindCandidateFailures := func(a *app) {
+		a.assetCacheMu.Lock()
+		for key, until := range a.assetFailureUntil {
+			if strings.HasPrefix(key, "cdragon:") && !strings.HasPrefix(key, "cdragon-resolved:") {
+				a.assetFailureUntil[key] = until.Add(-2 * communityImageCandidateNegativeTTL)
+			}
+		}
+		a.assetCacheMu.Unlock()
+	}
+
+	t.Run("every candidate failing is remembered per assetPath", func(t *testing.T) {
+		var calls atomic.Int32
+		p := newChampionProvider()
+		p.client = &http.Client{Transport: gameplayRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			calls.Add(1)
+			return missing(), nil
+		})}
+		a := &app{champions: p}
+		if first := request(a); first.Code != http.StatusNotFound {
+			t.Fatalf("initial status = %d", first.Code)
+		}
+		if got := calls.Load(); got != 6 {
+			t.Fatalf("initial upstream calls = %d, want the full 6-candidate fan-out", got)
+		}
+		a.assetCacheMu.Lock()
+		_, resolved := a.assetFailureUntil["cdragon-resolved:"+assetPath]
+		a.assetCacheMu.Unlock()
+		if !resolved {
+			t.Fatal("all-candidate failure was not negative-cached under the assetPath key")
+		}
+		// 把候选级负缓存全部作废，只留 assetPath 级那一条：第二次请求仍不得打上游。
+		// 摘掉 serveCommunityDragonImage 外层的 assetPath 负缓存，这里就会重新扇出 6 次。
+		rewindCandidateFailures(a)
+		if second := request(a); second.Code != http.StatusNotFound {
+			t.Fatalf("repeat status = %d", second.Code)
+		}
+		if got := calls.Load(); got != 6 {
+			t.Fatalf("repeat upstream calls = %d, want 6 (assetPath negative cache must short-circuit the fan-out)", got)
+		}
+	})
+
+	t.Run("partial failure does not replay the missing candidates", func(t *testing.T) {
+		var largeMisses, smallHits atomic.Int32
+		p := newChampionProvider()
+		p.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			if strings.HasSuffix(r.URL.Path, "_small.png") {
+				smallHits.Add(1)
+				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"image/png"}}, Body: io.NopCloser(strings.NewReader(string(png)))}, nil
+			}
+			largeMisses.Add(1)
+			return missing(), nil
+		})}
+		a := &app{champions: p}
+		first := request(a)
+		if first.Code != http.StatusOK || first.Header().Get("ETag") == "" {
+			t.Fatalf("initial status = %d etag = %q", first.Code, first.Header().Get("ETag"))
+		}
+		if got := largeMisses.Load(); got != 4 {
+			t.Fatalf("initial 404 candidates = %d, want 4", got)
+		}
+		if second := request(a); second.Code != http.StatusOK {
+			t.Fatalf("repeat status = %d", second.Code)
+		}
+		if got := largeMisses.Load(); got != 4 {
+			t.Fatalf("repeat 404 candidates = %d, want 4 (minute-level candidate negative cache must hold)", got)
+		}
+		if got := smallHits.Load(); got > 2 {
+			t.Fatalf("small candidate upstream hits = %d, want at most one per request", got)
+		}
+	})
+}
+
+func TestR117ProfileUsesJSONLDStartOverDirectoryRevision(t *testing.T) {
+	data, err := os.ReadFile("testdata/r107/opgg-profile.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return proHTTPBody(data), nil
+	})}
+	// old.LastMatchAt 必须同时满足两个条件，否则这条测试测不到合并逻辑：
+	//  1. 不等于 directory revision —— readProProfile 第一步就调 proRealLastMatchAt，
+	//     两者是同一时刻时 LastMatchAtKnown 会被直接重置为 false，「取大值」旧 bug
+	//     和「按来源优先」新逻辑就都通过了（这是独立验收揪出来的假护栏）。
+	//  2. 晚于 JSON-LD startTime —— 这样旧 bug 的 max() 会保留 old 的值，
+	//     新逻辑必须无条件用 JSON-LD 覆盖，两者结果不同才测得出来。
+	old := opggProAccount{
+		GameName: "Kimman", TagLine: "zxfkk", Region: "kr",
+		RevisionAt: "2026-09-17T03:56:23+09:00", DirectoryRevisionAt: "2026-09-17T03:56:23+09:00",
+		LastMatchAt: "2026-09-16T23:30:00Z", LastMatchAtKnown: true,
+	}
+	got := (&app{champions: &championProvider{client: client}}).readProProfile(context.Background(), old)
+	if !got.LastMatchAtKnown || got.LastMatchAt != "2026-09-16T18:19:58Z" {
+		t.Fatalf("JSON-LD startTime must win over a later directory/old timestamp: %+v", got)
+	}
+}
+
+func TestR117ProfileThrottleIsPendingWithoutShortTTL(t *testing.T) {
+	t.Setenv("RIOT_API_KEY", "RGAPI-fixture")
+	data, err := os.ReadFile("testdata/r107/opgg-profile.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = []byte(strings.ReplaceAll(string(data), "PlayGameAction", "NoHistory"))
+	cp := newChampionProvider()
+	cp.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return proHTTPBody(data), nil
+	})}
+	p := r99SeedProvider(t, t.TempDir(), func(r *http.Request) (*http.Response, error) {
+		t.Fatalf("throttled activity must not reach Riot transport: %s", r.URL)
+		return nil, nil
+	})
+	p.limitMu.Lock()
+	p.limitQueue = []*riotLimitWaiter{{turn: make(chan struct{})}}
+	p.limitMu.Unlock()
+	row := (&app{champions: cp, riot: p}).readProProfile(context.Background(), opggProAccount{
+		GameName: "Kimman", TagLine: "zxfkk", Region: "kr",
+	})
+	if !row.ActivityPending || row.ActivityFailed || proProfileTTL(row) != 15*time.Minute {
+		t.Fatalf("throttled activity collapsed profile TTL: %+v ttl=%s", row, proProfileTTL(row))
 	}
 }

@@ -74,6 +74,7 @@ type PoolIssue struct {
 type Snapshot struct {
 	Summoner          Summoner
 	All               []Skin
+	AllWithBase       []Skin
 	Owned             []Skin
 	Remaining         []Skin
 	PoolTotal         int
@@ -379,6 +380,8 @@ func loadCollectionSnapshotWithProvider(client *LCUClient, pool PoolManifest, id
 		}
 	}
 	sortSkins(displayAll)
+	allWithBase := append([]Skin(nil), all...)
+	sortSkins(allWithBase)
 
 	for _, skin := range all {
 		if skin.ID == profile.BackgroundSkinID {
@@ -392,6 +395,7 @@ func loadCollectionSnapshotWithProvider(client *LCUClient, pool PoolManifest, id
 	return Snapshot{
 		Summoner:    summoner,
 		All:         displayAll,
+		AllWithBase: allWithBase,
 		Owned:       owned,
 		Remaining:   remaining,
 		PoolTotal:   len(pool.Names),

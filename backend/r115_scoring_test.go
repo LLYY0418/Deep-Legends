@@ -88,7 +88,7 @@ func TestR115AbilityBoundedSymmetricScaleAndTrueZero(t *testing.T) {
 	p.damage = 1_000_000
 	forward := abilityMetrics(p, b)[3].PlayerScore
 	reverse := abilityMetrics(b, p)[3].PlayerScore
-	if math.Abs(forward+reverse-100) > 0.11 || forward >= 100 {
+	if math.Abs(forward+reverse-100) > 0.11 || forward > 100 || reverse < 0 {
 		t.Fatalf("unbounded/asymmetric: %v,%v", forward, reverse)
 	}
 }

@@ -119,11 +119,21 @@ function functionSource(script, name) {
   assert.fail(`unbalanced ${name}`);
 }
 
+// R128 §2.3：统计口径说明已从 UI 删除，shared.js 随之移除；聚焦测试不再需要
+// window.deepLegendsShared 桩。
+
 function compile(names, dependencies = {}, script = source) {
   names = [...names];
   for (const name of ["proBadgeAttributes", "renderProIdentityBadge", "proContextFromButton"]) if (!names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
   if (!names.includes("overviewSupplementTarget") && names.some(name => functionSource(script, name).includes("overviewSupplementTarget("))) names.push("overviewSupplementTarget");
-  dependencies = { riotTab: tab => tab?.region === "kr", isARAMRelatedMatch: () => false, ...dependencies };
+  // R116-B 评审整改（清 R116-D 账本 §11.7-1 的技术债）：renderLiveInsights 的七个
+  // 渲染 helper 已从函数体内提到模块作用域，这里按名字传递编译真实实现（顺序＝先
+  // 调用方后被调用方，names 是边扫边追加的），而不是给每个聚焦测试塞一份桩。
+  for (const name of ["renderLiveRosterNoticeBars", "renderLiveTeamPortraitTags", "liveRosterChampionName", "liveNoticeBar", "liveEvidenceSuffix", "liveConfidenceText", "liveDeltaPoints"]) if (!names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
+  // R129 P1：历史状态判据抽成 liveHistoryStateOf / liveHistorySettled，编译
+  // renderLivePlayer / renderInsightMatches 时按名字带上真实实现，不塞桩。
+  for (const name of ["liveHistoryStateOf", "liveHistorySettled"]) if (!names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
+  dependencies = { riotTab: tab => tab?.region === "kr", isARAMRelatedMatch: () => false, window: {}, ...dependencies };
   const keys = Object.keys(dependencies);
   return Function(...keys, `"use strict";\n${names.map((name) => functionSource(script, name)).join("\n")}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
 }
@@ -643,4 +653,45 @@ test('resolved repeated pro shards render in both legal rows, not in the bottom 
   assert.equal((html.match(/data-id="5008" data-selected="true"/g)||[]).length,2);
   assert.equal((html.match(/data-selected="true"/g)||[]).length,3);
   assert.doesNotMatch(html,/pro-known-shards|槽位未确认/);
+});
+
+// P0-1：赛季扫描没跑完时不得用半成品战绩覆盖上游真实胜负场；而且降级说明必须真的
+// 渲染到用户屏幕上——工单原则「后端设置了降级说明 ≠ 已披露」。
+test("R117 rank win-rate degradation is disclosed on screen, not only set on the backend", () => {
+  const helpers = compile(["renderRanks"], {
+    escapeHTML: (value) => String(value ?? ""),
+    number: (value) => String(value ?? 0),
+    percent: (value) => `${value}%`,
+    rankCrestIcon: (tier) => `<img class="rank-crest-icon" data-tier="${tier}">`,
+    rankTitle: (rank) => rank.tier,
+    renderRankMMRPopover: () => "",
+    renderRankHistory: () => "",
+  });
+  const capability = (detail) => [{ name: "ranked-stats", state: "failed", detail }];
+  const incomplete = [{ queueType: "RANKED_SOLO_5x5", tier: "大师", leaguePoints: 120, wins: 107, losses: 0, winRate: -1 }];
+
+  // 扫描仍在进行：不得出现胜率数字，必须是「正在统计中」这条明确降级标记。
+  const collecting = helpers.renderRanks(incomplete, capability("客户端未返回排位负场，胜率暂不展示"), [], [], { collecting: true });
+  assert.doesNotMatch(collecting, /win-rate-value/, "半成品战绩不得渲染成胜率");
+  assert.match(collecting, /107胜 · 正在统计中/);
+  assert.match(collecting, /data-tooltip="正在后台按当前队列统计本赛季战绩，完成后会自动更新胜率"/);
+
+  // 扫描完成但上游确实没给负场：必须把后端写的 capability.detail 披露出来。
+  const degraded = helpers.renderRanks(incomplete, capability("上游未返回排位负场，已按赛季战绩聚合补全胜率"), [], [], { collecting: false });
+  assert.doesNotMatch(degraded, /win-rate-value/);
+  assert.match(degraded, /107胜 · 负场未提供/);
+  assert.match(degraded, /胜率暂不可用/);
+  assert.match(degraded, /data-tooltip="上游未返回排位负场，已按赛季战绩聚合补全胜率"/, "capability.detail 必须落到屏幕上");
+
+  // 对抗变异：把 capability.Detail 改成空串必须有测试察觉——兜底文案要顶上。
+  const emptyDetail = helpers.renderRanks(incomplete, capability(""), [], [], { collecting: false });
+  assert.match(emptyDetail, /data-tooltip="上游未提供负场，无法计算胜率"/, "detail 为空时必须用兜底说明，不能留空 tooltip");
+
+  // 胜率已知时照常渲染数字，且不再挂降级提示。
+  const known = helpers.renderRanks(
+    [{ queueType: "RANKED_SOLO_5x5", tier: "大师", leaguePoints: 120, wins: 60, losses: 47, winRate: 57 }],
+    capability(""), [], [], null);
+  assert.match(known, /胜率 <b class="win-rate-value">57%<\/b>/);
+  assert.match(known, /60胜 47负/);
+  assert.doesNotMatch(known, /胜率暂不可用/);
 });

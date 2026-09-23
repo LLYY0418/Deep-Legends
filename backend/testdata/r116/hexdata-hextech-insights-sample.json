@@ -1,0 +1,1004 @@
+{
+ "heroes": [
+  {
+   "id": "21",
+   "name": "赏金猎人",
+   "tier": 2,
+   "games": 3333412,
+   "winRate": 0.504586,
+   "pickRate": 0.150277,
+   "topItems": [
+    {
+     "id": "2503",
+     "name": "黯炎火炬",
+     "games": 2253235,
+     "winRate": 0.519848,
+     "pickRate": 0.675955,
+     "confidence": "high"
+    },
+    {
+     "id": "6653",
+     "name": "兰德里的折磨",
+     "games": 2184384,
+     "winRate": 0.515991,
+     "pickRate": 0.6553,
+     "confidence": "high"
+    },
+    {
+     "id": "994403",
+     "name": "金铲铲",
+     "games": 63457,
+     "winRate": 0.563153,
+     "pickRate": 0.019037,
+     "confidence": "high"
+    },
+    {
+     "id": "6333",
+     "name": "死亡之舞",
+     "games": 15026,
+     "winRate": 0.559231,
+     "pickRate": 0.004508,
+     "confidence": "high"
+    },
+    {
+     "id": "4645",
+     "name": "影焰",
+     "games": 1215467,
+     "winRate": 0.497939,
+     "pickRate": 0.364631,
+     "confidence": "high"
+    }
+   ],
+   "detailUrl": "https://hexdata.com.cn/hero/21",
+   "confidence": "high",
+   "topAugments": [
+    {
+     "id": "2095",
+     "name": "掷骰狂人",
+     "games": 89446,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/2095",
+     "confidence": "high",
+     "pairWinRate": 0.555542,
+     "deltaWinRate": 0.050956
+    },
+    {
+     "id": "1113",
+     "name": "老练狙神",
+     "games": 549209,
+     "rarity": "黄金",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1113",
+     "confidence": "high",
+     "pairWinRate": 0.538063,
+     "deltaWinRate": 0.033477
+    },
+    {
+     "id": "1053",
+     "name": "科学狂人",
+     "games": 134329,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1053",
+     "confidence": "high",
+     "pairWinRate": 0.547432,
+     "deltaWinRate": 0.042846
+    },
+    {
+     "id": "1388",
+     "name": "无限循环往复",
+     "games": 291973,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1388",
+     "confidence": "high",
+     "pairWinRate": 0.539303,
+     "deltaWinRate": 0.034717
+    },
+    {
+     "id": "2100",
+     "name": "急速之追求",
+     "games": 162193,
+     "rarity": "黄金",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/2100",
+     "confidence": "high",
+     "pairWinRate": 0.541522,
+     "deltaWinRate": 0.036936
+    }
+   ],
+   "winRateChange": null
+  },
+  {
+   "id": "223",
+   "name": "河流之王",
+   "tier": 2,
+   "games": 3242520,
+   "winRate": 0.521467,
+   "pickRate": 0.14618,
+   "topItems": [
+    {
+     "id": "3084",
+     "name": "心之钢",
+     "games": 3143513,
+     "winRate": 0.523559,
+     "pickRate": 0.969466,
+     "confidence": "high"
+    },
+    {
+     "id": "3083",
+     "name": "狂徒铠甲",
+     "games": 2532249,
+     "winRate": 0.523741,
+     "pickRate": 0.780951,
+     "confidence": "high"
+    },
+    {
+     "id": "4633",
+     "name": "裂隙制造者",
+     "games": 999009,
+     "winRate": 0.552986,
+     "pickRate": 0.308096,
+     "confidence": "high"
+    },
+    {
+     "id": "3008",
+     "name": "暴食胫甲",
+     "games": 49587,
+     "winRate": 0.575373,
+     "pickRate": 0.015293,
+     "confidence": "high"
+    },
+    {
+     "id": "2510",
+     "name": "黄昏与黎明",
+     "games": 790012,
+     "winRate": 0.547602,
+     "pickRate": 0.243641,
+     "confidence": "high"
+    }
+   ],
+   "detailUrl": "https://hexdata.com.cn/hero/223",
+   "confidence": "high",
+   "topAugments": [
+    {
+     "id": "1152",
+     "name": "钢化你心",
+     "games": 422099,
+     "rarity": "黄金",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1152",
+     "confidence": "high",
+     "pairWinRate": 0.587042,
+     "deltaWinRate": 0.065575
+    },
+    {
+     "id": "1041",
+     "name": "歌利亚巨人",
+     "games": 639613,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1041",
+     "confidence": "high",
+     "pairWinRate": 0.57335,
+     "deltaWinRate": 0.051883
+    },
+    {
+     "id": "1353",
+     "name": "坦克引擎",
+     "games": 830148,
+     "rarity": "黄金",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1353",
+     "confidence": "high",
+     "pairWinRate": 0.563274,
+     "deltaWinRate": 0.041807
+    },
+    {
+     "id": "1029",
+     "name": "虚幻武器",
+     "games": 525517,
+     "rarity": "黄金",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1029",
+     "confidence": "high",
+     "pairWinRate": 0.570724,
+     "deltaWinRate": 0.049257
+    },
+    {
+     "id": "2095",
+     "name": "掷骰狂人",
+     "games": 183449,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/2095",
+     "confidence": "high",
+     "pairWinRate": 0.579861,
+     "deltaWinRate": 0.058394
+    }
+   ],
+   "winRateChange": null
+  },
+  {
+   "id": "63",
+   "name": "复仇焰魂",
+   "tier": 2,
+   "games": 3233966,
+   "winRate": 0.517327,
+   "pickRate": 0.145794,
+   "topItems": [
+    {
+     "id": "6653",
+     "name": "兰德里的折磨",
+     "games": 2960236,
+     "winRate": 0.519357,
+     "pickRate": 0.915358,
+     "confidence": "high"
+    },
+    {
+     "id": "2503",
+     "name": "黯炎火炬",
+     "games": 2691592,
+     "winRate": 0.522304,
+     "pickRate": 0.832288,
+     "confidence": "high"
+    },
+    {
+     "id": "3116",
+     "name": "瑞莱的冰晶节杖",
+     "games": 2021627,
+     "winRate": 0.514505,
+     "pickRate": 0.625123,
+     "confidence": "high"
+    },
+    {
+     "id": "3008",
+     "name": "暴食胫甲",
+     "games": 514851,
+     "winRate": 0.548495,
+     "pickRate": 0.159201,
+     "confidence": "high"
+    },
+    {
+     "id": "3742",
+     "name": "亡者的板甲",
+     "games": 3396,
+     "winRate": 0.564782,
+     "pickRate": 0.00105,
+     "confidence": "high"
+    }
+   ],
+   "detailUrl": "https://hexdata.com.cn/hero/63",
+   "confidence": "high",
+   "topAugments": [
+    {
+     "id": "1045",
+     "name": "炼狱导管",
+     "games": 731970,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1045",
+     "confidence": "high",
+     "pairWinRate": 0.571788,
+     "deltaWinRate": 0.054461
+    },
+    {
+     "id": "2128",
+     "name": "炽燃利息",
+     "games": 935562,
+     "rarity": "黄金",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/2128",
+     "confidence": "high",
+     "pairWinRate": 0.54336,
+     "deltaWinRate": 0.026033
+    },
+    {
+     "id": "2095",
+     "name": "掷骰狂人",
+     "games": 88205,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/2095",
+     "confidence": "high",
+     "pairWinRate": 0.562735,
+     "deltaWinRate": 0.045408
+    },
+    {
+     "id": "1105",
+     "name": "家园卫士",
+     "games": 153319,
+     "rarity": "白银",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1105",
+     "confidence": "high",
+     "pairWinRate": 0.554654,
+     "deltaWinRate": 0.037327
+    },
+    {
+     "id": "1390",
+     "name": "超凡邪恶",
+     "games": 358367,
+     "rarity": "黄金",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1390",
+     "confidence": "high",
+     "pairWinRate": 0.540739,
+     "deltaWinRate": 0.023412
+    }
+   ],
+   "winRateChange": null
+  },
+  {
+   "id": "22",
+   "name": "寒冰射手",
+   "tier": 5,
+   "games": 3199985,
+   "winRate": 0.462733,
+   "pickRate": 0.144262,
+   "topItems": [
+    {
+     "id": "6657",
+     "name": "时光之杖",
+     "games": 1306,
+     "winRate": 0.666156,
+     "pickRate": 0.000408,
+     "confidence": "high"
+    },
+    {
+     "id": "994403",
+     "name": "金铲铲",
+     "games": 45064,
+     "winRate": 0.553235,
+     "pickRate": 0.014083,
+     "confidence": "high"
+    },
+    {
+     "id": "3085",
+     "name": "卢安娜的飓风",
+     "games": 1251642,
+     "winRate": 0.501051,
+     "pickRate": 0.39114,
+     "confidence": "high"
+    },
+    {
+     "id": "3153",
+     "name": "破败王者之刃",
+     "games": 1254628,
+     "winRate": 0.496518,
+     "pickRate": 0.392073,
+     "confidence": "high"
+    },
+    {
+     "id": "6333",
+     "name": "死亡之舞",
+     "games": 11819,
+     "winRate": 0.536847,
+     "pickRate": 0.003693,
+     "confidence": "high"
+    }
+   ],
+   "detailUrl": "https://hexdata.com.cn/hero/22",
+   "confidence": "high",
+   "topAugments": [
+    {
+     "id": "2087",
+     "name": "大法师",
+     "games": 205105,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/2087",
+     "confidence": "high",
+     "pairWinRate": 0.541669,
+     "deltaWinRate": 0.078936
+    },
+    {
+     "id": "1077",
+     "name": "灵魂虹吸",
+     "games": 188343,
+     "rarity": "黄金",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1077",
+     "confidence": "high",
+     "pairWinRate": 0.514906,
+     "deltaWinRate": 0.052173
+    },
+    {
+     "id": "1081",
+     "name": "踢踏舞",
+     "games": 205790,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1081",
+     "confidence": "high",
+     "pairWinRate": 0.51331,
+     "deltaWinRate": 0.050577
+    },
+    {
+     "id": "1134",
+     "name": "亮出你的剑",
+     "games": 51739,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1134",
+     "confidence": "high",
+     "pairWinRate": 0.519453,
+     "deltaWinRate": 0.05672
+    },
+    {
+     "id": "1356",
+     "name": "暴击飞弹",
+     "games": 505984,
+     "rarity": "黄金",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1356",
+     "confidence": "high",
+     "pairWinRate": 0.50047,
+     "deltaWinRate": 0.037737
+    }
+   ],
+   "winRateChange": null
+  },
+  {
+   "id": "17",
+   "name": "迅捷斥候",
+   "tier": 1,
+   "games": 3154609,
+   "winRate": 0.535626,
+   "pickRate": 0.142217,
+   "topItems": [
+    {
+     "id": "3118",
+     "name": "残疫",
+     "games": 2584637,
+     "winRate": 0.538509,
+     "pickRate": 0.819321,
+     "confidence": "high"
+    },
+    {
+     "id": "6653",
+     "name": "兰德里的折磨",
+     "games": 2592210,
+     "winRate": 0.536981,
+     "pickRate": 0.821721,
+     "confidence": "high"
+    },
+    {
+     "id": "2503",
+     "name": "黯炎火炬",
+     "games": 1588405,
+     "winRate": 0.535613,
+     "pickRate": 0.503519,
+     "confidence": "high"
+    },
+    {
+     "id": "3087",
+     "name": "斯塔缇克电刃",
+     "games": 853700,
+     "winRate": 0.555196,
+     "pickRate": 0.27062,
+     "confidence": "high"
+    },
+    {
+     "id": "3089",
+     "name": "灭世者的死亡之帽",
+     "games": 1240591,
+     "winRate": 0.536646,
+     "pickRate": 0.393263,
+     "confidence": "high"
+    }
+   ],
+   "detailUrl": "https://hexdata.com.cn/hero/17",
+   "confidence": "high",
+   "topAugments": [
+    {
+     "id": "1029",
+     "name": "虚幻武器",
+     "games": 535737,
+     "rarity": "黄金",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1029",
+     "confidence": "high",
+     "pairWinRate": 0.613473,
+     "deltaWinRate": 0.077847
+    },
+    {
+     "id": "1388",
+     "name": "无限循环往复",
+     "games": 275011,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1388",
+     "confidence": "high",
+     "pairWinRate": 0.584038,
+     "deltaWinRate": 0.048412
+    },
+    {
+     "id": "2095",
+     "name": "掷骰狂人",
+     "games": 75702,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/2095",
+     "confidence": "high",
+     "pairWinRate": 0.590447,
+     "deltaWinRate": 0.054821
+    },
+    {
+     "id": "1030",
+     "name": "尤里卡",
+     "games": 492485,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1030",
+     "confidence": "high",
+     "pairWinRate": 0.55885,
+     "deltaWinRate": 0.023224
+    },
+    {
+     "id": "2118",
+     "name": "大招工具人",
+     "games": 376127,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/2118",
+     "confidence": "high",
+     "pairWinRate": 0.555881,
+     "deltaWinRate": 0.020255
+    }
+   ],
+   "winRateChange": null
+  },
+  {
+   "id": "51",
+   "name": "皮城女警",
+   "tier": 1,
+   "games": 2994517,
+   "winRate": 0.528087,
+   "pickRate": 0.134999,
+   "topItems": [
+    {
+     "id": "6333",
+     "name": "死亡之舞",
+     "games": 96775,
+     "winRate": 0.638584,
+     "pickRate": 0.032317,
+     "confidence": "high"
+    },
+    {
+     "id": "994403",
+     "name": "金铲铲",
+     "games": 54735,
+     "winRate": 0.620736,
+     "pickRate": 0.018278,
+     "confidence": "high"
+    },
+    {
+     "id": "3031",
+     "name": "无尽之刃",
+     "games": 2511091,
+     "winRate": 0.530146,
+     "pickRate": 0.838563,
+     "confidence": "high"
+    },
+    {
+     "id": "6676",
+     "name": "收集者",
+     "games": 2297008,
+     "winRate": 0.526249,
+     "pickRate": 0.767071,
+     "confidence": "high"
+    },
+    {
+     "id": "126697",
+     "name": "狂妄",
+     "games": 258546,
+     "winRate": 0.585594,
+     "pickRate": 0.08634,
+     "confidence": "high"
+    }
+   ],
+   "detailUrl": "https://hexdata.com.cn/hero/51",
+   "confidence": "high",
+   "topAugments": [
+    {
+     "id": "1134",
+     "name": "亮出你的剑",
+     "games": 389081,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1134",
+     "confidence": "high",
+     "pairWinRate": 0.681344,
+     "deltaWinRate": 0.153257
+    },
+    {
+     "id": "2095",
+     "name": "掷骰狂人",
+     "games": 92976,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/2095",
+     "confidence": "high",
+     "pairWinRate": 0.619504,
+     "deltaWinRate": 0.091417
+    },
+    {
+     "id": "1389",
+     "name": "男爵之手",
+     "games": 9501,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1389",
+     "confidence": "high",
+     "pairWinRate": 0.591727,
+     "deltaWinRate": 0.06364
+    },
+    {
+     "id": "1154",
+     "name": "海牛阿福的勇士",
+     "games": 66096,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1154",
+     "confidence": "high",
+     "pairWinRate": 0.564028,
+     "deltaWinRate": 0.035941
+    },
+    {
+     "id": "1077",
+     "name": "灵魂虹吸",
+     "games": 443592,
+     "rarity": "黄金",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1077",
+     "confidence": "high",
+     "pairWinRate": 0.547859,
+     "deltaWinRate": 0.019772
+    }
+   ],
+   "winRateChange": null
+  },
+  {
+   "id": "236",
+   "name": "圣枪游侠",
+   "tier": 3,
+   "games": 2992413,
+   "winRate": 0.493101,
+   "pickRate": 0.134904,
+   "topItems": [
+    {
+     "id": "3142",
+     "name": "幽梦之灵",
+     "games": 19710,
+     "winRate": 0.597412,
+     "pickRate": 0.006587,
+     "confidence": "high"
+    },
+    {
+     "id": "994403",
+     "name": "金铲铲",
+     "games": 57642,
+     "winRate": 0.590975,
+     "pickRate": 0.019263,
+     "confidence": "high"
+    },
+    {
+     "id": "2517",
+     "name": "无穷饥渴",
+     "games": 102966,
+     "winRate": 0.586504,
+     "pickRate": 0.034409,
+     "confidence": "high"
+    },
+    {
+     "id": "3031",
+     "name": "无尽之刃",
+     "games": 2491692,
+     "winRate": 0.503076,
+     "pickRate": 0.83267,
+     "confidence": "high"
+    },
+    {
+     "id": "6676",
+     "name": "收集者",
+     "games": 2482860,
+     "winRate": 0.498033,
+     "pickRate": 0.829718,
+     "confidence": "high"
+    }
+   ],
+   "detailUrl": "https://hexdata.com.cn/hero/236",
+   "confidence": "high",
+   "topAugments": [
+    {
+     "id": "2095",
+     "name": "掷骰狂人",
+     "games": 82101,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/2095",
+     "confidence": "high",
+     "pairWinRate": 0.619481,
+     "deltaWinRate": 0.12638
+    },
+    {
+     "id": "1092",
+     "name": "易损",
+     "games": 699377,
+     "rarity": "黄金",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1092",
+     "confidence": "high",
+     "pairWinRate": 0.551436,
+     "deltaWinRate": 0.058335
+    },
+    {
+     "id": "1048",
+     "name": "珠光护手",
+     "games": 489026,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1048",
+     "confidence": "high",
+     "pairWinRate": 0.545184,
+     "deltaWinRate": 0.052083
+    },
+    {
+     "id": "1134",
+     "name": "亮出你的剑",
+     "games": 243036,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1134",
+     "confidence": "high",
+     "pairWinRate": 0.537937,
+     "deltaWinRate": 0.044836
+    },
+    {
+     "id": "1053",
+     "name": "科学狂人",
+     "games": 74509,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1053",
+     "confidence": "high",
+     "pairWinRate": 0.542257,
+     "deltaWinRate": 0.049156
+    }
+   ],
+   "winRateChange": null
+  },
+  {
+   "id": "202",
+   "name": "戏命师",
+   "tier": 3,
+   "games": 2789383,
+   "winRate": 0.485875,
+   "pickRate": 0.125751,
+   "topItems": [
+    {
+     "id": "6676",
+     "name": "收集者",
+     "games": 2495652,
+     "winRate": 0.485679,
+     "pickRate": 0.894697,
+     "confidence": "high"
+    },
+    {
+     "id": "3031",
+     "name": "无尽之刃",
+     "games": 2421809,
+     "winRate": 0.484961,
+     "pickRate": 0.868224,
+     "confidence": "high"
+    },
+    {
+     "id": "994403",
+     "name": "金铲铲",
+     "games": 94596,
+     "winRate": 0.566356,
+     "pickRate": 0.033913,
+     "confidence": "high"
+    },
+    {
+     "id": "3036",
+     "name": "多米尼克领主的致意",
+     "games": 1635844,
+     "winRate": 0.486159,
+     "pickRate": 0.586454,
+     "confidence": "high"
+    },
+    {
+     "id": "3009",
+     "name": "轻灵之靴",
+     "games": 1315313,
+     "winRate": 0.479838,
+     "pickRate": 0.471543,
+     "confidence": "high"
+    }
+   ],
+   "detailUrl": "https://hexdata.com.cn/hero/202",
+   "confidence": "high",
+   "topAugments": [
+    {
+     "id": "2095",
+     "name": "掷骰狂人",
+     "games": 111944,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/2095",
+     "confidence": "high",
+     "pairWinRate": 0.562263,
+     "deltaWinRate": 0.076388
+    },
+    {
+     "id": "1154",
+     "name": "海牛阿福的勇士",
+     "games": 109095,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1154",
+     "confidence": "high",
+     "pairWinRate": 0.527449,
+     "deltaWinRate": 0.041574
+    },
+    {
+     "id": "1310",
+     "name": "小丑学院",
+     "games": 46151,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1310",
+     "confidence": "high",
+     "pairWinRate": 0.530866,
+     "deltaWinRate": 0.044991
+    },
+    {
+     "id": "1389",
+     "name": "男爵之手",
+     "games": 19099,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1389",
+     "confidence": "high",
+     "pairWinRate": 0.530708,
+     "deltaWinRate": 0.044833
+    },
+    {
+     "id": "1134",
+     "name": "亮出你的剑",
+     "games": 196692,
+     "rarity": "棱彩",
+     "reason": "同英雄收益更高",
+     "detailUrl": "https://hexdata.com.cn/augment/1134",
+     "confidence": "high",
+     "pairWinRate": 0.51211,
+     "deltaWinRate": 0.026235
+    }
+   ],
+   "winRateChange": null
+  }
+ ],
+ "siteUrl": "https://hexdata.com.cn",
+ "artifact": "hexdata-hextech-insights",
+ "augments": [
+  {
+   "id": "1238",
+   "name": "质变：棱彩阶",
+   "tier": 2,
+   "games": 20776908,
+   "rarity": "黄金",
+   "winRate": 0.506494,
+   "pickRate": 0.024689,
+   "detailUrl": "https://hexdata.com.cn/augment/1238",
+   "confidence": "high",
+   "avgDeltaWinRate": 0.005647,
+   "coverageHeroCount": 173
+  },
+  {
+   "id": "1068",
+   "name": "循环往复",
+   "tier": 3,
+   "games": 16973107,
+   "rarity": "黄金",
+   "winRate": 0.497055,
+   "pickRate": 0.020169,
+   "detailUrl": "https://hexdata.com.cn/augment/1068",
+   "confidence": "high",
+   "avgDeltaWinRate": -0.00307,
+   "coverageHeroCount": 170
+  },
+  {
+   "id": "1373",
+   "name": "缩小引擎",
+   "tier": 2,
+   "games": 16042386,
+   "rarity": "黄金",
+   "winRate": 0.512205,
+   "pickRate": 0.019063,
+   "detailUrl": "https://hexdata.com.cn/augment/1373",
+   "confidence": "high",
+   "avgDeltaWinRate": 0.009399,
+   "coverageHeroCount": 173
+  },
+  {
+   "id": "1048",
+   "name": "珠光护手",
+   "tier": 4,
+   "games": 15822748,
+   "rarity": "棱彩",
+   "winRate": 0.485991,
+   "pickRate": 0.018802,
+   "detailUrl": "https://hexdata.com.cn/augment/1048",
+   "confidence": "high",
+   "avgDeltaWinRate": -0.013667,
+   "coverageHeroCount": 170
+  },
+  {
+   "id": "1353",
+   "name": "坦克引擎",
+   "tier": 2,
+   "games": 12123724,
+   "rarity": "黄金",
+   "winRate": 0.503946,
+   "pickRate": 0.014407,
+   "detailUrl": "https://hexdata.com.cn/augment/1353",
+   "confidence": "high",
+   "avgDeltaWinRate": 0.012964,
+   "coverageHeroCount": 80
+  },
+  {
+   "id": "2132",
+   "name": "术士果汁盒",
+   "tier": 2,
+   "games": 11368036,
+   "rarity": "黄金",
+   "winRate": 0.518483,
+   "pickRate": 0.013509,
+   "detailUrl": "https://hexdata.com.cn/augment/2132",
+   "confidence": "high",
+   "avgDeltaWinRate": 0.01182,
+   "coverageHeroCount": 106
+  },
+  {
+   "id": "2006",
+   "name": "飞身踢",
+   "tier": 3,
+   "games": 11220570,
+   "rarity": "棱彩",
+   "winRate": 0.480983,
+   "pickRate": 0.013333,
+   "detailUrl": "https://hexdata.com.cn/augment/2006",
+   "confidence": "high",
+   "avgDeltaWinRate": -0.012083,
+   "coverageHeroCount": 85
+  },
+  {
+   "id": "1030",
+   "name": "尤里卡",
+   "tier": 2,
+   "games": 11136632,
+   "rarity": "棱彩",
+   "winRate": 0.508782,
+   "pickRate": 0.013234,
+   "detailUrl": "https://hexdata.com.cn/augment/1030",
+   "confidence": "high",
+   "avgDeltaWinRate": 0.004568,
+   "coverageHeroCount": 105
+  }
+ ],
+ "heroCount": 173,
+ "reportDate": "2026-09-18",
+ "generatedAt": "2026-09-20T06:15:55.681682+00:00",
+ "reportPatch": "16.18",
+ "augmentCount": 211,
+ "dataContract": {
+  "rawSourceHash": "d5fc191b0cc6a81898c33bc55a882ec0add697fe98e4fdbbab9cbda172c14499",
+  "schemaVersion": "1",
+  "corePayloadHash": "167d464cf859a170659c93bbe2daf5acf01b309d1c668aeae0da306ac9275a27"
+ },
+ "schemaVersion": "1",
+ "sourceProduct": "Hexdata"
+}

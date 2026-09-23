@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -121,12 +122,12 @@ func TestExplicitOwnershipDoesNotWalkUnknownNestedObjects(t *testing.T) {
 func TestFailedRefreshStateCannotServeOldSnapshot(t *testing.T) {
 	a := &app{
 		connected: true, summoner: Summoner{SummonerID: 1, PUUID: "secret"},
-		allSkins: []Skin{{ID: 1001}}, owned: []Skin{{ID: 1001}}, remaining: []Skin{{ID: 2001}},
+		allSkins: []Skin{{ID: 1001}}, allSkinsWithBase: []Skin{{ID: 1000}}, owned: []Skin{{ID: 1001}}, remaining: []Skin{{ID: 2001}},
 		poolTotal: 2, poolMatched: 2, poolIssues: []PoolIssue{{Name: "old"}}, lcu: &LCUClient{},
 		ownership: []OwnershipSourceStatus{{State: "success"}}, catalog: CatalogStats{SkinCount: 1000},
 	}
 	a.clearSnapshotLocked("disconnected")
-	if a.connected || a.summoner.SummonerID != 0 || a.lcu != nil || len(a.allSkins)+len(a.owned)+len(a.remaining) != 0 || a.poolMatched != 0 || len(a.poolIssues) != 0 {
+	if a.connected || a.summoner.SummonerID != 0 || a.lcu != nil || len(a.allSkins)+len(a.allSkinsWithBase)+len(a.owned)+len(a.remaining) != 0 || a.poolMatched != 0 || len(a.poolIssues) != 0 {
 		t.Fatalf("stale state remained after invalidation: %#v", a)
 	}
 	request := httptest.NewRequest(http.MethodGet, "/api/skins?view=owned", nil)
@@ -167,7 +168,7 @@ func TestChromaEndpointKeepsCatalogAndOwnershipSeparate(t *testing.T) {
 
 func TestSnapshotValidationErrorRetainsHealthyClientButNotSnapshot(t *testing.T) {
 	client := &LCUClient{token: "temporary"}
-	a := &app{poolTotal: 554, poolMatched: 554, allSkins: []Skin{{ID: 9999}}, owned: []Skin{{ID: 9999}}, snapshotReady: true}
+	a := &app{poolTotal: 554, poolMatched: 554, allSkins: []Skin{{ID: 9999}}, allSkinsWithBase: []Skin{{ID: 9000}}, owned: []Skin{{ID: 9999}}, snapshotReady: true}
 	a.retainClientAfterSnapshotErrorLocked(client, Snapshot{
 		Summoner:  Summoner{SummonerID: 7, GameName: "玩家"},
 		Ownership: []OwnershipSourceStatus{{Path: "/skins", State: "conflict", Count: 3}},
@@ -176,7 +177,7 @@ func TestSnapshotValidationErrorRetainsHealthyClientButNotSnapshot(t *testing.T)
 	if !a.connected || a.snapshotReady || a.lcu != client || a.summoner.GameName != "玩家" || len(a.ownership) != 1 || a.catalog.SkinCount != 1700 {
 		t.Fatalf("healthy client or diagnostics were not retained: %#v", a)
 	}
-	if len(a.allSkins)+len(a.owned)+len(a.remaining) != 0 || a.calculationOKLocked() {
+	if len(a.allSkins)+len(a.allSkinsWithBase)+len(a.owned)+len(a.remaining) != 0 || a.calculationOKLocked() {
 		t.Fatalf("invalid snapshot remained visible: %#v", a)
 	}
 }
@@ -415,7 +416,7 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &privacy); err != nil {
 		t.Fatal(err)
 	}
-	if len(privacy.ExplicitWrites) != 11 {
+	if len(privacy.ExplicitWrites) != 10 {
 		t.Fatalf("explicit client writes = %#v", privacy.ExplicitWrites)
 	}
 	if len(privacy.AutomaticWrites) != 10 {
@@ -467,6 +468,249 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 			t.Fatalf("reward storage privacy boundary is missing %q: %#v", expected, privacy.NeverStores)
 		}
 	}
+}
+
+// privacyStoreDirectoryCoverage 把「源码里实际会被创建的本地目录」映射到 stores 声明中
+// 必须出现的关键词。声明写的是存了什么内容而不是目录名，所以这里用内容关键词对齐，
+// 一个目录的全部关键词都命中才算被声明覆盖。
+var privacyStoreDirectoryCoverage = map[string][]string{
+	// storage.go openLocalStore 启动期创建
+	"updates":          {"自动更新", "安装包"},
+	"pools":            {"奖池清单"},
+	"snapshots":        {"历史快照"},
+	"season-stats":     {"本赛季个人对局统计", "海克斯与装备 ID", "4 MiB"},
+	"logs":             {"诊断事件"},
+	"prestige-artwork": {"原画"},
+	"champion-data":    {"英雄统计数据的公开信封"},
+	// storage.go 之外由 newPublicBinaryCache / MkdirAll 创建
+	"champion-images":  {"英雄与皮肤图标"},
+	"community-images": {"英雄与皮肤图标"},
+	"profile-icons":    {"玩家头像"},
+	"perk-catalog":     {"符文与海克斯目录"},
+	"riot-identities":  {"锚点", "Riot ID"},
+	"riot-matches":     {"对局内容", "PUUID"},
+	// R127 P1-c.3：按 gameId 落盘的韩服每场平均段位（7 天）。
+	"match-tiers":   {"韩服每场平均段位", "4000 条"},
+	"pro-runes-v1":  {"职业选手的符文与装备明细"},
+	"pro-directory": {"职业名单与账号快照"},
+	"pro-profiles":  {"职业名单与账号快照"},
+}
+
+// privacyStoreDirectoryExemptions 是显式豁免清单：目录确实会被创建，但刻意不出现在
+// stores 里。每条都必须写人话理由，空理由直接判失败。R120 P1-4 拍板后所有目录都已
+// 声明，所以现在是空的——将来真要豁免，理由写在这里，而不是把目录从覆盖表里删掉。
+var privacyStoreDirectoryExemptions = map[string]string{}
+
+// TestPrivacyStoresDeclareEveryLocalDirectory 是结构性对照：目录清单从源码解析出来，
+// 不是写死在本测试里。新增一个未声明的目录、或删掉 stores 里的某一条，都会红。
+func TestPrivacyStoresDeclareEveryLocalDirectory(t *testing.T) {
+	sources := map[string]string{}
+	var packageText strings.Builder
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		data, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sources[name] = string(data)
+		packageText.WriteString(sources[name])
+		packageText.WriteString("\n")
+	}
+	if len(sources) < 20 {
+		t.Fatalf("只读到 %d 个 Go 源文件，本测试必须在 backend 包目录里运行", len(sources))
+	}
+	all := packageText.String()
+	constantValue := func(identifier string) string {
+		match := regexp.MustCompile(regexp.QuoteMeta(identifier) + `\s*=\s*"([a-z0-9-]+)"`).FindStringSubmatch(all)
+		if match == nil {
+			return ""
+		}
+		return match[1]
+	}
+	created := map[string]string{}
+	record := func(dir, where string) {
+		if dir == "" {
+			return
+		}
+		if _, ok := created[dir]; !ok {
+			created[dir] = where
+		}
+	}
+	for name, text := range sources {
+		// (a) storage.go 启动期那一个 MkdirAll 循环的目录清单
+		if name == "storage.go" {
+			list := regexp.MustCompile("for _, path := range \\[\\]string\\{([^\\n]*)\\}").FindStringSubmatch(text)
+			if list == nil {
+				t.Fatal("storage.go 的启动期目录清单形状变了，请同步更新本测试的解析逻辑")
+			}
+			// 清单里有 filepath.Join(root, "x") 这种自带逗号的项，按逗号硬切会切碎，
+			// 所以只在括号深度 0 的位置切分。
+			items, depth, start := []string{}, 0, 0
+			for index := 0; index < len(list[1]); index++ {
+				switch list[1][index] {
+				case '(':
+					depth++
+				case ')':
+					depth--
+				case ',':
+					if depth == 0 {
+						items = append(items, list[1][start:index])
+						start = index + 1
+					}
+				}
+			}
+			items = append(items, list[1][start:])
+			for _, item := range items {
+				item = strings.TrimSpace(item)
+				if item == "root" {
+					// 存储根本身不是子目录；根级散文件由 stores 的「本机偏好与界面令牌」等条目声明
+					continue
+				}
+				if match := regexp.MustCompile(`^filepath\.Join\(root, "([a-z0-9-]+)"\)$`).FindStringSubmatch(item); match != nil {
+					record(match[1], name)
+					continue
+				}
+				if match := regexp.MustCompile(`^filepath\.Join\(root, ([A-Za-z_][A-Za-z0-9_]*)\)$`).FindStringSubmatch(item); match != nil {
+					value := constantValue(match[1])
+					if value == "" {
+						t.Fatalf("无法解析 storage.go 里的目录常量 %s", match[1])
+					}
+					record(value, name)
+					continue
+				}
+				t.Fatalf("storage.go 启动期目录清单里出现无法解析的项 %q，请同步更新本测试", item)
+			}
+		}
+		// (b) newPublicBinaryCache(store, "dir", 条数上限, 字节上限)
+		for _, match := range regexp.MustCompile(`newPublicBinaryCache\([^,]+,\s*"([a-z0-9-]+)"`).FindAllStringSubmatch(text, -1) {
+			record(match[1], name)
+		}
+		// (c) 变量 = filepath.Join(<...>root, "dir")，且同一文件里对该变量调用 MkdirAll
+		for _, match := range regexp.MustCompile(`([A-Za-z_][\w.]*)\s*(?::=|=)\s*filepath\.Join\([\w.]*root,\s*"([a-z0-9-]+)"\)`).FindAllStringSubmatch(text, -1) {
+			if regexp.MustCompile(`MkdirAll\(` + regexp.QuoteMeta(match[1]) + `\b`).MatchString(text) {
+				record(match[2], name)
+			}
+		}
+	}
+	// 解析失效时枚举结果会突然变少，那等于本测试悄悄放过一切，所以先钉一个下限。
+	if len(created) < 14 {
+		t.Fatalf("只枚举到 %d 个本地目录（%v），源码解析逻辑可能已失效", len(created), created)
+	}
+	dirs := make([]string, 0, len(created))
+	for dir := range created {
+		dirs = append(dirs, dir)
+	}
+	sort.Strings(dirs)
+	t.Logf("从源码枚举到 %d 个本地存储目录：%v", len(dirs), dirs)
+	for dir := range privacyStoreDirectoryCoverage {
+		if _, ok := created[dir]; !ok {
+			t.Errorf("覆盖表登记的目录 %q 在源码里找不到创建点，覆盖表已过期", dir)
+		}
+	}
+	recorder := httptest.NewRecorder()
+	(&app{}).handlePrivacy(recorder, httptest.NewRequest(http.MethodGet, "/api/privacy", nil))
+	var privacy struct {
+		Stores []string `json:"stores"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &privacy); err != nil {
+		t.Fatal(err)
+	}
+	stores := strings.Join(privacy.Stores, "\n")
+	for _, dir := range dirs {
+		if reason, exempt := privacyStoreDirectoryExemptions[dir]; exempt {
+			if strings.TrimSpace(reason) == "" {
+				t.Errorf("目录 %q 的豁免没有写理由", dir)
+			}
+			continue
+		}
+		keywords, ok := privacyStoreDirectoryCoverage[dir]
+		if !ok {
+			t.Errorf("目录 %q（创建于 %s）没有登记进隐私声明覆盖表：要么把它的实际内容写进 features.go 的 stores，要么在 privacyStoreDirectoryExemptions 里写明豁免理由", dir, created[dir])
+			continue
+		}
+		if len(keywords) == 0 {
+			t.Errorf("目录 %q 的覆盖关键词为空，等于没有断言", dir)
+			continue
+		}
+		for _, keyword := range keywords {
+			if !strings.Contains(stores, keyword) {
+				t.Errorf("目录 %q 的存储声明缺少关键词 %q；stores=%#v", dir, keyword, privacy.Stores)
+			}
+		}
+	}
+}
+
+// P3-1（R120 复测）加固：把生产源码里「创建目录」与「写本地存储」的调用点按
+// 文件+次数钉死。TestPrivacyStoresDeclareEveryLocalDirectory 的三条解析规则有已
+// 证实的盲区：行内 os.MkdirAll(filepath.Join(store.root, "x"), …)、目录名走常量、
+// 根变量不叫 root、以及 writeLocalStoreFile 用 "x/y.json" 隐式建子目录——这四种
+// 写法都能绕开枚举。但它们都必然**新增或改动一个调用点**，所以把调用点清单钉死，
+// 任何新写法都会先在这里红，逼作者归类：要么进覆盖表并补 stores 声明，要么写豁免
+// 理由，不允许悄悄多出一个没人审过的落盘点。
+var privacyMkdirCallPins = map[string]int{
+	"champion_images.go":             1, // newPublicBinaryCache：所有公开二进制/数据缓存目录的唯一创建点
+	"item_set_authorized_cleanup.go": 1, // 游戏安装目录里的备份标记（非 store root，属 explicitWrites 范畴）
+	"item_set_migration.go":          1, // 游戏安装目录里的装备方案备份（同上）
+	"item_set_recommended.go":        1, // 游戏 Config/Global/Recommended（同上）
+	"pro_runes.go":                   1, // pro-runes-v1 职业赛事缓存
+	"storage.go":                     2, // 启动期目录清单 + writeLocalStoreFile 的隐式父目录
+	"update.go":                      1, // updates 目录兜底
+}
+
+var privacyStoreWriteCallPins = map[string]int{
+	"season_stats.go": 1, // season-stats/<source>/<hash>-<season>.json（source 子目录由 writeLocalStoreFile 隐式创建）
+	"update.go":       3, // 根级 update-settings.json ×1、update-manifest.json ×2
+}
+
+func TestPrivacyStoreDirectoryCreationCallSitesArePinned(t *testing.T) {
+	mkdirPattern := regexp.MustCompile(`os\.Mkdir(?:All)?\(`)
+	writePattern := regexp.MustCompile(`writeLocalStoreFile\(`)
+	writeDefPattern := regexp.MustCompile(`func writeLocalStoreFile\(`)
+	mkdirCounts := map[string]int{}
+	writeCounts := map[string]int{}
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		data, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(data)
+		if n := len(mkdirPattern.FindAllStringIndex(text, -1)); n > 0 {
+			mkdirCounts[name] = n
+		}
+		if n := len(writePattern.FindAllStringIndex(text, -1)) - len(writeDefPattern.FindAllStringIndex(text, -1)); n > 0 {
+			writeCounts[name] = n
+		}
+	}
+	check := func(label string, got, pinned map[string]int) {
+		t.Helper()
+		for file, want := range pinned {
+			if got[file] != want {
+				t.Errorf("%s调用点清单不符：%s 钉死 %d 处、实际 %d 处。新增/删除落盘点必须先在隐私声明覆盖表（privacyStoreDirectoryCoverage）或豁免清单里归类，再同步更新钉死值", label, file, want, got[file])
+			}
+		}
+		for file, count := range got {
+			if _, ok := pinned[file]; !ok {
+				t.Errorf("%s调用点出现在未钉死的文件 %s（%d 处）：先归类（stores 声明或豁免理由），再把它加进钉死清单", label, file, count)
+			}
+		}
+	}
+	check("目录创建（os.Mkdir/os.MkdirAll）", mkdirCounts, privacyMkdirCallPins)
+	check("本地存储写入（writeLocalStoreFile）", writeCounts, privacyStoreWriteCallPins)
 }
 
 func TestLootFallbackDiagnosticRuntimePayloadNeverStoresItemDetails(t *testing.T) {

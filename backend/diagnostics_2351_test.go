@@ -69,13 +69,77 @@ func Test2351PreflightRejectsTeammatePickArrivingDuringDelay(t *testing.T) {
 	}
 }
 
-func Test2351BanSentinelDoesNotAuthorizeConfiguredHeroes(t *testing.T) {
+// P2-1（R120 复测）：现行契约是「通配符先悬停、经会话确认后才允许锁定」
+// （r91_addendum_test.go「wildcard must hover first」、r95_test.go「wildcard must
+// hover before lock」）。[-1] 哨兵在本地进行中的 ban 回合里会从选人网格挑候选，
+// 走 wildcard-grid-hover，forceHover（champselect.go:985）压掉 lock-now 的直接锁定，
+// 由 scheduleChampSelectRequest **异步**发出一条 completed:false 的悬停 PATCH。
+//
+// 旧版本在这里断言 patches==0（「哨兵不得当通配符」，R78/2351 时代的语义，已被上述
+// 契约取代），而且在 evaluateChampSelect 返回后立刻看计数——PATCH 大多数时候还没
+// 发出去，「碰巧为 0」；调度快一点就红（审查方实测 -race 全新进程单跑 18% 失败，
+// 断言前加 300ms sleep 则 20/20 全红；本机 120 次全新进程 0 红 + sleep 探针 20/20 红，
+// 同一根因）。现在改为：显式等那一次悬停 PATCH，断言载荷，再证明「确认之前不会锁」。
+// 策略必须钉成 lock-now：这是 forceHover 唯一承重的场景（show-then-lock 下未确认
+// 会话本来就不会锁，forceHover 改没改都一样，测不出退化）。
+func Test2351BanSentinelHoversOnceWithoutLocking(t *testing.T) {
 	f := newR78ChampSelectFixture(t, "practice", "ban", 0, []int64{-1}, map[int64]champSelectGridSelectionStatus{141: {}})
 	f.enable("practice", "ban", []int64{141})
+	settings := f.runner.currentWatch()
+	group := settings.ChampSelect.Groups["practice"]
+	group.Ban.Strategy = "lock-now"
+	settings.ChampSelect.Groups["practice"] = group
+	f.runner.apply(settings)
 	f.runner.evaluateChampSelect(f.client, f.runner.currentWatch().ChampSelect)
-	if f.patches.Load() != 0 {
-		t.Fatal("empty-ban sentinel used as a wildcard")
+	// 1) 悬停 PATCH 由调度器异步发出：用 patchCh 等它，而不是立刻看计数赌调度快慢。
+	var hover r78PatchRequest
+	select {
+	case hover = <-f.patchCh:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("[-1] sentinel never hovered: no PATCH within 5s (patches=%d)", f.patches.Load())
 	}
+	// 2) 载荷必须是「ban / 配置内且未被禁的 141 / 未锁定」。
+	if hover.Type != "ban" || hover.ChampionID != 141 || hover.Completed {
+		t.Fatalf("sentinel hover payload = %+v, want {Type:ban ChampionID:141 Completed:false}", hover)
+	}
+	wait2351RunnerIdle(t, f)
+	// 3) 会话还没有回显悬停（action.ChampionID 仍是 0）：再评估一次也必须被
+	//    「同键去重」挡住，不产生任何 completed:true 的锁定 PATCH。评估里的去重
+	//    return 在调度之前同步发生，所以 idle 之后的计数检查是确定性的，不是赌窗口。
+	f.runner.evaluateChampSelect(f.client, f.runner.currentWatch().ChampSelect)
+	wait2351RunnerIdle(t, f)
+	for {
+		select {
+		case extra := <-f.patchCh:
+			if extra.Completed {
+				t.Fatalf("sentinel locked before hover confirmation: %+v", extra)
+			}
+			continue
+		default:
+		}
+		break
+	}
+	if got := f.patches.Load(); got != 1 {
+		t.Fatalf("sentinel produced %d PATCHes, want exactly one hover (completed:false)", got)
+	}
+}
+
+// wait2351RunnerIdle 与 champselect_takeover_test.go 的 waitTakeoverIdle 同一口径：
+// 等到 runner 没有待调度也没有在飞的请求。r78 fixture 与 executionFixture 字段名
+// 不同，所以单独写一份而不是改共享 helper 的签名。
+func wait2351RunnerIdle(t *testing.T, f *r78ChampSelectFixture) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		f.runner.mu.Lock()
+		idle := len(f.runner.pending) == 0 && len(f.runner.champSelect.inFlight) == 0
+		f.runner.mu.Unlock()
+		if idle {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("champselect request did not finish within 5s")
 }
 
 // Keep the real transport/session preflight in the test, with no live LCU writes.

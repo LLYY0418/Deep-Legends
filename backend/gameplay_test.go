@@ -198,22 +198,31 @@ func callGameplayOverviewForTest(t *testing.T, a *app, publicRef string) {
 }
 
 func TestGameplayOverviewTencentLookupHTTPErrorIsExplainedAndRecorded(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/lol-summoner/v1/alias/lookup") {
-			http.NotFound(w, r)
-			return
-		}
-		http.Error(w, "fixture failure", http.StatusInternalServerError)
-	}))
-	defer server.Close()
-	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client(), region: "TENCENT", rsoPlatform: "HN1", platformProbe: true}
+	// P2-2（R120 复测）第二部分：lookup fixture 不再开真实 socket。-count=20000 时
+	// 2 万个 httptest 监听器/连接会把本地临时端口耗尽（TIME_WAIT 堆积），alias
+	// lookup 偶发退化成传输层错误、落进「当前服务器玩家查询暂时不可用」的泛化
+	// 分支——原版与哨兵改版实测各红 28 / 15 次（20000 次里），全部是这个形状，
+	// 与本测试要断言的映射无关。改用 gameplayRoundTripFunc 进程内桩（与本文件
+	// TestTencentLookupRetriesOneTransportFailure 同一做法）：http.Client.Do 之后
+	// 的错误分类路径逐字节相同，不再有任何环境依赖。
+	client := &LCUClient{baseURL: "https://lcu.invalid", token: "test-token", region: "TENCENT", rsoPlatform: "HN1", platformProbe: true,
+		http: &http.Client{Transport: gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+			if !strings.HasPrefix(request.URL.Path, "/lol-summoner/v1/alias/lookup") {
+				return &http.Response{StatusCode: http.StatusNotFound, Header: make(http.Header), Body: http.NoBody, Request: request}, nil
+			}
+			return &http.Response{StatusCode: http.StatusInternalServerError, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("fixture failure")), Request: request}, nil
+		})}}
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	a := &app{connected: true, lcu: client, summoner: Summoner{PUUID: strings.Repeat("c", 48)}, storage: store}
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/gameplay/overview", strings.NewReader(`{"gameName":"测试玩家","tagLine":"12345","serverId":"HN1","count":20}`))
+	// P2-2（R120 复测）：哨兵值不能用纯数字。诊断行的 "time" 字段带纳秒时间戳
+	// （形如 43.21234509Z），run_id 是十六进制——「12345」这种五位纯数字子串会被
+	// 它们偶然包含，让「不得泄漏 Riot ID」断言误报（实测 -count=20000 红 5 次）。
+	// ZQ7XK 含 a–f 之外的字母，时间戳（纯数字）与 run_id（0–9a–f）都不可能拼出它。
+	request := httptest.NewRequest(http.MethodPost, "/api/gameplay/overview", strings.NewReader(`{"gameName":"测试玩家","tagLine":"ZQ7XK","serverId":"HN1","count":20}`))
 	a.handleGameplayOverview(recorder, request)
 	if recorder.Code != http.StatusBadGateway || !strings.Contains(recorder.Body.String(), "HTTP 500") {
 		t.Fatalf("lookup response = status:%d body:%q", recorder.Code, recorder.Body.String())
@@ -228,7 +237,7 @@ func TestGameplayOverviewTencentLookupHTTPErrorIsExplainedAndRecorded(t *testing
 			t.Fatalf("lookup diagnostic missing %s: %s", field, line)
 		}
 	}
-	if strings.Contains(line, "测试玩家") || strings.Contains(line, "12345") {
+	if strings.Contains(line, "测试玩家") || strings.Contains(line, "ZQ7XK") {
 		t.Fatalf("lookup diagnostic leaked Riot ID: %s", line)
 	}
 }
@@ -1014,7 +1023,7 @@ func TestRankedQueueStatsKeepQueuesSeparateWhenSoloHasNoSample(t *testing.T) {
 			Participants: []gameplayParticipant{{ParticipantID: 1, PlayerRef: playerRef, Position: "jungle", Win: true}},
 		})
 	}
-	queues := buildGameplayRankedQueues(matches, matches, playerRef, nil, "")
+	queues := buildGameplayRankedQueues(legacyRankedQueueTabs(matches, matches), playerRef, nil, "")
 	solo, ok := queues["420"]
 	if !ok || solo.RecentRanked == nil || solo.RecentRanked.QueueID != 420 || solo.RecentRanked.Games != 0 {
 		t.Fatalf("solo recent stats unexpectedly used flex data: %#v", solo)
@@ -1033,7 +1042,7 @@ func TestRankedQueueAbilityUsesTheSameRecentMatchesAsTheSummary(t *testing.T) {
 	for index := range matches {
 		matches[index].QueueID = 440
 	}
-	queues := buildGameplayRankedQueues(matches, matches, "subject", nil, "")
+	queues := buildGameplayRankedQueues(legacyRankedQueueTabs(matches, matches), "subject", nil, "")
 	flex := queues["440"]
 	if flex.RecentRanked == nil || flex.RecentRanked.Games != 2 {
 		t.Fatalf("recent summary did not use the shared first-page sample: %#v", flex.RecentRanked)
@@ -1755,6 +1764,7 @@ func TestSeasonRankWinRateFallbackFillsOnlyIncompleteSGPRanks(t *testing.T) {
 			{QueueType: "RANKED_FLEX_SR", Wins: 12, Losses: 0, WinRate: -1},
 		},
 		EndpointCapability{Path: "sgp: /leagues-ledge/v2/rankedStats", Detail: "SGP 未返回排位负场，胜率暂不展示"},
+		seasonStatsProgress{Complete: true},
 		map[int64]gameplayAggregate{
 			420: {QueueID: 420, Games: 50, Wins: 30, Losses: 20, WinRate: 60},
 			440: {QueueID: 440, Games: 20, Wins: 5, Losses: 15, WinRate: 25},
@@ -1773,10 +1783,26 @@ func TestSeasonRankWinRateFallbackFillsOnlyIncompleteSGPRanks(t *testing.T) {
 	lcuFilled, lcuCapability := a.applySeasonRankWinRateFallback(
 		[]gameplayRank{{QueueType: "RANKED_SOLO_5x5", Wins: 107, Losses: 0, WinRate: -1}},
 		EndpointCapability{Path: "/lol-ranked/v1/ranked-stats/{player}"},
+		seasonStatsProgress{Complete: true},
 		map[int64]gameplayAggregate{420: {Games: 100, Wins: 57, Losses: 43, WinRate: 57}},
 	)
 	if lcuFilled[0].Wins != 57 || lcuFilled[0].Losses != 43 || lcuFilled[0].WinRate != 57 || lcuCapability.Detail != "上游未返回排位负场，已按赛季战绩聚合补全胜率" {
 		t.Fatalf("LCU season fallback = ranks:%#v capability=%#v", lcuFilled, lcuCapability)
+	}
+}
+
+func TestSeasonRankWinRateFallbackDoesNotFillIncompleteScan(t *testing.T) {
+	a := &app{}
+	original := gameplayRank{QueueType: "RANKED_SOLO_5x5", Wins: 107, Losses: 0, WinRate: -1}
+	capability := EndpointCapability{Path: "sgp: /leagues-ledge/v2/rankedStats", Detail: "客户端未返回排位负场，胜率暂不展示"}
+	ranks, got := a.applySeasonRankWinRateFallback([]gameplayRank{original}, capability, seasonStatsProgress{Collecting: true}, map[int64]gameplayAggregate{
+		420: {Games: 50, Wins: 30, Losses: 20, WinRate: 60},
+	})
+	if len(ranks) != 1 || ranks[0] != original {
+		t.Fatalf("incomplete scan changed rank: %#v", ranks)
+	}
+	if got.Detail != capability.Detail {
+		t.Fatalf("incomplete scan changed capability detail: %#v", got)
 	}
 }
 
@@ -1790,7 +1816,7 @@ func TestSeasonRankFallbackAppearsAfterRefreshSnapshotCompletes(t *testing.T) {
 	capability := EndpointCapability{Path: "/lol-ranked/v1/ranked-stats/{player}", Detail: "客户端未返回排位负场，胜率暂不展示"}
 
 	_, firstProgress, _, firstQueues := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
-	firstRanks, _ := a.applySeasonRankWinRateFallback(append([]gameplayRank(nil), incomplete...), capability, firstQueues)
+	firstRanks, _ := a.applySeasonRankWinRateFallback(append([]gameplayRank(nil), incomplete...), capability, firstProgress, firstQueues)
 	if firstRanks[0].WinRate >= 0 || !firstProgress.Collecting || firstProgress.Complete {
 		t.Fatalf("initial fallback state = ranks:%#v progress:%#v", firstRanks, firstProgress)
 	}
@@ -1805,7 +1831,7 @@ func TestSeasonRankFallbackAppearsAfterRefreshSnapshotCompletes(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, refreshedProgress, _, refreshedQueues := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
-	refreshedRanks, refreshedCapability := a.applySeasonRankWinRateFallback(append([]gameplayRank(nil), incomplete...), capability, refreshedQueues)
+	refreshedRanks, refreshedCapability := a.applySeasonRankWinRateFallback(append([]gameplayRank(nil), incomplete...), capability, refreshedProgress, refreshedQueues)
 	if refreshedRanks[0].Wins != 1 || refreshedRanks[0].Losses != 1 || refreshedRanks[0].WinRate != 50 || !refreshedProgress.Complete || refreshedCapability.Detail != "上游未返回排位负场，已按赛季战绩聚合补全胜率" {
 		t.Fatalf("refreshed fallback state = ranks:%#v progress:%#v capability:%#v", refreshedRanks, refreshedProgress, refreshedCapability)
 	}

@@ -352,6 +352,8 @@ test("平均段位只查询视口内卡片，并在分页加载期间停用", as
     tabServerID: () => "",
     matchTierFromScores: () => null,
     MATCH_TIERS_MAX_REFS: 24,
+    MATCH_TIER_KR_COALESCE_MS: 0,
+    MATCH_TIERS_PARALLEL_BATCHES: 2,
     api: async (_path, options) => {
       requests.push(JSON.parse(options.body));
       return {};
@@ -388,9 +390,13 @@ test("match-tier failures back off instead of retrying on the next render", asyn
     window: w, document: w.document, state,
     riotTab: () => false, connected: () => true,
     matchTierCacheKey: () => "scope:1", applyMatchTierValue: () => {}, tabServerID: () => "HN1",
-    matchTierFromScores: () => null, MATCH_TIERS_MAX_REFS: 24,
+    matchTierFromScores: () => null, MATCH_TIERS_MAX_REFS: 24, MATCH_TIER_KR_COALESCE_MS: 0, MATCH_TIERS_PARALLEL_BATCHES: 2,
     MATCH_TIER_RETRY_BASE_MS: 1000, MATCH_TIER_MAX_BACKOFF_MS: 60000,
     api: async () => { requests += 1; throw new Error("timeout"); },
+    // 一批失败后现在会安排重试（R127 复审第 5 条），harness 里不需要真的排程。
+    scheduleMatchTierRetry: () => {},
+    // 整批诊断现在失败也会上报（reason=failed），harness 里不需要真的发请求。
+    recordMatchTierOverviewBatch: () => {},
   });
   const tab = { key: "current", data: { player: { playerRef: "player" }, matches: [{ gameId: 1, participants: [{ playerRef: "ref" }] }] } };
   await functions.hydrateMatchTiers(container, tab, "scope", [node]);
@@ -405,10 +411,12 @@ test("match-tier overview diagnostics contain aggregate counts only", async () =
   const { recordMatchTierOverviewBatch } = compileFunctions(gameplaySource, ["recordMatchTierOverviewBatch"], {
     fetch: async (requestPath, options) => { requests.push([requestPath, JSON.parse(options.body)]); return { ok: true }; },
   });
-  recordMatchTierOverviewBatch(36, 24, 19);
+  recordMatchTierOverviewBatch(36, 24, 19, 2431);
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(requests, [["/api/diagnostics/client", {
     event: "match_tiers_overview_batch", reason: "complete", totalRefs: 36, uniqueRefs: 24, cacheHits: 19,
+    // R127 P0-3：整批耗时必须上报，否则日志里看不出平均段位到底花了多久。
+    durationMs: 2431,
   }]]);
   assert.doesNotMatch(JSON.stringify(requests), /playerRef|puuid|summoner/i);
 });
@@ -791,8 +799,29 @@ test("R56 工具页状态、确认、下拉与领奖契约完整", async () => {
   const confirmation = w.document.querySelector(".suite-confirm-card");
   assert.ok(confirmation, "清空表情轮盘未打开应用内确认卡");
   assert.equal(w.document.querySelector("[inert]"), null, "确认卡不应阻塞页面其它内容");
+  // P3-7：确认卡与 toast 共用右下角锚点，卡片打开时 toast 必须被抬到卡片上方，
+  // 否则 P2-4 的「上一个生涯写入尚未完成，请稍候」在屏幕上被完全遮住。
+  assert.equal(w.document.body.dataset.suiteConfirmOpen, "true", "确认卡打开时必须标记 body 以抬起 toast");
+  assert.match(w.document.documentElement.style.getPropertyValue("--suite-confirm-clearance"), /^\d+px$/, "确认卡打开时必须写入实测避让高度");
+  const confirmCancelButton = confirmation.querySelector("[data-suite-confirm-cancel]");
+  const confirmAcceptButton = confirmation.querySelector("[data-suite-confirm-accept]");
+  const pressTab = (shiftKey) => {
+    const event = new w.KeyboardEvent("keydown", { key: "Tab", shiftKey, bubbles: true, cancelable: true });
+    w.document.dispatchEvent(event);
+    return event;
+  };
+  confirmCancelButton.focus();
+  assert.equal(pressTab(false).defaultPrevented, true, "确认卡打开时 Tab 必须被焦点陷阱接管");
+  assert.equal(w.document.activeElement, confirmAcceptButton, "Tab 必须移到卡片内的确认按钮，不能跑进背景");
+  pressTab(false);
+  assert.equal(w.document.activeElement, confirmCancelButton, "Tab 到末尾必须循环回第一个按钮");
+  pressTab(true);
+  assert.equal(w.document.activeElement, confirmAcceptButton, "Shift+Tab 必须反向循环");
+  assert.ok(confirmation.contains(w.document.activeElement), "焦点必须始终留在确认卡内");
   confirmation.querySelector("[data-suite-confirm-cancel]").click();
   await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(w.document.body.dataset.suiteConfirmOpen, undefined, "确认卡关闭后必须撤销 toast 避让");
+  assert.equal(w.document.documentElement.style.getPropertyValue("--suite-confirm-clearance"), "", "确认卡关闭后必须清掉避让高度");
   assert.equal(nativeConfirmCalls, 0);
 	assert.equal(requests.filter((request) => request === "/api/facade/apply").length, 0, "取消确认后不应发出生涯写请求");
 	w.document.querySelector('[data-facade-clear="clear-title"]').click();
@@ -1977,7 +2006,7 @@ test("R112 KR average-tier errors retry only visible active cards, then cache re
  let timer, delay, calls=0, fail=true;
  w.setTimeout=(fn,ms)=>{timer=fn;delay=ms;return 1;};
  const f=compileFunctions(gameplaySource,['matchTierScrollRoot','matchTierNodeIsVisible','noteMatchTierFailure','hydrateMatchTiers','shouldHydrateMatchTiers','scheduleMatchTierRetry','applyMatchTierValue'],{
-  window:w,document:d,state,riotTab:()=>true,connected:()=>false,matchTierCacheKey:()=> 'scope:1',matchTierContent:value=>value?.tier||'—',matchTierTitle:()=>'',MATCH_TIER_RETRY_BASE_MS:1000,MATCH_TIER_MAX_BACKOFF_MS:60000,
+  window:w,document:d,state,riotTab:()=>true,connected:()=>false,matchTierCacheKey:()=> 'scope:1',matchTierContent:value=>value?.tier||'—',matchTierTitle:()=>'',MATCH_TIER_RETRY_BASE_MS:1000,MATCH_TIER_MAX_BACKOFF_MS:60000,MATCH_TIER_KR_COALESCE_MS:0,MATCH_TIERS_PARALLEL_BATCHES:2,
   api:async()=>{calls++;if(fail)throw Error('503');return {'1':{tier:'CHALLENGER',lp:2100}};},
  });
  try {
@@ -2002,4 +2031,61 @@ test("R112 KR average-tier errors retry only visible active cards, then cache re
   await f.hydrateMatchTiers(container,tab,'scope',[node]);
   assert.equal(calls,settledCalls,'rerender does not bypass the retry limit');
  } finally {w.close();}
+});
+
+// P1-7：韩服总览每个进度帧都全量重建并重新序列化整个生涯栏，只为发现「没变」。
+// 验收：同一份 data（只改 matches）连投 5 帧，renderCareerSections 只跑 1 次，
+// 且 .career-column 是同一个节点对象。
+// 对抗变异：把签名固定成常量（永远命中），下面「ranks 真的变了」那段必须 FAIL。
+test('R117 career column is rebuilt only when its own inputs change', () => {
+  const dom = new JSDOM('<div id="overview"></div>', { url: 'http://localhost/' });
+  const container = dom.window.document.getElementById('overview');
+  let careerRenders = 0;
+  const dependencies = {
+    state: { tabs: [{ key: 'current' }], settings: { maskNames: false } },
+    matchTierScope: () => 'scope', filteredMatches: (matches) => matches,
+    maskedProfileIcon: () => '', iconFigure: () => '', playerLabel: () => 'Player', riotTab: () => true,
+    emptyState: () => '', opggSummonerURL: () => '', loadOverview: () => {},
+    matchListEmptyContent: () => 'empty', matchSentinelShouldHide: () => true,
+    summonerContextChip: () => '', summonerProChip: () => '', summonerRegionChip: () => '', renderSummonerHighlights: () => '',
+    scheduleOverviewCurrentGame: () => {}, updateFriendPresenceChips: () => {},
+    paginationCopyFor: () => '', renderMatchFilters: () => '',
+    renderCareerSections: () => { careerRenders += 1; return '<section class="career-probe">生涯</section>'; },
+    renderMatch: (match) => `<article data-match-id="${match.gameId}" class="match-entry">${match.gameId}</article>`, number: (value) => String(value),
+    escapeHTML: (value) => String(value ?? ''), bindOverviewContent: () => {}, applyRenderedMetricStyles: () => {},
+    prepareImages: () => {}, ensurePerks: () => {}, ensureItems: () => {}, ensureSummonerSpells: () => {}, observeMatchTierVisibility: () => {},
+    window: dom.window, document: dom.window.document,
+  };
+  // reconcileFilteredMatchList 一起编译进来：进度帧里战绩列表要走真实的增量协调，
+  // 桩掉它就等于没验证「非战绩重渲染时列表节点被保留」这半边。
+  const { renderOverviewBodyContent } = compileFunctions(gameplaySource, ['renderOverviewBodyContent', 'reconcileFilteredMatchList'], dependencies);
+  // 进度帧的真实形状：data 里的 player / ranks / capabilities 都是同一批对象引用，
+  // 每帧只有 matches 被换掉。签名靠的正是这种对象身份稳定性。
+  const sharedData = {
+    player: { playerRef: 'ref', region: 'kr', gameName: 'Fixture', summonerLevel: 300 },
+    capabilities: [], ranks: [{ queue: 'RANKED_SOLO', tier: 'MASTER' }],
+    matches: [{ gameId: 1 }], pagination: { hasMore: false },
+  };
+  const makeTab = (matches) => ({
+    key: 'current', matchFilter: 'all', matchViewRevision: 0, openMatches: new Set(), quotaRetry: null, error: '',
+    data: { ...sharedData, matches },
+  });
+  renderOverviewBodyContent(container, makeTab([{ gameId: 1 }]));
+  const firstColumn = container.querySelector('.career-column');
+  assert.ok(firstColumn, '生涯栏必须渲染出来');
+  assert.equal(careerRenders, 1, '首帧必须渲染一次生涯栏');
+  assert.ok(firstColumn.querySelector('.career-probe'), '生涯栏内容必须落到 .career-column 里');
+  // 连投 5 帧，每帧只有 matches 变了——这正是韩服进度帧的典型形状。
+  for (let frame = 2; frame <= 6; frame += 1) renderOverviewBodyContent(container, makeTab([{ gameId: frame }]));
+  assert.equal(careerRenders, 1, `只改 matches 不得重建生涯栏，实际渲染 ${careerRenders} 次`);
+  assert.equal(container.querySelector('.career-column'), firstColumn, '.career-column 必须仍是同一个节点对象');
+  assert.equal(container.querySelector('.match-entry').dataset.matchId, '6', '战绩列表仍要跟着每帧更新');
+  // 生涯栏自己的输入真的变了就必须重建：签名写死成常量会让这条 FAIL。
+  const changed = makeTab([{ gameId: 9 }]);
+  changed.data.ranks = [{ queue: 'RANKED_SOLO', tier: 'CHALLENGER' }];
+  assert.notEqual(changed.data.player, null);
+  renderOverviewBodyContent(container, changed);
+  assert.equal(careerRenders, 2, 'ranks 变了必须重建生涯栏');
+  assert.notEqual(container.querySelector('.career-column'), firstColumn, '重建后必须是新的节点对象');
+  dom.window.close();
 });

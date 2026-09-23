@@ -5,7 +5,7 @@ dist/
 *.log
 .gocache/
 .gocache-*/
-/.gomodcache
+/.gomodcache/
 /.tmpbuild/
 /lol-loot-assistant
 /deep-legends
@@ -51,3 +51,8 @@ riot_key.local.*
 .mut102gopath/
 .gotoolchain/
 .r90env*
+
+# R135：构建产物与会话导出
+/backend/backend
+/backend/backend.exe
+/Claude outputs/

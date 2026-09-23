@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -12,6 +11,10 @@ import (
 	"time"
 )
 
+type facadeIconInventoryEntry struct {
+	ItemID int64 `json:"itemId"`
+	Owned  bool  `json:"owned"`
+}
 type facadeIcon struct {
 	ID          int64    `json:"id"`
 	Title       string   `json:"title"`
@@ -133,18 +136,6 @@ func (a *app) fetchIconCatalog(ctx context.Context, client *LCUClient, terms fun
 	}
 	return facadeIconCatalog{Icons: icons, OwnershipUnavailable: unknown, Total: len(rows), OwnedCount: ownedCount}, nil
 }
-func (a *app) knownFacadeIcon(ctx context.Context, client *LCUClient, id int64) bool {
-	icons, err := a.loadIconCatalog(ctx, client)
-	if err != nil {
-		return false
-	}
-	for _, icon := range icons {
-		if icon.ID == id {
-			return true
-		}
-	}
-	return false
-}
 func (a *app) handleFacadeIcons(w http.ResponseWriter, r *http.Request) {
 	client, _, err := a.gameplayClient()
 	if err != nil {
@@ -161,63 +152,6 @@ func (a *app) handleFacadeIcons(w http.ResponseWriter, r *http.Request) {
 	// Only the public DTO leaves this handler; inventory metadata remains private.
 	w.Header().Set("Cache-Control", "no-store")
 	respondJSON(w, catalog)
-}
-func (a *app) writeFacadeIcon(ctx context.Context, client *LCUClient, id int64) error {
-	_, err := a.writeFacadeIconResult(ctx, client, id)
-	return err
-}
-
-func (a *app) writeFacadeIconResult(ctx context.Context, client *LCUClient, id int64) (string, error) {
-	if id <= 0 || !a.knownFacadeIcon(ctx, client, id) {
-		return "", errFacadeInvalid
-	}
-	status, err := r99Request(ctx, client, http.MethodPut, "/lol-summoner/v1/current-summoner/icon", map[string]any{"profileIconId": id}, nil)
-	if err != nil {
-		var rejected *LCUHTTPError
-		if errors.As(err, &rejected) && (rejected.StatusCode == 401 || rejected.StatusCode == 403) {
-			// Chat presence has a separate icon field and supports unowned icons.
-			// This does not unlock or replace the official summoner profile icon.
-			if chatErr := writeFacadeChatIcon(ctx, client, id); chatErr == nil {
-				return "chat", nil
-			}
-			return "", fmt.Errorf("客户端拒绝更换生涯头像（%d），聊天头像也未确认切换：%w", rejected.StatusCode, err)
-		}
-		return "", err
-	}
-	if status != http.StatusCreated {
-		return "", errors.New("头像写入未返回 201，请在客户端核对后重试")
-	}
-	next, err := (SummonerAPI{client: client, ctx: ctx}).Current()
-	for attempt := 0; attempt < 3 && (err != nil || next.ProfileIconID != id); attempt++ {
-		if waitRiotDelay(ctx, 200*time.Millisecond) != nil {
-			break
-		}
-		next, err = (SummonerAPI{client: client, ctx: ctx}).Current()
-	}
-	if err != nil {
-		return "", errors.New("头像请求已提交，客户端资料暂时无法回读，请重新读取核对")
-	}
-	if next.ProfileIconID != id {
-		return "", errors.New("头像请求已提交，但客户端尚未确认，请重新读取核对")
-	}
-	_, err = a.applySummonerIdentity(client, next, time.Now())
-	return "profile", err
-}
-
-func writeFacadeChatIcon(ctx context.Context, client *LCUClient, id int64) error {
-	if err := client.RequestJSON(ctx, http.MethodPut, "/lol-chat/v1/me", map[string]any{"icon": id}, nil); err != nil {
-		return err
-	}
-	for attempt := 0; attempt < 4; attempt++ {
-		var chat map[string]any
-		if err := client.RequestJSON(ctx, http.MethodGet, "/lol-chat/v1/me", nil, &chat); err == nil && firstInt(chat, "icon") == id {
-			return nil
-		}
-		if attempt < 3 && waitRiotDelay(ctx, 200*time.Millisecond) != nil {
-			break
-		}
-	}
-	return errors.New("聊天头像请求已提交，但客户端没有确认更改")
 }
 
 func writeFacadeRankBanner(ctx context.Context, client *LCUClient, value string) error {

@@ -47,7 +47,6 @@
   border-radius: var(--radius-md);
   overflow: hidden;
 }
-.champion-search-row, .augment-toolbar { display: flex; min-height: 60px; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .champion-filter-bar { display: grid; min-height: 64px; grid-template-columns: minmax(260px,380px) minmax(500px,1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .champion-search { display: grid; width: min(480px,100%); min-height: 40px; grid-template-columns: 24px minmax(0,1fr); align-items: center; gap: 2px; padding: 0 10px; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
 .champion-search:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in oklab,var(--focus) 18%,transparent); }
@@ -147,9 +146,9 @@
 .champion-table td.metric-win.is-low { color: var(--danger); }
 .champion-table td.metric-games, .champion-table th.metric-games { color: var(--muted); font-size: 11px; }
 .champion-table .position-pill { white-space: nowrap; }
-.aram-champion-head h3, .augment-toolbar h3, .recommendation-section h3 { margin: 0; font-size: 15px; }
+.aram-champion-head h3, .recommendation-section h3 { margin: 0; font-size: 15px; }
 .recommendation-section h3 { display: inline-flex; align-items: center; gap: 7px; }
-.aram-champion-head p, .augment-toolbar p, .recommendation-section header p { margin: 1px 0 0; color: var(--muted); font-size: 10px; }
+.aram-champion-head p, .recommendation-section header p { margin: 1px 0 0; color: var(--muted); font-size: 10px; }
 
 .arena-detail-team-grid article > b { position: absolute; top: 9px; left: 10px; display: grid; width: 27px; height: 27px; place-items: center; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 50%; font-size: 13px; }
 .arena-team-faces { display: flex; min-width: 96px; align-items: center; justify-content: center; padding-left: 8px; }
@@ -202,8 +201,6 @@
 .mayhem-panel-head p { margin: 0; color: var(--muted); font-size: 10px; }
 .mayhem-panel-head .champion-search { width: min(380px,100%); margin-left: auto; }
 .mayhem-panel-head .champion-result-count { min-width: 72px; text-align: right; }
-.mayhem-champion-board .champion-table { min-width: 560px; }
-.mayhem-champion-board .champion-table th:nth-child(2) { width: auto; }
 
 .mayhem-workspace { display: grid; grid-template-columns: minmax(320px,340px) minmax(0,1fr); align-items: start; gap: 12px; container: mayhem-page / inline-size; }
 .mayhem-detail-pane { display: grid; min-width: 0; gap: 12px; container: mayhem-pane / inline-size; }
@@ -241,8 +238,6 @@
 .mayhem-overview-metrics .metric-win strong { color: var(--success); }
 .mayhem-detail-content { display: grid; gap: 12px; }
 .mayhem-detail-stale { margin: 0; padding: 9px 12px; color: var(--warning); background: var(--surface); border: 1px solid color-mix(in oklab,var(--warning) 42%,var(--line)); border-radius: 8px; font-size: 11px; line-height: 1.45; }
-.mayhem-measurement { display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); font-size: 10px; line-height: 1.55; }
-.mayhem-measurement b { flex: 0 0 auto; color: var(--ink); }
 
 .mayhem-ranking-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
 .mayhem-ranking-list article { display: grid; min-height: 70px; grid-template-columns: 22px 46px minmax(92px,1fr) max-content; align-items: center; gap: 8px; padding: 9px 12px; border-top: 1px solid var(--line); }
@@ -258,17 +253,15 @@
 .mayhem-ranking-list dd { margin: 0; font-size: 10px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .mayhem-ranking-list .metric-win { color: var(--success); }
 .mayhem-build-grid { display: grid; grid-template-columns: minmax(0,1fr); }
-.mayhem-build-grid > section, .mayhem-skill-grid > section { min-width: 0; padding: 12px; }
-.mayhem-build-grid > section + section, .mayhem-skill-grid > section + section { border-left: 1px solid var(--line); }
-.mayhem-build-grid h4, .mayhem-skill-grid h4 { margin: 0 0 9px; color: var(--muted); font-size: 11px; }
+.mayhem-build-grid > section { min-width: 0; padding: 12px; }
+.mayhem-build-grid > section + section { border-left: 1px solid var(--line); }
+.mayhem-build-grid h4 { margin: 0 0 9px; color: var(--muted); font-size: 11px; }
 .mayhem-build-grid .config-option-list { display: grid; gap: 7px; }
 .mayhem-build-grid .config-option { padding: 7px; background: var(--bg); border: 1px solid var(--line); border-radius: 7px; }
 .mayhem-build-grid .route-options { min-width: 0; }
-.mayhem-skill-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
-.mayhem-skill-grid .config-option-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
-.mayhem-skill-grid .config-option { min-height: 76px; padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 7px; }
 .mayhem-opening-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); }
-.mayhem-opening-grid > section:last-child { grid-column: 1 / -1; border-top: 1px solid var(--line); border-left: 0; }
+/* R116-B：技能加点搬到「构筑」tab 之后，开局配置只剩出门装/鞋子/召唤师技能三
+   组，正好占满三列，原来那条「最后一组横跨整行」的规则会让第三组掉到第二行。 */
 .mayhem-opening-grid > section { min-width: 0; padding: 12px; }
 .mayhem-opening-grid > section + section { border-left: 1px solid var(--line); }
 .mayhem-opening-grid h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 9px; color: var(--muted); font-size: 11px; }
@@ -293,26 +286,26 @@
 .mayhem-rarity-tabs button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 6px; }
 .mayhem-rarity-tabs i { display: inline-block; width: 8px; height: 8px; border-radius: 3px; }
 .mayhem-rarity-tabs i.is-all { display: none; }
-.mayhem-rarity-tabs i.is-silver { background: #9AA7B8; }
-.mayhem-rarity-tabs i.is-gold { background: #E3B341; }
-.mayhem-rarity-tabs i.is-prismatic { background: linear-gradient(135deg,#C77DFF,#5AA9FF,#FF8AC7); }
+.mayhem-rarity-tabs i.is-silver { background: var(--rarity-silver); }
+.mayhem-rarity-tabs i.is-gold { background: var(--rarity-gold); }
+.mayhem-rarity-tabs i.is-prismatic { background: linear-gradient(135deg,var(--rarity-prismatic-a),var(--rarity-prismatic-b),var(--rarity-prismatic-c)); }
 .mayhem-atlas-list { display: grid; min-height: 0; flex: 1 1 auto; align-content: start; overflow-y: auto; padding: 6px; }
 .mayhem-atlas-row { display: grid; width: 100%; min-height: 68px; grid-template-columns: 52px minmax(0,1fr) 34px; align-items: center; gap: 10px; padding: 7px 9px; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 8px; text-align: left; }
 .mayhem-atlas-row:hover { background: var(--surface-strong); }
 .mayhem-atlas-row.is-active { background: var(--primary-soft); border-color: color-mix(in oklab,var(--primary) 48%,var(--line)); }
-.mayhem-atlas-row .augment-icon { width: 52px; height: 52px; border-color: #6F7885; border-radius: 8px; }
-.mayhem-atlas-row.is-silver .augment-icon { border-color: #9AA7B8; }
-.mayhem-atlas-row.is-gold .augment-icon { border-color: #E3B341; }
-.mayhem-atlas-row.is-prismatic .augment-icon { border-color: #C77DFF; }
+.mayhem-atlas-row .augment-icon { width: 52px; height: 52px; border-color: var(--rarity-iron); border-radius: 8px; }
+.mayhem-atlas-row.is-silver .augment-icon { border-color: var(--rarity-silver); }
+.mayhem-atlas-row.is-gold .augment-icon { border-color: var(--rarity-gold); }
+.mayhem-atlas-row.is-prismatic .augment-icon { border-color: var(--rarity-prismatic-a); }
 .mayhem-atlas-row > span { display: grid; min-width: 0; gap: 2px; }
 .mayhem-atlas-row strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .mayhem-atlas-row small { color: var(--muted); font-size: 10px; }
 .mayhem-atlas-detail { min-width: 0; }
 .mayhem-atlas-detail-head { display: grid; min-height: 90px; flex: 0 0 auto; grid-template-columns: 64px minmax(0,1fr); align-items: center; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--line); }
-.mayhem-atlas-detail-head .augment-icon { width: 64px; height: 64px; border-color: #6F7885; border-radius: 11px; }
-.mayhem-atlas-detail-head.is-silver .augment-icon { border-color: #9AA7B8; }
-.mayhem-atlas-detail-head.is-gold .augment-icon { border-color: #E3B341; }
-.mayhem-atlas-detail-head.is-prismatic .augment-icon { border-color: #C77DFF; }
+.mayhem-atlas-detail-head .augment-icon { width: 64px; height: 64px; border-color: var(--rarity-iron); border-radius: 11px; }
+.mayhem-atlas-detail-head.is-silver .augment-icon { border-color: var(--rarity-silver); }
+.mayhem-atlas-detail-head.is-gold .augment-icon { border-color: var(--rarity-gold); }
+.mayhem-atlas-detail-head.is-prismatic .augment-icon { border-color: var(--rarity-prismatic-a); }
 .mayhem-atlas-detail-head > div { min-width: 0; }
 .mayhem-atlas-detail-head h3 { margin: 4px 0 2px; overflow-wrap: anywhere; font-size: 16px; }
 .mayhem-atlas-detail-head p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
@@ -341,21 +334,21 @@
 .mayhem-rarity-stages article:first-child { border-left: 0; }
 .mayhem-rarity-stages b { font-size: 11px; }
 .mayhem-rarity-stages span, .mayhem-rarity-stages small { color: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; }
-.mayhem-rarity-stages .is-gold { color: color-mix(in oklab,#E3B341 68%,var(--ink)); }
-.mayhem-rarity-stages .is-prismatic { color: color-mix(in oklab,#C77DFF 68%,var(--ink)); }
+.mayhem-rarity-stages .is-gold { color: color-mix(in oklab,var(--rarity-gold) 68%,var(--ink)); }
+.mayhem-rarity-stages .is-prismatic { color: color-mix(in oklab,var(--rarity-prismatic-a) 68%,var(--ink)); }
 
 /* 海斗推荐用的就是斗魂那张 .arena-option-card，这里只保留栅格。卡片本体
    （图标 56px、名称字号、S/A 徽章、品质芯片、指标列）全部由 arena-option-*
    一套规则供给，两个模式不会再各自漂移。 */
 .mayhem-recommend-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; padding: 12px; }
 .hex-rank { display: inline-grid; width: 24px; height: 24px; place-items: center; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.hex-rank.is-1 { color: #E3B341; background: color-mix(in oklab,#E3B341 16%,var(--surface)); border-color: #E3B341; box-shadow: inset 0 0 8px color-mix(in oklab,#E3B341 36%,transparent); clip-path: polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%); }
-.hex-rank.is-2 { color: #9AA7B8; background: color-mix(in oklab,#9AA7B8 16%,var(--surface)); border-color: #9AA7B8; box-shadow: inset 0 0 8px color-mix(in oklab,#9AA7B8 32%,transparent); clip-path: polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%); }
+.hex-rank.is-1 { color: var(--rarity-gold); background: color-mix(in oklab,var(--rarity-gold) 16%,var(--surface)); border-color: var(--rarity-gold); box-shadow: inset 0 0 8px color-mix(in oklab,var(--rarity-gold) 36%,transparent); clip-path: polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%); }
+.hex-rank.is-2 { color: var(--rarity-silver); background: color-mix(in oklab,var(--rarity-silver) 16%,var(--surface)); border-color: var(--rarity-silver); box-shadow: inset 0 0 8px color-mix(in oklab,var(--rarity-silver) 32%,transparent); clip-path: polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%); }
 .hex-rank.is-3 { color: #C08457; background: color-mix(in oklab,#C08457 16%,var(--surface)); border-color: #C08457; box-shadow: inset 0 0 8px color-mix(in oklab,#C08457 32%,transparent); clip-path: polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%); }
 .hex-rank.is-rest { width: 22px; height: 22px; border-radius: 5px; color: var(--muted); }
 .augment-grade { display: inline-flex; width: 22px; height: 22px; flex: 0 0 22px; align-items: center; justify-content: center; border-radius: 4px; font-size: 12px; font-weight: 800; line-height: 1; }
 .augment-grade.is-S { color: #FFF; background: #6E3A88; }
-.augment-grade.is-A { color: #17130A; background: #E3B341; }
+.augment-grade.is-A { color: var(--on-primary); background: var(--rarity-gold); }
 .augment-grade.is-B { color: #11151C; background: #AAB4C2; }
 .augment-grade.is-OP { color: #FFF; background: #C46A2B; }
 .augment-grade.is-C, .augment-grade.is-D { color: var(--ink); background: color-mix(in oklab,var(--muted) 48%,var(--surface)); }
@@ -396,8 +389,8 @@
   .mayhem-ranking-list article { grid-template-columns: 20px 42px minmax(0,1fr); }
   .mayhem-ranking-list article > .recommend-icon { width: 42px; height: 42px; }
   .mayhem-ranking-list article dl { grid-column: 3; }
-  .mayhem-build-grid, .mayhem-skill-grid { grid-template-columns: 1fr; }
-  .mayhem-build-grid > section + section, .mayhem-skill-grid > section + section { border-top: 1px solid var(--line); border-left: 0; }
+  .mayhem-build-grid { grid-template-columns: 1fr; }
+  .mayhem-build-grid > section + section { border-top: 1px solid var(--line); border-left: 0; }
   .mayhem-build-grid > section:last-child { grid-column: auto; }
   .mayhem-recommend-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .mayhem-opening-grid { grid-template-columns: 1fr; }
@@ -497,8 +490,6 @@
 @container champion-build (max-width: 560px) {
   .build-split .build-side { grid-template-columns: 1fr; }
 }
-.build-side-group { display: grid; gap: 8px; }
-.build-side-group h4 { margin: 0; color: var(--muted); font-size: 12px; font-weight: 650; }
 .build-side-row { display: flex; min-height: 56px; align-items: center; gap: 8px; padding: 7px 10px; overflow: hidden; background: color-mix(in oklab,var(--bg) 55%,transparent); border-radius: 8px; }
 .build-side-row .config-icons { display: flex; min-width: 0; flex: 0 0 auto; flex-wrap: nowrap; align-items: center; gap: 6px; --option-icon-size: 42px; }
 
@@ -531,7 +522,6 @@
 .build-primary-source { color: var(--muted); font-size: 10px; font-weight: 650; }
 .build-depth-column > .item-chain-source { display: block; margin: 0 0 5px; color: var(--primary-strong); }
 .build-depth-column h4 { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.build-depth-sample-badge { display: inline-flex; min-height: 16px; align-items: center; padding: 0 4px; color: #F2C46D; background: rgb(242 196 109 / .1); border: 1px solid rgb(242 196 109 / .38); border-radius: 3px; font-size: 8px; line-height: 1; white-space: nowrap; }
 .build-depth-empty { margin: 8px 0 0; font-size: 10px; line-height: 1.45; }
 
 /* 扣除下方三张对抗卡的两个 10px 间距，使核心装右边界与第一张卡右边界对齐。 */
@@ -567,13 +557,6 @@
   .build-core-column .config-option { align-items: stretch; flex-direction: column; gap: 6px; padding-block: 7px; }
   .champion-build-board .build-core-column .option-stats { width: 100%; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0; text-align: left; }
 }
-.recommended-augment-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
-.recommended-augment-list > div { display: grid; grid-template-columns: 24px 46px minmax(0,1fr) auto; min-height: 66px; align-items: center; gap: 9px; padding: 8px 12px; background: var(--bg); border-top: 1px solid var(--line); }
-.recommended-augment-list > div:nth-child(odd) { border-right: 1px solid var(--line); }
-.recommended-augment-list > div > b { color: var(--ink); font-size: 13px; text-align: center; }
-.recommended-augment-list .augment-icon { width: 46px; height: 46px; }
-.recommended-augment-list strong { font-size: 12px; }
-.recommended-augment-list > div > span:last-child { color: var(--primary-strong); font-size: 9px; font-weight: 750; }
 .arena-detail-team-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); }
 .arena-detail-team-grid > article { position: relative; display: grid; min-width: 0; place-items: center; gap: 8px; padding: 18px 14px 14px; background: var(--bg); border-left: 1px solid var(--line); text-align: center; }
 .arena-detail-team-grid > article:first-child { border-left: 0; background: color-mix(in oklab,var(--primary-soft) 38%,var(--bg)); }
@@ -583,11 +566,11 @@
 .arena-detail-team-grid dl > div { display: grid; gap: 1px; padding-inline: 5px; border-left: 1px solid var(--line); }
 .arena-detail-team-grid dl > div:first-child { border-left: 0; }
 .arena-augment-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
-.arena-augment-list > article { --arena-augment-quality: #7E8896; --arena-augment-quality-color: #7E8896; position: relative; display: grid; min-height: 66px; grid-template-columns: 24px 46px minmax(0,1fr) 66px 66px; align-items: center; gap: 8px; padding: 8px 12px 8px 16px; border-top: 1px solid var(--line); }
+.arena-augment-list > article { --arena-augment-quality: var(--rarity-iron); --arena-augment-quality-color: var(--rarity-iron); position: relative; display: grid; min-height: 66px; grid-template-columns: 24px 46px minmax(0,1fr) 66px 66px; align-items: center; gap: 8px; padding: 8px 12px 8px 16px; border-top: 1px solid var(--line); }
 .arena-augment-list > article::before { position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--arena-augment-quality); content: ""; }
-.arena-augment-list > article.is-silver { --arena-augment-quality: #9AA7B8; --arena-augment-quality-color: #9AA7B8; }
-.arena-augment-list > article.is-gold { --arena-augment-quality: #E3B341; --arena-augment-quality-color: #E3B341; }
-.arena-augment-list > article.is-prismatic { --arena-augment-quality: linear-gradient(180deg,#C77DFF,#5AA9FF,#FF8AC7); --arena-augment-quality-color: #9C86D8; }
+.arena-augment-list > article.is-silver { --arena-augment-quality: var(--rarity-silver); --arena-augment-quality-color: var(--rarity-silver); }
+.arena-augment-list > article.is-gold { --arena-augment-quality: var(--rarity-gold); --arena-augment-quality-color: var(--rarity-gold); }
+.arena-augment-list > article.is-prismatic { --arena-augment-quality: linear-gradient(180deg,var(--rarity-prismatic-a),var(--rarity-prismatic-b),var(--rarity-prismatic-c)); --arena-augment-quality-color: var(--rarity-prismatic-a); }
 .arena-augment-list > article:nth-child(odd) { border-right: 1px solid var(--line); }
 .arena-augment-list .augment-icon { width: 46px; height: 46px; }
 .arena-augment-list strong { overflow: hidden; color: var(--ink); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
@@ -684,7 +667,6 @@
 @media (max-width: 700px) {
   .champion-mode-tab small { display: none; }
   .champion-mode-tab { min-height: 46px; padding-inline: 6px; }
-  .champion-search-row, .augment-toolbar { align-items: stretch; flex-direction: column; }
   .champion-search, .champion-search.compact { width: 100%; }
   .champion-result-count { align-self: flex-end; }
   .mayhem-panel-head { align-items: stretch; flex-direction: column; }
@@ -705,8 +687,6 @@
   .arena-detail-team-grid { grid-template-columns: 1fr; }
   .arena-detail-team-grid > article { border-top: 1px solid var(--line); border-left: 0; }
   .arena-detail-team-grid > article:first-child { border-top: 0; }
-  .recommended-augment-list { grid-template-columns: 1fr; }
-  .recommended-augment-list > div:nth-child(odd) { border-right: 0; }
 }
 
 @media (max-width: 480px) {
@@ -808,9 +788,9 @@
 .arena-sort-chips { margin-left: auto; }
 .arena-rarity-chips button { display: inline-flex; align-items: center; gap: 5px; }
 .arena-rarity-chips i { width: 6px; height: 6px; background: var(--muted); border-radius: 50%; }
-.arena-rarity-chips i.is-silver { background: #9AA7B8; }
-.arena-rarity-chips i.is-gold { background: #E3B341; }
-.arena-rarity-chips i.is-prismatic { background: linear-gradient(135deg,#C77DFF,#5AA9FF,#FF8AC7); }
+.arena-rarity-chips i.is-silver { background: var(--rarity-silver); }
+.arena-rarity-chips i.is-gold { background: var(--rarity-gold); }
+.arena-rarity-chips i.is-prismatic { background: linear-gradient(135deg,var(--rarity-prismatic-a),var(--rarity-prismatic-b),var(--rarity-prismatic-c)); }
 
 .arena-data-section { overflow: hidden; }
 .arena-data-section > header { display: flex; min-height: 56px; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
@@ -818,10 +798,10 @@
 .arena-data-section > header > div:first-child > span:last-child { display: grid; min-width: 0; }
 .arena-option-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; padding: 12px; }
 .arena-augment-section .arena-option-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
-.arena-option-card { --arena-quality-color: #7E8896; position: relative; display: grid; min-width: 0; min-height: 102px; gap: 9px; overflow: hidden; padding: 10px; background: var(--bg); border: 1px solid color-mix(in oklab,var(--arena-quality-color) 38%,var(--line)); border-radius: 8px; }
-.arena-option-card.is-silver { --arena-quality: #9AA7B8; --arena-quality-color: #9AA7B8; }
-.arena-option-card.is-gold { --arena-quality: #E3B341; --arena-quality-color: #E3B341; }
-.arena-option-card.is-prismatic { --arena-quality: linear-gradient(180deg,#C77DFF,#5AA9FF,#FF8AC7); --arena-quality-color: #9C86D8; }
+.arena-option-card { --arena-quality-color: var(--rarity-iron); position: relative; display: grid; min-width: 0; min-height: 102px; gap: 9px; overflow: hidden; padding: 10px; background: var(--bg); border: 1px solid color-mix(in oklab,var(--arena-quality-color) 38%,var(--line)); border-radius: 8px; }
+.arena-option-card.is-silver { --arena-quality: var(--rarity-silver); --arena-quality-color: var(--rarity-silver); }
+.arena-option-card.is-gold { --arena-quality: var(--rarity-gold); --arena-quality-color: var(--rarity-gold); }
+.arena-option-card.is-prismatic { --arena-quality: linear-gradient(180deg,var(--rarity-prismatic-a),var(--rarity-prismatic-b),var(--rarity-prismatic-c)); --arena-quality-color: var(--rarity-prismatic-a); }
 .arena-core-option { opacity: 1; }
 .arena-option-card:hover, .arena-option-card:focus-within { border-color: color-mix(in oklab,var(--primary) 55%,var(--line)); opacity: 1; }
 .arena-option-main { display: flex; min-width: 0; align-items: center; gap: 8px; }
@@ -829,9 +809,9 @@
 .arena-option-icons, .arena-slim-icons { display: inline-flex; min-width: 0; align-items: center; gap: 4px; }
 .arena-option-main > strong { min-width: 0; flex: 1 1 auto; overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
 .arena-option-rarity { flex: 0 0 auto; padding: 2px 6px; color: var(--muted); background: var(--surface-strong); border-radius: 6px; font-size: 9px; font-weight: 750; }
-.arena-option-rarity.is-silver { color: color-mix(in oklab,#9AA7B8 58%,var(--ink)); background: color-mix(in oklab,#9AA7B8 18%,var(--surface)); }
-.arena-option-rarity.is-gold { color: color-mix(in oklab,#E3B341 58%,var(--ink)); background: color-mix(in oklab,#E3B341 18%,var(--surface)); }
-.arena-option-rarity.is-prismatic { color: color-mix(in oklab,#C77DFF 58%,var(--ink)); background: color-mix(in oklab,#C77DFF 18%,var(--surface)); }
+.arena-option-rarity.is-silver { color: color-mix(in oklab,var(--rarity-silver) 58%,var(--ink)); background: color-mix(in oklab,var(--rarity-silver) 18%,var(--surface)); }
+.arena-option-rarity.is-gold { color: color-mix(in oklab,var(--rarity-gold) 58%,var(--ink)); background: color-mix(in oklab,var(--rarity-gold) 18%,var(--surface)); }
+.arena-option-rarity.is-prismatic { color: color-mix(in oklab,var(--rarity-prismatic-a) 58%,var(--ink)); background: color-mix(in oklab,var(--rarity-prismatic-a) 18%,var(--surface)); }
 .arena-option-card .item-option-button { width: 48px; height: 48px; flex: 0 0 48px; padding: 0; }
 .arena-option-card .config-icons { --option-icon-size: 48px; }
 .arena-option-card .recommend-icon { width: 48px; height: 48px; border-radius: 7px; }
@@ -931,3 +911,60 @@
 
 /* Keep result tables as flex children of the existing list cards. */
 [data-champion-results] { display: contents; }
+
+/* ---- R128：英雄详情页切换与表现指标 ---- */
+.mayhem-detail-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mayhem-detail-tabs { --tab-count: 3; display: grid; min-width: 0; flex: 1 1 auto; grid-template-columns: repeat(var(--tab-count),minmax(0,1fr)); padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.mayhem-detail-tabs button { min-height: 42px; padding: 0 10px; color: color-mix(in oklab,var(--ink) 72%,transparent); background: transparent; border: 1px solid transparent; border-radius: 7px; font-size: 13px; font-weight: 750; white-space: nowrap; }
+.mayhem-detail-tabs button:hover { color: var(--ink); background: var(--surface-strong); }
+.mayhem-detail-tabs button.is-active { color: var(--primary); background: var(--primary-soft); border-color: color-mix(in oklab,var(--primary) 44%,var(--line)); box-shadow: inset 0 -2px 0 var(--primary); }
+.mayhem-atlas-entry { display: inline-flex; min-height: 42px; flex: 0 0 auto; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; font-size: 11px; font-weight: 700; }
+.mayhem-atlas-entry:hover { color: var(--ink); border-color: color-mix(in oklab,var(--primary) 44%,var(--line)); }
+.mayhem-detail-panels { display: grid; gap: 12px; }
+.mayhem-detail-panel { display: grid; min-width: 0; gap: 12px; }
+
+/* P0-1「较基准」：正数用既有胜率高亮色，负数用既有警示色，不新造配色。 */
+.mayhem-delta.is-delta-up { color: var(--success); }
+.mayhem-delta.is-delta-down { color: var(--warning); }
+.mayhem-without-item { color: var(--muted); }
+.mayhem-ranking-list dd.is-low-confidence { color: var(--warning); }
+.mayhem-ranking-list article.is-low-confidence { box-shadow: inset 2px 0 0 var(--warning); }
+.arena-option-card .is-low-confidence dd { color: var(--warning); }
+.arena-option-card .is-wilson dd { color: var(--muted); }
+.arena-option-card .is-hex-label dd { color: var(--primary-strong); }
+.arena-option-card[data-metric-count="5"] dl { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.arena-option-card[data-metric-count="6"] dl { grid-template-columns: repeat(3,minmax(0,1fr)); }
+/* 阶段视图多出「选取率」与「阶段基准」两格：指标数最多到 8，仍按三列排。
+   四条规则各自独立成行、不合并选择器：R116-B 的样式钉子按「dl 后紧跟左花括号」
+   的形状分别钉住 7 格与 8 格两档，合并写法会让它匹配不上。 */
+.arena-option-card[data-metric-count="7"] dl { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.arena-option-card[data-metric-count="8"] dl { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.mayhem-stage-chips { flex: 0 1 auto; min-width: 0; overflow-x: auto; }
+
+.mayhem-performance-groups { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.mayhem-performance-group { min-width: 0; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+.mayhem-performance-group h4 { margin: 0 0 6px; color: var(--muted); font-size: 11px; }
+.mayhem-performance-group dl { display: grid; margin: 0; }
+.mayhem-performance-group dl > div { display: grid; min-width: 0; min-height: 36px; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); }
+.mayhem-performance-group dl > div:first-child { border-top: 0; }
+.mayhem-performance-group dt { color: var(--muted); font-size: 10px; }
+.mayhem-performance-group dd { display: inline-flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 8px; margin: 0; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mayhem-performance-group dd > b { color: var(--ink); }
+.mayhem-performance-group dd > .mayhem-delta { flex: 0 0 auto; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.mayhem-performance-group dl > .is-cumulative { grid-template-columns: 92px minmax(0,1fr); }
+.mayhem-multikill-values { display: grid !important; width: 100%; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+.mayhem-multikill-values > span { display: grid; min-width: 0; gap: 2px; justify-items: end; }
+.mayhem-multikill-values small { color: var(--muted); font-size: 9px; font-weight: 650; }
+.mayhem-multikill-values b { overflow: hidden; color: var(--muted); font-size: 10px; font-weight: 700; text-overflow: ellipsis; }
+.mayhem-performance-note { margin: 0; padding: 10px 14px; color: var(--muted); border-top: 1px solid var(--line); font-size: 9px; line-height: 1.45; }
+
+/* P0-5-2：官方档位不可用、榜单退回本地分档时才出现的「本地估算」小字。 */
+.mayhem-tier-local { display: inline-block; margin-left: 4px; color: var(--warning); font-size: 9px; font-weight: 700; }
+
+@media (max-width: 700px) {
+  .mayhem-detail-tabs { flex: 1 0 100%; }
+  .mayhem-detail-tabs button { min-height: 44px; }
+  .mayhem-atlas-entry { min-height: 40px; }
+  .mayhem-performance-groups { grid-template-columns: 1fr; }
+  .mayhem-multikill-values { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}

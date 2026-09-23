@@ -142,48 +142,20 @@ func TestR99IconCatalogProjectionCachingAndClientSwitch(t *testing.T) {
 		t.Fatal("client switch reused cache")
 	}
 }
-func TestR99IconWriteAccepts201AndRefreshesSnapshot(t *testing.T) {
-	var puts atomic.Int32
-	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/lol-summoner/v1/current-summoner/icon":
-			var b map[string]any
-			json.NewDecoder(r.Body).Decode(&b)
-			if r.Method != "PUT" || len(b) != 1 || b["profileIconId"] != float64(71) {
-				t.Errorf("invalid write: %s %v", r.Method, b)
-			}
-			puts.Add(1)
-			w.WriteHeader(201)
-		case "/lol-summoner/v1/current-summoner":
-			fmt.Fprint(w, `{"summonerId":1,"profileIconId":71}`)
-		default:
-			fmt.Fprint(w, `{}`)
-		}
-	})
-	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1, ProfileIconID: 5}}
-	a.facadeIcons = facadeIconCache{client: client, at: time.Now(), catalog: facadeIconCatalog{Icons: []facadeIcon{{ID: 71}}}}
-	a.facadeIdentityShapeDiagnosticClient = client
-	w := httptest.NewRecorder()
-	a.handleFacadeApply(w, httptest.NewRequest("POST", "/api/facade/apply", strings.NewReader(`{"action":"icon","iconId":71}`)))
-	if w.Code != 200 || puts.Load() != 1 || a.summoner.ProfileIconID != 71 {
-		t.Fatalf("code=%d body=%s puts=%d snapshot=%d", w.Code, w.Body.String(), puts.Load(), a.summoner.ProfileIconID)
-	}
-	a.clearFacadeEventThrottle()
-}
-func TestR99IconRejectsUnknownWithoutWrite(t *testing.T) {
+func TestR99IconAndBannerApplyActionsRetired(t *testing.T) {
 	var calls atomic.Int32
 	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) { calls.Add(1) })
 	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}}
-	a.facadeIcons = facadeIconCache{client: client, at: time.Now(), catalog: facadeIconCatalog{Icons: []facadeIcon{{ID: 71}, {ID: 72, Disabled: true}}}}
-	for _, id := range []int64{0, 999} {
+	a.facadeIcons = facadeIconCache{client: client, at: time.Now(), catalog: facadeIconCatalog{Icons: []facadeIcon{{ID: 71}}}}
+	for _, body := range []string{`{"action":"icon","iconId":71}`, `{"action":"banner","bannerId":"4"}`} {
 		w := httptest.NewRecorder()
-		a.handleFacadeApply(w, httptest.NewRequest("POST", "/api/facade/apply", strings.NewReader(fmt.Sprintf(`{"action":"icon","iconId":%d}`, id))))
+		a.handleFacadeApply(w, httptest.NewRequest("POST", "/api/facade/apply", strings.NewReader(body)))
 		if w.Code != 400 {
-			t.Fatal(w.Code)
+			t.Fatal(body, w.Code)
 		}
 	}
 	if calls.Load() != 0 {
-		t.Fatal("invalid selection made requests")
+		t.Fatal("retired actions reached the client")
 	}
 }
 func TestR99SummonerEventStillUpdatesIdentity(t *testing.T) {
@@ -486,57 +458,6 @@ func TestR99ProbeHandlesAlternativeInventoryShape(t *testing.T) {
 	}
 	raw, _ := json.Marshal(e)
 	if strings.Contains(string(raw), "secret") || strings.Contains(string(raw), "itemId") {
-		t.Fatal(string(raw))
-	}
-}
-func TestR99WriteProbeRejectsUnsafeLoadoutIDs(t *testing.T) {
-	for _, id := range []string{"bad/path", "..", "foo..bar", " spaced "} {
-		t.Run(id, func(t *testing.T) {
-			writes := 0
-			client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != "GET" {
-					writes++
-				}
-				if r.URL.Path == "/lol-loadouts/v4/loadouts/scope/account" {
-					json.NewEncoder(w).Encode([]any{map[string]any{"id": id, "loadout": map[string]any{"REGALIA_BANNER_SLOT": map[string]any{"itemId": 3}}}})
-				} else {
-					fmt.Fprint(w, `{}`)
-				}
-			})
-			(&app{}).runR99WriteProbe(context.Background(), client)
-			if writes != 0 {
-				t.Fatal("unsafe loadout generated writes", writes)
-			}
-		})
-	}
-}
-func TestR99WriteProbeReportsErrorCodeWithoutMessage(t *testing.T) {
-	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case facadeChallengeSummaryPath:
-			fmt.Fprint(w, `{"bannerId":"old","topChallenges":[],"title":null}`)
-		case "/lol-game-data/assets/v1/regalia.json":
-			fmt.Fprint(w, `[{"id":"4","idSecondary":"target","regaliaType":"kBanner","isSelectable":true}]`)
-		case facadeBannerInventoryPath:
-			fmt.Fprint(w, `{"4":{"isOwned":true,"items":[{"contentId":"target"}]}}`)
-		case facadeChallengePreferencesPath:
-			http.Error(w, `{"errorCode":"UnsupportedSlot","message":"SECRET"}`, 400)
-		default:
-			fmt.Fprint(w, `{}`)
-		}
-	})
-	rows := (&app{}).runR99WriteProbe(context.Background(), client)
-	found := false
-	for _, row := range rows {
-		if row["probe"] == "W6" {
-			found = true
-			if row["status"] != 400 || row["error_code"] != "UnsupportedSlot" {
-				t.Fatal(row)
-			}
-		}
-	}
-	raw, _ := json.Marshal(rows)
-	if !found || strings.Contains(string(raw), "SECRET") {
 		t.Fatal(string(raw))
 	}
 }

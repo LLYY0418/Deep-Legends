@@ -67,9 +67,10 @@ const (
 	matchTiersMaxRefs     = 24
 	matchTiersMaxMatches  = 50
 	matchTiersOPGGTimeout = 9 * time.Second
-	// Four concurrent LCU ranked requests keep a 10-player match responsive
-	// without flooding the local client during reconnect or champion select.
-	matchTiersRankConcurrency = 4
+	// R127 P1-b.2：并发从 4 提到 8。平均段位改为 SGP 优先后，这条链路实测
+	// 60–130ms 一次，扛得住 8 并发；回退到本机客户端时仍受 LCU 自身吞吐限制。
+	// 注意这个常量同时被专精符文的对手段位查询复用。
+	matchTiersRankConcurrency = 8
 )
 
 type rankScoreEntry struct {
@@ -185,7 +186,13 @@ func (a *app) playerRankScore(ctx context.Context, client *LCUClient, playerRef 
 // playerRankScoreWithCacheStatus exposes only whether the lookup avoided a new
 // upstream request. It never exposes the cache key or player reference to
 // diagnostics.
-func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID, privacy string) (rankScoreEntry, bool) {
+//
+// R127 P1-b.1：可选的 tierOnly 表示「只要段位 + 小段 + 胜点，不需要胜负场」。
+// 平均段位走这个模式：有 SGP 时直接 SGP 优先，也不再因为「胜负场未完整验证」
+// 多补一次查询。它的缓存键带独立作用域，不会把没有胜负场的结果喂给个人资料页
+// 等需要胜负场的调用方。用变参是为了保持既有调用点与护栏测试不变。
+func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID, privacy string, tierOnly ...bool) (rankScoreEntry, bool) {
+	tierScope := len(tierOnly) > 0 && tierOnly[0]
 	a.rankScoresOnce.Do(func() {
 		if a.rankScores == nil {
 			a.rankScores = newRankScoreCache()
@@ -195,17 +202,25 @@ func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUCli
 	serverID = strings.ToUpper(strings.TrimSpace(serverID))
 	useRiot := serverID == "KR" && a.riot != nil && validPlayerReference(playerRef)
 	preferredSource := dataSourceRiot
+	cacheScope := ""
+	if tierScope {
+		cacheScope = rankScoreTierOnlyScope
+	}
 	if !useRiot {
 		decision := resolveRankDataSources(rankDataSourceInput{
 			PlayerReferenceValid: validPlayerReference(playerRef), LCUConnected: client != nil,
 			RemoteServer: isRemoteTencentServer(client, serverID), SGPAvailable: a.sgp != nil && serverID != "",
 		})
+		sources := decision.Sources
+		if tierScope {
+			sources = rankSourcesTierOnly(sources)
+		}
 		preferredSource = "unknown"
-		if len(decision.Sources) > 0 {
-			preferredSource = decision.Sources[0]
+		if len(sources) > 0 {
+			preferredSource = sources[0]
 		}
 	}
-	cacheKey := rankScoreCacheKey(preferredSource, serverID, playerRef)
+	cacheKey := rankScoreCacheKeyScoped(preferredSource, serverID, playerRef, cacheScope)
 	if entry, ok := cache.get(cacheKey); ok {
 		return entry, true
 	}
@@ -232,7 +247,7 @@ func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUCli
 	if useRiot {
 		ranks, capability = a.riot.loadRiotRanks(ctx, playerRef)
 	} else {
-		ranks, milestones, capability = a.loadRanksWithFallback(ctx, client, playerRef, isCurrent, serverID, privacy)
+		ranks, milestones, capability = a.loadRanksWithFallback(ctx, client, playerRef, isCurrent, serverID, privacy, tierScope)
 	}
 	entry.ranks = append([]gameplayRank(nil), ranks...)
 	entry.milestones = milestones
@@ -262,7 +277,7 @@ func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUCli
 		// 首选来源键代表这次稳定的数据源决策入口，使 LCU -> SGP fallback
 		// 能在下一次相同决策下命中，而不是重新请求两端。
 		entry.source = capabilitySource(capability)
-		actualKey := rankScoreCacheKey(entry.source, serverID, playerRef)
+		actualKey := rankScoreCacheKeyScoped(entry.source, serverID, playerRef, cacheScope)
 		cache.put(actualKey, entry)
 		if actualKey != cacheKey {
 			cache.put(cacheKey, entry)
@@ -277,14 +292,48 @@ func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUCli
 
 var globalMatchTiersRankSemaphore = make(chan struct{}, matchTiersRankConcurrency)
 
+// rankScoreTierOnlyScope 把「只要段位」的结果与需要胜负场的结果分开存放，
+// 避免平均段位的缓存条目被个人资料页当成含胜负场的完整结果复用。
+const rankScoreTierOnlyScope = "tier-only"
+
 func rankScoreCacheKey(source, serverID, playerRef string) string {
+	return rankScoreCacheKeyScoped(source, serverID, playerRef, "")
+}
+
+func rankScoreCacheKeyScoped(source, serverID, playerRef, scope string) string {
+	if scope != "" {
+		source += "|" + scope
+	}
 	return sourceScopedKey(source, strings.ToUpper(strings.TrimSpace(serverID))+"|"+strings.TrimSpace(playerRef))
+}
+
+// rankSourcesTierOnly 把 SGP 提到最前面。平均段位只要段位/小段/胜点：SGP 的
+// leagues-ledge/v2/rankedStats 实测 60–130ms，而本机客户端
+// /lol-ranked/v1/ranked-stats 中位 550ms、最长 2.4 秒，LCU 只做后备。
+func rankSourcesTierOnly(sources []string) []string {
+	reordered := make([]string, 0, len(sources))
+	for _, source := range sources {
+		if source == dataSourceSGP {
+			reordered = append(reordered, source)
+		}
+	}
+	for _, source := range sources {
+		if source != dataSourceSGP {
+			reordered = append(reordered, source)
+		}
+	}
+	return reordered
 }
 
 type matchTierMatchRequest struct {
 	GameID    int64 `json:"gameId"`
 	CreatedAt int64 `json:"createdAt"`
 	Duration  int64 `json:"duration"`
+	// R127 P1-c.2：Riot 的真正开局与结束时间（毫秒）。CreatedAt 是 gameCreation
+	// （房间创建时间），排位里比真正开局早 BP + 读条 2–4 分钟，只靠它去对 OP.GG
+	// 会整页对不上（日志里 23 场 0 命中）。三个基准都参与匹配，取差值最小的。
+	StartAt int64 `json:"startAt,omitempty"`
+	EndAt   int64 `json:"endAt,omitempty"`
 }
 
 type matchTiersRequest struct {
@@ -309,6 +358,9 @@ type matchTiersResponse struct {
 	Samples   int                        `json:"samples"`
 	Players   map[string]matchTierPlayer `json:"players,omitempty"`
 	CacheHits int                        `json:"cacheHits"`
+	// R127 P1-c.5：来源确实还没收录这场（OP.GG 最新一行明显早于 Riot 最新一场）
+	// 时置位。前端据此显示「来源暂未收录」，而不是一条让人以为出 bug 的横线。
+	SourceStale bool `json:"sourceStale,omitempty"`
 }
 
 type matchTierPlayer struct {
@@ -390,7 +442,7 @@ func (a *app) handleGameplayMatchTiers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			defer func() { <-globalMatchTiersRankSemaphore }()
-			entry, cacheHit := a.playerRankScoreWithCacheStatus(r.Context(), client, item.playerRef, item.isCurrent, item.serverID, item.privacy)
+			entry, cacheHit := a.playerRankScoreWithCacheStatus(r.Context(), client, item.playerRef, item.isCurrent, item.serverID, item.privacy, true)
 			scoresMu.Lock()
 			if cacheHit {
 				cacheHits++
@@ -455,11 +507,30 @@ func (a *app) handleRiotMatchTiers(w http.ResponseWriter, r *http.Request, reque
 		}
 		response[key] = nil
 		matches = append(matches, match)
-		if match.CreatedAt > 0 && (oldest == 0 || match.CreatedAt < oldest) {
-			oldest = match.CreatedAt
+		// 覆盖范围按最早的可用时间基准算：CreatedAt 是房间创建时间，通常最早，
+		// 缺失时退到开局/结束时间，避免整页请求被判成无效。
+		for _, base := range opggTierTimeBases(match) {
+			if oldest == 0 || base.value < oldest {
+				oldest = base.value
+			}
 		}
 	}
 	if len(matches) == 0 || oldest == 0 {
+		respondJSON(w, response)
+		return
+	}
+	// R127 P1-c.3：先吃 7 天长期缓存。命中的对局一个 OP.GG 请求都不用发，
+	// 重开同一个韩服玩家时平均段位是立即显示的。
+	cached, pending, cacheHits := a.splitCachedMatchTiers(matches)
+	for key, value := range cached {
+		response[key] = value
+	}
+	if len(pending) == 0 {
+		a.recordDiagnostic(map[string]any{
+			"event": "opgg_match_tiers_result", "matches": len(matches),
+			"matched": cacheHits, "missing": 0, "cache_hits": cacheHits, "opgg_requests": 0,
+			"rows": 0, "rows_with_tier": 0, "matched_bases": map[string]int{},
+		})
 		respondJSON(w, response)
 		return
 	}
@@ -473,12 +544,73 @@ func (a *app) handleRiotMatchTiers(w http.ResponseWriter, r *http.Request, reque
 		return
 	}
 	matched := 0
-	for _, match := range matches {
-		if value := matchOPGGAverageTier(match.CreatedAt, match.Duration, games); value != nil {
-			response[strconv.FormatInt(match.GameID, 10)] = value
-			matched++
+	bases := map[string]int{}
+	unmatchedTimeGaps := make([]int64, 0, len(matches))
+	unmatchedSpanGaps := make([]int64, 0, len(matches))
+	rowsWithTier, newestRow, newestRiot := 0, int64(0), int64(0)
+	for index := range games {
+		if games[index].tier.Tier != "" {
+			rowsWithTier++
+		}
+		if games[index].createdAt > newestRow {
+			newestRow = games[index].createdAt
 		}
 	}
-	a.recordDiagnostic(map[string]any{"event": "opgg_match_tiers_result", "matches": len(matches), "matched": matched, "missing": len(matches) - matched})
+	for _, match := range pending {
+		for _, base := range opggTierTimeBases(match) {
+			if base.value > newestRiot {
+				newestRiot = base.value
+			}
+		}
+		result := matchOPGGAverageTierDetailed(match, games)
+		if result.tier != nil {
+			response[strconv.FormatInt(match.GameID, 10)] = result.tier
+			// 已结束的对局平均段位不会再变，落盘 7 天，重开时不再取 OP.GG 页。
+			a.writeMatchTierCache(match.GameID, result.tier)
+			matched++
+			bases[result.bestBase]++
+			continue
+		}
+		// R127 P1-c.1：未匹配的对局记下与最近一行差了多少秒（只记秒数，不记任何
+		// ID）。否则「23 场一场都没对上」在日志里只是一个 0，根本没法判断是时间
+		// 基准错了、还是 OP.GG 那边还没收录这几场。
+		timeGap, spanGap := opggNearestRowGap(match, games)
+		unmatchedTimeGaps = append(unmatchedTimeGaps, timeGap)
+		unmatchedSpanGaps = append(unmatchedSpanGaps, spanGap)
+	}
+	sourceLag := int64(0)
+	if newestRow > 0 && newestRiot > 0 {
+		// OP.GG 最新一行比 Riot 最新一场早了多久。明显为正说明 OP.GG 还没收录
+		// 最近的对局（它不会自动更新），不是匹配算法的问题。
+		sourceLag = (newestRiot - newestRow) / 1000
+	}
+	if sourceLag > opggSourceStaleSeconds {
+		// R127 P1-c.5：来源确实落后时明确告诉前端，界面显示「来源暂未收录」，
+		// 而不是一条让人以为出 bug 的横线。
+		for _, match := range pending {
+			key := strconv.FormatInt(match.GameID, 10)
+			if response[key] == nil {
+				response[key] = &matchTiersResponse{SourceStale: true}
+			}
+		}
+	}
+	event := map[string]any{
+		"event": "opgg_match_tiers_result", "matches": len(matches),
+		"matched": matched + cacheHits, "missing": len(pending) - matched,
+		// R127 P1-c.3：命中长期缓存的场次与本次是否真的发了 OP.GG 请求。
+		"cache_hits": cacheHits, "opgg_requests": 1,
+		// OP.GG 这一页有多少行、其中多少行真的带平均段位（R112 实测约 7/20）。
+		"rows": len(games), "rows_with_tier": rowsWithTier,
+		// 命中用的是哪个 Riot 时间基准：真机日志可以直接证实或推翻 end 假设。
+		"matched_bases": bases,
+	}
+	if len(unmatchedTimeGaps) > 0 {
+		event["unmatched_time_gap_seconds"] = unmatchedTimeGaps
+		event["unmatched_duration_gap_seconds"] = unmatchedSpanGaps
+	}
+	if sourceLag != 0 {
+		event["source_lag_seconds"] = sourceLag
+	}
+	a.recordDiagnostic(event)
 	respondJSON(w, response)
 }

@@ -75,7 +75,9 @@ test('R113 non-leader matchmaking is an inline condition, never a repeated failu
 });
 
 test('R113 ARAM live cards omit ranks and keep their three verified metrics',()=>{
-  const {renderLivePlayer}=compile('gameplay.js',['renderLivePlayer'],{state:{},maskedPlayerName:p=>p.name,liveDisplayedChampionId:()=>13,rankTitle:()=> '钻石 I',positionLabel:()=> '其他',
+  // R131 §2.1-5：R129 P1 抽出的历史状态判据按真实实现一起编译（不桩），
+  // 否则这份「海斗卡片不显示段位」的钉子测不出同类 flicker 回归。
+  const {renderLivePlayer}=compile('gameplay.js',['renderLivePlayer','liveHistoryStateOf','liveHistorySettled'],{state:{},maskedPlayerName:p=>p.name,liveDisplayedChampionId:()=>13,rankTitle:()=> '钻石 I',positionLabel:()=> '其他',
     renderLivePremadeTag:()=>'',iconFigure:()=>'',proBadgeAttributes:()=>'',renderProIdentityBadge:()=>'',escapeHTML,number:String,percent:v=>`${v}%`,kda:String});
   const html=renderLivePlayer({name:'我自己',isCurrent:true,rank:{tier:'DIAMOND'},modeStats:{games:10,wins:6,losses:4,winRate:60,kda:4}},0,false,13,[],'',true,true);
   const dom=new JSDOM(html);
@@ -92,6 +94,9 @@ test('R113 silver source rows survive nine earlier gold rows in both recommendat
     augmentTooltipText:()=>'',renderLiveAugmentIcon:()=>'',percent:String,number:String});
   const html=live.renderLiveAugmentRecommendations({},'hextech');
   assert.match(html,/is-silver/);for(const id of [10,11,12])assert.match(html,new RegExp(`海克斯${id}`));
-  const champions=compile('champions.js',['renderRecommendedAugments'],{augmentMetaForAsset:()=>null,augmentRarityKey:r=>r,augmentGrade:()=> 'S',renderMayhemRecommendedAugment:e=>`<b>${e.item.assets[0].name}</b>`});
+  // R116-B P0-6：renderRecommendedAugments 现在多了阶段筛选（stage=0 是英雄级
+  // 汇总，与 R113 这条断言的语义无关），把三个新依赖按默认「汇总」注入即可。
+  // R128 §2.3：慎选陈述（mayhemCautionNote）已从 UI 删除，不再需要注入。
+  const champions=compile('champions.js',['renderRecommendedAugments'],{augmentMetaForAsset:()=>null,augmentRarityKey:r=>r,augmentGrade:()=> 'S',renderMayhemRecommendedAugment:e=>`<b>${e.item.assets[0].name}</b>`,state:{mayhemStage:0},normalizeMayhemStage:()=>0,mayhemAugmentStageRow:()=>null,renderMayhemStageChips:()=>''});
   const catalog=champions.renderRecommendedAugments(rows,{});for(const id of [10,11,12])assert.match(catalog,new RegExp(`海克斯${id}`));
 });

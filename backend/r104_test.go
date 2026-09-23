@@ -83,7 +83,7 @@ func TestR104RealOPGGFixtureProvidesRevisionTimeAndZeroRiot(t *testing.T) {
 			original = row
 		}
 	}
-	if !original.LastMatchAtKnown || original.LastMatchAt != "2026-09-16T18:56:23Z" || original.RevisionAt != "2026-09-17T03:56:23+09:00" || original.Level != 415 || len(original.Rank) == 0 || original.PUUID == "" {
+	if original.LastMatchAtKnown || original.DirectoryRevisionAt != "2026-09-17T03:56:23+09:00" || original.RevisionAt != "2026-09-17T03:56:23+09:00" || original.Level != 415 || len(original.Rank) == 0 || original.PUUID == "" {
 		t.Fatalf("real fixture fields/time lost: %+v", original)
 	}
 	var calls atomic.Int32
@@ -97,8 +97,8 @@ func TestR104RealOPGGFixtureProvidesRevisionTimeAndZeroRiot(t *testing.T) {
 		}
 	}
 	rows := r104Rows(a.loadProSeedAccounts(context.Background(), nil, []proSeedAccount{seed}, teams))
-	if len(rows) != 1 || rows[0].PUUID != original.PUUID || rows[0].LastMatchAt != original.LastMatchAt || !rows[0].LastMatchAtKnown || string(rows[0].Rank) != string(original.Rank) || rows[0].Level != original.Level {
-		t.Fatalf("directory projection lost: %+v", rows)
+	if len(rows) != 1 || rows[0].PUUID != original.PUUID || rows[0].LastMatchAt != "" || rows[0].LastMatchAtKnown || rows[0].DirectoryRevisionAt != original.DirectoryRevisionAt || string(rows[0].Rank) != string(original.Rank) || rows[0].Level != original.Level {
+		t.Fatalf("directory projection lost or treated revision as match time: %+v", rows)
 	}
 	if calls.Load() != 0 {
 		t.Fatalf("OPGG hit made %d Riot requests", calls.Load())

@@ -4,6 +4,19 @@
   const escapeHTML = window.deepLegendsRuntime.escapeHTML;
 
   const STATUS_INTERVAL = 60 * 60 * 1000;
+  const CLIENT_INSTALLATION_TTL = 30_000;
+  // R130 P1-A 兜底：卡片任务拿到名额后超过这个时长仍没有任何 load/error，就按失败
+  // 处理——释放名额、试下一个候选地址、全部试完显示「暂无预览」。
+  // R130 工单原本给的阈值比这个短，实测口径下必须放大：第二层 image-queue.js 从
+  // 放行到彻底放弃的最坏路径是 10s 超时 + 10s 重试冷却 + 再 10s 超时 = 30s，而且
+  // 这 30s 是从「第二层放行」起算，看门狗是从「第一层发名额」起算，中间还要排第二
+  // 层自己的 5 个名额。阈值取在 30s 之前会让看门狗抢在第二层前面推进，既有概率跳过
+  // 本来能显示的候选地址，也会在每张慢图上误报一条 card_image_stalled，把「名额
+  // 是否泄漏」这个判据搞脏。45s 让它退回真正的兜底位置；工单里那个更短的值已作废
+  // （原始数值与推导过程记在 docs/r130-execution-ledger.md 第 10 节，R133 P1 复核）。
+  const CARD_IMAGE_STALL_MS = 45_000;
+  // R130 P1-6：card_image_stalled 每 10 秒最多上报一条。
+  const CARD_IMAGE_STALL_REPORT_INTERVAL_MS = 10_000;
 	const LIVE_UPDATE_STATE_SLICES = Object.freeze({
 	  "refresh-started": ["status"],
 	  "refresh-failed": ["status"],
@@ -80,8 +93,9 @@
     artworkPrefetchCache: window.deepLegendsRuntime?.createCache({ max: 128, ttl: 600000 }) || new Map(),
     acquisitionAvailable: null,
     acquisitionFallback: false,
-    installations: [],
     installationsLoaded: false,
+    installationLoadedAt: 0,
+    installationLoadPromise: null,
     installationLoadError: "",
     clientLaunchInFlight: "",
     clientLaunched: null,
@@ -105,6 +119,9 @@
     cardImageQueue: [],
     activeCardImages: 0,
     activePrestigeCardImages: 0,
+    cardImageWatchdogs: new WeakMap(),
+    lastCardImageStallReportAt: 0,
+    hoverVideo: null,
     fullscreenExitInProgress: false,
     detailArtworkMode: "ordinary",
     settingsPage: "appearance",
@@ -125,7 +142,7 @@
     "chroma-unowned-control", "show-unowned-chromas", "chroma-prestige-control", "show-prestige-chromas",
     "startup-loading", "startup-loading-title", "startup-loading-copy", "startup-loading-meta", "startup-loading-retry", "app-frame",
     "pool-catalog-panel", "pool-upload-panel", "pool-history-panel", "pool-picker", "pool-search", "pool-quality", "pool-sort", "pool-list-meta", "pool-skin-grid",
-    "favorites-collection-panel", "favorites-account-panel", "favorites-pools-panel",
+    "favorites-collection-panel", "favorites-account-panel", "favorites-pools-panel", "favorites-facade-panel",
     "skin-dialog-art", "skin-dialog-backdrop", "skin-dialog-artwork", "skin-dialog-fullscreen", "skin-dialog-previous", "skin-dialog-next", "app-main", "app-scroll", "back-to-top",
     "setting-proxy-mode", "setting-proxy-url", "setting-proxy-url-wrap", "setting-proxy-save", "setting-proxy-state",
     "update-button", "update-dialog", "update-dialog-title", "update-notes", "update-meta", "update-progress", "update-progress-fill", "update-progress-percent", "update-progress-hint", "update-alert", "update-start", "update-later", "update-cancel", "update-apply", "update-release-link", "update-dialog-close",
@@ -140,7 +157,7 @@
 
   el.sectionTabs = [...document.querySelectorAll("[data-section]")];
   el.sectionPanels = [...document.querySelectorAll("main > [role='tabpanel'], main > [data-standalone-page]")];
-  el.viewTabs = [...document.querySelectorAll("[data-view]")];
+  el.viewTabs = [...document.querySelectorAll("#favorites-collection-panel [data-view]")];
   el.favoritesTabs = [...document.querySelectorAll("[data-favorites-page]")];
   el.poolPageTabs = [...document.querySelectorAll("[data-pool-page]")];
   el.poolViewTabs = [...document.querySelectorAll("[data-pool-view]")];
@@ -445,7 +462,7 @@
       }
       updateReadingOverlay(loadItems || changed);
 	  renderStatus();
-	  if (!state.status.connected) await loadClientInstallations();
+  if (!state.status.connected && (!previous || previous.connected)) await loadClientInstallations();
 	  if (state.section === "favorites" && state.favoritesPage === "collection") {
         if (!state.status.snapshotReady) void ensureCollection();
         else triggerCollectionRescanIfDirty();
@@ -767,22 +784,38 @@
   }
 
   async function loadClientInstallations(force = false) {
+    const installationTTL = typeof CLIENT_INSTALLATION_TTL === "number" ? CLIENT_INSTALLATION_TTL : 30_000;
+    const now = Date.now();
+    if (!force && state.installationLoadPromise) return state.installationLoadPromise;
+    if (!force && state.installationsLoaded && now - Number(state.installationLoadedAt || 0) < installationTTL) {
+      renderLaunchpad(state.status || {});
+      return;
+    }
     state.installationsLoaded = false;
     state.installationLoadError = "";
     state.officialLoginMessage = "";
     renderLaunchpad(state.status || {});
-    try {
-      const payload = await api(`/api/client-installations${force ? "?force=1" : ""}`, {}, "client-installations", 8000);
-      state.installations = Array.isArray(payload.items) ? payload.items : [];
-      state.installationsLoaded = true;
-      renderLaunchpad(state.status || {});
-    } catch (error) {
-      if (error.name === "RequestCancelled") return;
-      state.installations = [];
-      state.installationsLoaded = true;
-      state.installationLoadError = error.message || "安装位置检查失败";
-      renderLaunchpad(state.status || {});
-    }
+    let promise;
+    promise = (async () => {
+      try {
+        const payload = await api(`/api/client-installations${force ? "?force=1" : ""}`, {}, "client-installations", 8000);
+        state.installations = Array.isArray(payload.items) ? payload.items : [];
+        state.installationsLoaded = true;
+        state.installationLoadedAt = Date.now();
+        renderLaunchpad(state.status || {});
+      } catch (error) {
+        if (error.name === "RequestCancelled") return;
+        state.installations = [];
+        state.installationsLoaded = true;
+        state.installationLoadedAt = Date.now();
+        state.installationLoadError = error.message || "安装位置检查失败";
+        renderLaunchpad(state.status || {});
+      } finally {
+        if (state.installationLoadPromise === promise) state.installationLoadPromise = null;
+      }
+    })();
+    state.installationLoadPromise = promise;
+    return promise;
   }
 
   function renderLaunchpad(data) {
@@ -1004,9 +1037,31 @@
     return chronological || localeCompare(left.name, right.name) || Number(left.id) - Number(right.id);
   }
 
+  // R130 P5：摘要行里的数字统一用主题色。一律用 DOM 拼接，绝不把未转义文本塞进
+  // innerHTML——摘要里既有款数、英雄数，也有快照时间这类来自外部的字符串。
+  // 数字直接传 number，由 formatNumber 统一格式化；数组按顺序展开；空值跳过。
+  function renderListMeta(...segments) {
+    const nodes = [];
+    const push = (segment) => {
+      if (segment === null || segment === undefined || segment === false || segment === "") return;
+      if (Array.isArray(segment)) { for (const item of segment) push(item); return; }
+      if (typeof segment === "number") {
+        const value = document.createElement("b");
+        value.className = "list-meta-number";
+        value.textContent = formatNumber(segment);
+        nodes.push(value);
+        return;
+      }
+      nodes.push(document.createTextNode(String(segment)));
+    };
+    for (const segment of segments) push(segment);
+    el.listMeta.replaceChildren(...nodes);
+  }
+
   function renderItems() {
     cancelRenderFrames();
     cancelDeferredImages(el.grid);
+    stopHoverVideo();
     const generation = ++state.renderGeneration;
     if (state.section !== "favorites" || state.favoritesPage !== "collection") return;
     el.grid.classList.remove("is-sparse");
@@ -1040,7 +1095,7 @@
     const heroCount = ["all", "chromas"].includes(state.view) ? new Set(visible.map((skin) => skin.championId || skin.championName)).size : 0;
     const acquisitionHint = state.acquisitionFallback ? " · 客户端未提供获取时间，已改按名称排列" : state.view === "all" && state.sort === "acquired" ? " · 英雄按最近获得的皮肤排列" : "";
     const staleHint = state.staleSnapshot ? ` · 历史快照${state.staleSnapshotAt ? `（${formatDateTime(state.staleSnapshotAt)}）` : ""}` : "";
-    el.listMeta.textContent = `${label} ${formatNumber(visible.length)} 款${heroCount ? ` · ${formatNumber(heroCount)} 位英雄` : ""}${visible.length !== state.items.length ? ` · 共 ${formatNumber(state.items.length)} 款` : ""}${acquisitionHint}${staleHint}`;
+    renderListMeta(label, " ", visible.length, " 款", heroCount ? [" · ", heroCount, " 位英雄"] : "", visible.length !== state.items.length ? [" · 共 ", state.items.length, " 款"] : "", acquisitionHint, staleHint);
     el.grid.replaceChildren();
     if (!visible.length) {
       if (!state.status?.connected) {
@@ -1269,8 +1324,10 @@
     const locked = !chroma.owned;
     card.classList.toggle("is-locked", locked);
     const status = card.querySelector(".skin-state");
-    status.textContent = chroma.owned ? "已拥有" : "未获取";
-    status.hidden = false;
+    // R130 P3：炫彩卡片去掉右上角的状态标签。未获取靠置灰 + 锁图标表示，已获取
+    // 正常显示；拥有状态在详情弹窗里仍然保留一行。
+    status.textContent = "";
+    status.hidden = true;
     card.querySelector("strong").textContent = chroma.name;
     card.querySelector(".skin-hero").textContent = chroma.championName || `英雄 ID ${chroma.championId || "—"}`;
     card.querySelector(".skin-meta").textContent = `臻彩 · ID ${chroma.id}`;
@@ -1396,6 +1453,9 @@
   function openChromaDetails(chroma, candidates = null, options = {}) {
     const generation = ++state.detailGeneration;
     clearTimeout(state.detailMediaTimer);
+    // R130 P1-C：弹窗进入顶层之后卡片就收不到可靠的 pointerleave 了，悬停视频会一直
+    // 挂着 /api/media 的连接，和弹窗自己的原画、背景、悬停视频抢浏览器那 6 条连接。
+    stopHoverVideo();
     state.selectedSkin = chroma;
     state.detailKind = "chroma";
     state.detailArtworkMode = chroma.isPrestige && options.artworkMode === "prestige" ? "prestige" : "ordinary";
@@ -1500,13 +1560,41 @@
     return sources;
   }
   function skinVideoPath(skin) { return skin.collectionVideoPath || skin.splashVideoPath || skin.cardHoverVideoPath; }
+  // R130 P1-C：悬停视频走 /api/media，不经过图片队列，而以前全文件没有
+  // pointerleave——鼠标移开后循环视频继续占着连接，要等列表重建才停。Chromium
+  // 每个主机最多 6 条连接，炫彩原画、终极皮肤这类动态原画体积大，在列表上随便
+  // 划过几张卡就能把连接占满，图片因此超时，再叠加 P1-A 的名额泄漏就是整屏
+  // 「加载中」。这里限制全局同时只播放 1 个悬停视频，开始下一个前先停掉上一个。
+  function stopHoverVideo() {
+    const current = state.hoverVideo;
+    if (!current) return;
+    state.hoverVideo = null;
+    // resetVideo 会移除 src 并调用 load()，这才会真正中断传输、释放连接；
+    // 单纯 pause() 在 Chromium 里仍然保持连接。
+    resetVideo(current.video);
+    // 展示状态按当前真实情况恢复，不能用播放前的快照：视频播放期间图片可能已经
+    // 加载完成，快照会把「加载中」的占位重新盖到已经出图的卡片上。出过图就只显示
+    // 图；没出过图（还在加载、或候选全部失败）才让占位继续显示——图片本身没有
+    // is-loaded 时 CSS 就是 opacity: 0，露出来也看不见，不会变成一块空白。
+    const loaded = current.image.classList.contains("is-loaded");
+    current.image.hidden = false;
+    current.fallback.hidden = loaded;
+  }
   function prepareSkinVideo(video, image, fallback, path, card) {
     video.hidden = true;
     video.removeAttribute("src");
     if (!path) return;
-    const start = () => loadSkinVideo(video, image, fallback, path);
-    card.addEventListener("pointerenter", start, { once: true, passive: true });
-    card.addEventListener("focus", start, { once: true, passive: true });
+    const start = () => {
+      if (state.hoverVideo?.video === video) return;
+      stopHoverVideo();
+      state.hoverVideo = { video, image, fallback };
+      loadSkinVideo(video, image, fallback, path);
+    };
+    const stop = () => { if (state.hoverVideo?.video === video) stopHoverVideo(); };
+    card.addEventListener("pointerenter", start, { passive: true });
+    card.addEventListener("focus", start, { passive: true });
+    card.addEventListener("pointerleave", stop, { passive: true });
+    card.addEventListener("blur", stop, { passive: true });
   }
   function loadSkinVideo(video, image, fallback, path) {
     resetVideo(video);
@@ -1531,12 +1619,36 @@
   function loadImageAlternatives(image, fallback, paths, onComplete = null) {
     loadImageSources(image, fallback, localImageSources(paths), onComplete);
   }
+  function clearCardImageWatchdog(image) {
+    const timer = state.cardImageWatchdogs.get(image);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    state.cardImageWatchdogs.delete(image);
+  }
+  // R130 P1-6：看门狗判定卡片图卡死时上报，每 10 秒最多一条。只带队列计数、候选
+  // 序号与来源类别，不带任何资源路径，与 image-queue.js 的失败上报同一隐私口径。
+  // 限速在这里做而不是复用 runtime.js 的 sampled 通道：那条通道的 in-flight 集合
+  // 是所有 sampled 事件共用的，local_request_client 在途时会把 stall 一起压掉。
+  function reportCardImageStall(sourceIndex, url) {
+    const now = Date.now();
+    if (now - state.lastCardImageStallReportAt < CARD_IMAGE_STALL_REPORT_INTERVAL_MS) return;
+    state.lastCardImageStallReportAt = now;
+    window.reportFlowDiagnostic?.("card_image_stalled", "watchdog", {
+      activeCardImages: state.activeCardImages,
+      queued: state.cardImageQueue.length,
+      sourceIndex,
+      // 分类不出来就不带这个字段（runtime.js 与 features.go 都会丢掉非枚举值）。
+      // 这里绝不能兜底成 "lcu"：那是拿推断值代替证据，会把慢源归错类。
+      imageSource: window.deepLegendsImageSourceLabel?.(url),
+    });
+  }
   function loadImageSources(image, fallback, sources, onComplete = null) {
     let index = 0;
     let completed = false;
     const complete = () => {
       if (completed) return;
       completed = true;
+      clearCardImageWatchdog(image);
       onComplete?.();
     };
     image.onload = null;
@@ -1546,11 +1658,38 @@
     image.hidden = false;
     fallback.hidden = false;
     const next = () => {
+      clearCardImageWatchdog(image);
       if (index >= sources.length) { image.hidden = true; fallback.textContent = fallback.dataset.emptyText || "暂无预览"; fallback.hidden = false; complete(); return; }
-      image.setAttribute("data-queued-src", sources[index++]);
+      const sourceIndex = index;
+      const source = sources[index++];
+      image.setAttribute("data-queued-src", source);
+      // R130 P1-A 兜底看门狗：第二层彻底放弃时靠 removeAttribute("src") 收尾，
+      // 而移除 src 不触发任何 load/error，onerror 上的候选回退与名额释放就永远
+      // 不会执行。这里保证 CARD_IMAGE_STALL_MS（见文件顶部那条常量的注释）内必定
+      // 推进一次；写死具体秒数会和常量脱节，R133 P1 就是在收拾这个。
+      if (typeof setTimeout !== "function") return;
+      const timer = setTimeout(() => {
+        state.cardImageWatchdogs.delete(image);
+        // 只有卡片任务才上报：loadImageSources 也被皮肤/炫彩详情弹窗复用，弹窗图
+        // 不占第一层名额，把它报成 card_image_stalled 会污染「名额是否泄漏」这个判据。
+        if (state.cardImageJobs.has(image)) reportCardImageStall(sourceIndex, source);
+        next();
+      }, CARD_IMAGE_STALL_MS);
+      timer?.unref?.();
+      state.cardImageWatchdogs.set(image, timer);
     };
-    image.onload = () => { image.classList.add("is-loaded"); fallback.hidden = true; complete(); };
-    image.onerror = next;
+    image.onload = () => {
+      if (completed) return;
+      clearCardImageWatchdog(image);
+      image.classList.add("is-loaded"); fallback.hidden = true; complete();
+    };
+    // 看门狗已经推进到下一个候选之后，第二层迟到的 error 不能再推进一次，否则会
+    // 跳过本来能显示的那个地址。
+    image.onerror = () => {
+      if (completed) return;
+      if (index > 0 && sources[index - 1] !== image.getAttribute("data-queued-src")) return;
+      next();
+    };
     next();
   }
 
@@ -1558,16 +1697,38 @@
     if (state.cardImageObserver || !("IntersectionObserver" in window)) return state.cardImageObserver;
     state.cardImageObserver = new IntersectionObserver((entries) => {
       for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
         const job = state.cardImageJobs.get(entry.target);
-        state.cardImageObserver.unobserve(entry.target);
-        if (job && !job.cancelled) enqueueCardImageJob(job);
+        if (entry.isIntersecting) {
+          if (job && !job.cancelled) enqueueCardImageJob(job);
+          // R130 P1-B：只有真的拿到名额才停止观察。还排在队里的任务必须继续被
+          // 观察，否则卡片滚出预取范围时没人能把它撤回，全局名额又会被屏幕外的
+          // 卡片占住。任务结束时由 finishCardImageJob 统一 unobserve。
+          const current = state.cardImageJobs.get(entry.target);
+          if (!current || current.active || current.done || current.cancelled) state.cardImageObserver.unobserve(entry.target);
+          continue;
+        }
+        // R130 P1-B：两层各判一次可见区域时，第一层按 620px 预取范围发名额，第二层
+        // 却按真实可见才放行，屏幕外的卡片于是长期占着全局 8 个名额；直接跳到列表
+        // 底部会出现「屏幕上的卡片一张都不加载」。已经排队但还没拿到名额的任务，
+        // 卡片离开预取范围就撤回并重新观察，保证先加载当前屏幕上的卡片。
+        if (!job || job.cancelled || job.done || job.active) continue;
+        if (!withdrawCardImageJob(job)) continue;
+        state.cardImageObserver.observe(entry.target);
       }
     }, { root: el.appScroll, rootMargin: "620px 0px" });
     return state.cardImageObserver;
   }
 
+  function withdrawCardImageJob(job) {
+    const index = state.cardImageQueue.indexOf(job);
+    if (index < 0) return false;
+    state.cardImageQueue.splice(index, 1);
+    job.image.dataset.cardImage = "pending";
+    return true;
+  }
+
   function deferCardImageSources(image, fallback, sources, remote = false) {
+    clearCardImageWatchdog(image);
     image.onload = null;
     image.onerror = null;
     image.removeAttribute("src");
@@ -1609,6 +1770,9 @@
       state.activeCardImages += 1;
       if (job.remote) state.activePrestigeCardImages += 1;
       job.image.dataset.cardImage = "loading";
+      // R130 P1-B：可见区域只在第一层判一次。拿到名额就转 eager，第二层不再用
+      // 懒加载重复拦截——否则名额已经发出、请求却被压在第二层不放行。
+      job.image.loading = "eager";
       loadImageSources(job.image, job.fallback, job.sources, () => finishCardImageJob(job));
     }
   }
@@ -1622,6 +1786,7 @@
     }
     job.active = false;
     delete job.image.dataset.cardImage;
+    state.cardImageObserver?.unobserve(job.image);
     state.cardImageJobs.delete(job.image);
     pumpCardImageQueue();
   }
@@ -1633,6 +1798,7 @@
       if (!job || job.done) continue;
       job.cancelled = true;
       state.cardImageObserver?.unobserve(image);
+      clearCardImageWatchdog(image);
       image.onload = null;
       image.onerror = null;
       image.removeAttribute("src");
@@ -1643,6 +1809,9 @@
 
   function resetDialogImage(message) {
     loadDialogBackdrop("");
+    // R130 P1-A：弹窗图同样走 loadImageSources，重建前必须清掉上一张的看门狗，
+    // 否则它会在 CARD_IMAGE_STALL_MS 之后醒来，给一张已经关掉的弹窗重新写 data-queued-src。
+    clearCardImageWatchdog(el.skinDialogImage);
     el.skinDialogImage.onload = null;
     el.skinDialogImage.onerror = null;
     el.skinDialogImage.removeAttribute("src");
@@ -1656,6 +1825,8 @@
   async function openSkinDetails(skin, candidates = null) {
     const generation = ++state.detailGeneration;
     clearTimeout(state.detailMediaTimer);
+    // R130 P1-C：同 openChromaDetails——弹窗一开，卡片的 pointerleave 就不可靠了。
+    stopHoverVideo();
     state.selectedSkin = skin;
     state.detailKind = "skin";
     state.detailItems = candidates || state.items;
@@ -1961,6 +2132,7 @@
   function renderPoolCatalog() {
     cancelPoolRenderFrames();
     cancelDeferredImages(el.poolSkinGrid);
+    stopHoverVideo();
     const generation = ++state.poolRenderGeneration;
     el.poolSkinGrid.setAttribute("aria-busy", String(state.poolLoading));
     el.poolSkinGrid.classList.remove("is-grouped");
@@ -2110,6 +2282,11 @@
       state.renderGeneration += 1;
       state.poolRenderGeneration += 1;
       cancelDeferredImages(el.grid);
+      // R130 P1-D：奖池面板隐藏后里面的图片永远不可见，第二层不会放行，已经拿到
+      // 名额的任务会一直占着全局 8 个名额，直到下次打开奖池页。离开收藏页时和
+      // 皮肤列表一起取消。
+      cancelDeferredImages(el.poolSkinGrid);
+      stopHoverVideo();
     }
     state.section = name;
     const sectionTitles = { "pro-players": ["职业选手", "一队选手 · 公开韩服账号"], overview: ["总览", "召唤师生涯与最近对局"], champions: ["英雄", "韩服梯度、符文与构建推荐"], live: ["对局", "实时队伍与赛前配置"], favorites: ["收藏", "皮肤、物品与三合一奖池"], suite: ["工具", "自动 · 维护 · 生涯 · 领奖 · 征召"], settings: ["设置", "显示、对局行为与隐私"] };
@@ -2220,12 +2397,15 @@
       state.renderGeneration += 1;
       state.poolRenderGeneration += 1;
       cancelDeferredImages(el.grid);
+      // R130 P1-D：切换收藏子页时奖池网格同样要取消，理由同 activateSection。
+      cancelDeferredImages(el.poolSkinGrid);
+      stopHoverVideo();
     }
     state.favoritesPage = name;
     activateTab(tab, el.favoritesTabs, (selected) => {
-      for (const panel of [el.favoritesCollectionPanel, el.favoritesAccountPanel, el.favoritesPoolsPanel]) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
+      for (const panel of [el.favoritesCollectionPanel, el.favoritesAccountPanel, el.favoritesPoolsPanel, el.favoritesFacadePanel]) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
     });
-    const subtitles = { collection: "皮肤与炫彩收藏", account: "账户、战利品与待领取奖励", pools: "奖池目录、清单上传与本地历史" };
+    const subtitles = { collection: "皮肤与炫彩收藏", account: "账户、战利品与待领取奖励", pools: "奖池目录、清单上传与本地历史", "facade-collection": "头像与旗帜目录" };
     if (state.section === "favorites") el.topbarSubtitle.textContent = subtitles[name] || "收藏工具";
     el.pageIntro.hidden = state.section !== "favorites";
     if (name === "collection" && (returning || previous !== "collection")) {
@@ -2237,8 +2417,16 @@
     }
     if (name === "account" && !state.accountLoaded) loadAccount();
     if (name === "pools" && !state.poolsLoaded) loadPools();
+    if (name === "facade-collection") window.deepLegendsFavoritesFacade?.activate?.();
     if (state.status) renderNotice(state.status);
   }
+
+  // 生涯页「在收藏页浏览头像与旗帜」入口：切到收藏页并定位到头像/旗帜视图。
+  window.deepLegendsOpenFacadeCollection = (view) => {
+    activateSection("favorites");
+    activateFavoritesPage("facade-collection");
+    window.deepLegendsFavoritesFacade?.setView?.(view === "banners" ? "banners" : "icons");
+  };
 
   function resetCollectionControls(view) {
     state.view = view;
@@ -3128,7 +3316,7 @@
       visibleCount += 1;
       heroes.add(item.championId || item.championName);
     }
-    el.listMeta.textContent = `全部炫彩 ${formatNumber(visibleCount)} 款 · ${formatNumber(heroes.size)} 位英雄${visibleCount !== state.items.length ? ` · 共 ${formatNumber(state.items.length)} 款` : ""}`;
+    renderListMeta("全部炫彩 ", visibleCount, " 款 · ", heroes.size, " 位英雄", visibleCount !== state.items.length ? [" · 共 ", state.items.length, " 款"] : "");
   }
 
   el.refreshHistory.addEventListener("click", loadHistory);
@@ -3206,6 +3394,16 @@
   async function closeSkinDialog() {
     ++state.detailGeneration;
     clearTimeout(state.detailMediaTimer);
+    // R130 P1-A：关闭弹窗后不会再有新的 loadImageSources 来顶掉看门狗，必须显式清理。
+    clearCardImageWatchdog(el.skinDialogImage);
+    // R130 P1-A：弹窗节点一直留在文档里（isConnected 恒为 true），第二层彻底放弃时
+    // 照样会补发合成 error。不把 onload/onerror 与 data-queued-src 一起摘掉，一个
+    // 已经关闭的弹窗会继续试剩下的候选地址、白占连接，还会把「暂无预览」写进下一次
+    // 打开要用的占位里。摘掉 data-queued-src 之后第二层会走「URL 变了就重新入队」
+    // 那条路，enqueue 读不到 url 直接返回，不会再发请求。
+    el.skinDialogImage.onload = null;
+    el.skinDialogImage.onerror = null;
+    el.skinDialogImage.removeAttribute("data-queued-src");
     resetVideo(el.skinDialogVideo);
     await exitArtworkFullscreen();
     if (el.skinDialog.open) el.skinDialog.close();
@@ -3253,12 +3451,23 @@
   el.skinDialog.addEventListener("click", (event) => { if (event.target === el.skinDialog) void closeSkinDialog(); });
   for (const eventName of ["dblclick", "selectstart"]) el.skinDialogArt.addEventListener(eventName, (event) => event.preventDefault());
   el.copySkinId.addEventListener("click", async () => { if (!state.selectedSkin) return; const label = state.detailKind === "chroma" ? "炫彩 ID" : "皮肤 ID"; try { await navigator.clipboard.writeText(String(state.selectedSkin.id)); showToast(`${label} 已复制`); } catch (_) { showToast(`${label}：${state.selectedSkin.id}`); } });
-  document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(state.statusTimer); state.controllers.get("status")?.abort(); } else refreshStatus(false); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      clearTimeout(state.statusTimer);
+      state.controllers.get("status")?.abort();
+      return;
+    }
+    clearTimeout(state.liveUpdateTimer);
+    state.liveUpdateTimer = 0;
+    if (state.liveUpdateSlices.size) void flushLiveUpdateSlices();
+    else void refreshStatus(false);
+  });
 
   function debounce(callback, delay) { let timer = 0; return (...args) => { clearTimeout(timer); timer = setTimeout(() => callback(...args), delay); }; }
 
   async function flushLiveUpdateSlices() {
-	const slices = new Set(state.liveUpdateSlices);
+    if (typeof document !== "undefined" && document.hidden) return;
+    const slices = new Set(state.liveUpdateSlices);
 	state.liveUpdateSlices.clear();
 	if (!slices.size || state.destroyed) return;
 	if (slices.has("status")) await refreshStatus(slices.has("resync"));

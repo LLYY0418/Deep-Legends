@@ -1,0 +1,227 @@
+ M .github/workflows/ci.yml
+ M AGENTS.md
+ M CHANGELOG.md
+ M CLAUDE.md
+ M DESIGN.md
+ M README.md
+ M backend/asset_cache.go
+ M backend/catalog.go
+ M backend/catalog_test.go
+ M backend/champion_cache.go
+ M backend/champion_images.go
+ M backend/champions.go
+ M backend/champions_structured.go
+ M backend/champions_test.go
+ M backend/champselect_execution_test.go
+ M backend/community_images.go
+ M backend/diagnostics_2351_test.go
+ M backend/facade_backdrop.go
+ M backend/facade_banners.go
+ M backend/facade_icons.go
+ M backend/features.go
+ M backend/gameplay.go
+ M backend/gameplay_test.go
+ M backend/hexdata.go
+ M backend/hexdata_test.go
+ M backend/loot_metadata_test.go
+ M backend/main.go
+ M backend/main_test.go
+ M backend/opgg_insights.go
+ M backend/opgg_insights_test.go
+ M backend/overview_current_game.go
+ M backend/player_ability.go
+ M backend/player_ability_test.go
+ M backend/pro_players.go
+ M backend/pro_players_test.go
+ M backend/pro_profile_activity.go
+ M backend/pro_profiles.go
+ M backend/pro_refresh.go
+ M backend/profile_facade.go
+ M backend/qq101_test.go
+ M backend/quality_test.go
+ D backend/r101_probe.go
+ M backend/r101_test.go
+ M backend/r104_test.go
+ M backend/r105_test.go
+ M backend/r106_test.go
+ M backend/r107_test.go
+ M backend/r108_test.go
+ M backend/r115_scoring_test.go
+ M backend/r50_suite_test.go
+ M backend/r60_test.go
+ M backend/r74_regression_test.go
+ M backend/r87_test.go
+ M backend/r91_addendum_test.go
+ M backend/r99_probe.go
+ M backend/r99_test.go
+ M backend/rank_insights.go
+ M backend/riot_api.go
+ M backend/riot_history_filter.go
+ M backend/season_stats.go
+ M backend/season_stats_test.go
+ M backend/specialist_runes.go
+ M backend/specialist_runes_test.go
+ M backend/static_assets.go
+ M backend/static_assets_test.go
+ M backend/testdata/r88/protected-layout-rules.json
+ M backend/web/app-icon.png
+ M backend/web/app.css
+ M backend/web/app.js
+ M backend/web/champions.css
+ M backend/web/champions.js
+ M backend/web/champions.test.cjs
+ M backend/web/demo-data.js
+ M backend/web/friends.css
+ M backend/web/friends.js
+ M backend/web/gameplay.css
+ M backend/web/gameplay.js
+ M backend/web/gameplay.test.cjs
+ M backend/web/image-queue.js
+ M backend/web/index.html
+ M backend/web/loot-icons/blue-essence.png
+ M backend/web/loot-icons/hextech-chest-transparent.png
+ M backend/web/loot-icons/hextech-key.png
+ M backend/web/loot-icons/key-fragment.png
+ M backend/web/loot-icons/orange-essence.png
+ M backend/web/loot-icons/promotion-chest.png
+ M backend/web/pro-players.js
+ M backend/web/r100.test.cjs
+ M backend/web/r101.test.cjs
+ M backend/web/r105.test.cjs
+ M backend/web/r106.test.cjs
+ M backend/web/r111.test.cjs
+ M backend/web/r113.test.cjs
+ M backend/web/r115.test.cjs
+ M backend/web/r87.test.cjs
+ M backend/web/r90.test.cjs
+ M backend/web/r91-addendum.test.cjs
+ M backend/web/r91.test.cjs
+ M backend/web/r94.test.cjs
+ M backend/web/rank-crests/bronze.png
+ M backend/web/rank-crests/challenger.png
+ M backend/web/rank-crests/diamond.png
+ M backend/web/rank-crests/emerald.png
+ M backend/web/rank-crests/gold.png
+ M backend/web/rank-crests/grandmaster.png
+ M backend/web/rank-crests/iron.png
+ M backend/web/rank-crests/master.png
+ M backend/web/rank-crests/platinum.png
+ M backend/web/rank-crests/silver.png
+ M backend/web/runtime.js
+ M backend/web/section-loader.js
+ M backend/web/suite.css
+ M backend/web/suite.js
+ M backend/web/suite.test.cjs
+ M desktop/overview-render.test.cjs
+ M desktop/package-lock.json
+ M desktop/package.json
+ M desktop/r100-browser.cjs
+ M docs/r100-validation/browser/confirmed-backend-exit.png
+ M docs/r100-validation/browser/result.json
+ M docs/r100-validation/browser/status-with-hung-images.png
+?? "Claude outputs/"
+?? backend/augment_contract_probe.go
+?? backend/augment_contract_probe_test.go
+?? backend/backend
+?? backend/champion_cache_r116a_test.go
+?? backend/gameplay_r116b_test.go
+?? backend/gameplay_r116d_test.go
+?? backend/gameplay_r116e_test.go
+?? backend/hexdata_r116a_test.go
+?? backend/hexdata_r116b_test.go
+?? backend/hexdata_r116f_test.go
+?? backend/match_tier_cache.go
+?? backend/position_contract_probe.go
+?? backend/position_contract_probe_test.go
+?? backend/r119_autofill_test.go
+?? backend/r121_autofill_test.go
+?? backend/r122_autofill_diagnostic_test.go
+?? backend/r126_test.go
+?? backend/r127_test.go
+?? backend/r130_test.go
+?? backend/r132_test.go
+?? backend/readme_privacy_test.go
+?? backend/season_stats_budget.go
+?? backend/season_stats_budget_test.go
+?? backend/testdata/r116/
+?? backend/web/favorites-facade.js
+?? backend/web/r116b.test.cjs
+?? backend/web/r116d.test.cjs
+?? backend/web/r116e.test.cjs
+?? backend/web/r116f.test.cjs
+?? backend/web/r117-style.test.cjs
+?? backend/web/r117.test.cjs
+?? backend/web/r119.test.cjs
+?? backend/web/r123.test.cjs
+?? backend/web/r126.test.cjs
+?? backend/web/r127.test.cjs
+?? backend/web/r128.test.cjs
+?? backend/web/r129.test.cjs
+?? backend/web/r130.test.cjs
+?? desktop/r117-browser.cjs
+?? docs/WORKLIST-R117-FULL-PROJECT-OPTIMIZATION.md
+?? docs/WORKLIST-R118-INDEPENDENT-VERIFICATION-GAPS.md
+?? docs/WORKLIST-R119-AUTOFILL-DIAGNOSTIC-EVENTS-UNTESTED.md
+?? docs/WORKLIST-R119-AUTOFILL-LABEL-GAPS.md
+?? docs/WORKLIST-R120-INDEPENDENT-VERIFICATION-R116-R118-GAPS.md
+?? docs/WORKLIST-R120-TEST-POWER-AND-FLAKES.md
+?? docs/WORKLIST-R120-WILDCARD-HOVER-LOCK-CHECK-RACE.md
+?? docs/WORKLIST-R121-POSITION-PROBE-HELP-FALLBACK-INEFFECTIVE.md
+?? docs/WORKLIST-R123-FACADE-ICON-BANNER-COLLECTION-MIGRATION.md
+?? docs/WORKLIST-R124-FACADE-COLLECTION-UNOWNED-FILTER-GAP.md
+?? docs/WORKLIST-R125-FACADE-ICON-TILE-NATIVE-SIZE.md
+?? docs/WORKLIST-R126-CAREER-BACKGROUND-BASE-SKIN-MISMATCH.md
+?? docs/WORKLIST-R127-OVERVIEW-MATCH-LIST-SLOW-LOAD.md
+?? docs/WORKLIST-R128-MAYHEM-DETAIL-OVERVIEW-MODULES-AND-AUGMENT-HEADER.md
+?? docs/WORKLIST-R129-LIVE-RECOMMENDATION-FLICKER.md
+?? docs/WORKLIST-R130-COLLECTION-IMAGE-STALL-AND-FACADE-POLISH.md
+?? docs/WORKLIST-R131-R128-R129-TEST-SUITE-GAPS.md
+?? docs/WORKLIST-R133-R130-VERIFICATION-FOLLOWUPS.md
+?? docs/WORKLIST-R134-STALL-LOG-REPORT-CROSS-RUN-CONTAMINATION.md
+?? docs/WORKLIST-R135-REPO-SLIMMING-CACHE-DOCS-DEADCODE.md
+?? docs/design-mockups/
+?? "docs/history/worklists/R116-A-Hexdata\346\225\260\346\215\256\346\272\220\346\233\277\346\215\242\344\270\216\350\201\232\345\220\210\346\226\207\344\273\266\346\216\245\345\205\245-\345\267\245\345\215\225.md"
+?? "docs/history/worklists/R116-B-P0\345\205\255\351\241\271\344\270\216\350\257\246\346\203\205\351\241\265\344\270\211tab\351\207\215\346\225\264-\345\267\245\345\215\225.md"
+?? "docs/history/worklists/R116-D-\346\216\250\350\215\220\351\241\265\345\205\213\345\210\266\345\215\217\345\220\214\344\270\216\345\207\272\350\243\205\350\201\224\345\212\250-\345\267\245\345\215\225.md"
+?? "docs/history/worklists/R116-E-\350\207\252\345\273\272\346\265\267\346\226\227\347\273\237\350\256\241\344\270\216\347\243\201\347\233\230\351\242\204\347\256\227-\345\267\245\345\215\225.md"
+?? "docs/history/worklists/R116-F-\346\246\202\347\216\207\351\242\204\346\265\213\345\231\250\350\264\237\345\220\221\346\216\250\350\215\220\344\270\216\345\271\263\350\241\241\345\217\202\346\225\260\346\216\242\346\265\213-\345\267\245\345\215\225.md"
+?? "docs/history/worklists/R116-\346\216\242\346\265\213-\346\265\267\345\205\213\346\226\257\351\200\211\346\213\251\347\253\257\347\202\271\344\270\216\345\261\200\345\206\205\346\225\260\346\215\256\345\275\242\347\212\266\346\216\242\346\265\213-\345\267\245\345\215\225.md"
+?? docs/r116-execution-ledger.md
+?? docs/r116-independent-verification.md
+?? docs/r116-mayhem-data-dimensions-proposal.md
+?? docs/r116-probe-findings.md
+?? docs/r116-proposal-feasibility-review.md
+?? docs/r116-worklist-index.md
+?? docs/r116a-execution-ledger.md
+?? docs/r116b-execution-ledger.md
+?? docs/r116d-execution-ledger.md
+?? docs/r116e-execution-ledger.md
+?? docs/r116f-balance-param-findings.md
+?? docs/r116f-execution-ledger.md
+?? docs/r116probe-execution-ledger.md
+?? docs/r117-execution-ledger.md
+?? docs/r117-independent-verification.md
+?? docs/r117-validation/
+?? docs/r118-execution-ledger.md
+?? docs/r118-independent-verification.md
+?? docs/r119-execution-ledger.md
+?? docs/r119-independent-verification.md
+?? docs/r119-validation/
+?? docs/r120-execution-ledger.md
+?? docs/r120-retest-execution-ledger.md
+?? docs/r120-wildcard-hover-execution-ledger.md
+?? docs/r121-execution-ledger.md
+?? docs/r121-position-probe-findings.md
+?? docs/r122-execution-ledger.md
+?? docs/r123-execution-ledger.md
+?? docs/r123-validation/
+?? docs/r124-execution-ledger.md
+?? docs/r126-execution-ledger.md
+?? docs/r127-execution-ledger.md
+?? docs/r130-execution-ledger.md
+?? docs/r130-validation/
+?? docs/r133-execution-ledger.md
+?? docs/r134-execution-ledger.md
+?? docs/r135-validation/
+?? scripts/r133-stall-log-report.cjs
+?? scripts/r133-stall-log-report.test.cjs

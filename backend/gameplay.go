@@ -196,6 +196,17 @@ type participantCompletenessSummary struct {
 	MissingPlayerRefs     int
 	GamesMissingPlayerRef int
 	Counts                map[int]int
+	// 补位候选的证据计数，只统计召唤师峡谷单双排/灵活组排：Candidates 是
+	// **候选**人数（未经真机验证，不等于真实补位。旧名带「已打标签」含义，
+	// 但开关关闭时一个标签都不会打，那是假陈述，故按 R119 台账工单 P3-1
+	// 改成中性名）；PositionMismatch 是两个推算位置都有值但不一致的人数；
+	// NoEvidence 是整场缺少可用位置证据、因而整场降级不出标签的场次数。
+	// 三个数字由 autofillDiagnosticFields 统一拼进 sgp_match_history_* 与
+	// sgp_summary_history_* 诊断事件，供真机核验；计数走 riotAutofillCandidates，
+	// 因此标签总开关关闭时仍然照常产出。
+	AutofillCandidates int
+	PositionMismatch   int
+	AutofillNoEvidence int
 }
 
 type gameplayOverview struct {
@@ -418,9 +429,14 @@ type gameplayRecentPlayer struct {
 }
 
 type gameplayMatch struct {
-	GameID               int64  `json:"gameId"`
-	CreatedAt            int64  `json:"createdAt"`
-	Duration             int64  `json:"duration"`
+	GameID    int64 `json:"gameId"`
+	CreatedAt int64 `json:"createdAt"`
+	Duration  int64 `json:"duration"`
+	// R127 P1-c.2：真正的开局与结束时间（毫秒，来自 gameStartTimestamp /
+	// gameEndTimestamp）。CreatedAt 是房间创建时间，只用于展示与排序；韩服平均
+	// 段位要用这两个时间去和 OP.GG 的对局记录对齐。
+	StartedAt            int64  `json:"startedAt,omitempty"`
+	EndedAt              int64  `json:"endedAt,omitempty"`
 	QueueID              int64  `json:"queueId"`
 	QueueLabel           string `json:"queueLabel"`
 	ModeGroup            string `json:"modeGroup"`
@@ -484,6 +500,14 @@ type gameplayParticipant struct {
 	// Placement 是该小队的最终名次（1 为冠军）。
 	SubteamID int64 `json:"subteamId,omitempty"`
 	Placement int   `json:"placement,omitempty"`
+	// Autofill 是「补位」标签的**候选**位，由 riotAutofillFlags 下发。R121 P1-1
+	// 起总开关 autofillLabelGate 默认关闭：关闭时恒为 false，JSON 里不出现该键。
+	// 判定依据是 match-v5 的 teamPosition 与 individualPosition，而按 Riot 官方
+	// 定义这两个字段都是服务器**推算**出来的「最可能打的位置」，既不记录大厅
+	// 选位、也不记录是否补位——口径、范围门禁（仅 420/440）与降级规则都写在
+	// riotAutofillFlags / riotAutofillCandidates 的注释里。LCU 战绩回退路径没有
+	// 这两个字段，因此那条路径恒为 false：宁可不显示，也不用推断值冒充。
+	Autofill  bool `json:"autofill,omitempty"`
 	reference gameplayReference
 }
 
@@ -1221,8 +1245,12 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		started, finished time.Time
 	}
 	type seasonResult struct {
-		stats             []gameplaySeasonChampionStat
-		progress          seasonStatsProgress
+		stats    []gameplaySeasonChampionStat
+		progress seasonStatsProgress
+		// ranked 是赛季缓存里的逐场快照。海克斯大乱斗页签的数据只能来自这里：
+		// 首屏样本路径 loadRecentRankedSamples 只按 420/440 取队列样本，
+		// 再为海斗单独打一次带队列过滤的战绩请求是白花的网络开销。
+		ranked            []seasonRankedMatch
 		byQueue           map[int64]gameplayAggregate
 		started, finished time.Time
 	}
@@ -1241,8 +1269,8 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	}()
 	go func() {
 		started := time.Now()
-		stats, progress, _, byQueue := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
-		seasonCh <- seasonResult{stats, progress, byQueue, started, time.Now()}
+		stats, progress, ranked, byQueue := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
+		seasonCh <- seasonResult{stats, progress, ranked, byQueue, started, time.Now()}
 	}()
 	type rankResult struct {
 		value          rankScoreEntry
@@ -1318,7 +1346,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	}
 	season := <-seasonCh
 	phases.markSpan("season_snapshot", season.started, season.finished)
-	seasonStats, seasonProgress, seasonByQueue := season.stats, season.progress, season.byQueue
+	seasonStats, seasonProgress, seasonRanked, seasonByQueue := season.stats, season.progress, season.ranked, season.byQueue
 	response.SeasonChampionStats = seasonStats
 	response.SeasonStatsProgress = seasonProgress
 	response.SeasonOverall = seasonStatsOverall(seasonStats)
@@ -1339,7 +1367,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		ready := map[string]bool{}
 		select {
 		case result := <-rankCh:
-			response.Ranks, result.value.capability = a.applySeasonRankWinRateFallback(result.value.ranks, result.value.capability, seasonByQueue)
+			response.Ranks, result.value.capability = a.applySeasonRankWinRateFallback(result.value.ranks, result.value.capability, season.progress, seasonByQueue)
 			response.RankMilestones = rankMilestonesForRegion(reference.Region, result.value.milestones)
 			response.Capabilities = append(response.Capabilities, result.value.capability)
 			ready["ranked-stats"] = true
@@ -1374,7 +1402,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	rankEntry := rankResultValue.value
 	ranks := append([]gameplayRank(nil), rankEntry.ranks...)
 	rankMilestones, rankCapability := rankEntry.milestones, rankEntry.capability
-	ranks, rankCapability = a.applySeasonRankWinRateFallback(ranks, rankCapability, seasonByQueue)
+	ranks, rankCapability = a.applySeasonRankWinRateFallback(ranks, rankCapability, seasonProgress, seasonByQueue)
 	capabilities = append(capabilities, rankCapability)
 	response.RankMilestones = rankMilestonesForRegion(reference.Region, rankMilestones)
 	if reference.Region == riotRegionKR && !strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE") {
@@ -1435,6 +1463,10 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 				"min_participants": participantSummary.MinParticipants, "max_participants": participantSummary.MaxParticipants,
 				"participant_counts": participantSummary.Counts, "missing_player_refs": participantSummary.MissingPlayerRefs,
 				"games_missing_player_refs": participantSummary.GamesMissingPlayerRef,
+			}
+			// 补位候选计数：与 sgp_match_history_* 共用 autofillDiagnosticFields。
+			for key, value := range autofillDiagnosticFields(participantSummary) {
+				windowDiagnostic[key] = value
 			}
 			if windowPartial != nil {
 				windowDiagnostic["reason"] = safeDiagnosticReason(windowPartial)
@@ -1516,7 +1548,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	defaultRankedMatches := recentRankedMatchesForQueue(rankedSampleMatches, response.RecentRanked.QueueID, defaultMatchCount)
 	response.Positions = positionStats(defaultRankedMatches, playerRef)
 	response.Ability = buildGameplayAbilityProfile(defaultRankedMatches, playerRef, ranks, reference.Region)
-	response.RankedQueues = buildGameplayRankedQueues(rankedSamples.ByQueue[420], rankedSamples.ByQueue[440], playerRef, ranks, reference.Region)
+	// 海斗页签的数据来自赛季缓存的逐场快照（seasonRanked），首屏样本路径
+	// rankedSamples.ByQueue 只有 420/440 两个键。
+	response.RankedQueues = buildGameplayRankedQueues(gameplayRankedQueueTabs(rankedSamples.ByQueue, seasonRanked), playerRef, ranks, reference.Region)
 	response.ActivityHours = activityHours(windowMatches)
 	// “最近一起玩”需要每场的完整参与者名单，因此基于已读取的详情页
 	// 战绩统计，并限定在最近 30 天内。
@@ -1682,29 +1716,308 @@ func (a *app) removeRecentRankedSampleLocked(key string) {
 	}
 }
 
-func buildGameplayRankedQueues(soloMatches, flexMatches []gameplayMatch, playerRef string, ranks []gameplayRank, region string) map[string]gameplayRankedQueueStats {
-	queues := make(map[string]gameplayRankedQueueStats, 2)
-	for _, item := range []struct {
-		queueID int64
-		matches []gameplayMatch
-	}{
-		{420, soloMatches},
-		{440, flexMatches},
-	} {
-		queueID := item.queueID
-		samples := recentRankedMatchesForQueue(item.matches, queueID, defaultMatchCount)
-		recent := recentRankedSummaryForQueue(samples, playerRef, nil, queueID)
-		ability := buildGameplayAbilityProfileForQueue(samples, playerRef, ranks, region, queueID)
-		abilitySampleGames := gameplayAbilitySampleGamesForQueue(samples, playerRef, queueID)
-		positions := positionStatsForQueue(samples, playerRef, queueID)
-		positionQueueID := queueID
-		positionQueueLabel := rankedQueueLabel(queueID)
-		queues[strconv.FormatInt(queueID, 10)] = gameplayRankedQueueStats{
-			RecentRanked: &recent, Ability: ability, AbilitySampleGames: abilitySampleGames, Positions: positions,
-			PositionQueueID: positionQueueID, PositionQueueLabel: positionQueueLabel,
+// gameplayRankedQueueTab 是总览页队列切换器里的一个页签。
+// 海克斯大乱斗在官方队列目录里对应 2300/2400/3270 三个 ID（queue_groups.go 的
+// hextech-aram 组，三个 ID 的中文名都是「海克斯大乱斗」），UI 上合并成一个
+// 页签，所以这里用队列集合而不是单个 ID。
+type gameplayRankedQueueTab struct {
+	// Key 是前端页签标识，也是 rankedQueues 这个 map 的键。
+	Key string
+	// Label 是页签与卡片上显示的队列名。
+	Label string
+	// QueueIDs 是归属这个页签的全部队列 ID；单队列页签就是它自己。
+	QueueIDs []int64
+	// Matches 来自首屏详情战绩样本，Cached 来自赛季缓存的逐场快照。
+	// 海斗页签只有 Cached——首屏样本路径只按 420/440 取队列样本。
+	Matches []gameplayMatch
+	Cached  []seasonRankedMatch
+}
+
+// gameplayRankedQueueTabs 拼出总览页要渲染的页签。海斗页签只在真的有样本时
+// 才产出：没有海斗场次的玩家不该看到一个点进去全是空的页签（评审 6.1）。
+func gameplayRankedQueueTabs(byQueue map[int64][]gameplayMatch, seasonRanked []seasonRankedMatch) []gameplayRankedQueueTab {
+	tabs := []gameplayRankedQueueTab{
+		{Key: "420", Label: rankedQueueLabel(seasonQueueSoloDuo), QueueIDs: []int64{seasonQueueSoloDuo}, Matches: byQueue[seasonQueueSoloDuo]},
+		{Key: "440", Label: rankedQueueLabel(seasonQueueFlex), QueueIDs: []int64{seasonQueueFlex}, Matches: byQueue[seasonQueueFlex]},
+	}
+	mayhem := make([]seasonRankedMatch, 0, len(seasonRanked))
+	for _, item := range seasonRanked {
+		if seasonMayhemQueue(item.QueueID) {
+			mayhem = append(mayhem, item)
 		}
 	}
+	if len(mayhem) > 0 {
+		tabs = append(tabs, gameplayRankedQueueTab{
+			Key: strconv.FormatInt(seasonMayhemPrimaryQueueID, 10),
+			// 三个海斗队列合并成一个页签，所以页签名用组名而不是某个队列 ID 的名字。
+			Label:    rankedQueueLabel(seasonMayhemPrimaryQueueID),
+			QueueIDs: append([]int64(nil), seasonMayhemQueueIDs...),
+			Cached:   mayhem,
+		})
+	}
+	return tabs
+}
+
+// gameplayRankedTabHasPositions 判断一个页签是否有「分路」这个概念。
+// 海克斯大乱斗是 ARAM 系（hextech-aram 组），没有 top/jungle/middle/bottom/
+// utility 的位置口径，所以位置偏好与七维能力雷达（依赖同位置对位）在这个页签
+// 下根本不成立——不是「样本不足」，是「口径不适用」。此时后端不下发这两块，
+// 前端也不渲染，绝不能回退到不分队列的全量统计再挂一个海斗的标签。
+func (tab gameplayRankedQueueTab) gameplayRankedTabHasPositions() bool {
+	return len(tab.QueueIDs) == 1 && !seasonMayhemQueue(tab.QueueIDs[0])
+}
+
+func buildGameplayRankedQueues(tabs []gameplayRankedQueueTab, playerRef string, ranks []gameplayRank, region string) map[string]gameplayRankedQueueStats {
+	queues := make(map[string]gameplayRankedQueueStats, len(tabs))
+	for _, tab := range tabs {
+		if len(tab.QueueIDs) == 0 {
+			continue
+		}
+		queueID := tab.QueueIDs[0]
+		samples := gameplayRankedTabSamples(tab)
+		cached := gameplayRankedTabCached(tab)
+		stats := gameplayRankedQueueStats{
+			PositionQueueID: queueID, PositionQueueLabel: tab.Label,
+		}
+		if len(tab.QueueIDs) == 1 {
+			// 单队列页签（420/440）走既有路径，行为与 R116-E 之前逐字节一致。
+			recent := recentRankedSummaryForQueue(samples, playerRef, cached, queueID)
+			stats.RecentRanked = &recent
+		} else {
+			recent := recentRankedSummaryForQueues(samples, playerRef, cached, tab.QueueIDs, tab.Label)
+			stats.RecentRanked = &recent
+		}
+		if tab.gameplayRankedTabHasPositions() {
+			stats.Ability = buildGameplayAbilityProfileForQueue(samples, playerRef, ranks, region, queueID)
+			stats.AbilitySampleGames = gameplayAbilitySampleGamesForQueue(samples, playerRef, queueID)
+			stats.Positions = positionStatsForQueue(samples, playerRef, queueID)
+		}
+		// 页签名以后端为准回写一次，避免调用方传空 Label 时前端只能猜。
+		if stats.RecentRanked != nil && stats.RecentRanked.QueueLabel == "" {
+			stats.RecentRanked.QueueLabel = tab.Label
+		}
+		if stats.RecentRanked != nil && stats.RecentRanked.QueueID == 0 {
+			stats.RecentRanked.QueueID = queueID
+		}
+		queues[tab.Key] = stats
+	}
 	return queues
+}
+
+// gameplayRankedTabSamples 把页签的首屏详情战绩裁到本页签的队列集合。
+// 单队列页签复用 recentRankedMatchesForQueue（与既有行为完全一致）；
+// 多队列页签走集合版本，绝不能落到「非 420/440 就不过滤」的老兜底上。
+func gameplayRankedTabSamples(tab gameplayRankedQueueTab) []gameplayMatch {
+	if len(tab.QueueIDs) == 1 {
+		return recentRankedMatchesForQueue(tab.Matches, tab.QueueIDs[0], defaultMatchCount)
+	}
+	return recentRankedMatchesForQueues(tab.Matches, tab.QueueIDs, defaultMatchCount)
+}
+
+// gameplayRankedTabCached 把赛季缓存里的逐场快照裁到本页签的队列集合。
+func gameplayRankedTabCached(tab gameplayRankedQueueTab) []seasonRankedMatch {
+	if len(tab.Cached) == 0 {
+		return nil
+	}
+	wanted := make(map[int64]bool, len(tab.QueueIDs))
+	for _, queueID := range tab.QueueIDs {
+		wanted[queueID] = true
+	}
+	result := make([]seasonRankedMatch, 0, len(tab.Cached))
+	for _, item := range tab.Cached {
+		if wanted[item.QueueID] {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+// recentRankedMatchesForQueues 是 recentRankedMatchesForQueue 的多队列版本。
+// 注意：这里对「不在集合里的队列」一律过滤掉，没有老函数那种
+// 「queueID 不是 420/440 就全收」的兜底——那个兜底会把别的队列的场次
+// 算进当前页签，属于伪造口径。
+func recentRankedMatchesForQueues(matches []gameplayMatch, queueIDs []int64, limit int) []gameplayMatch {
+	wanted := make(map[int64]bool, len(queueIDs))
+	for _, queueID := range queueIDs {
+		wanted[queueID] = true
+	}
+	filtered := make([]gameplayMatch, 0, min(len(matches), limit))
+	for _, match := range matches {
+		if wanted[match.QueueID] && (match.Result == "win" || match.Result == "loss") {
+			filtered = append(filtered, match)
+		}
+	}
+	sort.SliceStable(filtered, func(i, j int) bool { return filtered[i].CreatedAt > filtered[j].CreatedAt })
+	if limit > 0 && len(filtered) > limit {
+		filtered = filtered[:limit]
+	}
+	return filtered
+}
+
+// ---------------------------------------------------------------------------
+// R116-E P2-6：海克斯 → 出装 静态查询的 HTTP 出口
+//
+// 数据全部来自本地赛季缓存（season-stats/sgp/<accountHash>-s26.json）里本人的
+// AugmentSamples，零额外网络请求、不碰 Riot 配额、不调用 enterRiotLimitQueue。
+// ---------------------------------------------------------------------------
+
+// seasonMayhemBuildsResponse 是 P2-6 静态查询的响应。
+// Available=false 时前端整块不渲染——包括「样本不足」和「读不到样本」两种情况，
+// 都不该在英雄详情页留一个点进去全是空的区块（评审 6.1）。
+type seasonMayhemBuildsResponse struct {
+	Available bool   `json:"available"`
+	Reason    string `json:"reason,omitempty"`
+	// Scope 固定是 current-account：这份样本只属于当前登录的英雄联盟账号，
+	// 不是页面上正在浏览的那个英雄详情页所属的账号（详情页本来就是全服口径）。
+	Scope         string                    `json:"scope,omitempty"`
+	Season        string                    `json:"season,omitempty"`
+	ChampionID    int64                     `json:"championId,omitempty"`
+	AugmentID     int64                     `json:"augmentId,omitempty"`
+	MinimumSample int                       `json:"minimumSample"`
+	SampleGames   int                       `json:"sampleGames"`
+	Groups        []seasonAugmentBuildGroup `json:"groups,omitempty"`
+}
+
+func seasonMayhemBuildsUnavailable(reason string) seasonMayhemBuildsResponse {
+	return seasonMayhemBuildsResponse{Available: false, Reason: reason, Scope: "current-account", MinimumSample: seasonAugmentMinimumSample}
+}
+
+// handleGameplaySeasonMayhemBuilds 服务英雄详情页「构筑」tab 的个人海斗出装查询。
+// GET /api/gameplay/season-mayhem-builds?championId=<id>[&augmentId=<id>][&minimumSample=<n>]
+func (a *app) handleGameplaySeasonMayhemBuilds(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	championID, championErr := strconv.ParseInt(strings.TrimSpace(query.Get("championId")), 10, 64)
+	if championErr != nil || championID <= 0 {
+		http.Error(w, "championId required", http.StatusBadRequest)
+		return
+	}
+	// augmentId 是可选的：给了就只查这一个海克斯（工单判据里的形态），
+	// 不给就返回本人在这个英雄上用得最多、且达到门槛的前几个。
+	var augmentID int64
+	if raw := strings.TrimSpace(query.Get("augmentId")); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed <= 0 {
+			http.Error(w, "invalid augmentId", http.StatusBadRequest)
+			return
+		}
+		augmentID = parsed
+	}
+	// 门槛可配置（工单 P3 判据第 2 条），但夹在 [1, seasonAugmentSampleLimit] 里，
+	// 免得一个 ?minimumSample=0 把「1 场也算规律」放出来。
+	minimumSample := seasonAugmentMinimumSample
+	if raw := strings.TrimSpace(query.Get("minimumSample")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed <= 0 {
+			http.Error(w, "invalid minimumSample", http.StatusBadRequest)
+			return
+		}
+		minimumSample = min(parsed, seasonAugmentSampleLimit)
+	}
+
+	_, player, err := a.gameplayClient()
+	if err != nil {
+		respondJSON(w, seasonMayhemBuildsUnavailable("未连接英雄联盟客户端，读不到本人赛季样本"))
+		return
+	}
+	if a.storage == nil {
+		respondJSON(w, seasonMayhemBuildsUnavailable("本地存储不可用"))
+		return
+	}
+	accountHash := a.storage.accountHash(player)
+	season, _ := currentRankedSeason(time.Now())
+	if accountHash == "" {
+		respondJSON(w, seasonMayhemBuildsUnavailable("当前账号标识不可用"))
+		return
+	}
+	cache, err := a.storage.loadSeasonStats(seasonStatsSource, accountHash, season)
+	if err != nil {
+		// 读不到就是读不到。不用最近 20 场代替、不猜、不编。
+		respondJSON(w, seasonMayhemBuildsUnavailable("本赛季还没有可读取的海克斯大乱斗样本"))
+		return
+	}
+	report := seasonAugmentBuildReportFor(cache.AugmentSamples, championID, augmentID, minimumSample, seasonAugmentBuildGroupLimit, seasonAugmentBuildComboLimit)
+	response := seasonMayhemBuildsResponse{
+		Available: len(report.Groups) > 0, Scope: "current-account", Season: season,
+		ChampionID: championID, AugmentID: augmentID,
+		MinimumSample: report.MinimumSample, SampleGames: report.SampleGames,
+		Groups: report.Groups,
+	}
+	if !response.Available {
+		response.Reason = fmt.Sprintf("本人海克斯大乱斗样本不足（该英雄 %d 场，每个海克斯需 ≥%d 场）", report.SampleGames, report.MinimumSample)
+		respondJSON(w, response)
+		a.recordDiagnostic(map[string]any{
+			"event": "season_mayhem_builds_insufficient", "champion_id": championID, "augment_id": augmentID,
+			"sample_games": report.SampleGames, "minimum_sample": report.MinimumSample,
+			"total_samples": len(cache.AugmentSamples),
+		})
+		return
+	}
+	a.attachSeasonMayhemItemNames(r.Context(), response.Groups)
+	respondJSON(w, response)
+	a.recordDiagnostic(map[string]any{
+		"event": "season_mayhem_builds_resolved", "champion_id": championID, "augment_id": augmentID,
+		"groups": len(response.Groups), "sample_games": report.SampleGames,
+		"total_samples": len(cache.AugmentSamples),
+	})
+}
+
+// attachSeasonMayhemItemNames 用已有的 Data Dragon 静态目录把装备 ID 翻成中文名。
+// 目录读不到就整块留空（前端回落到「装备 <id>」），绝不编名字——
+// 数据准确性红线：证据不足明确降级，不用推断值代替。
+func (a *app) attachSeasonMayhemItemNames(ctx context.Context, groups []seasonAugmentBuildGroup) {
+	if a == nil || a.champions == nil || len(groups) == 0 {
+		return
+	}
+	names := a.seasonMayhemItemNames(ctx)
+	if len(names) == 0 {
+		return
+	}
+	for groupIndex := range groups {
+		for comboIndex := range groups[groupIndex].Combos {
+			combo := &groups[groupIndex].Combos[comboIndex]
+			resolved := make([]string, 0, len(combo.ItemIDs))
+			missing := 0
+			for _, id := range combo.ItemIDs {
+				name := strings.TrimSpace(names[id])
+				if name == "" {
+					missing++
+					continue
+				}
+				resolved = append(resolved, name)
+			}
+			// 只要有一件翻不出来就整组不给名字：一半有名一半是 ID 的列表
+			// 比统一的 ID 列表更容易被误读成「这几件才是核心」。
+			if missing > 0 || len(resolved) != len(combo.ItemIDs) {
+				continue
+			}
+			combo.ItemNames = resolved
+		}
+	}
+}
+
+// seasonMayhemItemNames 返回 装备 ID → 中文名。loadStaticDescriptions 自带缓存，
+// 这里只加一个短超时，避免目录冷启动时把一个纯本地查询拖成十几秒。
+func (a *app) seasonMayhemItemNames(ctx context.Context) map[int64]string {
+	loadCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
+	defer cancel()
+	descriptions, err := a.champions.loadStaticDescriptions(loadCtx)
+	if err != nil {
+		a.recordDiagnostic(map[string]any{"event": "season_mayhem_item_names_unavailable", "reason": safeDiagnosticReason(err)})
+		return nil
+	}
+	names := make(map[int64]string, len(descriptions))
+	for key, description := range descriptions {
+		file, ok := strings.CutPrefix(key, "item/")
+		if !ok {
+			continue
+		}
+		id, parseErr := strconv.ParseInt(strings.TrimSuffix(file, ".png"), 10, 64)
+		if parseErr != nil || id <= 0 || strings.TrimSpace(description.Name) == "" {
+			continue
+		}
+		names[id] = description.Name
+	}
+	return names
 }
 
 func recentRankedMatchesForQueue(matches []gameplayMatch, queueID int64, limit int) []gameplayMatch {
@@ -1771,8 +2084,48 @@ func summarizeRiotParticipants(infos []*riotMatchInfo) participantCompletenessSu
 		if missingInGame > 0 {
 			summary.GamesMissingPlayerRef++
 		}
+		// 补位候选的证据计数：只统计召唤师峡谷单双排/灵活组排，用于真机核验。
+		// 走 riotAutofillCandidates 而不是 riotAutofillFlags——标签总开关默认
+		// 关闭（R121 P1-1），但计数必须照常产出，否则永远拿不到真机数据。
+		if seasonClassicRankedQueue(info.QueueID) {
+			flags, evidence := riotAutofillCandidates(info)
+			if !evidence {
+				summary.AutofillNoEvidence++
+			}
+			for index, participant := range info.Participants {
+				if index < len(flags) && flags[index] {
+					summary.AutofillCandidates++
+					continue
+				}
+				team := riotLaneKeyValue(participant.TeamPosition)
+				individual := riotLaneKeyValue(participant.IndividualPosition)
+				if team != "" && individual != "" && team != individual {
+					// 两个推算位置都有值但不一致。R121 P1-2：这只能说明「孤立
+					// 推算」与「加队伍约束后的推算」不同，不能断言成换位。
+					summary.PositionMismatch++
+				}
+			}
+		}
 	}
 	return summary
+}
+
+// autofillDiagnosticFields 把补位候选的三个计数拼成诊断事件字段。
+//
+// 抽成函数的唯一理由：这三个键要同时进 sgp_match_history_*（战绩分页）与
+// sgp_summary_history_*（30 天窗口）两个事件，两处各写一遍必然会漂移——
+// R119 台账工单 P2-1 实测过「删掉其中一行赋值，全部测试仍然通过」。现在两个
+// 事件都调用本函数，键名与取值只有一个来源，且有直接的单元断言。
+//
+// 键名一律中性：autofill_candidates 是**候选**人数（标签总开关默认关闭，
+// 一个标签都没打，不能叫 tagged）；position_mismatch 只说两个推算位置不一致，
+// 不断言成因；autofill_no_evidence 是整场降级的场次数。
+func autofillDiagnosticFields(summary participantCompletenessSummary) map[string]any {
+	return map[string]any{
+		"autofill_candidates":  summary.AutofillCandidates,
+		"position_mismatch":    summary.PositionMismatch,
+		"autofill_no_evidence": summary.AutofillNoEvidence,
+	}
 }
 
 func riotRosterIncomplete(info riotMatchInfo) bool {
@@ -1942,6 +2295,12 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 				"min_participants": participantSummary.MinParticipants, "max_participants": participantSummary.MaxParticipants,
 				"participant_counts": participantSummary.Counts, "missing_player_refs": participantSummary.MissingPlayerRefs,
 				"games_missing_player_refs": participantSummary.GamesMissingPlayerRef,
+			}
+			// 补位候选的证据计数：三个键统一由 autofillDiagnosticFields 产出，
+			// 与 sgp_summary_history_* 共用同一来源，避免两处各写一遍再漂移
+			// （R119 台账工单 P2-1）。标签总开关默认关闭期间照常统计。
+			for key, value := range autofillDiagnosticFields(participantSummary) {
+				diagnostic[key] = value
 			}
 			if partialErr != nil {
 				diagnostic["reason"] = safeDiagnosticReason(partialErr)
@@ -2481,7 +2840,10 @@ func gameplayDisplayName(summoner Summoner) string {
 // decision. Local LCU ranked-stats is preferred because it is fast and normally
 // returns verified wins/losses; SGP is attempted only when LCU is unavailable,
 // incompatible with a remote server, or returns an unverified win/loss pair.
-func (a *app) loadRanksWithFallback(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID, privacy string) ([]gameplayRank, *gameplayRankMilestones, EndpointCapability) {
+func (a *app) loadRanksWithFallback(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID, privacy string, tierOnly ...bool) ([]gameplayRank, *gameplayRankMilestones, EndpointCapability) {
+	// R127 P1-b.1：tierOnly 表示调用方只要段位/小段/胜点（平均段位），不需要
+	// 胜负场。变参形式保证既有调用点与护栏测试都不用改。
+	tierScope := len(tierOnly) > 0 && tierOnly[0]
 	if serverID == "" && client != nil {
 		serverID = clientTencentServerID(client)
 	}
@@ -2491,15 +2853,24 @@ func (a *app) loadRanksWithFallback(ctx context.Context, client *LCUClient, play
 		RemoteServer:         isRemoteTencentServer(client, serverID),
 		SGPAvailable:         a.sgp != nil && serverID != "",
 	})
-	attempts := make([]DataSourceAttempt, 0, len(decision.Sources))
+	sources := decision.Sources
+	if tierScope {
+		// R127 P1-b.1：只要段位时 SGP 优先（实测 60–130ms），本机客户端做后备
+		// （中位 550ms、最长 2.4 秒）。
+		sources = rankSourcesTierOnly(sources)
+	}
+	attempts := make([]DataSourceAttempt, 0, len(sources))
 	fallbackReason := ""
-	if len(decision.Sources) > 0 && decision.Sources[0] == dataSourceSGP {
+	if len(sources) > 0 && sources[0] == dataSourceSGP {
 		fallbackReason = decision.Reason
+		if tierScope && len(decision.Sources) > 0 && decision.Sources[0] != dataSourceSGP {
+			fallbackReason = "tier-only-prefers-sgp"
+		}
 	}
 	var lcuRanks []gameplayRank
 	var lcuMilestones *gameplayRankMilestones
 	var lcuCapability EndpointCapability
-	for _, source := range decision.Sources {
+	for _, source := range sources {
 		switch source {
 		case dataSourceLCU:
 			ranks, milestones, capability, err := a.loadGameplayRanksContext(ctx, client, playerRef, isCurrent)
@@ -2522,6 +2893,15 @@ func (a *app) loadRanksWithFallback(ctx context.Context, client *LCUClient, play
 			lcuRanks, lcuMilestones, lcuCapability = ranks, milestones, capability
 			if !ranksHaveUnverifiedWinRate(ranks) {
 				attempts = append(attempts, DataSourceAttempt{Source: source, Outcome: dataSourceSuccess})
+				capability.Attempts = attempts
+				a.recordRankDataSourceDecision(decision, capability, attempts)
+				return ranks, milestones, capability
+			}
+			if tierScope {
+				// R127 P1-b.1：平均段位只要段位/小段/胜点，胜负场没验证完也直接采用
+				// 本机结果，不再为了它多等一次 SGP——日志里成对的
+				// fallback_reason: lcu-unverified-win-loss 就是这么来的。
+				attempts = append(attempts, DataSourceAttempt{Source: source, Outcome: dataSourceSuccess, Message: "只要段位：跳过胜负场补查"})
 				capability.Attempts = attempts
 				a.recordRankDataSourceDecision(decision, capability, attempts)
 				return ranks, milestones, capability
@@ -2792,8 +3172,13 @@ func rankMilestonesForRegion(region string, milestones *gameplayRankMilestones) 
 }
 
 // applySeasonRankWinRateFallback fills only records with an incomplete
-// win/loss pair, using the already-loaded aggregate for that exact queue.
-func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability EndpointCapability, seasonByQueue map[int64]gameplayAggregate) ([]gameplayRank, EndpointCapability) {
+// win/loss pair after the season scan is complete, using the already-loaded
+// aggregate for that exact queue. Incomplete scans keep the upstream empty
+// state so the capability detail remains reachable by the client.
+func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability EndpointCapability, progress seasonStatsProgress, seasonByQueue map[int64]gameplayAggregate) ([]gameplayRank, EndpointCapability) {
+	if !progress.Complete {
+		return ranks, capability
+	}
 	filled := 0
 	filledGames, filledWins, filledLosses := 0, 0, 0
 	for index := range ranks {
@@ -3107,6 +3492,9 @@ func normalizeGameplayMatch(game lcuGame, subject gameplayReference, names map[i
 		perks := compactPositiveInt64(raw.Stats.Perk0, raw.Stats.Perk1, raw.Stats.Perk2, raw.Stats.Perk3, raw.Stats.Perk4, raw.Stats.Perk5, raw.Stats.StatPerk0, raw.Stats.StatPerk1, raw.Stats.StatPerk2)
 		augments := compactPositiveInt64(raw.Stats.PlayerAugment1, raw.Stats.PlayerAugment2, raw.Stats.PlayerAugment3, raw.Stats.PlayerAugment4, raw.Stats.PlayerAugment5, raw.Stats.PlayerAugment6)
 		cs := raw.Stats.TotalMinionsKilled + raw.Stats.NeutralMinionsKilled
+		// LCU 战绩回退路径：/lol-match-history 的参与者只有 timeline.lane/role，
+		// 没有 teamPosition / individualPosition，补位无法判定 → Autofill 保持
+		// false。这是刻意降级：证据不足就不打标签，不用推断值代替。
 		participant := gameplayParticipant{
 			ParticipantID: raw.ParticipantID, TeamID: raw.TeamID, PlayerRef: playerRef, DisplayName: name,
 			GameName: identity.Player.GameName, TagLine: identity.Player.TagLine, ProfileIconID: identity.Player.ProfileIcon,
@@ -3255,11 +3643,21 @@ type rankedSample struct {
 	position  string
 }
 
+// recentRankedSummary 是「经典排位」口径的近期战绩汇总：只认 420/440。
+// 总览页顶部那张卡片标题就是「近 N 场排位」，把海克斯大乱斗混进来会让标题
+// 变成假话，所以这里刻意保持双队列口径。海斗页签走 recentRankedSummaryForQueues。
 func recentRankedSummary(matches []gameplayMatch, playerRef string, cached []seasonRankedMatch) gameplayRecentRankedSummary {
+	return recentRankedSummaryScoped(matches, playerRef, cached, seasonClassicRankedQueue)
+}
+
+// recentRankedSummaryScoped 是 recentRankedSummary 的实现体，队列判据由
+// accept 传入。抽出来的唯一目的：让海斗页签能复用同一段聚合逻辑，
+// 又不会把 420/440 的场次混进「海克斯大乱斗」这个标签下面。
+func recentRankedSummaryScoped(matches []gameplayMatch, playerRef string, cached []seasonRankedMatch, accept func(int64) bool) gameplayRecentRankedSummary {
 	samples := make([]rankedSample, 0, len(matches)+len(cached))
 	seen := make(map[int64]bool, len(matches)+len(cached))
 	for _, match := range matches {
-		if match.QueueID != 420 && match.QueueID != 440 || match.Result != "win" && match.Result != "loss" {
+		if !accept(match.QueueID) || match.Result != "win" && match.Result != "loss" {
 			continue
 		}
 		subject, ok := matchSubject(match, playerRef)
@@ -3283,7 +3681,7 @@ func recentRankedSummary(matches []gameplayMatch, playerRef string, cached []sea
 		samples = append(samples, sample)
 	}
 	for _, item := range cached {
-		if item.QueueID != 420 && item.QueueID != 440 {
+		if !accept(item.QueueID) {
 			continue
 		}
 		if item.GameID > 0 && seen[item.GameID] {
@@ -3397,7 +3795,11 @@ func recentRankedSummary(matches []gameplayMatch, playerRef string, cached []sea
 
 func recentRankedSummaryForQueue(matches []gameplayMatch, playerRef string, cached []seasonRankedMatch, queueID int64) gameplayRecentRankedSummary {
 	if queueID != 420 && queueID != 440 {
-		return recentRankedSummary(matches, playerRef, cached)
+		// ★这里曾经写的是 `return recentRankedSummary(matches, playerRef, cached)`。
+		// 那个早退在只有两个页签时无害，但放开海斗之后它会把「不分队列的
+		// 420/440 混合汇总」当成某个具体队列的结果返回——挂在「海克斯大乱斗」
+		// 标签下就是伪造口径。现在改成显式按这一个队列过滤。
+		return recentRankedSummaryForQueues(matches, playerRef, cached, []int64{queueID}, rankedQueueLabel(queueID))
 	}
 	filteredMatches := make([]gameplayMatch, 0, len(matches))
 	for _, match := range matches {
@@ -3419,12 +3821,58 @@ func recentRankedSummaryForQueue(matches []gameplayMatch, playerRef string, cach
 	return result
 }
 
-func rankedQueueLabel(queueID int64) string {
-	if queueID == 440 {
-		return "灵活组排"
+// recentRankedSummaryForQueues 是队列集合版本的近期战绩汇总，海克斯大乱斗
+// 页签用它（2300/2400/3270 在 UI 上是一个页签，但底层是三个队列 ID）。
+//
+// 与 recentRankedSummaryForQueue 的区别：这里的样本只可能来自 queueIDs 里
+// 列出的队列，绝不会回退到「不分队列」的全量汇总。label 由调用方给定，
+// 因为多队列页签的名字是组名（海克斯大乱斗），不是某个队列 ID 的名字。
+func recentRankedSummaryForQueues(matches []gameplayMatch, playerRef string, cached []seasonRankedMatch, queueIDs []int64, label string) gameplayRecentRankedSummary {
+	wanted := make(map[int64]bool, len(queueIDs))
+	for _, queueID := range queueIDs {
+		wanted[queueID] = true
 	}
-	if queueID == 420 {
+	filteredMatches := make([]gameplayMatch, 0, len(matches))
+	for _, match := range matches {
+		if wanted[match.QueueID] {
+			filteredMatches = append(filteredMatches, match)
+		}
+	}
+	filteredCached := make([]seasonRankedMatch, 0, len(cached))
+	for _, item := range cached {
+		if wanted[item.QueueID] {
+			filteredCached = append(filteredCached, item)
+		}
+	}
+	result := recentRankedSummaryScoped(filteredMatches, playerRef, filteredCached, func(queueID int64) bool { return wanted[queueID] })
+	if len(queueIDs) > 0 && result.QueueID == 0 {
+		result.QueueID = queueIDs[0]
+	}
+	if result.QueueLabel == "" {
+		result.QueueLabel = label
+	}
+	return result
+}
+
+// seasonClassicRankedQueue 是「经典排位」判据：只有单双排与灵活组排。
+// 海克斯大乱斗不属于排位，不能混进任何以「排位」为标题的卡片。
+func seasonClassicRankedQueue(queueID int64) bool {
+	return queueID == seasonQueueSoloDuo || queueID == seasonQueueFlex
+}
+
+// rankedQueueLabel 是后端唯一的队列名解析点。
+// 海克斯大乱斗的三个队列 ID（2300/2400/3270）在官方目录里同名，合并成一个名字。
+// 未知队列返回空串，由调用方决定怎么兜底——绝不把未知队列默默标成「单双排」，
+// 那等于给一个没核实过的口径编了个名字。
+func rankedQueueLabel(queueID int64) string {
+	switch queueID {
+	case seasonQueueFlex:
+		return "灵活组排"
+	case seasonQueueSoloDuo:
 		return "单双排"
+	}
+	if seasonMayhemQueue(queueID) {
+		return "海克斯大乱斗"
 	}
 	return ""
 }
@@ -3439,7 +3887,12 @@ func championStats(matches []gameplayMatch, playerRef string, names map[int64]st
 		if match.Result != "win" && match.Result != "loss" {
 			continue
 		}
-		if match.QueueID != 420 && match.QueueID != 440 {
+		// 刻意保持「只认 420/440」：这个函数产出的 response.ChampionStats 是
+		// 总览页「英雄胜率」卡片在赛季缓存不可用时的兜底，卡片标题是
+		// 「本赛季 · N 场排位」。放开海斗会让海斗场次混进一张写着「排位」的
+		// 卡片里。它也不被任何队列页签消费（只有 1515 与 riot_api.go:1459
+		// 两个调用点，都是总览级），所以海斗页签不受影响。
+		if !seasonClassicRankedQueue(match.QueueID) {
 			continue
 		}
 		participant, ok := matchSubject(match, playerRef)
@@ -3502,7 +3955,13 @@ func positionStats(matches []gameplayMatch, playerRef string) []gameplayPosition
 
 func positionStatsForQueue(matches []gameplayMatch, playerRef string, queueID int64) []gameplayPositionStat {
 	if queueID != 420 && queueID != 440 {
-		return positionStats(matches, playerRef)
+		// ★这里曾经写的是 `return positionStats(matches, playerRef)`，即回退到
+		// 「不分队列的全量位置统计」。放开海斗之后那是最危险的一条：海克斯大乱斗
+		// 页签会拿到混了全部队列的分路数据，却显示在「海克斯大乱斗」标签下。
+		// 海斗是 ARAM 系（queue_groups.go 的 hextech-aram 组），根本没有
+		// top/jungle/middle/bottom/utility 的分路概念，所以正确处置是返回空，
+		// 由前端整块隐藏位置统计（评审 6.1「取不到就整块隐藏」）。
+		return nil
 	}
 	filtered := make([]gameplayMatch, 0, len(matches))
 	for _, match := range matches {
@@ -3514,8 +3973,12 @@ func positionStatsForQueue(matches []gameplayMatch, playerRef string, queueID in
 }
 
 // Reuse the already-fetched latest ten games; never infer a role from a champion.
+//
+// 非 420/440 一律返回 nil 是**有意的**，不是漏改：局内视图的 response.QueueID
+// 在海克斯大乱斗里会是 2300/2400/3270，而 ARAM 系没有分路，位置偏好在这个
+// 语境下不成立。改成回退到全量统计等于把别的队列的分路数据挂在海斗局内页上。
 func liveRecentPositions(matches []gameplayMatch, playerRef string, queueID int64) []gameplayPositionStat {
-	if queueID != 420 && queueID != 440 {
+	if !seasonClassicRankedQueue(queueID) {
 		return nil
 	}
 	if len(matches) > 10 {
@@ -3652,6 +4115,7 @@ type gameplayRecommendationBundle struct {
 	HasTopPlayers        bool                        `json:"hasTopPlayers"`
 	HasItemDepths        bool                        `json:"hasItemDepths"`
 	Citation             *championSourceCitation     `json:"citation,omitempty"`
+	// R128 §2.3：口径说明不再进 UI，前端一律不消费；字段保留供诊断与既有后端测试使用。
 	MeasurementTechnique string                      `json:"measurementTechnique,omitempty"`
 	Positions            []championPositionOption    `json:"positions,omitempty"`
 	ResolvedPosition     string                      `json:"resolvedPosition"`
@@ -3661,6 +4125,10 @@ type gameplayRecommendationBundle struct {
 	Augments             []championMetricRow         `json:"augments"`
 	ItemRanking          []championMetricRow         `json:"itemRanking,omitempty"`
 	Build                gameplayRecommendationBuild `json:"build"`
+	// R116-D P1-2/P1-3/P1-5：命中才出现，没命中一律是 nil/空，前端整块不渲染。
+	MatchupNotices []gameplayMatchupNotice `json:"matchupNotices,omitempty"`
+	SynergyNotices []gameplaySynergyNotice `json:"synergyNotices,omitempty"`
+	TeamPortrait   *gameplayTeamPortrait   `json:"teamPortrait,omitempty"`
 }
 
 type gameplayRecommendationHero struct {
@@ -3678,6 +4146,87 @@ type gameplayRecommendationMatchup struct {
 	ChampionName string  `json:"championName"`
 	WinRate      float64 `json:"winRate,omitempty"`
 	Games        int     `json:"games,omitempty"`
+}
+
+// ---------------------------------------------------------------------------
+// R116-D P1-2 / P1-3 / P1-5：克制提示、协同提示与队伍画像缺口标签的数据形状。
+//
+// 三条共同红线：
+//  1. 数据全部来自「本人英雄」那一次 hero-json（weakAgainst / strongAgainst /
+//     teammateSynergies / terminalItemTrios）与全量 postmatch，两个页面都是推荐
+//     路径在同一次请求里刚刚拉过、已在缓存里的。R116-D 新增的 hexdata 上游请求
+//     数恒为 0（Anti-scope 第 1 条）。评审 4.2/4.4 算过反面：10 个英雄各拉一次
+//     是 10 请求 / 12 MB，最坏排队 11 秒 = ChampSelect 3 秒轮询周期的 3.67 倍，
+//     而 recordLoadFailure 对取消直接 return，熔断计数永远是 0，链路会陷入
+//     「20s 拉 12MB → 被 AbortController 掐断 → 60s 退避 → 再来」，每 80 秒稳定
+//     烧 12 MB 且永不报警。
+//  2. 覆盖率撑不起总分：weakAgainst/strongAgainst 各 7 条 → 单局克制命中率
+//     34.6%；teammateSynergies 7 条 → 协同命中率 18.8%（评审 3.1）。所以这里
+//     没有任何「阵容协同 +X%」总分字段（Anti-scope 第 2 条），只有命中条目。
+//  3. 没命中就是 nil，前端整块不渲染 DOM，不出现「暂无数据」占位卡片。
+// ---------------------------------------------------------------------------
+
+// gameplayMatchupNotice 是 P1-3：本人英雄的 weakAgainst/strongAgainst 与当前对局
+// 敌方 5 人 championId 的交集里的一条。字段与工单 P1-2/P1-3 的结构体示例一致，
+// 唯一差别是 ConfidenceLow/ConfidenceHigh 各带自己的 tag——工单原文写成
+// `json:"confidenceLow,confidenceHigh"` 是笔误：Go 的 struct tag 不支持一个 tag
+// 两个名字，那样会被解析成「字段名叫 confidenceLow,confidenceHigh」而永远匹配不上，
+// 两个值都会被静默丢掉（详见 docs/r116d-execution-ledger.md）。
+//
+// CounterDelta 是上游原值（0..1 的胜率差，实测 0.03639 = 3.6 个百分点），
+// 不做任何换算；正负号由 Direction 决定，前端负责换算成百分点。
+type gameplayMatchupNotice struct {
+	Direction      string  `json:"direction"` // "weak"（我被克）| "strong"（我克对面）
+	OpponentID     int     `json:"opponentChampionId"`
+	CounterDelta   float64 `json:"counterDelta"`
+	Evidence       string  `json:"evidence"`
+	ConfidenceLow  float64 `json:"confidenceLow"`
+	ConfidenceHigh float64 `json:"confidenceHigh"`
+}
+
+// gameplaySynergyNotice 是 P1-2：本人英雄的 teammateSynergies 与我方 5 人
+// championId 的交集里的一条。tag 笔误的说明同 gameplayMatchupNotice。
+type gameplaySynergyNotice struct {
+	TeammateID     int     `json:"teammateChampionId"`
+	SynergyDelta   float64 `json:"synergyDelta"`
+	Evidence       string  `json:"evidence"`
+	ConfidenceLow  float64 `json:"confidenceLow"`
+	ConfidenceHigh float64 `json:"confidenceHigh"`
+}
+
+// gameplayTeamPortraitLabel 是 P1-5 的一个缺口标签。Key 稳定（前端做样式映射），
+// Label 是给用户看的中文。
+type gameplayTeamPortraitLabel struct {
+	Key   string `json:"key"` // frontline | crowdControl | sustainedDamage
+	Label string `json:"label"`
+}
+
+// gameplayTeamPortrait 是 P1-5 的整块结果。Labels 为空时后端干脆不下发这个对象
+// （工单验证判据：「阵容均衡」→ 不生成任何标签，不是生成一个空标签）。
+// ResolvedHeroes/HeroPoolSize 是降级依据：我方 5 人里查不到 postmatch 的英雄太多
+// 时整块不下发，绝不用「查不到」冒充「这一项不缺」。
+type gameplayTeamPortrait struct {
+	Labels               []gameplayTeamPortraitLabel `json:"labels"`
+	RosterSize           int                         `json:"rosterSize"`
+	ResolvedHeroes       int                         `json:"resolvedHeroes"`
+	HeroPoolSize         int                         `json:"heroPoolSize,omitempty"`
+	// R128 §2.3：前端不展示（队伍画像的 tooltip 只留「本队 N 位英雄进入统计」）。
+	MeasurementTechnique string                      `json:"measurementTechnique,omitempty"`
+}
+
+// gameplayNextItemSuggestion 是 P1-4 阶段二「下一件推荐」的纯计算结果。
+//
+// ⚠️ 已实现但未接线。docs/r116-probe-findings.md §3.4 的
+// live_client_playerlist_shape.element_keys 判据目前仍是「待填」——海斗（KIWI）的
+// playerlist 形状零观测（19 键基线是在斗魂 CHERRY 下测的）。按工单 P1-4
+// 「对抗变异」最后一条与 Anti-scope 第 3 条，探测结论落地前不许实现渲染层。
+// 接线条件与接线点见 gameplayNextItemSuggestionFromTrios 的注释。
+type gameplayNextItemSuggestion struct {
+	ItemID   int     `json:"itemId"`
+	ItemName string  `json:"itemName,omitempty"`
+	WinRate  float64 `json:"winRate"`
+	Games    int     `json:"games"`
+	TrioKey  string  `json:"trioKey,omitempty"`
 }
 
 type gameplayRecommendationRunes struct {
@@ -3858,6 +4407,450 @@ func (a *app) recordRecommendationModeResolution(gameID, queueID int64, gameMode
 	})
 }
 
+// ---------------------------------------------------------------------------
+// R116-D P1-2 / P1-3 / P1-5：克制提示、协同提示与队伍画像的计算。
+// 全部是纯函数（除了只读缓存的两个取数入口），便于单测与对抗变异。
+// ---------------------------------------------------------------------------
+
+const (
+	// gameplayRosterNoticeLimit：工单 P1-2/P1-3 要求各自最多 5 条。
+	gameplayRosterNoticeLimit = 5
+	// gameplayRosterSideLimit：海斗是 5v5，一侧最多 5 个英雄 ID。段数超出说明
+	// 前端传错了东西（例如把 10 人塞进一侧），整串丢弃而不是截断——截断等于猜。
+	gameplayRosterSideLimit = 5
+	// gameplayTeamPortraitMinResolvedHeroes：我方 5 人里至少要查到 4 个 postmatch
+	// 才敢下「这一项不缺」的结论。少于 4 个 → 整块不下发（证据不足明确降级）。
+	gameplayTeamPortraitMinResolvedHeroes = 4
+)
+
+// gameplayTeamPortraitThresholdRatio 是 P1-5 的判据比例：某项指标 ≥ 全英雄算术
+// 均值 × 这个比例，就算这名英雄具备该角色。
+//
+// ⚠️ 这是本地约定的启发式，不是上游官方口径，也不是任何第三方站点的流派划分。
+// 工单要求「阈值定义参考虎牙站的流派划分思路（承伤与开团 / 治疗与增益 / 暴击与
+// 攻速）」——只借产品思路，不接它的数据（方案第 294 行），所以这里没有一个外部
+// 数字：比例 1.0 就是「算术均值」本身。
+//
+// 为什么用均值而不是中位数、也不用绝对值：hexdata postmatch 这 5 项都是「每局
+// 均值 / 比率」，跨英雄可比（R116 实测 173 英雄无缺失字段），但极差巨大
+// （avgHealShield min 0.63 / mean 1595 / max 27543），任何绝对值门槛都会在
+// 上游改口径后立刻失效。用「相对全英雄均值的比例」是唯一不需要魔法数字的写法。
+// 取 1.0（而非中位数）会让判据偏严：右偏分布下高于均值的英雄少于半数
+// （实测 avgDamageTaken 67/173、avgCcTime 75/173、damageShare 107/173），
+// 因此更容易报「缺」。这是有意的——漏报会让用户以为阵容没有缺口。
+// 实测随机 5 人组合（173 英雄池，2 万次采样）：85.2% 不产出任何标签，
+// 9.8% 报「缺前排」、5.5% 报「缺控制」、0.6% 报「缺持续输出」。
+const gameplayTeamPortraitThresholdRatio = 1.0
+
+// gameplayRosterMatchupPhases 是允许消费「对面 5 人」的阶段白名单。
+//
+// Anti-scope 第 4 条：不在 ChampSelect 阶段展示「对面 5 人」相关的克制/协同，
+// 除非 R116-探测证实该阶段能拿到 theirTeam 非空数据。而 docs/r116-probe-findings.md
+// §4.4 的 lcu_champ_select_session_shape.their_team_length 判据**目前仍是「待填」**
+// （真机部分需要 Windows + 真实海斗对局，本轮无法执行），仓库里 theirTeam 的
+// fixture 无一例外是 []，docs 里零真实观测 → 按「未证实」处理，白名单里没有
+// ChampSelect。
+//
+// 真机证实 their_team_length > 0 之后，放开的位置就是这个白名单：加上
+// "ChampSelect" 即可，交集计算与前端渲染都不需要改（前端也只在 InProgress/
+// Reconnect 才下发 enemyChampionIds，两处都要放开，见 gameplay.js 的
+// ensureLiveRecommendations）。InProgress/Reconnect 的 10 人来自
+// session.GameData.TeamOne/TeamTwo，是既有能力，不受这条限制。
+var gameplayRosterMatchupPhases = []string{"InProgress", "Reconnect"}
+
+// gameplayTeamPortraitFields 是 P1-5 用到的 5 项 postmatch 指标，键名与上游字段名
+// 逐字一致，顺序只影响诊断事件里的可读性。
+var gameplayTeamPortraitFields = []struct {
+	Key   string
+	Value func(hexdataPostmatchRow) float64
+}{
+	{"avgDamageTaken", func(row hexdataPostmatchRow) float64 { return row.AvgDamageTaken }},
+	{"avgCcTime", func(row hexdataPostmatchRow) float64 { return row.AvgCcTime }},
+	{"avgDmgMitigated", func(row hexdataPostmatchRow) float64 { return row.AvgDmgMitigated }},
+	{"avgHealShield", func(row hexdataPostmatchRow) float64 { return row.AvgHealShield }},
+	{"damageShare", func(row hexdataPostmatchRow) float64 { return row.DamageShare }},
+}
+
+// gameplayRosterChampionIDs 解析前端传来的逗号分隔英雄 ID 串。
+// 严格策略：任何一段不是 1..10000 的整数、或段数超过 gameplayRosterSideLimit，
+// 整串返回 nil。宁可一条提示都不出，也不猜「大概是这几个」。
+func gameplayRosterChampionIDs(raw string) []int {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil
+	}
+	parts := strings.Split(trimmed, ",")
+	if len(parts) > gameplayRosterSideLimit {
+		return nil
+	}
+	ids := make([]int, 0, len(parts))
+	seen := make(map[int]struct{}, len(parts))
+	for _, part := range parts {
+		value, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || value <= 0 || value > 10000 {
+			return nil
+		}
+		if _, duplicate := seen[value]; duplicate {
+			continue
+		}
+		seen[value] = struct{}{}
+		ids = append(ids, value)
+	}
+	return ids
+}
+
+// gameplayRosterWithout 去掉本人英雄：teammateSynergies 是「我与队友」的表，
+// 本人不该被算成自己的队友（前端的 allyChampionIds 含 self）。
+func gameplayRosterWithout(ids []int, exclude int) []int {
+	if exclude <= 0 {
+		return ids
+	}
+	result := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id != exclude {
+			result = append(result, id)
+		}
+	}
+	return result
+}
+
+// gameplayMatchupNotices 是 P1-3 的交集计算（纯函数）：本人英雄 hero-json 的
+// weakAgainst / strongAgainst 与「当前对局敌方 championId 集合」求交，命中才生成
+// notice。按 |counterDelta| 降序、OpponentID 升序（保证同样输入必然同样输出），
+// 最多 gameplayRosterNoticeLimit 条；一条都没命中返回 nil。
+//
+// 交集比较的必须是 row.OpponentChampionID ↔ 敌方 roster。工单「对抗变异」要求
+// 验证：把这一侧写反（拿队友 roster 去比）会得到全零匹配，而测试必须能抓到这种
+// 「永远不命中」的隐蔽退化——见 gameplay_r116d_test.go 的
+// TestGameplayMatchupNoticesNeverMatchDegenerationIsDetected。
+func gameplayMatchupNotices(weak, strong []hexdataMatchupRow, enemyChampionIDs []int) []gameplayMatchupNotice {
+	if len(enemyChampionIDs) == 0 {
+		return nil
+	}
+	roster := make(map[int]struct{}, len(enemyChampionIDs))
+	for _, id := range enemyChampionIDs {
+		if id > 0 {
+			roster[id] = struct{}{}
+		}
+	}
+	var notices []gameplayMatchupNotice
+	collect := func(rows []hexdataMatchupRow, direction string) {
+		for _, row := range rows {
+			// OpponentChampionID 由 R116-A 从上游字符串安全转换而来，转换失败的
+			// 整条已被丢弃，所以这里 <= 0 只可能是上游给了 0；0 不是合法英雄 ID，
+			// 拿它去比对等于伪造一次命中。
+			if row.OpponentChampionID <= 0 {
+				continue
+			}
+			if _, hit := roster[row.OpponentChampionID]; !hit {
+				continue
+			}
+			notices = append(notices, gameplayMatchupNotice{
+				Direction: direction, OpponentID: row.OpponentChampionID, CounterDelta: row.CounterDelta,
+				Evidence: row.Evidence, ConfidenceLow: row.ConfidenceLow, ConfidenceHigh: row.ConfidenceHigh,
+			})
+		}
+	}
+	collect(weak, "weak")
+	collect(strong, "strong")
+	sort.SliceStable(notices, func(left, right int) bool {
+		leftDelta, rightDelta := math.Abs(notices[left].CounterDelta), math.Abs(notices[right].CounterDelta)
+		if leftDelta != rightDelta {
+			return leftDelta > rightDelta
+		}
+		return notices[left].OpponentID < notices[right].OpponentID
+	})
+	if len(notices) > gameplayRosterNoticeLimit {
+		notices = notices[:gameplayRosterNoticeLimit]
+	}
+	return notices
+}
+
+// gameplaySynergyNotices 是 P1-2 的交集计算（纯函数）：本人英雄的
+// teammateSynergies 与我方队友 championId 求交。排序与上限规则同
+// gameplayMatchupNotices，只是效果量换成 synergyDelta。
+// 这里不做「阵容协同 +X%」总分（Anti-scope 第 2 条）：7/172 的覆盖率
+// （单局命中率 18.8%）撑不起一个看起来很全面的总分。
+func gameplaySynergyNotices(synergies []hexdataSynergyRow, teammateChampionIDs []int) []gameplaySynergyNotice {
+	if len(teammateChampionIDs) == 0 {
+		return nil
+	}
+	roster := make(map[int]struct{}, len(teammateChampionIDs))
+	for _, id := range teammateChampionIDs {
+		if id > 0 {
+			roster[id] = struct{}{}
+		}
+	}
+	var notices []gameplaySynergyNotice
+	for _, row := range synergies {
+		if row.TeammateChampionID <= 0 {
+			continue
+		}
+		if _, hit := roster[row.TeammateChampionID]; !hit {
+			continue
+		}
+		notices = append(notices, gameplaySynergyNotice{
+			TeammateID: row.TeammateChampionID, SynergyDelta: row.SynergyDelta,
+			Evidence: row.Evidence, ConfidenceLow: row.ConfidenceLow, ConfidenceHigh: row.ConfidenceHigh,
+		})
+	}
+	sort.SliceStable(notices, func(left, right int) bool {
+		leftDelta, rightDelta := math.Abs(notices[left].SynergyDelta), math.Abs(notices[right].SynergyDelta)
+		if leftDelta != rightDelta {
+			return leftDelta > rightDelta
+		}
+		return notices[left].TeammateID < notices[right].TeammateID
+	})
+	if len(notices) > gameplayRosterNoticeLimit {
+		notices = notices[:gameplayRosterNoticeLimit]
+	}
+	return notices
+}
+
+// errGameplayHexdataPageNotCached 是「只读缓存」的哨兵错误。
+var errGameplayHexdataPageNotCached = errors.New("hexdata page is not cached")
+
+// gameplayPeekCachedHexdataPage 只读 hexdata 的内存/磁盘缓存，缓存未命中就返回
+// false，**绝不触发上游请求**。
+//
+// 这是 Anti-scope 第 1 条的执行手段。P1-2/P1-3/P1-5 要消费的 hero-json 与
+// postmatch 都由推荐路径（loadMayhemDetail → hexdata.load("hero-json") 与
+// mayhemPerformancePanel → loadHexdataPostmatch）在同一次请求里刚刚拉过，缓存键
+// 完全相同（buildID|kind|id），所以生产上这里必然是缓存命中。
+//
+// 之所以不直接再调一次 provider.hexdata.load：那条路在缓存未命中、熔断半开或
+// buildChecked 过期时会真的回源，而 recordLoadFailure 对取消直接 return，熔断
+// 计数永远涨不起来（评审 4.4）。「新增请求数恒为 0」必须是结构上成立的，
+// 不能靠调用顺序碰巧成立。loader 恒返回哨兵错误 → 结构上不可能发出 HTTP。
+func gameplayPeekCachedHexdataPage(ctx context.Context, provider *championProvider, kind, id string) ([]byte, bool) {
+	if provider == nil || provider.cache == nil || provider.hexdata == nil {
+		return nil, false
+	}
+	key := provider.hexdata.cacheKey(kind, id)
+	result, err := provider.cache.loadWithStatus(ctx, key, hexdataCacheTTL, hexdataCacheTTL, true, func(context.Context) ([]byte, error) {
+		return nil, errGameplayHexdataPageNotCached
+	})
+	if err != nil || len(result.data) == 0 {
+		return nil, false
+	}
+	return result.data, true
+}
+
+// gameplayHeroHexdataTables 取本人英雄 hero-json 里的三个数组（只读缓存）。
+// 取不到就返回 false，调用方必须一个提示都不生成——绝不为了「有内容」而去拉
+// 10 个英雄的 hero-json。
+func gameplayHeroHexdataTables(ctx context.Context, provider *championProvider, championID int64) (hexdataHeroDetailV2, bool) {
+	if championID <= 0 {
+		return hexdataHeroDetailV2{}, false
+	}
+	data, ok := gameplayPeekCachedHexdataPage(ctx, provider, "hero-json", strconv.FormatInt(championID, 10))
+	if !ok {
+		return hexdataHeroDetailV2{}, false
+	}
+	detail, err := parseHexdataHeroJSON(data)
+	if err != nil {
+		return hexdataHeroDetailV2{}, false
+	}
+	return detail, true
+}
+
+// gameplayPostmatchTable 取全量 postmatch（只读缓存）。
+func gameplayPostmatchTable(ctx context.Context, provider *championProvider) (map[int]hexdataPostmatchRow, map[int]map[string]bool, bool) {
+	data, ok := gameplayPeekCachedHexdataPage(ctx, provider, "postmatch", hexdataAggregateID)
+	if !ok {
+		return nil, nil, false
+	}
+	rows, present, _, err := parseHexdataPostmatchWithPresence(data)
+	if err != nil || len(rows) == 0 {
+		return nil, nil, false
+	}
+	return rows, present, true
+}
+
+// gameplayTeamPortraitAverages 是 5 项画像指标在全部英雄上的算术均值，键名与上游
+// 字段名逐字一致。HeroCount 是 postmatch 里的英雄总数（实测 173）。
+// 某一项一个英雄都没有时该键不存在 → 判据函数整套放弃，绝不用 0 当门槛。
+type gameplayTeamPortraitAverages struct {
+	Values    map[string]float64
+	HeroCount int
+}
+
+// gameplayTeamPortraitAveragesFrom 的口径与 R116-B P1-6 的 mayhemPerformancePanel
+// 完全一致：只统计「该字段确实出现过」的英雄（用 postmatch.Present 判定），
+// 不拿 0 顶替缺失值把均值拉低。B 的均值只存在于 championPerformanceMetric
+// .DeltaPercent 里、没有暴露成可复用的数字，所以这里自己算一份同样的口径，
+// 而不是把实测均值抄成魔法常量。
+func gameplayTeamPortraitAveragesFrom(heroes map[int]hexdataPostmatchRow, present map[int]map[string]bool) gameplayTeamPortraitAverages {
+	averages := gameplayTeamPortraitAverages{Values: make(map[string]float64, len(gameplayTeamPortraitFields)), HeroCount: len(heroes)}
+	if len(heroes) == 0 {
+		return averages
+	}
+	sums := make(map[string]float64, len(gameplayTeamPortraitFields))
+	counts := make(map[string]int, len(gameplayTeamPortraitFields))
+	for id, row := range heroes {
+		seen := present[id]
+		for _, field := range gameplayTeamPortraitFields {
+			if len(seen) > 0 && !seen[field.Key] {
+				continue
+			}
+			sums[field.Key] += field.Value(row)
+			counts[field.Key]++
+		}
+	}
+	for _, field := range gameplayTeamPortraitFields {
+		if counts[field.Key] > 0 {
+			averages.Values[field.Key] = sums[field.Key] / float64(counts[field.Key])
+		}
+	}
+	return averages
+}
+
+// gameplayTeamPortraitLabels 是 P1-5 的标签生成纯函数（工单要求：可测试的纯函数，
+// 不许把魔法数字散落在渲染代码里）。
+//
+// 判据（全部相对全英雄算术均值，没有任何绝对值门槛）：
+//   - 前排：avgDamageTaken ≥ 均值×ratio 且 avgDmgMitigated ≥ 均值×ratio（承伤）
+//   - 控制：avgCcTime ≥ 均值×ratio（开团）
+//   - 持续输出：damageShare ≥ 均值×ratio
+//
+// 我方阵容里「一个都没有」才产出对应的「缺 X」标签；三类都有人 → 返回 nil
+// （工单验证判据：不是生成一个空标签）。
+//
+// 工单列了 5 项指标，其中 avgHealShield（治疗与增益）本轮**不参与判定**：三个
+// 标签里没有一个能给它一个可辩护的判据位置，硬塞进去就是编造口径（数据准确性
+// 红线）。它照常算进 gameplayTeamPortraitAverages、照常进 gameplay_team_portrait
+// 诊断事件，等真要加「缺治疗/护盾」标签时直接用。
+func gameplayTeamPortraitLabels(rows []hexdataPostmatchRow, averages gameplayTeamPortraitAverages) []gameplayTeamPortraitLabel {
+	if len(rows) == 0 {
+		return nil
+	}
+	taken, takenOK := averages.Values["avgDamageTaken"]
+	mitigated, mitigatedOK := averages.Values["avgDmgMitigated"]
+	cc, ccOK := averages.Values["avgCcTime"]
+	share, shareOK := averages.Values["damageShare"]
+	// 任何一项均值缺失或 ≤ 0（除零 / 上游整字段没了）→ 整套判据失效，一个标签
+	// 都不生成。宁可不出提示，也不出一个用坏门槛算出来的提示。
+	if !takenOK || taken <= 0 || !mitigatedOK || mitigated <= 0 || !ccOK || cc <= 0 || !shareOK || share <= 0 {
+		return nil
+	}
+	ratio := gameplayTeamPortraitThresholdRatio
+	frontline, control, carry := false, false, false
+	for _, row := range rows {
+		if row.AvgDamageTaken >= taken*ratio && row.AvgDmgMitigated >= mitigated*ratio {
+			frontline = true
+		}
+		if row.AvgCcTime >= cc*ratio {
+			control = true
+		}
+		if row.DamageShare >= share*ratio {
+			carry = true
+		}
+	}
+	var labels []gameplayTeamPortraitLabel
+	if !frontline {
+		labels = append(labels, gameplayTeamPortraitLabel{Key: "frontline", Label: "缺前排"})
+	}
+	if !control {
+		labels = append(labels, gameplayTeamPortraitLabel{Key: "crowdControl", Label: "缺控制"})
+	}
+	if !carry {
+		labels = append(labels, gameplayTeamPortraitLabel{Key: "sustainedDamage", Label: "缺持续输出"})
+	}
+	return labels
+}
+
+// gameplayTeamPortraitFrom 把「我方 championId 列表 + 全量 postmatch」拼成 P1-5
+// 的结果。查不到 postmatch 的英雄直接跳过；能解析的英雄少于
+// gameplayTeamPortraitMinResolvedHeroes 个时整块返回 nil（证据不足明确降级），
+// 因为「5 人里缺 2 个数据」时「没有任何人是前排」这个结论不成立。
+func gameplayTeamPortraitFrom(rosterChampionIDs []int, heroes map[int]hexdataPostmatchRow, present map[int]map[string]bool) *gameplayTeamPortrait {
+	if len(rosterChampionIDs) == 0 || len(heroes) == 0 {
+		return nil
+	}
+	rows := make([]hexdataPostmatchRow, 0, len(rosterChampionIDs))
+	for _, id := range rosterChampionIDs {
+		if row, ok := heroes[id]; ok {
+			rows = append(rows, row)
+		}
+	}
+	if len(rows) < gameplayTeamPortraitMinResolvedHeroes {
+		return nil
+	}
+	averages := gameplayTeamPortraitAveragesFrom(heroes, present)
+	labels := gameplayTeamPortraitLabels(rows, averages)
+	if len(labels) == 0 {
+		return nil
+	}
+	return &gameplayTeamPortrait{
+		Labels: labels, RosterSize: len(rosterChampionIDs), ResolvedHeroes: len(rows), HeroPoolSize: averages.HeroCount,
+		MeasurementTechnique: fmt.Sprintf("队伍画像门槛是 %d 位英雄赛后每局均值的算术平均（Hexdata postmatch 全量聚合）：承伤与减伤、控制时长、输出占比三项里全队无人达到均值即提示缺口。这是本地约定的启发式判据，不是上游官方口径", averages.HeroCount),
+	}
+}
+
+// gameplayApplyRosterInsights 是 R116-D P1-2/P1-3/P1-5 的唯一接线点，
+// 由 handleGameplayRecommendations 在组装完 bundle 之后调用。
+//
+// 只在 hextech-aram（海斗）模式下工作：hero-json 与 postmatch 只有这条路径会拉，
+// 其它模式调进来就是缓存未命中 → 一个提示都不生成，也一个请求都不发。
+func (a *app) gameplayApplyRosterInsights(ctx context.Context, bundle *gameplayRecommendationBundle, query url.Values, provider *championProvider, championID int64, internalMode string) {
+	if a == nil || bundle == nil || internalMode != "hextech-aram" {
+		return
+	}
+	phase := strings.TrimSpace(query.Get("phase"))
+	allyIDs := gameplayRosterChampionIDs(query.Get("allyChampionIds"))
+	enemyIDs := gameplayRosterChampionIDs(query.Get("enemyChampionIds"))
+	// Anti-scope 第 4 条：ChampSelect 阶段一律不消费「对面 5 人」。
+	// 依据与放开位置见 gameplayRosterMatchupPhases 的注释。
+	matchupPhaseAllowed := false
+	for _, allowed := range gameplayRosterMatchupPhases {
+		if strings.EqualFold(phase, allowed) {
+			matchupPhaseAllowed = true
+			break
+		}
+	}
+	enemyCountBeforeGuard := len(enemyIDs)
+	if !matchupPhaseAllowed {
+		enemyIDs = nil
+	}
+	detail, detailOK := gameplayHeroHexdataTables(ctx, provider, championID)
+	teammateIDs := gameplayRosterWithout(allyIDs, int(championID))
+	if detailOK && len(enemyIDs) > 0 {
+		bundle.MatchupNotices = gameplayMatchupNotices(detail.WeakAgainst, detail.StrongAgainst, enemyIDs)
+	}
+	if detailOK && len(teammateIDs) > 0 {
+		bundle.SynergyNotices = gameplaySynergyNotices(detail.TeammateSynergies, teammateIDs)
+	}
+	heroes, present, postmatchOK := map[int]hexdataPostmatchRow(nil), map[int]map[string]bool(nil), false
+	if len(allyIDs) > 0 {
+		heroes, present, postmatchOK = gameplayPostmatchTable(ctx, provider)
+		if postmatchOK {
+			bundle.TeamPortrait = gameplayTeamPortraitFrom(allyIDs, heroes, present)
+		}
+	}
+	labelKeys := make([]string, 0, 3)
+	if bundle.TeamPortrait != nil {
+		for _, label := range bundle.TeamPortrait.Labels {
+			labelKeys = append(labelKeys, label.Key)
+		}
+	}
+	a.recordDiagnostic(map[string]any{
+		"event": "gameplay_roster_insights", "diagnostic_schema": 1,
+		"trace_id": bundle.TraceID, "recommendation_key": bundle.RecommendationKey,
+		"champion_id": championID, "internal_mode": internalMode, "phase": phase,
+		"ally_count": len(allyIDs), "teammate_count": len(teammateIDs),
+		"enemy_count": len(enemyIDs), "enemy_count_before_phase_guard": enemyCountBeforeGuard,
+		"matchup_phase_allowed": matchupPhaseAllowed,
+		"hero_json_cached":      detailOK, "postmatch_cached": postmatchOK,
+		"weak_against_rows": len(detail.WeakAgainst), "strong_against_rows": len(detail.StrongAgainst),
+		"synergy_rows":    len(detail.TeammateSynergies),
+		"matchup_notices": len(bundle.MatchupNotices), "synergy_notices": len(bundle.SynergyNotices),
+		"team_portrait_labels": labelKeys, "team_portrait_hero_pool": len(heroes),
+		// 结构性保证：gameplayPeekCachedHexdataPage 的 loader 恒返回哨兵错误，
+		// 这条路径发出的上游请求数恒为 0（Anti-scope 第 1 条）。
+		"upstream_requests_added": 0,
+	})
+}
+
 func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
 	query := r.URL.Query()
@@ -4034,6 +5027,12 @@ func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Reque
 	bundle.GameID = gameID
 	bundle.GameMode = strings.ToUpper(strings.TrimSpace(query.Get("gameMode")))
 	bundle.Tier = tier
+	// R116-D P1-2/P1-3/P1-5：克制提示、协同提示与队伍画像缺口标签。
+	// 三个都只读推荐路径刚刚拉过的缓存（hero-json / postmatch），新增的 hexdata
+	// 上游请求数恒为 0（Anti-scope 第 1 条）；只在海斗模式产出，取不到就一个提示
+	// 都不生成，绝不为「有内容」去按英雄扇出请求。
+	diagnosticStage = "roster-insights"
+	a.gameplayApplyRosterInsights(ctx, &bundle, query, provider, championID, resolution.InternalMode)
 	coreIn := len(detail.Build.CoreItems)
 	bundle.Build.CoreOptions = capGameplayCoreOptions(bundle.Build.CoreOptions)
 	a.recordDiagnostic(map[string]any{"event": "live_build_shape", "diagnostic_schema": 2, "trace_id": traceID, "recommendation_key": recommendationKey, "core_in": coreIn, "core_out": len(bundle.Build.CoreOptions)})
@@ -4389,10 +5388,41 @@ type liveClientArenaGrouping struct {
 	IdentifiedPlayers int
 }
 
+// liveClientItem 是 /liveclientdata/playerlist 里 items[] 的一个元素
+// （R116-D P1-4 阶段一）。
+//
+// 斗魂（CHERRY）在 R90 的 63 次 200 采样里恒定给出 19 个顶层键，其中含 items；
+// 海斗（KIWI / ARAM_MAYHEM）下这个字段是否存在、元素结构是否一致，
+// docs/r116-probe-findings.md §3.4 与 §5.3 的观测值目前全部是「待填」——零观测。
+// 所以这里的解析对键名大小写宽松（itemID / itemId / itemid 都认），任何一项缺失
+// 都按零值处理，元素不是对象就整条跳过并计数，绝不 panic、绝不猜字段。
+// 观测到的真实键名会原样进 live_client_items_parsed 事件，真机日志一到就能判读。
+type liveClientItem struct {
+	ItemID     int  `json:"itemID"`
+	Slot       int  `json:"slot"`
+	Count      int  `json:"count"`
+	CanUse     bool `json:"canUse"`
+	Consumable bool `json:"consumable"`
+}
+
 type liveClientSnapshot struct {
 	Grouping           liveClientArenaGrouping
 	OrderedIdentities  [][]string
 	PositionByIdentity map[string]string
+	// R116-D P1-4 阶段一：每个身份键 → 该玩家已出装备。
+	// 身份匹配复用 liveClientEntryIdentityKeys，与 PositionByIdentity 同一套。
+	// 只有 entry 里确实存在 items 键时才写入（空数组也写，代表「字段在、还没出装」），
+	// 这样调用方能区分「items 键不存在」与「存在但为空」。
+	// ⚠️ 阶段一只喂诊断事件 live_client_items_parsed，生产 UI 不消费任何内容。
+	ItemsByIdentity map[string][]liveClientItem
+	// items[] 元素上实际观测到的键名（排序去重的并集），用于判读海斗的元素结构
+	// 是否与斗魂的 itemID/slot/count/canUse/consumable 一致。
+	ItemElementKeys []string
+	// ItemElementsSeen / ItemElementsSkipped 是容错计数：跳过的元素（不是对象、
+	// itemID 不是数字）必须能在诊断里看到，否则「解析成功但全是 0」这种退化
+	// 和「上游没给字段」在日志里长得一模一样。
+	ItemElementsSeen    int
+	ItemElementsSkipped int
 }
 
 type liveClientProbeState struct {
@@ -4554,6 +5584,127 @@ func liveClientEntryIdentityKeys(entry map[string]any) []string {
 	return keys
 }
 
+// parseLiveClientItems 宽松解析一个玩家对象里的 items 字段（R116-D P1-4 阶段一）。
+//
+// 返回值：
+//   - items：解析成功的装备，按上游给的顺序原样保留（不重排，重排就是编造顺序）；
+//   - elementKeys：items[] 元素上实际观测到的键名并集（原样大小写，供真机判读）；
+//   - seen / skipped：元素总数与被跳过的元素数；
+//   - present：entry 里到底有没有 items 这个键。
+//
+// 容错要求（工单 P1-4 阶段一）：items 缺失 / 不是数组 / 元素不是对象 / itemID 不是
+// 数字，全部安全跳过并计入 skipped，绝不 panic。海斗下的真实形状未经实测，所以
+// 键名一律走 liveClientMapValue 的大小写无关匹配（itemID / itemId / itemid 都认），
+// 数字同时接受 JSON number 与数字字符串（上游在别处确实把 ID 写成字符串，
+// hexdata 的 opponentChampionId 就是一例）。
+func parseLiveClientItems(entry map[string]any) (items []liveClientItem, elementKeys []string, seen, skipped int, present bool) {
+	if len(entry) == 0 {
+		return nil, nil, 0, 0, false
+	}
+	raw, exists := liveClientMapValue(entry, "items")
+	if !exists {
+		return nil, nil, 0, 0, false
+	}
+	// items 存在但不是数组（null / 对象 / 字符串）：present 仍然为 true，
+	// 因为「字段在、形状不对」正是真机要判读的信息，seen=0 + skipped=0 +
+	// elementKeys 为空就足够说明问题，不需要再造一个错误码。
+	array, ok := raw.([]any)
+	if !ok {
+		return nil, nil, 0, 0, true
+	}
+	keySet := make(map[string]struct{})
+	for _, element := range array {
+		seen++
+		object, ok := element.(map[string]any)
+		if !ok {
+			skipped++
+			continue
+		}
+		for key := range object {
+			if trimmed := strings.TrimSpace(key); trimmed != "" {
+				keySet[trimmed] = struct{}{}
+			}
+		}
+		itemID, idOK := liveClientItemInt(object, "itemID")
+		if !idOK || itemID <= 0 {
+			// 没有可用 itemID 的元素对下游毫无意义（既不能比对 trio，也不能显示），
+			// 但它确实存在过 → 计入 skipped，让诊断能看出「元素在、ID 读不出来」。
+			skipped++
+			continue
+		}
+		slot, _ := liveClientItemInt(object, "slot")
+		count, _ := liveClientItemInt(object, "count")
+		if count <= 0 {
+			count = 1
+		}
+		canUse, _ := liveClientItemBool(object, "canUse")
+		consumable, _ := liveClientItemBool(object, "consumable")
+		items = append(items, liveClientItem{ItemID: itemID, Slot: slot, Count: count, CanUse: canUse, Consumable: consumable})
+	}
+	if len(keySet) > 0 {
+		elementKeys = make([]string, 0, len(keySet))
+		for key := range keySet {
+			elementKeys = append(elementKeys, key)
+		}
+		sort.Strings(elementKeys)
+	}
+	return items, elementKeys, seen, skipped, true
+}
+
+// liveClientItemInt 大小写无关地取一个整数字段。JSON number 与数字字符串都接受；
+// 取不到或不是整数返回 ok=false，调用方自己决定是跳过还是按零值处理。
+func liveClientItemInt(object map[string]any, name string) (int, bool) {
+	value, exists := liveClientMapValue(object, name)
+	if !exists {
+		return 0, false
+	}
+	switch typed := value.(type) {
+	case float64:
+		if math.IsNaN(typed) || math.IsInf(typed, 0) || typed != math.Trunc(typed) {
+			return 0, false
+		}
+		return int(typed), true
+	case int:
+		return typed, true
+	case int64:
+		return int(typed), true
+	case json.Number:
+		parsed, err := typed.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return int(parsed), true
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(typed))
+		if err != nil {
+			return 0, false
+		}
+		return parsed, true
+	default:
+		return 0, false
+	}
+}
+
+// liveClientItemBool 大小写无关地取一个布尔字段，同时接受 "true"/"false" 字符串。
+func liveClientItemBool(object map[string]any, name string) (bool, bool) {
+	value, exists := liveClientMapValue(object, name)
+	if !exists {
+		return false, false
+	}
+	switch typed := value.(type) {
+	case bool:
+		return typed, true
+	case string:
+		parsed, err := strconv.ParseBool(strings.TrimSpace(typed))
+		if err != nil {
+			return false, false
+		}
+		return parsed, true
+	default:
+		return false, false
+	}
+}
+
 func parseLiveClientPlayerList(raw []byte, sizes ...int) (liveClientSnapshot, liveClientPlayerListShape, error) {
 	squadSize := 3
 	if len(sizes) > 0 {
@@ -4583,9 +5734,29 @@ func parseLiveClientPlayerList(raw []byte, sizes ...int) (liveClientSnapshot, li
 		TeamValues:     liveClientFieldDistribution(entries, "team"),
 		PositionValues: make(map[string]int),
 	}
-	snapshot := liveClientSnapshot{PositionByIdentity: make(map[string]string)}
+	snapshot := liveClientSnapshot{PositionByIdentity: make(map[string]string), ItemsByIdentity: make(map[string][]liveClientItem)}
+	itemElementKeySet := make(map[string]struct{})
 	for _, entry := range entries {
-		snapshot.OrderedIdentities = append(snapshot.OrderedIdentities, liveClientEntryIdentityKeys(entry))
+		identities := liveClientEntryIdentityKeys(entry)
+		snapshot.OrderedIdentities = append(snapshot.OrderedIdentities, identities)
+		// R116-D P1-4 阶段一：读 items。必须放在 position 的 continue 之前——
+		// 海斗的 position 实测恒为 "OTHER"（docs/r116-probe-findings.md §1.5 的
+		// 斗魂基线是 position_values:{"OTHER":18}），normalizePosition 会把它
+		// 归一成空串，放在后面就等于永远解析不到。
+		if items, elementKeys, seen, skipped, present := parseLiveClientItems(entry); present {
+			snapshot.ItemElementsSeen += seen
+			snapshot.ItemElementsSkipped += skipped
+			for _, key := range elementKeys {
+				itemElementKeySet[key] = struct{}{}
+			}
+			if len(identities) > 0 {
+				// 空数组也写：代表「items 键在、这名玩家还没出装」，与「键不存在」
+				// 是两回事，诊断事件要靠这个区别判读海斗形状。
+				for _, identity := range identities {
+					snapshot.ItemsByIdentity[identity] = items
+				}
+			}
+		}
 		value, _ := liveClientMapValue(entry, "position")
 		position, _ := value.(string)
 		position = normalizePosition(position, "")
@@ -4593,9 +5764,19 @@ func parseLiveClientPlayerList(raw []byte, sizes ...int) (liveClientSnapshot, li
 		if position == "" {
 			continue
 		}
-		for _, identity := range liveClientEntryIdentityKeys(entry) {
+		for _, identity := range identities {
 			snapshot.PositionByIdentity[identity] = position
 		}
+	}
+	if len(itemElementKeySet) > 0 {
+		snapshot.ItemElementKeys = make([]string, 0, len(itemElementKeySet))
+		for key := range itemElementKeySet {
+			snapshot.ItemElementKeys = append(snapshot.ItemElementKeys, key)
+		}
+		sort.Strings(snapshot.ItemElementKeys)
+	}
+	if len(snapshot.ItemsByIdentity) == 0 {
+		snapshot.ItemsByIdentity = nil
 	}
 	if len(shape.PositionValues) == 0 {
 		shape.PositionValues = nil
@@ -4685,6 +5866,58 @@ func (a *app) recordLiveClientPlayerListShape(gameID int64, status int, shape li
 	})
 }
 
+// recordLiveClientItemsParsed 是 R116-D P1-4 阶段一的唯一产出：一条纯诊断事件，
+// 生产 UI 上不展示任何内容（工单 P1-4 阶段一第 2 条）。
+//
+// 用途：海斗（KIWI / ARAM_MAYHEM）的 /liveclientdata/playerlist 里 items 字段
+// 是否存在、元素结构是否与斗魂一致，docs/r116-probe-findings.md §3.4/§5.3 的观测
+// 值至今是「待填」。这条事件把本人（self）识别到的 items 长度、itemID 集合、
+// 以及所有玩家 items[] 元素上实际观测到的键名一并落盘，真机日志一到就能直接判读，
+// 不需要再改代码重跑。
+//
+// 去重键是 game:<gameID>:<items 指纹>：出装每变一次就记一条，同一套装备的 20 秒
+// 轮询不会刷屏。复用既有的 liveClientPlayerListDiagnostic* 有界 map（上限
+// lcuSessionShapeDiagnosticLimit=128，超出整体重置），键前缀 "items:" 与
+// recordLiveClientPlayerListShape 的 "game:" 不冲突——这样不必给 app 结构体加新
+// 字段（main.go 不在本工单允许改动范围内）。
+func (a *app) recordLiveClientItemsParsed(gameID int64, phase string, snapshot liveClientSnapshot, selfMatched bool, identitySource string, items []liveClientItem) {
+	if a == nil {
+		return
+	}
+	itemIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		if item.ItemID > 0 {
+			itemIDs = append(itemIDs, item.ItemID)
+		}
+	}
+	sort.Ints(itemIDs)
+	idTexts := make([]string, 0, len(itemIDs))
+	for _, id := range itemIDs {
+		idTexts = append(idTexts, strconv.Itoa(id))
+	}
+	fingerprint := strconv.Itoa(len(items)) + "|" + strings.Join(idTexts, ",")
+	key := "items:" + strconv.FormatInt(gameID, 10) + ":" + fingerprint
+	if !claimBoundedDiagnosticKey(&a.liveClientPlayerListDiagnosticMu, &a.liveClientPlayerListDiagnosticKeys, key, lcuSessionShapeDiagnosticLimit) {
+		return
+	}
+	a.recordDiagnostic(map[string]any{
+		"event": "live_client_items_parsed", "diagnostic_schema": 1,
+		"game_id": gameID, "phase": phase,
+		// ui_visible 恒为 false：阶段一只开解析能力，不向用户展示任何基于
+		// 未实测形状的内容（Anti-scope 第 3 条）。
+		"ui_visible":   false,
+		"self_matched": selfMatched, "identity_source": identitySource,
+		"self_item_count": len(items), "self_item_ids": itemIDs,
+		// item_element_keys 是判据二的主体证据之一：与斗魂基线的
+		// itemID/slot/count/canUse/consumable 逐项对比即可判定结构是否一致。
+		"item_element_keys":     snapshot.ItemElementKeys,
+		"item_elements_seen":    snapshot.ItemElementsSeen,
+		"item_elements_skipped": snapshot.ItemElementsSkipped,
+		"identities_with_items": len(snapshot.ItemsByIdentity),
+		"player_count":          len(snapshot.OrderedIdentities),
+	})
+}
+
 func liveClientPositionMatchSourceCounts(counts map[string]int) map[string]int {
 	return map[string]int{
 		"summonerName": counts["summonerName"],
@@ -4701,6 +5934,19 @@ func cloneLiveClientSnapshot(snapshot liveClientSnapshot) liveClientSnapshot {
 	for _, keys := range snapshot.OrderedIdentities {
 		cloned.OrderedIdentities = append(cloned.OrderedIdentities, append([]string(nil), keys...))
 	}
+	// R116-D P1-4 阶段一：ItemsByIdentity 必须逐条深拷贝。
+	// maps.Clone 只做浅拷贝，多个身份键会共享同一个底层数组；快照既被
+	// liveClientProbeState 持有、又被 cloneLiveClientSnapshot 交给调用方 goroutine
+	// 读取，共享底层数组就是跨 goroutine 的数据竞争（-race 会直接报）。
+	if len(snapshot.ItemsByIdentity) > 0 {
+		cloned.ItemsByIdentity = make(map[string][]liveClientItem, len(snapshot.ItemsByIdentity))
+		for identity, items := range snapshot.ItemsByIdentity {
+			cloned.ItemsByIdentity[identity] = append([]liveClientItem(nil), items...)
+		}
+	}
+	cloned.ItemElementKeys = append([]string(nil), snapshot.ItemElementKeys...)
+	cloned.ItemElementsSeen = snapshot.ItemElementsSeen
+	cloned.ItemElementsSkipped = snapshot.ItemElementsSkipped
 	return cloned
 }
 
@@ -4859,6 +6105,140 @@ func liveClientPositionForIdentities(snapshot liveClientSnapshot, summonerNames,
 		}
 	}
 	return "", ""
+}
+
+// liveClientItemsForIdentities 与 liveClientPositionForIdentities 同一套身份匹配
+// 优先级（riotId 先于 summonerName），返回本人已出装备与命中来源。
+//
+// 与位置查询的差别：这里用双返回值 map 读取，因为「items 键存在但为空数组」
+// （开局还没出装）和「items 键根本不存在」必须能区分——前者是解析成功、
+// 后者是海斗没给这个字段，两者的真机判读结论完全相反。
+func liveClientItemsForIdentities(snapshot liveClientSnapshot, summonerNames, riotIDs []string) ([]liveClientItem, string) {
+	if len(snapshot.ItemsByIdentity) == 0 {
+		return nil, ""
+	}
+	for _, candidate := range []struct {
+		source string
+		values []string
+	}{{source: "riotId", values: riotIDs}, {source: "summonerName", values: summonerNames}} {
+		for _, value := range candidate.values {
+			for _, key := range normalizeLiveClientPlayerName(value) {
+				if items, ok := snapshot.ItemsByIdentity[key]; ok {
+					return items, candidate.source
+				}
+			}
+		}
+	}
+	return nil, ""
+}
+
+// ---------------------------------------------------------------------------
+// R116-D P1-4 阶段二：纯计算部分。
+//
+// ⚠️ 已实现、有完整单测，但**未接线**。
+//
+// 依据：docs/r116-probe-findings.md §3.4 的 live_client_playerlist_shape
+// .element_keys 与 §5.3 的 $.allPlayers[].items element_keys 两项判据，观测值
+// 目前全部是「待填」——需要 Windows 真机 + 真实海斗对局，本轮执行环境无法产出。
+// 工单 P1-4「对抗变异」最后一条明写：「若阶段二判定为不可行（探测结果否定），
+// 本工单只交付阶段一的诊断解析，不强行实现阶段二——验收时以 R116-探测的结论
+// 文档为准，不接受『猜测字段结构强行实现』的交付。」Anti-scope 第 3 条同义。
+//
+// 所以本轮把能力备好、接线留空：
+//   - 下面两个函数是纯函数，输入输出完全确定，单测覆盖前缀匹配、消耗品过滤、
+//     无匹配降级三条路径；
+//   - 它们没有任何调用方（除测试），不进 gameplayRecommendationBundle，
+//     前端 gameplay.js 里也没有对应的渲染分支；
+//   - 接线条件：§3.4 的 element_keys 回填为「含 items」且 §5.3 的 items 元素
+//     键名与斗魂基线（itemID/slot/count/canUse/consumable）一致；
+//   - 接线点（两处，各一行量级）：
+//       1. 后端——在 gameplayApplyRosterInsights 里把 liveClientSnapshot
+//          .ItemsByIdentity 的本人装备喂给 gameplayOwnedTerminalItemIDs +
+//          gameplayNextItemSuggestionFromTrios，结果挂到 bundle 的新字段上；
+//       2. 前端——backend/web/gameplay.js 的 renderBuildRecommendation
+//          （当前 5694 行附近）里加一行「下一件推荐」补充行，不替换现有的
+//          静态核心装路线；items 解析失败 / 结构不符 / 无 trio 前缀匹配时
+//          整行不渲染（工单 P1-4 阶段二第 5 条的降级规则）。
+// ---------------------------------------------------------------------------
+
+// gameplayOwnedTerminalItemIDs 把 playerlist 的 items[] 过滤成「可用于 trio 前缀
+// 比对」的装备 ID 集合：丢掉 itemID ≤ 0 与消耗品（药水/眼位，consumable=true）。
+//
+// 未解决：工单还要求滤掉「未成型的空槽」，但 playerlist 的 items[] 元素里没有
+// 任何能区分「成品件」与「合成组件」的字段（canUse 是「能不能主动使用」，
+// 与是否成型无关）。要真正过滤组件，需要一份成品件 ID 目录，而那不在本轮
+// 允许改动的文件里。这一点已记入 docs/r116d-execution-ledger.md 的未解决问题，
+// 接线前必须用真机数据核对：如果组件也会进 items[]，前缀匹配会假命中。
+func gameplayOwnedTerminalItemIDs(items []liveClientItem) []int {
+	if len(items) == 0 {
+		return nil
+	}
+	ids := make([]int, 0, len(items))
+	seen := make(map[int]struct{}, len(items))
+	for _, item := range items {
+		if item.ItemID <= 0 || item.Consumable {
+			continue
+		}
+		if _, duplicate := seen[item.ItemID]; duplicate {
+			continue
+		}
+		seen[item.ItemID] = struct{}{}
+		ids = append(ids, item.ItemID)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return ids
+}
+
+// gameplayNextItemSuggestionFromTrios 是 P1-4 阶段二的核心：本人已出装备里
+// 恰好包含某个 terminalItemTrio 的前两件、且第三件还没出时，推荐第三件。
+//
+// trios 必须按上游顺序传入（R116-A 已按 games 降序裁剪到 top-50），本函数取
+// **第一条**命中的 trio，不自造排序键——上游的 games 降序就是样本量优先级，
+// 在这里重新排序等于用本地口径覆盖上游口径。
+//
+// 降级规则（工单 P1-4 阶段二第 5 条）：已出装备不足 2 件、trios 为空、
+// trio 的 itemIds 不是恰好 3 个、或没有任何前缀匹配 → 返回 ok=false，
+// 调用方整行不渲染。绝不返回一个「大概是这件」的猜测值。
+func gameplayNextItemSuggestionFromTrios(ownedItemIDs []int, trios []hexdataTrioRow) (gameplayNextItemSuggestion, bool) {
+	if len(ownedItemIDs) < 2 || len(trios) == 0 {
+		return gameplayNextItemSuggestion{}, false
+	}
+	owned := make(map[int]struct{}, len(ownedItemIDs))
+	for _, id := range ownedItemIDs {
+		if id > 0 {
+			owned[id] = struct{}{}
+		}
+	}
+	if len(owned) < 2 {
+		return gameplayNextItemSuggestion{}, false
+	}
+	for _, trio := range trios {
+		if len(trio.ItemIDs) != 3 {
+			continue
+		}
+		first, second, third := trio.ItemIDs[0], trio.ItemIDs[1], trio.ItemIDs[2]
+		if first <= 0 || second <= 0 || third <= 0 {
+			continue
+		}
+		if _, ok := owned[first]; !ok {
+			continue
+		}
+		if _, ok := owned[second]; !ok {
+			continue
+		}
+		if _, already := owned[third]; already {
+			// 三件都出齐了，不是「下一件」。
+			continue
+		}
+		name := ""
+		if len(trio.ItemNames) == 3 {
+			name = strings.TrimSpace(trio.ItemNames[2])
+		}
+		return gameplayNextItemSuggestion{ItemID: third, ItemName: name, WinRate: trio.WinRate, Games: trio.Games, TrioKey: trio.TrioKey}, true
+	}
+	return gameplayNextItemSuggestion{}, false
 }
 
 func arenaAllyIdentityKeys(player lcuLivePlayer) []string {
@@ -5360,6 +6740,26 @@ func gameplayRecommendationsFromChampionDetail(championID int64, position string
 	return result
 }
 
+// gameplayAugmentRowsWithoutStages 复制海克斯行并清掉 Stages（R116-B 独立评审
+// 整改 B5）。stages 是英雄详情页「阶段筛选」chips 的数据源，一条 augment 带 4 条
+// 阶段行，实测英雄 157 是 97 KB/英雄；而对局内推荐页（backend/web/gameplay.js）
+// 对 stages 零消费——全文 0 命中。这条链路是延迟敏感的局内 overlay，所以拷贝时
+// 就把阶段维度剥掉：详情页仍然完整下发，局内 bundle 一个字节都不带。
+//
+// 逐行取值拷贝而不是共享底层数组：range 出来的 row 是副本，改它的 Stages 不会动
+// 到 detail.RecommendedAugments（那份切片还要给详情页响应与缓存用）。
+func gameplayAugmentRowsWithoutStages(rows []championMetricRow) []championMetricRow {
+	if len(rows) == 0 {
+		return nil
+	}
+	result := make([]championMetricRow, 0, len(rows))
+	for _, row := range rows {
+		row.Stages = nil
+		result = append(result, row)
+	}
+	return result
+}
+
 func gameplayRecommendationsFromResolvedDetail(championID int64, position string, detail championDetailResponse, resolution gameplayRecommendationModeResolution) gameplayRecommendationBundle {
 	spec := opggModeSpecs[resolution.InternalMode]
 	hasTopPlayers := recommendationModeHasTopPlayers(resolution)
@@ -5383,7 +6783,8 @@ func gameplayRecommendationsFromResolvedDetail(championID int64, position string
 		Augments: []championMetricRow{},
 	}
 	if spec.HasAugments {
-		result.Augments = append([]championMetricRow(nil), detail.RecommendedAugments...)
+		// 评审整改 B5：局内不渲染阶段维度，别让它背上 stages 的体积。
+		result.Augments = gameplayAugmentRowsWithoutStages(detail.RecommendedAugments)
 	}
 	result.ItemRanking = append([]championMetricRow(nil), detail.ItemRanking...)
 	if detail.Mode == "arena" {
@@ -6069,6 +7470,13 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	}
 	ranksMS, matchesMS := phaseMilliseconds(ranksFinishedAt), phaseMilliseconds(matchesFinishedAt)
 	positionMatchSources := liveClientPositionMatchSourceCounts(nil)
+	// R116-D P1-4 阶段一：本人已出装备的识别结果。只在真的解析到 playerlist
+	// 时记录（len(OrderedIdentities) > 0），否则「探测失败」会在日志里伪装成
+	// 「解析到 0 件装备」，两种情况的真机判读结论完全相反。
+	itemsProbeUsable := len(liveClientSnapshotValue.OrderedIdentities) > 0
+	var selfItems []liveClientItem
+	selfItemsSource := ""
+	selfItemsMatched := false
 	for index, raw := range rawPlayers {
 		player := response.Players[index]
 		summonerNames, riotIDs := livePlayerIdentityValues(raw.player, player)
@@ -6077,6 +7485,13 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		if source != "" {
 			positionMatchSources[source]++
 		}
+		if itemsProbeUsable && player.IsCurrent {
+			selfItems, selfItemsSource = liveClientItemsForIdentities(liveClientSnapshotValue, summonerNames, riotIDs)
+			selfItemsMatched = selfItemsSource != ""
+		}
+	}
+	if itemsProbeUsable {
+		a.recordLiveClientItemsParsed(response.GameID, phase, liveClientSnapshotValue, selfItemsMatched, selfItemsSource, selfItems)
 	}
 	a.finalizeLiveClientPlayerListShape(response.GameID, positionMatchSources["summonerName"]+positionMatchSources["riotId"], positionMatchSources)
 	if arenaMode {
@@ -6093,6 +7508,12 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		a.compareArenaChampOrder(client, &response, sessionPlayers, liveClientSnapshotValue)
 		a.recordArenaMissingSession(current, &response, liveClientSnapshotValue)
 		a.applyArenaLiveGrouping(client, current, &response, sessionPlayers, liveClientSnapshotValue)
+		go a.sampleArenaAllGameData(ctx, response.GameID)
+	}
+	// R116-探测（一次性侦察，工单 P1 第 1 条）：海斗（KIWI/ARAM_MAYHEM）此前不满足上面的
+	// arenaMode 条件，live_client_allgamedata_shape 在海斗下从未被观测过。这里只把既有诊断
+	// 埋点扩大到海斗模式，不新增任何用户可见功能；探测结论落盘后按工单 P1 第 4 条评估保留/删除。
+	if aramMode && !arenaMode && (phase == "GameStart" || phase == "InProgress" || phase == "Reconnect") {
 		go a.sampleArenaAllGameData(ctx, response.GameID)
 	}
 

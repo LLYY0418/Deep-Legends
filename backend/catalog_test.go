@@ -213,6 +213,23 @@ func TestR87LoadCollectionSnapshotReusesOwnershipPayloads(t *testing.T) {
 		t.Fatalf("loadCollectionSnapshot failed: %v", err)
 	}
 	assertLootNamingFixture(t, snapshot.Account.Loot)
+	if len(snapshot.All) != 900 || len(snapshot.AllWithBase) != 1000 {
+		t.Fatalf("catalog split = display %d full %d, want 900 and 1000", len(snapshot.All), len(snapshot.AllWithBase))
+	}
+	displayByID := make(map[int64]Skin, len(snapshot.All))
+	for _, skin := range snapshot.All {
+		displayByID[skin.ID] = skin
+	}
+	fullByID := make(map[int64]Skin, len(snapshot.AllWithBase))
+	for _, skin := range snapshot.AllWithBase {
+		fullByID[skin.ID] = skin
+	}
+	if _, exists := displayByID[1000]; exists {
+		t.Fatal("collection display catalog retained a base skin")
+	}
+	if !fullByID[1000].Owned || fullByID[2000].Owned {
+		t.Fatalf("base ownership did not follow champion inventory: champion1=%v champion2=%v", fullByID[1000].Owned, fullByID[2000].Owned)
+	}
 	inventoryCalls.Range(func(key, value any) bool {
 		if value.(*atomic.Int32).Load() != 1 {
 			t.Errorf("%s requested %d times", key, value.(*atomic.Int32).Load())

@@ -161,3 +161,79 @@ func facadeChallengeNames(challenges []facadeChallenge) []string {
 	}
 	return names
 }
+
+func TestR117FacadeChallengeCatalogRetriesAfterFailureAndSharesFlight(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/lol-challenges/v1/challenges/local-player" {
+			_, _ = w.Write([]byte(`{}`))
+			return
+		}
+		if calls.Add(1) == 1 {
+			http.Error(w, "temporary failure", http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte(`{"1":{"name":"目录勋章"}}`))
+	}))
+	defer server.Close()
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	a := &app{}
+	if _, _, err := a.loadFacadeChallengeCatalog(context.Background(), client); err == nil {
+		t.Fatal("catalog failure reported success")
+	}
+	if _, _, err := a.loadFacadeChallengeCatalog(context.Background(), client); err == nil || calls.Load() != 1 {
+		t.Fatalf("failure was not held by backoff: calls=%d err=%v", calls.Load(), err)
+	}
+	a.facadeChallengeCatalogMu.Lock()
+	a.facadeChallengeCatalogBackoffUntil = time.Now().Add(-time.Second)
+	a.facadeChallengeCatalogMu.Unlock()
+	catalog, _, err := a.loadFacadeChallengeCatalog(context.Background(), client)
+	if err != nil || len(catalog) != 1 || calls.Load() != 2 {
+		t.Fatalf("retry after backoff: catalog=%v calls=%d err=%v", catalog, calls.Load(), err)
+	}
+	if _, _, err := a.loadFacadeChallengeCatalog(context.Background(), client); err != nil || calls.Load() != 2 {
+		t.Fatalf("successful catalog was reloaded: calls=%d err=%v", calls.Load(), err)
+	}
+
+	var concurrentCalls atomic.Int32
+	started := make(chan struct{})
+	release := make(chan struct{})
+	concurrentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/lol-challenges/v1/challenges/local-player" {
+			_, _ = w.Write([]byte(`{}`))
+			return
+		}
+		if concurrentCalls.Add(1) == 1 {
+			close(started)
+			<-release
+		}
+		_, _ = w.Write([]byte(`{"1":{"name":"目录勋章"}}`))
+	}))
+	defer concurrentServer.Close()
+	concurrentClient := &LCUClient{baseURL: concurrentServer.URL, token: "test-token", http: concurrentServer.Client()}
+	concurrentApp := &app{}
+	results := make(chan error, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			_, _, err := concurrentApp.loadFacadeChallengeCatalog(context.Background(), concurrentClient)
+			results <- err
+		}()
+	}
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("challenge catalog request did not start")
+	}
+	select {
+	case err := <-results:
+		t.Fatalf("concurrent caller bypassed flight: %v", err)
+	case <-time.After(30 * time.Millisecond):
+	}
+	close(release)
+	if err := <-results; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-results; err != nil || concurrentCalls.Load() != 1 {
+		t.Fatalf("challenge catalog flight calls=%d err=%v", concurrentCalls.Load(), err)
+	}
+}

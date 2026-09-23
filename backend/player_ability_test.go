@@ -209,7 +209,7 @@ func TestBuildGameplayRankedQueuesUsesOnlyTheSharedRecentSample(t *testing.T) {
 	for index := range detailMatches {
 		detailMatches[index].QueueID = 440
 	}
-	queues := buildGameplayRankedQueues(detailMatches, detailMatches, "subject", nil, riotRegionKR)
+	queues := buildGameplayRankedQueues(legacyRankedQueueTabs(detailMatches, detailMatches), "subject", nil, riotRegionKR)
 	flex, ok := queues["440"]
 	if !ok {
 		t.Fatal("flex queue entry missing")
@@ -234,7 +234,7 @@ func TestBuildGameplayRankedQueuesCapsEveryRecentCardAtTwentyMatches(t *testing.
 		matches = append(matches, match)
 	}
 
-	solo := buildGameplayRankedQueues(matches, matches, "subject", nil, riotRegionKR)["420"]
+	solo := buildGameplayRankedQueues(legacyRankedQueueTabs(matches, matches), "subject", nil, riotRegionKR)["420"]
 	if solo.RecentRanked == nil || solo.RecentRanked.Games != defaultMatchCount {
 		t.Fatalf("recent ranked sample = %#v, want %d games", solo.RecentRanked, defaultMatchCount)
 	}

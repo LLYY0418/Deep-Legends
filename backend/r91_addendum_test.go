@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -248,22 +249,48 @@ func TestR91AddendumWildcardHoverClearKeepsArmedLock(t *testing.T) {
 			s.ChampSelect.Groups["arena"] = g
 			f.r.apply(s)
 			f.tick(t) // wildcard must hover first
+			// 「悬停优先」必须在本测试内钉死：forceHover=false 变异下第一次写会变成
+			// 直接锁定（completed:true），后面所有场景都失真。tick 已等到 idle，
+			// 这条检查是确定性的，不赌任何窗口。
+			if f.count() != 1 || f.last().Body["completed"] != false {
+				t.Fatalf("wildcard must hover first: %+v", f.patches)
+			}
+			// P1-1（R120 复测）：武装锁之前先挂上写冻结闸，废掉原来的挂钟竞速。
+			// 旧写法赌了两个挂钟窗口：① evaluate 返回后同步 peek 一个后台 goroutine
+			// 随时会清空的 pending map；② 赌「改会话 + 第三次 evaluate」赶在锁的写
+			// 请求完成之前。实测 lock-now 策略下 delay_ms 恒为 0（DelayMS=120 对这个
+			// 分支是死配置），armed→PATCH 完成仅约 2.5ms；负载下测试 goroutine 被晾
+			// 超过这个窗口就出「lock not armed」/「clear diagnostic missing」/计数不符
+			// 的随机红（2 核容器实测整包 2/2 红、忙等压力 12/100 红），与 R120 P1-1
+			// 的 1 秒墙钟预算被调度噪声吃掉是同一类挂钟窗口问题。闸门把 action PATCH
+			// 冻结在传输层之后：武装改用同步 armed 诊断事件判定，clear/takeover 判定
+			// 必然发生在写完成之前，放行后写才落地；104 分支的取消由传输层复查
+			// req.Context() 感知——已取消的写绝不会记进 f.patches。
+			gate := make(chan struct{})
+			var releaseOnce sync.Once
+			release := func() { releaseOnce.Do(func() { close(gate) }) }
+			f.mu.Lock()
+			f.patchGate = gate
+			f.mu.Unlock()
+			t.Cleanup(release) // 提前 Fatal 时也放行被冻结的写，不留悬挂 goroutine
 			s = f.r.currentWatch()
 			g = s.ChampSelect.Groups["arena"]
 			g.Ban.DelayMS = 120
 			s.ChampSelect.Groups["arena"] = g
 			f.r.apply(s)
 			f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
-			f.r.mu.Lock()
-			pending := f.r.pending["champselect-ban"]
-			f.r.mu.Unlock()
-			if pending == nil {
+			// 「已武装」是同步事实：scheduleChampSelectRequest 在 evaluate 调用栈内
+			// 发出 armed 事件（champDiagnostic→record→observe 全同步），evaluate 返回
+			// 时必然已在 f.events 里。用 completed=true + champion 141 认出第二次决策
+			// （锁）；第一次悬停的 armed 事件是 completed=false，不会混淆。
+			if !r91LockArmedSeen(f) {
 				t.Fatal("lock not armed")
 			}
 			f.mu.Lock()
 			f.session.Actions[0][0].ChampionID = newID
 			f.mu.Unlock()
 			f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
+			release() // clear/takeover 判定已完成，放行被冻结的写请求
 			waitTakeoverIdle(t, f)
 			if newID == 0 {
 				if f.count() != 2 || f.last().Body["completed"] != true {
@@ -287,6 +314,35 @@ func TestR91AddendumWildcardHoverClearKeepsArmedLock(t *testing.T) {
 			}
 		})
 	}
+}
+
+// r91LockArmedSeen 报告诊断事件流里是否已经出现第二次决策（锁：completed=true、
+// champion 141）的 armed 事件。事件由 scheduleChampSelectRequest 同步发出，evaluate
+// 返回即存在；champDiagnostic 的去重只吞「载荷逐字节相同」的事件，锁与悬停的
+// completed/trace_id/delay 都不同，不可能被吞。与 peek pending map 不同，
+// 这条判定不依赖后台 goroutine 跑到了哪里。
+func r91LockArmedSeen(f *executionFixture) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	hoverArmed := false
+	for _, e := range f.events {
+		if e["event"] != "champselect_trace" || e["stage"] != "schedule" || e["reason"] != "armed" ||
+			e["action"] != "champselect-ban" || e["champion_id"] != int64(141) {
+			continue
+		}
+		// 顺序敏感：必须先见过悬停的 armed（completed=false），再见到锁的
+		// armed（completed=true）。「先悬停后锁定」就是本测试要保护的契约，
+		// forceHover=false 一类变异会让锁直接出现在悬停之前（或根本没有悬停），
+		// 这里的顺序断言与 tick 后的 completed:false 检查形成双保险。
+		if e["completed"] == false {
+			hoverArmed = true
+			continue
+		}
+		if e["completed"] == true && hoverArmed {
+			return true
+		}
+	}
+	return false
 }
 
 func TestR91AddendumSaveReevaluatesCurrentPhase(t *testing.T) {

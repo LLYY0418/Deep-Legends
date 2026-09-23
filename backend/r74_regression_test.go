@@ -66,7 +66,7 @@ func TestR74FacadeCatalogLoadsWithoutOpeningCollection(t *testing.T) {
 	if reads != 1 || len(a.allSkins) != 0 {
 		t.Fatal("career should cache metadata without triggering collection")
 	}
-	a.allSkins = []Skin{{ID: 1000, Owned: true}}
+	a.allSkinsWithBase = []Skin{{ID: 1000, Owned: true}}
 	skins, source, err := a.loadFacadeSkins(context.Background(), client)
 	if err != nil || source != "collection" || !skins[0].Owned {
 		t.Fatal("collection ownership must supersede metadata")

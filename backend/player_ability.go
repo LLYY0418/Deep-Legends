@@ -235,16 +235,27 @@ func abilityMetrics(player, baseline gameplayAbilityAccumulator) []gameplayAbili
 			metric.Grade = "—"
 			metric.Description += " 数据或有效对手基准不足，本项不评分。"
 		} else {
-			// Symmetric bounded comparison: equal=50, real zero=0.
-			// Square-root compression limits extreme ratios without a fake floor.
-			p, b := math.Sqrt(item.player), math.Sqrt(item.baseline)
-			metric.PlayerScore = abilityRound(2*abilityBaselineScore*p/(p+b), 1)
+			// Symmetric bounded comparison: equal=50, real zero=0, never 100+.
+			// R132 P2：图形值 = 100×本人²/(本人²+对手²)。旧的开方压缩把 767 对 988
+			// 这种 22% 的差距画成 47 对 50，图上几乎看不出来；平方后是 38 对 50，
+			// 与等级（C+）一致。仍然对称（互换两边之和恒为 100）且有界。
+			// 说明文字只写在这里，不进提示框（CLAUDE.md 界面文案红线）。
+			metric.PlayerScore = abilityRound(abilityRadarScore(item.player, item.baseline), 1)
 			metric.Grade = abilityGrade(item.player / item.baseline)
-			metric.Description += " 图形值=100×√本人/(√本人+√对手)，对手基线50；等级按原始比值分档，均非全服百分位。"
 		}
 		metrics = append(metrics, metric)
 	}
 	return metrics
+}
+
+// abilityRadarScore maps player/baseline onto 0–100 with the baseline at 50:
+// 100·p²/(p²+b²). Callers guarantee baseline > 0.
+func abilityRadarScore(player, baseline float64) float64 {
+	p, b := player*player, baseline*baseline
+	if p+b <= 0 {
+		return abilityBaselineScore
+	}
+	return 2 * abilityBaselineScore * p / (p + b)
 }
 
 func abilityRatio(numerator, denominator int, scale float64) float64 {

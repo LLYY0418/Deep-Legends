@@ -1,0 +1,184 @@
+{
+  "chrome": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+  "stall": {
+    "atOneSecond": {
+      "activeCardImages": 8,
+      "queued": 0,
+      "cards": 8,
+      "ready": 0,
+      "loading": 8,
+      "empty": 0,
+      "stalls": 0
+    },
+    "afterGiveUp": {
+      "activeCardImages": 0,
+      "queued": 0,
+      "cards": 8,
+      "ready": 0,
+      "loading": 0,
+      "empty": 8,
+      "stalls": 1
+    },
+    "afterFresh": {
+      "activeCardImages": 0,
+      "queued": 0,
+      "cards": 14,
+      "ready": 6,
+      "loading": 0,
+      "empty": 8,
+      "stalls": 1
+    },
+    "watchdogOnly": {
+      "activeCardImages": 0,
+      "queued": 0,
+      "cards": 8,
+      "ready": 0,
+      "loading": 0,
+      "empty": 8,
+      "stalls": 1
+    }
+  },
+  "mutation": {
+    "afterGiveUp": {
+      "activeCardImages": 8,
+      "queued": 0,
+      "cards": 8,
+      "ready": 0,
+      "loading": 8,
+      "empty": 0,
+      "stalls": 0
+    }
+  },
+  "facade": {
+    "icons": {
+      "cards": 8,
+      "metricsBar": false,
+      "totalNode": false,
+      "stateBadges": 0,
+      "stateVisible": 0,
+      "locks": 0,
+      "unownedToggleChecked": false,
+      "unownedToggleHidden": false,
+      "metaText": "共 5,099 款头像 · 已拥有 8",
+      "metaNumbers": [
+        {
+          "text": "5,099",
+          "color": "rgb(217, 164, 65)",
+          "weight": "650",
+          "numeric": "tabular-nums"
+        },
+        {
+          "text": "8",
+          "color": "rgb(217, 164, 65)",
+          "weight": "650",
+          "numeric": "tabular-nums"
+        }
+      ],
+      "gridColumns": "92px 92px 92px 92px 92px 92px 92px 92px 92px 92px 92px",
+      "artBox": {
+        "width": 92,
+        "height": 92
+      },
+      "natural": {
+        "width": 128,
+        "height": 128
+      },
+      "copyBelowArt": {
+        "position": "static",
+        "top": 274,
+        "artBottom": 268
+      },
+      "heroHidden": "none",
+      "cardTitle": "头像 4390"
+    },
+    "iconsWithUnowned": {
+      "cards": 12,
+      "locks": 4,
+      "stateBadges": 0,
+      "stateVisible": 0,
+      "metaText": "共 5,099 款头像 · 已拥有 8"
+    },
+    "iconDetail": {
+      "open": true,
+      "dialogWidth": 320,
+      "artBox": {
+        "width": 128,
+        "height": 128
+      },
+      "natural": {
+        "width": 128,
+        "height": 128
+      },
+      "objectFit": "contain",
+      "vars": {
+        "width": "128px",
+        "height": "128px"
+      },
+      "ownershipRow": [
+        "名称",
+        "系列",
+        "拥有状态",
+        "ID"
+      ],
+      "closeInsideArt": false
+    },
+    "banners": {
+      "cards": 8,
+      "bannerRatioVar": "0.2550",
+      "gridColumns": "150px 150px 150px 150px 150px 150px 150px",
+      "artBox": {
+        "width": 148,
+        "height": 580.390625
+      },
+      "natural": {
+        "width": 102,
+        "height": 400
+      },
+      "objectFit": "contain",
+      "verticalWhitespace": 0,
+      "cropped": false,
+      "stateBadges": 0,
+      "copyBelowArt": {
+        "position": "static",
+        "top": 762.390625,
+        "artBottom": 756.390625
+      },
+      "metaText": "共 8 款旗帜 · 已拥有 6",
+      "unownedToggleChecked": true
+    },
+    "bannerDetail": {
+      "artBox": {
+        "width": 82,
+        "height": 320
+      },
+      "natural": {
+        "width": 102,
+        "height": 400
+      },
+      "ratio": 0.25625,
+      "naturalRatio": 0.255,
+      "objectFit": "contain",
+      "dialogWidth": 320
+    },
+    "degraded": {
+      "unavailable": {
+        "cards": 12,
+        "locks": 0,
+        "stateBadges": 0,
+        "metaText": "共 5,099 款头像 · 拥有状态未读取",
+        "unownedToggleHidden": true,
+        "unownedToggleChecked": false
+      },
+      "recovered": {
+        "cards": 8,
+        "locks": 0,
+        "stateBadges": 0,
+        "metaText": "共 5,099 款头像 · 已拥有 8",
+        "unownedToggleHidden": false,
+        "unownedToggleChecked": false
+      }
+    }
+  },
+  "browserErrors": [],
+  "hungRequests": 11
+}

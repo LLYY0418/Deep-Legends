@@ -26,6 +26,9 @@ func (a *app) applyFacadeBackdrop(ctx context.Context, client *LCUClient, curren
 	if err != nil || backdrop.SummonerID != current.SummonerID {
 		return
 	}
+	if backdrop.Type == "recently-played" || backdrop.Type == "highest-mastery" {
+		state.Profile.BackgroundChampionID = backdrop.ChampionID
+	}
 	imagePath := sanitizeClientImagePath(backdrop.Image)
 	if imagePath == "" {
 		return
@@ -54,10 +57,12 @@ func (a *app) applyFacadeBackdrop(ctx context.Context, client *LCUClient, curren
 	if matched != nil {
 		state.Profile.BackgroundSkinID = matched.ID
 		state.Profile.BackgroundSkinName = matched.Name
+		state.Profile.BackgroundChampionID = matched.ChampionID
 	} else if backdrop.Type != "specified-skin" {
 		state.Profile.BackgroundSkinID = 0
 		state.Profile.BackgroundSkinName = "客户端当前背景"
 	}
 	a.recordDiagnostic(map[string]any{"event": "facade_backdrop_read", "backdrop_type": backdrop.Type,
-		"background_skin_id": state.Profile.BackgroundSkinID, "catalog_matched": matched != nil, "image_available": true})
+		"background_skin_id": state.Profile.BackgroundSkinID, "background_champion_id": state.Profile.BackgroundChampionID,
+		"catalog_matched": matched != nil, "image_available": true})
 }

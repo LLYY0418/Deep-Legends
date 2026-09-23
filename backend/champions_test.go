@@ -943,3 +943,12 @@ func TestOPGGDepthRowsAreNotDeduplicatedAgainstCoreItems(t *testing.T) {
 		t.Fatal("depth rows must keep the OP.GG rows verbatim; the core-item dedup must stay deleted")
 	}
 }
+
+func TestFractionToPercentContracts(t *testing.T) {
+	if got := fractionToPercent(0.53); got != 53 {
+		t.Fatalf("fraction 0.53 = %v, want 53", got)
+	}
+	if got := fractionToPercent(0.03); got != 3 {
+		t.Fatalf("fraction 0.03 = %v, want 3", got)
+	}
+}

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"sort"
 	"strconv"
@@ -240,30 +239,4 @@ func (a *app) handleFacadeProbe(w http.ResponseWriter, r *http.Request) {
 	// even when the icon itself is restored. A diagnostic must never do that.
 	a.recordR99SurfaceShape(ctx, client)
 	respondJSON(w, map[string]any{"mode": "read-only", "writeTested": false})
-}
-func (a *app) runR99WriteProbe(ctx context.Context, client *LCUClient) []map[string]any {
-	results := []map[string]any{}
-	restoreFailed := false
-	record := func(e map[string]any) {
-		e["event"] = "r99_write_probe"
-		a.recordDiagnostic(e)
-		results = append(results, e)
-		if e["restored"] == false {
-			restoreFailed = true
-		}
-	}
-	a.r101ProbeIcon(ctx, client, record)
-	if restoreFailed {
-		return results
-	}
-	a.r101ProbeBanner(ctx, client, record)
-	return results
-}
-
-func r99ProbeErrorCode(err error) string {
-	var failure *LCUHTTPError
-	if errors.As(err, &failure) && len(failure.ErrorCode) <= 40 {
-		return r99SafeKey(failure.ErrorCode)
-	}
-	return ""
 }

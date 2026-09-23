@@ -12,9 +12,12 @@ import (
 // The directory DTO intentionally omits local activity metadata. Persist it
 // explicitly beside the public profile so restarting preserves account order.
 type proProfileSnapshot struct {
-	Account          opggProAccount `json:"account"`
-	LastMatchAt      string         `json:"lastMatchAt,omitempty"`
-	LastMatchAtKnown bool           `json:"lastMatchAtKnown"`
+	Account             opggProAccount `json:"account"`
+	LastMatchAt         string         `json:"lastMatchAt,omitempty"`
+	LastMatchAtKnown    bool           `json:"lastMatchAtKnown"`
+	DirectoryRevisionAt string         `json:"directoryRevisionAt,omitempty"`
+	// RevisionAt accepts snapshots written before directoryRevisionAt was named explicitly.
+	RevisionAt string `json:"revisionAt,omitempty"`
 }
 
 // OP.GG's JSON-LD ItemList describes historical PlayGameActions. Its startTime

@@ -39,10 +39,11 @@ type facadeSummoner struct {
 }
 
 type facadeProfile struct {
-	BackgroundPath     string `json:"backgroundPath,omitempty"`
-	BackgroundType     string `json:"backgroundType,omitempty"`
-	BackgroundSkinID   int64  `json:"backgroundSkinId,omitempty"`
-	BackgroundSkinName string `json:"backgroundSkinName,omitempty"`
+	BackgroundPath       string `json:"backgroundPath,omitempty"`
+	BackgroundType       string `json:"backgroundType,omitempty"`
+	BackgroundSkinID     int64  `json:"backgroundSkinId,omitempty"`
+	BackgroundChampionID int64  `json:"backgroundChampionId,omitempty"`
+	BackgroundSkinName   string `json:"backgroundSkinName,omitempty"`
 }
 
 type facadeChatLOL struct {
@@ -59,7 +60,6 @@ type facadeChat struct {
 }
 
 type facadeState struct {
-	IconApplyScope           string                   `json:"iconApplyScope,omitempty"`
 	RankBanner               string                   `json:"rankBanner,omitempty"`
 	BannerAccent             string                   `json:"bannerAccent,omitempty"`
 	SkinsUnavailable         bool                     `json:"skinsUnavailable,omitempty"`
@@ -78,8 +78,6 @@ type facadeState struct {
 }
 
 type facadeApplyRequest struct {
-	IconID        int64                     `json:"iconId,omitempty"`
-	BannerID      string                    `json:"bannerId,omitempty"`
 	RankBanner    string                    `json:"rankBanner,omitempty"`
 	BannerAccent  string                    `json:"bannerAccent,omitempty"`
 	Action        string                    `json:"action"`
@@ -93,7 +91,6 @@ type facadeApplyRequest struct {
 }
 
 type facadeApplyResult struct {
-	IconScope           string
 	TitleRestore        string
 	TitleAttemptStatus  []int
 	TitleHasTitle       bool
@@ -202,7 +199,7 @@ func (a *app) loadFacadeStateTriggered(ctx context.Context, trigger string) faca
 			break
 		}
 	}
-	a.recordDiagnostic(map[string]any{"event": "facade_skin_state", "trigger": facadeLoadTrigger(trigger), "source": source, "skin_count": len(state.Skins), "unavailable": state.SkinsUnavailable, "profile_available": !state.ProfileUnavailable, "configured_skin_id": profile.BackgroundSkinID, "background_skin_id": state.Profile.BackgroundSkinID, "background_in_catalog": backgroundInCatalog})
+	a.recordDiagnostic(map[string]any{"event": "facade_skin_state", "trigger": facadeLoadTrigger(trigger), "source": source, "skin_count": len(state.Skins), "unavailable": state.SkinsUnavailable, "profile_available": !state.ProfileUnavailable, "configured_skin_id": profile.BackgroundSkinID, "background_skin_id": state.Profile.BackgroundSkinID, "background_champion_id": state.Profile.BackgroundChampionID, "background_in_catalog": backgroundInCatalog})
 	if watch := a.activeWatch(); watch != nil {
 		state.LoginReset = watch.currentWatch().Facade
 	}
@@ -252,30 +249,74 @@ func projectFacadeTitle(value any) any {
 	return nil
 }
 
+const facadeChallengeCatalogRetryDelay = 5 * time.Second
+
 func (a *app) loadFacadeChallengeCatalog(ctx context.Context, client *LCUClient) (map[string]facadeChallenge, json.RawMessage, error) {
 	if a == nil || client == nil {
 		return nil, nil, errors.New("challenge catalog unavailable")
 	}
-	a.facadeChallengeCatalogMu.Lock()
-	defer a.facadeChallengeCatalogMu.Unlock()
-	if a.facadeChallengeCatalogClient != client {
-		a.facadeChallengeCatalogClient = client
-		a.facadeChallengeCatalogAttempted = false
-		a.facadeChallengeCatalog = nil
-		a.facadeChallengeCatalogRaw = nil
-		a.facadeChallengeCatalogErr = nil
-	}
-	if !a.facadeChallengeCatalogAttempted {
-		a.facadeChallengeCatalogAttempted = true
+	for {
+		a.facadeChallengeCatalogMu.Lock()
+		if a.facadeChallengeCatalogClient != client {
+			a.facadeChallengeCatalogClient = client
+			a.facadeChallengeCatalogAttempted = false
+			a.facadeChallengeCatalogBackoffUntil = time.Time{}
+			a.facadeChallengeCatalog = nil
+			a.facadeChallengeCatalogRaw = nil
+			a.facadeChallengeCatalogErr = nil
+			a.facadeChallengeCatalogFlight = nil
+		}
+		if a.facadeChallengeCatalogAttempted {
+			catalog, raw, err := a.facadeChallengeCatalog, append(json.RawMessage(nil), a.facadeChallengeCatalogRaw...), a.facadeChallengeCatalogErr
+			a.facadeChallengeCatalogMu.Unlock()
+			return catalog, raw, err
+		}
+		if time.Now().Before(a.facadeChallengeCatalogBackoffUntil) {
+			raw := append(json.RawMessage(nil), a.facadeChallengeCatalogRaw...)
+			err := a.facadeChallengeCatalogErr
+			a.facadeChallengeCatalogMu.Unlock()
+			return nil, raw, err
+		}
+		if flight := a.facadeChallengeCatalogFlight; flight != nil {
+			a.facadeChallengeCatalogMu.Unlock()
+			select {
+			case <-flight:
+				continue
+			case <-ctx.Done():
+				return nil, nil, ctx.Err()
+			}
+		}
+		flight := make(chan struct{})
+		a.facadeChallengeCatalogFlight = flight
+		a.facadeChallengeCatalogMu.Unlock()
+
 		var raw json.RawMessage
 		err := client.RequestJSON(ctx, http.MethodGet, "/lol-challenges/v1/challenges/local-player", nil, &raw)
-		a.facadeChallengeCatalogRaw = append(json.RawMessage(nil), raw...)
-		a.facadeChallengeCatalogErr = err
+		var catalog map[string]facadeChallenge
 		if err == nil {
-			a.facadeChallengeCatalog = parseFacadeChallengeCatalog(raw)
+			catalog = parseFacadeChallengeCatalog(raw)
 		}
+
+		a.facadeChallengeCatalogMu.Lock()
+		if a.facadeChallengeCatalogClient == client && a.facadeChallengeCatalogFlight == flight {
+			a.facadeChallengeCatalogRaw = append(json.RawMessage(nil), raw...)
+			a.facadeChallengeCatalogErr = err
+			if err == nil {
+				a.facadeChallengeCatalog = catalog
+				a.facadeChallengeCatalogAttempted = true
+				a.facadeChallengeCatalogBackoffUntil = time.Time{}
+			} else {
+				a.facadeChallengeCatalogAttempted = false
+				a.facadeChallengeCatalogBackoffUntil = time.Now().Add(facadeChallengeCatalogRetryDelay)
+			}
+			a.facadeChallengeCatalogFlight = nil
+			close(flight)
+		} else {
+			close(flight)
+		}
+		a.facadeChallengeCatalogMu.Unlock()
+		return catalog, append(json.RawMessage(nil), raw...), err
 	}
-	return a.facadeChallengeCatalog, append(json.RawMessage(nil), a.facadeChallengeCatalogRaw...), a.facadeChallengeCatalogErr
 }
 
 func (a *app) clearFacadeChallengeCatalog(client *LCUClient) {
@@ -289,6 +330,8 @@ func (a *app) clearFacadeChallengeCatalog(client *LCUClient) {
 	}
 	a.facadeChallengeCatalogClient = nil
 	a.facadeChallengeCatalogAttempted = false
+	a.facadeChallengeCatalogBackoffUntil = time.Time{}
+	a.facadeChallengeCatalogFlight = nil
 	a.facadeChallengeCatalog = nil
 	a.facadeChallengeCatalogRaw = nil
 	a.facadeChallengeCatalogErr = nil
@@ -700,10 +743,6 @@ func (a *app) handleFacadeApply(w http.ResponseWriter, r *http.Request) {
 			result = "invalid"
 		}
 		diagnostic := facadeApplyDiagnostic(request.Action, result, applyResult)
-		if request.Action == "banner" {
-			diagnostic["requested_banner_id"] = request.BannerID
-			diagnostic["banner_contract"] = "catalog-id"
-		}
 		var httpErr *LCUHTTPError
 		if errors.As(err, &httpErr) {
 			diagnostic["status_code"] = httpErr.StatusCode
@@ -713,15 +752,7 @@ func (a *app) handleFacadeApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	diagnostic := facadeApplyDiagnostic(request.Action, "ok", applyResult)
-	if request.Action == "banner" {
-		diagnostic["requested_banner_id"] = request.BannerID
-		diagnostic["banner_contract"] = "catalog-id"
-	}
 	next := a.loadFacadeStateTriggered(r.Context(), "manual")
-	next.IconApplyScope = applyResult.IconScope
-	if applyResult.IconScope != "" {
-		diagnostic["icon_scope"] = applyResult.IconScope
-	}
 	if request.Action == "background" {
 		diagnostic["requested_skin_id"] = request.SkinID
 		diagnostic["observed_skin_id"] = next.Profile.BackgroundSkinID
@@ -736,7 +767,7 @@ var errFacadeInvalid = errors.New("生涯操作参数无效")
 
 func facadeDiagnosticAction(action string) string {
 	switch action {
-	case "icon", "banner", "rank-banner", "background", "chat", "rank", "login-reset", "clear-border", "clear-challenges", "clear-title", "clear-emotes", "clear-objectives":
+	case "rank-banner", "background", "chat", "rank", "login-reset", "clear-border", "clear-challenges", "clear-title", "clear-emotes", "clear-objectives":
 		return action
 	default:
 		return "unknown"
@@ -769,11 +800,6 @@ func (a *app) applyFacadeActionResult(ctx context.Context, client *LCUClient, cu
 
 func (a *app) applyFacadeActionResultDetails(ctx context.Context, client *LCUClient, current Summoner, request facadeApplyRequest) (facadeApplyResult, error) {
 	switch request.Action {
-	case "icon":
-		scope, err := a.writeFacadeIconResult(ctx, client, request.IconID)
-		return facadeApplyResult{IconScope: scope}, err
-	case "banner":
-		return facadeApplyResult{}, writeFacadeBanner(ctx, client, request.BannerID)
 	case "rank-banner":
 		return facadeApplyResult{}, writeFacadeRankBanner(ctx, client, request.RankBanner)
 	case "clear-objectives":
@@ -1155,7 +1181,7 @@ func (a *app) scheduleFacadeLoginReset(ctx context.Context, client *LCUClient) {
 // contains public catalog metadata only; ownership is never inferred from it.
 func (a *app) loadFacadeSkins(ctx context.Context, client *LCUClient) ([]Skin, string, error) {
 	a.mu.RLock()
-	skins := append([]Skin(nil), a.allSkins...)
+	skins := append([]Skin(nil), a.allSkinsWithBase...)
 	a.mu.RUnlock()
 	if len(skins) > 0 {
 		return skins, "collection", nil

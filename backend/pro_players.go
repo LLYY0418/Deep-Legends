@@ -58,25 +58,47 @@ type opggProMember struct {
 	FetchedAt  time.Time        `json:"-"`
 }
 type opggProAccount struct {
-	ActivityFailed   bool            `json:"activity_failed,omitempty"`
-	CheckedAt        string          `json:"checked_at,omitempty"`
-	CheckFailed      bool            `json:"check_failed,omitempty"`
-	SeedKey          string          `json:"-"`
-	LastMatchAt      string          `json:"-"`
-	LastMatchAtKnown bool            `json:"-"`
-	PUUID            string          `json:"puuid"`
-	Source           string          `json:"-"`
-	Inactive         bool            `json:"-"`
-	Stale            bool            `json:"-"`
-	GameName         string          `json:"game_name"`
-	TagLine          string          `json:"tagline"`
-	Region           string          `json:"region"`
-	UpdatedAt        string          `json:"updated_at"`
-	RevisionAt       string          `json:"revision_at,omitempty"`
-	Level            int             `json:"level,omitempty"`
-	Rank             json.RawMessage `json:"solo_tier_info"`
-	LadderRank       int             `json:"-"`
-	LadderRankKnown  bool            `json:"-"`
+	ActivityFailed      bool            `json:"activity_failed,omitempty"`
+	ActivityPending     bool            `json:"activity_pending,omitempty"`
+	CheckedAt           string          `json:"checked_at,omitempty"`
+	CheckFailed         bool            `json:"check_failed,omitempty"`
+	SeedKey             string          `json:"-"`
+	LastMatchAt         string          `json:"-"`
+	LastMatchAtKnown    bool            `json:"-"`
+	DirectoryRevisionAt string          `json:"-"`
+	PUUID               string          `json:"puuid"`
+	Source              string          `json:"-"`
+	Inactive            bool            `json:"-"`
+	Stale               bool            `json:"-"`
+	GameName            string          `json:"game_name"`
+	TagLine             string          `json:"tagline"`
+	Region              string          `json:"region"`
+	UpdatedAt           string          `json:"updated_at"`
+	RevisionAt          string          `json:"revision_at,omitempty"` // kept for directory JSON compatibility
+	Level               int             `json:"level,omitempty"`
+	Rank                json.RawMessage `json:"solo_tier_info"`
+	LadderRank          int             `json:"-"`
+	LadderRankKnown     bool            `json:"-"`
+}
+
+func proDirectoryRevisionAt(row opggProAccount) string {
+	if strings.TrimSpace(row.DirectoryRevisionAt) != "" {
+		return row.DirectoryRevisionAt
+	}
+	return row.RevisionAt
+}
+
+func proRealLastMatchAt(row opggProAccount) (string, bool) {
+	if !row.LastMatchAtKnown || strings.TrimSpace(row.LastMatchAt) == "" {
+		return "", false
+	}
+	revision := strings.TrimSpace(proDirectoryRevisionAt(row))
+	matchAt, matchErr := time.Parse(time.RFC3339Nano, row.LastMatchAt)
+	revisionAt, revisionErr := time.Parse(time.RFC3339Nano, revision)
+	if revision != "" && matchErr == nil && revisionErr == nil && matchAt.Equal(revisionAt) {
+		return "", false
+	}
+	return row.LastMatchAt, true
 }
 
 type proPlayersResponse struct {
@@ -110,26 +132,27 @@ type proPlayer struct {
 	Accounts []proAccount `json:"accounts"`
 }
 type proAccount struct {
-	CheckedAt        string `json:"checkedAt,omitempty"`
-	CheckFailed      bool   `json:"checkFailed,omitempty"`
-	Reviewed         bool   `json:"reviewed,omitempty"`
-	LastMatchAt      string `json:"lastMatchAt,omitempty"`
-	LastMatchAtKnown bool   `json:"lastMatchAtKnown"`
-	Dormant          bool   `json:"dormant"`
-	Confidence       string `json:"confidence,omitempty"`
-	GameName         string `json:"gameName"`
-	Source           string `json:"source"`
-	Inactive         bool   `json:"inactive,omitempty"`
-	Stale            bool   `json:"stale,omitempty"`
-	LPKnown          bool   `json:"lpKnown"`
-	TagLine          string `json:"tagLine"`
-	RankStatus       string `json:"rankStatus"`
-	Tier             string `json:"tier,omitempty"`
-	Division         int    `json:"division,omitempty"`
-	LP               int    `json:"lp"`
-	UpdatedAt        string `json:"updatedAt,omitempty"`
-	LadderRank       int    `json:"ladderRank"`
-	LadderRankKnown  bool   `json:"ladderRankKnown"`
+	CheckedAt           string `json:"checkedAt,omitempty"`
+	CheckFailed         bool   `json:"checkFailed,omitempty"`
+	Reviewed            bool   `json:"reviewed,omitempty"`
+	LastMatchAt         string `json:"lastMatchAt,omitempty"`
+	LastMatchAtKnown    bool   `json:"lastMatchAtKnown"`
+	Dormant             bool   `json:"dormant"`
+	Confidence          string `json:"confidence,omitempty"`
+	GameName            string `json:"gameName"`
+	Source              string `json:"source"`
+	Inactive            bool   `json:"inactive,omitempty"`
+	Stale               bool   `json:"stale,omitempty"`
+	LPKnown             bool   `json:"lpKnown"`
+	TagLine             string `json:"tagLine"`
+	RankStatus          string `json:"rankStatus"`
+	Tier                string `json:"tier,omitempty"`
+	Division            int    `json:"division,omitempty"`
+	LP                  int    `json:"lp"`
+	UpdatedAt           string `json:"updatedAt,omitempty"`
+	LadderRank          int    `json:"ladderRank"`
+	LadderRankKnown     bool   `json:"ladderRankKnown"`
+	DirectoryRevisionAt string `json:"-"`
 }
 
 func (a *app) handleProPlayers(w http.ResponseWriter, r *http.Request) {
@@ -431,8 +454,9 @@ func parseOPGGProPlayers(body []byte) ([]opggProTeam, error) {
 				for mi := range team.Members {
 					for ai := range team.Members[mi].Summoners {
 						row := &team.Members[mi].Summoners[ai]
-						if at, err := time.Parse(time.RFC3339Nano, row.RevisionAt); err == nil && !at.IsZero() {
-							setProLastMatch(row, at, true)
+						if revision := strings.TrimSpace(row.RevisionAt); revision != "" {
+							// Keep directory freshness separate from real match activity.
+							row.DirectoryRevisionAt = revision
 						}
 					}
 				}
@@ -534,7 +558,8 @@ func proSecondaryTeam(team opggProTeam) bool {
 var proTierOrder = map[string]int{"IRON": 1, "BRONZE": 2, "SILVER": 3, "GOLD": 4, "PLATINUM": 5, "EMERALD": 6, "DIAMOND": 7, "MASTER": 8, "GRANDMASTER": 9, "CHALLENGER": 10}
 
 func normalizeProAccount(raw opggProAccount) (proAccount, bool) {
-	account := proAccount{LastMatchAt: raw.LastMatchAt, LastMatchAtKnown: raw.LastMatchAtKnown, GameName: strings.TrimSpace(raw.GameName), TagLine: strings.TrimSpace(raw.TagLine), RankStatus: "unavailable", Source: "OP.GG", Inactive: raw.Inactive, Dormant: raw.Inactive, Stale: raw.Stale, LadderRank: raw.LadderRank, LadderRankKnown: raw.LadderRankKnown}
+	lastMatchAt, lastMatchKnown := proRealLastMatchAt(raw)
+	account := proAccount{LastMatchAt: lastMatchAt, LastMatchAtKnown: lastMatchKnown, DirectoryRevisionAt: proDirectoryRevisionAt(raw), GameName: strings.TrimSpace(raw.GameName), TagLine: strings.TrimSpace(raw.TagLine), RankStatus: "unavailable", Source: "OP.GG", Inactive: raw.Inactive, Dormant: raw.Inactive, Stale: raw.Stale, LadderRank: raw.LadderRank, LadderRankKnown: raw.LadderRankKnown}
 	account.CheckedAt, account.CheckFailed = raw.CheckedAt, raw.CheckFailed
 	if raw.PUUID == "" {
 		account.Confidence = "low"
@@ -595,6 +620,12 @@ func proAccountLess(a, b proAccount) bool {
 	if a.LastMatchAtKnown {
 		aa, _ := time.Parse(time.RFC3339Nano, a.LastMatchAt)
 		bb, _ := time.Parse(time.RFC3339Nano, b.LastMatchAt)
+		if !aa.Equal(bb) {
+			return aa.After(bb)
+		}
+	} else {
+		aa, _ := time.Parse(time.RFC3339Nano, a.DirectoryRevisionAt)
+		bb, _ := time.Parse(time.RFC3339Nano, b.DirectoryRevisionAt)
 		if !aa.Equal(bb) {
 			return aa.After(bb)
 		}

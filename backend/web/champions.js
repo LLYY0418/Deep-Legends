@@ -37,6 +37,10 @@
 	    augmentQuery: normalizeStoredSearch(readSetting("champion-augment-query", "")),
     augmentRarity: "all",
 	    mayhemView: normalizeMayhemView(readSetting("champion-mayhem-view", "champions")),
+    mayhemDetailTab: normalizeMayhemDetailTab(readSetting("champion-mayhem-detail-tab", "overview")),
+    // 阶段筛选（P0-6）是会话内的视图状态，不持久化：换英雄后上游缺该阶段时
+    // 一个记住的阶段号会让整片推荐凭空消失，默认回到英雄级汇总更安全。
+    mayhemStage: 0,
     mayhemAugmentID: 0,
     mayhemAugmentDetail: null,
     mayhemAugmentDetailCache: window.deepLegendsRuntime?.createCache({ max: 96, ttl: 300000 }) || new Map(),
@@ -47,6 +51,12 @@
     mayhemRarityData: null,
     mayhemRarityLoading: false,
     mayhemRarityError: "",
+    // R116-E P2-6：本人海克斯大乱斗「选了某个海克斯之后通常出什么」静态查询。
+    // 数据全部来自本地赛季缓存（season-stats），后端零额外网络请求。
+    mayhemPersonalBuilds: null,
+    mayhemPersonalBuildsKey: 0,
+    mayhemPersonalBuildsLoading: false,
+    mayhemPersonalBuildsError: "",
     mayhemDetailLoading: false,
     mayhemDetailError: "",
     mayhemDetailKey: 0,
@@ -128,6 +138,14 @@
   function normalizeMode(value) { return ["ranked", "aram-mayhem", "arena"].includes(value) ? value : "ranked"; }
 	function normalizeStoredSearch(value) { return String(value || "").slice(0, 120); }
 	function normalizeMayhemView(value) { return value === "atlas" ? "atlas" : "champions"; }
+  // R116-B：英雄详情页三 tab（概览/构筑/表现）。「表现」只在 postmatch 面板真的
+  // 下发时出现，所以这里只做取值归一，有没有内容由 mayhemDetailTabSpecs 判断。
+  // 取值列表写成字面量而不是模块级 const：这个函数在 state 初始化时（第 40 行）
+  // 就会被调用，const 还没到声明位置会踩 TDZ，整个英雄页直接白屏。
+  function normalizeMayhemDetailTab(value) { return ["overview", "build", "performance"].includes(value) ? value : "overview"; }
+  // 阶段筛选：0 = 英雄级汇总（默认视图，工单 P0-6-2），1..4 = 上游 stages[] 的阶段号。
+  const MAYHEM_STAGE_OPTIONS = [[0, "汇总"], [1, "阶段 1"], [2, "阶段 2"], [3, "阶段 3"], [4, "阶段 4"]];
+  function normalizeMayhemStage(value) { const parsed = Number(value); return Number.isInteger(parsed) && parsed >= 0 && parsed <= 4 ? parsed : 0; }
 	function normalizeArenaFirstTab(value) { return value === "mine" ? "mine" : "pros"; }
 	function normalizeRunePage(value) { const parsed = Number(value); return Number.isInteger(parsed) && parsed >= 0 && parsed <= 20 ? parsed : 0; }
 	function normalizeChampionDetailID(value) { const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? parsed : 0; }
@@ -236,20 +254,26 @@
     state.requests.get(key)?.abort();
     const controller = new AbortController();
     state.requests.set(key, controller);
-    const timer = setTimeout(() => controller.abort(), 35000);
+    let timedOut = false;
+    let httpStatus = 0;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 35000);
     try {
       const response = await fetch(path, { headers: { Accept: "application/json" }, signal: controller.signal });
+      httpStatus = response.status;
       if (response.status === 401) throw new Error("页面会话已过期，刷新页面即可重新连接");
       if (!response.ok) throw new Error((await response.text()).trim() || `本地服务返回 HTTP ${response.status}`);
-      const payload = await response.json();
+      let payload;
+      try { payload = await response.json(); } catch (error) { error.errorKind = "decode"; throw error; }
       if (controller.signal.aborted || state.requests.get(key) !== controller) {
-        const cancelled = new Error("请求已取消");
-        cancelled.name = "AbortError";
-        throw cancelled;
+        const cancelled = new Error("请求已取消"); cancelled.name = "RequestCancelled"; cancelled.errorKind = "canceled"; throw cancelled;
       }
       return payload;
     } catch (error) {
-      if (error.name === "AbortError") throw new Error("联网读取超时，请重试");
+      const errorKind = timedOut ? "timeout" : error.errorKind || (error.name === "AbortError" || error.name === "RequestCancelled" ? "canceled" : httpStatus >= 400 ? "http" : httpStatus ? "decode" : "network");
+      window.reportFlowDiagnostic?.("local_request_client", "failed", { endpoint: "champions", httpStatus, errorKind });
+      if (error.name === "RequestCancelled") throw error;
+      if (timedOut) { const timeoutError = new Error("本地请求超时，请重试"); timeoutError.name = "TimeoutError"; throw timeoutError; }
+      if (error.name === "AbortError") { const cancelled = new Error("请求已取消"); cancelled.name = "RequestCancelled"; throw cancelled; }
       throw error;
     } finally {
       clearTimeout(timer);
@@ -552,6 +576,13 @@
     state.mayhemDetailLoading = true;
     state.mayhemDetailError = "";
     state.mayhemDetailKey = Number(selected.championId);
+    // 评审整改 A1：换英雄必须把阶段筛选放回「汇总」。state 初始化处（第 41-43 行）
+    // 的注释早就写明了这个意图，但重置只发生在 resetTransientChampionState（换模式
+    // / section 重置），换英雄走的是本函数与 selectMayhemChampion，两者都不重置——
+    // 于是上一个英雄记住的「阶段 3」会带到下一个英雄，而下一个英雄可能一条阶段行
+    // 都没有（hero-json 熔断走 OP.GG RSC 兜底时必然如此）。renderRecommendedAugments
+    // 里另有一道兜底钳制，这里是第一道：从源头上不让阶段号跨英雄存活。
+    state.mayhemStage = 0;
     return selected;
   }
 
@@ -669,8 +700,9 @@
       if (!current()) return;
       state.mayhemAugmentError = error?.message || "海克斯详情读取失败";
     }).finally(() => {
-      if (!current()) return;
+      if (token !== state.mayhemAugmentRequestToken) return;
       state.mayhemAugmentLoading = false;
+      if (!current()) return;
       render();
     });
   }
@@ -688,6 +720,86 @@
       state.mayhemRarityLoading = false;
       if (state.section === "champions" && state.mode === "aram-mayhem") render();
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // R116-E P2-6：本人海克斯大乱斗「选了某个海克斯之后通常出什么」静态查询
+  //
+  // 这是对**本机已保存的本人赛季样本**的静态聚合，不是局内实时联动。
+  // 局内形态的三个输入（已选海克斯 / 当前阶段 / 系统候选）在仓库现状下
+  // 全部没有通道，已被 R116-探测与评审第 3 节证伪（Anti-scope 第 1 条）。
+  // 后端 /api/gameplay/season-mayhem-builds 只读本地 season-stats 缓存，
+  // 零额外网络请求、不碰 Riot 配额。
+  // ---------------------------------------------------------------------
+
+  // 详情页响应里已经带了本英雄的海克斯行与装备行，每行 assets[0] 就是
+  // {id, name}。用它把个人样本里的纯 ID 翻成中文名，不必为这一块再拉一次目录。
+  // 翻不出来的 ID 一律回落到「海克斯 <id>」/「装备 <id>」，绝不编名字
+  // （数据准确性红线：证据不足明确降级，不用推断值代替）。
+  function mayhemPersonalAssetNames(rows) {
+    const names = new Map();
+    for (const row of objectRows(rows)) {
+      for (const asset of objectRows(row.assets)) {
+        const id = Number(asset.id);
+        const name = String(asset.name || "").trim();
+        if (Number.isFinite(id) && id > 0 && name && !names.has(id)) names.set(id, name);
+      }
+    }
+    return names;
+  }
+
+  async function loadMayhemPersonalBuilds(championID) {
+    const key = Number(championID);
+    if (!Number.isFinite(key) || key <= 0) return;
+    // 同一个英雄只拉一次；失败也记住 key，避免每次重渲染都重打一次。
+    if (state.mayhemPersonalBuildsLoading || state.mayhemPersonalBuildsKey === key) return;
+    state.mayhemPersonalBuildsLoading = true;
+    state.mayhemPersonalBuildsError = "";
+    try {
+      state.mayhemPersonalBuilds = await api(`/api/gameplay/season-mayhem-builds?championId=${encodeURIComponent(key)}`, "mayhem-personal-builds");
+    } catch (error) {
+      state.mayhemPersonalBuilds = null;
+      state.mayhemPersonalBuildsError = error?.message || "个人海斗出装样本读取失败";
+    } finally {
+      state.mayhemPersonalBuildsKey = key;
+      state.mayhemPersonalBuildsLoading = false;
+      if (state.section === "champions" && state.mode === "aram-mayhem") render();
+    }
+  }
+
+  // 只渲染后端明确标了 available 的结果。样本不足、没连客户端、本赛季没有
+  // 海斗场次——一律返回空串，整块不进 DOM（评审 6.1「取不到就整块隐藏」），
+  // 不在构筑 tab 里留一个空壳，也不用一句猜测把空缺填上。
+  //
+  // 结构刻意复用「装备排行」那套 .mayhem-item-ranking / .mayhem-ranking-list
+  // 网格（b 序号 / 图标位 / strong 名称 / dl 指标），因此本块零新增 CSS：
+  // R117 的样式棘轮把 border-radius / padding / gap 三个预算都卡在实测上限，
+  // 任何新的间距取值都会让棘轮变差。
+  function renderMayhemPersonalBuilds(detail) {
+    const championID = Number(state.selected?.championId || 0);
+    const payload = state.mayhemPersonalBuildsKey === championID ? state.mayhemPersonalBuilds : null;
+    if (!payload?.available) return "";
+    const groups = objectRows(payload.groups);
+    if (!groups.length) return "";
+    const augmentNames = mayhemPersonalAssetNames(detail?.recommendedAugments);
+    const catalogItemNames = mayhemPersonalAssetNames(detail?.itemRanking);
+    let index = 0;
+    const rows = [];
+    for (const group of groups) {
+      const augmentID = Number(group.augmentId);
+      const augmentName = augmentNames.get(augmentID) || `海克斯 ${Number.isFinite(augmentID) ? augmentID : "?"}`;
+      for (const combo of objectRows(group.combos)) {
+        index += 1;
+        const ids = (Array.isArray(combo.itemIds) ? combo.itemIds : []).map(Number).filter((id) => Number.isFinite(id) && id > 0);
+        // 后端给的 itemNames 优先（它覆盖全目录）；缺名字时回落到详情页
+        // 自带的装备行；再缺就显示 ID。三种来源都不猜。
+        const given = Array.isArray(combo.itemNames) ? combo.itemNames.map((name) => String(name || "").trim()) : [];
+        const label = (given.length === ids.length && given.every(Boolean) ? given : ids.map((id) => catalogItemNames.get(id) || `装备 ${id}`)).join(" · ");
+        rows.push(`<article><b>${index}</b><span class="mayhem-item-name-only" aria-hidden="true"></span><strong>${escapeHTML(`${augmentName} → ${label}`)}</strong><dl><div><dt>场次</dt><dd>${compactNumber(combo.games)}</dd></div><div><dt>胜率</dt><dd class="metric-win">${percent(combo.winRate)}</dd></div></dl></article>`);
+      }
+    }
+    if (!rows.length) return "";
+    return `<section class="recommendation-section mayhem-item-ranking" data-mayhem-personal-builds><header><h3><span class="arena-section-icon" aria-hidden="true">◈</span>我的海斗出装</h3><span class="section-count">本人 ${compactNumber(payload.sampleGames)} 场</span></header><div class="mayhem-ranking-list">${rows.join("")}</div></section>`;
   }
 
   function resetArenaControls() {
@@ -885,6 +997,10 @@
 	window.deepLegendsSelects?.enhance(root);
     prepareImages();
     if (state.section === "champions" && state.mode === "aram-mayhem" && root.querySelector(".mayhem-rarity-panel") && !state.mayhemRarityData && !state.mayhemRarityLoading && !state.mayhemRarityError) void loadMayhemRarity();
+    // R116-E P2-6：构筑 tab 真的渲染出来了才去拉个人海斗出装样本。
+    // 与上面 mayhem-rarity 的懒加载同一套口径：不在渲染函数里发请求，
+    // 也不为「用户从没点开构筑 tab」的情况白花一次本地读盘。
+    if (state.section === "champions" && state.mode === "aram-mayhem" && root.querySelector("[data-mayhem-personal-builds-host]") && !state.mayhemPersonalBuildsLoading) void loadMayhemPersonalBuilds(state.selected?.championId);
     applyRenderedMetricStyles();
     mountArenaMatchCards();
     mountMayhemTierDialog();
@@ -1003,11 +1119,16 @@
     const subtitle = meta?.titleZh && meta.titleZh !== title ? meta.titleZh : meta?.nameEn || "";
     const source = row.imageSource || meta?.imageSource;
     const path = row.imagePath || meta?.imagePath;
+    // R116-B P0-5-2：梯度徽章只认官方档位。详情已到而 stats.tier 为空说明官方
+    // 档位不可用（后端在 insights 熔断时刻意留 nil），整块隐藏，不拿榜单行的
+    // 本地分档冒充官方档位。
+    const heroTier = mayhemHeroTier(row, detail);
+    const localNote = heroTier?.locallyCalculated ? '<small class="mayhem-tier-local">本地估算</small>' : "";
     const overview = `<section class="mayhem-overview-strip">
       <img class="mayhem-overview-art" data-queued-src="${heroArtworkURL(meta, source, path)}" data-artwork-fallback="${escapeHTML(heroArtworkFallbackURL(meta))}" alt="" aria-hidden="true" decoding="async" data-champion-image>
       <span class="mayhem-overview-shade" aria-hidden="true"></span>
-      <div class="mayhem-overview-identity"><span class="champion-detail-portrait"><img data-queued-src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span><div><h2>${escapeHTML(title)} ${tierBadge(row.tier, "arena-title-tier")}</h2><small>${escapeHTML(subtitle)} · 总榜第 ${Number(row.rank) || "—"} 位</small></div></div>
-      <div class="mayhem-overview-metrics">${metric("胜率", percent(detail?.stats?.winRate ?? row.winRate))}${metric("样本", compactNumber(row.play))}${metric("梯度", `T${Number(row.tier) || "—"}`)}</div>
+      <div class="mayhem-overview-identity"><span class="champion-detail-portrait"><img data-queued-src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span><div><h2>${escapeHTML(title)} ${heroTier ? tierBadge(heroTier.tier, "arena-title-tier") : ""}</h2><small>${escapeHTML(subtitle)} · 总榜第 ${Number(row.rank) || "—"} 位${localNote}</small></div></div>
+      <div class="mayhem-overview-metrics">${metric("胜率", percent(detail?.stats?.winRate ?? row.winRate))}${metric("样本", compactNumber(row.play))}${heroTier ? metric("梯度", `T${heroTier.tier}`) : ""}</div>
     </section>`;
     if (state.mayhemDetailLoading && !detail) return overview + renderDetailSkeleton();
     if (state.mayhemDetailError && !detail) return overview + renderError(state.mayhemDetailError, true);
@@ -1015,31 +1136,234 @@
     const staleNotice = state.mayhemDetailError
       ? `<p class="mayhem-detail-stale" role="status">${escapeHTML(state.mayhemDetailError)}，已保留上次适配数据。</p>`
       : "";
-    return overview + staleNotice + `<div class="mayhem-detail-content">${renderRecommendedAugments(detail.recommendedAugments || [], detail.citation)}${renderMayhemOpeningConfiguration(detail.build || {}, detail.buildCitation)}${renderMayhemItemRoutes(detail.build || {}, detail.buildCitation)}${renderMayhemItemRanking(detail.itemRanking || [], detail.citation)}${renderMeasurementTechnique(detail.measurementTechnique)}</div>`;
+    return overview + staleNotice + `<div class="mayhem-detail-content">${mayhemDetailWorkspace(detail)}</div>`;
+  }
+
+  // R116-B P0-5-2：详情页梯度徽章的取值来源。
+  // - 详情已到：只认 response.stats.tier（官方 hextech-insights 档位）；为 nil
+  //   就返回 null → 徽章与「梯度」指标整块隐藏，绝不显示一个编出来的档位。
+  // - 详情还在路上：先用榜单行的档位顶上，并按 tierLocallyCalculated 标注
+  //   「本地估算」，避免加载期间徽章闪一下再消失。
+  function mayhemHeroTier(row, detail) {
+    if (detail) {
+      const official = Number(detail?.stats?.tier);
+      return Number.isFinite(official) && official > 0 ? { tier: official, locallyCalculated: false } : null;
+    }
+    const fallback = Number(row?.tier);
+    return Number.isFinite(fallback) && fallback > 0 ? { tier: fallback, locallyCalculated: row?.tierLocallyCalculated === true } : null;
+  }
+
+  // 英雄详情使用「概览/构筑/表现」三页局部切换，只渲染当前页内容。
+  function mayhemDetailWorkspace(detail) {
+    return `${mayhemDetailToolbar(detail)}<div class="mayhem-detail-panels" data-mayhem-detail-panels>${mayhemDetailPanelMarkup(detail)}</div>`;
+  }
+
+  // 表现 tab 只在后端真的下发了指标时出现：某组指标全缺时后端整组不下发，
+  // 前端也不留一个点进去全是空的页签（评审 6.1）。
+  function mayhemDetailTabSpecs(detail) {
+    const tabs = [["overview", "概览"], ["build", "构筑"]];
+    if (objectRows(detail?.performance?.metrics).length) tabs.push(["performance", "表现"]);
+    return tabs;
+  }
+
+  function mayhemDetailActiveTab(detail) {
+    const keys = mayhemDetailTabSpecs(detail).map(([key]) => key);
+    return keys.includes(state.mayhemDetailTab) ? state.mayhemDetailTab : keys[0];
+  }
+
+  function mayhemDetailToolbar(detail) {
+    const active = mayhemDetailActiveTab(detail);
+    const specs = mayhemDetailTabSpecs(detail);
+    const tabs = specs.map(([key, label]) => `<button type="button" role="tab" id="mayhem-detail-tab-${key}" aria-controls="mayhem-detail-panel-${key}" aria-selected="${active === key}" tabindex="${active === key ? "0" : "-1"}" class="${active === key ? "is-active" : ""}" data-mayhem-detail-tab="${key}">${label}</button>`).join("");
+    // 海克斯图鉴与稀有度分布是跨英雄的全局维度，保留独立入口并复用既有视图状态机。
+    return `<div class="mayhem-detail-toolbar"><div class="mayhem-detail-tabs" role="tablist" aria-label="英雄详情分区" data-mayhem-detail-tabs style="--tab-count:${specs.length}">${tabs}</div><button type="button" class="mayhem-atlas-entry" data-mayhem-view="atlas" aria-label="离开当前英雄，查看全局海克斯图鉴与稀有度分布"><span aria-hidden="true">◈</span>海克斯图鉴</button></div>`;
+  }
+
+  // 只渲染当前 tab 的内容：隐藏 tab 一个节点都不进 DOM，因此不可能占布局高度
+  // （R33「收藏页 UI」那类隐藏元素占位问题）。
+  function mayhemDetailPanelMarkup(detail) {
+    const active = mayhemDetailActiveTab(detail);
+    const content = active === "build" ? mayhemBuildTabMarkup(detail) : active === "performance" ? renderMayhemPerformancePanel(detail.performance) : mayhemOverviewTabMarkup(detail);
+    return `<div class="mayhem-detail-panel" id="mayhem-detail-panel-${active}" role="tabpanel" aria-labelledby="mayhem-detail-tab-${active}" data-mayhem-detail-panel="${active}">${content}</div>`;
+  }
+
+  // 概览：海克斯推荐 → 开局配置 → 该英雄专属品质概率。
+  function mayhemOverviewTabMarkup(detail) {
+    return `<div data-mayhem-augments>${renderRecommendedAugments(detail.recommendedAugments || [], detail.citation)}</div>${renderMayhemOpeningConfiguration(detail.build || {}, detail.buildCitation)}${renderMayhemHeroRarityPanel(detail.heroStageRarity)}`;
+  }
+
+  // 构筑：装备排行（P0-1/P0-2）+ 装备路线 + 技能加点。成装三件套
+  // （terminalItemTrios）后端解析层已有但详情页响应还没下发，本轮未消费。
+  function mayhemBuildTabMarkup(detail) {
+    // R116-E P2-6：末尾追加「我的海斗出装」个人静态查询块。既有三段
+    // （装备排行 / 装备路线 / 技能加点）的渲染一字未动，只是多拼一段；
+    // 拿不到样本时 renderMayhemPersonalBuilds 返回空串，输出与改动前完全一致。
+    return `${renderMayhemItemRanking(detail.itemRanking || [], detail.citation)}${renderMayhemItemRoutes(detail.build || {}, detail.buildCitation)}${renderMayhemSkillPlan(detail.build || {})}<div data-mayhem-personal-builds-host>${renderMayhemPersonalBuilds(detail)}</div>`;
+  }
+
+
+  // 切 tab 只替换面板内容与页签状态，避免整棵详情重渲染。
+  function switchMayhemDetailTab(value) {
+    const tab = normalizeMayhemDetailTab(value);
+    if (tab === state.mayhemDetailTab) return;
+    state.mayhemDetailTab = tab;
+    writeSetting("champion-mayhem-detail-tab", tab);
+    if (!updateMayhemDetailTabs()) render();
+  }
+
+  function updateMayhemDetailTabs() {
+    const detail = state.detail;
+    if (!detail) return false;
+    const panels = root.querySelector("[data-mayhem-detail-panels]");
+    const bar = root.querySelector("[data-mayhem-detail-tabs]");
+    if (!panels || !bar) return false;
+    const active = mayhemDetailActiveTab(detail);
+    panels.innerHTML = mayhemDetailPanelMarkup(detail);
+    for (const button of bar.querySelectorAll("[data-mayhem-detail-tab]")) {
+      const isActive = button.dataset.mayhemDetailTab === active;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", String(isActive));
+      button.tabIndex = isActive ? 0 : -1;
+    }
+    prepareImages(panels);
+    applyRenderedMetricStyles();
+    return true;
   }
 
   function renderMayhemItemRanking(rows, citation) {
-    const rankingRows = objectRows(rows).slice().sort((left, right) => (Number(right.score) || 0) - (Number(left.score) || 0) || (Number(right.games) || 0) - (Number(left.games) || 0));
-    const content = rankingRows.slice(0, 8).map((row, index) => {
+    // R116-B P0-2 排序护栏：这里以前按 score 降序、再按 games 降序重排（R63
+    // 「前端偷偷重排」的老毛病），一条「10 场胜率 100%」的行只要 score 高就能
+    // 插到「5000 场胜率 55%」前面。后端直出的顺序就是官方口径
+    // meta.recommendationPolicy.ranking = sample_tier_then_wilson_lower_bound_v1
+    // （rankingSignals: sample_tier → wilson_lower_bound → pick_rate → games），
+    // 所以前端一律不重排，原样渲染。
+    const rankingRows = objectRows(rows).slice(0, 8);
+    const content = rankingRows.map((row, index) => {
       const asset = row.assets?.[0] || {};
       const icon = asset.source && asset.path ? assetImage(asset, "recommend-icon", true) : '<span class="mayhem-item-name-only" aria-hidden="true"></span>';
-      return `<article><b>${index + 1}</b>${icon}<strong>${escapeHTML(asset.name || "未知装备")}</strong><dl><div><dt>胜率</dt><dd class="metric-win">${percent(row.winRate)}</dd></div><div><dt>场次</dt><dd>${compactNumber(row.games)}</dd></div></dl></article>`;
+      return `<article${mayhemSampleTierLabel(row) ? ' class="is-low-confidence"' : ""}><b>${index + 1}</b>${icon}<strong>${escapeHTML(asset.name || "未知装备")}</strong><dl><div><dt>胜率</dt><dd class="metric-win"${mayhemWilsonTooltip(row)}>${percent(row.winRate)}</dd></div><div><dt>场次</dt><dd>${compactNumber(row.games)}</dd></div>${mayhemDeltaCell(row.deltaWinRate)}${mayhemWithoutItemCell(row)}${mayhemSampleCell(row)}</dl></article>`;
     }).join("");
     return `<section class="recommendation-section mayhem-item-ranking"><header><h3><span class="arena-section-icon" aria-hidden="true">◈</span>装备排行</h3><span class="section-count">${objectRows(rows).length} 件</span></header><div class="mayhem-ranking-list">${content || '<p class="mayhem-inline-empty">暂无装备排行样本。</p>'}</div></section>`;
+  }
+
+  // ---- R116-B P0-1 / P0-2 的行内标签（海克斯卡与装备排行共用）----
+  // deltaWinRate 是上游 0..1 原值（后端不换算，与 winRate 的百分数不同），
+  // 展示时 ×100。为 0 或字段缺失时返回空串：「较基准 +0.0%」没有信息量，
+  // 还会被读成「实测过、确实没有收益」（评审 6.1：取不到就整块隐藏）。
+  //
+  // 评审整改 A2：0 的判据必须放在 toFixed(1) 之后。原来只挡精确 0，挡不住被一位
+  // 小数抹成 0 的小值——任何 |deltaWinRate| < 0.00005 的行都会渲染出「较基准
+  // +0.0%」，正是工单 P0-1 判据明文禁止的那个字符串；而触发面不小（单英雄 118 条
+  // 装备行 + 499 条阶段行都走这个函数，「某阶段收益率实测接近 0」是完全正常的
+  // 上游取值）。格式化之后再判 "0.0" 就把整个舍入区间一起挡住了。
+  function mayhemDeltaLabel(deltaWinRate) {
+    const value = Number(deltaWinRate);
+    if (!Number.isFinite(value)) return "";
+    const points = value * 100;
+    const text = Math.abs(points).toFixed(1);
+    if (text === "0.0") return "";
+    return `${points > 0 ? "+" : "-"}${text}%`;
+  }
+
+  // 正数用既有的胜率高亮色（--success），负数用既有的警示色（--warning），
+  // 不新造配色（工单 P0-1-2）。
+  function mayhemDeltaTone(deltaWinRate) {
+    const value = Number(deltaWinRate);
+    if (!Number.isFinite(value) || value === 0) return "";
+    return value > 0 ? "is-delta-up" : "is-delta-down";
+  }
+
+  // 评审整改 B6：给「较基准」一个定义，别让它是个没有定义的词。装备行是英雄级
+  // 口径，实测 deltaWinRate = 这件装备的胜率 − 该英雄整体胜率（4 个英雄共 479 条
+  // 装备行零误差），tooltip 就把这句话原样给用户；不带任何算出来的数字，因为英雄
+  // 级基准值本身没有逐行下发。tabindex 与 data-tooltip-size 沿用 mayhemWilsonTooltip
+  // 的既有写法（键盘可达 + 紧凑气泡）。海克斯卡那边因为卡片外壳 overflow:hidden
+  // 装不下 tooltip，改用可见的「阶段基准」一格，见 mayhemAugmentConfidenceMetrics。
+  function mayhemDeltaCell(deltaWinRate) {
+    const label = mayhemDeltaLabel(deltaWinRate);
+    return label ? `<div><dt>较基准</dt><dd class="mayhem-delta ${mayhemDeltaTone(deltaWinRate)}" tabindex="0" data-tooltip="较基准 = 这件装备的胜率 − 该英雄整体胜率" data-tooltip-size="compact">${label}</dd></div>` : "";
+  }
+
+  // P0-1-3：「出 vs 不出」对照。withoutItemWinRate 后端已换算成百分数；
+  // 缺失或为 0 时整个单元格不渲染（0 会被读成「不出这件必败」）。
+  function mayhemWithoutItemCell(row) {
+    const value = Number(row?.withoutItemWinRate);
+    if (!Number.isFinite(value) || value <= 0) return "";
+    return `<div><dt>不出时</dt><dd class="mayhem-without-item" data-tooltip="不出这件装备时的胜率 ${percent(value)}">${percent(value)}</dd></div>`;
+  }
+
+  // P0-2-2：低样本徽记复用既有的 is-low-confidence 样式类，不新造一套。
+  // sampleTier 由后端按 meta.samplePolicy 算好直出；空串（meta 不可用）时
+  // 整块不渲染，前端不自己按 games 猜阈值。
+  function mayhemSampleTierLabel(row) {
+    return String(row?.sampleTier || "") === "low" ? "样本极少" : "";
+  }
+
+  function mayhemSampleCell(row) {
+    const label = mayhemSampleTierLabel(row);
+    return label ? `<div><dt>置信</dt><dd class="is-low-confidence">${label}</dd></div>` : "";
+  }
+
+  // P0-2-3：Wilson 下界只在高样本行给（低样本行的下界没有参考意义，那一行已经
+  // 有「样本极少」徽记）。wilsonLowerWinRate 是上游 0..1 原值，展示 ×100。
+  function mayhemWilsonLabel(row) {
+    if (String(row?.sampleTier || "") !== "high") return "";
+    const value = Number(row?.wilsonLowerWinRate);
+    if (!Number.isFinite(value) || value <= 0) return "";
+    return percent(value * 100);
+  }
+
+  function mayhemWilsonTooltip(row) {
+    const label = mayhemWilsonLabel(row);
+    return label ? ` tabindex="0" data-tooltip="95% 置信区间下界 ${label}" data-tooltip-size="compact"` : "";
   }
 
   function renderMayhemOpeningConfiguration(build, citation) {
     const starters = objectRows(build.starterItems).slice(0, 2);
     const boots = objectRows(build.boots).slice(0, 2);
-    const skills = objectRows(build.skills)[0];
     const spells = objectRows(build.summonerSpells).slice(0, 2);
     const group = (title, rows, kind) => `<section><h4>${title}</h4><div class="config-option-list">${rows.map((row) => renderConfigOption(row, kind, false)).join("") || '<p class="muted">暂无样本</p>'}</div></section>`;
-    return `<section class="recommendation-section champion-build-board mayhem-opening-config"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✦</span>开局配置</h3><p>当前版本推荐出门装、鞋子与召唤师技能</p></div></header><div class="mayhem-opening-grid">${group("出门装", starters, "item")}${group("鞋子", boots, "item")}${group("召唤师技能", spells, "spell")}<section class="skill-plan"><h4>技能加点</h4>${renderChampionSkillPlan(skills, false)}</section></div></section>`;
+    // R116-B P0-4：只有召唤师技能这一组显示胜率。它的数据源已经换成同时带
+    // winRate 与 pickRate 的那一份；出门装与鞋子仍然只有选用率，保持 false 不变
+    // ——它们的数据里没有胜率，跟着打开就是显示不存在的数据（工单 P0-4-2）。
+    // renderConfigOption 的三态开关本身一字未改，这里只用它的第四个参数
+    // （statsRenderer，与 renderDepthStats 同一套用法）。
+    //
+    // 为什么不直接传 null（＝既有的 renderOptionStats）：那个函数只用
+    // hasPick/hasWin 决定「整块要不要渲染」，之后两格是无条件输出的，所以一旦
+    // 上游波动、后端回退到只有选用率的那一份数据（winRate 为 0），它会照渲染
+    // 「胜率 0.00%」——那是显示不存在的数据。这里改成逐格判断：大于 0 才渲染，
+    // 两格都取不到就整块返回空串（工单 P0-4 判据 2 的「回退成 pickRate-only」）。
+    const spellStats = (row) => {
+      const hasPick = Number(row?.pickRate) > 0;
+      const hasWin = Number(row?.winRate) > 0;
+      if (!hasPick && !hasWin) return "";
+      return `<dl class="option-stats">${hasPick ? `<div class="is-pick"><dt>选用率</dt><dd>${percent(row.pickRate)}</dd></div>` : ""}${hasWin ? `<div class="is-win"><dt>胜率</dt><dd>${percent(row.winRate)}</dd></div>` : ""}</dl>`;
+    };
+    const spellGroup = (title, rows) => `<section><h4>${title}</h4><div class="config-option-list">${rows.map((row) => renderConfigOption(row, "spell", null, spellStats)).join("") || '<p class="muted">暂无样本</p>'}</div></section>`;
+    return `<section class="recommendation-section champion-build-board mayhem-opening-config"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✦</span>开局配置</h3><p>当前版本推荐出门装、鞋子与召唤师技能</p></div></header><div class="mayhem-opening-grid">${group("出门装", starters, "item")}${group("鞋子", boots, "item")}${spellGroup("召唤师技能", spells)}</div></section>`;
+  }
+
+  // 技能加点从「开局配置」搬到「构筑」tab（工单三-tab 表格：构筑 = 装备排行 +
+  // 成装三件套 + 装备路线 + 技能加点）。取不到技能行时整块隐藏。
+  function renderMayhemSkillPlan(build) {
+    const skills = objectRows(build?.skills)[0];
+    if (!skills) return "";
+    return `<section class="recommendation-section champion-build-board mayhem-skill-plan"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✧</span>技能加点</h3><p>升级优先级与加点顺序</p></div></header><div class="mayhem-build-grid"><section class="skill-plan">${renderChampionSkillPlan(skills, false)}</section></div></section>`;
   }
 
   function renderMayhemItemRoutes(build, citation) {
-    const routes = sortedGradeRows(objectRows(build.coreItems).filter((row) => objectRows(row.assets).length && objectRows(row.assets).every((asset) => asset.kind === "item"))).slice(0, CORE_RECOMMENDATION_LIMIT);
+    const routes = mayhemRouteRows(objectRows(build.coreItems).filter((row) => objectRows(row.assets).length && objectRows(row.assets).every((asset) => asset.kind === "item"))).slice(0, CORE_RECOMMENDATION_LIMIT);
     return `<section class="recommendation-section champion-build-board mayhem-item-routes"><header><div><h3><span class="arena-section-icon" aria-hidden="true">◇</span>装备路线</h3><p>核心装备路线与后续成装顺序</p></div></header><div class="mayhem-build-grid"><section><div class="config-option-list">${routes.map((row) => renderConfigOption(row, "route", false)).join("") || '<p class="muted">暂无样本</p>'}</div></section></div></section>`;
+  }
+
+  // R116-B P0-2 排序护栏：这里以前调 sortedGradeRows（按 grade → score → games
+  // 重排），同样忽略样本分档，低样本行能靠一个高 score 插队。海斗路径改成保持
+  // 后端直出顺序，与对局推荐页 renderBuildRecommendation 的 inUpstreamOrder 一致。
+  // sortedGradeRows 函数体一字未改：它同时服务 renderArenaAugmentSection 的
+  // 斗魂路径（那边读的是 YOUR.GG/用户显式排序，属另一套口径，不许动）。
+  function mayhemRouteRows(rows) {
+    return objectRows(rows);
   }
 
   function renderMayhemAtlas(items) {
@@ -1093,7 +1417,7 @@
             const winRate = champion.winRate ?? champion.win_rate;
             const games = champion.games ?? champion.play;
             return `<div class="mayhem-fit-row"><b>${index + 1}</b>${assetImage({ source: champion.imageSource || meta?.imageSource, path: champion.imagePath || meta?.imagePath, name: champion.name || meta?.nameZh || meta?.titleZh }, "augment-champion-icon")}<strong>${escapeHTML(champion.name || meta?.nameZh || meta?.titleZh || `英雄 ${champion.id}`)}</strong><span class="mayhem-fit-metrics">${score != null ? `综合评分 ${number(score, 1)} · ` : ""}${winRate != null ? `胜率 <b class="win-rate-value">${percent(winRate)}</b> · ` : ""}${games != null ? `${compactNumber(games)} 场` : "暂无样本"}</span></div>`;
-          }).join("") : '<p class="mayhem-inline-empty">当前没有可展示的适配英雄样本。</p>'}</div>${renderMeasurementTechnique(detail?.measurementTechnique)}`;
+          }).join("") : '<p class="mayhem-inline-empty">当前没有可展示的适配英雄样本。</p>'}</div>`;
     return `<header class="mayhem-atlas-detail-head is-${escapeHTML(item.rarity || "unknown")}">
         ${assetImage({ source: item.imageSource, path: item.imagePath, fallbackPath: item.imageFallbackPath, name: item.name, description: item.tooltip || item.description }, "augment-icon")}
         <div><span class="rarity-label is-${escapeHTML(item.rarity || "unknown")}">${rarityLabel(item.rarity)}</span><h3>${escapeHTML(item.name)}</h3><p>${augmentTierLabel(item.tier)} 级海克斯${metrics ? ` · ${metrics}` : ""}</p></div>
@@ -1103,7 +1427,7 @@
   }
 
   // 说明只认海克斯本身的效果文案。详情接口以前回的是页面 SEO 摘要
-  // （"…海克斯大乱斗胜率 53.2%，选取率 0.4%…"），那是统计口径不是说明。
+  // （"…海克斯大乱斗胜率 53.2%，选取率 0.4%…"），那是数据口径不是说明。
   function mayhemAtlasDescription(item) {
     const detail = state.mayhemAugmentDetail;
     const fromDetail = String(detail?.description || "").trim();
@@ -1126,8 +1450,43 @@
     if (state.mayhemRarityError && !stages.length) return "";
     let body = '<p class="mayhem-inline-empty">正在读取品质分布…</p>';
     if (state.mayhemRarityLoading) body = '<p class="mayhem-inline-empty">正在读取品质分布…</p>';
-    else if (stages.length) body = `<div class="mayhem-rarity-stages">${stages.map((row) => `<article><b>第 ${Number(row.stage)} 阶段</b><span class="is-silver">白银 ${percent(row.silver)}</span><span class="is-gold">黄金 ${percent(row.gold)}</span><span class="is-prismatic">棱彩 ${percent(row.prismatic)}</span><small>${compactNumber(row.games)} 次选择</small></article>`).join("")}</div>${renderMeasurementTechnique(state.mayhemRarityData?.measurementTechnique)}`;
-    return `<section class="augment-directory mayhem-rarity-panel"><header><div><h3>海克斯品质分布</h3><p>玩家实际选择的样本分布，不代表抽取、刷新或保底概率</p></div></header>${body}</section>`;
+    else if (stages.length) body = `<div class="mayhem-rarity-stages">${stages.map((row) => `<article><b>第 ${Number(row.stage)} 阶段</b><span class="is-silver">白银 ${percent(row.silver)}</span><span class="is-gold">黄金 ${percent(row.gold)}</span><span class="is-prismatic">棱彩 ${percent(row.prismatic)}</span><small>${compactNumber(row.games)} 次选择</small></article>`).join("")}</div>`;
+    return `<section class="augment-directory mayhem-rarity-panel"><header><div><h3>海克斯品质分布</h3></div></header>${body}</section>`;
+  }
+
+  // ---- R116-F P1：该英雄专属的「阶段 × 稀有度」概率（英雄口径）----
+  // 与上面那份全服口径并存、互不替换：全服口径（/api/champions/augment-rarity，
+  // 渲染在海克斯图鉴里）回答「整体分布」，这一份回答「这个英雄」。两者并存是工单
+  // 要求，但实测差异并不大：patch 16.18 全服阶段 1 是白银 8.4% / 黄金 46.6% /
+  // 棱彩 45.0%，英雄 157 同阶段是 8.12 / 44.90 / 46.98（差 ≤2 个百分点），阶段 2-4
+  // 差 ≤0.4 个百分点（四个英雄 157/223/17/875 实测，见执行账本 §3.4）。所以文案
+  // 只说「该英雄样本里」，不宣称英雄口径与全服口径有量级差别——那是没有证据的话。
+  // 数值由后端从 hero-json 的 augments[].stages[].pickRate 本地聚合好直出（百分数，
+  // 与全服口径同单位，前端直接 percent() 渲染），前端不重算、也不为它多发一条请求。
+  // 取不到就整块隐藏，不留一个空壳（评审 6.1）。
+  function renderMayhemHeroRarityPanel(rows) {
+    const stages = objectRows(rows).filter((row) => Number(row?.stage) > 0 && mayhemHeroRarityTotal(row) > 0);
+    if (!stages.length) return "";
+    return `<section class="recommendation-section mayhem-hero-rarity"><header><div><h3><span class="arena-section-icon" aria-hidden="true">◈</span>该英雄专属品质概率</h3><p>各阶段白银 / 黄金 / 棱彩选取概率</p></div><span class="section-count">${stages.length} 个阶段</span></header><div class="mayhem-rarity-stages">${stages.map(mayhemHeroRarityStage).join("")}</div></section>`;
+  }
+
+  // 三组之和。后端已经保证只有 Total > 0 的阶段才下发，这里再算一次是给前端一道
+  // 自己的护栏：任何一组缺失都会让合计明显小于 100%，用户能直接看出来。
+  function mayhemHeroRarityTotal(row) {
+    return [row?.silver, row?.gold, row?.prismatic].reduce((total, value) => total + (Number(value) || 0), 0);
+  }
+
+  // 单阶段一列，形态与全服口径那一份一致（复用同一套 .mayhem-rarity-stages 样式），
+  // 两个视图并排看时不需要重新学习。小字披露这一阶段真实参与聚合的海克斯条数与三组
+  // 之和：实测阶段 1 只有 121/126 条有 stage 行，缺失的行是跳过的、不是按 0 计入的，
+  // 把条数写出来用户才知道分母是多少。
+  function mayhemHeroRarityStage(row) {
+    const cell = (label, value, tone) => `<span class="is-${tone}">${label} ${percent(value)}</span>`;
+    const count = Number(row?.augments) > 0 ? `${compactNumber(row.augments)} 项海克斯` : "";
+    const total = mayhemHeroRarityTotal(row);
+    const sum = total > 0 ? `三项合计 ${percent(total)}` : "";
+    const note = [count, sum].filter(Boolean).join(" · ");
+    return `<article><b>第 ${Number(row.stage)} 阶段</b>${cell("白银", row.silver, "silver")}${cell("黄金", row.gold, "gold")}${cell("棱彩", row.prismatic, "prismatic")}${note ? `<small>${note}</small>` : ""}</article>`;
   }
 
   function renderArena() {
@@ -1277,8 +1636,12 @@
     const rarity = rarityKey ? ` is-${rarityKey}` : "";
     const quality = ({ silver: "银色", gold: "黄金", prismatic: "棱彩" })[rarityKey] || "";
     const grade = augmentGrade(row.tier || row.grade, row.score, scores);
+    // options.hideGradeBadge（R116-B 评审整改 B4）：只有海斗的阶段视图会用——阶段行
+    // 没有自己的官方字母档位时整块隐藏徽章，而不是拿英雄级的字母去配阶段级的
+    // 「官方档位」。不传这个选项时行为与从前逐字一致（斗魂/棱彩/核心装备照旧）。
+    const gradeBadge = options?.hideGradeBadge ? "" : `<b class="augment-grade is-${grade}">${grade}</b>`;
     const badge = kind === "augment" || kind === "prism" || kind === "core"
-      ? `<b class="augment-grade is-${grade}">${grade}</b>`
+      ? gradeBadge
       : `<b class="hex-rank ${index < 3 ? `is-${index + 1}` : "is-rest"}">${index + 1}</b>`;
     const primary = kind === "augment" || kind === "prism" || kind === "core"
       ? `<div class="arena-option-icons">${route}</div>${badge}`
@@ -1521,7 +1884,7 @@
     return `<tr class="champion-row${rowClass ? ` ${rowClass}` : ""}" tabindex="0" role="button" data-champion-row="${Number(row.championId)}" aria-label="查看${escapeHTML(name)}详情"${selected ? ' aria-current="true"' : ""}>
       <td class="champion-rank">${rank}</td>
       <td class="champion-name-cell">${artwork}<span class="champion-identity"><span class="champion-portrait"><img data-queued-src="${imageURL(source, path)}" alt="" loading="lazy" decoding="async" data-champion-image><span>${escapeHTML(name.slice(0, 1))}</span></span><span><strong>${escapeHTML(name)}</strong>${subname ? `<small>${escapeHTML(subname)}</small>` : ""}</span></span></td>
-      <td>${tierBadge(row.tier, "", arena ? row.grade : "")}</td>
+      <td>${tierBadge(row.tier, "", arena ? row.grade : "")}${mayhem && row.tierLocallyCalculated === true ? '<small class="mayhem-tier-local">本地估算</small>' : ""}</td>
       ${showPosition ? `<td><span class="position-pill">${positionIcon(row.position)}${positionLabel(row.position)}</span></td>` : ""}${mayhem ? `<td class="metric-win" data-tooltip="样本 ${escapeHTML(compactNumber(row.play))}">${percent(row.winRate)}</td>` : arena ? `<td class="metric-win${Number(row.winRate) < 49.5 ? " is-low" : ""}">${percent(row.winRate)}</td><td class="metric-placement">${number(row.averagePlacement, 2)}</td>` : rankedMetrics ? `<td class="metric-win${Number(row.winRate) < 49.5 ? " is-low" : ""}">${percent(row.winRate)}</td><td class="metric-pick">${percent(row.pickRate)}</td><td class="metric-ban">${percent(row.banRate)}</td><td class="metric-games">${Number(row.play) > 0 ? compactNumber(row.play) : "—"}</td>` : ""}
     </tr>`;
   }
@@ -1593,8 +1956,25 @@
   }
 
   function renderRecommendedAugments(items, citation) {
+    // R116-B P0-6：阶段筛选。stage=0 是英雄级汇总（默认视图，展示 augments[]
+    // 自己的 winRate），1..4 用上游 stages[] 的对应行替换数值。缺这个阶段的
+    // augment 在该阶段视图下整条不渲染——绝不拿 0 顶上（0 会显示成「胜率 0%」，
+    // 是显示不存在的数据）。斗魂路径没有 stages，stage 恒为 0。
+    //
+    // 评审整改 A1：还要加一道兜底钳制。记住的阶段号在新英雄上一条阶段行都匹配不
+    // 到时，过滤结果是空的 → 卡片区变成「0 个 + 这个阶段没有可展示的海克斯样本」，
+    // 而 renderMayhemStageChips 因为 available.length <= 1 整块不渲染 → 用户没有
+    // 任何控件可以点回「汇总」，只能换模式或重载，视图被锁死在无出口的空态里。
+    // 最现实的触发路径不需要上游缺阶段：主数据源熔断时后端仍然会拿 RSC 那份
+    // augments 兜底，而那些行一律没有 stages。所以这里退回英雄级汇总渲染
+    // （评审 6.1：取不到就整块隐藏，不留空态），并把状态写回，让 chips 的
+    // aria-pressed 与实际渲染的视图一致，不留一个「没有选中项」的工具条。
+    const wanted = state.mode === "aram-mayhem" ? normalizeMayhemStage(state.mayhemStage) : 0;
+    const stage = wanted && !items.some((item) => mayhemAugmentStageRow(item, wanted)) ? 0 : wanted;
+    if (stage !== wanted) state.mayhemStage = stage;
+    const rows = stage === 0 ? items : items.filter((item) => mayhemAugmentStageRow(item, stage));
     const counts = new Map();
-    const visible = items.filter(item => {
+    const visible = rows.filter(item => {
       const rarity = augmentMetaForAsset(item.assets?.[0])?.rarity || augmentRarityKey(item.rarity || item.assets?.[0]?.rarity);
       const count = counts.get(rarity) || 0;
       counts.set(rarity, count + 1);
@@ -1607,11 +1987,92 @@
       const meta = catalogMeta || { ...asset, rarity: augmentRarityKey(item.rarity), imageSource: asset.source, imagePath: asset.path };
       return { item, meta, grade: augmentGrade(item.grade, item.score, scores) };
     });
-    return `<section class="recommendation-section mayhem-augment-ranking"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✦</span>海克斯推荐</h3><p>按综合评分、胜率与样本展示各品质前三项</p></div><span class="section-count">${entries.length} 个</span></header><div class="arena-option-grid mayhem-recommend-grid">${entries.map(renderMayhemRecommendedAugment).join("")}</div></section>`;
+    // chips 用的是未过滤的 items：只要上游给过任何一个阶段，工具条就在，用户随时
+    // 能点回「汇总」（评审整改 A1 之前，一条都不剩时工具条会整块消失）。
+    const chips = renderMayhemStageChips(items);
+    // 兜底钳制之后，阶段视图已经不可能一条都不剩，所以这句阶段文案只在理论上出现；
+    // 汇总视图（含斗魂路径，它根本没有阶段维度）另给一句不带「阶段」字样的文案，
+    // 免得对着一片空说「这个阶段」。
+    const body = entries.length
+      ? `<div class="arena-option-grid mayhem-recommend-grid">${entries.map(renderMayhemRecommendedAugment).join("")}</div>`
+      : `<p class="mayhem-inline-empty">${stage ? "这个阶段没有可展示的海克斯样本。" : "暂无可展示的海克斯推荐样本。"}</p>`;
+    return `<section class="recommendation-section mayhem-augment-ranking"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✦</span>海克斯推荐</h3><p>按综合评分、胜率与样本展示各品质前三项</p></div>${chips}</header>${body}</section>`;
+  }
+
+  // 当前生效的阶段号。斗魂/单双排路径恒为 0（英雄级汇总），它们的行里没有
+  // stages，套一个阶段号只会把整片推荐过滤空。
+  function mayhemActiveStage() {
+    return state.mode === "aram-mayhem" ? normalizeMayhemStage(state.mayhemStage) : 0;
+  }
+
+  // 取某条 augment 在指定阶段的行。stage=0（汇总）或该阶段缺失时返回 null，
+  // 调用方据此决定「用汇总值」还是「整条不渲染」，两种情况都不会出现 0 值。
+  function mayhemAugmentStageRow(item, stage) {
+    const wanted = normalizeMayhemStage(stage);
+    if (!wanted) return null;
+    return objectRows(item?.stages).find((row) => Number(row?.stage) === wanted) || null;
+  }
+
+  // 阶段视图下把父行的展示字段换成该阶段的值。汇总视图原样返回父行。
+  //
+  // 评审整改 A3：不能无条件展开。后端 championMetricStageRow 的展示字段全带
+  // omitempty，Go 的零值不进 JSON，于是「这个阶段没有这个值」在前端表现为「键不
+  // 存在」；`{ ...item, ...staged }` 会静默保留父行（英雄级汇总）的值，却把它显示
+  // 在「阶段 N」的 chip 下——口径混用且不披露（最容易触发的是 deltaWinRate：阶段
+  // 行缺这个键，卡片就会在阶段 3 下渲染出英雄级的「较基准 +11.2%」）。所以阶段
+  // 维度拥有的那几个字段一律以阶段行为准：键不在就置 undefined，让
+  // mayhemDeltaLabel / percent / mayhemSampleTierLabel 各自走隐藏分支（评审 6.1）。
+  // score / rarity / assets / description 这些阶段维度根本没有的字段继续沿用父行
+  // （「综合评分」的口径由 renderMayhemRecommendedAugment 显式标注成英雄级）。
+  //
+  // 键名列表写在函数体内而不是模块级 const：本函数被 champions.test.cjs 与
+  // r116b.test.cjs 的 compileFunctions 单独编译（依赖列表是固定的），模块级 const
+  // 会变成自由变量抛 ReferenceError（与 normalizeMayhemDetailTab 的 TDZ 教训同源）。
+  function mayhemAugmentStageItem(item, stage) {
+    const staged = mayhemAugmentStageRow(item, stage);
+    if (!staged) return item;
+    const merged = { ...item, ...staged };
+    const stageOwnedKeys = ["winRate", "pickRate", "deltaWinRate", "wilsonLowerWinRate", "stageBaselineWinRate", "games", "hexLabel", "grade", "sampleTier"];
+    for (const key of stageOwnedKeys) if (!Object.hasOwn(staged, key)) merged[key] = undefined;
+    return merged;
+  }
+
+  // P0-6 的阶段 chips：交互形态复用 .arena-chips（renderArenaSortBar 那一套）。
+  // 上游没有任何阶段数据时整条不渲染——不给用户一个点了没反应的控件。
+  function renderMayhemStageChips(items) {
+    if (state.mode !== "aram-mayhem") return "";
+    const rows = objectRows(items);
+    if (!rows.length) return "";
+    const available = MAYHEM_STAGE_OPTIONS.filter(([stage]) => stage === 0 || rows.some((row) => mayhemAugmentStageRow(row, stage)));
+    if (available.length <= 1) return "";
+    const active = normalizeMayhemStage(state.mayhemStage);
+    return `<div class="arena-chips mayhem-stage-chips" role="group" aria-label="海克斯阶段筛选">${available.map(([stage, label]) => `<button type="button" class="${active === stage ? "is-active" : ""}" aria-pressed="${active === stage}" data-mayhem-stage="${stage}">${label}</button>`).join("")}</div>`;
+  }
+
+  // 切阶段是纯本地重渲染：四个阶段的数值已随详情页一次下发，这里只替换海克斯
+  // 推荐那一段，不发任何请求（工单 P0-6 判据 2）。
+  function switchMayhemStage(value) {
+    const stage = normalizeMayhemStage(value);
+    if (stage === state.mayhemStage) return;
+    state.mayhemStage = stage;
+    if (!updateMayhemAugments()) render();
+  }
+
+  function updateMayhemAugments() {
+    const host = root.querySelector("[data-mayhem-augments]");
+    const detail = state.detail;
+    if (!host || !detail) return false;
+    host.innerHTML = renderRecommendedAugments(detail.recommendedAugments || [], detail.citation);
+    prepareImages(host);
+    applyRenderedMetricStyles();
+    return true;
   }
 
   function renderMayhemRecommendedAugment(entry, index) {
-    const { item, meta, grade } = entry;
+    const { meta } = entry;
+    // 阶段视图下用该阶段的数值替换英雄级汇总（缺阶段的行已在上一步过滤掉）。
+    const stage = mayhemActiveStage();
+    const item = mayhemAugmentStageItem(entry.item, stage);
     const base = item.assets?.[0] || item;
     const asset = {
       kind: "augment",
@@ -1622,29 +2083,149 @@
       name: meta?.name || base.name || "推荐海克斯",
       description: base.description || meta?.description || meta?.tooltip || "",
     };
+    // 评审整改 B4：一张卡上不许混两种口径。阶段视图里徽章的字母必须来自阶段行自己
+    // 的官方档位（后端用同一个官方档位映射算好直出，前端不复制 hexTier/hexLabel →
+    // 字母的对照表），否则同一张卡会出现「徽章 S（父行 hang）」配「官方档位 顶级
+    // （阶段 top）」这种自相矛盾——实测英雄 157 的 499 条阶段行里有 115 条 hexTier
+    // 与父行不同。阶段行没有官方档位时（上游给 insufficient，实测 4/499）字母徽章
+    // 整块隐藏：拿英雄级的 S 去配阶段级的「样本过少」正是评审点名的口径混用
+    // （评审 6.1：取不到就整块隐藏，不拿别的口径顶）。
+    const stageGrade = stage ? String(item.grade || "").trim().toUpperCase() : "";
     const row = {
       assets: [asset],
       rarity: meta?.rarity || item.rarity,
-      grade,
+      grade: stage ? stageGrade : entry.grade,
       score: item.score,
       winRate: item.winRate,
       games: item.games,
     };
     return renderArenaOptionCard(row, "augment", index, [], {
       className: "is-mayhem",
+      hideGradeBadge: Boolean(stage) && !stageGrade,
       metrics: [
         ["胜率", percent(item.winRate), "is-win"],
+        // 工单 P0-6「实现要求」第 1 条：点击阶段 chip 后要重新渲染该阶段的
+        // winRate / deltaWinRate / pickRate 三个值。选取率只在阶段视图出现——汇总
+        // 视图的布局保持原样（P0-6 第 2 条只要求汇总展示英雄级 winRate，多选一格
+        // 属超范围视觉改动）。阶段行没带 pickRate 时整格不渲染，绝不留 0.0% 或
+        // 「—」占位（评审 6.1：取不到就整块隐藏）；父行的英雄级 pickRate 不参与，
+        // 因为 mayhemAugmentStageItem 只覆盖阶段行真带着的键（评审整改 A3）。
+        ...(stage && Number(item.pickRate) > 0 ? [["选取率", percent(item.pickRate), ""]] : []),
         ["样本", compactNumber(item.games), ""],
-        ["综合评分", number(item.score, 1), "is-score"],
+        // 综合评分是英雄级的 hexScore：后端刻意没下发阶段级 hexScore（体积取舍，
+        // 见台账第 5 节），所以阶段视图里必须写明口径，不能让一个英雄级数字冒充
+        // 阶段数值（评审整改 B4 的第二半）。
+        [stage ? "综合评分（英雄级）" : "综合评分", number(item.score, 1), "is-score"],
+        ...mayhemAugmentConfidenceMetrics(item),
       ],
     });
   }
 
-  function renderMeasurementTechnique(value) {
-    // Citation records remain in API state for patch selection; the former
-    // renderer used: Patch ${escapeHTML(citation.patch)} · ${escapeHTML(citation.reportDate)} · build ${escapeHTML(citation.buildId)}.
-    const text = String(value || "").trim();
-    return text ? `<aside class="mayhem-measurement"><b>统计口径</b><span>${escapeHTML(text)}</span></aside>` : "";
+  // P0-1 / P0-2 / P0-5 / B6 的追加指标格，每一格都「有数据才出现」：字段缺失时
+  // 卡片保持原来的三格，不会冒出 undefined / NaN% / 0.0%（评审 6.1）。
+  function mayhemAugmentConfidenceMetrics(item) {
+    const metrics = [];
+    const delta = mayhemDeltaLabel(item?.deltaWinRate);
+    if (delta) metrics.push(["较基准", delta, `mayhem-delta ${mayhemDeltaTone(item.deltaWinRate)}`]);
+    // 评审整改 B6：「较基准」的基准必须可见，否则它是个没有定义的词（相对英雄？
+    // 相对阶段？相对全英雄？）。阶段行带 stageBaselineWinRate，实测口径精确成立
+    // （deltaWinRate = 阶段胜率 − 阶段基准胜率，英雄 157 的 499/499 条零误差），
+    // 所以在阶段视图里把基准值单列一格，用户能自己验算 61.66% − 57.05% = +4.6%。
+    // 卡片外壳是 overflow:hidden，逐格 data-tooltip 会被裁掉（P0-2 的 Wilson 下界
+    // 因此也是单独一格而不是 tooltip），所以这里用可见的一格而不是悬浮提示。
+    // 英雄级汇总行没有这个字段（上游只在 stages[] 里给），拿不到就整格不渲染。
+    const baseline = Number(item?.stageBaselineWinRate);
+    if (delta && Number.isFinite(baseline) && baseline > 0) metrics.push(["阶段基准", percent(baseline), "is-baseline"]);
+    // P0-5：官方档位文案用 hexLabel（中文「夯」「顶级」），绝不用 hexTier
+    // （那是内部枚举名 "hang"/"top"，给用户看等于泄露实现细节）。
+    const label = String(item?.hexLabel || "").trim();
+    if (label) metrics.push(["官方档位", escapeHTML(label), "is-hex-label"]);
+    const lowSample = mayhemSampleTierLabel(item);
+    if (lowSample) metrics.push(["置信", lowSample, "is-low-confidence"]);
+    else {
+      const wilson = mayhemWilsonLabel(item);
+      if (wilson) metrics.push(["95%下界", wilson, "is-wilson"]);
+    }
+    return metrics;
+  }
+
+
+  // ---- R116-B P1-6：赛后表现指标面板（「表现」tab）----
+  // 数值、「较全英雄平均」与量纲处置全部在后端算好，前端只负责分组与展示。
+  function renderMayhemPerformancePanel(panel) {
+    const metrics = objectRows(panel?.metrics).filter((metric) => mayhemPerformanceValue(metric) !== "");
+    if (!metrics.length) return "";
+    const groups = mayhemPerformanceGroups(panel, metrics);
+    if (!groups.length) return "";
+    const heroCount = Number(panel?.heroCount);
+    const scope = Number.isFinite(heroCount) && heroCount > 0 ? `<span class="section-count">对比 ${compactNumber(heroCount)} 位英雄</span>` : "";
+    const cumulativeNote = metrics.some((metric) => metric?.cumulative === true)
+      ? '<p class="mayhem-performance-note">双杀/三杀/四杀/五杀为累计次数，受出场场次影响，不可跨英雄直接比较。</p>'
+      : "";
+    return `<section class="recommendation-section mayhem-performance"><header><div><h3><span class="arena-section-icon" aria-hidden="true">◔</span>表现指标</h3></div>${scope}</header><div class="mayhem-performance-groups">${groups.map((group) => mayhemPerformanceGroup(group, metrics)).join("")}</div>${cumulativeNote}</section>`;
+  }
+
+  // Groups 决定分组与顺序；某一组指标全缺时后端整组不下发，前端也不留空态。
+  function mayhemPerformanceGroups(panel, metrics) {
+    const declared = (Array.isArray(panel?.groups) ? panel.groups : []).map((name) => String(name || "").trim()).filter(Boolean);
+    const extra = [];
+    for (const metric of metrics) {
+      const name = String(metric?.group || "").trim();
+      if (name && !declared.includes(name) && !extra.includes(name)) extra.push(name);
+    }
+    return [...declared, ...extra].filter((name) => metrics.some((metric) => String(metric?.group || "").trim() === name));
+  }
+
+  function mayhemPerformanceGroup(group, metrics) {
+    const rows = metrics.filter((metric) => String(metric?.group || "").trim() === group);
+    const cells = rows.filter((metric) => metric?.cumulative !== true).map((metric) => {
+      const delta = mayhemPerformanceDelta(metric);
+      return `<div><dt>${escapeHTML(metric?.label)}</dt><dd><b>${mayhemPerformanceValue(metric)}</b>${delta ? `<span class="mayhem-delta ${mayhemPerformanceDeltaTone(metric)}">较平均 ${delta}</span>` : ""}</dd></div>`;
+    });
+    const cumulative = rows.filter((metric) => metric?.cumulative === true);
+    if (cumulative.length) {
+      const values = cumulative.map((metric) => {
+        const label = String(metric?.label || "").replace(/累计次数$/, "").trim() || "多杀";
+        return `<span><small>${escapeHTML(label)}</small><b>${mayhemPerformanceValue(metric)}</b></span>`;
+      }).join("");
+      cells.push(`<div class="is-cumulative"><dt>多杀累计</dt><dd class="mayhem-multikill-values">${values}</dd></div>`);
+    }
+    if (!cells.length) return "";
+    return `<section class="mayhem-performance-group"><h4>${escapeHTML(group)}</h4><dl>${cells.join("")}</dl></section>`;
+  }
+
+  // format 的取值只有后端 hexdataPerformanceFields 里那五种（decimal2 /
+  // decimal3 / int / count / percent）。percent 的 value 是上游 0..1 原值
+  // （实测 killParticipation 0.76618、damageShare 0.19214），要 ×100 再格式化；
+  // 其余三种已经是最终量纲。
+  function mayhemPerformanceValue(metric) {
+    const value = Number(metric?.value);
+    if (!Number.isFinite(value)) return "";
+    switch (String(metric?.format || "")) {
+      case "percent": return percent(value * 100);
+      case "int":
+      case "count": return number(value, 0);
+      case "decimal2": return number(value, 2);
+      case "decimal3": return number(value, 3);
+      default: return "";
+    }
+  }
+
+  // hasDelta=false 时 DeltaPercent=0 有「真的等于平均」和「无法计算」两种含义，
+  // 所以只看 hasDelta、不看数值（后端注释里的硬要求）。累计项永不带 ±%。
+  // 评审整改 A2：0 的判据必须放在 toFixed(1) 之后。|deltaPercent| < 0.05 会被
+  // 一位小数抹成 "0.0"，先判数值再格式化就会渲染出「较平均 +0.0%」——那正是
+  // 工单 P1-6 判据（与 P0-1 同一条红线）禁止的没有信息量的标签。
+  function mayhemPerformanceDelta(metric) {
+    if (metric?.cumulative === true || metric?.hasDelta !== true) return "";
+    const value = Number(metric?.deltaPercent);
+    if (!Number.isFinite(value)) return "";
+    const text = Math.abs(value).toFixed(1);
+    return text === "0.0" ? "" : `${value > 0 ? "+" : "-"}${text}%`;
+  }
+
+  function mayhemPerformanceDeltaTone(metric) {
+    return Number(metric?.deltaPercent) > 0 ? "is-delta-up" : "is-delta-down";
   }
 
   function augmentMetaForAsset(asset) {
@@ -2120,6 +2701,9 @@
     closeMayhemTierDialog(false);
     closeArenaTierDialog(false);
 	    state.augmentRarity = "all";
+    // 阶段筛选是会话内的视图状态：换模式/重置时回到英雄级汇总，避免一个记住的
+    // 阶段号在新英雄身上把整片推荐过滤空。
+    state.mayhemStage = 0;
     state.mayhemAugmentID = 0;
     state.mayhemAugmentDetail = null;
     state.mayhemAugmentLoading = false;
@@ -2129,6 +2713,10 @@
     state.mayhemRarityData = null;
     state.mayhemRarityLoading = false;
     state.mayhemRarityError = "";
+    state.mayhemPersonalBuilds = null;
+    state.mayhemPersonalBuildsKey = 0;
+    state.mayhemPersonalBuildsLoading = false;
+    state.mayhemPersonalBuildsError = "";
     state.mayhemDetailLoading = false;
     state.mayhemDetailError = "";
     state.mayhemDetailKey = 0;
@@ -2185,6 +2773,12 @@
     }
     const rarity = event.target.closest("[data-augment-rarity]");
     if (rarity) { state.augmentRarity = rarity.dataset.augmentRarity; render(); return; }
+    // R116-B：详情页三 tab 与阶段 chips 都走「局部替换」而不是整棵重渲染——
+    // 只换面板内容与页签状态，切阶段也不许发请求（R128 起详情页已无口径页脚）。
+    const mayhemDetailTab = event.target.closest("[data-mayhem-detail-tab]");
+    if (mayhemDetailTab) { switchMayhemDetailTab(mayhemDetailTab.dataset.mayhemDetailTab); return; }
+    const mayhemStage = event.target.closest("[data-mayhem-stage]");
+    if (mayhemStage) { switchMayhemStage(mayhemStage.dataset.mayhemStage); return; }
     const mayhemView = event.target.closest("[data-mayhem-view]");
     if (mayhemView) {
 	      state.mayhemView = normalizeMayhemView(mayhemView.dataset.mayhemView);

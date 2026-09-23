@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -139,61 +138,6 @@ func TestParseHexdataHeroesRequiresCompleteShapeAndCalculatesTiers(t *testing.T)
 	}
 }
 
-func TestParseHexdataHeroDetailFiltersLowSampleRecommendations(t *testing.T) {
-	var body strings.Builder
-	body.WriteString(`<p>胜率 57.8% · 样本 1,720,638 场，层级 T1</p><table><tbody>`)
-	for id := 1; id <= 8; id++ {
-		games := 1000
-		if id == 2 {
-			games = 1
-		}
-		fmt.Fprintf(&body, `<tr><td><a href="/augment/%d-augment%d">海克斯%d</a></td><td>%.1f</td><td>60.0%%</td><td>%d</td></tr>`, id, id, id, 90-float64(id), games)
-	}
-	body.WriteString(`</tbody></table><table><tbody>`)
-	for id := 1; id <= 8; id++ {
-		fmt.Fprintf(&body, `<tr><td>装备%d</td><td>%.1f</td><td>55.0%%</td><td>1,000</td></tr>`, id, 80-float64(id))
-	}
-	body.WriteString(`</tbody></table>`)
-	detail, err := parseHexdataHeroDetail(hexdataTestPage(body.String()), "/hero/67-vayne")
-	if err != nil || detail.Tier != 1 || len(detail.Augments) != 7 || len(detail.Items) != 8 {
-		t.Fatalf("detail shape = %#v %v", detail, err)
-	}
-	for _, row := range detail.Augments {
-		if row.Games < hexdataMinimumSample {
-			t.Fatalf("low sample recommendation leaked: %#v", row)
-		}
-	}
-	broken := strings.Replace(body.String(), `<tr><td>装备8`, `<tr><td>`, 1)
-	if _, err := parseHexdataHeroDetail(hexdataTestPage(broken), "/hero/67-vayne"); err == nil {
-		t.Fatal("expected 8+8 shape gate to fail")
-	}
-}
-
-func TestParseHexdataHeroDetailAcceptsMetricSeparatorsAndExpandedShape(t *testing.T) {
-	for _, separator := range []string{"·", "，", ","} {
-		t.Run(separator, func(t *testing.T) {
-			var body strings.Builder
-			fmt.Fprintf(&body, `<p>胜率 57.8%%%s样本 1,720,638 场，层级 T1</p><table><tbody><tr><td>说明</td></tr></tbody></table><table><tbody>`, separator)
-			for id := 1; id <= 9; id++ {
-				href := fmt.Sprintf("/augment/%d-augment%d", id, id)
-				if id%2 == 0 {
-					href = "https://hexdata.com.cn" + href + "?source=hero#row"
-				}
-				fmt.Fprintf(&body, `<tr><td><a href="%s">海克斯%d</a></td><td>%.1f</td><td>60.0%%</td><td>1,000</td></tr>`, href, id, 90-float64(id))
-			}
-			body.WriteString(`</tbody></table><table><tbody>`)
-			for id := 1; id <= 9; id++ {
-				fmt.Fprintf(&body, `<tr><td>装备%d</td><td>%.1f</td><td>55.0%%</td><td>1,000</td></tr>`, id, 80-float64(id))
-			}
-			body.WriteString(`</tbody></table>`)
-			detail, err := parseHexdataHeroDetail(hexdataTestPage(body.String()), "/hero/67-vayne")
-			if err != nil || detail.WinRate != 57.8 || detail.Games != 1720638 || len(detail.Augments) != 9 || len(detail.Items) != 9 {
-				t.Fatalf("separator %q detail = %#v err=%v", separator, detail, err)
-			}
-		})
-	}
-}
-
 func TestParseHexdataAugmentsAcceptsMetricSeparatorsAndURLShapes(t *testing.T) {
 	for _, separator := range []string{"·", "，", ","} {
 		t.Run(separator, func(t *testing.T) {
@@ -233,12 +177,11 @@ func TestParseHexdataAugmentsAcceptsThreeColumnIconAndNameShape(t *testing.T) {
 func TestHexdataHeroShapeReportsActualRecommendationAndItemCounts(t *testing.T) {
 	var event map[string]any
 	provider := &championProvider{diag: func(payload map[string]any) { event = payload }}
-	provider.reportHexdataHeroShape(hexdataHeroDetail{
-		Citation: championSourceCitation{BuildID: hexdataTestBuild},
-		Augments: make([]championMetricRow, 7),
-		Items:    make([]championMetricRow, 8),
-	})
-	if event["event"] != "hexdata_shape" || event["kind"] != "hero" || event["rows"] != 7 || event["fields"] != 8 || event["buildId"] != hexdataTestBuild {
+	provider.reportHexdataHeroShape(hexdataHeroDetailV2{
+		Augments: make([]hexdataAugmentRowV2, 7),
+		Items:    make([]hexdataItemRow, 8),
+	}, championSourceCitation{BuildID: hexdataTestBuild})
+	if event["event"] != "hexdata_shape" || event["kind"] != "hero-json" || event["rows"] != 7 || event["fields"] != 8 || event["buildId"] != hexdataTestBuild {
 		t.Fatalf("hero shape event = %#v", event)
 	}
 }
@@ -518,9 +461,25 @@ func TestParseMayhemRSCRealFixture(t *testing.T) {
 	}
 }
 
+// TestHexdataColdRankingBudgetAndDiskRestart 钉住榜单页冷启动的上游请求预算。
+//
+// 预算变更记账（R116-B P0-5-2）：2 → 4 条。
+//
+//	原来 2 条：/api/hexdata/answer-cards + /heroes
+//	新增 2 条：/api/hexdata/meta（8 KB，citation/buildID 快照的唯一来源）
+//	          /api/hexdata/hextech-insights（373 KB，官方英雄档位 tier 的唯一来源）
+//
+// 两条新增都是「每个 buildID 只取一次」的目录型文件：meta 走 12h 软 TTL，
+// insights 走 hexdataCacheTTL，都会 promote 落盘，所以只有冷启动付这个代价，
+// 重启后必须一条都不再发（下面第二个断言就是这道护栏）。
+// 换来的收益是梯度徽章不再由本地按返回顺序自算（原来是 index*5/len(rows)+1，
+// 且自带 TierLocallyCalculated=true），而是上游官方口径。
+// 这条测试同时断言官方档位真的被用上了——否则多付的 2 条请求就是白付。
 func TestHexdataColdRankingBudgetAndDiskRestart(t *testing.T) {
 	root := t.TempDir()
 	answerData, heroesData := hexdataRankingFixtures(t)
+	metaData := r116aMetaFixture(t, hexdataTestBuild)
+	insightsData := r116aInsightsFixture(t, 173, 211)
 	var requests atomic.Int32
 	transport := championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		requests.Add(1)
@@ -529,6 +488,10 @@ func TestHexdataColdRankingBudgetAndDiskRestart(t *testing.T) {
 			return hexdataResponse(request, answerData), nil
 		case "/heroes":
 			return hexdataResponse(request, heroesData), nil
+		case hexdataMetaPath:
+			return hexdataResponse(request, metaData), nil
+		case hexdataHextechInsightsPath:
+			return hexdataResponse(request, insightsData), nil
 		default:
 			return &http.Response{StatusCode: http.StatusNotFound, Header: make(http.Header), Body: http.NoBody, Request: request}, nil
 		}
@@ -538,8 +501,15 @@ func TestHexdataColdRankingBudgetAndDiskRestart(t *testing.T) {
 	if err != nil || len(ranking.Rows) != 172 {
 		t.Fatalf("cold ranking rows=%d err=%v", len(ranking.Rows), err)
 	}
-	if got := requests.Load(); got != 2 {
-		t.Fatalf("cold ranking Hexdata requests = %d, want 2", got)
+	if got := requests.Load(); got != 4 {
+		t.Fatalf("cold ranking Hexdata requests = %d, want 4 (answer-cards + heroes + meta + hextech-insights)", got)
+	}
+	// 多付的 2 条请求必须换来官方档位：insights 夹具把 1..173 号英雄的 tier 都
+	// 设成 2，所以每一行都该是官方 tier=2 且不再标记为本地估算。
+	for index, row := range ranking.Rows {
+		if row.Tier != 2 || row.TierLocallyCalculated {
+			t.Fatalf("row %d (champion %d) tier=%d locallyCalculated=%t, want official tier=2", index, row.ChampionID, row.Tier, row.TierLocallyCalculated)
+		}
 	}
 
 	restarted := newHexdataBudgetProvider(t, root, transport)
@@ -547,8 +517,13 @@ func TestHexdataColdRankingBudgetAndDiskRestart(t *testing.T) {
 	if err != nil || len(ranking.Rows) != 172 {
 		t.Fatalf("disk ranking rows=%d err=%v", len(ranking.Rows), err)
 	}
-	if got := requests.Load(); got != 2 {
-		t.Fatalf("restart made %d additional Hexdata requests", got-2)
+	if got := requests.Load(); got != 4 {
+		t.Fatalf("restart made %d additional Hexdata requests; meta and hextech-insights must be promoted to disk like answer-cards and heroes", got-4)
+	}
+	for index, row := range ranking.Rows {
+		if row.Tier != 2 || row.TierLocallyCalculated {
+			t.Fatalf("after restart row %d tier=%d locallyCalculated=%t, want official tier=2 served from disk", index, row.Tier, row.TierLocallyCalculated)
+		}
 	}
 }
 
@@ -900,28 +875,6 @@ func TestHexdataCircuitProbesLazilyOnNextLoadAndClosesOnSuccess(t *testing.T) {
 	}
 }
 
-func TestMayhemAugmentSlugsNegativeCachesListFailure(t *testing.T) {
-	var requests atomic.Int32
-	provider := newHexdataBudgetProvider(t, t.TempDir(), championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-		requests.Add(1)
-		return &http.Response{StatusCode: http.StatusInternalServerError, Header: make(http.Header), Body: http.NoBody, Request: request}, nil
-	}))
-
-	if slugs := provider.mayhemAugmentSlugs(context.Background()); len(slugs) != 0 {
-		t.Fatalf("failed augment list returned slugs: %#v", slugs)
-	}
-	first := requests.Load()
-	if first == 0 {
-		t.Fatal("failed augment list made no request")
-	}
-	if slugs := provider.mayhemAugmentSlugs(context.Background()); len(slugs) != 0 {
-		t.Fatalf("negative-cached augment list returned slugs: %#v", slugs)
-	}
-	if got := requests.Load(); got != first {
-		t.Fatalf("negative cache made another list request: %d -> %d", first, got)
-	}
-}
-
 func TestNormalizeAugmentRarityIsShared(t *testing.T) {
 	for _, test := range []struct {
 		input any
@@ -1017,220 +970,6 @@ func TestHexdataRequestJitterUsesRandomSource(t *testing.T) {
 	}
 	if slept != 317*time.Millisecond {
 		t.Fatalf("jitter sleep = %v, want %v", slept, 317*time.Millisecond)
-	}
-}
-
-// 海斗海克斯的说明只有 Hexdata 详情页有，所以推荐卡上的那几条要就地补齐，
-// 而不是把用户推去图鉴。一次列表请求拿全 ID→slug，再按需取详情页。
-func TestHydrateMayhemAugmentCopyFillsRecommendationRows(t *testing.T) {
-	var list strings.Builder
-	list.WriteString(`<table><tbody>`)
-	// 斗魂 ID 322 也在榜上：它的说明来自 CommunityDragon，即使能查到 slug
-	// 也不该走 Hexdata，否则就是在为已有数据的条目白发请求。
-	fmt.Fprintf(&list, `<tr><td><a href="/augment/322-augmented-power">强化之能量</a></td><td>globalHexScore 80.0 · 胜率 55.0%%</td><td>查看详情</td></tr>`)
-	for id := 1001; id <= 1160; id++ {
-		fmt.Fprintf(&list, `<tr><td><a href="/augment/%d-augment-%d">海克斯%d</a></td><td>globalHexScore 80.0 · 胜率 55.0%%</td><td>查看详情</td></tr>`, id, id, id)
-	}
-	list.WriteString(`</tbody></table>`)
-
-	augmentPage := func(id int) []byte {
-		var body strings.Builder
-		body.WriteString(`<table><tbody>`)
-		for hero := 1; hero <= 12; hero++ {
-			fmt.Fprintf(&body, `<tr><td><a href="/hero/%d-hero%d">英雄%d</a></td><td>90.0</td><td>60.0%%</td><td>1,000</td></tr>`, hero, hero, hero)
-		}
-		body.WriteString(`</tbody></table>`)
-		fmt.Fprintf(&body, `<section data-seo-guide><p>海克斯%d更适合先在英雄1这类高分高样本英雄上考虑。这是 %d 的效果说明。如果你的英雄机制能稳定触发这个海克斯，优先看上方适配英雄。</p></section>`, id, id)
-		return hexdataTestPage(body.String())
-	}
-
-	var mu sync.Mutex
-	hits := map[string]int{}
-	// 1099 每次都 500：失败不能被记进缓存，否则一次抖动就让这个海克斯整轮没说明。
-	provider := newHexdataBudgetProvider(t, t.TempDir(), gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-		mu.Lock()
-		hits[request.URL.Path]++
-		mu.Unlock()
-		if request.URL.Path == "/augments" {
-			return hexdataResponse(request, hexdataTestPage(list.String())), nil
-		}
-		match := hexdataAugmentPathPattern.FindStringSubmatch(request.URL.Path)
-		if len(match) != 3 {
-			t.Errorf("unexpected hexdata path: %s", request.URL.Path)
-			return nil, errors.New("unexpected path")
-		}
-		id, _ := strconv.Atoi(match[1])
-		if id == 1099 {
-			return &http.Response{StatusCode: http.StatusInternalServerError, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("boom")), Request: request}, nil
-		}
-		return hexdataResponse(request, augmentPage(id)), nil
-	}))
-	count := func(path string) int {
-		mu.Lock()
-		defer mu.Unlock()
-		return hits[path]
-	}
-
-	rows := []championMetricRow{
-		{Assets: []championAsset{{ID: 1001, Name: "海克斯1001"}}},
-		{Assets: []championAsset{{ID: 1002, Name: "海克斯1002"}}},
-		{Assets: []championAsset{{ID: 322, Name: "强化之能量"}}},
-		// 同一个 ID 已经带着 CommunityDragon 的说明，不能被上游覆盖。
-		{Assets: []championAsset{{ID: 1002, Name: "海克斯1002", Description: "已有说明"}}},
-		{Assets: []championAsset{{ID: 1099, Name: "海克斯1099"}}},
-	}
-	provider.hydrateMayhemAugmentCopy(context.Background(), rows)
-
-	if rows[0].Assets[0].Description != "这是 1001 的效果说明。" || rows[1].Assets[0].Description != "这是 1002 的效果说明。" {
-		t.Fatalf("mayhem copy = %q / %q", rows[0].Assets[0].Description, rows[1].Assets[0].Description)
-	}
-	if rows[2].Assets[0].Description != "" {
-		t.Fatalf("arena augment must not be hydrated from hexdata: %q", rows[2].Assets[0].Description)
-	}
-	if rows[3].Assets[0].Description != "已有说明" {
-		t.Fatalf("existing copy was overwritten: %q", rows[3].Assets[0].Description)
-	}
-	// 斗魂 ID 在榜上有 slug，但它的说明来自 CommunityDragon：一次都不该请求。
-	if got := count("/augment/322-augmented-power"); got != 0 {
-		t.Fatalf("arena augment page was fetched %d times", got)
-	}
-	firstRound := count("/augment/1001-augment-1001")
-	failedFirst := count("/augment/1099-augment-1099")
-	if firstRound == 0 || failedFirst == 0 {
-		t.Fatalf("first render fetches = %d / %d", firstRound, failedFirst)
-	}
-
-	// 第二轮：命中的走缓存；失败过的必须重试；slug 表不再重新拉取。
-	repeat := []championMetricRow{
-		{Assets: []championAsset{{ID: 1001, Name: "海克斯1001"}}},
-		{Assets: []championAsset{{ID: 1099, Name: "海克斯1099"}}},
-		{Assets: []championAsset{{ID: 1003, Name: "海克斯1003"}}},
-	}
-	provider.hydrateMayhemAugmentCopy(context.Background(), repeat)
-	if repeat[0].Assets[0].Description != "这是 1001 的效果说明。" {
-		t.Fatalf("cached copy = %q", repeat[0].Assets[0].Description)
-	}
-	if repeat[2].Assets[0].Description != "这是 1003 的效果说明。" {
-		t.Fatalf("newly requested copy = %q", repeat[2].Assets[0].Description)
-	}
-	if got := count("/augment/1001-augment-1001"); got != firstRound {
-		t.Fatalf("resolved copy was re-fetched: %d -> %d", firstRound, got)
-	}
-	if got := count("/augment/1099-augment-1099"); got <= failedFirst {
-		t.Fatalf("failed copy was memoized and never retried: %d -> %d", failedFirst, got)
-	}
-	if got := count("/augments"); got != 1 {
-		t.Fatalf("augment list was fetched %d times, want 1", got)
-	}
-}
-
-// 补齐必须挂在 decorateHexdataAugments 上，否则详情页拿到的还是空说明。
-func TestDecorateHexdataAugmentsHydratesMayhemCopy(t *testing.T) {
-	source, err := os.ReadFile("hexdata.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	body := string(source)
-	start := strings.Index(body, "func (p *championProvider) decorateHexdataAugments(")
-	if start < 0 {
-		t.Fatal("decorateHexdataAugments not found")
-	}
-	end := strings.Index(body[start:], "\n}\n")
-	if end < 0 {
-		t.Fatal("decorateHexdataAugments body is not balanced")
-	}
-	decorate := body[start : start+end]
-	if !strings.Contains(decorate, "p.hydrateMayhemAugmentCopy(ctx, rows)") {
-		t.Fatal("decorateHexdataAugments no longer hydrates Mayhem copy")
-	}
-	// 补齐要排在离线兜底之前，否则真说明永远被占位文案挡住。
-	if strings.Index(decorate, "p.hydrateMayhemAugmentCopy(ctx, rows)") > strings.LastIndex(decorate, "augmentDescriptionWithOfflineGuidance") {
-		t.Fatal("offline guidance runs before the Hexdata copy is hydrated")
-	}
-}
-
-func TestHydrateMayhemAugmentCopyUsesBoundedParallelismAndCache(t *testing.T) {
-	root := t.TempDir()
-	var active atomic.Int32
-	var maxActive atomic.Int32
-	var detailRequests atomic.Int32
-	var listRequests atomic.Int32
-	provider := newHexdataBudgetProvider(t, root, gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-		if request.URL.Path == "/augments" {
-			listRequests.Add(1)
-			var rows strings.Builder
-			rows.WriteString(`<table><tbody>`)
-			for id := 1000; id < 1150; id++ {
-				fmt.Fprintf(&rows, `<tr><td><a href="/augment/%d-augment-%d">海克斯%d</a></td><td>globalHexScore 80.0 · 胜率 55.0%%</td></tr>`, id, id, id)
-			}
-			rows.WriteString(`</tbody></table>`)
-			return hexdataResponse(request, hexdataTestPage(rows.String())), nil
-		}
-		if hexdataAugmentPathPattern.MatchString(request.URL.Path) {
-			detailRequests.Add(1)
-			current := active.Add(1)
-			for {
-				previous := maxActive.Load()
-				if current <= previous || maxActive.CompareAndSwap(previous, current) {
-					break
-				}
-			}
-			time.Sleep(40 * time.Millisecond)
-			active.Add(-1)
-			var detail strings.Builder
-			detail.WriteString(`<table><tbody>`)
-			for hero := 1; hero <= 12; hero++ {
-				fmt.Fprintf(&detail, `<tr><td><a href="/hero/%d-hero%d">英雄%d</a></td><td>90.0</td><td>60.0%%</td><td>1,000</td></tr>`, hero, hero, hero)
-			}
-			detail.WriteString(`</tbody></table><section data-seo-guide><p>海克斯更适合先在英雄1这类高分高样本英雄上考虑。这是海克斯效果说明。如果你的英雄机制能稳定触发这个海克斯，优先看上方适配英雄。</p></section>`)
-			return hexdataResponse(request, hexdataTestPage(detail.String())), nil
-		}
-		return nil, errors.New("unexpected hexdata path")
-	}))
-	// Keep this timing probe focused on the production hydration fan-out; disk
-	// persistence is covered by the cache tests and adds unrelated I/O jitter.
-	provider.cache = nil
-	rows := make([]championMetricRow, 8)
-	for index := range rows {
-		rows[index] = championMetricRow{Assets: []championAsset{{ID: index + 1001, Name: fmt.Sprintf("海克斯%d", index+1001)}}}
-	}
-	started := time.Now()
-	provider.hydrateMayhemAugmentCopy(context.Background(), rows)
-	elapsed := time.Since(started)
-	if maxActive.Load() > mayhemAugmentCopyConcurrency {
-		t.Fatalf("augment detail concurrency = %d, want <= %d", maxActive.Load(), mayhemAugmentCopyConcurrency)
-	}
-	if maxActive.Load() < 2 || elapsed >= 500*time.Millisecond {
-		t.Fatalf("augment details were effectively serial: max=%d elapsed=%v", maxActive.Load(), elapsed)
-	}
-	if detailRequests.Load() != 8 || listRequests.Load() != 1 {
-		t.Fatalf("first hydration requests = details %d/list %d", detailRequests.Load(), listRequests.Load())
-	}
-	repeat := make([]championMetricRow, 8)
-	for index := range repeat {
-		repeat[index] = championMetricRow{Assets: []championAsset{{ID: index + 1001, Name: fmt.Sprintf("海克斯%d", index+1001)}}}
-	}
-	provider.hydrateMayhemAugmentCopy(context.Background(), repeat)
-	if detailRequests.Load() != 8 || listRequests.Load() != 1 {
-		t.Fatalf("cached hydration re-requested details/list: %d/%d", detailRequests.Load(), listRequests.Load())
-	}
-}
-
-func TestMayhemAugmentCopyCacheExpiresAfterTTL(t *testing.T) {
-	provider := newChampionProvider()
-	provider.augmentCopy = map[int]augmentCopyCacheEntry{1001: {Text: "旧说明", FetchedAt: time.Now().Add(-mayhemAugmentCopyTTL - time.Minute)}}
-	if _, ok := provider.augmentCopy[1001]; !ok {
-		t.Fatal("test cache entry was not installed")
-	}
-	// Expired entries must be considered misses by the production lookup.
-	provider.hexdata.minInterval = 0
-	provider.hexdata.maximumJitter = 0
-	provider.hexdata.retryDelay = 0
-	provider.client = &http.Client{Transport: championRoundTripFunc(func(*http.Request) (*http.Response, error) {
-		return nil, errors.New("fixture upstream unavailable")
-	})}
-	if got := provider.mayhemAugmentCopy(context.Background(), []int{1001}); len(got) != 0 {
-		t.Fatalf("expired cache returned stale copy: %#v", got)
 	}
 }
 

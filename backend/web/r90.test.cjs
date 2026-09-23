@@ -75,7 +75,9 @@ test("R90 inactive tabs and repeated in-game SSE do not reload the roster; phase
 test("R90 stopped UI has an operable manual refresh and foreground wake checks phase",()=>{
  const h=harness(full());assert.match(h.renderLiveRefreshStatus(h.state.live),/对局中数据不再变化，已停止自动刷新/);
  const calls=[];let handler;const button={addEventListener:(event,fn)=>{if(event==="click")handler=fn}};
- const {bindLiveContent}=compile(["bindLiveContent"],{state:h.state,nodes:{liveContent:{querySelector:s=>s==="[data-live-refresh]"?button:null,querySelectorAll:()=>[]}},bindRuneWorkspaceControls:()=>{},bindRuneChoiceButtons:()=>{},loadLive:(...args)=>calls.push(args),bindPlayerLinks:()=>{},bindInsightMatchExpand:()=>{},applyRunes:()=>{},applyItemSet:()=>{}});
+ // R131 §2.1-4：R129 把面板内绑定拆进 bindLivePanelScope，这里与同对象里既有的
+ // bindRuneWorkspaceControls / bindPlayerLinks 一样桩掉（本条只验证刷新按钮的 manual 来源）。
+ const {bindLiveContent}=compile(["bindLiveContent"],{state:h.state,nodes:{liveContent:{querySelector:s=>s==="[data-live-refresh]"?button:null,querySelectorAll:()=>[]}},bindRuneWorkspaceControls:()=>{},bindRuneChoiceButtons:()=>{},bindLivePanelScope:()=>{},loadLive:(...args)=>calls.push(args),bindPlayerLinks:()=>{},bindInsightMatchExpand:()=>{},applyRunes:()=>{},applyItemSet:()=>{}});
  bindLiveContent();handler();assert.deepEqual(calls,[[true,"manual"]]);
  const visibility=source.slice(source.indexOf('document.addEventListener("visibilitychange", () => {\n    if (state.destroyed)'),source.indexOf('/* ---------- 新对局提示灯'));
  assert.doesNotMatch(visibility,/loadLive\(true/);assert.match(visibility,/scheduleBeaconPoll\(0\)/);
@@ -84,10 +86,11 @@ test("R90 stopped UI has an operable manual refresh and foreground wake checks p
 test("R90 actual loader bypasses cache for manual refresh; R91 supersedes the former manual queue",async()=>{
  const state={beacon:{phase:"InProgress"},live:full(),settings:{},controllers:new Map(),liveRetryAttempts:8};const requests=[];const noop=()=>{};
  const deps={state,connected:()=>true,recordLiveRefresh:noop,normalizeLiveGameId:v=>Number(v)||0,liveSnapshotBehindPhase:()=>false,recordLiveObservation:noop,invalidateLiveForNewGame:noop,liveGamePhase:()=>true,renderLive:noop,api:async(url)=>{requests.push(url);return full()},shouldResetLiveGameScopedState:()=>false,resetLiveGameScopedState:noop,resetLivePositionOverrides:noop,resetRecommendationTabsOnChampionChange:noop,updateBeacon:noop,renderCapabilitySettings:noop,liveRecommendationsFor:()=>null,ensureLiveRecommendations:noop,ensureSpecialistRunes:noop,ensureProRunes:noop,syncLiveRetryBudget:noop,scheduleLiveRefresh:noop,queueLiveEventRefresh:noop};
- const {loadLive}=compile(["loadLive"],deps);await loadLive(true,"manual");assert.deepEqual(requests,["/api/gameplay/live?refresh=1"]);assert.equal(state.liveRetryAttempts,0);
+ // R131 §2.1-1：loadLive 开头会记一次触发来源，把纯函数 liveRenderTriggerLabel 一并按真实实现编译。
+ const {loadLive}=compile(["loadLive","liveRenderTriggerLabel"],deps);await loadLive(true,"manual");assert.deepEqual(requests,["/api/gameplay/live?refresh=1"]);assert.equal(state.liveRetryAttempts,0);
  const releases=[];let aborted=0;state.controllers.set("live",{abort:()=>aborted++});
  deps.api=async(url)=>{requests.push(url);await new Promise(resolve=>releases.push(resolve));return full()};
- const loader=compile(["loadLive"],deps).loadLive;const pending=loader(false);const forced=loader(true,"manual");
+ const loader=compile(["loadLive","liveRenderTriggerLabel"],deps).loadLive;const pending=loader(false);const forced=loader(true,"manual");
  assert.equal(aborted,1);assert.equal(releases.length,2);assert.equal(requests.at(-1),"/api/gameplay/live?refresh=1");
  releases[0]();await pending;assert.equal(state.liveLoading,true);releases[1]();await forced;assert.equal(state.liveLoading,false);
 });

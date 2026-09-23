@@ -100,11 +100,28 @@
 
   let activeConfirmation = null;
 
+  // 确认卡与 toast 共用右下角锚点，卡片打开期间把 toast 抬到卡片上方（见 app.css）。
+  function syncConfirmationClearance(card) {
+    const height = Math.ceil(card?.getBoundingClientRect().height || 0);
+    document.documentElement.style.setProperty("--suite-confirm-clearance", `${height + 10}px`);
+    document.body.dataset.suiteConfirmOpen = "true";
+  }
+
+  function clearConfirmationClearance() {
+    document.documentElement.style.removeProperty("--suite-confirm-clearance");
+    delete document.body.dataset.suiteConfirmOpen;
+  }
+
+  function confirmationFocusables(card) {
+    return [...card.querySelectorAll("[data-suite-confirm-cancel], [data-suite-confirm-accept]")];
+  }
+
   function closeConfirmation(confirmed, restoreFocus = true) {
     const current = activeConfirmation;
     if (!current) return;
     activeConfirmation = null;
     current.card.remove();
+    clearConfirmationClearance();
     current.resolve(Boolean(confirmed));
     if (restoreFocus && current.trigger?.isConnected) current.trigger.focus();
   }
@@ -123,22 +140,42 @@
       activeConfirmation = { card, resolve, trigger };
       card.querySelector("[data-suite-confirm-cancel]").addEventListener("click", () => closeConfirmation(false));
       card.querySelector("[data-suite-confirm-accept]").addEventListener("click", () => closeConfirmation(true));
-      requestAnimationFrame(() => card.querySelector("[data-suite-confirm-cancel]")?.focus());
+      requestAnimationFrame(() => {
+        syncConfirmationClearance(card);
+        card.querySelector("[data-suite-confirm-cancel]")?.focus();
+      });
     });
   }
 
   document.addEventListener("keydown", (event) => {
     if (!activeConfirmation) return;
+    const { card } = activeConfirmation;
     if (event.key === "Escape") {
       event.preventDefault();
       closeConfirmation(false);
-    } else if (event.key === "Enter" && activeConfirmation.card.contains(document.activeElement)) {
+      return;
+    }
+    // 焦点陷阱：卡片是不可逆操作（卸下全部勋章等）的最后一道确认，Tab 不能跑进背景，
+    // 否则用户会在焦点已离开卡片后按 Enter 触发背景控件。
+    // aria-modal 保持 "false"：鼠标仍能点背景，卡片对辅助技术不是真正的模态，
+    // 声明成 true 会让读屏软件隐藏仍然可操作的内容。
+    if (event.key === "Tab") {
+      const focusables = confirmationFocusables(card);
+      if (!focusables.length) return;
+      event.preventDefault();
+      const index = focusables.indexOf(document.activeElement);
+      const step = event.shiftKey ? -1 : 1;
+      const next = focusables[(index + step + focusables.length) % focusables.length];
+      next?.focus();
+      return;
+    }
+    if (event.key === "Enter" && card.contains(document.activeElement)) {
       event.preventDefault();
       closeConfirmation(true);
     }
   });
 
-  async function api(path, options = {}, timeout = 15000) {
+  async function api(path, options = {}, timeout = 15000, timeoutHint = "本地请求超时，请重试") {
     const controller = new AbortController();
     const abort = () => controller.abort();
     if (options.signal?.aborted) abort();
@@ -151,21 +188,27 @@
             headers: { "Content-Type": "application/json", ...(options.headers || {}) } });
           const text = await response.text();
           let payload = null;
-          try { payload = text ? JSON.parse(text) : {}; } catch (_) {}
+          let parseError = null;
+          try { payload = text ? JSON.parse(text) : {}; } catch (error) { parseError = error; }
           if (!response.ok) {
             const error = new Error(payload?.message || text.trim() || `请求失败（${response.status}）`);
             error.status = response.status; error.errorKind = response.status === 504 ? "timeout" : "http"; throw error;
           }
+          if (parseError) {
+            const error = new Error("响应格式异常，请重试");
+            error.name = "ResponseFormatError"; error.errorKind = "invalid-response"; throw error;
+          }
           return payload ?? {};
         })(),
         new Promise((_, reject) => { timer = setTimeout(() => {
-          const error = new Error("请求超时，可重新扫描后重试；本项失败不影响其它条目。");
+          const error = new Error(timeoutHint);
           error.name = "TimeoutError"; error.errorKind = "timeout";
           reject(error); controller.abort();
         }, timeout); }),
       ]);
     } catch (error) {
       error.errorKind ||= error.name === "AbortError" ? "canceled" : "network";
+      if (typeof window !== "undefined") window.reportFlowDiagnostic?.("local_request_client", "failed", { endpoint: "other", httpStatus: Number(error?.status || 0), errorKind: error.errorKind });
       throw error;
     } finally {
       clearTimeout(timer);
@@ -183,9 +226,6 @@
     offline.hidden = state.connected;
     for (const subpanel of panels) subpanel.hidden = !state.connected || subpanel.dataset.suitePanel !== state.tab;
     if (!state.connected) {
-      state.facadeIconCatalog = null;
-      state.facadeIconDialog?.close();
-      state.facadeBannerDialog?.close();
       clearTimeout(state.facadeRefreshTimer);
       clearTimeout(state.facadeChallengeRetryTimer);
       state.facadeRefreshTimer = 0;
@@ -204,8 +244,6 @@
   function activateTab(name, focus = false) {
     if (!tabCopy[name]) name = "watch";
     if (state.tab !== name) {
-      state.facadeIconDialog?.close();
-      state.facadeBannerDialog?.close();
       state.scroll[state.tab] = Number(appScroll?.scrollTop || 0);
       writePreference("suite-scroll", JSON.stringify(state.scroll));
     }
@@ -469,7 +507,7 @@
 	if (typeof watchDiagnostic === "function") watchDiagnostic("load-started");
 	state.watchPromise = (async () => {
 	  try {
-		const response = await api("/api/watch/rules");
+      const response = await api("/api/watch/rules", undefined, 15000, "自动规则读取超时，请重试");
 		if ((state.watchRevision || 0) !== revision || state.watchPendingSaves > 0) { if (typeof watchDiagnostic === "function") watchDiagnostic("load-stale"); return; }
 		state.watch = response;
 		if (typeof watchDiagnostic === "function") watchDiagnostic("load-applied");
@@ -511,7 +549,7 @@
     state.watchRevision = revision;
     state.watchPendingSaves = (state.watchPendingSaves || 0) + 1;
     if (typeof watchDiagnostic === "function") watchDiagnostic("save-queued");
-    const task = Promise.resolve(state.watchSaveQueue).catch(() => {}).then(() => api("/api/watch/rules", { method: "POST", body }));
+    const task = Promise.resolve(state.watchSaveQueue).catch(() => {}).then(() => api("/api/watch/rules", { method: "POST", body }, 15000, "自动规则保存超时，请重试"));
     state.watchSaveQueue = task;
     try {
       const response = await task;
@@ -1146,7 +1184,7 @@
       report("failed", { errorKind: timedOut ? "timeout" : error.errorKind || "other", httpStatus: error.status || 0 });
       state.champSelectPosition = "all";
       state.champSelectPositionIDs = null;
-      toast(`位置筛选读取失败：${timedOut ? "请求超时，请重试" : error.message}`);
+      toast(`位置筛选读取失败：${timedOut ? "本地请求超时，请重试" : error.message}`);
     } finally {
       clearTimeout(timer);
       if (state.champSelectPositionController === controller) state.champSelectPositionController = null;
@@ -1296,157 +1334,7 @@
     return imageURL(`/lol-game-data/assets/v1/profile-icons/${Number(icon.id)}.jpg`);
   }
 
-  async function openFacadeIconPicker(opener) {
-    if (!state.facade?.connected || state.facadeApplying) return;
-    if (state.facadeIconDialog?.open) return;
-    const dialog = document.createElement("dialog");
-    dialog.className = "facade-picker";
-    dialog.setAttribute("aria-labelledby", "facade-icon-title");
-    dialog.innerHTML = `<div class="facade-picker-sheet"><header class="facade-picker-head"><div><h2 id="facade-icon-title">选择头像</h2><p>名称、拼音或首字母搜索；未拥有头像可用于聊天与好友栏，生涯头像需已解锁</p></div><button type="button" class="button button-secondary" data-picker-close aria-label="关闭头像选择">关闭</button></header><div class="facade-picker-loading" role="status">正在读取头像目录…</div></div>`;
-    document.body.append(dialog);
-    state.facadeIconDialog = dialog;
-    const close = () => dialog.close();
-    dialog.querySelector("[data-picker-close]").addEventListener("click", close);
-    dialog.addEventListener("click", event => { if (event.target === dialog) close(); });
-    dialog.addEventListener("cancel", event => { event.preventDefault(); close(); });
-    dialog.addEventListener("keydown", event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); } });
-    dialog.addEventListener("close", () => {
-      dialog.renderGeneration = (dialog.renderGeneration || 0) + 1;
-      clearTimeout(dialog.searchTimer);
-      state.facadeIconDialog = null;
-      window.desktopTheme?.setModalOpen?.(false);
-      dialog.remove();
-      requestAnimationFrame(() => (opener?.isConnected ? opener : roots.facade.querySelector("[data-facade-icons]"))?.focus({ preventScroll: true }));
-    }, { once: true });
-    dialog.showModal();
-    window.desktopTheme?.setModalOpen?.(true);
-    try {
-      const result = state.facadeIconCatalog || await api("/api/facade/icons");
-      if (!dialog.open) return;
-      if (!state.facade?.connected) { close(); return; }
-      state.facadeIconCatalog = result;
-      const icons = Array.isArray(result.icons) ? result.icons : [];
-      const sets = [...new Set(icons.flatMap(icon => icon.sets || []))].sort((a, b) => a.localeCompare(b, "zh-CN"));
-      const filters = { query: "", group: "all", set: "", sort: "new" };
-      let selectedIcon = icons.find(icon => Number(icon.id) === Number(state.facade?.summoner?.profileIconId));
-      const sheet = dialog.querySelector(".facade-picker-sheet");
-      sheet.querySelector(".facade-picker-loading").remove();
-      sheet.insertAdjacentHTML("beforeend", `<div class="facade-picker-tools"><input class="suite-input" type="search" data-picker-search placeholder="搜索名称 / 拼音 / 首字母" aria-label="搜索头像"><select class="suite-select" data-picker-set aria-label="头像系列"><option value="">全部系列</option>${sets.map(set => `<option value="${escapeHTML(set)}">${escapeHTML(set)}</option>`).join("")}</select><select class="suite-select" data-picker-sort aria-label="头像排序"><option value="new">最新在前</option><option value="old">最早在前</option><option value="name">按名称</option></select><span class="suite-chip" data-picker-count aria-live="polite"></span></div><div class="facade-picker-body"><nav class="facade-picker-side" aria-label="头像分类"><button type="button" data-picker-group="all" class="is-active">全部头像</button><button type="button" data-picker-group="recent">近三年新增</button>${sets.map(set => `<button type="button" data-picker-series="${escapeHTML(set)}">${escapeHTML(set)}</button>`).join("")}</nav><div class="facade-picker-scroll"><div class="facade-icon-grid" data-picker-grid></div></div></div><footer class="facade-picker-footer"><div class="facade-picker-selection" data-picker-selection></div><p>选择头像后，点击“设为头像”确认</p><button type="button" class="button button-primary" data-picker-apply>设为头像</button></footer>`);
-      const grid = dialog.querySelector("[data-picker-grid]");
-      const apply = dialog.querySelector("[data-picker-apply]");
-      const preview = () => {
-        dialog.querySelector("[data-picker-selection]").innerHTML = selectedIcon ? `<img data-queued-src="${facadeIconImage(selectedIcon)}" alt=""><strong>${escapeHTML(selectedIcon.title)}</strong>` : "请选择一个头像";
-        dialog.querySelector(".facade-picker-footer p").textContent = !selectedIcon ? "请选择头像" : result.iconOwnershipUnavailable ? "拥有状态未读取；点击“设为头像”后核对客户端结果" : selectedIcon.owned ? "已拥有；点击“设为头像”确认" : "未拥有；当前客户端可能只允许更换聊天与好友栏头像";
-        apply.disabled = !selectedIcon || state.facadeApplying;
-        for (const button of grid.querySelectorAll("[data-picker-icon]")) button.setAttribute("aria-pressed", String(Number(button.dataset.pickerIcon) === Number(selectedIcon?.id)));
-      };
-      const render = () => {
-        const generation = dialog.renderGeneration = (dialog.renderGeneration || 0) + 1;
-        const query = filters.query.trim().toLowerCase();
-        const score = icon => window.deepLegendsChampionSearch?.scoreOption?.(query, "", [icon.title, ...(icon.searchTerms || [])].join(" ")) || 0;
-        const rows = icons.filter(icon => (filters.group !== "recent" || Number(icon.year) >= new Date().getFullYear() - 2) && (!filters.set || icon.sets?.includes(filters.set)) && (!query || score(icon) > 0 || [icon.title, ...(icon.searchTerms || [])].join(" ").toLowerCase().includes(query)));
-        rows.sort((a, b) => filters.sort === "name" ? a.title.localeCompare(b.title, "zh-CN") : (filters.sort === "old" ? 1 : -1) * (Number(a.year) - Number(b.year) || Number(a.id) - Number(b.id)));
-        grid.replaceChildren();
-        dialog.querySelector(".facade-picker-scroll").scrollTop = 0;
-        const count = dialog.querySelector("[data-picker-count]");
-        let index = 0;
-        const chunk = () => {
-          if (!dialog.open || generation !== dialog.renderGeneration) return;
-          const started = performance.now();
-          let added = 0;
-          const fragment = document.createDocumentFragment();
-          // Hard per-frame cap as well as the 7ms budget, including fast machines.
-          while (index < rows.length && added < 72 && performance.now() - started < 7) {
-            const icon = rows[index++]; added++;
-            const button = document.createElement("button");
-            button.type = "button"; button.dataset.pickerIcon = String(icon.id);
-            button.className = "facade-icon-option";
-            button.disabled = Boolean(state.facadeApplying);
-            button.setAttribute("aria-label", icon.title);
-            button.setAttribute("aria-pressed", String(Number(icon.id) === Number(selectedIcon?.id)));
-            button.innerHTML = `<span class="facade-icon-picture"><img data-queued-src="${facadeIconImage(icon)}" alt="" loading="lazy" decoding="async"></span><span class="facade-icon-name">${escapeHTML(icon.title)}</span>`;
-            button.addEventListener("click", () => { selectedIcon = icon; preview(); });
-            fragment.append(button);
-          }
-          grid.append(fragment);
-          count.textContent = `共 ${result.total ?? icons.length} · 已显示 ${index}`;
-          if (index < rows.length) requestAnimationFrame(chunk);
-          else if (!rows.length) grid.textContent = "没有符合条件的头像";
-        };
-        chunk();
-      };
-      let composing = false;
-      const search = dialog.querySelector("[data-picker-search]");
-      const queueSearch = () => { clearTimeout(dialog.searchTimer); dialog.searchTimer = setTimeout(() => { filters.query = search.value; render(); }, 150); };
-      search.addEventListener("compositionstart", () => { composing = true; clearTimeout(dialog.searchTimer); });
-      search.addEventListener("compositionend", () => { composing = false; queueSearch(); });
-      search.addEventListener("input", () => { if (!composing) queueSearch(); });
-      const series = dialog.querySelector("[data-picker-set]");
-      const syncSidebar = () => { for (const button of dialog.querySelectorAll(".facade-picker-side button")) button.classList.toggle("is-active", button.dataset.pickerSeries ? button.dataset.pickerSeries === filters.set : !filters.set && button.dataset.pickerGroup === filters.group); };
-      series.addEventListener("change", () => { filters.set = series.value; filters.group = "all"; syncSidebar(); render(); });
-      dialog.querySelector("[data-picker-sort]").addEventListener("change", event => { filters.sort = event.target.value; render(); });
-      for (const button of dialog.querySelectorAll(".facade-picker-side button")) button.addEventListener("click", () => { filters.group = button.dataset.pickerGroup || "all"; filters.set = button.dataset.pickerSeries || ""; series.value = filters.set; syncSidebar(); render(); });
-      apply.addEventListener("click", async () => {
-        if (!selectedIcon || state.facadeApplying) return;
-        const id = Number(selectedIcon.id);
-        state.facadeDraft.iconId = id;
-        apply.disabled = true;
-        const ok = await applyFacade({ action: "icon", iconId: id }, "头像已应用");
-        if (ok) close(); else { preview(); dialog.querySelector(".facade-picker-footer p").textContent = state.facadeApplyError || "客户端尚未确认更改"; }
-      });
-      render(); preview(); search.focus();
-    } catch (error) {
-      if (dialog.open) dialog.querySelector(".facade-picker-loading").textContent = `${error.message}。请关闭后重试。`;
-    }
-  }
 
-  async function openFacadeBannerPicker(opener) {
-    if (!state.facade?.connected || state.facadeApplying || state.facadeBannerDialog?.open) return;
-    const dialog = document.createElement("dialog");
-    dialog.className = "facade-picker facade-banner-picker";
-    dialog.setAttribute("aria-labelledby", "facade-banner-title");
-    dialog.innerHTML = `<div class="facade-picker-sheet"><header class="facade-picker-head"><div><h2 id="facade-banner-title">选择旗帜</h2><p>点击旗帜立即更改</p></div><button class="button button-secondary" type="button" data-banner-close>关闭</button></header><div class="facade-picker-loading" role="status">正在读取旗帜目录…</div></div>`;
-    document.body.append(dialog); state.facadeBannerDialog = dialog;
-    const close = () => dialog.close();
-    dialog.querySelector("[data-banner-close]").addEventListener("click", close);
-    dialog.addEventListener("click", event => { if (event.target === dialog) close(); });
-    dialog.addEventListener("cancel", event => { event.preventDefault(); close(); });
-    dialog.addEventListener("keydown", event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); } });
-    dialog.addEventListener("close", () => {
-      state.facadeBannerDialog = null; dialog.remove(); window.desktopTheme?.setModalOpen?.(false);
-      requestAnimationFrame(() => (opener?.isConnected ? opener : roots.facade.querySelector("[data-facade-banners]"))?.focus({preventScroll:true}));
-    }, {once:true});
-    dialog.showModal(); window.desktopTheme?.setModalOpen?.(true);
-    try {
-      const result = await api("/api/facade/banners");
-      if (!dialog.open) return;
-      if (!state.facade?.connected) { close(); return; }
-      const banners = (result.banners || []).slice().sort((a,b) => a.localizedName.localeCompare(b.localizedName,"zh-CN"));
-      const sheet = dialog.querySelector(".facade-picker-sheet");
-      sheet.querySelector(".facade-picker-loading").remove();
-      sheet.insertAdjacentHTML("beforeend", `<div class="facade-picker-tools"><input type="search" class="suite-input" data-banner-search placeholder="搜索旗帜名称 / 拼音 / 编号" aria-label="搜索旗帜"></div><div class="facade-picker-body"><nav class="facade-picker-side" aria-label="旗帜分类">${[["all","全部"],["owned","已拥有"],["tencent","国服专属"]].map(([key,label]) => `<button type="button" data-banner-group="${key}" class="${key === "all" ? "is-active" : ""}">${label}</button>`).join("")}</nav><div class="facade-picker-scroll"><div class="facade-banner-grid" data-banner-grid></div></div></div><footer class="facade-picker-footer"><p data-banner-selection>共 ${banners.length} 个旗帜 · 未拥有旗帜可能被客户端拒绝装备</p></footer>`);
-      let currentGroup = "all";
-      const render = group => {
-        currentGroup = group;
-        const query = dialog.querySelector("[data-banner-search]").value.trim().toLowerCase();
-        const matches = item => [item.localizedName, item.id, ...(item.searchTerms || [])].join(" ").toLowerCase().includes(query);
-        const grid = dialog.querySelector("[data-banner-grid]");
-        grid.innerHTML = banners.filter(item => (group === "all" || (group === "owned" ? item.owned : item.isTencentOnly)) && matches(item)).map(item => `<button type="button" class="facade-banner-option" data-banner-id="${escapeHTML(item.id)}" >${item.imagePath ? `<img data-queued-src="${imageURL(item.imagePath)}" alt="" class="facade-banner-picture">` : `<span class="facade-banner-placeholder" aria-hidden="true">⚑</span>`}<strong>${escapeHTML(item.localizedName)}</strong><span>${result.bannerOwnershipUnavailable ? "拥有状态未知" : item.owned ? "已拥有" : "未拥有"}${item.isTencentOnly ? " · 国服专属" : ""}</span></button>`).join("");
-        for (const button of grid.querySelectorAll("[data-banner-id]")) button.addEventListener("click", async () => {
-          if (state.facadeApplying) return;
-          button.disabled = true;
-          const ok = await applyFacade({ action: "banner", bannerId: button.dataset.bannerId }, "旗帜已应用");
-          if (ok) close(); else { button.disabled = false; dialog.querySelector("[data-banner-selection]").textContent = state.facadeApplyError || "客户端尚未确认更改"; }
-        });
-      };
-      for (const button of dialog.querySelectorAll("[data-banner-group]")) button.addEventListener("click", () => {
-        for (const sibling of dialog.querySelectorAll("[data-banner-group]")) sibling.classList.toggle("is-active", sibling === button);
-        render(button.dataset.bannerGroup);
-      });
-      dialog.querySelector("[data-banner-search]").addEventListener("input", () => render(currentGroup));
-      render("all"); dialog.querySelector("[data-banner-search]").focus();
-    } catch (error) { if (dialog.open) dialog.querySelector(".facade-picker-loading").textContent = `${error.message}。请关闭后重试。`; }
-  }
 
   async function runFacadeProbe(button) {
     if (state.facadeApplying) return;
@@ -1470,8 +1358,10 @@
     const lol = chat.lol || {};
 	const actualID = Number(value.profile?.backgroundSkinId || 0);
 	const firstSkin = skins.find((skin) => Number(skin.id) === actualID) || {};
+	const explicitChampionID = Number(value.profile?.backgroundChampionId || 0);
+	const inferredChampionID = actualID > 0 ? Math.floor(actualID / 1000) : 0;
     state.facadeDraft = {
-      hero: String(firstSkin.championId || (actualID > 0 ? Math.floor(actualID / 1000) : skins[0]?.championId || "")), skinId: Number(firstSkin.id || value.profile?.backgroundSkinId || 0), ownedOnly: false,
+      hero: String(Number(firstSkin.championId || 0) || explicitChampionID || inferredChampionID || ""), skinId: Number(firstSkin.id || value.profile?.backgroundSkinId || 0), ownedOnly: false,
       iconId: Number(value.summoner?.profileIconId || 0), bannerId: String(value.bannerId || ""), rankBanner: value.rankBanner || "", bannerAccent: value.bannerAccent || "",
       availability: chat.availability || "chat", statusMessage: chat.statusMessage || "",
       queue: lol.rankedLeagueQueue || "RANKED_SOLO_5X5", tier: lol.rankedLeagueTier || "UNRANKED", division: lol.rankedLeagueDivision || "I",
@@ -1547,6 +1437,8 @@
     const summoner = value.summoner || {};
     const skins = Array.isArray(value.skins) ? value.skins : [];
     const champions = [...new Map(skins.map((skin) => [String(skin.championId), skin.championName || `英雄 ${skin.championId}`])).entries()].sort((left, right) => left[1].localeCompare(right[1], "zh-CN"));
+    if (draft.hero && !champions.some(([id]) => id === draft.hero)) champions.unshift([draft.hero, `英雄 ${draft.hero}`]);
+    champions.unshift(["", "请选择英雄"]);
     const visibleSkins = facadeVisibleSkins(skins, draft);
 
     const selectedSkin = skins.find((skin) => Number(skin.id) === Number(draft.skinId)) || {};
@@ -1565,8 +1457,8 @@
     const resetDirty = facadeResetDirty();
     roots.facade.className = "";
 	// `.facade-signature` 保留既有样式类名，但这里承载的是生涯头衔而不是个性签名。
-	const markup = `<div class="facade-layout"><div class="facade-left"><section class="suite-card facade-preview"><div class="facade-preview-art">${backgroundURL ? `<img data-queued-src="${backgroundURL}" alt="" data-suite-facade-art>` : ""}<span class="facade-art-label">当前背景 · ${escapeHTML(previewName)}</span></div><div class="facade-preview-body"><span class="facade-avatar">${summoner.profileIconId ? `<img data-queued-src="${imageURL(`/lol-game-data/assets/v1/profile-icons/${summoner.profileIconId}.jpg`)}" alt="">` : escapeHTML(displayName.slice(0, 1))}<small class="facade-avatar-level">${Number(summoner.summonerLevel || 0)}</small></span><div class="facade-identity"><h2>${escapeHTML(displayName)}</h2><p>${escapeHTML(tagLine || "当前账号")}</p></div><div class="facade-tags"><span class="suite-chip is-gold" data-facade-preview-rank>${escapeHTML(rankLabel(draft))}</span><span class="suite-chip" data-facade-preview-availability>${escapeHTML(availabilityLabels[draft.availability] || draft.availability)}</span><span class="suite-chip">上赛季旗帜</span></div><div class="facade-signature${titleFilled ? " is-filled" : ""}">${escapeHTML(title)}</div><div class="facade-slots">${facadeChallengeSlots(value)}</div></div></section><section class="suite-card facade-icon-card" ${value.connected ? "" : "hidden"}><div class="suite-card-head"><h3>头像</h3></div><div class="icon-current"><img class="icon-thumb" data-queued-src="${facadeIconImage({id:summoner.profileIconId})}" alt="当前头像"><div class="meta"><strong>生涯头像</strong><span>${Number(value.chat?.icon) > 0 && Number(value.chat.icon) !== Number(summoner.profileIconId) ? `聊天与好友栏另用头像 #${Number(value.chat.icon)}` : "名称与拼音搜索"}</span></div><button class="button button-secondary" type="button" data-facade-icons>选择头像</button></div></section>
-      <section class="suite-card facade-banner-card" ${value.connected ? "" : "hidden"}><div class="suite-card-head"><h3>旗帜</h3></div><div class="facade-stack-row"><h4>生涯旗帜</h4><p>点击更改生涯旗帜</p><div class="ctl"><button class="button button-secondary" type="button" data-facade-banners>选择旗帜</button></div></div><div class="facade-stack-row"><h4>段位旗</h4><p>保留当前头像框偏好</p><div class="ctl"><div class="suite-segment">${[["lastSeasonHighestRank", "上赛季段位"], ["blank", "空白"]].map(([key, label]) => `<button type="button" data-facade-rank-banner="${key}" aria-pressed="${value.rankBanner === key}" class="${value.rankBanner === key ? "is-active" : ""}">${label}</button>`).join("")}</div></div></div></section><section class="suite-card facade-write-card"><div class="suite-card-head"><div><h3>这一页会改什么</h3></div></div><dl class="facade-write-list"><dt>生涯背景</dt><dd>你生涯页顶部的那张大图</dd><dt>好友悬浮卡</dt><dd>别人点你头像时看到的在线状态、签名和段位</dd><dt>生涯页展示</dt><dd>头像框、挑战勋章、赛季旗帜、表情轮盘</dd></dl><div class="suite-note facade-write-note"><span aria-hidden="true">⚑</span><span>以上全部<strong>只在你点击后执行</strong>，没有任何自动写入。只有“登录时重设”两项例外，它们默认关闭，开启后也只重放你保存过的值。</span></div></section></div>
+	const markup = `<div class="facade-layout"><div class="facade-left"><section class="suite-card facade-preview"><div class="facade-preview-art">${backgroundURL ? `<img data-queued-src="${backgroundURL}" alt="" data-suite-facade-art>` : ""}<span class="facade-art-label">当前背景 · ${escapeHTML(previewName)}</span></div><div class="facade-preview-body"><span class="facade-avatar">${summoner.profileIconId ? `<img data-queued-src="${imageURL(`/lol-game-data/assets/v1/profile-icons/${summoner.profileIconId}.jpg`)}" alt="">` : escapeHTML(displayName.slice(0, 1))}<small class="facade-avatar-level">${Number(summoner.summonerLevel || 0)}</small></span><div class="facade-identity"><h2>${escapeHTML(displayName)}</h2><p>${escapeHTML(tagLine || "当前账号")}</p></div><div class="facade-tags"><span class="suite-chip is-gold" data-facade-preview-rank>${escapeHTML(rankLabel(draft))}</span><span class="suite-chip" data-facade-preview-availability>${escapeHTML(availabilityLabels[draft.availability] || draft.availability)}</span><span class="suite-chip">上赛季旗帜</span></div><div class="facade-signature${titleFilled ? " is-filled" : ""}">${escapeHTML(title)}</div><div class="facade-slots">${facadeChallengeSlots(value)}</div></div></section><section class="suite-card facade-icon-card" ${value.connected ? "" : "hidden"}><div class="suite-card-head"><h3>头像</h3></div><div class="icon-current"><img class="icon-thumb" data-queued-src="${facadeIconImage({id:summoner.profileIconId})}" alt="当前头像"><div class="meta"><strong>生涯头像</strong><span>${Number(value.chat?.icon) > 0 && Number(value.chat.icon) !== Number(summoner.profileIconId) ? `聊天与好友栏另用头像 #${Number(value.chat.icon)}` : "当前客户端生涯头像"}</span></div><button class="text-button" type="button" data-facade-browse="icons">在收藏页浏览头像与旗帜 →</button></div></section>
+      <section class="suite-card facade-banner-card" ${value.connected ? "" : "hidden"}><div class="suite-card-head"><h3>旗帜</h3></div><div class="facade-stack-row"><h4>生涯旗帜</h4><p>生涯旗帜只读浏览，目录与拥有状态在收藏页查看</p><div class="ctl"><button class="text-button" type="button" data-facade-browse="banners">在收藏页浏览头像与旗帜 →</button></div></div><div class="facade-stack-row"><h4>段位旗</h4><p>保留当前头像框偏好</p><div class="ctl"><div class="suite-segment">${[["lastSeasonHighestRank", "上赛季段位"], ["blank", "空白"]].map(([key, label]) => `<button type="button" data-facade-rank-banner="${key}" aria-pressed="${value.rankBanner === key}" class="${value.rankBanner === key ? "is-active" : ""}">${label}</button>`).join("")}</div></div></div></section><section class="suite-card facade-write-card"><div class="suite-card-head"><div><h3>这一页会改什么</h3></div></div><dl class="facade-write-list"><dt>生涯背景</dt><dd>你生涯页顶部的那张大图</dd><dt>好友悬浮卡</dt><dd>别人点你头像时看到的在线状态、签名和段位</dd><dt>生涯页展示</dt><dd>头像框、挑战勋章、赛季旗帜、表情轮盘</dd></dl><div class="suite-note facade-write-note"><span aria-hidden="true">⚑</span><span>以上全部<strong>只在你点击后执行</strong>，没有任何自动写入。只有“登录时重设”两项例外，它们默认关闭，开启后也只重放你保存过的值。</span></div></section></div>
       <div class="facade-controls"><section class="suite-card facade-background-card"><div class="suite-card-head"><div><h3>生涯背景</h3></div><span class="suite-chip" data-facade-background-applied ${backgroundApplied ? "" : "hidden"}>已应用</span><button class="button button-primary" type="button" data-facade-apply-background ${backgroundApplied ? "hidden" : ""} ${selectedSkin.id ? "" : "disabled"}>应用背景</button></div><div class="facade-selections"><label class="select-wrap"><span class="sr-only">英雄</span><select class="suite-select" data-facade-hero>${champions.map(([id, name]) => `<option value="${escapeHTML(id)}"${selected(draft.hero, id)}>${escapeHTML(name)}</option>`).join("")}</select></label><label class="suite-switch"><input type="checkbox" data-facade-owned${checked(draft.ownedOnly)}${value.skinOwnershipUnavailable ? ' disabled title="拥有状态尚未读取"' : ""}><span>只显示已拥有</span></label></div><div class="facade-film" aria-label="皮肤网格">${facadeFilmHTML(visibleSkins, draft)}</div><p class="facade-background-note">客户端接口<strong>不校验皮肤是否拥有</strong>——关掉上面的开关就能设置未拥有的皮肤，但它可能在下次登录时被服务端还原。</p></section>
 
 	  <section class="suite-card facade-chat-card"><div class="suite-card-head"><div><h3>聊天身份</h3></div></div><div class="facade-row"><div><h4>在线状态</h4><p>部分状态只在特定情况下可用；客户端只会在实际进入对局或观战时保留对应状态</p></div><div class="suite-segment">${Object.entries(availabilityLabels).map(([key, label]) => `<button type="button" class="${draft.availability === key ? "is-active" : ""}" data-facade-availability="${key}">${label}</button>`).join("")}</div></div><div class="facade-row"><div><h4>个性签名</h4><p>留空即删除签名。开启“登录时重设”后每次客户端登录都会重新应用</p></div><div class="facade-row-control"><input class="suite-input facade-status-input" type="text" maxlength="200" value="${escapeHTML(draft.statusMessage)}" placeholder="输入签名…" data-facade-status><label class="suite-switch facade-reset-switch" data-tooltip="登录时重设个性签名"><input type="checkbox" aria-label="登录时重设个性签名" data-facade-reset-status${checked(draft.resetStatus)}><span class="sr-only">登录时重设</span></label></div></div><div class="facade-row"><div><h4>展示段位</h4><p>只改好友悬浮卡上的段位显示，不影响你的真实段位、战绩与匹配。大师及以上不需要选分段</p></div><div class="facade-row-control"><div class="facade-rank-fields"><span class="select-wrap"><select class="suite-select" aria-label="展示段位队列" data-facade-rank="queue"><option value="RANKED_SOLO_5X5"${selected(draft.queue, "RANKED_SOLO_5X5")}>单双排</option><option value="RANKED_FLEX_SR"${selected(draft.queue, "RANKED_FLEX_SR")}>灵活组排</option></select></span><span class="select-wrap"><select class="suite-select" aria-label="展示段位" data-facade-rank="tier">${rankOptions(draft.tier)}</select></span><span class="select-wrap"><select class="suite-select" aria-label="展示分段" data-facade-rank="division" ${highTier ? "disabled" : ""}>${["I","II","III","IV"].map((division) => `<option value="${division}"${selected(draft.division, division)}>${division}</option>`).join("")}</select></span></div><label class="suite-switch facade-reset-switch" data-tooltip="登录时重设展示段位"><input type="checkbox" aria-label="登录时重设展示段位" data-facade-reset-rank${checked(draft.resetRank)}><span class="sr-only">登录时重设</span></label></div></div><div class="facade-commit" data-facade-commit ${identityDirty || resetDirty ? "" : "hidden"}><span>改动只在左侧预览，确认后才写入客户端。</span><div><button class="button button-secondary" type="button" data-facade-save-reset ${resetDirty ? "" : "hidden"}>保存登录重设</button><button class="button button-primary" type="button" data-facade-apply-chat ${identityDirty ? "" : "hidden"}>确认并应用</button></div></div></section>
@@ -1617,8 +1509,13 @@
   }
 
   function facadeBackgroundDirty() {
+    const value = state.facade || {};
     const draft = state.facadeDraft || {};
-    return Number(state.facade?.profile?.backgroundSkinId || 0) !== Number(draft.skinId || 0) || Boolean(draft.ownedOnly);
+    const skins = Array.isArray(value.skins) ? value.skins : [];
+    const actualID = Number(value.profile?.backgroundSkinId || 0);
+    const firstSkin = skins.find((skin) => Number(skin.id) === actualID) || {};
+    const actualHero = String(Number(firstSkin.championId || 0) || Number(value.profile?.backgroundChampionId || 0) || (actualID > 0 ? Math.floor(actualID / 1000) : 0) || "");
+    return actualID !== Number(draft.skinId || 0) || actualHero !== String(draft.hero || "") || Boolean(draft.ownedOnly);
   }
 
   function facadeDraftDirty() {
@@ -1712,8 +1609,7 @@
   }
 
   function bindFacadeControls() {
-    roots.facade.querySelector("[data-facade-banners]")?.addEventListener("click", event => openFacadeBannerPicker(event.currentTarget));
-    roots.facade.querySelector("[data-facade-icons]")?.addEventListener("click", event => openFacadeIconPicker(event.currentTarget));
+    for (const button of roots.facade.querySelectorAll("[data-facade-browse]")) button.addEventListener("click", () => window.deepLegendsOpenFacadeCollection?.(button.dataset.facadeBrowse));
     roots.facade.querySelector("[data-facade-probe]")?.addEventListener("click", event => runFacadeProbe(event.currentTarget));
     for (const button of roots.facade.querySelectorAll("[data-facade-rank-banner]")) button.addEventListener("click", () => applyFacade({ action: "rank-banner", rankBanner: button.dataset.facadeRankBanner }));
     roots.facade.querySelector("[data-facade-catalog-retry]")?.addEventListener("click", () => loadFacade(true, true, "manual"));
@@ -1736,7 +1632,7 @@
   }
 
   async function applyFacadeIdentity() {
-    if (state.facadeApplying) return;
+    if (state.facadeApplying) { toast("上一个生涯写入尚未完成，请稍候"); return false; }
     state.facadeApplying = true;
     state.facadeApplyError = "";
     state.facadeRequestToken = Number(state.facadeRequestToken || 0) + 1;
@@ -1762,7 +1658,7 @@
   }
 
   async function applyFacade(body, success = "生涯设置已应用") {
-    if (state.facadeApplying) return;
+    if (state.facadeApplying) { toast("上一个生涯写入尚未完成，请稍候"); return false; }
     state.facadeApplying = true;
     state.facadeApplyError = "";
     state.facadeRequestToken = Number(state.facadeRequestToken || 0) + 1;
@@ -1772,11 +1668,9 @@
 	  state.facadeLoadedAt = state.facade.skinsUnavailable ? 0 : Date.now();
       hydrateFacadeDraft(true);
       renderFacade();
-      const chatIconApplied = body.action === "icon" && state.facade.iconApplyScope === "chat" && Number(state.facade.chat?.icon) === Number(body.iconId);
-      const iconConfirmed = body.action !== "icon" || chatIconApplied || Number(state.facade.summoner?.profileIconId) === Number(body.iconId);
       const backgroundConfirmed = body.action !== "background" || (!state.facade.profileUnavailable && Number(state.facade.profile?.backgroundSkinId) === Number(body.skinId));
-      toast(chatIconApplied ? "已更换聊天与好友栏头像；生涯头像仍显示已拥有头像" : !iconConfirmed ? "头像请求已提交，但客户端尚未确认，请重新读取核对" : backgroundConfirmed ? success : "背景请求已提交，但客户端尚未确认所选背景，请重新读取核对");
-      return iconConfirmed && backgroundConfirmed;
+      toast(backgroundConfirmed ? success : "背景请求已提交，但客户端尚未确认所选背景，请重新读取核对");
+      return backgroundConfirmed;
     } catch (error) { state.facadeApplyError = error.message; toast(error.message); return false; }
     finally { state.facadeApplying = false; }
   }
@@ -1819,7 +1713,7 @@
 		displayName: String(summoner.displayName || ""), gameName: String(summoner.gameName || ""), tagLine: String(summoner.tagLine || ""),
 		profileIconId: Number(summoner.profileIconId || 0), summonerLevel: Number(summoner.summonerLevel || 0),
 	  },
-	  profile: { backgroundSkinId: Number(profile.backgroundSkinId || 0), backgroundSkinName: String(profile.backgroundSkinName || ""), backgroundPath: String(profile.backgroundPath || ""), backgroundType: String(profile.backgroundType || "") },
+	  profile: { backgroundSkinId: Number(profile.backgroundSkinId || 0), backgroundChampionId: Number(profile.backgroundChampionId || 0), backgroundSkinName: String(profile.backgroundSkinName || ""), backgroundPath: String(profile.backgroundPath || ""), backgroundType: String(profile.backgroundType || "") },
 	  chat: {
 		icon: Number(chat.icon || 0), availability: String(chat.availability || ""), statusMessage: String(chat.statusMessage || ""),
 		lol: {
@@ -2147,7 +2041,7 @@
   async function loadClaims(force = false) {
     if (state.claims && !force) { renderClaims(); return; }
     try {
-      state.claims = await api("/api/claim/scan");
+      state.claims = await api("/api/claim/scan", {}, 15000, "请求超时，可重新扫描后重试；本项失败不影响其它条目。");
       for (const item of state.claims.items || []) if (item.failure && !state.claimFailures.has(item.key)) state.claimFailures.set(item.key, item.failure);
       for (const key of [...state.selectedClaims]) if (!state.claims.items?.some((item) => item.key === key)) state.selectedClaims.delete(key);
       renderClaims();
@@ -2183,8 +2077,6 @@
   function handleLazySection(event) {
     state.active = event.detail?.name === "suite";
     if (!state.active) {
-      state.facadeIconDialog?.close();
-      state.facadeBannerDialog?.close();
       clearTimeout(state.facadeChallengeRetryTimer);
       state.facadeChallengeRetryTimer = 0;
       return;
@@ -2244,9 +2136,6 @@
 
   function disposeSuite() {
     state.destroyed = true;
-    state.facadeIconCatalog = null;
-    state.facadeIconDialog?.close();
-      state.facadeBannerDialog?.close();
     closeChampSelectDialog();
     state.facadeRequestToken = Number(state.facadeRequestToken || 0) + 1;
     state.facadeController?.abort();

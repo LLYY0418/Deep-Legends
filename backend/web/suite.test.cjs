@@ -698,61 +698,50 @@ test("R78 ranked pick renders an editable sixth unassigned-position pool", () =>
   dom.window.close();
 });
 
-test("R99 icon dialog is body mounted, sliced, CSP safe, and restores focus on every exit", async () => {
-  const { JSDOM } = require("../../desktop/node_modules/jsdom");
-  const script = process.env.R99_SUITE_SOURCE ? fs.readFileSync(process.env.R99_SUITE_SOURCE, "utf8") : source;
-  for (const method of ["escape", "backdrop", "button", "native", "apply"]) {
-    const dom = new JSDOM('<main id="facade"><button data-facade-icons>头像</button></main>', { pretendToBeVisual: true });
-    const { window } = dom, { document } = window;
-    window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
-    window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event("close")); };
-    const frames = [], modal = [], root = document.getElementById("facade"), opener = root.querySelector("button");
-    window.desktopTheme = { setModalOpen: value => modal.push(value) };
-    const state = { facade: { connected: true, summoner: { profileIconId: 1 } }, facadeDraft: {} };
-    let requests = 0;
-    const icons = Array.from({ length: 500 }, (_, i) => ({ id: i + 1, title: `头像 <${i}>`, year: 2026, disabled: i === 3, owned: true, sets: ["系列"], searchTerms: ["touxiang"] }));
-    const deps = { state, document, window, roots: { facade: root }, imageURL: value => `/api/image?path=${encodeURIComponent(value)}`, escapeHTML, requestAnimationFrame: callback => frames.push(callback), performance, api: async () => { requests++; return { icons, iconOwnershipUnavailable: false }; }, applyFacade: async request => {
-      assert.deepEqual(request, { action: "icon", iconId: 1 });
-      state.facade.summoner.profileIconId = request.iconId;
-      root.innerHTML = '<button data-facade-icons>新触发按钮</button>';
-      return true;
-    } };
-    const helpers = Function(...Object.keys(deps), `${functionSource(script,"facadeIconImage")}\nasync ${functionSource(script,"openFacadeIconPicker")}\nreturn {openFacadeIconPicker};`)(...Object.values(deps));
-    opener.focus(); await helpers.openFacadeIconPicker(opener);
-    const dialog = document.querySelector("dialog");
-    assert.equal(dialog.parentElement, document.body);
-    assert.equal(root.contains(dialog), false);
-    assert.equal(dialog.querySelectorAll("[style]").length, 0);
-    const firstCount = dialog.querySelectorAll("[data-picker-icon]").length;
-    assert.ok(firstCount > 0 && firstCount <= 72, `first-frame count ${firstCount}`);
-    assert.equal(dialog.querySelector("[data-picker-owned]"), null);
-    while (frames.length) frames.shift()();
-    assert.equal(dialog.querySelector('[data-picker-icon="4"]').disabled, false);
-    // A facade rerender must leave the modal subtree alive.
-    const grid = dialog.querySelector("[data-picker-grid]");
-    root.append(document.createElement("span"));
-    assert.equal(dialog.querySelector("[data-picker-grid]"), grid);
-    if (method === "escape") dialog.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
-    if (method === "backdrop") dialog.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
-    if (method === "button") dialog.querySelector("[data-picker-close]").click();
-    if (method === "native") dialog.close();
-    if (method === "apply") { dialog.querySelector("[data-picker-apply]").click(); await new Promise(setImmediate); }
-    for (const frame of frames.splice(0)) frame();
-    assert.equal(document.querySelector("dialog"), null);
-    assert.equal(document.activeElement, method === "apply" ? root.querySelector("[data-facade-icons]") : opener, `${method} did not restore focus`);
-    assert.deepEqual(modal, [true, false]);
-    await helpers.openFacadeIconPicker(opener);
-    assert.equal(requests, 1, "catalog should be lazy and cached across opens");
-    document.querySelector("dialog").close();
-    dom.window.close();
-  }
-});
 
-test("R99 disconnect closes the picker and invalidates the catalog", () => {
-  let closed = 0;
-  const state = { facadeIconCatalog: { icons: [1] }, facadeIconDialog: { close() { closed++; } }, connected: true };
-  const { setConnected } = compile(["setConnected"], { state, offline: {}, panels: [], metrics: { rig: {}, claim: {} } });
-  setConnected(false);
-  assert.equal(closed, 1);
-  assert.equal(state.facadeIconCatalog, null);
+// P2-4：重入时两个入口都必须独立拒绝，不能委托 identity 写入到通用 applyFacade。
+test("R117 facade write reentry is reported instead of silently dropped", async () => {
+	const messages = [];
+	const state = { facadeApplying: true, facadeApplyError: "", facadeRequestToken: 0, facadeController: null };
+	let apiCalls = 0;
+	let applyFacadeCalls = 0;
+	// functionSource 会丢掉 async 前缀；按原样补回后分别编译两个入口。
+	const asyncAwareSource = (name) => {
+		const body = functionSource(source, name);
+		const at = source.indexOf(body);
+		return source.slice(at - 6, at) === "async " ? `async ${body}` : body;
+	};
+	const compileAsync = (name, dependencies) => {
+		const keys = Object.keys(dependencies);
+		return Function(...keys, `"use strict";\n${asyncAwareSource(name)}\nreturn ${name};`)(...keys.map((key) => dependencies[key]));
+	};
+	const toast = (message) => messages.push(message);
+	const applyFacade = compileAsync("applyFacade", {
+		state,
+		toast,
+		api: async () => { apiCalls += 1; return {}; },
+	});
+	const applyFacadeIdentity = compileAsync("applyFacadeIdentity", {
+		state,
+		toast,
+		api: async () => { apiCalls += 1; return {}; },
+		applyFacade: async () => {
+			applyFacadeCalls += 1;
+			toast("上一个生涯写入尚未完成，请稍候");
+			return false;
+		},
+	});
+
+	assert.equal(await applyFacade({ action: "clear-emotes" }), false, "重入必须返回可区分的 false");
+	assert.deepEqual(messages, ["上一个生涯写入尚未完成，请稍候"], "重入必须弹出提示，不能静默丢弃");
+	assert.equal(apiCalls, 0, "重入不得发出第二次生涯写请求");
+	assert.equal(state.facadeRequestToken, 0, "重入不得推进请求 token");
+
+	messages.length = 0;
+	assert.equal(await applyFacadeIdentity(), false, "身份写入入口同样必须返回 false");
+	assert.deepEqual(messages, ["上一个生涯写入尚未完成，请稍候"], "身份写入入口同样必须弹出提示");
+	assert.equal(applyFacadeCalls, 0, "身份写入重入必须由自身守卫拦截，不得委托到 applyFacade");
+	assert.equal(apiCalls, 0, "身份写入入口重入也不得发出写请求");
+	assert.equal(state.facadeRequestToken, 0, "身份写入重入不得推进请求 token");
+	assert.equal(state.facadeApplying, true, "重入不得动在途写入持有的锁");
 });

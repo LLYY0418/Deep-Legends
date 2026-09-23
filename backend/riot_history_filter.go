@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 func riotOverviewFilter(filters []string) string {
@@ -23,6 +24,15 @@ func riotOverviewPagination(start, loaded, requested int, filter string) gamepla
 // Ask Match v5 for IDs in the requested queues, never download unrelated
 // matches to discover whether a mode has any history. Each queue prefix is
 // cached by matchIDsFiltered; only the final page's details are downloaded.
+// KR match IDs share a monotonically increasing platform game ID, allowing
+// multiple queue streams to merge before fetching any match payloads.
+const riotOverviewMaxIDRequests = 12
+
+// riotOverviewMaxConcurrentIDRequests 限制一次分模式查询同时在途的 Riot ID 请求数。
+// 具名而不是字面量：并发上界是工单 P1-1 的验收对象，测试要能直接引用同一个常量，
+// 否则把容量改大（等于去掉限流）不会有任何测试察觉。
+const riotOverviewMaxConcurrentIDRequests = 4
+
 // KR match IDs share a monotonically increasing platform game ID, allowing
 // multiple queue streams to merge before fetching any match payloads.
 func (p *riotProvider) matchIDsForOverview(ctx context.Context, puuid string, start, count int, filter string) ([]string, error) {
@@ -44,19 +54,62 @@ func (p *riotProvider) matchIDsForOverview(ctx context.Context, puuid string, st
 		return p.matchIDsFiltered(ctx, puuid, start, count, queues[0], "")
 	}
 	ids := make(map[string]struct{})
+	workerCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var requestMu sync.Mutex
+	issued := 0
+	var idsMu sync.Mutex
+	var firstErr error
+	var errOnce sync.Once
+	semaphore := make(chan struct{}, riotOverviewMaxConcurrentIDRequests)
+	var workers sync.WaitGroup
 	for _, queue := range queues {
-		for offset := 0; offset < start+count; offset += 100 {
-			page, err := p.matchIDsFiltered(ctx, puuid, offset, 100, queue, "")
-			if err != nil {
-				return nil, err
+		queue := queue
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for offset := 0; offset < start+count; offset += 100 {
+				if workerCtx.Err() != nil {
+					return
+				}
+				requestMu.Lock()
+				if issued >= riotOverviewMaxIDRequests {
+					requestMu.Unlock()
+					return
+				}
+				issued++
+				requestMu.Unlock()
+				select {
+				case semaphore <- struct{}{}:
+				case <-workerCtx.Done():
+					return
+				}
+				page, err := p.matchIDsFiltered(workerCtx, puuid, offset, 100, queue, "")
+				<-semaphore
+				if err != nil {
+					errOnce.Do(func() {
+						firstErr = err
+						cancel()
+					})
+					return
+				}
+				idsMu.Lock()
+				for _, id := range page {
+					ids[id] = struct{}{}
+				}
+				idsMu.Unlock()
+				if len(page) < 100 {
+					return
+				}
 			}
-			for _, id := range page {
-				ids[id] = struct{}{}
-			}
-			if len(page) < 100 {
-				break
-			}
-		}
+		}()
+	}
+	workers.Wait()
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	merged := make([]string, 0, len(ids))
 	for id := range ids {

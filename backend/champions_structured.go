@@ -1174,15 +1174,23 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 		qq101Ctx, cancel := context.WithDeadline(ctx, qq101Deadline)
 		cancelQQ101 = cancel
 		defer cancel()
-		qq101PositionsC = make(chan qq101PositionsResult, 1)
+		// P2-1（R120）：闭包必须捕获局部通道变量。原来两个 goroutine 直接引用外层的
+		// qq101PositionsC / qq101BuildC，而父协程收完结果或预算超时后会把这两个变量
+		// 置为 nil（见下面 select 的 timer.C 分支），后果有两层：① `-race` 报置空处与
+		// 发送处的数据竞争；② 晚到的 goroutine 读到 nil 通道，向 nil 通道发送会永久
+		// 阻塞，goroutine 泄漏且结果丢失。这里先建好带缓冲（cap 1）的局部通道再启动，
+		// 发送永远不需要接收方在场；父侧的置空只作用于它自己的等待状态，两边不共享变量。
+		positionsCh := make(chan qq101PositionsResult, 1)
+		buildCh := make(chan qq101BuildResult, 1)
+		qq101PositionsC = positionsCh
+		qq101BuildC = buildCh
 		go func() {
 			positions, patch, loadErr := p.loadQQ101Positions(qq101Ctx, id, tier)
-			qq101PositionsC <- qq101PositionsResult{positions: positions, patch: patch, err: loadErr}
+			positionsCh <- qq101PositionsResult{positions: positions, patch: patch, err: loadErr}
 		}()
-		qq101BuildC = make(chan qq101BuildResult, 1)
 		go func() {
 			depths, patch, loadErr := p.loadQQ101BuildRows(qq101Ctx, id, tier, position)
-			qq101BuildC <- qq101BuildResult{depths: depths, patch: patch, err: loadErr}
+			buildCh <- qq101BuildResult{depths: depths, patch: patch, err: loadErr}
 		}()
 	}
 	spec, requestPath, query, err := opggDetailRequest(mode, id, position, tier)
@@ -1211,8 +1219,8 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 	}
 	stats := payload.Data.Summary.AverageStats
 	response.Stats = championDetailStats{
-		WinRate:  firstPositive(ratePercent(stats.WinRate), percentOf(stats.Win, stats.Play)),
-		PickRate: ratePercent(stats.PickRate), BanRate: ratePercent(stats.BanRate),
+		WinRate:  firstPositive(fractionToPercent(stats.WinRate), percentOf(stats.Win, stats.Play)),
+		PickRate: fractionToPercent(stats.PickRate), BanRate: fractionToPercent(stats.BanRate),
 	}
 	if spec.PositionMode == opggPositionRequired {
 		response.Positions = make([]championPositionOption, 0, len(payload.Data.Summary.Positions))
@@ -1223,15 +1231,15 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 				continue
 			}
 			tierValue, rankValue := opggTierRank(raw.Stats)
-			roleRate := ratePercent(raw.Stats.RoleRate)
+			roleRate := fractionToPercent(raw.Stats.RoleRate)
 			if roleRate == 0 && raw.Stats.Play > 0 && payload.Data.Summary.AverageStats.Play > 0 {
 				roleRate = percentOf(raw.Stats.Play, payload.Data.Summary.AverageStats.Play)
 			}
 			response.Positions = append(response.Positions, championPositionOption{
 				Position: positionName,
-				WinRate:  ratePercent(raw.Stats.WinRate),
-				PickRate: ratePercent(raw.Stats.PickRate),
-				BanRate:  ratePercent(raw.Stats.BanRate),
+				WinRate:  fractionToPercent(raw.Stats.WinRate),
+				PickRate: fractionToPercent(raw.Stats.PickRate),
+				BanRate:  fractionToPercent(raw.Stats.BanRate),
 				RoleRate: roleRate,
 				Play:     raw.Stats.Play,
 				Tier:     tierValue,
@@ -1349,7 +1357,7 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 			Tier: stats.Tier, Rank: firstPositiveInt(stats.TierData.Rank, stats.Rank), RankPrevPatch: stats.TierData.RankPrevPatch,
 			Games: stats.Play, KDA: stats.KDA,
 			AveragePlacement: arenaAverage(float64(stats.TotalPlace), stats.Play), FirstPlaceRate: percentOf(stats.FirstPlace, stats.Play),
-			PickRate: ratePercent(stats.PickRate), WinRate: percentOf(stats.Win, stats.Play), BanRate: ratePercent(stats.BanRate),
+			PickRate: fractionToPercent(stats.PickRate), WinRate: percentOf(stats.Win, stats.Play), BanRate: fractionToPercent(stats.BanRate),
 		}
 		response.ArenaAugmentGroups = p.structuredArenaAugmentGroups(ctx, payload.Data.AugmentGroup)
 		applyLocalArenaAugmentGrades(response.ArenaAugmentGroups)
@@ -1416,7 +1424,7 @@ func (p *championProvider) structuredMetricCandidate(value opggMetric, assetKind
 		return structuredMetricCandidate{}, false
 	}
 	return structuredMetricCandidate{row: championMetricRow{
-		Assets: assets, PickRate: ratePercent(value.PickRate), WinRate: firstPositive(ratePercent(value.WinRate), percentOf(value.Win, value.Play)), Games: value.Play,
+		Assets: assets, PickRate: fractionToPercent(value.PickRate), WinRate: firstPositive(fractionToPercent(value.WinRate), percentOf(value.Win, value.Play)), Games: value.Play,
 		AveragePlacement: arenaAverage(float64(value.TotalPlace), value.Play), FirstPlaceRate: percentOf(value.FirstPlace, value.Play),
 	}, games: value.Play}, true
 }
@@ -1573,7 +1581,7 @@ func (p *championProvider) structuredSkills(values []opggSkillMetric) []champion
 		}
 		if len(priority) > 0 {
 			result = append(result, championMetricRow{
-				Assets: assets, SkillPriority: priority, SkillOrder: order, PickRate: ratePercent(pick), WinRate: percentOf(win, play), Games: play,
+				Assets: assets, SkillPriority: priority, SkillOrder: order, PickRate: fractionToPercent(pick), WinRate: percentOf(win, play), Games: play,
 				AveragePlacement: arenaAverage(float64(value.TotalPlace), value.Play), FirstPlaceRate: percentOf(value.FirstPlace, value.Play),
 			})
 		}
@@ -1675,7 +1683,7 @@ func (p *championProvider) structuredRunes(ctx context.Context, values []opggRun
 		if !okPrimary || !okSecondary {
 			continue
 		}
-		page := championRunePage{PrimaryStyle: runeStyleAsset(primary), SubStyle: runeStyleAsset(secondary), PickRate: ratePercent(value.PickRate), WinRate: percentOf(value.Win, value.Play), Games: value.Play}
+		page := championRunePage{PrimaryStyle: runeStyleAsset(primary), SubStyle: runeStyleAsset(secondary), PickRate: fractionToPercent(value.PickRate), WinRate: percentOf(value.Win, value.Play), Games: value.Play}
 		page.PrimarySlots = runeStyleSlots(primary, selected, &page.Selected)
 		// 副系不显示基石行：游戏中副系只能选两个小符文。
 		if subSlots := runeStyleSlots(secondary, selected, &page.Selected); len(subSlots) > 1 {
@@ -2408,7 +2416,7 @@ func arenaAugmentGroups(groups []opggArenaAugmentGroup, catalog []gameplayAugmen
 				rarity = normalizeAugmentRarity(rarityCode)
 			}
 			rows = append(rows, championMetricRow{
-				Assets: []championAsset{asset}, Rarity: rarity, PickRate: ratePercent(item.PickRate), WinRate: firstPositive(ratePercent(item.WinRate), percentOf(item.Win, item.Play)), Games: item.Play,
+				Assets: []championAsset{asset}, Rarity: rarity, PickRate: fractionToPercent(item.PickRate), WinRate: firstPositive(fractionToPercent(item.WinRate), percentOf(item.Win, item.Play)), Games: item.Play,
 				AveragePlacement: arenaAverage(float64(item.TotalPlace), item.Play), FirstPlaceRate: percentOf(item.FirstPlace, item.Play),
 			})
 		}
@@ -2496,7 +2504,7 @@ func (p *championProvider) structuredSynergies(subjectID int, values []opggSyner
 		if subject.ID == 0 || mate.ID == 0 || value.Play <= 0 {
 			continue
 		}
-		result = append(result, arenaTeamComposition{Champions: []arenaTeamChampion{arenaTeamChampionFromMeta(subject), arenaTeamChampionFromMeta(mate)}, AveragePlacement: arenaAverage(float64(value.TotalPlace), value.Play), FirstPlaceRate: percentOf(value.FirstPlace, value.Play), PickRate: ratePercent(value.PickRate), WinRate: percentOf(value.Win, value.Play), Games: value.Play})
+		result = append(result, arenaTeamComposition{Champions: []arenaTeamChampion{arenaTeamChampionFromMeta(subject), arenaTeamChampionFromMeta(mate)}, AveragePlacement: arenaAverage(float64(value.TotalPlace), value.Play), FirstPlaceRate: percentOf(value.FirstPlace, value.Play), PickRate: fractionToPercent(value.PickRate), WinRate: percentOf(value.Win, value.Play), Games: value.Play})
 		if len(result) == 10 {
 			break
 		}

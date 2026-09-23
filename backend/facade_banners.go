@@ -3,10 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -75,118 +73,13 @@ func (a *app) handleFacadeBanners(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	respondJSON(w, map[string]any{"banners": banners, "bannerOwnershipUnavailable": unknown, "writeSupported": true, "writeStatus": "supported"})
+	respondJSON(w, map[string]any{"banners": banners, "bannerOwnershipUnavailable": unknown})
 }
 
-// The client profile editor passes selectedBannerId (regalia.id) as bannerAccent.
+// R123：生涯旗帜写入已退场，目录与拥有状态仅只读浏览；客户端编辑器的 bannerAccent 写入路径不再使用。
 // idSecondary is the rank tier for built-in rank banners, not a cosmetic ID.
 // REGALIA_BANNER_SLOT accepts PATCH but is not the career banner's source.
 const facadeChallengeSummaryPath = "/lol-challenges/v1/summary-player-data/local-player"
-const facadeChallengePreferencesPath = "/lol-challenges/v1/update-player-preferences/"
-
-func writeFacadeBanner(ctx context.Context, client *LCUClient, target string) error {
-	var catalog []facadeRegalia
-	if err := client.RequestJSON(ctx, http.MethodGet, "/lol-game-data/assets/v1/regalia.json", nil, &catalog); err != nil {
-		return err
-	}
-	accent := ""
-	for _, item := range catalog {
-		if item.ID == target && item.Type == "kBanner" && item.Selectable && item.ID != "1" && item.ID != "2" {
-			accent = item.ID
-			break
-		}
-	}
-	if accent == "" {
-		return errFacadeInvalid
-	}
-	preferences, err := facadeBannerPreferences(ctx, client)
-	if err != nil {
-		return err
-	}
-	preferences["bannerAccent"] = accent
-	return writeFacadeBannerPreferences(ctx, client, preferences)
-}
-
-// Snapshot exactly the preferences used by the client editor so changing the
-// banner cannot clear tokens, title, or crest. Probes retain this for restore.
-func facadeBannerPreferences(ctx context.Context, client *LCUClient) (map[string]any, error) {
-	var summary map[string]any
-	if err := client.RequestJSON(ctx, http.MethodGet, facadeChallengeSummaryPath, nil, &summary); err != nil {
-		return nil, err
-	}
-	accent, present := summary["bannerId"]
-	if !present {
-		return nil, errors.New("客户端尚未提供当前旗帜状态，已停止写入")
-	}
-	body := map[string]any{"bannerAccent": accent}
-	var ids []any
-	if selected, valid := facadeSelectedChallengeIDs(summary); valid {
-		for _, id := range selected {
-			value, _ := strconv.ParseInt(id, 10, 64)
-			ids = append(ids, value)
-		}
-	} else if top, ok := summary["topChallenges"].([]any); ok {
-		for _, item := range top {
-			if item == nil {
-				ids = append(ids, int64(-1))
-				continue
-			}
-			id := facadeChallengeID(anyMap(item)["id"])
-			if id == "" {
-				return nil, errors.New("客户端挑战展示数据格式无效，已停止写入")
-			}
-			value, _ := strconv.ParseInt(id, 10, 64)
-			ids = append(ids, value)
-		}
-	} else {
-		return nil, errors.New("客户端挑战展示数据格式无效，已停止写入")
-	}
-	if len(ids) > 0 {
-		for len(ids) < 3 {
-			ids = append(ids, int64(-1))
-		}
-		body["challengeIds"] = ids
-	}
-	if id, ok := facadeTitleItemID(summary); ok {
-		body["title"] = strconv.FormatInt(id, 10)
-	} else if facadeSummaryHasTitle(summary) {
-		return nil, &facadeTitleRestoreNoCandidateError{}
-	}
-	if value, ok := summary["crestId"]; ok {
-		body["crestBorder"] = value
-	}
-	if value, ok := summary["prestigeCrestBorderLevel"]; ok {
-		body["prestigeCrestBorderLevel"] = value
-	}
-	return body, nil
-}
-
-func writeFacadeBannerPreferences(ctx context.Context, client *LCUClient, body map[string]any) error {
-	_, err := writeFacadeBannerPreferencesResult(ctx, client, body)
-	return err
-}
-
-func writeFacadeBannerPreferencesResult(ctx context.Context, client *LCUClient, body map[string]any) (int, error) {
-	status, err := r99Request(ctx, client, http.MethodPost, facadeChallengePreferencesPath, body, nil)
-	if err != nil {
-		return status, err
-	}
-	expected := facadeBannerIdentity(body["bannerAccent"])
-	for attempt := 0; attempt <= 10; attempt++ {
-		var observed map[string]any
-		err := client.RequestJSON(ctx, http.MethodGet, facadeChallengeSummaryPath, nil, &observed)
-		value, present := observed["bannerId"]
-		if err == nil && present && facadeBannerIdentity(value) == expected {
-			return status, nil
-		}
-		if attempt < 10 {
-			if err := waitRiotDelay(ctx, 200*time.Millisecond); err != nil {
-				return status, err
-			}
-		}
-	}
-	return status, errors.New("客户端尚未确认装备所选旗帜，已保留实际装备状态；接口返回成功不代表装备已生效")
-}
 
 func facadeBannerIdentity(value any) string {
 	raw, _ := json.Marshal(value)

@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"embed"
 	"encoding/hex"
 	"encoding/json"
@@ -97,6 +98,7 @@ type app struct {
 	masteries                       map[int64]ChampionMastery
 	masteryCapability               EndpointCapability
 	allSkins                        []Skin
+	allSkinsWithBase                []Skin
 	chromas                         []Chroma
 	chromaState                     EndpointCapability
 	owned                           []Skin
@@ -128,6 +130,10 @@ type app struct {
 	assetCacheGeneration            uint64
 	assetFlights                    map[string]*assetFlight
 	assetFailureUntil               map[string]time.Time
+	assetHostTimeouts               map[string]int
+	assetHostBackoffUntil           map[string]time.Time
+	matchTierCacheOnce              sync.Once
+	matchTierCache                  *championDataCache
 	mediaSlots                      chan struct{}
 	collectionRefreshPending        bool
 	refreshRequests                 chan struct{}
@@ -250,6 +256,8 @@ type app struct {
 	facadeChallengeCatalogMu            sync.Mutex
 	facadeChallengeCatalogClient        *LCUClient
 	facadeChallengeCatalogAttempted     bool
+	facadeChallengeCatalogBackoffUntil  time.Time
+	facadeChallengeCatalogFlight        chan struct{}
 	facadeChallengeCatalog              map[string]facadeChallenge
 	facadeChallengeCatalogRaw           json.RawMessage
 	facadeChallengeCatalogErr           error
@@ -404,31 +412,33 @@ func main() {
 		}()
 	}
 	a := &app{
-		token:               token,
-		startedAt:           time.Now(),
-		poolTotal:           len(builtInPool.Names),
-		poolSource:          builtInPool.Source,
-		poolVersion:         builtInPool.Version,
-		poolID:              builtInPool.ID,
-		poolHash:            builtInPool.Hash,
-		pools:               pools,
-		storage:             store,
-		assetCache:          make(map[string][]byte),
-		assetFlights:        make(map[string]*assetFlight),
-		assetFailureUntil:   make(map[string]time.Time),
-		mediaSlots:          make(chan struct{}, 2),
-		connectionState:     "connecting",
-		refreshRequests:     make(chan struct{}, 1),
-		eventSubscribers:    make(map[chan string]struct{}),
-		gameplayRefs:        make(map[string]string),
-		gameplayRefDetails:  make(map[string]gameplayReference),
-		gameplayRefOrder:    list.New(),
-		gameplayRefEntries:  make(map[string]*list.Element),
-		perkCatalog:         make(map[string]gameplayPerkCatalogCacheEntry),
-		riotClientDiscovery: discoverRiotClient,
-		champions:           championProvider,
-		riot:                newRiotProvider(championProvider),
-		sgp:                 newSGPProvider(),
+		token:                 token,
+		startedAt:             time.Now(),
+		poolTotal:             len(builtInPool.Names),
+		poolSource:            builtInPool.Source,
+		poolVersion:           builtInPool.Version,
+		poolID:                builtInPool.ID,
+		poolHash:              builtInPool.Hash,
+		pools:                 pools,
+		storage:               store,
+		assetCache:            make(map[string][]byte),
+		assetFlights:          make(map[string]*assetFlight),
+		assetFailureUntil:     make(map[string]time.Time),
+		assetHostTimeouts:     make(map[string]int),
+		assetHostBackoffUntil: make(map[string]time.Time),
+		mediaSlots:            make(chan struct{}, 2),
+		connectionState:       "connecting",
+		refreshRequests:       make(chan struct{}, 1),
+		eventSubscribers:      make(map[chan string]struct{}),
+		gameplayRefs:          make(map[string]string),
+		gameplayRefDetails:    make(map[string]gameplayReference),
+		gameplayRefOrder:      list.New(),
+		gameplayRefEntries:    make(map[string]*list.Element),
+		perkCatalog:           make(map[string]gameplayPerkCatalogCacheEntry),
+		riotClientDiscovery:   discoverRiotClient,
+		champions:             championProvider,
+		riot:                  newRiotProvider(championProvider),
+		sgp:                   newSGPProvider(),
 	}
 	if store != nil {
 		store.onDiagnosticRotation = a.resetDiagnosticDeduplication
@@ -502,6 +512,8 @@ func main() {
 	mux.HandleFunc("POST /api/gameplay/overview", a.authorized(a.handleGameplayOverview))
 	mux.HandleFunc("GET /api/gameplay/live", a.authorized(a.handleGameplayLive))
 	mux.HandleFunc("GET /api/gameplay/mayhem-rating", a.authorized(a.handleGameplayMayhemRating))
+	// R116-E P2-6：本人海克斯大乱斗「选了某个海克斯之后通常出什么」静态查询。
+	mux.HandleFunc("GET /api/gameplay/season-mayhem-builds", a.authorized(a.handleGameplaySeasonMayhemBuilds))
 	mux.HandleFunc("GET /api/gameplay/recommendations", a.authorized(a.handleGameplayRecommendations))
 	mux.HandleFunc("GET /api/gameplay/specialist-runes", a.authorized(a.handleGameplaySpecialistRunes))
 	mux.HandleFunc("GET /api/gameplay/pro-runes", a.authorized(a.handleGameplayProRunes))
@@ -937,7 +949,15 @@ func (a *app) handleImage(w http.ResponseWriter, r *http.Request) {
 		// _large.png 全彩大图只存在于游戏侧 (/latest/game/assets/…)，连着
 		// 客户端时逐个 404。回落到 CommunityDragon 才能拿到大图，否则前端
 		// 只能退化成品质色实心块。
-		a.serveCommunityDragonImage(w, r, assetPath)
+		served := a.serveCommunityDragonImage(w, r, assetPath)
+		// R127 P1-a.4：只有增强符文图标会落这条日志（augmentIconPathTemplate 只认
+		// augments/icons 路径）。带上 LCU 的真实状态，才能判断本机到底有没有这张
+		// 图、出网是不是必要；以前这里完全没有痕迹，只能看到一堆 8 秒超时。
+		status := http.StatusNotFound
+		if served {
+			status = http.StatusOK
+		}
+		a.champions.reportAugmentIconFetch(assetPath, status, -1, true, lcuFailureStatus(err))
 		return
 	}
 	contentType := http.DetectContentType(data)
@@ -948,31 +968,49 @@ func (a *app) handleImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not an image", http.StatusUnsupportedMediaType)
 		return
 	}
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Cache-Control", "private, max-age=3600")
-	_, _ = w.Write(data)
+	writeImageResponse(w, r, data, contentType, "private, max-age=3600")
 }
 
-func (a *app) serveCommunityDragonImage(w http.ResponseWriter, r *http.Request, assetPath string) {
+// serveCommunityDragonImage 用 CommunityDragon 兜底本机客户端没有的资源，并返回
+// 是否真的写出了图片（R127 P1-a.4 需要据此上报最终状态）。
+func (a *app) serveCommunityDragonImage(w http.ResponseWriter, r *http.Request, assetPath string) bool {
 	remotePaths := communityDragonImagePaths(assetPath)
 	if len(remotePaths) == 0 || a.champions == nil {
 		http.NotFound(w, r)
-		return
+		return false
 	}
-	var data []byte
-	for _, remotePath := range remotePaths {
-		loaded, err := a.loadCommunityDragonAsset(r.Context(), remotePath)
-		if err == nil && strings.HasPrefix(http.DetectContentType(loaded), "image/") {
-			data = loaded
-			break
+	// 「该 assetPath 全部候选均失败」单独记一条负缓存，键用 assetPath 而不是
+	// remotePath：否则每次请求都要把整组扇出重放一遍。maxEntrySize=0 表示成功
+	// 结果仍只由 cdragon:<remotePath> 那层持有，这里不重复占用缓存预算。
+	// 这一层是「该 assetPath 的全部候选都失败」的聚合结论，不按主机归因：每个
+	// 候选在 loadCommunityDragonAsset 里已经各自归因过主机超时了。若这里也走
+	// loadAssetFromHost，聚合错误会把内层刚建立的主机退避立刻抹掉（R127 复审）。
+	data, err := a.loadAsset(r.Context(), "cdragon-resolved:"+assetPath, 0, communityImageResolveNegativeTTL, func(ctx context.Context) ([]byte, error) {
+		for _, remotePath := range remotePaths {
+			loaded, loadErr := a.loadCommunityDragonAsset(ctx, remotePath)
+			if loadErr == nil && strings.HasPrefix(http.DetectContentType(loaded), "image/") {
+				return loaded, nil
+			}
 		}
-	}
-	if len(data) == 0 {
+		return nil, errCommunityImageCandidatesExhausted
+	})
+	if err != nil || len(data) == 0 {
 		http.NotFound(w, r)
+		return false
+	}
+	writeImageResponse(w, r, data, http.DetectContentType(data), "private, max-age=86400")
+	return true
+}
+
+func writeImageResponse(w http.ResponseWriter, r *http.Request, data []byte, contentType, cacheControl string) {
+	etag := fmt.Sprintf(`"%x"`, sha256.Sum256(data))
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", cacheControl)
+	w.Header().Set("ETag", etag)
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
 		return
 	}
-	w.Header().Set("Content-Type", http.DetectContentType(data))
-	w.Header().Set("Cache-Control", "private, max-age=86400")
 	_, _ = w.Write(data)
 }
 
@@ -1244,6 +1282,7 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 	a.masteries = result.Masteries
 	a.masteryCapability = result.MasteryCapability
 	a.allSkins = result.All
+	a.allSkinsWithBase = result.AllWithBase
 	a.chromas = append([]Chroma(nil), result.Chromas...)
 	a.chromaState = result.ChromaState
 	a.owned = result.Owned
@@ -1334,6 +1373,7 @@ func (a *app) clearSnapshotLocked(message string) {
 	a.masteries = nil
 	a.masteryCapability = EndpointCapability{}
 	a.allSkins = nil
+	a.allSkinsWithBase = nil
 	a.chromas = nil
 	a.chromaState = EndpointCapability{}
 	a.owned = nil
@@ -1371,6 +1411,7 @@ func (a *app) retainClientAfterSnapshotErrorLocked(client *LCUClient, result Sna
 		a.account.Profile = result.Account.Profile
 	}
 	a.allSkins = nil
+	a.allSkinsWithBase = nil
 	a.chromas = nil
 	a.chromaState = result.ChromaState
 	a.owned = nil
@@ -1401,6 +1442,8 @@ func (a *app) clearAssetCache() {
 	a.assetCacheBytes = 0
 	a.assetCacheGeneration++
 	a.assetFailureUntil = make(map[string]time.Time)
+	a.assetHostTimeouts = make(map[string]int)
+	a.assetHostBackoffUntil = make(map[string]time.Time)
 	a.assetCacheMu.Unlock()
 }
 
@@ -1636,7 +1679,7 @@ func (a *app) updateDiscovery(report LCUDiscoveryStatus) {
 
 func (a *app) snapshotLocked() Snapshot {
 	return Snapshot{
-		Summoner: a.summoner, All: append([]Skin(nil), a.allSkins...), Owned: append([]Skin(nil), a.owned...),
+		Summoner: a.summoner, All: append([]Skin(nil), a.allSkins...), AllWithBase: append([]Skin(nil), a.allSkinsWithBase...), Owned: append([]Skin(nil), a.owned...),
 		Remaining: append([]Skin(nil), a.remaining...), PoolTotal: a.poolTotal, PoolMatched: a.poolMatched,
 		Issues: append([]PoolIssue(nil), a.poolIssues...), Client: a.lcu,
 		Ownership: append([]OwnershipSourceStatus(nil), a.ownership...), Catalog: a.catalog,

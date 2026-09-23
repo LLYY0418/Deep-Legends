@@ -139,7 +139,7 @@
     gameflowTimer?.unref?.();
   };
   const queueGameflowDiagnostic = (reason, fields) => {
-    if (!["received", "invalidate", "stale-response"].includes(reason)) return;
+    if (!["received", "invalidate", "stale-response", "poll-failed"].includes(reason)) return;
     if (!["direct", "event", "sse", "poll", "resync", "interval", "manual"].includes(fields.source)) return;
     const rawPhase = value => typeof value === "string" && (value === "" || /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(value)) ? value : "";
     const id = value => Number.isSafeInteger(value) && value > 0 ? value : 0;
@@ -171,7 +171,7 @@
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
-    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client"].includes(event)) return;
+    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "card_image_stalled"].includes(event)) return;
     // Background observations share one in-flight slot and never retry. A slow
     // diagnostics endpoint must not occupy the connections needed by the UI.
     const sampled = event === "live_refresh_client" || event === "local_request_client";
@@ -188,8 +188,19 @@
       if (["overview", "live", "champions", "favorites", "suite", "collection", "tools"].includes(fields.section)) body.section = fields.section;
     }
     if (event === "local_request_client") {
-      if (["status", "gameplay", "champions", "collection", "other"].includes(fields.endpoint)) body.endpoint = fields.endpoint;
+      if (["status", "gameplay", "champions", "collection", "pro-players", "friends", "image", "section-loader", "other"].includes(fields.endpoint)) body.endpoint = fields.endpoint;
       for (const key of ["startedAt", "completedAt"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1e13, Math.floor(fields[key])));
+      // R127 P0-2：图片队列的排队/加载计时与来源类别（不含具体路径）。
+      for (const key of ["queueWaitMs", "loadMs", "activeSlowCount"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1000000, Math.floor(fields[key])));
+      if (["lcu", "communitydragon", "ddragon", "gtimg"].includes(fields.imageSource)) body.imageSource = fields.imageSource;
+    }
+    // R130 P1-6：卡片图看门狗超时上报。只放行队列计数、候选序号与来源类别，
+    // 不放行任何资源路径。限速由 app.js 的 reportCardImageStall 负责（每 10 秒
+    // 最多一条）；这里不进 sampled 通道——那条通道的 in-flight 集合是所有 sampled
+    // 事件共用的，local_request_client 在途时会把 stall 一起压掉。
+    if (event === "card_image_stalled") {
+      for (const key of ["activeCardImages", "queued", "sourceIndex"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1000000, Math.floor(fields[key])));
+      if (["lcu", "communitydragon", "ddragon", "gtimg"].includes(fields.imageSource)) body.imageSource = fields.imageSource;
     }
     if (["no-reference", "destroyed", "external-render", "private-kr", "reference-changed"].includes(fields.gate)) body.gate = fields.gate;
     if (/^cg-[0-9]{13}-[0-9]{1,6}$/.test(fields.traceId || "")) body.traceId = fields.traceId;

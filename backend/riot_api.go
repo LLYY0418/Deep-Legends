@@ -922,12 +922,11 @@ func (p *riotProvider) matchTimeline(ctx context.Context, matchID string) ([]tim
 
 /* ---------- 数据映射 ---------- */
 
-func riotPositionKey(participant riotParticipant) string {
-	position := strings.ToUpper(strings.TrimSpace(participant.TeamPosition))
-	if position == "" {
-		position = strings.ToUpper(strings.TrimSpace(participant.IndividualPosition))
-	}
-	switch position {
+// riotLaneKeyValue 把单个位置字段规范化成 top/jungle/middle/bottom/utility。
+// 空串、"Invalid" 之类无法识别的取值一律返回空串，含义是「这个字段没有给出
+// 位置」——调用方必须把空串当证据缺失处理，不能把它当成某一条具体分路。
+func riotLaneKeyValue(value string) string {
+	switch strings.ToUpper(strings.TrimSpace(value)) {
 	case "TOP":
 		return "top"
 	case "JUNGLE":
@@ -940,6 +939,140 @@ func riotPositionKey(participant riotParticipant) string {
 		return "utility"
 	}
 	return ""
+}
+
+func riotPositionKey(participant riotParticipant) string {
+	// 保持改动前的语义：只有 teamPosition 的**原始值**为空（含纯空白）才回退到
+	// individualPosition。teamPosition 是非空但无效的值（例如 "Invalid"）时
+	// **不回退**，直接返回空串——这是历史行为，不能顺手改掉。
+	position := strings.ToUpper(strings.TrimSpace(participant.TeamPosition))
+	if position == "" {
+		position = strings.ToUpper(strings.TrimSpace(participant.IndividualPosition))
+	}
+	return riotLaneKeyValue(position)
+}
+
+// ---------------------------------------------------------------------------
+// 「补位」标签：R119 引入，R121 P1-1 起**默认关闭**
+//
+// 口径现状（务必如实理解，不要当成已证实的事实）：Riot match-v5 的
+// teamPosition 与 individualPosition **都是游戏服务器按对局中的实际表现推算
+// 出来的「这名玩家最可能打的位置」**——individualPosition 是孤立地看这名玩家
+// 时的最佳猜测，teamPosition 是再加上「每队各有一个上单、一个打野、一个中单……」
+// 约束后的最佳猜测，官方一般建议用 teamPosition。文档没有任何一处说这两个字段
+// 记录了大厅选位，也没有说它们记录了是否被补位。
+//
+// 所以下面这条规则**并不能检测补位**：它找出的是「孤立推算认不出位置、但加上
+// 队伍约束后被分到某一路」的玩家。这类人更可能是提前退出、挂机、极端打法，或者
+// 撞上 Riot 已知的数据缺失（developer-relations issue #554：JP1 排位约 0.9% 的
+// 对局 individualPosition=INVALID 且 teamPosition 为空）。
+//
+// 用户原始规则需要大厅里的**两个位置偏好**加上「是否选了任意位置」；这两个值
+// match-v5 里都没有，LCU 的 /lol-lobby/v2/lobby 目前也只解析 gameConfig
+// （见 lcuLobby）。到底有没有真正的补位数据源，由 R121 P3-1 的契约探测回答
+// （backend/position_contract_probe.go，结论落盘 docs/r121-position-probe-findings.md）。
+//
+// 在 P3-2 的真机对照结果回填 docs/r119-execution-ledger.md §5 之前，
+// autofillLabelGate 保持 false：界面不出标签，但候选计算与诊断计数照常运行，
+// 用来收集真机数据。
+// ---------------------------------------------------------------------------
+
+// autofillLabelGate 是「补位」标签的总开关，默认关闭（R121 P1-1）。
+// 打开的前置条件：真机对照证明「individualPosition 缺失」确实对应真实补位。
+// 用变量而不是常量，是为了让测试能翻转它、验证「打开」这条路径（对抗变异要求）。
+var autofillLabelGate = false
+
+const (
+	// autofillMinIndividualCoveragePercent 是整场覆盖率护栏：有效
+	// individualPosition 的覆盖率低于该值就整场降级。R121 P2-2 之前只要求
+	// 「任意 1 人有值」，实测一场里只有 1 人带个人位置时，其余 9 人会被全部误标。
+	autofillMinIndividualCoveragePercent = 90
+	// autofillMaxFlaggedPercent 是第二道护栏：一局里候选占比超过该值就整场降级。
+	// 同一局多人补位是可能的，但 10 人里 9 个几乎一定是数据问题。当前覆盖率护栏
+	// 更严（≥90% 覆盖意味着最多 10% 候选），这条一般轮不到触发；保留它是为了
+	// 将来放宽覆盖率时不会立刻出现大面积误标。
+	autofillMaxFlaggedPercent = 30
+)
+
+// autofillCoverageInsufficient 报告有效个人位置的覆盖率是否低于门槛。
+func autofillCoverageInsufficient(known, total int) bool {
+	if total <= 0 {
+		return true
+	}
+	return known*100 < total*autofillMinIndividualCoveragePercent
+}
+
+// autofillFlagRatioExcessive 报告候选占比是否高到只能解释成数据问题。
+func autofillFlagRatioExcessive(flagged, total int) bool {
+	if total <= 0 {
+		return false
+	}
+	return flagged*100 > total*autofillMaxFlaggedPercent
+}
+
+// riotAutofillCandidates 是纯计算：**不看总开关**，永远按数据形状算出候选，
+// 第二个返回值说明这一场到底有没有拿到可用的位置证据。诊断计数走这一条，
+// 所以开关关闭期间仍然能收集真机数据（R121 P1-1 的明确要求）。
+//
+// 范围门禁：只在召唤师峡谷的单双排（420）与灵活组排（440）里计算，其余队列
+// 一律 false——海克斯大乱斗等模式根本没有这两个字段
+// （docs/r116e-execution-ledger.md §5.4）。
+func riotAutofillCandidates(info *riotMatchInfo) ([]bool, bool) {
+	if info == nil || len(info.Participants) == 0 {
+		return nil, false
+	}
+	total := len(info.Participants)
+	flags := make([]bool, total)
+	if !seasonClassicRankedQueue(info.QueueID) {
+		return flags, false
+	}
+	individualKnown, teamKnown := 0, 0
+	for _, raw := range info.Participants {
+		if riotLaneKeyValue(raw.IndividualPosition) != "" {
+			individualKnown++
+		}
+		if riotLaneKeyValue(raw.TeamPosition) != "" {
+			teamKnown++
+		}
+	}
+	// 整场护栏一（覆盖率）：响应残缺或只拿到半场数据时，缺失的人会被成片误标，
+	// 因此宁可整场不出标签，并把 evidence 置为 false 供诊断计数。
+	if teamKnown == 0 || autofillCoverageInsufficient(individualKnown, total) {
+		return flags, false
+	}
+	flagged := 0
+	for index, raw := range info.Participants {
+		// 这名玩家连最终分路都没有（Riot issue #554 的形状）：那是数据缺失，
+		// 不是补位证据，跳过。去掉这一句会让这类玩家被误标（R121 P2-1）。
+		if riotLaneKeyValue(raw.TeamPosition) == "" {
+			continue
+		}
+		if riotLaneKeyValue(raw.IndividualPosition) == "" {
+			flags[index] = true
+			flagged++
+		}
+	}
+	// 整场护栏二（候选占比）。
+	if autofillFlagRatioExcessive(flagged, total) {
+		for index := range flags {
+			flags[index] = false
+		}
+		return flags, false
+	}
+	return flags, true
+}
+
+// riotAutofillFlags 是对外口径：总开关关闭时一律全 false、evidence=false，
+// JSON 里不会出现 autofill 键（omitempty 保证既有响应逐字节不变）。
+// 只有它参与界面标签；诊断计数一律走 riotAutofillCandidates。
+func riotAutofillFlags(info *riotMatchInfo) ([]bool, bool) {
+	if !autofillLabelGate {
+		if info == nil {
+			return nil, false
+		}
+		return make([]bool, len(info.Participants)), false
+	}
+	return riotAutofillCandidates(info)
 }
 
 func riotMatchDurationSeconds(info *riotMatchInfo) int64 {
@@ -988,10 +1121,20 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 	}
 	remake := riotMatchInfoIsRemake(info)
 	label := queueLabel(info.QueueID, info.GameMode, queueLabels)
+	// R127 P1-c.2：把 gameStartTimestamp / gameEndTimestamp 一起带下去。之前只传
+	// gameCreation（房间创建时间），韩服平均段位拿它去对 OP.GG 的记录，23 场一场
+	// 都对不上。缺少结束时间时用开局时间 + 时长兜底，不编造数据。
+	startedAt := normalizeEpochMillis(info.GameStartTimestamp)
+	endedAt := normalizeEpochMillis(info.GameEndTimestamp)
+	if endedAt <= 0 && startedAt > 0 && duration > 0 {
+		endedAt = startedAt + duration*1000
+	}
 	result := gameplayMatch{
 		GameID:     info.GameID,
 		CreatedAt:  createdAt,
 		Duration:   duration,
+		StartedAt:  startedAt,
+		EndedAt:    endedAt,
 		QueueID:    info.QueueID,
 		QueueLabel: label,
 		ModeGroup:  queueModeGroupForLabel(info.QueueID, info.GameMode, info.MapID, label),
@@ -1002,7 +1145,8 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 	if remake {
 		result.Result = "remake"
 	}
-	for _, raw := range info.Participants {
+	autofillFlags, _ := riotAutofillFlags(info)
+	for participantIndex, raw := range info.Participants {
 		name := strings.TrimSpace(raw.RiotIDGameName)
 		if name == "" {
 			name = strings.TrimSpace(raw.SummonerName)
@@ -1057,6 +1201,7 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 			Spell1ID: spell1ID, Spell2ID: spell2ID, PrimaryStyleID: primaryStyle, SubStyleID: subStyle,
 			PerkIDs: perkIDs, ItemIDs: itemSlots(raw.Item0, raw.Item1, raw.Item2, raw.Item3, raw.Item4, raw.Item5, raw.Item6),
 			Position: riotPositionKey(raw),
+			Autofill: participantIndex < len(autofillFlags) && autofillFlags[participantIndex],
 			Kills:    raw.Kills, Deaths: raw.Deaths, Assists: raw.Assists,
 			KDA: ratio(raw.Kills+raw.Assists, raw.Deaths), CS: cs,
 			LaneCS: raw.TotalMinionsKilled, JungleCS: raw.NeutralMinionsKilled, CSPerMinute: perMinute(cs, duration),
@@ -1256,6 +1401,9 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			started := time.Now()
 			historicalRanks = a.cachedOPGGHistoricalRanks(puuid)
 			a.startOPGGHistoricalRanks(reference, gameName, tagLine, puuid, reference.Privacy)
+			// R127 P1-c.4：与总览并行预热 OP.GG 对局列表，平均段位不再等卡片
+			// 渲染完、滚动到可见才开始取（那一次要 1.5–3.6 秒）。
+			a.startOPGGGameTiers(gameName, tagLine, puuid)
 			phases.markSpan("opgg-historical", started, time.Now())
 		}
 	}
@@ -1456,7 +1604,12 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	response.SeasonStatsProgress = seasonStatsProgress{Unavailable: true, Message: "近期战绩样本（非本赛季汇总）"}
 	response.Positions = positionStats(matches, puuid)
 	response.Ability = buildGameplayAbilityProfile(matches, puuid, ranks, riotRegionKR)
-	response.RankedQueues = buildGameplayRankedQueues(recentRankedMatchesForQueue(matches, 420, defaultMatchCount), recentRankedMatchesForQueue(matches, 440, defaultMatchCount), puuid, ranks, riotRegionKR)
+	// 韩服路径没有海克斯大乱斗队列（ARAMKit 只收录国服），所以只产出
+	// 单双排 / 灵活组排两个页签，行为与 R116-E 之前一致。
+	response.RankedQueues = buildGameplayRankedQueues([]gameplayRankedQueueTab{
+		{Key: "420", Label: rankedQueueLabel(seasonQueueSoloDuo), QueueIDs: []int64{seasonQueueSoloDuo}, Matches: recentRankedMatchesForQueue(matches, 420, defaultMatchCount)},
+		{Key: "440", Label: rankedQueueLabel(seasonQueueFlex), QueueIDs: []int64{seasonQueueFlex}, Matches: recentRankedMatchesForQueue(matches, 440, defaultMatchCount)},
+	}, puuid, ranks, riotRegionKR)
 	response.ActivityHours = activityHours(matches)
 	response.RecentPlayers = recentPlayers(matches, puuid, recentWindowAfter)
 	a.publicizeOverviewReferences(&response)

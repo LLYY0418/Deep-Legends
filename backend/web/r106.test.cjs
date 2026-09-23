@@ -31,7 +31,7 @@ for(const kind of ["game","champion"]) test(`R106 ${kind} icons without src rema
   img.hidden=true;img.dispatchEvent(new w.Event("load"));
   assert.equal(img.hidden,false);assert.ok(img.parentElement.classList.contains("has-loaded-image"));
 });
-test("R106 reopening a successfully loaded icon bypasses cold queue slots and can reattach",t=>{
+test("R106 reopening a successfully loaded icon stays behind cold queue slots",t=>{
   const dom=new JSDOM("<main></main>",{url:"http://localhost/",runScripts:"outside-only"}),w=dom.window;
   t.after(()=>{w.dispatchEvent(new w.Event("deep-legends:dispose"));w.close()});
   w.eval(read("image-queue.js"));
@@ -39,15 +39,13 @@ test("R106 reopening a successfully loaded icon bypasses cold queue slots and ca
   const first=add("/warm.jpg");first.dispatchEvent(new w.Event("load"));first.remove();
   for(let i=1;i<=6;i++)add(`/cold-${i}.jpg`);
   const queued=add("/cold-7.jpg");assert.equal(queued.getAttribute("src"),null);
-  const reopened=add("/warm.jpg");assert.equal(reopened.getAttribute("src"),"/warm.jpg");
-  reopened.dispatchEvent(new w.Event("load"));reopened.removeAttribute("src");
-  w.deepLegendsQueueImage(reopened,"/warm.jpg");assert.equal(reopened.getAttribute("src"),"/warm.jpg");
+  const reopened=add("/warm.jpg");assert.equal(reopened.getAttribute("src"),null);
 });
-test("R106 an unset career background selects a real hero without inventing an applied or pending background",()=>{
+test("R106 an unset career background does not invent an applied or pending background",()=>{
   const state={facade:{profile:{backgroundSkinId:0},skins:[{id:134001,championId:134,name:"Fixture"},{id:103001,championId:103}]}};
   const source=read("suite.js"), methods=Function("state",functionSource(source,"hydrateFacadeDraft")+functionSource(source,"facadeVisibleSkins")+"return {hydrateFacadeDraft,facadeVisibleSkins}")(state);
-  methods.hydrateFacadeDraft();assert.equal(state.facadeDraft.hero,"134");
-  assert.equal(methods.facadeVisibleSkins(state.facade.skins,state.facadeDraft).length,1);
+  methods.hydrateFacadeDraft();assert.equal(state.facadeDraft.hero,"");
+  assert.equal(methods.facadeVisibleSkins(state.facade.skins,state.facadeDraft).length,0);
   assert.equal(state.facade.profile.backgroundSkinId,0,"draft must not mutate actual background");
   assert.equal(state.facadeDraft.skinId,0,"browsing a hero must not create a pending skin selection");
   state.facade.profile.backgroundSkinId=103001;methods.hydrateFacadeDraft(true);

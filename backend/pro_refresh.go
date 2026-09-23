@@ -76,7 +76,7 @@ func proDirectoryAccounts(groups ...[]opggProTeam) map[string]opggProAccount {
 		for _, team := range teams {
 			for _, member := range team.Members {
 				for _, row := range member.Summoners {
-					at, err := time.Parse(time.RFC3339Nano, row.RevisionAt)
+					at, err := time.Parse(time.RFC3339Nano, proDirectoryRevisionAt(row))
 					if row.Source == "seed" || row.PUUID == "" || err != nil || at.IsZero() {
 						continue
 					}
@@ -104,7 +104,7 @@ func (a *app) rememberProDirectoryAnchors(ctx context.Context, seeds []opggProTe
 	for _, team := range seeds {
 		for _, member := range team.Members {
 			for _, row := range member.Summoners {
-				if row.RevisionAt != "" {
+				if proDirectoryRevisionAt(row) != "" {
 					a.rememberProSeedAnchor(ctx, row.SeedKey, row.PUUID)
 				}
 			}

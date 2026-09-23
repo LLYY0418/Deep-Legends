@@ -10,10 +10,7 @@
     <link rel="stylesheet" href="/app.css">
     <link rel="stylesheet" href="/build-item-row.css">
     <link rel="stylesheet" href="/gameplay.css">
-    <link rel="stylesheet" href="/champions.css">
-    <link rel="stylesheet" href="/pro-players.css">
     <link rel="stylesheet" href="/friends.css">
-    <link rel="stylesheet" href="/suite.css">
     <link rel="stylesheet" href="/metrics.css">
     <script src="/runtime.js" defer></script>
     <script src="/image-queue.js" defer></script>
@@ -21,6 +18,7 @@
     <script src="/augment-artwork.js" defer></script>
     <script src="/section-loader.js" defer></script>
     <script src="/app.js" defer></script>
+    <script src="/favorites-facade.js" defer></script>
     <script src="/gameplay.js" defer></script>
     <script src="/friends.js" defer></script>
   </head>
@@ -121,6 +119,7 @@
               <button id="favorites-tab-collection" class="favorites-nav-item is-active" type="button" role="tab" aria-selected="true" aria-controls="favorites-collection-panel" data-favorites-page="collection"><span aria-hidden="true">◆</span><span><strong>皮肤与炫彩</strong><small>收藏浏览与筛选</small></span></button>
               <button id="favorites-tab-account" class="favorites-nav-item" type="button" role="tab" aria-selected="false" aria-controls="favorites-account-panel" data-favorites-page="account"><span aria-hidden="true">◉</span><span><strong>账户与物品</strong><small>战利品与奖励</small></span></button>
               <button id="favorites-tab-pools" class="favorites-nav-item" type="button" role="tab" aria-selected="false" aria-controls="favorites-pools-panel" data-favorites-page="pools"><span aria-hidden="true">⬡</span><span><strong>三合一奖池</strong><small>目录、清单与历史</small></span></button>
+              <button id="favorites-tab-facade" class="favorites-nav-item" type="button" role="tab" aria-selected="false" aria-controls="favorites-facade-panel" data-favorites-page="facade-collection"><span aria-hidden="true">❖</span><span><strong>头像与旗帜</strong><small>头像旗帜与拥有状态</small></span></button>
             </nav>
             <dl class="metrics" aria-label="收藏概览">
               <div data-tooltip="皮肤收藏&#10;按客户端收藏口径统计永久普通皮肤；不含基础皮肤、炫彩、独立任务形态和库存附属项"><dt>皮肤收藏</dt><dd id="owned-count">—</dd></div>
@@ -247,6 +246,26 @@
             </section>
             <section id="pool-history-panel" class="pool-subpanel" role="tabpanel" aria-labelledby="pool-tab-history" hidden><div class="panel-heading compact-heading"><div><h2>本地历史</h2><p>仅保留收藏或三合一结果真正变化后的脱敏快照，完全重复的记录会自动合并。</p></div><button id="refresh-history" class="text-button" type="button">刷新历史</button></div><div id="history-content" class="data-panel"><p class="muted">尚未读取历史。</p></div></section>
             <footer class="footer pool-footer"><p>数据来源：<a id="pool-source" href="https://lol.qq.com/news/detail.shtml?docid=12008689032502035596" target="_blank" rel="noreferrer">当前奖池清单</a></p></footer>
+          </section>
+          <section id="favorites-facade-panel" class="favorites-subpanel facade-collection" role="tabpanel" tabindex="-1" aria-labelledby="favorites-tab-facade" hidden>
+            <div class="collection-toolbar">
+              <div class="collection-head">
+                <div class="view-tabs" role="tablist" aria-label="头像与旗帜视图">
+                  <button id="facade-view-icons" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="facade-grid" tabindex="0" data-view="icons">头像</button>
+                  <button id="facade-view-banners" class="tab" type="button" role="tab" aria-selected="false" aria-controls="facade-grid" tabindex="-1" data-view="banners">旗帜</button>
+                </div>
+                <div id="facade-quick-groups" class="facade-quick-groups" role="group" aria-label="快捷分类"></div>
+              </div>
+              <div class="filters" aria-label="头像与旗帜筛选">
+                <label class="search"><span aria-hidden="true">⌕</span><span class="sr-only">搜索头像或旗帜</span><input id="facade-search" type="search" placeholder="搜索名称、拼音或首字母" autocomplete="off"></label>
+                <label id="facade-set-control" class="select-wrap"><span class="sr-only">头像系列</span><select id="facade-set" aria-label="头像系列"><option value="">全部系列</option></select></label>
+                <label id="facade-unowned-control" class="toggle-control"><input id="facade-show-unowned" type="checkbox"><span>显示未拥有</span></label>
+                <label class="select-wrap"><span class="sr-only">排序方式</span><select id="facade-sort" aria-label="排序方式"></select></label>
+                <button id="facade-sort-direction" class="text-button" type="button" aria-label="切换排序方向" aria-pressed="false">升序</button>
+              </div>
+            </div>
+            <div class="list-row"><div id="facade-list-meta" class="list-meta" role="status" aria-live="polite"></div></div>
+            <div id="facade-grid" class="skin-grid facade-grid" aria-busy="true" aria-labelledby="favorites-tab-facade"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
           </section>
               </div>
             </div>
@@ -376,6 +395,7 @@
     </dialog>
     <dialog id="career-dialog" class="career-dialog" aria-labelledby="career-dialog-title" aria-describedby="career-dialog-context"><section class="career-dialog-sheet"><header class="career-dialog-head"><div><h2 id="career-dialog-title">生涯统计</h2><p id="career-dialog-context"></p></div><button id="career-dialog-close" class="control-icon-button" type="button" aria-label="关闭生涯统计" data-tooltip="关闭"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div id="career-dialog-content" class="career-dialog-grid"></div></section></dialog>
     <dialog id="skin-dialog" class="skin-dialog" aria-labelledby="skin-dialog-title"><div class="dialog-art" id="skin-dialog-art"><img id="skin-dialog-backdrop" class="dialog-art-backdrop" alt="" hidden><video id="skin-dialog-video" muted loop playsinline preload="metadata" aria-hidden="true" hidden></video><img id="skin-dialog-image" class="dialog-art-primary" src="/image-unavailable.svg" alt=""><span id="skin-dialog-fallback">加载中</span><div class="dialog-toolbar"><button id="skin-dialog-artwork" class="dialog-action control-icon-button" type="button" aria-label="切换到臻彩原画" data-tooltip="切换到臻彩原画" hidden><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4V5Zm3 10 3-3 2 2 2-2 3 3M8 9h.01"/><path d="M17 2v3M14 3.5h6"/></svg></button><button id="skin-dialog-fullscreen" class="dialog-action control-icon-button" type="button" aria-label="全屏查看原画" data-tooltip="全屏查看原画"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg></button><button id="skin-dialog-close" class="dialog-action control-icon-button" type="button" aria-label="关闭详情" data-tooltip="关闭"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><button id="skin-dialog-previous" class="dialog-nav dialog-nav-previous control-icon-button" type="button" aria-label="查看上一款"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button><button id="skin-dialog-next" class="dialog-nav dialog-nav-next control-icon-button" type="button" aria-label="查看下一款"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button></div><div class="dialog-copy"><p id="skin-dialog-status" class="account-label"></p><h2 id="skin-dialog-title"></h2><p id="skin-dialog-hero" class="dialog-hero"></p><dl id="skin-dialog-data" class="detail-list"></dl><button id="copy-skin-id" class="text-button" type="button">复制皮肤 ID</button></div></dialog>
+    <dialog id="facade-detail-dialog" class="skin-dialog facade-detail-dialog" aria-labelledby="facade-detail-title"><div class="dialog-art"><img id="facade-detail-image" class="dialog-art-primary" src="/image-unavailable.svg" alt=""><span id="facade-detail-fallback">加载中</span></div><div class="dialog-copy"><div class="dialog-toolbar"><button id="facade-detail-close" class="dialog-action control-icon-button" type="button" aria-label="关闭详情" data-tooltip="关闭"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><h2 id="facade-detail-title"></h2><dl id="facade-detail-data" class="detail-list"></dl><p id="facade-detail-note" class="muted">详情仅用于浏览目录，不提供任何写入操作。</p></div></dialog>
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <template id="skin-card-template"><button class="skin-card" type="button"><span class="skin-art"><video muted loop playsinline preload="metadata" hidden></video><img src="/image-unavailable.svg" alt="" loading="lazy" decoding="async"><span class="image-fallback" role="img">加载中</span><span class="skin-lock" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 10V7a5 5 0 0 1 10 0v3h1.5A1.5 1.5 0 0 1 20 11.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19.5v-8A1.5 1.5 0 0 1 5.5 10H7Zm2 0h6V7a3 3 0 0 0-6 0v3Zm3 4a1.5 1.5 0 0 0-1 2.62V18h2v-1.38A1.5 1.5 0 0 0 12 14Z"/></svg></span><span class="skin-state"></span></span><span class="skin-copy"><strong></strong><span class="skin-hero"></span><span class="skin-meta"></span></span></button></template>
   </body>

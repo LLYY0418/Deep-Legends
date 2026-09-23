@@ -35,8 +35,13 @@ function harness() {
     renderRecommendationArea: data => `<article>recommendation-${data.gameId || "empty"}</article>`,
     emptyState: (title, copy, retry) => `<div>${title}<p>${copy}</p>${retry ? '<button data-gameplay-retry>重试</button>' : ''}</div>`,
     bindLiveContent: noop, applyRenderedMetricStyles: noop, prepareImages: noop,
+    // R131 §2.1-2/3：R129 给 renderLive 新增的两个依赖。updateLivePanels 桩成 false，
+    // 让 renderLive 退回「标记没变就不动、变了就整块重建」的老路径，本文件的 renders
+    // 计数与 DOM 复用断言语义不变；recordLiveRenderRebuild 只做计数与聚合。
+    recordLiveRenderRebuild: noop, updateLivePanels: () => false,
   };
-  const names = ["updateLiveLoadingVisibility", "loadLive", "liveRecommendationMarkup", "renderLive", "handleGameplayPhase", "queueLiveEventRefresh", "shouldResetLiveGameScopedState", "resetLiveGameScopedState", "softResetGameplayState", "syncLiveRetryBudget", "liveSnapshotComplete", "liveAutoRefreshStopped", "renderLiveRefreshStatus", "scheduleLiveRefresh", "normalizeLiveInterval", "liveRefreshDelayMs"];
+  // R131 §2.1-1：liveRenderTriggerLabel 是纯函数、无外部依赖，按真实实现抽取。
+  const names = ["updateLiveLoadingVisibility", "loadLive", "liveRecommendationMarkup", "renderLive", "handleGameplayPhase", "queueLiveEventRefresh", "shouldResetLiveGameScopedState", "resetLiveGameScopedState", "softResetGameplayState", "syncLiveRetryBudget", "liveSnapshotComplete", "liveAutoRefreshStopped", "renderLiveRefreshStatus", "scheduleLiveRefresh", "normalizeLiveInterval", "liveRefreshDelayMs", "liveRenderTriggerLabel"];
   for (const name of ["liveGamePhase", "invalidateLiveForNewGame", "resetDisconnectedLive", "normalizeLiveGameId", "liveGameIdComparison", "recordLiveObservation", "liveSnapshotBehindPhase"]) if (source.includes(`function ${name}(`)) names.push(name);
   vm.runInNewContext(names.map(extract).join("\n") + "\n" + extract("pollGameflowPhase"), context);
   context.beaconPollDelay = () => 12000;

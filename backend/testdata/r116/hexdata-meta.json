@@ -1,0 +1,315 @@
+{
+ "seoGeo": {
+  "lastmod": "2026-09-20",
+  "pageCount": 938,
+  "heroPageCount": 173,
+  "schemaVersion": "hexdata-seo-pages-v1",
+  "sitemapUrlCount": 525,
+  "augmentPageCount": 211,
+  "availableLocales": [
+   "zh-CN",
+   "zh-TW",
+   "en"
+  ],
+  "indexableLocales": [
+   "zh-CN"
+  ],
+  "hydratedPageCount": 2802,
+  "homeIndexRefreshed": true,
+  "localizedPageCount": 1868,
+  "migratedSourcePageCount": 0,
+  "migratedCreatorPageCount": 0,
+  "migratedDescriptionPageCount": 518
+ },
+ "source": {
+  "iesPublicRaw": "ies_public_raw",
+  "aramMayhemRaw": "aram_mayhem_raw"
+ },
+ "buildId": "hexdata-2026-09-18-167d464cf859",
+ "dataMode": "standard",
+ "heroCount": 173,
+ "tierBands": [
+  {
+   "tier": 1,
+   "label": "前15%"
+  },
+  {
+   "tier": 2,
+   "label": "15%-35%"
+  },
+  {
+   "tier": 3,
+   "label": "35%-65%"
+  },
+  {
+   "tier": 4,
+   "label": "65%-85%"
+  },
+  {
+   "tier": 5,
+   "label": "后15%"
+  }
+ ],
+ "reportDate": "2026-09-18",
+ "tierMethod": "data_rank_v2",
+ "generatedAt": "2026-09-20T06:15:55.681Z",
+ "reportPatch": "16.18",
+ "sampleScope": {
+  "patch": "16.18",
+  "queueId": 2400,
+  "platform": "CQ100+GZ100+HN1+HN10+NJ100+TJ100+TJ101",
+  "seriesId": "queue2400_seven_region_patch16.18_validated_subset_v1",
+  "platforms": [
+   "CQ100",
+   "GZ100",
+   "HN1",
+   "HN10",
+   "NJ100",
+   "TJ100",
+   "TJ101"
+  ],
+  "snapshotId": "union-1618-web-c554cefdde806576",
+  "sourceKind": "accepted_immutable_seven_region_subset",
+  "regionCount": 7,
+  "windowEndUtc": "2026-09-18 13:12:42.014+08",
+  "payloadScopes": {
+   "outcome": {
+    "metrics": [
+     "hero_games",
+     "hero_wins",
+     "hero_win_rate",
+     "hero_pick_rate"
+    ],
+    "platforms": [
+     "CQ100",
+     "GZ100",
+     "HN1",
+     "HN10",
+     "NJ100",
+     "TJ100",
+     "TJ101"
+    ],
+    "sourceKind": "outcome_payload",
+    "eligibleMatches": 22181715,
+    "participantRows": 221817150,
+    "snapshotMatches": 23097211
+   },
+   "richParticipant": {
+    "metrics": [
+     "items",
+     "augments",
+     "summoner_spells",
+     "combat",
+     "challenge_metrics"
+    ],
+    "platforms": [
+     "CQ100",
+     "GZ100",
+     "HN1",
+     "HN10",
+     "NJ100",
+     "TJ100",
+     "TJ101"
+    ],
+    "sourceKind": "rich_participant_payload",
+    "regionMatches": {
+     "HN1": 5887462,
+     "HN10": 3365855,
+     "CQ100": 3294275,
+     "GZ100": 2340614,
+     "NJ100": 2176023,
+     "TJ100": 2754629,
+     "TJ101": 3278353
+    },
+    "eligibleMatches": 22181715,
+    "participantRows": 221817150,
+    "snapshotMatches": 23097211
+   }
+  },
+  "regionMatches": {
+   "HN1": 5887462,
+   "HN10": 3365855,
+   "CQ100": 3294275,
+   "GZ100": 2340614,
+   "NJ100": 2176023,
+   "TJ100": 2754629,
+   "TJ101": 3278353
+  },
+  "uniquePlayers": 0,
+  "windowStartUtc": "2026-09-10 06:55:21.324+08",
+  "eligibleMatches": 22181715,
+  "participantRows": 221817150,
+  "snapshotMatches": 23097211,
+  "samplingBoundary": "accepted immutable subset of actual patch16.18 matches from seven regions; regional totals reflect the validated subset only; not random, rank-certified, or a complete regional census",
+  "metricScopePolicy": "outcome metrics use every eligible outcome row; item, augment, spell, combat, and challenge metrics use only eligible rich-participant rows",
+  "rankCertification": "not_available",
+  "crossSourcePatchTrend": "disabled",
+  "excludedIncompleteMatches": 1264,
+  "minimumGameDurationSeconds": 240,
+  "referenceEnrichmentFromLocalHexdata": true,
+  "currentMetricsFromFrozenSnapshotOnly": true,
+  "excludedMatchesAtOrBelowMinimumDuration": 914232
+ },
+ "assetVersion": "16.18.1",
+ "augmentCount": 211,
+ "dataContract": {
+  "rawSourceHash": "d5fc191b0cc6a81898c33bc55a882ec0add697fe98e4fdbbab9cbda172c14499",
+  "schemaVersion": "1",
+  "corePayloadHash": "167d464cf859a170659c93bbe2daf5acf01b309d1c668aeae0da306ac9275a27"
+ },
+ "samplePolicy": {
+  "low": {
+   "min": 1,
+   "maxExclusive": 250
+  },
+  "high": {
+   "min": 1000
+  },
+  "medium": {
+   "min": 250,
+   "maxExclusive": 1000
+  }
+ },
+ "sourceSeries": "queue2400_seven_region_patch16.18_validated_subset_v1",
+ "itemNameSource": "https://ddragon.leagueoflegends.com/cdn/16.18.1/data/zh_CN/item.json",
+ "candidateStatus": "validated_subset_collection_ongoing",
+ "corePayloadHash": "72ba432bdc4e9c91b4ad9bbd8eb6ed9c329011848a52b7c41ffb242cde3896b6",
+ "heroItemRawRows": 33123,
+ "itemNameVersion": "16.18.1",
+ "rawAugmentCount": 211,
+ "aggregateVariant": "seven_region_queue2400_16.18_validated_subset_standard",
+ "comparisonPolicy": "current_patch_only_source_series_changed",
+ "heroItemKeptRows": 20916,
+ "heroTrioCoverage": 173,
+ "heroTrioRowCount": 173000,
+ "iesPublicRawHash": "424d3a4ccc574bce5fe1b5d8ae77dc9ef46012b3fad3f4165e5691e696e0a3f4",
+ "itemFilterMethod": "completed_items_v1",
+ "itemIconCoverage": 139,
+ "itemNameCoverage": 124,
+ "itemNameLanguage": "zh_CN",
+ "itemRankingCount": 123,
+ "rawChampionFiles": 173,
+ "aramMayhemRawHash": "d5fc191b0cc6a81898c33bc55a882ec0add697fe98e4fdbbab9cbda172c14499",
+ "augmentIconSource": "https://raw.communitydragon.org/16.18/game/assets/ux/cherry/augments/icons",
+ "heroTrendCoverage": 0,
+ "observedHeroCount": 173,
+ "officialRankClaim": false,
+ "referenceCoverage": {
+  "reference_patch": [
+   "16.17"
+  ],
+  "reference_data_dir": "data",
+  "observed_hero_count": 173,
+  "reference_hero_count": 173,
+  "reference_meta_sha256": "e7191b0db9b4bf2e26842ce156522ee4e6305b8d5fbe7e844a4512d4a49889dd",
+  "trend_reference_patch": null,
+  "observed_augment_count": 211,
+  "reference_augment_count": 209,
+  "reference_heroes_sha256": "9d69c610a251130766b12cae073bb8fec7af3b51f100d28abd91e3e03e04e0cb",
+  "trend_reference_hero_ids": [],
+  "absent_reference_hero_ids": [],
+  "adjacent_patch_comparison": "disabled_source_series_changed",
+  "reference_augments_sha256": "ef71e2eec5c04e65dda55b661d97d4ecbeb85140437f20c4d0c0dccf0d733ae7",
+  "unknown_observed_hero_ids": [],
+  "trend_reference_hero_count": 0,
+  "reference_item_name_version": "16.16.1",
+  "absent_reference_augment_ids": [],
+  "unknown_observed_augment_ids": [
+   "1310",
+   "1361"
+  ],
+  "reference_champion_name_version": "16.16.1"
+ },
+ "augmentIconStorage": "local",
+ "championNameSource": "https://ddragon.leagueoflegends.com/cdn/16.18.1/data/zh_CN/champion.json",
+ "dataHealthWarnings": [],
+ "itemHexScorePolicy": {
+  "version": "item_hexscore_v7_core_delta",
+  "coreDelta": "with_item_win_rate - without_item_win_rate",
+  "sampleRisk": "item_games",
+  "effectiveGames": "item_games * without_item_games / hero_games",
+  "coreDeltaWeight": 0.35,
+  "poolDeltaWeight": 0.65,
+  "coreDeltaShrinkage": "effective_games / (effective_games + 700)"
+ },
+ "reportDateCoverage": {
+  "2026-09-18": 173
+ },
+ "augmentIconCoverage": 211,
+ "championNameVersion": "16.18.1",
+ "reportPatchCoverage": {
+  "16.18": 173
+ },
+ "unobservedHeroCount": 0,
+ "augmentIconLocalPath": "/assets/augments/icons/16.18",
+ "championIconCoverage": 173,
+ "championNameCoverage": 173,
+ "championNameLanguage": "zh_CN",
+ "globalHexScorePolicy": {
+  "source": "hero_augment_hexScore",
+  "weight": "sqrt(pair_games)",
+  "minPairHexScoreExclusive": 30
+ },
+ "heroAugmentHeroCount": 173,
+ "heroDetailShardCount": 173,
+ "heroItemFilteredRows": 12207,
+ "heroTrioLimitPerHero": 1000,
+ "mandatoryItemIconIds": [
+  "1036",
+  "2051",
+  "3112",
+  "3177"
+ ],
+ "recommendationPolicy": {
+  "ranking": "sample_tier_then_wilson_lower_bound_v1",
+  "wilsonZ": 1.96,
+  "rankingSignals": [
+   "sample_tier",
+   "wilson_lower_bound",
+   "pick_rate",
+   "games"
+  ],
+  "confidenceInterval": "wilson_95",
+  "minRecommendationGames": 250,
+  "strongRecommendationMinGames": 1000
+ },
+ "augmentIconCachedFiles": 184,
+ "augmentDetailShardCount": 211,
+ "augmentRarityStageCount": 4,
+ "heroAugmentStageRowCount": 85718,
+ "removedAggregatePayloads": [
+  "hero_augments.json",
+  "augment_heroes.json",
+  "hero_items.json",
+  "hero_trios.json",
+  "augment_stages.json"
+ ],
+ "augmentAverageDeltaPolicy": {
+  "weight": "hero_augment_pair_games",
+  "formula": "sum((pair_win_rate - hero_win_rate) * pair_games) / sum(pair_games)",
+  "version": "hero_baseline_games_weighted_v1"
+ },
+ "augmentIconManifestSource": "https://raw.communitydragon.org/16.18/plugins/rcp-be-lol-game-data/global/default/v1/cherry-augments.json",
+ "dataContractSchemaVersion": "1",
+ "heroAnalysisSchemaVersion": "hexdata-hero-analysis-v2",
+ "postmatchDamageSharePolicy": {
+  "version": "team_damage_share_v1",
+  "numerator": "champion damage dealt to champions",
+  "aggregation": "ratio_of_aggregate_totals",
+  "denominator": "five-player team damage dealt to champions in the same games"
+ },
+ "filteredUnknownAugmentCount": 0,
+ "hextechInsightSchemaVersion": "1",
+ "heroTerminalItemTrioRowCount": 160928,
+ "mandatoryItemIconDescription": "Always cache low-tier and Guardian item icons because they can appear in recommendations, build routes, or sourced detail rows even when they are filtered out of completed-item tables.",
+ "heroSummonerSpellPairRowCount": 4694,
+ "heroAugmentStageHexScorePolicy": {
+  "pool": "same_stage_same_rarity",
+  "effect": "stage_win_rate - same_hero_same_stage_baseline",
+  "sample": "stage_games",
+  "formula": "same_as_hero_augment_hexscore",
+  "version": "hero_augment_stage_hexscore_v1"
+ },
+ "sourceCorePayloadHash": "167d464cf859a170659c93bbe2daf5acf01b309d1c668aeae0da306ac9275a27",
+ "runtimeProjectionVersion": "5"
+}

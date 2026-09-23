@@ -8,11 +8,31 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
 
 const publicImageTimeout = 8 * time.Second
+
+// R127 P1-a.3：远程小图标 8 秒太长。实测 ddragon 150–250ms、communitydragon 正常
+// 时 270–650ms，而国内访问 raw.communitydragon.org 经常整张等满超时，一张图就能
+// 占住前端图片队列的名额。远程小图标收紧到 3 秒；原画/加载图这类大文件仍保留
+// 原来的 8 秒预算，避免为了图标把皮肤原画一起改坏。
+const publicRemoteImageTimeout = 3 * time.Second
+
+// largeRemoteArtworkMarkers 标记体积远大于图标的原画与加载图路径。
+var largeRemoteArtworkMarkers = []string{"splash", "centered", "loadscreen", "loading/", "/skin/big", "skinanimation"}
+
+func remoteImageBudget(requestPath string) time.Duration {
+	lower := strings.ToLower(requestPath)
+	for _, marker := range largeRemoteArtworkMarkers {
+		if strings.Contains(lower, marker) {
+			return publicImageTimeout
+		}
+	}
+	return publicRemoteImageTimeout
+}
 
 const championImageAccept = "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8"
 
@@ -44,7 +64,7 @@ func (a *app) loadChampionRemoteAsset(ctx context.Context, p *championProvider, 
 	started := time.Now()
 	observation := &assetCacheObservation{state: "memory"}
 	ctx = context.WithValue(ctx, assetCacheObservationKey{}, observation)
-	data, err := a.loadAsset(ctx, "champion-asset:"+source+":"+host+":"+path, championImageMax, 5*time.Second, func(ctx context.Context) ([]byte, error) {
+	data, err := a.loadAssetFromHost(ctx, host, "champion-asset:"+source+":"+host+":"+path, championImageMax, 5*time.Second, func(ctx context.Context) ([]byte, error) {
 		observation.state = "miss"
 		return p.fetch(ctx, host, path, nil, championImageMax, championImageAccept)
 	})

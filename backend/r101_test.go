@@ -15,195 +15,6 @@ import (
 	"time"
 )
 
-func r101IconProbeFixture(t *testing.T, status int, cancelWrite bool) ([]int64, []map[string]any, []byte) {
-	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	var writes []int64
-	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/lol-summoner/v1/current-summoner":
-			fmt.Fprint(w, `{"profileIconId":71}`)
-		case "/lol-inventory/v2/inventory/SUMMONER_ICON":
-			fmt.Fprint(w, `[{"itemId":71,"owned":true},{"itemId":72,"owned":true},{"itemId":99,"owned":true},{"itemId":70,"owned":false}]`)
-		case "/lol-summoner/v1/current-summoner/icon":
-			var body struct {
-				Icon int64 `json:"profileIconId"`
-			}
-			json.NewDecoder(r.Body).Decode(&body)
-			writes = append(writes, body.Icon)
-			if body.Icon == 71 {
-				w.WriteHeader(201)
-				return
-			}
-			if cancelWrite {
-				cancel()
-			}
-			w.WriteHeader(status)
-			fmt.Fprint(w, `{"errorCode":"RPC_ERROR"}`)
-		default:
-			http.NotFound(w, r)
-		}
-	})
-	store := trackTestStore(t, &localStore{root: t.TempDir()})
-	os.MkdirAll(filepath.Join(store.root, "logs"), 0700)
-	a := &app{storage: store}
-	var events []map[string]any
-	a.r101ProbeIcon(ctx, client, func(e map[string]any) {
-		e["event"] = "r99_write_probe"
-		events = append(events, e)
-		a.recordDiagnostic(e)
-	})
-	raw, _ := store.readDiagnosticLog()
-	return writes, events, raw
-}
-func TestR101IconProbePicksOwnedNonCurrentIcon(t *testing.T) {
-	writes, events, _ := r101IconProbeFixture(t, 201, false)
-	if len(writes) != 2 || (writes[0] != 72 && writes[0] != 99) || writes[1] != 71 {
-		t.Fatalf("writes=%v", writes)
-	}
-	if events[0]["ok"] != true || events[1]["restored"] != true {
-		t.Fatal(events)
-	}
-}
-func TestR101IconProbeRestoresOnFailure(t *testing.T) {
-	for _, tc := range []struct {
-		status int
-		cancel bool
-	}{{401, false}, {500, false}, {500, true}} {
-		t.Run(fmt.Sprint(tc), func(t *testing.T) {
-			writes, _, _ := r101IconProbeFixture(t, tc.status, tc.cancel)
-			if len(writes) < 2 || writes[len(writes)-1] != 71 {
-				t.Fatalf("restore missing: %v", writes)
-			}
-		})
-	}
-}
-func TestR101IconProbeNeverLogsIconID(t *testing.T) {
-	_, _, raw := r101IconProbeFixture(t, 201, false)
-	for _, bad := range []string{"profileIconId", ":72", ":99", ":71"} {
-		if strings.Contains(string(raw), bad) {
-			t.Fatalf("leaked %s: %s", bad, raw)
-		}
-	}
-}
-func TestR101IconFallbackOrderAndTokenPrivacy(t *testing.T) {
-	var paths []string
-	var events []map[string]any
-	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
-		paths = append(paths, r.Method+" "+r.URL.Path)
-		switch r.URL.Path {
-		case "/lol-summoner/v1/current-summoner":
-			fmt.Fprint(w, `{"profileIconId":71}`)
-		case "/lol-inventory/v2/inventory/SUMMONER_ICON":
-			fmt.Fprint(w, `[{"itemId":72,"owned":true}]`)
-		case "/lol-summoner/v1/current-summoner/icon":
-			var b map[string]any
-			json.NewDecoder(r.Body).Decode(&b)
-			if b["profileIconId"] == float64(71) {
-				w.WriteHeader(201)
-			} else {
-				w.WriteHeader(401)
-			}
-		case "/lol-summoner/v1/current-summoner/summoner-profile":
-			w.WriteHeader(400)
-		default:
-			fmt.Fprint(w, `{"token":"SECRET_TOKEN"}`)
-		}
-	})
-	store := trackTestStore(t, &localStore{root: t.TempDir()})
-	os.MkdirAll(filepath.Join(store.root, "logs"), 0700)
-	(&app{storage: store}).r101ProbeIcon(context.Background(), client, func(e map[string]any) { events = append(events, e) })
-	if len(paths) != 9 || paths[7] != "GET /lol-inventory/v2/signedInventory" || paths[8] != "GET /lol-inventory/v1/signedInventory" {
-		t.Fatal(paths)
-	}
-	raw, _ := store.readDiagnosticLog()
-	if strings.Contains(string(raw), "SECRET_TOKEN") {
-		t.Fatal("token leaked")
-	}
-	if events[len(events)-1]["probe"] != "W5-c" || events[len(events)-1]["skipped"] != true {
-		t.Fatal(events)
-	}
-}
-
-func r101BannerProbeFixture(t *testing.T, mode string) ([]map[string]any, []map[string]any) {
-	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	equipped := "3"
-	var writes, events []map[string]any
-	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case facadeChallengeSummaryPath:
-			if mode == "read-error" && len(writes) == 1 {
-				w.WriteHeader(500)
-				return
-			}
-			fmt.Fprintf(w, `{"bannerId":%q,"selectedChallengesString":"101,102","title":{"itemId":42},"crestId":"ranked","prestigeCrestBorderLevel":0}`, equipped)
-		case facadeBannerInventoryPath:
-			fmt.Fprint(w, `{"2":{"isOwned":true},"3":{"isOwned":true},"4":{"isOwned":true},"5":{"isOwned":false}}`)
-		case "/lol-game-data/assets/v1/regalia.json":
-			fmt.Fprint(w, `[{"id":"2","idSecondary":"GOLD","regaliaType":"kBanner","isSelectable":true},{"id":"3","idSecondary":"","regaliaType":"kBanner","isSelectable":true},{"id":"4","idSecondary":"","regaliaType":"kBanner","isSelectable":true}]`)
-		case facadeChallengePreferencesPath:
-			var body map[string]any
-			json.NewDecoder(r.Body).Decode(&body)
-			writes = append(writes, body)
-			if len(writes) == 1 {
-				if mode == "cancel" {
-					cancel()
-				}
-				if mode == "reject" {
-					w.WriteHeader(400)
-					return
-				}
-				if mode == "noop" {
-					return
-				}
-			}
-			if mode != "restore-noop" || len(writes) == 1 {
-				equipped = body["bannerAccent"].(string)
-			}
-		default:
-			t.Errorf("unexpected %s", r.URL.Path)
-		}
-	})
-	(&app{}).r101ProbeBanner(ctx, client, func(e map[string]any) { events = append(events, e) })
-	if len(writes) != 2 || writes[1]["bannerAccent"] != "3" {
-		t.Fatalf("restore missing: %v", writes)
-	}
-	return writes, events
-}
-func TestR101BannerProbeSwitchesToDifferentOwnedBanner(t *testing.T) {
-	p, e := r101BannerProbeFixture(t, "ok")
-	if p[0]["bannerAccent"] != "4" || e[0]["ok"] != true {
-		t.Fatal(p, e)
-	}
-}
-func TestR108BannerProbePreservesOtherPreferences(t *testing.T) {
-	p, _ := r101BannerProbeFixture(t, "ok")
-	for _, body := range p {
-		if body["title"] != "42" || body["crestBorder"] != "ranked" || body["prestigeCrestBorderLevel"] != float64(0) || !reflect.DeepEqual(body["challengeIds"], []any{float64(101), float64(102), float64(-1)}) {
-			t.Fatal(body)
-		}
-	}
-}
-func TestR101BannerProbeReadsBackBeforeClaimingSuccess(t *testing.T) {
-	_, e := r101BannerProbeFixture(t, "noop")
-	if e[0]["changed"] != false || e[0]["ok"] != false {
-		t.Fatal(e)
-	}
-}
-func TestR101BannerProbeAlwaysRestores(t *testing.T) {
-	for _, mode := range []string{"ok", "noop", "reject", "read-error", "cancel", "restore-noop"} {
-		t.Run(mode, func(t *testing.T) {
-			_, e := r101BannerProbeFixture(t, mode)
-			if e[len(e)-1]["restored"] != (mode != "restore-noop") {
-				t.Fatal(e)
-			}
-		})
-	}
-}
-
 func r101IconCatalogFixture(t *testing.T, fail bool) facadeIconCatalog {
 	t.Helper()
 	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
@@ -539,48 +350,18 @@ func TestR101IconOwnershipCacheIsClientScoped(t *testing.T) {
 		t.Fatal("ownership carried across clients")
 	}
 }
-func TestR101FailedIconRestoreStopsFurtherProbes(t *testing.T) {
-	var paths []string
-	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
-		paths = append(paths, r.URL.Path)
-		switch r.URL.Path {
-		case "/lol-summoner/v1/current-summoner":
-			fmt.Fprint(w, `{"profileIconId":71}`)
-		case r99ReadPaths[3]:
-			fmt.Fprint(w, `[{"itemId":72,"owned":true}]`)
-		case "/lol-summoner/v1/current-summoner/icon":
-			w.WriteHeader(401)
-		default:
-			t.Error("continued after failed restore", r.URL.Path)
+func TestR123FacadeIconAndBannerActionsRemoved(t *testing.T) {
+	calls := 0
+	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) { calls++; w.WriteHeader(200) })
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}}
+	for _, body := range []string{`{"action":"icon","iconId":72}`, `{"action":"banner","bannerId":"4"}`} {
+		w := httptest.NewRecorder()
+		a.handleFacadeApply(w, httptest.NewRequest("POST", "/api/facade/apply", strings.NewReader(body)))
+		if w.Code != 400 || calls != 0 {
+			t.Fatal(body, w.Code, calls)
 		}
-	})
-	rows := (&app{}).runR99WriteProbe(context.Background(), client)
-	if len(paths) != 4 || len(rows) != 2 || rows[1]["restored"] != false {
-		t.Fatal(paths, rows)
 	}
-}
-func TestR110BannerProbeUsesCatalogIDWithOpaqueInventory(t *testing.T) {
-	equipped := "3"
-	var bodies []map[string]any
-	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case facadeChallengeSummaryPath:
-			fmt.Fprintf(w, `{"bannerId":%q,"topChallenges":[],"title":null}`, equipped)
-		case facadeBannerInventoryPath:
-			fmt.Fprint(w, `{"4":{"isOwned":true,"items":["opaque-item"]}}`)
-		case "/lol-game-data/assets/v1/regalia.json":
-			fmt.Fprint(w, `[{"id":"4","idSecondary":"","regaliaType":"kBanner","isSelectable":true}]`)
-		case facadeChallengePreferencesPath:
-			var body map[string]any
-			json.NewDecoder(r.Body).Decode(&body)
-			bodies = append(bodies, body)
-			equipped = body["bannerAccent"].(string)
-		default:
-			t.Error(r.URL.Path)
-		}
-	})
-	(&app{}).r101ProbeBanner(context.Background(), client, func(map[string]any) {})
-	if len(bodies) != 2 || bodies[0]["bannerAccent"] != "4" {
-		t.Fatal(bodies)
+	if facadeDiagnosticAction("icon") != "unknown" || facadeDiagnosticAction("banner") != "unknown" {
+		t.Fatal("diagnostic still classifies retired actions")
 	}
 }

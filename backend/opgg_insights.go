@@ -39,7 +39,11 @@ const (
 	opggGamesSpanSlack   = 20         // 时长匹配容差（秒）
 	opggGamesResponseMax = 8 << 20
 	opggHistoryCacheTTL  = 30 * time.Minute
+	opggHistoryEmptyTTL  = 10 * time.Minute
 	opggHistoryCacheMax  = 32
+	// R127 P1-c.5：OP.GG 最新一行比 Riot 最新一场早超过这个秒数，就认定来源还没
+	// 收录最近的对局（OP.GG 不会自动更新，需要有人点更新）。
+	opggSourceStaleSeconds = 30 * 60
 )
 
 type opggGameTier struct {
@@ -64,8 +68,18 @@ type opggTierFlight struct {
 }
 
 type opggHistoryCacheEntry struct {
-	at    time.Time
-	ranks []gameplayHistoricalRank
+	at        time.Time
+	expiresAt time.Time
+	ranks     []gameplayHistoricalRank
+	empty     bool
+}
+
+func opggHistoryEntryFresh(entry opggHistoryCacheEntry, now time.Time) bool {
+	expiresAt := entry.expiresAt
+	if expiresAt.IsZero() {
+		expiresAt = entry.at.Add(opggHistoryCacheTTL)
+	}
+	return now.Before(expiresAt)
 }
 
 type opggHistoryFlight struct {
@@ -139,26 +153,29 @@ func parseOPGGHistoricalRanks(data []byte) []gameplayHistoricalRank {
 	return result
 }
 
-func (a *app) fetchOPGGHistoricalRanks(ctx context.Context, slug string) []gameplayHistoricalRank {
+func (a *app) fetchOPGGHistoricalRanks(ctx context.Context, slug string) ([]gameplayHistoricalRank, error) {
 	if a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) {
-		return nil
+		return nil, errors.New("opgg historical ranks disabled")
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://op.gg/zh-cn/lol/summoners/kr/"+slug, nil)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	request.Header.Set("Accept", "text/html")
 	request.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36")
 	response, err := a.champions.httpClient().Do(request)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	data, readErr := readLimited(response.Body, opggGamesResponseMax)
 	response.Body.Close()
-	if response.StatusCode != http.StatusOK || readErr != nil {
-		return nil
+	if response.StatusCode != http.StatusOK {
+		return nil, errors.New("opgg historical ranks HTTP error")
 	}
-	return parseOPGGHistoricalRanks(data)
+	if readErr != nil {
+		return nil, readErr
+	}
+	return parseOPGGHistoricalRanks(data), nil
 }
 
 func (a *app) opggHistoricalRanks(ctx context.Context, gameName, tagLine, puuid, privacy string) []gameplayHistoricalRank {
@@ -173,7 +190,7 @@ func (a *app) opggHistoricalRanks(ctx context.Context, gameName, tagLine, puuid,
 		if cached {
 			stale = append(stale[:0], entry.ranks...)
 		}
-		if cached && time.Since(entry.at) < opggHistoryCacheTTL {
+		if cached && opggHistoryEntryFresh(entry, time.Now()) {
 			ranks := append([]gameplayHistoricalRank(nil), entry.ranks...)
 			a.opgg.mu.Unlock()
 			return ranks
@@ -194,9 +211,9 @@ func (a *app) opggHistoricalRanks(ctx context.Context, gameName, tagLine, puuid,
 	}
 
 	slug := url.PathEscape(gameName + "-" + tagLine)
-	ranks := a.fetchOPGGHistoricalRanks(ctx, slug)
+	ranks, fetchErr := a.fetchOPGGHistoricalRanks(ctx, slug)
 	a.opgg.mu.Lock()
-	if len(ranks) > 0 {
+	if fetchErr == nil {
 		if _, exists := a.opgg.histories[cacheKey]; !exists && len(a.opgg.histories) >= opggHistoryCacheMax {
 			oldestKey := ""
 			oldestAt := time.Now()
@@ -207,7 +224,12 @@ func (a *app) opggHistoricalRanks(ctx context.Context, gameName, tagLine, puuid,
 			}
 			delete(a.opgg.histories, oldestKey)
 		}
-		a.opgg.histories[cacheKey] = opggHistoryCacheEntry{at: time.Now(), ranks: append([]gameplayHistoricalRank(nil), ranks...)}
+		now := time.Now()
+		ttl := opggHistoryCacheTTL
+		if len(ranks) == 0 {
+			ttl = opggHistoryEmptyTTL
+		}
+		a.opgg.histories[cacheKey] = opggHistoryCacheEntry{at: now, expiresAt: now.Add(ttl), ranks: append([]gameplayHistoricalRank(nil), ranks...), empty: len(ranks) == 0}
 	}
 	flight := a.opgg.historyFlights[cacheKey]
 	delete(a.opgg.historyFlights, cacheKey)
@@ -215,7 +237,7 @@ func (a *app) opggHistoricalRanks(ctx context.Context, gameName, tagLine, puuid,
 		close(flight.done)
 	}
 	a.opgg.mu.Unlock()
-	if len(ranks) == 0 {
+	if fetchErr != nil {
 		return stale
 	}
 	return ranks
@@ -228,11 +250,15 @@ func (a *app) cachedOPGGHistoricalRanks(puuid string) []gameplayHistoricalRank {
 	key := sourceScopedKey(dataSourceOPGG, puuid)
 	a.opgg.mu.Lock()
 	entry, ok := a.opgg.histories[key]
-	a.opgg.mu.Unlock()
-	if !ok {
-		return nil
+	if ok && !opggHistoryEntryFresh(entry, time.Now()) {
+		ok = false
 	}
-	return append([]gameplayHistoricalRank(nil), entry.ranks...)
+	var ranks []gameplayHistoricalRank
+	if ok && !entry.empty {
+		ranks = append([]gameplayHistoricalRank(nil), entry.ranks...)
+	}
+	a.opgg.mu.Unlock()
+	return ranks
 }
 
 func (a *app) startOPGGHistoricalRanks(reference gameplayReference, gameName, tagLine, puuid, privacy string) {
@@ -241,7 +267,7 @@ func (a *app) startOPGGHistoricalRanks(reference gameplayReference, gameName, ta
 	}
 	key := sourceScopedKey(dataSourceOPGG, puuid)
 	a.opgg.mu.Lock()
-	if entry, ok := a.opgg.histories[key]; ok && time.Since(entry.at) < opggHistoryCacheTTL {
+	if entry, ok := a.opgg.histories[key]; ok && opggHistoryEntryFresh(entry, time.Now()) {
 		a.opgg.mu.Unlock()
 		return
 	}
@@ -379,7 +405,13 @@ func (a *app) opggFetchGamesPage(ctx context.Context, ref gameplayReference, pro
 
 // Resolve the provider-specific ID once per fresh cache, then reuse the page
 // cursor for older visible matches. Unknown tiers still count toward coverage.
-func (a *app) opggGameTiers(ctx context.Context, gameName, tagLine, puuid string, oldest int64) (result []opggGameTier, resultErr error) {
+func (a *app) opggGameTiers(ctx context.Context, gameName, tagLine, puuid string, oldest int64, maxPages ...int) (result []opggGameTier, resultErr error) {
+	// R127 P1-c.4：预热只取第一页。oldest=0 时下面的覆盖判断和提前停止条件都不
+	// 成立，不限页数就会一路拉满 4 页，还会把前台请求一起拖住（它等同一个 flight）。
+	pageLimit := opggGamesMaxPages
+	if len(maxPages) > 0 && maxPages[0] > 0 && maxPages[0] < pageLimit {
+		pageLimit = maxPages[0]
+	}
 	if a.champions == nil || a.opgg == nil || !a.champions.featureGates.enabled(featureGateOPGG) || strings.TrimSpace(gameName) == "" || !validPlayerReference(puuid) {
 		return nil, errors.New("opgg-games-unavailable")
 	}
@@ -437,7 +469,7 @@ func (a *app) opggGameTiers(ctx context.Context, gameName, tagLine, puuid string
 			}
 		}
 	}
-	for page := 0; entry.err == nil && page < opggGamesMaxPages; page++ {
+	for page := 0; entry.err == nil && page < pageLimit; page++ {
 		stage = "games-page"
 		games, cursor, err := a.opggFetchGamesPage(ctx, ref, entry.profileID, entry.cursor)
 		pages++
@@ -489,31 +521,156 @@ func (a *app) opggGameTiers(ctx context.Context, gameName, tagLine, puuid string
 	return append([]opggGameTier(nil), entry.games...), entry.err
 }
 
-// matchOPGGAverageTier 按时间和时长把一场 Riot 对局映射到 OP.GG 的
-// 不透明对局记录。返回副本，避免调用方持有缓存切片内部字段的地址。
+// R127 P1-c.2：OP.GG 的 created_at 到底是什么时间基准，之前从没用真实数据核对过，
+// 现有测试两边都是手写的同一个基准，所以全绿也发现不了 23 场一场都对不上。
+//
+// 用仓库里的真实抓包 backend/testdata/r112-opgg-average-tiers.txt（20 行，含
+// created_at 与 game_length）做相邻对局重叠检验：
+//   - 当 created_at 是「开局时间」：出现 3 处不可能的重叠（-21s、-105s、-574s）；
+//   - 当 created_at 是「结束时间」：0 重叠，相邻间隔 158s–63341s 全部合理。
+//
+// 所以 end 是最可能的基准。但这里仍然把 Riot 的三个时间（结束 / 开局 / 房间创建）
+// 都比较一遍、取差值最小的那个，不把结论钉死在单一假设上；命中所用基准会写进
+// opgg_match_tiers_result 诊断，下一份真机日志可以直接证实或推翻。
+const (
+	opggTierBaseEnd      = "end"
+	opggTierBaseStart    = "start"
+	opggTierBaseCreation = "creation"
+)
+
+type opggTierTimeBase struct {
+	name  string
+	value int64
+}
+
+type opggTierMatch struct {
+	tier     *matchTiersResponse
+	bestGap  int64  // 命中行与所用基准的时间差（毫秒）；-1 表示一行都没对上
+	bestBase string // 命中所用的 Riot 时间基准
+}
+
+func opggTierTimeBases(request matchTierMatchRequest) []opggTierTimeBase {
+	bases := make([]opggTierTimeBase, 0, 3)
+	for _, candidate := range []opggTierTimeBase{
+		{opggTierBaseEnd, request.EndAt},
+		{opggTierBaseStart, request.StartAt},
+		{opggTierBaseCreation, request.CreatedAt},
+	} {
+		if candidate.value > 0 {
+			bases = append(bases, candidate)
+		}
+	}
+	return bases
+}
+
+// matchOPGGAverageTier 保留旧的两参数形状（只有 gameCreation 可用时的兼容入口）。
+// 生产路径走 matchOPGGAverageTierDetailed。
 func matchOPGGAverageTier(createdAt, duration int64, games []opggGameTier) *matchTiersResponse {
-	if createdAt <= 0 || duration <= 0 {
-		return nil
+	return matchOPGGAverageTierDetailed(matchTierMatchRequest{CreatedAt: createdAt, Duration: duration}, games).tier
+}
+
+// matchOPGGAverageTierDetailed 按时间和时长把一场 Riot 对局映射到 OP.GG 的不透明
+// 对局记录。返回副本，避免调用方持有缓存切片内部字段的地址。
+func matchOPGGAverageTierDetailed(request matchTierMatchRequest, games []opggGameTier) opggTierMatch {
+	result := opggTierMatch{bestGap: -1}
+	if request.Duration <= 0 {
+		return result
+	}
+	bases := opggTierTimeBases(request)
+	if len(bases) == 0 {
+		return result
 	}
 	var best *opggGameTier
 	bestGap := int64(opggGamesTimeSlack + 1)
+	bestBase := ""
 	for index := range games {
 		candidate := &games[index]
-		gap := createdAt - candidate.createdAt
-		if gap < 0 {
-			gap = -gap
-		}
-		spanGap := duration - candidate.duration
+		spanGap := request.Duration - candidate.duration
 		if spanGap < 0 {
 			spanGap = -spanGap
 		}
-		if gap <= opggGamesTimeSlack && spanGap <= opggGamesSpanSlack && gap < bestGap {
-			best, bestGap = candidate, gap
+		if spanGap > opggGamesSpanSlack {
+			continue
+		}
+		for _, base := range bases {
+			gap := base.value - candidate.createdAt
+			if gap < 0 {
+				gap = -gap
+			}
+			if gap <= opggGamesTimeSlack && gap < bestGap {
+				best, bestGap, bestBase = candidate, gap, base.name
+			}
 		}
 	}
-	if best == nil || best.tier.Tier == "" {
-		return nil
+	if best == nil {
+		return result
+	}
+	result.bestGap, result.bestBase = bestGap, bestBase
+	if best.tier.Tier == "" {
+		// 行对上了但 OP.GG 没给平均段位：不算命中，差值仍留给诊断。
+		return result
 	}
 	value := best.tier
-	return &value
+	result.tier = &value
+	return result
+}
+
+// opggNearestRowGap 返回不受容差限制的最小时间差与时长差（秒），只用于诊断
+// 「最近的一行到底差了多少」，不参与匹配判定。
+func opggNearestRowGap(request matchTierMatchRequest, games []opggGameTier) (int64, int64) {
+	bestTime, bestSpan := int64(-1), int64(-1)
+	bases := opggTierTimeBases(request)
+	if len(bases) == 0 || len(games) == 0 {
+		return bestTime, bestSpan
+	}
+	for index := range games {
+		candidate := &games[index]
+		gap := int64(-1)
+		for _, base := range bases {
+			diff := base.value - candidate.createdAt
+			if diff < 0 {
+				diff = -diff
+			}
+			if gap < 0 || diff < gap {
+				gap = diff
+			}
+		}
+		// 时间差与时长差必须来自同一行。分别取最小值会拼出一个根本不存在的组合
+		// （最近的那行时长差 100 秒、另一行时长差 0），诊断就失真了。
+		if bestTime < 0 || gap < bestTime {
+			spanGap := request.Duration - candidate.duration
+			if spanGap < 0 {
+				spanGap = -spanGap
+			}
+			bestTime, bestSpan = gap/1000, spanGap
+		}
+	}
+	return bestTime, bestSpan
+}
+
+// startOPGGGameTiers 在打开韩服玩家总览时就并行预热 OP.GG 的对局列表（R127
+// P1-c.4）。Riot ID 一开始就有，不必等战绩卡片渲染完、用户滚动到可见才发第一次
+// 请求——那一次要 1.5–3.6 秒，正好就是「总览出来了、平均段位还在转」的那段。
+//
+// oldest 传 0：只预热第一页。需要更老的对局时前台请求会按现有逻辑继续翻页，
+// opggGameTiers 自身的 flight 合并保证不会重复取页。
+func (a *app) startOPGGGameTiers(gameName, tagLine, puuid string) {
+	if a.champions == nil || a.opgg == nil || !a.champions.featureGates.enabled(featureGateOPGG) ||
+		strings.TrimSpace(gameName) == "" || !validPlayerReference(puuid) {
+		return
+	}
+	key := sourceScopedKey(dataSourceOPGG, puuid+":"+strings.ToLower(gameName+"#"+tagLine))
+	a.opgg.mu.Lock()
+	entry := a.opgg.tiers[key]
+	fresh := !entry.at.IsZero() && time.Since(entry.at) < opggTierCacheTTL
+	running := a.opgg.flights[key] != nil
+	a.opgg.mu.Unlock()
+	if fresh || running {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), matchTiersOPGGTimeout)
+		defer cancel()
+		_, _ = a.opggGameTiers(ctx, gameName, tagLine, puuid, 0, 1)
+	}()
 }

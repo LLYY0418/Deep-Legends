@@ -204,13 +204,24 @@ func TestFetchAndEnrichProLadderRankUsesFixedKRLeaderboard(t *testing.T) {
 func newProMockApp(t *testing.T, fetch func(*http.Request) (*http.Response, error)) *app {
 	t.Helper()
 	p := newChampionProvider()
+	// P2-2（R120）：loadProPlayers 发布目录之后还会用后台 goroutine 继续补种子与阶梯，
+	// 这些 goroutine 会活过测试结束再回调这个 transport。此时任何 t.Log/t.Error 都会
+	// 触发 "Log in goroutine after test has completed" panic，把整个测试包打红，而失败
+	// 会被记在当时正在跑的另一个测试头上——这就是「单跑 40/40 通过、整包负载下偶发
+	// 红」的形状。所以测试结束后只记录事实、不再动 t。
+	var finished atomic.Bool
+	t.Cleanup(func() { finished.Store(true) })
 	p.clientMu.Lock()
 	p.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Host == proSupplementHost {
 			name := strings.TrimPrefix(r.URL.Path, "/player/")
 			_, player, ok := proSupplementPlayer(name)
 			if !ok {
-				t.Errorf("unreviewed supplement: %s", name)
+				if !finished.Load() {
+					t.Errorf("unreviewed supplement: %s", name)
+				}
+				// 未复核的名字没有可用的 Names[0]，继续走下去会在测试结束后 panic。
+				return nil, errors.New("unreviewed pro identity page")
 			}
 			return proHTTPBody([]byte(fmt.Sprintf("<h1>%s</h1><table><tr><td>Name</td><td>%s</td></tr></table><div><h4>Accounts</h4><table></table></div>", player.Name, player.Names[0]))), nil
 		}
@@ -310,23 +321,58 @@ func TestProDirectoryPublishesBeforeSlowSupplements(t *testing.T) {
 	release := make(chan struct{})
 	defer close(release)
 	a := &app{champions: newChampionProvider()}
-	var directoryCalls atomic.Int32
+	// P2-2（R120）：后台补种子/阶梯用的是 a.proRefreshContext（生产里是 runtimeContext），
+	// 而且刻意不随调用方 ctx 取消（「一个调用方离开页面不能取消别人共享的加载」）。
+	// 测试必须自己给它一个可取消的 ctx 并在结束时取消，否则这些 goroutine 会带着
+	// 90 秒预算活到后面的测试里去，把失败记到别的测试头上。
+	refreshCtx, cancelRefresh := context.WithCancel(context.Background())
+	defer cancelRefresh()
+	a.proRefreshContext = refreshCtx
+	var directoryCalls, supplementCalls, otherCalls, supplementDone atomic.Int32
 	a.champions.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Host == proSupplementHost {
+			supplementCalls.Add(1)
 			select {
 			case <-release:
 			case <-r.Context().Done():
 			}
+			// P1-1（R120 复测）：完成计数必须在 return 之前落定。补充源 handler 自己
+			// 带 12 秒超时 × 2 次重试（pro_players_supplement.go:103），「release 不关
+			// 它就永远不返回」不成立——生产代码若改成发布前等补充源，约 24 秒后这里
+			// 会经由 r.Context().Done() 返回并把计数抬上去，下面的断言就能抓到。
+			supplementDone.Add(1)
 			return nil, errors.New("supplement unavailable")
 		}
-		directoryCalls.Add(1)
+		// 只数「目录」这一个请求。原来任何非补充源请求都被计成一次目录请求，于是
+		// 后台补种子/阶梯打到 op.gg 的 /zh-cn/lol/summoners/... 也算进去，断言就变成
+		// 「后台请求有没有恰好在三次轮询之间落地」的时序赌博：GOMAXPROCS=1 下
+		// -race -count=100 里 27 次假红，报的全是 poll refetched directory。
+		if r.URL.Path == proPlayersPath {
+			directoryCalls.Add(1)
+		} else {
+			otherCalls.Add(1)
+		}
 		return proHTTPBody(proFixtureHTML("kr")), nil
 	})}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	// 原来这里是 1 秒墙钟预算。要证明的是「目录先发布、不等补充源」，与墙钟无关；
+	// 1 秒在整包 -race 并行下会被调度噪声吃掉，变成随机红。改成不设墙钟的 cancel ctx，
+	// 外加一个只把「挂死」翻译成可读失败的看门狗：取消之后 loadProPlayers 只能返回
+	// ctx 错误，下面的断言必然失败，所以看门狗不可能把挂死伪装成通过。
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	watchdog := time.AfterFunc(60*time.Second, cancel)
+	defer watchdog.Stop()
+	// 同步点（P1-1 修正版）：release 在测试体内不关闭，补充源 handler 只能阻塞在
+	// select 上；它自带的 12s×2 超时只会让 handler「返回失败」，不会让测试体里的
+	// 任何断言失效。所以「loadProPlayers 已经返回、而 supplementDone 仍是 0」就是
+	// 一个不依赖墙钟的证明：发布没有等过任何一次补充源请求的完成。
 	teams, _, err := a.loadProPlayers(ctx, false)
 	if err != nil || len(teams) != 42 {
-		t.Fatalf("directory waited for supplement: %v", err)
+		t.Fatalf("directory waited for supplement: %v (teams=%d)", err, len(teams))
+	}
+	// 只要发布路径等过补充源（哪怕等到它自己超时），这里必然非 0。
+	if done := supplementDone.Load(); done != 0 {
+		t.Fatalf("directory returned only after %d supplement requests had finished（发布等过补充源）", done)
 	}
 	a.proPlayers.mu.Lock()
 	updating := a.proPlayers.updating
@@ -339,9 +385,10 @@ func TestProDirectoryPublishesBeforeSlowSupplements(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if directoryCalls.Load() != 1 {
-		t.Fatal("poll refetched directory")
+	if got := directoryCalls.Load(); got != 1 {
+		t.Fatalf("poll refetched directory: %d 次目录请求（补充源 %d 次、其它后台请求 %d 次）", got, supplementCalls.Load(), otherCalls.Load())
 	}
+	t.Logf("P2-2 精确计数：目录 %d 次、补充源 %d 次、后台补种子/阶梯 %d 次", directoryCalls.Load(), supplementCalls.Load(), otherCalls.Load())
 }
 
 func TestProDirectoryFailureRetainsRosterAndAuth(t *testing.T) {

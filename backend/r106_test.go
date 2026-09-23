@@ -166,7 +166,7 @@ func TestR106CancelledFacadeReaderDoesNotCancelSharedRead(t *testing.T) {
 		}
 		fmt.Fprint(w, `{}`)
 	})
-	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}, allSkins: []Skin{{ID: 103001, ChampionID: 103, Name: "Fixture"}}, facadeIdentityShapeDiagnosticClient: client}
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}, allSkinsWithBase: []Skin{{ID: 103001, ChampionID: 103, Name: "Fixture"}}, facadeIdentityShapeDiagnosticClient: client}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { _, err := a.cachedFacadeState(ctx, false, "poll"); done <- err }()
@@ -225,7 +225,7 @@ func TestR106MutationDetachesAnOlderFacadeRead(t *testing.T) {
 		}
 		fmt.Fprint(w, `{}`)
 	})
-	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}, allSkins: []Skin{{ID: 103001, ChampionID: 103}}, facadeIdentityShapeDiagnosticClient: client}
+	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}, allSkinsWithBase: []Skin{{ID: 103001, ChampionID: 103}}, facadeIdentityShapeDiagnosticClient: client}
 	done := make(chan facadeState, 1)
 	go func() { value, _ := a.cachedFacadeState(context.Background(), false, "poll"); done <- value }()
 	<-entered

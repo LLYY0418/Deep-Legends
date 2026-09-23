@@ -10,6 +10,17 @@ const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
 const appScript = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
 const appStyles = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
 const script = fs.readFileSync(path.join(__dirname, "champions.js"), "utf8");
+// R128 §2.3：统计口径说明已从全项目 UI 删除，shared.js 与它的测试桩一并移除。
+
+// R116-B：P0-1「较基准」/ P0-2 置信度 / P0-5 官方档位 / P0-6 阶段筛选的行内助手。
+// 聚焦测试一律编译真实实现而不是打桩，这样卡片测试同时覆盖「字段缺失就整块不
+// 渲染」的降级路径（评审 6.1）。
+const mayhemMetricHelpers = [
+  "normalizeMayhemStage", "mayhemActiveStage", "mayhemAugmentStageRow", "mayhemAugmentStageItem",
+  "mayhemDeltaLabel", "mayhemDeltaTone", "mayhemDeltaCell", "mayhemWithoutItemCell",
+  "mayhemSampleTierLabel", "mayhemSampleCell", "mayhemWilsonLabel", "mayhemWilsonTooltip",
+  "mayhemAugmentConfidenceMetrics",
+];
 const styles = fs.readFileSync(path.join(__dirname, "champions.css"), "utf8");
 
 test("R86 ADD-4 retired synergy panel selector stays absent without removing shared card styles", () => {
@@ -183,6 +194,31 @@ function compileFunctions(source, names, dependencies = {}) {
   }
   // Compile the actual R75 helpers transitively for focused legacy render tests.
   for (const name of ["proRunesFor", "proRequestTarget", "proBadgeAttributes", "renderProIdentityBadge", "proContextFromButton"]) {
+    if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
+  }
+  // R116-B 评审整改（清 R116-D 账本 §11.7 的两笔技术债）：renderLiveInsights 的七个
+  // 渲染 helper 已从函数体内提到模块作用域，ensureLiveRecommendations 也去掉了
+  // `typeof liveRecommendationRoster === "function"` 那道护栏。聚焦测试单独编译这两个
+  // 函数时，helper 一律按名字传递编译真实实现（沿用上面 R75 那套做法），绝不塞桩——
+  // 桩会让断言与生产各说各话；liveRecommendationRoster 的默认注入取「返回 null」，
+  // 因为它的降级语义本来就是「拿不到阵容 → 不发 roster 参数 → 后端一个提示都不生成」。
+  if (bodies.some((body) => body.includes("liveRecommendationRoster(")) && compiledDependencies.liveRecommendationRoster === undefined) {
+    compiledDependencies.liveRecommendationRoster = () => null;
+  }
+  // 顺序＝先调用方后被调用方：bodies 是边扫边追加的，被调用方要等调用方进来才扫得到。
+  for (const name of ["renderLiveRosterNoticeBars", "renderLiveTeamPortraitTags", "liveRosterChampionName", "liveNoticeBar", "liveEvidenceSuffix", "liveConfidenceText", "liveDeltaPoints"]) {
+    if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
+  }
+  // R129 P1：历史状态判据抽成 liveHistoryStateOf / liveHistorySettled，编译
+  // renderLivePlayer / renderInsightMatches 时按名字带上真实实现，不塞桩。
+  for (const name of ["liveHistoryStateOf", "liveHistorySettled"]) {
+    if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
+  }
+  // R116-E：rankedQueueData / renderRecentRanked 依赖的队列名解析 helper 一律
+  // 编译真实实现，绝不塞桩。rankedQueueLabel 以前在生产代码里根本没有定义
+  // （全仓只有本文件下面那个测试桩），真机命中即 ReferenceError——桩正是
+  // 把这个缺陷盖住的原因，所以这里按 R75/R116-B 的既有做法传递真实函数。
+  for (const name of ["rankedQueueLabel", "isMayhemQueueId", "rankedQueueNoun"]) {
     if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
   }
   const dependencyNames = Object.keys(compiledDependencies);
@@ -739,13 +775,15 @@ test("mayhem redesign keeps the two-column workspace, atlas, and R6 recommendati
   // 指标改成与斗魂同款的带标签列，不再是一行串起来的文字。
   assert.match(script, /\["胜率", percent\(item\.winRate\), "is-win"\]/);
   assert.match(script, /\["样本", compactNumber\(item\.games\), ""\]/);
-  assert.match(script, /\["综合评分", number\(item\.score, 1\), "is-score"\]/);
+  // R116-B 评审整改 B4：阶段视图里这一格是英雄级的 hexScore（后端刻意不下发阶段级
+  // 评分），标签必须写明口径，不能让英雄级数字冒充阶段数值。
+  assert.match(script, /\[stage \? "综合评分（英雄级）" : "综合评分", number\(item\.score, 1\), "is-score"\]/);
   assert.match(script, /按综合评分、胜率与样本展示各品质前三项/);
   assert.match(script, /if \(!usesHexdata\(state\.augments\?\.source\)\)/);
   assert.match(script, /state\.mayhemAugmentDetail = \{ source: state\.augments\?\.source \|\| "OP\.GG", champions: \[\] \};/);
   assert.match(script, /if \(!state\.mayhemAugmentID && first\)/);
-  assert.match(script, /Patch \$\{escapeHTML\(citation\.patch\)\} · \$\{escapeHTML\(citation\.reportDate\)\} · build/);
-  assert.match(script, /function renderMeasurementTechnique\(value\)/);
+  // R128 §2.3：口径说明的转发函数与那段 citation 注释一并删除，界面上不再出现。
+  assert.doesNotMatch(script, /citation\.patch|renderMeasurementTechnique|mayhem-measurement|mayhemDetailFooter/);
   assert.match(styles, /\.mayhem-atlas\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\) minmax\(0,1fr\)/s);
   assert.match(styles, /\.mayhem-recommend-grid\s*\{[^}]*repeat\(3,minmax\(0,1fr\)\)/s);
   assert.match(styles, /\.augment-grade\.is-S/);
@@ -775,11 +813,12 @@ test("Mayhem recommendation and item ranking never request a guessed image URL",
     augmentGrade: (grade) => grade || "B",
     objectRows: (value) => Array.isArray(value) ? value : [],
     renderSourceCitation: () => "",
+    state: { mode: "aram-mayhem", mayhemStage: 0 },
   };
   dependencies.renderAssetButton = (asset) => `<button>${dependencies.assetImage(asset)}</button>`;
   const { renderMayhemRecommendedAugment, renderMayhemItemRanking, renderArenaOptionCard } = compileFunctions(
     script,
-    ["renderArenaOptionCard", "renderMayhemRecommendedAugment", "renderMayhemItemRanking"],
+    ["renderArenaOptionCard", "renderMayhemRecommendedAugment", "renderMayhemItemRanking", ...mayhemMetricHelpers],
     dependencies,
   );
   assert.equal(typeof renderArenaOptionCard, "function");
@@ -816,10 +855,11 @@ test("Mayhem and Arena augment cards render the same card shell", () => {
     compactNumber: (value) => String(value),
     assetImage: () => "<img>",
     objectRows: (value) => Array.isArray(value) ? value : [],
+    state: { mode: "aram-mayhem", mayhemStage: 0 },
   };
   const { renderArenaOptionCard, renderMayhemRecommendedAugment } = compileFunctions(
     script,
-    ["renderArenaOptionCard", "renderMayhemRecommendedAugment"],
+    ["renderArenaOptionCard", "renderMayhemRecommendedAugment", ...mayhemMetricHelpers],
     dependencies,
   );
   const arena = renderArenaOptionCard(
@@ -848,7 +888,7 @@ test("Mayhem and Arena augment cards render the same card shell", () => {
 test("Mayhem augment cards carry the augment copy in the tooltip", () => {
   const { renderMayhemRecommendedAugment } = compileFunctions(
     script,
-    ["renderArenaOptionCard", "renderMayhemRecommendedAugment", "renderAssetButton", "assetTooltip", "appendAssetNumbers"],
+    ["renderArenaOptionCard", "renderMayhemRecommendedAugment", "renderAssetButton", "assetTooltip", "appendAssetNumbers", ...mayhemMetricHelpers],
     {
       assetImage: () => "<img>",
       imageURL: imageURLStub,
@@ -859,6 +899,7 @@ test("Mayhem augment cards carry the augment copy in the tooltip", () => {
       number: (value) => String(value),
       compactNumber: (value) => String(value),
       objectRows: (value) => Array.isArray(value) ? value : [],
+      state: { mode: "aram-mayhem", mayhemStage: 0 },
     },
   );
   const markup = renderMayhemRecommendedAugment({
@@ -1007,8 +1048,19 @@ test("R6 win rates, spell fallback, patch fallback, and subtitles are explicit",
   assert.match(routes, /slice\(0, CORE_RECOMMENDATION_LIMIT\)/);
   assert.doesNotMatch(routes, /route-win-rate|renderConfigOption\(row, "route", true\)/);
   assert.match(routes, /renderConfigOption\(row, "route", false\)/);
-  assert.doesNotMatch(functionSource(script, "renderMayhemOpeningConfiguration"), /option-win-rate|renderConfigOption\(row, kind, true\)/);
-  assert.match(functionSource(script, "renderMayhemOpeningConfiguration"), /renderConfigOption\(row, kind, false\)/);
+  // R116-B P0-4：只有召唤师技能这一组显示胜率，而且走的是 renderConfigOption 的
+  // 第四个参数（statsRenderer）而不是三态开关的 null：既有的 renderOptionStats 只用
+  // hasPick/hasWin 决定整块要不要渲染，之后两格无条件输出，上游回退到只有选用率的
+  // 数据（winRate=0）时会渲染出「胜率 0.00%」。逐格判断才不会显示不存在的数据。
+  // 出门装与鞋子仍然只有选用率（false）：它们的数据里没有胜率，跟着打开就是
+  // 显示不存在的数据。renderConfigOption 的三态开关本身没改。
+  const opening = functionSource(script, "renderMayhemOpeningConfiguration");
+  assert.match(opening, /renderConfigOption\(row, kind, false\)/);
+  assert.match(opening, /renderConfigOption\(row, "spell", null, spellStats\)/);
+  assert.doesNotMatch(opening, /renderConfigOption\(row, kind, true\)|renderConfigOption\(row, "spell", true\)|option-win-rate/);
+  assert.equal((opening.match(/renderConfigOption\(/g) || []).length, 2, "开局配置只允许两处 renderConfigOption：出门装/鞋子一组，召唤师技能一组");
+  assert.doesNotMatch(opening, /skill-plan|技能加点/, "技能加点已搬到「构筑」tab");
+  assert.match(functionSource(script, "renderMayhemSkillPlan"), /renderChampionSkillPlan\(skills, false\)/);
   assert.match(functionSource(script, "renderChampionSkillPlan"), /skill-win-rate/);
   const subtitles = ["renderMayhemOpeningConfiguration", "renderMayhemItemRoutes", "renderMayhemItemRanking", "renderRecommendedAugments", "renderMayhemAtlasDetail"].map((name) => functionSource(script, name)).join("\n");
   assert.doesNotMatch(subtitles, /OP\.GG|Hexdata|hexdata|your\.gg|HexScore|globalHexScore/);
@@ -1345,9 +1397,9 @@ test("arena round 8 removals stay scoped to the arena workspace", () => {
   const coreSection = script.match(/function renderArenaCoreSection\([\s\S]*?(?=\n  function )/)?.[0] || "";
   assert.ok(coreSection, "renderArenaCoreSection source not found");
   assert.doesNotMatch(coreSection, /build\.skills|技能加点/);
-  assert.match(styles, /\.arena-option-card\.is-silver\s*\{[^}]*#9AA7B8/);
-  assert.match(styles, /\.arena-option-card\.is-gold\s*\{[^}]*#E3B341/);
-  assert.match(styles, /\.arena-option-card\.is-prismatic\s*\{[^}]*#C77DFF[^}]*#5AA9FF[^}]*#FF8AC7/);
+  assert.match(styles, /\.arena-option-card\.is-silver\s*\{[^}]*var\(--rarity-silver\)/);
+  assert.match(styles, /\.arena-option-card\.is-gold\s*\{[^}]*var\(--rarity-gold\)/);
+  assert.match(styles, /\.arena-option-card\.is-prismatic\s*\{[^}]*var\(--rarity-prismatic-a\)[^}]*var\(--rarity-prismatic-b\)[^}]*var\(--rarity-prismatic-c\)/);
 });
 
 test("arena tolerates a missing catalog and formats unknown tiers correctly", () => {
@@ -1458,9 +1510,9 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.match(gameplayStyles, /\.match-entry\s*\{[^}]*min-height:\s*118px[^}]*contain-intrinsic-size:\s*118px/);
 	assert.match(gameplayStyles, /\.arena-team-row-compact\s*\{[^}]*grid-template-columns:\s*18px minmax\(0,1fr\)/);
 	assert.match(gameplayStyles, /\.arena-rank-chip\s*\{[^}]*width:\s*18px[^}]*height:\s*18px/);
-	assert.match(gameplayStyles, /\.arena-rank-chip\.is-rank-1\s*\{[^}]*#2A1D05[^}]*#F5D372[^}]*#D9A441[^}]*#E8C468/);
-	assert.match(gameplayStyles, /\.arena-rank-chip\.is-rank-2\s*\{[^}]*#1C2027[^}]*#DDE4EC[^}]*#AFBAC8[^}]*#C7D0DC/);
-	assert.match(gameplayStyles, /\.arena-rank-chip\.is-rank-3\s*\{[^}]*#2A1A0E[^}]*#DCA070[^}]*#B87333[^}]*#C8834A/);
+	assert.match(gameplayStyles, /\.arena-rank-chip\.is-rank-1\s*\{[^}]*#2A1D05[^}]*var\(--arena-gold-start\)[^}]*var\(--arena-gold-border\)/);
+	assert.match(gameplayStyles, /\.arena-rank-chip\.is-rank-2\s*\{[^}]*#1C2027[^}]*var\(--arena-silver-start\)[^}]*var\(--arena-silver-border\)/);
+	assert.match(gameplayStyles, /\.arena-rank-chip\.is-rank-3\s*\{[^}]*#2A1A0E[^}]*var\(--arena-bronze-start\)[^}]*var\(--arena-bronze-border\)/);
   assert.doesNotMatch(gameplayScript, /if \(matchPlayerGroups\(match\)\.arena\)[\s\S]{0,220}match-detail-tabs/);
 });
 
@@ -1656,9 +1708,9 @@ test("career ranked queue switches use one recent sample and ignore season scan 
   assert.doesNotMatch(gameplayScript, /function addRankedQueueTools/);
   assert.doesNotMatch(gameplayScript, /tab\.rankedQueue\s*=/);
 
-	const { rankedQueueData } = compileFunctions(gameplayScript, ["rankedQueueData"], {
-		rankedQueueLabel: (queueId) => queueId === 440 ? "灵活组排" : "单双排",
-	});
+	// 不注入 rankedQueueLabel 桩：它现在是生产函数（R116-E 闭合的既存缺陷），
+	// compileFunctions 会按名字编译真实实现。
+	const { rankedQueueData } = compileFunctions(gameplayScript, ["rankedQueueData"]);
 	const { renderAbility, renderRecentRanked, renderPositionStats } = compileFunctions(gameplayScript, ["renderAbility", "renderRecentRanked", "renderPositionStats"], {
 		escapeHTML: (value) => String(value),
 		positionIcon: () => "",
@@ -1727,7 +1779,7 @@ test("season progress refreshes the active overview without resetting queue choi
 	const timers = [];
 	let currentTab = tab;
 	let switchDuringRefresh = false;
-	const { handleSeasonProgress } = compileFunctions(gameplayScript, ["handleSeasonProgress"], {
+	const { handleSeasonProgress } = compileFunctions(gameplayScript, ["markSeasonRefreshPending", "handleSeasonProgress"], {
 		state,
 		activeTab: () => currentTab,
 		overviewGroupForSection: () => "players",
@@ -2298,7 +2350,8 @@ test("match tier hydration is asynchronous and isolated by stable region, server
   assert.match(gameplayScript, /container\.querySelectorAll\("\[data-match-tier\]"\)/);
   assert.match(gameplayScript, /region: "kr"[\s\S]+playerRef,[\s\S]+matches,/);
   assert.match(gameplayScript, /const candidate = result\?\.\[gameID\]/);
-  assert.match(gameplayScript, /playerRefs: refs, serverId: tabServerID\(tab\)/);
+  // R127 P1-b.3 之后批次对象持有自己的 refs，请求体形状不变（playerRefs + 当前页签服务器）。
+  assert.match(gameplayScript, /playerRefs: batch\.refs, serverId: tabServerID\(tab\)/);
   assert.doesNotMatch(gameplayScript, /if \(riotTab\(tab\) \|\| !connected\(\)\) return/);
   assert.doesNotMatch(gameplayScript, /document\.querySelectorAll\(`\[data-match-tier\]/);
   assert.match(gameplayScript, /tab\.overviewRequestToken === requestToken/);
@@ -2863,6 +2916,7 @@ test("random pick pending state has distinct empty-state copy", () => {
     renderBuildRecommendation: () => "",
     renderChampionRecommendationHeader: () => "",
     recommendationEmptyPanel: (title, copy) => `<strong>${title}</strong><p>${copy}</p>`,
+    window: {},
   });
   const markup = renderRecommendationArea({ available: true, champSelectNotice: "斗魂英雄选择阶段只展示小队玩家信息", players: [{ isCurrent: true, championPickPending: true, championPickIntent: 0 }] });
   assert.match(markup, /随机待定/);
@@ -4233,12 +4287,15 @@ test("champion detail keeps conditional fourth/fifth items out of core routes", 
 });
 
 test("mayhem champion detail uses the same five-row core recommendation limit", () => {
-  const { renderMayhemItemRoutes } = compileFunctions(script, ["renderMayhemItemRoutes"], {
+  // R116-B P0-2 排序护栏：海斗的装备路线不再走 sortedGradeRows（按 grade →
+  // score → games 重排会让低样本行插队），改成保持后端直出顺序。
+  const { renderMayhemItemRoutes } = compileFunctions(script, ["renderMayhemItemRoutes", "mayhemRouteRows"], {
 	    CORE_RECOMMENDATION_LIMIT: 5,
     objectRows: (value) => Array.isArray(value) ? value : [],
-    sortedGradeRows: (rows) => rows,
     renderConfigOption: (row) => `<option data-mayhem-core="${row.id}"></option>`,
   });
+  assert.doesNotMatch(functionSource(script, "renderMayhemItemRoutes"), /sortedGradeRows/);
+  assert.doesNotMatch(functionSource(script, "mayhemRouteRows"), /sort\(/);
   const coreItems = Array.from({ length: 18 }, (_, index) => ({ id: index + 1, assets: [{ kind: "item", path: `/item-${index + 1}.png` }] }));
   const markup = renderMayhemItemRoutes({ coreItems });
 	  assert.equal((markup.match(/data-mayhem-core=/g) || []).length, 5);
@@ -4546,7 +4603,7 @@ test("live skill plan distinguishes primary, secondary, final, and ultimate cont
   assert.match(gameplayStyles, /\.skill-icon-button\s*\{[^}]*color:\s*var\(--ink\)/s);
   assert.match(gameplayStyles, /\.skill-order \.is-q b\s*\{[^}]*#57A6FF/s);
   assert.match(gameplayStyles, /\.skill-order \.is-w b\s*\{[^}]*#61C992/s);
-  assert.match(gameplayStyles, /\.skill-order \.is-e b\s*\{[^}]*#E3B341/s);
+  assert.match(gameplayStyles, /\.skill-order \.is-e b\s*\{[^}]*var\(--rarity-gold\)/s);
 });
 
 test("live skill plan keeps four distinct controls on narrow screens", () => {
@@ -6587,4 +6644,109 @@ test("R86 champion index preserves numeric/first-match/key semantics and invalid
   assert.equal(arrays, 2);
   state.catalog = null;
   assert.equal(championMeta(1), null);
+});
+
+// P2-6：`finally { if (!current()) return; loading = false }` 会把转圈永久留在 true。
+// 用户点开某个海克斯后立刻切走图鉴视图，响应回来时 current() 为 false，
+// mayhemAugmentLoading 再也不会复位。验收：复位必须无条件，用 token 决定是否 render()。
+test("R117 mayhem augment spinner resets even when the view changed mid-flight", async () => {
+	const state = {
+		mode: "aram-mayhem", mayhemView: "atlas", mayhemAugmentID: 0, mayhemAugmentRequestToken: 0,
+		mayhemAugmentLoading: false, mayhemAugmentError: "", mayhemAugmentDetail: null,
+		mayhemAugmentDetailCache: new Map(), augments: { source: "hexdata" },
+	};
+	const requested = [];
+	let renders = 0;
+	let release;
+	const functions = compileFunctions(script, ["loadMayhemAugmentDetail"], {
+		state,
+		render: () => { renders += 1; },
+		usesHexdata: (source) => source === "hexdata",
+		api: (path) => { requested.push(path); return new Promise((resolve) => { release = resolve; }); },
+	});
+	functions.loadMayhemAugmentDetail({ id: 7, key: "hex-seven" });
+	assert.equal(state.mayhemAugmentLoading, true, "请求在途时必须显示转圈");
+	assert.deepEqual(requested, ["/api/champions/augment-detail?id=7&slug=hex-seven"]);
+	const rendersWhileLoading = renders;
+	state.mayhemView = "champions"; // 用户切走图鉴视图
+	release({ source: "hexdata", champions: [{ id: 7 }] });
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(state.mayhemAugmentLoading, false, "陈旧响应不得把 mayhemAugmentLoading 永久留在 true");
+	assert.equal(state.mayhemAugmentDetail, null, "陈旧响应不得写入详情");
+	assert.equal(state.mayhemAugmentDetailCache.size, 0, "陈旧响应不得进缓存");
+	assert.equal(renders, rendersWhileLoading, "视图已切走，陈旧响应不该再触发一次重渲染");
+
+	// 视图没变时正常路径必须仍然写详情、进缓存并重渲染。
+	state.mayhemView = "atlas";
+	functions.loadMayhemAugmentDetail({ id: 7, key: "hex-seven" });
+	release({ source: "hexdata", champions: [{ id: 7 }] });
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(state.mayhemAugmentLoading, false);
+	assert.deepEqual(state.mayhemAugmentDetail, { source: "hexdata", champions: [{ id: 7 }] });
+	assert.equal(state.mayhemAugmentDetailCache.size, 1, "当前视图下的结果必须进缓存");
+	assert.ok(renders > rendersWhileLoading, "当前视图下必须重渲染");
+});
+
+// P2-5c：champions.js 曾在造出 AbortError 取消哨兵后立刻 throw new Error("联网读取超时")
+// 把它抹平。验收判据：连续两次调用同 key 的 api()，第一个 promise 的 error.name 必须是
+// RequestCancelled。这条必须是行为测试——源码子串正则在四处都有同样字符串时测不出删了哪处。
+test("R117 champions api() surfaces RequestCancelled instead of flattening it into a timeout", async () => {
+	const state = { requests: new Map() };
+	const diagnostics = [];
+	let settle;
+	const fetchStub = (path, options) => new Promise((resolve, reject) => {
+		options.signal.addEventListener("abort", () => {
+			const aborted = new Error("The operation was aborted");
+			aborted.name = "AbortError";
+			reject(aborted);
+		});
+		settle = () => resolve({ ok: true, status: 200, json: async () => ({ path }) });
+	});
+	const { api } = compileFunctions(script, ["api"], {
+		state,
+		fetch: fetchStub,
+		window: { reportFlowDiagnostic: (kind, outcome, detail) => diagnostics.push(detail) },
+	});
+	const first = api("/api/champions/augment-detail?id=7", "same-key");
+	const second = api("/api/champions/augment-detail?id=8", "same-key");
+	settle();
+	await assert.rejects(first, (error) => {
+		assert.equal(error.name, "RequestCancelled", "同 key 的第二次调用必须让第一个 promise 以 RequestCancelled 收场");
+		assert.equal(error.errorKind, undefined);
+		assert.doesNotMatch(error.message, /超时/, "取消不得被抹平成超时");
+		return true;
+	});
+	assert.deepEqual(await second, { path: "/api/champions/augment-detail?id=8" }, "第二次调用必须正常拿到结果");
+	const cancelled = diagnostics.filter((detail) => detail.errorKind === "canceled");
+	assert.equal(cancelled.length, 1, `取消必须记一条 errorKind=canceled 的埋点，实际 ${JSON.stringify(diagnostics)}`);
+	assert.equal(diagnostics.some((detail) => detail.errorKind === "timeout"), false, "取消不得记成 timeout");
+});
+
+test("R117 champions api() keeps RequestCancelled when a successful fetch is superseded", async () => {
+	const state = { requests: new Map() };
+	const diagnostics = [];
+	let resolveFetch;
+	const fetchStub = () => new Promise((resolve) => {
+		resolveFetch = resolve;
+	});
+	const { api } = compileFunctions(script, ["api"], {
+		state,
+		fetch: fetchStub,
+		window: { reportFlowDiagnostic: (kind, outcome, detail) => diagnostics.push(detail) },
+	});
+	const first = api("/api/champions/augment-detail?id=9", "replacement-key");
+	assert.equal(typeof resolveFetch, "function", "fetch 必须已正常开始并等待响应");
+	const replacement = new AbortController();
+	state.requests.set("replacement-key", replacement);
+	resolveFetch({ ok: true, status: 200, json: async () => ({ path: "/api/champions/augment-detail?id=9" }) });
+	await assert.rejects(first, (error) => {
+		assert.equal(error.name, "RequestCancelled", "成功响应发现同 key 已被取代时必须以 RequestCancelled 收场");
+		assert.equal(error.errorKind, "canceled", "取代分支必须保留 canceled 分类");
+		assert.doesNotMatch(error.message, /超时/, "取代不得被抹平成超时");
+		return true;
+	});
+	assert.equal(state.requests.get("replacement-key"), replacement, "旧请求清理不得删除新的同 key controller");
+	assert.equal(diagnostics.length, 1, `取代必须记一条失败埋点，实际 ${JSON.stringify(diagnostics)}`);
+	assert.equal(diagnostics[0].errorKind, "canceled", "取代埋点必须记录 errorKind=canceled");
+	assert.equal(diagnostics.some((detail) => detail.errorKind === "timeout"), false, "取代不得记成 timeout");
 });

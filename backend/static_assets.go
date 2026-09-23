@@ -52,7 +52,7 @@ func newStaticAssetHandler(files fs.FS) http.Handler {
 			switch path.Ext(name) {
 			case ".js", ".css", ".html", ".svg":
 				var output bytes.Buffer
-				writer, _ := gzip.NewWriterLevel(&output, gzip.BestSpeed)
+				writer, _ := gzip.NewWriterLevel(&output, gzip.DefaultCompression)
 				_, _ = writer.Write(asset.body)
 				_ = writer.Close()
 				if output.Len() < len(asset.body) {

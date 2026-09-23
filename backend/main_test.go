@@ -51,11 +51,12 @@ func TestLootIconPNGsUseRGBAColorType(t *testing.T) {
 		if colorType := data[25]; colorType != 6 {
 			t.Fatalf("%s PNG color type = %d, want 6 (RGBA)", path, colorType)
 		}
+		width, height := binary.BigEndian.Uint32(data[16:20]), binary.BigEndian.Uint32(data[20:24])
+		if width > 256 || height > 256 {
+			t.Fatalf("%s dimensions = %dx%d, want at most 256x256", path, width, height)
+		}
 		if filepath.Base(path) != "promotion-chest.png" {
 			continue
-		}
-		if width, height := binary.BigEndian.Uint32(data[16:20]), binary.BigEndian.Uint32(data[20:24]); width != 512 || height != 512 {
-			t.Fatalf("promotion chest dimensions = %dx%d, want 512x512", width, height)
 		}
 		decoded, err := png.Decode(bytes.NewReader(data))
 		if err != nil {
@@ -66,6 +67,65 @@ func TestLootIconPNGsUseRGBAColorType(t *testing.T) {
 		if cornerAlpha != 0 || centerAlpha == 0 {
 			t.Fatalf("promotion chest alpha: corner=%d center=%d", cornerAlpha, centerAlpha)
 		}
+	}
+}
+
+// P1-9：rank-crests / loot-icons 原本是显示尺寸的 6~7 倍（500px / 414px），内嵌资源
+// 白占约 1.7 MB。降采样是一次性离线落盘、没有构建期依赖，所以只能用预算测试钉住，
+// 否则下一次换图会把体积静默带回来。
+// 显示需求上界：.rank-crest-icon 78px，2x DPR 需要 156px，192px 源图仍有 1.23 倍余量。
+func TestR117EmbeddedRasterBudgetsStayDownsampled(t *testing.T) {
+	pngDimensions := func(path string) (uint32, uint32) {
+		t.Helper()
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		if len(data) < 26 || !bytes.Equal(data[:8], []byte("\x89PNG\r\n\x1a\n")) || string(data[12:16]) != "IHDR" {
+			t.Fatalf("%s is not a valid PNG with an IHDR header", path)
+		}
+		return binary.BigEndian.Uint32(data[16:20]), binary.BigEndian.Uint32(data[20:24])
+	}
+	var total int64
+	for _, group := range []struct {
+		pattern  string
+		minCount int
+		maxEdge  uint32
+	}{
+		{"web/rank-crests/*.png", 9, 192},
+		{"web/loot-icons/*.png", 6, 256},
+	} {
+		paths, err := filepath.Glob(group.pattern)
+		if err != nil {
+			t.Fatalf("%s glob: %v", group.pattern, err)
+		}
+		if len(paths) < group.minCount {
+			t.Fatalf("%s matched %d files, want at least %d (embedded set looks incomplete)", group.pattern, len(paths), group.minCount)
+		}
+		for _, path := range paths {
+			info, err := os.Stat(path)
+			if err != nil {
+				t.Fatalf("stat %s: %v", path, err)
+			}
+			total += info.Size()
+			width, height := pngDimensions(path)
+			if width > group.maxEdge || height > group.maxEdge {
+				t.Fatalf("%s dimensions = %dx%d, want at most %dpx per edge", path, width, height, group.maxEdge)
+			}
+		}
+	}
+	if total >= 700_000 {
+		t.Fatalf("rank-crests + loot-icons total = %d bytes, want < 700000", total)
+	}
+	iconInfo, err := os.Stat("web/app-icon.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if iconInfo.Size() >= 85_000 {
+		t.Fatalf("app-icon.png = %d bytes, want < 85000", iconInfo.Size())
+	}
+	if width, height := pngDimensions("web/app-icon.png"); width != 256 || height != 256 {
+		t.Fatalf("app-icon.png dimensions = %dx%d, want 256x256", width, height)
 	}
 }
 
