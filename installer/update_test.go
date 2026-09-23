@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -69,7 +70,7 @@ func TestUpdateDestinationMustExistAndBeWritable(t *testing.T) {
 	if validateUpgradeDestination(file) == nil {
 		t.Fatal("file accepted as directory")
 	}
-	if os.Geteuid() != 0 {
+	if runtime.GOOS != "windows" && os.Geteuid() != 0 {
 		os.Chmod(root, 0500)
 		defer os.Chmod(root, 0700)
 		if validateUpgradeDestination(root) == nil {

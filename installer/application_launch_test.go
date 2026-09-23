@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"os/exec"
 	"reflect"
@@ -128,7 +127,8 @@ func TestExecuteWarmCommandCancellationReapsOnlyItsChild(t *testing.T) {
 		<-waited
 		t.Fatal("warmup cancellation did not stop its child")
 	}
-	if !errors.Is(cmd.Process.Kill(), os.ErrProcessDone) {
-		t.Fatal("warm process handle was not reaped")
+	// Wait populates ProcessState for both a killed Unix child and a Windows child.
+	if cmd.ProcessState == nil {
+		t.Fatal("warm process was not reaped")
 	}
 }

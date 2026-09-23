@@ -102,6 +102,7 @@ type liveSnapshotCache struct {
 	response        gameplayLiveResponse
 	flight          *liveSnapshotFlight
 	generation      uint64
+	revision        uint64
 	cancel          context.CancelFunc
 }
 
@@ -114,6 +115,7 @@ func (c *liveSnapshotCache) invalidate() {
 		c.cancel = nil
 	}
 	c.generation++
+	c.revision++
 	c.flight = nil
 	c.mu.Unlock()
 }
@@ -135,6 +137,7 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 		c.at, c.flight = time.Time{}, nil
 		c.warmPending = false
 		c.generation++
+		c.revision++
 	}
 	ttl := 20 * time.Second
 	if phase == "ChampSelect" || phase == "GameStart" || c.response.ArenaGroupingRetryable {
@@ -145,7 +148,8 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 	wholeGame := (phase == "InProgress" || phase == "Reconnect") && c.response.GameID != 0 && gameplayLiveSnapshotComplete(c.response)
 	if !c.at.IsZero() && (wholeGame || time.Since(c.at) < ttl) {
 		response := c.response
-		generation, at := c.generation, c.at
+		// A clock tick can cover multiple writes, so at alone cannot detect replacement.
+		generation, revision := c.generation, c.revision
 		c.mu.Unlock()
 		// LCU can omit intermediate phases. Verify the game identity before
 		// consuming a warm response, even when the phase string is unchanged.
@@ -162,14 +166,16 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 			c.mu.Unlock()
 			return gameplayLiveResponse{Phase: phase}
 		}
-		if c.at != at {
+		if c.revision != revision {
 			c.mu.Unlock()
 			return a.cachedGameplayLive(ctx, client, current, phase)
 		}
 		if valid && c.warmPending && !isWarming {
 			c.warmPending, c.at = false, time.Now()
+			c.revision++
 		} else if !valid {
 			c.at, c.warmPending = time.Time{}, false
+			c.revision++
 		}
 		c.mu.Unlock()
 		if valid {
@@ -207,6 +213,7 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 		if loadCtx.Err() == nil {
 			c.at, c.response = time.Now(), response
 			c.warmPending = isWarming
+			c.revision++
 		}
 	}
 	if loadCtx.Err() != nil || c.generation != generation {

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Version = "",
     [string]$CertificateFile = "",
     [string]$CertificatePassword = "",
@@ -12,7 +12,7 @@ $desktopRoot = Join-Path $projectRoot "desktop"
 $backendRoot = Join-Path $desktopRoot "backend"
 $backendOutput = Join-Path $backendRoot "loot-service.exe"
 
-$package = Get-Content -Raw (Join-Path $desktopRoot "package.json") | ConvertFrom-Json
+$package = Get-Content -Raw -Encoding UTF8 (Join-Path $desktopRoot "package.json") | ConvertFrom-Json
 if (-not $Version) { $Version = $package.version }
 
 if ($Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$') {

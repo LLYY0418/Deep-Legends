@@ -64,3 +64,4 @@
 | R139 | 阵营位置播报设置项精简，分路默认固定开启 | 已关闭 | [WORKLIST-R139-BROADCAST-SETTINGS-DECLUTTER.md](WORKLIST-R139-BROADCAST-SETTINGS-DECLUTTER.md) | [r139-execution-ledger.md](r139-execution-ledger.md) | [r139-validation](r139-validation/)；版本 0.12.19 |
 | R140 | 旗帜列表列数、间距与详情放大；详情弹窗无滚动条 | 已关闭 | [WORKLIST-R140-R138-BANNER-SCOPE-DROPPED.md](WORKLIST-R140-R138-BANNER-SCOPE-DROPPED.md) | [r140-execution-ledger.md](r140-execution-ledger.md) | [r140-validation](r140-validation/)；版本 0.12.19 |
 | R141 | 旗帜列表优先可见尺寸：200px、1200/960 下为 4/3 列 | 已关闭 | [WORKLIST-R141-BANNER-GRID-VISIBLE-SIZE-OVER-COLUMN-COUNT.md](WORKLIST-R141-BANNER-GRID-VISIBLE-SIZE-OVER-COLUMN-COUNT.md) | [r141-execution-ledger.md](r141-execution-ledger.md) | [r141-validation](r141-validation/)；版本 0.12.19 |
+| R142 | WORKLIST-R142：首次发布到 GitHub Release（0.12.19）+ 演示截图 | 未执行 | [WORKLIST-R142-PUBLISH-FIRST-RELEASE-AND-SCREENSHOTS.md](WORKLIST-R142-PUBLISH-FIRST-RELEASE-AND-SCREENSHOTS.md) | — | — |
