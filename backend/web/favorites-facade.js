@@ -273,10 +273,11 @@
     el.grid.style.setProperty("--facade-banner-ratio", (width / height).toFixed(4));
   }
 
-  // R130 P6：头像/旗帜详情按图片自身尺寸显示。以前弹窗固定 560px、图片区域
-  // 560×560，128px 的头像被放大 4 倍多——详情图发糊就是这么来的。
+  // R130 P6：旗帜详情按原图尺寸显示；R138 按用户决定将头像详情放大 2 倍，
+  // 接受原图插值后的模糊，仍限制最大边长以免撑出屏幕。
   const DETAIL_ART_PLACEHOLDER_PX = 128;
-  const DETAIL_ART_ICON_MAX_PX = 256;
+  const DETAIL_ART_ICON_SCALE = 2;
+  const DETAIL_ART_ICON_MAX_PX = 512;
   const DETAIL_ART_BANNER_MAX_HEIGHT_PX = 320;
   function setDetailArtSize(width, height) {
     el.dialog.style.setProperty("--facade-art-width", `${Math.max(1, Math.round(width))}px`);
@@ -287,9 +288,8 @@
     const height = Number(el.dialogImage.naturalHeight);
     if (!width || !height) return;
     if (state.view === "icons") {
-      // 正方形区域，边长取图片较长边并封顶 256px；object-fit: contain 保证小于
-      // 256px 的头像按 CSS 像素 1:1 显示，绝不放大。
-      const size = Math.min(DETAIL_ART_ICON_MAX_PX, Math.max(width, height));
+      const nativeSize = Math.max(width, height);
+      const size = Math.min(DETAIL_ART_ICON_MAX_PX, nativeSize * DETAIL_ART_ICON_SCALE);
       setDetailArtSize(size, size);
       return;
     }

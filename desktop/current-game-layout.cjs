@@ -59,6 +59,7 @@ async function main(){
  await evaluate(`new Promise((resolve,reject)=>{const t=setInterval(()=>{if(document.querySelector('.current-game-card')){clearInterval(t);resolve();}},30);setTimeout(()=>{clearInterval(t);reject(Error('live card missing: '+document.querySelector('#overview-content').textContent.slice(0,700)));},8000);})`);
  const output=process.env.CURRENT_GAME_SHOTS || '/private/tmp/current-game-layout';fs.mkdirSync(output,{recursive:true});
  if(process.env.SUITE_TABS_LAYOUT==='1') { await require('./suite-tabs-layout.cjs').verify({call,evaluate,output}); return; }
+ if(process.env.R139_LAYOUT==='1') { await require('./r139-broadcast-layout.cjs').verify({call,evaluate,output}); return; }
  if(process.env.CHAMPSELECT_LAYOUT==='1') { await require('./champselect-layout.cjs').verify({call,evaluate,output}); return; }
  if(process.env.DIAGNOSTICS_1555_LAYOUT==='1') { await require('./diagnostics-1555-layout.cjs').verify({call,evaluate,output}); return; }
  if(process.env.R74_LAYOUT_SUITE==='groups') { await require('./player-group-layout.cjs').verify({call,evaluate,output}); return; }

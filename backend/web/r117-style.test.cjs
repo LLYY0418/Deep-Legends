@@ -60,7 +60,8 @@ test("R117 confirmed dead classes are absent while dynamic loot-table stays guar
 test("R117 CSS budgets do not exceed the audited baseline", () => {
   assert.ok(values("border-radius").size <= 33, "border-radius budget increased");
   assert.ok(values("padding").size <= 205, "padding budget increased");
-  assert.ok(values("gap").size <= 54, "gap budget increased");
+  // R138 的图标网格新增独立间距 20px 16px；其余 gap 取值仍受原预算约束。
+  assert.ok(values("gap").size <= 55, "gap budget increased");
 });
 
 // P3-2 / P3-3 的固定白名单（23 个 hex、20 个类名）只能防旧问题复发，换一个白名单之外

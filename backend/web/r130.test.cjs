@@ -34,7 +34,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 const appSource = read('app.js');
 const queueSource = read('image-queue.js');
-const facadeSource = read('favorites-facade.js');
+const facadeSource = process.env.R138_FACADE_SOURCE ? fs.readFileSync(process.env.R138_FACADE_SOURCE, 'utf8') : read('favorites-facade.js');
 const runtimeSource = read('runtime.js');
 const html = read('index.html');
 const css = read('app.css');
@@ -573,6 +573,11 @@ const FACADE_FUNCTIONS = [
 function facadeWindow(src = facadeSource) {
   const dom = new JSDOM('<body></body>', { url: 'http://fixture/', runScripts: 'outside-only' });
   const w = dom.window;
+  const detailConstants = ['DETAIL_ART_PLACEHOLDER_PX', 'DETAIL_ART_ICON_SCALE', 'DETAIL_ART_ICON_MAX_PX', 'DETAIL_ART_BANNER_MAX_HEIGHT_PX'].map((name) => {
+    const declaration = src.match(new RegExp(`const ${name} = \\d+;`))?.[0];
+    assert.ok(declaration, `${name} 必须从生产源码读取，避免测试常量与实现漂移`);
+    return declaration;
+  }).join('\n');
   w.eval(`(() => {
     "use strict";
     const el = {
@@ -601,9 +606,7 @@ function facadeWindow(src = facadeSource) {
       },
     };
     let bannerRatioSampled = false;
-    const DETAIL_ART_PLACEHOLDER_PX = 128;
-    const DETAIL_ART_ICON_MAX_PX = 256;
-    const DETAIL_ART_BANNER_MAX_HEIGHT_PX = 320;
+    ${detailConstants}
     ${FACADE_FUNCTIONS.map((name) => functionSource(src, name)).join('\n')}
     window.__facade = {
       el, state, syncControls, sampleBannerRatio, resetBannerRatioSample, applyDetailArtSize, setDetailArtSize,
@@ -790,7 +793,7 @@ test('R130 P5-4 拥有状态从不可用恢复后，头像开关回到用户原�
   assert.throws(() => recovery(mutated), /开关必须仍然显示用户自己的设置|恢复后开关必须回到用户原来的设置/, '把复位语句塞回去后必须测得出来');
 });
 
-test('R130 P6 头像详情按 naturalWidth×naturalHeight 1:1 显示，最大 256px', () => {
+test('R138 头像详情按原图 2 倍显示、最大 512px，旗帜详情保留 R130 尺寸', () => {
   const h = facadeWindow();
   try {
     const { api } = h;
@@ -802,9 +805,11 @@ test('R130 P6 头像详情按 naturalWidth×naturalHeight 1:1 显示，最大 25
       return [api.el.dialog.style.getPropertyValue('--facade-art-width'), api.el.dialog.style.getPropertyValue('--facade-art-height')];
     };
     api.state.view = 'icons';
-    assert.deepEqual(size(128, 128), ['128px', '128px'], '128px 的头像必须 1:1 显示，不放大');
-    assert.deepEqual(size(64, 64), ['64px', '64px'], '更小的头像也按原尺寸');
-    assert.deepEqual(size(512, 512), ['256px', '256px'], '超过 256px 封顶');
+    // R138：用户明确接受放大后的模糊，覆盖 R130 的头像 1:1 设计。
+    assert.deepEqual(size(128, 128), ['256px', '256px'], '128px 头像应放大为 256px');
+    assert.deepEqual(size(64, 64), ['128px', '128px'], '更小的头像也按 2 倍放大');
+    assert.deepEqual(size(300, 300), ['512px', '512px'], '300px 头像应封顶 512px，而不是 600px');
+    assert.deepEqual(size(512, 512), ['512px', '512px'], '原图超过上限时仍封顶 512px');
     api.state.view = 'banners';
     assert.deepEqual(size(100, 400), ['80px', '320px'], '旗帜按自身比例，高度不超过上限');
     assert.deepEqual(size(100, 200), ['100px', '200px'], '高度没到上限时按原尺寸');

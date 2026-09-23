@@ -147,10 +147,16 @@ test("R124 ownership-unavailable catalog survives a previously closed unowned to
 });
 
 test("R125 icon tiles render at native square size", () => {
-  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
+  const css = fs.readFileSync(process.env.R138_APP_CSS || path.join(__dirname, "app.css"), "utf8");
   assert.match(css, /\.facade-grid\.is-icons \{[^}]*repeat\(auto-fill, 92px\)/, "头像格子必须固定 92px，不随窗口拉伸");
   assert.match(css, /\.facade-grid\.is-icons \.skin-art \{[^}]*aspect-ratio: 1\/1/, "头像格子必须正方形");
   assert.match(css, /\.facade-grid\.is-icons \.skin-art img \{ object-fit: contain; \}/, "头像不得裁剪");
+  const iconRule = css.match(/\.facade-grid\.is-icons\s*\{([^}]*)\}/)?.[1] || "";
+  const gap = iconRule.match(/\bgap:\s*(\d+)px\s+(\d+)px\s*;/);
+  assert.ok(gap, "头像网格必须显式设置行列间距");
+  assert.ok(Number(gap[1]) >= 18 && Number(gap[2]) >= 14, `头像间距应明显变大，实际 ${gap[1]}px ${gap[2]}px`);
+  assert.doesNotMatch(iconRule, /gap:\s*12px\s+10px/, "不能退回拥挤的旧间距");
+  assert.match(css, /\.facade-grid\.is-banners\s*\{[^}]*gap:\s*12px 10px/, "旗帜间距应保持原样");
   assert.match(facadeSource, /classList\.toggle\("is-icons", state\.view === "icons"\)/);
   assert.match(facadeSource, /if \(state\.view === "icons"\) card\.title = fields\.title;/);
 });

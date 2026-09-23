@@ -144,7 +144,7 @@ func defaultWatchSettings() watchSettings {
 			AutoAccept:        watchTimedRule{DelayMS: 1500},
 			AutoReconnect:     watchTimedRule{DelayMS: 10000},
 			AutoHonor:         watchHonorRule{Strategy: "prefer-party"},
-			PositionBroadcast: watchBroadcastRule{Visibility: "self"},
+			PositionBroadcast: watchBroadcastRule{Visibility: "self", AssignedPosition: true},
 			Invitations:       watchInvitationRule{Policies: map[string]string{}},
 			AutoMatchmaking:   watchMatchmakingRule{DelayMS: 5000, MinPartySize: 1},
 		},
@@ -245,6 +245,7 @@ func normalizeWatchSettings(settings watchSettings) watchSettings {
 	default:
 		settings.Rules.PositionBroadcast.Visibility = "self"
 	}
+	settings.Rules.PositionBroadcast.AssignedPosition = true // R139: 固定开启，不再提供用户开关。
 	if settings.Rules.Invitations.Policies == nil {
 		settings.Rules.Invitations.Policies = map[string]string{}
 	}

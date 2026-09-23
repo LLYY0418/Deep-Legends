@@ -890,6 +890,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-table th:first-child, .match-table td:first-child { text-align: left; }
 .participant-link { display: flex; min-width: 130px; align-items: center; gap: 6px; padding: 0; color: var(--ink); background: transparent; border: 0; }
 .participant-link span { max-width: 118px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match-detail .participant-name.is-current-player { color: var(--primary-strong); font-weight: 750; }
 .match-table .participant-link { width: 100%; min-width: 0; justify-content: flex-start; }
 .match-table .participant-link span.participant-name { min-width: 0; max-width: none; }
 .match-table .match-score-cell { margin-inline: auto; }

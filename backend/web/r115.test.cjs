@@ -34,11 +34,33 @@ test('R115 Suite loads helpers first, retains navigation tab and replays only th
   const a=h.w.deepLegendsSections.activate('suite');assert.equal(h.styles().length,1);assert.equal(h.scripts().length,0);h.finish('champions');await new Promise(setImmediate);let detail;assert.equal(h.styles().length,2);h.finish('suite',e=>detail=e.detail);await a;assert.equal(detail.name,'suite');assert.equal(detail.navigation.tab,'sweep');
  }finally{h.close();}
 });
-test('R115 broadcast controls use server declarations, disable team-only options for self, and retain default-off choices',()=>{
- const source=read('suite.js'),start=source.indexOf('  function watchRuleControl('),end=source.indexOf('\n  function watchChoiceButtons',start);
+test('R139 broadcast controls hide options for self and show one suite-switch for team',()=>{
+ const source=process.env.R139_SUITE_SOURCE ? fs.readFileSync(process.env.R139_SUITE_SOURCE,'utf8') : read('suite.js');
+ const start=source.indexOf('  function watchRuleControl('),end=source.indexOf('\n  function watchChoiceButtons',start);
  const state={watch:{broadcastOptions:[{key:'camp',label:'阵营位置',template:'SOURCE CAMP'},{key:'teamComposition',label:'己方英雄',template:'SOURCE LINEUP',teamOnly:true},{key:'assignedPosition',label:'我的分路',template:'SOURCE POSITION'}]}};
  const render=Function('state','escapeHTML','watchChoiceButtons',source.slice(start,end)+';return watchRuleControl')(state,String,()=> '');
- const dom=new JSDOM(render({control:'visibility'},{visibility:'self'}));try{const inputs=[...dom.window.document.querySelectorAll('input')];assert.equal(inputs.length,3);assert.equal(inputs[0].checked,true);assert.equal(inputs[1].disabled,true);assert.equal(inputs[1].checked,false);assert.equal(inputs[2].checked,false);assert.match(dom.window.document.body.textContent,/SOURCE CAMP.*SOURCE LINEUP.*SOURCE POSITION/s);}finally{dom.window.close();}
+ for (const [visibility, enabled] of [['self',false],['team',false],['team',true]]) {
+  const dom=new JSDOM(render({control:'visibility'},{visibility,teamComposition:enabled}));
+  try {
+   const {document}=dom.window;
+   const inputs=[...document.querySelectorAll('input')];
+   if (visibility==='self') {
+    assert.equal(inputs.length,0,'仅自己可见时不渲染选项');
+    assert.equal(document.querySelector('.watch-broadcast-options'),null,'仅自己可见时选项节点不存在');
+   } else {
+    assert.equal(inputs.length,1,'队伍频道只有一个选项');
+    assert.equal(inputs[0].dataset.watchBroadcast,'teamComposition');
+    assert.equal(inputs[0].disabled,false);
+    assert.equal(inputs[0].checked,enabled);
+    assert.ok(document.querySelector('.suite-switch input[data-watch-broadcast="teamComposition"]'),'须使用全站统一开关');
+    assert.match(document.body.textContent,/己方英雄.*SOURCE LINEUP/s);
+    assert.doesNotMatch(document.body.textContent,/SOURCE CAMP|SOURCE POSITION/);
+   }
+  } finally {dom.window.close();}
+ }
+ const css=read('suite.css');
+ assert.match(css,/\.watch-broadcast-row\s*\{/);
+ assert.doesNotMatch(css,/\.watch-broadcast-option\s*\{/);
  assert.match(source,/state.watch.rules.positionBroadcast\[input.dataset.watchBroadcast\] = input.checked/);
 });
 test('R115 shared blocks keep critical geometry while optional CSS waits for its section',()=>{

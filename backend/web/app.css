@@ -1158,7 +1158,7 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 .facade-detail-dialog .dialog-art { width: var(--facade-art-width, 128px); max-width: 100%; height: var(--facade-art-height, 128px); aspect-ratio: auto; margin: 12px auto 0; }
 .facade-detail-dialog .dialog-art-primary { object-fit: contain; background: var(--surface-strong); }
 .facade-detail-dialog .dialog-copy > p { margin: 0; font-size: 12px; }
-.facade-grid.is-icons { grid-template-columns: repeat(auto-fill, 92px); justify-content: start; gap: 12px 10px; }
+.facade-grid.is-icons { grid-template-columns: repeat(auto-fill, 92px); justify-content: start; gap: 20px 16px; }
 .facade-grid.is-icons .skin-card { contain-intrinsic-size: auto 124px; }
 .facade-grid.is-icons .skin-art { width: 92px; aspect-ratio: 1/1; border-radius: 8px; }
 .facade-grid.is-icons .skin-art img { object-fit: contain; }

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -142,8 +144,11 @@ func TestR115_BroadcastContentsAndGuards(t *testing.T) {
 func TestR115_BroadcastDefaultsAndMissingData(t *testing.T) {
 	s := defaultWatchSettings()
 	json.Unmarshal([]byte(`{"rules":{"positionBroadcast":{"enabled":true,"visibility":"team"}}}`), &s)
-	if s.Rules.PositionBroadcast.TeamComposition || s.Rules.PositionBroadcast.AssignedPosition {
+	if s.Rules.PositionBroadcast.TeamComposition {
 		t.Fatal("upgrade enabled new messages")
+	}
+	if !s.Rules.PositionBroadcast.AssignedPosition {
+		t.Fatal("R139: assigned position must default on, it is no longer user-configurable")
 	}
 	s.Rules.PositionBroadcast.Visibility = "garbage"
 	if normalizeWatchSettings(s).Rules.PositionBroadcast.Visibility != "self" {
@@ -160,6 +165,28 @@ func TestR115_BroadcastDefaultsAndMissingData(t *testing.T) {
 	options := positionBroadcastOptions()
 	if options[0].Template != watchCampPrefix+"蓝色方 / 红色方" || !strings.HasPrefix(options[1].Template, watchLineupPrefix) || !strings.HasPrefix(options[2].Template, watchPositionPrefix) {
 		t.Fatal("declaration drift")
+	}
+}
+
+func TestR139_BroadcastAssignedPositionLegacyOffIsNormalized(t *testing.T) {
+	store := trackTestStore(t, &localStore{root: t.TempDir()})
+	old := []byte(`{"rules":{"positionBroadcast":{"enabled":true,"visibility":"team","teamComposition":false,"assignedPosition":false}}}`)
+	if err := os.WriteFile(filepath.Join(store.root, convenienceSettingsFile), old, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded := loadWatchSettings(store)
+	if !loaded.Rules.PositionBroadcast.AssignedPosition {
+		t.Fatal("R139: old saved false value must be normalized to true")
+	}
+	if loaded.Rules.PositionBroadcast.TeamComposition || loaded.Rules.PositionBroadcast.Visibility != "team" {
+		t.Fatalf("other broadcast settings changed: %+v", loaded.Rules.PositionBroadcast)
+	}
+	loaded.Rules.PositionBroadcast.AssignedPosition = false
+	if err := saveWatchSettings(store, loaded); err != nil {
+		t.Fatal(err)
+	}
+	if !loadWatchSettings(store).Rules.PositionBroadcast.AssignedPosition {
+		t.Fatal("R139: save must not persist a false assigned-position value")
 	}
 }
 func TestR115_BroadcastUncertainWriteIsNotRetried(t *testing.T) {

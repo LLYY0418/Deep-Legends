@@ -324,12 +324,11 @@
       return watchChoiceButtons("autoHonor.strategy", rule.strategy, [["prefer-party", "优先房间队友"], ["party-only", "仅房间队友"], ["any-teammate", "任意队友"], ["abstain", "弃票"]], "点赞策略");
     }
     if (definition.control === "visibility") {
-      const options = (state.watch?.broadcastOptions || []).map(option => {
-        const fixed = option.key === "camp";
-        const disabled = fixed || (option.teamOnly && rule.visibility !== "team");
-        return `<label class="watch-broadcast-option"><input type="checkbox" data-watch-broadcast="${escapeHTML(option.key)}"${fixed || rule[option.key] ? " checked" : ""}${disabled ? " disabled" : ""}> ${escapeHTML(option.label)}<small>发送格式：${escapeHTML(option.template)}</small></label>`;
-      }).join("");
-      return watchChoiceButtons("positionBroadcast.visibility", rule.visibility, [["self", "仅自己可见"], ["team", "发到队伍频道"]], "播报范围") + `<div class="watch-broadcast-options">${options}</div>`;
+      const teamComposition = (state.watch?.broadcastOptions || []).find(option => option.key === "teamComposition");
+      const optionsHTML = rule.visibility === "team" && teamComposition
+        ? `<div class="watch-broadcast-options"><div class="watch-broadcast-row"><span><strong>${escapeHTML(teamComposition.label)}</strong><small>发送格式：${escapeHTML(teamComposition.template)}</small></span><label class="suite-switch"><input type="checkbox" aria-label="${escapeHTML(teamComposition.label)}" data-watch-broadcast="teamComposition"${rule.teamComposition ? " checked" : ""}><span class="sr-only">${escapeHTML(teamComposition.label)}</span></label></div></div>`
+        : "";
+      return watchChoiceButtons("positionBroadcast.visibility", rule.visibility, [["self", "仅自己可见"], ["team", "发到队伍频道"]], "播报范围") + optionsHTML;
     }
     if (definition.control === "matchmaking") {
       return `<div class="watch-parameter-fields"><label><span>最少人数</span><span class="select-wrap"><select class="suite-select watch-compact-select" data-watch-number="autoMatchmaking.minPartySize">${[1,2,3,4,5].map((value) => `<option value="${value}"${selected(Number(rule.minPartySize), value)}>${value}</option>`).join("")}</select></span></label><label><span>延时</span><span class="select-wrap"><select class="suite-select watch-compact-select" data-watch-number="autoMatchmaking.delayMs">${[0,1000,3000,5000,10000,15000,30000].map((value) => `<option value="${value}"${selected(Number(rule.delayMs), value)}>${formatDelay(value)}</option>`).join("")}</select></span></label></div>`;
@@ -457,7 +456,7 @@
       await saveWatch();
     });
     for (const input of roots.watch.querySelectorAll("[data-watch-broadcast]")) input.addEventListener("change", async () => {
-      if (!["teamComposition", "assignedPosition"].includes(input.dataset.watchBroadcast)) return;
+      if (input.dataset.watchBroadcast !== "teamComposition") return;
       state.watch.rules.positionBroadcast[input.dataset.watchBroadcast] = input.checked;
       await saveWatch();
     });

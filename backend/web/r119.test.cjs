@@ -26,7 +26,7 @@ const positionLabel = (value) => ({ top: '上路', jungle: '打野', middle: '�
 const escapeHTML = (value) => String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
 function detailHarness() {
-  return compile('gameplay.js', ['matchTableRows', 'autofillChip'], {
+  return compile('gameplay.js', ['isCurrentMatchParticipant', 'matchTableRows', 'autofillChip'], {
     positionLabel,
     escapeHTML,
     playerParticipantName: (player) => player.gameName,
@@ -69,6 +69,23 @@ test('R119 详情概览的队友/对手行按参与者逐个决定是否带补�
   assert.doesNotMatch(html, /换位中单<\/span><b/, '换位的行不能带标签');
   const withoutEvidence = context.matchTableRows([{ participantId: 1, gameName: '正常选位', position: 'top' }], scores);
   assert.equal(withoutEvidence.includes('补位'), false, '没有 autofill 字段时整行不该出现「补位」二字');
+});
+
+test('总览战绩详情只突出当前玩家名称', () => {
+  const context = detailHarness();
+  const players = [
+    { participantId: 1, gameName: '队友' },
+    { participantId: 2, gameName: '当前玩家' },
+    { participantId: 3, gameName: '对手' },
+  ];
+  const html = context.matchTableRows(players, new Map(), { subjectParticipantId: 2 });
+  assert.equal((html.match(/participant-name is-current-player/g) || []).length, 1);
+  assert.match(html, /<span class="participant-name is-current-player">当前玩家<\/span>/);
+  assert.match(html, /<span class="participant-name">队友<\/span>/);
+  assert.match(html, /<span class="participant-name">对手<\/span>/);
+  assert.doesNotMatch(context.matchTableRows(players, new Map(), {}), /is-current-player/, '缺少可靠 ID 时不猜测当前玩家');
+  const css = read('gameplay.css');
+  assert.match(css, /\.match-detail \.participant-name\.is-current-player\s*\{[^}]*color:\s*var\(--primary-strong\);[^}]*font-weight:\s*750;/);
 });
 
 test('R119 补位标签复用现有 chip 尺寸与主题令牌，不写死颜色', () => {

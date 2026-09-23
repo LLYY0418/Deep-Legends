@@ -3558,11 +3558,16 @@
     return `<div id="match-detail-${match.gameId}" class="match-detail"><div class="match-detail-head"><div class="match-detail-tabs" role="tablist" aria-label="对局详情">${detailTab("overview", "概览")}${detailTab("team", "队伍分析")}${detailTab("build", "构建")}</div></div><div id="${panelID}" role="tabpanel" aria-labelledby="match-detail-tab-${active}-${match.gameId}">${active === "overview" ? renderMatchOverview(match) : active === "team" ? renderTeamAnalysis(match, tab) : renderBuild(match, subject, tab)}</div></div>`;
   }
 
-  function matchTableRows(players, scores) {
+  function isCurrentMatchParticipant(item, match) {
+    const subjectID = Number(match?.subjectParticipantId);
+    return subjectID > 0 && Number(item.participantId) === subjectID;
+  }
+
+  function matchTableRows(players, scores, match) {
     return players.map((item, index) => {
       const record = scores.get(Number(item.participantId));
       const name = playerParticipantName(item, index);
-      return `<tr><td><button class="participant-link" type="button" ${item.playerRef ? `data-player-ref="${escapeHTML(item.playerRef)}" ${proBadgeAttributes(item)}` : "disabled"} data-tooltip="${escapeHTML(name)}" data-tooltip-overflow=".participant-name" data-tooltip-size="compact">${iconFigure("champion", item.championId, item.championName, "small")}<span class="participant-name">${escapeHTML(name)}</span>${autofillChip(item)}</button></td><td>${renderMatchScoreCell(record)}</td><td>${number(item.kills)} / ${number(item.deaths)} / ${number(item.assists)}<small>${kda(item.kda)}:1</small></td><td>${number(item.damage)}<small>承伤 ${number(item.damageTaken)}</small></td><td>${number(item.wardsPlaced)} / ${number(item.wardsKilled)}</td><td>${number(item.cs)}<small>${number(item.csPerMinute)}/分钟</small></td><td><div class="table-items">${renderItemIcons(item.itemIds || [], "small")}</div></td></tr>`;
+      return `<tr><td><button class="participant-link" type="button" ${item.playerRef ? `data-player-ref="${escapeHTML(item.playerRef)}" ${proBadgeAttributes(item)}` : "disabled"} data-tooltip="${escapeHTML(name)}" data-tooltip-overflow=".participant-name" data-tooltip-size="compact">${iconFigure("champion", item.championId, item.championName, "small")}<span class="participant-name${isCurrentMatchParticipant(item, match) ? " is-current-player" : ""}">${escapeHTML(name)}</span>${autofillChip(item)}</button></td><td>${renderMatchScoreCell(record)}</td><td>${number(item.kills)} / ${number(item.deaths)} / ${number(item.assists)}<small>${kda(item.kda)}:1</small></td><td>${number(item.damage)}<small>承伤 ${number(item.damageTaken)}</small></td><td>${number(item.wardsPlaced)} / ${number(item.wardsKilled)}</td><td>${number(item.cs)}<small>${number(item.csPerMinute)}/分钟</small></td><td><div class="table-items">${renderItemIcons(item.itemIds || [], "small")}</div></td></tr>`;
     }).join("");
   }
 
@@ -3580,7 +3585,7 @@
     const teams = grouping.groups.map((group) => {
       const teamID = group.teamId;
       const team = (match.teams || []).find((item) => item.teamId === teamID) || {};
-      return `<section class="team-overview is-${teamID === 100 ? "blue" : "red"}"><header><strong>${teamID === 100 ? "蓝方" : "红方"}${team.win ? " · 胜利" : ""}</strong><span>${number(team.kills)} 击杀 · ${number(team.gold)} 金币</span></header>${matchTableShell(matchTableRows(group.players, scores))}</section>`;
+      return `<section class="team-overview is-${teamID === 100 ? "blue" : "red"}"><header><strong>${teamID === 100 ? "蓝方" : "红方"}${team.win ? " · 胜利" : ""}</strong><span>${number(team.kills)} 击杀 · ${number(team.gold)} 金币</span></header>${matchTableShell(matchTableRows(group.players, scores, match))}</section>`;
     }).join("");
     return `<div class="match-overview-teams">${teams}</div>`;
   }
@@ -3597,7 +3602,7 @@
       const players = group.players.map((item, index) => {
         const record = scores.get(Number(item.participantId));
         const name = playerParticipantName(item, index);
-		return `<div class="arena-detail-player"><button class="participant-link" type="button" ${item.playerRef ? `data-player-ref="${escapeHTML(item.playerRef)}" ${proBadgeAttributes(item)}` : "disabled"} data-tooltip="${escapeHTML(name)}" data-tooltip-overflow=".participant-name" data-tooltip-size="compact">${iconFigure("champion", item.championId, item.championName, "small")}<span class="participant-name">${escapeHTML(name)}</span></button><span class="arena-detail-augments">${(item.augmentIds || []).slice(0, 6).map((id) => augmentIconFigure(id, "small")).join("")}</span>${renderMatchScoreCell(record)}<span class="arena-detail-kda"><b>${number(item.kills)} / ${number(item.deaths)} / ${number(item.assists)}</b><small>${kda(item.kda)}:1 KDA</small></span><span class="arena-detail-damage" aria-label="${escapeHTML(`伤害 ${plainInteger(item.damage)}，承伤 ${plainInteger(item.damageTaken)}`)}" data-tooltip="${escapeHTML(`伤害 ${number(item.damage)} · 承伤 ${number(item.damageTaken)}`)}" data-tooltip-size="compact"><b class="match-damage-value">${plainInteger(item.damage)}</b><i aria-hidden="true">/</i><b class="match-taken-value">${plainInteger(item.damageTaken)}</b></span><span class="arena-detail-items">${renderItemIcons(item.itemIds || [], "small")}</span></div>`;
+		return `<div class="arena-detail-player"><button class="participant-link" type="button" ${item.playerRef ? `data-player-ref="${escapeHTML(item.playerRef)}" ${proBadgeAttributes(item)}` : "disabled"} data-tooltip="${escapeHTML(name)}" data-tooltip-overflow=".participant-name" data-tooltip-size="compact">${iconFigure("champion", item.championId, item.championName, "small")}<span class="participant-name${isCurrentMatchParticipant(item, match) ? " is-current-player" : ""}">${escapeHTML(name)}</span></button><span class="arena-detail-augments">${(item.augmentIds || []).slice(0, 6).map((id) => augmentIconFigure(id, "small")).join("")}</span>${renderMatchScoreCell(record)}<span class="arena-detail-kda"><b>${number(item.kills)} / ${number(item.deaths)} / ${number(item.assists)}</b><small>${kda(item.kda)}:1 KDA</small></span><span class="arena-detail-damage" aria-label="${escapeHTML(`伤害 ${plainInteger(item.damage)}，承伤 ${plainInteger(item.damageTaken)}`)}" data-tooltip="${escapeHTML(`伤害 ${number(item.damage)} · 承伤 ${number(item.damageTaken)}`)}" data-tooltip-size="compact"><b class="match-damage-value">${plainInteger(item.damage)}</b><i aria-hidden="true">/</i><b class="match-taken-value">${plainInteger(item.damageTaken)}</b></span><span class="arena-detail-items">${renderItemIcons(item.itemIds || [], "small")}</span></div>`;
       }).join("");
       return `<section class="arena-detail-team${tone}"><header><b>#${number(group.placement || "—")}</b>${emblem}<strong>${escapeHTML(team.name)}</strong><span>${number(kills)} 击杀 · ${compactNumber(damage)} 伤害</span></header><div class="arena-detail-player-list">${players}</div></section>`;
     }).join("");
