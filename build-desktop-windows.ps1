@@ -90,6 +90,16 @@ try {
     } finally {
         Pop-Location
     }
+
+    # Web and desktop tests import jsdom from desktop/node_modules.
+    Push-Location $desktopRoot
+    try {
+        if (Test-Path "package-lock.json") { npm ci } else { npm install }
+        if ($LASTEXITCODE -ne 0) { throw "Desktop dependencies install failed" }
+    } finally {
+        Pop-Location
+    }
+
     node --check backend/web/app.js
     if ($LASTEXITCODE -ne 0) { throw "backend/web/app.js syntax check failed" }
     node --check backend/web/champions.js
@@ -142,9 +152,6 @@ try {
 
     Push-Location $desktopRoot
     try {
-        if (Test-Path "package-lock.json") { npm ci } else { npm install }
-        if ($LASTEXITCODE -ne 0) { throw "Desktop dependencies install failed" }
-
         # 文件名使用版本号；诊断与构建核验仍保留源码指纹。
         $env:DEEP_LEGENDS_FINGERPRINT = $sourceFingerprint
         $builderSignArgs = @()
