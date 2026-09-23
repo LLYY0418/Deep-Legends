@@ -6,6 +6,11 @@ $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 if ($env:OS -ne "Windows_NT") { throw "Run this script on Windows." }
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = New-Object -TypeName Security.Principal.WindowsPrincipal -ArgumentList $identity
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw "Open PowerShell as Administrator before running this script; Windows symlink tests require it."
+}
 
 # An elevated PowerShell may find an old per-user Node before the system Node.
 $systemNode = "C:\Program Files\nodejs\node.exe"
