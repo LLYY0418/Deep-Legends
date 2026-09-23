@@ -52,6 +52,8 @@ var riotAPIKeyCipher = ""
 
 var riotAPIKey = ""
 
+var errRiotKeyMissing = errors.New("此安装包未内置 Riot API Key，韩服战绩暂不可用。")
+
 // riotCipherKey 由分散的固定片段派生解密密钥；仅用于混淆，见上方说明。
 func riotCipherKey() []byte {
 	parts := []string{"deep", "legends", "hexcore", "loot", "kr-riot-channel", "v1"}
@@ -194,12 +196,38 @@ type riotOverviewCostTracker struct {
 	rateLimitedCount   int
 	matchesFailed      int
 	firstErrorKind     string
+	accountErrorKind   string
 	queueWait          time.Duration
 	matchesFromMemory  int
 	matchesFromNetwork int
 	matchesFromDisk    int
 	inFlight           int
 	peakInFlight       int
+}
+
+func (t *riotOverviewCostTracker) recordAccountFailure(err error) {
+	if t == nil || err == nil {
+		return
+	}
+	if errors.Is(err, context.Canceled) {
+		return
+	}
+	kind := championProviderErrorKind(err)
+	if errors.Is(err, errRiotKeyMissing) {
+		kind = "riot_key_missing"
+	}
+	t.mu.Lock()
+	t.accountErrorKind = kind
+	t.mu.Unlock()
+}
+
+func (t *riotOverviewCostTracker) accountFailureSnapshot() string {
+	if t == nil {
+		return ""
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.accountErrorKind
 }
 
 func (t *riotOverviewCostTracker) recordMatchFailure(err error) {
@@ -417,7 +445,7 @@ func (p *riotProvider) get(ctx context.Context, host, requestPath string, query 
 // （timeline）包含逐帧事件，体积可达数 MB，需要比常规接口更大的额度。
 func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string, query url.Values, out any, responseMax int64) error {
 	if !riotKeyConfigured() {
-		return errors.New("尚未配置 Riot API Key：请用 -encrypt-riot-key 生成密文，构建时通过 -ldflags \"-X main.riotAPIKeyCipher=<密文>\" 注入（临时调试可用环境变量 RIOT_API_KEY）")
+		return errRiotKeyMissing
 	}
 	scope := riotRequestRateScope(host, requestPath)
 	ctx = context.WithValue(ctx, riotRateScopeKey{}, scope)
@@ -1286,6 +1314,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			"event": "riot_overview_cost", "duration_ms": time.Since(started).Milliseconds(),
 			"matches_requested": matchesRequested, "matches_loaded": matchesLoaded,
 			"matches_failed": matchesFailed, "first_error_kind": firstErrorKind,
+			"error_kind":         tracker.accountFailureSnapshot(),
 			"rate_limited_count": tracker.rateLimitCount(),
 			"limiter_queue_ms":   tracker.queueWait.Milliseconds(), "matches_from_disk": tracker.matchesFromDisk,
 			"matches_from_memory": tracker.matchesFromMemory, "matches_from_network": tracker.matchesFromNetwork,
@@ -1318,11 +1347,14 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		}
 		if errors.Is(err, errRiotNotFound) {
 			if tagLine == "" {
+				tracker.recordAccountFailure(err)
 				return gameplayOverview{}, riotNotFoundError("没有找到玩家「%s」：请补全 # 后的编号，或核对名称拼写", gameName)
 			}
+			tracker.recordAccountFailure(err)
 			return gameplayOverview{}, riotNotFoundError("没有找到 Riot ID「%s#%s」：编号可能不对（并非所有玩家都是 KR1），请核对后重试", gameName, tagLine)
 		}
 		if err != nil {
+			tracker.recordAccountFailure(err)
 			return gameplayOverview{}, err
 		}
 		puuid = account.PUUID

@@ -205,3 +205,33 @@ func TestRiotOverviewCostTrackerIgnoresCancellation(t *testing.T) {
 		t.Fatalf("failure snapshot = (%d, %q), want one non-cancellation failure", failed, kind)
 	}
 }
+
+func TestR136MissingRiotKeyIsUserFacingAndDiagnosedAtAccountLookup(t *testing.T) {
+	t.Setenv("RIOT_API_KEY", "")
+	previousCipher, previousPlain := riotAPIKeyCipher, riotAPIKey
+	riotAPIKeyCipher, riotAPIKey = "", ""
+	defer func() { riotAPIKeyCipher, riotAPIKey = previousCipher, previousPlain }()
+	if riotKeyConfigured() {
+		t.Fatal("test requires a missing Riot key")
+	}
+	var cost map[string]any
+	champions := newChampionProvider()
+	champions.diag = func(event map[string]any) {
+		if event["event"] == "riot_overview_cost" {
+			cost = event
+		}
+	}
+	a := &app{riot: newRiotProvider(champions)}
+	_, err := a.loadRiotOverview(context.Background(), gameplayReference{GameName: "Chovy", TagLine: "KR1", Region: riotRegionKR}, 0, 10)
+	if !errors.Is(err, errRiotKeyMissing) {
+		t.Fatalf("missing-key error = %v", err)
+	}
+	for _, developerInstruction := range []string{"ldflags", "encrypt-riot-key", "riotAPIKeyCipher"} {
+		if strings.Contains(err.Error(), developerInstruction) {
+			t.Fatalf("developer instruction %q leaked to user: %q", developerInstruction, err)
+		}
+	}
+	if cost == nil || cost["error_kind"] != "riot_key_missing" || cost["matches_requested"] != 0 {
+		t.Fatalf("account-stage cost = %#v", cost)
+	}
+}

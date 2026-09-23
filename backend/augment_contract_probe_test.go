@@ -292,7 +292,7 @@ func TestR116AugmentContractProbeMutation(t *testing.T) {
 // /swagger/v3/openapi.json 与 v2 都 404，只有 /help?format=Full 返回 200。
 // 此时 count == 0 绝不能被读成「确证客户端没有海克斯端点」。
 func TestR116AugmentContractProbeUnreadableContractIsNotConclusive(t *testing.T) {
-	help := []byte(`{"functions":[{"uri":"/lol-champ-select/v1/session"},{"uri":"/lol-cherry-augments/v1/select"},{"uri":"/lol-missions/v1/missions"}]}`)
+	help := []byte(`{"functions":[{"name":"GetLolCherryV1AugmentOffer"},{"uri":"/lol-missions/v1/missions"}],"events":[{"name":"OnJsonApiEvent_lol-champ-select"}],"types":[{"name":"LolLobby"}]}`)
 	server, writes := r116ProbeServer(t, r116OpenAPIFixture(true), http.StatusNotFound, help)
 	a, store := r116ProbeApp(t, server)
 	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
@@ -314,18 +314,21 @@ func TestR116AugmentContractProbeUnreadableContractIsNotConclusive(t *testing.T)
 	if fallback == nil {
 		t.Fatalf("missing help fallback event: %v", events)
 	}
-	if int(fallback["count"].(float64)) != 1 {
-		t.Fatalf("format-independent fallback missed the cherry path: %v", fallback)
+	if int(fallback["count"].(float64)) != 1 || fallback["negative_conclusive"] != false {
+		t.Fatalf("structured help scan missed the camel-case function: %v", fallback)
 	}
-	matched, _ := json.Marshal(fallback["matched_paths"])
-	if !strings.Contains(string(matched), "/lol-cherry-augments/v1/select") {
-		t.Fatalf("matched path not recorded: %s", matched)
+	matched, _ := json.Marshal(fallback["matched_items"])
+	if !strings.Contains(string(matched), "GetLolCherryV1AugmentOffer") {
+		t.Fatalf("matched function not recorded: %s", matched)
 	}
 	if strings.Contains(string(matched), "/lol-missions/v1/missions") {
 		t.Fatalf("unrelated namespace recorded: %s", matched)
 	}
 	if fallback["root_keys"] == nil || fallback["json_root"] != "object" {
 		t.Fatalf("root shape not recorded (R82 4.2-1 requires shape before guessing): %v", fallback)
+	}
+	if fallback["functions_scanned"] != float64(2) || fallback["events_scanned"] != float64(1) || fallback["types_scanned"] != float64(1) {
+		t.Fatalf("help array scan counts wrong: %v", fallback)
 	}
 	summary := r116ProbeEvents(t, store, "augment_contract_probe_summary")
 	if summary[0]["contract_read_any"] != true || summary[0]["negative_conclusive_all"] != false {
@@ -339,7 +342,7 @@ func TestR116AugmentContractProbeUnreadableContractIsNotConclusive(t *testing.T)
 // TestR116AugmentContractProbeZeroEverywhereIsConclusive 是「确证无端点」这条判据的
 // 正向样例：三份来源都可读且零命中时，才允许写 negative_conclusive_all。
 func TestR116AugmentContractProbeZeroEverywhereIsConclusive(t *testing.T) {
-	help := []byte(`{"functions":[{"uri":"/lol-missions/v1/missions"},{"uri":"/lol-champ-select/v1/session"}]}`)
+	help := []byte(`{"functions":[{"uri":"/lol-missions/v1/missions"},{"uri":"/lol-champ-select/v1/session"}],"events":[],"types":[]}`)
 	server, _ := r116ProbeServer(t, r116OpenAPIFixture(false), http.StatusOK, help)
 	a, store := r116ProbeApp(t, server)
 	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
@@ -356,27 +359,59 @@ func TestR116AugmentContractProbeZeroEverywhereIsConclusive(t *testing.T) {
 	}
 }
 
-// TestR116AugmentProbeTextScanIsBounded 保证 3 MB 级契约文本的兜底扫描有硬上限，
-// 且明细被截断时 count 仍然是全量命中数（判据不被截断污染）。
-func TestR116AugmentProbeTextScanIsBounded(t *testing.T) {
+// 全量计数与明细上限分离；扫描元素超过硬上限时不下否定结论。
+func TestR136AugmentHelpScanIsBounded(t *testing.T) {
 	var builder strings.Builder
 	builder.WriteString(`{"functions":[`)
-	for i := 0; i < augmentProbeTextPathLimit+40; i++ {
+	for i := 0; i < augmentProbeOperationLimit+40; i++ {
 		if i > 0 {
 			builder.WriteString(",")
 		}
-		fmt.Fprintf(&builder, `{"uri":"/lol-augment-%d/v1/offer"}`, i)
+		fmt.Fprintf(&builder, `{"name":"GetLolCherryAugment%d"}`, i)
 	}
-	builder.WriteString(`]}`)
-	matched, stats := augmentProbeTextPaths([]byte(builder.String()))
-	if stats.MatchedPaths != augmentProbeTextPathLimit+40 {
-		t.Fatalf("count must stay complete under truncation: %d", stats.MatchedPaths)
+	builder.WriteString(`],"events":[],"types":[]}`)
+	matched, _, stats := augmentProbeHelpDocument([]byte(builder.String()))
+	if stats.Count != augmentProbeOperationLimit+40 {
+		t.Fatalf("count must stay complete under truncation: %d", stats.Count)
 	}
-	if len(matched) != augmentProbeTextPathLimit || !stats.Truncated {
+	if len(matched) != augmentProbeOperationLimit || !stats.Truncated {
 		t.Fatalf("retained list must be bounded: %d truncated=%t", len(matched), stats.Truncated)
 	}
-	if _, over := augmentProbeTextPaths(make([]byte, 0)); over.Tokens != 0 {
-		t.Fatal("empty body must scan nothing")
+	if stats.Complete {
+		t.Fatal("truncated detail must not authorize a conclusive negative")
+	}
+}
+
+func TestR136AugmentHelpRequiresAllArraysAndAllElements(t *testing.T) {
+	for _, input := range []string{
+		`{"events":[],"types":[]}`,
+		`{"functions":{},"events":[],"types":[]}`,
+	} {
+		_, _, stats := augmentProbeHelpDocument([]byte(input))
+		if stats.Complete {
+			t.Fatalf("incomplete help was conclusive: %s", input)
+		}
+	}
+	var builder strings.Builder
+	builder.WriteString(`{"functions":[`)
+	for i := 0; i <= augmentProbeHelpElementLimit; i++ {
+		if i != 0 {
+			builder.WriteByte(',')
+		}
+		builder.WriteString(`{"name":"Unrelated"}`)
+	}
+	builder.WriteString(`],"events":[],"types":[]}`)
+	_, _, stats := augmentProbeHelpDocument([]byte(builder.String()))
+	if stats.Complete || !stats.LimitReached || stats.Scanned["functions"] != augmentProbeHelpElementLimit {
+		t.Fatalf("limit did not revoke conclusion: %+v", stats)
+	}
+}
+
+func TestR136AugmentHelpScansNestedPathsAndSeparatesStaticCatalog(t *testing.T) {
+	raw := []byte(`{"functions":[{"name":"GetLolCherryV1AugmentOffer","parameters":{"route":{"path":"/lol-mayhem/v1/offer"}}},{"name":"StaticAssets","url":"/lol-game-data/assets/v1/cherry-augments.json"}],"events":[],"types":[]}`)
+	matched, static, stats := augmentProbeHelpDocument(raw)
+	if !stats.Complete || stats.Count != 2 || stats.StaticCount != 1 || len(matched) != 2 || len(static) != 1 {
+		t.Fatalf("nested/static scan = matched=%v static=%v stats=%+v", matched, static, stats)
 	}
 }
 
@@ -458,9 +493,12 @@ func r116WaitForSampling(t *testing.T, a *app, calls *atomic.Int32, gameID int64
 	key := strconv.FormatInt(gameID, 10)
 	claimed := func() bool {
 		a.liveClientAllGameDataMu.Lock()
-		defer a.liveClientAllGameDataMu.Unlock()
-		_, ok := a.liveClientAllGameDataKeys[key]
-		return ok
+		_, arenaClaimed := a.liveClientAllGameDataKeys[key]
+		a.liveClientAllGameDataMu.Unlock()
+		a.mayhemSamplerMu.Lock()
+		mayhemStarted := a.mayhemSamplerGameID == gameID
+		a.mayhemSamplerMu.Unlock()
+		return arenaClaimed || mayhemStarted
 	}
 	if !want {
 		deadline := time.Now().Add(750 * time.Millisecond)
@@ -498,7 +536,7 @@ func TestR116AramModeTriggersArenaAllGameDataSampling(t *testing.T) {
 		want     bool
 	}{
 		{"海斗 ARAM_MAYHEM InProgress", "ARAM_MAYHEM", 1900, 12, "InProgress", 10, true},
-		{"海斗 KIWI GameStart", "KIWI", 1900, 12, "GameStart", 10, true},
+		{"海斗 KIWI GameStart 尚未启动采样", "KIWI", 1900, 12, "GameStart", 10, false},
 		{"海斗 ARAM_MAYHEM Reconnect", "ARAM_MAYHEM", 1900, 12, "Reconnect", 10, true},
 		{"普通大乱斗 ARAM 也扩大覆盖", "ARAM", 450, 12, "InProgress", 10, true},
 		{"海斗 ChampSelect 不触发", "ARAM_MAYHEM", 1900, 12, "ChampSelect", 10, false},
@@ -554,7 +592,7 @@ func TestR116AramBranchSourceGuardForArenaSampling(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := string(data)
-	required := "if aramMode && !arenaMode && (phase == \"GameStart\" || phase == \"InProgress\" || phase == \"Reconnect\") {\n\t\tgo a.sampleArenaAllGameData(ctx, response.GameID)\n\t}"
+	required := "if aramMode && !arenaMode && (phase == \"InProgress\" || phase == \"Reconnect\") {\n\t\ta.startMayhemSampler(client, response.GameID, phase)\n\t}"
 	if !strings.Contains(source, required) {
 		t.Error("gameplay.go lost the R116 aramMode sampling branch (or it was mutated)")
 	}

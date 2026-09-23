@@ -195,6 +195,7 @@ func (a *app) waitForDiscovery(ctx context.Context, delay time.Duration) bool {
 func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error {
 	sessionCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	defer a.stopMayhemSamplerForClient("connection-ended", client)
 	champSelectPoll := time.NewTicker(time.Second)
 	defer champSelectPoll.Stop()
 	eventTriggers := make(chan string, 4)

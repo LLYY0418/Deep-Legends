@@ -32,6 +32,9 @@ func isEndOfGamePhase(phase string) bool {
 
 // One lifecycle per client/game. End phases may be duplicated or omitted by LCU.
 func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase string) {
+	if phase != "GameStart" && phase != "InProgress" && phase != "Reconnect" {
+		a.stopMayhemSamplerForClient("gameflow-left", client)
+	}
 	f := &a.gameplayFlow
 	f.mu.Lock()
 	changed := f.client != client || f.phase != phase

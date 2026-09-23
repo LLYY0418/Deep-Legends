@@ -58,6 +58,13 @@ type app struct {
 	liveClientAllGameData           func(context.Context) ([]byte, int, error)
 	liveClientAllGameDataMu         sync.Mutex
 	liveClientAllGameDataKeys       map[string]struct{}
+	mayhemSamplerMu                 sync.Mutex
+	mayhemSamplerGameID             int64
+	mayhemSamplerClient             *LCUClient
+	mayhemSamplerDoneGameID         int64
+	mayhemSamplerCancel             context.CancelCauseFunc
+	mayhemSamplerNow                func() time.Time
+	mayhemSamplerWait               func(context.Context, time.Duration) bool
 	gameplayFlow                    gameplayFlowState
 	overviewTimeout                 func(context.Context, time.Duration) (context.Context, context.CancelFunc)
 	updates                         *updateManager

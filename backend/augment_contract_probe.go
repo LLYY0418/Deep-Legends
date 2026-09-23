@@ -31,6 +31,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
@@ -43,13 +44,8 @@ import (
 // 因此 `/help?format=Full` 这类探测自身的请求路径不会自我命中。
 var augmentProbePath = regexp.MustCompile(`(?i)cherry|augment|mayhem`)
 
-// augmentProbeTextToken 用于 /help?format=Full 的格式无关兜底扫描：
-// 只要形如「/段/段…」的绝对路径 token 都收集，再交给谓词过滤。
-// 这条兜底来自 docs/history/DIAGNOSIS-R82-CURRENT-GAME-MATRIX-RESULT.md 第 4.2 节：
-// 2026-09-12 的真机观测里 /swagger/v3/openapi.json 与 /swagger/v2/swagger.json
-// 双双 404，而 /help?format=Full 返回 200 / 3,021,918 字节。没有这条兜底，
-// 本机探测只会得到「404 → count == 0」这种无法区分「没有端点」和「没读到契约」的结果。
-var augmentProbeTextToken = regexp.MustCompile(`/[A-Za-z0-9._{}:-]+(?:/[A-Za-z0-9._{}:-]+)+`)
+// /help?format=Full 是 functions/events/types JSON，不能用 REST 路径 token 判定。
+var augmentProbeHelpValue = regexp.MustCompile(`^[A-Za-z0-9_./:{}-]{1,512}$`)
 
 // augmentProbeSafeToken 限定可写入诊断日志的 token 形状（响应码、根对象键名）。
 var augmentProbeSafeToken = regexp.MustCompile(`^[A-Za-z0-9_:-]{1,64}$`)
@@ -64,9 +60,9 @@ const (
 	augmentProbeParameterLimit = 20
 	augmentProbeResponseLimit  = 12
 	augmentProbeRootKeyLimit   = 40
-	// /help 兜底扫描的硬上限，防止 3 MB 文本把内存/CPU 吃掉。
-	augmentProbeTextTokenLimit = 200000
-	augmentProbeTextPathLimit  = 500
+	// 真机样本合计 5,783 个条目。超限时不得下否定结论。
+	augmentProbeHelpElementLimit = 10000
+	augmentProbeHelpNodeLimit    = 100000
 	// 单次请求与整轮探测的超时。这是一次性人工侦察，不在任何实时链路上，
 	// 因此比既有诊断的 1500ms 宽松，以保证 3 MB 契约能完整读完。
 	augmentProbeRequestTimeout = 10 * time.Second
@@ -200,45 +196,134 @@ func augmentProbeOperation(path, method string, operation, root map[string]any) 
 	return entry
 }
 
-// augmentProbeTextStats 是 /help 兜底扫描的计数证据。
-type augmentProbeTextStats struct {
-	Tokens            int  `json:"paths_scanned"`
-	UniquePaths       int  `json:"unique_paths"`
-	MatchedPaths      int  `json:"count"`
-	TokenLimitReached bool `json:"scan_limit_reached"`
-	Truncated         bool `json:"paths_truncated"`
+type augmentProbeHelpStats struct {
+	Lengths        map[string]int
+	Scanned        map[string]int
+	ElementKeys    map[string][]string
+	Count          int
+	StaticCount    int
+	Truncated      bool
+	LimitReached   bool
+	InvalidJSON    bool
+	InvalidElement bool
+	Complete       bool
 }
 
-// augmentProbeTextPaths 是不依赖任何 JSON 结构的兜底：直接在原始文本上收集
-// 绝对路径 token，去重后用谓词过滤。客户端换契约格式也打不垮这条扫描。
-func augmentProbeTextPaths(raw []byte) ([]string, augmentProbeTextStats) {
-	var stats augmentProbeTextStats
-	tokens := augmentProbeTextToken.FindAllString(string(raw), augmentProbeTextTokenLimit)
-	stats.Tokens = len(tokens)
-	stats.TokenLimitReached = len(tokens) >= augmentProbeTextTokenLimit
-	unique := make(map[string]struct{}, 256)
-	matched := []string{}
-	for _, token := range tokens {
-		if len(token) > augmentProbePathLimit {
-			continue
+// 仅记录契约名字或去掉 query/host 的路径，不记录响应体中的其他取值。
+func augmentProbeHelpSafeValue(raw string) string {
+	value := strings.TrimSpace(raw)
+	if strings.Contains(value, "://") {
+		parsed, err := url.Parse(value)
+		if err != nil {
+			return ""
 		}
-		if _, seen := unique[token]; seen {
-			continue
-		}
-		unique[token] = struct{}{}
-		if !augmentProbeMatches(token) {
-			continue
-		}
-		stats.MatchedPaths++
-		if len(matched) >= augmentProbeTextPathLimit {
-			stats.Truncated = true
-			continue
-		}
-		matched = append(matched, token)
+		value = parsed.Path
 	}
-	stats.UniquePaths = len(unique)
-	sort.Strings(matched)
-	return matched, stats
+	value = strings.SplitN(value, "?", 2)[0]
+	if !augmentProbeHelpValue.MatchString(value) || !augmentProbePath.MatchString(value) {
+		return ""
+	}
+	return value
+}
+
+func augmentProbeStaticCatalog(value string) bool {
+	return strings.Contains(strings.ToLower(value), "cherry-augments.json") || strings.HasSuffix(strings.ToLower(value), "/perks.json")
+}
+
+// 扫描 help-full 的三个真实数组；任何结构缺失或扫描上限都会撤销否定资格。
+func augmentProbeHelpDocument(raw []byte) ([]map[string]any, []map[string]any, augmentProbeHelpStats) {
+	stats := augmentProbeHelpStats{Lengths: map[string]int{}, Scanned: map[string]int{}, ElementKeys: map[string][]string{}}
+	matches, static := []map[string]any{}, []map[string]any{}
+	var root map[string]any
+	if json.Unmarshal(raw, &root) != nil || root == nil {
+		stats.InvalidJSON = true
+		return matches, static, stats
+	}
+	arraysPresent := true
+	totalElements, totalNodes := 0, 0
+	for _, group := range []string{"functions", "events", "types"} {
+		items, ok := root[group].([]any)
+		if !ok {
+			arraysPresent = false
+			continue
+		}
+		stats.Lengths[group] = len(items)
+		keys := map[string]struct{}{}
+		for _, item := range items {
+			if totalElements >= augmentProbeHelpElementLimit {
+				stats.LimitReached = true
+				break
+			}
+			totalElements++
+			stats.Scanned[group]++
+			object, ok := item.(map[string]any)
+			if !ok {
+				stats.InvalidElement = true
+				continue
+			}
+			for key := range object {
+				if augmentProbeSafeToken.MatchString(key) {
+					keys[key] = struct{}{}
+				}
+			}
+			var visit func(any, int)
+			visit = func(value any, depth int) {
+				totalNodes++
+				if totalNodes > augmentProbeHelpNodeLimit || depth > 16 {
+					stats.LimitReached = true
+					return
+				}
+				switch typed := value.(type) {
+				case map[string]any:
+					for key, child := range typed {
+						if key == "name" && depth == 0 || strings.EqualFold(key, "url") || strings.EqualFold(key, "path") || strings.EqualFold(key, "uri") {
+							if rawValue, ok := child.(string); ok {
+								if safe := augmentProbeHelpSafeValue(rawValue); safe != "" {
+									entry := map[string]any{"array": group, "field": key, "value": safe}
+									if augmentProbeStaticCatalog(safe) {
+										stats.StaticCount++
+										if len(static) < augmentProbeOperationLimit {
+											static = append(static, entry)
+										} else {
+											stats.Truncated = true
+										}
+									} else {
+										stats.Count++
+										if len(matches) < augmentProbeOperationLimit {
+											matches = append(matches, entry)
+										} else {
+											stats.Truncated = true
+										}
+									}
+								}
+							}
+						}
+						if totalNodes <= augmentProbeHelpNodeLimit {
+							visit(child, depth+1)
+						}
+					}
+				case []any:
+					for _, child := range typed {
+						if totalNodes <= augmentProbeHelpNodeLimit {
+							visit(child, depth+1)
+						}
+					}
+				}
+			}
+			visit(object, 0)
+		}
+		for key := range keys {
+			stats.ElementKeys[group] = append(stats.ElementKeys[group], key)
+		}
+		sort.Strings(stats.ElementKeys[group])
+	}
+	stats.Complete = arraysPresent && !stats.InvalidElement && !stats.LimitReached && !stats.Truncated
+	for _, group := range []string{"functions", "events", "types"} {
+		if stats.Scanned[group] != stats.Lengths[group] {
+			stats.Complete = false
+		}
+	}
+	return matches, static, stats
 }
 
 // augmentProbeRootShape 记录契约文档根对象的形状（键名 + 值类型 + 元素个数），
@@ -359,15 +444,22 @@ func (a *app) collectAugmentContractProbe(ctx context.Context, client *LCUClient
 		count, contractRead := 0, false
 		if err == nil && len(raw) > 0 {
 			if spec.kind == "help-full" {
-				matched, stats := augmentProbeTextPaths(raw)
-				count = stats.MatchedPaths
-				event["count"] = stats.MatchedPaths
-				event["paths_scanned"] = stats.Tokens
-				event["unique_paths"] = stats.UniquePaths
-				event["matched_paths"] = matched
-				event["paths_truncated"] = stats.Truncated
-				event["scan_limit_reached"] = stats.TokenLimitReached
-				contractRead = stats.Tokens > 0
+				matched, static, stats := augmentProbeHelpDocument(raw)
+				count = stats.Count
+				event["count"] = count
+				event["matched_items"] = matched
+				event["static_catalog_hits"] = static
+				event["static_catalog_count"] = stats.StaticCount
+				event["matches_truncated"] = stats.Truncated
+				event["scan_limit_reached"] = stats.LimitReached
+				event["invalid_json"] = stats.InvalidJSON
+				event["invalid_element"] = stats.InvalidElement
+				for _, group := range []string{"functions", "events", "types"} {
+					event[group+"_length"] = stats.Lengths[group]
+					event[group+"_scanned"] = stats.Scanned[group]
+					event[group+"_element_keys"] = stats.ElementKeys[group]
+				}
+				contractRead = stats.Complete
 				for key, value := range augmentProbeRootShape(raw) {
 					event[key] = value
 				}

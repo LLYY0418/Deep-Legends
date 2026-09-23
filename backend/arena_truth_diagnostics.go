@@ -304,30 +304,31 @@ func liveClientAllGameDataShape(raw []byte) map[string]any {
 	slices.Sort(top)
 	return map[string]any{"top_level_keys": slices.Compact(top), "arrays": arrays}
 }
+
+func (a *app) fetchLiveClientAllGameData(ctx context.Context) ([]byte, int, error) {
+	if a.liveClientAllGameData != nil {
+		return a.liveClientAllGameData(ctx)
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, liveClientAllGameDataURL, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	response, err := liveClientDataHTTPClient.Do(request)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+	return raw, response.StatusCode, err
+}
+
 func (a *app) sampleArenaAllGameData(ctx context.Context, gameID int64) {
 	if gameID == 0 || !claimBoundedDiagnosticKey(&a.liveClientAllGameDataMu, &a.liveClientAllGameDataKeys, strconv.FormatInt(gameID, 10), 32) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
-	var raw []byte
-	status := 0
-	var err error
-	if a.liveClientAllGameData != nil {
-		raw, status, err = a.liveClientAllGameData(ctx)
-	} else {
-		var request *http.Request
-		request, err = http.NewRequestWithContext(ctx, http.MethodGet, liveClientAllGameDataURL, nil)
-		if err == nil {
-			var response *http.Response
-			response, err = liveClientDataHTTPClient.Do(request)
-			if err == nil {
-				status = response.StatusCode
-				raw, err = io.ReadAll(io.LimitReader(response.Body, 4<<20))
-				response.Body.Close()
-			}
-		}
-	}
+	raw, status, err := a.fetchLiveClientAllGameData(ctx)
 	payload := liveClientAllGameDataShape(raw)
 	payload["event"] = "live_client_allgamedata_shape"
 	payload["game_id"] = gameID

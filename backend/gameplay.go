@@ -2780,6 +2780,7 @@ func (a *app) removeGameplayReferenceElementLocked(element *list.Element) {
 }
 
 func (a *app) clearGameplayReferences() {
+	a.stopMayhemSampler("connection-ended")
 	a.arenaTruth.mu.Lock()
 	a.arenaTruth.records = nil
 	a.arenaTruth.mu.Unlock()
@@ -7178,6 +7179,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	liveLoadStarted := time.Now()
 	response := gameplayLiveResponse{Phase: phase, Capabilities: []EndpointCapability{{Name: "gameflow", Path: "/lol-gameflow/v1/gameflow-phase", State: capabilityAvailable, Count: 1}}}
 	if phase != "ChampSelect" && phase != "InProgress" && phase != "GameStart" && phase != "Reconnect" {
+		a.stopMayhemSamplerForClient("gameflow-left", client)
 		a.clearArenaAllies()
 		a.clearLiveClientProbe()
 		a.clearLivePositionSnapshot()
@@ -7513,8 +7515,8 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	// R116-探测（一次性侦察，工单 P1 第 1 条）：海斗（KIWI/ARAM_MAYHEM）此前不满足上面的
 	// arenaMode 条件，live_client_allgamedata_shape 在海斗下从未被观测过。这里只把既有诊断
 	// 埋点扩大到海斗模式，不新增任何用户可见功能；探测结论落盘后按工单 P1 第 4 条评估保留/删除。
-	if aramMode && !arenaMode && (phase == "GameStart" || phase == "InProgress" || phase == "Reconnect") {
-		go a.sampleArenaAllGameData(ctx, response.GameID)
+	if aramMode && !arenaMode && (phase == "InProgress" || phase == "Reconnect") {
+		a.startMayhemSampler(client, response.GameID, phase)
 	}
 
 	proIndex := a.proIdentitySnapshot()

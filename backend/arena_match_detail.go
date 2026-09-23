@@ -74,8 +74,8 @@ func arenaMatchDetailFailure(err error) (int, string, string) {
 		return http.StatusNotFound, "Riot 未找到这场对局", "not-found"
 	case strings.Contains(value, "429") || strings.Contains(value, "限流"):
 		return http.StatusTooManyRequests, "Riot 接口限流中，请稍后重试", "rate-limited"
-	case strings.Contains(value, "尚未配置 riot api key"):
-		return http.StatusServiceUnavailable, "Riot 对局详情未启用：当前安装包没有注入 Riot API Key，重新构建时带上密钥即可展开韩服高手对局", "not-configured"
+	case errors.Is(err, errRiotKeyMissing):
+		return http.StatusServiceUnavailable, errRiotKeyMissing.Error(), "not-configured"
 	case strings.Contains(value, "api key"):
 		return http.StatusBadGateway, "Riot 对局详情服务认证失败", "forbidden"
 	case strings.Contains(value, "无法解析") || strings.Contains(value, "缺少必要字段"):

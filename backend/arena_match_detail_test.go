@@ -161,7 +161,7 @@ func TestArenaMatchDetailWithoutAPIKeyFailsClosed(t *testing.T) {
 
 	a.handleArenaMatchDetail(recorder, request)
 
-	if recorder.Code != http.StatusServiceUnavailable || !strings.Contains(recorder.Body.String(), "没有注入 Riot API Key") {
+	if recorder.Code != http.StatusServiceUnavailable || !strings.Contains(recorder.Body.String(), errRiotKeyMissing.Error()) {
 		t.Fatalf("response = %d %q", recorder.Code, recorder.Body.String())
 	}
 	if upstreamCalls.Load() != 0 {
