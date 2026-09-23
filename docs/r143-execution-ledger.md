@@ -6,7 +6,7 @@
 
 `installer/internal/webviewhost/abi_test.go` 原先用 `go list -m -f {{.Dir}}`，空模块缓存时目录为空。改为 `go mod download -json github.com/jchv/go-webview2`，从 JSON 的 `Dir` 读取依赖源码，并保留原有 COM 槽位断言。错误同时显示模块下载的 JSON Error 和 stderr。
 
-本机用全新 `GOMODCACHE`、默认官方 GOPROXY 运行 `cd installer && go test ./...`：通过（见本次执行记录）。GitHub Actions `main/quality` 运行链接与结论：待填。
+本机用全新 `GOMODCACHE`、默认官方 GOPROXY 运行 `cd installer && go test ./...`：通过。GitHub Actions [`main/quality`](https://github.com/LLYY0418/Deep-Legends/actions/runs/35886360802/job/107267397722) 已通过，包含原先失败的 `Test installer module`；任务耗时 10 分 48 秒。
 
 ## P2：11 项 Windows 桌面测试
 
@@ -19,7 +19,7 @@
 
 `build-desktop-windows.ps1` 在所有 Go、前端和桌面测试前清除继承的 `DEEP_LEGENDS_KEY_MODE`，桌面测试完成后才设置本次 key mode，用于真正构建、打包和凭据核验。未新增平台跳过或放宽断言。
 
-本机定向 Node 测试：48 项，47 通过，1 项原有 Windows 专属测试在 macOS 跳过。GitHub Actions Windows 桌面测试全绿链接与结论：待填。
+本机定向 Node 测试：48 项，47 通过，1 项原有 Windows 专属测试在 macOS 跳过。[GitHub Actions Windows job](https://github.com/LLYY0418/Deep-Legends/actions/runs/35886360802/job/107271782211) 在 `Build desktop client and checksums` 步骤失败；公开页面只显示 exit code 1，完整日志要求 GitHub 登录。因此这 11 项在 Windows 上是否全部通过，当前尚无证据，不能记为验收通过。
 
 ## P3：Release 工作流
 
@@ -29,12 +29,12 @@
 
 README 发布流程改为确认 CHANGELOG → Actions 运行 Windows public release draft → 检查草稿后 Publish。本地 Windows 脚本保留为备用。删除仓库内 `tools/windows-installer-go-cache.zip` 及展开代码；Actions 不设置 goproxy.cn；删除 `dist/` 中两个 `r142-windows-*` 补丁包。
 
-若仓库为私有，工单提醒 Windows 运行分钟数按 2 倍计。`windows-build` 单次耗时：待 GitHub Actions 成功运行后填写。
+仓库为公开仓库，工单提及的私有仓库 Windows 分钟数 2 倍计费不适用。本次 `windows-build` 运行 12 分 37 秒后失败。成功单次耗时待验收时填写。
 
 ## Actions 运行记录
 
 | 运行 | 链接 | 结果 | 耗时 |
 |---|---|---|---|
-| main / quality | 待填 | 待运行 | 待填 |
-| main / windows-build | 待填 | 待运行 | 待填 |
+| main / quality | [35886360802 / quality](https://github.com/LLYY0418/Deep-Legends/actions/runs/35886360802/job/107267397722) | 通过 | 10 分 48 秒 |
+| main / windows-build | [35886360802 / windows-build](https://github.com/LLYY0418/Deep-Legends/actions/runs/35886360802/job/107271782211) | 失败，需登录读取 Build desktop client and checksums 日志 | 12 分 37 秒 |
 | 手动 release.yml | 待填 | 待运行 | 待填 |
