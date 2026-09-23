@@ -1,6 +1,0 @@
-=== RUN   TestR98LimiterFIFOHasOnlyOneSleepingHeadAndCanceledWaitersUseNoQuota
-    r98_test.go:324: waiter missing
---- FAIL: TestR98LimiterFIFOHasOnlyOneSleepingHeadAndCanceledWaitersUseNoQuota (1.00s)
-FAIL
-FAIL	lol-loot-assistant	1.509s
-FAIL

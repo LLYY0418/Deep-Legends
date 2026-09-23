@@ -1,6 +1,0 @@
-=== RUN   TestR98OverviewEndpointCachesAndKeys
-    r98_test.go:162: ranks not cached: 2 calls
---- FAIL: TestR98OverviewEndpointCachesAndKeys (0.04s)
-FAIL
-FAIL	lol-loot-assistant	0.538s
-FAIL

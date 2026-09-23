@@ -1,6 +1,0 @@
-2026/09/16 15:00:56 http: TLS handshake error from 127.0.0.1:51229: read tcp 127.0.0.1:51227->127.0.0.1:51229: use of closed network connection
---- FAIL: TestRiotSpecialistQueueLimitReturnsThrottled (0.00s)
-    specialist_runes_test.go:334: specialist queue wait = 韩服查询额度正在恢复，请约 120 秒后重试；已加载的战绩仍可查看 after 11.084µs
-FAIL
-FAIL	lol-loot-assistant	114.907s
-FAIL

@@ -1,4 +1,0 @@
-=== RUN   TestR98LimiterFIFOHasOnlyOneSleepingHeadAndCanceledWaitersUseNoQuota
---- PASS: TestR98LimiterFIFOHasOnlyOneSleepingHeadAndCanceledWaitersUseNoQuota (0.03s)
-PASS
-ok  	lol-loot-assistant	0.473s

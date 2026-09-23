@@ -1,5 +1,7 @@
 # R98 执行账本
 
+> 证据已于 R135 移出工作区，见提交 `b62bca1b9671bccd8c3cf9f7079096d4b33a6fa0`。
+
 执行日期：2026-09-16。范围：`WORKLIST-R98-KR-REFRESH-CHURN-AND-SLOW-LOADING.md`。保留 R95/R96/R97 既有工作和用户 NSIS 配置；未提交、未推送。
 
 ## 逐项落实
