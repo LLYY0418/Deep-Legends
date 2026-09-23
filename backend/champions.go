@@ -146,20 +146,20 @@ type championMetadata struct {
 }
 
 type championRankingResponse struct {
-	Mode                 string                  `json:"mode"`
-	Region               string                  `json:"region"`
-	Tier                 string                  `json:"tier,omitempty"`
-	Position             string                  `json:"position,omitempty"`
-	Patch                string                  `json:"patch,omitempty"`
-	Source               string                  `json:"source"`
-	FetchedAt            time.Time               `json:"fetchedAt"`
-	EntertainmentSample  bool                    `json:"entertainmentSample,omitempty"`
-	Citation             *championSourceCitation `json:"citation,omitempty"`
+	Mode                string                  `json:"mode"`
+	Region              string                  `json:"region"`
+	Tier                string                  `json:"tier,omitempty"`
+	Position            string                  `json:"position,omitempty"`
+	Patch               string                  `json:"patch,omitempty"`
+	Source              string                  `json:"source"`
+	FetchedAt           time.Time               `json:"fetchedAt"`
+	EntertainmentSample bool                    `json:"entertainmentSample,omitempty"`
+	Citation            *championSourceCitation `json:"citation,omitempty"`
 	// R128 §2.3：前端不展示（界面上不再出现口径/方法论说明）；字段保留供诊断与既有后端测试使用。
-	MeasurementTechnique string                  `json:"measurementTechnique,omitempty"`
-	Rows                 []championRankingRow    `json:"rows"`
-	TeamCompositions     []arenaTeamComposition  `json:"teamCompositions,omitempty"`
-	TierBands            []championTierBand      `json:"tierBands,omitempty"`
+	MeasurementTechnique string                 `json:"measurementTechnique,omitempty"`
+	Rows                 []championRankingRow   `json:"rows"`
+	TeamCompositions     []arenaTeamComposition `json:"teamCompositions,omitempty"`
+	TierBands            []championTierBand     `json:"tierBands,omitempty"`
 }
 
 type championRankingRow struct {
@@ -516,25 +516,25 @@ type championPositionOption struct {
 }
 
 type championDetailResponse struct {
-	Mode                 string                   `json:"mode"`
-	Region               string                   `json:"region"`
-	Tier                 string                   `json:"tier,omitempty"`
-	Position             string                   `json:"position,omitempty"`
-	Positions            []championPositionOption `json:"positions,omitempty"`
-	PositionsSource      string                   `json:"positionsSource,omitempty"`
-	Patch                string                   `json:"patch,omitempty"`
-	CurrentPatch         string                   `json:"currentPatch,omitempty"`
-	IsStale              bool                     `json:"isStale,omitempty"`
-	Source               string                   `json:"source"`
-	FetchedAt            time.Time                `json:"fetchedAt"`
-	EntertainmentSample  bool                     `json:"entertainmentSample,omitempty"`
-	Citation             *championSourceCitation  `json:"citation,omitempty"`
-	BuildCitation        *championSourceCitation  `json:"buildCitation,omitempty"`
+	Mode                string                   `json:"mode"`
+	Region              string                   `json:"region"`
+	Tier                string                   `json:"tier,omitempty"`
+	Position            string                   `json:"position,omitempty"`
+	Positions           []championPositionOption `json:"positions,omitempty"`
+	PositionsSource     string                   `json:"positionsSource,omitempty"`
+	Patch               string                   `json:"patch,omitempty"`
+	CurrentPatch        string                   `json:"currentPatch,omitempty"`
+	IsStale             bool                     `json:"isStale,omitempty"`
+	Source              string                   `json:"source"`
+	FetchedAt           time.Time                `json:"fetchedAt"`
+	EntertainmentSample bool                     `json:"entertainmentSample,omitempty"`
+	Citation            *championSourceCitation  `json:"citation,omitempty"`
+	BuildCitation       *championSourceCitation  `json:"buildCitation,omitempty"`
 	// R128 §2.3：前端不展示；字段保留供诊断与既有后端测试使用。
-	MeasurementTechnique string                   `json:"measurementTechnique,omitempty"`
-	Stats                championDetailStats      `json:"stats,omitempty"`
-	Runes                []championRunePage       `json:"runes,omitempty"`
-	Counters             championCounterSections  `json:"counters,omitempty"`
+	MeasurementTechnique string                  `json:"measurementTechnique,omitempty"`
+	Stats                championDetailStats     `json:"stats,omitempty"`
+	Runes                []championRunePage      `json:"runes,omitempty"`
+	Counters             championCounterSections `json:"counters,omitempty"`
 	// SampleTier / CountersTier：所选段位样本不足时实际使用的回退段位。
 	SampleTier          string                 `json:"sampleTier,omitempty"`
 	CountersTier        string                 `json:"countersTier,omitempty"`
@@ -589,21 +589,21 @@ type championPerformancePanel struct {
 	HeroCount int                         `json:"heroCount,omitempty"`
 	// Groups 是四组的展示顺序；某一组的全部指标都缺失时该组整块不下发，
 	// 前端不留空态。
-	Groups               []string                `json:"groups,omitempty"`
-	Citation             *championSourceCitation `json:"citation,omitempty"`
+	Groups   []string                `json:"groups,omitempty"`
+	Citation *championSourceCitation `json:"citation,omitempty"`
 	// R128 §2.3：前端不展示；字段保留供诊断与既有后端测试使用。
-	MeasurementTechnique string                  `json:"measurementTechnique,omitempty"`
+	MeasurementTechnique string `json:"measurementTechnique,omitempty"`
 }
 
 type championAugmentResponse struct {
-	Source               string                  `json:"source"`
-	Mode                 string                  `json:"mode"`
-	FetchedAt            time.Time               `json:"fetchedAt"`
-	EntertainmentSample  bool                    `json:"entertainmentSample"`
-	Citation             *championSourceCitation `json:"citation,omitempty"`
+	Source              string                  `json:"source"`
+	Mode                string                  `json:"mode"`
+	FetchedAt           time.Time               `json:"fetchedAt"`
+	EntertainmentSample bool                    `json:"entertainmentSample"`
+	Citation            *championSourceCitation `json:"citation,omitempty"`
 	// R128 §2.3：前端不展示；字段保留供诊断与既有后端测试使用。
-	MeasurementTechnique string                  `json:"measurementTechnique,omitempty"`
-	Rows                 []championAugment       `json:"rows"`
+	MeasurementTechnique string            `json:"measurementTechnique,omitempty"`
+	Rows                 []championAugment `json:"rows"`
 }
 
 type championAugment struct {

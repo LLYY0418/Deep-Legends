@@ -697,22 +697,22 @@ type hexdataRarityStage struct {
 }
 
 type championAugmentDetailResponse struct {
-	ID                   int                       `json:"id"`
-	Slug                 string                    `json:"slug"`
-	Source               string                    `json:"source"`
-	Description          string                    `json:"description,omitempty"`
-	Citation             *championSourceCitation   `json:"citation,omitempty"`
+	ID          int                     `json:"id"`
+	Slug        string                  `json:"slug"`
+	Source      string                  `json:"source"`
+	Description string                  `json:"description,omitempty"`
+	Citation    *championSourceCitation `json:"citation,omitempty"`
 	// R128 §2.3：前端不展示（海克斯图鉴详情不再渲染口径说明）；字段保留供诊断与既有后端测试使用。
 	MeasurementTechnique string                    `json:"measurementTechnique,omitempty"`
 	Champions            []championAugmentChampion `json:"champions"`
 }
 
 type championAugmentRarityResponse struct {
-	Source               string                  `json:"source"`
-	Citation             *championSourceCitation `json:"citation,omitempty"`
+	Source   string                  `json:"source"`
+	Citation *championSourceCitation `json:"citation,omitempty"`
 	// R128 §2.3：前端不展示（全服品质分布面板不再渲染口径说明）；字段保留供诊断与既有后端测试使用。
-	MeasurementTechnique string                  `json:"measurementTechnique,omitempty"`
-	Stages               []hexdataRarityStage    `json:"stages"`
+	MeasurementTechnique string               `json:"measurementTechnique,omitempty"`
+	Stages               []hexdataRarityStage `json:"stages"`
 }
 
 func newHexdataClient(provider *championProvider, store *localStore) *hexdataClient {

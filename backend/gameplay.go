@@ -4093,28 +4093,28 @@ type gameplayRecommendationsResponse struct {
 }
 
 type gameplayRecommendationBundle struct {
-	TraceID              string                      `json:"traceId,omitempty"`
-	RecommendationKey    string                      `json:"recommendationKey,omitempty"`
-	RequestedPosition    string                      `json:"requestedPosition,omitempty"`
-	QueueID              int64                       `json:"queueId,omitempty"`
-	MapID                int64                       `json:"mapId,omitempty"`
-	GameID               int64                       `json:"gameId,omitempty"`
-	GameMode             string                      `json:"gameMode,omitempty"`
-	Tier                 string                      `json:"tier,omitempty"`
-	Source               string                      `json:"source"`
-	ResolvedMode         string                      `json:"resolvedMode"`
-	ResolvedRegion       string                      `json:"resolvedRegion"`
-	DataVersion          string                      `json:"dataVersion,omitempty"`
-	CurrentVersion       string                      `json:"currentVersion,omitempty"`
-	IsFallback           bool                        `json:"isFallback"`
-	IsStale              bool                        `json:"isStale"`
-	HasRunes             bool                        `json:"hasRunes"`
-	HasAugments          bool                        `json:"hasAugments"`
-	HasCounters          bool                        `json:"hasCounters"`
-	HasBanRate           bool                        `json:"hasBanRate"`
-	HasTopPlayers        bool                        `json:"hasTopPlayers"`
-	HasItemDepths        bool                        `json:"hasItemDepths"`
-	Citation             *championSourceCitation     `json:"citation,omitempty"`
+	TraceID           string                  `json:"traceId,omitempty"`
+	RecommendationKey string                  `json:"recommendationKey,omitempty"`
+	RequestedPosition string                  `json:"requestedPosition,omitempty"`
+	QueueID           int64                   `json:"queueId,omitempty"`
+	MapID             int64                   `json:"mapId,omitempty"`
+	GameID            int64                   `json:"gameId,omitempty"`
+	GameMode          string                  `json:"gameMode,omitempty"`
+	Tier              string                  `json:"tier,omitempty"`
+	Source            string                  `json:"source"`
+	ResolvedMode      string                  `json:"resolvedMode"`
+	ResolvedRegion    string                  `json:"resolvedRegion"`
+	DataVersion       string                  `json:"dataVersion,omitempty"`
+	CurrentVersion    string                  `json:"currentVersion,omitempty"`
+	IsFallback        bool                    `json:"isFallback"`
+	IsStale           bool                    `json:"isStale"`
+	HasRunes          bool                    `json:"hasRunes"`
+	HasAugments       bool                    `json:"hasAugments"`
+	HasCounters       bool                    `json:"hasCounters"`
+	HasBanRate        bool                    `json:"hasBanRate"`
+	HasTopPlayers     bool                    `json:"hasTopPlayers"`
+	HasItemDepths     bool                    `json:"hasItemDepths"`
+	Citation          *championSourceCitation `json:"citation,omitempty"`
 	// R128 §2.3：口径说明不再进 UI，前端一律不消费；字段保留供诊断与既有后端测试使用。
 	MeasurementTechnique string                      `json:"measurementTechnique,omitempty"`
 	Positions            []championPositionOption    `json:"positions,omitempty"`
@@ -4206,12 +4206,12 @@ type gameplayTeamPortraitLabel struct {
 // ResolvedHeroes/HeroPoolSize 是降级依据：我方 5 人里查不到 postmatch 的英雄太多
 // 时整块不下发，绝不用「查不到」冒充「这一项不缺」。
 type gameplayTeamPortrait struct {
-	Labels               []gameplayTeamPortraitLabel `json:"labels"`
-	RosterSize           int                         `json:"rosterSize"`
-	ResolvedHeroes       int                         `json:"resolvedHeroes"`
-	HeroPoolSize         int                         `json:"heroPoolSize,omitempty"`
+	Labels         []gameplayTeamPortraitLabel `json:"labels"`
+	RosterSize     int                         `json:"rosterSize"`
+	ResolvedHeroes int                         `json:"resolvedHeroes"`
+	HeroPoolSize   int                         `json:"heroPoolSize,omitempty"`
 	// R128 §2.3：前端不展示（队伍画像的 tooltip 只留「本队 N 位英雄进入统计」）。
-	MeasurementTechnique string                      `json:"measurementTechnique,omitempty"`
+	MeasurementTechnique string `json:"measurementTechnique,omitempty"`
 }
 
 // gameplayNextItemSuggestion 是 P1-4 阶段二「下一件推荐」的纯计算结果。
