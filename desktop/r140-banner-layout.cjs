@@ -3,10 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-// R140_LAYOUT=1 R140_BANNER_SAMPLE=/private/tmp/r140-lny-banner.png
-// CURRENT_GAME_SHOTS=docs/r140-validation node desktop/current-game-layout.cjs
+// R141_LAYOUT=1 R141_BANNER_SAMPLE=/private/tmp/r140-lny-banner.png
+// CURRENT_GAME_SHOTS=docs/r141-validation node desktop/current-game-layout.cjs
+// R140_LAYOUT=1 also checks the current banner detail dialog at multiple viewport heights.
 exports.verify = async ({call,evaluate,output}) => {
-  assert.ok(process.env.R140_BANNER_SAMPLE,'R140_BANNER_SAMPLE must point to a real game banner image');
+  assert.ok(process.env.R141_BANNER_SAMPLE||process.env.R140_BANNER_SAMPLE,'banner sample must point to a real game image');
   await evaluate(`(() => {
     const original=window.fetch;
     window.fetch=async(...args)=>{
@@ -53,32 +54,39 @@ exports.verify = async ({call,evaluate,output}) => {
   for(const width of [1200,960]) {
     await call('Emulation.setDeviceMetricsOverride',{width,height:950,deviceScaleFactor:1,mobile:false});
     await evaluate(`document.getElementById('facade-grid').scrollIntoView({block:'start',behavior:'instant'});new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
-    if(process.env.R140_PROBE==='1') {
+    if(process.env.R141_PROBE==='1'||process.env.R140_PROBE==='1') {
       const samples=[];
-      for(const size of [150,152,156,160,164,168,170,172,176,180,184,190]) {
+      for(const size of [152,184,190,192,196,200,204,208,212,216]) {
         await evaluate(`{const g=document.getElementById('facade-grid');g.style.gridTemplateColumns='repeat(auto-fill,${size}px)';g.style.gap='20px 16px'}`);
         samples.push({size,...await gridMeasure()});
       }
-      console.log('R140 probe',width,JSON.stringify(samples));
+      console.log('banner probe',width,JSON.stringify(samples));
       continue;
     }
     await evaluate(`{const g=document.getElementById('facade-grid');g.style.gridTemplateColumns='repeat(auto-fill,150px)';g.style.gap='12px 10px'}`);
-    const before=await gridMeasure();
-    await shot('before-grid-'+width+'.png');
+    const r138=await gridMeasure();
+    await shot('r138-grid-'+width+'.png');
+    await evaluate(`{const g=document.getElementById('facade-grid');g.style.gridTemplateColumns='repeat(auto-fill,152px)';g.style.gap='20px 16px'}`);
+    const r140=await gridMeasure();
+    await shot('r140-grid-'+width+'.png');
     await evaluate(`{const g=document.getElementById('facade-grid');g.style.removeProperty('grid-template-columns');g.style.removeProperty('gap')}`);
     const after=await gridMeasure();
-    await shot('after-grid-'+width+'.png');
-    console.log('R140 grid',width,JSON.stringify({before,after}));
-    assert.ok(after.columns>=4&&after.columns<=5,`${width}: expected 4–5 columns, got ${after.columns}`);
-    assert.equal(before.gap,'12px 10px');assert.equal(after.gap,'20px 16px');
-    assert.equal(after.cardWidth,152,`${width}: card width changed from the measured 5/4-column fit`);
-    assert.equal(after.intrinsic,'auto 409px');
+    await shot('r141-grid-'+width+'.png');
+    console.log('R141 grid',width,JSON.stringify({r138,r140,after}));
+    assert.ok(after.columns>=3&&after.columns<=4,`${width}: expected 3–4 columns, got ${after.columns}`);
+    assert.ok(after.columns<r140.columns,`${width}: reverting to the R140 width must change the column count`);
+    assert.equal(r138.gap,'12px 10px');assert.equal(r140.gap,'20px 16px');assert.equal(after.gap,'20px 16px');
+    assert.equal(r140.cardWidth,152);
+    assert.ok(after.cardWidth>=190,`${width}: banner tile must be visibly wider`);
+    assert.equal(after.cardWidth,200,`${width}: measured 200px width must remain stable`);
+    assert.equal(after.intrinsic,'auto 531px');
     assert.ok(after.naturalWidth>0&&after.naturalHeight>0&&after.naturalWidth<after.naturalHeight,'fixture is a decoded vertical banner');
     assert.equal(after.objectFit,'contain');
     assert.ok(Math.abs(after.artWidth/after.artHeight-after.naturalWidth/after.naturalHeight)<.002,'banner art ratio must match source');
     assert.equal(after.lockDisplay,'grid');assert.equal(after.lockWidth,30);
     assert.equal(after.lockedOpacity,'0.38');assert.match(after.lockedFilter,/grayscale\(1\)/);
-    assert.ok(after.cardHeight>before.cardHeight,`${width}: banner card did not grow`);
+    assert.ok(after.cardHeight>r140.cardHeight*1.2,`${width}: banner card did not visibly grow`);
+    if(process.env.R141_LAYOUT==='1') continue;
     const card=await evaluate(`(() => {const card=document.querySelector('#facade-grid .skin-card');card.click();return true})()`);
     assert.ok(card);
     await evaluate(`new Promise((resolve,reject)=>{const timer=setInterval(()=>{const d=document.getElementById('facade-detail-dialog');if(d.open&&d.style.getPropertyValue('--facade-art-height')==='640px'){clearInterval(timer);resolve(true)}},30);setTimeout(()=>{clearInterval(timer);reject(Error('banner detail did not reach 640px'))},8000)})`);
@@ -114,6 +122,6 @@ exports.verify = async ({call,evaluate,output}) => {
     await evaluate(`document.getElementById('facade-detail-dialog').close()`);
     console.log('R140 detail',width,JSON.stringify(detail));
   }
-  if(process.env.R140_PROBE==='1')return;
-  console.log('R140 Chromium PASS');
+  if(process.env.R141_PROBE==='1'||process.env.R140_PROBE==='1')return;
+  console.log(process.env.R141_LAYOUT==='1'?'R141 Chromium PASS':'banner Chromium PASS');
 };

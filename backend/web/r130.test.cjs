@@ -624,14 +624,15 @@ const natural = (w, width, height) => {
   return image;
 };
 
-test('R140 旗帜列宽按真实页面 4–5 列确定，名称保持在图片下方', () => {
+test('R141 旗帜列宽明显放大且保持两种窗口下 3–4 列，名称在图片下方', () => {
   const bannerCSS = process.env.R140_APP_CSS ? fs.readFileSync(process.env.R140_APP_CSS, 'utf8') : css;
   const bannerRule = bannerCSS.match(/\.facade-grid\.is-banners \{([^}]*)\}/)?.[1] || '';
   const width = Number(bannerRule.match(/grid-template-columns:\s*repeat\(auto-fill,\s*(\d+)px\)/)?.[1]);
   const gap = bannerRule.match(/gap:\s*(\d+)px\s+(\d+)px/);
-  assert.equal(width, 152, 'R140 真 Chromium 在 1200/960 下分别为 5/4 列；优先列数后取 152px');
+  assert.ok(width >= 190, `R141 旗帜列宽至少 190px，实际 ${width}px`);
+  assert.equal(width, 200, '真 Chromium 测得 200px 在 1200/960 下分别为 4/3 列');
   assert.ok(gap && Number(gap[1]) >= 18 && Number(gap[2]) >= 14, '旗帜间距不得退回旧值');
-  assert.match(bannerCSS, /\.facade-grid\.is-banners \.skin-card \{ contain-intrinsic-size: auto 409px; \}/, '占位高度应匹配真实旗帜约 409px 卡片');
+  assert.match(bannerCSS, /\.facade-grid\.is-banners \.skin-card \{ contain-intrinsic-size: auto 531px; \}/, '占位高度应匹配真实旗帜约 531px 卡片');
   assert.match(css, /\.facade-grid\.is-banners \{[^}]*justify-content: start/, '固定宽度的格子必须靠左排，不能被拉开');
   assert.match(css, /\.facade-grid\.is-banners \{[^}]*--facade-banner-ratio: 0\.3/, '取样前必须有 0.3 的默认比例兜底');
   assert.match(css, /\.facade-grid\.is-banners \.skin-art \{ aspect-ratio: var\(--facade-banner-ratio\);/, '格子高度必须跟着真实比例走，不能写死正方形');
@@ -659,7 +660,7 @@ test('R130 P2 旗帜比例取自第一张图片的真实尺寸，铺满格子后
     api.sampleBannerRatio(natural(w, 102, 400), true);
     const ratio = api.el.grid.style.getPropertyValue('--facade-banner-ratio');
     assert.equal(ratio, (102 / 400).toFixed(4), '必须写 naturalWidth / naturalHeight，不能写反');
-    const cellWidth = 152;
+    const cellWidth = 200;
     const cellHeight = cellWidth / Number(ratio);
     // object-fit: contain 下图片按同一比例铺满格子；格子比例 == 图片比例时留白为 0。
     const drawnHeight = Math.min(cellHeight, cellWidth / (102 / 400));

@@ -25,8 +25,9 @@ async function main(){
  ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(m.method==='Runtime.exceptionThrown'||m.method==='Runtime.consoleAPICalled'&&m.params.type==='error')console.log('browser error',JSON.stringify(m.params).slice(0,1800));});
  server=require('node:http').createServer((req,res)=>{
    const pathname=new URL(req.url,'http://localhost').pathname;
-   if(process.env.R140_BANNER_SAMPLE && pathname==='/api/image' && new URL(req.url,'http://localhost').searchParams.get('path')?.includes('/Regalia/BannerSkins/')) {
-     res.setHeader('Content-Type','image/png');res.end(fs.readFileSync(process.env.R140_BANNER_SAMPLE));return;
+   const bannerSample=process.env.R141_BANNER_SAMPLE||process.env.R140_BANNER_SAMPLE;
+   if(bannerSample && pathname==='/api/image' && new URL(req.url,'http://localhost').searchParams.get('path')?.includes('/Regalia/BannerSkins/')) {
+     res.setHeader('Content-Type','image/png');res.end(fs.readFileSync(bannerSample));return;
    }
    if(process.env.R140_APP_CSS && pathname==='/app.css') {res.setHeader('Content-Type','text/css');res.end(fs.readFileSync(process.env.R140_APP_CSS));return;}
    if (process.env.DIAGNOSTICS_1555_LAYOUT === '1' && pathname === '/api/events') { res.writeHead(200, {'Content-Type':'text/event-stream','Cache-Control':'no-cache'}); res.write('data: ready\n\n'); return; }
@@ -64,7 +65,7 @@ async function main(){
  const output=process.env.CURRENT_GAME_SHOTS || '/private/tmp/current-game-layout';fs.mkdirSync(output,{recursive:true});
  if(process.env.SUITE_TABS_LAYOUT==='1') { await require('./suite-tabs-layout.cjs').verify({call,evaluate,output}); return; }
  if(process.env.R139_LAYOUT==='1') { await require('./r139-broadcast-layout.cjs').verify({call,evaluate,output}); return; }
- if(process.env.R140_LAYOUT==='1') { await require('./r140-banner-layout.cjs').verify({call,evaluate,output}); return; }
+ if(process.env.R140_LAYOUT==='1'||process.env.R141_LAYOUT==='1') { await require('./r140-banner-layout.cjs').verify({call,evaluate,output}); return; }
  if(process.env.CHAMPSELECT_LAYOUT==='1') { await require('./champselect-layout.cjs').verify({call,evaluate,output}); return; }
  if(process.env.DIAGNOSTICS_1555_LAYOUT==='1') { await require('./diagnostics-1555-layout.cjs').verify({call,evaluate,output}); return; }
  if(process.env.R74_LAYOUT_SUITE==='groups') { await require('./player-group-layout.cjs').verify({call,evaluate,output}); return; }

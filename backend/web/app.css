@@ -1143,11 +1143,11 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 .facade-quick-groups button.is-active { color: var(--primary-strong); background: var(--primary-soft); border-color: color-mix(in oklab, var(--primary) 55%, var(--line)); }
 /* R130 P4：头像/旗帜页去掉「目录总数 / 已拥有 / 当前显示」三格统计条，和其它收藏
    子页保持一致，只留下面一行摘要。 */
-/* R130 P2 / R140：旗帜是细长竖图，使用固定 152px 宽的竖长卡；宽高比取第一张加载成功的旗帜图片的
+/* R130 P2 / R141：旗帜是细长竖图，使用固定 200px 宽的竖长卡；宽高比取第一张加载成功的旗帜图片的
    真实 naturalWidth/naturalHeight（favorites-facade.js 写进 --facade-banner-ratio），
    取样前按 0.3 兜底，object-fit: contain 不裁剪。 */
-.facade-grid.is-banners { --facade-banner-ratio: 0.3; grid-template-columns: repeat(auto-fill, 152px); justify-content: start; gap: 20px 16px; }
-.facade-grid.is-banners .skin-card { contain-intrinsic-size: auto 409px; }
+.facade-grid.is-banners { --facade-banner-ratio: 0.3; grid-template-columns: repeat(auto-fill, 200px); justify-content: start; gap: 20px 16px; }
+.facade-grid.is-banners .skin-card { contain-intrinsic-size: auto 531px; }
 .facade-grid.is-banners .skin-art { aspect-ratio: var(--facade-banner-ratio); border-radius: 8px; }
 .facade-grid.is-banners .skin-art img { object-fit: contain; }
 .facade-grid .image-fallback { font-size: 26px; }
