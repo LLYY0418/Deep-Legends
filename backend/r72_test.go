@@ -274,7 +274,7 @@ func TestR72PersistedShopSnapshotUsesOnlyKnownNumericFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	file := filepath.Join(location.configRoot, "PersistedSettings.json")
-	fixture := `{"description":"private-description","files":[{"name":"Game.cfg","sections":[{"name":"HUD","settings":[{"name":"ItemShopPrevX","value":"-130"},{"name":"ItemShopPrevY","value":"20"},{"name":"ItemShopResizeWidth","value":1300},{"name":"ItemShopResizeHeight","value":"900"},{"name":"GlobalScale","value":"0.8"},{"name":"Account","value":"private-account"},{"name":"ShopScale","value":"private-token"}]}]},{"name":"Input.ini","sections":[{"name":"HUD","settings":[{"name":"ItemShopPrevX","value":"9999"}]}]}]}`
+	fixture := `{"description":"private-description","files":[{"name":"Game.cfg","sections":[{"name":"HUD","settings":[{"name":"ItemShopPrevX","value":"-130"},{"name":"ItemShopPrevY","value":"20"},{"name":"ItemShopResizeWidth","value":1300},{"name":"ItemShopResizeHeight","value":"900"},{"name":"GlobalScale","value":"0.8"},{"name":"Account","value":"private-account"},{"name":"ShopScale","value":"private-token"}]}]},{"name":"Input.ini","sections":[{"name":"HUD","settings":[{"name":"ItemShopPrevX","value":"ZQ7XK"}]}]}]}`
 	if err := os.WriteFile(file, []byte(fixture), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +288,7 @@ func TestR72PersistedShopSnapshotUsesOnlyKnownNumericFields(t *testing.T) {
 		t.Fatal(persisted)
 	}
 	encoded, err := json.Marshal(out)
-	if err != nil || strings.Contains(string(encoded), "private-") || strings.Contains(string(encoded), "9999") {
+	if err != nil || strings.Contains(string(encoded), "private-") || strings.Contains(string(encoded), "ZQ7XK") {
 		t.Fatal(string(encoded), err)
 	}
 	after, _ := os.ReadFile(file)

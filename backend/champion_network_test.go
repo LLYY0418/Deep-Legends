@@ -38,7 +38,7 @@ func TestHandleChampionAssetCommunityDragonFallsBackFromLargeToSmall(t *testing.
 		requested = append(requested, request.URL.Path)
 		requestedMu.Unlock()
 		status, body := http.StatusNotFound, []byte("missing")
-		if request.URL.Path == "/latest/game/assets/ux/cherry/augments/icons/drop_bear_small.png" {
+		if request.URL.Path == "/latest/game/assets/ux/cherry/augments/icons/drop_zq7xk_small.png" {
 			status, body = http.StatusOK, smallImage
 		}
 		return &http.Response{
@@ -47,18 +47,20 @@ func TestHandleChampionAssetCommunityDragonFallsBackFromLargeToSmall(t *testing.
 		}, nil
 	})}
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
+	// 旧的 2031 子串检查会误把这个 run_id 当成具体图标 ID。
+	store.diagnosticRunID = "abc2031def0123456789abcd"
 	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	a := &app{champions: provider, storage: store}
 	provider.diag = a.recordDiagnostic
 	recorder := httptest.NewRecorder()
-	a.handleChampionAsset(recorder, httptest.NewRequest(http.MethodGet, "/api/champion-asset?source=communitydragon&path=%2Flatest%2Fgame%2Fassets%2Fux%2Fcherry%2Faugments%2Ficons%2Fdrop_bear_large.png", nil))
+	a.handleChampionAsset(recorder, httptest.NewRequest(http.MethodGet, "/api/champion-asset?source=communitydragon&path=%2Flatest%2Fgame%2Fassets%2Fux%2Fcherry%2Faugments%2Ficons%2Fdrop_zq7xk_large.png", nil))
 	if recorder.Code != http.StatusOK || !bytes.Equal(recorder.Body.Bytes(), smallImage) {
 		t.Fatalf("large-to-small response = status %d body %q", recorder.Code, recorder.Body.Bytes())
 	}
 	requestedMu.Lock()
-	allowed := communityDragonChampionAssetCandidates("/latest/game/assets/ux/cherry/augments/icons/drop_bear_large.png")
+	allowed := communityDragonChampionAssetCandidates("/latest/game/assets/ux/cherry/augments/icons/drop_zq7xk_large.png")
 	for _, request := range requested {
 		found := false
 		for _, candidate := range allowed {
@@ -78,7 +80,7 @@ func TestHandleChampionAssetCommunityDragonFallsBackFromLargeToSmall(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(data), "drop_bear") || strings.Contains(string(data), "2031") {
+	if strings.Contains(string(data), "drop_zq7xk") {
 		t.Fatalf("augment icon diagnostic leaked a concrete icon: %s", data)
 	}
 	var event map[string]any

@@ -510,7 +510,7 @@ func TestR127AugmentIconFetchReportsLCUStatus(t *testing.T) {
 	// 生产日志里的形状：增强符文图标走 /api/image，LCU 400 之后回退 CommunityDragon。
 	collector.reset()
 	recorder = httptest.NewRecorder()
-	clientImagePath := "/lol-game-data/assets/ASSETS/UX/Kiwi/Augments/Icons/1234_large.png"
+	clientImagePath := "/lol-game-data/assets/ASSETS/UX/Kiwi/Augments/Icons/ZQ7XK_large.png"
 	instance = &app{champions: r127AugmentProvider(collector), lcu: client, connected: true}
 	instance.handleImage(recorder, httptest.NewRequest(http.MethodGet, "/api/image?path="+url.QueryEscape(clientImagePath), nil))
 	if recorder.Code != http.StatusNotFound {
@@ -531,7 +531,7 @@ func TestR127AugmentIconFetchReportsLCUStatus(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(string(encoded), "1234") || strings.Contains(string(encoded), "missing") {
+		if strings.Contains(strings.ToLower(string(encoded)), "zq7xk") || strings.Contains(string(encoded), "missing") {
 			t.Fatalf("augment 诊断泄漏了具体图标 ID: %s", encoded)
 		}
 	}

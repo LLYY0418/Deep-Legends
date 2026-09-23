@@ -17,6 +17,8 @@ func TestRankedSplitProbeRecordsOnlyShapeMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := trackTestStore(t, &localStore{root: root})
+	// 旧的 123456 子串检查会误把这个 run_id 当成泄漏。
+	store.diagnosticRunID = "abc123456def0123456789ab"
 	client := &LCUClient{
 		baseURL: "https://lcu.test", token: "secret-token",
 		http: &http.Client{Transport: gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
@@ -25,12 +27,12 @@ func TestRankedSplitProbeRecordsOnlyShapeMetadata(t *testing.T) {
 		})},
 	}
 	a := &app{storage: store}
-	a.probeRankedSplitEndpoints(context.Background(), client, "private-player", 123456)
+	a.probeRankedSplitEndpoints(context.Background(), client, "private-player", 987654321013)
 	data, err := store.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(data), "private-player") || strings.Contains(string(data), "123456") || strings.Contains(string(data), "secret-token") {
+	if strings.Contains(string(data), "private-player") || strings.Contains(string(data), "987654321013") || strings.Contains(string(data), "secret-token") {
 		t.Fatalf("probe leaked an identifier: %s", data)
 	}
 	var event map[string]any

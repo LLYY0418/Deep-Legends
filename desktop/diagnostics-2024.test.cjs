@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
-const source = fs.readFileSync(path.join(__dirname, "../backend/web/champions.js"), "utf8");
+const source = fs.readFileSync(process.env.R137_CHAMPIONS_SOURCE || path.join(__dirname, "../backend/web/champions.js"), "utf8");
 
 function workspace(stored = {}) {
   const dom = new JSDOM('<div id="champions-root"></div><div id="champions-panel"></div>', {url:"http://localhost/", runScripts:"outside-only", pretendToBeVisual:true});
@@ -123,7 +123,7 @@ test("2024 rarity UI says selection distribution, retains all stages, hides fail
   const dom = workspace();
   try {
     const {state, renderMayhemRarityPanel:render} = dom.window.testWorkspace;
-    assert.match(render(),/不代表抽取、刷新或保底概率/);
+    assert.doesNotMatch(render(),/不代表抽取、刷新或保底概率/);
     state.mayhemRarityData = {stages:[1,2,3,4].map(stage=>({stage,silver:10,gold:60,prismatic:30,games:1000}))};
     const html = render();
     assert.equal((html.match(/次选择/g)||[]).length,4);

@@ -18,7 +18,7 @@ func TestSocialFriendsResponseUsesAnonymousPlayerReferences(t *testing.T) {
 		case "/lol-chat/v1/friend-groups":
 			_, _ = io.WriteString(w, `[{"id":1,"name":"好友","priority":1}]`)
 		case "/lol-chat/v1/friends":
-			_, _ = io.WriteString(w, `[{"gameName":"好友玩家","gameTag":"4321","icon":27,"groupId":1,"displayGroupId":1,"puuid":"`+puuid+`","summonerId":9988,"availability":"chat"}]`)
+			_, _ = io.WriteString(w, `[{"gameName":"好友玩家","gameTag":"ZQ7XT","icon":27,"groupId":1,"displayGroupId":1,"puuid":"`+puuid+`","summonerId":987654321013,"availability":"chat"}]`)
 		case "/lol-game-data/assets/v1/queues.json":
 			_, _ = io.WriteString(w, `[]`)
 		default:
@@ -46,7 +46,7 @@ func TestSocialFriendsResponseUsesAnonymousPlayerReferences(t *testing.T) {
 		t.Fatalf("friends = %#v", response.Friends)
 	}
 	reference, ok := a.resolveGameplayReferenceDetails(response.Friends[0].PlayerRef)
-	if !ok || reference.PlayerRef != puuid || reference.GameName != "好友玩家" || reference.TagLine != "4321" || reference.ProfileIconID != 27 {
+	if !ok || reference.PlayerRef != puuid || reference.GameName != "好友玩家" || reference.TagLine != "ZQ7XT" || reference.ProfileIconID != 27 {
 		t.Fatalf("reference = %#v, ok = %v", reference, ok)
 	}
 }
@@ -65,7 +65,7 @@ func TestSocialFriendsNeverProbesSpectatorForInGameFriends(t *testing.T) {
 		case "/lol-chat/v1/friend-groups":
 			_, _ = io.WriteString(w, `[]`)
 		case "/lol-chat/v1/friends":
-			_, _ = io.WriteString(w, `[{"gameName":"对局好友","gameTag":"4321","puuid":"`+puuid+`","summonerId":9988,"availability":"chat","lol":{"gameStatus":"inGame","championId":"64","queueId":"1750","timeStamp":"1700000000000"}}]`)
+			_, _ = io.WriteString(w, `[{"gameName":"对局好友","gameTag":"ZQ7XT","puuid":"`+puuid+`","summonerId":987654321013,"availability":"chat","lol":{"gameStatus":"inGame","championId":"64","queueId":"1750","timeStamp":"1700000000000"}}]`)
 		case "/lol-game-data/assets/v1/queues.json":
 			_, _ = io.WriteString(w, `[]`)
 		case "/lol-spectator/v1/spectate/launch":
@@ -78,7 +78,10 @@ func TestSocialFriendsNeverProbesSpectatorForInGameFriends(t *testing.T) {
 	defer server.Close()
 
 	client := &LCUClient{baseURL: server.URL, token: "lcu-secret", http: server.Client()}
-	a := &app{token: "session-secret", connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: root})}
+	store := trackTestStore(t, &localStore{root: root})
+	// 旧的四位数断言在这个合法十六进制 run_id 上必然误报。
+	store.diagnosticRunID = "26ad6026a998814321b275cf"
+	a := &app{token: "session-secret", connected: true, lcu: client, storage: store}
 	for range 2 {
 		recorder := httptest.NewRecorder()
 		a.handleSocialFriends(recorder, httptest.NewRequest(http.MethodGet, "/api/social/friends", nil))
@@ -102,7 +105,7 @@ func TestSocialFriendsNeverProbesSpectatorForInGameFriends(t *testing.T) {
 	if strings.Contains(logText, "lcu_spectator_read_probe") {
 		t.Fatal("removed probe still logged")
 	}
-	for _, secret := range []string{puuid, "token-value", "对局好友", "4321", "9988"} {
+	for _, secret := range []string{puuid, "token-value", "对局好友", "ZQ7XT", "987654321013"} {
 		if strings.Contains(logText, secret) {
 			t.Fatalf("spectator diagnostic leaked %q: %s", secret, logText)
 		}

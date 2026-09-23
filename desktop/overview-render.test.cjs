@@ -12,7 +12,7 @@ const path = require("node:path");
 const { JSDOM } = require("jsdom");
 
 const WEB = path.join(__dirname, "..", "backend", "web");
-const SCRIPTS = ["runtime.js", "demo-data.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
+const SCRIPTS = ["runtime.js", "demo-data.js", "app.js", "favorites-facade.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
 const gameplaySource = fs.readFileSync(process.env.R104_GAMEPLAY_SOURCE || path.join(WEB, "gameplay.js"), "utf8");
 const suiteSource = fs.readFileSync(path.join(WEB, "suite.js"), "utf8");
 const appStyles = fs.readFileSync(path.join(WEB, "app.css"), "utf8");
@@ -140,6 +140,7 @@ function bootDemoApp(options = {}) {
 
   for (const file of SCRIPTS) {
     let source = fs.readFileSync(path.join(WEB, file), "utf8");
+    if (file === "suite.js" && process.env.R137_SUITE_SOURCE) source = fs.readFileSync(process.env.R137_SUITE_SOURCE, "utf8");
     if (file === "suite.js" && options.suiteSourceTransform) source = options.suiteSourceTransform(source);
     if (file === "champions.js" && options.championsSourceTransform) source = options.championsSourceTransform(source);
     if (file === "gameplay.js" && options.gameplaySourceTransform) source = options.gameplaySourceTransform(source);
@@ -748,6 +749,25 @@ test("2351 自定义暂停事件保留真实总开关和卡片高亮", async () 
   } finally { w.close(); }
 });
 
+test("R123 生涯头像与旗帜入口切到收藏页对应视图", async () => {
+  const { window: w, errors } = bootDemoApp();
+  try {
+    await settled();
+    for (const view of ["banners", "icons"]) {
+      w.document.querySelector('[data-section="suite"]').click();
+      await visitTool(w, "facade");
+      const entry = w.document.querySelector(`#suite-facade-root [data-facade-browse="${view}"]`);
+      assert.ok(entry, `${view} 缺少生涯页入口`);
+      entry.click();
+      assert.equal(w.document.querySelector('[data-section="favorites"]').getAttribute("aria-selected"), "true");
+      assert.equal(w.document.querySelector('[data-favorites-page="facade-collection"]').getAttribute("aria-selected"), "true");
+      assert.equal(w.document.getElementById("favorites-facade-panel").hidden, false);
+      assert.equal(w.document.getElementById(`facade-view-${view}`).getAttribute("aria-selected"), "true");
+    }
+    assert.deepEqual(errors, []);
+  } finally { w.close(); }
+});
+
 test("R56 工具页状态、确认、下拉与领奖契约完整", async () => {
   const { window: w, errors } = bootDemoApp();
   await settled();
@@ -771,7 +791,8 @@ test("R56 工具页状态、确认、下拉与领奖契约完整", async () => {
   assert.match(facadeText, /生涯页展示[\s\S]*头像框、挑战勋章、赛季旗帜、表情轮盘/);
 	assert.match(facadeText, /卸下全部勋章[\s\S]*保留旗帜和当前头衔[\s\S]*无法保留头衔，本次操作会中止并提示/);
 	assert.doesNotMatch(facadeText, /切换上赛季旗帜|挑战旗帜配色/);
-  assert.ok(w.document.querySelector(".facade-left [data-facade-banners]"), "R101 保留旗帜只读入口");
+  assert.ok(w.document.querySelector('#suite-facade-root [data-facade-browse="icons"]'), "R123 生涯头像应有收藏页入口");
+  assert.ok(w.document.querySelector('#suite-facade-root [data-facade-browse="banners"]'), "R123 生涯旗帜应有收藏页入口");
 	assert.doesNotMatch(facadeText, /头衔可能同时卸下/);
   assert.doesNotMatch(facadeText, /展示位/);
   assert.equal(w.document.querySelector("[data-facade-owned]").checked, false, "只显示已拥有不应默认开启");
