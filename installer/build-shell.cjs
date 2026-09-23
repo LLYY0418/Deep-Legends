@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { setupArtifactName } = require("../desktop/artifact-names.cjs");
 
 function installedSize(directory) {
   let total = 0;
@@ -64,7 +65,7 @@ function buildShell({ projectRoot, version, fingerprint, run = spawnSync }) {
   if (version !== packagedVersion) throw new Error("Installer and desktop package versions differ");
   const moduleRoot = path.join(projectRoot, "installer");
   const files = path.join(moduleRoot, "payload/files");
-  const artifact = path.join(projectRoot, "dist/desktop", `Deep Legends Setup ${version}.exe`);
+  const artifact = path.join(projectRoot, "dist/desktop", setupArtifactName(version, process.env.DEEP_LEGENDS_KEY_MODE || "private"));
   const staging = path.join(projectRoot, "dist/desktop", `.installer-shell-${fingerprint}.exe`);
   const setup = path.join(files, "setup.exe");
   const metadata = path.join(files, "meta.json");

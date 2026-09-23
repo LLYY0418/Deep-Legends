@@ -33,18 +33,18 @@ test("build receipt rejects a stale packaged backend and clears obsolete approva
   const packaged = path.join(directory, "win-unpacked", "resources", "app.asar.unpacked", "backend", "loot-service.exe");
   for (const file of [backend, packaged]) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, `MZ\0${fingerprint}\0`); }
   fs.writeFileSync(path.join(directory, `Deep Legends 0.12.1.exe`), "portable");
-  fs.writeFileSync(path.join(directory, `Deep Legends Setup 0.12.1.exe`), "installer");
+  fs.writeFileSync(path.join(directory, `Deep Legends Setup 0.12.1-public.exe`), "installer");
   fs.writeFileSync(path.join(root, "desktop/package.json"), JSON.stringify({ version: "0.12.1" }));
   const receipt = recordReleaseBuild({ root, fingerprint, mode: "public" });
-  assert.deepEqual(Object.keys(receipt.assets), ["Deep Legends Setup 0.12.1.exe"], "stale portable output must not enter the receipt");
+  assert.deepEqual(Object.keys(receipt.assets), ["Deep Legends Setup 0.12.1-public.exe"], "stale portable output must not enter the receipt");
   fs.rmSync(path.join(directory, "Deep Legends 0.12.1.exe"));
   assert.deepEqual(recordReleaseBuild({ root, fingerprint, mode: "public" }), receipt, "setup alone is sufficient");
-  fs.rmSync(path.join(directory, "Deep Legends Setup 0.12.1.exe"));
+  fs.rmSync(path.join(directory, "Deep Legends Setup 0.12.1-public.exe"));
   assert.throws(() => recordReleaseBuild({ root, fingerprint, mode: "public" }), /Setup build is missing/);
   assert.equal(fs.existsSync(path.join(directory, "release-build.json")), false);
-  fs.writeFileSync(path.join(directory, "Deep Legends Setup 0.12.1.exe"), "");
+  fs.writeFileSync(path.join(directory, "Deep Legends Setup 0.12.1-public.exe"), "");
   assert.throws(() => recordReleaseBuild({ root, fingerprint, mode: "public" }), /Empty build artifact/);
-  fs.writeFileSync(path.join(directory, "Deep Legends Setup 0.12.1.exe"), "installer");
+  fs.writeFileSync(path.join(directory, "Deep Legends Setup 0.12.1-public.exe"), "installer");
   recordReleaseBuild({ root, fingerprint, mode: "public" });
   fs.appendFileSync(packaged, "stale");
   assert.throws(() => recordReleaseBuild({ root, fingerprint, mode: "public" }), /Packaged backend differs/);

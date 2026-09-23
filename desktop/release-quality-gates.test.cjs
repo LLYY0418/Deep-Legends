@@ -3,6 +3,18 @@ const test = require("node:test"), assert = require("node:assert/strict");
 const fs = require("node:fs"), os = require("node:os"), path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
+const { setupArtifactName, checksumArtifactName } = require("./artifact-names.cjs");
+
+test("R136 public outputs have distinct names and private outputs keep release names", () => {
+  assert.equal(setupArtifactName("0.12.19", "public"), "Deep Legends Setup 0.12.19-public.exe");
+  assert.equal(setupArtifactName("0.12.19", "private"), "Deep Legends Setup 0.12.19.exe");
+  assert.equal(checksumArtifactName("public"), "SHA256SUMS-public.txt");
+  assert.equal(checksumArtifactName("private"), "SHA256SUMS.txt");
+  const bash = fs.readFileSync(path.join(root, "build-desktop.sh"), "utf8");
+  assert.match(bash, /--config\.nsis\.artifactName=Deep Legends Setup \$\{version\}-public\.\$\{ext\}/);
+  const windows = fs.readFileSync(path.join(root, "build-desktop-windows.ps1"), "utf8");
+  assert.match(windows, /--config\.nsis\.artifactName=Deep Legends Setup \$\{version\}-public\.\$\{ext\}/);
+});
 
 function writeToolchainFixture(directory) {
   const toolchainTests = path.join(directory, ".gotoolchain", "test");

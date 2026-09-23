@@ -21,10 +21,14 @@ version="${1:-$package_version}"
 [[ "$version" == "$package_version" ]] || { echo "Version mismatch: package.json is $package_version, requested build is $version" >&2; exit 1; }
 export DEEP_LEGENDS_KEY_MODE="${DEEP_LEGENDS_KEY_MODE:-private}"
 case "$DEEP_LEGENDS_KEY_MODE" in public|private) ;; *) echo "DEEP_LEGENDS_KEY_MODE must be public or private" >&2; exit 1 ;; esac
+artifact_suffix=""
+if [[ "$DEEP_LEGENDS_KEY_MODE" == "public" ]]; then artifact_suffix="-public"; fi
+setup_artifact="Deep Legends Setup ${version}${artifact_suffix}.exe"
+checksum_artifact="SHA256SUMS${artifact_suffix}.txt"
 run_stage cleanup bash -c '
   project_root="$1"
   rm -f "$project_root/dist/desktop/release-build.json"
-  find "$project_root/dist/desktop" -maxdepth 1 -type f \( -name "Deep Legends*.exe" -o -name "Deep Legends*.zip" -o -name "SHA256SUMS.txt" \) -delete 2>/dev/null || true
+  find "$project_root/dist/desktop" -maxdepth 1 -type f \( -name "Deep Legends*.exe" -o -name "Deep Legends*.zip" -o -name "SHA256SUMS*.txt" \) -delete 2>/dev/null || true
   rm -rf "$project_root/dist/desktop/win-unpacked"
 ' bash "$project_root"
 
@@ -177,6 +181,9 @@ report_electron_dist() {
   GOCACHE="$GOCACHE" GOTMPDIR="${GOTMPDIR:-/tmp}" \
     node "$project_root/scripts/build-stage.cjs" uninstaller-shell node ../installer/build-shell.cjs --uninstall "$version"
   setup_args=("${builder_common_args[@]}")
+  if [[ "$DEEP_LEGENDS_KEY_MODE" == "public" ]]; then
+    setup_args+=('--config.nsis.artifactName=Deep Legends Setup ${version}-public.${ext}')
+  fi
   if [[ -n "$electron_dist" ]]; then setup_args+=(--config.electronDist="$electron_dist"); fi
   # beforePack retains the required level 9 compression; report its long runtime.
   node "$project_root/scripts/build-stage.cjs" nsis npm run pack:win-setup -- "${setup_args[@]}"
@@ -188,7 +195,7 @@ report_electron_dist() {
   run_stage packaged-fingerprint node verify-build-fingerprint.cjs ../dist/desktop/win-unpacked/resources/app.asar.unpacked/backend/loot-service.exe "$source_fingerprint"
   run_stage release-receipt node release-build.cjs "$source_fingerprint"
   cd ../dist/desktop
-  run_stage setup-checksum bash -c 'shasum -a 256 "$1" > SHA256SUMS.txt' bash "Deep Legends Setup ${version}.exe"
+  run_stage setup-checksum bash -c 'shasum -a 256 "$1" > "$2"' bash "$setup_artifact" "$checksum_artifact"
   run_stage unpacked-cleanup rm -rf win-unpacked
-  echo "Setup build complete: Deep Legends Setup ${version}.exe"
+  echo "Setup build complete: $setup_artifact"
 )

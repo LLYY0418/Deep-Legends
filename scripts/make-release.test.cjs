@@ -9,7 +9,7 @@ test("setup-only release hashes actual renamed bytes and emits exactly three fil
   fs.writeFileSync(path.join(root,"desktop","package.json"),JSON.stringify({version:"0.12.0"}));
   fs.writeFileSync(path.join(root,"CHANGELOG.md"),'# 更新日志\n\n## 0.12.0 — 2026-09-11\n\n### 新增\n- 更新\n\n## 0.11.2 — 2026-09-10\n- 旧内容\n');
   const fingerprint="a1b2c3d4e5f6",bytes=Buffer.from("actual installer bytes");
-  fs.writeFileSync(path.join(root,"dist","desktop",`Deep Legends Setup 0.12.0.exe`),bytes);
+  fs.writeFileSync(path.join(root,"dist","desktop",`Deep Legends Setup 0.12.0-public.exe`),bytes);
   const backend=path.join(root,"desktop","backend","loot-service.exe");
   const packaged=path.join(root,"dist","desktop","win-unpacked","resources","app.asar.unpacked","backend","loot-service.exe");
   for(const file of [backend,packaged]){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,`MZ-test-backend-${fingerprint}`);}
@@ -17,18 +17,18 @@ test("setup-only release hashes actual renamed bytes and emits exactly three fil
   recordReleaseBuild({root,fingerprint,mode:"public"});
   const manifest=makeRelease({root,fingerprint,publishedAt:"2026-09-11T12:00:00Z"});
   const directory=path.join(root,"dist","release"),names=fs.readdirSync(directory);
-  assert.deepEqual(names.sort(),["Deep-Legends-Setup-0.12.0.exe","SHA256SUMS.txt","latest.json"]);
+  assert.deepEqual(names.sort(),["Deep-Legends-Setup-0.12.0-public.exe","SHA256SUMS-public.txt","latest.json"]);
   assert.equal(manifest.asset.size,bytes.length);assert.equal(manifest.asset.sha256,crypto.createHash("sha256").update(bytes).digest("hex"));
   assert.deepEqual(fs.readFileSync(path.join(directory,manifest.asset.name)),bytes);
   assert.equal(manifest.asset.url,`https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.0/${manifest.asset.name}`);
   assert.equal(manifest.notes,"### 新增\n- 更新");assert.deepEqual(JSON.parse(fs.readFileSync(path.join(directory,"latest.json"))),manifest);
-  for(const line of fs.readFileSync(path.join(directory,"SHA256SUMS.txt"),"utf8").trim().split("\n")){
+  for(const line of fs.readFileSync(path.join(directory,"SHA256SUMS-public.txt"),"utf8").trim().split("\n")){
    const [hash,name]=line.split("  ");assert.equal(hash,crypto.createHash("sha256").update(fs.readFileSync(path.join(directory,name))).digest("hex"));
   }
   fs.writeFileSync(path.join(directory,"stale.exe"),"old");makeRelease({root,fingerprint});assert.equal(fs.readdirSync(directory).length,3);
-  fs.appendFileSync(path.join(root,"dist","desktop",`Deep Legends Setup 0.12.0.exe`),"changed");
+  fs.appendFileSync(path.join(root,"dist","desktop",`Deep Legends Setup 0.12.0-public.exe`),"changed");
   assert.throws(()=>makeRelease({root,fingerprint}),/发布文件与已验证构建不一致/);
-  fs.writeFileSync(path.join(root,"dist","desktop",`Deep Legends Setup 0.12.0.exe`),bytes);
+  fs.writeFileSync(path.join(root,"dist","desktop",`Deep Legends Setup 0.12.0-public.exe`),bytes);
   fs.appendFileSync(backend,"changed");assert.throws(()=>makeRelease({root,fingerprint}),/Backend changed/);
   fs.writeFileSync(backend,`MZ-test-backend-${fingerprint}`);
   const receiptPath=path.join(root,"dist","desktop","release-build.json"),receipt=JSON.parse(fs.readFileSync(receiptPath));

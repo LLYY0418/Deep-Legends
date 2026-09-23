@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { setupArtifactName } = require("./artifact-names.cjs");
 const { verifyRiotKeyPolicy } = require("./verify-embedded-riot-key.cjs");
 const { verifyBuildFingerprint } = require("./verify-build-fingerprint.cjs");
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -22,7 +23,7 @@ function recordReleaseBuild({ root = path.resolve(__dirname, ".."), fingerprint,
   if (sha256(fs.readFileSync(packaged)) !== backendHash) throw new Error("Packaged backend differs from the verified build");
   const version = JSON.parse(fs.readFileSync(path.join(root, "desktop/package.json"), "utf8")).version;
   if (!/^\d+\.\d+\.\d+(?:[-+][\dA-Za-z.-]+)?$/.test(version)) throw new Error("Invalid build version");
-  const names = [`Deep Legends Setup ${version}.exe`];
+  const names = [setupArtifactName(version, mode)];
   const assets = {};
   for (const name of names) {
     const file = path.join(directory, name);

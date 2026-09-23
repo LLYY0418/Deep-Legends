@@ -12,17 +12,17 @@ const sha256 = bytes => crypto.createHash("sha256").update(bytes).digest("hex");
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "setup-only-build-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  for (const dir of ["bin", "desktop/backend", "scripts", "installer", "dist/desktop/win-unpacked"]) {
+  for (const dir of ["bin", "backend", "desktop/backend", "scripts", "installer", "dist/desktop/win-unpacked"]) {
     fs.mkdirSync(path.join(root, dir), { recursive: true });
   }
-  for (const name of ["build-desktop.sh", "scripts/build-stage.cjs", "scripts/go-test-shards.cjs", "desktop/package.json", "desktop/package-lock.json", "desktop/release-build.cjs",
+  for (const name of ["build-desktop.sh", "scripts/build-stage.cjs", "scripts/go-test-shards.cjs", "desktop/package.json", "desktop/package-lock.json", "desktop/release-build.cjs", "desktop/artifact-names.cjs",
     "desktop/verify-embedded-riot-key.cjs", "desktop/apply-portable-template.cjs", "desktop/verify-build-fingerprint.cjs"]) {
     fs.copyFileSync(path.join(project, name), path.join(root, name));
   }
   const prelude = `const fs = require("node:fs"), path = require("node:path");
     const root = process.env.R82_FIXTURE_ROOT;
     const record = value => fs.appendFileSync(path.join(root, "calls.jsonl"), JSON.stringify(value) + "\\n");
-    const artifact = path.join(root, "dist/desktop/Deep Legends Setup ${packageVersion}.exe");
+    const artifact = path.join(root, "dist/desktop/Deep Legends Setup ${packageVersion}-public.exe");
     const backend = path.join(root, "desktop/backend/loot-service.exe");
     const uninstall = path.join(root, "desktop/uninstall-shell.exe");
   `;
@@ -114,15 +114,16 @@ test("setup-only Bash build wraps one NSIS result, hashes final bytes and remove
   assert.deepEqual(events.filter(value => typeof value === "string"), ["backend", "npm-ci", "uninstaller", "installer", "runtime-verified"]);
   const nsis = events.filter(value => value.stage === "nsis");
   assert.equal(nsis.length, 1);
+  assert.ok(nsis[0].args.includes('--config.nsis.artifactName=Deep Legends Setup ${version}-public.${ext}'));
   assert.ok(nsis[0].args.includes(`--config.electronDist=${path.join(root, "cached Electron.zip")}`));
   const compression = events.find(value => value.compression).compression;
   assert.ok(compression.includes("-mx=9"), compression.join(" "));
   assert.ok(compression.includes("-mf=BCJ"), "retain NSIS-compatible filter even with an external BCJ2 override");
   assert.ok(!compression.includes("-mf=BCJ2"));
-  const name = `Deep Legends Setup ${packageVersion}.exe`;
-  assert.deepEqual(fs.readdirSync(directory).sort(), [name, "SHA256SUMS.txt", "release-build.json"]);
+  const name = `Deep Legends Setup ${packageVersion}-public.exe`;
+  assert.deepEqual(fs.readdirSync(directory).sort(), [name, "SHA256SUMS-public.txt", "release-build.json"]);
   const hash = sha256(fs.readFileSync(path.join(directory, name)));
-  assert.equal(fs.readFileSync(path.join(directory, "SHA256SUMS.txt"), "utf8"), `${hash}  ${name}\n`);
+  assert.equal(fs.readFileSync(path.join(directory, "SHA256SUMS-public.txt"), "utf8"), `${hash}  ${name}\n`);
   const receipt = JSON.parse(fs.readFileSync(path.join(directory, "release-build.json")));
   assert.equal(receipt.fingerprint, "abcdef012345"); assert.equal(receipt.mode, "public");
   assert.deepEqual(receipt.assets, {[name]: hash});
@@ -137,7 +138,7 @@ test("failed NSIS stops before wrapping or issuing a receipt and cleans the unin
   const result = run({R82_FAIL_STAGE: "nsis"});
   assert.equal(result.status, 23, result.stdout + result.stderr);
   assert.ok(!calls().includes("installer"));
-  for (const name of ["release-build.json", "SHA256SUMS.txt", `Deep Legends Setup ${packageVersion}.exe`]) {
+  for (const name of ["release-build.json", "SHA256SUMS-public.txt", `Deep Legends Setup ${packageVersion}-public.exe`]) {
     assert.equal(fs.existsSync(path.join(directory, name)), false, name);
   }
   assert.equal(fs.existsSync(path.join(root, "desktop/uninstall-shell.exe")), false);

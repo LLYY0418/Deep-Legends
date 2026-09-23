@@ -21,6 +21,9 @@ if ($Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$') {
 if ($package.version -ne $Version) {
     throw "Version mismatch: package.json is $($package.version), requested build is $Version"
 }
+$artifactSuffix = if ($KeyMode -eq "public") { "-public" } else { "" }
+$setupArtifact = "Deep Legends Setup $Version$artifactSuffix.exe"
+$checksumArtifact = "SHA256SUMS$artifactSuffix.txt"
 
 # public 构建不读取个人凭据。private 构建保留本地注入方式。
 if ($KeyMode -eq "public") {
@@ -63,7 +66,7 @@ try {
     $env:DEEP_LEGENDS_KEY_MODE = $KeyMode
     Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $projectRoot "dist\desktop\release-build.json")
     Get-ChildItem (Join-Path $projectRoot "dist\desktop") -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -match '^Deep Legends( Setup)?( ([0-9a-f]{12}|[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?))?\.(exe|zip)$' -or $_.Name -eq "SHA256SUMS.txt" } |
+        Where-Object { $_.Name -match '^Deep Legends( Setup)?( ([0-9a-f]{12}|[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?)(-public)?)?\.(exe|zip)$' -or $_.Name -match '^SHA256SUMS(-public)?\.txt$' } |
         Remove-Item -Force
     $staleUnpacked = Join-Path $projectRoot "dist\desktop\win-unpacked"
     if (Test-Path $staleUnpacked) { Remove-Item -Recurse -Force $staleUnpacked }
@@ -146,6 +149,7 @@ try {
         $env:DEEP_LEGENDS_FINGERPRINT = $sourceFingerprint
         $builderSignArgs = @()
         if (-not $CertificateFile) { $builderSignArgs = @("--config.win.signExecutable=false") }
+        if ($KeyMode -eq "public") { $builderSignArgs += '--config.nsis.artifactName=Deep Legends Setup ${version}-public.${ext}' }
 
         # 只构建 setup；beforePack 默认使用 7z level 3，保留原有解压方式。
         & node (Join-Path $projectRoot "installer\build-shell.cjs") --uninstall $Version
@@ -175,13 +179,13 @@ try {
     Remove-Item -Recurse -Force $unpackedDirectory
 
     $artifacts = Get-ChildItem (Join-Path $projectRoot "dist\desktop") -File |
-        Where-Object { $_.Name -eq "Deep Legends Setup $Version.exe" } |
+        Where-Object { $_.Name -eq $setupArtifact } |
         Sort-Object Name
     $hashLines = foreach ($artifact in $artifacts) {
         $hash = (Get-FileHash -Algorithm SHA256 $artifact.FullName).Hash.ToLowerInvariant()
         "$hash  $($artifact.Name)"
     }
-    $hashLines | Set-Content -Encoding ascii (Join-Path $projectRoot "dist\desktop\SHA256SUMS.txt")
+    $hashLines | Set-Content -Encoding ascii (Join-Path $projectRoot "dist\desktop\$checksumArtifact")
     Write-Host "Desktop build complete: $(Join-Path $projectRoot 'dist\desktop')"
 } finally {
     $env:DEEP_LEGENDS_KEY_MODE = $previousKeyMode
