@@ -35,8 +35,8 @@ if (-not $env:GOPROXY -or $env:GOPROXY -eq "https://proxy.golang.org,direct") {
     $env:GOPROXY = "https://goproxy.cn|https://proxy.golang.org|direct"
 }
 
-# A Windows Git checkout may convert every Go file to CRLF. gofmt reports
-# line-ending-only changes as unformatted, so restore the repository's LF form.
+# A Windows Git checkout may convert Go and manifest files to CRLF. gofmt
+# rejects line-ending-only changes, and the manifest must match its .syso bytes.
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 foreach ($sourceRoot in @("backend", "installer", "tools")) {
     Get-ChildItem -Path (Join-Path $projectRoot $sourceRoot) -Recurse -File -Filter "*.go" | ForEach-Object {
@@ -44,6 +44,13 @@ foreach ($sourceRoot in @("backend", "installer", "tools")) {
         if ($source.Contains("`r`n")) {
             [System.IO.File]::WriteAllText($_.FullName, $source.Replace("`r`n", "`n"), $utf8NoBom)
         }
+    }
+}
+foreach ($relativeManifest in @("installer\app.manifest", "installer\uninstall\app.manifest")) {
+    $manifestPath = Join-Path $projectRoot $relativeManifest
+    $manifest = [System.IO.File]::ReadAllText($manifestPath)
+    if ($manifest.Contains("`r`n")) {
+        [System.IO.File]::WriteAllText($manifestPath, $manifest.Replace("`r`n", "`n"), $utf8NoBom)
     }
 }
 
