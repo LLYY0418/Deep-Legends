@@ -1,13 +1,13 @@
 # R133 执行台账：R130 独立验证收尾
 
-基线 **0.12.18**（R130 之后）。工单：`docs/WORKLIST-R133-R130-VERIFICATION-FOLLOWUPS.md`（诊断人 Claude，执行人 GPT）。
+基线 **0.12.18**（R130 之后）。工单：`docs/history/worklists/WORKLIST-R133-R130-VERIFICATION-FOLLOWUPS.md`（诊断人 Claude，执行人 GPT）。
 
 三条的处置结果：
 
 | 项 | 内容 | 结果 |
 |---|---|---|
 | **P1** | 看门狗注释还停在旧数值（`backend/web/app.js`） | **已完成**，验收 grep 干净 |
-| **P2** | R130 验收总表要求的真机 5 分钟手动验证 | **本机做不了，仍未执行**；已把最后一步的日志判读固化成可复核的脚本 + 交接步骤，等有客户端的机器上跑 |
+| **P2** | R130 验收总表要求的真机 5 分钟手动验证 | **已完成**；2026-09-23 用户在 Windows 真机执行，R136 收到的诊断日志判定 `clean` |
 | **P3** | Claude 那轮没能重新编译执行 `backend/r130_test.go`（设备登录过期） | **我这边代跑了**：`go test -race ./backend` 通过 |
 
 版本号**没有**递增，仍是 0.12.18。理由：P1 只改注释（三行），P2/P3 不改任何生产代码，新增的两个文件在 `scripts/` 下、既不被 `//go:embed web/*.js` 收录也不进安装包，运行时行为零变化。两个 0.12.18 构建靠 `build_fingerprint` 区分（`build-desktop.sh:62` 由 `desktop/source-fingerprint.cjs` 对源码取 12 位十六进制指纹，注释改动会改变指纹），诊断日志里不会混。
@@ -44,7 +44,7 @@ $ grep -n "CARD_IMAGE_STALL_MS" backend/web/app.js
 
 ## 2. P2　真机手动验证：本机做不了，交接件已备好
 
-### 为什么做不了（不是跳过，是环境不具备）
+### 原先为什么做不了（之后已由用户在真机完成）
 
 工单要求「找一台能连英雄联盟客户端的机器」。在这台 macOS 上逐项查过：
 
@@ -56,7 +56,7 @@ $ grep -n "CARD_IMAGE_STALL_MS" backend/web/app.js
 | LCU lockfile | `find "$HOME/Library/Application Support" -maxdepth 4 -iname lockfile` | 无 |
 | LCU 监听端口 | `lsof -nP -iTCP -sTCP:LISTEN` | 只有 rapportd / ControlCenter / DingTalk / clash 等本机服务，没有 LCU |
 
-R130 台账第 8 节「未验证 / 边界」第 1 条已经如实记了这一步没做，本轮结论不变：**P2 仍然未执行**。不编造结果、不拿 jsdom/虚拟 DOM 的机制验证冒充真机负载验证。
+R133 初次执行时这一步尚未完成；后续用户在 Windows 真机按步骤进行了 5 分钟压测，结果见本节末尾的补记。
 
 ### 交接件：把工单第 6 步的日志判读做成可复核的命令
 
@@ -119,6 +119,10 @@ card_image_stalled：0 条
    - `notify-gap` → 这是新缺陷，按项目惯例另开工单，把脚本的 `--json` 输出附在工单里。
    - `inconclusive` / `undated` / `clean-unverified` → 证据不足，先按判词里写的办法补样本，不要据此改代码。
 
+### 2026-09-23 真机结果补记（R136）
+
+用户在 Windows 真机按上述步骤进行了 5 分钟压测，导出的 `docs/r136-validation/lol-loot-diagnostics-0923-1137.jsonl` 包含同一运行 4,849 条日志，`app_start.version=0.12.18`、`build_fingerprint=1de5cc3d1e8c`。`node scripts/r133-stall-log-report.cjs` 给出 `clean`：`card_image_stalled`=0、`local_request_client/failed(endpoint=image)`=0、`client_diagnostic_rejected`=0。日志覆盖 03:00:14–03:37:06Z；日志不记录页面导航，具体操作和 5 分钟时长以用户口述为准。**P2 结项；P1、P3 也已完成，R133 全部关闭。**
+
 ## 3. P3　Go 测试复核（代跑完成）
 
 工单说 Claude 那轮只做了代码审阅、没能自己编译执行 `backend/r130_test.go`（往云端传文件被拒，报设备登录状态过期 `untrusted_device`），并说「如果你已经处理过那个登录提示，下次我可以重新尝试独立编译执行（连同 `-race` 那一轮）」。
@@ -164,6 +168,6 @@ Claude 那边的登录问题属于它自己的通道，不影响本项：`-race`
 | `scripts/r133-stall-log-report.cjs` | 新增，P2 第 6 步的日志判读脚本（只读日志，246 → 282 行） |
 | `scripts/r133-stall-log-report.test.cjs` | 新增，14 条用例含 2 条对抗变异 |
 | `docs/history/ledgers/r130-execution-ledger.md` | 第 8 节「未验证 / 边界」第 1 条补上指向本台账的交接说明 |
-| `docs/r133-execution-ledger.md` | 本文件 |
+| `docs/history/ledgers/r133-execution-ledger.md` | 本文件 |
 
 生产运行时行为**零变化**：`backend/web/` 下只改了注释，`scripts/` 不参与 `//go:embed`、不进安装包，`backend/` 一行未动。所以版本号保持 0.12.18，`backend/static_assets_test.go` 的嵌入清单也无需同步。

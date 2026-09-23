@@ -3,9 +3,11 @@
 `docs/pro-accounts-verification-2026-09-17.md` 已于 R105 完整嵌入代码。
 职业页以该表的 6 队、33 人、53 个账号为唯一归属来源；修改身份前必须核对该文件，保留大小写、空格和原始顺序。动态目录只补充账号数据，不覆盖人工归属。
 
-当前版本：0.12.18（以 `desktop/package.json` 为准）。R107 的视频/日志分析、真实数据验证与 Windows 真机验证边界见 `docs/r107-execution-ledger.md`。
+当前版本：0.12.19（以 `desktop/package.json` 为准）。R107 的视频/日志分析、真实数据验证与 Windows 真机验证边界见 `docs/r107-execution-ledger.md`。
 
 目录布局：Go 源码与内嵌资源位于 `backend/`（构建 `go build ./backend`，测试 `go test ./backend`，前端在 `backend/web/`）；`installer/`、`tools/` 为独立模块。Go 构建缓存使用系统默认目录，不放仓库内。`docs/` 根目录只放进行中的 `WORKLIST-*` 与对应账本、长期参考文档；关闭后工单归档到 `docs/history/worklists/`，账本归档到 `docs/history/ledgers/`，核查报告、提案和探测结论归档到 `docs/history/reports/`。查工单先看 `docs/WORKLIST-INDEX.md`。
+
+验证性打包的账本必须记明 key mode；public 产物必须带 `-public` 文件名后缀，验证完只保留这种可识别的名称，不能留下与 private 同名的包。
 
 ## 界面文案红线（R128 §2.5，2026-09-22 用户指示）
 

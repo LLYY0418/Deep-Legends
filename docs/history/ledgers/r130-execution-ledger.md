@@ -275,7 +275,7 @@ R125 用例 `R125 icon tiles render at native square size` 的 5 条断言（92p
 ### 未验证 / 边界（按 R107 台账口径如实列出）
 
 1. **工单验收总表的手动 5 分钟验证没做**：「在皮肤列表来回快速拖动滚动条、悬停十几张动态原画卡、在奖池页和皮肤页之间切换，持续 5 分钟后屏幕上的卡片仍能在 2 秒内出图」需要连着国服客户端、在 Windows 真机上跑真实皮肤目录与真实动态原画视频。本轮只做到：单条机制在真机 Chromium 上复现并修复（第 0 节的表）、40 张图跳底部在 jsdom 里 2 秒内出图、悬停 3 张卡只有 1 个视频在播。**请在下一次真机运行时按这 3 个动作各跑一遍，并导出诊断日志确认有没有 `card_image_stalled`。**
-   → **R133 复核后这一条仍未关闭**：R133（`docs/WORKLIST-R133-R130-VERIFICATION-FOLLOWUPS.md` P2）再次确认本机没有英雄联盟客户端（无进程、无安装路径、无 LCU lockfile、无监听端口），所以真机验证到现在还是空的。交接件已经备好，见 `docs/r133-execution-ledger.md` 第 2 节：8 步操作流程 + `node scripts/r133-stall-log-report.cjs <导出的 jsonl>`，脚本会按同一时间窗的 `local_request_client/failed(endpoint=image)` 数量把结果判成 `clean` / `backlog-only` / `notify-gap` / `inconclusive`，并且会拒绝把 0.12.18 之前的旧日志判成 `clean`。
+   → R133 复核时本机没有英雄联盟客户端，交接流程见 `docs/history/ledgers/r133-execution-ledger.md` 第 2 节。**2026-09-23 用户在 Windows 真机按 R133 P2 步骤压测 5 分钟，诊断日志 `card_image_stalled`=0、图片请求失败=0，见 `docs/r136-validation/lol-loot-diagnostics-0923-1137.jsonl`。** 同一运行共 4,849 条，0.12.18 `app_start` 确认事件支持，`client_diagnostic_rejected`=0；`node scripts/r133-stall-log-report.cjs` 判定 `clean`。日志没有页面导航事件，操作与时长以用户口述为准。
 2. **P1-C 的连接占用没做真实大体积视频实测**：工单 §1-C 的「5 个 40MB 视频占满 6 条连接」由诊断人已经实测过，本轮只验证了修复侧的可观察结果（`pointerleave`/`blur` 后 `src` 被移除、`resetVideo` 被调用、全局同时只有 1 个视频、打开详情弹窗也会停、原画/占位正确恢复），没有用真实 40MB 视频再测一次 Chromium 的连接占用。
 3. **45 秒这个看门狗阈值仍然没有真机数据支撑**：它是按「必须晚于第二层最坏放弃时间 30s」推出来的下界加余量，不是从真实日志里量出来的。下一份真机日志里如果 `card_image_stalled` 大量出现、而同一时间窗的 `local_request_client/failed(endpoint=image)` 很少，说明是第二层积压而不是通知失败，那时该调的是第二层的名额而不是这个阈值（判读方法见第 1 节第 6 条）。
 4. **`desktop/*.test.cjs` 有 2 条先前就红的用例，本轮未动**（不在工单范围）：
