@@ -1143,19 +1143,21 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 .facade-quick-groups button.is-active { color: var(--primary-strong); background: var(--primary-soft); border-color: color-mix(in oklab, var(--primary) 55%, var(--line)); }
 /* R130 P4：头像/旗帜页去掉「目录总数 / 已拥有 / 当前显示」三格统计条，和其它收藏
    子页保持一致，只留下面一行摘要。 */
-/* R130 P2：旗帜是细长竖图，正方形格子只占中间一窄条、文字还压在上面。改成固定
-   150px 宽的竖长卡，宽窗口下格子尺寸不变；宽高比取第一张加载成功的旗帜图片的
+/* R130 P2 / R140：旗帜是细长竖图，使用固定 152px 宽的竖长卡；宽高比取第一张加载成功的旗帜图片的
    真实 naturalWidth/naturalHeight（favorites-facade.js 写进 --facade-banner-ratio），
    取样前按 0.3 兜底，object-fit: contain 不裁剪。 */
-.facade-grid.is-banners { --facade-banner-ratio: 0.3; grid-template-columns: repeat(auto-fill, 150px); justify-content: start; gap: 12px 10px; }
-.facade-grid.is-banners .skin-card { contain-intrinsic-size: auto 524px; }
+.facade-grid.is-banners { --facade-banner-ratio: 0.3; grid-template-columns: repeat(auto-fill, 152px); justify-content: start; gap: 20px 16px; }
+.facade-grid.is-banners .skin-card { contain-intrinsic-size: auto 409px; }
 .facade-grid.is-banners .skin-art { aspect-ratio: var(--facade-banner-ratio); border-radius: 8px; }
 .facade-grid.is-banners .skin-art img { object-fit: contain; }
 .facade-grid .image-fallback { font-size: 26px; }
 /* R130 P6：详情弹窗按图片自身尺寸显示，宽度跟着内容收缩，不留大片空白。图片区域
    尺寸由 favorites-facade.js 写进 --facade-art-width/height，加载前按 128px 占位。 */
-.facade-detail-dialog { width: fit-content; min-width: min(320px, calc((100dvw - 28px) / var(--ui-zoom, 1))); max-width: calc((100dvw - 28px) / var(--ui-zoom, 1)); }
-.facade-detail-dialog .dialog-art { width: var(--facade-art-width, 128px); max-width: 100%; height: var(--facade-art-height, 128px); aspect-ratio: auto; margin: 12px auto 0; }
+.facade-detail-dialog { width: fit-content; min-width: min(320px, calc((100dvw - 28px) / var(--ui-zoom, 1))); max-width: calc((100dvw - 28px) / var(--ui-zoom, 1)); max-height: calc((100dvh - 28px) / var(--ui-zoom, 1)); }
+/* 详情文字保留完整高度；视口较矮时只收缩图片，不让弹窗出现滚动条。 */
+.facade-detail-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
+.facade-detail-dialog .dialog-art { flex: 0 1 var(--facade-art-height, 128px); width: var(--facade-art-width, 128px); max-width: 100%; height: var(--facade-art-height, 128px); aspect-ratio: auto; margin: 12px auto 0; }
+.facade-detail-dialog .dialog-copy { flex: 0 0 auto; }
 .facade-detail-dialog .dialog-art-primary { object-fit: contain; background: var(--surface-strong); }
 .facade-detail-dialog .dialog-copy > p { margin: 0; font-size: 12px; }
 .facade-grid.is-icons { grid-template-columns: repeat(auto-fill, 92px); justify-content: start; gap: 20px 16px; }

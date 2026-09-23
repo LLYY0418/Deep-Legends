@@ -573,7 +573,7 @@ const FACADE_FUNCTIONS = [
 function facadeWindow(src = facadeSource) {
   const dom = new JSDOM('<body></body>', { url: 'http://fixture/', runScripts: 'outside-only' });
   const w = dom.window;
-  const detailConstants = ['DETAIL_ART_PLACEHOLDER_PX', 'DETAIL_ART_ICON_SCALE', 'DETAIL_ART_ICON_MAX_PX', 'DETAIL_ART_BANNER_MAX_HEIGHT_PX'].map((name) => {
+  const detailConstants = ['DETAIL_ART_PLACEHOLDER_PX', 'DETAIL_ART_ICON_SCALE', 'DETAIL_ART_ICON_MAX_PX', 'DETAIL_ART_BANNER_SCALE', 'DETAIL_ART_BANNER_MAX_HEIGHT_PX'].map((name) => {
     const declaration = src.match(new RegExp(`const ${name} = \\d+;`))?.[0];
     assert.ok(declaration, `${name} 必须从生产源码读取，避免测试常量与实现漂移`);
     return declaration;
@@ -624,8 +624,14 @@ const natural = (w, width, height) => {
   return image;
 };
 
-test('R130 P2 旗帜改成 150px 竖长卡，名称移到图片下方', () => {
-  assert.match(css, /\.facade-grid\.is-banners \{[^}]*grid-template-columns: repeat\(auto-fill, 150px\)/, '旗帜格子必须固定 150px 宽，宽窗口下尺寸不变');
+test('R140 旗帜列宽按真实页面 4–5 列确定，名称保持在图片下方', () => {
+  const bannerCSS = process.env.R140_APP_CSS ? fs.readFileSync(process.env.R140_APP_CSS, 'utf8') : css;
+  const bannerRule = bannerCSS.match(/\.facade-grid\.is-banners \{([^}]*)\}/)?.[1] || '';
+  const width = Number(bannerRule.match(/grid-template-columns:\s*repeat\(auto-fill,\s*(\d+)px\)/)?.[1]);
+  const gap = bannerRule.match(/gap:\s*(\d+)px\s+(\d+)px/);
+  assert.equal(width, 152, 'R140 真 Chromium 在 1200/960 下分别为 5/4 列；优先列数后取 152px');
+  assert.ok(gap && Number(gap[1]) >= 18 && Number(gap[2]) >= 14, '旗帜间距不得退回旧值');
+  assert.match(bannerCSS, /\.facade-grid\.is-banners \.skin-card \{ contain-intrinsic-size: auto 409px; \}/, '占位高度应匹配真实旗帜约 409px 卡片');
   assert.match(css, /\.facade-grid\.is-banners \{[^}]*justify-content: start/, '固定宽度的格子必须靠左排，不能被拉开');
   assert.match(css, /\.facade-grid\.is-banners \{[^}]*--facade-banner-ratio: 0\.3/, '取样前必须有 0.3 的默认比例兜底');
   assert.match(css, /\.facade-grid\.is-banners \.skin-art \{ aspect-ratio: var\(--facade-banner-ratio\);/, '格子高度必须跟着真实比例走，不能写死正方形');
@@ -644,10 +650,16 @@ test('R130 P2 旗帜比例取自第一张图片的真实尺寸，铺满格子后
   try {
     const { api, w } = h;
     api.state.view = 'banners';
+    const pending = natural(w, 320, 180);
+    pending.setAttribute('src', '/image-unavailable.svg');
+    pending.setAttribute('data-queued-src', '/api/image?path=%2Flol-game-data%2Fassets%2Fbanner.png');
+    api.sampleBannerRatio(pending, true);
+    assert.equal(api.el.grid.style.getPropertyValue('--facade-banner-ratio'), '', '占位图不得抢先锁住旗帜比例');
+    assert.equal(api.bannerRatioSampled, false);
     api.sampleBannerRatio(natural(w, 102, 400), true);
     const ratio = api.el.grid.style.getPropertyValue('--facade-banner-ratio');
     assert.equal(ratio, (102 / 400).toFixed(4), '必须写 naturalWidth / naturalHeight，不能写反');
-    const cellWidth = 150;
+    const cellWidth = 152;
     const cellHeight = cellWidth / Number(ratio);
     // object-fit: contain 下图片按同一比例铺满格子；格子比例 == 图片比例时留白为 0。
     const drawnHeight = Math.min(cellHeight, cellWidth / (102 / 400));
@@ -793,7 +805,7 @@ test('R130 P5-4 拥有状态从不可用恢复后，头像开关回到用户原�
   assert.throws(() => recovery(mutated), /开关必须仍然显示用户自己的设置|恢复后开关必须回到用户原来的设置/, '把复位语句塞回去后必须测得出来');
 });
 
-test('R138 头像详情按原图 2 倍显示、最大 512px，旗帜详情保留 R130 尺寸', () => {
+test('R138/R140 头像与旗帜详情都按原图 2 倍显示并分别封顶', () => {
   const h = facadeWindow();
   try {
     const { api } = h;
@@ -811,8 +823,11 @@ test('R138 头像详情按原图 2 倍显示、最大 512px，旗帜详情保留
     assert.deepEqual(size(300, 300), ['512px', '512px'], '300px 头像应封顶 512px，而不是 600px');
     assert.deepEqual(size(512, 512), ['512px', '512px'], '原图超过上限时仍封顶 512px');
     api.state.view = 'banners';
-    assert.deepEqual(size(100, 400), ['80px', '320px'], '旗帜按自身比例，高度不超过上限');
-    assert.deepEqual(size(100, 200), ['100px', '200px'], '高度没到上限时按原尺寸');
+    // R140：旗帜也接受放大后的模糊；高度翻倍后最多 640px。
+    assert.deepEqual(size(100, 400), ['160px', '640px'], '高 400px 的旗帜封顶到 640px');
+    assert.deepEqual(size(100, 200), ['200px', '400px'], '高 200px 的旗帜按 2 倍显示');
+    assert.deepEqual(size(100, 250), ['200px', '500px'], '超过旧 320px 上限的高度不得被误封顶');
+    assert.deepEqual(size(100, 1000), ['64px', '640px'], '远超新上限时高度仍封顶 640px');
   } finally { h.close(); }
   // 还没解码出尺寸时不得改动占位大小，否则弹窗会跳。
   const fresh = facadeWindow();
@@ -827,7 +842,10 @@ test('R138 头像详情按原图 2 倍显示、最大 512px，旗帜详情保留
 
 test('R130 P6 弹窗改紧凑布局、加载前 128×128 占位，皮肤/炫彩弹窗不动', () => {
   assert.match(css, /\.facade-detail-dialog \{ width: fit-content;/, '弹窗宽度必须跟着内容收缩，不留大片空白');
-  assert.match(css, /\.facade-detail-dialog \.dialog-art \{ width: var\(--facade-art-width, 128px\); max-width: 100%; height: var\(--facade-art-height, 128px\); aspect-ratio: auto;/, '图片区域尺寸由 JS 写进变量，加载前按 128px 占位');
+  assert.match(css, /\.facade-detail-dialog \{[^}]*max-height: calc\(\(100dvh - 28px\) \/ var\(--ui-zoom, 1\)\)/, '旗帜图片在窗口够高时应能达到 640px，同时保留视口边距');
+  assert.match(css, /\.facade-detail-dialog\[open\] \{ display: flex; flex-direction: column; overflow: hidden; \}/, '详情弹窗须让图片随可用高度收缩且不显示滚动条');
+  assert.match(css, /\.facade-detail-dialog \.dialog-art \{ flex: 0 1 var\(--facade-art-height, 128px\); width: var\(--facade-art-width, 128px\); max-width: 100%; height: var\(--facade-art-height, 128px\); aspect-ratio: auto;/, '图片区域尺寸由 JS 写进变量，空间不足时可缩小');
+  assert.match(css, /\.facade-detail-dialog \.dialog-copy \{ flex: 0 0 auto; \}/, '详情文字不得为了隐藏滚动条而被压扁');
   assert.match(css, /\.facade-detail-dialog \.dialog-art-primary \{ object-fit: contain;/, '不得裁剪');
   assert.doesNotMatch(css, /\.facade-detail-dialog \{ width: min\(560px/, '560px 的固定宽度必须去掉');
   assert.doesNotMatch(css, /\.facade-detail-dialog \.dialog-art \{ aspect-ratio: 1\/1;/, '正方形写死的图片区域必须去掉');

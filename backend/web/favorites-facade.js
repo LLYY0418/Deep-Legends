@@ -266,6 +266,10 @@
   // state.view 可能已经切走，读实时值会让一张方形头像把 1.0 写进整个旗帜网格。
   function sampleBannerRatio(image, isBanner) {
     if (!isBanner || bannerRatioSampled) return;
+    // 模板自带的 image-unavailable.svg 可能先于队列中的真实旗帜触发 load。
+    // 只有当前 src 已切到目标图片时才采样，否则会把 16:9 占位图比例锁死。
+    const queued = image.getAttribute("data-queued-src");
+    if (queued && image.getAttribute("src") !== queued) return;
     const width = Number(image.naturalWidth);
     const height = Number(image.naturalHeight);
     if (!width || !height) return;
@@ -273,12 +277,13 @@
     el.grid.style.setProperty("--facade-banner-ratio", (width / height).toFixed(4));
   }
 
-  // R130 P6：旗帜详情按原图尺寸显示；R138 按用户决定将头像详情放大 2 倍，
-  // 接受原图插值后的模糊，仍限制最大边长以免撑出屏幕。
+  // R138/R140：头像和旗帜详情按原图放大 2 倍，接受插值后的模糊；
+  // 分别限制头像最大边长、旗帜最大高度，避免撑出屏幕。
   const DETAIL_ART_PLACEHOLDER_PX = 128;
   const DETAIL_ART_ICON_SCALE = 2;
   const DETAIL_ART_ICON_MAX_PX = 512;
-  const DETAIL_ART_BANNER_MAX_HEIGHT_PX = 320;
+  const DETAIL_ART_BANNER_SCALE = 2;
+  const DETAIL_ART_BANNER_MAX_HEIGHT_PX = 640;
   function setDetailArtSize(width, height) {
     el.dialog.style.setProperty("--facade-art-width", `${Math.max(1, Math.round(width))}px`);
     el.dialog.style.setProperty("--facade-art-height", `${Math.max(1, Math.round(height))}px`);
@@ -293,8 +298,8 @@
       setDetailArtSize(size, size);
       return;
     }
-    // 旗帜按自身比例缩放，高度不超过弹窗可视高度；contain 保证不裁剪。
-    const scaled = Math.min(DETAIL_ART_BANNER_MAX_HEIGHT_PX, height);
+    // 旗帜按自身比例放大，高度封顶 640px；contain 保证不裁剪。
+    const scaled = Math.min(DETAIL_ART_BANNER_MAX_HEIGHT_PX, height * DETAIL_ART_BANNER_SCALE);
     setDetailArtSize(scaled * (width / height), scaled);
   }
 
