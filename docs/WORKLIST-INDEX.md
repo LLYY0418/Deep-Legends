@@ -57,4 +57,4 @@
 | R132 | 未找到仓库内工单 | 进行中 | — | — | — |
 | R133 | WORKLIST-R133：R130 独立验证收尾——注释未同步、真机手动验证与 Go 测试复核仍缺 | 进行中 | [WORKLIST-R133-R130-VERIFICATION-FOLLOWUPS.md](WORKLIST-R133-R130-VERIFICATION-FOLLOWUPS.md) | [r133-execution-ledger.md](r133-execution-ledger.md) | — |
 | R134 | WORKLIST-R134：`r133-stall-log-report.cjs` 判词会被不相关的另一次启动污染 | 已关闭 | [WORKLIST-R134-STALL-LOG-REPORT-CROSS-RUN-CONTAMINATION.md](history/worklists/WORKLIST-R134-STALL-LOG-REPORT-CROSS-RUN-CONTAMINATION.md) | [r134-execution-ledger.md](history/ledgers/r134-execution-ledger.md) | — |
-| R135 | R135 · 仓库瘦身：本机缓存、Git 历史、docs 工单归档与无引用代码清理 | 进行中 | [WORKLIST-R135-REPO-SLIMMING-CACHE-DOCS-DEADCODE.md](WORKLIST-R135-REPO-SLIMMING-CACHE-DOCS-DEADCODE.md) | — | r135-validation: `c2b678d07938cc39b5c15ccc49e5a09c931c17e3` |
+| R135 | R135 · 仓库瘦身：本机缓存、Git 历史、docs 工单归档与无引用代码清理 | 已关闭（P2 待用户决定） | [WORKLIST-R135-REPO-SLIMMING-CACHE-DOCS-DEADCODE.md](history/worklists/WORKLIST-R135-REPO-SLIMMING-CACHE-DOCS-DEADCODE.md) | [r135-execution-ledger.md](r135-execution-ledger.md) | r135-validation 基线：`c2b678d07938cc39b5c15ccc49e5a09c931c17e3`；分析报告：`0703538d`；size-after 与本账本同提交 |

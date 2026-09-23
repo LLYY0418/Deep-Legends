@@ -1,0 +1,23 @@
+210M	.git
+152M	desktop
+ 97M	dist
+ 35M	docs
+ 13M	backend
+780K	installer
+344K	output
+232K	scripts
+188K	tools
+ 52K	README.md
+ 36K	DESIGN.md
+ 12K	build-desktop.sh
+ 12K	build-desktop-windows.ps1
+8.0K	PRODUCT.md
+8.0K	CHANGELOG.md
+4.0K	riot_key.local.txt
+4.0K	go.sum
+4.0K	go.mod
+4.0K	build-windows.ps1
+4.0K	CLAUDE.md
+4.0K	AGENTS.md
+4.0K	.gitignore
+4.0K	.github
