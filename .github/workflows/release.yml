@@ -55,7 +55,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = $env:RELEASE_TAG
-          $releases = & gh release list --json tagName,isDraft --limit 1000
+          $releases = & gh release list --json 'tagName,isDraft' --limit 1000
           if ($LASTEXITCODE -ne 0) { throw "Could not inspect existing Releases" }
           $existing = @($releases | ConvertFrom-Json | Where-Object { $_.tagName -eq $tag })
           if ($existing.Count -gt 0) {
@@ -67,8 +67,13 @@ jobs:
           if ($manifest.version -ne $env:RELEASE_VERSION) { throw "Release notes version mismatch" }
           $notesFile = Join-Path $env:RUNNER_TEMP 'deep-legends-release-notes.md'
           [System.IO.File]::WriteAllText($notesFile, $manifest.notes, (New-Object System.Text.UTF8Encoding($false)))
-          $setup = "dist/release/Deep-Legends-Setup-$env:RELEASE_VERSION-public.exe"
+          $setup = "dist/release/Deep-Legends-Setup-${env:RELEASE_VERSION}-public.exe"
           & gh release create $tag $setup 'dist/release/latest.json' 'dist/release/SHA256SUMS-public.txt' --draft --target $env:GITHUB_SHA --title $tag --notes-file $notesFile
           if ($LASTEXITCODE -ne 0) { throw "Could not create draft Release $tag" }
-          $draft = & gh release view $tag --json isDraft --jq '.isDraft'
-          if ($LASTEXITCODE -ne 0 -or $draft.Trim() -ne 'true') { throw "Created Release $tag is not a draft" }
+          $releaseJson = & gh release view $tag --json 'isDraft,assets'
+          if ($LASTEXITCODE -ne 0) { throw "Could not inspect draft Release $tag" }
+          $release = $releaseJson | ConvertFrom-Json
+          if (-not $release.isDraft) { throw "Created Release $tag is not a draft" }
+          $expectedAssets = @("Deep-Legends-Setup-${env:RELEASE_VERSION}-public.exe", 'latest.json', 'SHA256SUMS-public.txt') | Sort-Object
+          $actualAssets = @($release.assets | ForEach-Object { $_.name }) | Sort-Object
+          if (($actualAssets -join "`n") -ne ($expectedAssets -join "`n")) { throw "Draft Release $tag does not have exactly the three public files" }
