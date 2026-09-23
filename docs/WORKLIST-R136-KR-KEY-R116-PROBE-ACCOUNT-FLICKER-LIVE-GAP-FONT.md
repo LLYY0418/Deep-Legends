@@ -229,12 +229,12 @@ GPT 完成 P1–P6 后：
 1. 版本号 0.12.19，**private 模式**打包（不要设置 `DEEP_LEGENDS_KEY_MODE=public`），确认 `dist/desktop/Deep Legends Setup 0.12.19.exe` 文件名不带 `-public`，账本记录 key mode、指纹和 SHA256。
 2. 连同 `dist/probes/` 里的探测 exe 和 README 一起交给用户。
 
-用户在真机上做（写进 README，也写进账本「待真机」栏）：
+用户在真机上做（写进 README，也写进账本「待真机」栏）——**R116 与 R121 要打两局不同类型的对局，不是同一局**：
 
 - 装 0.12.19，打开任意韩服玩家页，确认能出战绩；首次进入「账户与物品」不闪；看一下对局页页签上方的空隙和海斗「表现」字号。
-- **匹配进入一局 5v5 海克斯大乱斗（不是自定义房间）**，进游戏后至少待 2 分钟（让 P2 的采样器拿到 2999 数据），结束后导出诊断日志。
-- 同一局的英雄选择阶段，用 `r116-augment-probe.exe` 跑一次判据一；R121 位置探测按 README 在大厅和英雄选择两个阶段各跑一次。
-- 把诊断日志和探测输出发回来，由 Claude 读取后回填 `docs/r116-probe-findings.md` 和 `docs/r121-position-probe-findings.md`。
+- **R116（海斗探测）**：匹配进入一局 5v5 海克斯大乱斗（不是自定义房间），英雄选择阶段跑一次 `r116-augment-probe.exe` 判据一；进游戏后至少待 2 分钟（让 P2 的采样器拿到 2999 数据），结束后导出诊断日志。海斗才有海克斯天赋，别的模式测这个探测没有意义。
+- **R121（位置探测）**：换一局单/双排或灵活组排——不是海克斯大乱斗，大乱斗没有分路，测不出位置偏好/补位字段（见 `docs/WORKLIST-R119-AUTOFILL-LABEL-GAPS.md` P3-1，那里明确写的是「单双排/灵活组排」）。最好挑一局你自己或队友明确知道被补位的。大厅开始匹配、还没进英雄选择时跑一次；进入英雄选择后再跑一次。
+- 把诊断日志和三份探测输出（`augment-probe.jsonl`、`position-lobby.jsonl`、`position-champselect.jsonl`）发回来，由 Claude 读取后回填 `docs/r116-probe-findings.md` 和 `docs/r121-position-probe-findings.md`。
 
 ## 验收总表
 
