@@ -30,6 +30,18 @@ if (-not $env:GOPROXY -or $env:GOPROXY -eq "https://proxy.golang.org,direct") {
     $env:GOPROXY = "https://goproxy.cn|https://proxy.golang.org|direct"
 }
 
+# A Windows Git checkout may convert every Go file to CRLF. gofmt reports
+# line-ending-only changes as unformatted, so restore the repository's LF form.
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+foreach ($sourceRoot in @("backend", "installer", "tools")) {
+    Get-ChildItem -Path (Join-Path $projectRoot $sourceRoot) -Recurse -File -Filter "*.go" | ForEach-Object {
+        $source = [System.IO.File]::ReadAllText($_.FullName)
+        if ($source.Contains("`r`n")) {
+            [System.IO.File]::WriteAllText($_.FullName, $source.Replace("`r`n", "`n"), $utf8NoBom)
+        }
+    }
+}
+
 Push-Location $projectRoot
 try {
     & (Join-Path $projectRoot "build-desktop-windows.ps1") -Version $Version -KeyMode public
