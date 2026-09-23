@@ -1,5 +1,0 @@
---- FAIL: TestR104ColdStartupDripProtectsForegroundTwentyMatches (0.46s)
-    r104_test.go:271: one-account minute must cost four cold Riot requests, got 15
-FAIL
-FAIL	lol-loot-assistant	0.996s
-FAIL

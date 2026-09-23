@@ -1,5 +1,0 @@
---- FAIL: TestR104SeedRank24HourCacheSeparateFromOverview (0.03s)
-    r101_test.go:488: seed cache expired before 24 hours: 3 <nil>
-FAIL
-FAIL	lol-loot-assistant	0.533s
-FAIL

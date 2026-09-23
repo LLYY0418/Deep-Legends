@@ -13,7 +13,7 @@
   // 层自己的 5 个名额。阈值取在 30s 之前会让看门狗抢在第二层前面推进，既有概率跳过
   // 本来能显示的候选地址，也会在每张慢图上误报一条 card_image_stalled，把「名额
   // 是否泄漏」这个判据搞脏。45s 让它退回真正的兜底位置；工单里那个更短的值已作废
-  // （原始数值与推导过程记在 docs/r130-execution-ledger.md 第 10 节，R133 P1 复核）。
+  // （原始数值与推导过程记在 docs/history/ledgers/r130-execution-ledger.md 第 10 节，R133 P1 复核）。
   const CARD_IMAGE_STALL_MS = 45_000;
   // R130 P1-6：card_image_stalled 每 10 秒最多上报一条。
   const CARD_IMAGE_STALL_REPORT_INTERVAL_MS = 10_000;

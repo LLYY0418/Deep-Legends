@@ -1,8 +1,0 @@
-{
-  "scenario": "Real in-app browser, production gameplay prepareImages and image-queue.js, local SVG fixture images",
-  "images": 6,
-  "loaded": 6,
-  "visible": 6,
-  "naturalWidth": 80,
-  "scope": "Browser queue/lazy-admission regression, not Windows LCU artwork verification"
-}

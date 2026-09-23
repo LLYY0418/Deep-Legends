@@ -13,7 +13,7 @@ run_stage() {
   fi
 }
 
-export GOCACHE="${GOCACHE:-$project_root/.gocache}"
+export GOCACHE="${GOCACHE:-$(go env GOCACHE)}"
 export GOTMPDIR="${GOTMPDIR:-${TMPDIR:-/tmp}}"
 
 package_version="$(node -p 'require("./desktop/package.json").version')"
@@ -54,14 +54,14 @@ if [[ "$DEEP_LEGENDS_KEY_MODE" == "private" ]]; then
   fi
   plain_key="$(tr -d '\r\n' < "$key_file")"
   [[ -n "$plain_key" ]] || { echo "Riot API key is empty" >&2; exit 1; }
-  cipher="$(run_stage key-encryption env GOCACHE="${GOCACHE:-$project_root/.gocache}" GOTMPDIR="${GOTMPDIR:-/private/tmp}" go run ./backend -encrypt-riot-key "$plain_key")"
+  cipher="$(run_stage key-encryption env GOCACHE="$GOCACHE" GOTMPDIR="${GOTMPDIR:-/private/tmp}" go run ./backend -encrypt-riot-key "$plain_key")"
   [[ -n "$cipher" ]] || { echo "Failed to encrypt Riot API key" >&2; exit 1; }
 else
   echo "Public build: no embedded Riot API key; KR queries require RIOT_API_KEY at runtime."
 fi
 source_fingerprint="$(run_stage source-fingerprint node desktop/source-fingerprint.cjs)"
 [[ "$source_fingerprint" =~ ^[0-9a-f]{12}$ ]] || { echo "Invalid source fingerprint" >&2; exit 1; }
-run_stage backend-build env GOCACHE="${GOCACHE:-$project_root/.gocache}" GOTMPDIR="${GOTMPDIR:-/private/tmp}" GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -trimpath \
+run_stage backend-build env GOCACHE="$GOCACHE" GOTMPDIR="${GOTMPDIR:-/private/tmp}" GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -trimpath \
   -ldflags="-s -w -H=windowsgui -buildid= -X main.version=$version -X main.buildFingerprint=$source_fingerprint -X main.riotAPIKey= -X main.riotAPIKeyCipher=$cipher" \
   -o desktop/backend/loot-service.exe ./backend
 run_stage backend-fingerprint node desktop/verify-build-fingerprint.cjs desktop/backend/loot-service.exe "$source_fingerprint"
@@ -174,7 +174,7 @@ report_electron_dist() {
   echo "electron-cache: check completed"
   report_electron_dist "$electron_dist"
   trap 'rm -f "$project_root/desktop/uninstall-shell.exe"' EXIT
-  GOCACHE="${GOCACHE:-$project_root/.gocache}" GOTMPDIR="${GOTMPDIR:-/tmp}" \
+  GOCACHE="$GOCACHE" GOTMPDIR="${GOTMPDIR:-/tmp}" \
     node "$project_root/scripts/build-stage.cjs" uninstaller-shell node ../installer/build-shell.cjs --uninstall "$version"
   setup_args=("${builder_common_args[@]}")
   if [[ -n "$electron_dist" ]]; then setup_args+=(--config.electronDist="$electron_dist"); fi
@@ -182,7 +182,7 @@ report_electron_dist() {
   node "$project_root/scripts/build-stage.cjs" nsis npm run pack:win-setup -- "${setup_args[@]}"
   rm -f "$project_root/desktop/uninstall-shell.exe"
   # NSIS → embedded payload → Go shell → final artifact, before SHA256SUMS.
-  GOCACHE="${GOCACHE:-$project_root/.gocache}" GOTMPDIR="${GOTMPDIR:-/tmp}" \
+  GOCACHE="$GOCACHE" GOTMPDIR="${GOTMPDIR:-/tmp}" \
     node "$project_root/scripts/build-stage.cjs" installer-shell node ../installer/build-shell.cjs "$version" "$source_fingerprint"
   run_stage packaged-runtime node verify-packaged-runtime.cjs ../dist/desktop/win-unpacked/resources/app.asar
   run_stage packaged-fingerprint node verify-build-fingerprint.cjs ../dist/desktop/win-unpacked/resources/app.asar.unpacked/backend/loot-service.exe "$source_fingerprint"

@@ -1,5 +1,0 @@
-=== RUN   TestR106LiveProfileBatch
-    r106_test.go:251: accounts=53 ranked=47 unranked=6 failed=0 source timestamps=53 duration=11.150989125s
---- PASS: TestR106LiveProfileBatch (11.15s)
-PASS
-ok  	lol-loot-assistant	11.419s

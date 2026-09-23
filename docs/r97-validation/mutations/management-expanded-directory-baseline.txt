@@ -1,4 +1,0 @@
-=== RUN   TestR97ManagementAndBadgesShareReviewedSixTeams
---- PASS: TestR97ManagementAndBadgesShareReviewedSixTeams (0.00s)
-PASS
-ok  	lol-loot-assistant	0.013s

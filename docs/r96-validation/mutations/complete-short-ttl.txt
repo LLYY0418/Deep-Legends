@@ -1,6 +1,0 @@
---- FAIL: TestR90LiveSnapshotCacheLayersAndManualRefresh (0.01s)
-    --- FAIL: TestR90LiveSnapshotCacheLayersAndManualRefresh/true (0.01s)
-        r90_test.go:270: TTL layer true
-FAIL
-FAIL	lol-loot-assistant	0.496s
-FAIL

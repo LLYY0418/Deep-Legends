@@ -1,6 +1,0 @@
---- FAIL: TestR90LiveSnapshotCacheLayersAndManualRefresh (0.01s)
-    --- FAIL: TestR90LiveSnapshotCacheLayersAndManualRefresh/false (0.01s)
-        r90_test.go:259: second HTTP request reassembled roster
-FAIL
-FAIL	lol-loot-assistant	0.498s
-FAIL

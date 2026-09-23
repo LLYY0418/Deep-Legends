@@ -1,5 +1,0 @@
---- FAIL: TestR102LastMatchStartCachedSevenDays (0.04s)
-    r102_test.go:267: early expiry 4
-FAIL
-FAIL	lol-loot-assistant	0.502s
-FAIL

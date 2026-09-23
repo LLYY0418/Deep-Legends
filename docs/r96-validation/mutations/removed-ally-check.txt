@@ -1,8 +1,0 @@
---- FAIL: TestR96ExplicitSubteamGuard (0.02s)
-    --- FAIL: TestR96ExplicitSubteamGuard/subteamId/conflict=true (0.01s)
-        r96_test.go:51: conflicting candidate accepted: "4"
-    --- FAIL: TestR96ExplicitSubteamGuard/playerSubteamId/conflict=true (0.01s)
-        r96_test.go:51: conflicting candidate accepted: "4"
-FAIL
-FAIL	lol-loot-assistant	0.516s
-FAIL

@@ -1,5 +1,0 @@
---- FAIL: TestR104BackgroundAdmissionYieldsAtThirtyOrForegroundQueue (0.00s)
-    r104_test.go:160: shared occupancy 30 must yield: <nil>
-FAIL
-FAIL	lol-loot-assistant	0.482s
-FAIL

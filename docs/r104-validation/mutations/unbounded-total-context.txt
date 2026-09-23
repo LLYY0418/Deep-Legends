@@ -1,5 +1,0 @@
---- FAIL: TestR104SeedTotalBudgetIsBoundedRegardlessOfAccountCount (0.00s)
-    r102_test.go:334: count=1 total budget=3m19.999998208s, want fixed 20s
-FAIL
-FAIL	lol-loot-assistant	0.503s
-FAIL

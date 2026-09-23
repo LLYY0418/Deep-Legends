@@ -24,7 +24,7 @@
 - **别人看不到**。改的只是你本地客户端读到的数据，服务端真值没变。
 - **不持久**。重启客户端后需要脚本重新施加；目标 ID 写在 `CONFIG` 里所以会自动恢复。
 - **不能让别人也看到未拥有外观**。那需要服务端接受写入，已确认被所有权校验拒绝
-  （`docs/r106-execution-ledger.md`、`docs/r107-execution-ledger.md`；外部项目
+  （`docs/history/ledgers/r106-execution-ledger.md`、`docs/r107-execution-ledger.md`；外部项目
   league-profile-tool 同样只做到聊天作用域）。
 - **不改游戏文件、不联网、不上传任何数据、不写持久化存储**。
 

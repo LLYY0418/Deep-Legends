@@ -1,8 +1,0 @@
-export PATH=/tmp/go/bin:$PATH
-export GOROOT=/tmp/go
-export GOCACHE=/sessions/youthful-determined-volta/mnt/deep-legends/.gocache
-export GOMODCACHE=/sessions/youthful-determined-volta/mnt/deep-legends/.gomodcache
-export TMPDIR=/dev/shm/r90tmp
-export GOTMPDIR=/dev/shm/r90tmp
-export GOFLAGS=-mod=mod
-
