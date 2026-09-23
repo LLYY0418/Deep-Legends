@@ -175,6 +175,7 @@ type sgpProvider struct {
 	historyCache       map[string]sgpHistoryCacheEntry
 	historyGeneration  uint64
 	historyBytes       int
+	historyLastUsed    time.Time
 	summonerCache      map[string]sgpSummonerCacheEntry
 	credentialVersions map[sgpCredentialIdentity]string
 	credentialOrder    []sgpCredentialIdentity
@@ -780,23 +781,33 @@ func (p *sgpProvider) cachedHistoryPage(serverID, puuid string, startIndex, maxP
 			delete(p.historyCache, key)
 			continue
 		}
-		entry.lastUsed = now
+		entry.lastUsed = p.nextHistoryLastUsed(now)
 		p.historyCache[key] = entry
 		return entry, pageSize, true
 	}
 	return sgpHistoryCacheEntry{}, 0, false
 }
 
+// Windows clocks may return the same tick for consecutive accesses. Keep the
+// LRU timestamp strictly increasing so eviction does not depend on map order.
+func (p *sgpProvider) nextHistoryLastUsed(now time.Time) time.Time {
+	if !now.After(p.historyLastUsed) {
+		now = p.historyLastUsed.Add(time.Nanosecond)
+	}
+	p.historyLastUsed = now
+	return now
+}
+
 func (p *sgpProvider) cacheHistoryPage(serverID, puuid string, startIndex, pageSize int, tags []string, entry sgpHistoryCacheEntry, expectedGeneration ...uint64) {
 	now := time.Now()
-	entry.at = now
-	entry.lastUsed = now
 	key := sgpHistoryPageCacheKey(serverID, puuid, startIndex, pageSize, tags)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if len(expectedGeneration) > 0 && expectedGeneration[0] != p.historyGeneration {
 		return
 	}
+	entry.at = now
+	entry.lastUsed = p.nextHistoryLastUsed(now)
 	if p.historyCache == nil {
 		p.historyCache = make(map[string]sgpHistoryCacheEntry)
 	}

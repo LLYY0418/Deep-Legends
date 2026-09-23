@@ -891,11 +891,19 @@ func TestSGPSummonerSuccessIsCached(t *testing.T) {
 func TestMatchHistoryCacheEvictsByBytes(t *testing.T) {
 	provider := newSGPProvider()
 	puuid := strings.Repeat("b", 48)
+	var previousUse time.Time
 	for start := 0; start < 3; start++ {
 		provider.cacheHistoryPage("HN1", puuid, start, 50, nil, sgpHistoryCacheEntry{
 			consumed: 50,
 			bytes:    10 << 20,
 		})
+		provider.mu.Lock()
+		lastUsed := provider.historyCache[sgpHistoryPageCacheKey("HN1", puuid, start, 50, nil)].lastUsed
+		provider.mu.Unlock()
+		if !lastUsed.After(previousUse) {
+			t.Fatal("history cache access order did not advance")
+		}
+		previousUse = lastUsed
 	}
 	provider.mu.Lock()
 	defer provider.mu.Unlock()
