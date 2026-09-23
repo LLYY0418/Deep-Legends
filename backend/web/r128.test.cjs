@@ -171,7 +171,8 @@ test("R128 §2.1 概览/构筑/表现 tab 改成等分的一级切换", () => {
   const narrow = championsStyles.slice(championsStyles.lastIndexOf("@media (max-width: 700px)"));
   assert.match(narrow, /\.mayhem-detail-tabs \{ flex: 1 0 100%; \}/);
   assert.match(narrow, /\.mayhem-detail-tabs button \{ min-height: 44px; \}/);
-  assert.match(narrow, /\.mayhem-performance-groups \{ grid-template-columns: 1fr; \}/);
+  assert.match(championsStyles, /@container mayhem-pane \(max-width: 760px\) \{\s*\.mayhem-performance-groups \{ grid-template-columns: 1fr; \}/);
+  assert.match(championsStyles, /@container mayhem-pane \(max-width: 520px\) \{\s*\.mayhem-multikill-values \{ grid-template-columns: repeat\(2,minmax\(0,1fr\)\); \}/);
 });
 
 test("R128 §2.2 表现指标改成逐行列表，多杀四项合并成一行", () => {

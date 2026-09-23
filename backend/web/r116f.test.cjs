@@ -337,7 +337,8 @@ test("R128 详情页样式走既有变量，不引入 hex 字面值，废弃样�
   assert.match(block, /\.mayhem-detail-tabs button\.is-active \{[^}]*box-shadow: inset 0 -2px 0 var\(--primary\);/);
   assert.match(block, /\.mayhem-performance-groups \{[^}]*repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(block, /\.mayhem-performance-group dl > div \{[^}]*grid-template-columns: minmax\(0,1fr\) auto;/);
-  assert.match(block, /@media \(max-width: 700px\) \{[\s\S]*\.mayhem-detail-tabs \{ flex: 1 0 100%; \}[\s\S]*\.mayhem-performance-groups \{ grid-template-columns: 1fr; \}/);
+  assert.match(block, /@media \(max-width: 700px\) \{[\s\S]*\.mayhem-detail-tabs \{ flex: 1 0 100%; \}/);
+  assert.match(block, /@container mayhem-pane \(max-width: 760px\) \{\s*\.mayhem-performance-groups \{ grid-template-columns: 1fr; \}/);
   // 口径页脚、统计口径与慎选陈述的样式随文案一起删除。
   assert.doesNotMatch(championsStyles, /mayhem-caution-note|mayhem-measurement|mayhem-detail-footer/);
   // 新增类名必须在源码里被引用（R117 的未引用类名棘轮）。

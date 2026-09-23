@@ -59,7 +59,7 @@ test("R90 incomplete snapshots stop after eight retries with a visible refresh e
  h.syncLiveRetryBudget();h.state.liveRetryStartedAt=Date.now()-60001;
  for(let i=0;i<8;i++){h.scheduleLiveRefresh();assert.equal(h.timers.size,1);assert.equal(h.fire(),20000)}
  h.scheduleLiveRefresh();assert.equal(h.calls.length,8);assert.equal(h.timers.size,0);
- assert.match(h.renderLiveRefreshStatus(h.state.live),/已停止自动重试/);assert.match(h.renderLiveRefreshStatus(h.state.live),/data-live-refresh>刷新/);
+ assert.match(h.renderLiveRefreshStatus(h.state.live),/已停止自动重试/);assert.doesNotMatch(h.renderLiveRefreshStatus(h.state.live),/data-live-refresh/);
  h.state.live.gameId=91;h.scheduleLiveRefresh();assert.equal(h.state.liveRetryAttempts,0);assert.equal(h.timers.size,1);
  h.state.beacon.phase="ChampSelect";h.state.live.phase="ChampSelect";h.scheduleLiveRefresh();assert.equal(h.fire(),3000);
 });
@@ -74,11 +74,7 @@ test("R90 inactive tabs and repeated in-game SSE do not reload the roster; phase
 });
 test("R90 stopped UI has an operable manual refresh and foreground wake checks phase",()=>{
  const h=harness(full());assert.match(h.renderLiveRefreshStatus(h.state.live),/对局中数据不再变化，已停止自动刷新/);
- const calls=[];let handler;const button={addEventListener:(event,fn)=>{if(event==="click")handler=fn}};
- // R131 §2.1-4：R129 把面板内绑定拆进 bindLivePanelScope，这里与同对象里既有的
- // bindRuneWorkspaceControls / bindPlayerLinks 一样桩掉（本条只验证刷新按钮的 manual 来源）。
- const {bindLiveContent}=compile(["bindLiveContent"],{state:h.state,nodes:{liveContent:{querySelector:s=>s==="[data-live-refresh]"?button:null,querySelectorAll:()=>[]}},bindRuneWorkspaceControls:()=>{},bindRuneChoiceButtons:()=>{},bindLivePanelScope:()=>{},loadLive:(...args)=>calls.push(args),bindPlayerLinks:()=>{},bindInsightMatchExpand:()=>{},applyRunes:()=>{},applyItemSet:()=>{}});
- bindLiveContent();handler();assert.deepEqual(calls,[[true,"manual"]]);
+ assert.match(source, /nodes\.liveRefresh\.addEventListener\("click", \(\) => loadLive\(true, "manual"\)\)/);
  const visibility=source.slice(source.indexOf('document.addEventListener("visibilitychange", () => {\n    if (state.destroyed)'),source.indexOf('/* ---------- 新对局提示灯'));
  assert.doesNotMatch(visibility,/loadLive\(true/);assert.match(visibility,/scheduleBeaconPoll\(0\)/);
  assert.match(source,/const BEACON_FAST_POLL_MS = 1_000/);assert.match(source,/const BEACON_IDLE_POLL_MS = 12_000/);

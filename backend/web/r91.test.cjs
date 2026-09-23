@@ -14,7 +14,7 @@ const extract = name => {
 };
 const snapshot = (gameId = 90, phase = "InProgress") => ({ gameId, phase, available: true, currentChampionId: gameId, players: [{ isCurrent: true, championId: gameId, historyState: "ok" }] });
 function harness() {
-  const dom = new JSDOM('<div class="live-toolbar"><div id="summary"></div><button id="refresh">刷新对局</button></div><div id="content"></div>', { pretendToBeVisual: true });
+  const dom = new JSDOM('<div class="live-toolbar"><div id="summary"></div><div data-live-status></div><button id="refresh">刷新对局</button></div><div id="content"></div>', { pretendToBeVisual: true });
   const document = dom.window.document;
   const nodes = { liveContent: document.querySelector("#content"), liveRefresh: document.querySelector("#refresh"), liveSessionSummary: document.querySelector("#summary") };
   const state = { section: "live", beacon: { phase: "InProgress" }, live: snapshot(), settings: { liveRefresh: true }, controllers: new Map(), tabs: [], liveGameGeneration: 0, liveRecommendations: new Map([["old", {}]]), specialistRunes: new Map([["old", {}]]), proRunes: new Map([["old", {}]]) };
@@ -108,10 +108,11 @@ test("R91 repeated manual refresh immediately aborts and replaces only the live 
       assert.equal(h.requests[1].url, "/api/gameplay/live?refresh=1");
       assert.match(h.nodes.liveRefresh.textContent, /正在刷新/);
       assert.equal(h.nodes.liveRefresh.getAttribute("aria-busy"), "true");
-      assert.doesNotMatch(h.nodes.liveContent.querySelector("[data-live-status]").textContent, /正在刷新/);
+      assert.doesNotMatch(h.nodes.liveRefresh.closest(".live-toolbar").querySelector("[data-live-status]").textContent, /正在刷新/);
       const delayed = [...h.jobs.entries()].find(([, job]) => job.delay === 240);
       assert.ok(delayed); h.jobs.delete(delayed[0]); delayed[1].fn();
-      assert.match(h.text(), /正在刷新/); assert.match(h.text(), /recommendation-90/);
+      assert.match(h.nodes.liveRefresh.closest(".live-toolbar").querySelector("[data-live-status]").textContent, /正在刷新/);
+      assert.match(h.text(), /recommendation-90/);
       assert.equal(overview.signal.aborted, false); assert.equal(collection.signal.aborted, false);
       assert.equal(h.state.controllers.get("overview:current"), overview); assert.equal(h.state.controllers.get("collection"), collection);
       assert.equal(JSON.stringify(h.state.tabs), tabsBefore);
@@ -171,7 +172,7 @@ test("R91 empty new-game snapshots stay explicit and bounded instead of showing 
     h.requests[0].resolve({ phase: "InProgress", available: false, players: [] }); await flush();
     assert.match(h.text(), /正在识别新对局/); assert.doesNotMatch(h.text(), /recommendation-empty|recommendation-90/);
     h.state.liveRetryAttempts = 8; h.scheduleLiveRefresh(); h.renderLive();
-    assert.equal(h.jobs.size, 0); assert.match(h.text(), /已停止自动重试/);
+    assert.equal(h.jobs.size, 0); assert.match(h.nodes.liveRefresh.closest(".live-toolbar").querySelector("[data-live-status]").textContent, /已停止自动重试/);
     assert.ok(h.nodes.liveContent.querySelector("button"));
   } finally { h.close(); }
 });

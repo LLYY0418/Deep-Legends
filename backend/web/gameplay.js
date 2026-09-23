@@ -166,7 +166,7 @@
       ? "对局阶段已变化，正在同步当前对局…"
       : state.liveLoadingVisible ? "正在刷新…"
       : liveAutoRefreshStopped(data);
-    return message ? `<div class="live-refresh-status" role="status"><span>${escapeHTML(message)}</span><button type="button" class="text-button" data-live-refresh>刷新</button></div>` : "";
+    return message ? `<div class="live-refresh-status" role="status"><span>${escapeHTML(message)}</span></div>` : "";
   }
   function normalizeLiveOrder(value) { return ["team", "position", "kda", "win-rate"].includes(value) ? value : "team"; }
   function liveRecommendationTier() {
@@ -5146,19 +5146,26 @@
 
   // R129 P1：参与 markup 比较与增量替换的 HTML 只能由快照数据和用户选择决定，
   // 不能包含 state.liveLoading、计时器、在途请求数这类瞬时状态；加载反馈只放在
-  // data-live-status 状态条里。否则英雄选择阶段每 3 秒的自动刷新会各重绘两次
+  // 工具栏的 data-live-status 状态条里。否则英雄选择阶段每 3 秒的自动刷新会各重绘两次
   // 整块内容：海克斯图标退回名称首字占位、内容高度变化把滚动位置顶走。
   function renderLive() {
     if (state.destroyed || (state.section && state.section !== "live")) return;
     const toolbar = nodes.liveRefresh?.closest(".live-toolbar");
+    const status = toolbar?.querySelector?.("[data-live-status]");
     if (!connected()) {
       // 未连接时收起工具栏（刷新按钮无意义），只保留居中的提示卡。
       if (toolbar) toolbar.hidden = true;
+      if (status) status.innerHTML = "";
       renderSessionSummary(null);
       nodes.liveContent.innerHTML = emptyState("等待英雄联盟客户端", "登录国服客户端并进入英雄选择或对局后，这里会自动展示队伍信息与推荐配置。", false);
       return;
     }
     if (toolbar) toolbar.hidden = false;
+    const statusMarkup = renderLiveRefreshStatus(state.live || { phase: state.beacon.phase });
+    if (status && status.innerHTML !== statusMarkup) {
+      status.innerHTML = statusMarkup;
+      recordLiveRenderRebuild(["status"]);
+    }
     if (nodes.liveRefresh) {
       nodes.liveRefresh.textContent = state.liveLoading
         ? "正在刷新…" : "刷新对局";
@@ -5166,17 +5173,14 @@
     }
     if (state.liveError) {
       renderSessionSummary(null);
-      nodes.liveContent.innerHTML = renderLiveRefreshStatus(state.live) + emptyState("实时对局读取失败", state.liveError, true);
+      nodes.liveContent.innerHTML = emptyState("实时对局读取失败", state.liveError, true);
       nodes.liveContent.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadLive(true, "manual"));
-      nodes.liveContent.querySelector("[data-live-refresh]")?.addEventListener("click", () => loadLive(true, "manual"));
       return;
     }
     if (state.liveAwaitingGame) {
       renderSessionSummary(null);
-      nodes.liveContent.innerHTML = renderLiveRefreshStatus(state.live || { phase: state.beacon.phase })
-        + `<div role="status">${emptyState("正在识别新对局…", "新对局数据尚未就绪，读取完成后会自动显示。也可点击刷新重试。", true)}</div>`;
+      nodes.liveContent.innerHTML = `<div role="status">${emptyState("正在识别新对局…", "新对局数据尚未就绪，读取完成后会自动显示。也可点击刷新重试。", true)}</div>`;
       nodes.liveContent.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadLive(true, "manual"));
-      nodes.liveContent.querySelector("[data-live-refresh]")?.addEventListener("click", () => loadLive(true, "manual"));
       return;
     }
     if (state.liveLoading && !state.live) {
@@ -5191,22 +5195,15 @@
       return;
     }
     if (!data?.available) {
-      nodes.liveContent.innerHTML = renderLiveRefreshStatus(data) + renderRecommendationArea(data || {});
+      nodes.liveContent.innerHTML = renderRecommendationArea(data || {});
       bindLiveContent();
       return;
     }
     state.liveRenderSource = state.liveRenderTrigger || liveRenderTriggerLabel(state.liveLoadSource);
     state.liveRenderTrigger = "";
     const markup = liveRecommendationMarkup(data);
-    const statusMarkup = renderLiveRefreshStatus(data);
-    const status = nodes.liveContent.querySelector("[data-live-status]");
     // Refresh feedback changes independently of the roster and recommendation DOM.
     if (nodes.liveContent._recommendationMarkup === markup && nodes.liveContent.querySelector("[data-live-body]")) {
-      if (status && status.innerHTML !== statusMarkup) {
-        status.innerHTML = statusMarkup;
-        status.querySelector("[data-live-refresh]")?.addEventListener("click", () => loadLive(true, "manual"));
-        recordLiveRenderRebuild(["status"]);
-      }
       return;
     }
     // R129 P2：markup 变了也先试按面板替换，只有外壳（提示条、页签行、面板数量
@@ -5214,16 +5211,11 @@
     // 正在看的海克斯与出装面板里的图标节点保持不动。
     if (updateLivePanels(markup)) {
       nodes.liveContent._recommendationMarkup = markup;
-      if (status && status.innerHTML !== statusMarkup) {
-        status.innerHTML = statusMarkup;
-        status.querySelector("[data-live-refresh]")?.addEventListener("click", () => loadLive(true, "manual"));
-        recordLiveRenderRebuild(["status"]);
-      }
       return;
     }
     recordLiveRenderRebuild(["full"]);
     nodes.liveContent._recommendationMarkup = markup;
-    nodes.liveContent.innerHTML = `<div data-live-status>${statusMarkup}</div><div data-live-body>${markup}</div>`;
+    nodes.liveContent.innerHTML = `<div data-live-body>${markup}</div>`;
     bindLiveContent();
     applyRenderedMetricStyles(nodes.liveContent);
     prepareImages(nodes.liveContent);
@@ -6510,7 +6502,6 @@
   }
 
   function bindLiveContent() {
-    nodes.liveContent.querySelector("[data-live-refresh]")?.addEventListener("click", () => loadLive(true, "manual"));
     for (const button of nodes.liveContent.querySelectorAll("[data-recommendation-tab]")) button.addEventListener("click", () => {
       state.recommendationTab = button.dataset.recommendationTab;
       state.recommendationTabTouched = true;

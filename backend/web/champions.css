@@ -943,20 +943,26 @@
 
 .mayhem-performance-groups { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .mayhem-performance-group { min-width: 0; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
-.mayhem-performance-group h4 { margin: 0 0 6px; color: var(--muted); font-size: 11px; }
+.mayhem-performance-group h4 { margin: 0 0 6px; color: var(--muted); font-size: 13px; }
 .mayhem-performance-group dl { display: grid; margin: 0; }
-.mayhem-performance-group dl > div { display: grid; min-width: 0; min-height: 36px; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); }
+.mayhem-performance-group dl > div { display: grid; min-width: 0; min-height: 40px; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); }
 .mayhem-performance-group dl > div:first-child { border-top: 0; }
-.mayhem-performance-group dt { color: var(--muted); font-size: 10px; }
-.mayhem-performance-group dd { display: inline-flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 8px; margin: 0; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mayhem-performance-group dt { color: var(--muted); font-size: 13px; }
+.mayhem-performance-group dd { display: inline-flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 8px; margin: 0; font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .mayhem-performance-group dd > b { color: var(--ink); }
-.mayhem-performance-group dd > .mayhem-delta { flex: 0 0 auto; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.mayhem-performance-group dd > .mayhem-delta { flex: 0 0 auto; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .mayhem-performance-group dl > .is-cumulative { grid-template-columns: 92px minmax(0,1fr); }
 .mayhem-multikill-values { display: grid !important; width: 100%; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
 .mayhem-multikill-values > span { display: grid; min-width: 0; gap: 2px; justify-items: end; }
-.mayhem-multikill-values small { color: var(--muted); font-size: 9px; font-weight: 650; }
-.mayhem-multikill-values b { overflow: hidden; color: var(--muted); font-size: 10px; font-weight: 700; text-overflow: ellipsis; }
-.mayhem-performance-note { margin: 0; padding: 10px 14px; color: var(--muted); border-top: 1px solid var(--line); font-size: 9px; line-height: 1.45; }
+.mayhem-multikill-values small { color: var(--muted); font-size: 12px; font-weight: 650; }
+.mayhem-multikill-values b { overflow: hidden; color: var(--muted); font-size: 13px; font-weight: 700; text-overflow: ellipsis; }
+.mayhem-performance-note { margin: 0; padding: 10px 14px; color: var(--muted); border-top: 1px solid var(--line); font-size: 12px; line-height: 1.45; }
+@container mayhem-pane (max-width: 760px) {
+  .mayhem-performance-groups { grid-template-columns: 1fr; }
+}
+@container mayhem-pane (max-width: 520px) {
+  .mayhem-multikill-values { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
 
 /* P0-5-2：官方档位不可用、榜单退回本地分档时才出现的「本地估算」小字。 */
 .mayhem-tier-local { display: inline-block; margin-left: 4px; color: var(--warning); font-size: 9px; font-weight: 700; }
@@ -965,6 +971,4 @@
   .mayhem-detail-tabs { flex: 1 0 100%; }
   .mayhem-detail-tabs button { min-height: 44px; }
   .mayhem-atlas-entry { min-height: 40px; }
-  .mayhem-performance-groups { grid-template-columns: 1fr; }
-  .mayhem-multikill-values { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }

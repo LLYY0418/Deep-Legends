@@ -488,6 +488,12 @@
   }
 
 	function clearDisconnectedClientState() {
+      state.accountRequestSeq = (state.accountRequestSeq || 0) + 1;
+      state.poolsRequestSeq = (state.poolsRequestSeq || 0) + 1;
+      state.poolCatalogRequestSeq = (state.poolCatalogRequestSeq || 0) + 1;
+      delete el.accountContent._accountMarkup;
+      delete el.poolsContent._poolsMarkup;
+      delete el.poolPicker._poolsSignature;
       state.skinLoadGeneration = Number(state.skinLoadGeneration || 0) + 1;
       for (const key of ["skins", "account", "pools", "pool-catalog", "history"]) state.controllers.get(key)?.abort();
       state.loading = false;
@@ -498,6 +504,7 @@
 	  state.pools = [];
 	  state.poolsLoaded = false;
 	  state.poolItems = [];
+	  state.poolCatalogLoaded = false;
 	  state.skinsCache?.clear();
 	  state.items = [];
 	  state.staleSnapshot = false;
@@ -1949,8 +1956,12 @@
   }
 
   async function loadAccount() {
+    const requestSeq = (state.accountRequestSeq || 0) + 1;
+    state.accountRequestSeq = requestSeq;
     if (!state.status?.connected) {
       state.accountLoaded = false;
+      state.account = null;
+      delete el.accountContent._accountMarkup;
       if (el.accountLiveState) {
         el.accountLiveState.textContent = "等待客户端";
         el.accountLiveState.className = "state-chip";
@@ -1958,9 +1969,10 @@
       el.accountContent.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true">◉</span><strong>等待英雄联盟客户端</strong><p>登录国服客户端并进入大厅后，这里会按类别展示战利品、皮肤物品和待领取奖励。</p></div>';
       return;
     }
-    el.accountContent.innerHTML = '<div class="account-loading"><div class="skeleton-line"></div><div class="skeleton-line"></div><div class="skeleton-line"></div></div>';
+    if (!el.accountContent._accountMarkup) el.accountContent.innerHTML = '<div class="account-loading"><div class="skeleton-line"></div><div class="skeleton-line"></div><div class="skeleton-line"></div></div>';
     try {
       const payload = await api("/api/account", {}, "account", 15000);
+      if (requestSeq !== state.accountRequestSeq || state.destroyed || !state.status?.connected) return;
       state.account = payload;
       state.accountLoaded = true;
       const summoner = payload.summoner || {};
@@ -2001,15 +2013,19 @@
 	  const backgroundArt = window.deepLegendsOverviewArt?.render(summoner) || (summoner.backgroundSource && summoner.backgroundPath
 		? `<img class="summoner-strip-art account-hero-art" data-queued-src="/api/champion-asset?source=${encodeURIComponent(summoner.backgroundSource)}&path=${encodeURIComponent(summoner.backgroundPath)}" alt="" aria-hidden="true" decoding="async" data-game-image>`
 		: "");
-	  el.accountContent.innerHTML = `<section class="account-hero">${backgroundArt}${profileIcon}<div class="account-identity"><p class="eyebrow">当前召唤师</p><h3>${escapeHTML(profileName)}</h3><p>等级 ${formatNumber(summoner.summonerLevel)} · 本机只读连接</p></div><dl class="account-facts"><div><dt>皮肤物品</dt><dd>${formatNumber(skinLoot.length)} 种 · ${formatNumber(skinLootQuantity)} 件</dd></div><div><dt>待领取</dt><dd>${formatNumber(rewards.length)} 组 · ${formatNumber(rewardQuantity)} 件</dd></div></dl></section>${lootPending ? '<div class="notice" role="status">客户端数据暂未同步，可稍后重试</div>' : ""}${categorySections || '<div class="empty-state"><strong>仓库当前没有可展示物品</strong></div>'}<section class="account-section"><div class="section-copy"><h3>待领取奖励</h3><span class="section-count">${formatNumber(rewards.length)} 组</span><button class="text-button" type="button" data-navigate-suite="sweep">去领奖</button></div>${rewardCards ? `<div class="reward-grid">${rewardCards}</div>` : '<div class="empty-state compact"><strong>没有待领取奖励</strong><p>工具会扫描奖励账本、任务与事件中心。</p></div>'}</section><details class="capability-details"><summary>数据来源状态</summary><p>只读接口单独降级，不影响皮肤库存核验。</p><div class="capability-list">${capabilityRows || '<p class="muted">尚无能力状态</p>'}</div></details>`;
-      for (const image of el.accountContent.querySelectorAll(".loot-art img")) loadNextLootImage(image, true);
-	  window.deepLegendsGameIcons?.prepareImages?.(el.accountContent);
+	  const markup = `<section class="account-hero">${backgroundArt}${profileIcon}<div class="account-identity"><p class="eyebrow">当前召唤师</p><h3>${escapeHTML(profileName)}</h3><p>等级 ${formatNumber(summoner.summonerLevel)} · 本机只读连接</p></div><dl class="account-facts"><div><dt>皮肤物品</dt><dd>${formatNumber(skinLoot.length)} 种 · ${formatNumber(skinLootQuantity)} 件</dd></div><div><dt>待领取</dt><dd>${formatNumber(rewards.length)} 组 · ${formatNumber(rewardQuantity)} 件</dd></div></dl></section>${lootPending ? '<div class="notice" role="status">客户端数据暂未同步，可稍后重试</div>' : ""}${categorySections || '<div class="empty-state"><strong>仓库当前没有可展示物品</strong></div>'}<section class="account-section"><div class="section-copy"><h3>待领取奖励</h3><span class="section-count">${formatNumber(rewards.length)} 组</span><button class="text-button" type="button" data-navigate-suite="sweep">去领奖</button></div>${rewardCards ? `<div class="reward-grid">${rewardCards}</div>` : '<div class="empty-state compact"><strong>没有待领取奖励</strong><p>工具会扫描奖励账本、任务与事件中心。</p></div>'}</section><details class="capability-details"><summary>数据来源状态</summary><p>只读接口单独降级，不影响皮肤库存核验。</p><div class="capability-list">${capabilityRows || '<p class="muted">尚无能力状态</p>'}</div></details>`;
+      if (markup !== el.accountContent._accountMarkup) {
+        el.accountContent.innerHTML = markup;
+        el.accountContent._accountMarkup = markup;
+        for (const image of el.accountContent.querySelectorAll(".loot-art img")) loadNextLootImage(image, true);
+	    window.deepLegendsGameIcons?.prepareImages?.(el.accountContent);
+      }
     } catch (error) {
-      if (error.name === "RequestCancelled" || state.destroyed) return;
-      state.accountLoaded = false;
+      if (error.name === "RequestCancelled" || state.destroyed || requestSeq !== state.accountRequestSeq) return;
+      if (!el.accountContent._accountMarkup) state.accountLoaded = false;
       el.accountLiveState.textContent = "读取失败";
       el.accountLiveState.className = "state-chip failed";
-      renderPanelError(el.accountContent, "账户与物品读取失败", error.message, loadAccount);
+      if (!el.accountContent._accountMarkup) renderPanelError(el.accountContent, "账户与物品读取失败", error.message, loadAccount);
     }
   }
 
@@ -2067,28 +2083,37 @@
   }
 
   async function loadPools() {
-    el.poolsContent.innerHTML = '<p class="muted">正在读取奖池清单…</p>';
+    const requestSeq = (state.poolsRequestSeq || 0) + 1;
+    state.poolsRequestSeq = requestSeq;
+    if (!el.poolsContent._poolsMarkup) el.poolsContent.innerHTML = '<p class="muted">正在读取奖池清单…</p>';
     try {
       const payload = await api("/api/pools", {}, "pools");
+      if (requestSeq !== state.poolsRequestSeq || state.destroyed) return;
       state.pools = payload.items || [];
       state.poolsLoaded = true;
-      el.poolPicker.replaceChildren(...state.pools.map((pool) => {
+      const pickerSignature = JSON.stringify(state.pools.map((pool) => [pool.id, pool.name, pool.entryCount, pool.selected]));
+      if (pickerSignature !== el.poolPicker._poolsSignature) el.poolPicker.replaceChildren(...state.pools.map((pool) => {
         const option = new Option(`${pool.name} · ${formatNumber(pool.entryCount)} 款`, pool.id);
         option.selected = Boolean(pool.selected);
         return option;
       }));
+      el.poolPicker._poolsSignature = pickerSignature;
       const pickerWrap = el.poolPicker.closest(".pool-picker-wrap");
       if (pickerWrap) pickerWrap.hidden = state.pools.length <= 1;
       const rows = state.pools.map((pool) => `<tr><td>${escapeHTML(pool.name)}${pool.builtIn ? ' <span class="state-chip">内置</span>' : ""}</td><td>${escapeHTML(pool.version || "—")}</td><td>${formatNumber(pool.entryCount)}</td><td class="table-actions-cell">${pool.selected ? '<span class="state-chip success">当前使用</span>' : `<button class="text-button select-pool" type="button" data-pool-id="${escapeHTML(pool.id)}">使用这份清单</button>`}</td></tr>`).join("");
-      el.poolsContent.innerHTML = `<div class="table-scroll"><table class="data-table"><thead><tr><th>清单</th><th>版本</th><th>皮肤</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-      for (const button of el.poolsContent.querySelectorAll(".select-pool")) button.addEventListener("click", () => selectPool(button.dataset.poolId));
+      const markup = `<div class="table-scroll"><table class="data-table"><thead><tr><th>清单</th><th>版本</th><th>皮肤</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      if (markup !== el.poolsContent._poolsMarkup) {
+        el.poolsContent.innerHTML = markup;
+        el.poolsContent._poolsMarkup = markup;
+        for (const button of el.poolsContent.querySelectorAll(".select-pool")) button.addEventListener("click", () => selectPool(button.dataset.poolId));
+      }
       const activePage = el.poolPageTabs.find((tab) => tab.classList.contains("is-active"))?.dataset.poolPage;
       if (activePage === "history") {
         if (!state.historyLoaded) await loadHistory();
       } else if (activePage === "catalog" || !activePage) {
         await loadPoolCatalog();
       }
-    } catch (error) { if (error.name === "RequestCancelled" || state.destroyed) return; state.poolsLoaded = false; renderPanelError(el.poolsContent, "奖池读取失败", error.message, loadPools); }
+    } catch (error) { if (error.name === "RequestCancelled" || state.destroyed || requestSeq !== state.poolsRequestSeq) return; if (!el.poolsContent._poolsMarkup) { state.poolsLoaded = false; renderPanelError(el.poolsContent, "奖池读取失败", error.message, loadPools); } }
   }
 
   async function loadPoolCatalog() {
@@ -2096,21 +2121,41 @@
     if (!state.status?.connected || !state.status?.calculationOK) {
       state.poolItems = [];
       state.poolLoading = false;
+      state.poolCatalogLoaded = false;
+      state.poolCatalogSignature = "";
       renderPoolCatalog();
       return;
     }
+    const requestSeq = (state.poolCatalogRequestSeq || 0) + 1;
+    state.poolCatalogRequestSeq = requestSeq;
+    const hadContent = state.poolCatalogLoaded === true;
+    let shouldRender = !hadContent;
     state.poolLoading = true;
-    renderPoolCatalog();
+    if (!hadContent) renderPoolCatalog();
+    else el.poolSkinGrid.setAttribute("aria-busy", "true");
     try {
       const payload = await api("/api/pool-skins", {}, "pool-skins", 15000);
-      state.poolItems = Array.isArray(payload.items) ? payload.items : [];
+      if (requestSeq !== state.poolCatalogRequestSeq || state.destroyed) return;
+      const nextItems = Array.isArray(payload.items) ? payload.items : [];
+      const signature = JSON.stringify(nextItems);
+      shouldRender = !hadContent || signature !== state.poolCatalogSignature;
+      state.poolItems = nextItems;
+      state.poolCatalogSignature = signature;
+      state.poolCatalogLoaded = true;
     } catch (error) {
-      if (error.name === "RequestCancelled") return;
-      state.poolItems = [];
-      state.poolError = error.message;
+      if (error.name === "RequestCancelled" || requestSeq !== state.poolCatalogRequestSeq) return;
+      if (hadContent) {
+        el.poolListMeta.textContent = "奖池刷新失败";
+      } else {
+        state.poolItems = [];
+        state.poolError = error.message;
+      }
     } finally {
-      state.poolLoading = false;
-      renderPoolCatalog();
+      if (requestSeq === state.poolCatalogRequestSeq) {
+        state.poolLoading = false;
+        if (shouldRender) renderPoolCatalog();
+        else el.poolSkinGrid.setAttribute("aria-busy", "false");
+      }
     }
   }
 

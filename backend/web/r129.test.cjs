@@ -262,6 +262,8 @@ test("R129 P1 renderLive 上方写明 markup 的取值纪律", () => {
   assert.match(above, /只能由快照数据和用户选择决定/);
   assert.match(above, /不能包含 state\.liveLoading/);
   assert.match(above, /data-live-status/);
+  assert.match(above, /工具栏的 data-live-status/);
+  assert.doesNotMatch(functionSource(gameplayScript, "renderLive"), /nodes\.liveContent\.querySelector\("\[data-live-status\]"\)|<div data-live-status>/);
 });
 
 test("R129 P1 对抗变异：把骨架判据改回依赖 liveLoading，节点身份钉子必须失败", (t) => {

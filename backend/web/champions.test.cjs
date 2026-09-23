@@ -5098,6 +5098,7 @@ test("R46 TFT live sessions render one explicit unsupported state", () => {
 		state,
 		nodes: { liveRefresh: { closest: () => toolbar, setAttribute() {} }, liveContent: content },
 		connected: () => true,
+		renderLiveRefreshStatus: () => "",
 		renderSessionSummary: () => {},
 		emptyState: (title, detail) => `<empty><strong>${title}</strong><p>${detail}</p></empty>`,
 	});

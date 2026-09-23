@@ -14,7 +14,7 @@ const extract = name => {
 };
 const snapshot = (gameId = 90, phase = "InProgress") => ({ gameId, phase, available: true, currentChampionId: gameId, players: [{ isCurrent: true, championId: gameId, historyState: "ok" }] });
 function harness() {
-  const dom = new JSDOM('<div class="live-toolbar"><div id="summary"></div><button id="refresh">刷新对局</button></div><div id="content"></div>', { pretendToBeVisual: true });
+  const dom = new JSDOM('<div class="live-toolbar"><div id="summary"></div><div data-live-status></div><button id="refresh">刷新对局</button></div><div id="content"></div>', { pretendToBeVisual: true });
   const document = dom.window.document;
   const nodes = { liveContent: document.querySelector("#content"), liveRefresh: document.querySelector("#refresh"), liveSessionSummary: document.querySelector("#summary") };
   const state = { section: "live", beacon: { phase: "InProgress" }, live: snapshot(), settings: { liveRefresh: true }, controllers: new Map(), tabs: [], liveGameGeneration: 0, liveRecommendations: new Map([["old", {}]]), specialistRunes: new Map([["old", {}]]), proRunes: new Map([["old", {}]]) };
@@ -129,7 +129,7 @@ test("R94 same-game phase advance labels the retained snapshot and rejects a lat
   try {
     h.state.live = snapshot(90, "ChampSelect"); h.state.beacon.phase = "ChampSelect";
     const pending = h.loadLive(); h.handleGameplayPhase("InProgress", "sse", false, 90);
-    assert.equal(h.state.liveGameGeneration, 0); assert.match(h.text(), /同步当前对局/);
+    assert.equal(h.state.liveGameGeneration, 0); assert.match(h.nodes.liveRefresh.closest(".live-toolbar").querySelector("[data-live-status]").textContent, /同步当前对局/);
     h.requests[0].resolve(snapshot(90, "ChampSelect")); await pending;
     assert.equal(h.state.beacon.phase, "InProgress");
   } finally { h.close(); }
