@@ -1,0 +1,74 @@
+name: Windows public release draft
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Validate release version
+        shell: powershell
+        run: |
+          $version = (& node -p "require('./desktop/package.json').version").Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid desktop package version" }
+          $tag = "v$version"
+          if ($env:GITHUB_REF -like 'refs/tags/*' -and $env:GITHUB_REF -ne "refs/tags/$tag") {
+            throw "Tag $env:GITHUB_REF does not match desktop package version $tag"
+          }
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding ascii -Append
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding ascii -Append
+      - name: Build and verify public release
+        shell: powershell
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-public-release-windows.ps1 -Version $env:RELEASE_VERSION
+          if ($LASTEXITCODE -ne 0) { throw "Public release build failed" }
+      - name: Upload verified release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-legends-public-${{ github.sha }}
+          path: |
+            dist/release/Deep-Legends-Setup-${{ env.RELEASE_VERSION }}-public.exe
+            dist/release/latest.json
+            dist/release/SHA256SUMS-public.txt
+          if-no-files-found: error
+      - name: Create draft Release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:RELEASE_TAG
+          $releases = & gh release list --json tagName,isDraft --limit 1000
+          if ($LASTEXITCODE -ne 0) { throw "Could not inspect existing Releases" }
+          $existing = @($releases | ConvertFrom-Json | Where-Object { $_.tagName -eq $tag })
+          if ($existing.Count -gt 0) {
+            if ($existing.Count -ne 1 -or -not $existing[0].isDraft) { throw "Published Release $tag already exists; refusing to replace it" }
+            & gh release delete $tag --yes
+            if ($LASTEXITCODE -ne 0) { throw "Could not delete the previous draft $tag" }
+          }
+          $manifest = Get-Content -Raw -Encoding UTF8 'dist/release/latest.json' | ConvertFrom-Json
+          if ($manifest.version -ne $env:RELEASE_VERSION) { throw "Release notes version mismatch" }
+          $notesFile = Join-Path $env:RUNNER_TEMP 'deep-legends-release-notes.md'
+          [System.IO.File]::WriteAllText($notesFile, $manifest.notes, (New-Object System.Text.UTF8Encoding($false)))
+          $setup = "dist/release/Deep-Legends-Setup-$env:RELEASE_VERSION-public.exe"
+          & gh release create $tag $setup 'dist/release/latest.json' 'dist/release/SHA256SUMS-public.txt' --draft --target $env:GITHUB_SHA --title $tag --notes-file $notesFile
+          if ($LASTEXITCODE -ne 0) { throw "Could not create draft Release $tag" }
+          $draft = & gh release view $tag --json isDraft --jq '.isDraft'
+          if ($LASTEXITCODE -ne 0 -or $draft.Trim() -ne 'true') { throw "Created Release $tag is not a draft" }

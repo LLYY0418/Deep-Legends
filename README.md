@@ -240,9 +240,11 @@ node --test backend/web/*.test.cjs desktop/*.test.cjs
 
 ## 发布流程
 
-1. 同步 `desktop/package.json`、锁文件和构建脚本的版本号，在 `CHANGELOG.md` 顶部新增 `## 版本 — 日期` 一节。更新弹窗的内容仅取该节的 `### 新增 / ### 优化 / ### 修复` 和列表。
-2. 执行不含个人 Key 的完整构建（包含 R80 安装/卸载外壳）：Windows 使用 `./build-desktop-windows.ps1 -Version 0.12.1 -KeyMode public`，macOS 使用 `DEEP_LEGENDS_KEY_MODE=public bash build-desktop.sh 0.12.1`。随后运行 `node scripts/make-release.cjs`。脚本核对 `dist/desktop/release-build.json` 中的 public 模式、源码指纹、后端和 Setup EXE 的 SHA-256；缺失记录、private 包或构建后被替换的文件均拒绝生成发布资产。这份本机构建记录不上传。脚本默认使用当前源码指纹，也可在命令末尾指定已验证的 12 位构建指纹。请核对 `dist/release/SHA256SUMS.txt`；Windows 可用 `Get-FileHash`，macOS 可用 `shasum -a 256`。
-3. 在 GitHub 仓库 `LLYY0418/Deep-Legends` 创建 `v<version>` Release，**上传 `dist/release/` 中全部三个文件**：安装版 EXE、`latest.json`、`SHA256SUMS.txt`。EXE 的发布名由脚本改为无空格版本。`latest.json` 缺失会导致客户端无法发现更新，不能只上传 EXE。公开发布前沿用本项目的凭据边界：不得公开分发内置个人 Riot API Key 的构建物。
+1. 确认 `desktop/package.json` 的版本和 `CHANGELOG.md` 顶部的 `## 版本 — 日期` 一节一致。更新弹窗内容仅取该节的 `### 新增 / ### 优化 / ### 修复` 和列表。
+2. 在 GitHub Actions 运行 **Windows public release draft** 工作流。工作流在 Windows 上完整测试、构建无个人 Riot Key 的 public 安装包，核验构建收据、源码指纹和 SHA-256，并上传三个发布文件作为 Actions artifact，随后创建草稿 Release。
+3. 检查 `v<version>` 草稿 Release 的说明和三个附件：`Deep-Legends-Setup-<version>-public.exe`、`latest.json`、`SHA256SUMS-public.txt`。确认后由用户点击 **Publish**。`latest.json` 是客户端发现更新所必需的文件。
+
+本地 Windows 备用入口：在管理员 PowerShell 运行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-public-release-windows.ps1`。
 
 更新检查使用 `https://github.com/LLYY0418/Deep-Legends/releases/latest/download/latest.json`，不使用 GitHub API。安装版启动后静默检查一次，此后每 6 小时检查；用户点击后才下载和安装。开发构建 `version=dev` 禁用更新。便携版及低于清单 `minSupported` 的版本只提供发布页入口。
 

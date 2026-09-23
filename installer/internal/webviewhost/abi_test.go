@@ -1,12 +1,13 @@
 package webviewhost
 
 import (
+	"bytes"
+	"encoding/json"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -14,12 +15,16 @@ import (
 // declarations, not another handwritten array that repeats production mistakes.
 func dependencyCOMSlots(t *testing.T) map[string]map[string]int {
 	t.Helper()
-	command := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", "github.com/jchv/go-webview2")
-	output, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("locate the pinned WebView2 dependency: %v: %s", err, output)
+	command := exec.Command("go", "mod", "download", "-json", "github.com/jchv/go-webview2")
+	var stderr bytes.Buffer
+	command.Stderr = &stderr
+	output, err := command.Output()
+	var module struct{ Dir, Error string }
+	decodeErr := json.Unmarshal(output, &module)
+	if err != nil || decodeErr != nil || module.Dir == "" || module.Error != "" {
+		t.Fatalf("locate the pinned WebView2 dependency: command=%v json=%v module=%s stderr=%s", err, decodeErr, module.Error, stderr.String())
 	}
-	directory := filepath.Join(strings.TrimSpace(string(output)), "pkg", "edge")
+	directory := filepath.Join(module.Dir, "pkg", "edge")
 	structs := map[string]*ast.StructType{}
 	for _, name := range []string{"corewebview2.go", "ICoreWebView2Controller.go", "ICoreWebView2Controller2.go", "ICoreWebViewSettings.go", "ICoreWebView2NavigationCompletedEventArgs.go"} {
 		file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(directory, name), nil, 0)

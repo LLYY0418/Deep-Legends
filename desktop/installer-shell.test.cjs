@@ -8,7 +8,7 @@ const os = require("node:os");
 const { JSDOM } = require("jsdom");
 const { buildShell, buildUninstallShell, verifyShell } = require("../installer/build-shell.cjs");
 
-function fixture(t) {
+function fixture(t, keyMode = "private") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "r80-shell-build-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   for (const name of ["desktop", "dist/desktop/win-unpacked/resources", "installer/payload/files"]) fs.mkdirSync(path.join(root, name), { recursive: true });
@@ -16,7 +16,7 @@ function fixture(t) {
   fs.writeFileSync(path.join(root, "installer/payload/files/.gitkeep"), "");
   fs.writeFileSync(path.join(root, "dist/desktop/win-unpacked/Deep Legends.exe"), "application");
   fs.writeFileSync(path.join(root, "dist/desktop/win-unpacked/resources/app.asar"), "resources");
-  fs.writeFileSync(path.join(root, "dist/desktop/Deep Legends Setup 0.11.2.exe"), "original NSIS payload");
+  fs.writeFileSync(path.join(root, `dist/desktop/Deep Legends Setup 0.11.2${keyMode === "public" ? "-public" : ""}.exe`), "original NSIS payload");
   return root;
 }
 
@@ -31,7 +31,7 @@ function fakePE(file, size = 51 * 1024 * 1024) {
 
 test("installer build embeds the actual NSIS artifact and publishes only a verified GUI shell", (t) => {
   const root = fixture(t);
-  const result = buildShell({ projectRoot: root, version: "0.11.2", fingerprint: "aabbccddeeff", run(command, args, options) {
+  const result = buildShell({ projectRoot: root, version: "0.11.2", fingerprint: "aabbccddeeff", keyMode: "private", run(command, args, options) {
     assert.equal(command, "go");
     assert.equal(options.cwd, path.join(root, "installer"));
     assert.equal(options.env.GOOS, "windows"); assert.equal(options.env.GOARCH, "amd64"); assert.equal(options.env.CGO_ENABLED, "0");
@@ -50,7 +50,7 @@ test("installer build embeds the actual NSIS artifact and publishes only a verif
 for (const failure of ["compiler", "missing-payload", "wrong-format"]) {
   test(`installer build cleans payload and rejects ${failure}`, (t) => {
     const root = fixture(t);
-    assert.throws(() => buildShell({ projectRoot: root, version: "0.11.2", fingerprint: "aabbccddeeff", run(command, args) {
+    assert.throws(() => buildShell({ projectRoot: root, version: "0.11.2", fingerprint: "aabbccddeeff", keyMode: "private", run(command, args) {
       const output = args[args.indexOf("-o") + 1];
       if (failure === "compiler") return { status: 1 };
       fakePE(output, failure === "missing-payload" ? 4 * 1024 * 1024 : undefined);
@@ -62,6 +62,17 @@ for (const failure of ["compiler", "missing-payload", "wrong-format"]) {
     assert.equal(fs.readdirSync(path.join(root, "dist/desktop")).some(name => name.startsWith(".installer-shell-")), false);
   });
 }
+
+test("public installer shell uses the public NSIS artifact", (t) => {
+  const root = fixture(t, "public");
+  const result = buildShell({ projectRoot: root, version: "0.11.2", fingerprint: "aabbccddeeff", keyMode: "public", run(_command, args) {
+    assert.equal(fs.readFileSync(path.join(root, "installer/payload/files/setup.exe"), "utf8"), "original NSIS payload");
+    fakePE(args[args.indexOf("-o") + 1]);
+    return { status: 0 };
+  } });
+  assert.equal(result.artifact, path.join(root, "dist/desktop/Deep Legends Setup 0.11.2-public.exe"));
+  assert.doesNotThrow(() => verifyShell(result.artifact));
+});
 
 test("both release entry points wrap NSIS before hashes and before deleting win-unpacked", () => {
   for (const name of ["build-desktop.sh", "build-desktop-windows.ps1"]) {

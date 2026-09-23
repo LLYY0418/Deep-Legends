@@ -57,7 +57,7 @@ function buildUninstallShell({ projectRoot, version, run = spawnSync }) {
 }
 
 // Both release scripts use exactly this sequence, including failure cleanup.
-function buildShell({ projectRoot, version, fingerprint, run = spawnSync }) {
+function buildShell({ projectRoot, version, fingerprint, keyMode = "private", run = spawnSync }) {
   if (!/^\d+\.\d+\.\d+(?:[-+][\dA-Za-z.-]+)?$/.test(version) || !/^[0-9a-f]{12}$/.test(fingerprint)) {
     throw new Error("Invalid installer version or fingerprint");
   }
@@ -65,7 +65,7 @@ function buildShell({ projectRoot, version, fingerprint, run = spawnSync }) {
   if (version !== packagedVersion) throw new Error("Installer and desktop package versions differ");
   const moduleRoot = path.join(projectRoot, "installer");
   const files = path.join(moduleRoot, "payload/files");
-  const artifact = path.join(projectRoot, "dist/desktop", setupArtifactName(version, process.env.DEEP_LEGENDS_KEY_MODE || "private"));
+  const artifact = path.join(projectRoot, "dist/desktop", setupArtifactName(version, keyMode));
   const staging = path.join(projectRoot, "dist/desktop", `.installer-shell-${fingerprint}.exe`);
   const setup = path.join(files, "setup.exe");
   const metadata = path.join(files, "meta.json");
@@ -101,7 +101,7 @@ if (require.main === module) {
     const artifact = buildUninstallShell({ projectRoot: path.resolve(__dirname, ".."), version: process.argv[3] });
     console.log(`Uninstaller shell built: ${path.basename(artifact)}`);
   } else {
-  const result = buildShell({ projectRoot: path.resolve(__dirname, ".."), version: process.argv[2], fingerprint: process.argv[3] });
+  const result = buildShell({ projectRoot: path.resolve(__dirname, ".."), version: process.argv[2], fingerprint: process.argv[3], keyMode: process.env.DEEP_LEGENDS_KEY_MODE || "private" });
   console.log(`Installer shell built: ${path.basename(result.artifact)} (${result.installedBytes} installed bytes)`);
   }
 }

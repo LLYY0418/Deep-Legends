@@ -64,9 +64,9 @@ if ($KeyMode -eq "public") {
 }
 
 $previousKeyMode = $env:DEEP_LEGENDS_KEY_MODE
+Remove-Item Env:DEEP_LEGENDS_KEY_MODE -ErrorAction SilentlyContinue
 Push-Location $projectRoot
 try {
-    $env:DEEP_LEGENDS_KEY_MODE = $KeyMode
     Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $projectRoot "dist\desktop\release-build.json")
     Get-ChildItem (Join-Path $projectRoot "dist\desktop") -File -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -match '^Deep Legends( Setup)?( ([0-9a-f]{12}|[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?)(-public)?)?\.(exe|zip)$' -or $_.Name -match '^SHA256SUMS(-public)?\.txt$' } |
@@ -118,6 +118,8 @@ try {
     $desktopTests = @(Get-ChildItem (Join-Path $desktopRoot "*.test.cjs") | ForEach-Object { $_.FullName })
     node --test $desktopTests
     if ($LASTEXITCODE -ne 0) { throw "Desktop tests failed" }
+
+    $env:DEEP_LEGENDS_KEY_MODE = $KeyMode
 
     $previousGoos = $env:GOOS
     $previousGoarch = $env:GOARCH
@@ -199,6 +201,10 @@ try {
     $hashLines | Set-Content -Encoding ascii (Join-Path $projectRoot "dist\desktop\$checksumArtifact")
     Write-Host "Desktop build complete: $(Join-Path $projectRoot 'dist\desktop')"
 } finally {
-    $env:DEEP_LEGENDS_KEY_MODE = $previousKeyMode
+    if ($null -eq $previousKeyMode) {
+        Remove-Item Env:DEEP_LEGENDS_KEY_MODE -ErrorAction SilentlyContinue
+    } else {
+        $env:DEEP_LEGENDS_KEY_MODE = $previousKeyMode
+    }
     Pop-Location
 }

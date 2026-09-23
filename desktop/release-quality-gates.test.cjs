@@ -72,7 +72,7 @@ test("R86 Windows release stops on a real failing Go test and rejects an indepen
   function check(source) {
     const directory=fs.mkdtempSync(path.join(os.tmpdir(),"r86-win-gate-"));
     try {
-      for(const name of ["desktop","dist/desktop","bin",".gomodcache",".gopath/pkg/mod/dependency@v1.0.0"])fs.mkdirSync(path.join(directory,name),{recursive:true});
+      for(const name of ["desktop","dist/desktop","bin","scripts",".gomodcache",".gopath/pkg/mod/dependency@v1.0.0"])fs.mkdirSync(path.join(directory,name),{recursive:true});
       fs.writeFileSync(path.join(directory,"desktop/package.json"),JSON.stringify({version:"99.1.2"}));
       fs.writeFileSync(path.join(directory,"go.mod"),"module releasegate\n\ngo 1.24\n");
       fs.writeFileSync(path.join(directory,"main.go"),"package main\n\nfunc main() {}\n");
@@ -81,11 +81,15 @@ test("R86 Windows release stops on a real failing Go test and rejects an indepen
       fs.writeFileSync(path.join(directory,".gopath/pkg/mod/dependency@v1.0.0/invalid.go"),"invalid dependency parser fixture");
       writeToolchainFixture(directory);
       fs.writeFileSync(path.join(directory,"build-desktop-windows.ps1"),source);
+      fs.copyFileSync(path.join(root,"scripts/normalize-source-line-endings.cjs"),path.join(directory,"scripts/normalize-source-line-endings.cjs"));
+      fs.writeFileSync(path.join(directory,"bin/npm.cmd"),"@echo off\r\nexit /b 0\r\n");
       fs.writeFileSync(path.join(directory,"bin/go.cmd"),`@echo off\r\necho %* >> "${path.join(directory,"go-calls")}"\r\n"${go}" %*\r\nexit /b %errorlevel%\r\n`);
-      const result=spawnSync("pwsh",["-NoProfile","-File","build-desktop-windows.ps1","-KeyMode","public"],{cwd:directory,encoding:"utf8",timeout:60000,env:{...process.env,PATH:`${path.join(directory,"bin")};${process.env.PATH}`}});
+      const result=spawnSync("powershell.exe",["-NoProfile","-ExecutionPolicy","Bypass","-File","build-desktop-windows.ps1","-KeyMode","public"],{cwd:directory,encoding:"utf8",timeout:60000,env:{...process.env,PATH:`${path.join(directory,"bin")};${process.env.PATH}`}});
+      if (result.error) throw new Error(`Windows PowerShell failed to start: ${result.error.message}`);
+      const output = `${result.stdout || ""}${result.stderr || ""}`;
       assert.notEqual(result.status,0);
-      assert.match(result.stdout+result.stderr,/R86_INTENTIONAL_FAILURE/);
-      assert.match(result.stdout+result.stderr,/Root tests failed/);
+      assert.match(output,/R86_INTENTIONAL_FAILURE/);
+      assert.match(output,/Root tests failed/);
       assert.doesNotMatch(fs.readFileSync(path.join(directory,"go-calls"),"utf8"),/^build\b/m);
     } finally {fs.rmSync(directory,{recursive:true,force:true})}
   }

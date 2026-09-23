@@ -8,6 +8,7 @@ const { EventEmitter } = require("node:events");
 const scale = require("./ui-scale.cjs");
 const scaleSource = fs.readFileSync(path.join(__dirname, "ui-scale.cjs"), "utf8");
 const mainSource = fs.readFileSync(path.join(__dirname, "main.cjs"), "utf8");
+const storedScalePath = path.join("/user-data", "ui-scale.json");
 const cases = [[1366,768,1],[1600,900,1],[1920,1080,1],[2304,1318,1.2],[2560,1440,1.33],[2560,1600,1.33],[3440,1440,1.6],[3840,2160,2],[3840,1600,1.78],[5120,2880,2.5],[7680,4320,2.5],[1024,600,1]];
 for (const [width,height,expected] of cases) test(`auto ${width}x${height} = ${expected}`, () => {
   assert.equal(scale.autoScaleFor({width,height}), expected);
@@ -70,7 +71,7 @@ test("scale mutants turn the corresponding geometry guards red", () => {
 });
 
 function harness({source=mainSource, stored, width=1920, height=1080}={}) {
-  const files = new Map(stored === undefined ? [] : [["/user-data/ui-scale.json", stored]]);
+  const files = new Map(stored === undefined ? [] : [[storedScalePath, stored]]);
   const writes=[], windows=[], zoom=[], minimum=[], overlays=[], timers=new Map();
   let now=0, seq=0;
   const ipcMain = new EventEmitter();
@@ -168,7 +169,7 @@ test("IPC restores independent preferences, normalizes fixed values and rejects 
   const h=harness({stored:JSON.stringify({mode:"fixed",value:2})});
   h.window.webContents.emit("did-finish-load");assert.deepEqual(h.get(),{mode:"fixed",value:2,auto:1});
   h.set("fixed",1.6);assert.equal(h.get().value,1.5);
-  assert.deepEqual(JSON.parse(h.files.get("/user-data/ui-scale.json")),{mode:"fixed",value:1.5});
+  assert.deepEqual(JSON.parse(h.files.get(storedScalePath)),{mode:"fixed",value:1.5});
   assert.ok(h.writes.every(file=>file.endsWith("ui-scale.json.tmp")));
   const count=h.writes.length;h.set("fixed",1.5);assert.equal(h.writes.length,count);
   h.window.bounds={width:3840,height:2160};h.screen.emit("display-metrics-changed");assert.equal(h.get().value,1.5);assert.equal(h.get().auto,2);
@@ -179,7 +180,7 @@ test("IPC restores independent preferences, normalizes fixed values and rejects 
   assert.equal(h.get().mode,"auto");assert.equal(h.get().value,2);
   h.set("invalid",2);h.set("fixed","broken");assert.equal(h.get().mode,"auto");
   for(const stored of ["invalid", "x".repeat(1025), JSON.stringify({mode:"fixed",value:"bad"})])assert.equal(harness({stored}).get().mode,"auto");
-  const restored=harness({stored:h.files.get("/user-data/ui-scale.json")});assert.equal(restored.get().mode,"auto");
+  const restored=harness({stored:h.files.get(storedScalePath)});assert.equal(restored.get().mode,"auto");
 });
 
 test("main behavior guards reject titlebar, minimum size, trust, reload, debounce and export mutants", () => {

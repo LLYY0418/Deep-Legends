@@ -17,6 +17,8 @@ const {
 
 const validToken = "A".repeat(32);
 const validMarkup = '<div class="overview-share-surface"><main>overview</main></div>';
+const temporaryDirectory = path.resolve("/tmp");
+const userDataDirectory = path.resolve("/user-data");
 
 test("分享图文件名会清理路径字符并固定为 PNG", () => {
   assert.equal(sanitizeSuggestedName('Deep:Legends/玩家?.jpg'), "Deep-Legends-玩家-.jpg.png");
@@ -59,11 +61,12 @@ function createHarness({ canceled = false, trusted = true, writeError = null, st
   const events = [];
   const writes = [];
   const files = new Map();
-  const directories = new Set(["/tmp", "/user-data", selectedDirectory]);
+  const chosenDirectory = path.resolve(selectedDirectory);
+  const directories = new Set([temporaryDirectory, userDataDirectory, chosenDirectory]);
   for (const file of existingFiles) files.set(path.resolve(file), Buffer.from("existing"));
   if (storedDirectory) {
-    directories.add(storedDirectory);
-    files.set(path.resolve("/user-data/share-export.json"), JSON.stringify({ saveDirectory: storedDirectory }));
+    directories.add(path.resolve(storedDirectory));
+    files.set(path.join(userDataDirectory, "share-export.json"), JSON.stringify({ saveDirectory: path.resolve(storedDirectory) }));
   }
   let destroyed = false;
   class FakeBrowserWindow {
@@ -94,7 +97,7 @@ function createHarness({ canceled = false, trusted = true, writeError = null, st
   const dialog = {
     async showOpenDialog(_owner, options) {
       events.push(["dialog", options]);
-      return canceled ? { canceled: true, filePaths: [] } : { canceled: false, filePaths: [selectedDirectory] };
+      return canceled ? { canceled: true, filePaths: [] } : { canceled: false, filePaths: [chosenDirectory] };
     },
   };
   const fileSystem = {
@@ -124,7 +127,7 @@ function createHarness({ canceled = false, trusted = true, writeError = null, st
   const controller = createShareExportController({
     BrowserWindow: FakeBrowserWindow,
     directoryController,
-    app: { getPath(name) { return name === "userData" ? "/user-data" : "/tmp"; } },
+    app: { getPath(name) { return name === "userData" ? userDataDirectory : temporaryDirectory; } },
     dialog,
     fileSystem,
     isTrustedRenderer: () => trusted,
@@ -140,7 +143,7 @@ function createHarness({ canceled = false, trusted = true, writeError = null, st
 test("首次选择目录后持久化，后续自动保存且不覆盖同名 PNG", async () => {
   const harness = createHarness();
   const destination = await harness.controller.prepareSave(harness.event, "Deep Legends.png");
-  assert.deepEqual(destination, { canceled: false, token: validToken, directory: "/tmp", prompted: true });
+  assert.deepEqual(destination, { canceled: false, token: validToken, directory: temporaryDirectory, prompted: true });
   assert.equal(harness.events[0][0], "dialog");
   assert.equal(harness.events.some(([name]) => name === "window"), false, "选择路径前不应创建截图窗口");
 
@@ -188,9 +191,9 @@ test("不受信任的 renderer 不能选择路径或提交截图", async () => {
 
 test("设置接口读取并更改主进程保存目录", async () => {
   const harness = createHarness({ storedDirectory: "/tmp", selectedDirectory: "/exports" });
-  assert.deepEqual(harness.controller.getSaveDirectory(harness.event), { directory: "/tmp" });
-  assert.deepEqual(await harness.controller.chooseSaveDirectory(harness.event), { canceled: false, directory: "/exports" });
-  assert.deepEqual(harness.controller.getSaveDirectory(harness.event), { directory: "/exports" });
+  assert.deepEqual(harness.controller.getSaveDirectory(harness.event), { directory: temporaryDirectory });
+  assert.deepEqual(await harness.controller.chooseSaveDirectory(harness.event), { canceled: false, directory: path.resolve("/exports") });
+  assert.deepEqual(harness.controller.getSaveDirectory(harness.event), { directory: path.resolve("/exports") });
 });
 
 test("preload 只暴露受校验的分享接口，不暴露 ipcRenderer", async () => {
@@ -241,15 +244,15 @@ test("分享图独立窗口不携带主窗口 zoom，且使用独立内存会话
 test("R110 share capture writes through the common validated staging controller", async () => {
   const calls=[];
   const directoryController={
-    getSaveDirectory(){return {directory:"/tmp"};},
-    prepareFile(destination){calls.push(["prepare",destination]);return "/user-data/stage.png";},
-    async finalizeFile(file){calls.push(["finalize",file]);return "/tmp/shared-final.png";},
+    getSaveDirectory(){return {directory:temporaryDirectory};},
+    prepareFile(destination){calls.push(["prepare",destination]);return path.join(userDataDirectory,"stage.png");},
+    async finalizeFile(file){calls.push(["finalize",file]);return path.join(temporaryDirectory,"shared-final.png");},
     discardFile(file){calls.push(["discard",file]);},
   };
   const harness=createHarness({directoryController});
   const prepared=await harness.controller.prepareSave(harness.event,"share");
   const result=await harness.controller.captureAndSave(harness.event,{token:prepared.token,markup:validMarkup});
-  assert.equal(harness.writes[0].filePath,"/user-data/stage.png");
+  assert.equal(harness.writes[0].filePath,path.join(userDataDirectory,"stage.png"));
   assert.equal(result.fileName,"shared-final.png");
   assert.deepEqual(calls.map(row=>row[0]),["prepare","finalize","discard"]);
   await harness.controller.prepareSave(harness.event,"canceled");

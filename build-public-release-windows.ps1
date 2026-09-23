@@ -8,7 +8,7 @@ $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 if ($env:OS -ne "Windows_NT") { throw "Run this script on Windows." }
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object -TypeName Security.Principal.WindowsPrincipal -ArgumentList $identity
-if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) -and $env:GITHUB_ACTIONS -ne "true") {
     throw "Open PowerShell as Administrator before running this script; Windows symlink tests require it."
 }
 
@@ -23,15 +23,7 @@ if ($nodeVersion -notmatch '^v(\d+)\.') { throw "Cannot parse Node.js version: $
 $nodeMajor = [int]($nodeVersion -replace '^v(\d+)\..*$', '$1')
 if ($nodeMajor -lt 22) { throw "Node.js 22 or newer is required; found $nodeVersion." }
 
-# Seed the exact installer modules needed on Windows. Go checks them against go.sum.
-$moduleCacheArchive = Join-Path $projectRoot "tools\windows-installer-go-cache.zip"
-if (Test-Path $moduleCacheArchive) {
-    $goCacheRoot = (& go env GOMODCACHE).Trim()
-    if ($LASTEXITCODE -ne 0) { throw "Cannot locate the Go module cache." }
-    $moduleDownloadCache = Join-Path $goCacheRoot "cache\download"
-    Expand-Archive -Path $moduleCacheArchive -DestinationPath $moduleDownloadCache -Force
-}
-if (-not $env:GOPROXY -or $env:GOPROXY -eq "https://proxy.golang.org,direct") {
+if ($env:GITHUB_ACTIONS -ne "true" -and (-not $env:GOPROXY -or $env:GOPROXY -eq "https://proxy.golang.org,direct")) {
     $env:GOPROXY = "https://goproxy.cn|https://proxy.golang.org|direct"
 }
 
