@@ -49,8 +49,6 @@ func arenaSessionOrderGroups(queueID int64, players []lcuLivePlayer) ([]string, 
 	return arenaOrderGroups(len(players), arenaSquadSize(queueID))
 }
 
-func arenaRosterDivisible(count, squadSize int) bool { return squadSize > 0 && count%squadSize == 0 }
-
 func arenaOrderGroups(count, squadSize int) ([]string, bool) {
 	if squadSize < 2 || count < 6 || count > 18 || count%squadSize != 0 {
 		return nil, false
@@ -60,32 +58,6 @@ func arenaOrderGroups(count, squadSize int) ([]string, bool) {
 		groups[index] = strconv.Itoa(index/squadSize + 1)
 	}
 	return groups, true
-}
-
-func orderGroupsFromLiveClient(snapshot liveClientSnapshot, squadSize int) (liveClientArenaGrouping, bool) {
-	groups, ok := arenaOrderGroups(len(snapshot.OrderedIdentities), squadSize)
-	if !ok {
-		return liveClientArenaGrouping{}, false
-	}
-	grouping := liveClientArenaGrouping{Field: "order", ByIdentity: map[string]string{}, IdentifiedPlayers: len(groups)}
-	ambiguous := map[string]bool{}
-	for index, keys := range snapshot.OrderedIdentities {
-		if len(keys) == 0 {
-			return liveClientArenaGrouping{}, false
-		}
-		for _, key := range keys {
-			if ambiguous[key] {
-				continue
-			}
-			if old := grouping.ByIdentity[key]; old != "" && old != groups[index] {
-				delete(grouping.ByIdentity, key)
-				ambiguous[key] = true
-				continue
-			}
-			grouping.ByIdentity[key] = groups[index]
-		}
-	}
-	return grouping, true
 }
 
 // Resolved identity is shared by grouping and position matching. CN gameflow
@@ -335,40 +307,6 @@ type arenaInference struct {
 	playerlistIdentities                 [][]string
 }
 
-func (a *app) rememberArenaInference(client *LCUClient, current Summoner, response *gameplayLiveResponse, grouping liveClientArenaGrouping, verified bool, squadSize int) {
-	record := arenaInference{fromLoading: response.Phase == "GameStart", selfPUUID: current.PUUID, client: client, gameID: response.GameID, queueID: response.QueueID, serverID: clientTencentServerID(client), source: response.ArenaGroupSource, grouping: cloneLiveClientArenaGrouping(grouping), byPUUID: map[string]string{}, playerCount: len(response.Players), squadSize: squadSize, verified: verified}
-	if grouping.IdentifiedPlayers > 0 {
-		record.playerCount = grouping.IdentifiedPlayers
-	}
-	for _, p := range response.Players {
-		if p.reference.PlayerRef != "" {
-			record.byPUUID[p.reference.PlayerRef] = p.ArenaGroup
-		}
-		if p.IsCurrent {
-			record.selfBlock, _ = strconv.Atoi(p.ArenaGroup)
-		}
-	}
-	a.arenaTruth.mu.Lock()
-	defer a.arenaTruth.mu.Unlock()
-	for i, old := range a.arenaTruth.records {
-		if old.client == client && old.gameID == record.gameID {
-			// A partial frame cannot erase complete boundaries captured while loading.
-			if old.source == "session-order" && record.source == "session-order" && len(old.byPUUID) > len(record.byPUUID) {
-				return
-			}
-			record.checked = old.checked
-			record.truthObserved, record.noneReported = old.truthObserved, old.noneReported
-			record.fromLoading = record.fromLoading || old.fromLoading
-			a.arenaTruth.records[i] = record
-			return
-		}
-	}
-	a.arenaTruth.records = append(a.arenaTruth.records, record)
-	if len(a.arenaTruth.records) > 5 {
-		a.arenaTruth.records = append([]arenaInference(nil), a.arenaTruth.records[len(a.arenaTruth.records)-5:]...)
-	}
-}
-
 type arenaGroupTruthParticipant struct {
 	PUUID        string
 	RiotID       string
@@ -464,25 +402,6 @@ func (a *app) finishArenaGroupTruth(ctx context.Context, client *LCUClient) {
 			return
 		}
 	}
-}
-
-// Reuse established boundaries by identity; never cut a shortened roster again.
-func (a *app) carriedArenaSessionGroups(client *LCUClient, current Summoner, response *gameplayLiveResponse) ([]string, bool) {
-	a.arenaTruth.mu.Lock()
-	defer a.arenaTruth.mu.Unlock()
-	for _, record := range a.arenaTruth.records {
-		if response.GameID == 0 || record.client != client || record.gameID != response.GameID || record.queueID != response.QueueID || record.selfPUUID != current.PUUID || record.source != "session-order" || !record.fromLoading || !strings.EqualFold(record.serverID, clientTencentServerID(client)) {
-			continue
-		}
-		groups := make([]string, len(response.Players))
-		for i, player := range response.Players {
-			groups[i] = record.byPUUID[player.reference.PlayerRef]
-		}
-		if validArenaGroupAssignments(groups, record.squadSize) {
-			return groups, true
-		}
-	}
-	return nil, false
 }
 
 func (a *app) observeArenaGroupingPhase(client *LCUClient, phase string) {

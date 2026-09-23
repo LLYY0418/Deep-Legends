@@ -217,11 +217,6 @@ func (a *app) recordR99SurfaceShape(ctx context.Context, client *LCUClient) {
 	}
 	wg.Wait()
 }
-func r99Request(ctx context.Context, client *LCUClient, method, path string, body, out any) (int, error) {
-	status := &atomic.Int64{}
-	err := client.RequestJSON(context.WithValue(ctx, lcuResponseStatusKey{}, status), method, path, body, out)
-	return int(status.Load()), err
-}
 func (a *app) handleFacadeProbe(w http.ResponseWriter, r *http.Request) {
 	client, _, err := a.gameplayClient()
 	if err != nil {

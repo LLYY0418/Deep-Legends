@@ -102,28 +102,3 @@ func (a *app) enrichProActivity(ctx context.Context, teams []opggProTeam, previo
 		}
 	}
 }
-
-func proSeedTotalAccounts() int {
-	count := 0
-	for _, seed := range proSeedAccounts {
-		count += len(seed.Accounts)
-	}
-	return count
-}
-
-func proActivityAccountCount(teams []opggProTeam) int {
-	ids := map[string]bool{}
-	for _, team := range teams {
-		for _, member := range team.Members {
-			if _, ok := proReviewedMemberBadge(team, member); !ok {
-				continue
-			}
-			for _, row := range member.Summoners {
-				if row.PUUID != "" && row.Source != "seed" {
-					ids[row.PUUID] = true
-				}
-			}
-		}
-	}
-	return len(ids)
-}
