@@ -4,7 +4,7 @@
 执行人：GPT。
 日期：2026-09-23。
 基线：HEAD `087ceeec`（"Record CRLF checkout regression verification"），版本 0.12.19。
-状态：未执行。本单完成后，R142 §P2「在真实 Windows 上构建」由本单的 Release 工作流完成；R142 其余内容不变。
+状态：已完成。R142 §P2「在真实 Windows 上构建」已由本单的 Release 工作流完成；R142 其余内容不变。验收记录见 `docs/history/ledgers/r143-execution-ledger.md`。
 
 ## 0. 结论
 
