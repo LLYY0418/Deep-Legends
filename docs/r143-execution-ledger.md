@@ -19,7 +19,9 @@
 
 `build-desktop-windows.ps1` 在所有 Go、前端和桌面测试前清除继承的 `DEEP_LEGENDS_KEY_MODE`，桌面测试完成后才设置本次 key mode，用于真正构建、打包和凭据核验。未新增平台跳过或放宽断言。
 
-本机定向 Node 测试：48 项，47 通过，1 项原有 Windows 专属测试在 macOS 跳过。[GitHub Actions Windows job](https://github.com/LLYY0418/Deep-Legends/actions/runs/35886360802/job/107271782211) 在 `Build desktop client and checksums` 步骤失败；公开页面只显示 exit code 1，完整日志要求 GitHub 登录。因此这 11 项在 Windows 上是否全部通过，当前尚无证据，不能记为验收通过。
+本机定向 Node 测试：48 项，47 通过，1 项原有 Windows 专属测试在 macOS 跳过。[GitHub Actions Windows job](https://github.com/LLYY0418/Deep-Legends/actions/runs/35886360802/job/107271782211) 完整日志确认：前端 692/692 通过，Windows 桌面测试 263 项中 261 通过、0 失败、2 项原有跳过；工单列出的 11 项均未再失败。
+
+同一次运行在测试之后到达真正的 electron-builder NSIS 打包，随后报 `File: ".../desktop/nsis/../assets/hexcore-icon.ico" -> no files found`。仓库中该图标存在，electron-builder 自身也已使用它；问题是自定义 NSIS 脚本通过 `${__FILEDIR__}/../` 拼出的路径。改为编译器已传入的绝对 `${MUI_ICON}`；同文件卸载外壳路径改用 `${PROJECT_DIR}`，避免下一个同类错误。`desktop/installer-nsh.test.cjs` 断言这两个输入变量；本机相关 37 项测试全通过。修复后的 Windows 打包仍待 Actions 再验。
 
 ## P3：Release 工作流
 
@@ -36,5 +38,5 @@ README 发布流程改为确认 CHANGELOG → Actions 运行 Windows public rele
 | 运行 | 链接 | 结果 | 耗时 |
 |---|---|---|---|
 | main / quality | [35886360802 / quality](https://github.com/LLYY0418/Deep-Legends/actions/runs/35886360802/job/107267397722) | 通过 | 10 分 48 秒 |
-| main / windows-build | [35886360802 / windows-build](https://github.com/LLYY0418/Deep-Legends/actions/runs/35886360802/job/107271782211) | 失败，需登录读取 Build desktop client and checksums 日志 | 12 分 37 秒 |
+| main / windows-build | [35886360802 / windows-build](https://github.com/LLYY0418/Deep-Legends/actions/runs/35886360802/job/107271782211) | 测试全通过，NSIS 自定义图标相对路径失败 | 12 分 37 秒 |
 | 手动 release.yml | 待填 | 待运行 | 待填 |

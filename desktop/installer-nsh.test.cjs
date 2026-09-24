@@ -81,7 +81,8 @@ test('R74 installer opts out of bitmap DPI virtualization and has a visible prog
 });
 
 test('R80 customInstall swaps the executable without changing registry or removal logic', () => {
-  assert.match(source, /!define DL_UNINSTALL_SHELL "\$\{__FILEDIR__\}\/\.\.\/uninstall-shell\.exe"/);
+  assert.match(source, /!define DL_UNINSTALL_SHELL "\$\{PROJECT_DIR\}\\uninstall-shell\.exe"/);
+  assert.match(source, /!define DL_INSTALLER_ICON "\$\{MUI_ICON\}"/);
   const hook = source.match(/!macro customInstall\r?\n([\s\S]*?)!macroend/)?.[1];
   assert.ok(hook);
   assert.ok(hook.includes('Rename "$INSTDIR\\${UNINSTALL_FILENAME}" "$INSTDIR\\resources\\uninstall-core.dat"'));

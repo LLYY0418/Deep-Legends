@@ -22,7 +22,7 @@ ManifestDPIAware true
 
 ; Keep registry/shortcut targets unchanged. The stock NSIS uninstaller remains
 ; the only implementation of file, registry and shortcut removal.
-!define DL_UNINSTALL_SHELL "${__FILEDIR__}/../uninstall-shell.exe"
+!define DL_UNINSTALL_SHELL "${PROJECT_DIR}\uninstall-shell.exe"
 !macro customInstall
   ; Internal payload, not a second user-facing uninstaller. The shell copies
   ; this PE to its temporary workspace before launching the stock NSIS logic.
@@ -82,7 +82,7 @@ Var DLProgressIcon
 ; The builder emits its custom include and plugin paths asynchronously.
 ; Defer executable functions until installer.nsi calls customHeader, after
 ; all plugin directories and standard helper variables have been registered.
-!define DL_INSTALLER_ICON "${__FILEDIR__}/../assets/hexcore-icon.ico"
+!define DL_INSTALLER_ICON "${MUI_ICON}"
  ; Coordinates are design pixels at 96 DPI, shared by all three pages.
 !macro DLPosition HWND X Y W H
   System::Call 'kernel32::MulDiv(i ${X}, i $DLDpi, i 96)i.r5'
