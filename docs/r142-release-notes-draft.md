@@ -1,69 +1,51 @@
-# Deep Legends v0.12.19
+# Deep Legends
 
-Deep Legends 是 Windows 本地英雄联盟助手，提供英雄推荐、召唤师战绩、实时对局、收藏和客户端工具。首次公开发布的 0.12.19 汇总了自 0.12.0 起的功能和改进。
+Deep Legends 是一款 Windows 本地英雄联盟助手，把英雄数据、赛前准备、实时对局、召唤师战绩和客户端收藏整理在同一个桌面窗口。游戏客户端尚未启动时，可以先浏览英雄梯度与推荐；登录国服客户端后，还能查看本机账号相关内容并使用需要客户端配合的工具。
 
-以下 6 张截图上传 Release 后替换成真实链接。下列占位说明不包含本地相对图片链接；上传图片后，在每条说明下插入 GitHub 提供的图片 Markdown。
+下面六张均为 **3840 × 2160 原始截图**，使用演示数据展示界面与布局。点击图片可打开完整分辨率原图。
 
-## 界面预览
+## 界面一览
 
-### 1. 总览
+### 总览 · 从战绩回到每一场对局
 
-查看召唤师资料、排位、能力表现和最近战绩。
+总览将排位、近期表现和最近战绩放在一起。可以按模式筛选对局，查看英雄、K/D/A、装备、参团与补刀等信息；展开单场后还能继续看队伍分析、符文、出装路线和技能加点。搜索栏可打开其他召唤师的独立页签。
 
-<!-- 上传 docs/r142-validation/01-overview.png 后，在这里插入 GitHub 图片链接。 -->
+[![Deep Legends 总览界面，3840 × 2160 演示截图](https://raw.githubusercontent.com/LLYY0418/Deep-Legends/e10ad3a3f3dfd96c7ea92825440b4aa8456b57bf/docs/r142-validation/01-overview.png)](https://raw.githubusercontent.com/LLYY0418/Deep-Legends/e10ad3a3f3dfd96c7ea92825440b4aa8456b57bf/docs/r142-validation/01-overview.png)
 
-### 2. 英雄
+### 英雄 · 按模式、位置和段位寻找思路
 
-浏览韩服英雄梯度、符文和构建推荐，并切换海克斯大乱斗与斗魂竞技场。
+英雄页汇总韩服单/双排的梯度、胜率、选用率和禁用率，支持按位置、段位和英雄名称查找。切换到海克斯大乱斗或斗魂竞技场，可以查看各模式对应的英雄和构建推荐；点开英雄可继续研究符文、技能与出装。
 
-<!-- 上传 docs/r142-validation/02-champions.png 后，在这里插入 GitHub 图片链接。 -->
+[![Deep Legends 英雄界面，3840 × 2160 演示截图](https://raw.githubusercontent.com/LLYY0418/Deep-Legends/e10ad3a3f3dfd96c7ea92825440b4aa8456b57bf/docs/r142-validation/02-champions.png)](https://raw.githubusercontent.com/LLYY0418/Deep-Legends/e10ad3a3f3dfd96c7ea92825440b4aa8456b57bf/docs/r142-validation/02-champions.png)
 
-### 3. 对局
+### 对局 · 把赛前信息放在需要它的位置
 
-在选人和对局中查看当前阵容、推荐符文与赛前信息。
+进入英雄选择后，对局页结合当前阵容与位置展示符文、出装和技能建议。不同推荐来源可切换比较；确认方案后，可由玩家主动点击应用所选符文。页面也提供当前对局信息与英雄选择阶段的配置入口。
 
-<!-- 上传 docs/r142-validation/03-live.png 后，在这里插入 GitHub 图片链接。 -->
+[![Deep Legends 对局界面，3840 × 2160 演示截图](https://raw.githubusercontent.com/LLYY0418/Deep-Legends/e10ad3a3f3dfd96c7ea92825440b4aa8456b57bf/docs/r142-validation/03-live.png)](https://raw.githubusercontent.com/LLYY0418/Deep-Legends/e10ad3a3f3dfd96c7ea92825440b4aa8456b57bf/docs/r142-validation/03-live.png)
 
-### 4. 收藏
+### 收藏 · 一个地方查看账号物品
 
-查看本机客户端中的账户物品、战利品和待领取奖励；收藏页还提供皮肤与奖池入口。
+连接国服客户端后，可按皮肤与炫彩、账户与物品、三合一奖池、头像与旗帜浏览本机账号内容。材料、宝箱、英雄碎片和待领取奖励分区呈现，方便查看已有物品并找到相应入口。
 
-<!-- 上传 docs/r142-validation/04-favorites.png 后，在这里插入 GitHub 图片链接。 -->
+[![Deep Legends 收藏界面，3840 × 2160 演示截图](https://raw.githubusercontent.com/LLYY0418/Deep-Legends/e10ad3a3f3dfd96c7ea92825440b4aa8456b57bf/docs/r142-validation/04-favorites.png)](https://raw.githubusercontent.com/LLYY0418/Deep-Legends/e10ad3a3f3dfd96c7ea92825440b4aa8456b57bf/docs/r142-validation/04-favorites.png)
 
-### 5. 工具
+### 工具 · 按自己的习惯配置客户端流程
 
-按需配置自动接受、断线重连等规则，并使用维护、生涯、领奖和征召工具。
+工具页集中管理自动接受、快速下一把、断线重连等规则，并提供维护、征召、生涯和领奖入口。自动规则可以逐项开启和调整；需要修改客户端内容的操作由玩家明确触发或配置。
 
-<!-- 上传 docs/r142-validation/05-suite.png 后，在这里插入 GitHub 图片链接。 -->
+[![Deep Legends 工具界面，3840 × 2160 演示截图](https://raw.githubusercontent.com/LLYY0418/Deep-Legends/e10ad3a3f3dfd96c7ea92825440b4aa8456b57bf/docs/r142-validation/05-suite.png)](https://raw.githubusercontent.com/LLYY0418/Deep-Legends/e10ad3a3f3dfd96c7ea92825440b4aa8456b57bf/docs/r142-validation/05-suite.png)
 
-### 6. 设置
+### 设置 · 让窗口和信息呈现适合自己
 
-调整界面外观、导航、战绩展示和隐私选项。
+界面缩放、密度、侧边栏、主题与默认页面都可在设置中调整；战绩与对局、隐私相关选项也按类别整理。需要分享或排查时，可从应用内选择导出位置。
 
-<!-- 上传 docs/r142-validation/06-settings.png 后，在这里插入 GitHub 图片链接。 -->
+[![Deep Legends 设置界面，3840 × 2160 演示截图](https://raw.githubusercontent.com/LLYY0418/Deep-Legends/e10ad3a3f3dfd96c7ea92825440b4aa8456b57bf/docs/r142-validation/06-settings.png)](https://raw.githubusercontent.com/LLYY0418/Deep-Legends/e10ad3a3f3dfd96c7ea92825440b4aa8456b57bf/docs/r142-validation/06-settings.png)
 
-## 0.12.19 — 2026-09-23
+## 安装与使用
 
-首次公开发布，一并包含 0.12.0 起累计的全部改动。
+1. 下载本页附件中带 `-public.exe` 后缀的 Windows 安装包；需要核对下载文件时，使用同页的 `SHA256SUMS-public.txt`。
+2. 安装并启动 Deep Legends。未启动游戏客户端也能先浏览英雄页；登录国服客户端后，可使用总览、对局、收藏及客户端工具。
+3. 公开安装包不内置个人 Riot API Key。韩服召唤师及对局等依赖 Riot 官方 API 的查询，需要使用者在运行环境中自行提供 `RIOT_API_KEY`；英雄梯度等公开数据页不依赖该 Key。
 
-### 新增
-- 应用内支持检查、下载和校验新版本；安装版可手动重启升级，便携版可前往发布页下载。
-- 国服玩家总览增加海克斯大乱斗估算分及误差范围；没有可靠数据时不显示单双排和灵活组排隐藏分。
-- 选人阶段的阵营播报可选择加入己方英雄和本人分路，默认关闭。
-
-### 优化
-- 安装或升级后保留启动进度，直到应用窗口出现；启动窗口在内容准备好后再显示，减少短暂空白。
-- 英雄、职业选手和工具页面按需加载，支持加载失败重试、直达页面与快速切换。
-- 国服排位卡在本赛季战绩统计完成后及时更新；离开再返回也能看到补全后的胜率。
-- 能力雷达更清楚地呈现与对手的指标差距；战绩卡的数据列保持稳定，避免平均段位回填时跳动。
-- 韩服当前对局按位置排列玩家，职业选手标签紧跟名称；韩服总览移除海斗隐藏分入口。
-- 切换对局符文分类、职业选手和绝活哥时保留已加载内容，减少页面闪烁。
-- 收藏页后台刷新保留现有卡片；斗魂搭档名称更易辨认，对局状态集中在工具栏，海斗表现数字更清晰。
-- 下载更新支持镜像回退与断点续传，显示近期下载速度和预计剩余时间。
-
-### 修复
-- 韩服战绩缺少 Riot API Key 时明确提示原因；公开安装包不包含个人 Key。
-- 修复海斗数据探测可能误判的问题，并改善局内数据短时不可用时的读取。
-- 单场相对评分正确计入助攻，并按同位置比较有效指标；缺失的数据不再被当作零。
-- 能力雷达在部分指标缺失时仍显示可用结果，只使用能够准确配对的本人和对手数据。
-- 修复收藏数据刷新时列表重复重建，以及安装升级后启动失败时的等待与提示问题。
+更多操作与功能边界见[项目 README](https://github.com/LLYY0418/Deep-Legends)。
