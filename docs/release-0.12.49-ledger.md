@@ -32,3 +32,11 @@
 ## 真机边界
 
 用户本次明确授权正式发布，发布后由用户试用更新。没有声称 Windows 真机检查、下载、重启安装或失败回退已经验证。public 包不包含个人 Riot API Key。R184 仅增加设置监测诊断，镜头重置问题尚未修复。
+
+## GitHub 发布结果
+
+- 已正式发布且设为 Latest：<https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.49>。发布时间 2026-10-02T08:06:53Z，release id=401635504；draft=false、prerelease=false。
+- 发布源码目标为 a4a59c037c84c0878114fd85ae0542712047a66a。从该提交 git archive 单独还原的源码指纹为 e55eeb092260，与安装包一致；发布分支已推送 GitHub。
+- 草稿阶段逐一核对三附件的 GitHub digest、size、uploaded 状态；全部与本地 SHA-256/大小一致。下载回来的 latest.json 与 SHA256SUMS-public.txt 逐字节一致。
+- 正式发布后匿名访问 `/releases/latest/download/latest.json` 成功，内容与本地清单逐字节一致，version=0.12.49；GitHub `/releases/latest` 同样指向 v0.12.49。
+- 已知兼容边界：R169 / 0.12.34 起接受 public 文件后缀。GitHub 旧版 0.12.19 的校验器仍只接受无后缀或指纹后缀，不能用它验证此次 public 更新链路；使用 0.12.48 等已含 R169 的旧版本测试。若仍在 0.12.19，需从发布页手动安装。
