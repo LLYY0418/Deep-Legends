@@ -148,7 +148,8 @@
   function liveSnapshotComplete(data) {
     if (liveClientPositionsPending(data)) return false;
     if (!data?.available || !Array.isArray(data.players) || !data.players.length) return false;
-    if ([420, 440, 2300, 2400, 3270].includes(Number(data.queueId))) {
+    // R194: mirror registered 5v5 PvP queues in queue_groups.go; bots/Arena stay excluded.
+    if ([400, 420, 430, 440, 450, 480, 490, 700, 720, 900, 930, 1900, 2300, 2400, 3220, 3270].includes(Number(data.queueId))) {
       const blue = data.players.filter((player) => Number(player.teamId) === 100).length;
       const red = data.players.filter((player) => Number(player.teamId) === 200).length;
       if (data.players.length !== 10 || blue !== 5 || red !== 5) return false;
@@ -7354,7 +7355,7 @@
     const inGame = phase === "GameStart" || phase === "InProgress" || phase === "Reconnect";
     if (inGame && (liveSnapshotComplete(state.live) && state.live?.phase === phase || Number(state.liveRetryAttempts || 0) >= 8)) return;
     const loadingProbe = inGame && liveAugmentRecommendationSource(state.live) === "arena" && !state.live?.arenaGrouped && Date.now() - Number(state.liveRetryStartedAt || 0) < 60_000;
-    const loadingTenPlayerRoster = inGame && [420, 440, 2300, 2400, 3270].includes(Number(state.live?.queueId)) && Array.isArray(state.live?.players) && state.live.players.length < 10;
+    const loadingTenPlayerRoster = inGame && [400, 420, 430, 440, 450, 480, 490, 700, 720, 900, 930, 1900, 2300, 2400, 3220, 3270].includes(Number(state.live?.queueId)) && Array.isArray(state.live?.players) && state.live.players.length < 10;
     const delay = loadingProbe || loadingTenPlayerRoster ? 5_000 : inGame ? 20_000 : state.liveError ? 60_000 : liveRefreshDelayMs(phase, state.settings.liveInterval);
     state.liveTimer = setTimeout(() => {
       state.liveTimer = 0;

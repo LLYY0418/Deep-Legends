@@ -216,7 +216,16 @@ func TestR113RSCDoesNotDiscardLaterRarityRows(t *testing.T) {
 }
 
 func TestR113FailedHistoryDoesNotFreezeForWholeGame(t *testing.T) {
-	response := gameplayLiveResponse{Available: true, QueueID: 450, GameID: 113, Players: []gameplayLivePlayer{{HistoryState: "failed"}}}
+	// R194: ARAM requires 5+5. Keep the roster complete so only history
+	// state controls the whole-game cache guard being tested here.
+	response := gameplayLiveResponse{Available: true, QueueID: 450, GameID: 113, Players: []gameplayLivePlayer{{TeamID: 100, HistoryState: "failed"}}}
+	for i := 1; i < 10; i++ {
+		team := int64(100)
+		if i >= 5 {
+			team = 200
+		}
+		response.Players = append(response.Players, gameplayLivePlayer{TeamID: team, HistoryState: "ok"})
+	}
 	if gameplayLiveSnapshotComplete(response) {
 		t.Fatal("transient history failure became immutable for the entire game")
 	}

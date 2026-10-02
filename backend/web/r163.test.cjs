@@ -23,7 +23,8 @@ test('R163 Hextech ARAM 5+4 roster remains retryable until both teams have five 
     assert.equal(complete({ available: true, queueId, players: players.slice(0, 9) }), false);
     assert.equal(complete({ available: true, queueId, players }), true);
   }
-  assert.equal(complete({ available: true, queueId: 450, players: players.slice(0, 9) }), true);
+  // R194: regular ARAM now shares the verified 5v5 completeness gate.
+  assert.equal(complete({ available: true, queueId: 450, players: players.slice(0, 9) }), false);
 });
 
 test('R163 partial Hextech ARAM roster retries at five seconds', () => {

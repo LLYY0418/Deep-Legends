@@ -5621,6 +5621,7 @@ type liveClientRosterPlayer struct {
 	Team         string
 	Position     string
 	ChampionName string
+	IsBot        bool
 }
 
 type liveClientProbeState struct {
@@ -5949,6 +5950,7 @@ func parseLiveClientPlayerList(raw []byte, sizes ...int) (liveClientSnapshot, li
 		}
 		rosterPlayer.Team, _ = liveClientMapValueString(entry, "team")
 		rosterPlayer.ChampionName, _ = liveClientMapValueString(entry, "championName")
+		rosterPlayer.IsBot, _ = liveClientItemBool(entry, "isBot")
 		snapshot.RosterPlayers = append(snapshot.RosterPlayers, rosterPlayer)
 		// R116-D P1-4 阶段一：读 items。必须放在 position 的 continue 之前——
 		// 海斗的 position 实测恒为 "OTHER"（docs/r116-probe-findings.md §1.5 的
@@ -7671,10 +7673,15 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	freshness := a.liveHistoryFreshnessForGame(client, response.GameID, response.QueueID)
 	names := a.overviewChampionNames(ctx)
 	recoveredPositionStart := len(rawPlayers)
-	if (phase == "InProgress" || phase == "Reconnect") && liveTenPlayerRosterQueue(response.QueueID) && len(rawPlayers) < 10 {
-		var appended int
-		rawPlayers, appended, _, _ = a.recoverClassicLiveRoster(ctx, client, current, rawPlayers, liveClientSnapshotValue, names, liveAnonymousRosterQueue(response.QueueID), liveRosterRecoveryScope{response.GameID, response.QueueID, phase, response.RawCount})
-		response.MergeAppended += appended
+	if (phase == "InProgress" || phase == "Reconnect") && len(rawPlayers) < 10 {
+		scope := liveRosterRecoveryScope{response.GameID, response.QueueID, phase, response.RawCount}
+		if liveTenPlayerRosterQueue(response.QueueID) {
+			var appended int
+			rawPlayers, appended, _, _ = a.recoverClassicLiveRoster(ctx, client, current, rawPlayers, liveClientSnapshotValue, names, liveAnonymousRosterQueue(response.QueueID), scope)
+			response.MergeAppended += appended
+		} else {
+			a.recordUnsupportedLiveRosterQueue(client, scope, len(liveClientSnapshotValue.RosterPlayers))
+		}
 	}
 	liveClientPositions := make([]string, len(rawPlayers))
 	response.Players = make([]gameplayLivePlayer, len(rawPlayers))

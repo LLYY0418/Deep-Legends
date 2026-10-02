@@ -20,15 +20,23 @@ func liveClientMapValueString(entry map[string]any, name string) (string, bool) 
 }
 
 // Gameflow can omit players after the local Live Client playerlist has all ten.
-// Only an exact Riot ID lookup may supply a missing PUUID. In ranked and Hextech
-// ARAM an anonymous slot may be shown without identity or history once its
-// team is verified against the current player.
+// Only an exact Riot ID lookup may supply a missing PUUID. In supported 5v5
+// PvP queues an anonymous slot may be shown without identity or history once
+// its team is verified against the current player.
 func liveTenPlayerRosterQueue(queueID int64) bool {
 	if queueID == seasonQueueSoloDuo || queueID == seasonQueueFlex {
 		return true
 	}
 	definition, ok := supportedQueueDefinition(queueID)
-	return ok && definition.ModeGroup == "hextech-aram"
+	if !ok {
+		return false
+	}
+	switch definition.ModeGroup {
+	case "solo", "flex", "match", "aram", "hextech-aram", "clash", "urf":
+		return true
+	default:
+		return false
+	}
 }
 
 func liveAnonymousRosterQueue(queueID int64) bool {
@@ -64,10 +72,11 @@ type liveRosterRecoveryFlight struct {
 	Result liveRosterRecoveryResult
 }
 type liveRosterRecoveryCache struct {
-	Mu      sync.Mutex
-	GameID  int64
-	Client  *LCUClient
-	Entries map[string]*liveRosterRecoveryFlight
+	Mu                     sync.Mutex
+	GameID                 int64
+	Client                 *LCUClient
+	Entries                map[string]*liveRosterRecoveryFlight
+	QueueUnsupportedLogged bool
 }
 
 func (a *app) clearLiveRosterRecovery() {
@@ -75,6 +84,7 @@ func (a *app) clearLiveRosterRecovery() {
 	a.liveRosterRecovery.GameID = 0
 	a.liveRosterRecovery.Client = nil
 	a.liveRosterRecovery.Entries = nil
+	a.liveRosterRecovery.QueueUnsupportedLogged = false
 	a.liveRosterRecovery.Mu.Unlock()
 }
 
@@ -85,7 +95,21 @@ func (a *app) prepareLiveRosterRecovery(client *LCUClient, gameID int64) {
 	if cache.GameID != gameID || cache.Client != client {
 		cache.GameID, cache.Client = gameID, client
 		cache.Entries = make(map[string]*liveRosterRecoveryFlight)
+		cache.QueueUnsupportedLogged = false
 	}
+}
+
+// R194: distinguish unsupported queues from a failed recovery, once per game.
+func (a *app) recordUnsupportedLiveRosterQueue(client *LCUClient, scope liveRosterRecoveryScope, playerlistCount int) {
+	cache := &a.liveRosterRecovery
+	cache.Mu.Lock()
+	if cache.GameID != scope.GameID || cache.Client != client || cache.QueueUnsupportedLogged {
+		cache.Mu.Unlock()
+		return
+	}
+	cache.QueueUnsupportedLogged = true
+	cache.Mu.Unlock()
+	a.recordDiagnostic(map[string]any{"event": "live_roster_recovery", "game_id": scope.GameID, "queue_id": scope.QueueID, "phase": scope.Phase, "raw_count": scope.RawCount, "playerlist_count": playerlistCount, "appended": 0, "alias_attempts": 0, "reason": "queue-unsupported", "anonymous_count": 0, "named_present": 0, "named_appended": 0, "unresolved_named": 0, "cached": false})
 }
 
 // Fingerprints stay in memory. Include position/champion data too so a changed
@@ -93,7 +117,7 @@ func (a *app) prepareLiveRosterRecovery(client *LCUClient, gameID int64) {
 func liveRosterRecoveryKey(current Summoner, raw []liveRosterEntry, snapshot liveClientSnapshot, names map[int64]string, allowAnonymous bool) string {
 	live := make([]string, 0, len(snapshot.RosterPlayers))
 	for _, p := range snapshot.RosterPlayers {
-		encoded, _ := json.Marshal([]string{strings.ToUpper(strings.TrimSpace(p.Team)), strings.ToLower(p.GameName), strings.ToLower(p.TagLine), p.Position, p.ChampionName})
+		encoded, _ := json.Marshal([]any{strings.ToUpper(strings.TrimSpace(p.Team)), strings.ToLower(p.GameName), strings.ToLower(p.TagLine), p.Position, p.ChampionName, p.IsBot})
 		live = append(live, string(encoded))
 	}
 	players := make([]string, 0, len(raw))
@@ -120,6 +144,7 @@ func (a *app) cachedClassicLiveRoster(ctx context.Context, client *LCUClient, cu
 	if cache.GameID != scope.GameID || cache.Client != client {
 		cache.GameID, cache.Client = scope.GameID, client
 		cache.Entries = make(map[string]*liveRosterRecoveryFlight)
+		cache.QueueUnsupportedLogged = false
 	}
 	if flight := cache.Entries[key]; flight != nil {
 		cache.Mu.Unlock()
@@ -249,6 +274,9 @@ func (a *app) computeClassicLiveRoster(ctx context.Context, client *LCUClient, c
 			continue
 		}
 		if entry.GameName == "" || entry.TagLine == "" {
+			if entry.IsBot {
+				continue
+			}
 			anonymous = append(anonymous, entry)
 			stats.AnonymousCount++
 			continue

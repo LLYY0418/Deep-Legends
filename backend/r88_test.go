@@ -50,13 +50,24 @@ func TestR88ArenaBanWildcardActuallyPatches(t *testing.T) {
 func TestR88OrdinaryLiveLoadsCacheAndReuseWithoutExtendingTTL(t *testing.T) {
 	var identities atomic.Int32
 	ref := strings.Repeat("r", 48)
+	// R194: the immutable ARAM snapshot fixture must have a complete 5+5 roster.
+	teamOne := []map[string]any{{"puuid": ref, "summonerId": 88}}
+	teamTwo := []map[string]any{}
+	for i := 1; i < 10; i++ {
+		player := map[string]any{"puuid": r161Ref(i), "summonerId": 88 + i}
+		if i < 5 {
+			teamOne = append(teamOne, player)
+		} else {
+			teamTwo = append(teamTwo, player)
+		}
+	}
 	c := &LCUClient{baseURL: "https://127.0.0.1:2999", token: "fixture", http: &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Path == "/lol-gameflow/v1/session" {
-			return response2351(map[string]any{"gameData": map[string]any{"gameId": 88, "queue": map[string]any{"id": 450, "gameMode": "ARAM"}, "teamOne": []map[string]any{{"puuid": ref, "summonerId": 88}}}}), nil
+			return response2351(map[string]any{"gameData": map[string]any{"gameId": 88, "queue": map[string]any{"id": 450, "gameMode": "ARAM"}, "teamOne": teamOne, "teamTwo": teamTwo}}), nil
 		}
 		if strings.Contains(r.URL.Path, "/summoners/puuid/") {
 			identities.Add(1)
-			return response2351(Summoner{PUUID: ref, GameName: "test", SummonerID: 88}), nil
+			return response2351(Summoner{PUUID: strings.TrimPrefix(r.URL.Path, "/lol-summoner/v2/summoners/puuid/"), GameName: "test", SummonerID: 88}), nil
 		}
 		if strings.Contains(r.URL.Path, "/lol-match-history/") {
 			return response2351(map[string]any{"games": map[string]any{"gameCount": 0, "games": []any{}}}), nil
@@ -65,7 +76,7 @@ func TestR88OrdinaryLiveLoadsCacheAndReuseWithoutExtendingTTL(t *testing.T) {
 	})}}
 	a := &app{liveClientPlayerList: func(context.Context) ([]byte, int, error) { return nil, 0, errors.New("fixture") }}
 	first := a.cachedGameplayLive(context.Background(), c, Summoner{PUUID: "self"}, "InProgress")
-	if !first.Available || len(first.Players) != 1 || a.liveSnapshots.at.IsZero() {
+	if !first.Available || len(first.Players) != 10 || a.liveSnapshots.at.IsZero() {
 		t.Fatalf("ordinary load not cached: %+v", first)
 	}
 	at := a.liveSnapshots.at
@@ -75,7 +86,7 @@ func TestR88OrdinaryLiveLoadsCacheAndReuseWithoutExtendingTTL(t *testing.T) {
 			t.Fatal("hit consumed or extended cache")
 		}
 	}
-	if identities.Load() != 1 {
+	if identities.Load() != 10 {
 		t.Fatal("roster reloaded", identities.Load())
 	}
 	a.liveSnapshots.at = time.Now().Add(-time.Minute)

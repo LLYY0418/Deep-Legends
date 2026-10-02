@@ -1,0 +1,31 @@
+{
+  "version": "0.12.58",
+  "baseline": "2107435d",
+  "node": {
+    "command": "node --test backend/web/*.test.cjs desktop/*.test.cjs",
+    "tests": 1103,
+    "pass": 1102,
+    "skip": 1,
+    "fail": 0,
+    "durationSeconds": 282.2
+  },
+  "go": {
+    "command": "go test ./backend -count=1",
+    "result": "PASS",
+    "durationSeconds": 244.42
+  },
+  "race": {
+    "result": "PASS",
+    "durationSeconds": 12.34
+  },
+  "vet": "PASS",
+  "mutations": "3/3 killed by target assertions via Go overlay",
+  "build": {
+    "mode": "public",
+    "tests": 1690,
+    "result": "PASS",
+    "fingerprint": "5230b7850e83"
+  },
+  "windows": "pending user verification",
+  "fixture": "synthetic LCU/Live Client through production backend"
+}
