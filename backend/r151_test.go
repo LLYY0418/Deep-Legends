@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -102,8 +103,13 @@ func TestR151StructuredArenaUsesYourGGAugmentsAndFallsBackToOPGG(t *testing.T) {
 				{ID: 903, Name: "棱彩测试", Rarity: "kPrismatic"},
 				{ID: 904, Name: "回退测试", Rarity: "kSilver"},
 			}
+			var eventsMu sync.Mutex
 			events := make([]map[string]any, 0)
-			provider.diag = func(event map[string]any) { events = append(events, event) }
+			provider.diag = func(event map[string]any) {
+				eventsMu.Lock()
+				events = append(events, event)
+				eventsMu.Unlock()
+			}
 			provider.static["item/3153.png"] = championAssetDescription{Name: "测试装备"}
 			provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 				key := request.URL.Host + request.URL.Path
@@ -159,8 +165,11 @@ func TestR151StructuredArenaUsesYourGGAugmentsAndFallsBackToOPGG(t *testing.T) {
 					t.Fatalf("OP.GG fallback augment = %+v", rows)
 				}
 			}
+			eventsMu.Lock()
+			eventsSnapshot := append([]map[string]any(nil), events...)
+			eventsMu.Unlock()
 			foundSource := false
-			for _, event := range events {
+			for _, event := range eventsSnapshot {
 				if event["event"] != "arena_augment_source" {
 					continue
 				}
@@ -179,7 +188,7 @@ func TestR151StructuredArenaUsesYourGGAugmentsAndFallsBackToOPGG(t *testing.T) {
 				}
 			}
 			if !foundSource {
-				t.Fatalf("missing arena_augment_source diagnostic: %+v", events)
+				t.Fatalf("missing arena_augment_source diagnostic: %+v", eventsSnapshot)
 			}
 		})
 	}

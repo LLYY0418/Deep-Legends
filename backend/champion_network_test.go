@@ -1204,10 +1204,13 @@ func TestStructuredArenaDetailPreservesAllAugmentRows(t *testing.T) {
 	// A populated static map keeps this regression focused on the structured
 	// detail funnel instead of requiring unrelated Data Dragon catalogs.
 	provider.static["item/3153.png"] = championAssetDescription{Name: "测试装备"}
+	var seenMu sync.Mutex
 	seen := make(map[string]int)
 	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		key := request.URL.Host + request.URL.Path
+		seenMu.Lock()
 		seen[key]++
+		seenMu.Unlock()
 		var body []byte
 		switch {
 		case request.URL.Host == opggChampionHost && request.URL.Path == "/api/global/champions/arena/versions":
@@ -1238,6 +1241,8 @@ func TestStructuredArenaDetailPreservesAllAugmentRows(t *testing.T) {
 	if len(response.ArenaAugments) != 16 {
 		t.Fatalf("structured arena augments were truncated: got %d, want 16", len(response.ArenaAugments))
 	}
+	seenMu.Lock()
+	defer seenMu.Unlock()
 	for _, path := range []string{
 		opggChampionHost + "/api/global/champions/arena/versions",
 		opggChampionHost + "/api/global/champions/arena/67",
