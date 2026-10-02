@@ -35,6 +35,7 @@
 - GitHub `/releases/latest` 与 Release 列表均返回 v0.12.58 / isLatest=true；v0.12.49 和 v0.12.50 仍为原草稿。
 - `refs/tags/v0.12.58` 指向 `33e4e4a882a3bac7fba99b40325a625bda65f13a`，与实际 Windows 构建源码一致。
 - 匿名访问 `https://github.com/LLYY0418/Deep-Legends/releases/latest/download/latest.json` 成功；下载字节与已核验清单完全一致，version=0.12.58、fingerprint=5230b7850e83。正式发布后再次核对三个附件的 digest/size 和发布说明，均保持一致。
+- 发布动作创建标签后，GitHub 自动触发同提交的重复任务。重复草稿构建 [37042140922](https://github.com/LLYY0418/Deep-Legends/actions/runs/37042140922) 已申请取消：该提交的 Windows public 发布构建此前已 success，且已发布版本禁止重建替换。标签另触发 [37042140790](https://github.com/LLYY0418/Deep-Legends/actions/runs/37042140790) CI，保留其自动执行；发布验收采用同一提交已全部通过的 37039185391。
 - 后续只提交发布账本和公共核验元数据，不移动已发布版本标签。
 
 ## 发布说明与验收边界
