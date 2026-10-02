@@ -1,0 +1,22 @@
+[
+  {
+    "name": "missing-as-zero",
+    "test": "TestR191_01RiotSGPPresence",
+    "result": "assertion FAIL (mutant killed)"
+  },
+  {
+    "name": "global-rerender",
+    "test": "R191 09",
+    "result": "assertion FAIL (mutant killed)"
+  },
+  {
+    "name": "directory-direct-error",
+    "test": "TestR191_11DirectoryFallbackHTTP",
+    "result": "assertion FAIL (mutant killed)"
+  },
+  {
+    "name": "sample-unbounded",
+    "test": "TestR191_07SampleCap",
+    "result": "assertion FAIL (mutant killed)"
+  }
+]

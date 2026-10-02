@@ -256,6 +256,8 @@ type app struct {
 	arenaTruth                          arenaTruthState
 	unknownQueueDiagnosticMu            sync.Mutex
 	unknownQueueDiagnosticIDs           map[int64]struct{}
+	perkDiagnosticMu                    sync.Mutex
+	perkDiagnosticCounts                map[string]int
 	diagnosticDedupMu                   sync.Mutex
 	diagnosticDedupCounts               map[string]int
 	rankedWinrateDiagnosticMu           sync.Mutex

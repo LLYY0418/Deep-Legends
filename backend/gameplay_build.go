@@ -14,23 +14,133 @@ import (
 	xhtml "golang.org/x/net/html"
 )
 
-func lcuPerkStats(raw lcuParticipant) []gameplayPerkStat {
-	s := raw.Stats
-	entries := []gameplayPerkStat{
-		{PerkID: s.Perk0, Vars: [3]int64{s.Perk0Var1, s.Perk0Var2, s.Perk0Var3}},
-		{PerkID: s.Perk1, Vars: [3]int64{s.Perk1Var1, s.Perk1Var2, s.Perk1Var3}},
-		{PerkID: s.Perk2, Vars: [3]int64{s.Perk2Var1, s.Perk2Var2, s.Perk2Var3}},
-		{PerkID: s.Perk3, Vars: [3]int64{s.Perk3Var1, s.Perk3Var2, s.Perk3Var3}},
-		{PerkID: s.Perk4, Vars: [3]int64{s.Perk4Var1, s.Perk4Var2, s.Perk4Var3}},
-		{PerkID: s.Perk5, Vars: [3]int64{s.Perk5Var1, s.Perk5Var2, s.Perk5Var3}},
-	}
+// nil preserves absence through the v2 disk cache; explicit zero remains data.
+type rawPerkStat struct {
+	ID   int64
+	Vars [3]*int64
+}
+
+func completePerkStats(entries []rawPerkStat) []gameplayPerkStat {
 	out := make([]gameplayPerkStat, 0, 6)
 	for _, entry := range entries {
-		if entry.PerkID > 0 {
-			out = append(out, entry)
+		if entry.ID <= 0 {
+			continue
 		}
+		if entry.Vars[0] == nil && entry.Vars[1] == nil && entry.Vars[2] == nil {
+			return nil
+		}
+		stat := gameplayPerkStat{PerkID: entry.ID}
+		for i, value := range entry.Vars {
+			if value != nil {
+				stat.Vars[i] = *value
+			}
+		}
+		out = append(out, stat)
 	}
 	return out
+}
+
+func riotRawPerkStats(raw riotParticipant) []rawPerkStat {
+	var entries []rawPerkStat
+	for _, style := range raw.Perks.Styles {
+		for _, selection := range style.Selections {
+			if selection.Perk > 0 && len(entries) < 6 {
+				entries = append(entries, rawPerkStat{selection.Perk, [3]*int64{selection.Var1, selection.Var2, selection.Var3}})
+			}
+		}
+	}
+	return entries
+}
+
+func riotParticipantPerkStats(raw riotParticipant, stale bool) []gameplayPerkStat {
+	if stale {
+		return nil
+	}
+	return completePerkStats(riotRawPerkStats(raw))
+}
+
+func lcuRawPerkStats(raw lcuParticipant) []rawPerkStat {
+	s := raw.Stats
+	return []rawPerkStat{
+		{s.Perk0, [3]*int64{s.Perk0Var1, s.Perk0Var2, s.Perk0Var3}},
+		{s.Perk1, [3]*int64{s.Perk1Var1, s.Perk1Var2, s.Perk1Var3}},
+		{s.Perk2, [3]*int64{s.Perk2Var1, s.Perk2Var2, s.Perk2Var3}},
+		{s.Perk3, [3]*int64{s.Perk3Var1, s.Perk3Var2, s.Perk3Var3}},
+		{s.Perk4, [3]*int64{s.Perk4Var1, s.Perk4Var2, s.Perk4Var3}},
+		{s.Perk5, [3]*int64{s.Perk5Var1, s.Perk5Var2, s.Perk5Var3}},
+	}
+}
+
+func lcuPerkStats(raw lcuParticipant) []gameplayPerkStat {
+	return completePerkStats(lcuRawPerkStats(raw))
+}
+
+// These caps live for the app session, including diagnostic log rotations.
+func (a *app) allowPerkDiagnostic(key string) bool {
+	a.perkDiagnosticMu.Lock()
+	defer a.perkDiagnosticMu.Unlock()
+	if a.perkDiagnosticCounts == nil {
+		a.perkDiagnosticCounts = make(map[string]int)
+	}
+	if a.perkDiagnosticCounts[key] >= 3 {
+		return false
+	}
+	a.perkDiagnosticCounts[key]++
+	return true
+}
+
+func (a *app) recordPerkPresence(source string, participants, withVars int) {
+	if a.allowPerkDiagnostic("presence:" + source) {
+		a.recordDiagnostic(map[string]any{"event": "perk_stats_presence", "source": source, "participants": participants, "with_vars": withVars, "without_vars": participants - withVars})
+	}
+}
+
+func (a *app) recordPerkSamples(source string, entries []rawPerkStat, queueID, duration int64) {
+	for _, entry := range entries {
+		if entry.ID != 8008 && entry.ID != 8304 {
+			continue
+		}
+		if a.allowPerkDiagnostic("sample:" + strconv.FormatInt(entry.ID, 10)) {
+			a.recordDiagnostic(map[string]any{"event": "perk_effect_sample", "perk_id": entry.ID, "vars": entry.Vars, "source": source, "queue_id": queueID, "game_duration": duration})
+		}
+	}
+}
+
+func (a *app) recordRiotPerkDiagnostics(source string, infos []*riotMatchInfo, subjectPUUID string, subjectID int64) {
+	participants, withVars := 0, 0
+	for _, info := range infos {
+		if info == nil {
+			continue
+		}
+		duration := riotMatchDurationSeconds(info)
+		for _, raw := range info.Participants {
+			participants++
+			if len(riotParticipantPerkStats(raw, info.PerkStatsStale)) > 0 {
+				withVars++
+			}
+			if subjectID > 0 && raw.ParticipantID == subjectID || subjectID == 0 && subjectPUUID != "" && raw.PUUID == subjectPUUID {
+				a.recordPerkSamples(source, riotRawPerkStats(raw), info.QueueID, duration)
+			}
+		}
+	}
+	a.recordPerkPresence(source, participants, withVars)
+}
+
+func (a *app) recordLCUPerkDiagnostics(games []lcuGame, subject gameplayReference) {
+	participants, withVars := 0, 0
+	for _, game := range games {
+		match := normalizeGameplayMatch(game, subject, nil, nil)
+		for _, raw := range game.Participants {
+			participants++
+			if len(lcuPerkStats(raw)) > 0 {
+				withVars++
+			}
+			if match.SubjectParticipantID > 0 && raw.ParticipantID == match.SubjectParticipantID {
+				a.recordPerkSamples("lcu", lcuRawPerkStats(raw), game.QueueID, game.GameDuration)
+			}
+		}
+	}
+	a.recordPerkPresence("lcu", participants, withVars)
 }
 
 // CommunityDragon supplies only templates here; names and artwork remain from
@@ -111,6 +221,7 @@ func (a *app) handleGameplayMatch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "对局参与者无效", http.StatusBadRequest)
 		return
 	}
+	a.recordRiotPerkDiagnostics("riot", []*riotMatchInfo{&raw.Info}, "", request.ParticipantID)
 	a.publicizeMatchReferences(&match)
 	a.recordDiagnostic(map[string]any{"event": "perk_stats_refreshed", "game_id": request.GameID})
 	respondJSON(w, match)

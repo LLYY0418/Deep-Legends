@@ -59,8 +59,8 @@ test("R117 confirmed dead classes are absent while dynamic loot-table stays guar
 
 test("R117 CSS budgets do not exceed the audited baseline", () => {
   assert.ok(values("border-radius").size <= 33, "border-radius budget increased");
-  // R190 design adds precisely these three local effect/card paddings.
-  const r190PaddingValues = new Set(["8px 8px 10px", "8px 6px 2px", "10px 12px 10px 10px"]);
+  // R190 local paddings plus R191 shard-chip left padding of 4px.
+  const r190PaddingValues = new Set(["8px 8px 10px", "8px 6px 2px", "10px 12px 10px 10px", "3px 9px 3px 4px"]);
   assert.ok([...values("padding")].filter(value => !r190PaddingValues.has(value)).length <= 205, "padding budget increased beyond R190 design");
   // R138 的图标网格新增独立间距 20px 16px；其余 gap 取值仍受原预算约束。
   assert.ok(values("gap").size <= 55, "gap budget increased");

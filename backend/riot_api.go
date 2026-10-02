@@ -612,10 +612,10 @@ type riotPerkSelections struct {
 	Description string `json:"description"`
 	Style       int64  `json:"style"`
 	Selections  []struct {
-		Perk int64 `json:"perk"`
-		Var1 int64 `json:"var1"`
-		Var2 int64 `json:"var2"`
-		Var3 int64 `json:"var3"`
+		Perk int64  `json:"perk"`
+		Var1 *int64 `json:"var1"`
+		Var2 *int64 `json:"var2"`
+		Var3 *int64 `json:"var3"`
 	} `json:"selections"`
 }
 
@@ -1207,7 +1207,7 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 			name = "隐藏玩家"
 		}
 		perkIDs := make([]int64, 0, 9)
-		perkStats := make([]gameplayPerkStat, 0, 6)
+		perkStats := riotParticipantPerkStats(raw, info.PerkStatsStale)
 		var primaryStyle, subStyle int64
 		for index, style := range raw.Perks.Styles {
 			if index == 0 || strings.EqualFold(style.Description, "primaryStyle") {
@@ -1220,9 +1220,6 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 			for _, selection := range style.Selections {
 				if selection.Perk > 0 {
 					perkIDs = append(perkIDs, selection.Perk)
-					if !info.PerkStatsStale && len(perkStats) < 6 {
-						perkStats = append(perkStats, gameplayPerkStat{PerkID: selection.Perk, Vars: [3]int64{selection.Var1, selection.Var2, selection.Var3}})
-					}
 				}
 			}
 		}
@@ -1607,6 +1604,13 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			matches = append(matches, match)
 		}
 	}
+	perkInfos := make([]*riotMatchInfo, 0, len(details))
+	for _, detail := range details {
+		if detail != nil {
+			perkInfos = append(perkInfos, &detail.Info)
+		}
+	}
+	a.recordRiotPerkDiagnostics("riot", perkInfos, puuid, 0)
 	historyCapability := EndpointCapability{Name: "match-history", Path: "riot: /lol/match/v5/matches/by-puuid", State: capabilityAvailable, Count: len(ids)}
 	if err != nil {
 		historyCapability.State = capabilityUnsupported

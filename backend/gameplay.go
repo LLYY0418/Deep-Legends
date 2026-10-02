@@ -614,67 +614,67 @@ type lcuParticipant struct {
 	Spell2ID      int64 `json:"spell2Id"`
 	TeamID        int64 `json:"teamId"`
 	Stats         struct {
-		Assists                     int   `json:"assists"`
-		ChampLevel                  int   `json:"champLevel"`
-		Deaths                      int   `json:"deaths"`
-		GoldEarned                  int   `json:"goldEarned"`
-		GameEndedInEarlySurrender   bool  `json:"gameEndedInEarlySurrender"`
-		GameEndedInSurrender        bool  `json:"gameEndedInSurrender"`
-		Item0                       int64 `json:"item0"`
-		Item1                       int64 `json:"item1"`
-		Item2                       int64 `json:"item2"`
-		Item3                       int64 `json:"item3"`
-		Item4                       int64 `json:"item4"`
-		Item5                       int64 `json:"item5"`
-		Item6                       int64 `json:"item6"`
-		Kills                       int   `json:"kills"`
-		LargestMultiKill            int   `json:"largestMultiKill"`
-		NeutralMinionsKilled        int   `json:"neutralMinionsKilled"`
-		Perk0                       int64 `json:"perk0"`
-		Perk0Var1                   int64 `json:"perk0Var1"`
-		Perk0Var2                   int64 `json:"perk0Var2"`
-		Perk0Var3                   int64 `json:"perk0Var3"`
-		Perk1                       int64 `json:"perk1"`
-		Perk1Var1                   int64 `json:"perk1Var1"`
-		Perk1Var2                   int64 `json:"perk1Var2"`
-		Perk1Var3                   int64 `json:"perk1Var3"`
-		Perk2                       int64 `json:"perk2"`
-		Perk2Var1                   int64 `json:"perk2Var1"`
-		Perk2Var2                   int64 `json:"perk2Var2"`
-		Perk2Var3                   int64 `json:"perk2Var3"`
-		Perk3                       int64 `json:"perk3"`
-		Perk3Var1                   int64 `json:"perk3Var1"`
-		Perk3Var2                   int64 `json:"perk3Var2"`
-		Perk3Var3                   int64 `json:"perk3Var3"`
-		Perk4                       int64 `json:"perk4"`
-		Perk4Var1                   int64 `json:"perk4Var1"`
-		Perk4Var2                   int64 `json:"perk4Var2"`
-		Perk4Var3                   int64 `json:"perk4Var3"`
-		Perk5                       int64 `json:"perk5"`
-		Perk5Var1                   int64 `json:"perk5Var1"`
-		Perk5Var2                   int64 `json:"perk5Var2"`
-		Perk5Var3                   int64 `json:"perk5Var3"`
-		PerkPrimaryStyle            int64 `json:"perkPrimaryStyle"`
-		PerkSubStyle                int64 `json:"perkSubStyle"`
-		StatPerk0                   int64 `json:"statPerk0"`
-		StatPerk1                   int64 `json:"statPerk1"`
-		StatPerk2                   int64 `json:"statPerk2"`
-		PlayerAugment1              int64 `json:"playerAugment1"`
-		PlayerAugment2              int64 `json:"playerAugment2"`
-		PlayerAugment3              int64 `json:"playerAugment3"`
-		PlayerAugment4              int64 `json:"playerAugment4"`
-		PlayerAugment5              int64 `json:"playerAugment5"`
-		PlayerAugment6              int64 `json:"playerAugment6"`
-		PlayerSubteamID             int64 `json:"playerSubteamId"`
-		SubteamPlacement            int   `json:"subteamPlacement"`
-		TotalDamageDealtToChampions int   `json:"totalDamageDealtToChampions"`
-		TotalDamageTaken            int   `json:"totalDamageTaken"`
-		TotalMinionsKilled          int   `json:"totalMinionsKilled"`
-		VisionScore                 int   `json:"visionScore"`
-		WardsKilled                 int   `json:"wardsKilled"`
-		WardsPlaced                 int   `json:"wardsPlaced"`
-		VisionWardsBoughtInGame     *int  `json:"visionWardsBoughtInGame"`
-		Win                         bool  `json:"win"`
+		Assists                     int    `json:"assists"`
+		ChampLevel                  int    `json:"champLevel"`
+		Deaths                      int    `json:"deaths"`
+		GoldEarned                  int    `json:"goldEarned"`
+		GameEndedInEarlySurrender   bool   `json:"gameEndedInEarlySurrender"`
+		GameEndedInSurrender        bool   `json:"gameEndedInSurrender"`
+		Item0                       int64  `json:"item0"`
+		Item1                       int64  `json:"item1"`
+		Item2                       int64  `json:"item2"`
+		Item3                       int64  `json:"item3"`
+		Item4                       int64  `json:"item4"`
+		Item5                       int64  `json:"item5"`
+		Item6                       int64  `json:"item6"`
+		Kills                       int    `json:"kills"`
+		LargestMultiKill            int    `json:"largestMultiKill"`
+		NeutralMinionsKilled        int    `json:"neutralMinionsKilled"`
+		Perk0                       int64  `json:"perk0"`
+		Perk0Var1                   *int64 `json:"perk0Var1"`
+		Perk0Var2                   *int64 `json:"perk0Var2"`
+		Perk0Var3                   *int64 `json:"perk0Var3"`
+		Perk1                       int64  `json:"perk1"`
+		Perk1Var1                   *int64 `json:"perk1Var1"`
+		Perk1Var2                   *int64 `json:"perk1Var2"`
+		Perk1Var3                   *int64 `json:"perk1Var3"`
+		Perk2                       int64  `json:"perk2"`
+		Perk2Var1                   *int64 `json:"perk2Var1"`
+		Perk2Var2                   *int64 `json:"perk2Var2"`
+		Perk2Var3                   *int64 `json:"perk2Var3"`
+		Perk3                       int64  `json:"perk3"`
+		Perk3Var1                   *int64 `json:"perk3Var1"`
+		Perk3Var2                   *int64 `json:"perk3Var2"`
+		Perk3Var3                   *int64 `json:"perk3Var3"`
+		Perk4                       int64  `json:"perk4"`
+		Perk4Var1                   *int64 `json:"perk4Var1"`
+		Perk4Var2                   *int64 `json:"perk4Var2"`
+		Perk4Var3                   *int64 `json:"perk4Var3"`
+		Perk5                       int64  `json:"perk5"`
+		Perk5Var1                   *int64 `json:"perk5Var1"`
+		Perk5Var2                   *int64 `json:"perk5Var2"`
+		Perk5Var3                   *int64 `json:"perk5Var3"`
+		PerkPrimaryStyle            int64  `json:"perkPrimaryStyle"`
+		PerkSubStyle                int64  `json:"perkSubStyle"`
+		StatPerk0                   int64  `json:"statPerk0"`
+		StatPerk1                   int64  `json:"statPerk1"`
+		StatPerk2                   int64  `json:"statPerk2"`
+		PlayerAugment1              int64  `json:"playerAugment1"`
+		PlayerAugment2              int64  `json:"playerAugment2"`
+		PlayerAugment3              int64  `json:"playerAugment3"`
+		PlayerAugment4              int64  `json:"playerAugment4"`
+		PlayerAugment5              int64  `json:"playerAugment5"`
+		PlayerAugment6              int64  `json:"playerAugment6"`
+		PlayerSubteamID             int64  `json:"playerSubteamId"`
+		SubteamPlacement            int    `json:"subteamPlacement"`
+		TotalDamageDealtToChampions int    `json:"totalDamageDealtToChampions"`
+		TotalDamageTaken            int    `json:"totalDamageTaken"`
+		TotalMinionsKilled          int    `json:"totalMinionsKilled"`
+		VisionScore                 int    `json:"visionScore"`
+		WardsKilled                 int    `json:"wardsKilled"`
+		WardsPlaced                 int    `json:"wardsPlaced"`
+		VisionWardsBoughtInGame     *int   `json:"visionWardsBoughtInGame"`
+		Win                         bool   `json:"win"`
 	} `json:"stats"`
 	Timeline struct {
 		Lane string `json:"lane"`
@@ -1529,6 +1529,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 				windowDiagnostic["reason"] = safeDiagnosticReason(windowPartial)
 			}
 			a.recordDiagnostic(windowDiagnostic)
+			a.recordRiotPerkDiagnostics("sgp", infos, playerRef, 0)
 			if len(infos) > len(matches) {
 				windowMatches = make([]gameplayMatch, 0, len(infos))
 				for _, info := range infos {
@@ -1722,6 +1723,7 @@ func (a *app) loadRecentRankedSampleQueue(ctx context.Context, client *LCUClient
 			result = append(result, match)
 		}
 	}
+	a.recordRiotPerkDiagnostics("sgp", infos, playerRef, 0)
 	a.cacheRecentRankedSample(cacheKey, recentRankedSampleCacheEntry{at: time.Now(), matches: append([]gameplayMatch(nil), result...)})
 	a.recordDiagnostic(map[string]any{"event": "recent_ranked_sample_resolved", "source": "sgp-tag", "queue_id": queueID, "filter": filter, "tag": "q_" + strconv.FormatInt(queueID, 10), "matches": len(result)})
 	return result
@@ -2342,6 +2344,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 					matches = append(matches, match)
 				}
 			}
+			a.recordRiotPerkDiagnostics("sgp", infos, playerRef, 0)
 			detailState := capabilityAvailable
 			detailText := "通过官方 SGP 网关读取完整对局数据"
 			if participantSummary.Incomplete > 0 {
@@ -2466,6 +2469,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 			matches = append(matches, match)
 		}
 	}
+	a.recordLCUPerkDiagnostics(rawGames, reference)
 	filterSummary := summarizeLCUGameplayFilters(rawGames)
 	if lcuAttempt.Outcome == dataSourceSuccess {
 		a.recordDiagnostic(map[string]any{

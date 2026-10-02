@@ -1,0 +1,18 @@
+{
+  "version": "0.12.55",
+  "worklistChecks": 17,
+  "worklistChecksPassed": 17,
+  "mutantsKilled": 4,
+  "goFullTests": 1686,
+  "goFullPassed": true,
+  "backendVetPassed": true,
+  "installerTestsAndVetPassed": true,
+  "nodeFullTests": 1129,
+  "nodePassed": 1126,
+  "nodeFailed": 0,
+  "nodePlatformSkipped": 3,
+  "chromiumRankedScenes": ["wide", "narrow"],
+  "keyMode": "public",
+  "fingerprint": "e664dffd29b6",
+  "windowsRealClientVerified": false
+}

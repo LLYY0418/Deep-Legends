@@ -3438,21 +3438,27 @@ func (p *championProvider) loadHexdataAugmentDetail(ctx context.Context, id int,
 	slug = sanitizeAugmentSlug(slug)
 	if slug == "" && id >= 1000 && p.hexdata != nil {
 		page, err := p.hexdata.load(ctx, "augments", "all", "/augments", "text/html,application/xhtml+xml", false)
-		if err != nil {
-			return championAugmentDetailResponse{}, err
-		}
-		rows, citation, err := parseHexdataAugments(page.Data)
-		if err != nil || !hexdataCitationComplete(citation) || page.Cache != championCacheStateStale && !p.hexdata.adoptCitation(citation) {
-			return championAugmentDetailResponse{}, errors.New("hexdata augment directory changed")
-		}
-		for _, row := range rows {
-			if row.ID == id {
-				slug = sanitizeAugmentSlug(row.Key)
-				break
+		if err == nil {
+			var rows []championAugment
+			var citation championSourceCitation
+			rows, citation, err = parseHexdataAugments(page.Data)
+			if err == nil && (!hexdataCitationComplete(citation) || page.Cache != championCacheStateStale && !p.hexdata.adoptCitation(citation)) {
+				err = errors.New("hexdata augment directory changed")
+			}
+			if err == nil {
+				for _, row := range rows {
+					if row.ID == id {
+						slug = sanitizeAugmentSlug(row.Key)
+						break
+					}
+				}
+				if slug == "" {
+					err = errors.New("hexdata augment not found")
+				}
 			}
 		}
-		if slug == "" {
-			return championAugmentDetailResponse{}, errors.New("hexdata augment not found")
+		if err != nil {
+			p.reportHexdataFallback("augment-directory", err)
 		}
 	}
 	if slug == "" {

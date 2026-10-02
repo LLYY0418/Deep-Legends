@@ -15,7 +15,7 @@ import (
 
 func TestR190LCUAndRiotPerkStats(t *testing.T) {
 	var game lcuGame
-	err := json.Unmarshal([]byte(`{"gameId":190,"participants":[{"participantId":4,"stats":{"perk0":8005,"perk1":9111,"perk1Var1":804,"perk1Var2":300,"perk2":9103,"perk3":8017,"perk4":8321,"perk5":8347,"statPerk0":5005}}]}`), &game)
+	err := json.Unmarshal([]byte(`{"gameId":190,"participants":[{"participantId":4,"stats":{"perk0":8005,"perk0Var1":0,"perk0Var2":0,"perk0Var3":0,"perk1":9111,"perk1Var1":804,"perk1Var2":300,"perk2":9103,"perk2Var1":0,"perk2Var2":0,"perk2Var3":0,"perk3":8017,"perk3Var1":0,"perk3Var2":0,"perk3Var3":0,"perk4":8321,"perk4Var1":0,"perk4Var2":0,"perk4Var3":0,"perk5":8347,"perk5Var1":0,"perk5Var2":0,"perk5Var3":0,"statPerk0":5005}}]}`), &game)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func TestR190LCUAndRiotPerkStats(t *testing.T) {
 		t.Fatalf("LCU stats=%#v", lcu.Participants[0].PerkStats)
 	}
 	var raw riotMatch
-	err = json.Unmarshal([]byte(`{"metadata":{"matchId":"KR_190"},"info":{"gameId":190,"participants":[{"participantId":4,"perks":{"styles":[{"style":8000,"selections":[{"perk":8005},{"perk":9111,"var1":804,"var2":300,"var3":0},{"perk":9103},{"perk":8017}]},{"style":8300,"selections":[{"perk":8321},{"perk":8347}]}],"statPerks":{"offense":5005}}}]}}`), &raw)
+	err = json.Unmarshal([]byte(`{"metadata":{"matchId":"KR_190"},"info":{"gameId":190,"participants":[{"participantId":4,"perks":{"styles":[{"style":8000,"selections":[{"perk":8005,"var1":0,"var2":0,"var3":0},{"perk":9111,"var1":804,"var2":300,"var3":0},{"perk":9103,"var1":0,"var2":0,"var3":0},{"perk":8017,"var1":0,"var2":0,"var3":0}]},{"style":8300,"selections":[{"perk":8321,"var1":0,"var2":0,"var3":0},{"perk":8347,"var1":0,"var2":0,"var3":0}]}],"statPerks":{"offense":5005}}}]}}`), &raw)
 	if err != nil {
 		t.Fatal(err)
 	}

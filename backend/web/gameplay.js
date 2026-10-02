@@ -3960,7 +3960,13 @@
       return `${divider}<div class="eff${row.keystone ? " is-keystone" : ""}" data-perk-id="${Number(row.perk.id)}" tabindex="0">${perkIconFigure(row.perk.id, "rune", false)}<div class="name"><strong>${escapeHTML(row.perk.name)}${row.keystone ? '<span class="kchip">基石</span>' : ""}</strong>${subtitle ? `<small>${escapeHTML(subtitle)}</small>` : ""}</div>${stats ? `<div class="stats">${stats}</div>` : ""}</div>`;
     }).join("");
     const ids = (subject.statModIds || subject.stat_mod_ids || (subject.perkIds?.length >= 9 ? subject.perkIds.slice(-3) : [])).map(Number);
-    const shards = ids.map(id => runeShardDescription(id)).filter(Boolean).map(description => `<span class="shard-chip">${escapeHTML(description)}</span>`).join("");
+    const shards = ids.map(id => {
+      const description = runeShardDescription(id);
+      if (!description) return "";
+      const path = dataDragonRuneShardPath(id);
+      const icon = path ? remoteStaticIcon("ddragon", path, description, "rune", false) : pendingCatalogIcon(description, "rune");
+      return `<span class="shard-chip">${icon}<span>${escapeHTML(description)}</span></span>`;
+    }).join("");
     return `<div class="rune-effects" aria-label="符文效果">${content}${shards ? `<div class="shards-line"><small>属性碎片</small>${shards}</div>` : ""}</div>`;
   }
 
@@ -4007,7 +4013,23 @@
     } catch {
       for (const id of missing) state.augmentDescriptions.set(id, { status: "unavailable" });
     }
-    rerenderCatalogViews();
+    rerenderAugmentDescriptionViews(missing);
+  }
+
+  function rerenderAugmentDescriptionViews(ids) {
+    const changed = new Set(ids.map(Number));
+    const tabs = new Set([...(state.tabs || []), ...(state.overlay || [])]);
+    for (const [container, view] of externalMatchViews) {
+      if (container.isConnected) tabs.add(view.tab);
+    }
+    for (const tab of tabs) {
+      for (const match of tab.data?.matches || []) {
+        const id = String(match.gameId);
+        if (!tab.openMatches?.has(id) || tab.matchDetailTabs?.get(id) !== "build") continue;
+        const subject = matchSubject(match, tab.data?.player?.playerRef);
+        if (matchAugmentIDs(subject, 6).some(id => changed.has(Number(id)))) rerenderMatch(tab, id);
+      }
+    }
   }
 
   async function ensureBuildData(match, tab) {
@@ -4386,16 +4408,20 @@
   function rerenderMatch(tab, id) {
     if (state.destroyed) return;
     if (typeof tab?.externalRender === "function") return tab.externalRender(id);
-    if (tab.overlay && state.overlay[state.overlay.length - 1] !== tab) return;
+    const workspace = tab.overlay ? nodes.playerOverlayContent : overviewWorkspace(tabGroup(tab)).content;
     const container = overviewContainer(tab);
-    const entry = [...(container?.querySelectorAll(".match-entry") || [])].find(item => item.dataset.matchId === id);
-    if (entry) replaceMatchEntry(entry, tab, () => rerenderTab(tab));
+    // Inactive views retain their DOM in a fragment. Update that same detail so
+    // switching back does not restore a loading skeleton or rebuild the list.
+    const cached = workspace?._overviewViews?.get(tab)?.content;
+    const scope = tab.overlay && state.overlay[state.overlay.length - 1] !== tab ? cached : container || cached;
+    const entry = [...(scope?.querySelectorAll(".match-entry") || [])].find(item => item.dataset.matchId === String(id));
+    if (entry) replaceMatchEntry(entry, tab, () => rerenderTab(tab), scope === cached);
   }
 
-  function replaceMatchEntry(entry, tab, rerender) {
+  function replaceMatchEntry(entry, tab, rerender, retained = false) {
     const id = String(entry?.dataset.matchId || "");
     const match = (tab.data?.matches || []).find((item) => String(item.gameId) === id);
-    if (!match || !entry.isConnected) {
+    if (!match || !entry.isConnected && !retained) {
       rerender();
       return;
     }
@@ -7672,11 +7698,8 @@
           const match = matches.find((item) => String(item.gameId) === id);
           const entry = [...container.querySelectorAll(".match-entry")].find((item) => item.querySelector("[data-toggle-match]")?.dataset.toggleMatch === id);
           if (!match || !entry) return;
-          const template = document.createElement("template");
-          template.innerHTML = renderMatch(match, playerRef, tab).trim();
-          scope = template.content.firstElementChild;
-          if (!scope) return;
-          entry.replaceWith(scope);
+          replaceMatchEntry(entry, tab, () => {});
+          return;
         } else container.innerHTML = matches.map((match) => renderMatch(match, playerRef, tab)).join("");
 		for (const button of scope.querySelectorAll("[data-toggle-match]:not(:disabled), [data-retry-match-detail]")) button.addEventListener("click", () => view.toggleMatch(button.dataset.toggleMatch || button.dataset.retryMatchDetail));
         bindMatchDetailControls(scope, tab);

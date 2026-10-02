@@ -1727,7 +1727,7 @@ test("R86 ADD-1 failed timelines wait for explicit retry and keep unrelated card
 test("R86 ADD-1 late timeline cannot reveal a filtered-out card", async () => {
   async function check(mutate = false) {
     const { window: w } = bootDemoApp({ matchCount: 200, gameplaySourceTransform: source => mutate
-      ? source.replace("function replaceMatchEntry(entry, tab, rerender) {", "function replaceMatchEntry(entry, tab, rerender) { entry.hidden = false;") : source });
+      ? source.replace("function replaceMatchEntry(entry, tab, rerender, retained = false) {", "function replaceMatchEntry(entry, tab, rerender, retained = false) { entry.hidden = false;") : source });
     try {
       await settled();
       const d = w.document, list = d.querySelector(".match-list");
@@ -1859,9 +1859,11 @@ test("R86 external match expansion preserves unrelated cards", async () => {
     const host=w.document.createElement('div');w.document.body.append(host);
     w.deepLegendsMatchCards.mount(host,{matches:data.matches,playerRef:data.player.playerRef});
     const before=[...host.querySelectorAll('.match-entry')];assert.ok(before.length>1);
+    const summary=before[0].querySelector('.match-summary');
     before[0].querySelector('[data-toggle-match]').click();
     const after=[...host.querySelectorAll('.match-entry')];
-    assert.notEqual(after[0],before[0]);assert.equal(after[1],before[1]);
+    assert.equal(after[0],before[0]);assert.equal(after[0].querySelector('.match-summary'),summary);
+    assert.ok(after[0].querySelector('.match-detail'));assert.equal(after[1],before[1]);
   }finally{w.dispatchEvent(new w.CustomEvent('deep-legends:dispose'));w.close()}
  }
  await check();await assert.rejects(check(true),{name:"AssertionError"});
