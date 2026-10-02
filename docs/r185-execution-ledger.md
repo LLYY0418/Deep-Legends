@@ -31,7 +31,11 @@
 - scripts 发布/构建工具回归 39 项：37 通过、2 项平台跳过、0 失败（11.565 秒）。
 - 完整 `DEEP_LEGENDS_KEY_MODE=public ./build-desktop.sh` 通过：1645 个 Go 测试五分片、主模块与 installer 的 vet/test、Windows 后端交叉构建、NSIS 与安装器 shell、包内 runtime（包含 process-metrics）、源码/包内指纹、public 模式收据及 SHA-256。没有嵌入 Riot Key，最终只保留 `-public` 安装包。日志 /private/tmp/release-0.12.50-build.log。
 - `node scripts/make-release.cjs` 经 public 收据生成发布三件套。指纹 **ea5645b17558**；安装包 110935552 字节；SHA-256 `d24ab6470bb2cba9fa477e2a28291276a36df8c9ea2d0c66aa9d2fccc515ce8e`。latest.json 的名称、URL、大小、SHA-256 与包一致，SHA256SUMS-public.txt 校验两文件。
-- GitHub 上传、正式发布与匿名更新入口结果将在完成后补入本节。
+- 更新清单/收据专项 4/4 通过（71.648 毫秒）。
+- 源码提交 `035cb995845483cea924b8fba3fb417673c89bf4` 推送至 `codex/release-0.12.50`；独立 git archive 指纹 ea5645b17558，与 public 包一致。只提交实现、测试和文档，未提交 docs 下四组本机原始验证日志/截图。
+- 草稿三附件 GitHub digest、size、uploaded 状态均与本地一致；下载 latest.json 与 SHA256SUMS-public.txt 逐字节一致。
+- 已正式发布并设为 Latest：<https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.50>；release id=401671502，published_at=2026-10-02T09:06:09Z，draft=false、prerelease=false；targetCommitish 与上述源码一致。
+- 发布后 `/releases/latest` API 确认 v0.12.50；匿名 `/releases/latest/download/latest.json` 与本地逐字节一致；匿名安装包下载 HEAD 最终 HTTP 200。Windows 检查、下载、重启安装尚未真机验收。
 
 ## 发布与真机验收
 
