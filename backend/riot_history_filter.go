@@ -67,6 +67,8 @@ func (p *riotProvider) matchIDsForOverview(ctx context.Context, puuid string, st
 		queue := queue
 		workers.Add(1)
 		go func() {
+			defer recoverPanic("riot_history_filter.matchIDsForOverview.1")
+
 			defer workers.Done()
 			for offset := 0; offset < start+count; offset += 100 {
 				if workerCtx.Err() != nil {

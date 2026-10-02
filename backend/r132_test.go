@@ -33,8 +33,8 @@ func TestR132CurrentGamePlayersOrderedTopToSupport(t *testing.T) {
 // R132 P2：DPM 767 对 988（比值 0.78，C+）在雷达图上必须看得出差距，
 // 提示框只保留指标本身的解释，不再附带图形值公式。
 func TestR132AbilityRadarShowsRealGapWithoutFormulaText(t *testing.T) {
-	if score := abilityRadarScore(767, 988); score > 40 || score < 35 {
-		t.Fatalf("767 vs 988 radar score = %.1f, want a visible gap below 40", score)
+	if score := abilityRadarScore(767, 988); score > 27 || score < 26 {
+		t.Fatalf("767 vs 988 radar score = %.1f, want a visible gap around 26.6", score)
 	}
 	if abilityRadarScore(5, 5) != 50 || abilityRadarScore(0, 5) != 0 {
 		t.Fatal("baseline must stay 50 and a real zero must stay 0")

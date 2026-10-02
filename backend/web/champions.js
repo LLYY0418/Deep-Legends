@@ -2,6 +2,9 @@
   "use strict";
 
   const escapeHTML = window.deepLegendsRuntime.escapeHTML;
+  const gradeBadge = window.deepLegendsRuntime.gradeBadge;
+  const gradeRank = window.deepLegendsRuntime.gradeRank;
+  let lastArenaHeaderSource = "";
 
   // Shoes are rendered separately and do not count toward these route limits.
   const ADC_ITEM_ROUTE_LIMIT = 7;
@@ -102,6 +105,20 @@
   };
 
   let searchComposing = false;
+  let mayhemHoverTimer = 0;
+  let mayhemHoverRow = null;
+  const mayhemRSCPrefetched = new Set();
+
+  function prefetchMayhemRSC(rowElement) {
+    if (state.mode !== "aram-mayhem" || state.mayhemView !== "champions") return;
+    const row = rankingRows().find((item) => Number(item.championId) === Number(rowElement?.dataset.championRow));
+    const slug = String(row?.key || championMeta(row?.championId)?.slug || row?.champion || row?.championId || "").toLowerCase();
+    if (!/^[a-z0-9-]+$/.test(slug) || mayhemRSCPrefetched.has(slug)) return;
+    mayhemRSCPrefetched.add(slug);
+    void fetch(`/api/champions/mayhem-rsc-prefetch?champion=${encodeURIComponent(slug)}`, { headers: { Accept: "application/json" } })
+      .then((response) => { if (!response.ok) mayhemRSCPrefetched.delete(slug); })
+      .catch(() => mayhemRSCPrefetched.delete(slug));
+  }
 
   function readSetting(key, fallback) { try { return localStorage.getItem(`lol-loot-${key}`) ?? fallback; } catch (_) { return fallback; } }
   function writeSetting(key, value) { try { localStorage.setItem(`lol-loot-${key}`, String(value)); } catch (_) {} }
@@ -170,33 +187,11 @@
     const name = ({ all: "all", top: "top", jungle: "jungle", mid: "middle", adc: "bottom", support: "utility" })[value] || "all";
     return `<span class="position-icon" aria-hidden="true"><img src="/position-icons/${name}.svg" alt="" decoding="async"></span>`;
   }
-  function tierDisplay(value) {
-    if (value === null || value === undefined || String(value).trim() === "") return "—";
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed >= 0 ? (parsed === 0 ? "OP" : String(parsed)) : "—";
-  }
-  function tierBadge(value, extra = "", sourceGrade = "") {
-    const grade = String(sourceGrade).trim().toUpperCase();
-    if (["S", "A", "B", "C", "D", "F"].includes(grade)) return `<img class="tier-badge${extra ? ` ${extra}` : ""}" src="/tier-icons/yourgg-${grade.toLowerCase()}.svg" alt="梯度 ${grade}" decoding="async">`;
-    const present = value !== null && value !== undefined && String(value).trim() !== "";
-    const parsed = Number(value);
-    const key = present && Number.isFinite(parsed) && parsed >= 0 && parsed <= 5 ? (parsed === 0 ? "op" : String(parsed)) : "";
-    const label = tierDisplay(value);
-    return key
-      ? `<img class="tier-badge${extra ? ` ${extra}` : ""}" src="/tier-icons/${key}.svg" alt="梯度 ${label}" decoding="async">`
-      : `<span class="tier-badge-fallback${extra ? ` ${extra}` : ""}">${label}</span>`;
-  }
   function objectRows(value) { return Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : []; }
   function currentModePatch() { return state.rankings?.patch || state.detail?.citation?.patch || "当前版本"; }
-  function augmentGrade(value, score = 0, scores = []) {
+  function augmentGrade(value) {
     const grade = String(value || "").trim().toUpperCase();
-    if (["OP", "S", "A", "B", "C", "D", "F"].includes(grade)) return grade;
-    const numericScore = Number(score);
-    const numericScores = scores.map(Number).filter((item) => Number.isFinite(item) && item > 0);
-    const percentile = Number.isFinite(numericScore) && numericScore > 0 && numericScores.length
-      ? numericScores.filter((item) => item <= numericScore).length / numericScores.length
-      : 0;
-    return percentile >= 0.9 ? "S" : percentile >= 0.7 ? "A" : "B";
+    return ["OP", "S", "A", "B", "C", "D", "F"].includes(grade) ? grade : "";
   }
   function catalogTiers() { return objectRows(state.catalog?.tiers); }
   function championIndex() {
@@ -292,7 +287,7 @@
       position,
       catalog: remember("catalog", api("/api/champions/catalog", "preload-catalog")),
       ranked: remember("ranked", api(`/api/champions/rankings?mode=ranked&tier=${encodeURIComponent(tier)}&position=${encodeURIComponent(position)}`, "preload-ranked")),
-	  arena: remember("arena", api("/api/champions/rankings?mode=arena", "preload-arena")),
+	  arena: remember("arena", api("/api/champions/rankings?mode=arena&preload=1", "preload-arena")),
     };
   }
 
@@ -570,7 +565,8 @@
 
   function primeMayhemDetail(selected) {
     if (!selected) return null;
-    const preserveDetail = Number(state.selected?.championId) === Number(selected.championId) && state.detail;
+    const sameChampion = Number(state.selected?.championId) === Number(selected.championId);
+    const preserveDetail = sameChampion && state.detail;
     state.selected = selected;
     if (!preserveDetail) state.detail = null;
     state.mayhemDetailLoading = true;
@@ -583,6 +579,12 @@
     // 都没有（hero-json 熔断走 OP.GG RSC 兜底时必然如此）。renderRecommendedAugments
     // 里另有一道兜底钳制，这里是第一道：从源头上不让阶段号跨英雄存活。
     state.mayhemStage = 0;
+    // tab 与阶段筛选同属英雄内视图状态，换英雄时回到概览并同步持久化；
+    // 同一英雄的重复点击或详情刷新继续保留当前 tab。
+    if (!sameChampion) {
+      state.mayhemDetailTab = "overview";
+      writeSetting("champion-mayhem-detail-tab", "overview");
+    }
     return selected;
   }
 
@@ -620,18 +622,28 @@
     loadMayhemDetail(selected);
   }
 
+  function championDetailErrorMessage(error) {
+    const message = String(error?.message || "英雄详情读取失败");
+    if (message.includes("hexdata circuit is open") || message.includes("上游暂时不可用")) return "上游暂时不可用，请稍后再试";
+    if (error?.name === "TimeoutError" || message.includes("本地请求超时")) return "网络超时，请重试";
+    return message;
+  }
+
   function loadMayhemDetail(selected) {
     const token = state.mayhemRequestToken + 1;
     state.mayhemRequestToken = token;
     const championID = Number(selected.championId);
     const current = () => token === state.mayhemRequestToken && state.mode === "aram-mayhem" && state.mayhemView === "champions" && Number(state.selected?.championId) === championID;
     void api(`/api/champions/detail?mode=aram-mayhem&champion=${encodeURIComponent(selected.champion)}`, "mayhem-detail").then((detail) => {
+      if (detail?.recommendedAugments?.some((row) => row.assets?.some((asset) => asset.source === "hexdata" && asset.path))) {
+        window.dispatchEvent(new Event("deep-legends:augment-index-updated"));
+      }
       if (!current()) return;
       state.detail = detail;
       state.mayhemDetailError = "";
     }).catch((error) => {
       if (!current()) return;
-      state.mayhemDetailError = error?.message || "英雄详情读取失败";
+      state.mayhemDetailError = championDetailErrorMessage(error);
     }).finally(() => {
       if (!current()) return;
       state.mayhemDetailLoading = false;
@@ -840,14 +852,20 @@
     }).catch((error) => {
       if (!current()) return;
       state.detail = null;
-      state.arenaDetailError = error?.message || "英雄详情读取失败";
+      state.arenaDetailError = championDetailErrorMessage(error);
     }).finally(() => {
       if (!current()) return;
       state.arenaDetailLoading = false;
       render();
     });
 
-    void api(`/api/champions/arena-first-places?championId=${championID}&limit=10`, "arena-first-places").then((result) => {
+    // Let the detail aggregate acquire YOUR.GG's shared request slot first.
+    // This lower section already has its own loading state.
+    void new Promise((resolve) => setTimeout(resolve, 200)).then(() => {
+      if (!current()) return null;
+      return api(`/api/champions/arena-first-places?championId=${championID}&limit=10`, "arena-first-places");
+    }).then((result) => {
+      if (!result || !current()) return;
       if (!current()) return;
       state.arenaFirstPlaces = result;
       state.arenaFirstError = "";
@@ -1071,7 +1089,7 @@
       return `<article class="champion-topcard${index === 0 ? " is-first" : ""}" role="button" tabindex="0" data-champion-row="${Number(row.championId)}" aria-label="查看${escapeHTML(name)}详情">
         <img class="topcard-art" data-queued-src="${heroArtworkURL(meta, source, path)}" alt="" loading="lazy" decoding="async" data-champion-image>
         <div class="topcard-shade" aria-hidden="true"></div>
-        ${tierBadge(row.tier, "topcard-tier")}
+        ${gradeBadge(row.grade, "topcard-tier")}
         <div class="topcard-copy">
           <h3>${escapeHTML(name)}</h3>
           <p>${escapeHTML(subname)}${position}</p>
@@ -1127,8 +1145,8 @@
     const overview = `<section class="mayhem-overview-strip">
       <img class="mayhem-overview-art" data-queued-src="${heroArtworkURL(meta, source, path)}" data-artwork-fallback="${escapeHTML(heroArtworkFallbackURL(meta))}" alt="" aria-hidden="true" decoding="async" data-champion-image>
       <span class="mayhem-overview-shade" aria-hidden="true"></span>
-      <div class="mayhem-overview-identity"><span class="champion-detail-portrait"><img data-queued-src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span><div><h2>${escapeHTML(title)} ${heroTier ? tierBadge(heroTier.tier, "arena-title-tier") : ""}</h2><small>${escapeHTML(subtitle)} · 总榜第 ${Number(row.rank) || "—"} 位${localNote}</small></div></div>
-      <div class="mayhem-overview-metrics">${metric("胜率", percent(detail?.stats?.winRate ?? row.winRate))}${metric("样本", compactNumber(row.play))}${heroTier ? metric("梯度", `T${heroTier.tier}`) : ""}</div>
+      <div class="mayhem-overview-identity"><span class="champion-detail-portrait"><img data-queued-src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span><div><h2>${escapeHTML(title)} ${heroTier ? gradeBadge(heroTier.grade, "arena-title-tier") : ""}</h2><small>${escapeHTML(subtitle)} · 总榜第 ${Number(row.rank) || "—"} 位${localNote}</small></div></div>
+      <div class="mayhem-overview-metrics">${metric("胜率", percent(detail?.stats?.winRate ?? row.winRate))}${metric("样本", compactNumber(row.play))}${heroTier ? metric("梯度", gradeBadge(heroTier.grade, "is-metric")) : ""}</div>
     </section>`;
     if (state.mayhemDetailLoading && !detail) return overview + renderDetailSkeleton();
     if (state.mayhemDetailError && !detail) return overview + renderError(state.mayhemDetailError, true);
@@ -1140,17 +1158,17 @@
   }
 
   // R116-B P0-5-2：详情页梯度徽章的取值来源。
-  // - 详情已到：只认 response.stats.tier（官方 hextech-insights 档位）；为 nil
+  // - 详情已到：只认 response.stats.grade（后端依据官方 hextech-insights 档位映射）；为空
   //   就返回 null → 徽章与「梯度」指标整块隐藏，绝不显示一个编出来的档位。
   // - 详情还在路上：先用榜单行的档位顶上，并按 tierLocallyCalculated 标注
   //   「本地估算」，避免加载期间徽章闪一下再消失。
   function mayhemHeroTier(row, detail) {
     if (detail) {
-      const official = Number(detail?.stats?.tier);
-      return Number.isFinite(official) && official > 0 ? { tier: official, locallyCalculated: false } : null;
+      const grade = String(detail?.stats?.grade || "").trim().toUpperCase();
+      return grade ? { grade, locallyCalculated: false } : null;
     }
-    const fallback = Number(row?.tier);
-    return Number.isFinite(fallback) && fallback > 0 ? { tier: fallback, locallyCalculated: row?.tierLocallyCalculated === true } : null;
+    const grade = String(row?.grade || "").trim().toUpperCase();
+    return grade ? { grade, locallyCalculated: row?.tierLocallyCalculated === true } : null;
   }
 
   // 英雄详情使用「概览/构筑/表现」三页局部切换，只渲染当前页内容。
@@ -1392,8 +1410,8 @@
     const active = Number(item.id) === Number(selected?.id);
     return `<button type="button" class="mayhem-atlas-row is-${escapeHTML(item.rarity || "unknown")}${active ? " is-active" : ""}" role="option" aria-selected="${active}" data-mayhem-augment="${Number(item.id)}">
       ${assetImage({ source: item.imageSource, path: item.imagePath, fallbackPath: item.imageFallbackPath, name: item.name, description: item.tooltip || item.description }, "augment-icon")}
-      <span><strong>${escapeHTML(item.name)}</strong><small>${rarityLabel(item.rarity)} · ${augmentTierLabel(item.tier)} 级</small></span>
-      <b class="augment-grade is-${augmentGrade(augmentTierLabel(item.tier))}">${augmentGrade(augmentTierLabel(item.tier))}</b>
+      <span><strong>${escapeHTML(item.name)}</strong><small>${rarityLabel(item.rarity)}</small></span>
+      ${gradeBadge(item.grade, "atlas-augment-grade")}
     </button>`;
   }
 
@@ -1420,7 +1438,7 @@
           }).join("") : '<p class="mayhem-inline-empty">当前没有可展示的适配英雄样本。</p>'}</div>`;
     return `<header class="mayhem-atlas-detail-head is-${escapeHTML(item.rarity || "unknown")}">
         ${assetImage({ source: item.imageSource, path: item.imagePath, fallbackPath: item.imageFallbackPath, name: item.name, description: item.tooltip || item.description }, "augment-icon")}
-        <div><span class="rarity-label is-${escapeHTML(item.rarity || "unknown")}">${rarityLabel(item.rarity)}</span><h3>${escapeHTML(item.name)}</h3><p>${augmentTierLabel(item.tier)} 级海克斯${metrics ? ` · ${metrics}` : ""}</p></div>
+        <div><span class="rarity-label is-${escapeHTML(item.rarity || "unknown")}">${rarityLabel(item.rarity)}</span><h3>${gradeBadge(item.grade, "atlas-detail-grade")}${escapeHTML(item.name)}</h3><p>海克斯${metrics ? ` · ${metrics}` : ""}</p></div>
       </header>
       <div class="mayhem-atlas-description">${escapeHTML(mayhemAtlasDescription(item))}</div>
       <div class="mayhem-atlas-detail-body">${body}</div>`;
@@ -1491,7 +1509,8 @@
 
   function renderArena() {
     const rows = filteredChampionRows();
-    const selectedRow = rows.find((row) => Number(row.championId) === Number(state.selected?.championId)) || null;
+    const selectedRow = rows.find((row) => Number(row.championId) === Number(state.selected?.championId)) || rankingRows().find((row) => Number(row.championId) === Number(state.selected?.championId)) || null;
+    if (Number(state.selected?.championId) > 0) reportArenaHeaderSource(selectedRow, Number(state.selected.championId));
     const selected = selectedRow && state.selected ? arenaSelectedRow({ ...state.selected, ...selectedRow }) : null;
     const list = `<section class="champion-list-card aram-champions arena-champions">
       <div class="aram-champion-head"><div><h3>英雄梯度</h3><p>胜率与海克斯 · ${escapeHTML(currentModePatch())}</p></div><span class="champion-result-count">${rows.length} 位</span></div>
@@ -1508,32 +1527,37 @@
     </div>`;
   }
 
+  function reportArenaHeaderSource(row, championId) {
+    const fields = { championId, rank: Number(row?.rank) || 0, grade: String(row?.grade || ""), listGames: Number(row?.play) || 0, hasListRow: Boolean(row) };
+    const key = JSON.stringify(fields);
+    if (key === lastArenaHeaderSource) return;
+    lastArenaHeaderSource = key;
+    window.reportFlowDiagnostic?.("arena_header_source", "rendered", fields);
+  }
+
   function renderArenaDetailPane(row = state.selected) {
     if (!row) return '<div class="arena-pane-empty"><strong>选择一位英雄</strong><span>查看海克斯、装备与吃鸡战绩</span></div>';
     const meta = row.meta || championMeta(row.championId);
     const detail = state.detail;
-    const stats = detail?.arenaStats || {};
     const title = row.name || meta?.nameZh || meta?.titleZh || `英雄 ${row.championId}`;
     const subtitle = meta?.titleZh && meta.titleZh !== title ? meta.titleZh : meta?.nameEn || "";
     const source = row.imageSource || meta?.imageSource;
     const path = row.imagePath || meta?.imagePath;
-    const tier = stats.tier ?? row.tier;
-    const rank = Number(stats.rank || row.rank) || 0;
+    const rank = Number(row.rank) || 0;
     const hasMetric = (value) => value !== null && value !== undefined && String(value).trim() !== "" && Number.isFinite(Number(value));
     const secondaryMetrics = [
-      ["选用率", "metric-pick", stats.pickRate ?? row.pickRate, percent, ""],
-      ["禁用率", "metric-ban", stats.banRate ?? row.banRate, percent, ""],
-      ["样本", "", stats.games ?? row.play, compactNumber, " 场"],
+      ["禁用率", "metric-ban", row.banRate, percent, ""],
+      ["样本", "", row.play, compactNumber, " 场"],
     ].filter(([, , value]) => hasMetric(value)).map(([label, className, value, formatter, suffix]) => `<span>${label} <b${className ? ` class="${className}"` : ""}>${formatter(value)}</b>${suffix}</span>`).join("");
     const overview = `<section class="arena-overview-strip">
       <img class="arena-overview-art" data-queued-src="${heroArtworkURL(meta, source, path)}" data-artwork-fallback="${escapeHTML(heroArtworkFallbackURL(meta))}" alt="" aria-hidden="true" decoding="async" data-champion-image>
       <span class="arena-overview-shade" aria-hidden="true"></span>
-      <div class="arena-overview-identity"><span class="champion-detail-portrait"><img data-queued-src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span><div><h2>${escapeHTML(title)} ${tierBadge(tier, "arena-title-tier")}</h2><small>${escapeHTML(subtitle)}${rank ? ` · 总榜第 ${rank} 位` : ""}</small></div></div>
+      <div class="arena-overview-identity"><span class="champion-detail-portrait"><img data-queued-src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span><div><h2>${escapeHTML(title)} ${gradeBadge(row.grade, "arena-title-tier")}</h2><small>${escapeHTML(subtitle)}${rank ? ` · 总榜第 ${rank} 位` : ""}</small></div></div>
       <div class="arena-overview-metrics">
-        ${arenaOverviewMetric("梯度", tierBadge(tier, "is-metric"), "tier", tierDisplay(tier) === "—" ? "暂无梯度" : `${tierDisplay(tier)} 档`)}
-        ${arenaOverviewMetric("胜率", percent(stats.winRate || row.winRate), "win", rank ? `总榜第 ${rank} 名` : "全球样本")}
-        ${arenaOverviewMetric("平均名次", number(stats.averagePlacement || row.averagePlacement, 2), "placement", "名次越低越好")}
-        ${arenaOverviewMetric("吃鸡率", percent(stats.firstPlaceRate || row.firstPlaceRate), "first", `${compactNumber(stats.games || row.play)} 场样本`)}
+        ${row.grade ? arenaOverviewMetric("梯度", gradeBadge(row.grade, "is-metric"), "tier", "") : ""}
+        ${arenaOverviewMetric("胜率", percent(row.winRate), "win", rank ? `总榜第 ${rank} 名` : "全球样本")}
+        ${arenaOverviewMetric("平均名次", number(row.averagePlacement, 2), "placement", "名次越低越好")}
+        ${arenaOverviewMetric("吃鸡率", percent(row.firstPlaceRate), "first", `${compactNumber(row.play)} 场样本`)}
       </div>
       <div class="arena-overview-secondary">${secondaryMetrics}${renderArenaSortBar()}</div>
     </section>`;
@@ -1544,7 +1568,7 @@
   }
 
   function arenaOverviewMetric(label, value, tone, note) {
-    return `<div class="is-${tone}"><span>${label}</span><strong>${value}</strong><small>${escapeHTML(note)}</small></div>`;
+    return `<div class="is-${tone}"><span>${label}</span><strong>${value}</strong>${note ? `<small>${escapeHTML(note)}</small>` : ""}</div>`;
   }
 
   function renderArenaDetailContent(detail) {
@@ -1572,12 +1596,10 @@
       return primary || (Number(right?.games) || 0) - (Number(left?.games) || 0);
     });
   }
-  function gradeRank(value) { return ({ OP: 0, S: 1, A: 2, B: 3, C: 4, D: 5, F: 6 })[String(value || "B").toUpperCase()] ?? 7; }
   function sortedGradeRows(rows) {
     const list = objectRows(rows);
-    const scores = list.map((row) => row.score).filter((value) => Number(value) > 0);
     return [...list].sort((left, right) => {
-      const grade = gradeRank(augmentGrade(left.tier || left.grade, left.score, scores)) - gradeRank(augmentGrade(right.tier || right.grade, right.score, scores));
+      const grade = gradeRank(left.grade) - gradeRank(right.grade);
       return grade || (Number(right.score) || 0) - (Number(left.score) || 0) || (Number(right.games) || 0) - (Number(left.games) || 0);
     });
   }
@@ -1597,15 +1619,15 @@
     const visible = state.arenaExpanded.augments ? sorted : sorted.slice(0, 9);
     const scores = sorted.map((row) => row.score);
     const filters = [["all", "全部"], ["silver", "银色"], ["gold", "黄金"], ["prismatic", "棱彩"]];
-    return `<section class="arena-data-section arena-augment-section"><header><div><span class="arena-section-icon" aria-hidden="true">✦</span><span><h3>海克斯推荐</h3><small>按综合评分、胜率与样本展示前九项 · ${allRows.length} 条</small></span></div><div class="arena-chips arena-rarity-chips" role="tablist" aria-label="海克斯品质">${filters.map(([value, label]) => `<button type="button" role="tab" aria-selected="${state.arenaRarity === value}" class="${state.arenaRarity === value ? "is-active" : ""}" data-arena-rarity="${value}"><i class="is-${value}" aria-hidden="true"></i>${label}</button>`).join("")}</div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "augment", index, scores)).join("")}</div>${renderArenaExpand("augments", sorted.length, 9)}` : '<div class="arena-section-empty">该品质暂无海克斯样本</div>'}</section>`;
+    return `<section class="arena-data-section arena-augment-section"><header><div><span class="arena-section-icon" aria-hidden="true">✦</span><span><h3>海克斯推荐</h3><small>按档位与样本展示前九项 · ${allRows.length} 条</small></span></div><div class="arena-chips arena-rarity-chips" role="tablist" aria-label="海克斯品质">${filters.map(([value, label]) => `<button type="button" role="tab" aria-selected="${state.arenaRarity === value}" class="${state.arenaRarity === value ? "is-active" : ""}" data-arena-rarity="${value}"><i class="is-${value}" aria-hidden="true"></i>${label}</button>`).join("")}</div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "augment", index, scores)).join("")}</div>${renderArenaExpand("augments", sorted.length, 9)}` : '<div class="arena-section-empty">该品质暂无海克斯样本</div>'}</section>`;
   }
 
-  // YOUR.GG's default equipment order is tier, then sample count (not score).
-  // Keep this separate from augment/mayhem scoring and retain every item.
+  // Preserve every upstream item. Grade, official score, then sample count
+  // determine presentation order; the hero ranking itself keeps upstream order.
   function sortedArenaItemRows(rows) {
-    const tier = (value) => ({ OP: 0, S: 1, A: 2, B: 3, C: 4, D: 5, F: 6 })[String(value || "").toUpperCase()] ?? 99;
     return [...objectRows(rows)].sort((left, right) =>
-      tier(left.tier || left.grade) - tier(right.tier || right.grade)
+      gradeRank(left.grade) - gradeRank(right.grade)
+        || (Number(right.score) || 0) - (Number(left.score) || 0)
         || (Number(right.games) || 0) - (Number(left.games) || 0));
   }
 
@@ -1635,23 +1657,14 @@
     const rarityKey = kind === "augment" ? arenaRarityKey(row.rarity) : "";
     const rarity = rarityKey ? ` is-${rarityKey}` : "";
     const quality = ({ silver: "银色", gold: "黄金", prismatic: "棱彩" })[rarityKey] || "";
-    const grade = augmentGrade(row.tier || row.grade, row.score, scores);
-    // options.hideGradeBadge（R116-B 评审整改 B4）：只有海斗的阶段视图会用——阶段行
-    // 没有自己的官方字母档位时整块隐藏徽章，而不是拿英雄级的字母去配阶段级的
-    // 「官方档位」。不传这个选项时行为与从前逐字一致（斗魂/棱彩/核心装备照旧）。
-    const gradeBadge = options?.hideGradeBadge ? "" : `<b class="augment-grade is-${grade}">${grade}</b>`;
-    const badge = kind === "augment" || kind === "prism" || kind === "core"
-      ? gradeBadge
-      : `<b class="hex-rank ${index < 3 ? `is-${index + 1}` : "is-rest"}">${index + 1}</b>`;
-    const primary = kind === "augment" || kind === "prism" || kind === "core"
-      ? `<div class="arena-option-icons">${route}</div>${badge}`
-      : `${badge}<div class="arena-option-icons">${route}</div>`;
+    const badge = options?.hideGradeBadge ? "" : gradeBadge(row.grade, "arena-option-grade");
+    const primary = `<div class="arena-option-icons">${route}</div>${badge}`;
     const metrics = options?.metrics || [
       ["胜率", percent(row.winRate), "is-win"],
       ["平均名次", number(row.averagePlacement, 2), "is-placement"],
       ["吃鸡率", percent(row.firstPlaceRate), "is-first"],
       ["样本", compactNumber(row.games), ""],
-      ["综合评分", number(row.score, 2), "is-score"],
+      ...(Number(row.score) > 0 ? [["综合评分", number(row.score, 2), "is-score"]] : []),
     ];
     const cells = metrics.map(([label, value, tone]) => `<div${tone ? ` class="${tone}"` : ""}><dt>${escapeHTML(label)}</dt><dd>${value}</dd></div>`).join("");
     const extra = options?.className ? ` ${options.className}` : "";
@@ -1699,7 +1712,7 @@
     const prosAvailable = pros.length > 0 || state.arenaFirstLoading;
     const active = state.arenaFirstTab === "pros" && prosAvailable ? "pros" : "mine";
     const name = state.selected?.name || state.selected?.meta?.nameZh || "该英雄";
-    const firstRate = detail?.arenaStats?.firstPlaceRate || state.selected?.firstPlaceRate;
+    const firstRate = state.selected?.firstPlaceRate;
     const tabs = `<div class="arena-first-tabs" role="tablist" aria-label="吃鸡战绩来源"><button type="button" role="tab" aria-selected="${active === "pros"}" class="${active === "pros" ? "is-active" : ""}" data-arena-first-tab="pros" data-tooltip="韩服高手样本" ${prosAvailable ? "" : "disabled"}>高手对局</button><button type="button" role="tab" aria-selected="${active === "mine"}" class="${active === "mine" ? "is-active" : ""}" data-arena-first-tab="mine">我的吃鸡</button></div>`;
     let body;
     if (active === "pros" && state.arenaFirstLoading && !pros.length) {
@@ -1848,11 +1861,11 @@
   function renderAugmentGroups(items) {
     const groups = new Map();
     for (const item of items) {
-      const tier = Number(item.tier) || 0;
-      if (!groups.has(tier)) groups.set(tier, []);
-      groups.get(tier).push(item);
+      const grade = String(item.grade || "").trim().toUpperCase();
+      if (!groups.has(grade)) groups.set(grade, []);
+      groups.get(grade).push(item);
     }
-    return `<div class="augment-tier-groups">${[...groups.entries()].sort((a, b) => a[0] - b[0]).map(([tier, rows]) => `<section class="augment-tier-group"><header><span class="augment-tier-letter is-${Math.min(5, tier)}">${augmentTierLabel(tier)}</span><div><h4>${augmentTierLabel(tier)} 级海克斯</h4><p>${rows.length} 个，优先展示更高品质</p></div></header><div class="augment-grid">${rows.map(renderAugmentCard).join("")}</div></section>`).join("")}</div>`;
+    return `<div class="augment-tier-groups">${[...groups.entries()].sort((a, b) => gradeRank(a[0]) - gradeRank(b[0])).map(([grade, rows]) => `<section class="augment-tier-group"><header>${gradeBadge(grade, "augment-tier-letter")}<div><h4>海克斯</h4><p>${rows.length} 个，优先展示更高品质</p></div></header><div class="augment-grid">${rows.map(renderAugmentCard).join("")}</div></section>`).join("")}</div>`;
   }
 
   function renderChampionTable(rows, metrics, rankOffset = 0) {
@@ -1884,7 +1897,7 @@
     return `<tr class="champion-row${rowClass ? ` ${rowClass}` : ""}" tabindex="0" role="button" data-champion-row="${Number(row.championId)}" aria-label="查看${escapeHTML(name)}详情"${selected ? ' aria-current="true"' : ""}>
       <td class="champion-rank">${rank}</td>
       <td class="champion-name-cell">${artwork}<span class="champion-identity"><span class="champion-portrait"><img data-queued-src="${imageURL(source, path)}" alt="" loading="lazy" decoding="async" data-champion-image><span>${escapeHTML(name.slice(0, 1))}</span></span><span><strong>${escapeHTML(name)}</strong>${subname ? `<small>${escapeHTML(subname)}</small>` : ""}</span></span></td>
-      <td>${tierBadge(row.tier, "", arena ? row.grade : "")}${mayhem && row.tierLocallyCalculated === true ? '<small class="mayhem-tier-local">本地估算</small>' : ""}</td>
+      <td>${gradeBadge(row.grade)}${mayhem && row.tierLocallyCalculated === true ? '<small class="mayhem-tier-local">本地估算</small>' : ""}</td>
       ${showPosition ? `<td><span class="position-pill">${positionIcon(row.position)}${positionLabel(row.position)}</span></td>` : ""}${mayhem ? `<td class="metric-win" data-tooltip="样本 ${escapeHTML(compactNumber(row.play))}">${percent(row.winRate)}</td>` : arena ? `<td class="metric-win${Number(row.winRate) < 49.5 ? " is-low" : ""}">${percent(row.winRate)}</td><td class="metric-placement">${number(row.averagePlacement, 2)}</td>` : rankedMetrics ? `<td class="metric-win${Number(row.winRate) < 49.5 ? " is-low" : ""}">${percent(row.winRate)}</td><td class="metric-pick">${percent(row.pickRate)}</td><td class="metric-ban">${percent(row.banRate)}</td><td class="metric-games">${Number(row.play) > 0 ? compactNumber(row.play) : "—"}</td>` : ""}
     </tr>`;
   }
@@ -1919,14 +1932,13 @@
     const hasPositions = state.mode === "ranked" && positions.length > 1;
     const activePosition = detail?.position || state.detailPosition || row.position || firstPositionOf(row);
     const positionStats = detailPositions.find((item) => item.position === activePosition) || null;
-    const tier = positionStats?.tier ?? row.tier;
+    const grade = positionStats?.grade || row.grade;
     const winRate = positionStats?.winRate ?? row.winRate;
     const pickRate = positionStats?.pickRate ?? row.pickRate;
     const banRate = positionStats?.banRate ?? row.banRate;
     const positionsMarkup = hasPositions ? `<div class="champion-detail-positions" data-count="${positions.length}" role="group" aria-label="${escapeHTML(title)}可用分路">${positions.map((item) => `<button type="button" class="${item.position === activePosition ? "is-active" : ""}" aria-pressed="${item.position === activePosition}" data-detail-position="${escapeHTML(item.position)}">${positionIcon(item.position)}<span><strong>${escapeHTML(positionLabel(item.position))}</strong><small><span class="metric-win">${percent(item.winRate)}</span><span aria-hidden="true">·</span><span class="metric-pick">占${percent(item.roleRate)}</span></small></span></button>`).join("")}</div>` : "";
     const detailBody = state.loading ? `<div class="champion-detail-content">${renderDetailSkeleton()}</div>` : state.error ? renderError(state.error, true) : detail ? renderDetailContent(detail) : renderError("详情暂时不可用", true);
     const modeLabel = state.mode === "ranked" ? "梯度榜" : state.mode === "arena" ? "斗魂竞技场" : "海克斯大乱斗";
-    const arenaStats = detail?.arenaStats || {};
 	const detailTierSelect = state.mode === "ranked" ? `<label class="champion-tier-select select-wrap champion-detail-tier-select"><span>段位</span><select data-champion-tier aria-label="切换英雄详情段位">${renderTierOptions()}</select></label>` : "";
     root.innerHTML = `<div class="champion-detail-toolbar"><button class="champion-back" type="button" data-champion-back><span aria-hidden="true">←</span> 返回${modeLabel}</button>${detailTierSelect}</div>
       <header class="champion-detail-hero${hasPositions ? " has-positions" : ""}">
@@ -1934,7 +1946,7 @@
         <div class="champion-detail-art-shade" aria-hidden="true"></div>
         <span class="champion-detail-portrait"><img data-queued-src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span>
         <div class="champion-detail-title"><p>${state.mode === "ranked" ? `韩服 · ${tierLabel(state.tier)} · ${positionLabel(activePosition)}` : state.mode === "arena" ? "斗魂竞技场" : "海克斯大乱斗"}</p><h2>${escapeHTML(title)}</h2><span>${escapeHTML(name)}${detail?.patch ? ` · 版本 ${escapeHTML(detail.patch)}` : ""}</span></div>
-        <div class="champion-detail-side"><div class="champion-detail-metrics${state.mode === "aram-mayhem" ? " is-compact" : state.mode === "arena" ? " is-arena" : ""}">${state.mode === "ranked" ? metric("梯度", tierBadge(tier, "is-metric")) + metric("胜率", percent(winRate)) + metric("选用率", percent(pickRate)) + metric("禁用率", percent(banRate)) : state.mode === "arena" ? metric("平均名次", number(arenaStats.averagePlacement, 2)) + metric("第一名", percent(arenaStats.firstPlaceRate)) + metric("胜率", percent(arenaStats.winRate || row.winRate)) + metric("选用率", percent(arenaStats.pickRate || row.pickRate)) + metric("禁用率", percent(arenaStats.banRate)) : metric("排名", `#${row.rank || "—"}`) + metric("梯度", tierBadge(row.tier, "is-metric"))}</div>${positionsMarkup}</div>
+        <div class="champion-detail-side"><div class="champion-detail-metrics${state.mode === "aram-mayhem" ? " is-compact" : state.mode === "arena" ? " is-arena" : ""}">${state.mode === "ranked" ? (grade ? metric("梯度", gradeBadge(grade, "is-metric")) : "") + metric("胜率", percent(winRate)) + metric("选用率", percent(pickRate)) + metric("禁用率", percent(banRate)) : state.mode === "arena" ? metric("平均名次", number(row.averagePlacement, 2)) + metric("第一名", percent(row.firstPlaceRate)) + metric("胜率", percent(row.winRate)) + metric("禁用率", percent(row.banRate)) : metric("排名", `#${row.rank || "—"}`) + (row.grade ? metric("梯度", gradeBadge(row.grade, "is-metric")) : "")}</div>${positionsMarkup}</div>
       </header>
       ${detailBody}`;
   }
@@ -1980,12 +1992,11 @@
       counts.set(rarity, count + 1);
       return count < 3;
     });
-    const scores = visible.map((item) => item.score);
     const entries = visible.map((item) => {
       const catalogMeta = augmentMetaForAsset(item.assets?.[0]);
       const asset = item.assets?.[0] || {};
       const meta = catalogMeta || { ...asset, rarity: augmentRarityKey(item.rarity), imageSource: asset.source, imagePath: asset.path };
-      return { item, meta, grade: augmentGrade(item.grade, item.score, scores) };
+      return { item, meta, grade: augmentGrade(item.grade) };
     });
     // chips 用的是未过滤的 items：只要上游给过任何一个阶段，工具条就在，用户随时
     // 能点回「汇总」（评审整改 A1 之前，一条都不剩时工具条会整块消失）。
@@ -2083,13 +2094,9 @@
       name: meta?.name || base.name || "推荐海克斯",
       description: base.description || meta?.description || meta?.tooltip || "",
     };
-    // 评审整改 B4：一张卡上不许混两种口径。阶段视图里徽章的字母必须来自阶段行自己
-    // 的官方档位（后端用同一个官方档位映射算好直出，前端不复制 hexTier/hexLabel →
-    // 字母的对照表），否则同一张卡会出现「徽章 S（父行 hang）」配「官方档位 顶级
-    // （阶段 top）」这种自相矛盾——实测英雄 157 的 499 条阶段行里有 115 条 hexTier
-    // 与父行不同。阶段行没有官方档位时（上游给 insufficient，实测 4/499）字母徽章
-    // 整块隐藏：拿英雄级的 S 去配阶段级的「样本过少」正是评审点名的口径混用
-    // （评审 6.1：取不到就整块隐藏，不拿别的口径顶）。
+    // 阶段视图的字母来自阶段行自己的官方档位。实测英雄 157 的 499 条阶段行中
+    // 115 条与父行档位不同；缺失时隐藏徽章，不沿用英雄级字母。R150 已删去卡片上
+    // 重复的中文「官方档位」指标，hexLabel 仍由后端用于辨别官方/本地档位。
     const stageGrade = stage ? String(item.grade || "").trim().toUpperCase() : "";
     const row = {
       assets: [asset],
@@ -2115,7 +2122,7 @@
         // 综合评分是英雄级的 hexScore：后端刻意没下发阶段级 hexScore（体积取舍，
         // 见台账第 5 节），所以阶段视图里必须写明口径，不能让一个英雄级数字冒充
         // 阶段数值（评审整改 B4 的第二半）。
-        [stage ? "综合评分（英雄级）" : "综合评分", number(item.score, 1), "is-score"],
+        ...(Number(item.score) > 0 ? [[stage ? "综合评分（英雄级）" : "综合评分", number(item.score, 1), "is-score"]] : []),
         ...mayhemAugmentConfidenceMetrics(item),
       ],
     });
@@ -2136,10 +2143,6 @@
     // 英雄级汇总行没有这个字段（上游只在 stages[] 里给），拿不到就整格不渲染。
     const baseline = Number(item?.stageBaselineWinRate);
     if (delta && Number.isFinite(baseline) && baseline > 0) metrics.push(["阶段基准", percent(baseline), "is-baseline"]);
-    // P0-5：官方档位文案用 hexLabel（中文「夯」「顶级」），绝不用 hexTier
-    // （那是内部枚举名 "hang"/"top"，给用户看等于泄露实现细节）。
-    const label = String(item?.hexLabel || "").trim();
-    if (label) metrics.push(["官方档位", escapeHTML(label), "is-hex-label"]);
     const lowSample = mayhemSampleTierLabel(item);
     if (lowSample) metrics.push(["置信", lowSample, "is-low-confidence"]);
     else {
@@ -2593,7 +2596,6 @@
   }
 
   function metric(label, value) { const className = label === "胜率" ? "metric-win" : label === "选用率" ? "metric-pick" : label === "禁用率" ? "metric-ban" : ""; return `<div class="${className}"><span>${label}</span><strong>${value}</strong></div>`; }
-  function augmentTierLabel(value) { return ({ 0: "S", 1: "A", 2: "B", 3: "C", 4: "D", 5: "E" })[Number(value)] || "—"; }
   function rarityLabel(value) { return ({ silver: "白银", gold: "黄金", prismatic: "棱彩" })[augmentRarityKey(value)] || "未分类"; }
 
   function filteredChampionRows() {
@@ -2873,6 +2875,28 @@
 		loadRankings();
 	  }
     }
+  });
+
+  root.addEventListener("pointerover", (event) => {
+    const row = event.target.closest("[data-champion-row]");
+    if (!row || row === mayhemHoverRow || state.mode !== "aram-mayhem" || state.mayhemView !== "champions") return;
+    clearTimeout(mayhemHoverTimer);
+    mayhemHoverRow = row;
+    mayhemHoverTimer = setTimeout(() => {
+      if (mayhemHoverRow === row && row.isConnected) prefetchMayhemRSC(row);
+    }, 150);
+  });
+  root.addEventListener("pointerout", (event) => {
+    const row = event.target.closest("[data-champion-row]");
+    if (!row || row.contains(event.relatedTarget)) return;
+    if (row === mayhemHoverRow) {
+      clearTimeout(mayhemHoverTimer);
+      mayhemHoverRow = null;
+    }
+  });
+  root.addEventListener("pointerdown", (event) => {
+    const row = event.target.closest("[data-champion-row]");
+    if (row) { clearTimeout(mayhemHoverTimer); prefetchMayhemRSC(row); }
   });
 
   root.addEventListener("input", (event) => {

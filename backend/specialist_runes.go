@@ -165,6 +165,7 @@ func (a *app) handleGameplaySpecialistRunes(w http.ResponseWriter, r *http.Reque
 		respondJSON(w, map[string]any{"reason": reason, "runes": runes})
 		return
 	}
+	a.riot.attachReadySpecialistStarters(runes)
 	respondJSON(w, runes)
 }
 
@@ -242,6 +243,7 @@ func (p *riotProvider) finishSpecialistRuneFlight(key string, flight *specialist
 
 func (p *riotProvider) loadSpecialistRunes(ctx context.Context, championID int64, championSlug, championName, position string) (result []gameplayRecommendationRune, outcome specialistOutcome) {
 	started := time.Now()
+	prefetchStarted := 0
 	players := p.champions.loadTopPlayersForPosition(ctx, championSlug, position)
 	if len(players) > specialistRunePlayerLimit {
 		players = players[:specialistRunePlayerLimit]
@@ -255,7 +257,7 @@ func (p *riotProvider) loadSpecialistRunes(ctx context.Context, championID int64
 		budgetMu.Lock()
 		remaining := budget.remaining
 		budgetMu.Unlock()
-		p.recordSpecialistDiagnostic(map[string]any{"event": "specialist_runes_done", "champion_id": championID, "position": canonicalSpecialistPosition(position), "runes_returned": len(result), "outcome": outcome, "budget_used": specialistRuneRequestBudget - remaining, "duration_ms": time.Since(started).Milliseconds()})
+		p.recordSpecialistDiagnostic(map[string]any{"event": "specialist_runes_done", "champion_id": championID, "position": canonicalSpecialistPosition(position), "runes_returned": len(result), "outcome": outcome, "budget_used": specialistRuneRequestBudget - remaining, "prefetch_started": prefetchStarted, "duration_ms": time.Since(started).Milliseconds()})
 	}()
 	playerResults := make([][]gameplayRecommendationRune, len(players))
 	var workers sync.WaitGroup
@@ -263,6 +265,8 @@ func (p *riotProvider) loadSpecialistRunes(ctx context.Context, championID int64
 		playerIndex, player := playerIndex, player
 		workers.Add(1)
 		go func() {
+			defer recoverPanic("specialist_runes.loadSpecialistRunes.1")
+
 			defer workers.Done()
 			take := func() bool { budgetMu.Lock(); defer budgetMu.Unlock(); return budget.take() }
 			remaining := func() int { budgetMu.Lock(); defer budgetMu.Unlock(); return budget.remaining }
@@ -321,6 +325,8 @@ func (p *riotProvider) loadSpecialistRunes(ctx context.Context, championID int64
 					}
 					detailWorkers.Add(1)
 					go func(offset int, matchID string) {
+						defer recoverPanic("specialist_runes.loadSpecialistRunes.2")
+
 						defer detailWorkers.Done()
 						detailCtx, detailCancel := specialistStepContext(ctx, specialistMatchDetailTimeout)
 						match, detailErr := p.matchByID(detailCtx, matchID)
@@ -395,6 +401,9 @@ func (p *riotProvider) loadSpecialistRunes(ctx context.Context, championID int64
 	}
 	opponentRanks.apply(result)
 	rankCancel()
+	if len(playerResults) > 0 {
+		prefetchStarted = p.prefetchSpecialistStarters(ctx, playerResults[0])
+	}
 	if len(result) > 0 {
 		return result, specialistOutcomeSuccess
 	}
@@ -521,6 +530,8 @@ func (b *specialistOpponentRankBatch) add(puuid string) {
 	b.wait.Add(1)
 	b.mu.Unlock()
 	go func() {
+		defer recoverPanic("specialist_runes.add.1")
+
 		defer b.wait.Done()
 		select {
 		case b.semaphore <- struct{}{}:
@@ -706,7 +717,9 @@ func specialistRuneFromParticipant(championID int64, championName string, player
 	gameCount := games
 	return gameplayRecommendationRune{
 		Key: "specialist-" + strconv.Itoa(index), Title: riotID, ChampionID: championID, ChampionName: championName,
-		PrimaryStyleID: primaryStyleID, SubStyleID: subStyleID, SelectedPerkIDs: selected, StatModIDs: statMods, ItemIDs: items,
+		PrimaryStyleID: primaryStyleID, SubStyleID: subStyleID, Spell1ID: participant.Summoner1ID, Spell2ID: participant.Summoner2ID,
+		SelectedPerkIDs: selected, StatModIDs: statMods, ItemIDs: items,
+		runeMatchID: match.Metadata.MatchID, runeParticipantID: participant.ParticipantID,
 		Stats:      gameplayRecommendationStats{WinRate: &winRate, Games: &gameCount},
 		PlayerName: strings.TrimSpace(player.Name), TagLine: strings.TrimSpace(player.Tagline), Tier: tier, Division: division,
 		LeaguePoints: strings.TrimSpace(player.LP), ChampionGames: games, PlayedAt: normalizeEpochMillis(match.Info.GameCreation), Result: result, Region: riotRegionKR,
@@ -746,6 +759,7 @@ func cloneSpecialistRunes(source []gameplayRecommendationRune) []gameplayRecomme
 		result[index].SelectedPerkIDs = append([]int64(nil), source[index].SelectedPerkIDs...)
 		result[index].StatModIDs = append([]int64(nil), source[index].StatModIDs...)
 		result[index].ItemIDs = append([]int64(nil), source[index].ItemIDs...)
+		result[index].StarterItemIDs = append([]int64(nil), source[index].StarterItemIDs...)
 		if source[index].OpponentWinRate != nil {
 			winRate := *source[index].OpponentWinRate
 			result[index].OpponentWinRate = &winRate

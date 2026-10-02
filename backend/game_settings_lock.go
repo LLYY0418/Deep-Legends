@@ -149,7 +149,7 @@ func readRigStatus(ctx context.Context, client *LCUClient) rigStatus {
 func (a *app) handleRigStatus(w http.ResponseWriter, r *http.Request) {
 	client, _, err := a.gameplayClient()
 	if err != nil {
-		a.recordDiagnostic(map[string]any{"event": "rig_status_read", "result": "not-connected"})
+		a.recordDiagnostic(map[string]any{"event": "rig_status_read", "result": "not-connected", "settings_locked": false, "path_kind": ""})
 		respondJSON(w, rigStatus{Reason: "未连接英雄联盟客户端"})
 		return
 	}
@@ -158,7 +158,7 @@ func (a *app) handleRigStatus(w http.ResponseWriter, r *http.Request) {
 	if status.InstallRoot == "" {
 		result = "locate-failed"
 	}
-	a.recordDiagnostic(map[string]any{"event": "rig_status_read", "result": result})
+	a.recordDiagnostic(map[string]any{"event": "rig_status_read", "result": result, "settings_locked": status.SettingsLocked, "path_kind": settingsWatchPathKind(settingsLocation{installRoot: status.InstallRoot}, status.SettingsFile)})
 	respondJSON(w, status)
 }
 
@@ -172,38 +172,40 @@ func (a *app) handleSettingsLock(w http.ResponseWriter, r *http.Request) {
 	}
 	client, _, err := a.gameplayClient()
 	if err != nil {
-		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "not-connected"})
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "not-connected", "settings_locked": false, "path_kind": ""})
 		http.Error(w, "未连接英雄联盟客户端", http.StatusConflict)
 		return
 	}
 	location, err := locateGameSettings(r.Context(), client)
 	if err != nil {
-		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "locate-failed"})
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "locate-failed", "settings_locked": false, "path_kind": ""})
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
-	resolvedFile, _, err := safeSettingsFile(location)
+	resolvedFile, infoBefore, err := safeSettingsFile(location)
 	if err != nil {
-		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "unsafe-file"})
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "unsafe-file", "settings_locked": false, "path_kind": settingsWatchPathKind(location, location.file)})
 		http.Error(w, "设置文件不可安全操作", http.StatusUnprocessableEntity)
 		return
 	}
+	beforeLocked := gameSettingsReadOnly(resolvedFile, infoBefore)
 	mode := os.FileMode(0o644)
 	if request.Locked {
 		mode = 0o444
 	}
 	if err := os.Chmod(resolvedFile, mode); err != nil {
-		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "failed"})
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "failed", "settings_locked": beforeLocked, "path_kind": settingsWatchPathKind(location, location.file)})
 		http.Error(w, "无法修改设置文件只读状态", http.StatusServiceUnavailable)
 		return
 	}
 	status := readRigStatus(r.Context(), client)
 	// Do not report success if the filesystem did not retain the requested state.
 	if !status.SettingsKnown || status.SettingsLocked != request.Locked {
-		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "verify-failed"})
+		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "verify-failed", "settings_locked": status.SettingsLocked, "path_kind": settingsWatchPathKind(location, location.file)})
 		http.Error(w, "设置文件只读状态未生效或无法确认，请刷新后重试", http.StatusServiceUnavailable)
 		return
 	}
-	a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "ok"})
+	a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "ok", "settings_locked": status.SettingsLocked, "path_kind": settingsWatchPathKind(location, location.file)})
+	a.queueSettingsLockSnapshot(client, location, beforeLocked)
 	respondJSON(w, status)
 }

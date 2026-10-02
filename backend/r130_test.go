@@ -147,7 +147,7 @@ func TestR130CardImageStalledClampsAndDropsUnsafeValues(t *testing.T) {
 func TestR130CardImageStalledNeverLeaksResourcePaths(t *testing.T) {
 	instance := newR127DiagnosticApp(t)
 	body := `{"event":"card_image_stalled","reason":"watchdog","activeCardImages":12,"queued":34,` +
-		`"sourceIndex":1,"imageSource":"/api/image?path=/lol-game-data/assets/v1/profile-icons/4379.jpg"}`
+		`"sourceIndex":1,"imageSource":"/api/image?path=/lol-game-data/assets/v1/profile-icons/4379-private-resource.jpg"}`
 	if code := r127PostDiagnostic(t, instance, body); code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204", code)
 	}
@@ -164,7 +164,7 @@ func TestR130CardImageStalledNeverLeaksResourcePaths(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, leaked := range []string{"profile-icons", "4379", "/api/image", "lol-game-data"} {
+		for _, leaked := range []string{"profile-icons", "4379-private-resource", "/api/image", "lol-game-data"} {
 			if strings.Contains(string(encoded), leaked) {
 				t.Fatalf("诊断泄漏了 %q: %s", leaked, encoded)
 			}

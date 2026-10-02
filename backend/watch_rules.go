@@ -104,32 +104,33 @@ type convenienceSettings struct {
 
 type watchRunner struct {
 	// Snapshot-only lookup. Never load a catalog to compose a chat message.
-	broadcastChampionNames func() map[int64]string
-	now                    func() time.Time
-	wait                   func(context.Context, time.Duration) error
-	champDiagnosticSession string
-	champDiagnosticSamples map[string]diagnosticSample
-	writeContext           context.Context
-	writeCancel            context.CancelFunc
-	customSession          bool
-	customObservation      [2]string
-	mu                     sync.Mutex
-	settings               watchSettings
-	lastRun                map[string]time.Time
-	pending                map[string]*watchPendingAction
-	notify                 func(event string)
-	observe                func(event map[string]any)
-	honorInProgress        bool
-	deferredPlayAgain      bool
-	autoMatchStarted       bool
-	autoMatchInFlight      bool
-	autoMatchExhausted     bool
-	autoMatchRetryDelays   []time.Duration
-	lobbyShapeKeys         map[string]struct{}
-	promotedForLobby       bool
-	broadcastForSession    bool
-	acceptedForReadyCheck  bool
-	champSelect            champSelectRuntimeStore
+	broadcastChampionNames  func() map[int64]string
+	now                     func() time.Time
+	wait                    func(context.Context, time.Duration) error
+	champDiagnosticSession  string
+	champDiagnosticSamples  map[string]diagnosticSample
+	writeContext            context.Context
+	writeCancel             context.CancelFunc
+	customSession           bool
+	customObservation       [2]string
+	mu                      sync.Mutex
+	settings                watchSettings
+	lastRun                 map[string]time.Time
+	pending                 map[string]*watchPendingAction
+	notify                  func(event string)
+	observe                 func(event map[string]any)
+	honorInProgress         bool
+	deferredPlayAgain       bool
+	autoMatchStarted        bool
+	autoMatchInFlight       bool
+	autoMatchExhausted      bool
+	autoMatchRetryDelays    []time.Duration
+	lobbyShapeKeys          map[string]struct{}
+	invitationShapeRecorded bool
+	promotedForLobby        bool
+	broadcastForSession     bool
+	acceptedForReadyCheck   bool
+	champSelect             champSelectRuntimeStore
 }
 
 // Alias the old name so focused legacy tests and downstream integrations keep
@@ -491,7 +492,7 @@ func (r *watchRunner) handleEvent(client *LCUClient, event LCUEvent, current Sum
 		}
 	case strings.HasPrefix(uri, "/lol-honor-v2/v1/ballot") && settings.Rules.AutoHonor.Enabled:
 		r.record(map[string]any{"event": "endgame_trigger", "source": "honor-ballot", "honor_enabled": true})
-		go r.handleHonor(client, event.Data, current, settings.Rules.AutoHonor)
+		goSafe("watch_rules.handleEvent.1", func() { r.handleHonor(client, event.Data, current, settings.Rules.AutoHonor) })
 	case strings.HasPrefix(uri, "/lol-pre-end-of-game/v1/currentsequenceevent") && settings.Rules.SkipCelebration.Enabled:
 		var payload struct {
 			Name string `json:"name"`
@@ -500,9 +501,9 @@ func (r *watchRunner) handleEvent(client *LCUClient, event LCUEvent, current Sum
 			r.schedule(client, "skip-celebration", 0, http.MethodPost, "/lol-pre-end-of-game/v1/complete/missions-celebration", nil)
 		}
 	case strings.HasPrefix(uri, "/lol-lobby/v2/received-invitations") && settings.Rules.Invitations.Enabled:
-		go r.handleInvitations(client, settings.Rules.Invitations)
+		goSafe("watch_rules.handleEvent.2", func() { r.handleInvitations(client, settings.Rules.Invitations) })
 	case strings.HasPrefix(uri, "/lol-lobby/v2/lobby"):
-		go r.handleLobby(client, current, settings.Rules)
+		goSafe("watch_rules.handleEvent.3", func() { r.handleLobby(client, current, settings.Rules) })
 	}
 }
 
@@ -545,6 +546,8 @@ func (r *watchRunner) handleChampSelect(client *LCUClient, current Summoner) {
 			cancel()
 		} else {
 			go func() {
+				defer recoverPanic("watch_rules.handleChampSelect.1")
+
 				defer cancel()
 				defer func() {
 					r.mu.Lock()
@@ -655,6 +658,8 @@ func (r *watchRunner) scheduleMarked(client *LCUClient, action string, delayMS i
 	r.emit(fmt.Sprintf("watch:armed:%s:%d", action, delayMS))
 	r.record(map[string]any{"event": "watch_action", "action": action, "result": "armed"})
 	go func() {
+		defer recoverPanic("watch_rules.scheduleMarked.1")
+
 		outcome := "not-attempted"
 		attempted := false
 		defer func() {
@@ -836,6 +841,24 @@ func (r *watchRunner) recordLobbyShape(lobby map[string]any) {
 	r.record(map[string]any{"event": "lcu_lobby_shape", "top_level_keys": topKeys, "local_member_keys": localKeys, "game_config_keys": configKeys})
 }
 
+func (r *watchRunner) recordInvitationShape(invitation map[string]any) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	if r.invitationShapeRecorded {
+		r.mu.Unlock()
+		return
+	}
+	r.invitationShapeRecorded = true
+	r.mu.Unlock()
+	config, _ := invitation["gameConfig"].(map[string]any)
+	r.record(map[string]any{
+		"event": "lcu_invitation_shape", "top_level_keys": sortedWatchMapKeys(invitation),
+		"game_config_keys": sortedWatchMapKeys(config),
+	})
+}
+
 func waitWatchDelay(ctx context.Context, delay time.Duration) bool {
 	if delay <= 0 {
 		return ctx.Err() == nil
@@ -905,6 +928,8 @@ func (r *watchRunner) scheduleAutoMatchmaking(client *LCUClient, delayMS int) bo
 	r.emit(fmt.Sprintf("watch:armed:auto-matchmaking:%d", delayMS))
 	r.record(map[string]any{"event": "watch_action", "action": "auto-matchmaking", "result": "armed"})
 	go func() {
+		defer recoverPanic("watch_rules.scheduleAutoMatchmaking.1")
+
 		defer func() {
 			r.mu.Lock()
 			if r.pending["auto-matchmaking"] == pending {
@@ -1282,38 +1307,64 @@ func secureRandomMember(values []int64) (int64, bool) {
 
 func (r *watchRunner) handleInvitations(client *LCUClient, rule watchInvitationRule) {
 	if r.customPaused() {
+		r.record(map[string]any{"event": "watch_action", "action": "invitations", "result": "skipped_custom"})
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	var invitations []map[string]any
 	if err := client.RequestJSON(ctx, http.MethodGet, "/lol-lobby/v2/received-invitations", nil, &invitations); err != nil {
+		r.record(map[string]any{"event": "watch_action", "action": "invitations", "result": "failed", "reason": "list-read-failed"})
 		r.emit("watch:failed:invitations")
+		return
+	}
+	if len(invitations) > 0 {
+		r.recordInvitationShape(invitations[0])
+	}
+	if r.customPaused() {
+		r.record(map[string]any{"event": "watch_action", "action": "invitations", "result": "skipped_custom"})
 		return
 	}
 	for _, invitation := range invitations {
 		id := anyString(invitation, "invitationId", "id")
-		if !safeLCUIdentifier(id) || !r.markRun("invitation:"+id, 10*time.Minute) {
+		if !safeLCUIdentifier(id) {
 			continue
 		}
-		queue := strconv.FormatInt(anyInt(invitation, "queueId", "queueID"), 10)
+		if !r.markRun("invitation:"+id, 10*time.Minute) {
+			if r.customPaused() {
+				r.record(map[string]any{"event": "watch_action", "action": "invitations", "result": "skipped_custom"})
+				return
+			}
+			continue
+		}
+		config, _ := invitation["gameConfig"].(map[string]any)
+		queueID := anyInt(config, "queueId", "queueID")
+		if queueID <= 0 {
+			queueID = anyInt(invitation, "queueId", "queueID")
+		}
+		queue := strconv.FormatInt(queueID, 10)
 		policy := rule.Policies[queue]
 		if policy == "" {
 			policy = rule.Policies["default"]
 		}
 		if policy != "accept" && policy != "decline" {
+			r.record(map[string]any{"event": "watch_action", "action": "invitations", "result": "skipped_no_policy", "queue_id": queueID})
 			continue
 		}
 		if r.customPaused() {
+			r.record(map[string]any{"event": "watch_action", "action": "invitations", "result": "skipped_custom", "queue_id": queueID, "policy": policy})
 			return
 		}
 		path := "/lol-lobby/v2/received-invitations/" + id + "/" + policy
 		if err := r.requestWatchJSON(ctx, client, http.MethodPost, path, nil); err != nil {
 			if r.customPaused() {
+				r.record(map[string]any{"event": "watch_action", "action": "invitations", "result": "skipped_custom", "queue_id": queueID, "policy": policy})
 				return
 			}
+			r.record(map[string]any{"event": "watch_action", "action": "invitations", "result": "failed", "queue_id": queueID, "policy": policy})
 			r.emit("watch:failed:invitations")
 		} else {
+			r.record(map[string]any{"event": "watch_action", "action": "invitations", "result": "fired", "queue_id": queueID, "policy": policy})
 			r.emit("watch:fired:invitations")
 		}
 	}

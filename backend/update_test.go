@@ -328,7 +328,8 @@ func TestUpdateManifestAndSettingsValidation(t *testing.T) {
 }
 
 func TestUpdateVersionNamedAssetAndLegacyCompatibility(t *testing.T) {
-	for _, name := range []string{"Deep-Legends-Setup-0.12.0.exe", "Deep-Legends-Setup-0.12.0-a1b2c3d4e5f6.exe"} {
+	names := []string{"Deep-Legends-Setup-0.12.0.exe", "Deep-Legends-Setup-0.12.0-a1b2c3d4e5f6.exe", "Deep-Legends-Setup-0.12.0-public.exe"}
+	for _, name := range names {
 		m := updateTestManifest([]byte("setup"))
 		m.Asset.Name = name
 		m.Asset.URL = "https://github.com/" + updateRepo + "/releases/download/v0.12.0/" + name
@@ -339,6 +340,119 @@ func TestUpdateVersionNamedAssetAndLegacyCompatibility(t *testing.T) {
 		if validateUpdateManifest(m) == nil {
 			t.Fatal("URL/name mismatch accepted")
 		}
+	}
+	for _, tc := range []struct{ name, urlName string }{
+		{"Deep-Legends-Setup-0.12.0-public.exe", names[1]},
+		{names[1], "Deep-Legends-Setup-0.12.0-public.exe"},
+		{"Deep-Legends-Setup-0.12.0-beta.exe", "Deep-Legends-Setup-0.12.0-beta.exe"},
+	} {
+		m := updateTestManifest([]byte("setup"))
+		m.Asset.Name = tc.name
+		m.Asset.URL = "https://github.com/" + updateRepo + "/releases/download/v0.12.0/" + tc.urlName
+		if validateUpdateManifest(m) == nil {
+			t.Fatalf("unexpected release asset accepted: name=%s urlName=%s", tc.name, tc.urlName)
+		}
+	}
+}
+
+func TestUpdatePublicManifestCheckAvailableAndReady(t *testing.T) {
+	setup := []byte("public installer fixture")
+	u := updateTestManager(t, setup)
+	if err := os.Mkdir(filepath.Join(u.store.root, "logs"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	u.diagnostic = (&app{storage: u.store}).recordDiagnostic
+	u.mirrors = []string{""}
+	manifest := updateTestManifest(setup)
+	manifest.Asset.Name = "Deep-Legends-Setup-0.12.0-public.exe"
+	manifest.Asset.URL = "https://github.com/" + updateRepo + "/releases/download/v0.12.0/" + manifest.Asset.Name
+	encoded, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.client = &http.Client{Transport: updateRoundTrip(func(r *http.Request) (*http.Response, error) {
+		if r.URL.String() != updateManifestPath {
+			t.Errorf("unexpected manifest URL: %s", r.URL)
+		}
+		return updateResponse(http.StatusOK, encoded), nil
+	})}
+	if !u.Check(true) {
+		t.Fatal("public manifest check did not start")
+	}
+	waitUpdateCheck(t, u)
+	if status := u.Status(); status.State != "available" || status.Error != "" || status.Latest != manifest.Version {
+		t.Fatalf("public manifest not available: %#v", status)
+	}
+	if err := os.WriteFile(filepath.Join(u.directory, manifest.Asset.Name), setup, 0600); err != nil {
+		t.Fatal(err)
+	}
+	u.now = func() time.Time { return time.Now().Add(10 * time.Second) }
+	if !u.Check(true) {
+		t.Fatal("ready check did not start")
+	}
+	waitUpdateCheck(t, u)
+	if status := u.Status(); status.State != "ready" || status.Error != "" {
+		t.Fatalf("public setup not ready: %#v", status)
+	}
+	data, err := u.store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"event":"update_check_succeeded"`) || !strings.Contains(string(data), `"state":"ready"`) || !strings.Contains(string(data), `"latest_version":"0.12.0"`) {
+		t.Fatalf("success diagnostics missing: %s", data)
+	}
+}
+
+func TestUpdateCheckFailureDiagnosticsPersistSafeStages(t *testing.T) {
+	for _, tc := range []struct {
+		name, mirror, stage, errorKind, safeError string
+		status                                    int
+		body                                      []byte
+	}{
+		{"http", "https://mirror.test/private-token/", "fetch", "http", "http-error", 503, nil},
+		{"parse", "", "parse", "decode", "manifest-decode-failed", 200, []byte("{")},
+		{"validate", "", "validate", "invalid-manifest", "manifest-invalid", 200, []byte(`{"schema":1}`)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			u := updateTestManager(t, []byte("setup"))
+			if err := os.Mkdir(filepath.Join(u.store.root, "logs"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			u.diagnostic = (&app{storage: u.store}).recordDiagnostic
+			u.mirrors = []string{tc.mirror}
+			u.client = &http.Client{Transport: updateRoundTrip(func(*http.Request) (*http.Response, error) { return updateResponse(tc.status, tc.body), nil })}
+			if !u.Check(true) {
+				t.Fatal("check did not start")
+			}
+			waitUpdateCheck(t, u)
+			if u.Status().Error == "" {
+				t.Fatal("failure was not surfaced")
+			}
+			data, err := u.store.readDiagnosticLog()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var found bool
+			for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+				var event map[string]any
+				if err := json.Unmarshal([]byte(line), &event); err != nil {
+					t.Fatal(err)
+				}
+				if event["event"] != "update_check_failed" {
+					continue
+				}
+				found = true
+				if event["stage"] != tc.stage || event["error_kind"] != tc.errorKind || event["error"] != tc.safeError || event["current_version"] != "0.11.2" || event["build_fingerprint"] != buildFingerprint || event["http_status"] != float64(tc.status) {
+					t.Fatalf("incomplete failure diagnostic: %#v", event)
+				}
+				if tc.mirror == "" && event["mirror_prefix"] != "direct" || tc.mirror != "" && event["mirror_prefix"] != "https://mirror.test/" {
+					t.Fatalf("unsafe mirror prefix: %#v", event)
+				}
+			}
+			if !found || strings.Contains(string(data), "private-token") || strings.Contains(string(data), updateManifestPath) {
+				t.Fatalf("missing or unsafe diagnostic: %s", data)
+			}
+		})
 	}
 }
 func TestUpdateDownloadHashRetryAndCleanup(t *testing.T) {

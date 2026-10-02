@@ -1,9 +1,9 @@
 # R121-P3-1 探测结论文档：位置偏好 / 分配位置 / 补位字段
 
-> **本文档只提供结论回填骨架，所有表格值必须由真机运行产生。** 禁止根据常识、客户端版本或合成 fixture 推断任何字段名或结论——合成 fixture 只用于验证扫描逻辑本身，不是真机证据。
+> 本文结论已根据 2026-09-25 的两份真机端点直探日志回填。合成 fixture 只验证扫描逻辑，不作为字段存在证据。
 
 - 工单出处：`WORKLIST-R121` P3-1，以及 `WORKLIST-R121-POSITION-PROBE-HELP-FALLBACK-INEFFECTIVE`（首次真机运行后的整改）
-- 探测代码：`backend/position_contract_probe.go`、`backend/position_contract_probe_test.go`
+- 探测代码：结论回填后按 §5 已删除；原探测输出归档在 `docs/r121-validation/`。
 - 探测名：`r121-position-preference-inventory`
 - 安全边界：只发 GET，永不写客户端；事件里的 `write_executed` 恒为 `false`；日志只保存**形状**（端点路径、HTTP 状态、键名、值类型、键所在对象路径），不保存任何响应体取值、账号标识、召唤师名或对局数据。
 
@@ -27,24 +27,31 @@
 
 ---
 
-## 1. 结论表（待新一轮真机运行填写）
+## 1. 结论表（2026-09-25 真机端点直探）
 
-执行时间：`待真机运行填写`　客户端版本/区服：`待真机运行填写`　`trace_id`：`待真机运行填写`　导出文件：`待真机运行填写`
-探测时客户端所处阶段（看 `/lol-gameflow/v1/gameflow-phase` 那条事件）：`待真机运行填写`
+执行时间：2026-09-25 14:29:21 / 14:29:31 UTC。`trace_id`：`2f87778ded39cf7351b61bc6` / `c026ce0ad394c7207b3e25a6`。原始文件和哈希见 [归档 README](r121-validation/README.md)。区服和客户端版本没有记录在探测事件中，不作推定。两份文件端点状态与键名形状相同，以下数字均适用于两份。
+
+文件 A 运行时选人接口也返回完整 `myTeam` / `theirTeam`，所以不能视为进入选人前的大厅快照。`gameflow-phase` 探测只记录裸字符串形状，不记录阶段取值。
 
 | 端点 | critical | `status` / `result` | `endpoint_scanned` | `scanned_keys` | 命中键名（`matched_keys` 里的 `name`，含 `owner` 与 `type`） | 覆盖范围（己方·双方·仅实时·可事后回看） |
 |---|---|---|---|---|---|---|
-| `/lol-lobby/v2/lobby` | 是 | 待填 | 待填 | 待填 | 待填 | 待填 |
-| `/lol-champ-select/v1/session` | 是 | 待填 | 待填 | 待填 | 待填 | 待填 |
-| `/lol-gameflow/v1/session` | 是 | 待填 | 待填 | 待填 | 待填 | 待填 |
-| `/lol-gameflow/v1/gameflow-phase` | 否 | 待填 | 待填 | 待填 | 待填（裸字符串响应，`scanned_keys` 应为 0） | 不适用 |
-| `/lol-match-history/v1/products/lol/current-summoner/matches` | 否 | 待填 | 待填 | 待填 | 待填（预期至少含 `teamPosition`/`individualPosition`，可用来确认扫描器有效） | 待填 |
-| `/lol-end-of-game/v1/eog-stats-block` | 否 | 待填 | 待填 | 待填 | 待填 | 待填 |
+| `/lol-lobby/v2/lobby` | 是 | 200 / `ok` | 是 | 216 | `localMember`、`members[]`：`firstPositionPreference`、`secondPositionPreference` (string)，`third`–`fifthPositionPreference` (null)，`autoFillEligible`、`autoFillProtectedForPromos/Remedy/Soloing/Streaking` (boolean)；`gameConfig.showPositionSelector` (boolean)，根对象 `scarcePositions` (array) | 大厅成员偏好与保护状态；本次在选人接口可用时读取 |
+| `/lol-champ-select/v1/session` | 是 | 200 / `ok` | 是 | 504 | `myTeam[]`、`theirTeam[]`：`assignedPosition` (string)、`isAutofilled` (boolean)；根对象 `positionSwaps` (array) | 选人阶段双方字段形状；对方取值未知 |
+| `/lol-gameflow/v1/session` | 是 | 200 / `ok` | 是 | 292 | `gameData.teamOne[]`、`teamTwo[]`：`selectedPosition`、`selectedRole` (string)；`gameData.queue.showPositionSelector` (boolean) | 对局流程双方分路；已用于实时位置排序 |
+| `/lol-gameflow/v1/gameflow-phase` | 否 | 200 / `ok` | 否 | 0 | 无；裸字符串响应 | 不适用 |
+| `/lol-match-history/v1/products/lol/current-summoner/matches` | 否 | 200 / `ok` | 是 | 589 | 0 命中；`keys_truncated=true`、扫描深度上限 3 | 不能据此否定战绩里存在位置字段 |
+| `/lol-end-of-game/v1/eog-stats-block` | 否 | 404 / `unavailable` | 否 | 0 | 无 | 本次不可用 |
 
-**`verdict`（取自 `position_contract_probe_summary`）**：`待真机运行填写`（`found` / `not-found` / `inconclusive` 三选一，不得预填）
-**`inconclusive_reason`**：`待真机运行填写`
+**`verdict`（两次 `position_contract_probe_summary`）**：`found`；`inconclusive_reason` 为空。两次均探测 6 个端点、扫描 4 个，3 个 critical 端点证据可判定，扫描 1601 个键、命中 97 个键。`/swagger/v3/openapi.json` 与 `/swagger/v2/swagger.json` 均 404；结论只来自端点直探。
 
-若 `verdict=found`，再补一张「字段 → 语义 → 是否等于补位」的判断表；**注意命中谓词只代表键名含 position/preference/fill/role/lane/assigned 等词，不等于该字段就是「补位」标记**，语义必须另行论证。
+| 字段 | 语义与使用边界 | 是否直接等于补位 |
+|---|---|---|
+| `myTeam[].isAutofilled` | 选人阶段客户端给己方每位玩家的布尔字段；本次日志只记录类型，未记录任何人的取值 | 是，实时详情只采用己方 `true` |
+| `theirTeam[].isAutofilled` | 对方对象有同名布尔字段，但具体取值是否真实填充未知 | 暂不用于 UI，只记录汇总计数 |
+| `assignedPosition`、`selectedPosition` | 分配或选择的位置 | 否 |
+| `first/secondPositionPreference`、`autoFillEligible/Protected*` | 选位偏好、补位资格与保护状态 | 否，不能代表这局确实被补位 |
+
+探测只保存键名和类型，不保存响应取值；下一次真机用 `champ_select_autofill_shape` 的对方两项汇总计数核查对方字段是否可用。两份 start 事件没有 `write_executed` 字段，其余事件该字段均为 `false`；归档文件未包含响应体取值、玩家标识或对局数据。
 
 ## 2. 证据判读（新口径）
 
@@ -59,41 +66,16 @@
 6. 只抄日志里实际出现的键名与类型，不把 fixture、推断或记忆中的字段名写进结论。
 7. **`not-found` 的范围边界（回填结论时必须一并写明）**：扫描覆盖「深度 ≤ 3 的键」与「每个数组的前 10 个元素」。到达深度上限时，若被跳过的值下面**还有非空结构**，会置 `keys_truncated=true`，该端点随即失去否定证据资格（`verdict` 降级为 `inconclusive`）；若被跳过的只是标量则不算截断——否则任何真实响应都会被判不完整，关键端点永远无法下否定结论。因此 `not-found` 的严格表述是：**在深度 ≤3、每数组前 10 个元素的范围内，这些端点的响应里没有命中谓词的键，且没有任何因超限而漏扫的结构**。
 
-## 3. 真机运行
+## 3. 真机运行归档
 
-**关键：探测结果强依赖客户端所处阶段。** lobby 端点只在**已进入队列/大厅**时有效，champ-select 只在**英雄选择阶段**有效。上一轮之所以 inconclusive，很可能就是跑探测时客户端不在这些阶段。因此建议分两次跑：
-
-- 第一次：客户端停在**大厅且已选好想打的队列**（单双排/灵活组排，最好已经点了「寻找对局」但还没进选人）；
-- 第二次：客户端处于**英雄选择阶段**（此时 champ-select 与 gameflow session 都有内容）。
-
-启动并登录 League 客户端后，在仓库根目录执行。`R121_POSITION_PROBE_LOCKFILE` 可填客户端 lockfile 绝对路径；自动发现成功时可留空。
-
-### Git Bash / WSL
-
-```bash
-R121_POSITION_PROBE=1 \
-R121_POSITION_PROBE_LOCKFILE='D:/Games/League of Legends/LeagueClient/lockfile' \
-R121_POSITION_PROBE_OUTPUT=docs/r121-validation/position-endpoint-probe.jsonl \
-go test ./backend -run 'R121Position' -v -timeout 5m
-```
-
-### PowerShell
-
-```powershell
-$env:R121_POSITION_PROBE="1"
-$env:R121_POSITION_PROBE_LOCKFILE="D:\Games\League of Legends\LeagueClient\lockfile"
-$env:R121_POSITION_PROBE_OUTPUT="docs/r121-validation/position-endpoint-probe.jsonl"
-go test ./backend -run 'R121Position' -v -timeout 5m
-```
-
-测试会把诊断日志写入临时本地存储，并在设置 `R121_POSITION_PROBE_OUTPUT` 时导出完整 JSONL。测试自身会在结尾打印 `verdict` 并据此判定：`inconclusive` 会让测试**失败**（这是刻意的，避免把「没查到」当成「查过了」而静默通过）。
+两份用户上传的原始输出已归档在 `docs/r121-validation/`，SHA-256 和运行时间见 README。原计划分别在大厅和选人阶段运行；这次两份输出都显示选人接口返回了完整阵容，所以未得到可靠的选人前快照。R121 探测程序已删除，后续验证使用正式应用的 `champ_select_autofill_shape` 汇总事件和实时卡片，不再运行临时探针。
 
 ## 4. 回填步骤
 
 1. 打开导出的 JSONL，找到 `position_contract_probe_summary`，记录 `verdict`、`inconclusive_reason`、`endpoints_probed`、`endpoints_scanned`、`endpoints_critical_conclusive`、`endpoint_keys_scanned`、`endpoint_matched_keys`。
 2. 对每条 `position_endpoint_probe` 事件，按 `endpoint_path` 逐行填 §1 的结论表：`status`/`result`、`endpoint_scanned`、`scanned_keys`、`matched_keys`（只抄 `name`/`type`/`owner`）。
 3. 若 `verdict=inconclusive`：§1 的 `verdict` 行如实写 `inconclusive`，其余单元格保留「待真机运行填写」或填实际的 404 状态，**不要写「不存在」**；然后按 §3 换阶段重跑。
-4. 回填完成后复核：所有事件的 `write_executed` 均为 `false`；导出内容里没有任何响应体取值、召唤师名、puuid 或对局数据。
+4. 回填完成后复核：start 事件未带 `write_executed`，其余事件均为 `false`；导出内容里没有任何响应体取值、召唤师名、puuid 或对局数据。
 
 ## 5. 探测代码处置约定
 

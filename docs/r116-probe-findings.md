@@ -1,14 +1,14 @@
 # R116-探测 结论文档：海克斯选择端点穷举 + 海斗局内数据形状
 
-> **本文档由代码侧准备完成，三项判据的真机观测值待用户执行后回填。**
-> 编写环境是 macOS，没有 Windows、没有 League 客户端、无法进行真实对局，因此本文档里
-> **没有任何一条真机观测值**；所有 `待填` 单元格必须由真机导出的诊断日志逐字抄写。
+> **2026-09-25 R155 回填：**判据一未获形式确证；`functions`/`events` 已完整扫描且没有相关接口，实践上按不可行处理，不再安排新一轮探测。判据二可行；判据三选人阶段看不到对方英雄。
+> 两轮真机原始文件见 `docs/r116-validation/`；`skinName` 修复仍待下一局真机复核。
 > 项目红线：证据不足明确降级，绝不用推断值代替真实值——包括「看起来应该是 0」这种推断。
 
 - 工单原文：`docs/history/worklists/R116-探测-海克斯选择端点与局内数据形状探测-工单.md`
 - 执行账本（做了什么、验证到哪一步）：`docs/r116probe-execution-ledger.md`
+- 第二轮回填与探针清理账本：`docs/history/ledgers/r155-execution-ledger.md`
 - 背景依据：`docs/r116-proposal-feasibility-review.md` 第 3 节（P1 逐项证伪）与 3.2 节（这条探测）
-- 探测代码：`backend/augment_contract_probe.go`、`backend/augment_contract_probe_test.go`、`backend/gameplay.go` 的 `aramMode && !arenaMode` 分支
+- 历史临时探测代码：`backend/augment_contract_probe.go`、`backend/augment_contract_probe_test.go`（R155 已删）；正式采样分支仍见 `backend/gameplay.go` 的 `aramMode && !arenaMode`
 
 ---
 
@@ -16,13 +16,13 @@
 
 | # | 判据 | 读哪个诊断事件的哪个字段 | 状态 | 回填位置 |
 |---|---|---|---|---|
-| 一 | LCU 客户端契约里是否存在海克斯三选一候选端点（决定 P1-1 去留） | `augment_contract_probe.count` / `.operations[].path`；`augment_contract_probe_summary.negative_conclusive_all` | **待真机验证** | §2.4 |
-| 二 | 海斗 `/liveclientdata/playerlist` 是否带装备字段（决定 P1-4 去留） | `live_client_playerlist_shape.element_keys`（+ `live_client_allgamedata_shape.arrays` 看 items 元素结构） | **待真机验证** | §3.4 |
-| 三 | 海斗选人阶段能否看到对方阵容（决定 P1-2/P1-3 覆盖率） | `lcu_champ_select_session_shape.their_team_length` / `.their_team_nonzero_counts` | **待真机验证** | §4.4 |
-| 交叉 | 海斗 allgamedata 顶层键（不阻塞判定，只交叉核实） | `live_client_allgamedata_shape.top_level_keys` | **待真机验证**（依赖本次新增分支） | §5.3 |
+| 一 | LCU 客户端契约里是否存在海克斯三选一候选端点（决定 P1-1 去留） | `augment_contract_probe.count` / `.matched_items`；`augment_contract_probe_summary.negative_conclusive_all` | **未获形式确证，但 functions/events 已扫满、无相关命中——按不可行处理，不再安排新一轮探测** | §2.4 |
+| 二 | 海斗 `/liveclientdata/playerlist` 是否带装备字段（决定 P1-4 去留） | `live_client_playerlist_shape.element_keys`（+ `live_client_allgamedata_shape.arrays` 看 items 元素结构） | **可行** | §3.4 |
+| 三 | 海斗选人阶段能否看到对方阵容（决定 P1-2/P1-3 覆盖率） | `lcu_champ_select_session_shape.their_team_length` / `.their_team_nonzero_counts` | **看不到对方英雄** | §4.4 |
+| 交叉 | 海斗 allgamedata 顶层键（不阻塞判定，只交叉核实） | `live_client_allgamedata_shape.top_level_keys` | **已核实，未知键见 §3.4** | §5.3 |
 
-代码侧已完成：探测函数 + 单测（含工单要求的两条对抗变异）全部就位，`go build` / `go vet` / `go test` 全绿，详见账本。
-真机侧未完成：P0 第 4 条（打开客户端触发探测）、P1 第 2~3 条（打一局海斗并导出日志）。
+历史代码侧验证：临时探测函数 + 单测（含对抗变异）曾通过 `go build` / `go vet` / `go test`；R155 判据收尾后已按删除条件清理临时探测代码，详见执行账本。
+2026-09-25 已收到两局真实 KIWI 对局与两轮端点探测；判据一按 R155 收尾，`skinName` 真机复核仍待执行。
 
 ---
 
@@ -76,9 +76,9 @@
 为此探测代码做了两件事（全部在新文件内，未改任何既有逻辑）：
 
 1. **每条事件自带判据护栏字段**：`status` / `result` / `contract_read` / `negative_conclusive`。
-   `contract_read` 只有在「HTTP 200 且真的解析到契约内容（openapi 的 `paths` 非空 / help 扫到路径 token）」时才为 true；
+   `contract_read` 只有在「HTTP 200 且契约结构完整扫描（openapi 的 `paths` 非空 / help 三组数组均完整）」时才为 true；
    **只有 `contract_read=true` 时 `count == 0` 才构成否定证据**。
-2. **补第三个来源 `/help?format=Full` 的格式无关兜底扫描**：正则收集全部 `/段/段…` 路径 token → 去重 → 谓词过滤，
+2. **补第三个来源 `/help?format=Full` 的结构化兜底扫描**：扫描 `functions/events/types` 的顶层名称与嵌套 `url/path/uri`，
    同时记录根对象形状（`json_root` / `root_keys` / `root_shape` / `root_key_count`），
    落实 R82 第 4.2 节第 1 条「先把形状打出来，别再猜」与第 2 条「加一条与格式无关的兜底」。
    汇总事件 `augment_contract_probe_summary.negative_conclusive_all` **只在所有可读来源都零命中时才为 true**。
@@ -86,16 +86,14 @@
 → **判据一的阈值因此修正为**：先看 `contract_read_any`，为 false 时本轮探测**不出结论**（要换来源或换客户端版本重跑）；
 为 true 时才用 `count` 判定。这一条修正已写进代码与单测（`TestR116AugmentContractProbeUnreadableContractIsNotConclusive`）。
 
-### 1.4 三个局内形状事件在仓库存档里**没有任何真实观测**
+### 1.4 R153 归档前，三个局内形状事件在仓库存档里**没有真实观测**
 
 检索 `docs/` 与 `backend/testdata/`：`live_client_playerlist_shape`、`live_client_allgamedata_shape`、
 `lcu_champ_select_session_shape` 只出现在**源码快照**（`docs/r100-validation/before/*.txt`、
 `docs/r96-validation/before-arena_truth_diagnostics.go.txt`）与工单/评审文本里。
-仓库内唯一的 `.jsonl` 真实日志存档是 `docs/r89-kr-player/diagnostic-samples.jsonl` 与 `catalog-failure.jsonl`，
-与这三个事件无关。
+当时相关的 `.jsonl` 真实日志存档只在 `docs/r89-kr-player/`，与这三个事件无关。
 
-→ 与工单第 49-51 行「海斗（KIWI）下这个事件从未被观测过」「没有一条真实海斗/大乱斗对局的观测」一致。
-判据二、三、交叉项都是**从零开始的第一次观测**，没有可以先抄的历史值。
+→ 这是 2026-09-20 的先验状态。R153 已把 2026-09-25 的两局真实海斗日志归档至 `docs/r116-validation/mayhem-live-shapes.jsonl`，并在 §3.4、§4.4、§5.3 回填。
 
 ### 1.5 斗魂（CHERRY）下的 19 键基线 —— 判据二的对照物
 
@@ -144,11 +142,11 @@ position_match_source_counts:{"riotId":17,"summonerName":0}`。
 | `source_path` | `/swagger/v3/openapi.json`、`/swagger/v2/swagger.json`、`/help?format=Full` |
 | `status` / `result` | HTTP 状态码；`ok` / `unavailable` / `too-large` |
 | `body_bytes` | 契约文档实际字节数（16 MiB 上限） |
-| **`count`** | **本来源命中谓词的条目数**：openapi = 命中的 operation 数（get/put/patch/post/delete/head/options 全算）；help = 命中的去重路径数 |
+| **`count`** | **本来源命中谓词的条目数**：openapi = 命中的 operation 数（get/put/patch/post/delete/head/options 全算）；help = 命中的名称或路径字段数（静态目录单列） |
 | `scanned_paths` / `matched_paths` | openapi：`paths` 总数 / 命中谓词的路径数（**全量扫描，不限定前缀**） |
-| `paths_scanned` / `unique_paths` | help：扫到的路径 token 数 / 去重后数量 |
+| `events/functions/types_length`、`*_scanned`、`*_nodes_visited`、`*_limit_reached` | help：各数组顶层项、递归节点及预算状态；R153 后新增后两类字段 |
 | `operations[]` | 与 `objective_badge_contracts` **同构**：`path` / `method` / `parameters`（`name`+`in`+`required`+`schema`）/ `body` / `response_codes` |
-| `matched_paths[]`（help） | 命中的路径字面量列表（最多 500 条，超出时 `paths_truncated=true`，但 `count` 仍是全量） |
+| `matched_items[]`（help） | 命中的数组/字段/安全值列表（最多 200 条，超出时 `matches_truncated=true`，但 `count` 仍是全量） |
 | `operations_truncated` | 明细超过 200 条被截断（`count` 不受影响） |
 | `json_root` / `root_keys` / `root_shape` | help 来源的根对象形状（R82 4.2-1 要求） |
 | **`contract_read`** | **是否真的读到契约内容**（判据护栏） |
@@ -180,30 +178,72 @@ position_match_source_counts:{"riotId":17,"summonerName":0}`。
 | **C. `count > 0`，但命中全是 §1.2 那类静态目录** | 工单未单列这种情况（先验证据 §1.2 补的） | 视同 A 处理：静态目录不解决「这一手的 3 个候选」，P1-1 仍判不可行；但在结论里写明「命中的是静态目录，不是选择端点」，避免后人误读 |
 | **D. 三个来源都读不到（`contract_read_any == false`）** | 工单未覆盖（先验证据 §1.3 补的） | **不出结论**。记录 status/result，改约一次能读到契约的客户端版本或换来源重跑；P1-1 保持「未判定」，不许默认删除也不许默认实现 |
 
-### 2.4 回填表（待真机观测，禁止填推断值）
+### 2.4 回填表（2026-09-25 首轮真机观测）
 
-执行时间：`待填`　客户端版本/区服：`待填`　是否在对局中：`待填`（工单要求：登录即可，不需要在对局中）
-`trace_id`：`待填`　导出文件：`待填`（建议路径见 §7）
+执行时间：2026-09-25 06:14:53Z；应用版本：0.12.19；客户端版本/区服：事件未记录；是否在对局中：探测事件未记录（时间处于第二局诊断区间）。
+`trace_id`：`a0b512f620d71407490f3416`；导出文件：`docs/r116-validation/augment-contract-probe-round1-0925.jsonl` 第 1–5 行。
 
 | `contract_kind` | `source_path` | `status` | `result` | `body_bytes` | `scanned_paths` / `paths_scanned` | `count` | `contract_read` | `negative_conclusive` |
 |---|---|---|---|---|---|---|---|---|
-| openapi-v3 | `/swagger/v3/openapi.json` | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 |
-| openapi-v2 | `/swagger/v2/swagger.json` | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 |
-| help-full | `/help?format=Full` | 待填 | 待填 | 待填 | 待填（另记 `unique_paths`=待填） | 待填 | 待填 | 待填 |
+| openapi-v3 | `/swagger/v3/openapi.json` | 404 | unavailable | 0 | 未提供 | 未提供 | false | false |
+| openapi-v2 | `/swagger/v2/swagger.json` | 404 | unavailable | 0 | 未提供 | 未提供 | false | false |
+| help-full | `/help?format=Full` | 200 | ok | 3032902 | 不适用；`events=749/749`、`functions=1468/1468`、`types=3578/3578` | 21 | false | false |
 
-汇总：`contract_read_any` = `待填`　`negative_conclusive_all` = `待填`
+help-full：`scan_limit_reached=true`、`matches_truncated=false`、`static_catalog_count=0`。三个数组的顶层元素数满，但递归节点预算耗尽，不能视为完整扫描。
+汇总：`contract_read_any=false`、`negative_conclusive_all=false`。
 
 命中的路径逐条列出（排除 §1.2 已知无关项后还剩几条）：
 
-| # | `path` | `method` | `parameters`（name/in/required） | `body` 关键字段 | 是否「按对局/按玩家的候选或已选端点」 | 是否已知无关命中 |
-|---|---|---|---|---|---|---|
-| 1 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 |
-| 2 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 |
+help-full 命中的是契约名称，不提供 `method`、`parameters` 或 `body`；以下 21 条均为已知无关命中，均不是按对局/按玩家的候选或已选端点：
+
+| # | 数组 | `matched_items[].value` | 性质 | 已知无关 |
+|---:|---|---|---|---|
+| 1 | functions | `DeleteLolCosmeticsV1SelectionTftAugmentPillar` | TFT 外观 | 是 |
+| 2 | functions | `GetLolCosmeticsV1InventoriesBySetNameAugmentPillars` | TFT 外观 | 是 |
+| 3 | functions | `GetLolInventoryV1CherryInventory` | Cherry 库存清单 | 是 |
+| 4 | functions | `PutLolCosmeticsV1SelectionTftAugmentPillar` | TFT 外观 | 是 |
+| 5 | types | `LolCatalogGameDataSkinAugment` | 皮肤外观类型 | 是 |
+| 6 | types | `LolChampionsCollectionsChampionSkinAugment` | 皮肤外观类型 | 是 |
+| 7 | types | `LolChampionsCollectionsChampionSkinAugmentOverlays` | 皮肤外观类型 | 是 |
+| 8 | types | `LolChampionsCollectionsChampionSkinAugments` | 皮肤外观类型 | 是 |
+| 9 | types | `LolCollectionsCollectionsSummonerBackdropAugments` | 个人资料背景类型 | 是 |
+| 10 | types | `LolCollectionsGameDataChampionSkinAugment` | 皮肤外观类型 | 是 |
+| 11 | types | `LolCollectionsGameDataChampionSkinAugmentOverlays` | 皮肤外观类型 | 是 |
+| 12 | types | `LolCollectionsGameDataChampionSkinAugments` | 皮肤外观类型 | 是 |
+| 13 | types | `LolCosmeticsCosmeticsTFTAugmentPillar` | TFT 外观类型 | 是 |
+| 14 | types | `LolCosmeticsCosmeticsTFTAugmentPillarViewModel` | TFT 外观类型 | 是 |
+| 15 | types | `LolCosmeticsCosmeticsTFTPlaybookAugment` | TFT 外观类型 | 是 |
+| 16 | types | `LolCosmeticsCosmeticsTFTPlaybookAugmentEffectAmount` | TFT 外观类型 | 是 |
+| 17 | types | `LolCosmeticsGameDataTFTAugmentPillar` | TFT 外观类型 | 是 |
+| 18 | types | `LolCosmeticsTFTAugmentPillarFavoritesViewModel` | TFT 外观类型 | 是 |
+| 19 | types | `LolCosmeticsTFTAugmentPillarGroupViewModel` | TFT 外观类型 | 是 |
+| 20 | types | `LolCosmeticsTFTAugmentPillarGroupedViewModel` | TFT 外观类型 | 是 |
+| 21 | types | `LolEndOfGameTFTEndOfGameCustomAugmentContainerViewModel` | TFT 外观类型 | 是 |
 
 help 来源的根对象形状（若 openapi 全 404，这一栏是唯一能判读的东西）：
-`json_root` = `待填`　`root_key_count` = `待填`　`root_keys` = `待填`　`root_shape` = `待填`
+`json_root=object`；`root_key_count=3`；`root_keys=[events, functions, types]`；`root_shape={events:array:749, functions:array:1468, types:array:3578}`。
 
-**判据一结论（A/B/C/D 之一）**：`待填`　→ 对 P1-1 的处置：`待填`
+**首轮当时的判据一结论：D 的变体。**两个 openapi 来源不可读；help-full HTTP 200，但递归节点预算打满，`contract_read=false`。首轮暂不出结论；R155 第二轮结果与实践收尾判断见下。
+
+#### 第二轮回填（R155，2026-09-25 08:14:38Z）
+
+原始文件：`docs/r116-validation/augment-contract-probe-round2-0925.jsonl` 第 1–5 行；`run_id=ab3ccdfafb1c41a65e88b2eb`；`trace_id=430c7f117d542ba85c652080`。本轮仍是只读探测，三个来源均为 GET、`write_executed=false`。
+
+| 来源 | `status` | `result` | `body_bytes` | `count` | `contract_read` | `negative_conclusive` |
+|---|---:|---|---:|---:|---|---|
+| openapi-v3 | 404 | unavailable | 0 | 未提供 | false | false |
+| openapi-v2 | 404 | unavailable | 0 | 未提供 | false | false |
+| help-full | 200 | ok | 3027989 | 21 | false | false |
+
+| help-full 分组 | `scanned/length` | `nodes_visited` | `limit_reached` | 本轮能否完整判读该组 |
+|---|---:|---:|---|---|
+| `events` | 718/718 | 5752 | false | 是 |
+| `functions` | 1468/1468 | 28724 | false | 是 |
+| `types` | 3578/3578 | 100000 | true | 否；顶层元素已计数，递归字段未扫完 |
+
+help-full 另记：`scan_limit_reached=true`、`matches_truncated=false`、`static_catalog_count=0`。汇总事件仍为 `contract_read_any=false`、`negative_conclusive_all=false`，**不能写成形式上的“确证无端点”**。第二轮 `matched_items` 的 21 条与首轮上表逐项、逐序相同：4 条 `functions` 为 TFT 外观/Cherry 库存接口，17 条 `types` 为外观或 TFT 数据类型；`events` 无命中。没有按局/按玩家的实时海克斯候选或已选接口命中。
+
+**实践结论：P1-1 按不可行处理。**可调用接口声明所在的 `functions` 与事件声明 `events` 已完整扫描且未触顶，没有相关接口；`types` 是数据结构定义而非可调用接口，预算耗尽仍使整份 help 契约不满足形式确证门槛。R155 到此收尾判据一，不再安排新一轮探测；将来客户端契约变化时需重新核实，不把本轮推断拔高为 `negative_conclusive_all=true`。
 
 ---
 
@@ -233,8 +273,8 @@ element_keys 含 "items"？
   是 → 再看 allgamedata 的 $.allPlayers[].items 的 element_keys 是否为 itemID/slot/count 那一套
         一致 → P1-4 可行
         不同 → P1-4 不可行（结构不同即视为不可用）
-element_keys 出现 "<unknown-key>"？（arenaShapeKey 的兜底分支）
-  是 → 海斗有斗魂没有的字段，必须人工判读该字段是否与本方案相关（可能是 augment 相关，属重大发现）
+allgamedata 的 $.allPlayers.element_keys 出现 "<unknown-key>"？（arenaShapeKey 的兜底分支）
+  是 → 核对已知字段表与 field_shapes，再判断是否有本方案相关新字段
 ```
 
 ### 3.3 三种可能结论 → 后续动作（工单原文）
@@ -243,22 +283,24 @@ element_keys 出现 "<unknown-key>"？（arenaShapeKey 的兜底分支）
 |---|---|---|
 | 含 `items` 且结构与斗魂一致 | 「若含 `items` 且元素结构与斗魂一致（`itemID`/`slot`/`count` 等）→ P1-4「下一步出装」判定为**可行**，转入 R116-D 正式实现」 | P1-4 保留在 R116-D；实现是 `parseLiveClientPlayerList` 多读一个 `items`（评审 3.1 表） |
 | 不含 `items` 或结构不同 | 「若不含 `items` 或结构不同 → P1-4 判定为**不可行**，从 R116-D 移除，记录到 `docs/r116-probe-findings.md`」 | 从 R116-D 移除 P1-4，本表即为记录 |
-| 出现 `<unknown-key>` | 「说明海斗有斗魂没有的字段，需要人工判读该字段是否与本方案相关」 | 把 `element_keys` 全量抄进 §3.4，逐个人工判读；若疑似 augment 相关，升级为独立调研项（同 §5 判据 3） |
+| allgamedata 出现 `<unknown-key>` | 「说明海斗可能有斗魂没有的字段，需要人工判读该字段是否与本方案相关」 | 把 `element_keys` 和 `field_shapes` 核对到 §3.4；若疑似 augment 相关，升级为独立调研项（同 §5 判据 3） |
 
-### 3.4 回填表（待真机观测）
+### 3.4 回填表（2026-09-25 两局真机观测）
 
-对局信息：模式（KIWI / ARAM_MAYHEM / ARAM_MAYHEM_CLASSIC）=`待填`　`game_id`=`待填`　日期时间=`待填`
+对局信息：模式 `KIWI`、队列 `2400`；`game_id=8999110339` / `8999150286`；原始文件 `docs/r116-validation/mayhem-live-shapes.jsonl` 第 2287–2288、3612–3613 行。
 
 | `phase` | `http_status` | `player_count` | `result` | `element_keys`（逐项抄，不要省略） | 含 `items`？ | 含 `<unknown-key>`？ |
 |---|---|---|---|---|---|---|
-| 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 |
-| 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 |
+| InProgress（05:42:23Z） | 200 | 10 | ungrouped | `championName, isBot, isDead, items, level, position, rawChampionName, rawSkinName, respawnTimer, riotId, riotIdGameName, riotIdTagLine, runes, scores, skinID, skinName, summonerName, summonerSpells, team` | 是 | 否 |
+| InProgress（06:10:55Z） | 200 | 10 | ungrouped | `championName, isBot, isDead, items, level, position, rawChampionName, rawSkinName, respawnTimer, riotId, riotIdGameName, riotIdTagLine, runes, scores, skinID, skinName, summonerName, summonerSpells, team` | 是 | 否 |
 
-与斗魂 19 键基线（§1.5）的差异：多出的键 = `待填`　缺失的键 = `待填`
+与斗魂 19 键基线（§1.5）的差异：多出的键 = 无；缺失的键 = 无。
 
-`items[]` 元素结构（取自 §5 的 `live_client_allgamedata_shape.arrays`）：路径 = `待填`　`element_keys` = `待填`
+`items[]` 元素结构（两局均取自 §5 的 `live_client_allgamedata_shape.arrays`）：路径 `$.allPlayers[].items`；非空元素的 `element_keys=[canUse, consumable, count, displayName, itemID, price, rawDescription, rawDisplayName, slot]`。
 
-**判据二结论**：`待填`（可行 / 不可行 / 需人工判读）　→ 对 P1-4 的处置：`待填`
+**判据二结论：可行。**P1-4「下一步出装」保留在 R116-D，无需新增判定分支。
+
+顺手核实：两局 `$.allPlayers` 的 `element_keys` 比上表均少 `skinName`、多 `<unknown-key>`。`field_shapes["<unknown-key>"]` 均为单个非空字符串形状；`arenaShapeKey` 的已知字段表恰好遗漏 `skinName`，其余 18 个玩家键均已在表内。R153 已补白名单并通过本地测试；**状态：已定位，待下一局真机复核**。复核应见 `skinName` 且不见 `<unknown-key>`，之后才更新为“已复核，非海克斯相关”。
 
 ---
 
@@ -284,7 +326,7 @@ element_keys 出现 "<unknown-key>"？（arenaShapeKey 的兜底分支）
 
 ```
 their_team_length > 0 且 their_team_nonzero_counts 里 championId 非零 > 0 → 选人阶段能看到对方阵容
-their_team_length == 0（或非零计数全 0）                                  → 选人阶段看不到
+their_team_length == 0 或 championId 非零计数 == 0                       → 选人阶段看不到对方英雄
 ```
 注意：海斗是 5v5，若 `their_team_length` 为 5 属正常；若为 0，则与评审第 3 节的保守判定一致。
 
@@ -292,17 +334,21 @@ their_team_length == 0（或非零计数全 0）                                
 
 | 观测 | 工单原文判据 | 后续动作 |
 |---|---|---|
-| `their_team_length > 0` | 「`> 0` → P1-2/P1-3 可以扩展到 ChampSelect 阶段」 | R116-D 的 P1-2（阵容协同）/P1-3（克制提示）可在选人阶段出现；仍受覆盖率约束（评审 3.1：协同 7/172、克制 34.6%），形态按「有就显示、没有就整块隐藏」 |
-| `their_team_length == 0` | 「`== 0` → P1-2/P1-3 只在 InProgress 阶段出现（与本次评审的保守判定一致，**不算回退**）」 | R116-D 的 P1-2/P1-3 明确只在 InProgress 出；选人阶段不做克制/协同展示 |
+| `their_team_length > 0` 且 `championId` 非零计数 > 0 | 原工单只写「`> 0` → P1-2/P1-3 可以扩展到 ChampSelect 阶段」；§4.2 增加实际英雄 ID 条件 | R116-D 的 P1-2（阵容协同）/P1-3（克制提示）可在选人阶段出现；仍受覆盖率约束（评审 3.1：协同 7/172、克制 34.6%），形态按「有就显示、没有就整块隐藏」 |
+| `their_team_length == 0` 或 `championId` 非零计数 == 0 | 原工单「`== 0` → P1-2/P1-3 只在 InProgress 阶段出现」；对空壳位置按 §4.2 同样处理 | R116-D 的 P1-2/P1-3 明确只在 InProgress 出；选人阶段不做克制/协同展示，不算回退 |
 
-### 4.4 回填表（待真机观测）
+### 4.4 回填表（2026-09-25 两局真机观测）
 
 | `phase` | `game_mode` | `queue_id` | `their_team_length` | `their_team_nonzero_counts`（抄 championId 一项即可，其余可略） | `my_team_length` | `top_level_keys` |
 |---|---|---|---|---|---|---|
-| 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 |
-| 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 |
+| ChampSelect（05:40:45Z） | KIWI | 2400 | 5 | `championId=0`；其余非零：`cellId:4, nameVisibilityType:5, team:5, wardSkinId:5` | 5 | 见下方共同键表 |
+| ChampSelect（06:10:05Z） | KIWI | 2400 | 5 | `championId=0`；其余非零：`cellId:5, nameVisibilityType:5, team:5, wardSkinId:5` | 5 | 见下方共同键表 |
 
-**判据三结论**：`待填`（>0 / ==0）　→ 对 P1-2/P1-3 的处置：`待填`
+两条事件的 `top_level_keys` 相同，逐项为：`actions, allowBattleBoost, allowDuplicatePicks, allowLockedEvents, allowPlayerPickSameChampion, allowRerolling, allowSkinSelection, allowSubsetChampionPicks, bans, benchChampions, benchEnabled, boostableSkinCount, chatDetails, counter, disallowBanningTeammateHoveredChampions, gameId, hasSimultaneousBans, hasSimultaneousPicks, id, isCustomGame, isLegacyChampSelect, isSpectating, localPlayerCellId, lockedEventIndex, myTeam, pickOrderSwaps, positionSwaps, queueId, rerollsRemaining, showQuitButton, skipChampionSelect, theirTeam, timer, trades`。原始文件第 1447、3285 行。
+
+两局 `InProgress` 的 `lcu_gameflow_session_shape` 均显示 `team_one_length=5`、`team_two_length=5`，双方 `championId` 非零计数均为 5（原始文件第 2241、3522 行）。
+
+**判据三结论：`==0`（对方 `championId` 全 0，视同看不到）。**P1-2/P1-3 只在 InProgress/Reconnect 展示；选人阶段不做克制/协同展示，不算回退。
 
 ---
 
@@ -344,13 +390,18 @@ if aramMode && !arenaMode && (phase == "GameStart" || phase == "InProgress" || p
 
 | `game_id` | `http_status` | `success` | `top_level_keys`（逐项抄） | `$.allPlayers[].items` 的 `element_keys` | 是否出现 augment/cherry/`<unknown-key>` |
 |---|---|---|---|---|---|
-| 待填 | 待填 | 待填 | 待填 | 待填 | 待填 |
+| 8999110339 | 200 | true | `[activePlayer, allPlayers, events, gameData]` | `[canUse, consumable, count, displayName, itemID, price, rawDescription, rawDisplayName, slot]` | 是：`$.allPlayers` 有 `<unknown-key>`，已定位为 `skinName` 白名单遗漏；顶层无 augment/cherry |
+| 8999150286 | 200 | true | `[activePlayer, allPlayers, events, gameData]` | `[canUse, consumable, count, displayName, itemID, price, rawDescription, rawDisplayName, slot]` | 是：`$.allPlayers` 有 `<unknown-key>`，已定位为 `skinName` 白名单遗漏；顶层无 augment/cherry |
+
+两局的 `<unknown-key>` 已按 §3.4 定位为已知字段漏收，不作为新增海克斯端点线索；修复后的诊断仍待下一局真机确认。
 
 ---
 
-## 6. 用户操作步骤清单（照做即可）
+## 6. 历史真机操作步骤（保留供复核）
 
-### 6.A 判据一：LCU 端点穷举（**不需要打包应用，不需要进对局**，只要客户端已登录）
+### 6.A 判据一：LCU 端点穷举（R155 后入口已删除，不再执行）
+
+以下命令记录当时的探测方式；`TestR116AugmentContractProbeLiveClient` 已随 R155 清理，当前仓库无法再运行。两轮原件与结论见 §2.4、§7；不要覆盖归档文件。
 
 > 触发入口说明：工单 P0 第 3 条建议「诊断面板加临时按钮」或「复用导出诊断日志入口」。
 > 这两种都要改 `backend/main.go`（注册路由）与 `backend/web/**`（加按钮），本次执行的允许改动范围不含这两个文件，
@@ -407,20 +458,19 @@ if aramMode && !arenaMode && (phase == "GameStart" || phase == "InProgress" || p
 
 ---
 
-## 7. 真机诊断日志导出文件（待办：路径已定，文件待产出）
+## 7. 真机诊断日志导出文件（2026-09-25 已归档两轮）
 
 沿用仓库既有惯例（`docs/r107-validation/`、`docs/r115-validation/`、`docs/r89-kr-player/*.jsonl`）：
 
 | 用途 | 建议存档路径 | 状态 |
 |---|---|---|
-| 判据一：端点穷举导出 | `docs/r116-validation/augment-contract-probe.jsonl` | **待产出**（§6.A 第 2 步的 `R116_AUGMENT_PROBE_OUTPUT` 直接写这里） |
-| 判据二/三/交叉：海斗对局导出 | `docs/r116-validation/mayhem-live-shapes.jsonl` | **待产出**（§6.B 第 3 步导出的文件改名后放这里） |
-| 终端输出与命令记录 | `docs/r116-validation/probe-run.log` | **待产出**（可选，便于复核命令与耗时） |
-| 目录说明（来源、客户端版本、时间、脱敏声明） | `docs/r116-validation/README.md` | **待产出**（参考 `docs/r107-validation/` 的写法） |
+| 判据一：首轮端点探测 | `docs/r116-validation/augment-contract-probe-round1-0925.jsonl` | 已归档；`trace_id=a0b512f620d71407490f3416` |
+| 判据一：第二轮端点探测 | `docs/r116-validation/augment-contract-probe-round2-0925.jsonl` | 已归档；`trace_id=430c7f117d542ba85c652080`；判据一实践收尾 |
+| 判据二/三/交叉：海斗对局导出 | `docs/r116-validation/mayhem-live-shapes.jsonl` | 已归档两局 |
+| 终端输出与命令记录 | `docs/r116-validation/probe-run.log` | 已归档一次人工参数笔误（UTF-16LE） |
+| 目录说明（来源、时间、校验值） | `docs/r116-validation/README.md` | 已建立 |
 
-本次执行**没有创建** `docs/r116-validation/`（不在允许改动范围内），路径仅作为约定记录在此。
-归档时请在 README 里写明：客户端版本/区服、对局模式与 `game_id`、导出时间、
-以及「日志已脱敏，仅含接口形状与公开编号，不含账号令牌」这一条与实际写操作一致的声明。
+原始文件按字节复制，校验值和已知/未知元数据见目录 README。应用版本为 0.12.19；客户端版本/区服未在探测事件中记录。
 
 ---
 
@@ -428,8 +478,8 @@ if aramMode && !arenaMode && (phase == "GameStart" || phase == "InProgress" || p
 
 | 对象 | 位置 | 删除时机 |
 |---|---|---|
-| 探测函数与谓词 | `backend/augment_contract_probe.go`（整个文件） | 判据一结论回填进 §2.4 后**立即整体删除**，不进正式版本 |
-| 探测单测 + 真机临时入口 | `backend/augment_contract_probe_test.go`（整个文件，含 `TestR116AugmentContractProbeLiveClient`） | 同上，与探测文件一起删 |
+| 探测函数与谓词 | `backend/augment_contract_probe.go`（整个文件） | R155 三项判据已有处理结论后已删除；第二轮未达形式确证，实践按不可行处理 |
+| 探测单测 + 真机临时入口 | `backend/augment_contract_probe_test.go`（整个文件，含 `TestR116AugmentContractProbeLiveClient`） | R155 已随探测实现整体删除 |
 | 海斗触发分支 | `backend/gameplay.go` 的 `if aramMode && !arenaMode && (...)`（3 行注释 + 3 行代码） | 按工单 P1 第 4 条**评估**：若 P1-4/P1-2/P1-3 判定要做 → 保留作为正式埋点（回退成本一行）；若判定不做 → 删除 |
 | 本文档 | `docs/r116-probe-findings.md` | **不删除**，作为结论存档 |
 | 执行账本 | `docs/r116probe-execution-ledger.md` | **不删除** |

@@ -114,6 +114,8 @@ func (u *updateManager) Download() error {
 	u.mu.Unlock()
 	u.publish()
 	go func() {
+		defer recoverPanic("update_download.Download.1")
+
 		defer close(done)
 		defer cancel()
 		err := u.downloadAsset(ctx, manifest.Asset, mirrors)
@@ -264,7 +266,7 @@ func (u *updateManager) downloadSource(parent context.Context, asset updateAsset
 	u.status.State = "downloading"
 	u.mu.Unlock()
 	u.publish()
-	go func() {
+	goSafe("update_download.downloadSource.1", func() {
 		defer close(watchStopped)
 		ticks, stopTicks := u.downloadProgressTicks()
 		defer stopTicks()
@@ -297,7 +299,7 @@ func (u *updateManager) downloadSource(parent context.Context, asset updateAsset
 				u.notify("update:progress", progress)
 			}
 		}
-	}()
+	})
 	writer := &updateDownloadWriter{file: file, received: &received, activity: &activity, pulses: pulses, nextPulse: offset + 512*1024}
 	count, copyErr := io.Copy(writer, io.TeeReader(io.LimitReader(response.Body, asset.Size-offset+1), hash))
 	close(watchDone)

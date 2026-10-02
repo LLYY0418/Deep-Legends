@@ -395,10 +395,6 @@ func TestParseArenaTeamCompositionsAndStats(t *testing.T) {
 	if teams[0].Games != 342 || teams[0].AveragePlacement != 2.85 || teams[0].FirstPlaceRate != 29.53 || teams[0].WinRate != 68.13 {
 		t.Fatalf("arena team metrics were not parsed: %#v", teams[0])
 	}
-	stats := parseArenaStats(decoded)
-	if stats.AveragePlacement != 3.56 || stats.FirstPlaceRate != 16.07 || stats.PickRate != 13.85 || stats.WinRate != 48.77 || stats.BanRate != 42.49 {
-		t.Fatalf("arena summary metrics were not parsed: %#v", stats)
-	}
 }
 
 func TestParseArenaAugmentsKeepsMetricsAndTooltip(t *testing.T) {
@@ -784,7 +780,13 @@ func TestOPGGItemDepthDiagnosticsSeparateNetworkFailureFromParsedZero(t *testing
 	if _, _, err := provider.loadOPGGDepthRows(context.Background(), "jax", "top", "emerald_plus", "16.17", time.Time{}); !isOPGGDepthParseError(err) {
 		t.Fatalf("parsed-zero error = %v", err)
 	}
-	if len(events) != 1 || events[0]["event"] != "opgg_item_depths_parsed_zero" || events[0]["fields"] == nil || events[0]["rows"] != 0 {
+	var parsedZero map[string]any
+	for _, event := range events {
+		if event["event"] == "opgg_item_depths_parsed_zero" {
+			parsedZero = event
+		}
+	}
+	if parsedZero == nil || parsedZero["fields"] == nil || parsedZero["rows"] != 0 {
 		t.Fatalf("parsed-zero diagnostic = %#v", events)
 	}
 

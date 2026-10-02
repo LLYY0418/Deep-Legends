@@ -213,7 +213,7 @@ func TestEnrichLootItemsRetainsTheLCUPendingShell(t *testing.T) {
 		{LootID: "CHEST_224", LocalizedName: "未命名战利品", Count: 1},
 		{LootName: "MATERIAL_REAL", Count: 1},
 	}, nil)
-	if len(items) != 3 || !items[0].DataPending || items[0].DisplayName != "客户端数据暂未同步，可稍后重试" {
+	if len(items) != 3 || !items[0].DataPending || !items[0].Blank || items[0].DisplayName != "" || items[0].Kind != "类型未知" {
 		t.Fatalf("empty-shell filtering dropped non-empty loot: %#v", items)
 	}
 	if items[1].DisplayName != "CHEST_224" || items[2].DisplayName != "MATERIAL_REAL" {
@@ -283,7 +283,7 @@ func TestLootDiagnosticsAllPersistWithReviewedFields(t *testing.T) {
 		_, _ = io.WriteString(w, `{
 			"CHEST_224":{"localizedName":"未命名战利品","type":"CHEST","count":1},
 			"CHEST_SKIN_EVENT":{"displayCategories":"SKIN","type":"CHEST","count":2},
-			"":{"lootId":"","type":"","count":30},
+			"":{"lootId":"","type":"","count":30,"itemStatus":"OWNED","refId":"internal-ref-value"},
 			"MATERIAL_EMPTY":{"type":"MATERIAL","count":0}
 		}`)
 	}))
@@ -299,8 +299,9 @@ func TestLootDiagnosticsAllPersistWithReviewedFields(t *testing.T) {
 		t.Fatalf("loot fixture = items:%#v capability:%#v", items, capability)
 	}
 	items = enrichLootItemsWithMetadata(items, nil, nil, a.recordDiagnostic)
-	if len(items) != 3 || !items[1].DataPending || items[0].LootID == "" || items[2].LootID == "" {
-		t.Fatalf("loot enrichment must label the pending shell and preserve real loot: %#v", items)
+	// The identity-less record has no name to sort by, so it comes last.
+	if len(items) != 3 || !items[2].DataPending || !items[2].Blank || items[2].DisplayName != "" || items[2].Kind != "类型未知" || items[0].LootID == "" || items[1].LootID == "" {
+		t.Fatalf("loot enrichment must label the pending shell, keep it last and preserve real loot: %#v", items)
 	}
 	data, err := store.readDiagnosticLog()
 	if err != nil {
@@ -344,6 +345,14 @@ func TestLootDiagnosticsAllPersistWithReviewedFields(t *testing.T) {
 	}
 	if _, ok := fallback["count"]; ok {
 		t.Fatalf("loot_name_fallback retained an unnecessary item count: %#v", fallback)
+	}
+	// The blank record's shape is logged as key names and enum-like values only.
+	fieldKeys, _ := fallback["field_keys"].([]any)
+	if len(fieldKeys) != 3 || fieldKeys[0] != "count" || fieldKeys[1] != "itemStatus" || fieldKeys[2] != "refId" || fallback["item_status"] != "OWNED" {
+		t.Fatalf("loot_name_fallback did not describe the blank record: %#v", fallback)
+	}
+	if strings.Contains(diagnosticLog, "internal-ref-value") {
+		t.Fatalf("diagnostics copied a raw field value: %s", diagnosticLog)
 	}
 	category := events["loot_category_assigned"]
 	if category["category"] != "宝箱" || category["id_prefix"] != "CHEST_" || category["type"] != "CHEST" {

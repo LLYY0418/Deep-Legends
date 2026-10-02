@@ -305,6 +305,7 @@
 
   function createCard(fields, item) {
     const card = el.template.content.firstElementChild.cloneNode(true);
+    card.dataset.facadeKey = `${state.view}:${item.id}`;
     card.querySelector("strong").textContent = fields.title;
     card.querySelector(".skin-hero").textContent = fields.hero;
     card.querySelector(".skin-meta").textContent = fields.meta;
@@ -324,6 +325,9 @@
     const image = card.querySelector("img");
     const fallback = card.querySelector(".image-fallback");
     if (fields.image) {
+      // 2026-09-24 直接修改：头像格子不显示「加载中」文字，改用 CSS 骨架屏波动动画
+      // （.facade-grid.is-icons .skin-art:has(img:not(.is-loaded))），旗帜格子不受影响。
+      if (state.view === "icons") fallback.textContent = "";
       image.onload = () => { image.classList.add("is-loaded"); fallback.hidden = true; sampleBannerRatio(image, isBanner); };
       image.onerror = () => { fallback.textContent = "无图"; };
       image.setAttribute("data-queued-src", fields.image);
@@ -331,8 +335,25 @@
       image.remove();
       fallback.textContent = "";
     }
-    card.addEventListener("click", () => openDetail(item, fields));
+    card.onclick = () => openDetail(item, fields);
     return card;
+  }
+
+  function refreshCard(card, fields, item) {
+    card.querySelector("strong").textContent = fields.title;
+    card.querySelector(".skin-hero").textContent = fields.hero;
+    card.querySelector(".skin-meta").textContent = fields.meta;
+    card.classList.toggle("is-locked", fields.locked);
+    card.title = fields.title;
+    card.setAttribute("aria-label", fields.title);
+    card.onclick = () => openDetail(item, fields);
+    const image = card.querySelector("img");
+    if (image && image.getAttribute("data-queued-src") !== fields.image) {
+      image.classList.remove("is-loaded");
+      image.removeAttribute("src");
+      image.setAttribute("data-queued-src", fields.image);
+      card.querySelector(".image-fallback").hidden = false;
+    }
   }
 
   function render() {
@@ -350,7 +371,14 @@
     const total = state.view === "icons" ? (Number(payload.total) || items.length) : items.length;
     renderFacadeMeta(state.view === "icons" ? "头像" : "旗帜", total, ownedCount, unavailable);
     el.grid.setAttribute("aria-busy", "false");
-    el.grid.replaceChildren();
+    const existing = new Map([...el.grid.querySelectorAll(".skin-card[data-facade-key]")].map((card) => [card.dataset.facadeKey, card]));
+    const wanted = new Set(rows.map((item) => `${state.view}:${item.id}`));
+    for (const [key, card] of existing) {
+      if (!wanted.has(key)) { card.remove(); existing.delete(key); }
+    }
+    for (const child of [...el.grid.children]) {
+      if (!child.matches(".skin-card[data-facade-key]")) child.remove();
+    }
     if (!rows.length) {
       el.grid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true">⌕</span><strong>没有符合条件的条目</strong><p>调整搜索、系列或快捷分类后再试。</p></div>';
       return;
@@ -359,14 +387,16 @@
     const chunk = () => {
       if (generation !== state.renderGeneration || !panelVisible()) return;
       const started = performance.now();
-      const fragment = document.createDocumentFragment();
-      // 与生涯页选择器同样的分帧预算：5099 条目录不能一次性同步渲染。
+      // 已有卡片直接移动到新顺序；仅新增卡片要进入图片队列。
       while (index < rows.length && performance.now() - started < 7) {
         const item = rows[index++];
         const fields = state.view === "icons" ? facadeCollectionIconFields(item, unavailable) : facadeCollectionBannerFields(item, unavailable);
-        fragment.append(createCard(fields, item));
+        const key = `${state.view}:${item.id}`;
+        let card = existing.get(key);
+        if (card) refreshCard(card, fields, item);
+        else card = createCard(fields, item);
+        if (el.grid.children[index - 1] !== card) el.grid.insertBefore(card, el.grid.children[index - 1] || null);
       }
-      el.grid.append(fragment);
       if (index < rows.length) requestAnimationFrame(chunk);
     };
     chunk();
@@ -445,8 +475,12 @@
     const changed = state.view !== next;
     state.view = next;
     syncControls();
-    if (changed && !state[next]) load(next, false);
-    else render();
+    if (changed && !state[next]) {
+      state.renderGeneration += 1;
+      el.grid.replaceChildren();
+      el.grid.setAttribute("aria-busy", "true");
+      load(next, false);
+    } else render();
   }
 
   function activate() {

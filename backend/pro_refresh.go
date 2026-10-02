@@ -135,7 +135,7 @@ func (a *app) startProSeedRefresh() {
 	}
 	c.refreshStarted = true
 	c.mu.Unlock()
-	go a.runProSeedRefresh(a.proRefreshContext)
+	a.goSafe("pro_refresh.startProSeedRefresh.1", func() { a.runProSeedRefresh(a.proRefreshContext) })
 }
 func (a *app) runProSeedRefresh(ctx context.Context) {
 	wait, now := a.proPlayers.refreshWait, a.proPlayers.refreshNow

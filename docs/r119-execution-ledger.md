@@ -113,11 +113,69 @@ Select-String -Path "$env:LOCALAPPDATA\LOLLootAssistant\logs\diagnostics*.jsonl"
    - 想直接看标签：把 `backend/riot_api.go` 的 `autofillLabelGate` 临时改成 `true` 重新构建（`TestR121AutofillLabelGateIsClosedByDefault` 会打红，属预期），对照完**必须改回 `false`**。
 4. 实时对局侧的形状证据本来就有：`live_position_shape` 事件里的 `selected_position_counts` / `assigned_position_counts`（`backend/gameplay.go:5244` 起）。若里面出现 `INVALID` 计数，说明实时侧也能用同一口径判定，可作为下一步。
 
-### 观测栏（P3-2 回填；未回填之前 `autofillLabelGate` 保持 false）
+### 观测栏（P3-2 已有首例真实样本；`autofillLabelGate` 保持 false）
 
 | 日期 | 队列 | 局数 | `autofill_candidates` | `position_mismatch` | `autofill_no_evidence` | 已知真实补位的人 | 标签是否落在正确的人身上 | 结论 |
 |---|---|---|---|---|---|---|---|---|
-| _待填_ | | | | | | | | |
+| 2026-09-26 | 440 | 快照取自 `sgp_match_history_succeeded`（每次都是最近 20 场滚动窗口，本条取该局结束后 8 秒的第一次刷新，12:43:17） | 0 | 1（该局结束前一次快照是 0，结束 8 秒后变成 1） | 0 | 1（青钢影/Camille 辅助玩家，用户已亲口确认，见 §5.1） | **否** | 见下方说明 |
+
+**判读**：这是 P3-2 第一条真正回填的数据。已知补位的人**没有**落进 `autofill_candidates`
+（那一桶要求 `TeamPosition` 有值 + `IndividualPosition` 缺失），而是落进了
+`position_mismatch`（`TeamPosition`/`IndividualPosition` 两个都有值但互相矛盾——
+`riotAutofillCandidates`，`backend/riot_api.go:1047` 起）。也就是说这名玩家的
+match-v5 `individualPosition` 字段本身是有值的，只是和 `teamPosition` 打架，
+不属于"整场缺失"那种形状。
+
+对照 §2/§6 风险项 2 早就写明的保守设计——「换位与补位在两值不一致形状下不可
+区分，当前口径把不一致判为换位（不打标签），宁可漏标不可错标」——**这次真机
+数据首次证实了这条预判确实会发生**：即便把 `autofillLabelGate` 打开，这次这个
+真实补位也不会被打上标签，因为它落在被设计成保守放过的那一桶里。这不代表整套
+历史推断口径完全不成立（`autofill_candidates` 桶覆盖的"整场缺失"场景仍然可能
+是准的，这次只是没有对应样本去验证那一桶），但目前唯一拿到的 1 个真实样本落在
+了"注定漏标"的桶里，样本量为 1，不能作为开关判断的充分依据，仍需要更多样本
+（尤其是至少 1 例"这个人整场 `individualPosition` 缺失"的真实补位场景，才能
+验证 `autofill_candidates` 桶本身准不准）。
+
+补充观察：这份日志里全部 23 条 `sgp_match_history_succeeded` 快照，
+`autofill_candidates` **无一例外全部是 0**（`autofill_no_evidence` 也全部是
+0，说明不是数据整体缺失）。这可能只是因为这个赛季/大区这个账号最近的对局里
+恰好没出现"个人位置整场缺失"这种数据形状，也可能说明这个桶在实践里触发门槛
+偏高——目前样本不够，区分不开这两种可能，留给下一轮继续观察。
+
+### 5.1 真机人工确认的补位实例（R168 追加，2026-09-26；不是 P3-2 原定口径）
+
+这条不是从上面 P3-2 要的 `sgp_match_history_succeeded`/`sgp_summary_history_*`
+历史推断口径来的（`0926-2043` 日志里没有这两类事件；随后提供的 `0926-2139`
+日志已补出上表首例真实历史样本）。这是 Claude 分析
+`lol-loot-diagnostics-0926-2043.jsonl`（queue 440，`game_id=9001498310`）
+时，从 `live_position_shape` 事件的 `selected_role_counts` 字段里看到的：
+
+```
+"UTILITY.AUTOFILL.JUNGLE.MIDDLE.FILL": 1
+```
+
+这是 LCU `/lol-gameflow/v1/session` 原生 `SelectedRole` 字段（见
+`backend/gameplay.go:5480` 附近 `livePositionShapeDiagnostic`），不是
+match-v5 事后推断，是 Riot 客户端自己在选人当下打的补位标记。这局我方
+辅助位选的是青钢影（Camille），**用户已亲口确认这位辅助玩家确实是被
+补位的**。日志里唯一一条匿名 `SelectedRole` 记录显示某人主选 `JUNGLE`、
+次选 `MIDDLE`、最终为 `UTILITY`；它尚未以 PUUID 绑定到青钢影玩家，不能
+把这两个报名位置当作对该玩家的直接观测。
+
+这证实了两件事：
+1. LCU 原生 `SelectedRole`/`AUTOFILL` 字段在这局里与用户确认的补位事实
+   **相符**；但匿名计数未绑定具体玩家，不能据此证明它精确指向青钢影。
+2. 这不能替代 P3-2——P3-2 要校准的是「从历史战绩 `individualPosition`/
+   `teamPosition` 事后推断」这条口径的准确率，而这条证据来自完全不同的
+   实时 LCU 信号。P3-2 已由后续日志填入首例，但仍需更多不同形状的样本。
+3. 这次核验支持 R168 P3 里"中期方向"的评估：`SelectedRole` 的 `AUTOFILL`
+   标记本身作为实时对局补位信号是可信的，值得 GPT 正式评估要不要把它接
+   到具体玩家（配合 `PUUID`）上，作为独立于 R119 历史推断口径之外的另一
+   条能用的补位判定路径。
+
+### 5.2 `SelectedRole` 实时补位信号评估（R168）
+
+`SelectedRole` 中的 `AUTOFILL` 来自当前对局 LCU 原始字段；本次用户确认的青钢影辅助位与该局唯一一条 `UTILITY.AUTOFILL.JUNGLE.MIDDLE.FILL` 聚合记录吻合。但 `selected_role_counts` 只有匿名聚合计数，不能单凭这条日志把信号精确归给某个玩家。若后续接入实时标签，须在读取 `GameData.TeamOne/TeamTwo` 时以 PUUID 精确绑定到 `gameplayLivePlayer`，并只接受原始字段明确带 `AUTOFILL` 的玩家；缺值、身份无法绑定或非标准队列均不推断。当前仅有这一局 440 样本，尚未覆盖 420 与非排位模式，R168 不打开历史 `autofillLabelGate`，也不将匿名聚合直接用于个人标签。此方向待跨队列真机数据验证后另立工单。
 
 ---
 

@@ -53,6 +53,7 @@ function functionSource(source, name) {
 }
 
 function compile(names, dependencies, source = gameplayScript) {
+  for (const name of ["champSelectEnemyPlaceholder", "stampLiveRows", "preserveLiveImages", "patchLiveRosterPanel"]) if (!names.includes(name) && names.some(n=>functionSource(source,n).includes(name + "("))) names.push(name);
   const keys = Object.keys(dependencies);
   const body = names.map((name) => functionSource(source, name)).join("\n");
   return Function(...keys, `"use strict";\n${body}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
@@ -401,7 +402,7 @@ test("R129 P3 live_render_rebuild 每 60 秒聚合一次，记录面板与来源
   assert.deepEqual(entry.context.sources, { interval: 1, catalog: 1 });
   assert.equal(entry.context.total, 2);
   assert.equal(entry.context.phase, "ChampSelect");
-  assert.equal(entry.context.gameId, 9001);
+  assert.equal(Object.hasOwn(entry.context, "gameId"), false, "R179 rebuild only sends counters and phase");
   assert.ok(entry.context.windowMs >= 0);
   assert.equal(fx.state.liveRenderRebuild.timer, 0, "flush 后定时器要清掉");
 

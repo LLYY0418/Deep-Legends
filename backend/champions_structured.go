@@ -221,6 +221,14 @@ func opggDetailRequest(mode string, championID int, position, tier string) (opgg
 }
 
 func (p *championProvider) loadOPGGLatestVersion(ctx context.Context, spec opggModeSpec) (string, error) {
+	if spec.APIMode == "arena" {
+		p.mu.Lock()
+		version, at := p.arenaVersion, p.arenaVersionAt
+		p.mu.Unlock()
+		if version != "" && time.Since(at) < 20*time.Minute {
+			return version, nil
+		}
+	}
 	requestPath := "/api/" + spec.Region + "/champions/" + spec.APIMode + "/versions"
 	data, err := p.fetch(ctx, opggChampionHost, requestPath, nil, championJSONMax, "application/json")
 	if err != nil {
@@ -235,6 +243,11 @@ func (p *championProvider) loadOPGGLatestVersion(ctx context.Context, spec opggM
 	version := strings.TrimSpace(payload.Data[0])
 	if !validQQ101PatchName(version) {
 		return "", errors.New("OP.GG champion version is invalid")
+	}
+	if spec.APIMode == "arena" {
+		p.mu.Lock()
+		p.arenaVersion, p.arenaVersionAt = version, time.Now()
+		p.mu.Unlock()
 	}
 	return version, nil
 }
@@ -344,33 +357,38 @@ func (p *championProvider) loadDetail(ctx context.Context, mode, champion, posit
 // and top-player providers, otherwise one slow provider can leave both matchup
 // columns stuck on the same single row.
 func (p *championProvider) loadStructuredCounters(ctx context.Context, mode, champion, position, tier string) (championCounterSections, error) {
+	rows, err := p.loadStructuredCounterRows(ctx, mode, champion, position, tier)
+	return championCounterSectionsFromRows(rows), err
+}
+
+func (p *championProvider) loadStructuredCounterRows(ctx context.Context, mode, champion, position, tier string) ([]championCounterRow, error) {
 	mode = normalizeInternalChampionMode(mode)
 	id, _, err := p.resolveChampionID(ctx, champion)
 	if err != nil {
-		return championCounterSections{}, err
+		return nil, err
 	}
 	spec, requestPath, query, err := opggDetailRequest(mode, id, position, tier)
 	if err != nil || !spec.HasCounters {
 		if err == nil {
 			err = errors.New("OP.GG counters are unavailable for this mode")
 		}
-		return championCounterSections{}, err
+		return nil, err
 	}
 	query, dataVersion, err := p.applyOPGGRequestVersion(ctx, spec, query)
 	if err != nil {
-		return championCounterSections{}, err
+		return nil, err
 	}
 	requestPosition := spec.requestPosition(position)
 	cacheKey := opggDetailCacheKey(mode, spec.Region, id, requestPosition, tier, dataVersion)
 	data, _, err := p.fetchWithMetadataCacheKey(ctx, opggChampionHost, requestPath, query, championJSONMax, "application/json", cacheKey)
 	if err != nil {
-		return championCounterSections{}, err
+		return nil, err
 	}
 	var payload opggStructuredDetail
 	if json.Unmarshal(data, &payload) != nil || payload.Data.Summary.ID != id {
-		return championCounterSections{}, errors.New("OP.GG champion counters response changed")
+		return nil, errors.New("OP.GG champion counters response changed")
 	}
-	return p.structuredCountersForChampion(payload.Data.Counters, id), nil
+	return p.structuredCounterRowsForChampion(payload.Data.Counters, id), nil
 }
 
 func (p *championProvider) loadOPGGPageCounters(ctx context.Context, champion, position, tier, patch string) (championCounterSections, error) {
@@ -1148,6 +1166,24 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 	if strings.TrimSpace(metadata.Slug) != "" {
 		champion = metadata.Slug
 	}
+	type arenaAggregateResult struct {
+		aggregate yourGGArenaAggregateResponse
+		items     []gameplayItem
+		fetchedAt time.Time
+		err       error
+	}
+	var arenaAggregateReady chan arenaAggregateResult
+	if mode == "arena" {
+		ready := make(chan arenaAggregateResult, 1)
+		arenaAggregateReady = ready
+		go func() {
+			defer recoverPanic("champions_structured.loadStructuredDetail.1")
+			defer close(ready)
+
+			aggregate, items, fetchedAt, loadErr := p.loadArenaChampionAggregate(ctx, id)
+			ready <- arenaAggregateResult{aggregate, items, fetchedAt, loadErr}
+		}()
+	}
 	if mode == "ranked" {
 		p.startQQ101Probe(ctx, champion, id, tier, position)
 	}
@@ -1185,10 +1221,16 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 		qq101PositionsC = positionsCh
 		qq101BuildC = buildCh
 		go func() {
+			defer recoverPanic("champions_structured.loadStructuredDetail.2")
+			defer close(positionsCh)
+
 			positions, patch, loadErr := p.loadQQ101Positions(qq101Ctx, id, tier)
 			positionsCh <- qq101PositionsResult{positions: positions, patch: patch, err: loadErr}
 		}()
 		go func() {
+			defer recoverPanic("champions_structured.loadStructuredDetail.3")
+			defer close(buildCh)
+
 			depths, patch, loadErr := p.loadQQ101BuildRows(qq101Ctx, id, tier, position)
 			buildCh <- qq101BuildResult{depths: depths, patch: patch, err: loadErr}
 		}()
@@ -1222,6 +1264,10 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 		WinRate:  firstPositive(fractionToPercent(stats.WinRate), percentOf(stats.Win, stats.Play)),
 		PickRate: fractionToPercent(stats.PickRate), BanRate: fractionToPercent(stats.BanRate),
 	}
+	if mode != "arena" && stats.Tier != nil {
+		response.Stats.Tier = stats.Tier
+		response.Stats.Grade = normalizeChampionGrade("opgg", *stats.Tier, "")
+	}
 	if spec.PositionMode == opggPositionRequired {
 		response.Positions = make([]championPositionOption, 0, len(payload.Data.Summary.Positions))
 		for _, raw := range payload.Data.Summary.Positions {
@@ -1243,6 +1289,7 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 				RoleRate: roleRate,
 				Play:     raw.Stats.Play,
 				Tier:     tierValue,
+				Grade:    normalizeChampionGrade("opgg", tierValue, ""),
 				Rank:     rankValue,
 			})
 		}
@@ -1353,19 +1400,68 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 		response.Counters = p.structuredCountersForChampion(payload.Data.Counters, id)
 	}
 	if spec.HasAugments {
-		response.ArenaStats = arenaChampionStats{
-			Tier: stats.Tier, Rank: firstPositiveInt(stats.TierData.Rank, stats.Rank), RankPrevPatch: stats.TierData.RankPrevPatch,
-			Games: stats.Play, KDA: stats.KDA,
-			AveragePlacement: arenaAverage(float64(stats.TotalPlace), stats.Play), FirstPlaceRate: percentOf(stats.FirstPlace, stats.Play),
-			PickRate: fractionToPercent(stats.PickRate), WinRate: percentOf(stats.Win, stats.Play), BanRate: fractionToPercent(stats.BanRate),
+		response.TeamCompositions = p.structuredSynergies(id, payload.Data.Synergies)
+		loadedAggregate := <-arenaAggregateReady
+		aggregate, itemCatalog, aggregateFetchedAt, aggregateErr := loadedAggregate.aggregate, loadedAggregate.items, loadedAggregate.fetchedAt, loadedAggregate.err
+		augmentFallbackReason := ""
+		augmentStats := yourGGArenaAugmentMapStats{RowsIn: len(aggregate.Response.Augments)}
+		var yourGGAugments []arenaAugmentGroup
+		augmentCatalog := p.arenaAugmentCatalogFast()
+		var augmentCatalogErr error
+		if len(augmentCatalog) == 0 {
+			augmentCatalog, augmentCatalogErr = p.loadCommunityDragonAugments(ctx)
 		}
-		response.ArenaAugmentGroups = p.structuredArenaAugmentGroups(ctx, payload.Data.AugmentGroup)
-		applyLocalArenaAugmentGrades(response.ArenaAugmentGroups)
+		if aggregateErr != nil {
+			augmentFallbackReason = "aggregate-failed"
+		} else if len(aggregate.Response.Augments) == 0 {
+			augmentFallbackReason = "augment-missing"
+		} else {
+			if augmentCatalogErr != nil || len(augmentCatalog) == 0 {
+				augmentFallbackReason = "catalog-failed"
+			} else {
+				groups, stats, mapErr := mapYourGGArenaAggregateAugmentsWithStats(aggregate.Response.Augments, augmentCatalog)
+				augmentStats = stats
+				switch {
+				case errors.Is(mapErr, errYourGGArenaAugmentsTooManyInvalid):
+					augmentFallbackReason = "too-many-invalid"
+				case mapErr != nil:
+					augmentFallbackReason = "quality-missing"
+				default:
+					yourGGAugments = groups
+				}
+			}
+		}
+		if augmentFallbackReason == "" {
+			response.ArenaAugmentGroups = yourGGAugments
+			response.Source = "OP.GG JSON + YOUR.GG aggregate"
+			response.FetchedAt = aggregateFetchedAt
+			response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "斗魂海克斯采用 YOUR.GG 聚合数据的档位与综合评分；品质与本地化资料由 CommunityDragon 对照")
+		} else {
+			response.ArenaAugmentGroups = p.structuredArenaAugmentGroupsWithCatalog(payload.Data.AugmentGroup, augmentCatalog, augmentCatalogErr)
+			applyLocalArenaAugmentGrades(response.ArenaAugmentGroups)
+			response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "YOUR.GG 海克斯暂不可用，海克斯回退 OP.GG，字母档位使用本地分位估算且不显示综合评分")
+		}
 		// Preserve every quality group for the live page; the client applies a
 		// per-quality display limit so no rarity disappears due to global sorting.
 		response.ArenaAugments = flattenArenaAugmentGroups(response.ArenaAugmentGroups, 0)
-		response.TeamCompositions = p.structuredSynergies(id, payload.Data.Synergies)
-		aggregate, itemCatalog, aggregateFetchedAt, aggregateErr := p.loadArenaChampionAggregate(ctx, id)
+		if p.diag != nil {
+			augmentSource := "your.gg"
+			if augmentFallbackReason != "" {
+				augmentSource = "op.gg"
+			}
+			event := map[string]any{
+				"event": "arena_augment_source", "source": augmentSource,
+				"rows":    len(response.ArenaAugments),
+				"rows_in": augmentStats.RowsIn, "rows_kept": augmentStats.RowsKept,
+				"skipped_matches": augmentStats.SkippedMatches, "skipped_score": augmentStats.SkippedScore,
+				"skipped_grade": augmentStats.SkippedGrade, "skipped_id": augmentStats.SkippedID,
+				"skipped_duplicate": augmentStats.SkippedDuplicate,
+			}
+			if augmentFallbackReason != "" {
+				event["reason"] = augmentFallbackReason
+			}
+			p.diag(event)
+		}
 		if aggregateErr == nil {
 			coreItems := mapYourGGArenaAggregateItems(aggregate.Response.CoreItems, itemCatalog)
 			prismItems := mapYourGGArenaAggregateItems(aggregate.Response.PrismaticItems, itemCatalog)
@@ -1604,6 +1700,25 @@ func (p *championProvider) structuredCounters(values []opggCounter) championCoun
 }
 
 func (p *championProvider) structuredCountersForChampion(values []opggCounter, subjectID int) championCounterSections {
+	return championCounterSectionsFromRows(p.structuredCounterRowsForChampion(values, subjectID))
+}
+
+func championCounterSectionsFromRows(rows []championCounterRow) championCounterSections {
+	result := championCounterSections{}
+	for _, row := range rows {
+		if row.WinRate < 50 && len(result.WeakAgainst) < 5 {
+			result.WeakAgainst = append(result.WeakAgainst, row)
+		}
+	}
+	for index := len(rows) - 1; index >= 0 && len(result.StrongAgainst) < 5; index-- {
+		if rows[index].WinRate > 50 {
+			result.StrongAgainst = append(result.StrongAgainst, rows[index])
+		}
+	}
+	return result
+}
+
+func (p *championProvider) structuredCounterRowsForChampion(values []opggCounter, subjectID int) []championCounterRow {
 	rows := make([]championCounterRow, 0, len(values))
 	droppedNoMeta, droppedNoPlay, droppedSubject, droppedDuplicate := 0, 0, 0, 0
 	seenIDs := make(map[int]bool, len(values))
@@ -1635,21 +1750,10 @@ func (p *championProvider) structuredCountersForChampion(values []opggCounter, s
 		rows = append(rows, championCounterRow{ChampionID: value.ChampionID, Key: meta.Key, Name: meta.NameZH, ImageSource: meta.ImageSource, ImagePath: meta.ImagePath, WinRate: percentOf(value.Win, value.Play), Games: value.Play})
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].WinRate < rows[j].WinRate })
-	result := championCounterSections{}
-	for _, row := range rows {
-		if row.WinRate < 50 && len(result.WeakAgainst) < 5 {
-			result.WeakAgainst = append(result.WeakAgainst, row)
-		}
-	}
-	for index := len(rows) - 1; index >= 0 && len(result.StrongAgainst) < 5; index-- {
-		if rows[index].WinRate > 50 {
-			result.StrongAgainst = append(result.StrongAgainst, rows[index])
-		}
-	}
 	if p.diag != nil {
 		p.diag(map[string]any{"event": "counters_shape", "in": len(values), "out": len(rows), "dropped_no_meta": droppedNoMeta, "dropped_no_play": droppedNoPlay, "dropped_subject": droppedSubject, "dropped_duplicate": droppedDuplicate})
 	}
-	return result
+	return rows
 }
 
 func (p *championProvider) structuredRunes(ctx context.Context, values []opggRunePage) []championRunePage {
@@ -1748,6 +1852,10 @@ func runeShardName(id int) string {
 
 func (p *championProvider) structuredArenaAugmentGroups(ctx context.Context, groups []opggArenaAugmentGroup) []arenaAugmentGroup {
 	catalog, err := p.loadCommunityDragonAugments(ctx)
+	return p.structuredArenaAugmentGroupsWithCatalog(groups, catalog, err)
+}
+
+func (p *championProvider) structuredArenaAugmentGroupsWithCatalog(groups []opggArenaAugmentGroup, catalog []gameplayAugment, err error) []arenaAugmentGroup {
 	if err != nil {
 		if p.diag != nil {
 			p.diag(map[string]any{"event": "arena_augment_catalog_failed", "source": "communitydragon", "errorKind": championProviderErrorKind(err)})
@@ -1781,7 +1889,8 @@ func (p *championProvider) structuredArenaAugmentGroups(ctx context.Context, gro
 					continue
 				}
 				meta, ok := metadata[int64(item.ID)]
-				if !ok || communityDragonGameAssetPath(meta.IconPath) == "" || strings.TrimSpace(meta.Name) == "" {
+				_, iconPath := augmentMetadataImage(meta.IconPath)
+				if !ok || iconPath == "" || strings.TrimSpace(meta.Name) == "" {
 					missingMeta++
 				}
 			}
@@ -1795,7 +1904,9 @@ func (p *championProvider) structuredArenaAugmentGroups(ctx context.Context, gro
 }
 
 func (p *championProvider) loadCommunityDragonAugments(ctx context.Context) ([]gameplayAugment, error) {
-	data, err := p.fetch(ctx, communityDragonHost, "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/cherry-augments.json", nil, 1<<20, "application/json")
+	requestCtx, cancel := context.WithTimeout(ctx, communityDragonAugmentRequestBudget)
+	defer cancel()
+	data, err := p.fetchCommunityDragonAugmentPart(requestCtx, ctx, "cherry", "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/cherry-augments.json")
 	if err != nil {
 		return nil, err
 	}
@@ -1804,9 +1915,10 @@ func (p *championProvider) loadCommunityDragonAugments(ctx context.Context) ([]g
 		return nil, err
 	}
 	base := normalizeGameplayAugments(raw)
-	arenaData, arenaErr := p.fetch(ctx, communityDragonHost, "/latest/cdragon/arena/zh_cn.json", nil, 1<<20, "application/json")
+	arenaData, arenaErr := p.fetchCommunityDragonAugmentPart(requestCtx, ctx, "arena", "/latest/cdragon/arena/zh_cn.json")
 	if arenaErr != nil {
 		p.reportMayhemAugmentCatalogShape(base)
+		p.rememberCommunityDragonAugments(base)
 		return base, nil
 	}
 	var arenaPayload struct {
@@ -1823,6 +1935,7 @@ func (p *championProvider) loadCommunityDragonAugments(ctx context.Context) ([]g
 	}
 	if json.Unmarshal(arenaData, &arenaPayload) != nil {
 		p.reportMayhemAugmentCatalogShape(base)
+		p.rememberCommunityDragonAugments(base)
 		return base, nil
 	}
 	supplement := make([]gameplayAugment, 0, len(arenaPayload.Augments))
@@ -1848,7 +1961,14 @@ func (p *championProvider) loadCommunityDragonAugments(ctx context.Context) ([]g
 	}
 	catalog := mergeGameplayAugmentMetadata(base, supplement)
 	p.reportMayhemAugmentCatalogShape(catalog)
+	p.rememberCommunityDragonAugments(catalog)
 	return catalog, nil
+}
+
+func (p *championProvider) rememberCommunityDragonAugments(catalog []gameplayAugment) {
+	p.remoteAugmentMu.Lock()
+	p.remoteAugments = append([]gameplayAugment(nil), catalog...)
+	p.remoteAugmentMu.Unlock()
 }
 
 var (
@@ -2399,16 +2519,18 @@ func arenaAugmentGroups(groups []opggArenaAugmentGroup, catalog []gameplayAugmen
 			}
 			id := int64(item.ID)
 			meta, ok := metadata[id]
-			iconPath := communityDragonGameAssetPath(meta.IconPath)
+			iconSource, iconPath := augmentMetadataImage(meta.IconPath)
 			name := meta.Name
 			if strings.TrimSpace(name) == "" {
 				name = arenaAugmentFallbackName(item.ID)
 			}
 			asset := championAsset{ID: int(id), Kind: "arena-augment", Name: name, Description: meta.Description}
 			if ok && iconPath != "" {
-				asset.Source = "communitydragon"
+				asset.Source = iconSource
 				asset.Path = iconPath
-				asset.FallbackPath = communityDragonGameAssetPath(meta.FallbackIconPath)
+				if iconSource == "communitydragon" {
+					asset.FallbackPath = communityDragonGameAssetPath(meta.FallbackIconPath)
+				}
 			}
 			rarityCode, rarityOK := map[int]int{1: 0, 4: 1, 8: 2}[group.Rarity]
 			rarity := "unknown"
@@ -2471,6 +2593,8 @@ func applyLocalArenaAugmentGrades(groups []arenaAugmentGroup) {
 	}
 	applyLocalAugmentGrades(graded)
 	for index, ref := range refs {
+		// Score is reserved for an upstream value; the temporary local percentile
+		// only contributes Grade and must not become a displayed score.
 		groups[ref.group].Rows[ref.row].Grade = graded[index].Grade
 	}
 }

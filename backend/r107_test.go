@@ -192,7 +192,9 @@ func TestR107ImageBudgetReachesUnderlyingTransport(t *testing.T) {
 			a := &app{champions: p}
 			w := httptest.NewRecorder()
 			if endpoint == "client" {
-				a.handleImage(w, httptest.NewRequest("GET", "/api/image?path=/lol-game-data/assets/v1/champion-icons/103.png", nil))
+				// Champion squares are bundled now; use an unbundled client icon to
+				// keep checking the remote transport's full deadline budget.
+				a.handleImage(w, httptest.NewRequest("GET", "/api/image?path=/lol-game-data/assets/v1/profile-icons/103.jpg", nil))
 			} else {
 				a.handleChampionAsset(w, httptest.NewRequest("GET", "/api/champion-asset?source=communitydragon&path=/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/103.png", nil))
 			}

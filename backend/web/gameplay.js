@@ -2,6 +2,8 @@
   "use strict";
 
   const escapeHTML = window.deepLegendsRuntime.escapeHTML;
+  const gradeBadge = window.deepLegendsRuntime.gradeBadge;
+  const gradeRank = window.deepLegendsRuntime.gradeRank;
 
   const nodes = Object.fromEntries([
     "player-tabs", "player-tabs-prev", "player-tabs-next", "overview-content", "overview-refresh",
@@ -9,7 +11,7 @@
     "live-content", "live-refresh", "live-session-summary", "toast",
     "player-overlay", "player-overlay-back", "player-overlay-title", "player-overlay-add", "player-overlay-content",
     "career-dialog", "career-dialog-close", "career-dialog-context", "career-dialog-content",
-    "setting-default-page", "setting-match-count", "setting-default-match-filter", "setting-live-refresh", "setting-live-interval", "setting-live-order", "setting-detail-position-align", "setting-mask-names",
+    "setting-default-page", "setting-match-count", "setting-default-match-filter", "setting-live-refresh", "setting-live-interval", "setting-live-order", "setting-mask-names",
     "setting-confirm-replay", "gameplay-settings-status",
   ].map((id) => [camel(id), document.getElementById(id)]));
 
@@ -44,6 +46,8 @@
     perks: null,
     perksLoading: false,
     perksRequestToken: 0,
+    augmentCatalog: null,
+    augmentCatalogLoading: false,
     items: null,
     itemsLoading: false,
     summonerSpells: null,
@@ -69,6 +73,10 @@
     // R116-D：推荐缓存 key 的格式被 champions.test.cjs 钉死（不含阵容），
     // 所以「阵容变了要重取」用这张旁表记录：签名不同就当缓存失效。
     liveRecommendationRosters: new Map(),
+    laneMatchupCandidates: new Map(),
+    laneMatchupPairs: new Map(),
+    laneMatchupCardDiagnostics: new Set(),
+    laneMatchupLanes: new Map(),
     liveRecommendationSkipDiagnostics: new Set(),
     specialistRuneSkipDiagnostics: new Set(),
     liveRosterRenderDiagnostics: new Set(),
@@ -79,6 +87,7 @@
     specialistRunes: new Map(),
     specialistRuneFlights: new Map(),
     specialistRuneFailures: new Map(),
+    runeStarterRequests: new Map(),
 	seasonProgressRefreshes: window.deepLegendsRuntime?.createCache({ max: 32, ttl: 3600000, dispose: (entry) => clearTimeout(entry.timer) }) || new Map(),
     specialistPlayerTabs: new Map(),
     liveGameGeneration: 0,
@@ -113,7 +122,6 @@
       liveRefresh: readSetting("live-refresh", "true") !== "false",
       liveInterval: normalizeLiveInterval(readSetting("live-interval", "3")),
       liveOrder: normalizeLiveOrder(readSetting("live-order", "team")),
-      detailPositionAlign: readSetting("detail-position-align", "false") === "true",
       maskNames: readSetting("mask-names", "false") === "true",
       // 回放默认直接在客户端内播放，不再弹确认框（可在设置中重新开启）。
       confirmReplay: readSetting("confirm-replay", "false") === "true",
@@ -132,8 +140,17 @@
     if (normalized === "ChampSelect") return 3_000;
     return normalizeLiveInterval(configuredSeconds) * 1_000;
   }
+  function liveClientPositionsPending(data) {
+    return (data?.capabilities || []).some(capability => capability.name === "live-client-positions" && capability.state === "pending");
+  }
   function liveSnapshotComplete(data) {
+    if (liveClientPositionsPending(data)) return false;
     if (!data?.available || !Array.isArray(data.players) || !data.players.length) return false;
+    if ([420, 440, 2300, 2400, 3270].includes(Number(data.queueId))) {
+      const blue = data.players.filter((player) => Number(player.teamId) === 100).length;
+      const red = data.players.filter((player) => Number(player.teamId) === 200).length;
+      if (data.players.length !== 10 || blue !== 5 || red !== 5) return false;
+    }
     if (data.players.some((player) => ["pending", "failed"].includes(player.historyState))) return false;
     return liveAugmentRecommendationSource(data) !== "arena" || data.arenaGrouped === true || data.arenaGroupingUnavailable === true && data.arenaGroupingRetryable !== true;
   }
@@ -153,9 +170,12 @@
   function syncLiveRetryBudget() {
     const key = `${state.beacon.phase || state.live?.phase || ""}:${state.live?.gameId || 0}`;
     if (state.liveRetryKey !== key) { state.liveRetryKey = key; state.liveRetryAttempts = 0; state.liveRetryStartedAt = Date.now(); }
+    const positionKey = `${Number(state.liveGameGeneration || 0)}:${state.live?.gameId || 0}`;
+    if (state.livePositionRetryKey !== positionKey) { state.livePositionRetryKey = positionKey; state.livePositionRetryAttempts = 0; }
   }
   function liveAutoRefreshStopped(data) {
     if (!["InProgress", "Reconnect"].includes(data?.phase)) return "";
+    if (liveClientPositionsPending(data)) return "";
     if (data?.arenaGroupingUnavailable && !data?.arenaGrouped && Number(state.liveRetryAttempts || 0) < 8) return data.arenaGroupingRetryable ? "小队数据尚未完整，正在自动重试" : "暂时无法确认小队，可手动刷新";
     if (liveSnapshotComplete(data)) return "对局中数据不再变化，已停止自动刷新";
     if (Number(state.liveRetryAttempts || 0) >= 8) return "数据尚未完整，已停止自动重试，可手动刷新";
@@ -435,6 +455,7 @@
   function activateSection(name) {
     const previous = state.section;
     state.section = name;
+    if (name !== "live") clearRuneStarterRetries();
     clearTimeout(state.liveTimer);
     clearTimeout(state.perksAugmentTimer);
     clearTimeout(state.currentGameTimer);
@@ -1609,6 +1630,7 @@
     if (!entry) {
       nodes.playerOverlay.hidden = true;
       delete nodes.playerOverlay.dataset.entryKey;
+      activateOverviewView(nodes.playerOverlayContent, null);
       nodes.playerOverlayContent.innerHTML = "";
       return;
     }
@@ -1616,7 +1638,7 @@
     nodes.playerOverlay.dataset.entryKey = entry.key;
     nodes.playerOverlay.hidden = false;
     const regionChip = `<span class="region-chip${riotTab(entry) ? " is-kr" : ""}" data-tooltip="${escapeHTML(tabServerTitle(entry))}" data-tooltip-size="compact">${escapeHTML(tabServerLabel(entry))}</span>`;
-    const hiddenBadge = entry.data?.player?.hidden || entry.data?.player?.privateHistory ? '<span class="player-tab-hidden">隐藏战绩</span>' : "";
+    const hiddenBadge = entry.data?.player?.privateHistory === true ? '<span class="player-tab-hidden">隐藏战绩</span>' : "";
     nodes.playerOverlayTitle.innerHTML = `<strong data-tooltip="${escapeHTML(entry.label)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(entry.label)}</strong>${regionChip}${hiddenBadge}${state.overlay.length > 1 ? `<small>第 ${state.overlay.length} 层</small>` : ""}`;
     syncOverlayAddButton(entry);
     renderOverviewBody(nodes.playerOverlayContent, entry);
@@ -1705,6 +1727,7 @@
     const workspace = overviewWorkspace(group);
     for (const key of ["matchObserver", "proMatchObserver", "matchTierObserver", "proMatchTierObserver"]) { state[key]?.disconnect(); state[key] = null; }
     const tab = activeTab(group);
+    activateOverviewView(workspace.content, tab);
     // 通知外层：启动入口卡只在“当前召唤师”页签展示。
     window.dispatchEvent(new CustomEvent("deep-legends:overview-tab", { detail: { current: group === "players" && Boolean(tab?.current) } }));
     if (group !== "players" && !tab) {
@@ -1734,6 +1757,39 @@
 
   // renderOverviewBody 把某个玩家页签（总览页签或覆盖层条目）的总览
   // 渲染到指定容器；总览页与覆盖层共用同一套展示与交互。
+
+  function activateOverviewView(container, tab) {
+    const fields = ["_stripHTML", "_backgroundArt", "_careerSignature", "_careerChildHTML", "_careerHTML",
+      "_careerObjectTokens", "_careerObjectCounter", "_matchListMatches", "_matchListFilter", "_matchListViewRevision"];
+    const views = container._overviewViews || (container._overviewViews = new Map());
+    for (const cached of views.keys()) {
+      if (cached.closed || !state.tabs.includes(cached) && !state.overlay.includes(cached)) views.delete(cached);
+    }
+    if (container._overviewViewTab === tab) return;
+    const previous = container._overviewViewTab;
+    if (previous && !previous.closed && (state.tabs.includes(previous) || state.overlay.includes(previous))) {
+      const content = container.ownerDocument.createDocumentFragment();
+      while (container.firstChild) content.appendChild(container.firstChild);
+      const values = Object.fromEntries(fields.map((field) => [field, container[field]]));
+      views.delete(previous);
+      views.set(previous, { content, scope: container.dataset.matchTierScope, values });
+    } else {
+      container.replaceChildren();
+    }
+    const restored = tab && views.get(tab);
+    if (restored) {
+      views.delete(tab);
+      container.appendChild(restored.content);
+      container.dataset.matchTierScope = restored.scope || "";
+      for (const field of fields) container[field] = restored.values[field];
+    } else {
+      container.dataset.matchTierScope = "";
+      for (const field of fields) delete container[field];
+    }
+    container._overviewViewTab = tab;
+    // Keep only a few inactive player views; evicted nodes can be rebuilt normally.
+    while (views.size > 4) views.delete(views.keys().next().value);
+  }
 
   // R116-E：队列名的唯一解析点。
   //
@@ -1774,7 +1830,7 @@
 
   // 「近 N 场排位」这类文案里的队列量词。海斗不是排位，必须换成准确表述，
   // 否则放开队列过滤之后卡片标题就成了假话。
-  function rankedQueueNoun(queueId) { return isMayhemQueueId(queueId) ? "海克斯大乱斗" : "排位"; }
+  function rankedQueueNoun(queueId) { return isMayhemQueueId(queueId) ? "海斗" : "排位"; }
 
   function rankedQueueData(data, tab, scope = "recent") {
     const stateKey = { recent: "rankedQueueRecent", ability: "rankedQueueAbility", position: "rankedQueuePosition" }[scope] || "rankedQueueRecent";
@@ -1805,7 +1861,7 @@
     //      一旦切过去整块被隐藏，页签本身就再也点不回来了（死胡同）。
     const payload = data || tab?.data || null;
     const mayhemAvailable = scope === "recent" && !!payload?.rankedQueues?.[MAYHEM_QUEUE_TAB_KEY];
-    const mayhemButton = mayhemAvailable ? `<button type="button" class="ranked-queue-button${selected === MAYHEM_QUEUE_TAB_KEY ? " is-active" : ""}" data-ranked-queue="${MAYHEM_QUEUE_TAB_KEY}" aria-pressed="${selected === MAYHEM_QUEUE_TAB_KEY}">海克斯大乱斗</button>` : "";
+    const mayhemButton = mayhemAvailable ? `<button type="button" class="ranked-queue-button${selected === MAYHEM_QUEUE_TAB_KEY ? " is-active" : ""}" data-ranked-queue="${MAYHEM_QUEUE_TAB_KEY}" aria-pressed="${selected === MAYHEM_QUEUE_TAB_KEY}">海斗</button>` : "";
     // 无障碍标签跟着实际可选范围走：只有排位队列时叫「排位模式」，
     // 加了海克斯大乱斗（非排位）之后必须改叫「对局模式」，否则标签本身
     // 就成了不准确表述。
@@ -1873,6 +1929,7 @@
   // 保证任何单点渲染故障都不会把整页锁死。
   function renderOverviewBody(container, tab) {
     try {
+      activateOverviewView(container, tab);
       renderOverviewBodyContent(container, tab);
     } catch (error) {
       console.error("总览渲染失败", error);
@@ -1927,7 +1984,7 @@
     const regionChip = summonerRegionChip(tab);
     const playerTag = !maskProfile && player.tagLine ? `<span>#${escapeHTML(player.tagLine)}</span>` : "";
     const nameMeta = playerTag || proChip ? `<div class="summoner-name-meta">${playerTag}${proChip}</div>` : "";
-    const hiddenChip = player.hidden || player.privateHistory ? '<span class="player-tab-hidden" data-tooltip="该玩家在客户端里开启了隐藏战绩" data-tooltip-size="compact">隐藏战绩</span>' : "";
+    const hiddenChip = player.privateHistory === true ? '<span class="player-tab-hidden">隐藏战绩</span>' : "";
     const backgroundArt = window.deepLegendsOverviewArt?.render(player) || (player.backgroundSource && player.backgroundPath
       ? `<img class="summoner-strip-art" data-queued-src="/api/champion-asset?source=${encodeURIComponent(player.backgroundSource)}&path=${encodeURIComponent(player.backgroundPath)}" alt="" aria-hidden="true" decoding="async" data-game-image>`
       : "");
@@ -2293,7 +2350,7 @@
     const markers = metrics.map((metric, index) => {
       if (metric.unavailable) return "";
       const [x, y] = radarPoint(index, metric.playerScore, metrics.length);
-      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"/>`;
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3"/>`;
     }).join("");
     const complete = metrics.every((metric) => !metric.unavailable);
     const baselineLabel = ability.baselineLabel || "近期同位置对手样本";
@@ -2303,7 +2360,7 @@
     }).join("");
     const summary = `${number(ability.sampleGames)} 场当前玩家 · ${number(ability.baselineGames)} 场同位置对手`;
     const sourceDetail = `${ability.sourceLabel || "七项指标参考 OP.GG"}\n${summary}\n对手基准来自这名玩家排位中的同位置对手样本聚合，不是全服或段位平均；缺失项不评分、不连成完整多边形`;
-    return `<section class="career-section ability-section"><header><h3>能力表现</h3><div class="career-section-tools">${tools}</div></header><div class="ability-meta"><div class="ability-legend"><span><i class="is-player"></i>当前玩家</span><span><i class="is-baseline"></i>${escapeHTML(baselineLabel)}</span></div><span data-tooltip="${escapeHTML(sourceDetail)}" data-tooltip-size="compact">${escapeHTML(`${ability.positionLabel ? `${ability.positionLabel} · ` : ""}${number(ability.sampleGames)} 场样本`)}</span></div><div class="ability-radar-wrap"><svg class="ability-radar" viewBox="0 0 320 275" aria-hidden="true" focusable="false"><g class="ability-radar-grid">${rings}${axes}</g>${complete ? `<polygon class="ability-radar-baseline" points="${radarPoints(metrics, () => 50)}"/>` : ""}${complete ? `<polygon class="ability-radar-player" points="${radarPoints(metrics, (metric) => metric.playerScore)}"/>` : ""}<g class="ability-radar-points">${markers}</g></svg><div class="ability-radar-controls" role="group" aria-label="当前玩家与近期同位置对手样本的七维能力数据">${controls}</div></div></section>`;
+    return `<section class="career-section ability-section"><header><h3>能力表现</h3><div class="career-section-tools">${tools}</div></header><div class="ability-meta"><div class="ability-legend"><span><i class="is-player"></i>当前玩家</span><span><i class="is-baseline"></i>${escapeHTML(baselineLabel)}</span></div><span data-tooltip="${escapeHTML(sourceDetail)}" data-tooltip-size="compact">${escapeHTML(`${ability.positionLabel ? `${ability.positionLabel} · ` : ""}${number(ability.sampleGames)} 场样本`)}</span></div><div class="ability-radar-wrap"><svg class="ability-radar" viewBox="0 0 320 275" aria-hidden="true" focusable="false"><g class="ability-radar-grid">${rings}${axes}</g>${complete ? `<polygon class="ability-radar-player" points="${radarPoints(metrics, (metric) => metric.playerScore)}"/>` : ""}${complete ? `<polygon class="ability-radar-baseline" points="${radarPoints(metrics, () => 50)}"/>` : ""}<g class="ability-radar-points">${markers}</g></svg><div class="ability-radar-controls" role="group" aria-label="当前玩家与近期同位置对手样本的七维能力数据">${controls}</div></div></section>`;
   }
 
 	function renderRecentRanked(stats, queueId = 0, queueSwitcher = "") {
@@ -3873,6 +3930,21 @@
 
   // 图标目录（符文/装备/召唤师技能）：客户端连接时来自本机客户端；
   // 未连接时后端会回退到 Data Dragon，因此不再限制连接状态。
+  async function ensureAugments() {
+    if (state.destroyed || state.augmentCatalog || state.augmentCatalogLoading) return;
+    state.augmentCatalogLoading = true;
+    try {
+      const result = await api("/api/gameplay/augments", {}, "augments", 5000);
+      if (state.destroyed || !Array.isArray(result?.augments) || !result.augments.length) return;
+      state.augmentCatalog = new Map(result.augments.map((item) => [Number(item.id), item]));
+      rerenderCatalogViews();
+    } catch (_) {
+      // The full perk catalog remains the existing fallback for this index.
+    } finally {
+      state.augmentCatalogLoading = false;
+    }
+  }
+
   async function ensurePerks(force = false) {
     if (!force && (state.perks || state.perksLoading)) return;
     const requestToken = Number(state.perksRequestToken || 0) + 1;
@@ -3895,6 +3967,10 @@
       }
     }
   }
+
+  window.addEventListener("deep-legends:augment-index-updated", () => {
+    if (state.perks && !state.perksLoading && !state.destroyed) void ensurePerks(true);
+  });
 
   async function ensureItems() {
     if (state.destroyed || state.items || state.itemsLoading || Date.now() < Number(state.itemsRetryAt || 0)) return;
@@ -4414,11 +4490,11 @@
   async function loadLive(force = false, source = "direct") {
     recordLiveRefresh("load", source);
     // R129 P3：记住这一轮加载的来源，供 live_render_rebuild 诊断归类。
-    state.liveLoadSource = liveRenderTriggerLabel(source);
     if (state.destroyed) return;
     if (!connected()) { renderLive(); return; }
     invalidateLiveForNewGame(state.live?.phase, state.beacon.phase, state.liveExpectedGameId, source);
     if (state.liveLoading && !force) return;
+    state.liveLoadSource = liveRenderTriggerLabel(source);
     // Manual refresh replaces only this request; other pages and recommendation
     // selections keep their state. The token below fences off the old finalizer.
     if (state.liveLoading) state.controllers.get("live")?.abort();
@@ -4447,6 +4523,7 @@
       if (state.liveAwaitingGame && liveGamePhase(state.beacon.phase) && !liveGamePhase(nextLive.phase)) return;
       if (invalidateLiveForNewGame(previousLive?.phase, nextLive.phase, nextLive.gameId, source, requestToken)) previousLive = null;
       if (shouldResetLiveGameScopedState(previousLive, nextLive)) resetLiveGameScopedState();
+      if (previousLive?.phase === "ChampSelect" && nextLive.phase !== "ChampSelect") { for (const key of state.laneMatchupPairs?.keys?.() || []) state.controllers?.get?.(`lane-pair:${key}`)?.abort?.(); state.laneMatchupPairs?.clear?.(); state.laneMatchupCardDiagnostics?.clear?.(); state.laneMatchupCandidates?.clear?.(); state.laneMatchupDiagnosticSkips?.clear?.(); }
       resetLivePositionOverrides(previousLive, nextLive);
       resetRecommendationTabsOnChampionChange(previousLive, nextLive);
       // Keep known history from the same game when a refresh returns a pending cell.
@@ -4472,6 +4549,7 @@
       ensureLiveRecommendations(state.live);
       ensureSpecialistRunes(state.live);
       void ensureProRunes(state.live);
+      void ensureLaneMatchupCandidates(state.live);
     } catch (error) {
       if (state.liveRequestToken === requestToken && (error.name !== "RequestCancelled" || !state.live || state.liveAwaitingGame)) {
         state.liveError = error.name === "RequestCancelled" ? "读取已中断，请重试。" : (error.message || "未能读取对局，请重试。");
@@ -4610,9 +4688,15 @@
     state.liveGameGeneration = Number(state.liveGameGeneration || 0) + 1;
     for (const key of state.liveRecommendationFlights?.keys?.() || []) state.controllers?.get?.(`live-recommendations:${key}`)?.abort?.();
     for (const key of state.specialistRuneFlights?.keys?.() || []) state.controllers?.get?.(`live-specialist-runes:${key}`)?.abort?.();
+    clearRuneStarterRetries();
+    state.laneMatchupUnavailableCount = 0;
+    for (const key of state.laneMatchupPairs?.keys?.() || []) state.controllers?.get?.(`lane-pair:${key}`)?.abort?.();
+    for (const [key, entry] of state.laneMatchupLanes || []) if (entry.status === "pending") { state.controllers?.get?.(entry.controllerKey)?.abort?.(); state.laneMatchupLanes.delete(key); }
+    for (const key of state.runeStarterRequests?.keys?.() || []) state.controllers?.get?.(`live-rune-starters:${key}`)?.abort?.();
+    state.runeStarterRequests?.clear?.();
     clearTimeout(state.proRuneTimer);
     for (const key of state.proRuneFlights?.keys?.() || []) state.controllers?.get?.(`live-pro-runes:${key}`)?.abort?.();
-    for (const collection of [state.proRunes, state.proRuneFlights, state.liveRecommendations, state.liveRecommendationTraces, state.specialistRunes, state.liveRecommendationFailures, state.liveRecommendationFlights, state.specialistRuneFailures, state.specialistRuneFlights, state.livePositionOverride, state.liveRecommendationSkipDiagnostics, state.specialistRuneSkipDiagnostics, state.liveRosterRenderDiagnostics, state.specialistPlayerTabs, state.liveRecommendationRosters]) collection?.clear?.();
+    for (const collection of [state.proRunes, state.proRuneFlights, state.liveRecommendations, state.liveRecommendationTraces, state.specialistRunes, state.liveRecommendationFailures, state.liveRecommendationFlights, state.specialistRuneFailures, state.specialistRuneFlights, state.livePositionOverride, state.liveRecommendationSkipDiagnostics, state.specialistRuneSkipDiagnostics, state.liveRosterRenderDiagnostics, state.specialistPlayerTabs, state.liveRecommendationRosters, state.laneMatchupCandidates, state.laneMatchupPairs, state.laneMatchupCardDiagnostics, state.laneMatchupDiagnosticSkips]) collection?.clear?.();
     state.recommendationTab = "runes";
     state.recommendationTabTouched = false;
     state.runeSourceTab = "opgg";
@@ -4796,7 +4880,7 @@
     const target = liveRecommendationTarget(data);
     if (!target) return null;
     const position = specialistPosition(data, target);
-    return { ...target, position, key: `${target.championId}:${position}:${target.gameMode}:${target.mapId}:${target.tier}:${target.spellKey}` };
+    return { ...target, position, key: `${target.championId}:${position}` };
   }
 
   function liveAugmentRecommendationSource(data) {
@@ -4827,7 +4911,11 @@
       blockCount: Number(context.blockCount || 0), itemCount: Number(context.itemCount || 0),
       endpoint: String(context.endpoint || ""), itemId: Number(context.itemId || 0),
       httpStatus: Number(context.httpStatus || 0), errorKind: String(context.errorKind || ""),
+	  rowCount: Number(context.rowCount || 0), enemyChampionId: Number(context.enemyChampionId || 0),
+      selfPosition: String(context.selfPosition || ""), enemyLockedCount: Number(context.enemyLockedCount || 0),
+      enemyPositionKnownCount: Number(context.enemyPositionKnownCount || 0), allyPositionKnownCount: Number(context.allyPositionKnownCount || 0),
     };
+    if (event === "lane_matchup_card") Object.assign(body, { mode: String(context.mode || ""), shown: context.shown === true, hiddenReason: String(context.hiddenReason || ""), ownLocked: context.ownLocked === true });
     void fetch("/api/diagnostics/client", {
       method: "POST", credentials: "same-origin",
       headers: { "Accept": "application/json", "Content-Type": "application/json" },
@@ -4992,6 +5080,7 @@
       const response = await api(`/api/gameplay/pro-runes?${query}`, {}, `live-pro-runes:${target.key}`, 28000);
       if (generation !== Number(state.liveGameGeneration || 0)) return;
       if (!Array.isArray(response?.pros)) throw new Error("职业符文数据不完整");
+      retainRuneStarterItems(response.pros, cached?.pros);
       state.proRunes.set(target.key, { ...response, receivedAt: Date.now() });
       if (response.pros.length) { ensurePerks(); ensureItems(); }
     } catch (error) {
@@ -5048,6 +5137,7 @@
 		state.specialistRuneFailures.set(target.key, { reason: String(response.reason), at: Date.now() });
 		state.specialistRunes.delete(target.key);
 	  } else {
+		retainRuneStarterItems(runes, state.specialistRunes.get(target.key));
 		state.specialistRunes.set(target.key, runes);
 		state.specialistRuneFailures.delete(target.key);
 	  }
@@ -5056,9 +5146,105 @@
     } catch (error) {
 	  if (gameGeneration === Number(state.liveGameGeneration || 0) && error.name !== "RequestCancelled") state.specialistRuneFailures.set(target.key, { reason: "request-failed", at: Date.now() });
     } finally {
-      if (gameGeneration === Number(state.liveGameGeneration || 0)) state.specialistRuneFlights.delete(target.key);
+      if (gameGeneration === Number(state.liveGameGeneration || 0) && state.specialistRuneFlights.get(target.key) === now) state.specialistRuneFlights.delete(target.key);
 	      if (specialistRequestTarget(state.live)?.key === target.key) renderLive();
     }
+  }
+
+  function retainRuneStarterItems(runes, previous) {
+    const known = new Map((previous || []).filter(row => Array.isArray(row.starterItemIds)).map(row => [String(row.key), row]));
+    for (const row of runes) {
+      const cached = known.get(String(row.key));
+      if (row.starterItemIds === undefined && cached && Number(cached.playedAt) === Number(row.playedAt)) row.starterItemIds = [...cached.starterItemIds];
+    }
+  }
+
+  function clearRuneStarterRetries(keepSource = "", keepTarget = "") {
+    for (const [key, entry] of state.runeStarterRequests || []) {
+      if (entry.source === keepSource && entry.targetKey === keepTarget) continue;
+      clearTimeout(entry.timer);
+      entry.timer = 0;
+      entry.cancelled = true;
+      if (entry.pending) state.controllers?.get?.(`live-rune-starters:${key}`)?.abort?.();
+    }
+  }
+
+  function runeStarterTargetActive(entry) {
+    if (entry.cancelled || entry.generation !== Number(state.liveGameGeneration || 0)) return false;
+    if (state.section !== "live" || !["ChampSelect", "InProgress"].includes(state.live?.phase) || document.hidden) return false;
+    if (state.runeSourceTab !== entry.source) return false;
+    const target = entry.source === "pro" ? proRequestTarget(state.live) : specialistRequestTarget(state.live);
+    return target?.key === entry.targetKey;
+  }
+
+  async function ensureRuneStarterItems(data, retryKey = "") {
+    const source = state.runeSourceTab;
+    const target = source === "pro" ? proRequestTarget(data) : source === "specialist" ? specialistRequestTarget(data) : null;
+    clearRuneStarterRetries(source, target?.key || "");
+    if (!target) return;
+    const runes = source === "pro" ? proRunesFor(data) : specialistRunesFor(data);
+    if (!Array.isArray(runes)) return;
+    // Only records rendered for the active player need the second-stage request.
+    const visible = new Set([...nodes.liveContent.querySelectorAll(".specialist-game-row[data-rune-choice]")].map(row => row.dataset.runeChoice));
+    const rows = runes.filter(row => visible.has(String(row.key)) && row.starterItemIds === undefined)
+      .slice(0, source === "pro" ? 5 : 3).map(row => ({ key: String(row.key), playedAt: Number(row.playedAt) }));
+    if (!rows.length) return;
+    state.runeStarterRequests ||= new Map();
+    const requestKey = retryKey || `${source}:${target.key}:${rows.map(row => `${row.key}:${row.playedAt}`).join(",")}`;
+    const previous = state.runeStarterRequests.get(requestKey);
+    if (previous?.pending || (!retryKey && previous && Date.now() - previous.at < 90000)) return;
+    // A partial response changes the missing-row signature. Polls must still
+    // respect the pending retry for that batch instead of starting a new one.
+    if (!retryKey && [...state.runeStarterRequests.values()].some(entry => entry.source === source && entry.targetKey === target.key && (entry.pending || entry.timer || Date.now() - entry.at < 90000 && entry.rows?.some(old => rows.some(row => row.key === old.key && row.playedAt === old.playedAt))))) return;
+    if (retryKey && (!previous || !runeStarterTargetActive(previous) || previous.retries >= 2)) return;
+    const generation = Number(state.liveGameGeneration || 0);
+    const entry = { source, targetKey: target.key, generation, rows: previous?.rows || rows, pending: true, at: Date.now(), retries: (previous?.retries || 0) + (retryKey ? 1 : 0), timer: 0, cancelled: false };
+    state.runeStarterRequests.set(requestKey, entry);
+    let retryAfter = 0;
+    try {
+      const response = await api("/api/gameplay/rune-starters", { method: "POST", body: JSON.stringify({ source, championId: target.championId, position: target.position, rows }) }, `live-rune-starters:${requestKey}`, 32000);
+      if (!runeStarterTargetActive(entry) || !Array.isArray(response?.starters)) return;
+      const patches = new Map(response.starters.map(row => [String(row.key), row]));
+      const current = source === "pro" ? proRunesFor(state.live) : specialistRunesFor(state.live);
+      for (const config of current || []) {
+        const patch = patches.get(String(config.key));
+        if (!patch || Number(patch.playedAt) !== Number(config.playedAt) || !Array.isArray(patch.starterItemIds)) continue;
+        config.starterItemIds = patch.starterItemIds.map(Number).filter(id => Number.isInteger(id) && id > 0).slice(0, 6);
+      }
+      patchRuneStarterEquipment(current || []);
+      if (Number.isFinite(Number(response.retryAfterSeconds)) && Number(response.retryAfterSeconds) > 0
+        && (current || []).some(row => visible.has(String(row.key)) && row.starterItemIds === undefined)) {
+        retryAfter = Math.min(45, Math.max(5, Number(response.retryAfterSeconds)));
+      }
+    } catch (_) {
+      // Opening items are optional; network failures keep the existing cooldown.
+    } finally {
+      if (state.runeStarterRequests.get(requestKey) === entry) {
+        entry.pending = false;
+        entry.at = Date.now();
+        if (retryAfter && entry.retries < 2 && runeStarterTargetActive(entry)) {
+          entry.timer = setTimeout(() => {
+            entry.timer = 0;
+            if (state.runeStarterRequests.get(requestKey) === entry && runeStarterTargetActive(entry)) void ensureRuneStarterItems(state.live, requestKey);
+          }, retryAfter * 1000);
+        }
+      }
+    }
+  }
+
+  function patchRuneStarterEquipment(configs) {
+    const byKey = new Map(configs.map(config => [String(config.key), config]));
+    for (const row of nodes.liveContent.querySelectorAll(".specialist-game-row[data-rune-choice]")) {
+      const config = byKey.get(row.dataset.runeChoice);
+      if (!config?.starterItemIds?.length) continue;
+      const current = row.querySelector(".specialist-game-items");
+      if (!current) continue;
+      const next = document.createElement("div");
+      next.innerHTML = renderRuneEquipment(config);
+      const equipment = next.firstElementChild;
+      if (equipment) { current.replaceWith(equipment); prepareImages(equipment); }
+    }
+    rememberLiveRecommendationMarkup();
   }
 
 	function specialistRuneFailure(value) {
@@ -5096,13 +5282,15 @@
 	  const phase = String(data?.phase || "");
 	  const gameId = Number(data?.gameId || 0);
 	  const playersReceived = Array.isArray(data?.players) ? data.players.length : 0;
-	  const key = `${gameId}:${phase}:${playersReceived}:${rendered100}:${rendered200}`;
+	  const hiddenIdentityRendered = Array.isArray(data?.players) ? data.players.filter((player) => player.hidden === true).length : 0;
+	  const privateHistoryRendered = Array.isArray(data?.players) ? data.players.filter((player) => player.privateHistory === true).length : 0;
+	  const key = `${gameId}:${phase}:${playersReceived}:${rendered100}:${rendered200}:${hiddenIdentityRendered}:${privateHistoryRendered}`;
 	  if (state.liveRosterRenderDiagnostics?.has(key)) return;
 	  state.liveRosterRenderDiagnostics ||= new Set();
 	  state.liveRosterRenderDiagnostics.add(key);
 	  void fetch("/api/diagnostics/client", {
 	    method: "POST", credentials: "same-origin", headers: { "Accept": "application/json", "Content-Type": "application/json" },
-	    body: JSON.stringify({ event: "live_roster_rendered", reason: "render", phase, gameId, queueId: Number(data?.queueId || 0), playersReceived, rendered100, rendered200 }),
+	    body: JSON.stringify({ event: "live_roster_rendered", reason: "render", phase, gameId, queueId: Number(data?.queueId || 0), playersReceived, rendered100, rendered200, hiddenIdentityRendered, privateHistoryRendered }),
 	  }).catch(() => {});
 	}
 
@@ -5172,7 +5360,7 @@
       recordLiveRenderRebuild(["status"]);
     }
     if (nodes.liveRefresh) {
-      nodes.liveRefresh.textContent = state.liveLoading
+      nodes.liveRefresh.textContent = state.liveLoading && state.liveLoadSource === "manual"
         ? "正在刷新…" : "刷新对局";
       nodes.liveRefresh.setAttribute("aria-busy", String(Boolean(state.liveLoading)));
     }
@@ -5218,9 +5406,14 @@
       nodes.liveContent._recommendationMarkup = markup;
       return;
     }
-    recordLiveRenderRebuild(["full"]);
+    const fullHolder = document.createElement("div");
+    fullHolder.innerHTML = markup;
+    const oldImageKeys = new Set([...nodes.liveContent.querySelectorAll("img")].map(img => img._liveAssetKey || img.getAttribute("data-queued-src") || img.getAttribute("src")));
+    const imagesRecreated = [...fullHolder.querySelectorAll("img")].filter(img => oldImageKeys.has(img.getAttribute("data-queued-src") || img.getAttribute("src"))).length;
+    recordLiveRenderRebuild(["full"], { imagesRecreated, rowsReplaced: fullHolder.querySelectorAll('[data-live-player-row^="card:"]').length });
     nodes.liveContent._recommendationMarkup = markup;
     nodes.liveContent.innerHTML = `<div data-live-body>${markup}</div>`;
+    stampLiveRows(nodes.liveContent);
     bindLiveContent();
     applyRenderedMetricStyles(nodes.liveContent);
     prepareImages(nodes.liveContent);
@@ -5244,6 +5437,56 @@
     for (const [root, top] of captured) if (root?.isConnected) root.scrollTop = top;
   }
 
+  function stampLiveRows(root) {
+    for (const row of root.querySelectorAll("[data-live-player-row], .specialist-game-row[data-rune-choice]")) if (!row._liveMarkup) row._liveMarkup = row.outerHTML;
+    for (const img of root.querySelectorAll("img")) if (!img._liveAssetKey) img._liveAssetKey = img.getAttribute("data-queued-src") || img.getAttribute("src") || "";
+  }
+
+  function preserveLiveImages(current, next, stats) {
+    const images = new Map();
+    const originals = new Set(current.querySelectorAll("img"));
+    for (const img of originals) {
+      const key = img._liveAssetKey || img.getAttribute("data-queued-src") || img.getAttribute("src");
+      if (key) { if (!images.has(key)) images.set(key, []); images.get(key).push(img); }
+    }
+    for (const img of [...next.querySelectorAll("img")]) {
+      const key = img._liveAssetKey || img.getAttribute("data-queued-src") || img.getAttribute("src");
+      const old = images.get(key)?.shift();
+      if (!old || old === img) continue;
+      for (const name of ["alt", "title", "width", "height"]) { if (img.hasAttribute(name)) old.setAttribute(name, img.getAttribute(name)); else old.removeAttribute(name); }
+      img.replaceWith(old);
+    }
+    // A same-source replacement must be preserved above, so the recreated
+    // count is zero. New sources represent changed content, not reload flicker.
+    for (const img of next.querySelectorAll("img")) {
+      const key = img._liveAssetKey || img.getAttribute("data-queued-src") || img.getAttribute("src");
+      if (!originals.has(img) && [...originals].some(old => (old._liveAssetKey || old.getAttribute("data-queued-src") || old.getAttribute("src")) === key)) stats.imagesRecreated++;
+    }
+  }
+
+  function patchLiveRosterPanel(current, next, stats) {
+    const oldLists = [...current.querySelectorAll(".live-player-list")];
+    const newLists = [...next.querySelectorAll(".live-player-list")];
+    if (!oldLists.length || oldLists.length !== newLists.length) return false;
+    const pairs = [];
+    for (let i = 0; i < oldLists.length; i++) {
+      const old = [...oldLists[i].children], fresh = [...newLists[i].children];
+      if (old.length !== fresh.length || old.some((row,j) => !row.dataset.livePlayerRow || row.dataset.livePlayerRow !== fresh[j].dataset.livePlayerRow)) return false;
+      pairs.push([oldLists[i], newLists[i], old, fresh]);
+    }
+    for (const [oldList,newList,old,fresh] of pairs) {
+      for (let i = 0; i < old.length; i++) if ((old[i]._liveMarkup || old[i].outerHTML) !== fresh[i].outerHTML) {
+        fresh[i]._liveMarkup = fresh[i].outerHTML;
+        preserveLiveImages(old[i], fresh[i], stats);
+        old[i].replaceWith(fresh[i]);
+        if (fresh[i].dataset.livePlayerRow.startsWith("card:")) stats.rowsReplaced++;
+      }
+      newList.replaceWith(oldList);
+    }
+    current.replaceChildren(...next.childNodes);
+    return true;
+  }
+
   function updateLivePanels(markup) {
     const body = nodes.liveContent.querySelector("[data-live-body]");
     if (!body) return false;
@@ -5256,11 +5499,23 @@
       const current = body.querySelector(`#recommendation-panel-${key}`);
       const next = holder.querySelector(`#recommendation-panel-${key}`);
       if (!current || !next || current.innerHTML === next.innerHTML) continue;
-      current.innerHTML = next.innerHTML;
+      let stats = { imagesRecreated: 0, rowsReplaced: 0 };
+      if (key === "insight" && patchLiveRosterPanel(current, next, stats)) {
+        // The roster rows were patched or moved intact.
+      } else {
+        const oldRows = new Map([...current.querySelectorAll(".specialist-game-row[data-rune-choice]")].map(row => [row.dataset.runeChoice, row]));
+        for (const row of next.querySelectorAll(".specialist-game-row[data-rune-choice]")) {
+          const old = oldRows.get(row.dataset.runeChoice);
+          if (old && (old._liveMarkup || old.outerHTML) === row.outerHTML) row.replaceWith(old);
+        }
+        preserveLiveImages(current, next, stats);
+        current.replaceChildren(...next.childNodes);
+      }
+      stampLiveRows(current);
       bindLivePanelScope(current);
       applyRenderedMetricStyles(current);
       prepareImages(current);
-      recordLiveRenderRebuild([key]);
+      recordLiveRenderRebuild([key], stats);
       replaced = true;
     }
     if (replaced) restoreLiveScroll(captured);
@@ -5291,7 +5546,7 @@
 		championURL: proxyAsset(assetPath("champion", championId)),
 	  };
 	});
-	const direct = source === "session" || source === "both";
+	const direct = source === "session" || source === "both" || source === "lobby";
 	const tooltip = direct
 	  ? `客户端直接给出的组队信息${source === "both" ? "\n最近战绩也支持这一判断" : ""}`
 	  : `预组队推测\n最近战绩中共同出现至少 ${LIVE_PREMADE_MIN_SHARED_GAMES} 场`;
@@ -5337,7 +5592,15 @@
     return `<span class="pro-identity-chip${badge.secondary ? " is-secondary" : ""}">${escapeHTML(badge.teamCode)} ${escapeHTML(badge.playerName)}${badge.secondary ? " · 二队" : ""}</span>`;
   }
 
-  function renderLivePlayer(player, index, arenaMode = false, currentChampionId = 0, premadePlayers = [], recentPositions = "", aramMode = false, hextechMode = false) {
+  function champSelectEnemyPlaceholder(player, phase, players) {
+    const selfTeam = Number((players || []).find(p => p.isCurrent)?.teamId);
+    return phase === "ChampSelect" && !player.isAlly && !player.isCurrent && selfTeam > 0 && Number(player.teamId) > 0 && Number(player.teamId) !== selfTeam;
+  }
+
+  function renderLivePlayer(player, index, arenaMode = false, currentChampionId = 0, premadePlayers = [], recentPositions = "", aramMode = false, hextechMode = false, phase = "") {
+    if (champSelectEnemyPlaceholder(player, phase, premadePlayers)) {
+      return `<article class="live-player">${iconFigure("champion", liveDisplayedChampionId(player, currentChampionId), player.championName, "live")}<div class="live-player-copy">暂无玩家信息</div></article>`;
+    }
     const rank = player.rank;
     const stats = player.modeStats || {};
     const rankedRecord = player.recentRankedRecord;
@@ -5354,12 +5617,14 @@
     const rankCopy = rank?.tier ? rankTitle(rank) : "未定级";
     const contextCopy = arenaMode || aramMode ? "" : `${positionLabel(player.position)} · ${rankCopy}`;
     const rowTone = player.isCurrent ? " is-self" : player.isAlly ? " is-ally" : "";
+    const hiddenChip = `${player.privateHistory === true ? '<span class="player-tab-hidden">隐藏战绩</span>' : ""}${player.hidden === true ? '<span class="player-tab-hidden">隐藏身份</span>' : player.identityUnresolved === true ? '<span class="player-tab-hidden">身份待公开</span>' : ""}`;
+    const liveAutofillChip = player.autofill === true ? '<span class="match-autofill-chip">补位</span>' : "";
     const premadeTag = renderLivePremadeTag(player, premadePlayers, currentChampionId);
-	const emptySummary = historyState === "unavailable" ? "客户端未公开该玩家" : historyState === "failed" ? "读取失败" : "暂无样本";
+	const emptySummary = historyState === "unavailable" ? player.identityUnresolved === true ? "身份尚未公开" : "客户端未公开该玩家" : historyState === "failed" ? "读取失败" : "暂无样本";
 	const historySummary = historyPending
 	  ? '<dl class="is-history-pending" aria-label="战绩读取中"><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div></dl>'
 	  : `<dl><div><dt>${recordGames ? `近 ${number(recordGames)} 局` : "当前模式"}</dt><dd class="live-record-value">${displayStats.games ? `${number(displayStats.wins)}胜 ${number(displayStats.losses)}负` : emptySummary}</dd></div><div><dt>胜率</dt><dd class="win-rate-value">${displayStats.games ? percent(displayStats.winRate) : "—"}</dd></div><div><dt>KDA</dt><dd class="live-kda-value">${displayStats.games ? `${kda(displayStats.kda)}:1` : "—"}</dd></div></dl>`;
-	return `<article class="live-player${rowTone}">${iconFigure("champion", championId, player.championName, "live")}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}" ${proBadgeAttributes(player)}` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${premadeTag}${player.mySquad ? '<span class="my-squad-chip">我的小队</span>' : ""}${renderProIdentityBadge(player)}</div>${contextCopy ? `<span>${escapeHTML(contextCopy)}</span>` : ""}${recentPositions}</div>${historySummary}</article>`;
+	return `<article class="live-player${rowTone}">${iconFigure("champion", championId, player.championName, "live")}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}" ${proBadgeAttributes(player)}` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${hiddenChip}${liveAutofillChip}${premadeTag}${player.mySquad ? '<span class="my-squad-chip">我的小队</span>' : ""}${renderProIdentityBadge(player)}</div>${contextCopy ? `<span>${escapeHTML(contextCopy)}</span>` : ""}${recentPositions}</div>${historySummary}</article>`;
   }
 
 	  function orderLivePlayers(players, groupByTeam = true) {
@@ -5442,6 +5707,236 @@
     return false;
   }
 
+  function laneMatchupEnemies(data, self) {
+    // teamId distinguishes other allies even when isAlly only marks self.
+    return (data?.players || []).filter(player => !player.isAlly && !player.isCurrent
+      && Number(self?.teamId) > 0 && Number(player.teamId) > 0 && Number(player.teamId) !== Number(self.teamId)
+      && player.championLocked === true && Number(player.championId) > 0);
+  }
+
+  function laneMatchupInference(data, self, position) {
+    const enemies = laneMatchupEnemies(data, self);
+    const tier = laneMatchupTier({ self });
+    const unknown = enemies.filter(player => !livePositionValue(player.position));
+    if (!unknown.length) return { reason: "lane-not-locked" };
+    const candidates = [];
+    for (const enemy of unknown) {
+      const lanes = state.laneMatchupLanes?.get(`${Number(enemy.championId)}:${tier}`);
+      // Missing competitor shares cannot be treated as zero evidence.
+      if (lanes?.status === "failed" || lanes?.status === "succeeded" && !lanes.rows?.length) return { reason: "lanes-failed" };
+      if (lanes?.status !== "succeeded") return { reason: "lanes-pending" };
+      const rate = Number(lanes.rows.find(row => livePositionValue(row.position) === position)?.rate || 0);
+      if (rate >= 0.25) candidates.push({ enemy, rate });
+    }
+    candidates.sort((left, right) => right.rate - left.rate);
+    if (candidates.length === 1) return { enemy: candidates[0].enemy };
+    if (candidates.length > 1 && candidates[0].rate >= 0.5 && candidates[0].rate >= 2 * candidates[1].rate) return { enemy: candidates[0].enemy };
+    return { reason: candidates.length > 1 ? "lane-ambiguous" : "lane-not-locked" };
+  }
+
+  function laneMatchupContext(data) {
+    if (data?.phase !== "ChampSelect") return null;
+    const self = (data.players || []).find(player => player.isCurrent);
+    const position = livePositionValue(self?.position);
+    if (!["top", "jungle", "mid", "adc", "support"].includes(position)) return null;
+    const known = laneMatchupEnemies(data, self).find(player => livePositionValue(player.position) === position);
+    const enemy = known || laneMatchupInference(data, self, position).enemy;
+    return enemy ? { self, enemy, position } : null;
+  }
+
+  async function ensureLaneMatchupPositions(data) {
+    if (data?.phase !== "ChampSelect") return;
+    const self = (data.players || []).find(player => player.isCurrent);
+    const position = livePositionValue(self?.position);
+    if (!["top", "jungle", "mid", "adc", "support"].includes(position)) return;
+    const enemies = laneMatchupEnemies(data, self);
+    if (enemies.some(player => livePositionValue(player.position) === position)) return;
+    const tier = laneMatchupTier({ self });
+    state.laneMatchupLanes ||= new Map();
+    const missing = [...new Set(enemies.filter(player => !livePositionValue(player.position)).map(player => Number(player.championId)))]
+      .filter(id => !state.laneMatchupLanes.has(`${id}:${tier}`)).slice(0, 5);
+    if (!missing.length) return;
+    const generation = Number(state.liveGameGeneration || 0);
+    const key = `${missing.join(",")}:${tier}`;
+    const entries = new Map(missing.map(id => [id, { rows: [], status: "pending", controllerKey: `lane-lanes:${key}` }]));
+    for (const [id, entry] of entries) state.laneMatchupLanes.set(`${id}:${tier}`, entry);
+    try {
+      const response = await api(`/api/gameplay/champion-lanes?${new URLSearchParams({ champions: missing.join(","), tier })}`, {}, `lane-lanes:${key}`, 14000);
+      for (const [id, entry] of entries) {
+        if (state.laneMatchupLanes.get(`${id}:${tier}`) !== entry) continue;
+        entry.rows = (Array.isArray(response?.[id]) ? response[id] : []).filter(row => ["top", "jungle", "mid", "adc", "support"].includes(livePositionValue(row.position)) && Number.isFinite(Number(row.rate)) && Number(row.rate) > 0 && Number(row.rate) <= 1);
+        entry.status = "succeeded";
+      }
+    } catch (_) {
+      for (const [id, entry] of entries) if (state.laneMatchupLanes.get(`${id}:${tier}`) === entry) entry.status = "failed";
+    }
+    if (generation === Number(state.liveGameGeneration || 0) && state.live?.phase === "ChampSelect" && state.section === "live") renderLive();
+  }
+
+  function laneMatchupAvailability(data) {
+    const self = (data?.players || []).find(player => player.isCurrent);
+    const enemyLockedCount = laneMatchupEnemies(data, self).length;
+    const players = data?.players || [];
+    const known = player => ["top", "jungle", "mid", "adc", "support"].includes(livePositionValue(player.position));
+    return { selfPosition: livePositionValue(self?.position), enemyLockedCount,
+      enemyPositionKnownCount: players.filter(player => !player.isAlly && !player.isCurrent && Number(self?.teamId) > 0 && Number(player.teamId) > 0 && Number(player.teamId) !== Number(self.teamId) && known(player)).length,
+      allyPositionKnownCount: players.filter(player => Number(self?.teamId) > 0 && Number(player.teamId) === Number(self.teamId) && known(player)).length };
+  }
+
+  function laneMatchupOwnChampionId(data, self) {
+    if (Number(self?.championId) > 0) return Number(self.championId);
+    if (self?.championPickPending) return 0;
+    return Number(self?.championPickIntent) || Number(data?.currentChampionId) || 0;
+  }
+
+  function laneMatchupTier(_context) {
+    return liveRecommendationTier();
+  }
+
+  function laneMatchupOwnLocked(self) {
+    return self?.championLocked === true;
+  }
+
+  function laneMatchupCandidateKey(context) {
+    return `${Number(context.enemy.championId)}:${context.position}:${laneMatchupTier(context)}`;
+  }
+
+  function laneMatchupPairKey(data, context) {
+    return `${laneMatchupOwnChampionId(data, context.self)}:${Number(context.enemy.championId)}:${context.position}:${laneMatchupTier(context)}`;
+  }
+
+  async function ensureLaneMatchupPair(data, context) {
+    const ownId = laneMatchupOwnChampionId(data, context.self);
+    if (data?.phase !== "ChampSelect" || ownId <= 0) return;
+    state.laneMatchupPairs ||= new Map();
+    const key = laneMatchupPairKey(data, context);
+    if (state.laneMatchupPairs.has(key)) return;
+    const entry = { status: "pending", data: null };
+    state.laneMatchupPairs.set(key, entry);
+    const generation = Number(state.liveGameGeneration || 0);
+    const query = new URLSearchParams({ champion: String(ownId), enemy: String(context.enemy.championId), position: context.position, tier: laneMatchupTier(context) });
+    try {
+      const pair = await api(`/api/gameplay/lane-matchup?${query}`, {}, `lane-pair:${key}`, 20000);
+      if (generation !== Number(state.liveGameGeneration || 0) || state.live?.phase !== "ChampSelect" || state.laneMatchupPairs.get(key) !== entry) return;
+      entry.data = Number(pair?.championId) === ownId && Number(pair?.enemyChampionId) === Number(context.enemy.championId)
+        && Number.isFinite(Number(pair.winRate)) && Number(pair.winRate) >= 0 && Number(pair.winRate) <= 100 && Number(pair.games) > 0 ? pair : null;
+      entry.status = "succeeded";
+    } catch (_) {
+      if (generation !== Number(state.liveGameGeneration || 0) || state.live?.phase !== "ChampSelect" || state.laneMatchupPairs.get(key) !== entry) return;
+      entry.status = "failed";
+    }
+    if (state.section === "live") renderLive();
+  }
+
+  function recordLaneMatchupCandidateSkip(reason, data, context) {
+    const shape = laneMatchupAvailability(data);
+    const key = `${Number(state.liveGameGeneration || 0)}:${reason}:${Number(data?.gameId || 0)}:${context ? laneMatchupCandidateKey(context) : ""}:${shape.selfPosition}:${shape.enemyLockedCount}:${shape.enemyPositionKnownCount}:${shape.allyPositionKnownCount}`;
+    state.laneMatchupDiagnosticSkips ||= new Set();
+    if (state.laneMatchupDiagnosticSkips.has(key)) return;
+    if (reason === "context-unavailable" && Number(state.laneMatchupUnavailableCount || 0) >= 20) return;
+    if (reason === "context-unavailable") state.laneMatchupUnavailableCount = Number(state.laneMatchupUnavailableCount || 0) + 1;
+    state.laneMatchupDiagnosticSkips.add(key);
+    recordLaneMatchupCandidateDiagnostic(reason, data, context);
+  }
+
+  function laneMatchupUnavailableReason(data) {
+    const self = (data?.players || []).find(player => player.isCurrent);
+    const position = livePositionValue(self?.position);
+    if (data?.phase !== "ChampSelect" || !["top", "jungle", "mid", "adc", "support"].includes(position)) return "context-unavailable";
+    return laneMatchupInference(data, self, position).reason || "context-unavailable";
+  }
+
+  function recordLaneMatchupCandidateDiagnostic(reason, data, context, extra) {
+    recordItemSetClientDiagnostic("lane_matchup_candidate_fetch", reason, {
+      enemyChampionId: Number(context?.enemy?.championId || 0), queueId: Number(data?.queueId || 0),
+      gameId: Number(data?.gameId || 0), position: context?.position || "",
+      tier: context ? laneMatchupTier(context) : "", ...laneMatchupAvailability(data), ...(extra || {}),
+    });
+  }
+
+  async function ensureLaneMatchupCandidates(data) {
+    let context = laneMatchupContext(data);
+    if (!context) {
+      const pending = ensureLaneMatchupPositions(data);
+      recordLaneMatchupCandidateSkip(laneMatchupUnavailableReason(data), data, null);
+      await pending;
+      if (data !== state.live) return;
+      context = laneMatchupContext(data);
+    }
+    if (!context) { recordLaneMatchupCandidateSkip(laneMatchupUnavailableReason(data), data, null); return; }
+    const pairRequest = ensureLaneMatchupPair(data, context);
+    if (laneMatchupOwnLocked(context.self)) {
+      recordLaneMatchupCandidateSkip("own-champion-selected", data, context);
+      await pairRequest;
+      return;
+    }
+    state.laneMatchupCandidates ||= new Map();
+    const key = laneMatchupCandidateKey(context);
+    const cached = state.laneMatchupCandidates.get(key);
+    if (cached) {
+      const logFlag = cached.status === "pending" ? "inFlightLogged" : "cacheLogged";
+      if (!cached[logFlag]) {
+        cached[logFlag] = true;
+        recordLaneMatchupCandidateDiagnostic(cached.status === "pending" ? "in-flight" : "cached", data, context, { rowCount: cached.rows?.length || 0 });
+      }
+      await pairRequest;
+      return;
+    }
+    const entry = { rows: [], status: "pending" };
+    state.laneMatchupCandidates.set(key, entry);
+    const generation = Number(state.liveGameGeneration || 0);
+    const query = new URLSearchParams({ mode: "ranked", champion: String(context.enemy.championId), position: context.position, tier: laneMatchupTier(context) });
+    recordLaneMatchupCandidateDiagnostic("requested", data, context);
+    try {
+      const detail = await api(`/api/champions/detail?${query}`, {}, `lane-matchup:${key}`, 20000);
+      if (generation !== Number(state.liveGameGeneration || 0) || state.live?.phase !== "ChampSelect" || state.laneMatchupCandidates.get(key) !== entry) return;
+      // These losing matchups use the enemy perspective; candidate win rate is inverted.
+      entry.rows = (detail?.counters?.weakAgainst || []).filter(row => Number(row.championId) > 0
+        && Number.isFinite(Number(row.winRate)) && Number(row.winRate) > 0 && Number(row.winRate) < 50).slice(0, 5);
+      entry.status = "succeeded";
+      recordLaneMatchupCandidateDiagnostic("succeeded", data, context, { rowCount: entry.rows.length });
+    } catch (error) {
+      if (generation !== Number(state.liveGameGeneration || 0) || state.live?.phase !== "ChampSelect" || state.laneMatchupCandidates.get(key) !== entry) return;
+      entry.status = "failed";
+      recordLaneMatchupCandidateDiagnostic("failed", data, context, { httpStatus: Number(error?.status || 0), errorKind: String(error?.errorKind || error?.kind || (error?.status ? "http" : "network")) });
+    }
+    await pairRequest;
+    if (laneMatchupContext(state.live) && state.section === "live") renderLive();
+  }
+
+  function recordLaneMatchupCardDiagnostic(data, context, mode, shown, hiddenReason) {
+    const fields = { mode, shown, hiddenReason: shown ? "" : hiddenReason, ownLocked: laneMatchupOwnLocked(context.self),
+      enemyChampionId: Number(context.enemy.championId), tier: laneMatchupTier(context) };
+    const key = JSON.stringify(fields);
+    state.laneMatchupCardDiagnostics ||= new Set();
+    if (state.laneMatchupCardDiagnostics.has(key)) return;
+    state.laneMatchupCardDiagnostics.add(key);
+    recordItemSetClientDiagnostic("lane_matchup_card", "render", fields);
+  }
+
+  function renderLaneMatchupCard(data, _hero) {
+    const context = laneMatchupContext(data);
+    if (!context) return "";
+    const enemyId = Number(context.enemy.championId);
+    const ownId = laneMatchupOwnChampionId(data, context.self);
+    const locked = laneMatchupOwnLocked(context.self);
+    const mode = ownId > 0 ? locked ? "a" : "a+b" : "b";
+    const pair = ownId > 0 ? state.laneMatchupPairs?.get(laneMatchupPairKey(data, context)) : null;
+    const candidates = locked ? [] : state.laneMatchupCandidates?.get(laneMatchupCandidateKey(context))?.rows || [];
+    let content = "";
+    if (pair?.status === "succeeded" && pair.data) {
+      const winRate = Number(pair.data.winRate);
+      const tone = winRate > 50 ? "strong" : winRate < 50 ? "weak" : "even";
+      const copy = winRate === 50 ? "这局对线五五开，胜率约 50%" : `这局对线偏${winRate > 50 ? "优势" : "劣势"}，胜率约 ${rate(winRate)}`;
+      content += `<div class="lane-matchup-result is-${tone}"><strong>${copy}</strong></div>`;
+    }
+    if (candidates.length) content += `<div class="lane-matchup-options">${candidates.map(row => `<div class="lane-matchup-option">${iconFigure("champion", row.championId, row.name || "候选英雄", "small")}<strong>${escapeHTML(row.name || "候选英雄")}</strong><span>胜率差 +${rate(50 - Number(row.winRate))}</span></div>`).join("")}</div>`;
+    const hiddenReason = ownId > 0 ? !pair || pair.status === "pending" ? "pair-pending" : pair.status === "failed" ? "pair-failed" : "pair-no-data" : "candidates-empty";
+    recordLaneMatchupCardDiagnostic(data, context, mode, Boolean(content), hiddenReason);
+    if (!content) return "";
+    return `<section class="lane-matchup-card" data-lane-matchup-card><h3>对位克制建议</h3><div class="lane-matchup-foe">${iconFigure("champion", enemyId, context.enemy.championName || "敌方英雄", "small")}<span>对位：${escapeHTML(context.enemy.championName || "敌方英雄")}</span></div>${content}</section>`;
+  }
+
   function renderRecommendationArea(data) {
     const self = (data.players || []).find((player) => player.isCurrent);
     const target = liveRecommendationTarget(data);
@@ -5479,7 +5974,7 @@
     } else {
       // R116-D：把推荐 payload 一起传进去，详情 tab 才能渲染克制/协同小条与
       // 队伍画像标签。payload 为空时函数内部整块不渲染（拿不到就隐藏）。
-      content.insight = renderLiveInsights(data, payload);
+      content.insight = `${renderLaneMatchupCard(data, payload.hero)}${renderLiveInsights(data, payload)}`;
       if (noChampion) {
         const pendingTitle = randomPending ? "随机待定" : "请先选定英雄";
         const pendingCopy = randomPending ? "英雄尚未确定，锁定后自动加载。" : "点击预选或锁定英雄后自动读取推荐数据。";
@@ -5488,7 +5983,9 @@
       } else {
         if (capabilities.hasRunes) {
           const runePanel = renderRuneRecommendations(data, true);
-          content.runes = `${renderChampionRecommendationHeader(payload.hero, self, data)}${runePanel}<footer class="recommendation-action"><div><strong>${selected ? `已选择：${escapeHTML(runeConfigurationTitle(selected))}` : "请选择一套完整符文"}</strong><span>${selectedComplete ? "将新建符文页并设为当前页" : "这套数据尚不完整，暂时不能应用"}</span></div><button class="button button-primary apply-runes" type="button" data-apply-runes="selected" ${!selectedComplete || data.phase !== "ChampSelect" ? "disabled" : ""}>${data.phase === "ChampSelect" ? "应用所选符文" : "仅英雄选择阶段可应用"}</button></footer>`;
+          const spellPair = selectedComplete ? recommendedRuneSpellIDs(data, selected) : [];
+          const spellToggle = spellPair.length ? `<label class="rune-spell-toggle"><input type="checkbox" data-apply-rune-spells ${state.applyRuneSpells !== false ? "checked" : ""}>同时应用召唤师技能</label>` : "";
+          content.runes = `${renderChampionRecommendationHeader(payload.hero, self, data)}${runePanel}<footer class="recommendation-action"><div><strong>${selected ? `已选择：${escapeHTML(runeConfigurationTitle(selected))}` : "请选择一套完整符文"}</strong><span>${selectedComplete ? "将新建符文页并设为当前页" : "这套数据尚不完整，暂时不能应用"}</span>${spellToggle}</div><button class="button button-primary apply-runes" type="button" data-apply-runes="selected" ${!selectedComplete || data.phase !== "ChampSelect" ? "disabled" : ""}>${data.phase === "ChampSelect" ? "应用所选符文" : "仅英雄选择阶段可应用"}</button></footer>`;
         }
 		const recommendationHeader = renderChampionRecommendationHeader(payload.hero, self, data);
 		const augmentContent = capabilities.hasAugments && augmentSource ? renderLiveAugmentRecommendations(data, augmentSource) : "";
@@ -5569,27 +6066,23 @@
       const tooltip = augmentTooltipText(tooltipDetails, asset.id || row.id);
       const hasMetric = (value) => value !== null && value !== undefined && String(value).trim() !== "" && Number.isFinite(Number(value));
       const metrics = source === "arena"
-        ? [["win", "胜率", row.winRate, percent], ["pick", "选用率", row.pickRate, percent]]
+        ? [["win", "胜率", row.winRate, percent], ["pick", "选用率", row.pickRate > 0 ? row.pickRate : null, percent], ["games", "场次", row.games, number]]
         : [["win", "胜率", row.winRate, percent], ["games", "场次", row.games, number]];
-      const stats = metrics.filter(([, , value]) => hasMetric(value)).map(([key, label, value, formatter]) => {
+      const stats = metrics.filter(([, , value]) => hasMetric(value)).slice(0, 2).map(([key, label, value, formatter]) => {
         const suffix = key === "games" ? " 场" : "";
         return `<span class="live-augment-stat is-${key}"><span>${label}</span><b>${escapeHTML(formatter(value))}${suffix}</b></span>`;
       }).join("");
-      const gradeValue = String(row.grade || row.tier || "").trim().toUpperCase();
-      const grade = ["OP", "S", "A", "B", "C", "D", "F"].includes(gradeValue) ? gradeValue : "";
-      const gradeBadge = grade ? `<b class="augment-grade is-${grade}" aria-label="${grade}档">${grade}</b>` : "";
+      const badge = gradeBadge(row.grade, "live-augment-grade");
       const statsMarkup = stats ? `<small class="live-augment-stats">${stats}</small>` : "";
-      return `<article class="live-augment-option is-${rarity.key}" tabindex="0" data-tooltip="${escapeHTML(tooltip)}" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}">${renderLiveAugmentIcon(row, source)}<span><span class="live-augment-title">${gradeBadge}<strong>${escapeHTML(asset.name || `海克斯 ${asset.id || row.id}`)}</strong></span>${statsMarkup}</span></article>`;
+      return `<article class="live-augment-option is-${rarity.key}" tabindex="0" data-tooltip="${escapeHTML(tooltip)}" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}">${renderLiveAugmentIcon(row, source)}<span><span class="live-augment-title">${badge}<strong>${escapeHTML(asset.name || `海克斯 ${asset.id || row.id}`)}</strong></span>${statsMarkup}</span></article>`;
     };
     const definitions = [["silver", "白银"], ["gold", "黄金"], ["prismatic", "棱彩"]];
     const hasUnknown = rows.some((row) => !definitions.some(([key]) => normalizeAugmentRarity(row.rarity || row.assets?.[0]?.rarity).key === key));
     const columns = [...definitions, ...(hasUnknown ? [["unknown", "品质待确认"]] : [])].map(([key, label]) => {
-      const gradeRank = (row) => ({ OP: 0, S: 1, A: 2, B: 3, C: 4, D: 5, F: 6 }[String(row?.grade || row?.tier || "").trim().toUpperCase()] ?? 7);
       const matches = rows
         .filter((row) => normalizeAugmentRarity(row.rarity || row.assets?.[0]?.rarity).key === key)
-        .sort((left, right) => gradeRank(left) - gradeRank(right)
+        .sort((left, right) => gradeRank(left.grade) - gradeRank(right.grade)
           || (Number(right.score) || 0) - (Number(left.score) || 0)
-          || (Number(right.winRate) || 0) - (Number(left.winRate) || 0)
           || (Number(right.games) || 0) - (Number(left.games) || 0)).slice(0, 3);
       if (!matches.length) return "";
       return `<section class="live-augment-column is-${key}"><header><span aria-hidden="true"></span><strong>${label}</strong><small>${matches.length} 个</small></header><div>${matches.map(renderRow).join("")}</div></section>`;
@@ -5607,10 +6100,10 @@
   function renderInsightMatches(player) {
 	// R129 P1：与 renderLivePlayer 共用同一个判据，两处词表不会再各写一份。
 	if (!liveHistorySettled(player)) return '<div class="insight-match-row is-history-pending" aria-label="战绩读取中"><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span></div>';
-    const games = (player.recentGames || []).slice(0, 8);
+    const games = (player.recentGames || []).slice(0, 10);
 	if (!games.length) {
 	  const historyState = liveHistoryStateOf(player);
-	  if (historyState === "unavailable") return '<div class="insight-match-row"><small class="insight-none">客户端未公开该玩家</small></div>';
+	  if (historyState === "unavailable") return `<div class="insight-match-row"><small class="insight-none">${player.identityUnresolved === true ? "身份尚未公开" : "客户端未公开该玩家"}</small></div>`;
 	  if (historyState === "failed") return '<div class="insight-match-row"><small class="insight-none">读取失败</small><button class="text-button insight-retry" type="button" data-live-history-retry>重试</button></div>';
 	  return '<div class="insight-match-row"><small class="insight-none">该玩家当前模式暂无最近战绩</small></div>';
 	}
@@ -5651,20 +6144,18 @@
 	    });
 	  }
 
-	  function insightTeamLayout(players, enabled) {
-	    const teams = new Map([100, 200].map((teamID) => [teamID, players.filter((player) => Number(player.teamId) === teamID)]));
-	    if (!enabled) return { teams, aligned: false, reason: "" };
-	    const positions = { top: 1, jungle: 2, middle: 3, bottom: 4, utility: 5, other: 6 };
-	    for (const teamID of [100, 200]) {
-	      const rows = teams.get(teamID) || [];
-	      const values = rows.map((player) => String(player.position || "").toLowerCase());
-	      if (rows.length !== 5 || values.some((position) => !positions[position]) || new Set(values).size !== values.length) {
-	        return { teams: new Map([100, 200].map((id) => [id, players.filter((player) => Number(player.teamId) === id)])), aligned: false, reason: "位置数据重复或缺失，已保留客户端顺序" };
-	      }
-	      teams.set(teamID, [...rows].sort((left, right) => positions[left.position] - positions[right.position]));
-	    }
-	    return { teams, aligned: true, reason: "" };
-	  }
+  function insightTeamLayout(players, enabled) {
+    const teams = new Map([100, 200].map((teamID) => [teamID, players.filter((player) => Number(player.teamId) === teamID)]));
+    if (!enabled) return { teams, aligned: false, reason: "" };
+    const positions = { top: 1, jungle: 2, middle: 3, bottom: 4, utility: 5, other: 6 };
+    for (const teamID of [100, 200]) {
+      const rows = teams.get(teamID) || [];
+      // 同队可能出现重复或未知位置；只按已知位置排序，同位置保留原顺序。
+      teams.set(teamID, [...rows].sort((left, right) =>
+        (positions[String(left.position || "").toLowerCase()] || 6) - (positions[String(right.position || "").toLowerCase()] || 6)));
+    }
+    return { teams, aligned: true, reason: "" };
+  }
 
   // ---------------------------------------------------------------------
   // R116-D P1-2/P1-3（克制与协同的行内小条）与 P1-5（队伍画像缺口标签）的渲染
@@ -5778,13 +6269,17 @@
     if (!players.length) return '<div class="recommendation-empty"><strong>暂无玩家数据</strong><p>进入英雄选择或对局后，这里会展示自己、队友与对手的队伍信息与最近战绩。</p></div>';
 		const arenaMode = liveAugmentRecommendationSource(data) === "arena";
 		const basePlayers = orderLivePlayers(players, !arenaMode);
-		const orderedPlayers = arenaMode || !state.settings.detailPositionAlign ? clusterPremadePlayers(basePlayers) : basePlayers;
+		const orderedPlayers = arenaMode ? clusterPremadePlayers(basePlayers) : basePlayers;
 	    recordLiveRosterRendered(data, orderedPlayers.filter((player) => player.teamId === 100).length, orderedPlayers.filter((player) => player.teamId === 200).length);
     const selfPlayer = orderedPlayers.find((player) => player.isCurrent && [100, 200].includes(Number(player.teamId)));
     const selfTeam = Number(selfPlayer?.teamId) || 100;
     const foeTeam = selfTeam === 200 ? 100 : 200;
     const relativeTeamsKnown = Boolean(selfPlayer);
-    const alignment = insightTeamLayout(orderedPlayers, !arenaMode && state.settings.detailPositionAlign === true);
+    const positionAligned = !arenaMode && isSummonersRiftMatch(data);
+    const alignment = insightTeamLayout(orderedPlayers, positionAligned);
+    if (!arenaMode && !positionAligned) {
+      for (const teamID of [100, 200]) alignment.teams.set(teamID, clusterPremadePlayers(alignment.teams.get(teamID)));
+    }
     const headerNotice = !relativeTeamsKnown ? "无法确定你所在阵营，按蓝方/红方展示" : alignment.reason;
     // R116-D P1-2/P1-3（克制与协同的行内小条）与 P1-5（队伍画像缺口标签）：
     // 七个渲染 helper 已经提到模块作用域（就在本函数上面那一段），这里只负责调用。
@@ -5793,7 +6288,13 @@
     // R128 §2.3：队伍画像的口径披露不再进 UI；缺口标签本身保留。
     const supplement = bars ? `<div class="live-roster-supplement">${bars}</div>` : "";
     const team = (teamID, label, tone, source = orderedPlayers, extra = "") => {
-      const rows = source.filter((player) => teamID === null || player.teamId === teamID).map((player, index) => `${renderLivePlayer(player, index, arenaMode, data.currentChampionId, orderedPlayers, renderLiveRecentPositions(player, data.queueId), isARAMRelatedMatch(data), liveAugmentRecommendationSource(data) === "hextech")}${renderInsightMatches(player)}`).join("");
+      const rows = source.filter((player) => teamID === null || player.teamId === teamID).map((player, index) => {
+        const key = escapeHTML(String(player.playerRef || `${player.teamId}:${player.cellId ?? index}`));
+        const card = renderLivePlayer(player, index, arenaMode, data.currentChampionId, orderedPlayers, renderLiveRecentPositions(player, data.queueId), isARAMRelatedMatch(data), liveAugmentRecommendationSource(data) === "hextech", data.phase)
+          .replace('<article ', `<article data-live-player-row="card:${key}" `);
+        const history = champSelectEnemyPlaceholder(player, data.phase, orderedPlayers) ? '<div class="insight-match-row"></div>' : renderInsightMatches(player);
+        return card + history.replace('<div ', `<div data-live-player-row="history:${key}" `);
+      }).join("");
       return `<section class="live-team is-${tone}"><header><h3>${escapeHTML(label)}</h3><span>${escapeHTML(headerNotice || "当前模式最新战绩")}</span>${extra}</header><div class="live-player-list is-insight">${rows || '<p class="section-empty">客户端暂未公开这一队的玩家</p>'}</div></section>`;
     };
 		if (arenaMode) {
@@ -5806,16 +6307,6 @@
 		}
     if (!relativeTeamsKnown) return `${supplement}<div class="live-teams is-insight">${team(100, "蓝方", "blue", alignment.teams.get(100))}${team(200, "红方", "red", alignment.teams.get(200))}</div>`;
     return `${supplement}<div class="live-teams is-insight">${team(selfTeam, "我方", "blue", alignment.teams.get(selfTeam), portraitTags)}${team(foeTeam, "对方", "red", alignment.teams.get(foeTeam))}</div>`;
-  }
-
-  function liveChampionTierBadge(value) {
-    const present = value !== null && value !== undefined && String(value).trim() !== "";
-    const parsed = Number(value);
-    const key = present && Number.isFinite(parsed) && parsed >= 0 && parsed <= 5 ? (parsed === 0 ? "op" : String(parsed)) : "";
-    const label = key ? (parsed === 0 ? "OP" : String(parsed)) : "—";
-    return key
-      ? `<img class="tier-badge is-metric" src="/tier-icons/${key}.svg" alt="梯度 ${label}" decoding="async">`
-      : `<span class="tier-badge-fallback is-metric">${label}</span>`;
   }
 
   function renderChampionRecommendationHeader(hero, self, data = state.live) {
@@ -5864,7 +6355,7 @@
 	const hasMetric = (value) => value !== null && value !== undefined && String(value).trim() !== "" && Number.isFinite(Number(value));
 	const summaryMetrics = [
 	  ["win", "胜率", stats.winRate, true],
-	  ["pick", "选取率", stats.pickRate, true],
+	  ["pick", "选取率", stats.pickRate, payload.source !== "arena"],
 	  ["ban", "禁用率", stats.banRate, hasBanRate],
 	].filter(([, , value, enabled]) => enabled && hasMetric(value)).map(([tone, label, value]) => `<div class="is-${tone}"><dt>${label}</dt><dd>${rate(value)}</dd></div>`).join("");
 	const statsContent = stats.emptyReason
@@ -5873,8 +6364,8 @@
 	const hasCounters = payload.hasCounters !== false;
 	const matchupHTML = hasCounters ? `<div class="champion-matchups"><div><span>优势对抗</span>${matchups(stats.strongAgainst, "strong")}</div><div><span>劣势对抗</span>${matchups(stats.weakAgainst, "weak")}</div></div>` : "";
 	const showTier = Boolean(liveAugmentRecommendationSource(data));
-	const tierContent = showTier ? `<div class="champion-summary-tier"><span>梯度</span><strong>${liveChampionTierBadge(stats.tier)}</strong></div>` : "";
-	return `<section class="recommendation-champion-summary${hasCounters ? "" : " is-no-counters"}${showTier ? " has-tier" : ""}"><div class="champion-summary-main">${championId ? iconFigure("champion", championId, self?.championName || "当前英雄", "live") : '<span class="game-icon is-live">?</span>'}<div><strong>${escapeHTML(self?.championName || (championId ? "当前英雄" : "尚未选择英雄"))}</strong><span>${escapeHTML(positionLabel(livePositionDisplay(resolvedPosition)))}</span></div>${statsContent}</div>${positionControls}${matchupHTML}${tierContent}</section>`;
+	const tierContent = showTier && stats.grade ? `<div class="champion-summary-tier"><span>梯度</span><strong>${gradeBadge(stats.grade, "is-metric")}</strong></div>` : "";
+	return `<section class="recommendation-champion-summary${hasCounters ? "" : " is-no-counters"}${tierContent ? " has-tier" : ""}"><div class="champion-summary-main">${championId ? iconFigure("champion", championId, self?.championName || "当前英雄", "live") : '<span class="game-icon is-live">?</span>'}<div><strong>${escapeHTML(self?.championName || (championId ? "当前英雄" : "尚未选择英雄"))}</strong><span>${escapeHTML(positionLabel(livePositionDisplay(resolvedPosition)))}</span></div>${statsContent}</div>${positionControls}${matchupHTML}${tierContent}</section>`;
   }
 
   function renderRuneRecommendations(data, championSelected) {
@@ -5896,6 +6387,29 @@
     const activeSection = sections.find((section) => section.key === activeKey) || sections[0];
     const sourceNote = activeSection?.note ? `<small class="rune-source-note">${escapeHTML(activeSection.note)}</small>` : "";
     return `<div class="rune-source-tabs"><div class="rune-source-tab-buttons" role="tablist" aria-label="符文数据来源">${sourceTabs}</div>${sourceNote}</div><div class="rune-source-stack">${activeSection ? renderRuneSourceSection(activeSection, championSelected) : ""}</div>`;
+  }
+
+  function recommendedRuneSpellIDs(data, recommendation) {
+    if (!recommendation) return [];
+    let ids = [];
+    if (recommendation.sourceLabel === "OPGG") {
+      const build = liveRecommendationsFor(data)?.build;
+      ids = build?.spellOptions?.[0]?.ids || build?.spells || [];
+    } else if (["绝活哥", "职业选手"].includes(recommendation.sourceLabel)) {
+      ids = [recommendation.spell1Id, recommendation.spell2Id];
+    }
+    const pair = Array.isArray(ids) ? ids.map(Number) : [];
+    return pair.length === 2 && pair.every((id) => Number.isInteger(id) && id > 0 && id <= 100000) && pair[0] !== pair[1] ? pair : [];
+  }
+
+  function renderRuneSpellPair(ids) {
+    const pair = Array.isArray(ids) ? ids.map(Number) : [];
+    if (pair.length !== 2 || pair.some((id) => !Number.isInteger(id) || id <= 0 || id > 100000) || pair[0] === pair[1]) return "";
+    const items = pair.map((id) => {
+      const spell = (state.summonerSpells?.spells || []).find((item) => Number(item.id) === id);
+      return `<span class="rune-spell-item">${renderSummonerSpellIcon(id)}<small>${escapeHTML(spell?.name || `召唤师技能 ${id}`)}</small></span>`;
+    }).join("");
+    return `<div class="rune-spell-row"><span>召唤师技能</span><div class="rune-spell-items">${items}</div></div>`;
   }
 
   function renderRuneSourceSection(section, championSelected) {
@@ -5931,7 +6445,8 @@
       : section.items.length
       ? `<div class="rune-choice-list" role="radiogroup" aria-label="${escapeHTML(section.title)}符文">${section.items.map((config, index) => renderRuneChoice({ ...config, sourceKey: section.key, key: config.key || (section.key === "opgg" && index === 0 ? "opgg" : `${section.key}-${index}`) })).join("")}</div>`
 	  : `<div class="recommendation-empty"><strong>${emptyTitle}</strong><p>${section.loading ? "正在核对专家榜玩家最近对局中的完整符文，通常需要 5-15 秒。" : specialistNoPositionSample || specialistRetryable ? unavailableReason.specialist : section.failed ? "本次后台读取未完成，稍后刷新时会自动重试。" : unavailableReason[section.key] || "OPGG 返回完整主系、副系与属性碎片后即可选择。"}</p>${specialistKeyMissing ? '<button class="text-button" type="button" data-open-riot-settings>去设置</button>' : specialistRetryable ? '<button class="text-button" type="button" data-retry-specialist-runes>重试</button>' : ""}</div>`;
-    return `<section class="rune-source-section">${content}</section>`;
+    const opggSpells = section.key === "opgg" && section.items.length ? renderRuneSpellPair(recommendedRuneSpellIDs(state.live, { sourceLabel: "OPGG" })) : "";
+    return `<section class="rune-source-section">${opggSpells}${content}</section>`;
   }
 
   function renderSpecialistPlayers(items, source = "specialist") {
@@ -5991,13 +6506,21 @@
 	  const opponentRank = opponentRankText
 	    ? `<span class="specialist-opponent-rank">${config.opponentTier ? rankCrestIcon(config.opponentTier) : ""}<small>${escapeHTML(opponentRankTitle)}${opponentRankTitle && opponentWinRate ? " · " : ""}${opponentWinRate ? `胜率 <b class="win-rate-value">${Math.round(Number(config.opponentWinRate))}%</b>` : ""}</small></span>`
 	    : "";
-      const itemIDs = (config.itemIds || config.itemIDs || []).map(Number).filter((id) => Number.isInteger(id) && id > 0).slice(0, 7);
-      const items = itemIDs.length
-        ? `<div class="specialist-game-items"><span>最终装备</span><div>${itemIDs.map((id) => renderItemIcon(id)).join("")}</div></div>`
-        : "";
+      const items = renderRuneEquipment(config);
 	      return `<div class="specialist-game-row ${tone}${selected ? " is-selected" : ""}" role="radio" aria-checked="${selected}" tabindex="0" data-rune-choice="${escapeHTML(choiceKey)}"><div class="specialist-game-head"><span class="specialist-game-choice"><span class="radio-mark" aria-hidden="true"></span>${championIcon}<span class="specialist-game-title"><strong>${escapeHTML(title)}</strong><span class="specialist-game-meta">${position ? `<span>${escapeHTML(position)}</span>` : ""}${config.eventLabel ? `<span class="pro-event-label">${escapeHTML(config.eventLabel)}</span>` : ""}${config.winKnown === false ? '<span data-tooltip="该局胜负未获官方确认">胜负未确认</span>' : ""}</span></span></span><span class="specialist-opponent is-${tone.slice(3)}"><span class="specialist-result-dot" aria-hidden="true"></span>${config.opponentChampionId ? iconFigure("champion", config.opponentChampionId, opponentName, "small") : ""}<span class="specialist-opponent-copy"><b>${escapeHTML(opponentName)}</b><small>${escapeHTML(opponentPlayer)}</small></span>${opponentRank}</span></div><div class="specialist-game-content"><div class="specialist-game-runes">${renderUnifiedRuneBoard(config)}${items}${config.selectedComplete === false ? '<p class="pro-rune-status">属性碎片：上游未提供完整槽位；这套数据尚不完整，暂时不能应用。</p>' : ""}</div></div></div>`;
     }).join("");
     return `<div class="specialist-player-tabs" role="tablist" aria-label="${source === "pro" ? "职业选手" : "绝活哥玩家"}">${tabs}</div><div class="specialist-player-games" role="radiogroup" aria-label="${source === "pro" ? "职业比赛符文" : "绝活哥最近对局符文"}">${rows || '<p class="section-empty">暂无最近对局符文数据</p>'}</div>`;
+  }
+
+  function renderRuneEquipment(config) {
+    const itemIDs = (config.itemIds || config.itemIDs || []).map(Number).filter((id) => Number.isInteger(id) && id > 0).slice(0, 7);
+    const spellIDs = [config.spell1Id, config.spell2Id].map(Number);
+    const spells = spellIDs.every(id => Number.isInteger(id) && id > 0 && id <= 100000) && spellIDs[0] !== spellIDs[1]
+      ? '<div class="specialist-game-spells">' + spellIDs.map(id => renderSummonerSpellIcon(id)).join("") + '</div>' : "";
+    if (!itemIDs.length) return spells ? '<div class="specialist-game-items">' + spells + '</div>' : "";
+    const starterIDs = (config.starterItemIds || []).map(Number).filter((id) => Number.isInteger(id) && id > 0).slice(0, 6);
+    const starter = starterIDs.length ? `${starterIDs.map(id => renderItemIcon(id)).join("")}<span class="route-divider" aria-hidden="true"></span>` : "";
+    return `<div class="specialist-game-items"><span>${starterIDs.length ? "装备" : "最终装备"}</span><div>${starter}${itemIDs.map((id) => renderItemIcon(id)).join("")}</div>${spells}</div>`;
   }
 
   function proRuneRecordLabel(config) {
@@ -6042,7 +6565,7 @@
       ? iconFigure("champion", championID, config.championName || "英雄", "small")
       : '<span class="rune-choice-champion-placeholder" aria-hidden="true"></span>';
     const choiceCopy = `<span class="rune-choice-copy"><strong>${escapeHTML(title)}</strong>${sourceParts.length ? `<small>${escapeHTML(sourceParts.join(" · "))}</small>` : ""}</span>`;
-    return `<article class="rune-choice-card${selected ? " is-selected" : ""}" role="radio" aria-checked="${selected}" tabindex="0" data-rune-choice="${escapeHTML(key)}"><div class="rune-choice-selector"><span class="radio-mark" aria-hidden="true"></span>${championIcon}${choiceCopy}${specialistStats}</div><div class="rune-choice-detail">${renderUnifiedRuneBoard(config)}</div></article>`;
+    return `<article class="rune-choice-card${selected ? " is-selected" : ""}" role="radio" aria-checked="${selected}" tabindex="0" data-rune-choice="${escapeHTML(key)}"><div class="rune-choice-selector"><span class="radio-mark" aria-hidden="true"></span>${championIcon}${choiceCopy}${specialistStats}</div><div class="rune-choice-detail">${renderUnifiedRuneBoard(config)}${renderRuneSpellPair([config.spell1Id, config.spell2Id])}</div></article>`;
   }
 
   function renderUnifiedRuneBoard(config) {
@@ -6124,8 +6647,7 @@
     const route = ids.map((id, index) => `${index ? '<span class="route-arrow" aria-hidden="true">›</span>' : ""}${renderItemIcon(id)}`).join("");
     const item = ids.length === 1 ? (state.items?.items || []).find((candidate) => Number(candidate.id) === ids[0]) : null;
     const name = ids.length === 1 ? item?.name || `装备 ${ids[0]}` : "";
-    const gradeValue = String(option.grade || "B").trim().toUpperCase();
-    const grade = ["OP", "S", "A", "B", "C", "D", "F"].includes(gradeValue) ? gradeValue : "B";
+    const badge = gradeBadge(option.grade, "live-build-grade");
     const stats = option.stats ? { ...option.stats, gamesUnavailable: option.gamesUnavailable ?? option.stats.gamesUnavailable } : option;
     const games = stats.games ?? stats.play;
     const derivedWinRate = stats.win != null && games ? stats.win * 100 / games : null;
@@ -6138,7 +6660,7 @@
       ["吃鸡率", arenaPercent(stats.firstPlaceRate), "is-first"],
     ];
     const cells = metrics.map(([label, value, tone]) => `<div class="${tone}"><dt>${label}</dt><dd>${value}</dd></div>`).join("");
-    return `<article class="arena-option-card live-arena-build-option${kind === "core" ? " arena-core-option" : ""}" data-metric-count="3"><div class="arena-option-main"><div class="arena-option-icons">${route}</div><b class="augment-grade is-${grade}">${grade}</b>${name ? `<strong>${escapeHTML(name)}</strong>` : ""}</div><dl>${cells}</dl></article>`;
+    return `<article class="arena-option-card live-arena-build-option${kind === "core" ? " arena-core-option" : ""}" data-metric-count="3"><div class="arena-option-main"><div class="arena-option-icons">${route}</div>${badge}${name ? `<strong>${escapeHTML(name)}</strong>` : ""}</div><dl>${cells}</dl></article>`;
   }
 
   function renderBuildRecommendation(build, self, abilities, data) {
@@ -6453,14 +6975,24 @@
     if (focusSelector) panel.querySelector(focusSelector)?.focus({ preventScroll: true });
   }
 
+  function bindLiveNode(node, event, role, listener) {
+    if (!node) return;
+    const bindings = node._liveBindings || (node._liveBindings = new Set());
+    const key = `${event}:${role}`;
+    if (bindings.has(key)) return;
+    bindings.add(key);
+    node.addEventListener(event, listener);
+  }
+
   function bindRuneWorkspaceControls(root) {
-    for (const button of root?.querySelectorAll("[data-rune-source]") || []) button.addEventListener("click", () => {
+    for (const button of root?.querySelectorAll("[data-rune-source]") || []) bindLiveNode(button, "click", "rune-source", () => {
       const source = button.dataset.runeSource;
       if (!["opgg", "specialist", "pro"].includes(source)) return;
+      clearRuneStarterRetries();
       state.runeSourceTab = source;
       refreshLiveRuneWorkspace(`[data-rune-source="${CSS.escape(source)}"]`);
     });
-    for (const button of root?.querySelectorAll("[data-specialist-overview]") || []) button.addEventListener("click", () => {
+    for (const button of root?.querySelectorAll("[data-specialist-overview]") || []) bindLiveNode(button, "click", "specialist-overview", () => {
       const gameName = button.dataset.playerName;
       const tagLine = button.dataset.playerTag;
       if (!gameName || !tagLine) return;
@@ -6468,7 +7000,7 @@
         detail: { gameName, tagLine, region: "kr", source: "live-specialist" },
       }));
     });
-    for (const button of root?.querySelectorAll("[data-specialist-player]") || []) button.addEventListener("click", () => {
+    for (const button of root?.querySelectorAll("[data-specialist-player]") || []) bindLiveNode(button, "click", "specialist-player", () => {
       const pro = button.dataset.playerSource === "pro";
       const target = pro ? proRequestTarget(state.live) : specialistRequestTarget(state.live);
       if (!target) return;
@@ -6476,34 +7008,36 @@
       state.specialistPlayerTabs.set(pro ? `pro:${target.key}` : target.key, player);
       refreshLiveRuneWorkspace(`[data-specialist-player="${CSS.escape(player)}"]`);
     });
-    root?.querySelector("[data-retry-pro-runes]")?.addEventListener("click", () => { void ensureProRunes(state.live, true); });
-	root?.querySelector("[data-open-riot-settings]")?.addEventListener("click", () => {
+    bindLiveNode(root?.querySelector("[data-retry-pro-runes]"), "click", "data-retry-pro-runes", () => { void ensureProRunes(state.live, true); });
+	bindLiveNode(root?.querySelector("[data-open-riot-settings]"), "click", "data-open-riot-settings", () => {
 	  window.dispatchEvent(new CustomEvent("deep-legends:navigate", { detail: { section: "settings", page: "privacy" } }));
 	});
-	root?.querySelector("[data-retry-specialist-runes]")?.addEventListener("click", () => {
+	bindLiveNode(root?.querySelector("[data-retry-specialist-runes]"), "click", "data-retry-specialist-runes", () => {
 	  const target = specialistRequestTarget(state.live);
 	  if (!target) return;
 	  state.specialistRuneFailures.delete(target.key);
 	  state.specialistRunes.delete(target.key);
 	  void ensureSpecialistRunes(state.live);
 	});
+    void ensureRuneStarterItems(state.live);
   }
 
   // R129 P2：面板内的交互绑定与 chrome（页签行、刷新按钮）分开。外科式替换单个
   // 面板时只重绑这一个面板，不会给没被替换的节点重复挂监听。
   function bindLivePanelScope(scope) {
     if (!scope) return;
-    scope.querySelector("[data-live-history-retry]")?.addEventListener("click", () => loadLive(true));
+    bindLiveNode(scope?.querySelector("[data-live-history-retry]"), "click", "data-live-history-retry", () => loadLive(true));
     // 对局页里点击玩家名称：在当前页面上以覆盖层打开该玩家的总览，
     // 不再跳转到总览页；对局数据来自本机客户端，必然是国服玩家。
-    for (const button of scope.querySelectorAll("[data-player-ref]")) button.addEventListener("click", () => {
+    for (const button of scope.querySelectorAll("[data-player-ref]")) button.onclick = () => {
       openPlayerOverlay({ playerRef: button.dataset.playerRef, region: "", label: playerButtonLabel(button), ...proContextFromButton(button) });
-    });
+    };
     bindRuneWorkspaceControls(scope);
-    for (const button of scope.querySelectorAll("[data-live-position]")) button.addEventListener("click", () => selectLivePosition(livePositionValue(button.dataset.livePosition)));
+    bindLiveNode(scope?.querySelector("[data-apply-rune-spells]"), "change", "data-apply-rune-spells", (event) => { state.applyRuneSpells = event.currentTarget.checked; });
+    for (const button of scope.querySelectorAll("[data-live-position]")) bindLiveNode(button, "click", "live-position", () => selectLivePosition(livePositionValue(button.dataset.livePosition)));
     bindRuneChoiceButtons(scope);
-    scope.querySelector("[data-apply-runes]")?.addEventListener("click", applyRunes);
-    scope.querySelector("[data-apply-item-set]")?.addEventListener("click", applyItemSet);
+    bindLiveNode(scope?.querySelector("[data-apply-runes]"), "click", "data-apply-runes", applyRunes);
+    bindLiveNode(scope?.querySelector("[data-apply-item-set]"), "click", "data-apply-item-set", applyItemSet);
   }
 
   function bindLiveContent() {
@@ -6526,6 +7060,8 @@
 
 	function bindRuneChoiceButtons(root) {
 	    for (const choice of root?.querySelectorAll("[data-rune-choice]") || []) {
+	      if (choice._runeChoiceBound) continue;
+	      choice._runeChoiceBound = true;
 	      const select = () => {
 	        state.selectedRecommendation = choice.dataset.runeChoice;
 	        renderLive();
@@ -6563,8 +7099,11 @@
     button.disabled = true;
     button.textContent = "正在应用…";
     try {
-      await api("/api/gameplay/runes/apply", { method: "POST", body: JSON.stringify({ championName: self.championName, source: recommendation.sourceLabel, championId: recommendation.championId || championId, primaryStyleId: recommendation.primaryStyleId, subStyleId: recommendation.subStyleId, selectedPerkIds: recommendation.selectedPerkIds || recommendation.perkIds || [] }) }, "apply-runes", 15000);
-      showToast("符文已新建并设为当前页");
+      const spells = state.applyRuneSpells === false ? [] : recommendedRuneSpellIDs(state.live, recommendation);
+      const payload = { championName: self.championName, source: recommendation.sourceLabel, championId: recommendation.championId || championId, primaryStyleId: recommendation.primaryStyleId, subStyleId: recommendation.subStyleId, selectedPerkIds: recommendation.selectedPerkIds || recommendation.perkIds || [] };
+      if (spells.length) { payload.spell1Id = spells[0]; payload.spell2Id = spells[1]; }
+      const result = await api("/api/gameplay/runes/apply", { method: "POST", body: JSON.stringify(payload) }, "apply-runes", 15000);
+      showToast(spells.length ? result?.spellApplied === true ? "符文和召唤师技能已应用" : "符文已应用，召唤师技能未能同步" : "符文已新建并设为当前页");
       button.textContent = "再次新增";
     } catch (error) { showToast(error.message); button.textContent = "应用所选符文"; }
     finally { button.disabled = false; }
@@ -6613,12 +7152,28 @@
     const phase = state.beacon.phase || state.live?.phase;
     if (!["ChampSelect", "GameStart", "InProgress", "Reconnect"].includes(phase)) return;
     syncLiveRetryBudget();
+    const positionPending = ["InProgress", "Reconnect"].includes(phase) && state.live?.phase === phase && liveClientPositionsPending(state.live);
+    if (positionPending) {
+      if (Number(state.livePositionRetryAttempts || 0) >= 6) return;
+      const gameId = String(state.live?.gameId || 0);
+      const generation = Number(state.liveGameGeneration || 0);
+      state.liveTimer = setTimeout(() => {
+        state.liveTimer = 0;
+        if (state.destroyed || !state.settings.liveRefresh || !connected() || generation !== Number(state.liveGameGeneration || 0)
+          || String(state.live?.gameId || 0) !== gameId || !["InProgress", "Reconnect"].includes(state.beacon.phase || state.live?.phase)
+          || !["InProgress", "Reconnect"].includes(state.live?.phase) || !liveClientPositionsPending(state.live)) return;
+        state.livePositionRetryAttempts = Number(state.livePositionRetryAttempts || 0) + 1;
+        void loadLive(false, "interval");
+      }, 10000);
+      return;
+    }
     const background = document.hidden || state.section !== "live";
     if (background && (Number(state.liveRetryAttempts || 0) >= 8 || liveSnapshotComplete(state.live) && state.live?.phase === phase)) return;
     const inGame = phase === "GameStart" || phase === "InProgress" || phase === "Reconnect";
     if (inGame && (liveSnapshotComplete(state.live) && state.live?.phase === phase || Number(state.liveRetryAttempts || 0) >= 8)) return;
     const loadingProbe = inGame && liveAugmentRecommendationSource(state.live) === "arena" && !state.live?.arenaGrouped && Date.now() - Number(state.liveRetryStartedAt || 0) < 60_000;
-    const delay = loadingProbe ? 5_000 : inGame ? 20_000 : state.liveError ? 60_000 : liveRefreshDelayMs(phase, state.settings.liveInterval);
+    const loadingTenPlayerRoster = inGame && [420, 440, 2300, 2400, 3270].includes(Number(state.live?.queueId)) && Array.isArray(state.live?.players) && state.live.players.length < 10;
+    const delay = loadingProbe || loadingTenPlayerRoster ? 5_000 : inGame ? 20_000 : state.liveError ? 60_000 : liveRefreshDelayMs(phase, state.settings.liveInterval);
     state.liveTimer = setTimeout(() => {
       state.liveTimer = 0;
       if (background || inGame && !loadingProbe) state.liveRetryAttempts = Number(state.liveRetryAttempts || 0) + 1;
@@ -6633,7 +7188,6 @@
     nodes.settingLiveRefresh.checked = state.settings.liveRefresh;
     nodes.settingLiveInterval.value = String(state.settings.liveInterval);
 	    nodes.settingLiveOrder.value = state.settings.liveOrder;
-	    nodes.settingDetailPositionAlign.checked = state.settings.detailPositionAlign;
     nodes.settingMaskNames.checked = state.settings.maskNames;
     nodes.settingConfirmReplay.checked = state.settings.confirmReplay;
     nodes.settingDefaultPage.addEventListener("change", () => { state.settings.defaultPage = nodes.settingDefaultPage.value; writeSetting("default-page", state.settings.defaultPage); });
@@ -6648,7 +7202,6 @@
     nodes.settingLiveInterval.disabled = !state.settings.liveRefresh;
     nodes.settingLiveInterval.addEventListener("change", () => { state.settings.liveInterval = normalizeLiveInterval(nodes.settingLiveInterval.value); writeSetting("live-interval", state.settings.liveInterval); scheduleLiveRefresh(); renderLive(); });
 	    nodes.settingLiveOrder.addEventListener("change", () => { state.settings.liveOrder = normalizeLiveOrder(nodes.settingLiveOrder.value); writeSetting("live-order", state.settings.liveOrder); renderLive(); });
-	    nodes.settingDetailPositionAlign.addEventListener("change", () => { state.settings.detailPositionAlign = nodes.settingDetailPositionAlign.checked; writeSetting("detail-position-align", state.settings.detailPositionAlign); renderLive(); });
     nodes.settingMaskNames.addEventListener("change", () => { state.settings.maskNames = nodes.settingMaskNames.checked; writeSetting("mask-names", state.settings.maskNames); renderPlayerTabs(); renderOverview(overviewGroupForSection()); renderLive(); if (state.overlay.length) renderOverlay(); });
     nodes.settingConfirmReplay.addEventListener("change", () => { state.settings.confirmReplay = nodes.settingConfirmReplay.checked; writeSetting("confirm-replay", state.settings.confirmReplay); });
   }
@@ -6672,10 +7225,10 @@
 
   function emptyState(title, copy, retry, icon = "⬡") { return `<div class="gameplay-empty"><span aria-hidden="true">${escapeHTML(icon)}</span><strong>${escapeHTML(title)}</strong><p>${escapeHTML(copy)}</p>${retry ? '<button class="text-button" type="button" data-gameplay-retry>重试</button>' : ""}</div>`; }
   function summonerLabel(summoner) { return `${summoner.gameName || summoner.displayName || "当前召唤师"}${summoner.tagLine ? `#${summoner.tagLine}` : ""}`; }
-  function playerLabel(player) { return `${player.gameName || player.displayName || "隐藏玩家"}${player.tagLine ? `#${player.tagLine}` : ""}`; }
-  function maskedPlayerName(player, index) { if (!state.settings.maskNames || player.isCurrent) return playerLabel(player); return player.hidden ? "隐藏玩家" : `玩家 ${String(index + 1).padStart(2, "0")}`; }
-  function maskedListName(player, index) { if (!state.settings.maskNames) return player.displayName || "隐藏玩家"; return player.hidden ? "隐藏玩家" : `玩家 ${String(index + 1).padStart(2, "0")}`; }
-  function playerParticipantName(player, index) { if (!state.settings.maskNames) return `${player.gameName || player.displayName || "隐藏玩家"}${player.tagLine ? `#${player.tagLine}` : ""}`; return player.hidden ? "隐藏玩家" : `玩家 ${String(index + 1).padStart(2, "0")}`; }
+  function playerLabel(player) { if (player.identityUnresolved === true) return "身份待公开"; if (player.hidden === true) return "隐藏玩家"; return `${player.gameName || player.displayName || "隐藏玩家"}${player.tagLine ? `#${player.tagLine}` : ""}`; }
+  function maskedPlayerName(player, index) { if (player.identityUnresolved === true) return "身份待公开"; if (player.hidden === true) return "隐藏玩家"; if (!state.settings.maskNames || player.isCurrent) return playerLabel(player); return `玩家 ${String(index + 1).padStart(2, "0")}`; }
+  function maskedListName(player, index) { if (player.identityUnresolved === true) return "身份待公开"; if (player.hidden === true) return "隐藏玩家"; if (!state.settings.maskNames) return player.displayName || "隐藏玩家"; return `玩家 ${String(index + 1).padStart(2, "0")}`; }
+  function playerParticipantName(player, index) { if (player.identityUnresolved === true) return "身份待公开"; if (player.hidden === true) return "隐藏玩家"; if (!state.settings.maskNames) return `${player.gameName || player.displayName || "隐藏玩家"}${player.tagLine ? `#${player.tagLine}` : ""}`; return `玩家 ${String(index + 1).padStart(2, "0")}`; }
   function rankTitle(rank) { const tier = String(rank.tier || "").toLowerCase(); const tierName = ({ iron: "黑铁", bronze: "青铜", silver: "白银", gold: "黄金", platinum: "铂金", emerald: "翡翠", diamond: "钻石", master: "大师", grandmaster: "宗师", challenger: "王者" })[tier] || rank.tier || "未定级"; return `${tierName}${rank.division && !["master", "grandmaster", "challenger"].includes(tier) ? ` ${rank.division}` : ""}`; }
   function rankTierMark(tier) { return ({ IRON: "I", BRONZE: "B", SILVER: "S", GOLD: "G", PLATINUM: "P", EMERALD: "E", DIAMOND: "D", MASTER: "M", GRANDMASTER: "GM", CHALLENGER: "C" })[String(tier).toUpperCase()] || "◇"; }
   function rankCrestIcon(tier) {
@@ -6712,7 +7265,7 @@
     if (kind === "item") return `/lol-game-data/assets/v1/items/${id}.png`;
 	if (kind === "spell") return `/lol-game-data/assets/v1/summoner-spells/${id}.png`;
 	if (kind === "augment") {
-	  const augment = (state.perks?.augments || []).find((item) => Number(item.id) === Number(id));
+	  const augment = augmentMetadata(id);
 	  return augment?.iconPath || "";
 	}
     if (kind === "perk") {
@@ -6728,6 +7281,8 @@
     // "ddragon:" 前缀表示后端目录来自 Data Dragon（未连接客户端时的兜底），
     // 通过联网资源代理加载而不是本机客户端。
     if (path.startsWith("ddragon:")) return `/api/champion-asset?source=ddragon&path=${encodeURIComponent(path.slice(8))}`;
+    if (path.startsWith("hexdata:")) return `/api/champion-asset?source=hexdata&path=${encodeURIComponent(path.slice(8))}`;
+    if (path.startsWith("builtin:")) return `/api/champion-asset?source=builtin&path=${encodeURIComponent(path.slice(8))}`;
     return `/api/image?path=${encodeURIComponent(path)}${/\/augments\/icons\//i.test(path) ? "&art=2" : ""}`;
   }
   function assetIcon(path, label, size = "", withTooltip = true, fallbackPath = "", extraClass = "") {
@@ -6789,12 +7344,16 @@
     const style = (state.perks?.styles || []).find((candidate) => Number(candidate.id) === Number(styleID));
     return style?.iconPath ? assetIcon(style.iconPath, `副系 · ${style.name}`, size) : "";
   }
+  function augmentMetadata(id) {
+    return (state.perks?.augments || []).find((candidate) => Number(candidate.id) === Number(id))
+      || state.augmentCatalog?.get(Number(id));
+  }
   function augmentIconFigure(id, size = "") {
-    const augment = (state.perks?.augments || []).find((candidate) => Number(candidate.id) === Number(id));
+    const augment = augmentMetadata(id);
     const details = augment || { id, name: `海克斯 ${id}`, rarity: "unknown" };
     const icon = augment?.iconPath
       ? assetIcon(augment.iconPath, augment.name || `海克斯 ${id}`, size, false, augment.fallbackIconPath)
-      : state.perks ? iconFigure("augment", id, details.name, size, false) : pendingCatalogIcon(details.name, size, false);
+      : state.perks || state.augmentCatalog ? iconFigure("augment", id, details.name, size, false) : pendingCatalogIcon(details.name, size, false);
     return wrapAugmentIcon(icon, details, id);
   }
   function renderItemIcons(items, size = "") { const valid = items.filter((id) => Number(id) > 0); return valid.map((id) => itemIconFigure(id, size)).join(""); }
@@ -7318,8 +7877,11 @@
     return "direct";
   }
 
-  function recordLiveRenderRebuild(parts) {
+  function recordLiveRenderRebuild(parts, stats) {
+    stats ||= {};
     const bucket = state.liveRenderRebuild || (state.liveRenderRebuild = { counts: {}, sources: {}, timer: 0, startedAt: 0 });
+    bucket.imagesRecreated = Number(bucket.imagesRecreated || 0) + Number(stats.imagesRecreated || 0);
+    bucket.rowsReplaced = Number(bucket.rowsReplaced || 0) + Number(stats.rowsReplaced || 0);
     if (!bucket.startedAt) bucket.startedAt = Date.now();
     for (const part of parts) bucket.counts[part] = Number(bucket.counts[part] || 0) + 1;
     const label = String(state.liveRenderSource || "direct");
@@ -7339,7 +7901,7 @@
       counts, sources: bucket.sources || {}, total,
       windowMs: Math.max(0, Date.now() - Number(bucket.startedAt || 0)),
       phase: String(state.beacon?.phase || state.live?.phase || ""),
-      gameId: normalizeLiveGameId(state.live?.gameId),
+      imagesRecreated: Number(bucket.imagesRecreated || 0), rowsReplaced: Number(bucket.rowsReplaced || 0),
     });
   }
 
@@ -7516,6 +8078,7 @@
   renderOverview("players");
   renderLive();
   renderCapabilitySettings();
+  ensureAugments();
   ensurePerks();
   requestAnimationFrame(() => {
     const defaultSection = ["overview", "champions", "live", "favorites", "suite"].includes(state.settings.defaultPage) ? state.settings.defaultPage : "overview";

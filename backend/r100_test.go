@@ -199,7 +199,11 @@ func TestR100PerksNeverWaitForOptionalAugmentsAndPersist(t *testing.T) {
 	if w.Code != 200 || time.Since(started) > 2*time.Second {
 		t.Fatal("perks waited for augments", w.Code, time.Since(started))
 	}
-	<-startedAugment
+	select {
+	case <-startedAugment:
+		t.Fatal("offline augment catalog unexpectedly used the slow remote source")
+	default:
+	}
 	if !a.perkCatalogMu.TryLock() {
 		t.Fatal("optional I/O holds catalog mutex")
 	}

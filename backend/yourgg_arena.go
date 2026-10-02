@@ -42,11 +42,24 @@ type yourGGArenaAggregateResponse struct {
 	Success    bool `json:"success"`
 	StatusCode int  `json:"statusCode"`
 	Response   struct {
-		Version        string                       `json:"version"`
-		CoreItems      []yourGGArenaAggregateMetric `json:"coreItems"`
-		PrismaticItems []yourGGArenaAggregateMetric `json:"prismaticItems"`
-		TotalMatches   int                          `json:"totalMatches"`
+		Version        string                        `json:"version"`
+		Augments       []yourGGArenaAggregateAugment `json:"augments"`
+		CoreItems      []yourGGArenaAggregateMetric  `json:"coreItems"`
+		PrismaticItems []yourGGArenaAggregateMetric  `json:"prismaticItems"`
+		TotalMatches   int                           `json:"totalMatches"`
 	} `json:"response"`
+}
+
+// YOUR.GG does not include augment rarity or pick rate in this response.
+// Rarity comes from the CommunityDragon catalog; pick rate remains unset.
+type yourGGArenaAggregateAugment struct {
+	AugmentID          int      `json:"augmentId"`
+	Tier               string   `json:"tier"`
+	Score              *float64 `json:"score"`
+	WinRate            float64  `json:"winRate"`
+	AveragePlacement   float64  `json:"averagePlacement"`
+	FirstPlacementRate float64  `json:"firstPlacementRate"`
+	Matches            int      `json:"matches"`
 }
 
 type yourGGArenaAggregateMetric struct {
@@ -98,6 +111,17 @@ func (p *championProvider) loadCommunityDragonItems(ctx context.Context) ([]game
 		}
 		raw = wrapped.Items
 	}
+	items := normalizeCommunityDragonItems(raw)
+	if len(items) == 0 {
+		return nil, errors.New("CommunityDragon item catalog is empty")
+	}
+	p.mu.Lock()
+	p.arenaItems, p.arenaItemsAt = append([]gameplayItem(nil), items...), time.Now()
+	p.mu.Unlock()
+	return items, nil
+}
+
+func normalizeCommunityDragonItems(raw []communityDragonItemRaw) []gameplayItem {
 	items := make([]gameplayItem, 0, len(raw))
 	for _, source := range raw {
 		if source.ID <= 0 {
@@ -113,13 +137,7 @@ func (p *championProvider) loadCommunityDragonItems(ctx context.Context) ([]game
 		path := communityDragonGameAssetPath(firstNonEmpty(source.IconPath, source.ImagePath))
 		items = append(items, gameplayItem{ID: source.ID, Name: name, Description: cleanMarkup(firstNonEmpty(source.Description, source.ShortDescription)), IconPath: path, Price: source.PriceTotal})
 	}
-	if len(items) == 0 {
-		return nil, errors.New("CommunityDragon item catalog is empty")
-	}
-	p.mu.Lock()
-	p.arenaItems, p.arenaItemsAt = append([]gameplayItem(nil), items...), time.Now()
-	p.mu.Unlock()
-	return items, nil
+	return items
 }
 
 func mapYourGGArenaAggregateItems(values []yourGGArenaAggregateMetric, catalog []gameplayItem) []championMetricRow {
@@ -143,7 +161,7 @@ func mapYourGGArenaAggregateItems(values []yourGGArenaAggregateMetric, catalog [
 			source = "ddragon"
 			path = "/cdn/latest/img/item/" + strconv.Itoa(value.ItemID) + ".png"
 		}
-		grade := strings.ToUpper(strings.TrimSpace(value.Tier))
+		grade := normalizeChampionGrade("yourgg", 0, value.Tier)
 		rows = append(rows, championMetricRow{
 			Assets: []championAsset{{ID: value.ItemID, Kind: "item", Name: name, Description: item.Description, Source: source, Path: path}},
 			Tier:   grade, Grade: grade, Score: value.Score,
@@ -155,12 +173,129 @@ func mapYourGGArenaAggregateItems(values []yourGGArenaAggregateMetric, catalog [
 	return rows
 }
 
+// A smaller valid share suggests that the upstream schema has changed, so
+// replacing the complete OP.GG fallback would quietly lose too many rows.
+const minYourGGArenaAugmentValidPercent = 80
+
+var (
+	errYourGGArenaAugmentsTooManyInvalid = errors.New("YOUR.GG augment valid share is too low")
+	errYourGGArenaAugmentsQualityMissing = errors.New("YOUR.GG augment qualities are incomplete")
+)
+
+type yourGGArenaAugmentMapStats struct {
+	RowsIn           int
+	RowsKept         int
+	SkippedMatches   int
+	SkippedScore     int
+	SkippedGrade     int
+	SkippedID        int
+	SkippedDuplicate int
+}
+
+func mapYourGGArenaAggregateAugments(values []yourGGArenaAggregateAugment, catalog []gameplayAugment) ([]arenaAugmentGroup, error) {
+	groups, _, err := mapYourGGArenaAggregateAugmentsWithStats(values, catalog)
+	return groups, err
+}
+
+func mapYourGGArenaAggregateAugmentsWithStats(values []yourGGArenaAggregateAugment, catalog []gameplayAugment) ([]arenaAugmentGroup, yourGGArenaAugmentMapStats, error) {
+	stats := yourGGArenaAugmentMapStats{RowsIn: len(values)}
+	if len(values) == 0 || len(catalog) == 0 {
+		return nil, stats, errYourGGArenaAugmentsQualityMissing
+	}
+	metadata := make(map[int64]gameplayAugment, len(catalog))
+	for _, item := range catalog {
+		metadata[item.ID] = item
+	}
+	type candidate struct {
+		value yourGGArenaAggregateAugment
+		grade string
+	}
+	candidates := make([]candidate, 0, len(values))
+	indexByID := make(map[int]int, len(values))
+	for _, value := range values {
+		// Classify each skipped row once so the counters add up to rows_in - rows_kept.
+		if value.AugmentID <= 0 {
+			stats.SkippedID++
+			continue
+		}
+		if value.Matches <= 0 {
+			stats.SkippedMatches++
+			continue
+		}
+		if value.Score == nil {
+			stats.SkippedScore++
+			continue
+		}
+		grade := normalizeChampionGrade("yourgg", 0, value.Tier)
+		if grade == "" {
+			stats.SkippedGrade++
+			continue
+		}
+		if index, exists := indexByID[value.AugmentID]; exists {
+			stats.SkippedDuplicate++
+			if value.Matches > candidates[index].value.Matches {
+				candidates[index] = candidate{value: value, grade: grade}
+			}
+			continue
+		}
+		indexByID[value.AugmentID] = len(candidates)
+		candidates = append(candidates, candidate{value: value, grade: grade})
+	}
+	stats.RowsKept = len(candidates)
+	if stats.RowsKept*100 < stats.RowsIn*minYourGGArenaAugmentValidPercent {
+		return nil, stats, errYourGGArenaAugmentsTooManyInvalid
+	}
+	groups := []arenaAugmentGroup{{Rarity: 1}, {Rarity: 4}, {Rarity: 8}, {Rarity: -1}}
+	for _, candidate := range candidates {
+		value, grade := candidate.value, candidate.grade
+		meta, found := metadata[int64(value.AugmentID)]
+		name := strings.TrimSpace(meta.Name)
+		if name == "" {
+			name = arenaAugmentFallbackName(value.AugmentID)
+		}
+		asset := championAsset{ID: value.AugmentID, Kind: "arena-augment", Name: name, Description: meta.Description}
+		if source, path := augmentMetadataImage(meta.IconPath); found && path != "" {
+			asset.Source = source
+			asset.Path = path
+			if source == "communitydragon" {
+				asset.FallbackPath = communityDragonGameAssetPath(meta.FallbackIconPath)
+			}
+		}
+		rarity := normalizeAugmentRarity(meta.Rarity)
+		groupIndex := map[string]int{"silver": 0, "gold": 1, "prismatic": 2}[rarity]
+		if rarity != "silver" && rarity != "gold" && rarity != "prismatic" {
+			groupIndex = 3
+		}
+		groups[groupIndex].Rows = append(groups[groupIndex].Rows, championMetricRow{
+			Assets: []championAsset{asset}, Rarity: rarity, Tier: grade, Grade: grade, Score: *value.Score,
+			WinRate: value.WinRate * 100, AveragePlacement: value.AveragePlacement,
+			FirstPlaceRate: value.FirstPlacementRate * 100, Games: value.Matches,
+		})
+	}
+	// A partial quality set would silently shrink the existing three-tab list.
+	if len(groups[0].Rows) == 0 || len(groups[1].Rows) == 0 || len(groups[2].Rows) == 0 {
+		return nil, stats, errYourGGArenaAugmentsQualityMissing
+	}
+	result := make([]arenaAugmentGroup, 0, len(groups))
+	for _, group := range groups {
+		if len(group.Rows) > 0 {
+			result = append(result, group)
+		}
+	}
+	return result, stats, nil
+}
+
 func (p *championProvider) loadArenaChampionAggregate(ctx context.Context, championID int) (yourGGArenaAggregateResponse, []gameplayItem, time.Time, error) {
 	if championID <= 0 {
 		return yourGGArenaAggregateResponse{}, nil, time.Time{}, errors.New("invalid arena aggregate request")
 	}
+	// Arena detail already has OP.GG augment rows. A stalled optional
+	// YOUR.GG aggregate must not hold the whole page for the HTTP client's
+	// 12-second ceiling; the caller explicitly falls back to those rows.
+	aggregateCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
 	requestPath := "/kr/api/arena/champions/" + strconv.Itoa(championID)
-	data, fetchedAt, err := p.fetchWithMetadata(ctx, yourGGArenaHost, requestPath, nil, championJSONMax, "application/json")
+	data, fetchedAt, err := p.fetchWithMetadata(aggregateCtx, yourGGArenaHost, requestPath, nil, championJSONMax, "application/json")
 	if err != nil {
 		return yourGGArenaAggregateResponse{}, nil, time.Time{}, err
 	}
@@ -171,12 +306,20 @@ func (p *championProvider) loadArenaChampionAggregate(ctx context.Context, champ
 	if payload.Response.CoreItems == nil && payload.Response.PrismaticItems == nil {
 		return yourGGArenaAggregateResponse{}, nil, time.Time{}, errors.New("YOUR.GG aggregate response is missing item sections")
 	}
-	items, err := p.loadCommunityDragonItems(ctx)
-	if err != nil {
-		if p.diag != nil {
-			p.diag(map[string]any{"event": "arena_item_catalog_failed", "source": "communitydragon", "errorKind": championProviderErrorKind(err)})
-		}
-		items = nil
+	// The live CommunityDragon item catalog took the full 12-second request
+	// deadline in the reported session. Use the dated, exact-ID metadata
+	// snapshot for this page; the aggregate statistics above remain live.
+	p.mu.Lock()
+	var items []gameplayItem
+	if len(p.arenaItems) > 0 && time.Since(p.arenaItemsAt) < 30*time.Minute {
+		items = append([]gameplayItem(nil), p.arenaItems...)
+	}
+	p.mu.Unlock()
+	if len(items) == 0 {
+		items = bundledArenaItems()
+	}
+	if len(items) == 0 {
+		items, _ = p.loadCommunityDragonItems(ctx)
 	}
 	return payload, items, fetchedAt, nil
 }

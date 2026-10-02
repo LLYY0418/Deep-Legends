@@ -39,6 +39,8 @@ func loadLootMetadata(ctx context.Context, client *LCUClient, provider *champion
 	for index, catalog := range lootMetadataCatalogs {
 		group.Add(1)
 		go func(index int, catalog lootMetadataCatalog) {
+			defer recoverPanic("loot_metadata.loadLootMetadata.1")
+
 			defer group.Done()
 			results[index].source = "unavailable"
 			if client != nil {

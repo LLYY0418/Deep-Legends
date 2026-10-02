@@ -83,7 +83,7 @@ test('R91 addendum existing history remains readable during polling; new history
  const state={liveLoading:false,settings:{}};const deps={state,number:String,percent:String,kda:String,escapeHTML:String,iconFigure:()=>'<img>',maskedPlayerName:()=> 'Player',liveDisplayedChampionId:()=>1,renderLivePremadeTag:()=>'',rankTitle:()=> '白银 I',positionLabel:()=> '上单'};
  // R131 §2.1-5：R129 P1 把历史状态判据抽成 liveHistoryStateOf / liveHistorySettled。
  // 这两个函数正是本条测试要盯的 flicker 判据，按真实实现编译，不桩掉。
- vm.runInNewContext(['renderInsightMatches','insightScore','renderLivePlayer','proBadgeAttributes','renderProIdentityBadge','liveHistoryStateOf','liveHistorySettled'].map(n=>extract(n)).join('\n'),deps);
+ vm.runInNewContext(['renderInsightMatches','insightScore','renderLivePlayer','champSelectEnemyPlaceholder','proBadgeAttributes','renderProIdentityBadge','liveHistoryStateOf','liveHistorySettled'].map(n=>extract(n)).join('\n'),deps);
  const player={playerRef:'p',historyState:'ok',rank:{tier:'SILVER'},modeStats:{games:1,wins:1,kda:3},recentGames:[{championId:1,kills:3,deaths:1,assists:0,win:true}]};
  const before=deps.renderInsightMatches(player)+deps.renderLivePlayer(player,0,true);state.liveLoading=true;
  assert.equal(deps.renderInsightMatches(player)+deps.renderLivePlayer(player,0,true),before);assert.doesNotMatch(before,/白银|未定级/);assert.match(deps.renderLivePlayer(player,0,false),/白银 I/);
@@ -98,15 +98,15 @@ test('R91 addendum unchanged polling preserves roster DOM nodes',()=>{
  const state={section:'live',beacon:{phase:'ChampSelect'},live:{available:true,phase:'ChampSelect'},settings:{}};
  // R131 §2.1-2/3：renderLive 新增的两个依赖。updateLivePanels 桩成 false → 退回
  // 「标记没变就不动」的老路径，正是本条要断言的 DOM 节点复用语义。
- const h={state,nodes:{liveRefresh:doc.querySelector('button'),liveContent:doc.querySelector('div')},connected:()=>true,renderSessionSummary:()=>{},renderLiveRefreshStatus:()=>state.liveLoading?'<span>正在刷新</span>':'',renderRecommendationArea:()=>'<article>known match</article>',bindLiveContent:()=>{},applyRenderedMetricStyles:()=>{},prepareImages:()=>{},recordLiveRenderRebuild:()=>{},updateLivePanels:()=>false};
+ const h={state,document:doc,nodes:{liveRefresh:doc.querySelector('button'),liveContent:doc.querySelector('div')},connected:()=>true,renderSessionSummary:()=>{},renderLiveRefreshStatus:()=>state.liveLoading?'<span>正在刷新</span>':'',renderRecommendationArea:()=>'<article>known match</article>',bindLiveContent:()=>{},applyRenderedMetricStyles:()=>{},prepareImages:()=>{},recordLiveRenderRebuild:()=>{},updateLivePanels:()=>false};
  h.liveRecommendationMarkup=data=>h.renderRecommendationArea(data);
- vm.runInNewContext([extract('renderLive'),extract('liveRenderTriggerLabel')].join('\n'),h);h.renderLive();const row=h.nodes.liveContent.querySelector('article');state.liveLoading=true;h.renderLive();assert.equal(h.nodes.liveContent.querySelector('article'),row);state.liveLoading=false;h.renderLive();assert.equal(h.nodes.liveContent.querySelector('article'),row);dom.window.close();
+ vm.runInNewContext([extract('renderLive'),extract('stampLiveRows'),extract('liveRenderTriggerLabel')].join('\n'),h);h.renderLive();const row=h.nodes.liveContent.querySelector('article');state.liveLoading=true;h.renderLive();assert.equal(h.nodes.liveContent.querySelector('article'),row);state.liveLoading=false;h.renderLive();assert.equal(h.nodes.liveContent.querySelector('article'),row);dom.window.close();
 });
 test('R91 addendum Loading and early incomplete arena poll every five seconds then converge',()=>{
  for(const phase of ['GameStart','InProgress','Reconnect']){
   const state={section:'live',beacon:{phase},live:{phase,gameId:91,available:true,gameMode:'CHERRY',arenaGrouped:false,arenaGroupingUnavailable:true,arenaGroupingRetryable:true,players:[{historyState:'ok'}]},settings:{liveRefresh:true}};
   let job;const h={state,document:{hidden:false},Date,connected:()=>true,liveGamePhase:p=>['GameStart','InProgress','Reconnect'].includes(p),liveAugmentRecommendationSource:()=> 'arena',clearTimeout:()=>{job=null;},setTimeout:(fn,delay)=>{job={fn,delay};return 1;},loadLive:()=>{}};
-  vm.runInNewContext(['syncLiveRetryBudget','liveSnapshotComplete','scheduleLiveRefresh'].map(n=>extract(n)).join('\n'),h);
+  vm.runInNewContext(['syncLiveRetryBudget','liveSnapshotComplete','liveClientPositionsPending','scheduleLiveRefresh'].map(n=>extract(n)).join('\n'),h);
   for(let i=0;i<12;i++){h.scheduleLiveRefresh();assert.equal(job.delay,5000);job.fn();assert.equal(state.liveRetryAttempts,0);}
   state.liveRetryStartedAt=Date.now()-60001;
   for(let i=0;i<8;i++){h.scheduleLiveRefresh();assert.equal(job.delay,20000);job.fn();}

@@ -29,7 +29,7 @@ function harness() {
     }),
     recordLiveRefresh: noop, updateBeacon: phase => { state.beacon.phase = phase; }, markOverviewAfterGame: noop, scheduleBeaconPoll: noop,
     resetLivePositionOverrides: noop, resetRecommendationTabsOnChampionChange: noop, renderCapabilitySettings: noop,
-    liveRecommendationsFor: () => null, ensureLiveRecommendations: noop, ensureSpecialistRunes: noop, ensureProRunes: noop,
+    liveRecommendationsFor: () => null, ensureLiveRecommendations: noop, ensureSpecialistRunes: noop, ensureProRunes: noop, ensureLaneMatchupCandidates: noop,
     liveAugmentRecommendationSource: () => "", escapeHTML: String,
     renderSessionSummary: data => { nodes.liveSessionSummary.textContent = data ? `game-${data.gameId}` : ""; },
     renderRecommendationArea: data => `<article>recommendation-${data.gameId || "empty"}</article>`,
@@ -41,7 +41,7 @@ function harness() {
     recordLiveRenderRebuild: noop, updateLivePanels: () => false,
   };
   // R131 §2.1-1：liveRenderTriggerLabel 是纯函数、无外部依赖，按真实实现抽取。
-  const names = ["updateLiveLoadingVisibility", "loadLive", "liveRecommendationMarkup", "renderLive", "handleGameplayPhase", "queueLiveEventRefresh", "shouldResetLiveGameScopedState", "resetLiveGameScopedState", "softResetGameplayState", "syncLiveRetryBudget", "liveSnapshotComplete", "liveAutoRefreshStopped", "renderLiveRefreshStatus", "scheduleLiveRefresh", "normalizeLiveInterval", "liveRefreshDelayMs", "liveRenderTriggerLabel"];
+  const names = ["updateLiveLoadingVisibility", "loadLive", "liveRecommendationMarkup", "renderLive", "stampLiveRows", "handleGameplayPhase", "queueLiveEventRefresh", "shouldResetLiveGameScopedState", "resetLiveGameScopedState", "clearRuneStarterRetries", "softResetGameplayState", "syncLiveRetryBudget", "liveSnapshotComplete", "liveClientPositionsPending", "liveAutoRefreshStopped", "renderLiveRefreshStatus", "scheduleLiveRefresh", "normalizeLiveInterval", "liveRefreshDelayMs", "liveRenderTriggerLabel"];
   for (const name of ["liveGamePhase", "invalidateLiveForNewGame", "resetDisconnectedLive", "normalizeLiveGameId", "liveGameIdComparison", "recordLiveObservation", "liveSnapshotBehindPhase"]) if (source.includes(`function ${name}(`)) names.push(name);
   vm.runInNewContext(names.map(extract).join("\n"), context);
   nodes.liveRefresh.addEventListener("click", () => context.loadLive(true, "manual"));

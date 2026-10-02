@@ -168,7 +168,7 @@ func TestR127DiagnosticAllowlistStaysClosed(t *testing.T) {
 
 	instance = newR127DiagnosticApp(t)
 	body := `{"event":"local_request_client","reason":"failed",` +
-		`"endpoint":"/api/image?path=/lol-game-data/assets/v1/profile-icons/4379.jpg","imageSource":"lcu"}`
+		`"endpoint":"/api/image?path=/lol-game-data/assets/v1/profile-icons/4379-private-resource.jpg","imageSource":"lcu"}`
 	if code := r127PostDiagnostic(t, instance, body); code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204", code)
 	}
@@ -184,7 +184,8 @@ func TestR127DiagnosticAllowlistStaysClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, leaked := range []string{"profile-icons", "4379", "/api/image", "path"} {
+	// Use a textual sentinel: a bare four-digit ID can occur by chance in the log timestamp.
+	for _, leaked := range []string{"profile-icons", "4379-private-resource", "/api/image", "path"} {
 		if strings.Contains(string(encoded), leaked) {
 			t.Fatalf("诊断泄漏了 %q: %s", leaked, encoded)
 		}

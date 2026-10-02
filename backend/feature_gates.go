@@ -103,7 +103,7 @@ func featureGateForChampionHost(host string) string {
 	switch strings.ToLower(strings.TrimSpace(host)) {
 	case opggChampionHost, opggWebAPIHost, opggPageHost:
 		return featureGateOPGG
-	case hexdataHost:
+	case hexdataHost, hexdataAssetHost:
 		return featureGateHexdata
 	case aramkitRatingHost:
 		return featureGateAramkit

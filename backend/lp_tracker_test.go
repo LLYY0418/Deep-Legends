@@ -2,13 +2,19 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"github.com/gorilla/websocket"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -63,7 +69,8 @@ func assertLPObservationPrivacy(t *testing.T, events []map[string]any, forbidden
 	t.Helper()
 	allowedKeys := map[string]bool{
 		"event": true, "reason": true, "stage": true, "has_baseline": true,
-		"capture_index": true, "attempt": true, "attempts": true, "capability_state": true,
+		"capture_index": true, "attempt": true, "attempts": true, "capability_state": true, "games_gap": true,
+		"wins_delta": true, "losses_delta": true, "score_delta": true, "baseline_source": true, "baseline_age_s": true, "snapshot_source": true, "writer": true, "season_fallback": true,
 	}
 	for _, event := range events {
 		for key := range event {
@@ -322,6 +329,9 @@ func TestLPTrackerCaptureReportsSkippedReasons(t *testing.T) {
 			if !startedOK || !captureIndexOK || captureIndex == 0 || !ok || lpObservationCount(*events, "lp_capture_skipped") != 1 || skipped["reason"] != test.reason || skipped["capture_index"] != captureIndex {
 				t.Fatalf("skipped observation = %#v", skipped)
 			}
+			if test.reason == "games_jumped" && skipped["games_gap"] != 2 {
+				t.Fatalf("games gap = %#v, want 2", skipped["games_gap"])
+			}
 			if _, recorded := lpObservation(*events, "lp_capture_recorded"); recorded {
 				t.Fatalf("skipped capture was recorded: %#v", *events)
 			}
@@ -469,5 +479,450 @@ func TestItemSlotsKeepPositions(t *testing.T) {
 		if got[index] != want[index] {
 			t.Fatalf("slot %d = %d, want %d", index, got[index], want[index])
 		}
+	}
+}
+
+func r182Rank(snapshot lpSnapshot, queue string) gameplayRank {
+	return gameplayRank{QueueType: queue, Tier: snapshot.Tier, Division: snapshot.Division, LeaguePoints: snapshot.LeaguePoints, Wins: snapshot.Wins, Losses: snapshot.Losses}
+}
+func r182Start(t *testing.T) (*lpTracker, string, string, lpSnapshot, *LCUClient) {
+	t.Helper()
+	ref := strings.Repeat("b", 48)
+	queue := "RANKED_SOLO_5x5"
+	baseline := lpSnapshot{Tier: "GOLD", Division: "II", LeaguePoints: 80, Wins: 10, Losses: 10}
+	tracker, hash := seededLPTracker(t, ref, queue, baseline)
+	client := lpTestClient(t, 182001, 420)
+	tracker.takeGameStart(client, ref, func() ([]gameplayRank, EndpointCapability) {
+		return []gameplayRank{r182Rank(baseline, queue)}, EndpointCapability{State: capabilityAvailable, Path: "/lol-ranked/v1/current-ranked-stats"}
+	})
+	if tracker.history.GameStarts[hash][queue].GameID != 182001 {
+		t.Fatal("start not saved")
+	}
+	return tracker, ref, queue, baseline, client
+}
+func r182Capture(tracker *lpTracker, client *LCUClient, ref, queue string, snapshots []lpSnapshot, sources []string) int {
+	calls := 0
+	tracker.capture(client, ref, func() ([]gameplayRank, EndpointCapability) {
+		i := min(calls, len(snapshots)-1)
+		source := "lcu"
+		if len(sources) > 0 {
+			source = sources[min(calls, len(sources)-1)]
+		}
+		calls++
+		return []gameplayRank{r182Rank(snapshots[i], queue)}, EndpointCapability{State: capabilityAvailable, Path: source + ":ranked"}
+	})
+	return calls
+}
+func TestR182LossGapTwoUsesGameStartScore(t *testing.T) {
+	tracker, ref, queue, baseline, client := r182Start(t)
+	events := captureLPObservations(tracker)
+	after := baseline
+	after.Losses += 2
+	after.LeaguePoints -= 18
+	calls := r182Capture(tracker, client, ref, queue, []lpSnapshot{after}, nil)
+	recorded, ok := lpObservation(*events, "lp_capture_recorded")
+	if !ok || tracker.history.Games["182001"].Delta != -18 || recorded["games_gap"] != 2 || recorded["baseline_source"] != "game_start" || recorded["snapshot_source"] != "lcu" || recorded["wins_delta"] != 0 || recorded["losses_delta"] != 2 || recorded["score_delta"] != -18 || calls != 3 || lpObservationCount(*events, "lp_capture_settle") != 2 {
+		t.Fatal(tracker.history.Games, calls, *events)
+	}
+	hash := tracker.accountHash(ref)
+	if _, ok := tracker.history.GameStarts[hash][queue]; ok {
+		t.Fatal("finished start baseline retained")
+	}
+	assertLPObservationPrivacy(t, *events, ref, hash, queue, "182001")
+}
+func TestR182ProjectedLossWinWithUnchangedGames(t *testing.T) {
+	tracker, ref, queue, baseline, client := r182Start(t)
+	events := captureLPObservations(tracker)
+	after := baseline
+	after.Wins++
+	after.Losses--
+	after.LeaguePoints += 20
+	r182Capture(tracker, client, ref, queue, []lpSnapshot{after}, nil)
+	event, ok := lpObservation(*events, "lp_capture_recorded")
+	if !ok || tracker.history.Games["182001"].Delta != 20 || event["games_gap"] != 0 || event["wins_delta"] != 1 || event["losses_delta"] != -1 {
+		t.Fatal(tracker.history.Games, *events)
+	}
+}
+func TestR182ScoreSettlesBeforeDelayedGameCount(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		lp    []int
+		delta int
+		calls int
+	}{{"score-first", []int{62, 62, 62}, -18, 3}, {"changes-twice", []int{62, 60, 58, 58}, -22, 4}, {"never-stable", []int{62, 60, 58, 56}, 0, 4}} {
+		t.Run(test.name, func(t *testing.T) {
+			tracker, ref, queue, baseline, client := r182Start(t)
+			events := captureLPObservations(tracker)
+			snaps := []lpSnapshot{}
+			for i, lp := range test.lp {
+				s := baseline
+				s.LeaguePoints = lp
+				if i > 0 {
+					s.Losses += 2
+				}
+				snaps = append(snaps, s)
+			}
+			calls := r182Capture(tracker, client, ref, queue, snaps, nil)
+			record, recorded := tracker.history.Games["182001"]
+			if calls != test.calls {
+				t.Fatal(calls, *events)
+			}
+			if test.delta == 0 {
+				event, ok := lpObservation(*events, "lp_capture_skipped")
+				if recorded || !ok || event["reason"] != "score_unstable" {
+					t.Fatal(*events)
+				}
+			} else if !recorded || record.Delta != test.delta {
+				t.Fatal(record, *events)
+			}
+		})
+	}
+}
+func TestR182ProtectionTimeoutAndSourceMismatch(t *testing.T) {
+	t.Run("unchanged", func(t *testing.T) {
+		tracker, ref, queue, baseline, client := r182Start(t)
+		events := captureLPObservations(tracker)
+		calls := r182Capture(tracker, client, ref, queue, []lpSnapshot{baseline}, nil)
+		if _, ok := tracker.history.Games["182001"]; ok {
+			t.Fatal("unchanged recorded")
+		}
+		if calls != 18 || lpObservationCount(*events, "lp_capture_timeout") != 1 || lpObservationCount(*events, "lp_capture_settle") != 0 {
+			t.Fatal(calls, *events)
+		}
+	})
+	t.Run("same-source-unchanged-after-fallback", func(t *testing.T) {
+		tracker, ref, queue, baseline, client := r182Start(t)
+		events := captureLPObservations(tracker)
+		calls := r182Capture(tracker, client, ref, queue, []lpSnapshot{baseline}, []string{"sgp", "lcu"})
+		if calls != 18 || lpObservationCount(*events, "lp_capture_timeout") != 1 || lpObservationCount(*events, "lp_capture_skipped") != 0 || len(tracker.history.Games) != 0 {
+			t.Fatal(calls, tracker.history.Games, *events)
+		}
+	})
+
+	for _, allMismatch := range []bool{false, true} {
+		t.Run(strconv.FormatBool(allMismatch), func(t *testing.T) {
+			tracker, ref, queue, baseline, client := r182Start(t)
+			events := captureLPObservations(tracker)
+			after := baseline
+			after.Losses += 2
+			after.LeaguePoints -= 18
+			sources := []string{"sgp", "sgp", "lcu"}
+			if allMismatch {
+				sources = []string{"sgp"}
+			}
+			calls := r182Capture(tracker, client, ref, queue, []lpSnapshot{after}, sources)
+			if allMismatch {
+				event, ok := lpObservation(*events, "lp_capture_skipped")
+				if !ok || event["reason"] != "source_mismatch" || event["score_delta"] != nil || calls != 18 {
+					t.Fatal(calls, *events)
+				}
+				if _, ok := tracker.history.Games["182001"]; ok {
+					t.Fatal("cross-source score recorded")
+				}
+			} else if calls != 5 || tracker.history.Games["182001"].Delta != -18 {
+				t.Fatal(calls, tracker.history.Games, *events)
+			}
+		})
+	}
+}
+func TestR182ObserveCannotReplaceGameStart(t *testing.T) {
+	tracker, ref, queue, baseline, client := r182Start(t)
+	hash := tracker.accountHash(ref)
+	before := tracker.history.GameStarts[hash][queue]
+	observed := baseline
+	observed.LeaguePoints = 99
+	observed.Wins++
+	tracker.observe(ref, []gameplayRank{r182Rank(observed, queue)}, EndpointCapability{Path: "lcu:ranked"})
+	if tracker.history.GameStarts[hash][queue] != before || tracker.history.Baselines[hash][queue] != observed {
+		t.Fatal("observe replaced immutable game baseline", tracker.history)
+	}
+	after := baseline
+	after.LeaguePoints -= 18
+	after.Losses += 2
+	r182Capture(tracker, client, ref, queue, []lpSnapshot{after}, nil)
+	if tracker.history.Games["182001"].Delta != -18 {
+		t.Fatal(tracker.history.Games)
+	}
+}
+func TestR182SeasonFallbackSkippedAndDiagnosticsDedup(t *testing.T) {
+	tracker, ref, queue, baseline, _ := r182Start(t)
+	events := captureLPObservations(tracker)
+	hash := tracker.accountHash(ref)
+	clock := time.Unix(1820000000, 0)
+	tracker.now = func() time.Time { return clock }
+	raw := r182Rank(baseline, queue)
+	raw.Wins = 99
+	raw.Losses = 0
+	raw.WinRate = -1
+	a := &app{}
+	filled, _ := a.applySeasonRankWinRateFallback([]gameplayRank{raw}, EndpointCapability{}, seasonStatsProgress{Complete: true}, map[int64]gameplayAggregate{420: {Games: 25, Wins: 12, Losses: 13, WinRate: 48}})
+	if !filled[0].seasonFallback {
+		t.Fatal("fallback provenance missing")
+	}
+	for i := 0; i < 3; i++ {
+		tracker.observe(ref, filled)
+	}
+	if tracker.history.Baselines[hash][queue] != baseline {
+		t.Fatal("season counts wrote baseline", tracker.history)
+	}
+	event, ok := lpObservation(*events, "lp_baseline_written")
+	if !ok || event["writer"] != "observe" || event["season_fallback"] != true || event["reason"] != "season_fallback" || lpObservationCount(*events, "lp_baseline_written") != 1 {
+		t.Fatal(*events)
+	}
+	clock = clock.Add(61 * time.Second)
+	tracker.observe(ref, filled)
+	if lpObservationCount(*events, "lp_baseline_written") != 2 {
+		t.Fatal(*events)
+	}
+	// A trustworthy untouched queue can still write, and unchanged writes are bounded.
+	flex := r182Rank(baseline, "RANKED_FLEX_SR")
+	for i := 0; i < 3; i++ {
+		tracker.observe(ref, []gameplayRank{flex})
+	}
+	if tracker.history.Baselines[hash][flex.QueueType] != baseline || lpObservationCount(*events, "lp_baseline_written") != 3 {
+		t.Fatal(*events, tracker.history)
+	}
+	assertLPObservationPrivacy(t, *events, ref, hash, queue)
+}
+func TestR182HistorySchemaOneCompatibilityAndStartRoundTrip(t *testing.T) {
+	ref := strings.Repeat("v", 48)
+	tracker, hash := seededLPTracker(t, ref, "RANKED_SOLO_5x5", lpSnapshot{Tier: "GOLD", Division: "II", LeaguePoints: 80, Wins: 10, Losses: 10})
+	old := tracker.history
+	old.SchemaVersion = 1
+	old.Games["181001"] = lpGameRecord{AccountHash: hash, QueueType: "RANKED_SOLO_5x5", Delta: -18, RecordedAt: 1}
+	old.GameStarts = nil
+	old.BaselineInfo = nil
+	data, _ := json.Marshal(old)
+	if err := os.WriteFile(filepath.Join(tracker.store.root, lpHistoryFile), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	reloaded := newLPTracker(tracker.store)
+	reloaded.sleep = func(time.Duration) {}
+	if reloaded.history.Games["181001"].Delta != -18 || len(reloaded.history.GameStarts) != 0 || reloaded.history.SchemaVersion != 2 {
+		t.Fatal(reloaded.history)
+	}
+	snapshot := old.Baselines[hash]["RANKED_SOLO_5x5"]
+	reloaded.takeGameStart(lpTestClient(t, 182001, 420), ref, func() ([]gameplayRank, EndpointCapability) {
+		return []gameplayRank{r182Rank(snapshot, "RANKED_SOLO_5x5")}, EndpointCapability{State: capabilityAvailable, Path: "sgp:ranked"}
+	})
+	final := newLPTracker(tracker.store)
+	if !reflect.DeepEqual(final.history, reloaded.history) || final.history.GameStarts[hash]["RANKED_SOLO_5x5"].Source != "sgp" || final.history.Games["181001"].Delta != -18 {
+		t.Fatal(final.history, reloaded.history)
+	}
+	data, _ = os.ReadFile(filepath.Join(tracker.store.root, lpHistoryFile))
+	if bytes.Contains(data, []byte(ref)) {
+		t.Fatal("persistent raw player reference")
+	}
+}
+func TestR182StartRetryBudgetAndPhaseDedup(t *testing.T) {
+	tracker, ref, queue, baseline, _ := r182Start(t)
+	hash := tracker.accountHash(ref)
+	delete(tracker.history.GameStarts[hash], queue)
+	tracker.startSeen = map[string]bool{}
+	events := captureLPObservations(tracker)
+	calls := 0
+	waits := []time.Duration{}
+	tracker.sleep = func(d time.Duration) { waits = append(waits, d) }
+	client := lpTestClient(t, 182002, 420)
+	tracker.takeGameStart(client, ref, func() ([]gameplayRank, EndpointCapability) {
+		calls++
+		if calls < 3 {
+			return nil, EndpointCapability{State: capabilityFailed}
+		}
+		return []gameplayRank{r182Rank(baseline, queue)}, EndpointCapability{State: capabilityAvailable, Path: "lcu:ranked"}
+	})
+	tracker.takeGameStart(client, ref, func() ([]gameplayRank, EndpointCapability) {
+		t.Error("duplicated start read")
+		return nil, EndpointCapability{}
+	})
+	if calls != 3 || !reflect.DeepEqual(waits, []time.Duration{5 * time.Second, 5 * time.Second}) || tracker.history.GameStarts[hash][queue].GameID != 182002 {
+		t.Fatal(calls, waits, tracker.history)
+	}
+	delete(tracker.history.GameStarts[hash], queue)
+	calls = 0
+	tracker.takeGameStart(lpTestClient(t, 182003, 420), ref, func() ([]gameplayRank, EndpointCapability) {
+		calls++
+		return nil, EndpointCapability{State: capabilityFailed}
+	})
+	if calls != 3 || len(tracker.history.GameStarts[hash]) != 0 {
+		t.Fatal(calls, tracker.history)
+	}
+	event, ok := lpObservation(*events, "lp_baseline_written")
+	if !ok {
+		t.Fatal(*events)
+	}
+	_ = event
+	if _, ok := lpObservation(*events, "lp_game_start_poll"); !ok {
+		t.Fatal(*events)
+	}
+}
+func TestR182DiagnosticPrivacyAndBaselineAge(t *testing.T) {
+	ref := strings.Repeat("z", 48)
+	queue := "RANKED_SOLO_5x5"
+	baseline := lpSnapshot{Tier: "CHALLENGER", LeaguePoints: 98765, Wins: 123456, Losses: 654321}
+	tracker, hash := seededLPTracker(t, ref, queue, baseline)
+	events := captureLPObservations(tracker)
+	clock := time.Unix(1820000000, 0)
+	tracker.now = func() time.Time { return clock }
+	client := lpTestClient(t, 182001, 420)
+	tracker.takeGameStart(client, ref, func() ([]gameplayRank, EndpointCapability) {
+		return []gameplayRank{r182Rank(baseline, queue)}, EndpointCapability{State: capabilityAvailable, Path: "lcu:ranked"}
+	})
+	clock = clock.Add(120 * time.Second)
+	after := baseline
+	after.Losses += 2
+	after.LeaguePoints -= 18
+	r182Capture(tracker, client, ref, queue, []lpSnapshot{after}, nil)
+	event, ok := lpObservation(*events, "lp_capture_recorded")
+	if !ok || event["baseline_age_s"] != int64(120) {
+		t.Fatal(*events)
+	}
+	assertLPObservationPrivacy(t, *events, ref, hash, queue, "CHALLENGER", "98765", "123456", "654321", "182001")
+}
+
+func TestR182GameflowEventsStartThenSettlement(t *testing.T) {
+	ref := strings.Repeat("e", 48)
+	queue := "RANKED_SOLO_5x5"
+	baseline := lpSnapshot{Tier: "GOLD", Division: "II", LeaguePoints: 80, Wins: 10, Losses: 10}
+	tracker, hash := seededLPTracker(t, ref, queue, baseline)
+	var settled atomic.Bool
+	var rankReads atomic.Int32
+	endPhase := make(chan struct{})
+	started := make(chan struct{}, 1)
+	recorded := make(chan struct{}, 1)
+	var eventMu sync.Mutex
+	events := []map[string]any{}
+	tracker.observeEvent = func(event map[string]any) {
+		eventMu.Lock()
+		events = append(events, event)
+		eventMu.Unlock()
+		if event["event"] == "lp_baseline_written" && event["writer"] == "game_start" {
+			started <- struct{}{}
+		}
+		if event["event"] == "lp_capture_recorded" {
+			recorded <- struct{}{}
+		}
+	}
+	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if websocket.IsWebSocketUpgrade(r) {
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+			if _, _, err = conn.ReadMessage(); err != nil {
+				return
+			}
+			send := func(phase string) {
+				_ = conn.WriteJSON([]any{8, "OnJsonApiEvent", map[string]any{"uri": "/lol-gameflow/v1/gameflow-phase", "eventType": "Update", "data": phase}})
+			}
+			send("InProgress")
+			<-endPhase
+			send("WaitingForStats")
+			for {
+				if _, _, err = conn.ReadMessage(); err != nil {
+					return
+				}
+			}
+		}
+		switch r.URL.Path {
+		case "/lol-gameflow/v1/session":
+			_ = json.NewEncoder(w).Encode(map[string]any{"gameData": map[string]any{"gameId": 182001, "queue": map[string]any{"id": 420, "mapId": 11, "gameMode": "CLASSIC"}}})
+		case "/lol-ranked/v1/current-ranked-stats":
+			rankReads.Add(1)
+			s := baseline
+			if settled.Load() {
+				s.Losses += 2
+				s.LeaguePoints -= 18
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"queues": []any{r182Rank(s, queue)}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	u, _ := url.Parse(server.URL)
+	port, _ := strconv.Atoi(u.Port())
+	client := newLCUClient(port, "fixture")
+	defer client.Close()
+	p := newChampionProvider()
+	p.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) { return r178JSON(map[string]any{}, 404), nil })}
+	a := &app{lcu: client, connected: true, summoner: Summoner{PUUID: ref}, lpTracker: tracker, champions: p, refreshRequests: make(chan struct{}, 1)}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- a.runConnectedSession(ctx, client) }()
+	var endOnce sync.Once
+	finish := func() { endOnce.Do(func() { close(endPhase) }) }
+	defer func() {
+		finish()
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Error("session did not stop")
+		}
+	}()
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("InProgress did not write a game-start baseline")
+	}
+	tracker.mu.Lock()
+	start := tracker.history.GameStarts[hash][queue]
+	tracker.mu.Unlock()
+	if start.GameID != 182001 || start.Source != "lcu" || start.Snapshot != baseline {
+		t.Fatal(start)
+	}
+	settled.Store(true)
+	finish()
+	select {
+	case <-recorded:
+	case <-time.After(3 * time.Second):
+		t.Fatal("WaitingForStats did not record loss")
+	}
+	tracker.mu.Lock()
+	record := tracker.history.Games["182001"]
+	tracker.mu.Unlock()
+	if record.Delta != -18 || rankReads.Load() < 4 {
+		t.Fatal(record, rankReads.Load())
+	}
+	eventMu.Lock()
+	defer eventMu.Unlock()
+	event, ok := lpObservation(events, "lp_capture_recorded")
+	if !ok || event["baseline_source"] != "game_start" {
+		t.Fatal(events)
+	}
+	assertLPObservationPrivacy(t, events, ref, hash, queue, "182001")
+}
+
+func TestR182NoStartKeepsFirstEligibleDecision(t *testing.T) {
+	ref := strings.Repeat("f", 48)
+	queue := "RANKED_SOLO_5x5"
+	baseline := lpSnapshot{Tier: "GOLD", Division: "II", LeaguePoints: 80, Wins: 10, Losses: 10}
+	tracker, _ := seededLPTracker(t, ref, queue, baseline)
+	events := captureLPObservations(tracker)
+	first := baseline
+	first.Wins++
+	first.LeaguePoints += 24
+	followup := first
+	followup.Wins++
+	followup.LeaguePoints += 20
+	calls := r182Capture(tracker, lpTestClient(t, 182001, 420), ref, queue, []lpSnapshot{first, followup}, nil)
+	if calls != 3 || tracker.history.Games["182001"].Delta != 24 || tracker.history.Baselines[tracker.accountHash(ref)][queue] != followup || lpObservationCount(*events, "lp_capture_settle") != 2 {
+		t.Fatal(tracker.history, *events)
+	}
+	// Diagnostic sampling failure cannot erase a decision supported by the old +1 guard.
+	tracker, _ = seededLPTracker(t, ref, queue, baseline)
+	calls = 0
+	tracker.capture(lpTestClient(t, 182002, 420), ref, func() ([]gameplayRank, EndpointCapability) {
+		calls++
+		if calls == 1 {
+			return []gameplayRank{r182Rank(first, queue)}, EndpointCapability{State: capabilityAvailable, Path: "lcu:ranked"}
+		}
+		return nil, EndpointCapability{State: capabilityFailed}
+	})
+	if calls != 3 || tracker.history.Games["182002"].Delta != 24 {
+		t.Fatal(calls, tracker.history)
 	}
 }

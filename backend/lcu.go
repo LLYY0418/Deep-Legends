@@ -247,6 +247,42 @@ func (c *LCUClient) flushRequestDiagnostics() {
 	}
 }
 
+// flushExpiredRequestDiagnostics publishes idle request buckets while the LCU
+// connection remains open. A later request to the same path is not required.
+func (c *LCUClient) flushExpiredRequestDiagnostics(now time.Time) {
+	if c == nil {
+		return
+	}
+	c.diagnosticMu.Lock()
+	observe := c.diagnosticObserve
+	events := make([]map[string]any, 0)
+	for key, bucket := range c.requestDiagnostics {
+		if len(bucket.samples) == 0 || !now.After(bucket.windowStart.Add(lcuRequestDiagnosticWindow)) {
+			continue
+		}
+		events = append(events, lcuRequestDiagnosticEvent(bucket))
+		delete(c.requestDiagnostics, key)
+	}
+	c.diagnosticMu.Unlock()
+	if observe != nil {
+		for _, event := range events {
+			observe(event)
+		}
+	}
+}
+
+func (c *LCUClient) runRequestDiagnosticFlush(ctx context.Context, ticks <-chan time.Time) {
+	for {
+		select {
+		case now := <-ticks:
+			c.flushExpiredRequestDiagnostics(now)
+		case <-ctx.Done():
+			c.flushRequestDiagnostics()
+			return
+		}
+	}
+}
+
 func lcuRequestDiagnosticEvent(bucket *lcuRequestDiagnosticBucket) map[string]any {
 	durations := make([]int64, 0, len(bucket.samples))
 	connWaits := make([]int64, 0, len(bucket.samples))
@@ -299,6 +335,17 @@ func lcuDiagnosticPath(value string) string {
 	}
 	if path == "/lol-challenges/v1/update-player-preferences" || path == "/lol-challenges/v1/update-player-preferences/" {
 		return "/lol-challenges/v1/update-player-preferences/"
+	}
+	const invitationPath = "/lol-lobby/v2/received-invitations"
+	if path == invitationPath {
+		return path
+	}
+	if strings.HasPrefix(path, invitationPath+"/") {
+		parts := strings.Split(strings.TrimPrefix(path, invitationPath+"/"), "/")
+		if len(parts) == 2 && (parts[1] == "accept" || parts[1] == "decline") {
+			return invitationPath + "/{id}/" + parts[1]
+		}
+		return invitationPath + "/{id}"
 	}
 	if strings.HasPrefix(path, "/lol-ranked/v1/ranked-stats/") {
 		return "/lol-ranked/v1/ranked-stats/{puuid}"

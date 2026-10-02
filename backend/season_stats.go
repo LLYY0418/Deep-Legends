@@ -754,6 +754,8 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 	a.seasonBackfillMu.Unlock()
 
 	go func() {
+		defer a.recoverPanic("season_stats.startSeasonStatsRefresh.1")
+
 		defer func() {
 			a.seasonBackfillMu.Lock()
 			delete(a.seasonBackfills, flightKey)
@@ -967,7 +969,7 @@ func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference
 	a.seasonBackfills[key] = struct{}{}
 	a.seasonBackfillMu.Unlock()
 
-	go func() {
+	a.goSafe("season_stats.startSeasonBackfill.1", func() {
 		defer func() {
 			a.seasonBackfillMu.Lock()
 			delete(a.seasonBackfills, key)
@@ -1023,7 +1025,7 @@ func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference
 			case <-time.After(seasonBackfillRoundPause):
 			}
 		}
-	}()
+	})
 }
 
 // ---------------------------------------------------------------------------

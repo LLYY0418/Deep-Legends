@@ -230,6 +230,8 @@ func (a *app) warmRankedItemIcons(ctx context.Context) error {
 		}
 		wait.Add(1)
 		go func(row championRankingRow) {
+			defer a.recoverPanic("champion_images.warmRankedItemIcons.1")
+
 			defer wait.Done()
 			select {
 			case slots <- struct{}{}:
@@ -267,6 +269,8 @@ func (a *app) warmRankedItemIcons(ctx context.Context) error {
 		}
 		wait.Add(1)
 		go func(path string) {
+			defer a.recoverPanic("champion_images.warmRankedItemIcons.2")
+
 			defer wait.Done()
 			select {
 			case slots <- struct{}{}:

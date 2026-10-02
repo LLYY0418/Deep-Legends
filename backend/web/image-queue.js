@@ -11,12 +11,13 @@
   const REMOTE_LANE_LIMIT = 2;
   // 占着名额超过这个时长即算慢图，失败上报时带上数量，用于判断名额被谁占满。
   const SLOW_ACTIVE_MS = 3000;
-  const REPORTABLE_IMAGE_SOURCES = ["lcu", "communitydragon", "ddragon", "gtimg"];
+  const REPORTABLE_IMAGE_SOURCES = ["lcu", "communitydragon", "ddragon", "gtimg", "builtin"];
   const limit = IMAGE_QUEUE_LIMIT, pending = new Map(), active = new Map(), failed = new Map();
   const seen = new WeakMap(), retries = new WeakMap(), cooldowns = new Map();
   const loadedURLs = new Map();
   const queuedAt = new WeakMap(), admittedAt = new WeakMap(), admittedLane = new WeakMap();
   const retryDelay = 10000, maxRetries = 1;
+  let lastSlowSuccessReportAt = 0;
   let disposed = false;
   const visible = new WeakSet(), prefetch = new WeakSet(), succeeded = new WeakMap();
   const connected = img => img.isConnected || prefetch.has(img);
@@ -43,7 +44,7 @@
   }
   function laneOf(url) {
     const source = imageSourceOf(url);
-    if (source && source !== "lcu") return "remote";
+    if (source && source !== "lcu" && source !== "builtin") return "remote";
     return remoteAssetPattern.test(String(url || "")) ? "remote" : "local";
   }
   function activeLaneCount(lane) {
@@ -145,6 +146,16 @@
           }
         } else {
           img.dataset.imageReady = "true";
+          // The existing failure diagnostic cannot explain a correct icon that
+          // appears late. Sample successful slow admissions independently so a
+          // success observation never suppresses an image failure report.
+          const reportedAt = Date.now();
+          if ((queueWaitMs >= 1500 || loadMs >= 1500) && reportedAt - lastSlowSuccessReportAt >= 10000) {
+            lastSlowSuccessReportAt = reportedAt;
+            window.reportFlowDiagnostic?.("image_queue_slow", "loaded", {
+              queueWaitMs, loadMs, activeSlowCount, imageSource: imageSourceLabel(url),
+            });
+          }
           succeeded.set(img, url);
           loadedURLs.delete(url);
           loadedURLs.set(url, Date.now());

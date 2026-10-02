@@ -99,7 +99,7 @@ func parseYourGGArenaRankings(data []byte, at time.Time, observers ...func(map[s
 			report("score_order", row.Score)
 		}
 		seen[row.ChampionID], lastScore = true, row.Score
-		result.Rows = append(result.Rows, championRankingRow{ChampionID: row.ChampionID, Rank: i + 1, Tier: tier, Grade: row.Tier, Play: row.Matches, WinRate: row.WinRate * 100, BanRate: row.BanRate * 100, AveragePlacement: row.AveragePlacement, FirstPlaceRate: row.FirstPlacementRate * 100})
+		result.Rows = append(result.Rows, championRankingRow{ChampionID: row.ChampionID, Rank: i + 1, Tier: tier, Grade: normalizeChampionGrade("yourgg", 0, row.Tier), Play: row.Matches, WinRate: row.WinRate * 100, BanRate: row.BanRate * 100, AveragePlacement: row.AveragePlacement, FirstPlaceRate: row.FirstPlacementRate * 100})
 	}
 	accepted = len(result.Rows)
 	if accepted == 0 {

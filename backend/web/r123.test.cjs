@@ -50,13 +50,17 @@ test("R123 retired write surfaces are gone from the suite page", () => {
   for (const marker of ["openFacadeIconPicker", "openFacadeBannerPicker", "data-facade-icons", "data-facade-banners", "设为头像", "旗帜已应用", "立即更改", "facade-picker"]) {
     assert.equal(suiteSource.includes(marker), false, `suite.js still contains ${marker}`);
   }
-  assert.match(suiteSource, /data-facade-browse="icons"/);
-  assert.match(suiteSource, /data-facade-browse="banners"/);
-  assert.match(suiteSource, /在收藏页浏览头像与旗帜/);
+  for (const marker of ["facade-icon-card", "facade-banner-card", "data-facade-browse", "data-facade-rank-banner", 'action: "rank-banner"']) {
+    assert.equal(suiteSource.includes(marker), false, `suite.js still contains ${marker}`);
+  }
+  for (const marker of ["facade-preview", "facade-background-card", "facade-chat-card", "展示清理"]) {
+    assert.ok(suiteSource.includes(marker), `suite.js lost ${marker}`);
+  }
 });
 
 test("R123 favorites page exposes the facade collection subpage", () => {
   assert.match(html, /data-favorites-page="facade-collection"/);
+  assert.match(html, /aria-label="头像与旗帜视图"/);
   assert.match(html, /id="favorites-facade-panel"/);
   assert.match(html, /id="facade-detail-dialog"/);
   assert.match(html, /src="\/favorites-facade\.js"/);

@@ -16,6 +16,7 @@ import (
 
 const (
 	capabilityAvailable   = "available"
+	capabilityPending     = "pending"
 	capabilityUnsupported = "unsupported"
 	capabilityFailed      = "failed"
 	capabilityCanceled    = "canceled"
@@ -40,6 +41,7 @@ type SummonerProfile struct {
 
 type LootItem struct {
 	DataPending          bool   `json:"dataPending,omitempty"`
+	Blank                bool   `json:"blank,omitempty"`
 	LootID               string `json:"lootId"`
 	LootName             string `json:"lootName,omitempty"`
 	LocalizedName        string `json:"localizedName,omitempty"`
@@ -64,6 +66,7 @@ type LootItem struct {
 	IsSkinRelated        bool   `json:"isSkinRelated"`
 	Kind                 string `json:"kind,omitempty"`
 	rawKeyEmpty          bool
+	rawFieldKeys         []string
 	shapeDiagnostics     *lootShapeDiagnostics
 }
 
@@ -233,8 +236,9 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 			item.DisplayName = lootDisplayName(*item)
 		}
 		if lootNameMissing(*item, item.DisplayName) {
+			blank := strings.TrimSpace(item.LootID) == "" && strings.TrimSpace(item.LootName) == ""
 			if observe != nil {
-				observe(map[string]any{
+				event := map[string]any{
 					"event": "loot_name_fallback", "loot_id_prefix": lootIDPrefix(item.LootID),
 					"has_localized_name":       strings.TrimSpace(item.LocalizedName) != "",
 					"has_loot_name":            strings.TrimSpace(item.LootName) != "",
@@ -242,7 +246,19 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 					"raw_key_empty":            item.rawKeyEmpty,
 					"type_empty":               strings.TrimSpace(item.Type) == "",
 					"display_categories":       normalizeLootToken(item.DisplayCategories),
-				})
+				}
+				if blank {
+					// Identity-less record: log which raw fields the client filled
+					// (key names, enum-like status values, artwork path; never the
+					// quantity) so the next log can say what the record is.
+					event["field_keys"] = item.rawFieldKeys
+					event["item_status"] = normalizeLootToken(item.ItemStatus)
+					event["rarity"] = normalizeLootToken(item.Rarity)
+					event["redeemable_status"] = normalizeLootToken(item.RedeemableStatus)
+					event["asset"] = lootShellAssetForLog(item.Asset, item.TilePath, item.SplashPath)
+					event["store_item_id_set"] = item.StoreItemID > 0
+				}
+				observe(event)
 			}
 			if item.shapeDiagnostics != nil {
 				// Count entries, not inventory quantity: this preserves the privacy
@@ -253,9 +269,22 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 			if item.DisplayName == "" {
 				item.DisplayName = strings.TrimSpace(item.LootName)
 			}
-			if item.DisplayName == "" {
+			if blank {
+				// The client returned a record with no key, ID, name or type, so
+				// there is nothing to look up. Logs from 09-12, 09-13 and 09-24
+				// show the same record surviving every retry, so it is a stable
+				// blank entry, not a sync race. DataPending only holds while the
+				// bounded retries run (see settleBlankLoot); the card keeps the
+				// real quantity but never claims a category it cannot know.
+				item.Blank = true
 				item.DataPending = true
-				item.DisplayName = "客户端数据暂未同步，可稍后重试"
+				item.Kind = "类型未知"
+				// LCU can build a .png URL from an empty loot name. There is no
+				// usable artwork for an identity-less record, so let the card use
+				// its existing placeholder instead of requesting that URL.
+				item.Asset = ""
+				item.TilePath = ""
+				item.SplashPath = ""
 			}
 		}
 		kept = append(kept, *item)
@@ -282,6 +311,68 @@ func lootIDPrefix(value string) string {
 		}
 	}
 	return "OTHER"
+}
+
+// lootIdentityEmpty reports a record that carries no key, ID, name or usable
+// localized name: nothing a catalog lookup could start from.
+func lootIdentityEmpty(item LootItem) bool {
+	localized := strings.TrimSpace(item.LocalizedName)
+	return strings.TrimSpace(item.LootID) == "" && strings.TrimSpace(item.LootName) == "" && (localized == "" || localized == "未命名战利品")
+}
+
+// lootFilledFieldKeys lists the top-level JSON keys of one LCU loot record that
+// carry a real value (not null, "", 0, false, [] or {}). Only key names leave
+// this function, so the diagnostic shows the shape of an unnamed record without
+// copying any of its values.
+func lootFilledFieldKeys(raw json.RawMessage) []string {
+	var fields map[string]any
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil
+	}
+	keys := make([]string, 0, len(fields))
+	for key, value := range fields {
+		switch typed := value.(type) {
+		case nil:
+			continue
+		case string:
+			if strings.TrimSpace(typed) == "" {
+				continue
+			}
+		case float64:
+			if typed == 0 {
+				continue
+			}
+		case bool:
+			if !typed {
+				continue
+			}
+		case []any:
+			if len(typed) == 0 {
+				continue
+			}
+		case map[string]any:
+			if len(typed) == 0 {
+				continue
+			}
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// lootShellAssetForLog returns the first artwork path an unnamed record carries.
+// Catalog artwork names identify an item type, not a player's inventory.
+func lootShellAssetForLog(paths ...string) string {
+	for _, path := range paths {
+		if path = strings.TrimSpace(path); path != "" {
+			if len(path) > 160 {
+				path = path[:160]
+			}
+			return path
+		}
+	}
+	return ""
 }
 
 func lootNameMissing(item LootItem, name string) bool {
@@ -711,10 +802,28 @@ func (api SkinAppearanceAPI) BorderStatus(skin Skin) (hasBorder, ownershipKnown,
 
 func (api LootAPI) PlayerLoot() ([]LootItem, EndpointCapability) {
 	const path = "/lol-loot/v1/player-loot-map"
-	var lootMap map[string]LootItem
+	var rawMap map[string]json.RawMessage
 	capability := EndpointCapability{Name: "player-loot", Path: path}
-	if err := api.client.GetJSON(path, &lootMap); err != nil {
+	data, err := api.client.GetBytes(path)
+	if err == nil {
+		if decodeErr := json.Unmarshal(data, &rawMap); decodeErr != nil {
+			err = fmt.Errorf("decode %s: %w", path, decodeErr)
+		}
+	}
+	if err != nil {
 		return nil, optionalCapabilityError(capability, err)
+	}
+	lootMap := make(map[string]LootItem, len(rawMap))
+	rawFieldKeys := make(map[string][]string)
+	for key, raw := range rawMap {
+		var item LootItem
+		if err := json.Unmarshal(raw, &item); err != nil {
+			return nil, optionalCapabilityError(capability, fmt.Errorf("decode %s: %w", path, err))
+		}
+		lootMap[key] = item
+		if strings.TrimSpace(key) == "" && strings.TrimSpace(item.LootID) == "" && strings.TrimSpace(item.LootName) == "" {
+			rawFieldKeys[key] = lootFilledFieldKeys(raw)
+		}
 	}
 	items := make([]LootItem, 0, len(lootMap))
 	droppedZeroCount := 0
@@ -727,6 +836,7 @@ func (api LootAPI) PlayerLoot() ([]LootItem, EndpointCapability) {
 	}
 	for key, item := range lootMap {
 		item.rawKeyEmpty = strings.TrimSpace(key) == ""
+		item.rawFieldKeys = rawFieldKeys[key]
 		if item.LootID == "" {
 			item.LootID = key
 		}
@@ -753,6 +863,11 @@ func (api LootAPI) PlayerLoot() ([]LootItem, EndpointCapability) {
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].IsSkinRelated != items[j].IsSkinRelated {
 			return items[i].IsSkinRelated
+		}
+		// A record with no identity has no name to sort by; keep it after every
+		// real item instead of letting the empty string float to the front.
+		if leftBlank, rightBlank := lootIdentityEmpty(items[i]), lootIdentityEmpty(items[j]); leftBlank != rightBlank {
+			return rightBlank
 		}
 		left, right := lootDisplayName(items[i]), lootDisplayName(items[j])
 		if left != right {

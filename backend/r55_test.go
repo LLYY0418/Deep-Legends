@@ -309,7 +309,7 @@ func TestR55PrimeWatchStateReadsPhaseAndLobby(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(source), "go a.primeWatchState(client)") {
+	if !strings.Contains(string(source), "a.goSafe(\"connection_manager.runConnectedSession.5\", func() { a.primeWatchState(client) })") {
 		t.Fatal("event-stream ready callback no longer primes watch state")
 	}
 }

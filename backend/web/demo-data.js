@@ -396,11 +396,11 @@
 	champions: [...arenaDemoChampions, akaliDemoChampion],
   };
   const arenaRankingsFixture = {
-    mode: "arena", region: "GLOBAL", patch: "16.16", source: "OP.GG JSON", fetchedAt: new Date(now).toISOString(), entertainmentSample: true,
+    mode: "arena", region: "KR", patch: "16.16", source: "YOUR.GG JSON", fetchedAt: new Date(now).toISOString(), entertainmentSample: true,
     rows: arenaDemoChampions.slice(0, 12).map((champion, index) => ({
       championId: champion.id, key: champion.slug, name: champion.nameZh, imageSource: champion.imageSource, imagePath: champion.imagePath,
-      rank: index + 1, tier: index === 11 ? -1 : Math.min(5, Math.floor(index / 2)), play: 36_809 - index * 2_360,
-      winRate: Number((56.05 - index * 1.12).toFixed(2)), pickRate: Number((8.61 - index * .45).toFixed(2)), banRate: Number((18.06 - index * .71).toFixed(2)),
+      rank: index + 1, tier: index === 11 ? -1 : Math.min(5, Math.floor(index / 2)), grade: ["OP", "S", "A", "A", "B", "B", "C", "C", "D", "D", "F", ""][index], play: 36_809 - index * 2_360,
+      winRate: Number((56.05 - index * 1.12).toFixed(2)), banRate: Number((18.06 - index * .71).toFixed(2)),
       kda: Number((3.44 - index * .07).toFixed(2)), averagePlacement: Number((3.26 + index * .055).toFixed(2)), firstPlaceRate: Number((22.08 - index * .82).toFixed(2)),
     })),
   };
@@ -416,7 +416,7 @@
   const demoItemAsset = (id) => ({ id, kind: "item", name: demoItemNames[id] || `装备 ${id}`, source: "ddragon", path: `/cdn/${PATCH}/img/item/${id}.png` });
   const demoMetric = (ids, index, extra = {}) => ({
     assets: ids.map(demoItemAsset), games: 12_579 - index * 790, winRate: Number((63.6 - index * 1.15).toFixed(2)),
-    averagePlacement: Number((2.88 + index * .045).toFixed(2)), firstPlaceRate: Number((25.1 - index * .72).toFixed(2)), pickRate: Number((8.4 - index * .31).toFixed(2)), ...extra,
+    averagePlacement: Number((2.88 + index * .045).toFixed(2)), firstPlaceRate: Number((25.1 - index * .72).toFixed(2)), pickRate: Number((8.4 - index * .31).toFixed(2)), score: Number((92 - index * 3.2).toFixed(2)), grade: ["S", "A", "A", "B", "B", "C", "C", "D", "D"][index] || "", ...extra,
   });
   const demoAugmentAsset = (augment) => ({
     id: augment.id, kind: "arena-augment", name: augment.name, description: augment.description, source: "communitydragon",
@@ -429,7 +429,7 @@
     rarity: augmentRarityNumber[rarity],
     rows: arenaAugmentCatalog.filter((augment) => augment.rarity === rarity).map((augment, index) => ({
       assets: [demoAugmentAsset(augment)], rarity: augmentRarityKey[rarity], games: 8_020 - index * 430,
-      winRate: Number((63.6 - index * 1.1).toFixed(2)), averagePlacement: Number((2.88 + index * .06).toFixed(2)), firstPlaceRate: Number((25.1 - index * .9).toFixed(2)), pickRate: Number((9.2 - index * .5).toFixed(2)),
+      winRate: Number((63.6 - index * 1.1).toFixed(2)), averagePlacement: Number((2.88 + index * .06).toFixed(2)), firstPlaceRate: Number((25.1 - index * .9).toFixed(2)), pickRate: Number((9.2 - index * .5).toFixed(2)), grade: index === 0 ? "S" : index < 4 ? "A" : "B",
     })),
   }));
   const demoChampionRef = (id) => {
@@ -438,7 +438,6 @@
   };
   const arenaDetailFixture = {
     mode: "arena", region: "GLOBAL", patch: "16.16", source: "OP.GG JSON", fetchedAt: new Date(now).toISOString(), entertainmentSample: true,
-    arenaStats: { tier: 0, rank: 9, rankPrevPatch: 12, games: 36_809, kda: 3.44, averagePlacement: 3.26, firstPlaceRate: 22.08, pickRate: 8.61, winRate: 56.05, banRate: 18.06 },
     arenaAugmentGroups: arenaAugmentGroupsFixture,
     arenaAugments: arenaAugmentGroupsFixture.flatMap((group) => group.rows),
     teamCompositions: [
@@ -924,7 +923,7 @@
     profile: { backgroundSkinId: 99001, backgroundSkinName: "星之守护者 拉克丝" },
 	chat: { availability: "chat", statusMessage: "今晚九点峡谷见", lol: { rankedLeagueQueue: "RANKED_SOLO_5X5", rankedLeagueTier: "DIAMOND", rankedLeagueDivision: "II", playerTitleSelected: 101, gameStatus: "outOfGame" } },
 	regalia: { preferredBannerType: "lastSeasonHighestRank" },
-    rankBanner: "lastSeasonHighestRank", bannerAccent: "2",
+    bannerAccent: "2",
 	challengeSummary: { title: { name: "峡谷先锋", contentId: "demo-title-content-id", itemId: 101 }, topChallenges: [], selectedChallengesString: "", categoryProgress: [] },
 	challenges: [{ id: "101", name: "不破不立" }, { id: "202", name: "峡谷收藏家" }, { id: "303", name: "团队之星" }],
 	challengesReady: true,
@@ -993,6 +992,7 @@
     ["/api/gameplay/current-game", () => currentGame],
     ["/api/gameplay/live", () => hextechLiveDemo ? hextechLive : arenaFullDemo ? arenaFullLive : arenaLiveDemo ? arenaLive : live],
     ["/api/gameplay/perks", () => perksCatalog],
+    ["/api/gameplay/augments", () => ({ augments: perksCatalog.augments || [] })],
     ["/api/gameplay/items", () => demoItemsCatalog],
     ["/api/champions/catalog", () => championsCatalogFixture],
     ["/api/social/friends", friendsFixture],
@@ -1075,7 +1075,6 @@
       let request = {};
       try { request = JSON.parse(init?.body || "{}"); } catch (_) {}
       if (request.action === "icon") suiteFacade.summoner.profileIconId = request.iconId;
-      if (request.action === "rank-banner") suiteFacade.rankBanner = request.rankBanner;
       if (request.action === "background") suiteFacade.profile.backgroundSkinId = request.skinId;
       if (request.action === "chat") { suiteFacade.chat.availability = request.availability || suiteFacade.chat.availability; suiteFacade.chat.statusMessage = request.statusMessage ?? suiteFacade.chat.statusMessage; }
       if (request.action === "rank") suiteFacade.chat.lol = { rankedLeagueQueue: request.queue, rankedLeagueTier: request.tier, rankedLeagueDivision: request.division };

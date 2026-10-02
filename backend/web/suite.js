@@ -308,6 +308,7 @@
 
   const queuePolicies = [
     ["420", "单双排"], ["440", "灵活组排"], ["450", "极地大乱斗"],
+    ["hextech-aram", "海克斯大乱斗"],
     ["400", "匹配征召"], ["430", "匹配自选"], ["490", "快速模式"],
     ["1700", "斗魂竞技场"], ["1090", "云顶普通"], ["default", "其他队列"],
   ];
@@ -350,7 +351,16 @@
   }
 
   function invitationPolicy(policies, key) {
-    return policies[key] || policies.default || "ignore";
+    return policies[invitationPolicyKeys(key)[0]] || policies.default || "ignore";
+  }
+
+  function invitationPolicyKeys(key) {
+    return key === "hextech-aram" ? ["2300", "2400", "3270"] : [key];
+  }
+
+  function cycleInvitationPolicy(policies, key) {
+    const next = { ignore: "accept", accept: "decline", decline: "ignore" }[invitationPolicy(policies, key)] || "ignore";
+    for (const queueID of invitationPolicyKeys(key)) policies[queueID] = next;
   }
 
   function invitationPolicyButton(key, label, policies) {
@@ -479,9 +489,7 @@
     });
     for (const button of roots.watch.querySelectorAll("[data-watch-policy-cycle]")) button.addEventListener("click", async () => {
       state.watch.rules.invitations.policies ||= {};
-      const key = button.dataset.watchPolicyCycle;
-      const current = state.watch.rules.invitations.policies[key] || state.watch.rules.invitations.policies.default || "ignore";
-      state.watch.rules.invitations.policies[key] = { ignore: "accept", accept: "decline", decline: "ignore" }[current] || "ignore";
+      cycleInvitationPolicy(state.watch.rules.invitations.policies, button.dataset.watchPolicyCycle);
       await saveWatch();
     });
   }
@@ -1329,12 +1337,6 @@
     catch (error) { roots.rig.innerHTML = errorCard("维护状态读取失败", error.message, "rig"); }
   }
 
-  function facadeIconImage(icon) {
-    return imageURL(`/lol-game-data/assets/v1/profile-icons/${Number(icon.id)}.jpg`);
-  }
-
-
-
   async function runFacadeProbe(button) {
     if (state.facadeApplying) return;
     state.facadeApplying = true; button.disabled = true;
@@ -1361,7 +1363,6 @@
 	const inferredChampionID = actualID > 0 ? Math.floor(actualID / 1000) : 0;
     state.facadeDraft = {
       hero: String(Number(firstSkin.championId || 0) || explicitChampionID || inferredChampionID || ""), skinId: Number(firstSkin.id || value.profile?.backgroundSkinId || 0), ownedOnly: false,
-      iconId: Number(value.summoner?.profileIconId || 0), bannerId: String(value.bannerId || ""), rankBanner: value.rankBanner || "", bannerAccent: value.bannerAccent || "",
       availability: chat.availability || "chat", statusMessage: chat.statusMessage || "",
       queue: lol.rankedLeagueQueue || "RANKED_SOLO_5X5", tier: lol.rankedLeagueTier || "UNRANKED", division: lol.rankedLeagueDivision || "I",
       resetStatus: Boolean(value.loginReset?.statusMessageEnabled), resetRank: Boolean(value.loginReset?.rankEnabled),
@@ -1456,8 +1457,7 @@
     const resetDirty = facadeResetDirty();
     roots.facade.className = "";
 	// `.facade-signature` 保留既有样式类名，但这里承载的是生涯头衔而不是个性签名。
-	const markup = `<div class="facade-layout"><div class="facade-left"><section class="suite-card facade-preview"><div class="facade-preview-art">${backgroundURL ? `<img data-queued-src="${backgroundURL}" alt="" data-suite-facade-art>` : ""}<span class="facade-art-label">当前背景 · ${escapeHTML(previewName)}</span></div><div class="facade-preview-body"><span class="facade-avatar">${summoner.profileIconId ? `<img data-queued-src="${imageURL(`/lol-game-data/assets/v1/profile-icons/${summoner.profileIconId}.jpg`)}" alt="">` : escapeHTML(displayName.slice(0, 1))}<small class="facade-avatar-level">${Number(summoner.summonerLevel || 0)}</small></span><div class="facade-identity"><h2>${escapeHTML(displayName)}</h2><p>${escapeHTML(tagLine || "当前账号")}</p></div><div class="facade-tags"><span class="suite-chip is-gold" data-facade-preview-rank>${escapeHTML(rankLabel(draft))}</span><span class="suite-chip" data-facade-preview-availability>${escapeHTML(availabilityLabels[draft.availability] || draft.availability)}</span><span class="suite-chip">上赛季旗帜</span></div><div class="facade-signature${titleFilled ? " is-filled" : ""}">${escapeHTML(title)}</div><div class="facade-slots">${facadeChallengeSlots(value)}</div></div></section><section class="suite-card facade-icon-card" ${value.connected ? "" : "hidden"}><div class="suite-card-head"><h3>头像</h3></div><div class="icon-current"><img class="icon-thumb" data-queued-src="${facadeIconImage({id:summoner.profileIconId})}" alt="当前头像"><div class="meta"><strong>生涯头像</strong><span>${Number(value.chat?.icon) > 0 && Number(value.chat.icon) !== Number(summoner.profileIconId) ? `聊天与好友栏另用头像 #${Number(value.chat.icon)}` : "当前客户端生涯头像"}</span></div><button class="text-button" type="button" data-facade-browse="icons">在收藏页浏览头像与旗帜 →</button></div></section>
-      <section class="suite-card facade-banner-card" ${value.connected ? "" : "hidden"}><div class="suite-card-head"><h3>旗帜</h3></div><div class="facade-stack-row"><h4>生涯旗帜</h4><p>生涯旗帜只读浏览，目录与拥有状态在收藏页查看</p><div class="ctl"><button class="text-button" type="button" data-facade-browse="banners">在收藏页浏览头像与旗帜 →</button></div></div><div class="facade-stack-row"><h4>段位旗</h4><p>保留当前头像框偏好</p><div class="ctl"><div class="suite-segment">${[["lastSeasonHighestRank", "上赛季段位"], ["blank", "空白"]].map(([key, label]) => `<button type="button" data-facade-rank-banner="${key}" aria-pressed="${value.rankBanner === key}" class="${value.rankBanner === key ? "is-active" : ""}">${label}</button>`).join("")}</div></div></div></section><section class="suite-card facade-write-card"><div class="suite-card-head"><div><h3>这一页会改什么</h3></div></div><dl class="facade-write-list"><dt>生涯背景</dt><dd>你生涯页顶部的那张大图</dd><dt>好友悬浮卡</dt><dd>别人点你头像时看到的在线状态、签名和段位</dd><dt>生涯页展示</dt><dd>头像框、挑战勋章、赛季旗帜、表情轮盘</dd></dl><div class="suite-note facade-write-note"><span aria-hidden="true">⚑</span><span>以上全部<strong>只在你点击后执行</strong>，没有任何自动写入。只有“登录时重设”两项例外，它们默认关闭，开启后也只重放你保存过的值。</span></div></section></div>
+	const markup = `<div class="facade-layout"><div class="facade-left"><section class="suite-card facade-preview"><div class="facade-preview-art">${backgroundURL ? `<img data-queued-src="${backgroundURL}" alt="" data-suite-facade-art>` : ""}<span class="facade-art-label">当前背景 · ${escapeHTML(previewName)}</span></div><div class="facade-preview-body"><span class="facade-avatar">${summoner.profileIconId ? `<img data-queued-src="${imageURL(`/lol-game-data/assets/v1/profile-icons/${summoner.profileIconId}.jpg`)}" alt="">` : escapeHTML(displayName.slice(0, 1))}<small class="facade-avatar-level">${Number(summoner.summonerLevel || 0)}</small></span><div class="facade-identity"><h2>${escapeHTML(displayName)}</h2><p>${escapeHTML(tagLine || "当前账号")}</p></div><div class="facade-tags"><span class="suite-chip is-gold" data-facade-preview-rank>${escapeHTML(rankLabel(draft))}</span><span class="suite-chip" data-facade-preview-availability>${escapeHTML(availabilityLabels[draft.availability] || draft.availability)}</span><span class="suite-chip">上赛季旗帜</span></div><div class="facade-signature${titleFilled ? " is-filled" : ""}">${escapeHTML(title)}</div><div class="facade-slots">${facadeChallengeSlots(value)}</div></div></section><section class="suite-card facade-write-card"><div class="suite-card-head"><div><h3>这一页会改什么</h3></div></div><dl class="facade-write-list"><dt>生涯背景</dt><dd>你生涯页顶部的那张大图</dd><dt>好友悬浮卡</dt><dd>别人点你头像时看到的在线状态、签名和段位</dd><dt>生涯页展示</dt><dd>头像框、挑战勋章、表情轮盘</dd></dl><div class="suite-note facade-write-note"><span aria-hidden="true">⚑</span><span>以上全部<strong>只在你点击后执行</strong>，没有任何自动写入。只有“登录时重设”两项例外，它们默认关闭，开启后也只重放你保存过的值。</span></div></section></div>
       <div class="facade-controls"><section class="suite-card facade-background-card"><div class="suite-card-head"><div><h3>生涯背景</h3></div><span class="suite-chip" data-facade-background-applied ${backgroundApplied ? "" : "hidden"}>已应用</span><button class="button button-primary" type="button" data-facade-apply-background ${backgroundApplied ? "hidden" : ""} ${selectedSkin.id ? "" : "disabled"}>应用背景</button></div><div class="facade-selections"><label class="select-wrap"><span class="sr-only">英雄</span><select class="suite-select" data-facade-hero>${champions.map(([id, name]) => `<option value="${escapeHTML(id)}"${selected(draft.hero, id)}>${escapeHTML(name)}</option>`).join("")}</select></label><label class="suite-switch"><input type="checkbox" data-facade-owned${checked(draft.ownedOnly)}${value.skinOwnershipUnavailable ? ' disabled title="拥有状态尚未读取"' : ""}><span>只显示已拥有</span></label></div><div class="facade-film" aria-label="皮肤网格">${facadeFilmHTML(visibleSkins, draft)}</div><p class="facade-background-note">客户端接口<strong>不校验皮肤是否拥有</strong>——关掉上面的开关就能设置未拥有的皮肤，但它可能在下次登录时被服务端还原。</p></section>
 
 	  <section class="suite-card facade-chat-card"><div class="suite-card-head"><div><h3>聊天身份</h3></div></div><div class="facade-row"><div><h4>在线状态</h4><p>部分状态只在特定情况下可用；客户端只会在实际进入对局或观战时保留对应状态</p></div><div class="suite-segment">${Object.entries(availabilityLabels).map(([key, label]) => `<button type="button" class="${draft.availability === key ? "is-active" : ""}" data-facade-availability="${key}">${label}</button>`).join("")}</div></div><div class="facade-row"><div><h4>个性签名</h4><p>留空即删除签名。开启“登录时重设”后每次客户端登录都会重新应用</p></div><div class="facade-row-control"><input class="suite-input facade-status-input" type="text" maxlength="200" value="${escapeHTML(draft.statusMessage)}" placeholder="输入签名…" data-facade-status><label class="suite-switch facade-reset-switch" data-tooltip="登录时重设个性签名"><input type="checkbox" aria-label="登录时重设个性签名" data-facade-reset-status${checked(draft.resetStatus)}><span class="sr-only">登录时重设</span></label></div></div><div class="facade-row"><div><h4>展示段位</h4><p>只改好友悬浮卡上的段位显示，不影响你的真实段位、战绩与匹配。大师及以上不需要选分段</p></div><div class="facade-row-control"><div class="facade-rank-fields"><span class="select-wrap"><select class="suite-select" aria-label="展示段位队列" data-facade-rank="queue"><option value="RANKED_SOLO_5X5"${selected(draft.queue, "RANKED_SOLO_5X5")}>单双排</option><option value="RANKED_FLEX_SR"${selected(draft.queue, "RANKED_FLEX_SR")}>灵活组排</option></select></span><span class="select-wrap"><select class="suite-select" aria-label="展示段位" data-facade-rank="tier">${rankOptions(draft.tier)}</select></span><span class="select-wrap"><select class="suite-select" aria-label="展示分段" data-facade-rank="division" ${highTier ? "disabled" : ""}>${["I","II","III","IV"].map((division) => `<option value="${division}"${selected(draft.division, division)}>${division}</option>`).join("")}</select></span></div><label class="suite-switch facade-reset-switch" data-tooltip="登录时重设展示段位"><input type="checkbox" aria-label="登录时重设展示段位" data-facade-reset-rank${checked(draft.resetRank)}><span class="sr-only">登录时重设</span></label></div></div><div class="facade-commit" data-facade-commit ${identityDirty || resetDirty ? "" : "hidden"}><span>改动只在左侧预览，确认后才写入客户端。</span><div><button class="button button-secondary" type="button" data-facade-save-reset ${resetDirty ? "" : "hidden"}>保存登录重设</button><button class="button button-primary" type="button" data-facade-apply-chat ${identityDirty ? "" : "hidden"}>确认并应用</button></div></div></section>
@@ -1608,9 +1608,7 @@
   }
 
   function bindFacadeControls() {
-    for (const button of roots.facade.querySelectorAll("[data-facade-browse]")) button.addEventListener("click", () => window.deepLegendsOpenFacadeCollection?.(button.dataset.facadeBrowse));
     roots.facade.querySelector("[data-facade-probe]")?.addEventListener("click", event => runFacadeProbe(event.currentTarget));
-    for (const button of roots.facade.querySelectorAll("[data-facade-rank-banner]")) button.addEventListener("click", () => applyFacade({ action: "rank-banner", rankBanner: button.dataset.facadeRankBanner }));
     roots.facade.querySelector("[data-facade-catalog-retry]")?.addEventListener("click", () => loadFacade(true, true, "manual"));
     roots.facade.querySelector("[data-facade-hero]")?.addEventListener("change", (event) => { state.facadeDraft.hero = event.target.value; state.facadeDraft.skinId = 0; rebuildFacadeFilm(); });
     roots.facade.querySelector("[data-facade-owned]")?.addEventListener("change", (event) => { state.facadeDraft.ownedOnly = event.target.checked; rebuildFacadeFilm(); });
@@ -1703,7 +1701,6 @@
 	else if (rawTitle && typeof rawTitle === "object") title = { name: typeof rawTitle.name === "string" ? rawTitle.name.trim() : "" };
 	return {
 	  connected: value.connected === true,
-      rankBanner: value.rankBanner || "", bannerAccent: value.bannerAccent || "",
       skinsUnavailable: value.skinsUnavailable === true,
       skinOwnershipUnavailable: value.skinOwnershipUnavailable === true,
       profileUnavailable: value.profileUnavailable === true,
@@ -2103,14 +2100,15 @@
     state.eventStream = false;
     if (state.rig) renderRig();
   });
-  (window.deepLegendsSections?.listen || window.addEventListener.bind(window))("deep-legends:gameflow", (event) => {
+  function handleSuiteGameflow(event) {
 	state.phase = event.detail?.phase || state.phase;
 	if (state.watch) renderWatch();
-	if ((event.detail?.changed || event.detail?.phase) && state.active && state.connected) {
+	if (event.detail?.changed || event.detail?.phase) {
 	  state.champSelectRuntime = null;
-	  void loadChampSelect(false);
+	  if (state.active && state.connected) void loadChampSelect(false);
 	}
-  });
+  }
+  (window.deepLegendsSections?.listen || window.addEventListener.bind(window))("deep-legends:gameflow", handleSuiteGameflow);
   window.addEventListener("deep-legends:watch", (event) => handleWatchEvent(event.detail?.event || event.detail || ""));
   window.addEventListener("deep-legends:claim-changed", () => { if (state.active) loadClaims(true); else state.claims = null; });
   window.addEventListener("deep-legends:facade-changed", () => queueFacadeRefresh());

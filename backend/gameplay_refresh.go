@@ -32,6 +32,7 @@ func isEndOfGamePhase(phase string) bool {
 
 // One lifecycle per client/game. End phases may be duplicated or omitted by LCU.
 func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase string) {
+	a.observeGameSettingsPhase(client, phase)
 	if phase != "GameStart" && phase != "InProgress" && phase != "Reconnect" {
 		a.stopMayhemSamplerForClient("gameflow-left", client)
 	}
@@ -63,11 +64,11 @@ func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase
 	a.observeArenaGroupingPhase(client, phase)
 	a.liveSnapshots.invalidate()
 	if isEndOfGamePhase(phase) {
-		go func() {
+		a.goSafe("finishArenaGroupTruth", func() {
 			truthCtx, cancel := context.WithTimeout(phaseContext, 35*time.Second)
 			defer cancel()
 			a.finishArenaGroupTruth(truthCtx, client)
-		}()
+		})
 	}
 	if phase != "ChampSelect" && phase != "GameStart" && phase != "InProgress" && phase != "Reconnect" {
 		return
@@ -78,15 +79,18 @@ func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase
 	if !valid {
 		return
 	}
-	go func() {
+	a.goSafe("live-prewarm", func() {
 		// Only phase transitions prewarm; one shared flight, bounded by session
 		// lifetime and a hard budget. No periodic upstream polling here.
 		warmCtx, cancel := context.WithTimeout(phaseContext, 40*time.Second)
 		defer cancel()
+		if a.gameplayPrewarmHook != nil {
+			a.gameplayPrewarmHook()
+		}
 		started := time.Now()
 		response := a.cachedGameplayLive(warmCtx, client, current, phase, true)
 		a.recordDiagnostic(map[string]any{"event": "live_prewarm", "phase": phase, "players": len(response.Players), "duration_ms": time.Since(started).Milliseconds(), "error_kind": diagnosticErrorKind(warmCtx.Err())})
-	}()
+	})
 }
 
 type liveSnapshotFlight struct {
@@ -120,7 +124,7 @@ func (c *liveSnapshotCache) invalidate() {
 	c.mu.Unlock()
 }
 
-func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current Summoner, phase string, warming ...bool) gameplayLiveResponse {
+func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current Summoner, phase string, warming ...bool) (response gameplayLiveResponse) {
 	c := &a.liveSnapshots
 	isWarming := len(warming) > 0 && warming[0]
 	c.mu.Lock()
@@ -140,7 +144,8 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 		c.revision++
 	}
 	ttl := 20 * time.Second
-	if phase == "ChampSelect" || phase == "GameStart" || c.response.ArenaGroupingRetryable {
+	if phase == "ChampSelect" || phase == "GameStart" || c.response.ArenaGroupingRetryable || gameplayLivePositionsPending(c.response) ||
+		((phase == "InProgress" || phase == "Reconnect") && liveTenPlayerRosterQueue(c.response.QueueID) && !gameplayLiveSnapshotComplete(c.response)) {
 		ttl = 3 * time.Second
 	}
 	// Complete in-game data is immutable for this game. Incomplete snapshots
@@ -206,22 +211,42 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 	c.cancel = cancel
 	c.mu.Unlock()
 	defer cancel()
-	response := a.loadGameplayLive(loadCtx, client, current, phase)
-	c.mu.Lock()
-	if c.generation == generation && c.flight == flight {
-		c.flight = nil
-		if loadCtx.Err() == nil {
-			c.at, c.response = time.Now(), response
-			c.warmPending = isWarming
-			c.revision++
+	// The owner always publishes and closes its flight, including on panic. A
+	// canceled old generation must not clear or populate a replacement flight.
+	defer func() {
+		value := recover()
+		if value != nil {
+			response = gameplayLiveResponse{Phase: phase}
 		}
+		c.mu.Lock()
+		if c.generation == generation && c.flight == flight {
+			c.flight = nil
+			c.cancel = nil
+			if value == nil && loadCtx.Err() == nil {
+				c.at, c.response = time.Now(), response
+				c.warmPending = isWarming
+				c.revision++
+			}
+		}
+		if loadCtx.Err() != nil || c.generation != generation {
+			response = gameplayLiveResponse{Phase: phase}
+		}
+		flight.response = response
+		close(flight.done)
+		c.mu.Unlock()
+		if value != nil {
+			site := "cachedGameplayLive"
+			if isWarming {
+				site = "live-prewarm"
+			}
+			a.recordRecoveredPanic(site, value)
+		}
+	}()
+	if a.gameplayLiveLoader != nil {
+		response = a.gameplayLiveLoader(loadCtx, client, current, phase)
+	} else {
+		response = a.loadGameplayLive(loadCtx, client, current, phase)
 	}
-	if loadCtx.Err() != nil || c.generation != generation {
-		response = gameplayLiveResponse{Phase: phase}
-	}
-	flight.response = response
-	close(flight.done)
-	c.mu.Unlock()
 	return response
 }
 
@@ -287,8 +312,20 @@ func gameplayCancellationScope(ctx context.Context) string {
 }
 
 func gameplayLiveSnapshotComplete(response gameplayLiveResponse) bool {
+	if gameplayLivePositionsPending(response) {
+		return false
+	}
 	if !response.Available || len(response.Players) == 0 {
 		return false
+	}
+	if liveTenPlayerRosterQueue(response.QueueID) {
+		teams := map[int64]int{}
+		for _, player := range response.Players {
+			teams[player.TeamID]++
+		}
+		if teams[100] != 5 || teams[200] != 5 || len(response.Players) != 10 {
+			return false
+		}
 	}
 	for _, p := range response.Players {
 		if p.HistoryState == "pending" || p.HistoryState == "failed" {

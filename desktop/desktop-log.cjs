@@ -52,6 +52,13 @@ function desktopLogForExport(directory, now = Date.now()) {
       const at=Date.parse(time);
       if (!Number.isFinite(at)) { omitted++; continue; }
       if (at < now - 7*24*60*60*1000 || at > now) { expired++; continue; }
+      if(message.startsWith("后端证据 ")) {
+        try {
+          const { normalizeBackendEvidence } = require("./backend-evidence.cjs");
+          const event = normalizeBackendEvidence(JSON.parse(message.slice(5)));
+          if(event){rows.push(JSON.stringify({...event,time}));continue;}
+        } catch {}
+      }
       if(message.startsWith('进程异常 ')) {
         try { const raw=JSON.parse(message.slice(5));const event=desktopCrashEvent(raw.kind, {reason:raw.reason,exitCode:raw.exitCode,type:raw.processType,name:raw.errorType});
           if(event){rows.push(JSON.stringify({...event,time}));continue;}

@@ -58,6 +58,7 @@ let splashWindow = null;
 let backend = null;
 let backendReady = null;
 let backendExit = null;
+let backendStderrTail = Buffer.alloc(0);
 let readyTimer = null;
 let stdoutBuffer = "";
 let quitting = false;
@@ -308,6 +309,7 @@ function startBackend() {
   const childEnvironment = { ...process.env };
   delete childEnvironment.ELECTRON_RUN_AS_NODE;
   startupMarks.backendSpawn = Date.now();
+  backendStderrTail = Buffer.alloc(0);
   backend = spawn(spec.command, spec.args, {
     cwd: spec.cwd,
     windowsHide: true,
@@ -318,7 +320,11 @@ function startBackend() {
   backend.stdout.setEncoding("utf8");
   backend.stdout.on("data", onBackendStdout);
   backend.stderr.setEncoding("utf8");
-  backend.stderr.on("data", appendDesktopLog);
+  backend.stderr.on("data", chunk => {
+    const { stderrTail } = require("./backend-evidence.cjs");
+    backendStderrTail = stderrTail(backendStderrTail, chunk);
+    appendDesktopLog(chunk);
+  });
   backend.on("error", (error) => failStartup(`本地数据服务无法启动：${error.message}`));
   // close follows stdout EOF; exit may precede the final LOOT_QUIT message.
   backend.on("close", onBackendClosed);
@@ -326,7 +332,16 @@ function startBackend() {
 
 // Only the child-process lifecycle confirms death, never HTTP polling failures.
 // Keep close (rather than exit) so a final LOOT_QUIT line can mark intentional exit.
+function recordRelaunchCompletion() {
+  const { consumeRelaunchMarker } = require("./backend-evidence.cjs");
+  const relaunchEvidence = consumeRelaunchMarker(app.getPath("userData"));
+  if (relaunchEvidence) appendDesktopLog("后端证据 " + JSON.stringify(relaunchEvidence));
+}
+
 function onBackendClosed(code, signal) {
+  const { backendExitEvidence } = require("./backend-evidence.cjs");
+  appendDesktopLog("后端证据 " + JSON.stringify(backendExitEvidence(code, signal, Math.max(0, Date.now() - startupMarks.backendSpawn), backendStderrTail)));
+  backendStderrTail = Buffer.alloc(0);
   clearTimeout(readyTimer);
   backend = null;
   if (quitting || shutdownStarted) return;
@@ -352,6 +367,9 @@ function setupBackendIPC() {
   ipcMain.handle("desktop-backend-restart", event => {
     if (!trusted(event) || !backendExit || quitting || shutdownStarted) return false;
     // A dead backend cannot serve /api/quit or be revived by location.reload().
+    const { writeRelaunchMarker } = require("./backend-evidence.cjs");
+    appendDesktopLog("后端证据 " + JSON.stringify({ event: "desktop_relaunch_requested" }));
+    writeRelaunchMarker(app.getPath("userData"));
     app.relaunch();
     quitting = true;
     app.quit();
@@ -727,6 +745,7 @@ async function shutdownBackend() {
 app.whenReady().then(() => {
   if (!hasInstanceLock) return;
   startupMarks.appReady = Date.now();
+  recordRelaunchCompletion();
   session.defaultSession.setPermissionCheckHandler((webContents, permission) => permission === "fullscreen" && isTrustedRenderer(webContents));
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => callback(permission === "fullscreen" && isTrustedRenderer(webContents)));
   createSplashWindow();

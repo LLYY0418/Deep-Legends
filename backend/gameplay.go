@@ -152,6 +152,17 @@ func (p *overviewPhaseTimings) markSpan(name string, started, finished time.Time
 	p.mu.Unlock()
 }
 
+// advance closes the overview assembly interval without assigning parallel
+// upstream wait time to a local calculation or to JSON serialization.
+func (p *overviewPhaseTimings) advance() {
+	if p == nil {
+		return
+	}
+	p.mu.Lock()
+	p.last = time.Now()
+	p.mu.Unlock()
+}
+
 func (p *overviewPhaseTimings) snapshot(now time.Time) map[string]any {
 	if p == nil {
 		return nil
@@ -267,8 +278,10 @@ type gameplayPlayer struct {
 	// PrivateHistory 表示玩家在客户端里开启了“隐藏战绩”；身份正常展示，
 	// 界面在名称旁标注“隐藏战绩”标签。
 	PrivateHistory bool `json:"privateHistory,omitempty"`
-	IsCurrent      bool `json:"isCurrent"`
-	reference      gameplayReference
+	// Autofill is a direct fact from this match's own champ-select myTeam.
+	Autofill  bool `json:"autofill,omitempty"`
+	IsCurrent bool `json:"isCurrent"`
+	reference gameplayReference
 }
 
 // gameplayReference is retained only inside the authenticated backend. It
@@ -293,15 +306,16 @@ type gameplayReference struct {
 }
 
 type gameplayRank struct {
-	QueueType    string `json:"queueType"`
-	QueueLabel   string `json:"queueLabel"`
-	Tier         string `json:"tier,omitempty"`
-	Division     string `json:"division,omitempty"`
-	LeaguePoints int    `json:"leaguePoints"`
-	Wins         int    `json:"wins"`
-	Losses       int    `json:"losses"`
-	WinRate      int    `json:"winRate"`
-	Provisional  bool   `json:"provisional"`
+	QueueType      string `json:"queueType"`
+	QueueLabel     string `json:"queueLabel"`
+	Tier           string `json:"tier,omitempty"`
+	Division       string `json:"division,omitempty"`
+	LeaguePoints   int    `json:"leaguePoints"`
+	Wins           int    `json:"wins"`
+	Losses         int    `json:"losses"`
+	WinRate        int    `json:"winRate"`
+	Provisional    bool   `json:"provisional"`
+	seasonFallback bool   // Internal provenance; never used as an LP baseline.
 }
 
 type gameplayHistoricalRank struct {
@@ -1258,16 +1272,25 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	namesCh := make(chan namesResult, 1)
 	seasonCh := make(chan seasonResult, 1)
 	go func() {
+		defer a.recoverPanic("gameplay.loadGameplayOverview.1")
+		defer close(queueCh)
+
 		started := time.Now()
 		value := loadQueueLabelsContext(ctx, client)
 		queueCh <- queueResult{value, started, time.Now()}
 	}()
 	go func() {
+		defer a.recoverPanic("gameplay.loadGameplayOverview.2")
+		defer close(namesCh)
+
 		started := time.Now()
 		value := a.overviewChampionNames(ctx)
 		namesCh <- namesResult{value, started, time.Now()}
 	}()
 	go func() {
+		defer a.recoverPanic("gameplay.loadGameplayOverview.3")
+		defer close(seasonCh)
+
 		started := time.Now()
 		stats, progress, ranked, byQueue := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
 		seasonCh <- seasonResult{stats, progress, ranked, byQueue, started, time.Now()}
@@ -1286,12 +1309,18 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	if begIndex == 0 && ctx.Err() == nil {
 		rankCh = make(chan rankResult, 1)
 		go func() {
+			defer a.recoverPanic("gameplay.loadGameplayOverview.4")
+			defer close(rankCh)
+
 			started := time.Now()
 			value := a.playerRankScore(ctx, client, playerRef, isCurrent, reference.ServerID, reference.Privacy)
 			rankCh <- rankResult{value: value, started: started, ended: time.Now()}
 		}()
 		masteryCh = make(chan masteryResult, 1)
 		go func() {
+			defer a.recoverPanic("gameplay.loadGameplayOverview.5")
+			defer close(masteryCh)
+
 			started := time.Now()
 			capability := EndpointCapability{Name: "champion-mastery", Path: "/lol-champion-mastery/v1/{player}/champion-mastery"}
 			value := map[int64]ChampionMastery{}
@@ -1319,6 +1348,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	if begIndex == 0 && ctx.Err() == nil {
 		rankedCh = make(chan recentRankedResult, 1)
 		go func() {
+			defer a.recoverPanic("gameplay.loadGameplayOverview.6")
+			defer close(rankedCh)
+
 			started := time.Now()
 			value := a.loadRecentRankedSamples(ctx, client, reference, playerRef, matchFilter, pagination, matches, names, queueLabels)
 			rankedCh <- recentRankedResult{value: value, started: started, ended: time.Now()}
@@ -1411,7 +1443,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	}
 	// 刷新 LP 追踪基线：下一场结算时据此计算胜点变化。
 	if isCurrent {
-		a.lpTracker.observe(playerRef, ranks)
+		a.lpTracker.observe(playerRef, ranks, rankCapability)
 	}
 	masteryResultValue := <-masteryCh
 	phases.markSpan("mastery", masteryResultValue.started, masteryResultValue.ended)
@@ -1536,10 +1568,13 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	response.Masteries = masteries
 	a.completeOverviewBackground(&response, playerRef)
 	response.Capabilities = capabilities
+	aggregationStarted := time.Now()
 	response.Overall = aggregateMatches(matches, playerRef, nil)
 	recentWindowAfter := time.Now().Add(-recentWindowDays * 24 * time.Hour).UnixMilli()
+	phases.markSpan("recent_players", aggregationStarted, time.Now())
 	rankedResult := <-rankedCh
 	phases.markSpan("recent_ranked", rankedResult.started, rankedResult.ended)
+	aggregationStarted = time.Now()
 	rankedSamples := rankedResult.value
 	rankedSampleMatches := append(append([]gameplayMatch(nil), rankedSamples.ByQueue[420]...), rankedSamples.ByQueue[440]...)
 	response.RecentRanked = recentRankedSummary(rankedSampleMatches, playerRef, nil)
@@ -1555,6 +1590,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	// “最近一起玩”需要每场的完整参与者名单，因此基于已读取的详情页
 	// 战绩统计，并限定在最近 30 天内。
 	response.RecentPlayers = recentPlayers(windowMatches, playerRef, recentWindowAfter)
+	phases.markSpan("recent_players", aggregationStarted, time.Now())
 	usableRecentMatches := 0
 	for _, match := range windowMatches {
 		if match.CreatedAt > 0 && match.CreatedAt < recentWindowAfter {
@@ -1580,7 +1616,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		}
 	}
 	a.recordDiagnostic(map[string]any{"event": "overview_loadout_shape", "matches": len(matches), "spell1_present": spell1Present, "spell2_present": spell2Present})
-	phases.mark("recent_players")
+	phases.advance()
 	a.publicizeOverviewReferences(&response)
 	return response
 }
@@ -1618,6 +1654,8 @@ func (a *app) loadRecentRankedSamples(ctx context.Context, client *LCUClient, re
 		queueID := queueID
 		group.Add(1)
 		go func() {
+			defer a.recoverPanic("gameplay.loadRecentRankedSamples.1")
+
 			defer group.Done()
 			queueResults <- queueResult{queueID: queueID, matches: a.loadRecentRankedSampleQueue(ctx, client, reference, playerRef, queueID, names, queueLabels, result.ByQueue[queueID])}
 		}()
@@ -2048,6 +2086,24 @@ func positionStatsGames(rows []gameplayPositionStat) int {
 func (a *app) overviewChampionNames(ctx context.Context) map[int64]string {
 	if a.riot == nil || a.riot.champions == nil {
 		return a.championNames()
+	}
+	if names := bundledChampionNames(); len(names) > 0 {
+		provider := a.riot.champions
+		provider.mu.Lock()
+		patch := provider.patch
+		if patch == "" || strings.HasPrefix(patch, "16.19.") {
+			for id, meta := range provider.championMeta {
+				if meta.NameZH != "" {
+					names[int64(id)] = meta.NameZH
+				}
+			}
+			provider.mu.Unlock()
+			for id, name := range a.championNames() {
+				names[id] = name
+			}
+			return names
+		}
+		provider.mu.Unlock()
 	}
 	boundedCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
 	defer cancel()
@@ -3197,6 +3253,7 @@ func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability En
 		if !ok || season.Games <= 0 {
 			continue
 		}
+		ranks[index].seasonFallback = true
 		ranks[index].Wins = season.Wins
 		ranks[index].Losses = season.Losses
 		ranks[index].WinRate = season.WinRate
@@ -3358,6 +3415,8 @@ func loadGameplayHistoryContext(ctx context.Context, client *LCUClient, playerRe
 		}
 		wait.Add(1)
 		go func(index int) {
+			defer recoverPanic("gameplay.loadGameplayHistoryContext.1")
+
 			defer wait.Done()
 			select {
 			case semaphore <- struct{}{}:
@@ -4134,6 +4193,7 @@ type gameplayRecommendationBundle struct {
 
 type gameplayRecommendationHero struct {
 	Tier          *int                            `json:"tier,omitempty"`
+	Grade         string                          `json:"grade,omitempty"`
 	WinRate       float64                         `json:"winRate,omitempty"`
 	PickRate      float64                         `json:"pickRate,omitempty"`
 	BanRate       float64                         `json:"banRate,omitempty"`
@@ -4243,10 +4303,13 @@ type gameplayRecommendationRune struct {
 	ChampionName         string                      `json:"championName,omitempty"`
 	PrimaryStyleID       int64                       `json:"primaryStyleId"`
 	SubStyleID           int64                       `json:"subStyleId"`
+	Spell1ID             int64                       `json:"spell1Id,omitempty"`
+	Spell2ID             int64                       `json:"spell2Id,omitempty"`
 	SelectedPerkIDs      []int64                     `json:"selectedPerkIds"`
 	StatModIDs           []int64                     `json:"statModIds,omitempty"`
 	ShardResolution      string                      `json:"shardResolution,omitempty"`
 	ItemIDs              []int64                     `json:"itemIds,omitempty"`
+	StarterItemIDs       []int64                     `json:"starterItemIds,omitempty"`
 	Stats                gameplayRecommendationStats `json:"stats"`
 	PlayerName           string                      `json:"playerName,omitempty"`
 	TagLine              string                      `json:"tagLine,omitempty"`
@@ -4275,6 +4338,8 @@ type gameplayRecommendationRune struct {
 	RecordPartial        bool                        `json:"recordPartial,omitempty"`
 	CacheReadAt          string                      `json:"cacheReadAt,omitempty"`
 	opponentPUUID        string
+	runeMatchID          string
+	runeParticipantID    int64
 }
 
 type gameplayRecommendationStats struct {
@@ -4446,17 +4511,15 @@ const gameplayTeamPortraitThresholdRatio = 1.0
 // gameplayRosterMatchupPhases 是允许消费「对面 5 人」的阶段白名单。
 //
 // Anti-scope 第 4 条：不在 ChampSelect 阶段展示「对面 5 人」相关的克制/协同，
-// 除非 R116-探测证实该阶段能拿到 theirTeam 非空数据。而 docs/r116-probe-findings.md
-// §4.4 的 lcu_champ_select_session_shape.their_team_length 判据**目前仍是「待填」**
-// （真机部分需要 Windows + 真实海斗对局，本轮无法执行），仓库里 theirTeam 的
-// fixture 无一例外是 []，docs 里零真实观测 → 按「未证实」处理，白名单里没有
-// ChampSelect。
+// 除非 R116-探测同时证实 their_team_length > 0 且
+// their_team_nonzero_counts.championId > 0（见 docs/r116-probe-findings.md §4.2）。
+// R153 两局真机样本的 their_team_length 均为 5，但 championId 非零计数均为 0；
+// 选人阶段仍看不到对方英雄，白名单里没有 ChampSelect。
 //
-// 真机证实 their_team_length > 0 之后，放开的位置就是这个白名单：加上
-// "ChampSelect" 即可，交集计算与前端渲染都不需要改（前端也只在 InProgress/
-// Reconnect 才下发 enemyChampionIds，两处都要放开，见 gameplay.js 的
+// 只有两个条件都由真机证实后，才可评估把 ChampSelect 加入白名单；前端
+// enemyChampionIds 的下发阶段也要同步核对（见 gameplay.js 的
 // ensureLiveRecommendations）。InProgress/Reconnect 的 10 人来自
-// session.GameData.TeamOne/TeamTwo，是既有能力，不受这条限制。
+// session.GameData.TeamOne/TeamTwo，是既有能力。
 var gameplayRosterMatchupPhases = []string{"InProgress", "Reconnect"}
 
 // gameplayTeamPortraitFields 是 P1-5 用到的 5 项 postmatch 指标，键名与上游字段名
@@ -5018,6 +5081,18 @@ func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Reque
 		detail.TopPlayers = nil
 	}
 	bundle := gameplayRecommendationsFromResolvedDetail(championID, strings.ToLower(position), detail, resolution)
+	if resolution.InternalMode == "arena" {
+		var listRow *championRankingRow
+		if rankings, rankingErr := provider.loadArenaRankings(ctx); rankingErr == nil {
+			for index := range rankings.Rows {
+				if rankings.Rows[index].ChampionID == int(championID) {
+					listRow = &rankings.Rows[index]
+					break
+				}
+			}
+		}
+		applyArenaRankingToRecommendation(&bundle, listRow)
+	}
 	bundle.TraceID = traceID
 	bundle.RecommendationKey = recommendationKey
 	bundle.RequestedPosition = requestedPosition
@@ -5235,6 +5310,87 @@ func (a *app) clearLivePositionSnapshot() {
 	a.livePositionMu.Unlock()
 }
 
+func (a *app) clearLiveAutofillSnapshot() {
+	if a == nil {
+		return
+	}
+	a.liveAutofillMu.Lock()
+	a.liveAutofillGameID = 0
+	a.liveAutofillByRef = nil
+	a.liveAutofillMu.Unlock()
+}
+
+func (a *app) rememberLiveAutofillSnapshot(gameID int64, players []gameplayLivePlayer) {
+	if a == nil {
+		return
+	}
+	if gameID <= 0 {
+		a.clearLiveAutofillSnapshot()
+		return
+	}
+	next := make(map[string]bool)
+	for _, player := range players {
+		// Only renderer-safe session aliases from our own champ-select team are retained.
+		if player.Autofill && strings.HasPrefix(player.PlayerRef, "player_") {
+			next[player.PlayerRef] = true
+		}
+	}
+	a.liveAutofillMu.Lock()
+	a.liveAutofillGameID = gameID
+	a.liveAutofillByRef = next
+	a.liveAutofillMu.Unlock()
+}
+
+func (a *app) applyLiveAutofillSnapshot(gameID int64, players []gameplayLivePlayer) {
+	if a == nil {
+		return
+	}
+	a.liveAutofillMu.Lock()
+	if gameID <= 0 || a.liveAutofillGameID != gameID {
+		a.liveAutofillGameID = 0
+		a.liveAutofillByRef = nil
+		a.liveAutofillMu.Unlock()
+		return
+	}
+	refs := make(map[string]bool, len(a.liveAutofillByRef))
+	for ref := range a.liveAutofillByRef {
+		refs[ref] = true
+	}
+	a.liveAutofillMu.Unlock()
+	for index := range players {
+		players[index].Autofill = refs[players[index].PlayerRef]
+	}
+}
+
+func (a *app) recordChampSelectAutofillShape(gameID int64, session lcuChampSelectSession) {
+	if a == nil {
+		return
+	}
+	allyTrue, enemyTrue, enemyPosition := 0, 0, 0
+	for _, player := range session.MyTeam {
+		if player.IsAutofilled {
+			allyTrue++
+		}
+	}
+	for _, player := range session.TheirTeam {
+		if player.IsAutofilled {
+			enemyTrue++
+		}
+		if strings.TrimSpace(player.AssignedPosition) != "" {
+			enemyPosition++
+		}
+	}
+	key := fmt.Sprintf("%d:%d:%d:%d:%d", gameID, len(session.MyTeam), allyTrue, enemyTrue, enemyPosition)
+	if !claimBoundedDiagnosticKey(&a.liveAutofillDiagnosticMu, &a.liveAutofillDiagnosticKeys, key, lcuSessionShapeDiagnosticLimit) {
+		return
+	}
+	a.recordDiagnostic(map[string]any{
+		"event": "champ_select_autofill_shape", "ally_count": len(session.MyTeam),
+		"ally_autofilled_count": allyTrue, "enemy_autofilled_count": enemyTrue,
+		"enemy_assigned_position_count": enemyPosition,
+	})
+}
+
 func (a *app) rememberLivePositionSnapshot(gameID int64, players []gameplayLivePlayer) {
 	if a == nil || gameID <= 0 {
 		return
@@ -5292,6 +5448,7 @@ func (a *app) applyLivePositionSnapshot(gameID int64, players []gameplayLivePlay
 	for index := range players {
 		if position := positions[players[index].PlayerRef]; position != "" {
 			players[index].Position = position
+			players[index].positionSource = "snapshot"
 			stats.AppliedCount++
 		}
 	}
@@ -5338,6 +5495,7 @@ func livePositionShapeDiagnostic(response gameplayLiveResponse, session lcuGamef
 			smiteCount++
 		}
 	}
+	positionSources, duplicatePositions := liveFinalPositionShape(response.Players)
 	positionSwapKeys := map[string]struct{}{}
 	for _, swap := range champSelect.PositionSwaps {
 		for key := range swap {
@@ -5354,6 +5512,7 @@ func livePositionShapeDiagnostic(response gameplayLiveResponse, session lcuGamef
 		"game_mode": response.GameMode, "game_id": response.GameID,
 		"selected_position_counts": selectedPositions, "selected_role_counts": selectedRoles,
 		"assigned_position_counts": assignedPositions, "normalized_position_counts": normalizedPositions,
+		"position_source_counts": positionSources, "team_duplicate_positions": duplicatePositions,
 		"smite_count": smiteCount, "self_selected_position": selfSelected, "self_assigned_position": selfAssigned,
 		"position_swaps_length": len(champSelect.PositionSwaps), "position_swaps_element_keys": keys,
 		"snapshot_game_id": snapshot.GameID, "snapshot_size": snapshot.Size, "snapshot_applied_count": snapshot.AppliedCount,
@@ -5409,6 +5568,7 @@ type liveClientItem struct {
 type liveClientSnapshot struct {
 	Grouping           liveClientArenaGrouping
 	OrderedIdentities  [][]string
+	RosterPlayers      []liveClientRosterPlayer
 	PositionByIdentity map[string]string
 	// R116-D P1-4 阶段一：每个身份键 → 该玩家已出装备。
 	// 身份匹配复用 liveClientEntryIdentityKeys，与 PositionByIdentity 同一套。
@@ -5424,6 +5584,14 @@ type liveClientSnapshot struct {
 	// 和「上游没给字段」在日志里长得一模一样。
 	ItemElementsSeen    int
 	ItemElementsSkipped int
+}
+
+type liveClientRosterPlayer struct {
+	GameName     string
+	TagLine      string
+	Team         string
+	Position     string
+	ChampionName string
 }
 
 type liveClientProbeState struct {
@@ -5740,6 +5908,19 @@ func parseLiveClientPlayerList(raw []byte, sizes ...int) (liveClientSnapshot, li
 	for _, entry := range entries {
 		identities := liveClientEntryIdentityKeys(entry)
 		snapshot.OrderedIdentities = append(snapshot.OrderedIdentities, identities)
+		rosterPlayer := liveClientRosterPlayer{}
+		rosterPlayer.GameName, _ = liveClientMapValueString(entry, "riotIdGameName")
+		rosterPlayer.TagLine, _ = liveClientMapValueString(entry, "riotIdTagLine")
+		if rosterPlayer.GameName == "" || rosterPlayer.TagLine == "" {
+			if riotID, ok := liveClientMapValueString(entry, "riotId"); ok {
+				if gameName, tagLine, found := strings.Cut(riotID, "#"); found && strings.TrimSpace(gameName) != "" && strings.TrimSpace(tagLine) != "" {
+					rosterPlayer.GameName, rosterPlayer.TagLine = strings.TrimSpace(gameName), strings.TrimSpace(tagLine)
+				}
+			}
+		}
+		rosterPlayer.Team, _ = liveClientMapValueString(entry, "team")
+		rosterPlayer.ChampionName, _ = liveClientMapValueString(entry, "championName")
+		snapshot.RosterPlayers = append(snapshot.RosterPlayers, rosterPlayer)
 		// R116-D P1-4 阶段一：读 items。必须放在 position 的 continue 之前——
 		// 海斗的 position 实测恒为 "OTHER"（docs/r116-probe-findings.md §1.5 的
 		// 斗魂基线是 position_values:{"OTHER":18}），normalizePosition 会把它
@@ -5761,6 +5942,7 @@ func parseLiveClientPlayerList(raw []byte, sizes ...int) (liveClientSnapshot, li
 		value, _ := liveClientMapValue(entry, "position")
 		position, _ := value.(string)
 		position = normalizePosition(position, "")
+		snapshot.RosterPlayers[len(snapshot.RosterPlayers)-1].Position = position
 		shape.PositionValues[position]++
 		if position == "" {
 			continue
@@ -5932,6 +6114,7 @@ func cloneLiveClientArenaGrouping(grouping liveClientArenaGrouping) liveClientAr
 
 func cloneLiveClientSnapshot(snapshot liveClientSnapshot) liveClientSnapshot {
 	cloned := liveClientSnapshot{Grouping: cloneLiveClientArenaGrouping(snapshot.Grouping), PositionByIdentity: maps.Clone(snapshot.PositionByIdentity)}
+	cloned.RosterPlayers = append([]liveClientRosterPlayer(nil), snapshot.RosterPlayers...)
 	for _, keys := range snapshot.OrderedIdentities {
 		cloned.OrderedIdentities = append(cloned.OrderedIdentities, append([]string(nil), keys...))
 	}
@@ -6016,6 +6199,11 @@ func (a *app) liveClientSnapshotForGame(ctx context.Context, gameID int64, phase
 		result = "ungrouped"
 	}
 	usable := shape.Grouped || len(snapshot.PositionByIdentity) > 0
+	if len(queues) > 0 && liveTenPlayerRosterQueue(queues[0]) {
+		// ARAM positions are OTHER, so identity-based position keys can be absent
+		// even when its playerlist is complete. Keep probing until all ten arrive.
+		usable = shape.PlayerCount == 10
+	}
 	if expectedArenaPlayers > 0 {
 		usable = shape.PlayerCount >= expectedArenaPlayers
 	}
@@ -6741,6 +6929,22 @@ func gameplayRecommendationsFromChampionDetail(championID int64, position string
 	return result
 }
 
+// applyArenaRankingToRecommendation makes the live Arena hero header use the
+// same YOUR.GG row as the left ranking. Missing rows hide the grade and all
+// hero-level statistics rather than substituting OP.GG's different sample.
+func applyArenaRankingToRecommendation(bundle *gameplayRecommendationBundle, row *championRankingRow) {
+	if bundle == nil {
+		return
+	}
+	bundle.Hero = gameplayRecommendationHero{EmptyReason: "该英雄暂无斗魂榜单样本"}
+	if row == nil {
+		return
+	}
+	bundle.Hero = gameplayRecommendationHero{
+		Grade: row.Grade, WinRate: row.WinRate, BanRate: row.BanRate,
+	}
+}
+
 // gameplayAugmentRowsWithoutStages 复制海克斯行并清掉 Stages（R116-B 独立评审
 // 整改 B5）。stages 是英雄详情页「阶段筛选」chips 的数据源，一条 augment 带 4 条
 // 阶段行，实测英雄 157 是 97 KB/英雄；而对局内推荐页（backend/web/gameplay.js）
@@ -6766,7 +6970,17 @@ func gameplayRecommendationsFromResolvedDetail(championID int64, position string
 	hasTopPlayers := recommendationModeHasTopPlayers(resolution)
 	heroStats := detail.Stats
 	if detail.Mode == "arena" {
-		heroStats = championDetailStats{Tier: detail.ArenaStats.Tier, WinRate: detail.ArenaStats.WinRate, PickRate: detail.ArenaStats.PickRate, BanRate: detail.ArenaStats.BanRate}
+		// Arena hero statistics are filled from the YOUR.GG ranking row by the
+		// handler. Never fall back to the differently sampled OP.GG detail.
+		heroStats = championDetailStats{}
+	}
+	if detail.Mode != "arena" && heroStats.Grade == "" {
+		for _, option := range detail.Positions {
+			if option.Position == position {
+				heroStats.Grade = option.Grade
+				break
+			}
+		}
 	}
 	emptyReason := ""
 	if heroStats.WinRate <= 0 && heroStats.PickRate <= 0 && heroStats.BanRate <= 0 {
@@ -6778,7 +6992,7 @@ func gameplayRecommendationsFromResolvedDetail(championID int64, position string
 		HasRunes: spec.HasRunes, HasAugments: spec.HasAugments, HasCounters: spec.HasCounters, HasBanRate: spec.HasBanRate, HasTopPlayers: hasTopPlayers, HasItemDepths: spec.SupportsItemDepths,
 		Citation: detail.Citation, MeasurementTechnique: detail.MeasurementTechnique,
 		Positions: append([]championPositionOption(nil), detail.Positions...), ResolvedPosition: position,
-		Hero:     gameplayRecommendationHero{Tier: heroStats.Tier, WinRate: heroStats.WinRate, PickRate: heroStats.PickRate, BanRate: heroStats.BanRate, EmptyReason: emptyReason},
+		Hero:     gameplayRecommendationHero{Tier: heroStats.Tier, Grade: heroStats.Grade, WinRate: heroStats.WinRate, PickRate: heroStats.PickRate, BanRate: heroStats.BanRate, EmptyReason: emptyReason},
 		Runes:    gameplayRecommendationRunes{OPGG: []gameplayRecommendationRune{}, Specialists: []gameplayRecommendationRune{}, Pros: []gameplayRecommendationRune{}},
 		Build:    gameplayRecommendationBuild{Position: position, SpellOptions: []gameplayRecommendationOption{}, StarterOptions: []gameplayRecommendationOption{}, BootOptions: []gameplayRecommendationOption{}, CoreOptions: []gameplayRecommendationOption{}},
 		Augments: []championMetricRow{},
@@ -6886,6 +7100,7 @@ func recommendationStats(pickRate, winRate float64, games int) gameplayRecommend
 
 type gameplayLivePlayer struct {
 	gameplayPlayer
+	IdentityUnresolved   bool   `json:"identityUnresolved,omitempty"`
 	TeamID               int64  `json:"teamId"`
 	ArenaGroup           string `json:"arenaGroup,omitempty"`
 	MySquad              bool   `json:"mySquad,omitempty"`
@@ -6896,12 +7111,13 @@ type gameplayLivePlayer struct {
 	IsAlly               bool   `json:"isAlly,omitempty"`
 	// ChampionID is the locked champion. During champion select the client can
 	// expose a separate pick intent before the player locks it in.
-	ChampionID          int64                  `json:"championId,omitempty"`
-	ChampionPickIntent  int64                  `json:"championPickIntent,omitempty"`
-	ChampionPickPending bool                   `json:"championPickPending,omitempty"`
-	ChampionLocked      bool                   `json:"championLocked"`
-	ChampionName        string                 `json:"championName,omitempty"`
-	Position            string                 `json:"position,omitempty"`
+	ChampionID          int64  `json:"championId,omitempty"`
+	ChampionPickIntent  int64  `json:"championPickIntent,omitempty"`
+	ChampionPickPending bool   `json:"championPickPending,omitempty"`
+	ChampionLocked      bool   `json:"championLocked"`
+	ChampionName        string `json:"championName,omitempty"`
+	Position            string `json:"position,omitempty"`
+	positionSource      string
 	Spell1ID            int64                  `json:"spell1Id,omitempty"`
 	Spell2ID            int64                  `json:"spell2Id,omitempty"`
 	Rank                *gameplayRank          `json:"rank,omitempty"`
@@ -6910,6 +7126,12 @@ type gameplayLivePlayer struct {
 	RecentGames         []gameplayRecentGame   `json:"recentGames,omitempty"`
 	RecentRankedRecord  *gameplayRecentRecord  `json:"recentRankedRecord,omitempty"`
 	RecentPositions     []gameplayPositionStat `json:"recentPositions,omitempty"`
+}
+
+func livePlayerIdentityFlags(visibility, gameName, displayName string) (hidden, unresolved bool) {
+	hidden = strings.EqualFold(strings.TrimSpace(visibility), "HIDDEN")
+	unresolved = !hidden && strings.TrimSpace(gameName) == "" && strings.TrimSpace(displayName) == ""
+	return hidden, unresolved
 }
 
 // gameplayRecentGame 是对局页“详情”页签使用的单场极简摘要，
@@ -6948,26 +7170,49 @@ func recentRankedRecord(games []gameplayRecentGame) *gameplayRecentRecord {
 	return record
 }
 
-func recentGamesFromMatches(matches []gameplayMatch, playerRef string, limit int, queueID int64) []gameplayRecentGame {
-	result := make([]gameplayRecentGame, 0, limit)
-	for _, match := range matches {
+func recentMatchSubject(match gameplayMatch, playerRef string) *gameplayParticipant {
+	var subject *gameplayParticipant
+	for index := range match.Participants {
+		participant := &match.Participants[index]
+		if match.SubjectParticipantID > 0 && participant.ParticipantID == match.SubjectParticipantID {
+			return participant
+		}
+		if playerRef != "" && participant.PlayerRef == playerRef {
+			subject = participant
+		}
+	}
+	return subject
+}
+
+func recentMatchesForPlayer(matches []gameplayMatch, playerRef string, limit int, queueID int64) []gameplayMatch {
+	if limit <= 0 {
+		return nil
+	}
+	ordered := append([]gameplayMatch(nil), matches...)
+	sort.SliceStable(ordered, func(i, j int) bool { return ordered[i].CreatedAt > ordered[j].CreatedAt })
+	result := make([]gameplayMatch, 0, limit)
+	for _, match := range ordered {
 		if match.Result != "win" && match.Result != "loss" {
 			continue
 		}
 		if queueID > 0 && match.QueueID != queueID {
 			continue
 		}
-		var subject *gameplayParticipant
-		for index := range match.Participants {
-			participant := &match.Participants[index]
-			if match.SubjectParticipantID > 0 && participant.ParticipantID == match.SubjectParticipantID {
-				subject = participant
-				break
-			}
-			if playerRef != "" && participant.PlayerRef == playerRef {
-				subject = participant
-			}
+		if recentMatchSubject(match, playerRef) == nil {
+			continue
 		}
+		result = append(result, match)
+		if len(result) == limit {
+			break
+		}
+	}
+	return result
+}
+
+func recentGamesFromSelectedMatches(matches []gameplayMatch, playerRef string) []gameplayRecentGame {
+	result := make([]gameplayRecentGame, 0, len(matches))
+	for _, match := range matches {
+		subject := recentMatchSubject(match, playerRef)
 		if subject == nil {
 			continue
 		}
@@ -6976,11 +7221,17 @@ func recentGamesFromMatches(matches []gameplayMatch, playerRef string, limit int
 			Win: match.Result == "win", Kills: subject.Kills, Deaths: subject.Deaths, Assists: subject.Assists,
 			CS: subject.CS, QueueLabel: match.QueueLabel, CreatedAt: match.CreatedAt,
 		})
-		if len(result) == limit {
-			break
-		}
 	}
 	return result
+}
+
+func recentGamesFromMatches(matches []gameplayMatch, playerRef string, limit int, queueID int64) []gameplayRecentGame {
+	return recentGamesFromSelectedMatches(recentMatchesForPlayer(matches, playerRef, limit, queueID), playerRef)
+}
+
+func liveRecentPlayerStats(matches []gameplayMatch, playerRef string, queueID int64) (gameplayAggregate, []gameplayRecentGame) {
+	recentMatches := recentMatchesForPlayer(matches, playerRef, 10, queueID)
+	return aggregateMatches(recentMatches, playerRef, nil), recentGamesFromSelectedMatches(recentMatches, playerRef)
 }
 
 type gameplayRecommendation struct {
@@ -7046,6 +7297,7 @@ type lcuLivePlayer struct {
 	Spell1ID             int64  `json:"spell1Id"`
 	Spell2ID             int64  `json:"spell2Id"`
 	TeamParticipantID    int64  `json:"teamParticipantId"`
+	IsAutofilled         bool   `json:"-"`
 }
 
 type lcuChampSelectSession struct {
@@ -7084,7 +7336,12 @@ type lcuChampSelectAction struct {
 	Type         string `json:"type"`
 }
 
+type lcuLobbyMember struct {
+	PUUID string `json:"puuid"`
+}
+
 type lcuLobby struct {
+	Members    []lcuLobbyMember `json:"members"`
 	GameConfig struct {
 		QueueID  int64  `json:"queueId"`
 		MapID    int64  `json:"mapId"`
@@ -7100,6 +7357,7 @@ type lcuChampSelectPlayer struct {
 	// Arena squads therefore cannot be recovered during champion select; the
 	// established client projects cannot recover them either. Do not retry.
 	AssignedPosition     string `json:"assignedPosition"`
+	IsAutofilled         bool   `json:"isAutofilled"`
 	CellID               *int64 `json:"cellId"`
 	ChampionID           int64  `json:"championId"`
 	ChampionPickIntent   int64  `json:"championPickIntent"`
@@ -7183,9 +7441,13 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		a.clearArenaAllies()
 		a.clearLiveClientProbe()
 		a.clearLivePositionSnapshot()
+		a.clearLiveAutofillSnapshot()
+		a.clearLiveHistoryFreshness()
+		a.clearLiveRosterRecovery()
 		return response
 	}
 	if phase == "ChampSelect" {
+		a.clearLiveRosterRecovery()
 		a.clearLiveClientProbe()
 	}
 	var session lcuGameflowSession
@@ -7252,12 +7514,14 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	mergeAppended := 0
 	var localPlayerCellID *int64
 	var champSelect lcuChampSelectSession
+	var lobbyMembers []lcuLobbyMember
 	if phase == "ChampSelect" {
 		champSelectRaw, champSelectErr := client.GetBytesContext(ctx, "/lol-champ-select/v1/session")
 		if champSelectErr == nil {
 			champSelectErr = json.Unmarshal(champSelectRaw, &champSelect)
 		}
 		if champSelectErr == nil {
+			a.recordChampSelectAutofillShape(champSelect.GameID, champSelect)
 			localPlayerCellID = champSelect.LocalPlayerCellID
 			beforeMerge := len(rawPlayers)
 			rawPlayers = mergeChampSelectPlayers(rawPlayers, champSelect, response.RawCount)
@@ -7269,9 +7533,10 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			if response.QueueID == 0 {
 				response.QueueID = champSelect.QueueID
 			}
-			if response.QueueID == 0 || response.MapID == 0 || response.GameMode == "" {
+			{
 				var lobby lcuLobby
-				if err := client.GetJSON("/lol-lobby/v2/lobby", &lobby); err == nil {
+				if err := client.RequestJSON(ctx, http.MethodGet, "/lol-lobby/v2/lobby", nil, &lobby); err == nil {
+					lobbyMembers = lobby.Members
 					if response.QueueID == 0 {
 						response.QueueID = lobby.GameConfig.QueueID
 					}
@@ -7282,7 +7547,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 						response.GameMode = lobby.GameConfig.GameMode
 					}
 					response.Capabilities = append(response.Capabilities, EndpointCapability{Name: "lobby", Path: "/lol-lobby/v2/lobby", State: capabilityAvailable, Count: 1})
-				} else {
+				} else if response.QueueID == 0 || response.MapID == 0 || response.GameMode == "" {
 					response.Capabilities = append(response.Capabilities, gameplayCapabilityError("lobby", "/lol-lobby/v2/lobby", err))
 				}
 			}
@@ -7330,6 +7595,12 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		return response
 	}
 	response.Available = true
+	arenaMode := isArenaChampSelectMode(response.GameMode)
+	aramMode := isARAMFamilyGameMode(response.GameMode)
+	switch queueModeGroupFor(response.QueueID, response.GameMode, response.MapID) {
+	case "aram", "hextech-aram", "hextech-classic":
+		aramMode = true
+	}
 	// Begin recommendations before the ten-player identity/history fan-out.
 	seed := liveRecommendationSeed{ChampionID: response.CurrentChampionID, QueueID: response.QueueID, MapID: response.MapID, GameMode: response.GameMode}
 	for _, raw := range rawPlayers {
@@ -7338,17 +7609,14 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			if seed.ChampionID <= 0 {
 				seed.ChampionID = raw.player.ChampionID
 			}
-			seed.Position = normalizePosition(raw.player.SelectedPosition, raw.player.SelectedRole)
+			seed.Position = normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole)
+			if (aramMode || arenaMode) && seed.Position == "" && normalizePosition(raw.player.SelectedPosition, raw.player.SelectedRole) == "other" {
+				seed.Position = "other"
+			}
 			break
 		}
 	}
 	a.liveRecommendationPrewarmer.warm(seed)
-	arenaMode := isArenaChampSelectMode(response.GameMode)
-	aramMode := isARAMFamilyGameMode(response.GameMode)
-	switch queueModeGroupFor(response.QueueID, response.GameMode, response.MapID) {
-	case "aram", "hextech-aram", "hextech-classic":
-		aramMode = true
-	}
 	if arenaMode {
 		a.noteArenaPhaseRoster(client, &response)
 	}
@@ -7358,7 +7626,6 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	if staleAllies {
 		a.clearArenaAllies()
 	}
-	liveClientPositions := make([]string, len(rawPlayers))
 	var liveClientSnapshotValue liveClientSnapshot
 	if phase == "InProgress" || phase == "Reconnect" {
 		expectedArenaPlayers := 0
@@ -7368,7 +7635,19 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		liveClientSnapshotValue, _ = a.liveClientSnapshotForGame(ctx, response.GameID, phase, expectedArenaPlayers, response.QueueID)
 	}
 
+	if phase == "InProgress" || phase == "Reconnect" || phase == "GameStart" {
+		a.prepareLiveRosterRecovery(client, response.GameID)
+	}
+	a.observeLiveHistoryGame(client, phase, response.GameID, response.QueueID)
+	freshness := a.liveHistoryFreshnessForGame(client, response.GameID, response.QueueID)
 	names := a.overviewChampionNames(ctx)
+	recoveredPositionStart := len(rawPlayers)
+	if (phase == "InProgress" || phase == "Reconnect") && liveTenPlayerRosterQueue(response.QueueID) && len(rawPlayers) < 10 {
+		var appended int
+		rawPlayers, appended, _, _ = a.recoverClassicLiveRoster(ctx, client, current, rawPlayers, liveClientSnapshotValue, names, liveAnonymousRosterQueue(response.QueueID), liveRosterRecoveryScope{response.GameID, response.QueueID, phase, response.RawCount})
+		response.MergeAppended += appended
+	}
+	liveClientPositions := make([]string, len(rawPlayers))
 	response.Players = make([]gameplayLivePlayer, len(rawPlayers))
 	premadeInputs := make([]livePremadeInput, len(rawPlayers))
 	ranksFinishedAt := make([]time.Time, len(rawPlayers))
@@ -7380,9 +7659,12 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		concurrency = a.liveRosterConcurrencyOverride
 	}
 	semaphore := make(chan struct{}, concurrency)
+	historyResults := make([]livePlayerMatchesResult, len(rawPlayers))
 	for index := range rawPlayers {
 		wait.Add(1)
 		go func(index int) {
+			defer a.recoverPanic("gameplay.loadGameplayLive.1")
+
 			defer wait.Done()
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
@@ -7402,6 +7684,11 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			playerRef := reference.PlayerRef
 			validRef := validPlayerReference(playerRef)
 			isCurrent := gameplayLivePlayerIsCurrent(reference, current.PUUID, raw.player.CellID, localPlayerCellID)
+			if isCurrent && validPlayerReference(current.PUUID) {
+				playerRef = current.PUUID
+				reference.PlayerRef = playerRef
+				validRef = true
+			}
 			isAlly := isCurrent || (arenaMode && (phase == "ChampSelect" || a.isRememberedArenaAlly(raw.player)))
 			var ranks []gameplayRank
 			var matches []gameplayMatch
@@ -7412,6 +7699,8 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 				var enrichment sync.WaitGroup
 				enrichment.Add(2)
 				go func() {
+					defer a.recoverPanic("gameplay.loadGameplayLive.2")
+
 					defer enrichment.Done()
 					if aramMode {
 						return // ARAM details do not display ranked tiers.
@@ -7420,8 +7709,11 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 					ranksFinishedAt[index] = time.Now()
 				}()
 				go func() {
+					defer a.recoverPanic("gameplay.loadGameplayLive.3")
+
 					defer enrichment.Done()
-					historyResult = a.livePlayerMatches(ctx, client, reference, playerRef, isCurrent, names)
+					historyResult = a.livePlayerMatchesForGame(ctx, client, reference, playerRef, isCurrent, names, freshness, raw.team, -1)
+					historyResults[index] = historyResult
 					matches = historyResult.Matches
 					matchesFinishedAt[index] = time.Now()
 				}()
@@ -7438,8 +7730,8 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 					break
 				}
 			}
-			modeStats := aggregateMatches(matches, playerRef, func(match gameplayMatch) bool { return response.QueueID == 0 || match.QueueID == response.QueueID })
-			hidden := strings.EqualFold(raw.player.NameVisibilityType, "HIDDEN") || (strings.TrimSpace(summoner.GameName) == "" && strings.TrimSpace(summoner.DisplayName) == "")
+			modeStats, recentGames := liveRecentPlayerStats(matches, playerRef, response.QueueID)
+			hidden, identityUnresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
 			displayChampionID := raw.player.ChampionID
 			if displayChampionID <= 0 {
 				displayChampionID = raw.player.ChampionPickIntent
@@ -7448,16 +7740,32 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 				displayChampionID = -3
 			}
 			locked := raw.player.ChampionLocked || raw.player.ChampionID > 0
-			recentGames := recentGamesFromMatches(matches, playerRef, 8, response.QueueID)
 			var rankedRecord *gameplayRecentRecord
 			if response.QueueID == 420 || response.QueueID == 440 {
 				rankedRecord = recentRankedRecord(recentGames)
 			}
-			response.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: playerRef, DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Hidden: hidden, IsCurrent: isCurrent, reference: reference}, TeamID: raw.team, IsAlly: isAlly, ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionPickPending: raw.player.ChampionPickPending || raw.player.ChampionPickIntent < 0, ChampionLocked: locked, ChampionName: championName(names, displayChampionID), Position: normalizePosition(raw.player.SelectedPosition, raw.player.SelectedRole), Spell1ID: raw.player.Spell1ID, Spell2ID: raw.player.Spell2ID, Rank: rank, ModeStats: modeStats, HistoryState: liveHistoryState(validRef, historyResult), RecentGames: recentGames, RecentRankedRecord: rankedRecord, RecentPositions: liveRecentPositions(matches, playerRef, response.QueueID)}
+			response.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: playerRef, DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Hidden: hidden, PrivateHistory: strings.EqualFold(strings.TrimSpace(summoner.Privacy), "PRIVATE"), Autofill: raw.player.IsAutofilled, IsCurrent: isCurrent, reference: reference}, IdentityUnresolved: identityUnresolved, TeamID: raw.team, IsAlly: isAlly, ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionPickPending: raw.player.ChampionPickPending || raw.player.ChampionPickIntent < 0, ChampionLocked: locked, ChampionName: championName(names, displayChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), Spell1ID: raw.player.Spell1ID, Spell2ID: raw.player.Spell2ID, Rank: rank, ModeStats: modeStats, HistoryState: liveHistoryState(validRef, historyResult), RecentGames: recentGames, RecentRankedRecord: rankedRecord, RecentPositions: liveRecentPositions(matches, playerRef, response.QueueID)}
+			if aramMode || arenaMode {
+				// Unknown non-lane modes have historically rendered "other".
+				if response.Players[index].Position == "" && normalizePosition(raw.player.SelectedPosition, raw.player.SelectedRole) == "other" {
+					response.Players[index].Position = "other"
+				}
+			}
+			if response.Players[index].Position != "" {
+				response.Players[index].positionSource = "gameflow"
+				if index >= recoveredPositionStart {
+					response.Players[index].positionSource = "liveclient"
+				}
+			}
+
 			premadeInputs[index] = livePremadeInput{TeamID: raw.team, TeamParticipantID: raw.player.TeamParticipantID, Matches: cloneGameplayMatches(matches)}
 		}(index)
 	}
 	wait.Wait()
+	historyByRef := make(map[string]livePlayerMatchesResult, len(historyResults))
+	for index, player := range response.Players {
+		historyByRef[player.reference.PlayerRef] = historyResults[index]
+	}
 	phaseMilliseconds := func(finished []time.Time) int64 {
 		var latest time.Time
 		for _, value := range finished {
@@ -7500,7 +7808,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		response.ArenaMySquadNotice = arenaChampSelectNotice
 		a.markRememberedArenaSquad(&response)
 	}
-	applyLivePremadeAssignments(response.Players, premadeInputs, phase, arenaMode)
+	a.applyLivePremades(response.GameID, response.Players, premadeInputs, phase, arenaMode, lobbyMembers)
 	if arenaMode && (phase == "GameStart" || phase == "InProgress" || phase == "Reconnect") {
 		sessionPlayers := make([]lcuLivePlayer, len(rawPlayers))
 		for i := range rawPlayers {
@@ -7510,7 +7818,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		a.compareArenaChampOrder(client, &response, sessionPlayers, liveClientSnapshotValue)
 		a.recordArenaMissingSession(current, &response, liveClientSnapshotValue)
 		a.applyArenaLiveGrouping(client, current, &response, sessionPlayers, liveClientSnapshotValue)
-		go a.sampleArenaAllGameData(ctx, response.GameID)
+		a.goSafe("gameplay.loadGameplayLive.4", func() { a.sampleArenaAllGameData(ctx, response.GameID) })
 	}
 	// R116-探测（一次性侦察，工单 P1 第 1 条）：海斗（KIWI/ARAM_MAYHEM）此前不满足上面的
 	// arenaMode 条件，live_client_allgamedata_shape 在海斗下从未被观测过。这里只把既有诊断
@@ -7528,19 +7836,54 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	snapshotStats := livePositionSnapshotStats{}
 	if phase == "ChampSelect" {
 		a.rememberLivePositionSnapshot(response.GameID, response.Players)
+		a.rememberLiveAutofillSnapshot(response.GameID, response.Players)
 		snapshotStats = a.livePositionSnapshotStats()
 	} else if phase == "InProgress" || phase == "Reconnect" {
 		snapshotStats = a.applyLivePositionSnapshot(response.GameID, response.Players)
+		a.applyLiveAutofillSnapshot(response.GameID, response.Players)
 		// Position source priority is deliberate: Live Client Data is the only
 		// in-game source covering self, allies, and opponents. Champ-select's
 		// snapshot remains the fallback, followed by gameflow selectedPosition.
 		for index, position := range liveClientPositions {
 			if position != "" {
 				response.Players[index].Position = position
+				response.Players[index].positionSource = "liveclient"
 			}
 		}
 	}
+	if !aramMode && !arenaMode && (response.MapID == 11 || response.GameMode == "CLASSIC") && (phase == "InProgress" || phase == "Reconnect") && len(response.Players) > 0 {
+		positionsReady := true
+		for _, player := range response.Players {
+			if player.positionSource != "liveclient" || !isStandardLivePosition(player.Position) {
+				positionsReady = false
+				break
+			}
+		}
+		if !positionsReady {
+			response.Capabilities = append(response.Capabilities, EndpointCapability{Name: "live-client-positions", Path: "/liveclientdata/playerlist", State: capabilityPending})
+			// A ten-player playerlist can arrive before its position fields. Do
+			// not keep such a partial successful probe for the rest of the game.
+			a.liveClientProbeMu.Lock()
+			if a.liveClientProbe.GameID == response.GameID {
+				a.liveClientProbe.Succeeded = false
+			}
+			a.liveClientProbeMu.Unlock()
+		}
+	}
 	response.Capabilities = append(response.Capabilities, EndpointCapability{Name: "live-player-analysis", Path: "本机召唤师、排位与战绩接口", State: capabilityAvailable, Count: len(response.Players)})
+	slots := liveHistoryRosterSlots(response.Players, !aramMode && !arenaMode && (response.MapID == 11 || response.GameMode == "CLASSIC"))
+	for index, player := range response.Players {
+		ref := player.reference.PlayerRef
+		if validPlayerReference(ref) {
+			loaded, queried := historyByRef[ref]
+			if !queried {
+				// Arena can append a corroborated squad member after enrichment.
+				// Report the absence of a read without fabricating a history window.
+				loaded = livePlayerMatchesResult{State: player.HistoryState, Source: "none"}
+			}
+			a.recordLiveHistoryFreshness(loaded, ref, player.IsCurrent, freshness, player.TeamID, slots[index])
+		}
+	}
 	a.recordLiveRosterShape(response)
 	a.recordDiagnostic(livePositionShapeDiagnostic(response, session, champSelect, current, snapshotStats))
 	recommendationChampionID, recommendationPosition := gameplayLiveRecommendationTargetWithChampSelect(response.Players, response.CurrentChampionID, champSelect)
@@ -7552,10 +7895,14 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		var recommendationWait sync.WaitGroup
 		recommendationWait.Add(2)
 		go func() {
+			defer a.recoverPanic("gameplay.loadGameplayLive.5")
+
 			defer recommendationWait.Done()
 			recommendation, recommendationErr = loadClientRecommendation(client, recommendationChampionID, recommendationPosition, response.MapID)
 		}()
 		go func() {
+			defer a.recoverPanic("gameplay.loadGameplayLive.6")
+
 			defer recommendationWait.Done()
 			abilities, abilitiesErr = a.loadChampionAbilitiesWithFallback(ctx, client, recommendationChampionID)
 		}()
@@ -7812,18 +8159,24 @@ func livePremadeAssignments(inputs []livePremadeInput, threshold int) []livePrem
 type livePlayerMatchesCacheEntry struct {
 	Matches   []gameplayMatch
 	State     string
+	Source    string
+	Evidence  *liveHistoryEvidence
 	FetchedAt time.Time
 }
 
 type livePlayerMatchesFlight struct {
-	Done    chan struct{}
-	Matches []gameplayMatch
-	State   string
+	Done     chan struct{}
+	Matches  []gameplayMatch
+	State    string
+	Source   string
+	Evidence *liveHistoryEvidence
 }
 
 type livePlayerMatchesResult struct {
-	Matches []gameplayMatch
-	State   string
+	Matches  []gameplayMatch
+	State    string
+	Source   string
+	Evidence *liveHistoryEvidence
 }
 
 func liveHistoryState(validRef bool, result livePlayerMatchesResult) string {
@@ -7851,7 +8204,7 @@ func (a *app) cachedLivePlayerMatches(ctx context.Context, key string, loader fu
 				a.livePlayerMatchOrder.MoveToFront(element)
 			}
 			a.livePlayerMatchesMu.Unlock()
-			return livePlayerMatchesResult{Matches: cloneGameplayMatches(cached.Matches), State: cached.State}
+			return livePlayerMatchesResult{Matches: cloneGameplayMatches(cached.Matches), State: cached.State, Source: cached.Source, Evidence: cached.Evidence}
 		}
 		delete(a.livePlayerMatchCache, key)
 		if element := a.livePlayerMatchEntries[key]; element != nil {
@@ -7865,7 +8218,7 @@ func (a *app) cachedLivePlayerMatches(ctx context.Context, key string, loader fu
 		case <-ctx.Done():
 			return livePlayerMatchesResult{State: "failed"}
 		case <-flight.Done:
-			return livePlayerMatchesResult{Matches: cloneGameplayMatches(flight.Matches), State: flight.State}
+			return livePlayerMatchesResult{Matches: cloneGameplayMatches(flight.Matches), State: flight.State, Source: flight.Source, Evidence: flight.Evidence}
 		}
 	}
 	if a.livePlayerMatchCache == nil {
@@ -7884,7 +8237,7 @@ func (a *app) cachedLivePlayerMatches(ctx context.Context, key string, loader fu
 	// A transient failure is not evidence of an empty history and must not poison
 	// subsequent refreshes for the full cache TTL.
 	if loaded.State != "failed" {
-		a.livePlayerMatchCache[key] = livePlayerMatchesCacheEntry{Matches: stored, State: loaded.State, FetchedAt: time.Now()}
+		a.livePlayerMatchCache[key] = livePlayerMatchesCacheEntry{Matches: stored, State: loaded.State, Source: loaded.Source, Evidence: loaded.Evidence, FetchedAt: time.Now()}
 		if element := a.livePlayerMatchEntries[key]; element != nil {
 			a.livePlayerMatchOrder.MoveToFront(element)
 		} else {
@@ -7903,15 +8256,16 @@ func (a *app) cachedLivePlayerMatches(ctx context.Context, key string, loader fu
 	}
 	flight.Matches = cloneGameplayMatches(stored)
 	flight.State = loaded.State
+	flight.Source = loaded.Source
+	flight.Evidence = loaded.Evidence
 	delete(a.livePlayerMatchFlights, key)
 	close(flight.Done)
 	a.livePlayerMatchesMu.Unlock()
-	return livePlayerMatchesResult{Matches: cloneGameplayMatches(stored), State: loaded.State}
+	return livePlayerMatchesResult{Matches: cloneGameplayMatches(stored), State: loaded.State, Source: loaded.Source, Evidence: loaded.Evidence}
 }
 
-// livePlayerMatches 读取对局页单名玩家的最近战绩：先用本机客户端的
-// 列表接口（轻量），拿不到数据时改走 SGP 网关。最终规范化结果按
-// playerRef + isCurrent 短暂缓存，避免 20 秒自动刷新重复请求。
+// livePlayerMatches shares the 45-second cache and request flight. All players
+// merge fresh SUMMARY and LCU; self keeps the current-summoner LCU endpoint.
 func (a *app) livePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string) livePlayerMatchesResult {
 	key := playerRef + "\x00" + strconv.FormatBool(isCurrent)
 	return a.cachedLivePlayerMatches(ctx, key, func(loadCtx context.Context) livePlayerMatchesResult {
@@ -7919,40 +8273,63 @@ func (a *app) livePlayerMatches(ctx context.Context, client *LCUClient, referenc
 	})
 }
 
-func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string) livePlayerMatchesResult {
-	history, capabilities, _ := loadGameplayHistoryContext(ctx, client, playerRef, isCurrent, 0, 10, false)
+func loadLiveLCUMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string) livePlayerMatchesResult {
+	// Keep a mixed-queue window of thirty before the existing ten-game filter.
+	history, capabilities, _ := loadGameplayHistoryContext(ctx, client, playerRef, isCurrent, 0, 30, false)
 	matches := make([]gameplayMatch, 0, len(history))
 	for _, game := range history {
 		matches = append(matches, normalizeGameplayMatch(game, reference, names, nil))
 	}
-	listFailed := len(capabilities) == 0 || capabilities[0].State != capabilityAvailable
-	fallbackFailed := false
-	if len(matches) == 0 && (listFailed || len(history) == 0) {
-		if a.sgp != nil {
-			_, _, ok := a.sgp.available(client)
-			if ok {
-				infos, _, _, err := a.sgp.matchHistory(ctx, client, playerRef, 0, 10, true)
-				if err == nil {
-					for _, info := range infos {
-						a.checkArenaGroupTruth(client, reference.ServerID, info)
-						matches = append(matches, convertRiotMatchInfo(info, playerRef, names, nil, "", reference.ServerID))
-					}
-					if len(matches) > 0 {
-						return livePlayerMatchesResult{Matches: matches, State: "ok"}
-					}
-					return livePlayerMatchesResult{Matches: matches, State: "empty"}
-				}
-				fallbackFailed = true
-			}
-		}
-	}
+	state := "empty"
 	if len(matches) > 0 {
-		return livePlayerMatchesResult{Matches: matches, State: "ok"}
+		state = "ok"
+	} else if len(capabilities) == 0 || capabilities[0].State != capabilityAvailable {
+		state = "failed"
 	}
-	if listFailed || fallbackFailed {
-		return livePlayerMatchesResult{State: "failed"}
+	return livePlayerMatchesResult{Matches: matches, State: state, Source: "lcu"}
+}
+
+func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string) livePlayerMatchesResult {
+	var lcu, sgp livePlayerMatchesResult
+	var sgpOK bool
+	lcu.State = "failed"
+	sgp.State = "failed"
+	var wait sync.WaitGroup
+	wait.Add(2)
+	go func() {
+		defer wait.Done()
+		defer a.recoverPanic("live-history.lcu")
+		lcu = loadLiveLCUMatches(ctx, client, reference, playerRef, isCurrent, names)
+	}()
+	go func() {
+		defer wait.Done()
+		defer a.recoverPanic("live-history.sgp")
+		sgpCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		sgp, sgpOK = a.loadLiveSGPMatches(sgpCtx, client, reference, playerRef, names)
+	}()
+	wait.Wait()
+	evidence := &liveHistoryEvidence{LCU: cloneGameplayMatches(lcu.Matches), SGP: cloneGameplayMatches(sgp.Matches), SGPRequested: sgp.State != "unavailable", SGPOK: sgpOK}
+	if !sgpOK {
+		lcu.Evidence = evidence
+		// Empty LCU plus failed SGP remains a failure, not a cached empty history.
+		if len(lcu.Matches) == 0 && sgp.State == "failed" {
+			lcu.State = "failed"
+		}
+		return lcu
 	}
-	return livePlayerMatchesResult{State: "empty"}
+	merged := mergeLivePlayerMatches(lcu.Matches, sgp.Matches, playerRef)
+	source := "lcu+sgp"
+	if len(lcu.Matches) == 0 {
+		source = "sgp"
+	} else if len(sgp.Matches) == 0 {
+		source = "lcu"
+	}
+	state := "empty"
+	if len(merged) > 0 {
+		state = "ok"
+	}
+	return livePlayerMatchesResult{Matches: merged, State: state, Source: source, Evidence: evidence}
 }
 
 func loadChampionAbilities(client *LCUClient, championID int64) ([]gameplayChampionAbility, error) {
@@ -8062,7 +8439,7 @@ func mergeChampSelectPlayers(existing []struct {
 			result[index].player.ChampionLocked = true
 		}
 	}
-	merge := func(source []lcuChampSelectPlayer, team int64) {
+	merge := func(source []lcuChampSelectPlayer, team int64, ownTeam bool) {
 		for _, selected := range source {
 			visiblePlayerRef := visibleChampSelectPlayerReference(selected)
 			selectedReference := normalizeGameplayReference(gameplayReference{PlayerRef: visiblePlayerRef, AlternatePlayerRef: selected.ObfuscatedPUUID, SummonerID: selected.SummonerID, AlternateSummonerID: selected.ObfuscatedSummonerID, GameName: selected.GameName, DisplayName: selected.GameName, TagLine: selected.TagLine})
@@ -8092,9 +8469,10 @@ func mergeChampSelectPlayers(existing []struct {
 				result = append(result, struct {
 					player lcuLivePlayer
 					team   int64
-				}{player: lcuLivePlayer{CellID: selected.CellID, PUUID: visiblePlayerRef, ObfuscatedPUUID: selected.ObfuscatedPUUID, SummonerID: selected.SummonerID, ObfuscatedSummonerID: selected.ObfuscatedSummonerID, ChampionID: selected.ChampionID, ChampionPickIntent: pickIntent, ChampionPickPending: selected.ChampionPickIntent < 0, ChampionLocked: selected.ChampionID > 0, SummonerName: selected.GameName, GameName: selected.GameName, TagLine: selected.TagLine, NameVisibilityType: selected.NameVisibilityType, SelectedPosition: selected.AssignedPosition, Spell1ID: selected.Spell1ID, Spell2ID: selected.Spell2ID}, team: team})
+				}{player: lcuLivePlayer{CellID: selected.CellID, PUUID: visiblePlayerRef, ObfuscatedPUUID: selected.ObfuscatedPUUID, SummonerID: selected.SummonerID, ObfuscatedSummonerID: selected.ObfuscatedSummonerID, ChampionID: selected.ChampionID, ChampionPickIntent: pickIntent, ChampionPickPending: selected.ChampionPickIntent < 0, ChampionLocked: selected.ChampionID > 0, SummonerName: selected.GameName, GameName: selected.GameName, TagLine: selected.TagLine, NameVisibilityType: selected.NameVisibilityType, SelectedPosition: selected.AssignedPosition, Spell1ID: selected.Spell1ID, Spell2ID: selected.Spell2ID, IsAutofilled: ownTeam && selected.IsAutofilled}, team: team})
 				continue
 			}
+			result[index].player.IsAutofilled = ownTeam && selected.IsAutofilled
 			result[index].player.ChampionPickIntent = positiveChampionPickIntent(selected.ChampionPickIntent)
 			result[index].player.ChampionPickPending = selected.ChampionPickIntent < 0
 			if selected.ChampionID > 0 {
@@ -8142,8 +8520,8 @@ func mergeChampSelectPlayers(existing []struct {
 			}
 		}
 	}
-	merge(session.MyTeam, 100)
-	merge(session.TheirTeam, 200)
+	merge(session.MyTeam, 100, true)
+	merge(session.TheirTeam, 200, false)
 	return result
 }
 
@@ -8205,6 +8583,8 @@ type gameplayRuneApplyRequest struct {
 	ChampionID      int64   `json:"championId"`
 	PrimaryStyleID  int64   `json:"primaryStyleId"`
 	SubStyleID      int64   `json:"subStyleId"`
+	Spell1ID        int64   `json:"spell1Id,omitempty"`
+	Spell2ID        int64   `json:"spell2Id,omitempty"`
 	SelectedPerkIDs []int64 `json:"selectedPerkIds"`
 }
 
@@ -8250,10 +8630,11 @@ func (a *app) handleGameplayRuneApply(w http.ResponseWriter, r *http.Request) {
 	phase := ""
 	outcome := "rejected"
 	reason := "unknown"
+	spellApplied := false
 	var request gameplayRuneApplyRequest
 	trace := &runeApplyTrace{}
 	defer func() {
-		event := map[string]any{"event": "perk_apply_attempt", "phase": phase, "outcome": outcome, "reason": truncateClientDiagnosticText(reason)}
+		event := map[string]any{"event": "perk_apply_attempt", "phase": phase, "outcome": outcome, "reason": truncateClientDiagnosticText(reason), "spell_requested": request.Spell1ID > 0 && request.Spell2ID > 0, "spell_applied": spellApplied}
 		if len(request.SelectedPerkIDs) > 0 {
 			event["perk_ids"] = append([]int64(nil), request.SelectedPerkIDs...)
 		}
@@ -8309,7 +8690,14 @@ func (a *app) handleGameplayRuneApply(w http.ResponseWriter, r *http.Request) {
 	}
 	outcome = "success"
 	reason = "applied"
-	respondJSON(w, map[string]any{"applied": true, "pageId": pageID, "name": runePageName(request.ChampionName, request.Source), "selectedPerkIds": request.SelectedPerkIDs})
+	if request.Spell1ID > 0 && request.Spell2ID > 0 {
+		if err := applySummonerSpells(ctx, client, request.Spell1ID, request.Spell2ID); err != nil {
+			reason = "spell-write-failed: " + diagnosticErrorKind(err)
+		} else {
+			spellApplied = true
+		}
+	}
+	respondJSON(w, map[string]any{"applied": true, "spellApplied": spellApplied, "pageId": pageID, "name": runePageName(request.ChampionName, request.Source), "selectedPerkIds": request.SelectedPerkIDs})
 }
 
 func validateRuneApplyRequest(request gameplayRuneApplyRequest) error {
@@ -8325,6 +8713,11 @@ func validateRuneApplyRequest(request gameplayRuneApplyRequest) error {
 	if request.PrimaryStyleID <= 0 || request.SubStyleID <= 0 || request.PrimaryStyleID == request.SubStyleID {
 		return errors.New("主系或副系符文无效")
 	}
+	if request.Spell1ID != 0 || request.Spell2ID != 0 {
+		if request.Spell1ID <= 0 || request.Spell2ID <= 0 || request.Spell1ID == request.Spell2ID || request.Spell1ID > 100000 || request.Spell2ID > 100000 {
+			return errors.New("召唤师技能编号无效或不完整")
+		}
+	}
 	if len(request.SelectedPerkIDs) < 6 || len(request.SelectedPerkIDs) > 12 {
 		return errors.New("符文数量不完整")
 	}
@@ -8337,6 +8730,10 @@ func validateRuneApplyRequest(request gameplayRuneApplyRequest) error {
 		}
 	}
 	return nil
+}
+
+func applySummonerSpells(ctx context.Context, client *LCUClient, spell1ID, spell2ID int64) error {
+	return client.RequestJSON(ctx, http.MethodPatch, "/lol-champ-select/v1/session/my-selection", map[string]any{"spell1Id": spell1ID, "spell2Id": spell2ID}, nil)
 }
 
 func applyRunePage(ctx context.Context, client *LCUClient, request gameplayRuneApplyRequest) (int64, error) {
@@ -9327,6 +9724,10 @@ func (a *app) handleGameplayPerks(w http.ResponseWriter, r *http.Request) {
 	})
 	if err == nil {
 		payload = a.enrichPerkAugments(cacheKey, client, payload)
+		// Hexdata hero visits extend the observed ID index after the base perk
+		// catalog may already have been cached. Merge it on every response.
+		payload.Augments = mergeGameplayAugmentMetadata(payload.Augments, a.championDataProvider().observedHexdataAugments())
+		payload.Augments = preferBundledAugmentIcons(mergeGameplayAugmentMetadata(payload.Augments, bundledAugmentCatalog()))
 	}
 	source := payload.source
 	if source == "" {
@@ -9338,6 +9739,20 @@ func (a *app) handleGameplayPerks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, payload)
+}
+
+// Keep the offline augment icon index independent from the slower rune catalog.
+// Overview cards can paint their exact-ID artwork as soon as this local response
+// arrives, while the full perk catalog continues loading for rune details.
+func (a *app) handleGameplayAugments(w http.ResponseWriter, r *http.Request) {
+	augments := bundledAugmentCatalog()
+	if len(augments) == 0 {
+		http.Error(w, "海克斯图标目录暂不可用", http.StatusServiceUnavailable)
+		return
+	}
+	respondJSON(w, struct {
+		Augments []gameplayAugment `json:"augments"`
+	}{Augments: augments})
 }
 
 func (a *app) cachedGameplayPerkCatalog(ctx context.Context, key string, loader func() (gameplayPerkCatalogResponse, error)) (gameplayPerkCatalogResponse, error) {
@@ -9570,6 +9985,9 @@ func loadGameplayAugmentsFromClient(client *LCUClient) ([]gameplayAugment, error
 }
 
 func (a *app) fallbackGameplayAugments(ctx context.Context) ([]gameplayAugment, error) {
+	if catalog := bundledAugmentCatalog(); len(catalog) > 0 {
+		return catalog, nil
+	}
 	loadCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	catalog, err := a.championDataProvider().loadCommunityDragonAugments(loadCtx)

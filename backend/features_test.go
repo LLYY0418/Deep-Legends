@@ -121,6 +121,36 @@ func TestClientDiagnosticWritesSanitizedEvent(t *testing.T) {
 	}
 }
 
+func TestR165LiveRosterRenderedKeepsSeparateHiddenCountsOnly(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	store := trackTestStore(t, &localStore{root: root})
+	a := &app{storage: store}
+	recorder := httptest.NewRecorder()
+	a.handleClientDiagnostic(recorder, httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(`{"event":"live_roster_rendered","reason":"render","phase":"InProgress","gameId":164,"queueId":2400,"playersReceived":10,"rendered100":5,"rendered200":5,"hiddenIdentityRendered":1,"privateHistoryRendered":2}`)))
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("diagnostic status = %d: %s", recorder.Code, recorder.Body.String())
+	}
+	data, err := store.readDiagnosticLog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var event map[string]any
+	if err := json.Unmarshal(data, &event); err != nil {
+		t.Fatal(err)
+	}
+	if event["hidden_identity_rendered"] != float64(1) || event["private_history_rendered"] != float64(2) || event["players_received"] != float64(10) {
+		t.Fatalf("roster diagnostic = %#v", event)
+	}
+	for _, privateField := range []string{"playerRef", "puuid", "gameName", "tagLine"} {
+		if _, ok := event[privateField]; ok {
+			t.Fatalf("roster diagnostic leaked %s", privateField)
+		}
+	}
+}
+
 func TestMatchTierOverviewDiagnosticKeepsOnlyAggregateCounts(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {

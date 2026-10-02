@@ -57,7 +57,7 @@
   --radius-lg: 14px;
   --card-min: 288px;
   --space-card: 10px;
-  --sidebar-width: 226px;
+  --sidebar-width: 214px;
   --topbar-height: 56px;
   /* 全局等比缩放标量。由 app.js 按窗口逻辑尺寸选档后写到 :root 上，
      只有 .app-frame（以及浮层）真正吃 zoom；所有 100vh/100dvh 必须除以它，
@@ -273,13 +273,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .startup-spinner::after { position: absolute; inset: 8px; border: 1px solid var(--hex-line); clip-path: polygon(25% 7%,75% 7%,100% 50%,75% 93%,25% 93%,0 50%); content: ""; opacity: .7; }
 .startup-spinner img { position: relative; z-index: 1; width: 42px; height: 42px; object-fit: contain; }
 .app-frame { display: grid; height: calc(100vh / var(--ui-zoom, 1)); zoom: var(--ui-zoom, 1); grid-template-columns: var(--sidebar-width) minmax(0,1fr); }
+.tier-badge { display: inline-block; width: 26px; height: 30px; vertical-align: middle; filter: drop-shadow(0 2px 4px rgb(0 0 0 / .35)); }
+.tier-badge.is-metric { width: 24px; height: 27px; }
 .app-main { display: flex; min-width: 0; height: calc(100vh / var(--ui-zoom, 1)); flex-direction: column; overflow: hidden; background: var(--bg); }
 /* scrollbar-gutter 固定滚动条占位：切换页签时内容高度变化不会引起卡片宽度先增后减的抖动。 */
 .app-scroll { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: auto; scrollbar-gutter: stable; }
 .sidebar { position: relative; z-index: 31; display: flex; min-width: 0; height: calc(100vh / var(--ui-zoom, 1)); flex-direction: column; padding: 10px; overflow: hidden; background: var(--sidebar-bg); border-right: 1px solid var(--hex-line); }
 .sidebar::after { position: absolute; right: -1px; bottom: 12%; width: 1px; height: 32%; background: linear-gradient(transparent,var(--primary),transparent); content: ""; opacity: .65; }
-.sidebar-brand { position: relative; display: flex; width: 100%; min-height: 58px; align-items: center; gap: 10px; padding: 4px 4px 13px; color: var(--ink); background: transparent; border: 0; border-radius: 10px; text-align: left; -webkit-app-region: no-drag; }
-.sidebar-brand::after { position: absolute; right: 4px; bottom: 6px; left: 4px; height: 1px; background: linear-gradient(90deg,color-mix(in oklab,var(--primary) 55%,transparent),transparent 78%); content: ""; }
+.sidebar-brand { position: relative; display: flex; width: 100%; min-height: 58px; align-items: center; gap: 10px; padding: 4px 11px 13px; color: var(--ink); background: transparent; border: 0; border-radius: 10px; text-align: left; -webkit-app-region: no-drag; }
+.sidebar-brand::after { position: absolute; right: 11px; bottom: 6px; left: 11px; height: 1px; background: linear-gradient(90deg,color-mix(in oklab,var(--primary) 55%,transparent),transparent 78%); content: ""; }
 .sidebar-brand:hover { background: color-mix(in oklab,var(--surface-strong) 62%,transparent); }
 .sidebar-brand img { flex: 0 0 32px; width: 32px; height: 32px; object-fit: contain; }
 .sidebar-brand-copy { min-width: 0; flex: 1; overflow: hidden; }
@@ -306,7 +308,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   font-family: "Beaufort for LOL",Constantia,Georgia,serif;
   font-size: 18px;
   font-weight: 700;
-  letter-spacing: .045em;
+  letter-spacing: .025em;
   line-height: 1.15;
   white-space: nowrap;
 }
@@ -704,10 +706,7 @@ body.is-fatal main.shell > :not(#notice) { display: none !important; }
 .loot-art { position: relative; display: grid; width: 70px; height: 70px; place-items: center; overflow: visible; color: var(--loot-tone); }
 .loot-art > span { display: grid; place-items: center; }
 .loot-art.has-image > span { display: none; }
-.loot-art img { --loot-icon-scale: 1; position: absolute; top: 50%; left: 50%; display: block; width: 100%; height: 100%; object-fit: contain; transform: translate(-50%,-50%) scale(var(--loot-icon-scale)); transform-origin: center; }
-.loot-card.loot-currency-champion .loot-art img, .loot-card.loot-currency-cosmetic .loot-art img { --loot-icon-scale: 1.65; }
-.loot-card.loot-currency-ancient-spark .loot-art img { --loot-icon-scale: .94; }
-.loot-card.loot-chest-champion-mastery .loot-art img { --loot-icon-scale: 1.22; }
+.loot-art img { --loot-icon-scale: 1; position: absolute; top: 50%; left: 50%; display: block; width: 100%; height: 100%; object-fit: contain; transform: translate(-50%,-50%) translate(var(--loot-icon-dx,0px),var(--loot-icon-dy,0px)) scale(var(--loot-icon-scale)); transform-origin: center; }
 .loot-card-copy { display: grid; min-width: 0; }
 .loot-card-copy > span { color: color-mix(in oklab,var(--loot-tone) 74%,var(--muted)); font-size: 10px; }
 .loot-card-copy > strong { margin-top: 2px; overflow-wrap: anywhere; }
@@ -1143,13 +1142,18 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 .facade-quick-groups button.is-active { color: var(--primary-strong); background: var(--primary-soft); border-color: color-mix(in oklab, var(--primary) 55%, var(--line)); }
 /* R130 P4：头像/旗帜页去掉「目录总数 / 已拥有 / 当前显示」三格统计条，和其它收藏
    子页保持一致，只留下面一行摘要。 */
-/* R130 P2 / R141：旗帜是细长竖图，使用固定 200px 宽的竖长卡；宽高比取第一张加载成功的旗帜图片的
-   真实 naturalWidth/naturalHeight（favorites-facade.js 写进 --facade-banner-ratio），
-   取样前按 0.3 兜底，object-fit: contain 不裁剪。 */
-.facade-grid.is-banners { --facade-banner-ratio: 0.3; grid-template-columns: repeat(auto-fill, 200px); justify-content: start; gap: 20px 16px; }
-.facade-grid.is-banners .skin-card { contain-intrinsic-size: auto 531px; }
+/* R130 P2 / R141 / 2026-09-24 直接修改：旗帜是细长竖图，使用固定 208px 宽的竖长卡（R141 探测过
+   190–208px 在 1200/960 两个参照宽度下都还是 4/3 列，212px 就会在 960 宽度下掉到 2 列，208 是
+   不掉列的前提下能给到的最大宽度）；宽高比取第一张加载成功的旗帜图片的真实
+   naturalWidth/naturalHeight（favorites-facade.js 写进 --facade-banner-ratio），取样前按 0.38
+   兜底（比旧的 0.3 兜底稍矮一点），object-fit: contain 不裁剪、不拉伸变形。justify-content:
+   space-between 把整行排不满时剩下的空隙摊到列间距里，不再整块留在最右边。未拥有的旗帜只压
+   透明度、不做全灰去色，参考锁图标 + 半透明遮罩的风格，能看清旗帜本来的配色。 */
+.facade-grid.is-banners { --facade-banner-ratio: 0.38; grid-template-columns: repeat(auto-fill, 208px); justify-content: space-between; gap: 20px 16px; }
+.facade-grid.is-banners .skin-card { contain-intrinsic-size: auto 547px; }
 .facade-grid.is-banners .skin-art { aspect-ratio: var(--facade-banner-ratio); border-radius: 8px; }
 .facade-grid.is-banners .skin-art img { object-fit: contain; }
+.facade-grid.is-banners .skin-card.is-locked .skin-art img.is-loaded { opacity: .68; filter: none; }
 .facade-grid .image-fallback { font-size: 26px; }
 /* R130 P6：详情弹窗按图片自身尺寸显示，宽度跟着内容收缩，不留大片空白。图片区域
    尺寸由 favorites-facade.js 写进 --facade-art-width/height，加载前按 128px 占位。 */
@@ -1164,12 +1168,21 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 .facade-grid.is-icons .skin-card { contain-intrinsic-size: auto 124px; }
 .facade-grid.is-icons .skin-art { width: 92px; aspect-ratio: 1/1; border-radius: 8px; }
 .facade-grid.is-icons .skin-art img { object-fit: contain; }
+.facade-grid.is-icons .skin-card.is-locked .skin-art img.is-loaded { opacity: .68; filter: none; }
+/* 2026-09-24 直接修改：头像格子不再显示「加载中」文字，改成和别处骨架屏一样的波动动画
+   （复用已有的 .skeleton 渐变/@keyframes skeleton，不新起一套动画）；图片一加载完成
+   （img.is-loaded）就停。加载失败时 favorites-facade.js 仍然会把文字改成「无图」，那种情况
+   不受这条影响。 */
+.facade-grid.is-icons .skin-art:has(img:not(.is-loaded)) { background: linear-gradient(100deg,var(--surface) 30%,var(--surface-strong) 46%,var(--surface) 62%); background-size: 220% 100%; animation: skeleton 1.2s ease-in-out infinite; }
 /* R130 P3：头像/旗帜卡片不再显示右上角的「已拥有 / 未拥有」标签，未拥有靠置灰 +
    锁图标表示；拥有状态在详情弹窗里仍然保留一行。 */
 .facade-grid .skin-state { display: none; }
 .facade-grid .skin-lock { width: 30px; height: 30px; }
 .facade-grid .skin-lock svg { width: 15px; height: 15px; }
-/* R125 / R130 P2：头像与旗帜格子都只把名称放在图片下方，不再压在原图上。 */
-.facade-grid .skin-copy { position: static; margin: 6px 0 0; padding: 0; background: none; }
+/* R125 / R130 P2：头像与旗帜格子都只把名称放在图片下方，不再压在原图上。
+   2026-09-24 直接修改：补上左右 4px 内边距（4px 是仓库里已经在用的既有内边距取值，不再新增一种新的 padding 组合）——卡片外层 .skin-card 的圆角是 14px 并且设了
+   overflow: hidden，名字贴着最左边（padding 是 0）时最左边那个字的左下角会被圆角裁掉一点，
+   不是字体本身又单独设置了圆角。 */
+.facade-grid .skin-copy { position: static; margin: 6px 0 0; padding: 0 4px; background: none; }
 .facade-grid .skin-copy strong { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .facade-grid .skin-hero, .facade-grid .skin-meta { display: none; }

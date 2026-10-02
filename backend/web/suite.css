@@ -583,18 +583,7 @@ button.suite-chip.is-gold { color: var(--primary-strong); border-color: var(--he
 /* Body-mounted: app-frame already has zoom, so this dialog owns it once. */
 
 /* R101: compact cards in the 392px preview column. */
-.facade-stack-row { display: grid; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); }
-.facade-stack-row h4, .facade-stack-row p { margin: 0; }
-.facade-stack-row h4 { font-size: 13px; }
-.facade-stack-row p { font-size: 11.5px; line-height: 1.5; }
-.facade-stack-row .ctl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .suite-segment button { white-space: nowrap; }
-.icon-current { display: flex; gap: 11px; align-items: center; }
-.icon-current .icon-thumb { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
-.icon-current .meta { flex: 1; min-width: 0; }
-.icon-current strong, .icon-current span { display: block; }
-.icon-current span { margin-top: 3px; font-size: 11px; color: var(--muted); }
-.facade-banner-card .suite-segment button { line-height: 18px; }
 
 .watch-broadcast-options { display: grid; width: 100%; }
 .watch-broadcast-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 0; }

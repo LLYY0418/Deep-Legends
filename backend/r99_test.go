@@ -181,26 +181,47 @@ func TestR99SummonerEventStillUpdatesIdentity(t *testing.T) {
 	}
 	t.Fatal("identity never updated")
 }
-func TestR99RankBannerPreservesCrestAndRejectsUnknown(t *testing.T) {
+func TestR149RankBannerActionIsRetiredWithoutLCUWrites(t *testing.T) {
 	calls := 0
 	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
 		calls++
-		if r.Method == "GET" {
-			fmt.Fprint(w, `{"preferredCrestType":"ranked","selectedPrestigeCrest":7}`)
-			return
-		}
-		var b map[string]any
-		json.NewDecoder(r.Body).Decode(&b)
-		if r.Method != "PUT" || b["preferredCrestType"] != "ranked" || b["selectedPrestigeCrest"] != float64(7) || b["preferredBannerType"] != "blank" {
-			t.Errorf("crest overwritten: %v", b)
-		}
-		w.WriteHeader(204)
+		t.Error("retired rank-banner action contacted LCU")
 	})
-	if err := writeFacadeRankBanner(context.Background(), client, "hextech"); !errors.Is(err, errFacadeInvalid) || calls != 0 {
-		t.Fatal("invalid banner made request")
+	if facadeDiagnosticAction("rank-banner") != "unknown" {
+		t.Fatal("retired action still accepted by diagnostics")
 	}
-	if err := writeFacadeRankBanner(context.Background(), client, "blank"); err != nil || calls != 2 {
-		t.Fatalf("write=%v calls=%d", err, calls)
+	_, err := (&app{}).applyFacadeActionResultDetails(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "rank-banner"})
+	if !errors.Is(err, errFacadeInvalid) || calls != 0 {
+		t.Fatalf("retired action result=%v calls=%d", err, calls)
+	}
+}
+
+func TestR149ClearBorderPreservesExistingBannerPreference(t *testing.T) {
+	var methods []string
+	client := r99Client(t, func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		if r.URL.Path != "/lol-regalia/v2/current-summoner/regalia" {
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+		switch r.Method {
+		case http.MethodGet:
+			_, _ = w.Write([]byte(`{"preferredBannerType":"lastSeasonHighestRank","preferredCrestType":"ranked"}`))
+		case http.MethodPut:
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["preferredBannerType"] != "lastSeasonHighestRank" || body["preferredCrestType"] != "prestige" || body["selectedPrestigeCrest"] != float64(22) {
+				t.Errorf("clear-border changed banner preference or crest target: %v", body)
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Errorf("unexpected method %s", r.Method)
+		}
+	})
+	_, err := (&app{}).applyFacadeActionResultDetails(context.Background(), client, Summoner{SummonerLevel: 526}, facadeApplyRequest{Action: "clear-border"})
+	if err != nil || !reflect.DeepEqual(methods, []string{http.MethodGet, http.MethodPut}) {
+		t.Fatalf("clear-border result=%v methods=%v", err, methods)
 	}
 }
 

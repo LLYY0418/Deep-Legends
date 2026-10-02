@@ -35,7 +35,7 @@ function liveHarness() {
     api: async url => { calls.push(url); return { phase: 'InProgress', players: [] }; },
     updateBeacon: phase => { state.beacon.phase = phase; }, scheduleBeaconPoll() {}, markOverviewAfterGame() {},
     renderLive() {}, resetLiveGameScopedState() {}, shouldResetLiveGameScopedState: () => false, resetLivePositionOverrides() {}, resetRecommendationTabsOnChampionChange() {},
-    renderCapabilitySettings() {}, liveRecommendationsFor: () => null, ensureLiveRecommendations() {}, ensureSpecialistRunes() {}, ensureProRunes() {}, scheduleLiveRefresh() {},
+    renderCapabilitySettings() {}, liveRecommendationsFor: () => null, ensureLiveRecommendations() {}, ensureSpecialistRunes() {}, ensureProRunes() {}, ensureLaneMatchupCandidates() {}, scheduleLiveRefresh() {},
     activeTab: () => state.tabs[0], overviewGroupForSection: () => 'cn', loadOverview: async () => true,
     window: { reportFlowDiagnostic: (event, reason, fields) => reports.push({event, reason, ...fields}), addEventListener: (event, fn) => listeners.set(event, fn) },
   };

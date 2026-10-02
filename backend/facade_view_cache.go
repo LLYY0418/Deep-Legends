@@ -52,6 +52,8 @@ func (a *app) cachedFacadeState(ctx context.Context, force bool, trigger string)
 			done = make(chan struct{})
 			c.flight = done
 			go func() {
+				defer a.recoverPanic("facade_view_cache.cachedFacadeState.1")
+
 				readCtx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 				defer cancel()
 				value := a.loadFacadeStateTriggered(readCtx, trigger)

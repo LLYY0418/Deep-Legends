@@ -247,6 +247,9 @@ func TestProRuneRecommendationUnknownRecordAndOffline(t *testing.T) {
 		t.Fatal("missing recommendation", res)
 	}
 	r := res.Pros[0]
+	if r.Spell1ID != 0 || r.Spell2ID != 0 {
+		t.Fatalf("unverified pro spells must stay empty: %d/%d", r.Spell1ID, r.Spell2ID)
+	}
 	if *r.WinKnown || r.Win != nil || r.Result != "" || r.RecordGames != 0 || !*r.SelectedComplete || r.OpponentPlayerName != "GEN Chovy" || r.OpponentChampionID != 103 || r.EventLabel == "" {
 		t.Fatal("V6/V9 unknown improperly counted/rendered", r)
 	}

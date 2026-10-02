@@ -63,6 +63,7 @@ function functionSource(source, name) {
 
 function compileFunctions(source, names, dependencies = {}) {
   const bodies = names.map((name) => functionSource(source, name));
+  if (bodies.some(body=>body.includes("champSelectEnemyPlaceholder("))) bodies.push(functionSource(source,"champSelectEnemyPlaceholder"));
   const dependencyNames = Object.keys(dependencies);
   const factory = Function(...dependencyNames, `"use strict";\n${bodies.join("\n")}\nreturn { ${names.join(", ")} };`);
   return factory(...dependencyNames.map((name) => dependencies[name]));
@@ -308,6 +309,7 @@ function insightDeps(payload, overrides = {}, source = gameplayScript) {
     // R128 §2.3：统计口径说明已从 UI 删除，不再需要 deepLegendsShared 桩。
     window: {},
     isARAMRelatedMatch: () => false,
+    isSummonersRiftMatch: () => false,
     liveAugmentRecommendationSource: () => "hextech",
     orderLivePlayers: (players) => players,
     clusterPremadePlayers: (players) => players,

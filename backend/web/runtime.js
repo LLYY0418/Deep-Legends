@@ -77,7 +77,15 @@
   const escapeHTML = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[character]));
-  window.deepLegendsRuntime = Object.freeze({ createCache: (options) => new ResponseCache(options), escapeHTML });
+  const GRADE_ORDER = Object.freeze({ OP: 0, S: 1, A: 2, B: 3, C: 4, D: 5, F: 6 });
+  const gradeRank = (value) => GRADE_ORDER[String(value || "").trim().toUpperCase()] ?? 7;
+  const gradeBadge = (value, extra = "") => {
+    const grade = String(value || "").trim().toUpperCase();
+    if (!Object.hasOwn(GRADE_ORDER, grade)) return "";
+    const icon = grade === "OP" ? "op" : `yourgg-${grade.toLowerCase()}`;
+    return `<img class="tier-badge${extra ? ` ${extra}` : ""}" src="/tier-icons/${icon}.svg" alt="梯度 ${grade}" decoding="async">`;
+  };
+  window.deepLegendsRuntime = Object.freeze({ createCache: (options) => new ResponseCache(options), escapeHTML, gradeRank, gradeBadge });
   const flowSamples = new Map();
   const flowPending = new Set();
   const sampledPending = new Set();
@@ -171,13 +179,20 @@
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
-    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "card_image_stalled"].includes(event)) return;
+    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "arena_header_source", "live_render_rebuild", "lane_matchup_candidate_fetch", "lane_matchup_card"].includes(event)) return;
     // Background observations share one in-flight slot and never retry. A slow
     // diagnostics endpoint must not occupy the connections needed by the UI.
     const sampled = event === "live_refresh_client" || event === "local_request_client";
     const now = Date.now();
     if (sampled && (sampledPending.size || now - (sampledAt.get(event) ?? -Infinity) < (event === "local_request_client" ? 10000 : 1000))) { increment("transportSuppressed"); return; }
     const body = { event, reason };
+    if (event === "arena_header_source") {
+      if (Number.isInteger(fields.championId) && fields.championId > 0) body.championId = Math.min(1000000, fields.championId);
+      if (Number.isInteger(fields.rank) && fields.rank >= 0) body.rank = Math.min(1000000, fields.rank);
+      if (Number.isInteger(fields.listGames) && fields.listGames >= 0) body.listGames = Math.min(100000000, fields.listGames);
+      if (["OP", "S", "A", "B", "C", "D", "F"].includes(fields.grade)) body.grade = fields.grade;
+      if (typeof fields.hasListRow === "boolean") body.hasListRow = fields.hasListRow;
+    }
     for (const key of ["revision", "durationMs", "pendingSaves", "playersReceived", "rendered100", "rendered200", "teamsReceived", "cacheAgeMs", "httpStatus", "requestId", "itemCount"]) {
       if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1000000, Math.floor(fields[key])));
     }
@@ -187,12 +202,12 @@
       if (["direct", "event", "sse", "poll", "resync", "interval"].includes(fields.source)) body.source = fields.source;
       if (["overview", "live", "champions", "favorites", "suite", "collection", "tools"].includes(fields.section)) body.section = fields.section;
     }
-    if (event === "local_request_client") {
+    if (event === "local_request_client" || event === "image_queue_slow") {
       if (["status", "gameplay", "champions", "collection", "pro-players", "friends", "image", "section-loader", "other"].includes(fields.endpoint)) body.endpoint = fields.endpoint;
       for (const key of ["startedAt", "completedAt"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1e13, Math.floor(fields[key])));
       // R127 P0-2：图片队列的排队/加载计时与来源类别（不含具体路径）。
       for (const key of ["queueWaitMs", "loadMs", "activeSlowCount"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1000000, Math.floor(fields[key])));
-      if (["lcu", "communitydragon", "ddragon", "gtimg"].includes(fields.imageSource)) body.imageSource = fields.imageSource;
+      if (["lcu", "communitydragon", "ddragon", "gtimg", "builtin"].includes(fields.imageSource)) body.imageSource = fields.imageSource;
     }
     // R130 P1-6：卡片图看门狗超时上报。只放行队列计数、候选序号与来源类别，
     // 不放行任何资源路径。限速由 app.js 的 reportCardImageStall 负责（每 10 秒
@@ -208,6 +223,26 @@
     if (["none", "http", "timeout", "network", "decode", "read", "canceled", "invalid-response", "other"].includes(fields.errorKind)) body.errorKind = fields.errorKind;
     for (const key of ["requestedPosition", "resolvedPosition"]) {
       if (["all", "top", "jungle", "middle", "bottom", "utility", "mid", "adc", "support"].includes(fields[key])) body[key] = fields[key];
+    }
+    if (event === "live_render_rebuild") {
+      for (const [field,allowed] of [["counts",["full","status","runes","build","insight"]],["sources",["direct","manual","interval","sse","event","poll","resync","recommendation","rune","catalog","unknown"]]]) {
+        body[field] = {};
+        for (const key of allowed) if (Number.isFinite(fields[field]?.[key])) body[field][key] = Math.max(0,Math.min(1000000,Math.floor(fields[field][key])));
+      }
+      for (const key of ["total","windowMs","imagesRecreated","rowsReplaced"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0,Math.min(1000000,Math.floor(fields[key])));
+      if (["ChampSelect","GameStart","InProgress","Reconnect","EndOfGame","Lobby","None"].includes(fields.phase)) body.phase = fields.phase;
+    }
+    if (event === "lane_matchup_candidate_fetch") {
+      for (const key of ["enemyLockedCount","enemyPositionKnownCount","allyPositionKnownCount","enemyChampionId","rowCount","queueId","gameId"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0,Math.min(1e13,Math.floor(fields[key])));
+      for (const key of ["selfPosition","position"]) if (["top","jungle","mid","adc","support"].includes(fields[key])) body[key] = fields[key];
+      if (["all","iron","bronze","silver","gold","gold_plus","platinum","platinum_plus","emerald","emerald_plus","diamond","diamond_plus","master","master_plus","grandmaster","challenger"].includes(fields.tier)) body.tier = fields.tier;
+    }
+    if (event === "lane_matchup_card") {
+      if (["a","b","a+b"].includes(fields.mode)) body.mode = fields.mode;
+      for (const key of ["shown","ownLocked"]) if (typeof fields[key] === "boolean") body[key] = fields[key];
+      if (["pair-no-data","pair-pending","pair-failed","candidates-empty"].includes(fields.hiddenReason)) body.hiddenReason = fields.hiddenReason;
+      if (Number.isInteger(fields.enemyChampionId)) body.enemyChampionId = Math.max(0,Math.min(1000000,fields.enemyChampionId));
+      if (["all","iron","bronze","silver","gold","gold_plus","platinum","platinum_plus","emerald","emerald_plus","diamond","diamond_plus","master","master_plus","grandmaster","challenger"].includes(fields.tier)) body.tier = fields.tier;
     }
     const encoded = JSON.stringify(body);
     if (flowPending.has(encoded) || flowSamples.has(encoded) && now - flowSamples.get(encoded) < 30000) { increment("transportSuppressed"); return; }

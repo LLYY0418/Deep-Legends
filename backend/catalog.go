@@ -190,10 +190,14 @@ func loadIdentitySnapshot(client *LCUClient) (Snapshot, error) {
 	var group sync.WaitGroup
 	group.Add(2)
 	go func() {
+		defer recoverPanic("catalog.loadIdentitySnapshot.1")
+
 		defer group.Done()
 		measure("profile", func() { profile, profileCapability = NewSummonerAPI(client).Profile() })
 	}()
 	go func() {
+		defer recoverPanic("catalog.loadIdentitySnapshot.2")
+
 		defer group.Done()
 		measure("masteries", func() { masteries, masteryCapability = NewChampionMasteryAPI(client).All(summoner.PUUID) })
 	}()
@@ -268,26 +272,36 @@ func loadCollectionSnapshotWithProvider(client *LCUClient, pool PoolManifest, id
 	var independent sync.WaitGroup
 	independent.Add(7)
 	go func() {
+		defer recoverPanic("catalog.loadCollectionSnapshotWithProvider.1")
+
 		defer independent.Done()
 		measure("chroma_catalog", func() { chromas, chromaCatalogErr = loadChromaCatalog(client, all) })
 	}()
 	go func() {
+		defer recoverPanic("catalog.loadCollectionSnapshotWithProvider.2")
+
 		defer independent.Done()
 		measure("skin_ownership", func() {
 			ownedIDs, ownershipSources, ownershipErr = inventory.OwnedSkinIDs(summoner.SummonerID, all)
 		})
 	}()
 	go func() {
+		defer recoverPanic("catalog.loadCollectionSnapshotWithProvider.3")
+
 		defer independent.Done()
 		measure("champion_ownership", func() {
 			ownedChampionIDs, championCapability = inventory.OwnedChampionIDs(summoner.SummonerID)
 		})
 	}()
 	go func() {
+		defer recoverPanic("catalog.loadCollectionSnapshotWithProvider.4")
+
 		defer independent.Done()
 		measure("loot", func() { loot, lootCapability = NewObservedLootAPI(client, observe).PlayerLoot() })
 	}()
 	go func() {
+		defer recoverPanic("catalog.loadCollectionSnapshotWithProvider.5")
+
 		defer independent.Done()
 		measure("loot_metadata", func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
@@ -296,10 +310,14 @@ func loadCollectionSnapshotWithProvider(client *LCUClient, pool PoolManifest, id
 		})
 	}()
 	go func() {
+		defer recoverPanic("catalog.loadCollectionSnapshotWithProvider.6")
+
 		defer independent.Done()
 		measure("sanctum", func() { sanctumSparks, sanctumCapability = NewLootAPI(client).SanctumSparks() })
 	}()
 	go func() {
+		defer recoverPanic("catalog.loadCollectionSnapshotWithProvider.7")
+
 		defer independent.Done()
 		measure("rewards", func() { rewards, rewardsCapability = NewRewardsAPI(client).PendingGrants() })
 	}()
@@ -418,8 +436,16 @@ func loadCollectionSnapshotWithProvider(client *LCUClient, pool PoolManifest, id
 func runParallelLoaders(first, second func()) {
 	var group sync.WaitGroup
 	group.Add(2)
-	go func() { defer group.Done(); first() }()
-	go func() { defer group.Done(); second() }()
+	go func() {
+		defer recoverPanic("catalog.runParallelLoaders.1")
+		defer group.Done()
+		first()
+	}()
+	go func() {
+		defer recoverPanic("catalog.runParallelLoaders.2")
+		defer group.Done()
+		second()
+	}()
 	group.Wait()
 }
 

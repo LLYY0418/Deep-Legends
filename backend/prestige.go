@@ -134,7 +134,11 @@ func (a *app) handlePrestigeImage(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 		if a.storage != nil {
-			go func() { _ = a.storage.storePrestigeArtwork(metadata.InstanceID, data) }()
+			go func() {
+				defer a.recoverPanic("prestige.handlePrestigeImage.1")
+
+				_ = a.storage.storePrestigeArtwork(metadata.InstanceID, data)
+			}()
 		}
 		return data, nil
 	})

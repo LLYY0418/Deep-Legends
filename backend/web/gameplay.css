@@ -492,9 +492,9 @@
 .ability-radar { display: block; width: 100%; height: auto; overflow: visible; }
 .ability-radar-grid { fill: none; stroke: var(--line); stroke-width: 1; }
 .ability-radar-grid line { opacity: .72; }
-.ability-radar-baseline { fill: color-mix(in oklab,var(--ink) 8%,transparent); stroke: color-mix(in oklab,var(--ink) 70%,transparent); stroke-width: 1.5; }
+.ability-radar-baseline { fill: none; stroke: color-mix(in oklab,var(--ink) 70%,transparent); stroke-width: 1.5; }
 .ability-radar-player { fill: color-mix(in oklab,var(--primary-strong) 20%,transparent); stroke: var(--primary-strong); stroke-width: 2; }
-.ability-radar-points circle { fill: var(--primary-strong); stroke: var(--surface); stroke-width: 2; }
+.ability-radar-points circle { fill: var(--primary-strong); stroke: var(--surface); stroke-width: 1.5; }
 .ability-radar-controls { position: absolute; inset: 0; pointer-events: none; }
 .ability-radar-metric { position: absolute; display: grid; min-width: 48px; min-height: 38px; padding: 3px 4px; transform: translate(-50%,-50%); place-content: center; color: var(--muted); background: transparent; border: 0; border-radius: 4px; font: inherit; font-size: 10px; line-height: 1.2; text-align: center; cursor: help; pointer-events: auto; }
 .ability-radar-metric.is-metric-0 { left: 50%; top: 12%; }
@@ -989,7 +989,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 
 /* 设计稿：阶段与队列信息放在“刷新对局”同一行的左侧 */
 .live-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; margin-bottom: 10px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
-.live-toolbar [data-live-status] { min-width: 0; flex: 0 1 270px; }
+.live-toolbar [data-live-status] { min-width: 0; flex: 0 1 auto; }
+.live-toolbar [data-live-status]:empty { display: none; }
 .live-session-summary { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
 .live-session-summary[hidden] { display: none; }
 .live-session-summary .state-chip { flex: 0 0 auto; color: var(--primary-strong); background: var(--primary-soft); border: 1px solid color-mix(in oklab,var(--primary) 42%,var(--line)); }
@@ -1000,7 +1001,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-current-position .position-icon { width: 17px; height: 17px; filter: brightness(.2); }
 .live-position-mismatch { display: inline-grid; width: 16px; height: 16px; place-items: center; color: var(--primary); background: var(--on-primary); border-radius: 50%; font-size: 10px; line-height: 1; cursor: help; }
 .live-position-mismatch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.live-toolbar > .text-button { flex: 0 0 auto; margin-left: auto; }
+.live-toolbar > .text-button { flex: 0 0 auto; margin-left: 0; }
 .state-chip { display: inline-flex; width: fit-content; min-height: 26px; align-items: center; padding: 0 8px; color: var(--muted); background: var(--surface-strong); border-radius: 999px; font-size: 11px; font-weight: 650; }
 .state-chip.success { color: var(--success); background: var(--success-soft); }
 .live-teams { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; padding-top: 10px; }
@@ -1105,6 +1106,18 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .recommendation-tabs button:hover { color: var(--ink); }
 .recommendation-tabs button.is-active { color: var(--ink); background: var(--surface-strong); }
 .recommendation-panel[hidden] { display: none; }
+.lane-matchup-card { display: grid; gap: 9px; margin-bottom: 12px; padding: 13px 15px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.lane-matchup-card h3 { margin: 0; font-size: 13px; }
+.lane-matchup-foe, .lane-matchup-result, .lane-matchup-option { display: flex; min-width: 0; align-items: center; gap: 9px; }
+.lane-matchup-foe { color: var(--muted); font-size: 11px; }
+.lane-matchup-result { font-size: 12px; }
+.lane-matchup-result.is-weak { color: var(--danger); }
+.lane-matchup-result.is-strong { color: var(--success); }
+.lane-matchup-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 7px; }
+.lane-matchup-option { padding: 7px 9px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; font-size: 11px; }
+.lane-matchup-option strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-matchup-option > span { margin-left: auto; color: var(--success); white-space: nowrap; }
+.lane-matchup-card .game-icon { flex: 0 0 auto; }
 /* 页签内加载遮罩：只盖住 tab 栏下方的这块面板，tab 栏与其上方内容照常可用。 */
 .recommendation-panel { position: relative; min-width: 0; min-height: 220px; }
 .recommendation-panel.is-loading { min-height: min(420px,calc(60dvh / var(--ui-zoom, 1))); }
@@ -1151,6 +1164,14 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .rune-source-tab:hover { color: var(--ink); background: var(--surface-strong); }
 .rune-source-tab.is-active { color: var(--ink); background: var(--primary-soft); box-shadow: inset 0 0 0 1px color-mix(in oklab,var(--primary) 50%,transparent); }
 .rune-source-section { overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.rune-spell-row { display: flex; min-width: 0; align-items: center; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--line); }
+.rune-source-section > .rune-spell-row { border-top: 0; border-bottom: 1px solid var(--line); }
+.rune-spell-row > span { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
+.rune-spell-items { display: flex; min-width: 0; flex-wrap: wrap; gap: 10px; }
+.rune-spell-item { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); }
+.rune-spell-item .item-option-button { width: 30px; height: 30px; padding: 2px; }
+.rune-spell-item .game-icon { width: 26px; height: 26px; flex-basis: 26px; }
+.rune-spell-item small { font-size: 10px; white-space: nowrap; }
 .rune-source-note { min-width: 0; margin: 0 8px 2px; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .rune-choice-list { display: grid; grid-template-columns: 1fr; }
 .rune-choice-card { cursor: pointer; }
@@ -1210,11 +1231,12 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .specialist-result-dot { display: inline-block; width: 8px; height: 8px; flex: 0 0 8px; background: currentColor; border-radius: 50%; }
 .specialist-game-content { display: block; min-width: 0; }
 .specialist-game-runes { min-width: 0; overflow: visible; }
-.specialist-game-items { display: flex; min-height: 44px; align-items: center; gap: 8px; padding: 7px 10px 10px; border-top: 1px solid var(--line); }
+.specialist-game-items { display: flex; box-sizing: border-box; height: 48px; min-height: 44px; align-items: center; gap: 8px; padding: 7px 10px 10px; border-top: 1px solid var(--line); }
 .specialist-game-items > span { flex: 0 0 auto; color: var(--muted); font-size: 9px; }
-.specialist-game-items > div { display: flex; min-width: 0; flex-wrap: wrap; gap: 4px; }
+.specialist-game-items > div:not(.specialist-game-spells) { display: flex; min-width: 0; overflow-x: auto; flex-wrap: nowrap; align-items: center; gap: 4px; }
 .specialist-game-items .item-option-button { width: 30px; height: 30px; padding: 2px; }
 .specialist-game-items .game-icon { width: 24px; height: 24px; flex-basis: 24px; }
+.specialist-game-spells { display: flex; flex: 0 0 auto; align-items: center; flex-wrap: nowrap; min-width: auto; gap: 6px; margin-left: auto; }
 .specialist-opponent { display: flex; min-width: 0; align-items: center; justify-self: end; justify-content: flex-end; gap: 7px; overflow: hidden; }
 .specialist-opponent-copy { display: flex; min-width: 0; align-items: baseline; gap: 6px; overflow: hidden; }
 .specialist-opponent.is-win { color: var(--accent); }
@@ -1261,7 +1283,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-augment-option .arena-augment-icon > .game-icon.is-large { width: 48px; height: 48px; flex-basis: 48px; border-radius: 5px; }
 .live-augment-option > span:last-child { display: grid; min-width: 0; gap: 3px; }
 .live-augment-title { display: flex; min-width: 0; align-items: center; gap: 6px; }
-.live-augment-title .augment-grade { width: 20px; height: 20px; flex: 0 0 20px; font-size: 11px; }
+.live-augment-title .tier-badge.live-augment-grade { width: 20px; height: 23px; flex: 0 0 20px; }
 .live-augment-option strong { overflow: hidden; color: var(--ink); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .live-augment-option small { color: var(--muted); font-size: 9px; line-height: 1.45; }
 .live-augment-option small.live-augment-stats { display: flex; min-width: 0; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.3; }
@@ -1298,7 +1320,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-teams.is-insight:not(.is-arena) > .live-team { display: grid; grid-row: 1 / span 11; grid-template-rows: subgrid; }
 .live-teams.is-insight:not(.is-arena) > .live-team > header { grid-row: 1; }
 .live-teams.is-insight:not(.is-arena) .live-player-list.is-insight { display: contents; }
-.live-player-list.is-insight .insight-match-row { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 11px 11px 68px; }
+.live-player-list.is-insight .insight-match-row { display: flex; flex-wrap: wrap; align-content: flex-end; align-items: flex-end; gap: 5px; padding: 0 11px 11px 68px; }
 .live-player-list.is-insight .live-player { border-top: 1px solid var(--line); }
 .live-player-list.is-insight .live-player:first-child { border-top: 0; }
 .live-player-list.is-insight .live-player.is-self + .insight-match-row { background: color-mix(in oklab,var(--primary-soft) 62%,transparent); }
@@ -1403,6 +1425,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .shell:has(#live-panel:not([hidden]) .recommendation-panel:not([hidden]) > .recommendation-action) { padding-bottom: 0; }
 .recommendation-action > div { display: grid; }
 .recommendation-action span { color: var(--muted); font-size: 10px; }
+.rune-spell-toggle { display: inline-flex; align-items: center; gap: 6px; margin-top: 5px; color: var(--ink); font-size: 11px; cursor: pointer; }
+.rune-spell-toggle input { margin: 0; accent-color: var(--primary-strong); }
 
 .build-recommendation { overflow: hidden; container: build-recommendation / inline-size; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .live-augment-recommendations + .build-recommendation { position: relative; margin-top: 20px; }
@@ -1486,6 +1510,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .config-icons .game-icon { border-radius: 8px; }
 .route-step { display: inline-flex; min-width: 0; flex: 0 0 auto; align-items: center; gap: 6px; }
 .route-arrow { flex: 0 0 auto; color: var(--muted); font-size: 18px; }
+.route-divider { width: 3px; height: 34px; flex: 0 0 3px; margin-inline: 5px; background: var(--primary-strong); border-radius: 2px; }
 .option-stats { display: grid; min-width: 0; flex: 0 0 auto; grid-template-columns: repeat(3,minmax(48px,64px)); margin: 0; text-align: right; }
 .option-stats.is-depth { grid-template-columns: repeat(2,minmax(48px,64px)); }
 .item-core-column .option-stats.is-depth { column-gap: 0; }
@@ -1729,11 +1754,10 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
     flex-basis: 28px;
   }
   .live-arena-build-section.is-core .arena-option-card .route-arrow { font-size: 9px; }
-  .live-arena-build-section.is-core .arena-option-card .augment-grade {
+  .live-arena-build-section.is-core .arena-option-card .tier-badge.live-build-grade {
     width: 18px;
-    height: 18px;
+    height: 21px;
     flex-basis: 18px;
-    font-size: 10px;
   }
   .live-arena-build-section.is-prismatic .arena-option-card .item-option-button,
   .live-arena-build-section.is-prismatic .arena-option-card .item-option-button > .game-icon.is-large {

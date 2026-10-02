@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -66,6 +67,7 @@ func r116aAnswerFixture(t *testing.T, buildID string) []byte {
 	for index := range answer.HeroAliases {
 		answer.HeroAliases[index].ID = strconv.Itoa(index + 1)
 		answer.HeroAliases[index].Name = "英雄" + strconv.Itoa(index+1)
+		answer.HeroAliases[index].URL = fmt.Sprintf("/hero/%d-hero%d", index+1, index+1)
 	}
 	data, err := json.Marshal(answer)
 	if err != nil {
@@ -98,6 +100,10 @@ func r116aInsightsFixture(t *testing.T, heroCount, augmentCount int) []byte {
 				row[field] = value
 			}
 			row["id"] = strconv.Itoa(index + 1)
+			if key == "heroes" {
+				row["name"] = "英雄" + strconv.Itoa(index+1)
+				row["detailUrl"] = fmt.Sprintf("/hero/%d-hero%d", index+1, index+1)
+			}
 			rows = append(rows, row)
 		}
 		return rows
@@ -178,6 +184,9 @@ func (m *r116aMock) roundTrip(recorder *r116aRecorder) championRoundTripFunc {
 		}
 		if status, ok := m.status[request.URL.Path]; ok {
 			return &http.Response{StatusCode: status, Header: make(http.Header), Body: http.NoBody, Request: request}, nil
+		}
+		if request.URL.Path == "/" || request.URL.Path == "/heroes" || hexdataHeroPathPattern.MatchString(request.URL.Path) {
+			return hexdataResponse(request, []byte("<html></html>")), nil
 		}
 		body, ok := m.bodies[request.URL.Path]
 		if !ok && hexdataHeroJSONPathPattern.MatchString(request.URL.Path) {
@@ -648,7 +657,89 @@ func r116aMayhemProvider(t *testing.T, recorder *r116aRecorder, heroJSON []byte)
 	return provider, root
 }
 
-func TestLoadMayhemDetailRequestsHeroJSONAndMetaOnly(t *testing.T) {
+func TestR148MayhemDetailRunsHeroAndAggregatesConcurrently(t *testing.T) {
+	recorder := &r116aRecorder{}
+	provider, _ := r116aMayhemProvider(t, recorder, r116aFixture(t, "hexdata-hero-157.json"))
+	if _, err := provider.loadHexdataMeta(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	base := provider.client.Transport
+	var entered atomic.Int32
+	release := make(chan struct{})
+	provider.client.Transport = championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		switch request.URL.Path {
+		case hexdataHeroJSONPathPrefix + "157", hexdataHextechInsightsPath, hexdataPostmatchPath:
+			entered.Add(1)
+			select {
+			case <-release:
+			case <-request.Context().Done():
+				return nil, request.Context().Err()
+			}
+		}
+		return base.RoundTrip(request)
+	})
+	done := make(chan error, 1)
+	go func() { _, err := provider.loadMayhemDetail(context.Background(), "157"); done <- err }()
+	deadline := time.After(3 * time.Second)
+	for entered.Load() < 3 {
+		select {
+		case err := <-done:
+			close(release)
+			t.Fatalf("detail completed before all three requests overlapped: %v, entered=%d", err, entered.Load())
+		case <-deadline:
+			close(release)
+			t.Fatalf("three concurrent requests never overlapped: entered=%d", entered.Load())
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestR148MayhemHeroFailureStillAttemptsOPGGRSC(t *testing.T) {
+	for _, failure := range []struct {
+		name string
+		err  error
+	}{
+		{name: "http_504"},
+		{name: "timeout", err: context.DeadlineExceeded},
+	} {
+		t.Run(failure.name, func(t *testing.T) {
+			recorder := &r116aRecorder{}
+			provider, _ := r116aMayhemProvider(t, recorder, r116aFixture(t, "hexdata-hero-157.json"))
+			base := provider.client.Transport
+			provider.client.Transport = championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+				if request.URL.Path == hexdataHeroJSONPathPrefix+"157" {
+					recorder.add(request)
+					if failure.err != nil {
+						return nil, failure.err
+					}
+					return &http.Response{StatusCode: http.StatusGatewayTimeout, Header: make(http.Header), Body: http.NoBody, Request: request}, nil
+				}
+				return base.RoundTrip(request)
+			})
+			if _, err := provider.loadMayhemDetail(context.Background(), "157"); err == nil {
+				t.Fatal("hero and RSC failures should return an error")
+			}
+			recorder.mu.Lock()
+			defer recorder.mu.Unlock()
+			foundRSC := false
+			for _, path := range recorder.foreign {
+				if strings.Contains(path, "/lol/modes/aram-mayhem/yasuo/build") {
+					foundRSC = true
+				}
+			}
+			if !foundRSC {
+				t.Fatalf("OP.GG RSC fallback was not attempted: %v", recorder.foreign)
+			}
+		})
+	}
+}
+
+func TestLoadMayhemDetailRequestsHeroJSONMetaAndTokenPage(t *testing.T) {
 	recorder := &r116aRecorder{}
 	provider, _ := r116aMayhemProvider(t, recorder, r116aFixture(t, "hexdata-hero-157.json"))
 	response, err := provider.loadMayhemDetail(context.Background(), "157")
@@ -660,8 +751,8 @@ func TestLoadMayhemDetailRequestsHeroJSONAndMetaOnly(t *testing.T) {
 	if got := recorder.countPrefix("/augment/"); got != 0 {
 		t.Fatalf("augment HTML pages were still fetched %d times: %v", got, paths)
 	}
-	if got := recorder.countPrefix("/hero/"); got != 0 {
-		t.Fatalf("hero HTML page was still fetched %d times: %v", got, paths)
+	if got := recorder.countPrefix("/hero/"); got != 1 {
+		t.Fatalf("hero token pages = %d, want 1: %v", got, paths)
 	}
 	if got := recorder.count(hexdataMetaPath); got != 1 {
 		t.Fatalf("meta requests = %d, want 1 (%v)", got, paths)
@@ -679,7 +770,7 @@ func TestLoadMayhemDetailRequestsHeroJSONAndMetaOnly(t *testing.T) {
 		t.Fatalf("hexdata data requests = %d, want 2 (%v)", dataRequests, paths)
 	}
 	// answer-cards 是既有的站点元数据请求（measurementTechnique 的唯一来源，
-	// 12h 软 TTL、与榜单页共用），工单没有要求移除；缓存命中后详情页就是 2 条。
+	// 12h 软 TTL、与榜单页共用）；R147 额外取一次当前英雄页以取得令牌。
 	if got := recorder.count(hexdataAnswerPath); got != 1 {
 		t.Fatalf("answer-cards requests = %d, want 1 (%v)", got, paths)
 	}
@@ -771,13 +862,14 @@ func TestLoadMayhemDetailRequestsHeroJSONAndMetaOnly(t *testing.T) {
 //	R116-A 交付时 = 2 条：/api/hexdata/meta + /api/hexdata/heroes/157
 //	R116-B 之后   = 4 条：再加 /api/hexdata/hextech-insights（P0-5-2 官方英雄档位）
 //	                       与 /api/hexdata/postmatch（P1-6 的 22 项表现指标）
+//	R147 之后     = 5 条：先访问当前英雄页取得页面令牌。
 //
 // 两条新增都是「每个 buildID 只取一次」的目录型全量文件（373 KB / 89 KB），都会
 // promote 落盘并长期缓存，所以只有该 buildID 下的第一次详情页付这个代价；此后同一
 // 英雄再打开必须是 0 条。这正是评审第 4.2/4.3 节要求的形态（「/postmatch +
 // /hextech-insights 两个全量文件，0.46 MB / 2 请求」），而不是对 10 个英雄各拉一次
 // hero-json（最坏排队 11 秒，且 recordLoadFailure 对取消直接 return 会让熔断永远不触发）。
-func TestLoadMayhemDetailColdHeroCostsFourHexdataRequestsWithWarmSiteMetadata(t *testing.T) {
+func TestLoadMayhemDetailColdHeroCostsFiveHexdataRequestsWithWarmSiteMetadata(t *testing.T) {
 	recorder := &r116aRecorder{}
 	provider, _ := r116aMayhemProvider(t, recorder, r116aFixture(t, "hexdata-hero-157.json"))
 	if _, _, err := provider.loadHexdataAnswer(context.Background()); err != nil {
@@ -788,16 +880,20 @@ func TestLoadMayhemDetailColdHeroCostsFourHexdataRequestsWithWarmSiteMetadata(t 
 		t.Fatal(err)
 	}
 	paths := recorder.hexdataPaths()
-	want := []string{hexdataMetaPath, "/api/hexdata/heroes/157", hexdataHextechInsightsPath, hexdataPostmatchPath}
+	want := []string{hexdataMetaPath, "/hero/157-yasuo", "/api/hexdata/heroes/157", hexdataHextechInsightsPath, hexdataPostmatchPath}
 	if len(paths) != len(want) {
 		t.Fatalf("hexdata requests = %v, want %v", paths, want)
 	}
-	for index := range want {
-		if paths[index] != want[index] {
-			t.Fatalf("hexdata requests = %v, want %v", paths, want)
+	counts := make(map[string]int, len(paths))
+	for _, path := range paths {
+		counts[path]++
+	}
+	for _, path := range want {
+		if counts[path] != 1 {
+			t.Fatalf("hexdata requests = %v, want one %s", paths, path)
 		}
 	}
-	// 四个响应都必须落盘，否则同一英雄每次打开都要重新付这 4 条请求。
+	// 四个 JSON 响应都必须落盘；页面令牌只保存在内存里。
 	*recorder = r116aRecorder{}
 	if _, err := provider.loadMayhemDetail(context.Background(), "157"); err != nil {
 		t.Fatal(err)
@@ -1154,12 +1250,11 @@ func TestHexdataDeadHTMLChainIsGone(t *testing.T) {
 			t.Fatalf("dead reference %q is still in hexdata.go", symbol)
 		}
 	}
-	// 保留项：decorateHexdataAugments 继续按 ID 补 CommunityDragon 图标/rarity，
-	// 且绝不改用 hexdata 自己 CDN 的 augmentIconUrl / itemImageUrl（Anti-scope 第 2 条）。
+	// R159 放行经过严格校验的 augmentIconUrl，保留 R116-A 对 itemImageUrl 的限制。
 	if !strings.Contains(body, "func (p *championProvider) decorateHexdataAugments(") {
 		t.Fatal("decorateHexdataAugments was deleted but must be kept")
 	}
-	for _, forbidden := range []string{"augmentIconUrl", "itemImageUrl"} {
+	for _, forbidden := range []string{"itemImageUrl"} {
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("hexdata CDN field %q must not be used (Anti-scope 2)", forbidden)
 		}

@@ -111,6 +111,22 @@ func TestSpecialistRuneMarksEarlySurrenderAsRemake(t *testing.T) {
 	}
 }
 
+func TestSpecialistRuneCarriesVerifiedSummonerSpells(t *testing.T) {
+	var match riotMatch
+	if err := json.Unmarshal([]byte(specialistMatchBodyAtPosition("KR_1", "expert-puuid", 64, "complete", "MIDDLE", true, false)), &match); err != nil {
+		t.Fatal(err)
+	}
+	participant, ok := specialistParticipant(&match, "expert-puuid")
+	if !ok {
+		t.Fatal("specialist participant missing")
+	}
+	participant.Summoner1ID, participant.Summoner2ID = 4, 11
+	rune, ok := specialistRuneFromParticipant(64, "李青", championTopPlayer{Name: "Expert", Tagline: "KR1"}, &match, participant, 0)
+	if !ok || rune.Spell1ID != 4 || rune.Spell2ID != 11 {
+		t.Fatalf("specialist spells = %d/%d, ok=%v", rune.Spell1ID, rune.Spell2ID, ok)
+	}
+}
+
 func TestSpecialistRunesUsesThirdMatchingGame(t *testing.T) {
 	t.Setenv("RIOT_API_KEY", "RGAPI-test")
 	player := championTopPlayer{Name: "Expert", Tagline: "KR1", Tier: "master", LP: "211", Games: "1,451", WinRate: 51}

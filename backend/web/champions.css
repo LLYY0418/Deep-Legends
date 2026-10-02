@@ -92,10 +92,8 @@
 .champion-portrait img, .champion-detail-portrait img, .recommend-icon img, .augment-icon img, .augment-champion-icon img, .rune-style-icon img, .rune-icon img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; }
 .champion-portrait > span, .champion-detail-portrait > span, .recommend-icon > span, .augment-icon > span, .augment-champion-icon > span, .rune-style-icon > span, .rune-icon > span { position: absolute; font-size: 11px; font-weight: 800; }
 /* 设计稿：六边形梯度徽章（OP/1-5 内置 SVG 图标） */
-.tier-badge { display: inline-block; width: 26px; height: 30px; vertical-align: middle; filter: drop-shadow(0 2px 4px rgb(0 0 0 / .35)); }
-.tier-badge.is-metric { width: 24px; height: 27px; }
 .tier-badge.topcard-tier { position: absolute; top: 10px; left: 14px; z-index: 2; width: 28px; height: 32px; }
-.tier-badge-fallback { color: var(--muted); font-size: 12px; font-weight: 800; }
+.tier-badge.arena-option-grade, .tier-badge.atlas-augment-grade { width: 22px; height: 25px; flex: 0 0 22px; }
 .champion-table td.metric-win, .champion-detail-metrics .metric-win strong, .champion-detail-positions .metric-win { color: var(--success); font-weight: 800; }
 .champion-table td.metric-pick, .champion-detail-metrics .metric-pick strong, .champion-detail-positions .metric-pick { color: var(--accent); font-weight: 800; }
 .champion-table td.metric-ban, .champion-detail-metrics .metric-ban strong { color: var(--danger); font-weight: 800; }
@@ -169,10 +167,7 @@
 .augment-tier-group > header div { display: grid; }
 .augment-tier-group h4 { margin: 0; color: var(--ink); font-size: 13px; }
 .augment-tier-group > header p { margin: 1px 0 0; color: var(--muted); font-size: 10px; }
-.augment-tier-letter { display: grid; width: 36px; height: 36px; place-items: center; color: var(--ink); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 9px; font-size: 16px; font-weight: 850; }
-.augment-tier-letter.is-0 { color: var(--primary-strong); background: var(--primary-soft); border-color: color-mix(in oklab,var(--primary) 35%,var(--line)); }
-.augment-tier-letter.is-1 { color: var(--accent); }
-.augment-tier-letter.is-2 { color: var(--success); }
+.tier-badge.augment-tier-letter { width: 32px; height: 36px; }
 .augment-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); gap: 8px; padding: 8px 12px 12px; }
 .augment-card { display: grid; min-height: 188px; grid-template-rows: auto 1fr auto; padding: 13px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
 .augment-card header { display: grid; grid-template-columns: 52px minmax(0,1fr); align-items: center; gap: 10px; }
@@ -307,7 +302,8 @@
 .mayhem-atlas-detail-head.is-gold .augment-icon { border-color: var(--rarity-gold); }
 .mayhem-atlas-detail-head.is-prismatic .augment-icon { border-color: var(--rarity-prismatic-a); }
 .mayhem-atlas-detail-head > div { min-width: 0; }
-.mayhem-atlas-detail-head h3 { margin: 4px 0 2px; overflow-wrap: anywhere; font-size: 16px; }
+.mayhem-atlas-detail-head h3 { display: flex; align-items: center; gap: 6px; margin: 4px 0 2px; overflow-wrap: anywhere; font-size: 16px; }
+.mayhem-atlas-detail-head .tier-badge.atlas-detail-grade { width: 20px; height: 23px; flex: 0 0 20px; }
 .mayhem-atlas-detail-head p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .mayhem-atlas-detail-head p span { display: inline-flex; gap: 3px; }
 .mayhem-atlas-detail-head p b { color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -341,18 +337,6 @@
    （图标 56px、名称字号、S/A 徽章、品质芯片、指标列）全部由 arena-option-*
    一套规则供给，两个模式不会再各自漂移。 */
 .mayhem-recommend-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; padding: 12px; }
-.hex-rank { display: inline-grid; width: 24px; height: 24px; place-items: center; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.hex-rank.is-1 { color: var(--rarity-gold); background: color-mix(in oklab,var(--rarity-gold) 16%,var(--surface)); border-color: var(--rarity-gold); box-shadow: inset 0 0 8px color-mix(in oklab,var(--rarity-gold) 36%,transparent); clip-path: polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%); }
-.hex-rank.is-2 { color: var(--rarity-silver); background: color-mix(in oklab,var(--rarity-silver) 16%,var(--surface)); border-color: var(--rarity-silver); box-shadow: inset 0 0 8px color-mix(in oklab,var(--rarity-silver) 32%,transparent); clip-path: polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%); }
-.hex-rank.is-3 { color: #C08457; background: color-mix(in oklab,#C08457 16%,var(--surface)); border-color: #C08457; box-shadow: inset 0 0 8px color-mix(in oklab,#C08457 32%,transparent); clip-path: polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%); }
-.hex-rank.is-rest { width: 22px; height: 22px; border-radius: 5px; color: var(--muted); }
-.augment-grade { display: inline-flex; width: 22px; height: 22px; flex: 0 0 22px; align-items: center; justify-content: center; border-radius: 4px; font-size: 12px; font-weight: 800; line-height: 1; }
-.augment-grade.is-S { color: #FFF; background: #6E3A88; }
-.augment-grade.is-A { color: var(--on-primary); background: var(--rarity-gold); }
-.augment-grade.is-B { color: #11151C; background: #AAB4C2; }
-.augment-grade.is-OP { color: #FFF; background: #C46A2B; }
-.augment-grade.is-C, .augment-grade.is-D { color: var(--ink); background: color-mix(in oklab,var(--muted) 48%,var(--surface)); }
-.augment-grade.is-F { color: #FFF; background: #7D465B; }
 .skill-plan-summary { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 10px; }
 .skill-plan-summary .skill-priority { flex: 1 1 auto; margin-bottom: 0; }
 .skill-win-rate, .option-win-rate, .route-win-rate { display: grid; min-width: 62px; flex: 0 0 auto; gap: 2px; margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; }
@@ -822,6 +806,7 @@
 /* 海斗是大乱斗口径，没有平均名次/吃鸡率，指标列按实际条数收敛。 */
 .arena-option-card[data-metric-count="3"] dl { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .arena-option-card[data-metric-count="4"] dl { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.arena-augment-section .arena-option-card[data-metric-count="4"] dl { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .arena-option-card dl > div { display: grid; min-width: 0; gap: 1px; }
 .arena-option-card dt { color: var(--muted); font-size: 8px; }
 .arena-option-card dd { margin: 0; overflow: hidden; color: var(--muted); font-size: 10px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }

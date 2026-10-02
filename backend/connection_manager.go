@@ -195,6 +195,10 @@ func (a *app) waitForDiscovery(ctx context.Context, delay time.Duration) bool {
 func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error {
 	sessionCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	a.beginGameSettingsWatch(sessionCtx, client)
+	requestDiagnosticTicker := time.NewTicker(30 * time.Second)
+	defer requestDiagnosticTicker.Stop()
+	a.goSafe("connection_manager.runConnectedSession.1", func() { client.runRequestDiagnosticFlush(sessionCtx, requestDiagnosticTicker.C) })
 	defer a.stopMayhemSamplerForClient("connection-ended", client)
 	champSelectPoll := time.NewTicker(time.Second)
 	defer champSelectPoll.Stop()
@@ -208,17 +212,17 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 	defer func() {
 		a.recordDiagnostic(map[string]any{"event": "champselect_delivery", "reason": "connection-ended", "events": champEvents.Load(), "ui_coalesced": champCoalesced.Load()})
 	}()
-	go a.collectObjectiveDiagnostics(sessionCtx, client, "connected")
+	a.goSafe("connection_manager.runConnectedSession.2", func() { a.collectObjectiveDiagnostics(sessionCtx, client, "connected") })
 	startEvents := func() {
-		go func() {
+		a.goSafe("connection_manager.runConnectedSession.3", func() {
 			err := client.ListenEvents(sessionCtx, func() {
 				a.setEventStream(client, true)
 				select {
 				case eventReady <- struct{}{}:
 				default:
 				}
-				go a.primeGameplayState(sessionCtx, client)
-				go a.primeWatchState(client)
+				a.goSafe("connection_manager.runConnectedSession.4", func() { a.primeGameplayState(sessionCtx, client) })
+				a.goSafe("connection_manager.runConnectedSession.5", func() { a.primeWatchState(client) })
 			}, func(event LCUEvent) {
 				client.rememberAcceptFocusEvent(event)
 				recordObjectiveEvent(event)
@@ -229,21 +233,14 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 					var phase string
 					if json.Unmarshal(event.Data, &phase) == nil && phase != "" {
 						if phase == "Matchmaking" {
-							go a.collectAcceptFocusInspectionAt(sessionCtx, client, "matchmaking-not-at-accept")
+							a.goSafe("connection_manager.runConnectedSession.6", func() { a.collectAcceptFocusInspectionAt(sessionCtx, client, "matchmaking-not-at-accept") })
 						}
 						a.observeGameplayPhase(sessionCtx, client, phase)
 						a.broadcastEvent("gameflow:" + phase)
 						if watch := a.activeWatch(); watch != nil {
 							watch.handlePhase(client, phase)
 						}
-						// 排位结算时记录这一场的胜点变化（段位优先走 SGP，
-						// 本机客户端的 ranked-stats 已不返回负场）。
-						if playerRef := a.currentPlayerRef(); playerRef != "" {
-							a.lpTracker.handlePhase(client, phase, playerRef, func() ([]gameplayRank, EndpointCapability) {
-								ranks, _, capability := a.loadRanksWithFallback(context.Background(), client, playerRef, true, clientTencentServerID(client), "")
-								return ranks, capability
-							})
-						}
+						a.handleLPGameflowPhase(client, phase)
 					}
 					return
 				}
@@ -313,7 +310,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 			case eventErrors <- err:
 			case <-sessionCtx.Done():
 			}
-		}()
+		})
 	}
 	startEvents()
 	a.scheduleFacadeLoginReset(sessionCtx, client)
@@ -803,4 +800,14 @@ func (a *app) disconnectClient(client *LCUClient, message string) {
 	client.Close()
 	a.clearAssetCache()
 	a.broadcastEvent("connection-state")
+}
+
+// Both game-start and settlement use this uncached, identical rank loader.
+func (a *app) handleLPGameflowPhase(client *LCUClient, phase string) {
+	if playerRef := a.currentPlayerRef(); playerRef != "" {
+		a.lpTracker.handlePhase(client, phase, playerRef, func() ([]gameplayRank, EndpointCapability) {
+			ranks, _, capability := a.loadRanksWithFallback(context.Background(), client, playerRef, true, clientTencentServerID(client), "")
+			return ranks, capability
+		})
+	}
 }

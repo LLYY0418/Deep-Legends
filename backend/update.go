@@ -165,11 +165,44 @@ type updateManager struct {
 	freeBytes        func(string) (int64, error)
 	launch           func(string, string) error
 	notify           func(string, any)
+	diagnostic       func(map[string]any)
 	ctx              context.Context
 	stop             context.CancelFunc
 	downloadCancel   context.CancelFunc
 	downloadDone     chan struct{}
 	checkDone        chan struct{}
+}
+
+type updateCheckFailure struct {
+	stage      string
+	errorKind  string
+	safeError  string
+	httpStatus int
+	cause      error
+}
+
+func (e *updateCheckFailure) Error() string { return e.cause.Error() }
+func (e *updateCheckFailure) Unwrap() error { return e.cause }
+
+func updateDiagnosticMirrorPrefix(prefix string) string {
+	if prefix == "" {
+		return "direct"
+	}
+	parsed, err := url.Parse(prefix)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || len(parsed.Host) > 128 {
+		return "custom"
+	}
+	// Custom mirror paths may contain tokens; log only the scheme and host.
+	return "https://" + parsed.Host + "/"
+}
+
+func (u *updateManager) recordUpdateCheck(event map[string]any) {
+	if u.diagnostic == nil {
+		return
+	}
+	event["current_version"] = u.status.Current
+	event["build_fingerprint"] = buildFingerprint
+	u.diagnostic(event)
 }
 
 func newUpdateManager(current string, store *localStore, notify func(string, any)) *updateManager {
@@ -226,7 +259,7 @@ func (u *updateManager) Start() {
 	if !u.Status().Supported {
 		return
 	}
-	go func() {
+	goSafe("update.Start.1", func() {
 		u.Check(false)
 		ticker := time.NewTicker(updateCacheTTL)
 		defer ticker.Stop()
@@ -238,7 +271,7 @@ func (u *updateManager) Start() {
 				u.Check(false)
 			}
 		}
-	}()
+	})
 }
 
 func (u *updateManager) Close() {
@@ -250,11 +283,13 @@ func (u *updateManager) Close() {
 func validateUpdateManifest(m updateManifest) error {
 	_, versionOK := parseUpdateVersion(m.Version)
 	_, minimumOK := parseUpdateVersion(m.MinSupported)
-	expected := "Deep-Legends-Setup-" + strings.TrimPrefix(m.Version, "v") + ".exe"
-	// Accept already-published legacy manifests as well as version-only names.
-	legacy := "Deep-Legends-Setup-" + strings.TrimPrefix(m.Version, "v") + "-" + m.Fingerprint + ".exe"
-	if m.Asset.Name == legacy {
-		expected = legacy
+	base := "Deep-Legends-Setup-" + strings.TrimPrefix(m.Version, "v")
+	expected := base + ".exe"
+	// The published public package and both older names are an exact allowlist.
+	for _, name := range []string{base + "-" + m.Fingerprint + ".exe", base + "-public.exe"} {
+		if m.Asset.Name == name {
+			expected = name
+		}
 	}
 	parsed, err := url.Parse(m.Asset.URL)
 	if m.Schema != 1 || !versionOK || (m.MinSupported != "" && !minimumOK) ||
@@ -339,6 +374,8 @@ func (u *updateManager) Check(force bool) bool {
 	u.mu.Unlock()
 	u.publish()
 	go func() {
+		defer recoverPanic("update.Check.1")
+
 		defer close(done)
 		var err error
 		// Reserve the check before cleanup so a manual download cannot race it.
@@ -394,7 +431,23 @@ func (u *updateManager) Check(force bool) bool {
 			data, _ := json.Marshal(u.cache)
 			_ = writeLocalStoreFile(u.store, "update-manifest.json", data)
 		}
+		resultState := u.status.State
 		u.mu.Unlock()
+		if err == nil && u.ctx.Err() == nil {
+			u.recordUpdateCheck(map[string]any{
+				"event": "update_check_succeeded", "latest_version": manifest.Version,
+				"state": resultState, "cached": cached,
+			})
+		} else if err != nil {
+			var sourceFailure *updateCheckFailure
+			if !errors.As(err, &sourceFailure) {
+				u.recordUpdateCheck(map[string]any{
+					"event": "update_check_failed", "stage": "cleanup",
+					"mirror_prefix": "none", "http_status": 0,
+					"error_kind": diagnosticErrorKind(err), "error": "local-cleanup-failed",
+				})
+			}
+		}
 		u.publish()
 	}()
 	return true
@@ -410,6 +463,16 @@ func (u *updateManager) fetchManifest(ctx context.Context, mirrors []string) (up
 		if err == nil {
 			return manifest, nil
 		}
+		if !isCancellation(err) {
+			var failure *updateCheckFailure
+			if errors.As(err, &failure) {
+				u.recordUpdateCheck(map[string]any{
+					"event": "update_check_failed", "stage": failure.stage,
+					"mirror_prefix": updateDiagnosticMirrorPrefix(prefix),
+					"http_status":   failure.httpStatus, "error_kind": failure.errorKind, "error": failure.safeError,
+				})
+			}
+		}
 		last = err
 	}
 	if last == nil {
@@ -424,26 +487,32 @@ func (u *updateManager) fetchManifestSource(ctx context.Context, target string) 
 	var manifest updateManifest
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
-		return manifest, err
+		return manifest, &updateCheckFailure{stage: "fetch", errorKind: "request", safeError: "request-invalid", cause: err}
 	}
 	request.Header.Set("User-Agent", "Deep-Legends/"+u.status.Current)
 	request.Header.Set("Cache-Control", "no-cache")
 	response, err := u.client.Do(request)
 	if err != nil {
-		return manifest, err
+		return manifest, &updateCheckFailure{stage: "fetch", errorKind: diagnosticErrorKind(err), safeError: "request-failed", cause: err}
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return manifest, fmt.Errorf("%s：HTTP %d", target, response.StatusCode)
+		return manifest, &updateCheckFailure{stage: "fetch", errorKind: "http", safeError: "http-error", httpStatus: response.StatusCode, cause: fmt.Errorf("%s：HTTP %d", target, response.StatusCode)}
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, 256*1024+1))
 	if err != nil {
-		return manifest, err
+		return manifest, &updateCheckFailure{stage: "fetch", errorKind: diagnosticErrorKind(err), safeError: "body-read-failed", httpStatus: response.StatusCode, cause: err}
 	}
-	if len(data) > 256*1024 || json.Unmarshal(data, &manifest) != nil {
-		return manifest, errors.New("更新清单无法读取")
+	if len(data) > 256*1024 {
+		return manifest, &updateCheckFailure{stage: "parse", errorKind: "response-too-large", safeError: "manifest-too-large", httpStatus: response.StatusCode, cause: errors.New("更新清单无法读取")}
 	}
-	return manifest, validateUpdateManifest(manifest)
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return manifest, &updateCheckFailure{stage: "parse", errorKind: "decode", safeError: "manifest-decode-failed", httpStatus: response.StatusCode, cause: errors.New("更新清单无法读取")}
+	}
+	if err := validateUpdateManifest(manifest); err != nil {
+		return manifest, &updateCheckFailure{stage: "validate", errorKind: "invalid-manifest", safeError: "manifest-invalid", httpStatus: response.StatusCode, cause: err}
+	}
+	return manifest, nil
 }
 
 func (u *updateManager) cleanDownloads(keep string) error {

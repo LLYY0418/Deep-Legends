@@ -121,6 +121,10 @@ type proRuneProvider struct {
 	identities       map[string]string
 	ends             map[string]proWindow
 	details          map[string]proDetails
+	startDetails     map[string]proDetails
+	startFailures    map[string]time.Time
+	backgroundSlots  chan struct{}
+	detailsShapes    map[string]bool
 	flights          map[string]chan struct{}
 	gate             chan struct{}
 	preparing        bool
@@ -135,7 +139,7 @@ type proRuneProvider struct {
 }
 
 func newProRuneProvider(provider *championProvider, store *localStore, notify func()) *proRuneProvider {
-	p := &proRuneProvider{provider: provider, notify: notify, identities: map[string]string{}, ends: map[string]proWindow{}, details: map[string]proDetails{}, flights: map[string]chan struct{}{}, gate: make(chan struct{}, 4), snapshot: proRuneSnapshot{Games: map[string]proRuneIndexGame{}, Events: map[string]proRuneEvent{}}}
+	p := &proRuneProvider{provider: provider, notify: notify, identities: map[string]string{}, ends: map[string]proWindow{}, details: map[string]proDetails{}, startDetails: map[string]proDetails{}, startFailures: map[string]time.Time{}, backgroundSlots: make(chan struct{}, proRuneBackgroundWorkers), detailsShapes: map[string]bool{}, flights: map[string]chan struct{}{}, gate: make(chan struct{}, 4), snapshot: proRuneSnapshot{Games: map[string]proRuneIndexGame{}, Events: map[string]proRuneEvent{}}}
 	if store != nil {
 		p.root = filepath.Join(store.root, "pro-runes-v1")
 	}
@@ -205,6 +209,16 @@ func (p *proRuneProvider) fetch(ctx context.Context, feed bool, endpoint string,
 			return errors.New("invalid public query")
 		}
 	}
+	// All background index, terminal and opening requests share three slots,
+	// leaving the fourth network slot for the selected rune's foreground detail.
+	if background, _ := ctx.Value(proBackgroundRequestKey{}).(bool); background {
+		select {
+		case p.backgroundSlots <- struct{}{}:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		defer func() { <-p.backgroundSlots }()
+	}
 	select {
 	case p.gate <- struct{}{}:
 	case <-ctx.Done():
@@ -236,6 +250,9 @@ func (p *proRuneProvider) fetch(ctx context.Context, feed bool, endpoint string,
 	data, err := readLimited(res.Body, 2<<20)
 	if err != nil {
 		return err
+	}
+	if observation, ok := ctx.Value(proDetailsObservationKey{}).(proDetailsObservation); ok {
+		p.recordDetailsShape(data, observation)
 	}
 	return json.Unmarshal(data, into)
 }
@@ -316,10 +333,12 @@ func proParallelLimit[T any](ctx context.Context, values []T, workers int, fn fu
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func() {
+			defer recoverPanic("pro_runes.proParallelLimit.1")
+
 			defer wg.Done()
 			for value := range jobs {
 				if ctx.Err() == nil {
-					fn(value)
+					func() { defer recoverPanic("proParallelLimit.job"); fn(value) }()
 				}
 			}
 		}()
@@ -349,9 +368,11 @@ func (p *proRuneProvider) kick(force bool) {
 	p.attempted = now
 	p.mu.Unlock()
 	go func() {
+		defer recoverPanic("pro_runes.kick.1")
+
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
-		p.refresh(ctx, now)
+		p.refresh(withProBackground(ctx), now)
 		if p.notify != nil {
 			p.notify()
 		}
@@ -369,7 +390,7 @@ func (p *proRuneProvider) kick(force bool) {
 		finished := map[string]bool{}
 		// Leave one of the four public-request slots available for selected rune details.
 		proParallelLimit(endCtx, games, proRuneBackgroundWorkers, func(g proRuneIndexGame) {
-			if _, err := p.terminal(endCtx, g); err == nil {
+			if _, err := p.terminal(withProBackground(endCtx), g); err == nil {
 				resultMu.Lock()
 				finished[g.ID] = true
 				resultMu.Unlock()

@@ -24,7 +24,7 @@ func (a *app) startRankedSplitProbe(client *LCUClient, puuid string, summonerID 
 		return
 	}
 	a.rankedSplitProbeOnce.Do(func() {
-		go a.probeRankedSplitEndpoints(context.Background(), client, puuid, summonerID)
+		a.goSafe("ranked_split_probe.startRankedSplitProbe.1", func() { a.probeRankedSplitEndpoints(context.Background(), client, puuid, summonerID) })
 	})
 }
 

@@ -135,8 +135,12 @@ func TestLoadArenaChampionAggregateUsesAggregateEndpointAndCatalog(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if payload.Response.CoreItems == nil || catalog == nil || len(catalog) != 1 || catalog[0].Name != "黑色切割者" || catalog[0].Price != 3000 {
-		t.Fatalf("aggregate/catalog response = %#v %#v", payload.Response, catalog)
+	items := make(map[int64]gameplayItem, len(catalog))
+	for _, item := range catalog {
+		items[item.ID] = item
+	}
+	if payload.Response.CoreItems == nil || len(catalog) < 500 || items[223071].Name != "黑色切割者" || items[223071].Price != 2500 {
+		t.Fatalf("aggregate/bundled catalog: rows=%d item=%#v", len(catalog), items[223071])
 	}
 }
 

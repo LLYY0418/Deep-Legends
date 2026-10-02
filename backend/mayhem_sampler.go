@@ -64,7 +64,7 @@ func (a *app) startMayhemSampler(client *LCUClient, gameID int64, phase string) 
 	a.mayhemSamplerClient = client
 	a.mayhemSamplerCancel = cancel
 	a.mayhemSamplerMu.Unlock()
-	go func() {
+	a.goSafe("mayhem_sampler.startMayhemSampler.1", func() {
 		a.runMayhemSampler(ctx, gameID, phase)
 		a.mayhemSamplerMu.Lock()
 		if a.mayhemSamplerGameID == gameID {
@@ -72,7 +72,7 @@ func (a *app) startMayhemSampler(client *LCUClient, gameID int64, phase string) 
 			a.mayhemSamplerCancel = nil
 		}
 		a.mayhemSamplerMu.Unlock()
-	}()
+	})
 }
 
 func (a *app) stopMayhemSampler(reason string) {

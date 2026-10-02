@@ -32,10 +32,44 @@ function functionSource(script, name) {
 
 function compile(names, dependencies = {}, script = source) {
   const keys = Object.keys(dependencies);
-  return Function(...keys, `"use strict";\n${names.map((name) => functionSource(script, name)).join("\n")}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
+  return Function(...keys, `"use strict";\n${names.map((name) => `${script.slice(script.indexOf(`function ${name}(`) - 6, script.indexOf(`function ${name}(`)) === "async " ? "async " : ""}${functionSource(script, name)}`).join("\n")}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
 }
 
 const escapeHTML = (value) => String(value ?? "").replace(/[&<>'"]/g, "_");
+
+test("R168 gameflow invalidates champ select while away and returning fetches current runtime", async () => {
+  const state = { active: false, connected: true, tab: "champselect", phase: "ChampSelect", watch: {}, champSelectGroups: [], champSelectCatalog: [], champSelectRuntime: { active: true, teammatePicked: [22] } };
+  const requests = [], pending = [];
+  let helpers;
+  helpers = compile(["handleSuiteGameflow", "handleLazySection", "loadChampSelect"], {
+    state, roots: { champselect: {} }, renderWatch() {}, renderChampSelect() {},
+    api: async (url) => { requests.push(url); return { active: false, teammatePicked: [] }; },
+    loadAll: () => pending.push(helpers.loadChampSelect(false)),
+    clearTimeout() {}, subtitle: { textContent: "" }, tabCopy: { champselect: "征召" }, activateTab() {},
+    champSelectPanelRoot: () => ({ innerHTML: "" }), errorCard: () => "",
+  });
+  helpers.handleSuiteGameflow({ detail: { changed: true, phase: "InProgress" } });
+  assert.equal(state.champSelectRuntime, null);
+  assert.deepEqual(requests, [], "hidden section does not start a background request");
+  helpers.handleLazySection({ detail: { name: "suite" } });
+  await Promise.all(pending);
+  assert.deepEqual(requests, ["/api/champselect/state"]);
+  assert.equal(state.champSelectRuntime.active, false);
+});
+
+test("R168 active champ select refreshes once for one gameflow change", async () => {
+  const state = { active: true, connected: true, phase: "ChampSelect", watch: {}, champSelectGroups: [], champSelectCatalog: [], champSelectRuntime: { active: true } };
+  const requests = [];
+  const { handleSuiteGameflow } = compile(["handleSuiteGameflow", "loadChampSelect"], {
+    state, roots: { champselect: {} }, renderWatch() {}, renderChampSelect() {},
+    api: async (url) => { requests.push(url); return { active: false }; },
+    champSelectPanelRoot: () => ({ innerHTML: "" }), errorCard: () => "",
+  });
+  handleSuiteGameflow({ detail: { changed: true, phase: "InProgress" } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(requests, ["/api/champselect/state"]);
+  assert.equal(state.champSelectRuntime.active, false);
+});
 
 test("career manual reread resets stale preview even when server payload is unchanged", async () => {
   const current = { connected: true, profile: { backgroundSkinId: 21069 }, skins: [{ id: 21069, championId: 21, name: "当前皮肤" }, { id: 67004, championId: 67, name: "待应用皮肤" }] };

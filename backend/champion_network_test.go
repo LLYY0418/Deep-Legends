@@ -112,6 +112,91 @@ func TestHandleChampionAssetCommunityDragonReportsFinalAugmentFailure(t *testing
 	}
 }
 
+func TestR154CommunityDragonChampionIconFallsBackToDataDragon(t *testing.T) {
+	image := []byte("\x89PNG\r\n\x1a\nfrom-ddragon")
+	for _, blocked := range []bool{false, true} {
+		t.Run(fmt.Sprint("blocked=", blocked), func(t *testing.T) {
+			provider := newChampionProvider()
+			collector := &r127EventCollector{}
+			provider.diag = collector.record
+			provider.patch = "16.19.1"
+			provider.championMeta[103] = championMetadata{ID: 103, Key: "Ahri"}
+			var communityCalls, fallbackCalls int
+			provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+				switch request.URL.Hostname() {
+				case communityDragonHost:
+					communityCalls++
+					return nil, context.DeadlineExceeded
+				case dataDragonHost:
+					fallbackCalls++
+					if request.URL.Path != "/cdn/16.19.1/img/champion/Ahri.png" {
+						t.Errorf("fallback path = %s", request.URL.Path)
+					}
+					return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(image)), Request: request}, nil
+				}
+				t.Errorf("unexpected host %s", request.URL.Hostname())
+				return nil, errors.New("unexpected host")
+			})}
+			a := &app{champions: provider}
+			if blocked {
+				a.assetHostBackoffUntil = map[string]time.Time{communityDragonHost: time.Now().Add(time.Minute)}
+			}
+			recorder := httptest.NewRecorder()
+			a.handleChampionAsset(recorder, httptest.NewRequest(http.MethodGet, "/api/champion-asset?source=communitydragon&path=/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/103.png", nil))
+			if recorder.Code != http.StatusOK || !bytes.Equal(recorder.Body.Bytes(), image) || fallbackCalls != 1 {
+				t.Fatalf("fallback response = %d %q, calls=%d", recorder.Code, recorder.Body.Bytes(), fallbackCalls)
+			}
+			if blocked && communityCalls != 0 || !blocked && communityCalls != 1 {
+				t.Fatalf("community calls = %d, blocked=%v", communityCalls, blocked)
+			}
+			fallbacks := collector.only("champion_asset_fallback")
+			if len(fallbacks) != 1 || fallbacks[0]["fallback_host"] != dataDragonHost || fallbacks[0]["fallback_path"] != "/cdn/16.19.1/img/champion/Ahri.png" {
+				t.Fatalf("fallback diagnostic = %#v", fallbacks)
+			}
+		})
+	}
+}
+
+func TestR154OfflineProfileIconFallsBackAfterCommunityDragonNegativeCache(t *testing.T) {
+	image := []byte("\x89PNG\r\n\x1a\nprofile")
+	provider := newChampionProvider()
+	var communityCalls, fallbackCalls, versionCalls int
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Hostname() == communityDragonHost {
+			communityCalls++
+			return nil, context.DeadlineExceeded
+		}
+		if request.URL.Hostname() == dataDragonHost && request.URL.Path == "/api/versions.json" {
+			versionCalls++
+			return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`["16.19.1"]`)), Request: request}, nil
+		}
+		if request.URL.Hostname() != dataDragonHost || request.URL.Path != "/cdn/16.19.1/img/profileicon/29.png" {
+			t.Errorf("unexpected fallback URL %s", request.URL)
+		}
+		fallbackCalls++
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(image)), Request: request}, nil
+	})}
+	a := &app{champions: provider, assetHostBackoffUntil: map[string]time.Time{communityDragonHost: time.Now().Add(time.Minute)}}
+	assetPath := "/lol-game-data/assets/v1/profile-icons/29.jpg"
+	a.assetFailureUntil = map[string]time.Time{"cdragon-resolved:" + assetPath: time.Now().Add(time.Minute)}
+	recorder := httptest.NewRecorder()
+	a.handleImage(recorder, httptest.NewRequest(http.MethodGet, "/api/image?path="+assetPath, nil))
+	if recorder.Code != http.StatusOK || !bytes.Equal(recorder.Body.Bytes(), image) || fallbackCalls != 1 || communityCalls != 0 || versionCalls != 1 {
+		t.Fatalf("offline profile fallback = status %d body %q, community=%d fallback=%d versions=%d", recorder.Code, recorder.Body.Bytes(), communityCalls, fallbackCalls, versionCalls)
+	}
+}
+
+func TestR154CommunityDragonItemFallbackUsesExactDataDragonID(t *testing.T) {
+	provider := newChampionProvider()
+	provider.patch = "16.19.1"
+	for _, source := range []string{"/lol-game-data/assets/v1/items/1001.png", "/latest/plugins/rcp-be-lol-game-data/global/default/v1/items/1001.png"} {
+		host, path, ok := provider.communityDragonAssetFallback(context.Background(), source)
+		if !ok || host != dataDragonHost || path != "/cdn/16.19.1/img/item/1001.png" {
+			t.Fatalf("%s -> %s %s %v", source, host, path, ok)
+		}
+	}
+}
+
 func TestChampionNetworkSettingsValidation(t *testing.T) {
 	for _, mode := range []string{"auto", "direct"} {
 		settings, err := validateChampionNetworkSettings(championNetworkSettings{Mode: mode, URL: "http://ignored:7890"})
@@ -1132,14 +1217,8 @@ func TestStructuredArenaDetailPreservesAllAugmentRows(t *testing.T) {
 				return nil, fmt.Errorf("structured arena detail version query = %q", request.URL.RawQuery)
 			}
 			body = fixture
-		case request.URL.Host == communityDragonHost && request.URL.Path == "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/cherry-augments.json":
-			body = []byte(`[]`)
-		case request.URL.Host == communityDragonHost && request.URL.Path == "/latest/cdragon/arena/zh_cn.json":
-			body = []byte(`{"augments":[]}`)
 		case request.URL.Host == yourGGArenaHost && request.URL.Path == "/kr/api/arena/champions/67":
 			body = aggregate
-		case request.URL.Host == communityDragonHost && request.URL.Path == "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/items.json":
-			body = []byte(`[{"id":3153,"name":"测试装备","iconPath":"/lol-game-data/assets/ASSETS/Items/3153.png"}]`)
 		default:
 			return nil, fmt.Errorf("unexpected structured arena request: %s", request.URL.String())
 		}
@@ -1162,13 +1241,15 @@ func TestStructuredArenaDetailPreservesAllAugmentRows(t *testing.T) {
 	for _, path := range []string{
 		opggChampionHost + "/api/global/champions/arena/versions",
 		opggChampionHost + "/api/global/champions/arena/67",
-		communityDragonHost + "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/cherry-augments.json",
-		communityDragonHost + "/latest/cdragon/arena/zh_cn.json",
 		yourGGArenaHost + "/kr/api/arena/champions/67",
-		communityDragonHost + "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/items.json",
 	} {
 		if seen[path] == 0 {
 			t.Fatalf("structured arena request was not exercised: %s (seen=%v)", path, seen)
+		}
+	}
+	for path := range seen {
+		if strings.HasPrefix(path, communityDragonHost+"/") {
+			t.Fatalf("structured arena unexpectedly blocked on CommunityDragon: %s", path)
 		}
 	}
 }

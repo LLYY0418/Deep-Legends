@@ -20,6 +20,8 @@ const read = (name) => fs.readFileSync(path.join(__dirname, name), "utf8");
 const championsScript = fs.readFileSync(process.env.R116B_CHAMPIONS_SOURCE || path.join(__dirname, "champions.js"), "utf8");
 const gameplayScript = read("gameplay.js");
 const runtimeScript = read("runtime.js");
+const gradeSource = runtimeScript.slice(runtimeScript.indexOf("  const GRADE_ORDER ="), runtimeScript.indexOf("  window.deepLegendsRuntime ="));
+const sharedGrades = Function(`${gradeSource}\nreturn { gradeBadge, gradeRank };`)();
 const indexHTML = read("index.html");
 const championsStyles = read("champions.css");
 const gameplayStyles = read("gameplay.css");
@@ -112,7 +114,7 @@ function detailFixture(overrides = {}) {
     mode: "hextech-aram", region: "CN", source: "Hexdata + OP.GG RSC", patch: "16.18",
     measurementTechnique: "上游公布的统计口径：样本为国服七区海克斯大乱斗，置信区间为 wilson_95",
     citation: { patch: "16.18", reportDate: "2026-09-18", buildId: "hexdata-test" },
-    stats: { tier: 2, winRate: 56.7509 },
+    stats: { tier: 2, grade: "A", winRate: 56.7509 },
     recommendedAugments: [
       augmentRow(upstreamAugment),
       augmentRow(heroFixture.augments[1] || upstreamAugment, { rarity: "gold" }),
@@ -221,6 +223,7 @@ function goFunctionSource(source, name) {
 }
 
 function compile(names, dependencies = {}, source = championsScript) {
+  dependencies = { gradeBadge: sharedGrades.gradeBadge, gradeRank: sharedGrades.gradeRank, ...dependencies };
   const keys = Object.keys(dependencies);
   return Function(...keys, `"use strict";\n${names.map((name) => functionSource(source, name)).join("\n")}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
 }
@@ -400,10 +403,9 @@ test("R116-B P0-1 海克斯卡带较基准与官方档位，字段缺失时整�
   };
   const { mayhemAugmentConfidenceMetrics } = compile(["mayhemAugmentConfidenceMetrics", "mayhemDeltaLabel", "mayhemDeltaTone", "mayhemSampleTierLabel", "mayhemWilsonLabel"], deps);
   const full = mayhemAugmentConfidenceMetrics({ deltaWinRate: 0.111527, hexLabel: "夯", sampleTier: "high", wilsonLowerWinRate: 0.675997 });
-  assert.deepEqual(full.map(([label]) => label), ["较基准", "官方档位", "95%下界"]);
+  assert.deepEqual(full.map(([label]) => label), ["较基准", "95%下界"]);
   assert.equal(full[0][1], "+11.2%");
-  assert.equal(full[1][1], "夯", "官方档位展示 hexLabel（中文），不是 hexTier 枚举名");
-  assert.equal(full[2][1], "67.60%");
+  assert.equal(full[1][1], "67.60%");
   // 全部字段缺失 → 一格都不加，卡片保持原来的三格，不会出现 undefined / NaN%。
   assert.deepEqual(mayhemAugmentConfidenceMetrics({}), []);
   assert.deepEqual(mayhemAugmentConfidenceMetrics({ deltaWinRate: 0, hexLabel: "", sampleTier: "", wilsonLowerWinRate: 0 }), []);
@@ -449,9 +451,10 @@ test("R116-B P0-2 海斗路径不再有任何前端重排（对抗变异必须�
   assert.match(recommended, /return count < 3;/);
   // 护栏只动海斗调用点：sortedGradeRows 函数体与斗魂/YOUR.GG 三处边界原样保留。
   const sorted = functionSource(championsScript, "sortedGradeRows");
-  assert.match(sorted, /gradeRank\(augmentGrade\(left\.tier \|\| left\.grade, left\.score, scores\)\)/);
+  assert.match(sorted, /gradeRank\(left\.grade\) - gradeRank\(right\.grade\)/);
+  assert.match(sorted, /Number\(right\.score\)/);
   assert.match(championsScript, /const sorted = sortedGradeRows\(filtered\);/, "斗魂 renderArenaAugmentSection 仍用 sortedGradeRows");
-  assert.match(championsScript, /YOUR\.GG's default equipment order is tier, then sample count \(not score\)\./);
+  assert.match(championsScript, /Grade, official score, then sample count/);
   assert.match(functionSource(championsScript, "sortedArenaRows"), /const metric = state\.arenaSort;/);
 });
 
@@ -548,11 +551,12 @@ test("R116-B P0-5 官方档位展示中文 hexLabel，绝不展示内部枚举�
   const { window, document } = await mountMayhemDetail();
   t.after(() => window.close());
   const card = [...document.querySelectorAll(".mayhem-recommend-grid .arena-option-card")][0];
-  assert.match(card.textContent, /官方档位夯/, "上游 hexLabel 是「夯」");
+  assert.match(card.innerHTML, /yourgg-s\.svg/, "上游 hexTier hang 对应 S 徽章");
+  assert.doesNotMatch(card.textContent, /官方档位/);
   assert.doesNotMatch(card.textContent, /hang/, "hexTier 是内部枚举名，不许露出");
   assert.doesNotMatch(document.querySelector(".mayhem-detail-pane").textContent, /\bhang\b|\btop\b|insufficient/);
   // 英雄级梯度用官方 stats.tier（fixture 里是 2）。
-  assert.match(document.querySelector(".mayhem-overview-metrics").textContent, /梯度T2/);
+  assert.match(document.querySelector(".mayhem-overview-metrics").innerHTML, /梯度[\s\S]*yourgg-a\.svg/);
 });
 
 test("R116-B P0-5 stats.tier 为 nil 时梯度徽章整块隐藏，不用行级档位冒充", async (t) => {
@@ -573,8 +577,8 @@ test("R116-B P0-5 榜单行 tierLocallyCalculated 时显示「本地估算」小
   assert.match(championsStyles, /\.mayhem-tier-local\s*\{[^}]*color:\s*var\(--warning\)/s);
   // 后端红线：insights 不可用时 Stats.Tier 必须留 nil（已有 Go 测试钉住），
   // 这里锁住前端确实读了这个字段而不是自己算。
-  assert.match(functionSource(championsScript, "mayhemHeroTier"), /Number\(detail\?\.stats\?\.tier\)/);
-  assert.match(functionSource(championsScript, "mayhemHeroTier"), /return Number\.isFinite\(official\) && official > 0 \? \{ tier: official, locallyCalculated: false \} : null;/);
+  assert.match(functionSource(championsScript, "mayhemHeroTier"), /detail\?\.stats\?\.grade/);
+  assert.match(functionSource(championsScript, "mayhemHeroTier"), /return grade \? \{ grade, locallyCalculated: false \} : null;/);
 });
 
 // ---------------------------------------------------------------------------
@@ -608,7 +612,7 @@ test("R116-B P0-6 切阶段只改数字不发请求，切回汇总恢复原值",
   assert.equal(calls.length, before, "切到阶段 3 同样不许发请求");
   // 阶段 3 样本只有 373 场（medium），官方档位从「夯」变成「顶级」。
   assert.match(firstCard().textContent, /61\.66%/);
-  assert.match(firstCard().textContent, /官方档位顶级/);
+  assert.match(firstCard().innerHTML, /yourgg-a\.svg/);
 
   document.querySelector('[data-mayhem-stage="0"]').click();
   assert.equal(calls.length, before);
@@ -798,6 +802,7 @@ test("R116-B P0-3 海斗局 hasAugments=true 时写入按钮为空，经典局�
     liveRecommendationFlightActive: () => false,
     selectedRuneRecommendation: () => null,
     renderLiveInsights: () => "",
+    renderLaneMatchupCard: () => "",
     renderRecommendationDataNotices: () => "",
     renderLiveAugmentRecommendations: () => "",
     // 真实 renderBuildRecommendation 内部自己算 capabilities；这里用 data 上的
@@ -1059,24 +1064,21 @@ test("R116-B 评审整改 A3 阶段行缺 deltaWinRate 时不渲染「较基准�
   for (const other of others) assert.match(other.textContent, /较基准/, "阶段行字段齐全的行照常显示较基准");
 });
 
-test("R116-B 评审整改 B4 阶段视图的徽章与官方档位同口径，综合评分标明英雄级", async (t) => {
+test("R150 阶段视图的六角徽章与阶段等级同口径，综合评分标明英雄级", async (t) => {
   const { window, document } = await mountMayhemDetail();
   t.after(() => window.close());
   const card = () => document.querySelector(".mayhem-recommend-grid .arena-option-card");
-  const badge = () => card().querySelector(".augment-grade");
-  // 汇总视图：父行 hexTier hang → 徽章 S，官方档位「夯」，综合评分是英雄级的 95.8。
-  assert.equal(badge().textContent, "S");
-  assert.match(badge().className, /is-S/);
-  assert.match(card().textContent, /官方档位夯/);
+  const badge = () => card().querySelector(".tier-badge.arena-option-grade");
+  assert.match(badge().getAttribute("src"), /yourgg-s\.svg/);
+  assert.equal(badge().getAttribute("alt"), "梯度 S");
+  assert.doesNotMatch(card().textContent, /官方档位/);
   assert.match(card().textContent, /综合评分95\.8/);
   assert.doesNotMatch(card().textContent, /综合评分（英雄级）/);
   assert.doesNotMatch(card().textContent, /阶段基准/);
   document.querySelector('[data-mayhem-stage="3"]').click();
-  // 阶段 3：hexTier top → 徽章 A + 官方档位「顶级」。整改前这里是徽章 S（父行 hang）
-  // 配官方档位「顶级」（阶段 top），同一张卡两个官方档位表述互相矛盾。
-  assert.equal(badge().textContent, "A", "徽章必须跟着阶段行走");
-  assert.match(badge().className, /is-A/);
-  assert.match(card().textContent, /官方档位顶级/);
+  assert.match(badge().getAttribute("src"), /yourgg-a\.svg/, "徽章必须跟着阶段行走");
+  assert.equal(badge().getAttribute("alt"), "梯度 A");
+  assert.doesNotMatch(card().textContent, /官方档位/);
   assert.doesNotMatch(card().textContent, /综合评分95\.8/, "英雄级评分必须带口径限定词");
   assert.match(card().textContent, /综合评分（英雄级）95\.8/);
   // B6：阶段基准可见，用户能自己验算 61.66% − 57.05% ≈ +4.6%。
@@ -1084,8 +1086,8 @@ test("R116-B 评审整改 B4 阶段视图的徽章与官方档位同口径，综
   assert.match(card().textContent, /较基准\+4\.6%/);
   assert.doesNotMatch(card().textContent, /undefined|NaN/);
   document.querySelector('[data-mayhem-stage="0"]').click();
-  assert.equal(badge().textContent, "S", "切回汇总恢复英雄级徽章");
-  assert.match(card().textContent, /官方档位夯/);
+  assert.match(badge().getAttribute("src"), /yourgg-s\.svg/, "切回汇总恢复英雄级徽章");
+  assert.doesNotMatch(card().textContent, /官方档位/);
 });
 
 test("R116-B 评审整改 B4 阶段行没有官方档位时字母徽章整块隐藏", () => {
@@ -1115,24 +1117,26 @@ test("R116-B 评审整改 B4 阶段行没有官方档位时字母徽章整块隐
     grade: "S",
   });
   const summary = renderMayhemRecommendedAugment(entryFor({ stage: 3, winRate: 61.66, games: 373, hexLabel: "样本过少", stageBaselineWinRate: 57.05, deltaWinRate: 0.046, sampleTier: "medium" }), 0);
-  assert.match(summary, /class="augment-grade is-S">S<\/b>/, "汇总视图照旧用英雄级徽章");
+  assert.match(summary, /class="tier-badge arena-option-grade"[^>]*yourgg-s\.svg/, "汇总视图使用英雄级徽章");
   // 上游给 insufficient 时后端不给字母档位（实测英雄 157 是 4/499 条阶段行）。
   state.mayhemStage = 3;
   const insufficient = renderMayhemRecommendedAugment(entryFor({ stage: 3, winRate: 61.66, games: 373, hexLabel: "样本过少", stageBaselineWinRate: 57.05, deltaWinRate: 0.046, sampleTier: "medium" }), 0);
-  assert.doesNotMatch(insufficient, /augment-grade/, "阶段行没有官方档位 → 字母徽章整块隐藏");
+  assert.doesNotMatch(insufficient, /tier-badge arena-option-grade/, "阶段行没有官方档位 → 字母徽章整块隐藏");
   assert.doesNotMatch(insufficient, />S</, "绝不拿英雄级的 S 去配阶段级的「样本过少」");
-  assert.match(insufficient, /官方档位/);
-  assert.match(insufficient, /样本过少/);
+  assert.doesNotMatch(insufficient, /官方档位/);
   assert.match(insufficient, /<dt>阶段基准<\/dt><dd>57\.05%<\/dd>/);
   assert.doesNotMatch(insufficient, /undefined|NaN/);
   // 阶段行带着官方档位时徽章就用它（后端 hexdataOfficialGrade 的唯一实现）。
   const graded = renderMayhemRecommendedAugment(entryFor({ stage: 3, winRate: 61.66, games: 373, hexLabel: "顶级", grade: "A", stageBaselineWinRate: 57.05, deltaWinRate: 0.046, sampleTier: "medium" }), 0);
-  assert.match(graded, /class="augment-grade is-A">A<\/b>/);
-  assert.match(graded, /<dt>官方档位<\/dt><dd>顶级<\/dd>/);
+  assert.match(graded, /class="tier-badge arena-option-grade"[^>]*yourgg-a\.svg/);
+  assert.doesNotMatch(graded, /官方档位/);
+  const noScore = entryFor({ stage: 3, winRate: 61.66, grade: "A" });
+  noScore.item.score = 0;
+  assert.doesNotMatch(renderMayhemRecommendedAugment(noScore, 0), /综合评分/, "缺少 hexScore 时不展示空评分格");
   // 斗魂路径（stage 恒为 0）不受影响。
   state.mode = "arena";
   state.mayhemStage = 3;
-  assert.match(renderMayhemRecommendedAugment(entryFor({ stage: 3, hexLabel: "顶级", grade: "A" }), 0), /class="augment-grade is-S">S<\/b>/);
+  assert.match(renderMayhemRecommendedAugment(entryFor({ stage: 3, hexLabel: "顶级", grade: "A" }), 0), /class="tier-badge arena-option-grade"[^>]*yourgg-s\.svg/);
 });
 
 test("R116-B 评审整改 B6 阶段基准是一格可见数字，装备排行的较基准带口径 tooltip", async (t) => {
@@ -1151,7 +1155,7 @@ test("R116-B 评审整改 B6 阶段基准是一格可见数字，装备排行的
   const card = () => document.querySelector(".mayhem-recommend-grid .arena-option-card");
   document.querySelector('[data-mayhem-stage="3"]').click();
   const cells = [...card().querySelectorAll("dl > div")].map((cell) => [cell.querySelector("dt").textContent, cell.querySelector("dd").textContent]);
-  assert.deepEqual(cells.map(([label]) => label), ["胜率", "选取率", "样本", "综合评分（英雄级）", "较基准", "阶段基准", "官方档位"]);
+  assert.deepEqual(cells.map(([label]) => label), ["胜率", "选取率", "样本", "综合评分（英雄级）", "较基准", "阶段基准"]);
   const byLabel = Object.fromEntries(cells);
   assert.equal(byLabel["胜率"], "61.66%");
   // 工单 P0-6「实现要求」第 1 条：阶段 chip 要重渲染 winRate/deltaWinRate/pickRate。
@@ -1159,8 +1163,7 @@ test("R116-B 评审整改 B6 阶段基准是一格可见数字，装备排行的
   assert.equal(byLabel["选取率"], "0.02%", "阶段视图必须渲染该阶段自己的 pickRate，不是父行的英雄级选取率");
   assert.equal(byLabel["较基准"], "+4.6%");
   assert.equal(byLabel["阶段基准"], "57.05%", "上游 stageBaselineWinRate 0.570537 → 百分数");
-  assert.equal(byLabel["官方档位"], "顶级");
-  assert.equal(card().getAttribute("data-metric-count"), "7", "阶段视图比汇总多「选取率」与「阶段基准」两格");
+  assert.equal(card().getAttribute("data-metric-count"), "6", "阶段视图有六格");
   assert.match(championsStyles, /\.arena-option-card\[data-metric-count="7"\] dl\s*\{[^}]*repeat\(3,minmax\(0,1fr\)\)/s, "七格时也要三列，不能退回五列");
   // 恢复阶段 pickRate 后，阶段视图最多 8 格（再叠一格「置信」或「95%下界」），
   // 这一档也必须有栅格规则，否则第 8 格会掉到默认的 auto 列宽上。

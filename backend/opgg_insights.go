@@ -278,6 +278,8 @@ func (a *app) startOPGGHistoricalRanks(reference gameplayReference, gameName, ta
 	a.opgg.historyStarts[key] = struct{}{}
 	a.opgg.mu.Unlock()
 	go func() {
+		defer a.recoverPanic("opgg_insights.startOPGGHistoricalRanks.1")
+
 		defer func() {
 			a.opgg.mu.Lock()
 			delete(a.opgg.historyStarts, key)
@@ -669,6 +671,8 @@ func (a *app) startOPGGGameTiers(gameName, tagLine, puuid string) {
 		return
 	}
 	go func() {
+		defer a.recoverPanic("opgg_insights.startOPGGGameTiers.1")
+
 		ctx, cancel := context.WithTimeout(context.Background(), matchTiersOPGGTimeout)
 		defer cancel()
 		_, _ = a.opggGameTiers(ctx, gameName, tagLine, puuid, 0, 1)

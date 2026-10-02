@@ -88,6 +88,9 @@ type championProvider struct {
 	diag                  func(event map[string]any)
 	mu                    sync.Mutex
 	patch                 string
+	arenaVersion          string
+	arenaVersionAt        time.Time
+	patchFlight           chan struct{}
 	static                map[string]championAssetDescription
 	itemPurchasable       map[int64]bool
 	championKeys          map[string]string
@@ -112,6 +115,18 @@ type championProvider struct {
 	augmentCatalogMu    sync.Mutex
 	augmentCatalog      championAugmentResponse
 	augmentCatalogReady bool
+	augmentBackoff      communityDragonAugmentBackoff
+	observedAugmentMu   sync.Mutex
+	observedAugments    map[int64]gameplayAugment
+	observedLoaded      bool
+	observedWriteActive bool
+	observedWriteDirty  bool
+	remoteAugmentMu     sync.RWMutex
+	remoteAugments      []gameplayAugment
+	mayhemWarmOnce      sync.Once
+	mayhemWarmWait      sync.WaitGroup
+	mayhemRSCWarmMu     sync.Mutex
+	mayhemRSCWarmActive string
 	// Injected by main to read the authenticated LCU augment catalog.
 	// Keeping it as a callback makes the provider testable and preserves the
 	// CommunityDragon fallback when the client is offline.
@@ -212,19 +227,6 @@ type arenaTeamComposition struct {
 	Games            int                 `json:"games,omitempty"`
 }
 
-type arenaChampionStats struct {
-	Tier             *int    `json:"tier,omitempty"`
-	Rank             int     `json:"rank,omitempty"`
-	RankPrevPatch    int     `json:"rankPrevPatch,omitempty"`
-	Games            int     `json:"games,omitempty"`
-	KDA              float64 `json:"kda,omitempty"`
-	AveragePlacement float64 `json:"averagePlacement,omitempty"`
-	FirstPlaceRate   float64 `json:"firstPlaceRate,omitempty"`
-	PickRate         float64 `json:"pickRate,omitempty"`
-	WinRate          float64 `json:"winRate,omitempty"`
-	BanRate          float64 `json:"banRate,omitempty"`
-}
-
 type championAsset struct {
 	ID           int       `json:"id,omitempty"`
 	Kind         string    `json:"kind"`
@@ -309,7 +311,8 @@ type championMetricRow struct {
 // 的」9 个：实测单英雄 126 条 augment × 4 阶段的 JSON 体积从 140,138 B 降到
 // 102,135 B（-27%）。丢掉的 wins / tier / hexTier / hexScore /
 // recommendationScore 前端一个都不渲染——hexTier 是内部枚举名（实测 "hang"），
-// 给用户看的档位文案一律是 hexLabel（"夯"），所以只下发 hexLabel。
+// R150 起前端只用 Grade 画字母徽章；HexLabel 继续下发供后端判断官方档位，
+// 卡片不再把它渲染成另一项中文等级指标。
 //
 // R116-B 独立评审整改（B4 / B6）又调了一次这 9 个字段，一进一出体积反而更小
 // （同一套静态核算：102,008 B → 97,033 B，净减 4,975 B/英雄；砍 pickRate 省
@@ -348,27 +351,59 @@ type championMetricStageRow struct {
 	SampleTier           string  `json:"sampleTier,omitempty"`
 }
 
-// hexdataOfficialGrade 把 Hexdata 官方 hexTier 枚举映射到站内既有的字母档位，
-// 只用于 .augment-grade.is-X 这套样式类；给用户看的文案一律是官方 hexLabel
-// （中文「夯」「顶级」…），绝不展示内部枚举名 hexTier。
-// 实测枚举只有六个取值：hang(夯) / top(顶级) / elite(人上人) / npc(NPC) /
-// trap(拉完了) / insufficient(样本过少)。insufficient 故意不给字母档位——它是
-// 上游自己的「样本不足」标记，硬套一个 S/A/B 等于替上游编一个强度评价。
-func hexdataOfficialGrade(hexTier string) string {
-	switch hexTier {
-	case "hang":
-		return "S"
-	case "top":
-		return "A"
-	case "elite":
-		return "B"
-	case "npc":
-		return "C"
-	case "trap":
-		return "F"
-	default:
-		return ""
+// normalizeChampionGrade is the only upstream-to-display-grade mapping.
+// YOUR.GG: OP/S/A/B/C/D/F remain unchanged. OP.GG numeric tiers:
+// 0→OP, 1→S, 2→A, 3→B, 4→C, 5→D (the live Arena page confirms 1..5
+// strongest to weakest; 0 is the existing OP.GG OP compatibility case).
+// Hexdata hero numeric tiers: 1→S, 2→A, 3→B, 4→C, 5→F. Hexdata augment
+// hexTier: hang→S, top→A, elite→B, npc→C, trap→F; insufficient/unknown→none.
+// Hero numeric tiers and augment hexTier describe different populations: this
+// is a display scale, not a claim that those upstream fields are equivalent.
+// The legacy OP.GG augment catalog uses a separate 0..5 strength scale:
+// 0→S, 1→A, 2→B, 3→C, 4→D, 5→F. Local percentile grades are already
+// S/A/B and pass through the same letters.
+func normalizeChampionGrade(source string, tier int, raw string) string {
+	switch source {
+	case "yourgg", "local":
+		grade := strings.ToUpper(strings.TrimSpace(raw))
+		switch grade {
+		case "OP", "S", "A", "B", "C", "D", "F":
+			if source == "local" && grade != "S" && grade != "A" && grade != "B" {
+				return ""
+			}
+			return grade
+		}
+	case "opgg":
+		if tier >= 0 && tier <= 5 {
+			return [...]string{"OP", "S", "A", "B", "C", "D"}[tier]
+		}
+	case "hexdata-hero":
+		if tier >= 1 && tier <= 5 {
+			return [...]string{"", "S", "A", "B", "C", "F"}[tier]
+		}
+	case "hexdata-augment":
+		switch strings.ToLower(strings.TrimSpace(raw)) {
+		case "hang":
+			return "S"
+		case "top":
+			return "A"
+		case "elite":
+			return "B"
+		case "npc":
+			return "C"
+		case "trap":
+			return "F"
+		}
+	case "opgg-augment-catalog":
+		if tier >= 0 && tier <= 5 {
+			return [...]string{"S", "A", "B", "C", "D", "F"}[tier]
+		}
 	}
+	return ""
+}
+
+func hexdataOfficialGrade(hexTier string) string {
+	return normalizeChampionGrade("hexdata-augment", 0, hexTier)
 }
 
 // hexdataRowHasOfficialGrade 判断这一行是否带可用的官方档位。只要官方给了
@@ -384,15 +419,14 @@ func hexdataRowHasOfficialGrade(row championMetricRow) bool {
 // 一条都没删：它仍是唯一的兜底。
 func applyLocalAugmentGrades(rows []championMetricRow) {
 	scores := make([]float64, 0, len(rows))
+	localScores := make([]float64, len(rows))
 	for index := range rows {
 		if hexdataRowHasOfficialGrade(rows[index]) {
 			continue
 		}
-		if rows[index].Score <= 0 {
-			rows[index].Score = localAugmentScore(rows[index])
-		}
-		if rows[index].Score > 0 {
-			scores = append(scores, rows[index].Score)
+		localScores[index] = localAugmentScore(rows[index])
+		if localScores[index] > 0 {
+			scores = append(scores, localScores[index])
 		}
 	}
 	for index := range rows {
@@ -404,7 +438,7 @@ func applyLocalAugmentGrades(rows []championMetricRow) {
 		if len(scores) > 0 {
 			percentile = 0
 			for _, score := range scores {
-				if score <= rows[index].Score {
+				if score <= localScores[index] {
 					percentile++
 				}
 			}
@@ -412,11 +446,11 @@ func applyLocalAugmentGrades(rows []championMetricRow) {
 		}
 		switch {
 		case percentile >= 0.9:
-			rows[index].Grade = "S"
+			rows[index].Grade = normalizeChampionGrade("local", 0, "S")
 		case percentile >= 0.7:
-			rows[index].Grade = "A"
+			rows[index].Grade = normalizeChampionGrade("local", 0, "A")
 		default:
-			rows[index].Grade = "B"
+			rows[index].Grade = normalizeChampionGrade("local", 0, "B")
 		}
 	}
 }
@@ -499,6 +533,7 @@ type championCounterSections struct {
 
 type championDetailStats struct {
 	Tier     *int    `json:"tier,omitempty"`
+	Grade    string  `json:"grade,omitempty"`
 	WinRate  float64 `json:"winRate,omitempty"`
 	PickRate float64 `json:"pickRate,omitempty"`
 	BanRate  float64 `json:"banRate,omitempty"`
@@ -512,6 +547,7 @@ type championPositionOption struct {
 	RoleRate float64 `json:"roleRate"`
 	Play     int     `json:"play"`
 	Tier     int     `json:"tier"`
+	Grade    string  `json:"grade,omitempty"`
 	Rank     int     `json:"rank"`
 }
 
@@ -541,7 +577,6 @@ type championDetailResponse struct {
 	TopPlayers          []championTopPlayer    `json:"topPlayers,omitempty"`
 	RecommendedAugments []championMetricRow    `json:"recommendedAugments,omitempty"`
 	ItemRanking         []championMetricRow    `json:"itemRanking,omitempty"`
-	ArenaStats          arenaChampionStats     `json:"arenaStats,omitempty"`
 	TeamCompositions    []arenaTeamComposition `json:"teamCompositions,omitempty"`
 	ArenaAugments       []championMetricRow    `json:"arenaAugments,omitempty"`
 	ArenaAugmentGroups  []arenaAugmentGroup    `json:"arenaAugmentGroups,omitempty"`
@@ -611,6 +646,7 @@ type championAugment struct {
 	Key                    string                    `json:"key"`
 	Name                   string                    `json:"name"`
 	Tier                   int                       `json:"tier"`
+	Grade                  string                    `json:"grade,omitempty"`
 	Rarity                 string                    `json:"rarity"`
 	Performance            float64                   `json:"performance,omitempty"`
 	PerformanceUnavailable bool                      `json:"performanceUnavailable,omitempty"`
@@ -754,7 +790,7 @@ func (p *championProvider) fetchWithMetadataCacheKeyLoader(ctx context.Context, 
 }
 
 func (p *championProvider) reportChampionUpstream(host, accept string, data []byte, err error, cacheState string, started time.Time) {
-	if p.diag == nil || isCancellation(err) || (accept != "application/json" && accept != "text/html,application/xhtml+xml") {
+	if p.diag == nil || isCancellation(err) || errors.Is(err, errCommunityDragonAugmentBackoff) || (accept != "application/json" && accept != "text/html,application/xhtml+xml") {
 		return
 	}
 	p.diag(map[string]any{
@@ -811,8 +847,20 @@ func (p *championProvider) fetchDirect(ctx context.Context, host, requestPath st
 	}
 	u := url.URL{Scheme: "https", Host: host, Path: requestPath, RawQuery: query.Encode()}
 	if host == yourGGArenaHost {
+		waitStarted := time.Now()
 		if err := p.waitForYourGG(ctx); err != nil {
 			return nil, err
+		}
+		if p.diag != nil {
+			kind := "other"
+			if strings.HasSuffix(requestPath, "/top-builds") {
+				kind = "arena-top-builds"
+			} else if strings.HasPrefix(requestPath, "/kr/api/arena/champions/") {
+				kind = "arena-aggregate"
+			} else if requestPath == "/kr/api/arena/champions" {
+				kind = "arena-rankings"
+			}
+			p.diag(map[string]any{"event": "yourgg_request_slot", "kind": kind, "wait_ms": time.Since(waitStarted).Milliseconds()})
 		}
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
@@ -847,7 +895,7 @@ func (p *championProvider) fetchDirect(ctx context.Context, host, requestPath st
 }
 
 func allowedChampionHost(host string) bool {
-	return host == opggChampionHost || host == opggWebAPIHost || host == opggPageHost || host == opggAssetHost || host == dataDragonHost || host == prestigeArtworkHost || host == communityDragonHost || host == yourGGArenaHost || host == hexdataHost || host == qq101Host
+	return host == opggChampionHost || host == opggWebAPIHost || host == opggPageHost || host == opggAssetHost || host == dataDragonHost || host == prestigeArtworkHost || host == communityDragonHost || host == yourGGArenaHost || host == hexdataHost || host == hexdataAssetHost || host == qq101Host
 }
 
 func (a *app) handleChampionCatalog(w http.ResponseWriter, r *http.Request) {
@@ -879,6 +927,24 @@ func (a *app) handleChampionRankings(w http.ResponseWriter, r *http.Request) {
 		response, err = provider.loadARAMRankings(r.Context())
 	case "arena":
 		response, err = provider.loadArenaRankings(r.Context())
+		if err == nil && r.URL.Query().Get("preload") == "1" {
+			// These shared catalogs do not depend on a selected hero. Warm both
+			// while the ranking screen is visible; neither failure blocks the list.
+			go func() {
+				defer a.recoverPanic("champions.handleChampionRankings.1")
+
+				warmCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				_, _ = provider.loadOPGGLatestVersion(warmCtx, opggModeSpecs["arena"])
+			}()
+			go func() {
+				defer a.recoverPanic("champions.handleChampionRankings.2")
+
+				warmCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				_, _ = provider.loadStaticDescriptions(warmCtx)
+			}()
+		}
 	case "aram", "urf", "nexus-blitz":
 		response, err = provider.loadStructuredModeRankings(r.Context(), mode)
 	default:
@@ -951,6 +1017,50 @@ func (a *app) handleChampionDetail(w http.ResponseWriter, r *http.Request) {
 	writeChampionResponse(w, response, err)
 }
 
+func (a *app) handleMayhemRSCPrefetch(w http.ResponseWriter, r *http.Request) {
+	slug := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("champion")))
+	if !championSlugPattern.MatchString(slug) {
+		http.Error(w, "invalid champion", http.StatusBadRequest)
+		return
+	}
+	provider := a.championDataProvider()
+	provider.mayhemRSCWarmMu.Lock()
+	if provider.mayhemRSCWarmActive != "" {
+		active := provider.mayhemRSCWarmActive
+		provider.mayhemRSCWarmMu.Unlock()
+		if active == slug {
+			w.WriteHeader(http.StatusAccepted)
+		} else {
+			w.WriteHeader(http.StatusTooManyRequests)
+		}
+		return
+	}
+	provider.mayhemRSCWarmActive = slug
+	provider.mayhemRSCWarmMu.Unlock()
+	// Hover can end or the page can rerender while the user is clicking.
+	// Keep this one RSC flight independent of the short-lived HTTP request.
+	go func() {
+		defer a.recoverPanic("champions.handleMayhemRSCPrefetch.1")
+
+		defer func() {
+			provider.mayhemRSCWarmMu.Lock()
+			provider.mayhemRSCWarmActive = ""
+			provider.mayhemRSCWarmMu.Unlock()
+		}()
+		warmCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		defer cancel()
+		requestPath := "/lol/modes/aram-mayhem/" + slug + "/build"
+		key := strings.Join([]string{"v2", "opgg-rsc", "aram-mayhem", slug}, "|")
+		loader := func(ctx context.Context) ([]byte, error) { return provider.fetchOPGGRSCDirect(ctx, requestPath) }
+		if provider.cache != nil {
+			_, _ = provider.cache.loadWithStatus(warmCtx, key, 6*time.Hour, 24*time.Hour, true, loader)
+		} else {
+			_, _ = loader(warmCtx)
+		}
+	}()
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func (a *app) handleArenaFirstPlaces(w http.ResponseWriter, r *http.Request) {
 	championID, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("championId")))
 	if err != nil || championID <= 0 || championID > 10000 {
@@ -1004,6 +1114,13 @@ func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid champion asset", http.StatusBadRequest)
 		return
 	}
+	if source == "builtin" {
+		if data, ok := bundledAugmentImage(requestPath); ok && writeChampionAssetImage(w, data) {
+			return
+		}
+		http.NotFound(w, r)
+		return
+	}
 	provider := a.championDataProvider()
 	if source == "communitydragon" {
 		candidates := communityDragonChampionAssetCandidates(requestPath)
@@ -1015,7 +1132,7 @@ func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
 			data, lcuStatus, ok := a.clientAssetStatus(ctx, provider, source, candidatePath)
 			lcuStatuses[index] = lcuStatus
 			if ok {
-				provider.reportAugmentIconFetch(requestPath, http.StatusOK, index, index > 0, lcuStatus)
+				provider.reportAugmentIconFetch(requestPath, http.StatusOK, index, index > 0, lcuStatus, "lcu")
 				writeChampionAssetImage(w, data)
 				return
 			}
@@ -1026,7 +1143,11 @@ func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
 		}
 		// Keep colored large/unsuffixed artwork ahead of small monochrome icons.
 		// Race equivalent variants in each quality tier within the same deadline.
+	remoteCandidates:
 		for _, small := range []bool{false, true} {
+			if a.assetHostBlocked(host) {
+				break
+			}
 			results := make(chan assetResult, len(candidates))
 			count := 0
 			for index, candidatePath := range candidates {
@@ -1035,24 +1156,35 @@ func (a *app) handleChampionAsset(w http.ResponseWriter, r *http.Request) {
 				}
 				count++
 				go func(index int, candidatePath string) {
-					data, _ := a.loadChampionRemoteAsset(ctx, provider, source, host, candidatePath)
-					results <- assetResult{data, index}
+					defer a.recoverPanic("champions.handleChampionAsset.1")
+
+					var data []byte
+					defer func() { results <- assetResult{data, index} }()
+					data, _ = a.loadChampionRemoteAsset(ctx, provider, source, host, candidatePath)
 				}(index, candidatePath)
 			}
 			for n := 0; n < count; n++ {
 				select {
 				case result := <-results:
 					if len(result.data) > 0 && writeChampionAssetImage(w, result.data) {
-						provider.reportAugmentIconFetch(requestPath, http.StatusOK, result.index, result.index > 0, lcuStatusAt(lcuStatuses, result.index))
+						provider.reportAugmentIconFetch(requestPath, http.StatusOK, result.index, result.index > 0, lcuStatusAt(lcuStatuses, result.index), host)
 						return
 					}
 				case <-ctx.Done():
-					http.NotFound(w, r)
-					return
+					break remoteCandidates
 				}
 			}
 		}
-		provider.reportAugmentIconFetch(requestPath, http.StatusNotFound, -1, len(candidates) > 1, lcuStatusAt(lcuStatuses, 0))
+		if fallbackHost, fallbackPath, ok := provider.communityDragonAssetFallback(ctx, requestPath); ok && ctx.Err() == nil {
+			if data, err := a.loadChampionRemoteAsset(ctx, provider, "fallback", fallbackHost, fallbackPath); err == nil && writeChampionAssetImage(w, data) {
+				provider.reportAugmentIconFetch(requestPath, http.StatusOK, -1, true, lcuStatusAt(lcuStatuses, 0), fallbackHost)
+				if provider.diag != nil {
+					provider.diag(map[string]any{"event": "champion_asset_fallback", "source": source, "fallback_host": fallbackHost, "fallback_path": fallbackPath})
+				}
+				return
+			}
+		}
+		provider.reportAugmentIconFetch(requestPath, http.StatusNotFound, -1, len(candidates) > 1, lcuStatusAt(lcuStatuses, 0), "")
 		http.NotFound(w, r)
 		return
 	}
@@ -1091,14 +1223,14 @@ func communityDragonChampionAssetCandidates(requestPath string) []string {
 	return []string{requestPath}
 }
 
-func (p *championProvider) reportAugmentIconFetch(requestPath string, status, candidateIndex int, fellBack bool, lcuStatus int) {
+func (p *championProvider) reportAugmentIconFetch(requestPath string, status, candidateIndex int, fellBack bool, lcuStatus int, finalHost string) {
 	pathTemplate, ok := augmentIconPathTemplate(requestPath)
 	if p == nil || p.diag == nil || !ok {
 		return
 	}
 	p.diag(map[string]any{
 		"event": "augment_icon_fetch", "source": "communitydragon", "path_template": pathTemplate,
-		"status": status, "candidate_index": candidateIndex, "fell_back": fellBack,
+		"status": status, "candidate_index": candidateIndex, "fell_back": fellBack, "final_host": finalHost,
 		// R127 P1-a.4：本机客户端对这张图的真实回应。0 = 没有 LCU 映射或未连接
 		// 客户端（根本没问）；-1 = 问了但没有 HTTP 状态；其它 = LCU 状态码，
 		// 400/404 就说明客户端确实没打包这张图，出网是必要的。
@@ -1227,6 +1359,11 @@ func validateChampionAssetPath(source, requestPath string) (string, bool) {
 		return communityDragonHost, strings.HasPrefix(requestPath, "/latest/game/") || strings.HasPrefix(requestPath, "/latest/plugins/rcp-be-lol-game-data/global/default/") || strings.HasPrefix(requestPath, masteryCrestPrefix)
 	case "gtimg":
 		return prestigeArtworkHost, strings.HasPrefix(requestPath, gtimgChampionIconPrefix) || strings.HasPrefix(requestPath, gtimgSkinArtworkPrefix)
+	case "hexdata":
+		return hexdataAssetHost, hexdataAugmentIconPath(requestPath) == requestPath
+	case "builtin":
+		_, ok := bundledAugmentID(requestPath)
+		return "", ok
 	default:
 		return "", false
 	}
@@ -1284,6 +1421,110 @@ func (p *championProvider) championAssetFallback(source, requestPath string) (st
 	return dataDragonHost, "/cdn/img/champion/splash/" + meta.Key + "_" + strconv.Itoa(skinID%1000) + ".jpg", true
 }
 
+// CommunityDragon's numeric champion and item icons have exact counterparts on
+// Data Dragon. Other assets (notably augment art) have no verified equivalent.
+func (p *championProvider) communityDragonAssetFallback(ctx context.Context, requestPath string) (string, string, bool) {
+	var relative string
+	for _, prefix := range []string{"/latest/plugins/rcp-be-lol-game-data/global/default/", "/latest/game/assets/"} {
+		if value, ok := strings.CutPrefix(requestPath, prefix); ok {
+			relative = value
+			break
+		}
+	}
+	if value, ok := strings.CutPrefix(requestPath, "/lol-game-data/assets/"); ok {
+		relative = value
+	}
+	if relative == "" {
+		return "", "", false
+	}
+	championIcon := strings.HasPrefix(relative, "v1/champion-icons/") && strings.HasSuffix(relative, ".png")
+	profileIcon := strings.HasPrefix(relative, "v1/profile-icons/") && strings.HasSuffix(relative, ".jpg")
+	itemIcon := (strings.HasPrefix(relative, "items/") || strings.HasPrefix(relative, "v1/items/")) && strings.HasSuffix(relative, ".png")
+	if !championIcon && !profileIcon && !itemIcon {
+		return "", "", false
+	}
+	if championIcon {
+		_ = p.ensureChampionMetadata(ctx)
+	}
+	if err := p.ensureDataDragonPatch(ctx); err != nil {
+		return "", "", false
+	}
+	p.mu.Lock()
+	patch := p.patch
+	var key string
+	if raw, ok := strings.CutPrefix(relative, "v1/champion-icons/"); ok {
+		if digits, ok := strings.CutSuffix(raw, ".png"); ok {
+			if id, err := strconv.Atoi(digits); err == nil && id > 0 {
+				key = p.championMeta[id].Key
+			}
+		}
+	}
+	p.mu.Unlock()
+	if patch == "" {
+		return "", "", false
+	}
+	if key != "" {
+		return dataDragonHost, "/cdn/" + patch + "/img/champion/" + key + ".png", true
+	}
+	if raw, ok := strings.CutPrefix(relative, "v1/profile-icons/"); ok {
+		if digits, ok := strings.CutSuffix(raw, ".jpg"); ok {
+			if id, err := strconv.Atoi(digits); err == nil && id > 0 {
+				return dataDragonHost, "/cdn/" + patch + "/img/profileicon/" + digits + ".png", true
+			}
+		}
+	}
+	itemPath := strings.TrimPrefix(relative, "v1/")
+	if raw, ok := strings.CutPrefix(itemPath, "items/"); ok {
+		if digits, ok := strings.CutSuffix(raw, ".png"); ok {
+			if id, err := strconv.Atoi(digits); err == nil && id > 0 {
+				return dataDragonHost, "/cdn/" + patch + "/img/item/" + digits + ".png", true
+			}
+		}
+	}
+	return "", "", false
+}
+
+func (p *championProvider) ensureDataDragonPatch(ctx context.Context) error {
+	p.mu.Lock()
+	if p.patch != "" {
+		p.mu.Unlock()
+		return nil
+	}
+	if flight := p.patchFlight; flight != nil {
+		p.mu.Unlock()
+		select {
+		case <-flight:
+			p.mu.Lock()
+			ready := p.patch != ""
+			p.mu.Unlock()
+			if ready {
+				return nil
+			}
+			return errors.New("Data Dragon patch unavailable")
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	flight := make(chan struct{})
+	p.patchFlight = flight
+	p.mu.Unlock()
+	data, err := p.fetch(ctx, dataDragonHost, "/api/versions.json", nil, 1<<20, "application/json")
+	var versions []string
+	if err == nil {
+		if json.Unmarshal(data, &versions) != nil || len(versions) == 0 || !validDDragonVersion(versions[0]) {
+			err = errors.New("Data Dragon version response changed")
+		}
+	}
+	p.mu.Lock()
+	if err == nil {
+		p.patch = versions[0]
+	}
+	p.patchFlight = nil
+	close(flight)
+	p.mu.Unlock()
+	return err
+}
+
 func (p *championProvider) championAssetLCUPath(source, requestPath string) (string, bool) {
 	if source == "communitydragon" {
 		if relative, ok := strings.CutPrefix(requestPath, "/latest/game/assets/"); ok && relative != "" {
@@ -1312,6 +1553,10 @@ func (p *championProvider) championAssetLCUPath(source, requestPath string) (str
 
 func writeChampionResponse(w http.ResponseWriter, value any, err error) {
 	if err != nil {
+		if errors.Is(err, errHexdataCircuitOpen) {
+			http.Error(w, "上游暂时不可用，请稍后再试", http.StatusServiceUnavailable)
+			return
+		}
 		http.Error(w, "英雄数据暂时不可用，请稍后重试", http.StatusBadGateway)
 		return
 	}
@@ -1980,7 +2225,11 @@ func (p *championProvider) loadRanked(ctx context.Context, tier, position string
 			}
 		}
 		tierValue, rankValue := opggTierRank(stats)
-		rows = append(rows, championRankingRow{ChampionID: item.ID, Rank: rankValue, Tier: tierValue, Position: rowPosition, Positions: positions, Play: stats.Play, WinRate: stats.WinRate * 100, PickRate: stats.PickRate * 100, BanRate: stats.BanRate * 100, KDA: stats.KDA})
+		grade := ""
+		if rankValue > 0 {
+			grade = normalizeChampionGrade("opgg", tierValue, "")
+		}
+		rows = append(rows, championRankingRow{ChampionID: item.ID, Rank: rankValue, Tier: tierValue, Grade: grade, Position: rowPosition, Positions: positions, Play: stats.Play, WinRate: stats.WinRate * 100, PickRate: stats.PickRate * 100, BanRate: stats.BanRate * 100, KDA: stats.KDA})
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
 		if rows[i].Rank == rows[j].Rank {
@@ -2031,14 +2280,6 @@ type arenaTeamRaw struct {
 	PickRate          float64                `json:"pick_rate"`
 }
 
-type arenaStatsRaw struct {
-	WinRate    float64 `json:"win_rate"`
-	PickRate   float64 `json:"pick_rate"`
-	BanRate    float64 `json:"ban_rate"`
-	FirstPlace float64 `json:"first_place"`
-	AvgPlace   float64 `json:"avg_place"`
-}
-
 type arenaAugmentRaw struct {
 	ID          int             `json:"id"`
 	Name        string          `json:"name"`
@@ -2087,7 +2328,7 @@ func (p *championProvider) loadARAMRankings(ctx context.Context) (championRankin
 		if id == 0 || item.Rank <= 0 {
 			continue
 		}
-		rows = append(rows, championRankingRow{ChampionID: id, Key: item.Key, Name: item.Name, Rank: item.Rank, Tier: item.Tier})
+		rows = append(rows, championRankingRow{ChampionID: id, Key: item.Key, Name: item.Name, Rank: item.Rank, Tier: item.Tier, Grade: normalizeChampionGrade("opgg", item.Tier, "")})
 	}
 	if len(rows) < 100 {
 		return championRankingResponse{}, errors.New("OP.GG ARAM champion response changed")
@@ -2124,8 +2365,13 @@ func (p *championProvider) loadStructuredModeRankings(ctx context.Context, mode 
 		if item.ID <= 0 || stats.Play <= 0 {
 			continue
 		}
+		rank := firstPositiveInt(stats.TierData.Rank, stats.Rank)
+		grade := ""
+		if rank > 0 {
+			grade = normalizeChampionGrade("opgg", stats.TierData.Tier, "")
+		}
 		rows = append(rows, championRankingRow{
-			ChampionID: item.ID, Rank: firstPositiveInt(stats.TierData.Rank, stats.Rank), Tier: stats.TierData.Tier,
+			ChampionID: item.ID, Rank: rank, Tier: stats.TierData.Tier, Grade: grade,
 			Play: stats.Play, WinRate: firstPositive(fractionToPercent(stats.WinRate), percentOf(stats.Win, stats.Play)),
 			PickRate: fractionToPercent(stats.PickRate), BanRate: fractionToPercent(stats.BanRate), KDA: stats.KDA,
 		})
@@ -2241,29 +2487,6 @@ func parseArenaTeamCompositions(decoded, marker string, subjectID, limit int) []
 	return result
 }
 
-func parseArenaStats(decoded string) arenaChampionStats {
-	for offset := 0; ; {
-		index := strings.Index(decoded[offset:], `"average_stats":`)
-		if index < 0 {
-			return arenaChampionStats{}
-		}
-		index += offset + len(`"average_stats":`)
-		object, end, ok := balancedJSONObject(decoded, index)
-		if ok {
-			var raw arenaStatsRaw
-			if json.Unmarshal(object, &raw) == nil && (raw.WinRate > 0 || raw.PickRate > 0) {
-				return arenaChampionStats{
-					AveragePlacement: raw.AvgPlace, FirstPlaceRate: raw.FirstPlace,
-					PickRate: raw.PickRate, WinRate: raw.WinRate, BanRate: raw.BanRate,
-				}
-			}
-			offset = end
-		} else {
-			offset = index + 1
-		}
-	}
-}
-
 func parseArenaAugments(decoded string) []championMetricRow {
 	rows := make([]championMetricRow, 0, 12)
 	seen := make(map[string]bool)
@@ -2367,9 +2590,11 @@ func (p *championProvider) loadAugments(ctx context.Context) (championAugmentRes
 						if rarity := normalizeAugmentRarity(meta.Rarity); rarity != "unknown" {
 							rows[index].Rarity = rarity
 						}
-						if path := communityDragonGameAssetPath(meta.IconPath); path != "" {
-							rows[index].ImageSource, rows[index].ImagePath = "communitydragon", path
-							rows[index].ImageFallbackPath = communityDragonGameAssetPath(meta.FallbackIconPath)
+						if source, path := augmentMetadataImage(meta.IconPath); path != "" {
+							rows[index].ImageSource, rows[index].ImagePath = source, path
+							if source == "communitydragon" {
+								rows[index].ImageFallbackPath = communityDragonGameAssetPath(meta.FallbackIconPath)
+							}
 						}
 					}
 					rows[index].Description = augmentDescriptionWithOfflineGuidance(rows[index].ID, rows[index].Description)
@@ -2441,7 +2666,7 @@ func (p *championProvider) loadAugments(ctx context.Context) (championAugmentRes
 			}
 			champions = append(champions, entry)
 		}
-		rows = append(rows, championAugment{ID: item.ID, Key: item.Key, Name: item.Name, Tier: item.Tier, Rarity: augmentRarity(item.Rarity), Performance: item.Performance, Popularity: item.Popular, Description: cleanMarkup(item.Desc), Tooltip: cleanMarkup(item.Tooltip), ImageSource: asset.Source, ImagePath: asset.Path, Champions: champions})
+		rows = append(rows, championAugment{ID: item.ID, Key: item.Key, Name: item.Name, Tier: item.Tier, Grade: normalizeChampionGrade("opgg-augment-catalog", item.Tier, ""), Rarity: augmentRarity(item.Rarity), Performance: item.Performance, Popularity: item.Popular, Description: cleanMarkup(item.Desc), Tooltip: cleanMarkup(item.Tooltip), ImageSource: asset.Source, ImagePath: asset.Path, Champions: champions})
 	}
 	for index := range rows {
 		rows[index].Description = augmentDescriptionWithOfflineGuidance(rows[index].ID, rows[index].Description)
@@ -2496,20 +2721,35 @@ func (p *championProvider) rememberedAugmentCatalog() (championAugmentResponse, 
 	return cloneChampionAugmentResponse(p.augmentCatalog), true
 }
 
-// loadAugmentMetadataCatalog gives the authenticated client the first chance
-// to describe an augment by its real ID. CommunityDragon is merged afterward
-// for icons, rarity, and entries absent from the local catalog.
+// Authenticated LCU metadata has priority; icons observed in successful Hexdata
+// hero JSON responses provide an offline fallback. CommunityDragon fills only
+// the remaining fields and IDs when available.
 func (p *championProvider) loadAugmentMetadataCatalog(ctx context.Context) []gameplayAugment {
+	catalog := p.loadAugmentMetadataCatalogFast(ctx)
+	if len(bundledAugmentCatalog()) > 0 {
+		return catalog
+	}
+	if remote, err := p.loadCommunityDragonAugments(ctx); err == nil {
+		catalog = mergeGameplayAugmentMetadata(catalog, remote)
+	}
+	return catalog
+}
+
+// Mayhem detail already has Hexdata icon, name and rarity. It may use cached
+// CommunityDragon enrichment, but must never wait for a fresh remote probe.
+func (p *championProvider) loadAugmentMetadataCatalogFast(ctx context.Context) []gameplayAugment {
 	var catalog []gameplayAugment
 	if p.gameplayAugments != nil {
 		if local, err := p.gameplayAugments(ctx); err == nil {
 			catalog = append(catalog, local...)
 		}
 	}
-	if remote, err := p.loadCommunityDragonAugments(ctx); err == nil {
-		catalog = mergeGameplayAugmentMetadata(catalog, remote)
-	}
-	return catalog
+	catalog = mergeGameplayAugmentMetadata(catalog, bundledAugmentCatalog())
+	catalog = mergeGameplayAugmentMetadata(catalog, p.observedHexdataAugments())
+	p.remoteAugmentMu.RLock()
+	catalog = mergeGameplayAugmentMetadata(catalog, p.remoteAugments)
+	p.remoteAugmentMu.RUnlock()
+	return preferBundledAugmentIcons(catalog)
 }
 
 // R116-B 更正（原注释的前提已被实测证伪）：这里以前写的是「Riot 数据里到处

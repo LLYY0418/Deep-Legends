@@ -10,6 +10,9 @@ const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
 const appScript = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
 const appStyles = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
 const script = fs.readFileSync(path.join(__dirname, "champions.js"), "utf8");
+const runtimeScript = fs.readFileSync(path.join(__dirname, "runtime.js"), "utf8");
+const gradeSource = runtimeScript.slice(runtimeScript.indexOf("  const GRADE_ORDER ="), runtimeScript.indexOf("  window.deepLegendsRuntime ="));
+const sharedGrades = Function(`${gradeSource}\nreturn { gradeBadge, gradeRank };`)();
 // R128 §2.3：统计口径说明已从全项目 UI 删除，shared.js 与它的测试桩一并移除。
 
 // R116-B：P0-1「较基准」/ P0-2 置信度 / P0-5 官方档位 / P0-6 阶段筛选的行内助手。
@@ -172,7 +175,7 @@ function cssNumber(source, marker, property) {
 
 function compileFunctions(source, names, dependencies = {}) {
   const bodies = names.map((name) => functionSource(source, name));
-  const compiledDependencies = { ...dependencies };
+  const compiledDependencies = { gradeBadge: sharedGrades.gradeBadge, gradeRank: sharedGrades.gradeRank, isSummonersRiftMatch: data => Number(data?.mapId) === 11, ...dependencies };
   if (source.includes("function loadOverview(")) {
     compiledDependencies.riotTab ||= tab => tab?.region === "kr";
     for (const name of ["syncOverviewSupplementRefs", "overviewSupplementTarget"]) {
@@ -194,6 +197,9 @@ function compileFunctions(source, names, dependencies = {}) {
   }
   // Compile the actual R75 helpers transitively for focused legacy render tests.
   for (const name of ["proRunesFor", "proRequestTarget", "proBadgeAttributes", "renderProIdentityBadge", "proContextFromButton"]) {
+    if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
+  }
+  for (const name of ["recommendedRuneSpellIDs", "renderRuneSpellPair", "renderRuneEquipment", "retainRuneStarterItems", "clearRuneStarterRetries", "liveClientPositionsPending"]) {
     if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
   }
   // R116-B 评审整改（清 R116-D 账本 §11.7 的两笔技术债）：renderLiveInsights 的七个
@@ -221,6 +227,7 @@ function compileFunctions(source, names, dependencies = {}) {
   for (const name of ["rankedQueueLabel", "isMayhemQueueId", "rankedQueueNoun"]) {
     if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
   }
+  for (const name of ["bindLiveNode", "champSelectEnemyPlaceholder", "stampLiveRows", "preserveLiveImages", "patchLiveRosterPanel"]) if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body=>body.includes(name + "("))) bodies.push(functionSource(source,name));
   const dependencyNames = Object.keys(compiledDependencies);
   const factory = Function(
     ...dependencyNames,
@@ -276,7 +283,6 @@ function assertR46Contracts({
 	assert.match(cachePut, /for len\(cache\.entries\) > overviewQueryCacheMax/);
 	assert.match(cachePut, /cache\.removeElementLocked\(cache\.recent\.Back\(\)\)/);
 
-	assert.match(hexSource, /hexdataHeroMetricPattern\s*=\s*regexp\.MustCompile\(`[^`\n]*\[·，,\][^`\n]*`\)/);
 	assert.match(hexSource, /hexdataGlobalMetric\s*=\s*regexp\.MustCompile\(`[^`\n]*\[·，,\][^`\n]*`\)/);
 	assert.match(goFunctionSource(hexSource, "parseHexdataRarity"), /\[·，,\]/);
 
@@ -368,12 +374,12 @@ function assertMayhemCSSContract(css) {
 function assertR6RecommendationContract(js, css, goSource = backend) {
   assert.match(js, /return count < 3;/);
   assert.match(js, /sorted\.slice\(0, 9\)/);
-  assert.match(js, /class="augment-grade is-\$\{grade\}"/);
+  assert.match(js, /gradeBadge\(row\.grade, "arena-option-grade"\)/);
   assert.match(js, /objectRows\(row\.assets\)\.every\(\(asset\) => asset\.kind === "item"\)/);
   assert.match(js, /4: "SummonerFlash"/);
-  assert.match(goSource, /if score <= rows\[index\]\.Score/);
+  assert.match(goSource, /if score <= localScores\[index\]/);
   assert.match(css, /\.mayhem-recommend-grid\s*\{[^}]*display:\s*grid;[^}]*repeat\(3,minmax\(0,1fr\)\)/s);
-  assert.match(css, /\.augment-grade\s*\{[^}]*width:\s*22px[^}]*height:\s*22px[^}]*border-radius:\s*4px/s);
+  assert.match(css, /\.tier-badge\.arena-option-grade[^}]*width:\s*22px[^}]*height:\s*25px/s);
   assert.match(css, /\.arena-augment-section \.arena-option-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3,minmax\(0,1fr\)\)/s);
   assert.match(cssBlockAfter(css, "@container arena-pane (max-width: 820px)"), /\.arena-option-grid, \.arena-augment-section \.arena-option-grid\s*\{[^}]*repeat\(2,minmax\(0,1fr\)\)/s);
   assert.match(cssBlockAfter(css, "@container arena-pane (max-width: 540px)"), /\.arena-option-grid, \.arena-augment-section \.arena-option-grid\s*\{[^}]*grid-template-columns:\s*1fr/s);
@@ -452,7 +458,7 @@ test("R15 mutation probes fail for every new guard", () => {
 });
 
 function assertR7Contract(js, css, structuredSource, hexdataSource, gameplaySource, gameplayCSSSource) {
-	assert.match(js, /kind === "augment" \|\| kind === "prism"/);
+	assert.match(js, /gradeBadge\(row\.grade, "arena-option-grade"\)/);
 	assert.doesNotMatch(js, /快节奏团战/);
 	assert.match(css, /\.arena-overview-strip\s*\{[^}]*min-height:\s*132px/s);
 	assert.match(css, /\.arena-overview-metrics > div\s*\{[^}]*min-height:\s*70px/s);
@@ -461,7 +467,7 @@ function assertR7Contract(js, css, structuredSource, hexdataSource, gameplaySour
 	assert.doesNotMatch(css, /\.arena-overview-strip\s*\{\s*min-height:\s*118px/s);
 	assert.match(css, /\.arena-overview-secondary\s*\{[^}]*min-height:\s*22px/s);
 	assert.match(structuredSource, /applyLocalAugmentGrades\(response\.Build\.PrismItems\)/);
-	assert.match(hexdataSource, /hexdataChampionNickname\.ReplaceAllString\(name, ""\)/);
+	assert.match(hexdataSource, /func hexdataRankingRowsFromInsights\(/);
 	assert.match(gameplaySource, /function renderMatchDetailFailure\(gameID, detailState\)/);
 	assert.match(gameplaySource, /data-retry-match-detail/);
 	const matchSource = functionSource(gameplaySource, "renderMatch");
@@ -771,7 +777,7 @@ test("mayhem redesign keeps the two-column workspace, atlas, and R6 recommendati
   assert.match(script, /function usesHexdata\(source\)/);
   assert.match(script, /class="arena-option-grid mayhem-recommend-grid"/);
   assert.match(script, /return count < 3;/);
-  assert.match(script, /class="augment-grade is-\$\{grade\}"/);
+  assert.match(script, /gradeBadge\(row\.grade, "arena-option-grade"\)/);
   // 指标改成与斗魂同款的带标签列，不再是一行串起来的文字。
   assert.match(script, /\["胜率", percent\(item\.winRate\), "is-win"\]/);
   assert.match(script, /\["样本", compactNumber\(item\.games\), ""\]/);
@@ -786,14 +792,14 @@ test("mayhem redesign keeps the two-column workspace, atlas, and R6 recommendati
   assert.doesNotMatch(script, /citation\.patch|renderMeasurementTechnique|mayhem-measurement|mayhemDetailFooter/);
   assert.match(styles, /\.mayhem-atlas\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\) minmax\(0,1fr\)/s);
   assert.match(styles, /\.mayhem-recommend-grid\s*\{[^}]*repeat\(3,minmax\(0,1fr\)\)/s);
-  assert.match(styles, /\.augment-grade\.is-S/);
-  assert.match(styles, /\.hex-rank\.is-1\s*\{[^}]*clip-path:/s);
+  assert.match(styles, /\.tier-badge\.arena-option-grade/);
+  assert.doesNotMatch(styles, /\.hex-rank\.is-1/);
   assert.doesNotMatch(styles, /\.arena-option-rank\s*\{/);
 	  assert.match(gameplayStyles, /\.live-augment-columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
 	  assert.match(gameplayStyles, /\.live-augment-column > div\s*\{[^}]*repeat\(4,minmax\(0,1fr\)\)[^}]*gap:\s*8px/s);
 	  assert.doesNotMatch(gameplayScript, /\["HexScore", row\.score/);
 	  assert.match(gameplayScript, /\["win", "胜率", row\.winRate, percent\]/);
-	  assert.match(gameplayScript, /\["pick", "选用率", row\.pickRate, percent\]/);
+	  assert.match(gameplayScript, /\["pick", "选用率", row\.pickRate > 0 \? row\.pickRate : null, percent\]/);
 	  assert.match(gameplayScript, /\["games", "场次", row\.games, number\]/);
   assert.match(script, /class="mayhem-fit-metrics"/);
   assert.doesNotMatch(styles, /\.mayhem-fit-row > span/);
@@ -873,7 +879,7 @@ test("Mayhem and Arena augment cards render the same card shell", () => {
   for (const markup of [arena, mayhem]) {
     assert.match(markup, /class="arena-option-card[^"]*is-prismatic/);
     assert.match(markup, /<div class="arena-option-main">/);
-    assert.match(markup, /class="augment-grade is-S">S<\/b>/);
+    assert.match(markup, /class="tier-badge arena-option-grade"[^>]*yourgg-s\.svg/);
     assert.match(markup, /class="arena-option-rarity is-prismatic">棱彩<\/small>/);
     assert.match(markup, /<dt>胜率<\/dt>/);
   }
@@ -995,7 +1001,7 @@ test("R6 A B C contracts reject recommendation, spell, and item-route mutations 
       ".mayhem-recommend-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr))",
     ));
     assert.throws(() => assertR6RecommendationContract(originalScript, fs.readFileSync(styleCopy, "utf8")));
-    fs.writeFileSync(backendCopy, originalBackend.replace("if score <= rows[index].Score", "if true"));
+    fs.writeFileSync(backendCopy, originalBackend.replace("if score <= localScores[index]", "if true"));
     assert.throws(() => assertR6RecommendationContract(originalScript, originalStyles, fs.readFileSync(backendCopy, "utf8")));
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
@@ -1041,9 +1047,9 @@ test("R6 win rates, spell fallback, patch fallback, and subtitles are explicit",
   assert.deepEqual(summonerSpellAsset({ id: 4, name: "4", kind: "spell" }), { id: 4, name: "闪现", kind: "spell", source: "ddragon", path: "/cdn/16.16.1/img/spell/SummonerFlash.png" });
   assert.equal(summonerSpellAsset({ name: "闪现", kind: "spell" }).path, "/cdn/16.16.1/img/spell/SummonerFlash.png");
   const { augmentGrade } = compileFunctions(script, ["augmentGrade"]);
-  assert.equal(augmentGrade("", 90, [50, 90, 10, 80, 70, 60, 40, 30, 20]), "S");
-  assert.equal(augmentGrade("", 80, [50, 90, 10, 80, 70, 60, 40, 30, 20]), "A");
-  assert.equal(augmentGrade("", 50, [50, 90, 10, 80, 70, 60, 40, 30, 20]), "B");
+  assert.equal(augmentGrade("", 90, [50, 90, 10, 80, 70, 60, 40, 30, 20]), "");
+  assert.equal(augmentGrade("S", 90, [50, 90, 10, 80, 70, 60, 40, 30, 20]), "S");
+  assert.equal(augmentGrade("Q", 90, [50, 90, 10, 80, 70, 60, 40, 30, 20]), "");
   const routes = functionSource(script, "renderMayhemItemRoutes");
   assert.match(routes, /slice\(0, CORE_RECOMMENDATION_LIMIT\)/);
   assert.doesNotMatch(routes, /route-win-rate|renderConfigOption\(row, "route", true\)/);
@@ -1089,10 +1095,10 @@ test("R7 prism grades, compact arena overview, recoverable match details, and cl
 	});
 	const row = { grade: "A", score: 80, winRate: 60, averagePlacement: 3, firstPlaceRate: 20, games: 1000, assets: [{ name: "测试装备" }] };
 	const prism = renderArenaOptionCard(row, "prism", 0, [80]);
-	assert.match(prism, /class="augment-grade is-A">A<\/b>/);
+	assert.match(prism, /class="tier-badge arena-option-grade"[^>]*yourgg-a\.svg/);
 	assert.doesNotMatch(prism, /hex-rank/);
 	const core = renderArenaOptionCard(row, "core", 0, [80]);
-	assert.match(core, /class="augment-grade is-A">A<\/b>/);
+	assert.match(core, /class="tier-badge arena-option-grade"[^>]*yourgg-a\.svg/);
 
 	const { renderMatchDetailFailure } = compileFunctions(gameplayScript, ["renderMatchDetailFailure"], {
 		escapeHTML: (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
@@ -1245,13 +1251,13 @@ test("R7 contracts reject UI, parser, backend grade, and retry mutations on true
 			overrides.gameplay || original.gameplay, overrides.gameplayCSS || original.gameplayCSS,
 		);
 		check();
-		assert.throws(() => check({ js: original.js.replaceAll('kind === "augment" || kind === "prism"', 'kind === "augment"') }));
+		assert.throws(() => check({ js: original.js.replace('gradeBadge(row.grade, "arena-option-grade")', '""') }));
 		assert.throws(() => check({ css: original.css.replace(
 			".arena-overview-strip { position: relative; display: flex; min-height: 132px",
 			".arena-overview-strip { position: relative; display: flex; min-height: 154px",
 		) }));
 		assert.throws(() => check({ structured: original.structured.replace("applyLocalAugmentGrades(response.Build.PrismItems)", "") }));
-		assert.throws(() => check({ hexdata: original.hexdata.replace('hexdataChampionNickname.ReplaceAllString(name, "")', "name") }));
+		assert.throws(() => check({ hexdata: original.hexdata.replace("func hexdataRankingRowsFromInsights(", "func removedRankingRowsFromInsights(") }));
 		assert.throws(() => check({ gameplay: original.gameplay.replaceAll("data-retry-match-detail", "data-broken-retry") }));
 		assert.throws(() => check({ gameplay: original.gameplay.replace("if (wasConnected) {", "if (true) {") }));
 	} finally {
@@ -1313,7 +1319,7 @@ test("champion detail uses complete build, matchup, and augment ranking layouts"
   assert.match(script, /heroArtworkURL\(meta, source, path\)/);
   assert.match(script, /meta\?\.artworkSource && meta\?\.artworkPath/);
   assert.match(script, /data-rune-page="\$\{index\}"/);
-  assert.match(script, /tier-icons\/\$\{key\}\.svg/);
+  assert.match(runtimeScript, /tier-icons\/\$\{icon\}\.svg/);
   assert.match(script, /data-skill-count="\$\{Math\.max\(1, order\.length\)\}"/);
 	assert.match(script, /class="counter-champion"/);
   assert.match(script, /function applyRenderedMetricStyles\(\)/);
@@ -1379,15 +1385,16 @@ test("arena keeps the champion list on wide screens and renders the redesigned d
   assert.match(fs.readFileSync(path.join(root, "yourgg_arena_rankings.go"), "utf8"), /Region:\s*"KR"/);
 });
 
-test("YOUR.GG champion grades preserve all six source letters in project-style badges", () => {
-  const render = new Function("tierDisplay", `${functionSource(script,"tierBadge")}; return tierBadge;`)(String);
+test("YOUR.GG champion grades preserve all six source letters in shared badges", () => {
+  const render = sharedGrades.gradeBadge;
   for (const grade of ["S","A","B","C","D","F"]) {
-    const html=render(0,"",grade);
+    const html=render(grade);
     assert.match(html,new RegExp(`yourgg-${grade.toLowerCase()}\\.svg`));
     assert.match(html,new RegExp(`alt="梯度 ${grade}"`));
     assert.match(fs.readFileSync(path.join(__dirname,"tier-icons",`yourgg-${grade.toLowerCase()}.svg`),"utf8"),new RegExp(`>${grade}</text>`));
   }
-  assert.match(render(1),/\/tier-icons\/1\.svg/);
+  assert.match(render("OP"),/\/tier-icons\/op\.svg/);
+  assert.equal(render(1), "");
 });
 
 test("arena round 8 removals stay scoped to the arena workspace", () => {
@@ -1402,16 +1409,8 @@ test("arena round 8 removals stay scoped to the arena workspace", () => {
   assert.match(styles, /\.arena-option-card\.is-prismatic\s*\{[^}]*var\(--rarity-prismatic-a\)[^}]*var\(--rarity-prismatic-b\)[^}]*var\(--rarity-prismatic-c\)/);
 });
 
-test("arena tolerates a missing catalog and formats unknown tiers correctly", () => {
-  const source = script.match(/function tierDisplay\(value\) \{[\s\S]*?\n  \}/)?.[0];
-  assert.ok(source, "tierDisplay source not found");
-  const tierDisplay = Function(`"use strict"; ${source}; return tierDisplay;`)();
-  assert.equal(tierDisplay(-1), "—");
-  assert.equal(tierDisplay(null), "—");
-  assert.equal(tierDisplay(undefined), "—");
-  assert.equal(tierDisplay(""), "—");
-  assert.equal(tierDisplay(0), "OP");
-  assert.equal(tierDisplay(3), "3");
+test("arena tolerates a missing catalog and hides unknown grades", () => {
+  for (const value of [-1, null, undefined, "", 0, 3]) assert.equal(sharedGrades.gradeBadge(value), "");
   assert.match(script, /function rankingRows\(\) \{ return objectRows\(state\.rankings\?\.rows\); \}/);
   assert.match(script, /if \(!catalog \|\| !Array\.isArray\(catalog\.tiers\) \|\| !Array\.isArray\(catalog\.champions\)\) return;/);
   assert.match(script, /row\.key \|\| meta\?\.slug \|\| row\.champion \|\| row\.championId/);
@@ -2083,7 +2082,7 @@ test("ranked queue cards stay visible so empty-season copy follows the selected 
 });
 
 test("expanded sidebar stays compact without the old navigation subtitle", () => {
-	assert.match(appStyles, /--sidebar-width:\s*226px/);
+	assert.match(appStyles, /--sidebar-width:\s*214px/);
 	assert.match(appStyles, /:root\[data-sidebar="collapsed"\]\s*\{\s*--sidebar-width:\s*70px/);
 	assert.match(html, /<div class="sidebar-brand-copy"><strong>DEEP <span class="brand-accent">LEGENDS<\/span><\/strong><\/div>/);
 	assert.doesNotMatch(html, /战绩 · 英雄 · 对局 · 收藏/);
@@ -2724,7 +2723,7 @@ test("round 9 augment rendering uses upstream images, descriptions, and all rari
   };
   const augmentFunctions = compileFunctions(
     gameplayScript,
-    ["normalizeAugmentRarity", "augmentTooltipText", "wrapAugmentIcon", "augmentIconFigure"],
+    ["normalizeAugmentRarity", "augmentTooltipText", "wrapAugmentIcon", "augmentMetadata", "augmentIconFigure"],
     dependencies,
   );
   for (const [rarity, tone] of Object.entries({ kBronze: "bronze", kSilver: "silver", kGold: "gold", kPrismatic: "prismatic", kEventChoice: "event" })) {
@@ -2750,6 +2749,24 @@ test("round 9 augment rendering uses upstream images, descriptions, and all rari
   assert.match(rendered, /data-path="\/meta\/images\/lol\/latest\/augment\/lightningstrikes_large\.png"/);
   assert.match(rendered, /arena-augment-icon is-gold/);
   assert.match(rendered, /获得总攻击速度。/);
+});
+
+test("R159 observed Hexdata icons render through the scoped image proxy in detail and match rows", () => {
+  const icon = "/assets/augments/icons/16.18/highroller_small.png";
+  const detail = compileFunctions(script, ["imageURL"]);
+  assert.equal(detail.imageURL("hexdata", icon), `/api/champion-asset?source=hexdata&path=${encodeURIComponent(icon)}&art=2`);
+
+  const state = { perks: { augments: [{ id: 2095, name: "掷骰狂人", rarity: "prismatic", iconPath: `hexdata:${icon}` }] } };
+  const rendered = compileFunctions(gameplayScript, ["proxyAsset", "assetIcon", "augmentMetadata", "augmentIconFigure"], {
+    state,
+    escapeHTML: value => String(value ?? ""),
+    wrapAugmentIcon: iconHTML => iconHTML,
+    iconFigure: () => "<fallback>",
+    pendingCatalogIcon: () => "<pending>",
+  }).augmentIconFigure(2095);
+  assert.match(rendered, /data-queued-src="\/api\/champion-asset\?source=hexdata&path=/);
+  assert.match(rendered, /highroller_small\.png/);
+  assert.doesNotMatch(rendered, /<fallback>|<pending>/);
 });
 
 test("round 9 recommendation modes drive tabs, fallbacks, and ranked-only sources", () => {
@@ -2908,6 +2925,7 @@ test("random pick pending state has distinct empty-state copy", () => {
     recommendationActiveTab: () => "build",
     selectedRuneRecommendation: () => null,
     renderLiveInsights: () => "",
+    renderLaneMatchupCard: () => "",
     renderRecommendationDataNotices: () => "",
     recommendationPanelBusy: () => false,
     liveRecommendationFlightActive: () => false,
@@ -3124,7 +3142,7 @@ test("perk stat mod slots are separated from rune styles", () => {
 
 test("perk catalogs supply icons while entertainment recommendations come from the current hero", () => {
 	assert.match(gameplayScript, /ensurePerks\(true\)/);
-	assert.match(gameplayScript, /renderCapabilitySettings\(\);\s*ensurePerks\(\);/);
+	assert.match(gameplayScript, /renderCapabilitySettings\(\);\s*ensureAugments\(\);\s*ensurePerks\(\);/);
 	assert.match(gameplayBackend, /gameplayPerkCatalogTTL = 30 \* time\.Minute/);
 	assert.match(gameplayBackend, /cachedGameplayPerkCatalog\(r.Context\(\), cacheKey/);
 	assert.match(gameplayScript, /function matchAugmentIDs\(subject, limit = 4\)/);
@@ -3497,7 +3515,8 @@ test("augment metadata is looked up by ID without an icon-directory filter", () 
   assert.doesNotMatch(structuredBackend, /gameplayAugmentIndexForMode/);
   assert.doesNotMatch(hexdataBackend, /gameplayAugmentIndexForMode/);
   assert.doesNotMatch(backend, /gameplayAugmentIndexForMode/);
-  assert.match(hexdataBackend, /byID := gameplayAugmentIndexAll\(catalog\)/);
+  assert.match(hexdataBackend, /augmentMetadata = gameplayAugmentIndexAll\(p\.loadAugmentMetadataCatalogFast\(ctx\)\)/);
+  assert.match(hexdataBackend, /meta, ok := byID\[asset\.ID\]/);
   assert.match(backend, /byID := gameplayAugmentIndexAll\(catalog\)/);
 });
 
@@ -3729,8 +3748,8 @@ test("arena live build aligns prism and core cards with the three Arena metrics"
   assert.match(markup, /class="live-arena-build-section is-prismatic"[\s\S]*棱彩测试装备/);
   assert.match(markup, /class="live-arena-build-section is-core"[\s\S]*data-id="6630"[\s\S]*data-id="3071"[\s\S]*data-id="3053"/);
   assert.ok(markup.indexOf('class="live-arena-build-section is-prismatic"') < markup.indexOf('class="live-arena-build-section is-core"'));
-  assert.match(markup, /class="augment-grade is-A">A<\/b>/);
-  assert.match(markup, /class="augment-grade is-B">B<\/b>/);
+  assert.match(markup, /class="tier-badge live-build-grade"[^>]*yourgg-a\.svg/);
+  assert.match(markup, /class="tier-badge live-build-grade"[^>]*yourgg-b\.svg/);
   assert.equal((markup.match(/data-metric-count="3"/g) || []).length, 2);
   for (const label of ["胜率", "平均名次", "吃鸡率"]) assert.match(markup, new RegExp(`<dt>${label}<\\/dt>`));
   assert.match(markup, /<dd>63\.60%<\/dd>[\s\S]*<dd>2\.88<\/dd>[\s\S]*<dd>25\.10%<\/dd>/);
@@ -3747,7 +3766,7 @@ test("arena live build aligns prism and core cards with the three Arena metrics"
 	  const narrowArenaBuild = cssBlockAfter(gameplayStyles, "@container build-recommendation (max-width: 500px)");
 	  assert.match(narrowArenaBuild, /\.live-arena-build-section\.is-core \.arena-option-card\s*\{[^}]*padding:\s*5px/s);
 	  assert.match(narrowArenaBuild, /\.live-arena-build-section\.is-core \.arena-option-card \.item-option-button,[\s\S]*\.item-option-button > \.game-icon\.is-large\s*\{[^}]*width:\s*28px[^}]*height:\s*28px[^}]*flex-basis:\s*28px/s);
-	  assert.match(narrowArenaBuild, /\.live-arena-build-section\.is-core \.arena-option-card \.augment-grade\s*\{[^}]*width:\s*18px[^}]*height:\s*18px[^}]*flex-basis:\s*18px/s);
+	  assert.match(narrowArenaBuild, /\.live-arena-build-section\.is-core \.arena-option-card \.tier-badge\.live-build-grade\s*\{[^}]*width:\s*18px[^}]*height:\s*21px[^}]*flex-basis:\s*18px/s);
 });
 
 test("live core routes render at most five rows without an expansion control", () => {
@@ -3900,6 +3919,73 @@ test("item set payload uses three core routes, removes cross-group duplicates, a
 		assert.ok(block.items.length <= 20, `${block.type} exceeded the server limit`);
 		assert.equal(new Set(block.items.map(({ id }) => id)).size, block.items.length, `${block.type} contains duplicates`);
 	}
+});
+
+test("R176 classic core routes start at core items while retaining the starter summary", () => {
+  const deps = {
+    LIVE_CORE_OPTION_LIMIT: 5, state: {}, escapeHTML: value => String(value ?? ""),
+    recommendationCapabilities: () => ({ hasAugments: false }), liveAugmentRecommendationSource: () => "",
+    liveRecommendationsFor: () => ({}), recommendationEmptyPanel: () => "",
+    renderItemIcon: id => `<icon data-item="${id}"></icon>`, renderSummonerSpellIcon: id => `<spell data-id="${id}"></spell>`,
+    renderOptionStats: () => "", renderCoreStats: () => "", renderDepthStats: () => "",
+    buildItemSetPayload: () => ({ blocks: [] }), liveRecommendationChampionId: () => 1,
+    renderRecommendationStats: () => "", renderSkillPlan: () => "",
+  };
+  const { renderBuildRecommendation, renderConfigOption } = compileFunctions(gameplayScript, ["renderBuildRecommendation", "renderConfigOption"], deps);
+  const build = { starterOptions: [{ ids: [1055, 2003] }, { ids: [1082] }], coreOptions: [{ ids: [3006, 3078, 3053] }, { ids: [3111, 3153, 3071] }] };
+  const html = renderBuildRecommendation(build, { championName: "瑞兹" }, [], { phase: "InProgress" });
+  const dom = new JSDOM(html);
+  try {
+    const starter = dom.window.document.querySelector(".build-summary-starter");
+    assert.ok(starter);
+    assert.deepEqual([...starter.querySelectorAll("[data-item]")].map(icon => Number(icon.dataset.item)), [1055, 2003, 1082]);
+    const core = dom.window.document.querySelector(".item-core-column");
+    assert.doesNotMatch(core.innerHTML, /data-item="(?:1055|2003|1082)"|route-divider/);
+    const rows = [...core.querySelectorAll(".config-option")];
+    assert.equal(rows.length, build.coreOptions.length);
+    rows.forEach((row, index) => {
+      assert.deepEqual([...row.querySelectorAll("[data-item]")].map(icon => Number(icon.dataset.item)), build.coreOptions[index].ids);
+      assert.equal(row.querySelectorAll(".route-arrow").length, 2);
+      assert.equal(row.querySelector(".route-step").firstElementChild.className, "config-item");
+      assert.equal(Number(row.querySelector(".config-icons").dataset.iconCount), build.coreOptions[index].ids.length);
+    });
+  } finally { dom.window.close(); }
+  assert.match(gameplayStyles, /\.route-divider\s*\{[^}]*width:\s*3px[^}]*background:\s*var\(--primary-strong\)/s);
+
+  const withoutStarter = renderBuildRecommendation({ coreOptions: build.coreOptions }, { championName: "瑞兹" }, [], { phase: "InProgress" });
+  assert.doesNotMatch(withoutStarter, /build-summary-starter|route-divider/);
+  assert.match(withoutStarter, /class="item-core-column".*data-item="3006".*class="route-arrow".*data-item="3078"/s);
+  for (const ids of [[], [3006], [3006, 3078, 3053]]) {
+    const route = renderConfigOption({ ids }, "route");
+    assert.match(route, new RegExp(`data-icon-count="${ids.length}"`));
+    assert.doesNotMatch(route, /route-divider/);
+  }
+});
+
+test("R176 arena and hextech build routes remain free of starter dividers", () => {
+  const deps = {
+    LIVE_CORE_OPTION_LIMIT: 5, state: {}, escapeHTML: value => String(value ?? ""),
+    recommendationCapabilities: () => ({ hasAugments: true }),
+    liveAugmentRecommendationSource: data => data.gameMode === "CHERRY" ? "arena" : "hextech",
+    liveRecommendationsFor: () => ({}), recommendationEmptyPanel: () => "",
+    renderItemIcon: id => `<icon data-item="${id}"></icon>`, renderSummonerSpellIcon: () => "",
+    renderOptionStats: () => "", renderCoreStats: () => "", renderDepthStats: () => "",
+    renderArenaBuildOption: option => `<arena>${option.ids.join(",")}</arena>`,
+    buildItemSetPayload: () => ({ blocks: [] }), liveRecommendationChampionId: () => 1,
+    renderRecommendationStats: () => "", renderSkillPlan: () => "",
+  };
+  const { renderBuildRecommendation, renderConfigOption } = compileFunctions(gameplayScript, ["renderBuildRecommendation", "renderConfigOption"], deps);
+  const build = { starterOptions: [{ ids: [1055] }], coreOptions: [{ ids: [3006, 3078] }] };
+  const arena = renderBuildRecommendation(build, { championName: "瑞兹" }, [], { phase: "InProgress", gameMode: "CHERRY" });
+  assert.match(arena, /build-summary-starter/);
+  assert.match(arena, /<arena>3006,3078<\/arena>/);
+  assert.doesNotMatch(arena, /route-divider/);
+  const hextech = renderBuildRecommendation(build, { championName: "瑞兹" }, [], { phase: "InProgress", gameMode: "HEXTECH" });
+  assert.match(hextech, /build-summary-starter/);
+  assert.doesNotMatch(hextech, /route-divider/);
+  const hextechCore = hextech.slice(hextech.indexOf('class="item-core-column"'));
+  assert.doesNotMatch(hextechCore, /data-item="1055"|route-divider/);
+  assert.match(hextechCore, /data-icon-count="2".*data-item="3006".*class="route-arrow".*data-item="3078"/s);
 });
 
 test("item set payload preserves recommendation trace and resolved position context", () => {
@@ -4368,6 +4454,31 @@ test("ranked, arena, and mayhem champion rows all expose selected state", () => 
   assert.match(styles, /\.champion-table tbody tr\.is-selected:hover > td/);
 });
 
+test("R148 Mayhem ranking win rate and detail sample render from insights row", () => {
+  const row = { championId: 157, name: "亚索", rank: 1, tier: 1, winRate: 56.7509, play: 2_372_569 };
+  const common = {
+    championMeta: () => ({ nameZh: "亚索", titleZh: "疾风剑豪", nameEn: "Yasuo" }),
+    heroArtworkURL: () => "/art.png", heroArtworkFallbackURL: () => "/fallback.png",
+    imageURL: () => "/portrait.png", tierBadge: () => "<tier></tier>",
+    escapeHTML: String, compactNumber: (value) => `${Math.round(value / 10000)}万`,
+    percent: (value) => `${Number(value).toFixed(2)}%`,
+  };
+  const { renderChampionRow } = compileFunctions(script, ["renderChampionRow"], {
+    ...common, state: { selected: null },
+  });
+  const ranking = renderChampionRow(row, "mayhem", false, 1);
+  assert.match(ranking, /56\.75%/);
+  assert.match(ranking, /样本 237万/);
+  const { renderMayhemDetailPane } = compileFunctions(script, ["renderMayhemDetailPane"], {
+    ...common, state: { detail: null, mayhemDetailLoading: false, mayhemDetailError: "" },
+    mayhemHeroTier: () => ({ tier: 1 }),
+    metric: (label, value) => `<metric>${label}:${value}</metric>`,
+  });
+  const detail = renderMayhemDetailPane(row);
+  assert.match(detail, /<metric>胜率:56\.75%<\/metric>/);
+  assert.match(detail, /<metric>样本:237万<\/metric>/);
+});
+
 test("match loadout follows the OPGG mode matrix instead of trusting stray augment data", () => {
   const { matchModeKind, renderMatchLoadout } = compileFunctions(gameplayScript, ["matchQueueLabel", "queueDefinitionFor", "queueModeGroup", "isHextechClassic", "isHextechQualifier", "isOrdinaryHextechMatch", "matchModeKind", "matchAugmentIDs", "renderMatchLoadout"], {
     state: { queueGroups: [{ id: 1750, modeGroup: "arena", augmentSource: "arena" }, { id: 2300, modeGroup: "hextech-aram", augmentSource: "hextech" }, { id: 2400, modeGroup: "hextech-aram", augmentSource: "hextech" }] },
@@ -4482,7 +4593,7 @@ test("live rune matchups occupy the champion strip right side without wrapping t
   assert.match(header, /const values = \(items \|\| \[\]\)\.slice\(0, 3\)/);
   assert.match(header, /\$\{percent\(item\.winRate\)\} 胜率/);
   assert.match(header, /\$\{number\(item\.games\)\} 场/);
-  assert.match(header, /\["win", "胜率", stats\.winRate, true\][\s\S]*\["pick", "选取率", stats\.pickRate, true\]/);
+  assert.match(header, /\["win", "胜率", stats\.winRate, true\][\s\S]*\["pick", "选取率", stats\.pickRate, payload\.source !== "arena"\]/);
   assert.match(header, /class="is-\$\{tone\}"/);
   assert.match(header, /hasBanRate/);
   assert.match(gameplayStyles, /\.recommendation-champion-summary\s*\{[^}]*grid-template-areas:\s*"summary matchups" "positions matchups"/s);
@@ -4532,11 +4643,12 @@ test("live matchup rows use equal-width three-column grids", () => {
 });
 
 test("live recommendation capability flags hide unsupported matchup and ban-rate blocks", () => {
-	  const { renderChampionRecommendationHeader } = compileFunctions(gameplayScript, ["liveChampionTierBadge", "renderChampionRecommendationHeader"], {
+	  const { renderChampionRecommendationHeader } = compileFunctions(gameplayScript, ["renderChampionRecommendationHeader"], {
     escapeHTML: (value) => String(value ?? ""),
     liveRecommendationChampionId: () => 64,
     liveRecommendationTarget: () => ({ position: "top", positionOverride: true }),
-    liveRecommendationsFor: () => ({
+    liveRecommendationsFor: (data) => ({
+      source: data?.gameMode === "CHERRY" ? "arena" : "hextech-aram",
       hasCounters: false,
       hasBanRate: false,
       resolvedPosition: "top",
@@ -4554,22 +4666,23 @@ test("live recommendation capability flags hide unsupported matchup and ban-rate
 	    liveAugmentRecommendationSource: (data) => data?.gameMode === "CHERRY" ? "arena" : data?.gameMode === "KIWI" ? "hextech" : "",
 	  });
 	  const markup = renderChampionRecommendationHeader(
-	    { tier: 1, winRate: 52, pickRate: 8, banRate: 3, strongAgainst: [{ championId: 1, championName: "测试" }], weakAgainst: [] },
+	    { grade: "S", winRate: 52, pickRate: 8, banRate: 3, strongAgainst: [{ championId: 1, championName: "测试" }], weakAgainst: [] },
 	    { championName: "测试英雄", position: "top" },
 	    { players: [], gameMode: "KIWI", mapId: 12 },
 	  );
 	  assert.match(markup, /recommendation-champion-summary is-no-counters/);
 	  assert.match(markup, /is-no-counters has-tier/);
-	  assert.match(markup, /class="champion-summary-tier"[\s\S]*>梯度<[\s\S]*\/tier-icons\/1\.svg/);
+	  assert.match(markup, /\/tier-icons\/yourgg-s\.svg/);
 	  assert.doesNotMatch(markup, /champion-matchups/);
 	  assert.doesNotMatch(markup, /class="is-ban"/);
 	  const arenaMarkup = renderChampionRecommendationHeader(
-	    { tier: 0, winRate: 56, pickRate: 9 },
+	    { grade: "OP", winRate: 56, pickRate: 14.38 },
 	    { championName: "斗魂英雄", position: "other" },
 	    { players: [], gameMode: "CHERRY", mapId: 30 },
 	  );
 	  assert.match(arenaMarkup, /is-no-counters has-tier/);
 	  assert.match(arenaMarkup, /class="champion-summary-tier"[\s\S]*\/tier-icons\/op\.svg/);
+	  assert.doesNotMatch(arenaMarkup, /选取率|14\.38%/, "斗魂实时头部没有 YOUR.GG 选取率，不得显示旧站点的值");
 	  const rankedMarkup = renderChampionRecommendationHeader(
 	    { tier: 2, winRate: 52, pickRate: 8 },
 	    { championName: "排位英雄", position: "top" },
@@ -4577,7 +4690,7 @@ test("live recommendation capability flags hide unsupported matchup and ban-rate
 	  );
 	  assert.doesNotMatch(rankedMarkup, /champion-summary-tier|has-tier/);
 	  assert.match(gameplayBackend, /Tier\s+\*int\s+`json:"tier,omitempty"`/);
-	  assert.match(goFunctionSource(gameplayBackend, "gameplayRecommendationsFromResolvedDetail"), /Tier:\s+detail\.ArenaStats\.Tier[\s\S]*Tier:\s+heroStats\.Tier/);
+	  assert.doesNotMatch(gameplayBackend, /ArenaStats/);
 	  assert.match(goFunctionSource(hexdataBackend, "loadMayhemDetail"), /response\.Stats\.Tier = &tier/);
 	  assert.match(gameplayStyles, /\.recommendation-champion-summary\.is-no-counters\.has-tier\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\) 72px[^}]*grid-template-areas:\s*"summary tier" "positions tier"/s);
 	  assert.match(gameplayStyles, /\.champion-summary-tier\s*\{[^}]*grid-area:\s*tier[^}]*place-content:\s*center[^}]*border-left:\s*1px solid var\(--line\)/s);
@@ -4647,7 +4760,7 @@ test("live augments group before limiting, retaining the top three of each rarit
 	  assert.match(markup, /<h3>海克斯推荐<\/h3>/);
   assert.equal((markup.match(/class="live-augment-column is-/g) || []).length, 3);
   assert.equal((markup.match(/class="live-augment-option is-/g) || []).length, 9);
-  assert.equal((markup.match(/class="augment-grade is-/g) || []).length, 9);
+  assert.equal((markup.match(/class="tier-badge live-augment-grade"/g) || []).length, 9);
   for (const index of [4, 10, 7, 5, 8, 2, 6, 3, 12]) assert.match(markup, new RegExp(`推荐${index}(?!\\d)`));
   for (const index of [1, 9, 11]) assert.doesNotMatch(markup, new RegExp(`推荐${index}(?!\\d)`));
   assert.ok(markup.indexOf("推荐4") < markup.indexOf("推荐10") && markup.indexOf("推荐10") < markup.indexOf("推荐7"));
@@ -4656,7 +4769,7 @@ test("live augments group before limiting, retaining the top three of each rarit
   const source = functionSource(gameplayScript, "renderLiveAugmentRecommendations");
   assert.doesNotMatch(source, /liveChampionAugmentRows\(data, source\)\.slice/);
 	  assert.match(source, /\.sort\(/);
-	  assert.match(markup, /class="augment-grade is-S"[^>]*>S<\/b>/);
+	  assert.match(markup, /class="tier-badge live-augment-grade"[^>]*yourgg-s\.svg/);
 	  assert.match(markup, /<article class="live-augment-option is-silver" tabindex="0" data-tooltip=/);
 	  const metriclessCards = [...markup.matchAll(/<article class="live-augment-option[\s\S]*?<\/article>/g)].map((match) => match[0]);
 	  assert.equal(metriclessCards.length, 9);
@@ -4669,6 +4782,20 @@ test("live augments group before limiting, retaining the top three of each rarit
 	  assert.match(arenaCard, /class="live-augment-stat is-win"[\s\S]*胜率[\s\S]*64%/);
 	  assert.match(arenaCard, /class="live-augment-stat is-pick"[\s\S]*选用率[\s\S]*8%/);
 	  assert.doesNotMatch(arenaCard.replace(/\s(?:data-tooltip|aria-label)="[^"]*"/g, ""), /白银|黄金|棱彩|HexScore/);
+
+	  renderedRows = [{ rarity: "silver", grade: "S", winRate: 61, games: 321, assets: [{ id: 100, name: "官方海克斯", description: "官方描述" }] }];
+	  const officialCard = renderLiveAugmentRecommendations({ players: [] }, "arena").match(/<article class="live-augment-option[\s\S]*?<\/article>/)?.[0] || "";
+	  assert.match(officialCard, /class="live-augment-stat is-win"[\s\S]*胜率[\s\S]*61%/);
+	  assert.match(officialCard, /class="live-augment-stat is-games"[\s\S]*场次[\s\S]*321 场/);
+	  assert.doesNotMatch(officialCard, /class="live-augment-stat is-pick"/);
+	  assert.match(officialCard, /data-tooltip="[^"]*官方海克斯[^"]*官方描述/);
+
+	  renderedRows = [{ rarity: "silver", grade: "S", winRate: 60, pickRate: 7, games: 555, assets: [{ id: 101, name: "回退海克斯" }] }];
+	  const allMetricsCard = renderLiveAugmentRecommendations({ players: [] }, "arena").match(/<article class="live-augment-option[\s\S]*?<\/article>/)?.[0] || "";
+	  assert.ok(allMetricsCard.indexOf('class="live-augment-stat is-win"') < allMetricsCard.indexOf('class="live-augment-stat is-pick"'));
+	  assert.match(allMetricsCard, /class="live-augment-stat is-pick"[\s\S]*选用率[\s\S]*7%/);
+	  assert.doesNotMatch(allMetricsCard, /class="live-augment-stat is-games"/);
+	  assert.equal((allMetricsCard.match(/class="live-augment-stat is-/g) || []).length, 2);
 
 	  renderedRows = [{ rarity: "silver", grade: "S", score: 92.4, winRate: 62, games: 12480, assets: [{ id: 98, name: "海斗推荐" }] }];
 	  const hextechMarkup = renderLiveAugmentRecommendations({ players: [] }, "hextech");
@@ -4683,7 +4810,7 @@ test("live augments group before limiting, retaining the top three of each rarit
 	  assert.match(sparseMarkup, /class="live-augment-column is-silver"/);
 	  assert.doesNotMatch(sparseMarkup, /live-augment-column is-(?:gold|prismatic|unknown)/);
 	  const sparseCard = sparseMarkup.match(/<article class="live-augment-option[\s\S]*?<\/article>/)?.[0] || "";
-	  assert.match(sparseCard, /class="augment-grade is-S"/);
+	  assert.match(sparseCard, /class="tier-badge live-augment-grade"[^>]*yourgg-s\.svg/);
 	  assert.doesNotMatch(sparseCard, /<small>|—/);
 
 	  assert.match(gameplayStyles, /\.live-augment-columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
@@ -5287,7 +5414,7 @@ test("R66 premade backend guards reject cache and inference mutations", () => {
 		assert.match(goFunctionSource(source, "livePremadeAssignments"), /shared >= threshold/);
 		assert.match(goFunctionSource(source, "livePremadeAssignments"), /union\(left, right\)/);
 		assert.match(goFunctionSource(source, "livePlayerMatches"), /return a\.cachedLivePlayerMatches/);
-		assert.match(goFunctionSource(source, "loadGameplayLive"), /applyLivePremadeAssignments\(response\.Players, premadeInputs, phase, arenaMode\)/);
+		assert.match(goFunctionSource(source, "loadGameplayLive"), /applyLivePremades\(response\.GameID, response\.Players, premadeInputs, phase, arenaMode, lobbyMembers\)/);
 		assert.match(goFunctionSource(source, "applyLivePremadeAssignments"), /if arenaMode \|\| \(phase != "InProgress" && phase != "Reconnect"\)/);
 	};
 	assertContracts(gameplayBackend);
@@ -5778,6 +5905,67 @@ test("R61 unnamed loot remains visible by raw ID with a completion hint", () => 
 	assert.deepEqual(functions.lootImagePaths({ lootId: "CHEST_promotion" }), ["/loot-icons/promotion-chest.png"]);
 });
 
+test("0924 blank LCU loot record: hinted while retries run, plain and typeless once settled", () => {
+	const functions = compileFunctions(appScript, ["lootToken", "lootName", "lootNamePending", "lootTypeLabel", "lootImagePaths", "lootCategorySlug", "lootCategoryIcon", "lootCard"], {
+		escapeHTML: (value) => String(value ?? ""),
+		formatNumber: (value) => String(value),
+	});
+	// Backend shape while the bounded retries are still running.
+	const pending = functions.lootCard({ blank: true, dataPending: true, kind: "类型未知", category: "材料", count: 74 });
+	assert.match(pending, /<strong>客户端返回的空白条目<\/strong>/);
+	assert.match(pending, /类型未知/);
+	assert.match(pending, /is-name-pending/);
+	assert.match(pending, /× 74/);
+	assert.equal((pending.match(/客户端数据暂未同步/g) || []).length, 1, "the hint must not also be the card title");
+	// After every retry read the same record back, it is just a blank entry.
+	const settled = functions.lootCard({ blank: true, dataPending: false, kind: "类型未知", category: "材料", count: 74 });
+	assert.match(settled, /<strong>客户端返回的空白条目<\/strong>/);
+	assert.match(settled, /类型未知/);
+	assert.match(settled, /× 74/);
+	assert.doesNotMatch(settled, /客户端数据暂未同步|is-name-pending/);
+	// The page-level notice follows the same flag, so it disappears once settled.
+	assert.match(appScript, /const lootPending = loot\.some\(item => item\.dataPending\)/);
+});
+
+test("0924 the account page does not show the blank LCU placeholder record or its notice", async () => {
+	const render = async (source, loot) => {
+		const accountContent = { innerHTML: "", querySelectorAll: () => [] };
+		const state = { status: { connected: true, eventStream: true }, destroyed: false };
+		const { loadAccount } = compileFunctions(source, ["loadAccount"], {
+			state,
+			el: { accountContent, accountLiveState: { textContent: "", className: "" } },
+			api: async () => ({ summoner: { summonerLevel: 1 }, account: { loot }, rewards: [], capabilities: [] }),
+			lootCategorySlug: () => "material",
+			lootCategoryIcon: () => "◇",
+			lootCard: (item) => `<article>${item.lootId || "BLANK"}:${item.count}</article>`,
+			escapeHTML: (value) => String(value ?? ""),
+			formatNumber: (value) => String(value ?? 0),
+			playerName: () => "测试玩家",
+			capabilityName: (value) => value,
+			sourceStateLabel: (value) => value,
+			rewardStatusLabel: (value) => value,
+			formatDateTime: (value) => value,
+			renderPanelError: (_node, _title, error) => { throw error; },
+			loadNextLootImage: () => {},
+			window: { deepLegendsGameIcons: { iconFigure: () => "", prepareImages: () => {} } },
+		});
+		await loadAccount();
+		return accountContent.innerHTML;
+	};
+	const loot = [
+		{ lootId: "CURRENCY_CHAMPION", category: "材料", count: 5 },
+		{ blank: true, dataPending: true, kind: "类型未知", category: "材料", count: 74 },
+	];
+	const markup = await render(appScript, loot);
+	assert.match(markup, /CURRENCY_CHAMPION:5/);
+	assert.doesNotMatch(markup, /BLANK|:74|客户端数据暂未同步/);
+	// Once the record gains an identity the client no longer marks it blank and it shows normally.
+	assert.match(await render(appScript, [{ lootId: "MATERIAL_NEW", category: "材料", count: 74 }]), /MATERIAL_NEW:74/);
+	const unfiltered = appScript.replace(".filter(item => !item?.blank)", "");
+	assert.notEqual(unfiltered, appScript, "mutation target not found");
+	assert.match(await render(unfiltered, loot), /BLANK:74/);
+});
+
 test("0912 named ward, icon and legacy loot render their resolved names", () => {
   const functions = compileFunctions(appScript, ["lootToken", "lootName", "lootNamePending", "lootTypeLabel", "lootImagePaths", "lootCategorySlug", "lootCategoryIcon", "lootCard"], {
     escapeHTML: (value) => String(value ?? ""), formatNumber: (value) => String(value),
@@ -5996,10 +6184,12 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		assert.match(goFunctionSource(sources.seasonGo, "cacheSeasonQuerySnapshotLocked"), /len\(a\.seasonQuerySnapshots\) > seasonQuerySnapshotsMax[\s\S]*removeSeasonQuerySnapshotLocked/);
 		assert.match(goFunctionSource(sources.mainGo, "recordDiagnostic"), /eventName == "ranked_winrate_resolved"[\s\S]*aggregateRankedWinrateDiagnostic/); // B-8
 
-		assert.match(goFunctionSource(sources.structured, "loadStructuredCounters"), /structuredCountersForChampion\(payload\.Data\.Counters, id\)/); // C-1
+		assert.match(goFunctionSource(sources.structured, "loadStructuredCounters"), /loadStructuredCounterRows\(ctx, mode, champion, position, tier\)/);
+		assert.match(goFunctionSource(sources.structured, "loadStructuredCounterRows"), /structuredCounterRowsForChampion\(payload\.Data\.Counters, id\)/); // C-1
 		assert.match(sources.structured, /response\.Counters = p\.structuredCountersForChampion\(payload\.Data\.Counters, id\)/);
 		assert.doesNotMatch(sources.structured, /opggCountersForPosition|countersPositionScoped/);
-		const counters = goFunctionSource(sources.structured, "structuredCountersForChampion");
+		assert.match(goFunctionSource(sources.structured, "structuredCountersForChampion"), /championCounterSectionsFromRows\(p\.structuredCounterRowsForChampion/);
+		const counters = goFunctionSource(sources.structured, "championCounterSectionsFromRows");
 		assert.match(counters, /row\.WinRate < 50/); // C-2
 		assert.match(counters, /rows\[index\]\.WinRate > 50/);
 
@@ -6028,7 +6218,7 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		["B-7 recent ranked LRU", "gameplayGo", "for len(a.recentRankedSamples) > recentRankedSampleCacheMax {", "for false {"],
 		["B-7 season snapshot LRU", "seasonGo", "for len(a.seasonQuerySnapshots) > seasonQuerySnapshotsMax {", "for false {"],
 		["B-8 minute aggregation", "mainGo", 'if eventName, _ := event["event"].(string); eventName == "ranked_winrate_resolved" {', "if false {"],
-		["C-1 complete counter payload", "structured", "structuredCountersForChampion(payload.Data.Counters, id)", "structuredCountersForChampion(payload.Data.Summary.Positions[0].Counters, id)"],
+		["C-1 complete counter payload", "structured", "structuredCounterRowsForChampion(payload.Data.Counters, id)", "structuredCounterRowsForChampion(payload.Data.Summary.Positions[0].Counters, id)"],
 		["C-2 weak sign", "structured", "row.WinRate < 50 && len(result.WeakAgainst) < 5", "len(result.WeakAgainst) < 5"],
 		["C-2 strong sign", "structured", "rows[index].WinRate > 50", "rows[index].WinRate < 50"],
 		["D-2 raw-key diagnostic", "lootGo", '"raw_key_empty":            item.rawKeyEmpty,', "// raw key diagnostic removed"],
@@ -6587,18 +6777,18 @@ test("captured Arena equipment matches YOUR.GG preview order and expands to ever
   });
   const toRows = values => values.map(value => ({
     assets:[{id:value.itemId,kind:"item",name:catalog.get(value.itemId)?.name || "未知装备"}],
-    tier:value.tier, score:value.score, games:value.matches, winRate:value.winRate*100,
+    tier:value.tier, grade:({0:"OP",1:"S",2:"A",3:"B",4:"C",5:"D"})[value.tier] || "", score:value.score, games:value.matches, winRate:value.winRate*100,
     firstPlaceRate:value.firstPlacementRate*100, averagePlacement:value.averagePlacement,
   }));
   const ids = document => [...document.querySelectorAll("[data-item-id]")].map(el => Number(el.dataset.itemId));
   for (const [kind, values, expectedPreview] of [
-    ["prism", capture.prismaticItems, [443056,447106,443193,446632,447112,447107]],
-    ["core", capture.coreItems, [226695,224401,223075,223026,223143,226696]],
+    ["prism", capture.prismaticItems, [443056,447106,443193,446632,447107,447119]],
+    ["core", capture.coreItems, [226695,224401,223075,223143,226696,223026]],
   ]) {
     const rows = toRows(values);
     const render = () => kind === "prism" ? functions.renderArenaItemSection("棱彩装备", "单件", rows, kind) : functions.renderArenaCoreSection({coreItems:rows});
     let dom = new JSDOM(render());
-    assert.deepEqual(ids(dom.window.document), expectedPreview, `${kind}: same-tier order must follow matches, not score`);
+    assert.deepEqual(ids(dom.window.document), expectedPreview, `${kind}: grade then official score then samples`);
     assert.equal(dom.window.document.querySelectorAll(".arena-option-card").length, 6);
     assert.equal(dom.window.document.querySelector("[data-arena-expand]").textContent, `展开全部 ${values.length} 条`);
     dom.window.close();
@@ -6614,8 +6804,8 @@ test("captured Arena equipment matches YOUR.GG preview order and expands to ever
 
 test("Arena equipment sorting retains low samples, missing metadata and ungraded items", () => {
   const {sortedArenaItemRows} = compileFunctions(script,["objectRows","sortedArenaItemRows"]);
-  const rows = [{tier:"A",score:99,games:1,id:1},{tier:"A",score:10,games:100,id:2},{tier:"S",games:0,id:3},{games:50,id:4}];
-  assert.deepEqual(sortedArenaItemRows(rows).map(row=>row.id), [3,2,1,4]);
+  const rows = [{grade:"A",score:99,games:1,id:1},{grade:"A",score:10,games:100,id:2},{grade:"S",games:0,id:3},{games:50,id:4}];
+  assert.deepEqual(sortedArenaItemRows(rows).map(row=>row.id), [3,1,2,4]);
   assert.deepEqual(rows.map(row=>row.id),[1,2,3,4],"do not mutate source array");
 });
 
@@ -6750,4 +6940,35 @@ test("R117 champions api() keeps RequestCancelled when a successful fetch is sup
 	assert.equal(diagnostics.length, 1, `取代必须记一条失败埋点，实际 ${JSON.stringify(diagnostics)}`);
 	assert.equal(diagnostics[0].errorKind, "canceled", "取代埋点必须记录 errorKind=canceled");
 	assert.equal(diagnostics.some((detail) => detail.errorKind === "timeout"), false, "取代不得记成 timeout");
+});
+
+test("R148 changing Mayhem heroes resets the detail tab and its saved setting", () => {
+  const settings = new Map([["champion-mayhem-detail-tab", "build"]]);
+  const state = {
+    selected: { championId: 157 }, detail: { marker: "old" }, mayhemDetailTab: "build",
+    mayhemStage: 3, mayhemDetailLoading: false, mayhemDetailError: "", mayhemDetailKey: 157,
+  };
+  const { primeMayhemDetail, normalizeMayhemDetailTab, mayhemDetailActiveTab, mayhemDetailPanelMarkup } = compileFunctions(
+    script, ["primeMayhemDetail", "normalizeMayhemDetailTab", "mayhemDetailActiveTab", "mayhemDetailPanelMarkup", "mayhemDetailTabSpecs"], {
+      state,
+      writeSetting: (key, value) => settings.set(key, value),
+      objectRows: (value) => Array.isArray(value) ? value : [],
+      mayhemOverviewTabMarkup: () => "OVERVIEW-CONTENT",
+      mayhemBuildTabMarkup: () => "BUILD-CONTENT",
+      renderMayhemPerformancePanel: () => "PERFORMANCE-CONTENT",
+    },
+  );
+  const detail = { performance: { metrics: [{ key: "kda" }] } };
+  primeMayhemDetail({ championId: 887 });
+  assert.equal(state.mayhemDetailTab, "overview");
+  assert.equal(state.mayhemStage, 0);
+  assert.equal(mayhemDetailActiveTab(detail), "overview");
+  assert.match(mayhemDetailPanelMarkup(detail), /OVERVIEW-CONTENT/);
+  assert.equal(settings.get("champion-mayhem-detail-tab"), "overview");
+  state.mayhemDetailTab = "build";
+  settings.set("champion-mayhem-detail-tab", "build");
+  primeMayhemDetail({ championId: 887 });
+  assert.equal(state.mayhemDetailTab, "build", "same hero refresh keeps its active tab");
+  primeMayhemDetail({ championId: 157 });
+  assert.equal(normalizeMayhemDetailTab(settings.get("champion-mayhem-detail-tab")), "overview", "restart reads overview");
 });

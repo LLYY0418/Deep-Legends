@@ -103,6 +103,23 @@ type timelineItemRecord struct {
 // extractParticipantTimeline 从时间线帧里抽出指定参与者的装备购买
 // 路线（按分钟分组，撤销的购买/出售会抵消）与技能加点顺序。
 func extractParticipantTimeline(frames []timelineFrame, participantID int64) ([]timelineItemGroup, []timelineSkillUp) {
+	records, skills := participantTimelineRecords(frames, participantID)
+	groups := make([]timelineItemGroup, 0, 16)
+	for _, record := range records {
+		minute := int(record.at / 60000)
+		if length := len(groups); length > 0 && groups[length-1].Minute == minute {
+			groups[length-1].Events = append(groups[length-1].Events, timelineItemEvent{ItemID: record.itemID, Sold: record.sold})
+			continue
+		}
+		groups = append(groups, timelineItemGroup{Minute: minute, Events: []timelineItemEvent{{ItemID: record.itemID, Sold: record.sold}}})
+	}
+	if len(groups) > timelineMaxItemGroups {
+		groups = groups[:timelineMaxItemGroups]
+	}
+	return groups, skills
+}
+
+func participantTimelineRecords(frames []timelineFrame, participantID int64) ([]timelineItemRecord, []timelineSkillUp) {
 	records := make([]timelineItemRecord, 0, 32)
 	skills := make([]timelineSkillUp, 0, 18)
 	for _, frame := range frames {
@@ -139,19 +156,7 @@ func extractParticipantTimeline(frames []timelineFrame, participantID int64) ([]
 			}
 		}
 	}
-	groups := make([]timelineItemGroup, 0, 16)
-	for _, record := range records {
-		minute := int(record.at / 60000)
-		if length := len(groups); length > 0 && groups[length-1].Minute == minute {
-			groups[length-1].Events = append(groups[length-1].Events, timelineItemEvent{ItemID: record.itemID, Sold: record.sold})
-			continue
-		}
-		groups = append(groups, timelineItemGroup{Minute: minute, Events: []timelineItemEvent{{ItemID: record.itemID, Sold: record.sold}}})
-	}
-	if len(groups) > timelineMaxItemGroups {
-		groups = groups[:timelineMaxItemGroups]
-	}
-	return groups, skills
+	return records, skills
 }
 
 func removeLastItemRecord(records []timelineItemRecord, itemID int64, sold bool) []timelineItemRecord {

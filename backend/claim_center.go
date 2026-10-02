@@ -258,6 +258,8 @@ func scanEventClaims(ctx context.Context, client *LCUClient, observers ...func(m
 		index, event := index, event
 		wait.Add(1)
 		go func() {
+			defer recoverPanic("claim_center.scanEventClaims.1")
+
 			defer wait.Done()
 			select {
 			case sem <- struct{}{}:

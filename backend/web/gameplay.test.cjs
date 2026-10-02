@@ -124,16 +124,21 @@ function functionSource(script, name) {
 
 function compile(names, dependencies = {}, script = source) {
   names = [...names];
-  for (const name of ["proBadgeAttributes", "renderProIdentityBadge", "proContextFromButton"]) if (!names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
+  for (const name of ["proBadgeAttributes", "renderProIdentityBadge", "proContextFromButton"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
   if (!names.includes("overviewSupplementTarget") && names.some(name => functionSource(script, name).includes("overviewSupplementTarget("))) names.push("overviewSupplementTarget");
   // R116-B 评审整改（清 R116-D 账本 §11.7-1 的技术债）：renderLiveInsights 的七个
   // 渲染 helper 已从函数体内提到模块作用域，这里按名字传递编译真实实现（顺序＝先
   // 调用方后被调用方，names 是边扫边追加的），而不是给每个聚焦测试塞一份桩。
-  for (const name of ["renderLiveRosterNoticeBars", "renderLiveTeamPortraitTags", "liveRosterChampionName", "liveNoticeBar", "liveEvidenceSuffix", "liveConfidenceText", "liveDeltaPoints"]) if (!names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
+  for (const name of ["renderLiveRosterNoticeBars", "renderLiveTeamPortraitTags", "liveRosterChampionName", "liveNoticeBar", "liveEvidenceSuffix", "liveConfidenceText", "liveDeltaPoints"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
   // R129 P1：历史状态判据抽成 liveHistoryStateOf / liveHistorySettled，编译
   // renderLivePlayer / renderInsightMatches 时按名字带上真实实现，不塞桩。
-  for (const name of ["liveHistoryStateOf", "liveHistorySettled"]) if (!names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
-  dependencies = { riotTab: tab => tab?.region === "kr", isARAMRelatedMatch: () => false, window: {}, ...dependencies };
+  for (const name of ["liveHistoryStateOf", "liveHistorySettled"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
+  for (const name of ["recommendedRuneSpellIDs", "renderRuneSpellPair", "renderRuneEquipment", "retainRuneStarterItems"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
+  for (let length = -1; length !== names.length;) {
+    length = names.length;
+    for (const name of ["bindLiveNode", "champSelectEnemyPlaceholder", "stampLiveRows", "preserveLiveImages", "patchLiveRosterPanel", "liveClientPositionsPending", "clearRuneStarterRetries", "runeStarterTargetActive", "laneMatchupEnemies", "laneMatchupTier", "laneMatchupInference", "laneMatchupAvailability", "ensureLaneMatchupPositions", "laneMatchupPairKey", "laneMatchupOwnLocked", "ensureLaneMatchupPair", "recordLaneMatchupCandidateSkip", "laneMatchupUnavailableReason", "recordLaneMatchupCardDiagnostic", "liveRecommendationTier"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
+  }
+  dependencies = { readSetting: (_key, fallback) => fallback, recordItemSetClientDiagnostic: () => {}, document: { hidden: false }, setTimeout, clearTimeout, riotTab: tab => tab?.region === "kr", isARAMRelatedMatch: () => false, isSummonersRiftMatch: data => Number(data?.mapId) === 11, clusterPremadePlayers: players => players, window: {}, ...dependencies };
   const keys = Object.keys(dependencies);
   return Function(...keys, `"use strict";\n${names.map((name) => functionSource(script, name)).join("\n")}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
 }
@@ -159,7 +164,7 @@ test("R68 specialist request uses OPGG-resolved position unless the user overrid
   assert.equal(functions.specialistPosition({}, target), "adc");
   await functions.ensureSpecialistRunes({});
   assert.match(apiCalls[0], /championId=222&position=adc/);
-  assert.match(functions.specialistRequestTarget({}).key, /^222:adc:/);
+  assert.equal(functions.specialistRequestTarget({}).key, "222:adc");
 
   target = { ...target, positionOverride: "mid" };
   state.specialistRunes.clear();
@@ -194,17 +199,46 @@ test("R68 live insight labels are relative to the current player's absolute team
   assert.match(functions.renderLiveInsights({ players: [{ name: "blue", teamId: 100 }, { name: "red", teamId: 200 }] }), /无法确定你所在阵营/);
 });
 
-test("R68 optional insight alignment sorts complete positions and fails closed on duplicates", () => {
+test("live insight sorts both teams by known positions while retaining duplicate order", () => {
   const { insightTeamLayout } = compile(["insightTeamLayout"]);
   const positions = ["utility", "bottom", "middle", "jungle", "top"];
   const players = [100, 200].flatMap((teamId) => positions.map((position) => ({ teamId, position })));
   const aligned = insightTeamLayout(players, true);
   assert.equal(aligned.aligned, true);
   assert.deepEqual(aligned.teams.get(100).map((player) => player.position), ["top", "jungle", "middle", "bottom", "utility"]);
-  const duplicate = players.map((player, index) => index === 0 ? { ...player, position: "top" } : player);
-  const fallback = insightTeamLayout(duplicate, true);
-  assert.equal(fallback.aligned, false);
-  assert.match(fallback.reason, /重复或缺失/);
+  const duplicate = [
+    { teamId: 200, position: "middle", name: "mid-1" },
+    { teamId: 200, position: "jungle", name: "jungle-1" },
+    { teamId: 200, position: "top", name: "top" },
+    { teamId: 200, position: "jungle", name: "jungle-2" },
+    { teamId: 200, position: "middle", name: "mid-2" },
+  ];
+  assert.deepEqual(insightTeamLayout(duplicate, true).teams.get(200).map((player) => player.name),
+    ["top", "jungle-1", "jungle-2", "mid-1", "mid-2"]);
+  assert.deepEqual(insightTeamLayout([{ teamId: 100, position: "", name: "unknown" }, { teamId: 100, position: "top", name: "top" }], true).teams.get(100).map((player) => player.name),
+    ["top", "unknown"]);
+});
+
+test("live insight keeps current-player highlight after position ordering", () => {
+  const state = { settings: { liveOrder: "team" } };
+  const { renderLiveInsights } = compile(["orderLivePlayers", "insightTeamLayout", "renderLiveRecentPositions", "renderLiveInsights"], {
+    state,
+    liveAugmentRecommendationSource: () => "",
+    recordLiveRosterRendered: () => {},
+    renderLivePlayer: (player) => `<article class="live-player${player.isCurrent ? " is-self" : ""}">${player.name}</article>`,
+    renderInsightMatches: () => '<div class="insight-match-row"></div>',
+    escapeHTML: String,
+    arenaLivePlayerGroups: () => [],
+  });
+  const html = renderLiveInsights({ mapId: 11, players: [
+    { name: "self", teamId: 100, position: "bottom", isCurrent: true },
+    { name: "top", teamId: 100, position: "top" },
+    { name: "foe", teamId: 200, position: "top" },
+  ] });
+  const own = html.slice(html.indexOf("<h3>我方</h3>"), html.indexOf("<h3>对方</h3>"));
+  assert.ok(own.indexOf(">top</article>") < own.indexOf(">self</article>"));
+  assert.match(own, /class="live-player is-self">self/);
+  assert.match(cssSource, /\.live-player-list\.is-insight \.insight-match-row \{[^}]*align-content: flex-end;[^}]*align-items: flex-end;/);
 });
 
 test("R68 rendered-roster diagnostic carries queueId and absolute counts", () => {
@@ -214,8 +248,8 @@ test("R68 rendered-roster diagnostic carries queueId and absolute counts", () =>
     state,
     fetch: (_url, options) => { body = JSON.parse(options.body); return Promise.resolve(); },
   });
-  recordLiveRosterRendered({ phase: "ChampSelect", gameId: 68, queueId: 420, players: [{}, {}] }, 1, 1);
-  assert.deepEqual({ queueId: body.queueId, rendered100: body.rendered100, rendered200: body.rendered200 }, { queueId: 420, rendered100: 1, rendered200: 1 });
+  recordLiveRosterRendered({ phase: "ChampSelect", gameId: 68, queueId: 420, players: [{ hidden: true }, { privateHistory: true }, { privateHistory: true }] }, 1, 2);
+  assert.deepEqual({ queueId: body.queueId, rendered100: body.rendered100, rendered200: body.rendered200, hiddenIdentityRendered: body.hiddenIdentityRendered, privateHistoryRendered: body.privateHistoryRendered }, { queueId: 420, rendered100: 1, rendered200: 2, hiddenIdentityRendered: 1, privateHistoryRendered: 2 });
 });
 
 test("R68 gameplay mutation probes execute real position and team logic", () => {
@@ -303,6 +337,21 @@ test("R69 history rows distinguish unavailable failed empty and pending states",
   const pending = render(true, "pending");
   assert.match(pending, /live-history-skeleton/);
   assert.doesNotMatch(pending, /未公开|读取失败|暂无最近战绩/);
+});
+
+test("live detail shows at most ten newest recent games", () => {
+  const { renderInsightMatches } = compile(["insightScore", "renderInsightMatches"], {
+    escapeHTML: String, number: String, iconFigure: (_kind, id) => `<i data-champion="${id}"></i>`,
+  });
+  const recentGames = Array.from({ length: 12 }, (_, index) => ({
+    championId: index + 1, championName: `Champion ${index + 1}`,
+    win: true, kills: 1, deaths: 1, assists: 1,
+  }));
+  const markup = renderInsightMatches({ historyState: "ok", recentGames });
+  assert.equal((markup.match(/class="insight-match is-/g) || []).length, 10);
+  assert.match(markup, /data-champion="1"/);
+  assert.match(markup, /data-champion="10"/);
+  assert.doesNotMatch(markup, /data-champion="11"|data-champion="12"/);
 });
 
 test("R69 current-position chip preserves client position and discloses specialist fallback", () => {
@@ -460,10 +509,10 @@ test("R75 pro target is independent of specialist rankings and rejects non-SR mo
 });
 
 test("R75 pro rows use shared game renderer, neutral unknown, real event and sample threshold", () => {
-  const state = { live: { mapId: 11 }, specialistPlayerTabs: new Map(), selectedRecommendation: "pro-1" };
+  const state = { live: { mapId: 11 }, specialistPlayerTabs: new Map(), selectedRecommendation: "pro-1", summonerSpells: { spells: [{ id: 4, name: "闪现" }, { id: 11, name: "惩戒" }] } };
   const fn = compile(["renderSpecialistPlayers", "renderRuneSourceSection", "proRuneRecordLabel"], {
-    state, proRequestTarget: () => ({key:"69:mid"}), escapeHTML: x=>String(x??""), relativeTime:()=>"刚刚",
-    runeConfigurationTitle:()=>"电刑 + 坚决", renderUnifiedRuneBoard:()=>"<runes></runes>", renderItemIcon:id=>`<item>${id}</item>`, iconFigure:()=>"<icon></icon>",
+    state, proRequestTarget: () => ({key:"69:mid"}), specialistRequestTarget: () => ({key:"69:mid"}), positionLabel: value => value, livePositionDisplay: value => value, escapeHTML: x=>String(x??""), relativeTime:()=>"刚刚",
+    runeConfigurationTitle:()=>"电刑 + 坚决", renderUnifiedRuneBoard:()=>"<runes></runes>", renderItemIcon:id=>`<item>${id}</item>`, renderSummonerSpellIcon:id=>`<spell>${id}</spell>`, iconFigure:()=>"<icon></icon>",
   });
   const row = { key:"pro-1", title:"T1 Faker", playerName:"Faker", championId:69, position:"中路", opponentPlayerName:"GEN Chovy", eventLabel:"LCK · 2026-09-06 · T1 vs GEN 第 1 局", winKnown:false, recordGames:2, recordWins:1, recordPartial:true, selectedComplete:false, itemIds:[3364,2031,6692] };
   let html=fn.renderRuneSourceSection({key:"pro",items:[row],proStatus:{}},true);
@@ -472,10 +521,84 @@ test("R75 pro rows use shared game renderer, neutral unknown, real event and sam
   assert.match(html,/specialist-game-row is-unknown is-selected/);assert.match(html,/该局胜负未获官方确认/);
   assert.match(html,/LCK · 2026-09-06/);assert.match(html,/GEN Chovy/);assert.match(html,/最终装备/);
   assert.match(html,/上游未提供完整槽位/);assert.doesNotMatch(html,/specialist-opponent-rank/);
+  assert.doesNotMatch(html,/specialist-game-spells/,"pro record without verified spell IDs must omit the entire spell container");
+  assert.doesNotMatch(html,/rune-spell-row/,"pro records must not render a separate spell row");
   html=fn.renderSpecialistPlayers([{...row,recordGames:3,recordWins:2}],"pro");assert.match(html,/aria-label="2胜1负，仅已确认场次"/);
+  html=fn.renderSpecialistPlayers([{...row,spell1Id:4,spell2Id:11}],"specialist");
+  assert.match(html,/<div class="specialist-game-spells"><spell>4<\/spell><spell>11<\/spell><\/div>/);
+  assert.doesNotMatch(html,/rune-spell-row|召唤师技能|闪现|惩戒/);
   html=fn.renderRuneSourceSection({key:"pro",items:[row],proStatus:{readAt:new Date(Date.now()-600000).toISOString()}},true);
   assert.doesNotMatch(html,/缓存数据|无法连接职业赛事数据源/);assert.match(html,/data-retry-pro-runes/);assert.match(html,/当前显示上次读取结果/);
   html=fn.renderRuneSourceSection({key:"pro",items:[],proStatus:{reason:"upstream-timeout"}},true);assert.match(html,/上游超时/);assert.match(html,/data-retry-pro-runes/);
+});
+
+test("R171 spell pairs stay with their own rune source and require two verified IDs", () => {
+  const state = { summonerSpells: { spells: [{ id: 4, name: "闪现" }, { id: 11, name: "惩戒" }] } };
+  const { recommendedRuneSpellIDs, renderRuneSpellPair } = compile(["recommendedRuneSpellIDs", "renderRuneSpellPair"], {
+    state,
+    liveRecommendationsFor: () => ({ build: { spellOptions: [{ ids: [4, 11] }, { ids: [3, 11] }] } }),
+    renderSummonerSpellIcon: id => `<icon data-spell="${id}"></icon>`,
+    escapeHTML: value => String(value),
+  });
+  assert.deepEqual(recommendedRuneSpellIDs({}, { sourceLabel: "OPGG" }), [4, 11]);
+  assert.deepEqual(recommendedRuneSpellIDs({}, { sourceLabel: "绝活哥", spell1Id: 7, spell2Id: 4 }), [7, 4]);
+  assert.deepEqual(recommendedRuneSpellIDs({}, { sourceLabel: "职业选手" }), []);
+  assert.deepEqual(recommendedRuneSpellIDs({}, { sourceLabel: "绝活哥", spell1Id: 4 }), []);
+  assert.equal(renderRuneSpellPair([4, 0]), "");
+  assert.equal(renderRuneSpellPair([undefined, 11]), "");
+  const html = renderRuneSpellPair([4, 11]);
+  assert.match(html, /data-spell="4".*闪现.*data-spell="11".*惩戒/s);
+  assert.doesNotMatch(html, /占位/);
+});
+
+test("R171 apply optionally writes the selected source's spells and reports partial success", async () => {
+  const state = { live: { players: [{ isCurrent: true, championId: 64, championName: "李青" }] }, applyRuneSpells: true };
+  const recommendation = { sourceLabel: "绝活哥", championId: 64, primaryStyleId: 8000, subStyleId: 8100, selectedPerkIds: [1,2,3,4,5,6,7,8,9], spell1Id: 4, spell2Id: 11 };
+  const posts = [], toasts = [];
+  let spellApplied = true;
+  const { applyRunes } = compile(["applyRunes"], {
+    state, selectedRuneRecommendation: () => recommendation, liveRecommendationChampionId: player => player.championId,
+    liveRecommendationsFor: () => ({ build: { spellOptions: [{ ids: [3, 6] }] } }),
+    api: async (_, options) => { posts.push(JSON.parse(options.body)); return { applied: true, spellApplied }; },
+    showToast: message => toasts.push(message),
+  });
+  const button = { disabled: false, textContent: "应用所选符文" };
+  await applyRunes({ currentTarget: button });
+  assert.deepEqual([posts[0].spell1Id, posts[0].spell2Id], [4, 11]);
+  assert.equal(toasts.at(-1), "符文和召唤师技能已应用");
+  spellApplied = false;
+  await applyRunes({ currentTarget: button });
+  assert.equal(toasts.at(-1), "符文已应用，召唤师技能未能同步");
+  state.applyRuneSpells = false;
+  await applyRunes({ currentTarget: button });
+  assert.equal(posts.at(-1).spell1Id, undefined);
+  assert.equal(toasts.at(-1), "符文已新建并设为当前页");
+  state.applyRuneSpells = true;
+  recommendation.sourceLabel = "职业选手";
+  recommendation.spell1Id = 0;
+  await applyRunes({ currentTarget: button });
+  assert.equal(posts.at(-1).spell1Id, undefined, "pro source must not borrow OPGG spells");
+});
+
+test("R171 rune card shows OPGG spells once and only complete specialist rows", () => {
+  const state = { live: {}, specialistRuneFailures: new Map(), summonerSpells: { spells: [{ id: 4, name: "闪现" }, { id: 11, name: "惩戒" }] } };
+  const { renderRuneSourceSection } = compile(["renderRuneSourceSection"], {
+    state, liveRecommendationsFor: () => ({ build: { spellOptions: [{ ids: [4, 11] }] } }),
+    specialistRequestTarget: () => null, specialistRuneFailure: () => null,
+    renderRuneChoice: config => `<choice>${config.key}</choice>`, renderSpecialistPlayers: () => "",
+    renderSummonerSpellIcon: id => `<icon data-spell="${id}"></icon>`, escapeHTML: value => String(value),
+  });
+  const opgg = renderRuneSourceSection({ key: "opgg", title: "OPGG", items: [{ key: "a" }, { key: "b" }] }, true);
+  assert.equal((opgg.match(/class="rune-spell-row"/g) || []).length, 1);
+  assert.match(opgg, /data-spell="4".*闪现.*data-spell="11".*惩戒/s);
+  assert.ok(opgg.indexOf("rune-spell-row") < opgg.indexOf("<choice>a</choice>"));
+
+  const { renderRuneSpellPair } = compile(["renderRuneSpellPair"], {
+    state, renderSummonerSpellIcon: id => `<icon data-spell="${id}"></icon>`, escapeHTML: value => String(value),
+  });
+  for (const ids of [[0, 11], [4, 0], [undefined, 11], [4, undefined]]) {
+    assert.equal(renderRuneSpellPair(ids), "", `missing pair ${ids} must not render a row`);
+  }
 });
 
 test("R75 incomplete pro disables actual action markup and refuses POST", async () => {
@@ -486,7 +609,7 @@ test("R75 incomplete pro disables actual action markup and refuses POST", async 
     state,liveRecommendationTarget:()=>({key:"69:mid"}),liveRecommendationsFor:()=>({}),liveAugmentRecommendationSource:()=>null,
     recommendationCapabilities:()=>({hasRunes:true}),recommendationTabSpecs:()=>[["runes","符文"]],recommendationActiveTab:()=>"runes",
     selectedRuneRecommendation:()=>selection,recommendationPanelBusy:()=>false,renderLiveInsights:()=>"",renderRuneRecommendations:()=>"",
-    renderChampionRecommendationHeader:()=>"",renderBuildRecommendation:()=>"",renderRecommendationDataNotices:()=>"",runeConfigurationTitle:()=>"职业符文",escapeHTML:x=>String(x),
+    renderChampionRecommendationHeader:()=>"",renderBuildRecommendation:()=>"",renderRecommendationDataNotices:()=>"",renderLaneMatchupCard:()=>"",runeConfigurationTitle:()=>"职业符文",escapeHTML:x=>String(x),
     showToast:()=>{},api:async()=>{posts++},
   });
   assert.match(f.renderRecommendationArea(state.live),/data-apply-runes="selected" disabled/);
@@ -496,6 +619,12 @@ test("R75 incomplete pro disables actual action markup and refuses POST", async 
   await f.applyRunes({currentTarget:{}});assert.equal(posts,0,"false complete flag must not allow eight perks");
   selection.selectedPerkIds.push(5005);
   assert.doesNotMatch(f.renderRecommendationArea(state.live),/data-apply-runes="selected" disabled/);
+  selection.sourceLabel="职业选手"; selection.spell1Id=4; selection.spell2Id=11;
+  assert.match(f.renderRecommendationArea(state.live),/data-apply-rune-spells checked/);
+  state.applyRuneSpells=false;
+  assert.match(f.renderRecommendationArea(state.live),/data-apply-rune-spells(?! checked)/);
+  selection.spell2Id=0;
+  assert.doesNotMatch(f.renderRecommendationArea(state.live),/data-apply-rune-spells/);
   state.live.phase="InProgress";assert.match(f.renderRecommendationArea(state.live),/data-apply-runes="selected" disabled/);
 });
 
@@ -655,6 +784,159 @@ test('resolved repeated pro shards render in both legal rows, not in the bottom 
   assert.doesNotMatch(html,/pro-known-shards|槽位未确认/);
 });
 
+test("R167 lane card renders only a locked enemy in the current player's lane", () => {
+  const state = { laneMatchupCandidates: new Map(), recommendationTab: "insight" };
+  const player = (teamId, position, championId, extra = {}) => ({ teamId, position, championId, championLocked: championId > 0, ...(teamId === 100 ? { isAlly: true } : {}), ...extra });
+  const data = { phase: "ChampSelect", available: true, players: [
+    player(100, "middle", 69, { isCurrent: true, rank: { tier: "GOLD" } }),
+    player(100, "middle", 7),
+    player(200, "top", 64, { championName: "李青" }),
+    player(200, "middle", 103, { championName: "阿狸" }),
+  ] };
+  let payload = {};
+  const helpers = compile(["laneMatchupContext", "laneMatchupOwnChampionId", "laneMatchupTier", "laneMatchupCandidateKey", "renderLaneMatchupCard", "renderRecommendationArea"], {
+    state, livePositionValue: value => ({ middle: "mid", bottom: "adc", utility: "support" })[value] || value || "",
+    liveRecommendationTier: () => "emerald_plus", iconFigure: (_kind, id) => `<img data-champion-id="${id}">`,
+    rate: value => `${Number(value).toFixed(1)}%`, escapeHTML: value => String(value ?? ""),
+    liveRecommendationTarget: current => current.players[0].championId ? { key: "self" } : null,
+    liveRecommendationsFor: () => payload, liveAugmentRecommendationSource: () => "",
+    recommendationCapabilities: () => ({ hasRunes: false, hasAugments: false }),
+    recommendationTabSpecs: () => [["insight", "详情"]], recommendationActiveTab: () => "insight",
+    selectedRuneRecommendation: () => null, recommendationPanelBusy: () => false,
+    renderLiveInsights: () => "<div>玩家列表</div>", renderChampionRecommendationHeader: () => "",
+    renderBuildRecommendation: () => "", renderRecommendationDataNotices: () => "",
+    recommendationEmptyPanel: () => "",
+  });
+  const render = hero => { const row = [...(hero?.weakAgainst || []), ...(hero?.strongAgainst || [])].find(row => row.championId === 103); state.laneMatchupPairs = new Map([["69:103:mid:emerald_plus", { status: "succeeded", data: row }]]); return helpers.renderLaneMatchupCard(data, hero); };
+  let html = render({ weakAgainst: [{ championId: 103, winRate: 43.7, championName: "阿狸" }] });
+  assert.match(html, /对位克制建议/);
+  assert.match(html, /对线偏劣势，胜率约 43\.7%/);
+  assert.equal((html.match(/lane-matchup-result/g) || []).length, 1);
+  assert.equal((html.match(/data-champion-id="103"/g) || []).length, 1);
+  assert.doesNotMatch(html, /data-champion-id="64"|data-champion-id="7"/);
+  payload = { hero: { weakAgainst: [{ championId: 103, winRate: 43.7 }] } };
+  const insightHTML = helpers.renderRecommendationArea(data);
+  assert.ok(insightHTML.indexOf("data-lane-matchup-card") < insightHTML.indexOf("玩家列表"));
+  html = render({ strongAgainst: [{ championId: 103, winRate: 57.4 }] });
+  assert.match(html, /对线偏优势，胜率约 57\.4%/);
+  assert.equal(render({ weakAgainst: [{ championId: 64, winRate: 41 }] }), "");
+  payload = {};
+  state.laneMatchupPairs.clear();
+  assert.doesNotMatch(helpers.renderRecommendationArea(data), /data-lane-matchup-card/);
+  data.phase = "InProgress";
+  assert.equal(render({ weakAgainst: [{ championId: 103, winRate: 43.7 }] }), "");
+  data.phase = "ChampSelect";
+  data.players[0].position = "";
+  assert.equal(render({ weakAgainst: [{ championId: 103, winRate: 43.7 }] }), "");
+  data.players[0].position = "middle";
+  data.players[3].championLocked = false;
+  assert.equal(render({ weakAgainst: [{ championId: 103, winRate: 43.7 }] }), "");
+});
+
+// gameplay.go's isAlly := isCurrent || (arenaMode && ...): in standard ranked/flex select,
+// isAlly is true ONLY for the current player, never for the other four teammates. A teammate
+// who ends up in the same lane as the current player (autofill/duo mishap) therefore also has
+// isAlly falsy here — exactly like a real enemy. laneMatchupContext must tell them apart by
+// teamId, not by isAlly, or a teammate's pick would be shown as "the enemy laner".
+test("R167 lane card tells a same-lane teammate apart from the real enemy when isAlly is falsy for both", () => {
+  const state = { laneMatchupCandidates: new Map(), recommendationTab: "insight" };
+  const data = { phase: "ChampSelect", available: true, players: [
+    { isCurrent: true, teamId: 100, position: "middle", championId: 69, isAlly: true, rank: { tier: "GOLD" } },
+    // Real backend semantics: not current, so isAlly is omitted/falsy despite being an ally.
+    { teamId: 100, position: "middle", championId: 999, championLocked: true, championName: "队友英雄" },
+    { teamId: 200, position: "middle", championId: 103, championLocked: true, championName: "阿狸" },
+  ] };
+  const helpers = compile(["laneMatchupContext", "laneMatchupOwnChampionId", "laneMatchupTier", "laneMatchupCandidateKey", "renderLaneMatchupCard"], {
+    state, livePositionValue: value => ({ middle: "mid", bottom: "adc", utility: "support" })[value] || value || "",
+    liveRecommendationTier: () => "emerald_plus", iconFigure: (_kind, id) => `<img data-champion-id="${id}">`,
+    rate: value => `${Number(value).toFixed(1)}%`, escapeHTML: value => String(value ?? ""),
+  });
+  state.laneMatchupPairs = new Map([["69:103:mid:emerald_plus", {status:"succeeded", data:{winRate:43.7}}]]);
+  const html = helpers.renderLaneMatchupCard(data, { weakAgainst: [{ championId: 103, winRate: 43.7, championName: "阿狸" }] });
+  assert.match(html, /对位克制建议/);
+  assert.match(html, /对线偏劣势，胜率约 43\.7%/);
+  assert.equal((html.match(/data-champion-id="103"/g) || []).length, 1, "must pick the team-200 player as the enemy");
+  assert.doesNotMatch(html, /data-champion-id="999"/, "must not treat the same-lane ally with falsy isAlly as the enemy");
+});
+
+test("R167 candidate request uses the enemy champion, current lane and tier, once per mapping", async () => {
+  const data = { phase: "ChampSelect", available: true, players: [
+    { isCurrent: true, isAlly: true, teamId: 100, position: "middle", championId: 0, rank: { tier: "GOLD" } },
+    { teamId: 200, position: "top", championId: 64, championLocked: true },
+    { teamId: 200, position: "middle", championId: 103, championLocked: true, championName: "阿狸" },
+  ] };
+  const state = { live: data, section: "live", liveGameGeneration: 1, laneMatchupCandidates: new Map() };
+  const requests = [];
+  const diagnostics = [];
+  const finishes = [];
+  const helpers = compile(["laneMatchupContext", "laneMatchupOwnChampionId", "laneMatchupTier", "laneMatchupCandidateKey", "recordLaneMatchupCandidateDiagnostic", "ensureLaneMatchupCandidates", "renderLaneMatchupCard"], {
+    state, livePositionValue: value => ({ middle: "mid", bottom: "adc", utility: "support" })[value] || value || "",
+    liveRecommendationTier: () => "emerald_plus", URLSearchParams,
+    recordItemSetClientDiagnostic: (event, reason, context) => diagnostics.push({ event, reason, context }),
+    api: path => { requests.push(path); return new Promise(resolve => { finishes.push(resolve); }); },
+    renderLive: () => {}, iconFigure: (_kind, id) => `<img data-champion-id="${id}">`,
+    rate: value => `${Number(value).toFixed(1)}%`, escapeHTML: String,
+  });
+  const first = helpers.ensureLaneMatchupCandidates(data);
+  const duplicate = helpers.ensureLaneMatchupCandidates(data);
+  assert.equal(requests.length, 1, "pending request is single flight");
+  assert.deepEqual(diagnostics.slice(0, 2).map((item) => item.reason), ["requested", "in-flight"]);
+  const query = new URL(requests[0], "http://local").searchParams;
+  assert.equal(query.get("champion"), "103");
+  assert.equal(query.get("position"), "mid");
+  assert.equal(query.get("tier"), "emerald_plus");
+  finishes[0]({ counters: { weakAgainst: [{ championId: 69, name: "卡西奥佩娅", winRate: 43, games: 120 }] } });
+  await Promise.all([first, duplicate]);
+  await helpers.ensureLaneMatchupCandidates(data);
+  assert.equal(requests.length, 1, "later live polls reuse the cached matchup");
+  assert.equal(diagnostics.filter((item) => item.reason === "cached").length, 1, "cache diagnostics are deduplicated across polls");
+  assert.ok(diagnostics.some((item) => item.reason === "succeeded" && item.context.rowCount === 1));
+  assert.ok(diagnostics.every((item) => item.event === "lane_matchup_candidate_fetch"));
+  assert.match(helpers.renderLaneMatchupCard(data, {}), /卡西奥佩娅/);
+  assert.match(helpers.renderLaneMatchupCard(data, {}), /胜率差 \+7\.0%/);
+  data.players[0].championPickIntent = 69;
+  assert.match(helpers.renderLaneMatchupCard(data, {}), /卡西奥佩娅/, "own preview retains candidates");
+  data.players[0].championPickIntent = 0;
+  delete data.players[0].rank;
+  data.players[1].position = "middle";
+  data.players[2].position = "top";
+  const swapped = helpers.ensureLaneMatchupCandidates(data);
+  assert.equal(requests.length, 2, "position swap requests the new opposing champion");
+  assert.equal(new URL(requests[1], "http://local").searchParams.get("champion"), "64");
+  assert.equal(new URL(requests[1], "http://local").searchParams.get("tier"), "emerald_plus", "uses recommendation tier even without rank");
+  finishes[1]({ counters: { weakAgainst: [] } });
+  await swapped;
+  data.phase = "InProgress";
+  await helpers.ensureLaneMatchupCandidates(data);
+  assert.equal(helpers.renderLaneMatchupCard(data, {}), "");
+  assert.equal(requests.length, 2);
+});
+
+test("R168 candidate failure and skipped context emit distinguishable diagnostics", async () => {
+  const data = { phase: "ChampSelect", queueId: 440, gameId: 123, players: [
+    { isCurrent: true, teamId: 100, position: "top", championId: 0 },
+    { teamId: 200, position: "top", championId: 62, championLocked: true },
+  ] };
+  const state = { live: data, section: "live", liveGameGeneration: 1, laneMatchupCandidates: new Map() };
+  const diagnostics = [];
+  const { ensureLaneMatchupCandidates } = compile(["laneMatchupContext", "laneMatchupOwnChampionId", "laneMatchupTier", "laneMatchupCandidateKey", "recordLaneMatchupCandidateDiagnostic", "ensureLaneMatchupCandidates"], {
+    state, livePositionValue: value => value || "", URLSearchParams,
+    api: async () => { throw Object.assign(Error("upstream failed"), { status: 503 }); },
+    recordItemSetClientDiagnostic: (event, reason, context) => diagnostics.push({ event, reason, context }),
+    renderLive() {},
+  });
+  await ensureLaneMatchupCandidates(data);
+  assert.deepEqual(diagnostics.map((item) => item.reason), ["requested", "failed"]);
+  assert.equal(diagnostics[1].context.httpStatus, 503);
+  assert.equal(diagnostics[1].context.enemyChampionId, 62);
+  data.players[0].championId = 8;
+  data.players[0].championLocked = true;
+  await ensureLaneMatchupCandidates(data);
+  await ensureLaneMatchupCandidates(data);
+  assert.equal(diagnostics.filter((item) => item.reason === "own-champion-selected").length, 1);
+  assert.doesNotMatch(JSON.stringify(diagnostics), /upstream failed/);
+});
+
 // P0-1：赛季扫描没跑完时不得用半成品战绩覆盖上游真实胜负场；而且降级说明必须真的
 // 渲染到用户屏幕上——工单原则「后端设置了降级说明 ≠ 已披露」。
 test("R117 rank win-rate degradation is disclosed on screen, not only set on the backend", () => {
@@ -694,4 +976,470 @@ test("R117 rank win-rate degradation is disclosed on screen, not only set on the
   assert.match(known, /胜率 <b class="win-rate-value">57%<\/b>/);
   assert.match(known, /60胜 47负/);
   assert.doesNotMatch(known, /胜率暂不可用/);
+});
+
+test("R173 rune equipment places opening items, divider and seven final slots in exact order", () => {
+  const { JSDOM } = require("../../desktop/node_modules/jsdom");
+  const { renderRuneEquipment } = compile(["renderRuneEquipment"], {
+    renderItemIcon: id => '<i data-item="' + id + '"></i>',
+  });
+  const html = renderRuneEquipment({ starterItemIds: [1055, 2003, 2003, 1086, 1001, 1056, 9999], itemIds: [3006, 3072, 3031, 3085, 3036, 3139, 3364, 8888] });
+  const dom = new JSDOM(html), equipment = dom.window.document.querySelector(".specialist-game-items");
+  assert.equal(equipment.children[0].textContent, "装备");
+  assert.deepEqual([...equipment.children[1].children].map(node => node.classList.contains("route-divider") ? "|" : Number(node.dataset.item)),
+    [1055, 2003, 2003, 1086, 1001, 1056, "|", 3006, 3072, 3031, 3085, 3036, 3139, 3364]);
+  assert.equal(equipment.querySelector(".route-divider").getAttribute("aria-hidden"), "true");
+  assert.equal(equipment.querySelectorAll("[data-tooltip],[title]").length, 0);
+});
+
+test("R173 absent opening items retains byte-identical final equipment markup", () => {
+  const renderItemIcon = id => '<i data-item="' + id + '"></i>';
+  const { renderRuneEquipment } = compile(["renderRuneEquipment"], { renderItemIcon });
+  const itemIDs = [1055, 2003, 3006], old = '<div class="specialist-game-items"><span>最终装备</span><div>' + itemIDs.map(renderItemIcon).join("") + '</div></div>';
+  assert.equal(renderRuneEquipment({ itemIds: itemIDs }), old);
+  assert.equal(renderRuneEquipment({ itemIds: itemIDs, starterItemIds: [] }), old);
+  assert.equal(renderRuneEquipment({ itemIds: [], starterItemIds: [1055] }), "");
+});
+
+test("R173 delayed equipment patch preserves row identity, order and selected state", () => {
+  const { JSDOM } = require("../../desktop/node_modules/jsdom");
+  const dom = new JSDOM('<section><div data-rune-choice="new" class="specialist-game-row is-selected" aria-checked="true"><div class="specialist-game-items"><span>最终装备</span><div></div></div></div><div data-rune-choice="old" class="specialist-game-row" aria-checked="false"><div class="specialist-game-items"><span>最终装备</span><div></div></div></div></section>');
+  const document = dom.window.document, root = document.querySelector("section"), before = [...root.children];
+  let remembered = 0;
+  const { patchRuneStarterEquipment } = compile(["patchRuneStarterEquipment"], {
+    document, nodes: { liveContent: root }, renderItemIcon: id => '<i data-item="' + id + '"></i>',
+    prepareImages: () => {}, rememberLiveRecommendationMarkup: () => remembered++,
+  });
+  patchRuneStarterEquipment([{ key: "old", itemIds: [3031], starterItemIds: [2003, 2003] }, { key: "new", itemIds: [3006], starterItemIds: [1055] }]);
+  assert.deepEqual([...root.children], before);
+  assert.deepEqual([...root.children].map(row => row.dataset.runeChoice), ["new", "old"]);
+  assert.equal(before[0].getAttribute("aria-checked"), "true");
+  assert.equal(before[0].classList.contains("is-selected"), true);
+  assert.equal(before[1].getAttribute("aria-checked"), "false");
+  assert.deepEqual([...before[0].querySelectorAll("[data-item]")].map(node => Number(node.dataset.item)), [1055, 3006]);
+  assert.equal(remembered, 1);
+});
+
+test("R173 second stage loads only visible rows and leaves rune list available while pending", async () => {
+  for (const [source, cap] of [["specialist", 3], ["pro", 5]]) {
+    const runes = Array.from({ length: 12 }, (_, index) => ({ key: "row-" + index, playedAt: 1700000000000 + index, itemIds: [3006] }));
+    const state = { live: { phase: "ChampSelect" }, section: "live", runeSourceTab: source, liveGameGeneration: 1 };
+    let resolve, request, patches = 0;
+    const funcs = compile(["ensureRuneStarterItems"], {
+      state, nodes: { liveContent: { querySelectorAll: () => runes.slice(0, cap).map(row => ({ dataset: { runeChoice: row.key } })) } },
+      specialistRequestTarget: () => ({ key: "64:mid", championId: 64, position: "mid" }),
+      proRequestTarget: () => ({ key: "64:mid", championId: 64, position: "mid" }),
+      specialistRunesFor: () => runes, proRunesFor: () => runes,
+      api: (_url, options) => { request = JSON.parse(options.body); return new Promise(done => resolve = done); },
+      patchRuneStarterEquipment: rows => { patches++; assert.equal(rows, runes); },
+    });
+    const pending = funcs.ensureRuneStarterItems(state.live);
+    assert.equal(request.rows.length, cap);
+    assert.deepEqual(request.rows.map(row => row.key), runes.slice(0, cap).map(row => row.key));
+    assert.ok(runes.every(row => row.starterItemIds === undefined));
+    await funcs.ensureRuneStarterItems(state.live);
+    resolve({ starters: [{ key: runes[0].key, playedAt: runes[0].playedAt, starterItemIds: [1055, 2003] }, { key: runes[1].key, playedAt: 1, starterItemIds: [9999] }] });
+    await pending;
+    assert.deepEqual(runes[0].starterItemIds, [1055, 2003]);
+    assert.equal(runes[1].starterItemIds, undefined, "recycled row keys must match timestamp too");
+    assert.equal(patches, 1);
+    assert.deepEqual(runes.map(row => row.key), Array.from({ length: 12 }, (_, index) => "row-" + index));
+  }
+});
+
+test("R173 optional failure and previous game response leave current equipment unchanged", async () => {
+  const runes = [{ key: "row-1", playedAt: 1700000000000, itemIds: [3006] }];
+  const state = { live: { phase: "ChampSelect" }, section: "live", runeSourceTab: "specialist", liveGameGeneration: 1 };
+  let resolve, patchCount = 0, calls = 0;
+  const funcs = compile(["ensureRuneStarterItems"], {
+    state, nodes: { liveContent: { querySelectorAll: () => [{ dataset: { runeChoice: "row-1" } }] } },
+    specialistRequestTarget: () => ({ key: "64:mid", championId: 64, position: "mid" }),
+    specialistRunesFor: () => runes,
+    api: () => { calls++; return new Promise(done => resolve = done); },
+    patchRuneStarterEquipment: () => patchCount++,
+  });
+  const pending = funcs.ensureRuneStarterItems(state.live);
+  state.liveGameGeneration++;
+  resolve({ starters: [{ key: "row-1", playedAt: runes[0].playedAt, starterItemIds: [1055] }] });
+  await pending;
+  assert.equal(runes[0].starterItemIds, undefined);
+  assert.equal(patchCount, 0);
+  state.runeStarterRequests.clear();
+  const failing = compile(["ensureRuneStarterItems"], {
+    state, nodes: { liveContent: { querySelectorAll: () => [{ dataset: { runeChoice: "row-1" } }] } },
+    specialistRequestTarget: () => ({ key: "64:mid", championId: 64, position: "mid" }), specialistRunesFor: () => runes,
+    api: async () => { calls++; throw new Error("HTTP 429"); }, patchRuneStarterEquipment: () => patchCount++,
+  });
+  await failing.ensureRuneStarterItems(state.live);
+  await failing.ensureRuneStarterItems(state.live);
+  assert.equal(calls, 2, "failed optional fetch must enter cooldown");
+  assert.equal(patchCount, 0);
+  assert.equal(runes[0].starterItemIds, undefined);
+});
+
+test("R173 a refreshed pro list retains completed opening items without affecting source order", () => {
+  const { retainRuneStarterItems } = compile(["retainRuneStarterItems"]);
+  const previous = [{ key: "pro-1", playedAt: 1, starterItemIds: [1055, 2003] }, { key: "pro-2", playedAt: 2, starterItemIds: [] }];
+  const next = [{ key: "pro-2", playedAt: 2 }, { key: "pro-1", playedAt: 1 }, { key: "pro-1", playedAt: 3 }];
+  retainRuneStarterItems(next, previous);
+  assert.deepEqual(next.map(row => row.key), ["pro-2", "pro-1", "pro-1"]);
+  assert.deepEqual(next[0].starterItemIds, []);
+  assert.deepEqual(next[1].starterItemIds, [1055, 2003]);
+  assert.notEqual(next[1].starterItemIds, previous[0].starterItemIds);
+  assert.equal(next[2].starterItemIds, undefined);
+});
+
+function r174EquipmentRenderer() {
+  const { renderRuneEquipment } = compile(["renderRuneEquipment"], {
+    renderItemIcon: id => '<i data-item="' + id + '"></i>',
+    renderSummonerSpellIcon: id => '<i data-spell="' + id + '"></i>',
+  });
+  return renderRuneEquipment;
+}
+
+test("R174 equipment then spells are direct children and spells contain only two icons", () => {
+  const { JSDOM } = require("../../desktop/node_modules/jsdom");
+  const html = r174EquipmentRenderer()({ itemIds: [3006, 3031], spell1Id: 4, spell2Id: 11 });
+  const row = new JSDOM(html).window.document.querySelector(".specialist-game-items");
+  assert.equal(row.children.length, 3);
+  assert.equal(row.children[0].tagName, "SPAN");
+  assert.equal(row.children[0].textContent, "最终装备");
+  assert.deepEqual([...row.children[1].children].map(node => Number(node.dataset.item)), [3006, 3031]);
+  const spells = row.lastElementChild;
+  assert.equal(spells.className, "specialist-game-spells");
+  assert.deepEqual([...spells.children].map(node => Number(node.dataset.spell)), [4, 11]);
+  assert.equal(spells.querySelectorAll("small,span,label,[data-tooltip],[title]").length, 0);
+  assert.equal(spells.textContent, "");
+  assert.doesNotMatch(html, /召唤师技能|rune-spell-row/);
+});
+
+test("R174 opening inventory and divider precede final inventory and rightmost spells", () => {
+  const { JSDOM } = require("../../desktop/node_modules/jsdom");
+  const html = r174EquipmentRenderer()({ starterItemIds: [1055, 2003, 2003], itemIds: [3006, 3031, 3364], spell1Id: 4, spell2Id: 11 });
+  const row = new JSDOM(html).window.document.querySelector(".specialist-game-items");
+  assert.equal(row.children[0].textContent, "装备");
+  assert.deepEqual([...row.children].map(node => node.className || node.tagName), ["SPAN", "DIV", "specialist-game-spells"]);
+  assert.deepEqual([...row.children[1].children].map(node => node.classList.contains("route-divider") ? "|" : Number(node.dataset.item)), [1055, 2003, 2003, "|", 3006, 3031, 3364]);
+  assert.deepEqual([...row.lastElementChild.children].map(node => Number(node.dataset.spell)), [4, 11]);
+});
+
+test("R174 invalid or absent spell pair retains byte-identical equipment markup", () => {
+  const render = r174EquipmentRenderer();
+  const oldFinal = '<div class="specialist-game-items"><span>最终装备</span><div><i data-item="3006"></i></div></div>';
+  const oldOpening = '<div class="specialist-game-items"><span>装备</span><div><i data-item="1055"></i><span class="route-divider" aria-hidden="true"></span><i data-item="3006"></i></div></div>';
+  for (const [spell1Id, spell2Id] of [[undefined, undefined], [undefined, 11], [4, 0], [0, 11], [4, 4], [-1, 4], [4.5, 11], [4, Infinity], [4, 100001]]) {
+    assert.equal(render({ itemIds: [3006], spell1Id, spell2Id }), oldFinal);
+    assert.equal(render({ itemIds: [3006], starterItemIds: [1055], spell1Id, spell2Id }), oldOpening);
+    assert.equal(render({ itemIds: [], spell1Id, spell2Id }), "");
+  }
+  assert.match(render({ itemIds: [3006], spell1Id: "4", spell2Id: "11" }), /specialist-game-spells/);
+});
+
+test("R174 spells without final inventory render one right-aligned container without labels or empty group", () => {
+  const { JSDOM } = require("../../desktop/node_modules/jsdom");
+  const html = r174EquipmentRenderer()({ starterItemIds: [1055], itemIds: [], spell1Id: 4, spell2Id: 11 });
+  const row = new JSDOM(html).window.document.querySelector(".specialist-game-items");
+  assert.ok(row, "spells cannot disappear when final equipment is absent");
+  assert.equal(row.children.length, 1);
+  assert.equal(row.children[0].className, "specialist-game-spells");
+  assert.equal(row.querySelector(":scope > span"), null);
+  assert.equal(row.querySelectorAll("[data-item]").length, 0);
+  assert.deepEqual([...row.children[0].children].map(node => Number(node.dataset.spell)), [4, 11]);
+});
+
+test("R174 full specialist and pro templates have no standalone spell row", () => {
+  const { JSDOM } = require("../../desktop/node_modules/jsdom");
+  const state = { live: {}, specialistPlayerTabs: new Map(), selectedRecommendation: "game-1" };
+  const funcs = compile(["renderSpecialistPlayers", "proRuneRecordLabel"], {
+    state, proRequestTarget: () => ({ key: "64:mid" }), specialistRequestTarget: () => ({ key: "64:mid" }),
+    positionLabel: x => x, livePositionDisplay: x => x, escapeHTML: x => String(x ?? ""),
+    runeConfigurationTitle: () => "符文", renderUnifiedRuneBoard: () => "<runes></runes>",
+    renderItemIcon: id => '<i data-item="' + id + '"></i>',
+    renderSummonerSpellIcon: id => '<i data-spell="' + id + '"></i>', iconFigure: () => "",
+  });
+  for (const source of ["specialist", "pro"]) {
+    const html = funcs.renderSpecialistPlayers([{ key: "game-1", playerName: "Fixture", itemIds: [3006], spell1Id: 4, spell2Id: 11, recordGames: 1, recordWins: 1 }], source);
+    const doc = new JSDOM(html).window.document;
+    assert.equal(doc.querySelectorAll(".rune-spell-row").length, 0);
+    assert.equal(doc.querySelectorAll(".specialist-game-items > .specialist-game-spells").length, 1);
+    assert.equal(doc.querySelectorAll("[data-spell]").length, 2);
+  }
+});
+
+test("R174 async opening inventory replacement preserves rightmost spell pair and selected rows", () => {
+  const { JSDOM } = require("../../desktop/node_modules/jsdom");
+  const render = r174EquipmentRenderer();
+  const first = { key: "new", itemIds: [3006], spell1Id: 4, spell2Id: 11 };
+  const second = { key: "old", itemIds: [3031], spell1Id: 4, spell2Id: 7 };
+  const dom = new JSDOM('<section><div class="specialist-game-row is-selected" aria-checked="true" data-rune-choice="new">' + render(first) + '</div><div class="specialist-game-row" aria-checked="false" data-rune-choice="old">' + render(second) + '</div></section>');
+  const document = dom.window.document, root = document.querySelector("section"), rows = [...root.children];
+  const beforePairs = rows.map(row => [...row.querySelectorAll("[data-spell]")].map(node => Number(node.dataset.spell)));
+  const { patchRuneStarterEquipment } = compile(["patchRuneStarterEquipment"], {
+    document, nodes: { liveContent: root }, prepareImages: () => {}, rememberLiveRecommendationMarkup: () => {},
+    renderItemIcon: id => '<i data-item="' + id + '"></i>', renderSummonerSpellIcon: id => '<i data-spell="' + id + '"></i>',
+  });
+  patchRuneStarterEquipment([{ ...first, starterItemIds: [1055, 2003] }, { ...second, starterItemIds: [2003, 2003] }]);
+  assert.deepEqual([...root.children], rows);
+  assert.equal(rows[0].classList.contains("is-selected"), true);
+  assert.equal(rows[0].getAttribute("aria-checked"), "true");
+  assert.equal(rows[1].getAttribute("aria-checked"), "false");
+  assert.deepEqual(rows.map(row => [...row.querySelectorAll("[data-spell]")].map(node => Number(node.dataset.spell))), beforePairs);
+  for (const row of rows) {
+    assert.equal(row.querySelector(".specialist-game-items").lastElementChild.className, "specialist-game-spells");
+    assert.equal(row.querySelectorAll(".specialist-game-spells").length, 1);
+    assert.equal(row.querySelectorAll(".rune-spell-row").length, 0);
+  }
+});
+
+test("R174 standalone spell renderer remains byte-identical; R179 inventory keeps a fixed height", () => {
+  const { renderRuneSpellPair } = compile(["renderRuneSpellPair"], {
+    state: { summonerSpells: { spells: [{ id: 4, name: "闪现" }, { id: 11, name: "惩戒" }] } },
+    escapeHTML: x => String(x), renderSummonerSpellIcon: id => '<i data-spell="' + id + '"></i>',
+  });
+  assert.equal(renderRuneSpellPair([4, 11]), '<div class="rune-spell-row"><span>召唤师技能</span><div class="rune-spell-items"><span class="rune-spell-item"><i data-spell="4"></i><small>闪现</small></span><span class="rune-spell-item"><i data-spell="11"></i><small>惩戒</small></span></div></div>');
+  const rule = cssSource.match(/\.specialist-game-spells\s*\{([^}]+)\}/)[1];
+  for (const declaration of ["display: flex", "flex: 0 0 auto", "flex-wrap: nowrap", "margin-left: auto", "min-width: auto"]) assert.ok(rule.includes(declaration), declaration);
+  assert.match(cssSource, /\.specialist-game-items > div:not\(\.specialist-game-spells\).*flex-wrap: nowrap/);
+});
+
+function r177FakeClock() {
+  let now = 0, serial = 0;
+  const timers = new Map();
+  return {
+    timers,
+    setTimeout(fn, ms) { const id = ++serial; timers.set(id, { fn, at: now + ms }); return id; },
+    clearTimeout(id) { timers.delete(id); },
+    async advance(ms) {
+      now += ms;
+      for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.fn(); }
+      // Drain the async api/ensure/finally chain without using real timers.
+      for (let index = 0; index < 12; index++) await Promise.resolve();
+    },
+  };
+}
+
+function r177StarterHarness(responses) {
+  const { JSDOM } = require("../../desktop/node_modules/jsdom");
+  const runes = [{ key: "row-1", playedAt: 1000, itemIds: [3006, 3031], spell1Id: 4, spell2Id: 11 }];
+  const render = r174EquipmentRenderer();
+  const dom = new JSDOM(`<section><div class="specialist-game-row" data-rune-choice="row-1">${render(runes[0])}</div></section>`, { pretendToBeVisual: true });
+  const state = { section: "live", live: { phase: "ChampSelect" }, runeSourceTab: "specialist", liveGameGeneration: 1, runeStarterRequests: new Map() };
+  const clock = r177FakeClock(), calls = [];
+  let targetKey = "64:mid";
+  const funcs = compile(["ensureRuneStarterItems", "patchRuneStarterEquipment", "clearRuneStarterRetries", "resetLiveGameScopedState"], {
+    state, nodes: { liveContent: dom.window.document.querySelector("section") }, document: dom.window.document,
+    setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
+    specialistRequestTarget: () => ({ key: targetKey, championId: 64, position: "mid" }),
+    proRequestTarget: () => ({ key: targetKey, championId: 64, position: "mid" }),
+    specialistRunesFor: () => runes, proRunesFor: () => runes,
+    renderRuneEquipment: render, renderItemIcon: id => `<i data-item="${id}"></i>`, renderSummonerSpellIcon: id => `<i data-spell="${id}"></i>`, prepareImages() {}, rememberLiveRecommendationMarkup() {},
+    api: async (_url, options) => { calls.push(JSON.parse(options.body)); const response = responses[Math.min(calls.length - 1, responses.length - 1)]; if (response instanceof Error) throw response; return response; },
+  });
+  return { state, clock, calls, funcs, runes, dom, changeTarget(key) { targetKey = key; } };
+}
+
+test("R177 starter rate hint retries at eight seconds twice and keeps one flight", async () => {
+  const h = r177StarterHarness([{ starters: [], retryAfterSeconds: 8 }]);
+  try {
+    await h.funcs.ensureRuneStarterItems(h.state.live);
+    assert.equal(h.calls.length, 1);
+    assert.equal(h.clock.timers.size, 1);
+    await h.funcs.ensureRuneStarterItems(h.state.live);
+    await h.clock.advance(7999);
+    assert.equal(h.calls.length, 1);
+    await h.clock.advance(1);
+    assert.equal(h.calls.length, 2);
+    assert.equal(h.clock.timers.size, 1);
+    await h.clock.advance(8000);
+    assert.equal(h.calls.length, 3);
+    assert.equal(h.clock.timers.size, 0);
+    await h.clock.advance(90000);
+    assert.equal(h.calls.length, 3);
+    assert.deepEqual(h.calls.map(call => call.rows), Array(3).fill([{ key: "row-1", playedAt: 1000 }]));
+  } finally { h.dom.window.close(); }
+});
+
+test("R177 starter waiting retry rejects a new generation source target or invisible page", async () => {
+  for (const change of [
+    h => h.state.liveGameGeneration++,
+    h => h.state.runeSourceTab = "opgg",
+    h => h.changeTarget("103:mid"),
+    h => h.state.section = "overview",
+    h => h.state.live.phase = "Lobby",
+  ]) {
+    const h = r177StarterHarness([{ starters: [], retryAfterSeconds: 8 }]);
+    try {
+      await h.funcs.ensureRuneStarterItems(h.state.live);
+      assert.equal(h.clock.timers.size, 1);
+      change(h);
+      await h.clock.advance(8000);
+      assert.equal(h.calls.length, 1);
+      assert.equal(h.clock.timers.size, 0);
+    } finally { h.dom.window.close(); }
+  }
+  for (const cancel of [h => h.funcs.resetLiveGameScopedState(), h => h.funcs.clearRuneStarterRetries(), async h => { h.changeTarget("103:mid"); await h.funcs.ensureRuneStarterItems(h.state.live); }]) {
+    const h = r177StarterHarness([{ starters: [], retryAfterSeconds: 8 }]);
+    try {
+      await h.funcs.ensureRuneStarterItems(h.state.live);
+      const oldTimer = [...h.clock.timers.keys()][0];
+      await cancel(h);
+      assert.equal(h.clock.timers.has(oldTimer), false, "scope change cancels old timer immediately");
+    } finally { h.funcs.clearRuneStarterRetries(); h.dom.window.close(); }
+  }
+});
+
+test("R177 starter no quota hint or network failure never schedules a retry", async () => {
+  for (const response of [{ starters: [] }, new Error("network failed")]) {
+    const h = r177StarterHarness([response]);
+    try {
+      await h.funcs.ensureRuneStarterItems(h.state.live);
+      await h.clock.advance(90000);
+      assert.equal(h.calls.length, 1);
+      assert.equal(h.clock.timers.size, 0);
+    } finally { h.dom.window.close(); }
+  }
+});
+
+test("R177 starter retry success patches opening items and retains rightmost R174 spells", async () => {
+  const h = r177StarterHarness([{ starters: [], retryAfterSeconds: 8 }, { starters: [{ key: "row-1", playedAt: 1000, starterItemIds: [1055, 2003] }], retryAfterSeconds: 8 }]);
+  try {
+    await h.funcs.ensureRuneStarterItems(h.state.live);
+    await h.clock.advance(8000);
+    assert.deepEqual(h.runes[0].starterItemIds, [1055, 2003]);
+    const row = h.dom.window.document.querySelector(".specialist-game-items");
+    assert.deepEqual([...row.querySelectorAll("[data-item]")].map(icon => Number(icon.dataset.item)), [1055, 2003, 3006, 3031]);
+    assert.ok(row.querySelector(".route-divider"));
+    assert.equal(row.lastElementChild.className, "specialist-game-spells");
+    assert.deepEqual([...row.lastElementChild.children].map(icon => Number(icon.dataset.spell)), [4, 11]);
+    assert.equal(h.clock.timers.size, 0, "completed row does not retry even with a stale hint");
+  } finally { h.dom.window.close(); }
+});
+
+function r177LaneHarness(enemies, shares) {
+  const data = { phase: "ChampSelect", gameId: 123, queueId: 440, players: [
+    { isCurrent: true, isAlly: true, teamId: 100, position: "mid", championId: 0, rank: { tier: "GOLD" } },
+    ...enemies.map(enemy => ({ teamId: 200, championLocked: true, position: "", ...enemy })),
+  ] };
+  const state = { live: data, section: "live", liveGameGeneration: 1, laneMatchupCandidates: new Map(), laneMatchupLanes: new Map() };
+  const requests = [], diagnostics = [];
+  const funcs = compile(["ensureLaneMatchupCandidates", "laneMatchupContext", "renderLaneMatchupCard", "recordLaneMatchupCandidateDiagnostic", "laneMatchupCandidateKey", "laneMatchupOwnChampionId"], {
+    state, livePositionValue: value => ({ middle: "mid", bottom: "adc", utility: "support" })[value] || value || "", URLSearchParams,
+    api: async path => { requests.push(path); if (path.includes("champion-lanes")) { if (shares instanceof Error) throw shares; return shares; } return { counters: { weakAgainst: [{ championId: 69, name: "卡西奥佩娅", winRate: 43 }] } }; },
+    recordItemSetClientDiagnostic: (_event, reason, context) => diagnostics.push({ reason, context }), renderLive() {},
+    iconFigure: (_kind, id) => `<i data-champion="${id}"></i>`, rate: value => `${value}%`, escapeHTML: String,
+  });
+  return { data, state, requests, diagnostics, funcs };
+}
+
+test("R177 unique unknown enemy lane produces a card and caches champion tier shares", async () => {
+  const h = r177LaneHarness([{ championId: 103 }], { 103: [{ position: "mid", rate: 0.7 }], 64: [{ position: "mid", rate: 0.8 }] });
+  await h.funcs.ensureLaneMatchupCandidates(h.data);
+  assert.match(h.funcs.renderLaneMatchupCard(h.data, {}), /对位克制建议/);
+  assert.equal(h.funcs.laneMatchupContext(h.data).enemy.championId, 103);
+  await h.funcs.ensureLaneMatchupCandidates(h.data);
+  assert.equal(h.requests.filter(url => url.includes("champion-lanes")).length, 1);
+  assert.equal(new URL(h.requests[0], "http://local").searchParams.get("tier"), "emerald_plus");
+  h.data.players[1].championId = 64;
+  await h.funcs.ensureLaneMatchupCandidates(h.data);
+  const requests = h.requests.filter(url => url.includes("champion-lanes"));
+  assert.equal(requests.length, 2);
+  assert.equal(new URL(requests[1], "http://local").searchParams.get("champions"), "64");
+  h.data.players[1].championId = 103;
+  await h.funcs.ensureLaneMatchupCandidates(h.data);
+  assert.equal(h.requests.filter(url => url.includes("champion-lanes")).length, 2);
+});
+
+test("R177 competing lane shares require half and double advantage or remain ambiguous", async () => {
+  for (const [first, second, visible] of [[0.6, 0.4, false], [0.49, 0.25, false], [0.5, 0.25, true], [0.3, 0.1, true], [0.24, 0.1, false]]) {
+    const h = r177LaneHarness([{ championId: 103 }, { championId: 64 }], { 103: [{ position: "mid", rate: first }], 64: [{ position: "mid", rate: second }] });
+    await h.funcs.ensureLaneMatchupCandidates(h.data);
+    assert.equal(Boolean(h.funcs.renderLaneMatchupCard(h.data, {})), visible, `shares ${first}/${second}`);
+    if (first >= 0.25 && second >= 0.25 && !visible) assert.ok(h.diagnostics.some(event => event.reason === "lane-ambiguous"));
+    if (!visible) assert.equal(h.requests.filter(url => url.includes("champions/detail")).length, 0);
+  }
+});
+
+test("R177 known enemy position wins over conflicting cached inference without lane requests", async () => {
+  const h = r177LaneHarness([{ championId: 103, position: "mid" }, { championId: 64 }], {});
+  h.state.laneMatchupLanes.set("64:emerald_plus", { status: "succeeded", rows: [{ position: "mid", rate: 0.9 }] });
+  await h.funcs.ensureLaneMatchupCandidates(h.data);
+  assert.equal(h.funcs.laneMatchupContext(h.data).enemy.championId, 103);
+  assert.equal(h.requests.filter(url => url.includes("champion-lanes")).length, 0);
+  assert.equal(new URL(h.requests[0], "http://local").searchParams.get("champion"), "103");
+});
+
+test("R177 missing competitor shares or failed provider cannot invent an enemy lane", async () => {
+  for (const shares of [{}, new Error("failed"), { 103: [{ position: "mid", rate: 0.7 }] }, { 103: [{ position: "mid", rate: 70 }], 64: [] }]) {
+    const h = r177LaneHarness([{ championId: 103 }, { championId: 64 }], shares);
+    await h.funcs.ensureLaneMatchupCandidates(h.data);
+    assert.equal(h.funcs.renderLaneMatchupCard(h.data, {}), "");
+    assert.equal(h.requests.filter(url => url.includes("champions/detail")).length, 0);
+    await h.funcs.ensureLaneMatchupCandidates(h.data);
+    assert.equal(h.requests.filter(url => url.includes("champion-lanes")).length, 1, "failed share fetch is cached too");
+  }
+});
+
+test("R177 unavailable diagnostics follow shape changes and cap at twenty per game", async () => {
+  const h = r177LaneHarness([], {});
+  h.data.players[0].position = "";
+  for (let locked = 0; locked <= 5; locked++) {
+    for (let known = 0; known <= 5; known++) {
+      h.data.players = [h.data.players[0], ...Array.from({ length: 5 }, (_, index) => ({ teamId: 200, championId: index + 1, championLocked: index < locked, position: index < known ? "top" : "" }))];
+      await h.funcs.ensureLaneMatchupCandidates(h.data);
+      await h.funcs.ensureLaneMatchupCandidates(h.data);
+    }
+  }
+  const events = h.diagnostics.filter(event => event.reason === "context-unavailable");
+  assert.equal(events.length, 20);
+  assert.equal(events[0].context.selfPosition, "");
+  assert.equal(events[0].context.enemyLockedCount, 0);
+  assert.equal(events[0].context.allyPositionKnownCount, 0);
+  assert.ok(new Set(events.map(event => `${event.context.enemyLockedCount}:${event.context.enemyPositionKnownCount}`)).size > 1);
+});
+
+test("R177 a pending timed retry stays single flight and a source switch cancels it", async () => {
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  const h = r177StarterHarness([{ starters: [], retryAfterSeconds: 8 }, pending]);
+  try {
+    await h.funcs.ensureRuneStarterItems(h.state.live);
+    await h.clock.advance(8000);
+    assert.equal(h.calls.length, 2);
+    const [key, entry] = [...h.state.runeStarterRequests][0];
+    assert.equal(entry.pending, true);
+    await h.funcs.ensureRuneStarterItems(h.state.live, key);
+    await h.funcs.ensureRuneStarterItems(h.state.live);
+    assert.equal(h.calls.length, 2, "a retry cannot bypass an active request");
+    let aborted = 0;
+    h.state.controllers = new Map([[`live-rune-starters:${key}`, { abort() { aborted++; } }]]);
+    h.state.runeSourceTab = "opgg";
+    h.funcs.clearRuneStarterRetries();
+    assert.equal(aborted, 1);
+    release({ starters: [{ key: "row-1", playedAt: 1000, starterItemIds: [1055] }], retryAfterSeconds: 8 });
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    assert.equal(h.runes[0].starterItemIds, undefined);
+    assert.equal(h.clock.timers.size, 0);
+  } finally { h.dom.window.close(); }
+});
+
+test("R177 partial starter patches do not create a fresh retry budget for remaining rows", async () => {
+  const h = r177StarterHarness([{ starters: [{ key: "row-1", playedAt: 1000, starterItemIds: [1055] }], retryAfterSeconds: 8 }, { starters: [], retryAfterSeconds: 8 }]);
+  try {
+    const row = { key: "row-2", playedAt: 2000, itemIds: [3111], spell1Id: 4, spell2Id: 7 };
+    h.runes.push(row);
+    const element = h.dom.window.document.createElement("div");
+    element.className = "specialist-game-row";
+    element.dataset.runeChoice = row.key;
+    element.innerHTML = r174EquipmentRenderer()(row);
+    h.dom.window.document.querySelector("section").append(element);
+    await h.funcs.ensureRuneStarterItems(h.state.live);
+    await h.funcs.ensureRuneStarterItems(h.state.live);
+    assert.equal(h.calls.length, 1);
+    await h.clock.advance(8000);
+    await h.clock.advance(8000);
+    await h.funcs.ensureRuneStarterItems(h.state.live);
+    assert.equal(h.calls.length, 3);
+    assert.deepEqual(h.calls.slice(1).map(call => call.rows), Array(2).fill([{ key: "row-2", playedAt: 2000 }]));
+    assert.ok(h.calls.every(call => call.source === "specialist" && call.championId === 64 && call.position === "mid"));
+  } finally { h.dom.window.close(); }
 });

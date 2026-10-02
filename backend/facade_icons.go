@@ -153,17 +153,3 @@ func (a *app) handleFacadeIcons(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	respondJSON(w, catalog)
 }
-
-func writeFacadeRankBanner(ctx context.Context, client *LCUClient, value string) error {
-	if value != "lastSeasonHighestRank" && value != "blank" {
-		return errFacadeInvalid
-	}
-	var current map[string]any
-	if err := client.RequestJSON(ctx, http.MethodGet, "/lol-regalia/v2/current-summoner/regalia", nil, &current); err != nil {
-		return err
-	}
-	if current["preferredCrestType"] == nil || current["selectedPrestigeCrest"] == nil {
-		return errors.New("客户端边框偏好无法读取，已停止修改段位旗")
-	}
-	return client.RequestJSON(ctx, http.MethodPut, "/lol-regalia/v2/current-summoner/regalia", map[string]any{"preferredBannerType": value, "preferredCrestType": current["preferredCrestType"], "selectedPrestigeCrest": current["selectedPrestigeCrest"]}, nil)
-}

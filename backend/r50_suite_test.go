@@ -141,9 +141,9 @@ func TestWatchEventsRouteSkipCelebrationAndInvitationPolicies(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method == http.MethodGet && r.URL.Path == "/lol-lobby/v2/received-invitations" {
 			_ = json.NewEncoder(w).Encode([]map[string]any{
-				{"invitationId": "accept-one", "queueId": 420},
-				{"invitationId": "decline-one", "queueId": 440},
-				{"invitationId": "ignore-one", "queueId": 450},
+				{"invitationId": "accept-one", "gameConfig": map[string]any{"queueId": 420}},
+				{"invitationId": "decline-one", "gameConfig": map[string]any{"queueId": 440}},
+				{"invitationId": "ignore-one", "gameConfig": map[string]any{"queueId": 450}},
 			})
 			return
 		}

@@ -72,8 +72,8 @@ func startActor(ctx context.Context, anchor uintptr, rec *recorder) (*actorClien
 	}
 	c.pid = uint32(c.cmd.Process.Pid)
 	// Drain stdout before Wait closes StdoutPipe; otherwise the final response can be lost.
-	go func() { <-c.readerDone; c.waitErr = c.cmd.Wait(); close(c.exited) }()
-	go func() {
+	goSafe("window-probe.controller_windows.startActor.1", func() { <-c.readerDone; c.waitErr = c.cmd.Wait(); close(c.exited) })
+	goSafe("window-probe.controller_windows.startActor.2", func() {
 		defer close(c.readerDone)
 		defer close(c.replies)
 		decoder := json.NewDecoder(io.LimitReader(c.out, 2<<20))
@@ -91,7 +91,7 @@ func startActor(ctx context.Context, anchor uintptr, rec *recorder) (*actorClien
 				return
 			}
 		}
-	}()
+	})
 	// Retain a kernel handle for the process identity, not merely its reusable PID.
 	processHandle, _, openErr := kernel.NewProc("OpenProcess").Call(0x00100000, 0, uintptr(c.pid)) // SYNCHRONIZE only.
 	if processHandle == 0 {

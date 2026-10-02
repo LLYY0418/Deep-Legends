@@ -111,7 +111,7 @@ func (p *proRuneProvider) supplement(ctx context.Context, g proRuneIndexGame) (p
 			return true
 		}
 		if !p.readDisk("details-"+g.ID, &result) || !valid(result) {
-			if err = p.fetch(ctx, true, "details/"+g.ID, url.Values{"startingTime": {proStartingTime(last.Timestamp)}}, &result); err != nil {
+			if err = p.fetch(context.WithValue(ctx, proDetailsObservationKey{}, proDetailsObservation{game: g, kind: "end"}), true, "details/"+g.ID, url.Values{"startingTime": {proStartingTime(last.Timestamp)}}, &result); err != nil {
 				return err
 			}
 		}
@@ -531,10 +531,12 @@ func proHitParallel[T any](ctx context.Context, values []T, fn func(T)) {
 	for i := 0; i < min(5, len(values)); i++ {
 		wg.Add(1)
 		go func() {
+			defer recoverPanic("pro_runes_recommendations.proHitParallel.1")
+
 			defer wg.Done()
 			for value := range jobs {
 				if ctx.Err() == nil {
-					fn(value)
+					func() { defer recoverPanic("proHitParallel.job"); fn(value) }()
 				}
 			}
 		}()

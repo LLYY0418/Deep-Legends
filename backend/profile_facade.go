@@ -60,7 +60,6 @@ type facadeChat struct {
 }
 
 type facadeState struct {
-	RankBanner               string                   `json:"rankBanner,omitempty"`
 	BannerAccent             string                   `json:"bannerAccent,omitempty"`
 	SkinsUnavailable         bool                     `json:"skinsUnavailable,omitempty"`
 	SkinOwnershipUnavailable bool                     `json:"skinOwnershipUnavailable,omitempty"`
@@ -78,7 +77,6 @@ type facadeState struct {
 }
 
 type facadeApplyRequest struct {
-	RankBanner    string                    `json:"rankBanner,omitempty"`
 	BannerAccent  string                    `json:"bannerAccent,omitempty"`
 	Action        string                    `json:"action"`
 	SkinID        int64                     `json:"skinId,omitempty"`
@@ -150,6 +148,8 @@ func (a *app) loadFacadeStateTriggered(ctx context.Context, trigger string) faca
 	identityShapeDiagnostic := a.claimFacadeIdentityShape(client)
 	if identityShapeDiagnostic {
 		go func() {
+			defer a.recoverPanic("profile_facade.loadFacadeStateTriggered.1")
+
 			probeCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
 			a.recordR99SurfaceShape(probeCtx, client)
@@ -157,7 +157,6 @@ func (a *app) loadFacadeStateTriggered(ctx context.Context, trigger string) faca
 	}
 	regaliaRaw := map[string]any{}
 	regaliaErr := client.RequestJSON(ctx, http.MethodGet, "/lol-regalia/v2/current-summoner/regalia", nil, &regaliaRaw)
-	state.RankBanner = anyString(regaliaRaw, "preferredBannerType")
 	state.BannerAccent = anyString(anyMap(chatRaw["lol"]), "bannerIdSelected")
 	var challengeSummaryRaw json.RawMessage
 	challengesStarted := time.Now()
@@ -767,7 +766,7 @@ var errFacadeInvalid = errors.New("生涯操作参数无效")
 
 func facadeDiagnosticAction(action string) string {
 	switch action {
-	case "rank-banner", "background", "chat", "rank", "login-reset", "clear-border", "clear-challenges", "clear-title", "clear-emotes", "clear-objectives":
+	case "background", "chat", "rank", "login-reset", "clear-border", "clear-challenges", "clear-title", "clear-emotes", "clear-objectives":
 		return action
 	default:
 		return "unknown"
@@ -800,8 +799,6 @@ func (a *app) applyFacadeActionResult(ctx context.Context, client *LCUClient, cu
 
 func (a *app) applyFacadeActionResultDetails(ctx context.Context, client *LCUClient, current Summoner, request facadeApplyRequest) (facadeApplyResult, error) {
 	switch request.Action {
-	case "rank-banner":
-		return facadeApplyResult{}, writeFacadeRankBanner(ctx, client, request.RankBanner)
 	case "clear-objectives":
 		return facadeApplyResult{}, a.clearObjectiveBadge(ctx, client)
 	case "background":
@@ -1143,7 +1140,7 @@ func (a *app) scheduleFacadeLoginReset(ctx context.Context, client *LCUClient) {
 	a.facadeMu.Lock()
 	version := a.facadeManualVersion
 	a.facadeMu.Unlock()
-	go func() {
+	a.goSafe("profile_facade.scheduleFacadeLoginReset.1", func() {
 		timer := time.NewTimer(2 * time.Second)
 		defer timer.Stop()
 		select {
@@ -1174,7 +1171,7 @@ func (a *app) scheduleFacadeLoginReset(ctx context.Context, client *LCUClient) {
 				}
 			}
 		}
-	}()
+	})
 }
 
 // The career editor must work before the user opens Collection. This cache

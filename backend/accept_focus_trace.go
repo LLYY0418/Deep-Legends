@@ -49,12 +49,12 @@ func startAcceptFocusTrace(ctx context.Context, client *LCUClient, delayMS int, 
 		return t
 	}
 	client.acceptFocusOwner.Store(t.id)
-	go func() {
+	goSafe("accept_focus_trace.startAcceptFocusTrace.1", func() {
 		defer client.acceptFocusSampling.Store(false)
 		sampleCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
 		phaseDone := make(chan struct{})
-		go func() { defer close(phaseDone); t.samplePhases(sampleCtx, client) }()
+		goSafe("accept_focus_trace.startAcceptFocusTrace.2", func() { defer close(phaseDone); t.samplePhases(sampleCtx, client) })
 		ticker := time.NewTicker(200 * time.Millisecond)
 		defer ticker.Stop()
 		previous := ""
@@ -112,7 +112,7 @@ func startAcceptFocusTrace(ctx context.Context, client *LCUClient, delayMS int, 
 				previous = string(raw)
 			}
 		}
-	}()
+	})
 	return t
 }
 

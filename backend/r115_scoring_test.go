@@ -70,7 +70,7 @@ func TestR115AbilityKDAIsInvariantWhenZeroDeathGamesRepeat(t *testing.T) {
 	}
 }
 
-func TestR115AbilityBoundedSymmetricScaleAndTrueZero(t *testing.T) {
+func TestR115AbilityBoundedGradeScaleAndTrueZero(t *testing.T) {
 	var p, b gameplayAbilityAccumulator
 	item := abilityTestMatch(1).Participants[0]
 	team := gameplayTeam{Kills: 20, Damage: 20000}
@@ -88,8 +88,8 @@ func TestR115AbilityBoundedSymmetricScaleAndTrueZero(t *testing.T) {
 	p.damage = 1_000_000
 	forward := abilityMetrics(p, b)[3].PlayerScore
 	reverse := abilityMetrics(b, p)[3].PlayerScore
-	if math.Abs(forward+reverse-100) > 0.11 || forward > 100 || reverse < 0 {
-		t.Fatalf("unbounded/asymmetric: %v,%v", forward, reverse)
+	if forward != 95 || reverse < 0 || reverse >= 50 {
+		t.Fatalf("unbounded or wrong grade direction: %v,%v", forward, reverse)
 	}
 }
 

@@ -1977,7 +1977,9 @@
       state.accountLoaded = true;
       const summoner = payload.summoner || {};
       const account = payload.account || {};
-      const loot = Array.isArray(account.loot) ? account.loot : [];
+      // 客户端返回的空白占位记录（无键、无 ID、无名称，命名不了）不展示，
+      // 也不因它显示“暂未同步”提示；它一旦拿到身份就不再带 blank 标记，会正常出现。
+      const loot = (Array.isArray(account.loot) ? account.loot : []).filter(item => !item?.blank);
       const displayLoot = [...loot];
       const lootPending = loot.some(item => item.dataPending) || (account.capabilities || []).some(item => item.name === "player-loot" && item.state === "pending");
       if (account.sanctumSparksKnown) displayLoot.push({
@@ -2466,13 +2468,6 @@
     if (state.status) renderNotice(state.status);
   }
 
-  // 生涯页「在收藏页浏览头像与旗帜」入口：切到收藏页并定位到头像/旗帜视图。
-  window.deepLegendsOpenFacadeCollection = (view) => {
-    activateSection("favorites");
-    activateFavoritesPage("facade-collection");
-    window.deepLegendsFavoritesFacade?.setView?.(view === "banners" ? "banners" : "icons");
-  };
-
   function resetCollectionControls(view) {
     state.view = view;
     state.query = "";
@@ -2953,11 +2948,61 @@
     };
     return [...new Set([fixed[token], item.tilePath, item.asset, item.splashPath].filter(Boolean))];
   }
+  // R146：所有战利品图标按「可见像素外框的几何平均边长」归一到同一视觉大小，
+  // 基准是蓝色精粹（256 图内可见 107×169，在 70px 图框里放大 1.65 倍后约 48×76，
+  // 几何平均约 60px）。只按最大边归一会让实心方块（挑战券、宝箱）比瘦长的水晶
+  // 显得大很多，几何平均把宽高一起算进去。同时最大边不超过 LOOT_ICON_MAX_SIDE。
+  // 规则只看图，不看物品类型，所以以后新增的物品自动适用。
+  const LOOT_ICON_BOX = 70;
+  const LOOT_ICON_TARGET = 60;
+  const LOOT_ICON_MAX_SIDE = 78;
+  function lootIconFit(alpha, size) {
+    let minX = size, minY = size, maxX = -1, maxY = -1;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (alpha[y * size + x] > 16) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return null;
+    const width = maxX - minX + 1, height = maxY - minY + 1;
+    // 外框铺满整张图说明图片自带不透明底，量不出主体，保持原样。
+    if (width >= size - 1 && height >= size - 1) return null;
+    const byMean = LOOT_ICON_TARGET / (Math.sqrt(width * height) / size * LOOT_ICON_BOX);
+    const byMaxSide = LOOT_ICON_MAX_SIDE / (Math.max(width, height) / size * LOOT_ICON_BOX);
+    const scale = Math.min(3, Math.max(0.5, Math.min(byMean, byMaxSide)));
+    const dx = -((minX + maxX + 1) / 2 - size / 2) / size * LOOT_ICON_BOX * scale;
+    const dy = -((minY + maxY + 1) / 2 - size / 2) / size * LOOT_ICON_BOX * scale;
+    return { scale: Number(scale.toFixed(3)), dx: Number(dx.toFixed(2)), dy: Number(dy.toFixed(2)) };
+  }
+  function normalizeLootIcon(image) {
+    try {
+      const size = 128;
+      const canvas = document.createElement("canvas");
+      canvas.width = size; canvas.height = size;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      const width = image.naturalWidth || size, height = image.naturalHeight || size;
+      const ratio = Math.min(size / width, size / height);
+      context.drawImage(image, (size - width * ratio) / 2, (size - height * ratio) / 2, width * ratio, height * ratio);
+      const pixels = context.getImageData(0, 0, size, size).data;
+      const alpha = new Uint8Array(size * size);
+      for (let index = 0; index < alpha.length; index++) alpha[index] = pixels[index * 4 + 3];
+      const fit = lootIconFit(alpha, size);
+      if (!fit) return;
+      image.style.setProperty("--loot-icon-scale", String(fit.scale));
+      image.style.setProperty("--loot-icon-dx", `${fit.dx}px`);
+      image.style.setProperty("--loot-icon-dy", `${fit.dy}px`);
+    } catch {}
+  }
   function loadNextLootImage(image, first = false) {
     if (first) {
       image.dataset.index = "0";
       image.addEventListener("error", () => loadNextLootImage(image));
-      image.addEventListener("load", () => image.closest(".loot-art")?.classList.add("has-image"));
+      image.addEventListener("load", () => { image.closest(".loot-art")?.classList.add("has-image"); normalizeLootIcon(image); });
     }
     const paths = decodeURIComponent(image.dataset.paths || "").split("\n").filter(Boolean);
     const index = Number(image.dataset.index || 0);

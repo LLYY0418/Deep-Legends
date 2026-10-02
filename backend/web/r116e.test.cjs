@@ -164,7 +164,7 @@ test("R116-E the queue switcher grows a third mayhem tab only where it is honest
   const classicPayload = { rankedQueues: { 420: {}, 440: {} } };
 
   const recent = rankedQueueSwitcher({ rankedQueueRecent: "2300" }, "2300", "recent", mayhemPayload);
-  assert.match(recent, /data-ranked-queue="2300"[^>]*>海克斯大乱斗</);
+  assert.match(recent, /data-ranked-queue="2300"[^>]*>海斗</);
   assert.match(recent, /data-ranked-queue="420"[^>]*>单双排</);
   assert.match(recent, /data-ranked-queue="440"[^>]*>灵活组排</);
   assert.match(recent, /class="ranked-queue-button is-active"[^>]*data-ranked-queue="2300"/);
@@ -175,22 +175,22 @@ test("R116-E the queue switcher grows a third mayhem tab only where it is honest
 
   // 没有海斗样本 → 不出第三个页签（不给用户一个点进去全是空的按钮）。
   const withoutMayhem = rankedQueueSwitcher({}, "420", "recent", classicPayload);
-  assert.doesNotMatch(withoutMayhem, /海克斯大乱斗/);
+  assert.doesNotMatch(withoutMayhem, />海斗</);
   assert.match(withoutMayhem, /aria-label="排位模式"/);
 
   // 位置偏好与能力表现依赖分路口径，海斗没有分路 → 这两个 scope 永远只有两个页签。
   // 否则用户切过去之后整块被隐藏，页签本身就再也点不回来（死胡同）。
   for (const scope of ["ability", "position"]) {
     const markup = rankedQueueSwitcher({}, "420", scope, mayhemPayload);
-    assert.doesNotMatch(markup, /海克斯大乱斗/, `${scope} must not offer a mayhem tab`);
+    assert.doesNotMatch(markup, />海斗</, `${scope} must not offer a mayhem tab`);
     assert.match(markup, /aria-label="排位模式"/, `${scope} only offers ranked queues`);
     assert.match(markup, new RegExp(`data-ranked-queue-scope="${scope}"`));
   }
 
   // 不传 data 时回落到 tab.data（覆盖层与生涯弹窗都走这条路）。
-  assert.match(rankedQueueSwitcher({ data: mayhemPayload }, "420", "recent"), /海克斯大乱斗/);
+  assert.match(rankedQueueSwitcher({ data: mayhemPayload }, "420", "recent"), />海斗</);
   // 旧载荷没有 rankedQueues → 不出海斗页签。
-  assert.doesNotMatch(rankedQueueSwitcher({}, "420", "recent", {}), /海克斯大乱斗/);
+  assert.doesNotMatch(rankedQueueSwitcher({}, "420", "recent", {}), />海斗</);
 });
 
 test("R116-E the switcher click gate accepts the mayhem tab in the recent scope only", () => {
@@ -203,7 +203,7 @@ test("R116-E the switcher click gate accepts the mayhem tab in the recent scope 
   assert.match(seasonBackend, /const seasonMayhemPrimaryQueueID = int64\(2300\)/);
   // 三个海斗队列合并成一个页签：源码里只允许出现一个海斗按钮。
   const switcher = functionSource(gameplayScript, "rankedQueueSwitcher");
-  assert.equal((switcher.match(/>海克斯大乱斗</g) || []).length, 1, "one merged mayhem button, not three");
+  assert.equal((switcher.match(/>海斗</g) || []).length, 1, "one merged mayhem button, not three");
   assert.equal((switcher.match(/data-ranked-queue="\$\{MAYHEM_QUEUE_TAB_KEY\}"/g) || []).length, 1);
   assert.match(seasonBackend, /var seasonMayhemQueueIDs = \[\]int64\{2300, 2400, 3270\}/);
 });
@@ -259,7 +259,7 @@ test("R116-E card headings stay truthful once mayhem games are counted", () => {
   assert.doesNotMatch(solo, /海克斯大乱斗/);
 
   const mayhem = renderRecentRanked({ games: 7, wins: 4, losses: 3, queueLabel: "海克斯大乱斗", positions: [] }, 2300, "SWITCH");
-  assert.match(mayhem, /近 7 场海克斯大乱斗/);
+  assert.match(mayhem, /近 7 场海斗/);
   assert.doesNotMatch(mayhem, /场排位/, "a mayhem card must not call itself ranked");
   // R128 §2.3-B：海斗没有分路，这一格整块不渲染——既不写「位置数据不足」，
   // 也不再留一句口径解释占位。
@@ -268,7 +268,7 @@ test("R116-E card headings stay truthful once mayhem games are counted", () => {
   assert.doesNotMatch(mayhem, /recent-ranked-positions/);
 
   const empty = renderRecentRanked({ games: 0 }, 2300, "SWITCH");
-  assert.match(empty, /近 0 场海克斯大乱斗/);
+  assert.match(empty, /近 0 场海斗/);
   assert.match(empty, /当前样本未发现海克斯大乱斗对局/);
   assert.match(empty, /本赛季已扫描到的海克斯大乱斗对局/);
   // 队列名解析不出来时不许默默写「单双排」。

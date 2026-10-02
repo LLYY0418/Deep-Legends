@@ -87,13 +87,13 @@ func (c *LCUClient) ListenEvents(ctx context.Context, onReady func(), onEvent fu
 	}
 
 	done := make(chan struct{})
-	go func() {
+	goSafe("lcu_events.ListenEvents.1", func() {
 		select {
 		case <-ctx.Done():
 			_ = conn.Close()
 		case <-done:
 		}
-	}()
+	})
 	defer close(done)
 	uriStats := make(map[string]lcuEventURIStat)
 

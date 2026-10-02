@@ -435,6 +435,8 @@ func (a *app) handleGameplayMatchTiers(w http.ResponseWriter, r *http.Request) {
 	for _, item := range tasks {
 		wait.Add(1)
 		go func(item task) {
+			defer a.recoverPanic("rank_insights.handleGameplayMatchTiers.1")
+
 			defer wait.Done()
 			select {
 			case globalMatchTiersRankSemaphore <- struct{}{}:

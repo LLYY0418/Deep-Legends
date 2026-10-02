@@ -1,0 +1,319 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"sort"
+	"strconv"
+	"sync"
+	"time"
+)
+
+type liveHistoryFreshnessScope struct {
+	mu              sync.Mutex
+	client          *LCUClient
+	gameID, queueID int64
+	records         map[string]liveHistoryRecord
+	previousGameID  int64
+}
+
+type liveHistoryRecord struct {
+	latestGameID int64
+	count        int
+}
+type liveHistoryRunGames struct {
+	client                                       *LCUClient
+	lastID, lastQueue, previousID, previousQueue int64
+}
+
+// Retained across end/lobby phases, scoped to this running client's session.
+func (a *app) observeLiveHistoryGame(client *LCUClient, phase string, gameID, queueID int64) {
+	a.liveHistoryFreshnessMu.Lock()
+	defer a.liveHistoryFreshnessMu.Unlock()
+	games := &a.liveHistoryRunGames
+	if games.client != client {
+		*games = liveHistoryRunGames{client: client}
+	}
+	if phase != "InProgress" || gameID <= 0 || queueID <= 0 || games.lastID == gameID {
+		return
+	}
+	games.previousID, games.previousQueue = games.lastID, games.lastQueue
+	games.lastID, games.lastQueue = gameID, queueID
+}
+
+// Read-only after a loader publishes its result. Kept with the 45-second cache
+// and flight so diagnostics compare the same windows used for the displayed row.
+type liveHistoryEvidence struct {
+	LCU, SGP     []gameplayMatch
+	SGPRequested bool
+	SGPOK        bool
+}
+
+func (a *app) clearLiveHistoryFreshness() {
+	a.liveHistoryFreshnessMu.Lock()
+	a.liveHistoryFreshness = nil
+	a.liveHistoryFreshnessMu.Unlock()
+}
+func (a *app) liveHistoryFreshnessForGame(client *LCUClient, gameID, queueID int64) *liveHistoryFreshnessScope {
+	a.liveHistoryFreshnessMu.Lock()
+	defer a.liveHistoryFreshnessMu.Unlock()
+	scope := a.liveHistoryFreshness
+	if scope == nil || scope.client != client || scope.gameID != gameID || scope.queueID != queueID {
+		scope = &liveHistoryFreshnessScope{client: client, gameID: gameID, queueID: queueID, records: map[string]liveHistoryRecord{}}
+		games := a.liveHistoryRunGames
+		if games.client == client {
+			previousID, previousQueue := games.lastID, games.lastQueue
+			if previousID == gameID {
+				previousID, previousQueue = games.previousID, games.previousQueue
+			}
+			if previousID > 0 && previousID != gameID && previousQueue == queueID {
+				scope.previousGameID = previousID
+			}
+		}
+		a.liveHistoryFreshness = scope
+	}
+	return scope
+}
+
+func liveHistoryCacheKey(scope *liveHistoryFreshnessScope, playerRef string, isCurrent bool) string {
+	return fmt.Sprintf("live-history:%p:%d:%d:%s:%t", scope.client, scope.gameID, scope.queueID, playerRef, isCurrent)
+}
+
+func (a *app) livePlayerMatchesForGame(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string, scope *liveHistoryFreshnessScope, team int64, slot int) livePlayerMatchesResult {
+	if scope == nil {
+		return a.livePlayerMatches(ctx, client, reference, playerRef, isCurrent, names)
+	}
+	result := a.cachedLivePlayerMatches(ctx, liveHistoryCacheKey(scope, playerRef, isCurrent), func(loadCtx context.Context) livePlayerMatchesResult {
+		return a.loadLivePlayerMatches(loadCtx, client, reference, playerRef, isCurrent, names)
+	})
+	if slot >= 0 {
+		a.recordLiveHistoryFreshness(result, playerRef, isCurrent, scope, team, slot)
+	}
+	return result
+}
+
+func (a *app) recordLiveHistoryFreshness(result livePlayerMatchesResult, playerRef string, isCurrent bool, scope *liveHistoryFreshnessScope, team int64, slot int) {
+	if scope == nil {
+		return
+	}
+	shown := recentMatchesForPlayer(result.Matches, playerRef, 10, scope.queueID)
+	var latest int64
+	if len(shown) > 0 {
+		latest = shown[0].GameID
+	}
+	scope.mu.Lock()
+	key := playerRef + "\x00" + strconv.FormatBool(isCurrent)
+	record := scope.records[key]
+	if record.count >= 6 || record.count > 0 && record.latestGameID == latest {
+		scope.mu.Unlock()
+		return
+	}
+	record.count++
+	record.latestGameID = latest
+	scope.records[key] = record
+	scope.mu.Unlock()
+	event := liveHistoryFreshnessDiagnostic(result, playerRef, scope.queueID, team, slot, isCurrent, time.Now())
+	event["load_index"] = record.count
+	if isCurrent && scope.previousGameID > 0 {
+		lcu, sgp := result.Matches, []gameplayMatch(nil)
+		if result.Evidence != nil {
+			lcu, sgp = result.Evidence.LCU, result.Evidence.SGP
+		}
+		event["prev_game_in_lcu"] = liveHistoryContainsGame(lcu, scope.previousGameID)
+		event["prev_game_in_sgp"] = liveHistoryContainsGame(sgp, scope.previousGameID)
+		event["prev_game_shown"] = liveHistoryContainsGame(shown, scope.previousGameID)
+	}
+	a.recordDiagnostic(event)
+}
+
+func liveHistoryContainsGame(matches []gameplayMatch, gameID int64) bool {
+	for _, match := range matches {
+		if match.GameID == gameID {
+			return true
+		}
+	}
+	return false
+}
+
+// Slots follow the default classic details layout: known lanes first, and self
+// first for tied/unknown lanes. Compute after snapshot/Live Client corrections.
+func liveHistoryRosterSlots(players []gameplayLivePlayer, aligned bool) []int {
+	slots := make([]int, len(players))
+	teams := map[int64][]int{}
+	for i, player := range players {
+		teams[player.TeamID] = append(teams[player.TeamID], i)
+	}
+	positions := map[string]int{"top": 1, "jungle": 2, "middle": 3, "bottom": 4, "utility": 5}
+	for _, indices := range teams {
+		sort.SliceStable(indices, func(i, j int) bool {
+			left, right := players[indices[i]], players[indices[j]]
+			if aligned {
+				l, r := positions[left.Position], positions[right.Position]
+				if l == 0 {
+					l = 6
+				}
+				if r == 0 {
+					r = 6
+				}
+				if l != r {
+					return l < r
+				}
+			}
+			return left.IsCurrent && !right.IsCurrent
+		})
+		for slot, i := range indices {
+			slots[i] = slot
+		}
+	}
+	return slots
+}
+
+// SUMMARY only. useCache=false deliberately avoids both reading and writing the
+// shared five-minute SGP page cache; the live roster has its own 45-second cache.
+func (a *app) loadLiveSGPMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, names map[int64]string) (livePlayerMatchesResult, bool) {
+	if a.sgp == nil {
+		return livePlayerMatchesResult{State: "unavailable"}, false
+	}
+	_, _, ok := a.sgp.available(client)
+	if !ok {
+		return livePlayerMatchesResult{State: "unavailable"}, false
+	}
+	infos, _, _, err := a.sgp.matchHistory(ctx, client, playerRef, 0, 30, false)
+	if err != nil {
+		return livePlayerMatchesResult{State: "failed"}, false
+	}
+	matches := make([]gameplayMatch, 0, len(infos))
+	for _, info := range infos {
+		a.checkArenaGroupTruth(client, reference.ServerID, info)
+		matches = append(matches, convertRiotMatchInfo(info, playerRef, names, nil, "", reference.ServerID))
+	}
+	state := "ok"
+	if len(matches) == 0 {
+		state = "empty"
+	}
+	return livePlayerMatchesResult{Matches: matches, State: state, Source: "sgp"}, true
+}
+
+// Both adapters directly preserve the numeric LCU gameId / SGP json.gameId.
+// Never parse a region-prefixed metadata matchId as a gameId. Only positive IDs
+// are deduplicated; missing IDs cannot safely identify the same game.
+func mergeLivePlayerMatches(lcu, sgp []gameplayMatch, playerRef string) []gameplayMatch {
+	merged := make([]gameplayMatch, 0, len(lcu)+len(sgp))
+	byID := map[int64]int{}
+	for _, window := range [][]gameplayMatch{lcu, sgp} {
+		for _, match := range window {
+			if index, exists := byID[match.GameID]; match.GameID > 0 && exists {
+				if liveMatchCompleteness(match, playerRef) > liveMatchCompleteness(merged[index], playerRef) {
+					merged[index] = match
+				}
+				continue
+			}
+			if match.GameID > 0 {
+				byID[match.GameID] = len(merged)
+			}
+			merged = append(merged, match)
+		}
+	}
+	sort.SliceStable(merged, func(i, j int) bool { return merged[i].CreatedAt > merged[j].CreatedAt })
+	return merged
+}
+
+func liveMatchCompleteness(match gameplayMatch, playerRef string) int {
+	// A usable subject/result/queue outweigh optional metadata and roster size.
+	quality := min(len(match.Participants), 15)
+	if recentMatchSubject(match, playerRef) != nil {
+		quality += 256
+	}
+	if match.Result == "win" || match.Result == "loss" {
+		quality += 128
+	}
+	if match.QueueID > 0 {
+		quality += 64
+	}
+	if match.CreatedAt > 0 {
+		quality += 32
+	}
+	if match.Duration > 0 {
+		quality += 16
+	}
+	return quality
+}
+
+func liveNewestTimestamp(matches []gameplayMatch, queueID int64) int64 {
+	var newest int64
+	for _, match := range matches {
+		if queueID > 0 && match.QueueID != queueID {
+			continue
+		}
+		if match.CreatedAt > newest {
+			newest = match.CreatedAt
+		}
+	}
+	return newest
+}
+func liveNewestAgeMinutes(matches []gameplayMatch, queueID int64, now time.Time) *float64 {
+	newest := liveNewestTimestamp(matches, queueID)
+	if newest <= 0 {
+		return nil
+	}
+	age := round2(max(0, float64(now.UnixMilli()-newest)/60000))
+	return &age
+}
+func liveHistoryFreshnessDiagnostic(result livePlayerMatchesResult, playerRef string, queueID, team int64, slot int, isCurrent bool, now time.Time) map[string]any {
+	lcu := result.Matches
+	if result.Evidence != nil {
+		lcu = result.Evidence.LCU
+	}
+	queueGames, unmatched, skipped := 0, 0, 0
+	for _, match := range lcu {
+		if queueID > 0 && match.QueueID != queueID {
+			continue
+		}
+		queueGames++
+		// Independent counts: a missing subject can also cause an unknown result.
+		if recentMatchSubject(match, playerRef) == nil {
+			unmatched++
+		}
+		if match.Result != "win" && match.Result != "loss" {
+			skipped++
+		}
+	}
+	shown := recentMatchesForPlayer(result.Matches, playerRef, 10, queueID)
+	event := map[string]any{"event": "live_history_freshness", "team": team, "slot": slot, "is_current": isCurrent,
+		"source": result.Source, "window_games": len(lcu), "queue_games": queueGames,
+		"newest_any_age_min": liveNewestAgeMinutes(lcu, 0, now), "newest_queue_age_min": liveNewestAgeMinutes(lcu, queueID, now),
+		"lcu_newest_queue_age_min": liveNewestAgeMinutes(lcu, queueID, now), "subject_unmatched": unmatched, "remake_skipped": skipped,
+		"shown_newest_age_min": liveNewestAgeMinutes(shown, 0, now)}
+	if evidence := result.Evidence; evidence != nil && evidence.SGPRequested {
+		if !evidence.SGPOK {
+			event["sample_failed"] = true
+		} else {
+			event["sgp_newest_any_age_min"] = liveNewestAgeMinutes(evidence.SGP, 0, now)
+			event["sgp_newest_queue_age_min"] = liveNewestAgeMinutes(evidence.SGP, queueID, now)
+			event["missing_newer_any"] = liveMissingNewerGames(lcu, evidence.SGP, 0)
+			event["missing_newer_in_queue"] = liveMissingNewerGames(lcu, evidence.SGP, queueID)
+		}
+	}
+	return event
+}
+func liveMissingNewerGames(lcu, sgp []gameplayMatch, queueID int64) any {
+	newest := liveNewestTimestamp(lcu, queueID)
+	// Without a dated LCU baseline, newer-than-LCU cannot be established.
+	if newest <= 0 {
+		return nil
+	}
+	known := map[int64]bool{}
+	for _, match := range lcu {
+		known[match.GameID] = true
+	}
+	newer := map[int64]bool{}
+	for _, match := range sgp {
+		if queueID > 0 && match.QueueID != queueID {
+			continue
+		}
+		if match.GameID > 0 && match.CreatedAt > newest && !known[match.GameID] {
+			newer[match.GameID] = true
+		}
+	}
+	return len(newer)
+}

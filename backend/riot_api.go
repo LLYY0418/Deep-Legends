@@ -186,6 +186,9 @@ type riotProvider struct {
 	specialistRecent  map[string]specialistRecentSummaryCacheEntry
 	specialistSlots   chan struct{}
 	opponentRankScore func(context.Context, string) rankScoreEntry
+	starterCache      *championDataCache
+	starterFailures   map[string]time.Time
+	starterPrefetches map[string]specialistStarterPrefetch
 }
 
 type riotOverviewCostTrackerKey struct{}
@@ -995,10 +998,9 @@ func riotPositionKey(participant riotParticipant) string {
 // 撞上 Riot 已知的数据缺失（developer-relations issue #554：JP1 排位约 0.9% 的
 // 对局 individualPosition=INVALID 且 teamPosition 为空）。
 //
-// 用户原始规则需要大厅里的**两个位置偏好**加上「是否选了任意位置」；这两个值
-// match-v5 里都没有，LCU 的 /lol-lobby/v2/lobby 目前也只解析 gameConfig
-// （见 lcuLobby）。到底有没有真正的补位数据源，由 R121 P3-1 的契约探测回答
-// （backend/position_contract_probe.go，结论落盘 docs/r121-position-probe-findings.md）。
+// R121 真机探测在 LCU champ-select myTeam 中找到了直接的 isAutofilled，
+// 仅供实时对局使用；这里仍是 match-v5 的历史对局推断，不与直接字段混用。
+// 证据与边界见 docs/r121-position-probe-findings.md。
 //
 // 在 P3-2 的真机对照结果回填 docs/r119-execution-ledger.md §5 之前，
 // autofillLabelGate 保持 false：界面不出标签，但候选计算与诊断计数照常运行，
@@ -1377,13 +1379,17 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	championNamesRead.Add(1)
 	defer championNamesRead.Wait()
 	go func() {
+		defer a.recoverPanic("riot_api.loadRiotOverview.1")
+		defer close(summonerReady)
+
 		defer profileWait.Done()
 		started := time.Now()
 		summoner, summonerErr = provider.summonerByPUUID(ctx, puuid)
-		close(summonerReady)
 		phases.markSpan("summoner", started, time.Now())
 	}()
 	go func() {
+		defer a.recoverPanic("riot_api.loadRiotOverview.2")
+
 		defer championNamesRead.Done()
 		started := time.Now()
 		names = a.riotChampionNames(ctx)
@@ -1391,6 +1397,8 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		phases.markSpan("champion_names", started, time.Now())
 	}()
 	go func() {
+		defer a.recoverPanic("riot_api.loadRiotOverview.3")
+
 		defer identityReads.Done()
 		started := time.Now()
 		ids, idsErr = provider.matchIDsForOverview(ctx, puuid, begIndex, count, matchFilter)
@@ -1406,18 +1414,22 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	if begIndex == 0 {
 		profileWait.Add(2)
 		go func() {
+			defer a.recoverPanic("riot_api.loadRiotOverview.4")
+			defer close(ranksReady)
+
 			defer profileWait.Done()
 			started := time.Now()
 			ranks, rankCapability = provider.loadRiotRanks(ctx, puuid)
-			close(ranksReady)
 			phases.markSpan("ranks", started, time.Now())
 		}()
 		go func() {
+			defer a.recoverPanic("riot_api.loadRiotOverview.5")
+			defer close(masteriesReady)
+
 			defer profileWait.Done()
 			started := time.Now()
 			championNamesRead.Wait()
 			masteries, masteryCapability = provider.loadRiotMasteries(ctx, puuid, names)
-			close(masteriesReady)
 			phases.markSpan("mastery", started, time.Now())
 		}()
 	}
@@ -1497,6 +1509,8 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	for index := range ids {
 		wait.Add(1)
 		go func(index int) {
+			defer a.recoverPanic("riot_api.loadRiotOverview.6")
+
 			defer wait.Done()
 			defer func() { completedDetails <- struct{}{} }()
 			select {

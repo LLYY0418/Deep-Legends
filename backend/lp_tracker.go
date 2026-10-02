@@ -5,8 +5,8 @@ package main
 // 是靠服务器持续轮询实现的；本地助手改为监听客户端 gameflow 事件：
 //
 //  1. 平时读取排位数据时记录基线快照（段位 + 胜点 + 场次）；
-//  2. 对局进入 EndOfGame 后轮询排位数据，等到胜负场次 +1 时
-//     用绝对分数差得出这一场的 LP 变化（跨小段晋降级也成立）；
+//  2. GameStart/InProgress 单独保存本局快照，结算时等待同源绝对分稳定；
+//     没有开局快照时沿用胜负场次恰好 +1 的保守判断；
 //  3. 结果按 gameId 与加盐脱敏账号标识存入本地 lp-history.json，
 //     战绩列表读取时标注；稳定玩家标识不会写入文件。
 //
@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	lpHistorySchemaVersion = 1
+	lpHistorySchemaVersion = 2
 	lpHistoryFile          = "lp-history.json"
 	lpHistoryLimit         = 400
 	lpCaptureAttempts      = 18
@@ -63,22 +63,28 @@ type lpHistoryData struct {
 	// Baselines: 加盐脱敏账号标识 -> 排位队列 -> 最近一次已知快照。
 	Baselines map[string]map[string]lpSnapshot `json:"baselines"`
 	// Games: gameId -> 该场的胜点变化。
-	Games map[string]lpGameRecord `json:"games"`
+	Games        map[string]lpGameRecord                   `json:"games"`
+	BaselineInfo map[string]map[string]lpBaselineInfo      `json:"baselineInfo,omitempty"`
+	GameStarts   map[string]map[string]lpGameStartBaseline `json:"gameStarts,omitempty"`
 }
 
 type lpTracker struct {
-	mu           sync.Mutex
-	store        *localStore
-	history      lpHistoryData
-	pending      map[string]bool
-	captureIndex uint64
-	observeEvent func(map[string]any)
-	sleep        func(time.Duration)
+	mu                  sync.Mutex
+	store               *localStore
+	history             lpHistoryData
+	pending             map[string]bool
+	captureIndex        uint64
+	observeEvent        func(map[string]any)
+	sleep               func(time.Duration)
+	now                 func() time.Time
+	startSeen           map[string]bool
+	startFlights        map[string]chan struct{}
+	baselineDiagnostics map[string]lpBaselineDiagnostic
 }
 
 func newLPTracker(store *localStore) *lpTracker {
-	tracker := &lpTracker{store: store, pending: make(map[string]bool), sleep: time.Sleep}
-	tracker.history = lpHistoryData{SchemaVersion: lpHistorySchemaVersion, Baselines: make(map[string]map[string]lpSnapshot), Games: make(map[string]lpGameRecord)}
+	tracker := &lpTracker{store: store, pending: make(map[string]bool), sleep: time.Sleep, now: time.Now, startSeen: make(map[string]bool), startFlights: make(map[string]chan struct{}), baselineDiagnostics: make(map[string]lpBaselineDiagnostic)}
+	tracker.history = lpHistoryData{SchemaVersion: lpHistorySchemaVersion, Baselines: make(map[string]map[string]lpSnapshot), Games: make(map[string]lpGameRecord), BaselineInfo: make(map[string]map[string]lpBaselineInfo), GameStarts: make(map[string]map[string]lpGameStartBaseline)}
 	if store == nil {
 		return tracker
 	}
@@ -105,6 +111,12 @@ func newLPTracker(store *localStore) *lpTracker {
 	}
 	if loaded.Games != nil {
 		tracker.history.Games = loaded.Games
+	}
+	if loaded.BaselineInfo != nil {
+		tracker.history.BaselineInfo = loaded.BaselineInfo
+	}
+	if loaded.GameStarts != nil {
+		tracker.history.GameStarts = loaded.GameStarts
 	}
 	return tracker
 }
@@ -136,11 +148,26 @@ func validLPAccountHash(value string) bool {
 }
 
 func validLPHistory(history lpHistoryData) bool {
-	if history.SchemaVersion != lpHistorySchemaVersion || len(history.Games) > lpHistoryLimit {
+	if (history.SchemaVersion != 1 && history.SchemaVersion != lpHistorySchemaVersion) || len(history.Games) > lpHistoryLimit {
 		return false
 	}
 	for accountHash := range history.Baselines {
 		if !validLPAccountHash(accountHash) {
+			return false
+		}
+	}
+	for hash, byQueue := range history.GameStarts {
+		if !validLPAccountHash(hash) {
+			return false
+		}
+		for queue, baseline := range byQueue {
+			if queueIDForRankedType(queue) == 0 || baseline.QueueType != queue || baseline.GameID <= 0 || baseline.TakenAt <= 0 || (baseline.Source != "lcu" && baseline.Source != "sgp") {
+				return false
+			}
+		}
+	}
+	for hash := range history.BaselineInfo {
+		if !validLPAccountHash(hash) {
 			return false
 		}
 	}
@@ -201,41 +228,37 @@ func lpSnapshotFromRank(rank gameplayRank) lpSnapshot {
 
 // observe 在读取到当前登录玩家的排位数据时刷新基线。
 // 正在等待结算捕获的队列跳过，避免赛后快照顶掉赛前基线。
-func (t *lpTracker) observe(playerRef string, ranks []gameplayRank) {
+func (t *lpTracker) observe(playerRef string, ranks []gameplayRank, capabilities ...EndpointCapability) {
 	accountHash := t.accountHash(playerRef)
 	if accountHash == "" {
 		return
+	}
+	source := ""
+	if len(capabilities) > 0 {
+		source = lpRankSource(capabilities[0])
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	changed := false
 	for _, rank := range ranks {
-		if rank.Tier == "" {
-			continue
-		}
-		if _, tracked := lpRankedQueues[queueIDForRankedType(rank.QueueType)]; !tracked {
+		if rank.Tier == "" || queueIDForRankedType(rank.QueueType) == 0 {
 			continue
 		}
 		snapshot := lpSnapshotFromRank(rank)
+		if rank.seasonFallback {
+			t.baselineObservationLocked(accountHash, rank.QueueType, snapshot, "observe", true, "season_fallback")
+			continue
+		}
 		if !snapshot.trustworthy() {
-			t.recordObservation(map[string]any{
-				"event": "lp_snapshot_rejected", "stage": "observe",
-				"reason": "missing_losses",
-			})
+			t.recordObservation(map[string]any{"event": "lp_snapshot_rejected", "stage": "observe", "reason": "missing_losses"})
 			continue
 		}
 		if t.pending[accountHash+"|"+rank.QueueType] {
 			continue
 		}
-		byQueue := t.history.Baselines[accountHash]
-		if byQueue == nil {
-			byQueue = make(map[string]lpSnapshot)
-			t.history.Baselines[accountHash] = byQueue
-		}
-		if byQueue[rank.QueueType] != snapshot {
-			byQueue[rank.QueueType] = snapshot
-			changed = true
-		}
+		// Queue observations may advance; the independent game-start snapshot is immutable.
+		t.writeQueueBaselineLocked(accountHash, rank.QueueType, snapshot, "observe", source)
+		changed = true
 	}
 	if changed {
 		t.persistLocked()
@@ -269,17 +292,20 @@ func (t *lpTracker) annotate(matches []gameplayMatch, playerRef string) {
 	}
 }
 
-// handlePhase 由 LCU gameflow 事件触发：对局结算时启动一次捕获。
-// loadRanks 由调用方注入（优先 SGP 段位数据）；只有包含胜负场次的
-// 可信快照才会用于判断场次 +1。
+// handlePhase 由 LCU gameflow 事件触发开局快照与结算捕获。
+// 两阶段共用调用方注入的 loadRanks；没有开局快照时保留场次 +1 判断。
 func (t *lpTracker) handlePhase(client *LCUClient, phase, playerRef string, loadRanks func() ([]gameplayRank, EndpointCapability)) {
 	if t == nil || client == nil || playerRef == "" || loadRanks == nil {
+		return
+	}
+	if phase == "GameStart" || phase == "InProgress" {
+		goSafe("lp_tracker.gameStart", func() { t.takeGameStart(client, playerRef, loadRanks) })
 		return
 	}
 	if phase != "EndOfGame" && phase != "PreEndOfGame" && phase != "WaitingForStats" {
 		return
 	}
-	go t.capture(client, playerRef, loadRanks)
+	goSafe("lp_tracker.handlePhase.1", func() { t.capture(client, playerRef, loadRanks) })
 }
 
 type lpGameflowSession struct {
@@ -291,19 +317,162 @@ type lpGameflowSession struct {
 	} `json:"gameData"`
 }
 
+type lpBaselineInfo struct {
+	Writer  string `json:"writer"`
+	Source  string `json:"source,omitempty"`
+	TakenAt int64  `json:"takenAt"`
+}
+type lpGameStartBaseline struct {
+	GameID    int64      `json:"gameId"`
+	QueueType string     `json:"queueType"`
+	Snapshot  lpSnapshot `json:"snapshot"`
+	Source    string     `json:"source"`
+	TakenAt   int64      `json:"takenAt"`
+}
+type lpBaselineDiagnostic struct {
+	Snapshot       lpSnapshot
+	SeasonFallback bool
+	Reason         string
+	At             time.Time
+}
+
+func lpRankSource(capability EndpointCapability) string {
+	source := capabilitySource(capability)
+	if source == dataSourceLCU || source == dataSourceSGP {
+		return source
+	}
+	return ""
+}
+func lpScore(snapshot lpSnapshot) (int, bool) {
+	return rankAbsoluteScore(snapshot.Tier, snapshot.Division, snapshot.LeaguePoints)
+}
+func lpDeltaFields(snapshot, baseline lpSnapshot, known bool) map[string]any {
+	fields := map[string]any{"wins_delta": nil, "losses_delta": nil, "score_delta": nil}
+	if known {
+		fields["wins_delta"] = snapshot.Wins - baseline.Wins
+		fields["losses_delta"] = snapshot.Losses - baseline.Losses
+		after, afterOK := lpScore(snapshot)
+		before, beforeOK := lpScore(baseline)
+
+		if afterOK && beforeOK {
+			fields["score_delta"] = after - before
+		}
+	}
+	return fields
+}
+func (t *lpTracker) baselineObservationLocked(hash, queue string, snapshot lpSnapshot, writer string, fallback bool, reason string) {
+	key := hash + "|" + queue
+	now := t.now()
+	last, exists := t.baselineDiagnostics[key]
+	if exists && last.Snapshot == snapshot && last.SeasonFallback == fallback && last.Reason == reason && now.Sub(last.At) < time.Minute {
+		return
+	}
+	t.baselineDiagnostics[key] = lpBaselineDiagnostic{snapshot, fallback, reason, now}
+	baseline, known := t.history.Baselines[hash][queue]
+	event := lpDeltaFields(snapshot, baseline, known)
+	event["event"] = "lp_baseline_written"
+	event["writer"] = writer
+	event["season_fallback"] = fallback
+	event["has_baseline"] = known
+	if reason != "" {
+		event["reason"] = reason
+	}
+	t.recordObservation(event)
+}
+func (t *lpTracker) writeQueueBaselineLocked(hash, queue string, snapshot lpSnapshot, writer, source string) {
+	t.baselineObservationLocked(hash, queue, snapshot, writer, false, "")
+	if t.history.Baselines[hash] == nil {
+		t.history.Baselines[hash] = make(map[string]lpSnapshot)
+	}
+	if t.history.BaselineInfo[hash] == nil {
+		t.history.BaselineInfo[hash] = make(map[string]lpBaselineInfo)
+	}
+	t.history.Baselines[hash][queue] = snapshot
+	t.history.BaselineInfo[hash][queue] = lpBaselineInfo{Writer: writer, Source: source, TakenAt: t.now().UnixMilli()}
+}
+func lpCurrentSnapshot(ranks []gameplayRank, capability EndpointCapability, queue string) (lpSnapshot, bool) {
+	if capability.State == capabilityAvailable {
+		for _, rank := range ranks {
+			if rank.QueueType == queue && rank.Tier != "" && !rank.seasonFallback {
+				return lpSnapshotFromRank(rank), true
+			}
+		}
+	}
+	return lpSnapshot{}, false
+}
+func (t *lpTracker) takeGameStart(client *LCUClient, playerRef string, loadRanks func() ([]gameplayRank, EndpointCapability)) {
+	hash := t.accountHash(playerRef)
+	if hash == "" {
+		return
+	}
+	var session lpGameflowSession
+	if client.GetJSON("/lol-gameflow/v1/session", &session) != nil {
+		t.recordObservation(map[string]any{"event": "lp_baseline_written", "writer": "game_start", "season_fallback": false, "reason": "session_unavailable"})
+		return
+	}
+	gameID := session.GameData.GameID
+	queue, ranked := lpRankedQueues[session.GameData.Queue.ID]
+	if !ranked || gameID <= 0 {
+		return
+	}
+	flightKey := hash + "|" + strconv.FormatInt(gameID, 10)
+	t.mu.Lock()
+	if t.startSeen[flightKey] || t.history.GameStarts[hash][queue].GameID == gameID {
+		t.mu.Unlock()
+		return
+	}
+	t.startSeen[flightKey] = true
+	if len(t.startSeen) > lpHistoryLimit {
+		t.startSeen = map[string]bool{flightKey: true}
+	}
+	done := make(chan struct{})
+	t.startFlights[flightKey] = done
+	t.mu.Unlock()
+	defer func() { t.mu.Lock(); delete(t.startFlights, flightKey); close(done); t.mu.Unlock() }()
+	for attempt := 1; attempt <= 3; attempt++ {
+		if attempt > 1 {
+			t.wait(lpCaptureInterval)
+		}
+		ranks, capability := loadRanks()
+		snapshot, ok := lpCurrentSnapshot(ranks, capability, queue)
+		source := lpRankSource(capability)
+		t.recordObservation(map[string]any{"event": "lp_game_start_poll", "attempt": attempt, "capability_state": capability.State})
+		if !ok || source == "" {
+			continue
+		}
+		if !snapshot.trustworthy() {
+			t.recordObservation(map[string]any{"event": "lp_snapshot_rejected", "stage": "game_start", "reason": "missing_losses"})
+			continue
+		}
+		if _, ok = lpScore(snapshot); !ok {
+			continue
+		}
+		t.mu.Lock()
+		t.baselineObservationLocked(hash, queue, snapshot, "game_start", false, "")
+		if t.history.GameStarts[hash] == nil {
+			t.history.GameStarts[hash] = make(map[string]lpGameStartBaseline)
+		}
+		t.history.GameStarts[hash][queue] = lpGameStartBaseline{gameID, queue, snapshot, source, t.now().UnixMilli()}
+		t.persistLocked()
+		t.mu.Unlock()
+		return
+	}
+	t.recordObservation(map[string]any{"event": "lp_baseline_written", "writer": "game_start", "season_fallback": false, "reason": "read_failed", "attempts": 3})
+}
+
 func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func() ([]gameplayRank, EndpointCapability)) {
-	accountHash := t.accountHash(playerRef)
-	if accountHash == "" {
+	hash := t.accountHash(playerRef)
+	if hash == "" {
 		t.recordObservation(map[string]any{"event": "lp_capture_ignored", "reason": "invalid_player_reference"})
 		return
 	}
 	var session lpGameflowSession
-	if err := client.GetJSON("/lol-gameflow/v1/session", &session); err != nil {
+	if client.GetJSON("/lol-gameflow/v1/session", &session) != nil {
 		t.recordObservation(map[string]any{"event": "lp_capture_ignored", "reason": "session_unavailable"})
 		return
 	}
 	gameID := session.GameData.GameID
-	queueType, ranked := lpRankedQueues[session.GameData.Queue.ID]
+	queue, ranked := lpRankedQueues[session.GameData.Queue.ID]
 	if !ranked {
 		t.recordObservation(map[string]any{"event": "lp_capture_ignored", "reason": "unranked_queue"})
 		return
@@ -313,7 +482,13 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 		return
 	}
 	gameKey := strconv.FormatInt(gameID, 10)
-	pendingKey := accountHash + "|" + queueType
+	pendingKey := hash + "|" + queue
+	t.mu.Lock()
+	flight := t.startFlights[hash+"|"+gameKey]
+	t.mu.Unlock()
+	if flight != nil {
+		<-flight
+	}
 	t.mu.Lock()
 	_, recorded := t.history.Games[gameKey]
 	if recorded || t.pending[pendingKey] {
@@ -327,101 +502,208 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 		return
 	}
 	t.captureIndex++
-	captureIndex := t.captureIndex
+	index := t.captureIndex
 	t.pending[pendingKey] = true
-	baseline, hasBaseline := t.history.Baselines[accountHash][queueType]
+	baseline, hasBaseline := t.history.Baselines[hash][queue]
+	info := t.history.BaselineInfo[hash][queue]
+	gameStart, hasStart := t.history.GameStarts[hash][queue]
+	hasStart = hasStart && gameStart.GameID == gameID
+	if hasStart {
+		baseline = gameStart.Snapshot
+		hasBaseline = true
+		info = lpBaselineInfo{Writer: "game_start", Source: gameStart.Source, TakenAt: gameStart.TakenAt}
+	}
+	if info.Writer == "" {
+		info.Writer = "observe"
+	}
 	t.mu.Unlock()
-	t.recordObservation(map[string]any{
-		"event": "lp_capture_started", "capture_index": captureIndex,
-		"has_baseline": hasBaseline,
-	})
+	t.recordObservation(map[string]any{"event": "lp_capture_started", "capture_index": index, "has_baseline": hasBaseline})
+	var last lpSnapshot
+	lastOK := false
+	lastSource := ""
+	diagnostic := func(name, reason string, snapshot lpSnapshot, source string) map[string]any {
+		event := lpDeltaFields(snapshot, baseline, hasBaseline)
+		if hasStart && source != gameStart.Source {
+			event["score_delta"] = nil
+		}
+		event["event"] = name
+		event["capture_index"] = index
+		event["has_baseline"] = hasBaseline
+		event["baseline_source"] = info.Writer
+		age := int64(0)
+		if info.TakenAt > 0 {
+			age = max(int64(0), (t.now().UnixMilli()-info.TakenAt)/1000)
+		}
+		event["baseline_age_s"] = age
+		if source != "" {
+			event["snapshot_source"] = source
+		}
+		if reason != "" {
+			event["reason"] = reason
+		}
+		if hasBaseline {
+			event["games_gap"] = snapshot.games() - baseline.games()
+		}
+		return event
+	}
 	defer func() {
 		t.mu.Lock()
+		defer t.mu.Unlock()
+		// Keep the final upstream observation for future fallback captures, even on timeout.
+		if lastOK {
+			t.writeQueueBaselineLocked(hash, queue, last, "capture", lastSource)
+		}
+		if start := t.history.GameStarts[hash][queue]; start.GameID == gameID {
+			delete(t.history.GameStarts[hash], queue)
+		}
 		delete(t.pending, pendingKey)
-		t.mu.Unlock()
+		t.persistLocked()
 	}()
 	t.wait(lpCaptureFirstWait)
-	for attempt := 0; attempt < lpCaptureAttempts; attempt++ {
-		if attempt > 0 {
+	firstChanged := false
+	settleSamples := 0
+	previousScore := 0
+	previousValid := false
+	seenMismatch := false
+	seenSameSource := false
+	debugRemaining := 0
+	debugStarted := false
+	maxPolls := lpCaptureAttempts
+	for attempt := 1; attempt <= maxPolls; attempt++ {
+		if attempt > 1 {
 			t.wait(lpCaptureInterval)
 		}
 		ranks, capability := loadRanks()
-		var current *gameplayRank
-		if capability.State == capabilityAvailable {
-			for index := range ranks {
-				if ranks[index].QueueType == queueType {
-					current = &ranks[index]
-					break
-				}
+		snapshot, ok := lpCurrentSnapshot(ranks, capability, queue)
+		source := lpRankSource(capability)
+		t.recordObservation(map[string]any{"event": "lp_capture_poll", "capture_index": index, "attempt": attempt, "capability_state": capability.State})
+		if firstChanged || debugRemaining > 0 {
+			if debugRemaining > 0 {
+				debugRemaining--
 			}
+			event := map[string]any{"event": "lp_capture_settle", "capture_index": index, "attempt": attempt, "capability_state": capability.State}
+			if ok {
+				event = diagnostic("lp_capture_settle", "", snapshot, source)
+				event["attempt"] = attempt
+				event["capability_state"] = capability.State
+			}
+			t.recordObservation(event)
 		}
-		var snapshot lpSnapshot
-		if current != nil && current.Tier != "" {
-			snapshot = lpSnapshotFromRank(*current)
-		}
-		t.recordObservation(map[string]any{
-			"event": "lp_capture_poll", "capture_index": captureIndex,
-			"attempt": attempt + 1, "capability_state": capability.State,
-		})
-		if current == nil || current.Tier == "" {
+		if !ok {
+			previousValid = false
 			continue
 		}
 		if !snapshot.trustworthy() {
-			t.recordObservation(map[string]any{
-				"event": "lp_snapshot_rejected", "stage": "capture", "capture_index": captureIndex,
-				"reason": "missing_losses",
-			})
+			t.recordObservation(map[string]any{"event": "lp_snapshot_rejected", "stage": "capture", "capture_index": index, "reason": "missing_losses"})
+			previousValid = false
 			continue
 		}
-		// 结算数据尚未同步时场次不变，继续等待。
-		if hasBaseline && snapshot.games() <= baseline.games() {
+		last, lastOK, lastSource = snapshot, true, source
+		if hasStart && source != gameStart.Source {
+			seenMismatch = true
+			previousValid = false
 			continue
 		}
-		recordedDelta := 0
-		recordedGame := false
-		skipReason := ""
+		seenSameSource = true
+		after, afterOK := lpScore(snapshot)
+		before, beforeOK := lpScore(baseline)
+
+		if !hasStart {
+			if hasBaseline && !debugStarted && (snapshot.Wins != baseline.Wins || snapshot.Losses != baseline.Losses || afterOK && beforeOK && after != before) {
+				debugStarted = true
+				debugRemaining = 2
+			}
+			if hasBaseline && snapshot.games() <= baseline.games() {
+				continue
+			}
+			// Preserve the old decision from the first eligible snapshot. Follow-up
+			// samples diagnose upstream changes; they must not rewrite that decision.
+			reason := ""
+			switch {
+			case !hasBaseline:
+				reason = "no_baseline"
+			case snapshot.games() > baseline.games()+1:
+				reason = "games_jumped"
+			case !afterOK || !beforeOK:
+				reason = "score_unresolved"
+			}
+			for settle := 1; settle <= 2; settle++ {
+				t.wait(lpCaptureInterval)
+				nextRanks, nextCapability := loadRanks()
+				next, nextOK := lpCurrentSnapshot(nextRanks, nextCapability, queue)
+				nextSource := lpRankSource(nextCapability)
+				event := map[string]any{"event": "lp_capture_settle", "capture_index": index, "attempt": attempt + settle, "capability_state": nextCapability.State}
+				if nextOK {
+					event = diagnostic("lp_capture_settle", "", next, nextSource)
+					event["attempt"] = attempt + settle
+					event["capability_state"] = nextCapability.State
+					if next.trustworthy() {
+						last, lastOK, lastSource = next, true, nextSource
+					}
+				}
+				t.recordObservation(event)
+			}
+			if reason != "" {
+				t.recordObservation(diagnostic("lp_capture_skipped", reason, snapshot, source))
+				return
+			}
+			t.mu.Lock()
+			t.history.Games[gameKey] = lpGameRecord{hash, queue, after - before, t.now().UnixMilli()}
+			t.mu.Unlock()
+			t.recordObservation(diagnostic("lp_capture_recorded", "", snapshot, source))
+			return
+		}
+		if !firstChanged {
+			if hasBaseline {
+				if hasStart {
+					if snapshot.Wins == baseline.Wins && snapshot.Losses == baseline.Losses && afterOK && beforeOK && after == before {
+						continue
+					}
+				}
+			}
+			firstChanged = true
+			previousScore = after
+			previousValid = afterOK
+			// P1 requests two follow-up observations. P2 permits at most three
+			// comparable follow-ups to find consecutive equal scores. Allow these at
+			// the waiting budget's boundary too, without restarting the 18-poll wait.
+			maxPolls = max(maxPolls, attempt+3)
+			continue
+		}
+		settleSamples++
+		stable := previousValid && afterOK && after == previousScore
+		previousScore, previousValid = after, afterOK
+		if settleSamples < 2 {
+			continue
+		}
+		if hasStart && !stable && settleSamples < 3 {
+			continue
+		}
+		reason := ""
+		delta := 0
 		switch {
 		case !hasBaseline:
-			skipReason = "no_baseline"
-		case snapshot.games() > baseline.games()+1:
-			skipReason = "games_jumped"
+			reason = "no_baseline"
+		case !afterOK || !beforeOK:
+			reason = "score_unresolved"
+		case hasStart && !stable:
+			reason = "score_unstable"
 		default:
-			after, afterOK := rankAbsoluteScore(snapshot.Tier, snapshot.Division, snapshot.LeaguePoints)
-			before, beforeOK := rankAbsoluteScore(baseline.Tier, baseline.Division, baseline.LeaguePoints)
-			if afterOK && beforeOK {
-				recordedDelta = after - before
-				recordedGame = true
-			} else {
-				skipReason = "score_unresolved"
-			}
+			delta = after - before
 		}
-
+		if reason != "" {
+			t.recordObservation(diagnostic("lp_capture_skipped", reason, snapshot, source))
+			return
+		}
 		t.mu.Lock()
-		byQueue := t.history.Baselines[accountHash]
-		if byQueue == nil {
-			byQueue = make(map[string]lpSnapshot)
-			t.history.Baselines[accountHash] = byQueue
-		}
-		byQueue[queueType] = snapshot
-		if recordedGame {
-			t.history.Games[gameKey] = lpGameRecord{AccountHash: accountHash, QueueType: queueType, Delta: recordedDelta, RecordedAt: time.Now().UnixMilli()}
-		}
-		t.persistLocked()
+		t.history.Games[gameKey] = lpGameRecord{hash, queue, delta, t.now().UnixMilli()}
 		t.mu.Unlock()
-		if recordedGame {
-			t.recordObservation(map[string]any{
-				"event": "lp_capture_recorded", "capture_index": captureIndex,
-			})
-		} else {
-			t.recordObservation(map[string]any{
-				"event": "lp_capture_skipped", "capture_index": captureIndex,
-				"reason": skipReason,
-			})
-		}
+		t.recordObservation(diagnostic("lp_capture_recorded", "", snapshot, source))
 		return
 	}
-	t.recordObservation(map[string]any{
-		"event": "lp_capture_timeout", "capture_index": captureIndex,
-		"attempts": lpCaptureAttempts,
-	})
+	if hasStart && seenMismatch && !seenSameSource {
+		t.recordObservation(diagnostic("lp_capture_skipped", "source_mismatch", last, lastSource))
+		return
+	}
+	t.recordObservation(map[string]any{"event": "lp_capture_timeout", "capture_index": index, "attempts": maxPolls})
 }

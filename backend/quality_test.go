@@ -489,6 +489,7 @@ var privacyStoreDirectoryCoverage = map[string][]string{
 	"perk-catalog":     {"符文与海克斯目录"},
 	"riot-identities":  {"锚点", "Riot ID"},
 	"riot-matches":     {"对局内容", "PUUID"},
+	"rune-starters":    {"出门装净购买缓存", "600 条", "128 MiB"},
 	// R127 P1-c.3：按 gameId 落盘的韩服每场平均段位（7 天）。
 	"match-tiers":   {"韩服每场平均段位", "4000 条"},
 	"pro-runes-v1":  {"职业选手的符文与装备明细"},

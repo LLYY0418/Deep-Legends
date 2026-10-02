@@ -459,6 +459,8 @@ func (p *championProvider) startQQ101Probe(ctx context.Context, champion string,
 	p.qq101ProbeRunning[baseKey] = true
 	p.qq101ProbeMu.Unlock()
 	go func() {
+		defer recoverPanic("qq101.startQQ101Probe.1")
+
 		started := time.Now()
 		probeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 36*time.Second)
 		defer cancel()
@@ -518,6 +520,8 @@ func (p *championProvider) qq101ProbeWithPatch(ctx context.Context, champion str
 	for index := range requests {
 		wait.Add(1)
 		go func(index int) {
+			defer recoverPanic("qq101.qq101ProbeWithPatch.1")
+
 			defer wait.Done()
 			item := requests[index]
 			data, loadErr := p.fetchQQ101(ctx, item.path, query)

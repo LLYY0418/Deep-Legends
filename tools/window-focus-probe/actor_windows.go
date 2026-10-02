@@ -62,7 +62,7 @@ func runActor() error {
 	}
 	done := make(chan struct{})
 	defer close(done)
-	go func() {
+	goSafe("window-probe.actor_windows.runActor.1", func() {
 		scan := bufio.NewScanner(os.Stdin)
 		scan.Buffer(make([]byte, 1024), 8192)
 		for scan.Scan() {
@@ -79,8 +79,8 @@ func runActor() error {
 		}
 		// EOF also happens if the controller is killed; no permanent hidden window.
 		postMessage.Call(h, wmClose, 0, 0)
-	}()
-	go func() {
+	})
+	goSafe("window-probe.actor_windows.runActor.2", func() {
 		select {
 		case <-done:
 		case <-time.After(60 * time.Second):
@@ -91,7 +91,7 @@ func runActor() error {
 				os.Exit(3)
 			}
 		}
-	}()
+	})
 	return messageLoop()
 }
 

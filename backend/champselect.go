@@ -705,7 +705,7 @@ func (r *watchRunner) handleChampSelectAutomation(client *LCUClient) {
 	r.champSelect.processing = true
 	r.mu.Unlock()
 	r.champDiagnostic("trigger", "evaluation-started", champSelectDecision{}, nil)
-	go func() {
+	goSafe("champselect.handleChampSelectAutomation.1", func() {
 		for {
 			r.evaluateChampSelect(client, r.currentWatch().ChampSelect)
 			r.mu.Lock()
@@ -718,7 +718,7 @@ func (r *watchRunner) handleChampSelectAutomation(client *LCUClient) {
 			r.mu.Unlock()
 			return
 		}
-	}()
+	})
 }
 
 func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelectSettings) {
@@ -1185,6 +1185,8 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 	verb := champSelectDecisionVerb(decision)
 	r.champSelectChampionLog("ok", fmt.Sprintf("已排定：%.1f 秒后%s英雄 %d", float64(delayMS)/1000, verb, decision.ChampionID), decision.ChampionID)
 	go func() {
+		defer recoverPanic("champselect.scheduleChampSelectRequest.1")
+
 		defer func() {
 			r.mu.Lock()
 			if r.pending[decision.Action] == pending {
@@ -1524,6 +1526,8 @@ func (r *watchRunner) handleChampSelectTrade(client *LCUClient) {
 		return
 	}
 	go func() {
+		defer recoverPanic("champselect.handleChampSelectTrade.1")
+
 		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 		defer cancel()
 		var swap champSelectOngoingSwap

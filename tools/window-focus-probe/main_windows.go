@@ -66,11 +66,11 @@ func runController() error {
 				enableWindow.Call(start, 0)
 				enableWindow.Call(cancelButton, 1)
 				textWindow(output, "正在创建独立模拟窗口……\r\n请暂时不要操作其他窗口。")
-				go func() {
+				goSafe("window-probe.main_windows.runController.1", func() {
 					defer c()
 					runExperiment(ctx, h, func(text string) { post(uiNotice{kind: "status", text: text}) },
 						func(text, folder string) { post(uiNotice{kind: "done", text: text, folder: folder}) })
-				}()
+				})
 			case 2:
 				if running {
 					stop()

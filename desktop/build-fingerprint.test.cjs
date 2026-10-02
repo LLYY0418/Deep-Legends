@@ -54,7 +54,7 @@ test("R70 fingerprint tracks embedded assets/build inputs but excludes tests and
     assert.notEqual(sourceFingerprint(root), original, `${name} must invalidate the build`);
     fs.writeFileSync(file, bytes);
   }
-  for (const name of ["backend/prestige_chromas.json", "go.mod", "desktop/package-lock.json", "backend/data/reroll_pool_14_5.json", "backend/data/skin_release_dates.json", "backend/data/skin_release_overrides.json", "backend/web/app.js", "backend/web/runtime.js", "desktop/nsis/portable.nsi", "installer/main_windows.go", "installer/ui/installer.html", "installer/ui/notice.html", "installer/go.sum", "installer/rsrc_windows_amd64.syso", "installer/build-shell.cjs"]) {
+  for (const name of ["backend/prestige_chromas.json", "go.mod", "desktop/package-lock.json", "backend/data/reroll_pool_14_5.json", "backend/data/skin_release_dates.json", "backend/data/skin_release_overrides.json", "backend/data/augment_catalog_20260924.json", "backend/data/augment_icons_20260924.bin", "backend/data/arena_items_20260924.json", "backend/data/champion_names_16.19.1_zh_cn.json", "backend/data/champion_icons_16.19.1.bin", "backend/web/app.js", "backend/web/runtime.js", "desktop/nsis/portable.nsi", "installer/main_windows.go", "installer/ui/installer.html", "installer/ui/notice.html", "installer/go.sum", "installer/rsrc_windows_amd64.syso", "installer/build-shell.cjs"]) {
     const file = path.join(root, name);
     const bytes = fs.readFileSync(file);
     fs.appendFileSync(file, "\n");

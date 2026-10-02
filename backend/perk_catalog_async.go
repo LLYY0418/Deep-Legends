@@ -32,6 +32,8 @@ func (a *app) enrichPerkAugments(key string, client *LCUClient, payload gameplay
 	generation := a.perkCatalog[key].loadedAt
 	payload.AugmentsPending = true
 	go func() {
+		defer a.recoverPanic("perk_catalog_async.enrichPerkAugments.1")
+
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		data, err := cache.load(ctx, "normalized-augments-v1|"+key, gameplayPerkCatalogTTL, 24*time.Hour, true, func(ctx context.Context) ([]byte, error) {

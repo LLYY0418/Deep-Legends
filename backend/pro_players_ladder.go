@@ -77,7 +77,7 @@ func newProLadderPipeline(ctx context.Context, provider *championProvider) *proL
 	p.ready = sync.NewCond(&p.mu)
 	p.workers.Add(proLadderConcurrency)
 	for i := 0; i < proLadderConcurrency; i++ {
-		go func() {
+		goSafe("pro_players_ladder.newProLadderPipeline.1", func() {
 			defer p.workers.Done()
 			for {
 				p.mu.Lock()
@@ -102,7 +102,7 @@ func newProLadderPipeline(ctx context.Context, provider *championProvider) *proL
 					p.mu.Unlock()
 				}
 			}
-		}()
+		})
 	}
 	return p
 }

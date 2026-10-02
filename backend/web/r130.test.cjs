@@ -630,11 +630,17 @@ test('R141 旗帜列宽明显放大且保持两种窗口下 3–4 列，名称�
   const width = Number(bannerRule.match(/grid-template-columns:\s*repeat\(auto-fill,\s*(\d+)px\)/)?.[1]);
   const gap = bannerRule.match(/gap:\s*(\d+)px\s+(\d+)px/);
   assert.ok(width >= 190, `R141 旗帜列宽至少 190px，实际 ${width}px`);
-  assert.equal(width, 200, '真 Chromium 测得 200px 在 1200/960 下分别为 4/3 列');
+  // 2026-09-24 直接修改：按 R141 自己探测过的可行区间（190–208px 在 1200/960 下都还是 4/3 列，
+  // 212px 就会在 960 宽度下掉到 2 列）把宽度从 200px 提到这个区间里能给到的最大值 208px，
+  // 用同一条「(可用宽度 + gap) / (卡片宽度 + gap) 取整」公式核对：1200 宽度下可用宽度 882.22px，
+  // 960 宽度下 657.56px（R141 台账里真 Chromium 测出来的值，卡片本身的宽度变化不影响这两个数），
+  // 208px 代入仍然是 4 列 / 3 列，没有再重新跑一遍 Chromium 是因为这台机器上没有装 Chrome，
+  // 这条断言只能靠公式核算，不是真机复测。
+  assert.equal(width, 208, 'R141 探测过的安全上限是 208px（209px 起才会在 960 宽度下掉到 3 列以下），不能再往上加');
   assert.ok(gap && Number(gap[1]) >= 18 && Number(gap[2]) >= 14, '旗帜间距不得退回旧值');
-  assert.match(bannerCSS, /\.facade-grid\.is-banners \.skin-card \{ contain-intrinsic-size: auto 531px; \}/, '占位高度应匹配真实旗帜约 531px 卡片');
-  assert.match(css, /\.facade-grid\.is-banners \{[^}]*justify-content: start/, '固定宽度的格子必须靠左排，不能被拉开');
-  assert.match(css, /\.facade-grid\.is-banners \{[^}]*--facade-banner-ratio: 0\.3/, '取样前必须有 0.3 的默认比例兜底');
+  assert.match(bannerCSS, /\.facade-grid\.is-banners \.skin-card \{ contain-intrinsic-size: auto 547px; \}/, '占位高度应跟着 208px 卡片的真实比例走（约 547px）');
+  assert.match(css, /\.facade-grid\.is-banners \{[^}]*justify-content: space-between/, '排不满一行时，剩下的空隙要摊给列间距，不能整块堆在最右边');
+  assert.match(css, /\.facade-grid\.is-banners \{[^}]*--facade-banner-ratio: 0\.38/, '取样前必须有 0.38 的默认比例兜底');
   assert.match(css, /\.facade-grid\.is-banners \.skin-art \{ aspect-ratio: var\(--facade-banner-ratio\);/, '格子高度必须跟着真实比例走，不能写死正方形');
   assert.match(css, /\.facade-grid\.is-banners \.skin-art img \{ object-fit: contain; \}/, '旗帜不得裁剪');
   assert.doesNotMatch(css, /\.facade-grid\.is-banners \{[^}]*--card-min/, '旗帜不再用 --card-min 的自适应格子');

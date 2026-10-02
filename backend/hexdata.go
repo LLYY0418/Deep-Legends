@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/rand/v2"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -26,6 +28,7 @@ import (
 
 const (
 	hexdataHost                 = "hexdata.com.cn"
+	hexdataAssetHost            = "dl.hexdata.com.cn"
 	hexdataAnswerPath           = "/api/hexdata/answer-cards"
 	hexdataCacheTTL             = 10 * 365 * 24 * time.Hour
 	hexdataBuildSoftTTL         = 12 * time.Hour
@@ -35,7 +38,9 @@ const (
 	hexdataCircuitFailureDecay  = 30 * time.Minute
 	hexdataCircuitFailureMax    = 6
 	hexdataMinimumInterval      = 300 * time.Millisecond
-	hexdataMaximumJitter        = 800 * time.Millisecond
+	hexdataMaximumJitter        = 250 * time.Millisecond
+	hexdataPaceIdleWindow       = 2 * time.Second
+	hexdataBurstAllowance       = 4
 	hexdataRetryDelay           = 2 * time.Second
 	hexdataMinimumSample        = 250
 	// R116-A：JSON API 的三个数据端点与站点元数据端点。响应体本身不带 buildId，
@@ -65,32 +70,32 @@ func hexdataMeasurementTechnique(answer hexdataAnswerCards) string {
 
 var (
 	hexdataHeroPathPattern    = regexp.MustCompile(`^/hero/([0-9]+)-([a-z0-9-]+)$`)
+	hexdataHeroNumericPattern = regexp.MustCompile(`^/hero/([0-9]+)$`)
 	hexdataAugmentPathPattern = regexp.MustCompile(`^/augment/([0-9]+)-([a-z0-9-]+)$`)
 	// R116-A：JSON API 的单英雄端点。只放行带数字 ID 的详情页，
 	// /api/hexdata/heroes（无 ID 的列表接口）上游已 403 拦截并明文警告，绝不放行。
-	hexdataHeroJSONPathPattern = regexp.MustCompile(`^/api/hexdata/heroes/([0-9]+)$`)
-	hexdataHeroMetricPattern   = regexp.MustCompile(`胜率\s*([0-9]+(?:\.[0-9]+)?)%\s*[·，,]\s*样本\s*([0-9,]+)`)
-	hexdataChampionNickname    = regexp.MustCompile(`\s*[\(（][^()（）]*[\)）]\s*$`)
-	hexdataPatchPattern        = regexp.MustCompile(`Patch\s+([0-9]+\.[0-9]+)`)
-	hexdataDatePattern         = regexp.MustCompile(`数据日期\s*([0-9]{4}-[0-9]{2}-[0-9]{2})`)
-	hexdataGlobalMetric        = regexp.MustCompile(`globalHexScore\s*([0-9]+(?:\.[0-9]+)?)\s*[·，,]\s*胜率\s*([0-9]+(?:\.[0-9]+)?)%`)
-	hexdataAugmentWinRate      = regexp.MustCompile(`胜率\s*([0-9]+(?:\.[0-9]+)?)%`)
-	opggRSCVersionPattern      = regexp.MustCompile(`/meta/images/lol/([0-9]+\.[0-9]+(?:\.[0-9]+)?)/`)
-	opggRSCLinePattern         = regexp.MustCompile(`(?m)^([0-9a-f]+):(.*)$`)
-	opggRSCReferencePattern    = regexp.MustCompile(`"\$L([0-9a-f]+)"`)
-	opggRSCMetaIDPattern       = regexp.MustCompile(`"metaId":([0-9]+)`)
-	opggRSCMetaKindIDPattern   = regexp.MustCompile(`"metaType":"([^"]+)"\s*,\s*"metaId":([0-9]+)`)
-	opggRSCMetaIDKindPattern   = regexp.MustCompile(`"metaId":([0-9]+)\s*,\s*"metaType":"([^"]+)"`)
-	opggRSCAugmentIDPattern    = regexp.MustCompile(`"metaId":([0-9]+),"metaType":"aram-augment"`)
-	opggRSCSkillPattern        = regexp.MustCompile(`"skill_[0-9]+"[\s\S]{0,600}?"extraData":"([QWER])"`)
-	opggRSCSkillOrderPattern   = regexp.MustCompile(`"span","[0-9]+"[\s\S]{0,320}?"children":"([QWER])"`)
-	opggRSCSpellPairPattern    = regexp.MustCompile(`(?m)^[0-9a-f]+:(.*"spell_0".*"spell_1".*)$`)
-	opggRSCSpellMetaPattern    = regexp.MustCompile(`(?:"metaId":([0-9]+)\s*,\s*"metaType":"spell"|"metaType":"spell"\s*,\s*"metaId":([0-9]+))`)
-	opggRSCMetaNamePattern     = regexp.MustCompile(`"(?:name|title)":"([^"]+)"`)
-	opggRSCMetaIconPattern     = regexp.MustCompile(`"(?:src|icon|iconUrl|image_url)":"([^"]+\.(?:png|jpg|jpeg|webp))"`)
-	hexdataGlobalGate          = make(chan struct{}, 3)
-	hexdataGlobalPaceMu        sync.Mutex
-	hexdataGlobalLastRequest   time.Time
+	hexdataHeroJSONPathPattern  = regexp.MustCompile(`^/api/hexdata/heroes/([0-9]+)$`)
+	hexdataPatchPattern         = regexp.MustCompile(`Patch\s+([0-9]+\.[0-9]+)`)
+	hexdataDatePattern          = regexp.MustCompile(`数据日期\s*([0-9]{4}-[0-9]{2}-[0-9]{2})`)
+	hexdataGlobalMetric         = regexp.MustCompile(`globalHexScore\s*([0-9]+(?:\.[0-9]+)?)\s*[·，,]\s*胜率\s*([0-9]+(?:\.[0-9]+)?)%`)
+	hexdataAugmentWinRate       = regexp.MustCompile(`胜率\s*([0-9]+(?:\.[0-9]+)?)%`)
+	opggRSCVersionPattern       = regexp.MustCompile(`/meta/images/lol/([0-9]+\.[0-9]+(?:\.[0-9]+)?)/`)
+	opggRSCLinePattern          = regexp.MustCompile(`(?m)^([0-9a-f]+):(.*)$`)
+	opggRSCReferencePattern     = regexp.MustCompile(`"\$L([0-9a-f]+)"`)
+	opggRSCMetaIDPattern        = regexp.MustCompile(`"metaId":([0-9]+)`)
+	opggRSCMetaKindIDPattern    = regexp.MustCompile(`"metaType":"([^"]+)"\s*,\s*"metaId":([0-9]+)`)
+	opggRSCMetaIDKindPattern    = regexp.MustCompile(`"metaId":([0-9]+)\s*,\s*"metaType":"([^"]+)"`)
+	opggRSCAugmentIDPattern     = regexp.MustCompile(`"metaId":([0-9]+),"metaType":"aram-augment"`)
+	opggRSCSkillPattern         = regexp.MustCompile(`"skill_[0-9]+"[\s\S]{0,600}?"extraData":"([QWER])"`)
+	opggRSCSkillOrderPattern    = regexp.MustCompile(`"span","[0-9]+"[\s\S]{0,320}?"children":"([QWER])"`)
+	opggRSCSpellPairPattern     = regexp.MustCompile(`(?m)^[0-9a-f]+:(.*"spell_0".*"spell_1".*)$`)
+	opggRSCSpellMetaPattern     = regexp.MustCompile(`(?:"metaId":([0-9]+)\s*,\s*"metaType":"spell"|"metaType":"spell"\s*,\s*"metaId":([0-9]+))`)
+	opggRSCMetaNamePattern      = regexp.MustCompile(`"(?:name|title)":"([^"]+)"`)
+	opggRSCMetaIconPattern      = regexp.MustCompile(`"(?:src|icon|iconUrl|image_url)":"([^"]+\.(?:png|jpg|jpeg|webp))"`)
+	hexdataGlobalGate           = make(chan struct{}, 3)
+	hexdataGlobalPaceMu         sync.Mutex
+	hexdataGlobalLastRequest    time.Time
+	hexdataGlobalBurstRemaining int
 )
 
 type championSourceCitation struct {
@@ -175,9 +180,16 @@ func (e *hexdataShapeValidationError) Error() string {
 func (e *hexdataShapeValidationError) Unwrap() error { return e.err }
 
 var errHexdataEmptyPayload = errors.New("hexdata returned an empty response")
+var errHexdataCircuitOpen = errors.New("hexdata circuit is open")
 
 type hexdataClient struct {
 	provider      *championProvider
+	tokenJar      http.CookieJar
+	tokenMu       sync.Mutex
+	tokenReady    bool
+	tokenExpires  time.Time
+	tokenVersion  uint64
+	tokenFlight   *hexdataTokenFlight
 	mu            sync.Mutex
 	state         hexdataState
 	statePath     string
@@ -190,25 +202,51 @@ type hexdataClient struct {
 	probeInFlight map[string]bool
 	// R116-A P3：拿到新 buildID 后异步回收旧 buildID 的 hexdata- 落盘文件。
 	// prunedBuildID 保证每个 (进程, buildID) 只扫一次盘，pruneWait 供测试等待。
-	pruneMu       sync.Mutex
-	prunedBuildID string
-	pruneWait     sync.WaitGroup
+	pruneMu         sync.Mutex
+	prunedBuildID   string
+	pruneWait       sync.WaitGroup
+	prefetchMu      sync.Mutex
+	prefetchedBuild string
+	prefetchWait    sync.WaitGroup
+}
+
+type hexdataTokenFlight struct {
+	done chan struct{}
+	err  error
+}
+
+type hexdataTokenPageKey struct{}
+
+// The shared HTTP client also serves other providers. Its cookie jar must never
+// receive Hexdata cookies, and Hexdata must not send them to another host.
+type hexdataHostCookieJar struct{ jar http.CookieJar }
+
+func (j *hexdataHostCookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
+	if u == nil || !strings.EqualFold(u.Hostname(), hexdataHost) {
+		return
+	}
+	var kept []*http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == "hexpage" || cookie.Name == "ink" {
+			copy := *cookie
+			copy.Domain = ""
+			kept = append(kept, &copy)
+		}
+	}
+	j.jar.SetCookies(u, kept)
+}
+
+func (j *hexdataHostCookieJar) Cookies(u *url.URL) []*http.Cookie {
+	if u == nil || !strings.EqualFold(u.Hostname(), hexdataHost) {
+		return nil
+	}
+	return j.jar.Cookies(u)
 }
 
 type hexdataPage struct {
 	Data      []byte
 	FetchedAt time.Time
 	Cache     string
-}
-
-type hexdataHeroRow struct {
-	ID       int
-	Slug     string
-	Name     string
-	WinRate  float64
-	Games    int
-	Wilson   float64
-	TierBand int
 }
 
 // R116-A：JSON API 的响应体不含 buildId/citation，站点元数据由
@@ -356,6 +394,7 @@ type hexdataAugmentRowV2 struct {
 	AugmentID           int                      `json:"augmentId"`
 	AugmentName         string                   `json:"augmentName"`
 	AugmentDescription  string                   `json:"augmentDescription"`
+	AugmentIconURL      string                   `json:"augmentIconUrl"`
 	Rarity              string                   `json:"rarity"`
 	Tier                int                      `json:"tier"`
 	Score               float64                  `json:"score"`
@@ -716,8 +755,9 @@ type championAugmentRarityResponse struct {
 }
 
 func newHexdataClient(provider *championProvider, store *localStore) *hexdataClient {
+	jar, _ := cookiejar.New(nil)
 	client := &hexdataClient{
-		provider: provider, minInterval: hexdataMinimumInterval, maximumJitter: hexdataMaximumJitter,
+		provider: provider, tokenJar: &hexdataHostCookieJar{jar: jar}, minInterval: hexdataMinimumInterval, maximumJitter: hexdataMaximumJitter,
 		retryDelay: hexdataRetryDelay, now: time.Now,
 		state: hexdataState{
 			Circuits:     make(map[string]hexdataCircuitState),
@@ -836,12 +876,6 @@ func inspectHexdataPayload(kind, requestPath string, data []byte, reporters ...f
 		shape = hexdataPayloadShape{Rows: len(answer.HeroAliases), Fields: len(answer.HeroAliases), BuildID: answer.BuildID}
 		if !validHexdataAnswer(answer) {
 			return shape, errors.New("hexdata answer cards changed")
-		}
-	case "heroes":
-		rows, citation, err := parseHexdataHeroes(data, hexdataAnswerCards{})
-		shape = hexdataPayloadShape{Rows: len(rows), Fields: hexdataTableFieldCount(data), BuildID: citation.BuildID}
-		if err != nil || !hexdataCitationComplete(citation) {
-			return shape, firstError(err, errors.New("hexdata heroes citation is incomplete"))
 		}
 	case "augments":
 		rows, citation, stats, err := parseHexdataAugmentsWithStats(data)
@@ -964,8 +998,8 @@ func (h *hexdataClient) allowedPath(path string) bool {
 	// R116-A：新增 JSON API 的四个端点。/api/hexdata/heroes（无 ID 的列表接口）
 	// 不在白名单里——上游已 403 拦截并明文警告「请停止未经许可的自动化访问」，
 	// 且 /heroes 榜单页与 /hextech-insights 已经覆盖全量英雄概览，本站不需要它。
-	// 两条 HTML 正则保留：hexdataHeroPathPattern 仍被 parseHexdataHeroes /
-	// parseHexdataAugmentDetail 用于解析站内链接，hexdataAugmentPathPattern 对应的
+	// HTML 正则仍由 parseHexdataAugmentDetail 解析站内英雄链接，
+	// hexdataAugmentPathPattern 对应的
 	// /augment/{id}-{slug} 详情页仍由 loadHexdataAugmentDetail 抓取。
 	return path == hexdataAnswerPath || path == hexdataMetaPath || path == hexdataPostmatchPath || path == hexdataHextechInsightsPath || hexdataHeroJSONPathPattern.MatchString(path) ||
 		path == "/heroes" || path == "/augments" || path == "/augment-rarity" || hexdataHeroPathPattern.MatchString(path) || hexdataAugmentPathPattern.MatchString(path)
@@ -1004,6 +1038,9 @@ func (h *hexdataClient) load(ctx context.Context, kind, id, requestPath, accept 
 		}
 		return data, fetchErr
 	}
+	// The circuit intentionally protects an upstream kind across champion IDs.
+	// Arena's current detail path reads OP.GG with optional YOUR.GG augments,
+	// not hero-json; do not infer a shared Arena failure without a request trace.
 	state := h.snapshot()
 	circuit := state.Circuits[kind]
 	probe := false
@@ -1023,7 +1060,7 @@ func (h *hexdataClient) load(ctx context.Context, kind, id, requestPath, accept 
 				h.provider.diag(map[string]any{"event": "hexdata_circuit_open", "module": module, "kind": kind, "until": current.Until, "probeAt": current.ProbeAt})
 				h.provider.diag(map[string]any{"event": "hexdata_fallback", "module": module, "reason": "hexdata circuit is open"})
 			}
-			return hexdataPage{}, errors.New("hexdata circuit is open")
+			return hexdataPage{}, errHexdataCircuitOpen
 		} else {
 			// A single periodic half-open request is allowed. Mark it before
 			// releasing the lock so concurrent callers cannot stampede upstream.
@@ -1143,6 +1180,12 @@ func sha256Bytes(data []byte) string {
 }
 
 func (h *hexdataClient) fetch(ctx context.Context, kind, requestPath, accept string, stale []byte, probe bool) ([]byte, error) {
+	protected := hexdataHeroJSONPathPattern.MatchString(requestPath) || requestPath == hexdataPostmatchPath || requestPath == hexdataHextechInsightsPath
+	if protected {
+		if err := h.ensurePageToken(ctx, kind, requestPath, false, 0); err != nil {
+			return nil, err
+		}
+	}
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
 		if attempt > 0 {
@@ -1153,11 +1196,25 @@ func (h *hexdataClient) fetch(ctx context.Context, kind, requestPath, accept str
 				return nil, err
 			}
 		}
-		data, status, err := h.fetchOnce(ctx, requestPath, accept, stale)
+		generation := h.pageTokenVersion()
+		data, status, err := h.fetchOnceKind(ctx, kind, requestPath, accept, stale)
 		if err == nil {
 			return data, nil
 		}
 		lastErr = err
+		var rejected *hexdataHTTPError
+		if protected && status == http.StatusForbidden && errors.As(err, &rejected) && rejected.code == "page_token_required" {
+			// A concurrent caller may already have replaced this generation. Either
+			// way, make at most one more attempt at the original resource.
+			if refreshErr := h.ensurePageToken(ctx, kind, requestPath, true, generation); refreshErr != nil {
+				return nil, refreshErr
+			}
+			if h.provider != nil && h.provider.diag != nil {
+				h.provider.diag(map[string]any{"event": "hexdata_token_refreshed", "reason": rejected.code})
+			}
+			data, _, err = h.fetchOnceKind(ctx, kind, requestPath, accept, stale)
+			return data, err
+		}
 		if status == http.StatusNotModified && len(stale) == 0 {
 			// A validator without a reusable body is not a cache hit. The
 			// fetchOnce path clears it; retry once without conditions.
@@ -1171,38 +1228,234 @@ func (h *hexdataClient) fetch(ctx context.Context, kind, requestPath, accept str
 	return nil, lastErr
 }
 
-func (h *hexdataClient) fetchOnce(ctx context.Context, requestPath, accept string, stale []byte) ([]byte, int, error) {
+type hexdataHTTPError struct {
+	status int
+	code   string
+}
+
+func (e *hexdataHTTPError) Error() string {
+	return fmt.Sprintf("champion provider returned HTTP %d", e.status)
+}
+
+func (h *hexdataClient) pageTokenVersion() uint64 {
+	h.tokenMu.Lock()
+	defer h.tokenMu.Unlock()
+	return h.tokenVersion
+}
+
+func (h *hexdataClient) notePageToken(response *http.Response) bool {
+	for _, cookie := range response.Cookies() {
+		if cookie.Name != "hexpage" || cookie.Value == "" {
+			continue
+		}
+		var expires time.Time
+		if cookie.MaxAge > 0 {
+			lifetime := time.Duration(cookie.MaxAge) * time.Second
+			expires = h.now().Add(lifetime - min(lifetime/10, 5*time.Minute))
+		} else if !cookie.Expires.IsZero() {
+			remaining := cookie.Expires.Sub(h.now())
+			expires = cookie.Expires.Add(-min(remaining/10, 5*time.Minute))
+		}
+		h.tokenMu.Lock()
+		h.tokenReady = true
+		h.tokenExpires = expires
+		h.tokenVersion++
+		h.tokenMu.Unlock()
+		return true
+	}
+	return false
+}
+
+func (h *hexdataClient) ensurePageToken(ctx context.Context, kind, requestPath string, refresh bool, previous uint64) error {
+	for {
+		h.tokenMu.Lock()
+		valid := h.tokenReady && (h.tokenExpires.IsZero() || h.now().Before(h.tokenExpires))
+		if valid && (!refresh || h.tokenVersion != previous) {
+			h.tokenMu.Unlock()
+			return nil
+		}
+		if flight := h.tokenFlight; flight != nil {
+			h.tokenMu.Unlock()
+			select {
+			case <-flight.done:
+				if flight.err != nil {
+					return flight.err
+				}
+				continue
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+		flight := &hexdataTokenFlight{done: make(chan struct{})}
+		h.tokenFlight = flight
+		h.tokenMu.Unlock()
+
+		expires, err := h.acquirePageToken(ctx, kind, requestPath)
+		h.tokenMu.Lock()
+		if err == nil {
+			h.tokenReady = true
+			h.tokenExpires = expires
+			h.tokenVersion++
+		}
+		flight.err = err
+		h.tokenFlight = nil
+		close(flight.done)
+		h.tokenMu.Unlock()
+		return err
+	}
+}
+
+func (h *hexdataClient) acquirePageToken(ctx context.Context, kind, requestPath string) (time.Time, error) {
+	// Aggregates need a page token before any hero is selected. The landing page
+	// supplies the same cookie without fetching the obsolete /heroes table.
+	pagePath := "/"
+	if candidate, ok := ctx.Value(hexdataTokenPageKey{}).(string); ok && hexdataHeroPathPattern.MatchString(candidate) {
+		pagePath = candidate
+	}
+	started := time.Now()
+	status := 0
+	var expires time.Time
+	var resultErr error
+	defer func() {
+		if h.provider != nil && h.provider.diag != nil {
+			h.provider.diag(map[string]any{"event": "hexdata_token_acquired", "kind": kind, "status": status, "duration_ms": time.Since(started).Milliseconds(), "ok": resultErr == nil})
+		}
+	}()
+	if pagePath != "/" && !h.allowedPath(pagePath) {
+		resultErr = errors.New("hexdata token page path rejected")
+		return expires, resultErr
+	}
+	release, paceWait, err := h.waitForPace(ctx)
+	if err != nil {
+		resultErr = err
+		return expires, err
+	}
+	defer release()
+	wireStarted := time.Now()
+	responseBytes := 0
+	defer func() {
+		h.reportRequest(kind, "token_page", status, responseBytes, paceWait, time.Since(wireStarted), "token")
+	}()
+	requestContext, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	u := url.URL{Scheme: "https", Host: hexdataHost, Path: pagePath}
+	request, err := http.NewRequestWithContext(requestContext, http.MethodGet, u.String(), nil)
+	if err != nil {
+		resultErr = err
+		return expires, err
+	}
+	request.Header.Set("Accept", "text/html")
+	request.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
+	request.Header.Set("Referer", "https://"+hexdataHost+"/heroes")
+	request.Header.Set("User-Agent", "DeepLegends/"+version+" (+https://github.com/LLYY0418/Deep-Legends; LoL 本地助手; 用户触发查询)")
+	response, err := h.hexdataHTTPClient().Do(request)
+	if err != nil {
+		resultErr = fmt.Errorf("hexdata token page unavailable: %w", err)
+		return expires, resultErr
+	}
+	defer response.Body.Close()
+	status = response.StatusCode
+	if status != http.StatusOK {
+		resultErr = &hexdataHTTPError{status: status}
+		return expires, resultErr
+	}
+	page, readErr := readLimited(response.Body, championHTMLMax)
+	responseBytes = len(page)
+	if readErr != nil {
+		resultErr = readErr
+		return expires, resultErr
+	}
+	if !h.notePageToken(response) {
+		resultErr = errors.New("hexdata token page supplied no hexpage cookie")
+		return expires, resultErr
+	}
+	h.tokenMu.Lock()
+	expires = h.tokenExpires
+	h.tokenMu.Unlock()
+	return expires, nil
+}
+
+func (h *hexdataClient) hexdataHTTPClient() *http.Client {
+	h.provider.clientMu.RLock()
+	base := h.provider.client
+	h.provider.clientMu.RUnlock()
+	client := *base
+	client.Timeout = 8 * time.Second
+	client.Jar = h.tokenJar
+	return &client
+}
+
+func (h *hexdataClient) reportRequest(kind, pathKind string, status, bytes int, paceWait, wire time.Duration, cache string) {
+	if h.provider == nil || h.provider.diag == nil {
+		return
+	}
+	h.provider.diag(map[string]any{
+		"event": "hexdata_request", "kind": kind, "path_kind": pathKind,
+		"status": status, "bytes": bytes, "pace_wait_ms": paceWait.Milliseconds(),
+		"wire_ms": wire.Milliseconds(), "cache": cache,
+	})
+}
+
+// Reserve a send time under the mutex, then wait without holding it. A reserved
+// future slot maintains the same per-process rate limit even for parallel calls.
+func (h *hexdataClient) waitForPace(ctx context.Context) (func(), time.Duration, error) {
 	select {
 	case hexdataGlobalGate <- struct{}{}:
-		defer func() { <-hexdataGlobalGate }()
 	case <-ctx.Done():
 		return nil, 0, ctx.Err()
 	}
+	release := func() { <-hexdataGlobalGate }
 	hexdataGlobalPaceMu.Lock()
 	now := h.now()
 	lastRequest := hexdataGlobalLastRequest
-	if lastRequest.After(now) {
-		// A clock adjustment must not turn a 300 ms pacing rule into a long stall.
+	if lastRequest.After(now.Add(30 * time.Second)) {
+		// This is a clock change, not one of our at most three queued slots.
 		lastRequest = time.Time{}
 	}
-	wait := time.Duration(0)
-	if !lastRequest.IsZero() {
-		wait = h.minInterval - now.Sub(lastRequest)
-		if wait < 0 {
-			wait = 0
+	sendAt := now
+	if lastRequest.IsZero() || now.Sub(lastRequest) >= hexdataPaceIdleWindow {
+		hexdataGlobalBurstRemaining = hexdataBurstAllowance
+	}
+	if hexdataGlobalBurstRemaining > 0 {
+		hexdataGlobalBurstRemaining--
+	} else {
+		if earliest := lastRequest.Add(h.minInterval); earliest.After(sendAt) {
+			sendAt = earliest
+		}
+		if h.maximumJitter > 0 && h.jitter != nil {
+			sendAt = sendAt.Add(h.jitter(h.maximumJitter))
 		}
 	}
-	if h.maximumJitter > 0 && h.jitter != nil {
-		wait += h.jitter(h.maximumJitter)
-	}
+	hexdataGlobalLastRequest = sendAt
+	hexdataGlobalPaceMu.Unlock()
+	wait := sendAt.Sub(now)
 	if wait > 0 {
 		if err := h.sleep(ctx, wait); err != nil {
-			hexdataGlobalPaceMu.Unlock()
-			return nil, 0, err
+			release()
+			return nil, wait, err
 		}
 	}
-	hexdataGlobalLastRequest = h.now()
-	hexdataGlobalPaceMu.Unlock()
+	return release, wait, nil
+}
+
+func (h *hexdataClient) fetchOnce(ctx context.Context, requestPath, accept string, stale []byte) ([]byte, int, error) {
+	return h.fetchOnceKind(ctx, "direct", requestPath, accept, stale)
+}
+
+func (h *hexdataClient) fetchOnceKind(ctx context.Context, kind, requestPath, accept string, stale []byte) ([]byte, int, error) {
+	started := time.Now()
+	release, paceWait, err := h.waitForPace(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer release()
+	status, responseBytes := 0, 0
+	wire := time.Duration(0)
+	cache := "miss"
+	if len(stale) > 0 {
+		cache = "revalidate"
+	}
+	defer func() { h.reportRequest(kind, kind, status, responseBytes, paceWait, wire, cache) }()
 
 	requestContext, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
@@ -1228,17 +1481,17 @@ func (h *hexdataClient) fetchOnce(ctx context.Context, requestPath, accept strin
 		}
 	}
 	h.mu.Unlock()
-	h.provider.clientMu.RLock()
-	baseClient := h.provider.client
-	h.provider.clientMu.RUnlock()
-	client := *baseClient
-	client.Timeout = 8 * time.Second
-	response, err := client.Do(request)
+	wireStarted := time.Now()
+	response, err := h.hexdataHTTPClient().Do(request)
 	if err != nil {
+		wire = time.Since(wireStarted)
 		return nil, 0, fmt.Errorf("hexdata unavailable: %w", err)
 	}
 	defer response.Body.Close()
+	status = response.StatusCode
 	if response.StatusCode == http.StatusNotModified && len(stale) > 0 {
+		cache = "not_modified"
+		wire = time.Since(wireStarted)
 		return append([]byte(nil), stale...), response.StatusCode, nil
 	}
 	if response.StatusCode == http.StatusNotModified {
@@ -1250,12 +1503,25 @@ func (h *hexdataClient) fetchOnce(ctx context.Context, requestPath, accept strin
 		return nil, response.StatusCode, errors.New("hexdata validator has no cached body")
 	}
 	if response.StatusCode != http.StatusOK {
-		return nil, response.StatusCode, fmt.Errorf("champion provider returned HTTP %d", response.StatusCode)
+		code := h.reportUpstreamRejection(requestPath, response)
+		wire = time.Since(wireStarted)
+		return nil, response.StatusCode, &hexdataHTTPError{status: response.StatusCode, code: code}
+	}
+	if requestPath == "/heroes" || hexdataHeroPathPattern.MatchString(requestPath) {
+		if h.notePageToken(response) && h.provider != nil && h.provider.diag != nil {
+			kind := "hero-page"
+			if requestPath == "/heroes" {
+				kind = "heroes"
+			}
+			h.provider.diag(map[string]any{"event": "hexdata_token_acquired", "kind": kind, "status": response.StatusCode, "duration_ms": time.Since(started).Milliseconds(), "ok": true})
+		}
 	}
 	if response.ContentLength > championHTMLMax {
 		return nil, response.StatusCode, errors.New("hexdata response is too large")
 	}
 	data, err := readLimited(response.Body, championHTMLMax)
+	wire = time.Since(wireStarted)
+	responseBytes = len(data)
 	if err != nil || len(data) == 0 {
 		if err == nil {
 			err = errHexdataEmptyPayload
@@ -1441,6 +1707,8 @@ func (h *hexdataClient) pruneStaleBuildsAsync(buildID string) {
 	h.pruneMu.Unlock()
 	h.pruneWait.Add(1)
 	go func() {
+		defer recoverPanic("hexdata.pruneStaleBuildsAsync.1")
+
 		defer h.pruneWait.Done()
 		removed, err := h.provider.cache.pruneStaleHexdataBuildsCount(buildID)
 		if h.provider.diag == nil {
@@ -1771,141 +2039,177 @@ func hexdataCitation(document *xhtml.Node, buildID, canonical string) championSo
 	return championSourceCitation{Source: "Hexdata", Patch: patch, ReportDate: reportDate, BuildID: buildID, CanonicalURL: "https://" + hexdataHost + canonical}
 }
 
-func parseHexdataHeroes(data []byte, answer hexdataAnswerCards) ([]hexdataHeroRow, championSourceCitation, error) {
-	document, buildID, err := parseHexdataDocument(data)
-	if err != nil {
-		return nil, championSourceCitation{}, err
-	}
-	tables := primaryTables(document)
-	if len(tables) != 1 {
-		return nil, championSourceCitation{}, errors.New("hexdata heroes table changed")
-	}
-	rows := make([]hexdataHeroRow, 0, 180)
-	for _, cells := range tableRows(tables[0]) {
-		if len(cells) < 2 {
-			continue
-		}
-		href, name := firstLink(cells[0])
-		name = strings.TrimSpace(hexdataChampionNickname.ReplaceAllString(name, ""))
-		path := hexdataHeroPathPattern.FindStringSubmatch(hexdataLinkPath(href))
-		metrics := hexdataHeroMetricPattern.FindStringSubmatch(hexdataNodeText(cells[1]))
-		if len(path) != 3 || len(metrics) != 3 {
-			continue
-		}
-		id, _ := strconv.Atoi(path[1])
-		winRate := parseFloatText(metrics[1])
-		games := parseCountText(metrics[2])
-		if id <= 0 || name == "" || winRate <= 0 || games <= 0 {
-			continue
-		}
-		rows = append(rows, hexdataHeroRow{ID: id, Slug: path[2], Name: name, WinRate: winRate, Games: games})
-	}
-	if len(rows) < 150 || len(answer.HeroAliases) >= 150 && len(rows) != len(answer.HeroAliases) {
-		return rows, championSourceCitation{}, errors.New("hexdata heroes shape is incomplete")
-	}
-	applyHexdataLocalTiers(rows, answer.Methodology)
-	citation := hexdataCitation(document, buildID, "/heroes")
-	return rows, citation, nil
-}
-
-func applyHexdataLocalTiers(rows []hexdataHeroRow, methodology hexdataMethodology) {
-	z := methodology.RecommendationPolicy.WilsonZ
-	if z <= 0 {
-		return
-	}
-	highMin := methodology.SamplePolicy.High.Min
-	mediumMin := methodology.SamplePolicy.Medium.Min
-	if highMin <= 0 || mediumMin <= 0 {
-		return
-	}
-	for index := range rows {
-		row := &rows[index]
-		switch {
-		case row.Games >= highMin:
-			row.TierBand = 2
-		case row.Games >= mediumMin:
-			row.TierBand = 1
-		default:
-			row.TierBand = 0
-		}
-		p := row.WinRate / 100
-		n := float64(row.Games)
-		row.Wilson = (p + z*z/(2*n) - z*math.Sqrt((p*(1-p)+z*z/(4*n))/n)) / (1 + z*z/n)
-	}
-	sort.SliceStable(rows, func(i, j int) bool {
-		if rows[i].TierBand != rows[j].TierBand {
-			return rows[i].TierBand > rows[j].TierBand
-		}
-		if rows[i].Wilson != rows[j].Wilson {
-			return rows[i].Wilson > rows[j].Wilson
-		}
-		return rows[i].ID < rows[j].ID
-	})
-}
-
 func (p *championProvider) loadHexdataRankings(ctx context.Context) (championRankingResponse, error) {
+	// The token page is independent of answer/meta. Start it alongside answer
+	// when the current build needs a protected aggregate request.
+	go func() {
+		defer recoverPanic("hexdata.loadHexdataRankings.1")
+
+		if p.hexdata.needsMayhemPageTokenPrefetch() {
+			_ = p.hexdata.ensurePageToken(ctx, "rankings", hexdataHextechInsightsPath, false, 0)
+		}
+	}()
+	p.prefetchMayhemCatalogs()
 	answer, _, answerErr := p.loadHexdataAnswer(ctx)
 	if answerErr != nil {
 		p.reportHexdataFallback("rankings", answerErr)
 		return championRankingResponse{}, answerErr
 	}
-	heroesPage, heroesErr := p.hexdata.load(ctx, "heroes", "all", "/heroes", "text/html,application/xhtml+xml", false)
-	if heroesErr != nil {
-		p.reportHexdataFallback("rankings", heroesErr)
-		return championRankingResponse{}, heroesErr
-	}
-	rows, citation, err := parseHexdataHeroes(heroesPage.Data, answer)
-	if err != nil {
-		p.hexdata.recordShapeFailure("heroes", len(rows), hexdataTableFieldCount(heroesPage.Data), citation.BuildID)
-		return championRankingResponse{}, err
-	}
-	if (citation.BuildID != answer.BuildID || citation.Patch != answer.ReportPatch || citation.ReportDate != answer.ReportDate) && heroesPage.Cache != championCacheStateStale {
-		p.hexdata.recordShapeFailure("heroes", len(rows), hexdataTableFieldCount(heroesPage.Data), citation.BuildID)
-		return championRankingResponse{}, errors.New("hexdata heroes build metadata mismatch")
-	}
-	p.hexdata.promote("heroes", "all", citation.BuildID, heroesPage.Data, heroesPage.FetchedAt)
-	if heroesPage.Cache != championCacheStateStale {
-		p.hexdata.recordSuccess("heroes", "/heroes")
-	}
-	// R116-B P0-5-2：官方英雄档位优先。meta 快照这一趟同时给出 tierBands
-	// （官方 T1-T5 的中文标签）与 samplePolicy，所以只加载一次；insights 复用
-	// 同一份快照，冷启动最多多 2 条 hexdata 请求（meta + hextech-insights），
-	// 两者都按 buildID 长期缓存，同一版本内只回源一次。
 	snapshot, snapshotErr := p.loadHexdataMeta(ctx)
 	if snapshotErr != nil {
-		// meta 不可用不是榜单的失败条件：citation 已经从 answer-cards 拼好了。
-		p.reportHexdataFallback("hero-tiers", snapshotErr)
+		p.reportHexdataFallback("rankings", snapshotErr)
+		return championRankingResponse{}, snapshotErr
 	}
-	officialTiers := p.hexdataOfficialHeroTiers(ctx, snapshot, snapshotErr)
-	result := make([]championRankingRow, 0, len(rows))
-	localTierRows := 0
-	for index, item := range rows {
-		row := championRankingRow{ChampionID: item.ID, Key: item.Slug, Name: item.Name, Rank: index + 1, Play: item.Games, WinRate: item.WinRate}
-		if tier, ok := officialTiers[item.ID]; ok {
-			row.Tier, row.TierLocallyCalculated = tier, false
-		} else {
-			// 官方档位缺失（insights 熔断/降级，或该英雄不在 insights 里）：
-			// 沿用旧的「按返回顺序本地分档」，并如实标记为本地估算，前端据此
-			// 显示「本地估算」小字。绝不把本地值伪装成官方值。
-			row.Tier, row.TierLocallyCalculated = index*5/len(rows)+1, true
-			localTierRows++
-		}
-		result = append(result, row)
+	p.prefetchMayhemPostmatch(snapshot)
+	insights, insightsErr := p.loadHexdataHextechInsightsWithSnapshot(ctx, snapshot)
+	if insightsErr != nil {
+		p.reportHexdataFallback("rankings", insightsErr)
+		return championRankingResponse{}, insightsErr
 	}
-	p.reportHexdataShape("heroes", len(result), len(result)*5, citation.BuildID)
+	if answer.BuildID != snapshot.BuildID {
+		return championRankingResponse{}, errors.New("hexdata ranking snapshots have different builds")
+	}
+	result := hexdataRankingRowsFromInsights(insights.Heroes, answer)
+	if len(result) < hexdataAggregateHeroMin {
+		return championRankingResponse{}, errors.New("hexdata ranking insights are incomplete")
+	}
+	p.reportHexdataShape("heroes", len(result), len(result)*5, insights.Citation.BuildID)
 	if p.diag != nil {
 		p.diag(map[string]any{
 			"event": "hexdata_hero_tier_source", "rows": len(result),
-			"officialTierRows": len(result) - localTierRows, "localTierRows": localTierRows,
-			"insightsAvailable": officialTiers != nil, "metaAvailable": snapshotErr == nil,
+			"officialTierRows": len(result), "localTierRows": 0,
+			"insightsAvailable": true, "metaAvailable": true,
 			"tierBands": len(snapshot.TierBands),
 		})
 	}
-	response := championRankingResponse{Mode: "hextech-aram", Region: "CN", Patch: citation.Patch, Source: "Hexdata", FetchedAt: heroesPage.FetchedAt, EntertainmentSample: true, Citation: &citation, MeasurementTechnique: hexdataMeasurementTechnique(answer), Rows: result, TierBands: snapshot.tierBands()}
-	if localTierRows > 0 {
-		response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "部分英雄的梯度档位为本地按排名顺序估算（官方档位数据不可用），已在界面标注「本地估算」")
+	return championRankingResponse{Mode: "hextech-aram", Region: "CN", Patch: insights.Citation.Patch, Source: "Hexdata", FetchedAt: insights.FetchedAt, EntertainmentSample: true, Citation: &insights.Citation, MeasurementTechnique: hexdataMeasurementTechnique(answer), Rows: result, TierBands: snapshot.tierBands()}, nil
+}
+
+func (h *hexdataClient) needsMayhemPageTokenPrefetch() bool {
+	h.tokenMu.Lock()
+	valid := h.tokenReady && (h.tokenExpires.IsZero() || h.now().Before(h.tokenExpires))
+	h.tokenMu.Unlock()
+	if valid {
+		return false
 	}
-	return response, nil
+	state := h.snapshot()
+	if state.BuildID == "" || state.BuildChecked.IsZero() || h.now().Sub(state.BuildChecked) >= hexdataBuildSoftTTL || h.provider.cache == nil {
+		return true
+	}
+	for _, kind := range []string{"hextech-insights", "postmatch"} {
+		entry, err := h.provider.cache.readDisk(strings.Join([]string{state.BuildID, kind, hexdataAggregateID}, "|"))
+		if err != nil || !h.now().Before(entry.ExpiresAt) {
+			return true
+		}
+	}
+	return false
+}
+
+// Both directories are shared by all heroes. The existing network cache keeps
+// CommunityDragon on disk for 24h and Data Dragon under patch-specific paths.
+func (p *championProvider) prefetchMayhemCatalogs() {
+	p.mayhemWarmOnce.Do(func() {
+		p.mayhemWarmWait.Add(2)
+		go func() {
+			defer recoverPanic("hexdata.prefetchMayhemCatalogs.1")
+
+			defer p.mayhemWarmWait.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_, _ = p.loadStaticDescriptions(ctx)
+		}()
+		go func() {
+			defer recoverPanic("hexdata.prefetchMayhemCatalogs.2")
+
+			defer p.mayhemWarmWait.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_, _ = p.loadCommunityDragonAugments(ctx)
+		}()
+	})
+}
+
+// Entering the Mayhem board warms only the shared postmatch aggregate. Meta and
+// insights are already needed for the board itself; hero JSON stays click-only.
+func (p *championProvider) prefetchMayhemPostmatch(snapshot hexdataMetaSnapshot) {
+	if p.hexdata == nil || snapshot.BuildID == "" {
+		return
+	}
+	h := p.hexdata
+	h.prefetchMu.Lock()
+	if h.prefetchedBuild == snapshot.BuildID {
+		h.prefetchMu.Unlock()
+		return
+	}
+	h.prefetchedBuild = snapshot.BuildID
+	h.prefetchWait.Add(1)
+	h.prefetchMu.Unlock()
+	go func() {
+		defer recoverPanic("hexdata.prefetchMayhemPostmatch.1")
+
+		defer h.prefetchWait.Done()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, _ = p.loadHexdataPostmatchWithSnapshot(ctx, snapshot)
+	}()
+}
+
+// The live /heroes page is ordered by winRate, then games, then champion ID.
+// On 2026-09-24 this ordering reproduced all 173 page rows from the same
+// insights snapshot. The answer-cards Wilson policy describes recommendations,
+// not the displayed hero ranking; using it here changes the official top 20.
+func hexdataRankingRowsFromInsights(heroes []hexdataInsightHero, answer hexdataAnswerCards) []championRankingRow {
+	aliases := make(map[int]string, len(answer.HeroAliases))
+	for _, alias := range answer.HeroAliases {
+		id, ok := hexdataParseID(alias.ID)
+		if !ok {
+			continue
+		}
+		if match := hexdataHeroPathPattern.FindStringSubmatch(hexdataLinkPath(alias.URL)); len(match) == 3 && match[1] == alias.ID {
+			aliases[id] = match[2]
+		}
+	}
+	rows := make([]championRankingRow, 0, len(heroes))
+	seen := make(map[int]bool, len(heroes))
+	for _, hero := range heroes {
+		id := hero.ChampionID
+		if id <= 0 || seen[id] || hero.Games <= 0 || hero.WinRate <= 0 || hero.WinRate > 1 || hero.Tier < 1 || hero.Tier > 5 || strings.TrimSpace(hero.Name) == "" {
+			continue
+		}
+		slug := ""
+		if match := hexdataHeroPathPattern.FindStringSubmatch(hexdataLinkPath(hero.DetailURL)); len(match) == 3 && match[1] == hero.ID {
+			slug = match[2]
+		}
+		if slug == "" {
+			slug = aliases[id]
+		}
+		if slug == "" {
+			// answer-cards currently has 172 aliases for 173 insights rows.
+			// A same-ID numeric detail URL is a real site route; keep this hero
+			// selectable without inventing a slug.
+			if match := hexdataHeroNumericPattern.FindStringSubmatch(hexdataLinkPath(hero.DetailURL)); len(match) == 2 && match[1] == hero.ID {
+				slug = hero.ID
+			}
+		}
+		if slug == "" {
+			continue
+		}
+		seen[id] = true
+		rows = append(rows, championRankingRow{ChampionID: id, Key: slug, Name: hero.Name, Play: hero.Games, WinRate: hero.WinRate * 100, Tier: hero.Tier, Grade: normalizeChampionGrade("hexdata-hero", hero.Tier, "")})
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].WinRate != rows[j].WinRate {
+			return rows[i].WinRate > rows[j].WinRate
+		}
+		if rows[i].Play != rows[j].Play {
+			return rows[i].Play > rows[j].Play
+		}
+		return rows[i].ChampionID < rows[j].ChampionID
+	})
+	for index := range rows {
+		rows[index].Rank = index + 1
+	}
+	return rows
 }
 
 func firstError(values ...error) error {
@@ -2227,8 +2531,12 @@ func hexdataAugmentMetricRows(rows []hexdataAugmentRowV2) []championMetricRow {
 		if row.Games < hexdataMinimumSample {
 			continue
 		}
+		iconSource, iconPath := "hexdata", hexdataAugmentIconPath(row.AugmentIconURL)
+		if path := bundledAugmentIconPath(int64(row.AugmentID)); path != "" {
+			iconSource, iconPath = "builtin", path
+		}
 		result = append(result, championMetricRow{
-			Assets:             []championAsset{{ID: row.AugmentID, Kind: "augment", Name: row.AugmentName, Description: row.AugmentDescription, Source: "hexdata"}},
+			Assets:             []championAsset{{ID: row.AugmentID, Kind: "augment", Name: row.AugmentName, Description: row.AugmentDescription, Source: iconSource, Path: iconPath}},
 			Rarity:             hexdataRarityLabel(row.Rarity),
 			Score:              row.HexScore,
 			WinRate:            row.PairWinRate * 100,
@@ -2642,6 +2950,10 @@ func (p *championProvider) loadHexdataPostmatch(ctx context.Context) (hexdataPos
 	if err != nil {
 		return hexdataPostmatch{}, err
 	}
+	return p.loadHexdataPostmatchWithSnapshot(ctx, snapshot)
+}
+
+func (p *championProvider) loadHexdataPostmatchWithSnapshot(ctx context.Context, snapshot hexdataMetaSnapshot) (hexdataPostmatch, error) {
 	page, err := p.hexdata.load(ctx, "postmatch", hexdataAggregateID, hexdataPostmatchPath, "application/json", false)
 	if err != nil {
 		p.reportHexdataFallback("postmatch", err)
@@ -3187,8 +3499,10 @@ func (p *championProvider) loadHexdataRarity(ctx context.Context) (championAugme
 }
 
 func (p *championProvider) decorateHexdataAugments(ctx context.Context, rows []championMetricRow) {
-	catalog := p.loadAugmentMetadataCatalog(ctx)
-	byID := gameplayAugmentIndexAll(catalog)
+	p.decorateHexdataAugmentsWithCatalog(rows, gameplayAugmentIndexAll(p.loadAugmentMetadataCatalog(ctx)))
+}
+
+func (p *championProvider) decorateHexdataAugmentsWithCatalog(rows []championMetricRow, byID map[int]gameplayAugment) {
 	for rowIndex := range rows {
 		if len(rows[rowIndex].Assets) == 0 {
 			continue
@@ -3196,7 +3510,7 @@ func (p *championProvider) decorateHexdataAugments(ctx context.Context, rows []c
 		asset := &rows[rowIndex].Assets[0]
 		meta, ok := byID[asset.ID]
 		if !ok {
-			if p.diag != nil {
+			if p.diag != nil && asset.Path == "" {
 				p.diag(map[string]any{"event": "hexdata_augment_metadata_missing", "id": asset.ID})
 			}
 			continue
@@ -3210,9 +3524,13 @@ func (p *championProvider) decorateHexdataAugments(ctx context.Context, rows []c
 		if rarity := normalizeAugmentRarity(meta.Rarity); rarity != "unknown" {
 			rows[rowIndex].Rarity = rarity
 		}
-		if path := communityDragonGameAssetPath(meta.IconPath); path != "" {
-			asset.Source, asset.Path = "communitydragon", path
-			asset.FallbackPath = communityDragonGameAssetPath(meta.FallbackIconPath)
+		if asset.Path == "" {
+			if source, path := augmentMetadataImage(meta.IconPath); path != "" {
+				asset.Source, asset.Path = source, path
+				if source == "communitydragon" {
+					asset.FallbackPath = communityDragonGameAssetPath(meta.FallbackIconPath)
+				}
+			}
 		}
 	}
 	for rowIndex := range rows {
@@ -3223,7 +3541,7 @@ func (p *championProvider) decorateHexdataAugments(ctx context.Context, rows []c
 		asset.Description = augmentDescriptionWithOfflineGuidance(asset.ID, asset.Description)
 		// Drop Bear's colored 256px artwork has no size suffix. Its _small
 		// resource is a monochrome 64px HUD glyph, not prismatic card artwork.
-		if asset.ID == 2031 {
+		if asset.ID == 2031 && asset.Path == "" {
 			asset.Source = "communitydragon"
 			asset.Path = "/latest/game/assets/ux/cherry/augments/icons/drop_bear.png"
 			asset.FallbackPath = "/latest/game/assets/ux/cherry/augments/icons/drop_bear_small.png"
@@ -3264,6 +3582,27 @@ func normalizeAugmentRarity(value any) string {
 }
 
 func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string) (championDetailResponse, error) {
+	started := time.Now()
+	var metaMS, heroMS, insightsMS, postmatchMS, rscMS, decorateMS int64
+	var rscPhases mayhemRSCPhases
+	var augmentMetadata map[int]gameplayAugment
+	augmentMetadataLoaded := false
+	loadAugmentMetadata := func() map[int]gameplayAugment {
+		if !augmentMetadataLoaded {
+			augmentMetadata = gameplayAugmentIndexAll(p.loadAugmentMetadataCatalogFast(ctx))
+			augmentMetadataLoaded = true
+		}
+		return augmentMetadata
+	}
+	defer func() {
+		if p.diag != nil {
+			p.diag(map[string]any{"event": "mayhem_detail_phases_ms", "meta": metaMS, "hero_json": heroMS,
+				"insights": insightsMS, "postmatch": postmatchMS, "rsc": rscMS,
+				"rsc_wire": rscPhases.wireMS, "rsc_parse": rscPhases.parseMS,
+				"rsc_descriptions": rscPhases.descriptionsMS,
+				"decorate":         decorateMS, "total": time.Since(started).Milliseconds()})
+		}
+	}()
 	id, metadata, err := p.resolveChampionID(ctx, champion)
 	if err != nil {
 		return championDetailResponse{}, err
@@ -3274,16 +3613,24 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 	}
 	// CanonicalURL 依旧指向给人看的 HTML 详情页；数据本身改走 JSON API。
 	canonical := "/hero/" + strconv.Itoa(id) + "-" + slug
+	ctx = context.WithValue(ctx, hexdataTokenPageKey{}, canonical)
 	requestPath := hexdataHeroJSONPathPrefix + strconv.Itoa(id)
 	// Independent providers used to run serially on the recommendation path.
 	type rscResult struct {
 		detail mayhemRSCDetail
 		err    error
+		ms     int64
+		phases mayhemRSCPhases
 	}
 	rscReady := make(chan rscResult, 1)
 	go func() {
-		detail, err := p.loadMayhemRSC(ctx, metadata.Slug)
-		rscReady <- rscResult{detail, err}
+		defer recoverPanic("hexdata.loadMayhemDetail.1")
+		defer close(rscReady)
+
+		phaseStarted := time.Now()
+		var phases mayhemRSCPhases
+		detail, err := p.loadMayhemRSCWithPhases(ctx, metadata.Slug, &phases)
+		rscReady <- rscResult{detail, err, time.Since(phaseStarted).Milliseconds(), phases}
 	}()
 	var primary hexdataHeroDetailV2
 	var citation championSourceCitation
@@ -3291,12 +3638,44 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 	var primaryErr error
 	// JSON 响应体不带 buildId，必须先拿 meta 快照：它既提供 citation，也把
 	// state.BuildID 落地，否则 hero-json 的 cache key 会退回 "bootstrap|" 前缀，
-	// 磁盘缓存永远命不中。冷启动因此固定是 2 条 hexdata 请求（meta + hero-json），
+	// 磁盘缓存永远命不中。冷启动是 meta + 当前英雄页面令牌 + hero-json，
 	// 不再有旧链路的 per-augment 描述扇出。
+	metaStarted := time.Now()
 	snapshot, snapshotErr := p.loadHexdataMeta(ctx)
+	metaMS = time.Since(metaStarted).Milliseconds()
+	type tierResult struct {
+		tiers map[int]int
+		ms    int64
+	}
+	type performanceResult struct {
+		panel *championPerformancePanel
+		ms    int64
+	}
+	var tiersReady chan tierResult
+	if snapshotErr == nil {
+		tiersReady = make(chan tierResult, 1)
+		go func() {
+			defer recoverPanic("hexdata.loadMayhemDetail.2")
+			defer close(tiersReady)
+
+			phaseStarted := time.Now()
+			tiers := p.hexdataOfficialHeroTiers(ctx, snapshot, nil)
+			tiersReady <- tierResult{tiers, time.Since(phaseStarted).Milliseconds()}
+		}()
+	}
+	performanceReady := make(chan performanceResult, 1)
+	go func() {
+		defer recoverPanic("hexdata.loadMayhemDetail.3")
+		defer close(performanceReady)
+
+		phaseStarted := time.Now()
+		panel := p.mayhemPerformancePanel(ctx, id)
+		performanceReady <- performanceResult{panel, time.Since(phaseStarted).Milliseconds()}
+	}()
 	if snapshotErr != nil {
 		primaryErr = snapshotErr
 	} else {
+		heroStarted := time.Now()
 		citation = hexdataJSONCitation(snapshot, canonical)
 		page, pageErr := p.hexdata.load(ctx, "hero-json", strconv.Itoa(id), requestPath, "application/json", false)
 		if pageErr != nil {
@@ -3314,6 +3693,7 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 			case !hexdataCitationComplete(citation):
 				primaryErr = errors.New("hexdata hero citation metadata is incomplete")
 			default:
+				p.observeHexdataAugments(detail.Augments)
 				// P0-5：成功路径必须 promote。refreshBuild 那条通道用的是
 				// key+"|refresh" 且 persistDisk=false，忘了 promote 就永远不落盘，
 				// 每 12 小时第一次访问都强制回源。
@@ -3326,20 +3706,17 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 				p.hexdata.recordShapeFailure("hero-json", len(detail.Items), len(detail.Augments), citation.BuildID)
 			}
 		}
+		heroMS = time.Since(heroStarted).Milliseconds()
 	}
-	loadedRSC := <-rscReady
-	rsc, rscErr := loadedRSC.detail, loadedRSC.err
-	if primaryErr != nil && rscErr != nil {
-		return championDetailResponse{}, primaryErr
-	}
-	response := championDetailResponse{Mode: "hextech-aram", Region: "CN", Source: "Hexdata + OP.GG RSC", EntertainmentSample: true, MeasurementTechnique: p.loadHexdataMeasurementTechnique(ctx)}
-	// R116-B：P0-2 的 sampleTier 阈值、P0-5 的 tierBands、P0-5-2 的官方英雄
-	// 档位都要 meta 快照里的东西。meta 在上面已经取过一次，这里全部复用，
-	// 冷启动不会为详情页多打一条 /api/hexdata/meta。
 	var officialTiers map[int]int
-	if snapshotErr == nil {
-		officialTiers = p.hexdataOfficialHeroTiers(ctx, snapshot, nil)
+	if tiersReady != nil {
+		loadedTiers := <-tiersReady
+		officialTiers, insightsMS = loadedTiers.tiers, loadedTiers.ms
 	}
+	decorateStarted := time.Now()
+	response := championDetailResponse{Mode: "hextech-aram", Region: "CN", Source: "Hexdata + OP.GG RSC", EntertainmentSample: true, MeasurementTechnique: p.loadHexdataMeasurementTechnique(ctx)}
+	var spellPairs []championMetricRow
+	// Meta is shared with the parallel official-tier request; it is not refetched.
 	if primaryErr == nil {
 		response.Patch, response.FetchedAt, response.Stats.WinRate = citation.Patch, fetchedAt, primary.HeroWinRate
 		// R116-B P0-5-2：英雄级梯度接 hextech-insights.heroes[].tier（官方 T1-T5）。
@@ -3350,11 +3727,14 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 		// 好过显示一个编出来的档位。
 		if tier, ok := officialTiers[id]; ok {
 			response.Stats.Tier = &tier
+			response.Stats.Grade = normalizeChampionGrade("hexdata-hero", tier, "")
 		}
 		response.Citation = &citation
 		response.RecommendedAugments = hexdataAugmentMetricRows(primary.Augments)
 		response.ItemRanking = hexdataItemMetricRows(primary.Items)
-		p.decorateHexdataAugments(ctx, response.RecommendedAugments)
+		spellPairs = hexdataSpellPairMetricRows(primary.SummonerSpellPairs)
+		applyHexdataSampleTiers(spellPairs, snapshot)
+		p.decorateHexdataAugmentsWithCatalog(response.RecommendedAugments, loadAugmentMetadata())
 		p.decorateHexdataItemAssets(ctx, response.ItemRanking)
 		p.reportHexdataHeroShape(primary, citation)
 		// R116-F P1：英雄专属的「阶段 × 稀有度」概率分布，从 hero-json 的
@@ -3369,6 +3749,17 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 	// 实现阈值逻辑。meta 不可用时全部留空 → 前端整块不渲染样本分档元素。
 	applyHexdataSampleTiers(response.RecommendedAugments, snapshot)
 	applyHexdataSampleTiers(response.ItemRanking, snapshot)
+	decorateMS += time.Since(decorateStarted).Milliseconds()
+	// Asset decoration derived from hero-json can finish while RSC is in flight.
+	// Only merged rows and the RSC build need to wait for that result.
+	loadedRSC := <-rscReady
+	rsc, rscErr := loadedRSC.detail, loadedRSC.err
+	rscMS = loadedRSC.ms
+	rscPhases = loadedRSC.phases
+	if primaryErr != nil && rscErr != nil {
+		return championDetailResponse{}, primaryErr
+	}
+	decorateStarted = time.Now()
 	if rscErr == nil {
 		response.Build = rsc.Build
 		response.BuildCitation = &rsc.Citation
@@ -3380,13 +3771,13 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 		// top-nine cut can discard every silver recommendation before grouping.
 		response.RecommendedAugments = mergeMayhemAugmentRows(response.RecommendedAugments, rsc.Augments, 0)
 		applyHexdataSampleTiers(response.RecommendedAugments, snapshot)
-		p.decorateHexdataAugments(ctx, response.RecommendedAugments)
+		p.decorateHexdataAugmentsWithCatalog(response.RecommendedAugments, loadAugmentMetadata())
 		// 必须在 decorateDetailAssets 之前替换召唤师技能，让 hexdata 的行也走
 		// 同一套资产装饰。
-		p.applyMayhemSummonerSpellPairs(&response, primary, primaryErr, snapshot)
+		p.applyMayhemSummonerSpellPairs(&response, spellPairs, primaryErr, len(primary.SummonerSpellPairs))
 		p.decorateDetailAssets(ctx, metadata.Slug, &response)
 	} else {
-		p.applyMayhemSummonerSpellPairs(&response, primary, primaryErr, snapshot)
+		p.applyMayhemSummonerSpellPairs(&response, spellPairs, primaryErr, len(primary.SummonerSpellPairs))
 	}
 	applyLocalAugmentGrades(response.RecommendedAugments)
 	// R116-B P0-5-1：档位改成官方优先之后，这句口径说明不能再无条件挂上去，
@@ -3413,7 +3804,9 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 	}
 	// R116-B P1-6：22 项赛后表现指标 + 后端算好的「较全英雄平均」。
 	// postmatch 取不到时返回 nil → 前端整个「表现」tab 不渲染。
-	response.Performance = p.mayhemPerformancePanel(ctx, id)
+	decorateMS += time.Since(decorateStarted).Milliseconds()
+	loadedPerformance := <-performanceReady
+	response.Performance, postmatchMS = loadedPerformance.panel, loadedPerformance.ms
 	if response.Performance != nil {
 		response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique,
 			fmt.Sprintf("表现指标为 %d 位英雄赛后数据的每局均值，「较平均」是相对全部英雄同一项均值的百分比差", response.Performance.HeroCount))
@@ -3486,19 +3879,17 @@ func hexdataSpellPairMetricRows(rows []hexdataSpellPairRow) []championMetricRow 
 // 上游波动 / 字段改名导致 summonerSpellPairs 为空时，保留已有的 OP.GG
 // pickRate-only 行：不整块清空、不用 0 胜率顶替（0 会被前端渲染成「0.0%」，
 // 那是显示不存在的数据）。
-func (p *championProvider) applyMayhemSummonerSpellPairs(response *championDetailResponse, primary hexdataHeroDetailV2, primaryErr error, snapshot hexdataMetaSnapshot) {
+func (p *championProvider) applyMayhemSummonerSpellPairs(response *championDetailResponse, pairs []championMetricRow, primaryErr error, rawRows int) {
 	if primaryErr != nil {
 		return
 	}
-	pairs := hexdataSpellPairMetricRows(primary.SummonerSpellPairs)
 	if len(pairs) == 0 {
 		if p.diag != nil {
-			p.diag(map[string]any{"event": "hexdata_spell_pairs_unavailable", "rawRows": len(primary.SummonerSpellPairs), "opggFallbackRows": len(response.Build.SummonerSpells)})
+			p.diag(map[string]any{"event": "hexdata_spell_pairs_unavailable", "rawRows": rawRows, "opggFallbackRows": len(response.Build.SummonerSpells)})
 		}
 		return
 	}
 	response.Build.SummonerSpells = pairs
-	applyHexdataSampleTiers(response.Build.SummonerSpells, snapshot)
 	// 口径必须与实际数据来源一致：开局配置现在是混合来源，说清楚哪块来自谁。
 	response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique,
 		"召唤师技能的胜率与选用率来自 Hexdata 英雄数据，出门装与鞋子仍来自 OP.GG（只有选用率，没有胜率）")
@@ -3537,6 +3928,8 @@ type mayhemRSCDetail struct {
 	RejectedCoreItems []rscRejectedItem
 }
 
+type mayhemRSCPhases struct{ wireMS, parseMS, descriptionsMS int64 }
+
 type rscRejectedItem struct {
 	ID     int
 	Reason string
@@ -3552,12 +3945,33 @@ func (p *championProvider) reportRSCRejectedItems(rows []rscRejectedItem) {
 }
 
 func (p *championProvider) loadMayhemRSC(ctx context.Context, slug string) (mayhemRSCDetail, error) {
+	return p.loadMayhemRSCWithPhases(ctx, slug, nil)
+}
+
+func (p *championProvider) loadMayhemRSCWithPhases(ctx context.Context, slug string, phases *mayhemRSCPhases) (mayhemRSCDetail, error) {
 	requestPath := "/lol/modes/aram-mayhem/" + slug + "/build"
 	key := strings.Join([]string{"v2", "opgg-rsc", "aram-mayhem", slug}, "|")
+	// The shared item catalog is independent of this hero's RSC payload.
+	// Start it now so a cold Data Dragon read does not follow the RSC wait.
+	type descriptionsResult struct {
+		rows map[string]championAssetDescription
+		err  error
+		ms   int64
+	}
+	descriptionsReady := make(chan descriptionsResult, 1)
+	go func() {
+		defer recoverPanic("hexdata.loadMayhemRSCWithPhases.1")
+		defer close(descriptionsReady)
+
+		started := time.Now()
+		rows, err := p.loadStaticDescriptions(ctx)
+		descriptionsReady <- descriptionsResult{rows, err, time.Since(started).Milliseconds()}
+	}()
 	loader := func(loadCtx context.Context) ([]byte, error) { return p.fetchOPGGRSCDirect(loadCtx, requestPath) }
 	var data []byte
 	var fetchedAt time.Time
 	var err error
+	wireStarted := time.Now()
 	if p.cache != nil {
 		result, loadErr := p.cache.loadWithStatus(ctx, key, 6*time.Hour, 24*time.Hour, true, loader)
 		data, fetchedAt, err = result.data, result.fetchedAt, loadErr
@@ -3565,17 +3979,28 @@ func (p *championProvider) loadMayhemRSC(ctx context.Context, slug string) (mayh
 		data, err = loader(ctx)
 		fetchedAt = time.Now()
 	}
+	if phases != nil {
+		phases.wireMS = time.Since(wireStarted).Milliseconds()
+	}
 	if err != nil {
 		return mayhemRSCDetail{}, err
 	}
+	parseStarted := time.Now()
 	result, err := parseMayhemRSC(data, slug)
+	if phases != nil {
+		phases.parseMS = time.Since(parseStarted).Milliseconds()
+	}
 	if err != nil {
 		return mayhemRSCDetail{}, err
 	}
 	result.Citation.Source, result.Citation.CanonicalURL = "OP.GG RSC", "https://op.gg"+requestPath
 	result.FetchedAt = fetchedAt
 	p.reportRSCRejectedItems(result.RejectedCoreItems)
-	descriptions, descriptionErr := p.loadStaticDescriptions(ctx)
+	loadedDescriptions := <-descriptionsReady
+	descriptions, descriptionErr := loadedDescriptions.rows, loadedDescriptions.err
+	if phases != nil {
+		phases.descriptionsMS = loadedDescriptions.ms
+	}
 	if descriptionErr != nil {
 		return mayhemRSCDetail{}, fmt.Errorf("load Data Dragon item catalog: %w", descriptionErr)
 	}
@@ -3623,7 +4048,15 @@ func (p *championProvider) loadMayhemRSC(ctx context.Context, slug string) (mayh
 	return result, nil
 }
 
-func (p *championProvider) fetchOPGGRSCDirect(ctx context.Context, requestPath string) ([]byte, error) {
+func (p *championProvider) fetchOPGGRSCDirect(ctx context.Context, requestPath string) (data []byte, err error) {
+	started := time.Now()
+	defer func() {
+		if p.diag != nil && !isCancellation(err) {
+			p.diag(map[string]any{"event": "champion_upstream", "host": "op.gg", "kind": "rsc",
+				"status": championUpstreamHTTPStatus(err), "bytes": len(data),
+				"duration_ms": time.Since(started).Milliseconds(), "cache": championCacheStateMiss})
+		}
+	}()
 	requestContext, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	request, err := http.NewRequestWithContext(requestContext, http.MethodGet, "https://"+opggPageHost+requestPath, nil)
@@ -3933,4 +4366,30 @@ func containsString(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+// reportUpstreamRejection 记录 Hexdata 拒绝请求时上游自己给出的原因（R146）。
+// 0924 日志里三个 JSON 端点全是 HTTP 403，但日志只有状态码，无法区分是策略拦截
+// （data_not_public）、缺请求头还是限流。这里只记路径、状态码、上游错误码字段
+// （最多 48 字符）、Content-Type 与 Server 头，不记响应正文的其他内容。
+func (h *hexdataClient) reportUpstreamRejection(requestPath string, response *http.Response) string {
+	code := ""
+	if body, err := io.ReadAll(io.LimitReader(response.Body, 512)); err == nil {
+		var payload struct {
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(body, &payload) == nil {
+			code = payload.Error
+		}
+	}
+	if len(code) > 48 {
+		code = code[:48]
+	}
+	if h.provider != nil && h.provider.diag != nil {
+		h.provider.diag(map[string]any{
+			"event": "hexdata_upstream_rejected", "path": requestPath, "status": response.StatusCode,
+			"error_code": code, "content_type": response.Header.Get("Content-Type"), "server": response.Header.Get("Server"),
+		})
+	}
+	return code
 }

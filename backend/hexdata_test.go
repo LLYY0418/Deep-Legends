@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,17 +68,7 @@ func hexdataRankingFixtures(t *testing.T) ([]byte, []byte) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var rows strings.Builder
-	rows.WriteString(`<table><tbody>`)
-	for id := 1; id <= 172; id++ {
-		name := fmt.Sprintf("英雄%d", id)
-		if id == 1 {
-			name += "（昵称）"
-		}
-		fmt.Fprintf(&rows, `<tr><td><a href="/hero/%d-hero%d">%s</a></td><td>胜率 %.1f%% · 样本 1,000</td><td>查看详情</td></tr>`, id, id, name, 60-float64(id)/10)
-	}
-	rows.WriteString(`</tbody></table>`)
-	return answerData, hexdataTestPage(rows.String())
+	return answerData, nil
 }
 
 func newHexdataBudgetProvider(t *testing.T, root string, transport http.RoundTripper) *championProvider {
@@ -96,45 +88,16 @@ func newHexdataBudgetProvider(t *testing.T, root string, transport http.RoundTri
 }
 
 func hexdataResponse(request *http.Request, data []byte) *http.Response {
+	header := make(http.Header)
+	if request.URL.Path == "/" || request.URL.Path == "/heroes" || hexdataHeroPathPattern.MatchString(request.URL.Path) {
+		header.Set("Set-Cookie", "hexpage=test-token; Path=/; Max-Age=86400; Secure; HttpOnly; SameSite=Lax")
+	}
 	return &http.Response{
 		StatusCode:    http.StatusOK,
-		Header:        make(http.Header),
+		Header:        header,
 		Body:          io.NopCloser(bytes.NewReader(data)),
 		ContentLength: int64(len(data)),
 		Request:       request,
-	}
-}
-
-func TestParseHexdataHeroesRequiresCompleteShapeAndCalculatesTiers(t *testing.T) {
-	var rows strings.Builder
-	rows.WriteString(`<table><tbody>`)
-	for id := 1; id <= 172; id++ {
-		fmt.Fprintf(&rows, `<tr><td><a href="/hero/%d-hero%d">英雄%d</a></td><td>胜率 %.1f%% · 样本 1,000</td><td>查看详情</td></tr>`, id, id, id, 60-float64(id)/10)
-	}
-	rows.WriteString(`</tbody></table>`)
-	answer := hexdataAnswerCards{BuildID: hexdataTestBuild, ReportPatch: "16.16", ReportDate: "2026-08-19"}
-	answer.Methodology.RecommendationPolicy.WilsonZ = 1.96
-	answer.Methodology.SamplePolicy.Medium.Min = 250
-	answer.Methodology.SamplePolicy.High.Min = 1000
-	answer.HeroAliases = make([]struct {
-		ID             string   `json:"id"`
-		URL            string   `json:"url"`
-		Name           string   `json:"name"`
-		AlternateNames []string `json:"alternateNames"`
-	}, 172)
-	parsed, citation, err := parseHexdataHeroes(hexdataTestPage(rows.String()), answer)
-	if err != nil || len(parsed) != 172 || citation.BuildID != hexdataTestBuild {
-		t.Fatalf("heroes parse = %d %#v %v", len(parsed), citation, err)
-	}
-	if parsed[0].TierBand != 2 || parsed[0].Wilson <= parsed[len(parsed)-1].Wilson {
-		t.Fatalf("local tier order not applied: %#v %#v", parsed[0], parsed[len(parsed)-1])
-	}
-	if parsed[0].Name != "英雄1" {
-		t.Fatalf("champion nickname was not removed: %q", parsed[0].Name)
-	}
-	broken := strings.Replace(rows.String(), `<tr><td><a href="/hero/172-hero172">`, `<tr><td>`, 1)
-	if _, _, err := parseHexdataHeroes(hexdataTestPage(broken), answer); err == nil {
-		t.Fatal("expected incomplete heroes shape to fail")
 	}
 }
 
@@ -463,11 +426,10 @@ func TestParseMayhemRSCRealFixture(t *testing.T) {
 
 // TestHexdataColdRankingBudgetAndDiskRestart 钉住榜单页冷启动的上游请求预算。
 //
-// 预算变更记账（R116-B P0-5-2）：2 → 4 条。
+// 预算变更记账（R148）：榜单由 insights 单一数据源生成。
 //
-//	原来 2 条：/api/hexdata/answer-cards + /heroes
-//	新增 2 条：/api/hexdata/meta（8 KB，citation/buildID 快照的唯一来源）
-//	          /api/hexdata/hextech-insights（373 KB，官方英雄档位 tier 的唯一来源）
+//	冷启动 5 条：answer-cards + meta + 根页面令牌 + hextech-insights + postmatch。
+//	不再请求 /heroes HTML 表格。
 //
 // 两条新增都是「每个 buildID 只取一次」的目录型文件：meta 走 12h 软 TTL，
 // insights 走 hexdataCacheTTL，都会 promote 落盘，所以只有冷启动付这个代价，
@@ -477,33 +439,55 @@ func TestParseMayhemRSCRealFixture(t *testing.T) {
 // 这条测试同时断言官方档位真的被用上了——否则多付的 2 条请求就是白付。
 func TestHexdataColdRankingBudgetAndDiskRestart(t *testing.T) {
 	root := t.TempDir()
-	answerData, heroesData := hexdataRankingFixtures(t)
+	answerData, _ := hexdataRankingFixtures(t)
 	metaData := r116aMetaFixture(t, hexdataTestBuild)
 	insightsData := r116aInsightsFixture(t, 173, 211)
+	postmatchData := r116aFixture(t, "hexdata-postmatch.json")
 	var requests atomic.Int32
+	var paths sync.Map
 	transport := championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-		requests.Add(1)
+		if request.URL.Host == hexdataHost {
+			requests.Add(1)
+			paths.Store(request.URL.Path, true)
+		} else {
+			return &http.Response{StatusCode: http.StatusNotFound, Header: make(http.Header), Body: http.NoBody, Request: request}, nil
+		}
 		switch request.URL.Path {
 		case hexdataAnswerPath:
 			return hexdataResponse(request, answerData), nil
-		case "/heroes":
-			return hexdataResponse(request, heroesData), nil
+		case "/":
+			return hexdataResponse(request, []byte("<html></html>")), nil
 		case hexdataMetaPath:
 			return hexdataResponse(request, metaData), nil
 		case hexdataHextechInsightsPath:
 			return hexdataResponse(request, insightsData), nil
+		case hexdataPostmatchPath:
+			return hexdataResponse(request, postmatchData), nil
 		default:
 			return &http.Response{StatusCode: http.StatusNotFound, Header: make(http.Header), Body: http.NoBody, Request: request}, nil
 		}
 	})
 	provider := newHexdataBudgetProvider(t, root, transport)
 	ranking, err := provider.loadHexdataRankings(context.Background())
-	if err != nil || len(ranking.Rows) != 172 {
+	provider.hexdata.prefetchWait.Wait()
+	provider.mayhemWarmWait.Wait()
+	if err != nil || len(ranking.Rows) != 173 {
 		t.Fatalf("cold ranking rows=%d err=%v", len(ranking.Rows), err)
 	}
-	if got := requests.Load(); got != 4 {
-		t.Fatalf("cold ranking Hexdata requests = %d, want 4 (answer-cards + heroes + meta + hextech-insights)", got)
+	if got := requests.Load(); got != 5 {
+		t.Fatalf("cold ranking Hexdata requests = %d, want 5 (answer-cards + meta + token page + insights + postmatch)", got)
 	}
+	for _, path := range []string{hexdataAnswerPath, hexdataMetaPath, "/", hexdataHextechInsightsPath, hexdataPostmatchPath} {
+		if _, ok := paths.Load(path); !ok {
+			t.Fatalf("cold board did not request %s", path)
+		}
+	}
+	paths.Range(func(path, _ any) bool {
+		if strings.HasPrefix(path.(string), hexdataHeroJSONPathPrefix) || path == "/heroes" {
+			t.Errorf("board prefetched a per-hero route or old HTML ranking: %s", path)
+		}
+		return true
+	})
 	// 多付的 2 条请求必须换来官方档位：insights 夹具把 1..173 号英雄的 tier 都
 	// 设成 2，所以每一行都该是官方 tier=2 且不再标记为本地估算。
 	for index, row := range ranking.Rows {
@@ -514,16 +498,52 @@ func TestHexdataColdRankingBudgetAndDiskRestart(t *testing.T) {
 
 	restarted := newHexdataBudgetProvider(t, root, transport)
 	ranking, err = restarted.loadHexdataRankings(context.Background())
-	if err != nil || len(ranking.Rows) != 172 {
+	restarted.hexdata.prefetchWait.Wait()
+	restarted.mayhemWarmWait.Wait()
+	if err != nil || len(ranking.Rows) != 173 {
 		t.Fatalf("disk ranking rows=%d err=%v", len(ranking.Rows), err)
 	}
-	if got := requests.Load(); got != 4 {
-		t.Fatalf("restart made %d additional Hexdata requests; meta and hextech-insights must be promoted to disk like answer-cards and heroes", got-4)
+	if got := requests.Load(); got != 5 {
+		t.Fatalf("restart made %d additional Hexdata requests; all three aggregates must be cached", got-5)
 	}
 	for index, row := range ranking.Rows {
 		if row.Tier != 2 || row.TierLocallyCalculated {
 			t.Fatalf("after restart row %d tier=%d locallyCalculated=%t, want official tier=2 served from disk", index, row.Tier, row.TierLocallyCalculated)
 		}
+	}
+}
+
+func TestHexdataRankingRowsUseOfficialInsightsMetricsAndPageOrder(t *testing.T) {
+	answer := hexdataAnswerCards{}
+	answer.HeroAliases = make([]struct {
+		ID             string   `json:"id"`
+		URL            string   `json:"url"`
+		Name           string   `json:"name"`
+		AlternateNames []string `json:"alternateNames"`
+	}, 2)
+	answer.HeroAliases[0].ID, answer.HeroAliases[0].URL = "157", "/hero/157-yasuo"
+	answer.HeroAliases[1].ID, answer.HeroAliases[1].URL = "887", "/hero/887-gwen"
+	heroes := []hexdataInsightHero{
+		{ID: "887", ChampionID: 887, Name: "格温", Games: 1_000, WinRate: .52, Tier: 2, DetailURL: "/hero/887"},
+		{ID: "157", ChampionID: 157, Name: "亚索", Games: 2_372_569, WinRate: .567509, Tier: 1, DetailURL: "/hero/157"},
+		{ID: "4", ChampionID: 4, Name: "崔斯特", Games: 300, WinRate: .52, Tier: 3, DetailURL: "/hero/4"},
+		{ID: "120", ChampionID: 120, Name: "赫卡里姆", Games: 300, WinRate: .52, Tier: 4, DetailURL: "/hero/120"},
+		{ID: "99", ChampionID: 99, Name: "无链接", Games: 10, WinRate: .9, Tier: 1},
+	}
+	rows := hexdataRankingRowsFromInsights(heroes, answer)
+	if len(rows) != 4 {
+		t.Fatalf("rows = %d, want 4; unlinked hero must be omitted", len(rows))
+	}
+	for index, id := range []int{157, 887, 4, 120} {
+		if rows[index].ChampionID != id || rows[index].Rank != index+1 {
+			t.Fatalf("row %d = %#v; want champion %d", index, rows[index], id)
+		}
+	}
+	if math.Abs(rows[0].WinRate-56.7509) > 0.000001 || rows[0].Play != 2_372_569 || rows[0].Tier != 1 || rows[0].TierLocallyCalculated || rows[0].Key != "yasuo" {
+		t.Fatalf("official metrics or alias lost: %#v", rows[0])
+	}
+	if rows[2].Key != "4" {
+		t.Fatalf("numeric official detail URL should remain selectable: %#v", rows[2])
 	}
 }
 
@@ -649,6 +669,37 @@ func TestHexdataCircuitStatePersistsAcrossRestart(t *testing.T) {
 	var raw map[string]any
 	if json.Unmarshal(data, &raw) != nil {
 		t.Fatal("invalid persisted state")
+	}
+}
+
+func TestR154HeroJSONCircuitAppliesAcrossChampionIDs(t *testing.T) {
+	provider := newChampionProvider()
+	var requests atomic.Int32
+	provider.client = &http.Client{Transport: championRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		requests.Add(1)
+		return nil, errors.New("open circuit made a network request")
+	})}
+	h := provider.hexdata
+	h.now = func() time.Time { return time.Date(2026, 9, 25, 10, 0, 0, 0, time.UTC) }
+	for range hexdataCircuitFailureLimit {
+		h.recordLoadFailure("hero-json", context.DeadlineExceeded)
+	}
+	if circuit := h.circuitSnapshot("hero-json"); circuit.Failures != hexdataCircuitFailureLimit || circuit.Until.IsZero() {
+		t.Fatalf("hero-json circuit did not trip: %#v", circuit)
+	}
+	for _, id := range []string{"89", "105"} {
+		_, err := h.load(context.Background(), "hero-json", id, "/api/hexdata/heroes/"+id, "application/json", false)
+		if !errors.Is(err, errHexdataCircuitOpen) {
+			t.Fatalf("hero %s circuit error = %v", id, err)
+		}
+	}
+	if requests.Load() != 0 {
+		t.Fatalf("open circuit made %d network requests", requests.Load())
+	}
+	response := httptest.NewRecorder()
+	writeChampionResponse(response, nil, errHexdataCircuitOpen)
+	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "上游暂时不可用") {
+		t.Fatalf("circuit HTTP response = %d %q", response.Code, response.Body.String())
 	}
 }
 
@@ -903,11 +954,6 @@ func TestHexdataMethodologyValuesComeFromAnswerCards(t *testing.T) {
 	if got := hexdataMeasurementTechnique(answer); got != "上游公布的统计口径" {
 		t.Fatalf("measurement technique = %q", got)
 	}
-	rows := []hexdataHeroRow{{ID: 1, WinRate: 60, Games: 1200}, {ID: 2, WinRate: 59, Games: 500}}
-	applyHexdataLocalTiers(rows, answer.Methodology)
-	if rows[0].TierBand != 1 || rows[1].TierBand != 1 {
-		t.Fatalf("sample bands ignored answer cards: %#v", rows)
-	}
 }
 
 func TestHexdataRequestUsesHonestUserAgent(t *testing.T) {
@@ -934,42 +980,99 @@ func TestHexdataRequestUsesHonestUserAgent(t *testing.T) {
 	}
 }
 
-func TestHexdataRequestJitterUsesRandomSource(t *testing.T) {
+func TestHexdataPaceAllowsFourIdleBurstRequestsThenJitters(t *testing.T) {
 	provider := newChampionProvider()
 	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		return hexdataResponse(request, hexdataTestPage("<p>ok</p>")), nil
 	})}
 	now := time.Date(2026, time.August, 21, 12, 0, 0, 0, time.UTC)
 	provider.hexdata.now = func() time.Time { return now }
-	provider.hexdata.minInterval = 0
-	provider.hexdata.maximumJitter = 800 * time.Millisecond
+	provider.hexdata.minInterval = 300 * time.Millisecond
+	provider.hexdata.maximumJitter = 250 * time.Millisecond
 	provider.hexdata.jitter = func(maximum time.Duration) time.Duration {
-		if maximum != 800*time.Millisecond {
+		if maximum != 250*time.Millisecond {
 			t.Fatalf("jitter maximum = %v", maximum)
 		}
-		return 317 * time.Millisecond
+		return 117 * time.Millisecond
 	}
-	var slept time.Duration
+	var slept []time.Duration
 	provider.hexdata.sleep = func(_ context.Context, duration time.Duration) error {
-		slept = duration
+		slept = append(slept, duration)
 		return nil
 	}
 
 	hexdataGlobalPaceMu.Lock()
 	previousLastRequest := hexdataGlobalLastRequest
-	hexdataGlobalLastRequest = now.Add(time.Hour)
+	previousBurst := hexdataGlobalBurstRemaining
+	hexdataGlobalLastRequest = now.Add(-3 * time.Second)
+	hexdataGlobalBurstRemaining = 0
 	hexdataGlobalPaceMu.Unlock()
 	t.Cleanup(func() {
 		hexdataGlobalPaceMu.Lock()
 		hexdataGlobalLastRequest = previousLastRequest
+		hexdataGlobalBurstRemaining = previousBurst
 		hexdataGlobalPaceMu.Unlock()
 	})
 
+	for index := 0; index < hexdataBurstAllowance; index++ {
+		if _, _, err := provider.hexdata.fetchOnce(context.Background(), "/heroes", "text/html", nil); err != nil {
+			t.Fatal(err)
+		}
+		if len(slept) != 0 {
+			t.Fatalf("burst request %d waited: %v", index+1, slept)
+		}
+	}
 	if _, _, err := provider.hexdata.fetchOnce(context.Background(), "/heroes", "text/html", nil); err != nil {
 		t.Fatal(err)
 	}
-	if slept != 317*time.Millisecond {
-		t.Fatalf("jitter sleep = %v, want %v", slept, 317*time.Millisecond)
+	if len(slept) != 1 || slept[0] != 417*time.Millisecond {
+		t.Fatalf("consecutive request waits = %v, want 417ms", slept)
+	}
+}
+
+func TestHexdataPaceWaitDoesNotHoldGlobalMutex(t *testing.T) {
+	provider := newChampionProvider()
+	now := time.Date(2026, time.August, 21, 12, 0, 0, 0, time.UTC)
+	provider.hexdata.now = func() time.Time { return now }
+	provider.hexdata.maximumJitter = 0
+	entered, releaseWait := make(chan struct{}), make(chan struct{})
+	provider.hexdata.sleep = func(_ context.Context, duration time.Duration) error {
+		if duration < 300*time.Millisecond {
+			t.Errorf("pace wait = %v, want at least 300ms", duration)
+		}
+		close(entered)
+		<-releaseWait
+		return nil
+	}
+	hexdataGlobalPaceMu.Lock()
+	previous := hexdataGlobalLastRequest
+	previousBurst := hexdataGlobalBurstRemaining
+	hexdataGlobalLastRequest = now
+	hexdataGlobalBurstRemaining = 0
+	hexdataGlobalPaceMu.Unlock()
+	t.Cleanup(func() {
+		hexdataGlobalPaceMu.Lock()
+		hexdataGlobalLastRequest = previous
+		hexdataGlobalBurstRemaining = previousBurst
+		hexdataGlobalPaceMu.Unlock()
+	})
+	done := make(chan error, 1)
+	go func() {
+		unlock, _, err := provider.hexdata.waitForPace(context.Background())
+		if unlock != nil {
+			unlock()
+		}
+		done <- err
+	}()
+	<-entered
+	if !hexdataGlobalPaceMu.TryLock() {
+		close(releaseWait)
+		t.Fatal("pace mutex remained locked during the wait")
+	}
+	hexdataGlobalPaceMu.Unlock()
+	close(releaseWait)
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -1005,7 +1108,12 @@ func TestDecorateHexdataAugmentsPersistsMissingMetadataDiagnostic(t *testing.T) 
 	})}
 	a := &app{storage: store}
 	provider.diag = a.recordDiagnostic
-	rows := []championMetricRow{{Assets: []championAsset{{ID: 2031, Kind: "augment", Name: "空投熊"}}}}
+	known := []championMetricRow{{Assets: []championAsset{{ID: 2031, Kind: "augment", Name: "空投熊"}}}}
+	provider.decorateHexdataAugments(context.Background(), known)
+	if known[0].Assets[0].Source != "builtin" || known[0].Assets[0].Path != "/augments/2031.png" {
+		t.Fatal("Drop Bear must use its verified colored artwork", known)
+	}
+	rows := []championMetricRow{{Assets: []championAsset{{ID: 999999, Kind: "augment", Name: "未知海克斯"}}}}
 	provider.decorateHexdataAugments(context.Background(), rows)
 	data, err := store.readDiagnosticLog()
 	if err != nil {
@@ -1018,10 +1126,10 @@ func TestDecorateHexdataAugmentsPersistsMissingMetadataDiagnostic(t *testing.T) 
 			missing = event
 		}
 	}
-	if missing["id"] != float64(2031) {
+	if missing["id"] != float64(999999) {
 		t.Fatalf("persisted augment metadata diagnostic = %#v; log=%s", missing, data)
 	}
-	if rows[0].Assets[0].Path != "/latest/game/assets/ux/cherry/augments/icons/drop_bear.png" {
-		t.Fatal("Drop Bear must use its actual colored unsuffixed artwork, not the monochrome small HUD glyph", rows)
+	if rows[0].Assets[0].Path != "" {
+		t.Fatal("unknown augment must not receive a guessed icon", rows)
 	}
 }

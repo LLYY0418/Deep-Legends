@@ -78,13 +78,18 @@ exports.verify = async ({call,evaluate,output}) => {
     assert.equal(r138.gap,'12px 10px');assert.equal(r140.gap,'20px 16px');assert.equal(after.gap,'20px 16px');
     assert.equal(r140.cardWidth,152);
     assert.ok(after.cardWidth>=190,`${width}: banner tile must be visibly wider`);
-    assert.equal(after.cardWidth,200,`${width}: measured 200px width must remain stable`);
-    assert.equal(after.intrinsic,'auto 531px');
+    // 2026-09-24 直接修改：宽度从 200px 提到 208px（R141 自己探测过 190–208px 在两个参照宽度下
+    // 都还是 4/3 列，212px 起会在 960 宽度下掉到 2 列，208 是不掉列前提下能给到的最大值；这台
+    // 机器没装 Chrome，没法重新跑这个脚本实测，208/547 是按 R141 台账里真 Chromium 量出的可用宽度
+    // 用同一条 auto-fill 取整公式核算出来的，不是猜的，但也不是这次真的跑了 Chromium 复测）。
+    assert.equal(after.cardWidth,208,`${width}: measured 208px width must remain stable`);
+    assert.equal(after.intrinsic,'auto 547px');
     assert.ok(after.naturalWidth>0&&after.naturalHeight>0&&after.naturalWidth<after.naturalHeight,'fixture is a decoded vertical banner');
     assert.equal(after.objectFit,'contain');
     assert.ok(Math.abs(after.artWidth/after.artHeight-after.naturalWidth/after.naturalHeight)<.002,'banner art ratio must match source');
     assert.equal(after.lockDisplay,'grid');assert.equal(after.lockWidth,30);
-    assert.equal(after.lockedOpacity,'0.38');assert.match(after.lockedFilter,/grayscale\(1\)/);
+    // 未拥有旗帜不再整体去色，只压透明度，色彩还看得出来（参考锁图标 + 半透明遮罩的风格）。
+    assert.equal(after.lockedOpacity,'0.68');assert.equal(after.lockedFilter,'none');
     assert.ok(after.cardHeight>r140.cardHeight*1.2,`${width}: banner card did not visibly grow`);
     if(process.env.R141_LAYOUT==='1') continue;
     const card=await evaluate(`(() => {const card=document.querySelector('#facade-grid .skin-card');card.click();return true})()`);

@@ -63,21 +63,7 @@ func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAcc
 	directoryRevisionLegacy := old.RevisionAt
 	if !found && c.disk != nil {
 		if entry, err := c.disk.readDisk(key); err == nil {
-			var stored proProfileSnapshot
-			found = json.Unmarshal(entry.Data, &stored) == nil
-			cached = stored.Account
-			cached.LastMatchAt, cached.LastMatchAtKnown = stored.LastMatchAt, stored.LastMatchAtKnown
-			cached.DirectoryRevisionAt = stored.DirectoryRevisionAt
-			if cached.DirectoryRevisionAt == "" {
-				cached.DirectoryRevisionAt = stored.RevisionAt
-			}
-			if cached.DirectoryRevisionAt == "" {
-				cached.DirectoryRevisionAt = proDirectoryRevisionAt(cached)
-			}
-			// Older snapshots used directory revision_at as LastMatchAt.
-			if stored.DirectoryRevisionAt == "" && cached.LastMatchAtKnown && cached.LastMatchAt == cached.DirectoryRevisionAt {
-				setProLastMatch(&cached, time.Time{}, false)
-			}
+			cached, found = decodeProProfileSnapshot(entry.Data)
 		}
 	}
 	at, _ := time.Parse(time.RFC3339Nano, cached.CheckedAt)
@@ -181,9 +167,11 @@ func (a *app) enrichProProfiles(ctx context.Context, seeds []opggProTeam) []opgg
 	for i := 0; i < 6; i++ {
 		workers.Add(1)
 		go func() {
+			defer a.recoverPanic("pro_profiles.enrichProProfiles.1")
+
 			defer workers.Done()
 			for row := range jobs {
-				*row = a.readProProfile(ctx, *row)
+				func() { defer a.recoverPanic("enrichProProfiles.job"); *row = a.readProProfile(ctx, *row) }()
 			}
 		}()
 	}

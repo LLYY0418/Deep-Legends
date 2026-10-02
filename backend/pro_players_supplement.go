@@ -95,6 +95,8 @@ func loadProSupplements(ctx context.Context, provider *championProvider, publish
 	for i, name := range proSupplementPlayers {
 		wg.Add(1)
 		go func(i int, name string) {
+			defer recoverPanic("pro_players_supplement.loadProSupplements.1")
+
 			defer wg.Done()
 			team, player, _ := proSupplementPlayer(name)
 			member := opggProMember{TeamID: team.OPGGID, Nickname: player.Name, RealName: player.Names[0], Authority: "PROGAMER", Incomplete: true, Supplement: true}
@@ -132,7 +134,12 @@ func loadProSupplements(ctx context.Context, provider *championProvider, publish
 			results <- result{i, member}
 		}(i, name)
 	}
-	go func() { wg.Wait(); close(results) }()
+	go func() {
+		defer recoverPanic("pro_players_supplement.loadProSupplements.2")
+
+		wg.Wait()
+		close(results)
+	}()
 	for row := range results {
 		teams[row.index].Members = []opggProMember{row.member}
 		for _, fn := range publish {

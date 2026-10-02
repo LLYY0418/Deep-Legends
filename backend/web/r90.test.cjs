@@ -29,7 +29,7 @@ function functionSource(script, name) {
   assert.fail(`unbalanced ${name}`);
 }
 
-function compile(names,deps={}) {deps={updateLiveLoadingVisibility(){},...deps};return Function(...Object.keys(deps),names.map(n=>functionSource(source,n)).join("\n")+`\nreturn {${names.join(",")}}`)(...Object.values(deps))}
+function compile(names,deps={}) {if (!names.includes("liveClientPositionsPending") && names.some(n=>functionSource(source,n).includes("liveClientPositionsPending("))) names=[...names,"liveClientPositionsPending"];deps={updateLiveLoadingVisibility(){},...deps};return Function(...Object.keys(deps),names.map(n=>functionSource(source,n)).join("\n")+`\nreturn {${names.join(",")}}`)(...Object.values(deps))}
 function harness(data,section="live") {
  let serial=0;const timers=new Map();const calls=[];
  const state={section,beacon:{phase:data.phase},live:data,settings:{liveRefresh:true,liveInterval:60}};
@@ -81,7 +81,7 @@ test("R90 stopped UI has an operable manual refresh and foreground wake checks p
 });
 test("R90 actual loader bypasses cache for manual refresh; R91 supersedes the former manual queue",async()=>{
  const state={beacon:{phase:"InProgress"},live:full(),settings:{},controllers:new Map(),liveRetryAttempts:8};const requests=[];const noop=()=>{};
- const deps={state,connected:()=>true,recordLiveRefresh:noop,normalizeLiveGameId:v=>Number(v)||0,liveSnapshotBehindPhase:()=>false,recordLiveObservation:noop,invalidateLiveForNewGame:noop,liveGamePhase:()=>true,renderLive:noop,api:async(url)=>{requests.push(url);return full()},shouldResetLiveGameScopedState:()=>false,resetLiveGameScopedState:noop,resetLivePositionOverrides:noop,resetRecommendationTabsOnChampionChange:noop,updateBeacon:noop,renderCapabilitySettings:noop,liveRecommendationsFor:()=>null,ensureLiveRecommendations:noop,ensureSpecialistRunes:noop,ensureProRunes:noop,syncLiveRetryBudget:noop,scheduleLiveRefresh:noop,queueLiveEventRefresh:noop};
+ const deps={state,connected:()=>true,recordLiveRefresh:noop,normalizeLiveGameId:v=>Number(v)||0,liveSnapshotBehindPhase:()=>false,recordLiveObservation:noop,invalidateLiveForNewGame:noop,liveGamePhase:()=>true,renderLive:noop,api:async(url)=>{requests.push(url);return full()},shouldResetLiveGameScopedState:()=>false,resetLiveGameScopedState:noop,resetLivePositionOverrides:noop,resetRecommendationTabsOnChampionChange:noop,updateBeacon:noop,renderCapabilitySettings:noop,liveRecommendationsFor:()=>null,ensureLiveRecommendations:noop,ensureSpecialistRunes:noop,ensureProRunes:noop,ensureLaneMatchupCandidates:noop,syncLiveRetryBudget:noop,scheduleLiveRefresh:noop,queueLiveEventRefresh:noop};
  // R131 §2.1-1：loadLive 开头会记一次触发来源，把纯函数 liveRenderTriggerLabel 一并按真实实现编译。
  const {loadLive}=compile(["loadLive","liveRenderTriggerLabel"],deps);await loadLive(true,"manual");assert.deepEqual(requests,["/api/gameplay/live?refresh=1"]);assert.equal(state.liveRetryAttempts,0);
  const releases=[];let aborted=0;state.controllers.set("live",{abort:()=>aborted++});
@@ -89,4 +89,26 @@ test("R90 actual loader bypasses cache for manual refresh; R91 supersedes the fo
  const loader=compile(["loadLive","liveRenderTriggerLabel"],deps).loadLive;const pending=loader(false);const forced=loader(true,"manual");
  assert.equal(aborted,1);assert.equal(releases.length,2);assert.equal(requests.at(-1),"/api/gameplay/live?refresh=1");
  releases[0]();await pending;assert.equal(state.liveLoading,true);releases[1]();await forced;assert.equal(state.liveLoading,false);
+});
+
+const positionPending = () => ({...full(), capabilities:[{name:"live-client-positions",state:"pending"}]});
+test("R178 pending positions retry at ten seconds at most six times, including reconnect",()=>{
+ const h=harness(positionPending());
+ for(let i=0;i<6;i++) {
+  h.scheduleLiveRefresh();assert.equal(h.timers.size,1);assert.equal(h.fire(),10000);
+  if(i===2){h.state.beacon.phase="Reconnect";h.state.live.phase="Reconnect";}
+ }
+ h.scheduleLiveRefresh();assert.equal(h.timers.size,0);assert.equal(h.calls.length,6);
+ assert.equal(h.state.livePositionRetryAttempts,6);
+ assert.deepEqual(h.calls,Array.from({length:6},()=>[false,"interval"]));
+ assert.equal(h.renderLiveRefreshStatus(h.state.live),"","pending adds no UI text");
+});
+test("R178 ready positions restore silence, game/phase/generation changes cancel old jobs",()=>{
+ for(const change of [h=>h.state.live.capabilities=[],h=>h.state.live.gameId++,h=>h.state.beacon.phase="EndOfGame",h=>h.state.liveGameGeneration=1]) {
+  const h=harness(positionPending());h.scheduleLiveRefresh();assert.equal(h.timers.size,1);change(h);h.fire();assert.equal(h.calls.length,0);
+ }
+ const h=harness(positionPending());h.scheduleLiveRefresh();h.state.live.capabilities=[];h.scheduleLiveRefresh();assert.equal(h.timers.size,0);
+ const silent=harness(full());silent.scheduleLiveRefresh();assert.equal(silent.timers.size,0);
+ const exhausted=harness(positionPending());exhausted.syncLiveRetryBudget();exhausted.state.livePositionRetryAttempts=6;
+ exhausted.state.live.gameId++;exhausted.scheduleLiveRefresh();assert.equal(exhausted.state.livePositionRetryAttempts,0);assert.equal(exhausted.fire(),10000);
 });

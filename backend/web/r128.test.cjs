@@ -206,9 +206,9 @@ test("R128 §2.4 概览顺序与推荐卡标题行", () => {
   assert.ok(augments.includes("${chips}</header>"), "阶段 chips 必须是 header 的最后一个子元素");
   assert.doesNotMatch(augments, /section-count/, "标题行不再有计数");
   assert.doesNotMatch(augments, /entries\.length\} 个/);
-  // 推荐卡本体保持现状：收益率/置信度/官方档位/阶段筛选一个都不动。
+  // R150 将官方档位收敛为共享六角徽章，其余收益率/置信度/阶段筛选保留。
   assert.match(championsScript, /mayhemAugmentConfidenceMetrics/);
-  assert.match(championsScript, /\["官方档位", escapeHTML\(label\), "is-hex-label"\]/);
+  assert.doesNotMatch(championsScript, /\["官方档位", escapeHTML\(label\), "is-hex-label"\]/);
   assert.match(championsScript, /function renderMayhemStageChips\(items\)/);
   assert.match(championsStyles, /\.recommendation-section > header \{[^}]*justify-content: space-between/);
 });

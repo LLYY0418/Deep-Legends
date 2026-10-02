@@ -244,6 +244,8 @@ func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, ti
 		c.mu.Unlock()
 		// One caller leaving a page must not cancel another caller's shared load.
 		go func() {
+			defer a.recoverPanic("pro_players.loadProPlayers.1")
+
 			started := time.Now()
 			background := a.proRefreshContext
 			if background == nil {
@@ -325,7 +327,11 @@ func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, ti
 			// resolve. Newly discovered accounts join the same bounded worker pool.
 			ladderStarted := time.Now()
 			profiles := make(chan []opggProTeam, 1)
-			go func() { profiles <- a.enrichProProfiles(loadCtx, seeds) }()
+			go func() {
+				defer a.recoverPanic("pro_players.loadProPlayers.2")
+				defer close(profiles)
+				profiles <- a.enrichProProfiles(loadCtx, seeds)
+			}()
 			ladder := newProLadderPipeline(loadCtx, provider)
 			ladder.submit(teams)
 			// Every published snapshot is immutable, including nested accounts.

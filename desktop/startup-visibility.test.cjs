@@ -38,6 +38,7 @@ function harness(text = source) {
         child.stdout.setEncoding = child.stderr.setEncoding = () => {}; child.kill = () => {}; return child;
       } };
       if (name === "node:http") return { request() { const request = new EventEmitter(); request.end = body => posts.push(JSON.parse(body)); request.destroy = () => {}; return request; } };
+      if (name === "./backend-evidence.cjs") return { consumeRelaunchMarker: () => null };
       if (name.startsWith("./")) return { attachDiagnosticsExport() {} };
       return require(name);
     },

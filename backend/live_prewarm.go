@@ -87,6 +87,8 @@ func (p *liveRecommendationPrewarmer) warm(seed liveRecommendationSeed) bool {
 	p.entries[key] = livePrewarmEntry{busy: true}
 	p.mu.Unlock()
 	go func() {
+		defer recoverPanic("live_prewarm.warm.1")
+
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		start := time.Now()

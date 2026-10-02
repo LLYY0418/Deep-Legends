@@ -326,6 +326,8 @@ func (c *championDataCache) scheduleDiskPrune(written int64) {
 	done := make(chan struct{})
 	c.pruneDone = done
 	go func() {
+		defer recoverPanic("champion_cache.scheduleDiskPrune.1")
+
 		_ = c.pruneDisk()
 		c.pruneMu.Lock()
 		c.pruneDone = nil
@@ -335,13 +337,16 @@ func (c *championDataCache) scheduleDiskPrune(written int64) {
 }
 
 func championCacheDiskAllowed(key string) bool {
+	if strings.HasPrefix(key, "rune-starters-v1|KR_") {
+		return true
+	}
 	if strings.HasPrefix(key, "public-profile-icon|") || strings.HasPrefix(key, "pro-profile-v1|") || strings.HasPrefix(key, "pro-profile-v2|") {
 		return true
 	}
 	if strings.HasPrefix(key, "public-pro-snapshot-v1|") || strings.HasPrefix(key, "normalized-perks-v1|") || strings.HasPrefix(key, "normalized-augments-v1|") || strings.HasPrefix(key, "riot-identity-v1|") || strings.HasPrefix(key, "riot-match-v1|KR_") || strings.HasPrefix(key, "kr-match-tier-v1|KR_") || strings.HasPrefix(key, "hexdata-") || strings.HasPrefix(key, "bootstrap|") || strings.HasPrefix(key, "v2|opgg-rsc|") || strings.HasPrefix(key, "v3|opgg-detail|") {
 		return true
 	}
-	for _, host := range []string{dataDragonHost, communityDragonHost, opggChampionHost, opggPageHost, qq101Host} {
+	for _, host := range []string{dataDragonHost, communityDragonHost, hexdataAssetHost, opggChampionHost, opggPageHost, qq101Host} {
 		if strings.HasPrefix(key, "v1|"+host+"|") {
 			return true
 		}
@@ -600,4 +605,31 @@ func (c *championDataCache) cacheNow() time.Time {
 		return c.now()
 	}
 	return time.Now()
+}
+
+// lookupReady reads finished cache entries only; it never waits on a flight or
+// starts an upstream loader. Used when returning optional prefetched data.
+func (c *championDataCache) lookupReady(key string) ([]byte, bool) {
+	if c == nil {
+		return nil, false
+	}
+	c.mu.Lock()
+	if entry, ok := c.entries[key]; ok && c.cacheNow().Before(entry.ExpiresAt) {
+		c.touchLocked(key)
+		data := append([]byte(nil), entry.Data...)
+		c.mu.Unlock()
+		return data, true
+	}
+	c.mu.Unlock()
+	if !championCacheDiskAllowed(key) {
+		return nil, false
+	}
+	entry, err := c.readDisk(key)
+	if err != nil || len(entry.Data) == 0 || !c.cacheNow().Before(entry.ExpiresAt) {
+		return nil, false
+	}
+	c.mu.Lock()
+	c.storeMemoryLocked(key, entry)
+	c.mu.Unlock()
+	return append([]byte(nil), entry.Data...), true
 }

@@ -165,6 +165,8 @@ type app struct {
 	clientInstallationsCacheAt      time.Time
 	collectionProbe                 func(context.Context, *LCUClient, int64) (bool, int)
 	collectionRefresh               func(*LCUClient) bool
+	gameplayPrewarmHook             func()
+	gameplayLiveLoader              func(context.Context, *LCUClient, Summoner, string) gameplayLiveResponse
 	liveClientPlayerList            func(context.Context) ([]byte, int, error)
 	liveClientPlayerListNow         func() time.Time
 	clientLauncher                  func(clientInstallation) (clientLaunchResult, error)
@@ -207,6 +209,11 @@ type app struct {
 	recentRankedSamples                 map[string]recentRankedSampleCacheEntry
 	recentRankedSampleOrder             *list.List
 	recentRankedSampleEntries           map[string]*list.Element
+	liveHistoryFreshnessMu              sync.Mutex
+	livePremadeMu                       sync.Mutex
+	livePremadeLabels                   livePremadeLabels
+	liveHistoryFreshness                *liveHistoryFreshnessScope
+	liveHistoryRunGames                 liveHistoryRunGames
 	livePlayerMatchesMu                 sync.Mutex
 	livePlayerMatchCache                map[string]livePlayerMatchesCacheEntry
 	livePlayerMatchOrder                *list.List
@@ -225,11 +232,18 @@ type app struct {
 	matchModeDiagnosticKeys             map[int64]struct{}
 	championDataDiagnosticMu            sync.Mutex
 	championDataDiagnosticKeys          map[string]struct{}
+	gameSettingsWatch                   gameSettingsWatchState
+	liveRosterRecovery                  liveRosterRecoveryCache
 	liveRosterDiagnosticMu              sync.Mutex
 	liveRosterDiagnosticKeys            map[string]struct{}
 	livePositionMu                      sync.Mutex
 	livePositionGameID                  int64
 	livePositionByRef                   map[string]string
+	liveAutofillMu                      sync.Mutex
+	liveAutofillGameID                  int64
+	liveAutofillByRef                   map[string]bool
+	liveAutofillDiagnosticMu            sync.Mutex
+	liveAutofillDiagnosticKeys          map[string]struct{}
 	liveClientPlayerListDiagnosticMu    sync.Mutex
 	liveClientPlayerListDiagnosticKeys  map[string]struct{}
 	liveClientProbeMu                   sync.Mutex
@@ -379,6 +393,7 @@ func main() {
 	if storageErr != nil {
 		log.Printf("本地历史与自定义奖池不可用：%v", storageErr)
 	}
+	panicDiagnosticStore.Store(store)
 	defer closeDiagnosticStore(store)
 	token, err := loadOrCreateSessionToken(store)
 	if err != nil {
@@ -405,6 +420,8 @@ func main() {
 	}
 	if gateURL := strings.TrimSpace(os.Getenv("DEEP_LEGENDS_FEATURE_GATES_URL")); gateURL != "" {
 		go func() {
+			defer recoverPanic("main.main.1")
+
 			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
 			if gateErr := championProvider.featureGates.refresh(ctx, championProvider.httpClient(), gateURL); gateErr != nil {
@@ -523,6 +540,9 @@ func main() {
 	mux.HandleFunc("GET /api/gameplay/season-mayhem-builds", a.authorized(a.handleGameplaySeasonMayhemBuilds))
 	mux.HandleFunc("GET /api/gameplay/recommendations", a.authorized(a.handleGameplayRecommendations))
 	mux.HandleFunc("GET /api/gameplay/specialist-runes", a.authorized(a.handleGameplaySpecialistRunes))
+	mux.HandleFunc("POST /api/gameplay/rune-starters", a.authorized(a.handleGameplayRuneStarters))
+	mux.HandleFunc("GET /api/gameplay/champion-lanes", a.authorized(a.handleGameplayChampionLanes))
+	mux.HandleFunc("GET /api/gameplay/lane-matchup", a.authorized(a.handleGameplayLaneMatchup))
 	mux.HandleFunc("GET /api/gameplay/pro-runes", a.authorized(a.handleGameplayProRunes))
 	mux.HandleFunc("POST /api/gameplay/match-tiers", a.authorized(a.handleGameplayMatchTiers))
 	mux.HandleFunc("POST /api/gameplay/current-game", a.authorized(a.handleOverviewCurrentGame))
@@ -547,6 +567,7 @@ func main() {
 	mux.HandleFunc("GET /api/claim/scan", a.authorized(a.handleClaimScan))
 	mux.HandleFunc("POST /api/claim/execute", a.authorized(a.handleClaimExecute))
 	mux.HandleFunc("GET /api/gameplay/perks", a.authorized(a.handleGameplayPerks))
+	mux.HandleFunc("GET /api/gameplay/augments", a.authorized(a.handleGameplayAugments))
 	mux.HandleFunc("GET /api/gameplay/items", a.authorized(a.handleGameplayItems))
 	mux.HandleFunc("GET /api/gameplay/summoner-spells", a.authorized(a.handleGameplaySummonerSpells))
 	mux.HandleFunc("POST /api/gameplay/runes/apply", a.authorized(a.handleGameplayRuneApply))
@@ -560,6 +581,7 @@ func main() {
 	mux.HandleFunc("GET /api/champions/augment-detail", a.authorized(a.handleChampionAugmentDetail))
 	mux.HandleFunc("GET /api/champions/augment-rarity", a.authorized(a.handleChampionAugmentRarity))
 	mux.HandleFunc("GET /api/champions/detail", a.authorized(a.handleChampionDetail))
+	mux.HandleFunc("GET /api/champions/mayhem-rsc-prefetch", a.authorized(a.handleMayhemRSCPrefetch))
 	mux.HandleFunc("GET /api/champions/arena-first-places", a.authorized(a.handleArenaFirstPlaces))
 	mux.HandleFunc("GET /api/champions/arena/match/{matchId}", a.authorized(a.handleArenaMatchDetail))
 	mux.HandleFunc("GET /api/champions/network", a.authorized(a.handleChampionNetwork))
@@ -594,6 +616,7 @@ func main() {
 	mux.HandleFunc("POST /api/quit", a.authorized(a.handleQuit))
 	a.registerUpdateRoutes(mux)
 	a.updates = newUpdateManager(version, a.storage, a.broadcastUpdateEvent)
+	a.updates.diagnostic = a.recordDiagnostic
 
 	listener, err := net.Listen("tcp", *listenAddress)
 	if err != nil {
@@ -618,11 +641,13 @@ func main() {
 	runtimeContext, runtimeCancel := context.WithCancel(context.Background())
 	a.runtimeCancel = runtimeCancel
 	a.proRefreshContext = runtimeContext
-	go a.runConnectionManager(runtimeContext)
-	go func() { _, _, _ = a.loadProPlayers(runtimeContext, true) }()
+	goSafe("main.main.2", func() { a.runConnectionManager(runtimeContext) })
+	a.warmProPlayersCaches()
 	a.updates.Start()
 	if !*noBrowser && !*desktopMode {
 		go func() {
+			defer recoverPanic("main.main.3")
+
 			time.Sleep(250 * time.Millisecond)
 			if err := openBrowser(address); err != nil {
 				log.Printf("浏览器未能自动打开，请访问本地助手首页：%s (%v)", baseAddress, err)
@@ -653,6 +678,14 @@ func (a *app) authorized(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+		defer func() {
+			if value := recover(); value != nil {
+				a.recordRecoveredPanic(authorizedPanicSite(r), value)
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				w.WriteHeader(http.StatusInternalServerError)
+				respondJSON(w, map[string]string{"error": "本地数据服务读取失败"})
+			}
+		}()
 		next(w, r)
 	}
 }
@@ -878,10 +911,16 @@ func (a *app) handleSkinDetails(w http.ResponseWriter, r *http.Request) {
 	priceResults := make(chan priceResult, 1)
 	borderResults := make(chan borderResult, 1)
 	go func() {
+		defer a.recoverPanic("main.handleSkinDetails.1")
+		defer close(priceResults)
+
 		value, known := NewStoreAPI(client).SkinPrice(skin.ID)
 		priceResults <- priceResult{value: value, known: known}
 	}()
 	go func() {
+		defer a.recoverPanic("main.handleSkinDetails.2")
+		defer close(borderResults)
+
 		hasBorder, known, owned := NewSkinAppearanceAPI(client).BorderStatus(skin)
 		borderResults <- borderResult{hasBorder: hasBorder, known: known, owned: owned}
 	}()
@@ -943,6 +982,12 @@ func (a *app) handleImage(w http.ResponseWriter, r *http.Request) {
 	connected := a.connected
 	a.mu.RUnlock()
 	if client == nil || !connected {
+		if a.champions.bundledChampionVersionCompatible() {
+			if data, ok := bundledChampionIcon(assetPath); ok {
+				writeImageResponse(w, r, data, "image/png", "private, max-age=86400")
+				return
+			}
+		}
 		// 未连接客户端（例如只查看韩服页签）时改用 CommunityDragon：
 		// 其目录结构与客户端的 lol-game-data 资源路径完全一致。
 		a.serveCommunityDragonImage(w, r, assetPath)
@@ -964,7 +1009,7 @@ func (a *app) handleImage(w http.ResponseWriter, r *http.Request) {
 		if served {
 			status = http.StatusOK
 		}
-		a.champions.reportAugmentIconFetch(assetPath, status, -1, true, lcuFailureStatus(err))
+		a.champions.reportAugmentIconFetch(assetPath, status, -1, true, lcuFailureStatus(err), communityDragonHost)
 		return
 	}
 	contentType := http.DetectContentType(data)
@@ -994,13 +1039,30 @@ func (a *app) serveCommunityDragonImage(w http.ResponseWriter, r *http.Request, 
 	// loadAssetFromHost，聚合错误会把内层刚建立的主机退避立刻抹掉（R127 复审）。
 	data, err := a.loadAsset(r.Context(), "cdragon-resolved:"+assetPath, 0, communityImageResolveNegativeTTL, func(ctx context.Context) ([]byte, error) {
 		for _, remotePath := range remotePaths {
+			if a.assetHostBlocked(communityDragonHost) {
+				break
+			}
 			loaded, loadErr := a.loadCommunityDragonAsset(ctx, remotePath)
 			if loadErr == nil && strings.HasPrefix(http.DetectContentType(loaded), "image/") {
+				if strings.HasPrefix(assetPath, "/fe/lol-loot/assets/loot_item_icons/") {
+					loaded = stripSolidPNGBackground(loaded)
+				}
 				return loaded, nil
 			}
 		}
 		return nil, errCommunityImageCandidatesExhausted
 	})
+	if err != nil && r.Context().Err() == nil {
+		if fallbackHost, fallbackPath, ok := a.champions.communityDragonAssetFallback(r.Context(), assetPath); ok {
+			data, err = a.loadChampionRemoteAsset(r.Context(), a.champions, "fallback", fallbackHost, fallbackPath)
+			if err == nil && !strings.HasPrefix(http.DetectContentType(data), "image/") {
+				err = errors.New("fallback asset is not an image")
+			}
+			if err == nil && a.champions.diag != nil {
+				a.champions.diag(map[string]any{"event": "champion_asset_fallback", "source": "communitydragon", "fallback_host": fallbackHost, "fallback_path": fallbackPath})
+			}
+		}
+	}
 	if err != nil || len(data) == 0 {
 		http.NotFound(w, r)
 		return false
@@ -1021,9 +1083,27 @@ func writeImageResponse(w http.ResponseWriter, r *http.Request, data []byte, con
 	_, _ = w.Write(data)
 }
 
+// 客户端前端插件（/fe/…）里的战利品与货币图标，在 CommunityDragon 镜像里位于
+// 各自插件的 global/default 目录下。国服客户端并不带全这些文件：0924 日志里
+// 英雄魔法引擎（chest_128.png）和冠军杯赛挑战券在本机 /fe/ 路径下都是 404。
+var communityDragonFrontendIcons = []struct{ client, remote string }{
+	{"/fe/lol-loot/assets/loot_item_icons/", "/latest/plugins/rcp-fe-lol-loot/global/default/assets/loot_item_icons/"},
+	{"/fe/lol-static-assets/images/currency/icons/", "/latest/plugins/rcp-fe-lol-static-assets/global/default/images/currency/icons/"},
+}
+
 func communityDragonImagePaths(assetPath string) []string {
 	const prefix = "/lol-game-data/assets/"
 	value := strings.ToLower(strings.TrimSpace(assetPath))
+	for _, icons := range communityDragonFrontendIcons {
+		if strings.HasPrefix(value, icons.client) {
+			// 只接受目录下的单个带主名的文件；空主名（".png"）、子目录和上跳都不发请求。
+			name := strings.TrimPrefix(value, icons.client)
+			if name == "" || strings.HasPrefix(name, ".") || strings.ContainsAny(name, "/\\?#%") || strings.Contains(name, "..") {
+				return nil
+			}
+			return []string{icons.remote + name}
+		}
+	}
 	if !strings.HasPrefix(value, prefix) {
 		return nil
 	}
@@ -1137,6 +1217,8 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 	a.broadcastEvent("connection-state")
 	if a.proRefreshContext != nil {
 		go func() {
+			defer a.recoverPanic("main.refreshIdentityWithClient.1")
+
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 			_, _ = a.cachedFacadeState(ctx, false, "poll")

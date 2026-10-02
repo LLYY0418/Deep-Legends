@@ -197,6 +197,8 @@ func (a *app) recordR99SurfaceShape(ctx context.Context, client *LCUClient) {
 		}
 		wg.Add(1)
 		go func(index int, path string) {
+			defer a.recoverPanic("r99_probe.recordR99SurfaceShape.1")
+
 			defer wg.Done()
 			slots <- struct{}{}
 			defer func() { <-slots }()

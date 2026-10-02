@@ -180,7 +180,7 @@ test("gameplay soft reset clears stalled pagination and recommendation failures 
   };
   const { softResetGameplayState } = compileFunctions(
     gameplaySource,
-    ["resetLiveGameScopedState", "softResetGameplayState"],
+    ["clearRuneStarterRetries", "resetLiveGameScopedState", "softResetGameplayState"],
     { state },
   );
   softResetGameplayState();

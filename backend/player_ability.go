@@ -235,11 +235,7 @@ func abilityMetrics(player, baseline gameplayAbilityAccumulator) []gameplayAbili
 			metric.Grade = "—"
 			metric.Description += " 数据或有效对手基准不足，本项不评分。"
 		} else {
-			// Symmetric bounded comparison: equal=50, real zero=0, never 100+.
-			// R132 P2：图形值 = 100×本人²/(本人²+对手²)。旧的开方压缩把 767 对 988
-			// 这种 22% 的差距画成 47 对 50，图上几乎看不出来；平方后是 38 对 50，
-			// 与等级（C+）一致。仍然对称（互换两边之和恒为 100）且有界。
-			// 说明文字只写在这里，不进提示框（CLAUDE.md 界面文案红线）。
+			// 图形值按等级边界分段映射，数值说明只留在代码里，不进界面。
 			metric.PlayerScore = abilityRound(abilityRadarScore(item.player, item.baseline), 1)
 			metric.Grade = abilityGrade(item.player / item.baseline)
 		}
@@ -248,14 +244,30 @@ func abilityMetrics(player, baseline gameplayAbilityAccumulator) []gameplayAbili
 	return metrics
 }
 
-// abilityRadarScore maps player/baseline onto 0–100 with the baseline at 50:
-// 100·p²/(p²+b²). Callers guarantee baseline > 0.
+// abilityRadarScore maps grade boundaries to even radial steps. Baseline is 50;
+// ratio anchors 0/.50/.66/.74/.82/.90/.97/1/1.03/1.10/1.20/1.35/2
+// map to 0/5/15/23/31/39/47/50/53/61/69/77/95. The visual score is not
+// a percentile and does not change the underlying metric or letter grade.
 func abilityRadarScore(player, baseline float64) float64 {
-	p, b := player*player, baseline*baseline
-	if p+b <= 0 {
+	if baseline <= 0 {
 		return abilityBaselineScore
 	}
-	return 2 * abilityBaselineScore * p / (p + b)
+	ratio := player / baseline
+	if ratio <= 0 {
+		return 0
+	}
+	anchors := [...]struct{ ratio, score float64 }{
+		{0, 0}, {0.50, 5}, {0.66, 15}, {0.74, 23}, {0.82, 31},
+		{0.90, 39}, {0.97, 47}, {1.00, 50}, {1.03, 53}, {1.10, 61},
+		{1.20, 69}, {1.35, 77}, {2.00, 95},
+	}
+	for index := 1; index < len(anchors); index++ {
+		upper, lower := anchors[index], anchors[index-1]
+		if ratio <= upper.ratio {
+			return lower.score + (ratio-lower.ratio)*(upper.score-lower.score)/(upper.ratio-lower.ratio)
+		}
+	}
+	return 95
 }
 
 func abilityRatio(numerator, denominator int, scale float64) float64 {

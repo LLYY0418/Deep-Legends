@@ -749,16 +749,18 @@ test("2351 自定义暂停事件保留真实总开关和卡片高亮", async () 
   } finally { w.close(); }
 });
 
-test("R123 生涯头像与旗帜入口切到收藏页对应视图", async () => {
+test("R149 收藏页仍可独立进入头像与旗帜视图", async () => {
   const { window: w, errors } = bootDemoApp();
   try {
     await settled();
     for (const view of ["banners", "icons"]) {
       w.document.querySelector('[data-section="suite"]').click();
       await visitTool(w, "facade");
-      const entry = w.document.querySelector(`#suite-facade-root [data-facade-browse="${view}"]`);
-      assert.ok(entry, `${view} 缺少生涯页入口`);
-      entry.click();
+      assert.equal(w.document.querySelector("#suite-facade-root .facade-icon-card, #suite-facade-root .facade-banner-card"), null);
+      w.document.querySelector('[data-section="favorites"]').click();
+      w.document.querySelector('[data-favorites-page="facade-collection"]').click();
+      w.document.getElementById(`facade-view-${view}`).click();
+      await settled();
       assert.equal(w.document.querySelector('[data-section="favorites"]').getAttribute("aria-selected"), "true");
       assert.equal(w.document.querySelector('[data-favorites-page="facade-collection"]').getAttribute("aria-selected"), "true");
       assert.equal(w.document.getElementById("favorites-facade-panel").hidden, false);
@@ -788,11 +790,11 @@ test("R56 工具页状态、确认、下拉与领奖契约完整", async () => {
   assert.match(facadeText, /“登录时重设”两项例外/);
   assert.match(facadeText, /生涯背景[\s\S]*你生涯页顶部的那张大图/);
   assert.match(facadeText, /好友悬浮卡[\s\S]*别人点你头像时看到的在线状态、签名和段位/);
-  assert.match(facadeText, /生涯页展示[\s\S]*头像框、挑战勋章、赛季旗帜、表情轮盘/);
+  assert.match(facadeText, /生涯页展示[\s\S]*头像框、挑战勋章、表情轮盘/);
 	assert.match(facadeText, /卸下全部勋章[\s\S]*保留旗帜和当前头衔[\s\S]*无法保留头衔，本次操作会中止并提示/);
 	assert.doesNotMatch(facadeText, /切换上赛季旗帜|挑战旗帜配色/);
-  assert.ok(w.document.querySelector('#suite-facade-root [data-facade-browse="icons"]'), "R123 生涯头像应有收藏页入口");
-  assert.ok(w.document.querySelector('#suite-facade-root [data-facade-browse="banners"]'), "R123 生涯旗帜应有收藏页入口");
+  assert.equal(w.document.querySelector('#suite-facade-root [data-facade-browse]'), null);
+  assert.equal(w.document.querySelector('#suite-facade-root [data-facade-rank-banner]'), null);
 	assert.doesNotMatch(facadeText, /头衔可能同时卸下/);
   assert.doesNotMatch(facadeText, /展示位/);
   assert.equal(w.document.querySelector("[data-facade-owned]").checked, false, "只显示已拥有不应默认开启");

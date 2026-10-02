@@ -33,7 +33,7 @@ type objectiveDiagnostics struct {
 func (a *app) objectiveEventRecorder(ctx context.Context, client *LCUClient) func(LCUEvent) {
 	queue := make(chan LCUEvent, 16)
 	var dropped atomic.Int64
-	go func() {
+	a.goSafe("objective_diagnostics.objectiveEventRecorder.1", func() {
 		for {
 			select {
 			case <-ctx.Done():
@@ -45,7 +45,7 @@ func (a *app) objectiveEventRecorder(ctx context.Context, client *LCUClient) fun
 				}
 			}
 		}
-	}()
+	})
 	return func(event LCUEvent) {
 		if objectiveDiagnosticPath(event.URI) == "" || ctx.Err() != nil {
 			return

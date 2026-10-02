@@ -11,7 +11,10 @@ function extract(source, name) {
   assert.ok(end >= 0, name);
   return tail.slice(0, end + tail.slice(end).indexOf('}') + 1);
 }
-function compile(file, names, deps) { return Function(...Object.keys(deps), names.map(n => extract(read(file), n)).join('\n') + `\nreturn {${names.join(',')}}`)(...Object.values(deps)); }
+const runtime = read('runtime.js');
+const gradeSource = runtime.slice(runtime.indexOf('  const GRADE_ORDER ='), runtime.indexOf('  window.deepLegendsRuntime ='));
+const sharedGrades = Function(`${gradeSource}\nreturn { gradeBadge, gradeRank };`)();
+function compile(file, names, deps) { if (file === "gameplay.js" && names.some(n=>extract(read(file),n).includes("liveClientPositionsPending(")) && !names.includes("liveClientPositionsPending")) names = [...names,"liveClientPositionsPending"]; if (file === "gameplay.js" && names.some(n=>extract(read(file),n).includes("champSelectEnemyPlaceholder(")) && !names.includes("champSelectEnemyPlaceholder")) names=[...names,"champSelectEnemyPlaceholder"]; const injected = { ...sharedGrades, ...deps }; return Function(...Object.keys(injected), names.map(n => extract(read(file), n)).join('\n') + `\nreturn {${names.join(',')}}`)(...Object.values(injected)); }
 const escapeHTML = s => String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 
 test('R113 transient history errors remain retryable while unavailable and empty results are terminal',()=>{
