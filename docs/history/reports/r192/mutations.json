@@ -1,0 +1,17 @@
+[
+  {
+    "name": "hydrate-without-full",
+    "test": "R192 1",
+    "result": "assertion FAIL (mutant killed)"
+  },
+  {
+    "name": "hydrate-without-full",
+    "test": "R192 5",
+    "result": "assertion FAIL (mutant killed)"
+  },
+  {
+    "name": "retry-unbound",
+    "test": "R192 2",
+    "result": "assertion FAIL (mutant killed)"
+  }
+]

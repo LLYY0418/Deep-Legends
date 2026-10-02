@@ -1852,7 +1852,7 @@ test("R86 healthy SSE reduces phase polling while closed SSE retains one-second 
 
 test("R86 external match expansion preserves unrelated cards", async () => {
  async function check(mutate=false) {
-  const {window:w}=bootDemoApp({gameplaySourceTransform:mutate ? source=>source.replace('render(id = "") {','render(id = "") { id = "";') : undefined});
+  const {window:w}=bootDemoApp({gameplaySourceTransform:mutate ? source=>source.replace('render(id = "", options = {}) {','render(id = "", options = {}) { id = "";') : undefined});
   try {
     await settled();
     const data=await (await w.fetch('/api/gameplay/overview')).json();

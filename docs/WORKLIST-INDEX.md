@@ -115,3 +115,5 @@
 | R190 | 战绩名单主体高亮、符文效果与海克斯说明卡片 | 代码、全量回归、7项变异、Chromium宽窄截图与完整public构建通过；真实符文变量/Windows待验 | [WORKLIST-R190-ROSTER-SELF-HIGHLIGHT-RUNE-EFFECTS-AND-AUGMENT-CARDS.md](WORKLIST-R190-ROSTER-SELF-HIGHLIGHT-RUNE-EFFECTS-AND-AUGMENT-CARDS.md) | [r190-execution-ledger.md](r190-execution-ledger.md) | 源码版本0.12.54；8008/8304未核实行隐藏 |
 
 | R191 | R190 复核：变量存在性、诊断样本、局部刷新、回退与布局 | 进行中（本地完成，Windows 待验） | [WORKLIST-R191-R190-VERIFICATION-PERK-VAR-PRESENCE-SCOPED-RERENDER-AND-LAYOUT-FIXES.md](WORKLIST-R191-R190-VERIFICATION-PERK-VAR-PRESENCE-SCOPED-RERENDER-AND-LAYOUT-FIXES.md) | [r191-execution-ledger.md](r191-execution-ledger.md) | 本次工作区；R190 基线 `c2582075` |
+
+| R192 | 外部战绩补全后摘要不更新与重试失效 | 进行中（本地完成，Windows 待验） | [WORKLIST-R192-EXTERNAL-MATCH-LIST-SUMMARY-NOT-REFRESHED-AFTER-HYDRATE-AND-DEAD-RETRY.md](WORKLIST-R192-EXTERNAL-MATCH-LIST-SUMMARY-NOT-REFRESHED-AFTER-HYDRATE-AND-DEAD-RETRY.md) | [r192-execution-ledger.md](r192-execution-ledger.md) | 本次工作区；R191 基线 `0ee9780c` |

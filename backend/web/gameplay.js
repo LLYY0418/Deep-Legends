@@ -7670,7 +7670,7 @@
         if (!match) return;
         if (loadMatchDetails && !matchHasCompleteParticipantStats(match)) {
           detailStates.set(id, { status: "loading", message: "正在读取完整详情" });
-          view.render(id);
+          view.render(id, { full: true });
           try {
             const loaded = hydratedExternalMatch(match, await loadMatchDetails(match), playerRef);
             if (!loaded) throw new Error("Riot 返回的完整详情无法与当前样本匹配");
@@ -7685,23 +7685,41 @@
             detailStates.set(id, { status: "failed", message });
             tab.openMatches.delete(id);
           }
-          view.render(id);
+          view.render(id, { full: true });
           return;
         }
         tab.openMatches.add(id);
         view.render(id);
       },
-      render(id = "") {
+      bindRetryButtons(scope) {
+        for (const button of scope.querySelectorAll("[data-retry-match-detail]")) {
+          if (button._externalMatchRetryBound) continue;
+          button._externalMatchRetryBound = true;
+          button.addEventListener("click", () => view.toggleMatch(button.dataset.retryMatchDetail));
+        }
+      },
+      render(id = "", options = {}) {
         if (!container.isConnected) { externalMatchViews.delete(container); return; }
         let scope = container;
         if (id) {
           const match = matches.find((item) => String(item.gameId) === id);
           const entry = [...container.querySelectorAll(".match-entry")].find((item) => item.querySelector("[data-toggle-match]")?.dataset.toggleMatch === id);
           if (!match || !entry) return;
-          replaceMatchEntry(entry, tab, () => {});
-          return;
+          if (!options.full) {
+            replaceMatchEntry(entry, tab, () => {});
+            view.bindRetryButtons(entry);
+            return;
+          }
+          // Hydration and loading/failure transitions also change the summary.
+          // Replace this card only, then bind every control on its new nodes.
+          const template = document.createElement("template");
+          template.innerHTML = renderMatch(match, playerRef, tab).trim();
+          scope = template.content.firstElementChild;
+          if (!scope) return;
+          entry.replaceWith(scope);
         } else container.innerHTML = matches.map((match) => renderMatch(match, playerRef, tab)).join("");
-		for (const button of scope.querySelectorAll("[data-toggle-match]:not(:disabled), [data-retry-match-detail]")) button.addEventListener("click", () => view.toggleMatch(button.dataset.toggleMatch || button.dataset.retryMatchDetail));
+		for (const button of scope.querySelectorAll("[data-toggle-match]:not(:disabled)")) button.addEventListener("click", () => view.toggleMatch(button.dataset.toggleMatch));
+        view.bindRetryButtons(scope);
         bindMatchDetailControls(scope, tab);
         for (const button of scope.querySelectorAll("[data-replay]:not(:disabled)")) button.addEventListener("click", () => replay(button));
         bindPlayerLinks(scope, tab);
