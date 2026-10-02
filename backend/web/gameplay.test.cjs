@@ -309,14 +309,15 @@ test("R69 premade tags distinguish direct session groups from inferred groups", 
   ];
   const session = renderLivePremadeTag({ ...base[0], premadeSource: "session" }, [{ ...base[0], premadeSource: "session" }, { ...base[1], premadeSource: "session" }]);
   assert.match(session, />组队 ×2<\/span>/);
-  assert.match(session, /客户端直接给出的组队信息/);
+  assert.match(session, /组队 2 人/);
   assert.doesNotMatch(session, /推测/);
   const inferred = renderLivePremadeTag({ ...base[0], premadeSource: "inferred" }, [{ ...base[0], premadeSource: "inferred" }, { ...base[1], premadeSource: "inferred" }]);
   assert.match(inferred, />预组 ×2<\/span>/);
-  assert.match(inferred, /推测/);
+  assert.match(inferred, /预组队 2 人/);
   const both = renderLivePremadeTag({ ...base[0], premadeSource: "both" }, [{ ...base[0], premadeSource: "both" }, { ...base[1], premadeSource: "both" }]);
   assert.match(both, />组队 ×2<\/span>/);
-  assert.match(both, /最近战绩也支持这一判断/);
+  assert.match(both, /组队 2 人/);
+  assert.doesNotMatch(both, /最近战绩/);
 });
 
 test("R69 history rows distinguish unavailable failed empty and pending states", () => {
@@ -809,8 +810,8 @@ test("R167 lane card renders only a locked enemy in the current player's lane", 
   });
   const render = hero => { const row = [...(hero?.weakAgainst || []), ...(hero?.strongAgainst || [])].find(row => row.championId === 103); state.laneMatchupPairs = new Map([["69:103:mid:emerald_plus", { status: "succeeded", data: row }]]); return helpers.renderLaneMatchupCard(data, hero); };
   let html = render({ weakAgainst: [{ championId: 103, winRate: 43.7, championName: "阿狸" }] });
-  assert.match(html, /对位克制建议/);
-  assert.match(html, /对线偏劣势，胜率约 43\.7%/);
+  assert.match(html, /data-lane-matchup-card/);
+  assert.match(html, /偏劣势 43\.7%/);
   assert.equal((html.match(/lane-matchup-result/g) || []).length, 1);
   assert.equal((html.match(/data-champion-id="103"/g) || []).length, 1);
   assert.doesNotMatch(html, /data-champion-id="64"|data-champion-id="7"/);
@@ -818,7 +819,7 @@ test("R167 lane card renders only a locked enemy in the current player's lane", 
   const insightHTML = helpers.renderRecommendationArea(data);
   assert.ok(insightHTML.indexOf("data-lane-matchup-card") < insightHTML.indexOf("玩家列表"));
   html = render({ strongAgainst: [{ championId: 103, winRate: 57.4 }] });
-  assert.match(html, /对线偏优势，胜率约 57\.4%/);
+  assert.match(html, /偏优势 57\.4%/);
   assert.equal(render({ weakAgainst: [{ championId: 64, winRate: 41 }] }), "");
   payload = {};
   state.laneMatchupPairs.clear();
@@ -853,8 +854,8 @@ test("R167 lane card tells a same-lane teammate apart from the real enemy when i
   });
   state.laneMatchupPairs = new Map([["69:103:mid:emerald_plus", {status:"succeeded", data:{winRate:43.7}}]]);
   const html = helpers.renderLaneMatchupCard(data, { weakAgainst: [{ championId: 103, winRate: 43.7, championName: "阿狸" }] });
-  assert.match(html, /对位克制建议/);
-  assert.match(html, /对线偏劣势，胜率约 43\.7%/);
+  assert.match(html, /data-lane-matchup-card/);
+  assert.match(html, /偏劣势 43\.7%/);
   assert.equal((html.match(/data-champion-id="103"/g) || []).length, 1, "must pick the team-200 player as the enemy");
   assert.doesNotMatch(html, /data-champion-id="999"/, "must not treat the same-lane ally with falsy isAlly as the enemy");
 });
@@ -893,7 +894,7 @@ test("R167 candidate request uses the enemy champion, current lane and tier, onc
   assert.ok(diagnostics.some((item) => item.reason === "succeeded" && item.context.rowCount === 1));
   assert.ok(diagnostics.every((item) => item.event === "lane_matchup_candidate_fetch"));
   assert.match(helpers.renderLaneMatchupCard(data, {}), /卡西奥佩娅/);
-  assert.match(helpers.renderLaneMatchupCard(data, {}), /胜率差 \+7\.0%/);
+  assert.match(helpers.renderLaneMatchupCard(data, {}), /\+7\.0%/);
   data.players[0].championPickIntent = 69;
   assert.match(helpers.renderLaneMatchupCard(data, {}), /卡西奥佩娅/, "own preview retains candidates");
   data.players[0].championPickIntent = 0;
@@ -1334,7 +1335,7 @@ function r177LaneHarness(enemies, shares) {
 test("R177 unique unknown enemy lane produces a card and caches champion tier shares", async () => {
   const h = r177LaneHarness([{ championId: 103 }], { 103: [{ position: "mid", rate: 0.7 }], 64: [{ position: "mid", rate: 0.8 }] });
   await h.funcs.ensureLaneMatchupCandidates(h.data);
-  assert.match(h.funcs.renderLaneMatchupCard(h.data, {}), /对位克制建议/);
+  assert.match(h.funcs.renderLaneMatchupCard(h.data, {}), /data-lane-matchup-card/);
   assert.equal(h.funcs.laneMatchupContext(h.data).enemy.championId, 103);
   await h.funcs.ensureLaneMatchupCandidates(h.data);
   assert.equal(h.requests.filter(url => url.includes("champion-lanes")).length, 1);

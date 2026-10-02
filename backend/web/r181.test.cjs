@@ -21,7 +21,7 @@ function harness({locked=true,own=799,enemyPosition='top',pairMissing=false,pair
 test('R181 full pair shows locked A when enemy is absent from both top-five lists',async()=>{
  const h=harness({enemyPosition:''});await h.ensureLaneMatchupCandidates(h.data);
  const html=h.renderLaneMatchupCard(h.data,{weakAgainst:[{championId:1,winRate:40}],strongAgainst:[{championId:2,winRate:60}]});
- assert.match(html,/对线偏优势，胜率约 53\.0%/);assert.doesNotMatch(html,/候选/);
+ assert.match(html,/偏优势 53\.0%/);assert.doesNotMatch(html,/候选/);
  assert.ok(h.events.some(e=>e.event==='lane_matchup_card'&&e.mode==='a'&&e.shown===true&&e.ownLocked===true&&e.tier==='emerald_plus'));
  for(let i=0;i<10;i++)h.renderLaneMatchupCard(h.data,{});assert.equal(h.events.filter(e=>e.event==='lane_matchup_card'&&e.shown).length,1);
  assert.ok(h.calls.every(url=>new URL(url,'http://local').searchParams.get('tier')==='emerald_plus'));
@@ -30,11 +30,11 @@ test('R181 missing full pair hides A and diagnoses pair-no-data; failure/pending
  for(const [opts,reason] of [[{pairMissing:true},'pair-no-data'],[{pairFailed:true},'pair-failed']]) {
  const h=harness(opts);assert.equal(h.renderLaneMatchupCard(h.data,{}),'');assert.equal(h.events.at(-1).hiddenReason,'pair-pending');await h.ensureLaneMatchupCandidates(h.data);assert.equal(h.renderLaneMatchupCard(h.data,{}),'');assert.equal(h.events.at(-1).hiddenReason,reason);
  }
- const h=harness();await h.ensureLaneMatchupCandidates(h.data);const pair=[...h.state.laneMatchupPairs.values()][0];pair.data.winRate=50;assert.match(h.renderLaneMatchupCard(h.data,{}),/这局对线五五开，胜率约 50%/);pair.data.winRate=0;assert.match(h.renderLaneMatchupCard(h.data,{}),/偏劣势，胜率约 0\.0%/);
+ const h=harness();await h.ensureLaneMatchupCandidates(h.data);const pair=[...h.state.laneMatchupPairs.values()][0];pair.data.winRate=50;assert.match(h.renderLaneMatchupCard(h.data,{}),/五五开 50\.0%/);pair.data.winRate=0;assert.match(h.renderLaneMatchupCard(h.data,{}),/偏劣势 0\.0%/);
  const b=harness({own:0,locked:false});assert.equal(b.renderLaneMatchupCard(b.data,{}),'');assert.equal(b.events.at(-1).hiddenReason,'candidates-empty');
 });
 test('R181 intent and hover show A+B under one enemy heading, locking keeps A and hides B',async()=>{
- const h=harness({locked:false});await h.ensureLaneMatchupCandidates(h.data);let html=h.renderLaneMatchupCard(h.data,{});assert.match(html,/53\.0%/);assert.match(html,/候选/);assert.equal((html.match(/data-champion="266"/g)||[]).length,1);assert.equal((html.match(/对位克制建议/g)||[]).length,1);assert.equal(h.events.at(-1).mode,'a+b');
+ const h=harness({locked:false});await h.ensureLaneMatchupCandidates(h.data);let html=h.renderLaneMatchupCard(h.data,{});assert.match(html,/53\.0%/);assert.match(html,/候选/);assert.equal((html.match(/data-champion="266"/g)||[]).length,1);assert.equal((html.match(/data-lane-matchup-card/g)||[]).length,1);assert.equal(h.events.at(-1).mode,'a+b');
  h.data.players[0].championId=799;h.data.players[0].championPickIntent=0;await h.ensureLaneMatchupCandidates(h.data);assert.match(h.renderLaneMatchupCard(h.data,{}),/候选/);
  h.data.players[0].championLocked=true;await h.ensureLaneMatchupCandidates(h.data);html=h.renderLaneMatchupCard(h.data,{});assert.match(html,/53\.0%/);assert.doesNotMatch(html,/候选/);assert.equal(h.events.at(-1).mode,'a');
 });

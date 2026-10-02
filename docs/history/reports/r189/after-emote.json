@@ -1,0 +1,10 @@
+{
+  "title": "演示表情（测试夹具）",
+  "hint": "",
+  "ownership": "已拥有",
+  "imageLoaded": true,
+  "overflow": false,
+  "requestedImages": [
+    "/lol-game-data/assets/ASSETS/Loadouts/SummonerEmotes/fixture.png"
+  ]
+}

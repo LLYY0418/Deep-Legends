@@ -1067,7 +1067,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 
 
 .recommendation-area { --rune-icon-size: 32px; --rune-style-icon-width: 32px; --rune-style-icon-height: 40px; --rune-header-height: 52px; --rune-row-height: 52px; container: recommendation-area / inline-size; margin-top: 14px; }
-.recommendation-tab-row { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.recommendation-tab-row { display: flex; flex-wrap: wrap; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 0 10px; }
 .live-content > .recommendation-area:first-child, .recommendation-area:first-child { margin-top: 0; border-top: 0; padding-top: 0; }
 #live-content [data-live-body] > .arena-my-squad-notice + .recommendation-area { margin-top: 0; }
 .recommendation-champion-summary { display: grid; grid-template-columns: minmax(360px,.82fr) minmax(0,1.18fr); grid-template-areas: "summary matchups" "positions matchups"; align-items: center; gap: 7px 16px; margin-bottom: 10px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
@@ -1107,18 +1107,23 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .recommendation-tabs button:hover { color: var(--ink); }
 .recommendation-tabs button.is-active { color: var(--ink); background: var(--surface-strong); }
 .recommendation-panel[hidden] { display: none; }
-.lane-matchup-card { display: grid; gap: 9px; margin-bottom: 12px; padding: 13px 15px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
-.lane-matchup-card h3 { margin: 0; font-size: 13px; }
-.lane-matchup-foe, .lane-matchup-result, .lane-matchup-option { display: flex; min-width: 0; align-items: center; gap: 9px; }
+[data-lane-matchup-slot] { flex: 0 0 auto; min-width: 0; margin: 0 0 10px auto; }
+[data-lane-matchup-slot]:empty { display: none; }
+.lane-matchup-card { display: flex; height: 46px; align-items: center; gap: 10px; padding: 3px 9px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; white-space: nowrap; }
+.lane-matchup-foe, .lane-matchup-result, .lane-matchup-option { display: flex; min-width: 0; align-items: center; gap: 5px; }
 .lane-matchup-foe { color: var(--muted); font-size: 11px; }
 .lane-matchup-result { font-size: 12px; }
 .lane-matchup-result.is-weak { color: var(--danger); }
 .lane-matchup-result.is-strong { color: var(--success); }
-.lane-matchup-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 7px; }
-.lane-matchup-option { padding: 7px 9px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; font-size: 11px; }
-.lane-matchup-option strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lane-matchup-option > span { margin-left: auto; color: var(--success); white-space: nowrap; }
-.lane-matchup-card .game-icon { flex: 0 0 auto; }
+.lane-matchup-result.is-even { color: var(--ink); }
+.lane-matchup-options { display: flex; gap: 7px; }
+.lane-matchup-option { font-size: 11px; }
+.lane-matchup-option > span { color: var(--success); white-space: nowrap; }
+.lane-matchup-card .game-icon { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; }
+.recommendation-tab-row > .live-roster-notice { flex: 0 0 auto; max-width: 100%; }
+@container recommendation-area (min-width: 701px) {
+  .recommendation-tab-row:has([data-lane-matchup-card]) .recommendation-tabs button { min-width: clamp(76px,12cqw,150px); }
+}
 /* 页签内加载遮罩：只盖住 tab 栏下方的这块面板，tab 栏与其上方内容照常可用。 */
 .recommendation-panel { position: relative; min-width: 0; min-height: 220px; }
 .recommendation-panel.is-loading { min-height: min(420px,calc(60dvh / var(--ui-zoom, 1))); }
@@ -1675,6 +1680,9 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
   .live-player dl { grid-template-columns: repeat(3,minmax(60px,1fr)); }
   .recommendation-tabs { width: 100%; overflow-x: auto; }
   .recommendation-tabs button { min-width: 132px; flex: 1 0 auto; }
+  [data-lane-matchup-slot] { flex: 1 1 100%; width: 100%; margin-left: 0; }
+  .lane-matchup-card { width: 100%; }
+  .lane-matchup-option:nth-child(n+3) { display: none; }
   .recommendation-action { align-items: flex-start; flex-direction: column; }
   .recommendation-action .apply-runes, .recommendation-action .apply-item-set { width: 100%; }
   .rune-choice-selector { display: grid; grid-template-columns: 18px 26px minmax(0,1fr); }

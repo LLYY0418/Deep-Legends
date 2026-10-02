@@ -85,6 +85,7 @@ type clientDiagnosticRequest struct {
 	Shown                   bool                        `json:"shown"`
 	HiddenReason            string                      `json:"hiddenReason,omitempty"`
 	OwnLocked               bool                        `json:"ownLocked"`
+	Placement               string                      `json:"placement,omitempty"`
 	Counts                  map[string]int              `json:"counts,omitempty"`
 	Sources                 map[string]int              `json:"sources,omitempty"`
 	WindowMs                int                         `json:"windowMs,omitempty"`
@@ -321,6 +322,9 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if request.Event == "lane_matchup_card" {
+		if request.Placement == "tab-row" {
+			event["placement"] = "tab-row"
+		}
 		switch request.LaneMatchupMode {
 		case "a", "b", "a+b":
 			event["mode"] = request.LaneMatchupMode

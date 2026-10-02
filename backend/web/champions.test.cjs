@@ -5393,8 +5393,8 @@ test("R66 live premade hints cluster players and render a rich, fail-closed tag"
 	assert.match(tag, /class="premade-team-tag is-color-0"/);
 	assert.match(tag, />预组 ×2<\/span>/);
 	assert.match(tag, /data-tooltip-roster=/);
-	assert.match(tag, /profile-icons%2F11\.jpg/);
-	assert.match(tag, /champion-icons%2F22\.png/);
+	assert.doesNotMatch(tag, /profileURL|championURL|profile-icons|champion-icons/);
+	assert.match(tag, /预组队 2 人/);
 
 	const inconsistent = [{ ...players[0], premadeSize: 3 }, players[2]];
 	assert.equal(renderLivePremadeTag(inconsistent[0], inconsistent, 0), "");
@@ -5887,15 +5887,14 @@ test("QQ101 item depths disclose unavailable samples and flag extreme rates", ()
   assert.doesNotMatch(opgg, /腾讯官方数据不提供样本量|样本极少|is-low-confidence/);
 });
 
-test("R61 unnamed loot remains visible by raw ID with a completion hint", () => {
+test("R189 nonblank fallback loot remains visible without a pending hint", () => {
 	const functions = compileFunctions(appScript, ["lootToken", "lootName", "lootNamePending", "lootTypeLabel", "lootImagePaths", "lootCategorySlug", "lootCategoryIcon", "lootCard"], {
 		escapeHTML: (value) => String(value ?? ""),
 		formatNumber: (value) => String(value),
 	});
-	const markup = functions.lootCard({ lootId: "CHEST_224", localizedName: "未命名战利品", count: 1 });
-	assert.match(markup, /CHEST_224/);
-	assert.match(markup, /客户端数据暂未同步，可稍后重试/);
-	assert.match(markup, /is-name-pending/);
+	const markup = functions.lootCard({ lootId: "CHEST_224", displayName: "宝箱 224", dataPending: false, localizedName: "未命名战利品", count: 1 });
+	assert.match(markup, /宝箱 224/);
+	assert.doesNotMatch(markup, /CHEST_224|客户端数据暂未同步|is-name-pending/);
 	assert.doesNotMatch(markup, />未命名战利品</);
 	const emptyShell = functions.lootCard({ lootId: "", lootName: "", type: "", localizedDescription: "不得展示的说明", count: 30 });
 	assert.match(emptyShell, /客户端返回的空白条目/);

@@ -178,7 +178,7 @@ func TestEnrichLootItemsUsesChineseNamesAndCatalogSkinNames(t *testing.T) {
 		{LootID: "CHEST_promotion", Type: "CHEST", Count: 1},
 	}
 	items = enrichLootItems(items, []Skin{{ID: 143002, Name: "K/DA ALL OUT 萨勒芬妮 独立音乐人", ChampionID: 143, ChampionName: "萨勒芬妮", TilePath: "/lol-game-data/assets/skin.png", Owned: true}, {ID: 45000, Name: "维迦", ChampionID: 45, ChampionName: "维迦"}})
-	want := []string{"K/DA ALL OUT 萨勒芬妮 独立音乐人", "蓝色精粹", "橙色精粹", "战利品宝箱钥匙", "钥匙碎片", "维迦", "loot-box", "战利品宝箱", "紫色宝箱"}
+	want := []string{"K/DA ALL OUT 萨勒芬妮 独立音乐人", "蓝色精粹", "橙色精粹", "战利品宝箱钥匙", "钥匙碎片", "维迦", "材料", "战利品宝箱", "紫色宝箱"}
 	for index, expected := range want {
 		if items[index].DisplayName != expected {
 			t.Fatalf("item %d name=%q want=%q", index, items[index].DisplayName, expected)
@@ -216,8 +216,8 @@ func TestEnrichLootItemsRetainsTheLCUPendingShell(t *testing.T) {
 	if len(items) != 3 || !items[0].DataPending || !items[0].Blank || items[0].DisplayName != "" || items[0].Kind != "类型未知" {
 		t.Fatalf("empty-shell filtering dropped non-empty loot: %#v", items)
 	}
-	if items[1].DisplayName != "CHEST_224" || items[2].DisplayName != "MATERIAL_REAL" {
-		t.Fatalf("real loot identifiers were not preserved: %#v", items)
+	if items[1].DisplayName != "宝箱 224" || items[2].DisplayName != "材料" || items[1].LootID != "CHEST_224" || items[2].LootName != "MATERIAL_REAL" || items[1].DataPending || items[2].DataPending {
+		t.Fatalf("nonblank fallback names or original identifiers were incorrect: %#v", items)
 	}
 }
 

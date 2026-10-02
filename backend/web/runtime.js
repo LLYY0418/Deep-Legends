@@ -239,6 +239,7 @@
       if (["all","iron","bronze","silver","gold","gold_plus","platinum","platinum_plus","emerald","emerald_plus","diamond","diamond_plus","master","master_plus","grandmaster","challenger"].includes(fields.tier)) body.tier = fields.tier;
     }
     if (event === "lane_matchup_card") {
+      if (fields.placement === "tab-row") body.placement = "tab-row";
       if (["a","b","a+b"].includes(fields.mode)) body.mode = fields.mode;
       for (const key of ["shown","ownLocked"]) if (typeof fields[key] === "boolean") body[key] = fields[key];
       if (["pair-no-data","pair-pending","pair-failed","candidates-empty"].includes(fields.hiddenReason)) body.hiddenReason = fields.hiddenReason;

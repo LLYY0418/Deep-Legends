@@ -4915,7 +4915,7 @@
       selfPosition: String(context.selfPosition || ""), enemyLockedCount: Number(context.enemyLockedCount || 0),
       enemyPositionKnownCount: Number(context.enemyPositionKnownCount || 0), allyPositionKnownCount: Number(context.allyPositionKnownCount || 0),
     };
-    if (event === "lane_matchup_card") Object.assign(body, { mode: String(context.mode || ""), shown: context.shown === true, hiddenReason: String(context.hiddenReason || ""), ownLocked: context.ownLocked === true });
+    if (event === "lane_matchup_card") Object.assign(body, { placement: context.placement === "tab-row" ? "tab-row" : "", mode: String(context.mode || ""), shown: context.shown === true, hiddenReason: String(context.hiddenReason || ""), ownLocked: context.ownLocked === true });
     void fetch("/api/diagnostics/client", {
       method: "POST", credentials: "same-origin",
       headers: { "Accept": "application/json", "Content-Type": "application/json" },
@@ -5424,6 +5424,7 @@
   function liveBodyChrome(body) {
     const clone = body.cloneNode(true);
     for (const panel of clone.querySelectorAll(".recommendation-panel")) panel.innerHTML = "";
+    for (const slot of clone.querySelectorAll("[data-lane-matchup-slot]")) slot.innerHTML = "";
     return clone.innerHTML;
   }
 
@@ -5495,6 +5496,15 @@
     if (liveBodyChrome(body) !== liveBodyChrome(holder)) return false;
     const captured = captureLiveScroll();
     let replaced = false;
+    const currentSlot = body.querySelector("[data-lane-matchup-slot]");
+    const nextSlot = holder.querySelector("[data-lane-matchup-slot]");
+    if (currentSlot && nextSlot && currentSlot.innerHTML !== nextSlot.innerHTML) {
+      preserveLiveImages(currentSlot, nextSlot, { imagesRecreated: 0, rowsReplaced: 0 });
+      currentSlot.replaceChildren(...nextSlot.childNodes);
+      stampLiveRows(currentSlot);
+      prepareImages(currentSlot);
+      replaced = true;
+    }
     for (const key of ["runes", "build", "insight"]) {
       const current = body.querySelector(`#recommendation-panel-${key}`);
       const next = holder.querySelector(`#recommendation-panel-${key}`);
@@ -5538,18 +5548,13 @@
 	const source = String(player?.premadeSource || "inferred").trim().toLowerCase();
 	const roster = members.map((member) => {
 	  const index = Math.max(0, players.indexOf(member));
-	  const championId = liveDisplayedChampionId(member, currentChampionId);
 	  return {
 		name: maskedPlayerName(member, index),
-		champion: member.championName || "英雄待确认",
-		profileURL: Number(member.profileIconId) > 0 ? proxyAsset(assetPath("profile", member.profileIconId)) : "",
-		championURL: proxyAsset(assetPath("champion", championId)),
+		champion: Number(member.championId) > 0 && !member.championPickPending ? member.championName || "" : "",
 	  };
 	});
 	const direct = source === "session" || source === "both" || source === "lobby";
-	const tooltip = direct
-	  ? `客户端直接给出的组队信息${source === "both" ? "\n最近战绩也支持这一判断" : ""}`
-	  : `预组队推测\n最近战绩中共同出现至少 ${LIVE_PREMADE_MIN_SHARED_GAMES} 场`;
+	const tooltip = `${direct ? "组队" : "预组队"} ${members.length} 人`;
 	return `<span class="premade-team-tag is-color-${colorIndex}" tabindex="0" data-tooltip="${escapeHTML(tooltip)}" data-tooltip-roster="${escapeHTML(JSON.stringify(roster))}" data-tooltip-size="compact">${direct ? "组队" : "预组"} ×${members.length}</span>`;
   }
 
@@ -5905,7 +5910,7 @@
   }
 
   function recordLaneMatchupCardDiagnostic(data, context, mode, shown, hiddenReason) {
-    const fields = { mode, shown, hiddenReason: shown ? "" : hiddenReason, ownLocked: laneMatchupOwnLocked(context.self),
+    const fields = { mode, shown, placement: "tab-row", hiddenReason: shown ? "" : hiddenReason, ownLocked: laneMatchupOwnLocked(context.self),
       enemyChampionId: Number(context.enemy.championId), tier: laneMatchupTier(context) };
     const key = JSON.stringify(fields);
     state.laneMatchupCardDiagnostics ||= new Set();
@@ -5927,14 +5932,14 @@
     if (pair?.status === "succeeded" && pair.data) {
       const winRate = Number(pair.data.winRate);
       const tone = winRate > 50 ? "strong" : winRate < 50 ? "weak" : "even";
-      const copy = winRate === 50 ? "这局对线五五开，胜率约 50%" : `这局对线偏${winRate > 50 ? "优势" : "劣势"}，胜率约 ${rate(winRate)}`;
+      const copy = `${winRate === 50 ? "五五开" : `偏${winRate > 50 ? "优势" : "劣势"}`} ${rate(winRate)}`;
       content += `<div class="lane-matchup-result is-${tone}"><strong>${copy}</strong></div>`;
     }
-    if (candidates.length) content += `<div class="lane-matchup-options">${candidates.map(row => `<div class="lane-matchup-option">${iconFigure("champion", row.championId, row.name || "候选英雄", "small")}<strong>${escapeHTML(row.name || "候选英雄")}</strong><span>胜率差 +${rate(50 - Number(row.winRate))}</span></div>`).join("")}</div>`;
+    if (candidates.length) content += `<div class="lane-matchup-options">${candidates.slice(0, 3).map(row => `<div class="lane-matchup-option" aria-label="${escapeHTML(row.name || "")}" data-tooltip="${escapeHTML(row.name || "")}">${iconFigure("champion", row.championId, row.name || "", "small")}<span>+${rate(50 - Number(row.winRate))}</span></div>`).join("")}</div>`;
     const hiddenReason = ownId > 0 ? !pair || pair.status === "pending" ? "pair-pending" : pair.status === "failed" ? "pair-failed" : "pair-no-data" : "candidates-empty";
     recordLaneMatchupCardDiagnostic(data, context, mode, Boolean(content), hiddenReason);
     if (!content) return "";
-    return `<section class="lane-matchup-card" data-lane-matchup-card><h3>对位克制建议</h3><div class="lane-matchup-foe">${iconFigure("champion", enemyId, context.enemy.championName || "敌方英雄", "small")}<span>对位：${escapeHTML(context.enemy.championName || "敌方英雄")}</span></div>${content}</section>`;
+    return `<section class="lane-matchup-card" data-lane-matchup-card><div class="lane-matchup-foe">${iconFigure("champion", enemyId, context.enemy.championName || "敌方英雄", "small")}<span>对位 ${escapeHTML(context.enemy.championName || "敌方英雄")}</span></div>${content}</section>`;
   }
 
   function renderRecommendationArea(data) {
@@ -5974,7 +5979,7 @@
     } else {
       // R116-D：把推荐 payload 一起传进去，详情 tab 才能渲染克制/协同小条与
       // 队伍画像标签。payload 为空时函数内部整块不渲染（拿不到就隐藏）。
-      content.insight = `${renderLaneMatchupCard(data, payload.hero)}${renderLiveInsights(data, payload)}`;
+      content.insight = renderLiveInsights(data, payload);
       if (noChampion) {
         const pendingTitle = randomPending ? "随机待定" : "请先选定英雄";
         const pendingCopy = randomPending ? "英雄尚未确定，锁定后自动加载。" : "点击预选或锁定英雄后自动读取推荐数据。";
@@ -5995,7 +6000,7 @@
 	    const rosterNotice = data.champSelectNotice ? `<p class="live-roster-notice" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5m0-9h.01"></path></svg><span>${escapeHTML(data.champSelectNotice)}</span></p>` : "";
     // R128 §2.3：方法论/口径类说明不再进 UI（用户 2026-09-22 指示，撤销 R116-B
     // P0-3 的常驻页脚）。后端仍可能下发那个口径字段，前端一律不消费。
-	    return `<section class="recommendation-area">${renderRecommendationDataNotices(payload)}<div class="recommendation-tab-row"><div class="recommendation-tabs" role="tablist" aria-label="推荐类型">${tabs.map(([key, label]) => tab(key, label)).join("")}</div>${rosterNotice}</div>${tabs.map(([key]) => panel(key, content[key] || "")).join("")}</section>`;
+	    return `<section class="recommendation-area">${renderRecommendationDataNotices(payload)}<div class="recommendation-tab-row"><div class="recommendation-tabs" role="tablist" aria-label="推荐类型">${tabs.map(([key, label]) => tab(key, label)).join("")}</div><div data-lane-matchup-slot>${renderLaneMatchupCard(data, payload.hero)}</div>${rosterNotice}</div>${tabs.map(([key]) => panel(key, content[key] || "")).join("")}</section>`;
   }
 
 	function liveChampionAugmentRows(data, source) {

@@ -17,12 +17,13 @@ type lootMetadataCatalog struct {
 	parse      func([]byte) (map[string]lootMetadata, error)
 }
 
-// These are separate client catalogs: loot.json does not contain ward/icon
+// These are separate client catalogs: loot.json does not contain ward/icon/emote
 // names, and some legacy chests/materials only have loot_name_* translations.
 var lootMetadataCatalogs = []lootMetadataCatalog{
 	{"loot", "/lol-game-data/assets/v1/loot.json", "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/loot.json", parseLootCatalog},
 	{"wards", "/lol-game-data/assets/v1/ward-skins.json", "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/ward-skins.json", parseLootWardCatalog},
 	{"icons", "/lol-game-data/assets/v1/summoner-icons.json", "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/summoner-icons.json", parseLootIconCatalog},
+	{"emotes", "/lol-game-data/assets/v1/summoner-emotes.json", "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/summoner-emotes.json", parseLootEmoteCatalog},
 	{"translations", "/fe/lol-loot/trans.json", "/latest/plugins/rcp-fe-lol-loot/global/zh_cn/trans.json", parseLootTranslations},
 }
 
@@ -130,6 +131,29 @@ func parseLootIconCatalog(data []byte) (map[string]lootMetadata, error) {
 		entry := lootMetadata{Name: strings.TrimSpace(icon.Title), Image: sanitizeClientImagePath(icon.ImagePath)}
 		for _, prefix := range []string{"SUMMONER_ICON_", "SUMMONERICON_"} {
 			result[prefix+strconv.FormatInt(*icon.ID, 10)] = entry
+		}
+	}
+	return requireLootMetadataEntries(result)
+}
+
+func parseLootEmoteCatalog(data []byte) (map[string]lootMetadata, error) {
+	var emotes []struct {
+		ID            *int64 `json:"id"`
+		Name          string `json:"name"`
+		Description   string `json:"description"`
+		InventoryIcon string `json:"inventoryIcon"`
+	}
+	if err := json.Unmarshal(data, &emotes); err != nil {
+		return nil, err
+	}
+	result := make(map[string]lootMetadata)
+	for _, emote := range emotes {
+		if emote.ID == nil || *emote.ID < 0 || strings.TrimSpace(emote.Name) == "" {
+			continue
+		}
+		result["EMOTE_"+strconv.FormatInt(*emote.ID, 10)] = lootMetadata{
+			Name: strings.TrimSpace(emote.Name), Description: strings.TrimSpace(emote.Description),
+			Image: sanitizeClientImagePath(emote.InventoryIcon),
 		}
 	}
 	return requireLootMetadataEntries(result)

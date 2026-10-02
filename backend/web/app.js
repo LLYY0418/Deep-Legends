@@ -2925,9 +2925,7 @@
 		return item?.displayName || (localized === "未命名战利品" ? "" : localized) || item?.lootName || item?.lootId || "客户端返回的空白条目";
 	  }
   function lootNamePending(item) {
-    const name = String(lootName(item) || "").trim();
-    const rawID = String(item?.lootId || "").trim();
-	return Boolean(item?.dataPending || rawID && name.toUpperCase() === rawID.toUpperCase());
+	return Boolean(item?.dataPending);
   }
   function lootTypeLabel(item) {
     const type = String(item?.type || item?.displayCategories || "").toUpperCase();
@@ -3019,7 +3017,9 @@
     const art = paths.length ? `<img data-paths="${encodeURIComponent(paths.join("\n"))}" alt="" loading="lazy" decoding="async">` : "";
 	const ownership = category === "皮肤" && item.skinOwnedKnown
 	  ? `<small class="loot-ownership ${item.skinOwned ? "is-owned" : "is-unowned"}">${item.skinOwned ? "已拥有" : "可升级"}</small>`
-      : "";
+      : ["表情", "守卫", "图标"].includes(category) && item.ownedKnown
+        ? `<small class="loot-ownership ${item.owned ? "is-owned" : "is-missing"}">${item.owned ? "已拥有" : "未拥有"}</small>`
+        : "";
 	const essenceIcon = '<img src="/loot-icons/orange-essence.png" alt="橙色精粹">';
 	const canUpgrade = !item.skinOwnedKnown || !item.skinOwned;
 	const namePending = lootNamePending(item);
@@ -4043,20 +4043,13 @@
 		for (const item of roster) {
 		  const playerNode = document.createElement("span");
 		  playerNode.className = "tooltip-roster-player";
-		  const icons = document.createElement("span");
-		  icons.className = "tooltip-roster-icons";
-		  for (const [kind, rawURL] of [["profile", item?.profileURL], ["champion", item?.championURL]]) {
-			const imageURL = String(rawURL || "");
-			if (!imageURL.startsWith("/api/image?path=")) continue;
-			const image = document.createElement("img");
-			image.className = `is-${kind}`;
-			image.setAttribute("data-queued-src", imageURL);
-			image.alt = "";
-			icons.append(image);
-		  }
-		  const copy = document.createElement("span");
-		  copy.textContent = [item?.name, item?.champion].filter(Boolean).join(" · ");
-		  playerNode.append(icons, copy);
+		  const name = document.createElement("span");
+		  name.className = "tooltip-roster-name";
+		  name.textContent = String(item?.name || "");
+		  const champion = document.createElement("span");
+		  champion.className = "tooltip-roster-champion";
+		  champion.textContent = String(item?.champion || "");
+		  playerNode.append(name, champion);
 		  rosterNode.append(playerNode);
 		}
 		children.push(rosterNode);

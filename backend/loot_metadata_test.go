@@ -150,8 +150,8 @@ func TestLootNamingPublicCatalogFallbackIsCachedAndPrivate(t *testing.T) {
 			t.Fatal("diagnostics leaked credential")
 		}
 	}
-	if got := requests.Load(); got != 4 {
-		t.Fatalf("public catalogs fetched %d times, want four cached reads", got)
+	if got := requests.Load(); got != int32(len(lootMetadataCatalogs)) {
+		t.Fatalf("public catalogs fetched %d times, want one cached read per catalog", got)
 	}
 }
 
@@ -170,7 +170,7 @@ func TestLootNamingSharedDeadlineAndOfflineFallback(t *testing.T) {
 	defer cancel()
 	started := time.Now()
 	metadata := loadLootMetadata(ctx, nil, provider, nil)
-	if time.Since(started) > time.Second || peak.Load() != 4 || len(metadata) != 0 {
+	if time.Since(started) > time.Second || peak.Load() != int32(len(lootMetadataCatalogs)) || len(metadata) != 0 {
 		t.Fatalf("catalogs did not share a concurrent deadline: peak=%d, entries=%d", peak.Load(), len(metadata))
 	}
 	items := enrichLootItems([]LootItem{{LootID: "CHEST_128", Count: 1}, {LootID: "MATERIAL_clashtickets", Count: 1}}, nil)
@@ -181,7 +181,7 @@ func TestLootNamingSharedDeadlineAndOfflineFallback(t *testing.T) {
 	}
 }
 
-func TestLootNamingPreservesLocalNamesAndReportsUnresolvedRawIDs(t *testing.T) {
+func TestLootNamingPreservesLocalNamesAndReportsUnresolvedCategories(t *testing.T) {
 	shape := &lootShapeDiagnostics{unnamedTypeCounts: make(map[string]int)}
 	var events []map[string]any
 	items := enrichLootItemsWithMetadata([]LootItem{
@@ -191,7 +191,7 @@ func TestLootNamingPreservesLocalNamesAndReportsUnresolvedRawIDs(t *testing.T) {
 		// 纯数字字段都拼不出它。前缀匹配（WARD_）与回退语义不受影响。
 		{LootID: "WARD_SKIN_RENTAL_ZQ7XK", LootName: "WARD_SKIN_RENTAL_ZQ7XK", Count: 2, Type: "WARDSKIN_RENTAL", shapeDiagnostics: shape},
 	}, nil, map[string]lootMetadata{"SUMMONER_ICON_782": {Name: "公开目录名称"}}, func(event map[string]any) { events = append(events, event) })
-	if len(items) != 2 || items[0].DisplayName != "客户端专属名称" || items[1].DisplayName != items[1].LootID || items[1].Count != 2 {
+	if len(items) != 2 || items[0].DisplayName != "客户端专属名称" || items[1].DisplayName != "守卫" || items[1].Count != 2 {
 		t.Fatalf("local names or unresolved inventory were overwritten: %#v", items)
 	}
 	if len(events) != 1 || events[0]["event"] != "loot_name_fallback" || events[0]["loot_id_prefix"] != "WARD_" || shape.unnamedTypeCounts["WARDSKIN_RENTAL"] != 1 {

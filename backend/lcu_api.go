@@ -50,6 +50,8 @@ type LootItem struct {
 	SkinID               int64  `json:"skinId,omitempty"`
 	SkinOwned            bool   `json:"skinOwned"`
 	SkinOwnedKnown       bool   `json:"skinOwnedKnown,omitempty"`
+	Owned                bool   `json:"owned"`
+	OwnedKnown           bool   `json:"ownedKnown,omitempty"`
 	LocalizedDescription string `json:"localizedDescription,omitempty"`
 	DisplayCategories    string `json:"displayCategories,omitempty"`
 	Type                 string `json:"type,omitempty"`
@@ -171,7 +173,9 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 	kept := items[:0]
 	for index := range items {
 		item := &items[index]
-		// A real localized inventory name is more specific than a public catalog.
+		catalogHit, emoteCatalogImage := false, false
+		item.Category = lootCategory(*item)
+		// Prefer localized inventory names; emotes below use their dedicated catalog.
 		if lootNameMissing(*item, item.DisplayName) && !lootNameMissing(*item, item.LocalizedName) {
 			item.DisplayName = strings.TrimSpace(item.LocalizedName)
 		}
@@ -180,6 +184,7 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 			if !ok {
 				continue
 			}
+			catalogHit = true
 			if lootNameMissing(*item, item.DisplayName) && !lootNameMissing(*item, entry.Name) {
 				item.DisplayName = entry.Name
 			}
@@ -189,6 +194,17 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 			if item.Asset == "" {
 				item.Asset = entry.Image
 			}
+			if item.Category == "表情" {
+				if !lootNameMissing(*item, entry.Name) {
+					item.DisplayName = entry.Name
+				}
+				item.LocalizedDescription = entry.Description
+				if entry.Image != "" {
+					item.Asset = entry.Image
+					item.TilePath, item.SplashPath = "", ""
+					emoteCatalogImage = true
+				}
+			}
 			break
 		}
 		for _, raw := range []string{item.LootID, item.LootName} {
@@ -196,11 +212,20 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 			if name, ok := lootChineseNames[token]; ok && lootNameMissing(*item, item.DisplayName) {
 				item.DisplayName = name
 			}
-			if icon, ok := lootClientIcons[token]; ok {
+			if icon, ok := lootClientIcons[token]; ok && !emoteCatalogImage {
 				item.Asset = icon
 			}
 		}
 		item.Category = lootCategory(*item)
+		item.Owned, item.OwnedKnown = false, false
+		if item.Category == "表情" || item.Category == "守卫" || item.Category == "图标" {
+			switch normalizeLootToken(item.ItemStatus) {
+			case "OWNED":
+				item.OwnedKnown, item.Owned = true, true
+			case "NONE":
+				item.OwnedKnown = true
+			}
+		}
 		if observe != nil && (item.Category == "宝箱" || (item.Category == "皮肤" && lootSkinID(*item) == 0)) {
 			observe(map[string]any{"event": "loot_category_assigned", "category": item.Category,
 				"id_prefix": lootIDPrefix(item.LootID), "type": normalizeLootToken(item.Type)})
@@ -246,13 +271,14 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 					"raw_key_empty":            item.rawKeyEmpty,
 					"type_empty":               strings.TrimSpace(item.Type) == "",
 					"display_categories":       normalizeLootToken(item.DisplayCategories),
+					"item_status":              normalizeLootToken(item.ItemStatus),
+					"catalog_hit":              catalogHit,
 				}
 				if blank {
 					// Identity-less record: log which raw fields the client filled
 					// (key names, enum-like status values, artwork path; never the
 					// quantity) so the next log can say what the record is.
 					event["field_keys"] = item.rawFieldKeys
-					event["item_status"] = normalizeLootToken(item.ItemStatus)
 					event["rarity"] = normalizeLootToken(item.Rarity)
 					event["redeemable_status"] = normalizeLootToken(item.RedeemableStatus)
 					event["asset"] = lootShellAssetForLog(item.Asset, item.TilePath, item.SplashPath)
@@ -265,9 +291,11 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 				// boundary while showing which LCU type still lacks a display name.
 				item.shapeDiagnostics.unnamedTypeCounts[normalizeLootToken(item.Type)]++
 			}
-			item.DisplayName = strings.TrimSpace(item.LootID)
-			if item.DisplayName == "" {
-				item.DisplayName = strings.TrimSpace(item.LootName)
+			if !blank {
+				item.DisplayName = lootFallbackDisplayName(*item)
+				if item.Category == "表情" {
+					item.Asset, item.TilePath, item.SplashPath = "", "", ""
+				}
 			}
 			if blank {
 				// The client returned a record with no key, ID, name or type, so
@@ -301,6 +329,24 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 		})
 	}
 	return items
+}
+
+// Unknown names are not synchronization failures. Only explicit numeric
+// inventory tokens identify a fallback; storeItemId is not assumed equivalent.
+func lootFallbackDisplayName(item LootItem) string {
+	category := item.Category
+	if category == "" {
+		category = lootCategory(item)
+	}
+	for _, raw := range []string{item.LootID, item.LootName} {
+		parts := strings.Split(normalizeLootToken(raw), "_")
+		for index := len(parts) - 1; index >= 0; index-- {
+			if id, err := strconv.ParseInt(parts[index], 10, 64); err == nil && id >= 0 {
+				return category + " " + strconv.FormatInt(id, 10)
+			}
+		}
+	}
+	return category
 }
 
 func lootIDPrefix(value string) string {
