@@ -1,0 +1,45 @@
+{
+  "baseline": "a175718b",
+  "cards": [
+    {
+      "player": {
+        "hidden": false,
+        "position": "jungle",
+        "championId": 64,
+        "championName": "李青",
+        "historyState": "unavailable",
+        "modeStats": {},
+        "recentGames": [],
+        "identityUnresolved": true
+      },
+      "html": "<article class=\"live-player\"><img alt=\"李青\"><div class=\"live-player-copy\"><div class=\"live-player-identity\"><button class=\"live-player-name\" type=\"button\" disabled data-tooltip=\"身份待公开\" data-tooltip-overflow=\"self\" data-tooltip-size=\"compact\">身份待公开</button><span class=\"player-tab-hidden\">身份待公开</span></div><span>打野 · 未定级</span></div><dl><div><dt>当前模式</dt><dd class=\"live-record-value\">身份尚未公开</dd></div><div><dt>胜率</dt><dd class=\"win-rate-value\">—</dd></div><div><dt>KDA</dt><dd class=\"live-kda-value\">—</dd></div></dl></article><div class=\"insight-match-row\"><small class=\"insight-none\">身份尚未公开</small></div>"
+    },
+    {
+      "player": {
+        "hidden": false,
+        "position": "jungle",
+        "championId": 64,
+        "championName": "李青",
+        "historyState": "unavailable",
+        "modeStats": {},
+        "recentGames": [],
+        "privateHistory": true,
+        "gameName": "公开玩家"
+      },
+      "html": "<article class=\"live-player\"><img alt=\"李青\"><div class=\"live-player-copy\"><div class=\"live-player-identity\"><button class=\"live-player-name\" type=\"button\" disabled data-tooltip=\"公开玩家\" data-tooltip-overflow=\"self\" data-tooltip-size=\"compact\">公开玩家</button><span class=\"player-tab-hidden\">隐藏战绩</span></div><span>打野 · 未定级</span></div><dl><div><dt>当前模式</dt><dd class=\"live-record-value\">客户端未公开该玩家</dd></div><div><dt>胜率</dt><dd class=\"win-rate-value\">—</dd></div><div><dt>KDA</dt><dd class=\"live-kda-value\">—</dd></div></dl></article><div class=\"insight-match-row\"><small class=\"insight-none\">客户端未公开该玩家</small></div>"
+    },
+    {
+      "player": {
+        "hidden": false,
+        "position": "jungle",
+        "championId": 64,
+        "championName": "李青",
+        "historyState": "empty",
+        "modeStats": {},
+        "recentGames": [],
+        "gameName": "普通玩家"
+      },
+      "html": "<article class=\"live-player\"><img alt=\"李青\"><div class=\"live-player-copy\"><div class=\"live-player-identity\"><button class=\"live-player-name\" type=\"button\" disabled data-tooltip=\"普通玩家\" data-tooltip-overflow=\"self\" data-tooltip-size=\"compact\">普通玩家</button></div><span>打野 · 未定级</span></div><dl><div><dt>当前模式</dt><dd class=\"live-record-value\">暂无样本</dd></div><div><dt>胜率</dt><dd class=\"win-rate-value\">—</dd></div><div><dt>KDA</dt><dd class=\"live-kda-value\">—</dd></div></dl></article><div class=\"insight-match-row\"><small class=\"insight-none\">该玩家当前模式暂无最近战绩</small></div>"
+    }
+  ]
+}

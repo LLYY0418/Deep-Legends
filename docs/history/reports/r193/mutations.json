@@ -1,0 +1,12 @@
+[
+  {
+    "mutation": "fake-hidden-rank",
+    "test": "R193 1",
+    "result": "assertion FAIL (mutant killed)"
+  },
+  {
+    "mutation": "duplicate-bottom-message",
+    "test": "R193 2",
+    "result": "assertion FAIL (mutant killed)"
+  }
+]

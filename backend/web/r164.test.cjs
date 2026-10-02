@@ -94,7 +94,7 @@ test('R168 live identity copy separates unresolved champ select names from expli
   assert.match(hiddenHTML, /隐藏身份/);
   assert.match(hiddenHTML, /客户端未公开该玩家/);
   assert.doesNotMatch(hiddenHTML, /身份待公开/);
-  assert.match(helpers.renderInsightMatches(hidden), /客户端未公开该玩家/);
+  assert.equal(helpers.renderInsightMatches(hidden), "");
   assert.equal(helpers.playerLabel({ gameName: 'private-name', hidden: true }), '隐藏玩家');
   assert.equal(helpers.maskedListName({ displayName: 'private-name', hidden: true }, 0), '隐藏玩家');
   assert.equal(helpers.playerParticipantName({ gameName: 'private-name', hidden: true }, 0), '隐藏玩家');

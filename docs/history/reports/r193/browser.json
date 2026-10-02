@@ -1,0 +1,171 @@
+{
+  "route": "对局页 → 详情",
+  "fixture": true,
+  "avatar": "本地 SVG 演示夹具",
+  "results": [
+    {
+      "mode": "before",
+      "text": "李隐藏玩家隐藏身份打野 · 未定级当前模式客户端未公开该玩家胜率—KDA—客户端未公开该玩家",
+      "subtitle": "打野 · 未定级",
+      "columns": 3,
+      "history": true,
+      "disabled": true,
+      "avatar": true,
+      "nextGap": 10,
+      "statWidth": 95.015625,
+      "clip": {
+        "x": 753,
+        "y": 473.5,
+        "width": 485.046875,
+        "height": 199.5,
+        "scale": 1
+      },
+      "rows": [
+        [
+          {
+            "name": "青钢影不加班#DEMO",
+            "y": 265,
+            "height": 83.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 473.5,
+            "height": 84.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 683,
+            "height": 84.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 892.5,
+            "height": 84.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 1102,
+            "height": 84.5
+          }
+        ],
+        [
+          {
+            "name": "演示玩家#DEMO",
+            "y": 265,
+            "height": 83.5
+          },
+          {
+            "name": "隐藏玩家",
+            "y": 473.5,
+            "height": 84.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 683,
+            "height": 84.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 892.5,
+            "height": 84.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 1102,
+            "height": 84.5
+          }
+        ]
+      ],
+      "errors": []
+    },
+    {
+      "mode": "after",
+      "text": "李隐藏玩家隐藏身份打野当前模式客户端未公开该玩家",
+      "subtitle": "打野",
+      "columns": 1,
+      "history": false,
+      "disabled": true,
+      "avatar": true,
+      "nextGap": 0,
+      "statWidth": 220,
+      "clip": {
+        "x": 753,
+        "y": 443.5,
+        "width": 485.046875,
+        "height": 72,
+        "scale": 1
+      },
+      "rows": [
+        [
+          {
+            "name": "青钢影不加班#DEMO",
+            "y": 255,
+            "height": 83.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 443.5,
+            "height": 84.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 633,
+            "height": 84.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 822.5,
+            "height": 84.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 1012,
+            "height": 84.5
+          }
+        ],
+        [
+          {
+            "name": "演示玩家#DEMO",
+            "y": 255,
+            "height": 83.5
+          },
+          {
+            "name": "隐藏玩家",
+            "y": 443.5,
+            "height": 72
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 515.5,
+            "height": 84.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 705,
+            "height": 84.5
+          },
+          {
+            "name": "演示玩家#DEMO",
+            "y": 894.5,
+            "height": 84.5
+          }
+        ]
+      ],
+      "errors": []
+    }
+  ],
+  "narrow": {
+    "width": 760,
+    "subtitle": "打野",
+    "history": false,
+    "nextGap": 0,
+    "columns": 1,
+    "clip": {
+      "x": 95.3125,
+      "y": 557.5,
+      "width": 639.375,
+      "height": 107.5,
+      "scale": 1
+    }
+  }
+}

@@ -1030,6 +1030,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-player-copy > span { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .live-player dl { display: grid; grid-template-columns: repeat(3,minmax(68px,1fr)); gap: 6px; margin: 0; }
 .live-player dl > div { padding-left: 7px; border-left: 1px solid var(--line); }
+.live-player dl > div:only-child { grid-column: 1 / -1; }
 .live-player dt { color: var(--muted); font-size: 10px; }
 .live-player dd { margin: 0; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .live-player.is-self dt, .live-player.is-self .live-player-copy > span { color: var(--ink); }
@@ -1326,6 +1327,10 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-teams.is-insight:not(.is-arena) > .live-team { display: grid; grid-row: 1 / span 11; grid-template-rows: subgrid; }
 .live-teams.is-insight:not(.is-arena) > .live-team > header { grid-row: 1; }
 .live-teams.is-insight:not(.is-arena) .live-player-list.is-insight { display: contents; }
+/* R193：隐藏玩家没有历史行；按各队内容排布，避免缺行使 subgrid 后续卡片错位。 */
+.live-teams.is-insight:not(.is-arena):has(.live-player.is-hidden) { grid-template-rows: none; }
+.live-teams.is-insight:not(.is-arena):has(.live-player.is-hidden) > .live-team { display: block; grid-row: auto; }
+.live-teams.is-insight:not(.is-arena):has(.live-player.is-hidden) .live-player-list.is-insight { display: grid; }
 .live-player-list.is-insight .insight-match-row { display: flex; flex-wrap: wrap; align-content: flex-end; align-items: flex-end; gap: 5px; padding: 0 11px 11px 68px; }
 .live-player-list.is-insight .live-player { border-top: 1px solid var(--line); }
 .live-player-list.is-insight .live-player:first-child { border-top: 0; }

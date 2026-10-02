@@ -7,7 +7,7 @@ function extract(name,source=src){let start=source.indexOf(`function ${name}(`);
 function compile(names,deps={},source=src){return Function(...Object.keys(deps),names.map(n=>extract(n,source)).join('\n')+`\nreturn {${names.join(',')}};`)(...Object.values(deps));}
 const flush=()=>new Promise(setImmediate);
 function cardRenderer(source=src){const state={live:{phase:'ChampSelect'}};const deps={state,maskedPlayerName:p=>p.hidden?'隐藏玩家':'Player',liveDisplayedChampionId:p=>p.championId||0,rankTitle:()=> '未定级',positionLabel:()=> '位置未知',renderLivePremadeTag:()=>'',proBadgeAttributes:()=>'',renderProIdentityBadge:()=>'',number:String,percent:String,kda:String,escapeHTML:String,iconFigure:(_,id)=>`<img src="champion-${id}">`};const f=compile(['renderLivePlayer','champSelectEnemyPlaceholder','liveHistoryStateOf','liveHistorySettled'],deps,source);return {state,renderLivePlayer:(...args)=>{args[8]=state.live.phase;return f.renderLivePlayer(...args)}};}
-test('R179 enemy placeholder is champ-select only and leaves allies/live hidden text unchanged',()=>{
+test('R179 enemy placeholder is champ-select only and keeps R193 live hidden identity display',()=>{
  const h=cardRenderer(),players=[{teamId:100,isCurrent:true},{teamId:200,hidden:true,historyState:'unavailable',championId:61}];
  const html=h.renderLivePlayer(players[1],1,false,0,players);const dom=new JSDOM(html);
  const style=dom.window.document.createElement('style');style.textContent=fs.readFileSync(path.join(__dirname,'gameplay.css'),'utf8');dom.window.document.head.appendChild(style);
