@@ -90,6 +90,9 @@ func (a *app) scheduleQuit(delay time.Duration, reason string) {
 			if a.runtimeCancel != nil {
 				a.runtimeCancel()
 			}
+			if a.runtimeMetricsDone != nil {
+				<-a.runtimeMetricsDone
+			}
 			a.updates.Close()
 			a.mu.Lock()
 			client := a.lcu

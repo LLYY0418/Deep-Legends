@@ -179,12 +179,13 @@
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
-    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "arena_header_source", "live_render_rebuild", "lane_matchup_candidate_fetch", "lane_matchup_card"].includes(event)) return;
-    // Background observations share one in-flight slot and never retry. A slow
-    // diagnostics endpoint must not occupy the connections needed by the UI.
+    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "arena_header_source", "live_render_rebuild", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf"].includes(event)) return;
+    // Sample local requests by fixed endpoint category so status polling cannot
+    // hide page timings. Delivery stays bounded and sampled events never retry.
     const sampled = event === "live_refresh_client" || event === "local_request_client";
+    const sampleKey = event === "local_request_client" ? event + ":" + fields.endpoint : event;
     const now = Date.now();
-    if (sampled && (sampledPending.size || now - (sampledAt.get(event) ?? -Infinity) < (event === "local_request_client" ? 10000 : 1000))) { increment("transportSuppressed"); return; }
+    if (sampled && (sampledPending.size && event !== "local_request_client" || now - (sampledAt.get(sampleKey) ?? -Infinity) < (event === "local_request_client" ? 10000 : 1000))) { increment("transportSuppressed"); return; }
     const body = { event, reason };
     if (event === "arena_header_source") {
       if (Number.isInteger(fields.championId) && fields.championId > 0) body.championId = Math.min(1000000, fields.championId);
@@ -203,7 +204,7 @@
       if (["overview", "live", "champions", "favorites", "suite", "collection", "tools"].includes(fields.section)) body.section = fields.section;
     }
     if (event === "local_request_client" || event === "image_queue_slow") {
-      if (["status", "gameplay", "champions", "collection", "pro-players", "friends", "image", "section-loader", "other"].includes(fields.endpoint)) body.endpoint = fields.endpoint;
+      if (["status", "gameplay", "champions", "collection", "pro-players", "friends", "image", "section-loader", "other", "overview", "live", "facade", "watch", "rig", "claim", "champselect"].includes(fields.endpoint)) body.endpoint = fields.endpoint;
       for (const key of ["startedAt", "completedAt"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1e13, Math.floor(fields[key])));
       // R127 P0-2：图片队列的排队/加载计时与来源类别（不含具体路径）。
       for (const key of ["queueWaitMs", "loadMs", "activeSlowCount"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1000000, Math.floor(fields[key])));
@@ -244,11 +245,84 @@
       if (Number.isInteger(fields.enemyChampionId)) body.enemyChampionId = Math.max(0,Math.min(1000000,fields.enemyChampionId));
       if (["all","iron","bronze","silver","gold","gold_plus","platinum","platinum_plus","emerald","emerald_plus","diamond","diamond_plus","master","master_plus","grandmaster","challenger"].includes(fields.tier)) body.tier = fields.tier;
     }
+    if (event === "local_request_client" && Number.isFinite(fields.responseBytes)) body.responseBytes = Math.max(0, Math.min(2147483648, Math.floor(fields.responseBytes)));
+    if (event === "renderer_perf") {
+      for (const key of ["windowMs","longtaskCount","longtaskTotalMs","longtaskMaxMs","timerLagCount","timerLagMaxMs","heapUsedMb","heapLimitMb","domNodes","imgCount"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1e9, key === "windowMs" ? Math.floor(fields[key]) : fields[key]));
+      body.groups = (Array.isArray(fields.groups) ? fields.groups : []).slice(0,32).filter(row => ["overview","live","champions","favorites","suite","settings","pro-players"].includes(row.section) && ["main","watch","rig","facade","sweep","champselect","collection","account","facade-collection","items","pools","icons","banners","runes","build","specialist","pro","opgg"].includes(row.tab)).map(row => ({section:row.section,tab:row.tab,count:Math.max(0,Math.min(1e6,Number(row.count)||0)),totalMs:Math.max(0,Math.min(1e9,Number(row.totalMs)||0)),maxMs:Math.max(0,Math.min(1e9,Number(row.maxMs)||0))}));
+    }
     const encoded = JSON.stringify(body);
     if (flowPending.has(encoded) || flowSamples.has(encoded) && now - flowSamples.get(encoded) < 30000) { increment("transportSuppressed"); return; }
     if (flowPending.size >= 32) { increment("transportDropped"); return; }
     flowPending.add(encoded);
-    if (sampled) { sampledAt.set(event, now); sampledPending.add(event); }
+    if (sampled) { sampledAt.set(sampleKey, now); sampledPending.add(event); }
     void sendFlowDiagnostic(body, encoded, sampled ? 1 : 0);
   };
+})();
+
+// R185: application-wide observers. No response content or dynamic tab names
+// enter diagnostics; request measurement consumes the same body, never a clone.
+(() => {
+  "use strict";
+  const sections = ["overview","live","champions","favorites","suite","settings","pro-players"];
+  const localOrigin = typeof location === "undefined" ? "" : location.origin;
+  const tabs = ["main","watch","rig","facade","sweep","champselect","collection","account","facade-collection","items","pools","icons","banners","runes","build","specialist","pro","opgg"];
+  const page = () => {
+    const section = document.querySelector('.section-tab.is-active')?.dataset?.section || "overview";
+    const root = document.getElementById(`${section}-panel`);
+    const active = root?.querySelector('[aria-selected="true"][data-suite-tab], [aria-selected="true"][data-favorites-page], [aria-selected="true"][data-recommendation-tab]');
+    const raw = active?.dataset?.suiteTab || active?.dataset?.favoritesPage || active?.dataset?.recommendationTab || "main";
+    return {section:sections.includes(section)?section:"overview",tab:tabs.includes(raw)?raw:"main"};
+  };
+  function createRendererPerformance({now=()=>performance.now(), getPage=page, snapshot=()=>({}), report, observe, interval=setInterval, clear=clearInterval}={}) {
+    let disposed=false,lastTick=now(), lastFlush=lastTick, lastReport=lastTick, groups=new Map(), count=0,total=0,max=0,lagCount=0,lagMax=0;
+    const timeline=[{at:lastTick,...getPage()}];
+    const markPage=()=>{if(disposed)return;const p=getPage();timeline.push({at:now(),...p});while(timeline.length>64)timeline.shift();};
+    const longtasks=entries=>{for(const e of entries){const duration=Number(e.duration);if(!Number.isFinite(duration)||duration<50)continue;
+      let p=timeline[0];for(const item of timeline){if(item.at<=Number(e.startTime??now())+duration)p=item;else break;}
+      const key=p.section+":"+p.tab;const row=groups.get(key)||{section:p.section,tab:p.tab,count:0,totalMs:0,maxMs:0};row.count++;row.totalMs+=duration;row.maxMs=Math.max(row.maxMs,duration);groups.set(key,row);count++;total+=duration;max=Math.max(max,duration);
+    }};
+    const tick=()=>{const at=now(),elapsed=at-lastTick;lastTick=at;if(elapsed>1200){lagCount++;lagMax=Math.max(lagMax,elapsed-1000);}};
+    const flush=()=>{const at=now();if(count || at-lastReport>=300000){report("renderer_perf","aggregated",{windowMs:at-lastFlush,longtaskCount:count,longtaskTotalMs:total,longtaskMaxMs:max,groups:[...groups.values()],timerLagCount:lagCount,timerLagMaxMs:lagMax,...snapshot()});lastReport=at;lastFlush=at;groups=new Map();count=total=max=lagCount=lagMax=0;}};
+    const observer=observe?.(longtasks),lagTimer=interval(tick,1000),flushTimer=interval(flush,60000);
+    return {longtasks,tick,flush,markPage,dispose(){disposed=true;observer?.disconnect?.();clear(lagTimer);clear(flushTimer);}};
+  }
+  function localEndpoint(input) {
+    const raw=typeof input==="string"?input:input?.url;
+    if(typeof raw!=="string")return null;
+    let url;try{url=new URL(raw,localOrigin);}catch{return null;}
+    if(url.origin!==localOrigin || !url.pathname.startsWith("/api/") || url.pathname.startsWith("/api/diagnostics/") || url.pathname==="/api/events" || url.pathname.startsWith("/api/image"))return null;
+    const p=url.pathname;
+    for(const [prefix,kind] of [["/api/gameplay/overview","overview"],["/api/gameplay/live","live"],["/api/facade/","facade"],["/api/watch/","watch"],["/api/rig/","rig"],["/api/claim/","claim"],["/api/champselect/","champselect"],["/api/gameplay/","gameplay"],["/api/champions/","champions"],["/api/pro-players","pro-players"],["/api/social/","friends"],["/api/status","status"]])if(p.startsWith(prefix))return kind;
+    return /^\/api\/(account|skins|collection|pool|snapshots)/.test(p)?"collection":"other";
+  }
+  function measuredFetch(native, report, input, init) {
+    const endpoint=localEndpoint(input);if(!endpoint)return native(input,init);
+    const startedAt=Date.now();let finished=false,bytes, status=0;
+    const finish=(errorKind="none")=>{if(finished)return;finished=true;const completedAt=Date.now();try {report("local_request_client",errorKind==="none"?"complete":"failed",{endpoint,startedAt,completedAt,durationMs:completedAt-startedAt,httpStatus:status,errorKind,...(bytes===undefined?{}:{responseBytes:bytes})});} catch {}};
+    return Promise.resolve(native(input,init)).then(response=>{
+      status=response.status;const length=response.headers?.get?.("Content-Length");if(length!==null&&length!==undefined&&/^\d+$/.test(length))bytes=Number(length);
+      if(!response.ok){finish("http");return response;}if(status===204||status===202){finish();return response;}
+      const text=response.text?.bind(response),json=response.json?.bind(response);
+      for(const method of ["text","json"]) {
+        const consume=method==="json"?json:text;if(!consume)continue;
+        response[method]=async()=>{try{
+          let value;
+          if (method==="text" || Object.prototype.toString.call(response)==="[object Response]") {
+            const raw=await text();if(typeof TextEncoder!=="undefined")bytes=new TextEncoder().encode(raw).length;value=method==="json"?JSON.parse(raw):raw;
+          } else value=await consume();
+          finish();return value;
+        }catch(e){finish(e.name==="SyntaxError"?"decode":e.name==="AbortError"?"canceled":"read");throw e;}};
+      }
+      if(response.body?.getReader){const get=response.body.getReader.bind(response.body);response.body.getReader=(...args)=>{const reader=get(...args);const read=reader.read.bind(reader);let readBytes=0;reader.read=async(...a)=>{try{const chunk=await read(...a);readBytes+=chunk.value?.byteLength||0;bytes=readBytes;if(chunk.done)finish();return chunk;}catch(e){finish(e.name==="AbortError"?"canceled":"read");throw e;}};const cancel=reader.cancel.bind(reader);reader.cancel=(...a)=>{if(!finished)finish("canceled");return cancel(...a);};return reader;};}
+      return response;
+    },error=>{finish(error.name==="AbortError"?"canceled":"network");throw error;});
+  }
+  window.deepLegendsPerformance={createRendererPerformance,measuredFetch,localEndpoint};
+  if(window.deepLegendsDemoNativeFetch || typeof document==="undefined" || typeof window.fetch!=="function" || typeof performance==="undefined")return;
+  const original=window.fetch,native=original.bind(window);const measured=(input,init)=>measuredFetch(native,(...args)=>window.reportFlowDiagnostic?.(...args),input,init);window.fetch=measured;window.deepLegendsPerformance.requestMetricsInstalled=true;
+  const monitor=createRendererPerformance({report:(...args)=>window.reportFlowDiagnostic?.(...args),snapshot:()=>{
+    const memory=performance.memory;return {domNodes:document.getElementsByTagName("*").length,imgCount:document.getElementsByTagName("img").length,...(memory?{heapUsedMb:memory.usedJSHeapSize/1048576,heapLimitMb:memory.jsHeapSizeLimit/1048576}:{})};
+  },observe:callback=>{try{const observer=new PerformanceObserver(list=>callback(list.getEntries()));observer.observe({type:"longtask",buffered:true});return observer;}catch{return null;}}});
+  const mark=()=>queueMicrotask(()=>{try{monitor.markPage();}catch{}});window.addEventListener("deep-legends:section",mark);document.addEventListener("click",mark,true);
+  window.addEventListener("deep-legends:dispose",()=>{monitor.dispose();window.removeEventListener("deep-legends:section",mark);document.removeEventListener("click",mark,true);window.deepLegendsPerformance.requestMetricsInstalled=false;if(window.fetch===measured)window.fetch=original;},{once:true});
 })();

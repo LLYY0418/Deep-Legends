@@ -68,6 +68,7 @@ let modalOpen = false;
 let shareExportController = null;
 let backendStarted = false;
 let backendStartTimer = null;
+let processMetrics = null;
 let uiScalePreference = "auto";
 let currentUiScale = 1;
 let startupStageAgent = null;
@@ -736,6 +737,7 @@ function requestBackendQuit() {
 }
 
 async function shutdownBackend() {
+  processMetrics?.dispose(); processMetrics=null;
   if (shutdownStarted) return;
   shutdownStarted = true;
   await Promise.race([requestBackendQuit(), new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS))]);
@@ -746,6 +748,7 @@ app.whenReady().then(() => {
   if (!hasInstanceLock) return;
   startupMarks.appReady = Date.now();
   recordRelaunchCompletion();
+  processMetrics=require("./process-metrics.cjs").startProcessMetrics({app,getBackendPid:()=>backend?.pid,report:row=>appendDesktopLog("进程指标 "+JSON.stringify(row))});
   session.defaultSession.setPermissionCheckHandler((webContents, permission) => permission === "fullscreen" && isTrustedRenderer(webContents));
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => callback(permission === "fullscreen" && isTrustedRenderer(webContents)));
   createSplashWindow();

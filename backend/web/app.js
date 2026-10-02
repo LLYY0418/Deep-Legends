@@ -414,10 +414,10 @@
     } finally {
       clearTimeout(timer);
       if (state.controllers.get(requestKey) === controller) state.controllers.delete(requestKey);
-      if (!path.startsWith("/api/diagnostics/")) {
-        const completedAt = Date.now();
-        const endpoint = path === "/api/status" ? "status" : path.startsWith("/api/gameplay/") ? "gameplay" : path.startsWith("/api/champions/") ? "champions" : /^\/api\/(skins|collection)(\/|\?|$)/.test(path) ? "collection" : "other";
-        window.reportFlowDiagnostic?.("local_request_client", "complete", { endpoint, startedAt, completedAt, durationMs: completedAt - startedAt, httpStatus, errorKind });
+      if (!window.deepLegendsPerformance?.requestMetricsInstalled && !path.startsWith("/api/diagnostics/")) {
+        const completedAt=Date.now();
+        const endpoint=path==="/api/status"?"status":path.startsWith("/api/gameplay/")?"gameplay":path.startsWith("/api/champions/")?"champions":/^\/api\/(skins|collection)(\/|\?|$)/.test(path)?"collection":"other";
+        window.reportFlowDiagnostic?.("local_request_client","complete",{endpoint,startedAt,completedAt,durationMs:completedAt-startedAt,httpStatus,errorKind});
       }
     }
   }

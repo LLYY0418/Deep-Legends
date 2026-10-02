@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -283,10 +284,18 @@ type app struct {
 	facadeChallengeCatalogRaw           json.RawMessage
 	facadeChallengeCatalogErr           error
 	facadeEventMu                       sync.Mutex
+	facadeEventSummaryGeneration        uint64
+	facadeEventBroadcasts               int
+	runtimeMetricsDone                  chan struct{}
 	facadeEventLastBroadcast            time.Time
 	facadeEventTimer                    *time.Timer
 	facadeEventPending                  bool
 	facadeEventGeneration               uint64
+	facadeEventFingerprints             map[string]string
+	facadeEventSources                  map[string]*facadeEventCount
+	facadeEventPendingSources           map[string]bool
+	facadeEventSummaryTimer             *time.Timer
+	localHTTPInFlight                   atomic.Int64
 }
 
 type statusResponse struct {
@@ -641,6 +650,8 @@ func main() {
 	runtimeContext, runtimeCancel := context.WithCancel(context.Background())
 	a.runtimeCancel = runtimeCancel
 	a.proRefreshContext = runtimeContext
+	a.runtimeMetricsDone = make(chan struct{})
+	a.goSafe("backend_runtime_metrics", func() { defer close(a.runtimeMetricsDone); a.runBackendRuntimeMetrics(runtimeContext, nil, nil) })
 	goSafe("main.main.2", func() { a.runConnectionManager(runtimeContext) })
 	a.warmProPlayersCaches()
 	a.updates.Start()
@@ -656,7 +667,7 @@ func main() {
 	}
 
 	server := &http.Server{
-		Handler:           securityHeaders(mux),
+		Handler:           a.trackLocalHTTP(securityHeaders(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       45 * time.Second,
 		WriteTimeout:      30 * time.Second,

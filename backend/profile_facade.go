@@ -74,6 +74,7 @@ type facadeState struct {
 	Skins                    []facadeSkin             `json:"skins"`
 	LoginReset               facadeLoginResetSettings `json:"loginReset"`
 	Reason                   string                   `json:"reason,omitempty"`
+	OmitSkins                bool                     `json:"-"`
 }
 
 type facadeApplyRequest struct {
@@ -123,6 +124,10 @@ func (a *app) loadFacadeState(ctx context.Context) facadeState {
 }
 
 func (a *app) loadFacadeStateTriggered(ctx context.Context, trigger string) facadeState {
+	return a.loadFacadeStateParts(ctx, trigger, true)
+}
+
+func (a *app) loadFacadeStateParts(ctx context.Context, trigger string, includeSkins bool) facadeState {
 	started := time.Now()
 	var chatMS, challengesMS, catalogMS int64
 	defer func() {
@@ -181,14 +186,27 @@ func (a *app) loadFacadeStateTriggered(ctx context.Context, trigger string) faca
 	if identityShapeDiagnostic {
 		a.recordFacadeIdentityShape(chatRaw, regaliaRaw, chatErr, regaliaErr, challengeSummaryRaw, challengeSummaryErr, challengeCatalogRaw, challengeCatalogErr)
 	}
-	skins, source, skinErr := a.loadFacadeSkins(ctx, client)
-	state.SkinsUnavailable = skinErr != nil || len(skins) == 0
-	state.SkinOwnershipUnavailable = source != "collection"
-	for _, skin := range skins {
-		if skin.ID <= 0 {
-			continue
+	source := "retained"
+	if includeSkins {
+		skins, skinSource, skinErr := a.loadFacadeSkins(ctx, client)
+		source = skinSource
+		state.SkinsUnavailable = skinErr != nil || len(skins) == 0
+		state.SkinOwnershipUnavailable = source != "collection"
+		for _, skin := range skins {
+			if skin.ID <= 0 {
+				continue
+			}
+			state.Skins = append(state.Skins, projectFacadeSkin(skin))
 		}
-		state.Skins = append(state.Skins, projectFacadeSkin(skin))
+	} else {
+		a.facadeView.mu.Lock()
+		if a.facadeView.client == client && a.facadeView.account == current.SummonerID {
+			state.Skins = a.facadeView.value.Skins
+			state.SkinsUnavailable = a.facadeView.value.SkinsUnavailable
+			state.SkinOwnershipUnavailable = a.facadeView.value.SkinOwnershipUnavailable
+		}
+		a.facadeView.mu.Unlock()
+		state.OmitSkins = true
 	}
 	a.applyFacadeBackdrop(ctx, client, current, &state)
 	backgroundInCatalog := false
@@ -198,7 +216,7 @@ func (a *app) loadFacadeStateTriggered(ctx context.Context, trigger string) faca
 			break
 		}
 	}
-	a.recordDiagnostic(map[string]any{"event": "facade_skin_state", "trigger": facadeLoadTrigger(trigger), "source": source, "skin_count": len(state.Skins), "unavailable": state.SkinsUnavailable, "profile_available": !state.ProfileUnavailable, "configured_skin_id": profile.BackgroundSkinID, "background_skin_id": state.Profile.BackgroundSkinID, "background_champion_id": state.Profile.BackgroundChampionID, "background_in_catalog": backgroundInCatalog})
+	a.recordDiagnostic(map[string]any{"event": "facade_skin_state", "trigger": facadeLoadTrigger(trigger), "source": source, "skin_count": len(state.Skins), "skins_included": includeSkins, "unavailable": state.SkinsUnavailable, "profile_available": !state.ProfileUnavailable, "configured_skin_id": profile.BackgroundSkinID, "background_skin_id": state.Profile.BackgroundSkinID, "background_champion_id": state.Profile.BackgroundChampionID, "background_in_catalog": backgroundInCatalog})
 	if watch := a.activeWatch(); watch != nil {
 		state.LoginReset = watch.currentWatch().Facade
 	}
@@ -702,7 +720,13 @@ func facadeLoadTrigger(value string) string {
 
 func (a *app) handleFacadeState(w http.ResponseWriter, r *http.Request) {
 	trigger := facadeLoadTrigger(r.URL.Query().Get("trigger"))
-	value, err := a.cachedFacadeState(r.Context(), trigger != "poll", trigger)
+	var value facadeState
+	var err error
+	if r.URL.Query().Get("skins") == "0" {
+		value = a.loadFacadeStateParts(r.Context(), trigger, false)
+	} else {
+		value, err = a.cachedFacadeState(r.Context(), trigger != "poll", trigger)
+	}
 	if err != nil {
 		http.Error(w, "生涯资料暂时读取失败，请重试", http.StatusGatewayTimeout)
 		return

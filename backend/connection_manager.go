@@ -19,7 +19,7 @@ const (
 	summonerFallbackInterval    = 60 * time.Second
 	eventDebounceInterval       = 900 * time.Millisecond
 	champSelectEventDebounce    = 300 * time.Millisecond
-	facadeEventThrottleInterval = 2 * time.Second
+	facadeEventThrottleInterval = 5 * time.Second
 	eventRetryInitialInterval   = 5 * time.Second
 	eventRetryMaxInterval       = time.Minute
 	minimumDiscoveryBackoff     = 3 * time.Second
@@ -527,7 +527,9 @@ func (a *app) handleFacadeLCUEvent(event LCUEvent) bool {
 	if !isFacadeLCUEvent(event) {
 		return false
 	}
-	a.queueFacadeChangedEvent(time.Now())
+	if a.facadeEventChanged(event) {
+		a.queueFacadeChangedEvent(time.Now())
+	}
 	return true
 }
 
@@ -541,6 +543,7 @@ func (a *app) queueFacadeChangedEvent(now time.Time) {
 		}
 		a.facadeEventLastBroadcast = now
 		a.facadeEventPending = false
+		a.countFacadeBroadcastLocked()
 		a.facadeEventMu.Unlock()
 		a.broadcastEvent("facade:changed")
 		return
@@ -568,6 +571,7 @@ func (a *app) flushFacadeChangedEvent(generation uint64) {
 	}
 	a.facadeEventPending = false
 	a.facadeEventLastBroadcast = time.Now()
+	a.countFacadeBroadcastLocked()
 	a.facadeEventMu.Unlock()
 	a.broadcastEvent("facade:changed")
 }
@@ -575,6 +579,15 @@ func (a *app) flushFacadeChangedEvent(generation uint64) {
 func (a *app) clearFacadeEventThrottle() {
 	a.facadeEventMu.Lock()
 	a.facadeEventGeneration++
+	if a.facadeEventSummaryTimer != nil {
+		a.facadeEventSummaryTimer.Stop()
+	}
+	a.facadeEventSummaryTimer = nil
+	a.facadeEventSummaryGeneration++
+	a.facadeEventBroadcasts = 0
+	a.facadeEventFingerprints = nil
+	a.facadeEventSources = nil
+	a.facadeEventPendingSources = nil
 	if a.facadeEventTimer != nil {
 		a.facadeEventTimer.Stop()
 	}

@@ -52,6 +52,9 @@ function desktopLogForExport(directory, now = Date.now()) {
       const at=Date.parse(time);
       if (!Number.isFinite(at)) { omitted++; continue; }
       if (at < now - 7*24*60*60*1000 || at > now) { expired++; continue; }
+      if(message.startsWith("进程指标 ")) {
+        try {const {normalizeProcessMetrics}=require("./process-metrics.cjs");rows.push(JSON.stringify({...normalizeProcessMetrics(JSON.parse(message.slice(5))),time}));continue;}catch{}
+      }
       if(message.startsWith("后端证据 ")) {
         try {
           const { normalizeBackendEvidence } = require("./backend-evidence.cjs");

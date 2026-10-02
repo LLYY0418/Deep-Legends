@@ -62,7 +62,25 @@ type diagnosticsResponse struct {
 	Discovery               LCUDiscoveryStatus      `json:"discovery"`
 }
 
+type rendererPerfGroup struct {
+	Section string  `json:"section"`
+	Tab     string  `json:"tab"`
+	Count   int     `json:"count"`
+	TotalMS float64 `json:"totalMs"`
+	MaxMS   float64 `json:"maxMs"`
+}
 type clientDiagnosticRequest struct {
+	ResponseBytes           *int64                      `json:"responseBytes,omitempty"`
+	LongtaskCount           int                         `json:"longtaskCount,omitempty"`
+	LongtaskTotalMS         float64                     `json:"longtaskTotalMs,omitempty"`
+	LongtaskMaxMS           float64                     `json:"longtaskMaxMs,omitempty"`
+	TimerLagCount           int                         `json:"timerLagCount,omitempty"`
+	TimerLagMaxMS           float64                     `json:"timerLagMaxMs,omitempty"`
+	HeapUsedMB              *float64                    `json:"heapUsedMb,omitempty"`
+	HeapLimitMB             *float64                    `json:"heapLimitMb,omitempty"`
+	DOMNodes                int                         `json:"domNodes,omitempty"`
+	ImgCount                int                         `json:"imgCount,omitempty"`
+	Groups                  []rendererPerfGroup         `json:"groups,omitempty"`
 	LaneMatchupMode         string                      `json:"mode,omitempty"`
 	Shown                   bool                        `json:"shown"`
 	HiddenReason            string                      `json:"hiddenReason,omitempty"`
@@ -156,6 +174,7 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
+	"renderer_perf":                {"aggregated": true},
 	"live_render_rebuild":          {"aggregated": true},
 	"arena_header_source":          {"rendered": true},
 	"gameflow_phase_client":        {"batch": true},
@@ -204,7 +223,7 @@ func (a *app) recordClientDiagnosticRejected(reason, rawEvent string) {
 }
 
 func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	r.Body = http.MaxBytesReader(w, r.Body, 8<<10)
 	defer r.Body.Close()
 	var request clientDiagnosticRequest
 	decoder := json.NewDecoder(r.Body)
@@ -241,6 +260,11 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	event := map[string]any{"event": request.Event, "reason": request.Reason}
+	if request.Event == "renderer_perf" {
+		a.recordRendererPerformance(request)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if request.Event == "arena_header_source" {
 		grade := normalizeChampionGrade("yourgg", 0, request.Grade)
 		if request.ChampionID <= 0 || request.ChampionID > 1000000 || request.HasListRow && (request.Rank <= 0 || request.ListGames <= 0 || grade == "") {
@@ -356,15 +380,18 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 	}
 	if request.Event == "local_request_client" {
 		switch request.Endpoint {
-		case "status", "gameplay", "champions", "collection", "image", "friends", "pro-players", "section-loader", "other":
+		case "status", "gameplay", "champions", "collection", "image", "friends", "pro-players", "section-loader", "other", "overview", "live", "facade", "watch", "rig", "claim", "champselect":
 			event["endpoint"] = request.Endpoint
 		}
 		event["started_at"] = min(int64(1e13), max(0, request.StartedAt))
 		event["completed_at"] = min(int64(1e13), max(0, request.CompletedAt))
+		if request.ResponseBytes != nil {
+			event["response_bytes"] = min(int64(2<<30), max(int64(0), *request.ResponseBytes))
+		}
 		event["duration_ms"] = min(1000000, max(0, request.DurationMS))
 		event["http_status"] = min(599, max(0, request.HTTPStatus))
 		switch request.ErrorKind {
-		case "none", "http", "timeout", "network", "decode", "canceled":
+		case "none", "http", "timeout", "network", "decode", "read", "canceled":
 			event["error_kind"] = request.ErrorKind
 		}
 		// R127 P0-2：图片队列的排队/加载计时与来源类别。只记来源枚举，

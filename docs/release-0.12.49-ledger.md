@@ -40,3 +40,7 @@
 - 草稿阶段逐一核对三附件的 GitHub digest、size、uploaded 状态；全部与本地 SHA-256/大小一致。下载回来的 latest.json 与 SHA256SUMS-public.txt 逐字节一致。
 - 正式发布后匿名访问 `/releases/latest/download/latest.json` 成功，内容与本地清单逐字节一致，version=0.12.49；GitHub `/releases/latest` 同样指向 v0.12.49。
 - 已知兼容边界：R169 / 0.12.34 起接受 public 文件后缀。GitHub 旧版 0.12.19 的校验器仍只接受无后缀或指纹后缀，不能用它验证此次 public 更新链路；使用 0.12.48 等已含 R169 的旧版本测试。若仍在 0.12.19，需从发布页手动安装。
+
+## 2026-10-02 R185 发布前状态复核
+
+GitHub API 当前返回 v0.12.49 isDraft=true、publishedAt=null，`/releases/latest` 仍为 v0.12.19。上面的正式发布结果不能代表当前 GitHub 状态；本轮通过 v0.12.50 正式发布完成更新试用目标，结果见 r185-execution-ledger.md。

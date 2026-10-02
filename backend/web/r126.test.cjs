@@ -61,7 +61,7 @@ test("R126 career draft stays empty when no background champion evidence exists"
 });
 
 test("R126 facade refresh signature includes the resolved background champion", () => {
-  const { facadeRenderSignature } = compile(["facadeRenderSignature"]);
+  const { facadeRenderSignature } = compile(["facadeSkinSignature", "facadeRenderSignature"], {state:{}});
   const lee = facadeRenderSignature({ profile: { backgroundSkinId: 0, backgroundChampionId: 64 } });
   const annie = facadeRenderSignature({ profile: { backgroundSkinId: 0, backgroundChampionId: 1 } });
   assert.notDeepEqual(lee, annie);

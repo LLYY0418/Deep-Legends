@@ -74,7 +74,7 @@ test("R168 active champ select refreshes once for one gameflow change", async ()
 test("career manual reread resets stale preview even when server payload is unchanged", async () => {
   const current = { connected: true, profile: { backgroundSkinId: 21069 }, skins: [{ id: 21069, championId: 21, name: "当前皮肤" }, { id: 67004, championId: 67, name: "待应用皮肤" }] };
   const state = { connected: true, facade: structuredClone(current) };
-  const helpers = compile(["hydrateFacadeDraft", "facadeRenderSignature", "facadeBackgroundDirty"], { state });
+  const helpers = compile(["hydrateFacadeDraft", "facadeSkinSignature", "facadeRenderSignature", "facadeBackgroundDirty"], { state });
   helpers.hydrateFacadeDraft();
   state.facadeDraft.skinId = 67004;
   state.facadeDraft.hero = "67";
@@ -107,7 +107,7 @@ test("global reread joins the active career refresh and does not refresh hidden 
 
 test("career SSE updates a clean background while preserving edited chat fields", async () => {
   const state = { connected: true, facade: { connected: true, profile: { backgroundSkinId: 21069 }, skins: [] } };
-  const helpers = compile(["hydrateFacadeDraft", "facadeRenderSignature", "facadeBackgroundDirty"], { state });
+  const helpers = compile(["hydrateFacadeDraft", "facadeSkinSignature", "facadeRenderSignature", "facadeBackgroundDirty"], { state });
   helpers.hydrateFacadeDraft();
   state.facadeDraft.statusMessage = "尚未提交的签名";
   const deps = { state, ...helpers, api: async () => ({ connected: true, profile: { backgroundSkinId: 18080 }, skins: [] }), renderFacade() {}, scheduleFacadeChallengeRetry() {}, roots: { facade: {} }, errorCard: () => { throw Error("unexpected load failure"); } };
@@ -134,7 +134,7 @@ test("career filtering never silently selects another background", () => {
 
 test("career apply invalidates an older GET and reports unconfirmed writes honestly", async () => {
   const state = {connected:true,facade:{profile:{backgroundSkinId:21069},skins:[]}};
-  const helpers=compile(["hydrateFacadeDraft","facadeRenderSignature","facadeBackgroundDirty"],{state});
+  const helpers=compile(["hydrateFacadeDraft","facadeSkinSignature", "facadeRenderSignature","facadeBackgroundDirty"],{state});
   helpers.hydrateFacadeDraft();
   let resolveGet, resolvePost, notice="", requests=0;
   const deps={state,...helpers,api:(_url,options)=>{requests++;return new Promise(resolve=>{if(options.method==="POST")resolvePost=resolve;else resolveGet=resolve;});},renderFacade(){},toast:message=>{notice=message;},scheduleFacadeChallengeRetry(){},roots:{facade:{}},errorCard:()=>{throw Error("unexpected failure");}};

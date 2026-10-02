@@ -208,7 +208,6 @@
       ]);
     } catch (error) {
       error.errorKind ||= error.name === "AbortError" ? "canceled" : "network";
-      if (typeof window !== "undefined") window.reportFlowDiagnostic?.("local_request_client", "failed", { endpoint: "other", httpStatus: Number(error?.status || 0), errorKind: error.errorKind });
       throw error;
     } finally {
       clearTimeout(timer);
@@ -1687,7 +1686,24 @@
 	}, 3000);
   }
 
-  function facadeRenderSignature(value = {}) {
+  function facadeSkinSignature(skins) {
+    if (!Array.isArray(skins)) return "0:0";
+    state.facadeSkinSignatures ||= new WeakMap();
+    if (state.facadeSkinSignatures.has(skins)) return state.facadeSkinSignatures.get(skins);
+    let hash = 2166136261, second = 5381;
+    for (const skin of skins) {
+      for (const key of ["id", "name", "championId", "championName", "splashPath", "tilePath", "owned", "releaseDate", "releaseSortDate", "parentSkinId", "isVariant"]) {
+        const value = String(skin?.[key] ?? "");
+        const text = `${value.length}:${value};`;
+        for (let i = 0; i < text.length; i++) { const code = text.charCodeAt(i); hash = Math.imul(hash ^ code, 16777619); second = Math.imul(second, 33) ^ code; }
+      }
+    }
+    const signature = `${skins.length}:${hash >>> 0}:${second >>> 0}`;
+    state.facadeSkinSignatures.set(skins, signature);
+    return signature;
+  }
+
+  function facadeRenderSignature(value = {}, includeSkins = true) {
 	const summoner = value.summoner || {};
 	const profile = value.profile || {};
 	const chat = value.chat || {};
@@ -1721,11 +1737,7 @@
 		id: String(challenge?.id || ""), name: String(challenge?.name || ""), iconPath: String(challenge?.iconPath || ""),
 	  })),
 	  challengesReady: value.challengesReady === true,
-	  skins: (Array.isArray(value.skins) ? value.skins : []).map((skin) => ({
-		id: Number(skin?.id || 0), name: String(skin?.name || ""), championId: Number(skin?.championId || 0), championName: String(skin?.championName || ""),
-		splashPath: String(skin?.splashPath || ""), tilePath: String(skin?.tilePath || ""), owned: skin?.owned === true,
-        releaseDate: skin?.releaseDate || "", releaseSortDate: skin?.releaseSortDate || "", parentSkinId: Number(skin?.parentSkinId || 0), isVariant: skin?.isVariant === true,
-	  })),
+	  ...(includeSkins ? { skins: facadeSkinSignature(value.skins) } : {}),
 	  loginReset: {
 		statusMessageEnabled: reset.statusMessageEnabled === true, statusMessage: String(reset.statusMessage || ""), rankEnabled: reset.rankEnabled === true,
 		rank: {
@@ -1749,11 +1761,12 @@
 	try {
 	  const previousSkins = Array.isArray(state.facade?.skins) ? state.facade.skins : [];
 	  const loadTrigger = ["manual", "sse", "poll"].includes(trigger) ? trigger : "poll";
-	  const next = await api(`/api/facade/state?trigger=${encodeURIComponent(loadTrigger)}`, { signal: controller.signal });
+	  const next = await api(`/api/facade/state?trigger=${encodeURIComponent(loadTrigger)}${loadTrigger === "sse" ? "&skins=0" : ""}`, { signal: controller.signal });
       if (token !== state.facadeRequestToken || controller.signal.aborted) return;
-	  if (next.connected === true && Array.isArray(next.skins) && next.skins.length === 0 && previousSkins.length) next.skins = previousSkins;
-	  const unchanged = Boolean(state.facade) && JSON.stringify(facadeRenderSignature(next)) === JSON.stringify(facadeRenderSignature(state.facade));
-	  state.facadeLoadedAt = next.skinsUnavailable ? 0 : Date.now();
+	  const omittedSkins = !Object.prototype.hasOwnProperty.call(next, "skins");
+      if (omittedSkins) next.skins = previousSkins;
+	  const unchanged = Boolean(state.facade) && JSON.stringify(facadeRenderSignature(next, !omittedSkins)) === JSON.stringify(facadeRenderSignature(state.facade, !omittedSkins));
+	  if (!omittedSkins) state.facadeLoadedAt = next.skinsUnavailable ? 0 : Date.now();
 	  if (unchanged && (preserveDraft || loadTrigger !== "manual")) {
 		scheduleFacadeChallengeRetry();
 		return;
