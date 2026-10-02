@@ -1,0 +1,25 @@
+{
+  "results": [
+    {
+      "name": "suppress-lethal-tempo",
+      "test": "R195 2",
+      "killed": true
+    },
+    {
+      "name": "remove-digit-time",
+      "test": "R195 3",
+      "killed": true
+    },
+    {
+      "name": "restore-effect-shards",
+      "test": "R195 1",
+      "killed": true
+    },
+    {
+      "name": "restore-hero-name-text",
+      "test": "R195 7",
+      "killed": true
+    }
+  ],
+  "logs": "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r195-mutants-UPhu2H"
+}

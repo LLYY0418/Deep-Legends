@@ -2,7 +2,7 @@
 
 诊断人：Claude（本轮独立验收由子代理执行，未改仓库业务代码；仅搬动了一个测试文件，见下）。
 执行人：GPT。覆盖对象：`WORKLIST-R91-KR-QUOTA-ARENA-BAN-FLICKER-GROUPING.md` 的 P4，
-以及 `docs/r91-addendum-execution-ledger.md` 声称的"全量回归全过"。
+以及 `docs/history/ledgers/r91-addendum-execution-ledger.md` 声称的"全量回归全过"。
 
 > 本轮独立验收方法：真实复跑了 GPT 自己的 23 条变异脚本（20 条非浏览器类全部真 kill，
 > 3 条浏览器类因沙箱无 Chromium 未能复现，不算失败也不算通过）；另外自己设计了 6 条
@@ -70,7 +70,7 @@ ban/pick 意图（把 hover 清回 0），**没有**发生"队友选走"或"已�
 
 ---
 
-## ★缺口二：`docs/r91-addendum-execution-ledger.md` 声称的全量回归结果不可复现
+## ★缺口二：`docs/history/ledgers/r91-addendum-execution-ledger.md` 声称的全量回归结果不可复现
 
 账本写"`go test -race ./...`：通过，117.454 秒"。独立验收环境里跑**同一份代码**的
 `go test -count=1 .`（非 race，全量）：**1135 PASS，1 FAIL**，可稳定复现（重跑两次结果一致，非偶发）：

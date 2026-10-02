@@ -475,7 +475,7 @@
 2. 新增的 R105 测试文件（`TestR105_*` 系列测试）
 3. 更新后的前端代码（移除头像/旗帜的拥有态门禁）
 4. 更新后的文档（`docs/r99-probe-results.md`、`docs/pro-players-sources.md`、CLAUDE.md）
-5. 执行账本（`docs/r105-execution-ledger.md`）
+5. 执行账本（`docs/history/ledgers/r105-execution-ledger.md`）
 6. 验证artifacts（`docs/r105-validation/`）
 7. 对抗变异结果（`docs/r105-validation/mutations/matrix.json`）
 

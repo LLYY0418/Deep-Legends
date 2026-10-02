@@ -1,0 +1,14 @@
+{
+  "indexMissingTargets": [],
+  "ongoingIDs": [
+    "R153",
+    "R156",
+    "R195"
+  ],
+  "archiveTargets": 154,
+  "manualLinkRepairs": [
+    "history/ledgers/r91-addendum-2-execution-ledger.md:3",
+    "history/ledgers/r102-execution-ledger.md:3"
+  ],
+  "independentReview": "frontend, backend, archive: PASS; two link repairs applied"
+}

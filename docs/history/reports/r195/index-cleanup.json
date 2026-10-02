@@ -1,0 +1,820 @@
+{
+  "closedStatusRows": [
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    99,
+    100,
+    101,
+    102,
+    105,
+    107,
+    108,
+    109,
+    110,
+    111,
+    115,
+    116,
+    119,
+    120,
+    122,
+    128,
+    129,
+    131,
+    132,
+    136,
+    142,
+    144,
+    145,
+    146,
+    147,
+    148,
+    149,
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    162,
+    163,
+    164,
+    165,
+    166,
+    167,
+    168,
+    169,
+    170,
+    171,
+    172,
+    173,
+    174,
+    175,
+    176,
+    177,
+    178,
+    179,
+    180,
+    181,
+    182,
+    183,
+    184,
+    185,
+    186,
+    187,
+    188,
+    189,
+    190,
+    191,
+    192,
+    193,
+    194
+  ],
+  "moved": [
+    {
+      "from": "docs/r179-execution-ledger.md",
+      "to": "docs/history/ledgers/r179-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R142-PUBLISH-FIRST-RELEASE-AND-SCREENSHOTS.md",
+      "to": "docs/history/worklists/WORKLIST-R142-PUBLISH-FIRST-RELEASE-AND-SCREENSHOTS.md"
+    },
+    {
+      "from": "docs/r160-execution-ledger.md",
+      "to": "docs/history/ledgers/r160-execution-ledger.md"
+    },
+    {
+      "from": "docs/r193-execution-ledger.md",
+      "to": "docs/history/ledgers/r193-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R194-ROSTER-RECOVERY-FOR-QUICKPLAY-AND-OTHER-5V5-QUEUES.md",
+      "to": "docs/history/worklists/WORKLIST-R194-ROSTER-RECOVERY-FOR-QUICKPLAY-AND-OTHER-5V5-QUEUES.md"
+    },
+    {
+      "from": "docs/WORKLIST-R119-AUTOFILL-LABEL-GAPS.md",
+      "to": "docs/history/worklists/WORKLIST-R119-AUTOFILL-LABEL-GAPS.md"
+    },
+    {
+      "from": "docs/r178-execution-ledger.md",
+      "to": "docs/history/ledgers/r178-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R167-CHAMPSELECT-LANE-MATCHUP-CARD.md",
+      "to": "docs/history/worklists/WORKLIST-R167-CHAMPSELECT-LANE-MATCHUP-CARD.md"
+    },
+    {
+      "from": "docs/WORKLIST-R140-R138-BANNER-SCOPE-DROPPED.md",
+      "to": "docs/history/worklists/WORKLIST-R140-R138-BANNER-SCOPE-DROPPED.md"
+    },
+    {
+      "from": "docs/r192-execution-ledger.md",
+      "to": "docs/history/ledgers/r192-execution-ledger.md"
+    },
+    {
+      "from": "docs/r161-execution-ledger.md",
+      "to": "docs/history/ledgers/r161-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R160-MAYHEM-ARENA-ARTWORK-AND-OVERVIEW-LATENCY.md",
+      "to": "docs/history/worklists/WORKLIST-R160-MAYHEM-ARENA-ARTWORK-AND-OVERVIEW-LATENCY.md"
+    },
+    {
+      "from": "docs/WORKLIST-R137-FLAKY-SENTINEL-AND-STALE-NODE-TESTS.md",
+      "to": "docs/history/worklists/WORKLIST-R137-FLAKY-SENTINEL-AND-STALE-NODE-TESTS.md"
+    },
+    {
+      "from": "docs/WORKLIST-R188-PREMADE-TOOLTIP-PLAIN-LIST-AND-LANE-MATCHUP-IN-TAB-ROW.md",
+      "to": "docs/history/worklists/WORKLIST-R188-PREMADE-TOOLTIP-PLAIN-LIST-AND-LANE-MATCHUP-IN-TAB-ROW.md"
+    },
+    {
+      "from": "docs/r162-execution-ledger.md",
+      "to": "docs/history/ledgers/r162-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R190-ROSTER-SELF-HIGHLIGHT-RUNE-EFFECTS-AND-AUGMENT-CARDS.md",
+      "to": "docs/history/worklists/WORKLIST-R190-ROSTER-SELF-HIGHLIGHT-RUNE-EFFECTS-AND-AUGMENT-CARDS.md"
+    },
+    {
+      "from": "docs/r191-execution-ledger.md",
+      "to": "docs/history/ledgers/r191-execution-ledger.md"
+    },
+    {
+      "from": "docs/r188-execution-ledger.md",
+      "to": "docs/history/ledgers/r188-execution-ledger.md"
+    },
+    {
+      "from": "docs/r190-execution-ledger.md",
+      "to": "docs/history/ledgers/r190-execution-ledger.md"
+    },
+    {
+      "from": "docs/r163-execution-ledger.md",
+      "to": "docs/history/ledgers/r163-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R159-HEXBRAWL_AUGMENT_ICON_MISSING_EVERYWHERE_AND_RESIDUAL_LOAD_LATENCY.md",
+      "to": "docs/history/worklists/WORKLIST-R159-HEXBRAWL_AUGMENT_ICON_MISSING_EVERYWHERE_AND_RESIDUAL_LOAD_LATENCY.md"
+    },
+    {
+      "from": "docs/r189-execution-ledger.md",
+      "to": "docs/history/ledgers/r189-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R187-CHAMPSELECT-ENEMY-PLACEHOLDER-HINT-AND-STALE-RANK-CACHE-AFTER-GAME.md",
+      "to": "docs/history/worklists/WORKLIST-R187-CHAMPSELECT-ENEMY-PLACEHOLDER-HINT-AND-STALE-RANK-CACHE-AFTER-GAME.md"
+    },
+    {
+      "from": "docs/r165-execution-ledger.md",
+      "to": "docs/history/ledgers/r165-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R131-R128-R129-TEST-SUITE-GAPS.md",
+      "to": "docs/history/worklists/WORKLIST-R131-R128-R129-TEST-SUITE-GAPS.md"
+    },
+    {
+      "from": "docs/WORKLIST-R138-FACADE-ICON-SPACING-AND-DETAIL-DIALOG-SIZE.md",
+      "to": "docs/history/worklists/WORKLIST-R138-FACADE-ICON-SPACING-AND-DETAIL-DIALOG-SIZE.md"
+    },
+    {
+      "from": "docs/r164-execution-ledger.md",
+      "to": "docs/history/ledgers/r164-execution-ledger.md"
+    },
+    {
+      "from": "docs/r135-execution-ledger.md",
+      "to": "docs/history/ledgers/r135-execution-ledger.md"
+    },
+    {
+      "from": "docs/r136-execution-ledger.md",
+      "to": "docs/history/ledgers/r136-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R158-OVERVIEW_PLAYER_TAB_REVISIT_ICON_RELOAD_AND_PHASE_TIMING.md",
+      "to": "docs/history/worklists/WORKLIST-R158-OVERVIEW_PLAYER_TAB_REVISIT_ICON_RELOAD_AND_PHASE_TIMING.md"
+    },
+    {
+      "from": "docs/r167-execution-ledger.md",
+      "to": "docs/history/ledgers/r167-execution-ledger.md"
+    },
+    {
+      "from": "docs/r194-execution-ledger.md",
+      "to": "docs/history/ledgers/r194-execution-ledger.md"
+    },
+    {
+      "from": "docs/r116probe-execution-ledger.md",
+      "to": "docs/history/ledgers/r116probe-execution-ledger.md"
+    },
+    {
+      "from": "docs/r91-addendum-execution-ledger.md",
+      "to": "docs/history/ledgers/r91-addendum-execution-ledger.md"
+    },
+    {
+      "from": "docs/r137-execution-ledger.md",
+      "to": "docs/history/ledgers/r137-execution-ledger.md"
+    },
+    {
+      "from": "docs/r166-execution-ledger.md",
+      "to": "docs/history/ledgers/r166-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R177-RUNE-STARTER-QUOTA-STARVATION-AND-R167-ENEMY-LANE-INFERENCE.md",
+      "to": "docs/history/worklists/WORKLIST-R177-RUNE-STARTER-QUOTA-STARVATION-AND-R167-ENEMY-LANE-INFERENCE.md"
+    },
+    {
+      "from": "docs/r181-execution-ledger.md",
+      "to": "docs/history/ledgers/r181-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R157-COMMUNITYDRAGON_AUGMENT_CATALOG_NEGATIVE_CACHE.md",
+      "to": "docs/history/worklists/WORKLIST-R157-COMMUNITYDRAGON_AUGMENT_CATALOG_NEGATIVE_CACHE.md"
+    },
+    {
+      "from": "docs/r172-execution-ledger.md",
+      "to": "docs/history/ledgers/r172-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R149-MAYHEM-PACE-WAIT-AND-REMOVE-FACADE-ICON-BANNER-CARDS.md",
+      "to": "docs/history/worklists/WORKLIST-R149-MAYHEM-PACE-WAIT-AND-REMOVE-FACADE-ICON-BANNER-CARDS.md"
+    },
+    {
+      "from": "docs/WORKLIST-R185-APP-SLUGGISH-FACADE-SSE-RELOAD-LOOP-AND-PERF-DIAGNOSTICS.md",
+      "to": "docs/history/worklists/WORKLIST-R185-APP-SLUGGISH-FACADE-SSE-RELOAD-LOOP-AND-PERF-DIAGNOSTICS.md"
+    },
+    {
+      "from": "docs/r173-execution-ledger.md",
+      "to": "docs/history/ledgers/r173-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R184-CAMERA-LOCK-RESET-EVERY-GAME-SETTINGS-WATCH-DIAGNOSTICS.md",
+      "to": "docs/history/worklists/WORKLIST-R184-CAMERA-LOCK-RESET-EVERY-GAME-SETTINGS-WATCH-DIAGNOSTICS.md"
+    },
+    {
+      "from": "docs/r122-execution-ledger.md",
+      "to": "docs/history/ledgers/r122-execution-ledger.md"
+    },
+    {
+      "from": "docs/r180-execution-ledger.md",
+      "to": "docs/history/ledgers/r180-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R182-LOSS-LP-DELTA-NEVER-RECORDED-GAMES-GAP-TWO.md",
+      "to": "docs/history/worklists/WORKLIST-R182-LOSS-LP-DELTA-NEVER-RECORDED-GAMES-GAP-TWO.md"
+    },
+    {
+      "from": "docs/r183-execution-ledger.md",
+      "to": "docs/history/ledgers/r183-execution-ledger.md"
+    },
+    {
+      "from": "docs/r121-execution-ledger.md",
+      "to": "docs/history/ledgers/r121-execution-ledger.md"
+    },
+    {
+      "from": "docs/r91-addendum-2-execution-ledger.md",
+      "to": "docs/history/ledgers/r91-addendum-2-execution-ledger.md"
+    },
+    {
+      "from": "docs/r170-execution-ledger.md",
+      "to": "docs/history/ledgers/r170-execution-ledger.md"
+    },
+    {
+      "from": "docs/r138-execution-ledger.md",
+      "to": "docs/history/ledgers/r138-execution-ledger.md"
+    },
+    {
+      "from": "docs/r169-execution-ledger.md",
+      "to": "docs/history/ledgers/r169-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R175-LIVE-ROSTER-RECOVERY-INDEX-PANIC-CRASH-AND-PANIC-CONTAINMENT.md",
+      "to": "docs/history/worklists/WORKLIST-R175-LIVE-ROSTER-RECOVERY-INDEX-PANIC-CRASH-AND-PANIC-CONTAINMENT.md"
+    },
+    {
+      "from": "docs/r120-execution-ledger.md",
+      "to": "docs/history/ledgers/r120-execution-ledger.md"
+    },
+    {
+      "from": "docs/r171-execution-ledger.md",
+      "to": "docs/history/ledgers/r171-execution-ledger.md"
+    },
+    {
+      "from": "docs/r182-execution-ledger.md",
+      "to": "docs/history/ledgers/r182-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R181-SELF-LATEST-GAME-MISSING-AND-LANE-MATCHUP-CARD-NEVER-SHOWN.md",
+      "to": "docs/history/worklists/WORKLIST-R181-SELF-LATEST-GAME-MISSING-AND-LANE-MATCHUP-CARD-NEVER-SHOWN.md"
+    },
+    {
+      "from": "docs/r139-execution-ledger.md",
+      "to": "docs/history/ledgers/r139-execution-ledger.md"
+    },
+    {
+      "from": "docs/r168-execution-ledger.md",
+      "to": "docs/history/ledgers/r168-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R172-CORE-ITEM-ROUTE-PREPEND-STARTER-ITEM-WITH-DIVIDER.md",
+      "to": "docs/history/worklists/WORKLIST-R172-CORE-ITEM-ROUTE-PREPEND-STARTER-ITEM-WITH-DIVIDER.md"
+    },
+    {
+      "from": "docs/r184-execution-ledger.md",
+      "to": "docs/history/ledgers/r184-execution-ledger.md"
+    },
+    {
+      "from": "docs/r177-execution-ledger.md",
+      "to": "docs/history/ledgers/r177-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R176-REMOVE-R172-CORE-ROUTE-STARTER-PREFIX.md",
+      "to": "docs/history/worklists/WORKLIST-R176-REMOVE-R172-CORE-ROUTE-STARTER-PREFIX.md"
+    },
+    {
+      "from": "docs/WORKLIST-R161-LIVE-ROSTER-RECOVERY-AND-TOOLBAR-POSITION.md",
+      "to": "docs/history/worklists/WORKLIST-R161-LIVE-ROSTER-RECOVERY-AND-TOOLBAR-POSITION.md"
+    },
+    {
+      "from": "docs/r120-retest-execution-ledger.md",
+      "to": "docs/history/ledgers/r120-retest-execution-ledger.md"
+    },
+    {
+      "from": "docs/r176-execution-ledger.md",
+      "to": "docs/history/ledgers/r176-execution-ledger.md"
+    },
+    {
+      "from": "docs/r185-execution-ledger.md",
+      "to": "docs/history/ledgers/r185-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R169-UPDATE-MANIFEST-PUBLIC-SUFFIX-MISMATCH.md",
+      "to": "docs/history/worklists/WORKLIST-R169-UPDATE-MANIFEST-PUBLIC-SUFFIX-MISMATCH.md"
+    },
+    {
+      "from": "docs/WORKLIST-R174-RUNE-CARD-SPELLS-INTO-EQUIPMENT-ROW.md",
+      "to": "docs/history/worklists/WORKLIST-R174-RUNE-CARD-SPELLS-INTO-EQUIPMENT-ROW.md"
+    },
+    {
+      "from": "docs/WORKLIST-R183-RANKED-ROSTER-MISSING-ANONYMOUS-ENEMY.md",
+      "to": "docs/history/worklists/WORKLIST-R183-RANKED-ROSTER-MISSING-ANONYMOUS-ENEMY.md"
+    },
+    {
+      "from": "docs/r186-execution-ledger.md",
+      "to": "docs/history/ledgers/r186-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R192-EXTERNAL-MATCH-LIST-SUMMARY-NOT-REFRESHED-AFTER-HYDRATE-AND-DEAD-RETRY.md",
+      "to": "docs/history/worklists/WORKLIST-R192-EXTERNAL-MATCH-LIST-SUMMARY-NOT-REFRESHED-AFTER-HYDRATE-AND-DEAD-RETRY.md"
+    },
+    {
+      "from": "docs/r175-execution-ledger.md",
+      "to": "docs/history/ledgers/r175-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R179-CHAMPSELECT-ENEMY-PLACEHOLDER-STARTER-ITEMS-WITH-RUNES-CHAMPSELECT-PREMADE-AND-LIVE-FLICKER.md",
+      "to": "docs/history/worklists/WORKLIST-R179-CHAMPSELECT-ENEMY-PLACEHOLDER-STARTER-ITEMS-WITH-RUNES-CHAMPSELECT-PREMADE-AND-LIVE-FLICKER.md"
+    },
+    {
+      "from": "docs/WORKLIST-R152-ARENA-AUGMENT-ROW-TOLERANCE-LIVE-SAMPLES-PAYLOAD.md",
+      "to": "docs/history/worklists/WORKLIST-R152-ARENA-AUGMENT-ROW-TOLERANCE-LIVE-SAMPLES-PAYLOAD.md"
+    },
+    {
+      "from": "docs/WORKLIST-R119-AUTOFILL-DIAGNOSTIC-EVENTS-UNTESTED.md",
+      "to": "docs/history/worklists/WORKLIST-R119-AUTOFILL-DIAGNOSTIC-EVENTS-UNTESTED.md"
+    },
+    {
+      "from": "docs/r174-execution-ledger.md",
+      "to": "docs/history/ledgers/r174-execution-ledger.md"
+    },
+    {
+      "from": "docs/r187-execution-ledger.md",
+      "to": "docs/history/ledgers/r187-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R120-TEST-POWER-AND-FLAKES.md",
+      "to": "docs/history/worklists/WORKLIST-R120-TEST-POWER-AND-FLAKES.md"
+    },
+    {
+      "from": "docs/r116b-execution-ledger.md",
+      "to": "docs/history/ledgers/r116b-execution-ledger.md"
+    },
+    {
+      "from": "docs/r92-execution-ledger.md",
+      "to": "docs/history/ledgers/r92-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R120-WILDCARD-HOVER-LOCK-CHECK-RACE.md",
+      "to": "docs/history/worklists/WORKLIST-R120-WILDCARD-HOVER-LOCK-CHECK-RACE.md"
+    },
+    {
+      "from": "docs/WORKLIST-R144-BLANK-LOOT-RECORD-NOT-SYNCED.md",
+      "to": "docs/history/worklists/WORKLIST-R144-BLANK-LOOT-RECORD-NOT-SYNCED.md"
+    },
+    {
+      "from": "docs/r144-execution-ledger.md",
+      "to": "docs/history/ledgers/r144-execution-ledger.md"
+    },
+    {
+      "from": "docs/r115-execution-ledger.md",
+      "to": "docs/history/ledgers/r115-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R145-LEGACY-LOOT-ICONS-CLIENT-404.md",
+      "to": "docs/history/worklists/WORKLIST-R145-LEGACY-LOOT-ICONS-CLIENT-404.md"
+    },
+    {
+      "from": "docs/WORKLIST-R193-HIDDEN-IDENTITY-CARD-NO-FAKE-RANK-AND-DUPLICATE-TEXT.md",
+      "to": "docs/history/worklists/WORKLIST-R193-HIDDEN-IDENTITY-CARD-NO-FAKE-RANK-AND-DUPLICATE-TEXT.md"
+    },
+    {
+      "from": "docs/r145-execution-ledger.md",
+      "to": "docs/history/ledgers/r145-execution-ledger.md"
+    },
+    {
+      "from": "docs/r93-execution-ledger.md",
+      "to": "docs/history/ledgers/r93-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R129-LIVE-RECOMMENDATION-FLICKER.md",
+      "to": "docs/history/worklists/WORKLIST-R129-LIVE-RECOMMENDATION-FLICKER.md"
+    },
+    {
+      "from": "docs/WORKLIST-R191-R190-VERIFICATION-PERK-VAR-PRESENCE-SCOPED-RERENDER-AND-LAYOUT-FIXES.md",
+      "to": "docs/history/worklists/WORKLIST-R191-R190-VERIFICATION-PERK-VAR-PRESENCE-SCOPED-RERENDER-AND-LAYOUT-FIXES.md"
+    },
+    {
+      "from": "docs/r90-execution-ledger.md",
+      "to": "docs/history/ledgers/r90-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R154-OFFLINE-ICON-FALLBACK-HEXDATA-CIRCUIT-SCOPE-AND-FACADE-ICON-GRID.md",
+      "to": "docs/history/worklists/WORKLIST-R154-OFFLINE-ICON-FALLBACK-HEXDATA-CIRCUIT-SCOPE-AND-FACADE-ICON-GRID.md"
+    },
+    {
+      "from": "docs/r89-execution-ledger.md",
+      "to": "docs/history/ledgers/r89-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R128-MAYHEM-DETAIL-OVERVIEW-MODULES-AND-AUGMENT-HEADER.md",
+      "to": "docs/history/worklists/WORKLIST-R128-MAYHEM-DETAIL-OVERVIEW-MODULES-AND-AUGMENT-HEADER.md"
+    },
+    {
+      "from": "docs/r91-execution-ledger.md",
+      "to": "docs/history/ledgers/r91-execution-ledger.md"
+    },
+    {
+      "from": "docs/r116-execution-ledger.md",
+      "to": "docs/history/ledgers/r116-execution-ledger.md"
+    },
+    {
+      "from": "docs/r147-execution-ledger.md",
+      "to": "docs/history/ledgers/r147-execution-ledger.md"
+    },
+    {
+      "from": "docs/r116a-execution-ledger.md",
+      "to": "docs/history/ledgers/r116a-execution-ledger.md"
+    },
+    {
+      "from": "docs/r88-execution-ledger.md",
+      "to": "docs/history/ledgers/r88-execution-ledger.md"
+    },
+    {
+      "from": "docs/r110-execution-ledger.md",
+      "to": "docs/history/ledgers/r110-execution-ledger.md"
+    },
+    {
+      "from": "docs/r141-execution-ledger.md",
+      "to": "docs/history/ledgers/r141-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R178-INGAME-DUPLICATE-POSITIONS-GAMEFLOW-ROLE-PARSE-AND-ROSTER-HISTORY-FRESHNESS.md",
+      "to": "docs/history/worklists/WORKLIST-R178-INGAME-DUPLICATE-POSITIONS-GAMEFLOW-ROLE-PARSE-AND-ROSTER-HISTORY-FRESHNESS.md"
+    },
+    {
+      "from": "docs/WORKLIST-R180-ROSTER-HISTORY-MISSING-LATEST-SAME-QUEUE-GAME.md",
+      "to": "docs/history/worklists/WORKLIST-R180-ROSTER-HISTORY-MISSING-LATEST-SAME-QUEUE-GAME.md"
+    },
+    {
+      "from": "docs/WORKLIST-R173-RUNE-CARD-STARTER-ITEMS-PRO-DETAILS-SHAPE-AND-0930-LOG-FINDINGS.md",
+      "to": "docs/history/worklists/WORKLIST-R173-RUNE-CARD-STARTER-ITEMS-PRO-DETAILS-SHAPE-AND-0930-LOG-FINDINGS.md"
+    },
+    {
+      "from": "docs/WORKLIST-R186-IN-APP-UPDATE-FOR-PORTABLE-AND-GAME-SETTINGS-RESET-AT-LAUNCH.md",
+      "to": "docs/history/worklists/WORKLIST-R186-IN-APP-UPDATE-FOR-PORTABLE-AND-GAME-SETTINGS-RESET-AT-LAUNCH.md"
+    },
+    {
+      "from": "docs/r109-execution-ledger.md",
+      "to": "docs/history/ledgers/r109-execution-ledger.md"
+    },
+    {
+      "from": "docs/r158-execution-ledger.md",
+      "to": "docs/history/ledgers/r158-execution-ledger.md"
+    },
+    {
+      "from": "docs/r111-execution-ledger.md",
+      "to": "docs/history/ledgers/r111-execution-ledger.md"
+    },
+    {
+      "from": "docs/r140-execution-ledger.md",
+      "to": "docs/history/ledgers/r140-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R141-BANNER-GRID-VISIBLE-SIZE-OVER-COLUMN-COUNT.md",
+      "to": "docs/history/worklists/WORKLIST-R141-BANNER-GRID-VISIBLE-SIZE-OVER-COLUMN-COUNT.md"
+    },
+    {
+      "from": "docs/WORKLIST-R168-SUITE-STALE-CACHE-R167-REALMATCH-FINDINGS-R119-LIVE-AUTOFILL-EVIDENCE.md",
+      "to": "docs/history/worklists/WORKLIST-R168-SUITE-STALE-CACHE-R167-REALMATCH-FINDINGS-R119-LIVE-AUTOFILL-EVIDENCE.md"
+    },
+    {
+      "from": "docs/r108-execution-ledger.md",
+      "to": "docs/history/ledgers/r108-execution-ledger.md"
+    },
+    {
+      "from": "docs/r159-execution-ledger.md",
+      "to": "docs/history/ledgers/r159-execution-ledger.md"
+    },
+    {
+      "from": "docs/r116f-execution-ledger.md",
+      "to": "docs/history/ledgers/r116f-execution-ledger.md"
+    },
+    {
+      "from": "docs/r116e-execution-ledger.md",
+      "to": "docs/history/ledgers/r116e-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R163-HEXBRAWL-HIDDEN-LIVE-PLAYER.md",
+      "to": "docs/history/worklists/WORKLIST-R163-HEXBRAWL-HIDDEN-LIVE-PLAYER.md"
+    },
+    {
+      "from": "docs/r95-execution-ledger.md",
+      "to": "docs/history/ledgers/r95-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R162-LIVE-DETAIL-ORDER-AND-LP-CAPTURE.md",
+      "to": "docs/history/worklists/WORKLIST-R162-LIVE-DETAIL-ORDER-AND-LP-CAPTURE.md"
+    },
+    {
+      "from": "docs/r116d-execution-ledger.md",
+      "to": "docs/history/ledgers/r116d-execution-ledger.md"
+    },
+    {
+      "from": "docs/r94-execution-ledger.md",
+      "to": "docs/history/ledgers/r94-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R150-ARENA-LIST-DETAIL-DATA-MISMATCH-UNIFIED-GRADE-SCALE-AND-AUGMENT-SCORE.md",
+      "to": "docs/history/worklists/WORKLIST-R150-ARENA-LIST-DETAIL-DATA-MISMATCH-UNIFIED-GRADE-SCALE-AND-AUGMENT-SCORE.md"
+    },
+    {
+      "from": "docs/r99-execution-ledger.md",
+      "to": "docs/history/ledgers/r99-execution-ledger.md"
+    },
+    {
+      "from": "docs/r107-execution-ledger.md",
+      "to": "docs/history/ledgers/r107-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R139-BROADCAST-SETTINGS-DECLUTTER.md",
+      "to": "docs/history/worklists/WORKLIST-R139-BROADCAST-SETTINGS-DECLUTTER.md"
+    },
+    {
+      "from": "docs/WORKLIST-R165-R121-POSITION-PROBE-BACKFILL-AUTOFILL-AND-LIVE-HIDDEN-CHIP-SEMANTICS.md",
+      "to": "docs/history/worklists/WORKLIST-R165-R121-POSITION-PROBE-BACKFILL-AUTOFILL-AND-LIVE-HIDDEN-CHIP-SEMANTICS.md"
+    },
+    {
+      "from": "docs/r157-execution-ledger.md",
+      "to": "docs/history/ledgers/r157-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R120-INDEPENDENT-VERIFICATION-R116-R118-GAPS.md",
+      "to": "docs/history/worklists/WORKLIST-R120-INDEPENDENT-VERIFICATION-R116-R118-GAPS.md"
+    },
+    {
+      "from": "docs/r154-execution-ledger.md",
+      "to": "docs/history/ledgers/r154-execution-ledger.md"
+    },
+    {
+      "from": "docs/r105-execution-ledger.md",
+      "to": "docs/history/ledgers/r105-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R171-RUNE-CARD-SUMMONER-SPELL-RECOMMENDATION-AND-ONE-CLICK-APPLY.md",
+      "to": "docs/history/worklists/WORKLIST-R171-RUNE-CARD-SUMMONER-SPELL-RECOMMENDATION-AND-ONE-CLICK-APPLY.md"
+    },
+    {
+      "from": "docs/WORKLIST-R146-LOOT-ICON-UNIFORM-SIZE-AND-MAYHEM-HEXDATA-403.md",
+      "to": "docs/history/worklists/WORKLIST-R146-LOOT-ICON-UNIFORM-SIZE-AND-MAYHEM-HEXDATA-403.md"
+    },
+    {
+      "from": "docs/WORKLIST-R166-ABILITY-RADAR-RESOLUTION-MAYHEM-TAB-LABEL-AND-DETAIL-FIRST-LOAD.md",
+      "to": "docs/history/worklists/WORKLIST-R166-ABILITY-RADAR-RESOLUTION-MAYHEM-TAB-LABEL-AND-DETAIL-FIRST-LOAD.md"
+    },
+    {
+      "from": "docs/r102-execution-ledger.md",
+      "to": "docs/history/ledgers/r102-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R151-ARENA-YOURGG-AUGMENT-PROBE-AND-SOURCE-TABLE.md",
+      "to": "docs/history/worklists/WORKLIST-R151-ARENA-YOURGG-AUGMENT-PROBE-AND-SOURCE-TABLE.md"
+    },
+    {
+      "from": "docs/r152-execution-ledger.md",
+      "to": "docs/history/ledgers/r152-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R147-HEXDATA-PAGE-TOKEN-COOKIE.md",
+      "to": "docs/history/worklists/WORKLIST-R147-HEXDATA-PAGE-TOKEN-COOKIE.md"
+    },
+    {
+      "from": "docs/WORKLIST-R136-KR-KEY-R116-PROBE-ACCOUNT-FLICKER-LIVE-GAP-FONT.md",
+      "to": "docs/history/worklists/WORKLIST-R136-KR-KEY-R116-PROBE-ACCOUNT-FLICKER-LIVE-GAP-FONT.md"
+    },
+    {
+      "from": "docs/r119-execution-ledger.md",
+      "to": "docs/history/ledgers/r119-execution-ledger.md"
+    },
+    {
+      "from": "docs/r148-execution-ledger.md",
+      "to": "docs/history/ledgers/r148-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R164-LIVE-HIDDEN-CHIP-AND-PREMADE-ORDER.md",
+      "to": "docs/history/worklists/WORKLIST-R164-LIVE-HIDDEN-CHIP-AND-PREMADE-ORDER.md"
+    },
+    {
+      "from": "docs/r87-execution-ledger.md",
+      "to": "docs/history/ledgers/r87-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R148-MAYHEM-FIRST-LOAD-SLOW-TIER-BOARD-WINRATE-TAB-RESET.md",
+      "to": "docs/history/worklists/WORKLIST-R148-MAYHEM-FIRST-LOAD-SLOW-TIER-BOARD-WINRATE-TAB-RESET.md"
+    },
+    {
+      "from": "docs/WORKLIST-R121-POSITION-PROBE-HELP-FALLBACK-INEFFECTIVE.md",
+      "to": "docs/history/worklists/WORKLIST-R121-POSITION-PROBE-HELP-FALLBACK-INEFFECTIVE.md"
+    },
+    {
+      "from": "docs/r100-execution-ledger.md",
+      "to": "docs/history/ledgers/r100-execution-ledger.md"
+    },
+    {
+      "from": "docs/r120-wildcard-hover-execution-ledger.md",
+      "to": "docs/history/ledgers/r120-wildcard-hover-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R170-LIVE-MODESTATS-GAMES-NOT-CAPPED-TO-TEN.md",
+      "to": "docs/history/worklists/WORKLIST-R170-LIVE-MODESTATS-GAMES-NOT-CAPPED-TO-TEN.md"
+    },
+    {
+      "from": "docs/r151-execution-ledger.md",
+      "to": "docs/history/ledgers/r151-execution-ledger.md"
+    },
+    {
+      "from": "docs/r149-execution-ledger.md",
+      "to": "docs/history/ledgers/r149-execution-ledger.md"
+    },
+    {
+      "from": "docs/r101-execution-ledger.md",
+      "to": "docs/history/ledgers/r101-execution-ledger.md"
+    },
+    {
+      "from": "docs/WORKLIST-R189-LOOT-EMOTE-NAME-ICON-AND-OWNED-STATUS.md",
+      "to": "docs/history/worklists/WORKLIST-R189-LOOT-EMOTE-NAME-ICON-AND-OWNED-STATUS.md"
+    },
+    {
+      "from": "docs/r150-execution-ledger.md",
+      "to": "docs/history/ledgers/r150-execution-ledger.md"
+    },
+    {
+      "from": "docs/r86-execution-ledger.md",
+      "to": "docs/history/ledgers/r86-execution-ledger.md"
+    }
+  ],
+  "linkAdjustedFiles": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "docs/WORKLIST-INDEX.md",
+    "docs/WORKLIST-R119-AUTOFILL-LABEL-GAPS.md",
+    "docs/WORKLIST-R120-INDEPENDENT-VERIFICATION-R116-R118-GAPS.md",
+    "docs/WORKLIST-R120-WILDCARD-HOVER-LOCK-CHECK-RACE.md",
+    "docs/WORKLIST-R136-KR-KEY-R116-PROBE-ACCOUNT-FLICKER-LIVE-GAP-FONT.md",
+    "docs/WORKLIST-R137-FLAKY-SENTINEL-AND-STALE-NODE-TESTS.md",
+    "docs/WORKLIST-R140-R138-BANNER-SCOPE-DROPPED.md",
+    "docs/WORKLIST-R141-BANNER-GRID-VISIBLE-SIZE-OVER-COLUMN-COUNT.md",
+    "docs/WORKLIST-R144-BLANK-LOOT-RECORD-NOT-SYNCED.md",
+    "docs/WORKLIST-R145-LEGACY-LOOT-ICONS-CLIENT-404.md",
+    "docs/WORKLIST-R147-HEXDATA-PAGE-TOKEN-COOKIE.md",
+    "docs/WORKLIST-R148-MAYHEM-FIRST-LOAD-SLOW-TIER-BOARD-WINRATE-TAB-RESET.md",
+    "docs/WORKLIST-R149-MAYHEM-PACE-WAIT-AND-REMOVE-FACADE-ICON-BANNER-CARDS.md",
+    "docs/WORKLIST-R150-ARENA-LIST-DETAIL-DATA-MISMATCH-UNIFIED-GRADE-SCALE-AND-AUGMENT-SCORE.md",
+    "docs/WORKLIST-R151-ARENA-YOURGG-AUGMENT-PROBE-AND-SOURCE-TABLE.md",
+    "docs/WORKLIST-R152-ARENA-AUGMENT-ROW-TOLERANCE-LIVE-SAMPLES-PAYLOAD.md",
+    "docs/WORKLIST-R160-MAYHEM-ARENA-ARTWORK-AND-OVERVIEW-LATENCY.md",
+    "docs/WORKLIST-R161-LIVE-ROSTER-RECOVERY-AND-TOOLBAR-POSITION.md",
+    "docs/WORKLIST-R162-LIVE-DETAIL-ORDER-AND-LP-CAPTURE.md",
+    "docs/WORKLIST-R163-HEXBRAWL-HIDDEN-LIVE-PLAYER.md",
+    "docs/WORKLIST-R164-LIVE-HIDDEN-CHIP-AND-PREMADE-ORDER.md",
+    "docs/WORKLIST-R166-ABILITY-RADAR-RESOLUTION-MAYHEM-TAB-LABEL-AND-DETAIL-FIRST-LOAD.md",
+    "docs/WORKLIST-R167-CHAMPSELECT-LANE-MATCHUP-CARD.md",
+    "docs/WORKLIST-R168-SUITE-STALE-CACHE-R167-REALMATCH-FINDINGS-R119-LIVE-AUTOFILL-EVIDENCE.md",
+    "docs/WORKLIST-R169-UPDATE-MANIFEST-PUBLIC-SUFFIX-MISMATCH.md",
+    "docs/WORKLIST-R173-RUNE-CARD-STARTER-ITEMS-PRO-DETAILS-SHAPE-AND-0930-LOG-FINDINGS.md",
+    "docs/WORKLIST-R174-RUNE-CARD-SPELLS-INTO-EQUIPMENT-ROW.md",
+    "docs/WORKLIST-R175-LIVE-ROSTER-RECOVERY-INDEX-PANIC-CRASH-AND-PANIC-CONTAINMENT.md",
+    "docs/WORKLIST-R176-REMOVE-R172-CORE-ROUTE-STARTER-PREFIX.md",
+    "docs/WORKLIST-R177-RUNE-STARTER-QUOTA-STARVATION-AND-R167-ENEMY-LANE-INFERENCE.md",
+    "docs/WORKLIST-R178-INGAME-DUPLICATE-POSITIONS-GAMEFLOW-ROLE-PARSE-AND-ROSTER-HISTORY-FRESHNESS.md",
+    "docs/WORKLIST-R179-CHAMPSELECT-ENEMY-PLACEHOLDER-STARTER-ITEMS-WITH-RUNES-CHAMPSELECT-PREMADE-AND-LIVE-FLICKER.md",
+    "docs/WORKLIST-R180-ROSTER-HISTORY-MISSING-LATEST-SAME-QUEUE-GAME.md",
+    "docs/WORKLIST-R181-SELF-LATEST-GAME-MISSING-AND-LANE-MATCHUP-CARD-NEVER-SHOWN.md",
+    "docs/WORKLIST-R182-LOSS-LP-DELTA-NEVER-RECORDED-GAMES-GAP-TWO.md",
+    "docs/WORKLIST-R183-RANKED-ROSTER-MISSING-ANONYMOUS-ENEMY.md",
+    "docs/WORKLIST-R184-CAMERA-LOCK-RESET-EVERY-GAME-SETTINGS-WATCH-DIAGNOSTICS.md",
+    "docs/WORKLIST-R185-APP-SLUGGISH-FACADE-SSE-RELOAD-LOOP-AND-PERF-DIAGNOSTICS.md",
+    "docs/WORKLIST-R186-IN-APP-UPDATE-FOR-PORTABLE-AND-GAME-SETTINGS-RESET-AT-LAUNCH.md",
+    "docs/WORKLIST-R187-CHAMPSELECT-ENEMY-PLACEHOLDER-HINT-AND-STALE-RANK-CACHE-AFTER-GAME.md",
+    "docs/WORKLIST-R188-PREMADE-TOOLTIP-PLAIN-LIST-AND-LANE-MATCHUP-IN-TAB-ROW.md",
+    "docs/WORKLIST-R189-LOOT-EMOTE-NAME-ICON-AND-OWNED-STATUS.md",
+    "docs/WORKLIST-R190-ROSTER-SELF-HIGHLIGHT-RUNE-EFFECTS-AND-AUGMENT-CARDS.md",
+    "docs/WORKLIST-R191-R190-VERIFICATION-PERK-VAR-PRESENCE-SCOPED-RERENDER-AND-LAYOUT-FIXES.md",
+    "docs/WORKLIST-R192-EXTERNAL-MATCH-LIST-SUMMARY-NOT-REFRESHED-AFTER-HYDRATE-AND-DEAD-RETRY.md",
+    "docs/WORKLIST-R193-HIDDEN-IDENTITY-CARD-NO-FAKE-RANK-AND-DUPLICATE-TEXT.md",
+    "docs/WORKLIST-R194-ROSTER-RECOVERY-FOR-QUICKPLAY-AND-OTHER-5V5-QUEUES.md",
+    "docs/history/ledgers/r117-execution-ledger.md",
+    "docs/history/ledgers/r124-execution-ledger.md",
+    "docs/history/worklists/R115-对标LeagueAkari-性能与功能补齐-工单.md",
+    "docs/history/worklists/R116-A-Hexdata数据源替换与聚合文件接入-工单.md",
+    "docs/history/worklists/R116-B-P0六项与详情页三tab重整-工单.md",
+    "docs/history/worklists/R116-D-推荐页克制协同与出装联动-工单.md",
+    "docs/history/worklists/R116-E-自建海斗统计与磁盘预算-工单.md",
+    "docs/history/worklists/R116-F-概率预测器负向推荐与平衡参数探测-工单.md",
+    "docs/history/worklists/WORKLIST-R102-PRO-ACCOUNT-RECENCY-AND-SEED-EMBED.md",
+    "docs/history/worklists/WORKLIST-R105-PRO-ACCOUNTS-EMBEDDING-AND-FACADE-UNLOCK.md",
+    "docs/history/worklists/WORKLIST-R117-FULL-PROJECT-OPTIMIZATION.md",
+    "docs/history/worklists/WORKLIST-R123-FACADE-ICON-BANNER-COLLECTION-MIGRATION.md",
+    "docs/history/worklists/WORKLIST-R135-REPO-SLIMMING-CACHE-DOCS-DEADCODE.md",
+    "docs/history/worklists/WORKLIST-R86-ADDENDUM-2-NEW-FINDINGS.md",
+    "docs/history/worklists/WORKLIST-R86-ADDENDUM-ACCEPTANCE-FOLLOWUP.md",
+    "docs/history/worklists/WORKLIST-R89-R88-FOLLOWUP.md",
+    "docs/history/worklists/WORKLIST-R91-ADDENDUM-2-INDEPENDENT-VERIFICATION-GAPS.md",
+    "docs/history/worklists/WORKLIST-R93-SPECIALIST-RUNES-GATE-DISK-TEST-GAP.md",
+    "docs/history/worklists/WORKLIST-R94-LIVE-GAMEID-JUMP-MISSED.md",
+    "docs/r102-execution-ledger.md",
+    "docs/r105-validation/README.md",
+    "docs/r115-execution-ledger.md",
+    "docs/r116-execution-ledger.md",
+    "docs/r116-independent-verification.md",
+    "docs/r116-probe-findings.md",
+    "docs/r116-worklist-index.md",
+    "docs/r116a-execution-ledger.md",
+    "docs/r116b-execution-ledger.md",
+    "docs/r116e-execution-ledger.md",
+    "docs/r116f-balance-param-findings.md",
+    "docs/r116f-execution-ledger.md",
+    "docs/r116probe-execution-ledger.md",
+    "docs/r119-execution-ledger.md",
+    "docs/r119-independent-verification.md",
+    "docs/r120-execution-ledger.md",
+    "docs/r120-retest-execution-ledger.md",
+    "docs/r120-wildcard-hover-execution-ledger.md",
+    "docs/r121-execution-ledger.md",
+    "docs/r122-execution-ledger.md",
+    "docs/r135-execution-ledger.md",
+    "docs/r136-execution-ledger.md",
+    "docs/r137-execution-ledger.md",
+    "docs/r138-execution-ledger.md",
+    "docs/r139-execution-ledger.md",
+    "docs/r140-execution-ledger.md",
+    "docs/r141-execution-ledger.md",
+    "docs/r147-execution-ledger.md",
+    "docs/r150-execution-ledger.md",
+    "docs/r151-execution-ledger.md",
+    "docs/r166-execution-ledger.md",
+    "docs/r188-execution-ledger.md",
+    "docs/r189-execution-ledger.md",
+    "docs/r190-execution-ledger.md",
+    "docs/r193-execution-ledger.md",
+    "docs/r86-execution-ledger.md",
+    "docs/r87-execution-ledger.md",
+    "docs/r88-execution-ledger.md",
+    "docs/r90-execution-ledger.md",
+    "docs/r91-addendum-2-execution-ledger.md",
+    "docs/r91-addendum-execution-ledger.md",
+    "docs/r91-execution-ledger.md",
+    "docs/r94-execution-ledger.md",
+    "docs/r95-execution-ledger.md",
+    "docs/r99-execution-ledger.md",
+    "docs/release-0.12.58-ledger.md"
+  ]
+}

@@ -22,18 +22,18 @@ function tooltip(d, f, players) {
 function roster(n, source = 'session') {
   return Array.from({length: n}, (_, i) => ({premadeGroup: '1', premadeSize: n, premadeSource: source, gameName: `测试成员${i + 1}`, tagLine: '188', championId: i ? 0 : 103, championName: i ? '未知英雄' : '阿狸', profileIconId: 42}));
 }
-test('R188 direct premade tooltip uses two plain text rows and no images or separator', () => {
+test('R188 direct premade tooltip uses champion icons before names without hero text', () => {
   const f = h(), d = dom();
   try {
     const t = tooltip(d, f, roster(2));
     assert.equal(t.querySelector('.tooltip-title').textContent, '组队 2 人');
     assert.equal(t.querySelectorAll('.tooltip-roster-player').length, 2);
-    assert.equal(t.querySelectorAll('img').length, 0);
+    assert.equal(t.querySelectorAll('img').length, 1);
     assert.doesNotMatch(t.textContent, /·|客户端直接|最近战绩/);
     assert.equal(t.querySelector('.tooltip-roster-name').textContent, '测试成员1#188');
-    assert.equal(t.querySelector('.tooltip-roster-champion').textContent, '阿狸');
+    assert.equal(t.querySelector('.tooltip-roster-champion'), null); assert.doesNotMatch(t.textContent,/阿狸|未知英雄/);
     const rows = JSON.parse(d.window.document.querySelector('[data-tooltip-roster]').dataset.tooltipRoster);
-    assert.deepEqual(Object.keys(rows[0]).sort(), ['champion', 'name']);
+    assert.deepEqual(Object.keys(rows[0]).sort(), ['championIconURL', 'name']);
   } finally { d.window.close(); }
 });
 test('R188 inferred title is a count with no methodology body, both/lobby stay direct', () => {
@@ -47,13 +47,13 @@ test('R188 inferred title is a count with no methodology body, both/lobby stay d
     } finally { d.window.close(); }
   }
 });
-test('R188 zero and negative champion IDs leave hero column empty even with intent/name', () => {
+test('R188 zero and negative champion IDs retain an empty icon slot even with intent/name', () => {
   for (const id of [0, -1, -3]) {
     const players = roster(2); players[1].championId = id; players[1].championPickIntent = 69;
     const d = dom();
     try {
       const t = tooltip(d, h(), players);
-      assert.equal(t.querySelectorAll('.tooltip-roster-champion')[1].textContent, '');
+      assert.equal(t.querySelectorAll('.tooltip-roster-player')[1].querySelector('img'), null); assert.ok(t.querySelectorAll('.tooltip-roster-player')[1].querySelector('span.tooltip-roster-icon'));
       assert.doesNotMatch(t.textContent, /未知英雄|英雄待确认/);
     } finally { d.window.close(); }
   }

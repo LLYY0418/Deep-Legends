@@ -1,6 +1,6 @@
 # R135 · 仓库瘦身：本机缓存、Git 历史、docs 工单归档与无引用代码清理
 
-- 编号：R135（本工单一个文件、按 P0–P6 分节；执行账本写 `docs/r135-execution-ledger.md`）
+- 编号：R135（本工单一个文件、按 P0–P6 分节；执行账本写 `docs/history/ledgers/r135-execution-ledger.md`）
 - 目标：在**不改变任何现有功能、界面文案、测试覆盖和打包产物**的前提下，降低仓库目录占用，并把 docs/ 里越堆越多的工单、账本、验证证据理顺。
 - 执行者：GPT（Codex），在用户 Mac 本机仓库根目录执行。
 - 红线：
@@ -155,7 +155,7 @@
 
 ## 交付物
 
-- `docs/r135-execution-ledger.md`：每节做了什么、删了/移了哪些路径（完整清单）、前后体积、测试前后对比、P2 是否执行。
+- `docs/history/ledgers/r135-execution-ledger.md`：每节做了什么、删了/移了哪些路径（完整清单）、前后体积、测试前后对比、P2 是否执行。
 - `docs/WORKLIST-INDEX.md`。
 - `docs/r135-validation/`：baseline-status、size-before/after、deadcode/unused 报告（纯文本，体积小）。
 - 本工单关闭后按 P3 规则移入 `docs/history/worklists/`。

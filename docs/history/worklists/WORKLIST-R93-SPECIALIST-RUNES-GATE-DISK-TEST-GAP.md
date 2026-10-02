@@ -4,7 +4,7 @@
 
 用户已拍板 J 组方向：先去查清楚这几个娱乐队列 OP.GG 到底有没有对应数据，视情况决定开放还是改提示文案，不要跳过调研直接二选一。
 
-**2026-09-14 J 组最终结论（已核实、已关闭，不用再调研）**：三个队列（1750 Arena 3x6 / 2400 ARAM: Mayhem / 3140 Practice Tool）均已确认**没有对应的高手玩家榜单数据**，证据见 `docs/r93-execution-ledger.md` 和 `docs/r93/research/responses.json`（每条调研都有真实请求的 URL/时间戳/HTTP状态/正文SHA-256留痕，不是靠猜）。用户看过结论后明确决定：**门禁维持现状，不开放这三个队列，也不加"该模式暂不支持"这类 UI 提示，保持现有的静默跳过行为**。J-2 的两个分支都不执行，`recommendationQueueHasTopPlayers`/`recommendationModeHasTopPlayers` 不需要改动。以后如果没有新证据（比如 OP.GG 上线了新功能），不用重新调研这三个队列。
+**2026-09-14 J 组最终结论（已核实、已关闭，不用再调研）**：三个队列（1750 Arena 3x6 / 2400 ARAM: Mayhem / 3140 Practice Tool）均已确认**没有对应的高手玩家榜单数据**，证据见 `docs/history/ledgers/r93-execution-ledger.md` 和 `docs/r93/research/responses.json`（每条调研都有真实请求的 URL/时间戳/HTTP状态/正文SHA-256留痕，不是靠猜）。用户看过结论后明确决定：**门禁维持现状，不开放这三个队列，也不加"该模式暂不支持"这类 UI 提示，保持现有的静默跳过行为**。J-2 的两个分支都不执行，`recommendationQueueHasTopPlayers`/`recommendationModeHasTopPlayers` 不需要改动。以后如果没有新证据（比如 OP.GG 上线了新功能），不用重新调研这三个队列。
 
 ---
 

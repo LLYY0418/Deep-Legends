@@ -5393,7 +5393,8 @@ test("R66 live premade hints cluster players and render a rich, fail-closed tag"
 	assert.match(tag, /class="premade-team-tag is-color-0"/);
 	assert.match(tag, />预组 ×2<\/span>/);
 	assert.match(tag, /data-tooltip-roster=/);
-	assert.doesNotMatch(tag, /profileURL|championURL|profile-icons|champion-icons/);
+	assert.doesNotMatch(tag, /profileURL|championURL|profile-icons/);
+	assert.match(tag, /championIconURL/);
 	assert.match(tag, /预组队 2 人/);
 
 	const inconsistent = [{ ...players[0], premadeSize: 3 }, players[2]];

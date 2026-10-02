@@ -1,6 +1,6 @@
 # R105 验证索引
 
-完整要求映射和Windows待验项：[执行账本](../r105-execution-ledger.md)。
+完整要求映射和Windows待验项：[执行账本](../history/ledgers/r105-execution-ledger.md)。
 
 | 证据 | 结果 |
 |---|---|

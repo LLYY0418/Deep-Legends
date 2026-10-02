@@ -268,7 +268,7 @@ func (u *updateManager) Start() {
 	}
 	if u.diagnostic != nil {
 		d := u.installDetection
-		u.diagnostic(map[string]any{"event": "update_install_detection", "result": d.Result, "registry_display_found": d.RegistryDisplayFound, "location_matches": d.LocationMatches})
+		u.diagnostic(d.diagnosticEvent())
 	}
 	goSafe("update.Start.1", func() {
 		u.Check(false)

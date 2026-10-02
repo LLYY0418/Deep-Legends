@@ -4046,10 +4046,16 @@
 		  const name = document.createElement("span");
 		  name.className = "tooltip-roster-name";
 		  name.textContent = String(item?.name || "");
-		  const champion = document.createElement("span");
-		  champion.className = "tooltip-roster-champion";
-		  champion.textContent = String(item?.champion || "");
-		  playerNode.append(name, champion);
+		  const iconURL = String(item?.championIconURL || "");
+		  const hasIcon = iconURL.startsWith("/api/image?path=");
+		  const icon = document.createElement(hasIcon ? "img" : "span");
+		  icon.className = "tooltip-roster-icon";
+		  icon.setAttribute("aria-hidden", "true");
+		  if (hasIcon) {
+			icon.alt = "";
+			icon.setAttribute("data-queued-src", iconURL);
+		  }
+		  playerNode.append(icon, name);
 		  rosterNode.append(playerNode);
 		}
 		children.push(rosterNode);

@@ -1,6 +1,6 @@
 # R119 独立验收：对局详情「补位」标签
 
-**验收日期：** 2026-09-21　**验收对象：** `docs/r119-execution-ledger.md`（用户口头需求，无 WORKLIST 文件；版本 0.12.13）
+**验收日期：** 2026-09-21　**验收对象：** `docs/history/ledgers/r119-execution-ledger.md`（用户口头需求，无 WORKLIST 文件；版本 0.12.13）
 **验收方法：** 隔离拷贝（未触碰工作树代码）；重跑 R119 全部 Go / JS 测试；对判定函数 `riotAutofillFlags`、字段管线、前端渲染做对抗变异；用真实 Chromium 渲染真实的 `matchTableRows` / `gameplay.css`；对判定口径的「事实前提」做外部核实。
 **姊妹文档：** `docs/r116-independent-verification.md`、`docs/r118-independent-verification.md`、`docs/WORKLIST-R120-…`。
 
@@ -96,7 +96,7 @@
 
 **仓库内部的对照：**
 
-- `docs/r119-execution-ledger.md` §2 与 `riot_api.go:960` 的注释把 `individualPosition` 写成「这名玩家被单独分配到的分路（他自己选到的那一路）」——**这是假设，不是事实**；台账 §2 自己也承认「仓库内没有真实抓包样本可佐证」，却把它写进了用户可见的提示文案。
+- `docs/history/ledgers/r119-execution-ledger.md` §2 与 `riot_api.go:960` 的注释把 `individualPosition` 写成「这名玩家被单独分配到的分路（他自己选到的那一路）」——**这是假设，不是事实**；台账 §2 自己也承认「仓库内没有真实抓包样本可佐证」，却把它写进了用户可见的提示文案。
 - 「两值不一致 = 英雄选择阶段换过位置」（判定为不打标签，并以 `autofill_swapped` 计数）同样没有依据：不一致更可能是「按行为推算」与「加队伍约束后重新分配」的差别。
 - 用户原话的规则是「最终位置不在他选择的两个位置中，并且没有选择任意位置」，需要**大厅里的两个位置偏好**。match-v5 里没有这两个值，R119 把它降级成「一个个人位置」时，语义已经变了，不再是同一条规则。
 

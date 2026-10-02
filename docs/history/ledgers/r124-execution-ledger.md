@@ -1,8 +1,8 @@
 # R124 执行台账：位置契约探测改为「端点直探 + 响应键名扫描」
 
-**工单：** `docs/WORKLIST-R121-POSITION-PROBE-HELP-FALLBACK-INEFFECTIVE.md`
+**工单：** `docs/history/worklists/WORKLIST-R121-POSITION-PROBE-HELP-FALLBACK-INEFFECTIVE.md`
 **基线版本：** 0.12.15　**最终版本：** **0.12.16**（`desktop/package.json` + `package-lock.json` 三处已同步）
-**轮次编号说明：** 工单标题自称 `WORKLIST-R121`，但 `docs/r121-execution-ledger.md` 已被「补位标签整改」那轮占用，`r122`（诊断计数护栏）与 `r123`（生涯头像/旗帜迁移）也已被占用，因此**本轮按 R124 记账**。工单文件本身不改名，保持原名以便追溯。
+**轮次编号说明：** 工单标题自称 `WORKLIST-R121`，但 `docs/history/ledgers/r121-execution-ledger.md` 已被「补位标签整改」那轮占用，`r122`（诊断计数护栏）与 `r123`（生涯头像/旗帜迁移）也已被占用，因此**本轮按 R124 记账**。工单文件本身不改名，保持原名以便追溯。
 
 ## 0. 三句话结论
 

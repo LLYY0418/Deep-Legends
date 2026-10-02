@@ -3887,10 +3887,9 @@
     return `<div class="match-skill-seq">${cells}</div>`;
   }
 
-  // These two Riot templates are malformed. Real Windows game variables are
-  // unavailable in this environment; suppress unverified lines rather than
-  // guessing their mapping. Evidence and follow-up are in the R190 ledger.
-  const PERK_EFFECT_OVERRIDES = Object.freeze({ 8008: [], 8304: [] });
+  // R195 Windows samples confirm Lethal Tempo damage in var2. Its first
+  // template incorrectly formats the variables as time; var1 stays hidden.
+  const PERK_EFFECT_OVERRIDES = Object.freeze({ 8008: ["已造成的伤害：@eogvar2@"] });
 
   function perkEffectLines(perk, vars) {
     if (!Array.isArray(vars) || vars.length < 3) return [];
@@ -3903,12 +3902,14 @@
       const valueTemplate = match[2].trim();
       const integer = valueTemplate.match(/^@eogvar([123])@$/i);
       const time = /^@eogvar1@:@eogvar2@$/i.test(valueTemplate);
+      const digitTime = /^@eogvar1@:@eogvar2@@eogvar3@$/i.test(valueTemplate);
       let value;
       if (integer) value = Number(vars[Number(integer[1]) - 1]);
       else if (time && Number.isSafeInteger(Number(vars[0])) && Number.isSafeInteger(Number(vars[1])) && vars[0] >= 0 && vars[1] >= 0 && vars[1] < 60) value = `${Number(vars[0])}:${String(Number(vars[1])).padStart(2, "0")}`;
+      else if (digitTime && vars.slice(0, 3).every(value => Number.isSafeInteger(value)) && vars[0] >= 0 && vars[1] >= 0 && vars[1] <= 9 && vars[2] >= 0 && vars[2] <= 9) value = `${vars[0]}:${vars[1]}${vars[2]}`;
       else continue;
       if (!label || (typeof value === "number" && !Number.isSafeInteger(value))) continue;
-      const kind = time ? "other" : /伤害/.test(label) ? "damage" : /治疗|回复|护盾/.test(label) ? "heal" : /金币/.test(label) ? "gold" : "other";
+      const kind = time || digitTime ? "other" : /伤害/.test(label) ? "damage" : /治疗|回复|护盾/.test(label) ? "heal" : /金币/.test(label) ? "gold" : "other";
       lines.push({ label, value, kind });
     }
     return lines;
@@ -3960,15 +3961,7 @@
       const subtitle = [row.keystone ? row.style.name : "", description].filter(Boolean).join(" · ");
       return `${divider}<div class="eff${row.keystone ? " is-keystone" : ""}" data-perk-id="${Number(row.perk.id)}" tabindex="0">${perkIconFigure(row.perk.id, "rune", false)}<div class="name"><strong>${escapeHTML(row.perk.name)}${row.keystone ? '<span class="kchip">基石</span>' : ""}</strong>${subtitle ? `<small>${escapeHTML(subtitle)}</small>` : ""}</div>${stats ? `<div class="stats">${stats}</div>` : ""}</div>`;
     }).join("");
-    const ids = (subject.statModIds || subject.stat_mod_ids || (subject.perkIds?.length >= 9 ? subject.perkIds.slice(-3) : [])).map(Number);
-    const shards = ids.map(id => {
-      const description = runeShardDescription(id);
-      if (!description) return "";
-      const path = dataDragonRuneShardPath(id);
-      const icon = path ? remoteStaticIcon("ddragon", path, description, "rune", false) : pendingCatalogIcon(description, "rune");
-      return `<span class="shard-chip">${icon}<span>${escapeHTML(description)}</span></span>`;
-    }).join("");
-    return `<div class="rune-effects" aria-label="符文效果">${content}${shards ? `<div class="shards-line"><small>属性碎片</small>${shards}</div>` : ""}</div>`;
+    return `<div class="rune-effects" aria-label="符文效果">${content}</div>`;
   }
 
   function bindRuneEffectLinks(container) {
@@ -5727,7 +5720,7 @@
 	  const index = Math.max(0, players.indexOf(member));
 	  return {
 		name: maskedPlayerName(member, index),
-		champion: Number(member.championId) > 0 && !member.championPickPending ? member.championName || "" : "",
+		championIconURL: Number(member.championId) > 0 && !member.championPickPending ? proxyAsset(assetPath("champion", liveDisplayedChampionId(member, currentChampionId))) : "",
 	  };
 	});
 	const direct = source === "session" || source === "both" || source === "lobby";

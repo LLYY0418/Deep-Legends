@@ -4,7 +4,7 @@
 
 **工单：** `docs/history/worklists/WORKLIST-R117-FULL-PROJECT-OPTIMIZATION.md`（2026-09-20，基线 0.12.7）
 **执行日期：** 2026-09-20
-**版本：** `desktop/package.json` = **0.12.8**（R116-A 的升版，见 `docs/r116a-execution-ledger.md:3`；R117 工单全文无升版要求，本轮不动）
+**版本：** `desktop/package.json` = **0.12.8**（R116-A 的升版，见 `docs/history/ledgers/r116a-execution-ledger.md:3`；R117 工单全文无升版要求，本轮不动）
 
 ---
 
@@ -21,7 +21,7 @@
 上一段会话把 R116 的产物当成污染，计划 `git show HEAD:backend/hexdata.go > backend/hexdata.go` 之类地恢复。**这个前提是错的，本轮已停止并纠正：**
 
 - `git log --oneline -1` = `4ca768ec refactor: Go 源码与内嵌资源统一迁入 backend/`，**HEAD 早于 R116 全部轮次**。
-- `backend/hexdata.go` 相对 HEAD 有 1859 行 diff，那是 R116-A（Hexdata 数据源替换）的成果，自带台账 `docs/r116a-execution-ledger.md` 并已验收 PASS。
+- `backend/hexdata.go` 相对 HEAD 有 1859 行 diff，那是 R116-A（Hexdata 数据源替换）的成果，自带台账 `docs/history/ledgers/r116a-execution-ledger.md` 并已验收 PASS。
 - `backend/web/shared.js` 被 `backend/web/gameplay.test.cjs:122` 与 `backend/web/gameplay.css:1871` 正常引用，是 R116-B 的公共模块，删掉会直接打红测试。
 - 6 份 R116 工单已按项目惯例归档在 `docs/history/worklists/`。
 

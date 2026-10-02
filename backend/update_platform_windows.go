@@ -15,6 +15,24 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+func updateLongPathName(value string) (string, error) {
+	input, err := windows.UTF16PtrFromString(value)
+	if err != nil {
+		return "", err
+	}
+	buffer := make([]uint16, 260)
+	for {
+		n, err := windows.GetLongPathName(input, &buffer[0], uint32(len(buffer)))
+		if err != nil {
+			return "", err
+		}
+		if n < uint32(len(buffer)) {
+			return windows.UTF16ToString(buffer[:n]), nil
+		}
+		buffer = make([]uint16, int(n)+1)
+	}
+}
+
 func updateDiskFreeBytes(directory string) (int64, error) {
 	path, err := windows.UTF16PtrFromString(directory)
 	if err != nil {

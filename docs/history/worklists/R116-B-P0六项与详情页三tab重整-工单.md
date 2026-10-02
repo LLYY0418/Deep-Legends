@@ -167,7 +167,7 @@ R116-A 接入的 `/api/hexdata/postmatch` 一次性给全 173 英雄的 22 项�
 
 - `champions.js`/`gameplay.js` 的 tab 重整与六项 P0 渲染
 - `champions.go` 的 `championMetricRow`/`championRankingRow` 字段扩展
-- `docs/r116b-execution-ledger.md`
+- `docs/history/ledgers/r116b-execution-ledger.md`
 
 ## 真机验证清单
 

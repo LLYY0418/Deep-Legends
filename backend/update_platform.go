@@ -14,7 +14,35 @@ func updateRootForExecutable(executable string) string {
 	return directory
 }
 func updateInstallationMatches(root, displayName, location string, uninstallExists bool) bool {
-	return uninstallExists && displayName == "Deep Legends" && location != "" && strings.EqualFold(filepath.Clean(root), filepath.Clean(location))
+	return uninstallExists && displayName == "Deep Legends" && updatePathsMatch(root, location, normalizeUpdateInstallationPath)
+}
+
+func trimUpdateInstallationPath(value string) string {
+	return strings.TrimSpace(strings.Trim(strings.TrimSpace(value), `"'`))
+}
+
+func normalizeUpdateInstallationPath(value string) string {
+	return normalizeUpdateInstallationPathWith(value, updateLongPathName)
+}
+
+func normalizeUpdateInstallationPathWith(value string, longPath func(string) (string, error)) string {
+	value = trimUpdateInstallationPath(value)
+	if value == "" {
+		return ""
+	}
+	value = filepath.Clean(value)
+	if expanded, err := longPath(value); err == nil && expanded != "" {
+		value = filepath.Clean(expanded)
+	}
+	if resolved, err := filepath.EvalSymlinks(value); err == nil {
+		value = filepath.Clean(resolved)
+	}
+	return value
+}
+
+func updatePathsMatch(left, right string, normalize func(string) string) bool {
+	left, right = normalize(left), normalize(right)
+	return left != "" && right != "" && strings.EqualFold(left, right)
 }
 func quoteUpdateArgument(value string) string {
 	// Always quote; double trailing backslashes and those preceding a quote for

@@ -1,0 +1,79 @@
+[
+  {
+    "scene": "runes",
+    "width": 1280,
+    "overflow": false,
+    "shards": 0,
+    "keystone": {
+      "x": 956.5,
+      "y": 101.75,
+      "w": 44,
+      "h": 44
+    },
+    "subtitle": "精密",
+    "damage": "972",
+    "shoe": "7:30",
+    "tooltip": null
+  },
+  {
+    "scene": "runes",
+    "width": 820,
+    "overflow": false,
+    "shards": 0,
+    "keystone": {
+      "x": 52,
+      "y": 497.75,
+      "w": 44,
+      "h": 44
+    },
+    "subtitle": "精密",
+    "damage": "972",
+    "shoe": "7:30",
+    "tooltip": null
+  },
+  {
+    "scene": "premade",
+    "width": 640,
+    "overflow": false,
+    "shards": 0,
+    "keystone": null,
+    "tooltip": {
+      "box": {
+        "x": 218,
+        "y": 88,
+        "w": 210,
+        "h": 121
+      },
+      "text": "组队 3 人演示玩家1#示例演示玩家2#示例演示玩家3#示例",
+      "images": [
+        {
+          "width": 20,
+          "height": 20,
+          "loaded": true,
+          "url": "/api/image?path=champion%2F103"
+        },
+        {
+          "width": 20,
+          "height": 20,
+          "loaded": true,
+          "url": "/api/image?path=champion%2F69"
+        }
+      ],
+      "placeholders": 1,
+      "names": [
+        {
+          "text": "演示玩家1#示例",
+          "x": 257
+        },
+        {
+          "text": "演示玩家2#示例",
+          "x": 257
+        },
+        {
+          "text": "演示玩家3#示例",
+          "x": 257
+        }
+      ]
+    }
+  }
+]

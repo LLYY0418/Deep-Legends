@@ -216,14 +216,14 @@ for _, queue := range queues {
 ```js
 const limit = 6, pending = new Map(), active = new Map(), failed = new Map();
 ```
-`docs/r107-execution-ledger.md:10` 明确记载这是 R107 从 2 提到 6 的：「现在并发 6、前端 10 秒…」。
+`docs/history/ledgers/r107-execution-ledger.md:10` 明确记载这是 R107 从 2 提到 6 的：「现在并发 6、前端 10 秒…」。
 
 而 R100 的防回归脚本 `desktop/r100-browser.cjs:67` 至今写着：
 ```js
 assert.ok(peakImages<=2,'browser image connection cap exceeded: '+peakImages);
 assert.ok(elapsed<8000,'status starved behind images: '+elapsed);
 ```
-更关键：`docs/r100-execution-ledger.md:101` 记载「变异明细：…**P1图片并发6**…均由实际行为断言失败杀死」—— 也就是**当年把 limit 设成 6 就是被杀死的变异，现在它成了生产值**。
+更关键：`docs/history/ledgers/r100-execution-ledger.md:101` 记载「变异明细：…**P1图片并发6**…均由实际行为断言失败杀死」—— 也就是**当年把 limit 设成 6 就是被杀死的变异，现在它成了生产值**。
 
 同时 `backend/web/r100.test.cjs:44` 已被改成 `assert.equal(imgs.filter(i=>i.hasAttribute('src')).length,6)`，把断言方向调转到 6。
 

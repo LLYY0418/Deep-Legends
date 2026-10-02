@@ -7,7 +7,7 @@
 
 ## 背景（先说清楚 R91 已经做了什么，避免这次和 R91 重复）
 
-`WORKLIST-R91-LIVE-STALE-DATA.md` 已经执行完（`docs/r91-execution-ledger.md` 存在，`web/gameplay.js` 已有 `invalidateLiveForNewGame`、`shouldResetLiveGameScopedState` 等函数），解决的是"新一局开始时 `state.live` 不清空、页面继续渲染上一局推荐"这个问题。**这部分已验证有效，不需要重做。**
+`WORKLIST-R91-LIVE-STALE-DATA.md` 已经执行完（`docs/history/ledgers/r91-execution-ledger.md` 存在，`web/gameplay.js` 已有 `invalidateLiveForNewGame`、`shouldResetLiveGameScopedState` 等函数），解决的是"新一局开始时 `state.live` 不清空、页面继续渲染上一局推荐"这个问题。**这部分已验证有效，不需要重做。**
 
 但 R91 的清空触发条件，目前**完全锚定在 `phase !== state.beacon.phase` 这一个字符串比较上**（`web/gameplay.js:6161 handleGameplayPhase` 附近）——只要收到的 phase 文本和上一次记录的相同，就不会触发清空，不管背后其实是不是已经换了一局。
 

@@ -2,7 +2,7 @@
 
 本工单是对 `WORKLIST-R86-ADDENDUM-ACCEPTANCE-FOLLOWUP.md` 四条追加工单的独立验收过程中，
 **顺带测出的、与R86无关的问题**。四条追加工单本身已经逐条亲自动手做变异验证通过，不需要再处理，
-详情见 `docs/r86-execution-ledger.md` 与本工单验收方的验证记录。
+详情见 `docs/history/ledgers/r86-execution-ledger.md` 与本工单验收方的验证记录。
 
 ---
 

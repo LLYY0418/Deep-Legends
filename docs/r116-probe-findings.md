@@ -5,7 +5,7 @@
 > 项目红线：证据不足明确降级，绝不用推断值代替真实值——包括「看起来应该是 0」这种推断。
 
 - 工单原文：`docs/history/worklists/R116-探测-海克斯选择端点与局内数据形状探测-工单.md`
-- 执行账本（做了什么、验证到哪一步）：`docs/r116probe-execution-ledger.md`
+- 执行账本（做了什么、验证到哪一步）：`docs/history/ledgers/r116probe-execution-ledger.md`
 - 第二轮回填与探针清理账本：`docs/history/ledgers/r155-execution-ledger.md`
 - 背景依据：`docs/r116-proposal-feasibility-review.md` 第 3 节（P1 逐项证伪）与 3.2 节（这条探测）
 - 历史临时探测代码：`backend/augment_contract_probe.go`、`backend/augment_contract_probe_test.go`（R155 已删）；正式采样分支仍见 `backend/gameplay.go` 的 `aramMode && !arenaMode`
@@ -482,7 +482,7 @@ if aramMode && !arenaMode && (phase == "GameStart" || phase == "InProgress" || p
 | 探测单测 + 真机临时入口 | `backend/augment_contract_probe_test.go`（整个文件，含 `TestR116AugmentContractProbeLiveClient`） | R155 已随探测实现整体删除 |
 | 海斗触发分支 | `backend/gameplay.go` 的 `if aramMode && !arenaMode && (...)`（3 行注释 + 3 行代码） | 按工单 P1 第 4 条**评估**：若 P1-4/P1-2/P1-3 判定要做 → 保留作为正式埋点（回退成本一行）；若判定不做 → 删除 |
 | 本文档 | `docs/r116-probe-findings.md` | **不删除**，作为结论存档 |
-| 执行账本 | `docs/r116probe-execution-ledger.md` | **不删除** |
+| 执行账本 | `docs/history/ledgers/r116probe-execution-ledger.md` | **不删除** |
 
 删除后必须重跑：`go build -o <out> ./backend`、`go vet ./backend`、`go test ./backend -run "Objective|Augment|Arena"`、
 全量 `go test ./backend/...`，确认删干净且无回归（`augment_contract_probe*` 两个文件删除后，

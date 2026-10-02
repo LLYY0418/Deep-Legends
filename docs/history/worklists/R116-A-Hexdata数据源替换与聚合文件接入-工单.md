@@ -165,7 +165,7 @@
 - `hexdata.go` 的路径白名单、`inspectHexdataPayload` 新 case、`hexdataMetaSnapshot` 缓存、`loadMayhemDetail` 重写、`parseHexdataHeroJSON`/`loadHexdataPostmatch`/`loadHexdataHextechInsights` 新函数
 - `champion_cache.go` 的 `pruneStaleHexdataBuilds`
 - 删除的死代码清单（写进执行账本，逐个函数名+删除理由）
-- `docs/r116a-execution-ledger.md`
+- `docs/history/ledgers/r116a-execution-ledger.md`
 
 ## 真机验证清单
 

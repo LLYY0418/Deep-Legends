@@ -664,7 +664,7 @@ P7（卫生，先清障）→ P0（首屏瘦身，收益最直接）→ P1（性
 2. 新增测试：`bench_core_test.go`、`TestR115_*` 系列、`match_timeline_jungle` 相关测试、P8 落盘与鉴权测试、`desktop/*.test.cjs` 新增项
 3. `scripts/run-benchmarks.sh` 与基线报告
 4. 探针文档：`docs/r115-validation/respawn-probe.md`
-5. 执行账本：`docs/r115-execution-ledger.md`
+5. 执行账本：`docs/history/ledgers/r115-execution-ledger.md`
 6. 验证 artifacts：`docs/r115-validation/`（含 bench 报告、首屏字节数对比、深链清单）
 7. 对抗变异结果：`docs/r115-validation/mutations/matrix.json`
 8. 更新后的 `CHANGELOG.md`、`PRODUCT.md`（如涉及声明）、`DESIGN.md`（如涉及隐私边界）

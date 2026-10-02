@@ -12,7 +12,7 @@ R88 已经删掉了三条从未命中的 `@container arena-first (max-width:720p
 ```css
 @container arena-first (max-width:640px) { .arena-match-detail ... }
 ```
-R88 执行账本（`docs/r88-execution-ledger.md` 第31行）给的保留理由是「英雄详情可使用的独立 arena-first 640px 详情滚动规则保留」——**这条理由被验证是错的**。
+R88 执行账本（`docs/history/ledgers/r88-execution-ledger.md` 第31行）给的保留理由是「英雄详情可使用的独立 arena-first 640px 详情滚动规则保留」——**这条理由被验证是错的**。
 
 ### 已证实
 `.arena-match-detail` / `.arena-detail-columns` / `.arena-detail-team` 这几个类名只在 **`web/gameplay.js:2907`** 附近被渲染（总览页对局卡片展开详情用的），跟声明 `container: arena-first` 的 `web/champions.css:877 .arena-first-section`（英雄详情页"我的吃鸡战绩"区块）**完全不在同一棵 DOM 祖先链上**。也就是说这条规则和被删的三条性质完全相同：**永远不会命中**，是死代码。
@@ -22,7 +22,7 @@ R88 执行账本（`docs/r88-execution-ledger.md` 第31行）给的保留理由�
 ### 要做的改动
 1. 定位并删除 `web/gameplay.css` 里这条 `@container arena-first (max-width:640px) { .arena-match-detail ... }` 死代码块。
 2. 删除前后各截一次图 / 跑一次现有的红线护栏测试，确认 `.arena-match-detail` 相关的详情展开功能在真实交互下没有受影响（这条规则从未命中过，删掉理论上零视觉变化，用来验证"确实无影响"这个判断）。
-3. 同步更新 `docs/r88-execution-ledger.md` 或本轮的新账本，把那条错误的"保留理由"改正。
+3. 同步更新 `docs/history/ledgers/r88-execution-ledger.md` 或本轮的新账本，把那条错误的"保留理由"改正。
 
 ### 验收判据
 - `git diff web/gameplay.css` 只有这一条规则被删除，其余内容不变。

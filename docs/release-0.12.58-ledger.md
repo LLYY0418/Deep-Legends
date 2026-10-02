@@ -7,7 +7,7 @@
 - 发布分支 `codex/release-0.12.58`，构建源码提交 `33e4e4a882a3bac7fba99b40325a625bda65f13a`。保留 main，未改动其他版本草稿。
 - 排除本机原始日志/截图目录 `docs/r116-validation/`、`r121-validation/`、`r166-validation/`、`r174-validation/`；个人密钥和构建产物没有进入源码提交。
 - 从该提交 `git archive` 单独还原后，源码指纹为 **5230b7850e83**，与本地 public 安装包、后端和构建收据一致。
-- 本地完整构建和全量回归见 [R194 执行账本](r194-execution-ledger.md)。发布前清单/收据测试 **4/4 通过**；更新专项 `go test ./backend -run '^TestUpdate' -count=1` 通过（1.395 秒）。暂存差异检查与独立只读发布复核通过。
+- 本地完整构建和全量回归见 [R194 执行账本](history/ledgers/r194-execution-ledger.md)。发布前清单/收据测试 **4/4 通过**；更新专项 `go test ./backend -run '^TestUpdate' -count=1` 通过（1.395 秒）。暂存差异检查与独立只读发布复核通过。
 - 本地交叉构建安装包 SHA256 `387fcfdd2d46666da3ed3fef707ba791027d7640cd85379ccad706260b169963`。正式附件采用 GitHub Windows runner 的 public 构建，附件哈希以该构建产物为准。
 
 ## GitHub 构建
@@ -29,7 +29,7 @@
 | latest.json | 630 字节；`a0ae6ba78528a3c1736cbae9c6a78f73b5ef7ce872696b3e9eff609a207547f2` |
 | SHA256SUMS-public.txt | 182 字节；`6f65d868fabfae189f03a67f70f3069b3a3eb92e305d8c79347e2102b1845001` |
 
-清单、校验表和核验元数据归档 [history/reports/release-0.12.58/](history/reports/release-0.12.58/)，正式三件套本地副本在 `dist/github-release-0.12.58-public/`（不入 Git）。
+清单、校验表和核验元数据归档 [history/reports/release-0.12.58/](history/reports/release-0.12.58)，正式三件套本地副本在 `dist/github-release-0.12.58-public/`（不入 Git）。
 
 - 已正式发布并设为 **Latest**：[v0.12.58](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.58)。release id `402019897`，发布时间 `2026-10-02T17:38:56Z`；draft=false、prerelease=false。
 - GitHub `/releases/latest` 与 Release 列表均返回 v0.12.58 / isLatest=true；v0.12.49 和 v0.12.50 仍为原草稿。

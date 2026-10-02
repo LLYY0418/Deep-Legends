@@ -3,7 +3,7 @@
 诊断人：Claude（只读诊断，未改仓库代码文件；本轮新增 `docs/pro-accounts-verification-2026-09-17.md`）。
 执行人：GPT。
 日期：2026-09-17。
-输入证据：用户对照 OP.GG 小程序核对完成的账号清单（已落盘 `docs/pro-accounts-verification-2026-09-17.md`），R101 独立验收（四路子代理，P1-P10 全部符合，详见 `docs/r101-execution-ledger.md`；验收发现两处工单措辞问题——`connection_manager.go` 文件名引用有误、`TestR99SeedNeverLeaksPUUID`测试名有误，均不是代码缺陷，本轮不必处理）。
+输入证据：用户对照 OP.GG 小程序核对完成的账号清单（已落盘 `docs/pro-accounts-verification-2026-09-17.md`），R101 独立验收（四路子代理，P1-P10 全部符合，详见 `docs/history/ledgers/r101-execution-ledger.md`；验收发现两处工单措辞问题——`connection_manager.go` 文件名引用有误、`TestR99SeedNeverLeaksPUUID`测试名有误，均不是代码缺陷，本轮不必处理）。
 
 ---
 

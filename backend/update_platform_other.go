@@ -7,6 +7,8 @@ import (
 	"syscall"
 )
 
+func updateLongPathName(value string) (string, error) { return value, nil }
+
 func detectUpdateInstallation() (updateInstallDetection, error) {
 	return classifyUpdateInstallation("", false, false, nil), nil
 }

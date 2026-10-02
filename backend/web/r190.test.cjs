@@ -13,13 +13,13 @@ test('R190 1–4 roster marks only subject, including Arena and masking',()=>{
 test('R190 5–9 effect parser handles zero, labels, time, invalid templates and overrides',()=>{
  const f=fixture();assert.deepEqual(f.perkEffectLines(f.perks[1],[804,300,0]),[{label:'回复生命值',value:804,kind:'heal'},{label:'额外金币',value:300,kind:'gold'}]);assert.equal(f.perkEffectLines(f.perks[2],[19,5,0])[0].value,'19:05');
  assert.equal(f.perkEffectLines({eogDescs:['护盾的总和：@eogvar1@']},[0,0,0])[0].value,0);
- for(const eogDescs of [['--'],[''],['时间：@eogvar1@:@eogvar2@@eogvar3@']]) assert.deepEqual(f.perkEffectLines({eogDescs},[1,2,3]),[]);
- for(const id of [8008,8304]) assert.deepEqual(f.perkEffectLines({id,eogDescs:['最大攻速运转时间：@eogvar1@:@eogvar2@<br>已造成的伤害：@eogvar2@']},[3,1028,0]),[]);
+ for(const eogDescs of [['--'],['']]) assert.deepEqual(f.perkEffectLines({eogDescs},[1,2,3]),[]);
+ assert.deepEqual(f.perkEffectLines({id:8304,eogDescs:['鞋子到达时间：@eogvar1@:@eogvar2@@eogvar3@']},[3,1028,0]),[]);
  assert.equal(f.perkEffectLines({eogDescs:['回复生命总和：@eogvar1@<BR/>金币总计：@eogvar2@']},[2,3,0]).length,2);
 });
 test('R190 10–11 slot order, max-per-perk totals and missing stats use descriptions',()=>{
  const f=fixture();assert.deepEqual(f.selectedRuneEffects(f.subject).map(r=>r.perk.id),[8005,9111,9103,8017,8321,8347]);assert.deepEqual(f.runeEffectTotals(f.selectedRuneEffects(f.subject)),{damage:2300,heal:804,gold:680});
- const d=dom(f.renderRuneEffects(f.subject));assert.equal(d.querySelectorAll('.eff').length,6);assert.equal(d.querySelectorAll('.shard-chip').length,3);assert.doesNotMatch(d.body.textContent,/--|@eogvar/);assert.match(d.body.textContent,/固定效果 8347/);
+ const d=dom(f.renderRuneEffects(f.subject));assert.equal(d.querySelectorAll('.eff').length,6);assert.equal(d.querySelectorAll('.shard-chip').length,0);assert.doesNotMatch(d.body.textContent,/--|@eogvar/);assert.match(d.body.textContent,/固定效果 8347/);
  const missing={...f.subject,perkStats:undefined};const no=dom(f.renderRuneEffects(missing));assert.equal(no.querySelectorAll('.eff .name small').length,6);assert.equal(no.querySelectorAll('.stat').length,0);assert.equal(f.renderRuneYield(missing),'');f.state.perks=null;assert.equal(f.renderRuneEffects(f.subject),'');
 });
 test('R190 12 shared board matches pre-R190 snapshot after removing data attribute',()=>{

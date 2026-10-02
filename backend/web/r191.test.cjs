@@ -50,22 +50,14 @@ test('R191 10 shared IDs update active and cached tabs plus overlay and external
 const css=read('gameplay.css');
 test('R191 14 effect icons and value gaps use corrected dimensions, wide tree is centered',()=>{
  assert.match(css,/\.eff \.game-icon\s*\{[^}]*width:\s*28px;\s*height:\s*28px/);
- assert.match(css,/\.eff\.is-keystone \.game-icon\s*\{[^}]*width:\s*38px;\s*height:\s*38px/);
+ assert.match(css,/\.eff\.is-keystone \.game-icon\s*\{[^}]*width:\s*44px;\s*height:\s*44px/);
  assert.match(css,/\.rune-effects \.stats\s*\{[^}]*gap:\s*12px/);
  assert.match(css,/@container \(min-width: 1100px\)\s*\{\s*\.rune-split\s*\{[^}]*\}\s*\.rune-split-tree\s*\{[^}]*display:\s*grid;\s*align-content:\s*center/);
 });
-test('R191 15 every shard chip carries the shared Data Dragon shard icon',()=>{
- const {extract}=require('./r188-harness.cjs');const sharedPath=compile(source,['dataDragonRuneShardPath']).dataDragonRuneShardPath;
- const f=fixture(source,{dataDragonRuneShardPath:sharedPath,remoteStaticIcon:(provider,path,name)=>`<span class="game-icon" data-provider="${provider}" data-path="${path}"><img alt="${name}"></span>`});
- const d=new JSDOM(f.renderRuneEffects(f.subject)).window.document;
- const chips=[...d.querySelectorAll('.shard-chip')];assert.equal(chips.length,3);
- chips.forEach((chip,i)=>{assert.equal(chip.querySelectorAll('.game-icon').length,1);assert.equal(chip.querySelector('.game-icon').dataset.provider,'ddragon');assert.equal(chip.querySelector('.game-icon').dataset.path,sharedPath(f.shards[i]));});
- assert.match(css,/\.shard-chip \.game-icon\s*\{[^}]*width:\s*22px;\s*height:\s*22px/);assert.match(css,/\.shard-chip\s*\{[^}]*padding:\s*3px 9px 3px 4px/);
- // Same URL lookup appears in the existing shared board renderer.
+test('R191 15–16 R195 removes effect shards while preserving the shared tree icons',()=>{
+ const {extract}=require('./r188-harness.cjs');
+ const f=fixture(source);const d=new JSDOM(f.renderRuneEffects(f.subject)).window.document;
+ assert.equal(d.querySelectorAll('.shards-line,.shard-chip').length,0);
+ assert.doesNotMatch(css,/shards-line|shard-chip/);
  assert.match(extract(source,'renderRuneOption'),/dataDragonRuneShardPath\(id\)/);
-});
-test('R191 16 shards wrap horizontally by default, vertical grid is wide-container-only',()=>{
- assert.match(css,/\.shards-line\s*\{[^}]*display:\s*flex;\s*flex-wrap:\s*wrap;[^}]*gap:\s*8px/);
- const rules=[...css.matchAll(/\.rune-effects \.shards-line\s*\{([^}]+)\}/g)];assert.equal(rules.filter(m=>/display:\s*grid/.test(m[1])).length,1);
- const grid=rules.find(m=>/display:\s*grid/.test(m[1]));assert.match(css.slice(0,grid.index).split('@container').at(-1),/^ \(min-width: 1100px\) \{[^@]*$/);
 });
