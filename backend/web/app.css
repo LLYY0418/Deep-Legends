@@ -1,4 +1,5 @@
 :root {
+  --yield-damage: #F0A27A;
   color-scheme: light;
   --bg: oklch(1 0 0);
   --surface: oklch(0.972 0 0);

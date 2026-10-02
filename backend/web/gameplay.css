@@ -1929,3 +1929,65 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .roster-notice.is-unverified { color: var(--faint); border-style: dashed; }
 .team-portrait-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 6px; }
 .team-portrait-tag { padding: 1px 5px; color: var(--warning); border: 1px solid var(--warning); border-radius: 999px; font-size: 9px; font-weight: 600; }
+
+/* R190: local to match build details; shared rune boards keep their breakpoints. */
+.match-players .match-player-name.is-current-player { color: var(--primary-strong); font-weight: 700; }
+.build-detail { container-type: inline-size; }
+.rune-split { display: grid; grid-template-columns: minmax(0,1fr); }
+.rune-split-tree { min-width: 0; border-bottom: 1px solid var(--line); }
+.rune-effects { display: grid; align-content: start; min-width: 0; padding: 8px 8px 10px; }
+.rune-detail > header .rune-yield { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.rune-yield > span { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-strong); color: var(--muted); font-size: 11px; }
+.rune-yield b { color: var(--ink); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.rune-yield .is-damage b { color: var(--yield-damage); }
+.rune-yield .is-heal b { color: var(--success); }
+.rune-yield .is-gold b { color: var(--rarity-gold); }
+.rune-effects .eff { display: grid; grid-template-columns: 32px minmax(0,1fr) auto; align-items: center; gap: 8px; min-width: 0; min-height: 44px; padding: 6px; border-radius: 9px; }
+.rune-effects .eff + .eff { border-top: 1px solid color-mix(in oklab,var(--line) 70%,transparent); }
+.rune-effects .eff .game-icon { width: 32px; height: 32px; border: 0; }
+.rune-effects .name { min-width: 0; }
+.rune-effects .name strong { display: block; overflow: hidden; color: var(--ink); font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.rune-effects .name small { display: block; overflow: hidden; color: var(--muted); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.rune-effects .stats { display: flex; justify-content: flex-end; gap: 16px; }
+.rune-effects .stat { display: grid; justify-items: end; padding: 0; background: transparent; border-radius: 0; line-height: 1.15; }
+.rune-effects .stat b { color: var(--ink); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rune-effects .stat span { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
+.rune-effects .eff.is-keystone { grid-template-columns: 44px minmax(0,1fr) auto; min-height: 62px; margin-bottom: 4px; background: linear-gradient(90deg,color-mix(in oklab,var(--primary-soft) 85%,transparent),transparent 85%); border: 1px solid color-mix(in oklab,var(--primary) 30%,var(--line)); }
+.rune-effects .eff.is-keystone .game-icon { width: 44px; height: 44px; }
+.rune-effects .eff.is-keystone .name strong { font-size: 14px; }
+.rune-effects .eff.is-keystone .stat b { color: var(--primary-strong); font-size: 18px; }
+.rune-effects .eff.is-keystone + .eff { border-top: 0; }
+.rune-effects .kchip { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; background: color-mix(in oklab,var(--primary) 16%,transparent); color: var(--primary-strong); font-size: 10px; font-weight: 700; vertical-align: 2px; }
+.rune-effects .eff-divider { display: flex; align-items: center; gap: 8px; margin: 6px 8px 2px; color: var(--muted); font-size: 11px; }
+.rune-effects .eff-divider > :first-child { width: 12px; height: 15px; }
+.rune-effects .eff-divider svg { width: 12px; height: 15px; }
+.rune-effects .eff-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.rune-effects .shards-line { display: grid; gap: 5px; margin-top: 4px; padding: 8px 6px 2px; border-top: 1px solid var(--line); }
+.rune-effects .shards-line > small { color: var(--muted); font-size: 11px; }
+.rune-effects .shard-chip { justify-self: start; padding: 3px 9px; border-radius: 999px; background: var(--surface-strong); color: var(--ink); font-size: 11.5px; }
+.rune-split .rune-option-button.is-linked { outline: 2px solid var(--primary-strong); outline-offset: 3px; box-shadow: 0 0 0 6px color-mix(in oklab,var(--primary) 22%,transparent); }
+.rune-effects .eff.is-hover { background: color-mix(in oklab,var(--primary-soft) 70%,transparent); }
+@container (min-width: 1100px) {
+  .rune-split { grid-template-columns: minmax(0,3fr) minmax(280px,1fr); }
+  .rune-split-tree { border-right: 1px solid var(--line); border-bottom: 0; }
+}
+.build-detail .aug-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(250px,1fr)); gap: 8px; padding: 10px; }
+.build-detail .aug { --acc: var(--rarity-silver); display: grid; grid-template-columns: 56px minmax(0,1fr); gap: 12px; min-height: 92px; padding: 10px 12px 10px 10px; border: 1px solid color-mix(in oklab,var(--acc) 28%,var(--line)); border-radius: 10px; background: linear-gradient(135deg,color-mix(in oklab,var(--acc) 9%,var(--surface)),var(--surface) 60%); }
+.build-detail .aug.is-gold { --acc: var(--rarity-gold); }
+.build-detail .aug.is-prismatic { --acc: var(--rarity-prismatic-a); }
+.build-detail .aug-icon { position: relative; width: 56px; height: 56px; padding: 3px; border-radius: 12px; background: var(--acc); box-shadow: 0 4px 14px color-mix(in oklab,var(--acc) 25%,transparent); }
+.build-detail .aug.is-prismatic .aug-icon { background: conic-gradient(from 200deg,var(--rarity-prismatic-a),var(--rarity-prismatic-b),var(--rarity-prismatic-c),var(--rarity-prismatic-a)); }
+.build-detail .aug-icon .arena-augment-icon { display: block; width: 50px; height: 50px; overflow: hidden; border: 0; border-radius: 9px; }
+.build-detail .aug-icon .game-icon { width: 50px; height: 50px; margin: 0; border: 0; border-radius: 9px; }
+.build-detail .aug-order { position: absolute; z-index: 1; top: -6px; left: -6px; display: grid; place-items: center; width: 20px; height: 20px; border: 1.5px solid var(--acc); border-radius: 50%; background: var(--bg); color: var(--ink); font-size: 10.5px; font-weight: 800; }
+.build-detail .aug-body { display: grid; align-content: start; gap: 4px; min-width: 0; }
+.build-detail .aug-title { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.build-detail .aug-title strong { overflow: hidden; font-size: 13.5px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.build-detail .aug .rar { flex: 0 0 auto; padding: 1px 6px; border-radius: 5px; background: color-mix(in oklab,var(--acc) 14%,transparent); color: var(--acc); font-size: 10px; font-weight: 700; }
+.build-detail .aug p { display: -webkit-box; overflow: hidden; margin: 0; color: color-mix(in oklab,var(--ink) 78%,var(--muted)); font-size: 12px; line-height: 1.55; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.build-detail .aug .skel { height: 9px; border-radius: 5px; background: linear-gradient(90deg,var(--surface-strong),color-mix(in oklab,var(--primary) 14%,var(--surface-strong)),var(--surface-strong)); background-size: 200% 100%; }
+.build-detail .aug .skel + .skel { margin-top: 7px; }
+.build-detail .aug.is-bare { align-items: center; min-height: 76px; }
+@container (min-width: 1100px) {
+  .rune-split-tree .unified-rune-board { --rune-icon-size: 34px; --rune-style-icon-width: 32px; --rune-style-icon-height: 40px; --rune-header-height: 52px; --rune-row-height: 52px; }
+}

@@ -464,36 +464,43 @@ type gameplayMatch struct {
 	LpDelta *int `json:"lpDelta,omitempty"`
 	// AverageTier 供演示数据和向后兼容使用；生产数据由前端在首屏之后
 	// 调用 match-tiers 异步回填，避免慢速外部请求阻塞总览。
-	AverageTier  *matchTiersResponse   `json:"averageTier,omitempty"`
-	Participants []gameplayParticipant `json:"participants"`
-	Teams        []gameplayTeam        `json:"teams"`
+	AverageTier    *matchTiersResponse   `json:"averageTier,omitempty"`
+	PerkStatsStale bool                  `json:"perkStatsStale,omitempty"`
+	Participants   []gameplayParticipant `json:"participants"`
+	Teams          []gameplayTeam        `json:"teams"`
+}
+
+type gameplayPerkStat struct {
+	PerkID int64    `json:"perkId"`
+	Vars   [3]int64 `json:"vars"`
 }
 
 type gameplayParticipant struct {
-	ProPlayer      *proIdentityBadge `json:"proPlayer,omitempty"`
-	ParticipantID  int64             `json:"participantId"`
-	TeamID         int64             `json:"teamId"`
-	PlayerRef      string            `json:"playerRef,omitempty"`
-	DisplayName    string            `json:"displayName"`
-	GameName       string            `json:"gameName,omitempty"`
-	TagLine        string            `json:"tagLine,omitempty"`
-	ProfileIconID  int64             `json:"profileIconId,omitempty"`
-	ChampionID     int64             `json:"championId"`
-	ChampionName   string            `json:"championName"`
-	ChampionLevel  int               `json:"championLevel"`
-	Spell1ID       int64             `json:"spell1Id,omitempty"`
-	Spell2ID       int64             `json:"spell2Id,omitempty"`
-	PrimaryStyleID int64             `json:"primaryStyleId,omitempty"`
-	SubStyleID     int64             `json:"subStyleId,omitempty"`
-	PerkIDs        []int64           `json:"perkIds"`
-	AugmentIDs     []int64           `json:"augmentIds,omitempty"`
-	ItemIDs        []int64           `json:"itemIds"`
-	Position       string            `json:"position,omitempty"`
-	Kills          int               `json:"kills"`
-	Deaths         int               `json:"deaths"`
-	Assists        int               `json:"assists"`
-	KDA            float64           `json:"kda"`
-	CS             int               `json:"cs"`
+	ProPlayer      *proIdentityBadge  `json:"proPlayer,omitempty"`
+	ParticipantID  int64              `json:"participantId"`
+	TeamID         int64              `json:"teamId"`
+	PlayerRef      string             `json:"playerRef,omitempty"`
+	DisplayName    string             `json:"displayName"`
+	GameName       string             `json:"gameName,omitempty"`
+	TagLine        string             `json:"tagLine,omitempty"`
+	ProfileIconID  int64              `json:"profileIconId,omitempty"`
+	ChampionID     int64              `json:"championId"`
+	ChampionName   string             `json:"championName"`
+	ChampionLevel  int                `json:"championLevel"`
+	Spell1ID       int64              `json:"spell1Id,omitempty"`
+	Spell2ID       int64              `json:"spell2Id,omitempty"`
+	PrimaryStyleID int64              `json:"primaryStyleId,omitempty"`
+	SubStyleID     int64              `json:"subStyleId,omitempty"`
+	PerkIDs        []int64            `json:"perkIds"`
+	PerkStats      []gameplayPerkStat `json:"perkStats,omitempty"`
+	AugmentIDs     []int64            `json:"augmentIds,omitempty"`
+	ItemIDs        []int64            `json:"itemIds"`
+	Position       string             `json:"position,omitempty"`
+	Kills          int                `json:"kills"`
+	Deaths         int                `json:"deaths"`
+	Assists        int                `json:"assists"`
+	KDA            float64            `json:"kda"`
+	CS             int                `json:"cs"`
 	// LaneCS / JungleCS 把补刀拆成小兵与野怪，供“分均补刀”提示展示。
 	LaneCS      int     `json:"laneCs"`
 	JungleCS    int     `json:"jungleCs"`
@@ -624,11 +631,29 @@ type lcuParticipant struct {
 		LargestMultiKill            int   `json:"largestMultiKill"`
 		NeutralMinionsKilled        int   `json:"neutralMinionsKilled"`
 		Perk0                       int64 `json:"perk0"`
+		Perk0Var1                   int64 `json:"perk0Var1"`
+		Perk0Var2                   int64 `json:"perk0Var2"`
+		Perk0Var3                   int64 `json:"perk0Var3"`
 		Perk1                       int64 `json:"perk1"`
+		Perk1Var1                   int64 `json:"perk1Var1"`
+		Perk1Var2                   int64 `json:"perk1Var2"`
+		Perk1Var3                   int64 `json:"perk1Var3"`
 		Perk2                       int64 `json:"perk2"`
+		Perk2Var1                   int64 `json:"perk2Var1"`
+		Perk2Var2                   int64 `json:"perk2Var2"`
+		Perk2Var3                   int64 `json:"perk2Var3"`
 		Perk3                       int64 `json:"perk3"`
+		Perk3Var1                   int64 `json:"perk3Var1"`
+		Perk3Var2                   int64 `json:"perk3Var2"`
+		Perk3Var3                   int64 `json:"perk3Var3"`
 		Perk4                       int64 `json:"perk4"`
+		Perk4Var1                   int64 `json:"perk4Var1"`
+		Perk4Var2                   int64 `json:"perk4Var2"`
+		Perk4Var3                   int64 `json:"perk4Var3"`
 		Perk5                       int64 `json:"perk5"`
+		Perk5Var1                   int64 `json:"perk5Var1"`
+		Perk5Var2                   int64 `json:"perk5Var2"`
+		Perk5Var3                   int64 `json:"perk5Var3"`
 		PerkPrimaryStyle            int64 `json:"perkPrimaryStyle"`
 		PerkSubStyle                int64 `json:"perkSubStyle"`
 		StatPerk0                   int64 `json:"statPerk0"`
@@ -3560,7 +3585,7 @@ func normalizeGameplayMatch(game lcuGame, subject gameplayReference, names map[i
 			GameName: identity.Player.GameName, TagLine: identity.Player.TagLine, ProfileIconID: identity.Player.ProfileIcon,
 			ChampionID: raw.ChampionID, ChampionName: championName(names, raw.ChampionID), ChampionLevel: raw.Stats.ChampLevel,
 			Spell1ID: raw.Spell1ID, Spell2ID: raw.Spell2ID, PrimaryStyleID: raw.Stats.PerkPrimaryStyle, SubStyleID: raw.Stats.PerkSubStyle,
-			PerkIDs: perks, AugmentIDs: augments, ItemIDs: items, Position: normalizePosition(raw.Timeline.Lane, raw.Timeline.Role),
+			PerkIDs: perks, PerkStats: lcuPerkStats(raw), AugmentIDs: augments, ItemIDs: items, Position: normalizePosition(raw.Timeline.Lane, raw.Timeline.Role),
 			Kills: raw.Stats.Kills, Deaths: raw.Stats.Deaths, Assists: raw.Stats.Assists,
 			KDA: ratio(raw.Stats.Kills+raw.Stats.Assists, raw.Stats.Deaths), CS: cs,
 			LaneCS: raw.Stats.TotalMinionsKilled, JungleCS: raw.Stats.NeutralMinionsKilled, CSPerMinute: perMinute(cs, game.GameDuration),
@@ -9593,12 +9618,13 @@ func (a *app) handleGameplayReplayAction(w http.ResponseWriter, r *http.Request)
 }
 
 type gameplayPerk struct {
-	ID               int64  `json:"id"`
-	Name             string `json:"name"`
-	IconPath         string `json:"iconPath"`
-	StyleID          int64  `json:"styleId,omitempty"`
-	ShortDescription string `json:"shortDesc,omitempty"`
-	LongDescription  string `json:"longDesc,omitempty"`
+	ID                 int64    `json:"id"`
+	Name               string   `json:"name"`
+	IconPath           string   `json:"iconPath"`
+	StyleID            int64    `json:"styleId,omitempty"`
+	ShortDescription   string   `json:"shortDesc,omitempty"`
+	LongDescription    string   `json:"longDesc,omitempty"`
+	EndOfGameStatDescs []string `json:"eogDescs,omitempty"`
 }
 
 // Riot Client's perkstyles.json has shipped both full perk objects and the
@@ -9623,6 +9649,15 @@ func (perk *gameplayPerk) UnmarshalJSON(data []byte) error {
 	var decoded gameplayPerkAlias
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
+	}
+	var raw struct {
+		EndOfGameStatDescs []string `json:"endOfGameStatDescs"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if len(decoded.EndOfGameStatDescs) == 0 {
+		decoded.EndOfGameStatDescs = raw.EndOfGameStatDescs
 	}
 	*perk = gameplayPerk(decoded)
 	return nil
@@ -9766,7 +9801,7 @@ func (a *app) cachedGameplayPerkCatalog(ctx context.Context, key string, loader 
 	}
 	cache := a.perkCatalogDisk
 	a.perkCatalogMu.Unlock()
-	data, err := cache.load(ctx, "normalized-perks-v1|"+key, gameplayPerkCatalogTTL, 24*time.Hour, true, func(context.Context) ([]byte, error) {
+	data, err := cache.load(ctx, "normalized-perks-v2|"+key, gameplayPerkCatalogTTL, 24*time.Hour, true, func(context.Context) ([]byte, error) {
 		payload, err := loader()
 		if err != nil {
 			return nil, err
@@ -9805,6 +9840,7 @@ func (a *app) loadGameplayPerkCatalog(ctx context.Context, client *LCUClient) (g
 			})
 			return gameplayPerkCatalogResponse{}, fallbackErr
 		}
+		perks = a.enrichPerkEffectTemplates(ctx, perks)
 		styles, perks, enriched, missingIcons := normalizeGameplayPerkCatalog(styles, perks)
 		styles, statModSlots := splitGameplayStatModSlots(styles)
 		if len(statModSlots) == 0 {
@@ -9865,6 +9901,9 @@ func (a *app) loadGameplayPerkCatalog(ctx context.Context, client *LCUClient) (g
 			return gameplayPerkCatalogResponse{}, fallbackErr
 		}
 	}
+	if source == "ddragon" {
+		perks = a.enrichPerkEffectTemplates(ctx, perks)
+	}
 	styles, perks, enriched, missingIcons := normalizeGameplayPerkCatalog(styles, perks)
 	styles, statModSlots := splitGameplayStatModSlots(styles)
 	if len(statModSlots) == 0 {
@@ -9903,6 +9942,9 @@ func normalizeGameplayPerkCatalog(styles []gameplayPerkStyle, perks []gameplayPe
 				}
 				if entry.LongDescription == "" {
 					entry.LongDescription = catalogEntry.LongDescription
+				}
+				if len(entry.EndOfGameStatDescs) == 0 {
+					entry.EndOfGameStatDescs = catalogEntry.EndOfGameStatDescs
 				}
 				if entry.StyleID == 0 {
 					entry.StyleID = catalogEntry.StyleID

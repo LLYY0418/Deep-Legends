@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="azure">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>R190 设计稿</title>
+<style>
+/* 设计稿：沿用 app.css azure 主题 token（截图里用户在用的主题）。
+   深色其他主题只换 --primary / --primary-strong / --primary-soft，结构不变。 */
+:root{
+  --bg:#0A0F16;--surface:#121926;--surface-strong:#192338;--ink:#E7EBF2;--muted:#8B95A8;--faint:#667386;
+  --primary:#58B7E8;--primary-strong:#8AD2F5;--primary-soft:#10283A;--line:#232E44;
+  --success:#4CBF8C;--danger:#E05C5C;
+  --rarity-silver:#9AA7B8;--rarity-gold:#E3B341;--rarity-prismatic-a:#C77DFF;--rarity-prismatic-b:#5AA9FF;--rarity-prismatic-c:#FF8AC7;
+  --mayhem-accent:#c6a1ff;
+  --font:"Segoe UI Variable","Segoe UI","Microsoft YaHei UI","PingFang SC","Noto Sans CJK SC",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:28px;background:#070B12;color:var(--ink);font:13px/1.45 var(--font)}
+.sheet{display:grid;gap:28px;max-width:1180px;margin:0 auto}
+.frame-title{display:flex;align-items:baseline;gap:12px;margin:0 0 10px}
+.frame-title b{font-size:15px;color:var(--ink)}
+.frame-title span{color:var(--faint);font-size:12px}
+.tag{display:inline-block;padding:1px 7px;border-radius:5px;background:var(--primary-soft);color:var(--primary-strong);font-size:11px;font-weight:700;margin-right:6px}
+.note{margin:10px 2px 0;color:var(--faint);font-size:11.5px;line-height:1.6}
+.note b{color:var(--muted)}
+
+/* ---------- 通用占位图标 ---------- */
+.ico{display:inline-grid;place-items:center;flex:0 0 auto;border-radius:50%;font-weight:800;color:#0b0e14;overflow:hidden}
+.champ{width:18px;height:18px;border-radius:4px;font-size:9px}
+.perk{width:28px;height:28px;font-size:11px;background:radial-gradient(circle at 35% 30%,#ffe7a3,#c99532 60%,#6d4b12);box-shadow:inset 0 0 0 1px rgb(255 255 255/.15)}
+.perk.is-insp{background:radial-gradient(circle at 35% 30%,#bff3f7,#3aa9b8 60%,#0f4d57)}
+.perk.is-key{width:38px;height:38px;font-size:14px}
+.perk.is-off{filter:grayscale(1);opacity:.34}
+.perk.is-on{outline:2px solid var(--primary);outline-offset:2px}
+.shard{width:22px;height:22px;font-size:9px;background:radial-gradient(circle at 35% 30%,#e6ecf5,#7d8aa0 65%,#2b3445)}
+
+/* ---------- P1 对局卡片右侧玩家列表 ---------- */
+.match-card{display:grid;grid-template-columns:150px 1fr 380px;align-items:center;gap:18px;padding:12px 16px;background:linear-gradient(90deg,#16243a,#121a28);border:1px solid var(--line);border-left:3px solid var(--primary);border-radius:12px}
+.match-meta b{display:block;color:var(--primary-strong);font-size:14px}
+.match-meta small{color:var(--muted)}
+.match-mid{color:var(--muted);font-size:12px}
+.match-players{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 14px}
+.match-team-list{display:grid;gap:1px}
+.match-team-list button{display:flex;align-items:center;gap:5px;min-width:0;padding:0;border:0;background:transparent;color:var(--muted);font:10.5px/1.6 var(--font);text-align:left}
+.match-team-list button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 新增：当前玩家（本页签对应的召唤师） */
+.match-team-list .match-player-name.is-current-player{color:var(--primary-strong);font-weight:700}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.compare > div{padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.compare h5{margin:0 0 6px;font-size:11px;color:var(--faint);font-weight:600}
+.zoom .match-team-list button{font-size:13px;gap:7px}
+.zoom .champ{width:22px;height:22px}
+
+/* ---------- 构建页签外壳（与现有 .build-detail 一致） ---------- */
+.match-detail{padding:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.detail-tabs{display:flex;gap:4px;margin-bottom:8px}
+.detail-tabs span{padding:6px 14px;border-radius:8px;color:var(--muted);font-size:12px}
+.detail-tabs span.on{background:var(--surface-strong);color:var(--ink)}
+.build-detail{display:grid;gap:7px}
+.build-detail>section{overflow:hidden;background:color-mix(in oklab,var(--bg) 56%,transparent);border:1px solid var(--line);border-radius:10px}
+.build-detail>section>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.build-detail h4{margin:0;font-size:14px}
+.collapsed{padding:10px 12px;color:var(--faint);font-size:12px}
+
+/* 头部右侧：符文收益汇总 chip */
+.rune-yield{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.rune-yield span{display:inline-flex;align-items:baseline;gap:5px;padding:3px 9px;border-radius:999px;background:var(--surface-strong);border:1px solid var(--line);color:var(--muted);font-size:11px}
+.rune-yield b{color:var(--ink);font-size:12.5px;font-variant-numeric:tabular-nums}
+.rune-yield .is-damage b{color:#F0A27A}
+.rune-yield .is-heal b{color:var(--success)}
+.rune-yield .is-gold b{color:var(--rarity-gold)}
+
+/* ---------- P2 符文：左树 + 右效果列表 ---------- */
+.rune-split{display:grid;grid-template-columns:minmax(0,3fr) minmax(280px,1fr)}
+.rune-split>.tree{border-right:1px solid var(--line)}
+/* 左侧：现有 unified-rune-board 原样保留（这里只做示意） */
+.unified-rune-board{display:grid;grid-template-columns:1.08fr 1fr .86fr;min-height:284px}
+.col{display:grid;grid-template-rows:52px repeat(4,52px);justify-items:center;align-content:center;padding:12px 8px 14px}
+.col+.col{border-left:1px solid var(--line)}
+.col header{display:flex;align-items:center;justify-content:center}
+.col header svg{width:28px;height:35px}
+.row{display:flex;align-items:center;justify-content:center;gap:14px;width:100%}
+.row.spacer{visibility:hidden}
+.col .perk{width:34px;height:34px;font-size:11px}
+.col .perk.is-key{width:34px;height:34px}
+.col .shard{width:26px;height:26px}
+.col header svg{width:32px;height:40px}
+.tree .perk.is-linked{outline:2px solid var(--primary-strong);outline-offset:3px;box-shadow:0 0 0 6px color-mix(in oklab,var(--primary) 22%,transparent)}
+
+/* 右侧：符文效果 */
+.rune-effects{display:grid;align-content:start;padding:8px 8px 10px}
+.eff{display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:8px;min-height:44px;padding:6px 6px;border-radius:9px}
+.eff+.eff{border-top:1px solid color-mix(in oklab,var(--line) 70%,transparent)}
+.eff.is-hover{background:color-mix(in oklab,var(--primary-soft) 70%,transparent);border-top-color:transparent}
+.eff .name{min-width:0}
+.eff .name strong{display:block;font-size:13px;font-weight:650;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eff .name small{display:block;color:var(--faint);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stats{display:flex;gap:12px;justify-content:flex-end}
+.stat{display:grid;justify-items:end;line-height:1.15}
+.stat b{font-size:15px;font-weight:750;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:.2px}
+.stat span{font-size:10.5px;color:var(--muted);white-space:nowrap}
+/* 基石：单独一块，强调色 */
+.eff.is-keystone{grid-template-columns:40px minmax(0,1fr) auto;min-height:62px;margin-bottom:4px;background:linear-gradient(90deg,color-mix(in oklab,var(--primary-soft) 85%,transparent),transparent 85%);border:1px solid color-mix(in oklab,var(--primary) 30%,var(--line))}
+.eff.is-keystone+.eff{border-top:0}
+.eff.is-keystone .name strong{font-size:14px}
+.eff.is-keystone .stat b{font-size:18px;color:var(--primary-strong)}
+.kchip{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;font-size:10px;font-weight:700;color:var(--primary-strong);background:color-mix(in oklab,var(--primary) 16%,transparent);vertical-align:2px}
+/* 副系分隔 */
+.eff-divider{display:flex;align-items:center;gap:8px;margin:6px 8px 2px;color:var(--faint);font-size:11px}
+.eff-divider svg{width:12px;height:15px}
+.eff-divider::after{content:"";flex:1;height:1px;background:var(--line)}
+/* 碎片：一行三个小 chip */
+.shards-line{display:grid;gap:5px;padding:8px 6px 2px;margin-top:4px;border-top:1px solid var(--line)}
+.shards-line > small{color:var(--faint);font-size:11px}
+.shards-line .shard-chip{justify-self:start}
+.shard-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px 3px 4px;border-radius:999px;background:var(--surface-strong);color:var(--muted);font-size:11.5px}
+.shard-chip b{color:var(--ink);font-weight:650}
+
+/* ---------- P3 海克斯 ---------- */
+.aug-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;padding:10px}
+.aug{--acc:var(--rarity-silver);display:grid;grid-template-columns:56px minmax(0,1fr);gap:12px;padding:10px 12px 10px 10px;background:linear-gradient(135deg,color-mix(in oklab,var(--acc) 9%,var(--surface)) ,var(--surface) 60%);border:1px solid color-mix(in oklab,var(--acc) 28%,var(--line));border-radius:10px;min-height:92px}
+.aug.is-gold{--acc:var(--rarity-gold)}
+.aug.is-prismatic{--acc:var(--rarity-prismatic-a);border-image:none}
+.aug-icon{position:relative;width:56px;height:56px;border-radius:12px;background:radial-gradient(circle at 35% 30%,color-mix(in oklab,var(--acc) 70%,white),color-mix(in oklab,var(--acc) 55%,#111) 70%);box-shadow:0 0 0 2px var(--acc) inset,0 4px 14px color-mix(in oklab,var(--acc) 25%,transparent)}
+.aug.is-prismatic .aug-icon{background:conic-gradient(from 200deg,var(--rarity-prismatic-a),var(--rarity-prismatic-b),var(--rarity-prismatic-c),var(--rarity-prismatic-a));box-shadow:0 4px 14px rgb(199 125 255/.3)}
+.aug-icon i{position:absolute;inset:4px;border-radius:9px;background:radial-gradient(circle at 40% 35%,#2b3950,#0e1420)}
+.aug-order{position:absolute;left:-6px;top:-6px;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--bg);border:1.5px solid var(--acc);color:var(--ink);font-size:10.5px;font-weight:800;z-index:1}
+.aug-body{min-width:0;display:grid;align-content:start;gap:4px}
+.aug-title{display:flex;align-items:center;gap:7px;min-width:0}
+.aug-title strong{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rar{flex:0 0 auto;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:750;color:var(--acc);background:color-mix(in oklab,var(--acc) 14%,transparent)}
+.aug p{margin:0;color:color-mix(in oklab,var(--ink) 78%,var(--muted));font-size:12px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.aug p em{font-style:normal;color:var(--primary-strong);font-weight:650}
+.skel{height:9px;border-radius:5px;background:linear-gradient(90deg,var(--surface-strong),#22304a,var(--surface-strong));background-size:200% 100%}
+.skel+.skel{margin-top:7px}
+.aug.is-bare{align-items:center;min-height:76px}
+.aug-mode-mayhem .build-detail > section.hex > header h4::after{content:"";}
+
+/* ---------- 窄宽度 ---------- */
+.narrow{max-width:620px}
+.narrow .rune-split{grid-template-columns:1fr}
+.narrow .rune-split>.tree{border-right:0;border-bottom:1px solid var(--line)}
+.narrow .stats{gap:12px}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<!-- ========== P1 ========== -->
+<section>
+  <h3 class="frame-title"><b>P1　总览对局卡片：右侧名单中当前玩家用主题色加粗</b><span>改动只有名字颜色和字重</span></h3>
+  <div class="match-card">
+    <div class="match-meta"><b>排位赛 灵活排位</b><small>1小时前 · 胜利 +17 LP</small></div>
+    <div class="match-mid">… 英雄 / 符文 / 装备 / KDA / 击杀参与率 …（不变）</div>
+    <div class="match-players">
+      <div class="match-team-list">
+        <button><span class="ico champ" style="background:#c98a6a">与</span><span class="match-player-name">与你挽手共浅夏c#55450</span></button>
+        <button><span class="ico champ" style="background:#a9b0b8">无</span><span class="match-player-name">无聊玩玩tua#65636</span></button>
+        <button><span class="ico champ" style="background:#b04050">D</span><span class="match-player-name">Details、sc30#70413</span></button>
+        <button><span class="ico champ" style="background:#8a6ad0">我</span><span class="match-player-name is-current-player">我听见风的颜色#26247</span></button>
+        <button><span class="ico champ" style="background:#c79ae0">蔚</span><span class="match-player-name">蔚Vi#66490</span></button>
+      </div>
+      <div class="match-team-list">
+        <button><span class="ico champ" style="background:#a65a3a">羊</span><span class="match-player-name">羊咩咩#50011</span></button>
+        <button><span class="ico champ" style="background:#b7b56a">她</span><span class="match-player-name">她说她喜欢晚风#16453</span></button>
+        <button><span class="ico champ" style="background:#e0606a">哥</span><span class="match-player-name">哥哥不行我还要啊#73854</span></button>
+        <button><span class="ico champ" style="background:#9a6a50">相</span><span class="match-player-name">相见时难别亦难#28764</span></button>
+        <button><span class="ico champ" style="background:#3a6a70">妮</span><span class="match-player-name">妮子姐姐、#10764</span></button>
+      </div>
+    </div>
+  </div>
+  <div class="compare zoom" style="margin-top:12px">
+    <div><h5>现在（放大）</h5><div class="match-team-list"><button><span class="ico champ" style="background:#b04050">D</span><span>Details、sc30#70413</span></button><button><span class="ico champ" style="background:#8a6ad0">我</span><span>我听见风的颜色#26247</span></button><button><span class="ico champ" style="background:#c79ae0">蔚</span><span>蔚Vi#66490</span></button></div></div>
+    <div><h5>改后（放大）</h5><div class="match-team-list"><button><span class="ico champ" style="background:#b04050">D</span><span>Details、sc30#70413</span></button><button><span class="ico champ" style="background:#8a6ad0">我</span><span class="match-player-name is-current-player">我听见风的颜色#26247</span></button><button><span class="ico champ" style="background:#c79ae0">蔚</span><span>蔚Vi#66490</span></button></div></div>
+  </div>
+  <p class="note"><b>样式：</b>color: var(--primary-strong); font-weight: 700。和展开详情「详尽表格」里已有的 .participant-name.is-current-player 用同一个判断（subjectParticipantId），字重从 750 降到 700，因为这里字号只有 10.5px，太粗会糊。悬停色、省略号、隐藏名字打码都不变。斗魂竞技场的四队预览名单也一样处理。</p>
+</section>
+
+<!-- ========== P2 ========== -->
+<section>
+  <h3 class="frame-title"><b>P2　构建 → 符文：保留符文树，右侧加「符文效果」</b><span>符文树 : 效果 = 3 : 1；宽度 ≥ 1100px 时左右排列</span></h3>
+  <div class="match-detail">
+    <div class="detail-tabs"><span>概览</span><span>队伍分析</span><span class="on">构建</span></div>
+    <div class="build-detail">
+      <section><header><h4>装备路线</h4></header><div class="collapsed">（不变）</div></section>
+      <section><header><h4>技能加点</h4></header><div class="collapsed">（不变）</div></section>
+      <section class="rune-detail">
+        <header><h4>符文</h4>
+          <div class="rune-yield"><span class="is-damage">伤害<b>3,190</b></span><span class="is-heal">治疗<b>804</b></span><span class="is-gold">金币<b>680</b></span></div>
+        </header>
+        <div class="rune-split">
+          <div class="tree">
+            <div class="unified-rune-board">
+              <div class="col">
+                <header><svg viewBox="0 0 24 30" fill="#d8ad4d"><path d="m14 6-2-3-2 3 2 6.1L14 6ZM9 8 8 7C6 8 5 8 4 7.2A3.2 3.2 0 0 1 3 6H0l6 5c.6-1.3 1.7-2.4 3-3Zm9 3 6-5h-3c-.2.5-.6.9-1 1.2-1 .8-2 .8-4-.8L15 8c1.3.6 2.4 1.7 3 3Zm2.8 2.1L22 10l-6 3.9 1 1.1v1l-4-2 2.2 3.8c-.7.5-1.4.9-2.2 1.2l-1 7-1-7c-.7-.2-1.4-.6-2-1l2-4-4 2v-1l1-1.1L2 10l1 3c1.2.5 2.1 1.7 2 3l1 1H4l-1 2 2 1 2-1c.4.4.8.2 2 1l2 8 1 2 1-2 2-8c1.2-.8 1.6-.6 2-1l2 1 2-1-1-2h-1.6l.6-1c0-1.2.7-2.3 1.8-2.9Z"/></svg></header>
+                <div class="row"><span class="ico perk is-off">强</span><span class="ico perk is-on">节</span><span class="ico perk is-off">步</span><span class="ico perk is-off">征</span></div>
+                <div class="row"><span class="ico perk is-off">吸</span><span class="ico perk is-on">凯</span><span class="ico perk is-off">气</span></div>
+                <div class="row"><span class="ico perk is-off">欢</span><span class="ico perk is-off">韧</span><span class="ico perk is-on">血</span></div>
+                <div class="row"><span class="ico perk is-off">致</span><span class="ico perk is-on is-linked">砍</span><span class="ico perk is-off">坚</span></div>
+              </div>
+              <div class="col">
+                <header><svg viewBox="0 0 24 30" fill="#50b8c7"><path d="M15 21c-3.8 0-6.1-3.7-7-5l2-2c.8 1.4 1.8 2.8 3 4 1 1 5 2 5 2-.9.7-1.9 1-3 1Zm3 6c-1.1-.2-2.1-.5-3-1-.9.5-1.900.8-3 1a9.1 9.1 0 0 1-8-4v-5c.5 1.1 1.2 2.1 2 3v1c1.5 1.7 3.7 2.7 6 2.9 0 0-6.6-4.8-9-11.9 0-.1-1 2-1 7-.5-1.6-.8-3.3-1-5-.1-1.4.2-2.8 1-4V8c0-3 2-5 4-5h4c-.8.1-1.5.5-2 1H5C4.2 4 3 5.200 3 8c.1 1.8.7 3.6 1.8 5.1L5 13c.7-1.5 2.9-5.4 6-7-3.3 0-6 3-6 3L4 8c2-2.4 4.9-3.9 8-4 1.4.1 2.7.4 4 1-1 .2-2 .5-3 1 0 0 2.8 1.1 6 6 2.7 4.1-1 6-1 6 .8-2 .4-4.3-1-6-1.500-1.8-3.2-3.5-5-5-2.8 2.4-4.9 5.5-6 9 0 0 7 10 13 10 .7 0 2.7-.2 2.7-3.2-.1-.5-.2-1-.4-1.5 0 0-1.3 2.7-3.3 2.7-.4-.2-2-1-2-1s5.7-1.9 5.7-7.7c0-5-5.1-8.7-5.1-8.7l.9-.9S23 9.4 23 14.900c.1 1.4-.1 2.8-.5 4.1.4 1 .6 2.1.5 3.3C23 27 18.9 27 18 27Zm-2-9c-3-5-5-6-5-6l1-1s3 1 5 6l-1 1Z"/></svg></header>
+                <div class="row spacer"><span class="ico perk">.</span></div>
+                <div class="row"><span class="ico perk is-insp is-off">闪</span><span class="ico perk is-insp is-off">鞋</span><span class="ico perk is-insp is-on">返</span></div>
+                <div class="row"><span class="ico perk is-insp is-off">饼</span><span class="ico perk is-insp is-off">时</span><span class="ico perk is-insp is-off">药</span></div>
+                <div class="row"><span class="ico perk is-insp is-off">速</span><span class="ico perk is-insp is-on">洞</span><span class="ico perk is-insp is-off">时</span></div>
+              </div>
+              <div class="col">
+                <header></header>
+                <div class="row spacer"><span class="ico shard">.</span></div>
+                <div class="row"><span class="ico shard is-on" style="outline:2px solid var(--primary);outline-offset:2px">攻</span><span class="ico shard" style="opacity:.34">适</span><span class="ico shard" style="opacity:.34">急</span></div>
+                <div class="row"><span class="ico shard" style="opacity:.34">适</span><span class="ico shard is-on" style="outline:2px solid var(--primary);outline-offset:2px">适</span><span class="ico shard" style="opacity:.34">移</span></div>
+                <div class="row"><span class="ico shard" style="opacity:.34">血</span><span class="ico shard" style="opacity:.34">韧</span><span class="ico shard is-on" style="outline:2px solid var(--primary);outline-offset:2px">成</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rune-effects" aria-label="符文效果">
+            <div class="eff is-keystone">
+              <span class="ico perk is-key">节</span>
+              <div class="name"><strong>致命节奏<span class="kchip">基石</span></strong><small>精密</small></div>
+              <div class="stats"><div class="stat"><b>1,028</b><span>造成伤害</span></div><div class="stat"><b>6:12</b><span>满层时长</span></div></div>
+            </div>
+            <div class="eff">
+              <span class="ico perk">凯</span>
+              <div class="name"><strong>凯旋</strong></div>
+              <div class="stats"><div class="stat"><b>804</b><span>回复生命</span></div><div class="stat"><b>300</b><span>额外金币</span></div></div>
+            </div>
+            <div class="eff">
+              <span class="ico perk">血</span>
+              <div class="name"><strong>传说：血统</strong></div>
+              <div class="stats"><div class="stat"><b>19:50</b><span>叠满时间</span></div></div>
+            </div>
+            <div class="eff is-hover">
+              <span class="ico perk">砍</span>
+              <div class="name"><strong>砍倒</strong></div>
+              <div class="stats"><div class="stat"><b>2,162</b><span>额外伤害</span></div></div>
+            </div>
+            <div class="eff-divider"><svg viewBox="0 0 24 30" fill="#50b8c7"><circle cx="12" cy="15" r="9"/></svg>启迪</div>
+            <div class="eff">
+              <span class="ico perk is-insp">返</span>
+              <div class="name"><strong>返现</strong></div>
+              <div class="stats"><div class="stat"><b>380</b><span>返还金币</span></div></div>
+            </div>
+            <div class="eff">
+              <span class="ico perk is-insp">洞</span>
+              <div class="name"><strong>星界洞悉</strong><small>+8 召唤师技能急速，+10 物品急速</small></div>
+              <div class="stats"></div>
+            </div>
+            <div class="shards-line"><small>属性碎片</small>
+              <span class="shard-chip"><span class="ico shard">攻</span><b>攻击速度</b> +10%</span>
+              <span class="shard-chip"><span class="ico shard">适</span><b>适应之力</b> +9</span>
+              <span class="shard-chip"><span class="ico shard">成</span><b>生命值</b> +10–180</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <p class="note"><b>交互：</b>鼠标移到右侧某一行（图中「砍倒」），左侧树上对应图标加一圈 --primary-strong 描边和浅光晕；反过来移到树上的已选图标，右侧对应行高亮。未选的灰色图标不联动。<br>
+  <b>数值：</b>数字 15px 粗体等宽数字，基石 18px 主题色；标签 10.5px --muted 放数字下面。没有对局数据的符文（星界洞悉、碎片）不显示「--」，改为在名字下面一行灰字写它的固定效果。<br>
+  <b>头部汇总：</b>把所有符文里能归类的数值加起来：伤害（橙）、治疗（绿，含护盾）、金币（金）。某类合计为 0 就不显示那个 chip；一个都没有就整组不显示。<br>
+  <b>比例：</b>左右 3 : 1（grid-template-columns: minmax(0,3fr) minmax(280px,1fr)），符文树变宽后图标放大到 34px、行高 52px；效果列表变窄，碎片改成竖排三行。<br>图中数字是示例；「满层时长」这一行要以真实变量核对为准（见工单 P2 第 3 条）。</p>
+</section>
+
+<!-- ========== P2 窄宽度 ========== -->
+<section>
+  <h3 class="frame-title"><b>P2 窄宽度（&lt; 1100px）</b><span>树在上，效果列表在下；树本身沿用现有断点</span></h3>
+  <div class="match-detail narrow">
+    <div class="build-detail">
+      <section class="rune-detail">
+        <header><h4>符文</h4><div class="rune-yield"><span class="is-damage">伤害<b>3,190</b></span><span class="is-heal">治疗<b>804</b></span><span class="is-gold">金币<b>680</b></span></div></header>
+        <div class="rune-split">
+          <div class="tree" style="padding:14px;color:var(--faint);font-size:12px;text-align:center">（现有符文树，按现有断点排两列 / 一列）</div>
+          <div class="rune-effects">
+            <div class="eff is-keystone"><span class="ico perk is-key">节</span><div class="name"><strong>致命节奏<span class="kchip">基石</span></strong><small>精密</small></div><div class="stats"><div class="stat"><b>1,028</b><span>造成伤害</span></div><div class="stat"><b>6:12</b><span>满层时长</span></div></div></div>
+            <div class="eff"><span class="ico perk">凯</span><div class="name"><strong>凯旋</strong></div><div class="stats"><div class="stat"><b>804</b><span>回复生命</span></div><div class="stat"><b>300</b><span>额外金币</span></div></div></div>
+            <div class="eff"><span class="ico perk">血</span><div class="name"><strong>传说：血统</strong></div><div class="stats"><div class="stat"><b>19:50</b><span>叠满时间</span></div></div></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</section>
+
+<!-- ========== P3 ========== -->
+<section>
+  <h3 class="frame-title"><b>P3　构建 → 海克斯（海克斯大乱斗 / 斗魂竞技场）</b><span>图标网格改成卡片：图标 + 选取顺序 + 名称 + 品质 + 效果说明</span></h3>
+  <div class="match-detail">
+    <div class="detail-tabs"><span>概览</span><span>队伍分析</span><span class="on">构建</span></div>
+    <div class="build-detail">
+      <section class="hex">
+        <header><h4>海克斯</h4></header>
+        <div class="aug-grid">
+          <article class="aug is-prismatic">
+            <div class="aug-icon"><i></i><span class="aug-order">1</span></div>
+            <div class="aug-body"><div class="aug-title"><strong>示例：双刀流</strong><span class="rar" style="--acc:var(--rarity-prismatic-a)">棱彩</span></div>
+              <p>普攻额外进行一次攻击，造成 <em>40%</em> 伤害，并且可以触发攻击特效。</p></div>
+          </article>
+          <article class="aug is-gold">
+            <div class="aug-icon"><i></i><span class="aug-order">2</span></div>
+            <div class="aug-body"><div class="aug-title"><strong>示例：炫技</strong><span class="rar">黄金</span></div>
+              <p>施放终极技能后，下一次普攻造成额外 <em>120</em> 魔法伤害并减速目标 <em>30%</em>，持续 1.5 秒。</p></div>
+          </article>
+          <article class="aug is-gold">
+            <div class="aug-icon"><i></i><span class="aug-order">3</span></div>
+            <div class="aug-body"><div class="aug-title"><strong>示例：说明加载中</strong><span class="rar">黄金</span></div>
+              <div><div class="skel" style="width:92%"></div><div class="skel" style="width:64%"></div></div></div>
+          </article>
+          <article class="aug is-bare">
+            <div class="aug-icon"><i></i><span class="aug-order">4</span></div>
+            <div class="aug-body"><div class="aug-title"><strong>示例：没有说明</strong><span class="rar">白银</span></div></div>
+          </article>
+        </div>
+      </section>
+    </div>
+  </div>
+  <p class="note"><b>卡片：</b>每张卡左上角数字是选取顺序（按 playerAugment1→6）。卡片底色和描边用品质色淡淡叠一层：白银 --rarity-silver、黄金 --rarity-gold、棱彩用 --rarity-prismatic-a/b/c 渐变环。说明最多 3 行，超出省略，完整内容放在卡片的 tooltip 里。说明里的数字（伤害、百分比、秒数）如果上游带了高亮标记，用 --primary-strong 加粗；没有就是纯文本，不要自己用正则去猜。<br>
+  <b>三种状态：</b>有说明 → 正常显示；说明还在加载 → 两行骨架条；拿不到说明 → 只显示名称和品质，卡片高度收紧，不写「暂无说明」之类的字。<br>
+  <b>没有收益数据：</b>Riot 对局数据里海克斯只有 ID，没有像符文那样的数值，所以海克斯只展示效果，不做汇总 chip。</p>
+</section>
+
+</div>
+</body>
+</html>

@@ -54,7 +54,13 @@ JSON 证据：`docs/history/reports/r189/before-emote.json`、`after-emote.json`
 
 - 前端全量 `node --test backend/web/*.test.cjs desktop/*.test.cjs`：1076 项，1075 通过、1 项平台条件跳过、0 失败（296.036 秒）。日志 `/private/tmp/r189-full-node.log`。
 - 首次 Go 全量和构建发现 lcu_api_test.go 两条既有测试仍期望原始名称 loot-box / CHEST_224 / MATERIAL_REAL。按 P2-3 更新为材料 / 宝箱 224 / 材料，同时保留原标识、空白状态及非空不 pending 断言；相关专项重跑通过。原失败日志 `/private/tmp/r189-full-go.log`、`r189-public-build.log`、`r189-public-build-retry.log`。
-- 最终 Go 全量、vet 和 public 构建结果及收据正在核对。
+- 最终 `go test ./backend -count=1` 全量通过（236.672 秒），随后 `go vet ./backend` 通过；`git diff --check` 通过。日志 `/private/tmp/r189-full-go-retry.log`、`r189-vet.log`。
+- 最终 `DEEP_LEGENDS_KEY_MODE=public ./build-desktop.sh` 完整构建成功：1669 项 Go 测试五分片、Go / installer vet 和测试、Windows 后端构建、NSIS 与外层安装器、包内 runtime / 指纹 / public 收据检查通过。日志 `/private/tmp/r189-public-build-final.log`。
+- key mode：**public**，未嵌入 Riot Key；版本 **0.12.54**，源码 / 后端 / 包内指纹均 **9252906c3c40**。
+- 安装包：`dist/desktop/Deep Legends Setup 0.12.54-public.exe`；只保留带 public 后缀的安装包。
+- SHA-256：`263b318e2c030035e7cbff12282f6cdef02fa87aded1b183397234848a1d21ed`，与 release-build.json / SHA256SUMS-public.txt 及实际文件一致。
+- package / lock、AGENTS / CLAUDE、CHANGELOG 与索引已同步；R144 索引备注“非空白记录不再显示未同步由 R189 调整”。
+- R188 / R189 工作区修改保留，用户原始验证目录未改动；没有推送或发布。
 
 ## 真机边界
 

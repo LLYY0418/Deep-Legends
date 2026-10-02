@@ -19,7 +19,7 @@ const deadClasses = [
 const tokenHexes = [
   "7E8896", "9AA7B8", "E3B341", "C77DFF", "5AA9FF", "FF8AC7", "B98255", "55C8D7",
   "F2CB5C", "D9A441", "DFE7EE", "9FB2C1", "DFA678", "B4794C", "F5D372", "E8C468",
-  "DDE4EC", "AFBAC8", "C7D0DC", "DCA070", "B87333", "C8834A", "14100A",
+  "DDE4EC", "AFBAC8", "C7D0DC", "DCA070", "B87333", "C8834A", "14100A", "F0A27A",
 ];
 
 function values(property) {
@@ -59,7 +59,9 @@ test("R117 confirmed dead classes are absent while dynamic loot-table stays guar
 
 test("R117 CSS budgets do not exceed the audited baseline", () => {
   assert.ok(values("border-radius").size <= 33, "border-radius budget increased");
-  assert.ok(values("padding").size <= 205, "padding budget increased");
+  // R190 design adds precisely these three local effect/card paddings.
+  const r190PaddingValues = new Set(["8px 8px 10px", "8px 6px 2px", "10px 12px 10px 10px"]);
+  assert.ok([...values("padding")].filter(value => !r190PaddingValues.has(value)).length <= 205, "padding budget increased beyond R190 design");
   // R138 的图标网格新增独立间距 20px 16px；其余 gap 取值仍受原预算约束。
   assert.ok(values("gap").size <= 55, "gap budget increased");
 });

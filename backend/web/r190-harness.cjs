@@ -1,0 +1,18 @@
+'use strict';
+const {read, compile, escapeHTML} = require('./r188-harness.cjs');
+const names = ['plainText','perkEffectLines','selectedRuneEffects','runeEffectTotals','renderRuneYield','renderRuneEffects','renderRuneOption','renderUnifiedRuneBoard','renderRuneStyleIcon','renderBuildAugments','normalizeAugmentRarity','augmentMetadata','augmentTooltipText','wrapAugmentIcon','augmentIconFigure','bindRuneEffectLinks','ensureAugmentDescriptions','ensureBuildData','renderBuild','isCurrentMatchParticipant','renderMatchPlayers','playerParticipantName','matchPlayerGroups','arenaGroupLabel'];
+function fixture(source = process.env.R190_SOURCE_FILE ? require('node:fs').readFileSync(process.env.R190_SOURCE_FILE,'utf8') : read('gameplay.js'), extra = {}) {
+ const ids = [8005,9111,9103,8017,8321,8347];
+ const perks = ids.map((id,i) => ({id,name:['强攻','凯旋','传说：血统','砍倒','返现','星界洞悉'][i],iconPath:`/fixture/${id}.svg`,shortDesc:`<b>固定效果 ${id}</b>`,eogDescs:[['伤害总和：@eogvar1@','额外伤害：@eogvar2@'],['回复生命值总和：@eogvar1@','提供的额外金币总和：@eogvar2@'],['已完成的时间：@eogvar1@:@eogvar2@'],['额外伤害总和：@eogvar1@'],['返还金币总计：@eogvar1@'],['--']][i]}));
+ const styles = [8000,8300].map((id,i)=>({id,name:i?'启迪':'精密',slots:(i?[[8300],[8321],[8347],[8304]]:[[8005,8008],[9111],[9103],[8017]]).map(slot=>({perks:slot.map(id=>perks.find(p=>p.id===id)||{id,name:`符文 ${id}`})}))}));
+ const shards = [5005,5008,5001];
+ const state = {settings:{maskNames:false},perks:{perks,styles,statModSlots:shards.map(id=>({perks:[{id,name:`碎片 ${id}`}]}))},augmentCatalog:new Map([120,1225,1116,1004,1005,1006].map((id,i)=>[id,{id,name:`测试海克斯 ${id}`,rarity:['silver','prismatic','gold','gold','silver','prismatic'][i]}])),augmentDescriptions:new Map(),perkStatsRefreshes:new Map(),matchTimelines:new Map()};
+ const subject = {participantId:4,primaryStyleId:8000,subStyleId:8300,perkIds:[8347,8017,9111,8005,8321,9103,...shards],perkStats:ids.map((perkId,i)=>({perkId,vars:[[2000,500,0],[804,300,0],[19,5,0],[300,0,0],[380,0,0],[0,0,0]][i]}))};
+ const icon = (_kind,id,name,size='')=>`<span class="game-icon is-${size}"><img src="/fixture/${id}.svg" alt="${escapeHTML(name)}"></span>`;
+ const deps = {state,escapeHTML,PERK_EFFECT_OVERRIDES:Function(source.match(/const PERK_EFFECT_OVERRIDES = ([^;]+);/)[0]+'return PERK_EFFECT_OVERRIDES')(),
+ runeShardDescription:id=>({5005:'攻击速度 +10%',5008:'适应之力 +9',5001:'生命值 +10–180'})[id]||'',dataDragonRuneShardPath:()=>'',renderRuneStyleIcon:style=>`<span class="style-icon">${escapeHTML(style?.name)}</span>`,assetIcon:(url,name,size)=>icon('perk',url.split('/').at(-1).split('.')[0],name,size),iconFigure:icon,remoteStaticIcon:(_source,url,name,size)=>icon('perk',url,name,size),perkIconFigure:(id,size)=>icon('perk',id,perks.find(p=>p.id===id)?.name,size),pendingCatalogIcon:name=>`<span>${escapeHTML(name)}</span>`,
+ matchSubject:match=>match.participants?.find(p=>p.participantId===match.subjectParticipantId)||subject,matchAugmentIDs:(s,limit)=>(s.augmentIds||[]).slice(0,limit),matchTimelineKey:()=> 'fixture',riotTab:()=>true,connected:()=>false,renderItemRoute:()=>'',renderSkillOrder:()=>'',skillPrioritySummary:()=>'',
+ matchPlayerGroups:match=>({arena:match.gameMode==='CHERRY',groups:Array.from({length:match.gameMode==='CHERRY'?8:2},(_,i)=>({placement:i+1,players:match.participants.slice(i*(match.gameMode==='CHERRY'?2:5),(i+1)*(match.gameMode==='CHERRY'?2:5))}))}),arenaTeamMeta:g=>({name:`小队 ${g.subteamId}`}),proBadgeAttributes:()=>'',...extra};
+ return {source,state,subject,perks,styles,shards,deps,...compile(source,names,deps)};
+}
+module.exports={fixture,names};

@@ -613,6 +613,9 @@ type riotPerkSelections struct {
 	Style       int64  `json:"style"`
 	Selections  []struct {
 		Perk int64 `json:"perk"`
+		Var1 int64 `json:"var1"`
+		Var2 int64 `json:"var2"`
+		Var3 int64 `json:"var3"`
 	} `json:"selections"`
 }
 
@@ -699,6 +702,7 @@ type riotTeam struct {
 // riotMatchInfo 是 Match-V5 风格的单场对局数据；Riot 官方接口与
 // 国服 SGP 网关（见 sgp_api.go）返回的结构一致，双方共用同一套转换逻辑。
 type riotMatchInfo struct {
+	PerkStatsStale     bool              `json:"-"`
 	GameID             int64             `json:"gameId"`
 	GameCreation       int64             `json:"gameCreation"`
 	GameStartTimestamp int64             `json:"gameStartTimestamp"`
@@ -855,7 +859,11 @@ func (p *riotProvider) matchByID(ctx context.Context, matchID string) (*riotMatc
 	return match, err
 }
 
-func (p *riotProvider) matchByIDWithCache(ctx context.Context, matchID string) (result *riotMatch, status string, resultErr error) {
+func (p *riotProvider) matchByIDWithCache(ctx context.Context, matchID string) (*riotMatch, string, error) {
+	return p.matchByIDWithCacheMode(ctx, matchID, false)
+}
+
+func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID string, refresh bool) (result *riotMatch, status string, resultErr error) {
 	defer func() {
 		tracker, _ := ctx.Value(riotOverviewCostTrackerKey{}).(*riotOverviewCostTracker)
 		if tracker == nil || resultErr != nil {
@@ -873,7 +881,7 @@ func (p *riotProvider) matchByIDWithCache(ctx context.Context, matchID string) (
 		}
 	}()
 	p.cacheMu.Lock()
-	if cached, ok := p.matchCache[matchID]; ok {
+	if cached, ok := p.matchCache[matchID]; ok && (!refresh || !cached.Info.PerkStatsStale) {
 		p.cacheMu.Unlock()
 		return cached, "hit", nil
 	}
@@ -885,7 +893,10 @@ func (p *riotProvider) matchByIDWithCache(ctx context.Context, matchID string) (
 		case <-flight.done:
 			// A departing leader must not poison another caller's live request.
 			if ctx.Err() == nil && (errors.Is(flight.err, context.Canceled) || errors.Is(flight.err, context.DeadlineExceeded)) {
-				return p.matchByIDWithCache(ctx, matchID)
+				return p.matchByIDWithCacheMode(ctx, matchID, refresh)
+			}
+			if refresh && flight.err == nil && flight.match != nil && flight.match.Info.PerkStatsStale {
+				return p.matchByIDWithCacheMode(ctx, matchID, true)
 			}
 			return flight.match, "hit", flight.err
 		}
@@ -905,10 +916,17 @@ func (p *riotProvider) matchByIDWithCache(ctx context.Context, matchID string) (
 	}()
 	var match riotMatch
 	status = "miss"
-	key := "riot-match-v1|" + matchID
+	key := "riot-match-v2|" + matchID
 	if p.matchDisk != nil && validRiotMatchID(matchID) {
 		if entry, err := p.matchDisk.readDisk(key); err == nil && time.Now().Before(entry.ExpiresAt) && json.Unmarshal(entry.Data, &match) == nil && match.Metadata.MatchID == matchID && len(match.Info.Participants) > 0 {
 			status = "disk"
+		}
+	}
+	if status != "disk" && !refresh && p.matchDisk != nil && validRiotMatchID(matchID) {
+		match = riotMatch{}
+		if entry, err := p.matchDisk.readDisk("riot-match-v1|" + matchID); err == nil && time.Now().Before(entry.ExpiresAt) && json.Unmarshal(entry.Data, &match) == nil && match.Metadata.MatchID == matchID && len(match.Info.Participants) > 0 {
+			status = "disk"
+			match.Info.PerkStatsStale = true
 		}
 	}
 	if status != "disk" {
@@ -927,8 +945,10 @@ func (p *riotProvider) matchByIDWithCache(ctx context.Context, matchID string) (
 	if p.matchCache == nil {
 		p.matchCache = make(map[string]*riotMatch)
 	}
+	if _, exists := p.matchCache[matchID]; !exists {
+		p.matchOrder = append(p.matchOrder, matchID)
+	}
 	p.matchCache[matchID] = &match
-	p.matchOrder = append(p.matchOrder, matchID)
 	for len(p.matchOrder) > riotMatchCacheMax {
 		delete(p.matchCache, p.matchOrder[0])
 		p.matchOrder = p.matchOrder[1:]
@@ -1160,17 +1180,18 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 		endedAt = startedAt + duration*1000
 	}
 	result := gameplayMatch{
-		GameID:     info.GameID,
-		CreatedAt:  createdAt,
-		Duration:   duration,
-		StartedAt:  startedAt,
-		EndedAt:    endedAt,
-		QueueID:    info.QueueID,
-		QueueLabel: label,
-		ModeGroup:  queueModeGroupForLabel(info.QueueID, info.GameMode, info.MapID, label),
-		GameMode:   info.GameMode,
-		GameType:   info.GameType,
-		MapID:      info.MapID,
+		PerkStatsStale: info.PerkStatsStale,
+		GameID:         info.GameID,
+		CreatedAt:      createdAt,
+		Duration:       duration,
+		StartedAt:      startedAt,
+		EndedAt:        endedAt,
+		QueueID:        info.QueueID,
+		QueueLabel:     label,
+		ModeGroup:      queueModeGroupForLabel(info.QueueID, info.GameMode, info.MapID, label),
+		GameMode:       info.GameMode,
+		GameType:       info.GameType,
+		MapID:          info.MapID,
 	}
 	if remake {
 		result.Result = "remake"
@@ -1186,6 +1207,7 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 			name = "隐藏玩家"
 		}
 		perkIDs := make([]int64, 0, 9)
+		perkStats := make([]gameplayPerkStat, 0, 6)
 		var primaryStyle, subStyle int64
 		for index, style := range raw.Perks.Styles {
 			if index == 0 || strings.EqualFold(style.Description, "primaryStyle") {
@@ -1198,6 +1220,9 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 			for _, selection := range style.Selections {
 				if selection.Perk > 0 {
 					perkIDs = append(perkIDs, selection.Perk)
+					if !info.PerkStatsStale && len(perkStats) < 6 {
+						perkStats = append(perkStats, gameplayPerkStat{PerkID: selection.Perk, Vars: [3]int64{selection.Var1, selection.Var2, selection.Var3}})
+					}
 				}
 			}
 		}
@@ -1229,7 +1254,7 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 			DisplayName: name, GameName: raw.RiotIDGameName, TagLine: raw.RiotIDTagline, ProfileIconID: raw.ProfileIcon,
 			ChampionID: raw.ChampionID, ChampionName: championName(names, raw.ChampionID), ChampionLevel: raw.ChampLevel,
 			Spell1ID: spell1ID, Spell2ID: spell2ID, PrimaryStyleID: primaryStyle, SubStyleID: subStyle,
-			PerkIDs: perkIDs, ItemIDs: itemSlots(raw.Item0, raw.Item1, raw.Item2, raw.Item3, raw.Item4, raw.Item5, raw.Item6),
+			PerkIDs: perkIDs, PerkStats: perkStats, ItemIDs: itemSlots(raw.Item0, raw.Item1, raw.Item2, raw.Item3, raw.Item4, raw.Item5, raw.Item6),
 			Position: riotPositionKey(raw),
 			Autofill: participantIndex < len(autofillFlags) && autofillFlags[participantIndex],
 			Kills:    raw.Kills, Deaths: raw.Deaths, Assists: raw.Assists,

@@ -1,0 +1,37 @@
+[
+  {
+    "name": "roster-all",
+    "status": "assertion FAIL",
+    "test": "R190 1"
+  },
+  {
+    "name": "summary-sum",
+    "status": "assertion FAIL",
+    "test": "R190 10"
+  },
+  {
+    "name": "no-overrides",
+    "status": "assertion FAIL",
+    "test": "R190 5"
+  },
+  {
+    "name": "board-structure",
+    "status": "assertion FAIL",
+    "test": "R190 12"
+  },
+  {
+    "name": "no-id-cache",
+    "status": "assertion FAIL",
+    "test": "R190 22"
+  },
+  {
+    "name": "riot-no-vars",
+    "status": "assertion FAIL",
+    "test": "TestR190LCUAndRiotPerkStats"
+  },
+  {
+    "name": "seo-description",
+    "status": "assertion FAIL",
+    "test": "TestR190AugmentDescriptionSources"
+  }
+]

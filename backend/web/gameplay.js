@@ -48,6 +48,8 @@
     perksRequestToken: 0,
     augmentCatalog: null,
     augmentCatalogLoading: false,
+    augmentDescriptions: new Map(),
+    perkStatsRefreshes: new Map(),
     items: null,
     itemsLoading: false,
     summonerSpells: null,
@@ -3117,7 +3119,7 @@
     const playerButton = (item, index) => {
       const fullName = playerParticipantName(item, index);
       const visibleName = grouping.arena && !state.settings.maskNames ? (item.gameName || item.displayName || "隐藏玩家").split("#")[0] : fullName;
-      return `<button type="button" ${item.playerRef ? `data-player-ref="${escapeHTML(item.playerRef)}" ${proBadgeAttributes(item)}` : "disabled"} data-tooltip="${escapeHTML(fullName)}" ${grouping.arena ? "" : 'data-tooltip-overflow=".match-player-name"'} data-tooltip-size="compact">${iconFigure("champion", item.championId, item.championName, "tiny")}<span class="match-player-name">${escapeHTML(visibleName)}</span></button>`;
+      return `<button type="button" ${item.playerRef ? `data-player-ref="${escapeHTML(item.playerRef)}" ${proBadgeAttributes(item)}` : "disabled"} data-tooltip="${escapeHTML(fullName)}" ${grouping.arena ? "" : 'data-tooltip-overflow=".match-player-name"'} data-tooltip-size="compact">${iconFigure("champion", item.championId, item.championName, "tiny")}<span class="match-player-name${isCurrentMatchParticipant(item, match) ? " is-current-player" : ""}">${escapeHTML(visibleName)}</span></button>`;
     };
     if (grouping.arena) {
       const rows = grouping.groups.slice(0, 4).map((group) => {
@@ -3884,13 +3886,159 @@
     return `<div class="match-skill-seq">${cells}</div>`;
   }
 
+  // These two Riot templates are malformed. Real Windows game variables are
+  // unavailable in this environment; suppress unverified lines rather than
+  // guessing their mapping. Evidence and follow-up are in the R190 ledger.
+  const PERK_EFFECT_OVERRIDES = Object.freeze({ 8008: [], 8304: [] });
+
+  function perkEffectLines(perk, vars) {
+    if (!Array.isArray(vars) || vars.length < 3) return [];
+    const templates = Object.hasOwn(PERK_EFFECT_OVERRIDES, Number(perk?.id)) ? PERK_EFFECT_OVERRIDES[Number(perk.id)] : perk?.eogDescs || [];
+    const lines = [];
+    for (const template of templates) for (const raw of String(template).split(/<br\s*\/?>/gi)) {
+      const match = raw.trim().match(/^([^：:]+)[：:]\s*(.+)$/);
+      if (!match) continue;
+      const label = plainText(match[1]).replace(/^提供的/, "").replace(/(?:的总和|总和|总计)$/, "").trim();
+      const valueTemplate = match[2].trim();
+      const integer = valueTemplate.match(/^@eogvar([123])@$/i);
+      const time = /^@eogvar1@:@eogvar2@$/i.test(valueTemplate);
+      let value;
+      if (integer) value = Number(vars[Number(integer[1]) - 1]);
+      else if (time && Number.isSafeInteger(Number(vars[0])) && Number.isSafeInteger(Number(vars[1])) && vars[0] >= 0 && vars[1] >= 0 && vars[1] < 60) value = `${Number(vars[0])}:${String(Number(vars[1])).padStart(2, "0")}`;
+      else continue;
+      if (!label || (typeof value === "number" && !Number.isSafeInteger(value))) continue;
+      const kind = time ? "other" : /伤害/.test(label) ? "damage" : /治疗|回复|护盾/.test(label) ? "heal" : /金币/.test(label) ? "gold" : "other";
+      lines.push({ label, value, kind });
+    }
+    return lines;
+  }
+
+  function selectedRuneEffects(subject) {
+    if (!state.perks) return null;
+    const selected = new Set((subject.perkIds || []).map(Number));
+    const stats = new Map((subject.perkStats || []).map(item => [Number(item.perkId), item.vars]));
+    const catalog = new Map((state.perks.perks || []).map(item => [Number(item.id), item]));
+    const styles = state.perks.styles || [];
+    const rows = [];
+    for (const [styleID, secondary] of [[subject.primaryStyleId, false], [subject.subStyleId, true]]) {
+      const style = styles.find(item => Number(item.id) === Number(styleID));
+      const slots = secondary ? (style?.slots || []).slice(1) : style?.slots || [];
+      slots.forEach((slot, index) => {
+        for (const entry of slot.perks || []) if (selected.has(Number(entry.id))) {
+          const perk = { ...entry, ...(catalog.get(Number(entry.id)) || {}) };
+          rows.push({ perk, style, secondary, keystone: !secondary && index === 0, lines: perkEffectLines(perk, stats.get(Number(perk.id))) });
+        }
+      });
+    }
+    return rows;
+  }
+
+  function runeEffectTotals(rows) {
+    const totals = { damage: 0, heal: 0, gold: 0 };
+    for (const row of rows || []) for (const kind of Object.keys(totals)) {
+      totals[kind] += Math.max(0, ...row.lines.filter(line => line.kind === kind && typeof line.value === "number").map(line => line.value));
+    }
+    return totals;
+  }
+
+  function renderRuneYield(subject) {
+    const totals = runeEffectTotals(selectedRuneEffects(subject));
+    const chips = [["damage", "伤害"], ["heal", "治疗"], ["gold", "金币"]].filter(([kind]) => totals[kind] > 0).map(([kind, label]) => `<span class="is-${kind}">${label}<b>${totals[kind].toLocaleString("en-US")}</b></span>`).join("");
+    return chips ? `<div class="rune-yield">${chips}</div>` : "";
+  }
+
+  function renderRuneEffects(subject) {
+    const rows = selectedRuneEffects(subject);
+    if (!rows) return "";
+    let secondaryStarted = false;
+    const content = rows.map(row => {
+      let divider = "";
+      if (row.secondary && !secondaryStarted) { secondaryStarted = true; divider = `<div class="eff-divider">${renderRuneStyleIcon(row.style)}<span>${escapeHTML(row.style.name)}</span></div>`; }
+      const description = !row.lines.length ? plainText(row.perk.shortDesc).replace(/\s+/g, " ") : "";
+      const stats = row.lines.map(line => `<div class="stat"><b>${escapeHTML(typeof line.value === "number" ? line.value.toLocaleString("en-US") : line.value)}</b><span>${escapeHTML(line.label)}</span></div>`).join("");
+      const subtitle = [row.keystone ? row.style.name : "", description].filter(Boolean).join(" · ");
+      return `${divider}<div class="eff${row.keystone ? " is-keystone" : ""}" data-perk-id="${Number(row.perk.id)}" tabindex="0">${perkIconFigure(row.perk.id, "rune", false)}<div class="name"><strong>${escapeHTML(row.perk.name)}${row.keystone ? '<span class="kchip">基石</span>' : ""}</strong>${subtitle ? `<small>${escapeHTML(subtitle)}</small>` : ""}</div>${stats ? `<div class="stats">${stats}</div>` : ""}</div>`;
+    }).join("");
+    const ids = (subject.statModIds || subject.stat_mod_ids || (subject.perkIds?.length >= 9 ? subject.perkIds.slice(-3) : [])).map(Number);
+    const shards = ids.map(id => runeShardDescription(id)).filter(Boolean).map(description => `<span class="shard-chip">${escapeHTML(description)}</span>`).join("");
+    return `<div class="rune-effects" aria-label="符文效果">${content}${shards ? `<div class="shards-line"><small>属性碎片</small>${shards}</div>` : ""}</div>`;
+  }
+
+  function bindRuneEffectLinks(container) {
+    for (const item of container.querySelectorAll(".rune-split .rune-option-button.is-selected")) item.tabIndex = 0;
+    if (container._runeEffectsBound) return;
+    container._runeEffectsBound = true;
+    const link = (event, active) => {
+      const target = event.target.closest?.(".eff[data-perk-id], .rune-option-button.is-selected[data-perk-id]");
+      const split = target?.closest(".rune-split");
+      if (!split || (event.relatedTarget && target.contains(event.relatedTarget))) return;
+      const fromEffect = target.classList.contains("eff");
+      for (const item of split.querySelectorAll(fromEffect ? ".rune-option-button.is-selected[data-perk-id]" : ".eff[data-perk-id]")) {
+        item.classList.toggle(fromEffect ? "is-linked" : "is-hover", active && item.dataset.perkId === target.dataset.perkId);
+      }
+    };
+    for (const name of ["pointerover", "focusin"]) container.addEventListener(name, event => link(event, true));
+    for (const name of ["pointerout", "focusout"]) container.addEventListener(name, event => link(event, false));
+
+  }
+
+  function renderBuildAugments(ids) {
+    return `<div class="aug-grid">${ids.map((id, index) => {
+      const augment = augmentMetadata(id) || { id, name: `海克斯 ${id}` };
+      const rarity = normalizeAugmentRarity(augment.rarity);
+      const entry = state.augmentDescriptions.get(Number(id));
+      const description = entry?.status === "ok" ? plainText(entry.description) : "";
+      const loading = !entry || entry.status === "loading";
+      const tooltip = [augment.name, description].filter(Boolean).join("\n");
+      return `<article class="aug is-${rarity.key}${!loading && !description ? " is-bare" : ""}" data-augment-id="${Number(id)}" data-tooltip="${escapeHTML(tooltip)}" tabindex="0"><div class="aug-icon">${augmentIconFigure(id, "large")}<span class="aug-order">${index + 1}</span></div><div class="aug-body"><div class="aug-title"><strong>${escapeHTML(augment.name)}</strong><span class="rar">${escapeHTML(rarity.label)}</span></div>${description ? `<p>${escapeHTML(description)}</p>` : loading ? '<div aria-hidden="true"><div class="skel" style="width:92%"></div><div class="skel" style="width:64%"></div></div>' : ""}</div></article>`;
+    }).join("")}</div>`;
+  }
+
+  async function ensureAugmentDescriptions(ids) {
+    const missing = [...new Set(ids.map(Number))].filter(id => id > 0 && !state.augmentDescriptions.has(id)).slice(0, 6);
+    if (!missing.length) return;
+    for (const id of missing) state.augmentDescriptions.set(id, { status: "loading" });
+    try {
+      const result = await api(`/api/gameplay/augment-descriptions?ids=${missing.join(",")}`, {}, `augment-descriptions:${missing.join(",")}`, 30000);
+      for (const id of missing) {
+        const item = result?.items?.find(item => Number(item.id) === id);
+        state.augmentDescriptions.set(id, item?.status === "ok" && item.description ? item : { status: "unavailable" });
+      }
+    } catch {
+      for (const id of missing) state.augmentDescriptions.set(id, { status: "unavailable" });
+    }
+    rerenderCatalogViews();
+  }
+
+  async function ensureBuildData(match, tab) {
+    const subject = matchSubject(match, tab.data?.player?.playerRef);
+    const ids = matchAugmentIDs(subject, 6);
+    if (ids.length) void ensureAugmentDescriptions(ids);
+    if (!match.perkStatsStale || !riotTab(tab)) return;
+    const key = `kr:${match.gameId}`;
+    if (!state.perkStatsRefreshes.has(key)) {
+      state.perkStatsRefreshes.set(key, (async () => {
+        try { return await api("/api/gameplay/match", { method: "POST", body: JSON.stringify({ gameId: Number(match.gameId), participantId: Number(subject.participantId), region: "kr", refresh: "perk-stats" }) }, `perk-stats:${key}`, 25000); }
+        catch { return null; }
+      })());
+    }
+    const fresh = await state.perkStatsRefreshes.get(key);
+    if (!fresh || !match.perkStatsStale) return;
+    for (const participant of match.participants || []) {
+      const replacement = fresh.participants?.find(item => Number(item.participantId) === Number(participant.participantId));
+      if (replacement?.perkStats) participant.perkStats = replacement.perkStats;
+    }
+    match.perkStatsStale = false;
+    rerenderMatch(tab, String(match.gameId));
+  }
+
   function renderBuild(match, subject, tab) {
     const augmentIDs = matchAugmentIDs(subject, 6);
     const hasAugments = augmentIDs.length > 0;
     const runeContent = hasAugments
-      ? `<div class="build-augment-grid">${augmentIDs.map((id) => augmentIconFigure(id, "large")).join("")}</div>`
+      ? renderBuildAugments(augmentIDs)
       : subject.perkIds?.length
-        ? renderUnifiedRuneBoard(subject)
+        ? `<div class="rune-split"><div class="rune-split-tree">${renderUnifiedRuneBoard(subject)}</div>${renderRuneEffects(subject)}</div>`
         : '<div class="detail-empty"><strong>这场对局没有符文或海克斯数据</strong><p>部分娱乐模式会关闭符文系统。</p></div>';
     const timeline = state.matchTimelines.get(matchTimelineKey(match, subject, tab));
     const timelineLoading = timeline === undefined && (riotTab(tab) || connected());
@@ -3909,7 +4057,7 @@
     return `<div class="build-detail">
       <section><header><h4>装备路线</h4>${timeline && !timeline.available ? `<button type="button" class="text-button" data-timeline-retry="${escapeHTML(String(match.gameId))}">重试加载</button>` : ""}</header>${routeContent}</section>
       <section><header><h4>技能加点</h4>${skillSummary || "<span>按对局中的真实加点顺序</span>"}</header>${skillContent}</section>
-      <section class="rune-detail"><header><h4>${hasAugments ? "海克斯" : "符文"}</h4></header>${runeContent}</section>
+      <section class="rune-detail"><header><h4>${hasAugments ? "海克斯" : "符文"}</h4>${hasAugments ? "" : renderRuneYield(subject)}</header>${runeContent}</section>
     </div>`;
   }
 
@@ -4292,6 +4440,7 @@
   }
 
 	function bindMatchDetailControls(container, tab) {
+    bindRuneEffectLinks(container);
     for (const button of container.querySelectorAll("[data-timeline-retry]")) button.addEventListener("click", () => {
       const match = (tab.data?.matches || []).find((item) => String(item.gameId) === button.dataset.timelineRetry);
       if (!match) return;
@@ -4306,7 +4455,7 @@
       if (button.dataset.matchDetail === "build") {
         ensurePerks(); ensureItems();
         const match = (tab.data?.matches || []).find((item) => String(item.gameId) === String(button.dataset.gameId));
-        if (match) ensureMatchTimeline(match, matchSubject(match, tab.data?.player?.playerRef), tab);
+        if (match) { ensureMatchTimeline(match, matchSubject(match, tab.data?.player?.playerRef), tab); ensureBuildData(match, tab); }
       }
       rerenderMatch(tab, String(button.dataset.gameId));
     });
@@ -4357,6 +4506,7 @@
       const match = (tab.data?.matches || []).find((item) => String(item.gameId) === String(gameId));
       if (!match) continue;
       const subject = matchSubject(match, tab.data?.player?.playerRef);
+      ensureBuildData(match, tab);
       // Rebinding a failed card is not a retry. Keep its retry button visible;
       // explicit retry/reopening still calls ensureMatchTimeline above.
       if (!state.matchTimelines.has(matchTimelineKey(match, subject, tab))) ensureMatchTimeline(match, subject, tab);
@@ -6600,7 +6750,7 @@
     const shardPath = dataDragonRuneShardPath(id);
     const icon = shardPath ? remoteStaticIcon("ddragon", shardPath, name, "rune", false) : perk?.iconPath ? assetIcon(perk.iconPath, name, "rune", false) : iconFigure("perk", id, name, "rune", false);
     const tooltip = explanation && explanation !== name ? `${name}\n${explanation}` : name;
-	    return `<span class="rune-option-button${selected ? " is-selected" : ""}" role="img" tabindex="-1" aria-label="${escapeHTML(`${name}：${explanation}`)}" data-tooltip="${escapeHTML(tooltip)}">${icon}</span>`;
+	    return `<span class="rune-option-button${selected ? " is-selected" : ""}" role="img" tabindex="-1" aria-label="${escapeHTML(`${name}：${explanation}`)}" data-perk-id="${id}" data-tooltip="${escapeHTML(tooltip)}">${icon}</span>`;
   }
 
   function renderRuneStyleIcon(style) {
@@ -7355,7 +7505,8 @@
   }
   function augmentIconFigure(id, size = "") {
     const augment = augmentMetadata(id);
-    const details = augment || { id, name: `海克斯 ${id}`, rarity: "unknown" };
+    const description = state.augmentDescriptions?.get(Number(id));
+    const details = { ...(augment || { id, name: `海克斯 ${id}`, rarity: "unknown" }), ...(description?.status === "ok" ? { description: description.description } : {}) };
     const icon = augment?.iconPath
       ? assetIcon(augment.iconPath, augment.name || `海克斯 ${id}`, size, false, augment.fallbackIconPath)
       : state.perks || state.augmentCatalog ? iconFigure("augment", id, details.name, size, false) : pendingCatalogIcon(details.name, size, false);

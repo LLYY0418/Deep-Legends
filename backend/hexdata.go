@@ -736,11 +736,13 @@ type hexdataRarityStage struct {
 }
 
 type championAugmentDetailResponse struct {
-	ID          int                     `json:"id"`
-	Slug        string                  `json:"slug"`
-	Source      string                  `json:"source"`
-	Description string                  `json:"description,omitempty"`
-	Citation    *championSourceCitation `json:"citation,omitempty"`
+	// Raw, checked guide text before metadata fallback; used by match build cards.
+	effectDescription string
+	ID                int                     `json:"id"`
+	Slug              string                  `json:"slug"`
+	Source            string                  `json:"source"`
+	Description       string                  `json:"description,omitempty"`
+	Citation          *championSourceCitation `json:"citation,omitempty"`
 	// R128 §2.3：前端不展示（海克斯图鉴详情不再渲染口径说明）；字段保留供诊断与既有后端测试使用。
 	MeasurementTechnique string                    `json:"measurementTechnique,omitempty"`
 	Champions            []championAugmentChampion `json:"champions"`
@@ -3434,6 +3436,25 @@ func (p *championProvider) loadHexdataAugmentDetail(ctx context.Context, id int,
 		return championAugmentDetailResponse{}, errors.New("invalid hexdata augment")
 	}
 	slug = sanitizeAugmentSlug(slug)
+	if slug == "" && id >= 1000 && p.hexdata != nil {
+		page, err := p.hexdata.load(ctx, "augments", "all", "/augments", "text/html,application/xhtml+xml", false)
+		if err != nil {
+			return championAugmentDetailResponse{}, err
+		}
+		rows, citation, err := parseHexdataAugments(page.Data)
+		if err != nil || !hexdataCitationComplete(citation) || page.Cache != championCacheStateStale && !p.hexdata.adoptCitation(citation) {
+			return championAugmentDetailResponse{}, errors.New("hexdata augment directory changed")
+		}
+		for _, row := range rows {
+			if row.ID == id {
+				slug = sanitizeAugmentSlug(row.Key)
+				break
+			}
+		}
+		if slug == "" {
+			return championAugmentDetailResponse{}, errors.New("hexdata augment not found")
+		}
+	}
 	if slug == "" {
 		catalog, catalogErr := p.loadCommunityDragonAugments(ctx)
 		if catalogErr != nil {
@@ -3477,7 +3498,7 @@ func (p *championProvider) loadHexdataAugmentDetail(ctx context.Context, id int,
 			}
 		}
 	}
-	return championAugmentDetailResponse{ID: id, Slug: slug, Source: "Hexdata", Description: description, Citation: &detail.Citation, MeasurementTechnique: p.loadHexdataMeasurementTechnique(ctx), Champions: detail.Rows}, nil
+	return championAugmentDetailResponse{ID: id, Slug: slug, Source: "Hexdata", Description: description, effectDescription: detail.Description, Citation: &detail.Citation, MeasurementTechnique: p.loadHexdataMeasurementTechnique(ctx), Champions: detail.Rows}, nil
 }
 
 func (p *championProvider) loadHexdataRarity(ctx context.Context) (championAugmentRarityResponse, error) {

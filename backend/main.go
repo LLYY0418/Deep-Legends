@@ -558,6 +558,8 @@ func main() {
 	mux.HandleFunc("POST /api/gameplay/current-game", a.authorized(a.handleOverviewCurrentGame))
 	mux.HandleFunc("POST /api/gameplay/season-summary", a.authorized(a.handleOPGGSeasonSummary))
 	mux.HandleFunc("POST /api/gameplay/match-timeline", a.authorized(a.handleGameplayMatchTimeline))
+	mux.HandleFunc("POST /api/gameplay/match", a.authorized(a.handleGameplayMatch))
+	mux.HandleFunc("GET /api/gameplay/augment-descriptions", a.authorized(a.handleGameplayAugmentDescriptions))
 	mux.HandleFunc("GET /api/gameplay/phase", a.authorized(a.handleGameplayPhase))
 	mux.HandleFunc("GET /api/gameplay/convenience", a.authorized(a.handleGameplayConvenience))
 	mux.HandleFunc("POST /api/gameplay/convenience", a.authorized(a.handleGameplayConvenience))

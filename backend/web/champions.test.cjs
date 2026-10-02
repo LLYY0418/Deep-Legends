@@ -6255,7 +6255,10 @@ test("live rune secondary style row stays aligned beneath the primary keystone r
 });
 
 test("R16 build, rune, skill, and Korean overview guards preserve the corrected contracts", () => {
-  assert.doesNotMatch(gameplayStyles, /--rune-icon-size:\s*(3[3-9]|[4-9]\d)px/);
+  // R190 design explicitly enlarges only the match-build split tree.
+  const splitTreeRule = /\.rune-split-tree \.unified-rune-board \{[^}]*\}/g;
+  assert.match(gameplayStyles, /\.rune-split-tree \.unified-rune-board \{[^}]*--rune-icon-size:\s*34px/);
+  assert.doesNotMatch(gameplayStyles.replace(splitTreeRule, ""), /--rune-icon-size:\s*(3[3-9]|[4-9]\d)px/);
   assert.match(gameplayStyles, /\.config-option\.is-route \.config-icons\s*\{[^}]*flex-wrap:\s*nowrap/s);
   assert.match(sharedBuildStyles, /--build-row-height:\s*64px/);
   assert.doesNotMatch(script, /class="route-row"/);
