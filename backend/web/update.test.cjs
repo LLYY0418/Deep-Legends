@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require(require.resolve("jsdom", { paths: [path.join(__dirname, "..", "..", "desktop")] }));
 const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
-const source = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
+const source = fs.readFileSync(process.env.R186_APP_SOURCE || path.join(__dirname, "app.js"), "utf8");
 const ids = ["update-button", "update-dialog", "update-dialog-title", "update-notes", "update-meta", "update-progress", "update-progress-fill", "update-progress-percent", "update-progress-hint", "update-alert", "update-start", "update-later", "update-cancel", "update-apply", "update-release-link", "update-dialog-close", "settings-update-check", "settings-update-feedback"];
 const available = { supported: true, current: "0.11.2", latest: "0.12.0", state: "available", portable: false, notes: "### 新增\n- **更新**和`代码`\n- [日志](https://example.com/log)", sizeBytes: 100 * 1024 * 1024, publishedAt: "2026-09-11T12:00:00Z", progress: {} };
 function harness(script = source, respond) {
@@ -72,8 +72,11 @@ test("portable, minimum supported, offline, game warning and no-update behavior"
  const h=harness();try {
   for(const extra of [{portable:true},{manualOnly:true}]){
    h.probe.renderUpdateStatus({...available,...extra});
-   assert.equal(h.get("update-start").hidden,true);assert.equal(h.get("update-apply").hidden,true);
-   assert.equal(h.get("update-release-link").hidden,false);assert.match(h.get("update-notes").textContent,/发布页/);
+   assert.equal(h.get("update-start").hidden,false);assert.equal(h.get("update-start").textContent,"立即升级");assert.equal(h.get("update-apply").hidden,true);
+   assert.equal(h.get("update-release-link").hidden,true);assert.doesNotMatch(h.get("update-notes").textContent,/便携版请|当前版本较旧/);
+   h.probe.renderUpdateStatus({...available,...extra,state:"downloading",progress:{receivedBytes:42,totalBytes:100}});assert.equal(h.get("update-progress").hidden,false);assert.equal(h.get("update-progress-percent").textContent,"42%");
+   h.probe.renderUpdateStatus({...available,...extra,state:"ready"});assert.equal(h.get("update-apply").hidden,false);assert.equal(h.get("update-apply").textContent,"立即重启升级");
+   h.probe.renderUpdateStatus({...available,...extra,state:"failed",error:"安装失败"});assert.equal(h.get("update-release-link").hidden,false);
   }
   h.probe.renderUpdateStatus({...available,state:"ready"});h.get("update-button").click();
   h.w.dispatchEvent(new h.w.CustomEvent("deep-legends:gameflow",{detail:{phase:"ChampSelect"}}));

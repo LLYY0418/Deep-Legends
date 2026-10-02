@@ -16,21 +16,22 @@ import (
 	"unicode/utf8"
 )
 
-// This watcher never writes game files or LCU settings. State and fingerprints
+// File snapshots are read-only. R186 separately syncs reviewed deltas to LCU. State and fingerprints
 // are connection-local; snapshots are serialized to preserve comparison order.
 type gameSettingsFileSnapshot struct {
-	PathKind string                       `json:"path_kind"`
-	Exists   bool                         `json:"exists"`
-	Located  bool                         `json:"is_located_target"`
-	ReadOnly bool                         `json:"read_only"`
-	Size     int64                        `json:"size"`
-	Mtime    string                       `json:"mtime_utc"`
-	Hash     string                       `json:"content_hash8"`
-	Values   map[string]string            `json:"camera_values"`
-	Changed  bool                         `json:"changed_since_prev"`
-	Changes  map[string]map[string]string `json:"camera_changed_keys"`
-	Result   string                       `json:"result"`
-	stage    string
+	PathKind  string                       `json:"path_kind"`
+	Exists    bool                         `json:"exists"`
+	Located   bool                         `json:"is_located_target"`
+	ReadOnly  bool                         `json:"read_only"`
+	Size      int64                        `json:"size"`
+	Mtime     string                       `json:"mtime_utc"`
+	Hash      string                       `json:"content_hash8"`
+	Values    map[string]string            `json:"camera_values"`
+	Changed   bool                         `json:"changed_since_prev"`
+	Changes   map[string]map[string]string `json:"camera_changed_keys"`
+	Result    string                       `json:"result"`
+	AllValues map[string]string            `json:"-"`
+	stage     string
 }
 type gameSettingsWatchJob struct {
 	stage              string
@@ -50,6 +51,8 @@ type gameSettingsWatchState struct {
 	generation      uint64
 	seen            map[string]bool
 	prev            map[string]gameSettingsFileSnapshot
+	start           map[string]gameSettingsFileSnapshot
+	location        settingsLocation
 	end             map[string]gameSettingsFileSnapshot
 	endChanged      map[string]bool
 	phase           string
@@ -101,6 +104,7 @@ func (a *app) startGameSettingsWatch(parent context.Context, client *LCUClient, 
 	s.jobs = nil
 	s.seen = map[string]bool{"app_start": true}
 	s.prev = make(map[string]gameSettingsFileSnapshot)
+	s.start = nil
 	s.end = nil
 	s.endChanged = nil
 	s.phase = ""
@@ -142,6 +146,7 @@ func (a *app) observeGameSettingsPhase(client *LCUClient, phase string) {
 	if phase == "ChampSelect" && s.phase != "ChampSelect" && (s.started || s.ended) || (phase == "GameStart" || phase == "InProgress") && s.ended {
 		s.generation++
 		s.seen = make(map[string]bool)
+		s.start = nil
 		s.end = nil
 		s.endChanged = nil
 		s.started = false
@@ -455,8 +460,10 @@ func readGameSettingsWatchFiles(location settingsLocation, stage string) []gameS
 			snapshot.Hash = itemSetDigest(data)[:8]
 			if strings.EqualFold(filepath.Base(file), "PersistedSettings.json") {
 				snapshot.Values = cameraSettingsFromJSON(data)
+				snapshot.AllValues = allSettingsFromJSON(data)
 			} else {
 				snapshot.Values = cameraSettingsFromINI(data, strings.EqualFold(filepath.Base(file), "input.ini"))
+				snapshot.AllValues = allSettingsFromINI(data, strings.EqualFold(filepath.Base(file), "input.ini"))
 			}
 		}
 		snapshots = append(snapshots, snapshot)
@@ -542,6 +549,10 @@ func gameSettingsWriterGuess(stage, previous string, hashChanged bool) string {
 	return "game"
 }
 func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient, job gameSettingsWatchJob) {
+	if job.stage == "sync_after_5s" {
+		a.runGameSettingsSyncJob(parent, client, job)
+		return
+	}
 	s := &a.gameSettingsWatch
 	s.mu.Lock()
 	valid := s.client == client && (!job.delayed || s.generation == job.generation)
@@ -577,6 +588,11 @@ func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient,
 		event["lcu_http_status"] = status
 	} else {
 		event["lcu_settings"] = cameraSettingsFromJSON(payload)
+		event["lcu_settings_hash8"] = itemSetDigest(payload)[:8]
+	}
+	var inputPayload json.RawMessage
+	if client.RequestJSON(ctx, http.MethodGet, "/lol-game-settings/v1/input-settings", nil, &inputPayload) == nil {
+		event["lcu_input_hash8"] = itemSetDigest(inputPayload)[:8]
 	}
 	a.mu.RLock()
 	current := a.summoner
@@ -611,7 +627,8 @@ func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient,
 		}
 		next.Changed = hashChanged
 		if hashChanged || job.stage == "lock_action" && permissionChanged {
-			a.recordDiagnostic(map[string]any{"event": "game_settings_changed", "path_kind": next.PathKind, "between": previous.stage + " → " + job.stage, "camera_changed_keys": next.Changes, "read_only_before": readOnlyBefore, "read_only_after": next.ReadOnly, "writer_guess": gameSettingsWriterGuess(job.stage, previous.stage, hashChanged)})
+			keys, truncated := gameSettingsChangedKeys(previous.AllValues, next.AllValues, location, current)
+			a.recordDiagnostic(map[string]any{"changed_keys": keys, "changed_keys_truncated": truncated, "event": "game_settings_changed", "path_kind": next.PathKind, "between": previous.stage + " → " + job.stage, "camera_changed_keys": next.Changes, "read_only_before": readOnlyBefore, "read_only_after": next.ReadOnly, "writer_guess": gameSettingsWriterGuess(job.stage, previous.stage, hashChanged)})
 		}
 		if hashChanged && s.end != nil && s.generation == job.generation {
 			s.endChanged[next.PathKind] = true
@@ -630,6 +647,19 @@ func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient,
 			s.end[file.PathKind] = file
 		}
 	}
+	if err == nil {
+		s.location = location
+	}
+	if (job.stage == "game_start" || job.stage == "in_game_60s") && s.generation == job.generation {
+		s.start = make(map[string]gameSettingsFileSnapshot)
+		for _, file := range snapshots {
+			s.start[file.PathKind] = file
+		}
+	}
+	event["lcu_matches_file"] = matchLCUSettingsFile(payload, s.start, s.end, snapshots)
 	event["files"] = snapshots
 	a.recordDiagnostic(event)
+	if job.stage == "game_end" {
+		a.scheduleGameSettingsSyncLocked(parent, client, job.generation)
+	}
 }

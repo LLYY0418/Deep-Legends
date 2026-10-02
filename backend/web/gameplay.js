@@ -5599,7 +5599,7 @@
 
   function renderLivePlayer(player, index, arenaMode = false, currentChampionId = 0, premadePlayers = [], recentPositions = "", aramMode = false, hextechMode = false, phase = "") {
     if (champSelectEnemyPlaceholder(player, phase, premadePlayers)) {
-      return `<article class="live-player">${iconFigure("champion", liveDisplayedChampionId(player, currentChampionId), player.championName, "live")}<div class="live-player-copy">暂无玩家信息</div></article>`;
+      return `<article class="live-player">${iconFigure("champion", liveDisplayedChampionId(player, currentChampionId), player.championName, "live")}<div class="live-player-copy live-player-placeholder">暂无玩家信息，进入游戏后显示</div></article>`;
     }
     const rank = player.rank;
     const stats = player.modeStats || {};

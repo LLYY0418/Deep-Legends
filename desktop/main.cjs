@@ -315,7 +315,7 @@ function startBackend() {
     cwd: spec.cwd,
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
-    env: childEnvironment,
+    env: { ...childEnvironment, LOOT_DESKTOP_PID: String(process.pid) },
   });
   readyTimer = setTimeout(() => failStartup("本地数据服务启动超时，请重新打开客户端。"), READY_TIMEOUT_MS);
   backend.stdout.setEncoding("utf8");

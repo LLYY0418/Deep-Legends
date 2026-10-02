@@ -3,15 +3,18 @@ package main
 import (
 	"errors"
 	"os"
+	"strconv"
 	"strings"
 )
 
 const upgradeFailureMessage = "升级失败，请从发布页下载完整安装包重新安装"
 
 type installerOptions struct {
-	Update      bool
-	Destination string
-	Error       error
+	Update       bool
+	FreshInstall bool
+	ParentPID    uint32
+	Destination  string
+	Error        error
 }
 
 func parseInstallerOptions(args []string) installerOptions {
@@ -20,6 +23,20 @@ func parseInstallerOptions(args []string) installerOptions {
 		switch args[i] {
 		case "--update":
 			options.Update = true
+		case "--fresh-install":
+			options.FreshInstall = true
+		case "--parent-pid":
+			if i+1 >= len(args) {
+				options.Error = errors.New(upgradeFailureMessage)
+				continue
+			}
+			i++
+			value, err := strconv.ParseUint(args[i], 10, 32)
+			if err != nil || value == 0 {
+				options.Error = errors.New(upgradeFailureMessage)
+			} else {
+				options.ParentPID = uint32(value)
+			}
 		case "--dest":
 			if i+1 >= len(args) || strings.HasPrefix(args[i+1], "--") {
 				options.Error = errors.New(upgradeFailureMessage)
@@ -30,6 +47,9 @@ func parseInstallerOptions(args []string) installerOptions {
 		}
 	}
 	if options.Update && options.Destination == "" {
+		options.Error = errors.New(upgradeFailureMessage)
+	}
+	if options.FreshInstall && (!options.Update || options.ParentPID == 0) {
 		options.Error = errors.New(upgradeFailureMessage)
 	}
 	return options
@@ -77,4 +97,17 @@ func renderInstallerUI(version string, options installerOptions) (string, error)
 		`$("btn-retry").addEventListener("click", () => { setPage("setup"); refresh(); });`, `$("btn-retry").addEventListener("click", () => send("install", { path: pathInput.value }));`,
 		`    refresh();`+"\n  },\n  path(s)", `    refresh();`+"\n    window.host.installing({ path: s.path });\n  },\n  path(s)",
 	).Replace(rendered), nil
+}
+
+// The parent stays alive until the NSIS child has exited successfully. Report
+// installation success before waiting for its normal quit, then reuse handoff.
+func portableUpdateHandoff(report func(string) error, waitParent func() bool, start func()) bool {
+	if report("DEEP_LEGENDS_UPDATE_INSTALLED") != nil || waitParent == nil || !waitParent() {
+		return false
+	}
+	start()
+	return true
+}
+func portableSetupCommandLine(setup, dest string) string {
+	return `"` + setup + `" /S /currentuser --portable-upgrade --updated /D=` + strings.TrimRight(dest, `\`)
 }

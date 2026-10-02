@@ -10,16 +10,17 @@ import (
 )
 
 type rigStatus struct {
-	Connected      bool   `json:"connected"`
-	Region         string `json:"region,omitempty"`
-	Platform       string `json:"platform,omitempty"`
-	InstallRoot    string `json:"installRoot,omitempty"`
-	ConfigRoot     string `json:"configRoot,omitempty"`
-	SettingsFile   string `json:"settingsFile,omitempty"`
-	SettingsKnown  bool   `json:"settingsKnown"`
-	SettingsLocked bool   `json:"settingsLocked"`
-	UXState        string `json:"uxState,omitempty"`
-	Reason         string `json:"reason,omitempty"`
+	KeepGameSettings bool   `json:"keepGameSettings"`
+	Connected        bool   `json:"connected"`
+	Region           string `json:"region,omitempty"`
+	Platform         string `json:"platform,omitempty"`
+	InstallRoot      string `json:"installRoot,omitempty"`
+	ConfigRoot       string `json:"configRoot,omitempty"`
+	SettingsFile     string `json:"settingsFile,omitempty"`
+	SettingsKnown    bool   `json:"settingsKnown"`
+	SettingsLocked   bool   `json:"settingsLocked"`
+	UXState          string `json:"uxState,omitempty"`
+	Reason           string `json:"reason,omitempty"`
 }
 
 type settingsLocation struct {
@@ -150,10 +151,11 @@ func (a *app) handleRigStatus(w http.ResponseWriter, r *http.Request) {
 	client, _, err := a.gameplayClient()
 	if err != nil {
 		a.recordDiagnostic(map[string]any{"event": "rig_status_read", "result": "not-connected", "settings_locked": false, "path_kind": ""})
-		respondJSON(w, rigStatus{Reason: "未连接英雄联盟客户端"})
+		respondJSON(w, rigStatus{Reason: "未连接英雄联盟客户端", KeepGameSettings: a.keepGameSettingsEnabled()})
 		return
 	}
 	status := readRigStatus(r.Context(), client)
+	status.KeepGameSettings = a.keepGameSettingsEnabled()
 	result := "ok"
 	if status.InstallRoot == "" {
 		result = "locate-failed"
@@ -199,6 +201,7 @@ func (a *app) handleSettingsLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status := readRigStatus(r.Context(), client)
+	status.KeepGameSettings = a.keepGameSettingsEnabled()
 	// Do not report success if the filesystem did not retain the requested state.
 	if !status.SettingsKnown || status.SettingsLocked != request.Locked {
 		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "verify-failed", "settings_locked": status.SettingsLocked, "path_kind": settingsWatchPathKind(location, location.file)})

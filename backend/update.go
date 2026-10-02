@@ -149,28 +149,32 @@ type updateSettings struct {
 }
 
 type updateManager struct {
-	startSourceTimer func(time.Duration, func()) func()
-	progressTicks    func() (<-chan time.Time, func())
-	mu               sync.Mutex
-	status           updateStatus
-	manifest         *updateManifest
-	cache            updateCache
-	lastManual       time.Time
-	store            *localStore
-	directory        string
-	installDir       string
-	mirrors          []string
-	client           *http.Client
-	now              func() time.Time
-	freeBytes        func(string) (int64, error)
-	launch           func(string, string) error
-	notify           func(string, any)
-	diagnostic       func(map[string]any)
-	ctx              context.Context
-	stop             context.CancelFunc
-	downloadCancel   context.CancelFunc
-	downloadDone     chan struct{}
-	checkDone        chan struct{}
+	migrationDirectory func() (string, error)
+	startSourceTimer   func(time.Duration, func()) func()
+	progressTicks      func() (<-chan time.Time, func())
+	mu                 sync.Mutex
+	status             updateStatus
+	manifest           *updateManifest
+	cache              updateCache
+	lastManual         time.Time
+	store              *localStore
+	directory          string
+	installDir         string
+	installDetection   updateInstallDetection
+	migrate            func() error
+	portableDirectory  func() (string, error)
+	mirrors            []string
+	client             *http.Client
+	now                func() time.Time
+	freeBytes          func(string) (int64, error)
+	launch             func(string, string) error
+	notify             func(string, any)
+	diagnostic         func(map[string]any)
+	ctx                context.Context
+	stop               context.CancelFunc
+	downloadCancel     context.CancelFunc
+	downloadDone       chan struct{}
+	checkDone          chan struct{}
 }
 
 type updateCheckFailure struct {
@@ -223,8 +227,11 @@ func newUpdateManager(current string, store *localStore, notify func(string, any
 	}
 	u.status.Supported = true
 	u.directory = filepath.Join(store.root, "updates")
-	u.installDir, _ = installedUpdateDirectory()
+	u.installDetection, _ = detectUpdateInstallation()
+	u.installDir = u.installDetection.directory
 	u.status.Portable = u.installDir == ""
+	u.migrate = u.preparePortableData
+	u.portableDirectory = defaultPortableInstallDirectory
 	if data, err := readLocalStoreFile(store, "update-settings.json"); err == nil && len(data) < 16384 {
 		var settings updateSettings
 		if json.Unmarshal(data, &settings) == nil && validUpdateMirrors(settings.Mirrors) == nil {
@@ -258,6 +265,10 @@ func (u *updateManager) publish() {
 func (u *updateManager) Start() {
 	if !u.Status().Supported {
 		return
+	}
+	if u.diagnostic != nil {
+		d := u.installDetection
+		u.diagnostic(map[string]any{"event": "update_install_detection", "result": d.Result, "registry_display_found": d.RegistryDisplayFound, "location_matches": d.LocationMatches})
 	}
 	goSafe("update.Start.1", func() {
 		u.Check(false)

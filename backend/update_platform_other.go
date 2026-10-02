@@ -7,9 +7,12 @@ import (
 	"syscall"
 )
 
+func detectUpdateInstallation() (updateInstallDetection, error) {
+	return classifyUpdateInstallation("", false, false, nil), nil
+}
 func installedUpdateDirectory() (string, error) { return "", nil }
 func launchUpdateInstaller(string, string) error {
-	return errors.New("应用内升级仅支持 Windows 安装版")
+	return errors.New("应用内升级仅支持 Windows")
 }
 func updateDiskFreeBytes(directory string) (int64, error) {
 	var stat syscall.Statfs_t

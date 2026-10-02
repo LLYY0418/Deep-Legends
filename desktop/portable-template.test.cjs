@@ -231,7 +231,12 @@ test("R71 executable resource editing stays enabled and branded setup has exactl
 
 test("NSIS page functions wait until standard builder plugins are available", () => {
   const script = fs.readFileSync(path.join(__dirname, "nsis", "installer.nsh"), "utf8");
-  const start = script.indexOf("!macro customHeader");
+  const headerStart = script.indexOf("!macro customHeader");
+  const headerEnd = script.indexOf("!macroend", headerStart);
+  const header = script.slice(headerStart, headerEnd);
+  assert.ok(headerStart >= 0 && headerEnd > headerStart);
+  assert.match(header, /!include getProcessInfo\.nsh[\s\S]*!ifndef BUILD_UNINSTALLER\s*!insertmacro DLcustomHeader/);
+  const start = script.indexOf("!macro DLcustomHeader");
   const end = script.indexOf("!macroend", start);
   assert.ok(start >= 0 && end > start);
   for (const match of script.matchAll(/^Function /gm)) {

@@ -55,6 +55,9 @@ func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase
 		f.ended = true
 	}
 	f.mu.Unlock()
+	if ended || changed && phase == "EndOfGame" {
+		a.invalidateRankPlayer(a.currentPlayerRef())
+	}
 	if ended {
 		a.invalidateOverviewPlayer(a.currentPlayerRef())
 	}

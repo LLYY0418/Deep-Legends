@@ -33,7 +33,11 @@ func (a *app) handleUpdateAction(w http.ResponseWriter, r *http.Request) {
 	case "cancel":
 		err = a.updates.Cancel()
 	case "apply":
-		err = a.updates.Apply()
+		if a.updates.Status().Portable {
+			err = a.updates.ApplyAsync(func() { a.scheduleQuit(300*time.Millisecond, "update") })
+		} else {
+			err = a.updates.Apply()
+		}
 	default:
 		http.NotFound(w, r)
 		return
@@ -43,7 +47,7 @@ func (a *app) handleUpdateAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, a.updates.Status())
-	if action == "apply" {
+	if action == "apply" && !a.updates.Status().Portable {
 		a.scheduleQuit(300*time.Millisecond, "update")
 	}
 }

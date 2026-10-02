@@ -412,7 +412,7 @@ function assertR15PerformanceAndBuildContracts() {
   assert.match(gameplayBackend, /func capGameplayCoreOptions[\s\S]*?if len\(options\) > championCoreRecommendationLimit \{[\s\S]*?return options\[:championCoreRecommendationLimit\]/);
   assert.match(gameplayBackend, /"event": "overview_load_cost"/);
   assert.match(gameplayBackend, /if shouldLoadOverviewHistory\(reference, playerRef, matches\)/);
-  assert.match(rankInsightsBackend, /case <-flight\.done:\s*return flight\.entry/);
+  assert.match(rankInsightsBackend, /case <-flight\.done:\s*if flight\.invalidated \{\s*continue\s*\}\s*return flight\.entry/);
   assert.match(gameplayScript, /const MATCH_TIERS_MAX_REFS = 24/);
   assert.match(rankInsightsBackend, /matchTiersMaxRefs\s*=\s*24/);
   assert.match(gameplayScript, /shouldHydrateMatchTiers\(tab, activeKey\)/);
@@ -6164,7 +6164,7 @@ test("R63 mandatory contracts reject every documented production regression", ()
 
 		assert.match(goFunctionSource(sources.lcuGo, "RequestJSON"), /httptrace\.WithClientTrace\(ctx, requestTrace\.clientTrace\(\)\)/); // B-1
 		assert.match(goFunctionSource(sources.lcuGo, "getBytes"), /httptrace\.WithClientTrace\(ctx, requestTrace\.clientTrace\(\)\)/);
-		assert.match(sources.gameplayGo, /value := a\.playerRankScore\(ctx,/); // B-2a overview
+		assert.match(sources.gameplayGo, /value, _ := a\.playerRankScoreWithCacheStatus\(ctx, client, playerRef, isCurrent, reference\.ServerID, reference\.Privacy, false, force\)/); // B-2a overview
 		assert.match(sources.gameplayGo, /a\.playerRankScore\(ctx, client, playerRef/); // B-2a live
 		assert.match(goFunctionSource(sources.gameplayGo, "loadQueueLabelsContext"), /if client\.queueLabelsLoaded \{\s*result := cloneQueueLabels\(client\.queueLabels\)\s*client\.queueLabelsMu\.Unlock\(\)\s*return result/); // B-2b
 		assert.doesNotMatch(functionSource(sources.gameplayJS, "updateFriendPresenceChips"), /loadOverview|renderOverview|\bapi\(/); // presence updates only its own fragment
@@ -6172,7 +6172,12 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		assert.match(tierScope, /return `\$\{region\}:\$\{serverID\}:\$\{playerRef\}`/); // B-3
 		assert.doesNotMatch(tierScope, /tab\?\.key|tab\.key/);
 		assert.match(sources.rankGo, /rankScoreNegativeCacheTTL = 60 \* time\.Second/); // B-4
-		assert.match(goFunctionSource(sources.rankGo, "playerRankScoreWithCacheStatus"), /entry\.negative = true[\s\S]*cache\.put\(cacheKey, entry\)/);
+		assert.match(goFunctionSource(sources.rankGo, "loadPlayerRankScoreEntry"), /entry\.negative = true/);
+		// Negative results still publish under the preferred key. R187 moved
+		// publication into finishFlight so invalidated reads cannot refill it.
+		assert.match(goFunctionSource(sources.rankGo, "playerRankScoreWithCacheStatus"), /if flight\.ctx\.Err\(\) == nil \{\s*keys = append\(keys, cacheKey\)\s*if !entry\.negative/);
+		assert.match(goFunctionSource(sources.rankGo, "playerRankScoreWithCacheStatus"), /cache\.finishFlight\(cacheKey, flight, entry, keys\.\.\.\)/);
+		assert.match(goFunctionSource(sources.rankGo, "finishFlight"), /for _, cacheKey := range cacheKeys \{\s*c\.putLocked\(cacheKey, entry\)/);
 		assert.match(sources.rankGo, /var globalMatchTiersRankSemaphore = make\(chan struct\{\}, matchTiersRankConcurrency\)/);
 		assert.match(functionSource(sources.gameplayJS, "hydrateMatchTiers"), /if \(failure && Number\(failure\.nextRetryAt \|\| 0\) > Date\.now\(\)\)/);
 		assert.match(functionSource(sources.gameplayJS, "shouldReloadOverview"), />= 120_000/); // B-5
@@ -6205,11 +6210,12 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		["A-3 honest oldest timestamp", "structured", "depthFetchedAt.Before(response.FetchedAt)", "depthFetchedAt.After(response.FetchedAt)"],
 		["A-4 one source label", "championsJS", '<section class="build-depth-column"><h4><span>${label}</span></h4>', '<section class="build-depth-column"><span class="item-chain-source">${sourceNote}</span><h4><span>${label}</span></h4>'],
 		["B-1 request trace", "lcuGo", "ctx = httptrace.WithClientTrace(ctx, requestTrace.clientTrace())", "// trace attachment removed"],
-		["B-2a overview rank cache", "gameplayGo", "value := a.playerRankScore(ctx,", "value := directRankLookup(ctx,"],
+		["B-2a overview rank cache", "gameplayGo", "value, _ := a.playerRankScoreWithCacheStatus(ctx,", "value, _ := directRankLookup(ctx,"],
 		["B-2a live rank cache", "gameplayGo", "a.playerRankScore(ctx, client, playerRef", "a.directRankLookup(ctx, client, playerRef"],
 		["B-2b queue cache", "gameplayGo", "if client.queueLabelsLoaded {", "if false {"],
 		["B-3 stable tier scope", "gameplayJS", "return `${region}:${serverID}:${playerRef}`;", "return `${region}:${tab.key}:${serverID}:${playerRef}`;"],
-		["B-4 negative cache", "rankGo", "entry.negative = true\n\t\tcache.put(cacheKey, entry)", "entry.negative = true"],
+		["B-4 negative result", "rankGo", "entry.negative = true", "entry.negative = false"],
+		["B-4 negative cache", "rankGo", "if flight.ctx.Err() == nil {", "if flight.ctx.Err() == nil && !entry.negative {"],
 		["B-4 global concurrency gate", "rankGo", "var globalMatchTiersRankSemaphore = make(chan struct{}, matchTiersRankConcurrency)", "// per-handler gate restored"],
 		["B-4 frontend backoff", "gameplayJS", "if (failure && Number(failure.nextRetryAt || 0) > Date.now())", "if (false)"],
 		["B-5 two-minute freshness", "gameplayJS", ">= 120_000", ">= 20_000"],

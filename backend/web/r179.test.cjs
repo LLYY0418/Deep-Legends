@@ -10,10 +10,12 @@ function cardRenderer(source=src){const state={live:{phase:'ChampSelect'}};const
 test('R179 enemy placeholder is champ-select only and leaves allies/live hidden text unchanged',()=>{
  const h=cardRenderer(),players=[{teamId:100,isCurrent:true},{teamId:200,hidden:true,historyState:'unavailable',championId:61}];
  const html=h.renderLivePlayer(players[1],1,false,0,players);const dom=new JSDOM(html);
- assert.equal(dom.window.document.body.textContent,'暂无玩家信息');assert.equal(dom.window.document.querySelector('img').getAttribute('src'),'champion-61');assert.doesNotMatch(html,/player-tab-hidden|客户端未公开该玩家|位置未知/);dom.window.close();
+ const style=dom.window.document.createElement('style');style.textContent=fs.readFileSync(path.join(__dirname,'gameplay.css'),'utf8');dom.window.document.head.appendChild(style);
+ const hint=dom.window.document.querySelector('.live-player-placeholder');assert.equal(hint.textContent,'暂无玩家信息，进入游戏后显示');
+ const computed=dom.window.getComputedStyle(hint);assert.equal(computed.whiteSpace,'normal');assert.equal(computed.gridColumn,'2 / -1');assert.notEqual(computed.textOverflow,'ellipsis');assert.equal(dom.window.document.querySelector('img').getAttribute('src'),'champion-61');assert.doesNotMatch(html,/player-tab-hidden|客户端未公开该玩家|位置未知/);dom.window.close();
  h.state.live.phase='InProgress';const live=h.renderLivePlayer(players[1],1,false,0,players);
  const baseline=fs.readFileSync(path.join(__dirname,'../testdata/r179-live-hidden.html'),'utf8');
- assert.equal(live,baseline);assert.match(live,/隐藏玩家/);assert.match(live,/隐藏身份/);
+ assert.equal(live,baseline);assert.match(live,/隐藏玩家/);assert.match(live,/隐藏身份/);assert.doesNotMatch(live,/暂无玩家信息，进入游戏后显示/);
  h.state.live.phase='ChampSelect';assert.match(h.renderLivePlayer({...players[1],teamId:100},1,false,0,players),/隐藏身份/);
 });
 function runeHarness(){

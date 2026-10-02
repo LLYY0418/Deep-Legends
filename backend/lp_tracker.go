@@ -80,6 +80,8 @@ type lpTracker struct {
 	startSeen           map[string]bool
 	startFlights        map[string]chan struct{}
 	baselineDiagnostics map[string]lpBaselineDiagnostic
+	staleRejections     map[string]time.Time
+	invalidateRanks     func(string)
 }
 
 func newLPTracker(store *localStore) *lpTracker {
@@ -254,6 +256,18 @@ func (t *lpTracker) observe(playerRef string, ranks []gameplayRank, capabilities
 			continue
 		}
 		if t.pending[accountHash+"|"+rank.QueueType] {
+			continue
+		}
+		if baseline, ok := t.history.Baselines[accountHash][rank.QueueType]; ok && snapshot.games() < baseline.games() {
+			key := accountHash + "|" + rank.QueueType
+			now := t.now()
+			if t.staleRejections == nil {
+				t.staleRejections = make(map[string]time.Time)
+			}
+			if last, seen := t.staleRejections[key]; !seen || now.Sub(last) >= time.Minute {
+				t.staleRejections[key] = now
+				t.recordObservation(map[string]any{"event": "lp_snapshot_rejected", "stage": "observe", "reason": "stale_regression"})
+			}
 			continue
 		}
 		// Queue observations may advance; the independent game-start snapshot is immutable.
@@ -461,6 +475,9 @@ func (t *lpTracker) takeGameStart(client *LCUClient, playerRef string, loadRanks
 }
 
 func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func() ([]gameplayRank, EndpointCapability)) {
+	if t != nil && t.invalidateRanks != nil {
+		defer t.invalidateRanks(playerRef)
+	}
 	hash := t.accountHash(playerRef)
 	if hash == "" {
 		t.recordObservation(map[string]any{"event": "lp_capture_ignored", "reason": "invalid_player_reference"})

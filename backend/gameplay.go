@@ -1313,7 +1313,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 			defer close(rankCh)
 
 			started := time.Now()
-			value := a.playerRankScore(ctx, client, playerRef, isCurrent, reference.ServerID, reference.Privacy)
+			value, _ := a.playerRankScoreWithCacheStatus(ctx, client, playerRef, isCurrent, reference.ServerID, reference.Privacy, false, force)
 			rankCh <- rankResult{value: value, started: started, ended: time.Now()}
 		}()
 		masteryCh = make(chan masteryResult, 1)

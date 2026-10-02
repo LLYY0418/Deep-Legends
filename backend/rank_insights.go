@@ -102,8 +102,11 @@ type rankScoreCacheItem struct {
 }
 
 type rankScoreFlight struct {
-	done  chan struct{}
-	entry rankScoreEntry
+	done        chan struct{}
+	entry       rankScoreEntry
+	invalidated bool
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 func newRankScoreCache() *rankScoreCache {
@@ -137,6 +140,9 @@ func (c *rankScoreCache) get(playerRef string) (rankScoreEntry, bool) {
 func (c *rankScoreCache) put(playerRef string, entry rankScoreEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.putLocked(playerRef, entry)
+}
+func (c *rankScoreCache) putLocked(playerRef string, entry rankScoreEntry) {
 	if element, ok := c.entries[playerRef]; ok {
 		element.Value = rankScoreCacheItem{key: playerRef, entry: entry}
 		c.recent.MoveToFront(element)
@@ -158,23 +164,69 @@ func (c *rankScoreCache) removeElement(element *list.Element) {
 	c.evictionSteps++
 }
 
-func (c *rankScoreCache) beginFlight(key string) (*rankScoreFlight, bool) {
+// Invalidation closes waiters immediately and cancels the old upstream read.
+// Completion and cache publication share this lock, so an old flight cannot
+// repopulate an invalidated player or remove a replacement flight.
+func (c *rankScoreCache) invalidatePlayer(playerRef string) {
+	playerRef = strings.TrimSpace(playerRef)
+	if c == nil || playerRef == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	matches := func(key string) bool { return strings.HasSuffix(key, "|"+playerRef) }
+	for key, element := range c.entries {
+		if matches(key) {
+			c.removeElement(element)
+		}
+	}
+	for key, flight := range c.flights {
+		if matches(key) {
+			delete(c.flights, key)
+			flight.invalidated = true
+			flight.cancel()
+			close(flight.done)
+		}
+	}
+}
+func (c *rankScoreCache) beginFlight(key string, parent context.Context) (*rankScoreFlight, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if flight, ok := c.flights[key]; ok {
 		return flight, false
 	}
-	flight := &rankScoreFlight{done: make(chan struct{})}
+	ctx, cancel := context.WithCancel(parent)
+	flight := &rankScoreFlight{done: make(chan struct{}), ctx: ctx, cancel: cancel}
 	c.flights[key] = flight
 	return flight, true
 }
-
-func (c *rankScoreCache) finishFlight(key string, flight *rankScoreFlight, entry rankScoreEntry) {
+func (c *rankScoreCache) finishFlight(key string, flight *rankScoreFlight, entry rankScoreEntry, cacheKeys ...string) bool {
 	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.flights[key] != flight {
+		return false
+	}
+	for _, cacheKey := range cacheKeys {
+		c.putLocked(cacheKey, entry)
+	}
 	flight.entry = entry
 	delete(c.flights, key)
+	flight.cancel()
 	close(flight.done)
-	c.mu.Unlock()
+	return true
+}
+func (a *app) ensureRankScores() *rankScoreCache {
+	a.rankScoresOnce.Do(func() {
+		if a.rankScores == nil {
+			a.rankScores = newRankScoreCache()
+		}
+	})
+	return a.rankScores
+}
+func (a *app) invalidateRankPlayer(playerRef string) {
+	if strings.TrimSpace(playerRef) != "" {
+		a.ensureRankScores().invalidatePlayer(playerRef)
+	}
 }
 
 // playerRankScore 读取单名玩家当前的排位绝对分数（单双排优先，其次灵活组排）。
@@ -190,15 +242,15 @@ func (a *app) playerRankScore(ctx context.Context, client *LCUClient, playerRef 
 // R127 P1-b.1：可选的 tierOnly 表示「只要段位 + 小段 + 胜点，不需要胜负场」。
 // 平均段位走这个模式：有 SGP 时直接 SGP 优先，也不再因为「胜负场未完整验证」
 // 多补一次查询。它的缓存键带独立作用域，不会把没有胜负场的结果喂给个人资料页
-// 等需要胜负场的调用方。用变参是为了保持既有调用点与护栏测试不变。
-func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID, privacy string, tierOnly ...bool) (rankScoreEntry, bool) {
-	tierScope := len(tierOnly) > 0 && tierOnly[0]
-	a.rankScoresOnce.Do(func() {
-		if a.rankScores == nil {
-			a.rankScores = newRankScoreCache()
-		}
-	})
-	cache := a.rankScores
+// 等需要胜负场的调用方。第二个可选 bool 为总览手动刷新 force：
+// 跳过缓存读取，仍共享失效后新建的 flight，并将新结果写回缓存。
+func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID, privacy string, options ...bool) (rankScoreEntry, bool) {
+	tierScope := len(options) > 0 && options[0]
+	force := len(options) > 1 && options[1]
+	cache := a.ensureRankScores()
+	if force {
+		cache.invalidatePlayer(playerRef)
+	}
 	serverID = strings.ToUpper(strings.TrimSpace(serverID))
 	useRiot := serverID == "KR" && a.riot != nil && validPlayerReference(playerRef)
 	preferredSource := dataSourceRiot
@@ -221,26 +273,54 @@ func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUCli
 		}
 	}
 	cacheKey := rankScoreCacheKeyScoped(preferredSource, serverID, playerRef, cacheScope)
-	if entry, ok := cache.get(cacheKey); ok {
-		return entry, true
-	}
-	flight, leader := cache.beginFlight(cacheKey)
-	if !leader {
-		select {
-		case <-flight.done:
-			return flight.entry, true
-		case <-ctx.Done():
-			return rankScoreEntry{}, false
+	for ctx.Err() == nil {
+		if !force {
+			if entry, ok := cache.get(cacheKey); ok {
+				return entry, true
+			}
+		}
+		flight, leader := cache.beginFlight(cacheKey, ctx)
+		if !leader {
+			select {
+			case <-flight.done:
+				if flight.invalidated {
+					continue
+				}
+				return flight.entry, true
+			case <-ctx.Done():
+				return rankScoreEntry{}, false
+			}
+		}
+		entry, accepted := func() (rankScoreEntry, bool) {
+			// Always release waiters, including when the caller's panic guard recovers.
+			defer cache.finishFlight(cacheKey, flight, rankScoreEntry{})
+			if !force {
+				if cached, ok := cache.get(cacheKey); ok {
+					return cached, cache.finishFlight(cacheKey, flight, cached)
+				}
+			}
+			entry := a.loadPlayerRankScoreEntry(flight.ctx, client, playerRef, isCurrent, serverID, privacy, tierScope, useRiot, preferredSource)
+			keys := []string{}
+			if flight.ctx.Err() == nil {
+				keys = append(keys, cacheKey)
+				if !entry.negative {
+					actualKey := rankScoreCacheKeyScoped(entry.source, serverID, playerRef, cacheScope)
+					if actualKey != cacheKey {
+						keys = append(keys, actualKey)
+					}
+				}
+			}
+			return entry, cache.finishFlight(cacheKey, flight, entry, keys...)
+		}()
+		if accepted {
+			return entry, false
 		}
 	}
-	// A previous leader may have populated the cache between get() and
-	// beginFlight(). Recheck after winning leadership to close that race.
-	if cached, ok := cache.get(cacheKey); ok {
-		cache.finishFlight(cacheKey, flight, cached)
-		return cached, true
-	}
+	return rankScoreEntry{}, false
+}
+
+func (a *app) loadPlayerRankScoreEntry(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID, privacy string, tierScope, useRiot bool, preferredSource string) rankScoreEntry {
 	entry := rankScoreEntry{at: time.Now()}
-	defer func() { cache.finishFlight(cacheKey, flight, entry) }()
 	var ranks []gameplayRank
 	var milestones *gameplayRankMilestones
 	var capability EndpointCapability
@@ -277,17 +357,12 @@ func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUCli
 		// 首选来源键代表这次稳定的数据源决策入口，使 LCU -> SGP fallback
 		// 能在下一次相同决策下命中，而不是重新请求两端。
 		entry.source = capabilitySource(capability)
-		actualKey := rankScoreCacheKeyScoped(entry.source, serverID, playerRef, cacheScope)
-		cache.put(actualKey, entry)
-		if actualKey != cacheKey {
-			cache.put(cacheKey, entry)
-		}
+
 	} else {
 		entry.source = preferredSource
 		entry.negative = true
-		cache.put(cacheKey, entry)
 	}
-	return entry, false
+	return entry
 }
 
 var globalMatchTiersRankSemaphore = make(chan struct{}, matchTiersRankConcurrency)

@@ -1064,7 +1064,11 @@
 	  try { suiteChampSelectState.sessionPaused = Boolean(JSON.parse(init?.body || "{}").paused); } catch (_) {}
 	  return Promise.resolve(new Response(JSON.stringify(structuredClone(suiteChampSelectState)), { status: 200, headers: { "Content-Type": "application/json" } }));
 	}
-    if (pathname === "/api/rig/settings-lock") {
+    if (pathname === "/api/rig/settings-sync") {
+ suiteRig.keepGameSettings=Boolean(JSON.parse(init?.body||"{}").enabled);
+ return Promise.resolve(new Response(JSON.stringify({enabled:suiteRig.keepGameSettings}),{status:200,headers:{"Content-Type":"application/json"}}));
+ }
+ if (pathname === "/api/rig/settings-lock") {
       try { suiteRig.settingsLocked = Boolean(JSON.parse(init?.body || "{}").locked); } catch (_) {}
       return Promise.resolve(new Response(JSON.stringify(structuredClone(suiteRig)), { status: 200, headers: { "Content-Type": "application/json" } }));
     }

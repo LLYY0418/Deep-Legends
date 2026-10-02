@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -40,4 +41,8 @@ func quoteUpdateArgument(value string) string {
 }
 func updateCommandLine(setup, destination string) string {
 	return quoteUpdateArgument(setup) + " --update --dest " + quoteUpdateArgument(destination)
+}
+
+func portableUpdateCommandLine(setup, destination string, parent int) string {
+	return updateCommandLine(setup, destination) + " --fresh-install --parent-pid " + strconv.Itoa(parent)
 }

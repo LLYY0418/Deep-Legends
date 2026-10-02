@@ -18,6 +18,32 @@ ManifestDPIAware true
 !define MUI_INSTFILESPAGE_PROGRESSBAR "smooth"
 !endif
 
+; Defer plugin-using functions until electron-builder has registered its
+; plugin directories. Loading getProcessInfo here would bind System too early.
+!macro customHeader
+  !include getProcessInfo.nsh
+  !ifndef BUILD_UNINSTALLER
+    !insertmacro DLcustomHeader
+  !endif
+!macroend
+Var pid
+!macro customCheckAppRunning
+  ; A portable parent must survive cancellation/failure. For a fresh migration,
+  ; detect an occupied destination and abort instead of terminating any app.
+  !insertmacro IS_POWERSHELL_AVAILABLE
+  ClearErrors
+  ${GetOptions} $CMDLINE "--portable-upgrade" $R0
+  ${IfNot} ${Errors}
+    !insertmacro FIND_PROCESS "${APP_EXECUTABLE_FILENAME}" $R0
+    ${If} $R0 == 0
+      SetErrorLevel 2
+      Abort "The destination is still in use"
+    ${EndIf}
+  ${Else}
+    !insertmacro _CHECK_APP_RUNNING
+  ${EndIf}
+!macroend
+
 !define MUI_ABORTWARNING
 
 ; Keep registry/shortcut targets unchanged. The stock NSIS uninstaller remains
@@ -117,7 +143,7 @@ Var DLProgressIcon
 !define DL_FOOTER_BG "EDEFF3"
 !define DL_FOOTER_INK "5A6377"
 
-!macro customHeader
+!macro DLcustomHeader
 Function DLGuiInit
   SetCtlColors $HWNDPARENT 0x20242B 0xFFFFFF
   StrCpy $DLDpi 96

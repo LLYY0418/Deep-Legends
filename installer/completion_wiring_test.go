@@ -72,7 +72,12 @@ func TestWindowsInstallCompletionCannotBypassPortableUpdateHandoff(t *testing.T)
 completeInstallation(a.options, installationResult{ExitCode: cmd.ProcessState.ExitCode(), WaitError: waitErr, Destination: dest}, installationCompletionHooks{
     Failed: reportFailure,
     Cleanup: func() { _ = os.RemoveAll(temporaryDir) },
-    Handoff: func() { a.handoffApplication(filepath.Join(dest, a.meta.ExeName), dest) },
+    Handoff: func() {
+ start:=func(){a.handoffApplication(filepath.Join(dest,a.meta.ExeName),dest)}
+ if !a.options.FreshInstall {start();return}
+ report:=func(value string) error {_,err:=fmt.Fprintln(os.Stdout,value);return err}
+ if !portableUpdateHandoff(report,a.waitParent,start) {reportFailure(failureMessage{Message:upgradeFailureMessage})}
+ },
 })
 return`)
 		return false

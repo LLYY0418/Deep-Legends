@@ -110,7 +110,7 @@ func (a *installerApp) install(message uiMessage) {
 		}
 		w.dispatch(func() { a.fail(failure) })
 	}
-	if a.options.Update {
+	if a.options.Update && !a.options.FreshInstall {
 		if err := validateUpgradeDestination(message.Path); err != nil {
 			reportFailure(failureMessage{Message: upgradeFailureMessage})
 			return
@@ -133,7 +133,11 @@ func (a *installerApp) install(message uiMessage) {
 	}
 	defer os.RemoveAll(temporaryDir)
 	cmd := exec.Command(setup)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CmdLine: installerCommandLine(setup, dest, message.DesktopShortcut, a.options.Update)}
+	commandLine := installerCommandLine(setup, dest, message.DesktopShortcut, a.options.Update)
+	if a.options.FreshInstall {
+		commandLine = portableSetupCommandLine(setup, dest)
+	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CmdLine: commandLine}
 	// Give this child its own TEMP so parallel installers cannot inflate progress.
 	// NSIS still uses its normal ns*.tmp/7z-out layout inside this directory.
 	cmd.Env = installerEnvironment(temporaryDir)
@@ -156,7 +160,17 @@ func (a *installerApp) install(message uiMessage) {
 			completeInstallation(a.options, installationResult{ExitCode: cmd.ProcessState.ExitCode(), WaitError: waitErr, Destination: dest}, installationCompletionHooks{
 				Failed:  reportFailure,
 				Cleanup: func() { _ = os.RemoveAll(temporaryDir) },
-				Handoff: func() { a.handoffApplication(filepath.Join(dest, a.meta.ExeName), dest) },
+				Handoff: func() {
+					start := func() { a.handoffApplication(filepath.Join(dest, a.meta.ExeName), dest) }
+					if !a.options.FreshInstall {
+						start()
+						return
+					}
+					report := func(value string) error { _, err := fmt.Fprintln(os.Stdout, value); return err }
+					if !portableUpdateHandoff(report, a.waitParent, start) {
+						reportFailure(failureMessage{Message: upgradeFailureMessage})
+					}
+				},
 			})
 			return
 		case <-ticker.C:

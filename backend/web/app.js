@@ -3749,7 +3749,7 @@
     const visible = current.supported && ["available", "downloading", "verifying", "ready", "applying", "failed"].includes(current.state) && !!current.latest;
     el.updateButton.hidden = !visible;
     if (!visible) { finishManualUpdateCheck(); return; }
-    const manual = current.portable || current.manualOnly;
+    const manual = false;
     const busy = ["downloading", "verifying"].includes(current.state);
     const ready = current.state === "ready" || current.state === "applying";
     const progress = current.progress || {};
@@ -3837,7 +3837,7 @@
 
   function renderUpdateDialog() {
     const current = updateUI.status || {};
-    const manual = current.portable || current.manualOnly;
+    const manual = false;
     const busy = ["downloading", "verifying"].includes(current.state);
     const ready = current.state === "ready" || current.state === "applying";
     const failed = current.state === "failed";
@@ -3845,9 +3845,7 @@
     el.updateDialogTitle.textContent = manual ? "发现新版本" : current.state === "applying" ? "正在重启升级" : ready ? "准备就绪" : current.state === "verifying" ? "正在校验安装包" : busy ? "正在下载新版本" : failed ? "升级未完成" : "发现新版本";
     el.updateDialog.querySelector(".from").textContent = `当前 ${current.current || ""}`;
     el.updateDialog.querySelector(".to").textContent = current.latest || "";
-    if (manual) {
-      el.updateNotes.innerHTML = `<p>${current.portable ? "便携版请从发布页下载新版程序。" : "当前版本较旧，请从发布页下载完整安装包。"}</p>${renderUpdateNotes(current.notes)}`;
-    } else if (busy) {
+    if (busy) {
       el.updateNotes.innerHTML = '<p class="muted">下载可以放着不管，完成后顶部按钮会变成「重启升级」。关掉这个窗口不会中断下载。</p>';
     } else if (ready) {
       el.updateNotes.innerHTML = '<p>安装包已下载并通过校验。点「立即重启升级」后，Deep Legends 会关闭，安装界面接管并显示进度，装完自动重新打开。</p>';
@@ -3870,14 +3868,14 @@
     el.updateAlert.textContent = [current.error, warning].filter(Boolean).join("\n");
     el.updateAlert.hidden = !el.updateAlert.textContent;
     el.updateStart.hidden = manual || ready;
-    el.updateStart.textContent = failed ? "重试" : "开始升级";
+    el.updateStart.textContent = failed ? "重试" : "立即升级";
     el.updateStart.disabled = busy || updateUI.pending || updateUI.checkPending;
     el.updateCancel.hidden = !busy || manual;
     el.updateCancel.disabled = updateUI.pending || updateUI.checkPending;
     el.updateApply.hidden = !ready || manual;
     el.updateApply.disabled = updateUI.pending || updateUI.checkPending || current.state === "applying";
     el.updateLater.hidden = busy && !manual;
-    el.updateReleaseLink.hidden = !manual && (busy || ready);
+    el.updateReleaseLink.hidden = !failed;
     el.updateReleaseLink.href = "https://github.com/LLYY0418/Deep-Legends/releases";
   }
 

@@ -37,6 +37,8 @@ func updateTestManager(t *testing.T, data []byte) *updateManager {
 	u := newUpdateManager("0.11.2", trackTestStore(t, &localStore{root: root}), nil)
 	t.Cleanup(u.Close)
 	u.status.Portable = false
+	u.portableDirectory = func() (string, error) { return filepath.Join(root, "Programs", "Deep Legends"), nil }
+	u.migrate = func() error { return nil }
 	u.installDir = filepath.Join(root, "installed")
 	u.freeBytes = func(string) (int64, error) { return 1 << 40, nil }
 	manifest := updateTestManifest(data)
@@ -611,21 +613,8 @@ func TestUpdateApplyRehashPortableMinimumAndCommand(t *testing.T) {
 		}
 		return nil
 	}
-	u.status.Portable = true
-	if u.Apply() == nil || launched != 0 {
-		t.Fatal("portable applied")
-	}
-	a := &app{updates: u}
-	w := httptest.NewRecorder()
-	a.handleUpdateAction(w, httptest.NewRequest("POST", "/api/update/apply", nil))
-	if w.Code != 400 {
-		t.Fatal("portable HTTP must be400")
-	}
 	u.status.Portable = false
 	u.status.ManualOnly = true
-	if u.Apply() == nil {
-		t.Fatal("minimum bypass")
-	}
 	u.status.ManualOnly = false
 	os.WriteFile(file, []byte("wrong"), 0600)
 	if u.Apply() == nil || launched != 0 {
@@ -700,8 +689,16 @@ func TestUpdateAfterUpgradeCleanupAndMinimum(t *testing.T) {
 	if len(entries) != 0 || !u.Status().ManualOnly || u.cache.Current != "0.11.2" {
 		t.Fatalf("cleanup/minimum: %d %#v", len(entries), u.Status())
 	}
-	if u.Download() == nil {
-		t.Fatal("minimum allowed download")
+	u.client.Transport = updateRoundTrip(func(r *http.Request) (*http.Response, error) { return updateResponse(200, []byte("setup")), nil })
+	if err := u.Download(); err != nil {
+		t.Fatal("old clients cannot download", err)
+	}
+	u.mu.Lock()
+	done := u.downloadDone
+	u.mu.Unlock()
+	<-done
+	if u.Status().State != "ready" {
+		t.Fatal(u.Status())
 	}
 }
 

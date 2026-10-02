@@ -16,6 +16,21 @@ func main() {
 	defer runtime.UnlockOSThread()
 	enableDPIAwareness()
 	options := parseInstallerOptions(os.Args[1:])
+	var waitParent func() bool
+	if options.FreshInstall {
+		if options.Error != nil {
+			return
+		}
+		parent, err := windows.OpenProcess(windows.SYNCHRONIZE, false, options.ParentPID)
+		if err != nil {
+			return
+		}
+		defer windows.CloseHandle(parent)
+		waitParent = func() bool {
+			result, err := windows.WaitForSingleObject(parent, 60000)
+			return err == nil && result == windows.WAIT_OBJECT_0
+		}
+	}
 	mutex, first, err := acquireSingleInstance()
 	if err != nil {
 		log.Print(err)
@@ -47,7 +62,7 @@ func main() {
 		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
 		return
 	}
-	app := &installerApp{window: w, meta: meta, payloadError: payloadError, options: options}
+	app := &installerApp{window: w, meta: meta, payloadError: payloadError, options: options, waitParent: waitParent}
 	if err := app.embed(html, initMessage{Path: path, NeedBytes: requiredSpace(meta.InstalledBytes), FreeBytes: free, Version: meta.Version}); err != nil {
 		destroyWindow.Call(w.hwnd)
 		runMessageLoop() // consume WM_QUIT before opening the error dialog

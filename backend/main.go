@@ -499,6 +499,7 @@ func main() {
 	a.convenience = a.watch
 	a.lpTracker = newLPTracker(store)
 	a.lpTracker.observeEvent = a.recordDiagnostic
+	a.lpTracker.invalidateRanks = a.invalidateRankPlayer
 	a.rankScores = newRankScoreCache()
 	a.riot.opponentRankScore = func(ctx context.Context, puuid string) rankScoreEntry {
 		return a.playerRankScore(ctx, nil, puuid, false, "KR", "")
@@ -566,6 +567,7 @@ func main() {
 	mux.HandleFunc("GET /api/champselect/state", a.authorized(a.handleChampSelectState))
 	mux.HandleFunc("POST /api/champselect/pause", a.authorized(a.handleChampSelectPause))
 	mux.HandleFunc("GET /api/rig/status", a.authorized(a.handleRigStatus))
+	mux.HandleFunc("POST /api/rig/settings-sync", a.authorized(a.handleGameSettingsSyncPreference))
 	mux.HandleFunc("POST /api/rig/settings-lock", a.authorized(a.handleSettingsLock))
 	mux.HandleFunc("POST /api/rig/maintenance", a.authorized(a.handleClientMaintenance))
 	mux.HandleFunc("GET /api/facade/state", a.authorized(a.handleFacadeState))

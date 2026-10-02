@@ -86,7 +86,7 @@ func verifyUpdateDigest(actual, expected string) error {
 
 func (u *updateManager) Download() error {
 	u.mu.Lock()
-	if !u.status.Supported || u.status.Portable || u.status.ManualOnly {
+	if !u.status.Supported {
 		u.mu.Unlock()
 		return errors.New("请从发布页下载完整安装包")
 	}
@@ -359,34 +359,68 @@ func (w *updateDownloadWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
-func (u *updateManager) Apply() error {
+func (u *updateManager) Apply() error { return u.apply(false, nil) }
+
+// Portable installation stays asynchronous: failure is delivered through the
+// existing status SSE and the old app exits only after installation succeeds.
+func (u *updateManager) ApplyAsync(success func()) error { return u.apply(true, success) }
+func (u *updateManager) apply(async bool, success func()) error {
 	u.mu.Lock()
-	if !u.status.Supported || u.status.Portable || u.status.ManualOnly || u.installDir == "" {
+	if !u.status.Supported {
 		u.mu.Unlock()
-		return errors.New("便携版或旧版客户端请从发布页下载完整安装包")
+		return errors.New("当前构建不支持更新")
 	}
 	if u.status.State != "ready" || u.manifest == nil || compareVersions(u.manifest.Version, u.status.Current) <= 0 {
 		u.mu.Unlock()
 		return errors.New("安装包尚未就绪")
 	}
-	asset, dest := u.manifest.Asset, u.installDir
+	asset, dest, portable := u.manifest.Asset, u.installDir, u.status.Portable
+
 	u.status.State = "applying"
 	u.status.Error = ""
 	u.mu.Unlock()
 	u.publish()
 	path := filepath.Join(u.directory, asset.Name)
-	err := verifyUpdateFile(u.ctx, path, asset)
-	if err == nil {
-		err = u.launch(path, dest)
+	fail := func(err error) error {
+		if err != nil {
+			u.mu.Lock()
+			u.status.State = "failed"
+			u.status.Error = err.Error()
+			u.mu.Unlock()
+			u.publish()
+		}
+		return err
 	}
-	if err != nil {
-		u.mu.Lock()
-		u.status.State = "failed"
-		u.status.Error = err.Error()
-		u.mu.Unlock()
-		u.publish()
+	if err := verifyUpdateFile(u.ctx, path, asset); err != nil {
+		return fail(err)
 	}
-	return err
+	if portable {
+		var err error
+		dest, err = u.portableDirectory()
+		if err != nil {
+			return fail(err)
+		}
+	}
+	finish := func() error {
+		if portable {
+			if err := u.checkPortableData(); err != nil {
+				return fail(err)
+			}
+		}
+		err := u.launch(path, dest)
+		if err == nil && portable && u.migrate != nil {
+			err = u.migrate()
+		}
+		if err = fail(err); err == nil && success != nil && u.ctx.Err() == nil {
+			success()
+		}
+		return err
+	}
+	if async {
+		goSafe("update-portable-apply", func() { _ = finish() })
+		return nil
+	}
+	return finish()
 }
 
 func (u *updateManager) sourceTimer(d time.Duration, expire func()) func() {

@@ -419,11 +419,11 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 	if len(privacy.ExplicitWrites) != 10 {
 		t.Fatalf("explicit client writes = %#v", privacy.ExplicitWrites)
 	}
-	if len(privacy.AutomaticWrites) != 10 {
+	if len(privacy.AutomaticWrites) != 11 {
 		t.Fatalf("automatic client writes = %#v", privacy.AutomaticWrites)
 	}
 	automaticWrites := strings.Join(privacy.AutomaticWrites, "\n")
-	for _, expected := range []string{"默认关闭", "ReadyCheck", "EndOfGame", "Reconnect", "点赞", "任务庆祝", "阵营位置", "房主", "邀请", "匹配", "禁用", "选用"} {
+	for _, expected := range []string{"保留对局内设置改动默认开启", "本局 Game.cfg 改动", "不修改本地游戏配置文件或按键", "默认关闭", "ReadyCheck", "EndOfGame", "Reconnect", "点赞", "任务庆祝", "阵营位置", "房主", "邀请", "匹配", "禁用", "选用"} {
 		if !strings.Contains(automaticWrites, expected) {
 			t.Fatalf("automatic write statement is missing %q: %s", expected, automaticWrites)
 		}
@@ -656,6 +656,7 @@ func TestPrivacyStoresDeclareEveryLocalDirectory(t *testing.T) {
 // 任何新写法都会先在这里红，逼作者归类：要么进覆盖表并补 stores 声明，要么写豁免
 // 理由，不允许悄悄多出一个没人审过的落盘点。
 var privacyMkdirCallPins = map[string]int{
+	"update_data_migration.go":       2, // 既有本地数据的升级暂存与目标复制；stores 明确声明，不新增采集。
 	"champion_images.go":             1, // newPublicBinaryCache：所有公开二进制/数据缓存目录的唯一创建点
 	"item_set_authorized_cleanup.go": 1, // 游戏安装目录里的备份标记（非 store root，属 explicitWrites 范畴）
 	"item_set_migration.go":          1, // 游戏安装目录里的装备方案备份（同上）
@@ -666,8 +667,9 @@ var privacyMkdirCallPins = map[string]int{
 }
 
 var privacyStoreWriteCallPins = map[string]int{
-	"season_stats.go": 1, // season-stats/<source>/<hash>-<season>.json（source 子目录由 writeLocalStoreFile 隐式创建）
-	"update.go":       3, // 根级 update-settings.json ×1、update-manifest.json ×2
+	"game_settings_sync.go": 1, // 根级 game-settings-sync.json：stores 的本机偏好开关。
+	"season_stats.go":       1, // season-stats/<source>/<hash>-<season>.json（source 子目录由 writeLocalStoreFile 隐式创建）
+	"update.go":             3, // 根级 update-settings.json ×1、update-manifest.json ×2
 }
 
 func TestPrivacyStoreDirectoryCreationCallSitesArePinned(t *testing.T) {

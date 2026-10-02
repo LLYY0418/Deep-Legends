@@ -16,6 +16,7 @@ import (
 
 type installerApp struct {
 	options      installerOptions
+	waitParent   func() bool
 	window       *shellWindow
 	meta         payload.Metadata
 	payloadError error
@@ -101,6 +102,10 @@ func (a *installerApp) fail(failure failureMessage) {
 	}
 	a.window.state.phase = phaseFailed
 	a.emit("failed", failure)
+	if a.options.FreshInstall {
+		fmt.Fprintln(os.Stdout, "DEEP_LEGENDS_UPDATE_FAILED")
+		postMessage.Call(a.window.hwnd, WM_CLOSE, 0, 0)
+	}
 }
 
 func (a *installerApp) validatePath(path string, replace bool) {
