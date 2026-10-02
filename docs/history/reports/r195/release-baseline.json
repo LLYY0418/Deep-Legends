@@ -1,0 +1,18 @@
+[
+  {
+    "created_at": "2026-10-02T09:04:27Z",
+    "draft": true,
+    "id": 401679319,
+    "published_at": null,
+    "tag_name": "v0.12.50",
+    "target_commitish": "035cb995845483cea924b8fba3fb417673c89bf4"
+  },
+  {
+    "created_at": "2026-10-02T17:12:50Z",
+    "draft": false,
+    "id": 402019897,
+    "published_at": "2026-10-02T17:38:56Z",
+    "tag_name": "v0.12.58",
+    "target_commitish": "33e4e4a882a3bac7fba99b40325a625bda65f13a"
+  }
+]

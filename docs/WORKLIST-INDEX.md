@@ -122,4 +122,4 @@
 
 | R194 | 快速、匹配、大乱斗等 5v5 队列恢复匿名玩家 | 已关闭：0.12.58 真机日志或用户确认正常（R195） | [WORKLIST-R194-ROSTER-RECOVERY-FOR-QUICKPLAY-AND-OTHER-5V5-QUEUES.md](history/worklists/WORKLIST-R194-ROSTER-RECOVERY-FOR-QUICKPLAY-AND-OTHER-5V5-QUEUES.md) | [r194-execution-ledger.md](history/ledgers/r194-execution-ledger.md) | 源码版本 0.12.58；R193 基线 `2107435d` |
 
-| R195 | 符文效果数值与去碎片、组队英雄头像、安装位置识别、工单索引收口 | 进行中：实现与自动验证执行中；Windows 在线升级待用户实测 | [WORKLIST-R195-RUNE-EFFECTS-KEYSTONE-VALUES-NO-SHARDS-PREMADE-ICONS-UPDATE-DETECTION-AND-INDEX-CLEANUP.md](WORKLIST-R195-RUNE-EFFECTS-KEYSTONE-VALUES-NO-SHARDS-PREMADE-ICONS-UPDATE-DETECTION-AND-INDEX-CLEANUP.md) | [r195-execution-ledger.md](r195-execution-ledger.md) | 目标版本 0.12.59 |
+| R195 | 符文效果数值与去碎片、组队英雄头像、安装位置识别、工单索引收口 | 进行中：0.12.59 已正式发布，自动验证通过；Windows 在线升级及界面待用户实测 | [WORKLIST-R195-RUNE-EFFECTS-KEYSTONE-VALUES-NO-SHARDS-PREMADE-ICONS-UPDATE-DETECTION-AND-INDEX-CLEANUP.md](WORKLIST-R195-RUNE-EFFECTS-KEYSTONE-VALUES-NO-SHARDS-PREMADE-ICONS-UPDATE-DETECTION-AND-INDEX-CLEANUP.md) | [r195-execution-ledger.md](r195-execution-ledger.md) | 目标版本 0.12.59 |

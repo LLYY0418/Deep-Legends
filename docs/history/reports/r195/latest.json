@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "version": "0.12.59",
+  "fingerprint": "628380d1c65b",
+  "publishedAt": "2026-10-02T19:29:38.925Z",
+  "minSupported": "0.9.0",
+  "notes": "- 符文效果移除属性碎片，致命节奏显示已造成的伤害，神奇之鞋显示鞋子到达时间；有数值的基石只保留所属系名。\n- 组队弹窗在名字前显示英雄头像，未选英雄保留空占位，隐藏名字设置继续生效。\n- 改善安装位置识别，支持引号、结尾分隔符、短路径和符号链接；默认安装目录有卸载程序时保留安装版升级流程。",
+  "asset": {
+    "name": "Deep-Legends-Setup-0.12.59-public.exe",
+    "size": 111334912,
+    "sha256": "8e021a2cfaf484b7509d88bdc014cb78e515c5432c2f9ba977b6adf68276f568",
+    "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.59/Deep-Legends-Setup-0.12.59-public.exe"
+  }
+}

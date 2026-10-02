@@ -21,7 +21,10 @@
 - 四项变异均由指定断言检出，见 [变异报告](history/reports/r195/mutations.json)。
 - Go 专项：`go test ./backend -run '^(TestR195|TestR186InstallDetection|TestUpdate)' -count=1` 通过；覆盖引号、斜杠、注入短路径转换、默认目录兜底、不同目录和诊断隐私。
 - Chromium 演示：改前与改后宽/窄符文布局及组队弹窗通过；真实图片队列加载两个本地英雄头像、一个占位。
-- 完整 Node、Go、vet、public 构建与 GitHub 发布核验：执行中，结果在发布后补齐。
+- 完整 Node：1111 项，1110 通过、1 项需 Windows/PowerShell 而跳过，0 失败（255.314 秒）。
+- 完整 Go：`go test ./backend -count=1` 通过（228.647 秒）；`go vet ./backend`、`git diff --check` 通过。
+- 本地完整 public 构建通过；版本 0.12.59，收据和从 Git 快照计算的源码指纹均为 `628380d1c65b`，打包运行时及 public 密钥策略通过。详见 [验证记录](history/reports/r195/verification.json)。
+- GitHub Windows 发布构建和完整 CI 全部 success；quality 包括全量 race、前端/desktop 回归、真实 Chromium 图片队列和懒加载 CSS 门禁。Windows Web 843/843，desktop 268 项、266 通过、2 项非 Windows 门禁跳过，0 失败；public 运行时、指纹、收据和密钥策略均通过。Windows 发布构建 Go 全量 176.454 秒，清单/收据专项 4/4、更新专项通过。
 
 ## 演示截图
 
@@ -35,7 +38,23 @@
 
 ## 发布与升级边界
 
-0.12.59 将按工单发布正式 GitHub Release Latest，附 public 安装包、SHA256 和 latest.json。正式发布版本保留公开历史记录；新版本接替 Latest，不删除旧版本或改回草稿。
+源码提交 `ca7ca4857162fbe8b2559138a7ca2b2fe21f90d0`，分支 `codex/release-0.12.59`。已完成 [Windows public 发布构建](https://github.com/LLYY0418/Deep-Legends/actions/runs/37052834087)；[完整 CI](https://github.com/LLYY0418/Deep-Legends/actions/runs/37052832986) 的 quality 与 windows-build 全部通过。
+
+GitHub 草稿 ID `402098152`，三附件已回下载并经独立只读复核；实际字节与 API digest、size、SHA256SUMS、manifest、CHANGELOG 一致。完整 CI 通过后已正式发布。
+
+| 附件 | 大小 | SHA256 |
+| --- | --- | --- |
+| Deep-Legends-Setup-0.12.59-public.exe | 111334912 | `8e021a2cfaf484b7509d88bdc014cb78e515c5432c2f9ba977b6adf68276f568` |
+| latest.json | 881 | `bca82565960d4d480bf23119729511745140007a6ec69a8d969e52c5d459043f` |
+| SHA256SUMS-public.txt | 182 | `60217bfe120036651c56cbe8aca3eeeb9b02b3f3224786f31ca85fcfdac47a36` |
+
+[清单](history/reports/r195/latest.json)、[校验表](history/reports/r195/SHA256SUMS-public.txt)、[附件核验](history/reports/r195/draft-verification.json) 已归档。完整安装包只保存在忽略目录 `dist/github-release-0.12.59-public/`，未进 Git。本地 macOS 交叉构建哈希与 GitHub Windows 实际构建分别记录，正式发布使用上表 Windows 附件。
+
+正式发布版本保留公开历史记录；新版本接替 Latest，不删除旧版本或改回草稿。
+
+已正式发布 [v0.12.59](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.59)，release id `402098152`，发布时间 `2026-10-02T19:41:08Z`（北京时间 10 月 3 日 03:41），draft=false、prerelease=false、isLatest=true。`refs/tags/v0.12.59` 指向上述构建提交。匿名 `releases/latest/download/latest.json` 字节与回下载清单完全一致；三个正式附件 digest/size/下载 URL 和正文复查通过。见 [正式发布核验](history/reports/r195/published-release.json)。
+
+旧 v0.12.58 仍公开，release id `402019897`、三附件 digest/size 不变，只让出 Latest；v0.12.49、v0.12.50 原草稿未改动。标签自动触发的重复草稿构建 `37055719259` 已确认 cancelled；同源码原发布构建已成功，禁止替换已发布附件。标签 CI `37055719278` 保留自动执行，验收采用同源码已全部成功的 `37052832986`。后续账本提交不移动版本标签。
 
 0.12.50：旧 R185 账本声称正式发布的 Release ID `401671502` 现返回 404；当前 v0.12.50 为另一个草稿记录 `401679319`，创建于 2026-10-02 09:04:27 UTC，未正式发布。现有证据无法确定旧记录删除时间、操作者，或旧账本 ID 是否有误。已在 [R185 账本](history/ledgers/r185-execution-ledger.md) 更正当前状态，不推断原因。
 

@@ -1,0 +1,67 @@
+{
+  "id": 402098152,
+  "tag_name": "v0.12.59",
+  "draft": false,
+  "prerelease": false,
+  "published_at": "2026-10-02T19:41:08Z",
+  "html_url": "https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.59",
+  "target_commitish": "ca7ca4857162fbe8b2559138a7ca2b2fe21f90d0",
+  "body": "- 符文效果移除属性碎片，致命节奏显示已造成的伤害，神奇之鞋显示鞋子到达时间；有数值的基石只保留所属系名。\n- 组队弹窗在名字前显示英雄头像，未选英雄保留空占位，隐藏名字设置继续生效。\n- 改善安装位置识别，支持引号、结尾分隔符、短路径和符号链接；默认安装目录有卸载程序时保留安装版升级流程。",
+  "assets": [
+    {
+      "name": "Deep-Legends-Setup-0.12.59-public.exe",
+      "size": 111334912,
+      "digest": "sha256:8e021a2cfaf484b7509d88bdc014cb78e515c5432c2f9ba977b6adf68276f568",
+      "state": "uploaded",
+      "browser_download_url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.59/Deep-Legends-Setup-0.12.59-public.exe"
+    },
+    {
+      "name": "latest.json",
+      "size": 881,
+      "digest": "sha256:bca82565960d4d480bf23119729511745140007a6ec69a8d969e52c5d459043f",
+      "state": "uploaded",
+      "browser_download_url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.59/latest.json"
+    },
+    {
+      "name": "SHA256SUMS-public.txt",
+      "size": 182,
+      "digest": "sha256:60217bfe120036651c56cbe8aca3eeeb9b02b3f3224786f31ca85fcfdac47a36",
+      "state": "uploaded",
+      "browser_download_url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.59/SHA256SUMS-public.txt"
+    }
+  ],
+  "tagCommit": "ca7ca4857162fbe8b2559138a7ca2b2fe21f90d0",
+  "anonymousLatestManifestMatches": true,
+  "releaseList": [
+    {
+      "isDraft": false,
+      "isLatest": true,
+      "publishedAt": "2026-10-02T19:41:08Z",
+      "tagName": "v0.12.59"
+    },
+    {
+      "isDraft": false,
+      "isLatest": false,
+      "publishedAt": "2026-10-02T17:38:56Z",
+      "tagName": "v0.12.58"
+    },
+    {
+      "isDraft": true,
+      "isLatest": false,
+      "publishedAt": "0001-01-01T00:00:00Z",
+      "tagName": "v0.12.50"
+    },
+    {
+      "isDraft": true,
+      "isLatest": false,
+      "publishedAt": "0001-01-01T00:00:00Z",
+      "tagName": "v0.12.49"
+    },
+    {
+      "isDraft": false,
+      "isLatest": false,
+      "publishedAt": "2026-09-24T02:46:32Z",
+      "tagName": "v0.12.19"
+    }
+  ]
+}
