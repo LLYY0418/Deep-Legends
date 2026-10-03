@@ -23,11 +23,34 @@
     "passed": true,
     "seconds": 248.905
   },
-  "public_build": "pending",
+  "public_build": {
+    "passed": true,
+    "mode": "public",
+    "source_commit": "be6294969a38ccab6c0ff1c6bf9727fadf501991",
+    "receipt": "local-release-build.json"
+  },
   "mutations": {
     "ban-pick": "assertion_fail",
     "budget": "assertion_fail",
     "holder": "assertion_fail"
   },
-  "release": "pending"
+  "release": {
+    "published": true,
+    "release_id": 402540854,
+    "isLatest": true,
+    "published_at": "2026-10-03T14:14:13Z",
+    "anonymous_latest_version": "0.12.65",
+    "receipt": "publication-verification.json",
+    "asset_receipt": "release-asset-verification.json"
+  },
+  "github_runs": {
+    "release": 37127823415,
+    "tag_quality": 37127823435,
+    "branch_quality": 37127821354
+  },
+  "github_checks": {
+    "windows_public_release": "success",
+    "linux_quality": "success",
+    "tag_windows_repeat": "in_progress"
+  }
 }

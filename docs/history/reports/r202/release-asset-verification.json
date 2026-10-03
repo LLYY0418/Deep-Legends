@@ -1,0 +1,28 @@
+{
+  "verified": true,
+  "version": "0.12.65",
+  "fingerprint": "7a0b897f0881",
+  "source_commit": "be6294969a38ccab6c0ff1c6bf9727fadf501991",
+  "draft_release_id": 402540854,
+  "windows_run": 37127823415,
+  "assets": [
+    {
+      "id": 607920953,
+      "name": "Deep-Legends-Setup-0.12.65-public.exe",
+      "size": 111408128,
+      "digest": "sha256:bf97221a0c8465b78d57bf32f15c746eeec72deb7f3ec4923323b095c16c70ac"
+    },
+    {
+      "id": 607920957,
+      "name": "latest.json",
+      "size": 911,
+      "digest": "sha256:b7ec367e93c58d00c161dfe7403c85da9c8c0430966458ceb2561bb107e8c19f"
+    },
+    {
+      "id": 607920952,
+      "name": "SHA256SUMS-public.txt",
+      "size": 182,
+      "digest": "sha256:8bfebced438f149ce0d0b499c0c52efbc5e9231a9590ed45f400ecdd04ccbb7b"
+    }
+  ]
+}

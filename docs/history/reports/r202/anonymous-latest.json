@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "version": "0.12.65",
+  "fingerprint": "7a0b897f0881",
+  "publishedAt": "2026-10-03T14:10:45.504Z",
+  "minSupported": "0.9.0",
+  "notes": "- 海斗卡片模式等进入最终准备阶段再交换备战席，未生效的提前交换不消耗最终阶段重试次数。\n- 开局首张卡不触发手动接管；持有序列英雄时遵守优先开关，玩家随后换走则停止本轮自动操作。\n- 镜头诊断以实际 PersistedSettings.json 的 CameraMode 为准。\n- 对局页优先读取当前队列近 30 天最新 10 局，筛选不可用时按需分页，缓存按队列隔离。",
+  "asset": {
+    "name": "Deep-Legends-Setup-0.12.65-public.exe",
+    "size": 111408128,
+    "sha256": "bf97221a0c8465b78d57bf32f15c746eeec72deb7f3ec4923323b095c16c70ac",
+    "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.65/Deep-Legends-Setup-0.12.65-public.exe"
+  }
+}

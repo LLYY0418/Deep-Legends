@@ -1,0 +1,115 @@
+{
+  "conclusion": "success",
+  "headSha": "be6294969a38ccab6c0ff1c6bf9727fadf501991",
+  "jobs": [
+    {
+      "completedAt": "2026-10-03T14:11:08Z",
+      "conclusion": "success",
+      "databaseId": 111216656769,
+      "name": "release",
+      "startedAt": "2026-10-03T13:55:16Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-10-03T13:55:19Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-10-03T13:55:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-03T13:55:31Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-10-03T13:55:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-03T13:55:43Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-go@v5",
+          "number": 3,
+          "startedAt": "2026-10-03T13:55:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-03T13:55:49Z",
+          "conclusion": "success",
+          "name": "Run actions/setup-node@v4",
+          "number": 4,
+          "startedAt": "2026-10-03T13:55:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-03T13:55:51Z",
+          "conclusion": "success",
+          "name": "Validate release version",
+          "number": 5,
+          "startedAt": "2026-10-03T13:55:49Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-03T14:10:51Z",
+          "conclusion": "success",
+          "name": "Build and verify public release",
+          "number": 6,
+          "startedAt": "2026-10-03T13:55:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-03T14:10:56Z",
+          "conclusion": "success",
+          "name": "Upload verified release files",
+          "number": 7,
+          "startedAt": "2026-10-03T14:10:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-03T14:11:03Z",
+          "conclusion": "success",
+          "name": "Create draft Release",
+          "number": 8,
+          "startedAt": "2026-10-03T14:10:56Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-03T14:11:05Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-node@v4",
+          "number": 14,
+          "startedAt": "2026-10-03T14:11:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-03T14:11:05Z",
+          "conclusion": "success",
+          "name": "Post Run actions/setup-go@v5",
+          "number": 15,
+          "startedAt": "2026-10-03T14:11:05Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-03T14:11:07Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 16,
+          "startedAt": "2026-10-03T14:11:05Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-03T14:11:07Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 17,
+          "startedAt": "2026-10-03T14:11:07Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/LLYY0418/Deep-Legends/actions/runs/37127823415/job/111216656769"
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/LLYY0418/Deep-Legends/actions/runs/37127823415"
+}

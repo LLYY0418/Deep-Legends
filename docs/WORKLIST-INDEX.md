@@ -140,4 +140,4 @@
 
 | R201 | 升级隐藏窗口与安装提速、只读镜头写入、海斗临时首卡测试 | 进行中：0.12.64 已正式发布，自动验证通过；Windows 真机待验收 | [WORKLIST-R201-UPDATE-HIDE-APP-DURING-INSTALL-FASTER-INSTALL-CAMERA-WITH-SETTINGS-LOCK-AND-ARAM-TEST-PICK.md](WORKLIST-R201-UPDATE-HIDE-APP-DURING-INSTALL-FASTER-INSTALL-CAMERA-WITH-SETTINGS-LOCK-AND-ARAM-TEST-PICK.md) | [r201-execution-ledger.md](r201-execution-ledger.md) | 版本 0.12.64；P3 临时逻辑删除另开工单 |
 
-| R202 | 海斗备战席等待最终准备、序列持有规则、当前模式近 30 天 10 局 | 进行中：0.12.65 实现与验证，发布未完成；Windows 真机待验收 | [WORKLIST-R202-ARAM-BENCH-SWAP-BEFORE-FINALIZATION-NOT-APPLIED-AND-POOL-HOLDER-RULE.md](WORKLIST-R202-ARAM-BENCH-SWAP-BEFORE-FINALIZATION-NOT-APPLIED-AND-POOL-HOLDER-RULE.md) | [r202-execution-ledger.md](r202-execution-ledger.md) | 版本 0.12.65；R201 临时首卡保持，实际换入待日志 |
+| R202 | 海斗备战席等待最终准备、序列持有规则、当前模式近 30 天 10 局 | 进行中：0.12.65 已正式发布，工单测试与正式 Windows 构建通过；真机待验收 | [WORKLIST-R202-ARAM-BENCH-SWAP-BEFORE-FINALIZATION-NOT-APPLIED-AND-POOL-HOLDER-RULE.md](WORKLIST-R202-ARAM-BENCH-SWAP-BEFORE-FINALIZATION-NOT-APPLIED-AND-POOL-HOLDER-RULE.md) | [r202-execution-ledger.md](r202-execution-ledger.md) | 版本 0.12.65；R201 临时首卡保持，实际换入待日志 |

@@ -21,11 +21,19 @@
 
 ## 验证
 
-相关 Go 回归通过（7.924 秒）：R202、R200/R201、普通大乱斗/手动接管、镜头、R178/R180/R181、赛后补全。旧夹具增加实际近期开始时间、遵守队列筛选和新缓存键；原去重、最新局与读取次数护栏保留。Node 全量 1127 项，1126 通过、1 跳过、0 失败（270.802 秒）。R202/R180/R181 race 通过（2.503 秒），go vet 通过。三项 overlay 变异均为断言 FAIL：BAN_PICK 发交换、失败计入最终预算、关闭开关仍横向换人。最终 `go test ./backend -count=1` 全量通过（248.905 秒）；完整 public 构建进行中。
+相关 Go 回归通过（7.924 秒）：R202、R200/R201、普通大乱斗/手动接管、镜头、R178/R180/R181、赛后补全。旧夹具增加实际近期开始时间、遵守队列筛选和新缓存键；原去重、最新局与读取次数护栏保留。Node 全量 1127 项，1126 通过、1 跳过、0 失败（270.802 秒）。R202/R180/R181 race 通过（2.503 秒），go vet 通过。三项 overlay 变异均为断言 FAIL：BAN_PICK 发交换、失败计入最终预算、关闭开关仍横向换人。最终 `go test ./backend -count=1` 全量通过（248.905 秒）；完整 public 构建通过，含全部 Go 分片、backend/installer vet、installer 测试及打包校验。
 
 ## 构建与发布
 
-key mode：public。版本 0.12.65；构建/发布未完成。正式发布后按 R199 补 release id、isLatest=true 和匿名 Latest 清单版本，以及附件 digest/源码指纹。
+key mode：public。本地完整构建通过，版本 0.12.65、指纹 `7a0b897f0881`，源提交/标签 `be6294969a38ccab6c0ff1c6bf9727fadf501991`。本地 Setup SHA-256：`a41720bb92898694bc23ee2a9520fdc21ed245442bc0b5ab9e785d278d3ed3ea`，见 [本地构建记录](history/reports/r202/local-release-build.json)。
+
+已正式发布 [v0.12.65](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.65)。Release id **402540854**，发布时间 **2026-10-03T14:14:13Z**（北京时间 22:14:13），`draft=false`、`prerelease=false`、`isLatest=true`；匿名下载 `releases/latest/download/latest.json` 返回 **0.12.65**，字节与已经下载核验的正式清单相同。见 [发布核验](history/reports/r202/publication-verification.json)。
+
+Windows public 工作流 [37127823415](https://github.com/LLYY0418/Deep-Legends/actions/runs/37127823415) 已成功，source SHA 与标签一致。标签质量工作流 [37127823435](https://github.com/LLYY0418/Deep-Legends/actions/runs/37127823435) 的 Linux quality 已成功（全量 race、Node、真实 Chromium、installer）；其后独立的 Windows 重复构建在收尾取证时仍运行中。正式 Windows 构建已完成全部必需检查，独立重复任务不记为已通过，具体快照见 [质量状态](history/reports/r202/github-quality-run.json)。
+
+正式发布恰有三个 public 附件：`Deep-Legends-Setup-0.12.65-public.exe`、`latest.json`、`SHA256SUMS-public.txt`。逐个下载核对大小和 GitHub digest，再核对清单版本/指纹/URL及 SHA256SUMS；全部吻合。正式 Windows Setup SHA-256：`bf97221a0c8465b78d57bf32f15c746eeec72deb7f3ec4923323b095c16c70ac`，大小 111408128 字节。不同构建主机的 Setup SHA 不同，两份构建源码指纹均为 `7a0b897f0881`。见 [附件核验](history/reports/r202/release-asset-verification.json)。
+
+本次仅新增该版本发布；之前九个 Release 的身份、正文、目标、发布时间及附件 id/名称/大小/digest 均未修改，0.12.60 草稿 **402378684** 保持原样。
 
 ## Windows 真机验收
 
