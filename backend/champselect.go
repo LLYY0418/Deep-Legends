@@ -133,53 +133,54 @@ type champSelectRuntimeRecord struct {
 }
 
 type champSelectRuntimeStore struct {
-	subsetClient     *LCUClient
-	subsetEndpoint   string
-	subsetDiscovered bool
-	subsetIDs        []int64
-	subsetSource     string
-	subsetRecordKey  string
-	pickAttempts     map[int64]map[int64]int
-	pickFailures     map[int64]map[int64]int
-	pickFailed       map[int64]map[int64]bool
-	benchFailed      map[string]bool
-	runtimeID        string
-	attempts         map[string]int
-	banEvidence      map[int64]struct{}
-	banEvidenceScope string
-	banSource        string
-	writeContext     context.Context
-	writeCancel      context.CancelFunc
-	phase            string
-	active           bool
-	processing       bool
-	queued           bool
-	groupID          string
-	position         string
-	remainingMS      int
-	benchEnabled     bool
-	sessionPaused    bool
-	gridLoaded       bool
-	grid             map[int64]champSelectGridChampion
-	pickable         map[int64]struct{}
-	bannable         map[int64]struct{}
-	decision         map[string]champSelectDecision
-	submitted        map[int64]champSelectSubmitRecord
-	inFlight         map[int64]bool
-	takeover         map[string]bool
-	takeoverChampion map[string]int64
-	benchObserved    bool
-	benchChampionID  int64
-	benchSwap        *champSelectBenchSubmission
-	exhausted        map[string]bool
-	benchFirstSeen   map[int64]time.Time
-	records          []champSelectRuntimeRecord
-	lastSession      lcuChampSelectSession
-	diagnosticKey    string
-	readFailures     map[string]bool
-	candidateKey     string
-	skippedKey       string
-	sourceKey        string
+	subsetClient          *LCUClient
+	subsetEndpoint        string
+	subsetDiscovered      bool
+	subsetIDs             []int64
+	subsetSource          string
+	subsetRecordKey       string
+	pickAttempts          map[int64]map[int64]int
+	pickFailures          map[int64]map[int64]int
+	pickFailed            map[int64]map[int64]bool
+	benchFailed           map[string]bool
+	benchPreFinalFailures map[string]int
+	runtimeID             string
+	attempts              map[string]int
+	banEvidence           map[int64]struct{}
+	banEvidenceScope      string
+	banSource             string
+	writeContext          context.Context
+	writeCancel           context.CancelFunc
+	phase                 string
+	active                bool
+	processing            bool
+	queued                bool
+	groupID               string
+	position              string
+	remainingMS           int
+	benchEnabled          bool
+	sessionPaused         bool
+	gridLoaded            bool
+	grid                  map[int64]champSelectGridChampion
+	pickable              map[int64]struct{}
+	bannable              map[int64]struct{}
+	decision              map[string]champSelectDecision
+	submitted             map[int64]champSelectSubmitRecord
+	inFlight              map[int64]bool
+	takeover              map[string]bool
+	takeoverChampion      map[string]int64
+	benchObserved         bool
+	benchChampionID       int64
+	benchSwap             *champSelectBenchSubmission
+	exhausted             map[string]bool
+	benchFirstSeen        map[int64]time.Time
+	records               []champSelectRuntimeRecord
+	lastSession           lcuChampSelectSession
+	diagnosticKey         string
+	readFailures          map[string]bool
+	candidateKey          string
+	skippedKey            string
+	sourceKey             string
 }
 
 type champSelectRuntimeResponse struct {
@@ -214,23 +215,24 @@ type champSelectOngoingSwap struct {
 
 func newChampSelectRuntimeStore() champSelectRuntimeStore {
 	return champSelectRuntimeStore{
-		pickAttempts:     map[int64]map[int64]int{},
-		pickFailures:     map[int64]map[int64]int{},
-		pickFailed:       map[int64]map[int64]bool{},
-		benchFailed:      map[string]bool{},
-		runtimeID:        newDiagnosticTrace("cs-runtime"),
-		attempts:         map[string]int{},
-		banEvidence:      map[int64]struct{}{},
-		grid:             map[int64]champSelectGridChampion{},
-		pickable:         map[int64]struct{}{},
-		bannable:         map[int64]struct{}{},
-		decision:         map[string]champSelectDecision{},
-		submitted:        map[int64]champSelectSubmitRecord{},
-		inFlight:         map[int64]bool{},
-		takeover:         map[string]bool{},
-		takeoverChampion: map[string]int64{},
-		exhausted:        map[string]bool{},
-		benchFirstSeen:   map[int64]time.Time{},
+		pickAttempts:          map[int64]map[int64]int{},
+		pickFailures:          map[int64]map[int64]int{},
+		pickFailed:            map[int64]map[int64]bool{},
+		benchFailed:           map[string]bool{},
+		benchPreFinalFailures: map[string]int{},
+		runtimeID:             newDiagnosticTrace("cs-runtime"),
+		attempts:              map[string]int{},
+		banEvidence:           map[int64]struct{}{},
+		grid:                  map[int64]champSelectGridChampion{},
+		pickable:              map[int64]struct{}{},
+		bannable:              map[int64]struct{}{},
+		decision:              map[string]champSelectDecision{},
+		submitted:             map[int64]champSelectSubmitRecord{},
+		inFlight:              map[int64]bool{},
+		takeover:              map[string]bool{},
+		takeoverChampion:      map[string]int64{},
+		exhausted:             map[string]bool{},
+		benchFirstSeen:        map[int64]time.Time{},
 	}
 }
 
@@ -958,6 +960,11 @@ func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelec
 		return
 	}
 	if action.ChampionID != 0 && (!submitted || lastSubmission.ChampionID != action.ChampionID) {
+		// R202: a first card chosen by the player belongs to the opening pick.
+		// Bench observation handles a later change away from a held pool hero.
+		if side == "pick" && session.AllowSubsetChampionPicks {
+			return
+		}
 		championID := lastSubmission.ChampionID
 		if championID == 0 {
 			championID = pendingDecision.ChampionID
@@ -1310,7 +1317,14 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 		}
 		r.mu.Unlock()
 		requestCtx, requestCancel := context.WithTimeout(ctx, 8*time.Second)
-		if (isBanPick && !r.champSelectRequestStillCurrent(requestCtx, client, decision)) || (decision.Action == champSelectActionBench && !r.champSelectBenchRequestStillCurrent(requestCtx, client, decision)) {
+		stillCurrent, benchPhase := true, ""
+		if isBanPick {
+			stillCurrent = r.champSelectRequestStillCurrent(requestCtx, client, decision)
+		}
+		if decision.Action == champSelectActionBench {
+			stillCurrent, benchPhase = r.champSelectBenchRequestStillCurrent(requestCtx, client, decision)
+		}
+		if !stillCurrent {
 			requestCancel()
 			r.mu.Lock()
 			if r.champSelect.decision[decision.Action] == decision {
@@ -1342,7 +1356,7 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 			r.champSelect.attempts[decision.Key]++
 		}
 		if decision.Action == champSelectActionBench || (decision.Action == champSelectActionTrade && decision.Completed) {
-			r.champSelect.benchSwap = &champSelectBenchSubmission{Decision: decision}
+			r.champSelect.benchSwap = &champSelectBenchSubmission{Decision: decision, TimerPhase: benchPhase}
 		}
 		attempt := r.champSelect.attempts[decision.Key]
 		r.mu.Unlock()
@@ -1555,12 +1569,24 @@ func (r *watchRunner) evaluateChampSelectBench(client *LCUClient, session lcuCha
 			return
 		}
 		attempt = r.champSelect.attempts[swap.Decision.Key]
+		if reason == "not-applied" && strings.EqualFold(swap.TimerPhase, "BAN_PICK") {
+			r.champSelect.benchPreFinalFailures[swap.Decision.Key]++
+		}
 		if reason == "target-gone" || attempt >= 2 {
 			r.champSelect.benchFailed[swap.Decision.Key] = true
 		}
 		r.champSelect.benchSwap = nil
 		if r.champSelect.decision[champSelectActionBench].TraceID == swap.Decision.TraceID {
 			delete(r.champSelect.decision, champSelectActionBench)
+		}
+	}
+	// Only unapplied BAN_PICK writes are refunded. Successful swaps and
+	// failures sent in FINALIZATION retain their two-attempt budget.
+	if strings.EqualFold(session.Timer.Phase, "FINALIZATION") {
+		for key, failures := range r.champSelect.benchPreFinalFailures {
+			r.champSelect.attempts[key] = max(0, r.champSelect.attempts[key]-failures)
+			delete(r.champSelect.benchFailed, key)
+			delete(r.champSelect.benchPreFinalFailures, key)
 		}
 	}
 	r.mu.Unlock()
@@ -1616,6 +1642,11 @@ func (r *watchRunner) evaluateChampSelectBench(client *LCUClient, session lcuCha
 		r.clearChampSelectDecision(champSelectActionBench)
 		return
 	}
+	if session.AllowSubsetChampionPicks && !strings.EqualFold(session.Timer.Phase, "FINALIZATION") {
+		r.champDiagnostic("bench-gate", "waiting-finalization", champSelectDecision{Action: champSelectActionBench, ChampionID: target}, map[string]any{"bench_ids": benchIDs, "current_champion_id": current, "target_id": target})
+		r.clearChampSelectDecision(champSelectActionBench)
+		return
+	}
 	r.champDiagnostic("bench-gate", "selected", champSelectDecision{Action: champSelectActionBench, ChampionID: target}, map[string]any{"bench_ids": benchIDs, "current_champion_id": current})
 	elapsed := int(now.Sub(firstSeen[target]) / time.Millisecond)
 	delay := champSelectDelay(max(0, group.Bench.HoldMS-elapsed), champSelectRemainingMS(session))
@@ -1629,6 +1660,9 @@ func (r *watchRunner) evaluateChampSelectBench(client *LCUClient, session lcuCha
 
 func champSelectBenchTarget(pool []int64, bench map[int64]lcuChampSelectBenchChampion, currentChampionID int64, preferFirst bool) int64 {
 	currentRank := slices.Index(pool, currentChampionID)
+	if !preferFirst && currentRank >= 0 {
+		return 0
+	}
 	for index, championID := range pool {
 		if _, available := bench[championID]; !available {
 			continue

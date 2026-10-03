@@ -189,8 +189,8 @@ func r178FreshnessFixture(t *testing.T, failed bool) (*app, *LCUClient, *atomic.
 	})}
 	a.sgp.http = &http.Client{Transport: sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		sgpCalls.Add(1)
-		if !strings.Contains(r.URL.Path, "/SUMMARY") || r.URL.Query().Get("count") != "30" {
-			t.Errorf("not SUMMARY30 %s", r.URL)
+		if !strings.Contains(r.URL.Path, "/SUMMARY") || (r.URL.Query().Get("count") != "30" && r.URL.Query().Get("count") != "10") {
+			t.Errorf("not SUMMARY page %s", r.URL)
 		}
 		if failed {
 			return r178JSON(map[string]any{}, 500), nil

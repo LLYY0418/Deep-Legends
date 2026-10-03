@@ -1,0 +1,33 @@
+{
+  "version": "0.12.65",
+  "fingerprint": "7a0b897f0881",
+  "focused": {
+    "passed": true,
+    "seconds": 7.924
+  },
+  "race": {
+    "passed": true,
+    "seconds": 2.503
+  },
+  "node_full": {
+    "tests": 1127,
+    "pass": 1126,
+    "skip": 1,
+    "fail": 0,
+    "seconds": 270.802
+  },
+  "go_vet": {
+    "passed": true
+  },
+  "go_full": {
+    "passed": true,
+    "seconds": 248.905
+  },
+  "public_build": "pending",
+  "mutations": {
+    "ban-pick": "assertion_fail",
+    "budget": "assertion_fail",
+    "holder": "assertion_fail"
+  },
+  "release": "pending"
+}

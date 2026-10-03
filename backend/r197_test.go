@@ -31,7 +31,7 @@ type r197Fixture struct {
 
 func newR197Fixture(t *testing.T, queue int64) *r197Fixture {
 	f := &r197Fixture{a: r175App(t), sessionID: 9012766973, now: time.Unix(0, 0)}
-	f.game = lcuGame{GameID: f.sessionID, QueueID: queue, GameMode: "CLASSIC", GameDuration: 1800}
+	f.game = lcuGame{GameID: f.sessionID, GameCreation: time.Now().Add(-time.Hour).UnixMilli(), QueueID: queue, GameMode: "CLASSIC", GameDuration: 1800}
 	if queue == 2400 {
 		f.game.GameMode = "ARAM_MAYHEM"
 	}

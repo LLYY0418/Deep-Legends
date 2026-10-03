@@ -1,0 +1,5 @@
+--- FAIL: TestR202BenchHolderPriority (0.00s)
+    r202_test.go:107: disabled preference swapped held hero 22
+FAIL
+FAIL	lol-loot-assistant/backend	0.587s
+FAIL

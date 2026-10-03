@@ -243,7 +243,7 @@ func TestR78ChampSelectStrategiesAndTradePriority(t *testing.T) {
 	if got := champSelectBenchTarget(pool, map[int64]lcuChampSelectBenchChampion{3: {ChampionID: 3}}, 2, true); got != 0 {
 		t.Fatalf("prefer-first accepted a worse bench target %d", got)
 	}
-	if got := champSelectBenchTarget(pool, map[int64]lcuChampSelectBenchChampion{3: {ChampionID: 3}}, 2, false); got != 3 {
+	if got := champSelectBenchTarget(pool, map[int64]lcuChampSelectBenchChampion{3: {ChampionID: 3}}, 2, false); got != 0 {
 		t.Fatalf("non-priority bench target = %d", got)
 	}
 }

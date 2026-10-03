@@ -4571,7 +4571,7 @@ func TestR69LiveHistoryStatesDistinguishUnavailableEmptyAndFailed(t *testing.T) 
 				t.Fatalf("history state = %q, want %q (%#v)", got, test.want, result)
 			}
 			a.livePlayerMatchesMu.Lock()
-			_, cached := a.livePlayerMatchCache["r69-history-ref-01\x00false"]
+			_, cached := a.livePlayerMatchCache["r69-history-ref-01\x00false\x000"]
 			a.livePlayerMatchesMu.Unlock()
 			if cached != test.wantCached {
 				t.Fatalf("cached=%v, want %v", cached, test.wantCached)
@@ -4812,7 +4812,7 @@ func TestR66LivePlayerMatchesCachePreventsRepeatedLCUReads(t *testing.T) {
 		t.Fatalf("cache returned the shared slice: %#v", second)
 	}
 
-	key := "cache-player\x00false"
+	key := "cache-player\x00false\x000"
 	a.livePlayerMatchesMu.Lock()
 	stale := a.livePlayerMatchCache[key]
 	stale.FetchedAt = time.Now().Add(-livePlayerMatchesCacheTTL - time.Second)
@@ -4882,7 +4882,7 @@ func TestR168LiveHistoryWindowFindsOlderSameQueueGames(t *testing.T) {
 				if tc.matching[i] {
 					queue = 440
 				}
-				game := lcuGame{GameID: int64(i + 1), QueueID: queue, GameMode: "CLASSIC", GameDuration: 1800}
+				game := lcuGame{GameID: int64(i + 1), GameCreation: time.Now().UnixMilli() - int64(i)*60000, QueueID: queue, GameMode: "CLASSIC", GameDuration: 1800}
 				participant := lcuParticipant{ParticipantID: 1, TeamID: 100, ChampionID: 103}
 				participant.Stats.Win = true
 				game.Participants = []lcuParticipant{participant}
@@ -4948,7 +4948,7 @@ func TestR170LiveModeStatsUseTheSameRecentQueueGames(t *testing.T) {
 					result = "win"
 				}
 				matches = append(matches, gameplayMatch{
-					GameID: int64(i + 1), CreatedAt: int64(i + 1), QueueID: queueID, Result: result,
+					GameID: int64(i + 1), CreatedAt: time.Now().Add(-time.Hour).UnixMilli() + int64(i+1), QueueID: queueID, Result: result,
 					Duration: 1200, SubjectParticipantID: 1,
 					Participants: []gameplayParticipant{{ParticipantID: 1, PlayerRef: "player", ChampionID: int64(i + 1),
 						Win: win, Kills: i + 1, Deaths: 1, Assists: 2, CS: 100 + i}},

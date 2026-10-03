@@ -1,0 +1,277 @@
+{
+  "source": "lol-loot-diagnostics-1003-2044.jsonl",
+  "bench_57": [
+    {
+      "time": "2026-10-03T12:17:01.4376239Z",
+      "stage": "bench-gate",
+      "reason": "selected",
+      "timer_phase": "BAN_PICK",
+      "champion_id": 57
+    },
+    {
+      "time": "2026-10-03T12:17:02.4397969Z",
+      "stage": "write",
+      "reason": "started",
+      "timer_phase": "BAN_PICK",
+      "champion_id": 57,
+      "attempt": 1
+    },
+    {
+      "time": "2026-10-03T12:17:02.4970645Z",
+      "stage": "write-result",
+      "reason": "http-success",
+      "timer_phase": "BAN_PICK",
+      "champion_id": 57
+    },
+    {
+      "time": "2026-10-03T12:17:05.272961Z",
+      "stage": "bench-postflight",
+      "reason": "not-applied",
+      "timer_phase": "BAN_PICK",
+      "champion_id": 57,
+      "attempt": 1
+    },
+    {
+      "time": "2026-10-03T12:17:05.272961Z",
+      "stage": "bench-gate",
+      "reason": "selected",
+      "timer_phase": "BAN_PICK",
+      "champion_id": 57
+    },
+    {
+      "time": "2026-10-03T12:17:05.2769825Z",
+      "stage": "write",
+      "reason": "started",
+      "timer_phase": "BAN_PICK",
+      "champion_id": 57,
+      "attempt": 2
+    },
+    {
+      "time": "2026-10-03T12:17:05.3350871Z",
+      "stage": "write-result",
+      "reason": "http-success",
+      "timer_phase": "BAN_PICK",
+      "champion_id": 57
+    },
+    {
+      "time": "2026-10-03T12:17:08.1220622Z",
+      "stage": "bench-postflight",
+      "reason": "not-applied",
+      "timer_phase": "FINALIZATION",
+      "champion_id": 57,
+      "attempt": 2
+    }
+  ],
+  "camera_snapshots": [
+    {
+      "time": "2026-10-03T09:03:41.6884415Z",
+      "matches": null,
+      "located_files": [
+        {
+          "located": true,
+          "camera_values": {
+            "Game.cfg.General.CameraMode": "2",
+            "Game.cfg.General.CameraModeWASD": "1",
+            "Game.cfg.General.CameraOffsetScale": "0.3300",
+            "Game.cfg.General.CameraZoomOnMouseScroll": "1",
+            "Game.cfg.General.DynamicCameraSpeed": "0.5000",
+            "Game.cfg.General.SnapCameraOnRespawn": "0",
+            "Game.cfg.HUD.CameraLockMode": "0",
+            "Game.cfg.HUD.DynamicCameraLockMode": "0",
+            "Input.ini.GameEvents.evtCameraLockToggle": "present",
+            "Input.ini.GameEvents.evtCameraSnap": "present"
+          }
+        }
+      ]
+    },
+    {
+      "time": "2026-10-03T09:17:21.8813263Z",
+      "matches": null,
+      "located_files": [
+        {
+          "located": true,
+          "camera_values": {
+            "Game.cfg.General.CameraMode": "2",
+            "Game.cfg.General.CameraModeWASD": "1",
+            "Game.cfg.General.CameraOffsetScale": "0.3300",
+            "Game.cfg.General.CameraZoomOnMouseScroll": "1",
+            "Game.cfg.General.DynamicCameraSpeed": "0.5000",
+            "Game.cfg.General.SnapCameraOnRespawn": "0",
+            "Game.cfg.HUD.CameraLockMode": "0",
+            "Game.cfg.HUD.DynamicCameraLockMode": "0",
+            "Input.ini.GameEvents.evtCameraLockToggle": "present",
+            "Input.ini.GameEvents.evtCameraSnap": "present"
+          }
+        }
+      ]
+    },
+    {
+      "time": "2026-10-03T09:42:27.7290442Z",
+      "matches": null,
+      "located_files": [
+        {
+          "located": true,
+          "camera_values": {
+            "Game.cfg.General.CameraMode": "2",
+            "Game.cfg.General.CameraModeWASD": "1",
+            "Game.cfg.General.CameraOffsetScale": "0.3300",
+            "Game.cfg.General.CameraZoomOnMouseScroll": "1",
+            "Game.cfg.General.DynamicCameraSpeed": "0.5000",
+            "Game.cfg.General.SnapCameraOnRespawn": "0",
+            "Game.cfg.HUD.CameraLockMode": "0",
+            "Game.cfg.HUD.DynamicCameraLockMode": "0",
+            "Input.ini.GameEvents.evtCameraLockToggle": "present",
+            "Input.ini.GameEvents.evtCameraSnap": "present"
+          }
+        }
+      ]
+    },
+    {
+      "time": "2026-10-03T10:11:10.8918721Z",
+      "matches": null,
+      "located_files": [
+        {
+          "located": true,
+          "camera_values": {
+            "Game.cfg.General.CameraMode": "2",
+            "Game.cfg.General.CameraModeWASD": "1",
+            "Game.cfg.General.CameraOffsetScale": "0.3300",
+            "Game.cfg.General.CameraZoomOnMouseScroll": "1",
+            "Game.cfg.General.DynamicCameraSpeed": "0.5000",
+            "Game.cfg.General.SnapCameraOnRespawn": "0",
+            "Game.cfg.HUD.CameraLockMode": "0",
+            "Game.cfg.HUD.DynamicCameraLockMode": "0",
+            "Input.ini.GameEvents.evtCameraLockToggle": "present",
+            "Input.ini.GameEvents.evtCameraSnap": "present"
+          }
+        }
+      ]
+    },
+    {
+      "time": "2026-10-03T10:36:52.6860004Z",
+      "matches": null,
+      "located_files": [
+        {
+          "located": true,
+          "camera_values": {
+            "Game.cfg.General.CameraMode": "2",
+            "Game.cfg.General.CameraModeWASD": "1",
+            "Game.cfg.General.CameraOffsetScale": "0.3300",
+            "Game.cfg.General.CameraZoomOnMouseScroll": "1",
+            "Game.cfg.General.DynamicCameraSpeed": "0.5000",
+            "Game.cfg.General.SnapCameraOnRespawn": "0",
+            "Game.cfg.HUD.CameraLockMode": "0",
+            "Game.cfg.HUD.DynamicCameraLockMode": "0",
+            "Input.ini.GameEvents.evtCameraLockToggle": "present",
+            "Input.ini.GameEvents.evtCameraSnap": "present"
+          }
+        }
+      ]
+    },
+    {
+      "time": "2026-10-03T11:00:17.8499224Z",
+      "matches": false,
+      "located_files": [
+        {
+          "located": true,
+          "camera_values": {
+            "Game.cfg.General.CameraMode": "2",
+            "Game.cfg.General.CameraModeWASD": "1",
+            "Game.cfg.General.CameraOffsetScale": "0.3300",
+            "Game.cfg.General.CameraZoomOnMouseScroll": "1",
+            "Game.cfg.General.DynamicCameraSpeed": "0.5000",
+            "Game.cfg.General.SnapCameraOnRespawn": "0",
+            "Game.cfg.HUD.CameraLockMode": "0",
+            "Game.cfg.HUD.DynamicCameraLockMode": "0",
+            "Input.ini.GameEvents.evtCameraLockToggle": "present",
+            "Input.ini.GameEvents.evtCameraSnap": "present"
+          }
+        }
+      ]
+    },
+    {
+      "time": "2026-10-03T11:20:48.6394211Z",
+      "matches": false,
+      "located_files": [
+        {
+          "located": true,
+          "camera_values": {
+            "Game.cfg.General.CameraMode": "2",
+            "Game.cfg.General.CameraModeWASD": "1",
+            "Game.cfg.General.CameraOffsetScale": "0.3300",
+            "Game.cfg.General.CameraZoomOnMouseScroll": "1",
+            "Game.cfg.General.DynamicCameraSpeed": "0.5000",
+            "Game.cfg.General.SnapCameraOnRespawn": "0",
+            "Game.cfg.HUD.CameraLockMode": "0",
+            "Game.cfg.HUD.DynamicCameraLockMode": "0",
+            "Input.ini.GameEvents.evtCameraLockToggle": "present",
+            "Input.ini.GameEvents.evtCameraSnap": "present"
+          }
+        }
+      ]
+    },
+    {
+      "time": "2026-10-03T11:36:48.6122117Z",
+      "matches": false,
+      "located_files": [
+        {
+          "located": true,
+          "camera_values": {
+            "Game.cfg.General.CameraMode": "2",
+            "Game.cfg.General.CameraModeWASD": "1",
+            "Game.cfg.General.CameraOffsetScale": "0.3300",
+            "Game.cfg.General.CameraZoomOnMouseScroll": "1",
+            "Game.cfg.General.DynamicCameraSpeed": "0.5000",
+            "Game.cfg.General.SnapCameraOnRespawn": "0",
+            "Game.cfg.HUD.CameraLockMode": "0",
+            "Game.cfg.HUD.DynamicCameraLockMode": "0",
+            "Input.ini.GameEvents.evtCameraLockToggle": "present",
+            "Input.ini.GameEvents.evtCameraSnap": "present"
+          }
+        }
+      ]
+    },
+    {
+      "time": "2026-10-03T12:00:36.6016971Z",
+      "matches": false,
+      "located_files": [
+        {
+          "located": true,
+          "camera_values": {
+            "Game.cfg.General.CameraMode": "2",
+            "Game.cfg.General.CameraModeWASD": "1",
+            "Game.cfg.General.CameraOffsetScale": "0.3300",
+            "Game.cfg.General.CameraZoomOnMouseScroll": "1",
+            "Game.cfg.General.DynamicCameraSpeed": "0.5000",
+            "Game.cfg.General.SnapCameraOnRespawn": "0",
+            "Game.cfg.HUD.CameraLockMode": "0",
+            "Game.cfg.HUD.DynamicCameraLockMode": "0",
+            "Input.ini.GameEvents.evtCameraLockToggle": "present",
+            "Input.ini.GameEvents.evtCameraSnap": "present"
+          }
+        }
+      ]
+    },
+    {
+      "time": "2026-10-03T12:18:38.7399532Z",
+      "matches": false,
+      "located_files": [
+        {
+          "located": true,
+          "camera_values": {
+            "Game.cfg.General.CameraMode": "0",
+            "Game.cfg.General.CameraModeWASD": "1",
+            "Game.cfg.General.CameraOffsetScale": "0.3300",
+            "Game.cfg.General.CameraZoomOnMouseScroll": "1",
+            "Game.cfg.General.DynamicCameraSpeed": "0.5000",
+            "Game.cfg.General.SnapCameraOnRespawn": "0",
+            "Game.cfg.HUD.CameraLockMode": "0",
+            "Game.cfg.HUD.DynamicCameraLockMode": "0",
+            "Input.ini.GameEvents.evtCameraLockToggle": "present",
+            "Input.ini.GameEvents.evtCameraSnap": "present"
+          }
+        }
+      ]
+    }
+  ]
+}

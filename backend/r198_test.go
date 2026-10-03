@@ -260,11 +260,11 @@ func TestR198InGameSnapshotReportsActualFiles(t *testing.T) {
 	if events[len(events)-1]["camera_mode_matches_target"] != true {
 		t.Fatal(events)
 	}
-	os.WriteFile(filepath.Join(v.f.location.configRoot, "game.cfg"), []byte(r198INI), 0600)
+	os.WriteFile(v.f.location.file, []byte(r198JSON), 0600)
 	v.f.a.recordGameSettingsWatch(context.Background(), v.f.client, gameSettingsWatchJob{stage: "in_game_60s", generation: 1})
 	events = r175Events(t, v.f.a, "game_settings_watch")
 	if events[len(events)-1]["camera_mode_matches_target"] != false {
-		t.Fatal("LCU target masked actual file reset")
+		t.Fatal("LCU target masked PersistedSettings reset")
 	}
 	if !reflect.DeepEqual(v.f.patches[0], map[string]map[string]any{"General": {"CameraMode": float64(0)}}) {
 		t.Fatal(v.f.patches)

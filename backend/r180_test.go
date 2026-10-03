@@ -56,7 +56,7 @@ func r180Fixture(t *testing.T) *r180HistoryFixture {
 			return r178JSON(map[string]any{"queues": []any{}}, 200), nil
 		}
 		f.sgpCalls.Add(1)
-		if !strings.HasSuffix(r.URL.Path, "/SUMMARY") || r.URL.Query().Get("count") != "30" {
+		if !strings.HasSuffix(r.URL.Path, "/SUMMARY") || (r.URL.Query().Get("count") != "30" && r.URL.Query().Get("count") != "10") {
 			t.Errorf("unexpected SGP %s", r.URL)
 		}
 		if f.sgpFailed.Load() {
@@ -69,6 +69,17 @@ func r180Fixture(t *testing.T) *r180HistoryFixture {
 			games = append(games, map[string]any{"json": f.sgpGame(i, 440, ref)})
 		}
 		games = append(games, map[string]any{"json": f.sgpGame(999, 420, ref)})
+		if tag := r.URL.Query().Get("tag"); tag != "" {
+			filtered := []any{}
+			if tag == "q_440" {
+				for i := 11 + int64(f.generation.Load()); i >= 1 && len(filtered) < 10; i-- {
+					filtered = append(filtered, map[string]any{"json": f.sgpGame(i, 440, ref)})
+				}
+			} else if tag == "q_420" {
+				filtered = append(filtered, map[string]any{"json": f.sgpGame(999, 420, ref)})
+			}
+			games = filtered
+		}
 		return r178JSON(map[string]any{"games": games}, 200), nil
 	})}
 	return f
@@ -126,7 +137,7 @@ func TestR180MergedLatestSameQueueAndDedup(t *testing.T) {
 		t.Fatal(stats, record, games)
 	}
 	// Both real adapters use the same numeric ID; metadata region prefixes are irrelevant.
-	if result.Evidence.LCU[0].GameID != 101 || result.Evidence.SGP[0].GameID != 101 {
+	if result.Evidence.LCU[0].GameID != 101 || result.Evidence.SGP[0].GameID != 112 {
 		t.Fatal("different id schemes")
 	}
 	events := r175Events(t, f.a, "live_history_freshness")

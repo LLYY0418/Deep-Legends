@@ -44,9 +44,12 @@ func (a *app) observeLiveHistoryGame(client *LCUClient, phase string, gameID, qu
 // Read-only after a loader publishes its result. Kept with the 45-second cache
 // and flight so diagnostics compare the same windows used for the displayed row.
 type liveHistoryEvidence struct {
-	LCU, SGP     []gameplayMatch
-	SGPRequested bool
-	SGPOK        bool
+	LCU, SGP      []gameplayMatch
+	SGPRequested  bool
+	SGPOK         bool
+	QueueFiltered bool
+	PagesRead     int
+	StopReason    string
 }
 
 func (a *app) clearLiveHistoryFreshness() {
@@ -84,7 +87,7 @@ func (a *app) livePlayerMatchesForGame(ctx context.Context, client *LCUClient, r
 		return a.livePlayerMatches(ctx, client, reference, playerRef, isCurrent, names)
 	}
 	result := a.cachedLivePlayerMatches(ctx, liveHistoryCacheKey(scope, playerRef, isCurrent), func(loadCtx context.Context) livePlayerMatchesResult {
-		return a.loadLivePlayerMatches(loadCtx, client, reference, playerRef, isCurrent, names)
+		return a.loadLivePlayerMatches(loadCtx, client, reference, playerRef, isCurrent, names, scope.queueID)
 	})
 	if slot >= 0 {
 		a.recordLiveHistoryFreshness(result, playerRef, isCurrent, scope, team, slot)
@@ -96,7 +99,7 @@ func (a *app) recordLiveHistoryFreshness(result livePlayerMatchesResult, playerR
 	if scope == nil {
 		return
 	}
-	shown := recentMatchesForPlayer(result.Matches, playerRef, 10, scope.queueID)
+	shown := recentLiveMatchesForPlayer(result.Matches, playerRef, scope.queueID, time.Now())
 	var latest int64
 	if len(shown) > 0 {
 		latest = shown[0].GameID
@@ -170,28 +173,93 @@ func liveHistoryRosterSlots(players []gameplayLivePlayer, aligned bool) []int {
 
 // SUMMARY only. useCache=false deliberately avoids both reading and writing the
 // shared five-minute SGP page cache; the live roster has its own 45-second cache.
-func (a *app) loadLiveSGPMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, names map[int64]string) (livePlayerMatchesResult, bool) {
+func liveHistoryQueue(queues []int64) int64 {
+	if len(queues) > 0 {
+		return queues[0]
+	}
+	return 0
+}
+
+func recentLiveMatchesForPlayer(matches []gameplayMatch, playerRef string, queueID int64, now time.Time) []gameplayMatch {
+	cutoff := now.Add(-30 * 24 * time.Hour).UnixMilli()
+	window := make([]gameplayMatch, 0, len(matches))
+	for _, match := range matches {
+		if match.CreatedAt >= cutoff {
+			window = append(window, match)
+		}
+	}
+	return recentMatchesForPlayer(window, playerRef, 10, queueID)
+}
+
+func liveHistoryPageStop(matches []gameplayMatch, playerRef string, queueID int64, now time.Time, more bool, pages int) string {
+	if len(recentLiveMatchesForPlayer(matches, playerRef, queueID, now)) >= 10 {
+		return "enough"
+	}
+	cutoff := now.Add(-30 * 24 * time.Hour).UnixMilli()
+	for _, match := range matches {
+		if match.CreatedAt > 0 && match.CreatedAt < cutoff {
+			return "window"
+		}
+	}
+	if !more {
+		return "exhausted"
+	}
+	if pages >= 4 {
+		return "page_limit"
+	}
+	return ""
+}
+
+func (a *app) loadLiveSGPMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, names map[int64]string, queues ...int64) (livePlayerMatchesResult, bool) {
 	if a.sgp == nil {
 		return livePlayerMatchesResult{State: "unavailable"}, false
 	}
-	_, _, ok := a.sgp.available(client)
+	serverID, _, ok := a.sgp.available(client)
 	if !ok {
 		return livePlayerMatchesResult{State: "unavailable"}, false
 	}
-	infos, _, _, err := a.sgp.matchHistory(ctx, client, playerRef, 0, 30, false)
-	if err != nil {
-		return livePlayerMatchesResult{State: "failed"}, false
+	if reference.ServerID != "" {
+		serverID = reference.ServerID
 	}
-	matches := make([]gameplayMatch, 0, len(infos))
-	for _, info := range infos {
-		a.checkArenaGroupTruth(client, reference.ServerID, info)
-		matches = append(matches, convertRiotMatchInfo(info, playerRef, names, nil, "", reference.ServerID))
+	queueID := liveHistoryQueue(queues)
+	filter := "all"
+	if definition, known := supportedQueueDefinition(queueID); known {
+		filter = definition.Filter
+	}
+	evidence := &liveHistoryEvidence{StopReason: "exhausted"}
+	matches := []gameplayMatch{}
+	now, offset := time.Now(), 0
+	for page := 0; page < 4; page++ {
+		count, pageFilter := 30, "all"
+		if page == 0 && queueID > 0 {
+			count, pageFilter = 10, filter
+		}
+		infos, consumed, more, resolution, err := a.loadSGPMatchHistoryPage(ctx, client, serverID, playerRef, offset, count, pageFilter, sgpHistoryPageOptions{NoCache: true, QueueID: queueID, FallbackCount: 30})
+		evidence.PagesRead++
+		if page == 0 {
+			evidence.QueueFiltered = resolution.ServerFiltered
+		}
+		for _, info := range infos {
+			a.checkArenaGroupTruth(client, reference.ServerID, info)
+			matches = append(matches, convertRiotMatchInfo(info, playerRef, names, nil, "", reference.ServerID))
+		}
+		if err != nil && len(matches) == 0 {
+			return livePlayerMatchesResult{State: "failed", Evidence: evidence}, false
+		}
+		evidence.StopReason = liveHistoryPageStop(matches, playerRef, queueID, now, more, evidence.PagesRead)
+		if evidence.QueueFiltered || queueID <= 0 || err != nil || consumed <= 0 || evidence.StopReason != "" {
+			if evidence.StopReason == "" {
+				evidence.StopReason = "exhausted"
+			}
+			break
+		}
+		offset += consumed
 	}
 	state := "ok"
 	if len(matches) == 0 {
 		state = "empty"
 	}
-	return livePlayerMatchesResult{Matches: matches, State: state, Source: "sgp"}, true
+	return livePlayerMatchesResult{Matches: matches, State: state, Source: "sgp", Evidence: evidence}, true
 }
 
 // Both adapters directly preserve the numeric LCU gameId / SGP json.gameId.
@@ -278,13 +346,19 @@ func liveHistoryFreshnessDiagnostic(result livePlayerMatchesResult, playerRef st
 			skipped++
 		}
 	}
-	shown := recentMatchesForPlayer(result.Matches, playerRef, 10, queueID)
+	shown := recentLiveMatchesForPlayer(result.Matches, playerRef, queueID, now)
 	event := map[string]any{"event": "live_history_freshness", "team": team, "slot": slot, "is_current": isCurrent,
 		"source": result.Source, "window_games": len(lcu), "queue_games": queueGames,
 		"newest_any_age_min": liveNewestAgeMinutes(lcu, 0, now), "newest_queue_age_min": liveNewestAgeMinutes(lcu, queueID, now),
 		"lcu_newest_queue_age_min": liveNewestAgeMinutes(lcu, queueID, now), "subject_unmatched": unmatched, "remake_skipped": skipped,
-		"shown_newest_age_min": liveNewestAgeMinutes(shown, 0, now)}
+		"shown_newest_age_min": liveNewestAgeMinutes(shown, 0, now), "window_days": 30, "shown_count": len(shown), "queue_filtered": false, "pages_read": 0, "stop_reason": liveHistoryPageStop(result.Matches, playerRef, queueID, now, false, 0)}
 	if evidence := result.Evidence; evidence != nil && evidence.SGPRequested {
+		event["queue_filtered"], event["pages_read"] = evidence.QueueFiltered, evidence.PagesRead
+		if len(shown) >= 10 {
+			event["stop_reason"] = "enough"
+		} else if evidence.StopReason != "" {
+			event["stop_reason"] = evidence.StopReason
+		}
 		if !evidence.SGPOK {
 			event["sample_failed"] = true
 		} else {

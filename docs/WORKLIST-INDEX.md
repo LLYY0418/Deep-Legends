@@ -136,6 +136,8 @@
 
 | R199 | 更正 R196 发布状态并补齐发布证据规则 | 已关闭：账本与发布规则已更正 | [WORKLIST-R199-R196-RELEASE-0.12.60-NOT-PUBLISHED.md](history/worklists/WORKLIST-R199-R196-RELEASE-0.12.60-NOT-PUBLISHED.md) | [r199-execution-ledger.md](history/ledgers/r199-execution-ledger.md) | 只读确认草稿 402378684；旧草稿及附件保持不变 |
 
-| R200 | 卡片选人只用发给自己的子集、失败顺延、备战席换人确认 | 进行中：0.12.63 已正式发布，自动验证通过；子集接口真机已核实；实际锁定与换人待用户日志 | [WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md](WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md) | [r200-execution-ledger.md](r200-execution-ledger.md) | 版本 0.12.63；源码 `91df3a9a`；子集接口真机已核实；临时测试选人见 R201 P3 |
+| R200 | 卡片选人只用发给自己的子集、失败顺延、备战席换人确认 | 进行中：0.12.63 已正式发布，自动验证通过；子集接口真机已核实；实际锁定与换人待用户日志 | [WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md](WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md) | [r200-execution-ledger.md](r200-execution-ledger.md) | 版本 0.12.63；源码 `91df3a9a`；子集接口真机已核实；临时测试选人见 R201 P3；卡片模式备战席交换时机由 R202 调整 |
 
 | R201 | 升级隐藏窗口与安装提速、只读镜头写入、海斗临时首卡测试 | 进行中：0.12.64 已正式发布，自动验证通过；Windows 真机待验收 | [WORKLIST-R201-UPDATE-HIDE-APP-DURING-INSTALL-FASTER-INSTALL-CAMERA-WITH-SETTINGS-LOCK-AND-ARAM-TEST-PICK.md](WORKLIST-R201-UPDATE-HIDE-APP-DURING-INSTALL-FASTER-INSTALL-CAMERA-WITH-SETTINGS-LOCK-AND-ARAM-TEST-PICK.md) | [r201-execution-ledger.md](r201-execution-ledger.md) | 版本 0.12.64；P3 临时逻辑删除另开工单 |
+
+| R202 | 海斗备战席等待最终准备、序列持有规则、当前模式近 30 天 10 局 | 进行中：0.12.65 实现与验证，发布未完成；Windows 真机待验收 | [WORKLIST-R202-ARAM-BENCH-SWAP-BEFORE-FINALIZATION-NOT-APPLIED-AND-POOL-HOLDER-RULE.md](WORKLIST-R202-ARAM-BENCH-SWAP-BEFORE-FINALIZATION-NOT-APPLIED-AND-POOL-HOLDER-RULE.md) | [r202-execution-ledger.md](r202-execution-ledger.md) | 版本 0.12.65；R201 临时首卡保持，实际换入待日志 |

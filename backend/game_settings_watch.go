@@ -663,11 +663,13 @@ func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient,
 	event["files"] = snapshots
 	if job.stage == "in_game_60s" {
 		if target, ok := gameCameraModeValues[a.cameraModePreference()]; ok {
-			_, _, value, present := cameraSetting(decodeLCUSettings(payload))
-			matches := present && settingMatches(strconv.Itoa(target), value)
+			// R202: the game starts from the located PersistedSettings.json.
+			// LCU does not necessarily expose CameraMode; game.cfg is rewritten.
+			matches := false
 			for _, file := range snapshots {
-				if file.Exists && file.Result == "ok" && (file.Located || strings.HasSuffix(strings.ToLower(file.PathKind), "game.cfg")) {
-					matches = matches && cameraConfigValue(file.AllValues) == strconv.Itoa(target)
+				if file.Located && file.Exists && file.Result == "ok" && strings.HasSuffix(strings.ToLower(file.PathKind), "persistedsettings.json") {
+					matches = cameraConfigValue(file.AllValues) == strconv.Itoa(target)
+					break
 				}
 			}
 			event["camera_mode_matches_target"] = matches

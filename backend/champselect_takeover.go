@@ -10,9 +10,10 @@ import (
 )
 
 type champSelectBenchSubmission struct {
-	Decision  champSelectDecision
-	Observed  bool
-	SettledAt time.Time
+	Decision   champSelectDecision
+	Observed   bool
+	SettledAt  time.Time
+	TimerPhase string
 }
 
 func champSelectLockDelay(config champSelectSideConfig) int {
@@ -85,7 +86,7 @@ func (r *watchRunner) observeChampSelectManualActions(session lcuChampSelectSess
 				continue
 			}
 			side := strings.ToLower(action.Type)
-			if side != "ban" && side != "pick" {
+			if side != "ban" && side != "pick" || side == "pick" && session.AllowSubsetChampionPicks {
 				continue
 			}
 			r.mu.Lock()
@@ -165,7 +166,7 @@ func (r *watchRunner) observeChampSelectBench(session lcuChampSelectSession, def
 		confirmedDecision = swap.Decision
 		attempt = r.champSelect.attempts[swap.Decision.Key]
 	}
-	tracking := slices.Contains(group.Pick.Champions[position], previous) || pending.Action != "" || swap != nil
+	tracking := slices.Contains(group.Pick.Champions[position], previous) || !session.AllowSubsetChampionPicks && (pending.Action != "" || swap != nil)
 	changed := group.Bench.Enabled && observed && previous > 0 && current > 0 && current != previous && tracking && !ownEcho
 	championID := previous
 	if !slices.Contains(group.Pick.Champions[position], championID) {
@@ -192,41 +193,41 @@ func (r *watchRunner) observeChampSelectBench(session lcuChampSelectSession, def
 	return yielded
 }
 
-func (r *watchRunner) champSelectBenchRequestStillCurrent(ctx context.Context, client *LCUClient, decision champSelectDecision) bool {
+func (r *watchRunner) champSelectBenchRequestStillCurrent(ctx context.Context, client *LCUClient, decision champSelectDecision) (bool, string) {
 	var session lcuChampSelectSession
 	if err := client.RequestJSON(ctx, http.MethodGet, champSelectAPI+"/session", nil, &session); err != nil {
-		return false
+		return false, ""
 	}
 	if session.GameID != decision.GameID || session.LocalPlayerCellID == nil || *session.LocalPlayerCellID != decision.LocalCellID || session.QueueID != decision.QueueID {
-		return false
+		return false, ""
 	}
 	r.mu.Lock()
 	if r.champSelect.runtimeID != decision.RuntimeID {
 		r.mu.Unlock()
-		return false
+		return false, ""
 	}
 	group := r.settings.ChampSelect.Groups[r.champSelect.groupID]
 	definition, _ := champSelectGroupDefinitionFor(r.champSelect.groupID)
 	position := r.champSelect.position
 	r.mu.Unlock()
 	if r.observeChampSelectBench(session, definition, group, position, decision.RuntimeID) {
-		return false
+		return false, ""
 	}
-	if champSelectLocalPickUnfinished(session) {
-		return false
+	if champSelectLocalPickUnfinished(session) || session.AllowSubsetChampionPicks && !strings.EqualFold(session.Timer.Phase, "FINALIZATION") {
+		return false, ""
 	}
 	if champSelectCurrentChampion(session) != decision.FromChampionID {
 		r.yieldChampSelect("bench", decision.ChampionID, decision.RuntimeID)
-		return false
+		return false, ""
 	}
 	if !definition.HasBench || !session.BenchEnabled || !group.Bench.Enabled || !slices.Contains(group.Pick.Champions[position], decision.ChampionID) {
-		return false
+		return false, ""
 	}
 	for _, champion := range session.BenchChampions {
 		if champion.ChampionID == decision.ChampionID {
-			return ctx.Err() == nil
+			return ctx.Err() == nil, session.Timer.Phase
 		}
 	}
 	r.champDiagnostic("bench-preflight", fmt.Sprintf("target-%d-no-longer-on-bench", decision.ChampionID), decision, nil)
-	return false
+	return false, ""
 }

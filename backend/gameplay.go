@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -2273,21 +2274,47 @@ func (resolution matchHistoryFilterResolution) pagination(begIndex, count int, m
 	}
 }
 
-func (a *app) loadSGPMatchHistoryPage(ctx context.Context, client *LCUClient, serverID, playerRef string, begIndex, count int, matchFilter string) ([]*riotMatchInfo, int, bool, matchHistoryFilterResolution, error) {
+type sgpHistoryPageOptions struct {
+	NoCache       bool
+	QueueID       int64
+	FallbackCount int
+}
+
+func (a *app) loadSGPMatchHistoryPage(ctx context.Context, client *LCUClient, serverID, playerRef string, begIndex, count int, matchFilter string, options ...sgpHistoryPageOptions) ([]*riotMatchInfo, int, bool, matchHistoryFilterResolution, error) {
 	matchFilter = normalizeGameplayMatchFilter(matchFilter)
 	spec := matchHistoryFilterFor(matchFilter)
 	resolution := matchHistoryFilterResolution{Filter: matchFilter}
+	useCache, fallbackCount := true, count
+	if len(options) > 0 {
+		option := options[0]
+		useCache = !option.NoCache
+		if option.FallbackCount > 0 {
+			fallbackCount = option.FallbackCount
+		}
+		if option.QueueID > 0 {
+			// Reuse only a tag already validated by the queue mapping. Live
+			// rows use the current queue, rather than a union of sibling queues.
+			tag := fmt.Sprintf("q_%d", option.QueueID)
+			if slices.Contains(spec.Tags, tag) {
+				spec.Tags = []string{tag}
+				spec.AllowedQueues, spec.AllowedGroups = int64Set(option.QueueID), nil
+				spec.Key += ":" + tag
+			} else {
+				spec.Tags = nil
+			}
+		}
+	}
 	if !spec.available() {
 		if matchFilter != "all" {
 			resolution.Fallback = true
 			resolution.FallbackReason = "当前模式没有可验证的单一 SGP tag，已使用客户端筛选"
 		}
-		infos, consumed, more, err := a.sgp.matchHistoryOn(ctx, client, serverID, playerRef, begIndex, count, true)
+		infos, consumed, more, err := a.sgp.matchHistoryOn(ctx, client, serverID, playerRef, begIndex, fallbackCount, useCache)
 		return infos, consumed, more, resolution, err
 	}
 	state := a.queueFilterCapability(serverID, spec.Key)
 	if state != queueFilterCapabilityUnsupported {
-		infos, consumed, more, err := a.sgp.matchHistoryFilteredOn(ctx, client, serverID, playerRef, begIndex, count, spec.Tags, true)
+		infos, consumed, more, err := a.sgp.matchHistoryFilteredOn(ctx, client, serverID, playerRef, begIndex, count, spec.Tags, useCache)
 		var partialErr *sgpPartialHistoryError
 		usablePartial := errors.As(err, &partialErr) && len(infos) > 0
 		if (err == nil || usablePartial) && spec.acceptsAll(infos) {
@@ -2319,7 +2346,7 @@ func (a *app) loadSGPMatchHistoryPage(ctx context.Context, client *LCUClient, se
 			"filter": matchFilter, "tags": spec.Tags, "reason": resolution.FallbackReason,
 		})
 	}
-	infos, consumed, more, err := a.sgp.matchHistoryOn(ctx, client, serverID, playerRef, begIndex, count, true)
+	infos, consumed, more, err := a.sgp.matchHistoryOn(ctx, client, serverID, playerRef, begIndex, fallbackCount, useCache)
 	return infos, consumed, more, resolution, err
 }
 
@@ -7291,7 +7318,7 @@ func recentGamesFromMatches(matches []gameplayMatch, playerRef string, limit int
 }
 
 func liveRecentPlayerStats(matches []gameplayMatch, playerRef string, queueID int64) (gameplayAggregate, []gameplayRecentGame) {
-	recentMatches := recentMatchesForPlayer(matches, playerRef, 10, queueID)
+	recentMatches := recentLiveMatchesForPlayer(matches, playerRef, queueID, time.Now())
 	return aggregateMatches(recentMatches, playerRef, nil), recentGamesFromSelectedMatches(recentMatches, playerRef)
 }
 
@@ -8342,10 +8369,11 @@ func (a *app) cachedLivePlayerMatches(ctx context.Context, key string, loader fu
 
 // livePlayerMatches shares the 45-second cache and request flight. All players
 // merge fresh SUMMARY and LCU; self keeps the current-summoner LCU endpoint.
-func (a *app) livePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string) livePlayerMatchesResult {
-	key := playerRef + "\x00" + strconv.FormatBool(isCurrent)
+func (a *app) livePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string, queues ...int64) livePlayerMatchesResult {
+	queueID := liveHistoryQueue(queues)
+	key := playerRef + "\x00" + strconv.FormatBool(isCurrent) + fmt.Sprintf("\x00%d", queueID)
 	return a.cachedLivePlayerMatches(ctx, key, func(loadCtx context.Context) livePlayerMatchesResult {
-		return a.loadLivePlayerMatches(loadCtx, client, reference, playerRef, isCurrent, names)
+		return a.loadLivePlayerMatches(loadCtx, client, reference, playerRef, isCurrent, names, queueID)
 	})
 }
 
@@ -8365,7 +8393,8 @@ func loadLiveLCUMatches(ctx context.Context, client *LCUClient, reference gamepl
 	return livePlayerMatchesResult{Matches: matches, State: state, Source: "lcu"}
 }
 
-func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string) livePlayerMatchesResult {
+func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string, queues ...int64) livePlayerMatchesResult {
+	queueID := liveHistoryQueue(queues)
 	var lcu, sgp livePlayerMatchesResult
 	var sgpOK bool
 	lcu.State = "failed"
@@ -8382,10 +8411,13 @@ func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, refe
 		defer a.recoverPanic("live-history.sgp")
 		sgpCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
-		sgp, sgpOK = a.loadLiveSGPMatches(sgpCtx, client, reference, playerRef, names)
+		sgp, sgpOK = a.loadLiveSGPMatches(sgpCtx, client, reference, playerRef, names, queueID)
 	}()
 	wait.Wait()
 	evidence := &liveHistoryEvidence{LCU: cloneGameplayMatches(lcu.Matches), SGP: cloneGameplayMatches(sgp.Matches), SGPRequested: sgp.State != "unavailable", SGPOK: sgpOK}
+	if sgp.Evidence != nil {
+		evidence.QueueFiltered, evidence.PagesRead, evidence.StopReason = sgp.Evidence.QueueFiltered, sgp.Evidence.PagesRead, sgp.Evidence.StopReason
+	}
 	if !sgpOK {
 		lcu.Evidence = evidence
 		// Empty LCU plus failed SGP remains a failure, not a cached empty history.

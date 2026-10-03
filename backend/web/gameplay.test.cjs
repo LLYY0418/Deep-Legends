@@ -1444,3 +1444,21 @@ test("R177 partial starter patches do not create a fresh retry budget for remain
     assert.ok(h.calls.every(call => call.source === "specialist" && call.championId === 64 && call.position === "mid"));
   } finally { h.dom.window.close(); }
 });
+
+
+test("R202 current mode ten games render the true count and ten history blocks", () => {
+  const { JSDOM } = require("../../desktop/node_modules/jsdom");
+  const f = compile(["renderLivePlayer", "renderInsightMatches", "insightScore"], {
+    state: {settings:{}}, number: String, escapeHTML: String,
+    maskedPlayerName: () => "Fixture", liveDisplayedChampionId: () => 13,
+    rankTitle: () => "", positionLabel: () => "", renderLivePremadeTag: () => "",
+    iconFigure: () => "", percent: String, kda: String,
+  });
+  const player = { historyState:"ok", recentRankedRecord:{games:10,wins:7,losses:3},
+    modeStats:{games:10,kda:3}, recentGames:Array.from({length:10},(_,i)=>({championId:13,win:i<7,kills:2,deaths:1,assists:1})) };
+  const dom = new JSDOM(f.renderLivePlayer(player,0,false,13,[],"",true,true)+f.renderInsightMatches(player));
+  try {
+    assert.match(dom.window.document.querySelector(".live-player").textContent,/近 10 局/);
+    assert.equal(dom.window.document.querySelectorAll(".insight-match").length,10);
+  } finally { dom.window.close(); }
+});
