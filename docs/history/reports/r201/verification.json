@@ -26,6 +26,31 @@
     "test_pick_ui": "assertion_fail"
   },
   "switch_off_r200": "pass",
-  "public_build": "pending",
-  "release": "pending"
+  "public_build": {
+    "passed": true,
+    "mode": "public",
+    "source_commit": "37bb3c12ea98260ea2b2806f88bea6f0a7d627cb",
+    "receipt": "local-release-build.json"
+  },
+  "release": {
+    "published": true,
+    "release_id": 402520305,
+    "isLatest": true,
+    "published_at": "2026-10-03T13:15:14Z",
+    "anonymous_latest_version": "0.12.64",
+    "receipt": "publication-verification.json",
+    "asset_receipt": "release-asset-verification.json"
+  },
+  "fingerprint": "88054c16893c",
+  "github_runs": {
+    "release": 37124778247,
+    "tag_quality": 37124778245,
+    "branch_quality": 37124776191
+  },
+  "github_checks": {
+    "windows_public_release": "success",
+    "linux_quality": "success",
+    "tag_windows_repeat": "success",
+    "tag_workflow": "success"
+  }
 }

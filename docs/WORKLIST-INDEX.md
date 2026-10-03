@@ -138,4 +138,4 @@
 
 | R200 | 卡片选人只用发给自己的子集、失败顺延、备战席换人确认 | 进行中：0.12.63 已正式发布，自动验证通过；子集接口真机已核实；实际锁定与换人待用户日志 | [WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md](WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md) | [r200-execution-ledger.md](r200-execution-ledger.md) | 版本 0.12.63；源码 `91df3a9a`；子集接口真机已核实；临时测试选人见 R201 P3 |
 
-| R201 | 升级隐藏窗口与安装提速、只读镜头写入、海斗临时首卡测试 | 进行中：0.12.64 实现与验证，发布未完成；Windows 真机待验收 | [WORKLIST-R201-UPDATE-HIDE-APP-DURING-INSTALL-FASTER-INSTALL-CAMERA-WITH-SETTINGS-LOCK-AND-ARAM-TEST-PICK.md](WORKLIST-R201-UPDATE-HIDE-APP-DURING-INSTALL-FASTER-INSTALL-CAMERA-WITH-SETTINGS-LOCK-AND-ARAM-TEST-PICK.md) | [r201-execution-ledger.md](r201-execution-ledger.md) | 版本 0.12.64；P3 临时逻辑删除另开工单 |
+| R201 | 升级隐藏窗口与安装提速、只读镜头写入、海斗临时首卡测试 | 进行中：0.12.64 已正式发布，自动验证通过；Windows 真机待验收 | [WORKLIST-R201-UPDATE-HIDE-APP-DURING-INSTALL-FASTER-INSTALL-CAMERA-WITH-SETTINGS-LOCK-AND-ARAM-TEST-PICK.md](WORKLIST-R201-UPDATE-HIDE-APP-DURING-INSTALL-FASTER-INSTALL-CAMERA-WITH-SETTINGS-LOCK-AND-ARAM-TEST-PICK.md) | [r201-execution-ledger.md](r201-execution-ledger.md) | 版本 0.12.64；P3 临时逻辑删除另开工单 |

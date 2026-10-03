@@ -1,0 +1,5 @@
+ok  	deeplegends/installer	1.412s
+ok  	deeplegends/installer/internal/webviewhost	(cached)
+?   	deeplegends/installer/payload	[no test files]
+?   	deeplegends/installer/ui	[no test files]
+ok  	deeplegends/installer/uninstall	(cached)
