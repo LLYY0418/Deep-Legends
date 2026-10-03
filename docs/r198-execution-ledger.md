@@ -40,7 +40,7 @@ Windows 使用已有原生进程检测确认 League of Legends.exe 是否运行�
 
 Windows public 发布构建成功：全量 Go 319.256 秒；Web 856/856；desktop 269 项、267 通过、2 项平台门禁跳过、0 失败；发布运行时 4/4，public 密钥/包内后端/指纹校验通过。草稿 id `402418510`，三个附件回下载 SHA256/size/digest/清单均通过，安装包 111,362,560 字节，SHA256 `d5430f8837aed465ebe6575ab1972fafb68d3529bc856e760b38b09b6763a71b`。旧六个 Release 的元数据与附件保持不变，包含 0.12.60 草稿；独立产物复核通过。证据见 [草稿核验](history/reports/r198/draft-verification.json)。
 
-已正式发布 [v0.12.61 Latest](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.61)，release id `402418510`，发布时间 `2026-10-03T08:57:22Z`（北京时间 17:57:22），draft=false、prerelease=false、**isLatest=true**。匿名 `releases/latest/download/latest.json` 得到 **0.12.61**，与回下载清单字节一致；标签指向 `302ca108139353df23fa03e9d00132a6c3d59eea`，正式附件 digest/size/下载 URL/正文核对通过。包含 R197/R198 和 R196 下载测速选线、ETA、后台完成提示及细按钮。key mode=public，不含个人 Riot Key。旧六个 Release 元数据和附件不变，0.12.60 草稿仍保留未发布。证据见 [正式发布核验](history/reports/r198/published-release.json)。
+已正式发布 [v0.12.61 Latest](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.61)，release id `402418510`，发布时间 `2026-10-03T08:57:22Z`（北京时间 16:57:22），draft=false、prerelease=false、**isLatest=true**。匿名 `releases/latest/download/latest.json` 得到 **0.12.61**，与回下载清单字节一致；标签指向 `302ca108139353df23fa03e9d00132a6c3d59eea`，正式附件 digest/size/下载 URL/正文核对通过。包含 R197/R198 和 R196 下载测速选线、ETA、后台完成提示及细按钮。key mode=public，不含个人 Riot Key。旧六个 Release 元数据和附件不变，0.12.60 草稿仍保留未发布。证据见 [正式发布核验](history/reports/r198/published-release.json)。
 
 标签自动触发的同源码 CI `37111418872` 保留自动执行；验收采用同源码已全部成功的 `37109826915`。标签触发的重复草稿构建 `37111418886` 已确认 cancelled，不改已发布附件。
 
