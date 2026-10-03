@@ -4,36 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require(require.resolve("jsdom", { paths: [path.join(__dirname, "..", "..", "desktop")] }));
-const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
-const source = fs.readFileSync(process.env.R186_APP_SOURCE || path.join(__dirname, "app.js"), "utf8");
-const ids = ["update-button", "update-dialog", "update-dialog-title", "update-notes", "update-meta", "update-progress", "update-progress-fill", "update-progress-percent", "update-progress-hint", "update-alert", "update-start", "update-later", "update-cancel", "update-apply", "update-release-link", "update-dialog-close", "settings-update-check", "settings-update-feedback"];
-const available = { supported: true, current: "0.11.2", latest: "0.12.0", state: "available", portable: false, notes: "### 新增\n- **更新**和`代码`\n- [日志](https://example.com/log)", sizeBytes: 100 * 1024 * 1024, publishedAt: "2026-09-11T12:00:00Z", progress: {} };
-function harness(script = source, respond) {
-  const dom = new JSDOM(html, { url: "http://127.0.0.1:8787/", runScripts: "outside-only", pretendToBeVisual: true });
-  const w = dom.window, requests = [], streams = [];
-  w.matchMedia = () => ({ matches: false, addEventListener(){}, removeEventListener(){} });
-  w.ResizeObserver = w.IntersectionObserver = class { observe(){} disconnect(){} unobserve(){} };
-  w.HTMLElement.prototype.scrollTo = function(){};
-  w.HTMLDialogElement.prototype.showModal = function(){this.open=true;};
-  w.HTMLDialogElement.prototype.close = function(){this.open=false;};
-  w.fetch = (url, options) => { requests.push([url,options]);if(url === "/api/diagnostics/client")return Promise.resolve({ok:true,status:204});return respond?.(url, options) || new Promise(()=>{}); };
-  w.Headers = Headers;
-  w.EventSource = class {
-    static CLOSED = 2;
-    constructor(url){this.url=url;this.listeners=new Map();streams.push(this);}
-    addEventListener(name,fn){this.listeners.set(name,fn);}
-    close(){}
-    emit(name,data){this.listeners.get(name)?.({data:JSON.stringify(data)});}
-  };
-  try {
-    w.eval(fs.readFileSync(path.join(__dirname, "runtime.js"), "utf8"));
-    w.eval(script.replace(/\}\)\(\);\s*$/, 'window.updateProbe = { renderUpdateStatus, renderUpdateNotes, updateUI, renderUpdateDialog, showUpdateCheckFeedback };})();'));
-  } catch(error) {dom.window.close();throw error;}
-  return { w, dom, requests, streams, probe:w.updateProbe, get:id=>w.document.getElementById(id), close:()=>w.close() };
-}
-function renderScenarios(h) {
-  for (const state of ["available", "downloading", "verifying", "ready", "failed", "applying"]) h.probe.renderUpdateStatus({ ...available, state, error:state==="failed"?"最后线路超时":"",progress:{receivedBytes:42,totalBytes:100,bytesPerSecond:10,etaSeconds:6} });
-}
+const {source,ids,available,harness,renderScenarios}=require("./update-harness.cjs");
 test("real app bootstrap registers every updater element and renders every state", () => {
  const h=harness();try {
   assert.equal(h.get("refresh").nextElementSibling.id,"update-button");
@@ -75,7 +46,7 @@ test("portable, minimum supported, offline, game warning and no-update behavior"
    assert.equal(h.get("update-start").hidden,false);assert.equal(h.get("update-start").textContent,"立即升级");assert.equal(h.get("update-apply").hidden,true);
    assert.equal(h.get("update-release-link").hidden,true);assert.doesNotMatch(h.get("update-notes").textContent,/便携版请|当前版本较旧/);
    h.probe.renderUpdateStatus({...available,...extra,state:"downloading",progress:{receivedBytes:42,totalBytes:100}});assert.equal(h.get("update-progress").hidden,false);assert.equal(h.get("update-progress-percent").textContent,"42%");
-   h.probe.renderUpdateStatus({...available,...extra,state:"ready"});assert.equal(h.get("update-apply").hidden,false);assert.equal(h.get("update-apply").textContent,"立即重启升级");
+   h.probe.renderUpdateStatus({...available,...extra,state:"ready"});assert.equal(h.get("update-apply").hidden,false);assert.equal(h.get("update-apply").textContent,"立即升级");
    h.probe.renderUpdateStatus({...available,...extra,state:"failed",error:"安装失败"});assert.equal(h.get("update-release-link").hidden,false);
   }
   h.probe.renderUpdateStatus({...available,state:"ready"});h.get("update-button").click();
@@ -101,7 +72,7 @@ function assertSafeNotes(h){
  assert.equal(node.querySelector("code").textContent,"**原样**");
 }
 test("notes allow only escaped whitelist Markdown",()=>{const h=harness();try{assertSafeNotes(h);}finally{h.close();}});
-test("all 18 missing registry ids are killed by the real renderer",()=>{
+test("all updater registry ids are killed by the real renderer",()=>{
  for(const id of ids){
   const mutated=source.replace(`"${id}",`,"");assert.notEqual(mutated,source,id);
   let h;

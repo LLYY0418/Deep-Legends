@@ -119,10 +119,11 @@ type updateManifest struct {
 	Asset        updateAsset `json:"asset"`
 }
 type updateProgress struct {
-	ReceivedBytes  int64   `json:"receivedBytes"`
-	TotalBytes     int64   `json:"totalBytes"`
-	BytesPerSecond float64 `json:"bytesPerSecond"`
-	ETASeconds     int64   `json:"etaSeconds"`
+	ReceivedBytes   int64   `json:"receivedBytes"`
+	TotalBytes      int64   `json:"totalBytes"`
+	BytesPerSecond  float64 `json:"bytesPerSecond"`
+	ETASeconds      int64   `json:"etaSeconds"`
+	SelectingSource bool    `json:"selectingSource,omitempty"`
 }
 type updateStatus struct {
 	Supported   bool           `json:"supported"`
@@ -145,13 +146,16 @@ type updateCache struct {
 	Manifest  updateManifest `json:"manifest"`
 }
 type updateSettings struct {
-	Mirrors []string `json:"mirrors"`
+	Mirrors         []string `json:"mirrors"`
+	PreferredSource string   `json:"preferredSource"`
 }
 
 type updateManager struct {
 	migrationDirectory func() (string, error)
 	startSourceTimer   func(time.Duration, func()) func()
 	progressTicks      func() (<-chan time.Time, func())
+	downloadClock      func() time.Time
+	sourceDefaults     []string
 	mu                 sync.Mutex
 	status             updateStatus
 	manifest           *updateManifest
@@ -164,6 +168,7 @@ type updateManager struct {
 	migrate            func() error
 	portableDirectory  func() (string, error)
 	mirrors            []string
+	preferredSource    string
 	client             *http.Client
 	now                func() time.Time
 	freeBytes          func(string) (int64, error)
@@ -236,6 +241,9 @@ func newUpdateManager(current string, store *localStore, notify func(string, any
 		var settings updateSettings
 		if json.Unmarshal(data, &settings) == nil && validUpdateMirrors(settings.Mirrors) == nil {
 			u.mirrors = settings.Mirrors
+			if updateSourcePresent(u.sourcesLocked(), settings.PreferredSource) {
+				u.preferredSource = settings.PreferredSource
+			}
 		}
 	}
 	if data, err := readLocalStoreFile(store, "update-manifest.json"); err == nil && len(data) <= 256*1024 {
@@ -333,7 +341,7 @@ func validUpdateMirrors(mirrors []string) error {
 func (u *updateManager) Settings() updateSettings {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	return updateSettings{Mirrors: append([]string(nil), u.mirrors...)}
+	return updateSettings{Mirrors: append([]string(nil), u.mirrors...), PreferredSource: u.preferredSource}
 }
 
 func (u *updateManager) SetSettings(settings updateSettings) error {
@@ -345,11 +353,19 @@ func (u *updateManager) SetSettings(settings updateSettings) error {
 	if u.busyLocked() {
 		return errors.New("更新任务进行中，请稍后修改线路")
 	}
+	configured := append(append([]string(nil), settings.Mirrors...), u.defaultUpdateSources()...)
+	if !updateSourcePresent(configured, settings.PreferredSource) {
+		settings.PreferredSource = ""
+	}
+	if settings.PreferredSource == "" && updateSourcePresent(configured, u.preferredSource) {
+		settings.PreferredSource = u.preferredSource
+	}
 	data, _ := json.Marshal(settings)
 	if err := writeLocalStoreFile(u.store, "update-settings.json", data); err != nil {
 		return err
 	}
 	u.mirrors = append([]string(nil), settings.Mirrors...)
+	u.preferredSource = settings.PreferredSource
 	u.lastManual = time.Time{}
 	return nil
 }
@@ -379,7 +395,7 @@ func (u *updateManager) Check(force bool) bool {
 	previous := u.manifest
 	done := make(chan struct{})
 	u.checkDone = done
-	mirrors := append([]string(nil), u.mirrors...)
+	mirrors := u.sourcesLocked()
 	manifest := u.cache.Manifest
 	upgraded := u.cache.Current != "" && compareVersions(u.status.Current, u.cache.Current) > 0
 	u.mu.Unlock()
@@ -389,6 +405,7 @@ func (u *updateManager) Check(force bool) bool {
 
 		defer close(done)
 		var err error
+		checkedSource := "cached"
 		// Reserve the check before cleanup so a manual download cannot race it.
 		if upgraded {
 			err = u.cleanDownloads("")
@@ -401,7 +418,7 @@ func (u *updateManager) Check(force bool) bool {
 			}
 		}
 		if err == nil && !cached {
-			manifest, err = u.fetchManifest(u.ctx, mirrors)
+			manifest, checkedSource, err = u.fetchManifest(u.ctx, mirrors)
 		}
 		if err == nil && u.ctx.Err() == nil {
 			keep := ""
@@ -447,7 +464,12 @@ func (u *updateManager) Check(force bool) bool {
 		if err == nil && u.ctx.Err() == nil {
 			u.recordUpdateCheck(map[string]any{
 				"event": "update_check_succeeded", "latest_version": manifest.Version,
-				"state": resultState, "cached": cached,
+				"state": resultState, "cached": cached, "mirror_prefix": func() string {
+					if cached {
+						return "cached"
+					}
+					return updateDiagnosticMirrorPrefix(checkedSource)
+				}(),
 			})
 		} else if err != nil {
 			var sourceFailure *updateCheckFailure
@@ -464,15 +486,16 @@ func (u *updateManager) Check(force bool) bool {
 	return true
 }
 
-func (u *updateManager) fetchManifest(ctx context.Context, mirrors []string) (updateManifest, error) {
+func (u *updateManager) fetchManifest(ctx context.Context, mirrors []string) (updateManifest, string, error) {
 	var last error
 	for _, prefix := range mirrors {
 		if ctx.Err() != nil {
-			return updateManifest{}, ctx.Err()
+			return updateManifest{}, "", ctx.Err()
 		}
 		manifest, err := u.fetchManifestSource(ctx, prefix+updateManifestPath)
 		if err == nil {
-			return manifest, nil
+			u.rememberUpdateSource(prefix)
+			return manifest, prefix, nil
 		}
 		if !isCancellation(err) {
 			var failure *updateCheckFailure
@@ -489,7 +512,7 @@ func (u *updateManager) fetchManifest(ctx context.Context, mirrors []string) (up
 	if last == nil {
 		last = errors.New("没有可用下载线路")
 	}
-	return updateManifest{}, last
+	return updateManifest{}, "", last
 }
 
 func (u *updateManager) fetchManifestSource(ctx context.Context, target string) (updateManifest, error) {

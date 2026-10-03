@@ -145,10 +145,10 @@
     "favorites-collection-panel", "favorites-account-panel", "favorites-pools-panel", "favorites-facade-panel",
     "skin-dialog-art", "skin-dialog-backdrop", "skin-dialog-artwork", "skin-dialog-fullscreen", "skin-dialog-previous", "skin-dialog-next", "app-main", "app-scroll", "back-to-top",
     "setting-proxy-mode", "setting-proxy-url", "setting-proxy-url-wrap", "setting-proxy-save", "setting-proxy-state",
-    "update-button", "update-dialog", "update-dialog-title", "update-notes", "update-meta", "update-progress", "update-progress-fill", "update-progress-percent", "update-progress-hint", "update-alert", "update-start", "update-later", "update-cancel", "update-apply", "update-release-link", "update-dialog-close",
+    "update-background", "update-ready-toast", "update-ready-title", "update-ready-copy", "update-ready-later", "update-ready-apply", "update-button", "update-dialog", "update-dialog-title", "update-notes", "update-meta", "update-progress", "update-progress-fill", "update-progress-percent", "update-progress-hint", "update-alert", "update-start", "update-later", "update-cancel", "update-apply", "update-release-link", "update-dialog-close",
   ].map((id) => [camel(id), document.getElementById(id)]));
 
-  const updateUI = { status: null, seen: preference("update-viewed", ""), announced: "", phase: "None", pending: false, checkPending: false, checkRequestPending: false, statusEventRevision: 0, feedbackTimer: 0 };
+  const updateUI = { status: null, readyAnnounced: new Set(), seen: preference("update-viewed", ""), announced: "", phase: "None", pending: false, checkPending: false, checkRequestPending: false, statusEventRevision: 0, feedbackTimer: 0 };
 
   el.grid = el.skinGrid;
   el.template = el.skinCardTemplate;
@@ -3748,7 +3748,7 @@
     renderManualUpdateCheck();
     const visible = current.supported && ["available", "downloading", "verifying", "ready", "applying", "failed"].includes(current.state) && !!current.latest;
     el.updateButton.hidden = !visible;
-    if (!visible) { finishManualUpdateCheck(); return; }
+    if (!visible) { renderUpdateReadyToast(); finishManualUpdateCheck(); return; }
     const manual = false;
     const busy = ["downloading", "verifying"].includes(current.state);
     const ready = current.state === "ready" || current.state === "applying";
@@ -3760,12 +3760,13 @@
       el.updateButton.classList.add("fresh");
       updateUI.announced = current.latest;
     }
-    el.updateButton.querySelector(".dot").hidden = current.state !== "available" || updateUI.seen === current.latest;
+    el.updateButton.querySelector(".dot").hidden = !(current.state === "ready" || current.state === "available" && updateUI.seen !== current.latest);
     el.updateButton.querySelector(".hex-progress").setAttribute("stroke-dashoffset", String(59 * (1 - percent / 100)));
-    const tooltip = manual ? `有新版本 ${current.latest}` : busy ? `正在下载 ${percent}%` : ready ? "已就绪，点击重启升级" : `有新版本 ${current.latest}`;
+    const tooltip = manual ? `有新版本 ${current.latest}` : busy ? `正在下载新版本 ${percent}%` : ready ? "新版本已下载，点击升级" : `有新版本 ${current.latest}`;
     el.updateButton.dataset.tooltip = tooltip;
     el.updateButton.setAttribute("aria-label", tooltip);
     renderUpdateDialog();
+    renderUpdateReadyToast();
     finishManualUpdateCheck();
   }
 
@@ -3830,8 +3831,9 @@
     updateUI.seen = updateUI.status.latest;
     savePreference("update-viewed", updateUI.seen);
     el.updateButton.classList.remove("fresh");
-    renderUpdateStatus(updateUI.status);
+    el.updateReadyToast.hidden = true;
     if (!el.updateDialog.open) el.updateDialog.showModal();
+    renderUpdateStatus(updateUI.status);
     void api("/api/gameplay/phase", {}, "update-gameflow", 2000).then((value) => { updateUI.phase = value.phase; renderUpdateDialog(); }).catch(() => {});
   }
 
@@ -3846,9 +3848,9 @@
     el.updateDialog.querySelector(".from").textContent = `当前 ${current.current || ""}`;
     el.updateDialog.querySelector(".to").textContent = current.latest || "";
     if (busy) {
-      el.updateNotes.innerHTML = '<p class="muted">下载可以放着不管，完成后顶部按钮会变成「重启升级」。关掉这个窗口不会中断下载。</p>';
+      el.updateNotes.innerHTML = '<p class="muted">可以点「后台下载」继续使用软件，下载完成后右下角会提示你。</p>';
     } else if (ready) {
-      el.updateNotes.innerHTML = '<p>安装包已下载并通过校验。点「立即重启升级」后，Deep Legends 会关闭，安装界面接管并显示进度，装完自动重新打开。</p>';
+      el.updateNotes.innerHTML = '<p>安装包已下载并通过校验。点「立即升级」后，Deep Legends 会关闭，安装界面接管并显示进度，装完自动重新打开。</p>';
     } else {
       el.updateNotes.innerHTML = renderUpdateNotes(current.notes);
     }
@@ -3862,12 +3864,13 @@
     el.updateProgressPercent.textContent = `${percent}%`;
     el.updateProgressFill.style.width = `${percent}%`;
     el.updateProgress.querySelector('[role="progressbar"]').setAttribute("aria-valuenow", String(percent));
-    const remaining = progress.bytesPerSecond > 0 ? `约剩 ${Math.max(0, Math.ceil(progress.etaSeconds || 0))} 秒` : "正在连接下载线路…";
-    el.updateProgressHint.textContent = current.state === "verifying" ? "下载完成，正在校验 SHA-256…" : `${updateBytes(progress.receivedBytes)} / ${updateBytes(progress.totalBytes || current.sizeBytes)} · ${updateBytes(progress.bytesPerSecond)}/s · ${remaining}`;
+    const remaining = progress.bytesPerSecond > 0 ? updateETA(progress.etaSeconds) : "正在连接下载线路…";
+    el.updateProgressHint.textContent = progress.selectingSource ? "正在选择最快的下载线路…" : current.state === "verifying" ? "下载完成，正在校验 SHA-256…" : `${updateBytes(progress.receivedBytes)} / ${updateBytes(progress.totalBytes || current.sizeBytes)} · ${updateBytes(progress.bytesPerSecond)}/s · ${remaining}`;
     const warning = ["InProgress", "ChampSelect"].includes(updateUI.phase) ? "你正在对局中，建议打完再升级" : "";
     el.updateAlert.textContent = [current.error, warning].filter(Boolean).join("\n");
     el.updateAlert.hidden = !el.updateAlert.textContent;
-    el.updateStart.hidden = manual || ready;
+    el.updateStart.hidden = manual || ready || busy;
+    el.updateBackground.hidden = !busy;
     el.updateStart.textContent = failed ? "重试" : "立即升级";
     el.updateStart.disabled = busy || updateUI.pending || updateUI.checkPending;
     el.updateCancel.hidden = !busy || manual;
@@ -3879,7 +3882,26 @@
     el.updateReleaseLink.href = "https://github.com/LLYY0418/Deep-Legends/releases";
   }
 
-  async function updateAction(action) {
+  function updateETA(value) {
+    const seconds = Math.max(0, Math.ceil(Number(value) || 0));
+    if (seconds < 60) return `约剩 ${seconds} 秒`;
+    if (seconds < 3600) return `约剩 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
+    return `约剩 ${Math.floor(seconds / 3600)} 小时 ${Math.floor(seconds % 3600 / 60)} 分`;
+  }
+
+  function renderUpdateReadyToast() {
+    const current = updateUI.status;
+    if (current?.state !== "ready" || !current.supported || !current.latest) { el.updateReadyToast.hidden = true; return; }
+    if (updateUI.readyAnnounced.has(current.latest)) return;
+    updateUI.readyAnnounced.add(current.latest);
+    window.desktopUpdate?.ready?.();
+    if (el.updateDialog.open) return;
+    el.updateReadyTitle.textContent = "新版本下载完成";
+    el.updateReadyCopy.textContent = `Deep Legends ${current.latest} 已准备好，升级时软件会自动重启。`;
+    el.updateReadyToast.hidden = false;
+  }
+
+  async function updateAction(action, fromToast = false) {
     if (updateUI.pending || updateUI.checkPending) return;
     updateUI.pending = true;
     renderManualUpdateCheck();
@@ -3892,8 +3914,8 @@
           updateUI.phase = phase.phase;
           // If a game started since opening the dialog, expose the warning
           // before the user confirms again. The button remains enabled.
-          if (!wasInGame && ["InProgress", "ChampSelect"].includes(updateUI.phase)) return;
-        } catch (_) {}
+          if ((fromToast || !wasInGame) && ["InProgress", "ChampSelect"].includes(updateUI.phase)) { openUpdateDialog(); return; }
+        } catch (_) { if (fromToast) { openUpdateDialog(); return; } }
       }
       const result = await api(`/api/update/${action}`, { method: "POST" }, "update-action", 30000);
       if (result) renderUpdateStatus(result);
@@ -3912,6 +3934,9 @@
     el.settingsUpdateCheck.addEventListener("click", () => void checkForUpdates());
     el.updateDialogClose.addEventListener("click", () => el.updateDialog.close());
     el.updateLater.addEventListener("click", () => el.updateDialog.close());
+    el.updateBackground.addEventListener("click", () => el.updateDialog.close());
+    el.updateReadyLater.addEventListener("click", () => { el.updateReadyToast.hidden = true; });
+    el.updateReadyApply.addEventListener("click", () => { el.updateReadyToast.hidden = true; void updateAction("apply", true); });
     el.updateStart.addEventListener("click", () => void updateAction("download"));
     el.updateCancel.addEventListener("click", () => void updateAction("cancel"));
     el.updateApply.addEventListener("click", () => void updateAction("apply"));

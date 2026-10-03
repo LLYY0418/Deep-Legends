@@ -22,7 +22,12 @@ import (
 
 type updateRoundTrip func(*http.Request) (*http.Response, error)
 
-func (f updateRoundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+func (f updateRoundTrip) RoundTrip(r *http.Request) (*http.Response, error) {
+	if r.Header.Get("Range") == "bytes=0-1048575" {
+		return updateResponse(http.StatusRequestedRangeNotSatisfiable, nil), nil
+	}
+	return f(r)
+}
 func updateTestManifest(data []byte) updateManifest {
 	digest := sha256.Sum256(data)
 	name := "Deep-Legends-Setup-0.12.0-a1b2c3d4e5f6.exe"
@@ -36,6 +41,8 @@ func updateTestManager(t *testing.T, data []byte) *updateManager {
 	}
 	u := newUpdateManager("0.11.2", trackTestStore(t, &localStore{root: root}), nil)
 	t.Cleanup(u.Close)
+	// Each fixture supplies its own complete route inventory; production retains built-ins with custom settings.
+	u.sourceDefaults = []string{}
 	u.status.Portable = false
 	u.portableDirectory = func() (string, error) { return filepath.Join(root, "Programs", "Deep Legends"), nil }
 	u.migrate = func() error { return nil }
@@ -138,7 +145,7 @@ func TestUpdateMirrorFallbackSingleFlightAndLastError(t *testing.T) {
 	u.manifest = nil
 	u.Check(true)
 	waitUpdateCheck(t, u)
-	if status := u.Status(); status.State != "idle" || !strings.Contains(status.Error, "https://mirror.test/"+updateManifestPath+"：HTTP 503") {
+	if status := u.Status(); status.State != "idle" || !strings.Contains(status.Error, updateManifestPath+"：HTTP 503") {
 		t.Fatalf("last error lost: %#v", status)
 	}
 }

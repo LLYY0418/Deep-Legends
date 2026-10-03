@@ -359,6 +359,11 @@ function onBackendClosed(code, signal) {
 
 function setupBackendIPC() {
   const trusted = event => event.sender === mainWindow?.webContents && isTrustedRenderer(event.sender);
+  ipcMain.removeAllListeners("desktop-update-ready");
+  ipcMain.on("desktop-update-ready", event => {
+    if (!trusted(event) || !mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized() || !mainWindow.isFocused()) mainWindow.flashFrame(true);
+  });
   ipcMain.removeHandler("desktop-backend-state");
   ipcMain.handle("desktop-backend-state", event => {
     if (!trusted(event)) return null;
@@ -510,6 +515,7 @@ function createMainWindow() {
   };
   mainWindow.on("resize", scheduleBoundsWrite);
   mainWindow.on("move", scheduleBoundsWrite);
+  mainWindow.on("focus", () => mainWindow?.flashFrame(false));
   mainWindow.on("close", () => {
     clearTimeout(boundsWriteTimer);
     persistBounds();
@@ -676,6 +682,7 @@ function createMainWindow() {
     screen.removeListener("display-metrics-changed", onDisplayMetricsChanged);
     ipcMain.removeHandler("desktop-backend-state");
     ipcMain.removeHandler("desktop-backend-restart");
+    ipcMain.removeAllListeners("desktop-update-ready");
     ipcMain.removeHandler("desktop-scale-get");
     ipcMain.removeAllListeners("desktop-scale-set");
     windowShareExportController.clear();

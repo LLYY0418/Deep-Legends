@@ -1,0 +1,30 @@
+{
+  "results": [
+    {
+      "name": "fixed-order-no-probe",
+      "test": "TestR196ProbeSelectsFastMirror",
+      "killed": true
+    },
+    {
+      "name": "disable-slow-switch",
+      "test": "TestR196SlowSourceSwitchResumesAndHashes",
+      "killed": true
+    },
+    {
+      "name": "eta-seconds-only",
+      "test": "R196 8",
+      "killed": true
+    },
+    {
+      "name": "ready-redownload",
+      "test": "R196 11",
+      "killed": true
+    },
+    {
+      "name": "toast-skip-phase-guard",
+      "test": "R196 12",
+      "killed": true
+    }
+  ],
+  "logs": "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r196-mutants-7u0LQn"
+}

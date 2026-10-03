@@ -1,0 +1,44 @@
+[
+  {
+    "scene": "busy-icon",
+    "icon": {
+      "x": 834,
+      "y": 26,
+      "w": 30,
+      "h": 30
+    },
+    "controlSize": 24,
+    "fill": "none",
+    "stroke": "2.15px",
+    "arrow": "2.15px",
+    "dialog": null,
+    "hint": "39.3 MB / 106.2 MB · 350.0 KB/s · 约剩 192 秒",
+    "buttons": [
+      "取消下载",
+      "立即升级"
+    ],
+    "toast": null,
+    "overflow": false
+  },
+  {
+    "scene": "ready-icon",
+    "icon": {
+      "x": 834,
+      "y": 26,
+      "w": 30,
+      "h": 30
+    },
+    "controlSize": 24,
+    "fill": "rgb(88, 183, 232)",
+    "stroke": "2.15px",
+    "arrow": "2.15px",
+    "dialog": null,
+    "hint": "39.3 MB / 106.2 MB · 350.0 KB/s · 约剩 192 秒",
+    "buttons": [
+      "稍后再说",
+      "立即重启升级"
+    ],
+    "toast": null,
+    "overflow": false
+  }
+]

@@ -81,3 +81,7 @@ contextBridge.exposeInMainWorld("desktopBackend", {
     return () => ipcRenderer.removeListener("desktop-backend-state", listener);
   },
 });
+
+contextBridge.exposeInMainWorld("desktopUpdate", {
+  ready() { ipcRenderer.send("desktop-update-ready"); },
+});

@@ -1008,13 +1008,13 @@ body.is-demo .toast { bottom: 52px; }
 
 /* ---------- 顶部栏升级入口：一个高亮图标，插在 #refresh 之后 ----------
    规格完全对齐 app.css 既有图标体系（.icon-button 42×42 / .control-icon 24×24 /
-   stroke-width 2.15），唯一差别是默认色取 --primary-strong，即"高亮"。
+   六边形线宽 1.6 / 箭头 1.8），默认色取 --primary-strong。
    图标形状与三态细节见 design-mockups/update-icon.html。 */
 .update-icon-button { position: relative; color: var(--primary-strong); }
-.update-icon-button .control-icon { width: 30px; height: 30px; }
+.update-icon-button .control-icon { width: var(--control-icon-size); height: var(--control-icon-size); }
 .update-icon-button:hover { color: var(--primary-strong); background: var(--primary-soft); }
 .update-icon-button .dot {
-  position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%;
+  position: absolute; top: 8px; right: 8px; width: 6px; height: 6px; border-radius: 50%;
   background: var(--danger); box-shadow: 0 0 0 2px var(--bg);
 }
 @keyframes update-breathe { 0%,100% { transform: none; } 50% { transform: translateY(-1.5px); } }
@@ -1027,7 +1027,7 @@ body.is-demo .toast { bottom: 52px; }
 }
 .update-icon-button.busy .arrow { stroke: var(--muted); }
 .update-icon-button.ready { color: var(--primary); }
-.update-icon-button.ready .control-icon .solid { fill: currentColor; stroke: none; }
+
 
 /* ---------- 更新弹窗 ---------- */
 .update-dialog {
@@ -1081,8 +1081,10 @@ body.is-demo .toast { bottom: 52px; }
 
 .update-icon-button .hex-progress { display: none; }
 .update-icon-button.busy .hex-progress { display: block; }
-.update-icon-button.ready .hex-track { fill: currentColor; stroke: none; }
-.update-icon-button.ready .arrow { stroke: var(--on-primary); }
+.update-icon-button .hex-track, .update-icon-button .hex-progress { fill: none; stroke-width: 1.6; }
+.update-icon-button .arrow { stroke-width: 1.8; }
+.update-icon-button.ready .hex-track { fill: none; stroke: var(--primary); }
+.update-icon-button.ready .arrow { stroke: var(--primary); }
 .update-alert { overflow-wrap: anywhere; }
 .update-notes p + p { margin-top: 8px; }
 .update-meta { flex-wrap: wrap; }
@@ -1186,3 +1188,11 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 .facade-grid .skin-copy { position: static; margin: 6px 0 0; padding: 0 4px; background: none; }
 .facade-grid .skin-copy strong { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .facade-grid .skin-hero, .facade-grid .skin-meta { display: none; }
+
+/* Persistent update completion card, independent of the transient toast. */
+.update-ready-toast { position: fixed; right: 20px; bottom: 20px; z-index: 1200; width: min(320px, calc(100vw - 40px)); padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); color: var(--ink); box-shadow: 0 18px 44px rgb(0 0 0 / .22); animation: update-ready-enter .18s ease-out; }
+.update-ready-toast h3 { margin: 0 0 8px; font-size: 15px; }
+.update-ready-toast p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
+.update-ready-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+@keyframes update-ready-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .update-ready-toast { animation: none; } }

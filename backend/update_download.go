@@ -23,11 +23,18 @@ type updateSpeedSample struct {
 	at    time.Time
 	bytes int64
 }
-type updateSpeedWindow struct{ samples []updateSpeedSample }
+type updateSpeedWindow struct {
+	samples  []updateSpeedSample
+	duration time.Duration
+}
 
 func (w *updateSpeedWindow) speed(at time.Time, received int64) float64 {
 	w.samples = append(w.samples, updateSpeedSample{at, received})
-	cutoff := at.Add(-5 * time.Second)
+	duration := w.duration
+	if duration == 0 {
+		duration = 5 * time.Second
+	}
+	cutoff := at.Add(-duration)
 	for len(w.samples) > 2 && !w.samples[1].at.After(cutoff) {
 		w.samples = w.samples[1:]
 	}
@@ -109,8 +116,8 @@ func (u *updateManager) Download() error {
 	ctx, cancel := context.WithCancel(u.ctx)
 	done := make(chan struct{})
 	u.downloadCancel, u.downloadDone = cancel, done
-	u.status.State, u.status.Error, u.status.Progress = "downloading", "", updateProgress{TotalBytes: manifest.Asset.Size}
-	mirrors := append([]string(nil), u.mirrors...)
+	u.status.State, u.status.Error, u.status.Progress = "downloading", "", updateProgress{TotalBytes: manifest.Asset.Size, SelectingSource: true}
+	mirrors := u.sourcesLocked()
 	u.mu.Unlock()
 	u.publish()
 	go func() {
@@ -149,17 +156,68 @@ func (u *updateManager) Cancel() error {
 	return nil
 }
 func (u *updateManager) downloadAsset(ctx context.Context, asset updateAsset, mirrors []string) error {
+	start := time.Now()
 	part := filepath.Join(u.directory, asset.Name+".part")
+	received := func() int64 {
+		if info, err := os.Stat(part); err == nil {
+			return info.Size()
+		}
+		return u.Status().Progress.ReceivedBytes
+	}
+	u.recordUpdateCheck(map[string]any{"event": "update_proxy_env", "http_proxy_set": updateProxyEnvSet("HTTP_PROXY"), "https_proxy_set": updateProxyEnvSet("HTTPS_PROXY")})
+	probes := u.probeUpdateSources(ctx, asset, mirrors)
+	if ctx.Err() == nil {
+		u.mu.Lock()
+		u.status.Progress.SelectingSource = false
+		u.mu.Unlock()
+		u.publish()
+	}
+	sources := make([]updateSourceProbe, 0, len(mirrors))
+	sources = append(sources, probes...)
+	// If every probe fails, keep the previous sequential fallback exactly.
+	if len(sources) == 0 {
+		for _, prefix := range mirrors {
+			sources = append(sources, updateSourceProbe{prefix: prefix})
+		}
+	}
 	var last error
+	switches := 0
+	var resumed int64
+	var downloaded int64
+	if info, err := os.Stat(part); err == nil && info.Size() <= asset.Size {
+		resumed = info.Size()
+	}
+	prefix := ""
+	defer func() {
+		if ctx.Err() != nil {
+			u.recordUpdateCheck(map[string]any{"event": "update_download_cancelled", "received_bytes": received()})
+		}
+	}()
 	for attempt := 0; attempt < 2; attempt++ {
 		checksumFailed := false
-		for _, prefix := range mirrors {
+		for i, source := range sources {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			err := u.downloadSource(ctx, asset, prefix+asset.URL, part)
+			prefix = source.prefix
+			offset := int64(0)
+			if info, err := os.Stat(part); err == nil {
+				offset = info.Size()
+			}
+			u.recordUpdateCheck(map[string]any{"event": "update_download_source_selected", "mirror_prefix": updateDiagnosticMirrorPrefix(prefix), "speed_kbps": source.speed / 1024, "resume_offset": offset})
+			// All measured sources slow: keep the fastest, avoiding pointless churn.
+			canSwitch := len(probes) > 0 && probes[0].speed >= updateSlowSpeed && i+1 < len(probes)
+			transfer := updateSourceTransfer{}
+			err := u.downloadSource(ctx, asset, prefix+asset.URL, part, canSwitch, &transfer)
+			downloaded += transfer.received
 			if err == nil {
-				return os.Rename(part, filepath.Join(u.directory, asset.Name))
+				err = os.Rename(part, filepath.Join(u.directory, asset.Name))
+				if err == nil {
+					u.rememberUpdateSource(prefix)
+					duration := time.Since(start)
+					u.recordUpdateCheck(map[string]any{"event": "update_download_finished", "mirror_prefix": updateDiagnosticMirrorPrefix(prefix), "duration_ms": duration.Milliseconds(), "avg_kbps": float64(downloaded) / duration.Seconds() / 1024, "switches": switches, "resumed_bytes": resumed})
+					return nil
+				}
 			}
 			last = err
 			if errors.Is(err, errUpdateChecksum) {
@@ -167,17 +225,32 @@ func (u *updateManager) downloadAsset(ctx context.Context, asset updateAsset, mi
 				checksumFailed = true
 				break
 			}
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if i+1 < len(sources) {
+				reason := "error"
+				if errors.Is(err, errUpdateSourceSlow) {
+					reason = "slow"
+				}
+				switches++
+				u.recordUpdateCheck(map[string]any{"event": "update_download_source_switched", "from": updateDiagnosticMirrorPrefix(prefix), "to": updateDiagnosticMirrorPrefix(sources[i+1].prefix), "reason": reason, "speed_kbps": transfer.speed / 1024, "received_bytes": received()})
+			}
 		}
 		if !checksumFailed {
-			return last
+			break
 		}
 	}
-	return errUpdateChecksum
+	if last == nil {
+		last = errors.New("没有可用下载线路")
+	}
+	u.recordUpdateCheck(map[string]any{"event": "update_download_failed", "mirror_prefix": updateDiagnosticMirrorPrefix(prefix), "error_kind": diagnosticErrorKind(last), "received_bytes": received()})
+	return last
 }
 
 // The watchdog bounds inactivity, not the total transfer duration. A healthy
 // download may take minutes; every received chunk resets the eight-second clock.
-func (u *updateManager) downloadSource(parent context.Context, asset updateAsset, target, part string) error {
+func (u *updateManager) downloadSource(parent context.Context, asset updateAsset, target, part string, canSwitch bool, transfer *updateSourceTransfer) error {
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 	file, err := os.OpenFile(part, os.O_CREATE|os.O_RDWR, 0600)
@@ -241,7 +314,7 @@ func (u *updateManager) downloadSource(parent context.Context, asset updateAsset
 			return errors.New("下载线路返回了错误的续传范围")
 		}
 	default:
-		return fmt.Errorf("%s：HTTP %d", target, response.StatusCode)
+		return fmt.Errorf("下载线路：HTTP %d", response.StatusCode)
 	}
 	if err = file.Truncate(offset); err != nil {
 		return err
@@ -255,6 +328,9 @@ func (u *updateManager) downloadSource(parent context.Context, asset updateAsset
 	if _, err = file.Seek(offset, io.SeekStart); err != nil {
 		return err
 	}
+	transfer.offset = offset
+	var slow atomic.Bool
+	started := u.downloadTime()
 	var received atomic.Int64
 	received.Store(offset)
 	var activity atomic.Int64
@@ -271,7 +347,9 @@ func (u *updateManager) downloadSource(parent context.Context, asset updateAsset
 		ticks, stopTicks := u.downloadProgressTicks()
 		defer stopTicks()
 		window := updateSpeedWindow{}
-		window.speed(time.Now(), offset)
+		slowWindow := updateSpeedWindow{duration: 10 * time.Second}
+		window.speed(started, offset)
+		slowWindow.speed(started, offset)
 		for {
 			select {
 			case <-watchDone:
@@ -286,12 +364,20 @@ func (u *updateManager) downloadSource(parent context.Context, asset updateAsset
 				return
 			}
 			current := received.Load()
-			speed := window.speed(time.Now(), current)
+			now := u.downloadTime()
+			speed := window.speed(now, current)
+			slowSpeed := slowWindow.speed(now, current)
+			transfer.speed = slowSpeed
+			if canSwitch && now.Sub(started) >= 15*time.Second && slowSpeed < updateSlowSpeed {
+				slow.Store(true)
+				cancel()
+				return
+			}
 			eta := int64(0)
 			if speed > 0 {
 				eta = int64(math.Ceil(float64(asset.Size-current) / speed))
 			}
-			progress := updateProgress{current, asset.Size, speed, eta}
+			progress := updateProgress{ReceivedBytes: current, TotalBytes: asset.Size, BytesPerSecond: speed, ETASeconds: eta}
 			u.mu.Lock()
 			u.status.Progress = progress
 			u.mu.Unlock()
@@ -304,8 +390,12 @@ func (u *updateManager) downloadSource(parent context.Context, asset updateAsset
 	count, copyErr := io.Copy(writer, io.TeeReader(io.LimitReader(response.Body, asset.Size-offset+1), hash))
 	close(watchDone)
 	<-watchStopped
+	transfer.received = count
 	if parent.Err() != nil {
 		return parent.Err()
+	}
+	if slow.Load() {
+		return errUpdateSourceSlow
 	}
 	if ctx.Err() != nil {
 		return errors.New("下载线路超过 8 秒未响应")

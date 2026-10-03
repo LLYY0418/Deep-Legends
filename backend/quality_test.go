@@ -670,6 +670,7 @@ var privacyStoreWriteCallPins = map[string]int{
 	"game_settings_sync.go": 1, // 根级 game-settings-sync.json：stores 的本机偏好开关。
 	"season_stats.go":       1, // season-stats/<source>/<hash>-<season>.json（source 子目录由 writeLocalStoreFile 隐式创建）
 	"update.go":             3, // 根级 update-settings.json ×1、update-manifest.json ×2
+	"update_sources.go":     1, // 根级 update-settings.json 的成功线路偏好；既有 stores 自动更新设置，不含账号数据。
 }
 
 func TestPrivacyStoreDirectoryCreationCallSitesArePinned(t *testing.T) {

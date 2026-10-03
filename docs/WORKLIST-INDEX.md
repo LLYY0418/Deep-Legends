@@ -123,3 +123,5 @@
 | R194 | 快速、匹配、大乱斗等 5v5 队列恢复匿名玩家 | 已关闭：0.12.58 真机日志或用户确认正常（R195） | [WORKLIST-R194-ROSTER-RECOVERY-FOR-QUICKPLAY-AND-OTHER-5V5-QUEUES.md](history/worklists/WORKLIST-R194-ROSTER-RECOVERY-FOR-QUICKPLAY-AND-OTHER-5V5-QUEUES.md) | [r194-execution-ledger.md](history/ledgers/r194-execution-ledger.md) | 源码版本 0.12.58；R193 基线 `2107435d` |
 
 | R195 | 符文效果数值与去碎片、组队英雄头像、安装位置识别、工单索引收口 | 进行中：0.12.59 已正式发布，自动验证通过；Windows 在线升级及界面待用户实测 | [WORKLIST-R195-RUNE-EFFECTS-KEYSTONE-VALUES-NO-SHARDS-PREMADE-ICONS-UPDATE-DETECTION-AND-INDEX-CLEANUP.md](WORKLIST-R195-RUNE-EFFECTS-KEYSTONE-VALUES-NO-SHARDS-PREMADE-ICONS-UPDATE-DETECTION-AND-INDEX-CLEANUP.md) | [r195-execution-ledger.md](r195-execution-ledger.md) | 目标版本 0.12.59 |
+
+| R196 | 更新下载测速换线、ETA、后台下载提示与细图标 | 进行中：实现完成，自动验证与发布执行中；Windows 真机升级待验收 | [WORKLIST-R196-UPDATE-DOWNLOAD-SOURCE-RACE-ETA-FORMAT-BACKGROUND-DOWNLOAD-TOAST-AND-THINNER-BUTTON.md](WORKLIST-R196-UPDATE-DOWNLOAD-SOURCE-RACE-ETA-FORMAT-BACKGROUND-DOWNLOAD-TOAST-AND-THINNER-BUTTON.md) | [r196-execution-ledger.md](r196-execution-ledger.md) | 目标版本 0.12.60 |
