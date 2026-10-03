@@ -126,10 +126,10 @@
 
 | R195 | 符文效果数值与去碎片、组队英雄头像、安装位置识别、工单索引收口 | 进行中：0.12.59 已正式发布，自动验证通过；Windows 在线升级及界面待用户实测 | [WORKLIST-R195-RUNE-EFFECTS-KEYSTONE-VALUES-NO-SHARDS-PREMADE-ICONS-UPDATE-DETECTION-AND-INDEX-CLEANUP.md](WORKLIST-R195-RUNE-EFFECTS-KEYSTONE-VALUES-NO-SHARDS-PREMADE-ICONS-UPDATE-DETECTION-AND-INDEX-CLEANUP.md) | [r195-execution-ledger.md](r195-execution-ledger.md) | 目标版本 0.12.59 |
 
-| R196 | 更新下载测速换线、ETA、后台下载提示与细图标 | 进行中：实现及自动验证完成，0.12.60 未发布；Windows 真机升级待验收 | [WORKLIST-R196-UPDATE-DOWNLOAD-SOURCE-RACE-ETA-FORMAT-BACKGROUND-DOWNLOAD-TOAST-AND-THINNER-BUTTON.md](WORKLIST-R196-UPDATE-DOWNLOAD-SOURCE-RACE-ETA-FORMAT-BACKGROUND-DOWNLOAD-TOAST-AND-THINNER-BUTTON.md) | [r196-execution-ledger.md](r196-execution-ledger.md) | 目标版本 0.12.60；0.12.60 未发布，并入 R197/R198 的版本发布 |
+| R196 | 更新下载测速换线、ETA、后台下载提示与细图标 | 进行中：0.12.61 已正式发布并包含 R196；0.12.60 未发布；Windows 真机升级待验收 | [WORKLIST-R196-UPDATE-DOWNLOAD-SOURCE-RACE-ETA-FORMAT-BACKGROUND-DOWNLOAD-TOAST-AND-THINNER-BUTTON.md](WORKLIST-R196-UPDATE-DOWNLOAD-SOURCE-RACE-ETA-FORMAT-BACKGROUND-DOWNLOAD-TOAST-AND-THINNER-BUTTON.md) | [r196-execution-ledger.md](r196-execution-ledger.md) | 目标版本 0.12.60；0.12.60 未发布，并入 R197/R198 的版本发布 |
 
-| R197 | 隐藏玩家赛后补全与默认镜头同步核对 | 进行中：实现与自动验证完成，发布执行中；Windows 真机待验收 | [WORKLIST-R197-HIDDEN-PLAYER-REVEAL-AFTER-GAME-AND-DEFAULT-CAMERA-MODE-SYNC.md](WORKLIST-R197-HIDDEN-PLAYER-REVEAL-AFTER-GAME-AND-DEFAULT-CAMERA-MODE-SYNC.md) | [r197-execution-ledger.md](r197-execution-ledger.md) | 版本 0.12.61；P2 由 R198 取代并扩展 |
+| R197 | 隐藏玩家赛后补全与默认镜头同步核对 | 进行中：0.12.61 已正式发布，自动验证通过；Windows 真机待验收 | [WORKLIST-R197-HIDDEN-PLAYER-REVEAL-AFTER-GAME-AND-DEFAULT-CAMERA-MODE-SYNC.md](WORKLIST-R197-HIDDEN-PLAYER-REVEAL-AFTER-GAME-AND-DEFAULT-CAMERA-MODE-SYNC.md) | [r197-execution-ledger.md](r197-execution-ledger.md) | 版本 0.12.61；P2 由 R198 取代并扩展 |
 
-| R198 | 维护固定开局镜头模式 | 进行中：实现与自动验证完成，发布执行中；0/1 映射与两局真机待核实 | [WORKLIST-R198-FIXED-CAMERA-MODE-ON-GAME-START-SETTING.md](WORKLIST-R198-FIXED-CAMERA-MODE-ON-GAME-START-SETTING.md) | [r198-execution-ledger.md](r198-execution-ledger.md) | 版本 0.12.61；与 R197 合并发布，包含 R196 |
+| R198 | 维护固定开局镜头模式 | 进行中：0.12.61 已正式发布，自动验证通过；0/1 映射与两局真机待核实 | [WORKLIST-R198-FIXED-CAMERA-MODE-ON-GAME-START-SETTING.md](WORKLIST-R198-FIXED-CAMERA-MODE-ON-GAME-START-SETTING.md) | [r198-execution-ledger.md](r198-execution-ledger.md) | 版本 0.12.61；与 R197 合并发布，包含 R196 |
 
-| R199 | 更正 R196 发布状态并补齐发布证据规则 | 已关闭：账本与发布规则已更正 | [WORKLIST-R199-R196-RELEASE-0.12.60-NOT-PUBLISHED.md](WORKLIST-R199-R196-RELEASE-0.12.60-NOT-PUBLISHED.md) | [r199-execution-ledger.md](r199-execution-ledger.md) | 只读确认草稿 402378684；旧草稿及附件保持不变 |
+| R199 | 更正 R196 发布状态并补齐发布证据规则 | 已关闭：账本与发布规则已更正 | [WORKLIST-R199-R196-RELEASE-0.12.60-NOT-PUBLISHED.md](history/worklists/WORKLIST-R199-R196-RELEASE-0.12.60-NOT-PUBLISHED.md) | [r199-execution-ledger.md](history/ledgers/r199-execution-ledger.md) | 只读确认草稿 402378684；旧草稿及附件保持不变 |

@@ -1,0 +1,42 @@
+{
+  "releaseID": 402418510,
+  "targetCommit": "302ca108139353df23fa03e9d00132a6c3d59eea",
+  "version": "0.12.61",
+  "fingerprint": "3a9d539dfb84",
+  "draft": true,
+  "prerelease": false,
+  "publishedAt": null,
+  "keyMode": "public",
+  "files": [
+    {
+      "name": "Deep-Legends-Setup-0.12.61-public.exe",
+      "size": 111362560,
+      "sha256": "d5430f8837aed465ebe6575ab1972fafb68d3529bc856e760b38b09b6763a71b",
+      "digest": "sha256:d5430f8837aed465ebe6575ab1972fafb68d3529bc856e760b38b09b6763a71b",
+      "assetID": 607475962
+    },
+    {
+      "name": "latest.json",
+      "size": 1117,
+      "sha256": "d28a67dbd4be0ca95a6c780be138e5fdb6faa8457f798803ed7e3116bb756229",
+      "digest": "sha256:d28a67dbd4be0ca95a6c780be138e5fdb6faa8457f798803ed7e3116bb756229",
+      "assetID": 607475963
+    },
+    {
+      "name": "SHA256SUMS-public.txt",
+      "size": 182,
+      "sha256": "2dc92d34c46c4b7bbdd1da276cde0b3ce3442190297ea6ba1ffad59ad5f37d10",
+      "digest": "sha256:2dc92d34c46c4b7bbdd1da276cde0b3ce3442190297ea6ba1ffad59ad5f37d10",
+      "assetID": 607475961
+    }
+  ],
+  "oldReleasesUnchanged": [
+    "v0.12.60",
+    "v0.12.50",
+    "v0.12.49",
+    "v0.12.59",
+    "v0.12.58",
+    "v0.12.19"
+  ],
+  "result": "PASS"
+}

@@ -50,10 +50,12 @@
 
 ## 发布与真机边界
 
-**0.12.60 未发布（用户决定与 R197、R198 合并后发布）。** 只读查询确认存在草稿 id `402378684`，`draft=true`、`prerelease=false`、`published_at=null`，三个 public 附件已构建并上传；`v0.12.60` 标签查询为 404。草稿和附件保持原样，不发布、不删除、不移动标签。构建 key mode 为 public，不含个人 Riot Key。证据见 [R199 账本](r199-execution-ledger.md)。
+**0.12.60 未发布（用户决定与 R197、R198 合并后发布）。** 只读查询确认存在草稿 id `402378684`，`draft=true`、`prerelease=false`、`published_at=null`，三个 public 附件已构建并上传；`v0.12.60` 标签查询为 404。草稿和附件保持原样，不发布、不删除、不移动标签。构建 key mode 为 public，不含个人 Riot Key。证据见 [R199 账本](history/ledgers/r199-execution-ledger.md)。
 
 源码提交 `e3ba8b6fe58cfb1c188bedaa75ca82c307fe70b4`，分支 `codex/release-0.12.60`；[Windows public 发布构建](https://github.com/LLYY0418/Deep-Legends/actions/runs/37104390470)、[完整 CI](https://github.com/LLYY0418/Deep-Legends/actions/runs/37104389986)。验证汇总见 [verification.json](history/reports/r196/verification.json)。
 
 **0.12.59 → 0.12.61 的下载仍由 0.12.59 旧逻辑执行，可能直连优先而很慢；测速选线从安装 0.12.61 后的下一次升级才生效。** 本次慢时可取消，从发布页手动下载安装。R195 的安装位置修正已在 0.12.59，仍需用户验证自动安装和重新打开。
+
+R196 改动已并入正式 [v0.12.61 Latest](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.61)，release id `402418510`、isLatest=true，匿名 latest.json 得到 0.12.61。证据见 [R198 正式发布核验](history/reports/r198/published-release.json)。0.12.60 草稿保持原样。
 
 仍需用户真机验收：本次从 0.12.59 安装并重开；0.12.61 的下一次升级验证测速、ETA、后台完成提示、任务栏闪烁与稍后后直接升级；导出日志核对 probe/selected/finished 与 installed。自动测试、演示 Chromium 和 Windows runner 构建均不等同于上述真机验收，R196 保留进行中。

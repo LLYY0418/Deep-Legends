@@ -21,10 +21,14 @@ Windows 使用已有原生进程检测确认 League of Legends.exe 是否运行�
 
 ## 自动验证
 
-- 工单九项 Go、R197 单字段同步及下一局覆盖、大厅/实际游戏进程/verify failure/持久化/写前并发锁定改写或 symlink/60s 文件回改等测试通过。截断或空 JSON 被 json.Valid 拒绝，测试覆盖。
-- 四项 overlay 变异均由指定断言检出，见 [mutations.json](history/reports/r198/mutations.json)。独立只读后端/前端复核完成。
-- Node 设置四选项、默认、立即保存、重新加载保持、只读可选、保存失败回滚通过；真实 Chromium 使用生产 UI 与演示 API 验证整页刷新保持。
-- 完整 Node 1124 项、1123 通过、1 跳过、0 失败；完整 Go 243.758 秒、专项 race 3.723 秒、vet/diff check 均通过。完整 public 构建 1725 项 Go 分片与安装壳/运行时/密钥/指纹门禁通过，前一轮指纹 `983e425a16cd`；赛后通知与名单请求重叠时接入既有尾随刷新队列，额外 Node 断言与真实 SSE 浏览器复测通过。最终源码指纹 `3a9d539dfb84`，全量 Node/public 构建及 GitHub CI 重跑中，见 [verification.json](history/reports/r198/verification.json)。GitHub CI 与发布待回填。
+- 工单九项 Go、R197 单字段同步及下一局覆盖、大厅/实际游戏进程/verify failure/持久化/写前并发锁定改写或 symlink/60s 文件回改等测试通过。截断/空 JSON 被 json.Valid 拒绝；读回核对最终字节。
+- 四项 overlay 变异均由指定断言检出，见 [mutations.json](history/reports/r198/mutations.json)。独立只读后端/前端及发布产物复核通过。
+- Node 2 项覆盖四选项、默认、立即保存、重新加载保持、只读可选、保存失败回滚；真实 Chromium 使用生产 UI 与演示 API 验证整页刷新保持。
+- 最终完整 Node 1125 项、1124 通过、1 项 Windows PowerShell 门禁在 macOS 跳过、0 失败（251.037 秒）；Go `go test ./backend -count=1` 243.758 秒通过；专项 race 3.723 秒、vet、diff check 通过。
+- 完整本地 public 构建再次通过：1725 项 Go 分片、installer test/vet、Windows 安装壳、包内后端、密钥策略与运行时门禁。源码、Git 快照和安装包内后端指纹均为 `3a9d539dfb84`。
+- GitHub 完整 CI 成功：全量 race 206.587 秒；Node 1125 项、1124 通过、1 跳过、0 失败（367.601 秒）；R100/R117 真实 Chromium、installer 与 embedded pool 门禁通过。Windows CI Go 238.048 秒、Web 856/856、desktop 269 项、267 通过、2 跳过、0 失败；校验和和产物上传均成功。
+- 源码提交 `302ca108139353df23fa03e9d00132a6c3d59eea`，分支 `codex/release-0.12.61`。[完整 CI 37109826915](https://github.com/LLYY0418/Deep-Legends/actions/runs/37109826915)、[Windows public 发布构建 37109827925](https://github.com/LLYY0418/Deep-Legends/actions/runs/37109827925)。后续账本提交不移动版本标签。
+- 汇总见 [verification.json](history/reports/r198/verification.json)。
 
 ## 维护页演示
 
@@ -34,6 +38,10 @@ Windows 使用已有原生进程检测确认 League of Legends.exe 是否运行�
 
 ## 发布与真机边界
 
-发布未完成。0.12.61 将作为 public Latest，包含 R197/R198 和 R196 下载测速选线、ETA、后台完成提示及细按钮。key mode=public，不含个人 Riot Key；旧草稿不修改。发布后回填 release id、isLatest=true、匿名 latest.json 版本和 SHA256/构建指纹。
+Windows public 发布构建成功：全量 Go 319.256 秒；Web 856/856；desktop 269 项、267 通过、2 项平台门禁跳过、0 失败；发布运行时 4/4，public 密钥/包内后端/指纹校验通过。草稿 id `402418510`，三个附件回下载 SHA256/size/digest/清单均通过，安装包 111,362,560 字节，SHA256 `d5430f8837aed465ebe6575ab1972fafb68d3529bc856e760b38b09b6763a71b`。旧六个 Release 的元数据与附件保持不变，包含 0.12.60 草稿；独立产物复核通过。证据见 [草稿核验](history/reports/r198/draft-verification.json)。
+
+已正式发布 [v0.12.61 Latest](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.61)，release id `402418510`，发布时间 `2026-10-03T08:57:22Z`（北京时间 17:57:22），draft=false、prerelease=false、**isLatest=true**。匿名 `releases/latest/download/latest.json` 得到 **0.12.61**，与回下载清单字节一致；标签指向 `302ca108139353df23fa03e9d00132a6c3d59eea`，正式附件 digest/size/下载 URL/正文核对通过。包含 R197/R198 和 R196 下载测速选线、ETA、后台完成提示及细按钮。key mode=public，不含个人 Riot Key。旧六个 Release 元数据和附件不变，0.12.60 草稿仍保留未发布。证据见 [正式发布核验](history/reports/r198/published-release.json)。
+
+标签自动触发的同源码 CI `37111418872` 保留自动执行；验收采用同源码已全部成功的 `37109826915`。标签触发的重复草稿构建 `37111418886` 已确认 cancelled，不改已发布附件。
 
 仍需用户 Windows 真机验收：选择自由镜头连续开两局，进游戏不操作，Esc 选项确认为自由；导出 game_camera_mode_apply（第一局 ok、后续 unchanged）及 in_game_60s camera_mode_matches_target=true。0/1 尚待真机确认，不将自动测试或 Windows runner 构建当作用户验收。R198 保留进行中。

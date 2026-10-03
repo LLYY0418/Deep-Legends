@@ -15,11 +15,11 @@
   "diffCheck": "pass",
   "mutantsKilled": 7,
   "goBuildShardedTests": 1725,
-  "releaseStatus": "\u53d1\u5e03\u672a\u5b8c\u6210",
+  "releaseStatus": "\u5df2\u53d1\u5e03",
   "realChromium": "PASS: actual SSE bridge, loadLive/full render, overview POST reference, rig load/status/save/page refresh",
   "screenshotsReviewed": true,
   "publicBuildBeforeEventRaceFix": "pass",
-  "publicBuild": "running",
+  "publicBuild": "pass",
   "localBuildReceiptBeforeEventRaceFix": {
     "schema": 1,
     "version": "0.12.61",
@@ -37,10 +37,87 @@
     "failed": 0,
     "seconds": 273.085
   },
-  "finalNodeFull": "running",
   "eventRaceTests": {
     "tests": 6,
     "pass": 6,
     "failed": 0
+  },
+  "nodeFull": {
+    "tests": 1125,
+    "pass": 1124,
+    "failed": 0,
+    "skipped": 1,
+    "seconds": 251.037,
+    "skipReason": "Windows PowerShell gate on macOS"
+  },
+  "localBuildReceipt": {
+    "schema": 1,
+    "version": "0.12.61",
+    "fingerprint": "3a9d539dfb84",
+    "mode": "public",
+    "backendSHA256": "2982a1d22b9db089adc1a3185bb283c709e36f990e72031a4edfd988e110a776",
+    "assets": {
+      "Deep Legends Setup 0.12.61-public.exe": "ec419991cba74c9061370329b5db5ed1bd7b50964b83dfc638d712fa7f6ae438"
+    }
+  },
+  "fingerprintFromGitArchive": "3a9d539dfb84",
+  "sourceCommit": "302ca108139353df23fa03e9d00132a6c3d59eea",
+  "releaseWorkflow": 37109827925,
+  "ciWorkflow": 37109826915,
+  "eventQueueIndependentReview": "PASS",
+  "releaseGuardIndependentReview": "PASS",
+  "qualityJob": "success",
+  "qualityJobID": 111165411137,
+  "realChromiumCI": "R100/R117 PASS",
+  "windowsReleaseBuild": "success",
+  "releaseID": 402418510,
+  "draftVerification": "PASS",
+  "oldReleasesUnchanged": [
+    "v0.12.60",
+    "v0.12.50",
+    "v0.12.49",
+    "v0.12.59",
+    "v0.12.58",
+    "v0.12.19"
+  ],
+  "independentArtifactReview": "PASS",
+  "windowsReleaseTests": {
+    "goSeconds": 319.256,
+    "web": {
+      "tests": 856,
+      "pass": 856,
+      "failed": 0
+    },
+    "desktop": {
+      "tests": 269,
+      "pass": 267,
+      "failed": 0,
+      "skipped": 2
+    },
+    "releaseRuntime": {
+      "tests": 4,
+      "pass": 4,
+      "failed": 0
+    }
+  },
+  "ciWorkflowStatus": "success",
+  "qualityRaceSeconds": 206.587,
+  "qualityNode": {
+    "tests": 1125,
+    "pass": 1124,
+    "failed": 0,
+    "skipped": 1,
+    "seconds": 367.601
+  },
+  "windowsCIJob": "success",
+  "windowsCIGoSeconds": 238.048,
+  "isLatest": true,
+  "anonymousLatestVersion": "0.12.61",
+  "tagCommit": "302ca108139353df23fa03e9d00132a6c3d59eea",
+  "publishedAt": "2026-10-03T08:57:22Z",
+  "tagCIWorkflow": 37111418872,
+  "duplicateTagReleaseWorkflow": {
+    "id": 37111418886,
+    "conclusion": "cancelled"
   }
 }

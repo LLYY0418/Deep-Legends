@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "version": "0.12.61",
+  "fingerprint": "3a9d539dfb84",
+  "publishedAt": "2026-10-03T08:46:12.947Z",
+  "minSupported": "0.9.0",
+  "notes": "- 对局结束后通过既有官方战绩数据补全可核验的隐藏玩家，恢复普通名字、近期战绩和总览入口；对局中保持隐藏身份。\n- 维护页新增进入游戏时的镜头模式，选人和开局时按所选模式核对；保留设置同步并补充镜头诊断。\n- 更新下载先并行测速选择线路，慢速自动切换并续传，记住成功线路并补全下载诊断。\n- 下载剩余时间显示为分秒或小时；支持后台下载，完成后显示升级提示，后台窗口通过任务栏提醒。\n- 顶部更新图标与其他按钮保持相同尺寸，下载和准备就绪状态使用更细的描边。",
+  "asset": {
+    "name": "Deep-Legends-Setup-0.12.61-public.exe",
+    "size": 111362560,
+    "sha256": "d5430f8837aed465ebe6575ab1972fafb68d3529bc856e760b38b09b6763a71b",
+    "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.61/Deep-Legends-Setup-0.12.61-public.exe"
+  }
+}
