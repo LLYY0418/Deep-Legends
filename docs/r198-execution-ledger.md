@@ -49,3 +49,7 @@ Windows public 发布构建成功：全量 Go 319.256 秒；Web 856/856；deskto
 ## 2026-10-03 用户追加要求覆盖
 
 用户明确要求移除“保留对局内设置改动”，镜头模式移到右侧维护按钮区。0.12.62 已删除旧结算自动同步及其接口，旧镜头选择继续保留；原工单涉及保留设置同步/紧邻旧开关的要求由此次用户要求覆盖，不再执行。R184 只读诊断、R198 开局镜头和原 Windows 验收边界保留；后续不再要求导出 game_settings_sync 事件。本地 public 构建完成，未发布 0.12.62，详情见 [追加要求账本](history/ledgers/maintenance-overview-1003-execution-ledger.md)。
+
+## 2026-10-03 用户追加 save 探测修正（并入 R200）
+
+镜头保存先读取 `/help`；未列出时探测一次 POST `/lol-game-settings/v1/save`，404/405 仅记 unsupported，不报错。不依赖 swagger。模拟与既有镜头回归通过，已并入 0.12.63 正式 Latest，发布证据见 [R200 账本](r200-execution-ledger.md)。真机镜头效果仍保留原验收边界。

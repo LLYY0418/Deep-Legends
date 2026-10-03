@@ -1,0 +1,12 @@
+✔ public policy rejects encrypted and plaintext keys; private requires a valid key (12.217458ms)
+✔ build receipt rejects a stale packaged backend and clears obsolete approval (41.950291ms)
+✔ setup-only release hashes actual renamed bytes and emits exactly three files (59.019ms)
+✔ invalid release identities and spaced assets are refused (0.14125ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 121.493583

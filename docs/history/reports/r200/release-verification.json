@@ -1,0 +1,33 @@
+{
+  "releaseID": 402455971,
+  "targetCommit": "91df3a9a8e2f8d66fb858eacebf9554b244cd84c",
+  "version": "0.12.63",
+  "fingerprint": "c21482dba3c7",
+  "keyMode": "public",
+  "files": [
+    {
+      "name": "Deep-Legends-Setup-0.12.63-public.exe",
+      "size": 111380480,
+      "sha256": "bac70119c1154897ce9a82745753f8727221a13e0304ef8ed89ec492661f9182",
+      "digest": "sha256:bac70119c1154897ce9a82745753f8727221a13e0304ef8ed89ec492661f9182",
+      "assetID": 607605577
+    },
+    {
+      "name": "latest.json",
+      "size": 929,
+      "sha256": "1926d7f174d7135af9cdc7339015e5b4bed58be94fb47fecb600991035dcbaf4",
+      "digest": "sha256:1926d7f174d7135af9cdc7339015e5b4bed58be94fb47fecb600991035dcbaf4",
+      "assetID": 607605576
+    },
+    {
+      "name": "SHA256SUMS-public.txt",
+      "size": 182,
+      "sha256": "fecf1ece900f0bc45997dfd8c6a366a0ad1da80e29dbc7967cc9ea6aeff42d15",
+      "digest": "sha256:fecf1ece900f0bc45997dfd8c6a366a0ad1da80e29dbc7967cc9ea6aeff42d15",
+      "assetID": 607605579
+    }
+  ],
+  "windowsReleaseRun": 37115254797,
+  "linuxQualityRun": 37115254808,
+  "draftFilesVerified": true
+}

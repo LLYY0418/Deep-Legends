@@ -17,10 +17,15 @@
 
 ## 验证
 
-- 相关 Go 测试通过；完整 Go、Node、vet、竞态与 public 构建结果待本轮完成后补记。
+- 相关 Go 回归通过（3.329 秒）；`go test ./backend -count=1` 全绿（258.045 秒）；Node 1124 项，1123 通过、1 跳过、0 失败；`go vet ./backend`、相关竞态、发布脚本测试及 `git diff --check` 通过。见 [验证结果](history/reports/r200/verification.json)。
 - 四项 Go overlay 变异均触发断言 FAIL，没有以编译失败充数：卡片用全英雄、读取失败回退全英雄、失败不顺延、备战席不确认/恢复。见 [变异结果](history/reports/r200/mutations.json)。
+- 全量测试发现 R78 旧夹具要求未选定英雄也能换人，与本工单 P3-3 冲突；改为已完成本地选人且当前英雄存在，保留“pickable 读取失败仍可换人”的回归。初次失败日志保留，修正后全量重跑通过。
+- 本地完整 public 构建 0.12.63 通过：指纹 `c21482dba3c7`，安装包 SHA-256 `15913d1f0331a700820810f2031ad55e7dd022fe8278b143eeefeffb2c6a3731`；内嵌后端与包装指纹、无内嵌私钥、安装包校验均通过，见 [本地构建记录](history/reports/r200/local-release-build.json)。
 - 真机卡片选择、备战席实际交换及镜头保存仍由用户下一局日志验收，工单保留进行中。
 
 ## 发布
 
-发布未完成；完成后补充 release id、Latest 查询及匿名 latest.json 版本证据。
+- 已正式发布 [v0.12.63](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.63)，release id `402455971`，北京时间 2026-10-03 18:24:29；draft=false、prerelease=false。Latest 查询 `isLatest=true`，匿名下载 Latest 的 latest.json 得到 `version=0.12.63`，且字节与已核验的草稿附件完全一致。见 [正式发布核验](history/reports/r200/published-release.json)、[Latest 查询](history/reports/r200/latest-query.json)、[匿名清单](history/reports/r200/anonymous-latest.json)。
+- 发布目标及标签提交 `91df3a9a8e2f8d66fb858eacebf9554b244cd84c`；Windows public 发布工作流 [37115254797](https://github.com/LLYY0418/Deep-Legends/actions/runs/37115254797) 完整通过。源码指纹 `c21482dba3c7` 与本地相同；正式 Windows Setup SHA-256 `bac70119c1154897ce9a82745753f8727221a13e0304ef8ed89ec492661f9182`，三个附件下载后逐一核验 GitHub digest、字节长度、SHA256SUMS 与 manifest。
+- 质量工作流 [37115254808](https://github.com/LLYY0418/Deep-Legends/actions/runs/37115254808) 的 Linux quality job 完整通过，包括全量竞态、Go/Node、真实 Chromium 与安装器检查；额外 windows-build 在发布核验时仍运行中。正式附件来自上面的独立 Windows public 发布工作流，已完整验证。
+- 发布前后对比所有既有 Release 的身份、标题/说明、目标、draft/prerelease、发布时间及各附件 ID/名称/字节/digest：全部保持不变。0.12.60 草稿 `402378684` 未发布。

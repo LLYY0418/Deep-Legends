@@ -1,0 +1,4 @@
+card-full-pickable EXPECTED FAIL
+failed-subset-fallback EXPECTED FAIL
+attempt-limit-no-advance EXPECTED FAIL
+bench-no-postflight-recovery EXPECTED FAIL

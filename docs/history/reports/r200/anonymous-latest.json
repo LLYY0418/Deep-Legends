@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "version": "0.12.63",
+  "fingerprint": "c21482dba3c7",
+  "publishedAt": "2026-10-03T10:21:41.614Z",
+  "minSupported": "0.9.0",
+  "notes": "- 大乱斗卡片模式只从发给自己的英雄中按序列选用；卡片变化时更新选择，读取失败时停止自动选人。\n- 英雄选用两次未生效后顺延下一个，每回合最多尝试三个英雄；备战席换人核对实际结果并有限重试。\n- 镜头设置保存先读取客户端 `/help`，未列出时探测保存接口，兼容未开启 swagger 的客户端。\n- 包含 0.12.62 的维护页调整与总览首次背景加载修复。",
+  "asset": {
+    "name": "Deep-Legends-Setup-0.12.63-public.exe",
+    "size": 111380480,
+    "sha256": "bac70119c1154897ce9a82745753f8727221a13e0304ef8ed89ec492661f9182",
+    "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.63/Deep-Legends-Setup-0.12.63-public.exe"
+  }
+}

@@ -4,7 +4,7 @@
 
 任何账本写“已发布”，必须同时有：release id、`isLatest=true` 的查询结果、匿名下载 `releases/latest/download/latest.json` 得到的版本号。缺任何一项，只能写“发布未完成”。
 
-2026-10-03 用户追加维护/总览调整已实现并本地构建 0.12.62 public，未发布；见 [执行账本](history/ledgers/maintenance-overview-1003-execution-ledger.md) 与 [日志分析](history/reports/maintenance-overview-1003/analysis.md)。R197/R198 已发布版本仍为 0.12.61，Windows 验收边界保留。
+2026-10-03 用户追加维护/总览调整曾本地构建 0.12.62 public，该版本未单独发布；改动已并入 R200 的 0.12.63 正式 Latest（release id 402455971、isLatest=true、匿名清单 0.12.63）；见 [执行账本](history/ledgers/maintenance-overview-1003-execution-ledger.md) 与 [日志分析](history/reports/maintenance-overview-1003/analysis.md)。R197/R198 已发布版本仍为 0.12.61，Windows 验收边界保留。
 
 | R 号 | 标题 | 状态 | 工单路径 | 账本路径 | 证据所在提交号 |
 |---|---|---|---|---|---|
@@ -136,4 +136,4 @@
 
 | R199 | 更正 R196 发布状态并补齐发布证据规则 | 已关闭：账本与发布规则已更正 | [WORKLIST-R199-R196-RELEASE-0.12.60-NOT-PUBLISHED.md](history/worklists/WORKLIST-R199-R196-RELEASE-0.12.60-NOT-PUBLISHED.md) | [r199-execution-ledger.md](history/ledgers/r199-execution-ledger.md) | 只读确认草稿 402378684；旧草稿及附件保持不变 |
 
-| R200 | 卡片选人只用发给自己的子集、失败顺延、备战席换人确认 | 进行中：0.12.63 实现/验证，待发布及用户真机日志 | [WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md](WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md) | [r200-execution-ledger.md](r200-execution-ledger.md) | — |
+| R200 | 卡片选人只用发给自己的子集、失败顺延、备战席换人确认 | 进行中：0.12.63 已正式发布，自动验证通过；子集接口与换人待用户真机日志 | [WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md](WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md) | [r200-execution-ledger.md](r200-execution-ledger.md) | 版本 0.12.63；源码 `91df3a9a` |
