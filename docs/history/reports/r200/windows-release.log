@@ -88,22 +88,22 @@ release	Run actions/checkout@v4	2026-10-03T10:05:56.9755920Z [command]"C:\Progra
 release	Run actions/checkout@v4	2026-10-03T10:05:57.0033740Z ##[group]Checking out the ref
 release	Run actions/checkout@v4	2026-10-03T10:05:57.0041660Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force refs/tags/v0.12.63
 release	Run actions/checkout@v4	2026-10-03T10:05:57.9842054Z Note: switching to 'refs/tags/v0.12.63'.
-release	Run actions/checkout@v4	2026-10-03T10:05:57.9842653Z 
+release	Run actions/checkout@v4	2026-10-03T10:05:57.9842653Z
 release	Run actions/checkout@v4	2026-10-03T10:05:57.9843025Z You are in 'detached HEAD' state. You can look around, make experimental
 release	Run actions/checkout@v4	2026-10-03T10:05:57.9843865Z changes and commit them, and you can discard any commits you make in this
 release	Run actions/checkout@v4	2026-10-03T10:05:57.9844748Z state without impacting any branches by switching back to a branch.
-release	Run actions/checkout@v4	2026-10-03T10:05:57.9845226Z 
+release	Run actions/checkout@v4	2026-10-03T10:05:57.9845226Z
 release	Run actions/checkout@v4	2026-10-03T10:05:57.9845514Z If you want to create a new branch to retain commits you create, you may
 release	Run actions/checkout@v4	2026-10-03T10:05:57.9846250Z do so (now or later) by using -c with the switch command. Example:
-release	Run actions/checkout@v4	2026-10-03T10:05:57.9846705Z 
+release	Run actions/checkout@v4	2026-10-03T10:05:57.9846705Z
 release	Run actions/checkout@v4	2026-10-03T10:05:57.9846937Z   git switch -c <new-branch-name>
-release	Run actions/checkout@v4	2026-10-03T10:05:57.9847258Z 
+release	Run actions/checkout@v4	2026-10-03T10:05:57.9847258Z
 release	Run actions/checkout@v4	2026-10-03T10:05:57.9847427Z Or undo this operation with:
-release	Run actions/checkout@v4	2026-10-03T10:05:57.9847728Z 
+release	Run actions/checkout@v4	2026-10-03T10:05:57.9847728Z
 release	Run actions/checkout@v4	2026-10-03T10:05:57.9847929Z   git switch -
-release	Run actions/checkout@v4	2026-10-03T10:05:57.9906543Z 
+release	Run actions/checkout@v4	2026-10-03T10:05:57.9906543Z
 release	Run actions/checkout@v4	2026-10-03T10:05:57.9906953Z Turn off this advice by setting config variable advice.detachedHead to false
-release	Run actions/checkout@v4	2026-10-03T10:05:57.9908696Z 
+release	Run actions/checkout@v4	2026-10-03T10:05:57.9908696Z
 release	Run actions/checkout@v4	2026-10-03T10:05:57.9909165Z HEAD is now at 91df3a9 fix: select offered ARAM cards and confirm bench swaps for 0.12.63
 release	Run actions/checkout@v4	2026-10-03T10:05:58.0017925Z ##[endgroup]
 release	Run actions/checkout@v4	2026-10-03T10:05:58.0479282Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
@@ -135,7 +135,7 @@ release	Run actions/setup-go@v5	2026-10-03T10:06:02.8965827Z [command]"C:\Progra
 release	Run actions/setup-go@v5	2026-10-03T10:06:14.1179100Z Cache restored successfully
 release	Run actions/setup-go@v5	2026-10-03T10:06:14.1294969Z Cache restored from key: setup-go-Windows-x64-go-1.24.13-a9fc12c66c581ebd975c04924614d911b843067079247990d4be659063ce44db
 release	Run actions/setup-go@v5	2026-10-03T10:06:14.1317938Z go version go1.24.13 windows/amd64
-release	Run actions/setup-go@v5	2026-10-03T10:06:14.1318162Z 
+release	Run actions/setup-go@v5	2026-10-03T10:06:14.1318162Z
 release	Run actions/setup-go@v5	2026-10-03T10:06:14.1318469Z ##[group]go env
 release	Run actions/setup-go@v5	2026-10-03T10:06:14.6924234Z set AR=ar
 release	Run actions/setup-go@v5	2026-10-03T10:06:14.6924603Z set CC=gcc
@@ -183,7 +183,7 @@ release	Run actions/setup-go@v5	2026-10-03T10:06:14.6939011Z set GOVCS=
 release	Run actions/setup-go@v5	2026-10-03T10:06:14.6939196Z set GOVERSION=go1.24.13
 release	Run actions/setup-go@v5	2026-10-03T10:06:14.6939389Z set GOWORK=
 release	Run actions/setup-go@v5	2026-10-03T10:06:14.6939576Z set PKG_CONFIG=pkg-config
-release	Run actions/setup-go@v5	2026-10-03T10:06:14.6939733Z 
+release	Run actions/setup-go@v5	2026-10-03T10:06:14.6939733Z
 release	Run actions/setup-go@v5	2026-10-03T10:06:14.6940039Z ##[endgroup]
 release	Run actions/setup-node@v4	﻿2026-10-03T10:06:14.7252306Z ##[group]Run actions/setup-node@v4
 release	Run actions/setup-node@v4	2026-10-03T10:06:14.7252659Z with:
@@ -230,20 +230,20 @@ release	Build and verify public release	2026-10-03T10:06:33.8707996Z npm warn de
 release	Build and verify public release	2026-10-03T10:06:35.6889683Z npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
 release	Build and verify public release	2026-10-03T10:06:35.8956923Z npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
 release	Build and verify public release	2026-10-03T10:06:38.0038978Z npm warn deprecated boolean@3.2.0: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
-release	Build and verify public release	2026-10-03T10:06:40.6026327Z 
+release	Build and verify public release	2026-10-03T10:06:40.6026327Z
 release	Build and verify public release	2026-10-03T10:06:40.6027594Z added 323 packages, and audited 324 packages in 11s
-release	Build and verify public release	2026-10-03T10:06:40.6028456Z 
+release	Build and verify public release	2026-10-03T10:06:40.6028456Z
 release	Build and verify public release	2026-10-03T10:06:40.6028741Z 56 packages are looking for funding
 release	Build and verify public release	2026-10-03T10:06:40.6029209Z   run `npm fund` for details
-release	Build and verify public release	2026-10-03T10:06:40.6733643Z 
+release	Build and verify public release	2026-10-03T10:06:40.6733643Z
 release	Build and verify public release	2026-10-03T10:06:40.6734388Z 14 high severity vulnerabilities
-release	Build and verify public release	2026-10-03T10:06:40.6734781Z 
+release	Build and verify public release	2026-10-03T10:06:40.6734781Z
 release	Build and verify public release	2026-10-03T10:06:40.6735767Z To address issues that do not require attention, run:
 release	Build and verify public release	2026-10-03T10:06:40.6738354Z   npm audit fix
-release	Build and verify public release	2026-10-03T10:06:40.6738915Z 
+release	Build and verify public release	2026-10-03T10:06:40.6738915Z
 release	Build and verify public release	2026-10-03T10:06:40.6739318Z To address all issues (including breaking changes), run:
 release	Build and verify public release	2026-10-03T10:06:40.6739925Z   npm audit fix --force
-release	Build and verify public release	2026-10-03T10:06:40.6740153Z 
+release	Build and verify public release	2026-10-03T10:06:40.6740153Z
 release	Build and verify public release	2026-10-03T10:06:40.6740332Z Run `npm audit` for details.
 release	Build and verify public release	2026-10-03T10:10:54.5103895Z ok  	lol-loot-assistant/backend	215.202s
 release	Build and verify public release	2026-10-03T10:11:14.7618198Z ok  	deeplegends/installer	1.681s
@@ -7368,13 +7368,13 @@ release	Build and verify public release	2026-10-03T10:18:32.3815615Z # skipped 2
 release	Build and verify public release	2026-10-03T10:18:32.3815779Z # todo 0
 release	Build and verify public release	2026-10-03T10:18:32.3815968Z # duration_ms 368790.5973
 release	Build and verify public release	2026-10-03T10:18:55.0061987Z verified build fingerprint=c21482dba3c7
-release	Build and verify public release	2026-10-03T10:18:56.0928330Z WARNING: Desktop package is unsigned. SmartScreen may show Unknown publisher until a trusted certificate builds 
+release	Build and verify public release	2026-10-03T10:18:56.0928330Z WARNING: Desktop package is unsigned. SmartScreen may show Unknown publisher until a trusted certificate builds
 release	Build and verify public release	2026-10-03T10:18:56.0929292Z reputation.
 release	Build and verify public release	2026-10-03T10:18:57.3578801Z Uninstaller shell built: uninstall-shell.exe
-release	Build and verify public release	2026-10-03T10:18:57.6821678Z 
+release	Build and verify public release	2026-10-03T10:18:57.6821678Z
 release	Build and verify public release	2026-10-03T10:18:57.6822821Z > deep-legends-desktop@0.12.63 pack:win-setup
 release	Build and verify public release	2026-10-03T10:18:57.6823763Z > electron-builder --win nsis --x64 --config.win.signExecutable=false --config.nsis.artifactName=Deep Legends Setup ${version}-public.${ext}
-release	Build and verify public release	2026-10-03T10:18:57.6824353Z 
+release	Build and verify public release	2026-10-03T10:18:57.6824353Z
 release	Build and verify public release	2026-10-03T10:18:58.4704493Z   • electron-builder  version=26.15.7 os=10.0.26100
 release	Build and verify public release	2026-10-03T10:18:58.4710753Z   • Implicit publishing triggered by git tag. This behavior will be disabled in electron-builder v27. Please use --publish explicitly.  tag=v0.12.63
 release	Build and verify public release	2026-10-03T10:18:58.4763010Z   • loaded configuration  file=package.json ("build" field)
@@ -7449,7 +7449,7 @@ release	Upload verified release files	2026-10-03T10:21:47.3977307Z   name: deep-
 release	Upload verified release files	2026-10-03T10:21:47.3978316Z   path: dist/release/Deep-Legends-Setup-0.12.63-public.exe
 release	Upload verified release files	dist/release/latest.json
 release	Upload verified release files	dist/release/SHA256SUMS-public.txt
-release	Upload verified release files	
+release	Upload verified release files
 release	Upload verified release files	2026-10-03T10:21:47.3978948Z   if-no-files-found: error
 release	Upload verified release files	2026-10-03T10:21:47.3979249Z   compression-level: 6
 release	Upload verified release files	2026-10-03T10:21:47.3979560Z   overwrite: false
