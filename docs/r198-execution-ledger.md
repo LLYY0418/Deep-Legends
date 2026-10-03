@@ -24,7 +24,7 @@ Windows 使用已有原生进程检测确认 League of Legends.exe 是否运行�
 - 工单九项 Go、R197 单字段同步及下一局覆盖、大厅/实际游戏进程/verify failure/持久化/写前并发锁定改写或 symlink/60s 文件回改等测试通过。截断或空 JSON 被 json.Valid 拒绝，测试覆盖。
 - 四项 overlay 变异均由指定断言检出，见 [mutations.json](history/reports/r198/mutations.json)。独立只读后端/前端复核完成。
 - Node 设置四选项、默认、立即保存、重新加载保持、只读可选、保存失败回滚通过；真实 Chromium 使用生产 UI 与演示 API 验证整页刷新保持。
-- 完整 Node 1124 项、1123 通过、1 跳过、0 失败；完整 Go 243.758 秒、专项 race 3.723 秒、vet/diff check 均通过。完整 public 构建 1725 项 Go 分片与安装壳/运行时/密钥/指纹门禁通过，指纹 `983e425a16cd`，见 [verification.json](history/reports/r198/verification.json)。GitHub CI 与发布待回填。
+- 完整 Node 1124 项、1123 通过、1 跳过、0 失败；完整 Go 243.758 秒、专项 race 3.723 秒、vet/diff check 均通过。完整 public 构建 1725 项 Go 分片与安装壳/运行时/密钥/指纹门禁通过，前一轮指纹 `983e425a16cd`；赛后通知与名单请求重叠时接入既有尾随刷新队列，额外 Node 断言与真实 SSE 浏览器复测通过。最终源码指纹 `3a9d539dfb84`，全量 Node/public 构建及 GitHub CI 重跑中，见 [verification.json](history/reports/r198/verification.json)。GitHub CI 与发布待回填。
 
 ## 维护页演示
 

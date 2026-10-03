@@ -1,18 +1,11 @@
 {
   "version": "0.12.61",
-  "fingerprint": "983e425a16cd",
+  "fingerprint": "3a9d539dfb84",
   "keyMode": "public",
   "goFull": {
     "command": "go test ./backend -count=1",
     "seconds": 243.758,
     "result": "pass"
-  },
-  "nodeFull": {
-    "tests": 1124,
-    "pass": 1123,
-    "skipped": 1,
-    "failed": 0,
-    "seconds": 273.085
   },
   "goVet": "pass",
   "targetRace": {
@@ -21,9 +14,13 @@
   },
   "diffCheck": "pass",
   "mutantsKilled": 7,
-  "publicBuild": "pass",
   "goBuildShardedTests": 1725,
-  "localBuildReceipt": {
+  "releaseStatus": "\u53d1\u5e03\u672a\u5b8c\u6210",
+  "realChromium": "PASS: actual SSE bridge, loadLive/full render, overview POST reference, rig load/status/save/page refresh",
+  "screenshotsReviewed": true,
+  "publicBuildBeforeEventRaceFix": "pass",
+  "publicBuild": "running",
+  "localBuildReceiptBeforeEventRaceFix": {
     "schema": 1,
     "version": "0.12.61",
     "fingerprint": "983e425a16cd",
@@ -33,7 +30,17 @@
       "Deep Legends Setup 0.12.61-public.exe": "5ccc6bb4d938d3506d595c1e35f9fa30a79642ddae34e7e3888b70b6a3f2cb31"
     }
   },
-  "releaseStatus": "\u53d1\u5e03\u672a\u5b8c\u6210",
-  "realChromium": "PASS: actual SSE bridge, loadLive/full render, overview POST reference, rig load/status/save/page refresh",
-  "screenshotsReviewed": true
+  "nodeFullBeforeEventRaceFix": {
+    "tests": 1124,
+    "pass": 1123,
+    "skipped": 1,
+    "failed": 0,
+    "seconds": 273.085
+  },
+  "finalNodeFull": "running",
+  "eventRaceTests": {
+    "tests": 6,
+    "pass": 6,
+    "failed": 0
+  }
 }

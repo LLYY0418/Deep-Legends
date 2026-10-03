@@ -21,7 +21,7 @@
 - 工单七项 Go 与额外重试中 gameId 变化、活动阶段/断线取消、队列段位、已有 PUUID、空姓名等边界已覆盖；Node 两项卡片断言和 SSE 桥接通过。
 - 三项 overlay 变异均由指定断言检出，见 [mutations.json](history/reports/r197/mutations.json)。
 - 独立只读后端/前端复核完成；逐次 gameId 校验缺口已修正。损坏 JSON 的复核疑点经原文核对已有 json.Valid 守卫，新增截断/空输入测试通过。
-- 完整 Node 1124 项，1123 通过、1 项 Windows PowerShell 门禁在 macOS 跳过、0 失败（273.085 秒）。最终 Go 243.758 秒通过，专项 race 3.723 秒通过、vet 与 diff check 通过；完整 public 构建 1725 项 Go 分片、installer test/vet、Windows 安装壳、包内后端、密钥策略与运行时验证通过。指纹 `983e425a16cd`，见 [verification.json](history/reports/r197/verification.json)。
+- 完整 Node 1124 项，1123 通过、1 项 Windows PowerShell 门禁在 macOS 跳过、0 失败（273.085 秒）。最终 Go 243.758 秒通过，专项 race 3.723 秒通过、vet 与 diff check 通过；完整 public 构建 1725 项 Go 分片、installer test/vet、Windows 安装壳、包内后端、密钥策略与运行时验证通过。前一轮指纹 `983e425a16cd`；赛后通知与名单请求重叠时接入既有尾随刷新队列，额外 Node 断言与真实 SSE 浏览器复测通过。最终源码指纹 `3a9d539dfb84`，全量 Node/public 构建及 GitHub CI 重跑中，见 [verification.json](history/reports/r197/verification.json)。
 
 ## 演示截图
 
