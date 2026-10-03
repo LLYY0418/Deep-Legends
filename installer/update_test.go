@@ -20,7 +20,7 @@ func TestUpdateModeArgumentsPageAndCommand(t *testing.T) {
 	}
 	for _, shortcut := range []bool{false, true} {
 		got := installerCommandLine(`C:\Temp Space\setup.exe`, options.Destination, shortcut, true)
-		if got != `"C:\Temp Space\setup.exe" /S --updated /D=C:\游戏\Deep Legends` || strings.Contains(got, "--no-desktop-shortcut") {
+		if got != `"C:\Temp Space\setup.exe" /S /NCRC --updated /D=C:\游戏\Deep Legends` || strings.Contains(got, "--no-desktop-shortcut") {
 			t.Fatal(got)
 		}
 	}

@@ -122,6 +122,7 @@ type champSelectDecision struct {
 	AvailabilitySource string
 	RuntimeID          string
 	FromChampionID     int64
+	TestFirstCard      bool
 }
 
 type champSelectRuntimeRecord struct {
@@ -979,11 +980,20 @@ func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelec
 	if candidate == 0 {
 		candidate, skipped = chooseChampSelectCandidate(side, champions, available, grid, config.AvoidTeammateIntent, groupID == "arena")
 	}
+	testFirstCard := false
+	if side == "pick" && session.AllowSubsetChampionPicks {
+		var testPool []int64
+		testPool, testFirstCard = champSelectSubsetTestPool(champions, pickableIDs, champSelectSubsetTestFirstCard)
+		if testFirstCard {
+			candidate, skipped = chooseChampSelectCandidate(side, testPool, available, grid, config.AvoidTeammateIntent, groupID == "arena")
+			r.champDiagnostic("subset", "test-first-card", champSelectDecision{Action: actionName, ActionID: action.ID, ChampionID: candidate}, nil)
+		}
+	}
 	availabilityCount := len(available)
 	if side == "pick" && session.AllowSubsetChampionPicks {
 		availabilityCount = len(pickable)
 	}
-	r.recordChampSelectCandidates(session, side, champions, candidate, skipped, availabilityCount, len(grid))
+	r.recordChampSelectCandidates(session, side, champions, candidate, skipped, availabilityCount, len(grid), testFirstCard)
 	if side == "pick" && session.AllowSubsetChampionPicks {
 		reason := "selected"
 		if candidate == 0 {
@@ -1005,7 +1015,7 @@ func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelec
 		changed := r.champSelect.subsetRecordKey != recordKey
 		r.champSelect.subsetRecordKey = recordKey
 		r.mu.Unlock()
-		if changed {
+		if changed && !testFirstCard {
 			if candidate > 0 {
 				r.champSelectChampionLog("ok", fmt.Sprintf("从开局卡片中选择 英雄 %d", candidate), candidate)
 			} else if reason == "no-pool-champion" {
@@ -1021,7 +1031,7 @@ func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelec
 		first := !r.champSelect.exhausted[key]
 		r.champSelect.exhausted[key] = true
 		r.mu.Unlock()
-		if first {
+		if first && !testFirstCard {
 			if side == "ban" && len(available) == 0 {
 				r.champSelectLog("fail", "客户端禁用列表没有提供任何英雄 ID，并非队友已选择全部候选；已记录原始 ID 与会话状态，等待客户端更新")
 			} else {
@@ -1063,6 +1073,7 @@ func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelec
 	path := fmt.Sprintf("%s/session/actions/%d", sessionAPI, action.ID)
 	decision := champSelectDecision{Key: fmt.Sprintf("%s:%d:%d:%t", sessionAPI, action.ID, candidate, completed), Action: actionName, ActionID: action.ID, ChampionID: candidate, Completed: completed, SessionAPI: sessionAPI, GameID: session.GameID, QueueID: session.QueueID, LocalCellID: *session.LocalPlayerCellID}
 	decision.Intent, decision.ForceHover, decision.AvailabilitySource = intent, forceHover, banSource
+	decision.TestFirstCard = testFirstCard
 	decision.Key += fmt.Sprintf(":%s:%t", session.Timer.Phase, intent)
 	if side == "pick" {
 		decision.AvailabilitySource = "client-pickable"
@@ -1127,7 +1138,7 @@ func champSelectActionCompleted(strategy string, actionChampionID, candidate int
 	return strategy == "lock-now" || (strategy == "show-then-lock" && actionChampionID == candidate && submitted && last.ChampionID == candidate && !last.Completed)
 }
 
-func (r *watchRunner) recordChampSelectCandidates(session lcuChampSelectSession, side string, pool []int64, selected int64, skipped map[int64]string, availableCount, gridCount int) {
+func (r *watchRunner) recordChampSelectCandidates(session lcuChampSelectSession, side string, pool []int64, selected int64, skipped map[int64]string, availableCount, gridCount int, silent ...bool) {
 	candidates := make([]map[string]any, 0, len(pool))
 	for _, id := range pool {
 		reason := skipped[id]
@@ -1171,7 +1182,7 @@ func (r *watchRunner) recordChampSelectCandidates(session lcuChampSelectSession,
 	skipChanged := r.champSelect.skippedKey != string(skipKey)
 	r.champSelect.skippedKey = string(skipKey)
 	r.mu.Unlock()
-	if skipChanged {
+	if skipChanged && !(len(silent) > 0 && silent[0]) {
 		labels := map[string]string{"unknown": "英雄网格未提供", "gone": "已禁用或已选定", "unavailable": "客户端可用列表未包含", "intent": "队友当前预选", "teammate-picked": "队友已经选择", "own-intent": "自己准备选用，不自动禁用"}
 		for _, id := range pool {
 			if reason := skipped[id]; reason != "" {
@@ -1247,9 +1258,9 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 	r.champSelect.decision[decision.Action] = decision
 	r.mu.Unlock()
 	r.champDiagnostic("schedule", "armed", decision, map[string]any{"delay_ms": delayMS, "replaced_pending": replaced, "method": method, "endpoint": diagnosticWatchEndpoint(path)})
-	r.emit(fmt.Sprintf("watch:armed:%s:%d", decision.Action, delayMS))
+	r.champSelectDecisionEmit(decision, fmt.Sprintf("watch:armed:%s:%d", decision.Action, delayMS))
 	verb := champSelectDecisionVerb(decision)
-	r.champSelectChampionLog("ok", fmt.Sprintf("已排定：%.1f 秒后%s英雄 %d", float64(delayMS)/1000, verb, decision.ChampionID), decision.ChampionID)
+	r.champSelectDecisionLog(decision, "ok", fmt.Sprintf("已排定：%.1f 秒后%s英雄 %d", float64(delayMS)/1000, verb, decision.ChampionID), decision.ChampionID)
 	go func() {
 		defer recoverPanic("champselect.scheduleChampSelectRequest.1")
 
@@ -1269,7 +1280,7 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 			select {
 			case <-ctx.Done():
 				r.champDiagnostic("delay", "canceled", decision, nil)
-				r.emit("watch:canceled:" + decision.Action)
+				r.champSelectDecisionEmit(decision, "watch:canceled:"+decision.Action)
 				return
 			case <-timer.C:
 			}
@@ -1367,7 +1378,7 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 			}
 			r.champDiagnostic("write-disposition", disposition, decision, nil)
 			if current && ctx.Err() == nil {
-				r.champSelectChampionLog("ok", fmt.Sprintf("已发送%s英雄 %d，等待客户端确认", verb, decision.ChampionID), decision.ChampionID)
+				r.champSelectDecisionLog(decision, "ok", fmt.Sprintf("已发送%s英雄 %d，等待客户端确认", verb, decision.ChampionID), decision.ChampionID)
 			}
 			return
 		}
@@ -1386,18 +1397,18 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 				}
 				r.mu.Unlock()
 				r.record(map[string]any{"event": "watch_action", "action": decision.Action, "result": "failed", "status_code": status, "error_code": code})
-				r.champSelectLog("fail", fmt.Sprintf("%s失败：%s", champSelectActionVerb(decision.Action), message))
-				r.emit(fmt.Sprintf("watch:failed:%s:%d:%s:%s", decision.Action, status, watchEventField(code), watchEventField(message)))
+				r.champSelectDecisionLog(decision, "fail", fmt.Sprintf("%s失败：%s", champSelectActionVerb(decision.Action), message), 0)
+				r.champSelectDecisionEmit(decision, fmt.Sprintf("watch:failed:%s:%d:%s:%s", decision.Action, status, watchEventField(code), watchEventField(message)))
 			}
 			return
 		}
 		if decision.Action == champSelectActionBench {
-			r.champSelectChampionLog("ok", fmt.Sprintf("已发送%s英雄 %d，等待客户端确认", verb, decision.ChampionID), decision.ChampionID)
+			r.champSelectDecisionLog(decision, "ok", fmt.Sprintf("已发送%s英雄 %d，等待客户端确认", verb, decision.ChampionID), decision.ChampionID)
 			return
 		}
 		r.record(map[string]any{"event": "watch_action", "action": decision.Action, "result": "fired"})
-		r.champSelectChampionLog("ok", fmt.Sprintf("已%s英雄 %d", champSelectActionVerb(decision.Action), decision.ChampionID), decision.ChampionID)
-		r.emit("watch:fired:" + decision.Action)
+		r.champSelectDecisionLog(decision, "ok", fmt.Sprintf("已%s英雄 %d", champSelectActionVerb(decision.Action), decision.ChampionID), decision.ChampionID)
+		r.champSelectDecisionEmit(decision, "watch:fired:"+decision.Action)
 	}()
 	return true
 }
@@ -1452,7 +1463,7 @@ func (r *watchRunner) champSelectRequestStillCurrent(ctx context.Context, client
 	definition, _ := champSelectGroupDefinitionFor(r.champSelect.groupID)
 	pool, poolPosition := champSelectConfiguredPool(config, definition, champSelectAssignedPosition(session), side)
 	checks["pool_position"], checks["pool_size"] = poolPosition, len(pool)
-	allowed = allowed && slices.Contains(pool, decision.ChampionID)
+	allowed = allowed && (slices.Contains(pool, decision.ChampionID) || side == "pick" && session.AllowSubsetChampionPicks && champSelectSubsetTestFirstCard && decision.TestFirstCard)
 	if side == "ban" {
 		allowed = allowed && definition.HasBan
 	}

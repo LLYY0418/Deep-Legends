@@ -1,0 +1,31 @@
+{
+  "version": "0.12.64",
+  "go_full": {
+    "passed": true,
+    "seconds": 262.544
+  },
+  "node_full": {
+    "tests": 1126,
+    "pass": 1125,
+    "skip": 1,
+    "fail": 0
+  },
+  "installer": {
+    "passed": true
+  },
+  "go_vet": {
+    "passed": true
+  },
+  "race_r201": {
+    "passed": true,
+    "seconds": 5.66
+  },
+  "mutations": {
+    "no_hide": "assertion_fail",
+    "readonly_skip": "assertion_fail",
+    "test_pick_ui": "assertion_fail"
+  },
+  "switch_off_r200": "pass",
+  "public_build": "pending",
+  "release": "pending"
+}

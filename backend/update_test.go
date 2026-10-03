@@ -632,8 +632,8 @@ func TestUpdateApplyRehashPortableMinimumAndCommand(t *testing.T) {
 	if err := u.Apply(); err != nil || launched != 1 || u.Status().State != "applying" {
 		t.Fatalf("apply %v count%d", err, launched)
 	}
-	command := updateCommandLine(`C:\更新 包\setup.exe`, `C:\Program Files\Deep Legends`)
-	if command != `"C:\更新 包\setup.exe" --update --dest "C:\Program Files\Deep Legends"` {
+	command := updateCommandLine(`C:\更新 包\setup.exe`, `C:\Program Files\Deep Legends`, 42)
+	if command != `"C:\更新 包\setup.exe" --update --parent-first --parent-pid 42 --dest "C:\Program Files\Deep Legends"` {
 		t.Fatal(command)
 	}
 	root := filepath.Join("/", "install", "Deep Legends")

@@ -141,11 +141,14 @@ func (a *app) applyGameCameraMode(parent context.Context, client *LCUClient, sta
 	if !allowed() {
 		return
 	}
-	event := map[string]any{"event": "game_camera_mode_apply", "stage": stage, "target": target, "target_value": value, "lcu_before": "unknown", "lcu_after": "unknown", "lcu_result": "unavailable", "file_before": map[string]string{}, "file_after": map[string]string{}, "file_result": "unchanged", "save_called": false}
+	event := map[string]any{"event": "game_camera_mode_apply", "stage": stage, "target": target, "target_value": value, "lcu_before": "unknown", "lcu_after": "unknown", "lcu_result": "unavailable", "file_before": map[string]string{}, "file_after": map[string]string{}, "file_result": "unchanged", "save_called": false, "relocked": false}
 	defer func() { a.recordDiagnostic(event) }()
 	var payload json.RawMessage
 	if client.RequestJSON(ctx, http.MethodGet, "/lol-game-settings/v1/game-settings", nil, &payload) == nil {
 		section, name, old, ok := cameraSetting(decodeLCUSettings(payload))
+		if !ok && name == "" {
+			event["lcu_result"] = "not_present"
+		}
 		if ok {
 			text, _ := settingRawValue(old)
 			event["lcu_before"] = cameraValue(text)
@@ -208,12 +211,20 @@ func (a *app) applyGameCameraMode(parent context.Context, client *LCUClient, sta
 	for _, name := range []string{"PersistedSettings.json", "game.cfg"} {
 		file := location
 		file.file = filepath.Join(location.configRoot, name)
-		b, n, result := applyCameraModeFile(file, value, safeToWrite)
+		permissions := a.cameraFilePermissions
+		if permissions == nil {
+			permissions = cameraFilePermissions
+		}
+		var relocked bool
+		b, n, result := applyCameraModeFileWithPermissions(file, value, safeToWrite, permissions, &relocked)
+		if relocked {
+			event["relocked"] = true
+		}
 		before[name] = b
 		after[name] = n
 		results[result] = true
 	}
-	for _, result := range []string{"write_failed", "read_only", "not_found", "ok", "unchanged"} {
+	for _, result := range []string{"relock_failed", "write_failed", "read_only", "not_found", "ok_relocked", "ok", "unchanged"} {
 		if results[result] {
 			event["file_result"] = result
 			break
@@ -224,6 +235,9 @@ func (a *app) applyGameCameraMode(parent context.Context, client *LCUClient, sta
 	}
 }
 func applyCameraModeFile(location settingsLocation, target int, valid func() bool) (string, string, string) {
+	return applyCameraModeFileWithPermissions(location, target, valid, cameraFilePermissions)
+}
+func applyCameraModeFileWithPermissions(location settingsLocation, target int, valid func() bool, permissions func(string, os.FileInfo) (func(bool) error, error), lockState ...*bool) (beforeValue, afterValue, result string) {
 	if !settingsWatchNoSymlinks(location, location.file) {
 		return "unknown", "unknown", "write_failed"
 	}
@@ -242,11 +256,62 @@ func applyCameraModeFile(location settingsLocation, target int, valid func() boo
 	if err != nil {
 		return "unknown", "unknown", "write_failed"
 	}
-	if gameSettingsReadOnly(file, info) {
-		return before, before, "read_only"
-	}
 	if string(data) == string(next) {
 		return before, before, "unchanged"
+	}
+	locked := gameSettingsReadOnly(file, info)
+	if locked {
+		// Only PersistedSettings is temporarily unlocked, after the phase/process
+		// guard. The defer restores it even when writing or a later guard fails.
+		if !strings.EqualFold(filepath.Base(file), "PersistedSettings.json") {
+			return before, before, "read_only"
+		}
+		if !valid() {
+			return before, before, "write_failed"
+		}
+		_, current, checkErr := safeSettingsFile(location)
+		stable, readErr := os.ReadFile(file)
+		if checkErr != nil || readErr != nil || !settingsWatchNoSymlinks(location, location.file) || !os.SameFile(info, current) || string(stable) != string(data) {
+			return before, before, "write_failed"
+		}
+		restore, err := permissions(file, info)
+		if err != nil {
+			return before, before, "write_failed"
+		}
+		defer func() {
+			restored := false
+			for attempt := 0; attempt < 2; attempt++ {
+				if !settingsWatchNoSymlinks(location, location.file) {
+					break
+				}
+				if restore(true) == nil {
+					if actual, err := os.Stat(file); err == nil && gameSettingsReadOnly(file, actual) {
+						restored = true
+						break
+					}
+				}
+			}
+			if !restored {
+				result = "relock_failed"
+			} else {
+				if len(lockState) > 0 && lockState[0] != nil {
+					*lockState[0] = true
+				}
+				if result == "ok" {
+					// Verify the installed bytes once more after the lock is restored.
+					verified, err := os.ReadFile(file)
+					if err != nil || !settingsWatchNoSymlinks(location, location.file) || string(verified) != string(next) {
+						result = "write_failed"
+						afterValue = "unknown"
+					} else {
+						result = "ok_relocked"
+					}
+				}
+			}
+		}()
+		if restore(false) != nil {
+			return before, before, "write_failed"
+		}
 	}
 	temp, err := os.CreateTemp(filepath.Dir(file), ".deep-legends-camera-*")
 	if err != nil {
@@ -254,7 +319,11 @@ func applyCameraModeFile(location settingsLocation, target int, valid func() boo
 	}
 	name := temp.Name()
 	defer os.Remove(name)
-	err = temp.Chmod(info.Mode().Perm())
+	mode := info.Mode().Perm()
+	if locked {
+		mode |= 0200
+	}
+	err = temp.Chmod(mode)
 	if err == nil {
 		_, err = temp.Write(next)
 	}

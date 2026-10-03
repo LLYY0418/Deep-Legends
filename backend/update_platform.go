@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -67,10 +68,20 @@ func quoteUpdateArgument(value string) string {
 	out.WriteByte('"')
 	return out.String()
 }
-func updateCommandLine(setup, destination string) string {
-	return quoteUpdateArgument(setup) + " --update --dest " + quoteUpdateArgument(destination)
+func updateParentPID() int {
+	if value, err := strconv.Atoi(os.Getenv("LOOT_DESKTOP_PID")); err == nil && value > 0 {
+		return value
+	}
+	return os.Getpid()
+}
+func updateCommandLine(setup, destination string, parent ...int) string {
+	pid := updateParentPID()
+	if len(parent) > 0 {
+		pid = parent[0]
+	}
+	return quoteUpdateArgument(setup) + " --update --parent-first --parent-pid " + strconv.Itoa(pid) + " --dest " + quoteUpdateArgument(destination)
 }
 
 func portableUpdateCommandLine(setup, destination string, parent int) string {
-	return updateCommandLine(setup, destination) + " --fresh-install --parent-pid " + strconv.Itoa(parent)
+	return updateCommandLine(setup, destination, parent) + " --fresh-install"
 }

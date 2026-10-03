@@ -13,7 +13,7 @@ func TestR186PortableInstallerHandshakeAndCurrentUserCommand(t *testing.T) {
 		t.Fatal(options)
 	}
 	cmd := portableSetupCommandLine(`C:\Temp\setup.exe`, options.Destination)
-	if !strings.Contains(cmd, `/S /currentuser --portable-upgrade --updated /D=C:\Users\test\AppData\Local\Programs\Deep Legends`) {
+	if !strings.Contains(cmd, `/S /NCRC /currentuser --portable-upgrade --updated /D=C:\Users\test\AppData\Local\Programs\Deep Legends`) {
 		t.Fatal(cmd)
 	}
 	for _, fail := range []bool{true, false} {

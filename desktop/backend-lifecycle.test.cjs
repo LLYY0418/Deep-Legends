@@ -33,7 +33,9 @@ function shellHarness() {
   ipcMain.removeHandler = name => handlers.delete(name);
   ipcRenderer.invoke = async (name, ...args) => handlers.get(name)({ sender: contents }, ...args);
   ipcRenderer.send = () => {};
-  const electron = { app, ipcMain, ipcRenderer, BrowserWindow: class {}, nativeTheme: {}, session: {}, shell: {},
+  const hidden = [];
+  const windows = ["main", "splash", "dialog"].map(name => ({isDestroyed: () => false, hide() { hidden.push(name); }}));
+  const electron = { app, ipcMain, ipcRenderer, BrowserWindow: class { static getAllWindows() {return windows;} }, nativeTheme: {}, session: {}, shell: {},
     dialog: { showMessageBox(value) { messages.push(value); return Promise.resolve(); } },
     contextBridge: { exposeInMainWorld(name, value) { bridges[name] = value; } } };
   const context = vm.createContext({ require(name) {
@@ -45,7 +47,7 @@ function shellHarness() {
   vm.runInContext(mainSource + '\nglobalThis.probe={startBackend,attach(window){backendReady={baseUrl:"http://127.0.0.1:8787",token:"secret"};mainWindow=window;setupBackendIPC();}};', context);
   context.probe.startBackend(); context.probe.attach(window);
   vm.runInNewContext(preloadSource, { require: () => electron });
-  return { child, app, handlers, contents, bridges, messages, sent, ipcRenderer,
+  return { child, app, hidden, handlers, contents, bridges, messages, sent, ipcRenderer,
     navigate(value) { url = value; }, get quits() { return quits; }, get relaunches() { return relaunches; } };
 }
 function rendererHarness(bridge) {
@@ -160,4 +162,17 @@ test("restart IPC failure tells the user to reopen manually instead of reloading
     assert.match(r.w.toasts[0], /请关闭软件后重新打开/);
     assert.equal(r.w.document.body.classList.contains("is-fatal"), true);
   } finally { r.close(); }
+});
+
+
+test("R201 installer ready hides every window before flushed shutdown quits", () => {
+  const h = shellHarness();
+  h.child.stdout.emit("data", "LOOT_UPDATE_STARTED\n");
+  assert.deepEqual(h.hidden, ["main", "splash", "dialog"]);
+  assert.equal(h.quits, 0, "allow backend to flush before final quit");
+  h.app.emit("activate");
+  h.child.stdout.emit("data", "LOOT_QUIT update\n");
+  assert.equal(h.quits, 1);
+  h.child.emit("close", 0, null);
+  assert.equal(h.sent.length, 0);
 });

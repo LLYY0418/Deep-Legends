@@ -170,9 +170,9 @@ func (r *watchRunner) reconcileChampSelectSubmissions(session lcuChampSelectSess
 		if applied {
 			r.champDiagnostic("confirmation", "applied", d, map[string]any{"timer_phase": session.Timer.Phase, "attempt": attempts, "observed_champion_id": observed.ChampionID, "observed_completed": observed.Completed})
 			verb := champSelectDecisionVerb(d)
-			r.champSelectChampionLog("ok", fmt.Sprintf("已确认%s英雄 %d", verb, d.ChampionID), d.ChampionID)
+			r.champSelectDecisionLog(d, "ok", fmt.Sprintf("已确认%s英雄 %d", verb, d.ChampionID), d.ChampionID)
 			r.record(map[string]any{"event": "watch_action", "action": d.Action, "result": "fired", "trace_id": d.TraceID, "confirmed": true, "intent": d.Intent, "completed": d.Completed, "champion_id": d.ChampionID, "write_step": champSelectDecisionStep(d)})
-			r.emit("watch:fired:" + d.Action)
+			r.champSelectDecisionEmit(d, "watch:fired:"+d.Action)
 		} else {
 			_, executable := champSelectExecutableAction(session, d.Intent)
 			reason := "retry-after-fresh-state"
@@ -189,8 +189,8 @@ func (r *watchRunner) reconcileChampSelectSubmissions(session lcuChampSelectSess
 			if advancing {
 				detail = ""
 			}
-			r.champSelectChampionLog("warn", fmt.Sprintf("英雄 %d 的请求未在客户端生效（第 %d/%d 次）%s", d.ChampionID, attempts, champSelectMaxWriteAttempts, map[bool]string{true: "：" + detail, false: ""}[detail != ""]), d.ChampionID)
-			r.emit("watch:canceled:" + d.Action)
+			r.champSelectDecisionLog(d, "warn", fmt.Sprintf("英雄 %d 的请求未在客户端生效（第 %d/%d 次）%s", d.ChampionID, attempts, champSelectMaxWriteAttempts, map[bool]string{true: "：" + detail, false: ""}[detail != ""]), d.ChampionID)
+			r.champSelectDecisionEmit(d, "watch:canceled:"+d.Action)
 		}
 	}
 }
@@ -249,6 +249,13 @@ func (r *watchRunner) champSelectFreshCandidate(ctx context.Context, client *LCU
 			r.mu.Lock()
 			pool = append([]int64{}, config.Champions[r.champSelect.position]...)
 			r.mu.Unlock()
+			testPool, test := champSelectSubsetTestPool(pool, raw, champSelectSubsetTestFirstCard)
+			if test != d.TestFirstCard {
+				return "subset-test-mode-changed"
+			}
+			if test {
+				pool = testPool
+			}
 		}
 	}
 	candidate, reasons := chooseChampSelectCandidate(side, pool, available, grid, config.AvoidTeammateIntent, arena)
@@ -259,4 +266,32 @@ func (r *watchRunner) champSelectFreshCandidate(ctx context.Context, client *LCU
 		return "candidate-unavailable"
 	}
 	return ""
+}
+
+// R201 临时测试，真机验证后删除（另开工单）。
+const champSelectSubsetTestFirstCard = true
+
+// Test fallback depends on the offered/pool intersection, not whether a pool
+// hero survives teammate/grid/retry gates. Never override a blocked pool hero.
+func champSelectSubsetTestPool(pool, offered []int64, enabled bool) ([]int64, bool) {
+	if !enabled {
+		return pool, false
+	}
+	cards := champSelectIDSet(offered)
+	for _, id := range pool {
+		if _, ok := cards[id]; ok {
+			return pool, false
+		}
+	}
+	return offered, true
+}
+func (r *watchRunner) champSelectDecisionLog(d champSelectDecision, kind, message string, id int64) {
+	if !d.TestFirstCard {
+		r.champSelectChampionLog(kind, message, id)
+	}
+}
+func (r *watchRunner) champSelectDecisionEmit(d champSelectDecision, event string) {
+	if !d.TestFirstCard {
+		r.emit(event)
+	}
 }

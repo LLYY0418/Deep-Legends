@@ -87,6 +87,9 @@ func writeLiveEvent(w io.Writer, event string) error {
 }
 func (a *app) scheduleQuit(delay time.Duration, reason string) {
 	a.quitOnce.Do(func() {
+		if reason == "update" {
+			fmt.Fprintln(os.Stdout, "LOOT_UPDATE_STARTED")
+		}
 		go func() {
 			defer a.recoverPanic("update_http.scheduleQuit.1")
 

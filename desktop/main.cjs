@@ -81,6 +81,7 @@ if (!hasInstanceLock) {
   app.quit();
 } else {
   app.on("second-instance", () => {
+    if (quitting) return;
     if (!mainWindow) {
       if (startupMarks.splashWindowShown) { splashWindow?.show(); splashWindow?.focus(); }
       return;
@@ -388,6 +389,15 @@ function onBackendStdout(chunk) {
   const lines = stdoutBuffer.split(/\r?\n/);
   stdoutBuffer = lines.pop() || "";
   for (const line of lines) {
+    if (backendReady && line === "LOOT_UPDATE_STARTED") {
+      // Hide immediately; backend performs its normal flush before LOOT_QUIT.
+      quitting = true;
+      processMetrics?.dispose(); processMetrics = null;
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.hide();
+      }
+      continue;
+    }
     if (backendReady && (line === "LOOT_QUIT update" || line === "LOOT_QUIT user")) {
       quitting = true;
       shutdownStarted = true;
@@ -766,6 +776,7 @@ app.whenReady().then(() => {
 });
 
 app.on("activate", () => {
+  if (quitting) return;
   if (mainWindow) mainWindow.show();
   else if (startupMarks.splashWindowShown) splashWindow?.show();
 });

@@ -26,6 +26,34 @@ ManifestDPIAware true
     !insertmacro DLcustomHeader
   !endif
 !macroend
+; Child TEMP belongs to the Go shell. FILETIME -> Unix milliseconds; preserve
+; scratch registers and the error flag used by electron-builder's copy retry.
+!macro DLUpdateTiming STAGE
+  Push $R7
+  Push $R8
+  Push $R9
+  Push $9
+  StrCpy $R7 0
+  IfErrors 0 +2
+    StrCpy $R7 1
+  ; System .r9 maps to NSIS $9 (uppercase .R9 maps to $R9).
+  System::Call 'kernel32::GetSystemTimeAsFileTime(*l .r9)'
+  System::Int64Op $9 / 10000
+  Pop $R9
+  System::Int64Op $R9 - 11644473600000
+  Pop $R9
+  FileOpen $R8 "$TEMP\update-install-stages.txt" a
+  FileWrite $R8 "${STAGE}=$R9$\r$\n"
+  FileClose $R8
+  ClearErrors
+  ${If} $R7 == 1
+    SetErrors
+  ${EndIf}
+  Pop $9
+  Pop $R9
+  Pop $R8
+  Pop $R7
+!macroend
 Var pid
 !macro customCheckAppRunning
   ; A portable parent must survive cancellation/failure. For a fresh migration,

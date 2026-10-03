@@ -130,10 +130,12 @@
 
 | R196 | 更新下载测速换线、ETA、后台下载提示与细图标 | 进行中：0.12.61 已正式发布并包含 R196；0.12.60 未发布；Windows 真机升级待验收 | [WORKLIST-R196-UPDATE-DOWNLOAD-SOURCE-RACE-ETA-FORMAT-BACKGROUND-DOWNLOAD-TOAST-AND-THINNER-BUTTON.md](WORKLIST-R196-UPDATE-DOWNLOAD-SOURCE-RACE-ETA-FORMAT-BACKGROUND-DOWNLOAD-TOAST-AND-THINNER-BUTTON.md) | [r196-execution-ledger.md](r196-execution-ledger.md) | 目标版本 0.12.60；0.12.60 未发布，并入 R197/R198 的版本发布 |
 
-| R197 | 隐藏玩家赛后补全与默认镜头同步核对 | 进行中：0.12.61 已正式发布，自动验证通过；Windows 真机待验收 | [WORKLIST-R197-HIDDEN-PLAYER-REVEAL-AFTER-GAME-AND-DEFAULT-CAMERA-MODE-SYNC.md](WORKLIST-R197-HIDDEN-PLAYER-REVEAL-AFTER-GAME-AND-DEFAULT-CAMERA-MODE-SYNC.md) | [r197-execution-ledger.md](r197-execution-ledger.md) | 版本 0.12.61；P2 由 R198 取代并扩展 |
+| R197 | 隐藏玩家赛后补全与默认镜头同步核对 | 进行中：0.12.61 已正式发布，自动验证通过；Windows 真机待验收 | [WORKLIST-R197-HIDDEN-PLAYER-REVEAL-AFTER-GAME-AND-DEFAULT-CAMERA-MODE-SYNC.md](WORKLIST-R197-HIDDEN-PLAYER-REVEAL-AFTER-GAME-AND-DEFAULT-CAMERA-MODE-SYNC.md) | [r197-execution-ledger.md](r197-execution-ledger.md) | 版本 0.12.61；P2 由 R198 取代并扩展；赛后补全真机正常，用户决定保持现状 |
 
 | R198 | 维护固定开局镜头模式 | 进行中：0.12.61 已正式发布，自动验证通过；0/1 映射与两局真机待核实 | [WORKLIST-R198-FIXED-CAMERA-MODE-ON-GAME-START-SETTING.md](WORKLIST-R198-FIXED-CAMERA-MODE-ON-GAME-START-SETTING.md) | [r198-execution-ledger.md](r198-execution-ledger.md) | 版本 0.12.61；与 R197 合并发布，包含 R196 |
 
 | R199 | 更正 R196 发布状态并补齐发布证据规则 | 已关闭：账本与发布规则已更正 | [WORKLIST-R199-R196-RELEASE-0.12.60-NOT-PUBLISHED.md](history/worklists/WORKLIST-R199-R196-RELEASE-0.12.60-NOT-PUBLISHED.md) | [r199-execution-ledger.md](history/ledgers/r199-execution-ledger.md) | 只读确认草稿 402378684；旧草稿及附件保持不变 |
 
-| R200 | 卡片选人只用发给自己的子集、失败顺延、备战席换人确认 | 进行中：0.12.63 已正式发布，自动验证通过；子集接口与换人待用户真机日志 | [WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md](WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md) | [r200-execution-ledger.md](r200-execution-ledger.md) | 版本 0.12.63；源码 `91df3a9a` |
+| R200 | 卡片选人只用发给自己的子集、失败顺延、备战席换人确认 | 进行中：0.12.63 已正式发布，自动验证通过；子集接口真机已核实；实际锁定与换人待用户日志 | [WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md](WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md) | [r200-execution-ledger.md](r200-execution-ledger.md) | 版本 0.12.63；源码 `91df3a9a`；子集接口真机已核实；临时测试选人见 R201 P3 |
+
+| R201 | 升级隐藏窗口与安装提速、只读镜头写入、海斗临时首卡测试 | 进行中：0.12.64 实现与验证，发布未完成；Windows 真机待验收 | [WORKLIST-R201-UPDATE-HIDE-APP-DURING-INSTALL-FASTER-INSTALL-CAMERA-WITH-SETTINGS-LOCK-AND-ARAM-TEST-PICK.md](WORKLIST-R201-UPDATE-HIDE-APP-DURING-INSTALL-FASTER-INSTALL-CAMERA-WITH-SETTINGS-LOCK-AND-ARAM-TEST-PICK.md) | [r201-execution-ledger.md](r201-execution-ledger.md) | 版本 0.12.64；P3 临时逻辑删除另开工单 |

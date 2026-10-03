@@ -132,7 +132,7 @@ func TestWindowsRealLaunchMustUseSanitizedCommandAndTimedLogger(t *testing.T) {
 			t.Fatal("explicit launch adapter required")
 		}
 		found++
-		assertCompletionBlock(t, callback.Body.List, `return logApplicationStart(func() (uint32,error) { return startApplication(exe,directory) },started)`)
+		assertCompletionBlock(t, callback.Body.List, `a.timing.mark("relaunch"); return logApplicationStart(func() (uint32,error) { return startApplication(exe,directory) },started)`)
 		return false
 	})
 	if found != 1 {

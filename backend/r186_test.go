@@ -84,7 +84,7 @@ func TestR186PortableDownloadApplyAndFailures(t *testing.T) {
 		t.Fatal(err, launches)
 	}
 	command := portableUpdateCommandLine(`C:\Temp Space\setup.exe`, `C:\Users\test\AppData\Local\Programs\Deep Legends`, 42)
-	if !strings.Contains(command, `--fresh-install --parent-pid 42`) || !strings.Contains(command, `--dest "C:\Users\test\AppData\Local\Programs\Deep Legends"`) {
+	if !strings.Contains(command, `--fresh-install`) || !strings.Contains(command, `--parent-pid 42`) || !strings.Contains(command, `--dest "C:\Users\test\AppData\Local\Programs\Deep Legends"`) {
 		t.Fatal(command)
 	}
 	u.status.State = "ready"

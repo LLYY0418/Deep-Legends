@@ -114,7 +114,7 @@ func TestR198ReadOnlyStillPatchesLCU(t *testing.T) {
 	v := newR198Fixture(t)
 	os.Chmod(v.f.location.file, 0444)
 	v.apply("champselect")
-	if r198Read(t, v.f.location.file) != r198JSON || len(v.f.patches) != 1 || cameraEvent(t, v)["file_result"] != "read_only" || cameraEvent(t, v)["file_skipped"] != "read_only" {
+	if r198Read(t, v.f.location.file) != strings.Replace(r198JSON, `"value":"2"`, `"value":"0"`, 1) || len(v.f.patches) != 1 || cameraEvent(t, v)["file_result"] != "ok_relocked" || cameraEvent(t, v)["relocked"] != true {
 		t.Fatalf("read-only result=%v", cameraEvent(t, v))
 	}
 }

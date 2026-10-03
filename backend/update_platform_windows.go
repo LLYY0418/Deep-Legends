@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -84,12 +83,7 @@ func launchUpdateInstaller(setup, destination string) error {
 	if !updateInstallationMatches(destination, "Deep Legends", installed, regularFile(filepath.Join(destination, "Uninstall Deep Legends.exe"))) {
 		return errors.New("安装位置已变化，请从发布页下载完整安装包")
 	}
-	command := exec.Command(setup)
-	command.SysProcAttr = &syscall.SysProcAttr{CmdLine: updateCommandLine(setup, destination)}
-	if err = command.Start(); err != nil {
-		return err
-	}
-	return command.Process.Release()
+	return startUpdateInstaller(setup, updateRecoveryCommandLine(updateCommandLine(setup, destination), destination), os.Environ())
 }
 
 func launchPortableUpdateInstaller(setup, dest string) error {
@@ -107,13 +101,12 @@ func launchPortableUpdateInstaller(setup, dest string) error {
 	if strings.EqualFold(filepath.Clean(dest), filepath.Clean(updateRootForExecutable(executable))) {
 		return errors.New("当前安装目录正在使用，请从发布页安装")
 	}
-	parent := os.Getpid()
-	if value, err := strconv.Atoi(os.Getenv("LOOT_DESKTOP_PID")); err == nil && value > 0 {
-		parent = value
-	}
+	return startUpdateInstaller(setup, updateRecoveryCommandLine(portableUpdateCommandLine(setup, dest, updateParentPID()), dest), portableUpdateEnvironment(os.Environ()))
+}
+func startUpdateInstaller(setup, commandLine string, environment []string) error {
 	cmd := exec.Command(setup)
-	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: portableUpdateCommandLine(setup, dest, parent), HideWindow: true}
-	cmd.Env = portableUpdateEnvironment(os.Environ())
+	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: commandLine, HideWindow: true}
+	cmd.Env = environment
 	output, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -126,7 +119,7 @@ func launchPortableUpdateInstaller(setup, dest string) error {
 		scanner := bufio.NewScanner(output)
 		scanner.Buffer(make([]byte, 256), 4096)
 		for scanner.Scan() {
-			if scanner.Text() == "DEEP_LEGENDS_UPDATE_INSTALLED" {
+			if scanner.Text() == "DEEP_LEGENDS_UPDATE_STARTED" {
 				result <- nil
 				_ = cmd.Wait()
 				return
@@ -135,13 +128,24 @@ func launchPortableUpdateInstaller(setup, dest string) error {
 				break
 			}
 		}
-		result <- errors.New("安装未完成，请重试或打开发布页")
+		result <- errors.New("安装程序未启动，请重试或打开发布页")
 		_ = cmd.Wait()
 	})
 	select {
 	case err := <-result:
 		return err
-	case <-time.After(5 * time.Minute):
+	case <-time.After(30 * time.Second):
+		// This child has not acknowledged readiness. Stop it before a late
+		// acknowledgement can create an installer behind a failed status.
+		_ = cmd.Process.Kill()
 		return errors.New("安装等待超时，请重试或打开发布页")
 	}
+}
+
+func updateRecoveryCommandLine(command, destination string) string {
+	exe := os.Getenv("PORTABLE_EXECUTABLE_FILE")
+	if exe == "" {
+		exe = filepath.Join(destination, "Deep Legends.exe")
+	}
+	return command + " --recovery-exe " + quoteUpdateArgument(exe)
 }

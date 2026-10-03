@@ -1,0 +1,33 @@
+{
+  "source_filename": "lol-loot-diagnostics-1003-2002.jsonl",
+  "subset_probes": [
+    {
+      "path": "/lol-lobby-team-builder/champ-select/v1/subset-champion-list",
+      "status_code": 200,
+      "parse_result": "integer-array",
+      "id_count": 3,
+      "valid": true,
+      "count": 199
+    }
+  ],
+  "subset_help_matches": [
+    {
+      "paths": [],
+      "result": "read"
+    },
+    {
+      "paths": [],
+      "result": "read"
+    },
+    {
+      "paths": [],
+      "result": "read"
+    }
+  ],
+  "post_game_reveal": [
+    {
+      "reason": "ok",
+      "revealed": 1
+    }
+  ]
+}

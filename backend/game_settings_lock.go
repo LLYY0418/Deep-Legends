@@ -128,7 +128,7 @@ func readRigStatus(ctx context.Context, client *LCUClient) rigStatus {
 		_, info, statErr := safeSettingsFile(location)
 		if statErr == nil {
 			status.SettingsKnown = true
-			status.SettingsLocked = info.Mode().Perm()&0o222 == 0
+			status.SettingsLocked = gameSettingsReadOnly(location.file, info)
 		} else if !errors.Is(statErr, errUnsafeSettingsFile) {
 			status.Reason = "设置文件尚未生成或无法读取"
 		} else {

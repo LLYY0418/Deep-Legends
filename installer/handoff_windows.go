@@ -64,6 +64,7 @@ func (a *installerApp) handoffApplication(exe, directory string) {
 	runApplicationHandoff(handoffHooks{
 		ShowStarting: func() { w.dispatch(func() { w.state.phase = phaseFinishing; a.emit("done", nil) }) },
 		Start: func() (uint32, error) {
+			a.timing.mark("relaunch")
 			return logApplicationStart(func() (uint32, error) { return startApplication(exe, directory) }, started)
 		},
 		HasWindow: hasApplicationWindow,

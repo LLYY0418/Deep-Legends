@@ -134,6 +134,10 @@ w.startupTimer.Stop()
 a.pageReady = true
 log.Print("installer page ready; WebView visible")
 if a.options.Update {
+ if a.payloadError!=nil {a.fail(failureMessage{Message:upgradeFailureMessage});return}
+ if a.options.ParentFirst {
+  if _,err:=fmt.Fprintln(os.Stdout,"DEEP_LEGENDS_UPDATE_STARTED");err!=nil {a.fail(failureMessage{Message:upgradeFailureMessage});return}
+ } else {legacyUpdateWindows(a.options.ParentPID,false,!a.options.FreshInstall)}
     a.onMessage(`+"`{\"type\":\"install\"}`"+`)
 } else if a.payloadError != nil {
     a.fail(failureMessage{Message: "这个安装包不完整，请重新下载"})

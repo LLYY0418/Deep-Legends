@@ -107,8 +107,17 @@ func (a *installerApp) install(message uiMessage) {
 	reportFailure := func(failure failureMessage) {
 		if a.options.Update {
 			failure.Message = upgradeFailureMessage
+			recoverUpdateApplication(a.options, a.meta.ExeName, a.parentExited, startApplication)
 		}
 		w.dispatch(func() { a.fail(failure) })
+	}
+	if a.options.Update && !(a.options.FreshInstall && !a.options.ParentFirst) {
+		if a.waitParent == nil || !a.waitParent() {
+			reportFailure(failureMessage{Message: upgradeFailureMessage})
+			return
+		}
+		a.parentExited = true
+		a.timing.mark("parent_exited")
 	}
 	if a.options.Update && !a.options.FreshInstall {
 		if err := validateUpgradeDestination(message.Path); err != nil {
@@ -157,19 +166,23 @@ func (a *installerApp) install(message uiMessage) {
 	for {
 		select {
 		case <-finished:
+			a.timing.importNSIS(temporaryDir)
 			completeInstallation(a.options, installationResult{ExitCode: cmd.ProcessState.ExitCode(), WaitError: waitErr, Destination: dest}, installationCompletionHooks{
 				Failed:  reportFailure,
 				Cleanup: func() { _ = os.RemoveAll(temporaryDir) },
 				Handoff: func() {
 					start := func() { a.handoffApplication(filepath.Join(dest, a.meta.ExeName), dest) }
-					if !a.options.FreshInstall {
-						start()
+					if a.options.FreshInstall && !a.options.ParentFirst {
+						// .63 migrates portable data only after INSTALLED; preserve that order.
+						// Its new destination is separate, so this legacy path cannot replace
+						// files occupied by the parent. New callers always wait before writing.
+						report := func(value string) error { _, err := fmt.Fprintln(os.Stdout, value); return err }
+						if !portableUpdateHandoff(report, a.waitParent, start) {
+							reportFailure(failureMessage{Message: upgradeFailureMessage})
+						}
 						return
 					}
-					report := func(value string) error { _, err := fmt.Fprintln(os.Stdout, value); return err }
-					if !portableUpdateHandoff(report, a.waitParent, start) {
-						reportFailure(failureMessage{Message: upgradeFailureMessage})
-					}
+					start()
 				},
 			})
 			return

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -13,7 +14,9 @@ type installerOptions struct {
 	Update       bool
 	FreshInstall bool
 	ParentPID    uint32
+	ParentFirst  bool
 	Destination  string
+	RecoveryExe  string
 	Error        error
 }
 
@@ -25,6 +28,8 @@ func parseInstallerOptions(args []string) installerOptions {
 			options.Update = true
 		case "--fresh-install":
 			options.FreshInstall = true
+		case "--parent-first":
+			options.ParentFirst = true
 		case "--parent-pid":
 			if i+1 >= len(args) {
 				options.Error = errors.New(upgradeFailureMessage)
@@ -37,6 +42,13 @@ func parseInstallerOptions(args []string) installerOptions {
 			} else {
 				options.ParentPID = uint32(value)
 			}
+		case "--recovery-exe":
+			if i+1 >= len(args) || strings.HasPrefix(args[i+1], "--") {
+				options.Error = errors.New(upgradeFailureMessage)
+				continue
+			}
+			i++
+			options.RecoveryExe = args[i]
 		case "--dest":
 			if i+1 >= len(args) || strings.HasPrefix(args[i+1], "--") {
 				options.Error = errors.New(upgradeFailureMessage)
@@ -49,7 +61,7 @@ func parseInstallerOptions(args []string) installerOptions {
 	if options.Update && options.Destination == "" {
 		options.Error = errors.New(upgradeFailureMessage)
 	}
-	if options.FreshInstall && (!options.Update || options.ParentPID == 0) {
+	if (options.FreshInstall || options.ParentFirst) && (!options.Update || options.ParentPID == 0) {
 		options.Error = errors.New(upgradeFailureMessage)
 	}
 	return options
@@ -72,7 +84,7 @@ func validateUpgradeDestination(dest string) error {
 	return nil
 }
 func upgradeSetupCommandLine(setup, dest string) string {
-	return `"` + setup + `" /S --updated /D=` + strings.TrimRight(dest, `\`)
+	return `"` + setup + `" /S /NCRC --updated /D=` + strings.TrimRight(dest, `\`)
 }
 func installerCommandLine(setup, dest string, shortcut, update bool) string {
 	if update {
@@ -109,5 +121,23 @@ func portableUpdateHandoff(report func(string) error, waitParent func() bool, st
 	return true
 }
 func portableSetupCommandLine(setup, dest string) string {
-	return `"` + setup + `" /S /currentuser --portable-upgrade --updated /D=` + strings.TrimRight(dest, `\`)
+	return `"` + setup + `" /S /NCRC /currentuser --portable-upgrade --updated /D=` + strings.TrimRight(dest, `\`)
+}
+
+// Startup is acknowledged before replacement, so an upgrade failure after the
+// parent exits must be able to reopen its original portable/installed launcher.
+func recoverUpdateApplication(options installerOptions, exeName string, parentExited bool, start func(string, string) (uint32, error)) bool {
+	if !options.Update || !parentExited {
+		return false
+	}
+	exe := options.RecoveryExe
+	if exe == "" {
+		exe = filepath.Join(options.Destination, exeName)
+	}
+	info, err := os.Stat(exe)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	_, err = start(exe, filepath.Dir(exe))
+	return err == nil
 }

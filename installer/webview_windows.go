@@ -17,6 +17,8 @@ import (
 type installerApp struct {
 	options      installerOptions
 	waitParent   func() bool
+	timing       *updateInstallTiming
+	parentExited bool
 	window       *shellWindow
 	meta         payload.Metadata
 	payloadError error
@@ -65,6 +67,21 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 		a.pageReady = true
 		log.Print("installer page ready; WebView visible")
 		if a.options.Update {
+			if a.payloadError != nil {
+				a.fail(failureMessage{Message: upgradeFailureMessage})
+				return
+			}
+			if a.options.ParentFirst {
+				// Acknowledge only after the native installer page is ready. The backend
+				// then hides its windows, flushes diagnostics and exits normally.
+				if _, err := fmt.Fprintln(os.Stdout, "DEEP_LEGENDS_UPDATE_STARTED"); err != nil {
+					a.fail(failureMessage{Message: upgradeFailureMessage})
+					return
+				}
+			} else {
+				// Compatibility with .63, whose portable backend waits for INSTALLED.
+				legacyUpdateWindows(a.options.ParentPID, false, !a.options.FreshInstall)
+			}
 			a.onMessage(`{"type":"install"}`)
 		} else if a.payloadError != nil {
 			a.fail(failureMessage{Message: "这个安装包不完整，请重新下载"})
@@ -102,10 +119,14 @@ func (a *installerApp) fail(failure failureMessage) {
 	}
 	a.window.state.phase = phaseFailed
 	a.emit("failed", failure)
-	if a.options.FreshInstall {
+	if a.options.Update {
 		fmt.Fprintln(os.Stdout, "DEEP_LEGENDS_UPDATE_FAILED")
+	}
+	if a.options.FreshInstall && !a.options.ParentFirst {
+		legacyUpdateWindows(a.options.ParentPID, true, false)
 		postMessage.Call(a.window.hwnd, WM_CLOSE, 0, 0)
 	}
+
 }
 
 func (a *installerApp) validatePath(path string, replace bool) {

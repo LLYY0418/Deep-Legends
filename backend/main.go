@@ -237,6 +237,7 @@ type app struct {
 	gameSettingsWriteMu                 sync.Mutex
 	gameSettingsPreferenceMu            sync.Mutex
 	cameraProcessRunning                func() (bool, error)
+	cameraFilePermissions               func(string, os.FileInfo) (func(bool) error, error)
 	postGameReveal                      postGameRevealState
 	liveRosterRecovery                  liveRosterRecoveryCache
 	liveRosterDiagnosticMu              sync.Mutex
@@ -481,6 +482,7 @@ func main() {
 	}
 	if store != nil {
 		store.onDiagnosticRotation = a.resetDiagnosticDeduplication
+		consumeUpdateInstallTiming(store.root, a.recordDiagnostic)
 	}
 	championProvider.gameplayAugments = func(ctx context.Context) ([]gameplayAugment, error) {
 		client, _, err := a.gameplayClient()

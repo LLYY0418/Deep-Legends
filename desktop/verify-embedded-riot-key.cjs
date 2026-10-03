@@ -72,6 +72,7 @@ function configureSetupCompression(env = process.env) {
 
 const beforePack = async function beforePack() {
   verifyRiotKeyPolicy();
+  require("./apply-update-timing-template.cjs").applyUpdateTiming();
   console.log(`Setup compression: 7z level ${configureSetupCompression()} (default 9)`);
 };
 beforePack.verifyEmbeddedRiotKey = verifyEmbeddedRiotKey;

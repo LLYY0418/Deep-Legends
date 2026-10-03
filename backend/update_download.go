@@ -204,7 +204,7 @@ func (u *updateManager) downloadAsset(ctx context.Context, asset updateAsset, mi
 			if info, err := os.Stat(part); err == nil {
 				offset = info.Size()
 			}
-			u.recordUpdateCheck(map[string]any{"event": "update_download_source_selected", "mirror_prefix": updateDiagnosticMirrorPrefix(prefix), "speed_kbps": source.speed / 1024, "resume_offset": offset})
+			u.recordUpdateCheck(map[string]any{"event": "update_download_source_selected", "mirror_prefix": updateDiagnosticMirrorPrefix(prefix), "speed_kbps": source.speed / 1024, "probe_measured": source.ok, "resume_offset": offset})
 			// All measured sources slow: keep the fastest, avoiding pointless churn.
 			canSwitch := len(probes) > 0 && probes[0].speed >= updateSlowSpeed && i+1 < len(probes)
 			transfer := updateSourceTransfer{}
@@ -451,8 +451,8 @@ func (w *updateDownloadWriter) Write(p []byte) (int, error) {
 
 func (u *updateManager) Apply() error { return u.apply(false, nil) }
 
-// Portable installation stays asynchronous: failure is delivered through the
-// existing status SSE and the old app exits only after installation succeeds.
+// Portable startup stays asynchronous. The shell exits after the installer
+// acknowledges readiness, before it starts replacing application files.
 func (u *updateManager) ApplyAsync(success func()) error { return u.apply(true, success) }
 func (u *updateManager) apply(async bool, success func()) error {
 	u.mu.Lock()
@@ -497,10 +497,13 @@ func (u *updateManager) apply(async bool, success func()) error {
 				return fail(err)
 			}
 		}
-		err := u.launch(path, dest)
-		if err == nil && portable && u.migrate != nil {
-			err = u.migrate()
+		// Finish migration before readiness acknowledgement starts the 15s parent wait.
+		if portable && u.migrate != nil {
+			if err := u.migrate(); err != nil {
+				return fail(err)
+			}
 		}
+		err := u.launch(path, dest)
 		if err = fail(err); err == nil && success != nil && u.ctx.Err() == nil {
 			success()
 		}

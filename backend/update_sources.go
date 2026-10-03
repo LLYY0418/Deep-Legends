@@ -86,27 +86,63 @@ func updateProxyEnvSet(name string) bool {
 	return os.Getenv(name) != "" || os.Getenv(strings.ToLower(name)) != ""
 }
 
-// Probe data never enters the partial file. Every request has its own deadline;
-// wait for all results, then preserve preference order only for equal speeds.
+// Probe bytes never enter the partial file. The first usable result starts a
+// one-second comparison window; cancel unfinished requests instead of waiting
+// for the slowest route. Only the receiver owns the result slice.
 func (u *updateManager) probeUpdateSources(parent context.Context, asset updateAsset, sources []string) []updateSourceProbe {
-	results := make([]updateSourceProbe, len(sources))
-	done := make(chan int, len(sources))
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
+	type completed struct {
+		index int
+		probe updateSourceProbe
+	}
+	done := make(chan completed, len(sources))
 	for i, prefix := range sources {
-		goSafe("update-download-probe", func() { results[i] = u.probeUpdateSource(parent, asset, prefix); done <- i })
+		goSafe("update-download-probe", func() { done <- completed{i, u.probeUpdateSource(ctx, asset, prefix)} })
 	}
-	for range sources {
-		<-done
-	}
-	sort.SliceStable(results, func(i, j int) bool {
-		if results[i].ok != results[j].ok {
-			return results[i].ok
+	results := make([]completed, 0, len(sources))
+	seen := make([]bool, len(sources))
+	var timer *time.Timer
+	var deadline <-chan time.Time
+	defer func() {
+		if timer != nil {
+			timer.Stop()
 		}
-		return results[i].speed > results[j].speed
+	}()
+collect:
+	for received := 0; received < len(sources); received++ {
+		select {
+		case result := <-done:
+			seen[result.index] = true
+			if result.probe.ok {
+				results = append(results, result)
+				if timer == nil {
+					timer = time.NewTimer(time.Second)
+					deadline = timer.C
+				}
+			}
+		case <-deadline:
+			break collect
+		case <-parent.Done():
+			return nil
+		}
+	}
+	cancel()
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].probe.speed == results[j].probe.speed {
+			return results[i].index < results[j].index
+		}
+		return results[i].probe.speed > results[j].probe.speed
 	})
-	usable := results[:0]
+	usable := make([]updateSourceProbe, 0, len(results))
 	for _, result := range results {
-		if result.ok {
-			usable = append(usable, result)
+		usable = append(usable, result.probe)
+	}
+	// Canceled probes are unmeasured, not failed routes. Preserve them after
+	// the measured winners for download-error fallback and slow-source switching.
+	for i, prefix := range sources {
+		if !seen[i] {
+			usable = append(usable, updateSourceProbe{prefix: prefix})
 		}
 	}
 	return usable
