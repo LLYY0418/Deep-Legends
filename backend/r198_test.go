@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -44,7 +43,7 @@ func newR198Fixture(t *testing.T) *r198Fixture {
 	f.a.lcu = f.client
 	f.a.cameraProcessRunning = func() (bool, error) { return v.running.Load(), nil }
 	mode := "free"
-	if err := f.a.saveGameSettingsPreference(nil, &mode); err != nil {
+	if err := f.a.saveGameSettingsPreference(mode); err != nil {
 		t.Fatal(err)
 	}
 	return v
@@ -139,7 +138,7 @@ func TestR198NoWritesDuringGame(t *testing.T) {
 func TestR198NoneDoesNotReadOrWrite(t *testing.T) {
 	v := newR198Fixture(t)
 	mode := "none"
-	v.f.a.saveGameSettingsPreference(nil, &mode)
+	v.f.a.saveGameSettingsPreference(mode)
 	v.apply("champselect")
 	if len(v.f.calls) != 0 || r198Read(t, v.f.location.file) != r198JSON {
 		t.Fatal("none touched settings")
@@ -149,7 +148,7 @@ func TestR198WASDNeverChanges(t *testing.T) {
 	for mode := range gameCameraModeValues {
 		t.Run(mode, func(t *testing.T) {
 			v := newR198Fixture(t)
-			v.f.a.saveGameSettingsPreference(nil, &mode)
+			v.f.a.saveGameSettingsPreference(mode)
 			v.apply("champselect")
 			if !strings.Contains(r198Read(t, v.f.location.file), `"name":"CameraModeWASD","value":"1"`) || !strings.Contains(r198Read(t, filepath.Join(v.f.location.configRoot, "game.cfg")), "CameraModeWASD=1") {
 				t.Fatal("WASD camera modified")
@@ -189,35 +188,6 @@ func TestR198UnsafeFilePathsRejected(t *testing.T) {
 		})
 	}
 }
-func TestR197CameraModeDeltaSyncAndR198NextGameOverride(t *testing.T) {
-	v := newR198Fixture(t)
-	before := allSettingsFromJSON([]byte(strings.Replace(r198JSON, `"value":"2"`, `"value":"0"`, 1)))
-	v.f.lcu["General"]["CameraMode"] = json.Number("0")
-	v.f.a.syncGameSettings(context.Background(), v.f.client, v.f.location, before, nil)
-	if len(v.f.patches) != 1 {
-		t.Fatal(v.f.patches)
-	}
-	e := r175Events(t, v.f.a, "game_settings_sync")
-	last := e[len(e)-1]
-	if last["result"] != "ok" || last["camera_mode_before"] != "0" || last["camera_mode_after"] != "2" {
-		t.Fatal(last)
-	}
-	body, _ := json.Marshal(v.f.patches[0])
-	if string(body) != `{"General":{"CameraMode":2}}` {
-		t.Fatalf("sync delta=%s", body)
-	}
-	v.apply("champselect")
-	if len(v.f.patches) != 2 || fmt.Sprint(v.f.lcu["General"]["CameraMode"]) != "0" {
-		t.Fatal("next game not overridden")
-	}
-	// R197 P2 exact direction: 2 at game start, user chooses free, LCU still 2.
-	v.f.patches = nil
-	v.f.lcu["General"]["CameraMode"] = json.Number("2")
-	v.f.a.syncGameSettings(context.Background(), v.f.client, v.f.location, allSettingsFromJSON([]byte(r198JSON)), nil)
-	if len(v.f.patches) != 1 || r175Events(t, v.f.a, "game_settings_sync")[1]["camera_mode_after"] != "0" {
-		t.Fatal("2 -> 0 delta missing")
-	}
-}
 func TestR198LobbyOnlyLCUAndPreferencesRetained(t *testing.T) {
 	v := newR198Fixture(t)
 	v.phase.Store("Lobby")
@@ -225,9 +195,8 @@ func TestR198LobbyOnlyLCUAndPreferencesRetained(t *testing.T) {
 	if len(v.f.patches) != 1 || r198Read(t, v.f.location.file) != r198JSON {
 		t.Fatal("lobby file write or missing LCU patch")
 	}
-	off := false
-	v.f.a.saveGameSettingsPreference(&off, nil)
-	if v.f.a.cameraModePreference() != "free" || v.f.a.keepGameSettingsEnabled() {
+	writeLocalStoreFile(v.f.a.storage, "game-settings-sync.json", []byte(`{"enabled":true,"cameraMode":"free"}`))
+	if v.f.a.cameraModePreference() != "free" {
 		t.Fatal("preference overwritten")
 	}
 	fresh := &app{storage: v.f.a.storage}
@@ -236,8 +205,12 @@ func TestR198LobbyOnlyLCUAndPreferencesRetained(t *testing.T) {
 	}
 	w := httptest.NewRecorder()
 	fresh.handleCameraModePreference(w, httptest.NewRequest("POST", "/api/rig/camera-mode", strings.NewReader(`{"mode":"dynamic"}`)))
-	if w.Code != 200 || fresh.cameraModePreference() != "dynamic" || fresh.keepGameSettingsEnabled() {
+	if w.Code != 200 || fresh.cameraModePreference() != "dynamic" {
 		t.Fatal("save failed")
+	}
+	data, _ := readLocalStoreFile(fresh.storage, "game-settings-sync.json")
+	if strings.Contains(string(data), "enabled") {
+		t.Fatal("legacy sync preference retained", string(data))
 	}
 }
 func TestR198GameStartRunningProcessSkipsFilesAndVerifyFailure(t *testing.T) {

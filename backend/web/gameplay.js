@@ -603,7 +603,10 @@
 	  summonerLevel: Number(summoner.summonerLevel) || 0,
 	};
 	const backgroundFields = ["backgroundSkinId", "backgroundSkinName", "backgroundSource", "backgroundPath", "backgroundPosterPath", "backgroundVideoPath"];
-	if (backgroundFields.some((field) => Object.prototype.hasOwnProperty.call(summoner, field))) {
+	// An identity-only status has no resolved automatic backdrop. Preserve the
+    // verified overview client poster/mastery fallback until usable art arrives.
+    if (backgroundFields.some((field) => Object.prototype.hasOwnProperty.call(summoner, field)) &&
+        (summoner.backgroundPath || summoner.backgroundPosterPath)) {
 	  Object.assign(identity, {
 		backgroundSkinId: Number(summoner.backgroundSkinId) || 0,
 		backgroundSkinName: String(summoner.backgroundSkinName || ""),
@@ -612,6 +615,10 @@
 		backgroundPosterPath: String(summoner.backgroundPosterPath || ""),
 		backgroundVideoPath: String(summoner.backgroundVideoPath || ""),
 	  });
+      if (!summoner.backgroundPosterPath && Number(summoner.backgroundSkinId) === Number(player.backgroundSkinId)) {
+        identity.backgroundPosterPath = player.backgroundPosterPath || "";
+        identity.backgroundVideoPath = player.backgroundVideoPath || "";
+      }
 	}
 	const fields = Object.keys(identity);
 	const playerChanged = fields.some((field) => player[field] !== identity[field]);

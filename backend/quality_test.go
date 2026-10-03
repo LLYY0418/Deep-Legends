@@ -419,11 +419,11 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 	if len(privacy.ExplicitWrites) != 10 {
 		t.Fatalf("explicit client writes = %#v", privacy.ExplicitWrites)
 	}
-	if len(privacy.AutomaticWrites) != 12 {
+	if len(privacy.AutomaticWrites) != 11 {
 		t.Fatalf("automatic client writes = %#v", privacy.AutomaticWrites)
 	}
 	automaticWrites := strings.Join(privacy.AutomaticWrites, "\n")
-	for _, expected := range []string{"进入游戏时的镜头模式默认不修改", "General.CameraMode", "原子替换", "不修改 WASD", "保留对局内设置改动默认开启", "本局 Game.cfg 改动", "不修改本地游戏配置文件或按键", "默认关闭", "ReadyCheck", "EndOfGame", "Reconnect", "点赞", "任务庆祝", "阵营位置", "房主", "邀请", "匹配", "禁用", "选用"} {
+	for _, expected := range []string{"进入游戏时的镜头模式默认不修改", "General.CameraMode", "原子替换", "不修改 WASD", "默认关闭", "ReadyCheck", "EndOfGame", "Reconnect", "点赞", "任务庆祝", "阵营位置", "房主", "邀请", "匹配", "禁用", "选用"} {
 		if !strings.Contains(automaticWrites, expected) {
 			t.Fatalf("automatic write statement is missing %q: %s", expected, automaticWrites)
 		}
@@ -667,7 +667,7 @@ var privacyMkdirCallPins = map[string]int{
 }
 
 var privacyStoreWriteCallPins = map[string]int{
-	"game_camera_mode.go": 1, // 根级 game-settings-sync.json：stores 的本机偏好开关及镜头模式；两类偏好共用一个写入点。
+	"game_camera_mode.go": 1, // 根级 game-settings-sync.json：stores 的镜头模式偏好；沿用旧文件名以保留升级前的选择。
 	"season_stats.go":     1, // season-stats/<source>/<hash>-<season>.json（source 子目录由 writeLocalStoreFile 隐式创建）
 	"update.go":           3, // 根级 update-settings.json ×1、update-manifest.json ×2
 	"update_sources.go":   1, // 根级 update-settings.json 的成功线路偏好；既有 stores 自动更新设置，不含账号数据。

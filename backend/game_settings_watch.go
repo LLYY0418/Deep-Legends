@@ -549,10 +549,6 @@ func gameSettingsWriterGuess(stage, previous string, hashChanged bool) string {
 	return "game"
 }
 func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient, job gameSettingsWatchJob) {
-	if job.stage == "sync_after_5s" {
-		a.runGameSettingsSyncJob(parent, client, job)
-		return
-	}
 	s := &a.gameSettingsWatch
 	s.mu.Lock()
 	valid := s.client == client && (!job.delayed || s.generation == job.generation)
@@ -678,7 +674,4 @@ func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient,
 		}
 	}
 	a.recordDiagnostic(event)
-	if job.stage == "game_end" {
-		a.scheduleGameSettingsSyncLocked(parent, client, job.generation)
-	}
 }

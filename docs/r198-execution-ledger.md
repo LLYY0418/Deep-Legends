@@ -45,3 +45,7 @@ Windows public 发布构建成功：全量 Go 319.256 秒；Web 856/856；deskto
 标签自动触发的同源码 CI `37111418872` 保留自动执行；验收采用同源码已全部成功的 `37109826915`。标签触发的重复草稿构建 `37111418886` 已确认 cancelled，不改已发布附件。
 
 仍需用户 Windows 真机验收：选择自由镜头连续开两局，进游戏不操作，Esc 选项确认为自由；导出 game_camera_mode_apply（第一局 ok、后续 unchanged）及 in_game_60s camera_mode_matches_target=true。0/1 尚待真机确认，不将自动测试或 Windows runner 构建当作用户验收。R198 保留进行中。
+
+## 2026-10-03 用户追加要求覆盖
+
+用户明确要求移除“保留对局内设置改动”，镜头模式移到右侧维护按钮区。0.12.62 已删除旧结算自动同步及其接口，旧镜头选择继续保留；原工单涉及保留设置同步/紧邻旧开关的要求由此次用户要求覆盖，不再执行。R184 只读诊断、R198 开局镜头和原 Windows 验收边界保留；后续不再要求导出 game_settings_sync 事件。本地 public 构建完成，未发布 0.12.62，详情见 [追加要求账本](history/ledgers/maintenance-overview-1003-execution-ledger.md)。

@@ -155,6 +155,15 @@ func (r *watchRunner) observeChampSelectBench(session lcuChampSelectSession, def
 	ownEcho := swap != nil && !swap.Observed && current == swap.Decision.ChampionID
 	if ownEcho {
 		swap.Observed = true
+		if pending.TraceID == swap.Decision.TraceID {
+			delete(r.champSelect.decision, champSelectActionBench)
+		}
+	}
+	confirmedDecision := champSelectDecision{}
+	attempt := 0
+	if ownEcho && swap.Decision.Action == champSelectActionBench {
+		confirmedDecision = swap.Decision
+		attempt = r.champSelect.attempts[swap.Decision.Key]
 	}
 	tracking := slices.Contains(group.Pick.Champions[position], previous) || pending.Action != "" || swap != nil
 	changed := group.Bench.Enabled && observed && previous > 0 && current > 0 && current != previous && tracking && !ownEcho
@@ -171,6 +180,12 @@ func (r *watchRunner) observeChampSelectBench(session lcuChampSelectSession, def
 	changed = changed && r.yieldChampSelectLocked("bench", championID)
 	yielded := r.champSelect.takeover["bench"]
 	r.mu.Unlock()
+	if confirmedDecision.Action != "" {
+		r.champDiagnostic("bench-postflight", "applied", confirmedDecision, map[string]any{"target_id": confirmedDecision.ChampionID, "observed_champion_id": current, "attempt": attempt})
+		r.champSelectChampionLog("ok", fmt.Sprintf("已交换英雄 %d", confirmedDecision.ChampionID), confirmedDecision.ChampionID)
+		r.record(map[string]any{"event": "watch_action", "action": champSelectActionBench, "result": "fired", "confirmed": true, "champion_id": current})
+		r.emit("watch:fired:" + champSelectActionBench)
+	}
 	if changed {
 		r.reportChampSelectTakeover("bench", championID)
 	}
@@ -195,6 +210,9 @@ func (r *watchRunner) champSelectBenchRequestStillCurrent(ctx context.Context, c
 	position := r.champSelect.position
 	r.mu.Unlock()
 	if r.observeChampSelectBench(session, definition, group, position, decision.RuntimeID) {
+		return false
+	}
+	if champSelectLocalPickUnfinished(session) {
 		return false
 	}
 	if champSelectCurrentChampion(session) != decision.FromChampionID {

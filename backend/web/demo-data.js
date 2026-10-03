@@ -1064,11 +1064,7 @@
 	  try { suiteChampSelectState.sessionPaused = Boolean(JSON.parse(init?.body || "{}").paused); } catch (_) {}
 	  return Promise.resolve(new Response(JSON.stringify(structuredClone(suiteChampSelectState)), { status: 200, headers: { "Content-Type": "application/json" } }));
 	}
-    if (pathname === "/api/rig/settings-sync") {
- suiteRig.keepGameSettings=Boolean(JSON.parse(init?.body||"{}").enabled);
- return Promise.resolve(new Response(JSON.stringify({enabled:suiteRig.keepGameSettings}),{status:200,headers:{"Content-Type":"application/json"}}));
- }
- if (pathname === "/api/rig/camera-mode") {
+    if (pathname === "/api/rig/camera-mode") {
       suiteRig.cameraMode = JSON.parse(init?.body || "{}").mode;
       return Promise.resolve(new Response(JSON.stringify({cameraMode:suiteRig.cameraMode}),{status:200,headers:{"Content-Type":"application/json"}}));
     }

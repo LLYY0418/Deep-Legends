@@ -99,8 +99,8 @@ async function main(){
  await evaluate('new Promise(r=>setTimeout(r,500))');
  await click('[data-section="suite"]');await wait('__r197.requests.includes("/api/rig/status")');await click('[data-suite-tab="rig"]');
  await wait('document.querySelector("[data-rig-camera-mode]")');
- const initial=await evaluate('(()=>{const s=document.querySelector("[data-rig-camera-mode]");return {value:s.value,disabled:s.disabled,options:[...s.options].map(o=>[o.value,o.textContent]),previous:s.closest("label").previousElementSibling.textContent,readOnly:document.querySelector("[data-rig-lock]").textContent}})()');
- assert.equal(initial.value,'none');assert.equal(initial.disabled,false);assert.equal(initial.options.length,4);assert.match(initial.previous,/保留对局内设置改动/);assert.equal(initial.readOnly,'解除锁定');
+ const initial=await evaluate('(()=>{const s=document.querySelector("[data-rig-camera-mode]");return {value:s.value,disabled:s.disabled,options:[...s.options].map(o=>[o.value,o.textContent]),maintenance:s.closest("aside").querySelector("h3").textContent,readOnly:document.querySelector("[data-rig-lock]").textContent}})()');
+ assert.equal(initial.value,'none');assert.equal(initial.disabled,false);assert.equal(initial.options.length,4);assert.equal(initial.maintenance,'客户端维护');assert.equal(initial.readOnly,'解除锁定');
  await evaluate('(()=>{const s=document.querySelector("[data-rig-camera-mode]");s.value="free";s.dispatchEvent(new Event("change"))})()');
  await wait('!document.querySelector("[data-rig-camera-mode]").disabled && __r197.rigMode==="free"');
  await call('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/?demo&r198=refresh`});

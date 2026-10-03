@@ -1,0 +1,15 @@
+{
+  "playerRef": "player_5c1617eb3f4eda1ee4ff0f534fab53bf",
+  "displayName": "当前玩家",
+  "gameName": "当前玩家",
+  "backgroundSkinId": 103086,
+  "backgroundSkinName": "Fixture selected skin",
+  "backgroundSource": "gtimg",
+  "backgroundPath": "/images/lol/act/img/skin/big103086.jpg",
+  "backgroundPosterPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/Images/ahri_splash_centered_86.jpg",
+  "backgroundVideoPath": "/lol-game-data/assets/ASSETS/Characters/Ahri/Skins/Skin86/Images/ahri_splash_centered_86.webm",
+  "serverId": "HN1",
+  "serverName": "艾欧尼亚",
+  "hidden": false,
+  "isCurrent": true
+}

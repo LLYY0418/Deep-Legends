@@ -1,0 +1,87 @@
+{
+  "fixture": "Go first overview response; full public catalog; synthetic local SVG; demo maintenance API; no Windows client",
+  "art": {
+    "src": "/api/image?path=%2Flol-game-data%2Fassets%2FASSETS%2FCharacters%2FAhri%2FSkins%2FSkin86%2FImages%2Fahri_splash_centered_86.jpg",
+    "width": 150,
+    "loaded": true,
+    "requests": [
+      "/api/champions/network",
+      "/api/status",
+      "/api/gameplay/augments",
+      "/api/gameplay/perks",
+      "/api/diagnostics/client",
+      "/api/gameplay/perks",
+      "/api/gameplay/items",
+      "/api/gameplay/summoner-spells",
+      "/api/gameplay/overview?count=20&begIndex=0&force=0&matchFilter=all",
+      "/api/social/friends",
+      "/api/gameplay/phase",
+      "/api/diagnostics/client",
+      "/api/diagnostics/client",
+      "/api/gameplay/mayhem-rating?playerRef=player_5c1617eb3f4eda1ee4ff0f534fab53bf",
+      "/api/diagnostics/client"
+    ],
+    "errors": [],
+    "clip": {
+      "x": 254.953125,
+      "y": 165,
+      "width": 984.09375,
+      "height": 140,
+      "scale": 1
+    }
+  },
+  "results": [
+    {
+      "width": 1280,
+      "overflow": false,
+      "right": true,
+      "actions": true,
+      "toggle": false,
+      "text": "\n      安装与连接只读核对当前连接安装目录，不猜测缺失路径。连接正常发行渠道TENCENT / HN1安装根目录C:\\Riot Games\\League of Legends\\TCLS配置目录C:\\Riot Games\\League of Legends\\Game\\Config设置文件C:\\Riot Games\\League of Legends\\Game\\Config\\PersistedSettings.json · 已定位HTTP 连接127.0.0.1 已连接（端口与令牌不展示、不落盘）事件流已连接，自动规则可以接收客户端事件客户端界面Running游戏设置已锁定设置文件为只读，游戏内改动不会写回文件。只读解除锁定i只影响当前连接的安装目录。写入前会再次校验路径位于安装目录内，且目标不是符号链接。\n    客户端维护普通维护动作会直接执行；关闭客户端前会再次确认。进入游戏时的镜头模式不修改自由镜头动态镜头锁定镜头不修改不修改✓自由镜头✓动态镜头✓锁定镜头✓没有匹配项重启客户端界面结束并重新启动 LeagueClientUx。执行结束界面进程只结束客户端界面，不结束游戏端。执行启动界面进程请求客户端重新拉起界面。执行关闭客户端请求英雄联盟客户端正常退出。执行断开连接让助手停止当前连接，顶部刷新后可重连。断开",
+      "value": "none",
+      "errors": [],
+      "clip": {
+        "x": 913.046875,
+        "y": 233.296875,
+        "width": 326,
+        "height": 473.8125,
+        "scale": 1
+      }
+    },
+    {
+      "width": 960,
+      "overflow": false,
+      "right": false,
+      "actions": true,
+      "toggle": false,
+      "text": "\n      安装与连接只读核对当前连接安装目录，不猜测缺失路径。连接正常发行渠道TENCENT / HN1安装根目录C:\\Riot Games\\League of Legends\\TCLS配置目录C:\\Riot Games\\League of Legends\\Game\\Config设置文件C:\\Riot Games\\League of Legends\\Game\\Config\\PersistedSettings.json · 已定位HTTP 连接127.0.0.1 已连接（端口与令牌不展示、不落盘）事件流已连接，自动规则可以接收客户端事件客户端界面Running游戏设置已锁定设置文件为只读，游戏内改动不会写回文件。只读解除锁定i只影响当前连接的安装目录。写入前会再次校验路径位于安装目录内，且目标不是符号链接。\n    客户端维护普通维护动作会直接执行；关闭客户端前会再次确认。进入游戏时的镜头模式不修改自由镜头动态镜头锁定镜头不修改不修改✓自由镜头✓动态镜头✓锁定镜头✓没有匹配项重启客户端界面结束并重新启动 LeagueClientUx。执行结束界面进程只结束客户端界面，不结束游戏端。执行启动界面进程请求客户端重新拉起界面。执行关闭客户端请求英雄联盟客户端正常退出。执行断开连接让助手停止当前连接，顶部刷新后可重连。断开",
+      "value": "none",
+      "errors": [],
+      "clip": {
+        "x": 244.71875,
+        "y": 663.8125,
+        "width": 684.5625,
+        "height": 473.8125,
+        "scale": 1
+      }
+    },
+    {
+      "width": 720,
+      "overflow": false,
+      "right": false,
+      "actions": true,
+      "toggle": false,
+      "text": "\n      安装与连接只读核对当前连接安装目录，不猜测缺失路径。连接正常发行渠道TENCENT / HN1安装根目录C:\\Riot Games\\League of Legends\\TCLS配置目录C:\\Riot Games\\League of Legends\\Game\\Config设置文件C:\\Riot Games\\League of Legends\\Game\\Config\\PersistedSettings.json · 已定位HTTP 连接127.0.0.1 已连接（端口与令牌不展示、不落盘）事件流已连接，自动规则可以接收客户端事件客户端界面Running游戏设置已锁定设置文件为只读，游戏内改动不会写回文件。只读解除锁定i只影响当前连接的安装目录。写入前会再次校验路径位于安装目录内，且目标不是符号链接。\n    客户端维护普通维护动作会直接执行；关闭客户端前会再次确认。进入游戏时的镜头模式不修改自由镜头动态镜头锁定镜头不修改不修改✓自由镜头✓动态镜头✓锁定镜头✓没有匹配项重启客户端界面结束并重新启动 LeagueClientUx。执行结束界面进程只结束客户端界面，不结束游戏端。执行启动界面进程请求客户端重新拉起界面。执行关闭客户端请求英雄联盟客户端正常退出。执行断开连接让助手停止当前连接，顶部刷新后可重连。断开",
+      "value": "none",
+      "errors": [],
+      "clip": {
+        "x": 93.03125,
+        "y": 664.0625,
+        "width": 603.9375,
+        "height": 473.8125,
+        "scale": 1
+      }
+    }
+  ],
+  "persisted": "dynamic"
+}

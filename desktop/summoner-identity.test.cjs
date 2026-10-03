@@ -312,3 +312,17 @@ test("manual reread awaits the backend identity refresh before hard-refresh disp
   assert.ok(backendRefresh >= 0 && hardRefresh > backendRefresh, "hard-refresh ran before the awaited backend identity refresh");
   assert.match(handler, /catch \(error\)[\s\S]*window\.dispatchEvent/);
 });
+
+ test("identity status with unresolved backdrop preserves the first overview art", () => {
+  const player = {gameName:"Fixture",backgroundSkinId:103086,backgroundPosterPath:"/lol-game-data/assets/current.jpg",backgroundPath:"/lol-game-data/assets/current.jpg"};
+  const current = {current:true,label:"Fixture",data:{player}};
+  const state = {tabs:[current]};
+  const {applyOverviewPlayerIdentity} = compileFunctions(gameplaySource,["applyOverviewPlayerIdentity"],{state,summonerLabel,renderPlayerTabs(){},rerenderTab(){}});
+  for (const status of [
+    {backgroundSkinId:0,backgroundSkinName:"",backgroundSource:"",backgroundPath:""},
+    {backgroundSkinId:103086,backgroundPath:""},
+    {backgroundSkinId:103086,backgroundSource:"gtimg",backgroundPath:"/fallback.jpg"}
+   ]) applyOverviewPlayerIdentity({gameName:"Fixture",...status});
+  assert.equal(current.data.player.backgroundPosterPath,player.backgroundPosterPath);
+  assert.equal(current.data.player.backgroundPath,"/fallback.jpg");
+ });

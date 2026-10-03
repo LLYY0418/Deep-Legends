@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -243,185 +242,39 @@ func newR186SyncFixture(t *testing.T) *r186SyncFixture {
 	})}
 	return f
 }
-func (f *r186SyncFixture) sync() {
-	f.a.syncGameSettings(context.Background(), f.client, f.location, allSettingsFromJSON([]byte(r186A)), nil)
-}
-func (f *r186SyncFixture) result(t *testing.T) string {
-	rows := r175Events(t, f.a, "game_settings_sync")
-	return rows[len(rows)-1]["result"].(string)
-}
-func TestR186SyncOnlyDeltaAndDoesNotWriteFiles(t *testing.T) {
-	f := newR186SyncFixture(t)
-	f.save = true
-	before := map[string]string{}
-	for _, name := range []string{"PersistedSettings.json", "game.cfg", "input.ini"} {
-		data, _ := os.ReadFile(filepath.Join(f.location.configRoot, name))
-		before[name] = itemSetDigest(data)
-	}
-	f.sync()
-	if f.result(t) != "ok" || len(f.patches) != 1 {
-		t.Fatal(f.result(t), f.calls)
-	}
-	expected := map[string]map[string]any{"General": {"SomeSetting": float64(2)}, "HUD": {"Other": float64(1)}}
-	if !reflect.DeepEqual(f.patches[0], expected) {
-		t.Fatal(f.patches)
-	}
-	saved := false
-	for _, call := range f.calls {
-		if call == "POST /lol-game-settings/v1/save" {
-			saved = true
-		}
-	}
-	if !saved {
-		t.Fatal("advertised save omitted")
-	}
-	for name, hash := range before {
-		data, _ := os.ReadFile(filepath.Join(f.location.configRoot, name))
-		if itemSetDigest(data) != hash {
-			t.Fatal("game file written", name)
-		}
-	}
-}
-func TestR186SyncSkipsCurrentDisabledLockedAndVerifyFailure(t *testing.T) {
-	for _, mode := range []string{"current", "disabled", "locked", "verify-failed", "diverged"} {
-		t.Run(mode, func(t *testing.T) {
-			f := newR186SyncFixture(t)
-			want := "skipped_no_change"
-			switch mode {
-			case "current":
-				f.lcu["General"]["SomeSetting"] = json.Number("2")
-				f.lcu["HUD"]["Other"] = json.Number("1")
-			case "disabled":
-				writeLocalStoreFile(f.a.storage, "game-settings-sync.json", []byte(`{"enabled":false}`))
-				want = "skipped_disabled"
-			case "locked":
-				os.Chmod(f.location.file, 0400)
-				want = "skipped_locked"
-			case "verify-failed":
-				f.verifyFailed = true
-				want = "verify_failed"
-			case "diverged":
-				f.lcu["General"]["SomeSetting"] = json.Number("3")
-				f.lcu["HUD"]["Other"] = json.Number("4")
-			}
-			f.sync()
-			if f.result(t) != want {
-				t.Fatal(f.result(t), f.calls)
-			}
-			patches := 0
-			if mode == "verify-failed" {
-				patches = 1
-			}
-			if len(f.patches) != patches {
-				t.Fatal("unexpected writes", f.patches)
-			}
-			if (mode == "disabled" || mode == "locked") && len(f.calls) != 0 {
-				t.Fatal("disabled/locked still read LCU", f.calls)
-			}
-		})
-	}
-}
-func TestR186PreferenceDefaultAndPersistence(t *testing.T) {
-	a := r175App(t)
-	if !a.keepGameSettingsEnabled() {
-		t.Fatal("not enabled by default")
-	}
-	w := httptest.NewRecorder()
-	a.handleGameSettingsSyncPreference(w, httptest.NewRequest("POST", "/api/rig/settings-sync", strings.NewReader(`{"enabled":false}`)))
-	if w.Code != 200 || a.keepGameSettingsEnabled() {
-		t.Fatal(w.Code, w.Body.String())
-	}
-	other := &app{storage: a.storage}
-	if other.keepGameSettingsEnabled() {
-		t.Fatal("preference lost")
-	}
-}
 
-func TestR186GameEndSchedulesFiveSecondSyncAndExportsSafeDiagnostics(t *testing.T) {
+// Settlement remains a read-only diagnostic even when an old preference file
+// still says enabled=true. Keep the A/B comparison and redaction coverage.
+func TestSettlementSettingsWatchDoesNotSynchronize(t *testing.T) {
 	f := newR186SyncFixture(t)
+	writeLocalStoreFile(f.a.storage, "game-settings-sync.json", []byte(`{"enabled":true}`))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	os.WriteFile(f.location.file, []byte(r186A), 0600)
-	due, release := make(chan time.Duration, 1), make(chan struct{})
 	s := &f.a.gameSettingsWatch
 	s.client, s.ctx, s.generation = f.client, ctx, 1
 	s.queue = make(chan struct{}, 1)
 	s.prev, s.seen = map[string]gameSettingsFileSnapshot{}, map[string]bool{}
-	s.wait = func(ctx context.Context, d time.Duration) bool {
-		if d == 5*time.Second {
-			due <- d
-			select {
-			case <-release:
-				return true
-			case <-ctx.Done():
-				return false
-			}
-		}
-		<-ctx.Done()
-		return false
-	}
-	runNext := func() {
-		s.mu.Lock()
-		if len(s.jobs) == 0 {
-			s.mu.Unlock()
-			t.Fatal("phase job missing")
-		}
-		job := s.jobs[0]
-		s.jobs = s.jobs[1:]
-		s.mu.Unlock()
-		f.a.recordGameSettingsWatch(ctx, f.client, job)
-	}
-	f.a.observeGameSettingsPhase(f.client, "GameStart")
-	runNext()
+	os.WriteFile(f.location.file, []byte(r186A), 0600)
+	f.a.recordGameSettingsWatch(ctx, f.client, gameSettingsWatchJob{stage: "game_start", generation: 1})
 	os.WriteFile(f.location.file, []byte(r186B), 0600)
-	f.a.observeGameSettingsPhase(f.client, "EndOfGame")
-	runNext()
-	select {
-	case d := <-due:
-		if d != 5*time.Second {
-			t.Fatal(d)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("sync not scheduled")
+	f.a.recordGameSettingsWatch(ctx, f.client, gameSettingsWatchJob{stage: "game_end", generation: 1})
+	f.a.recordGameSettingsWatch(ctx, f.client, gameSettingsWatchJob{stage: "lobby_after_10s", generation: 1})
+	f.a.recordGameSettingsWatch(ctx, f.client, gameSettingsWatchJob{stage: "lobby_after_60s", generation: 1})
+	if len(f.patches) != 0 || len(s.jobs) != 0 {
+		t.Fatal("settlement still writes/schedules sync", f.calls, s.jobs)
 	}
-	if len(f.patches) != 0 {
-		t.Fatal("sync ran before delay")
+	for _, call := range f.calls {
+		if !strings.HasPrefix(call, "GET ") {
+			t.Fatal("settlement write", call)
+		}
 	}
 	watch := r175Events(t, f.a, "game_settings_watch")
-	last := watch[len(watch)-1]
-	if last["lcu_matches_file"] != "A" || len(last["lcu_settings_hash8"].(string)) != 8 || len(last["lcu_input_hash8"].(string)) != 8 {
-		t.Fatal(last)
+	if watch[1]["lcu_matches_file"] != "A" {
+		t.Fatal(watch[1])
 	}
-	changes := r175Events(t, f.a, "game_settings_changed")
-	encoded, _ := json.Marshal(changes)
-	if strings.Contains(string(encoded), "PRIVATE_") || !strings.Contains(string(encoded), "Input.ini.GameEvents.evtAction") {
-		t.Fatal(string(encoded))
-	}
-	close(release)
-	deadline := time.Now().Add(time.Second)
-	for {
-		s.mu.Lock()
-		ready := len(s.jobs) > 0
-		s.mu.Unlock()
-		if ready {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("delayed job missing")
-		}
-		time.Sleep(time.Millisecond)
-	}
-	runNext()
-	if f.result(t) != "ok" || len(f.patches) != 1 {
-		t.Fatal(f.calls)
-	}
-	// A later game supersedes a pending sync, even if its timer has fired.
-	s.mu.Lock()
-	s.generation++
-	s.mu.Unlock()
-	f.a.runGameSettingsSyncJob(ctx, f.client, gameSettingsWatchJob{stage: "sync_after_5s", generation: 1, delayed: true})
-	if len(f.patches) != 1 {
-		t.Fatal("stale game patched")
+	changes, _ := json.Marshal(r175Events(t, f.a, "game_settings_changed"))
+	if strings.Contains(string(changes), "PRIVATE_") || !strings.Contains(string(changes), "Input.ini.GameEvents.evtAction") {
+		t.Fatal(string(changes))
 	}
 }
 

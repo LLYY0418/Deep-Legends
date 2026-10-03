@@ -4,6 +4,8 @@
 
 任何账本写“已发布”，必须同时有：release id、`isLatest=true` 的查询结果、匿名下载 `releases/latest/download/latest.json` 得到的版本号。缺任何一项，只能写“发布未完成”。
 
+2026-10-03 用户追加维护/总览调整已实现并本地构建 0.12.62 public，未发布；见 [执行账本](history/ledgers/maintenance-overview-1003-execution-ledger.md) 与 [日志分析](history/reports/maintenance-overview-1003/analysis.md)。R197/R198 已发布版本仍为 0.12.61，Windows 验收边界保留。
+
 | R 号 | 标题 | 状态 | 工单路径 | 账本路径 | 证据所在提交号 |
 |---|---|---|---|---|---|
 | R82 | WORKLIST-R82-ADDENDUM-2 · A/B 采集脚本文件名假设过期，改成读构建记录；WORKLIST-R82-ADDENDUM-3 · A/B 采集脚本在旧版 Node 上报错 `.at is not a function` 等 6 份 | 已关闭 | [WORKLIST-R82-ADDENDUM-2-AB-SCRIPT-FILENAME.md](history/WORKLIST-R82-ADDENDUM-2-AB-SCRIPT-FILENAME.md)<br>[WORKLIST-R82-ADDENDUM-3-NODE-COMPAT.md](history/WORKLIST-R82-ADDENDUM-3-NODE-COMPAT.md)<br>[WORKLIST-R82-ADDENDUM-GATEWAY-AND-PROBE-TRIGGER.md](history/WORKLIST-R82-ADDENDUM-GATEWAY-AND-PROBE-TRIGGER.md)<br>[WORKLIST-R82-CURRENT-GAME-PROBE-MATRIX.md](history/WORKLIST-R82-CURRENT-GAME-PROBE-MATRIX.md)<br>[WORKLIST-R82-STARTUP-HARDENING-ADDENDUM.md](history/WORKLIST-R82-STARTUP-HARDENING-ADDENDUM.md)<br>[WORKLIST-R82-STARTUP-LATENCY.md](history/WORKLIST-R82-STARTUP-LATENCY.md) | — | — |
@@ -133,3 +135,5 @@
 | R198 | 维护固定开局镜头模式 | 进行中：0.12.61 已正式发布，自动验证通过；0/1 映射与两局真机待核实 | [WORKLIST-R198-FIXED-CAMERA-MODE-ON-GAME-START-SETTING.md](WORKLIST-R198-FIXED-CAMERA-MODE-ON-GAME-START-SETTING.md) | [r198-execution-ledger.md](r198-execution-ledger.md) | 版本 0.12.61；与 R197 合并发布，包含 R196 |
 
 | R199 | 更正 R196 发布状态并补齐发布证据规则 | 已关闭：账本与发布规则已更正 | [WORKLIST-R199-R196-RELEASE-0.12.60-NOT-PUBLISHED.md](history/worklists/WORKLIST-R199-R196-RELEASE-0.12.60-NOT-PUBLISHED.md) | [r199-execution-ledger.md](history/ledgers/r199-execution-ledger.md) | 只读确认草稿 402378684；旧草稿及附件保持不变 |
+
+| R200 | 卡片选人只用发给自己的子集、失败顺延、备战席换人确认 | 进行中：0.12.63 实现/验证，待发布及用户真机日志 | [WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md](WORKLIST-R200-ARAM-CARD-PICK-USES-OFFERED-SUBSET-AND-BENCH-SWAP-CONFIRMATION.md) | [r200-execution-ledger.md](r200-execution-ledger.md) | — |

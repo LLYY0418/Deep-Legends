@@ -339,6 +339,20 @@ test("1505 timeline resolves champion names without changing delays, attempts or
   assert.equal(message(null, null), "");
 });
 
+test("R200 card timeline uses the existing champion token formatter", () => {
+  const catalog = { champions: [{ id: 136, nameZh: "铸星龙王" }] };
+  const { champSelectRecordMessage, renderChampSelectTimeline } = compile(["champSelectRecordMessage", "champSelectChampionMeta", "renderChampSelectTimeline"], { state: { champSelectCatalog: catalog }, escapeHTML });
+  const records = [
+    { at: "2026-10-03T07:34:17Z", kind: "ok", message: "从开局卡片中选择 英雄 136", championId: 136 },
+    { at: "2026-10-03T07:34:18Z", kind: "warn", message: "开局卡片中没有选用序列里的英雄" },
+  ];
+  assert.equal(champSelectRecordMessage(records[0], catalog), "从开局卡片中选择 铸星龙王");
+  const html = renderChampSelectTimeline({ records });
+  assert.match(html, /从开局卡片中选择 铸星龙王/);
+  assert.match(html, /开局卡片中没有选用序列里的英雄/);
+  assert.doesNotMatch(html, /英雄 136/);
+});
+
 test("1505 timeline escapes catalog names and preserves reverse chronological order", () => {
   const state = { champSelectCatalog: { champions: [{ id: 141, nameZh: '<img src=x onerror="alert(1)">' }] } };
   const { renderChampSelectTimeline } = compile(["renderChampSelectTimeline", "champSelectRecordMessage", "champSelectChampionMeta"], { state, escapeHTML });

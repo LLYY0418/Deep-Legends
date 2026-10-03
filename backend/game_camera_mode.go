@@ -17,7 +17,6 @@ import (
 var gameCameraModeValues = map[string]int{"free": 0, "dynamic": 1, "locked": 2}
 
 type gameSettingsPreference struct {
-	Enabled    *bool  `json:"enabled"`
 	CameraMode string `json:"cameraMode,omitempty"`
 }
 
@@ -35,18 +34,13 @@ func (a *app) cameraModePreference() string {
 	}
 	return value.CameraMode
 }
-func (a *app) saveGameSettingsPreference(enabled *bool, camera *string) error {
+
+// Keep the existing filename so saved camera choices survive upgrades. Legacy
+// enabled is ignored and removed on the next save; settlement sync is retired.
+func (a *app) saveGameSettingsPreference(camera string) error {
 	a.gameSettingsPreferenceMu.Lock()
 	defer a.gameSettingsPreferenceMu.Unlock()
-	currentEnabled := a.keepGameSettingsEnabled()
-	value := gameSettingsPreference{Enabled: &currentEnabled, CameraMode: a.cameraModePreference()}
-	if enabled != nil {
-		value.Enabled = enabled
-	}
-	if camera != nil {
-		value.CameraMode = *camera
-	}
-	data, _ := json.Marshal(value)
+	data, _ := json.Marshal(gameSettingsPreference{CameraMode: camera})
 	return writeLocalStoreFile(a.storage, "game-settings-sync.json", data)
 }
 func (a *app) handleCameraModePreference(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +55,7 @@ func (a *app) handleCameraModePreference(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "镜头模式无效", 400)
 		return
 	}
-	if a.saveGameSettingsPreference(nil, &request.Mode) != nil {
+	if a.saveGameSettingsPreference(request.Mode) != nil {
 		http.Error(w, "设置保存失败", 503)
 		return
 	}
@@ -119,8 +113,8 @@ func cameraConfigValue(all map[string]string) string {
 	return cameraValue(strings.TrimSpace(text))
 }
 
-// Both writes use this serialization, so a settlement sync and preference
-// action cannot overwrite each other while they are being verified.
+// Serialize camera applications from phase events and preference changes so
+// they cannot overwrite each other while being verified.
 func (a *app) applyGameCameraMode(parent context.Context, client *LCUClient, stage string, valid func() bool) {
 	target := a.cameraModePreference()
 	value, enabled := gameCameraModeValues[target]
@@ -168,8 +162,9 @@ func (a *app) applyGameCameraMode(parent context.Context, client *LCUClient, sta
 						text, _ := settingRawValue(actual)
 						event["lcu_after"] = cameraValue(text)
 						if exists && settingMatches(strconv.Itoa(value), actual) {
-							called, _, err := saveLCUGameSettings(ctx, client, allowed)
+							called, saveResult, err := saveLCUGameSettings(ctx, client, allowed)
 							event["save_called"] = called
+							event["save_result"] = saveResult
 							if err == nil {
 								event["lcu_result"] = "ok"
 							}
@@ -294,40 +289,25 @@ func applyCameraModeFile(location settingsLocation, target int, valid func() boo
 	return before, strconv.Itoa(target), "ok"
 }
 func saveLCUGameSettings(ctx context.Context, client *LCUClient, valid func() bool) (bool, string, error) {
-	var schema struct {
-		Paths map[string]map[string]json.RawMessage `json:"paths"`
-	}
-	if client.RequestJSON(ctx, http.MethodGet, "/swagger/v3/openapi.json", nil, &schema) != nil {
-		return false, "not_advertised", nil
-	}
-	operation := schema.Paths["/lol-game-settings/v1/save"]["post"]
-	if len(operation) == 0 {
-		return false, "not_advertised", nil
-	}
-	var post struct {
-		RequestBody struct {
-			Required bool `json:"required"`
-		} `json:"requestBody"`
-		Parameters []struct {
-			Required bool `json:"required"`
-		} `json:"parameters"`
-	}
-	if json.Unmarshal(operation, &post) != nil {
-		return false, "not_advertised", nil
-	}
-	if post.RequestBody.Required {
-		return false, "unsupported_schema", nil
-	}
-	for _, p := range post.Parameters {
-		if p.Required {
-			return false, "unsupported_schema", nil
+	// Swagger is commonly disabled. /help is evidence when available; an
+	// absent listing is inconclusive, so probe the single bodyless save operation.
+	raw, _ := client.GetBytesContext(ctx, "/help")
+	source := "probe"
+	for _, op := range lcuHelpOperations(raw) {
+		if op.Method == http.MethodPost && op.Path == "/lol-game-settings/v1/save" {
+			source = "help"
+			break
 		}
 	}
 	if valid != nil && !valid() {
 		return false, "failed", errors.New("settings stage changed")
 	}
 	if err := client.RequestJSON(ctx, http.MethodPost, "/lol-game-settings/v1/save", nil, nil); err != nil {
+		var httpErr *LCUHTTPError
+		if errors.As(err, &httpErr) && (httpErr.StatusCode == http.StatusNotFound || httpErr.StatusCode == http.StatusMethodNotAllowed) {
+			return true, "unsupported", nil
+		}
 		return true, "failed", err
 	}
-	return true, "ok", nil
+	return true, "ok-" + source, nil
 }

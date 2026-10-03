@@ -10,18 +10,17 @@ import (
 )
 
 type rigStatus struct {
-	CameraMode       string `json:"cameraMode"`
-	KeepGameSettings bool   `json:"keepGameSettings"`
-	Connected        bool   `json:"connected"`
-	Region           string `json:"region,omitempty"`
-	Platform         string `json:"platform,omitempty"`
-	InstallRoot      string `json:"installRoot,omitempty"`
-	ConfigRoot       string `json:"configRoot,omitempty"`
-	SettingsFile     string `json:"settingsFile,omitempty"`
-	SettingsKnown    bool   `json:"settingsKnown"`
-	SettingsLocked   bool   `json:"settingsLocked"`
-	UXState          string `json:"uxState,omitempty"`
-	Reason           string `json:"reason,omitempty"`
+	CameraMode     string `json:"cameraMode"`
+	Connected      bool   `json:"connected"`
+	Region         string `json:"region,omitempty"`
+	Platform       string `json:"platform,omitempty"`
+	InstallRoot    string `json:"installRoot,omitempty"`
+	ConfigRoot     string `json:"configRoot,omitempty"`
+	SettingsFile   string `json:"settingsFile,omitempty"`
+	SettingsKnown  bool   `json:"settingsKnown"`
+	SettingsLocked bool   `json:"settingsLocked"`
+	UXState        string `json:"uxState,omitempty"`
+	Reason         string `json:"reason,omitempty"`
 }
 
 type settingsLocation struct {
@@ -152,11 +151,10 @@ func (a *app) handleRigStatus(w http.ResponseWriter, r *http.Request) {
 	client, _, err := a.gameplayClient()
 	if err != nil {
 		a.recordDiagnostic(map[string]any{"event": "rig_status_read", "result": "not-connected", "settings_locked": false, "path_kind": ""})
-		respondJSON(w, rigStatus{Reason: "未连接英雄联盟客户端", KeepGameSettings: a.keepGameSettingsEnabled(), CameraMode: a.cameraModePreference()})
+		respondJSON(w, rigStatus{Reason: "未连接英雄联盟客户端", CameraMode: a.cameraModePreference()})
 		return
 	}
 	status := readRigStatus(r.Context(), client)
-	status.KeepGameSettings = a.keepGameSettingsEnabled()
 	status.CameraMode = a.cameraModePreference()
 	result := "ok"
 	if status.InstallRoot == "" {
@@ -203,7 +201,6 @@ func (a *app) handleSettingsLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status := readRigStatus(r.Context(), client)
-	status.KeepGameSettings = a.keepGameSettingsEnabled()
 	status.CameraMode = a.cameraModePreference()
 	// Do not report success if the filesystem did not retain the requested state.
 	if !status.SettingsKnown || status.SettingsLocked != request.Locked {

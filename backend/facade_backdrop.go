@@ -26,6 +26,12 @@ func (a *app) applyFacadeBackdrop(ctx context.Context, client *LCUClient, curren
 	if err != nil || backdrop.SummonerID != current.SummonerID {
 		return
 	}
+	a.applyFacadeBackdropValue(backdrop, state)
+}
+
+// Project previously read backdrop evidence after optional catalog metadata is
+// ready. Overview reads these independently so a slow catalog cannot skip art.
+func (a *app) applyFacadeBackdropValue(backdrop facadeBackdrop, state *facadeState) {
 	if backdrop.Type == "recently-played" || backdrop.Type == "highest-mastery" {
 		state.Profile.BackgroundChampionID = backdrop.ChampionID
 	}

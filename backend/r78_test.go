@@ -112,6 +112,12 @@ func TestR78TradeCapabilityIndependentOfBench(t *testing.T) {
 
 func TestR78PickableFailureStillSwapsBench(t *testing.T) {
 	fixture := newR78ChampSelectFixture(t, "aram", "pick", 0, []int64{1}, nil)
+	// R200: bench recovery still works without pickable IDs, after the
+	// local pick has completed and a current champion actually exists.
+	fixture.session.MyTeam[0].ChampionID = 2
+	fixture.session.Actions[0][0].ChampionID = 2
+	fixture.session.Actions[0][0].Completed = true
+	fixture.session.Actions[0][0].IsInProgress = false
 	fixture.failPickableIDs = true
 	fixture.session.BenchEnabled = true
 	fixture.session.BenchChampions = []lcuChampSelectBenchChampion{{ChampionID: 1}}

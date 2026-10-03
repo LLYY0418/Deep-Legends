@@ -1274,6 +1274,20 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		playerRef = player.PUUID
 		reference = mergeGameplayReferences(gameplayReferenceFromSummoner(player), reference)
 	}
+	backgroundCh := make(chan gameplayPlayer, 1)
+	go func() {
+		defer a.recoverPanic("gameplay.overview-background")
+		defer close(backgroundCh)
+		if begIndex == 0 {
+			backgroundCh <- a.loadOverviewBackground(ctx, client, current, isCurrent)
+		} else {
+			background := gameplayPlayer{}
+			if isCurrent {
+				background.BackgroundSkinID, background.BackgroundSkinName, background.BackgroundSource, background.BackgroundPath = a.currentProfileBackground()
+			}
+			backgroundCh <- background
+		}
+	}()
 	phases := overviewPhasesFromContext(ctx)
 	type queueResult struct {
 		value             map[int64]string
@@ -1393,8 +1407,21 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		Hidden: profileHidden, PrivateHistory: strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE"),
 		IsCurrent: isCurrent, reference: reference,
 	}
-	if isCurrent {
-		playerData.BackgroundSkinID, playerData.BackgroundSkinName, playerData.BackgroundSource, playerData.BackgroundPath = a.currentProfileBackground()
+	select {
+	case background, ok := <-backgroundCh:
+		if !ok {
+			if isCurrent {
+				playerData.BackgroundSkinID, playerData.BackgroundSkinName, playerData.BackgroundSource, playerData.BackgroundPath = a.currentProfileBackground()
+			}
+			break
+		}
+		playerData.BackgroundSkinID, playerData.BackgroundSkinName = background.BackgroundSkinID, background.BackgroundSkinName
+		playerData.BackgroundSource, playerData.BackgroundPath = background.BackgroundSource, background.BackgroundPath
+		playerData.BackgroundPosterPath, playerData.BackgroundVideoPath = background.BackgroundPosterPath, background.BackgroundVideoPath
+	case <-ctx.Done():
+		if isCurrent {
+			playerData.BackgroundSkinID, playerData.BackgroundSkinName, playerData.BackgroundSource, playerData.BackgroundPath = a.currentProfileBackground()
+		}
 	}
 	response := gameplayOverview{
 		Player:  playerData,
@@ -7335,16 +7362,17 @@ type lcuLivePlayer struct {
 }
 
 type lcuChampSelectSession struct {
-	GameID            int64                         `json:"gameId"`
-	QueueID           int64                         `json:"queueId"`
-	LocalPlayerCellID *int64                        `json:"localPlayerCellId"`
-	Actions           [][]lcuChampSelectAction      `json:"actions"`
-	MyTeam            []lcuChampSelectPlayer        `json:"myTeam"`
-	TheirTeam         []lcuChampSelectPlayer        `json:"theirTeam"`
-	PositionSwaps     []map[string]any              `json:"positionSwaps"`
-	BenchEnabled      bool                          `json:"benchEnabled"`
-	BenchChampions    []lcuChampSelectBenchChampion `json:"benchChampions"`
-	Timer             lcuChampSelectTimer           `json:"timer"`
+	AllowSubsetChampionPicks bool                          `json:"allowSubsetChampionPicks"`
+	GameID                   int64                         `json:"gameId"`
+	QueueID                  int64                         `json:"queueId"`
+	LocalPlayerCellID        *int64                        `json:"localPlayerCellId"`
+	Actions                  [][]lcuChampSelectAction      `json:"actions"`
+	MyTeam                   []lcuChampSelectPlayer        `json:"myTeam"`
+	TheirTeam                []lcuChampSelectPlayer        `json:"theirTeam"`
+	PositionSwaps            []map[string]any              `json:"positionSwaps"`
+	BenchEnabled             bool                          `json:"benchEnabled"`
+	BenchChampions           []lcuChampSelectBenchChampion `json:"benchChampions"`
+	Timer                    lcuChampSelectTimer           `json:"timer"`
 }
 
 type lcuChampSelectBenchChampion struct {
