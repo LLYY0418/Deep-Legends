@@ -1,6 +1,6 @@
 # R203 执行账本
 
-工单：[R203](WORKLIST-R203-FAVORITES-STUCK-UNDER-STARTUP-OVERLAY-RESCAN-LOOP-AND-BLOCKING-STATE-AUDIT.md)。基线 0.12.65（R201/R202 已发布），本次版本 **0.12.66**。代码实现、完整验证及本地 public 构建完成，云端构建和发布取证进行中；真机验收待用户日志。
+工单：[R203](WORKLIST-R203-FAVORITES-STUCK-UNDER-STARTUP-OVERLAY-RESCAN-LOOP-AND-BLOCKING-STATE-AUDIT.md)。基线 0.12.65（R201/R202 已发布），本次版本 **0.12.66**。代码实现、完整验证、public 构建和 GitHub Latest 发布已完成；真机验收待用户日志。
 
 ## 证据与判断
 
@@ -119,9 +119,18 @@
 
 ## 构建与发布
 
-key mode：**public**。最终源码指纹 **42989b84146c**。本地 public 构建已完成，打包后 backend 指纹一致；本地安装包 SHA256 `6a5245e2fe4362eb78d96f2ce7c776c6ec87963f199d32ce3d89d914d26e69fd`，见 [构建收据](history/reports/r203/local-public-build.json)。正式云端构建仍待完成；只保留 `-public` 可识别安装包名。
+key mode：**public**。最终源码指纹 **42989b84146c**。本地 public 构建已完成，打包后 backend 指纹一致；本地安装包 SHA256 `6a5245e2fe4362eb78d96f2ce7c776c6ec87963f199d32ce3d89d914d26e69fd`，见 [构建收据](history/reports/r203/local-public-build.json)。正式云端 Windows public 构建也已完成，版本/源码指纹相同；正式安装包 SHA256 `4a4c0b11f158ab21f900cafeeff379c1932d82babf89a0d46b81b8fb9720b922`。不同宿主的安装包 SHA 可不同，正式发布采用云端验证产物；只保留 `-public` 可识别安装包名。
 
-GitHub Latest 发布取证待填：Release id、isLatest、匿名 latest.json、三个附件 digest、旧 Release 保持、CI 状态。旧草稿 v0.12.60（402378684）必须保持，不修改旧 tag 或发布旧草稿。
+源码提交/标签：`d56b126751a0ce350b442d0d3c688840957ab493` / `v0.12.66`；后续仅补文档证据，不移动源码标签。
+
+- [正式 Windows public 构建 37135310296](https://github.com/LLYY0418/Deep-Legends/actions/runs/37135310296)：success；Node 两批共1135项，1133通过、2平台跳过、0失败，发布生成测试4项通过；backend 打包前后指纹、public 模式及附件清单检查通过。
+- [云端质量检查 37135310312](https://github.com/LLYY0418/Deep-Legends/actions/runs/37135310312)：Linux quality job success，含 race、全量前端/桌面、真实 Chromium、安装器检查。该工作流额外的 windows-build 复验在发布取证时仍 in_progress，**不声称整个工作流已完成**；正式发布使用上面独立成功的 Windows public Release 任务。
+- [0.12.66 Release](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.66)：id **402589430**，发布时间 **2026-10-03T16:17:49Z**（北京时间10月4日00:17:49），draft=false、prerelease=false、isLatest=true。
+- 匿名、无认证、no-cache 下载 `releases/latest/download/latest.json`：version=0.12.66、fingerprint=42989b84146c，字节与正式附件完全一致，SHA256 `b10d362d3831c63e165dac20f5907d4a62c4ab0c251103263778d00048e043b4`。
+- 三附件恰为安装包、latest.json、SHA256SUMS-public.txt，下载后 size/SHA 与 GitHub digest、manifest、两行 SHA256SUMS 逐项一致。正式安装包111424000字节；清单1012字节；校验表182字节。
+- 所有10个旧 Release 的 id/tag/正文/target/发布时间/附件 id/name/size/digest/URL 对比保持；v0.12.60 草稿 **402378684** 原样保留。v0.12.65 tag仍指向 `be6294969a38ccab6c0ff1c6bf9727fadf501991`。
+
+取证见 [发布核验](history/reports/r203/publication-verification.json)、[正式附件核验](history/reports/r203/release-asset-verification.json)、[云端构建摘要](history/reports/r203/source-log-summary.json)、[构建日志](history/reports/r203/build-public.log)。
 
 ## 用户真机验收
 

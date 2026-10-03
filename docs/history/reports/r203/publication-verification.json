@@ -1,0 +1,51 @@
+{
+  "release_id": 402589430,
+  "tag": "v0.12.66",
+  "url": "https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.66",
+  "published_at": "2026-10-03T16:17:49Z",
+  "draft": false,
+  "prerelease": false,
+  "isLatest": true,
+  "anonymous_latest": {
+    "url": "https://github.com/LLYY0418/Deep-Legends/releases/latest/download/latest.json",
+    "version": "0.12.66",
+    "sha256": "b10d362d3831c63e165dac20f5907d4a62c4ab0c251103263778d00048e043b4",
+    "matches_verified_manifest": true
+  },
+  "old_releases_unchanged": [
+    402378684,
+    401679319,
+    401644873,
+    402540854,
+    402520305,
+    402455971,
+    402418510,
+    402098152,
+    402019897,
+    395244133
+  ],
+  "preserved_draft_0_12_60": 402378684,
+  "assets": [
+    {
+      "id": 608113170,
+      "name": "Deep-Legends-Setup-0.12.66-public.exe",
+      "size": 111424000,
+      "digest": "sha256:4a4c0b11f158ab21f900cafeeff379c1932d82babf89a0d46b81b8fb9720b922",
+      "browser_download_url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.66/Deep-Legends-Setup-0.12.66-public.exe"
+    },
+    {
+      "id": 608113171,
+      "name": "latest.json",
+      "size": 1012,
+      "digest": "sha256:b10d362d3831c63e165dac20f5907d4a62c4ab0c251103263778d00048e043b4",
+      "browser_download_url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.66/latest.json"
+    },
+    {
+      "id": 608113166,
+      "name": "SHA256SUMS-public.txt",
+      "size": 182,
+      "digest": "sha256:ae2eed43346facda30a46b6fa8911a8c89316126c4286b378eb989fb83e49491",
+      "browser_download_url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.66/SHA256SUMS-public.txt"
+    }
+  ]
+}

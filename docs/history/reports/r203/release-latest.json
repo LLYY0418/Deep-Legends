@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "version": "0.12.66",
+  "fingerprint": "42989b84146c",
+  "publishedAt": "2026-10-03T16:14:54.697Z",
+  "minSupported": "0.9.0",
+  "notes": "- 收藏加载与后台刷新保持现有卡片，不再使用启动全屏遮罩；身份遮罩最多 15 秒，失败后可在状态条重试。\n- 身份重试独立于全量刷新；收藏自动补刷限制为前台每 60 秒一次，刷新结束后 5 秒抑制库存事件回声，记录请求来源。\n- 补齐身份、LP、皮肤详情等待取消与异常释放，将设置监测和 LP 诊断移出状态锁。\n- 收紧图片失败、账号、符文、职业资料和诊断缓存边界；每局结束 60 秒记录堆占用前 15 个分配位置。",
+  "asset": {
+    "name": "Deep-Legends-Setup-0.12.66-public.exe",
+    "size": 111424000,
+    "sha256": "4a4c0b11f158ab21f900cafeeff379c1932d82babf89a0d46b81b8fb9720b922",
+    "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.66/Deep-Legends-Setup-0.12.66-public.exe"
+  }
+}
