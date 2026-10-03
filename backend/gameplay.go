@@ -2724,6 +2724,9 @@ func mergeSummonerIdentity(preferred, fallback Summoner) Summoner {
 }
 
 func loadGameplaySummonerUncached(client *LCUClient, reference gameplayReference) (Summoner, EndpointCapability) {
+	return loadGameplaySummonerUncachedContext(context.Background(), client, reference)
+}
+func loadGameplaySummonerUncachedContext(ctx context.Context, client *LCUClient, reference gameplayReference) (Summoner, EndpointCapability) {
 	reference = normalizeGameplayReference(reference)
 	capability := EndpointCapability{Name: "summoner", Path: "/lol-summoner/v2/summoners/puuid/{player} 或 /lol-summoner/v1/summoners/{id}"}
 	var lastErr error
@@ -2732,7 +2735,7 @@ func loadGameplaySummonerUncached(client *LCUClient, reference gameplayReference
 			continue
 		}
 		var summoner Summoner
-		if err := client.GetJSON("/lol-summoner/v2/summoners/puuid/"+url.PathEscape(playerRef), &summoner); err == nil {
+		if err := client.GetJSONContext(ctx, "/lol-summoner/v2/summoners/puuid/"+url.PathEscape(playerRef), &summoner); err == nil {
 			if summoner.PUUID == "" {
 				summoner.PUUID = playerRef
 			}
@@ -2750,7 +2753,7 @@ func loadGameplaySummonerUncached(client *LCUClient, reference gameplayReference
 		}
 		seenIDs[summonerID] = true
 		var summoner Summoner
-		if err := client.GetJSON(fmt.Sprintf("/lol-summoner/v1/summoners/%d", summonerID), &summoner); err == nil {
+		if err := client.GetJSONContext(ctx, fmt.Sprintf("/lol-summoner/v1/summoners/%d", summonerID), &summoner); err == nil {
 			capability.State = capabilityAvailable
 			capability.Count = 1
 			return summoner, capability
@@ -7443,7 +7446,13 @@ func (a *app) handleGameplayPhase(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 6*time.Second)
 	defer cancel()
-	respondJSON(w, readGameplayPhaseIdentity(ctx, client))
+	identity := readGameplayPhaseIdentity(ctx, client)
+	if identity.Phase == "ChampSelect" || gameplayIdentityPhase(identity.Phase) {
+		a.stopPostGameReveal()
+	} else {
+		a.postGameSnapshot(client, identity.Phase, identity.GameID)
+	}
+	respondJSON(w, identity)
 }
 
 func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
@@ -7456,6 +7465,9 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 	if err := client.RequestJSON(r.Context(), http.MethodGet, "/lol-gameflow/v1/gameflow-phase", nil, &phase); err != nil {
 		respondJSON(w, gameplayLiveResponse{Phase: "Unavailable", Capabilities: []EndpointCapability{gameplayCapabilityError("gameflow", "/lol-gameflow/v1/gameflow-phase", err)}})
 		return
+	}
+	if expected, _ := strconv.ParseInt(r.URL.Query().Get("gameId"), 10, 64); expected > 0 {
+		a.postGameSnapshot(client, phase, expected)
 	}
 	if r.URL.Query().Get("refresh") == "1" {
 		a.liveSnapshots.invalidate()

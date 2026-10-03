@@ -3660,6 +3660,10 @@
 		window.dispatchEvent(new CustomEvent("deep-legends:facade-changed"));
 		return;
 	  }
+      if (event.data === "live-post-game-reveal") {
+        window.dispatchEvent(new CustomEvent("deep-legends:post-game-reveal"));
+        return;
+      }
       // 对局阶段事件只转发给对局模块（“对局”页签的新对局提示灯），不触发全量刷新。
       if (typeof event.data === "string" && (event.data.startsWith("gameflow:") || event.data === "champselect:changed")) {
         const detail = gameplayEventDetail(event.data);

@@ -908,7 +908,7 @@
     installRoot: "C:\\Riot Games\\League of Legends\\TCLS",
     configRoot: "C:\\Riot Games\\League of Legends\\Game\\Config",
     settingsFile: "C:\\Riot Games\\League of Legends\\Game\\Config\\PersistedSettings.json",
-    settingsKnown: true, settingsLocked: true, uxState: "Running",
+    settingsKnown: true, settingsLocked: true, uxState: "Running", cameraMode: "none",
   };
 	const facadeSkins = [
     [99000, "拉克丝", true], [99001, "星之守护者 拉克丝", true], [99007, "大元素使 拉克丝", false],
@@ -1068,7 +1068,11 @@
  suiteRig.keepGameSettings=Boolean(JSON.parse(init?.body||"{}").enabled);
  return Promise.resolve(new Response(JSON.stringify({enabled:suiteRig.keepGameSettings}),{status:200,headers:{"Content-Type":"application/json"}}));
  }
- if (pathname === "/api/rig/settings-lock") {
+ if (pathname === "/api/rig/camera-mode") {
+      suiteRig.cameraMode = JSON.parse(init?.body || "{}").mode;
+      return Promise.resolve(new Response(JSON.stringify({cameraMode:suiteRig.cameraMode}),{status:200,headers:{"Content-Type":"application/json"}}));
+    }
+    if (pathname === "/api/rig/settings-lock") {
       try { suiteRig.settingsLocked = Boolean(JSON.parse(init?.body || "{}").locked); } catch (_) {}
       return Promise.resolve(new Response(JSON.stringify(structuredClone(suiteRig)), { status: 200, headers: { "Content-Type": "application/json" } }));
     }

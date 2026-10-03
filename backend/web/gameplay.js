@@ -8117,6 +8117,9 @@
     if (phaseChanged || gameChanged) { state.liveRenderTrigger = "sse"; renderLive(); }
     if (phaseChanged || gameChanged || changed) queueLiveEventRefresh(source, phaseChanged || gameChanged);
   }
+  window.addEventListener("deep-legends:post-game-reveal", () => {
+    if (state.section === "live" && state.live?.gameId && !liveGamePhase(state.beacon.phase)) void loadLive(false, "event");
+  });
   window.addEventListener("deep-legends:gameflow", (event) => {
     handleGameplayPhase(String(event.detail?.phase || ""), "sse", Boolean(event.detail?.changed), event.detail?.gameId);
   });

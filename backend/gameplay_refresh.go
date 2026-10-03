@@ -33,6 +33,7 @@ func isEndOfGamePhase(phase string) bool {
 // One lifecycle per client/game. End phases may be duplicated or omitted by LCU.
 func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase string) {
 	a.observeGameSettingsPhase(client, phase)
+	a.observePostGameReveal(ctx, client, phase)
 	if phase != "GameStart" && phase != "InProgress" && phase != "Reconnect" {
 		a.stopMayhemSamplerForClient("gameflow-left", client)
 	}
@@ -128,6 +129,9 @@ func (c *liveSnapshotCache) invalidate() {
 }
 
 func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current Summoner, phase string, warming ...bool) (response gameplayLiveResponse) {
+	if snapshot, ok := a.postGameSnapshot(client, phase, 0); ok {
+		return snapshot
+	}
 	c := &a.liveSnapshots
 	isWarming := len(warming) > 0 && warming[0]
 	c.mu.Lock()

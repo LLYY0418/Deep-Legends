@@ -806,6 +806,7 @@ func (a *app) disconnectClient(client *LCUClient, message string) {
 	}
 	a.mu.Unlock()
 	if disconnectedCurrent {
+		a.stopPostGameReveal()
 		a.clearOverviewQuerySnapshots()
 		a.clearFacadeEventThrottle()
 	}

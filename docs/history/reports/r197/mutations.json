@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "name": "position-instead-of-champion",
+      "test": "TestR197SennaPostGameReveal",
+      "ticket": 197,
+      "killed": true
+    },
+    {
+      "name": "reveal-during-game",
+      "test": "TestR197InProgressNeverLoadsMatch",
+      "ticket": 197,
+      "killed": true
+    },
+    {
+      "name": "ambiguous-take-first",
+      "test": "TestR197AmbiguousAndHiddenParticipants",
+      "ticket": 197,
+      "killed": true
+    }
+  ],
+  "logs": "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r197198-mutants-HcDAlT"
+}

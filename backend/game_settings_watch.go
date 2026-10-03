@@ -560,6 +560,13 @@ func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient,
 	if !valid || parent.Err() != nil {
 		return
 	}
+	if job.stage == "champselect" || job.stage == "game_start" {
+		a.applyGameCameraMode(parent, client, job.stage, func() bool {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			return s.client == client && s.generation == job.generation && s.ctx != nil && s.ctx.Err() == nil
+		})
+	}
 	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 	defer cancel()
 	var location settingsLocation
@@ -658,6 +665,18 @@ func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient,
 	}
 	event["lcu_matches_file"] = matchLCUSettingsFile(payload, s.start, s.end, snapshots)
 	event["files"] = snapshots
+	if job.stage == "in_game_60s" {
+		if target, ok := gameCameraModeValues[a.cameraModePreference()]; ok {
+			_, _, value, present := cameraSetting(decodeLCUSettings(payload))
+			matches := present && settingMatches(strconv.Itoa(target), value)
+			for _, file := range snapshots {
+				if file.Exists && file.Result == "ok" && (file.Located || strings.HasSuffix(strings.ToLower(file.PathKind), "game.cfg")) {
+					matches = matches && cameraConfigValue(file.AllValues) == strconv.Itoa(target)
+				}
+			}
+			event["camera_mode_matches_target"] = matches
+		}
+	}
 	a.recordDiagnostic(event)
 	if job.stage == "game_end" {
 		a.scheduleGameSettingsSyncLocked(parent, client, job.generation)

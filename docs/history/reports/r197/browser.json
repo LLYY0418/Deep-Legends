@@ -1,0 +1,47 @@
+{
+  "route": "对局 → 详情 → 赛后事件刷新 → 点击名字打开总览",
+  "fixture": "Go 测试实际响应；匿名合成玩家；本地 SVG",
+  "results": [
+    {
+      "mode": "before",
+      "text": "赛隐藏玩家隐藏身份位置未知当前模式客户端未公开该玩家",
+      "disabled": true,
+      "teamPlayers": 5,
+      "liveRequests": 1,
+      "clip": {
+        "x": 752,
+        "y": 212,
+        "width": 487.046875,
+        "height": 594,
+        "scale": 1
+      },
+      "errors": []
+    },
+    {
+      "mode": "after",
+      "text": "赛Fixture9#TEST位置未知 · 黄金 I近 1 局1胜 0负胜率100%KDA6.00:1英4/2/86.0",
+      "disabled": false,
+      "ref": "player_25930a011de30ffcc7017464906182d3",
+      "teamPlayers": 5,
+      "liveRequests": 3,
+      "clip": {
+        "x": 752,
+        "y": 212,
+        "width": 487.046875,
+        "height": 695,
+        "scale": 1
+      },
+      "errors": []
+    }
+  ],
+  "overview": [
+    {
+      "playerRef": "player_25930a011de30ffcc7017464906182d3",
+      "serverId": "",
+      "count": 20,
+      "begIndex": 0,
+      "force": false,
+      "matchFilter": "all"
+    }
+  ]
+}

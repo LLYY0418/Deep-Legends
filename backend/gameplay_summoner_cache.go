@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -28,6 +29,12 @@ type gameplaySummonerCache struct {
 }
 
 func loadGameplaySummoner(client *LCUClient, reference gameplayReference) (Summoner, EndpointCapability) {
+	return loadGameplaySummonerContext(context.Background(), client, reference)
+}
+func loadGameplaySummonerContext(ctx context.Context, client *LCUClient, reference gameplayReference) (Summoner, EndpointCapability) {
+	if ctx.Err() != nil {
+		return Summoner{}, gameplayCapabilityError("summoner", "/lol-summoner/v2/summoners/puuid/{player}", ctx.Err())
+	}
 	reference = normalizeGameplayReference(reference)
 	key := fmt.Sprintf("%s|%s|%s|%d|%d", reference.ServerID, reference.PlayerRef, reference.AlternatePlayerRef, reference.SummonerID, reference.AlternateSummonerID)
 	c := &client.gameplaySummoners
@@ -48,13 +55,17 @@ func loadGameplaySummoner(client *LCUClient, reference gameplayReference) (Summo
 	}
 	if flight := c.flights[key]; flight != nil {
 		c.mu.Unlock()
-		<-flight.done
-		return flight.entry.summoner, flight.entry.capability
+		select {
+		case <-flight.done:
+			return flight.entry.summoner, flight.entry.capability
+		case <-ctx.Done():
+			return Summoner{}, gameplayCapabilityError("summoner", "/lol-summoner/v2/summoners/puuid/{player}", ctx.Err())
+		}
 	}
 	flight := &gameplaySummonerFlight{done: make(chan struct{})}
 	c.flights[key] = flight
 	c.mu.Unlock()
-	summoner, capability := loadGameplaySummonerUncached(client, reference)
+	summoner, capability := loadGameplaySummonerUncachedContext(ctx, client, reference)
 	c.mu.Lock()
 	flight.entry = gameplaySummonerEntry{time.Now(), summoner, capability}
 	if capability.State == capabilityAvailable {

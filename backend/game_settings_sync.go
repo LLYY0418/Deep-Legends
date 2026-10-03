@@ -36,8 +36,7 @@ func (a *app) handleGameSettingsSyncPreference(w http.ResponseWriter, r *http.Re
 		http.Error(w, "设置格式不正确", 400)
 		return
 	}
-	data, _ := json.Marshal(value)
-	if writeLocalStoreFile(a.storage, "game-settings-sync.json", data) != nil {
+	if a.saveGameSettingsPreference(value.Enabled, nil) != nil {
 		http.Error(w, "设置保存失败", 503)
 		return
 	}
@@ -225,7 +224,9 @@ func (a *app) runGameSettingsSyncJob(ctx context.Context, client *LCUClient, job
 	a.syncGameSettings(ctx, client, location, before, valid)
 }
 func (a *app) syncGameSettings(parent context.Context, client *LCUClient, location settingsLocation, before map[string]string, valid func() bool) {
-	event := map[string]any{"event": "game_settings_sync", "changed_count": 0, "patched_keys": []string{}, "result": "lcu_unavailable"}
+	a.gameSettingsWriteMu.Lock()
+	defer a.gameSettingsWriteMu.Unlock()
+	event := map[string]any{"camera_mode_before": "unknown", "camera_mode_after": "unknown", "event": "game_settings_sync", "changed_count": 0, "patched_keys": []string{}, "result": "lcu_unavailable"}
 	defer func() { a.recordDiagnostic(event) }()
 	if !a.keepGameSettingsEnabled() {
 		event["result"] = "skipped_disabled"
@@ -259,6 +260,8 @@ func (a *app) syncGameSettings(parent context.Context, client *LCUClient, locati
 		return
 	}
 	old, next := gameConfigValues(before), gameConfigValues(target.AllValues)
+	event["camera_mode_before"] = cameraConfigValue(before)
+	event["camera_mode_after"] = cameraConfigValue(target.AllValues)
 	changed := map[string]string{}
 	for key, value := range next {
 		if previous, ok := old[key]; ok && previous != value {
@@ -349,39 +352,12 @@ func (a *app) syncGameSettings(parent context.Context, client *LCUClient, locati
 			}
 		}
 	}
-	// Discover POST /save from the client's own read-only OpenAPI before using
-	// it. Do not invent a save call, required request body or write retry.
-	event["save_result"] = "not_advertised"
-	var schema struct {
-		Paths map[string]map[string]json.RawMessage `json:"paths"`
-	}
-	if client.RequestJSON(ctx, http.MethodGet, "/swagger/v3/openapi.json", nil, &schema) == nil {
-		if operation := schema.Paths["/lol-game-settings/v1/save"]["post"]; len(operation) > 0 {
-			var post struct {
-				RequestBody struct {
-					Required bool `json:"required"`
-				} `json:"requestBody"`
-				Parameters []struct {
-					Required bool `json:"required"`
-				} `json:"parameters"`
-			}
-			if json.Unmarshal(operation, &post) == nil {
-				required := post.RequestBody.Required
-				for _, p := range post.Parameters {
-					required = required || p.Required
-				}
-				if !required {
-					if client.RequestJSON(ctx, http.MethodPost, "/lol-game-settings/v1/save", nil, nil) != nil {
-						event["result"] = "verify_failed"
-						event["save_result"] = "failed"
-						return
-					}
-					event["save_result"] = "ok"
-				} else {
-					event["save_result"] = "unsupported_schema"
-				}
-			}
-		}
+	called, saveResult, saveErr := saveLCUGameSettings(ctx, client, valid)
+	_ = called
+	event["save_result"] = saveResult
+	if saveErr != nil {
+		event["result"] = "verify_failed"
+		return
 	}
 	event["result"] = "ok"
 }

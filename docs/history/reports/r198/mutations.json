@@ -1,0 +1,29 @@
+{
+  "results": [
+    {
+      "name": "patch-entire-settings",
+      "test": "TestR198CameraSingleFieldPatchAndSave",
+      "ticket": 198,
+      "killed": true
+    },
+    {
+      "name": "remarshal-local-json",
+      "test": "TestR198CameraFileBytesPreserved",
+      "ticket": 198,
+      "killed": true
+    },
+    {
+      "name": "write-during-game",
+      "test": "TestR198NoWritesDuringGame",
+      "ticket": 198,
+      "killed": true
+    },
+    {
+      "name": "also-patch-wasd",
+      "test": "TestR198WASDNeverChanges",
+      "ticket": 198,
+      "killed": true
+    }
+  ],
+  "logs": "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r197198-mutants-HcDAlT"
+}

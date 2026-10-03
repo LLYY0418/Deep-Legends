@@ -1,0 +1,36 @@
+{
+  "assets": [
+    {
+      "digest": "sha256:877b6414509648f8e758148593373308360dc248865ae77a7e603491942a75c2",
+      "id": 607334785,
+      "name": "Deep-Legends-Setup-0.12.60-public.exe",
+      "size": 111340544,
+      "updated_at": "2026-10-03T07:02:58Z"
+    },
+    {
+      "digest": "sha256:6be9dd821ae3a26143ac3a5cedf12afbf5f21d455ec0d0dc14aed7a37fc35211",
+      "id": 607334789,
+      "name": "latest.json",
+      "size": 818,
+      "updated_at": "2026-10-03T07:02:55Z"
+    },
+    {
+      "digest": "sha256:1a7a4bfca4b48e4c16b582a4306bcfa2312512e0b5477b6aecef2c5ea9790127",
+      "id": 607334786,
+      "name": "SHA256SUMS-public.txt",
+      "size": 182,
+      "updated_at": "2026-10-03T07:02:55Z"
+    }
+  ],
+  "draft": true,
+  "id": 402378684,
+  "prerelease": false,
+  "published_at": null,
+  "tag_name": "v0.12.60",
+  "target_commitish": "e3ba8b6fe58cfb1c188bedaa75ca82c307fe70b4",
+  "tagQuery": {
+    "status": 404,
+    "exists": false
+  },
+  "action": "read-only; draft and assets untouched"
+}

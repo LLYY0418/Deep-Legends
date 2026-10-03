@@ -234,6 +234,10 @@ type app struct {
 	championDataDiagnosticMu            sync.Mutex
 	championDataDiagnosticKeys          map[string]struct{}
 	gameSettingsWatch                   gameSettingsWatchState
+	gameSettingsWriteMu                 sync.Mutex
+	gameSettingsPreferenceMu            sync.Mutex
+	cameraProcessRunning                func() (bool, error)
+	postGameReveal                      postGameRevealState
 	liveRosterRecovery                  liveRosterRecoveryCache
 	liveRosterDiagnosticMu              sync.Mutex
 	liveRosterDiagnosticKeys            map[string]struct{}
@@ -572,6 +576,7 @@ func main() {
 	mux.HandleFunc("POST /api/champselect/pause", a.authorized(a.handleChampSelectPause))
 	mux.HandleFunc("GET /api/rig/status", a.authorized(a.handleRigStatus))
 	mux.HandleFunc("POST /api/rig/settings-sync", a.authorized(a.handleGameSettingsSyncPreference))
+	mux.HandleFunc("POST /api/rig/camera-mode", a.authorized(a.handleCameraModePreference))
 	mux.HandleFunc("POST /api/rig/settings-lock", a.authorized(a.handleSettingsLock))
 	mux.HandleFunc("POST /api/rig/maintenance", a.authorized(a.handleClientMaintenance))
 	mux.HandleFunc("GET /api/facade/state", a.authorized(a.handleFacadeState))

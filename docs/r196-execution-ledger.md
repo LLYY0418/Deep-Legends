@@ -27,7 +27,11 @@
 - Chromium 演示截图通过宽高、描边、fill、按钮、ETA、卡片距离及无横向溢出断言；主代理已查看截图。
 - 完整 Node：1119 项，1118 通过、1 项 Windows PowerShell 门禁在 macOS 跳过，0 失败；耗时 241.691 秒。
 - Go 隐私写入门禁识别了新增的线路偏好落盘点；已归入既有自动更新设置声明，并登记 `update_sources.go` 的一次 `update-settings.json` 写入，不新增账号采集或隐私 UI 文案。
-- 最终 `go vet ./backend` 与 `git diff --check` 通过；后端全量、public 构建与 GitHub CI / 发布执行中，收尾补齐结果。
+- 最终 `go test ./backend -count=1` 通过（252.013 秒），`go vet ./backend` 与 `git diff --check` 通过。
+- 完整本地 public 构建通过：1702 项 Go 分片、installer test/vet、Windows 安装壳、打包运行时、指纹、收据与 public 密钥策略全部通过。版本 0.12.60，工作区、Git 快照、安装包内后端指纹均为 `530db182f4c1`。本地 macOS 交叉构建与 GitHub Windows 正式附件分别记录。
+- GitHub quality 全部通过：全量 race 206.147 秒；Node 1119 项、1118 通过、1 跳过、0 失败；真实 Chromium R100 / R117 门禁通过。
+- Windows public 发布构建成功：Go 全量 199.472 秒，Web 850/850，desktop 269 项、267 通过、2 项非 Windows 门禁跳过、0 失败；public 密钥、打包运行时、指纹、收据与清单专项 4/4 全绿。
+- 草稿三附件已下载校验，实际大小/SHA256 与 API digest、清单、校验表一致；发布说明与 CHANGELOG 一致。独立只读附件复核 PASS。CI Windows 构建仍执行中。
 
 ## 演示截图
 
@@ -46,8 +50,10 @@
 
 ## 发布与真机边界
 
-按工单发布 0.12.60 public Release Latest，附安装包、latest.json、SHA256SUMS，保留所有旧正式版本及原草稿。key mode 为 public，不含个人 Riot Key。正式版本标签指向实际验证的构建提交，后续账本提交不移动标签。
+**0.12.60 未发布（用户决定与 R197、R198 合并后发布）。** 只读查询确认存在草稿 id `402378684`，`draft=true`、`prerelease=false`、`published_at=null`，三个 public 附件已构建并上传；`v0.12.60` 标签查询为 404。草稿和附件保持原样，不发布、不删除、不移动标签。构建 key mode 为 public，不含个人 Riot Key。证据见 [R199 账本](r199-execution-ledger.md)。
 
-**0.12.59 → 0.12.60 的下载仍由 0.12.59 旧逻辑执行，可能直连优先而很慢；测速选线从 0.12.60 开始的下一次升级才生效。** 本次慢时可取消，从发布页手动下载安装。R195 的安装位置修正已在 0.12.59，仍需用户验证自动安装和重新打开。
+源码提交 `e3ba8b6fe58cfb1c188bedaa75ca82c307fe70b4`，分支 `codex/release-0.12.60`；[Windows public 发布构建](https://github.com/LLYY0418/Deep-Legends/actions/runs/37104390470)、[完整 CI](https://github.com/LLYY0418/Deep-Legends/actions/runs/37104389986)。验证汇总见 [verification.json](history/reports/r196/verification.json)。
 
-仍需用户真机验收：本次从 0.12.59 安装并重开；0.12.60 的下一次升级验证测速、ETA、后台完成提示、任务栏闪烁与稍后后直接升级；导出日志核对 probe/selected/finished 与 installed。自动测试、演示 Chromium 和 Windows runner 构建均不等同于上述真机验收，R196 保留进行中。
+**0.12.59 → 0.12.61 的下载仍由 0.12.59 旧逻辑执行，可能直连优先而很慢；测速选线从安装 0.12.61 后的下一次升级才生效。** 本次慢时可取消，从发布页手动下载安装。R195 的安装位置修正已在 0.12.59，仍需用户验证自动安装和重新打开。
+
+仍需用户真机验收：本次从 0.12.59 安装并重开；0.12.61 的下一次升级验证测速、ETA、后台完成提示、任务栏闪烁与稍后后直接升级；导出日志核对 probe/selected/finished 与 installed。自动测试、演示 Chromium 和 Windows runner 构建均不等同于上述真机验收，R196 保留进行中。

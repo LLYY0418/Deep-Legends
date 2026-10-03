@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "version": "0.12.60",
+  "fingerprint": "530db182f4c1",
+  "publishedAt": "2026-10-03T07:02:39.800Z",
+  "minSupported": "0.9.0",
+  "notes": "- 更新下载先并行测速选择线路，慢速自动切换并续传，记住成功线路并补全下载诊断。\n- 下载剩余时间显示为分秒或小时；支持后台下载，完成后显示升级提示，后台窗口通过任务栏提醒。\n- 顶部更新图标与其他按钮保持相同尺寸，下载和准备就绪状态使用更细的描边。",
+  "asset": {
+    "name": "Deep-Legends-Setup-0.12.60-public.exe",
+    "size": 111340544,
+    "sha256": "877b6414509648f8e758148593373308360dc248865ae77a7e603491942a75c2",
+    "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.60/Deep-Legends-Setup-0.12.60-public.exe"
+  }
+}
