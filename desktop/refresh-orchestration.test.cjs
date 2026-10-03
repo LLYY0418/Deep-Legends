@@ -262,7 +262,13 @@ test("dirty collection rescans on entry and view changes without duplicate refre
     source.onmessage({ data: "collection-dirty" });
     await waitFor(() => completedStatusRequests >= 3, "second dirty status did not reach the shell");
     w.document.querySelector('[data-view="chromas"]').click();
-    await waitFor(() => refreshRequests === 2, "changing collection view did not start a deferred rescan");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(refreshRequests, 1, "view changes bypassed the 60 second automatic limit");
+    const originalNow = w.Date.now;
+    w.Date.now = () => originalNow() + 60001;
+    w.document.querySelector('[data-view="owned"]').click();
+    await waitFor(() => refreshRequests === 2, "view change after 60 seconds did not start the deferred rescan");
+    w.Date.now = originalNow;
     await new Promise((resolve) => setTimeout(resolve, 250));
     assert.deepEqual(errors, [], `deferred collection rescan raised errors:\n${errors.join("\n")}`);
   } finally {
@@ -432,8 +438,8 @@ function r71RefreshHarness() {
   let next = { ...state.status }, failEnsure = false;
   const requests = [], loads = [];
   const methods = compileFunctions(appSourceR70, ["refreshStatus", "ensureCollection", "triggerCollectionRescanIfDirty"], {
-    state, STATUS_INTERVAL: 5000, window: {},
-    api: async (url) => { requests.push(url); if (url === "/api/status") return { ...next }; if (failEnsure && url === "/api/collection/ensure") throw Error("offline"); return null; },
+    state, STATUS_INTERVAL: 5000, window: {}, document: { hidden: false },
+    api: async (url) => { requests.push(url); if (url === "/api/status") return { ...next }; if (failEnsure && url.startsWith("/api/collection/ensure?")) throw Error("offline"); return null; },
     clearDisconnectedClientState() {}, updateReadingOverlay() {}, renderStatus() {}, loadClientInstallations() {},
     loadSkins: async () => loads.push("skins"), loadAccount() {}, loadPools() {}, showFatal(message) { throw Error(message); }, showToast() {}, scheduleStatus() {},
   });
@@ -443,13 +449,13 @@ function r71RefreshHarness() {
 test("R71 collection startup issues one ensure across accepted requests, status events and scan start", async () => {
   const h = r71RefreshHarness();
   await h.methods.refreshStatus();
-  assert.equal(h.requests.filter((x) => x === "/api/collection/ensure").length, 0, "identity sync must finish first");
+  assert.equal(h.requests.filter((x) => x === "/api/collection/ensure?source=ensure").length, 0, "identity sync must finish first");
   h.next = { syncing: false, identityReady: true };
   await h.methods.refreshStatus();
   await h.methods.ensureCollection();
   for (let i = 0; i < 5; i++) await h.methods.refreshStatus();
-  assert.equal(h.requests.filter((x) => x === "/api/collection/ensure").length, 1, "202 is acceptance, not scan completion");
-  assert.equal(h.requests.filter((x) => x === "/api/refresh").length, 0, "dirty without a snapshot must not start a second rescan");
+  assert.equal(h.requests.filter((x) => x === "/api/collection/ensure?source=ensure").length, 1, "202 is acceptance, not scan completion");
+  assert.equal(h.requests.filter((x) => x === "/api/refresh?source=dirty_rescan").length, 0, "dirty without a snapshot must not start a second rescan");
   h.next = { syncing: true };
   await h.methods.refreshStatus();
   assert.equal(h.loads.length, 0, "scan-start events must not flash/reload collection cards");
@@ -461,7 +467,7 @@ test("R71 collection startup issues one ensure across accepted requests, status 
   h.next = { collectionDirty: true };
   await h.methods.refreshStatus();
   await h.methods.refreshStatus();
-  assert.equal(h.requests.filter((x) => x === "/api/refresh").length, 1);
+  assert.equal(h.requests.filter((x) => x === "/api/refresh?source=dirty_rescan").length, 1);
   assert.equal(h.loads.length, 1, "dirty events keep visible cached cards");
 });
 
@@ -477,5 +483,5 @@ test("R71 a failed or lost collection acceptance can retry without a permanent g
   assert.equal(h.state.collectionEnsureInFlight, true);
   h.state.collectionRequestAt = Date.now() - 31000;
   await h.methods.refreshStatus();
-  assert.equal(h.requests.filter((x) => x === "/api/collection/ensure").length, 3, "lost completion gets a bounded recovery, not a permanent block");
+  assert.equal(h.requests.filter((x) => x === "/api/collection/ensure?source=ensure").length, 3, "lost completion gets a bounded recovery, not a permanent block");
 });

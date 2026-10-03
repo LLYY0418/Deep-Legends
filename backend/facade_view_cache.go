@@ -15,6 +15,7 @@ type facadeViewCache struct {
 	value   facadeState
 	at      time.Time
 	flight  chan struct{}
+	load    func(context.Context, string) facadeState
 }
 
 func (a *app) invalidateFacadeView() {
@@ -51,18 +52,26 @@ func (a *app) cachedFacadeState(ctx context.Context, force bool, trigger string)
 		if done == nil {
 			done = make(chan struct{})
 			c.flight = done
+			load := c.load
+			if load == nil {
+				load = a.loadFacadeStateTriggered
+			}
 			go func() {
 				defer a.recoverPanic("facade_view_cache.cachedFacadeState.1")
-
+				value := facadeState{SkinsUnavailable: true, Reason: "外观读取失败，请重试"}
+				// Publish a bounded failure snapshot and release all waiters even
+				// when a parser panics; never leave a permanently occupied flight.
+				defer func() {
+					c.mu.Lock()
+					if c.client == client && c.account == summoner.SummonerID && c.flight == done {
+						c.value, c.at, c.flight = value, time.Now(), nil
+					}
+					close(done)
+					c.mu.Unlock()
+				}()
 				readCtx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 				defer cancel()
-				value := a.loadFacadeStateTriggered(readCtx, trigger)
-				c.mu.Lock()
-				if c.client == client && c.account == summoner.SummonerID && c.flight == done {
-					c.value, c.at, c.flight = value, time.Now(), nil
-				}
-				close(done)
-				c.mu.Unlock()
+				value = load(readCtx, trigger)
 			}()
 		}
 		c.mu.Unlock()

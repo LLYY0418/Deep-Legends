@@ -8214,6 +8214,7 @@
       if (tab.loading || tab.loadingMore) { tab.dirtyDueAt = Date.now() + 1000; scheduleDirtyOverview(tab); return; }
       tab.dirtyAttempts = Number(tab.dirtyAttempts || 0) + 1;
       // Existing refreshing bar retains the current list while the request runs.
+      if (typeof window !== "undefined") window.reportFlowDiagnostic?.("automatic_read_client", "request", { endpoint: "overview", source: "dirty_rescan" });
       const loaded = await loadOverview(tab, true);
       const newest = String(tab.data?.matches?.[0]?.gameId || "");
       if (loaded && newest && newest !== tab.dirtyBaseline) { tab.dirty = false; return; }

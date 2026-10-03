@@ -1,0 +1,28 @@
+✖ R203 sustained dirty statuses yield one automatic scan per sixty seconds, foreground favorites only (77.470584ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 523.372875
+
+✖ failing tests:
+
+test at backend/web/r203.test.cjs:29:1
+✖ R203 sustained dirty statuses yield one automatic scan per sixty seconds, foreground favorites only (77.470584ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  true !== false
+
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/backend/web/r203.test.cjs:30:193)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

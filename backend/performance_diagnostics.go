@@ -104,6 +104,9 @@ func (a *app) facadeEventChanged(event LCUEvent) bool {
 		return false
 	}
 	if valid {
+		if _, exists := a.facadeEventFingerprints[key]; !exists && len(a.facadeEventFingerprints) >= 256 {
+			a.facadeEventFingerprints = map[string]string{}
+		}
 		a.facadeEventFingerprints[key] = fingerprint
 	} else {
 		delete(a.facadeEventFingerprints, key)

@@ -24,6 +24,12 @@ type summonerIdentityFlight struct {
 // refreshSummonerIdentity is independent from the full catalog snapshot. It
 // intentionally neither reads nor changes a.syncing.
 func (a *app) refreshSummonerIdentity(client *LCUClient) (changed bool, err error) {
+	return a.refreshSummonerIdentityContext(context.Background(), client)
+}
+
+func (a *app) refreshSummonerIdentityContext(parent context.Context, client *LCUClient, identityOnly ...bool) (changed bool, err error) {
+	ctx, cancel := context.WithTimeout(parent, summonerIdentityTimeout)
+	defer cancel()
 	if client == nil {
 		return false, errors.New("summoner identity client is unavailable")
 	}
@@ -32,14 +38,26 @@ func (a *app) refreshSummonerIdentity(client *LCUClient) (changed bool, err erro
 	if flight := a.summonerIdentityFlight; flight != nil && flight.client == client {
 		done := flight.done
 		a.summonerIdentityMu.Unlock()
-		<-done
-		return flight.changed, flight.err
+		select {
+		case <-done:
+			return flight.changed, flight.err
+		case <-ctx.Done():
+			return false, ctx.Err()
+		}
 	}
 	flight := &summonerIdentityFlight{client: client, done: make(chan struct{})}
 	a.summonerIdentityFlight = flight
 	a.summonerIdentityMu.Unlock()
+	flight.err = errors.New("summoner identity read incomplete")
+	defer func() {
+		a.summonerIdentityMu.Lock()
+		if a.summonerIdentityFlight == flight {
+			a.summonerIdentityFlight = nil
+		}
+		close(flight.done)
+		a.summonerIdentityMu.Unlock()
+	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), summonerIdentityTimeout)
 	next, loadErr := NewSummonerAPI(client).withContext(ctx).Current()
 	var profile SummonerProfile
 	var profileCapability EndpointCapability
@@ -48,23 +66,17 @@ func (a *app) refreshSummonerIdentity(client *LCUClient) (changed bool, err erro
 	}
 	cancel()
 	if loadErr == nil {
-		flight.changed, loadErr = a.applySummonerIdentity(client, next, time.Now())
+		flight.changed, loadErr = a.applySummonerIdentity(client, next, time.Now(), identityOnly...)
 		if profileCapability.State != "" {
 			a.applySummonerProfile(client, profile, profileCapability)
 		}
 	}
 	flight.err = loadErr
 
-	a.summonerIdentityMu.Lock()
-	if a.summonerIdentityFlight == flight {
-		a.summonerIdentityFlight = nil
-	}
-	close(flight.done)
-	a.summonerIdentityMu.Unlock()
 	return flight.changed, flight.err
 }
 
-func (a *app) applySummonerIdentity(client *LCUClient, next Summoner, observedAt time.Time) (bool, error) {
+func (a *app) applySummonerIdentity(client *LCUClient, next Summoner, observedAt time.Time, identityOnly ...bool) (bool, error) {
 	if next.SummonerID == 0 {
 		return false, errors.New("current summoner is not ready")
 	}
@@ -86,7 +98,9 @@ func (a *app) applySummonerIdentity(client *LCUClient, next Summoner, observedAt
 
 	if accountChanged {
 		a.clearGameplayReferences()
-		a.requestCollectionRefresh()
+		if len(identityOnly) == 0 || !identityOnly[0] {
+			a.requestCollectionRefresh("event")
+		}
 	}
 	a.broadcastEvent("summoner-updated")
 	a.queueFacadeChangedEvent(time.Now())

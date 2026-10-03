@@ -798,10 +798,13 @@ func (api ChampionMasteryAPI) AllContext(ctx context.Context, puuid string) (map
 }
 
 func (api StoreAPI) SkinPrice(skinID int64) (int, bool) {
+	return api.SkinPriceContext(context.Background(), skinID)
+}
+func (api StoreAPI) SkinPriceContext(ctx context.Context, skinID int64) (int, bool) {
 	if skinID <= 0 {
 		return 0, false
 	}
-	data, err := api.client.GetBytes(fmt.Sprintf("/lol-store/v1/skins/%d", skinID))
+	data, err := api.client.GetBytesContext(ctx, fmt.Sprintf("/lol-store/v1/skins/%d", skinID))
 	if err != nil {
 		return 0, false
 	}
@@ -813,7 +816,10 @@ func (api StoreAPI) SkinPrice(skinID int64) (int, bool) {
 }
 
 func (api SkinAppearanceAPI) BorderStatus(skin Skin) (hasBorder, ownershipKnown, owned bool) {
-	data, err := api.client.GetBytes(fmt.Sprintf("/lol-game-data/assets/v1/champions/%d.json", skin.ChampionID))
+	return api.BorderStatusContext(context.Background(), skin)
+}
+func (api SkinAppearanceAPI) BorderStatusContext(ctx context.Context, skin Skin) (hasBorder, ownershipKnown, owned bool) {
+	data, err := api.client.GetBytesContext(ctx, fmt.Sprintf("/lol-game-data/assets/v1/champions/%d.json", skin.ChampionID))
 	if err != nil {
 		return false, false, false
 	}
@@ -827,7 +833,7 @@ func (api SkinAppearanceAPI) BorderStatus(skin Skin) (hasBorder, ownershipKnown,
 	}
 	sawSupportedInventory := false
 	for _, path := range []string{"/lol-inventory/v2/inventory/SKIN_BORDER", "/lol-inventory/v1/inventory?inventoryTypes=SKIN_BORDER", "/lol-regalia/v3/inventory/SKIN_BORDER"} {
-		inventory, requestErr := api.client.GetBytes(path)
+		inventory, requestErr := api.client.GetBytesContext(ctx, path)
 		if requestErr != nil {
 			continue
 		}

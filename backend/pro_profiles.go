@@ -58,6 +58,7 @@ func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAcc
 		c.entries = map[string]opggProAccount{}
 		c.disk = newPublicBinaryCache(a.storage, "pro-profiles", 64, 4<<20)
 	}
+	pruneProProfilesLocked(c, time.Now())
 	cached, found := c.entries[key]
 	directoryRevision := proDirectoryRevisionAt(old)
 	directoryRevisionLegacy := old.RevisionAt
@@ -144,6 +145,7 @@ func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAcc
 	old.CheckedAt, old.CheckFailed = time.Now().UTC().Format(time.RFC3339Nano), err != nil
 	c.mu.Lock()
 	c.entries[key] = old
+	pruneProProfilesLocked(c, time.Now())
 	// Only normalized public account facts are persisted, never full HTML or
 	// account identifiers from the page, cookies, auth tokens or request headers.
 	if c.disk != nil && err == nil {
@@ -324,4 +326,24 @@ func proNodeText(n *xhtml.Node) string {
 	}
 	walk(n)
 	return strings.TrimSpace(b.String())
+}
+
+func pruneProProfilesLocked(c *proProfileCache, now time.Time) {
+	for key, row := range c.entries {
+		at, _ := time.Parse(time.RFC3339Nano, row.CheckedAt)
+		if at.IsZero() || now.Sub(at) >= 7*24*time.Hour {
+			delete(c.entries, key)
+		}
+	}
+	for len(c.entries) > 128 {
+		var oldest string
+		var at string
+		for key, row := range c.entries {
+			if oldest == "" || row.CheckedAt < at {
+				oldest = key
+				at = row.CheckedAt
+			}
+		}
+		delete(c.entries, oldest)
+	}
 }

@@ -92,6 +92,12 @@ func (a *app) applyLivePremades(gameID int64, players []gameplayLivePlayer, inpu
 		key := strings.Join(refs, "\x00")
 		label := a.livePremadeLabels.labels[key]
 		if label == "" {
+			if len(a.livePremadeLabels.labels) >= 64 {
+				for old := range a.livePremadeLabels.labels {
+					delete(a.livePremadeLabels.labels, old)
+					break
+				}
+			}
 			a.livePremadeLabels.next++
 			label = strconv.Itoa(a.livePremadeLabels.next)
 			a.livePremadeLabels.labels[key] = label

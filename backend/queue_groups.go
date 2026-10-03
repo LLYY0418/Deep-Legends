@@ -21,6 +21,9 @@ func (a *app) setQueueFilterCapability(serverID, filter, state string) {
 	if a.queueFilterCapabilities == nil {
 		a.queueFilterCapabilities = make(map[string]string)
 	}
+	if _, exists := a.queueFilterCapabilities[serverID+"|"+filter]; !exists && len(a.queueFilterCapabilities) >= 256 {
+		a.queueFilterCapabilities = map[string]string{}
+	}
 	a.queueFilterCapabilities[serverID+"|"+filter] = state
 	a.queueFilterCapabilityMu.Unlock()
 }

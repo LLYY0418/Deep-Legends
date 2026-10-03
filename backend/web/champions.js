@@ -362,7 +362,8 @@
     const preload = state.preload;
     let hydrated = false;
     if (preload) {
-      const token = state.workspaceRequestToken + 1;
+      if (typeof window !== "undefined") window.reportFlowDiagnostic?.("automatic_read_client", "request", { endpoint: "champions", source: "workspace" });
+    const token = state.workspaceRequestToken + 1;
       state.workspaceRequestToken = token;
       const mode = state.mode;
       state.loading = true;
@@ -405,6 +406,7 @@
 
   async function loadWorkspace(force = false) {
     if (!force && rankingsFresh()) { renderLoadedWorkspace(); return; }
+    if (typeof window !== "undefined") window.reportFlowDiagnostic?.("automatic_read_client", "request", { endpoint: "champions", source: "workspace" });
     const token = state.workspaceRequestToken + 1;
     state.workspaceRequestToken = token;
     const mode = state.mode;
@@ -448,6 +450,7 @@
 
   async function loadRankings(preserveSearch = false) {
     if (state.mode !== "ranked") return;
+    if (typeof window !== "undefined") window.reportFlowDiagnostic?.("automatic_read_client", "request", { endpoint: "champions", source: "direct" });
     const token = ++state.workspaceRequestToken;
     const tier = state.tier, position = state.position;
     const current = () => state.mode === "ranked" && state.workspaceRequestToken === token && state.tier === tier && state.position === position;

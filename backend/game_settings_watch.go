@@ -16,7 +16,7 @@ import (
 	"unicode/utf8"
 )
 
-// File snapshots are read-only. R186 separately syncs reviewed deltas to LCU. State and fingerprints
+// File snapshots are read-only. State and fingerprints
 // are connection-local; snapshots are serialized to preserve comparison order.
 type gameSettingsFileSnapshot struct {
 	PathKind  string                       `json:"path_kind"`
@@ -41,24 +41,25 @@ type gameSettingsWatchJob struct {
 	lockReadOnlyBefore *bool
 }
 type gameSettingsWatchState struct {
-	mu              sync.Mutex
-	client          *LCUClient
-	standalone      bool
-	ctx             context.Context
-	cancel          context.CancelFunc
-	queue           chan struct{}
-	jobs            []gameSettingsWatchJob
-	generation      uint64
-	seen            map[string]bool
-	prev            map[string]gameSettingsFileSnapshot
-	start           map[string]gameSettingsFileSnapshot
-	location        settingsLocation
-	end             map[string]gameSettingsFileSnapshot
-	endChanged      map[string]bool
-	phase           string
-	started         bool
-	ended           bool
-	inGameScheduled bool
+	mu                  sync.Mutex
+	client              *LCUClient
+	standalone          bool
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	queue               chan struct{}
+	jobs                []gameSettingsWatchJob
+	generation          uint64
+	seen                map[string]bool
+	prev                map[string]gameSettingsFileSnapshot
+	start               map[string]gameSettingsFileSnapshot
+	location            settingsLocation
+	end                 map[string]gameSettingsFileSnapshot
+	endChanged          map[string]bool
+	phase               string
+	started             bool
+	ended               bool
+	inGameScheduled     bool
+	heapProfileCaptured bool
 	// Tests replace the cancellable clock, never the production read pipeline.
 	wait func(context.Context, time.Duration) bool
 }
@@ -111,6 +112,7 @@ func (a *app) startGameSettingsWatch(parent context.Context, client *LCUClient, 
 	s.started = false
 	s.ended = false
 	s.inGameScheduled = false
+	s.heapProfileCaptured = false
 	ctx, queue := s.ctx, s.queue
 	s.enqueueLocked(gameSettingsWatchJob{stage: "app_start", generation: s.generation})
 	s.mu.Unlock()
@@ -152,6 +154,7 @@ func (a *app) observeGameSettingsPhase(client *LCUClient, phase string) {
 		s.started = false
 		s.ended = false
 		s.inGameScheduled = false
+		s.heapProfileCaptured = false
 	}
 	s.phase = phase
 	enqueue := func(stage string) {
@@ -552,9 +555,16 @@ func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient,
 	s := &a.gameSettingsWatch
 	s.mu.Lock()
 	valid := s.client == client && (!job.delayed || s.generation == job.generation)
+	profile := valid && parent.Err() == nil && job.stage == "lobby_after_60s" && !s.heapProfileCaptured
+	if profile {
+		s.heapProfileCaptured = true
+	}
 	s.mu.Unlock()
 	if !valid || parent.Err() != nil {
 		return
+	}
+	if profile {
+		a.recordHeapProfileTop()
 	}
 	if job.stage == "champselect" || job.stage == "game_start" {
 		a.applyGameCameraMode(parent, client, job.stage, func() bool {
@@ -606,9 +616,10 @@ func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient,
 	if values, ok := event["lcu_settings"].(map[string]string); ok {
 		sanitizeGameSettingsCameraValues(values, location, current)
 	}
+	pendingDiagnostics := []map[string]any{}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.client != client || job.delayed && s.generation != job.generation || parent.Err() != nil {
+		s.mu.Unlock()
 		return
 	}
 	for i := range snapshots {
@@ -631,14 +642,14 @@ func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient,
 		next.Changed = hashChanged
 		if hashChanged || job.stage == "lock_action" && permissionChanged {
 			keys, truncated := gameSettingsChangedKeys(previous.AllValues, next.AllValues, location, current)
-			a.recordDiagnostic(map[string]any{"changed_keys": keys, "changed_keys_truncated": truncated, "event": "game_settings_changed", "path_kind": next.PathKind, "between": previous.stage + " → " + job.stage, "camera_changed_keys": next.Changes, "read_only_before": readOnlyBefore, "read_only_after": next.ReadOnly, "writer_guess": gameSettingsWriterGuess(job.stage, previous.stage, hashChanged)})
+			pendingDiagnostics = append(pendingDiagnostics, map[string]any{"changed_keys": keys, "changed_keys_truncated": truncated, "event": "game_settings_changed", "path_kind": next.PathKind, "between": previous.stage + " → " + job.stage, "camera_changed_keys": next.Changes, "read_only_before": readOnlyBefore, "read_only_after": next.ReadOnly, "writer_guess": gameSettingsWriterGuess(job.stage, previous.stage, hashChanged)})
 		}
 		if hashChanged && s.end != nil && s.generation == job.generation {
 			s.endChanged[next.PathKind] = true
 		}
 		if job.stage == "lobby_after_60s" {
 			if ended, ok := s.end[next.PathKind]; ok && ended.Hash != "" && next.Hash == ended.Hash && next.ReadOnly && !s.endChanged[next.PathKind] {
-				a.recordDiagnostic(map[string]any{"event": "game_settings_write_blocked_suspected", "path_kind": next.PathKind, "between": "game_end → lobby_after_60s"})
+				pendingDiagnostics = append(pendingDiagnostics, map[string]any{"event": "game_settings_write_blocked_suspected", "path_kind": next.PathKind, "between": "game_end → lobby_after_60s"})
 			}
 		}
 		s.prev[next.PathKind] = *next
@@ -674,6 +685,10 @@ func (a *app) recordGameSettingsWatch(parent context.Context, client *LCUClient,
 			}
 			event["camera_mode_matches_target"] = matches
 		}
+	}
+	s.mu.Unlock()
+	for _, diagnostic := range pendingDiagnostics {
+		a.recordDiagnostic(diagnostic)
 	}
 	a.recordDiagnostic(event)
 }

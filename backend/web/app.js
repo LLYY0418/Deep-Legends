@@ -460,7 +460,7 @@
           state.poolsLoaded = false;
         }
       }
-      updateReadingOverlay(loadItems || changed);
+      updateReadingOverlay();
 	  renderStatus();
   if (!state.status.connected && (!previous || previous.connected)) await loadClientInstallations();
 	  if (state.section === "favorites" && state.favoritesPage === "collection") {
@@ -520,44 +520,26 @@
     return `已重试 ${count} 次，耗时 ${duration}，${data?.snapshotRetryExhausted ? "将每 60 秒继续尝试" : "稍后自动重试"}`;
   }
 
-  function updateReadingOverlay(willLoadItems = false) {
+  function updateReadingOverlay() {
     if (!state.status) return;
     const data = state.status;
     const identityReady = data.identityReady ?? data.snapshotReady;
-    const attemptChanged = String(data.lastAttempt || "") !== state.overlayBaselineAttempt;
-    if (data.connected && identityReady && !state.loading && !willLoadItems && (!state.overlayForced || attemptChanged)) {
+    if (data.connected && identityReady) {
       state.overlaySuppressed = false;
       hideReadingOverlay();
       return;
     }
-    if (state.overlayForced && !attemptChanged) {
-      state.statusDelay = 450;
-      return;
-    }
-    // 快照已就绪后的后台皮肤重载（lastSync 变化触发）只在收藏页需要
-    // 遮罩；停留在总览/对局等页面时静默完成，避免周期性闪烁。
-	  const preparing = data.syncing && !identityReady
-	    || (data.connected && !identityReady)
-      || (data.connected && data.snapshotReady && state.section === "favorites" && (state.loading || willLoadItems));
-    if (!preparing) {
-      state.overlaySuppressed = false;
+    if (state.overlaySuppressed) {
       hideReadingOverlay();
       return;
     }
-    if (state.overlaySuppressed && !state.overlayForced) {
-      hideReadingOverlay();
-      state.statusDelay = 900;
-      return;
-    }
-	  showReadingOverlay(data.connected ? "正在读取召唤师信息" : "正在连接英雄联盟客户端", data.connected ? "正在读取身份与总览数据。" : "检测到客户端正在启动，请稍候。", state.overlayForced);
+    showReadingOverlay(data.connected ? "正在读取召唤师信息" : "正在连接英雄联盟客户端", data.connected ? "正在读取身份与总览数据。" : "检测到客户端正在启动，请稍候。");
     state.statusDelay = 900;
   }
 
-  function showReadingOverlay(title, copy, forced = false) {
+  function showReadingOverlay(title, copy) {
+    if (state.overlaySuppressed) return;
     clearTimeout(state.overlayTimer);
-    if (forced) state.overlaySuppressed = false;
-    if (forced && !state.overlayForced) state.overlayBaselineAttempt = String(state.status?.lastAttempt || "");
-    state.overlayForced ||= forced;
     el.startupLoadingTitle.textContent = title;
     el.startupLoadingCopy.textContent = copy;
     if (el.startupLoadingMeta) el.startupLoadingMeta.textContent = snapshotRetryText(state.status);
@@ -566,12 +548,13 @@
     el.startupLoading.classList.remove("is-leaving");
     el.appFrame.setAttribute("inert", "");
     if (!state.startupFallbackTimer) {
+      window.reportFlowDiagnostic?.("blocking_state_client", "show", { source: "startup" });
       state.startupFallbackTimer = setTimeout(() => {
-        state.startupFallbackTimer = 0;
         state.overlaySuppressed = true;
-        state.overlayForced = false;
         hideReadingOverlay();
-      }, 25000);
+        window.reportFlowDiagnostic?.("blocking_state_client", "timeout", { source: "startup", durationMs: 15000 });
+        if (state.status) renderNotice(state.status);
+      }, 15000);
     }
   }
 
@@ -580,14 +563,22 @@
     state.overlayBaselineAttempt = "";
     clearTimeout(state.startupFallbackTimer);
     state.startupFallbackTimer = 0;
-    if (el.startupLoading.hidden) {
-      el.appFrame.removeAttribute("inert");
-      return;
-    }
     el.appFrame.removeAttribute("inert");
-    el.startupLoading.classList.add("is-leaving");
     clearTimeout(state.overlayTimer);
-    state.overlayTimer = setTimeout(() => { el.startupLoading.hidden = true; }, 180);
+    if (!el.startupLoading.hidden) window.reportFlowDiagnostic?.("blocking_state_client", "hide", { source: "startup" });
+    el.startupLoading.hidden = true;
+    el.startupLoading.classList.remove("is-leaving");
+  }
+
+  async function retrySummonerIdentity() {
+    if (state.identityRetryInFlight || Date.now() - (state.identityRetryAt ?? -Infinity) < 1000) return;
+    state.identityRetryAt = Date.now();
+    state.identityRetryInFlight = true;
+    try {
+      await api("/api/identity/refresh?source=overlay_retry", { method: "POST" }, "identity-retry", 8000);
+    } catch (error) {
+      if (error.name !== "RequestCancelled") showToast(`召唤师信息读取失败：${error.message}`);
+    } finally { state.identityRetryInFlight = false; }
   }
 
   function applySkinsPayload(items, capability, stale = false, capturedAt = "") {
@@ -607,7 +598,7 @@
     state.collectionRequestAt = Date.now();
     state.collectionRequestAttempt = state.status.lastAttempt;
     try {
-      await api("/api/collection/ensure", { method: "POST" }, "collection-ensure", 8000);
+      await api("/api/collection/ensure?source=ensure", { method: "POST" }, "collection-ensure", 8000);
     } catch (error) {
       if (error.name !== "RequestCancelled" && !state.destroyed) state.listError = error.message || "收藏读取未启动";
       state.collectionEnsureInFlight = false;
@@ -638,8 +629,8 @@
 	      return;
 	  }
 	  if (!state.status?.snapshotReady && !fallbackAvailable) {
-	    state.loading = true;
-	    renderItems();
+	    state.loading = false;
+	    if (!state.items.length) renderItems();
 	    void ensureCollection();
 	    return;
 	  }
@@ -654,7 +645,7 @@
     // Keep a usable collection on screen while a snapshot event is verified.
     // Replacing thousands of cards with skeletons for every identical refresh
     // caused the collection page to flash even when nothing had changed.
-    const keepVisible = force && state.items.length > 0;
+    const keepVisible = state.items.length > 0;
     state.loading = !keepVisible;
     if (state.loading) renderItems();
     let shouldRender = !keepVisible;
@@ -767,6 +758,13 @@
   }
 
   function renderNotice(data) {
+    if (state.overlaySuppressed && data.connected && !(data.identityReady ?? data.snapshotReady)) {
+      el.notice.hidden = false;
+      el.notice.className = "notice is-warning";
+      el.notice.innerHTML = '<div class="notice-symbol" aria-hidden="true">!</div><div><strong>召唤师信息读取失败</strong><button class="text-button identity-retry" type="button">重试</button></div>';
+      el.notice.querySelector(".identity-retry")?.addEventListener("click", retrySummonerIdentity);
+      return;
+    }
     if (state.section !== "favorites" || state.favoritesPage !== "collection") {
       el.notice.hidden = true;
       return;
@@ -2234,7 +2232,7 @@
 
   async function selectPool(id) {
     try {
-      showReadingOverlay("正在切换奖池", "正在重新整理奖池与收藏，请稍候。", true);
+      showToast("正在切换奖池");
       await api("/api/pools/select", { method: "POST", body: JSON.stringify({ id }) }, "pool-select");
       showToast("奖池已切换，正在重新读取");
       await refreshStatus(true);
@@ -2489,11 +2487,13 @@
   }
 
   function triggerCollectionRescanIfDirty() {
+    if (document.hidden || state.section !== "favorites" || Date.now() - (state.collectionRescanAt ?? -Infinity) < 60000) return false;
     if (!state.status?.connected || !state.status?.snapshotReady || state.status?.syncing || !state.status?.collectionDirty || state.collectionRescanInFlight || state.collectionEnsureInFlight) return false;
+    state.collectionRescanAt = Date.now();
     state.collectionRescanInFlight = true;
     state.collectionRequestAt = Date.now();
     state.collectionRequestAttempt = state.status.lastAttempt;
-    void api("/api/refresh", { method: "POST" }, "collection-rescan").catch((error) => {
+    void api("/api/refresh?source=dirty_rescan", { method: "POST" }, "collection-rescan").catch((error) => {
       state.collectionRescanInFlight = false;
       if (error.name !== "RequestCancelled") showToast(`收藏后台补刷未启动：${error.message}`);
     });
@@ -3064,11 +3064,6 @@
   function softResetShellState() {
     for (const controller of state.controllers.values()) controller.abort();
     state.controllers.clear();
-    clearTimeout(state.startupFallbackTimer);
-    state.startupFallbackTimer = 0;
-    state.overlayForced = false;
-    state.overlaySuppressed = false;
-    state.overlayBaselineAttempt = "";
     updateReadingOverlay();
     clearTimeout(state.eventReconnectTimer);
     state.eventReconnectDelay = 1000;
@@ -3091,7 +3086,7 @@
     try {
 	  let refreshError = null;
 	  try {
-		await api("/api/refresh", { method: "POST" }, "refresh-background");
+		await api("/api/refresh?source=user_refresh", { method: "POST" }, "refresh-background");
 	  } catch (error) {
 		if (error.name !== "RequestCancelled") refreshError = error;
 	  }
@@ -3109,7 +3104,7 @@
       }
     }
   });
-  el.startupLoadingRetry?.addEventListener("click", () => el.refresh.click());
+  el.startupLoadingRetry?.addEventListener("click", retrySummonerIdentity);
   el.quit.addEventListener("click", async () => { if (!confirm("退出 Deep Legends？")) return; state.destroyed = true; window.dispatchEvent(new CustomEvent("deep-legends:dispose")); clearTimeout(state.statusTimer); clearTimeout(state.liveUpdateTimer); clearTimeout(state.eventReconnectTimer); state.eventSource?.close(); for (const controller of state.controllers.values()) controller.abort(); state.controllers.clear(); try { await fetch("/api/quit", { method: "POST" }); } catch (_) {} document.body.innerHTML = '<main class="shell"><section class="empty-state"><strong>Deep Legends 已退出</strong><p>现在可以关闭这个页面。</p></section></main>'; });
   el.settingTheme.addEventListener("change", () => { savePreference("theme", el.settingTheme.value); applyAppearance(); });
   el.settingUiScale.addEventListener("change", () => {
@@ -3528,6 +3523,8 @@
   });
   document.addEventListener("fullscreenchange", () => {
     const active = document.fullscreenElement === el.skinDialogArt;
+    if (active) state.artworkFullscreenAt = Date.now();
+    window.reportFlowDiagnostic?.("blocking_state_client", active ? "show" : "hide", { source: "artwork_fullscreen", durationMs: active ? 0 : Date.now() - (state.artworkFullscreenAt || Date.now()) });
     el.skinDialogFullscreen.classList.toggle("is-active", active);
     el.skinDialogFullscreen.setAttribute("aria-label", active ? "退出全屏" : "全屏查看原画");
     el.skinDialogFullscreen.dataset.tooltip = active ? "退出全屏" : "全屏查看原画";
@@ -3687,8 +3684,7 @@
       // 只在首次连接（快照尚未就绪）时展示全屏读取遮罩；客户端事件触发的
       // 后台刷新静默进行，避免总览等页面每隔几秒被遮罩闪一下。
       if (event.data === "refresh-started" && state.status?.connected && !(state.status?.identityReady ?? state.status?.snapshotReady)) {
-        state.overlaySuppressed = false;
-        showReadingOverlay("正在读取收藏信息", "正在整理皮肤、炫彩与账户物品…");
+        updateReadingOverlay();
       }
 	  queueLiveUpdateSlices(slices);
     };
@@ -4182,5 +4178,6 @@
   setupFloatingTooltips();
   setupTitlebarInset();
   void setupChampionNetwork();
+  showReadingOverlay("正在连接英雄联盟客户端", "正在检测英雄联盟客户端。");
   refreshStatus(true);
 })();

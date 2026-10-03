@@ -85,6 +85,9 @@ func (a *app) allowPerkDiagnostic(key string) bool {
 	if a.perkDiagnosticCounts[key] >= 3 {
 		return false
 	}
+	if _, exists := a.perkDiagnosticCounts[key]; !exists && len(a.perkDiagnosticCounts) >= 256 {
+		a.perkDiagnosticCounts = map[string]int{}
+	}
 	a.perkDiagnosticCounts[key]++
 	return true
 }

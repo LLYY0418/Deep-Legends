@@ -301,6 +301,15 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 					a.handleSummonerProfileEvent(client, event.Data)
 					return
 				}
+				if scope == "collection" || scope == "account+collection" {
+					a.markCollectionDirty(collectionURIKind(event.URI))
+				}
+				if scope == "collection" {
+					return
+				}
+				if scope == "account+collection" {
+					scope = "account"
+				}
 				select {
 				case eventTriggers <- scope:
 				default:
@@ -715,12 +724,43 @@ func (a *app) handleDebouncedRefreshScope(client *LCUClient, scope string, refre
 	}
 }
 
-func (a *app) markCollectionDirty() {
+func collectionURIKind(uri string) string {
+	uri = strings.ToLower(uri)
+	switch {
+	case strings.Contains(uri, "inventory"):
+		return "inventory"
+	case strings.Contains(uri, "loot"):
+		return "loot"
+	case strings.Contains(uri, "champion"):
+		return "champions"
+	default:
+		return "other"
+	}
+}
+
+func (a *app) markCollectionDirty(kinds ...string) { a.markCollectionDirtyAt(time.Now(), kinds...) }
+
+func (a *app) markCollectionDirtyAt(now time.Time, kinds ...string) bool {
+	kind := "other"
+	if len(kinds) > 0 {
+		switch kinds[0] {
+		case "inventory", "loot", "champions":
+			kind = kinds[0]
+		}
+	}
 	a.mu.Lock()
-	a.collectionDirty = true
-	a.collectionDirtyAt = time.Now()
+	during := a.syncing
+	suppressed := !a.collectionRefreshFinishedAt.IsZero() && now.Sub(a.collectionRefreshFinishedAt) < 5*time.Second
+	if !suppressed {
+		a.collectionDirty = true
+		a.collectionDirtyAt = now
+	}
 	a.mu.Unlock()
-	a.broadcastEvent("collection-dirty")
+	a.recordDiagnostic(map[string]any{"event": "collection_dirty_marked", "uri_kind": kind, "during_refresh": during, "suppressed": suppressed})
+	if !suppressed {
+		a.broadcastEvent("collection-dirty")
+	}
+	return !suppressed
 }
 
 func nextSnapshotRetryDelay(attempt int, exhausted bool) time.Duration {
@@ -820,7 +860,9 @@ func (a *app) disconnectClient(client *LCUClient, message string) {
 func (a *app) handleLPGameflowPhase(client *LCUClient, phase string) {
 	if playerRef := a.currentPlayerRef(); playerRef != "" {
 		a.lpTracker.handlePhase(client, phase, playerRef, func() ([]gameplayRank, EndpointCapability) {
-			ranks, _, capability := a.loadRanksWithFallback(context.Background(), client, playerRef, true, clientTencentServerID(client), "")
+			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+			defer cancel()
+			ranks, _, capability := a.loadRanksWithFallback(ctx, client, playerRef, true, clientTencentServerID(client), "")
 			return ranks, capability
 		})
 	}

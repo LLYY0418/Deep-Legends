@@ -68,6 +68,7 @@ func (a *app) warmProPlayersCaches() {
 			}
 		}
 	}
+	pruneProProfilesLocked(&a.proProfiles, time.Now())
 	a.proProfiles.mu.Unlock()
 	a.proPlayers.teams = teams
 	// Disk prewarming is not a network attempt; the first page request must

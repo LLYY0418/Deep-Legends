@@ -29,6 +29,7 @@ type assetFlight struct {
 
 func (a *app) loadAsset(ctx context.Context, key string, maxEntrySize int, negativeTTL time.Duration, loader func(context.Context) ([]byte, error)) ([]byte, error) {
 	a.assetCacheMu.Lock()
+	a.pruneAssetFailuresLocked(time.Now())
 	if data, ok := a.assetCache[key]; ok {
 		recordAssetCacheState(ctx, "memory")
 		a.assetCacheMu.Unlock()
@@ -77,6 +78,13 @@ func (a *app) loadAsset(ctx context.Context, key string, maxEntrySize int, negat
 	} else if err != nil && cacheIsCurrent && negativeTTL > 0 && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 		if a.assetFailureUntil == nil {
 			a.assetFailureUntil = make(map[string]time.Time)
+		}
+		a.pruneAssetFailuresLocked(time.Now())
+		if len(a.assetFailureUntil) >= assetCacheMaxEntries {
+			for key := range a.assetFailureUntil {
+				delete(a.assetFailureUntil, key)
+				break
+			}
 		}
 		a.assetFailureUntil[key] = time.Now().Add(negativeTTL)
 	}
@@ -202,4 +210,12 @@ func (a *app) loadAssetFromHost(ctx context.Context, host, key string, maxEntryS
 		a.observeAssetHostResult(host, err)
 	}
 	return data, err
+}
+
+func (a *app) pruneAssetFailuresLocked(now time.Time) {
+	for key, until := range a.assetFailureUntil {
+		if !now.Before(until) {
+			delete(a.assetFailureUntil, key)
+		}
+	}
 }

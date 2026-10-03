@@ -181,6 +181,7 @@ func (p *riotProvider) specialistRunes(ctx context.Context, championID int64, ch
 	position = canonicalSpecialistPosition(position)
 	key := specialistRuneKey(championID, position)
 	p.specialistMu.Lock()
+	pruneTTLCache(p.specialistCache, now, 256, func(v specialistRuneCacheEntry) time.Time { return v.expiresAt })
 	if cached, ok := p.specialistCache[key]; ok && cached.position == position && now.Before(cached.expiresAt) {
 		result := cloneSpecialistRunes(cached.runes)
 		p.specialistMu.Unlock()
@@ -233,6 +234,7 @@ func (p *riotProvider) finishSpecialistRuneFlight(key string, flight *specialist
 			ttl = specialistRunePartialCacheTTL
 		}
 		p.specialistCache[key] = specialistRuneCacheEntry{expiresAt: fetchedAt.Add(ttl), position: flight.position, runes: result, outcome: outcome}
+		pruneTTLCache(p.specialistCache, fetchedAt, 256, func(v specialistRuneCacheEntry) time.Time { return v.expiresAt })
 	}
 	flight.runes = cloneSpecialistRunes(result)
 	flight.outcome = outcome
@@ -470,6 +472,7 @@ func (p *riotProvider) specialistRecentSummaries(puuid string, now time.Time) ([
 		return nil, false
 	}
 	p.specialistMu.Lock()
+	pruneTTLCache(p.specialistRecent, now, 256, func(v specialistRecentSummaryCacheEntry) time.Time { return v.expiresAt })
 	entry, ok := p.specialistRecent[puuid]
 	if ok && !now.Before(entry.expiresAt) {
 		delete(p.specialistRecent, puuid)
@@ -492,6 +495,7 @@ func (p *riotProvider) cacheSpecialistRecentSummaries(puuid string, summaries []
 		expiresAt: fetchedAt.Add(specialistRecentSummaryTTL),
 		summaries: append([]specialistMatchSummary(nil), summaries...),
 	}
+	pruneTTLCache(p.specialistRecent, fetchedAt, 256, func(v specialistRecentSummaryCacheEntry) time.Time { return v.expiresAt })
 	p.specialistMu.Unlock()
 }
 

@@ -14,7 +14,9 @@ package main
 // 无法回溯，只保留基线以保证下一场的差值正确。
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -85,7 +87,7 @@ type lpTracker struct {
 }
 
 func newLPTracker(store *localStore) *lpTracker {
-	tracker := &lpTracker{store: store, pending: make(map[string]bool), sleep: time.Sleep, now: time.Now, startSeen: make(map[string]bool), startFlights: make(map[string]chan struct{}), baselineDiagnostics: make(map[string]lpBaselineDiagnostic)}
+	tracker := &lpTracker{store: store, pending: make(map[string]bool), now: time.Now, startSeen: make(map[string]bool), startFlights: make(map[string]chan struct{}), baselineDiagnostics: make(map[string]lpBaselineDiagnostic)}
 	tracker.history = lpHistoryData{SchemaVersion: lpHistorySchemaVersion, Baselines: make(map[string]map[string]lpSnapshot), Games: make(map[string]lpGameRecord), BaselineInfo: make(map[string]map[string]lpBaselineInfo), GameStarts: make(map[string]map[string]lpGameStartBaseline)}
 	if store == nil {
 		return tracker
@@ -124,7 +126,7 @@ func newLPTracker(store *localStore) *lpTracker {
 }
 
 func (t *lpTracker) recordObservation(event map[string]any) {
-	if t != nil && t.observeEvent != nil {
+	if event != nil && t != nil && t.observeEvent != nil {
 		t.observeEvent(event)
 	}
 }
@@ -182,25 +184,9 @@ func validLPHistory(history lpHistoryData) bool {
 }
 
 func (t *lpTracker) persistLocked() error {
+	t.pruneHistoryLocked()
 	if t.store == nil {
 		return nil
-	}
-	// 超出上限时按记录时间保留最新的一批。
-	if len(t.history.Games) > lpHistoryLimit {
-		type keyed struct {
-			key    string
-			record lpGameRecord
-		}
-		items := make([]keyed, 0, len(t.history.Games))
-		for key, record := range t.history.Games {
-			items = append(items, keyed{key, record})
-		}
-		sort.Slice(items, func(i, j int) bool { return items[i].record.RecordedAt > items[j].record.RecordedAt })
-		trimmed := make(map[string]lpGameRecord, lpHistoryLimit)
-		for _, item := range items[:lpHistoryLimit] {
-			trimmed[item.key] = item.record
-		}
-		t.history.Games = trimmed
 	}
 	t.history.SchemaVersion = lpHistorySchemaVersion
 	data, err := json.Marshal(t.history)
@@ -239,8 +225,14 @@ func (t *lpTracker) observe(playerRef string, ranks []gameplayRank, capabilities
 	if len(capabilities) > 0 {
 		source = lpRankSource(capabilities[0])
 	}
+	events := []map[string]any{}
 	t.mu.Lock()
-	defer t.mu.Unlock()
+	defer func() {
+		t.mu.Unlock()
+		for _, event := range events {
+			t.recordObservation(event)
+		}
+	}()
 	changed := false
 	for _, rank := range ranks {
 		if rank.Tier == "" || queueIDForRankedType(rank.QueueType) == 0 {
@@ -248,11 +240,11 @@ func (t *lpTracker) observe(playerRef string, ranks []gameplayRank, capabilities
 		}
 		snapshot := lpSnapshotFromRank(rank)
 		if rank.seasonFallback {
-			t.baselineObservationLocked(accountHash, rank.QueueType, snapshot, "observe", true, "season_fallback")
+			events = append(events, t.baselineObservationLocked(accountHash, rank.QueueType, snapshot, "observe", true, "season_fallback"))
 			continue
 		}
 		if !snapshot.trustworthy() {
-			t.recordObservation(map[string]any{"event": "lp_snapshot_rejected", "stage": "observe", "reason": "missing_losses"})
+			events = append(events, map[string]any{"event": "lp_snapshot_rejected", "stage": "observe", "reason": "missing_losses"})
 			continue
 		}
 		if t.pending[accountHash+"|"+rank.QueueType] {
@@ -265,13 +257,16 @@ func (t *lpTracker) observe(playerRef string, ranks []gameplayRank, capabilities
 				t.staleRejections = make(map[string]time.Time)
 			}
 			if last, seen := t.staleRejections[key]; !seen || now.Sub(last) >= time.Minute {
+				if len(t.staleRejections) >= 256 {
+					t.staleRejections = map[string]time.Time{}
+				}
 				t.staleRejections[key] = now
-				t.recordObservation(map[string]any{"event": "lp_snapshot_rejected", "stage": "observe", "reason": "stale_regression"})
+				events = append(events, map[string]any{"event": "lp_snapshot_rejected", "stage": "observe", "reason": "stale_regression"})
 			}
 			continue
 		}
 		// Queue observations may advance; the independent game-start snapshot is immutable.
-		t.writeQueueBaselineLocked(accountHash, rank.QueueType, snapshot, "observe", source)
+		events = append(events, t.writeQueueBaselineLocked(accountHash, rank.QueueType, snapshot, "observe", source))
 		changed = true
 	}
 	if changed {
@@ -374,12 +369,15 @@ func lpDeltaFields(snapshot, baseline lpSnapshot, known bool) map[string]any {
 	}
 	return fields
 }
-func (t *lpTracker) baselineObservationLocked(hash, queue string, snapshot lpSnapshot, writer string, fallback bool, reason string) {
+func (t *lpTracker) baselineObservationLocked(hash, queue string, snapshot lpSnapshot, writer string, fallback bool, reason string) map[string]any {
 	key := hash + "|" + queue
 	now := t.now()
 	last, exists := t.baselineDiagnostics[key]
 	if exists && last.Snapshot == snapshot && last.SeasonFallback == fallback && last.Reason == reason && now.Sub(last.At) < time.Minute {
-		return
+		return nil
+	}
+	if _, exists := t.baselineDiagnostics[key]; !exists && len(t.baselineDiagnostics) >= 256 {
+		t.baselineDiagnostics = map[string]lpBaselineDiagnostic{}
 	}
 	t.baselineDiagnostics[key] = lpBaselineDiagnostic{snapshot, fallback, reason, now}
 	baseline, known := t.history.Baselines[hash][queue]
@@ -391,10 +389,10 @@ func (t *lpTracker) baselineObservationLocked(hash, queue string, snapshot lpSna
 	if reason != "" {
 		event["reason"] = reason
 	}
-	t.recordObservation(event)
+	return event
 }
-func (t *lpTracker) writeQueueBaselineLocked(hash, queue string, snapshot lpSnapshot, writer, source string) {
-	t.baselineObservationLocked(hash, queue, snapshot, writer, false, "")
+func (t *lpTracker) writeQueueBaselineLocked(hash, queue string, snapshot lpSnapshot, writer, source string) map[string]any {
+	event := t.baselineObservationLocked(hash, queue, snapshot, writer, false, "")
 	if t.history.Baselines[hash] == nil {
 		t.history.Baselines[hash] = make(map[string]lpSnapshot)
 	}
@@ -403,6 +401,7 @@ func (t *lpTracker) writeQueueBaselineLocked(hash, queue string, snapshot lpSnap
 	}
 	t.history.Baselines[hash][queue] = snapshot
 	t.history.BaselineInfo[hash][queue] = lpBaselineInfo{Writer: writer, Source: source, TakenAt: t.now().UnixMilli()}
+	return event
 }
 func lpCurrentSnapshot(ranks []gameplayRank, capability EndpointCapability, queue string) (lpSnapshot, bool) {
 	if capability.State == capabilityAvailable {
@@ -415,12 +414,14 @@ func lpCurrentSnapshot(ranks []gameplayRank, capability EndpointCapability, queu
 	return lpSnapshot{}, false
 }
 func (t *lpTracker) takeGameStart(client *LCUClient, playerRef string, loadRanks func() ([]gameplayRank, EndpointCapability)) {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
 	hash := t.accountHash(playerRef)
 	if hash == "" {
 		return
 	}
 	var session lpGameflowSession
-	if client.GetJSON("/lol-gameflow/v1/session", &session) != nil {
+	if client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/session", nil, &session) != nil {
 		t.recordObservation(map[string]any{"event": "lp_baseline_written", "writer": "game_start", "season_fallback": false, "reason": "session_unavailable"})
 		return
 	}
@@ -445,7 +446,9 @@ func (t *lpTracker) takeGameStart(client *LCUClient, playerRef string, loadRanks
 	defer func() { t.mu.Lock(); delete(t.startFlights, flightKey); close(done); t.mu.Unlock() }()
 	for attempt := 1; attempt <= 3; attempt++ {
 		if attempt > 1 {
-			t.wait(lpCaptureInterval)
+			if !t.waitContext(ctx, lpCaptureInterval) {
+				return
+			}
 		}
 		ranks, capability := loadRanks()
 		snapshot, ok := lpCurrentSnapshot(ranks, capability, queue)
@@ -462,19 +465,22 @@ func (t *lpTracker) takeGameStart(client *LCUClient, playerRef string, loadRanks
 			continue
 		}
 		t.mu.Lock()
-		t.baselineObservationLocked(hash, queue, snapshot, "game_start", false, "")
+		event := t.baselineObservationLocked(hash, queue, snapshot, "game_start", false, "")
 		if t.history.GameStarts[hash] == nil {
 			t.history.GameStarts[hash] = make(map[string]lpGameStartBaseline)
 		}
 		t.history.GameStarts[hash][queue] = lpGameStartBaseline{gameID, queue, snapshot, source, t.now().UnixMilli()}
 		t.persistLocked()
 		t.mu.Unlock()
+		t.recordObservation(event)
 		return
 	}
 	t.recordObservation(map[string]any{"event": "lp_baseline_written", "writer": "game_start", "season_fallback": false, "reason": "read_failed", "attempts": 3})
 }
 
 func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func() ([]gameplayRank, EndpointCapability)) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 	if t != nil && t.invalidateRanks != nil {
 		defer t.invalidateRanks(playerRef)
 	}
@@ -484,7 +490,7 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 		return
 	}
 	var session lpGameflowSession
-	if client.GetJSON("/lol-gameflow/v1/session", &session) != nil {
+	if client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/session", nil, &session) != nil {
 		t.recordObservation(map[string]any{"event": "lp_capture_ignored", "reason": "session_unavailable"})
 		return
 	}
@@ -504,7 +510,13 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 	flight := t.startFlights[hash+"|"+gameKey]
 	t.mu.Unlock()
 	if flight != nil {
-		<-flight
+		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		err := waitLPStartFlight(ctx, flight)
+		cancel()
+		if err != nil {
+			t.recordObservation(map[string]any{"event": "lp_capture_ignored", "reason": "baseline_wait_timeout"})
+			return
+		}
 	}
 	t.mu.Lock()
 	_, recorded := t.history.Games[gameKey]
@@ -565,18 +577,22 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 	}
 	defer func() {
 		t.mu.Lock()
-		defer t.mu.Unlock()
+		var event map[string]any
 		// Keep the final upstream observation for future fallback captures, even on timeout.
 		if lastOK {
-			t.writeQueueBaselineLocked(hash, queue, last, "capture", lastSource)
+			event = t.writeQueueBaselineLocked(hash, queue, last, "capture", lastSource)
 		}
 		if start := t.history.GameStarts[hash][queue]; start.GameID == gameID {
 			delete(t.history.GameStarts[hash], queue)
 		}
 		delete(t.pending, pendingKey)
 		t.persistLocked()
+		t.mu.Unlock()
+		t.recordObservation(event)
 	}()
-	t.wait(lpCaptureFirstWait)
+	if !t.waitContext(ctx, lpCaptureFirstWait) {
+		return
+	}
 	firstChanged := false
 	settleSamples := 0
 	previousScore := 0
@@ -588,7 +604,9 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 	maxPolls := lpCaptureAttempts
 	for attempt := 1; attempt <= maxPolls; attempt++ {
 		if attempt > 1 {
-			t.wait(lpCaptureInterval)
+			if !t.waitContext(ctx, lpCaptureInterval) {
+				return
+			}
 		}
 		ranks, capability := loadRanks()
 		snapshot, ok := lpCurrentSnapshot(ranks, capability, queue)
@@ -645,7 +663,9 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 				reason = "score_unresolved"
 			}
 			for settle := 1; settle <= 2; settle++ {
-				t.wait(lpCaptureInterval)
+				if !t.waitContext(ctx, lpCaptureInterval) {
+					return
+				}
 				nextRanks, nextCapability := loadRanks()
 				next, nextOK := lpCurrentSnapshot(nextRanks, nextCapability, queue)
 				nextSource := lpRankSource(nextCapability)
@@ -723,4 +743,81 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 		return
 	}
 	t.recordObservation(map[string]any{"event": "lp_capture_timeout", "capture_index": index, "attempts": maxPolls})
+}
+
+// Keep at most 64 recently observed accounts; history still keeps 400 games.
+func (t *lpTracker) pruneHistoryLocked() {
+	// 超出上限时按记录时间保留最新的一批。
+	if len(t.history.Games) > lpHistoryLimit {
+		type keyed struct {
+			key    string
+			record lpGameRecord
+		}
+		items := make([]keyed, 0, len(t.history.Games))
+		for key, record := range t.history.Games {
+			items = append(items, keyed{key, record})
+		}
+		sort.Slice(items, func(i, j int) bool { return items[i].record.RecordedAt > items[j].record.RecordedAt })
+		trimmed := make(map[string]lpGameRecord, lpHistoryLimit)
+		for _, item := range items[:lpHistoryLimit] {
+			trimmed[item.key] = item.record
+		}
+		t.history.Games = trimmed
+	}
+
+	accounts := map[string]int64{}
+	for key := range t.history.Baselines {
+		accounts[key] = 0
+	}
+	for key, rows := range t.history.BaselineInfo {
+		for _, row := range rows {
+			accounts[key] = max(accounts[key], row.TakenAt)
+		}
+	}
+	for key, rows := range t.history.GameStarts {
+		for _, row := range rows {
+			accounts[key] = max(accounts[key], row.TakenAt)
+		}
+	}
+	type observed struct {
+		key string
+		at  int64
+	}
+	list := []observed{}
+	for key, at := range accounts {
+		list = append(list, observed{key, at})
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].at == list[j].at {
+			return list[i].key < list[j].key
+		}
+		return list[i].at > list[j].at
+	})
+	if len(list) > 64 {
+		for _, row := range list[64:] {
+			delete(t.history.Baselines, row.key)
+			delete(t.history.BaselineInfo, row.key)
+			delete(t.history.GameStarts, row.key)
+		}
+	}
+}
+
+func waitLPStartFlight(ctx context.Context, done <-chan struct{}) error {
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (t *lpTracker) waitContext(ctx context.Context, d time.Duration) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	if t.sleep != nil {
+		t.sleep(d)
+		return ctx.Err() == nil
+	}
+	return gameSettingsWait(ctx, d)
 }

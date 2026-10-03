@@ -729,6 +729,8 @@ func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine st
 	key := strings.ToLower(strings.TrimSpace(gameName)) + "\x1f" + strings.ToLower(strings.TrimSpace(tagLine))
 	now := time.Now()
 	p.accountMu.Lock()
+	previousFailures := p.accountCache[key].failures
+	pruneTTLCache(p.accountCache, now, 512, func(v riotAccountCacheEntry) time.Time { return v.expiresAt })
 	if cached, ok := p.accountCache[key]; ok && now.Before(cached.expiresAt) {
 		p.accountMu.Unlock()
 		return cached.account, cached.err
@@ -744,7 +746,6 @@ func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine st
 		}
 	}
 	flight := &riotAccountFlight{done: make(chan struct{})}
-	previousFailures := p.accountCache[key].failures
 	p.accountFlights[key] = flight
 	p.accountMu.Unlock()
 
@@ -764,6 +765,7 @@ func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine st
 	p.accountMu.Lock()
 	if !entry.expiresAt.IsZero() {
 		p.accountCache[key] = entry
+		pruneTTLCache(p.accountCache, completedAt, 512, func(v riotAccountCacheEntry) time.Time { return v.expiresAt })
 	} else {
 		delete(p.accountCache, key)
 	}
@@ -942,17 +944,7 @@ func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID strin
 		}
 	}
 	p.cacheMu.Lock()
-	if p.matchCache == nil {
-		p.matchCache = make(map[string]*riotMatch)
-	}
-	if _, exists := p.matchCache[matchID]; !exists {
-		p.matchOrder = append(p.matchOrder, matchID)
-	}
-	p.matchCache[matchID] = &match
-	for len(p.matchOrder) > riotMatchCacheMax {
-		delete(p.matchCache, p.matchOrder[0])
-		p.matchOrder = p.matchOrder[1:]
-	}
+	p.storeMatchLocked(matchID, &match)
 	p.cacheMu.Unlock()
 	return &match, status, nil
 }
@@ -1934,4 +1926,18 @@ func (a *app) riotQueueLabels(ctx context.Context) map[int64]string {
 		return nil
 	}
 	return loadQueueLabelsContext(ctx, client)
+}
+
+func (p *riotProvider) storeMatchLocked(matchID string, match *riotMatch) {
+	if p.matchCache == nil {
+		p.matchCache = make(map[string]*riotMatch)
+	}
+	if _, exists := p.matchCache[matchID]; !exists {
+		p.matchOrder = append(p.matchOrder, matchID)
+	}
+	p.matchCache[matchID] = match
+	for len(p.matchOrder) > riotMatchCacheMax {
+		delete(p.matchCache, p.matchOrder[0])
+		p.matchOrder = p.matchOrder[1:]
+	}
 }

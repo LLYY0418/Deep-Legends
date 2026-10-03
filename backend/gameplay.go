@@ -5238,6 +5238,9 @@ func (a *app) recordUnknownQueue(queueID int64, gameMode string, mapID int64) {
 		a.unknownQueueDiagnosticMu.Unlock()
 		return
 	}
+	if len(a.unknownQueueDiagnosticIDs) >= 128 {
+		a.unknownQueueDiagnosticIDs = map[int64]struct{}{}
+	}
 	a.unknownQueueDiagnosticIDs[queueID] = struct{}{}
 	a.unknownQueueDiagnosticMu.Unlock()
 	a.recordDiagnostic(map[string]any{
@@ -8334,6 +8337,19 @@ func (a *app) cachedLivePlayerMatches(ctx context.Context, key string, loader fu
 	a.livePlayerMatchFlights[key] = flight
 	a.livePlayerMatchesMu.Unlock()
 
+	defer func() {
+		if value := recover(); value != nil {
+			a.livePlayerMatchesMu.Lock()
+			if a.livePlayerMatchFlights[key] == flight {
+				delete(a.livePlayerMatchFlights, key)
+			}
+			flight.State = "failed"
+			close(flight.Done)
+			a.livePlayerMatchesMu.Unlock()
+			a.recordRecoveredPanic("cachedLivePlayerMatches", value)
+			panic(value)
+		}
+	}()
 	loaded := loader(ctx)
 	stored := cloneGameplayMatches(loaded.Matches)
 	a.livePlayerMatchesMu.Lock()

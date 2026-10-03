@@ -179,7 +179,7 @@
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
-    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "arena_header_source", "live_render_rebuild", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf"].includes(event)) return;
+    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "arena_header_source", "live_render_rebuild", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client"].includes(event)) return;
     // Sample local requests by fixed endpoint category so status polling cannot
     // hide page timings. Delivery stays bounded and sampled events never retry.
     const sampled = event === "live_refresh_client" || event === "local_request_client";
@@ -187,6 +187,14 @@
     const now = Date.now();
     if (sampled && (sampledPending.size && event !== "local_request_client" || now - (sampledAt.get(sampleKey) ?? -Infinity) < (event === "local_request_client" ? 10000 : 1000))) { increment("transportSuppressed"); return; }
     const body = { event, reason };
+    if (event === "collection_render_client") {
+      if (["owned", "remaining", "all", "chromas"].includes(fields.view)) body.view = fields.view;
+      body.force = Boolean(fields.force); body.keptVisible = Boolean(fields.keptVisible);
+    }
+    if (event === "blocking_state_client" || event === "automatic_read_client") {
+      if (["startup", "skin", "chroma", "champions", "career", "facade", "champselect", "update", "confirmation", "artwork_fullscreen", "other", "poll", "event", "direct", "dirty_rescan", "workspace", "manual"].includes(fields.source)) body.source = fields.source;
+      if (["friends", "pro-players", "champions", "overview", "facade"].includes(fields.endpoint)) body.endpoint = fields.endpoint;
+    }
     if (event === "arena_header_source") {
       if (Number.isInteger(fields.championId) && fields.championId > 0) body.championId = Math.min(1000000, fields.championId);
       if (Number.isInteger(fields.rank) && fields.rank >= 0) body.rank = Math.min(1000000, fields.rank);
@@ -327,3 +335,50 @@
   const mark=()=>queueMicrotask(()=>{try{monitor.markPage();}catch{}});window.addEventListener("deep-legends:section",mark);document.addEventListener("click",mark,true);
   window.addEventListener("deep-legends:dispose",()=>{monitor.dispose();window.removeEventListener("deep-legends:section",mark);document.removeEventListener("click",mark,true);window.deepLegendsPerformance.requestMetricsInstalled=false;if(window.fetch===measured)window.fetch=original;},{once:true});
 })();
+
+// Native user dialogs are reading/editing surfaces. Keep them open until the
+// user's close/Escape; log the successful show and native close, not raw IDs.
+function installBlockingDiagnostics(win, doc) {
+  if (typeof win.confirm === "function" && !win.confirm.deepLegendsTracked) {
+    const nativeConfirm = win.confirm.bind(win);
+    const trackedConfirm = message => {
+      const started = Date.now();
+      win.reportFlowDiagnostic?.("blocking_state_client", "show", { source: "confirmation" });
+      try { return nativeConfirm(message); }
+      finally { win.reportFlowDiagnostic?.("blocking_state_client", "hide", { source: "confirmation", durationMs: Date.now() - started }); }
+    };
+    trackedConfirm.deepLegendsTracked = true;
+    win.confirm = trackedConfirm;
+  }
+  const proto = win.HTMLDialogElement?.prototype;
+  if (!proto?.showModal || proto.showModal.deepLegendsTracked) return;
+  const shown = new WeakMap();
+  const category = dialog => {
+    if (dialog.matches?.(".cs-dialog")) return "champselect";
+    if (dialog.matches?.(".mayhem-tier-dialog")) return "champions";
+    const id = dialog.id || "";
+    for (const key of ["champselect", "chroma", "skin", "career", "facade", "update", "champion"]) if (id.includes(key)) return key === "champion" ? "champions" : key;
+    return "other";
+  };
+  const nativeShow = proto.showModal;
+  function showModal() {
+    const wasOpen = this.open;
+    nativeShow.call(this);
+    if (!wasOpen && this.open) {
+      shown.set(this, Date.now());
+      win.reportFlowDiagnostic?.("blocking_state_client", "show", { source: category(this) });
+    }
+  }
+  showModal.deepLegendsTracked = true;
+  proto.showModal = showModal;
+  const finish = dialog => {
+    const started = shown.get(dialog);
+    if (started === undefined) return;
+    shown.delete(dialog);
+    win.reportFlowDiagnostic?.("blocking_state_client", "hide", { source: category(dialog), durationMs: Date.now() - started });
+  };
+  const nativeClose = proto.close;
+  if (nativeClose) proto.close = function close(...args) { nativeClose.apply(this, args); if (!this.open) finish(this); };
+  doc.addEventListener("close", event => finish(event.target), true);
+}
+if (typeof window !== "undefined" && typeof document !== "undefined") installBlockingDiagnostics(window, document);

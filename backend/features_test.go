@@ -15,6 +15,12 @@ func TestClientDiagnosticAcceptsMultipleEventWhitelists(t *testing.T) {
 		for reason := range reasons {
 			recorder := httptest.NewRecorder()
 			body := `{"event":"` + event + `","reason":"` + reason + `","key":"13:middle:CLASSIC:11:4-12","championId":13,"queueId":420,"position":"MID"}`
+			if event == "blocking_state_client" || event == "automatic_read_client" {
+				body = `{"event":"` + event + `","reason":"` + reason + `","source":"direct"}`
+			}
+			if event == "collection_render_client" {
+				body = `{"event":"` + event + `","reason":"` + reason + `","view":"owned","itemCount":1183,"keptVisible":true}`
+			}
 			if event == "gameflow_phase_client" {
 				body = `{"event":"gameflow_phase_client","reason":"batch","observations":[{"reason":"received","phase":"InProgress","source":"poll","gameId":8980574903}]}`
 			}

@@ -1,0 +1,28 @@
+✖ R203 1183 cards survive lastSync changes every eight seconds without global blocking (88.594584ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 790.768166
+
+✖ failing tests:
+
+test at backend/web/r203.test.cjs:17:1
+✖ R203 1183 cards survive lastSync changes every eight seconds without global blocking (88.594584ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert(!f.events.some(e=>e[0]==='blocking_state_client'&&e[1]==='show'))
+
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/backend/web/r203.test.cjs:18:465)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

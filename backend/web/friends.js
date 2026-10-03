@@ -120,9 +120,10 @@
   }
 
   /* ---------- 数据 ---------- */
-  async function loadFriends() {
+  async function loadFriends(source = "direct") {
     if (!state.connected || state.destroyed) return;
-    if (state.loading) { state.refreshPending = true; return; }
+    if (state.loading) { state.refreshPending = true; state.refreshPendingSource = source; return; }
+    if (typeof window !== "undefined") window.reportFlowDiagnostic?.("automatic_read_client", "request", { endpoint: "friends", source });
     state.loading = true;
     const generation = state.requestGeneration = Number(state.requestGeneration || 0) + 1;
     const controller = new AbortController();
@@ -156,7 +157,7 @@
       if (state.open) render();
       if (state.refreshPending && state.connected) {
         state.refreshPending = false;
-        void loadFriends();
+        void loadFriends(state.refreshPendingSource || "event");
       }
     }
   }
@@ -334,7 +335,7 @@
 
   el.list.addEventListener("click", (event) => {
     const retry = event.target.closest("#friends-retry");
-    if (retry) { void loadFriends(); return; }
+    if (retry) { void loadFriends("manual"); return; }
     const groupHead = event.target.closest(".friends-group-head");
     if (groupHead) {
       if (state.filter) return;
@@ -402,7 +403,7 @@
   window.addEventListener("deep-legends:friends-updated", () => {
     if (!state.connected) return;
     if (state.refreshTimer) return;
-    state.refreshTimer = setTimeout(() => { state.refreshTimer = 0; state.stale = true; if (state.open) render(); void loadFriends(); }, 300);
+    state.refreshTimer = setTimeout(() => { state.refreshTimer = 0; state.stale = true; if (state.open) render(); void loadFriends("event"); }, 300);
   });
 
   function disposeFriends() {

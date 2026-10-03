@@ -91,6 +91,7 @@ type app struct {
 	snapshotFallbackAt              time.Time
 	collectionDirty                 bool
 	collectionDirtyAt               time.Time
+	collectionRefreshFinishedAt     time.Time
 	fallbackOwned                   []Skin
 	fallbackRemaining               []Skin
 	connected                       bool
@@ -144,6 +145,7 @@ type app struct {
 	matchTierCache                  *championDataCache
 	mediaSlots                      chan struct{}
 	collectionRefreshPending        bool
+	collectionRefreshPendingSource  string
 	refreshRequests                 chan struct{}
 	discovery                       LCUDiscoveryStatus
 	eventMu                         sync.Mutex
@@ -610,6 +612,7 @@ func main() {
 	mux.HandleFunc("GET /api/social/friends", a.authorized(a.handleSocialFriends))
 	mux.HandleFunc("POST /api/system-proxy", a.authorized(a.handleSystemProxy))
 	mux.HandleFunc("GET /api/champion-asset", a.authorized(a.handleChampionAsset))
+	mux.HandleFunc("POST /api/identity/refresh", a.authorized(a.handleIdentityRefresh))
 	mux.HandleFunc("POST /api/refresh", a.authorized(a.handleRefresh))
 	mux.HandleFunc("POST /api/collection/ensure", a.authorized(a.handleCollectionEnsure))
 	mux.HandleFunc("GET /api/image", a.authorized(a.handleImage))
@@ -928,6 +931,8 @@ func (a *app) handleSkinDetails(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "当前目录中没有这款皮肤", http.StatusNotFound)
 		return
 	}
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
 	type priceResult struct {
 		value int
 		known bool
@@ -943,18 +948,37 @@ func (a *app) handleSkinDetails(w http.ResponseWriter, r *http.Request) {
 		defer a.recoverPanic("main.handleSkinDetails.1")
 		defer close(priceResults)
 
-		value, known := NewStoreAPI(client).SkinPrice(skin.ID)
+		value, known := NewStoreAPI(client).SkinPriceContext(ctx, skin.ID)
 		priceResults <- priceResult{value: value, known: known}
 	}()
 	go func() {
 		defer a.recoverPanic("main.handleSkinDetails.2")
 		defer close(borderResults)
 
-		hasBorder, known, owned := NewSkinAppearanceAPI(client).BorderStatus(skin)
+		hasBorder, known, owned := NewSkinAppearanceAPI(client).BorderStatusContext(ctx, skin)
 		borderResults <- borderResult{hasBorder: hasBorder, known: known, owned: owned}
 	}()
-	price := <-priceResults
-	border := <-borderResults
+	var price priceResult
+	var border borderResult
+	var ok bool
+	select {
+	case price, ok = <-priceResults:
+		if !ok {
+			http.Error(w, "皮肤价格读取失败", http.StatusBadGateway)
+			return
+		}
+	case <-ctx.Done():
+		return
+	}
+	select {
+	case border, ok = <-borderResults:
+		if !ok {
+			http.Error(w, "皮肤边框读取失败", http.StatusBadGateway)
+			return
+		}
+	case <-ctx.Done():
+		return
+	}
 	detail := SkinDetailData{
 		PriceRP: price.value, PriceKnown: price.known,
 		HasBorder: border.hasBorder, BorderOwnershipKnown: border.known, OwnsBorder: border.owned,
@@ -962,17 +986,17 @@ func (a *app) handleSkinDetails(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, map[string]any{"skin": skin, "details": detail})
 }
 
-func (a *app) handleRefresh(w http.ResponseWriter, _ *http.Request) {
+func (a *app) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	a.mu.RLock()
 	client := a.lcu
 	connected := a.connected
 	a.mu.RUnlock()
 	if connected && client != nil {
-		if _, err := a.refreshSummonerIdentity(client); err != nil {
+		if _, err := a.refreshSummonerIdentityContext(r.Context(), client); err != nil {
 			a.recordDiagnostic(map[string]any{"event": "summoner_identity_manual_refresh_failed", "reason": safeDiagnosticReason(err)})
 		}
 	}
-	a.requestCollectionRefresh()
+	a.requestCollectionRefresh(r.URL.Query().Get("source"))
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -986,7 +1010,7 @@ func (a *app) handleCollectionEnsure(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	if !ready {
-		a.requestCollectionRefresh()
+		a.requestCollectionRefresh("ensure")
 	}
 	w.WriteHeader(http.StatusAccepted)
 }
@@ -1256,11 +1280,41 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 	return true
 }
 
-func (a *app) requestCollectionRefresh() {
+func collectionRefreshSource(sources []string) string {
+	if len(sources) > 0 {
+		switch sources[0] {
+		case "user_refresh", "overlay_retry", "dirty_rescan", "ensure", "event":
+			return sources[0]
+		}
+	}
+	return "event"
+}
+
+func (a *app) handleIdentityRefresh(w http.ResponseWriter, r *http.Request) {
+	a.mu.RLock()
+	client := a.lcu
+	connected := a.connected
+	a.mu.RUnlock()
+	a.recordDiagnostic(map[string]any{"event": "identity_refresh_request", "source": "overlay_retry"})
+	if !connected || client == nil {
+		http.Error(w, "当前没有已连接的英雄联盟客户端", http.StatusConflict)
+		return
+	}
+	if _, err := a.refreshSummonerIdentityContext(r.Context(), client, true); err != nil {
+		http.Error(w, "召唤师信息读取失败", http.StatusBadGateway)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (a *app) requestCollectionRefresh(sources ...string) {
 	a.mu.Lock()
 	a.collectionRequested = true
 	a.manualDisconnected = false
 	coalesced := a.collectionRefreshPending
+	if !coalesced {
+		a.collectionRefreshPendingSource = collectionRefreshSource(sources)
+	}
 	if !coalesced && a.refreshRequests != nil {
 		a.collectionRefreshPending = true
 		select {
@@ -1269,7 +1323,7 @@ func (a *app) requestCollectionRefresh() {
 		}
 	}
 	a.mu.Unlock()
-	a.recordDiagnostic(map[string]any{"event": "collection_refresh_request", "coalesced": coalesced})
+	a.recordDiagnostic(map[string]any{"event": "collection_refresh_request", "coalesced": coalesced, "source": collectionRefreshSource(sources)})
 }
 
 func (a *app) refreshWithClient(client *LCUClient) bool {
@@ -1281,6 +1335,11 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 		a.recordDiagnostic(map[string]any{"event": "collection_refresh_lifecycle", "stage": "coalesced"})
 		return true
 	}
+	queued := a.collectionRefreshPending
+	source := a.collectionRefreshPendingSource
+	if !queued || source == "" {
+		source = "event"
+	}
 	a.syncing = true
 	a.collectionRefreshPending = true
 	generation := a.poolGeneration
@@ -1290,9 +1349,15 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 	defer func() {
 		a.mu.Lock()
 		a.collectionRefreshPending = false
+		a.collectionRefreshPendingSource = ""
+		a.syncing = false
+		a.collectionRefreshFinishedAt = time.Now()
 		a.mu.Unlock()
 	}()
-	a.recordDiagnostic(map[string]any{"event": "collection_refresh_lifecycle", "stage": "begin"})
+	if !queued {
+		a.recordDiagnostic(map[string]any{"event": "collection_refresh_request", "source": source, "coalesced": false})
+	}
+	a.recordDiagnostic(map[string]any{"event": "collection_refresh_lifecycle", "stage": "begin", "source": source})
 	a.broadcastEvent("refresh-started")
 
 	result, err := loadSnapshotWithClientProvider(client, pool, a.champions, a.recordDiagnostic)
@@ -1321,18 +1386,21 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 	previousSnapshotUsable := a.snapshotReady && a.calculationOKLocked()
 	if a.manualDisconnected || (a.lcu != initialClient && a.lcu != client) {
 		a.syncing = false
+		a.collectionRefreshFinishedAt = time.Now()
 		a.mu.Unlock()
 		a.recordDiagnostic(map[string]any{"event": "collection_refresh_lifecycle", "stage": "canceled", "reason": "client-changed", "duration_ms": time.Since(started).Milliseconds()})
 		return false
 	}
 	if generation != a.poolGeneration {
 		a.syncing = false
+		a.collectionRefreshFinishedAt = time.Now()
 		a.mu.Unlock()
 		a.recordDiagnostic(map[string]any{"event": "collection_refresh_lifecycle", "stage": "canceled", "reason": "pool-changed", "duration_ms": time.Since(started).Milliseconds()})
 		a.requestRefresh()
 		return true
 	}
 	a.syncing = false
+	a.collectionRefreshFinishedAt = time.Now()
 	a.lastAttempt = time.Now()
 	a.lastDuration = time.Since(started)
 	if err != nil {

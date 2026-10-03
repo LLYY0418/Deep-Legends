@@ -106,6 +106,7 @@
   async function load(force = false, poll = false) {
     if (state.loading) return;
     if (!force && !poll && state.data && Date.now() - state.loadedAt < (state.data.unavailable || state.data.stale || state.data.partial ? 30000 : 300000) && !state.data.updating) return;
+    window.reportFlowDiagnostic?.("automatic_read_client", "request", { endpoint: "pro-players", source: poll ? "poll" : force ? "manual" : "direct" });
     clearTimeout(pollTimer);
     state.loading = true;
     state.error = "";

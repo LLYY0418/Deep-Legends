@@ -113,6 +113,9 @@ type clientDiagnosticRequest struct {
 	Tier                    string                      `json:"tier,omitempty"`
 	MapID                   int64                       `json:"mapId,omitempty"`
 	BlockCount              int                         `json:"blockCount,omitempty"`
+	View                    string                      `json:"view,omitempty"`
+	Force                   bool                        `json:"force,omitempty"`
+	KeptVisible             bool                        `json:"keptVisible,omitempty"`
 	ItemCount               int                         `json:"itemCount,omitempty"`
 	ChampionID              int64                       `json:"championId,omitempty"`
 	SelfPosition            string                      `json:"selfPosition,omitempty"`
@@ -175,6 +178,9 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
+	"blocking_state_client":        {"show": true, "hide": true, "timeout": true},
+	"automatic_read_client":        {"request": true},
+	"collection_render_client":     {"unchanged-suppressed": true, "updated": true},
 	"renderer_perf":                {"aggregated": true},
 	"live_render_rebuild":          {"aggregated": true},
 	"arena_header_source":          {"rendered": true},
@@ -261,6 +267,38 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	event := map[string]any{"event": request.Event, "reason": request.Reason}
+	if request.Event == "collection_render_client" {
+		switch request.View {
+		case "owned", "remaining", "all", "chromas":
+			event["view"] = request.View
+		default:
+			http.Error(w, "invalid collection view", http.StatusBadRequest)
+			return
+		}
+		event["item_count"] = min(100000, max(0, request.ItemCount))
+		event["force"] = request.Force
+		event["kept_visible"] = request.KeptVisible
+		a.recordDiagnostic(event)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if request.Event == "blocking_state_client" || request.Event == "automatic_read_client" {
+		switch request.Source {
+		case "startup", "skin", "chroma", "champions", "career", "facade", "champselect", "update", "confirmation", "artwork_fullscreen", "other", "poll", "event", "direct", "dirty_rescan", "workspace", "manual":
+			event["source"] = request.Source
+		default:
+			http.Error(w, "invalid state source", http.StatusBadRequest)
+			return
+		}
+		switch request.Endpoint {
+		case "friends", "pro-players", "champions", "overview", "facade":
+			event["endpoint"] = request.Endpoint
+		}
+		event["duration_ms"] = min(3600000, max(0, request.DurationMS))
+		a.recordDiagnostic(event)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if request.Event == "renderer_perf" {
 		a.recordRendererPerformance(request)
 		w.WriteHeader(http.StatusNoContent)
