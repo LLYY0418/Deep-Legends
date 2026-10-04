@@ -37,6 +37,7 @@
 | `suite.js:738/781/797/1084` | 用户编辑征召序列 | 用户编辑时长；保存/取消/关闭/Esc；事件刷新保持现有草稿与节点 | 保留，不能 15 秒强关草稿；统一 champselect 分类日志及原有 revision 日志；R87 对话框/事件回归 |
 | `gameplay.js:2681/2727` | 用户打开生涯详情/设置 | 用户阅读时长；关闭/Esc | 保留；统一 career 分类日志；既有 career 回归 |
 | `app.js:3833/3924` | 用户打开版本更新对话框、选择下载/安装 | 用户决策/下载可长于 15 秒，允许关闭/后台下载；安装启动由已验证 R201 桌面流程隐藏窗口并限时等待进程 | 保留既有更新流程；统一 update 分类日志，原下载/安装日志；desktop updater/NSIS 回归 |
+| `app.js:setupFloatingTooltips` | 原生 dialog 关闭归还焦点触发 data-tooltip | 只允许 pointer hover 或 :focus-visible；普通恢复焦点不显示 | R204 P7 全局修正，Node 验证恢复焦点隐藏、鼠标/键盘显示 |
 | `app.js:3108`、`gameplay.js:4623` | 用户退出/启动回放时的原生 confirm | 用户选择时长；确定/取消，原生窗口可关闭 | 保留确认语义，不记录提示文本；统一 confirmation show/hide；R203 取消返回值及隐私测试 |
 | `app.js:2839` | 已确认服务退出/授权失效的失败页 | 错误提示持续到用户重启/重新连接；可退出软件，没有新增 inert | 不改：失败提示不是进行中的加载遮罩；现有 backend lifecycle、fatal reconnect 回归 |
 | `gameplay.js` 局部 panel、`app.js` grid、其余模块 | 面板/网格骨架、单按钮 disabled、aria-busy | 各请求预算及 finally/generation；导航仍可用 | 不提升为全窗口阻塞；见下一表，既有局部加载测试保留 |

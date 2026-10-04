@@ -17,6 +17,8 @@ type updateInstallTiming struct {
 	stages map[string]int64
 }
 
+var timingStageOrder = []string{"installer_start", "parent_exited", "uninstall_old_start", "uninstall_old_done", "extract_start", "extract_done", "copy_done", "relaunch"}
+
 func newUpdateInstallTiming() *updateInstallTiming {
 	root := strings.TrimSpace(os.Getenv("LOL_LOOT_DATA_DIR"))
 	if root == "" {
@@ -35,7 +37,7 @@ func (t *updateInstallTiming) mark(stage string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if stage == "parent_exited" {
-		for _, name := range []string{"extract_start", "extract_done", "copy_done", "relaunch"} {
+		for _, name := range timingStageOrder[2:] {
 			delete(t.stages, name)
 		}
 	}
@@ -46,7 +48,15 @@ func (t *updateInstallTiming) writeLocked() {
 	if os.MkdirAll(filepath.Dir(t.path), 0700) != nil {
 		return
 	}
-	data, err := json.Marshal(t.stages)
+	stages := make(map[string]any, len(timingStageOrder))
+	for _, stage := range timingStageOrder {
+		if value := t.stages[stage]; value > 0 {
+			stages[stage] = value
+		} else {
+			stages[stage] = nil
+		}
+	}
+	data, err := json.Marshal(stages)
 	if err != nil {
 		return
 	}
@@ -81,19 +91,36 @@ func (t *updateInstallTiming) importNSIS(directory string) {
 	scanner.Buffer(make([]byte, 128), 1024)
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	changed := false
 	for scanner.Scan() {
 		stage, raw, ok := strings.Cut(scanner.Text(), "=")
-		if !ok || (stage != "extract_start" && stage != "extract_done" && stage != "copy_done") {
+		if !ok || (stage != "uninstall_old_start" && stage != "uninstall_old_done" && stage != "extract_start" && stage != "extract_done" && stage != "copy_done") {
 			continue
 		}
 		value, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || value < t.stages["parent_exited"] || value > time.Now().UnixMilli()+1000 {
 			continue
 		}
-		if stage == "extract_start" && t.stages[stage] != 0 {
+		if t.stages[stage] != 0 {
 			continue
 		}
 		t.stages[stage] = value
+		changed = true
 	}
-	t.writeLocked()
+	if changed {
+		t.writeLocked()
+	}
+}
+
+func (t *updateInstallTiming) snapshot() map[string]int64 {
+	if t == nil {
+		return nil
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	out := make(map[string]int64, len(t.stages))
+	for key, value := range t.stages {
+		out[key] = value
+	}
+	return out
 }

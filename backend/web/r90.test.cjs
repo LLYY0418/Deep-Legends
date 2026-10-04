@@ -1,3 +1,4 @@
+const cleanLiveURL = url => url.replace(/\?requestId=[^&]+/, '').replace('&refresh=1', '?refresh=1');
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -81,11 +82,11 @@ test("R90 stopped UI has an operable manual refresh and foreground wake checks p
 });
 test("R90 actual loader bypasses cache for manual refresh; R91 supersedes the former manual queue",async()=>{
  const state={beacon:{phase:"InProgress"},live:full(),settings:{},controllers:new Map(),liveRetryAttempts:8};const requests=[];const noop=()=>{};
- const deps={state,connected:()=>true,recordLiveRefresh:noop,normalizeLiveGameId:v=>Number(v)||0,liveSnapshotBehindPhase:()=>false,recordLiveObservation:noop,invalidateLiveForNewGame:noop,liveGamePhase:()=>true,renderLive:noop,api:async(url)=>{requests.push(url);return full()},shouldResetLiveGameScopedState:()=>false,resetLiveGameScopedState:noop,resetLivePositionOverrides:noop,resetRecommendationTabsOnChampionChange:noop,updateBeacon:noop,renderCapabilitySettings:noop,liveRecommendationsFor:()=>null,ensureLiveRecommendations:noop,ensureSpecialistRunes:noop,ensureProRunes:noop,ensureLaneMatchupCandidates:noop,syncLiveRetryBudget:noop,scheduleLiveRefresh:noop,queueLiveEventRefresh:noop};
+ const deps={state,connected:()=>true,recordLiveRefresh:noop,normalizeLiveGameId:v=>Number(v)||0,liveSnapshotBehindPhase:()=>false,recordLiveObservation:noop,invalidateLiveForNewGame:noop,liveGamePhase:()=>true,renderLive:noop,api:async(url)=>{requests.push(cleanLiveURL(url));return full()},shouldResetLiveGameScopedState:()=>false,resetLiveGameScopedState:noop,resetLivePositionOverrides:noop,resetRecommendationTabsOnChampionChange:noop,updateBeacon:noop,renderCapabilitySettings:noop,liveRecommendationsFor:()=>null,ensureLiveRecommendations:noop,ensureSpecialistRunes:noop,ensureProRunes:noop,ensureLaneMatchupCandidates:noop,syncLiveRetryBudget:noop,scheduleLiveRefresh:noop,queueLiveEventRefresh:noop};
  // R131 §2.1-1：loadLive 开头会记一次触发来源，把纯函数 liveRenderTriggerLabel 一并按真实实现编译。
  const {loadLive}=compile(["loadLive","liveRenderTriggerLabel"],deps);await loadLive(true,"manual");assert.deepEqual(requests,["/api/gameplay/live?refresh=1"]);assert.equal(state.liveRetryAttempts,0);
  const releases=[];let aborted=0;state.controllers.set("live",{abort:()=>aborted++});
- deps.api=async(url)=>{requests.push(url);await new Promise(resolve=>releases.push(resolve));return full()};
+ deps.api=async(url)=>{requests.push(cleanLiveURL(url));await new Promise(resolve=>releases.push(resolve));return full()};
  const loader=compile(["loadLive","liveRenderTriggerLabel"],deps).loadLive;const pending=loader(false);const forced=loader(true,"manual");
  assert.equal(aborted,1);assert.equal(releases.length,2);assert.equal(requests.at(-1),"/api/gameplay/live?refresh=1");
  releases[0]();await pending;assert.equal(state.liveLoading,true);releases[1]();await forced;assert.equal(state.liveLoading,false);

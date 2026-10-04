@@ -112,9 +112,6 @@ func TestR200OfferedSubsetOnly(t *testing.T) {
 	}
 }
 func TestR200NoPoolChampion(t *testing.T) {
-	if champSelectSubsetTestFirstCard {
-		t.Skip("R201 temporary first-card fallback; disabled-switch regression verified separately")
-	}
 	v := newR200Fixture(t, `[75,99,101]`)
 	v.tick(t)
 	v.tick(t)

@@ -1,3 +1,4 @@
+const cleanLiveURL = url => url.replace(/\?requestId=[^&]+/, '').replace('&refresh=1', '?refresh=1');
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -25,7 +26,7 @@ function harness() {
     setTimeout: (fn, delay) => { jobs.set(++serial, { fn, delay }); return serial; }, clearTimeout: id => jobs.delete(id),
     api: (url, _options, key) => new Promise((resolve, reject) => {
       const controller = new AbortController(); state.controllers.set(key || "live", controller);
-      requests.push({ url, resolve, reject, controller });
+      requests.push({ url: cleanLiveURL(url), resolve, reject, controller });
     }),
     recordLiveRefresh: noop, updateBeacon: phase => { state.beacon.phase = phase; }, markOverviewAfterGame: noop, scheduleBeaconPoll: noop,
     resetLivePositionOverrides: noop, resetRecommendationTabsOnChampionChange: noop, renderCapabilitySettings: noop,

@@ -67,6 +67,7 @@ test('R195 7 picked premade heroes render two queued icons before names without 
  assert.ok(images.every(img=>img.dataset.queuedSrc.startsWith('/api/image?path=')&&!img.hasAttribute('src')));
  for(const row of tooltip.querySelectorAll('.tooltip-roster-player')){assert.equal(row.firstElementChild.tagName,'IMG');assert.equal(row.lastElementChild.className,'tooltip-roster-name');}
  assert.doesNotMatch(tooltip.textContent,/阿狸|卡西奥佩娅/);
+ const originalMatches=anchor.matches.bind(anchor);anchor.matches=selector=>selector===':focus-visible'?true:originalMatches(selector);
  const rows=JSON.parse(anchor.dataset.tooltipRoster);assert.deepEqual(Object.keys(rows[0]).sort(),['championIconURL','name']);
  // The same tooltip renderer rejects remote or active-content image URLs.
  for(const url of ['https://example.org/hero.png','javascript:alert(1)','//example.org/hero.png']){

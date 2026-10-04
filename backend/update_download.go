@@ -492,6 +492,9 @@ func (u *updateManager) apply(async bool, success func()) error {
 		}
 	}
 	finish := func() error {
+		if err := riotUserKeys.migrateEmbedded(u.diagnostic); err != nil {
+			return fail(err)
+		}
 		if portable {
 			if err := u.checkPortableData(); err != nil {
 				return fail(err)

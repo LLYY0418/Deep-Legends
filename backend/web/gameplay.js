@@ -4681,13 +4681,14 @@
     if (force) state.liveRetryAttempts = 0;
     state.liveLoadStartedAt = Date.now();
     const requestToken = state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
+    state.liveProgressRequestId = `${Date.now()}-${requestToken}-${Math.random().toString(36).slice(2)}`;
     state.liveLoading = true;
     updateLiveLoadingVisibility(force, source);
     state.liveError = "";
     renderLive();
     try {
       let previousLive = state.live;
-      const nextLive = await api(force ? "/api/gameplay/live?refresh=1" : "/api/gameplay/live", {}, "live", 45000);
+      const nextLive = await api(`/api/gameplay/live?requestId=${encodeURIComponent(state.liveProgressRequestId)}${force ? "&refresh=1" : ""}`, {}, "live", 45000);
       if (state.liveRequestToken !== requestToken || !connected()) return;
       if (state.liveAwaitingGame && normalizeLiveGameId(state.liveExpectedGameId)
           && normalizeLiveGameId(nextLive.gameId) !== normalizeLiveGameId(state.liveExpectedGameId)) {
@@ -4743,6 +4744,33 @@
       if (state.liveRefreshQueued) queueLiveEventRefresh("event", Boolean(state.livePhaseRefreshQueued));
     }
   }
+
+  function applyLivePlayerProgress(detail) {
+    const next = detail?.live;
+    if (!state.liveLoading || detail.requestId !== state.liveProgressRequestId || !connected() || !next?.available || !liveGamePhase(next.phase)) return false;
+    if (liveSnapshotBehindPhase(next) || state.livePhaseRefreshQueued && next.phase !== state.beacon.phase) return false;
+    const expected = normalizeLiveGameId(state.liveExpectedGameId);
+    if (expected && normalizeLiveGameId(next.gameId) !== expected) return false;
+    if (!Array.isArray(next.players) || !next.players.length) return false;
+    // Background incremental refreshes retain the same game's known history
+    // while each pending row is being replaced, like the final-response path.
+    if (normalizeLiveGameId(state.live?.gameId) === normalizeLiveGameId(next.gameId) && state.live?.queueId === next.queueId) {
+      const previous = new Map((state.live.players || []).filter(player => player.playerRef).map(player => [player.playerRef, player]));
+      for (const player of next.players) {
+        const old = previous.get(player.playerRef);
+        if (player.historyState === "pending" && old && old.historyState !== "pending"
+            && Boolean(old.hidden) === Boolean(player.hidden) && Boolean(old.privateHistory) === Boolean(player.privateHistory)) {
+          for (const field of ["recentGames", "modeStats", "recentRankedRecord", "recentPositions", "historyState"]) player[field] = old[field];
+        }
+      }
+    }
+    state.live = next;
+    state.liveAwaitingGame = false;
+    state.liveError = "";
+    renderLive();
+    return true;
+  }
+  window.addEventListener("deep-legends:live-player-progress", event => applyLivePlayerProgress(event.detail));
 
   function liveGamePhase(phase) {
     return ["ChampSelect", "GameStart", "InProgress", "Reconnect"].includes(phase);
@@ -5296,16 +5324,17 @@
 	}
 	state.specialistRuneFailures.delete(target.key);
 	const gameGeneration = Number(state.liveGameGeneration || 0);
+	const keyGeneration = Number(state.riotKeyGeneration || 0);
 	state.specialistRuneFlights.set(target.key, now);
 	    if (specialistRequestTarget(state.live)?.key === target.key) renderLive();
     const query = new URLSearchParams({ championId: String(target.championId), position: target.position });
     try {
 	  const response = await api(`/api/gameplay/specialist-runes?${query}`, {}, `live-specialist-runes:${target.key}`, 30000);
-	  if (gameGeneration !== Number(state.liveGameGeneration || 0)) return;
+	  if (gameGeneration !== Number(state.liveGameGeneration || 0) || keyGeneration !== Number(state.riotKeyGeneration || 0)) return;
 	  const runes = Array.isArray(response) ? response : Array.isArray(response?.runes) ? response.runes : null;
       if (!runes) throw new Error("绝活哥符文数据不完整");
-	  if (response?.reason === "riot-key-missing") {
-		state.specialistRuneFailures.set(target.key, { reason: "riot-key-missing", at: Date.now() });
+	  if (response?.reason === "riot-key-missing" || response?.reason === "riot-key-invalid") {
+		state.specialistRuneFailures.set(target.key, { reason: response.reason, at: Date.now() });
 		state.specialistRunes.delete(target.key);
 	  } else if (response?.reason === "no-position-sample" && !runes.length) {
 		state.specialistRuneFailures.set(target.key, { reason: "no-position-sample", at: Date.now() });
@@ -5321,9 +5350,9 @@
       if (runes.length) ensurePerks();
 	      if (specialistRequestTarget(state.live)?.key === target.key) renderLive();
     } catch (error) {
-	  if (gameGeneration === Number(state.liveGameGeneration || 0) && error.name !== "RequestCancelled") state.specialistRuneFailures.set(target.key, { reason: "request-failed", at: Date.now() });
+	  if (gameGeneration === Number(state.liveGameGeneration || 0) && keyGeneration === Number(state.riotKeyGeneration || 0) && error.name !== "RequestCancelled") state.specialistRuneFailures.set(target.key, { reason: "request-failed", at: Date.now() });
     } finally {
-      if (gameGeneration === Number(state.liveGameGeneration || 0) && state.specialistRuneFlights.get(target.key) === now) state.specialistRuneFlights.delete(target.key);
+      if (gameGeneration === Number(state.liveGameGeneration || 0) && keyGeneration === Number(state.riotKeyGeneration || 0) && state.specialistRuneFlights.get(target.key) === now) state.specialistRuneFlights.delete(target.key);
 	      if (specialistRequestTarget(state.live)?.key === target.key) renderLive();
     }
   }
@@ -6613,6 +6642,8 @@
     const target = specialistRequestTarget(state.live);
 	const specialistKeyMissing = section.key === "specialist" && Boolean(target && specialistRuneFailure(state.specialistRuneFailures.get(target.key))?.reason === "riot-key-missing");
 		const specialistFailureInfo = section.key === "specialist" ? specialistRuneFailure(state.specialistRuneFailures.get(target?.key)) : null;
+		const specialistKeyInvalid = specialistFailureInfo?.reason === "riot-key-invalid";
+		const specialistKeyUnavailable = specialistKeyMissing || specialistKeyInvalid;
 		const specialistNoPositionSample = specialistFailureInfo?.reason === "no-position-sample";
 		const specialistTimeout = specialistFailureInfo?.reason === "upstream-timeout";
 		const specialistThrottled = specialistFailureInfo?.reason === "upstream-throttled";
@@ -6622,12 +6653,12 @@
 		  specialist: section.unsupported ? "绝活哥榜单仅支持单双排、灵活组排和召唤师峡谷自定义对局。" : specialistKeyMissing ? "未配置 Riot Key，暂时无法读取韩服绝活哥符文。" : specialistNoPositionSample ? `该绝活哥最近 10 局没有打过${positionLabel(livePositionDisplay(target?.position || ""))}。` : specialistTimeout ? "韩服接口响应超时，请稍后重试。" : specialistThrottled ? "请求过于频繁，约 1 分钟后可重试。" : specialistUpstreamError ? "上游数据异常，请稍后重试。" : "最近对局中没有找到完整且可核验的该英雄符文。",
       pro: "当前数据源不提供可核验的职业选手身份与完整符文，暂不展示。",
     };
-		const emptyTitle = !championSelected ? "请先选定英雄" : section.unsupported ? "当前队列没有可用的绝活哥榜单" : section.loading ? "正在读取韩服绝活哥符文" : specialistKeyMissing ? "未配置 Riot Key" : specialistNoPositionSample ? "最近 10 局没有该位置样本" : specialistTimeout ? "韩服接口响应超时" : specialistThrottled ? "请求过于频繁" : specialistUpstreamError ? "上游数据异常" : section.failed ? "韩服绝活哥符文读取失败" : section.key === "opgg" ? "等待完整符文数据" : section.key === "specialist" ? "暂无可核验的韩服绝活哥符文" : "暂无可核验数据源";
+		const emptyTitle = !championSelected ? "请先选定英雄" : section.unsupported ? "当前队列没有可用的绝活哥榜单" : section.loading ? "正在读取韩服绝活哥符文" : specialistKeyInvalid ? "Riot Key 无效" : specialistKeyMissing ? "未配置 Riot Key" : specialistNoPositionSample ? "最近 10 局没有该位置样本" : specialistTimeout ? "韩服接口响应超时" : specialistThrottled ? "请求过于频繁" : specialistUpstreamError ? "上游数据异常" : section.failed ? "韩服绝活哥符文读取失败" : section.key === "opgg" ? "等待完整符文数据" : section.key === "specialist" ? "暂无可核验的韩服绝活哥符文" : "暂无可核验数据源";
     const content = section.items.length && section.key === "specialist"
       ? renderSpecialistPlayers(section.items)
       : section.items.length
       ? `<div class="rune-choice-list" role="radiogroup" aria-label="${escapeHTML(section.title)}符文">${section.items.map((config, index) => renderRuneChoice({ ...config, sourceKey: section.key, key: config.key || (section.key === "opgg" && index === 0 ? "opgg" : `${section.key}-${index}`) })).join("")}</div>`
-	  : `<div class="recommendation-empty"><strong>${emptyTitle}</strong><p>${section.loading ? "正在核对专家榜玩家最近对局中的完整符文，通常需要 5-15 秒。" : specialistNoPositionSample || specialistRetryable ? unavailableReason.specialist : section.failed ? "本次后台读取未完成，稍后刷新时会自动重试。" : unavailableReason[section.key] || "OPGG 返回完整主系、副系与属性碎片后即可选择。"}</p>${specialistKeyMissing ? '<button class="text-button" type="button" data-open-riot-settings>去设置</button>' : specialistRetryable ? '<button class="text-button" type="button" data-retry-specialist-runes>重试</button>' : ""}</div>`;
+	  : `<div class="recommendation-empty"><strong>${emptyTitle}</strong>${specialistKeyUnavailable ? "" : `<p>${section.loading ? "正在核对专家榜玩家最近对局中的完整符文，通常需要 5-15 秒。" : specialistNoPositionSample || specialistRetryable ? unavailableReason.specialist : section.failed ? "本次后台读取未完成，稍后刷新时会自动重试。" : unavailableReason[section.key] || "OPGG 返回完整主系、副系与属性碎片后即可选择。"}</p>`}${specialistKeyUnavailable ? '<button class="text-button" type="button" data-open-riot-settings>去设置</button>' : specialistRetryable ? '<button class="text-button" type="button" data-retry-specialist-runes>重试</button>' : ""}</div>`;
     const opggSpells = section.key === "opgg" && section.items.length ? renderRuneSpellPair(recommendedRuneSpellIDs(state.live, { sourceLabel: "OPGG" })) : "";
     return `<section class="rune-source-section">${opggSpells}${content}</section>`;
   }
@@ -7193,7 +7224,7 @@
     });
     bindLiveNode(root?.querySelector("[data-retry-pro-runes]"), "click", "data-retry-pro-runes", () => { void ensureProRunes(state.live, true); });
 	bindLiveNode(root?.querySelector("[data-open-riot-settings]"), "click", "data-open-riot-settings", () => {
-	  window.dispatchEvent(new CustomEvent("deep-legends:navigate", { detail: { section: "settings", page: "privacy" } }));
+	  window.dispatchEvent(new CustomEvent("deep-legends:navigate", { detail: { section: "settings", page: "privacy", focus: "riot-key" } }));
 	});
 	bindLiveNode(root?.querySelector("[data-retry-specialist-runes]"), "click", "data-retry-specialist-runes", () => {
 	  const target = specialistRequestTarget(state.live);
@@ -7895,6 +7926,13 @@
   document.addEventListener("pointerdown", closePlayerGroupOnOutsidePointer);
   window.addEventListener("deep-legends:player-group", event => selectPlayerGroup(event.detail?.group));
   nodes.liveRefresh.addEventListener("click", () => loadLive(true, "manual"));
+  window.addEventListener("deep-legends:riot-key-updated", () => {
+	state.riotKeyGeneration = Number(state.riotKeyGeneration || 0) + 1;
+	for (const key of state.specialistRuneFlights.keys()) state.controllers?.get?.(`live-specialist-runes:${key}`)?.abort?.();
+	state.specialistRuneFlights.clear();
+    state.specialistRunes.clear(); state.specialistRuneFailures.clear();
+    if (state.live) void ensureSpecialistRunes(state.live);
+  });
   window.addEventListener("deep-legends:hard-refresh", (event) => {
     const detail = event.detail || {};
     const task = handleHardRefresh(detail);

@@ -411,6 +411,7 @@ func main() {
 	if storageErr != nil {
 		log.Printf("本地历史与自定义奖池不可用：%v", storageErr)
 	}
+	riotUserKeys = loadRiotKeyStore(store)
 	panicDiagnosticStore.Store(store)
 	defer closeDiagnosticStore(store)
 	token, err := loadOrCreateSessionToken(store)
@@ -607,6 +608,9 @@ func main() {
 	mux.HandleFunc("GET /api/champions/mayhem-rsc-prefetch", a.authorized(a.handleMayhemRSCPrefetch))
 	mux.HandleFunc("GET /api/champions/arena-first-places", a.authorized(a.handleArenaFirstPlaces))
 	mux.HandleFunc("GET /api/champions/arena/match/{matchId}", a.authorized(a.handleArenaMatchDetail))
+	mux.HandleFunc("GET /api/riot-key", a.authorized(a.handleRiotKeySettings))
+	mux.HandleFunc("POST /api/riot-key", a.authorized(a.handleRiotKeySettings))
+	mux.HandleFunc("DELETE /api/riot-key", a.authorized(a.handleRiotKeySettings))
 	mux.HandleFunc("GET /api/champions/network", a.authorized(a.handleChampionNetwork))
 	mux.HandleFunc("POST /api/champions/network", a.authorized(a.handleChampionNetwork))
 	mux.HandleFunc("GET /api/social/friends", a.authorized(a.handleSocialFriends))
@@ -1829,7 +1833,7 @@ func (a *app) resetDiagnosticDeduplication() {
 func (a *app) recordAppStartDiagnostic(rotation ...bool) {
 	a.recordDiagnostic(map[string]any{
 		"event": "app_start", "version": version,
-		"build_fingerprint": buildFingerprint, "riot_key": riotKeyConfigured(),
+		"build_fingerprint": buildFingerprint, "riot_key_source": riotKeySource(),
 		"log_rotation": len(rotation) > 0 && rotation[0],
 	})
 }

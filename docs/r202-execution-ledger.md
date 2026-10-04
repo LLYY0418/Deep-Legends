@@ -38,3 +38,7 @@ Windows public 工作流 [37127823415](https://github.com/LLYY0418/Deep-Legends/
 ## Windows 真机验收
 
 仍需用户海斗一局确认 waiting-finalization 后实际换入并 postflight applied、开关两种持有规则、当前模式近 30 天 10 局，以及 in_game_60s 镜头匹配。模拟 LCU/SGP 与交叉构建不能替代实际客户端验收。
+
+## R204 追加真机核对（2026-10-04）
+
+R204 工单真机摘录确认正式 2400 FINALIZATION 瑞兹 13 换入成功，以及用户将 22 换成 112 后 gate-blocked、不再换回，以上范围真机验证通过。queue_filtered=true/pages_read=1/stop_reason=enough 的 10 局读取也有摘录。临时测试选人由 R204 P9 删除。原 P6（Riot Key）因复制的是旧稿未执行，移到 R204。开关两种持有规则与完整近期战绩逐项真机验收仍缺记录，R202 保留进行中；不扩大证据范围。

@@ -234,15 +234,18 @@ func TestR202RerollKeepsHeldPoolEvidence(t *testing.T) {
 		t.Fatal("reroll away from held pool did not yield")
 	}
 }
-func TestR202SoftwareFirstCardThenBench(t *testing.T) {
+func TestR204NoPoolCardThenUserFirstCardAndBench(t *testing.T) {
 	v := newR200Fixture(t, `[107,141,75]`)
 	v.grid = append(v.grid, champSelectGridChampion{ID: 107, Owned: true})
 	v.tick(t)
 	v.tick(t)
-	if v.count() != 1 {
-		t.Fatal(v.patches)
+	if v.count() != 0 {
+		t.Fatal("no pool hero must not select", v.patches)
 	}
 	v.session.MyTeam[0].ChampionID = 107
+	v.session.Actions[0][0].ChampionID = 107
+	v.session.Actions[0][0].Completed = true
+	v.session.Actions[0][0].IsInProgress = false
 	v.session.BenchChampions = []lcuChampSelectBenchChampion{{ChampionID: 57}}
 	v.session.Timer.Phase = "FINALIZATION"
 	v.r.mu.Lock()
@@ -250,8 +253,8 @@ func TestR202SoftwareFirstCardThenBench(t *testing.T) {
 	v.r.mu.Unlock()
 	v.tick(t)
 	v.tick(t)
-	if v.count() != 2 || !strings.HasSuffix(v.last().Path, "/57") {
-		t.Fatal("software first card blocked bench", v.patches, v.events)
+	if v.count() != 1 || !strings.HasSuffix(v.last().Path, "/57") {
+		t.Fatal("user initial card blocked bench", v.patches, v.events)
 	}
 	v.requireTrace(t, "bench-postflight", "applied")
 }

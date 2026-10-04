@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -113,9 +112,12 @@ func TestR201TimingConsumedOnceAndInvalidDeleted(t *testing.T) {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Fatal("timing retained")
 		}
-		expected := "invalid"
+		expected := "partial"
+		if raw == `{` {
+			expected = "invalid"
+		}
 		if strings.Contains(raw, "relaunch") {
-			expected = "ok"
+			expected = "partial"
 		}
 		if rows[0]["result"] != expected {
 			t.Fatal(rows)
@@ -124,7 +126,7 @@ func TestR201TimingConsumedOnceAndInvalidDeleted(t *testing.T) {
 		if bytes.Contains(encoded, []byte(root)) {
 			t.Fatal("path exposed")
 		}
-		if expected == "ok" && rows[0]["total_ms"] != int64(600) {
+		if strings.Contains(raw, "relaunch") && rows[0]["total_ms"] != int64(600) {
 			t.Fatal(rows)
 		}
 	}
@@ -189,60 +191,27 @@ func TestR201BothUpdatePathsPassParent(t *testing.T) {
 		}
 	}
 }
-func TestR201SubsetFirstCardNoUIRecord(t *testing.T) {
-	for _, tc := range []struct {
-		cards          string
-		avoid, blocked bool
-		want           float64
-		test           bool
-	}{
-		{`[107,141,75]`, false, false, 107, true},
-		{`[107,141,75]`, true, true, 141, true},
-		{`[107,136,75]`, false, false, 136, false},
-	} {
-		v := newR200Fixture(t, tc.cards)
-		v.mu.Lock()
-		v.grid = append(v.grid, champSelectGridChampion{ID: 107, Owned: true, TeammateIntent: tc.blocked}, champSelectGridChampion{ID: 141, Owned: true})
-		if tc.blocked {
-			v.session.MyTeam[1].ChampionPickIntent = 107
-		}
-		v.mu.Unlock()
-		s := v.r.currentWatch()
-		g := s.ChampSelect.Groups["aram"]
-		g.Pick.AvoidTeammateIntent = tc.avoid
-		s.ChampSelect.Groups["aram"] = g
-		v.r.apply(s)
+func TestR204SubsetWithoutPoolChampionNeverSelects(t *testing.T) {
+	for _, strategy := range []string{"show-only", "show-then-lock", "lock-now"} {
+		v := newR200Fixture(t, `[107,141,75]`)
+		settings := v.r.currentWatch()
+		group := settings.ChampSelect.Groups["aram"]
+		group.Pick.Strategy = strategy
+		settings.ChampSelect.Groups["aram"] = group
+		v.r.apply(settings)
 		v.tick(t)
-		v.tick(t) // exercise scheduling, write and confirmed application
-		if v.count() != 1 || v.last().Body["championId"] != tc.want || v.last().Body["completed"] != true {
-			t.Fatalf("patches=%v events=%v", v.patches, v.events)
+		v.tick(t)
+		if v.count() != 0 {
+			t.Fatal("picked outside configured pool", v.patches)
 		}
-		if v.hasTrace("subset", "test-first-card") != tc.test {
-			t.Fatal("incorrect fallback")
-		}
-		if tc.test {
-			for _, row := range v.r.champSelectSnapshot().Records {
-				if row.ChampionID != 0 || strings.Contains(row.Message, "开局卡片") || strings.Contains(row.Message, "序列本次无可用") {
-					t.Fatal("temporary pick leaked to UI", row)
-				}
-			}
-		}
-	}
-	pool := []int64{22, 136}
-	offered := []int64{107, 141, 75}
-	if got, test := champSelectSubsetTestPool(pool, offered, false); test || !reflect.DeepEqual(got, pool) {
-		t.Fatal("disabled switch changed R200 behavior")
-	}
-	// Intersection exists even if its hero is blocked: never test-pick a different card.
-	if _, test := champSelectSubsetTestPool(pool, []int64{136, 107}, true); test {
-		t.Fatal("fallback overrides pool")
+		v.requireTrace(t, "subset", "no-pool-champion")
 	}
 }
 
-func TestR201SubsetTemporaryStrategies(t *testing.T) {
+func TestR201SubsetConfiguredStrategies(t *testing.T) {
 	for _, strategy := range []string{"show-only", "show-then-lock", "lock-now"} {
 		t.Run(strategy, func(t *testing.T) {
-			v := newR200Fixture(t, `[107,141,75]`)
+			v := newR200Fixture(t, `[136,141,75]`)
 			v.grid = append(v.grid, champSelectGridChampion{ID: 107, Owned: true}, champSelectGridChampion{ID: 141, Owned: true})
 			s := v.r.currentWatch()
 			g := s.ChampSelect.Groups["aram"]
@@ -263,11 +232,6 @@ func TestR201SubsetTemporaryStrategies(t *testing.T) {
 				t.Fatal("show-only locked", v.patches)
 			}
 			v.tick(t)
-			for _, row := range v.r.champSelectSnapshot().Records {
-				if row.ChampionID != 0 {
-					t.Fatal("strategy leaked test pick", row)
-				}
-			}
 			v.requireTrace(t, "postflight", "applied")
 		})
 	}

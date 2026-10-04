@@ -191,6 +191,10 @@ func (r *watchRunner) recordChampSelectPostflight(session lcuChampSelectSession)
 				}
 			}
 		}
+		// A later bench swap or manual choice cannot undo a confirmed application.
+		if record.Confirmed && (reason == "action-missing" || observed.ChampionID != record.ChampionID) {
+			continue
+		}
 		if reason != "action-missing" {
 			if observed.ChampionID == record.ChampionID && (!record.Completed || observed.Completed) {
 				reason = "applied"

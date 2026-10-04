@@ -112,7 +112,8 @@ func (a *installerApp) install(message uiMessage) {
 		w.dispatch(func() { a.fail(failure) })
 	}
 	if a.options.Update && !(a.options.FreshInstall && !a.options.ParentFirst) {
-		if a.waitParent == nil || !a.waitParent() {
+		w.dispatch(func() { a.emit("progress", progressMessage{Percent: 0, Stage: "正在等待旧程序退出…"}) })
+		if !waitUpgradeParent(a.waitParent, func(progress progressMessage) { w.dispatch(func() { a.emit("progress", progress) }) }) {
 			reportFailure(failureMessage{Message: upgradeFailureMessage})
 			return
 		}
@@ -163,6 +164,7 @@ func (a *installerApp) install(message uiMessage) {
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 	model := progressModel{installedBytes: a.meta.InstalledBytes}
+	upgradeModel := upgradeProgressModel{installedBytes: a.meta.InstalledBytes}
 	for {
 		select {
 		case <-finished:
@@ -191,6 +193,10 @@ func (a *installerApp) install(message uiMessage) {
 			extracted := extractedBytes(temporaryDir, started, finished)
 			copied := directoryBytes(dest, finished)
 			update := progressMessage{Percent: model.percent(extracted, copied, time.Since(started)), Stage: progressStage(extracted, copied)}
+			if a.options.Update {
+				a.timing.importNSIS(temporaryDir)
+				update = upgradeModel.update(a.timing.snapshot(), extracted, copied, time.Now())
+			}
 			w.dispatch(func() { a.emit("progress", update) })
 		}
 	}

@@ -7531,7 +7531,19 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 		a.liveSnapshots.invalidate()
 		a.clearLiveClientProbe()
 	}
-	respondJSON(w, a.cachedGameplayLive(r.Context(), client, current, phase))
+	ctx := r.Context()
+	if requestID := r.URL.Query().Get("requestId"); len(requestID) > 0 && len(requestID) <= 80 {
+		ctx = context.WithValue(ctx, liveProgressListenerKey{}, func(progress gameplayLiveResponse) {
+			if r.Context().Err() != nil {
+				return
+			}
+			data, err := json.Marshal(map[string]any{"type": "live-player-progress", "requestId": requestID, "live": progress})
+			if err == nil {
+				a.broadcastEvent(string(data))
+			}
+		})
+	}
+	respondJSON(w, a.cachedGameplayLive(ctx, client, current, phase))
 }
 
 func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current Summoner, phase string) gameplayLiveResponse {
@@ -7766,6 +7778,18 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	}
 	semaphore := make(chan struct{}, concurrency)
 	historyResults := make([]livePlayerMatchesResult, len(rawPlayers))
+	progress := response
+	progress.Players = make([]gameplayLivePlayer, len(rawPlayers))
+	for index, raw := range rawPlayers {
+		ref := normalizeGameplayReference(gameplayReference{PlayerRef: visibleLivePlayerReference(raw.player), SummonerID: raw.player.SummonerID, AlternatePlayerRef: raw.player.ObfuscatedPUUID, AlternateSummonerID: raw.player.ObfuscatedSummonerID, GameName: raw.player.GameName, TagLine: raw.player.TagLine, DisplayName: raw.player.SummonerName, ProfileIconID: raw.player.ProfileIconID, ServerID: clientTencentServerID(client)})
+		summoner := summonerFromGameplayReference(ref)
+		hidden, unresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
+		self := gameplayLivePlayerIsCurrent(ref, current.PUUID, raw.player.CellID, localPlayerCellID)
+		progress.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: a.registerGameplayReferenceDetails(ref), DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, Hidden: hidden, IsCurrent: self}, TeamID: raw.team, IsAlly: self || arenaMode && phase == "ChampSelect", IdentityUnresolved: unresolved, ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionLocked: raw.player.ChampionLocked, ChampionName: championName(names, raw.player.ChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), HistoryState: "pending"}
+	}
+	var progressMu sync.Mutex
+	publishLiveProgress(ctx, progress)
+	playerMS := make([]int64, len(rawPlayers))
 	for index := range rawPlayers {
 		wait.Add(1)
 		go func(index int) {
@@ -7774,6 +7798,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			defer wait.Done()
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
+			playerStarted := time.Now()
 			raw := rawPlayers[index]
 			visiblePlayerRef := visibleLivePlayerReference(raw.player)
 			reference := normalizeGameplayReference(gameplayReference{
@@ -7865,6 +7890,13 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			}
 
 			premadeInputs[index] = livePremadeInput{TeamID: raw.team, TeamParticipantID: raw.player.TeamParticipantID, Matches: cloneGameplayMatches(matches)}
+			playerMS[index] = time.Since(playerStarted).Milliseconds()
+			ready := response.Players[index]
+			ready.PlayerRef = a.registerGameplayReferenceDetails(ready.reference)
+			progressMu.Lock()
+			progress.Players[index] = ready
+			publishLiveProgress(ctx, progress)
+			progressMu.Unlock()
 		}(index)
 	}
 	wait.Wait()
@@ -8026,7 +8058,16 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			response.Capabilities = append(response.Capabilities, gameplayCapabilityError("champion-abilities", "/lol-game-data/assets/v1/champions/{id}.json", abilitiesErr))
 		}
 	}
+	var sgpMS, lcuMS, slowestPlayerMS int64
+	for i, result := range historyResults {
+		if result.Evidence != nil {
+			sgpMS = max(sgpMS, result.Evidence.SGPMS)
+			lcuMS = max(lcuMS, result.Evidence.LCUMS)
+		}
+		slowestPlayerMS = max(slowestPlayerMS, playerMS[i])
+	}
 	a.recordDiagnostic(map[string]any{
+		"sgp_ms": sgpMS, "lcu_ms": lcuMS, "slowest_player_ms": slowestPlayerMS,
 		"event": "live_load_cost", "players": len(response.Players), "concurrency": concurrency,
 		"ranks_ms": ranksMS, "matches_ms": matchesMS, "total_ms": time.Since(liveLoadStarted).Milliseconds(),
 	})
@@ -8415,22 +8456,35 @@ func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, refe
 	var sgpOK bool
 	lcu.State = "failed"
 	sgp.State = "failed"
-	var wait sync.WaitGroup
-	wait.Add(2)
-	go func() {
-		defer wait.Done()
+	var sgpMS, lcuMS int64
+	readLCU := func() {
+		started := time.Now()
+		defer func() { lcuMS = time.Since(started).Milliseconds() }()
 		defer a.recoverPanic("live-history.lcu")
 		lcu = loadLiveLCUMatches(ctx, client, reference, playerRef, isCurrent, names)
-	}()
-	go func() {
-		defer wait.Done()
+	}
+	readSGP := func() {
+		started := time.Now()
+		defer func() { sgpMS = time.Since(started).Milliseconds() }()
 		defer a.recoverPanic("live-history.sgp")
 		sgpCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
 		sgp, sgpOK = a.loadLiveSGPMatches(sgpCtx, client, reference, playerRef, names, queueID)
-	}()
-	wait.Wait()
-	evidence := &liveHistoryEvidence{LCU: cloneGameplayMatches(lcu.Matches), SGP: cloneGameplayMatches(sgp.Matches), SGPRequested: sgp.State != "unavailable", SGPOK: sgpOK}
+	}
+	if isCurrent {
+		// Self still needs the latest LCU result, even when SGP has ten games.
+		var wait sync.WaitGroup
+		wait.Add(2)
+		go func() { defer a.recoverPanic("live-history.self-lcu"); defer wait.Done(); readLCU() }()
+		go func() { defer a.recoverPanic("live-history.self-sgp"); defer wait.Done(); readSGP() }()
+		wait.Wait()
+	} else {
+		readSGP()
+		if !(sgpOK && sgp.Evidence != nil && sgp.Evidence.QueueFiltered && len(recentLiveMatchesForPlayer(sgp.Matches, playerRef, queueID, time.Now())) >= 10) {
+			readLCU()
+		}
+	}
+	evidence := &liveHistoryEvidence{LCU: cloneGameplayMatches(lcu.Matches), SGP: cloneGameplayMatches(sgp.Matches), SGPRequested: sgp.State != "unavailable", SGPOK: sgpOK, SGPMS: sgpMS, LCUMS: lcuMS}
 	if sgp.Evidence != nil {
 		evidence.QueueFiltered, evidence.PagesRead, evidence.StopReason = sgp.Evidence.QueueFiltered, sgp.Evidence.PagesRead, sgp.Evidence.StopReason
 	}

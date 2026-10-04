@@ -249,13 +249,7 @@ func (r *watchRunner) champSelectFreshCandidate(ctx context.Context, client *LCU
 			r.mu.Lock()
 			pool = append([]int64{}, config.Champions[r.champSelect.position]...)
 			r.mu.Unlock()
-			testPool, test := champSelectSubsetTestPool(pool, raw, champSelectSubsetTestFirstCard)
-			if test != d.TestFirstCard {
-				return "subset-test-mode-changed"
-			}
-			if test {
-				pool = testPool
-			}
+
 		}
 	}
 	candidate, reasons := chooseChampSelectCandidate(side, pool, available, grid, config.AvoidTeammateIntent, arena)
@@ -268,30 +262,9 @@ func (r *watchRunner) champSelectFreshCandidate(ctx context.Context, client *LCU
 	return ""
 }
 
-// R201 临时测试，真机验证后删除（另开工单）。
-const champSelectSubsetTestFirstCard = true
-
-// Test fallback depends on the offered/pool intersection, not whether a pool
-// hero survives teammate/grid/retry gates. Never override a blocked pool hero.
-func champSelectSubsetTestPool(pool, offered []int64, enabled bool) ([]int64, bool) {
-	if !enabled {
-		return pool, false
-	}
-	cards := champSelectIDSet(offered)
-	for _, id := range pool {
-		if _, ok := cards[id]; ok {
-			return pool, false
-		}
-	}
-	return offered, true
-}
 func (r *watchRunner) champSelectDecisionLog(d champSelectDecision, kind, message string, id int64) {
-	if !d.TestFirstCard {
-		r.champSelectChampionLog(kind, message, id)
-	}
+	r.champSelectChampionLog(kind, message, id)
 }
 func (r *watchRunner) champSelectDecisionEmit(d champSelectDecision, event string) {
-	if !d.TestFirstCard {
-		r.emit(event)
-	}
+	r.emit(event)
 }

@@ -8,17 +8,17 @@ import (
 	"time"
 )
 
-var updateInstallTimingStages = []string{"installer_start", "parent_exited", "extract_start", "extract_done", "copy_done", "relaunch"}
+var updateInstallTimingStages = []string{"installer_start", "parent_exited", "uninstall_old_start", "uninstall_old_done", "extract_start", "extract_done", "copy_done", "relaunch"}
 
-// Consume once, including malformed data, so a stale installation cannot be
-// attributed to later starts. Log durations only, never local paths.
+// Consume once. Partial legacy files retain every available interval; missing
+// endpoints are null, never invented or subtracted across an unknown stage.
 func consumeUpdateInstallTiming(root string, record func(map[string]any)) {
 	path := filepath.Join(root, "update-install-timing.json")
 	info, err := os.Lstat(path)
 	if os.IsNotExist(err) {
 		return
 	}
-	event := map[string]any{"event": "update_install_timing", "result": "invalid"}
+	event := map[string]any{"event": "update_install_timing", "result": "invalid", "reason": "parse_error"}
 	defer func() { _ = os.Remove(path); record(event) }()
 	if err != nil || !info.Mode().IsRegular() || info.Size() > 4096 {
 		return
@@ -30,26 +30,55 @@ func consumeUpdateInstallTiming(root string, record func(map[string]any)) {
 	data, err := io.ReadAll(io.LimitReader(file, 4097))
 	file.Close()
 	var stages map[string]int64
-	if err != nil || len(data) > 4096 || json.Unmarshal(data, &stages) != nil {
+	if err != nil || len(data) > 4096 || json.Unmarshal(data, &stages) != nil || stages == nil {
 		return
 	}
+	durations, missing := map[string]any{}, false
 	previous := int64(0)
-	durations := map[string]int64{}
+	skew := false
 	for i, stage := range updateInstallTimingStages {
 		value := stages[stage]
-		if value <= 0 || value < previous || value > time.Now().UnixMilli()+60000 {
-			return
+		if value <= 0 {
+			missing = true
+		} else {
+			if value < previous || value > time.Now().UnixMilli()+60000 {
+				skew = true
+			}
+			previous = value
 		}
 		if i > 0 {
-			durations[updateInstallTimingStages[i-1]+"_to_"+stage] = value - previous
+			prior := stages[updateInstallTimingStages[i-1]]
+			name := updateInstallTimingStages[i-1] + "_to_" + stage
+			durations[name] = nil
+			if prior > 0 && value >= prior && value <= time.Now().UnixMilli()+60000 {
+				durations[name] = value - prior
+			}
 		}
-		previous = value
 	}
-	total := previous - stages["installer_start"]
-	if total > int64(time.Hour/time.Millisecond) {
+	event["stages_ms"] = durations
+	for name, pair := range map[string][2]string{"uninstall_old_ms": {"uninstall_old_start", "uninstall_old_done"}, "extract_ms": {"extract_start", "extract_done"}, "copy_ms": {"extract_done", "copy_done"}} {
+		start, end := stages[pair[0]], stages[pair[1]]
+		event[name] = nil
+		if start > 0 && end >= start && end <= time.Now().UnixMilli()+60000 {
+			event[name] = end - start
+		}
+	}
+	event["total_ms"] = nil
+	if start, end := stages["installer_start"], stages["relaunch"]; start > 0 && end >= start && end-start <= int64(time.Hour/time.Millisecond) && end <= time.Now().UnixMilli()+60000 {
+		event["total_ms"] = end - start
+	}
+	if skew {
+		event["reason"] = "clock_skew"
+		return
+	}
+	if missing {
+		event["result"], event["reason"] = "partial", "missing_fields"
+		return
+	}
+	if event["total_ms"] == nil {
+		event["reason"] = "clock_skew"
 		return
 	}
 	event["result"] = "ok"
-	event["stages_ms"] = durations
-	event["total_ms"] = total
+	delete(event, "reason")
 }

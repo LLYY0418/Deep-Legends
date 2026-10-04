@@ -144,6 +144,7 @@
     "pool-catalog-panel", "pool-upload-panel", "pool-history-panel", "pool-picker", "pool-search", "pool-quality", "pool-sort", "pool-list-meta", "pool-skin-grid",
     "favorites-collection-panel", "favorites-account-panel", "favorites-pools-panel", "favorites-facade-panel",
     "skin-dialog-art", "skin-dialog-backdrop", "skin-dialog-artwork", "skin-dialog-fullscreen", "skin-dialog-previous", "skin-dialog-next", "app-main", "app-scroll", "back-to-top",
+    "setting-riot-key-input", "setting-riot-key-state", "setting-riot-key-reveal", "setting-riot-key-save", "setting-riot-key-clear",
     "setting-proxy-mode", "setting-proxy-url", "setting-proxy-url-wrap", "setting-proxy-save", "setting-proxy-state",
     "update-background", "update-ready-toast", "update-ready-title", "update-ready-copy", "update-ready-later", "update-ready-apply", "update-button", "update-dialog", "update-dialog-title", "update-notes", "update-meta", "update-progress", "update-progress-fill", "update-progress-percent", "update-progress-hint", "update-alert", "update-start", "update-later", "update-cancel", "update-apply", "update-release-link", "update-dialog-close",
   ].map((id) => [camel(id), document.getElementById(id)]));
@@ -2240,6 +2241,38 @@
     } catch (error) { showToast(error.message); }
   }
 
+  function renderRiotKeySettings(data) {
+    if (el.settingRiotKeyState) el.settingRiotKeyState.textContent = { configured: "已配置", unconfigured: "未配置", invalid: "无效" }[data.status] || "未配置";
+  }
+  async function loadRiotKeySettings() {
+    if (!el.settingRiotKeyState || state.riotKeyPending) return;
+    try { renderRiotKeySettings(await api("/api/riot-key", {}, "riot-key-status", 10000)); }
+    catch (error) { if (error.name !== "RequestCancelled") showToast("Riot Key 状态读取失败"); }
+  }
+  async function saveRiotKeySettings(clear = false) {
+    if (state.riotKeyPending) return;
+    state.riotKeyPending = true;
+    el.settingRiotKeySave.disabled = el.settingRiotKeyClear.disabled = true;
+    try {
+      const data = await api("/api/riot-key", clear ? { method: "DELETE" } : { method: "POST", body: JSON.stringify({ key: el.settingRiotKeyInput.value }) }, "riot-key-save", 10000);
+      renderRiotKeySettings(data);
+      el.settingRiotKeyInput.value = "";
+      el.settingRiotKeyInput.type = "password";
+      el.settingRiotKeyReveal.setAttribute("aria-pressed", "false");
+      el.settingRiotKeyReveal.setAttribute("aria-label", "显示 Riot Key");
+      if (data.result !== "invalid") window.dispatchEvent(new CustomEvent("deep-legends:riot-key-updated"));
+    } catch (error) { if (error.name !== "RequestCancelled") showToast(error.message); }
+    finally { state.riotKeyPending = false; el.settingRiotKeySave.disabled = el.settingRiotKeyClear.disabled = false; }
+  }
+  el.settingRiotKeySave?.addEventListener("click", () => void saveRiotKeySettings());
+  el.settingRiotKeyClear?.addEventListener("click", () => void saveRiotKeySettings(true));
+  el.settingRiotKeyReveal?.addEventListener("click", () => {
+    const reveal = el.settingRiotKeyInput.type === "password";
+    el.settingRiotKeyInput.type = reveal ? "text" : "password";
+    el.settingRiotKeyReveal.setAttribute("aria-pressed", String(reveal));
+    el.settingRiotKeyReveal.setAttribute("aria-label", reveal ? "隐藏 Riot Key" : "显示 Riot Key");
+  });
+
   async function loadPrivacy() {
     el.privacyContent.innerHTML = '<p class="muted">正在读取隐私说明…</p>';
     try {
@@ -2368,6 +2401,7 @@
     if (name === "settings") {
       if (previousSection !== "settings") activateSettingsPage("appearance");
       loadPrivacy();
+      void loadRiotKeySettings();
       loadDiagnostics();
     }
     if (state.status) renderNotice(state.status);
@@ -2379,6 +2413,7 @@
 	if (name) {
 	  activateSection(name);
 	  if (name === "settings" && event.detail?.page) activateSettingsPage(event.detail.page);
+    if (name === "settings" && event.detail?.focus === "riot-key") el.settingRiotKeyInput?.focus();
 	}
   });
 
@@ -3633,11 +3668,13 @@
         state.liveEventsReady = true;
         return;
       }
+      if (event.data === "riot-key-updated") { window.dispatchEvent(new CustomEvent("deep-legends:riot-key-updated")); void loadRiotKeySettings(); return; }
       if (event.data === "pro-runes") { window.dispatchEvent(new CustomEvent("deep-legends:pro-runes")); return; }
       if (event.data === "resync-required") { resyncLiveState(); return; }
 	  if (typeof event.data === "string" && event.data.startsWith("{")) {
 		try {
 		  const detail = JSON.parse(event.data);
+		  if (detail?.type === "live-player-progress") { window.dispatchEvent(new CustomEvent("deep-legends:live-player-progress", { detail })); return; }
 		  const slices = LIVE_UPDATE_STATE_SLICES[detail?.type] || [];
 		  if (slices.includes("overview-season")) window.dispatchEvent(new CustomEvent("deep-legends:season-progress", { detail }));
 		  if (slices.includes("overview-ranks")) window.dispatchEvent(new CustomEvent("deep-legends:overview-incremental", { detail }));
@@ -4124,7 +4161,7 @@
     });
     document.addEventListener("focusin", (event) => {
       const next = targetOf(event.target);
-      if (next && !pointerSuppressedPoint && next !== pointerSuppressedAnchor) show(next);
+      if (next?.matches(":focus-visible") && !pointerSuppressedPoint && next !== pointerSuppressedAnchor) show(next);
     });
     document.addEventListener("focusout", (event) => {
       if (targetOf(event.target) === anchor) hide();

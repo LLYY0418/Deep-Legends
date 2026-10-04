@@ -24,7 +24,6 @@ import (
 	"math"
 	"net/http"
 	"net/url"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,13 +35,14 @@ import (
 // Riot API Key 配置（三种方式按优先级从高到低）：
 //
 //  1. 环境变量 RIOT_API_KEY —— 仅本机临时调试用，不需要重新构建。
-//  2. riotAPIKeyCipher —— 推荐：加密后的 key（AES-256-GCM + Base64），
+//  2. 用户保存的 riot-user-key.dat（Windows 当前用户 DPAPI；开发环境0600）。
+//  3. riotAPIKeyCipher —— 推荐：加密后的 key（AES-256-GCM + Base64），
 //     在构建时通过 -ldflags "-X main.riotAPIKeyCipher=<密文>" 注入，
 //     源码里这个变量必须永远留空字符串，绝不能把真实密文写死提交到仓库。
 //     生成密文：go run ./backend -encrypt-riot-key "RGAPI-你的key"
 //     构建示例：./build-desktop-windows.ps1 -RiotAPIKeyCipher "<密文>"
 //     （或设置环境变量 RIOT_API_KEY_CIPHER，构建脚本会自动读取）
-//  3. riotAPIKey —— 明文变量，同样只能通过构建时注入，不能写死提交。
+//     riotAPIKey —— 明文变量，同样只能通过构建时注入，不能写死提交。
 //
 // 重要边界说明：密文与解密逻辑都在程序里，这只是混淆——能防止用
 // strings 等工具从 EXE 中直接扫出明文 key，但挡不住有心人抓包或逆向。
@@ -52,7 +52,7 @@ var riotAPIKeyCipher = ""
 
 var riotAPIKey = ""
 
-var errRiotKeyMissing = errors.New("此安装包未内置 Riot API Key，韩服战绩暂不可用。")
+var errRiotKeyMissing = errors.New("未配置 Riot Key")
 
 // riotCipherKey 由分散的固定片段派生解密密钥；仅用于混淆，见上方说明。
 func riotCipherKey() []byte {
@@ -115,10 +115,8 @@ var riotEmbeddedKey = sync.OnceValue(func() string {
 })
 
 func riotKey() string {
-	if value := strings.TrimSpace(os.Getenv("RIOT_API_KEY")); value != "" {
-		return value
-	}
-	return riotEmbeddedKey()
+	key, _ := riotUserKeys.effective()
+	return key
 }
 
 const (
@@ -293,15 +291,7 @@ func riotKeyConfiguredValue(ciphertext string) bool {
 	return err == nil && strings.TrimSpace(plain) != ""
 }
 
-func riotKeyConfigured() bool {
-	if strings.TrimSpace(os.Getenv("RIOT_API_KEY")) != "" {
-		return true
-	}
-	if strings.TrimSpace(riotAPIKeyCipher) != "" {
-		return riotKeyConfiguredValue(riotAPIKeyCipher)
-	}
-	return strings.TrimSpace(riotAPIKey) != ""
-}
+func riotKeyConfigured() bool { return riotKey() != "" }
 
 // wait uses Riot response quotas when available, retaining conservative defaults
 // until the server advertises the key's actual regional and method limits.
@@ -497,6 +487,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		}
 		switch response.StatusCode {
 		case http.StatusOK:
+			riotUserKeys.observe(request.Header.Get("X-Riot-Token"), response.StatusCode)
 			if readErr != nil {
 				return readErr
 			}
@@ -507,7 +498,8 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		case http.StatusNotFound:
 			return errRiotNotFound
 		case http.StatusUnauthorized, http.StatusForbidden:
-			return &riotStatusError{message: "Riot API Key 无效、过期或无权访问：请到 developer.riotgames.com 检查后重新生成密文并在构建时注入", status: response.StatusCode}
+			riotUserKeys.observe(request.Header.Get("X-Riot-Token"), response.StatusCode)
+			return &riotStatusError{message: "Riot Key 无效", status: response.StatusCode}
 		case http.StatusTooManyRequests:
 			retryAfter := time.Duration(3) * time.Second
 			if seconds, parseErr := strconv.Atoi(response.Header.Get("Retry-After")); parseErr == nil && seconds > 0 && seconds <= 86400 {
@@ -763,14 +755,16 @@ func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine st
 		entry.expiresAt = completedAt.Add(backoff)
 	}
 	p.accountMu.Lock()
-	if !entry.expiresAt.IsZero() {
-		p.accountCache[key] = entry
-		pruneTTLCache(p.accountCache, completedAt, 512, func(v riotAccountCacheEntry) time.Time { return v.expiresAt })
-	} else {
-		delete(p.accountCache, key)
+	if p.accountFlights[key] == flight {
+		if !entry.expiresAt.IsZero() {
+			p.accountCache[key] = entry
+			pruneTTLCache(p.accountCache, completedAt, 512, func(v riotAccountCacheEntry) time.Time { return v.expiresAt })
+		} else {
+			delete(p.accountCache, key)
+		}
+		delete(p.accountFlights, key)
 	}
 	flight.account, flight.err = account, err
-	delete(p.accountFlights, key)
 	close(flight.done)
 	p.accountMu.Unlock()
 	return account, err

@@ -115,6 +115,7 @@ func (f *r180HistoryFixture) expire(scope *liveHistoryFreshnessScope, ref string
 func TestR180MergedLatestSameQueueAndDedup(t *testing.T) {
 	f := r180Fixture(t)
 	ref := r161Ref(1)
+	f.a.setQueueFilterCapability("HN1", "flex:q_440", queueFilterCapabilityUnsupported)
 	scope := f.a.liveHistoryFreshnessForGame(f.c, 180, 440)
 	result := f.load(ref, false, scope, 100, 2)
 	selected := recentMatchesForPlayer(result.Matches, ref, 10, 440)
@@ -137,7 +138,7 @@ func TestR180MergedLatestSameQueueAndDedup(t *testing.T) {
 		t.Fatal(stats, record, games)
 	}
 	// Both real adapters use the same numeric ID; metadata region prefixes are irrelevant.
-	if result.Evidence.LCU[0].GameID != 101 || result.Evidence.SGP[0].GameID != 112 {
+	if result.Evidence.LCU[0].GameID != 101 || !liveHistoryContainsGame(result.Evidence.SGP, 112) {
 		t.Fatal("different id schemes")
 	}
 	events := r175Events(t, f.a, "live_history_freshness")
@@ -253,7 +254,7 @@ func TestR180PollingFlightsAndExpiry(t *testing.T) {
 		}
 		wg.Wait()
 	}
-	if f.sgpCalls.Load() != 10 || f.lcuCalls.Load() != 10 || len(r175Events(t, f.a, "live_history_freshness")) != 10 {
+	if f.sgpCalls.Load() != 10 || f.lcuCalls.Load() != 1 || len(r175Events(t, f.a, "live_history_freshness")) != 10 {
 		t.Fatal("polling amplified requests", f.sgpCalls.Load(), f.lcuCalls.Load(), r175Events(t, f.a, "live_history_freshness"))
 	}
 	ref := r161Ref(1)
@@ -287,7 +288,10 @@ func TestR180ConcurrentSources(t *testing.T) {
 		return oldSGP.RoundTrip(r)
 	})
 	done := make(chan struct{})
-	go func() { f.load(r161Ref(1), false, f.a.liveHistoryFreshnessForGame(f.c, 180, 440), 100, 0); close(done) }()
+	go func() {
+		f.load(f.a.summoner.PUUID, true, f.a.liveHistoryFreshnessForGame(f.c, 180, 440), 100, 0)
+		close(done)
+	}()
 	for _, started := range []chan struct{}{lcuStarted, sgpStarted} {
 		select {
 		case <-started:
@@ -411,7 +415,41 @@ func TestR180RealRosterStageDiagnostics(t *testing.T) {
 	}
 	current := Summoner{PUUID: f.a.summoner.PUUID, GameName: "Player0", TagLine: "CN1"}
 	for tick := 0; tick < 3; tick++ {
-		response := f.a.loadGameplayLive(context.Background(), f.c, current, "ChampSelect")
+		progressCount, earlyHistory := 0, false
+		ctx := context.WithValue(context.Background(), liveProgressPublisherKey{}, func(value gameplayLiveResponse) {
+			progressCount++
+			pending, ready := 0, 0
+			for _, player := range value.Players {
+				if player.HistoryState == "pending" {
+					pending++
+				}
+				if player.HistoryState == "ok" {
+					ready++
+				}
+			}
+			if pending > 0 && ready > 0 {
+				earlyHistory = true
+			}
+			encoded, _ := json.Marshal(value)
+			for i := 0; i < 10; i++ {
+				if strings.Contains(string(encoded), r161Ref(i)) {
+					t.Error("raw player identity in incremental payload")
+				}
+			}
+		})
+		response := f.a.loadGameplayLive(ctx, f.c, current, "ChampSelect")
+		if progressCount != 11 || !earlyHistory {
+			t.Fatal("real roster did not progressively publish", progressCount, earlyHistory)
+		}
+		costs := r175Events(t, f.a, "live_load_cost")
+		if len(costs) == 0 {
+			t.Fatal("missing live costs")
+		}
+		for _, key := range []string{"sgp_ms", "lcu_ms", "slowest_player_ms"} {
+			if _, ok := costs[len(costs)-1][key]; !ok {
+				t.Fatal("missing timing", key)
+			}
+		}
 		if len(response.Players) != 10 {
 			t.Fatal(response)
 		}

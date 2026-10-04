@@ -1,3 +1,4 @@
+const cleanLiveURL = url => url.replace(/\?requestId=[^&]+/, '').replace('&refresh=1', '?refresh=1');
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -32,7 +33,7 @@ function liveHarness() {
   const state = { section: 'overview', beacon: { phase: 'Lobby' }, tabs: [], settings: {}, controllers: new Map() };
   const document = { hidden: true };
   const deps = { ...timer, state, document, connected: () => true, fetch: async (_url, options) => { reports.push(JSON.parse(options.body)); },
-    api: async url => { calls.push(url); return { phase: 'InProgress', players: [] }; },
+    api: async url => { calls.push(cleanLiveURL(url)); return { phase: 'InProgress', players: [] }; },
     updateBeacon: phase => { state.beacon.phase = phase; }, scheduleBeaconPoll() {}, markOverviewAfterGame() {},
     renderLive() {}, resetLiveGameScopedState() {}, shouldResetLiveGameScopedState: () => false, resetLivePositionOverrides() {}, resetRecommendationTabsOnChampionChange() {},
     renderCapabilitySettings() {}, liveRecommendationsFor: () => null, ensureLiveRecommendations() {}, ensureSpecialistRunes() {}, ensureProRunes() {}, ensureLaneMatchupCandidates() {}, scheduleLiveRefresh() {},

@@ -52,4 +52,8 @@ Windows public 发布构建成功：全量 Go 319.256 秒；Web 856/856；deskto
 
 ## 2026-10-03 用户追加 save 探测修正（并入 R200）
 
-镜头保存先读取 `/help`；未列出时探测一次 POST `/lol-game-settings/v1/save`，404/405 仅记 unsupported，不报错。不依赖 swagger。模拟与既有镜头回归通过，已并入 0.12.63 正式 Latest，发布证据见 [R200 账本](r200-execution-ledger.md)。真机镜头效果仍保留原验收边界。
+镜头保存先读取 `/help`；未列出时探测一次 POST `/lol-game-settings/v1/save`，404/405 仅记 unsupported，不报错。不依赖 swagger。模拟与既有镜头回归通过，已并入 0.12.63 正式 Latest，发布证据见 [R200 账本](history/ledgers/r200-execution-ledger.md)。真机镜头效果仍保留原验收边界。
+
+## R204 追加真机核对（2026-10-04）
+
+R204 工单追加的用户真机证据已核实 0=自由、1=动态、2=锁定：14:24:40 动态写 1；14:25:55 自由写 0，只读文件 result=ok_relocked；14:35:01 game_start 仍只读且 CameraMode=0，用户确认镜头生效。以上引用 R204 提供的日志摘录和用户确认，原始 2236 日志本机不在，未声称重新读取。映射验收通过；连续两局及 in_game_60s 匹配仍缺独立记录，保留进行中。

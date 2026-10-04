@@ -146,6 +146,11 @@ func (a *app) handleGameplaySpecialistRunes(w http.ResponseWriter, r *http.Reque
 		respondJSON(w, map[string]any{"reason": "riot-key-missing", "runes": []gameplayRecommendationRune{}})
 		return
 	}
+	if riotActiveKeyInvalid() {
+		recordHandler("skipped", "riot-key-invalid")
+		respondJSON(w, map[string]any{"reason": "riot-key-invalid", "runes": []gameplayRecommendationRune{}})
+		return
+	}
 	recordHandler("accepted", "")
 	ctx, cancel := context.WithTimeout(r.Context(), specialistRuneRequestTimeout)
 	defer cancel()
@@ -158,6 +163,9 @@ func (a *app) handleGameplaySpecialistRunes(w http.ResponseWriter, r *http.Reque
 	runes, outcome := a.riot.specialistRunes(ctx, championID, metadata.Slug, metadata.NameZH, position)
 	if len(runes) == 0 {
 		reason := string(outcome)
+		if riotActiveKeyInvalid() {
+			reason = "riot-key-invalid"
+		}
 		if reason == "" {
 			reason = string(specialistOutcomeNoPositionSample)
 		}
@@ -223,7 +231,7 @@ func (p *riotProvider) specialistRunes(ctx context.Context, championID int64, ch
 func (p *riotProvider) finishSpecialistRuneFlight(key string, flight *specialistRuneFlight, runes []gameplayRecommendationRune, outcome specialistOutcome, fetchedAt time.Time) {
 	result := cloneSpecialistRunes(runes)
 	p.specialistMu.Lock()
-	if len(result) > 0 || outcome == specialistOutcomeNoPositionSample || outcome == specialistOutcomeThrottled || outcome == specialistOutcomeTimeout {
+	if p.specialistFlights[key] == flight && (len(result) > 0 || outcome == specialistOutcomeNoPositionSample || outcome == specialistOutcomeThrottled || outcome == specialistOutcomeTimeout) {
 		ttl := specialistRuneCacheTTL
 		if len(result) == 0 {
 			ttl = specialistRuneEmptyCacheTTL
@@ -238,7 +246,9 @@ func (p *riotProvider) finishSpecialistRuneFlight(key string, flight *specialist
 	}
 	flight.runes = cloneSpecialistRunes(result)
 	flight.outcome = outcome
-	delete(p.specialistFlights, key)
+	if p.specialistFlights[key] == flight {
+		delete(p.specialistFlights, key)
+	}
 	close(flight.done)
 	p.specialistMu.Unlock()
 }

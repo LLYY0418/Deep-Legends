@@ -855,6 +855,7 @@ body.is-fatal main.shell > :not(#notice) { display: none !important; }
 .dialog-art video { background: #000; object-fit: contain; }
 .dialog-art > span { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; color: var(--muted); }
 .dialog-toolbar { position: absolute; top: 12px; right: 12px; z-index: 4; display: flex; gap: 6px; padding: 4px; background: rgb(12 14 16/.86); border: 1px solid rgb(255 255 255/.16); border-radius: 11px; }
+.dialog-close-button { display: grid; width: var(--control-hit-size); height: var(--control-hit-size); place-items: center; padding: 0; color: inherit; background: transparent; border: 0; border-radius: 9px; }
 .dialog-action { display: grid; width: var(--control-hit-size); height: var(--control-hit-size); place-items: center; padding: 0; color: white; background: transparent; border: 0; border-radius: 9px; }
 .dialog-action:hover { background: rgb(255 255 255/.16); }
 .dialog-action.is-active { color: #ffd5a7; background: rgb(210 122 40/.28); }
@@ -1010,11 +1011,11 @@ body.is-demo .toast { bottom: 52px; }
    规格完全对齐 app.css 既有图标体系（.icon-button 42×42 / .control-icon 24×24 /
    六边形线宽 1.6 / 箭头 1.8），默认色取 --primary-strong。
    图标形状与三态细节见 design-mockups/update-icon.html。 */
-.update-icon-button { position: relative; color: var(--primary-strong); }
-.update-icon-button .control-icon { width: var(--control-icon-size); height: var(--control-icon-size); }
+.update-icon-button { position: relative; min-width: 36px; min-height: 36px; color: var(--primary-strong); }
+.update-icon-button .control-icon { width: 24px; height: 24px; }
 .update-icon-button:hover { color: var(--primary-strong); background: var(--primary-soft); }
 .update-icon-button .dot {
-  position: absolute; top: 8px; right: 8px; width: 6px; height: 6px; border-radius: 50%;
+  position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%;
   background: var(--danger); box-shadow: 0 0 0 2px var(--bg);
 }
 @keyframes update-breathe { 0%,100% { transform: none; } 50% { transform: translateY(-1.5px); } }
@@ -1196,3 +1197,7 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 .update-ready-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 @keyframes update-ready-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .update-ready-toast { animation: none; } }
+
+.setting-riot-key-card { margin-top: 16px; }
+.setting-riot-key-input { flex: 1; min-width: 160px; }
+.setting-riot-key-input input { width: 100%; }

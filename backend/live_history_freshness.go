@@ -50,6 +50,7 @@ type liveHistoryEvidence struct {
 	QueueFiltered bool
 	PagesRead     int
 	StopReason    string
+	SGPMS, LCUMS  int64
 }
 
 func (a *app) clearLiveHistoryFreshness() {
@@ -229,7 +230,12 @@ func (a *app) loadLiveSGPMatches(ctx context.Context, client *LCUClient, referen
 	evidence := &liveHistoryEvidence{StopReason: "exhausted"}
 	matches := []gameplayMatch{}
 	now, offset := time.Now(), 0
-	for page := 0; page < 4; page++ {
+	pageLimit := 4
+	definition, known := supportedQueueDefinition(queueID)
+	if queueID == 0 || queueID == 3140 || queueID == 3110 || known && (definition.ModeGroup == "custom" || definition.ModeGroup == "bots" || definition.ModeGroup == "doombots") {
+		pageLimit = 1
+	}
+	for page := 0; page < pageLimit; page++ {
 		count, pageFilter := 30, "all"
 		if page == 0 && queueID > 0 {
 			count, pageFilter = 10, filter
@@ -247,6 +253,9 @@ func (a *app) loadLiveSGPMatches(ctx context.Context, client *LCUClient, referen
 			return livePlayerMatchesResult{State: "failed", Evidence: evidence}, false
 		}
 		evidence.StopReason = liveHistoryPageStop(matches, playerRef, queueID, now, more, evidence.PagesRead)
+		if evidence.StopReason == "" && evidence.PagesRead >= pageLimit {
+			evidence.StopReason = "page_limit"
+		}
 		if evidence.QueueFiltered || queueID <= 0 || err != nil || consumed <= 0 || evidence.StopReason != "" {
 			if evidence.StopReason == "" {
 				evidence.StopReason = "exhausted"

@@ -19,7 +19,7 @@
 
 ## 真机日志与不改项
 
-`lol-loot-diagnostics-1003-2002.jsonl` 逐行核对：子集预设接口 `/lol-lobby-team-builder/champ-select/v1/subset-champion-list` 199 次均 200、整数数组、3 ID；三次 /help 匹配为空。R200 账本与索引已改为“真机已核实”；实际卡片锁定/换人仍待用户日志。R197 赛后补全 `reason=ok revealed=1`，按用户决定保持现状，索引注明。R195 安装识别及 R196 已确认的下载能力不另改。见 [脱敏统计](history/reports/r201/source-log-summary.json)。
+`lol-loot-diagnostics-1003-2002.jsonl` 逐行核对：子集预设接口 `/lol-lobby-team-builder/champ-select/v1/subset-champion-list` 199 次均 200、整数数组、3 ID；三次 /help 匹配为空。R200 账本与索引已改为“真机已核实”；实际卡片锁定/换人仍待用户日志。R197 赛后补全 `reason=ok revealed=1`，按用户决定保持现状，索引注明。R195 安装识别及 R196 已确认的下载能力不另改。见 [脱敏统计](../reports/r201/source-log-summary.json)。
 
 ## 验证
 
@@ -28,20 +28,24 @@
 - installer 独立模块 `go test ./...` 通过，另已交叉编译 Windows 安装器；根目录不是 installer 的 Go 模块，按实际模块目录执行。
 - 三项变异均触发断言 FAIL，没有以编译失败充数：不 hide、跳过只读文件、测试选人写 UI；实际将常量改 false 的 overlay 下 R200 原无交集不选人测试 PASS。
 - 测试还覆盖首个 0.49 秒完成/其他 5 秒的测速提前返回、窗口内两条完成选最快及取消后的下载备选；只读恢复首次失败/两次失败、局内与 none 不触属性；三种卡片策略、真实确认及 postflight；损坏计时删除、重复启动不重复记事件、原便携启动文件恢复。
-- 证据在 [R201 核查目录](history/reports/r201/verification.json)。本地最终构建与 GitHub Windows public 发布构建通过。
+- 证据在 [R201 核查目录](../reports/r201/verification.json)。本地最终构建与 GitHub Windows public 发布构建通过。
 
 ## 构建与发布
 
-本地完整 public 构建通过，版本 0.12.64、指纹 `88054c16893c`，Setup SHA-256 `7e3718e03581c2ccef113db107ec4e4d766420c3618fef767cb6a8db42a1fc84`（[本地记录](history/reports/r201/local-release-build.json)）。源提交及标签 `37bb3c12ea98260ea2b2806f88bea6f0a7d627cb`。
+本地完整 public 构建通过，版本 0.12.64、指纹 `88054c16893c`，Setup SHA-256 `7e3718e03581c2ccef113db107ec4e4d766420c3618fef767cb6a8db42a1fc84`（[本地记录](../reports/r201/local-release-build.json)）。源提交及标签 `37bb3c12ea98260ea2b2806f88bea6f0a7d627cb`。
 
-已正式发布 [v0.12.64](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.64)。Release id **402520305**，发布时间 **2026-10-03T13:15:14Z**（北京时间 21:15:14），`draft=false`、`prerelease=false`、`isLatest=true`；匿名下载 `releases/latest/download/latest.json` 返回 **0.12.64**，字节与核验后的发布清单相同。三项证据见 [发布核验](history/reports/r201/publication-verification.json)。
+已正式发布 [v0.12.64](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.64)。Release id **402520305**，发布时间 **2026-10-03T13:15:14Z**（北京时间 21:15:14），`draft=false`、`prerelease=false`、`isLatest=true`；匿名下载 `releases/latest/download/latest.json` 返回 **0.12.64**，字节与核验后的发布清单相同。三项证据见 [发布核验](../reports/r201/publication-verification.json)。
 
 Windows public 工作流 [37124778247](https://github.com/LLYY0418/Deep-Legends/actions/runs/37124778247) 已成功，source SHA 与标签一致。tag 质量工作流 [37124778245](https://github.com/LLYY0418/Deep-Legends/actions/runs/37124778245) 已全部成功：Linux quality（含全量 race、Node、真实 Chromium）及后续 Windows 构建/校验和均通过，状态见核查记录。
 
-正式发布恰有三个 public 附件：`Deep-Legends-Setup-0.12.64-public.exe`、`latest.json`、`SHA256SUMS-public.txt`。逐个下载比对大小、GitHub digest、SHA256SUMS 与清单；版本和指纹均吻合。Windows 正式 Setup SHA-256：`f59d0db66d5ba9ce10309aef3e352b4ae73b7a807d59535a0938b855969049ea`，大小 111415808 字节。跨构建主机的 Setup SHA 不同，两个构建的源码指纹均为 `88054c16893c`。见 [附件核验](history/reports/r201/release-asset-verification.json)。
+正式发布恰有三个 public 附件：`Deep-Legends-Setup-0.12.64-public.exe`、`latest.json`、`SHA256SUMS-public.txt`。逐个下载比对大小、GitHub digest、SHA256SUMS 与清单；版本和指纹均吻合。Windows 正式 Setup SHA-256：`f59d0db66d5ba9ce10309aef3e352b4ae73b7a807d59535a0938b855969049ea`，大小 111415808 字节。跨构建主机的 Setup SHA 不同，两个构建的源码指纹均为 `88054c16893c`。见 [附件核验](../reports/r201/release-asset-verification.json)。
 
 只新增本版本发布；对比之前八个 Release 的身份、正文、目标、发布时间和附件 id/名称/大小/digest 均未改变，0.12.60 草稿 **402378684** 保持原样。
 
 ## 用户 Windows 验收
 
 仍需从 0.12.63 在线升级，确认窗口隐藏、自动启动与计时；只读开启/自由镜头打一局，核对 `ok_relocked` 和 `in_game_60s camera_mode_matches_target=true`；海斗无序列英雄的首卡选择实际锁定成功。自动测试与交叉编译不替代用户游戏客户端验收。
+
+## R204 追加真机核对（2026-10-04）
+
+R204 工单提供的真机证据确认只读设置写自由镜头后恢复只读，game_start 仍 CameraMode=0，用户确认生效；卡片实际锁定全部 applied，临时首卡测试已由 R204 P9 删除。安装总耗时约 50 秒，但旧计时不完整，进度与提速数据追踪由 R204 P8 接手。原实现、已确认部分及后续接手构成关闭依据，R201 关闭。证据引用工单摘录；未将模拟或 Windows runner 当作用户验收。

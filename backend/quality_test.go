@@ -667,10 +667,11 @@ var privacyMkdirCallPins = map[string]int{
 }
 
 var privacyStoreWriteCallPins = map[string]int{
-	"game_camera_mode.go": 1, // 根级 game-settings-sync.json：stores 的镜头模式偏好；沿用旧文件名以保留升级前的选择。
-	"season_stats.go":     1, // season-stats/<source>/<hash>-<season>.json（source 子目录由 writeLocalStoreFile 隐式创建）
-	"update.go":           3, // 根级 update-settings.json ×1、update-manifest.json ×2
-	"update_sources.go":   1, // 根级 update-settings.json 的成功线路偏好；既有 stores 自动更新设置，不含账号数据。
+	"riot_key_settings.go": 1, // 用户明确保存/清除及升级迁移的本机 Key；stores 明确声明。
+	"game_camera_mode.go":  1, // 根级 game-settings-sync.json：stores 的镜头模式偏好；沿用旧文件名以保留升级前的选择。
+	"season_stats.go":      1, // season-stats/<source>/<hash>-<season>.json（source 子目录由 writeLocalStoreFile 隐式创建）
+	"update.go":            3, // 根级 update-settings.json ×1、update-manifest.json ×2
+	"update_sources.go":    1, // 根级 update-settings.json 的成功线路偏好；既有 stores 自动更新设置，不含账号数据。
 }
 
 func TestPrivacyStoreDirectoryCreationCallSitesArePinned(t *testing.T) {
@@ -948,7 +949,7 @@ func TestDiagnosticRotationImmediatelyRestoresBuildSnapshot(t *testing.T) {
 	if err := json.Unmarshal([]byte(lines[2]), &snapshot); err != nil {
 		t.Fatal(err)
 	}
-	if snapshot["event"] != "app_start" || snapshot["version"] != version || snapshot["build_fingerprint"] != buildFingerprint || snapshot["riot_key"] != riotKeyConfigured() {
+	if snapshot["event"] != "app_start" || snapshot["version"] != version || snapshot["build_fingerprint"] != buildFingerprint || snapshot["riot_key_source"] != riotKeySource() {
 		t.Fatalf("post-rotation build snapshot = %#v", snapshot)
 	}
 }
@@ -972,7 +973,7 @@ func TestAppStartDiagnosticIdentifiesBuild(t *testing.T) {
 	if err := json.Unmarshal([]byte(lines[0]), &event); err != nil {
 		t.Fatal(err)
 	}
-	if event["event"] != "app_start" || event["version"] != version || event["build_fingerprint"] != buildFingerprint || event["riot_key"] != riotKeyConfigured() || event["time"] == nil {
+	if event["event"] != "app_start" || event["version"] != version || event["build_fingerprint"] != buildFingerprint || event["riot_key_source"] != riotKeySource() || event["time"] == nil {
 		t.Fatalf("app start diagnostic = %#v", event)
 	}
 }

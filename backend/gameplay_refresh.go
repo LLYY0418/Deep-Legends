@@ -98,8 +98,11 @@ func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase
 }
 
 type liveSnapshotFlight struct {
-	done     chan struct{}
-	response gameplayLiveResponse
+	done       chan struct{}
+	response   gameplayLiveResponse
+	progressMu sync.Mutex
+	progress   *gameplayLiveResponse
+	listeners  map[*liveProgressListener]struct{}
 }
 type liveSnapshotCache struct {
 	mu              sync.Mutex
@@ -198,6 +201,7 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 	if flight := c.flight; flight != nil {
 		generation := c.generation
 		c.mu.Unlock()
+		defer flight.listen(ctx)()
 		select {
 		case <-flight.done:
 			c.mu.Lock()
@@ -217,6 +221,14 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 	loadCtx, cancel := context.WithCancel(ctx)
 	c.cancel = cancel
 	c.mu.Unlock()
+	defer flight.listen(ctx)()
+	loadCtx = context.WithValue(loadCtx, liveProgressPublisherKey{}, func(progress gameplayLiveResponse) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if loadCtx.Err() == nil && c.generation == generation && c.flight == flight {
+			flight.publish(progress)
+		}
+	})
 	defer cancel()
 	// The owner always publishes and closes its flight, including on panic. A
 	// canceled old generation must not clear or populate a replacement flight.
