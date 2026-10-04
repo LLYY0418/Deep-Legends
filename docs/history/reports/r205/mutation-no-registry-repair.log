@@ -1,0 +1,10 @@
+--- FAIL: TestR205KeepShortcutsRepair (0.00s)
+    --- FAIL: TestR205KeepShortcutsRepair/missing_with_desktop (0.00s)
+        r205_test.go:174: writes=0 want=1
+    --- FAIL: TestR205KeepShortcutsRepair/unknown (0.00s)
+        r205_test.go:174: writes=0 want=1
+    --- FAIL: TestR205KeepShortcutsRepair/permission (0.00s)
+        r205_test.go:174: writes=0 want=1
+FAIL
+FAIL	deeplegends/installer	0.318s
+FAIL
