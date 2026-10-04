@@ -1,0 +1,16 @@
+[
+  {
+    "mutant": "application cooldown marker changed to per-path",
+    "command": "node --test <temporary-worker-copy>/*.test.mjs",
+    "exit_code": 1,
+    "result": "killed by AssertionError: cached other path returned 200 instead of 429",
+    "log": "mutant-worker.log"
+  },
+  {
+    "mutant": "ignore non-JSON Content-Type when classifying relay quota",
+    "command": "go test -overlay <temporary-overlay> ./backend -run ^TestR208RelayQuotaDaily$ -count=1",
+    "exit_code": 1,
+    "result": "killed by quota classification assertions: kind http instead of quota_exhausted; not a compile failure",
+    "log": "mutant-go.log"
+  }
+]

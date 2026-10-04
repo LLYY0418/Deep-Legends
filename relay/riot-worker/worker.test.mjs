@@ -15,7 +15,7 @@ function fixture(upstream = async () => new Response('{"ok":true}')) {
     },
   };
   const env = { RIOT_API_KEY: "fixture-secret-not-a-real-key", IP_LIMITER: {
-    async limit({ key }) { const slot = key + ":" + Math.floor(stamp / 60000); const n = (counts.get(slot) || 0) + 1; counts.set(slot, n); return { success: n <= 120 }; },
+    async limit({ key }) { const slot = key + ":" + Math.floor(stamp / 60000); const n = (counts.get(slot) || 0) + 1; counts.set(slot, n); return { success: n <= 300 }; },
   } };
   const worker = createRiotWorker({ cache, now: () => stamp, crypto: webcrypto, log: e => logs.push(e), fetch: async (...args) => { requests.push(args); return upstream(...args); } });
   return { env, requests, entries, logs, advance(ms) { stamp += ms; }, get(path, method = "GET", ip = "192.0.2.1") {
@@ -65,11 +65,11 @@ test("R206 Worker response caching honors category TTL and contains no identity 
   for (const log of f.logs) assert.deepEqual(Object.keys(log).sort(), ["cache_hit", "category", "status"]);
 });
 
-test("R206 Worker per-IP limit rejects request 121 and allows another IP", async () => {
+test("R206 Worker per-IP limit rejects request 301 and allows another IP", async () => {
   const config = readFileSync(new URL("./wrangler.toml", import.meta.url), "utf8");
-  assert.match(config, /limit = 120\nperiod = 60/);
+  assert.match(config, /limit = 300\nperiod = 60/);
   const f = fixture();
-  for (let i = 0; i < 120; i++) assert.equal((await f.get("/r/kr/lol/status/v4/platform-data")).status, 200);
+  for (let i = 0; i < 300; i++) assert.equal((await f.get("/r/kr/lol/status/v4/platform-data")).status, 200);
   const denied = await f.get("/r/kr/lol/status/v4/platform-data");
   assert.equal(denied.status, 429); assert.equal(denied.headers.get("Retry-After"), "60");
   assert.equal((await f.get("/r/kr/lol/status/v4/platform-data", "GET", "192.0.2.2")).status, 200);
@@ -93,7 +93,7 @@ test("R206 Worker never exposes or logs its secret, including echoed upstream va
   assert.ok(!JSON.stringify(f.logs).includes(secret));
   const denied = fixture(async () => new Response(secret, { status: 429, headers: { "Retry-After": secret } }));
   const d = await denied.get("/r/kr/lol/status/v4/platform-data");
-  assert.ok(!(await d.text()).includes(secret)); assert.equal(d.headers.get("Retry-After"), "3");
+  assert.ok(!(await d.text()).includes(secret)); assert.equal(d.headers.get("Retry-After"), "5");
 });
 
 test("R206 Worker fails closed without a secret or rate limiter", async () => {
@@ -117,4 +117,78 @@ test("R206 Worker rejects upstream redirects without forwarding the secret or Lo
     assert.equal(f.requests.length, 1);
     assert.equal(f.entries.size, 0);
   }
+});
+
+test("R208 application cooldown blocks every path on its host, with decreasing remaining time", async () => {
+  let limited = true;
+  const a = "/r/asia/riot/account/v1/accounts/by-puuid/a";
+  const b = "/r/asia/riot/account/v1/accounts/by-puuid/b";
+  const f = fixture(async url => limited && url.endsWith("/a")
+    ? new Response("limited", { status: 429, headers: { "Retry-After": "7", "X-Rate-Limit-Type": "application" } })
+    : new Response('{"ok":true}'));
+  await f.get(b); // Even an already cached path must honor global cooldown.
+  const first = await f.get(a);
+  assert.equal(first.headers.get("X-Relay-Cooldown"), "application");
+  f.advance(2000);
+  const blocked = await f.get(b);
+  assert.equal(blocked.status, 429);
+  assert.equal(blocked.headers.get("Retry-After"), "5");
+  assert.equal(f.requests.length, 2);
+  assert.equal((await f.get("/r/kr/lol/status/v4/platform-data")).status, 200);
+  assert.equal(f.requests.length, 3);
+  assert.deepEqual(Object.keys(f.logs.find(x => x.limit_type)).sort(), ["cache_hit", "category", "limit_type", "status"]);
+  limited = false; f.advance(5000);
+  assert.equal((await f.get(a)).status, 200);
+  assert.equal(f.requests.length, 4);
+});
+
+test("R208 method/service/missing-header cooldowns remain path scoped and default to five seconds", async () => {
+  for (const type of ["method", "service", null]) {
+    let limited = true;
+    const f = fixture(async url => limited && url.endsWith("/a")
+      ? new Response("limited", { status: 429, headers: type ? { "X-Rate-Limit-Type": type } : {} })
+      : new Response('{"ok":true}'));
+    const path = "/r/asia/riot/account/v1/accounts/by-puuid/";
+    const first = await f.get(path + "a");
+    assert.equal(first.headers.get("X-Relay-Cooldown"), type || "service");
+    assert.equal(first.headers.get("Retry-After"), "5");
+    assert.equal((await f.get(path + "b")).status, 200);
+    f.advance(2000);
+    const blocked = await f.get(path + "a");
+    assert.equal(blocked.status, 429); assert.equal(blocked.headers.get("Retry-After"), "3");
+    assert.equal(f.requests.length, 2);
+    limited = false; f.advance(3000);
+    assert.equal((await f.get(path + "a")).status, 200);
+    assert.equal(f.requests.length, 3);
+  }
+});
+
+test("R208 IP 429 and controlled upstream failures are JSON rather than false daily-quota pages", async () => {
+  const f = fixture();
+  for (let i = 0; i < 300; i++) await f.get("/r/kr/lol/status/v4/platform-data");
+  const ip = await f.get("/r/kr/lol/status/v4/platform-data");
+  assert.equal(ip.status, 429);
+  assert.equal(ip.headers.get("X-Relay-Cooldown"), null);
+  assert.equal(ip.headers.get("Retry-After"), "60");
+  assert.match(ip.headers.get("Content-Type"), /^application\/json/);
+  assert.deepEqual(await ip.json(), { error: "Too many requests" });
+  const broken = fixture(async () => { throw new Error("fixture network failure"); });
+  const response = await broken.get("/r/kr/lol/status/v4/platform-data");
+  assert.equal(response.status, 502); assert.match(response.headers.get("Content-Type"), /^application\/json/);
+});
+
+test("R208 application remaining time takes precedence when IP limit also expires", async () => {
+  const f = fixture(async () => new Response("limited", {status: 429, headers: {"X-Rate-Limit-Type": "application", "Retry-After": "7"}}));
+  await f.get("/r/asia/riot/account/v1/accounts/by-puuid/a");
+  f.advance(2000);
+  for (let i = 0; i < 300; i++) {
+    const r = await f.get("/r/asia/riot/account/v1/accounts/by-puuid/b");
+    assert.equal(r.status, 429);
+    assert.equal(r.headers.get("X-Relay-Cooldown"), "application");
+    assert.equal(r.headers.get("Retry-After"), "5");
+  }
+  assert.equal(f.requests.length, 1);
+  const kr = await f.get("/r/kr/lol/status/v4/platform-data");
+  assert.equal(kr.headers.get("X-Relay-Cooldown"), null);
+  assert.equal(kr.headers.get("Retry-After"), "60");
 });

@@ -1,0 +1,26 @@
+[
+  {
+    "mutation": "non-active-roster-retention",
+    "exitCode": 1,
+    "assertionFailure": true,
+    "log": "non-active-roster-retention.log"
+  },
+  {
+    "mutation": "no-retention-expiry",
+    "exitCode": 1,
+    "assertionFailure": true,
+    "log": "no-retention-expiry.log"
+  },
+  {
+    "mutation": "no-frontend-phase-exit",
+    "exitCode": 1,
+    "assertionFailure": true,
+    "log": "no-frontend-phase-exit.log"
+  },
+  {
+    "mutation": "no-idle-response-filter",
+    "exitCode": 1,
+    "assertionFailure": true,
+    "log": "no-idle-response-filter.log"
+  }
+]

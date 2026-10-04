@@ -223,6 +223,7 @@ function goFunctionSource(source, name) {
 }
 
 function compile(names, dependencies = {}, source = championsScript) {
+  dependencies = { recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies };
   dependencies = { gradeBadge: sharedGrades.gradeBadge, gradeRank: sharedGrades.gradeRank, ...dependencies };
   const keys = Object.keys(dependencies);
   return Function(...keys, `"use strict";\n${names.map((name) => functionSource(source, name)).join("\n")}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));

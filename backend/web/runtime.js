@@ -179,7 +179,7 @@
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
-    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "arena_header_source", "live_render_rebuild", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client"].includes(event)) return;
+    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client"].includes(event)) return;
     // Sample local requests by fixed endpoint category so status polling cannot
     // hide page timings. Delivery stays bounded and sampled events never retry.
     const sampled = event === "live_refresh_client" || event === "local_request_client";
@@ -217,6 +217,13 @@
       // R127 P0-2：图片队列的排队/加载计时与来源类别（不含具体路径）。
       for (const key of ["queueWaitMs", "loadMs", "activeSlowCount"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1000000, Math.floor(fields[key])));
       if (["lcu", "communitydragon", "ddragon", "gtimg", "builtin"].includes(fields.imageSource)) body.imageSource = fields.imageSource;
+    }
+    // R209：只放行计数与布尔值；等待状态的三十秒限频由 app.js 负责。
+    if (["collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback"].includes(event)) {
+      for (const key of ["activeCount", "activeJobs", "queued", "pendingObserved", "visiblePending", "oldestActiveAgeMs", "beforeCount", "afterCount", "beforeRemoteCount", "afterRemoteCount", "count"]) {
+        if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1000000, Math.floor(fields[key])));
+      }
+      if (typeof fields.observerRootOk === "boolean") body.observerRootOk = fields.observerRootOk;
     }
     // R130 P1-6：卡片图看门狗超时上报。只放行队列计数、候选序号与来源类别，
     // 不放行任何资源路径。限速由 app.js 的 reportCardImageStall 负责（每 10 秒

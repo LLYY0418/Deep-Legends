@@ -101,6 +101,7 @@ func TestR68HonorContinuationFiresCanceledPlayAgainExactlyOnce(t *testing.T) {
 	if !runner.schedule(client, "play-again", 5_000, http.MethodPost, "/lol-lobby/v2/play-again", nil) {
 		t.Fatal("initial play-again was not armed")
 	}
+	runner.champSelect.phase = "EndOfGame"
 	runner.handleHonor(client, json.RawMessage(`{"eligiblePlayers":[]}`), Summoner{}, watchHonorRule{Enabled: true, Strategy: "abstain"})
 	waitForWatchDiagnostic(t, diagnostics, "play-again", "canceled")
 	select {

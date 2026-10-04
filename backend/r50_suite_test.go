@@ -123,6 +123,7 @@ func TestWatchReadFailuresBroadcastAndDoNotWrite(t *testing.T) {
 	if !seen["watch:failed:promote-leader"] || !seen["watch:failed:auto-matchmaking"] {
 		t.Fatalf("lobby failure events = %#v", seen)
 	}
+	runner.champSelect.phase = "EndOfGame"
 	runner.handleHonor(client, json.RawMessage(`{"eligiblePlayers":[{"puuid":"ally","isAlly":true}]}`), Summoner{PUUID: "self"}, watchHonorRule{Enabled: true, Strategy: "any-teammate"})
 	if event := <-events; event != "watch:priority:honoring" {
 		t.Fatalf("honor priority event = %q", event)
@@ -221,6 +222,7 @@ func TestWatchHonorEventNeverSelectsEnemy(t *testing.T) {
 	settings.Rules.AutoHonor.Enabled = true
 	settings.Rules.AutoHonor.Strategy = "any-teammate"
 	runner.apply(settings)
+	runner.handlePhase(client, "EndOfGame")
 	runner.handleEvent(client, LCUEvent{
 		URI:  "/lol-honor-v2/v1/ballot",
 		Data: json.RawMessage(`{"eligiblePlayers":[{"puuid":"enemy","isEnemy":true,"isAlly":false},{"puuid":"ally","isEnemy":false,"isAlly":true}]}`),

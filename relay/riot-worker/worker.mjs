@@ -28,7 +28,13 @@ export function allowedRoute(url) {
 function retrySeconds(value, now) {
   if (/^\d+$/.test(value || "")) return Math.max(1, Math.min(86400, Number(value)));
   const stamp = Date.parse(value || "");
-  return Number.isFinite(stamp) ? Math.max(1, Math.min(86400, Math.ceil((stamp - now) / 1000))) : 3;
+  return Number.isFinite(stamp) ? Math.max(1, Math.min(86400, Math.ceil((stamp - now) / 1000))) : 5;
+}
+
+function jsonError(message, status, headers = {}) {
+  return new Response(JSON.stringify({ error: message }), {
+    status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers },
+  });
 }
 
 async function boundedText(body) {
@@ -65,24 +71,37 @@ export function createRiotWorker(options = {}) {
       const url = new URL(request.url);
       const route = request.method === "GET" && allowedRoute(url);
       if (!route) return new Response("Not found", { status: 404 });
-      const finish = (response, hit = false) => {
-        log({ category: route.category, status: response.status, cache_hit: hit });
+      const finish = (response, hit = false, limitType = "") => {
+        const entry = { category: route.category, status: response.status, cache_hit: hit };
+        if (limitType) entry.limit_type = limitType;
+        log(entry);
         return response;
       };
-      if (!env.RIOT_API_KEY || !env.IP_LIMITER) return finish(new Response("Service unavailable", { status: 503 }));
+      if (!env.RIOT_API_KEY || !env.IP_LIMITER) return finish(jsonError("Service unavailable", 503));
       let permitted;
       try { permitted = await env.IP_LIMITER.limit({ key: request.headers.get("CF-Connecting-IP") || "unknown" }); }
-      catch { return finish(new Response("Service unavailable", { status: 503 })); }
-      if (!permitted.success) return finish(new Response("Too many requests", { status: 429, headers: { "Retry-After": "60" } }));
+      catch { return finish(jsonError("Service unavailable", 503)); }
       // Only expiring HTTP response caches are used. Cache keys contain neither
       // Riot IDs nor IPs; no KV/D1/R2 or application identity/request logs.
       const cache = options.cache || caches.default;
       const key = new Request(url.origin + "/_cache/" + await digest(route.host + route.path + url.search));
       const cooldownKey = new Request(url.origin + "/_cooldown/" + await digest(route.host + route.path));
-      const cooldown = await cache.match(cooldownKey);
-      if (cooldown) {
-        return finish(new Response("Too many requests", { status: 429, headers: { "Retry-After": cooldown.headers.get("Retry-After") || "3" } }), true);
+      const applicationKey = new Request(url.origin + "/_application_cooldown/" + await digest(route.host));
+      // Count every request against the IP binding, while preserving the
+      // application's host-wide Retry-After even when both limits apply.
+      for (const markerKey of permitted.success ? [applicationKey, cooldownKey] : [applicationKey]) {
+        const cooldown = await cache.match(markerKey);
+        if (!cooldown) continue;
+        const remaining = Math.ceil((Number(cooldown.headers.get("X-Relay-Cooldown-Until")) - now()) / 1000);
+        // Expiring HTTP cache entries may survive briefly; never extend a
+        // cooldown by returning its original Retry-After on every hit.
+        if (!Number.isFinite(remaining) || remaining <= 0) continue;
+        const type = cooldown.headers.get("X-Relay-Cooldown") || "service";
+        return finish(jsonError("Too many requests", 429, {
+          "Retry-After": String(remaining), "X-Relay-Cooldown": type,
+        }), true, type);
       }
+      if (!permitted.success) return finish(jsonError("Too many requests", 429, { "Retry-After": "60" }), false, "ip");
       const cached = await cache.match(key);
       if (cached) return finish(cached, true);
       let upstream;
@@ -93,22 +112,30 @@ export function createRiotWorker(options = {}) {
           method: "GET", redirect: "manual", signal: AbortSignal.timeout(15000),
           headers: { "X-Riot-Token": env.RIOT_API_KEY, Accept: "application/json" },
         });
-      } catch { return finish(new Response("Upstream unavailable", { status: 502 })); }
+      } catch { return finish(jsonError("Upstream unavailable", 502)); }
       if (upstream.status >= 300 && upstream.status < 400) {
         await upstream.body?.cancel();
-        return finish(new Response("Upstream unavailable", { status: 502 }));
+        return finish(jsonError("Upstream unavailable", 502));
       }
       if (upstream.status === 429) {
         await upstream.body?.cancel();
-        const rawRetry = upstream.headers.get("Retry-After") || "3";
-        const retry = rawRetry.includes(env.RIOT_API_KEY) ? "3" : rawRetry;
-        const marker = new Response("rate-limit", { headers: { "Retry-After": retry, "Cache-Control": "public, max-age=" + retrySeconds(retry, now()) } });
-        await cache.put(cooldownKey, marker);
-        return finish(new Response("Too many requests", { status: 429, headers: { "Retry-After": retry } }));
+        const rawType = upstream.headers.get("X-Rate-Limit-Type");
+        const type = ["application", "method", "service"].includes(rawType) ? rawType : "service";
+        const rawRetry = upstream.headers.get("Retry-After") || "5";
+        const retry = rawRetry.includes(env.RIOT_API_KEY) ? "5" : rawRetry;
+        const seconds = retrySeconds(retry, now());
+        const marker = new Response("rate-limit", { headers: {
+          "X-Relay-Cooldown": type, "X-Relay-Cooldown-Until": String(now() + seconds * 1000),
+          "Cache-Control": "public, max-age=" + seconds,
+        } });
+        await cache.put(type === "application" ? applicationKey : cooldownKey, marker);
+        return finish(jsonError("Too many requests", 429, {
+          "Retry-After": String(seconds), "X-Relay-Cooldown": type,
+        }), false, type);
       }
       let body;
       try { body = await boundedText(upstream.body); }
-      catch { return finish(new Response("Upstream unavailable", { status: 502 })); }
+      catch { return finish(jsonError("Upstream unavailable", 502)); }
       // Do not expose an echoed secret or arbitrary upstream headers.
       body = body.split(env.RIOT_API_KEY).join("[redacted]");
       const headers = new Headers({ "Content-Type": "application/json; charset=utf-8" });

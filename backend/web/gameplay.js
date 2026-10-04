@@ -70,6 +70,12 @@
     liveTimer: 0,
     liveRecommendations: new Map(),
     liveRecommendationTraces: new Map(),
+    liveRecommendationScopes: new Map(),
+    liveRecommendationSpells: new Map(),
+    liveRecommendationRenderDiagnostics: new Map(),
+    liveRecommendationRenderPhase: "",
+    liveRecommendationScopeGameId: 0,
+    liveScopeLastReset: null,
     liveRecommendationFlights: new Map(),
     liveRecommendationFailures: new Map(),
     // R116-D：推荐缓存 key 的格式被 champions.test.cjs 钉死（不含阵容），
@@ -512,12 +518,13 @@
       state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
       state.controllers.get("live")?.abort();
       state.liveLoading = false;
+      const previousLive = state.live;
       state.live = null;
       state.liveAwaitingGame = false;
       state.liveExpectedGameId = 0;
       state.liveGameRefreshQueued = false;
       state.liveError = "";
-      resetLiveGameScopedState();
+      resetLiveGameScopedState(false, { reason: "disconnect", previous: previousLive, next: null });
       // 只在连接状态真正切换时更换目录。周期性的未连接状态事件不能
       // 清空已加载的 Data Dragon 兜底，否则下一次卡片重绘会只剩空槽。
       if (wasConnected) {
@@ -4689,7 +4696,7 @@
     renderLive();
     try {
       let previousLive = state.live;
-      const nextLive = await api(`/api/gameplay/live?requestId=${encodeURIComponent(state.liveProgressRequestId)}${force ? "&refresh=1" : ""}`, {}, "live", 45000);
+      let nextLive = await api(`/api/gameplay/live?requestId=${encodeURIComponent(state.liveProgressRequestId)}${force ? "&refresh=1" : ""}`, {}, "live", 45000);
       if (state.liveRequestToken !== requestToken || !connected()) return;
       if (state.liveAwaitingGame && normalizeLiveGameId(state.liveExpectedGameId)
           && normalizeLiveGameId(nextLive.gameId) !== normalizeLiveGameId(state.liveExpectedGameId)) {
@@ -4701,7 +4708,11 @@
       // the new-game transition visible rather than accepting an old lobby snapshot.
       if (state.liveAwaitingGame && liveGamePhase(state.beacon.phase) && !liveGamePhase(nextLive.phase)) return;
       if (invalidateLiveForNewGame(previousLive?.phase, nextLive.phase, nextLive.gameId, source, requestToken)) previousLive = null;
-      if (shouldResetLiveGameScopedState(previousLive, nextLive)) resetLiveGameScopedState();
+      // R210: even an old server response must not republish an ended roster in the lobby.
+      if (nextLive.phase && !liveGamePhase(nextLive.phase) && !["WaitingForStats", "PreEndOfGame", "EndOfGame"].includes(nextLive.phase)) {
+        nextLive = { phase: nextLive.phase, available: false, gameId: 0, players: [], capabilities: nextLive.capabilities };
+      }
+      if (shouldResetLiveGameScopedState(previousLive, nextLive)) resetLiveGameScopedState(false, { reason: (Number(previousLive?.gameId) || Number(state.liveRecommendationScopeGameId)) > 0 && Number(nextLive.gameId) > 0 && (Number(previousLive?.gameId) || Number(state.liveRecommendationScopeGameId)) !== Number(nextLive.gameId) ? "game_changed" : "enter_champselect", previous: previousLive, next: nextLive, source });
       if (previousLive?.phase === "ChampSelect" && nextLive.phase !== "ChampSelect") { for (const key of state.laneMatchupPairs?.keys?.() || []) state.controllers?.get?.(`lane-pair:${key}`)?.abort?.(); state.laneMatchupPairs?.clear?.(); state.laneMatchupCardDiagnostics?.clear?.(); state.laneMatchupCandidates?.clear?.(); state.laneMatchupDiagnosticSkips?.clear?.(); }
       resetLivePositionOverrides(previousLive, nextLive);
       resetRecommendationTabsOnChampionChange(previousLive, nextLive);
@@ -4800,6 +4811,9 @@
   }
 
   function liveSnapshotBehindPhase(data) {
+    if (state.liveScopeLastReset?.reason === "left_end_of_game" && !liveGamePhase(state.beacon.phase)
+        && !["WaitingForStats", "PreEndOfGame", "EndOfGame"].includes(state.beacon.phase)
+        && ["WaitingForStats", "PreEndOfGame", "EndOfGame"].includes(data?.phase)) return true;
     const cachedId = normalizeLiveGameId(state.live?.gameId);
     const incomingId = normalizeLiveGameId(data?.gameId);
     if (cachedId && incomingId && cachedId !== incomingId) return false;
@@ -4813,7 +4827,9 @@
     const gameChanged = previousId > 0 && nextId > 0 && previousId !== nextId;
     const phaseBoundary = Boolean(previousPhase) && previousPhase !== nextPhase && liveGamePhase(nextPhase)
       && (!liveGamePhase(previousPhase) || nextPhase === "ChampSelect");
-    const invalidated = gameChanged || phaseBoundary;
+    const leftEndOfGame = ["WaitingForStats", "PreEndOfGame", "EndOfGame"].includes(previousPhase)
+      && Boolean(nextPhase) && !liveGamePhase(nextPhase) && !["WaitingForStats", "PreEndOfGame", "EndOfGame"].includes(nextPhase);
+    const invalidated = gameChanged || phaseBoundary || leftEndOfGame;
     recordLiveObservation("invalidate", nextPhase, gameId, source, invalidated);
     if (!invalidated) return false;
     // A completed current response may clear the old snapshot before publishing
@@ -4831,18 +4847,20 @@
     clearTimeout(state.liveEventTimer);
     state.liveTimer = 0;
     state.liveEventTimer = 0;
+    const previousLive = state.live;
     state.live = null;
-    state.liveExpectedGameId = nextId;
-    state.liveAwaitingGame = true;
+    state.liveExpectedGameId = leftEndOfGame ? 0 : nextId;
+    state.liveAwaitingGame = !leftEndOfGame;
     state.liveRetryAttempts = 0;
     state.liveRetryKey = "";
     state.liveError = "";
-    resetLiveGameScopedState();
+    resetLiveGameScopedState(false, { reason: leftEndOfGame ? "left_end_of_game" : gameChanged ? "game_changed" : nextPhase === "ChampSelect" ? "enter_champselect" : "await_game", previous: previousLive, next: { gameId: leftEndOfGame ? 0 : nextId, phase: nextPhase }, source });
     renderLive();
     return true;
   }
 
   function resetDisconnectedLive() {
+    const previousLive = state.live;
     state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
     state.controllers.get("live")?.abort();
     state.liveLoading = false;
@@ -4854,7 +4872,7 @@
     state.liveExpectedGameId = 0;
     state.liveGameRefreshQueued = false;
     state.liveError = "实时连接已中断，请重试。";
-    resetLiveGameScopedState();
+    resetLiveGameScopedState(false, { reason: "resync", previous: previousLive, next: null, source: "realtime-disconnect" });
     renderLive();
     scheduleLiveRefresh();
   }
@@ -4884,12 +4902,28 @@
 
   function shouldResetLiveGameScopedState(previous, next) {
     if (!previous || !next) return false;
-    const gameChanged = String(previous.gameId || "") !== String(next.gameId || "");
+    const previousId = Number(previous.gameId) || Number(state.liveRecommendationScopeGameId) || 0;
+    const nextId = Number(next.gameId) || 0;
+    const gameChanged = previousId > 0 && nextId > 0 && previousId !== nextId;
     const enteringChampionSelect = String(previous.phase || "") !== "ChampSelect" && String(next.phase || "") === "ChampSelect";
     return gameChanged || enteringChampionSelect;
   }
 
-  function resetLiveGameScopedState(preserveTabs = false) {
+  function resetLiveGameScopedState(preserveTabs = false, context = null) {
+    context ||= {};
+    const previous = context.previous || state.live;
+    const next = context.next;
+    const reason = context.reason || (preserveTabs ? "hard_refresh" : "resync");
+    state.liveScopeLastReset = { reason, at: Date.now() };
+    if (typeof fetch === "function") void fetch("/api/diagnostics/client", {
+      method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "live_scope_reset", reason, source: String(context.source || ""),
+        previousGameId: Number(previous?.gameId) || 0, gameId: Number(next?.gameId) || 0,
+        previousPhase: String(previous?.phase || ""), phase: String(next?.phase || ""),
+        clearedRecommendations: state.liveRecommendations?.size || 0 }),
+    }).catch(() => {});
+    state.liveRecommendationScopeGameId = 0;
+    state.liveRecommendationRenderPhase = "";
     const recommendationTab = state.recommendationTab;
     const recommendationTabTouched = state.recommendationTabTouched;
     const runeSourceTab = state.runeSourceTab;
@@ -4904,7 +4938,7 @@
     state.runeStarterRequests?.clear?.();
     clearTimeout(state.proRuneTimer);
     for (const key of state.proRuneFlights?.keys?.() || []) state.controllers?.get?.(`live-pro-runes:${key}`)?.abort?.();
-    for (const collection of [state.proRunes, state.proRuneFlights, state.liveRecommendations, state.liveRecommendationTraces, state.specialistRunes, state.liveRecommendationFailures, state.liveRecommendationFlights, state.specialistRuneFailures, state.specialistRuneFlights, state.livePositionOverride, state.liveRecommendationSkipDiagnostics, state.specialistRuneSkipDiagnostics, state.liveRosterRenderDiagnostics, state.specialistPlayerTabs, state.liveRecommendationRosters, state.laneMatchupCandidates, state.laneMatchupPairs, state.laneMatchupCardDiagnostics, state.laneMatchupDiagnosticSkips]) collection?.clear?.();
+    for (const collection of [state.liveRecommendationScopes, state.liveRecommendationSpells, state.proRunes, state.proRuneFlights, state.liveRecommendations, state.liveRecommendationTraces, state.specialistRunes, state.liveRecommendationFailures, state.liveRecommendationFlights, state.specialistRuneFailures, state.specialistRuneFlights, state.livePositionOverride, state.liveRecommendationSkipDiagnostics, state.specialistRuneSkipDiagnostics, state.liveRosterRenderDiagnostics, state.specialistPlayerTabs, state.liveRecommendationRosters, state.laneMatchupCandidates, state.laneMatchupPairs, state.laneMatchupCardDiagnostics, state.laneMatchupDiagnosticSkips]) collection?.clear?.();
     state.recommendationTab = "runes";
     state.recommendationTabTouched = false;
     state.runeSourceTab = "opgg";
@@ -4940,7 +4974,7 @@
     state.liveLoadingVisibleTimer = 0;
     state.liveLoadingVisible = false;
     state.liveError = "";
-    resetLiveGameScopedState(true);
+    resetLiveGameScopedState(true, { reason: "hard_refresh", previous: state.live, next: state.live, source: "manual" });
   }
 
   function handleHardRefresh() {
@@ -5041,8 +5075,26 @@
     const baseKey = `${championId}:${gameMode}:${mapId}`;
     const positionOverride = state.livePositionOverride.get(baseKey) || "";
     const position = positionOverride || clientPosition;
-    const spellKey = [Number(self?.spell1Id) || 0, Number(self?.spell2Id) || 0].filter((value) => value > 0).sort((left, right) => left - right).join("-") || "none";
-	return { self, championId, position, clientPosition, positionOverride, augmentSource, queueId, gameMode, mapId, tier, gameId: Number(data?.gameId) || 0, baseKey, spellKey, key: `${championId}:${position}:${gameMode}:${mapId}:${tier}:${spellKey}` };
+    const gameId = Number(data?.gameId) || 0;
+    const scopeGameId = gameId > 0 ? gameId : Number(state.liveRecommendationScopeGameId || 0);
+    if (gameId > 0) {
+      // An initial unknown ID can become known without a game boundary. The
+      // generation and reset policy already fence these successful responses.
+      if (!state.liveRecommendationScopeGameId) {
+        for (const scope of state.liveRecommendationScopes?.values?.() || []) if (!scope.gameId) scope.gameId = gameId;
+      }
+      state.liveRecommendationScopeGameId = gameId;
+    }
+    let spellKey = [Number(self?.spell1Id) || 0, Number(self?.spell2Id) || 0].filter((value) => value > 0).sort((left, right) => left - right).join("-") || "none";
+    // R207: special modes retain the last champion-select spell pair for this
+    // game. Live-client names and gameflow omissions must not replace that pair.
+    if (augmentSource || gameMode === "ARAM" || mapId === 12) {
+      const spells = state.liveRecommendationSpells ||= new Map();
+      const scopeKey = baseKey;
+      if (data?.phase === "ChampSelect" && Number(self?.spell1Id) > 0 && Number(self?.spell2Id) > 0) spells.set(scopeKey, spellKey);
+      if (data?.phase !== "ChampSelect") spellKey = spells.get(scopeKey) || "none";
+    }
+	return { self, championId, position, clientPosition, positionOverride, augmentSource, queueId, gameMode, mapId, tier, gameId, scopeGameId, baseKey, spellKey, key: `${championId}:${position}:${gameMode}:${mapId}:${tier}:${spellKey}` };
   }
 
   function livePositionValue(value) {
@@ -5068,7 +5120,21 @@
   function liveRecommendationsFor(data) {
     if (data?.recommendations) return data.recommendations;
     const target = liveRecommendationTarget(data);
-    return target ? state.liveRecommendations.get(target.key) || null : null;
+    if (!target) return null;
+    const exact = state.liveRecommendations.get(target.key);
+    if (exact) return exact;
+    // Metadata belongs to a successful response, not the render-time snapshot.
+    // Never borrow from another game, champion, mode, map, or tier.
+    let latest = null;
+    let latestAt = -1;
+    for (const [key, scope] of state.liveRecommendationScopes || []) {
+      if (!(target.scopeGameId > 0) || scope.gameId !== target.scopeGameId
+          || scope.championId !== target.championId || scope.gameMode !== target.gameMode
+          || scope.mapId !== target.mapId || scope.tier !== target.tier) continue;
+      const payload = state.liveRecommendations.get(key);
+      if (payload && scope.at >= latestAt) { latest = payload; latestAt = scope.at; }
+    }
+    return latest;
   }
 
   function specialistRunesFor(data) {
@@ -5162,8 +5228,11 @@
       traceId, recommendationKey: targetKey,
 		});
 		if (target.gameId > 0) query.set("gameId", String(target.gameId));
-		if (Number(target.self?.spell1Id) > 0) query.set("spell1Id", String(target.self.spell1Id));
-		if (Number(target.self?.spell2Id) > 0) query.set("spell2Id", String(target.self.spell2Id));
+    // R207: only champion select refines special-mode builds with spell IDs.
+    if (!(target.augmentSource || target.gameMode === "ARAM" || target.mapId === 12) || data?.phase === "ChampSelect") {
+      if (Number(target.self?.spell1Id) > 0) query.set("spell1Id", String(target.self.spell1Id));
+      if (Number(target.self?.spell2Id) > 0) query.set("spell2Id", String(target.self.spell2Id));
+    }
 	if (target.augmentSource === "hextech") query.set("source", "mayhem");
 	// R116-D P1-2/P1-3/P1-5：只把阵容的英雄 ID 交给后端做交集。
 	// Anti-scope 第 1 条——绝不为这 10 个英雄各拉一次 hero-json，后端只读本人
@@ -5180,6 +5249,10 @@
       recommendations.traceId = recommendations.traceId || traceId;
       recommendations.recommendationKey = recommendations.recommendationKey || targetKey;
       state.liveRecommendations.set(targetKey, recommendations);
+      (state.liveRecommendationScopes ||= new Map()).set(targetKey, {
+        gameId: target.scopeGameId || target.gameId, championId: target.championId,
+        gameMode: target.gameMode, mapId: target.mapId, tier: target.tier, at: Date.now(),
+      });
       // R116-D：记住这份缓存是按哪个阵容算出来的。阵容一变（选人阶段逐个锁定、
       // 或进入对局后拿到敌方 5 人）下一次轮询就会重新取，克制/协同提示才不会
       // 停在旧阵容上。推荐缓存 key 的格式被 champions.test.cjs 钉死（不含阵容），
@@ -6151,10 +6224,45 @@
     return `<section class="lane-matchup-card" data-lane-matchup-card><div class="lane-matchup-foe">${iconFigure("champion", enemyId, context.enemy.championName || "敌方英雄", "small")}<span>对位 ${escapeHTML(context.enemy.championName || "敌方英雄")}</span></div>${content}</section>`;
   }
 
+  function ensureLiveRecommendationForRender(data, target) {
+    if (!target || !data.available || data.recommendations || state.liveRecommendations.has(target.key)) return;
+    if (liveRecommendationFlightActive(target.key)) return;
+    const failedAt = Number(state.liveRecommendationFailures.get(target.key) || 0);
+    if (failedAt > 0 && Date.now() - failedAt < 60_000) return;
+    void ensureLiveRecommendations(data);
+  }
+
+  function recordLiveRecommendationRender(data, target, payload) {
+    const phase = String(data?.phase || "");
+    const phaseChanged = phase !== state.liveRecommendationRenderPhase;
+    state.liveRecommendationRenderPhase = phase;
+    const empty = !payload || (!payload.build && !payload.augments?.length && !payload.runes);
+    if (!target || (!phaseChanged && !empty)) return;
+    const counts = state.liveRecommendationRenderDiagnostics ||= new Map();
+    const key = `${target.scopeGameId}:${target.key}`;
+    const count = counts.get(key) || 0;
+    if (count >= 5) return;
+    counts.set(key, count + 1);
+    if (counts.size > 128) counts.delete(counts.keys().next().value);
+    const cachedKeys = [...state.liveRecommendations.keys()].filter(key => key.split(":")[0] === String(target.championId)).slice(-5);
+    const reset = state.liveScopeLastReset;
+    void fetch("/api/diagnostics/client", {
+      method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "live_recommendation_render", reason: empty ? "empty" : "phase",
+        phase, gameId: Number(data?.gameId) || 0, championId: target.championId, targetKey: target.key,
+        exactHit: state.liveRecommendations.has(target.key), fallbackHit: Boolean(payload && !data?.recommendations && !state.liveRecommendations.has(target.key)),
+        cachedKeys, hasPayloadField: Boolean(data?.recommendations), augmentRows: payload?.augments?.length || 0,
+        hasBuild: Boolean(payload?.build), lastResetReason: reset?.reason || "", msSinceReset: reset ? Math.max(0, Date.now() - reset.at) : 0 }),
+    }).catch(() => {});
+  }
+
   function renderRecommendationArea(data) {
     const self = (data.players || []).find((player) => player.isCurrent);
     const target = liveRecommendationTarget(data);
-    const payload = liveRecommendationsFor(data) || {};
+    const availablePayload = liveRecommendationsFor(data);
+    const payload = availablePayload || {};
+    recordLiveRecommendationRender(data, target, availablePayload);
+    ensureLiveRecommendationForRender(data, target);
     const waiting = !data.available;
     const randomPending = Boolean(self?.championPickPending) || Number(self?.championPickIntent) < 0;
     const noChampion = !waiting && !target;

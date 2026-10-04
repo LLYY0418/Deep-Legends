@@ -1,0 +1,32 @@
+TAP version 13
+# Subtest: R209 silent observer falls back for visible pending cards exactly after two seconds
+not ok 1 - R209 silent observer falls back for visible pending cards exactly after two seconds
+  ---
+  duration_ms: 254.992292
+  type: 'test'
+  location: '/Users/ly/personal/personal-work/deep-legends/backend/web/r209.test.cjs:77:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    0 !== 8
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 8
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/backend/web/r209.test.cjs:81:24)
+    async Test.run (node:internal/test_runner/test:1125:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 665.382541

@@ -1,0 +1,85 @@
+TAP version 13
+# Subtest: R207 drift fallback renders same-game successful cache and starts only one exact none request
+not ok 1 - R207 drift fallback renders same-game successful cache and starts only one exact none request
+  ---
+  duration_ms: 48.985208
+  type: 'test'
+  location: '/Users/ly/personal/personal-work/deep-legends/backend/web/r207.test.cjs:52:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + null
+    - {
+    -   augments: [
+    -     {
+    -       assets: [
+    -         {
+    -           name: '测试海克斯'
+    -         }
+    -       ],
+    -       games: 100,
+    -       id: 1,
+    -       rarity: 'gold',
+    -       winRate: 52
+    -     }
+    -   ],
+    -   build: {
+    -     boots: [
+    -       3006
+    -     ],
+    -     coreOptions: [
+    -       {
+    -         games: 100,
+    -         ids: [
+    -           3071
+    -         ]
+    -       }
+    -     ]
+    -   },
+    -   hero: {
+    -     name: '海兽祭司'
+    -   }
+    - }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    hero:
+      name: '海兽祭司'
+    augments:
+      0:
+        id: 1
+        rarity: 'gold'
+        assets:
+          0:
+            name: '测试海克斯'
+        games: 100
+        winRate: 52
+    build:
+      coreOptions:
+        0:
+          ids:
+            0: 3071
+          games: 100
+      boots:
+        0: 3006
+  actual: ~
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/backend/web/r207.test.cjs:57:10)
+    Test.runInAsyncScope (node:async_hooks:228:14)
+    Test.run (node:internal/test_runner/test:1118:25)
+    Test.start (node:internal/test_runner/test:1015:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 376.819542

@@ -491,7 +491,14 @@ func (r *watchRunner) handleEvent(client *LCUClient, event LCUEvent, current Sum
 			r.scheduleAccept(client, settings.Rules.AutoAccept.DelayMS)
 		}
 	case strings.HasPrefix(uri, "/lol-honor-v2/v1/ballot") && settings.Rules.AutoHonor.Enabled:
-		r.record(map[string]any{"event": "endgame_trigger", "source": "honor-ballot", "honor_enabled": true})
+		r.mu.Lock()
+		phase := r.champSelect.phase
+		r.mu.Unlock()
+		if phase != "EndOfGame" && phase != "PreEndOfGame" {
+			r.record(map[string]any{"event": "honor_ballot_ignored", "phase": phase, "reason": "not-endgame"})
+			return
+		}
+		r.record(map[string]any{"event": "endgame_trigger", "source": "honor-ballot", "phase": phase, "honor_enabled": true})
 		goSafe("watch_rules.handleEvent.1", func() { r.handleHonor(client, event.Data, current, settings.Rules.AutoHonor) })
 	case strings.HasPrefix(uri, "/lol-pre-end-of-game/v1/currentsequenceevent") && settings.Rules.SkipCelebration.Enabled:
 		var payload struct {
@@ -1108,9 +1115,15 @@ func (r *watchRunner) emit(event string) {
 	}
 }
 
+func (r *watchRunner) honorPhaseActive() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.champSelect.phase == "EndOfGame" || r.champSelect.phase == "PreEndOfGame"
+}
+
 func (r *watchRunner) handleHonor(client *LCUClient, ballotData json.RawMessage, current Summoner, rule watchHonorRule) {
 	r.mu.Lock()
-	if r.honorInProgress || r.customSession {
+	if r.honorInProgress || r.customSession || (r.champSelect.phase != "EndOfGame" && r.champSelect.phase != "PreEndOfGame") {
 		r.mu.Unlock()
 		return
 	}
@@ -1128,7 +1141,7 @@ func (r *watchRunner) handleHonor(client *LCUClient, ballotData json.RawMessage,
 		deferred := r.deferredPlayAgain
 		r.deferredPlayAgain = false
 		r.mu.Unlock()
-		if deferred && r.currentWatch().MasterEnabled && r.currentWatch().Rules.AutoPlayAgain.Enabled {
+		if deferred && r.honorPhaseActive() && r.currentWatch().MasterEnabled && r.currentWatch().Rules.AutoPlayAgain.Enabled {
 			// The earlier play-again job was canceled by this honor flow itself, so
 			// this continuation is not a duplicate and may bypass markRun's window.
 			r.scheduleMarked(client, "play-again", 500, http.MethodPost, "/lol-lobby/v2/play-again", nil)
@@ -1144,7 +1157,7 @@ func (r *watchRunner) handleHonor(client *LCUClient, ballotData json.RawMessage,
 			return
 		}
 	}
-	if r.customPaused() {
+	if r.customPaused() || !r.honorPhaseActive() {
 		return
 	}
 	recipient := chooseHonorRecipient(ballotData, party, current.PUUID, rule.Strategy)
@@ -1152,10 +1165,10 @@ func (r *watchRunner) handleHonor(client *LCUClient, ballotData json.RawMessage,
 	if recipient != "" && rule.Strategy != "abstain" {
 		actionErr = r.requestWatchJSON(requestCtx, client, http.MethodPost, "/lol-honor/v1/honor", map[string]any{"honorType": "HEART", "recipientPuuid": recipient})
 	}
-	if actionErr == nil && !r.customPaused() {
+	if actionErr == nil && !r.customPaused() && r.honorPhaseActive() {
 		actionErr = r.requestWatchJSON(requestCtx, client, http.MethodPost, "/lol-honor/v1/ballot", nil)
 	}
-	if r.customPaused() {
+	if r.customPaused() || !r.honorPhaseActive() {
 		return
 	}
 	if actionErr != nil {

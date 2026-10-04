@@ -123,6 +123,7 @@ function functionSource(script, name) {
 // window.deepLegendsShared 桩。
 
 function compile(names, dependencies = {}, script = source) {
+  dependencies = { recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies };
   names = [...names];
   for (const name of ["proBadgeAttributes", "renderProIdentityBadge", "proContextFromButton"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
   if (!names.includes("overviewSupplementTarget") && names.some(name => functionSource(script, name).includes("overviewSupplementTarget("))) names.push("overviewSupplementTarget");

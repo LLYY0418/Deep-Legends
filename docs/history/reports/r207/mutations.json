@@ -1,0 +1,23 @@
+[
+  {
+    "mutation": "no-fallback",
+    "exitCode": 1,
+    "assertionFailure": true,
+    "test": "R207 drift fallback",
+    "log": "no-fallback.log"
+  },
+  {
+    "mutation": "no-render-request",
+    "exitCode": 1,
+    "assertionFailure": true,
+    "test": "R207 cache cleared",
+    "log": "no-render-request.log"
+  },
+  {
+    "mutation": "zero-is-new-game",
+    "exitCode": 1,
+    "assertionFailure": true,
+    "test": "R207 gameId 0 wobble",
+    "log": "zero-is-new-game.log"
+  }
+]

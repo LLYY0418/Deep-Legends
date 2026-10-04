@@ -174,6 +174,7 @@ function cssNumber(source, marker, property) {
 }
 
 function compileFunctions(source, names, dependencies = {}) {
+  dependencies = { recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies };
   const bodies = names.map((name) => functionSource(source, name));
   const compiledDependencies = { gradeBadge: sharedGrades.gradeBadge, gradeRank: sharedGrades.gradeRank, isSummonersRiftMatch: data => Number(data?.mapId) === 11, ...dependencies };
   if (source.includes("function loadOverview(")) {
@@ -578,7 +579,7 @@ function assertPositionRecommendationContract(championJS, championCSS, liveJS) {
   assert.match(championCSS, /\.champion-detail-positions \.metric-pick[^}]*\{ color: var\(--accent\)/s);
   assert.match(championCSS, /\.spell-options\.is-single \.spell-option\s*\{[^}]*width:\s*100%/s);
   assert.match(liveJS, /const baseKey = `\$\{championId\}:\$\{gameMode\}:\$\{mapId\}`;/);
-  assert.match(liveJS, /const spellKey = \[Number\(self\?\.spell1Id\)[^;]+\.sort\(\(left, right\) => left - right\)\.join\("-"\) \|\| "none";/);
+  assert.match(liveJS, /let spellKey = \[Number\(self\?\.spell1Id\)[^;]+\.sort\(\(left, right\) => left - right\)\.join\("-"\) \|\| "none";/);
   assert.match(liveJS, /key: `\$\{championId\}:\$\{position\}:\$\{gameMode\}:\$\{mapId\}:\$\{tier\}:\$\{spellKey\}`/);
   assert.match(liveJS, /orderedPositions\.length >= 1 \?/);
   assert.match(functionSource(liveJS, "resetLivePositionOverrides"), /gameChanged \|\| leftChampionSelect/);
@@ -2451,7 +2452,7 @@ test("live recommendations render and select every returned option", () => {
   assert.match(gameplayScript, /function ensureSpecialistRunes\(data\)/);
   assert.match(gameplayScript, /\/api\/gameplay\/specialist-runes\?/);
   assert.match(gameplayScript, /ensureLiveRecommendations\(state\.live\);\s*ensureSpecialistRunes\(state\.live\);/);
-	assert.match(functionSource(gameplayScript, "ensureLiveRecommendations"), /const recommendations = response\.recommendations;[\s\S]*?state\.liveRecommendations\.set\(targetKey, recommendations\);[\s\S]{0,1200}ensureSpecialistRunes\(state\.live\);/);
+	assert.match(functionSource(gameplayScript, "ensureLiveRecommendations"), /const recommendations = response\.recommendations;[\s\S]*?state\.liveRecommendations\.set\(targetKey, recommendations\);[\s\S]{0,1600}ensureSpecialistRunes\(state\.live\);/);
   assert.match(gameplayScript, /Array\.isArray\(response\?\.runes\)/);
   assert.match(gameplayScript, /(?:liveRecommendation|specialistRequest)Target\(state\.live\)\?\.key === target(?:\.key|Key)/);
   assert.match(specialistSource, /specialistRuneCacheTTL\s*=\s*6 \* time\.Hour/);
@@ -2576,8 +2577,8 @@ test("live game scoped state resets on a new game or champion select entry", () 
   assert.equal(functions.shouldResetLiveGameScopedState({ gameId: 11, phase: "Lobby" }, { gameId: 11, phase: "ChampSelect" }), true);
   assert.equal(functions.shouldResetLiveGameScopedState({ gameId: 11, phase: "ChampSelect" }, { gameId: 11, phase: "ChampSelect" }), false, "ordinary same-game polling must not reset state");
   const loadSource = functionSource(gameplayScript, "loadLive");
-  const mutated = loadSource.replace("if (shouldResetLiveGameScopedState(previousLive, nextLive)) resetLiveGameScopedState();", "if (false) resetLiveGameScopedState();");
-  assert.throws(() => assert.match(mutated, /if \(shouldResetLiveGameScopedState\(previousLive, nextLive\)\) resetLiveGameScopedState\(\);/));
+  const mutated = loadSource.replace("if (shouldResetLiveGameScopedState(previousLive, nextLive)) resetLiveGameScopedState(false, {", "if (false) resetLiveGameScopedState();");
+  assert.throws(() => assert.match(mutated, /if \(shouldResetLiveGameScopedState\(previousLive, nextLive\)\) resetLiveGameScopedState\(false, \{/));
 });
 
 test("round 9 recommendation percentages preserve backend units and hide empty statistics", () => {

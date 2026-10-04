@@ -70,6 +70,29 @@ type rendererPerfGroup struct {
 	MaxMS   float64 `json:"maxMs"`
 }
 type clientDiagnosticRequest struct {
+	ActiveCount             int                         `json:"activeCount,omitempty"`
+	ActiveJobs              int                         `json:"activeJobs,omitempty"`
+	PendingObserved         int                         `json:"pendingObserved,omitempty"`
+	VisiblePending          int                         `json:"visiblePending,omitempty"`
+	ObserverRootOK          bool                        `json:"observerRootOk"`
+	OldestActiveAgeMS       int                         `json:"oldestActiveAgeMs,omitempty"`
+	BeforeCount             int                         `json:"beforeCount,omitempty"`
+	AfterCount              int                         `json:"afterCount,omitempty"`
+	BeforeRemoteCount       int                         `json:"beforeRemoteCount,omitempty"`
+	AfterRemoteCount        int                         `json:"afterRemoteCount,omitempty"`
+	Count                   int                         `json:"count,omitempty"`
+	TargetKey               string                      `json:"targetKey,omitempty"`
+	ExactHit                bool                        `json:"exactHit"`
+	FallbackHit             bool                        `json:"fallbackHit"`
+	CachedKeys              []string                    `json:"cachedKeys,omitempty"`
+	HasPayloadField         bool                        `json:"hasPayloadField"`
+	AugmentRows             int                         `json:"augmentRows"`
+	HasBuild                bool                        `json:"hasBuild"`
+	LastResetReason         string                      `json:"lastResetReason,omitempty"`
+	MSSinceReset            int64                       `json:"msSinceReset"`
+	PreviousGameID          int64                       `json:"previousGameId"`
+	PreviousPhase           string                      `json:"previousPhase,omitempty"`
+	ClearedRecommendations  int                         `json:"clearedRecommendations"`
 	ResponseBytes           *int64                      `json:"responseBytes,omitempty"`
 	LongtaskCount           int                         `json:"longtaskCount,omitempty"`
 	LongtaskTotalMS         float64                     `json:"longtaskTotalMs,omitempty"`
@@ -178,6 +201,11 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
+	"collection_card_image_state":  {"waiting": true},
+	"card_image_slot_reconciled":   {"reconciled": true},
+	"card_image_observer_fallback": {"visible-pending": true},
+	"live_scope_reset":             {"game_changed": true, "enter_champselect": true, "disconnect": true, "await_game": true, "hard_refresh": true, "resync": true, "left_end_of_game": true},
+	"live_recommendation_render":   {"phase": true, "empty": true},
 	"blocking_state_client":        {"show": true, "hide": true, "timeout": true},
 	"automatic_read_client":        {"request": true},
 	"collection_render_client":     {"unchanged-suppressed": true, "updated": true},
@@ -267,6 +295,35 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	event := map[string]any{"event": request.Event, "reason": request.Reason}
+	if request.Event == "live_scope_reset" || request.Event == "live_recommendation_render" {
+		event["phase"] = truncateClientDiagnosticText(request.Phase)
+		event["game_id"] = max(int64(0), request.GameID)
+		if request.Event == "live_scope_reset" {
+			event["source"] = truncateClientDiagnosticText(request.Source)
+			event["previous_game_id"] = max(int64(0), request.PreviousGameID)
+			event["previous_phase"] = truncateClientDiagnosticText(request.PreviousPhase)
+			event["cleared_recommendations"] = min(10000, max(0, request.ClearedRecommendations))
+		} else {
+			event["champion_id"] = min(int64(1000000), max(int64(0), request.ChampionID))
+			event["target_key"] = truncateClientDiagnosticText(request.TargetKey)
+			event["exact_hit"], event["fallback_hit"] = request.ExactHit, request.FallbackHit
+			keys := make([]string, 0, 5)
+			for _, key := range request.CachedKeys {
+				if len(keys) == 5 {
+					break
+				}
+				keys = append(keys, truncateClientDiagnosticText(key))
+			}
+			event["cached_keys"] = keys
+			event["has_payload_field"], event["has_build"] = request.HasPayloadField, request.HasBuild
+			event["augment_rows"] = min(10000, max(0, request.AugmentRows))
+			event["last_reset_reason"] = truncateClientDiagnosticText(request.LastResetReason)
+			event["ms_since_reset"] = min(int64(86400000), max(int64(0), request.MSSinceReset))
+		}
+		a.recordDiagnostic(event)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if request.Event == "collection_render_client" {
 		switch request.View {
 		case "owned", "remaining", "all", "chromas":
@@ -446,6 +503,26 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 			case "lcu", "communitydragon", "ddragon", "gtimg", "builtin":
 				event["image_source"] = request.ImageSource
 			}
+		}
+		a.recordDiagnostic(event)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if request.Event == "collection_card_image_state" || request.Event == "card_image_slot_reconciled" || request.Event == "card_image_observer_fallback" {
+		switch request.Event {
+		case "collection_card_image_state":
+			event["active_count"] = min(1000, max(0, request.ActiveCount))
+			event["active_jobs"] = min(1000, max(0, request.ActiveJobs))
+			event["queued"] = min(100000, max(0, request.Queued))
+			event["pending_observed"] = min(100000, max(0, request.PendingObserved))
+			event["visible_pending"] = min(100000, max(0, request.VisiblePending))
+			event["observer_root_ok"] = request.ObserverRootOK
+			event["oldest_active_age_ms"] = min(1000000, max(0, request.OldestActiveAgeMS))
+		case "card_image_slot_reconciled":
+			event["before_count"], event["after_count"] = min(1000, max(0, request.BeforeCount)), min(1000, max(0, request.AfterCount))
+			event["before_remote_count"], event["after_remote_count"] = min(1000, max(0, request.BeforeRemoteCount)), min(1000, max(0, request.AfterRemoteCount))
+		case "card_image_observer_fallback":
+			event["count"] = min(100000, max(0, request.Count))
 		}
 		a.recordDiagnostic(event)
 		w.WriteHeader(http.StatusNoContent)

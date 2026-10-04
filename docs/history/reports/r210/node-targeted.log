@@ -1,0 +1,226 @@
+TAP version 13
+# Subtest: R204 Key input is masked and save/clear immediately update status without echo
+ok 1 - R204 Key input is masked and save/clear immediately update status without echo
+  ---
+  duration_ms: 200.225208
+  type: 'test'
+  ...
+# Subtest: R204 dialog-restored pointer focus hides tooltip while keyboard and hover show it
+ok 2 - R204 dialog-restored pointer focus hides tooltip while keyboard and hover show it
+  ---
+  duration_ms: 19.72425
+  type: 'test'
+  ...
+# Subtest: R204 update icon and close controls use shared sizes
+ok 3 - R204 update icon and close controls use shared sizes
+  ---
+  duration_ms: 28.78425
+  type: 'test'
+  ...
+# Subtest: R204 incremental roster rejects old requests/games/phases and shows a ready player before others
+ok 4 - R204 incremental roster rejects old requests/games/phases and shows a ready player before others
+  ---
+  duration_ms: 2.039042
+  type: 'test'
+  ...
+# Subtest: R204 missing/invalid Key renders only its title and working settings navigation
+ok 5 - R204 missing/invalid Key renders only its title and working settings navigation
+  ---
+  duration_ms: 202.802041
+  type: 'test'
+  ...
+# Subtest: R204 same-game pending incremental rows retain known history during background refresh
+ok 6 - R204 same-game pending incremental rows retain known history during background refresh
+  ---
+  duration_ms: 2.199333
+  type: 'test'
+  ...
+# Subtest: R204 pending progress does not reuse history across unknown games or changed identity scope
+ok 7 - R204 pending progress does not reuse history across unknown games or changed identity scope
+  ---
+  duration_ms: 7.384709
+  type: 'test'
+  ...
+# Subtest: R206 relay settings and unavailable rune service show built-in state and retry
+ok 8 - R206 relay settings and unavailable rune service show built-in state and retry
+  ---
+  duration_ms: 129.220042
+  type: 'test'
+  ...
+# Subtest: R207 log replay ChampSelect → GameStart → gameflow → named live-client spells keeps real build and augments
+ok 9 - R207 log replay ChampSelect → GameStart → gameflow → named live-client spells keeps real build and augments
+  ---
+  duration_ms: 169.239416
+  type: 'test'
+  ...
+# Subtest: R207 drift fallback renders same-game successful cache and starts only one exact none request
+ok 10 - R207 drift fallback renders same-game successful cache and starts only one exact none request
+  ---
+  duration_ms: 32.688625
+  type: 'test'
+  ...
+# Subtest: R207 cache cleared during unchanged polling recovers from render with single flight and failure backoff
+ok 11 - R207 cache cleared during unchanged polling recovers from render with single flight and failure backoff
+  ---
+  duration_ms: 37.514667
+  type: 'test'
+  ...
+# Subtest: R207 gameId 0 wobble preserves cache; restored known different game resets
+ok 12 - R207 gameId 0 wobble preserves cache; restored known different game resets
+  ---
+  duration_ms: 17.043875
+  type: 'test'
+  ...
+# Subtest: R207 Classic spell changes retain original exact request and query; special modes freeze only after select
+ok 13 - R207 Classic spell changes retain original exact request and query; special modes freeze only after select
+  ---
+  duration_ms: 55.469167
+  type: 'test'
+  ...
+# Subtest: R207 empty diagnostics have complete fields and same-game same-key maximum five
+ok 14 - R207 empty diagnostics have complete fields and same-game same-key maximum five
+  ---
+  duration_ms: 13.597833
+  type: 'test'
+  ...
+# Subtest: R207 same champion in a new game cannot inherit prior fallback or spell pair
+ok 15 - R207 same champion in a new game cannot inherit prior fallback or spell pair
+  ---
+  duration_ms: 10.317125
+  type: 'test'
+  ...
+# Subtest: R207 initially missing gameId adopts its known scope and partial select spell IDs do not replace valid pair
+ok 16 - R207 initially missing gameId adopts its known scope and partial select spell IDs do not replace valid pair
+  ---
+  duration_ms: 10.013333
+  type: 'test'
+  ...
+# Subtest: R208 IP stream 429 retains partial matches silently and resumes the same page at 60 seconds
+ok 17 - R208 IP stream 429 retains partial matches silently and resumes the same page at 60 seconds
+  ---
+  duration_ms: 122.389084
+  type: 'test'
+  ...
+# Subtest: R208 quota exhausted 503 shows the existing unavailable message without a 429 retry timer
+ok 18 - R208 quota exhausted 503 shows the existing unavailable message without a 429 retry timer
+  ---
+  duration_ms: 37.78
+  type: 'test'
+  ...
+# Subtest: R210 Riot Key is the third row with help, an embedded reveal button and shared field styles
+ok 19 - R210 Riot Key is the third row with help, an embedded reveal button and shared field styles
+  ---
+  duration_ms: 212.010208
+  type: 'test'
+  ...
+# Subtest: R210 real settings events toggle visibility and save an empty masked field without echo
+ok 20 - R210 real settings events toggle visibility and save an empty masked field without echo
+  ---
+  duration_ms: 219.888042
+  type: 'test'
+  ...
+# Subtest: R210 log replay clears ten ended players immediately in Lobby and rejects old None roster
+ok 21 - R210 log replay clears ten ended players immediately in Lobby and rejects old None roster
+  ---
+  duration_ms: 53.140958
+  type: 'test'
+  ...
+# Subtest: R210 phase exit fences an in-flight EndOfGame response and subsequent stale end snapshot
+ok 22 - R210 phase exit fences an in-flight EndOfGame response and subsequent stale end snapshot
+  ---
+  duration_ms: 18.018125
+  type: 'test'
+  ...
+# Subtest: R94 same-phase live responses with changed gameId invoke the transition before replacement
+ok 23 - R94 same-phase live responses with changed gameId invoke the transition before replacement
+  ---
+  duration_ms: 138.508083
+  type: 'test'
+  ...
+# Subtest: R94 unchanged phase and gameId preserve content and recommendation generation
+ok 24 - R94 unchanged phase and gameId preserve content and recommendation generation
+  ---
+  duration_ms: 14.6675
+  type: 'test'
+  ...
+# Subtest: R94 identity polling catches a game jump even when all intermediate phases were missed
+ok 25 - R94 identity polling catches a game jump even when all intermediate phases were missed
+  ---
+  duration_ms: 24.992
+  type: 'test'
+  ...
+# Subtest: R94 SSE game identity aborts a pending old game; stale replacement data cannot undo it
+ok 26 - R94 SSE game identity aborts a pending old game; stale replacement data cannot undo it
+  ---
+  duration_ms: 15.06225
+  type: 'test'
+  ...
+# Subtest: R94 unknown IDs do not clear a known game and diagnostics distinguish first observations
+ok 27 - R94 unknown IDs do not clear a known game and diagnostics distinguish first observations
+  ---
+  duration_ms: 11.519417
+  type: 'test'
+  ...
+# Subtest: R94 same-game phase advance labels the retained snapshot and rejects a late selection response
+ok 28 - R94 same-game phase advance labels the retained snapshot and rejects a late selection response
+  ---
+  duration_ms: 10.748416
+  type: 'test'
+  ...
+# Subtest: R94 a delayed poll cannot reverse a newer SSE identity or phase
+ok 29 - R94 a delayed poll cannot reverse a newer SSE identity or phase
+  ---
+  duration_ms: 40.220041
+  type: 'test'
+  ...
+# Subtest: R94 a changed identity in a new selection snapshot is not mistaken for a late same-game response
+ok 30 - R94 a changed identity in a new selection snapshot is not mistaken for a late same-game response
+  ---
+  duration_ms: 15.307417
+  type: 'test'
+  ...
+# Subtest: R94 SSE decoder retains legacy phase events and game identity payloads
+ok 31 - R94 SSE decoder retains legacy phase events and game identity payloads
+  ---
+  duration_ms: 1.589125
+  type: 'test'
+  ...
+# Subtest: R94 diagnostics preserve every repeated phase and identity comparison in bounded batches
+ok 32 - R94 diagnostics preserve every repeated phase and identity comparison in bounded batches
+  ---
+  duration_ms: 3.3325
+  type: 'test'
+  ...
+# Subtest: R94 diagnostics use one request during a stall and expose queue overflow while retaining transitions
+ok 33 - R94 diagnostics use one request during a stall and expose queue overflow while retaining transitions
+  ---
+  duration_ms: 3.317
+  type: 'test'
+  ...
+# Subtest: R94 largest diagnostic batch fits backend limit and strips unrelated data; export sends queued observations
+ok 34 - R94 largest diagnostic batch fits backend limit and strips unrelated data; export sends queued observations
+  ---
+  duration_ms: 1.467208
+  type: 'test'
+  ...
+# Subtest: R94 hidden same-phase SSE identity jump resumes one forced refresh when visible
+ok 35 - R94 hidden same-phase SSE identity jump resumes one forced refresh when visible
+  ---
+  duration_ms: 17.422166
+  type: 'test'
+  ...
+# Subtest: R94 failed diagnostic batches release their slot without retries and recover on the next batch
+ok 36 - R94 failed diagnostic batches release their slot without retries and recover on the next batch
+  ---
+  duration_ms: 4.988458
+  type: 'test'
+  ...
+1..36
+# tests 36
+# suites 0
+# pass 36
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1168.910875

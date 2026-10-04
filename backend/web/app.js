@@ -116,6 +116,10 @@
     poolRenderFrames: new Set(),
     cardImageObserver: null,
     cardImageJobs: new WeakMap(),
+    cardImageJobRegistry: new Set(),
+    cardImageObservers: new Map(),
+    cardImageHealthTimer: 0,
+    lastCardImageStateReportAt: null,
     cardImageQueue: [],
     activeCardImages: 0,
     activePrestigeCardImages: 0,
@@ -1719,36 +1723,145 @@
     next();
   }
 
-  function ensureCardImageObserver() {
-    if (state.cardImageObserver || !("IntersectionObserver" in window)) return state.cardImageObserver;
-    state.cardImageObserver = new IntersectionObserver((entries) => {
+  function cardImageObserverRoot(image) {
+    if (!image?.isConnected || el.appScroll?.contains(image)) return el.appScroll;
+    for (let node = image.parentElement; node && node !== document.body; node = node.parentElement) {
+      const style = window.getComputedStyle(node);
+      if (/(auto|scroll)/.test(`${style.overflow} ${style.overflowY} ${style.overflowX}`)) return node;
+    }
+    return null;
+  }
+
+  function ensureCardImageObserver(image = null) {
+    if (!("IntersectionObserver" in window)) return null;
+    const root = cardImageObserverRoot(image);
+    const observers = state.cardImageObservers ||= new Map();
+    if (observers.has(root)) return observers.get(root);
+    const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         const job = state.cardImageJobs.get(entry.target);
+        if (job?.observer && job.observer !== observer) continue;
         if (entry.isIntersecting) {
           if (job && !job.cancelled) enqueueCardImageJob(job);
-          // R130 P1-B：只有真的拿到名额才停止观察。还排在队里的任务必须继续被
-          // 观察，否则卡片滚出预取范围时没人能把它撤回，全局名额又会被屏幕外的
-          // 卡片占住。任务结束时由 finishCardImageJob 统一 unobserve。
+          // R130：拿到名额后才停止观察；排队中的任务仍可在滚出预取范围时撤回。
           const current = state.cardImageJobs.get(entry.target);
-          if (!current || current.active || current.done || current.cancelled) state.cardImageObserver.unobserve(entry.target);
+          if (!current || current.active || current.done || current.cancelled) observer.unobserve(entry.target);
           continue;
         }
-        // R130 P1-B：两层各判一次可见区域时，第一层按 620px 预取范围发名额，第二层
-        // 却按真实可见才放行，屏幕外的卡片于是长期占着全局 8 个名额；直接跳到列表
-        // 底部会出现「屏幕上的卡片一张都不加载」。已经排队但还没拿到名额的任务，
-        // 卡片离开预取范围就撤回并重新观察，保证先加载当前屏幕上的卡片。
+        // 已排队但未拿到名额的卡片离开预取范围时撤回，避免挤占当前屏幕的队列。
         if (!job || job.cancelled || job.done || job.active) continue;
         if (!withdrawCardImageJob(job)) continue;
-        state.cardImageObserver.observe(entry.target);
+        observer.observe(entry.target);
       }
-    }, { root: el.appScroll, rootMargin: "620px 0px" });
-    return state.cardImageObserver;
+    }, { root, rootMargin: "620px 0px" });
+    observers.set(root, observer);
+    if (root === el.appScroll) state.cardImageObserver = observer;
+    return observer;
+  }
+
+  function cardImageVisible(job) {
+    const image = job.image;
+    if (!image.isConnected || image.closest("[hidden]") || !image.getClientRects().length) return false;
+    const rect = image.getBoundingClientRect();
+    const root = cardImageObserverRoot(image);
+    const viewport = root ? root.getBoundingClientRect() : { top: 0, left: 0, bottom: window.innerHeight, right: window.innerWidth };
+    let top = Math.max(0, viewport.top), left = Math.max(0, viewport.left);
+    let bottom = Math.min(window.innerHeight, viewport.bottom), right = Math.min(window.innerWidth, viewport.right);
+    const horizontal = image.closest(".chroma-stack-cards");
+    if (horizontal) {
+      const clip = horizontal.getBoundingClientRect();
+      top = Math.max(top, clip.top); left = Math.max(left, clip.left);
+      bottom = Math.min(bottom, clip.bottom); right = Math.min(right, clip.right);
+    }
+    return rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right;
+  }
+
+  function scheduleCardImageHealthCheck() {
+    if (state.destroyed || state.cardImageHealthTimer || !state.cardImageJobRegistry?.size) return;
+    state.cardImageHealthTimer = setTimeout(() => {
+      state.cardImageHealthTimer = 0;
+      if (state.destroyed) return;
+      checkCardImageHealth();
+      scheduleCardImageHealthCheck();
+    }, 2000);
+    state.cardImageHealthTimer?.unref?.();
+  }
+
+  function checkCardImageHealth() {
+    pumpCardImageQueue();
+    if (document.hidden || state.section && state.section !== "favorites") return;
+    const now = Date.now();
+    for (const job of state.cardImageJobRegistry || []) {
+      if (!job.image.isConnected && now - job.createdAt >= 2000) {
+        job.cancelled = true;
+        clearCardImageWatchdog(job.image);
+        finishCardImageJob(job, false);
+      }
+    }
+    let fallbackCount = 0;
+    const jobs = [...(state.cardImageJobRegistry || [])].filter(job => !job.done && !job.cancelled && job.image.isConnected);
+    for (const job of jobs) {
+      if (job.active) continue;
+      const observer = ensureCardImageObserver(job.image);
+      if (observer !== job.observer) {
+        job.observer?.unobserve(job.image);
+        job.observer = observer;
+        observer?.observe(job.image);
+      }
+      if (job.image.dataset.cardImage === "pending" && now - job.createdAt >= 2000 && cardImageVisible(job)) {
+        enqueueCardImageJob(job);
+        fallbackCount += 1;
+      }
+    }
+    if (fallbackCount) window.reportFlowDiagnostic?.("card_image_observer_fallback", "visible-pending", { count: fallbackCount });
+    const waiting = jobs.filter(job => !job.active && !job.done && !job.cancelled);
+    if (!waiting.some(job => now - job.createdAt > 5000)) return;
+    if (state.lastCardImageStateReportAt != null && now - state.lastCardImageStateReportAt < 30000) return;
+    state.lastCardImageStateReportAt = now;
+    const active = jobs.filter(job => job.active && !job.done);
+    const pending = waiting.filter(job => job.image.dataset.cardImage === "pending");
+    window.reportFlowDiagnostic?.("collection_card_image_state", "waiting", {
+      activeCount: state.activeCardImages, activeJobs: active.length,
+      queued: waiting.filter(job => job.queued).length, pendingObserved: pending.filter(job => job.observer).length,
+      visiblePending: pending.filter(cardImageVisible).length,
+      observerRootOk: jobs.every(job => el.appScroll?.contains(job.image)),
+      oldestActiveAgeMs: active.reduce((oldest, job) => Math.max(oldest, now - job.startedAt), 0),
+    });
+  }
+
+  function reconcileCardImageSlots() {
+    const beforeCount = state.activeCardImages;
+    const beforeRemoteCount = state.activePrestigeCardImages;
+    let active = 0, remote = 0;
+    for (const job of state.cardImageJobRegistry || []) {
+      if (job.active && !job.image.isConnected) {
+        job.cancelled = true;
+        clearCardImageWatchdog(job.image);
+        job.image.onload = null;
+        job.image.onerror = null;
+        job.image.removeAttribute("src");
+        job.image.removeAttribute("data-queued-src");
+        finishCardImageJob(job, false);
+        continue;
+      }
+      if (!job.active || job.done || !job.image.isConnected) continue;
+      active += 1;
+      if (job.remote) remote += 1;
+    }
+    state.activeCardImages = active;
+    state.activePrestigeCardImages = remote;
+    if (beforeCount !== active || beforeRemoteCount !== remote) {
+      window.reportFlowDiagnostic?.("card_image_slot_reconciled", "reconciled", {
+        beforeCount, afterCount: active, beforeRemoteCount, afterRemoteCount: remote,
+      });
+    }
   }
 
   function withdrawCardImageJob(job) {
     const index = state.cardImageQueue.indexOf(job);
     if (index < 0) return false;
     state.cardImageQueue.splice(index, 1);
+    job.queued = false;
     job.image.dataset.cardImage = "pending";
     return true;
   }
@@ -1764,35 +1877,49 @@
     fallback.textContent = "加载中";
     fallback.dataset.emptyText = "暂无预览";
     fallback.hidden = false;
-    const job = { image, fallback, sources, remote, active: false, done: false, cancelled: false };
+    const previous = state.cardImageJobs.get(image);
+    if (previous && !previous.done) {
+      previous.cancelled = true;
+      finishCardImageJob(previous, false);
+    }
+    const job = { image, fallback, sources, remote, active: false, queued: false, done: false, cancelled: false, createdAt: Date.now(), startedAt: 0, observer: null };
+    (state.cardImageJobRegistry ||= new Set()).add(job);
     state.cardImageJobs.set(image, job);
     image.dataset.cardImage = "pending";
-    const observer = ensureCardImageObserver();
+    const observer = ensureCardImageObserver(image);
+    job.observer = observer;
     if (observer) observer.observe(image);
     else enqueueCardImageJob(job);
+    scheduleCardImageHealthCheck();
   }
 
   function enqueueCardImageJob(job) {
-    if (job.done || job.cancelled || job.active) return;
+    if (job.done || job.cancelled || job.active || job.queued) return;
     if (!job.image.isConnected) {
       requestAnimationFrame(() => {
         if (!job.done && !job.cancelled) enqueueCardImageJob(job);
       });
       return;
     }
+    job.queued = true;
     job.image.dataset.cardImage = "queued";
     state.cardImageQueue.push(job);
     pumpCardImageQueue();
   }
 
   function pumpCardImageQueue() {
+    if (state.destroyed) return;
+    reconcileCardImageSlots();
     while (state.activeCardImages < 8) {
-      let index = state.cardImageQueue.findIndex((job) => !job.cancelled && !job.done && !job.remote);
-      if (index < 0 && state.activePrestigeCardImages < 2) index = state.cardImageQueue.findIndex((job) => !job.cancelled && !job.done);
+      let index = state.cardImageQueue.findIndex((job) => !job.cancelled && !job.done && !job.active && !job.remote);
+      if (index < 0 && state.activePrestigeCardImages < 2) index = state.cardImageQueue.findIndex((job) => !job.cancelled && !job.done && !job.active);
       if (index < 0) return;
       const [job] = state.cardImageQueue.splice(index, 1);
-      if (job.cancelled || job.done) continue;
+      job.queued = false;
+      if (job.cancelled || job.done || job.active) continue;
+      if (!job.image.isConnected) { job.cancelled = true; finishCardImageJob(job, false); continue; }
       job.active = true;
+      job.startedAt = Date.now();
       state.activeCardImages += 1;
       if (job.remote) state.activePrestigeCardImages += 1;
       job.image.dataset.cardImage = "loading";
@@ -1803,7 +1930,7 @@
     }
   }
 
-  function finishCardImageJob(job) {
+  function finishCardImageJob(job, pump = true) {
     if (job.done) return;
     job.done = true;
     if (job.active) {
@@ -1811,10 +1938,13 @@
       if (job.remote) state.activePrestigeCardImages = Math.max(0, state.activePrestigeCardImages - 1);
     }
     job.active = false;
+    job.queued = false;
     delete job.image.dataset.cardImage;
-    state.cardImageObserver?.unobserve(job.image);
+    job.observer?.unobserve(job.image);
     state.cardImageJobs.delete(job.image);
-    pumpCardImageQueue();
+    state.cardImageJobRegistry?.delete(job);
+    if (!state.cardImageJobRegistry?.size) { clearTimeout(state.cardImageHealthTimer); state.cardImageHealthTimer = 0; }
+    if (pump) pumpCardImageQueue();
   }
 
   function cancelDeferredImages(container) {
@@ -1823,14 +1953,16 @@
       const job = state.cardImageJobs.get(image);
       if (!job || job.done) continue;
       job.cancelled = true;
-      state.cardImageObserver?.unobserve(image);
+      job.observer?.unobserve(image);
       clearCardImageWatchdog(image);
       image.onload = null;
       image.onerror = null;
       image.removeAttribute("src");
-      finishCardImageJob(job);
+      image.removeAttribute("data-queued-src");
+      finishCardImageJob(job, false);
     }
     state.cardImageQueue = state.cardImageQueue.filter((job) => !job.cancelled && !job.done);
+    pumpCardImageQueue();
   }
 
   function resetDialogImage(message) {

@@ -1,0 +1,26 @@
+{
+  "checked_at_utc": "2026-10-04T10:12:28.555229+00:00",
+  "worker": "deep-legends-riot-relay",
+  "version_id": "3135e103-6727-4084-83d1-a0fd292f3504",
+  "wrangler": "4.147.0",
+  "binding": {
+    "IP_LIMITER": {
+      "limit": 300,
+      "period": 60
+    }
+  },
+  "requests": [
+    {
+      "url": "https://riot.yinxiaobia.net/r/kr/lol/status/v4/platform-data",
+      "http_status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "json_valid": true,
+      "body_bytes": 287
+    },
+    {
+      "url": "https://riot.yinxiaobia.net/r/kr/lol/challenges/v1/challenges/config",
+      "http_status": 404,
+      "body": "Not found"
+    }
+  ]
+}

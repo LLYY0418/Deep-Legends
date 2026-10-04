@@ -1,0 +1,358 @@
+TAP version 13
+# Subtest: R130 P1 前提：移除 src 不触发任何 load/error 事件
+ok 1 - R130 P1 前提：移除 src 不触发任何 load/error 事件
+  ---
+  duration_ms: 66.858167
+  type: 'test'
+  ...
+# Subtest: R130 P1-A 8 张永不返回的图放弃后名额归零，后续正常图全部加载
+ok 2 - R130 P1-A 8 张永不返回的图放弃后名额归零，后续正常图全部加载
+  ---
+  duration_ms: 103.403334
+  type: 'test'
+  ...
+# Subtest: R130 P1-A 挂起的第一个候选放弃后必须继续试下一个候选地址
+ok 3 - R130 P1-A 挂起的第一个候选放弃后必须继续试下一个候选地址
+  ---
+  duration_ms: 42.286333
+  type: 'test'
+  ...
+# Subtest: R130 P1-A 变异：两道防线都关掉时名额永久泄漏（场景必须能测到修复）
+ok 4 - R130 P1-A 变异：两道防线都关掉时名额永久泄漏（场景必须能测到修复）
+  ---
+  duration_ms: 68.680666
+  type: 'test'
+  ...
+# Subtest: R130 P1-A 变异：只留看门狗（第二层不补发 error）仍然不泄漏
+ok 5 - R130 P1-A 变异：只留看门狗（第二层不补发 error）仍然不泄漏
+  ---
+  duration_ms: 51.091583
+  type: 'test'
+  ...
+# Subtest: R130 P1-A 变异：只留合成 error（关掉看门狗）仍然不泄漏
+ok 6 - R130 P1-A 变异：只留合成 error（关掉看门狗）仍然不泄漏
+  ---
+  duration_ms: 35.90575
+  type: 'test'
+  ...
+# Subtest: R130 P1-B 跳到列表底部后屏幕上的卡片必须在 2 秒内开始加载
+ok 7 - R130 P1-B 跳到列表底部后屏幕上的卡片必须在 2 秒内开始加载
+  ---
+  duration_ms: 27.235792
+  type: 'test'
+  ...
+# Subtest: R130 P1-B 变异：去掉 eager 设置后屏幕上的卡片永远排不到
+ok 8 - R130 P1-B 变异：去掉 eager 设置后屏幕上的卡片永远排不到
+  ---
+  duration_ms: 127.561125
+  type: 'test'
+  ...
+# Subtest: R130 P1-B 已排队但未拿到名额的任务离开预取范围会被撤回
+ok 9 - R130 P1-B 已排队但未拿到名额的任务离开预取范围会被撤回
+  ---
+  duration_ms: 21.336833
+  type: 'test'
+  ...
+# Subtest: R130 P1-C pointerleave 之后视频 src 被移除，且全局只有 1 个视频在播放
+ok 10 - R130 P1-C pointerleave 之后视频 src 被移除，且全局只有 1 个视频在播放
+  ---
+  duration_ms: 12.088458
+  type: 'test'
+  ...
+# Subtest: R130 P1-C 生产源码绑定了 pointerleave/blur，且开始下一个前先停上一个
+ok 11 - R130 P1-C 生产源码绑定了 pointerleave/blur，且开始下一个前先停上一个
+  ---
+  duration_ms: 0.281333
+  type: 'test'
+  ...
+# Subtest: R130 P1-D 取消奖池网格后 activeCardImages 只统计皮肤列表的任务
+ok 12 - R130 P1-D 取消奖池网格后 activeCardImages 只统计皮肤列表的任务
+  ---
+  duration_ms: 13.543584
+  type: 'test'
+  ...
+# Subtest: R130 P1-D 切换收藏子页与一级页签时都取消奖池网格
+ok 13 - R130 P1-D 切换收藏子页与一级页签时都取消奖池网格
+  ---
+  duration_ms: 0.442
+  type: 'test'
+  ...
+# Subtest: R130 P1-6 看门狗上报 card_image_stalled，每 10 秒最多一条且不带路径
+ok 14 - R130 P1-6 看门狗上报 card_image_stalled，每 10 秒最多一条且不带路径
+  ---
+  duration_ms: 86.635458
+  type: 'test'
+  ...
+# Subtest: R130 P1-6 card_image_stalled 打通前端白名单与后端白名单
+ok 15 - R130 P1-6 card_image_stalled 打通前端白名单与后端白名单
+  ---
+  duration_ms: 0.42325
+  type: 'test'
+  ...
+# Subtest: R141 旗帜列宽明显放大且保持两种窗口下 3–4 列，名称在图片下方
+ok 16 - R141 旗帜列宽明显放大且保持两种窗口下 3–4 列，名称在图片下方
+  ---
+  duration_ms: 0.679375
+  type: 'test'
+  ...
+# Subtest: R130 P2 旗帜比例取自第一张图片的真实尺寸，铺满格子后上下留白 ≤ 5%
+ok 17 - R130 P2 旗帜比例取自第一张图片的真实尺寸，铺满格子后上下留白 ≤ 5%
+  ---
+  duration_ms: 15.346125
+  type: 'test'
+  ...
+# Subtest: R130 P3 头像/旗帜/炫彩去掉右上角状态标签，皮肤卡的奖池标签保留
+ok 18 - R130 P3 头像/旗帜/炫彩去掉右上角状态标签，皮肤卡的奖池标签保留
+  ---
+  duration_ms: 0.378083
+  type: 'test'
+  ...
+# Subtest: R130 P4 头像/旗帜页去掉三格统计条，只留摘要行
+ok 19 - R130 P4 头像/旗帜页去掉三格统计条，只留摘要行
+  ---
+  duration_ms: 0.526542
+  type: 'test'
+  ...
+# Subtest: R130 P5 摘要行去掉「已显示」，数字走主题色且不经过 innerHTML
+ok 20 - R130 P5 摘要行去掉「已显示」，数字走主题色且不经过 innerHTML
+  ---
+  duration_ms: 20.696625
+  type: 'test'
+  ...
+# Subtest: R130 P5-4 拥有状态从不可用恢复后，头像开关回到用户原来的设置
+ok 21 - R130 P5-4 拥有状态从不可用恢复后，头像开关回到用户原来的设置
+  ---
+  duration_ms: 11.900958
+  type: 'test'
+  ...
+# Subtest: R138/R140 头像与旗帜详情都按原图 2 倍显示并分别封顶
+ok 22 - R138/R140 头像与旗帜详情都按原图 2 倍显示并分别封顶
+  ---
+  duration_ms: 9.164
+  type: 'test'
+  ...
+# Subtest: R130 P6 弹窗改紧凑布局、加载前 128×128 占位，皮肤/炫彩弹窗不动
+ok 23 - R130 P6 弹窗改紧凑布局、加载前 128×128 占位，皮肤/炫彩弹窗不动
+  ---
+  duration_ms: 0.497666
+  type: 'test'
+  ...
+# Subtest: R130 P1-A 取消/重建之后看门狗不得复活已取消的卡片
+ok 24 - R130 P1-A 取消/重建之后看门狗不得复活已取消的卡片
+  ---
+  duration_ms: 13.778583
+  type: 'test'
+  ...
+# Subtest: R130 P1-A 看门狗只统计卡片任务，详情弹窗不得污染 stall 上报
+ok 25 - R130 P1-A 看门狗只统计卡片任务，详情弹窗不得污染 stall 上报
+  ---
+  duration_ms: 0.449875
+  type: 'test'
+  ...
+# Subtest: R130 P1-A 变异：看门狗先推进时，第二层迟到的合成 error 不得再推进一次
+ok 26 - R130 P1-A 变异：看门狗先推进时，第二层迟到的合成 error 不得再推进一次
+  ---
+  duration_ms: 55.907708
+  type: 'test'
+  ...
+# Subtest: R130 P1-A 看门狗必须晚于第二层的最坏放弃时间
+ok 27 - R130 P1-A 看门狗必须晚于第二层的最坏放弃时间
+  ---
+  duration_ms: 0.182292
+  type: 'test'
+  ...
+# Subtest: R130 评审补漏：弹窗、悬停视频、来源分类与旗帜取样的边界
+ok 28 - R130 评审补漏：弹窗、悬停视频、来源分类与旗帜取样的边界
+  ---
+  duration_ms: 4.103916
+  type: 'test'
+  ...
+# Subtest: R203 1183 cards survive lastSync changes every eight seconds without global blocking
+ok 29 - R203 1183 cards survive lastSync changes every eight seconds without global blocking
+  ---
+  duration_ms: 120.228666
+  type: 'test'
+  ...
+# Subtest: R203 first empty collection shows only a grid placeholder and no indefinite loading flag
+ok 30 - R203 first empty collection shows only a grid placeholder and no indefinite loading flag
+  ---
+  duration_ms: 16.652541
+  type: 'test'
+  ...
+# Subtest: R203 missing identity escapes at fifteen seconds across repeated shows and retries
+ok 31 - R203 missing identity escapes at fifteen seconds across repeated shows and retries
+  ---
+  duration_ms: 10.600916
+  type: 'test'
+  ...
+# Subtest: R203 overlay retry is identity-only, single-flight and one-second debounced
+ok 32 - R203 overlay retry is identity-only, single-flight and one-second debounced
+  ---
+  duration_ms: 10.649458
+  type: 'test'
+  ...
+# Subtest: R203 sustained dirty statuses yield one automatic scan per sixty seconds, foreground favorites only
+ok 33 - R203 sustained dirty statuses yield one automatic scan per sixty seconds, foreground favorites only
+  ---
+  duration_ms: 17.369625
+  type: 'test'
+  ...
+# Subtest: R203 native dialogs log show and user close with category, never raw IDs
+ok 34 - R203 native dialogs log show and user close with category, never raw IDs
+  ---
+  duration_ms: 7.127375
+  type: 'test'
+  ...
+# Subtest: R203 collection render telemetry preserves visibility and card count
+ok 35 - R203 collection render telemetry preserves visibility and card count
+  ---
+  duration_ms: 2.390125
+  type: 'test'
+  ...
+# Subtest: R203 native confirmation preserves cancellation and logs no message text
+ok 36 - R203 native confirmation preserves cancellation and logs no message text
+  ---
+  duration_ms: 0.524375
+  type: 'test'
+  ...
+# Subtest: R206 first collection scan skeleton, failure after fifteen seconds and collection-only retry
+ok 37 - R206 first collection scan skeleton, failure after fifteen seconds and collection-only retry
+  ---
+  duration_ms: 115.781875
+  type: 'test'
+  ...
+# Subtest: R206 twenty local images start within 100ms while five remote candidates are bounded to two
+ok 38 - R206 twenty local images start within 100ms while five remote candidates are bounded to two
+  ---
+  duration_ms: 28.082125
+  type: 'test'
+  ...
+# Subtest: R206 local timeout is 4s and first error immediately queues a token-free remote candidate
+ok 39 - R206 local timeout is 4s and first error immediately queues a token-free remote candidate
+  ---
+  duration_ms: 9.478791
+  type: 'test'
+  ...
+# Subtest: R206 all single-letter tier icons share font size 13
+ok 40 - R206 all single-letter tier icons share font size 13
+  ---
+  duration_ms: 0.769792
+  type: 'test'
+  ...
+# Subtest: 青年瑞兹与海克斯科技安妮在奖池中归入限定
+ok 41 - 青年瑞兹与海克斯科技安妮在奖池中归入限定
+  ---
+  duration_ms: 1.02475
+  type: 'test'
+  ...
+# Subtest: 奖池限定排在传说之前，其余按奖池品质顺序比较
+ok 42 - 奖池限定排在传说之前，其余按奖池品质顺序比较
+  ---
+  duration_ms: 0.167833
+  type: 'test'
+  ...
+# Subtest: 自动主题严格按本地时间在 06:00 和 18:00 切换
+ok 43 - 自动主题严格按本地时间在 06:00 和 18:00 切换
+  ---
+  duration_ms: 5.367875
+  type: 'test'
+  ...
+# Subtest: 品质与数量排序默认从高到低
+ok 44 - 品质与数量排序默认从高到低
+  ---
+  duration_ms: 0.179292
+  type: 'test'
+  ...
+# Subtest: 普通炫彩始终平铺且不再提示悬停展开
+ok 45 - 普通炫彩始终平铺且不再提示悬停展开
+  ---
+  duration_ms: 1.245791
+  type: 'test'
+  ...
+# Subtest: 炫彩横栏保留页面纵向滚动，仅在 Shift 滚轮时横移
+ok 46 - 炫彩横栏保留页面纵向滚动，仅在 Shift 滚轮时横移
+  ---
+  duration_ms: 0.497542
+  type: 'test'
+  ...
+# Subtest: 炫彩横栏包含臻彩并只显示去掉所属皮肤后的短名称
+ok 47 - 炫彩横栏包含臻彩并只显示去掉所属皮肤后的短名称
+  ---
+  duration_ms: 0.407459
+  type: 'test'
+  ...
+# Subtest: 臻彩详情可在普通炫彩图与独立原画之间切换
+ok 48 - 臻彩详情可在普通炫彩图与独立原画之间切换
+  ---
+  duration_ms: 0.333416
+  type: 'test'
+  ...
+# Subtest: 卡片等待图片时显示加载中，失败后才显示暂无预览
+ok 49 - 卡片等待图片时显示加载中，失败后才显示暂无预览
+  ---
+  duration_ms: 0.294834
+  type: 'test'
+  ...
+# Subtest: 详情与炫彩导航共用全局图标尺寸令牌
+ok 50 - 详情与炫彩导航共用全局图标尺寸令牌
+  ---
+  duration_ms: 1.289875
+  type: 'test'
+  ...
+# Subtest: 奖池不再使用三合一优先层级并在切换拥有状态时重置品质
+ok 51 - 奖池不再使用三合一优先层级并在切换拥有状态时重置品质
+  ---
+  duration_ms: 0.6065
+  type: 'test'
+  ...
+# Subtest: 主滚动区域从顶部栏下方开始且不显示滚动条箭头
+ok 52 - 主滚动区域从顶部栏下方开始且不显示滚动条箭头
+  ---
+  duration_ms: 0.808875
+  type: 'test'
+  ...
+# Subtest: 收藏临时筛选会恢复默认值，奖池详情按实际展示顺序导航
+ok 53 - 收藏临时筛选会恢复默认值，奖池详情按实际展示顺序导航
+  ---
+  duration_ms: 0.626833
+  type: 'test'
+  ...
+# Subtest: 皮肤详情只在英雄分组时按英雄切换，其余视图按当前展示顺序
+ok 54 - 皮肤详情只在英雄分组时按英雄切换，其余视图按当前展示顺序
+  ---
+  duration_ms: 0.506791
+  type: 'test'
+  ...
+# Subtest: 最小窗口使用应用内排序菜单并在工具栏内换行
+ok 55 - 最小窗口使用应用内排序菜单并在工具栏内换行
+  ---
+  duration_ms: 1.091958
+  type: 'test'
+  ...
+# Subtest: 炫彩显隐不再扫描整棵 DOM 或触发布局测量
+ok 56 - 炫彩显隐不再扫描整棵 DOM 或触发布局测量
+  ---
+  duration_ms: 0.672
+  type: 'test'
+  ...
+# Subtest: 大量炫彩的显隐统计保持线性且远低于一帧交互预算
+ok 57 - 大量炫彩的显隐统计保持线性且远低于一帧交互预算
+  ---
+  duration_ms: 4.831667
+  type: 'test'
+  ...
+# Subtest: 卡片资源采用可视区延迟加载且远程臻彩受独立并发限制
+ok 58 - 卡片资源采用可视区延迟加载且远程臻彩受独立并发限制
+  ---
+  duration_ms: 0.603291
+  type: 'test'
+  ...
+1..58
+# tests 58
+# suites 0
+# pass 58
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1518.995959

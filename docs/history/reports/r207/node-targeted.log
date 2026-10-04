@@ -1,0 +1,385 @@
+✔ R86 ADD-4 retired synergy panel selector stays absent without removing shared card styles (261.035209ms)
+✔ R69 career-column reentry preserves match width through the 1600 DIP band (0.289584ms)
+✔ R15 performance, fingerprint, and shared build CSS contracts (1.655209ms)
+✔ R15 mutation probes fail for every new guard (6.20725ms)
+✔ champion intelligence is a first-level accessible workspace (0.239125ms)
+✔ diagnostics panel exports the active structured log with concise guidance (0.366917ms)
+✔ R39 diagnostic event whitelist mutation is caught (0.465417ms)
+✔ exported diagnostic log filename is timestamped so repeat exports never collide (0.521084ms)
+✔ renderer only calls the authenticated local champion API (0.245208ms)
+✔ position-aware recommendation contracts kill documented mutations (44.59225ms)
+✔ summoner spell card renders the first two real recommendations without placeholders (0.562208ms)
+✔ ranked loadout side uses a balanced two-two-two height budget (0.645292ms)
+✔ summoner spell recommendations do not add a low-sample badge (0.343083ms)
+✔ ranked recommendation rows never dim low sample sizes (0.56175ms)
+✔ backend pins Korean data and restricts remote image paths (0.165125ms)
+✔ champion layouts keep responsive and reduced-motion fallbacks (1.207291ms)
+✔ mayhem redesign keeps the two-column workspace, atlas, and R6 recommendations (2.06ms)
+✔ Mayhem recommendation and item ranking never request a guessed image URL (1.459083ms)
+✔ Mayhem and Arena augment cards render the same card shell (1.127792ms)
+✔ Mayhem augment cards carry the augment copy in the tooltip (1.267292ms)
+✔ live recommendation panels do not render upstream provenance footers (0.603167ms)
+✔ mayhem narrow layout moves the one champion list into an accessible dialog (0.349375ms)
+✔ arena narrow layout moves the champion list into an accessible dialog (0.899791ms)
+✔ mayhem CSS contract catches breakpoint and hidden-column mutations on a true copy (2.938ms)
+✔ R6 A B C contracts reject recommendation, spell, and item-route mutations on true copies (90.658916ms)
+✔ R13 item column contract kills wrapping and equal-width mutations on a true copy (61.863834ms)
+✔ R6 win rates, spell fallback, patch fallback, and subtitles are explicit (1.369583ms)
+✔ R7 prism grades, compact arena overview, recoverable match details, and clean names are explicit (1.536458ms)
+✔ R8 arena augment icons preserve semantic first-place tone without fabricated masks (0.418125ms)
+✔ R8 augment assets render as ordinary artwork (0.418333ms)
+✔ icon hotfix prefers Riot large artwork and carries a small fallback (0.262542ms)
+✔ icon hotfix fallback handler switches to small artwork (0.119917ms)
+✔ R8 rendered metric styles do not apply augment masks (0.028125ms)
+✔ R8 mayhem item configuration hides win rate when requested (0.332875ms)
+✔ R7 repeated disconnected status events preserve fallback item and augment catalogs (0.73775ms)
+✔ disconnection drops Tencent player identity while preserving Korean tabs (0.532667ms)
+✔ R7 contracts reject UI, parser, backend grade, and retry mutations on true copies (96.8495ms)
+✔ mayhem atlas normalizes Riot rarity enums before filtering (0.734625ms)
+✔ search keeps its caret and IME state when the workspace rerenders (0.29075ms)
+✔ full Riot ID paste keeps the tag caret without selecting the tag (0.091333ms)
+✔ champion detail uses complete build, matchup, and augment ranking layouts (1.233958ms)
+✔ arena keeps the champion list on wide screens and renders the redesigned data workspace (1.610459ms)
+✔ YOUR.GG champion grades preserve all six source letters in shared badges (0.327916ms)
+✔ arena round 8 removals stay scoped to the arena workspace (0.602541ms)
+✔ arena tolerates a missing catalog and hides unknown grades (0.382833ms)
+✔ match history keeps arena summaries compact and arena details purpose-built (6.106875ms)
+✔ arena match detail uses a validated Riot route and fail-closed hydration (0.311583ms)
+✔ demo mode serves complete arena fixtures without stable account identifiers (0.225958ms)
+✔ demo overview includes a match for every selectable game mode (0.296292ms)
+✔ demo mode exposes a dedicated Hextech ARAM live session (1.019292ms)
+✔ demo mode exposes a complete six-team Arena live session (0.487583ms)
+✔ small overviews move career statistics into an accessible modal sheet (3.722375ms)
+✔ rank history and ability comparison stay inside the shared career surface (3.722541ms)
+✔ career ranked queue switches use one recent sample and ignore season scan state (2.177333ms)
+✔ season progress refreshes the active overview without resetting queue choices or scroll (0.498375ms)
+✔ live updates target explicit state slices and clear client state on disconnect (0.551833ms)
+✔ structured data-source attempts are visible while cancellations stay silent (0.521541ms)
+✔ historical rank increments refresh only the matching active overview (0.243917ms)
+✔ summoner banner and recent ranked summary expose verified profile highlights (3.436625ms)
+✔ ranked payload shape probes are one-shot and retain raw win-loss samples (0.619ms)
+✔ champion square icons crop out the baked-in vignette without eating the face (0.185375ms)
+✔ mastery and peak rank columns share row tracks so their labels, names and values line up (0.50725ms)
+✔ demo data routes champion icons through the same asset shape production actually serves (0.053ms)
+✔ ranked queue cards stay visible so empty-season copy follows the selected mode (0.603417ms)
+✔ expanded sidebar stays compact without the old navigation subtitle (1.13575ms)
+✔ match history surfaces SGP failures and uses an accessible custom mode menu (0.925ms)
+✔ player tabs use arrow scrolling, hide the native scrollbar, and deduplicate searches (0.603291ms)
+✔ player tab avatars have no tooltip while overflowing names retain their own hint (13.762792ms)
+✔ player overlays add durable tabs and non-self tabs can be reordered (1.269791ms)
+✔ damage analysis sorts by a real metric and shows full colored values (0.999792ms)
+✔ team analysis compares both sides across every requested metric (1.277542ms)
+✔ team analysis exposes only metrics supported by each map and mode (0.899958ms)
+✔ match tier hydration is asynchronous and isolated by stable region, server, player and container (1.130292ms)
+✔ top search and player navigation preserve the selected Chinese server (2.11525ms)
+✔ Chinese server merge guidance uses one scoped tooltip constant (2.276042ms)
+✔ cross-server ranked data is an explicit unsupported state (0.345667ms)
+✔ privacy UI separates explicit and opt-in automatic writes (0.251625ms)
+✖ live recommendations render and select every returned option (3.482792ms)
+✔ current champion endpoint keeps live recommendations usable without a roster identity (0.463584ms)
+✔ champion and live recommendations share the persisted tier (0.366333ms)
+✔ live recommendation requests recover from stale flights and empty payloads (1.3195ms)
+✔ recommendation tabs reset only when the champion changes (0.197333ms)
+✔ live game scoped state resets on a new game or champion select entry (1.394792ms)
+✔ round 9 recommendation percentages preserve backend units and hide empty statistics (0.892208ms)
+✔ live QQ101 depth rows preserve unavailable sample metadata (0.538333ms)
+✔ live build item cards keep icon tooltips without visible item names (0.264208ms)
+✔ round 9 match summaries show only placement while details align it beside scores (0.665292ms)
+✔ round 9 match scores assign overall ranks and replace side leaders with MVP and SVP (0.780541ms)
+✔ round 9 match score ranks use hidden precision and keep exact ties deterministic (0.640875ms)
+✔ round 9 augment rendering uses upstream images, descriptions, and all rarity tones (1.319791ms)
+✔ R159 observed Hexdata icons render through the scoped image proxy in detail and match rows (0.877792ms)
+✔ round 9 recommendation modes drive tabs, fallbacks, and ranked-only sources (1.950084ms)
+✔ OPGG only uses the client fallback when no upstream positions exist (0.568709ms)
+✔ live recommendations can temporarily use a champ-select pick intent (1.087666ms)
+✔ live recommendation champion ids reject negative pick sentinels and use resolved live fallback (0.419583ms)
+✔ random pick pending state has distinct empty-state copy (0.783208ms)
+✔ rune application creates or recycles only Deep Legends pages (3.411416ms)
+✔ friend navigation uses only session-scoped player references (0.798208ms)
+✔ position filters use icons and transient search state is reset (0.436084ms)
+✔ rune shards use crisp login-independent Data Dragon assets (0.668792ms)
+✔ server-filtered flex switch makes one fresh first-page request (5.058916ms)
+✔ client-filter fallback alone may automatically page until flex appears (0.507584ms)
+✔ filtered empty state distinguishes active loading from idle history (0.161375ms)
+✔ filtered empty state renders the pagination copy only once (0.5785ms)
+✔ ranked matches omit unavailable local LP records (0.731917ms)
+✔ perk stat mod slots are separated from rune styles (0.87425ms)
+✔ perk catalogs supply icons while entertainment recommendations come from the current hero (1.620583ms)
+✔ match statistic labels have an explicit faint tone in both themes (0.378459ms)
+✔ tooltips use one viewport-aware portal instead of clipped pseudo elements (1.013125ms)
+✔ tooltips use the layered hextech surface in every theme (1.178791ms)
+✔ floating tooltip content is structured safely and shown only after placement (1.370125ms)
+✔ round 9 section navigation restores each page scroll position after panel activation (0.813ms)
+✔ round 9 tooltip pointer suppression survives the click focus event (0.944416ms)
+✔ round 9 friend refreshes and redundant static icon tooltips stay disabled (0.175125ms)
+✔ player-name tooltips are gated by the actual ellipsized text (1.35025ms)
+✔ champion detail tooltips include static numerical metadata and player aliases (0.408416ms)
+✔ network preload excludes Hexdata and starts only ranked and arena work (0.332208ms)
+✔ champion data survives section switches and re-entry renders instantly while fresh (0.319125ms)
+✔ champion mode, searches, and tabs persist while transient detail state resets (0.434375ms)
+✔ ranked detail always keeps matchup and top-player cards (0.145417ms)
+✔ watch settings replace the legacy convenience controls and frontend writer (0.513291ms)
+✔ disconnected collection, account, live and pool pages hide filters (0.237833ms)
+✔ account page removes the duplicate title and sizes facts to unwrapped content (0.304291ms)
+✔ optional themes keep a neutral background and accent-only primary (0.121792ms)
+✔ mayhem atlas description comes from the guide paragraph, not the SEO blurb (0.293834ms)
+✔ mayhem atlas columns share one height cap and scroll independently (0.319917ms)
+✔ mayhem rarity panel disappears when the read fails (0.051917ms)
+✔ augment metadata is looked up by ID without an icon-directory filter (0.20125ms)
+✔ augment icons survive a client asset miss and never render as a solid tile (0.397334ms)
+✔ arena augment descriptions drop runtime counters and render calculations (0.265333ms)
+✔ mayhem augments without upstream copy do not promise the client has it (0.070666ms)
+✔ specialist rune loading never blocks the outer OPGG rune panel (0.304917ms)
+✔ live session shows the current position only when position capability exists (0.526459ms)
+✔ live position choices sort by role share and derive missing shares from play (0.784875ms)
+✔ live build recommendations use a wide core column and only the available depth columns (1.708083ms)
+✔ live rune source tabs keep stable widths when the contextual note appears (0.337042ms)
+✔ disabled controls use the not-allowed cursor throughout the web UI (0.248583ms)
+✔ arena live build aligns prism and core cards with the three Arena metrics (1.872666ms)
+✔ live core routes render at most five rows without an expansion control (0.991916ms)
+✔ live recommendation option groups keep the upstream order and never re-sort by win rate (0.867417ms)
+✔ mayhem opening sections follow actual data instead of the augment capability (0.869583ms)
+✔ item set payload uses three core routes, removes cross-group duplicates, and follows recommendation position (0.559166ms)
+✔ R176 classic core routes start at core items while retaining the starter summary (10.813333ms)
+✔ R176 arena and hextech build routes remain free of starter dividers (0.856ms)
+✔ item set payload preserves recommendation trace and resolved position context (0.418792ms)
+✔ item set drops an empty post-core block and reports applied group and item counts (0.721541ms)
+✔ item set apply tooltip carries the in-game shop clipping workaround without repeating it in the toast (0.362417ms)
+✔ item set apply failure records the same trace and item counts (0.296167ms)
+✔ live mayhem item ranking renders the passed-through rows without a new request (0.596917ms)
+✔ live Mayhem builds keep only core equipment beside a two-column ranking (1.973ms)
+✔ overview re-entry keeps its pages for the two minute freshness window (0.127541ms)
+✔ R63 forced overview refresh merges its first page into already loaded pages (1.184584ms)
+✔ R63 match-tier scope ignores transient tab keys (0.124291ms)
+✔ R61 append uses an independent controller and queues timed revalidation (1.07925ms)
+✔ R61 partial and budget-limited pagination stays resumable (0.293208ms)
+✔ desktop packaging has a static embedded Riot ciphertext gate (0.066417ms)
+✔ champion detail keeps conditional fourth/fifth items out of core routes (8.277041ms)
+✔ mayhem champion detail uses the same five-row core recommendation limit (0.352084ms)
+✔ hero detail rune workspace renders only the active rune board (0.474792ms)
+✔ champion list rerenders preserve the inner table scroll position (0.274833ms)
+✔ ranked, arena, and mayhem champion rows all expose selected state (0.386625ms)
+✔ R148 Mayhem ranking win rate and detail sample render from insights row (0.640834ms)
+✔ match loadout follows the OPGG mode matrix instead of trusting stray augment data (1.205833ms)
+✔ match filters keep ordinary, qualifier, and classic Hextech ARAM mutually exclusive (1.130833ms)
+✔ remade matches use a neutral result instead of win or loss (0.562583ms)
+✔ live rune matchups occupy the champion strip right side without wrapping their facts (1.240166ms)
+✔ live match statistics keep fixed geometry across modes (0.308417ms)
+✔ live matchup rows use equal-width three-column grids (0.084166ms)
+✔ live recommendation capability flags hide unsupported matchup and ban-rate blocks (1.325125ms)
+✔ live skill plan distinguishes primary, secondary, final, and ultimate controls (0.770375ms)
+✔ live skill plan keeps four distinct controls on narrow screens (0.347ms)
+✔ live augments group before limiting, retaining the top three of each rarity (2.502292ms)
+✔ arena detail augments use the shared three-column option grid (0.588584ms)
+✔ arena synergy cards show one readable paired champion label (0.325125ms)
+✔ live rune choices use the keystone title and make the whole card selectable (1.060208ms)
+✔ specialist matchups place the colored result dot beside the opponent (1.578625ms)
+✔ specialist second game selection redraws and applies that game's exact runes (2.487875ms)
+✔ specialist opponent lives in the selectable head and the rune content is single-column (0.680292ms)
+✔ live rune style icons preserve their 4:5 artwork ratio (0.799292ms)
+✔ arena medium cards keep one-line identities and compact recommendation icons (0.523584ms)
+✔ mayhem and arena hero strips match the ranked artwork treatment (0.317417ms)
+✔ build rows keep a fixed 42px icon size and wrap whole depth groups (1.89025ms)
+✔ session summary uses a generic auto refresh status (0.417209ms)
+✔ live page defaults to a 3 second refresh and resets recommendations to runes on re-entry (0.388917ms)
+✔ live beacon reacts to active phase changes and has a one second fallback (1.521875ms)
+✔ R46 live refresh delays follow the game phase (0.112875ms)
+✔ R46 TFT live sessions render one explicit unsupported state (0.745958ms)
+✔ R47 Arena live insights use one honest roster with phase-specific context (2.2565ms)
+✔ R58 Arena live playerlist groups six teams and malformed shapes fall back to one roster (2.756625ms)
+✔ R49 Arena player cards use the current champion fallback, hide lane copy, and put self first (25.267041ms)
+✔ R66 live premade hints cluster players and render a rich, fail-closed tag (1.021209ms)
+✔ R66 premade backend guards reject cache and inference mutations (5.527167ms)
+✔ Arena random champion IDs use the official unselected champion icon (0.701625ms)
+✔ R56 recommendation loading is centered by its overlay without viewport overflow (0.446167ms)
+✔ R56 missing recommendation metrics remove the whole metric item and empty wrappers (1.86825ms)
+✔ player header retains region and uses friend presence without CN spectator probes (0.345375ms)
+✔ R46 restores only a persisted champion ID and clears unavailable selections (0.557042ms)
+✔ R61 champion re-entry renders persisted detail on the first frame (4.522625ms)
+✔ R61 stale rankings re-entry runs loadWorkspace(true) without flashing the list (17.807125ms)
+✔ R61 detail cache survives leaving and prevents a second detail request (0.705083ms)
+✔ same champion route click overrides the previous detail position (0.476417ms)
+✔ item route limit follows the active bottom or adc detail before the selected row (0.28025ms)
+✔ R61 detail tier persists and keeps the refreshed rankings cache fresh (0.450291ms)
+✔ R70 section event runs after synchronous panel activation without snapshot delay (0.136291ms)
+✔ R47 ranked detail recovers to the list when champion metadata is unavailable (0.330792ms)
+✔ champion detail core routes hide pick rate and retain win rate with games (0.370625ms)
+✔ R63 keeps the OP.GG source only in the build header (0.41225ms)
+✔ QQ101 item depths disclose unavailable samples and flag extreme rates (0.294458ms)
+✔ R189 nonblank fallback loot remains visible without a pending hint (0.8655ms)
+✔ 0924 blank LCU loot record: hinted while retries run, plain and typeless once settled (0.729292ms)
+✔ 0924 the account page does not show the blank LCU placeholder record or its notice (1.6165ms)
+✔ 0912 named ward, icon and legacy loot render their resolved names (0.960792ms)
+✔ R61 account renderer directly retains unnamed loot and kills the old filter (0.954208ms)
+✔ R61 every mandatory contract rejects its documented production mutation (12.994708ms)
+✔ R63 mandatory contracts reject every documented production regression (20.803583ms)
+✔ live rune secondary style row stays aligned beneath the primary keystone row (0.496333ms)
+✔ R16 build, rune, skill, and Korean overview guards preserve the corrected contracts (1.7305ms)
+✔ R16 addendum guards reject every documented regression on true copies (82.473375ms)
+✔ R45 contracts cover desktop Arena geometry, build layout, and cell identity wiring (0.973125ms)
+✔ R45 mutation probes reject every documented A, B, and C regression (4.201334ms)
+✔ R46 contracts cover cache eviction, parsing, beacon, refresh, and TFT handling (0.617292ms)
+✔ R46 mutation probes reject all six required regressions (2.730125ms)
+✔ R47 contracts cover Arena champ-select filtering and the single-roster layout (1.132167ms)
+✔ R47 A-group mutation probes reject mode and single-roster regressions (2.385667ms)
+✔ R49 all seven required mutation probes fail on true copied files (34.444416ms)
+✔ R47 addendum scopes recommendation breakpoints to its inline-size container (0.430292ms)
+✔ R47 addendum mutation probes reject media-query regressions (0.524292ms)
+✔ R45 item-set branding uses DL in demo and LCU metadata (0.296333ms)
+✔ R71 item-set action uses game recommendations without verbose manual-cleanup notes (0.483375ms)
+✔ R58 mutation probes reject stale-roster and Arena fallback regressions (1.515208ms)
+✔ the duplicated 30-day ranked card is gone from every layer (0.73575ms)
+✔ ranked queue switchers drop the redundant text label (1.03725ms)
+✔ specialist rune client skips are observable and stale cooldowns recover (1.169375ms)
+✔ specialist upstream failures remain retryable and are never cached as empty samples (0.793625ms)
+✔ specialist retryable outcomes have accurate copy and a retry control (1.923375ms)
+✔ queues without top-player data keep an explicit specialist empty state (1.164875ms)
+✔ collection status wording is timeless and promotion chests use dedicated artwork (0.45875ms)
+✔ returning to a section restores its scroll position past the loading skeleton (0.20325ms)
+✔ captured Arena equipment matches YOUR.GG preview order and expands to every source item (62.484292ms)
+✔ Arena equipment sorting retains low samples, missing metadata and ungraded items (0.371ms)
+✔ R86 champion index preserves numeric/first-match/key semantics and invalidates catalogs (0.3295ms)
+✔ R117 mayhem augment spinner resets even when the view changed mid-flight (17.071584ms)
+✔ R117 champions api() surfaces RequestCancelled instead of flattening it into a timeout (0.664375ms)
+✔ R117 champions api() keeps RequestCancelled when a successful fetch is superseded (0.305708ms)
+✔ R148 changing Mayhem heroes resets the detail tab and its saved setting (0.35425ms)
+✔ R188 direct premade tooltip uses champion icons before names without hero text (74.910583ms)
+✔ R188 inferred title is a count with no methodology body, both/lobby stay direct (49.100958ms)
+✔ R188 zero and negative champion IDs retain an empty icon slot even with intent/name (34.410209ms)
+✔ R188 mask names uses the existing maskedPlayerName policy (9.751834ms)
+✔ R188 matchup is after tabs outside insight and visible on runes/build/insight (34.812167ms)
+✔ R188 preselection caps four candidates at three, narrow rule hides the third (82.327042ms)
+✔ R188 notice follows matchup slot without entering panels (9.9145ms)
+✔ R188 pending to success and hidden preserve tab buttons, focused tab, and fixed slot (20.238917ms)
+✔ R188 InProgress and unlocked enemy hide matchup (1.412666ms)
+✔ R188 placement passes both actual diagnostic senders (8.678666ms)
+✔ R207 log replay ChampSelect → GameStart → gameflow → named live-client spells keeps real build and augments (108.063833ms)
+✔ R207 drift fallback renders same-game successful cache and starts only one exact none request (38.213959ms)
+✔ R207 cache cleared during unchanged polling recovers from render with single flight and failure backoff (21.30375ms)
+✔ R207 gameId 0 wobble preserves cache; restored known different game resets (13.2705ms)
+✔ R207 Classic spell changes retain original exact request and query; special modes freeze only after select (52.621791ms)
+✔ R207 empty diagnostics have complete fields and same-game same-key maximum five (15.072208ms)
+ℹ tests 261
+ℹ suites 0
+ℹ pass 260
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1648.211833
+
+✖ failing tests:
+
+test at backend/web/champions.test.cjs:2427:1
+✖ live recommendations render and select every returned option (3.482792ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /const recommendations = response\.recommendations;[\s\S]*?state\.liveRecommendations\.set\(targetKey, recommendations\);[\s\S]{0,1200}ensureSpecialistRunes\(state\.live\);/. Input:
+  
+  'async function ensureLiveRecommendations(data) {\n' +
+    '    const target = liveRecommendationTarget(data);\n' +
+    '    if (!target) { recordLiveRecommendationSkip("no-target", null, data); return; }\n' +
+    '    const targetKey = target.key;\n' +
+    '    // R116-D：阵容（我方 5 人 + 视阶段而定的敌方 5 人）。拿不到阵容就不传 roster\n' +
+    '    // 参数，后端一个提示都不生成——降级方向由 liveRecommendationRoster 自己负责。\n' +
+    '    // R116-B 评审整改（D 账本 §11.7-2）去掉了原先的 typeof 护栏：那道护栏只是为了\n' +
+    '    // 让 champions.test.cjs 的 compileFunctions（注入列表固定、缺这个依赖）不抛\n' +
+    '    // ReferenceError，生产上从来不会走到「函数不存在」这一支；现在两个测试文件都\n' +
+    '    // 显式注入 liveRecommendationRoster，护栏留着只会掩盖真正的漏注入。\n' +
+    '    const roster = liveRecommendationRoster(data);\n' +
+    '    const rosterSignature = String(roster?.signature || "");\n' +
+    '    if (data?.recommendations) { recordLiveRecommendationSkip("has-payload", target, data); return; }\n' +
+    '    // 缓存命中还要再比一次阵容签名：选人阶段英雄是逐个锁定的，阵容变了而\n' +
+    '    // key 没变（key 的格式被既有测试钉死、不含阵容），提示就会停在旧阵容上。\n' +
+    '    if (state.liveRecommendations.has(targetKey) && (!rosterSignature || state.liveRecommendationRosters?.get?.(targetKey) === rosterSignature)) { recordLiveRecommendationSkip("cached", target, data); return; }\n' +
+    '    if (liveRecommendationFlightActive(targetKey)) { recordLiveRecommendationSkip("in-flight", target, data); return; }\n' +
+    '    const failedAt = Number(state.liveRecommendationFailures.get(targetKey) || 0);\n' +
+    '    if (failedAt > 0 && Date.now() - failedAt < 60_000) { recordLiveRecommendationSkip("backoff", target, data); return; }\n' +
+    '    const gameGeneration = Number(state.liveGameGeneration || 0);\n' +
+    '    const traceId = newLiveRecommendationTraceId();\n' +
+    '    state.liveRecommendationTraces.set(targetKey, traceId);\n' +
+    '    state.liveRecommendationFlights.set(targetKey, Date.now());\n' +
+    '    // 立刻重绘一次，好让各个页签在等待期间显示加载遮罩，而不是先闪一屏空状态。\n' +
+    '    if (liveRecommendationTarget(state.live)?.key === targetKey) renderLive();\n' +
+    '\t\tconst query = new URLSearchParams({\n' +
+    '\t\t  championId: String(target.championId), position: target.position,\n' +
+    '\t\t  queueId: String(target.queueId), gameMode: target.gameMode, mapId: String(target.mapId), tier: target.tier,\n' +
+    '      traceId, recommendationKey: targetKey,\n' +
+    '\t\t});\n' +
+    '\t\tif (target.gameId > 0) query.set("gameId", String(target.gameId));\n' +
+    '    // R207: only champion select refines special-mode builds with spell IDs.\n' +
+    '    if (!(target.augmentSource || target.gameMode === "ARAM" || target.mapId === 12) || data?.phase === "ChampSelect") {\n' +
+    '      if (Number(target.self?.spell1Id) > 0) query.set("spell1Id", String(target.self.spell1Id));\n' +
+    '      if (Number(target.self?.spell2Id) > 0) query.set("spell2Id", String(target.self.spell2Id));\n' +
+    '    }\n' +
+    '\tif (target.augmentSource === "hextech") query.set("source", "mayhem");\n' +
+    '\t// R116-D P1-2/P1-3/P1-5：只把阵容的英雄 ID 交给后端做交集。\n' +
+    '\t// Anti-scope 第 1 条——绝不为这 10 个英雄各拉一次 hero-json，后端只读本人\n' +
+    '\t// 英雄那一次的缓存。Anti-scope 第 4 条——ChampSelect 阶段不下发敌方 ID\n' +
+    '\t// （探测未证实 theirTeam 非空，后端还有一道同样的阶段白名单）。\n' +
+    '\tif (roster?.phase) query.set("phase", roster.phase);\n' +
+    '\tif (roster?.allyIds?.length) query.set("allyChampionIds", roster.allyIds.join(","));\n' +
+    '\tif (roster?.enemyIds?.length) query.set("enemyChampionIds", roster.enemyIds.join(","));\n' +
+    '    try {\n' +
+    '      const response = await api(`/api/gameplay/recommendations?${query}`, {}, `live-recommendations:${targetKey}`, 20000);\n' +
+    '      if (gameGeneration !== Number(state.liveGameGeneration || 0)) return;\n' +
+    '      if (!hasUsableLiveRecommendations(response?.recommendations)) throw new Error("推荐数据不完整");\n' +
+    '      const recommendations = response.recommendations;\n' +
+    '      recommendations.traceId = recommendations.traceId || traceId;\n' +
+    '      recommendations.recommendationKey = recommendations.recommendationKey || targetKey;\n' +
+    '      state.liveRecommendations.set(targetKey, recommendations);\n' +
+    '      (state.liveRecommendationScopes ||= new Map()).set(targetKey, {\n' +
+    '        gameId: target.scopeGameId || target.gameId, championId: target.championId,\n' +
+    '        gameMode: target.gameMode, mapId: target.mapId, tier: target.tier, at: Date.now(),\n' +
+    '      });\n' +
+    '      // R116-D：记住这份缓存是按哪个阵容算出来的。阵容一变（选人阶段逐个锁定、\n' +
+    '      // 或进入对局后拿到敌方 5 人）下一次轮询就会重新取，克制/协同提示才不会\n' +
+    '      // 停在旧阵容上。推荐缓存 key 的格式被 champions.test.cjs 钉死（不含阵容），\n' +
+    '      // 所以用这张旁表而不是改 key。\n' +
+    '      if (rosterSignature) state.liveRecommendationRosters?.set?.(targetKey, rosterSignature);\n' +
+    '      state.liveRecommendationFailures.delete(targetKey);\n' +
+    '      recordItemSetClientDiagnostic("live_recommendations_client", "received", {\n' +
+    '        ...target, traceId: recommendations.traceId, recommendationKey: recommendations.recommendationKey,\n' +
+    '        requestedPosition: recommendations.requestedPosition || target.position, resolvedPosition: recommendations.resolvedPosition,\n' +
+    '        positionSource: recommendations.positionSource, position: recommendations.build?.position || recommendations.resolvedPosition,\n' +
+    '      });\n' +
+    '      ensurePerks();\n' +
+    '      ensureItems();\n' +
+    '      ensureSummonerSpells();\n' +
+    '\t  // The first specialist check races this async recommendation request. Once\n' +
+    '\t  // hasTopPlayers arrives, retry immediately instead of waiting for another\n' +
+    '\t  // LCU live snapshot that may never change during champion select.\n' +
+    '\t  ensureSpecialistRunes(state.live);\n' +
+    '      if (liveRecommendationTarget(state.live)?.key === targetKey) {\n' +
+    '        renderLive();\n' +
+    '        recordItemSetClientDiagnostic("live_recommendations_client", "rendered", {\n' +
+    '          ...target, traceId: recommendations.traceId, recommendationKey: recommendations.recommendationKey,\n' +
+    '          requestedPosition: recommendations.requestedPosition || target.position, resolvedPosition: recommendations.resolvedPosition,\n' +
+    '          positionSource: recommendations.positionSource, position: recommendations.build?.position || recommendations.resolvedPosition,\n' +
+    '        });\n' +
+    '      }\n' +
+    '    } catch (error) {\n' +
+    '      if (gameGeneration === Number(state.liveGameGeneration || 0) && error.name !== "RequestCancelled") {\n' +
+    '        state.liveRecommendationFailures.set(targetKey, Date.now());\n' +
+    '        recordItemSetClientDiagnostic("live_recommendations_client", "failed", {\n' +
+    '          ...target, traceId, recommendationKey: targetKey, requestedPosition: target.position,\n' +
+    '        });\n' +
+    '      }\n' +
+    '    } finally {\n' +
+    '      if (gameGeneration === Number(state.liveGameGeneration || 0)) state.liveRecommendationFlights.delete(targetKey);\n' +
+    '      if (liveRecommendationTarget(state.live)?.key === targetKey) renderLive();\n' +
+    '    }\n' +
+    '  }'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/backend/web/champions.test.cjs:2455:9)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'async function ensureLiveRecommendations(data) {\n    const target = liveRecommendationTarget(data);\n    if (!target) { recordLiveRecommendationSkip("no-target", null, data); return; }\n    const targetKey = target.key;\n    // R116-D：阵容（我方 5 人 + 视阶段而定的敌方 5 人）。拿不到阵容就不传 roster\n    // 参数，后端一个提示都不生成——降级方向由 liveRecommendationRoster 自己负责。\n    // R116-B 评审整改（D 账本 §11.7-2）去掉了原先的 typeof 护栏：那道护栏只是为了\n    // 让 champions.test.cjs 的 compileFunctions（注入列表固定、缺这个依赖）不抛\n    // ReferenceError，生产上从来不会走到「函数不存在」这一支；现在两个测试文件都\n    // 显式注入 liveRecommendationRoster，护栏留着只会掩盖真正的漏注入。\n    const roster = liveRecommendationRoster(data);\n    const rosterSignature = String(roster?.signature || "");\n    if (data?.recommendations) { recordLiveRecommendationSkip("has-payload", target, data); return; }\n    // 缓存命中还要再比一次阵容签名：选人阶段英雄是逐个锁定的，阵容变了而\n    // key 没变（key 的格式被既有测试钉死、不含阵容），提示就会停在旧阵容上。\n    if (state.liveRecommendations.has(targetKey) && (!rosterSignature || state.liveRecommendationRosters?.get?.(targetKey) === rosterSignature)) { recordLiveRecommendationSkip("cached", target, data); return; }\n    if (liveRecommendationFlightActive(targetKey)) { recordLiveRecommendationSkip("in-flight", target, data); return; }\n    const failedAt = Number(state.liveRecommendationFailures.get(targetKey) || 0);\n    if (failedAt > 0 && Date.now() - failedAt < 60_000) { recordLiveRecommendationSkip("backoff", target, data); return; }\n    const gameGeneration = Number(state.liveGameGeneration || 0);\n    const traceId = newLiveRecommendationTraceId();\n    state.liveRecommendationTraces.set(targetKey, traceId);\n    state.liveRecommendationFlights.set(targetKey, Date.now());\n    // 立刻重绘一次，好让各个页签在等待期间显示加载遮罩，而不是先闪一屏空状态。\n    if (liveRecommendationTarget(state.live)?.key === targetKey) renderLive();\n\t\tconst query = new URLSearchParams({\n\t\t  championId: String(target.championId), position: target.position,\n\t\t  queueId: String(target.queueId), gameMode: target.gameMode, mapId: String(target.mapId), tier: target.tier,\n      traceId, recommendationKey: targetKey,\n\t\t});\n\t\tif (target.gameId > 0) query.set("gameId", String(target.gameId));\n    // R207: only champion select refines special-mode builds with spell IDs.\n    if (!(target.augmentSource || target.gameMode === "ARAM" || target.mapId === 12) || data?.phase === "ChampSelect") {\n      if (Number(target.self?.spell1Id) > 0) query.set("spell1Id", String(target.self.spell1Id));\n      if (Number(target.self?.spell2Id) > 0) query.set("spell2Id", String(target.self.spell2Id));\n    }\n\tif (target.augmentSource === "hextech") query.set("source", "mayhem");\n\t// R116-D P1-2/P1-3/P1-5：只把阵容的英雄 ID 交给后端做交集。\n\t// Anti-scope 第 1 条——绝不为这 10 个英雄各拉一次 hero-json，后端只读本人\n\t// 英雄那一次的缓存。Anti-scope 第 4 条——ChampSelect 阶段不下发敌方 ID\n\t// （探测未证实 theirTeam 非空，后端还有一道同样的阶段白名单）。\n\tif (roster?.phase) query.set("phase", roster.phase);\n\tif (roster?.allyIds?.length) query.set("allyChampionIds", roster.allyIds.join(","));\n\tif (roster?.enemyIds?.length) query.set("enemyChampionIds", roster.enemyIds.join(","));\n    try {\n      const response = await api(`/api/gameplay/recommendations?${query}`, {}, `live-recommendations:${targetKey}`, 20000);\n      if (gameGeneration !== Number(state.liveGameGeneration || 0)) return;\n      if (!hasUsableLiveRecommendations(response?.recommendations)) throw new Error("推荐数据不完整");\n      const recommendations = response.recommendations;\n      recommendations.traceId = recommendations.traceId || traceId;\n      recommendations.recommendationKey = recommendations.recommendationKey || targetKey;\n      state.liveRecommendations.set(targetKey, recommendations);\n      (state.liveRecommendationScopes ||= new Map()).set(targetKey, {\n        gameId: target.scopeGameId || target.gameId, championId: target.championId,\n        gameMode: target.gameMode, mapId: target.mapId, tier: target.tier, at: Date.now(),\n      });\n      // R116-D：记住这份缓存是按哪个阵容算出来的。阵容一变（选人阶段逐个锁定、\n      // 或进入对局后拿到敌方 5 人）下一次轮询就会重新取，克制/协同提示才不会\n      // 停在旧阵容上。推荐缓存 key 的格式被 champions.test.cjs 钉死（不含阵容），\n      // 所以用这张旁表而不是改 key。\n      if (rosterSignature) state.liveRecommendationRosters?.set?.(targetKey, rosterSignature);\n      state.liveRecommendationFailures.delete(targetKey);\n      recordItemSetClientDiagnostic("live_recommendations_client", "received", {\n        ...target, traceId: recommendations.traceId, recommendationKey: recommendations.recommendationKey,\n        requestedPosition: recommendations.requestedPosition || target.position, resolvedPosition: recommendations.resolvedPosition,\n        positionSource: recommendations.positionSource, position: recommendations.build?.position || recommendations.resolvedPosition,\n      });\n      ensurePerks();\n      ensureItems();\n      ensureSummonerSpells();\n\t  // The first specialist check races this async recommendation request. Once\n\t  // hasTopPlayers arrives, retry immediately instead of waiting for another\n\t  // LCU live snapshot that may never change during champion select.\n\t  ensureSpecialistRunes(state.live);\n      if (liveRecommendationTarget(state.live)?.key === targetKey) {\n        renderLive();\n        recordItemSetClientDiagnostic("live_recommendations_client", "rendered", {\n          ...target, traceId: recommendations.traceId, recommendationKey: recommendations.recommendationKey,\n          requestedPosition: recommendations.requestedPosition || target.position, resolvedPosition: recommendations.resolvedPosition,\n          positionSource: recommendations.positionSource, position: recommendations.build?.position || recommendations.resolvedPosition,\n        });\n      }\n    } catch (error) {\n      if (gameGeneration === Number(state.liveGameGeneration || 0) && error.name !== "RequestCancelled") {\n        state.liveRecommendationFailures.set(targetKey, Date.now());\n        recordItemSetClientDiagnostic("live_recommendations_client", "failed", {\n          ...target, traceId, recommendationKey: targetKey, requestedPosition: target.position,\n        });\n      }\n    } finally {\n      if (gameGeneration === Number(state.liveGameGeneration || 0)) state.liveRecommendationFlights.delete(targetKey);\n      if (liveRecommendationTarget(state.live)?.key === targetKey) renderLive();\n    }\n  }',
+    expected: /const recommendations = response\.recommendations;[\s\S]*?state\.liveRecommendations\.set\(targetKey, recommendations\);[\s\S]{0,1200}ensureSpecialistRunes\(state\.live\);/,
+    operator: 'match',
+    diff: 'simple'
+  }

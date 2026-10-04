@@ -16,8 +16,15 @@ func r206RelayFixture(t *testing.T) *riotKeyStore {
 	store := r204KeyFixture(t)
 	addresses, state := riotRelayAddresses, riotRelays
 	riotRelayAddresses, riotRelays = []string{"https://relay.example"}, &riotRelayState{}
-	t.Cleanup(func() { riotRelayAddresses, riotRelays = addresses, state })
+	owned := riotRelays
+	t.Cleanup(func() { owned.stopSummary(); riotRelayAddresses, riotRelays = addresses, state })
 	return store
+}
+
+func r206RelayResponse(status int, body []byte) *http.Response {
+	r := updateResponse(status, body)
+	r.Header.Set("Content-Type", "application/json")
+	return r
 }
 
 func TestR206RelayRoutingNoTokenAndDirectPriority(t *testing.T) {
@@ -26,7 +33,7 @@ func TestR206RelayRoutingNoTokenAndDirectPriority(t *testing.T) {
 	var requests []*http.Request
 	champions.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
 		requests = append(requests, r)
-		return updateResponse(200, []byte(`{"ok":true}`)), nil
+		return r206RelayResponse(200, []byte(`{"ok":true}`)), nil
 	})}
 	p := newRiotProvider(champions)
 	var out map[string]any
@@ -76,7 +83,10 @@ func TestR206RelayEmptyAndFailureCooldown(t *testing.T) {
 	calls := 0
 	var events []map[string]any
 	champions.diag = func(row map[string]any) { events = append(events, row) }
-	champions.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) { calls++; return updateResponse(503, []byte(`{}`)), nil })}
+	champions.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
+		calls++
+		return r206RelayResponse(503, []byte(`{}`)), nil
+	})}
 	p := newRiotProvider(champions)
 	var out map[string]any
 	riotRelayAddresses = nil
@@ -116,9 +126,9 @@ func TestR206Relay429PreservesBackoff(t *testing.T) {
 	champions.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
 		calls++
 		if calls == 1 {
-			return updateResponse(200, []byte(`{}`)), nil
+			return r206RelayResponse(200, []byte(`{}`)), nil
 		}
-		response := updateResponse(429, []byte(`{}`))
+		response := r206RelayResponse(429, []byte(`{}`))
 		response.Header.Set("Retry-After", "7")
 		return response, nil
 	})}

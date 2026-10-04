@@ -8,17 +8,77 @@ import (
 )
 
 type postGameRevealState struct {
-	mu         sync.Mutex
-	client     *LCUClient
-	snapshot   gameplayLiveResponse
-	ctx        context.Context
-	cancel     context.CancelFunc
-	generation uint64
-	started    bool
-	running    bool
-	attempt    int
-	wait       func(context.Context, time.Duration) bool
-	now        func() time.Time
+	mu            sync.Mutex
+	client        *LCUClient
+	snapshot      gameplayLiveResponse
+	ctx           context.Context
+	cancel        context.CancelFunc
+	generation    uint64
+	started       bool
+	running       bool
+	attempt       int
+	wait          func(context.Context, time.Duration) bool
+	now           func() time.Time
+	expiresAt     time.Time
+	expiryTimer   *time.Timer
+	expiredClient *LCUClient
+	expiredGameID int64
+}
+
+const postGameRevealRetention = 2 * time.Minute
+
+// Called with mu held, so cancellation cannot clear a newer generation.
+func (s *postGameRevealState) clearLocked() {
+	if s.cancel != nil {
+		s.cancel()
+	}
+	if s.expiryTimer != nil {
+		s.expiryTimer.Stop()
+	}
+	s.expiryTimer = nil
+	s.expiresAt = time.Time{}
+	s.generation++
+	s.client = nil
+	s.snapshot = gameplayLiveResponse{}
+	s.running, s.started = false, false
+	s.attempt = 0
+}
+
+func (a *app) stopPostGameRevealForClient(client *LCUClient, reason string) {
+	s := &a.postGameReveal
+	s.mu.Lock()
+	if client != nil && s.client != client {
+		s.mu.Unlock()
+		return
+	}
+	snapshot, attempt, running := s.snapshot, s.attempt, s.running
+	s.clearLocked()
+	if reason != "expired" {
+		s.expiredClient, s.expiredGameID = nil, 0
+	}
+	s.mu.Unlock()
+	if snapshot.GameID > 0 && (running || reason == "left_end_of_game") {
+		a.postGameRevealDiagnostic(snapshot, attempt, 0, reason)
+	}
+}
+
+func (a *app) expirePostGameReveal(client *LCUClient, generation uint64) {
+	s := &a.postGameReveal
+	s.mu.Lock()
+	now := s.now
+	if now == nil {
+		now = time.Now
+	}
+	if s.client != client || s.generation != generation || s.expiresAt.IsZero() || now().Before(s.expiresAt) {
+		s.mu.Unlock()
+		return
+	}
+	snapshot, attempt := s.snapshot, s.attempt
+	// Repeated EndOfGame observations must not resurrect the same expired roster.
+	s.expiredClient, s.expiredGameID = s.client, snapshot.GameID
+	s.clearLocked()
+	s.mu.Unlock()
+	a.postGameRevealDiagnostic(snapshot, attempt, 0, "expired")
 }
 
 func clonePostGameSnapshot(value gameplayLiveResponse) gameplayLiveResponse {
@@ -38,28 +98,15 @@ func (a *app) postGameRevealDiagnostic(snapshot gameplayLiveResponse, attempt, r
 	a.recordDiagnostic(map[string]any{"event": "live_roster_post_game_reveal", "game_id": snapshot.GameID, "queue_id": snapshot.QueueID, "attempt": attempt, "hidden_count": hiddenRosterCount(snapshot), "revealed": revealed, "reason": reason})
 }
 func (a *app) stopPostGameReveal() {
-	s := &a.postGameReveal
-	s.mu.Lock()
-	snapshot, attempt, running := s.snapshot, s.attempt, s.running
-	if s.cancel != nil {
-		s.cancel()
-	}
-	s.generation++
-	s.client = nil
-	s.snapshot = gameplayLiveResponse{}
-	s.running = false
-	s.started = false
-	s.mu.Unlock()
-	if running {
-		a.postGameRevealDiagnostic(snapshot, attempt, 0, "stopped")
-	}
+	a.stopPostGameRevealForClient(nil, "stopped")
 }
 func (a *app) observePostGameReveal(parent context.Context, client *LCUClient, phase string) {
-	if phase == "ChampSelect" || phase == "GameStart" || phase == "InProgress" || phase == "Reconnect" {
-		a.stopPostGameReveal()
-		return
-	}
 	if !isEndOfGamePhase(phase) {
+		reason := "left_end_of_game"
+		if phase == "ChampSelect" || phase == "GameStart" || phase == "InProgress" || phase == "Reconnect" {
+			reason = "stopped"
+		}
+		a.stopPostGameRevealForClient(nil, reason)
 		return
 	}
 	s := &a.postGameReveal
@@ -75,6 +122,10 @@ func (a *app) observePostGameReveal(parent context.Context, client *LCUClient, p
 		owner := a.liveSnapshots.client
 		a.liveSnapshots.mu.Unlock()
 		if owner != client || snapshot.GameID <= 0 || hiddenRosterCount(snapshot) == 0 {
+			s.mu.Unlock()
+			return
+		}
+		if s.expiredClient == client && s.expiredGameID == snapshot.GameID {
 			s.mu.Unlock()
 			return
 		}
@@ -101,10 +152,19 @@ func (a *app) observePostGameReveal(parent context.Context, client *LCUClient, p
 	a.goSafe("live-post-game-reveal", func() { a.runPostGameReveal(ctx, client, generation, snapshot, wait, now) })
 }
 func (a *app) postGameSnapshot(client *LCUClient, phase string, expectedGameID int64) (gameplayLiveResponse, bool) {
-	if phase == "ChampSelect" || phase == "GameStart" || phase == "InProgress" || phase == "Reconnect" {
+	if !isEndOfGamePhase(phase) {
+		reason := "left_end_of_game"
+		if phase == "ChampSelect" || phase == "GameStart" || phase == "InProgress" || phase == "Reconnect" {
+			reason = "stopped"
+		}
+		a.stopPostGameRevealForClient(client, reason)
 		return gameplayLiveResponse{}, false
 	}
 	s := &a.postGameReveal
+	s.mu.Lock()
+	generation := s.generation
+	s.mu.Unlock()
+	a.expirePostGameReveal(client, generation)
 	s.mu.Lock()
 	if s.client != client || s.snapshot.GameID <= 0 {
 		s.mu.Unlock()
@@ -147,6 +207,11 @@ func (a *app) runPostGameReveal(ctx context.Context, client *LCUClient, generati
 		s.mu.Lock()
 		if s.client == client && s.generation == generation {
 			s.running = false
+			s.expiresAt = now().Add(postGameRevealRetention)
+			if s.expiryTimer != nil {
+				s.expiryTimer.Stop()
+			}
+			s.expiryTimer = time.AfterFunc(postGameRevealRetention, func() { a.expirePostGameReveal(client, generation) })
 		}
 		s.mu.Unlock()
 	}
@@ -183,9 +248,18 @@ func (a *app) runPostGameReveal(ctx context.Context, client *LCUClient, generati
 		s.mu.Unlock()
 		attemptCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		var phase string
-		if client.RequestJSON(attemptCtx, http.MethodGet, "/lol-gameflow/v1/gameflow-phase", nil, &phase) != nil || phase == "ChampSelect" || phase == "GameStart" || phase == "InProgress" || phase == "Reconnect" {
+		if client.RequestJSON(attemptCtx, http.MethodGet, "/lol-gameflow/v1/gameflow-phase", nil, &phase) != nil {
 			cancel()
 			a.finishStoppedPostGameReveal(client, generation)
+			return
+		}
+		if !current() {
+			cancel()
+			return
+		}
+		if !isEndOfGamePhase(phase) {
+			cancel()
+			a.observePostGameReveal(ctx, client, phase)
 			return
 		}
 		// A reconnect or missed phase event may already expose another game while

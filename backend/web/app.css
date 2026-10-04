@@ -1198,6 +1198,20 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 @keyframes update-ready-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .update-ready-toast { animation: none; } }
 
-.setting-riot-key-card { margin-top: 16px; }
-.setting-riot-key-input { flex: 1; min-width: 160px; }
-.setting-riot-key-input input { width: 100%; }
+.setting-network-controls { --setting-field-height: 38px; --setting-field-border: var(--line); --setting-field-background: var(--surface); }
+.setting-network-controls .setting-network-field, .setting-network-controls .select-menu-trigger, .setting-network-controls .app-select-trigger { min-height: var(--setting-field-height); padding: 0 36px 0 11px; color: var(--ink); background: var(--setting-field-background); border: 1px solid var(--setting-field-border); border-radius: 10px; font: inherit; }
+.setting-network-controls .setting-network-field:focus-visible, .setting-network-controls .select-menu-trigger:focus-visible, .setting-network-controls .app-select-trigger:focus-visible { outline: 0; border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
+.setting-riot-key-card { flex-wrap: wrap; }
+.setting-riot-key-card > div:first-child { min-width: 0; }
+.setting-riot-key-heading { display: flex; align-items: center; gap: 6px; }
+.setting-riot-key-help { display: grid; width: 22px; height: 22px; padding: 2px; place-items: center; color: var(--muted); background: transparent; border: 0; border-radius: var(--radius-sm); }
+.setting-riot-key-help:hover, .setting-riot-key-help:focus-visible { color: var(--ink); }
+.setting-riot-key-help .control-icon { width: 16px; height: 16px; }
+.setting-riot-key-card p a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.setting-riot-key-card p a:hover, .setting-riot-key-card p a:focus-visible { color: var(--primary-strong); }
+.setting-riot-key-input { position: relative; flex: 0 1 300px; width: 300px; max-width: 100%; }
+.setting-riot-key-input input { width: 100%; cursor: text; }
+.setting-riot-key-reveal { position: absolute; top: 50%; right: 3px; display: grid; width: 32px; height: 32px; padding: 0; place-items: center; color: var(--muted); background: transparent; border: 0; border-radius: var(--radius-sm); transform: translateY(-50%); }
+.setting-riot-key-reveal:hover, .setting-riot-key-reveal:focus-visible { color: var(--ink); }
+.setting-riot-key-reveal .control-icon { width: 20px; height: 20px; }
+.setting-riot-key-reveal[aria-pressed="false"] .riot-key-eye-closed, .setting-riot-key-reveal[aria-pressed="true"] .riot-key-eye-open { display: none; }

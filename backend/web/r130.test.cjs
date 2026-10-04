@@ -66,6 +66,7 @@ function functionSource(script, name) {
 const CARD_QUEUE_FUNCTIONS = [
   'stopHoverVideo', 'prepareSkinVideo', 'loadSkinVideo', 'resetVideo',
   'clearCardImageWatchdog', 'reportCardImageStall', 'loadImageSources',
+  'cardImageObserverRoot', 'cardImageVisible', 'scheduleCardImageHealthCheck', 'checkCardImageHealth', 'reconcileCardImageSlots',
   'ensureCardImageObserver', 'withdrawCardImageJob', 'deferCardImageSources',
   'enqueueCardImageJob', 'pumpCardImageQueue', 'finishCardImageJob', 'cancelDeferredImages',
 ];

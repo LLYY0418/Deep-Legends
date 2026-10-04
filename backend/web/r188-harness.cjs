@@ -19,6 +19,7 @@ function extract(source, name) {
   throw Error(`Unbalanced function ${name}`);
 }
 function compile(source, names, dependencies = {}) {
+  dependencies = { recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies };
   return Function(...Object.keys(dependencies), names.map(name => extract(source, name)).join('\n') + `\nreturn {${names.join(',')}};`)(...Object.values(dependencies));
 }
 const escapeHTML = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');

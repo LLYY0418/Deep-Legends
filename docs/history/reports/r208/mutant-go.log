@@ -1,0 +1,12 @@
+--- FAIL: TestR208RelayQuotaDaily (0.05s)
+    --- FAIL: TestR208RelayQuotaDaily/probe=true/html (0.00s)
+        r208_test.go:68: quota classification: 战绩服务暂时不可用 main.riotHTTPError{Error:"战绩服务暂时不可用", Kind:"http", RetryAfter:0, CooldownScope:""}
+    --- FAIL: TestR208RelayQuotaDaily/probe=true/non-json-type (0.00s)
+        r208_test.go:68: quota classification: 战绩服务暂时不可用 main.riotHTTPError{Error:"战绩服务暂时不可用", Kind:"http", RetryAfter:0, CooldownScope:""}
+    --- FAIL: TestR208RelayQuotaDaily/probe=false/html (0.00s)
+        r208_test.go:68: quota classification: 战绩服务暂时不可用 main.riotHTTPError{Error:"战绩服务暂时不可用", Kind:"http", RetryAfter:0, CooldownScope:""}
+    --- FAIL: TestR208RelayQuotaDaily/probe=false/non-json-type (0.00s)
+        r208_test.go:68: quota classification: 战绩服务暂时不可用 main.riotHTTPError{Error:"战绩服务暂时不可用", Kind:"http", RetryAfter:0, CooldownScope:""}
+FAIL
+FAIL	lol-loot-assistant/backend	0.649s
+FAIL

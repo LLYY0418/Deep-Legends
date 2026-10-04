@@ -454,6 +454,9 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			if err != nil {
 				return err
 			}
+			if err := riotRelays.requestErrorFor(host, requestPath); err != nil {
+				return err
+			}
 		}
 		if encoded := query.Encode(); encoded != "" {
 			endpoint += "?" + encoded
@@ -472,6 +475,13 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		if err := p.wait(ctx); err != nil {
 			return err
 		}
+		// A different player/provider may have discovered a shared cooldown
+		// while this request was waiting for admission. Recheck before I/O.
+		if source == "relay" {
+			if err := riotRelays.requestErrorFor(host, requestPath); err != nil {
+				return err
+			}
+		}
 		tracker := riotOverviewCostTrackerFromContext(ctx)
 		isDetail := host == riotClusterHost && strings.HasPrefix(requestPath, "/lol/match/v5/matches/KR_") && !strings.HasSuffix(requestPath, "/timeline")
 		if isDetail {
@@ -481,9 +491,13 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			cost.requests.Add(1)
 		}
 		p.beginRiotRateRequest(scope)
+		requestedAt := time.Now()
 		response, err := client.Do(request)
 		if err != nil {
 			p.observeRiotRate(scope, nil, 0)
+			if source == "relay" {
+				riotRelays.recordRequest("network", 0, p.champions.diag)
+			}
 			if isDetail {
 				tracker.detailInFlight(-1)
 			}
@@ -496,11 +510,42 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			}
 			return fmt.Errorf("无法连接 Riot 官方接口（可在设置中调整“英雄数据网络”代理）：%w", err)
 		}
-		p.observeRiotRate(scope, response.Header, response.StatusCode)
+		if source == "relay" && response.StatusCode == http.StatusTooManyRequests {
+			// Shared relay cooldowns must not poison a subsequently saved user
+			// key's direct-Riot limiter, or widen a method/service/IP limit.
+			p.observeRiotRate(scope, nil, 0)
+		} else {
+			p.observeRiotRate(scope, response.Header, response.StatusCode)
+		}
 		body, readErr := readLimited(response.Body, responseMax)
 		response.Body.Close()
 		if isDetail {
 			tracker.detailInFlight(-1)
+		}
+		if source == "relay" {
+			failure := ""
+			switch {
+			case riotRelayQuotaResponse(response.Header, body):
+				failure = "quota_exhausted"
+			case readErr != nil:
+				failure = "read"
+			case response.StatusCode == http.StatusOK && !json.Valid(body):
+				failure = "invalid_json"
+			case response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden:
+				failure = "auth"
+			case response.StatusCode >= 500:
+				failure = "upstream"
+			case response.StatusCode >= 400 && response.StatusCode != http.StatusTooManyRequests:
+				failure = "http"
+			}
+			riotRelays.recordRequest(failure, response.StatusCode, p.champions.diag)
+			if failure == "quota_exhausted" {
+				riotRelays.quotaExhausted(relay)
+				if p.champions.diag != nil {
+					p.champions.diag(map[string]any{"event": "riot_relay_probe", "result": "quota_exhausted", "duration_ms": time.Since(requestedAt).Milliseconds(), "http_status": response.StatusCode})
+				}
+				return errRiotRelayQuotaExhausted
+			}
 		}
 		switch response.StatusCode {
 		case http.StatusOK:
@@ -534,6 +579,13 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			if seconds, parseErr := strconv.Atoi(response.Header.Get("Retry-After")); parseErr == nil && seconds > 0 && seconds <= 86400 {
 				retryAfter = time.Duration(seconds) * time.Second
 			}
+			cooldown := ""
+			if source == "relay" {
+				var seconds int
+				cooldown, seconds = riotRelayCooldown(response.Header)
+				retryAfter = time.Duration(seconds) * time.Second
+				riotRelays.observeCooldown(host, requestPath, cooldown, seconds)
+			}
 			rioTracker := riotOverviewCostTrackerFromContext(ctx)
 			rioTracker.recordRateLimit()
 			if p.champions != nil && p.champions.diag != nil {
@@ -542,7 +594,10 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 					"retry_after_ms": retryAfter.Milliseconds(), "attempt": attempt + 1,
 				})
 			}
-			quotaError := &riotStatusError{message: "Riot 接口限流中（HTTP 429），请稍后重试", status: http.StatusTooManyRequests, retryAfter: int(retryAfter / time.Second)}
+			quotaError := &riotStatusError{message: "Riot 接口限流中（HTTP 429），请稍后重试", status: http.StatusTooManyRequests, retryAfter: int(retryAfter / time.Second), relayCooldown: cooldown}
+			if cooldown == "application" || cooldown == "ip" {
+				return quotaError
+			}
 			deadline, bounded := ctx.Deadline()
 			if attempt == 2 || retryAfter > 30*time.Second || bounded && time.Until(deadline) <= retryAfter {
 				return quotaError
@@ -581,9 +636,10 @@ func riotDiagnosticPath(requestPath string) string {
 
 // riotStatusError 携带面向用户的中文提示与对应的 HTTP 状态码。
 type riotStatusError struct {
-	retryAfter int
-	message    string
-	status     int
+	retryAfter    int
+	message       string
+	status        int
+	relayCooldown string
 }
 
 func (e *riotStatusError) Error() string { return e.message }
@@ -1918,9 +1974,10 @@ func (p *championProvider) championNamesZH(ctx context.Context) map[int64]string
 
 // Preserve a useful backoff hint through the local API without exposing keys.
 type riotHTTPError struct {
-	Error      string `json:"error"`
-	Kind       string `json:"kind"`
-	RetryAfter int    `json:"retryAfter,omitempty"`
+	Error         string `json:"error"`
+	Kind          string `json:"kind"`
+	RetryAfter    int    `json:"retryAfter,omitempty"`
+	CooldownScope string `json:"cooldownScope,omitempty"`
 }
 
 func riotHTTPErrorBody(err error) riotHTTPError {
@@ -1928,6 +1985,7 @@ func riotHTTPErrorBody(err error) riotHTTPError {
 	var statusErr *riotStatusError
 	if errors.As(err, &statusErr) {
 		body.RetryAfter = statusErr.retryAfter
+		body.CooldownScope = statusErr.relayCooldown
 	}
 	if riotErrorStatus(err) == http.StatusTooManyRequests {
 		body.Kind = "rate-limited"
@@ -1935,6 +1993,9 @@ func riotHTTPErrorBody(err error) riotHTTPError {
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		body.Error = "韩服数据读取超时，请稍后重试"
+	}
+	if errors.Is(err, errRiotRelayQuotaExhausted) {
+		body.Kind = "quota_exhausted"
 	}
 	return body
 }
