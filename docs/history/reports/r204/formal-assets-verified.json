@@ -1,0 +1,27 @@
+{
+  "releaseId": 402764741,
+  "tag": "v0.12.67",
+  "source": "031715fd8a41b1c96f0a684e0b9710455fb41601",
+  "fingerprint": "834c40067e93",
+  "assets": [
+    {
+      "name": "Deep-Legends-Setup-0.12.67-public.exe",
+      "id": 608865444,
+      "size": 111446528,
+      "sha256": "6171661b827937f5ee403e3f5d77d8b1171b036338d8f7378939ae6e0bf14d97"
+    },
+    {
+      "name": "latest.json",
+      "id": 608865445,
+      "size": 1259,
+      "sha256": "0bab69a9c53535453224490c4b514e22041b1b20d1a5783628eb6519c9f85a9e"
+    },
+    {
+      "name": "SHA256SUMS-public.txt",
+      "id": 608865447,
+      "size": 182,
+      "sha256": "31a9b13fab166d72862eeb8870d106747d40aa22b02b57e25cd28c0bc6d8e71e"
+    }
+  ],
+  "verified": true
+}

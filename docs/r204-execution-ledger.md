@@ -1,6 +1,6 @@
 # R204 执行账本
 
-工单：[R204](WORKLIST-R204-RIOT-API-KEY-LOST-AFTER-ONLINE-UPDATE-USER-KEY-SETTING.md)。基线 `b684642b`（已发布 0.12.66 及 R203 收尾），本次 **0.12.67**。R203 已发布，本工单单独递增。实现完成；完整验证、构建与发布证据下方补齐，当前发布未完成。
+工单：[R204](WORKLIST-R204-RIOT-API-KEY-LOST-AFTER-ONLINE-UPDATE-USER-KEY-SETTING.md)。基线 `b684642b`（已发布 0.12.66 及 R203 收尾），本次 **0.12.67**。R203 已发布，本工单单独递增。实现与自动验证完成，0.12.67 已正式发布 Latest；Key、安装阶段实测与5秒目标保留真机验收。
 
 ## Key 设置、持久化与诊断
 
@@ -35,10 +35,30 @@ R198 0/1/2 映射、R200卡片锁定和备战席换入、R201只读镜头/临时
 
 ## 验证与发布
 
-针对性 Go、installer、Node 回归已通过。三项 Go overlay 变异（内置优先、401仍保存、Key写日志）都触发指定测试断言 FAIL，无编译失败充数。正式全量结果、key mode=public 构建与 R199 三项发布证据完成后追加。
+- 最终源码 `031715fd8a41b1c96f0a684e0b9710455fb41601`，指纹 `834c40067e93`。Key 旧 flight 防护及逐人进度范围隔离均已纳入；只有有效且相等的 gameId、相同 queueId/playerRef/hidden/privateHistory/identityUnresolved 才复用 pending 行历史。六种范围变化回归通过。
+- Node 指定全量最终为1143项、1142通过、1平台门禁跳过、0失败（280.324秒），见 [node-final.log](history/reports/r204/node-final.log)。Go指定完整命令在最终源码上再次通过（239.815秒），见 [go-final.log](history/reports/r204/go-final.log)；最终构建的全部Go分片也通过。最终go vet、安装器全量、Windows交叉构建及相关race通过（race 2.382秒）。
+- 三项Go overlay变异（内置优先、401仍保存、Key写日志）都触发指定断言FAIL，无编译失败充数，见 [mutations.json](history/reports/r204/mutations.json)。
+- 最终本机 public 重建于2026-10-04T00:56:09Z完成，完整测试分片、vet、installer、packaged runtime/fingerprint、public Key门禁、receipt/checksum全部通过。只保留 `Deep Legends Setup 0.12.67-public.exe`；本机Setup SHA256 `017838084ee14460b367bf0122580c95cda62d1fad9e6e09d25b0b5a2250bb15`，见 [local-release-build.json](history/reports/r204/local-release-build.json)。本机验证包与Windows正式包摘要可因构建平台/产物不同而不同，二者源码指纹相同。
+- 正式Windows public工作流 [37166290977](https://github.com/LLYY0418/Deep-Legends/actions/runs/37166290977) 对最终提交 `conclusion=success`；build/public Key gate/更新回归/附件检查均通过。[质量流水线](https://github.com/LLYY0418/Deep-Legends/actions/runs/37166290994) 的quality job已通过完整race、Node、真实Chromium图片队列与懒CSS、installer/pool门禁；完整Windows复建于2026-10-04T01:19:46Z通过，整个流水线 `conclusion=success`；同源码分支流水线37166289376也于01:18:29Z全部通过。见 [quality-workflow.json](history/reports/r204/quality-workflow.json) 与 [branch-quality-workflow.json](history/reports/r204/branch-quality-workflow.json)。个人Key文件未读取，public密钥门禁脚本未修改。
 
-仍需用户真机：Key 保存/下一次升级不丢失/绝活哥可用；下一次安装八阶段耗时与进度；无序列英雄不自动选；正常网络十人战绩≤5秒。源码实现与模拟检查不等于已达到真实网络5秒。
+### R199正式发布证据
 
-全量验证发现并修正了新增 self 并发包装缺少直接 panic 保护、旧 Node 夹具固定 URL 和 tooltip 焦点假设。修正后 Go 指定全量命令通过（236.570秒）；Node 1140项、1139通过、1平台门禁跳过、0失败。最终 Key 更换的旧 flight 防护增加后，再由完整构建测试分片、相关竞态及74项Node回归验证；最终源码的指定全量命令仍在运行，最终结果以发布证据为准。同局增量后台刷新保留已知战绩，不把卡片短暂清空。
+[0.12.67 Release](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.67)：id **402764741**；发布时间 **2026-10-04T01:10:25Z**；`draft=false`、`prerelease=false`、`isLatest=true`。见 [publication-proof.json](history/reports/r204/publication-proof.json)、[Latest查询](history/reports/r204/latest-after.json)、[Release元数据](history/reports/r204/published-release.json)。匿名无认证、no-cache下载 `releases/latest/download/latest.json` 得到version **0.12.67**、fingerprint **834c40067e93**，与正式附件逐字节一致，见 [匿名清单](history/reports/r204/anonymous-latest.json)。
 
-三项变异结果见 [mutations.json](history/reports/r204/mutations.json)。安装器全量、Windows 后端交叉构建、go vet 与相关 race 通过。验证性打包始终 key mode=public，输出只保留 -public 文件名；个人 Key 文件未读取，public 密钥门禁脚本未修改。
+| 正式附件 | 字节数 | SHA256 |
+|---|---:|---|
+| Deep-Legends-Setup-0.12.67-public.exe | 111446528 | `6171661b827937f5ee403e3f5d77d8b1171b036338d8f7378939ae6e0bf14d97` |
+| latest.json | 1259 | `0bab69a9c53535453224490c4b514e22041b1b20d1a5783628eb6519c9f85a9e` |
+| SHA256SUMS-public.txt | 182 | `31a9b13fab166d72862eeb8870d106747d40aa22b02b57e25cd28c0bc6d8e71e` |
+
+主线程与独立复核均验证三个附件的size/digest、清单版本/指纹/Setup URL及两条checksum；见 [正式附件核查](history/reports/r204/formal-assets-verified.json)。草稿的untagged下载URL发布后已转换为v0.12.67，清单使用确切正式tag URL。
+
+发布前后比较全部11个既有Release（含0.12.60草稿）的id/tag/name/body/draft/prerelease/target/时间与附件id/name/label/size/digest/state/content-type/时间/下载URL全部一致；忽略下载计数和Release updated_at。见 [保留证明](history/reports/r204/old-releases-preserved.json)。旧v0.12.66标签仍为 `d56b126751a0ce350b442d0d3c688840957ab493`，新v0.12.67为最终提交；见 [标签核对](history/reports/r204/tag-proof.txt)。
+
+### 修正记录与验收边界
+
+全量检查先发现新增self并发包装缺直接panic保护，以及旧Node夹具URL/tooltip焦点假设；修正后通过。随后R204测试源码提取器受注释单引号影响，修正后通过；最后独立复核补上gameId=0不可证明同局的隔离。前两候选六个任务37165481830/37165481843/37165481852、37165894014/37165894047/37165892237取消时均无v0.12.67 Release；仅更新本轮新建未发布标签，既有标签和Release未改。正式发布后标签固定为最终提交。
+
+索引与账本同步：R198映射真机已核实，连续两局仍待验收；R200/R201已关闭归档，未完成安装部分由R204接手；R202所提供范围验证通过，其余开关规则仍待验收。R204保持进行中，不能以自动验证或Windows构建代替用户客户端验收。
+
+仍需用户真机：首次在设置保存Key、绝活哥可用且下一次升级Key不丢失；下一次安装八阶段耗时与进度；无序列英雄不自动选；正常网络十人战绩≤5秒。P8提速方案待实测阶段数据决定，未编造前后对比或宣称真实网络5秒目标已达成。

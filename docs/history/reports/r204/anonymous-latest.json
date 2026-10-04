@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "version": "0.12.67",
+  "fingerprint": "834c40067e93",
+  "publishedAt": "2026-10-04T01:07:29.183Z",
+  "minSupported": "0.9.0",
+  "notes": "- 设置的「隐私与能力」新增 Riot API Key 保存、清除和状态；Windows 使用当前用户加密保存，更新前迁移内置 Key，保存后立即生效。\n- Key 缺失或失效时显示明确状态，可直接进入设置；公开安装包继续不含个人 Key。\n- 顶部升级图标放大并保留细线，关闭更新弹窗后不再自动显示提示，关闭按钮统一。\n- 安装计时保留不完整记录，增加移除旧版本阶段；升级进度按等待、移除、解压、写入和收尾推进。\n- 删除海斗无序列英雄时临时选首卡的逻辑，已确认选人后换英雄不再误报失败。\n- 对局页逐个显示玩家战绩；自定义、练习和人机只读一页，其他玩家 SGP 已筛够 10 局时跳过 LCU 读取，补齐分路耗时。",
+  "asset": {
+    "name": "Deep-Legends-Setup-0.12.67-public.exe",
+    "size": 111446528,
+    "sha256": "6171661b827937f5ee403e3f5d77d8b1171b036338d8f7378939ae6e0bf14d97",
+    "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.67/Deep-Legends-Setup-0.12.67-public.exe"
+  }
+}
