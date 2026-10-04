@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "version": "0.12.68",
+  "fingerprint": "a24a41472d2b",
+  "publishedAt": "2026-10-04T03:18:34.723Z",
+  "minSupported": "0.9.0",
+  "notes": "- 在线升级前保留已有桌面快捷方式，检测到删除或重建后恢复原文件，并核对安装目标。\n- 已有桌面快捷方式但缺少保留标记时，升级前补齐；新增快捷方式前后状态诊断。",
+  "asset": {
+    "name": "Deep-Legends-Setup-0.12.68-public.exe",
+    "size": 111497728,
+    "sha256": "8fa7dd821cfb5318634bfca14c26f922553d5c3ab62ddf8f194910be6f4b7b76",
+    "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.68/Deep-Legends-Setup-0.12.68-public.exe"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "releaseId": 402804973,
+  "source": "bb2b97a0b7bc2ce7c1d4155e4c99b64a44b66606",
+  "publishedAt": "2026-10-04T03:21:35Z",
+  "draft": false,
+  "prerelease": false,
+  "isLatest": true,
+  "anonymousLatestVersion": "0.12.68",
+  "fingerprint": "a24a41472d2b",
+  "anonymousMatchesFormal": true,
+  "manifestSHA256": "aa55ba232a9526ad4061b2eac2b6f8c81434cf442ea42c95f59daa1f6484d874"
+}

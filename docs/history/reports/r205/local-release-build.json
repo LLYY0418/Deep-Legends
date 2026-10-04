@@ -1,10 +1,10 @@
 {
   "schema": 1,
   "version": "0.12.68",
-  "fingerprint": "b6b8ec5899e4",
+  "fingerprint": "a24a41472d2b",
   "mode": "public",
-  "backendSHA256": "bb81126aeaf9df378480768cb6841c89f83968f61dcf4e73b0279dd3d1f2d867",
+  "backendSHA256": "71f493bae5e022c9e902dea6eda56be0b2047af1e799b43e4a8e2914ee119f4a",
   "assets": {
-    "Deep Legends Setup 0.12.68-public.exe": "f488d5775bf99754c3efeb8277ce987945c88b3619a29e28a0c5405452573cf1"
+    "Deep Legends Setup 0.12.68-public.exe": "06db62af3b11ccbda2d031a697ac7f8fb172e2b4f51308c5417bdabf0479c63e"
   }
 }
