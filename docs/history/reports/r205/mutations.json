@@ -1,0 +1,14 @@
+[
+  {
+    "mutation": "no_restore",
+    "test": "TestR205ShortcutRestoreCases",
+    "exitCode": 1,
+    "assertionFailure": true
+  },
+  {
+    "mutation": "no_registry_repair",
+    "test": "TestR205KeepShortcutsRepair",
+    "exitCode": 1,
+    "assertionFailure": true
+  }
+]

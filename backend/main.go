@@ -486,6 +486,7 @@ func main() {
 	if store != nil {
 		store.onDiagnosticRotation = a.resetDiagnosticDeduplication
 		consumeUpdateInstallTiming(store.root, a.recordDiagnostic)
+		consumeUpdateShortcutState(store.root, a.recordDiagnostic)
 	}
 	championProvider.gameplayAugments = func(ctx context.Context) ([]gameplayAugment, error) {
 		client, _, err := a.gameplayClient()

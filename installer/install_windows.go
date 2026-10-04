@@ -151,10 +151,15 @@ func (a *installerApp) install(message uiMessage) {
 	// Give this child its own TEMP so parallel installers cannot inflate progress.
 	// NSIS still uses its normal ns*.tmp/7z-out layout inside this directory.
 	cmd.Env = installerEnvironment(temporaryDir)
+	var shortcuts *shortcutUpdateGuard
+	if a.options.Update {
+		shortcuts = newWindowsShortcutUpdate(dest, temporaryDir, a.meta.ExeName, !a.options.FreshInstall)
+	}
 	a.startupWarm = newConfiguredExecutionWarmup(dest, installationStarted, executeWarmHooks{})
 	defer a.startupWarm.Finish()
 	started := time.Now()
 	if err := cmd.Start(); err != nil {
+		shortcuts.finish("start_failed")
 		reportFailure(failureMessage{Message: "无法启动安装，请重新下载安装包后重试", Detail: "退出码：未启动；目标路径：" + dest})
 		return
 	}
@@ -169,6 +174,11 @@ func (a *installerApp) install(message uiMessage) {
 		select {
 		case <-finished:
 			a.timing.importNSIS(temporaryDir)
+			shortcutResult := "ok"
+			if waitErr != nil || cmd.ProcessState.ExitCode() != 0 {
+				shortcutResult = "failed"
+			}
+			shortcuts.finish(shortcutResult)
 			completeInstallation(a.options, installationResult{ExitCode: cmd.ProcessState.ExitCode(), WaitError: waitErr, Destination: dest}, installationCompletionHooks{
 				Failed:  reportFailure,
 				Cleanup: func() { _ = os.RemoveAll(temporaryDir) },

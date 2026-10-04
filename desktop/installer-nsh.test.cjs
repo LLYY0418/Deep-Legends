@@ -4,6 +4,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname,'nsis/installer.nsh'),'utf8');
+test('R205 upgrade command preserves NSIS shortcut retention and uses the same registry identity',()=>{
+ const update=fs.readFileSync(path.join(__dirname,'../installer/update.go'),'utf8');
+ const command=update.match(/func upgradeSetupCommandLine\([^]*?\n\}/)?.[0];
+ assert.ok(command);assert.match(command,/--updated/);assert.doesNotMatch(command,/--no-desktop-shortcut/);
+ const config=require('./package.json');assert.equal(config.build.nsis.allowToChangeInstallationDirectory,false);
+ const {UUID}=require('builder-util-runtime');const guid=UUID.v5(config.build.appId,UUID.parse('50e065bc-3134-11e6-9bab-38c9862bdaf3'));
+ assert.ok(fs.readFileSync(path.join(__dirname,'../installer/update_shortcuts.go'),'utf8').includes(`Software\\${guid}`));
+});
 function fontGuard(text) {
  const lines=text.split('\n');
  for(let i=0;i<lines.length;i++) if(/\$\{NSD_Create(?:Label|Checkbox|Button|BrowseButton|DirRequest)\}/.test(lines[i])) assert.match(lines.slice(i+1,i+5).join('\n'), /\$\{WM_SETFONT\}/,`font missing at line ${i+1}`);

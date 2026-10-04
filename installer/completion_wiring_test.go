@@ -70,6 +70,11 @@ func TestWindowsInstallCompletionCannotBypassPortableUpdateHandoff(t *testing.T)
 		found++
 		assertCompletionBlock(t, clause.Body, `
 a.timing.importNSIS(temporaryDir)
+shortcutResult := "ok"
+if waitErr != nil || cmd.ProcessState.ExitCode() != 0 {
+ shortcutResult = "failed"
+}
+shortcuts.finish(shortcutResult)
 completeInstallation(a.options, installationResult{ExitCode: cmd.ProcessState.ExitCode(), WaitError: waitErr, Destination: dest}, installationCompletionHooks{
     Failed: reportFailure,
     Cleanup: func() { _ = os.RemoveAll(temporaryDir) },
