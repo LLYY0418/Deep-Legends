@@ -42,3 +42,7 @@ Windows public 工作流 [37127823415](https://github.com/LLYY0418/Deep-Legends/
 ## R204 追加真机核对（2026-10-04）
 
 R204 工单真机摘录确认正式 2400 FINALIZATION 瑞兹 13 换入成功，以及用户将 22 换成 112 后 gate-blocked、不再换回，以上范围真机验证通过。queue_filtered=true/pages_read=1/stop_reason=enough 的 10 局读取也有摘录。临时测试选人由 R204 P9 删除。原 P6（Riot Key）因复制的是旧稿未执行，移到 R204。开关两种持有规则与完整近期战绩逐项真机验收仍缺记录，R202 保留进行中；不扩大证据范围。
+
+## R206 补充的 10-04 用户日志核验
+
+海斗卡片选人及备战席应用在已提供范围内通过；无序列英雄时不提交选人。证据来自 `lol-loot-diagnostics-1004-1451.jsonl`，摘要见 [R206 日志证据](history/reports/r206/user-log-evidence.json)。

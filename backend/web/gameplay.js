@@ -1961,7 +1961,8 @@
     }
     if (tab.error) {
       const opggEscape = tab.riotId && riotTab(tab) ? '<div class="opgg-escape"><button class="text-button" type="button" data-open-opgg>在 OP.GG 中查看该玩家 ↗</button></div>' : "";
-      container.innerHTML = (tab.proMismatch ? summonerProChip(tab) : "") + emptyState("战绩读取失败", tab.error, true) + opggEscape;
+      const relayUnavailable = String(tab.error).includes("战绩服务暂时不可用");
+      container.innerHTML = (tab.proMismatch ? summonerProChip(tab) : "") + emptyState(relayUnavailable ? "战绩服务暂时不可用" : "战绩读取失败", relayUnavailable ? "" : tab.error, true) + opggEscape;
       container.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadOverview(tab, true));
       container.querySelector("[data-open-opgg]")?.addEventListener("click", () => window.open(opggSummonerURL(tab), "_blank", "noopener"));
       return;
@@ -5335,7 +5336,7 @@
 	  if (gameGeneration !== Number(state.liveGameGeneration || 0) || keyGeneration !== Number(state.riotKeyGeneration || 0)) return;
 	  const runes = Array.isArray(response) ? response : Array.isArray(response?.runes) ? response.runes : null;
       if (!runes) throw new Error("绝活哥符文数据不完整");
-	  if (response?.reason === "riot-key-missing" || response?.reason === "riot-key-invalid") {
+	  if (response?.reason === "riot-key-missing" || response?.reason === "riot-key-invalid" || response?.reason === "riot-relay-unavailable") {
 		state.specialistRuneFailures.set(target.key, { reason: response.reason, at: Date.now() });
 		state.specialistRunes.delete(target.key);
 	  } else if (response?.reason === "no-position-sample" && !runes.length) {
@@ -6645,22 +6646,23 @@
 	const specialistKeyMissing = section.key === "specialist" && Boolean(target && specialistRuneFailure(state.specialistRuneFailures.get(target.key))?.reason === "riot-key-missing");
 		const specialistFailureInfo = section.key === "specialist" ? specialistRuneFailure(state.specialistRuneFailures.get(target?.key)) : null;
 		const specialistKeyInvalid = specialistFailureInfo?.reason === "riot-key-invalid";
+		const specialistRelayUnavailable = specialistFailureInfo?.reason === "riot-relay-unavailable";
 		const specialistKeyUnavailable = specialistKeyMissing || specialistKeyInvalid;
 		const specialistNoPositionSample = specialistFailureInfo?.reason === "no-position-sample";
 		const specialistTimeout = specialistFailureInfo?.reason === "upstream-timeout";
 		const specialistThrottled = specialistFailureInfo?.reason === "upstream-throttled";
 		const specialistUpstreamError = specialistFailureInfo?.reason === "upstream-error";
-		const specialistRetryable = specialistTimeout || specialistThrottled || specialistUpstreamError || specialistFailureInfo?.reason === "request-failed";
+		const specialistRetryable = specialistRelayUnavailable || specialistTimeout || specialistThrottled || specialistUpstreamError || specialistFailureInfo?.reason === "request-failed";
 		const unavailableReason = {
 		  specialist: section.unsupported ? "绝活哥榜单仅支持单双排、灵活组排和召唤师峡谷自定义对局。" : specialistKeyMissing ? "未配置 Riot Key，暂时无法读取韩服绝活哥符文。" : specialistNoPositionSample ? `该绝活哥最近 10 局没有打过${positionLabel(livePositionDisplay(target?.position || ""))}。` : specialistTimeout ? "韩服接口响应超时，请稍后重试。" : specialistThrottled ? "请求过于频繁，约 1 分钟后可重试。" : specialistUpstreamError ? "上游数据异常，请稍后重试。" : "最近对局中没有找到完整且可核验的该英雄符文。",
       pro: "当前数据源不提供可核验的职业选手身份与完整符文，暂不展示。",
     };
-		const emptyTitle = !championSelected ? "请先选定英雄" : section.unsupported ? "当前队列没有可用的绝活哥榜单" : section.loading ? "正在读取韩服绝活哥符文" : specialistKeyInvalid ? "Riot Key 无效" : specialistKeyMissing ? "未配置 Riot Key" : specialistNoPositionSample ? "最近 10 局没有该位置样本" : specialistTimeout ? "韩服接口响应超时" : specialistThrottled ? "请求过于频繁" : specialistUpstreamError ? "上游数据异常" : section.failed ? "韩服绝活哥符文读取失败" : section.key === "opgg" ? "等待完整符文数据" : section.key === "specialist" ? "暂无可核验的韩服绝活哥符文" : "暂无可核验数据源";
+		const emptyTitle = !championSelected ? "请先选定英雄" : section.unsupported ? "当前队列没有可用的绝活哥榜单" : section.loading ? "正在读取韩服绝活哥符文" : specialistRelayUnavailable ? "战绩服务暂时不可用" : specialistKeyInvalid ? "Riot Key 无效" : specialistKeyMissing ? "未配置 Riot Key" : specialistNoPositionSample ? "最近 10 局没有该位置样本" : specialistTimeout ? "韩服接口响应超时" : specialistThrottled ? "请求过于频繁" : specialistUpstreamError ? "上游数据异常" : section.failed ? "韩服绝活哥符文读取失败" : section.key === "opgg" ? "等待完整符文数据" : section.key === "specialist" ? "暂无可核验的韩服绝活哥符文" : "暂无可核验数据源";
     const content = section.items.length && section.key === "specialist"
       ? renderSpecialistPlayers(section.items)
       : section.items.length
       ? `<div class="rune-choice-list" role="radiogroup" aria-label="${escapeHTML(section.title)}符文">${section.items.map((config, index) => renderRuneChoice({ ...config, sourceKey: section.key, key: config.key || (section.key === "opgg" && index === 0 ? "opgg" : `${section.key}-${index}`) })).join("")}</div>`
-	  : `<div class="recommendation-empty"><strong>${emptyTitle}</strong>${specialistKeyUnavailable ? "" : `<p>${section.loading ? "正在核对专家榜玩家最近对局中的完整符文，通常需要 5-15 秒。" : specialistNoPositionSample || specialistRetryable ? unavailableReason.specialist : section.failed ? "本次后台读取未完成，稍后刷新时会自动重试。" : unavailableReason[section.key] || "OPGG 返回完整主系、副系与属性碎片后即可选择。"}</p>`}${specialistKeyUnavailable ? '<button class="text-button" type="button" data-open-riot-settings>去设置</button>' : specialistRetryable ? '<button class="text-button" type="button" data-retry-specialist-runes>重试</button>' : ""}</div>`;
+	  : `<div class="recommendation-empty"><strong>${emptyTitle}</strong>${specialistKeyUnavailable || specialistRelayUnavailable ? "" : `<p>${section.loading ? "正在核对专家榜玩家最近对局中的完整符文，通常需要 5-15 秒。" : specialistNoPositionSample || specialistRetryable ? unavailableReason.specialist : section.failed ? "本次后台读取未完成，稍后刷新时会自动重试。" : unavailableReason[section.key] || "OPGG 返回完整主系、副系与属性碎片后即可选择。"}</p>`}${specialistKeyUnavailable ? '<button class="text-button" type="button" data-open-riot-settings>去设置</button>' : specialistRetryable ? '<button class="text-button" type="button" data-retry-specialist-runes>重试</button>' : ""}</div>`;
     const opggSpells = section.key === "opgg" && section.items.length ? renderRuneSpellPair(recommendedRuneSpellIDs(state.live, { sourceLabel: "OPGG" })) : "";
     return `<section class="rune-source-section">${opggSpells}${content}</section>`;
   }

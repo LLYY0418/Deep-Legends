@@ -1,0 +1,14 @@
+name = "deep-legends-riot-relay"
+main = "worker.mjs"
+compatibility_date = "2026-10-04"
+
+# Avoid invocation logs containing full request URLs or source addresses.
+[observability]
+enabled = false
+
+[[ratelimits]]
+name = "IP_LIMITER"
+namespace_id = "206001"
+[ratelimits.simple]
+limit = 120
+period = 60

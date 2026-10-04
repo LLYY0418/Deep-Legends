@@ -20,6 +20,7 @@ type updateShortcutSnapshot struct {
 // Independent installer module's v1 bridge. Do not log arbitrary source JSON:
 // even local files must not introduce paths, account names or error messages.
 type updateShortcutReport struct {
+	IconLocationStable          bool                              `json:"icon_location_stable"`
 	Schema                      int                               `json:"schema"`
 	Phase                       string                            `json:"phase"`
 	DesktopBefore               map[string]updateShortcutSnapshot `json:"desktop_before"`

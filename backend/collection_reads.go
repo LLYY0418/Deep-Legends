@@ -99,7 +99,9 @@ func (a *app) scheduleCollectionDataRetry(client *LCUClient, account AccountData
 		a.collectionDataRetry = nil
 		a.mu.Unlock()
 		if valid {
-			a.requestCollectionRefresh()
+			// A bounded data retry is not an LCU event; event throttling must
+			// not consume its remaining retry budget.
+			a.queueCollectionRefresh("pending_retry")
 		}
 	})
 }

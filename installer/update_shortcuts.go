@@ -20,6 +20,7 @@ type shortcutState struct {
 }
 
 type shortcutUpdateReport struct {
+	IconLocationStable          bool                     `json:"icon_location_stable"`
 	Schema                      int                      `json:"schema"`
 	Phase                       string                   `json:"phase"`
 	DesktopBefore               map[string]shortcutState `json:"desktop_before"`
@@ -40,13 +41,14 @@ type shortcutUpdateReport struct {
 }
 
 type shortcutUpdateHooks struct {
-	Snapshot     func() (desktop, menu map[string]shortcutState)
-	ReadKeep     func() *bool
-	RepairKeep   func() error
-	Backup       func(scope string) error
-	Restore      func(scope string) error
-	TargetExists func() bool
-	Write        func(shortcutUpdateReport)
+	StabilizeIcon func() bool
+	Snapshot      func() (desktop, menu map[string]shortcutState)
+	ReadKeep      func() *bool
+	RepairKeep    func() error
+	Backup        func(scope string) error
+	Restore       func(scope string) error
+	TargetExists  func() bool
+	Write         func(shortcutUpdateReport)
 }
 
 type shortcutUpdateGuard struct {
@@ -61,6 +63,11 @@ func shortcutCreationChanged(before, after shortcutState) bool {
 // The installed target, not the .lnk name alone, must exist before restoration.
 // Missing/unknown timestamps are never treated as evidence of recreation.
 func beginShortcutUpdate(hooks shortcutUpdateHooks, repairRegistry bool) *shortcutUpdateGuard {
+	// Migrate the icon before removing an old exe, including the first upgrade
+	// from a version whose shortcuts still refer to that executable's resource.
+	if hooks.StabilizeIcon != nil {
+		hooks.StabilizeIcon()
+	}
 	desktop, menu := hooks.Snapshot()
 	g := &shortcutUpdateGuard{hooks: hooks, report: shortcutUpdateReport{
 		Schema: 1, Phase: "before", DesktopBefore: desktop, StartMenuBefore: menu,
@@ -124,6 +131,9 @@ func (g *shortcutUpdateGuard) finish(result string) {
 		}
 	}
 	g.report.CreatedTimeChanged = g.report.DesktopCreatedTimeChanged || g.report.StartMenuCreatedTimeChanged
+	if result == "ok" && g.hooks.StabilizeIcon != nil {
+		g.report.IconLocationStable = g.hooks.StabilizeIcon()
+	}
 	g.report.DesktopFinal, _ = g.hooks.Snapshot()
 	g.hooks.Write(g.report)
 }

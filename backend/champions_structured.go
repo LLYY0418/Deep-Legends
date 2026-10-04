@@ -230,7 +230,13 @@ func (p *championProvider) loadOPGGLatestVersion(ctx context.Context, spec opggM
 		}
 	}
 	requestPath := "/api/" + spec.Region + "/champions/" + spec.APIMode + "/versions"
-	data, err := p.fetch(ctx, opggChampionHost, requestPath, nil, championJSONMax, "application/json")
+	var data []byte
+	var err error
+	if spec.APIMode == "arena" {
+		data, _, err = p.fetchArenaWithMetadata(ctx, opggChampionHost, requestPath, nil, "")
+	} else {
+		data, err = p.fetch(ctx, opggChampionHost, requestPath, nil, championJSONMax, "application/json")
+	}
 	if err != nil {
 		return "", err
 	}
@@ -1240,18 +1246,30 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 		return championDetailResponse{}, err
 	}
 	query, dataVersion, err := p.applyOPGGRequestVersion(ctx, spec, query)
-	if err != nil {
+	if err != nil && mode != "arena" {
 		return championDetailResponse{}, err
 	}
+	opggErr := err
 	requestPosition := spec.requestPosition(position)
 	cacheKey := opggDetailCacheKey(mode, spec.Region, id, requestPosition, tier, dataVersion)
-	data, fetchedAt, err := p.fetchWithMetadataCacheKey(ctx, opggChampionHost, requestPath, query, championJSONMax, "application/json", cacheKey)
-	if err != nil {
-		return championDetailResponse{}, err
+	var data []byte
+	var fetchedAt time.Time
+	if opggErr == nil {
+		if mode == "arena" {
+			data, fetchedAt, opggErr = p.fetchArenaWithMetadata(ctx, opggChampionHost, requestPath, query, cacheKey)
+		} else {
+			data, fetchedAt, opggErr = p.fetchWithMetadataCacheKey(ctx, opggChampionHost, requestPath, query, championJSONMax, "application/json", cacheKey)
+		}
+	}
+	if opggErr != nil && mode != "arena" {
+		return championDetailResponse{}, opggErr
 	}
 	var payload opggStructuredDetail
-	if json.Unmarshal(data, &payload) != nil || payload.Data.Summary.ID != id {
-		return championDetailResponse{}, errors.New("OP.GG champion detail response changed")
+	if opggErr == nil && (json.Unmarshal(data, &payload) != nil || payload.Data.Summary.ID != id) {
+		opggErr = errors.New("OP.GG champion detail response changed")
+		if mode != "arena" {
+			return championDetailResponse{}, opggErr
+		}
 	}
 	currentVersion := p.currentPatch()
 	response := championDetailResponse{
@@ -1403,6 +1421,17 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 		response.TeamCompositions = p.structuredSynergies(id, payload.Data.Synergies)
 		loadedAggregate := <-arenaAggregateReady
 		aggregate, itemCatalog, aggregateFetchedAt, aggregateErr := loadedAggregate.aggregate, loadedAggregate.items, loadedAggregate.fetchedAt, loadedAggregate.err
+		if opggErr != nil && aggregateErr != nil {
+			return championDetailResponse{}, opggErr
+		}
+		if opggErr != nil {
+			response.FailedBlocks = append(response.FailedBlocks, "synergies")
+			response.Source = "YOUR.GG aggregate"
+			response.Patch = aggregate.Response.Version
+		}
+		if aggregateErr != nil {
+			response.FailedBlocks = append(response.FailedBlocks, "items", "augments")
+		}
 		augmentFallbackReason := ""
 		augmentStats := yourGGArenaAugmentMapStats{RowsIn: len(aggregate.Response.Augments)}
 		var yourGGAugments []arenaAugmentGroup
@@ -1412,6 +1441,9 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 			augmentCatalog, augmentCatalogErr = p.loadCommunityDragonAugments(ctx)
 		}
 		if aggregateErr != nil {
+			if !containsString(response.FailedBlocks, "items") {
+				response.FailedBlocks = append(response.FailedBlocks, "items")
+			}
 			augmentFallbackReason = "aggregate-failed"
 		} else if len(aggregate.Response.Augments) == 0 {
 			augmentFallbackReason = "augment-missing"
@@ -1433,7 +1465,9 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 		}
 		if augmentFallbackReason == "" {
 			response.ArenaAugmentGroups = yourGGAugments
-			response.Source = "OP.GG JSON + YOUR.GG aggregate"
+			if opggErr == nil {
+				response.Source = "OP.GG JSON + YOUR.GG aggregate"
+			}
 			response.FetchedAt = aggregateFetchedAt
 			response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "斗魂海克斯采用 YOUR.GG 聚合数据的档位与综合评分；品质与本地化资料由 CommunityDragon 对照")
 		} else {
@@ -1474,13 +1508,18 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 				if len(prismItems) > 0 {
 					response.Build.PrismItems = prismItems
 				}
-				response.Source = "OP.GG JSON + YOUR.GG aggregate"
+				if opggErr == nil {
+					response.Source = "OP.GG JSON + YOUR.GG aggregate"
+				}
 				response.FetchedAt = aggregateFetchedAt
 				response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "核心物品与棱彩装备采用 YOUR.GG 聚合数据；胜率、选用率、吃鸡率由 0~1 小数换算为百分比，等级沿用上游 OP/S/A/B/C/D/F")
 			}
 		}
 		if aggregateErr != nil {
 			applyLocalAugmentGrades(response.Build.CoreItems)
+			if !containsString(response.FailedBlocks, "items") {
+				response.FailedBlocks = append(response.FailedBlocks, "items")
+			}
 			applyLocalAugmentGrades(response.Build.PrismItems)
 			response.MeasurementTechnique = appendMeasurementTechnique(response.MeasurementTechnique, "YOUR.GG 核心物品聚合暂不可用，核心物品回退 OP.GG 并使用本地综合评分分位")
 			if p.diag != nil {
@@ -1488,9 +1527,15 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 			}
 		}
 		response.Build = normalizeArenaBuild(response.Build)
+		if augmentFallbackReason != "" && len(response.ArenaAugments) == 0 && !containsString(response.FailedBlocks, "augments") {
+			response.FailedBlocks = append(response.FailedBlocks, "augments")
+		}
+		if len(response.FailedBlocks) > 0 && p.diag != nil {
+			p.diag(map[string]any{"event": "arena_detail_partial", "failed_blocks": response.FailedBlocks})
+		}
 	}
 	p.decorateDetailAssets(ctx, champion, &response)
-	if len(response.Build.CoreItems) == 0 && len(response.Build.Boots) == 0 && len(response.Build.Skills) == 0 {
+	if mode != "arena" && len(response.Build.CoreItems) == 0 && len(response.Build.Boots) == 0 && len(response.Build.Skills) == 0 {
 		return championDetailResponse{}, errors.New("OP.GG structured detail is incomplete")
 	}
 	return response, nil

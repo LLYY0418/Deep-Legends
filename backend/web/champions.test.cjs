@@ -3525,7 +3525,8 @@ test("augment metadata is looked up by ID without an icon-directory filter", () 
 test("augment icons survive a client asset miss and never render as a solid tile", () => {
   const image = goFunctionSource(mainSource, "handleImage");
   const candidates = goFunctionSource(mainSource, "communityDragonImagePaths");
-  assert.match(image, /if err != nil \{[\s\S]{0,400}a\.serveCommunityDragonImage\(w, r, assetPath\)/);
+  assert.match(image, /if _, augment := augmentIconPathTemplate\(assetPath\); !augment/);
+  assert.match(image, /served := a\.serveCommunityDragonImage\(w, r, assetPath\)/);
   assert.doesNotMatch(image, /if err != nil \{\s*http\.NotFound\(w, r\)/);
   assert.match(mainSource, /"\/latest\/game\/" \+ gameRelative/);
   assert.ok(candidates.indexOf("gamePath,") < candidates.indexOf("pluginPath,"), "game _large candidate must precede plugin _large");

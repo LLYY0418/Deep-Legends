@@ -288,6 +288,7 @@ func newWindowsShortcutUpdate(dest, temporaryDir, exeName string, repairRegistry
 	}
 	before := map[string]shortcutState{}
 	hooks := shortcutUpdateHooks{
+		StabilizeIcon: func() bool { return stabilizeWindowsShortcutIcons(dest, exeName) },
 		Snapshot: func() (map[string]shortcutState, map[string]shortcutState) {
 			d, m := map[string]shortcutState{}, map[string]shortcutState{}
 			for _, scope := range []string{"current", "public"} {

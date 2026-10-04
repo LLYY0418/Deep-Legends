@@ -99,7 +99,9 @@ func (a *app) applySummonerIdentity(client *LCUClient, next Summoner, observedAt
 	if accountChanged {
 		a.clearGameplayReferences()
 		if len(identityOnly) == 0 || !identityOnly[0] {
-			a.requestCollectionRefresh("event")
+			if a.markCollectionDirty("identity") {
+				a.queueCollectionRefresh("event")
+			}
 		}
 	}
 	a.broadcastEvent("summoner-updated")

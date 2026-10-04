@@ -9,6 +9,8 @@
   // 因此始终至少还有 3 个名额；总名额仍是 5，加上 SSE 正好不超过浏览器对同一源
   // 的 6 条连接。
   const REMOTE_LANE_LIMIT = 2;
+  const LOCAL_IMAGE_TIMEOUT_MS = 4000;
+  const REMOTE_IMAGE_TIMEOUT_MS = 10000;
   // 占着名额超过这个时长即算慢图，失败上报时带上数量，用于判断名额被谁占满。
   const SLOW_ACTIVE_MS = 3000;
   const REPORTABLE_IMAGE_SOURCES = ["lcu", "communitydragon", "ddragon", "gtimg", "builtin"];
@@ -110,7 +112,7 @@
       let timer, timedOut = false, exhausted = false, wasConnected = true;
       const finish = (error, cancelled = false) => {
         if (!active.has(img)) return;
-        clearTimeout(timer); img.removeEventListener("load", loaded); img.removeEventListener("error", errored);
+        clearTimeout(timer); img.removeEventListener("load", loaded); img.removeEventListener("error", errored, true);
         active.delete(img);
         const loadMs = Math.max(0, Date.now() - admittedAtMs);
         const activeSlowCount = slowActiveCount();
@@ -183,10 +185,19 @@
         }
         pump();
       };
-      const loaded = () => finish(false), errored = () => finish(true);
+      const loaded = () => finish(false), errored = (event) => {
+        // <img> cannot inspect response headers. Insert the remote URL as the
+        // next candidate on the first ordinary local failure, before existing
+        // card onerror handlers advance their own artwork candidates.
+        if (lane === "local" && /\/api\/image\?/.test(url) && !imageSourceOf(url)) {
+          event.stopImmediatePropagation();
+          img.setAttribute("data-queued-src", `${url}&source=communitydragon`);
+        }
+        finish(true);
+      };
       active.set(img, () => { img.removeAttribute("src"); finish(false, true); });
-      img.addEventListener("load", loaded); img.addEventListener("error", errored);
-      timer = setTimeout(() => { timedOut = true; img.removeAttribute("src"); finish(true); }, 10000);
+      img.addEventListener("load", loaded); img.addEventListener("error", errored, true);
+      timer = setTimeout(() => { timedOut = true; img.removeAttribute("src"); finish(true); }, lane === "local" ? LOCAL_IMAGE_TIMEOUT_MS : REMOTE_IMAGE_TIMEOUT_MS);
       delete img.dataset.imageReady;
       img.hidden = false;
       // Visibility has already been checked by our observer. Native lazy

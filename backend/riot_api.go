@@ -32,21 +32,10 @@ import (
 )
 
 // ============================================================================
-// Riot API Key 配置（三种方式按优先级从高到低）：
-//
-//  1. 环境变量 RIOT_API_KEY —— 仅本机临时调试用，不需要重新构建。
-//  2. 用户保存的 riot-user-key.dat（Windows 当前用户 DPAPI；开发环境0600）。
-//  3. riotAPIKeyCipher —— 推荐：加密后的 key（AES-256-GCM + Base64），
-//     在构建时通过 -ldflags "-X main.riotAPIKeyCipher=<密文>" 注入，
-//     源码里这个变量必须永远留空字符串，绝不能把真实密文写死提交到仓库。
-//     生成密文：go run ./backend -encrypt-riot-key "RGAPI-你的key"
-//     构建示例：./build-desktop-windows.ps1 -RiotAPIKeyCipher "<密文>"
-//     （或设置环境变量 RIOT_API_KEY_CIPHER，构建脚本会自动读取）
-//     riotAPIKey —— 明文变量，同样只能通过构建时注入，不能写死提交。
-//
-// 重要边界说明：密文与解密逻辑都在程序里，这只是混淆——能防止用
-// strings 等工具从 EXE 中直接扫出明文 key，但挡不住有心人抓包或逆向。
-// key 属于开发者个人凭据，泄露可到 developer.riotgames.com 重置后重新生成密文。
+// Runtime credentials: environment → user-saved Key → built-in relay → none.
+// Legacy cipher helpers remain for old private-version upgrade migration and
+// the embedded-key build gate. Embedded credentials are no longer a runtime
+// fallback; public packages must still contain no embedded Key.
 // ============================================================================
 var riotAPIKeyCipher = ""
 
@@ -217,6 +206,9 @@ func (t *riotOverviewCostTracker) recordAccountFailure(err error) {
 	if errors.Is(err, errRiotKeyMissing) {
 		kind = "riot_key_missing"
 	}
+	if errors.Is(err, errRiotRelayUnavailable) {
+		kind = "riot_relay_unavailable"
+	}
 	t.mu.Lock()
 	t.accountErrorKind = kind
 	t.mu.Unlock()
@@ -291,7 +283,7 @@ func riotKeyConfiguredValue(ciphertext string) bool {
 	return err == nil && strings.TrimSpace(plain) != ""
 }
 
-func riotKeyConfigured() bool { return riotKey() != "" }
+func riotKeyConfigured() bool { return riotKeySource() != "none" }
 
 // wait uses Riot response quotas when available, retaining conservative defaults
 // until the server advertises the key's actual regional and method limits.
@@ -443,10 +435,26 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 	scope := riotRequestRateScope(host, requestPath)
 	ctx = context.WithValue(ctx, riotRateScopeKey{}, scope)
 	for attempt := 0; attempt < 3; attempt++ {
+		key, source := riotUserKeys.effective()
+		if source == "none" {
+			return errRiotKeyMissing
+		}
 		// requestPath 已由调用方用 url.PathEscape 逐段转义，这里必须按
 		// 字符串拼接后交给 http.NewRequest 解析；若赋值给 url.URL.Path，
 		// 序列化时 % 会被二次转义，带空格或韩文的 Riot ID 会全部 404。
 		endpoint := "https://" + host + requestPath
+		relay := ""
+		if source == "relay" {
+			var err error
+			relay, err = p.relayOrigin(ctx)
+			if err != nil {
+				return err
+			}
+			endpoint, err = riotRelayEndpoint(relay, host, requestPath)
+			if err != nil {
+				return err
+			}
+		}
 		if encoded := query.Encode(); encoded != "" {
 			endpoint += "?" + encoded
 		}
@@ -454,10 +462,12 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		if err != nil {
 			return err
 		}
-		request.Header.Set("X-Riot-Token", riotKey())
+		if source != "relay" {
+			request.Header.Set("X-Riot-Token", key)
+		}
 		request.Header.Set("Accept", "application/json")
 		request.Header.Set("User-Agent", "Deep-Legends/"+version)
-		client := p.champions.httpClient()
+		client := riotHTTPClientWithoutRedirects(p.champions.httpClient())
 		// Reserve quota only after building the request, immediately before I/O.
 		if err := p.wait(ctx); err != nil {
 			return err
@@ -477,6 +487,13 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			if isDetail {
 				tracker.detailInFlight(-1)
 			}
+			if source == "relay" && ctx.Err() == nil {
+				riotRelays.failed(relay)
+				return errRiotRelayUnavailable
+			}
+			if source == "relay" {
+				return ctx.Err()
+			}
 			return fmt.Errorf("无法连接 Riot 官方接口（可在设置中调整“英雄数据网络”代理）：%w", err)
 		}
 		p.observeRiotRate(scope, response.Header, response.StatusCode)
@@ -489,15 +506,27 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		case http.StatusOK:
 			riotUserKeys.observe(request.Header.Get("X-Riot-Token"), response.StatusCode)
 			if readErr != nil {
+				if source == "relay" {
+					riotRelays.failed(relay)
+					return errRiotRelayUnavailable
+				}
 				return readErr
 			}
 			if err := json.Unmarshal(body, out); err != nil {
+				if source == "relay" {
+					riotRelays.failed(relay)
+					return errRiotRelayUnavailable
+				}
 				return errors.New("Riot 接口返回的数据无法解析，可能接口已变更")
 			}
 			return nil
 		case http.StatusNotFound:
 			return errRiotNotFound
 		case http.StatusUnauthorized, http.StatusForbidden:
+			if source == "relay" {
+				riotRelays.failed(relay)
+				return errRiotRelayUnavailable
+			}
 			riotUserKeys.observe(request.Header.Get("X-Riot-Token"), response.StatusCode)
 			return &riotStatusError{message: "Riot Key 无效", status: response.StatusCode}
 		case http.StatusTooManyRequests:
@@ -528,6 +557,10 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 				return err
 			}
 		default:
+			if source == "relay" && response.StatusCode >= 500 {
+				riotRelays.failed(relay)
+				return errRiotRelayUnavailable
+			}
 			return &riotStatusError{message: fmt.Sprintf("Riot 接口返回 HTTP %d", response.StatusCode), status: response.StatusCode}
 		}
 	}
@@ -560,6 +593,9 @@ func riotNotFoundError(format string, args ...any) error {
 }
 
 func riotErrorStatus(err error) int {
+	if errors.Is(err, errRiotRelayUnavailable) {
+		return http.StatusServiceUnavailable
+	}
 	var statusErr *riotStatusError
 	if errors.As(err, &statusErr) {
 		return statusErr.status

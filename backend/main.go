@@ -92,6 +92,11 @@ type app struct {
 	collectionDirty                 bool
 	collectionDirtyAt               time.Time
 	collectionRefreshFinishedAt     time.Time
+	collectionRefreshStartedAt      time.Time
+	collectionEventAt               map[string]time.Time
+	startupIdleAt                   time.Time
+	startupPrefetchDone             bool
+	startupConnectionsWarmed        bool
 	fallbackOwned                   []Skin
 	fallbackRemaining               []Skin
 	connected                       bool
@@ -141,6 +146,7 @@ type app struct {
 	assetFailureUntil               map[string]time.Time
 	assetHostTimeouts               map[string]int
 	assetHostBackoffUntil           map[string]time.Time
+	imageCosts                      imageProxyCosts
 	matchTierCacheOnce              sync.Once
 	matchTierCache                  *championDataCache
 	mediaSlots                      chan struct{}
@@ -308,41 +314,42 @@ type app struct {
 }
 
 type statusResponse struct {
-	Update                 updateStatus         `json:"update"`
-	Version                string               `json:"version"`
-	BuildFingerprint       string               `json:"buildFingerprint"`
-	Connected              bool                 `json:"connected"`
-	IdentityReady          bool                 `json:"identityReady"`
-	SnapshotReady          bool                 `json:"snapshotReady"`
-	ConnectionState        string               `json:"connectionState"`
-	EventStream            bool                 `json:"eventStream"`
-	Syncing                bool                 `json:"syncing"`
-	LastSync               time.Time            `json:"lastSync,omitempty"`
-	LastError              string               `json:"lastError,omitempty"`
-	LastAttempt            time.Time            `json:"lastAttempt,omitempty"`
-	LastDurationMS         int64                `json:"lastDurationMs"`
-	SnapshotRetryCount     int                  `json:"snapshotRetryCount,omitempty"`
-	SnapshotRetryElapsedMS int64                `json:"snapshotRetryElapsedMs,omitempty"`
-	SnapshotRetryExhausted bool                 `json:"snapshotRetryExhausted,omitempty"`
-	SnapshotFallback       bool                 `json:"snapshotFallback,omitempty"`
-	SnapshotFallbackAt     time.Time            `json:"snapshotFallbackAt,omitempty"`
-	CollectionDirty        bool                 `json:"collectionDirty,omitempty"`
-	Summoner               publicSummoner       `json:"summoner"`
-	OwnedCount             int                  `json:"ownedCount"`
-	ChromaOwnedCount       int                  `json:"chromaOwnedCount"`
-	PoolTotal              int                  `json:"poolTotal"`
-	PoolMatched            int                  `json:"poolMatched"`
-	Remaining              int                  `json:"remainingCount"`
-	CalculationOK          bool                 `json:"calculationOK"`
-	PoolIssues             []PoolIssue          `json:"poolIssues,omitempty"`
-	PoolSource             string               `json:"poolSource"`
-	PoolVersion            string               `json:"poolVersion"`
-	PoolID                 string               `json:"poolId"`
-	PoolHash               string               `json:"poolHash"`
-	StorageReady           bool                 `json:"storageReady"`
-	ServerID               string               `json:"serverId,omitempty"`
-	ServerName             string               `json:"serverName,omitempty"`
-	QueueGroups            []queueGroupResponse `json:"queueGroups"`
+	Update                     updateStatus         `json:"update"`
+	Version                    string               `json:"version"`
+	BuildFingerprint           string               `json:"buildFingerprint"`
+	Connected                  bool                 `json:"connected"`
+	IdentityReady              bool                 `json:"identityReady"`
+	SnapshotReady              bool                 `json:"snapshotReady"`
+	ConnectionState            string               `json:"connectionState"`
+	EventStream                bool                 `json:"eventStream"`
+	Syncing                    bool                 `json:"syncing"`
+	LastSync                   time.Time            `json:"lastSync,omitempty"`
+	LastError                  string               `json:"lastError,omitempty"`
+	LastAttempt                time.Time            `json:"lastAttempt,omitempty"`
+	LastDurationMS             int64                `json:"lastDurationMs"`
+	SnapshotRetryCount         int                  `json:"snapshotRetryCount,omitempty"`
+	SnapshotRetryElapsedMS     int64                `json:"snapshotRetryElapsedMs,omitempty"`
+	SnapshotRetryExhausted     bool                 `json:"snapshotRetryExhausted,omitempty"`
+	SnapshotFallback           bool                 `json:"snapshotFallback,omitempty"`
+	SnapshotFallbackAt         time.Time            `json:"snapshotFallbackAt,omitempty"`
+	CollectionDirty            bool                 `json:"collectionDirty,omitempty"`
+	CollectionRefreshElapsedMS int64                `json:"collectionRefreshElapsedMs,omitempty"`
+	Summoner                   publicSummoner       `json:"summoner"`
+	OwnedCount                 int                  `json:"ownedCount"`
+	ChromaOwnedCount           int                  `json:"chromaOwnedCount"`
+	PoolTotal                  int                  `json:"poolTotal"`
+	PoolMatched                int                  `json:"poolMatched"`
+	Remaining                  int                  `json:"remainingCount"`
+	CalculationOK              bool                 `json:"calculationOK"`
+	PoolIssues                 []PoolIssue          `json:"poolIssues,omitempty"`
+	PoolSource                 string               `json:"poolSource"`
+	PoolVersion                string               `json:"poolVersion"`
+	PoolID                     string               `json:"poolId"`
+	PoolHash                   string               `json:"poolHash"`
+	StorageReady               bool                 `json:"storageReady"`
+	ServerID                   string               `json:"serverId,omitempty"`
+	ServerName                 string               `json:"serverName,omitempty"`
+	QueueGroups                []queueGroupResponse `json:"queueGroups"`
 }
 
 type publicSummoner struct {
@@ -382,7 +389,7 @@ func main() {
 		return
 	}
 	if *selfCheckRiotKey {
-		if !riotKeyConfigured() {
+		if riotEmbeddedKey() == "" {
 			log.Fatal("Riot API key is not embedded")
 		}
 		fmt.Println("embedded Riot API key is configured")
@@ -810,6 +817,9 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	if !a.snapshotRetryStarted.IsZero() {
 		response.SnapshotRetryElapsedMS = time.Since(a.snapshotRetryStarted).Milliseconds()
 	}
+	if !a.collectionRefreshStartedAt.IsZero() && !a.snapshotReady {
+		response.CollectionRefreshElapsedMS = time.Since(a.collectionRefreshStartedAt).Milliseconds()
+	}
 	a.mu.RUnlock()
 	if response.Connected {
 		poster, video, _, _ := a.cachedOverviewSkinMedia(client, backgroundID)
@@ -996,12 +1006,13 @@ func (a *app) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	client := a.lcu
 	connected := a.connected
 	a.mu.RUnlock()
-	if connected && client != nil {
+	source := r.URL.Query().Get("source")
+	if connected && client != nil && source != "collection_retry" && source != "dirty_rescan" {
 		if _, err := a.refreshSummonerIdentityContext(r.Context(), client); err != nil {
 			a.recordDiagnostic(map[string]any{"event": "summoner_identity_manual_refresh_failed", "reason": safeDiagnosticReason(err)})
 		}
 	}
-	a.requestCollectionRefresh(r.URL.Query().Get("source"))
+	a.requestCollectionRefresh(source)
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -1039,6 +1050,12 @@ func (a *app) handleImage(w http.ResponseWriter, r *http.Request) {
 	client := a.lcu
 	connected := a.connected
 	a.mu.RUnlock()
+	if r.URL.Query().Get("source") == "communitydragon" {
+		started := time.Now()
+		ok := a.serveCommunityDragonImage(w, r, assetPath)
+		a.recordImageProxyCost("communitydragon", assetPath, ok, time.Since(started))
+		return
+	}
 	if client == nil || !connected {
 		if a.champions.bundledChampionVersionCompatible() {
 			if data, ok := bundledChampionIcon(assetPath); ok {
@@ -1048,13 +1065,23 @@ func (a *app) handleImage(w http.ResponseWriter, r *http.Request) {
 		}
 		// 未连接客户端（例如只查看韩服页签）时改用 CommunityDragon：
 		// 其目录结构与客户端的 lol-game-data 资源路径完全一致。
-		a.serveCommunityDragonImage(w, r, assetPath)
+		started := time.Now()
+		ok := a.serveCommunityDragonImage(w, r, assetPath)
+		a.recordImageProxyCost("communitydragon", assetPath, ok, time.Since(started))
 		return
 	}
 	data, err := a.loadAsset(r.Context(), assetPath, 2*1024*1024, 0, func(ctx context.Context) ([]byte, error) {
 		return a.loadClientIcon(ctx, client, assetPath)
 	})
 	if err != nil {
+		if _, augment := augmentIconPathTemplate(assetPath); !augment {
+			if lcuFailureStatus(err) == http.StatusNotFound {
+				a.recordImageProxyCost("local-404", assetPath, false, 0)
+				w.Header().Set("X-Image-Fallback", "communitydragon")
+			}
+			http.NotFound(w, r)
+			return
+		}
 		// 客户端只随包发布 rcp-be-lol-game-data 里的那一份资源，海克斯的
 		// _large.png 全彩大图只存在于游戏侧 (/latest/game/assets/…)，连着
 		// 客户端时逐个 404。回落到 CommunityDragon 才能拿到大图，否则前端
@@ -1079,6 +1106,7 @@ func (a *app) handleImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeImageResponse(w, r, data, contentType, "private, max-age=3600")
+	a.recordImageProxyCost("local-hit", assetPath, true, 0)
 }
 
 // serveCommunityDragonImage 用 CommunityDragon 兜底本机客户端没有的资源，并返回
@@ -1251,6 +1279,9 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 	a.connected = true
 	a.identityReady = result.Summoner.SummonerID != 0
 	a.collectionRequested = false
+	a.collectionRefreshStartedAt = time.Time{}
+	a.collectionRefreshFinishedAt = time.Time{}
+	a.collectionEventAt = nil
 	a.collectionRefreshPending = false
 	a.lastAttempt = time.Now()
 	a.lastDuration = time.Duration(result.LoadPhases["total"]) * time.Millisecond
@@ -1288,7 +1319,7 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 func collectionRefreshSource(sources []string) string {
 	if len(sources) > 0 {
 		switch sources[0] {
-		case "user_refresh", "overlay_retry", "dirty_rescan", "ensure", "event":
+		case "user_refresh", "overlay_retry", "dirty_rescan", "ensure", "event", "collection_retry", "startup_prefetch", "pending_retry", "snapshot_retry":
 			return sources[0]
 		}
 	}
@@ -1313,12 +1344,22 @@ func (a *app) handleIdentityRefresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) requestCollectionRefresh(sources ...string) {
+	if collectionRefreshSource(sources) == "event" && !a.markCollectionDirty("other") {
+		return
+	}
+	a.queueCollectionRefresh(collectionRefreshSource(sources))
+}
+
+func (a *app) queueCollectionRefresh(source string) {
 	a.mu.Lock()
 	a.collectionRequested = true
 	a.manualDisconnected = false
 	coalesced := a.collectionRefreshPending
 	if !coalesced {
-		a.collectionRefreshPendingSource = collectionRefreshSource(sources)
+		a.collectionRefreshPendingSource = source
+		if !a.snapshotReady {
+			a.collectionRefreshStartedAt = time.Now()
+		}
 	}
 	if !coalesced && a.refreshRequests != nil {
 		a.collectionRefreshPending = true
@@ -1328,11 +1369,17 @@ func (a *app) requestCollectionRefresh(sources ...string) {
 		}
 	}
 	a.mu.Unlock()
-	a.recordDiagnostic(map[string]any{"event": "collection_refresh_request", "coalesced": coalesced, "source": collectionRefreshSource(sources)})
+	a.recordDiagnostic(map[string]any{"event": "collection_refresh_request", "coalesced": coalesced, "source": source})
 }
 
 func (a *app) refreshWithClient(client *LCUClient) bool {
 	client.setDiagnosticObserver(a.recordDiagnostic)
+	a.mu.RLock()
+	queuedEvent := a.collectionRefreshPending
+	a.mu.RUnlock()
+	if !queuedEvent && !a.markCollectionDirty("other") {
+		return true
+	}
 	started := time.Now()
 	a.mu.Lock()
 	if a.syncing {
@@ -1346,6 +1393,9 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 		source = "event"
 	}
 	a.syncing = true
+	if a.collectionRefreshStartedAt.IsZero() {
+		a.collectionRefreshStartedAt = started
+	}
 	a.collectionRefreshPending = true
 	generation := a.poolGeneration
 	initialClient := a.lcu
@@ -1549,6 +1599,12 @@ func (a *app) clearSnapshotLocked(message string) {
 	a.identityReady = false
 	a.snapshotReady = false
 	a.collectionRequested = false
+	a.collectionRefreshStartedAt = time.Time{}
+	a.collectionRefreshFinishedAt = time.Time{}
+	a.collectionRefreshPendingSource = ""
+	a.collectionEventAt = nil
+	a.collectionDirty = false
+	a.collectionDirtyAt = time.Time{}
 	a.collectionRefreshPending = false
 	a.lastError = message
 	a.snapshotRetryCount = 0

@@ -38,8 +38,8 @@ func TestCommunityDragonImagePathsCoverFrontendLootIcons(t *testing.T) {
 }
 
 // The connected client answers 404 for these two legacy icons (0924 log), so the
-// image endpoint must fall back to the public mirror instead of returning 404.
-func TestHandleImageFallsBackToCommunityDragonForMissingLegacyLootIcons(t *testing.T) {
+// local image lane must return promptly; the frontend queues its mirror candidate.
+func TestHandleImageReturns404ForMissingLegacyLootIcons(t *testing.T) {
 	png := []byte("\x89PNG\r\n\x1a\n" + strings.Repeat("\x00", 60))
 	newApp := func(upstream *[]string) *app {
 		var mu sync.Mutex
@@ -63,11 +63,8 @@ func TestHandleImageFallsBackToCommunityDragonForMissingLegacyLootIcons(t *testi
 	for _, name := range []string{"chest_128.png", "material_clashtickets.png"} {
 		var upstream []string
 		w := get(newApp(&upstream), "/fe/lol-loot/assets/loot_item_icons/"+name)
-		if w.Code != http.StatusOK || !strings.HasPrefix(w.Header().Get("Content-Type"), "image/") || w.Body.Len() != len(png) {
-			t.Fatalf("%s: status=%d type=%q bytes=%d", name, w.Code, w.Header().Get("Content-Type"), w.Body.Len())
-		}
-		if len(upstream) != 1 || upstream[0] != "/latest/plugins/rcp-fe-lol-loot/global/default/assets/loot_item_icons/"+name {
-			t.Fatalf("%s: upstream requests = %#v", name, upstream)
+		if w.Code != http.StatusNotFound || w.Header().Get("X-Image-Fallback") != "communitydragon" || len(upstream) != 0 {
+			t.Fatalf("%s: local lane status=%d upstream=%#v", name, w.Code, upstream)
 		}
 	}
 	// A record without a name yields ".png": nothing is asked of the public mirror.

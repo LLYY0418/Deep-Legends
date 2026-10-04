@@ -1,0 +1,6 @@
+{
+  "name": "deep-legends-riot-relay",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test *.test.mjs" }
+}

@@ -292,10 +292,8 @@ func (p *championProvider) loadArenaChampionAggregate(ctx context.Context, champ
 	// Arena detail already has OP.GG augment rows. A stalled optional
 	// YOUR.GG aggregate must not hold the whole page for the HTTP client's
 	// 12-second ceiling; the caller explicitly falls back to those rows.
-	aggregateCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
-	defer cancel()
 	requestPath := "/kr/api/arena/champions/" + strconv.Itoa(championID)
-	data, fetchedAt, err := p.fetchWithMetadata(aggregateCtx, yourGGArenaHost, requestPath, nil, championJSONMax, "application/json")
+	data, fetchedAt, err := p.fetchArenaWithMetadata(ctx, yourGGArenaHost, requestPath, nil, "")
 	if err != nil {
 		return yourGGArenaAggregateResponse{}, nil, time.Time{}, err
 	}
@@ -393,7 +391,7 @@ func (p *championProvider) loadArenaFirstPlaces(ctx context.Context, championID,
 	}
 	query := url.Values{"limit": {strconv.Itoa(limit)}}
 	requestPath := "/kr/api/arena/champions/" + strconv.Itoa(championID) + "/top-builds"
-	data, fetchedAt, err := p.fetchWithMetadata(ctx, yourGGArenaHost, requestPath, query, championJSONMax, "application/json")
+	data, fetchedAt, err := p.fetchArenaWithMetadata(ctx, yourGGArenaHost, requestPath, query, "")
 	if err != nil {
 		p.reportArenaFirstPlacesFailure(arenaFirstPlacesErrorKind(err))
 		return arenaFirstPlacesResponse{}, err

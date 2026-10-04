@@ -43,9 +43,27 @@ func loadLootMetadata(ctx context.Context, client *LCUClient, provider *champion
 			defer recoverPanic("loot_metadata.loadLootMetadata.1")
 
 			defer group.Done()
+			catalogCtx := ctx
+			if catalog.name == "translations" {
+				var cancel context.CancelFunc
+				catalogCtx, cancel = context.WithTimeout(ctx, 2800*time.Millisecond)
+				defer cancel()
+				defer func() {
+					if provider == nil {
+						return
+					}
+					provider.lootTranslationsMu.Lock()
+					defer provider.lootTranslationsMu.Unlock()
+					if len(results[index].entries) > 0 {
+						provider.lootTranslations = results[index].entries
+					} else if len(provider.lootTranslations) > 0 {
+						results[index] = result{provider.lootTranslations, "previous-cache"}
+					}
+				}()
+			}
 			results[index].source = "unavailable"
 			if client != nil {
-				localCtx, cancel := context.WithTimeout(ctx, time.Second)
+				localCtx, cancel := context.WithTimeout(catalogCtx, time.Second)
 				data, err := client.GetBytesContext(localCtx, catalog.clientPath)
 				cancel()
 				if err == nil {
@@ -56,7 +74,7 @@ func loadLootMetadata(ctx context.Context, client *LCUClient, provider *champion
 				}
 			}
 			if provider != nil {
-				data, err := provider.fetch(ctx, communityDragonHost, catalog.publicPath, nil, championCacheMaxEntry, "application/json")
+				data, err := provider.fetch(catalogCtx, communityDragonHost, catalog.publicPath, nil, championCacheMaxEntry, "application/json")
 				if err == nil {
 					if entries, err := catalog.parse(data); err == nil {
 						results[index] = result{entries, "communitydragon"}

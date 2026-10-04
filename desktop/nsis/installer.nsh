@@ -29,6 +29,7 @@ ManifestDPIAware true
 ; Child TEMP belongs to the Go shell. FILETIME -> Unix milliseconds; preserve
 ; scratch registers and the error flag used by electron-builder's copy retry.
 !macro DLUpdateTiming STAGE
+  Push $R6
   Push $R7
   Push $R8
   Push $R9
@@ -42,7 +43,11 @@ ManifestDPIAware true
   Pop $R9
   System::Int64Op $R9 - 11644473600000
   Pop $R9
-  FileOpen $R8 "$TEMP\update-install-stages.txt" a
+  ReadEnvStr $R6 "DL_UPDATE_STAGES_FILE"
+  ${If} $R6 == ""
+    StrCpy $R6 "$TEMP\update-install-stages.txt"
+  ${EndIf}
+  FileOpen $R8 "$R6" a
   FileWrite $R8 "${STAGE}=$R9$\r$\n"
   FileClose $R8
   ClearErrors
@@ -53,6 +58,7 @@ ManifestDPIAware true
   Pop $R9
   Pop $R8
   Pop $R7
+  Pop $R6
 !macroend
 Var pid
 !macro customCheckAppRunning
@@ -68,7 +74,13 @@ Var pid
       Abort "The destination is still in use"
     ${EndIf}
   ${Else}
-    !insertmacro _CHECK_APP_RUNNING
+    ClearErrors
+    ${GetOptions} $CMDLINE "--parent-exited" $R0
+    ${If} ${Errors}
+      !insertmacro _CHECK_APP_RUNNING
+    ${ElseIfNot} ${isUpdated}
+      !insertmacro _CHECK_APP_RUNNING
+    ${EndIf}
   ${EndIf}
 !macroend
 

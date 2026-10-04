@@ -36,6 +36,9 @@ func (t *updateInstallTiming) mark(stage string) {
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if stage == "installer_start" {
+		_ = os.Remove(filepath.Join(filepath.Dir(t.path), "update-install-nsis-stages.txt"))
+	}
 	if stage == "parent_exited" {
 		for _, name := range timingStageOrder[2:] {
 			delete(t.stages, name)
@@ -73,6 +76,13 @@ func (t *updateInstallTiming) writeLocked() {
 	closeErr := file.Close()
 	if err == nil && closeErr == nil {
 		_ = os.Rename(name, t.path)
+		var lines strings.Builder
+		for _, stage := range timingStageOrder {
+			if value := t.stages[stage]; value > 0 {
+				lines.WriteString(stage + "=" + strconv.FormatInt(value, 10) + "\n")
+			}
+		}
+		_ = os.WriteFile(filepath.Join(filepath.Dir(t.path), "update-install-stages.txt"), []byte(lines.String()), 0600)
 	}
 }
 
@@ -82,7 +92,10 @@ func (t *updateInstallTiming) importNSIS(directory string) {
 	if t == nil {
 		return
 	}
-	file, err := os.Open(filepath.Join(directory, "update-install-stages.txt"))
+	file, err := os.Open(filepath.Join(filepath.Dir(t.path), "update-install-nsis-stages.txt"))
+	if os.IsNotExist(err) {
+		file, err = os.Open(filepath.Join(directory, "update-install-stages.txt"))
+	}
 	if err != nil {
 		return
 	}

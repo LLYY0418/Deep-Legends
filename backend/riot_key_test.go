@@ -61,7 +61,7 @@ func riotSelfCheckPrefix(source string) (string, error) {
 	return "", fmt.Errorf("missing self-check route")
 }
 
-func TestSelfCheckRiotKeyUsesConfiguredGuard(t *testing.T) {
+func TestSelfCheckRiotKeyUsesEmbeddedGuard(t *testing.T) {
 	source, err := os.ReadFile("main.go")
 	if err != nil {
 		t.Fatal(err)
@@ -82,12 +82,12 @@ func TestSelfCheckRiotKeyUsesConfiguredGuard(t *testing.T) {
 		t.Fatal("self-check startup route changed or bypassed; review the full AST prefix")
 	}
 	mutants := []string{
-		strings.Replace(string(source), "if !riotKeyConfigured() {", "return // if !riotKeyConfigured()\n if false {", 1),
+		strings.Replace(string(source), "if riotEmbeddedKey() == \"\" {", "return // if riotEmbeddedKey() == \"\"\n if false {", 1),
 		strings.Replace(string(source), "if *selfCheckRiotKey {", "if *selfCheckRiotKey { return }\n if *selfCheckRiotKey {", 1),
 		strings.Replace(string(source), "flag.Parse()", "flag.Parse(); bypassSelfCheck()", 1),
 	}
 	for index, mutant := range mutants {
-		if !strings.Contains(mutant, "if !riotKeyConfigured()") {
+		if !strings.Contains(mutant, "riotEmbeddedKey()") {
 			t.Fatal("mutation no longer demonstrates old guard weakness")
 		}
 		if check(mutant) {

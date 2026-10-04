@@ -75,6 +75,7 @@ if waitErr != nil || cmd.ProcessState.ExitCode() != 0 {
  shortcutResult = "failed"
 }
 shortcuts.finish(shortcutResult)
+if shortcutResult=="ok" && !a.options.Update {stabilizeWindowsShortcutIcons(dest,a.meta.ExeName)}
 completeInstallation(a.options, installationResult{ExitCode: cmd.ProcessState.ExitCode(), WaitError: waitErr, Destination: dest}, installationCompletionHooks{
     Failed: reportFailure,
     Cleanup: func() { _ = os.RemoveAll(temporaryDir) },

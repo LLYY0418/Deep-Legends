@@ -69,8 +69,8 @@ func (s *riotKeyStore) effective() (string, string) {
 	if value != "" {
 		return value, "user"
 	}
-	if value = riotEmbeddedKey(); value != "" {
-		return value, "embedded"
+	if len(configuredRiotRelays()) > 0 {
+		return "", "relay"
 	}
 	return "", "none"
 }
@@ -83,13 +83,13 @@ func riotActiveKeyInvalid() bool {
 	return key != "" && key == riotUserKeys.invalidKey
 }
 func riotKeyState() string {
-	key, _ := riotUserKeys.effective()
+	key, source := riotUserKeys.effective()
 	riotUserKeys.mu.Lock()
 	defer riotUserKeys.mu.Unlock()
 	if riotUserKeys.rejected || key != "" && key == riotUserKeys.invalidKey {
 		return "invalid"
 	}
-	if key == "" {
+	if key == "" && source != "relay" {
 		return "unconfigured"
 	}
 	return "configured"

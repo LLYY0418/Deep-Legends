@@ -606,6 +606,18 @@
     }
   }
 
+  function collectionReadFailed(data) {
+    const elapsed = Math.max(Number(data.collectionRefreshElapsedMs || 0), state.collectionRequestAt ? Date.now() - state.collectionRequestAt : 0);
+    return Boolean(data.lastError || Number(data.snapshotRetryCount || 0) > 0 || elapsed >= 15000);
+  }
+
+  async function retryCollection() {
+    state.collectionEnsureInFlight = false;
+    state.collectionRequestAt = Date.now();
+    try { await api("/api/refresh?source=collection_retry", { method: "POST" }, "collection-retry", 8000); }
+    catch (error) { if (error.name !== "RequestCancelled") showToast(error.message); }
+  }
+
   function sameCollectionItems(left, right) {
     if (left === right) return true;
     if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
@@ -777,13 +789,17 @@
       return;
     }
     const stale = data.snapshotFallback && !data.snapshotReady;
+    if (!data.snapshotReady && !stale && !collectionReadFailed(data)) {
+      el.notice.hidden = true;
+      return;
+    }
     if (!data.calculationOK || stale) {
       el.notice.classList.add("is-warning");
       const issues = data.poolIssues || [];
       const issueRows = issues.slice(0, 100).map((item) => `<li>${escapeHTML(item.name)}：${escapeHTML(item.reason)}</li>`).join("");
       const detail = !data.snapshotReady ? `${stale ? `实时库存暂不可用，当前显示 ${formatDateTime(data.snapshotFallbackAt)} 保存的历史快照（可能不是最新）。` : "正在读取收藏信息。"} ${snapshotRetryText(data)}${data.lastError ? ` 原因：${data.lastError}` : ""}` : `奖池共 ${formatNumber(data.poolTotal)} 款，已经确认 ${formatNumber(data.poolMatched)} 款；数据完整后会自动显示结果。`;
 	  el.notice.innerHTML = `<div class="notice-symbol" aria-hidden="true">!</div><div><strong>${data.connected ? (stale ? "显示历史收藏快照" : "部分收藏信息暂时不可用") : "奖池结果暂不可用"}</strong><p>${escapeHTML(detail)}</p>${issues.length ? `<details><summary>查看皮肤池匹配失败条目</summary><ul class="issue-list">${issueRows}</ul></details>` : ""}${data.connected && !data.snapshotReady ? '<button class="text-button retry-inline" type="button">立即重新读取</button>' : ""}</div>`;
-	  el.notice.querySelector(".retry-inline")?.addEventListener("click", () => el.refresh.click());
+	  el.notice.querySelector(".retry-inline")?.addEventListener("click", retryCollection);
       return;
     }
     el.notice.hidden = true;
@@ -1078,15 +1094,19 @@
     el.grid.classList.toggle("hide-prestige", state.view === "chromas" && !state.showPrestigeChromas);
     const qualityGrouping = state.qualitySelections.size > 0 || state.sort === "rarity";
     el.grid.classList.toggle("is-grouped", (state.view === "all" || state.view === "chromas" || qualityGrouping) && !state.loading && !state.listError);
-    if (state.loading) {
+    if (state.loading && !(state.status?.connected && !state.status?.snapshotReady && collectionReadFailed(state.status))) {
       el.grid.innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton"></div>').join("");
-      el.listMeta.textContent = "正在整理皮肤…";
+      el.listMeta.textContent = state.status?.connected && !state.status?.snapshotReady ? "正在读取收藏" : "正在整理皮肤…";
       return;
     }
 	if (state.status?.connected && !state.status?.snapshotReady && !state.staleSnapshot) {
 	  el.listMeta.textContent = "正在读取收藏";
-	  el.grid.innerHTML = `<div class="empty-state"><strong>客户端已经连接</strong><p>收藏信息还在准备中，${escapeHTML(snapshotRetryText(state.status) || "正在自动重试")}。${state.status.lastError ? ` 原因：${escapeHTML(state.status.lastError)}` : ""}</p><div class="empty-actions"><button class="text-button refresh-inline" type="button">立即重新读取</button></div></div>`;
-	  el.grid.querySelector(".refresh-inline")?.addEventListener("click", () => el.refresh.click());
+	  if (!collectionReadFailed(state.status)) {
+	    el.grid.innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton"></div>').join("");
+	  } else {
+	    el.grid.innerHTML = `<div class="empty-state"><strong>收藏信息读取失败</strong>${state.status.lastError ? `<p>${escapeHTML(state.status.lastError)}</p>` : ""}<div class="empty-actions"><button class="text-button refresh-inline" type="button">立即重新读取</button></div></div>`;
+	    el.grid.querySelector(".refresh-inline")?.addEventListener("click", retryCollection);
+	  }
 	  return;
 	}
     if (state.listError) {
@@ -2242,7 +2262,7 @@
   }
 
   function renderRiotKeySettings(data) {
-    if (el.settingRiotKeyState) el.settingRiotKeyState.textContent = { configured: "已配置", unconfigured: "未配置", invalid: "无效" }[data.status] || "未配置";
+    if (el.settingRiotKeyState) el.settingRiotKeyState.textContent = data.source === "relay" && data.status !== "invalid" ? "使用内置服务" : { configured: "已配置", unconfigured: "未配置", invalid: "无效" }[data.status] || "未配置";
   }
   async function loadRiotKeySettings() {
     if (!el.settingRiotKeyState || state.riotKeyPending) return;

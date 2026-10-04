@@ -11,7 +11,7 @@ test('R204 Key input is masked and save/clear immediately update status without 
  const requests=[],events=[],state={};const f=compile(app,['renderRiotKeySettings','saveRiotKeySettings'],{el,state,api:async(url,opt)=>{requests.push([url,opt]);return {status:opt.method==='DELETE'?'unconfigured':'configured'}},window:{dispatchEvent:e=>events.push(e)},CustomEvent:dom.window.CustomEvent,showToast:e=>{throw Error(e)}});
  el.settingRiotKeyInput.value='fixture-key';await f.saveRiotKeySettings();assert.equal(el.settingRiotKeyState.textContent,'已配置');assert.equal(el.settingRiotKeyInput.value,'');await f.saveRiotKeySettings(true);assert.equal(requests[1][1].method,'DELETE');assert.equal(el.settingRiotKeyState.textContent,'未配置');assert.equal(events.length,2);dom.window.close();
  assert.match(app,/detail\?\.focus === "riot-key"/);assert.match(app,/settingRiotKeyInput\?\.focus/);
- assert.match(gameplay,/specialistKeyInvalid \? "Riot Key 无效"/);assert.match(gameplay,/specialistKeyUnavailable \? ""/);assert.match(gameplay,/focus: "riot-key"/);
+ assert.match(gameplay,/specialistKeyInvalid \? "Riot Key 无效"/);assert.match(gameplay,/specialistKeyUnavailable \|\| specialistRelayUnavailable \? ""/);assert.match(gameplay,/focus: "riot-key"/);
 });
 test('R204 dialog-restored pointer focus hides tooltip while keyboard and hover show it',()=>{
  const dom=new JSDOM('<button data-tooltip="新版本已下载，点击升级">update</button>',{pretendToBeVisual:true});const w=dom.window,doc=w.document,button=doc.querySelector('button');let keyboard=false;const matches=button.matches.bind(button);button.matches=selector=>selector===':focus-visible'?keyboard:matches(selector);button.getBoundingClientRect=()=>({left:20,top:20,width:36,height:36,bottom:56,right:56});

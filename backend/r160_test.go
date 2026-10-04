@@ -76,12 +76,18 @@ func TestR160ArenaAggregateHasBoundedDetailBudget(t *testing.T) {
 	provider := newChampionProvider()
 	provider.cache = newChampionDataCache(nil)
 	called := false
+	attempt := 0
 	provider.client = &http.Client{Transport: championRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		called = true
 		deadline, ok := request.Context().Deadline()
 		remaining := time.Until(deadline)
-		if !ok || remaining < 3*time.Second || remaining > 4*time.Second {
-			t.Errorf("YOUR.GG aggregate budget = %s, want up to 4 seconds", remaining)
+		attempt++
+		want := 3 * time.Second
+		if attempt == 2 {
+			want = 5 * time.Second
+		}
+		if !ok || remaining < want-1200*time.Millisecond || remaining > want {
+			t.Errorf("YOUR.GG aggregate attempt %d budget = %s, want up to %s", attempt, remaining, want)
 		}
 		return nil, context.DeadlineExceeded
 	})}

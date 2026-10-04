@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-//go:embed ui/installer.html ui/license.html ui/notice.html ui/logo.png
+//go:embed ui/installer.html ui/license.html ui/notice.html ui/logo.png ui/app.ico
 var uiFiles embed.FS
 
 var templateToken = regexp.MustCompile(`__[A-Z][A-Z0-9_]*__`)

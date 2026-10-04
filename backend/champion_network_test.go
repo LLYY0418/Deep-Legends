@@ -663,9 +663,9 @@ func TestChampionUpstreamDiagnosticUsesSafeFields(t *testing.T) {
 	}
 	wantCache := []string{championCacheStateMiss, championCacheStateMemory, championCacheStateError}
 	wantStatus := []int{http.StatusOK, http.StatusOK, http.StatusForbidden}
-	allowed := map[string]bool{"event": true, "host": true, "status": true, "duration_ms": true, "bytes": true, "cache": true}
+	allowed := map[string]bool{"event": true, "host": true, "status": true, "duration_ms": true, "bytes": true, "cache": true, "attempt": true}
 	for index, event := range events {
-		if len(event) != len(allowed) || event["event"] != "champion_upstream" || event["host"] != dataDragonHost || event["cache"] != wantCache[index] || event["status"] != wantStatus[index] {
+		if len(event) != len(allowed) || event["event"] != "champion_upstream" || event["host"] != dataDragonHost || event["cache"] != wantCache[index] || event["status"] != wantStatus[index] || event["attempt"] != 1 {
 			t.Fatalf("unexpected upstream diagnostic %d: %#v", index, event)
 		}
 		for key := range event {

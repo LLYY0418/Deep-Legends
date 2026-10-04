@@ -1,0 +1,30 @@
+[
+  {
+    "mutation": "relay-token",
+    "exit_code": 1,
+    "assertion_failed": true,
+    "command": "go test -overlay <temporary-overlay> ./backend -count=1 -run TestR206RelayRoutingNoTokenAndDirectPriority"
+  },
+  {
+    "mutation": "ordinary-image-fallback",
+    "exit_code": 1,
+    "assertion_failed": true,
+    "command": "go test -overlay <temporary-overlay> ./backend -count=1 -run TestR206LocalImage404NeverFetchesRemote"
+  },
+  {
+    "mutation": "arena-no-retry",
+    "exit_code": 1,
+    "assertion_failed": true,
+    "command": "go test -overlay <temporary-overlay> ./backend -count=1 -run TestR206ArenaRetryPartialAndAllFailed/first-timeout"
+  },
+  {
+    "mutation": "worker-unknown-path",
+    "exit_code": 1,
+    "assertion_failed": true
+  },
+  {
+    "mutation": "local-timeout-10s",
+    "exit_code": 1,
+    "assertion_failed": true
+  }
+]

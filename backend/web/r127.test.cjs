@@ -129,11 +129,11 @@ test('R127 本机图超时上报 timeout，来源记为 lcu', async () => {
     assert.equal(img.getAttribute('src'), localURL(7));
     const pending = [...timers.values()];
     assert.equal(pending.length, 1, 'admission 只应挂一个前端超时定时器');
-    assert.equal(pending[0].ms, 10000);
+    assert.equal(pending[0].ms, 4000);
     pending[0].fn();
     const report = h.reports.find(item => item.fields?.endpoint === 'image');
     assert.ok(report, '前端超时也必须留下诊断');
-    assert.equal(report.fields.errorKind, 'timeout', '前端 10 秒超时必须报 timeout 而不是 network');
+    assert.equal(report.fields.errorKind, 'timeout', '前端 4 秒超时必须报 timeout 而不是 network');
     assert.equal(report.fields.imageSource, 'lcu', '/api/image?path=… 是本机客户端来源');
     assert.equal(report.fields.activeSlowCount, 0);
   } finally { h.dispose(); }

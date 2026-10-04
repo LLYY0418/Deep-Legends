@@ -151,6 +151,13 @@ func (a *app) handleGameplaySpecialistRunes(w http.ResponseWriter, r *http.Reque
 		respondJSON(w, map[string]any{"reason": "riot-key-invalid", "runes": []gameplayRecommendationRune{}})
 		return
 	}
+	if riotKeySource() == "relay" {
+		if _, err := a.riot.relayOrigin(r.Context()); err != nil {
+			recordHandler("skipped", "riot-relay-unavailable")
+			respondJSON(w, map[string]any{"reason": "riot-relay-unavailable", "runes": []gameplayRecommendationRune{}})
+			return
+		}
+	}
 	recordHandler("accepted", "")
 	ctx, cancel := context.WithTimeout(r.Context(), specialistRuneRequestTimeout)
 	defer cancel()
@@ -165,6 +172,9 @@ func (a *app) handleGameplaySpecialistRunes(w http.ResponseWriter, r *http.Reque
 		reason := string(outcome)
 		if riotActiveKeyInvalid() {
 			reason = "riot-key-invalid"
+		}
+		if riotKeySource() == "relay" && riotRelays.unavailable() {
+			reason = "riot-relay-unavailable"
 		}
 		if reason == "" {
 			reason = string(specialistOutcomeNoPositionSample)

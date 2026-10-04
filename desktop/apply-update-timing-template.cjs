@@ -1,35 +1,76 @@
 "use strict";
 const fs = require("node:fs");
 const path = require("node:path");
-const marker = "; R201 real update timing";
+const marker = "; R206 direct upgrade extraction";
+function stripLegacyTiming(source) {
+  return source.replace(/^; R201 real update timing\n/, "").replace(/^; R204 real old-version removal timing\n/, "")
+    .replace(/^[ \t]*!ifmacrodef DLUpdateTiming\n[ \t]*!insertmacro DLUpdateTiming (?:extract_start|extract_done|copy_done)\n[ \t]*!endif\n/gm, "")
+    .replace(/^!ifmacrodef DLUpdateTiming\n  \$\{If\} \$\{isUpdated\}\n    !insertmacro DLUpdateTiming uninstall_old_(?:start|done)\n  \$\{EndIf\}\n!endif\n/gm, "");
+}
 function patchUpdateTiming(source) {
-  if (source.includes(marker)) return source;
-  const hook = stage => `  !ifmacrodef DLUpdateTiming\n    !insertmacro DLUpdateTiming ${stage}\n  !endif\n`;
+  if (source.startsWith(marker+"\n")) return source;
+  source = stripLegacyTiming(source);
   const extraction = /(^[ \t]*Nsis7z::Extract "\$\{FILE\}"\r?\n)/gm;
-  const matches = [...source.matchAll(extraction)];
-  if (matches.length !== 2 || !source.includes("  DoneExtract7za:\n")) {
+  if ([...source.matchAll(extraction)].length !== 2 || !source.includes('  DoneExtract7za:\n') || !source.includes('!macro extractUsing7za FILE\n  Push $OUTDIR\n') || !source.includes('CopyFiles /SILENT "$PLUGINSDIR\\7z-out\\*" $OUTDIR')) {
     throw new Error("NSIS extraction template changed; update timing boundaries need review");
   }
-  return marker + "\n" + source.replace(extraction, line => hook("extract_start") + line + hook("extract_done"))
-    .replace("  DoneExtract7za:\n", "  DoneExtract7za:\n" + hook("copy_done"));
-}
-function applyUpdateTiming(desktopRoot = __dirname) {
-  const target = path.join(desktopRoot, "node_modules/app-builder-lib/templates/nsis/include/extractAppPackage.nsh");
-  const source = fs.readFileSync(target, "utf8").replaceAll("\r\n", "\n");
-  const next = patchUpdateTiming(source);
-  if (source !== next) fs.writeFileSync(target, next);
-  const install = path.join(desktopRoot, "node_modules/app-builder-lib/templates/nsis/installSection.nsh");
-  const section = fs.readFileSync(install, "utf8").replaceAll("\r\n", "\n");
-  const patched = patchUninstallTiming(section);
-  if (section !== patched) fs.writeFileSync(install, patched);
+  const hook = stage => `  !ifmacrodef DLUpdateTiming\n    !insertmacro DLUpdateTiming ${stage}\n  !endif\n`;
+  const direct = `  \u0024{If} \u0024{isUpdated}
+  \u0024{AndIf} $DLUpgradeExtractionReady == "1"
+    Push $OUTDIR
+    SetOutPath $INSTDIR
+    StrCpy $R1 0
+    DLDirectExtractRetry:
+      IntOp $R1 $R1 + 1
+      ClearErrors
+${hook("extract_start")}      Nsis7z::Extract "\u0024{FILE}"
+${hook("extract_done")}      IfErrors 0 DLDirectExtractDone
+      \u0024{If} $R1 < 5
+        Sleep 1000
+        Goto DLDirectExtractRetry
+      \u0024{EndIf}
+      SetErrorLevel 2
+      Quit
+    DLDirectExtractDone:
+      Pop $R0
+      SetOutPath $R0
+      Goto DoneExtract7za
+  \u0024{EndIf}
+`;
+  let next = source.replace(extraction,line=>hook("extract_start")+line+hook("extract_done"));
+  next=next.replace('!macro extractUsing7za FILE\n','!macro extractUsing7za FILE\n'+direct);
+  next=next.replace('  DoneExtract7za:\n','  DoneExtract7za:\n'+hook("copy_done"));
+  return marker+"\n"+next;
 }
 function patchUninstallTiming(source) {
-  const marker = "; R204 real old-version removal timing";
-  if (source.includes(marker)) return source;
+  const marker = "; R206 stable uninstall timing and extraction readiness";
+  if (source.startsWith(marker+"\n")) return source;
+  source=stripLegacyTiming(source);
   const start = "!insertmacro uninstallOldVersion SHELL_CONTEXT\n";
   const end = "SetOutPath $INSTDIR\n";
-  if (!source.includes(start) || !source.includes("!insertmacro uninstallOldVersion HKEY_CURRENT_USER") || !source.includes(end)) throw new Error("NSIS uninstall template changed; timing boundaries need review");
-  const hook = stage => `!ifmacrodef DLUpdateTiming\n  \u0024{If} \u0024{isUpdated}\n    !insertmacro DLUpdateTiming ${stage}\n  \u0024{EndIf}\n!endif\n`;
-  return marker + "\n" + source.replace(start, hook("uninstall_old_start") + start).replace(end, hook("uninstall_old_done") + end);
+  if (!source.includes(start) || !source.includes("!insertmacro uninstallOldVersion HKEY_CURRENT_USER") || !source.includes('!insertmacro handleUninstallResult HKEY_CURRENT_USER\n') || !source.includes(end)) throw new Error("NSIS uninstall template changed; timing boundaries need review");
+  const hook = stage => `!ifmacrodef DLUpdateTiming\n  \u0024{If} $DLUpdatedInstall == "1"\n    !insertmacro DLUpdateTiming ${stage}\n  \u0024{EndIf}\n!endif\n`;
+  const ready = `\u0024{IfNot} \u0024{Errors}
+\u0024{AndIf} $R0 == 0
+  StrCpy $DLUpgradeExtractionReady "1"
+\u0024{EndIf}
+`;
+  const flags=`Var /GLOBAL DLUpdatedInstall
+Var /GLOBAL DLUpgradeExtractionReady
+StrCpy $DLUpdatedInstall "0"
+StrCpy $DLUpgradeExtractionReady "0"
+\u0024{If} \u0024{isUpdated}
+  StrCpy $DLUpdatedInstall "1"
+\u0024{EndIf}
+`;
+  return marker+"\n"+source.replace(start,flags+hook("uninstall_old_start")+start).replace(end,ready+hook("uninstall_old_done")+end);
 }
-module.exports = { applyUpdateTiming, patchUpdateTiming, patchUninstallTiming };
+function applyUpdateTiming(desktopRoot = __dirname) {
+  const target = path.join(desktopRoot,"node_modules/app-builder-lib/templates/nsis/include/extractAppPackage.nsh");
+  const source=fs.readFileSync(target,"utf8").replaceAll("\r\n","\n");
+  const next=patchUpdateTiming(source);if(source!==next)fs.writeFileSync(target,next);
+  const install=path.join(desktopRoot,"node_modules/app-builder-lib/templates/nsis/installSection.nsh");
+  const section=fs.readFileSync(install,"utf8").replaceAll("\r\n","\n");
+  const patched=patchUninstallTiming(section);if(section!==patched)fs.writeFileSync(install,patched);
+}
+module.exports={applyUpdateTiming,patchUpdateTiming,patchUninstallTiming};

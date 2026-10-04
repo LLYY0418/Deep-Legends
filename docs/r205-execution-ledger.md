@@ -57,3 +57,7 @@
 发布前后全部12个既有 Release 的 id/tag/name/body/draft/prerelease/target/时间及附件 id/name/label/size/digest/state/content-type/时间/下载URL均保留（忽略Release updated_at和下载计数），包括0.12.60草稿。旧v0.12.67仍为 `031715fd8a41b1c96f0a684e0b9710455fb41601`，新v0.12.68固定为最终源码，不随账本收尾提交移动。见 [保留证明](history/reports/r205/old-releases-preserved.json)、[标签核对](history/reports/r205/tag-proof.txt)。
 
 最终 [标签质量流水线37172934342](https://github.com/LLYY0418/Deep-Legends/actions/runs/37172934342) 和 [分支质量流水线37172932782](https://github.com/LLYY0418/Deep-Legends/actions/runs/37172932782) 均为完整 `conclusion=success`，包括全量race、Node、真实Chromium护栏、installer/vet/pool及Windows public复建/checksum。见 [标签质量结果](history/reports/r205/quality-workflow.json)、[分支质量结果](history/reports/r205/branch-quality-workflow.json)。本次所有工单代码、测试/变异、版本、重建和正式发布收尾已完成；R205仅保留用户桌面位置真机验收，索引不提前关闭。
+
+## R206 补充的 10-04 用户日志核验
+
+快捷方式未重建，已真机确认：created_time_changed=false、keep_shortcuts_reg=true、current=unchanged、public=absent_before。此证据不替代 Explorer 桌面位置验收。证据来自 `lol-loot-diagnostics-1004-1451.jsonl`，摘要见 [R206 日志证据](history/reports/r206/user-log-evidence.json)。

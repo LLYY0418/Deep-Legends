@@ -320,7 +320,7 @@ func TestR71CollectionRequestsCoalesceAcrossQueueProbeAndScan(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
-		go func() { defer wg.Done(); a.requestCollectionRefresh() }()
+		go func() { defer wg.Done(); a.requestCollectionRefresh("user_refresh") }()
 	}
 	wg.Wait()
 	if len(a.refreshRequests) != 1 {
@@ -337,20 +337,20 @@ func TestR71CollectionRequestsCoalesceAcrossQueueProbeAndScan(t *testing.T) {
 	done := make(chan struct{})
 	go func() { a.refreshCollectionWithClient(nil); close(done) }()
 	<-probeEntered
-	a.requestCollectionRefresh()
+	a.requestCollectionRefresh("user_refresh")
 	if len(a.refreshRequests) != 0 {
 		t.Fatal("probe duplicated request")
 	}
 	close(releaseProbe)
 	<-scanEntered
-	a.requestCollectionRefresh()
+	a.requestCollectionRefresh("user_refresh")
 	if len(a.refreshRequests) != 0 {
 		t.Fatal("scan duplicated request")
 	}
 	close(releaseScan)
 	<-done
 	a.syncing = true // An account-only sync must not swallow a collection request.
-	a.requestCollectionRefresh()
+	a.requestCollectionRefresh("user_refresh")
 	if len(a.refreshRequests) != 1 {
 		t.Fatal("completed scan/account sync stranded retry")
 	}

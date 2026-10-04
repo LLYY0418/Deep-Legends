@@ -144,6 +144,9 @@ func (a *installerApp) install(message uiMessage) {
 	defer os.RemoveAll(temporaryDir)
 	cmd := exec.Command(setup)
 	commandLine := installerCommandLine(setup, dest, message.DesktopShortcut, a.options.Update)
+	if a.options.Update && a.parentExited && !a.options.FreshInstall {
+		commandLine = strings.Replace(commandLine, "--updated", "--updated --parent-exited", 1)
+	}
 	if a.options.FreshInstall {
 		commandLine = portableSetupCommandLine(setup, dest)
 	}
@@ -179,6 +182,9 @@ func (a *installerApp) install(message uiMessage) {
 				shortcutResult = "failed"
 			}
 			shortcuts.finish(shortcutResult)
+			if shortcutResult == "ok" && !a.options.Update {
+				stabilizeWindowsShortcutIcons(dest, a.meta.ExeName)
+			}
 			completeInstallation(a.options, installationResult{ExitCode: cmd.ProcessState.ExitCode(), WaitError: waitErr, Destination: dest}, installationCompletionHooks{
 				Failed:  reportFailure,
 				Cleanup: func() { _ = os.RemoveAll(temporaryDir) },
@@ -205,7 +211,11 @@ func (a *installerApp) install(message uiMessage) {
 			update := progressMessage{Percent: model.percent(extracted, copied, time.Since(started)), Stage: progressStage(extracted, copied)}
 			if a.options.Update {
 				a.timing.importNSIS(temporaryDir)
-				update = upgradeModel.update(a.timing.snapshot(), extracted, copied, time.Now())
+				stages := a.timing.snapshot()
+				if stages["uninstall_old_done"] > 0 && stages["extract_done"] == 0 && extracted == 0 {
+					extracted = copied // Direct upgrade extraction writes into dest.
+				}
+				update = upgradeModel.update(stages, extracted, copied, time.Now())
 			}
 			w.dispatch(func() { a.emit("progress", update) })
 		}
@@ -216,9 +226,12 @@ func installerEnvironment(temp string) []string {
 	env := make([]string, 0, len(os.Environ())+2)
 	for _, entry := range os.Environ() {
 		name, _, _ := strings.Cut(entry, "=")
-		if !strings.EqualFold(name, "TEMP") && !strings.EqualFold(name, "TMP") {
+		if !strings.EqualFold(name, "TEMP") && !strings.EqualFold(name, "TMP") && !strings.EqualFold(name, "DL_UPDATE_STAGES_FILE") {
 			env = append(env, entry)
 		}
+	}
+	if timing := newUpdateInstallTiming(); timing != nil {
+		env = append(env, "DL_UPDATE_STAGES_FILE="+filepath.Join(filepath.Dir(timing.path), "update-install-nsis-stages.txt"))
 	}
 	return append(env, "TEMP="+temp, "TMP="+temp)
 }

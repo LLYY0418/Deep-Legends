@@ -312,6 +312,7 @@
     if (!selected) return null;
     if (resetControls) resetArenaControls();
     state.selected = selected;
+    state.arenaBlockPending = new Set();
     state.detail = null;
     state.arenaDetailLoading = true;
     state.arenaDetailError = "";
@@ -1575,14 +1576,46 @@
   }
 
   function renderArenaDetailContent(detail) {
+    const failed = new Set(detail.failedBlocks || []);
     const sections = [
+      failed.has("augments") ? renderArenaBlockFailure("augments", "海克斯") : "",
       renderArenaAugmentSection(detail),
+      failed.has("items") ? renderArenaBlockFailure("items", "出装") : "",
       renderArenaItemSection("棱彩装备", "单件", detail.build?.prismItems || [], "prism"),
       renderArenaCoreSection(detail.build || {}),
     ];
+    if (failed.has("synergies")) sections.push(renderArenaBlockFailure("synergies", "英雄协同"));
     if (detail.teamCompositions?.length) sections.push(renderArenaSynergySection(detail.teamCompositions));
     sections.push(renderArenaFirstPlaces(detail));
     return `<div class="arena-detail-content">${sections.filter(Boolean).join("")}</div>`;
+  }
+
+  function renderArenaBlockFailure(block, title) {
+    return `<section class="arena-data-section"><header><h3>${escapeHTML(title)}</h3></header><button class="text-button" type="button" data-arena-block-retry="${block}"${state.arenaBlockPending?.has(block) ? " disabled" : ""}>加载失败 · 重试</button></section>`;
+  }
+
+  async function retryArenaBlock(block) {
+    if (!state.selected || state.arenaBlockPending?.has(block)) return;
+    state.arenaBlockPending ||= new Set();
+    state.arenaBlockPending.add(block);
+    const token = state.arenaRequestToken, championID = Number(state.selected.championId);
+    const current = () => token === state.arenaRequestToken && state.mode === "arena" && Number(state.selected?.championId) === championID;
+    render();
+    try {
+      if (block === "first") {
+        state.arenaFirstLoading = true;
+        const result = await api(`/api/champions/arena-first-places?championId=${championID}&limit=10`, "arena-first-places");
+        if (current()) { state.arenaFirstPlaces = result; state.arenaFirstError = ""; }
+      } else {
+        const result = await api(`/api/champions/detail?mode=arena&champion=${encodeURIComponent(state.selected.champion)}&block=${block}`, `arena-block-${block}`);
+        if (!current() || !state.detail) return;
+        if (block === "items") state.detail.build = { ...state.detail.build, coreItems: result.build?.coreItems || [], prismItems: result.build?.prismItems || [] };
+        if (block === "augments") { state.detail.arenaAugments = result.arenaAugments || []; state.detail.arenaAugmentGroups = result.arenaAugmentGroups || []; }
+        if (block === "synergies") state.detail.teamCompositions = result.teamCompositions || [];
+        state.detail.failedBlocks = (state.detail.failedBlocks || []).filter(key => key !== block);
+      }
+    } catch (_) { /* Retain the successful blocks and the retry control. */ }
+    finally { if (current()) { state.arenaBlockPending.delete(block); if (block === "first") state.arenaFirstLoading = false; render(); } }
   }
 
   function renderArenaSortBar() {
@@ -1732,7 +1765,7 @@
     }
     const unavailable = arenaFirstUnavailableCopy(state.arenaFirstPlaces?.unavailableReason);
     const degradedCopy = state.arenaFirstError ? arenaFirstFailureCopy(state.arenaFirstError) : unavailable;
-    const degraded = degradedCopy && !pros.length ? `<p class="arena-first-degraded" role="status">${escapeHTML(degradedCopy)}</p>` : "";
+    const degraded = state.arenaFirstError ? renderArenaBlockFailure("first", "高手对局") : degradedCopy && !pros.length ? `<p class="arena-first-degraded" role="status">${escapeHTML(degradedCopy)}</p>` : "";
     return `<section class="arena-data-section arena-first-section"><header><div><span class="arena-section-icon" aria-hidden="true">1</span><span><h3>吃鸡战绩</h3><small>该英雄最近拿到第一名的对局</small></span></div>${tabs}</header>${degraded}${body}</section>`;
   }
 
@@ -2846,6 +2879,8 @@
       loadWorkspace(true);
       return;
     }
+    const blockRetry = event.target.closest("[data-arena-block-retry]");
+    if (blockRetry) { void retryArenaBlock(blockRetry.dataset.arenaBlockRetry); return; }
     if (event.target.closest("[data-champion-retry]")) {
       if (state.mode === "aram-mayhem" && state.mayhemView === "atlas") {
         const item = objectRows(state.augments?.rows).find((row) => Number(row.id) === Number(state.mayhemAugmentID));

@@ -76,6 +76,8 @@ func arenaMatchDetailFailure(err error) (int, string, string) {
 		return http.StatusTooManyRequests, "Riot 接口限流中，请稍后重试", "rate-limited"
 	case errors.Is(err, errRiotKeyMissing):
 		return http.StatusServiceUnavailable, errRiotKeyMissing.Error(), "not-configured"
+	case errors.Is(err, errRiotRelayUnavailable):
+		return http.StatusServiceUnavailable, errRiotRelayUnavailable.Error(), "relay-unavailable"
 	case strings.Contains(value, "api key"):
 		return http.StatusBadGateway, "Riot 对局详情服务认证失败", "forbidden"
 	case strings.Contains(value, "无法解析") || strings.Contains(value, "缺少必要字段"):

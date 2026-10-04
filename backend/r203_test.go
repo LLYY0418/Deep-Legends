@@ -54,10 +54,10 @@ func TestR203RefreshSourcesAreAllowlistedAndPreserved(t *testing.T) {
 		a.requestCollectionRefresh(source)
 	}
 	rows := r175Events(t, a, "collection_refresh_request")
-	if len(rows) != 6 {
+	if len(rows) != 5 {
 		t.Fatal(rows)
 	}
-	for i, want := range []string{"user_refresh", "overlay_retry", "dirty_rescan", "ensure", "event", "event"} {
+	for i, want := range []string{"user_refresh", "overlay_retry", "dirty_rescan", "ensure", "event"} {
 		if rows[i]["source"] != want {
 			t.Fatal(rows)
 		}

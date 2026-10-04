@@ -908,7 +908,7 @@ test('R130 P1-A 变异：看门狗先推进时，第二层迟到的合成 error 
   // 冷却 + 再 10s 超时 = 30s，看门狗取 25s 就会抢在它前面推进。
   // 这里故意把看门狗调回 25s 复现交错，生产值是 45s。
   const run = async (queueSrc) => {
-    const h = cardWindow({ queueSrc, stallMs: 25000, viewportHeight: 5000 });
+    const h = cardWindow({ queueSrc: queueSrc.replace("LOCAL_IMAGE_TIMEOUT_MS = 4000", "LOCAL_IMAGE_TIMEOUT_MS = 10000"), stallMs: 25000, viewportHeight: 5000 });
     try {
       const entries = Array.from({ length: 4 }, (_, index) => h.addCard([`/api/image?path=%2Fhung-${index}.png`, `/api/image?path=%2Fok-${index}.png`]));
       await h.advance(90000);
@@ -938,7 +938,7 @@ test('R130 P1-A 看门狗必须晚于第二层的最坏放弃时间', () => {
   // 比它早就会抢在第二层前面推进——既有概率跳过本来能显示的候选地址，也会在每张
   // 慢图上误报一条 card_image_stalled，把「名额是否泄漏」这个判据搞脏。
   // 工单原文写的是 25 秒，按这个算式必须往上调，台账里记了这条偏差。
-  const timeout = Number(queueSource.match(/setTimeout\(\(\) => \{ timedOut = true;[^}]*\}, (\d+)\)/)?.[1]);
+  const timeout = Number(queueSource.match(/REMOTE_IMAGE_TIMEOUT_MS = (\d+)/)?.[1]);
   const retryDelay = Number(queueSource.match(/retryDelay = (\d+)/)?.[1]);
   const maxRetries = Number(queueSource.match(/maxRetries = (\d+)/)?.[1]);
   assert.ok(timeout > 0 && retryDelay >= 0 && maxRetries >= 0, '第二层的超时/冷却/重试次数必须能读出来');

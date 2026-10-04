@@ -76,6 +76,8 @@ var (
 )
 
 type championProvider struct {
+	lootTranslationsMu    sync.Mutex
+	lootTranslations      map[string]lootMetadata
 	imageCache            *championDataCache
 	communityImageCache   *championDataCache
 	assetStats            assetFetchStats
@@ -552,6 +554,7 @@ type championPositionOption struct {
 }
 
 type championDetailResponse struct {
+	FailedBlocks        []string                 `json:"failedBlocks,omitempty"`
 	Mode                string                   `json:"mode"`
 	Region              string                   `json:"region"`
 	Tier                string                   `json:"tier,omitempty"`
@@ -772,7 +775,9 @@ func (p *championProvider) fetchWithMetadataCacheKeyLoader(ctx context.Context, 
 			fetchedAt = started
 		}
 		recordAssetCacheState(ctx, cacheState)
-		p.reportChampionUpstream(host, accept, data, err, cacheState, started)
+		if ctx.Value(arenaRetryContextKey{}) == nil {
+			p.reportChampionUpstream(host, accept, data, err, cacheState, started)
+		}
 		return data, fetchedAt, err
 	}
 	key := explicitKey
@@ -785,7 +790,9 @@ func (p *championProvider) fetchWithMetadataCacheKeyLoader(ctx context.Context, 
 	if observedErr == nil && result.upstreamErr != nil {
 		observedErr = result.upstreamErr
 	}
-	p.reportChampionUpstream(host, accept, result.data, observedErr, result.state, started)
+	if ctx.Value(arenaRetryContextKey{}) == nil {
+		p.reportChampionUpstream(host, accept, result.data, observedErr, result.state, started)
+	}
 	return result.data, result.fetchedAt, err
 }
 
@@ -796,6 +803,7 @@ func (p *championProvider) reportChampionUpstream(host, accept string, data []by
 	p.diag(map[string]any{
 		"event": "champion_upstream", "host": host, "status": championUpstreamHTTPStatus(err),
 		"duration_ms": time.Since(started).Milliseconds(), "bytes": len(data), "cache": cacheState,
+		"attempt": 1,
 	})
 }
 
@@ -1013,7 +1021,13 @@ func (a *app) handleChampionDetail(w http.ResponseWriter, r *http.Request) {
 		position = spec.requestPosition("")
 		tier = ""
 	}
-	response, err := a.championDataProvider().loadDetail(r.Context(), mode, champion, position, tier)
+	provider := a.championDataProvider()
+	if mode == "arena" && r.URL.Query().Get("block") != "" {
+		response, err := provider.loadArenaDetailBlock(r.Context(), champion, r.URL.Query().Get("block"))
+		writeChampionResponse(w, response, err)
+		return
+	}
+	response, err := provider.loadDetail(r.Context(), mode, champion, position, tier)
 	writeChampionResponse(w, response, err)
 }
 

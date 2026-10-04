@@ -23,7 +23,7 @@ func main() {
 		return
 	}
 	if *selfCheckRiotKey {
-		if !riotKeyConfigured() {
+		if riotEmbeddedKey() == "" {
 			log.Fatal("Riot API key is not embedded")
 		}
 		fmt.Println("embedded Riot API key is configured")

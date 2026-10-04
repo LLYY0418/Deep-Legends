@@ -58,6 +58,9 @@ func (a *app) refreshCollectionWithClient(client *LCUClient) bool {
 	// that entire lifetime, not just while a request occupies the queue.
 	a.mu.Lock()
 	a.collectionRefreshPending = true
+	if a.collectionRefreshPendingSource == "" {
+		a.collectionRefreshPendingSource = "snapshot_retry"
+	}
 	a.mu.Unlock()
 	defer func() {
 		a.mu.Lock()
@@ -351,6 +354,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-champSelectPoll.C:
+			a.maybeStartupPrefetch(client, time.Now())
 			if watch := a.activeWatch(); watch != nil {
 				watch.handleChampSelectAutomation(client)
 			}
@@ -738,20 +742,29 @@ func collectionURIKind(uri string) string {
 	}
 }
 
-func (a *app) markCollectionDirty(kinds ...string) { a.markCollectionDirtyAt(time.Now(), kinds...) }
+func (a *app) markCollectionDirty(kinds ...string) bool {
+	return a.markCollectionDirtyAt(time.Now(), kinds...)
+}
 
 func (a *app) markCollectionDirtyAt(now time.Time, kinds ...string) bool {
 	kind := "other"
 	if len(kinds) > 0 {
 		switch kinds[0] {
-		case "inventory", "loot", "champions":
+		case "inventory", "loot", "champions", "identity", "loot-pending":
 			kind = kinds[0]
 		}
 	}
 	a.mu.Lock()
 	during := a.syncing
 	suppressed := !a.collectionRefreshFinishedAt.IsZero() && now.Sub(a.collectionRefreshFinishedAt) < 5*time.Second
+	if previous := a.collectionEventAt[kind]; !previous.IsZero() && now.Sub(previous) < 30*time.Second {
+		suppressed = true
+	}
 	if !suppressed {
+		if a.collectionEventAt == nil {
+			a.collectionEventAt = make(map[string]time.Time)
+		}
+		a.collectionEventAt[kind] = now
 		a.collectionDirty = true
 		a.collectionDirtyAt = now
 	}
@@ -761,6 +774,40 @@ func (a *app) markCollectionDirtyAt(now time.Time, kinds ...string) bool {
 		a.broadcastEvent("collection-dirty")
 	}
 	return !suppressed
+}
+
+// Polling runs in the existing session loop. Unknown phases fail closed until
+// the gameflow prime succeeds; entering a game resets the idle interval.
+func (a *app) maybeStartupPrefetch(client *LCUClient, now time.Time) bool {
+	a.gameplayFlow.mu.Lock()
+	phase, phaseClient := a.gameplayFlow.phase, a.gameplayFlow.client
+	a.gameplayFlow.mu.Unlock()
+	idle := phaseClient == client && (phase == "None" || phase == "Lobby" || phase == "Matchmaking" || phase == "ReadyCheck")
+	a.mu.Lock()
+	if a.lcu != client || !a.connected || !a.identityReady || !idle {
+		a.startupIdleAt = time.Time{}
+		a.mu.Unlock()
+		return false
+	}
+	if a.startupIdleAt.IsZero() {
+		a.startupIdleAt = now
+	}
+	warm := !a.startupConnectionsWarmed && a.champions != nil && now.Sub(a.startupIdleAt) >= 10*time.Second
+	if warm {
+		a.startupConnectionsWarmed = true
+	}
+	ready := !a.startupPrefetchDone && !a.collectionRequested && !a.snapshotReady && now.Sub(a.startupIdleAt) >= 10*time.Second
+	if ready {
+		a.startupPrefetchDone = true
+	}
+	a.mu.Unlock()
+	if warm {
+		a.champions.prewarmArenaConnections()
+	}
+	if ready {
+		a.requestCollectionRefresh("startup_prefetch")
+	}
+	return ready
 }
 
 func nextSnapshotRetryDelay(attempt int, exhausted bool) time.Duration {
