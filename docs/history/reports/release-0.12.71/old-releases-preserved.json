@@ -1,0 +1,26 @@
+{
+  "old_release_count": 14,
+  "old_release_ids": [
+    402927328,
+    402378684,
+    401679319,
+    401644873,
+    402804973,
+    402764741,
+    402589430,
+    402540854,
+    402520305,
+    402455971,
+    402418510,
+    402098152,
+    402019897,
+    395244133
+  ],
+  "old_release_metadata_and_assets_preserved": true,
+  "ignored_fields": [
+    "updated_at",
+    "download_count"
+  ],
+  "old_tag_count": 14,
+  "old_tags_preserved": true
+}

@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-10-04T12:43:18.623575+00:00",
+  "release_id": 403010042,
+  "published_at": "2026-10-04T12:42:23Z",
+  "version": "0.12.71",
+  "fingerprint": "696da05d0ad0",
+  "commit": "ea6d64c99a3e4ab86f9d9055a7a3fc4b300de4e6",
+  "draft": false,
+  "prerelease": false,
+  "isLatest": true,
+  "anonymous_latest_version": "0.12.71",
+  "anonymous_latest_matches_formal_asset": true,
+  "anonymous_manifest_sha256": "8ff7415ad7a15c092559ddb9be7ebdf828f76cf0033f1bb0ad07e4dee9a5715a",
+  "release_workflow": 37201404424,
+  "quality_workflow": 37201404448,
+  "old_releases_preserved": true,
+  "old_tags_preserved": true
+}

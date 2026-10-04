@@ -46,3 +46,8 @@
 未构建桌面程序/安装包，未发布GitHub Release、推送或更改tag。Worker部署属于R208明确要求的在线服务修复，独立于暂停的桌面发布。恢复后与R206/R207合并，按R199证据规则发布。
 
 用户真机验收仍待：不保存个人Key时打开绝活哥/职业页战绩；隔几天查看Cloudflare每日请求数。没有真实触发Riot应用限流或Cloudflare日额度用尽，自动回放不替代真实配额事件。
+
+
+## 0.12.71 合并正式发布
+
+2026-10-04 用户要求「发布新版本」，恢复构建/打包/发布。本工单随 **0.12.71 public Latest** 正式发布，release id **403010042**，`draft=false`、`prerelease=false`、`isLatest=true`，匿名 Latest 清单为 **0.12.71**。源码 `ea6d64c99a3e4ab86f9d9055a7a3fc4b300de4e6`，指纹 `696da05d0ad0`。正式 Windows 构建与完整质量/真实升级流水线全部通过，公开附件逐字节校验通过，旧 Release/草稿/标签保留。完整发布与附件证据见 [合并发布账本](history/ledgers/release-0.12.71-execution-ledger.md)。原有用户真机验收待办保持，不以 runner 结果提前关闭工单。

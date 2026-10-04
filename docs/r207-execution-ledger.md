@@ -47,3 +47,8 @@
 [R206账本](r206-execution-ledger.md) 当前记录用户2026-10-04“暂停构建和发布”，与本工单收尾要求冲突；已向用户确认是否恢复，当前未执行构建/打包/Release 写操作。版本号已递增，**没有声称 0.12.71 已构建或已发布**。若恢复验证性打包，key mode 使用 public，仅保留 `-public` 可识别文件名，发布需完整 R199 三项证据。
 
 用户真机仍需打一局海克斯大乱斗，验证选人及进入游戏后的同一页签持续显示海克斯/出装，导出诊断检查 exact_hit 或 fallback_hit，以及出现时的 live_scope_reset 原因。Node模拟不替代 Windows 客户端实测，工单保持进行中。
+
+
+## 0.12.71 合并正式发布
+
+2026-10-04 用户要求「发布新版本」，恢复构建/打包/发布。本工单随 **0.12.71 public Latest** 正式发布，release id **403010042**，`draft=false`、`prerelease=false`、`isLatest=true`，匿名 Latest 清单为 **0.12.71**。源码 `ea6d64c99a3e4ab86f9d9055a7a3fc4b300de4e6`，指纹 `696da05d0ad0`。正式 Windows 构建与完整质量/真实升级流水线全部通过，公开附件逐字节校验通过，旧 Release/草稿/标签保留。完整发布与附件证据见 [合并发布账本](history/ledgers/release-0.12.71-execution-ledger.md)。原有用户真机验收待办保持，不以 runner 结果提前关闭工单。
