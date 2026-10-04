@@ -7,7 +7,7 @@
 - Go 升级壳在 NSIS 前读取当前/公共桌面及当前/公共开始菜单 `Deep Legends.lnk` 的存在性、创建/修改时间、目标匹配布尔值；结束后再读取。Windows KnownFolder API 定位目录，不把目录或账号写入报告。时间保留 100ns 精度；缺失/读取失败记固定状态，未知时间不推断为重建。
 - 升级前把已有桌面快捷方式复制到本轮私有 TEMP；仅当结束后明确缺失或创建时间改变，且新安装 exe 存在，才覆盖回原名原目录。读取原链接的目标，若目标改变，只通过 IShellLinkW.SetPath 修改备份目标后再覆盖，保留 AppUserModelID、参数、图标等属性；恢复原创建/修改时间。未变化不动；备份失败、目标缺失、读取未知、恢复失败各有固定结果。
 - `desktop_after` 是恢复前的原始证据，`desktop_final` 是恢复后状态。`created_time_changed` 合并桌面/开始菜单变化，另有两种分项布尔值；不因恢复成功抹去重建证据。开始菜单仅诊断，不扩展恢复范围。
-- KeepShortcuts 位于 electron-builder 产品键 `Software\\ae355ba0-3686-5750-a759-b20159e02f53`（appId UUID.v5，Node 锁定），不是 Uninstall 键。按 NSIS x64 registry view 读取 HKCU/HKLM 已有产品键；有桌面链接且值不为 true 才补 REG_SZ `true`，已有 true 先只读返回，无重复写入。便携升级跳过注册表补写。
+- KeepShortcuts 位于 electron-builder 产品键 `Software\ae355ba0-3686-5750-a759-b20159e02f53`（appId UUID.v5，Node 锁定），不是 Uninstall 键。按 NSIS x64 registry view 读取 HKCU/HKLM 已有产品键；有桌面链接且值不为 true 才补 REG_SZ `true`，已有 true 先只读返回，无重复写入。便携升级跳过注册表补写。
 - 报告单独保存为既有数据目录下的 `update-shortcut-state.json`，原子写入，新版后端启动消费一次并删除，输出 `update_shortcut_state`。严格 schema、scope/状态白名单、时间校验、16KiB 上限、拒绝符号链接；未知字段/损坏报告只输出固定 invalid/parse_error。没有路径、账号、链接原文或异常原文，R204 timing 文件保持独立。
 - Update=false 没有 guard；`finish` 接收 nil 时直接返回。NSIS 启动失败/退出失败也先记录 before/after，再走原失败恢复；正常结束先恢复再清理 TEMP/启动新版。手动安装、NSIS 卸载及升级窗口文案不改。
 
@@ -31,3 +31,7 @@
 ## 用户真机验收
 
 升级后检查 Deep Legends 及相邻桌面图标位置；导出日志核对 `update_shortcut_state` 的 before/after、created_time_changed、keep_shortcuts_reg、restore_results。没有新的用户实测日志，不能宣称图标位置已真机恢复；Windows runner 原生测试也不能代替用户 Explorer 桌面位置验收。
+
+## Windows 候选修正
+
+第一候选 `1e59a19c` 的正式工作流37172329108在原生测试中失败，尚未创建v0.12.68 Release；同期重复任务37172329100/37172327798取消。before字段齐全但目标匹配为false，after日志原先只打印指针，无法证明时间恢复失败。改读 GetPath 的 SLGP_RAWPATH 并以已有目标文件身份核对别名，避免只凭路径字面不同改目标；增加原生别名测试及断言字段值。此时不宣称已查明用户桌面问题或已通过Windows验证。

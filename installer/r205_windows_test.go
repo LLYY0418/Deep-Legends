@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -106,7 +107,9 @@ func TestR205WindowsShortcutRoundTrip(t *testing.T) {
 			r205MakeLink(t, path, oldTarget)
 			before := snapshotWindowsShortcut(path, target)
 			if !before.Exists || before.CreatedTime == nil || before.ModifiedTime == nil || before.TargetMatches == nil || *before.TargetMatches == changedTarget {
-				t.Fatal(before)
+				data, _ := json.Marshal(before)
+				actual, err := shortcutTarget(path)
+				t.Fatalf("before=%s fixture_target=%q actual=%q err=%v", data, target, actual, err)
 			}
 			original, _ := os.ReadFile(path)
 			if err := copyShortcutFile(path, backup); err != nil {
@@ -118,7 +121,9 @@ func TestR205WindowsShortcutRoundTrip(t *testing.T) {
 			}
 			after := snapshotWindowsShortcut(path, target)
 			if !after.Exists || after.TargetMatches == nil || !*after.TargetMatches || shortcutCreationChanged(before, after) || *after.ModifiedTime != *before.ModifiedTime {
-				t.Fatal(before, after)
+				data, _ := json.Marshal([]shortcutState{before, after})
+				actual, err := shortcutTarget(path)
+				t.Fatalf("before/after=%s fixture_target=%q actual=%q err=%v", data, target, actual, err)
 			}
 			if !changedTarget {
 				data, _ := os.ReadFile(path)
@@ -156,6 +161,22 @@ func TestR205WindowsShortcutRoundTrip(t *testing.T) {
 				t.Fatal("link restored without target")
 			}
 		})
+	}
+}
+
+func TestR205WindowsShortcutTargetAlias(t *testing.T) {
+	root := t.TempDir()
+	target, alias, other := filepath.Join(root, "target.exe"), filepath.Join(root, "alias.exe"), filepath.Join(root, "other.exe")
+	for _, path := range []string{target, other} {
+		if err := os.WriteFile(path, []byte("fixture"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Link(target, alias); err != nil {
+		t.Fatal(err)
+	}
+	if !shortcutTargetsMatch(alias, target) || shortcutTargetsMatch(other, target) {
+		t.Fatal("target file identity not respected")
 	}
 }
 

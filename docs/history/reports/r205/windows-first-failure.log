@@ -1,0 +1,58 @@
+release	Build and verify public release	﻿2026-10-04T02:52:20.7992644Z ##[group]Run powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-public-release-windows.ps1 -Version $env:RELEASE_VERSION
+release	Build and verify public release	2026-10-04T02:52:20.7993660Z ^[[36;1mpowershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-public-release-windows.ps1 -Version $env:RELEASE_VERSION^[[0m
+release	Build and verify public release	2026-10-04T02:52:20.7994526Z ^[[36;1mif ($LASTEXITCODE -ne 0) { throw "Public release build failed" }^[[0m
+release	Build and verify public release	2026-10-04T02:52:20.8050135Z shell: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.EXE -command ". '{0}'"
+release	Build and verify public release	2026-10-04T02:52:20.8050732Z env:
+release	Build and verify public release	2026-10-04T02:52:20.8051106Z   RELEASE_VERSION: 0.12.68
+release	Build and verify public release	2026-10-04T02:52:20.8051459Z   RELEASE_TAG: v0.12.68
+release	Build and verify public release	2026-10-04T02:52:20.8051788Z ##[endgroup]
+release	Build and verify public release	2026-10-04T02:52:24.3410295Z Source line endings: normalized 0 files to LF.
+release	Build and verify public release	2026-10-04T02:52:25.4944018Z Public build: no embedded Riot API key; KR queries require RIOT_API_KEY at runtime.
+release	Build and verify public release	2026-10-04T02:52:31.2045909Z npm warn deprecated rimraf@2.6.3: Rimraf versions prior to v4 are no longer supported
+release	Build and verify public release	2026-10-04T02:52:32.6291594Z npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+release	Build and verify public release	2026-10-04T02:52:33.2780053Z npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+release	Build and verify public release	2026-10-04T02:52:34.1610801Z npm warn deprecated boolean@3.2.0: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+release	Build and verify public release	2026-10-04T02:52:38.1200285Z 
+release	Build and verify public release	2026-10-04T02:52:38.1201504Z added 323 packages, and audited 324 packages in 12s
+release	Build and verify public release	2026-10-04T02:52:38.1202016Z 
+release	Build and verify public release	2026-10-04T02:52:38.1202246Z 56 packages are looking for funding
+release	Build and verify public release	2026-10-04T02:52:38.1202749Z   run `npm fund` for details
+release	Build and verify public release	2026-10-04T02:52:38.1707965Z 
+release	Build and verify public release	2026-10-04T02:52:38.1708857Z 14 high severity vulnerabilities
+release	Build and verify public release	2026-10-04T02:52:38.1709178Z 
+release	Build and verify public release	2026-10-04T02:52:38.1709636Z To address issues that do not require attention, run:
+release	Build and verify public release	2026-10-04T02:52:38.1710132Z   npm audit fix
+release	Build and verify public release	2026-10-04T02:52:38.1710318Z 
+release	Build and verify public release	2026-10-04T02:52:38.1710637Z To address all issues (including breaking changes), run:
+release	Build and verify public release	2026-10-04T02:52:38.1711139Z   npm audit fix --force
+release	Build and verify public release	2026-10-04T02:52:38.1711376Z 
+release	Build and verify public release	2026-10-04T02:52:38.1711577Z Run `npm audit` for details.
+release	Build and verify public release	2026-10-04T02:56:38.5662653Z ok  	lol-loot-assistant/backend	200.613s
+release	Build and verify public release	2026-10-04T02:56:50.1311609Z 2026/10/04 02:56:49 startup warm mode=execute enabled=false
+release	Build and verify public release	2026-10-04T02:56:50.1312505Z --- FAIL: TestR205WindowsShortcutRoundTrip (0.07s)
+release	Build and verify public release	2026-10-04T02:56:50.1313254Z     --- FAIL: TestR205WindowsShortcutRoundTrip/same_target (0.05s)
+release	Build and verify public release	2026-10-04T02:56:50.1314346Z         r205_windows_test.go:109: {true 0xc0001181c0 0xc0001181b0 0xc00000a28f ok}
+release	Build and verify public release	2026-10-04T02:56:50.1315149Z     --- FAIL: TestR205WindowsShortcutRoundTrip/changed_target (0.02s)
+release	Build and verify public release	2026-10-04T02:56:50.1316112Z         r205_windows_test.go:121: {true 0xc000118270 0xc000118260 0xc00000a57f ok} {true 0xc000118290 0xc000118280 0xc00000a698 ok}
+release	Build and verify public release	2026-10-04T02:56:50.1316938Z FAIL
+release	Build and verify public release	2026-10-04T02:56:50.1317741Z FAIL	deeplegends/installer	1.189s
+release	Build and verify public release	2026-10-04T02:56:50.1318253Z ok  	deeplegends/installer/internal/webviewhost	0.191s
+release	Build and verify public release	2026-10-04T02:56:50.1318927Z ?   	deeplegends/installer/payload	[no test files]
+release	Build and verify public release	2026-10-04T02:56:50.1319521Z ?   	deeplegends/installer/ui	[no test files]
+release	Build and verify public release	2026-10-04T02:56:50.1319990Z ok  	deeplegends/installer/uninstall	0.048s
+release	Build and verify public release	2026-10-04T02:56:50.1320487Z FAIL
+release	Build and verify public release	2026-10-04T02:56:50.3087430Z Installer tests failed
+release	Build and verify public release	2026-10-04T02:56:50.3089110Z At D:\a\Deep-Legends\Deep-Legends\build-desktop-windows.ps1:100 char:36
+release	Build and verify public release	2026-10-04T02:56:50.3090112Z +         if ($LASTEXITCODE -ne 0) { throw "Installer tests failed" }
+release	Build and verify public release	2026-10-04T02:56:50.3090812Z +                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+release	Build and verify public release	2026-10-04T02:56:50.3092673Z     + CategoryInfo          : OperationStopped: (Installer tests failed:String) [], RuntimeException
+release	Build and verify public release	2026-10-04T02:56:50.3093653Z     + FullyQualifiedErrorId : Installer tests failed
+release	Build and verify public release	2026-10-04T02:56:50.3096574Z  
+release	Build and verify public release	2026-10-04T02:56:50.4211201Z Public release build failed
+release	Build and verify public release	2026-10-04T02:56:50.4212463Z At D:\a\_temp\bda31149-112a-47c8-b590-6a4585f76a16.ps1:3 char:28
+release	Build and verify public release	2026-10-04T02:56:50.4214747Z + if ($LASTEXITCODE -ne 0) { throw "Public release build failed" }
+release	Build and verify public release	2026-10-04T02:56:50.4215602Z +                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+release	Build and verify public release	2026-10-04T02:56:50.4216564Z     + CategoryInfo          : OperationStopped: (Public release build failed:String) [], RuntimeException
+release	Build and verify public release	2026-10-04T02:56:50.4217569Z     + FullyQualifiedErrorId : Public release build failed
+release	Build and verify public release	2026-10-04T02:56:50.4218700Z  
+release	Build and verify public release	2026-10-04T02:56:50.4368919Z ##[error]Process completed with exit code 1.

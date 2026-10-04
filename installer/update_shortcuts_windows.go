@@ -67,7 +67,8 @@ func shortcutTarget(path string) (string, error) {
 	var target string
 	err := withShortcutObject(path, func(link, _ *shortcutCOM) error {
 		var buffer [windows.MAX_PATH]uint16
-		if err := link.call(3, uintptr(unsafe.Pointer(&buffer[0])), uintptr(len(buffer)), 0, 0); err != nil {
+		// SLGP_RAWPATH reads the stored target without Shell path normalization.
+		if err := link.call(3, uintptr(unsafe.Pointer(&buffer[0])), uintptr(len(buffer)), 0, 4); err != nil {
 			return err
 		}
 		target = windows.UTF16ToString(buffer[:])
@@ -77,6 +78,17 @@ func shortcutTarget(path string) (string, error) {
 		return nil
 	})
 	return target, err
+}
+
+func shortcutTargetsMatch(actual, expected string) bool {
+	if strings.EqualFold(filepath.Clean(actual), filepath.Clean(expected)) {
+		return true
+	}
+	// An existing target can be represented by a short name or another alias.
+	// Compare Windows file identity before treating it as a different target.
+	actualFile, actualErr := os.Stat(actual)
+	expectedFile, expectedErr := os.Stat(expected)
+	return actualErr == nil && expectedErr == nil && os.SameFile(actualFile, expectedFile)
 }
 
 func retargetShortcut(path, target string) error {
@@ -121,7 +133,7 @@ func snapshotWindowsShortcut(path, expectedTarget string) shortcutState {
 	if err != nil {
 		state.Status = "target_error"
 	} else {
-		matches := strings.EqualFold(filepath.Clean(target), filepath.Clean(expectedTarget))
+		matches := shortcutTargetsMatch(target, expectedTarget)
 		state.TargetMatches = &matches
 	}
 	return state
@@ -155,7 +167,7 @@ func restoreShortcutFile(backup, destination, target string, before shortcutStat
 	}
 	// Work on the private backup first. A COM failure cannot damage a working
 	// shortcut just installed by NSIS. All original properties are loaded.
-	if !strings.EqualFold(filepath.Clean(oldTarget), filepath.Clean(target)) {
+	if !shortcutTargetsMatch(oldTarget, target) {
 		if err := retargetShortcut(backup, target); err != nil {
 			return err
 		}
