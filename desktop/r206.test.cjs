@@ -12,6 +12,12 @@ test('R206 upgrade extracts directly only after successful uninstall; manual use
 });
 test('R206 parent-exited fast path still checks manual and portable installs',()=>{
  const source=fs.readFileSync(path.join(__dirname,'nsis/installer.nsh'),'utf8');const macro=source.slice(source.indexOf('!macro customCheckAppRunning'),source.indexOf('!macroend',source.indexOf('!macro customCheckAppRunning')));
- assert.match(macro,/--portable-upgrade[\s\S]*FIND_PROCESS/);assert.match(macro,/--parent-exited[\s\S]*\$\{If\} \$\{Errors\}[\s\S]*_CHECK_APP_RUNNING[\s\S]*\$\{ElseIfNot\} \$\{isUpdated\}[\s\S]*_CHECK_APP_RUNNING/);
+ assert.match(macro,/--portable-upgrade[\s\S]*FIND_PROCESS/);assert.match(macro,/--parent-exited[\s\S]*\$\{IfNot\} \$\{Errors\}\s*\$\{AndIf\} \$\{isUpdated\}[\s\S]*StrCpy \$R1 "1"[\s\S]*\$\{If\} \$R1 != "1"[\s\S]*_CHECK_APP_RUNNING/);
  const shell=fs.readFileSync(path.join(__dirname,'../installer/install_windows.go'),'utf8');assert.match(shell,/a\.options\.Update && a\.parentExited && !a\.options\.FreshInstall/);assert.match(shell,/--updated --parent-exited/);
+});
+
+test('R206 app-running macro expands once to avoid duplicate NSIS labels',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'nsis/installer.nsh'),'utf8');
+ const block=source.match(/!macro customCheckAppRunning([\s\S]*?)!macroend/)[1];
+ assert.equal((block.match(/!insertmacro _CHECK_APP_RUNNING/g)||[]).length,1);
 });

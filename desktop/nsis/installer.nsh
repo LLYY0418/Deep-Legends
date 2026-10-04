@@ -76,9 +76,12 @@ Var pid
   ${Else}
     ClearErrors
     ${GetOptions} $CMDLINE "--parent-exited" $R0
-    ${If} ${Errors}
-      !insertmacro _CHECK_APP_RUNNING
-    ${ElseIfNot} ${isUpdated}
+    StrCpy $R1 "0"
+    ${IfNot} ${Errors}
+    ${AndIf} ${isUpdated}
+      StrCpy $R1 "1"
+    ${EndIf}
+    ${If} $R1 != "1"
       !insertmacro _CHECK_APP_RUNNING
     ${EndIf}
   ${EndIf}
