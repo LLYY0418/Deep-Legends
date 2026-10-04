@@ -49,3 +49,16 @@ test('R204 same-game pending incremental rows retain known history during backgr
  const f=compile(gameplay,['applyLivePlayerProgress','liveGamePhase'],{state,connected:()=>true,liveSnapshotBehindPhase:()=>false,normalizeLiveGameId:n=>Number(n)||0,renderLive(){}});
  assert(f.applyLivePlayerProgress({requestId:'current',live:{available:true,phase:'ChampSelect',gameId:204,queueId:440,players:[{playerRef:'opaque',historyState:'pending'}]}}));assert.equal(state.live.players[0].recentGames,old.recentGames);assert.equal(state.live.players[0].historyState,'ok');
 });
+
+test('R204 pending progress does not reuse history across unknown games or changed identity scope',()=>{
+ for(const change of [{gameId:0},{queueId:420},{playerRef:'other'},{hidden:true},{privateHistory:true},{identityUnresolved:true}]){
+  const old={playerRef:'opaque',historyState:'ok',recentGames:[{gameId:1}]};
+  const gameId=change.gameId===0?0:204;
+  const state={liveLoading:true,liveProgressRequestId:'current',liveExpectedGameId:gameId,beacon:{phase:'ChampSelect'},live:{gameId,queueId:440,players:[old]}};
+  const f=compile(gameplay,['applyLivePlayerProgress','liveGamePhase','normalizeLiveGameId'],{state,connected:()=>true,liveSnapshotBehindPhase:()=>false,renderLive(){}});
+  const player={playerRef:'opaque',historyState:'pending'};
+  for(const field of ['playerRef','hidden','privateHistory','identityUnresolved'])if(field in change)player[field]=change[field];
+  assert(f.applyLivePlayerProgress({requestId:'current',live:{available:true,phase:'ChampSelect',gameId,queueId:change.queueId||440,players:[player]}}));
+  assert.equal(state.live.players[0].historyState,'pending',JSON.stringify(change));assert.equal(state.live.players[0].recentGames,undefined,JSON.stringify(change));
+ }
+});

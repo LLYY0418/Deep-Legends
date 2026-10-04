@@ -4754,12 +4754,14 @@
     if (!Array.isArray(next.players) || !next.players.length) return false;
     // Background incremental refreshes retain the same game's known history
     // while each pending row is being replaced, like the final-response path.
-    if (normalizeLiveGameId(state.live?.gameId) === normalizeLiveGameId(next.gameId) && state.live?.queueId === next.queueId) {
+    const nextGameId = normalizeLiveGameId(next.gameId);
+    if (nextGameId && normalizeLiveGameId(state.live?.gameId) === nextGameId && state.live?.queueId === next.queueId) {
       const previous = new Map((state.live.players || []).filter(player => player.playerRef).map(player => [player.playerRef, player]));
       for (const player of next.players) {
         const old = previous.get(player.playerRef);
         if (player.historyState === "pending" && old && old.historyState !== "pending"
-            && Boolean(old.hidden) === Boolean(player.hidden) && Boolean(old.privateHistory) === Boolean(player.privateHistory)) {
+            && Boolean(old.hidden) === Boolean(player.hidden) && Boolean(old.privateHistory) === Boolean(player.privateHistory)
+            && Boolean(old.identityUnresolved) === Boolean(player.identityUnresolved)) {
           for (const field of ["recentGames", "modeStats", "recentRankedRecord", "recentPositions", "historyState"]) player[field] = old[field];
         }
       }
