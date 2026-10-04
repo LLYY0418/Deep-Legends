@@ -48,7 +48,7 @@ test("R70 fingerprint tracks embedded assets/build inputs but excludes tests and
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   copyFingerprintFixture(project, root);
   const original = sourceFingerprint(root);
-  for (const name of ["installer/uninstall/main_windows.go", "installer/uninstall/launch_windows.go", "installer/uninstall/progress.go", "installer/ui/uninstaller.go", "installer/ui/uninstaller.html", "installer/uninstall/app.manifest", "installer/uninstall/rsrc_windows_amd64.syso"]) {
+  for (const name of ["installer/uninstall/main_windows.go", "installer/uninstall/launch_windows.go", "installer/uninstall/progress.go", "installer/ui/uninstaller.go", "installer/ui/app.ico", "installer/ui/uninstaller.html", "installer/uninstall/app.manifest", "installer/uninstall/rsrc_windows_amd64.syso"]) {
     const file = path.join(root, name), bytes = fs.readFileSync(file);
     fs.appendFileSync(file, "\n");
     assert.notEqual(sourceFingerprint(root), original, `${name} must invalidate the build`);

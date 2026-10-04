@@ -37,3 +37,11 @@ R202/R204 的海斗选人、备战席应用及无序列不请求，在 10-04 日
 ## 构建、Windows 实际升级与发布
 
 进行中。发布前已有 Release 基线：[releases-before.json](history/reports/r206/releases-before.json)。新标签发布前固定源码，旧标签/Release/附件保持不变。R199 的 release id、isLatest=true、匿名 latest.json 证据在正式发布后追加。
+
+## 候选构建进展
+
+候选 c70e6b0e 的本机 public 完整重建通过，源指纹 **030c59db9431**。Go 1793 项分片、vet、installer、公钥门禁、运行时、指纹、receipt/checksum 全通过。Setup SHA256 `2ccf212a374ec7ce7aac67cf29bc2b59eb345f0593b036bb6d701fc3f8b08f58`；见 [构建凭证](history/reports/r206/local-build.json) 与 [完整构建日志](history/reports/r206/local-build.log)。只保留 `-public` 安装包。
+
+首次 NSIS 构建发现 `_CHECK_APP_RUNNING` 在两个条件分支中展开两次，导致 `doStopProcess` 标签重复；改为一次展开，增加实际宏展开次数护栏后重建通过。独立复核补充断线清空收藏起点/去重状态，并加入回归。
+
+Windows 流水线候选 384c2c2c 增加真实 0.12.65→0.12.68 阶段文件观测，再升级到 0.12.69。历史日志只能确认 start 已导入而 done 缺失（不能误读为空的 done-to-start 为 start 缺失）；当前等待运行证据，未声称已确定历史丢失原因。

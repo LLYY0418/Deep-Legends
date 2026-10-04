@@ -1,0 +1,5 @@
+--- FAIL: TestR206RelayRoutingNoTokenAndDirectPriority (0.00s)
+    r206_relay_test.go:45: relay received credential or wrong host
+FAIL
+FAIL	lol-loot-assistant/backend	1.048s
+FAIL

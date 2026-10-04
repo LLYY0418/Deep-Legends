@@ -35,7 +35,7 @@ function sourceFingerprint(projectRoot = root) {
     "desktop/source-fingerprint.cjs", "desktop/apply-portable-template.cjs", "desktop/apply-update-timing-template.cjs",
     "desktop/verify-embedded-riot-key.cjs", "desktop/verify-build-fingerprint.cjs", "desktop/release-build.cjs",
     "desktop/verify-packaged-runtime.cjs", "desktop/nsis/portable.nsi", "desktop/nsis/installer.nsh",
-    "desktop/assets/hexcore-icon.ico", "backend/data/reroll_pool_14_5.txt", "backend/data/reroll_pool_14_5.json",
+    "desktop/assets/hexcore-icon.ico", "installer/ui/app.ico", "backend/data/reroll_pool_14_5.txt", "backend/data/reroll_pool_14_5.json",
     "backend/data/skin_release_dates.json", "backend/data/skin_release_overrides.json",
     "backend/data/augment_catalog_20260924.json", "backend/data/augment_icons_20260924.bin",
     "backend/data/arena_items_20260924.json", "backend/data/champion_names_16.19.1_zh_cn.json",
