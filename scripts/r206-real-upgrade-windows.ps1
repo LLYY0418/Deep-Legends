@@ -9,11 +9,25 @@ $env:LOL_LOOT_DATA_DIR = $data
 $old = Join-Path $root "Deep-Legends-Setup-0.12.65-public.exe"
 Invoke-WebRequest "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.65/Deep-Legends-Setup-0.12.65-public.exe" -OutFile $old
 if ((Get-FileHash $old -Algorithm SHA256).Hash.ToLowerInvariant() -ne "bf97221a0c8465b78d57bf32f15c746eeec72deb7f3ec4923323b095c16c70ac") { throw "Old public setup checksum mismatch" }
-function Run-Setup([string]$File) {
+function Run-Setup([string]$File, [switch]$MonitorLegacy) {
     # These are the actual Go installer shells. --update auto-starts their
     # existing progress flow; /S alone would leave the Go setup page waiting.
     $process = Start-Process -FilePath $File -ArgumentList "--update --dest `"$install`"" -PassThru
-    if (-not $process.WaitForExit(180000)) { Stop-Process -Id $process.Id -Force; throw "Real installer timed out" }
+    $deadline=(Get-Date).AddSeconds(180)
+    $snapshots=@(); $last=""
+    while (-not $process.WaitForExit(50)) {
+        if ((Get-Date) -gt $deadline) { Stop-Process -Id $process.Id -Force; throw "Real installer timed out" }
+        if ($MonitorLegacy) {
+            Get-ChildItem $env:TEMP -Filter 'update-install-stages.txt' -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+                try {
+                    $lines=@(Get-Content $_.FullName -ErrorAction Stop)
+                    $text=$lines -join "`n"
+                    if ($text -ne $last) { $snapshots+=@{observed_at=(Get-Date).ToUniversalTime().ToString('o');stage_lines=$lines}; $last=$text }
+                } catch {}
+            }
+        }
+    }
+    if ($MonitorLegacy) { ConvertTo-Json -InputObject @($snapshots) -Depth 8 | Set-Content (Join-Path $evidence 'legacy-0.12.68-nsis-snapshots.json') }
     if ($process.ExitCode -ne 0) { throw "Real installer failed: $($process.ExitCode)" }
     if (-not (Test-Path (Join-Path $install "Deep Legends.exe"))) { throw "Installed executable missing" }
 }
@@ -23,6 +37,20 @@ function Stop-InstalledApp {
 }
 try {
     Run-Setup $old
+    Stop-InstalledApp
+    # Reproduce the reported 0.12.65 -> 0.12.68 path before upgrading to R206.
+    # Capture its private TEMP stage file while the real installer is running;
+    # the old wrapper removes that workspace at completion.
+    $legacy = Join-Path $root 'Deep-Legends-Setup-0.12.68-public.exe'
+    Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.68/Deep-Legends-Setup-0.12.68-public.exe' -OutFile $legacy
+    if ((Get-FileHash $legacy -Algorithm SHA256).Hash.ToLowerInvariant() -ne '8fa7dd821cfb5318634bfca14c26f922553d5c3ab62ddf8f194910be6f4b7b76') { throw 'Legacy public setup checksum mismatch' }
+    $originalTemp=$env:TEMP; $originalTmp=$env:TMP
+    $env:TEMP=Join-Path $root 'legacy-temp'; $env:TMP=$env:TEMP
+    New-Item -ItemType Directory -Force $env:TEMP | Out-Null
+    try { Run-Setup $legacy -MonitorLegacy } finally { $env:TEMP=$originalTemp; $env:TMP=$originalTmp }
+    Start-Sleep -Seconds 2
+    $legacyDiagnostics=Join-Path $data 'logs/diagnostics.jsonl'
+    if (Test-Path $legacyDiagnostics) { Get-Content $legacyDiagnostics | ForEach-Object {try {$row=$_ | ConvertFrom-Json; if ($row.event -eq 'update_install_timing') {$_}} catch {}} | Set-Content (Join-Path $evidence 'legacy-install-timing.jsonl') }
     Stop-InstalledApp
     $desktopLink = Join-Path ([Environment]::GetFolderPath('Desktop')) "Deep Legends.lnk"
     $menuLink = Join-Path ([Environment]::GetFolderPath('Programs')) "Deep Legends.lnk"
@@ -54,7 +82,7 @@ try {
     }
     $timing | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'update-install-timing-event.json')
     Copy-Item (Join-Path $data 'update-install-stages.txt'),(Join-Path $data 'update-install-nsis-stages.txt') $evidence
-    @{old_version='0.12.65';key_mode='public';stages=$order.Count;icon_location_stable=$true;created_time_changed=$false;total_ms=$timing.total_ms;uninstall_old_ms=$timing.uninstall_old_ms;copy_ms=$timing.copy_ms} | ConvertTo-Json | Set-Content (Join-Path $evidence 'real-upgrade-summary.json')
+    @{old_version='0.12.65';intermediate_version='0.12.68';key_mode='public';stages=$order.Count;icon_location_stable=$true;created_time_changed=$false;total_ms=$timing.total_ms;uninstall_old_ms=$timing.uninstall_old_ms;copy_ms=$timing.copy_ms} | ConvertTo-Json | Set-Content (Join-Path $evidence 'real-upgrade-summary.json')
     Get-Content (Join-Path $evidence 'real-upgrade-summary.json')
 } finally {
     foreach ($name in @('update-install-stages.txt','update-install-nsis-stages.txt','update-install-timing.json')) {
