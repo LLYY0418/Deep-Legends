@@ -1,0 +1,22 @@
+✔ R204 old-uninstaller timing wraps both scopes and preserves manual flow (2.086625ms)
+✔ R206 upgrade extracts directly only after successful uninstall; manual uses unchanged 7z-out (2.423166ms)
+✔ R206 parent-exited fast path still checks manual and portable installs (0.368959ms)
+✔ R206 app-running macro expands once to avoid duplicate NSIS labels (0.177666ms)
+✔ R206 Worker forwards only the actual Riot GET route whitelist (29.99425ms)
+✔ R206 Worker rejects arbitrary paths/hosts/methods without Riot I/O (0.748583ms)
+✔ R206 Worker response caching honors category TTL and contains no identity cache keys (4.562583ms)
+✔ R206 Worker per-IP limit rejects request 121 and allows another IP (15.292917ms)
+✔ R206 Worker preserves Riot Retry-After and avoids same-path I/O during cooldown (1.174625ms)
+✔ R206 Worker never exposes or logs its secret, including echoed upstream values (1.67ms)
+✔ R206 Worker fails closed without a secret or rate limiter (0.19425ms)
+✔ R206 Worker rejects upstream redirects without forwarding the secret or Location (1.00825ms)
+✔ setup-only release hashes actual renamed bytes and emits exactly three files (70.806667ms)
+✔ invalid release identities and spaced assets are refused (0.229667ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 150.31375

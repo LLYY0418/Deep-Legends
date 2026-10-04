@@ -1,0 +1,35 @@
+✔ R206 Worker forwards only the actual Riot GET route whitelist (21.17175ms)
+✔ R206 Worker rejects arbitrary paths/hosts/methods without Riot I/O (0.50475ms)
+✔ R206 Worker response caching honors category TTL and contains no identity cache keys (2.319625ms)
+✔ R206 Worker per-IP limit rejects request 121 and allows another IP (13.249875ms)
+✔ R206 Worker preserves Riot Retry-After and avoids same-path I/O during cooldown (0.9795ms)
+✔ R206 Worker never exposes or logs its secret, including echoed upstream values (1.337459ms)
+✔ R206 Worker fails closed without a secret or rate limiter (0.213875ms)
+✖ R206 Worker rejects upstream redirects without forwarding the secret or Location (1.105333ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 93.952083
+
+✖ failing tests:
+
+test at ../../../../../private/tmp/r206-relay-mutants/accept-upstream-redirect/worker.test.mjs:107:1
+✖ R206 Worker rejects upstream redirects without forwarding the secret or Location (1.105333ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  301 !== 502
+  
+      at TestContext.<anonymous> (file:///private/tmp/r206-relay-mutants/accept-upstream-redirect/worker.test.mjs:115:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 301,
+    expected: 502,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

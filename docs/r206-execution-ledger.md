@@ -20,7 +20,7 @@
 
 ## 用户日志核验
 
-来源 `lol-loot-diagnostics-1004-1451.jsonl`。只留匿名阶段/英雄与结果字段：[摘要](history/reports/r206/user-log-evidence.json)。0.12.65→0.12.68 总时长 41470ms、extract 7225ms、copy 18625ms，`uninstall_old_done` 缺失；旧日志不能确定丢失原因。阶段桥持久化及更新标志缓存是此次排查改动，Windows 实际升级仍需证明写出/导入，不能凭模板猜测把原因写成已查明。
+来源 `lol-loot-diagnostics-1004-1451.jsonl`。只留匿名阶段/英雄与结果字段：[摘要](history/reports/r206/user-log-evidence.json)。0.12.65→0.12.68 总时长 41470ms、extract 7225ms、copy 18625ms，`uninstall_old_done` 缺失；旧日志本身不能确定丢失原因。后续流水线逐阶段快照与 NSIS 原文已证实文件头覆盖（见下方修复记录）；修复后的 Windows 实际升级仍待恢复验证。
 
 R202/R204 的海斗选人、备战席应用及无序列不请求，在 10-04 日志提供范围内真机通过。R205 快捷方式未重建，已真机确认（创建时间未变、保留标记为 true）。桌面图标位置、此次独立图标是否避免白图标、用户电脑总升级 <25 秒仍待下一次用户实测。
 
@@ -36,7 +36,7 @@ R202/R204 的海斗选人、备战席应用及无序列不请求，在 10-04 日
 
 ## 构建、Windows 实际升级与发布
 
-进行中。发布前已有 Release 基线：[releases-before.json](history/reports/r206/releases-before.json)。新标签发布前固定源码，旧标签/Release/附件保持不变。R199 的 release id、isLatest=true、匿名 latest.json 证据在正式发布后追加。
+按用户 2026-10-04 最新指示，暂停构建和发布，取消尚在运行的 0.12.70 Windows 流水线。代码、非构建验证及部署已完成；修复后的实际 Windows 升级验证和正式发布留待恢复。发布前已有 Release 基线：[releases-before.json](history/reports/r206/releases-before.json)。新标签发布前固定源码，旧标签/Release/附件保持不变。R199 的 release id、isLatest=true、匿名 latest.json 证据在正式发布后追加。
 
 ## 候选构建进展
 
@@ -44,9 +44,9 @@ R202/R204 的海斗选人、备战席应用及无序列不请求，在 10-04 日
 
 首次 NSIS 构建发现 `_CHECK_APP_RUNNING` 在两个条件分支中展开两次，导致 `doStopProcess` 标签重复；改为一次展开，增加实际宏展开次数护栏后重建通过。独立复核补充断线清空收藏起点/去重状态，并加入回归。
 
-Windows 流水线候选 384c2c2c 增加真实 0.12.65→0.12.68 阶段文件观测，再升级到 0.12.69。历史日志只能确认 start 已导入而 done 缺失（不能误读为空的 done-to-start 为 start 缺失）；当前等待运行证据，未声称已确定历史丢失原因。
+Windows 流水线候选 384c2c2c 增加真实 0.12.65→0.12.68 阶段文件观测，再升级到 0.12.69。历史日志只能确认 start 已导入而 done 缺失（不能误读为空的 done-to-start 为 start 缺失）；该次运行已失败，快照随后证实阶段写入发生文件头覆盖（见下方修复记录）。
 
-最终源码 e0d263a52fe707cce2823f8fa1540de2a71a2f33 将新增独立图标也纳入指纹，public 重建通过。最终指纹 **33ca002c7114**，详见 [最终构建凭证](history/reports/r206/local-release-build.json)。首次候选凭证保留，不替代最终附件校验。v0.12.69 固定到此源码，正式 Windows 草稿构建及标签质量验证进行中。
+0.12.69 候选源码 e0d263a52fe707cce2823f8fa1540de2a71a2f33 将新增独立图标也纳入指纹，public 重建通过。候选指纹 **33ca002c7114**，详见 [最终构建凭证](history/reports/r206/local-release-build.json)。首次候选凭证保留，不替代最终附件校验。v0.12.69 固定到此源码，正式 Windows 草稿构建已完成，但实际升级验证失败，保留草稿而未发布。
 
 Windows API 核对使用微软原文：[SetIconLocation](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ishelllinkw-seticonlocation)、[SHChangeNotify](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shchangenotify)。只更新图标位置并通知精确快捷方式路径。
 
@@ -60,4 +60,12 @@ Cloudflare Worker 版本 `815f2bd4-eae1-42a0-9095-24c7df49bb93`，仅绑定自�
 
 Windows 候选 384c2c2c 实际升级失败，缺 uninstall_old_done/extract_done，未发布。实际旧版 0.12.68 的逐次快照显示 done→extract_start→extract_done→copy_done 每次从文件头替换，尾部留下短行；0.12.69 原始阶段文件仅剩 copy_done 和残留字符。结合 [NSIS FileOpen 原文](https://nsis.sourceforge.io/Reference/FileOpen)（所有模式均从文件头开始）确认缺少 FileSeek 为覆盖原因。修复为打开成功后 FileSeek 0 END，再写阶段，保留原 error flag/寄存器。旧卸载的 TEMP 假说不作为已查明原因。完整原始证据见 [失败运行快照](history/reports/r206/failed-upgrade-0.12.69/legacy-0.12.68-nsis-snapshots.json)。
 
-保留 v0.12.69 未发布草稿和固定标签，使用新版本 0.12.70 重建及实际 Windows 升级验证，尚未发布。
+保留 v0.12.69 未发布草稿和固定标签，0.12.70 本机重建在用户暂停指示前完成；修复后的实际 Windows 升级验证及发布现暂停，尚未发布。
+
+0.12.70 本机 public 完整重建通过：Go 1793 项分片、vet、installer、运行时与 public Key 门禁、版本/指纹、receipt/checksum 全通过。指纹 **ccd986308896**，Setup SHA256 `5d5e727540da313c9a1c1370602c8e3e98eeaea6b64217b0e0e68b3291d1738b`，见 [本机构建凭证](history/reports/r206/local-build-0.12.70.json)。新增中转后，无凭据测试明确隔离地址配置，避免测试无凭据场景实际启用中转。Go 同类 HTTP 客户端以三秒预算访问中转：HTTP 200、合法 JSON、817ms，见 [Go 实际中转检查](history/reports/r206/go-relay-live.log)。追加两项重定向变异均触发断言失败，见 [变异结果](history/reports/r206/relay-runtime-mutations.json)。
+
+正式 Windows 草稿构建：[37191701705](https://github.com/LLYY0418/Deep-Legends/actions/runs/37191701705)；完整质量与真实 Windows 升级：[37191701730](https://github.com/LLYY0418/Deep-Legends/actions/runs/37191701730)。两者均按用户指示取消，不自动重试或新建构建任务；不以本机构建替代实际升级。
+
+## 本轮收尾（暂停构建/发布）
+
+用户要求“先不要构建和发布，先把其他的做完”。已取消 `37191701705`、`37191701730`，重复分支运行 `37191697679` 此前也已取消。没有发布 0.12.69 或 0.12.70；0.12.68 仍是 Latest。R206 P1–P7 实现、部署与非构建验证已完成；保留修复后的 Windows 升级运行及用户界面/安装速度/桌面图标真机验收待办。不会自动恢复构建或发布。

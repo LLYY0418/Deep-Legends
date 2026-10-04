@@ -1,0 +1,35 @@
+✖ R206 Worker forwards only the actual Riot GET route whitelist (19.008333ms)
+✔ R206 Worker rejects arbitrary paths/hosts/methods without Riot I/O (1.539625ms)
+✔ R206 Worker response caching honors category TTL and contains no identity cache keys (2.61725ms)
+✔ R206 Worker per-IP limit rejects request 121 and allows another IP (14.598625ms)
+✔ R206 Worker preserves Riot Retry-After and avoids same-path I/O during cooldown (1.158708ms)
+✔ R206 Worker never exposes or logs its secret, including echoed upstream values (1.48175ms)
+✔ R206 Worker fails closed without a secret or rate limiter (0.180542ms)
+✔ R206 Worker rejects upstream redirects without forwarding the secret or Location (1.951833ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 103.157541
+
+✖ failing tests:
+
+test at ../../../../../private/tmp/r206-relay-mutants/redirect-follow/worker.test.mjs:26:1
+✖ R206 Worker forwards only the actual Riot GET route whitelist (19.008333ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'follow' !== 'manual'
+  
+      at TestContext.<anonymous> (file:///private/tmp/r206-relay-mutants/redirect-follow/worker.test.mjs:41:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'follow',
+    expected: 'manual',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
