@@ -1,12 +1,12 @@
 # R206 执行账本
 
-工单：`WORKLIST-R206-RIOT-KEY-RELAY-COLLECTION-FIRST-LOAD-AVATAR-QUEUE-ARENA-COLD-502-S-TIER-FONT-AND-UPGRADE-INSTALL-STAGES.md`。版本 **0.12.69**，验证与发布 key mode **public**。不读取个人 Key 文件；`desktop/verify-embedded-riot-key.cjs` 门禁保持不变。
+工单：`WORKLIST-R206-RIOT-KEY-RELAY-COLLECTION-FIRST-LOAD-AVATAR-QUEUE-ARENA-COLD-502-S-TIER-FONT-AND-UPGRADE-INSTALL-STAGES.md`。版本 **0.12.70**，验证与发布 key mode **public**。不读取个人 Key 文件；`desktop/verify-embedded-riot-key.cjs` 门禁保持不变。
 
 ## 实现与边界
 
 | 项 | 已实施 | 验证 |
 |---|---|---|
-| P1 | Cloudflare Worker 固定 Riot GET 白名单、分类缓存、来源 IP 120/分钟和同路径 429 冷却；只从 Secret 读取 Key。软件 env → saved user → relay → none；中转无 Token，3 秒合并探测、失败冷却 5 分钟，固定不可用提示/重试和诊断 | Worker 7 项、Go 路由/优先级/探测/退避、Node 设置/错误展示；Token 和任意路径两项变异 |
+| P1 | Cloudflare Worker 固定 Riot GET 白名单、分类缓存、来源 IP 120/分钟和同路径 429 冷却；只从 Secret 读取 Key。软件 env → saved user → relay → none；中转无 Token，3 秒合并探测、失败冷却 5 分钟，固定不可用提示/重试和诊断 | Worker 8 项、Go 路由/优先级/探测/退避、Node 设置/错误展示；Token 和任意路径两项变异 |
 | P2 | 首次正常收藏读取骨架；错误/重试/15 秒后失败按钮；collection_retry 仅刷新收藏；身份就绪空闲 10 秒后一次预读，游戏阶段禁用 | Go 空闲/阶段/收藏范围，Node 首次状态和请求行为 |
 | P3 | 普通已连接 LCU 图片 404 立即返回 404/fallback header；强化图标保留专用回退。前端统一候选 URL 改到 communitydragon 远程队列；本地 4 秒、远程 10 秒、总并发 5/远程 2；30 秒匿名分类耗时汇总 | Go 404 无远程 I/O、专用强化旧回归；Node 5 远程 +20 本地首发 <100ms；同请求远程/10 秒本地两项变异 |
 | P4 | OP.GG/YOUR.GG 首次网络超时或连接失败各重试一次，初次 3 秒、重试 5 秒预算（包括请求槽等待）；4xx 不重试。空闲一次 HEAD 预热；部分来源成功返回 200 并保留数据，全部失败 502。失败板块可单独重试 | Go 两端首次失败恢复/部分成功/全失败/4xx/预算/定向接口；Node 合并单板块且保留其余内容；去掉重试变异 |
@@ -14,7 +14,7 @@
 | P6 | 当前用户桌面/开始菜单 IconLocation 指向独立 app.ico；相同图标不重写，保留目标/参数/AppUserModelID/创建时间并通知 Explorer；诊断布尔字段。升级且卸载成功直接解压，手动/首次仍走原分支。Go 已等父进程时传 parent-exited。NSIS 阶段桥改写持久数据目录，保留原始 NSIS 和完整 8 阶段文件 | Go 文件无重写/Windows ShellLink 属性测试、Node 模板严格匹配/分支、Windows 真实旧版安装升级待流水线结果 |
 | P7 | 所有 event 发起点记录匿名 uri_kind/during_refresh/suppressed；刷新后 5 秒及同类 30 秒去重；有预算的缺数据重试使用 pending_retry，避免被事件限流吞掉。翻译请求总预算 2.8 秒，失败复用成功缓存 | Go 10 秒 5 次事件仅 1 次刷新、逐事件日志；完整收藏刷新超时 <3 秒并保留缓存；旧有三次缺数据重试回归 |
 
-中转常量列表目前为空：没有环境/用户 Key 时 source=none，不探测虚构地址。用户按 [Worker README](../relay/riot-worker/README.md) 自行部署、绑定自有域名后填入列表，需重新发布版本。development key 每 24 小时失效；公开服务需 production key，personal key 仅少量私人使用。
+0.12.69 草稿的中转列表为空，保持不探测虚构地址。用户完成本机 OAuth 授权并提供 `yinxiaobia.net` 后，已部署到 `https://riot.yinxiaobia.net`，0.12.70 内置此公开地址。用户在 Cloudflare 自行设置 Secret，并确认是 production Key；不读取凭据值。部署验证见 [relay-deployment.json](history/reports/r206/relay-deployment.json)。development key 每 24 小时失效；公开服务需 production key，personal key 仅少量私人使用。
 
 图片候选机制选择工单允许的前端下一候选方案：`img.onerror` 不能读取 HTTP header，第一次普通本地错误在统一队列内切换显式远程 URL；不会在后端本地请求中等待远程网络。远程失败继续现有卡片候选规则。客户端未连接时的公开图片与强化图标专用流程保留。
 
@@ -45,3 +45,19 @@ R202/R204 的海斗选人、备战席应用及无序列不请求，在 10-04 日
 首次 NSIS 构建发现 `_CHECK_APP_RUNNING` 在两个条件分支中展开两次，导致 `doStopProcess` 标签重复；改为一次展开，增加实际宏展开次数护栏后重建通过。独立复核补充断线清空收藏起点/去重状态，并加入回归。
 
 Windows 流水线候选 384c2c2c 增加真实 0.12.65→0.12.68 阶段文件观测，再升级到 0.12.69。历史日志只能确认 start 已导入而 done 缺失（不能误读为空的 done-to-start 为 start 缺失）；当前等待运行证据，未声称已确定历史丢失原因。
+
+最终源码 e0d263a52fe707cce2823f8fa1540de2a71a2f33 将新增独立图标也纳入指纹，public 重建通过。最终指纹 **33ca002c7114**，详见 [最终构建凭证](history/reports/r206/local-release-build.json)。首次候选凭证保留，不替代最终附件校验。v0.12.69 固定到此源码，正式 Windows 草稿构建及标签质量验证进行中。
+
+Windows API 核对使用微软原文：[SetIconLocation](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ishelllinkw-seticonlocation)、[SHChangeNotify](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shchangenotify)。只更新图标位置并通知精确快捷方式路径。
+
+最终指定全量回归通过：`go test ./backend -count=1` 251.091 秒，`node --test backend/web/*.test.cjs desktop/*.test.cjs` 1153 项/1152 通过/1 平台门禁跳过/0 失败（257.398 秒）；最新源码后端 vet 与 diff check 通过。指纹资源新增项另有实际变更图标字节必使指纹变化的回归。
+
+独立遗漏审计未发现其它实现缺失。Worker 段位白名单限定实际调用的 `/lol/league/v4/entries/by-puuid/{puuid}`（riot_api.go 使用点）；不开放泛化的未知 entries 子路径，符合“与实际用到一致”的限定。
+
+## 0.12.70 中转实际部署与阶段写入修复
+
+Cloudflare Worker 版本 `815f2bd4-eae1-42a0-9095-24c7df49bb93`，仅绑定自有子域名，关闭 workers.dev 和预览 URL。首次缺 Secret 的 503 符合预期；添加 Secret 后 502，在本地 workerd + 假 Key 中复现：`redirect:error` 被运行时拒绝。改为 manual 并显式拒绝全部 3xx，禁止凭据跟随重定向；8 项 Worker 测试通过，实际状态接口返回 200。真实账号、段位、熟练度、比赛详情/时间线及拒绝路径的结果见部署验证，证据不含账号 ID、PUUID、Key 或请求 URL。
+
+Windows 候选 384c2c2c 实际升级失败，缺 uninstall_old_done/extract_done，未发布。实际旧版 0.12.68 的逐次快照显示 done→extract_start→extract_done→copy_done 每次从文件头替换，尾部留下短行；0.12.69 原始阶段文件仅剩 copy_done 和残留字符。结合 [NSIS FileOpen 原文](https://nsis.sourceforge.io/Reference/FileOpen)（所有模式均从文件头开始）确认缺少 FileSeek 为覆盖原因。修复为打开成功后 FileSeek 0 END，再写阶段，保留原 error flag/寄存器。旧卸载的 TEMP 假说不作为已查明原因。完整原始证据见 [失败运行快照](history/reports/r206/failed-upgrade-0.12.69/legacy-0.12.68-nsis-snapshots.json)。
+
+保留 v0.12.69 未发布草稿和固定标签，使用新版本 0.12.70 重建及实际 Windows 升级验证，尚未发布。

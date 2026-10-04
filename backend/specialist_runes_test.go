@@ -922,6 +922,7 @@ func TestSpecialistOpponentRequiresMatchingPosition(t *testing.T) {
 }
 
 func TestSpecialistRunesWithoutRiotKeyReturnsEmptyWithoutRequests(t *testing.T) {
+	r204KeyFixture(t)
 	t.Setenv("RIOT_API_KEY", "")
 	var requests atomic.Int64
 	provider := specialistTestProvider(gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {

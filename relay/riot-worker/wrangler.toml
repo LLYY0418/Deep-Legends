@@ -1,6 +1,12 @@
 name = "deep-legends-riot-relay"
 main = "worker.mjs"
 compatibility_date = "2026-10-04"
+workers_dev = false
+preview_urls = false
+
+[[routes]]
+pattern = "riot.yinxiaobia.net"
+custom_domain = true
 
 # Avoid invocation logs containing full request URLs or source addresses.
 [observability]

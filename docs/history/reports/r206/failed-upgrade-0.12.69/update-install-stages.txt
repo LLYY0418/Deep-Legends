@@ -1,0 +1,6 @@
+installer_start=1791104026809
+parent_exited=1791104027411
+uninstall_old_start=1791104029651
+extract_start=1791104032023
+copy_done=1791104039456
+relaunch=1791104039659

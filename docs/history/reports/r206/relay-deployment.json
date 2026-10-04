@@ -1,0 +1,69 @@
+{
+  "verified_at": "2026-10-04T09:16:40.885487+00:00",
+  "origin": "https://riot.yinxiaobia.net",
+  "key_type": "production (user-confirmed)",
+  "credentials_read": false,
+  "worker_version": "815f2bd4-eae1-42a0-9095-24c7df49bb93",
+  "results": [
+    {
+      "category": "status",
+      "http_status": 200,
+      "json_valid": true,
+      "result": "ok"
+    },
+    {
+      "category": "account",
+      "http_status": 200,
+      "json_valid": true,
+      "result": "ok"
+    },
+    {
+      "category": "match-ids",
+      "http_status": 200,
+      "json_valid": true,
+      "result": "ok"
+    },
+    {
+      "category": "rank",
+      "http_status": 200,
+      "json_valid": true,
+      "result": "ok"
+    },
+    {
+      "category": "mastery",
+      "http_status": 200,
+      "json_valid": true,
+      "result": "ok"
+    },
+    {
+      "category": "match",
+      "http_status": 200,
+      "json_valid": true,
+      "result": "ok"
+    },
+    {
+      "category": "match-cache-repeat",
+      "http_status": 200,
+      "json_valid": true,
+      "result": "ok"
+    },
+    {
+      "category": "timeline",
+      "http_status": 200,
+      "json_valid": true,
+      "result": "ok"
+    },
+    {
+      "category": "unknown-path",
+      "http_status": 404,
+      "json_valid": false,
+      "result": "rejected"
+    },
+    {
+      "category": "post-rejected",
+      "http_status": 404,
+      "json_valid": false,
+      "result": "rejected"
+    }
+  ]
+}

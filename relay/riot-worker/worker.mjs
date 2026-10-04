@@ -88,10 +88,16 @@ export function createRiotWorker(options = {}) {
       let upstream;
       try {
         upstream = await fetchUpstream("https://" + route.host + route.path + url.search, {
-          method: "GET", redirect: "error", signal: AbortSignal.timeout(15000),
+          // workerd supports follow/manual, not redirect:"error". Reject
+          // redirects ourselves so the Riot secret never reaches another host.
+          method: "GET", redirect: "manual", signal: AbortSignal.timeout(15000),
           headers: { "X-Riot-Token": env.RIOT_API_KEY, Accept: "application/json" },
         });
       } catch { return finish(new Response("Upstream unavailable", { status: 502 })); }
+      if (upstream.status >= 300 && upstream.status < 400) {
+        await upstream.body?.cancel();
+        return finish(new Response("Upstream unavailable", { status: 502 }));
+      }
       if (upstream.status === 429) {
         await upstream.body?.cancel();
         const rawRetry = upstream.headers.get("Retry-After") || "3";

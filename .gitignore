@@ -40,6 +40,9 @@ __pycache__/
 
 # 本机临时构建密钥（不应存在，但以防万一）
 riot_key.local.*
+/relay/riot-worker/.wrangler/
+/relay/riot-worker/.dev.vars*
+/relay/riot-worker/.env*
 
 # Release payload is embedded into the installer shell, then removed.
 /installer/payload/files/*

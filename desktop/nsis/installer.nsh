@@ -26,7 +26,7 @@ ManifestDPIAware true
     !insertmacro DLcustomHeader
   !endif
 !macroend
-; Child TEMP belongs to the Go shell. FILETIME -> Unix milliseconds; preserve
+; Prefer the persistent stage bridge supplied by the Go shell. FILETIME -> Unix milliseconds; preserve
 ; scratch registers and the error flag used by electron-builder's copy retry.
 !macro DLUpdateTiming STAGE
   Push $R6
@@ -47,9 +47,16 @@ ManifestDPIAware true
   ${If} $R6 == ""
     StrCpy $R6 "$TEMP\update-install-stages.txt"
   ${EndIf}
+  ClearErrors
   FileOpen $R8 "$R6" a
-  FileWrite $R8 "${STAGE}=$R9$\r$\n"
-  FileClose $R8
+  ${If} $R8 != ""
+    ; NSIS "a" preserves contents but opens at offset zero, unlike fopen.
+    FileSeek $R8 0 END
+    ${IfNot} ${Errors}
+      FileWrite $R8 "${STAGE}=$R9$\r$\n"
+    ${EndIf}
+    FileClose $R8
+  ${EndIf}
   ClearErrors
   ${If} $R7 == 1
     SetErrors

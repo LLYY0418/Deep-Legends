@@ -20,10 +20,15 @@ const r204FixtureKey = "RGAPI-fixture-only-credential"
 func r204KeyFixture(t *testing.T) *riotKeyStore {
 	t.Helper()
 	old, embedded := riotUserKeys, riotEmbeddedKey
+	addresses, relays := riotRelayAddresses, riotRelays
+	riotRelayAddresses, riotRelays = nil, &riotRelayState{}
 	t.Setenv("RIOT_API_KEY", "")
 	riotEmbeddedKey = func() string { return "" }
 	riotUserKeys = loadRiotKeyStore(newFlowDiagnosticStore(t))
-	t.Cleanup(func() { riotUserKeys, riotEmbeddedKey = old, embedded })
+	t.Cleanup(func() {
+		riotUserKeys, riotEmbeddedKey = old, embedded
+		riotRelayAddresses, riotRelays = addresses, relays
+	})
 	return riotUserKeys
 }
 func r204ValidationClient(status int) *http.Client {

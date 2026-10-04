@@ -139,6 +139,7 @@ func TestArenaMatchDetailRejectsInvalidIDBeforeRiotRequest(t *testing.T) {
 }
 
 func TestArenaMatchDetailWithoutAPIKeyFailsClosed(t *testing.T) {
+	r204KeyFixture(t)
 	previousCipher := riotAPIKeyCipher
 	riotAPIKeyCipher = ""
 	t.Cleanup(func() { riotAPIKeyCipher = previousCipher })

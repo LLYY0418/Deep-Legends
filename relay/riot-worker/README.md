@@ -1,12 +1,12 @@
 # Riot 中转服务
 
-由服务所有者部署。软件中的 `backend/riot_relay.go` 地址列表默认为空；此时没有环境变量或用户 Key 就仍显示未配置，不会请求占位域名。
+当前服务已部署为 `deep-legends-riot-relay`，绑定 `https://riot.yinxiaobia.net`。用户已在 Cloudflare 配置 `RIOT_API_KEY` Secret 并确认类型为 production；软件 0.12.70 内置此公开地址。Key 不进入源码或安装包。
 
 1. 注册 Cloudflare，安装 Wrangler 4.36.0 或更新版本：`npm i -g wrangler`，执行 `wrangler login`。
 2. 在本目录运行 `wrangler secret put RIOT_API_KEY`，交互输入自己的 Key。不要把 Key 放进文件、命令参数或仓库。
 3. 运行 `wrangler deploy`。`wrangler.toml` 的限流 namespace_id 在同一 Cloudflare 账号中应独立；已有相同编号时换一个正整数。
 4. 在 Cloudflare 为 Worker 绑定自己的 HTTPS 域名。国内经常无法访问 `*.workers.dev`，使用自有域名。
-5. 将域名（例如 `https://你的域名`，无路径）加入 `backend/riot_relay.go` 的 `riotRelayAddresses`，重新构建、发布软件。软件会自动追加 `/r/asia/…` 或 `/r/kr/…`。
+5. 部署到其他域名时，将域名（例如 `https://你的域名`，无路径）加入 `backend/riot_relay.go` 的 `riotRelayAddresses`，重新构建、发布软件。软件会自动追加 `/r/asia/…` 或 `/r/kr/…`。
 
 默认 development key 每24小时失效，不适合稳定中转。Personal key 的配额为每秒20次、每2分钟100次，仅适合本人或小型私有社区；公开发布的服务应申请 production key。依据：[Riot Developer Portal](https://developer.riotgames.com/docs/portal)。软件用户可保存自己的 Key，优先直连。
 

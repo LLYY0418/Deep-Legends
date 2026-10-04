@@ -11,9 +11,8 @@ import (
 	"time"
 )
 
-// Deployment owner fills HTTPS origins before a subsequent release.
-// Empty is unconfigured; never contact a fictional placeholder domain.
-var riotRelayAddresses = []string{}
+// Public HTTPS origin; the Riot credential exists only in the Worker's Secret.
+var riotRelayAddresses = []string{"https://riot.yinxiaobia.net"}
 
 var errRiotRelayUnavailable = errors.New("战绩服务暂时不可用")
 

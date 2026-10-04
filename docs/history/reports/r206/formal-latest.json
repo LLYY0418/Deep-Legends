@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "version": "0.12.69",
+  "fingerprint": "33ca002c7114",
+  "publishedAt": "2026-10-04T08:46:32.631Z",
+  "minSupported": "0.9.0",
+  "notes": "- 增加 Riot 战绩中转服务接入和部署说明；本版中转地址尚未配置，可继续在设置中保存自己的 Key。\n- 收藏首次读取显示加载骨架，失败后可单独重试；空闲时预读收藏，合并重复事件，并保留已成功读取的翻译缓存。\n- 本地图片缺失时交给独立远程队列重试，减少头像等待；统一海斗单字评级字号。\n- 斗魂详情首次网络失败立即重试，保留已加载板块并支持单独重试失败板块。\n- 升级快捷方式使用独立图标副本；成功卸载旧版后直接解压，补齐安装阶段记录并跳过重复进程检查。",
+  "asset": {
+    "name": "Deep-Legends-Setup-0.12.69-public.exe",
+    "size": 111674368,
+    "sha256": "2ec566e15d78396f5e8cd76a6744d5709c51fd443348a91260f87f3b295a40ea",
+    "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.69/Deep-Legends-Setup-0.12.69-public.exe"
+  }
+}

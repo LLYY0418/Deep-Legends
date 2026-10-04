@@ -207,6 +207,7 @@ func TestRiotOverviewCostTrackerIgnoresCancellation(t *testing.T) {
 }
 
 func TestR136MissingRiotKeyIsUserFacingAndDiagnosedAtAccountLookup(t *testing.T) {
+	r204KeyFixture(t)
 	t.Setenv("RIOT_API_KEY", "")
 	previousCipher, previousPlain := riotAPIKeyCipher, riotAPIKey
 	riotAPIKeyCipher, riotAPIKey = "", ""

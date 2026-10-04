@@ -38,7 +38,7 @@ test("R206 Worker forwards only the actual Riot GET route whitelist", async () =
     const [url, options] = f.requests.at(-1);
     assert.equal(url, "https://" + region + ".api.riotgames.com" + path);
     assert.deepEqual(options.headers, { "X-Riot-Token": f.env.RIOT_API_KEY, Accept: "application/json" });
-    assert.equal(options.redirect, "error");
+    assert.equal(options.redirect, "manual");
   }
 });
 
@@ -101,5 +101,20 @@ test("R206 Worker fails closed without a secret or rate limiter", async () => {
     const f = fixture(); delete f.env[key];
     assert.equal((await f.get("/r/kr/lol/status/v4/platform-data")).status, 503);
     assert.equal(f.requests.length, 0);
+  }
+});
+
+test("R206 Worker rejects upstream redirects without forwarding the secret or Location", async () => {
+  for (const status of [301, 302, 303, 307, 308]) {
+    const f = fixture(async (_url, options) => {
+      // Cloudflare's runtime rejects redirect:error before making a request.
+      assert.equal(options.redirect, "manual");
+      return new Response("redirect", { status, headers: { Location: "https://other.example" } });
+    });
+    const response = await f.get("/r/kr/lol/status/v4/platform-data");
+    assert.equal(response.status, 502);
+    assert.equal(response.headers.get("Location"), null);
+    assert.equal(f.requests.length, 1);
+    assert.equal(f.entries.size, 0);
   }
 });
