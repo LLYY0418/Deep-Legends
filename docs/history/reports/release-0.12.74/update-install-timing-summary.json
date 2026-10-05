@@ -1,0 +1,24 @@
+{
+  "build_fingerprint": "a3d7c1e75735",
+  "copy_ms": 1,
+  "event": "update_install_timing",
+  "extract_ms": 6232,
+  "result": "ok",
+  "stages_ms": {
+    "check_done_to_uninstall_old_start": 1,
+    "copy_done_to_relaunch": 180,
+    "extract_done_to_copy_done": 1,
+    "extract_start_to_extract_done": 6232,
+    "installer_start_to_parent_exited": 442,
+    "nsis_start_to_oninit": 1226,
+    "oninit_to_check_done": 21,
+    "parent_exited_to_payload_released": 134,
+    "parent_exited_to_uninstall_old_start": 1418,
+    "payload_released_to_nsis_start": 36,
+    "uninstall_old_done_to_extract_start": 71,
+    "uninstall_old_start_to_uninstall_old_done": 1538
+  },
+  "time": "2026-10-05T15:07:56.3405778Z",
+  "total_ms": 9882,
+  "uninstall_old_ms": 1538
+}

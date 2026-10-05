@@ -1,0 +1,42 @@
+[
+  {
+    "check": "r69-focused-race",
+    "started_at": "2026-10-05T15:30:12Z",
+    "finished_at": "2026-10-05T15:30:31Z",
+    "seconds": 19.104,
+    "exit_code": 0,
+    "last_5_lines": [
+      "ok  \tlol-loot-assistant/backend\t1.874s"
+    ]
+  },
+  {
+    "check": "r228-go-full",
+    "started_at": "2026-10-05T15:30:31Z",
+    "finished_at": "2026-10-05T15:32:27Z",
+    "seconds": 115.116,
+    "exit_code": 0,
+    "last_5_lines": [
+      "ok  \tlol-loot-assistant/backend\t107.053s",
+      "?   \tlol-loot-assistant/scripts\t[no test files]"
+    ]
+  },
+  {
+    "check": "r228-go-race",
+    "started_at": "2026-10-05T15:32:27Z",
+    "finished_at": "2026-10-05T15:34:44Z",
+    "seconds": 137.349,
+    "exit_code": 0,
+    "last_5_lines": [
+      "ok  \tlol-loot-assistant/backend\t135.613s",
+      "?   \tlol-loot-assistant/scripts\t[no test files]"
+    ]
+  },
+  {
+    "check": "r228-go-vet",
+    "started_at": "2026-10-05T15:34:44Z",
+    "finished_at": "2026-10-05T15:34:46Z",
+    "seconds": 2.039,
+    "exit_code": 0,
+    "last_5_lines": []
+  }
+]

@@ -4570,7 +4570,15 @@ func TestR69LiveHistoryStatesDistinguishUnavailableEmptyAndFailed(t *testing.T) 
 				_, _ = io.WriteString(w, test.body)
 			}))
 			defer server.Close()
-			client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+			// Preserve the unknown-region retry path without spending its real 21s.
+			// R223 adds this policy; this test still checks empty/failed cache states.
+			var retryDelays []time.Duration
+			client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client(),
+				historyRetrySleep: func(ctx context.Context, delay time.Duration) error {
+					retryDelays = append(retryDelays, delay)
+					return ctx.Err()
+				},
+			}
 			a := &app{}
 			result := a.livePlayerMatches(context.Background(), client, gameplayReference{PlayerRef: "r69-history-ref-01"}, "r69-history-ref-01", false, nil)
 			if got := liveHistoryState(true, result); got != test.want {
@@ -4581,6 +4589,13 @@ func TestR69LiveHistoryStatesDistinguishUnavailableEmptyAndFailed(t *testing.T) 
 			a.livePlayerMatchesMu.Unlock()
 			if cached != test.wantCached {
 				t.Fatalf("cached=%v, want %v", cached, test.wantCached)
+			}
+			var wantDelays []time.Duration
+			if test.status == http.StatusInternalServerError {
+				wantDelays = []time.Duration{3 * time.Second, 6 * time.Second, 12 * time.Second}
+			}
+			if !reflect.DeepEqual(retryDelays, wantDelays) {
+				t.Fatalf("history retry delays=%v, want %v", retryDelays, wantDelays)
 			}
 		})
 	}
