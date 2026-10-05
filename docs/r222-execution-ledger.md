@@ -112,3 +112,7 @@ ok  lol-loot-assistant/backend 117.097s
 该轮最终本地 race 全量 **143.669s** 通过（macOS）；Linux ≤120s 仍待同 SHA CI 证明。
 
 进一步优化后本地 Node 预算 runner：1262 项，1258 pass、4 平台 skip、0 fail，**113.528s**；8 workers，最大文件 external **70.437s**，全部文件 ≤90s。
+
+第三轮 CI `37311010804`，SHA `b2d8413d`：Linux 完整 quality 成功，backend race **119.290s**，Node **234.984s**（1262 项，1260 pass、2 skip、0 fail；最慢 external 73.181s）。Windows 专属 Go/Node/PowerShell 全通过；desktop **215.353s**（284 项，282 pass、2 Linux/Bash skip、0 fail），但 external 文件 **91.981s** 超过 90s，images 87.805s。保持所有样本与断言，将 Windows jsdom worker 从 4 限至 3，降低大夹具并发争用；Linux 仍使用全部核心，时间门槛不变。
+
+最终隔离工作树普通 Go 全量 **124.767s** 通过（与 Node 同时运行的 macOS 测量），vet 通过；最终 public 后端再次构建/自检/指纹核验通过，仍为 0.12.73 / be7741263b5b。
