@@ -1,9 +1,14 @@
 param(
-    [string]$Version = "0.12.19"
+    [string]$Version = "",
+    [switch]$SkipTestsInCI
 )
 
 $ErrorActionPreference = "Stop"
+if ($SkipTestsInCI -and $env:GITHUB_ACTIONS -cne "true") {
+    throw "SkipTestsInCI requires GITHUB_ACTIONS=true"
+}
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (-not $Version) { $Version = (Get-Content -Raw (Join-Path $projectRoot "desktop\package.json") | ConvertFrom-Json).version }
 
 if ($env:OS -ne "Windows_NT") { throw "Run this script on Windows." }
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -29,16 +34,18 @@ if ($env:GITHUB_ACTIONS -ne "true" -and (-not $env:GOPROXY -or $env:GOPROXY -eq 
 
 Push-Location $projectRoot
 try {
-    & (Join-Path $projectRoot "build-desktop-windows.ps1") -Version $Version -KeyMode public
+    & (Join-Path $projectRoot "build-desktop-windows.ps1") -Version $Version -KeyMode public -SkipTestsInCI:$SkipTestsInCI
     if (-not $?) { throw "Windows desktop build failed." }
 
     & node (Join-Path $projectRoot "scripts\make-release.cjs")
     if ($LASTEXITCODE -ne 0) { throw "Release file generation failed." }
 
-    & node --test (Join-Path $projectRoot "scripts\make-release.test.cjs") (Join-Path $projectRoot "desktop\release-build.test.cjs")
-    if ($LASTEXITCODE -ne 0) { throw "Release tests failed." }
-    & go test -run TestUpdate ./...
-    if ($LASTEXITCODE -ne 0) { throw "Update tests failed." }
+    if (-not $SkipTestsInCI) {
+        & node --test (Join-Path $projectRoot "scripts\make-release.test.cjs") (Join-Path $projectRoot "desktop\release-build.test.cjs")
+        if ($LASTEXITCODE -ne 0) { throw "Release tests failed." }
+        & go test -run TestUpdate ./...
+        if ($LASTEXITCODE -ne 0) { throw "Update tests failed." }
+    }
 
     $releaseDir = Join-Path $projectRoot "dist\release"
     $setupName = "Deep-Legends-Setup-$Version-public.exe"

@@ -97,6 +97,7 @@ func TestR206LocalImage404NeverFetchesRemote(t *testing.T) {
 }
 
 func TestR206TranslationsTimeoutUsesPreviousCache(t *testing.T) {
+	t.Parallel()
 	provider := newChampionProvider()
 	provider.lootTranslations = map[string]lootMetadata{"CHEST_FIXTURE": {Name: "缓存名称"}}
 	provider.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
@@ -114,6 +115,7 @@ func TestR206TranslationsTimeoutUsesPreviousCache(t *testing.T) {
 }
 
 func TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds(t *testing.T) {
+	t.Parallel()
 	type catalogEntry struct {
 		ID         int64  `json:"id"`
 		Name       string `json:"name"`

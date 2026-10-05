@@ -39,6 +39,7 @@ func TestR54RetainedSnapshotExposesIdentityButNotAccount(t *testing.T) {
 }
 
 func TestR54CollectionProbeRetriesUntilReady(t *testing.T) {
+	t.Parallel()
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/lol-champions/v1/inventories/42/skins-minimal" {

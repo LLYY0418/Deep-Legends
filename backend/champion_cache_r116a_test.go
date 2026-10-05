@@ -175,6 +175,7 @@ func TestPruneStaleHexdataBuildsHonorsGracePeriod(t *testing.T) {
 // 判据 3：173 英雄 × 24 个 patch 的等比例缩小版（20 个 kind × 24 个 build），
 // 确认磁盘占用不会随 patch 历史无限增长。
 func TestPruneStaleHexdataBuildsBoundsDiskAcrossPatchHistory(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	cache := r116aCache(t, root)
 	now := time.Now()

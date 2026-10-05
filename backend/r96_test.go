@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -104,7 +105,17 @@ func TestR96PartialTruthDoesNotEndAsNone(t *testing.T) {
 	provider.tokenClient = a.lcu
 	a.sgp = provider
 	// Exhaust the real retry schedule, rather than directly testing the emitter.
+	var retryDelays []time.Duration
+	a.arenaTruthRetryWait = func(ctx context.Context, delay time.Duration) error {
+		retryDelays = append(retryDelays, delay)
+		return ctx.Err()
+	}
+
 	a.finishArenaGroupTruth(context.Background(), a.lcu)
+	if !reflect.DeepEqual(retryDelays, []time.Duration{0, 2 * time.Second, 5 * time.Second, 10 * time.Second}) {
+		t.Fatal("retry schedule changed", retryDelays)
+	}
+
 	if calls.Load() != 4 {
 		t.Fatal("did not exhaust bounded retries", calls.Load())
 	}

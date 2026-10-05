@@ -188,6 +188,8 @@ type app struct {
 	liveRecommendationPrewarmer     *liveRecommendationPrewarmer
 	riot                            *riotProvider
 	sgp                             *sgpProvider
+	arenaTruthRetryWait             func(context.Context, time.Duration) error
+	proSeedTimeout                  func(context.Context, time.Duration) (context.Context, context.CancelFunc)
 	watch                           *watchRunner
 	convenience                     *convenienceRunner // legacy alias; points at watch
 	lpTracker                       *lpTracker

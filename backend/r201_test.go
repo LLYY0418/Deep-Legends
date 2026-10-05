@@ -132,6 +132,7 @@ func TestR201TimingConsumedOnceAndInvalidDeleted(t *testing.T) {
 	}
 }
 func TestR201ProbeWindowCancelsSlowRoutes(t *testing.T) {
+	t.Parallel()
 	data := bytes.Repeat([]byte("x"), int(updateProbeBytes))
 	for _, second := range []bool{false, true} {
 		u := updateTestManager(t, data)

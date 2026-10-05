@@ -86,6 +86,7 @@ func TestR86ManualDisconnectPausesDiscoveryUntilRefresh(t *testing.T) {
 }
 
 func TestR86WebsocketDropKeepsLiveLCUConnection(t *testing.T) {
+	t.Parallel()
 	var attempts atomic.Int32
 	reconnected := make(chan struct{}, 1)
 	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}

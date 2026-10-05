@@ -57,6 +57,23 @@ test("R86 CI uses the package version, installs test dependencies and needs no p
   assert.match(ci, /require\('\.\/desktop\/package\.json'\)\.version/);
   assert.match(ci, /-Version \$version -KeyMode public/);
   const windows = ci.slice(ci.indexOf("  windows-build:"));
+  assert.doesNotMatch(windows, /needs:\s*quality/);
+  assert.match(windows, /-KeyMode public -SkipTestsInCI/);
+  assert.match(ci, /node scripts\/test-renderers\.cjs all/);
+  const timingRunner = fs.readFileSync(path.join(root, "scripts/test-renderers.cjs"), "utf8");
+  assert.match(timingRunner, /\["backend\/web", "desktop", "scripts"\]/);
+  assert.match(timingRunner, /duration_ms > 90000/);
+  assert.match(timingRunner, /duration_ms > 240000/);
+  assert.match(windows, /node --test --test-name-pattern="R86 Windows release\|R222 Windows" desktop\/release-quality-gates\.test\.cjs/);
+  for (const name of ["TestSplitRegistryPathSupportsNativeTencentKeys", "TestR204KeySaveRejectsUnauthorizedAndEncrypts", "TestR204KeyRuntime401AndPrivacy",
+    "TestWindowsApplicationWindowDetection", "TestR205WindowsShortcutRoundTrip", "TestR206IconOnlyChangesIconAndPreservesCreation",
+    "TestSettingsUseHRESULTAcrossEntireConfiguration", "TestCOMUsesHRESULTInsteadOfThreadLastError", "TestFailedNavigationEventIsNotReadiness"]) assert.ok(windows.includes(name), name);
+  assert.match(windows, /R82_POWERSHELL: powershell\.exe/);
+  assert.match(windows, /node --test scripts\/r82-startup-ab-script\.test\.cjs/);
+  assert.match(windows, /--test-name-pattern="setup-only Windows CI skip" scripts\/setup-only-build\.test\.cjs/);
+  const release = fs.readFileSync(path.join(root, ".github/workflows/release.yml"), "utf8");
+  assert.match(release, /-Version \$env:RELEASE_VERSION -SkipTestsInCI/);
+  assert.match(release, /gh release create[^\n]+--draft/);
   assert.ok(windows.indexOf("npm ci --prefix desktop") < windows.indexOf("./build-desktop-windows.ps1"));
   assert.match(fs.readFileSync(path.join(root, "build-desktop-windows.ps1"), "utf8"), /if \(-not \$Version\) \{ \$Version = \$package.version \}/);
   const retired = fs.readFileSync(path.join(root, "build-windows.ps1"), "utf8");
@@ -84,7 +101,7 @@ test("R86 Windows release stops on a real failing Go test and rejects an indepen
       fs.copyFileSync(path.join(root,"scripts/normalize-source-line-endings.cjs"),path.join(directory,"scripts/normalize-source-line-endings.cjs"));
       fs.writeFileSync(path.join(directory,"bin/npm.cmd"),"@echo off\r\nexit /b 0\r\n");
       fs.writeFileSync(path.join(directory,"bin/go.cmd"),`@echo off\r\necho %* >> "${path.join(directory,"go-calls")}"\r\n"${go}" %*\r\nexit /b %errorlevel%\r\n`);
-      const result=spawnSync("powershell.exe",["-NoProfile","-ExecutionPolicy","Bypass","-File","build-desktop-windows.ps1","-KeyMode","public"],{cwd:directory,encoding:"utf8",timeout:60000,env:{...process.env,PATH:`${path.join(directory,"bin")};${process.env.PATH}`}});
+      const result=spawnSync("powershell.exe",["-NoProfile","-ExecutionPolicy","Bypass","-File","build-desktop-windows.ps1","-KeyMode","public"],{cwd:directory,encoding:"utf8",timeout:60000,env:{...process.env,GITHUB_ACTIONS:"false",PATH:`${path.join(directory,"bin")};${process.env.PATH}`}});
       if (result.error) throw new Error(`Windows PowerShell failed to start: ${result.error.message}`);
       const output = `${result.stdout || ""}${result.stderr || ""}`;
       assert.notEqual(result.status,0);
@@ -141,4 +158,48 @@ test("format gates exclude local toolchains and GOPATH modules while retaining u
     const invalidSource = spawnSync("bash", ["-e", "-o", "pipefail", "-c", scan], { cwd: directory, encoding: "utf8", timeout: 10000 });
     assert.notEqual(invalidSource.status, 0, "real project syntax errors must still fail");
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+// This helper evaluates the actual guard, including casing; structural checks
+// below also keep every expensive gate within the local-only block.
+test("R222 CI skip preserves syntax, fingerprints, runtime verification and hashes", () => {
+  const source = fs.readFileSync(path.join(root, "build-desktop-windows.ps1"), "utf8");
+  const publicSource = fs.readFileSync(path.join(root, "build-public-release-windows.ps1"), "utf8");
+  for (const entry of [source, publicSource]) {
+    assert.match(entry, /\[switch\]\$SkipTestsInCI/);
+    assert.match(entry, /if \(\$SkipTestsInCI -and \$env:GITHUB_ACTIONS -cne "true"\) \{\s*throw "SkipTestsInCI requires GITHUB_ACTIONS=true"/);
+    assert.ok(entry.indexOf('SkipTestsInCI requires') < entry.indexOf('$projectRoot ='));
+  }
+  assert.match(publicSource, /-KeyMode public -SkipTestsInCI:\$SkipTestsInCI/);
+  assert.match(source, /if \(-not \$SkipTestsInCI\) \{\s*go test \.\/\.\.\./);
+  assert.match(source, /if \(-not \$SkipTestsInCI\) \{\s*\$webTests =/);
+  assert.match(source, /if \(-not \$SkipTestsInCI\) \{\s*\$desktopTests =/);
+  assert.match(publicSource, /if \(-not \$SkipTestsInCI\) \{\s*& node --test[\s\S]+& go test -run TestUpdate/);
+  for (const token of ['gofmt -l', 'node --check backend/web/app.js', 'node --check desktop/main.cjs',
+    'source-fingerprint.cjs', 'verify-build-fingerprint.cjs', '--self-test', 'verify-packaged-runtime.cjs',
+    'release-build.cjs', 'Get-FileHash -Algorithm SHA256']) assert.ok(source.includes(token), token);
+});
+
+test("R222 Windows release entry points reject CI skip locally before any side effect", {
+  skip: process.platform !== "win32" ? "requires Windows and PowerShell" : false,
+}, () => {
+  function check(source, value) {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "r222-local-skip-"));
+    try {
+      const file = path.join(directory, "entry.ps1");
+      fs.writeFileSync(file, source);
+      const result = spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", file, "-SkipTestsInCI"], {
+        cwd: directory, encoding: "utf8", timeout: 15000, env: { ...process.env, GITHUB_ACTIONS: value },
+      });
+      assert.ifError(result.error);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stdout + result.stderr, /SkipTestsInCI requires GITHUB_ACTIONS=true/);
+      assert.deepEqual(fs.readdirSync(directory), ["entry.ps1"], "rejection must precede normalization, installs and cleanup");
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  }
+  for (const file of ["build-desktop-windows.ps1", "build-public-release-windows.ps1"]) {
+    const source = fs.readFileSync(path.join(root, file), "utf8");
+    for (const value of ["", "false", "TRUE"]) check(source, value);
+    assert.throws(() => check(source.replace('$SkipTestsInCI -and $env:GITHUB_ACTIONS -cne "true"', '$false'), "false"), { name: "AssertionError" });
+  }
 });

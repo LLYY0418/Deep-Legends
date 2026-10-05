@@ -11,6 +11,7 @@ import (
 )
 
 func TestR64FacadeEventBurstIsThrottled(t *testing.T) {
+	t.Parallel()
 	events := make(chan string, 32)
 	a := &app{eventSubscribers: map[chan string]struct{}{events: {}}}
 	t.Cleanup(a.clearFacadeEventThrottle)

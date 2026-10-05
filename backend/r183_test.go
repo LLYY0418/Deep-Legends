@@ -26,6 +26,7 @@ type r183Fixture struct {
 func newR183Fixture(t *testing.T) *r183Fixture {
 	t.Helper()
 	f := &r183Fixture{app: r175App(t), current: Summoner{PUUID: r161Ref(6), GameName: "Player6", TagLine: "CN1"}, requests: make(map[string]int)}
+	f.app.champions = r222OfflineChampions()
 	for i := 0; i < 10; i++ {
 		team, liveTeam := int64(100), "ORDER"
 		if i >= 5 {

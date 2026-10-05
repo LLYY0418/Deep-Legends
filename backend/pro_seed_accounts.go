@@ -167,7 +167,11 @@ func (a *app) loadProSeedAccounts(ctx context.Context, previous []opggProTeam, s
 				a.rememberProSeedAnchor(ctx, key, row.PUUID)
 				cost.refreshed++
 			} else if a.riot != nil && riotKeyConfigured() && proSeedSelected(ctx, key) {
-				accountCtx, cancel := context.WithTimeout(seedCtx, proSeedPerAccountBudget)
+				timeout := a.proSeedTimeout
+				if timeout == nil {
+					timeout = context.WithTimeout
+				}
+				accountCtx, cancel := timeout(seedCtx, proSeedPerAccountBudget)
 				accountCtx = withRiotSingleWaitLimit(withRiotBackground(accountCtx), 100*time.Millisecond)
 				account, err := a.riot.resolveProSeed(accountCtx, seed, index)
 				if err == nil {

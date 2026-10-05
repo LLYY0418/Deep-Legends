@@ -354,6 +354,18 @@ func (a *app) checkArenaGroupTruthInput(client *LCUClient, serverID string, trut
 	}
 }
 
+// Injectable delay, retaining the production timer and cancellation semantics.
+func waitArenaTruthRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
 // Only end phases run this bounded read. SGP may publish stats a few seconds
 // after the gameflow event; normal overview reads also perform the same check.
 func (a *app) finishArenaGroupTruth(ctx context.Context, client *LCUClient) {
@@ -373,14 +385,15 @@ func (a *app) finishArenaGroupTruth(ctx context.Context, client *LCUClient) {
 	if a.sgp == nil || record.selfPUUID == "" {
 		return
 	}
+	wait := a.arenaTruthRetryWait
+	if wait == nil {
+		wait = waitArenaTruthRetry
+	}
 	for _, delay := range []time.Duration{0, 2 * time.Second, 5 * time.Second, 10 * time.Second} {
-		timer := time.NewTimer(delay)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
+		if err := wait(ctx, delay); err != nil {
 			return
-		case <-timer.C:
 		}
+
 		infos, _, _, err := a.sgp.matchHistoryOn(ctx, client, record.serverID, record.selfPUUID, 0, 5, false)
 		if ctx.Err() != nil {
 			return

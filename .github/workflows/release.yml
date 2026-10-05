@@ -38,7 +38,7 @@ jobs:
       - name: Build and verify public release
         shell: powershell
         run: |
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-public-release-windows.ps1 -Version $env:RELEASE_VERSION
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-public-release-windows.ps1 -Version $env:RELEASE_VERSION -SkipTestsInCI
           if ($LASTEXITCODE -ne 0) { throw "Public release build failed" }
       - name: Upload verified release files
         uses: actions/upload-artifact@v4

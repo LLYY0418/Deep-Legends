@@ -487,6 +487,18 @@ func TestR99SeedQuotaDiagnosticsNeverContainIdentity(t *testing.T) {
 	p := r99SeedProvider(t, t.TempDir(), func(r *http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: 429, Header: http.Header{"Retry-After": []string{"60"}}, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
 	})
+	clock := time.Now()
+	var slept time.Duration
+	p.limitNow = func() time.Time { return clock }
+	p.limitSleep = func(ctx context.Context, delay time.Duration) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		slept += delay
+		clock = clock.Add(delay)
+		return nil
+	}
+
 	var events []map[string]any
 	p.champions.diag = func(e map[string]any) { events = append(events, e) }
 	if _, err := p.resolveProSeed(context.Background(), r102RookieSeed(), 0); err == nil {
@@ -495,6 +507,10 @@ func TestR99SeedQuotaDiagnosticsNeverContainIdentity(t *testing.T) {
 	if _, err := p.fetchAccountByPUUID(context.Background(), "SECRET-STABLE-ID"); err == nil {
 		t.Fatal("expected quota rejection")
 	}
+	if slept != time.Minute {
+		t.Fatalf("quota cooldown changed: %v", slept)
+	}
+
 	raw, _ := json.Marshal(events)
 	if len(events) != 2 {
 		t.Fatalf("missing 429 diagnostics: %s", raw)

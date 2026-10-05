@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      measure_windows_renderers:
+        description: "R222 acceptance: run full desktop tests once on Windows and record budgets"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,18 +33,23 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Test with race detector
-        run: go test -race ./...
+        run: go test -count=1 -race ./...
       - name: Validate frontend JavaScript
         run: |
           node --check backend/web/app.js
           node --check backend/web/suite.js
           node --check desktop/main.cjs
-      - name: Validate frontend styles and assets
-        run: node --test backend/web/r117-style.test.cjs
       - name: Install desktop test dependencies
         run: npm ci --prefix desktop
       - name: Test frontend and desktop renderers
-        run: node --test backend/web/*.test.cjs desktop/*.test.cjs
+        env:
+          R222_NODE_TIMING_OUTPUT: ${{ runner.temp }}/renderer-timings-linux.json
+        run: node scripts/test-renderers.cjs all
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: renderer-timings-linux
+          path: ${{ runner.temp }}/renderer-timings-linux.json
       - name: Test Riot relay Worker
         run: node --test relay/riot-worker/*.test.mjs
       # P1-2：这两个脚本以前从不在任何流程里执行，护栏失效了半年没人发现。
@@ -57,12 +67,9 @@ jobs:
       - name: Vet installer module
         working-directory: installer
         run: go vet ./...
-      - name: Verify embedded pool
-        run: go test -run 'TestEmbeddedPoolHas554UniqueEntries|TestEmbeddedPoolMapsOneToOneWithoutOmissions' ./...
 
   windows-build:
     runs-on: windows-latest
-    needs: quality
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -76,12 +83,45 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - name: Install Windows test dependencies
         run: npm ci --prefix desktop
+      # Linux skips these platform gates; fail rather than skip PowerShell probes.
+      - name: Test Windows-only release and PowerShell guards
+        shell: pwsh
+        env:
+          R82_POWERSHELL: powershell.exe
+        run: |
+          go test ./backend -run '^(TestSplitRegistryPathSupportsNativeTencentKeys|TestR204KeySaveRejectsUnauthorizedAndEncrypts|TestR204KeyRuntime401AndPrivacy)$'
+          if ($LASTEXITCODE -ne 0) { throw "Windows backend guards failed" }
+          Push-Location installer
+          try {
+            go test ./... -run '^(TestWindowsApplicationWindowDetection|TestWindowsMissingApplicationDoesNotYieldAPID|TestR205WindowsShortcutRoundTrip|TestR205WindowsShortcutTargetAlias|TestR205WindowsKeepShortcutsStringValue|TestR205WindowsCOMAlreadyInitialized|TestR86WindowsDestinationPreflightSmoke|TestR86WindowsDialogDirectoryAndDiskHelpers|TestR206IconOnlyChangesIconAndPreservesCreation|TestSettingsUseHRESULTAcrossEntireConfiguration|TestCOMUsesHRESULTInsteadOfThreadLastError|TestFailedNavigationEventIsNotReadiness)$'
+            if ($LASTEXITCODE -ne 0) { throw "Windows installer guards failed" }
+          } finally { Pop-Location }
+          node --test --test-name-pattern="R86 Windows release|R222 Windows" desktop/release-quality-gates.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw "Windows release gates failed" }
+          node --test --test-name-pattern="setup-only Windows CI skip" scripts/setup-only-build.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw "Windows setup-only guards failed" }
+          node --test scripts/r82-startup-ab-script.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw "PowerShell script guards failed" }
+      # Opt-in acceptance only; routine tag/build runs rely on Linux's full suite.
+      - name: Measure full desktop renderer tests on Windows
+        if: github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers
+        shell: pwsh
+        env:
+          R222_NODE_TIMING_OUTPUT: ${{ runner.temp }}/renderer-timings-windows.json
+        run: |
+          node scripts/test-renderers.cjs desktop
+          if ($LASTEXITCODE -ne 0) { throw "Windows renderer test or time budget failed" }
+      - uses: actions/upload-artifact@v4
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers
+        with:
+          name: renderer-timings-windows
+          path: ${{ runner.temp }}/renderer-timings-windows.json
       - name: Build desktop client and checksums
         shell: pwsh
         run: |
           $version = node -p "require('./desktop/package.json').version"
           if ($LASTEXITCODE -ne 0) { throw "Unable to read desktop package version" }
-          ./build-desktop-windows.ps1 -Version $version -KeyMode public
+          ./build-desktop-windows.ps1 -Version $version -KeyMode public -SkipTestsInCI
           if ($LASTEXITCODE -ne 0) { throw "Desktop build failed" }
       - name: Verify checksums
         shell: pwsh

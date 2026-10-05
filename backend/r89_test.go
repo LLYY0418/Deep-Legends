@@ -88,6 +88,7 @@ func TestR89ImageNegativeCache(t *testing.T) {
 }
 
 func TestR89DiskBudgetAfter2000Images(t *testing.T) {
+	t.Parallel()
 	c := newPublicBinaryCache(&localStore{root: t.TempDir()}, "champion-images", 2048, 64<<20)
 	data := bytes.Repeat([]byte("x"), 48<<10)
 	for i := 0; i < 2000; i++ {

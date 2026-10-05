@@ -185,3 +185,14 @@ test("unchanged complete npm dependencies are reused; damage or a lock change re
   assert.equal(third.status, 0, third.stdout + third.stderr);
   assert.equal(calls().filter(value => value === "npm-ci").length, 3);
 });
+
+test("setup-only Windows CI skip leaves NSIS, wrapper and receipt gates unconditional", () => {
+  const source = fs.readFileSync(path.join(project, "build-desktop-windows.ps1"), "utf8");
+  const boundary = source.indexOf('$env:DEEP_LEGENDS_KEY_MODE = $KeyMode');
+  assert.ok(boundary > source.lastIndexOf('if (-not $SkipTestsInCI)'));
+  const packaging = source.slice(boundary);
+  assert.doesNotMatch(packaging, /\$SkipTestsInCI/);
+  for (const token of ['npm run pack:win-setup', 'build-shell.cjs', 'verify-packaged-runtime.cjs',
+    'verify-build-fingerprint.cjs', 'release-build.cjs', 'Get-FileHash -Algorithm SHA256']) assert.ok(packaging.includes(token), token);
+  assert.match(source, /SkipTestsInCI requires GITHUB_ACTIONS=true/);
+});

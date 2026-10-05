@@ -133,6 +133,7 @@ func TestR100SuccessfulDetailSurvivesCallerCancellation(t *testing.T) {
 }
 
 func TestR100AssetHasWholeHandlerDeadline(t *testing.T) {
+	t.Parallel()
 	p := newChampionProvider()
 	p.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		deadline, ok := r.Context().Deadline()

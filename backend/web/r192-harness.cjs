@@ -19,7 +19,7 @@ async function boot(){
  w.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};
  w.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
  w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.Element.prototype.scrollTo=()=>{};
- Object.assign(w,{structuredClone:globalThis.structuredClone,fetch:globalThis.fetch,Response:globalThis.Response,Headers:globalThis.Headers,Request:globalThis.Request});
+ Object.assign(w,{structuredClone:globalThis.structuredClone,fetch:(input,init)=>String(input).startsWith("/api/diagnostics/client")?Promise.resolve(new globalThis.Response("{}")):globalThis.fetch(input,init),Response:globalThis.Response,Headers:globalThis.Headers,Request:globalThis.Request});
  let closed=false;
  const close=()=>{if(closed)return;closed=true;w.dispatchEvent(new w.CustomEvent('deep-legends:dispose'));for(const observer of observers)observer.disconnect();w.close();};
  try {

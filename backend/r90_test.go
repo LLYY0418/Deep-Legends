@@ -86,7 +86,7 @@ func r90Fixture(t *testing.T, players []map[string]any, raw []byte) *app {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	return &app{connected: true, lcu: &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}, summoner: Summoner{PUUID: "r90-player-identity-01"}, storage: trackTestStore(t, &localStore{root: root}), liveClientPlayerList: func(context.Context) ([]byte, int, error) { return raw, http.StatusOK, nil }}
+	return &app{champions: r222OfflineChampions(), connected: true, lcu: &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}, summoner: Summoner{PUUID: "r90-player-identity-01"}, storage: trackTestStore(t, &localStore{root: root}), liveClientPlayerList: func(context.Context) ([]byte, int, error) { return raw, http.StatusOK, nil }}
 }
 
 func r90Events(t *testing.T, a *app, event string) []map[string]any {

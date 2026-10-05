@@ -3,10 +3,15 @@
     [string]$CertificateFile = "",
     [string]$CertificatePassword = "",
     [string]$RiotAPIKeyCipher = "",
-    [ValidateSet("private", "public")][string]$KeyMode = "private"
+    [ValidateSet("private", "public")][string]$KeyMode = "private",
+    [switch]$SkipTestsInCI
 )
 
 $ErrorActionPreference = "Stop"
+# R222: local builds must never bypass their fail-fast test gates.
+if ($SkipTestsInCI -and $env:GITHUB_ACTIONS -cne "true") {
+    throw "SkipTestsInCI requires GITHUB_ACTIONS=true"
+}
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $desktopRoot = Join-Path $projectRoot "desktop"
 $backendRoot = Join-Path $desktopRoot "backend"
@@ -90,34 +95,41 @@ try {
     $unformatted = @(gofmt -l $goSources)
     if ($LASTEXITCODE -ne 0) { throw "Go formatting check failed" }
     if ($unformatted.Count -gt 0) { throw "Go files are not formatted: $($unformatted -join ', ')" }
-    go test ./...
-    if ($LASTEXITCODE -ne 0) { throw "Root tests failed" }
-    go vet ./...
-    if ($LASTEXITCODE -ne 0) { throw "Root vet failed" }
-    Push-Location (Join-Path $projectRoot "installer")
-    try {
+    if (-not $SkipTestsInCI) {
         go test ./...
-        if ($LASTEXITCODE -ne 0) { throw "Installer tests failed" }
+        if ($LASTEXITCODE -ne 0) { throw "Root tests failed" }
         go vet ./...
-        if ($LASTEXITCODE -ne 0) { throw "Installer vet failed" }
-    } finally {
-        Pop-Location
+        if ($LASTEXITCODE -ne 0) { throw "Root vet failed" }
+        Push-Location (Join-Path $projectRoot "installer")
+        try {
+            go test ./...
+            if ($LASTEXITCODE -ne 0) { throw "Installer tests failed" }
+            go vet ./...
+            if ($LASTEXITCODE -ne 0) { throw "Installer vet failed" }
+        } finally {
+            Pop-Location
+        }
     }
 
     node --check backend/web/app.js
     if ($LASTEXITCODE -ne 0) { throw "backend/web/app.js syntax check failed" }
     node --check backend/web/champions.js
     if ($LASTEXITCODE -ne 0) { throw "backend/web/champions.js syntax check failed" }
-    $webTests = @(Get-ChildItem (Join-Path $projectRoot "backend\web\*.test.cjs") | ForEach-Object { $_.FullName })
-    node --test $webTests
-    if ($LASTEXITCODE -ne 0) { throw "Web tests failed" }
+    if (-not $SkipTestsInCI) {
+        $webTests = @(Get-ChildItem (Join-Path $projectRoot "backend\web\*.test.cjs") | ForEach-Object { $_.FullName })
+        node --test $webTests
+        if ($LASTEXITCODE -ne 0) { throw "Web tests failed" }
+    }
+
     node --check desktop/main.cjs
     if ($LASTEXITCODE -ne 0) { throw "desktop/main.cjs syntax check failed" }
     node --check desktop/proxy-resolution.cjs
     if ($LASTEXITCODE -ne 0) { throw "desktop/proxy-resolution.cjs syntax check failed" }
-    $desktopTests = @(Get-ChildItem (Join-Path $desktopRoot "*.test.cjs") | ForEach-Object { $_.FullName })
-    node --test $desktopTests
-    if ($LASTEXITCODE -ne 0) { throw "Desktop tests failed" }
+    if (-not $SkipTestsInCI) {
+        $desktopTests = @(Get-ChildItem (Join-Path $desktopRoot "*.test.cjs") | ForEach-Object { $_.FullName })
+        node --test $desktopTests
+        if ($LASTEXITCODE -ne 0) { throw "Desktop tests failed" }
+    }
 
     $env:DEEP_LEGENDS_KEY_MODE = $KeyMode
 

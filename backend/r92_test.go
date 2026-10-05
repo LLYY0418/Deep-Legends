@@ -14,6 +14,7 @@ import (
 )
 
 func TestR92RiotMatchConcreteDiskBudget(t *testing.T) {
+	t.Parallel()
 	p := newChampionProvider()
 	p.cache = newChampionDataCache(&localStore{root: t.TempDir()})
 	c := newRiotMatchDiskCache(p)

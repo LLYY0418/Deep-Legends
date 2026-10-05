@@ -352,7 +352,13 @@ func TestR102SeedOneAccountFailureDoesNotBlockOthers(t *testing.T) {
 		}
 		return r102AccountResponse(r), nil
 	})
-	rows := (&app{riot: p}).loadProSeedAccounts(context.Background(), nil, []proSeedAccount{seed})
+	a := &app{riot: p, proSeedTimeout: func(ctx context.Context, budget time.Duration) (context.Context, context.CancelFunc) {
+		if budget != 4*time.Second {
+			t.Fatalf("account timeout changed: %v", budget)
+		}
+		return context.WithTimeout(ctx, 200*time.Millisecond)
+	}}
+	rows := a.loadProSeedAccounts(context.Background(), nil, []proSeedAccount{seed})
 	if len(rows) != 1 || len(rows[0].Members[0].Summoners) != 3 {
 		t.Fatal("failed account discarded", rows)
 	}

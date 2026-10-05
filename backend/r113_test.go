@@ -65,6 +65,7 @@ func TestR113ChatJIDAndPhaseCancellation(t *testing.T) {
 }
 
 func TestR113BroadcastEventStormIsBoundedAndRearmsNextSession(t *testing.T) {
+	t.Parallel()
 	var reads atomic.Int32
 	client := &LCUClient{baseURL: "http://fixture", token: "fixture", http: &http.Client{Transport: gameplayRoundTripFunc(func(req *http.Request) (*http.Response, error) {
 		return nil, errors.New("session not ready")

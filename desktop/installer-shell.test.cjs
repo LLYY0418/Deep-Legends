@@ -83,7 +83,12 @@ test("both release entry points wrap NSIS before hashes and before deleting win-
     const wrap = source.indexOf("build-shell.cjs", pack);
     const hash = Math.max(source.lastIndexOf("shasum -a 256"), source.lastIndexOf("Get-FileHash -Algorithm SHA256"));
     assert.ok(pack >= 0 && wrap > pack && hash > wrap, name);
-    if (name.endsWith("ps1")) assert.ok(source.indexOf("Remove-Item -Recurse -Force $unpackedDirectory") > wrap);
+    if (name.endsWith("ps1")) {
+      assert.ok(source.indexOf("Remove-Item -Recurse -Force $unpackedDirectory") > wrap);
+      assert.ok(source.indexOf('$env:DEEP_LEGENDS_KEY_MODE = $KeyMode') < pack);
+      assert.ok(source.lastIndexOf('if (-not $SkipTestsInCI)') < source.indexOf('$env:DEEP_LEGENDS_KEY_MODE = $KeyMode'), "packaging and verification stay outside test skip blocks");
+      assert.match(source, /SkipTestsInCI requires GITHUB_ACTIONS=true/);
+    }
   }
 });
 

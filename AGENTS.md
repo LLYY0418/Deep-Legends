@@ -17,3 +17,10 @@
 - 日志完备：排障场景把能想到的地方都补上日志，避免二次返工。
 - 构建打包：改动后必须重新构建并确认版本号最新；用户通常自己打包。验证性打包的账本必须记明 key mode；public 产物必须带 `-public` 文件名后缀，验证完只保留这种可识别的名称，不能留下与 private 同名的包。
 - 沟通：中文、简短直接、给出确定答案。
+
+## 发布步骤（R222）
+
+1. 本地预检**全部通过**后，才更新并提交发布版本号（package.json、lockfile、CHANGELOG）；预检失败不推 tag、不占用新版本号。预检至少包含根模块 Go 全量/race/vet、installer test/vet、JS syntax、`node scripts/test-renderers.cjs all`、Worker 测试与真实 Chromium 护栏。任何源码或夹具修复后重跑受影响检查，再确认全部结果对应最终源码。
+2. 发布提交**只推 tag**（tag 已携带提交），不同时推同一提交到 `codex/release-*` 分支。确需保存发布分支，等 tag 的工作流结束后再推。这是 R222 选定的去重方式；日常开发/验收分支正常使用 CI。
+3. `release.yml` 只生成 public 草稿。发布 Latest 前必须看到 **同一 SHA 的完整 `quality-and-windows-release` 工作流 `conclusion=success`**（Linux quality、Windows 专属测试、构建/校验和实际升级均成功），不能只凭 release 作业成功发布。
+4. 按 [发布账本模板](docs/release-ledger-template.md) 记录开始、预检结束、tag、各作业起止、可发布 Latest、实际发布时刻；记录 SHA、key mode、指纹和工作流链接。tag→可发布 Latest 目标 ≤15 分钟，完整发布目标 ≤30 分钟。首次采用 R222 时手动启用 CI 的 `measure_windows_renderers`，记录 Windows 桌面全量 ≤4 分钟、每文件 ≤90 秒；日常发版不启用该一次性验收选项。
