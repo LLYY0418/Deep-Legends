@@ -100,7 +100,7 @@ test('R188 preselection caps four candidates at three, narrow rule hides the thi
 });
 test('R188 notice follows matchup slot without entering panels', () => {
   const f = h({notice: '我的小队'}), d = dom();
-  try { d.window.document.querySelector('main').innerHTML = f.renderRecommendationArea(f.data); assert.deepEqual([...d.window.document.querySelector('.recommendation-tab-row').children].map(e => e.className || 'slot'), ['recommendation-tabs', 'slot', 'live-roster-notice']); }
+  try { d.window.document.querySelector('main').innerHTML = f.renderRecommendationArea(f.data); assert.deepEqual([...d.window.document.querySelector('.recommendation-tab-row').children].map(e => e.className || 'slot'), ['recommendation-tabs', 'slot', 'slot']); }
   finally { d.window.close(); }
 });
 test('R188 pending to success and hidden preserve tab buttons, focused tab, and fixed slot', () => {

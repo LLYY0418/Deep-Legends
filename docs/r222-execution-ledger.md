@@ -2,7 +2,7 @@
 
 日期：2026-10-05（北京时间）。基线：0.12.73，HEAD `4f27d413`；不改用户功能、7z level 9 和在线升级流程。
 
-状态：实现与本地普通全量预检通过，最终 race 及同 SHA Linux/Windows CI 验收进行中；正式发布耗时留待下次发版记录。本次不推 tag、不发布 Latest。
+状态：P1—P4 实现及同 SHA Linux/Windows 完整 CI 验收通过；正式发布耗时留待下次发版记录。本次不推 tag、不发布 Latest。以下本地/前三轮记录为过程证据，最终结论以末尾验收表为准。
 
 ## P1：测试去重与 Windows 覆盖
 
@@ -26,7 +26,7 @@ Windows 编译约束及平台分支不能被 Linux 替代，windows-build 还单
 
 | 模块 | Windows 用例 |
 | --- | --- |
-| backend | TestSplitRegistryPathSupportsNativeTencentKeys；TestR204KeySaveRejectsUnauthorizedAndEncrypts；TestR204KeyRuntime401AndPrivacy |
+| backend | TestSplitRegistryPathSupportsNativeTencentKeys；TestR204KeySaveAndClear；TestR204KeyRuntime401AndPrivacy |
 | installer | TestWindowsApplicationWindowDetection；TestWindowsMissingApplicationDoesNotYieldAPID；TestR205WindowsShortcutRoundTrip；TestR205WindowsShortcutTargetAlias；TestR205WindowsKeepShortcutsStringValue；TestR205WindowsCOMAlreadyInitialized；TestR86WindowsDestinationPreflightSmoke；TestR86WindowsDialogDirectoryAndDiskHelpers；TestR206IconOnlyChangesIconAndPreservesCreation |
 | installer/internal/webviewhost | TestSettingsUseHRESULTAcrossEntireConfiguration；TestCOMUsesHRESULTInsteadOfThreadLastError；TestFailedNavigationEventIsNotReadiness |
 
@@ -46,7 +46,7 @@ AGENTS.md 已明确本地预检全部通过→提交版本号→只推 tag。采
 
 ## P4：Go 慢用例实测
 
-基线 `go test -json ./backend` 通过，包 261.368s（本机 macOS arm64；不能当作 Linux race）。前 20 个顶层用例如下，原始 JSON 见 reports/r222/backend-before.jsonl.gz。
+基线 `go test -json ./backend` 通过，包 261.368s（本机 macOS arm64；不能当作 Linux race）。前 20 个顶层用例如下，原始 JSON 仅留本地 reports/r222/backend-before.jsonl.gz；公开汇总见 reports/r222/backend-before-top20.json。
 
 | 用例 | 基线秒 |
 | --- | ---: |
@@ -89,7 +89,7 @@ AGENTS.md 已明确本地预检全部通过→提交版本号→只推 tag。采
 
 ## CI 与最终结果
 
-待写入同 SHA 的 Linux quality、Windows 专属/全量桌面计时/public 构建/实际升级结果。正式发布 tag→可发布 ≤15min、全流程 ≤30min 的验收要在下一次真实发版账本记录，不能用本次分支 CI 的预计值代替。
+同 SHA 的最终结果见末尾验收表。正式发布 tag→可发布 ≤15min、全流程 ≤30min 的验收要在下一次真实发版账本记录，不能用本次分支 CI 的预计值代替。
 
 最终本地 `go test -count=1 ./backend` 在最后一次 Go 修改后执行，通过，耗时 **117.097s**；输出：
 
@@ -102,3 +102,66 @@ ok  lol-loot-assistant/backend 117.097s
 最终源码 `go test -count=1 -race ./...` 全量通过，backend **209.067s（macOS）**。Linux race ≤120s 门槛仍须 CI 实测，不能把本机普通测试的 117.097s 代作 race 验收。
 
 公开验收分支只提交代码、文档和不含载荷的汇总 JSON；原始/压缩测试日志仅保存在本地 `docs/history/reports/r222/`。暂存内容已核验无 Riot UUID Key、GitHub token 或私钥模式。
+
+第一次 CI `37308442468`，SHA `270fc3af`：Windows backend/installer/R86/R222/setup-only 专项先通过；首次接入的 R82 PowerShell 5.1 夹具报 `Get-FileHash` 不可用。原因是 pwsh 作业向 powershell.exe 子进程传入了 PowerShell 7 的 PSModulePath；测试 launcher 现在仅针对 Windows PowerShell 子进程清理该环境项，由宿主重建原生模块路径，保留真实哈希与全部变异检查。修复在独立工作树完成，不接触并行 R223 改动。
+
+第二次 CI `37309200638`，SHA `bd8a72b7`：PSModulePath 修复有效，真实哈希及前八组夹具通过；随后 PS5.1 的 ConvertFrom-Json 顶层数组不枚举，让测试的三条记录 Count 变成 1。仅在 harness 读取后加 ForEach-Object 显式展开，真实脚本不改，全部 16 组和 7 个 mutant 断言保留。
+
+首次 Linux race 实测 **152.140s**，Node **244.784s**（1262 项，1260 pass、2 skip、0 fail；所有文件 <90s），均未达到门槛。继续将 Node 文件 worker 由核心数减一改为使用全部核心；8 个无共享状态的 CPU/大夹具用例加 t.Parallel，并给相同百万 GameID/season cache 夹具预分配等容量。数量、内容、nil/empty 语义、断言与门槛不变。新增并行用例为 season budget 的五项、R216 observed OPGG HTML、R203 五场缓存稳定、R86 300 页预算。
+
+该轮最终本地 race 全量 **143.669s** 通过（macOS）；Linux ≤120s 仍待同 SHA CI 证明。
+
+进一步优化后本地 Node 预算 runner：1262 项，1258 pass、4 平台 skip、0 fail，**113.528s**；8 workers，最大文件 external **70.437s**，全部文件 ≤90s。
+
+第三轮 CI `37311010804`，SHA `b2d8413d`：Linux 完整 quality 成功，backend race **119.290s**，Node **234.984s**（1262 项，1260 pass、2 skip、0 fail；最慢 external 73.181s）。Windows 专属 Go/Node/PowerShell 全通过；desktop **215.353s**（284 项，282 pass、2 Linux/Bash skip、0 fail），但 external 文件 **91.981s** 超过 90s，images 87.805s。保持所有样本与断言，将 Windows jsdom worker 从 4 限至 3，降低大夹具并发争用；Linux 仍使用全部核心，时间门槛不变。
+
+最终隔离工作树普通 Go 全量 **124.767s** 通过（与 Node 同时运行的 macOS 测量），vet 通过；最终 public 后端再次构建/自检/指纹核验通过，仍为 0.12.73 / be7741263b5b。
+
+## 最终验收（第四轮）
+
+[完整 quality-and-windows-release 37312091768](https://github.com/LLYY0418/Deep-Legends/actions/runs/37312091768) **success**，源码 SHA `7363fa8f`。quality 与 windows-build 20:48:28/20:48:29 并行开始，分别 20:55:36/20:59:25 结束；完整运行 **10 分 57 秒**，包含一次性 Windows 全量桌面计时。它是分支验收，不替代正式发版时间线。
+
+| 验收 | 实际结果 | 门槛 |
+| --- | --- | --- |
+| Linux backend race | **116.493s，全量通过** | ≤120s |
+| Linux web/desktop/scripts | **216.631s**，1262 项，1260 pass、2 Windows skip、0 fail | ≤240s |
+| Linux 最慢文件 | external **79.601s** | 每文件 ≤90s |
+| Windows desktop | **194.356s**，284 项，282 pass、2 Linux/Bash skip、0 fail | ≤240s |
+| Windows 最慢文件 | external **58.311s** | 每文件 ≤90s |
+| Windows 专属 backend/installer/R86/R222/setup-only/R82 PS5.1 | 全部通过，R82 16 组夹具及 7 个 mutant kill 通过 | 不丢平台测试 |
+| Linux Worker、Chromium、installer test/vet、syntax、格式、root vet | 全部通过 | 完整 quality |
+| Windows public 构建、runtime、指纹、receipt、SHA256 | 全部通过；0.12.73 / be7741263b5b，安装包带 `-public` | 保留打包校验 |
+| Windows 真实安装升级 | 0.12.65→0.12.68→本次 public，**14.014s**；卸旧 2.249s、解压 8.229s、8 阶段，图标位置/创建时间稳定 | 原真实升级护栏 |
+
+逐文件计时及无载荷结果：`docs/history/reports/r222/node-timings-ci-linux.json`、`node-timings-ci-windows.json`、`ci-validation-summary.json`。原始 CI 日志及升级详细事件只留本地；自动审批曾拒绝强制提交原始日志到公开仓库，已改为仅公开代码、文档和汇总证据。
+
+**唯一后续验收**：下一次正式发布按 `docs/release-ledger-template.md` 记录 tag→可发布 Latest ≤15min、开始→正式 Latest ≤30min。本次没有实际发版，不能将分支 CI 的 10:57 写成这两项已通过。R222 工单与账本因此暂留 docs 根目录。
+
+## R226 追加耗时核对（2026-10-05）
+
+R223 本地 renderer 集合与其它重验证同时执行，记录 **277.877 秒**、1 个 R70 断言失败，并有以下 8 个文件超过 90 秒。这里是 `test-renderers.cjs` 的文件/集合预算失败，**不是 GitHub Actions 作业硬超时**；原记录保留，不通过扩大门槛处理。
+
+| R223 文件 | 秒 |
+| --- | ---: |
+| desktop/overview-render-career.test.cjs | 142.575 |
+| desktop/overview-render-controls-mutants.test.cjs | 109.894 |
+| desktop/overview-render-200-timeline.test.cjs | 173.685 |
+| desktop/overview-render-200-filter.test.cjs | 174.385 |
+| desktop/overview-render-200-expand.test.cjs | 178.216 |
+| desktop/overview-render-200-controls.test.cjs | 191.341 |
+| desktop/overview-render-200-images.test.cjs | 215.090 |
+| desktop/overview-render-200-external.test.cjs | 217.803 |
+
+R226 修复隐藏页提前改写诊断状态后，单独运行原命令、原 8 workers、原 90/240 秒门槛：**1275 项，1271 pass、4 平台 skip、0 fail，78.352 秒**，最慢 requests **42.842 秒**，没有文件超预算。没有修改 runner 并发配置或测试断言。
+
+另读前三轮真实 Linux quality 日志：R192/R206 所有相关断言均 PASS，Node 断言失败数均为 0。37308442468/37309200638 的集合实际 **244.784/246.326 秒**，所以总预算返回 exit 1；37311010804 的 **234.984 秒**通过。第四轮 **216.631 秒**通过。没有观察到 R192 挂载或 R206 100ms 队列在这四轮 CI 中失败，不能把本地负载抖动写成 CI 已偶发。当前工作区的新源码尚未触发 CI。
+
+CI 不需要基于现有证据降低某个文件并发；若未来真实 CI 出现同类命名失败，先把 `backend/web/r192.test.cjs`、`backend/web/r206-collection-image.test.cjs` 的调度与 200 场 jsdom 大文件错峰，保持断言/时限。原 Windows 3-worker 上限保持不变。
+
+详细证据见 [R226 账本](r226-execution-ledger.md)、[CI 核对汇总](history/reports/r226/ci-flake-review.json)、[本轮完整计时](history/reports/r226/node-timings-local.json)。正式发布的时间线要求仍按上文执行。
+
+## R225 核验纠正
+
+上文 R222 三项 Windows backend 名单原第二项误写为不存在的函数，实际 CI 只匹配了另外两项，未证明 DPAPI 保存/重载已在 Windows 测试通过。上表名称已修正；[R225 账本](history/ledgers/r225-execution-ledger.md) 记录恢复完整 Windows backend/installer 的方案、逐函数路径映射和防空匹配守卫。R222 的 renderer 提速、生产默认时钟与原断言保留结论不变；Windows 后端覆盖结论以后续 R225 同 SHA 实跑为准。
+
+R225 最终补验：源码 b46dac17，完整 CI 37322933047 success（12:00）；Windows backend 包 97.174s，全套 Go 测试关键 82 项全部 pass，18 项更新与真实 DPAPI 保存/重载通过；installer 99/99，Node 筛选 2/1/2、0 skip。此前 Windows 覆盖缺口现已修复。

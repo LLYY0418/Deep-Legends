@@ -8,7 +8,7 @@ const noop=()=>{};
 test('R110 tab selection, progress and unrelated scroll preserve all existing avatar nodes',()=>{
  const dom=new JSDOM('<nav></nav>');try{
   const tabs=dom.window.document.querySelector('nav'),state={tabs:[{key:'a',icon:1,label:'Alpha'},{key:'b',icon:2,label:'Beta'},{key:'c',icon:3,label:'Gamma'}],activeTabs:{kr:'a'},settings:{}},scrolls=[];
-  const {renderPlayerTabWorkspace:render}=compile(['renderPlayerTabWorkspace'],{state,document:dom.window.document,overviewWorkspace:()=>({tabs}),tabGroup:()=> 'kr',connected:()=>true,riotTab:()=>true,escapeHTML:String,assetPath:(_k,id)=>`/${id}`,assetIcon:url=>`<img data-queued-src="${url}">`,prepareImages:noop,requestAnimationFrame:f=>f(),updatePlayerTabScrollControls:(_g,selected)=>scrolls.push(selected)});
+  const {renderPlayerTabWorkspace:render}=compile(['renderPlayerTabWorkspace'],{state,document:dom.window.document,overviewWorkspace:()=>({tabs}),tabGroup:()=> 'kr',connected:()=>true,riotTab:()=>true,tabServerLabel:()=> '韩服',escapeHTML:String,assetPath:(_k,id)=>`/${id}`,assetIcon:url=>`<img data-queued-src="${url}">`,prepareImages:noop,requestAnimationFrame:f=>f(),updatePlayerTabScrollControls:(_g,selected)=>scrolls.push(selected)});
   render('kr');const images=[...tabs.querySelectorAll('img')],wraps=[...tabs.children];
   for(let n=0;n<10;n++)render('kr');
   state.activeTabs.kr='b';render('kr');

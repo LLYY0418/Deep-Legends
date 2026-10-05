@@ -264,7 +264,7 @@ func TestR216PresenceRoundTripAndExtraFields(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"participantId":1,"totalDamageTaken":0,"damageSelfMitigated":0,"doubleKills":2,"challenges":{"dragonTakedowns":0}}`), &raw); err != nil {
 		t.Fatal(err)
 	}
-	if raw.TotalDamageTaken == nil || *raw.TotalDamageTaken != 0 || raw.DamageSelfMitigated == nil || raw.TotalHealsOnTeammates != nil || raw.Challenges.DragonTakedowns == nil {
+	if raw.TotalDamageTaken == nil || *historyIntValue(raw.TotalDamageTaken) != 0 || raw.DamageSelfMitigated == nil || raw.TotalHealsOnTeammates != nil || raw.Challenges.DragonTakedowns == nil {
 		t.Fatal(raw)
 	}
 	b, _ := json.Marshal(raw)

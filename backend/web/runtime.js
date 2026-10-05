@@ -179,7 +179,7 @@
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
-    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "overview_dirty_rescan"].includes(event)) return;
+    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_roster_duplicate_dropped", "stale_team_two_dropped", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "overview_dirty_rescan"].includes(event)) return;
     // Sample local requests by fixed endpoint category so status polling cannot
     // hide page timings. Delivery stays bounded and sampled events never retry.
     const sampled = event === "live_refresh_client" || event === "local_request_client";
@@ -250,8 +250,12 @@
     for (const key of ["requestedPosition", "resolvedPosition"]) {
       if (["all", "top", "jungle", "middle", "bottom", "utility", "mid", "adc", "support"].includes(fields[key])) body[key] = fields[key];
     }
+    if (["live_roster_duplicate_dropped", "stale_team_two_dropped"].includes(event)) {
+      for (const key of ["count", "queueId", "gameId"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(key === "gameId" ? 1e13 : 10000, Math.floor(fields[key])));
+    }
     if (event === "live_render_rebuild") {
-      for (const [field,allowed] of [["counts",["full","status","runes","build","insight"]],["sources",["direct","manual","interval","sse","event","poll","resync","recommendation","rune","catalog","progress","unknown"]],["fullReasons",["tab-row","banner","panel-count","lane-slot","other"]]]) {
+      if (/^[a-zA-Z0-9_.-]{1,120}$/.test(fields.shellNode || "")) body.shellNode = fields.shellNode;
+      for (const [field,allowed] of [["counts",["full","status","runes","build","insight","banner","tabs"]],["sources",["direct","manual","interval","sse","event","poll","resync","recommendation","rune","catalog","progress","unknown","load","timer","navigation","selection","settings","tabs","image"]],["fullReasons",["tab-row","banner","panel-count","lane-slot","other"]]]) {
         body[field] = {};
         for (const key of allowed) if (Number.isFinite(fields[field]?.[key])) body[field][key] = Math.max(0,Math.min(1000000,Math.floor(fields[field][key])));
       }

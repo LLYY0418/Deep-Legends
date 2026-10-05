@@ -145,7 +145,7 @@ test("R128 §2.3-C 状态/错误/数据回退提示保留不动", () => {
   assert.match(gameplayScript, /当前模式的出装与技能暂参考极地大乱斗数据/);
   assert.match(gameplayScript, /版本，仅供参考/);
   // 悬浮才出现的公式说明与「本地估算」「第三方估算」小标签。
-  assert.match(gameplayScript, /对手基准来自这名玩家排位中的同位置对手样本聚合/);
+  assert.doesNotMatch(gameplayScript, /对手基准来自这名玩家排位中的同位置对手样本聚合/);
   assert.match(gameplayScript, /第三方估算/);
   assert.match(championsScript, /本地估算/);
 });

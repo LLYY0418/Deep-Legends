@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+// Both execution and read-only postflight use this predicate. Bravery may
+// resolve to a positive champion only after the client's pick is completed.
+func champSelectSubmissionApplied(record champSelectSubmitRecord, observed lcuChampSelectAction, found bool) bool {
+	return found && (!record.Completed || observed.Completed) && (observed.ChampionID == record.ChampionID || record.ChampionID == -3 && record.Completed && observed.Completed && observed.Type == "pick" && observed.ChampionID > 0)
+}
+
 const champSelectMaxWriteAttempts = 2 // Initial attempt plus one fresh-state recovery.
 
 func champSelectDecisionStep(d champSelectDecision) string {
@@ -129,7 +135,7 @@ func (r *watchRunner) reconcileChampSelectSubmissions(session lcuChampSelectSess
 				}
 			}
 		}
-		applied := found && observed.ChampionID == record.ChampionID && (!record.Completed || observed.Completed)
+		applied := champSelectSubmissionApplied(record, observed, found)
 		if !applied && time.Since(record.At) < 2*time.Second {
 			continue
 		}
@@ -149,17 +155,17 @@ func (r *watchRunner) reconcileChampSelectSubmissions(session lcuChampSelectSess
 			}
 		} else {
 			if d.Action == champSelectActionPick {
-				if r.champSelect.pickFailures[id] == nil {
-					r.champSelect.pickFailures[id] = map[int64]int{}
+				if r.champSelect.pickFailures[champSelectPickStepKey(id, champSelectDecisionStep(d))] == nil {
+					r.champSelect.pickFailures[champSelectPickStepKey(id, champSelectDecisionStep(d))] = map[int64]int{}
 				}
-				r.champSelect.pickFailures[id][d.ChampionID]++
-				attempts = r.champSelect.pickFailures[id][d.ChampionID]
+				r.champSelect.pickFailures[champSelectPickStepKey(id, champSelectDecisionStep(d))][d.ChampionID]++
+				attempts = r.champSelect.pickFailures[champSelectPickStepKey(id, champSelectDecisionStep(d))][d.ChampionID]
 			}
 			if d.Action == champSelectActionPick && attempts >= champSelectMaxWriteAttempts {
-				if r.champSelect.pickFailed[id] == nil {
-					r.champSelect.pickFailed[id] = map[int64]bool{}
+				if r.champSelect.pickFailed[champSelectPickStepKey(id, champSelectDecisionStep(d))] == nil {
+					r.champSelect.pickFailed[champSelectPickStepKey(id, champSelectDecisionStep(d))] = map[int64]bool{}
 				}
-				r.champSelect.pickFailed[id][d.ChampionID] = true
+				r.champSelect.pickFailed[champSelectPickStepKey(id, champSelectDecisionStep(d))][d.ChampionID] = true
 			}
 			delete(r.champSelect.submitted, id)
 			if r.champSelect.decision[d.Action].TraceID == d.TraceID {
@@ -184,13 +190,31 @@ func (r *watchRunner) reconcileChampSelectSubmissions(session lcuChampSelectSess
 			r.champDiagnostic("confirmation", reason, d, map[string]any{"timer_phase": session.Timer.Phase, "attempt": attempts, "observed_champion_id": observed.ChampionID, "observed_completed": observed.Completed})
 			detail := map[string]string{"retry-after-fresh-state": "重新核验本回合后最多再尝试一次", "action-or-phase-ended": "回合已结束，不再补发", "attempt-limit": "已停止尝试，请手动操作"}[reason]
 			r.mu.Lock()
-			advancing := d.Action == champSelectActionPick && reason == "attempt-limit" && len(r.champSelect.pickAttempts[d.ActionID]) < 3
+			advancing := false
+			if d.Action == champSelectActionPick && reason == "attempt-limit" {
+				config := r.settings.ChampSelect.Groups[r.champSelect.groupID].Pick
+				definition, _ := champSelectGroupDefinitionFor(r.champSelect.groupID)
+				pool, _ := champSelectConfiguredPool(config, definition, champSelectAssignedPosition(session), "pick")
+				for _, candidate := range pool {
+					if candidate == d.ChampionID || !r.champSelectPickBudgetLocked(d.ActionID, candidate, champSelectDecisionStep(d)) {
+						continue
+					}
+					available, _ := chooseChampSelectCandidate("pick", []int64{candidate}, r.champSelect.pickable, r.champSelect.grid, config.AvoidTeammateIntent, r.champSelect.groupID == "arena")
+					if available != 0 {
+						advancing = true
+						break
+					}
+				}
+			}
 			r.mu.Unlock()
 			if advancing {
 				detail = ""
 			}
 			r.champSelectDecisionLog(d, "warn", fmt.Sprintf("英雄 %d 的请求未在客户端生效（第 %d/%d 次）%s", d.ChampionID, attempts, champSelectMaxWriteAttempts, map[bool]string{true: "：" + detail, false: ""}[detail != ""]), d.ChampionID)
 			r.champSelectDecisionEmit(d, "watch:canceled:"+d.Action)
+			if reason == "attempt-limit" && !advancing {
+				r.champSelectStopped(d, reason)
+			}
 		}
 	}
 }
@@ -244,13 +268,16 @@ func (r *watchRunner) champSelectFreshCandidate(ctx context.Context, client *LCU
 	r.mu.Unlock()
 	pool := []int64{d.ChampionID}
 	if side == "pick" {
-		available = r.champSelectRecoverableCandidates(d.ActionID, available)
+		available = r.champSelectRecoverableCandidates(d.ActionID, available, champSelectDecisionStep(d))
 		if session.AllowSubsetChampionPicks {
 			r.mu.Lock()
 			pool = append([]int64{}, config.Champions[r.champSelect.position]...)
 			r.mu.Unlock()
 
 		}
+	}
+	if side == "pick" {
+		pool = r.champSelectRecoverablePool(d.ActionID, pool, champSelectDecisionStep(d))
 	}
 	candidate, reasons := chooseChampSelectCandidate(side, pool, available, grid, config.AvoidTeammateIntent, arena)
 	if candidate != d.ChampionID {

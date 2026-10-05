@@ -1,0 +1,16 @@
+{
+  "command": [
+    "env",
+    "R224_SCREENSHOTS_ONLY=1",
+    "R224_BROWSER_IDLE_MS=1000",
+    "node",
+    "scripts/r224-browser.cjs"
+  ],
+  "start": "2026-10-05T21:25:19.826876+08:00",
+  "end": "2026-10-05T21:25:27.704521+08:00",
+  "seconds": 7.877,
+  "exit_code": 0,
+  "last_5_lines": [
+    "{\"platform\":\"darwin\",\"engine\":\"Headless Chromium\",\"evidence\":\"synthetic offline demo, not Windows/LCU, no real-game recording\",\"modes\":[{\"mode\":\"rift\",\"elapsedMs\":3432,\"rows\":10,\"bodyPreserved\":true,\"imagesPreserved\":true,\"rowsPreserved\":true,\"rebuilds\":[]},{\"mode\":\"hextech\",\"elapsedMs\":3055,\"rows\":10,\"bodyPreserved\":true,\"imagesPreserved\":true,\"rowsPreserved\":true,\"rebuilds\":[]},{\"mode\":\"aram\",\"elapsedMs\":2664,\"rows\":10,\"bodyPreserved\":true,\"imagesPreserved\":true,\"rowsPreserved\":true,\"rebuilds\":[]},{\"mode\":\"arena\",\"elapsedMs\":1892,\"rows\":18,\"bodyPreserved\":true,\"imagesPreserved\":true,\"rowsPreserved\":true,\"rebuilds\":[]},{\"mode\":\"practice\",\"elapsedMs\":1405,\"rows\":1,\"bodyPreserved\":true,\"imagesPreserved\":true,\"rowsPreserved\":true,\"rebuilds\":[]},{\"mode\":\"urf\",\"elapsedMs\":1038,\"rows\":10,\"bodyPreserved\":true,\"imagesPreserved\":true,\"rowsPreserved\":true,\"rebuilds\":[]}],\"errors\":[]}"
+  ]
+}

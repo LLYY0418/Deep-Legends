@@ -647,8 +647,8 @@ func TestLCUFullHistoryPageKeepsPaginationOpen(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(history)
 	}))
 	defer server.Close()
-	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client(), platformProbe: true, region: "NA"}
-	a := &app{sgp: newSGPProvider()}
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client(), platformProbe: true, region: "TENCENT", rsoPlatform: "HN1"}
+	a := &app{}
 	matches, capabilities, pagination := a.loadDetailedMatches(context.Background(), client, gameplayReference{}, strings.Repeat("p", 48), true, 0, count, "all", nil, nil)
 	if len(matches) != count || !pagination.HasMore || pagination.Total != 0 {
 		t.Fatalf("matches=%d pagination=%#v", len(matches), pagination)
@@ -2041,7 +2041,7 @@ func TestNormalizeGameplayMatchIncludesStatPerks(t *testing.T) {
 	participant.Stats.PerkPrimaryStyle = 8000
 	participant.Stats.PerkSubStyle = 8300
 	controlWardsBought := 0
-	participant.Stats.VisionWardsBoughtInGame = &controlWardsBought
+	participant.Stats.VisionWardsBoughtInGame = historyInt(controlWardsBought)
 	game.ParticipantIdentities = []lcuParticipantIdentity{identity}
 	game.Participants = []lcuParticipant{participant}
 
@@ -2577,7 +2577,7 @@ func TestR58InProgressKeepsGameflowRoster(t *testing.T) {
 		case "/lol-gameflow/v1/session":
 			_ = json.NewEncoder(w).Encode(map[string]any{"gameData": map[string]any{
 				"gameId": int64(8962886592), "queue": map[string]any{"id": 420, "mapId": 11, "gameMode": "CLASSIC"},
-				"teamOne": players[:9], "teamTwo": players[9:],
+				"teamOne": players, "teamTwo": []any{},
 			}})
 		default:
 			http.Error(w, "not available", http.StatusNotFound)
@@ -2620,7 +2620,7 @@ func TestR58LiveClientPlayerListGroupsSixArenaTeamsAndRedactsDiagnostics(t *test
 		case "/lol-gameflow/v1/session":
 			_ = json.NewEncoder(w).Encode(map[string]any{"gameData": map[string]any{
 				"gameId": int64(9001), "queue": map[string]any{"id": 1750, "mapId": 30, "gameMode": "CHERRY"},
-				"teamOne": gameflowPlayers[:9], "teamTwo": gameflowPlayers[9:],
+				"teamOne": gameflowPlayers, "teamTwo": []any{},
 			}})
 		default:
 			http.Error(w, "not available", http.StatusNotFound)
@@ -2791,7 +2791,7 @@ func TestR58LiveClientPlayerListUnavailableFallsBackWithoutError(t *testing.T) {
 		case "/lol-gameflow/v1/session":
 			_ = json.NewEncoder(w).Encode(map[string]any{"gameData": map[string]any{
 				"gameId": int64(9002), "queue": map[string]any{"id": 1750, "mapId": 30, "gameMode": "CHERRY"},
-				"teamOne": players[:9], "teamTwo": players[9:],
+				"teamOne": players, "teamTwo": []any{},
 			}})
 		default:
 			http.Error(w, "not available", http.StatusNotFound)
@@ -2884,8 +2884,8 @@ func TestR62ArenaPlayerListRetriesAndGroupsSeventeenPlayers(t *testing.T) {
 	a.liveSnapshots.at = time.Now().Add(-21 * time.Second)
 	a.liveSnapshots.mu.Unlock()
 	second := r62GameplayLiveResponse(t, a)
-	if second.ArenaGrouped || second.ArenaMascotMapping || len(second.Players) != 17 {
-		t.Fatalf("17-player Arena grouping = grouped:%v mascot:%v players:%d", second.ArenaGrouped, second.ArenaMascotMapping, len(second.Players))
+	if second.ArenaGrouped || second.ArenaMascotMapping || len(second.Players) != 18 {
+		t.Fatalf("17+1-player Arena grouping = grouped:%v mascot:%v players:%d", second.ArenaGrouped, second.ArenaMascotMapping, len(second.Players))
 	}
 	counts := make(map[string]int)
 	for index, player := range second.Players {
@@ -2897,8 +2897,8 @@ func TestR62ArenaPlayerListRetriesAndGroupsSeventeenPlayers(t *testing.T) {
 			t.Fatalf("opponent %d was highlighted as ally: %#v", index, player)
 		}
 	}
-	if len(counts) != 1 || counts[""] != 17 {
-		t.Fatalf("17-player Arena group counts = %#v", counts)
+	if len(counts) != 1 || counts[""] != 18 {
+		t.Fatalf("17+1-player Arena group counts = %#v", counts)
 	}
 	if probes.Load() != 2 {
 		t.Fatalf("playerlist probes = %d, want retry after initial failure", probes.Load())
@@ -4900,6 +4900,10 @@ func TestR168LiveHistoryWindowFindsOlderSameQueueGames(t *testing.T) {
 				if r.URL.Path == "/riotclient/command-line-args" {
 					probes.Add(1)
 					_ = json.NewEncoder(w).Encode([]string{})
+					return
+				}
+				if r.URL.Path == "/lol-platform-config/v1/namespaces/LoginDataPacket/platformId" || r.URL.Path == "/riotclient/region-locale" {
+					http.Error(w, "not ready", http.StatusNotFound)
 					return
 				}
 				if !strings.HasPrefix(r.URL.Path, "/lol-match-history/") {

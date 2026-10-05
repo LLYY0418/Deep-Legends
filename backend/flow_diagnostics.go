@@ -196,7 +196,7 @@ func (r *watchRunner) recordChampSelectPostflight(session lcuChampSelectSession)
 			continue
 		}
 		if reason != "action-missing" {
-			if observed.ChampionID == record.ChampionID && (!record.Completed || observed.Completed) {
+			if champSelectSubmissionApplied(record, observed, true) {
 				reason = "applied"
 			} else if time.Since(record.At) >= 2*time.Second {
 				reason = "not-applied-after-2s"

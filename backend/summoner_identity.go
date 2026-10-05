@@ -80,6 +80,14 @@ func (a *app) applySummonerIdentity(client *LCUClient, next Summoner, observedAt
 	if next.SummonerID == 0 {
 		return false, errors.New("current summoner is not ready")
 	}
+	if client != nil {
+		a.mu.RLock()
+		becomingReady := !a.identityReady && a.connected && a.lcu == client
+		a.mu.RUnlock()
+		if becomingReady {
+			client.retryPlatformAfterIdentityReady()
+		}
+	}
 	a.mu.Lock()
 	if client != nil && a.lcu != client {
 		a.mu.Unlock()

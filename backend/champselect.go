@@ -139,8 +139,8 @@ type champSelectRuntimeStore struct {
 	subsetSource          string
 	subsetRecordKey       string
 	pickAttempts          map[int64]map[int64]int
-	pickFailures          map[int64]map[int64]int
-	pickFailed            map[int64]map[int64]bool
+	pickFailures          map[string]map[int64]int
+	pickFailed            map[string]map[int64]bool
 	benchFailed           map[string]bool
 	benchPreFinalFailures map[string]int
 	runtimeID             string
@@ -215,8 +215,8 @@ type champSelectOngoingSwap struct {
 func newChampSelectRuntimeStore() champSelectRuntimeStore {
 	return champSelectRuntimeStore{
 		pickAttempts:          map[int64]map[int64]int{},
-		pickFailures:          map[int64]map[int64]int{},
-		pickFailed:            map[int64]map[int64]bool{},
+		pickFailures:          map[string]map[int64]int{},
+		pickFailed:            map[string]map[int64]bool{},
 		benchFailed:           map[string]bool{},
 		benchPreFinalFailures: map[string]int{},
 		runtimeID:             newDiagnosticTrace("cs-runtime"),
@@ -975,8 +975,22 @@ func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelec
 		r.champDiagnostic("candidate-gate", "awaiting-application", lastSubmission.Decision, nil)
 		return
 	}
+	step := "hover"
+	if intent {
+		step = "intent"
+	} else if config.Strategy == "lock-now" || config.Strategy == "show-then-lock" && submitted && lastSubmission.Confirmed && !lastSubmission.Completed {
+		step = "lock"
+	}
 	if side == "pick" {
-		available = r.champSelectRecoverableCandidates(action.ID, available)
+		original := champions
+		champions = r.champSelectRecoverablePool(action.ID, champions, step)
+		available = r.champSelectRecoverableCandidates(action.ID, available, step)
+		if len(champions) == 0 && !intent {
+			for _, id := range original {
+				r.champSelectStopped(champSelectDecision{Action: actionName, ActionID: action.ID, ChampionID: id}, "attempt-limit")
+			}
+			return
+		}
 	}
 	candidate := int64(0)
 	skipped := map[int64]string{}
@@ -985,6 +999,11 @@ func (r *watchRunner) evaluateChampSelect(client *LCUClient, settings champSelec
 	}
 	if candidate == 0 {
 		candidate, skipped = chooseChampSelectCandidate(side, champions, available, grid, config.AvoidTeammateIntent, groupID == "arena")
+	}
+	if intent && candidate == -3 {
+		r.clearChampSelectDecision(actionName)
+		r.champDiagnostic("candidate-gate", "bravery-await-local-turn", champSelectDecision{Action: actionName, ActionID: action.ID, ChampionID: candidate, Intent: true}, nil)
+		return
 	}
 	availabilityCount := len(available)
 	if side == "pick" && session.AllowSubsetChampionPicks {
@@ -1220,15 +1239,17 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 	pending := &watchPendingAction{cancel: cancel}
 	r.mu.Lock()
 	decision.RuntimeID = r.champSelect.runtimeID
-	if isBanPick && r.champSelect.attempts[decision.Key] >= champSelectMaxWriteAttempts || decision.Action == champSelectActionPick && !r.champSelectPickBudgetLocked(decision.ActionID, decision.ChampionID) || decision.Action == champSelectActionBench && (r.champSelect.attempts[decision.Key] >= 2 || r.champSelect.benchFailed[decision.Key]) {
+	if isBanPick && r.champSelect.attempts[decision.Key] >= champSelectMaxWriteAttempts || decision.Action == champSelectActionPick && !r.champSelectPickBudgetLocked(decision.ActionID, decision.ChampionID, champSelectDecisionStep(decision)) || decision.Action == champSelectActionBench && (r.champSelect.attempts[decision.Key] >= 2 || r.champSelect.benchFailed[decision.Key]) {
 		r.mu.Unlock()
 		r.champDiagnostic("schedule", "attempt-limit", decision, nil)
+		r.champSelectStopped(decision, "attempt-limit")
 		cancel()
 		return false
 	}
 	if !r.settings.ChampSelect.Enabled || !strings.EqualFold(r.champSelect.phase, "ChampSelect") || r.champSelect.sessionPaused || r.champSelect.takeover[strings.TrimPrefix(decision.Action, "champselect-")] {
 		r.mu.Unlock()
 		r.champDiagnostic("schedule", "gate-blocked", decision, nil)
+		// User/session gates do not exhaust the action's remaining write budget.
 		cancel()
 		return false
 	}
@@ -1331,7 +1352,7 @@ func (r *watchRunner) scheduleChampSelectRequest(client *LCUClient, decision cha
 			return
 		}
 		if decision.Action == champSelectActionPick {
-			if !r.champSelectPickBudgetLocked(decision.ActionID, decision.ChampionID) {
+			if !r.champSelectPickBudgetLocked(decision.ActionID, decision.ChampionID, champSelectDecisionStep(decision)) {
 				r.mu.Unlock()
 				requestCancel()
 				return
@@ -1867,6 +1888,26 @@ func (r *watchRunner) champSelectSnapshot() champSelectRuntimeResponse {
 			response.BanStates[key] = "verify-hover"
 		}
 		response.PickStates[key] = champSelectChampionState("pick", championID, r.champSelect.pickable, champion)
+	}
+	if action, ok := champSelectExecutableAction(r.champSelect.lastSession, response.PickIntent); ok && action.Type == "pick" {
+		step := "hover"
+		config := r.settings.ChampSelect.Groups[r.champSelect.groupID].Pick
+		last := r.champSelect.submitted[action.ID]
+		if response.PickIntent {
+			step = "intent"
+		} else if config.Strategy == "lock-now" || config.Strategy == "show-then-lock" && last.Confirmed {
+			step = "lock"
+		}
+		for id, failed := range r.champSelect.pickFailed[champSelectPickStepKey(action.ID, step)] {
+			if failed {
+				response.PickStates[fmt.Sprint(id)] = "stopped"
+			}
+		}
+		for _, id := range config.Champions[r.champSelect.position] {
+			if r.champSelect.exhausted[fmt.Sprintf("stopped:%d", action.ID)] {
+				response.PickStates[fmt.Sprint(id)] = "stopped"
+			}
+		}
 	}
 	if decision, ok := r.champSelect.decision[champSelectActionBan]; ok {
 		response.ActiveBanID = decision.ChampionID

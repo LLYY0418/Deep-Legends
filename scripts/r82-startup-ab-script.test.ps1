@@ -99,11 +99,13 @@ try {
     $fixture = New-Fixture
     $failure = Invoke-Fixture $fixture
     Assert-Fixture (!$failure) "versioned installer must collect successfully (got: $failure)"
-    $saved = @(Get-Content -LiteralPath $fixture.Results -Raw -Encoding UTF8 | ConvertFrom-Json)
+    $saved = @(Get-Content -LiteralPath $fixture.Results -Raw -Encoding UTF8 | ConvertFrom-Json | ForEach-Object { $_ })
     Assert-Fixture ($global:r82ABFixtureState.Launches -eq 1 -and $saved.Count -eq 1 -and $saved[0].fingerprint -eq 'abcdef012345') 'versioned installer must save the receipt fingerprint'
     Assert-Fixture ($env:DEEP_LEGENDS_STARTUP_PREWARM -eq 'fixture-original') 'measurement must restore the prewarm environment'
     Complete-Check 'version filename and receipt fingerprint reach the real collector'
 
+    # Windows PowerShell 5.1 emits a JSON array as one pipeline object.
+    # ForEach-Object above explicitly enumerates it before the count assertions.
     $measured = $fixture
     $fixture = New-Fixture '[archive] any filename.exe'
     $failure = Invoke-Fixture $fixture
@@ -158,7 +160,7 @@ try {
                 Assert-Fixture ([IO.File]::ReadAllText($fixture.Results) -eq $before) 'full group must preserve saved results'
             } else {
                 Assert-Fixture (!$failure -and $global:r82ABFixtureState.Launches -eq 1) "$group/$count must allow the third sample (got: $failure)"
-                $saved = @(Get-Content -LiteralPath $fixture.Results -Raw -Encoding UTF8 | ConvertFrom-Json)
+                $saved = @(Get-Content -LiteralPath $fixture.Results -Raw -Encoding UTF8 | ConvertFrom-Json | ForEach-Object { $_ })
                 Assert-Fixture ($saved.Count -eq 3) 'third sample must reach the real collector'
             }
             Assert-Fixture ($env:DEEP_LEGENDS_STARTUP_PREWARM -eq 'fixture-original') 'preflight must preserve the environment'
@@ -168,7 +170,7 @@ try {
         Write-GroupSamples $fixture $group 3
         $failure = Invoke-Fixture $fixture $otherGroup
         Assert-Fixture (!$failure -and $global:r82ABFixtureState.Launches -eq 1) "full $group must not block empty $otherGroup (got: $failure)"
-        $saved = @(Get-Content -LiteralPath $fixture.Results -Raw -Encoding UTF8 | ConvertFrom-Json)
+        $saved = @(Get-Content -LiteralPath $fixture.Results -Raw -Encoding UTF8 | ConvertFrom-Json | ForEach-Object { $_ })
         Assert-Fixture (@($saved | Where-Object { $_.group -eq $otherGroup }).Count -eq 1) 'other group sample must reach the real collector'
         Complete-Check "full $group allows empty $otherGroup"
     }

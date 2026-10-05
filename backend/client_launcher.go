@@ -16,8 +16,8 @@ const clientLaunchCooldown = 6 * time.Second
 
 type clientLaunchState struct {
 	mu            sync.Mutex
-	inFlight      bool
-	cooldownUntil time.Time
+	inFlight      map[string]bool
+	cooldownUntil map[string]time.Time
 }
 
 type clientInstallation struct {
@@ -47,8 +47,13 @@ type clientLaunchFailure struct {
 }
 
 type clientLaunchResult struct {
-	Source   string
-	Failures []clientLaunchFailure
+	Cancelled             bool
+	AlreadyOpen           bool
+	PathClass             string
+	ProductSettingsExists bool
+	ProductInstallClass   string
+	Source                string
+	Failures              []clientLaunchFailure
 }
 
 func buildDetectedClientInstallations(gameRoots, riotExecutables []string, shortcuts []clientInstallation, regular func(string) bool) []clientInstallation {
@@ -76,16 +81,20 @@ func buildDetectedClientInstallations(gameRoots, riotExecutables []string, short
 		}{
 			{"launcher", filepath.Join(root, "Launcher", "Client.exe")},
 			{"tcls", filepath.Join(root, "TCLS", "Client.exe")},
-			{"league-client", filepath.Join(root, "LeagueClient", "LeagueClient.exe")},
-			{"league-client", filepath.Join(root, "LeagueClient.exe")},
 		} {
 			add(clientInstallation{ID: "tcls", Name: "TCLS 客户端", Kind: "tcls", Description: "直接启动腾讯英雄联盟客户端", executable: candidate.executable}, candidate.source)
 		}
 	}
 	for _, candidate := range riotExecutables {
+		if isTencentInstallPath(candidate) {
+			continue
+		}
 		add(clientInstallation{ID: "riot", Name: "Riot 客户端", Kind: "riot", Description: "启动 Riot 英雄联盟客户端", executable: candidate, arguments: []string{"--launch-product=league_of_legends", "--launch-patchline=live"}}, "riot")
 	}
 	for _, installation := range shortcuts {
+		if installation.ID == "riot" && isTencentInstallPath(installation.shortcut) {
+			continue
+		}
 		add(installation, "shortcut")
 	}
 
@@ -169,21 +178,39 @@ func (a *app) handleClientLaunch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "没有找到这个客户端，请先在设置中检查安装位置", http.StatusNotFound)
 		return
 	}
-	if !a.beginClientLaunch() {
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
+	if !a.beginClientLaunch(installation.ID) {
 		a.recordClientLaunch(installation.ID, "busy")
 		http.Error(w, "客户端正在启动，请稍后再试", http.StatusTooManyRequests)
 		return
 	}
 	launched := false
-	defer func() { a.finishClientLaunch(launched) }()
+	defer func() { a.finishClientLaunch(installation.ID, launched) }()
 	a.recordClientLaunch(installation.ID, "requested")
 	result, err := a.launchDetectedClientInstallation(installation)
 	for _, failure := range result.Failures {
 		a.recordClientLaunchAttempt(installation.ID, failure)
 	}
+	if installation.ID == "riot" {
+		a.recordDiagnostic(map[string]any{"event": "client_launch", "client_id": "riot", "result": "validated", "source": safeClientLaunchSource(result.PathClass), "is_tencent_path": false, "product_settings_exists": result.ProductSettingsExists, "product_install_class": result.ProductInstallClass})
+	}
+	if result.Cancelled {
+		a.recordClientLaunch(installation.ID, "cancelled")
+		respondJSON(w, map[string]any{"cancelled": true})
+		return
+	}
+	if result.AlreadyOpen {
+		a.recordClientLaunch(installation.ID, "already-open")
+		respondJSON(w, map[string]any{"alreadyOpen": true})
+		return
+	}
 	if err != nil {
 		a.recordClientLaunch(installation.ID, "failed")
-		http.Error(w, "客户端启动失败，请尝试从桌面快捷方式启动", http.StatusInternalServerError)
+		message := "客户端启动失败，请尝试从桌面快捷方式启动"
+		if errors.Is(err, errRiotProductUnavailable) {
+			message = "Riot 客户端里没有可用的英雄联盟安装"
+		}
+		http.Error(w, message, http.StatusInternalServerError)
 		return
 	}
 	launched = true
@@ -192,25 +219,28 @@ func (a *app) handleClientLaunch(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (a *app) beginClientLaunch() bool {
+func (a *app) beginClientLaunch(id string) bool {
 	a.clientLaunch.mu.Lock()
 	defer a.clientLaunch.mu.Unlock()
-	if a.clientLaunch.inFlight || time.Now().Before(a.clientLaunch.cooldownUntil) {
+	if a.clientLaunch.inFlight == nil {
+		a.clientLaunch.inFlight = map[string]bool{}
+		a.clientLaunch.cooldownUntil = map[string]time.Time{}
+	}
+	if a.clientLaunch.inFlight[id] || time.Now().Before(a.clientLaunch.cooldownUntil[id]) {
 		return false
 	}
-	a.clientLaunch.inFlight = true
+	a.clientLaunch.inFlight[id] = true
 	return true
 }
-
-func (a *app) finishClientLaunch(succeeded bool) {
+func (a *app) finishClientLaunch(id string, succeeded bool) {
 	a.clientLaunch.mu.Lock()
 	defer a.clientLaunch.mu.Unlock()
-	a.clientLaunch.inFlight = false
+	delete(a.clientLaunch.inFlight, id)
 	if succeeded {
-		a.clientLaunch.cooldownUntil = time.Now().Add(clientLaunchCooldown)
-		return
+		a.clientLaunch.cooldownUntil[id] = time.Now().Add(clientLaunchCooldown)
+	} else {
+		delete(a.clientLaunch.cooldownUntil, id)
 	}
-	a.clientLaunch.cooldownUntil = time.Time{}
 }
 
 func (a *app) detectedClientInstallations() []clientInstallation {
@@ -300,6 +330,10 @@ func launchClientCandidates(installation clientInstallation, attempt func(client
 		failure.Source = candidate.Source
 		failure.Stage = safeClientLaunchStage(failure.Stage)
 		result.Failures = append(result.Failures, failure)
+		if failure.ErrorCode == 1223 {
+			result.Cancelled = true
+			return result, nil
+		}
 		lastErr = err
 	}
 	if lastErr == nil {
@@ -354,7 +388,7 @@ func safeClientLaunchEvent(id string) (string, string) {
 
 func safeClientLaunchSource(source string) string {
 	switch source {
-	case "shortcut", "launcher", "tcls", "league-client", "riot":
+	case "shortcut", "launcher", "tcls", "riot", "rc_default", "rc_live", "installs-json-other", "drive-guess":
 		return source
 	default:
 		return "unknown"

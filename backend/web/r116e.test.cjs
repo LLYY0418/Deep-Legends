@@ -270,7 +270,7 @@ test("R116-E card headings stay truthful once mayhem games are counted", () => {
   const empty = renderRecentRanked({ games: 0 }, 2300, "SWITCH");
   assert.match(empty, /近 0 场海斗/);
   assert.match(empty, /当前样本未发现海克斯大乱斗对局/);
-  assert.match(empty, /本赛季已扫描到的海克斯大乱斗对局/);
+  assert.doesNotMatch(empty, /基于|最多统计/);
   // 队列名解析不出来时不许默默写「单双排」。
   const unknown = renderRecentRanked({ games: 0 }, 9999, "SWITCH");
   assert.match(unknown, /当前样本未发现对局/);

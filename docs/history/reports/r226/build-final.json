@@ -1,0 +1,12 @@
+{
+  "version": "0.12.73",
+  "key_mode": "public",
+  "fingerprint": "d7d3268b6b23",
+  "fingerprint_after": "d7d3268b6b23",
+  "stable": true,
+  "artifacts": [
+    "/private/tmp/deep-legends-r226-0.12.73-public",
+    "/private/tmp/deep-legends-r226-0.12.73-public.exe"
+  ],
+  "built_at": "2026-10-05T13:46:26.263Z"
+}

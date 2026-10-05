@@ -12,11 +12,15 @@ const files = directories.flatMap(directory => fs.readdirSync(path.join(root, di
   .filter(name => name.endsWith(".test.cjs")).sort().map(name => path.join(root, directory, name)));
 const fileNames = new Set(files);
 const timings = [];
-// Two-core private runners must still overlap test files.
+// Two-core private runners must still overlap test files. Windows jsdom
+// workers contend more heavily; cap at three to keep each 200-match file <90s.
+const concurrency = process.platform === "win32"
+  ? Math.min(3, Math.max(2, os.availableParallelism()))
+  : Math.max(2, os.availableParallelism());
 let summary;
 let failed = false;
 (async () => {
-  for await (const event of run({ files, concurrency: Math.max(2, os.availableParallelism() - 1) })) {
+  for await (const event of run({ files, concurrency })) {
     const data = event.data;
     if (event.type === "test:stdout" || event.type === "test:stderr") process.stdout.write(data.message);
     if (event.type === "test:pass" && !fileNames.has(data.name)) console.log(`PASS ${data.name}`);
@@ -33,7 +37,7 @@ let failed = false;
     if (event.type === "test:summary" && !data.file) summary = data;
   }
   if (!summary?.success || summary.duration_ms > 240000 || timings.length !== files.length) failed = true;
-  const result = { scope, platform: process.platform, concurrency: Math.max(2, os.availableParallelism() - 1),
+  const result = { scope, platform: process.platform, concurrency,
     file_budget_ms: 90000, suite_budget_ms: 240000, files: timings, summary, success: !failed };
   if (process.env.R222_NODE_TIMING_OUTPUT) fs.writeFileSync(process.env.R222_NODE_TIMING_OUTPUT, JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify(result, null, 2));

@@ -1,0 +1,16 @@
+{
+  "command": [
+    "node",
+    "scripts/r224-browser.cjs"
+  ],
+  "start": "2026-10-05T21:19:14.771442+08:00",
+  "end": "2026-10-05T21:22:59.106842+08:00",
+  "seconds": 224.334,
+  "exit_code": 1,
+  "last_5_lines": [
+    "Error: CDP timeout Page.navigate",
+    "    at Timeout._onTimeout (/Users/ly/personal/personal-work/deep-legends/scripts/r224-browser.cjs:27:137)",
+    "    at listOnTimeout (node:internal/timers:605:17)",
+    "    at process.processTimers (node:internal/timers:541:7)"
+  ]
+}

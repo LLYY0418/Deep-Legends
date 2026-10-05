@@ -623,6 +623,7 @@
   }
 
   function champSelectStatusCopy(status, side, active, pickIntent = false) {
+    if (status === "stopped") return "自动选用已停止";
     if (status === "manual-takeover") return "玩家主动切换";
     if (active) return side === "ban" ? "即将禁用" : pickIntent ? "提前预选中" : "即将选用";
     return ({ available: side === "ban" ? "可禁用" : "可选", "verify-hover": "待亮出验证", "own-intent": "自己准备选用", "list-empty": "等待禁用列表", "teammate-picked": "队友已经选择", intent: "队友预选中", gone: "已被禁用或拿走", unavailable: side === "ban" ? "不在客户端可禁用列表" : "不在客户端可选列表" })[status] || "备用";
@@ -642,9 +643,9 @@
       }
       const champion = champSelectChampionMeta(championID, catalog);
       const brave = championID === -3;
-      const status = brave ? "available" : states[String(championID)] || "";
+      const status = states[String(championID)] || (brave ? "available" : "");
       const active = championID === activeID;
-      const statusClass = ({ available: " st-ok", "manual-takeover": " st-intent", "verify-hover": " st-intent", "own-intent": " st-intent", "list-empty": " st-intent", "teammate-picked": " st-gone", intent: " st-intent", gone: " st-gone", unavailable: " st-gone" })[status] || "";
+      const statusClass = ({ available: " st-ok", stopped: " st-gone", "manual-takeover": " st-intent", "verify-hover": " st-intent", "own-intent": " st-intent", "list-empty": " st-intent", "teammate-picked": " st-gone", intent: " st-intent", gone: " st-gone", unavailable: " st-gone" })[status] || "";
       const name = brave ? "勇敢举动" : champion?.nameZh || champion?.nameEn || `英雄 ${championID}`;
       const artwork = brave ? '<span class="cs-avatar cs-brave-avatar" aria-hidden="true">⚔</span>' : champSelectChampionImage(champion);
       parts.push(`<div class="cs-rail-slot${statusClass}${active ? " is-live" : ""}" data-cs-champion-id="${championID}" data-cs-rail-side="${side}" data-cs-rail-index="${index}" draggable="true" title="拖动到同序列的另一位英雄上交换位置"><span class="cs-slot-order">${index + 1}</span><button class="cs-slot-open" type="button" data-cs-open-dialog="${side}" aria-label="编辑${champSelectSideName(side)}序列">${artwork}<span class="cs-champion-name">${escapeHTML(name)}</span><span class="cs-champion-state"${status === "manual-takeover" ? ' title="玩家主动切换，本轮已停止自动操作；下一局恢复"' : ""}>${escapeHTML(champSelectStatusCopy(status, side, active, runtime?.pickIntent))}</span></button><button class="cs-slot-remove" type="button" data-cs-remove="${side}" data-cs-remove-index="${index}" aria-label="移除${escapeHTML(name)}">×</button></div>`);

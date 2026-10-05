@@ -93,6 +93,7 @@ type overviewLoadCost struct {
 	historyCalls            int
 	historyCacheHits        int
 	participantShapeSampled bool
+	decodeFailed            int
 }
 
 func (c *overviewLoadCost) claimParticipantShapeSample() bool {
@@ -182,12 +183,13 @@ type sgpProvider struct {
 }
 
 type sgpHistoryCacheEntry struct {
-	at       time.Time
-	lastUsed time.Time
-	games    []*riotMatchInfo
-	consumed int
-	more     bool
-	bytes    int
+	at           time.Time
+	lastUsed     time.Time
+	games        []*riotMatchInfo
+	consumed     int
+	decodeFailed int
+	more         bool
+	bytes        int
 }
 
 type sgpSummonerCacheEntry struct {
@@ -268,14 +270,14 @@ func (p *sgpProvider) available(client *LCUClient) (string, string, bool) {
 	if failing {
 		return "", "", false
 	}
+	region, platform := client.platformInfo()
+	if !strings.EqualFold(region, "TENCENT") || platform == "" {
+		return "", "", false
+	}
 	if p.gatewayAccount != nil {
 		if account := p.gatewayAccount(client); account != "" {
 			p.discoverGateway(context.Background(), client, account)
 		}
-	}
-	region, platform := client.platformInfo()
-	if !strings.EqualFold(region, "TENCENT") || platform == "" {
-		return "", "", false
 	}
 	base, ok := p.serverBaseOn(context.Background(), client, platform)
 	if !ok {
@@ -868,8 +870,8 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 	var partialErr error
 	downgraded := false
 	localShapeSampled := false
-	for len(games) < count && fetched < count+sgpPageSize {
-		pageSize := count - len(games)
+	for fetched < count {
+		pageSize := count - fetched
 		if pageSize > sgpPageSize {
 			pageSize = sgpPageSize
 		}
@@ -881,6 +883,7 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 			if cached, cachedPageSize, ok := p.cachedHistoryPage(serverID, puuid, pageStart, pageSize, tags); ok {
 				overviewCostFromContext(ctx).addHistoryCacheHit()
 				games = append(games, cached.games...)
+				recordSGPDecodeCount(ctx, cached.decodeFailed)
 				fetched += cached.consumed
 				lastPageFull = cached.more
 				if cached.consumed <= 0 || !lastPageFull || len(tags) > 0 {
@@ -916,9 +919,18 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 		}
 		participantKeys := make(map[string]struct{})
 		parsedPageGames := make([]*riotMatchInfo, 0, len(page.Games))
+		decodeFailed := 0
 		for _, game := range page.Games {
-			var info riotMatchInfo
-			if len(game.JSON) == 0 || json.Unmarshal(game.JSON, &info) != nil {
+			decoded, decodeErr := decodeSGPHistoryGame(game.JSON)
+			if decodeErr != nil {
+				decodeFailed++
+				p.recordObservation(sgpGameDecodeDiagnostic(decodeErr))
+				continue
+			}
+			info := *decoded
+			if info.GameID <= 0 {
+				decodeFailed++
+				p.recordObservation(sgpGameDecodeDiagnostic(&json.UnmarshalTypeError{Field: "gameId", Value: "number"}))
 				continue
 			}
 			shouldSample := false
@@ -954,6 +966,7 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 			sort.Strings(keys)
 			p.recordObservation(map[string]any{"event": "sgp_participant_keys", "keys": keys, "sampled": true})
 		}
+		recordSGPDecodeCount(ctx, decodeFailed)
 		consumed := len(page.Games)
 		clippedToFallbackPage := pageSize > sgpFallbackPageSize && consumed == sgpFallbackPageSize
 		lastPageFull = consumed >= pageSize || clippedToFallbackPage
@@ -963,7 +976,7 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 				pageBytes += len(game.JSON)
 			}
 			p.cacheHistoryPage(serverID, puuid, pageStart, pageSize, tags, sgpHistoryCacheEntry{
-				games: append([]*riotMatchInfo(nil), parsedPageGames...), consumed: consumed, more: lastPageFull, bytes: pageBytes,
+				games: append([]*riotMatchInfo(nil), parsedPageGames...), consumed: consumed, decodeFailed: decodeFailed, more: lastPageFull, bytes: pageBytes,
 			}, generation)
 		}
 		fetched += consumed
@@ -1212,4 +1225,36 @@ func (p *sgpProvider) summonerByPUUIDOn(ctx context.Context, client *LCUClient, 
 		}
 	}
 	return sgpSummoner{}, errors.New("SGP 访问令牌无效，请确认客户端已登录")
+}
+
+func (c *overviewLoadCost) addDecodeFailed(count int) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.decodeFailed += count
+	c.mu.Unlock()
+}
+func (c *overviewLoadCost) decodeFailedCount() int {
+	if c == nil {
+		return 0
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.decodeFailed
+}
+
+type sgpDecodeCountContextKey struct{}
+
+func recordSGPDecodeCount(ctx context.Context, count int) {
+	overviewCostFromContext(ctx).addDecodeFailed(count)
+	if stats, ok := ctx.Value(sgpDecodeCountContextKey{}).(*overviewLoadCost); ok {
+		stats.addDecodeFailed(count)
+	}
+}
+func sgpPageDecodeFailures(ctx context.Context) int {
+	if stats, ok := ctx.Value(sgpDecodeCountContextKey{}).(*overviewLoadCost); ok {
+		return stats.decodeFailedCount()
+	}
+	return 0
 }

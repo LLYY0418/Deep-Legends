@@ -19,6 +19,7 @@ function fixture() {
 function boot(t, { full = false, response = async () => fixture(), overviewStatus = 200, proMismatch = false, diagnosticsBridge, seasonSummary, currentGame, demoCurrentGame = false, noMatches = false, spellCatalog = async () => ({spells: [{id: 4, name: "闪现"}, {id: 11, name: "惩戒"}]}) } = {}) {
   const dom = new JSDOM(fs.readFileSync(process.env.R102_INDEX_SOURCE || path.join(WEB, "index.html"), "utf8"), { url: demoCurrentGame ? "http://localhost/?demo=current-game" : "http://localhost/?demo", runScripts: "outside-only", pretendToBeVisual: true });
   const w = dom.window, requests = [], errors = [];
+ w.document.hasFocus=()=>true;
   t.after(() => w.close());
   w.desktopDiagnostics = diagnosticsBridge;
   w.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
@@ -146,9 +147,12 @@ test("国服每次打开折叠；各拳头区服与职业入口可键盘聚焦�
   trigger.click(); assert.equal(options.hidden, true); assert.equal(cn.getAttribute("aria-expanded"), "false");
   cn.click(); trigger.click(); trigger.click(); assert.equal(options.hidden, true);
   cn.focus(); cn.dispatchEvent(new w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+  assert.equal(d.activeElement.id, "player-search-riot-toggle");
+  d.activeElement.click();
+  const foreign = d.querySelector('[data-region-option="kr"]'); foreign.focus();
   assert.equal(d.activeElement.dataset.regionOption, "kr");
-  // R221 added every Riot platform between KR and the professional directory.
-  for (const region of ["jp1", "na1", "euw1", "eun1", "tw2", "sg2", "br1", "la1", "la2", "me1", "oc1", "ru", "tr1", "vn2"]) {
+  // R223 exposes eight foreign platforms; the backend still supports all fifteen.
+  for (const region of ["jp1", "na1", "euw1", "eun1", "tw2", "vn2", "sg2"]) {
     d.activeElement.dispatchEvent(new w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     assert.equal(d.activeElement.dataset.regionOption, region);
   }
@@ -159,7 +163,7 @@ test("国服每次打开折叠；各拳头区服与职业入口可键盘聚焦�
   assert.equal(d.querySelector("#overview-panel").hidden, true);
   assert.equal(d.querySelector("#pro-overview-panel"), null);
   assert.equal(d.querySelector("#pro-players-home").hidden, false);
-  assert.equal(trigger.dataset.region, "cn"); assert.equal(trigger.dataset.serverId, "HN1");
+  assert.equal(trigger.dataset.region, "kr"); assert.equal(trigger.dataset.serverId, "");
   assert.equal(d.querySelectorAll('.section-tab[data-section="pro-players"]').length, 0);
   assert.equal(requests.filter((r) => r.url.startsWith("/api/pro-players")).length, 1);
   d.querySelector("#pro-players-home").click(); await tick();

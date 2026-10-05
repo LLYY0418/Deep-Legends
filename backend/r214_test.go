@@ -27,7 +27,7 @@ func r214HistoryFixture(t *testing.T) (*app, *LCUClient, string, *atomic.Int64, 
 		}}}})
 	}))
 	t.Cleanup(server.Close)
-	client := &LCUClient{}
+	client := &LCUClient{region: "TENCENT", rsoPlatform: "HN1"}
 	provider := newSGPProvider()
 	provider.http = server.Client()
 	provider.serverBases["HN1"] = server.URL

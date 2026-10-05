@@ -628,10 +628,10 @@ func (a *app) loadSeasonChampionStatsWithHistoryCache(ctx context.Context, clien
 	season, seasonStart := currentRankedSeason(time.Now())
 	progress := seasonStatsProgress{Season: season, Collecting: true}
 	serverID := strings.ToUpper(strings.TrimSpace(reference.ServerID))
-	if serverID == "" || a.sgp == nil || !validPlayerReference(playerRef) {
+	if serverID == "" || a.sgp == nil || !validPlayerReference(playerRef) || !isTencentClient(client) {
 		// “没查到”和“查过了确实没有”是两件事。只有完整扫描后的空结果
 		// 才能断言未发现对局；数据源不可用必须显式告诉前端。
-		return nil, seasonStatsProgress{Season: season, Unavailable: true, Message: "当前数据源不提供赛季统计"}, nil, nil
+		return nil, seasonStatsProgress{Season: season, Unavailable: true, Message: ""}, nil, nil
 	}
 	accountHash := ""
 	if a.storage != nil {
@@ -692,7 +692,7 @@ func (a *app) loadSeasonChampionStatsSnapshot(reference gameplayReference, playe
 	season, _ := currentRankedSeason(time.Now())
 	serverID := strings.ToUpper(strings.TrimSpace(reference.ServerID))
 	if serverID == "" || a.sgp == nil || !validPlayerReference(playerRef) {
-		return nil, seasonStatsProgress{Season: season, Unavailable: true, Message: "当前数据源不提供赛季统计"}, nil, nil
+		return nil, seasonStatsProgress{Season: season, Unavailable: true, Message: ""}, nil, nil
 	}
 	progress := seasonStatsProgress{Season: season, Collecting: true, Message: "正在后台读取本赛季对局"}
 	if a.storage == nil {
@@ -739,7 +739,7 @@ func seasonQuerySnapshotKey(serverID, playerRef, season string) string {
 func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayReference, player Summoner, playerRef string, names map[int64]string, fresh bool) {
 	season, _ := currentRankedSeason(time.Now())
 	serverID := strings.ToUpper(strings.TrimSpace(reference.ServerID))
-	if client == nil || serverID == "" || a.sgp == nil || a.storage == nil || !validPlayerReference(playerRef) {
+	if client == nil || serverID == "" || a.sgp == nil || a.storage == nil || !validPlayerReference(playerRef) || !isTencentClient(client) {
 		return
 	}
 	accountHash := a.storage.accountHash(player)
@@ -865,6 +865,10 @@ func (a *app) seasonScanPages(ctx context.Context, client *LCUClient, serverID, 
 }
 
 func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUClient, serverID, playerRef string, scan *seasonScanState, budget int, useHistoryCache bool) {
+	if !isTencentClient(client) {
+		scan.interrupted = true
+		return
+	}
 	start := scan.cache.ResumeIndex
 	headScan := start == 0
 	for page := 0; page < budget; page++ {
@@ -974,7 +978,7 @@ func seasonMayhemSnapshot(snapshots map[int64]seasonRankedQueueSnapshot) seasonR
 // 会叠出好几条几十 MB 的下载流。任务用自己的 context，不跟着 HTTP 请求
 // 被取消——否则用户一切页面回补就永远补不完。
 func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference, player Summoner, playerRef string, names map[int64]string, serverID, accountHash, season string, seasonStart time.Time) {
-	if accountHash == "" || a.storage == nil {
+	if accountHash == "" || a.storage == nil || !isTencentClient(client) {
 		return
 	}
 	key := sourceScopedKey(seasonStatsSource, accountHash+"|"+season)

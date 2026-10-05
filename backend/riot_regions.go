@@ -91,10 +91,10 @@ func clientRiotPlatform(client *LCUClient) string {
 	if strings.EqualFold(region, "TENCENT") {
 		return ""
 	}
-	if value := riotPlatform(platform); value != "" {
+	if value := riotPlatformFromClientRegion(platform); value != "" {
 		return value
 	}
-	return riotPlatform(region)
+	return riotPlatformFromClientRegion(region)
 }
 func clientRegionInfo(client *LCUClient) (string, string) {
 	if client == nil {
@@ -111,29 +111,36 @@ func riotMatchID(region string, gameID int64) string {
 	return strings.ToUpper(riotPlatform(region)) + "_" + strconv.FormatInt(gameID, 10)
 }
 
-func clientPlatformDiagnostic(client *LCUClient) map[string]any {
-	region, platform := client.platformInfo()
-	if !isRiotRegion(platform) && !strings.EqualFold(region, "TENCENT") {
-		region, platform = "", ""
+// Aliases are accepted only for local client region names; API route input
+// continues to require canonical platform IDs.
+func riotPlatformFromClientRegion(region string) string {
+	if p := riotPlatform(region); p != "" {
+		return p
 	}
-	if strings.EqualFold(region, "TENCENT") {
-		if _, known := normalizeTencentServerID(platform); !known {
+	return map[string]string{"JP": "jp1", "NA": "na1", "EUW": "euw1", "EUNE": "eun1", "BR": "br1", "LAN": "la1", "LAS": "la2", "OCE": "oc1", "TR": "tr1", "ME": "me1", "SG": "sg2", "TW": "tw2", "VN": "vn2", "PH": "sg2", "PH2": "sg2", "TH": "sg2", "TH2": "sg2"}[strings.ToUpper(strings.TrimSpace(region))]
+}
+func clientPlatformDiagnostic(client *LCUClient) map[string]any {
+	client.platformInfo()
+	return clientPlatformDiagnosticSnapshot(client)
+}
+func clientPlatformDiagnosticSnapshot(client *LCUClient) map[string]any {
+	client.mu.RLock()
+	defer client.mu.RUnlock()
+	region, platform, source := client.region, client.rsoPlatform, client.platformSource
+	if region != "" && region != "TENCENT" && riotPlatformFromClientRegion(region) == "" {
+		region = "other"
+	}
+	if !isRiotRegion(platform) {
+		if _, ok := normalizeTencentServerID(platform); !ok || region != "TENCENT" {
 			platform = ""
 		}
-	} else if platform != "" {
-		// Region is an enum too; do not retain arbitrary command-line values.
-		allowed := map[string]bool{"JP": true, "KR": true, "NA": true, "EUW": true, "EUNE": true, "BR": true, "LAN": true, "LAS": true, "OCE": true, "RU": true, "TR": true, "SG": true, "TW": true, "VN": true, "ME": true, "SEA": true}
-		if !allowed[region] && !isRiotRegion(region) {
-			region = ""
-		}
 	}
-	client.mu.RLock()
-	source := client.platformSource
-	client.mu.RUnlock()
-	if source != "startup-args" && source != "command-line-query" {
+	switch source {
+	case "startup-args", "command-line-query", "login-data-packet", "region-locale":
+	default:
 		source = "unknown"
 	}
-	return map[string]any{"event": "client_platform_resolved", "region": region, "platform": platform, "source": source}
+	return map[string]any{"event": "client_platform_resolved", "region": region, "platform": platform, "source": source, "has_region_arg": client.hasRegionArg, "has_platform_arg": client.hasPlatformArg, "attempt": client.platformAttempt}
 }
 
 type riotPlatformContextKey struct{}
@@ -158,4 +165,12 @@ func opggRegionCacheIdentity(region, identity string) string {
 		return identity
 	}
 	return riotPlatform(region) + ":" + identity
+}
+
+func isTencentClient(client *LCUClient) bool {
+	if client == nil {
+		return false
+	}
+	region, _ := client.platformInfo()
+	return strings.EqualFold(region, "TENCENT")
 }

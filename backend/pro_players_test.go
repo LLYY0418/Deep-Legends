@@ -392,7 +392,20 @@ func TestProDirectoryPublishesBeforeSlowSupplements(t *testing.T) {
 }
 
 func TestProDirectoryFailureRetainsRosterAndAuth(t *testing.T) {
-	a := newProMockApp(t, func(*http.Request) (*http.Response, error) { return proHTTPBody([]byte("not a directory")), nil })
+	// Assert the immediate failed-directory response, before the independent
+	// profile fallback publishes. Its completion order differs across platforms.
+	profilesReleased := make(chan struct{})
+	t.Cleanup(func() { close(profilesReleased) })
+	a := newProMockApp(t, func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path != proPlayersPath {
+			select {
+			case <-profilesReleased:
+			case <-r.Context().Done():
+				return nil, r.Context().Err()
+			}
+		}
+		return proHTTPBody([]byte("not a directory")), nil
+	})
 	w := httptest.NewRecorder()
 	a.handleProPlayers(w, httptest.NewRequest("GET", "/api/pro-players", nil))
 	var result proPlayersResponse
@@ -400,7 +413,7 @@ func TestProDirectoryFailureRetainsRosterAndAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !result.Unavailable || result.PlayerCount != 33 || result.AccountCount != 53 || len(result.Teams) != 6 || result.Teams[0].Players[0].Status != "available" {
-		t.Fatal("failed source erased roster")
+		t.Fatalf("failed source erased roster: unavailable=%t players=%d accounts=%d teams=%d", result.Unavailable, result.PlayerCount, result.AccountCount, len(result.Teams))
 	}
 	if w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("private response browser-cached")

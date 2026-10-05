@@ -94,7 +94,7 @@ test('R213 rejects stale request, game and phase before the same-game shortcut',
   }finally{h.close();}
 });
 
-test('R213 full tab rebuild moves original loaded and queued image objects, reporting zero recreation', () => {
+test('R224 tab and panel membership updates preserve original loaded and queued image objects', () => {
   const h=harness();try {
     h.state.live=snapshot();h.renderLive();
     const images=[...h.nodes.liveContent.querySelectorAll('img')];assert.equal(images.length,40);
@@ -103,19 +103,19 @@ test('R213 full tab rebuild moves original loaded and queued image objects, repo
     assert.equal(h.nodes.liveContent.querySelectorAll('.recommendation-panel').length,2);
     const next=[...h.nodes.liveContent.querySelectorAll('img')];next.forEach((img,i)=>assert.equal(img,images[i]));
     assert.equal(next[0].dataset.loaded,'true');h.flushLiveRenderRebuild();
-    assert.equal(h.diagnostics[0].imagesRecreated,0);assert.equal(h.diagnostics[0].counts.full,1);
-    assert.equal(h.diagnostics[0].fullReasons['tab-row'],1);assert.equal(h.diagnostics[0].fullReasons['panel-count'],1);
+    assert.equal(h.diagnostics[0].imagesRecreated,0);assert.equal(h.diagnostics[0].counts.full || 0,0);
+    assert.equal(h.diagnostics[0].counts.tabs,1);
   }finally{h.close();}
 });
 
-test('R213 full reasons identify banner, lane slot and other chrome differences', () => {
+test('R224 banners update independently; broken lane shell and other structure remain diagnosable', () => {
   const h=harness();try {
     h.state.live=snapshot();h.renderLive();h.flushLiveRenderRebuild();h.diagnostics.length=0;
-    h.state.live.arenaMySquadNotice='fixture notice';h.renderLive();h.flushLiveRenderRebuild();assert.equal(h.diagnostics.at(-1).fullReasons.banner,1);
+    h.state.live.arenaMySquadNotice='fixture notice';h.renderLive();h.flushLiveRenderRebuild();assert.equal(h.diagnostics.at(-1).counts.banner,1);assert.equal(h.diagnostics.at(-1).counts.full || 0,0);
     h.nodes.liveContent.querySelector('[data-lane-matchup-slot]').remove();h.nodes.liveContent._recommendationMarkup='changed';
     h.renderLive();h.flushLiveRenderRebuild();assert.equal(h.diagnostics.at(-1).fullReasons['lane-slot'],1);
     h.nodes.liveContent.querySelector('.recommendation-area').setAttribute('data-chrome','changed');h.nodes.liveContent._recommendationMarkup='changed';
-    h.renderLive();h.flushLiveRenderRebuild();assert.equal(h.diagnostics.at(-1).fullReasons.other,1);
+    h.renderLive();h.flushLiveRenderRebuild();assert.equal(h.diagnostics.at(-1).fullReasons.other,1);assert.equal(h.diagnostics.at(-1).shellNode,'section.recommendation-area');
   }finally{h.close();}
 });
 

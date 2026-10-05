@@ -258,7 +258,7 @@ func TestUnavailableSeasonStatsDoesNotClaimComplete(t *testing.T) {
 	_, progress, matches, byQueue := (&app{}).loadSeasonChampionStats(
 		t.Context(), nil, gameplayReference{}, Summoner{}, "invalid", nil,
 	)
-	if progress.Complete || !progress.Unavailable || progress.Message != "当前数据源不提供赛季统计" {
+	if progress.Complete || !progress.Unavailable || progress.Message != "" {
 		t.Fatalf("unavailable progress = %#v", progress)
 	}
 	if matches != nil || byQueue != nil {
@@ -307,7 +307,7 @@ func TestSeasonScanPagesClearsResumeIndexWhenComplete(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &LCUClient{}
+	client := &LCUClient{region: "TENCENT", rsoPlatform: "HN1"}
 	provider := newSGPProvider()
 	provider.http = server.Client()
 	provider.serverBases["HN1"] = server.URL

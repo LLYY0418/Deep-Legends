@@ -216,7 +216,7 @@ func TestPlayerRankScoreCoalescesConcurrentLookup(t *testing.T) {
 	}))
 	defer server.Close()
 	a := &app{rankScores: newRankScoreCache()}
-	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client(), platformProbe: true}
+	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client(), platformProbe: true, region: "TENCENT", rsoPlatform: "HN1"}
 	result := make(chan rankScoreEntry, 1)
 	go func() { result <- a.playerRankScore(context.Background(), client, playerPUUID, false, "", "") }()
 	select {
@@ -252,7 +252,7 @@ func TestPlayerRankScoreAllConcurrentFollowersReceiveLeaderResult(t *testing.T) 
 	}))
 	defer server.Close()
 	a := &app{rankScores: newRankScoreCache()}
-	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client(), platformProbe: true}
+	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client(), platformProbe: true, region: "TENCENT", rsoPlatform: "HN1"}
 	const count = 8
 	results := make(chan rankScoreEntry, count)
 	for index := 0; index < count; index++ {
@@ -284,7 +284,7 @@ func TestPlayerRankScoreNegativeCacheStopsImmediateLCURetry(t *testing.T) {
 	}))
 	defer server.Close()
 	a := &app{rankScores: newRankScoreCache()}
-	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client(), platformProbe: true}
+	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client(), platformProbe: true, region: "TENCENT", rsoPlatform: "HN1"}
 	first := a.playerRankScore(context.Background(), client, playerPUUID, false, "", "")
 	second := a.playerRankScore(context.Background(), client, playerPUUID, false, "", "")
 	if calls.Load() != 1 || !first.negative || !second.negative || first.capability.State == capabilityAvailable {
@@ -312,7 +312,7 @@ func TestGameplayMatchTiersUsesOneGlobalLCUConcurrencyGate(t *testing.T) {
 		_, _ = io.WriteString(w, `{"queues":[{"queueType":"RANKED_SOLO_5x5","tier":"GOLD","division":"II","leaguePoints":55,"wins":12,"losses":8}]}`)
 	}))
 	defer server.Close()
-	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client(), platformProbe: true}
+	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client(), platformProbe: true, region: "TENCENT", rsoPlatform: "HN1"}
 	a := &app{
 		connected: true, lcu: client, summoner: currentSummoner(strings.Repeat("c", 48)), rankScores: newRankScoreCache(),
 		gameplayRefs: make(map[string]string), gameplayRefDetails: make(map[string]gameplayReference),

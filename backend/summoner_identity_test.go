@@ -190,7 +190,7 @@ func TestRefreshSummonerIdentitySingleflightSharesOneLCURequest(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(next)
 	}))
 	defer server.Close()
-	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client(), region: "TENCENT", rsoPlatform: "HN1"}
 	a := identityTestApp(client, current)
 
 	results := make(chan error, 6)

@@ -137,11 +137,11 @@
     "search", "rarity-button", "rarity-menu", "sort", "sort-button", "sort-label", "sort-menu", "sort-direction", "list-meta", "retry-list", "skin-grid", "skin-card-template",
     "pool-source", "setting-theme", "setting-ui-scale", "density-toggle", "account-content", "account-live-state", "diagnostics-content", "copy-diagnostics", "export-diagnostics", "diagnostic-log-meta", "history-content",
     "player-search-region", "player-search-region-label", "player-search-region-menu", "player-search-cn-toggle", "player-search-cn-info", "player-search-cn-options",
-    "player-search-follow-client", "player-search-follow-status", "player-search-name", "player-search-tag", "player-search-go", "player-search-clear",
+    "player-search-follow-client", "player-search-follow-status", "player-search-riot-toggle", "player-search-riot-options", "player-search-riot-follow-client", "player-search-riot-follow-status", "player-search-name", "player-search-tag", "player-search-go", "player-search-clear",
     "refresh-history", "pools-content", "pool-import", "pool-name", "pool-version", "pool-source-input", "pool-file", "pool-import-status",
     "privacy-content", "skin-dialog", "skin-dialog-close", "skin-dialog-image", "skin-dialog-fallback", "skin-dialog-status",
     "skin-dialog-title", "skin-dialog-hero", "skin-dialog-data", "skin-dialog-video", "copy-skin-id", "toast", "client-launchpad", "launcher-list",
-    "launchpad-eyebrow", "launchpad-title", "launchpad-description", "client-launch-reselect", "official-login-status",
+    "launchpad-eyebrow", "launchpad-title", "launchpad-description", "official-login-status",
     "sidebar-toggle", "settings-sidebar-toggle", "current-section-title", "topbar-subtitle", "page-intro", "settings-build-identity", "setting-share-directory", "setting-share-directory-change",
     "settings-update-check", "settings-update-feedback",
     "chroma-unowned-control", "show-unowned-chromas", "chroma-prestige-control", "show-prestige-chromas",
@@ -458,7 +458,7 @@
 	  if (!state.status.connected) clearDisconnectedClientState();
       state.statusDelay = STATUS_INTERVAL;
       if (!previous?.connected && state.status.connected) state.overlaySuppressed = false;
-	  const changed = !previous || previous.lastSync !== state.status.lastSync || previous.lastAttempt !== state.status.lastAttempt || previous.calculationOK !== state.status.calculationOK || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.identityReady !== state.status.identityReady || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotRetryCount !== state.status.snapshotRetryCount || previous.snapshotRetryExhausted !== state.status.snapshotRetryExhausted || previous.snapshotFallback !== state.status.snapshotFallback || previous.collectionDirty !== state.status.collectionDirty;
+	  const changed = !previous || previous.lastSync !== state.status.lastSync || previous.lastAttempt !== state.status.lastAttempt || previous.calculationOK !== state.status.calculationOK || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.clientRegion !== state.status.clientRegion || previous.serverId !== state.status.serverId || previous.identityReady !== state.status.identityReady || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotRetryCount !== state.status.snapshotRetryCount || previous.snapshotRetryExhausted !== state.status.snapshotRetryExhausted || previous.snapshotFallback !== state.status.snapshotFallback || previous.collectionDirty !== state.status.collectionDirty;
       if (changed) {
         if (!(state.section === "favorites" && state.favoritesPage === "account")) state.accountLoaded = false;
         if (!(state.section === "favorites" && state.favoritesPage === "pools")) {
@@ -475,7 +475,7 @@
         else triggerCollectionRescanIfDirty();
       }
       // Scan start/dirty/status messages do not change the collection payload.
-      const snapshotChanged = !previous || previous.lastSync !== state.status.lastSync || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotFallback !== state.status.snapshotFallback;
+      const snapshotChanged = !previous || previous.lastSync !== state.status.lastSync || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.clientRegion !== state.status.clientRegion || previous.serverId !== state.status.serverId || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotFallback !== state.status.snapshotFallback;
       if (loadItems || snapshotChanged) {
         state.skinsCache?.clear();
         if (state.section === "favorites" && state.favoritesPage === "collection") await loadSkins(true);
@@ -876,12 +876,23 @@
     // 是否查到结果）都不展示，避免干扰查看他人战绩。
     if (data.connected) {
       state.clientLaunchInFlight = "";
+      state.clientLaunchPending = {}; state.clientLaunchWaiting = {};
       state.clientLaunched = null;
       state.officialLoginMessage = "";
     }
     const visible = !data.connected && state.section === "overview" && state.overviewTabIsCurrent !== false;
     el.clientLaunchpad.hidden = !visible;
     if (!visible) return;
+    if (state.clientLaunched && !state.clientLaunchWaiting?.[state.clientLaunched.id]) {
+      state.clientLaunchWaiting ||= {}; state.clientLaunchWaiting[state.clientLaunched.id] = state.clientLaunched;
+    }
+    for (const [id, launched] of Object.entries(state.clientLaunchWaiting || {})) {
+      if (["credentials-unreadable", "probe-failed"].includes(data.clientDiscovery)) launched.processSeen = true;
+      if (data.clientDiscovery === "process-not-found" && (launched.processSeen || Date.now() - launched.at >= 60_000)) {
+        delete state.clientLaunchWaiting[id]; if (state.clientLaunched?.id === id) state.clientLaunched = null; state.officialLoginMessage = "";
+      }
+    }
+    state.clientLaunched ||= Object.values(state.clientLaunchWaiting || {})[0] || null;
     const launchedID = state.clientLaunched?.id === "tcls" || state.clientLaunched?.id === "riot" ? state.clientLaunched.id : "";
     const launchedTCLS = launchedID === "tcls";
     el.launchpadEyebrow.textContent = launchedID ? "已启动" : "英雄联盟客户端未登录";
@@ -889,20 +900,7 @@
     el.launchpadDescription.textContent = launchedID
       ? (launchedTCLS ? "请在弹出的腾讯窗口完成登录；登录并进入大厅后会自动连接。" : "请在弹出的 Riot 窗口完成登录；登录并进入大厅后会自动连接。")
       : "密码、扫码与安全验证只在腾讯官方窗口完成，登录后自动连接。";
-    el.clientLaunchReselect.hidden = !launchedID;
-    el.clientLaunchReselect.disabled = false;
-    el.clientLaunchReselect.onclick = launchedID ? () => {
-      state.clientLaunchInFlight = "";
-      state.clientLaunched = null;
-      state.officialLoginMessage = "";
-      renderLaunchpad(state.status || {});
-    } : null;
-    el.officialLoginStatus.hidden = Boolean(launchedID);
-    if (launchedID) {
-      el.launcherList.hidden = true;
-      return;
-    }
-    const launchInFlight = Boolean(state.clientLaunchInFlight);
+    el.officialLoginStatus.hidden = false;
     const installationFailed = Boolean(state.installationLoadError);
     if (!state.installationsLoaded) {
       el.officialLoginStatus.textContent = "正在检查英雄联盟客户端安装位置。";
@@ -927,9 +925,10 @@
     el.launcherList.hidden = false;
     el.launcherList.innerHTML = installations.length ? installations.map((item) => {
       const isTCLS = item.id === "tcls";
-      const label = isTCLS ? (state.clientLaunchInFlight === "tcls" ? "正在打开国服纯净入口" : "国服纯净入口") : item.name;
+      const starting = Boolean(state.clientLaunchPending?.[item.id] || state.clientLaunchWaiting?.[item.id] || state.clientLaunchInFlight === item.id || launchedID === item.id);
+      const label = starting ? "正在启动…" : isTCLS ? "国服纯净入口" : item.name;
       const description = isTCLS ? "跳过 WeGame，直连国服客户端" : item.location || item.description;
-      return `<button${isTCLS ? ' id="official-login"' : ""} class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"${launchInFlight ? " disabled" : ""}><span class="launcher-kind">${escapeHTML(isTCLS ? "L" : "R")}</span><span class="launcher-card-copy"><strong>${escapeHTML(label)}</strong><small data-tooltip="${escapeHTML(description)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(description)}</small></span><span class="launcher-arrow" aria-hidden="true">›</span></button>`;
+      return `<button${isTCLS ? ' id="official-login"' : ""} class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"${starting ? " disabled" : ""}><span class="launcher-kind">${escapeHTML(isTCLS ? "L" : "R")}</span><span class="launcher-card-copy"><strong>${escapeHTML(label)}</strong><small data-tooltip="${escapeHTML(description)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(description)}</small></span><span class="launcher-arrow" aria-hidden="true">›</span></button>`;
     }).join("") : "";
     for (const button of el.launcherList.querySelectorAll("[data-client-id]")) {
       button.addEventListener("click", () => button.dataset.clientId === "tcls" ? launchOfficialLogin(button) : launchDetectedClient(button));
@@ -937,20 +936,25 @@
   }
 
   async function launchOfficialLogin(button) {
-    if (state.clientLaunchInFlight || button?.disabled) return;
+    if (state.clientLaunchPending?.tcls || state.clientLaunchInFlight === "tcls" || button?.disabled) return;
+    state.clientLaunchPending ||= {}; state.clientLaunchPending.tcls = true;
     state.clientLaunchInFlight = "tcls";
     state.clientLaunched = null;
     state.officialLoginMessage = "正在打开国服纯净入口。";
     renderLaunchpad(state.status || {});
     try {
-      await api("/api/client-launch", { method: "POST", body: JSON.stringify({ id: "tcls" }) }, "official-login-launch", 8000);
+      const result = await api("/api/client-launch", { method: "POST", body: JSON.stringify({ id: "tcls" }) }, "official-login-launch", 120_000);
+      delete state.clientLaunchPending.tcls;
+      if (result?.cancelled) { state.overlaySuppressed = true; hideReadingOverlay("launch-cancelled"); state.clientLaunchInFlight = ""; state.clientLaunched = null; state.officialLoginMessage = ""; renderLaunchpad(state.status || {}); return; }
       state.clientLaunchInFlight = "";
       state.clientLaunched = { id: "tcls", at: Date.now() };
+      state.clientLaunchWaiting ||= {}; state.clientLaunchWaiting.tcls = state.clientLaunched;
       state.officialLoginMessage = "";
       renderLaunchpad(state.status || {});
       showToast("国服客户端已打开");
       setTimeout(() => refreshStatus(false), 1200);
     } catch (error) {
+      delete state.clientLaunchPending.tcls;
       state.clientLaunchInFlight = "";
       state.clientLaunched = null;
       state.officialLoginMessage = error.message;
@@ -961,19 +965,24 @@
 
   async function launchDetectedClient(button) {
     const id = button?.dataset.clientId || "";
-    if (!id || state.clientLaunchInFlight || button.disabled) return;
+    if (!id || state.clientLaunchPending?.[id] || state.clientLaunchInFlight === id || button.disabled) return;
+    state.clientLaunchPending ||= {}; state.clientLaunchPending[id] = true;
     state.clientLaunchInFlight = id;
     state.clientLaunched = null;
     state.officialLoginMessage = "";
     renderLaunchpad(state.status || {});
     try {
-      await api("/api/client-launch", { method: "POST", body: JSON.stringify({ id }) }, "client-launch", 8000);
+      const result = await api("/api/client-launch", { method: "POST", body: JSON.stringify({ id }) }, "client-launch", 120_000);
+      delete state.clientLaunchPending[id];
+      if (result?.cancelled || result?.alreadyOpen) { if (result?.cancelled) { state.overlaySuppressed = true; hideReadingOverlay("launch-cancelled"); } state.clientLaunchInFlight = ""; state.clientLaunched = null; state.officialLoginMessage = result?.alreadyOpen ? "Riot 客户端已经打开" : ""; renderLaunchpad(state.status || {}); return; }
       state.clientLaunchInFlight = "";
       state.clientLaunched = { id, at: Date.now() };
+      state.clientLaunchWaiting ||= {}; state.clientLaunchWaiting[id] = state.clientLaunched;
       renderLaunchpad(state.status || {});
       showToast("客户端已启动，登录并进入大厅后会自动连接");
       setTimeout(() => refreshStatus(false), 3000);
     } catch (error) {
+      delete state.clientLaunchPending[id];
       state.clientLaunchInFlight = "";
       state.clientLaunched = null;
       state.officialLoginMessage = error.message;
@@ -3355,18 +3364,20 @@
   const RIOT_REGION_LABELS = {kr:"韩服",jp1:"日服",na1:"美服",euw1:"欧西",eun1:"欧北东",tw2:"台服",sg2:"东南亚",br1:"巴西",la1:"拉北",la2:"拉南",me1:"中东",oc1:"大洋洲",ru:"俄服",tr1:"土耳其",vn2:"越南"};
   function isRiotSearchRegion(region) { return Object.hasOwn(RIOT_REGION_LABELS, String(region || "").toLowerCase()); }
   let searchClientPlatform = "";
-  function searchRegion() { return isRiotSearchRegion(el.playerSearchRegion.dataset.region) ? el.playerSearchRegion.dataset.region : ""; }
+  function searchRegion() { const region = el.playerSearchRegion.dataset.region; return region === "riot-follow" ? (state.status?.connected && isRiotSearchRegion(state.status?.clientRegion) ? state.status.clientRegion : "") : isRiotSearchRegion(region) ? region : ""; }
   function searchServerID() { return searchRegion() ? "" : (el.playerSearchRegion.dataset.serverId || ""); }
 
   function submitPlayerSearch() {
     absorbPastedRiotID(el.playerSearchName);
     const region = searchRegion();
     const serverId = searchServerID();
+    if (el.playerSearchRegion.dataset.region === "riot-follow" && !region) { showToast("“跟随客户端”需要外服客户端正在运行"); return; }
     const gameName = el.playerSearchName.value.trim();
     const tagLine = el.playerSearchTag.value.replace(/#/g, "").trim();
     if (!gameName) { showToast("请填写玩家名称"); el.playerSearchName.focus(); return; }
     // 韩服允许只填名称：后端会用 OP.GG 自动补全出当前编号再查询。
     if (!tagLine && !region) { showToast("请填写 # 后的编号，例如 12345"); el.playerSearchTag.focus(); return; }
+    if (!region && state.status?.connected && state.status?.clientRegion !== "TENCENT") { showToast("当前客户端服务器未提供国服查询"); return; }
     if (!region && !serverId && !state.status?.connected) {
       showToast("“跟随客户端”需要英雄联盟客户端正在运行");
       el.playerSearchRegion.focus();
@@ -3392,9 +3403,20 @@
   function setCNRegionExpanded(expanded) {
     el.playerSearchCnToggle.setAttribute("aria-expanded", String(expanded));
     el.playerSearchCnOptions.hidden = !expanded;
+    if (expanded) { el.playerSearchRiotToggle.setAttribute("aria-expanded", "false"); el.playerSearchRiotOptions.hidden = true; }
+  }
+  function setRiotRegionExpanded(expanded) {
+    el.playerSearchRiotToggle.setAttribute("aria-expanded", String(expanded));
+    el.playerSearchRiotOptions.hidden = !expanded;
+    if (expanded) { setCNRegionExpanded(false); if (el.playerSearchRegion.dataset.region === "cn") applySearchRegion("kr"); }
   }
 
   function updateSearchRegionLabel(data = state.status) {
+    if (el.playerSearchRegion.dataset.region === "riot-follow") {
+      const region = data?.connected ? data.clientRegion : "";
+      el.playerSearchRegionLabel.textContent = isRiotSearchRegion(region) ? `外服 · ${RIOT_REGION_LABELS[region]}` : "外服 · 跟随客户端";
+      return;
+    }
     if (isRiotSearchRegion(el.playerSearchRegion.dataset.region)) {
       el.playerSearchRegionLabel.textContent = RIOT_REGION_LABELS[el.playerSearchRegion.dataset.region];
       return;
@@ -3412,18 +3434,25 @@
 
   function updateSearchRegionStatus(data) {
     const platform = isRiotSearchRegion(data?.clientRegion) ? data.clientRegion : data?.clientRegion === "TENCENT" ? "cn" : "";
-    if (data?.connected && platform && platform !== searchClientPlatform) {searchClientPlatform = platform; applySearchRegion(platform);}
+    if (data?.connected && platform && platform !== searchClientPlatform) {
+      searchClientPlatform = platform;
+      if (!el.playerSearchRegion.dataset.manual) applySearchRegion(platform === "cn" ? "cn" : "riot-follow", "", false);
+    }
+    const riotAvailable = Boolean(data?.connected && isRiotSearchRegion(data?.clientRegion));
+    el.playerSearchRiotFollowClient.disabled = !riotAvailable;
+    el.playerSearchRiotFollowClient.setAttribute("aria-disabled", String(!riotAvailable));
+    el.playerSearchRiotFollowStatus.textContent = riotAvailable ? `（${RIOT_REGION_LABELS[data.clientRegion]}）` : "需要外服客户端在运行";
     const serverId = data?.connected ? String(data.serverId || "").trim().toUpperCase() : "";
     const serverName = data?.connected ? String(data.serverName || "").trim() : "";
     const available = Boolean(serverId && serverName);
     el.playerSearchFollowClient.disabled = !available;
     el.playerSearchFollowClient.setAttribute("aria-disabled", String(!available));
     el.playerSearchFollowStatus.textContent = available ? `（${serverName}）` : data?.connected ? "未识别当前服务器" : "需要客户端在运行";
-    if (el.playerSearchRegion.dataset.region === "cn" && !el.playerSearchRegion.dataset.serverId) updateSearchRegionLabel(data);
+    updateSearchRegionLabel(data);
   }
 
-  function applySearchRegion(value, requestedServerID = "") {
-    const region = isRiotSearchRegion(value) ? String(value).toLowerCase() : "cn";
+  function applySearchRegion(value, requestedServerID = "", manual = true) {
+    const region = value === "riot-follow" ? value : isRiotSearchRegion(value) ? String(value).toLowerCase() : value === "cn" ? "cn" : "kr";
     const serverId = region !== "cn" ? "" : String(requestedServerID ?? "").trim().toUpperCase();
     const selected = [...el.playerSearchRegionMenu.querySelectorAll("[data-region-option]")].find((option) => (
       option.dataset.regionOption === region && (region !== "cn" || option.dataset.serverId === serverId)
@@ -3435,6 +3464,7 @@
     }
     if (region !== "cn") setCNRegionExpanded(false);
     updateSearchRegionLabel();
+    if (manual) { el.playerSearchRegion.dataset.manual = "true"; savePreference("search-region-manual", "true"); }
     savePreference("search-region", region);
     if (region === "cn") savePreference("search-server-id", el.playerSearchRegion.dataset.serverId);
   }
@@ -3447,7 +3477,7 @@
   function closeRegionMenu() { el.playerSearchRegionMenu.hidden = true; el.playerSearchRegion.setAttribute("aria-expanded", "false"); }
   el.playerSearchRegion.addEventListener("click", () => {
     const opening = el.playerSearchRegionMenu.hidden;
-    if (opening) setCNRegionExpanded(false);
+    if (opening) { setCNRegionExpanded(false); setRiotRegionExpanded(false); }
     el.playerSearchRegionMenu.hidden = !opening;
     el.playerSearchRegion.setAttribute("aria-expanded", String(opening));
     if (opening) {
@@ -3456,6 +3486,7 @@
     }
   });
   el.playerSearchCnToggle.addEventListener("click", () => setCNRegionExpanded(el.playerSearchCnToggle.getAttribute("aria-expanded") !== "true"));
+  el.playerSearchRiotToggle.addEventListener("click", () => setRiotRegionExpanded(el.playerSearchRiotToggle.getAttribute("aria-expanded") !== "true"));
   el.playerSearchRegionMenu.addEventListener("click", (event) => {
     if (event.target.closest("#player-search-pro")) {
       closeRegionMenu();
@@ -3483,7 +3514,8 @@
   });
   document.addEventListener("click", (event) => { if (!event.target.closest(".player-search-region")) closeRegionMenu(); });
   el.playerSearchCnInfo.dataset.tooltip = CN_SERVER_MERGE_NOTE;
-  applySearchRegion(preference("search-region", "cn"), preference("search-server-id", ""));
+  if (preference("search-region-manual", "") === "true") el.playerSearchRegion.dataset.manual = "true";
+  applySearchRegion(preference("search-region", "kr"), preference("search-server-id", ""), false);
   updateSearchRegionStatus(state.status || {});
   window.addEventListener("deep-legends:status", (event) => updateSearchRegionStatus(event.detail || {}));
 

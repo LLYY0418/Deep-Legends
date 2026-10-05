@@ -1,0 +1,123 @@
+[
+  {
+    "check": "go-full",
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "./..."
+    ],
+    "started_at": "2026-10-05T14:49:29Z",
+    "finished_at": "2026-10-05T14:51:49Z",
+    "seconds": 140.485,
+    "exit_code": 0
+  },
+  {
+    "check": "go-race",
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-race",
+      "./..."
+    ],
+    "started_at": "2026-10-05T14:51:49Z",
+    "finished_at": "2026-10-05T14:54:49Z",
+    "seconds": 179.997,
+    "exit_code": 0
+  },
+  {
+    "check": "go-vet",
+    "command": [
+      "go",
+      "vet",
+      "./..."
+    ],
+    "started_at": "2026-10-05T14:54:49Z",
+    "finished_at": "2026-10-05T14:54:51Z",
+    "seconds": 1.291,
+    "exit_code": 0
+  },
+  {
+    "check": "installer-test",
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "./..."
+    ],
+    "started_at": "2026-10-05T14:54:51Z",
+    "finished_at": "2026-10-05T14:54:54Z",
+    "seconds": 3.801,
+    "exit_code": 0
+  },
+  {
+    "check": "installer-vet",
+    "command": [
+      "go",
+      "vet",
+      "./..."
+    ],
+    "started_at": "2026-10-05T14:54:54Z",
+    "finished_at": "2026-10-05T14:54:55Z",
+    "seconds": 0.168,
+    "exit_code": 0
+  },
+  {
+    "check": "ci-filters",
+    "command": [
+      "node",
+      "scripts/verify-ci-test-filters.cjs"
+    ],
+    "started_at": "2026-10-05T14:54:55Z",
+    "finished_at": "2026-10-05T14:54:55Z",
+    "seconds": 0.185,
+    "exit_code": 0
+  },
+  {
+    "check": "renderers",
+    "command": [
+      "node",
+      "scripts/test-renderers.cjs",
+      "all"
+    ],
+    "started_at": "2026-10-05T14:54:55Z",
+    "finished_at": "2026-10-05T14:56:17Z",
+    "seconds": 81.849,
+    "exit_code": 0
+  },
+  {
+    "check": "worker",
+    "command": [
+      "node",
+      "--test",
+      "/Users/ly/personal/personal-work/deep-legends/relay/riot-worker/worker.test.mjs"
+    ],
+    "started_at": "2026-10-05T14:56:17Z",
+    "finished_at": "2026-10-05T14:56:17Z",
+    "seconds": 0.236,
+    "exit_code": 0
+  },
+  {
+    "check": "chromium-r100",
+    "command": [
+      "node",
+      "desktop/r100-browser.cjs"
+    ],
+    "started_at": "2026-10-05T14:56:17Z",
+    "finished_at": "2026-10-05T14:56:18Z",
+    "seconds": 1.545,
+    "exit_code": 0
+  },
+  {
+    "check": "chromium-r117",
+    "command": [
+      "node",
+      "desktop/r117-browser.cjs"
+    ],
+    "started_at": "2026-10-05T14:56:18Z",
+    "finished_at": "2026-10-05T14:56:22Z",
+    "seconds": 3.192,
+    "exit_code": 0
+  }
+]

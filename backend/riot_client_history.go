@@ -84,7 +84,8 @@ func transientLCUHistoryError(ctx context.Context, err error) bool {
 }
 func getLCUHistoryWithRetry(ctx context.Context, client *LCUClient, path string, out any) error {
 	delays := []time.Duration{3 * time.Second, 6 * time.Second, 12 * time.Second}
-	external := clientRiotPlatform(client) != ""
+	region, _ := clientRegionInfo(client)
+	external := region != "TENCENT"
 	for attempt := 0; ; attempt++ {
 		err := client.GetJSONContext(ctx, path, out)
 		if !external || attempt == len(delays) || !transientLCUHistoryError(ctx, err) {

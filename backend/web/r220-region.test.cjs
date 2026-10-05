@@ -24,13 +24,14 @@ test('R220 JP status moves the current tab and identityReady reissues its overvi
 
 test('R220 top search defaults to the connected platform, keeps manual choice, and clears Tencent server IDs',()=>{
  const dom=new JSDOM(html),el={};try{
- for(const id of ['player-search-region','player-search-region-label','player-search-region-menu','player-search-cn-toggle','player-search-cn-options','player-search-follow-client','player-search-follow-status'])el[id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase())]=dom.window.document.getElementById(id);
+ for(const id of ['player-search-region','player-search-region-label','player-search-region-menu','player-search-cn-toggle','player-search-cn-options','player-search-follow-client','player-search-follow-status','player-search-riot-toggle','player-search-riot-options','player-search-riot-follow-client','player-search-riot-follow-status'])el[id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase())]=dom.window.document.getElementById(id);
  const state={status:{connected:true,clientRegion:'jp1'}},preferences=[];
  const f=compile(app,['searchRegion','searchServerID','applySearchRegion','updateSearchRegionLabel','updateSearchRegionStatus','setCNRegionExpanded'],{state,el,savePreference:(...x)=>preferences.push(x)});
- f.updateSearchRegionStatus(state.status);assert.equal(f.searchRegion(),'jp1');assert.equal(el.playerSearchRegionLabel.textContent,'日服');assert.equal(f.searchServerID(),'');
+ f.updateSearchRegionStatus(state.status);assert.equal(f.searchRegion(),'jp1');assert.equal(el.playerSearchRegionLabel.textContent,'外服 · 日服');assert.equal(f.searchServerID(),'');
  f.applySearchRegion('na1','HN1');assert.equal(f.searchRegion(),'na1');assert.equal(f.searchServerID(),'');f.updateSearchRegionStatus(state.status);assert.equal(f.searchRegion(),'na1');
- state.status={connected:true,clientRegion:'TENCENT',serverId:'HN1',serverName:'艾欧尼亚'};f.updateSearchRegionStatus(state.status);assert.equal(f.searchRegion(),'');
- for(const region of platforms)assert(el.playerSearchRegionMenu.querySelector(`[data-region-option="${region}"]`),region);
+ state.status={connected:true,clientRegion:'TENCENT',serverId:'HN1',serverName:'艾欧尼亚'};f.updateSearchRegionStatus(state.status);assert.equal(f.searchRegion(),'na1');
+ for(const region of ['kr','jp1','na1','euw1','eun1','tw2','vn2','sg2'])assert(el.playerSearchRegionMenu.querySelector(`[data-region-option="${region}"]`),region);
+ for(const region of ['br1','la1','la2','me1','oc1','ru','tr1'])assert.equal(el.playerSearchRegionMenu.querySelector(`[data-region-option="${region}"]`),null);
  }finally{dom.window.close();}
 });
 

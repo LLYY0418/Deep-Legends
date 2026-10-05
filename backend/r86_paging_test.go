@@ -61,6 +61,7 @@ func r86PagingProvider(t *testing.T, lastPage int) (*app, *atomic.Int32) {
 }
 
 func TestR86SGPThreeHundredPhysicalPagesStayWithinBudget(t *testing.T) {
+	t.Parallel()
 	a, calls := r86PagingProvider(t, -1)
 	for page := 0; page < 300; page++ {
 		games, consumed, _, err := a.sgp.matchHistoryOn(context.Background(), a.lcu, "HN1", "subject", page*50, 50, true)

@@ -75,11 +75,17 @@ type LCUClient struct {
 	source                string
 	// region 与 rsoPlatform 来自客户端启动参数（例如 TENCENT / HN1），
 	// 用于确定国服玩家所属的 SGP 大区服务器；读取失败时留空。
-	region            string
-	rsoPlatform       string
-	platformProbe     bool
-	platformSource    string
-	historyRetrySleep func(context.Context, time.Duration) error
+	region             string
+	rsoPlatform        string
+	platformProbe      bool
+	platformSource     string
+	platformResolveMu  sync.Mutex
+	platformAttempt    int
+	platformFirstProbe time.Time
+	platformNextProbe  time.Time
+	hasRegionArg       bool
+	hasPlatformArg     bool
+	historyRetrySleep  func(context.Context, time.Duration) error
 	// inventoryV1Failures remembers a client-version-specific dead endpoint
 	// during this client session so every snapshot retry does not repeat it.
 	inventoryV1Failures int
@@ -609,37 +615,106 @@ func (c *LCUClient) applyPlatformArgs(commandLine string) {
 	defer c.mu.Unlock()
 	if match := regionPattern.FindStringSubmatch(commandLine); len(match) == 2 {
 		c.region = strings.ToUpper(match[1])
+		c.hasRegionArg = true
 	}
 	if match := rsoPlatformPattern.FindStringSubmatch(commandLine); len(match) == 2 {
 		c.rsoPlatform = strings.ToUpper(match[1])
+		c.hasPlatformArg = true
 	}
-	if c.region != "" && c.rsoPlatform != "" {
+	if c.hasRegionArg || c.hasPlatformArg {
 		c.platformSource = "startup-args"
-		c.platformProbe = true
 	}
+	c.platformProbe = resolvedClientPlatform(c.region, c.rsoPlatform)
 }
 
-// platformInfo 返回客户端所属大区（如 TENCENT）与子服务器（如 HN1）。
-// 启动参数缺失时向客户端查询一次命令行参数作为兜底。
-func (c *LCUClient) platformInfo() (string, string) {
+func resolvedClientPlatform(region, platform string) bool {
+	if strings.EqualFold(region, "TENCENT") {
+		return sgpPlatformCode.MatchString(strings.ToUpper(platform))
+	}
+	return riotPlatformFromClientRegion(platform) != ""
+}
+
+// Unknown identities retry with 2/4/8 second backoff. After 60 seconds only
+// explicit status refreshes/identity-ready transitions probe the client.
+func (c *LCUClient) platformInfo() (string, string) { return c.resolvePlatform(false) }
+func (c *LCUClient) resolvePlatform(refresh bool) (string, string) {
+	if c == nil {
+		return "", ""
+	}
+	c.platformResolveMu.Lock()
+	defer c.platformResolveMu.Unlock()
 	c.mu.RLock()
-	region, platform, probed := c.region, c.rsoPlatform, c.platformProbe
+	region, platform := c.region, c.rsoPlatform
+	next, first := c.platformNextProbe, c.platformFirstProbe
 	c.mu.RUnlock()
-	if region != "" && platform != "" || probed {
+	if resolvedClientPlatform(region, platform) || c.http == nil {
 		return region, platform
 	}
+	now := time.Now()
+	if !next.IsZero() && now.Before(next) || !refresh && !first.IsZero() && now.Sub(first) >= 60*time.Second {
+		return region, platform
+	}
+	probeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	// Never retain or diagnose any other command-line arguments.
 	var args []string
-	if err := c.GetJSON("/riotclient/command-line-args", &args); err == nil {
+	source := "command-line-query"
+	if c.GetJSONContext(probeCtx, "/riotclient/command-line-args", &args) == nil {
 		c.applyPlatformArgs(strings.Join(args, " "))
-		c.mu.Lock()
-		c.platformSource = "command-line-query"
-		c.mu.Unlock()
+		c.mu.RLock()
+		region, platform = c.region, c.rsoPlatform
+		c.mu.RUnlock()
+	}
+	if !resolvedClientPlatform(region, platform) {
+		var loginPlatform string
+		if c.GetJSONContext(probeCtx, "/lol-platform-config/v1/namespaces/LoginDataPacket/platformId", &loginPlatform) == nil {
+			if riotPlatform(loginPlatform) != "" {
+				platform = strings.ToUpper(loginPlatform)
+				source = "login-data-packet"
+			}
+		}
+	}
+	if !resolvedClientPlatform(region, platform) {
+		// Prefer the observed command-line region; locale is a last fallback.
+		if mapped := riotPlatformFromClientRegion(region); mapped != "" {
+			platform = strings.ToUpper(mapped)
+		} else {
+			var locale struct {
+				Region string `json:"region"`
+			}
+			if c.GetJSONContext(probeCtx, "/riotclient/region-locale", &locale) == nil && locale.Region != "" {
+				region = strings.ToUpper(locale.Region)
+				platform = strings.ToUpper(riotPlatformFromClientRegion(region))
+				source = "region-locale"
+			}
+		}
 	}
 	c.mu.Lock()
-	c.platformProbe = true
-	region, platform = c.region, c.rsoPlatform
+	c.region, c.rsoPlatform, c.platformSource = region, platform, source
+	c.platformProbe = resolvedClientPlatform(region, platform)
+	c.platformAttempt++
+	if c.platformFirstProbe.IsZero() {
+		c.platformFirstProbe = now
+	}
+	delay := time.Duration(1<<min(c.platformAttempt, 3)) * time.Second
+	c.platformNextProbe = now.Add(delay)
 	c.mu.Unlock()
+	c.diagnosticMu.Lock()
+	observe := c.diagnosticObserve
+	c.diagnosticMu.Unlock()
+	if observe != nil {
+		observe(clientPlatformDiagnosticSnapshot(c))
+	}
 	return region, platform
+}
+
+func (c *LCUClient) retryPlatformAfterIdentityReady() {
+	c.mu.Lock()
+	if !resolvedClientPlatform(c.region, c.rsoPlatform) {
+		c.platformNextProbe = time.Time{}
+	}
+	c.mu.Unlock()
+	c.resolvePlatform(true)
 }
 
 func lockfileCandidates(commandLines []string) []string {

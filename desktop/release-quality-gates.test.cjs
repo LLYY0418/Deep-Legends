@@ -64,13 +64,15 @@ test("R86 CI uses the package version, installs test dependencies and needs no p
   assert.match(timingRunner, /\["backend\/web", "desktop", "scripts"\]/);
   assert.match(timingRunner, /duration_ms > 90000/);
   assert.match(timingRunner, /duration_ms > 240000/);
-  assert.match(windows, /node --test --test-name-pattern="R86 Windows release\|R222 Windows" desktop\/release-quality-gates\.test\.cjs/);
-  for (const name of ["TestSplitRegistryPathSupportsNativeTencentKeys", "TestR204KeySaveRejectsUnauthorizedAndEncrypts", "TestR204KeyRuntime401AndPrivacy",
-    "TestWindowsApplicationWindowDetection", "TestR205WindowsShortcutRoundTrip", "TestR206IconOnlyChangesIconAndPreservesCreation",
-    "TestSettingsUseHRESULTAcrossEntireConfiguration", "TestCOMUsesHRESULTInsteadOfThreadLastError", "TestFailedNavigationEventIsNotReadiness"]) assert.ok(windows.includes(name), name);
+  assert.match(windows, /node scripts\/run-ci-tests\.cjs go backend/);
+  assert.match(windows, /node scripts\/run-ci-tests\.cjs go installer/);
+  assert.match(ci, /run: node scripts\/verify-ci-test-filters\.cjs/);
+  assert.match(windows, /--expected-tests=2 --test-name-pattern="R86 Windows release\|R222 Windows" desktop\/release-quality-gates\.test\.cjs/);
+  for (const name of ["TestSplitRegistryPathSupportsNativeTencentKeys", "TestR204KeySaveAndClear", "TestR204KeyRuntime401AndPrivacy"]) assert.ok(windows.includes(name), name);
+  assert.doesNotMatch(windows, /go test[^\n]+-run/);
   assert.match(windows, /R82_POWERSHELL: powershell\.exe/);
-  assert.match(windows, /node --test scripts\/r82-startup-ab-script\.test\.cjs/);
-  assert.match(windows, /--test-name-pattern="setup-only Windows CI skip" scripts\/setup-only-build\.test\.cjs/);
+  assert.match(windows, /--expected-tests=2 scripts\/r82-startup-ab-script\.test\.cjs/);
+  assert.match(windows, /--expected-tests=1 --test-name-pattern="setup-only Windows CI skip" scripts\/setup-only-build\.test\.cjs/);
   const release = fs.readFileSync(path.join(root, ".github/workflows/release.yml"), "utf8");
   assert.match(release, /-Version \$env:RELEASE_VERSION -SkipTestsInCI/);
   assert.match(release, /gh release create[^\n]+--draft/);

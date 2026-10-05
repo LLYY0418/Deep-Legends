@@ -1,0 +1,37 @@
+{
+  "run_id": 37312091768,
+  "url": "https://github.com/LLYY0418/Deep-Legends/actions/runs/37312091768",
+  "sha": "7363fa8f",
+  "conclusion": "success",
+  "backend_linux_race_seconds": 116.493,
+  "version": "0.12.73",
+  "fingerprint": "be7741263b5b",
+  "key_mode": "public",
+  "real_upgrade": {
+    "copy_ms": 0,
+    "uninstall_old_ms": 2249,
+    "key_mode": "public",
+    "total_ms": 14014,
+    "stages": 8,
+    "intermediate_version": "0.12.68",
+    "icon_location_stable": true,
+    "old_version": "0.12.65",
+    "created_time_changed": false
+  },
+  "jobs": [
+    {
+      "name": "quality",
+      "startedAt": "2026-10-05T12:48:28Z",
+      "completedAt": "2026-10-05T12:55:36Z",
+      "conclusion": "success",
+      "url": "https://github.com/LLYY0418/Deep-Legends/actions/runs/37312091768/job/111769724256"
+    },
+    {
+      "name": "windows-build",
+      "startedAt": "2026-10-05T12:48:29Z",
+      "completedAt": "2026-10-05T12:59:25Z",
+      "conclusion": "success",
+      "url": "https://github.com/LLYY0418/Deep-Legends/actions/runs/37312091768/job/111769724474"
+    }
+  ]
+}

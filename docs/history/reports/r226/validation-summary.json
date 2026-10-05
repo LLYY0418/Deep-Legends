@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "date": "2026-10-05",
+  "timezone": "Asia/Shanghai",
+  "status": "implemented_and_local_acceptance_passed",
+  "version": "0.12.73",
+  "source_fingerprint": "d7d3268b6b23",
+  "build": {
+    "version": "0.12.73",
+    "key_mode": "public",
+    "fingerprint": "d7d3268b6b23",
+    "fingerprint_after": "d7d3268b6b23",
+    "stable": true,
+    "artifacts": [
+      "/private/tmp/deep-legends-r226-0.12.73-public",
+      "/private/tmp/deep-legends-r226-0.12.73-public.exe"
+    ],
+    "built_at": "2026-10-05T13:46:26.263Z"
+  },
+  "artifacts": [
+    {
+      "path": "/private/tmp/deep-legends-r226-0.12.73-public",
+      "bytes": 31325618,
+      "sha256": "5861927d8a37704613238b6ee906d45ca5800a02651a95a02b1a6ca51c0eba29"
+    },
+    {
+      "path": "/private/tmp/deep-legends-r226-0.12.73-public.exe",
+      "bytes": 32229888,
+      "sha256": "4de09d7b45fc8cfc6164dbac2b2ab0d40a52f455b74e91966ed1603f0e700f2e"
+    }
+  ],
+  "checks": [
+    {
+      "command": "node --test desktop/refresh-orchestration.test.cjs (before fix)",
+      "exit_code": 1,
+      "expected_regression": true,
+      "tests": 15,
+      "passed": 13,
+      "failed": 2,
+      "log": "guard-before.log"
+    },
+    {
+      "command": "node --test desktop/refresh-orchestration.test.cjs",
+      "exit_code": 0,
+      "tests": 15,
+      "passed": 15,
+      "failed": 0,
+      "duration_ms": 5926.60125,
+      "log": "guard-after.log"
+    },
+    {
+      "command": "R222_NODE_TIMING_OUTPUT=... node scripts/test-renderers.cjs all",
+      "exit_code": 0,
+      "counts": {
+        "tests": 1275,
+        "failed": 0,
+        "passed": 1271,
+        "cancelled": 0,
+        "skipped": 4,
+        "todo": 0,
+        "topLevel": 1272,
+        "suites": 0
+      },
+      "duration_ms": 78351.775334,
+      "concurrency": 8,
+      "file_budget_ms": 90000,
+      "suite_budget_ms": 240000,
+      "max_file": {
+        "file": "desktop/overview-render-requests.test.cjs",
+        "duration_ms": 42841.720833
+      },
+      "log": "renderers-all.log",
+      "timings": "node-timings-local.json"
+    },
+    {
+      "command": "node --check backend/web/gameplay.js",
+      "exit_code": 0,
+      "log": "js-syntax.log"
+    },
+    {
+      "command": "native and Windows amd64 public go build; verify-build-fingerprint; native --startup-warmup",
+      "exit_code": 0,
+      "log": "build-final.json"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "log": "diff-check.log"
+    }
+  ],
+  "skipped": [
+    {
+      "name": "R82 A/B receipt lookup and deduplication execute the real PowerShell script",
+      "reason": "PowerShell is required; set R82_POWERSHELL to run the real script tests"
+    },
+    {
+      "name": "R82 A/B filename, hash mismatch and duplicate mutations reach failing assertions",
+      "reason": "PowerShell is required; set R82_POWERSHELL to run the real script tests"
+    },
+    {
+      "name": "R86 Windows release stops on a real failing Go test and rejects an independent early build",
+      "reason": "requires Windows and PowerShell"
+    },
+    {
+      "name": "R222 Windows release entry points reject CI skip locally before any side effect",
+      "reason": "requires Windows and PowerShell"
+    }
+  ],
+  "ci_review": "ci-flake-review.json",
+  "ci_current_source_verified": false,
+  "release": {
+    "version_changed": false,
+    "pushed": false,
+    "tagged": false,
+    "published": false,
+    "installer_created": false,
+    "key_mode": "public"
+  }
+}

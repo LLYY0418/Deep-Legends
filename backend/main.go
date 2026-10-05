@@ -850,6 +850,7 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	}
 	response.Update = a.updates.Status()
 	if response.Connected {
+		client.resolvePlatform(true)
 		response.ClientRegion, response.ClientRegionLabel = clientRegionInfo(client)
 		response.ServerID = clientTencentServerID(client)
 		response.ServerName = tencentServerName(response.ServerID)
@@ -1717,6 +1718,9 @@ func (a *app) clearAssetCache() {
 }
 
 func (a *app) recordDiagnostic(event map[string]any) {
+	if event["event"] == "sgp_game_decode_failed" {
+		event = allowSGPGameDecodeDiagnostic(event)
+	}
 	if a.storage == nil {
 		return
 	}

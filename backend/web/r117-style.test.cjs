@@ -62,8 +62,8 @@ test("R117 CSS budgets do not exceed the audited baseline", () => {
   // R190 local paddings plus R191 shard-chip left padding of 4px.
   const r190PaddingValues = new Set(["8px 8px 10px", "8px 6px 2px", "10px 12px 10px 10px", "3px 9px 3px 4px", "4px 0 7px", "0 3px", "5px 2px", "3px 8px 3px 5px"]);
   assert.ok([...values("padding")].filter(value => !r190PaddingValues.has(value)).length <= 205, "padding budget increased beyond R190 design");
-  // R211 熟练度网格新增 22px 12px；其余 gap 仍受原预算约束。
-  assert.ok([...values("gap")].filter(value => value !== "22px 12px").length <= 55, "gap budget increased");
+  // R211 网格 22px 12px、R224 名字标签统一 6px token；其他值受原预算约束。
+  assert.ok([...values("gap")].filter(value => value !== "22px 12px" && value !== "var(--identity-chip-gap)").length <= 55, "gap budget increased");
 });
 
 // P3-2 / P3-3 的固定白名单（23 个 hex、20 个类名）只能防旧问题复发，换一个白名单之外

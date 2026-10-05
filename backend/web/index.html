@@ -56,7 +56,7 @@
           <div class="window-drag"><strong id="current-section-title">总览</strong><span id="topbar-subtitle">召唤师生涯与最近对局</span></div>
           <div id="player-search" class="player-search" role="search" aria-label="召唤师搜索">
             <div class="player-search-region">
-              <button id="player-search-region" type="button" aria-haspopup="menu" aria-expanded="false" data-region="cn" data-server-id=""><span id="player-search-region-label">国服</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+              <button id="player-search-region" type="button" aria-haspopup="menu" aria-expanded="false" data-region="kr" data-server-id=""><span id="player-search-region-label">韩服</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
               <div id="player-search-region-menu" class="region-menu" role="menu" hidden>
                 <div class="region-menu-section region-menu-section-cn" role="none">
                   <div class="region-menu-section-head">
@@ -79,24 +79,22 @@
                     </div>
                   </div>
                 </div>
-                <div class="region-menu-section region-menu-section-kr" role="none">
-                  <button class="region-menu-kr" type="button" role="menuitemradio" aria-checked="false" data-region-option="kr" data-server-id="" data-region-menu-entry><b>韩服</b><span class="region-option-check" aria-hidden="true">✓</span></button>
-                </div>
-                <div class="region-server-grid" role="group" aria-label="拳头服务器">
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="jp1" data-server-id="" data-region-menu-entry><b>日服</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="na1" data-server-id="" data-region-menu-entry><b>美服</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="euw1" data-server-id="" data-region-menu-entry><b>欧西</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="eun1" data-server-id="" data-region-menu-entry><b>欧北东</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="tw2" data-server-id="" data-region-menu-entry><b>台服</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="sg2" data-server-id="" data-region-menu-entry><b>东南亚</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="br1" data-server-id="" data-region-menu-entry><b>巴西</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="la1" data-server-id="" data-region-menu-entry><b>拉北</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="la2" data-server-id="" data-region-menu-entry><b>拉南</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="me1" data-server-id="" data-region-menu-entry><b>中东</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="oc1" data-server-id="" data-region-menu-entry><b>大洋洲</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="ru" data-server-id="" data-region-menu-entry><b>俄服</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="tr1" data-server-id="" data-region-menu-entry><b>土耳其</b></button>
-                  <button type="button" role="menuitemradio" aria-checked="false" data-region-option="vn2" data-server-id="" data-region-menu-entry><b>越南</b></button>
+                <div class="region-menu-section region-menu-section-riot" role="none">
+                  <div class="region-menu-section-head"><button id="player-search-riot-toggle" class="region-menu-section-toggle" type="button" role="menuitem" aria-expanded="false" aria-controls="player-search-riot-options" data-region-menu-entry><b>外服</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div>
+                  <div id="player-search-riot-options" class="region-menu-cn-options" role="group" aria-label="外服服务器" hidden>
+                    <button id="player-search-riot-follow-client" class="region-menu-follow" type="button" role="menuitemradio" aria-checked="false" data-region-option="riot-follow" data-region-menu-entry disabled><span class="region-option-dot" aria-hidden="true"></span><span class="region-follow-copy"><b>跟随客户端</b><span id="player-search-riot-follow-status">需要外服客户端在运行</span></span></button>
+                    <div class="region-menu-divider" role="presentation"></div>
+                    <div class="region-server-grid" role="group" aria-label="指定外服服务器">
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="kr" data-region-menu-entry><b>韩服</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="jp1" data-region-menu-entry><b>日服</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="na1" data-region-menu-entry><b>美服</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="euw1" data-region-menu-entry><b>欧西</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="eun1" data-region-menu-entry><b>欧北东</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="tw2" data-region-menu-entry><b>台服</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="vn2" data-region-menu-entry><b>越南</b></button>
+                      <button type="button" role="menuitemradio" aria-checked="false" data-region-option="sg2" data-region-menu-entry><b>东南亚</b></button>
+                    </div>
+                  </div>
                 </div>
                 <div class="region-menu-divider" role="separator"></div>
                 <button id="player-search-pro" class="region-menu-pro" type="button" role="menuitem" aria-controls="pro-players-panel" data-region-menu-entry><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v5a4 4 0 0 1-8 0V3Zm0 2H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 1v6m-4 3h8m-10 0h12"/></svg><b>职业选手</b><span aria-hidden="true">→</span></button>
@@ -147,7 +145,7 @@
 
           <section id="client-launchpad" class="launchpad" hidden aria-labelledby="launchpad-title">
             <div class="launchpad-emblem"><img src="/app-icon.png" alt=""></div>
-            <div class="launchpad-copy" aria-live="polite"><p id="launchpad-eyebrow" class="eyebrow">英雄联盟客户端未登录</p><h2 id="launchpad-title">选择登录入口</h2><p id="launchpad-description">密码、扫码与安全验证只在腾讯官方窗口完成，登录后自动连接。</p><button id="client-launch-reselect" class="text-button" type="button" hidden>重新选择入口</button></div>
+            <div class="launchpad-copy" aria-live="polite"><p id="launchpad-eyebrow" class="eyebrow">英雄联盟客户端未登录</p><h2 id="launchpad-title">选择登录入口</h2><p id="launchpad-description">密码、扫码与安全验证只在腾讯官方窗口完成，登录后自动连接。</p></div>
             <div id="launcher-list" class="launcher-list" aria-label="客户端登录入口"><span class="muted">正在检查安装位置…</span></div>
             <p id="official-login-status" class="official-login-status" aria-live="polite">正在检查腾讯英雄联盟客户端安装位置。</p>
           </section>

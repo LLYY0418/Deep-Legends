@@ -13,11 +13,11 @@ function body(name) {
 function compile(names,deps={}) { names=require("./r211-harness-support.cjs").expand(source,names,deps); return Function(...Object.keys(deps),require('./r220-harness-support.cjs').prelude(source,deps)+names.map(body).join('\n')+`\nreturn {${names.join(',')}};`)(...Object.values(deps)); }
 test('R89 parallel supplements start before first overview resolves and survive ref adoption without duplicates',async()=>{
   const calls=[],pending=[];
-  const state={settings:{matchCount:20},controllers:new Map()};
+  const state={section:"overview",settings:{matchCount:20},controllers:new Map()};
   const tab={key:'kr:fixture',region:'kr',riotId:{gameName:'Fixture',tagLine:'KR1'}};
   const noop=()=>{};
   const helpers=compile(['loadOverview','overviewSupplementTarget','syncOverviewSupplementRefs','loadOPGGSeasonSummary','loadOverviewCurrentGame'],{
-    state,window:{},riotTab:t=>t?.region==='kr',tabReady:()=>true,tabGroup:()=> 'kr',
+    state,window:{},document:{hidden:false,hasFocus:()=>true},activeTab:()=>tab,riotTab:t=>t?.region==='kr',tabReady:()=>true,tabGroup:()=> 'kr',
     rerenderTab:noop,renderCapabilitySettings:noop,rememberTabPlayerRef:noop,playerLabel:()=> 'Fixture',
     updateCurrentGameCard:noop,ensurePerks:noop,ensureSummonerSpells:noop,
     normalizedPagination:(p,beg)=>({...p.pagination,nextBegIndex:beg+p.pagination.count}),
@@ -62,7 +62,7 @@ test('R89 catalog arrival invalidates retained match DOM in all open tabs',()=>{
 });
 test('R89 completion failure preserves first five and exposes a retry that completes the recent match list',async()=>{
  const tab={key:'kr:fixture',region:'kr',playerRef:'public-ref',initialPagePending:true,data:{player:{playerRef:'public-ref',region:'kr'},matches:Array.from({length:5},(_,gameId)=>({gameId})),pagination:{count:5,hasMore:true}}};
- const state={settings:{matchCount:20},controllers:new Map()};let fail=true;
+ const state={section:"overview",settings:{matchCount:20},controllers:new Map()};let fail=true;
  const noop=()=>{};
  const {loadOverview}=compile(['loadOverview'],{state,tabReady:()=>true,tabGroup:()=> 'kr',riotTab:()=>true,rerenderTab:noop,loadOPGGSeasonSummary:noop,loadOverviewCurrentGame:noop,syncOverviewSupplementRefs:noop,rememberTabPlayerRef:noop,playerLabel:()=> 'Fixture',renderCapabilitySettings:noop,AUTO_PAGE_DELAY_MS:1200,MAX_BROWSE_MATCHES:200,
   normalizedPagination:p=>({...p.pagination,nextBegIndex:p.pagination.count}),

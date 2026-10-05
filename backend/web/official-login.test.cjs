@@ -99,7 +99,7 @@ test("国服纯净入口动作只提交固定 tcls id 并进入等待登录状�
   assert.deepEqual(timers.map((timer) => timer.delay), [1200]);
 });
 
-test("所有客户端入口共享启动锁并在失败后立即解锁", async () => {
+test("每个入口只锁定自己并在失败后恢复", async () => {
   const calls = [];
   const timers = [];
   let resolveOfficial;
@@ -123,12 +123,12 @@ test("所有客户端入口共享启动锁并在失败后立即解锁", async ()
   const launchAlternative = compileFunction("launchDetectedClient", dependencies);
   const officialPromise = launchOfficial();
   await launchAlternative({ disabled: false, dataset: { clientId: "riot" } });
-  assert.equal(calls.length, 1, "alternative launch must be blocked while TCLS is launching");
+  assert.equal(calls.length, 2, "alternative launcher remains clickable");
   resolveOfficial();
   await officialPromise;
   assert.equal(state.clientLaunchInFlight, "");
   assert.equal(state.clientLaunched.id, "tcls");
-  assert.deepEqual(timers.map((timer) => timer.delay), [1200]);
+  assert.deepEqual(timers.map((timer) => timer.delay), [3000,1200]);
 
   const failingState = { clientLaunchInFlight: "", clientLaunched: null, officialLoginMessage: "", status: { connected: false } };
   const launchFailingAlternative = compileFunction("launchDetectedClient", {
@@ -165,7 +165,7 @@ test("Riot 入口成功后进入对应等待状态并只安排状态刷新", asy
   assert.deepEqual(timers.map((timer) => timer.delay), [3000]);
 });
 
-test("启动成功后隐藏入口并按客户端显示等待登录状态", () => {
+test("启动成功后入口保持显示，断开或超时恢复", () => {
   const launchpad = html.match(/<section id="client-launchpad"[\s\S]*?<\/section>/)?.[0] || "";
   const dom = new JSDOM(`<!doctype html><body>${launchpad}</body>`);
   const document = dom.window.document;
@@ -204,24 +204,23 @@ test("启动成功后隐藏入口并按客户端显示等待登录状态", () =>
   });
 
   render(state.status);
-  assert.equal(el.launcherList.hidden, true);
-  assert.equal(el.clientLaunchReselect.hidden, false);
-  assert.equal(el.clientLaunchReselect.disabled, false);
+  assert.equal(el.launcherList.hidden, false);
+  assert.equal(el.clientLaunchReselect, null);
   assert.equal(el.launchpadEyebrow.textContent, "已启动");
   assert.equal(el.launchpadTitle.textContent, "正在登录国服客户端");
   assert.match(el.launchpadDescription.textContent, /弹出的腾讯窗口完成登录/);
 
   state.clientLaunched = { id: "riot", at: 2 };
   render(state.status);
-  assert.equal(el.launcherList.hidden, true);
+  assert.equal(el.launcherList.hidden, false);
   assert.equal(el.launchpadTitle.textContent, "正在登录 Riot 客户端");
   assert.match(el.launchpadDescription.textContent, /弹出的 Riot 窗口完成登录/);
 
-  el.clientLaunchReselect.click();
+  state.clientLaunched.processSeen = true;
+  render({connected:false,clientDiscovery:"process-not-found"});
   assert.equal(state.clientLaunched, null);
   assert.equal(state.clientLaunchInFlight, "");
   assert.equal(el.launcherList.hidden, false);
-  assert.equal(el.clientLaunchReselect.hidden, true);
   assert.equal(el.launchpadTitle.textContent, "选择登录入口");
   const buttons = Array.from(el.launcherList.querySelectorAll("[data-client-id]"));
   assert.equal(buttons.length, 2);

@@ -179,7 +179,7 @@ func TestAramkitRatingHandlerUsesOpaqueReferenceAndRejectsKR(t *testing.T) {
 		}
 		return aramkitJSONResponse(http.StatusOK, `{"code":200,"data":{"rating":2001}}`), nil
 	}))
-	a := &app{token: "test-token", gameplayRefs: make(map[string]string), gameplayRefDetails: make(map[string]gameplayReference), mayhemRatings: client}
+	a := &app{lcu: &LCUClient{region: "TENCENT", rsoPlatform: "HN1"}, token: "test-token", gameplayRefs: make(map[string]string), gameplayRefDetails: make(map[string]gameplayReference), mayhemRatings: client}
 	cnRef := a.registerGameplayReferenceDetails(gameplayReference{PlayerRef: "cn-player-reference-0001", GameName: "国服玩家", TagLine: "峡谷", ServerID: "HN1"})
 	recorder := httptest.NewRecorder()
 	a.handleGameplayMayhemRating(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/mayhem-rating?playerRef="+cnRef, nil))

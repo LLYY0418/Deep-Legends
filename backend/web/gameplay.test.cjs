@@ -38,7 +38,7 @@ test("flow loader logs invalid response without inventing an idle state", async 
   const tab = { region: "kr", data: { player: { playerRef: "fixture" } } };
   const { loadOverviewCurrentGame } = compile(["loadOverviewCurrentGame"], {
     window: { reportFlowDiagnostic: (...args) => reports.push(args) },
-    state: {}, api: async () => ({ status: "active", teams: null }), updateCurrentGameCard: () => {},
+    state: {section:"overview"}, activeTab:()=>tab, api: async () => ({ status: "active", teams: null }), updateCurrentGameCard: () => {},
   });
   await loadOverviewCurrentGame(tab);
   assert.deepEqual(reports.map(report => report[1]), ["request", "invalid-response", "failed"]);
@@ -59,7 +59,7 @@ test("manual roster retry reaches the backend and diagnostics without exporting 
   const reports = [], requests = [];
   const tab = { region: "kr", key: "friend", data: { player: { playerRef: "sensitive-player" } }, currentGame: { ref: "sensitive-player", at: Date.now() } };
   const { loadOverviewCurrentGame } = compile(["loadOverviewCurrentGame"], {
-    window: { reportFlowDiagnostic: (...args) => reports.push(args) }, state: {}, updateCurrentGameCard: () => {},
+    window: { reportFlowDiagnostic: (...args) => reports.push(args) }, state: {section:"overview"}, activeTab:()=>tab, updateCurrentGameCard: () => {},
     api: async (_url, options) => { requests.push(JSON.parse(options.body)); return { status: "none", source: "OP.GG" }; },
   });
   await loadOverviewCurrentGame(tab);
@@ -80,7 +80,7 @@ test("2326 manual and automatic current-game failures retain their own trigger",
     const reports = [];
     const tab = { region: "kr", key: "friend", data: { player: { playerRef: "private-reference" } } };
     const { loadOverviewCurrentGame } = compile(["loadOverviewCurrentGame"], {
-      window: { reportFlowDiagnostic: (...args) => reports.push(args) }, state: {}, updateCurrentGameCard: () => {},
+      window: { reportFlowDiagnostic: (...args) => reports.push(args) }, state: {section:"overview"}, activeTab:()=>tab, updateCurrentGameCard: () => {},
       api: async () => ({ status: "active", teams: null }),
     });
     await loadOverviewCurrentGame(tab, force);
@@ -139,7 +139,7 @@ function compile(names, dependencies = {}, script = source) {
     length = names.length;
     for (const name of ["bindLiveNode", "champSelectEnemyPlaceholder", "stampLiveRows", "preserveLiveImages", "patchLiveRosterPanel", "liveClientPositionsPending", "clearRuneStarterRetries", "runeStarterTargetActive", "laneMatchupEnemies", "laneMatchupTier", "laneMatchupInference", "laneMatchupAvailability", "ensureLaneMatchupPositions", "laneMatchupPairKey", "laneMatchupOwnLocked", "ensureLaneMatchupPair", "recordLaneMatchupCandidateSkip", "laneMatchupUnavailableReason", "recordLaneMatchupCardDiagnostic", "liveRecommendationTier"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
   }
-  dependencies = { readSetting: (_key, fallback) => fallback, recordItemSetClientDiagnostic: () => {}, document: { hidden: false }, setTimeout, clearTimeout, riotTab: tab => tab?.region === "kr", isARAMRelatedMatch: () => false, isSummonersRiftMatch: data => Number(data?.mapId) === 11, clusterPremadePlayers: players => players, window: {}, ...dependencies };
+  dependencies = { readSetting: (_key, fallback) => fallback, recordItemSetClientDiagnostic: () => {}, document: { hidden: false, hasFocus:()=>true }, setTimeout, clearTimeout, riotTab: tab => tab?.region === "kr", isARAMRelatedMatch: () => false, isSummonersRiftMatch: data => Number(data?.mapId) === 11, clusterPremadePlayers: players => players, window: {}, ...dependencies };
   const keys = Object.keys(dependencies);
   return Function(...keys, `"use strict";\n${require("./r220-harness-support.cjs").prelude(script,dependencies)}${names.map((name) => functionSource(script, name)).join("\n")}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
 }
@@ -486,7 +486,7 @@ test('OPGG career rendering uses full season total and only the matching KR tab'
 test('current-game queries are single-flight, account scoped, and reject late identity changes',async()=>{
  let resolve,calls=0,paint=0;
  const tab={key:'fixture',region:'kr',data:{player:{playerRef:'first'}}};
- const {loadOverviewCurrentGame}=compile(['loadOverviewCurrentGame'],{state:{destroyed:false},riotTab:tab=>tab.region==='kr',api:()=>{calls++;return new Promise(r=>resolve=r)},updateCurrentGameCard:()=>paint++});
+ const {loadOverviewCurrentGame}=compile(['loadOverviewCurrentGame'],{state:{destroyed:false,section:"overview"},activeTab:()=>tab,riotTab:tab=>tab.region==='kr',api:()=>{calls++;return new Promise(r=>resolve=r)},updateCurrentGameCard:()=>paint++});
  const first=loadOverviewCurrentGame(tab);await loadOverviewCurrentGame(tab);assert.equal(calls,1);
  tab.data.player.playerRef='second';resolve({status:'active',teams:[]});await first;assert.equal(tab.currentGame,undefined);
  const second=loadOverviewCurrentGame(tab);resolve({status:'none',source:'OP.GG'});await second;assert.equal(tab.currentGame.ref,'second');assert.equal(tab.currentGame.data.status,'none');
@@ -958,7 +958,7 @@ test("R117 rank win-rate degradation is disclosed on screen, not only set on the
   const collecting = helpers.renderRanks(incomplete, capability("客户端未返回排位负场，胜率暂不展示"), [], [], { collecting: true });
   assert.doesNotMatch(collecting, /win-rate-value/, "半成品战绩不得渲染成胜率");
   assert.match(collecting, /107胜 · 正在统计中/);
-  assert.match(collecting, /data-tooltip="正在后台按当前队列统计本赛季战绩，完成后会自动更新胜率"/);
+  assert.match(collecting, /data-tooltip="正在统计中"/);
 
   // 扫描完成但上游确实没给负场：必须把后端写的 capability.detail 披露出来。
   const degraded = helpers.renderRanks(incomplete, capability("上游未返回排位负场，已按赛季战绩聚合补全胜率"), [], [], { collecting: false });

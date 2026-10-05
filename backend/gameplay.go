@@ -636,77 +636,78 @@ type lcuParticipant struct {
 	Spell2ID      int64 `json:"spell2Id"`
 	TeamID        int64 `json:"teamId"`
 	Stats         struct {
-		Assists                        int    `json:"assists"`
-		ChampLevel                     int    `json:"champLevel"`
-		Deaths                         int    `json:"deaths"`
-		GoldEarned                     int    `json:"goldEarned"`
-		GameEndedInEarlySurrender      bool   `json:"gameEndedInEarlySurrender"`
-		GameEndedInSurrender           bool   `json:"gameEndedInSurrender"`
-		Item0                          int64  `json:"item0"`
-		Item1                          int64  `json:"item1"`
-		Item2                          int64  `json:"item2"`
-		Item3                          int64  `json:"item3"`
-		Item4                          int64  `json:"item4"`
-		Item5                          int64  `json:"item5"`
-		Item6                          int64  `json:"item6"`
-		Kills                          int    `json:"kills"`
-		LargestMultiKill               int    `json:"largestMultiKill"`
-		NeutralMinionsKilled           int    `json:"neutralMinionsKilled"`
-		Perk0                          int64  `json:"perk0"`
-		Perk0Var1                      *int64 `json:"perk0Var1"`
-		Perk0Var2                      *int64 `json:"perk0Var2"`
-		Perk0Var3                      *int64 `json:"perk0Var3"`
-		Perk1                          int64  `json:"perk1"`
-		Perk1Var1                      *int64 `json:"perk1Var1"`
-		Perk1Var2                      *int64 `json:"perk1Var2"`
-		Perk1Var3                      *int64 `json:"perk1Var3"`
-		Perk2                          int64  `json:"perk2"`
-		Perk2Var1                      *int64 `json:"perk2Var1"`
-		Perk2Var2                      *int64 `json:"perk2Var2"`
-		Perk2Var3                      *int64 `json:"perk2Var3"`
-		Perk3                          int64  `json:"perk3"`
-		Perk3Var1                      *int64 `json:"perk3Var1"`
-		Perk3Var2                      *int64 `json:"perk3Var2"`
-		Perk3Var3                      *int64 `json:"perk3Var3"`
-		Perk4                          int64  `json:"perk4"`
-		Perk4Var1                      *int64 `json:"perk4Var1"`
-		Perk4Var2                      *int64 `json:"perk4Var2"`
-		Perk4Var3                      *int64 `json:"perk4Var3"`
-		Perk5                          int64  `json:"perk5"`
-		Perk5Var1                      *int64 `json:"perk5Var1"`
-		Perk5Var2                      *int64 `json:"perk5Var2"`
-		Perk5Var3                      *int64 `json:"perk5Var3"`
-		PerkPrimaryStyle               int64  `json:"perkPrimaryStyle"`
-		PerkSubStyle                   int64  `json:"perkSubStyle"`
-		StatPerk0                      int64  `json:"statPerk0"`
-		StatPerk1                      int64  `json:"statPerk1"`
-		StatPerk2                      int64  `json:"statPerk2"`
-		PlayerAugment1                 int64  `json:"playerAugment1"`
-		PlayerAugment2                 int64  `json:"playerAugment2"`
-		PlayerAugment3                 int64  `json:"playerAugment3"`
-		PlayerAugment4                 int64  `json:"playerAugment4"`
-		PlayerAugment5                 int64  `json:"playerAugment5"`
-		PlayerAugment6                 int64  `json:"playerAugment6"`
-		PlayerSubteamID                int64  `json:"playerSubteamId"`
-		SubteamPlacement               int    `json:"subteamPlacement"`
-		TotalDamageDealtToChampions    int    `json:"totalDamageDealtToChampions"`
-		TotalDamageTaken               *int   `json:"totalDamageTaken"`
-		TotalMinionsKilled             int    `json:"totalMinionsKilled"`
-		VisionScore                    int    `json:"visionScore"`
-		WardsKilled                    int    `json:"wardsKilled"`
-		WardsPlaced                    int    `json:"wardsPlaced"`
-		DamageSelfMitigated            *int   `json:"damageSelfMitigated"`
-		TotalHealsOnTeammates          *int   `json:"totalHealsOnTeammates"`
-		TotalDamageShieldedOnTeammates *int   `json:"totalDamageShieldedOnTeammates"`
-		TimeCCingOthers                *int   `json:"timeCCingOthers"`
-		DamageDealtToBuildings         *int   `json:"damageDealtToBuildings"`
-		TurretTakedowns                *int   `json:"turretTakedowns"`
-		DoubleKills                    *int   `json:"doubleKills"`
-		TripleKills                    *int   `json:"tripleKills"`
-		QuadraKills                    *int   `json:"quadraKills"`
-		PentaKills                     *int   `json:"pentaKills"`
-		VisionWardsBoughtInGame        *int   `json:"visionWardsBoughtInGame"`
-		Win                            bool   `json:"win"`
+		Assists                        int               `json:"assists"`
+		ChampLevel                     int               `json:"champLevel"`
+		Deaths                         int               `json:"deaths"`
+		GoldEarned                     int               `json:"goldEarned"`
+		GameEndedInEarlySurrender      bool              `json:"gameEndedInEarlySurrender"`
+		GameEndedInSurrender           bool              `json:"gameEndedInSurrender"`
+		Item0                          int64             `json:"item0"`
+		Item1                          int64             `json:"item1"`
+		Item2                          int64             `json:"item2"`
+		Item3                          int64             `json:"item3"`
+		Item4                          int64             `json:"item4"`
+		Item5                          int64             `json:"item5"`
+		Item6                          int64             `json:"item6"`
+		Kills                          int               `json:"kills"`
+		LargestMultiKill               int               `json:"largestMultiKill"`
+		NeutralMinionsKilled           int               `json:"neutralMinionsKilled"`
+		Perk0                          int64             `json:"perk0"`
+		Perk0Var1                      *int64            `json:"perk0Var1"`
+		Perk0Var2                      *int64            `json:"perk0Var2"`
+		Perk0Var3                      *int64            `json:"perk0Var3"`
+		Perk1                          int64             `json:"perk1"`
+		Perk1Var1                      *int64            `json:"perk1Var1"`
+		Perk1Var2                      *int64            `json:"perk1Var2"`
+		Perk1Var3                      *int64            `json:"perk1Var3"`
+		Perk2                          int64             `json:"perk2"`
+		Perk2Var1                      *int64            `json:"perk2Var1"`
+		Perk2Var2                      *int64            `json:"perk2Var2"`
+		Perk2Var3                      *int64            `json:"perk2Var3"`
+		Perk3                          int64             `json:"perk3"`
+		Perk3Var1                      *int64            `json:"perk3Var1"`
+		Perk3Var2                      *int64            `json:"perk3Var2"`
+		Perk3Var3                      *int64            `json:"perk3Var3"`
+		Perk4                          int64             `json:"perk4"`
+		Perk4Var1                      *int64            `json:"perk4Var1"`
+		Perk4Var2                      *int64            `json:"perk4Var2"`
+		Perk4Var3                      *int64            `json:"perk4Var3"`
+		Perk5                          int64             `json:"perk5"`
+		Perk5Var1                      *int64            `json:"perk5Var1"`
+		Perk5Var2                      *int64            `json:"perk5Var2"`
+		Perk5Var3                      *int64            `json:"perk5Var3"`
+		PerkPrimaryStyle               int64             `json:"perkPrimaryStyle"`
+		PerkSubStyle                   int64             `json:"perkSubStyle"`
+		StatPerk0                      int64             `json:"statPerk0"`
+		StatPerk1                      int64             `json:"statPerk1"`
+		StatPerk2                      int64             `json:"statPerk2"`
+		PlayerAugment1                 int64             `json:"playerAugment1"`
+		PlayerAugment2                 int64             `json:"playerAugment2"`
+		PlayerAugment3                 int64             `json:"playerAugment3"`
+		PlayerAugment4                 int64             `json:"playerAugment4"`
+		PlayerAugment5                 int64             `json:"playerAugment5"`
+		PlayerAugment6                 int64             `json:"playerAugment6"`
+		PlayerSubteamID                int64             `json:"playerSubteamId"`
+		SubteamPlacement               int               `json:"subteamPlacement"`
+		TotalDamageDealtToChampions    int               `json:"totalDamageDealtToChampions"`
+		TotalDamageTaken               *lenientInt       `json:"totalDamageTaken"`
+		TotalMinionsKilled             int               `json:"totalMinionsKilled"`
+		VisionScore                    int               `json:"visionScore"`
+		WardsKilled                    int               `json:"wardsKilled"`
+		WardsPlaced                    int               `json:"wardsPlaced"`
+		DamageSelfMitigated            *lenientInt       `json:"damageSelfMitigated"`
+		TotalHealsOnTeammates          *lenientInt       `json:"totalHealsOnTeammates"`
+		TotalDamageShieldedOnTeammates *lenientInt       `json:"totalDamageShieldedOnTeammates"`
+		TimeCCingOthers                *lenientInt       `json:"timeCCingOthers"`
+		DamageDealtToBuildings         *lenientInt       `json:"damageDealtToBuildings"`
+		TurretTakedowns                *lenientInt       `json:"turretTakedowns"`
+		DoubleKills                    *lenientInt       `json:"doubleKills"`
+		TripleKills                    *lenientInt       `json:"tripleKills"`
+		QuadraKills                    *lenientInt       `json:"quadraKills"`
+		PentaKills                     *lenientInt       `json:"pentaKills"`
+		VisionWardsBoughtInGame        *lenientInt       `json:"visionWardsBoughtInGame"`
+		Challenges                     lenientChallenges `json:"challenges"`
+		Win                            bool              `json:"win"`
 	} `json:"stats"`
 	Timeline struct {
 		Lane string `json:"lane"`
@@ -900,6 +901,10 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	client, current, err := a.gameplayClient()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if clientTencentServerID(client) == "" && (request.ServerID != "" || reference.ServerID != "" || request.GameName != "") {
+		http.Error(w, "当前客户端服务器未提供国服查询", http.StatusConflict)
 		return
 	}
 	// 按 Riot ID 打开国服玩家（顶部搜索）：当前服务器优先使用 LCU
@@ -1279,7 +1284,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		reference = mergeGameplayReferences(reference, gameplayReferenceFromSummoner(current))
 		a.startRankedSplitProbe(client, playerRef, current.SummonerID)
 		capabilities = append(capabilities, summonerCapability)
-	} else if reference.ServerID != "" {
+	} else if reference.ServerID != "" && isTencentClient(client) {
 		var loaded sgpSummoner
 		var loadErr error
 		if a.sgp == nil {
@@ -2418,6 +2423,7 @@ func (a *app) loadSGPMatchHistoryPage(ctx context.Context, client *LCUClient, se
 }
 
 func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, begIndex, count int, matchFilter string, names map[int64]string, queueLabels map[int64]string) ([]gameplayMatch, []EndpointCapability, gameplayPagination) {
+	ctx = context.WithValue(ctx, sgpDecodeCountContextKey{}, &overviewLoadCost{})
 	clientRegion, _ := clientRegionInfo(client)
 	if isRiotRegion(clientRegion) {
 		reference.Region = clientRegion
@@ -2433,7 +2439,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 		PlayerReferenceValid: validPlayerReference(playerRef),
 		LCUConnected:         client != nil,
 		RemoteServer:         remoteServer,
-		SGPAvailable:         a.sgp != nil && serverID != "",
+		SGPAvailable:         a.sgp != nil && serverID != "" && clientRegion == "TENCENT",
 	}, clientRegion)
 	attempts := make([]DataSourceAttempt, 0, len(decision.Sources)+1)
 	fallbackReason := ""
@@ -2523,7 +2529,8 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 			diagnostic := map[string]any{
 				"event":    event,
 				"returned": len(infos), "visible": len(matches), "consumed": consumed,
-				"filter": filterResolution.Filter, "server_filtered": filterResolution.ServerFiltered,
+				"decode_failed": sgpPageDecodeFailures(ctx),
+				"filter":        filterResolution.Filter, "server_filtered": filterResolution.ServerFiltered,
 				"skipped_empty_participants": filterSummary.SkippedEmptyParticipants,
 				"filtered_custom":            filterSummary.FilteredCustom, "custom_reasons": filterSummary.CustomReasons,
 				"incomplete": participantSummary.Incomplete, "single_participant": participantSummary.SingleParticipant,
@@ -3090,6 +3097,7 @@ func gameplayDisplayName(summoner Summoner) string {
 // returns verified wins/losses; SGP is attempted only when LCU is unavailable,
 // incompatible with a remote server, or returns an unverified win/loss pair.
 func (a *app) loadRanksWithFallback(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID, privacy string, tierOnly ...bool) ([]gameplayRank, *gameplayRankMilestones, EndpointCapability) {
+	clientRegion, _ := clientRegionInfo(client)
 	// R127 P1-b.1：tierOnly 表示调用方只要段位/小段/胜点（平均段位），不需要
 	// 胜负场。变参形式保证既有调用点与护栏测试都不用改。
 	tierScope := len(tierOnly) > 0 && tierOnly[0]
@@ -3110,7 +3118,7 @@ func (a *app) loadRanksWithFallback(ctx context.Context, client *LCUClient, play
 		PlayerReferenceValid: validPlayerReference(playerRef),
 		LCUConnected:         client != nil,
 		RemoteServer:         isRemoteTencentServer(client, serverID),
-		SGPAvailable:         a.sgp != nil && serverID != "",
+		SGPAvailable:         a.sgp != nil && serverID != "" && clientRegion == "TENCENT",
 	})
 	sources := decision.Sources
 	if tierScope {
@@ -3766,20 +3774,23 @@ func normalizeGameplayMatch(game lcuGame, subject gameplayReference, names map[i
 			Kills: raw.Stats.Kills, Deaths: raw.Stats.Deaths, Assists: raw.Stats.Assists,
 			KDA: ratio(raw.Stats.Kills+raw.Stats.Assists, raw.Stats.Deaths), CS: cs,
 			LaneCS: raw.Stats.TotalMinionsKilled, JungleCS: raw.Stats.NeutralMinionsKilled, CSPerMinute: perMinute(cs, game.GameDuration),
-			Gold: raw.Stats.GoldEarned, Damage: raw.Stats.TotalDamageDealtToChampions, DamageTaken: raw.Stats.TotalDamageTaken,
+			Gold: raw.Stats.GoldEarned, Damage: raw.Stats.TotalDamageDealtToChampions, DamageTaken: historyIntValue(raw.Stats.TotalDamageTaken),
 			VisionScore: raw.Stats.VisionScore, WardsPlaced: raw.Stats.WardsPlaced, WardsKilled: raw.Stats.WardsKilled,
-			ControlWardsBought: raw.Stats.VisionWardsBoughtInGame,
+			ControlWardsBought: historyIntValue(raw.Stats.VisionWardsBoughtInGame),
 			Win:                raw.Stats.Win, Hidden: hidden, MultiKill: raw.Stats.LargestMultiKill, scoreMissing: raw.scoreMissing,
-			DamageSelfMitigated:            raw.Stats.DamageSelfMitigated,
-			TotalHealsOnTeammates:          raw.Stats.TotalHealsOnTeammates,
-			TotalDamageShieldedOnTeammates: raw.Stats.TotalDamageShieldedOnTeammates,
-			TimeCCingOthers:                raw.Stats.TimeCCingOthers,
-			DamageDealtToBuildings:         raw.Stats.DamageDealtToBuildings,
-			TurretTakedowns:                raw.Stats.TurretTakedowns,
-			DoubleKills:                    raw.Stats.DoubleKills,
-			TripleKills:                    raw.Stats.TripleKills,
-			QuadraKills:                    raw.Stats.QuadraKills,
-			PentaKills:                     raw.Stats.PentaKills,
+			DamageSelfMitigated:            historyIntValue(raw.Stats.DamageSelfMitigated),
+			TotalHealsOnTeammates:          historyIntValue(raw.Stats.TotalHealsOnTeammates),
+			TotalDamageShieldedOnTeammates: historyIntValue(raw.Stats.TotalDamageShieldedOnTeammates),
+			TimeCCingOthers:                historyIntValue(raw.Stats.TimeCCingOthers),
+			DamageDealtToBuildings:         historyIntValue(raw.Stats.DamageDealtToBuildings),
+			TurretTakedowns:                historyIntValue(raw.Stats.TurretTakedowns),
+			DoubleKills:                    historyIntValue(raw.Stats.DoubleKills),
+			TripleKills:                    historyIntValue(raw.Stats.TripleKills),
+			QuadraKills:                    historyIntValue(raw.Stats.QuadraKills),
+			PentaKills:                     historyIntValue(raw.Stats.PentaKills),
+			DragonTakedowns:                historyIntValue(raw.Stats.Challenges.DragonTakedowns),
+			BaronTakedowns:                 historyIntValue(raw.Stats.Challenges.BaronTakedowns),
+			RiftHeraldTakedowns:            historyIntValue(raw.Stats.Challenges.RiftHeraldTakedowns),
 
 			SubteamID: raw.Stats.PlayerSubteamID, Placement: raw.Stats.SubteamPlacement, reference: reference,
 		}
@@ -4359,6 +4370,7 @@ type gameplayLiveResponse struct {
 	ChampionAbilities        []gameplayChampionAbility `json:"championAbilities,omitempty"`
 	Capabilities             []EndpointCapability      `json:"capabilities"`
 	RawCount                 int                       `json:"-"`
+	DuplicatesDropped        int                       `json:"-"`
 	MergeAppended            int                       `json:"-"`
 }
 
@@ -5487,6 +5499,7 @@ func (a *app) recordLiveRosterShape(response gameplayLiveResponse) {
 		strings.ToUpper(strings.TrimSpace(response.Phase)),
 		strconv.FormatBool(response.DroppedStaleGameData),
 		"with-stats:" + strconv.Itoa(withStats),
+		"duplicates-dropped:" + strconv.Itoa(response.DuplicatesDropped),
 		"empty-refs:" + strconv.Itoa(emptyRefs),
 		"arena-source:" + response.ArenaGroupSource,
 	}
@@ -5513,7 +5526,7 @@ func (a *app) recordLiveRosterShape(response gameplayLiveResponse) {
 		"event": "live_roster_shape", "game_id": response.GameID, "phase": response.Phase,
 		"players": len(response.Players), "raw_count": response.RawCount, "with_stats": withStats, "team_counts": teamCounts,
 		"arena_grouped": response.ArenaGrouped, "arena_group_source": response.ArenaGroupSource, "arena_group_counts": arenaGroupCounts,
-		"duplicate_player_refs": duplicates, "empty_ref_count": emptyRefs, "merge_appended": response.MergeAppended,
+		"duplicate_player_refs": duplicates, "duplicates_dropped": response.DuplicatesDropped, "empty_ref_count": emptyRefs, "merge_appended": response.MergeAppended,
 		"dropped_stale_gamedata": response.DroppedStaleGameData,
 		"fingerprint":            hex.EncodeToString(fingerprint[:8]),
 	})
@@ -5693,8 +5706,10 @@ func livePositionShapeDiagnostic(response gameplayLiveResponse, session lcuGamef
 	for _, player := range session.GameData.TeamOne {
 		countSelected(player)
 	}
-	for _, player := range session.GameData.TeamTwo {
-		countSelected(player)
+	if !isArenaQueue(response.QueueID, response.GameMode) {
+		for _, player := range session.GameData.TeamTwo {
+			countSelected(player)
+		}
 	}
 	for _, player := range champSelect.MyTeam {
 		position := strings.ToUpper(strings.TrimSpace(player.AssignedPosition))
@@ -7740,18 +7755,12 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		if response.QueueLabel == "" {
 			response.QueueLabel = queueLabel(response.QueueID, response.GameMode, nil)
 		}
-		for _, player := range session.GameData.TeamOne {
-			rawPlayers = append(rawPlayers, struct {
-				player lcuLivePlayer
-				team   int64
-			}{player, 100})
+		var stale int
+		rawPlayers, stale, response.DuplicatesDropped = gameflowLiveRoster(session)
+		if stale > 0 {
+			a.recordDiagnostic(map[string]any{"event": "stale_team_two_dropped", "count": stale, "queue_id": response.QueueID, "game_id": response.GameID})
 		}
-		for _, player := range session.GameData.TeamTwo {
-			rawPlayers = append(rawPlayers, struct {
-				player lcuLivePlayer
-				team   int64
-			}{player, 200})
-		}
+
 	}
 	response.RawCount = len(rawPlayers)
 	mergeAppended := 0
@@ -7838,7 +7847,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		return response
 	}
 	response.Available = true
-	arenaMode := isArenaChampSelectMode(response.GameMode)
+	arenaMode := isArenaQueue(response.QueueID, response.GameMode)
 	aramMode := isARAMFamilyGameMode(response.GameMode)
 	switch queueModeGroupFor(response.QueueID, response.GameMode, response.MapID) {
 	case "aram", "hextech-aram", "hextech-classic":
@@ -7895,6 +7904,9 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			a.recordUnsupportedLiveRosterQueue(client, scope, len(liveClientSnapshotValue.RosterPlayers))
 		}
 	}
+	var duplicates int
+	rawPlayers, duplicates = deduplicateLiveRoster(rawPlayers)
+	response.DuplicatesDropped += duplicates
 	liveClientPositions := make([]string, len(rawPlayers))
 	response.Players = make([]gameplayLivePlayer, len(rawPlayers))
 	premadeInputs := make([]livePremadeInput, len(rawPlayers))
@@ -8073,6 +8085,8 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	}
 	a.finalizeLiveClientPlayerListShape(response.GameID, positionMatchSources["summonerName"]+positionMatchSources["riotId"], positionMatchSources)
 	if arenaMode {
+		a.recordArenaMissingSession(current, &response, liveClientSnapshotValue)
+		a.recoverArenaPlayerList(ctx, client, current, &response, liveClientSnapshotValue, names)
 		response.ArenaMySquadNotice = arenaChampSelectNotice
 		a.markRememberedArenaSquad(&response)
 	}
@@ -8084,9 +8098,12 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		}
 		a.markArenaGroupingAttempt(client, &response)
 		a.compareArenaChampOrder(client, &response, sessionPlayers, liveClientSnapshotValue)
-		a.recordArenaMissingSession(current, &response, liveClientSnapshotValue)
 		a.applyArenaLiveGrouping(client, current, &response, sessionPlayers, liveClientSnapshotValue)
 		a.goSafe("gameplay.loadGameplayLive.4", func() { a.sampleArenaAllGameData(ctx, response.GameID) })
+	}
+	deduplicateLiveResponse(&response)
+	if arenaMode {
+		a.markRememberedArenaSquad(&response)
 	}
 	// R116-探测（一次性侦察，工单 P1 第 1 条）：海斗（KIWI/ARAM_MAYHEM）此前不满足上面的
 	// arenaMode 条件，live_client_allgamedata_shape 在海斗下从未被观测过。这里只把既有诊断

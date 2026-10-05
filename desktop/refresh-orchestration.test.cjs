@@ -414,6 +414,16 @@ test("R70 hidden gameplay pages do not construct DOM, and destroyed pages remain
   }
 });
 
+test("R226 hidden and destroyed live renders preserve the pending diagnostic source", () => {
+  for (const status of [{ section: "overview" }, { section: "live", destroyed: true }]) {
+    const state = { ...status, liveRenderTrigger: "sse", liveRenderSource: "manual" };
+    const before = { ...state };
+    const { renderLive } = compileFunctions(gameplaySource, ["renderLive"], { state });
+    assert.doesNotThrow(renderLive);
+    assert.deepEqual(state, before, "inactive render must preserve trigger and source without touching state");
+  }
+});
+
 test("R70 superseded status completion cannot overwrite current state or reschedule polling", async () => {
   const state = { destroyed: false, section: "overview", status: {} };
   let resolveOld;

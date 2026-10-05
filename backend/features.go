@@ -111,6 +111,7 @@ type clientDiagnosticRequest struct {
 	Placement               string                      `json:"placement,omitempty"`
 	Counts                  map[string]int              `json:"counts,omitempty"`
 	Sources                 map[string]int              `json:"sources,omitempty"`
+	ShellNode               string                      `json:"shellNode,omitempty"`
 	FullReasons             map[string]int              `json:"fullReasons,omitempty"`
 	ProgressApplied         int                         `json:"applied,omitempty"`
 	ProgressIgnoredSameGame int                         `json:"ignored_same_game,omitempty"`
@@ -215,35 +216,37 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
-	"collection_card_image_state":  {"waiting": true},
-	"card_image_slot_reconciled":   {"reconciled": true},
-	"card_image_observer_fallback": {"visible-pending": true},
-	"live_scope_reset":             {"game_changed": true, "enter_champselect": true, "disconnect": true, "await_game": true, "hard_refresh": true, "resync": true, "left_end_of_game": true},
-	"live_recommendation_render":   {"phase": true, "empty": true},
-	"blocking_state_client":        {"show": true, "hide": true, "timeout": true},
-	"status_render_failed":         {"failed": true},
-	"automatic_read_client":        {"request": true},
-	"overview_dirty_rescan":        {"resolved": true, "retry": true, "gave_up": true, "paused_hidden": true},
-	"collection_render_client":     {"unchanged-suppressed": true, "updated": true},
-	"renderer_perf":                {"aggregated": true},
-	"live_render_rebuild":          {"aggregated": true},
-	"live_progress_apply":          {"aggregated": true},
-	"arena_header_source":          {"rendered": true},
-	"gameflow_phase_client":        {"batch": true},
-	"catalog_client":               {"failed": true, "loaded": true},
-	"item_id_not_in_catalog":       {"missing": true},
-	"champselect_dialog_client":    {"open": true, "rerender-while-open": true, "close": true},
-	"live_refresh_client":          {"load": true, "queue": true, "phase": true},
-	"local_request_client":         {"complete": true, "failed": true},
-	"image_queue_slow":             {"loaded": true},
-	"card_image_stalled":           {"watchdog": true},
-	"claim_progress_client":        {"begin": true, "heartbeat": true, "end": true, "item-timeout": true},
-	"diagnostic_delivery_client":   {"export": true},
-	"champ_select_filter_client":   {"request": true, "all": true, "cached": true, "received": true, "stale": true, "failed": true},
-	"current_game_client":          {"request": true, "received": true, "rendered": true, "failed": true, "canceled": true, "stale": true, "cached": true, "in-flight": true, "gated": true, "render-failed": true, "render-no-root": true, "render-scope-mismatch": true, "invalid-response": true},
-	"watch_settings_client":        {"save-queued": true, "save-succeeded": true, "save-failed": true, "load-started": true, "load-applied": true, "load-stale": true, "load-failed": true, "load-skipped": true, "custom-event": true, "rendered": true},
-	"match_timeline_client":        {"missing-participant": true, "unavailable": true, "request-failed": true},
-	"specialist_runes_client_skip": specialistRuneClientReasons,
+	"collection_card_image_state":   {"waiting": true},
+	"card_image_slot_reconciled":    {"reconciled": true},
+	"card_image_observer_fallback":  {"visible-pending": true},
+	"live_scope_reset":              {"game_changed": true, "enter_champselect": true, "disconnect": true, "await_game": true, "hard_refresh": true, "resync": true, "left_end_of_game": true},
+	"live_recommendation_render":    {"phase": true, "empty": true},
+	"blocking_state_client":         {"show": true, "hide": true, "timeout": true},
+	"status_render_failed":          {"failed": true},
+	"automatic_read_client":         {"request": true},
+	"overview_dirty_rescan":         {"resolved": true, "retry": true, "gave_up": true, "paused_hidden": true},
+	"collection_render_client":      {"unchanged-suppressed": true, "updated": true},
+	"renderer_perf":                 {"aggregated": true},
+	"live_render_rebuild":           {"aggregated": true},
+	"live_roster_duplicate_dropped": {"deduplicated": true},
+	"stale_team_two_dropped":        {"dropped": true},
+	"live_progress_apply":           {"aggregated": true},
+	"arena_header_source":           {"rendered": true},
+	"gameflow_phase_client":         {"batch": true},
+	"catalog_client":                {"failed": true, "loaded": true},
+	"item_id_not_in_catalog":        {"missing": true},
+	"champselect_dialog_client":     {"open": true, "rerender-while-open": true, "close": true},
+	"live_refresh_client":           {"load": true, "queue": true, "phase": true},
+	"local_request_client":          {"complete": true, "failed": true},
+	"image_queue_slow":              {"loaded": true},
+	"card_image_stalled":            {"watchdog": true},
+	"claim_progress_client":         {"begin": true, "heartbeat": true, "end": true, "item-timeout": true},
+	"diagnostic_delivery_client":    {"export": true},
+	"champ_select_filter_client":    {"request": true, "all": true, "cached": true, "received": true, "stale": true, "failed": true},
+	"current_game_client":           {"request": true, "received": true, "rendered": true, "failed": true, "canceled": true, "stale": true, "cached": true, "in-flight": true, "gated": true, "render-failed": true, "render-no-root": true, "render-scope-mismatch": true, "invalid-response": true},
+	"watch_settings_client":         {"save-queued": true, "save-succeeded": true, "save-failed": true, "load-started": true, "load-applied": true, "load-stale": true, "load-failed": true, "load-skipped": true, "custom-event": true, "rendered": true},
+	"match_timeline_client":         {"missing-participant": true, "unavailable": true, "request-failed": true},
+	"specialist_runes_client_skip":  specialistRuneClientReasons,
 	"live_recommendations_skip": {
 		"no-target": true, "has-payload": true, "cached": true, "in-flight": true, "backoff": true,
 	},
@@ -445,6 +448,11 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	if request.Event == "live_roster_duplicate_dropped" || request.Event == "stale_team_two_dropped" {
+		a.recordDiagnostic(map[string]any{"event": request.Event, "count": min(1000, max(0, request.Count)), "queue_id": request.QueueID, "game_id": request.GameID})
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if request.Event == "live_render_rebuild" {
 		safe := func(values map[string]int, allowed []string) map[string]int {
 			out := map[string]int{}
@@ -455,9 +463,14 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 			}
 			return out
 		}
-		event["counts"] = safe(request.Counts, []string{"full", "status", "runes", "build", "insight"})
-		event["sources"] = safe(request.Sources, []string{"direct", "manual", "interval", "sse", "event", "poll", "resync", "recommendation", "rune", "catalog", "progress", "unknown"})
+		event["counts"] = safe(request.Counts, []string{"full", "status", "runes", "build", "insight", "banner", "tabs"})
+		event["sources"] = safe(request.Sources, []string{"direct", "manual", "interval", "sse", "event", "poll", "resync", "recommendation", "rune", "catalog", "progress", "unknown", "load", "timer", "navigation", "selection", "settings", "tabs", "image"})
 		event["full_reasons"] = safe(request.FullReasons, []string{"tab-row", "banner", "panel-count", "lane-slot", "other"})
+		if len(request.ShellNode) <= 120 && request.ShellNode != "" && strings.IndexFunc(request.ShellNode, func(r rune) bool {
+			return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '_' || r == '-')
+		}) < 0 {
+			event["shell_node"] = request.ShellNode
+		}
 		event["total"] = min(1000000, max(0, request.Total))
 		event["window_ms"] = min(1000000, max(0, request.WindowMs))
 		event["images_recreated"] = min(1000000, max(0, request.ImagesRecreated))
@@ -1138,6 +1151,19 @@ func allowMatchScoreDiagnostic(event map[string]any) map[string]any {
 	out := map[string]any{}
 	for key, value := range event {
 		if matchScoreDiagnosticFields[key] {
+			out[key] = value
+		}
+	}
+	return out
+}
+
+// R223 decode failures never retain values, match IDs, or account identity.
+var sgpGameDecodeDiagnosticFields = map[string]bool{"event": true, "count": true, "field": true, "value_type": true}
+
+func allowSGPGameDecodeDiagnostic(event map[string]any) map[string]any {
+	out := map[string]any{}
+	for key, value := range event {
+		if sgpGameDecodeDiagnosticFields[key] {
 			out[key] = value
 		}
 	}

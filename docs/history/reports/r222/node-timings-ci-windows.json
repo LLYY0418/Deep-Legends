@@ -1,0 +1,232 @@
+{
+  "scope": "desktop",
+  "platform": "win32",
+  "concurrency": 3,
+  "file_budget_ms": 90000,
+  "suite_budget_ms": 240000,
+  "files": [
+    {
+      "file": "desktop/backend-lifecycle.test.cjs",
+      "duration_ms": 1576.2216
+    },
+    {
+      "file": "desktop/diagnostics-0006.test.cjs",
+      "duration_ms": 1357.8107
+    },
+    {
+      "file": "desktop/diagnostics-1042.test.cjs",
+      "duration_ms": 1431.9826
+    },
+    {
+      "file": "desktop/desktop-log.test.cjs",
+      "duration_ms": 4863.2519
+    },
+    {
+      "file": "desktop/diagnostics-2024.test.cjs",
+      "duration_ms": 1773.6766
+    },
+    {
+      "file": "desktop/diagnostics-2135.test.cjs",
+      "duration_ms": 2102.9192
+    },
+    {
+      "file": "desktop/diagnostics-export.test.cjs",
+      "duration_ms": 131.0717
+    },
+    {
+      "file": "desktop/installer-nsh.test.cjs",
+      "duration_ms": 173.4616
+    },
+    {
+      "file": "desktop/diagnostics-2244.test.cjs",
+      "duration_ms": 1594.595
+    },
+    {
+      "file": "desktop/installer-startup.test.cjs",
+      "duration_ms": 1938.6714
+    },
+    {
+      "file": "desktop/installer-shell.test.cjs",
+      "duration_ms": 2735.354
+    },
+    {
+      "file": "desktop/build-fingerprint.test.cjs",
+      "duration_ms": 14204.1498
+    },
+    {
+      "file": "desktop/overview-render-200-expand.test.cjs",
+      "duration_ms": 39040.6052
+    },
+    {
+      "file": "desktop/overview-render-200-controls.test.cjs",
+      "duration_ms": 41503.1588
+    },
+    {
+      "file": "desktop/overview-render-200-external.test.cjs",
+      "duration_ms": 58310.8144
+    },
+    {
+      "file": "desktop/overview-render-200-filter.test.cjs",
+      "duration_ms": 34899.2713
+    },
+    {
+      "file": "desktop/overview-render-200-timeline.test.cjs",
+      "duration_ms": 31156.0804
+    },
+    {
+      "file": "desktop/overview-render-200-images.test.cjs",
+      "duration_ms": 55483.5549
+    },
+    {
+      "file": "desktop/overview-render-career.test.cjs",
+      "duration_ms": 36899.4336
+    },
+    {
+      "file": "desktop/overview-render-controls-mutants.test.cjs",
+      "duration_ms": 18302.7504
+    },
+    {
+      "file": "desktop/overview-render-events.test.cjs",
+      "duration_ms": 31342.2153
+    },
+    {
+      "file": "desktop/overview-render-tools.test.cjs",
+      "duration_ms": 26356.4087
+    },
+    {
+      "file": "desktop/portable-template.test.cjs",
+      "duration_ms": 187.7898
+    },
+    {
+      "file": "desktop/overview-render.test.cjs",
+      "duration_ms": 21562.4721
+    },
+    {
+      "file": "desktop/overview-render-requests.test.cjs",
+      "duration_ms": 51443.4442
+    },
+    {
+      "file": "desktop/proxy-resolution.test.cjs",
+      "duration_ms": 102.5129
+    },
+    {
+      "file": "desktop/r100.test.cjs",
+      "duration_ms": 168.9916
+    },
+    {
+      "file": "desktop/r110-export.test.cjs",
+      "duration_ms": 161.6507
+    },
+    {
+      "file": "desktop/r175.test.cjs",
+      "duration_ms": 190.7943
+    },
+    {
+      "file": "desktop/r185.test.cjs",
+      "duration_ms": 103.0917
+    },
+    {
+      "file": "desktop/r196.test.cjs",
+      "duration_ms": 101.063
+    },
+    {
+      "file": "desktop/r201.test.cjs",
+      "duration_ms": 93.8808
+    },
+    {
+      "file": "desktop/r204.test.cjs",
+      "duration_ms": 93.1261
+    },
+    {
+      "file": "desktop/r206.test.cjs",
+      "duration_ms": 98.8002
+    },
+    {
+      "file": "desktop/r87-p8-independent-verify.test.cjs",
+      "duration_ms": 67.7322
+    },
+    {
+      "file": "desktop/r88-diagnostics.test.cjs",
+      "duration_ms": 156.1616
+    },
+    {
+      "file": "desktop/pro-runes-render.test.cjs",
+      "duration_ms": 17648.1334
+    },
+    {
+      "file": "desktop/release-build.test.cjs",
+      "duration_ms": 124.6433
+    },
+    {
+      "file": "desktop/release-quality-gates.test.cjs",
+      "duration_ms": 7807.2342
+    },
+    {
+      "file": "desktop/share-export.test.cjs",
+      "duration_ms": 111.6882
+    },
+    {
+      "file": "desktop/refresh-orchestration.test.cjs",
+      "duration_ms": 13036.1932
+    },
+    {
+      "file": "desktop/startup-assets.test.cjs",
+      "duration_ms": 2555.1362
+    },
+    {
+      "file": "desktop/startup-sequence.test.cjs",
+      "duration_ms": 99.8966
+    },
+    {
+      "file": "desktop/startup-visibility.test.cjs",
+      "duration_ms": 113.2225
+    },
+    {
+      "file": "desktop/summoner-identity.test.cjs",
+      "duration_ms": 1627.6905
+    },
+    {
+      "file": "desktop/specialist-overview-render.test.cjs",
+      "duration_ms": 5836.8261
+    },
+    {
+      "file": "desktop/ui-scale.test.cjs",
+      "duration_ms": 197.5384
+    },
+    {
+      "file": "desktop/update-lifecycle.test.cjs",
+      "duration_ms": 102.6365
+    },
+    {
+      "file": "desktop/window-bounds-store.test.cjs",
+      "duration_ms": 93.5158
+    },
+    {
+      "file": "desktop/window-bounds.test.cjs",
+      "duration_ms": 93.8488
+    },
+    {
+      "file": "desktop/pro-players.test.cjs",
+      "duration_ms": 43679.6258
+    },
+    {
+      "file": "desktop/ui-scale-render.test.cjs",
+      "duration_ms": 3280.727
+    }
+  ],
+  "summary": {
+    "success": true,
+    "counts": {
+      "tests": 284,
+      "failed": 0,
+      "passed": 282,
+      "cancelled": 0,
+      "skipped": 2,
+      "todo": 0,
+      "topLevel": 281,
+      "suites": 0
+    },
+    "duration_ms": 194356.0318
+  },
+  "success": true
+}

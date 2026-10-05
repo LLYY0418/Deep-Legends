@@ -534,7 +534,7 @@ func TestWindowsClientDetectionUsesOrderedProductionBuilder(t *testing.T) {
 		t.Fatal("detectClientInstallationsWithScan production body was not found")
 	}
 	body := source[start:end]
-	if !strings.Contains(body, "buildDetectedClientInstallations(uniquePaths(gameRoots), riotClientCandidates(), shortcuts, regularFile)") {
+	if !strings.Contains(body, "buildDetectedClientInstallations(uniquePaths(gameRoots), executables, shortcuts, regularFile)") {
 		t.Fatal("Windows production detector does not use the ordered candidate builder")
 	}
 }
@@ -573,7 +573,7 @@ func TestBuildDetectedClientInstallationsPutsShortcutsLast(t *testing.T) {
 	if len(items) != 2 || items[0].ID != "tcls" || items[1].ID != "riot" {
 		t.Fatalf("detected installations = %#v", items)
 	}
-	for index, source := range []string{"launcher", "tcls", "league-client", "league-client", "shortcut"} {
+	for index, source := range []string{"launcher", "tcls", "shortcut"} {
 		if got := items[0].launchCandidates[index].Source; got != source {
 			t.Fatalf("tcls candidate %d source = %q, want %q", index, got, source)
 		}

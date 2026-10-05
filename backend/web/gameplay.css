@@ -1,3 +1,5 @@
+:root { --identity-chip-gap: 6px; }
+
 .connection {
   width: 100%;
   min-width: 0;
@@ -123,7 +125,7 @@
   white-space: nowrap;
 }
 
-.player-tab-copy { display: grid; min-width: 0; justify-items: start; align-content: center; line-height: 1.35; }
+.player-tab-copy { display: inline-flex; min-width: 0; align-items: center; line-height: 1.35; gap: var(--identity-chip-gap); }
 .player-tab-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 隐藏战绩玩家：名称下方的提示标签 */
 .player-tab-hidden { flex: 0 0 auto; width: fit-content; margin-top: 1px; padding: 0 5px; color: var(--warning); background: color-mix(in oklab,var(--warning) 13%,transparent); border: 1px solid color-mix(in oklab,var(--warning) 34%,transparent); border-radius: 5px; font-size: 9px; font-weight: 750; line-height: 1.6; white-space: nowrap; }
@@ -182,13 +184,13 @@
 .summoner-strip > :not(.summoner-strip-art) { position: relative; z-index: 2; }
 
 .summoner-strip-copy { min-width: 0; }
-.summoner-strip-copy > div { display: flex; min-width: 0; align-items: baseline; gap: 6px; }
-.summoner-name-meta { display: inline-flex; min-width: 0; flex: 0 1 auto; align-items: center; gap: 6px; }
+.summoner-strip-copy > div { display: flex; min-width: 0; align-items: baseline; gap: var(--identity-chip-gap); }
+.summoner-name-meta { display: inline-flex; min-width: 0; flex: 0 1 auto; align-items: center; gap: var(--identity-chip-gap); }
 .summoner-strip-copy h2 { overflow: hidden; font-size: 24px; text-overflow: ellipsis; text-shadow: 0 1px 8px var(--surface); white-space: nowrap; }
 .summoner-strip-copy span, .summoner-strip-copy p { color: var(--muted); }
 .summoner-strip-copy .pro-identity-chip { color: var(--primary-strong); }
 .summoner-strip-copy p { margin: 4px 0 0; font-size: 13px; }
-.summoner-level-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 7px; }
+.summoner-level-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--identity-chip-gap); }
 .summoner-level-row .player-tab-hidden { margin-top: 0; color: var(--warning); }
 .summoner-strip-copy .player-live-chip { color: var(--accent); overflow-wrap: anywhere; }
 .player-live-chip time { font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -973,7 +975,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .player-overlay-return { display: inline-flex; min-height: 34px; align-items: center; gap: 5px; padding: 0 12px 0 8px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; font-weight: 650; }
 .player-overlay-return:hover { background: var(--surface-strong); border-color: var(--hex-line); }
 .player-overlay-return svg { width: 18px; height: 18px; }
-.player-overlay-title { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: 8px; }
+.player-overlay-title { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: var(--identity-chip-gap); }
 .player-overlay-title strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .player-overlay-title small { color: var(--muted); font-size: 10px; }
 .player-overlay-add { min-height: 34px; flex: 0 0 auto; margin-left: auto; padding: 0 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; font-weight: 650; white-space: nowrap; }
@@ -1023,7 +1025,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-player.is-self { background: color-mix(in oklab,var(--primary-soft) 62%,transparent); }
 .live-player-copy { display: grid; min-width: 0; }
 .live-player-placeholder { grid-column: 2 / -1; white-space: normal; overflow-wrap: anywhere; }
-.live-player-identity { display: flex; min-width: 0; align-items: center; }
+.live-player-identity { display: flex; min-width: 0; align-items: center; gap: var(--identity-chip-gap); }
 .live-player-identity button { min-width: 0; }
 .live-player-copy button { padding: 0; overflow: hidden; color: var(--ink); background: transparent; border: 0; font-weight: 700; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .live-player-copy button:hover { color: var(--primary-strong); }
@@ -1038,8 +1040,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-player dd.live-record-value { color: var(--accent); }
 .live-player dd.win-rate-value { color: var(--success); }
 .live-player dd.live-kda-value { color: var(--kda-accent); }
-.self-chip { flex: 0 0 auto; margin-left: 7px; color: var(--primary-strong); font-size: 10px; font-weight: 750; }
-.premade-team-tag { display: inline-flex; min-height: 18px; flex: 0 0 auto; align-items: center; margin-left: 7px; padding: 1px 5px; color: var(--premade-color,#fff); background: var(--premade-bg,#555); border: 1px solid var(--premade-border,#555555d0); border-radius: 4px; font-size: 10px; font-weight: 800; line-height: 1; white-space: nowrap; cursor: help; }
+.self-chip { flex: 0 0 auto; margin-left: 0; color: var(--primary-strong); font-size: 10px; font-weight: 750; }
+.premade-team-tag { display: inline-flex; min-height: 18px; flex: 0 0 auto; align-items: center; margin-left: 0; padding: 1px 5px; color: var(--premade-color,#fff); background: var(--premade-bg,#555); border: 1px solid var(--premade-border,#555555d0); border-radius: 4px; font-size: 10px; font-weight: 800; line-height: 1; white-space: nowrap; cursor: help; }
 .premade-team-tag:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .premade-team-tag.is-color-0 { --premade-bg: #0f6f68; --premade-border: #0f6f68d0; }
 .premade-team-tag.is-color-1 { --premade-bg: #1f3fa6; --premade-border: #1f3fa6d0; }
@@ -1645,7 +1647,6 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
   .player-overlay-bar { gap: 6px; padding-inline: 10px; }
   .player-overlay-return { width: 34px; flex: 0 0 34px; justify-content: center; padding: 0; }
   .player-overlay-return span { display: none; }
-  .player-overlay-title { gap: 4px; }
   .player-overlay-title small { display: none; }
   .player-overlay-add { padding-inline: 8px; font-size: 11px; }
   .player-workspace-head { flex-wrap: wrap; }
@@ -1654,7 +1655,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
   .player-workspace-head > .text-button { order: 2; }
   #overview-refresh { margin-left: auto; }
   .summoner-strip { padding: 12px; }
-  .summoner-strip-copy > div { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .summoner-strip-copy > div { align-items: flex-start; flex-direction: column; gap: var(--identity-chip-gap); }
   .summoner-strip-copy span { font-size: 11px; }
   .live-toolbar { align-items: stretch; flex-direction: column; }
   .live-toolbar > .text-button { align-self: flex-end; margin-left: 0; }
@@ -1839,7 +1840,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .current-game-identity button, .current-game-identity strong { padding: 0; background: none; border: 0; text-align: left; font-size: 12px; font-weight: 700; color: var(--ink); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .current-game-identity button { cursor: pointer; }
 /* R132 P4：职业选手标签跟在名字右侧，宽度按内容自适应，不再在名字下方撑满整行。 */
-.current-game-name-row { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.current-game-name-row { display: flex; min-width: 0; align-items: center; gap: var(--identity-chip-gap); }
 .current-game-name-row > button, .current-game-name-row > strong { flex: 0 1 auto; min-width: 0; }
 .current-game-name-row .pro-identity-chip { flex: 0 0 auto; min-height: 18px; padding: 0 6px; font-size: 10.5px; line-height: 16px; }
 .current-game-identity button:hover { color: var(--primary-strong); }
@@ -2159,3 +2160,5 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 
 /* R218: matchup action stays readable on the stronger opponent-row surface. */
 .champion-data-table [data-table-more] { color:var(--ink); background:var(--surface-strong); border:1px solid var(--line); }
+
+.player-tab-region { flex: 0 0 auto; color: var(--muted); font-size: 10px; margin-left: 0; }

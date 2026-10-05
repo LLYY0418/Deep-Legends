@@ -81,7 +81,7 @@ func TestR220ClientStatusAndDiagnosticWhitelist(t *testing.T) {
 			t.Fatal(status.ClientRegion, status.ClientRegionLabel)
 		}
 		event := clientPlatformDiagnostic(c)
-		if len(event) != 4 || event["event"] != "client_platform_resolved" || event["source"] != "startup-args" {
+		if len(event) != 7 || event["event"] != "client_platform_resolved" || (tc.want != "" && event["source"] != "startup-args") {
 			t.Fatal(event)
 		}
 		raw, _ := json.Marshal(event)

@@ -1643,12 +1643,12 @@ test("rank history and ability comparison stay inside the shared career surface"
 	assert.match(gameplayStyles, /\.ability-radar-metric\.is-metric-3\s*\{[^}]*left:\s*66%[^}]*top:\s*91%/s);
 	assert.match(gameplayStyles, /\.ability-radar-metric\.is-metric-6\s*\{[^}]*left:\s*21%[^}]*top:\s*25%/s);
 	assert.match(gameplayScript, /item\.leaguePoints === null \|\| item\.leaguePoints === undefined \? "—"/);
-	assert.match(gameplayScript, /对手基准来自这名玩家排位中的同位置对手样本聚合，不是全服或段位平均/);
+	assert.doesNotMatch(gameplayScript, /对手基准来自这名玩家排位中的同位置对手样本聚合，不是全服或段位平均/);
 	assert.match(gameplayScript, /当前玩家 \$\{abilityMetricValue\(metric, "player"\)\} · \$\{baselineLabel\}/);
 	assert.match(demoScript, /baselineLabel: "近期同位置对手样本"/);
 	assert.doesNotMatch(demoScript, /baselineLabel: "翡翠 II 平均"/);
 	assert.doesNotMatch(gameplayScript, /评级 \$\{metric\.grade\} · 玩家/);
-	assert.match(gameplayScript, /至少需要 3 场包含完整参与者数据的排位对局/);
+	assert.doesNotMatch(gameplayScript, /至少需要 3 场包含完整参与者数据的排位对局/);
 	assert.match(gameplayStyles, /\.rank-history-head, \.rank-history-row\s*\{[^}]*grid-template-columns:\s*72px minmax\(0,1fr\) 52px/s);
 	assert.match(gameplayStyles, /@container career-dialog \(max-width: 360px\)[\s\S]+\.rank-history-head, \.rank-history-row\s*\{[^}]*grid-template-columns:\s*64px minmax\(0,1fr\) 44px/);
 	assert.match(gameplayStyles, /@container career-dialog \(max-width: 360px\)[\s\S]+\.rank-history-crest\s*\{\s*display:\s*none/);
@@ -1741,13 +1741,13 @@ test("career ranked queue switches use one recent sample and ignore season scan 
 			renderAbility(null, label, "SWITCH", 0, 0),
 			renderPositionStats([], Number(key), "SWITCH", label, 0),
 		]) {
-			assert.match(markup, /首屏已加载|首屏最近|最近对局/);
+			assert.doesNotMatch(markup, /基于首屏|最多统计|至少需要/);
 			assert.doesNotMatch(markup, /统计中|season-progress-badge|本赛季/);
 			assert.doesNotMatch(markup, label === "单双排" ? /灵活组排/ : /单双排/);
 		}
 	}
 
-	assert.match(renderAbility(null, "单双排", "SWITCH", 2, 2), /近期对局中单双排样本不足（需 ≥3 场，当前 2 场）/);
+	assert.match(renderAbility(null, "单双排", "SWITCH", 2, 2), /近期对局中单双排样本不足/);
 	assert.doesNotMatch(renderAbility(null, "单双排", "SWITCH", 0, 2), /本赛季未参加|统计中/);
 	assert.doesNotMatch(renderPositionStats([], 440, "SWITCH", "灵活组排", 2), /本赛季未参加|统计中/);
 	assert.match(renderRecentRanked({ queueLabel: "单双排" }, 420, "SWITCH"), /当前样本未发现单双排对局/);
@@ -2366,7 +2366,7 @@ test("top search and player navigation preserve the selected Chinese server", ()
   assert.match(html, /id="player-search-cn-toggle"[^>]+aria-expanded="false"[^>]+aria-controls="player-search-cn-options"/);
   assert.match(html, /id="player-search-cn-options"[^>]+role="group"[^>]+hidden/);
   assert.match(html, /id="player-search-follow-client"[^>]+data-region-option="cn" data-server-id=""[^>]+disabled/);
-  assert.match(html, /data-region-option="kr" data-server-id=""/);
+  assert.match(html, /data-region-option="kr"/);
   assert.doesNotMatch(html.replace(/<[^>]*>/g, " "), /\b(?:HN1|HN10|NJ100|GZ100|CQ100|TJ100|TJ101|BGP2|PBE)\b/);
   assert.match(appScript, /function searchServerID\(\)/);
   assert.match(appScript, /function visibleRegionMenuEntries\(\)/);
@@ -5191,7 +5191,7 @@ test("R46 TFT live sessions render one explicit unsupported state", () => {
 		liveLoading: false,
 	};
 	const toolbar = { hidden: true };
-	const { renderLive } = compileFunctions(gameplayScript, ["renderLive"], {
+	const { renderLive } = compileFunctions(gameplayScript, ["renderLive", "liveRenderTriggerLabel"], {
 		state,
 		nodes: { liveRefresh: { closest: () => toolbar, setAttribute() {} }, liveContent: content },
 		connected: () => true,
@@ -6236,7 +6236,7 @@ test("R16 build, rune, skill, and Korean overview guards preserve the corrected 
   assert.match(functionSource(script, "renderRankedBuild"), /renderConfigOption\(row, "route", null, renderDepthStats\)/);
   assert.match(styles, /\.champion-build-board \.config-option\s*\{[^}]*min-height:\s*var\(--build-row-height,\s*60px\)[^}]*flex-wrap:\s*nowrap/s);
   assert.match(gameplayStyles, /\.config-option\s*\{[^}]*min-height:\s*var\(--build-row-height,\s*60px\)/s);
-	  assert.match(gameplayScript, /const timeout = riotTab\(tab\) \? 190_000 : 25_000;/);
+	  assert.match(gameplayScript, /const timeout = retryHistory \? 190_000 : 25_000;/);
   for (const slot of ["fourth", "fifth"]) {
     assert.match(gameplayScript, new RegExp(`inUpstreamOrder\\(build\\.${slot}Options \\|\\| \\[\\], 5\\)`));
   }
@@ -6313,8 +6313,8 @@ test("R16 addendum guards reject every documented regression on true copies", ()
     fs.writeFileSync(path.join(webCopy, "build-item-row.css"), originals["build-item-row.css"].replace("--build-row-height: 64px", "--build-row-height: 40px"));
     assert.throws(() => assert.match(read("build-item-row.css"), /--build-row-height:\s*64px/));
 
-		fs.writeFileSync(path.join(webCopy, "gameplay.js"), originals["gameplay.js"].replace("const timeout = riotTab(tab) ? 190_000 : 25_000;", "const timeout = 10_000;"));
-		assert.throws(() => assert.match(read("gameplay.js"), /const timeout = riotTab\(tab\) \? 190_000 : 25_000;/));
+		fs.writeFileSync(path.join(webCopy, "gameplay.js"), originals["gameplay.js"].replace("const timeout = retryHistory ? 190_000 : 25_000;", "const timeout = 10_000;"));
+		assert.throws(() => assert.match(read("gameplay.js"), /const timeout = retryHistory \? 190_000 : 25_000;/));
 
 		const compileMilestones = (source) => compileFunctions(source, ["renderRankMilestones"], {
 			escapeHTML: (value) => String(value),

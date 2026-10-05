@@ -32,6 +32,8 @@ jobs:
           test -z "$unformatted"
       - name: Vet
         run: go vet ./...
+      - name: Verify CI test filters
+        run: node scripts/verify-ci-test-filters.cjs
       - name: Test with race detector
         run: go test -count=1 -race ./...
       - name: Validate frontend JavaScript
@@ -83,24 +85,27 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - name: Install Windows test dependencies
         run: npm ci --prefix desktop
-      # Linux skips these platform gates; fail rather than skip PowerShell probes.
+      # R225: restore all Windows-compiled shared paths, not only Linux skips.
+      # Includes TestUpdate*, TestR204KeySaveAndClear, TestR204KeyRuntime401AndPrivacy
+      # and TestSplitRegistryPathSupportsNativeTencentKeys. JSON proves actual passes.
+      - name: Test full Windows backend and installer suites
+        shell: pwsh
+        run: |
+          node scripts/run-ci-tests.cjs go backend
+          if ($LASTEXITCODE -ne 0) { throw "Windows backend tests or pass inventory failed" }
+          node scripts/run-ci-tests.cjs go installer
+          if ($LASTEXITCODE -ne 0) { throw "Windows installer tests or pass inventory failed" }
+      # Filtered platform gates must match their exact counts with zero skips.
       - name: Test Windows-only release and PowerShell guards
         shell: pwsh
         env:
           R82_POWERSHELL: powershell.exe
         run: |
-          go test ./backend -run '^(TestSplitRegistryPathSupportsNativeTencentKeys|TestR204KeySaveRejectsUnauthorizedAndEncrypts|TestR204KeyRuntime401AndPrivacy)$'
-          if ($LASTEXITCODE -ne 0) { throw "Windows backend guards failed" }
-          Push-Location installer
-          try {
-            go test ./... -run '^(TestWindowsApplicationWindowDetection|TestWindowsMissingApplicationDoesNotYieldAPID|TestR205WindowsShortcutRoundTrip|TestR205WindowsShortcutTargetAlias|TestR205WindowsKeepShortcutsStringValue|TestR205WindowsCOMAlreadyInitialized|TestR86WindowsDestinationPreflightSmoke|TestR86WindowsDialogDirectoryAndDiskHelpers|TestR206IconOnlyChangesIconAndPreservesCreation|TestSettingsUseHRESULTAcrossEntireConfiguration|TestCOMUsesHRESULTInsteadOfThreadLastError|TestFailedNavigationEventIsNotReadiness)$'
-            if ($LASTEXITCODE -ne 0) { throw "Windows installer guards failed" }
-          } finally { Pop-Location }
-          node --test --test-name-pattern="R86 Windows release|R222 Windows" desktop/release-quality-gates.test.cjs
+          node scripts/run-ci-tests.cjs node --expected-tests=2 --test-name-pattern="R86 Windows release|R222 Windows" desktop/release-quality-gates.test.cjs
           if ($LASTEXITCODE -ne 0) { throw "Windows release gates failed" }
-          node --test --test-name-pattern="setup-only Windows CI skip" scripts/setup-only-build.test.cjs
+          node scripts/run-ci-tests.cjs node --expected-tests=1 --test-name-pattern="setup-only Windows CI skip" scripts/setup-only-build.test.cjs
           if ($LASTEXITCODE -ne 0) { throw "Windows setup-only guards failed" }
-          node --test scripts/r82-startup-ab-script.test.cjs
+          node scripts/run-ci-tests.cjs node --expected-tests=2 scripts/r82-startup-ab-script.test.cjs
           if ($LASTEXITCODE -ne 0) { throw "PowerShell script guards failed" }
       # Opt-in acceptance only; routine tag/build runs rely on Linux's full suite.
       - name: Measure full desktop renderer tests on Windows

@@ -404,6 +404,14 @@ func (a *app) handleGameplayMayhemRating(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	gameName := strings.TrimSpace(query.Get("gameName"))
+	a.mu.RLock()
+	client := a.lcu
+	a.mu.RUnlock()
+	if !isTencentClient(client) {
+		respondJSON(w, unavailableMayhemRating("", dataSourceModeUnsupported))
+		return
+	}
+	knownTencent := clientTencentServerID(client) != ""
 	tagLine := strings.TrimSpace(query.Get("tagLine"))
 	if publicRef := strings.TrimSpace(query.Get("playerRef")); publicRef != "" {
 		reference, ok := a.resolveGameplayReferenceDetails(publicRef)
@@ -416,7 +424,12 @@ func (a *app) handleGameplayMayhemRating(w http.ResponseWriter, r *http.Request)
 			respondJSON(w, response)
 			return
 		}
+		knownTencent = reference.ServerID != ""
 		gameName, tagLine = reference.GameName, reference.TagLine
+	}
+	if !knownTencent {
+		respondJSON(w, unavailableMayhemRating("", dataSourceModeUnsupported))
+		return
 	}
 	if _, _, _, err := normalizeAramkitIdentity(gameName, tagLine); err != nil {
 		http.Error(w, "player identity unavailable", http.StatusBadRequest)

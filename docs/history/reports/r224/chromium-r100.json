@@ -1,0 +1,16 @@
+{
+  "command": [
+    "env",
+    "R100_BROWSER_OUTPUT=docs/history/reports/r224/r100",
+    "node",
+    "desktop/r100-browser.cjs"
+  ],
+  "start": "2026-10-05T21:20:28.724684+08:00",
+  "end": "2026-10-05T21:20:31.267134+08:00",
+  "seconds": 2.542,
+  "exit_code": 0,
+  "last_5_lines": [
+    "CDP connected",
+    "R100 Chromium PASS {\"elapsed\":2.100000023841858,\"peakImages\":5}"
+  ]
+}

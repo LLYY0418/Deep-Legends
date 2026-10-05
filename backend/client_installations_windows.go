@@ -3,7 +3,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -29,11 +28,74 @@ func detectClientInstallationsWithScan() ([]clientInstallation, clientInstallati
 	}
 	shortcuts := detectClientShortcuts()
 	report.ShortcutCandidates = len(shortcuts)
-	return buildDetectedClientInstallations(uniquePaths(gameRoots), riotClientCandidates(), shortcuts, regularFile), report
+	paths := riotClientCandidatesWithSources()
+	executables := []string{}
+	sources := map[string]string{}
+	for _, candidate := range paths {
+		skip := false
+		for _, root := range gameRoots {
+			if strings.HasPrefix(strings.ToLower(candidate.executable), strings.ToLower(filepath.Clean(root))+string(filepath.Separator)) {
+				skip = true
+				break
+			}
+		}
+		if !skip {
+			executables = append(executables, candidate.executable)
+			sources[strings.ToLower(candidate.executable)] = candidate.Source
+		}
+	}
+	items := buildDetectedClientInstallations(uniquePaths(gameRoots), executables, shortcuts, regularFile)
+	for i := range items {
+		if items[i].ID == "riot" {
+			for j := range items[i].launchCandidates {
+				if source := sources[strings.ToLower(items[i].launchCandidates[j].executable)]; source != "" {
+					items[i].launchCandidates[j].Source = source
+				}
+			}
+		}
+	}
+	return items, report
 }
 
 func launchClientInstallation(installation clientInstallation) (clientLaunchResult, error) {
-	return launchClientCandidates(installation, launchWindowsClientCandidate)
+	if installation.ID != "riot" {
+		return launchClientCandidates(installation, launchWindowsClientCandidate)
+	}
+	result := clientLaunchResult{}
+	if candidates := installation.candidates(); len(candidates) > 0 {
+		result.PathClass = candidates[0].Source
+	}
+	programData := os.Getenv("ProgramData")
+	if programData == "" {
+		programData = `C:\ProgramData`
+	}
+	data, err := os.ReadFile(filepath.Join(programData, "Riot Games", "Metadata", "league_of_legends.live", "league_of_legends.live.product_settings.yaml"))
+	result.ProductSettingsExists = err == nil
+	result.ProductInstallClass = classifyRiotProductInstall(data, func(path string) bool {
+		info, err := os.Stat(path)
+		return err == nil && info.IsDir() && !regularFile(filepath.Join(path, "TCLS", "Client.exe")) && (regularFile(filepath.Join(path, "LeagueClient.exe")) || regularFile(filepath.Join(path, "LeagueClient", "LeagueClient.exe")))
+	})
+	if regularFile(filepath.Join(riotProductInstallPath(data), "TCLS", "Client.exe")) {
+		result.ProductInstallClass = "tencent"
+	}
+	// A running Riot Client must never receive a second launch-product request.
+	if running, foreground := focusRunningRiotClient(); running {
+		result.AlreadyOpen = !foreground
+		result.Source = result.PathClass
+		return result, nil
+	}
+	if result.ProductInstallClass != "riot" {
+		return result, errRiotProductUnavailable
+	}
+	launched, err := launchClientCandidates(installation, launchWindowsClientCandidate)
+	launched.PathClass = result.PathClass
+	if launched.Source != "" {
+		launched.PathClass = launched.Source
+	} else if len(launched.Failures) > 0 {
+		launched.PathClass = launched.Failures[len(launched.Failures)-1].Source
+	}
+	launched.ProductSettingsExists, launched.ProductInstallClass = result.ProductSettingsExists, result.ProductInstallClass
+	return launched, err
 }
 
 func launchWindowsClientCandidate(candidate clientLaunchCandidate) (clientLaunchFailure, error) {
@@ -186,44 +248,18 @@ func splitRegistryPath(path string) (registry.Key, string, bool) {
 	}
 }
 
-func riotClientCandidates() []string {
-	values := make([]string, 0, 8)
+func riotClientCandidatesWithSources() []clientLaunchCandidate {
 	programData := os.Getenv("ProgramData")
 	if programData == "" {
 		programData = `C:\ProgramData`
 	}
-	data, err := os.ReadFile(filepath.Join(programData, "Riot Games", "RiotClientInstalls.json"))
-	if err == nil {
-		var payload any
-		if json.Unmarshal(data, &payload) == nil {
-			collectRiotExecutables(payload, &values)
-		}
-	}
+	data, _ := os.ReadFile(filepath.Join(programData, "Riot Games", "RiotClientInstalls.json"))
+	guesses := []string{}
 	for _, drive := range []string{"C:", "D:", "E:", "F:"} {
-		values = append(values, filepath.Join(drive+string(filepath.Separator), "Riot Games", "Riot Client", "RiotClientServices.exe"))
+		guesses = append(guesses, filepath.Join(drive+string(filepath.Separator), "Riot Games", "Riot Client", "RiotClientServices.exe"))
 	}
-	return uniquePaths(values)
+	return riotCandidatesFromJSON(data, guesses)
 }
-
-func collectRiotExecutables(value any, result *[]string) {
-	switch typed := value.(type) {
-	case string:
-		candidate := filepath.Clean(strings.Trim(typed, ` "`))
-		if strings.EqualFold(filepath.Base(candidate), "RiotClientServices.exe") {
-			*result = append(*result, candidate)
-		}
-	case []any:
-		for _, item := range typed {
-			collectRiotExecutables(item, result)
-		}
-	case map[string]any:
-		for key, item := range typed {
-			collectRiotExecutables(key, result)
-			collectRiotExecutables(item, result)
-		}
-	}
-}
-
 func uniquePaths(values []string) []string {
 	seen := make(map[string]bool)
 	result := make([]string, 0, len(values))

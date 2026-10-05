@@ -92,7 +92,7 @@ func (r *watchRunner) observeChampSelectManualActions(session lcuChampSelectSess
 			r.mu.Lock()
 			last, submitted := r.champSelect.submitted[action.ID]
 			pending := r.champSelect.decision["champselect-"+side]
-			ownEcho := r.champSelect.inFlight[action.ID] && pending.ActionID == action.ID && pending.ChampionID == action.ChampionID
+			ownEcho := r.champSelect.inFlight[action.ID] && pending.ActionID == action.ID && (pending.ChampionID == action.ChampionID || pending.ChampionID == -3 && pending.Completed && action.Completed && action.ChampionID > 0)
 			tracking := submitted || pending.Action != "" && pending.ActionID == action.ID
 			changed := tracking && !ownEcho && champSelectManualActionChanged(session, action, last, submitted)
 			championID := last.ChampionID
@@ -117,6 +117,9 @@ func (r *watchRunner) observeChampSelectManualActions(session lcuChampSelectSess
 }
 
 func champSelectManualActionChanged(session lcuChampSelectSession, action lcuChampSelectAction, last champSelectSubmitRecord, submitted bool) bool {
+	if submitted && last.ChampionID == -3 && last.Completed && action.Completed && action.ChampionID > 0 {
+		return false
+	}
 	if action.ChampionID != 0 {
 		return !submitted || action.ChampionID != last.ChampionID
 	}

@@ -93,7 +93,7 @@ function buildMarkup(data, fns) {
   const tab = (key, label, active) => `<button type="button" role="tab" id="recommendation-tab-${key}" class="${active ? "is-active" : ""}" aria-selected="${active}" tabindex="${active ? 0 : -1}" data-recommendation-tab="${key}">${label}</button>`;
   const panel = (key, content, active) => `<div id="recommendation-panel-${key}" class="recommendation-panel" role="tabpanel" aria-labelledby="recommendation-tab-${key}"${active ? "" : " hidden"}>${content}</div>`;
   const rosterNotice = data.champSelectNotice ? `<p class="live-roster-notice" role="note"><span>${data.champSelectNotice}</span></p>` : "";
-  return `<section class="recommendation-area"><div class="recommendation-tab-row"><div class="recommendation-tabs" role="tablist" aria-label="推荐类型">${tab("build", "海克斯与出装", true)}${tab("insight", "详情", false)}</div>${rosterNotice}</div>${panel("build", build, true)}${panel("insight", insight, false)}</section>`;
+  return `<section class="recommendation-area"><div class="recommendation-tab-row"><div class="recommendation-tabs" role="tablist" aria-label="推荐类型">${tab("build", "海克斯与出装", true)}${tab("insight", "详情", false)}</div><div data-live-notice="roster">${rosterNotice}</div></div>${panel("build", build, true)}${panel("insight", insight, false)}</section>`;
 }
 
 function mountFixture(source = gameplayScript) {
@@ -182,7 +182,7 @@ function mountFixture(source = gameplayScript) {
 // 首帧：整块渲染一次，返回可比较的节点快照。
 function firstRender(fx, data) {
   fx.state.live = data;
-  fx.fns.renderLive();
+  fx.fns.renderLive("interval");
   assert.equal(fx.writes.innerHTML, 1, "首帧应整块渲染一次");
   assert.deepEqual(fx.state.liveRenderRebuild?.counts || {}, { full: 1 });
   const build = fx.buildImages();
@@ -259,7 +259,7 @@ test("R129 P1 词表与后端一致，源码里不再残留 ready/liveLoading �
 });
 
 test("R129 P1 renderLive 上方写明 markup 的取值纪律", () => {
-  const index = gameplayScript.indexOf("function renderLive() {");
+  const index = gameplayScript.indexOf('function renderLive(source = "direct") {');
   assert.ok(index > 0);
   const above = gameplayScript.slice(Math.max(0, index - 700), index);
   assert.match(above, /只能由快照数据和用户选择决定/);
@@ -327,7 +327,7 @@ test("R129 P2 只有详情数据变化时，build 面板图标不动、滚动位
   assert.deepEqual(fx.prepared, ["recommendation-panel-insight"], "只对被替换的面板重新排队懒加载");
 });
 
-test("R129 P2 外壳变化（提示条/页签行）时回退整块重建", (t) => {
+test("R224 提示条变化原地更新并保留所有图片", (t) => {
   const fx = mountFixture();
   t.after(() => fx.cleanup());
   const data = liveFixture();
@@ -337,8 +337,8 @@ test("R129 P2 外壳变化（提示条/页签行）时回退整块重建", (t) =
   data.champSelectNotice = "海克斯大乱斗英雄选择阶段只展示本人信息";
   fx.fns.renderLive();
 
-  assert.equal(fx.writes.innerHTML, 2, "外壳变了必须整块重建");
-  assert.deepEqual(fx.state.liveRenderRebuild.counts, { full: 2 });
+  assert.equal(fx.writes.innerHTML, 1, "提示条变化不重建");
+  assert.deepEqual(fx.state.liveRenderRebuild.counts, { full: 1, banner: 1 });
   assert.equal(fx.buildImages().length, 9);
   assertSameNodes(before, fx.buildImages(), "R213 整块重建也复用相同地址图片");
   assert.match(fx.content.innerHTML, /live-roster-notice/);
@@ -370,7 +370,7 @@ test("R129 P2 markup 完全没变时连面板都不碰", (t) => {
 test("R129 P3 触发来源词表：interval / sse / manual / catalog，其余归为 direct", (t) => {
   const fx = mountFixture();
   t.after(() => fx.cleanup());
-  const cases = [["interval", "interval"], ["manual", "manual"], ["sse", "sse"], ["event", "sse"], ["catalog", "catalog"], ["resync", "direct"], ["direct", "direct"], ["", "direct"], [undefined, "direct"]];
+  const cases = [["interval", "interval"], ["manual", "manual"], ["sse", "sse"], ["event", "sse"], ["catalog", "catalog"], ["resync", "resync"], ["direct", "direct"], ["", "direct"], [undefined, "direct"]];
   for (const [input, expected] of cases) assert.equal(fx.fns.liveRenderTriggerLabel(input), expected, `${String(input)} 应归为 ${expected}`);
 });
 
@@ -391,7 +391,7 @@ test("R129 P3 live_render_rebuild 每 60 秒聚合一次，记录面板与来源
   fx.fns.renderLive();
   assert.equal(fx.state.liveRenderSource, "catalog");
   assert.equal(fx.state.liveRenderTrigger, "", "一次性触发用完即清");
-  assert.deepEqual(fx.state.liveRenderRebuild.counts, { full: 2 });
+  assert.deepEqual(fx.state.liveRenderRebuild.counts, { full: 1, banner: 1 });
   assert.deepEqual(fx.state.liveRenderRebuild.sources, { interval: 1, catalog: 1 });
   assert.deepEqual(fx.diagnostics, [], "60 秒窗口内仍不发诊断");
 
@@ -400,7 +400,7 @@ test("R129 P3 live_render_rebuild 每 60 秒聚合一次，记录面板与来源
   const [entry] = fx.diagnostics;
   assert.equal(entry.event, "live_render_rebuild");
   assert.equal(entry.reason, "aggregated");
-  assert.deepEqual(entry.context.counts, { full: 2 });
+  assert.deepEqual(entry.context.counts, { full: 1, banner: 1 });
   assert.deepEqual(entry.context.sources, { interval: 1, catalog: 1 });
   assert.equal(entry.context.total, 2);
   assert.equal(entry.context.phase, "ChampSelect");

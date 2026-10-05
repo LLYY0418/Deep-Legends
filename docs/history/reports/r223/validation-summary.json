@@ -1,0 +1,236 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-10-05T13:27:06.552Z",
+  "version": "0.12.73",
+  "source_fingerprint": "1f1aa659b7e7",
+  "build": {
+    "version": "0.12.73",
+    "key_mode": "public",
+    "fingerprint": "1f1aa659b7e7",
+    "fingerprint_after": "1f1aa659b7e7",
+    "stable": true,
+    "artifacts": [
+      "/private/tmp/deep-legends-r223-0.12.73-public",
+      "/private/tmp/deep-legends-r223-0.12.73-public.exe"
+    ],
+    "built_at": "2026-10-05T13:26:21.719Z"
+  },
+  "artifacts": [
+    {
+      "path": "/private/tmp/deep-legends-r223-0.12.73-public",
+      "bytes": 31325618,
+      "sha256": "514053d9205786c4c76fb5aa11aba6302fb947ab4a0933728ebafbf1b285f14f"
+    },
+    {
+      "path": "/private/tmp/deep-legends-r223-0.12.73-public.exe",
+      "bytes": 32229888,
+      "sha256": "737766f93da09c454fcb75cbd20399e75c26ca22eb0e2f64c014e920ab76a720"
+    }
+  ],
+  "status": "implemented_local_validation_with_failures_windows_pending",
+  "real_sgp_sample": {
+    "blocking": false,
+    "fixture_created": false,
+    "user_override": "No backend/testdata/r223/sgp-summary-tencent.json; synthetic coverage"
+  },
+  "windows_game_client": {
+    "verified": false,
+    "reason": "macOS session; no Windows game client connection provided"
+  },
+  "release": {
+    "version_changed": false,
+    "tag_created": false,
+    "published": false,
+    "installer_created": false,
+    "key_mode": "public"
+  },
+  "checks": [
+    {
+      "command": "go test ./backend -run 'TestR223|TestR201ProbeWindowCancelsSlowRoutes' -count=1",
+      "exit_code": 0,
+      "log": "r223-go-test.log"
+    },
+    {
+      "command": "go test ./backend -run 'TestR223|TestR214|TestPlayerRankScore|TestSGPValidatedGateway|TestRefreshSummonerIdentitySingleflight|TestSeasonScanPages' -count=1",
+      "exit_code": 0,
+      "log": "targeted-test.log"
+    },
+    {
+      "command": "go test ./backend -race -run 'TestR223|TestR220|TestMatchHistory|TestR216|TestR217|TestARAM|TestClientLaunch|TestPlayerRankScore|TestSGPValidatedGateway|TestRefreshSummonerIdentitySingleflight' -count=1",
+      "exit_code": 0,
+      "log": "go-race.log",
+      "run_pattern": "TestR223|TestR220|TestMatchHistory|TestR216|TestR217|TestARAM|TestClientLaunch|TestPlayerRankScore|TestSGPValidatedGateway|TestRefreshSummonerIdentitySingleflight"
+    },
+    {
+      "command": "go test ./backend -count=1",
+      "exit_code": 0,
+      "status": "passed",
+      "log": "go-test.log"
+    },
+    {
+      "command": "go test -race ./...",
+      "exit_code": 1,
+      "log": "go-race-full.log",
+      "failures": [
+        "TestR58LiveClientPlayerListGroupsSixArenaTeamsAndRedactsDiagnostics",
+        "TestR58LiveClientPlayerListUnavailableFallsBackWithoutError",
+        "TestR62ArenaPlayerListRetriesAndGroupsSeventeenPlayers",
+        "TestR201ProbeWindowCancelsSlowRoutes"
+      ],
+      "data_race_reported": false,
+      "note": "Earlier run while R224 fixtures were being adjusted; final Go full passes. R201 independent check passed; affected race recheck recorded separately.",
+      "affected_recheck": "race-recheck.log"
+    },
+    {
+      "command": "go vet ./...",
+      "exit_code": 0,
+      "log": "go-vet.log"
+    },
+    {
+      "command": "go test ./... (installer)",
+      "exit_code": 0,
+      "log": "installer-test.log"
+    },
+    {
+      "command": "go vet ./... (installer)",
+      "exit_code": 0,
+      "log": "installer-vet.log"
+    },
+    {
+      "command": "node --check (every backend/web/*.js)",
+      "exit_code": 0,
+      "log": "js-syntax.log"
+    },
+    {
+      "command": "node --test backend/web/r223.test.cjs",
+      "exit_code": 0,
+      "tests": 7,
+      "passed": 7,
+      "log": "r223-frontend.log"
+    },
+    {
+      "command": "node --test desktop/pro-players.test.cjs desktop/summoner-identity.test.cjs backend/web/r223.test.cjs",
+      "exit_code": 0,
+      "tests": 43,
+      "passed": 43,
+      "log": "desktop-targeted.log"
+    },
+    {
+      "command": "node --test --test-concurrency=4 backend/web/*.test.cjs",
+      "exit_code": 1,
+      "tests": 950,
+      "passed": 947,
+      "failed": 3,
+      "log": "frontend-test.log",
+      "failures": [
+        "R192 loader-free mount timeout",
+        "R192 hydrated Arena mount timeout",
+        "R206 100ms image-start deadline"
+      ],
+      "independent_recheck": "timing-recheck.log"
+    },
+    {
+      "command": "node --test backend/web/r192.test.cjs backend/web/r206-collection-image.test.cjs",
+      "exit_code": 0,
+      "tests": 9,
+      "passed": 9,
+      "log": "timing-recheck.log"
+    },
+    {
+      "command": "node scripts/test-renderers.cjs all",
+      "exit_code": 1,
+      "counts": {
+        "tests": 1274,
+        "failed": 1,
+        "passed": 1269,
+        "cancelled": 0,
+        "skipped": 4,
+        "todo": 0,
+        "topLevel": 1271,
+        "suites": 0
+      },
+      "duration_ms": 277876.871667,
+      "log": "renderers-test.log",
+      "failure": "R70 hidden gameplay pages do not construct DOM",
+      "budget_exceeded_files": [
+        {
+          "file": "desktop/overview-render-career.test.cjs",
+          "duration_ms": 142574.665667
+        },
+        {
+          "file": "desktop/overview-render-controls-mutants.test.cjs",
+          "duration_ms": 109894.054791
+        },
+        {
+          "file": "desktop/overview-render-200-timeline.test.cjs",
+          "duration_ms": 173684.781875
+        },
+        {
+          "file": "desktop/overview-render-200-filter.test.cjs",
+          "duration_ms": 174384.942
+        },
+        {
+          "file": "desktop/overview-render-200-expand.test.cjs",
+          "duration_ms": 178215.79025
+        },
+        {
+          "file": "desktop/overview-render-200-controls.test.cjs",
+          "duration_ms": 191340.99975
+        },
+        {
+          "file": "desktop/overview-render-200-images.test.cjs",
+          "duration_ms": 215089.968375
+        },
+        {
+          "file": "desktop/overview-render-200-external.test.cjs",
+          "duration_ms": 217802.606
+        }
+      ]
+    },
+    {
+      "command": "node --test relay/riot-worker/worker.test.mjs",
+      "exit_code": 0,
+      "tests": 15,
+      "passed": 15,
+      "log": "worker-test.log"
+    },
+    {
+      "command": "R100_BROWSER_OUTPUT=... node desktop/r100-browser.cjs",
+      "exit_code": 0,
+      "real_chromium": true,
+      "log": "chromium-r100.log"
+    },
+    {
+      "command": "R117_BROWSER_OUTPUT=... node desktop/r117-browser.cjs",
+      "exit_code": 0,
+      "real_chromium": true,
+      "log": "chromium-r117.log"
+    },
+    {
+      "command": "native and Windows amd64 public go build; verify-build-fingerprint; native --startup-warmup",
+      "exit_code": 0,
+      "log": "build-final.json"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "log": "diff-check.log"
+    },
+    {
+      "command": "go test -race ./backend -run 'TestR58LiveClientPlayerListGroupsSixArenaTeamsAndRedactsDiagnostics|TestR58LiveClientPlayerListUnavailableFallsBackWithoutError|TestR62ArenaPlayerListRetriesAndGroupsSeventeenPlayers|TestR201ProbeWindowCancelsSlowRoutes' -count=1",
+      "exit_code": 0,
+      "log": "race-recheck.log"
+    },
+    {
+      "command": "node --test desktop/refresh-orchestration.test.cjs",
+      "exit_code": 1,
+      "log": "renderer-recheck.log"
+    }
+  ],
+  "limitations": [
+    "No Windows game-client acceptance",
+    "Real Tencent triggering field unconfirmed and nonblocking",
+    "Concurrent R222/R224 changes preserved; frontend and renderer all checks retain failures"
+  ],
+  "source_notes": "Shared R224 gameplay.js changed after full frontend run; final R223 frontend, syntax, renderer failure recheck and public builds were repeated. Backend source unchanged since final passing Go full."
+}

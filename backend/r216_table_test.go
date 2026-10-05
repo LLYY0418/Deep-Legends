@@ -27,15 +27,15 @@ func TestR216ChampionTableThreeGamesAndMissing(t *testing.T) {
 				p.TotalMinionsKilled = 120
 				p.Win = i != 2
 				two := 2
-				p.DoubleKills = &two
+				p.DoubleKills = historyInt(two)
 				zero := 0
-				p.VisionWardsBoughtInGame = &zero
+				p.VisionWardsBoughtInGame = historyInt(zero)
 			}
 			if j == 5 {
 				p.ChampionID = enemy
 			}
 			taken := 10000
-			p.TotalDamageTaken = &taken
+			p.TotalDamageTaken = historyInt(taken)
 			ps = append(ps, p)
 		}
 		info := &riotMatchInfo{GameID: int64(216 + i), GameCreation: 1700000000000, GameDuration: 1200, QueueID: 420, Participants: ps}
@@ -96,6 +96,7 @@ func TestR216ChampionTableOpponentEvidence(t *testing.T) {
 }
 
 func TestR216OPGGChampionTableObservedPage(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("../docs/history/reports/r216/kr-champion-table-probe/champions.html")
 	if err != nil {
 		t.Fatal(err)

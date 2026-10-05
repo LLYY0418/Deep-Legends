@@ -94,7 +94,7 @@
   };
 
   const status = {
-    version: "demo", connected: true, snapshotReady: true, connectionState: "connected", eventStream: true,
+    version: "demo", connected: true, clientRegion: "TENCENT", clientRegionLabel: "国服", serverId: "HN1", serverName: "艾欧尼亚", snapshotReady: true, connectionState: "connected", eventStream: true,
     syncing: false, lastSync: iso(3), lastAttempt: iso(3), summoner,
     ownedCount: 312, chromaOwnedCount: 87, poolTotal: 554, poolMatched: 554, remainingCount: 173,
     calculationOK: true, poolSource: "内置奖池（演示）", poolVersion: "14.5", poolId: "builtin", poolHash: "demo000000000000", storageReady: true,

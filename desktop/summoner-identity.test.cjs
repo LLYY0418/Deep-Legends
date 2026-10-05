@@ -140,7 +140,7 @@ test("updateStatus refreshes a connected current-tab header without resetting ca
   const spells = { spells: [{ id: 4 }] };
   const current = { key: "current", current: true, label: "旧名字#OLD", icon: 10 };
   const state = {
-    status: { connected: true }, tabs: [current], queueGroups: [],
+    status: { connected: true }, tabs: [current], activeTabs:{players:"current",kr:"",pro:""}, queueGroups: [],
     perks, items, summonerSpells: spells, section: "overview",
   };
   let tabRenders = 0;

@@ -718,48 +718,44 @@ type riotParticipant struct {
 	Summoner1ID    int64  `json:"summoner1Id"`
 	Summoner2ID    int64  `json:"summoner2Id"`
 	// 国服 SGP 的 SUMMARY 在部分版本沿用旧字段名；兼容两种响应。
-	Spell1ID                       int64  `json:"spell1Id"`
-	Spell2ID                       int64  `json:"spell2Id"`
-	Item0                          int64  `json:"item0"`
-	Item1                          int64  `json:"item1"`
-	Item2                          int64  `json:"item2"`
-	Item3                          int64  `json:"item3"`
-	Item4                          int64  `json:"item4"`
-	Item5                          int64  `json:"item5"`
-	Item6                          int64  `json:"item6"`
-	TeamPosition                   string `json:"teamPosition"`
-	IndividualPosition             string `json:"individualPosition"`
-	Kills                          int    `json:"kills"`
-	Deaths                         int    `json:"deaths"`
-	Assists                        int    `json:"assists"`
-	TotalMinionsKilled             int    `json:"totalMinionsKilled"`
-	NeutralMinionsKilled           int    `json:"neutralMinionsKilled"`
-	GoldEarned                     int    `json:"goldEarned"`
-	TotalDamageDealtToChampions    int    `json:"totalDamageDealtToChampions"`
-	TotalDamageTaken               *int   `json:"totalDamageTaken"`
-	VisionScore                    int    `json:"visionScore"`
-	WardsPlaced                    int    `json:"wardsPlaced"`
-	WardsKilled                    int    `json:"wardsKilled"`
-	DamageSelfMitigated            *int   `json:"damageSelfMitigated"`
-	TotalHealsOnTeammates          *int   `json:"totalHealsOnTeammates"`
-	TotalDamageShieldedOnTeammates *int   `json:"totalDamageShieldedOnTeammates"`
-	TimeCCingOthers                *int   `json:"timeCCingOthers"`
-	DamageDealtToBuildings         *int   `json:"damageDealtToBuildings"`
-	TurretTakedowns                *int   `json:"turretTakedowns"`
-	DoubleKills                    *int   `json:"doubleKills"`
-	TripleKills                    *int   `json:"tripleKills"`
-	QuadraKills                    *int   `json:"quadraKills"`
-	PentaKills                     *int   `json:"pentaKills"`
-	Challenges                     struct {
-		DragonTakedowns     *int `json:"dragonTakedowns"`
-		BaronTakedowns      *int `json:"baronTakedowns"`
-		RiftHeraldTakedowns *int `json:"riftHeraldTakedowns"`
-	} `json:"challenges"`
-	VisionWardsBoughtInGame   *int `json:"visionWardsBoughtInGame"`
-	GameEndedInEarlySurrender bool `json:"gameEndedInEarlySurrender"`
-	GameEndedInSurrender      bool `json:"gameEndedInSurrender"`
-	Win                       bool `json:"win"`
-	LargestMultiKill          int  `json:"largestMultiKill"`
+	Spell1ID                       int64             `json:"spell1Id"`
+	Spell2ID                       int64             `json:"spell2Id"`
+	Item0                          int64             `json:"item0"`
+	Item1                          int64             `json:"item1"`
+	Item2                          int64             `json:"item2"`
+	Item3                          int64             `json:"item3"`
+	Item4                          int64             `json:"item4"`
+	Item5                          int64             `json:"item5"`
+	Item6                          int64             `json:"item6"`
+	TeamPosition                   string            `json:"teamPosition"`
+	IndividualPosition             string            `json:"individualPosition"`
+	Kills                          int               `json:"kills"`
+	Deaths                         int               `json:"deaths"`
+	Assists                        int               `json:"assists"`
+	TotalMinionsKilled             int               `json:"totalMinionsKilled"`
+	NeutralMinionsKilled           int               `json:"neutralMinionsKilled"`
+	GoldEarned                     int               `json:"goldEarned"`
+	TotalDamageDealtToChampions    int               `json:"totalDamageDealtToChampions"`
+	TotalDamageTaken               *lenientInt       `json:"totalDamageTaken"`
+	VisionScore                    int               `json:"visionScore"`
+	WardsPlaced                    int               `json:"wardsPlaced"`
+	WardsKilled                    int               `json:"wardsKilled"`
+	DamageSelfMitigated            *lenientInt       `json:"damageSelfMitigated"`
+	TotalHealsOnTeammates          *lenientInt       `json:"totalHealsOnTeammates"`
+	TotalDamageShieldedOnTeammates *lenientInt       `json:"totalDamageShieldedOnTeammates"`
+	TimeCCingOthers                *lenientInt       `json:"timeCCingOthers"`
+	DamageDealtToBuildings         *lenientInt       `json:"damageDealtToBuildings"`
+	TurretTakedowns                *lenientInt       `json:"turretTakedowns"`
+	DoubleKills                    *lenientInt       `json:"doubleKills"`
+	TripleKills                    *lenientInt       `json:"tripleKills"`
+	QuadraKills                    *lenientInt       `json:"quadraKills"`
+	PentaKills                     *lenientInt       `json:"pentaKills"`
+	Challenges                     lenientChallenges `json:"challenges"`
+	VisionWardsBoughtInGame        *lenientInt       `json:"visionWardsBoughtInGame"`
+	GameEndedInEarlySurrender      bool              `json:"gameEndedInEarlySurrender"`
+	GameEndedInSurrender           bool              `json:"gameEndedInSurrender"`
+	Win                            bool              `json:"win"`
+	LargestMultiKill               int               `json:"largestMultiKill"`
 	// 斗魂竞技场：多支小队同场，playerSubteamId 标记所属小队，
 	// subteamPlacement 是该小队的最终名次。
 	PlayerSubteamID  int64 `json:"playerSubteamId"`
@@ -1354,21 +1350,21 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 			Kills:    raw.Kills, Deaths: raw.Deaths, Assists: raw.Assists,
 			KDA: ratio(raw.Kills+raw.Assists, raw.Deaths), CS: cs,
 			LaneCS: raw.TotalMinionsKilled, JungleCS: raw.NeutralMinionsKilled, CSPerMinute: perMinute(cs, duration),
-			Gold: raw.GoldEarned, Damage: raw.TotalDamageDealtToChampions, DamageTaken: raw.TotalDamageTaken,
+			Gold: raw.GoldEarned, Damage: raw.TotalDamageDealtToChampions, DamageTaken: historyIntValue(raw.TotalDamageTaken),
 			VisionScore: raw.VisionScore, WardsPlaced: raw.WardsPlaced, WardsKilled: raw.WardsKilled,
-			ControlWardsBought: raw.VisionWardsBoughtInGame,
+			ControlWardsBought: historyIntValue(raw.VisionWardsBoughtInGame),
 			Win:                raw.Win, Hidden: hidden, MultiKill: raw.LargestMultiKill, scoreMissing: raw.scoreMissing,
-			DamageSelfMitigated:            raw.DamageSelfMitigated,
-			TotalHealsOnTeammates:          raw.TotalHealsOnTeammates,
-			TotalDamageShieldedOnTeammates: raw.TotalDamageShieldedOnTeammates,
-			TimeCCingOthers:                raw.TimeCCingOthers,
-			DamageDealtToBuildings:         raw.DamageDealtToBuildings,
-			TurretTakedowns:                raw.TurretTakedowns,
-			DoubleKills:                    raw.DoubleKills,
-			TripleKills:                    raw.TripleKills,
-			QuadraKills:                    raw.QuadraKills,
-			PentaKills:                     raw.PentaKills,
-			DragonTakedowns:                raw.Challenges.DragonTakedowns, BaronTakedowns: raw.Challenges.BaronTakedowns, RiftHeraldTakedowns: raw.Challenges.RiftHeraldTakedowns,
+			DamageSelfMitigated:            historyIntValue(raw.DamageSelfMitigated),
+			TotalHealsOnTeammates:          historyIntValue(raw.TotalHealsOnTeammates),
+			TotalDamageShieldedOnTeammates: historyIntValue(raw.TotalDamageShieldedOnTeammates),
+			TimeCCingOthers:                historyIntValue(raw.TimeCCingOthers),
+			DamageDealtToBuildings:         historyIntValue(raw.DamageDealtToBuildings),
+			TurretTakedowns:                historyIntValue(raw.TurretTakedowns),
+			DoubleKills:                    historyIntValue(raw.DoubleKills),
+			TripleKills:                    historyIntValue(raw.TripleKills),
+			QuadraKills:                    historyIntValue(raw.QuadraKills),
+			PentaKills:                     historyIntValue(raw.PentaKills),
+			DragonTakedowns:                historyIntValue(raw.Challenges.DragonTakedowns), BaronTakedowns: historyIntValue(raw.Challenges.BaronTakedowns), RiftHeraldTakedowns: historyIntValue(raw.Challenges.RiftHeraldTakedowns),
 			SubteamID: raw.PlayerSubteamID, Placement: raw.SubteamPlacement, AugmentIDs: augments, reference: reference,
 		}
 		result.Participants = append(result.Participants, participant)
