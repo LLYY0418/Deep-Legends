@@ -2,7 +2,7 @@
 
 2026-10-05。用户要求“先按照这个工单继续执行”。目标0.12.74，key mode **public**。
 
-工单：[WORKLIST-R228](WORKLIST-R228-RELEASE-0.12.74-CONSOLIDATE-R223-R227-AND-R222-R225-PIPELINE.md)。当前状态：执行中；正式Latest未发布，等待本单P6用户明确确认。
+工单：[WORKLIST-R228](WORKLIST-R228-RELEASE-0.12.74-CONSOLIDATE-R223-R227-AND-R222-R225-PIPELINE.md)。当前状态：草稿、分支及tag完整CI、附件验证已完成；保持未发布，停在P6等待用户明确确认。
 
 ## 接手时的事实
 
@@ -37,3 +37,13 @@ Windows顶层耗时定位R69状态测试21.00s：R223新增未知大区LCU重试
 最后一次Go测试修改后重跑普通全量/race/vet及R69/R223定向race，再执行完整分支CI。旧轮失败门槛和真实时长保留。
 
 最终Go夹具修改后，本机定向race三轮通过（包1.874s）；普通全量23:30:31→23:32:27，115.116s，backend107.053s；全量race23:32:27→23:34:44，137.349s，backend135.613s（macOS，不能代替Linux≤120）；vet23:34:44→23:34:46，2.039s，输出空、exit0。原生public后端重新构建、self-test和指纹核验通过，0.12.74/a3d7c1e75735。原有Node/Worker/installer/Chromium源码与测试未变，其预检结果仍对应最终源码。[完整最终Go预检摘要及输出末5行](history/reports/release-0.12.74/r228-go-preflight-after-fix.json)。
+
+## 最终准备结果（P6前）
+
+第二轮分支 **37334082296 / 3bbd7388** 完整success，Linux race115.797s、Node219.765s/最大67.949s，全部门槛通过。Windows backend包85.382s、1880项1854pass/26既有skip，关键82项均pass；installer99/99；Node2/1/2无skip。R69从21.00s降至0.01s；所有断言/数据量/预算保留。第二轮重复push运行37334082894取消，来源未确认；保留一条完整验收。
+
+P4说明另由e763345c只提交CHANGELOG，package/lock已为0.12.74，未夹带源码。修订草稿body/manifest/checksum后重新下载三附件核对；Setup保持原tagCI文件。草稿id403843482/public/a3d7c1e75735，所有size/SHA256/API digest/manifest/URL/body/当前CHANGELOG一致。tag不移动；分支相对tag仅有R69测试注入，生产源码相同。旧16个Release/附件、17个既有标签均保持，Latest仍0.12.73。
+
+技术准备23:48:02完成，tag→最终准备49分02秒、开始→准备1小时03分03秒（63分03秒），超过15/30目标。首轮分支预算失败和接手后复验环节已单列，原tag9分10秒自动门槛也单列，不冒充整个R228发布耗时。尚无正式Latest时刻，P6确认后才补匿名0.12.74清单/三个附件与正式发布证明。
+
+[完整发布账本](release-0.12.74-execution-ledger.md)、[最终分支CI汇总](history/reports/release-0.12.74/r228-final-ci-validation-summary.json)、[最终附件](history/reports/release-0.12.74/draft-assets-verified.json)、[P6前保留证明](history/reports/release-0.12.74/r228-prepublication-proof.json)。P7清单已交付，但真机结果仍未提供；不关闭R223/R224。

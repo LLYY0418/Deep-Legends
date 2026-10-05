@@ -165,3 +165,9 @@ CI 不需要基于现有证据降低某个文件并发；若未来真实 CI 出�
 上文 R222 三项 Windows backend 名单原第二项误写为不存在的函数，实际 CI 只匹配了另外两项，未证明 DPAPI 保存/重载已在 Windows 测试通过。上表名称已修正；[R225 账本](history/ledgers/r225-execution-ledger.md) 记录恢复完整 Windows backend/installer 的方案、逐函数路径映射和防空匹配守卫。R222 的 renderer 提速、生产默认时钟与原断言保留结论不变；Windows 后端覆盖结论以后续 R225 同 SHA 实跑为准。
 
 R225 最终补验：源码 b46dac17，完整 CI 37322933047 success（12:00）；Windows backend 包 97.174s，全套 Go 测试关键 82 项全部 pass，18 项更新与真实 DPAPI 保存/重载通过；installer 99/99，Node 筛选 2/1/2、0 skip。此前 Windows 覆盖缺口现已修复。
+
+## R228首次正式候选流程
+
+0.12.74原tag434caa92完整质量37329122051/public草稿37329122050成功；原自动门槛tag→完成9分10秒。R228后补分支首轮race139.721s预算失败，找到R223新增未知LCU历史重试使R69旧夹具真实等待21秒，测试注入既有historyRetrySleep并断言3/6/12秒，原状态/缓存断言和生产默认逻辑不变。最终37334082296 / 3bbd7388完整success，race115.797s、Node219.765s/最大67.949s，Windows全量/实际升级通过。
+
+R228最终草稿准备23:48:02，tag后49分02秒，开始后63分03秒，15/30目标未通过；额外分支验收和预算修复时段单列在 [0.12.74账本](release-0.12.74-execution-ledger.md)。按P6仍未发布Latest，不能关闭正式发布时间线验收或用9分10秒代替全部过程。

@@ -50,3 +50,7 @@ R223 的 8 个 >90 秒文件及原始耗时已逐项补到 [R222 耗时记录](r
 - macOS 原生与 Windows amd64 后端重建成功；版本 **0.12.73**、key mode **public**，指纹 **`d7d3268b6b23`**，构建前后稳定。两份二进制指纹核验及原生 `--startup-warmup` 通过。
 - 临时产物：`/private/tmp/deep-legends-r226-0.12.73-public`、`/private/tmp/deep-legends-r226-0.12.73-public.exe`。没有安装包，交叉编译不代替 Windows 游戏客户端验收。
 - [验证汇总](history/reports/r226/validation-summary.json)、[完整文件计时](history/reports/r226/node-timings-local.json)、[CI 核对汇总](history/reports/r226/ci-flake-review.json)、[构建记录](history/reports/r226/build-final.json)。完整专项/renderer 输出保留在同目录。
+
+## R228草稿合并与后续验证（2026-10-05）
+
+以上未提交/未发布描述为本单实施当时记录。修复现已纳入0.12.74 public草稿（tag434caa92，指纹a3d7c1e75735），tag完整质量37329122051与最终分支37334082296均success。R228最终预算115.797/219.765/67.949s达标；草稿附件验证通过。仍未正式发布Latest，等待R228 P6确认；Windows真实游戏客户端验收边界不变。详见 [R228账本](r228-execution-ledger.md)。

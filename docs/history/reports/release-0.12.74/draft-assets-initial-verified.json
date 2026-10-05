@@ -11,15 +11,15 @@
     },
     {
       "name": "latest.json",
-      "size": 1280,
-      "sha256": "20448b4e2ff0673fd8e8de2c1b3244db88a3b74621561d00e16687ddfb1b3f1b",
-      "api_digest": "sha256:20448b4e2ff0673fd8e8de2c1b3244db88a3b74621561d00e16687ddfb1b3f1b"
+      "size": 1452,
+      "sha256": "09bb4cddb79a469c0d7759833e418c91ef607e101242006640039d5bd8faf4be",
+      "api_digest": "sha256:09bb4cddb79a469c0d7759833e418c91ef607e101242006640039d5bd8faf4be"
     },
     {
       "name": "SHA256SUMS-public.txt",
       "size": 182,
-      "sha256": "616cfe462192ddb8179905a9d1c87f32558a852f17bb7b5556fe78a6284b2ffd",
-      "api_digest": "sha256:616cfe462192ddb8179905a9d1c87f32558a852f17bb7b5556fe78a6284b2ffd"
+      "sha256": "fe226ef83ffb2f47fe6a48a00e3636cd5cd40444131044fee13a1ca3c37ef9e9",
+      "api_digest": "sha256:fe226ef83ffb2f47fe6a48a00e3636cd5cd40444131044fee13a1ca3c37ef9e9"
     }
   ],
   "manifest_verified": true,
