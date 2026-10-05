@@ -33,7 +33,7 @@ test('R183 ranked backend response renders an anonymous enemy in middle and stop
     renderLiveRosterNoticeBars: () => '', renderLiveTeamPortraitTags: () => '', renderInsightMatches: () => '', renderLiveRecentPositions: () => '',
     isARAMRelatedMatch: () => false, arenaLivePlayerGroups: () => [], liveGamePhase: () => true,
   };
-  const functions = Function(...Object.keys(deps), names.map(extract).join('\n') + ';return {renderLiveInsights, liveSnapshotComplete, renderLiveRefreshStatus};')(...Object.values(deps));
+  const functions = Function(...Object.keys(deps), require('./r220-harness-support.cjs').prelude(source,deps)+names.map(extract).join('\n') + ';return {renderLiveInsights, liveSnapshotComplete, renderLiveRefreshStatus};')(...Object.values(deps));
   for (const queueId of [440, 420]) {
     const data = { ...response, queueId };
     assert.equal(functions.liveSnapshotComplete(data), true);

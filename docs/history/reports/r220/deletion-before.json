@@ -1,0 +1,86 @@
+[
+  {
+    "path": "docs/history/reports/r211/opgg-samples",
+    "exists": true,
+    "files": 368,
+    "bytes": 160598347,
+    "trackedFiles": []
+  },
+  {
+    "path": "docs/history/reports/r211/opgg-validation-new-accounts",
+    "exists": true,
+    "files": 282,
+    "bytes": 132475216,
+    "trackedFiles": []
+  },
+  {
+    "path": "docs/history/reports/r216/opgg-holdout",
+    "exists": true,
+    "files": 853,
+    "bytes": 384324607,
+    "trackedFiles": []
+  },
+  {
+    "path": "docs/history/reports/r217/opgg-holdout",
+    "exists": true,
+    "files": 591,
+    "bytes": 269160331,
+    "trackedFiles": []
+  },
+  {
+    "path": "docs/history/reports/r216/account-selection",
+    "exists": true,
+    "files": 140,
+    "bytes": 43576850,
+    "trackedFiles": []
+  },
+  {
+    "path": "docs/history/reports/r217/account-selection",
+    "exists": true,
+    "files": 122,
+    "bytes": 29179579,
+    "trackedFiles": []
+  },
+  {
+    "path": "docs/history/reports/r217/training-curves.json",
+    "exists": true,
+    "files": 1,
+    "bytes": 25744028,
+    "trackedFiles": []
+  },
+  {
+    "path": "docs/history/reports/r217/training-selected-go.json",
+    "exists": true,
+    "files": 1,
+    "bytes": 4299787,
+    "trackedFiles": []
+  },
+  {
+    "path": "docs/history/reports/r217/mode-interval-probe",
+    "exists": true,
+    "files": 18,
+    "bytes": 6517389,
+    "trackedFiles": []
+  },
+  {
+    "path": "scripts/r211-refine-calibration.py",
+    "exists": true,
+    "files": 1,
+    "bytes": 6335,
+    "trackedFiles": []
+  },
+  {
+    "path": "scripts/r211-refine-official-calibration.py",
+    "exists": true,
+    "files": 1,
+    "bytes": 7802,
+    "trackedFiles": []
+  },
+  {
+    "path": "scripts/r211-evaluate-new-accounts.py",
+    "exists": true,
+    "files": 1,
+    "bytes": 3901,
+    "trackedFiles": []
+  }
+]

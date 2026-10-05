@@ -16,8 +16,9 @@ import (
 // A Riot API project's encrypted IDs are not interchangeable with OP.GG's.
 // Bind the public page's own ID to its explicit KR + Riot-ID profile first.
 type opggPlayerPage struct {
-	rows  map[string]any
-	puuid string
+	region string
+	rows   map[string]any
+	puuid  string
 }
 
 func walkOPGGPage(value any, depth int, visit func(map[string]any)) {
@@ -38,7 +39,7 @@ func walkOPGGPage(value any, depth int, visit func(map[string]any)) {
 }
 
 func parseOPGGPlayerPage(data []byte, ref gameplayReference) (*opggPlayerPage, error) {
-	p := &opggPlayerPage{rows: map[string]any{}}
+	p := &opggPlayerPage{region: opggPlatform(ref.Region), rows: map[string]any{}}
 	for _, line := range strings.Split(decodeNextFlight(data), "\n") {
 		id, raw, ok := strings.Cut(line, ":")
 		if !ok {
@@ -53,7 +54,7 @@ func parseOPGGPlayerPage(data []byte, ref gameplayReference) (*opggPlayerPage, e
 	for _, value := range p.rows {
 		walkOPGGPage(value, 0, func(node map[string]any) {
 			profile, ok := node["data"].(map[string]any)
-			if !ok || node["region"] != "kr" {
+			if !ok || node["region"] != p.region {
 				return
 			}
 			name, _ := profile["gameName"].(string)
@@ -74,7 +75,7 @@ func parseOPGGPlayerPage(data []byte, ref gameplayReference) (*opggPlayerPage, e
 }
 
 func (a *app) readOPGGPlayerPage(ctx context.Context, ref gameplayReference, method, action string, body []byte) ([]byte, error) {
-	endpoint := "https://op.gg/zh-cn/lol/summoners/kr/" + url.PathEscape(ref.GameName+"-"+ref.TagLine)
+	endpoint := "https://op.gg/zh-cn/lol/summoners/" + opggPlatform(ref.Region) + "/" + url.PathEscape(ref.GameName+"-"+ref.TagLine)
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -175,7 +176,11 @@ func (p *opggPlayerPage) currentGame(now time.Time) ([]byte, bool, error) {
 	count := 0
 	for _, value := range p.rows {
 		walkOPGGPage(value, 0, func(node map[string]any) {
-			if node["region"] != "kr" || node["puuid"] != p.puuid {
+			region := p.region
+			if region == "" {
+				region = opggPlatform(riotRegionKR)
+			}
+			if node["region"] != region || node["puuid"] != p.puuid {
 				return
 			}
 			if result, ok := node["initialResult"].(map[string]any); ok {

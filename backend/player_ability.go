@@ -127,8 +127,8 @@ func abilityProfileFrom(playerStats, baselineStats gameplayAbilityAccumulator, p
 	positionLabels := map[string]string{"top": "上路", "jungle": "打野", "middle": "中路", "bottom": "下路", "utility": "辅助"}
 	baselineLabel := "近期同位置对手样本"
 	sourceLabel := "七项指标参考 OP.GG · 本机国服对局计算"
-	if region == riotRegionKR {
-		sourceLabel = "七项指标参考 OP.GG · Riot 韩服对局计算"
+	if isRiotRegion(region) {
+		sourceLabel = "七项指标参考 OP.GG · Riot " + riotRegionLabel(region) + "对局计算"
 	}
 	metrics := abilityMetrics(playerStats, baselineStats)
 	if len(metrics) != 7 {

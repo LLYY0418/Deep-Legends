@@ -165,6 +165,7 @@
     if (!target) return;
     const { account, teamCode, playerName, secondary } = target;
     state.returnKey = button.dataset.proAccount;
+    // 职业目录账号归属来源固定韩服，保持显式 KR 选择。
     window.dispatchEvent(new CustomEvent("deep-legends:open-player", { detail: { gameName: account.gameName, tagLine: account.tagLine, region: "kr", serverId: "", source: "pro-players", expectedTier: account.tier || "", teamCode, playerName, secondary } }));
   });
   home.addEventListener("click", () => navigate("overview"));

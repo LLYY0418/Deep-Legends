@@ -42,7 +42,7 @@ func TestConvertYourGGArenaMatchDeduplicatesSubjectAndStripsStableIDs(t *testing
 	if match.SubjectParticipantID != 1 || match.Participants[0].ChampionID != 799 || match.Participants[0].Placement != 1 {
 		t.Fatalf("unexpected subject mapping: %#v", match.Participants[0])
 	}
-	if match.Participants[0].Damage != 98209 || match.Participants[0].DamageTaken != 42560 || match.Participants[0].Gold != 16260 {
+	if match.Participants[0].Damage != 98209 || (match.Participants[0].DamageTaken == nil || *match.Participants[0].DamageTaken != 42560) || match.Participants[0].Gold != 16260 {
 		t.Fatalf("subject combat stats were not preserved: %#v", match.Participants[0])
 	}
 	if len(match.Participants[0].ItemIDs) != 1 || len(match.Participants[0].AugmentIDs) != 1 {

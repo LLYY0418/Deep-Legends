@@ -22,19 +22,19 @@ var errRiotRelayUnavailable = errors.New("战绩服务暂时不可用")
 var errRiotRelayQuotaExhausted = fmt.Errorf("%w", errRiotRelayUnavailable)
 
 type riotRelayState struct {
-	mu               sync.Mutex
-	config           string
-	active           string
-	nextTry          time.Time
-	flight           chan struct{}
-	quotaUntil       time.Time
-	applicationUntil time.Time
-	ipUntil          time.Time
-	now              func() time.Time
-	summaryAt        time.Time
-	summary          riotRelayRequestSummary
-	summaryTimer     *time.Timer
-	paths            map[string]riotRelayPathCooldown
+	mu           sync.Mutex
+	config       string
+	active       string
+	nextTry      time.Time
+	flight       chan struct{}
+	quotaUntil   time.Time
+	ipUntil      time.Time
+	now          func() time.Time
+	summaryAt    time.Time
+	summary      riotRelayRequestSummary
+	summaryTimer *time.Timer
+	paths        map[string]riotRelayPathCooldown
+	applications map[string]time.Time
 }
 
 type riotRelayPathCooldown struct {
@@ -43,9 +43,27 @@ type riotRelayPathCooldown struct {
 }
 
 type riotRelayRequestSummary struct {
-	Requests    int            `json:"requests"`
-	RateLimited int            `json:"rate_limited"`
-	Failures    map[string]int `json:"failures"`
+	Requests     int            `json:"requests"`
+	RateLimited  int            `json:"rate_limited"`
+	NotFound     int            `json:"not_found"`
+	Failures     map[string]int `json:"failures"`
+	HTTPStatuses map[string]int `json:"http_statuses"`
+	Categories   map[string]int `json:"categories"`
+}
+
+// Only fixed route categories reach diagnostics; identity path arguments are
+// never retained. Probe requests are counted as other.
+func riotRelayRequestCategory(path string) string {
+	for _, route := range []struct{ prefix, category string }{
+		{"/riot/account/v1/", "account"}, {"/lol/summoner/v4/", "summoner"},
+		{"/lol/match/v5/", "match"}, {"/lol/league/v4/", "league"},
+		{"/lol/spectator/v5/", "spectator"}, {"/lol/champion-mastery/v4/", "mastery"},
+	} {
+		if strings.HasPrefix(path, route.prefix) {
+			return route.category
+		}
+	}
+	return "other"
 }
 
 func (s *riotRelayState) nowLocked() time.Time {
@@ -60,21 +78,22 @@ func (s *riotRelayState) requestErrorLocked() error {
 	if now.Before(s.quotaUntil) {
 		return errRiotRelayQuotaExhausted
 	}
-	until, kind := s.applicationUntil, "application"
-	if s.ipUntil.After(until) {
-		until, kind = s.ipUntil, "ip"
-	}
+	until, kind := s.ipUntil, "ip"
 	if now.Before(until) {
 		return &riotStatusError{status: http.StatusTooManyRequests, retryAfter: int(math.Ceil(until.Sub(now).Seconds())), relayCooldown: kind, message: "Riot 接口限流中（HTTP 429），请稍后重试"}
 	}
 	return nil
 }
 
-func (s *riotRelayState) requestErrorFor(host, path string) error {
+func (s *riotRelayState) requestErrorFor(host, path string, platforms ...string) error {
+	host = riotRelayRateHost(host, platforms)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.requestErrorLocked(); err != nil {
 		return err
+	}
+	if until := s.applications[host]; s.nowLocked().Before(until) {
+		return &riotStatusError{status: 429, retryAfter: int(math.Ceil(until.Sub(s.nowLocked()).Seconds())), relayCooldown: "application", message: "Riot 接口限流中（HTTP 429），请稍后重试"}
 	}
 	if cold := s.paths[host+path]; s.nowLocked().Before(cold.Until) {
 		return &riotStatusError{status: 429, retryAfter: int(math.Ceil(cold.Until.Sub(s.nowLocked()).Seconds())), relayCooldown: cold.Kind, message: "Riot 接口限流中（HTTP 429），请稍后重试"}
@@ -86,22 +105,30 @@ func (s *riotRelayState) cooldown(kind string, seconds int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	until := s.nowLocked().Add(time.Duration(seconds) * time.Second)
-	if kind == "application" && until.After(s.applicationUntil) {
-		s.applicationUntil = until
-	}
 	if kind == "ip" && until.After(s.ipUntil) {
 		s.ipUntil = until
 	}
 }
 
-func (s *riotRelayState) observeCooldown(host, path, kind string, seconds int) {
-	if kind == "application" || kind == "ip" {
+func (s *riotRelayState) observeCooldown(host, path, kind string, seconds int, platforms ...string) {
+	host = riotRelayRateHost(host, platforms)
+	if kind == "ip" {
 		s.cooldown(kind, seconds)
 		return
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.nowLocked()
+	if kind == "application" {
+		if s.applications == nil {
+			s.applications = map[string]time.Time{}
+		}
+		until := now.Add(time.Duration(seconds) * time.Second)
+		if until.After(s.applications[host]) {
+			s.applications[host] = until
+		}
+		return
+	}
 	if s.paths == nil {
 		s.paths = make(map[string]riotRelayPathCooldown)
 	}
@@ -157,7 +184,7 @@ func (s *riotRelayState) quotaExhausted(origin string) {
 
 // Aggregate actual outbound Worker requests (including probes), never page
 // retries blocked locally. Flush an active window even if quota stops traffic.
-func (s *riotRelayState) recordRequest(failure string, status int, record func(map[string]any)) {
+func (s *riotRelayState) recordRequest(failure string, status int, category string, record func(map[string]any)) {
 	s.mu.Lock()
 	now := s.nowLocked()
 	if s.summaryAt.IsZero() {
@@ -170,10 +197,27 @@ func (s *riotRelayState) recordRequest(failure string, status int, record func(m
 		})
 	}
 	s.summary.Requests++
+	if s.summary.Categories == nil {
+		s.summary.Categories = make(map[string]int)
+	}
+	switch category {
+	case "account", "summoner", "match", "league", "spectator", "mastery":
+	default:
+		category = "other"
+	}
+	s.summary.Categories[category]++
+	if status > 0 {
+		if s.summary.HTTPStatuses == nil {
+			s.summary.HTTPStatuses = make(map[string]int)
+		}
+		s.summary.HTTPStatuses[fmt.Sprint(status)]++
+	}
 	if status == http.StatusTooManyRequests {
 		s.summary.RateLimited++
 	}
-	if failure != "" {
+	if failure == "not_found" {
+		s.summary.NotFound++
+	} else if failure != "" {
 		if s.summary.Failures == nil {
 			s.summary.Failures = make(map[string]int)
 		}
@@ -193,7 +237,14 @@ func (s *riotRelayState) flushSummary(record func(map[string]any)) {
 	if failures == nil {
 		failures = map[string]int{}
 	}
-	entry := map[string]any{"event": "riot_relay_request_summary", "window_ms": now.Sub(s.summaryAt).Milliseconds(), "requests": s.summary.Requests, "rate_limited": s.summary.RateLimited, "failures": failures}
+	statuses, categories := s.summary.HTTPStatuses, s.summary.Categories
+	if statuses == nil {
+		statuses = map[string]int{}
+	}
+	if categories == nil {
+		categories = map[string]int{}
+	}
+	entry := map[string]any{"event": "riot_relay_request_summary", "window_ms": now.Sub(s.summaryAt).Milliseconds(), "requests": s.summary.Requests, "rate_limited": s.summary.RateLimited, "failures": failures, "not_found": s.summary.NotFound, "http_statuses": statuses, "categories": categories}
 	if s.summaryTimer != nil {
 		s.summaryTimer.Stop()
 	}
@@ -241,7 +292,8 @@ func (s *riotRelayState) ensure(ctx context.Context, client *http.Client, record
 	s.mu.Lock()
 	if s.config != config {
 		s.config, s.active, s.nextTry, s.flight = config, "", time.Time{}, nil
-		s.quotaUntil, s.applicationUntil, s.ipUntil = time.Time{}, time.Time{}, time.Time{}
+		s.quotaUntil, s.ipUntil = time.Time{}, time.Time{}
+		s.applications = nil
 		s.paths = nil
 	}
 	if err := s.requestErrorLocked(); err != nil {
@@ -314,7 +366,7 @@ func (s *riotRelayState) probe(origins []string, config string, flight chan stru
 		req.Header.Set("Accept", "application/json")
 		response, err := riotHTTPClientWithoutRedirects(client).Do(req)
 		if err != nil {
-			s.recordRequest("network", 0, record)
+			s.recordRequest("network", 0, "other", record)
 			continue
 		}
 		status = response.StatusCode
@@ -323,7 +375,7 @@ func (s *riotRelayState) probe(origins []string, config string, flight chan stru
 		if riotRelayQuotaResponse(response.Header, body) {
 			quota = true
 			s.quotaExhausted(origin)
-			s.recordRequest("quota_exhausted", status, record)
+			s.recordRequest("quota_exhausted", status, "other", record)
 			break
 		}
 		failure := ""
@@ -334,10 +386,11 @@ func (s *riotRelayState) probe(origins []string, config string, flight chan stru
 		} else if status != http.StatusOK {
 			failure = "http"
 		}
-		s.recordRequest(failure, status, record)
+		s.recordRequest(failure, status, "other", record)
 		if status == http.StatusTooManyRequests {
 			kind, seconds := riotRelayCooldown(response.Header)
-			s.observeCooldown(riotPlatformHost, "/lol/status/v4/platform-data", kind, seconds)
+			// Relay health probe deliberately uses the Korean status endpoint.
+			s.observeCooldown("kr.api.riotgames.com", "/lol/status/v4/platform-data", kind, seconds)
 			active = origin
 			break
 		}
@@ -402,14 +455,17 @@ func (p *riotProvider) relayOrigin(ctx context.Context) (string, error) {
 }
 
 func riotRelayEndpoint(origin, host, path string) (string, error) {
-	region := ""
-	switch host {
-	case riotClusterHost:
-		region = "asia"
-	case riotPlatformHost:
-		region = "kr"
-	default:
+	region := riotHostRoute(host)
+	if region == "" {
 		return "", errRiotRelayUnavailable
 	}
 	return origin + "/r/" + region + path, nil
+}
+
+func riotRelayRateHost(host string, platforms []string) string {
+	platform := riotRegionKR // Legacy health-probe callers explicitly select KR.
+	if len(platforms) > 0 && isRiotRegion(platforms[0]) {
+		platform = platforms[0]
+	}
+	return host + "|" + platform
 }

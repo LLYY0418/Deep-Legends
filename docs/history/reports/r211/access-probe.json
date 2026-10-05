@@ -1,0 +1,15 @@
+{
+  "riot_account": {
+    "status": 403
+  },
+  "opgg_page": {
+    "status": 200,
+    "bytes": 678954,
+    "op_score_mentions": 5
+  },
+  "riot_relay_account": {
+    "status": 403,
+    "retry_after": null,
+    "limit_type": null
+  }
+}

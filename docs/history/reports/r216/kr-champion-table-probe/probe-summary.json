@@ -1,0 +1,31 @@
+{
+  "sourcePage": "https://op.gg/zh-cn/lol/summoners/kr/TOPKING-asd/champions",
+  "time": "2026-10-04T18:08:02.851330+00:00",
+  "status": 200,
+  "bytes": 2307908,
+  "required_full_table_and_opponents": true,
+  "conclusion": "OP.GG has season champion and matchup aggregates, integrated without Riot season crawling. Required Go score/rank and team damage-taken share cannot be recovered from aggregates: leave null; do not substitute OP score or absolute damage_taken. KR mayhem unsupported.",
+  "aggregateFields": [
+    "my_champion_stats",
+    "match_up_stats",
+    "kill_participation",
+    "damage_dealt_per_min",
+    "damage_dealt_share",
+    "damage_taken",
+    "vision_ward",
+    "ward_placed",
+    "ward_kill",
+    "cs",
+    "cs_per_min",
+    "gold",
+    "gold_per_min",
+    "double_kill",
+    "triple_kill",
+    "quadra_kill",
+    "penta_kill"
+  ],
+  "verifiedQueueParameter": "queue_type=SOLORANKED",
+  "season": 2026,
+  "allGames": 1383,
+  "fixtureSHA256": "9428530776a10df5c4b6a9cbee0f689458e4bdb3f30404824c20603974969332"
+}

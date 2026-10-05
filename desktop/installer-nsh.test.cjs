@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const source = fs.readFileSync(path.join(__dirname,'nsis/installer.nsh'),'utf8');
+const source = fs.readFileSync(process.env.R212_NSH_SOURCE || path.join(__dirname,'nsis/installer.nsh'),'utf8');
 test('R205 upgrade command preserves NSIS shortcut retention and uses the same registry identity',()=>{
  const update=fs.readFileSync(path.join(__dirname,'../installer/update.go'),'utf8');
  const command=update.match(/func upgradeSetupCommandLine\([^]*?\n\}/)?.[0];
@@ -128,3 +128,76 @@ test('N-1..5 mutation guards reject each broken contract',()=>{
    assert.match(source,/LoadImageW.*i r1, i r1/);
    assert.doesNotMatch(source,/SetCtlColors[^\n]*(?:0B0E14|131822)/);
  });
+
+// Execute the generated custom macro's supported control flow, rather than
+// matching a comment or counting calls that an updated installer never reaches.
+function r212CheckPath(text, {updated=false,parentExited=false,portable=false,uninstaller=false}={}) {
+ const block=text.match(/!macro customCheckAppRunning([\s\S]*?)!macroend/)?.[1];assert.ok(block);
+ const lines=block.split('\n'),compiled=[],pre=[];
+ let enabled=true;
+ for(const raw of lines){const line=raw.trim();
+  if(/^!ifn?def BUILD_UNINSTALLER$/.test(line)){pre.push(enabled);enabled=enabled&&(line.startsWith('!ifndef')?!uninstaller:uninstaller);continue;}
+  if(line==='!endif'){enabled=pre.pop();continue;}
+  if(enabled)compiled.push(line);
+ }
+ const regs={},calls=[],stack=[];let active=true,error=false;
+ const evaluate=expr=>expr==='${isUpdated}'?updated:expr==='${Errors}'?error:(()=>{const m=expr.match(/^\$(R\d) (==|!=) "?([^" ]+)"?$/);assert.ok(m,'unsupported condition '+expr);return m[2]==='=='?String(regs[m[1]])===m[3]:String(regs[m[1]])!==m[3];})();
+ for(let i=0;i<compiled.length;i++){const line=compiled[i];let m;
+  if((m=line.match(/^\$\{(If|IfNot)\} (.+)$/))){let condition=evaluate(m[2]);if(m[1]==='IfNot')condition=!condition;
+   while(compiled[i+1]?.startsWith('${AndIf} ')){condition=evaluate(compiled[++i].slice('${AndIf} '.length))&&condition;}
+   stack.push({parent:active,condition});active=active&&condition;continue;
+  }
+  if(line==='${Else}'){const frame=stack.at(-1);active=frame.parent&&!frame.condition;continue;}
+  if(line==='${EndIf}'){active=stack.pop().parent;continue;}
+  if(!active)continue;
+  if(line==='ClearErrors')error=false;
+  else if((m=line.match(/^StrCpy \$(R\d) "([^"]*)"$/)))regs[m[1]]=m[2];
+  else if((m=line.match(/^\$\{GetOptions\} \$CMDLINE "([^\"]+)" \$(R\d)$/))){const present=m[1]==='--portable-upgrade'?portable:parentExited;error=!present;regs[m[2]]=present?'':'absent';}
+  else if(line==='!insertmacro IS_POWERSHELL_AVAILABLE')calls.push('powershell');
+  else if(line.startsWith('!insertmacro FIND_PROCESS')){calls.push('find');regs.R0='1';}
+  else if(line==='!insertmacro _CHECK_APP_RUNNING')calls.push('check');
+ }
+ assert.equal(stack.length,0);return calls;
+}
+function r212FastPathGuard(text) {
+ assert.deepEqual(r212CheckPath(text,{updated:true,parentExited:true}),[]);
+ assert.deepEqual(r212CheckPath(text,{updated:true}),['powershell','check']);
+ assert.deepEqual(r212CheckPath(text),['powershell','check']);
+ assert.deepEqual(r212CheckPath(text,{parentExited:true}),['powershell','check']);
+ assert.deepEqual(r212CheckPath(text,{updated:true,portable:true}),['powershell','find']);
+ assert.deepEqual(r212CheckPath(text,{updated:true,uninstaller:true}),[]);
+ assert.deepEqual(r212CheckPath(text,{updated:true,portable:true,uninstaller:true}),[]);
+ assert.deepEqual(r212CheckPath(text,{uninstaller:true}),['powershell','check']);
+ const block=text.match(/!macro customCheckAppRunning([\s\S]*?)!macroend/)[1];
+ assert.equal((block.match(/!insertmacro _CHECK_APP_RUNNING/g)||[]).length,1);
+ assert.match(block,/!ifndef BUILD_UNINSTALLER\s+!insertmacro DLUpdateTiming check_done/);
+}
+test('R212 generated app-running paths skip PowerShell only after confirmed upgrade exit',()=>r212FastPathGuard(source));
+test('R212 real onInit template records its first instruction and repeated probes declare one variable',()=>{
+ const {applyUpdateTiming,patchInstallerInitTiming,patchPowerShellDeclaration}=require('./apply-update-timing-template.cjs');
+ const base=path.join(__dirname,'node_modules/app-builder-lib/templates/nsis');
+ const init=patchInstallerInitTiming(fs.readFileSync(path.join(base,'installer.nsi'),'utf8').replaceAll('\r\n','\n'));
+ assert.equal(patchInstallerInitTiming(init),init);
+ assert.match(init,/Function \.onInit\n\s*!ifndef BUILD_UNINSTALLER\s*!ifmacrodef DLUpdateTiming\s*!insertmacro DLUpdateTiming oninit\s*!endif\s*!endif\s*Call setInstallSectionSpaceRequired/);
+ const check=patchPowerShellDeclaration(fs.readFileSync(path.join(base,'include/allowOnlyOneInstallerInstance.nsh'),'utf8').replaceAll('\r\n','\n'));
+ assert.equal(patchPowerShellDeclaration(check),check);
+ assert.match(check,/!ifndef DL_POWER_SHELL_DECLARED\s*!define DL_POWER_SHELL_DECLARED\s*Var \/GLOBAL IsPowerShellAvailable[^\n]*\n\s*!endif/);
+ assert.throws(()=>patchInstallerInitTiming('changed template'),/need.*review/);
+ assert.throws(()=>patchPowerShellDeclaration('changed template'),/need.*review/);
+ // Verify beforePack wiring using copies of real templates, without packaging.
+ const os=require('node:os'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'r212-nsis-'));
+ try {
+  for(const relative of ['installer.nsi','installSection.nsh','include/extractAppPackage.nsh','include/allowOnlyOneInstallerInstance.nsh']){const dest=path.join(temp,'node_modules/app-builder-lib/templates/nsis',relative);fs.mkdirSync(path.dirname(dest),{recursive:true});fs.copyFileSync(path.join(base,relative),dest);}
+  applyUpdateTiming(temp);applyUpdateTiming(temp);
+  assert.equal(fs.readFileSync(path.join(temp,'node_modules/app-builder-lib/templates/nsis/installer.nsi'),'utf8'),init);
+  assert.equal(fs.readFileSync(path.join(temp,'node_modules/app-builder-lib/templates/nsis/include/allowOnlyOneInstallerInstance.nsh'),'utf8'),check);
+ } finally {fs.rmSync(temp,{recursive:true,force:true});}
+ const shell=fs.readFileSync(path.join(__dirname,'../installer/install_windows.go'),'utf8');
+ assert(shell.indexOf('releasePayloadWhileWaiting')<shell.indexOf('validateUpgradeDestination(message.Path)'));
+ assert.match(shell,/无法释放安装包，请检查临时磁盘空间后重试/);
+ assert.match(shell,/a\.timing\.mark\("nsis_start"\)\s*if err := cmd\.Start\(\)/);
+});
+test('R212 mutation rejects unconditional PowerShell and updated uninstaller checks',()=>{
+ assert.throws(()=>r212FastPathGuard(source.replace('!macro customCheckAppRunning','!macro customCheckAppRunning\n  !insertmacro IS_POWERSHELL_AVAILABLE')),assert.AssertionError);
+ assert.throws(()=>r212FastPathGuard(source.replace('    ${If} ${isUpdated}','    ${If} $R1 == "never"')),assert.AssertionError);
+});

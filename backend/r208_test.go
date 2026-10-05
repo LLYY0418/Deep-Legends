@@ -132,14 +132,14 @@ func TestR208RelayApplicationSharedAcrossProviders(t *testing.T) {
 	}
 	other := newRiotProvider(p.champions)
 	clock.advance(5 * time.Second)
-	for _, host := range []string{riotClusterHost, riotPlatformHost} {
+	for _, host := range []string{riotPlatformHost} {
 		err = other.get(t.Context(), host, "/riot/account/v1/accounts/by-puuid/other", nil, &out)
 		if body := riotHTTPErrorBody(err); body.RetryAfter != 2 || body.CooldownScope != "application" {
 			t.Fatal(body)
 		}
 	}
 	if calls.Load() != 2 {
-		t.Fatal("global cooldown bypassed", calls.Load())
+		t.Fatal("same-platform cooldown bypassed", calls.Load())
 	}
 	clock.advance(2 * time.Second)
 	if err = other.get(t.Context(), riotClusterHost, "/riot/account/v1/accounts/by-puuid/other", nil, &out); err != nil || calls.Load() != 3 {
@@ -161,7 +161,7 @@ func TestR208RelayDiskBeforeQuotaAndProbe(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"metadata":{"matchId":"KR_208"},"info":{"gameId":208,"participants":[{"puuid":"subject","participantId":1}]}}`), &match); err != nil {
 		t.Fatal(err)
 	}
-	p.persistRiotMatch("riot-match-v2|KR_208", &match)
+	p.persistRiotMatch("riot-match-v4|KR_208", &match)
 	tracker := &riotOverviewCostTracker{}
 	ctx := context.WithValue(t.Context(), riotOverviewCostTrackerKey{}, tracker)
 	got, source, err := p.matchByIDWithCache(ctx, "KR_208")
@@ -243,10 +243,10 @@ func TestR208RelaySummaryTenMinuteWindow(t *testing.T) {
 	t.Cleanup(s.stopSummary)
 	var rows []map[string]any
 	record := func(e map[string]any) { rows = append(rows, e) }
-	s.recordRequest("", 200, record)
-	s.recordRequest("", 429, record)
-	s.recordRequest("network", 0, record)
-	s.recordRequest("quota_exhausted", 503, record)
+	s.recordRequest("", 200, "other", record)
+	s.recordRequest("", 429, "other", record)
+	s.recordRequest("network", 0, "other", record)
+	s.recordRequest("quota_exhausted", 503, "other", record)
 	c.advance(10*time.Minute - time.Millisecond)
 	s.flushSummary(record)
 	if len(rows) != 0 {
@@ -299,7 +299,7 @@ func TestR208QueuedRequestChecksSharedCooldownBeforeIO(t *testing.T) {
 		p.shortWindow = append(p.shortWindow, stamp)
 	}
 	p.limitSleep = func(context.Context, time.Duration) error {
-		riotRelays.cooldown("application", 7)
+		riotRelays.observeCooldown(riotClusterHost, "/riot/account/v1/accounts/by-puuid/queued", "application", 7, "kr")
 		stamp = stamp.Add(time.Second)
 		return nil
 	}

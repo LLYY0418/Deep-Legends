@@ -72,14 +72,15 @@ type gameplayOverviewRequest struct {
 	PlayerRef    string `json:"playerRef"`
 	GameName     string `json:"gameName"`
 	TagLine      string `json:"tagLine"`
-	// Region 指定查询的服务器："kr" 走 Riot 官方 API 查询韩服；
+	// Region 指定 Riot 平台（如 kr、jp1）；非空平台走对应 Riot API；
 	// 留空表示国服，继续通过本机客户端查询。
 	Region string `json:"region"`
 	// ServerID 是国服子服务器（例如 HN1）；韩服必须留空。
-	ServerID string `json:"serverId"`
-	Count    int    `json:"count"`
-	BegIndex int    `json:"begIndex"`
-	Force    bool   `json:"force,omitempty"`
+	ServerID     string `json:"serverId"`
+	Count        int    `json:"count"`
+	BegIndex     int    `json:"begIndex"`
+	Force        bool   `json:"force,omitempty"`
+	ExpectGameID string `json:"expectGameId,omitempty"`
 	// MatchFilter is normalized server-side and mapped to the documented SGP
 	// tag contract. Raw upstream query parameters are never accepted.
 	MatchFilter string `json:"matchFilter,omitempty"`
@@ -222,10 +223,12 @@ type participantCompletenessSummary struct {
 }
 
 type gameplayOverview struct {
-	ProfilePending  bool                     `json:"profilePending,omitempty"`
-	Player          gameplayPlayer           `json:"player"`
-	Ranks           []gameplayRank           `json:"ranks"`
-	HistoricalRanks []gameplayHistoricalRank `json:"historicalRanks,omitempty"`
+	ExpectedGamePresent *bool                    `json:"expectedGamePresent,omitempty"`
+	LatestAllGameID     string                   `json:"latestAllGameId,omitempty"`
+	ProfilePending      bool                     `json:"profilePending,omitempty"`
+	Player              gameplayPlayer           `json:"player"`
+	Ranks               []gameplayRank           `json:"ranks"`
+	HistoricalRanks     []gameplayHistoricalRank `json:"historicalRanks,omitempty"`
 	// 国服 SGP 只提供上赛季和历史最高，不等同于韩服的多赛段 HistoricalRanks。
 	RankMilestones      *gameplayRankMilestones             `json:"rankMilestones,omitempty"`
 	RecentRanked        gameplayRecentRankedSummary         `json:"recentRanked"`
@@ -268,7 +271,7 @@ type gameplayPlayer struct {
 	BackgroundPath       string            `json:"backgroundPath,omitempty"`
 	BackgroundPosterPath string            `json:"backgroundPosterPath,omitempty"`
 	BackgroundVideoPath  string            `json:"backgroundVideoPath,omitempty"`
-	// Region 标注该玩家所属服务器："kr" 表示韩服（Riot 官方 API），
+	// Region 标注该玩家所属 Riot 平台（如 kr、jp1），
 	// 空值表示国服（本机客户端）。两个服务器的玩家互不相通。
 	Region string `json:"region,omitempty"`
 	// ServerID / ServerName 明确标注国服子服务器。稳定账号标识仍只在
@@ -299,7 +302,7 @@ type gameplayReference struct {
 	TagLine             string
 	ProfileIconID       int64
 	SummonerLevel       int64
-	// Region 标记玩家所属服务器；"kr" 表示该引用来自 Riot 官方 API 的韩服数据，
+	// Region 标记玩家所属 Riot 平台并隔离匿名引用作用域，
 	// 后续点击继续查询时无需本机客户端。空值表示国服（本机客户端）。
 	Region   string
 	ServerID string
@@ -444,9 +447,10 @@ type gameplayRecentPlayer struct {
 }
 
 type gameplayMatch struct {
-	GameID    int64 `json:"gameId"`
-	CreatedAt int64 `json:"createdAt"`
-	Duration  int64 `json:"duration"`
+	TagsAvailable bool  `json:"tagsAvailable,omitempty"`
+	GameID        int64 `json:"gameId"`
+	CreatedAt     int64 `json:"createdAt"`
+	Duration      int64 `json:"duration"`
 	// R127 P1-c.2：真正的开局与结束时间（毫秒，来自 gameStartTimestamp /
 	// gameEndTimestamp）。CreatedAt 是房间创建时间，只用于展示与排序；韩服平均
 	// 段位要用这两个时间去和 OP.GG 的对局记录对齐。
@@ -508,7 +512,7 @@ type gameplayParticipant struct {
 	CSPerMinute float64 `json:"csPerMinute"`
 	Gold        int     `json:"gold"`
 	Damage      int     `json:"damage"`
-	DamageTaken int     `json:"damageTaken"`
+	DamageTaken *int    `json:"damageTaken,omitempty"`
 	VisionScore int     `json:"visionScore"`
 	WardsPlaced int     `json:"wardsPlaced"`
 	WardsKilled int     `json:"wardsKilled"`
@@ -529,8 +533,24 @@ type gameplayParticipant struct {
 	// 选位、也不记录是否补位——口径、范围门禁（仅 420/440）与降级规则都写在
 	// riotAutofillFlags / riotAutofillCandidates 的注释里。LCU 战绩回退路径没有
 	// 这两个字段，因此那条路径恒为 false：宁可不显示，也不用推断值冒充。
-	Autofill  bool `json:"autofill,omitempty"`
-	reference gameplayReference
+	Autofill                       bool        `json:"autofill,omitempty"`
+	Keyword                        string      `json:"keyword,omitempty"`
+	Score                          *matchScore `json:"score,omitempty"`
+	scoreMissing                   map[string]bool
+	DamageSelfMitigated            *int `json:"damageSelfMitigated,omitempty"`
+	TotalHealsOnTeammates          *int `json:"totalHealsOnTeammates,omitempty"`
+	TotalDamageShieldedOnTeammates *int `json:"totalDamageShieldedOnTeammates,omitempty"`
+	TimeCCingOthers                *int `json:"timeCCingOthers,omitempty"`
+	DamageDealtToBuildings         *int `json:"damageDealtToBuildings,omitempty"`
+	TurretTakedowns                *int `json:"turretTakedowns,omitempty"`
+	DoubleKills                    *int `json:"doubleKills,omitempty"`
+	TripleKills                    *int `json:"tripleKills,omitempty"`
+	QuadraKills                    *int `json:"quadraKills,omitempty"`
+	PentaKills                     *int `json:"pentaKills,omitempty"`
+	DragonTakedowns                *int `json:"dragonTakedowns,omitempty"`
+	BaronTakedowns                 *int `json:"baronTakedowns,omitempty"`
+	RiftHeraldTakedowns            *int `json:"riftHeraldTakedowns,omitempty"`
+	reference                      gameplayReference
 }
 
 type gameplayTeam struct {
@@ -609,73 +629,84 @@ type lcuParticipantIdentity struct {
 }
 
 type lcuParticipant struct {
+	scoreMissing  map[string]bool
 	ChampionID    int64 `json:"championId"`
 	ParticipantID int64 `json:"participantId"`
 	Spell1ID      int64 `json:"spell1Id"`
 	Spell2ID      int64 `json:"spell2Id"`
 	TeamID        int64 `json:"teamId"`
 	Stats         struct {
-		Assists                     int    `json:"assists"`
-		ChampLevel                  int    `json:"champLevel"`
-		Deaths                      int    `json:"deaths"`
-		GoldEarned                  int    `json:"goldEarned"`
-		GameEndedInEarlySurrender   bool   `json:"gameEndedInEarlySurrender"`
-		GameEndedInSurrender        bool   `json:"gameEndedInSurrender"`
-		Item0                       int64  `json:"item0"`
-		Item1                       int64  `json:"item1"`
-		Item2                       int64  `json:"item2"`
-		Item3                       int64  `json:"item3"`
-		Item4                       int64  `json:"item4"`
-		Item5                       int64  `json:"item5"`
-		Item6                       int64  `json:"item6"`
-		Kills                       int    `json:"kills"`
-		LargestMultiKill            int    `json:"largestMultiKill"`
-		NeutralMinionsKilled        int    `json:"neutralMinionsKilled"`
-		Perk0                       int64  `json:"perk0"`
-		Perk0Var1                   *int64 `json:"perk0Var1"`
-		Perk0Var2                   *int64 `json:"perk0Var2"`
-		Perk0Var3                   *int64 `json:"perk0Var3"`
-		Perk1                       int64  `json:"perk1"`
-		Perk1Var1                   *int64 `json:"perk1Var1"`
-		Perk1Var2                   *int64 `json:"perk1Var2"`
-		Perk1Var3                   *int64 `json:"perk1Var3"`
-		Perk2                       int64  `json:"perk2"`
-		Perk2Var1                   *int64 `json:"perk2Var1"`
-		Perk2Var2                   *int64 `json:"perk2Var2"`
-		Perk2Var3                   *int64 `json:"perk2Var3"`
-		Perk3                       int64  `json:"perk3"`
-		Perk3Var1                   *int64 `json:"perk3Var1"`
-		Perk3Var2                   *int64 `json:"perk3Var2"`
-		Perk3Var3                   *int64 `json:"perk3Var3"`
-		Perk4                       int64  `json:"perk4"`
-		Perk4Var1                   *int64 `json:"perk4Var1"`
-		Perk4Var2                   *int64 `json:"perk4Var2"`
-		Perk4Var3                   *int64 `json:"perk4Var3"`
-		Perk5                       int64  `json:"perk5"`
-		Perk5Var1                   *int64 `json:"perk5Var1"`
-		Perk5Var2                   *int64 `json:"perk5Var2"`
-		Perk5Var3                   *int64 `json:"perk5Var3"`
-		PerkPrimaryStyle            int64  `json:"perkPrimaryStyle"`
-		PerkSubStyle                int64  `json:"perkSubStyle"`
-		StatPerk0                   int64  `json:"statPerk0"`
-		StatPerk1                   int64  `json:"statPerk1"`
-		StatPerk2                   int64  `json:"statPerk2"`
-		PlayerAugment1              int64  `json:"playerAugment1"`
-		PlayerAugment2              int64  `json:"playerAugment2"`
-		PlayerAugment3              int64  `json:"playerAugment3"`
-		PlayerAugment4              int64  `json:"playerAugment4"`
-		PlayerAugment5              int64  `json:"playerAugment5"`
-		PlayerAugment6              int64  `json:"playerAugment6"`
-		PlayerSubteamID             int64  `json:"playerSubteamId"`
-		SubteamPlacement            int    `json:"subteamPlacement"`
-		TotalDamageDealtToChampions int    `json:"totalDamageDealtToChampions"`
-		TotalDamageTaken            int    `json:"totalDamageTaken"`
-		TotalMinionsKilled          int    `json:"totalMinionsKilled"`
-		VisionScore                 int    `json:"visionScore"`
-		WardsKilled                 int    `json:"wardsKilled"`
-		WardsPlaced                 int    `json:"wardsPlaced"`
-		VisionWardsBoughtInGame     *int   `json:"visionWardsBoughtInGame"`
-		Win                         bool   `json:"win"`
+		Assists                        int    `json:"assists"`
+		ChampLevel                     int    `json:"champLevel"`
+		Deaths                         int    `json:"deaths"`
+		GoldEarned                     int    `json:"goldEarned"`
+		GameEndedInEarlySurrender      bool   `json:"gameEndedInEarlySurrender"`
+		GameEndedInSurrender           bool   `json:"gameEndedInSurrender"`
+		Item0                          int64  `json:"item0"`
+		Item1                          int64  `json:"item1"`
+		Item2                          int64  `json:"item2"`
+		Item3                          int64  `json:"item3"`
+		Item4                          int64  `json:"item4"`
+		Item5                          int64  `json:"item5"`
+		Item6                          int64  `json:"item6"`
+		Kills                          int    `json:"kills"`
+		LargestMultiKill               int    `json:"largestMultiKill"`
+		NeutralMinionsKilled           int    `json:"neutralMinionsKilled"`
+		Perk0                          int64  `json:"perk0"`
+		Perk0Var1                      *int64 `json:"perk0Var1"`
+		Perk0Var2                      *int64 `json:"perk0Var2"`
+		Perk0Var3                      *int64 `json:"perk0Var3"`
+		Perk1                          int64  `json:"perk1"`
+		Perk1Var1                      *int64 `json:"perk1Var1"`
+		Perk1Var2                      *int64 `json:"perk1Var2"`
+		Perk1Var3                      *int64 `json:"perk1Var3"`
+		Perk2                          int64  `json:"perk2"`
+		Perk2Var1                      *int64 `json:"perk2Var1"`
+		Perk2Var2                      *int64 `json:"perk2Var2"`
+		Perk2Var3                      *int64 `json:"perk2Var3"`
+		Perk3                          int64  `json:"perk3"`
+		Perk3Var1                      *int64 `json:"perk3Var1"`
+		Perk3Var2                      *int64 `json:"perk3Var2"`
+		Perk3Var3                      *int64 `json:"perk3Var3"`
+		Perk4                          int64  `json:"perk4"`
+		Perk4Var1                      *int64 `json:"perk4Var1"`
+		Perk4Var2                      *int64 `json:"perk4Var2"`
+		Perk4Var3                      *int64 `json:"perk4Var3"`
+		Perk5                          int64  `json:"perk5"`
+		Perk5Var1                      *int64 `json:"perk5Var1"`
+		Perk5Var2                      *int64 `json:"perk5Var2"`
+		Perk5Var3                      *int64 `json:"perk5Var3"`
+		PerkPrimaryStyle               int64  `json:"perkPrimaryStyle"`
+		PerkSubStyle                   int64  `json:"perkSubStyle"`
+		StatPerk0                      int64  `json:"statPerk0"`
+		StatPerk1                      int64  `json:"statPerk1"`
+		StatPerk2                      int64  `json:"statPerk2"`
+		PlayerAugment1                 int64  `json:"playerAugment1"`
+		PlayerAugment2                 int64  `json:"playerAugment2"`
+		PlayerAugment3                 int64  `json:"playerAugment3"`
+		PlayerAugment4                 int64  `json:"playerAugment4"`
+		PlayerAugment5                 int64  `json:"playerAugment5"`
+		PlayerAugment6                 int64  `json:"playerAugment6"`
+		PlayerSubteamID                int64  `json:"playerSubteamId"`
+		SubteamPlacement               int    `json:"subteamPlacement"`
+		TotalDamageDealtToChampions    int    `json:"totalDamageDealtToChampions"`
+		TotalDamageTaken               *int   `json:"totalDamageTaken"`
+		TotalMinionsKilled             int    `json:"totalMinionsKilled"`
+		VisionScore                    int    `json:"visionScore"`
+		WardsKilled                    int    `json:"wardsKilled"`
+		WardsPlaced                    int    `json:"wardsPlaced"`
+		DamageSelfMitigated            *int   `json:"damageSelfMitigated"`
+		TotalHealsOnTeammates          *int   `json:"totalHealsOnTeammates"`
+		TotalDamageShieldedOnTeammates *int   `json:"totalDamageShieldedOnTeammates"`
+		TimeCCingOthers                *int   `json:"timeCCingOthers"`
+		DamageDealtToBuildings         *int   `json:"damageDealtToBuildings"`
+		TurretTakedowns                *int   `json:"turretTakedowns"`
+		DoubleKills                    *int   `json:"doubleKills"`
+		TripleKills                    *int   `json:"tripleKills"`
+		QuadraKills                    *int   `json:"quadraKills"`
+		PentaKills                     *int   `json:"pentaKills"`
+		VisionWardsBoughtInGame        *int   `json:"visionWardsBoughtInGame"`
+		Win                            bool   `json:"win"`
 	} `json:"stats"`
 	Timeline struct {
 		Lane string `json:"lane"`
@@ -740,6 +771,7 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 			request.BegIndex, _ = strconv.Atoi(raw)
 		}
 		request.MatchFilter = r.URL.Query().Get("matchFilter")
+		request.ExpectGameID = r.URL.Query().Get("expectGameId")
 		request.Force = r.URL.Query().Get("force") == "1" || strings.EqualFold(r.URL.Query().Get("force"), "true")
 	}
 	request.PlayerRef = strings.TrimSpace(request.PlayerRef)
@@ -759,9 +791,28 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	request.Count = clampMatchCount(request.Count)
 	request.BegIndex = clampMatchStart(request.BegIndex)
 	request.MatchFilter = normalizeGameplayMatchFilter(request.MatchFilter)
+	if request.ExpectGameID != "" {
+		id, valid := normalizeExpectedGameID(request.ExpectGameID)
+		if !valid || request.BegIndex != 0 {
+			http.Error(w, "对局标识无效", http.StatusBadRequest)
+			return
+		}
+		request.ExpectGameID = id
+		request.Force = true
+		r = r.WithContext(context.WithValue(r.Context(), overviewFreshHistoryKey{}, true))
+		r = r.WithContext(context.WithValue(r.Context(), overviewAllHistoryKey{}, &overviewAllHistory{}))
+	}
 	request.GameName = strings.TrimSpace(request.GameName)
 	request.TagLine = strings.TrimSpace(strings.TrimPrefix(request.TagLine, "#"))
 	request.Region = strings.ToLower(strings.TrimSpace(request.Region))
+	if request.Region != "" && !isRiotRegion(request.Region) {
+		http.Error(w, "查询区服无效", http.StatusBadRequest)
+		return
+	}
+	if reference.Region != "" && request.Region != "" && reference.Region != request.Region {
+		http.Error(w, "玩家引用与所选区服不一致", http.StatusBadRequest)
+		return
+	}
 	rawServerID := strings.TrimSpace(request.ServerID)
 	request.ServerID = strings.ToUpper(rawServerID)
 	if rawServerID != "" {
@@ -787,13 +838,13 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	// 韩服玩家（英雄榜单点击、顶部搜索选择韩服、或此前打开的韩服页签）：
 	// 直接走 Riot 官方 API，不依赖本机客户端。
-	if strings.EqualFold(reference.Region, riotRegionKR) || (request.PlayerRef == "" && request.GameName != "" && request.Region == riotRegionKR) {
+	if isRiotRegion(reference.Region) || (request.PlayerRef == "" && request.GameName != "" && isRiotRegion(request.Region)) {
 		if request.ServerID != "" {
-			http.Error(w, "韩服查询不能指定国服服务器", http.StatusBadRequest)
+			http.Error(w, "外服查询不能指定国服服务器", http.StatusBadRequest)
 			return
 		}
 		if reference.Region == "" {
-			reference = gameplayReference{GameName: request.GameName, TagLine: request.TagLine, Region: riotRegionKR}
+			reference = gameplayReference{GameName: request.GameName, TagLine: request.TagLine, Region: riotPlatform(request.Region)}
 		}
 		phases.mark("identity")
 		stream = strings.Contains(r.Header.Get("Accept"), "application/x-ndjson")
@@ -832,6 +883,7 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response.Pagination.Filter = request.MatchFilter
+		a.verifyExpectedOverviewGame(r.Context(), nil, reference, request, &response)
 		// Comparison is request-local: never mutate the shared overview cache.
 		payload := struct {
 			gameplayOverview
@@ -891,6 +943,7 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	phases.mark("identity")
 	response := a.loadGameplayOverviewDeduplicated(r.Context(), client, current, reference, request.BegIndex, request.Count, request.MatchFilter, request.Force)
+	a.verifyExpectedOverviewGame(r.Context(), client, reference, request, &response)
 	respondJSON(w, response)
 	phases.mark("serialize")
 }
@@ -1177,13 +1230,21 @@ type recentRankedResult struct {
 }
 
 func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, current Summoner, reference gameplayReference, begIndex, count int, matchFilter string, force bool) gameplayOverview {
+	if force {
+		ctx = context.WithValue(ctx, overviewFreshHistoryKey{}, true)
+	}
 	reference = normalizeGameplayReference(reference)
 	if reference.Region == "" && reference.ServerID == "" {
+		reference.Region = clientRiotPlatform(client)
 		reference.ServerID = clientTencentServerID(client)
 	}
 	playerRef := reference.PlayerRef
 	isCurrent := (playerRef == "" || gameplayReferenceContains(reference, current.PUUID)) && !isRemoteTencentServer(client, reference.ServerID)
-	if force && a.sgp != nil {
+	localRankRegion := reference.Region
+	if isCurrent {
+		localRankRegion = ""
+	} // Preserve the connected account's LCU season milestones.
+	if force && a.sgp != nil && !isRiotRegion(reference.Region) {
 		historyRef := playerRef
 		if isCurrent {
 			historyRef = current.PUUID
@@ -1453,7 +1514,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		select {
 		case result := <-rankCh:
 			response.Ranks, result.value.capability = a.applySeasonRankWinRateFallback(result.value.ranks, result.value.capability, season.progress, seasonByQueue)
-			response.RankMilestones = rankMilestonesForRegion(reference.Region, result.value.milestones)
+			response.RankMilestones = rankMilestonesForRegion(localRankRegion, result.value.milestones)
 			response.Capabilities = append(response.Capabilities, result.value.capability)
 			ready["ranked-stats"] = true
 		default:
@@ -1480,7 +1541,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	}
 	// Season history is an incremental state slice. It must never block matches,
 	// ranks or player identity in the core overview response.
-	a.startSeasonStatsRefresh(client, reference, player, playerRef, names)
+	a.startSeasonStatsRefresh(client, reference, player, playerRef, names, overviewFreshHistory(ctx))
 
 	rankResultValue := <-rankCh
 	phases.markSpan("ranks", rankResultValue.started, rankResultValue.ended)
@@ -1489,9 +1550,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	rankMilestones, rankCapability := rankEntry.milestones, rankEntry.capability
 	ranks, rankCapability = a.applySeasonRankWinRateFallback(ranks, rankCapability, seasonProgress, seasonByQueue)
 	capabilities = append(capabilities, rankCapability)
-	response.RankMilestones = rankMilestonesForRegion(reference.Region, rankMilestones)
-	if reference.Region == riotRegionKR && !strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE") {
-		response.HistoricalRanks = a.cachedOPGGHistoricalRanks(playerRef)
+	response.RankMilestones = rankMilestonesForRegion(localRankRegion, rankMilestones)
+	if isRiotRegion(reference.Region) && !strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE") {
+		response.HistoricalRanks = a.cachedOPGGHistoricalRanks(playerRef, reference.Region)
 		a.startOPGGHistoricalRanks(reference, player.GameName, player.TagLine, playerRef, reference.Privacy)
 	}
 	// 刷新 LP 追踪基线：下一场结算时据此计算胜点变化。
@@ -1509,8 +1570,8 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	if shouldLoadOverviewHistory(reference, playerRef, matches) {
 		shouldLoadWindow = true
 	}
-	if a.sgp != nil && shouldLoadWindow {
-		infos, _, more, windowErr := a.sgp.matchHistoryOn(ctx, client, reference.ServerID, playerRef, 0, maximumSummaryMatchCount, true)
+	if a.sgp != nil && shouldLoadWindow && !isRiotRegion(reference.Region) {
+		infos, _, more, windowErr := a.sgp.matchHistoryOn(ctx, client, reference.ServerID, playerRef, 0, maximumSummaryMatchCount, !force)
 		windowCapability := EndpointCapability{Name: "seven-day-history", Path: "sgp: /match-history-query/v1/products/lol/player/{player}/SUMMARY", Detail: "用于过去 30 天排位与活跃时段统计"}
 		var windowPartial *sgpPartialHistoryError
 		if errors.As(windowErr, &windowPartial) && isCancellation(windowPartial) {
@@ -1565,6 +1626,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 						continue
 					}
 					match := convertRiotMatchInfo(info, playerRef, names, queueLabels, "", reference.ServerID)
+					a.recordMatchScores("sgp", match)
 					if !isCustomGameplayMatch(match) {
 						windowMatches = append(windowMatches, match)
 					}
@@ -1601,6 +1663,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 			windowMatches = make([]gameplayMatch, 0, len(windowGames))
 			for _, game := range windowGames {
 				match := normalizeGameplayMatch(game, reference, names, queueLabels)
+				a.recordMatchScores("lcu", match)
 				if !isCustomGameplayMatch(match) {
 					windowMatches = append(windowMatches, match)
 				}
@@ -1724,15 +1787,18 @@ func (a *app) loadRecentRankedSamples(ctx context.Context, client *LCUClient, re
 
 func (a *app) loadRecentRankedSampleQueue(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, queueID int64, names map[int64]string, queueLabels map[int64]string, fallback []gameplayMatch) []gameplayMatch {
 	cacheKey := strings.ToUpper(strings.TrimSpace(reference.ServerID)) + "|" + strings.TrimSpace(playerRef) + "|" + strconv.FormatInt(queueID, 10)
-	if result, ok := a.recentRankedSample(cacheKey, time.Now()); ok {
-		a.recordDiagnostic(map[string]any{"event": "recent_ranked_sample_resolved", "source": "cache", "queue_id": queueID, "matches": len(result)})
-		return result
+	fresh := overviewFreshHistory(ctx)
+	if !fresh {
+		if result, ok := a.recentRankedSample(cacheKey, time.Now()); ok {
+			a.recordDiagnostic(map[string]any{"event": "recent_ranked_sample_resolved", "source": "cache", "queue_id": queueID, "matches": len(result)})
+			return result
+		}
 	}
 	filter := "solo"
 	if queueID == 440 {
 		filter = "flex"
 	}
-	infos, _, _, resolution, err := a.loadSGPMatchHistoryPage(ctx, client, reference.ServerID, playerRef, 0, defaultMatchCount, filter)
+	infos, _, _, resolution, err := a.loadSGPMatchHistoryPage(ctx, client, reference.ServerID, playerRef, 0, defaultMatchCount, filter, sgpHistoryPageOptions{NoCache: fresh})
 	if err != nil || !resolution.ServerFiltered {
 		reason := resolution.FallbackReason
 		if err != nil {
@@ -1747,13 +1813,14 @@ func (a *app) loadRecentRankedSampleQueue(ctx context.Context, client *LCUClient
 			continue
 		}
 		match := convertRiotMatchInfo(info, playerRef, names, queueLabels, "", reference.ServerID)
+		a.recordMatchScores("sgp", match)
 		if !isCustomGameplayMatch(match) {
 			result = append(result, match)
 		}
 	}
 	a.recordRiotPerkDiagnostics("sgp", infos, playerRef, 0)
 	a.cacheRecentRankedSample(cacheKey, recentRankedSampleCacheEntry{at: time.Now(), matches: append([]gameplayMatch(nil), result...)})
-	a.recordDiagnostic(map[string]any{"event": "recent_ranked_sample_resolved", "source": "sgp-tag", "queue_id": queueID, "filter": filter, "tag": "q_" + strconv.FormatInt(queueID, 10), "matches": len(result)})
+	a.recordDiagnostic(map[string]any{"event": "recent_ranked_sample_resolved", "source": "sgp-tag", "queue_id": queueID, "filter": filter, "tag": "q_" + strconv.FormatInt(queueID, 10), "matches": len(result), "fresh": fresh})
 	return result
 }
 
@@ -2351,6 +2418,10 @@ func (a *app) loadSGPMatchHistoryPage(ctx context.Context, client *LCUClient, se
 }
 
 func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, begIndex, count int, matchFilter string, names map[int64]string, queueLabels map[int64]string) ([]gameplayMatch, []EndpointCapability, gameplayPagination) {
+	clientRegion, _ := clientRegionInfo(client)
+	if isRiotRegion(clientRegion) {
+		reference.Region = clientRegion
+	}
 	sgpDetail := ""
 	filterResolution := matchHistoryFilterResolution{Filter: normalizeGameplayMatchFilter(matchFilter)}
 	serverID := reference.ServerID
@@ -2363,21 +2434,46 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 		LCUConnected:         client != nil,
 		RemoteServer:         remoteServer,
 		SGPAvailable:         a.sgp != nil && serverID != "",
-	})
+	}, clientRegion)
 	attempts := make([]DataSourceAttempt, 0, len(decision.Sources)+1)
 	fallbackReason := ""
-	if len(decision.Sources) == 0 || decision.Sources[0] != dataSourceSGP {
+	if isRiotRegion(clientRegion) {
+		matches, pagination, err := a.loadClientRiotHistory(ctx, clientRegion, playerRef, begIndex, count, matchFilter, names, queueLabels)
+		attempt := DataSourceAttempt{Source: dataSourceRiot, Outcome: dataSourceSuccess}
+		if err == nil {
+			attempts = append(attempts, attempt)
+			capabilities := []EndpointCapability{{Name: "match-history", Path: "riot: /lol/match/v5/matches/by-puuid/{player}/ids", State: capabilityAvailable, Count: len(matches), Attempts: attempts}, {Name: "match-details", Path: "riot: /lol/match/v5/matches/{match}", State: capabilityAvailable, Count: len(matches), Attempts: attempts}}
+			a.recordDiagnostic(map[string]any{"event": "match_history_data_source_decision", "reason": decision.Reason, "client_region": clientRegion, "selected": dataSourceRiot, "attempts": attempts})
+			return matches, capabilities, pagination
+		}
+		if ctx.Err() != nil {
+			return nil, []EndpointCapability{{Name: "match-history", State: capabilityCanceled}}, gameplayPagination{}
+		}
+		attempt.Outcome, attempt.Message = dataSourceFailed, riotHistoryFailureMessage(err)
+		attempts = append(attempts, attempt)
+		fallbackReason = "riot-failed"
+	}
+	if !isRiotRegion(clientRegion) && (len(decision.Sources) == 0 || decision.Sources[0] != dataSourceSGP) {
 		attempts = append(attempts, DataSourceAttempt{Source: dataSourceSGP, Outcome: dataSourceDisabled, Message: "当前查询没有可用的 SGP 路由"})
 		fallbackReason = decision.Reason
 	}
 	if len(decision.Sources) > 0 && decision.Sources[0] == dataSourceSGP {
-		infos, consumed, more, resolvedFilter, historyErr := a.loadSGPMatchHistoryPage(ctx, client, serverID, playerRef, begIndex, count, matchFilter)
+		infos, consumed, more, resolvedFilter, historyErr := a.loadSGPMatchHistoryPage(ctx, client, serverID, playerRef, begIndex, count, matchFilter, sgpHistoryPageOptions{NoCache: overviewFreshHistory(ctx)})
 		filterResolution = resolvedFilter
 		var partialErr *sgpPartialHistoryError
 		if errors.As(historyErr, &partialErr) && isCancellation(partialErr) {
 			return nil, []EndpointCapability{{Name: "match-history", Path: "sgp: /match-history-query/v1/products/lol/player/{player}/SUMMARY", State: capabilityCanceled, Attempts: attempts}}, filterResolution.pagination(begIndex, 0, false)
 		}
 		if historyErr == nil || errors.As(historyErr, &partialErr) && len(infos) > 0 {
+			if begIndex == 0 && normalizeGameplayMatchFilter(matchFilter) == "all" {
+				ids := make([]string, 0, len(infos))
+				for _, info := range infos {
+					if info != nil {
+						ids = append(ids, strconv.FormatInt(info.GameID, 10))
+					}
+				}
+				recordOverviewAllHistory(ctx, ids)
+			}
 			attempt := DataSourceAttempt{Source: dataSourceSGP, Outcome: dataSourceSuccess}
 			if partialErr != nil {
 				attempt.Outcome = dataSourceFailed
@@ -2394,6 +2490,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 				}
 				a.checkArenaGroupTruth(client, serverID, info)
 				match := convertRiotMatchInfo(info, playerRef, names, queueLabels, "", serverID)
+				a.recordMatchScores("sgp", match)
 				if !isCustomGameplayMatch(match) {
 					matches = append(matches, match)
 				}
@@ -2519,9 +2616,17 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 	matches := make([]gameplayMatch, 0, len(rawGames))
 	for _, game := range rawGames {
 		match := normalizeGameplayMatch(game, reference, names, queueLabels)
+		a.recordMatchScores("lcu", match)
 		if !isCustomGameplayMatch(match) {
 			matches = append(matches, match)
 		}
+	}
+	if begIndex == 0 && normalizeGameplayMatchFilter(matchFilter) == "all" && lcuAttempt.Outcome == dataSourceSuccess {
+		ids := make([]string, 0, len(matches))
+		for _, match := range matches {
+			ids = append(ids, strconv.FormatInt(match.GameID, 10))
+		}
+		recordOverviewAllHistory(ctx, ids)
 	}
 	a.recordLCUPerkDiagnostics(rawGames, reference)
 	filterSummary := summarizeLCUGameplayFilters(rawGames)
@@ -2559,7 +2664,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 		}
 	}
 	a.recordDiagnostic(map[string]any{
-		"event": "match_history_data_source_decision", "reason": decision.Reason,
+		"event": "match_history_data_source_decision", "client_region": clientRegion, "reason": decision.Reason,
 		"selected": dataSourceLCU, "fallback_reason": fallbackReason, "attempts": attempts,
 	})
 	pagination := filterResolution.pagination(begIndex, len(rawGames), len(rawGames) == count)
@@ -2584,7 +2689,7 @@ func normalizeGameplayReference(reference gameplayReference) gameplayReference {
 	if reference.Privacy != "PUBLIC" && reference.Privacy != "PRIVATE" {
 		reference.Privacy = ""
 	}
-	if reference.Region == riotRegionKR {
+	if isRiotRegion(reference.Region) {
 		reference.ServerID = ""
 	} else if serverID, ok := normalizeTencentServerID(reference.ServerID); ok {
 		reference.ServerID = serverID
@@ -2958,6 +3063,7 @@ func (a *app) publicizeMatchReferencesWithProIndex(match *gameplayMatch, index p
 	if match == nil {
 		return
 	}
+	a.attachStoredMatchTags(match)
 	for playerIndex := range match.Participants {
 		participant := &match.Participants[playerIndex]
 		reference := mergeGameplayReferences(participant.reference, gameplayReference{
@@ -2987,6 +3093,16 @@ func (a *app) loadRanksWithFallback(ctx context.Context, client *LCUClient, play
 	// R127 P1-b.1：tierOnly 表示调用方只要段位/小段/胜点（平均段位），不需要
 	// 胜负场。变参形式保证既有调用点与护栏测试都不用改。
 	tierScope := len(tierOnly) > 0 && tierOnly[0]
+	if !isCurrent && clientRiotPlatform(client) != "" && a.riot != nil {
+		region := clientRiotPlatform(client)
+		ranks, capability := a.riot.forPlatform(region).loadRiotRanks(ctx, playerRef)
+		if capability.State == capabilityAvailable {
+			return ranks, nil, capability
+		}
+		local, milestones, localCapability, _ := a.loadGameplayRanksContext(ctx, client, playerRef, false)
+		localCapability.Attempts = []DataSourceAttempt{{Source: dataSourceRiot, Outcome: dataSourceFailed, Message: capability.Detail}, {Source: dataSourceLCU, Outcome: map[bool]string{true: dataSourceSuccess, false: dataSourceFailed}[localCapability.State == capabilityAvailable]}}
+		return local, milestones, localCapability
+	}
 	if serverID == "" && client != nil {
 		serverID = clientTencentServerID(client)
 	}
@@ -3467,7 +3583,7 @@ func loadGameplayHistoryContext(ctx context.Context, client *LCUClient, playerRe
 		publicPath = "/lol-match-history/v1/products/lol/current-summoner/matches"
 	}
 	var payload lcuMatchHistory
-	if err := client.GetJSONContext(ctx, path, &payload); err != nil {
+	if err := getLCUHistoryWithRetry(ctx, client, path, &payload); err != nil {
 		return nil, []EndpointCapability{gameplayCapabilityError("match-history", publicPath, err)}, 0
 	}
 	games := append([]lcuGame(nil), payload.Games.Games...)
@@ -3623,7 +3739,7 @@ func normalizeGameplayMatch(game lcuGame, subject gameplayReference, names map[i
 			PlayerRef: visiblePlayerRef, AlternatePlayerRef: identity.Player.ObfuscatedPUUID,
 			SummonerID: identity.Player.SummonerID, AlternateSummonerID: identity.Player.ObfuscatedSummonerID,
 			GameName: identity.Player.GameName, TagLine: identity.Player.TagLine,
-			DisplayName: identity.Player.SummonerName, ProfileIconID: identity.Player.ProfileIcon,
+			DisplayName: identity.Player.SummonerName, ProfileIconID: identity.Player.ProfileIcon, ServerID: subject.ServerID, Region: subject.Region,
 		})
 		playerRef := reference.PlayerRef
 		name := strings.TrimSpace(identity.Player.GameName)
@@ -3653,7 +3769,18 @@ func normalizeGameplayMatch(game lcuGame, subject gameplayReference, names map[i
 			Gold: raw.Stats.GoldEarned, Damage: raw.Stats.TotalDamageDealtToChampions, DamageTaken: raw.Stats.TotalDamageTaken,
 			VisionScore: raw.Stats.VisionScore, WardsPlaced: raw.Stats.WardsPlaced, WardsKilled: raw.Stats.WardsKilled,
 			ControlWardsBought: raw.Stats.VisionWardsBoughtInGame,
-			Win:                raw.Stats.Win, Hidden: hidden, MultiKill: raw.Stats.LargestMultiKill,
+			Win:                raw.Stats.Win, Hidden: hidden, MultiKill: raw.Stats.LargestMultiKill, scoreMissing: raw.scoreMissing,
+			DamageSelfMitigated:            raw.Stats.DamageSelfMitigated,
+			TotalHealsOnTeammates:          raw.Stats.TotalHealsOnTeammates,
+			TotalDamageShieldedOnTeammates: raw.Stats.TotalDamageShieldedOnTeammates,
+			TimeCCingOthers:                raw.Stats.TimeCCingOthers,
+			DamageDealtToBuildings:         raw.Stats.DamageDealtToBuildings,
+			TurretTakedowns:                raw.Stats.TurretTakedowns,
+			DoubleKills:                    raw.Stats.DoubleKills,
+			TripleKills:                    raw.Stats.TripleKills,
+			QuadraKills:                    raw.Stats.QuadraKills,
+			PentaKills:                     raw.Stats.PentaKills,
+
 			SubteamID: raw.Stats.PlayerSubteamID, Placement: raw.Stats.SubteamPlacement, reference: reference,
 		}
 		match.Participants = append(match.Participants, participant)
@@ -3689,7 +3816,9 @@ func normalizeGameplayMatch(game lcuGame, subject gameplayReference, names map[i
 		team.Kills += participant.Kills
 		team.Gold += participant.Gold
 		team.Damage += participant.Damage
-		team.DamageTaken += participant.DamageTaken
+		if participant.DamageTaken != nil {
+			team.DamageTaken += *participant.DamageTaken
+		}
 		team.VisionScore += participant.VisionScore
 		team.CS += participant.CS
 		teamByID[participant.TeamID] = team
@@ -3698,6 +3827,7 @@ func normalizeGameplayMatch(game lcuGame, subject gameplayReference, names map[i
 		match.Teams = append(match.Teams, team)
 	}
 	sort.Slice(match.Teams, func(i, j int) bool { return match.Teams[i].TeamID < match.Teams[j].TeamID })
+	applyMatchScores(&match)
 	return match
 }
 
@@ -4522,7 +4652,7 @@ func resolveGameplayRecommendationMode(queueID int64, gameMode string, mapID int
 		resolved.InternalMode = "urf"
 	case mode == "NEXUSBLITZ" && mapID == 21:
 		resolved.InternalMode = "nexus-blitz"
-	case mode == "CLASSIC" && mapID == 11:
+	case (mode == "CLASSIC" || mode == "PRACTICETOOL" || mode == "练习工具") && mapID == 11:
 		resolved.InternalMode = "ranked"
 	default:
 		resolved.InternalMode, resolved.IsFallback = "unsupported", true
@@ -5116,7 +5246,7 @@ func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "推荐召唤师技能无效", http.StatusBadRequest)
 		return
 	}
-	if requestedPosition == "" && hasSmiteSpell(spell1ID, spell2ID) {
+	if requestedPosition == "" && hasSmiteSpell(spell1ID, spell2ID) && strings.ToUpper(strings.TrimSpace(query.Get("gameMode"))) != "PRACTICETOOL" {
 		requestedPosition = "jungle"
 	}
 	diagnosticRequestedPosition = requestedPosition
@@ -6947,7 +7077,7 @@ func parseOptionalGameID(value string) (int64, error) {
 
 func normalizeOPGGPosition(value string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "", "other":
+	case "", "other", "none":
 		return "", nil
 	case "middle", "mid":
 		return "mid", nil
@@ -7781,11 +7911,11 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	progress := response
 	progress.Players = make([]gameplayLivePlayer, len(rawPlayers))
 	for index, raw := range rawPlayers {
-		ref := normalizeGameplayReference(gameplayReference{PlayerRef: visibleLivePlayerReference(raw.player), SummonerID: raw.player.SummonerID, AlternatePlayerRef: raw.player.ObfuscatedPUUID, AlternateSummonerID: raw.player.ObfuscatedSummonerID, GameName: raw.player.GameName, TagLine: raw.player.TagLine, DisplayName: raw.player.SummonerName, ProfileIconID: raw.player.ProfileIconID, ServerID: clientTencentServerID(client)})
+		ref := normalizeGameplayReference(gameplayReference{PlayerRef: visibleLivePlayerReference(raw.player), SummonerID: raw.player.SummonerID, AlternatePlayerRef: raw.player.ObfuscatedPUUID, AlternateSummonerID: raw.player.ObfuscatedSummonerID, GameName: raw.player.GameName, TagLine: raw.player.TagLine, DisplayName: raw.player.SummonerName, ProfileIconID: raw.player.ProfileIconID, Region: clientRiotPlatform(client), ServerID: clientTencentServerID(client)})
 		summoner := summonerFromGameplayReference(ref)
 		hidden, unresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
 		self := gameplayLivePlayerIsCurrent(ref, current.PUUID, raw.player.CellID, localPlayerCellID)
-		progress.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: a.registerGameplayReferenceDetails(ref), DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, Hidden: hidden, IsCurrent: self}, TeamID: raw.team, IsAlly: self || arenaMode && phase == "ChampSelect", IdentityUnresolved: unresolved, ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionLocked: raw.player.ChampionLocked, ChampionName: championName(names, raw.player.ChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), HistoryState: "pending"}
+		progress.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: a.registerGameplayReferenceDetails(ref), DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, Hidden: hidden, IsCurrent: self, Region: ref.Region}, TeamID: raw.team, IsAlly: self || arenaMode && phase == "ChampSelect", IdentityUnresolved: unresolved, ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionLocked: raw.player.ChampionLocked, ChampionName: championName(names, raw.player.ChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), HistoryState: "pending"}
 	}
 	var progressMu sync.Mutex
 	publishLiveProgress(ctx, progress)
@@ -7805,7 +7935,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 				PlayerRef: visiblePlayerRef, AlternatePlayerRef: raw.player.ObfuscatedPUUID,
 				SummonerID: raw.player.SummonerID, AlternateSummonerID: raw.player.ObfuscatedSummonerID,
 				DisplayName: raw.player.SummonerName, GameName: raw.player.GameName, TagLine: raw.player.TagLine,
-				ProfileIconID: raw.player.ProfileIconID, ServerID: clientTencentServerID(client),
+				ProfileIconID: raw.player.ProfileIconID, Region: clientRiotPlatform(client), ServerID: clientTencentServerID(client),
 			})
 			summoner := summonerFromGameplayReference(reference)
 			if loaded, capability := loadGameplaySummoner(client, reference); capability.State == capabilityAvailable {
@@ -8429,12 +8559,18 @@ func (a *app) cachedLivePlayerMatches(ctx context.Context, key string, loader fu
 func (a *app) livePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string, queues ...int64) livePlayerMatchesResult {
 	queueID := liveHistoryQueue(queues)
 	key := playerRef + "\x00" + strconv.FormatBool(isCurrent) + fmt.Sprintf("\x00%d", queueID)
+	if region := clientRiotPlatform(client); region != "" {
+		key = region + "\x00" + key
+	}
 	return a.cachedLivePlayerMatches(ctx, key, func(loadCtx context.Context) livePlayerMatchesResult {
 		return a.loadLivePlayerMatches(loadCtx, client, reference, playerRef, isCurrent, names, queueID)
 	})
 }
 
 func loadLiveLCUMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string) livePlayerMatchesResult {
+	if reference.ServerID == "" && reference.Region == "" {
+		reference.ServerID = clientTencentServerID(client)
+	}
 	// Keep a mixed-queue window of thirty before the existing ten-game filter.
 	history, capabilities, _ := loadGameplayHistoryContext(ctx, client, playerRef, isCurrent, 0, 30, false)
 	matches := make([]gameplayMatch, 0, len(history))
@@ -8452,6 +8588,27 @@ func loadLiveLCUMatches(ctx context.Context, client *LCUClient, reference gamepl
 
 func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string, queues ...int64) livePlayerMatchesResult {
 	queueID := liveHistoryQueue(queues)
+	if region := clientRiotPlatform(client); region != "" {
+		reference.Region = region
+		filter := "all"
+		if queueID == 420 {
+			filter = "solo"
+		} else if queueID == 440 {
+			filter = "flex"
+		}
+		// The live cards display ten games; avoid consuming thirty detail requests per player.
+		matches, _, err := a.loadClientRiotHistory(ctx, region, playerRef, 0, 10, filter, names, nil)
+		attempts := []DataSourceAttempt{{Source: dataSourceRiot, Outcome: dataSourceSuccess}}
+		if err == nil {
+			a.recordDiagnostic(map[string]any{"event": "match_history_data_source_decision", "client_region": region, "selected": dataSourceRiot, "attempts": attempts, "reason": "live-riot-platform"})
+			return livePlayerMatchesResult{Matches: matches, State: map[bool]string{true: "ok", false: "empty"}[len(matches) > 0], Source: dataSourceRiot}
+		}
+		attempts[0].Outcome, attempts[0].Message = dataSourceFailed, riotHistoryFailureMessage(err)
+		fallback := loadLiveLCUMatches(ctx, client, reference, playerRef, isCurrent, names)
+		attempts = append(attempts, DataSourceAttempt{Source: dataSourceLCU, Outcome: map[bool]string{true: dataSourceSuccess, false: dataSourceFailed}[fallback.State != "failed"]})
+		a.recordDiagnostic(map[string]any{"event": "match_history_data_source_decision", "client_region": region, "selected": dataSourceLCU, "attempts": attempts, "reason": "live-riot-platform", "fallback_reason": "riot-failed"})
+		return fallback
+	}
 	var lcu, sgp livePlayerMatchesResult
 	var sgpOK bool
 	lcu.State = "failed"

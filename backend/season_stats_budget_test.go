@@ -33,8 +33,7 @@ func r116eOverBudgetCache() seasonStatsCache {
 	for id := int64(1); id <= 173; id++ {
 		cache.Stats = append(cache.Stats, gameplaySeasonChampionStat{
 			ChampionID: id, ChampionName: strings.Repeat("英雄名", 4), Games: 40, Wins: 20,
-			Kills: 8.5, Deaths: 4.2, Assists: 9.1, TotalCS: 6000, Duration: 72000,
-			WinRate: 50, KDA: 4.19, CS: 148.2, CSPerMinute: 12.4,
+			TotalKills: 255, TotalDeaths: 126, TotalAssists: 273, TotalCS: 6000, Duration: 72000,
 		})
 	}
 	for id := int64(1); id <= 3000; id++ {
@@ -324,7 +323,7 @@ func TestSeasonStatsSynthetic2000MayhemGamesStayWithinBudget(t *testing.T) {
 		seasonStatsAccumulate(stats, queueStats, info, "subject", start)
 		seasonRecordRankedMatch(&cache, info, "subject")
 	}
-	cache.Stats = seasonStatsFinalize(stats, map[int64]string{157: "亚索"})
+	cache.Stats = seasonStatsRawRows(stats, map[int64]string{157: "亚索"})
 	cache.QueueStats = seasonStatsFinalizeQueues(queueStats)
 	seasonTrimRankedMatches(&cache)
 	augmentDropped := seasonTrimAugmentSamples(&cache)
@@ -406,8 +405,7 @@ func r120BudgetCache(gameIDs, augmentSamples, rankedMatches int) seasonStatsCach
 	for id := int64(1); id <= 173; id++ {
 		cache.Stats = append(cache.Stats, gameplaySeasonChampionStat{
 			ChampionID: id, ChampionName: strings.Repeat("英雄名", 4), Games: 40, Wins: 20,
-			Kills: 8.5, Deaths: 4.2, Assists: 9.1, TotalCS: 6000, Duration: 72000,
-			WinRate: 50, KDA: 4.19, CS: 148.2, CSPerMinute: 12.4,
+			TotalKills: 255, TotalDeaths: 126, TotalAssists: 273, TotalCS: 6000, Duration: 72000,
 		})
 	}
 	for id := 0; id < gameIDs; id++ {

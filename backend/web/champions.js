@@ -1777,6 +1777,7 @@
       if (kind === "pros") {
         matchCards.mount(container, {
           key: `arena-pros-${state.selected?.championId}`,
+          // OP.GG 吃鸡榜单固定韩服，外部样本保持原始平台。
           matches: state.arenaFirstPlaces?.matches || [], region: "kr",
           disableReplay: true,
           replayDisabledReason: "外部样本不支持回放",

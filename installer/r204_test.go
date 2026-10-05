@@ -59,7 +59,7 @@ func TestR204TimingImportAndNull(t *testing.T) {
 	}
 	var values map[string]any
 	json.Unmarshal(raw, &values)
-	if values["parent_exited"] != nil || values["uninstall_old_start"] == nil || values["extract_start"] == nil || len(values) != 8 {
+	if values["parent_exited"] != nil || values["uninstall_old_start"] == nil || values["extract_start"] == nil || len(values) != len(timingStageOrder) {
 		t.Fatal(values)
 	}
 	info, _ := os.Stat(timing.path)

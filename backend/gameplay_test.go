@@ -4244,6 +4244,12 @@ func TestGameplayRecommendationsHandlerResolvesPositionThroughHTTP(t *testing.T)
 		wantSource string
 	}{
 		{
+			name:      "R220 practice NONE and Smite use the hero primary lane",
+			query:     "championId=13&queueId=3140&gameMode=PRACTICETOOL&mapId=11&position=NONE&spell2Id=11",
+			wantPaths: []string{"/api/KR/champions/ranked/13/MID"},
+			wantPos:   "mid", wantSource: "opgg-primary",
+		},
+		{
 			name:       "missing live position uses the OP.GG primary lane",
 			query:      "championId=13&queueId=420&gameMode=CLASSIC&mapId=11",
 			wantPaths:  []string{"/api/KR/champions/ranked/13/MID"},
@@ -4889,9 +4895,17 @@ func TestR168LiveHistoryWindowFindsOlderSameQueueGames(t *testing.T) {
 				history.Games.Games = append(history.Games.Games, game)
 			}
 			history.Games.GameCount = len(history.Games.Games)
-			requests := 0
+			var requests, probes atomic.Int64
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				requests++
+				if r.URL.Path == "/riotclient/command-line-args" {
+					probes.Add(1)
+					_ = json.NewEncoder(w).Encode([]string{})
+					return
+				}
+				if !strings.HasPrefix(r.URL.Path, "/lol-match-history/") {
+					t.Errorf("unexpected live history endpoint: %s", r.URL.Path)
+				}
+				requests.Add(1)
 				if r.URL.Query().Get("begIndex") != "0" || r.URL.Query().Get("endIndex") != "29" {
 					t.Errorf("unexpected live history window: %s", r.URL.RawQuery)
 				}
@@ -4899,11 +4913,16 @@ func TestR168LiveHistoryWindowFindsOlderSameQueueGames(t *testing.T) {
 			}))
 			defer server.Close()
 			client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-			result := (&app{}).loadLivePlayerMatches(context.Background(), client, gameplayReference{PlayerRef: "player"}, "player", false, nil)
-			stats, games := liveRecentPlayerStats(result.Matches, "player", 440)
-			record := recentRankedRecord(games)
-			if result.State != "ok" || record == nil || record.Games != tc.want || stats.Games != len(games) || requests != 1 {
-				t.Fatalf("state=%q stats=%#v record=%#v recent=%d requests=%d", result.State, stats, record, len(games), requests)
+			for attempt := int64(1); attempt <= 2; attempt++ {
+				result := (&app{}).loadLivePlayerMatches(context.Background(), client, gameplayReference{PlayerRef: "player"}, "player", false, nil)
+				stats, games := liveRecentPlayerStats(result.Matches, "player", 440)
+				record := recentRankedRecord(games)
+				if result.State != "ok" || record == nil || record.Games != tc.want || stats.Games != len(games) || requests.Load() != attempt {
+					t.Fatalf("attempt=%d state=%q stats=%#v record=%#v recent=%d history_requests=%d", attempt, result.State, stats, record, len(games), requests.Load())
+				}
+				if probes.Load() != 1 {
+					t.Fatalf("platform probe not cached: %d", probes.Load())
+				}
 			}
 		})
 	}

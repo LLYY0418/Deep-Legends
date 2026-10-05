@@ -19,6 +19,7 @@ function extract(name) {
   assert.fail(`unbalanced ${name}`);
 }
 function compile(names, deps) {
+  names = require("./r211-harness-support.cjs").expand(source, names, deps);
   return Function(...Object.keys(deps), names.map(extract).join('\n') + `\nreturn {${names.join(',')}}`)(...Object.values(deps));
 }
 

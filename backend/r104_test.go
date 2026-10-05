@@ -105,7 +105,7 @@ func TestR104RealOPGGFixtureProvidesRevisionTimeAndZeroRiot(t *testing.T) {
 	}
 	// Read the persisted 30-day anchor from disk, proving rename tracking can
 	// survive restart without an account lookup during directory reuse.
-	entry, err := p.identityDisk.readDisk(riotIdentityKey(proSeedAnchor(seed, 0)))
+	entry, err := p.identityDisk.readDisk(riotIdentityKey(proSeedAnchor(seed, 0) + "|platform:kr"))
 	if err != nil {
 		t.Fatal(err)
 	}

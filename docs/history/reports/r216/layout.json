@@ -1,0 +1,194 @@
+{
+  "productionRenderers": true,
+  "fixtureData": true,
+  "measurements": [
+    {
+      "scene": "tags",
+      "width": 1280,
+      "theme": "light",
+      "overflow": false,
+      "tagHeights": [
+        30,
+        30,
+        30,
+        30
+      ],
+      "equipmentWidths": [
+        235,
+        235,
+        235,
+        235
+      ],
+      "lightContrast": [
+        9.257171371760785,
+        9.013493568080708,
+        8.637946432183698,
+        11.434701802698699
+      ],
+      "moreButtonContrast": [],
+      "heroPosition": null,
+      "combinedVisible": false
+    },
+    {
+      "scene": "tags",
+      "width": 1280,
+      "theme": "dark",
+      "overflow": false,
+      "tagHeights": [
+        30,
+        30,
+        30,
+        30
+      ],
+      "equipmentWidths": [
+        235,
+        235,
+        235,
+        235
+      ],
+      "lightContrast": [
+        6.307655189349617,
+        6.640757194386946,
+        6.832410445208835,
+        5.531838727298267
+      ],
+      "moreButtonContrast": [],
+      "heroPosition": null,
+      "combinedVisible": false
+    },
+    {
+      "scene": "tags",
+      "width": 780,
+      "theme": "light",
+      "overflow": false,
+      "tagHeights": [
+        30,
+        30,
+        30,
+        30
+      ],
+      "equipmentWidths": [
+        235,
+        235,
+        235,
+        235
+      ],
+      "lightContrast": [
+        9.257171371760785,
+        9.013493568080708,
+        8.637946432183698,
+        11.434701802698699
+      ],
+      "moreButtonContrast": [],
+      "heroPosition": null,
+      "combinedVisible": false
+    },
+    {
+      "scene": "tags",
+      "width": 780,
+      "theme": "dark",
+      "overflow": false,
+      "tagHeights": [
+        30,
+        30,
+        30,
+        30
+      ],
+      "equipmentWidths": [
+        235,
+        235,
+        235,
+        235
+      ],
+      "lightContrast": [
+        6.307655189349617,
+        6.640757194386946,
+        6.832410445208835,
+        5.531838727298267
+      ],
+      "moreButtonContrast": [],
+      "heroPosition": null,
+      "combinedVisible": false
+    },
+    {
+      "scene": "table",
+      "width": 1280,
+      "theme": "light",
+      "overflow": false,
+      "tagHeights": [],
+      "equipmentWidths": [],
+      "lightContrast": [],
+      "moreButtonContrast": [
+        {
+          "text": "oklch(0.18 0.012 57)",
+          "background": "oklch(0.925 0 0)",
+          "ratio": 15.110332988393923
+        }
+      ],
+      "tableWidth": 1198,
+      "tableScrollWidth": 1198,
+      "heroPosition": "sticky",
+      "combinedVisible": false
+    },
+    {
+      "scene": "table",
+      "width": 1280,
+      "theme": "dark",
+      "overflow": false,
+      "tagHeights": [],
+      "equipmentWidths": [],
+      "lightContrast": [],
+      "moreButtonContrast": [
+        {
+          "text": "rgb(232, 234, 240)",
+          "background": "rgb(26, 33, 48)",
+          "ratio": 13.386963609846712
+        }
+      ],
+      "tableWidth": 1198,
+      "tableScrollWidth": 1198,
+      "heroPosition": "sticky",
+      "combinedVisible": false
+    },
+    {
+      "scene": "table",
+      "width": 780,
+      "theme": "light",
+      "overflow": false,
+      "tagHeights": [],
+      "equipmentWidths": [],
+      "lightContrast": [],
+      "moreButtonContrast": [
+        {
+          "text": "oklch(0.18 0.012 57)",
+          "background": "oklch(0.925 0 0)",
+          "ratio": 15.110332988393923
+        }
+      ],
+      "tableWidth": 738,
+      "tableScrollWidth": 1050,
+      "heroPosition": "sticky",
+      "combinedVisible": true
+    },
+    {
+      "scene": "table",
+      "width": 780,
+      "theme": "dark",
+      "overflow": false,
+      "tagHeights": [],
+      "equipmentWidths": [],
+      "lightContrast": [],
+      "moreButtonContrast": [
+        {
+          "text": "rgb(232, 234, 240)",
+          "background": "rgb(26, 33, 48)",
+          "ratio": 13.386963609846712
+        }
+      ],
+      "tableWidth": 738,
+      "tableScrollWidth": 1050,
+      "heroPosition": "sticky",
+      "combinedVisible": true
+    }
+  ]
+}

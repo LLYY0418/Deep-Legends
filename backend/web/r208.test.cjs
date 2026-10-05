@@ -24,7 +24,7 @@ function harness(responses) {
     showToast: text => toasts.push(text), loadOPGGSeasonSummary: noop, loadOverviewCurrentGame: noop, syncOverviewSupplementRefs: noop, rememberTabPlayerRef: noop, playerLabel: () => 'Fixture', renderCapabilitySettings: noop,
     normalizedPagination: (p, beg) => ({...p.pagination, nextBegIndex: beg + p.pagination.count}),
   };
-  vm.runInNewContext(['api', 'loadOverview'].map(extract).join('\n'), context);
+  vm.runInNewContext(require('./r211-harness-support.cjs').expand(source,['api','loadOverview'],context).map(extract).join('\n'), context);
   return {...context, jobs, requests, toasts, root, close: () => dom.window.close(), async advance(ms) {now += ms; for (const [id, job] of [...jobs]) if (job.at <= now) {jobs.delete(id); job.fn();} await flush();}};
 }
 test('R208 IP stream 429 retains partial matches silently and resumes the same page at 60 seconds', async () => {

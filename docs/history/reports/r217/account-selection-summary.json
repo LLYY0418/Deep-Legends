@@ -1,0 +1,17 @@
+{
+  "frozenAt": "2026-10-05T07:36:31.079732+00:00",
+  "accounts": 16,
+  "pro_high": 8,
+  "ordinary": 8,
+  "tiers": {
+    "CHALLENGER": 4,
+    "GRANDMASTER": 4,
+    "DIAMOND": 4,
+    "PLATINUM": 4
+  },
+  "recent_solo_min": 20,
+  "old_puuid_overlap": 0,
+  "selection_rule": "tier + >=20 solo in last30days; directory sorted by PUUID; no outcomes or scores",
+  "user_confirmation": "waived by user 2026-10-05",
+  "sha256": "810db8badfdc8f8729a6783ee6631124b486600dd76e8b7dc37a0c7474c9d0a1"
+}

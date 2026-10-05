@@ -1,0 +1,23 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-json",
+    "./backend"
+  ],
+  "startUTC": "2026-10-05T09:12:32.094451+00:00",
+  "startShanghai": "2026-10-05T17:12:32.094451+08:00",
+  "elapsedSeconds": 0.702,
+  "exitCode": 1,
+  "lastFiveLines": [
+    "{\"ImportPath\":\"lol-loot-assistant/backend [lol-loot-assistant/backend.test]\",\"Action\":\"build-output\",\"Output\":\"backend/data_sources_test.go:45:77: too many errors\\n\"}",
+    "{\"ImportPath\":\"lol-loot-assistant/backend [lol-loot-assistant/backend.test]\",\"Action\":\"build-fail\"}",
+    "{\"Time\":\"2026-10-05T17:12:32.773873+08:00\",\"Action\":\"start\",\"Package\":\"lol-loot-assistant/backend\"}",
+    "{\"Time\":\"2026-10-05T17:12:32.773918+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Output\":\"FAIL\\tlol-loot-assistant/backend [build failed]\\n\"}",
+    "{\"Time\":\"2026-10-05T17:12:32.773929+08:00\",\"Action\":\"fail\",\"Package\":\"lol-loot-assistant/backend\",\"Elapsed\":0,\"FailedBuild\":\"lol-loot-assistant/backend [lol-loot-assistant/backend.test]\"}"
+  ],
+  "skippedTests": [],
+  "passedTests": [],
+  "failedTests": []
+}

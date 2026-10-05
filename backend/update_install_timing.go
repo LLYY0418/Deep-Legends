@@ -8,7 +8,11 @@ import (
 	"time"
 )
 
-var updateInstallTimingStages = []string{"installer_start", "parent_exited", "uninstall_old_start", "uninstall_old_done", "extract_start", "extract_done", "copy_done", "relaunch"}
+var updateInstallTimingStages = []string{"installer_start", "parent_exited", "payload_released", "nsis_start", "oninit", "check_done", "uninstall_old_start", "uninstall_old_done", "extract_start", "extract_done", "copy_done", "relaunch"}
+
+func detailedInstallTimingStage(stage string) bool {
+	return stage == "payload_released" || stage == "nsis_start" || stage == "oninit" || stage == "check_done"
+}
 
 // Consume once. Partial legacy files retain every available interval; missing
 // endpoints are null, never invented or subtracted across an unknown stage.
@@ -34,12 +38,22 @@ func consumeUpdateInstallTiming(root string, record func(map[string]any)) {
 		return
 	}
 	durations, missing := map[string]any{}, false
+	// Complete legacy eight-stage reports remain valid; new endpoints are
+	// unknown there. Once any detail is present, require all four details.
+	detailed := false
+	for _, stage := range updateInstallTimingStages {
+		if detailedInstallTimingStage(stage) && stages[stage] > 0 {
+			detailed = true
+		}
+	}
 	previous := int64(0)
 	skew := false
 	for i, stage := range updateInstallTimingStages {
 		value := stages[stage]
 		if value <= 0 {
-			missing = true
+			if detailed || !detailedInstallTimingStage(stage) {
+				missing = true
+			}
 		} else {
 			if value < previous || value > time.Now().UnixMilli()+60000 {
 				skew = true
@@ -54,6 +68,11 @@ func consumeUpdateInstallTiming(root string, record func(map[string]any)) {
 				durations[name] = value - prior
 			}
 		}
+	}
+	// Keep the aggregate gap for comparisons with pre-R212 diagnostics.
+	durations["parent_exited_to_uninstall_old_start"] = nil
+	if start, end := stages["parent_exited"], stages["uninstall_old_start"]; start > 0 && end >= start && end <= time.Now().UnixMilli()+60000 {
+		durations["parent_exited_to_uninstall_old_start"] = end - start
 	}
 	event["stages_ms"] = durations
 	for name, pair := range map[string][2]string{"uninstall_old_ms": {"uninstall_old_start", "uninstall_old_done"}, "extract_ms": {"extract_start", "extract_done"}, "copy_ms": {"extract_done", "copy_done"}} {

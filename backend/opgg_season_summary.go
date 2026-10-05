@@ -19,12 +19,15 @@ const opggSeasonSummaryAction = "4028494596c44675d8e9f617b8f659312f3b678072"
 const opggSeasonSummaryTTL = 10 * time.Minute
 
 type opggSeasonSummary struct {
-	Source    string                 `json:"source"`
-	Season    string                 `json:"season"`
-	SeasonID  int                    `json:"seasonId"`
-	Queue     string                 `json:"queue"`
-	Overall   gameplayAggregate      `json:"overall"`
-	Champions []gameplayChampionStat `json:"champions"`
+	TableSupported bool                   `json:"tableSupported,omitempty"`
+	TableRows      []championTableRow     `json:"tableRows,omitempty"`
+	TableOverall   championTableRow       `json:"tableOverall,omitempty"`
+	Source         string                 `json:"source"`
+	Season         string                 `json:"season"`
+	SeasonID       int                    `json:"seasonId"`
+	Queue          string                 `json:"queue"`
+	Overall        gameplayAggregate      `json:"overall"`
+	Champions      []gameplayChampionStat `json:"champions"`
 }
 type opggSeasonEntry struct {
 	at    time.Time
@@ -135,7 +138,7 @@ func parseOPGGSeasonSummary(data []byte, meta opggSummaryMetadata, champions map
 	if json.Unmarshal(records[strings.TrimPrefix(root.Action, "$@")], &rows) != nil || len(rows) == 0 || len(rows) > 201 {
 		return nil, errors.New("OP.GG 汇总暂不可用")
 	}
-	result := &opggSeasonSummary{Source: "OP.GG", Season: meta.Season.Label, SeasonID: meta.Season.ID, Queue: "RANKED", Champions: []gameplayChampionStat{}}
+	result := &opggSeasonSummary{Source: "OP.GG", Season: meta.Season.Label, SeasonID: meta.Season.ID, Queue: "RANKED", TableSupported: true, Champions: []gameplayChampionStat{}}
 	allCount, topGames := 0, 0
 	seen := map[int64]bool{}
 	for _, row := range rows {
@@ -190,7 +193,7 @@ func (a *app) fetchOPGGSeasonSummary(ctx context.Context, ref gameplayReference)
 	if err != nil {
 		return nil, err
 	}
-	body, _ := json.Marshal([]map[string]any{{"locale": "zh-cn", "region": "kr", "puuid": meta.PUUID, "season_id": meta.Season.ID, "game_type": "RANKED"}})
+	body, _ := json.Marshal([]map[string]any{{"locale": "zh-cn", "region": opggPlatform(ref.Region), "puuid": meta.PUUID, "season_id": meta.Season.ID, "game_type": "RANKED"}})
 	stage = "aggregate-request"
 	payload, err := a.readOPGGPlayerPage(ctx, ref, http.MethodPost, opggSeasonSummaryAction, body)
 	summaryMS = time.Since(started).Milliseconds() - pageMS
@@ -217,7 +220,7 @@ func (a *app) fetchOPGGSeasonSummary(ctx context.Context, ref gameplayReference)
 }
 
 func (a *app) opggSeasonSummary(ctx context.Context, ref gameplayReference, force bool) (*opggSeasonSummary, error) {
-	if a.opgg == nil || a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) || strings.EqualFold(ref.Privacy, "PRIVATE") || !strings.EqualFold(ref.Region, riotRegionKR) || !validPlayerReference(ref.PlayerRef) || ref.GameName == "" || ref.TagLine == "" {
+	if a.opgg == nil || a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) || strings.EqualFold(ref.Privacy, "PRIVATE") || !isRiotRegion(ref.Region) || !validPlayerReference(ref.PlayerRef) || ref.GameName == "" || ref.TagLine == "" {
 		return nil, errors.New("OP.GG 赛季汇总不可用")
 	}
 	key := sourceScopedKey(dataSourceOPGG, "season-summary:"+overviewSupplementCacheIdentity(ref))
@@ -287,7 +290,7 @@ func (a *app) handleOPGGSeasonSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ref, status := a.resolveOverviewSupplement(request.PlayerRef, request.GameName, request.TagLine, request.Region)
-	if status != 0 || !strings.EqualFold(ref.Region, riotRegionKR) {
+	if status != 0 || !isRiotRegion(ref.Region) {
 		if status == 0 {
 			status = http.StatusBadRequest
 		}

@@ -1,0 +1,28 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-json",
+    "./backend",
+    "-run",
+    "^TestR216Python(V2Migration|V21Golden)Consistency260$"
+  ],
+  "startUTC": "2026-10-05T09:01:53.725646+00:00",
+  "startShanghai": "2026-10-05T17:01:53.725646+08:00",
+  "elapsedSeconds": 2.509,
+  "exitCode": 0,
+  "lastFiveLines": [
+    "{\"Time\":\"2026-10-05T17:01:56.210778+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Test\":\"TestR216PythonV21GoldenConsistency260\",\"Output\":\"--- SKIP: TestR216PythonV21GoldenConsistency260 (0.51s)\\n\"}",
+    "{\"Time\":\"2026-10-05T17:01:56.210805+08:00\",\"Action\":\"skip\",\"Package\":\"lol-loot-assistant/backend\",\"Test\":\"TestR216PythonV21GoldenConsistency260\",\"Elapsed\":0.51}",
+    "{\"Time\":\"2026-10-05T17:01:56.210835+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Output\":\"PASS\\n\"}",
+    "{\"Time\":\"2026-10-05T17:01:56.211616+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Output\":\"ok  \\tlol-loot-assistant/backend\\t1.439s\\n\"}",
+    "{\"Time\":\"2026-10-05T17:01:56.211638+08:00\",\"Action\":\"pass\",\"Package\":\"lol-loot-assistant/backend\",\"Elapsed\":1.439}"
+  ],
+  "skippedTests": [
+    "TestR216PythonV2MigrationConsistency260",
+    "TestR216PythonV21GoldenConsistency260"
+  ],
+  "passedTests": [],
+  "failedTests": []
+}

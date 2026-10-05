@@ -4,15 +4,12 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 )
 
-var arenaRiotMatchIDPattern = regexp.MustCompile(`^KR_[0-9]+$`)
-
 func validArenaRiotMatchID(matchID string) bool {
-	return arenaRiotMatchIDPattern.MatchString(matchID)
+	return validRiotMatchID(matchID)
 }
 
 func (a *app) handleArenaMatchDetail(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +31,7 @@ func (a *app) handleArenaMatchDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	raw, cacheState, err := a.riot.matchByIDWithCache(r.Context(), matchID)
+	raw, cacheState, err := a.riot.forPlatform(strings.SplitN(matchID, "_", 2)[0]).matchByIDWithCache(r.Context(), matchID)
 	if err != nil {
 		status, message, errorKind := arenaMatchDetailFailure(err)
 		report(status, cacheState, "error", errorKind)
@@ -58,6 +55,15 @@ func (a *app) handleArenaMatchDetail(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(match.QueueLabel) == "" || match.QueueLabel == match.GameMode {
 		match.QueueLabel = "斗魂竞技场"
 	}
+	// This endpoint has no subject; a completed Arena score still has a known outcome.
+	if match.Result == "unknown" && len(match.Participants) > 0 && !match.Participants[0].scoreMissing["win"] {
+		match.Result = "loss"
+		if match.Participants[0].Win {
+			match.Result = "win"
+		}
+	}
+	applyMatchScores(&match)
+	a.recordMatchScores("riot", match)
 	a.publicizeMatchReferences(&match)
 	report(http.StatusOK, cacheState, "success", "")
 	respondJSON(w, match)

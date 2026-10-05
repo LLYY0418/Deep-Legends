@@ -13,12 +13,12 @@ import (
 )
 
 func TestValidArenaRiotMatchID(t *testing.T) {
-	for _, matchID := range []string{"KR_1", "KR_1234567890"} {
+	for _, matchID := range []string{"KR_1", "KR_1234567890", "NA1_123", "JP1_123"} {
 		if !validArenaRiotMatchID(matchID) {
 			t.Fatalf("valid match ID %q was rejected", matchID)
 		}
 	}
-	for _, matchID := range []string{"", "KR_", " KR_1", "KR_1 ", "NA1_123", "kr_123", "KR_1/../x", "KR_1%2F..%2Fx", "KR_12?x=1"} {
+	for _, matchID := range []string{"", "KR_", " KR_1", "KR_1 ", "ZZ1_123", "kr_123", "KR_1/../x", "KR_1%2F..%2Fx", "KR_12?x=1"} {
 		if validArenaRiotMatchID(matchID) {
 			t.Fatalf("invalid match ID %q was accepted", matchID)
 		}
@@ -129,8 +129,8 @@ func TestArenaMatchDetailRejectsInvalidIDBeforeRiotRequest(t *testing.T) {
 	events := make([]map[string]any, 0, 1)
 	champions.diag = func(event map[string]any) { events = append(events, event) }
 	a := &app{champions: champions}
-	request := httptest.NewRequest(http.MethodGet, "/api/champions/arena/match/NA1_123", nil).WithContext(context.Background())
-	request.SetPathValue("matchId", "NA1_123")
+	request := httptest.NewRequest(http.MethodGet, "/api/champions/arena/match/ZZ1_123", nil).WithContext(context.Background())
+	request.SetPathValue("matchId", "ZZ1_123")
 	recorder := httptest.NewRecorder()
 	a.handleArenaMatchDetail(recorder, request)
 	if recorder.Code != http.StatusBadRequest || len(events) != 1 || events[0]["errorKind"] != "invalid-match-id" {

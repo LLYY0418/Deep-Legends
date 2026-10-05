@@ -38,8 +38,24 @@ function functionSource(name) {
 
 function compileFunction(name, dependencies) {
   const names = Object.keys(dependencies);
-  return Function(...names, `"use strict"; return (${functionSource(name)});`)(...names.map((key) => dependencies[key]));
+  return Function(...names, `"use strict"; ${require("./r220-harness-support.cjs").prelude(source,dependencies)} return (${functionSource(name)});`)(...names.map((key) => dependencies[key]));
 }
+
+test("启动入口初始 state 没有 installations 字段也可渲染和重新检查", () => {
+  const dom = new JSDOM(html);
+  try {
+    const document = dom.window.document, state = { section: "overview", installationsLoaded: false };
+    const el = {};
+    for (const id of ["client-launchpad", "launcher-list", "launchpad-eyebrow", "launchpad-title", "launchpad-description", "client-launch-reselect", "official-login-status"]) el[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id);
+    const render = compileFunction("renderLaunchpad", { state, el, escapeHTML: String, launchOfficialLogin() {}, loadClientInstallations() {} });
+    assert.doesNotThrow(() => render({ connected: false }));
+    assert.match(el.launcherList.textContent, /正在检查/);
+    state.installationsLoaded = true;
+    assert.doesNotThrow(() => render({ connected: false }));
+    assert.match(el.launcherList.textContent, /没有检测到可启动入口/);
+    assert(el.launcherList.querySelector(".scan-launchers"));
+  } finally { dom.window.close(); }
+});
 
 test("总览未连接态只提供客户端入口且不提供密码输入", () => {
   const launchpad = html.match(/<section id="client-launchpad"[\s\S]*?<\/section>/)?.[0] || "";
@@ -220,7 +236,7 @@ test("启动成功后隐藏入口并按客户端显示等待登录状态", () =>
 
 test("启动入口只渲染可用的 TCLS 与 Riot 客户端并使用统一卡片", () => {
   const render = functionSource("renderLaunchpad");
-  assert.match(render, /item\.available && \(item\.id === "tcls" \|\| item\.id === "riot"\)/);
+  assert.match(render, /item\.available && \(item\.id === "riot" \|\| item\.id === "tcls" && !isRiotSearchRegion/);
   assert.match(render, /data-client-id=/);
   assert.match(render, /launchOfficialLogin\(button\)/);
   assert.match(render, /国服纯净入口/);

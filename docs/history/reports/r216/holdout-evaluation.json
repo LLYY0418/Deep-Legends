@@ -1,0 +1,1346 @@
+{
+  "manifestSha256": "232ead1a63d388571c3152c28e1b50f7f7862e200eb6abf829a84aec59c50f71",
+  "candidateSha256": "44b9a6d7c4c71b7800aefe9b81bbc2ad6b16bbdeee9eca5cc2ef95a7e81a51f7",
+  "keywordParamsSha256": "98ce919664c776bac3565b96a100a9a782eee0182c478123458f9de03b688d82",
+  "metrics": {
+    "v2": {
+      "all": {
+        "matches": 300,
+        "MVP": 0.7233333333333334,
+        "SVP": 0.7133333333333334,
+        "rhoMedian": 0.9030303030303031,
+        "rhoSamples": 300
+      },
+      "pro_high": {
+        "matches": 150,
+        "MVP": 0.7333333333333333,
+        "SVP": 0.7,
+        "rhoMedian": 0.9151515151515152,
+        "rhoSamples": 150
+      },
+      "ordinary": {
+        "matches": 150,
+        "MVP": 0.7133333333333334,
+        "SVP": 0.7266666666666667,
+        "rhoMedian": 0.8909090909090909,
+        "rhoSamples": 150
+      },
+      "keywords": {
+        "participants": 2970,
+        "accuracy": 0.35555555555555557,
+        "macroF1": 0.26474975633264897,
+        "perKeyword": {
+          "unstoppable": {
+            "correct": 133,
+            "predicted": 178,
+            "actual": 491,
+            "precision": 0.7471910112359551,
+            "recall": 0.2708757637474542,
+            "f1": 0.3976083707025411
+          },
+          "leader": {
+            "correct": 1,
+            "predicted": 9,
+            "actual": 101,
+            "precision": 0.1111111111111111,
+            "recall": 0.009900990099009901,
+            "f1": 0.01818181818181818
+          },
+          "victorious": {
+            "correct": 94,
+            "predicted": 437,
+            "actual": 185,
+            "precision": 0.2151029748283753,
+            "recall": 0.5081081081081081,
+            "f1": 0.3022508038585209
+          },
+          "latebloomer": {
+            "correct": 75,
+            "predicted": 322,
+            "actual": 179,
+            "precision": 0.2329192546583851,
+            "recall": 0.41899441340782123,
+            "f1": 0.2994011976047904
+          },
+          "resilience": {
+            "correct": 193,
+            "predicted": 307,
+            "actual": 327,
+            "precision": 0.6286644951140065,
+            "recall": 0.5902140672782875,
+            "f1": 0.6088328075709779
+          },
+          "dedication": {
+            "correct": 0,
+            "predicted": 2,
+            "actual": 16,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "average": {
+            "correct": 22,
+            "predicted": 189,
+            "actual": 189,
+            "precision": 0.1164021164021164,
+            "recall": 0.1164021164021164,
+            "f1": 0.1164021164021164
+          },
+          "rollercoaster": {
+            "correct": 0,
+            "predicted": 8,
+            "actual": 85,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "decline": {
+            "correct": 93,
+            "predicted": 249,
+            "actual": 225,
+            "precision": 0.37349397590361444,
+            "recall": 0.41333333333333333,
+            "f1": 0.3924050632911392
+          },
+          "innocent": {
+            "correct": 5,
+            "predicted": 26,
+            "actual": 15,
+            "precision": 0.19230769230769232,
+            "recall": 0.3333333333333333,
+            "f1": 0.24390243902439024
+          },
+          "unlucky": {
+            "correct": 177,
+            "predicted": 261,
+            "actual": 362,
+            "precision": 0.6781609195402298,
+            "recall": 0.4889502762430939,
+            "f1": 0.5682182985553772
+          },
+          "slowstarter": {
+            "correct": 2,
+            "predicted": 336,
+            "actual": 7,
+            "precision": 0.005952380952380952,
+            "recall": 0.2857142857142857,
+            "f1": 0.011661807580174927
+          },
+          "unyielding": {
+            "correct": 103,
+            "predicted": 281,
+            "actual": 225,
+            "precision": 0.3665480427046263,
+            "recall": 0.4577777777777778,
+            "f1": 0.40711462450592883
+          },
+          "struggling": {
+            "correct": 158,
+            "predicted": 365,
+            "actual": 563,
+            "precision": 0.4328767123287671,
+            "recall": 0.28063943161634103,
+            "f1": 0.34051724137931033
+          }
+        },
+        "confusion": [
+          {
+            "actual": "average",
+            "predicted": "average",
+            "count": 22
+          },
+          {
+            "actual": "average",
+            "predicted": "decline",
+            "count": 17
+          },
+          {
+            "actual": "average",
+            "predicted": "latebloomer",
+            "count": 27
+          },
+          {
+            "actual": "average",
+            "predicted": "resilience",
+            "count": 27
+          },
+          {
+            "actual": "average",
+            "predicted": "slowstarter",
+            "count": 25
+          },
+          {
+            "actual": "average",
+            "predicted": "struggling",
+            "count": 19
+          },
+          {
+            "actual": "average",
+            "predicted": "unlucky",
+            "count": 19
+          },
+          {
+            "actual": "average",
+            "predicted": "unstoppable",
+            "count": 1
+          },
+          {
+            "actual": "average",
+            "predicted": "unyielding",
+            "count": 17
+          },
+          {
+            "actual": "average",
+            "predicted": "victorious",
+            "count": 15
+          },
+          {
+            "actual": "decline",
+            "predicted": "average",
+            "count": 5
+          },
+          {
+            "actual": "decline",
+            "predicted": "decline",
+            "count": 93
+          },
+          {
+            "actual": "decline",
+            "predicted": "latebloomer",
+            "count": 3
+          },
+          {
+            "actual": "decline",
+            "predicted": "resilience",
+            "count": 1
+          },
+          {
+            "actual": "decline",
+            "predicted": "rollercoaster",
+            "count": 1
+          },
+          {
+            "actual": "decline",
+            "predicted": "slowstarter",
+            "count": 19
+          },
+          {
+            "actual": "decline",
+            "predicted": "struggling",
+            "count": 71
+          },
+          {
+            "actual": "decline",
+            "predicted": "unlucky",
+            "count": 19
+          },
+          {
+            "actual": "decline",
+            "predicted": "unyielding",
+            "count": 8
+          },
+          {
+            "actual": "decline",
+            "predicted": "victorious",
+            "count": 5
+          },
+          {
+            "actual": "dedication",
+            "predicted": "average",
+            "count": 3
+          },
+          {
+            "actual": "dedication",
+            "predicted": "decline",
+            "count": 4
+          },
+          {
+            "actual": "dedication",
+            "predicted": "latebloomer",
+            "count": 6
+          },
+          {
+            "actual": "dedication",
+            "predicted": "resilience",
+            "count": 1
+          },
+          {
+            "actual": "dedication",
+            "predicted": "unstoppable",
+            "count": 1
+          },
+          {
+            "actual": "dedication",
+            "predicted": "victorious",
+            "count": 1
+          },
+          {
+            "actual": "innocent",
+            "predicted": "innocent",
+            "count": 5
+          },
+          {
+            "actual": "innocent",
+            "predicted": "slowstarter",
+            "count": 1
+          },
+          {
+            "actual": "innocent",
+            "predicted": "unlucky",
+            "count": 8
+          },
+          {
+            "actual": "innocent",
+            "predicted": "unyielding",
+            "count": 1
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "average",
+            "count": 16
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "decline",
+            "count": 1
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "latebloomer",
+            "count": 75
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "leader",
+            "count": 3
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "resilience",
+            "count": 58
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "unstoppable",
+            "count": 5
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "victorious",
+            "count": 21
+          },
+          {
+            "actual": "leader",
+            "predicted": "average",
+            "count": 12
+          },
+          {
+            "actual": "leader",
+            "predicted": "decline",
+            "count": 3
+          },
+          {
+            "actual": "leader",
+            "predicted": "latebloomer",
+            "count": 15
+          },
+          {
+            "actual": "leader",
+            "predicted": "leader",
+            "count": 1
+          },
+          {
+            "actual": "leader",
+            "predicted": "resilience",
+            "count": 2
+          },
+          {
+            "actual": "leader",
+            "predicted": "unstoppable",
+            "count": 17
+          },
+          {
+            "actual": "leader",
+            "predicted": "victorious",
+            "count": 51
+          },
+          {
+            "actual": "resilience",
+            "predicted": "average",
+            "count": 57
+          },
+          {
+            "actual": "resilience",
+            "predicted": "decline",
+            "count": 2
+          },
+          {
+            "actual": "resilience",
+            "predicted": "latebloomer",
+            "count": 45
+          },
+          {
+            "actual": "resilience",
+            "predicted": "leader",
+            "count": 1
+          },
+          {
+            "actual": "resilience",
+            "predicted": "resilience",
+            "count": 193
+          },
+          {
+            "actual": "resilience",
+            "predicted": "rollercoaster",
+            "count": 3
+          },
+          {
+            "actual": "resilience",
+            "predicted": "victorious",
+            "count": 26
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "average",
+            "count": 10
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "decline",
+            "count": 4
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "latebloomer",
+            "count": 7
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "resilience",
+            "count": 3
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "slowstarter",
+            "count": 19
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "struggling",
+            "count": 8
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "unlucky",
+            "count": 10
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "unstoppable",
+            "count": 1
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "unyielding",
+            "count": 4
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "victorious",
+            "count": 19
+          },
+          {
+            "actual": "slowstarter",
+            "predicted": "slowstarter",
+            "count": 2
+          },
+          {
+            "actual": "slowstarter",
+            "predicted": "unlucky",
+            "count": 3
+          },
+          {
+            "actual": "slowstarter",
+            "predicted": "unyielding",
+            "count": 2
+          },
+          {
+            "actual": "struggling",
+            "predicted": "average",
+            "count": 8
+          },
+          {
+            "actual": "struggling",
+            "predicted": "decline",
+            "count": 73
+          },
+          {
+            "actual": "struggling",
+            "predicted": "dedication",
+            "count": 2
+          },
+          {
+            "actual": "struggling",
+            "predicted": "latebloomer",
+            "count": 6
+          },
+          {
+            "actual": "struggling",
+            "predicted": "resilience",
+            "count": 10
+          },
+          {
+            "actual": "struggling",
+            "predicted": "rollercoaster",
+            "count": 2
+          },
+          {
+            "actual": "struggling",
+            "predicted": "slowstarter",
+            "count": 155
+          },
+          {
+            "actual": "struggling",
+            "predicted": "struggling",
+            "count": 158
+          },
+          {
+            "actual": "struggling",
+            "predicted": "unlucky",
+            "count": 11
+          },
+          {
+            "actual": "struggling",
+            "predicted": "unyielding",
+            "count": 136
+          },
+          {
+            "actual": "struggling",
+            "predicted": "victorious",
+            "count": 2
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "average",
+            "count": 12
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "decline",
+            "count": 21
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "innocent",
+            "count": 21
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "rollercoaster",
+            "count": 1
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "slowstarter",
+            "count": 67
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "struggling",
+            "count": 53
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "unlucky",
+            "count": 177
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "unyielding",
+            "count": 10
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "average",
+            "count": 25
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "decline",
+            "count": 10
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "latebloomer",
+            "count": 111
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "leader",
+            "count": 2
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "resilience",
+            "count": 6
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "rollercoaster",
+            "count": 1
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "unstoppable",
+            "count": 133
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "victorious",
+            "count": 203
+          },
+          {
+            "actual": "unyielding",
+            "predicted": "decline",
+            "count": 4
+          },
+          {
+            "actual": "unyielding",
+            "predicted": "slowstarter",
+            "count": 48
+          },
+          {
+            "actual": "unyielding",
+            "predicted": "struggling",
+            "count": 56
+          },
+          {
+            "actual": "unyielding",
+            "predicted": "unlucky",
+            "count": 14
+          },
+          {
+            "actual": "unyielding",
+            "predicted": "unyielding",
+            "count": 103
+          },
+          {
+            "actual": "victorious",
+            "predicted": "average",
+            "count": 19
+          },
+          {
+            "actual": "victorious",
+            "predicted": "decline",
+            "count": 17
+          },
+          {
+            "actual": "victorious",
+            "predicted": "latebloomer",
+            "count": 27
+          },
+          {
+            "actual": "victorious",
+            "predicted": "leader",
+            "count": 2
+          },
+          {
+            "actual": "victorious",
+            "predicted": "resilience",
+            "count": 6
+          },
+          {
+            "actual": "victorious",
+            "predicted": "unstoppable",
+            "count": 20
+          },
+          {
+            "actual": "victorious",
+            "predicted": "victorious",
+            "count": 94
+          }
+        ],
+        "disableBelow40Percent": [
+          "leader",
+          "victorious",
+          "latebloomer",
+          "dedication",
+          "average",
+          "rollercoaster",
+          "decline",
+          "innocent",
+          "slowstarter",
+          "unyielding"
+        ]
+      }
+    },
+    "v21": {
+      "all": {
+        "matches": 300,
+        "MVP": 0.7766666666666666,
+        "SVP": 0.7633333333333333,
+        "rhoMedian": 0.9272727272727272,
+        "rhoSamples": 300
+      },
+      "pro_high": {
+        "matches": 150,
+        "MVP": 0.7866666666666666,
+        "SVP": 0.7533333333333333,
+        "rhoMedian": 0.9272727272727272,
+        "rhoSamples": 150
+      },
+      "ordinary": {
+        "matches": 150,
+        "MVP": 0.7666666666666667,
+        "SVP": 0.7733333333333333,
+        "rhoMedian": 0.9151515151515152,
+        "rhoSamples": 150
+      },
+      "keywords": {
+        "participants": 2970,
+        "accuracy": 0.36464646464646466,
+        "macroF1": 0.26841876587887586,
+        "perKeyword": {
+          "unstoppable": {
+            "correct": 146,
+            "predicted": 190,
+            "actual": 491,
+            "precision": 0.7684210526315789,
+            "recall": 0.2973523421588595,
+            "f1": 0.4287812041116006
+          },
+          "leader": {
+            "correct": 0,
+            "predicted": 3,
+            "actual": 101,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "victorious": {
+            "correct": 84,
+            "predicted": 387,
+            "actual": 185,
+            "precision": 0.21705426356589147,
+            "recall": 0.4540540540540541,
+            "f1": 0.2937062937062937
+          },
+          "latebloomer": {
+            "correct": 79,
+            "predicted": 321,
+            "actual": 179,
+            "precision": 0.24610591900311526,
+            "recall": 0.441340782122905,
+            "f1": 0.316
+          },
+          "resilience": {
+            "correct": 206,
+            "predicted": 335,
+            "actual": 327,
+            "precision": 0.6149253731343284,
+            "recall": 0.6299694189602446,
+            "f1": 0.622356495468278
+          },
+          "dedication": {
+            "correct": 0,
+            "predicted": 1,
+            "actual": 16,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "average": {
+            "correct": 21,
+            "predicted": 164,
+            "actual": 189,
+            "precision": 0.12804878048780488,
+            "recall": 0.1111111111111111,
+            "f1": 0.11898016997167139
+          },
+          "rollercoaster": {
+            "correct": 0,
+            "predicted": 5,
+            "actual": 85,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "decline": {
+            "correct": 102,
+            "predicted": 317,
+            "actual": 225,
+            "precision": 0.3217665615141956,
+            "recall": 0.4533333333333333,
+            "f1": 0.3763837638376384
+          },
+          "innocent": {
+            "correct": 7,
+            "predicted": 40,
+            "actual": 15,
+            "precision": 0.175,
+            "recall": 0.4666666666666667,
+            "f1": 0.2545454545454545
+          },
+          "unlucky": {
+            "correct": 190,
+            "predicted": 269,
+            "actual": 362,
+            "precision": 0.7063197026022305,
+            "recall": 0.5248618784530387,
+            "f1": 0.6022187004754358
+          },
+          "slowstarter": {
+            "correct": 2,
+            "predicted": 336,
+            "actual": 7,
+            "precision": 0.005952380952380952,
+            "recall": 0.2857142857142857,
+            "f1": 0.011661807580174927
+          },
+          "unyielding": {
+            "correct": 114,
+            "predicted": 314,
+            "actual": 225,
+            "precision": 0.3630573248407643,
+            "recall": 0.5066666666666667,
+            "f1": 0.4230055658627087
+          },
+          "struggling": {
+            "correct": 132,
+            "predicted": 288,
+            "actual": 563,
+            "precision": 0.4583333333333333,
+            "recall": 0.2344582593250444,
+            "f1": 0.3102232667450059
+          }
+        },
+        "confusion": [
+          {
+            "actual": "average",
+            "predicted": "average",
+            "count": 21
+          },
+          {
+            "actual": "average",
+            "predicted": "decline",
+            "count": 22
+          },
+          {
+            "actual": "average",
+            "predicted": "innocent",
+            "count": 2
+          },
+          {
+            "actual": "average",
+            "predicted": "latebloomer",
+            "count": 25
+          },
+          {
+            "actual": "average",
+            "predicted": "resilience",
+            "count": 30
+          },
+          {
+            "actual": "average",
+            "predicted": "slowstarter",
+            "count": 22
+          },
+          {
+            "actual": "average",
+            "predicted": "struggling",
+            "count": 13
+          },
+          {
+            "actual": "average",
+            "predicted": "unlucky",
+            "count": 22
+          },
+          {
+            "actual": "average",
+            "predicted": "unstoppable",
+            "count": 1
+          },
+          {
+            "actual": "average",
+            "predicted": "unyielding",
+            "count": 19
+          },
+          {
+            "actual": "average",
+            "predicted": "victorious",
+            "count": 12
+          },
+          {
+            "actual": "decline",
+            "predicted": "average",
+            "count": 3
+          },
+          {
+            "actual": "decline",
+            "predicted": "decline",
+            "count": 102
+          },
+          {
+            "actual": "decline",
+            "predicted": "latebloomer",
+            "count": 4
+          },
+          {
+            "actual": "decline",
+            "predicted": "resilience",
+            "count": 1
+          },
+          {
+            "actual": "decline",
+            "predicted": "slowstarter",
+            "count": 25
+          },
+          {
+            "actual": "decline",
+            "predicted": "struggling",
+            "count": 58
+          },
+          {
+            "actual": "decline",
+            "predicted": "unlucky",
+            "count": 19
+          },
+          {
+            "actual": "decline",
+            "predicted": "unyielding",
+            "count": 10
+          },
+          {
+            "actual": "decline",
+            "predicted": "victorious",
+            "count": 3
+          },
+          {
+            "actual": "dedication",
+            "predicted": "average",
+            "count": 2
+          },
+          {
+            "actual": "dedication",
+            "predicted": "decline",
+            "count": 5
+          },
+          {
+            "actual": "dedication",
+            "predicted": "latebloomer",
+            "count": 5
+          },
+          {
+            "actual": "dedication",
+            "predicted": "resilience",
+            "count": 2
+          },
+          {
+            "actual": "dedication",
+            "predicted": "victorious",
+            "count": 2
+          },
+          {
+            "actual": "innocent",
+            "predicted": "innocent",
+            "count": 7
+          },
+          {
+            "actual": "innocent",
+            "predicted": "slowstarter",
+            "count": 1
+          },
+          {
+            "actual": "innocent",
+            "predicted": "unlucky",
+            "count": 6
+          },
+          {
+            "actual": "innocent",
+            "predicted": "unyielding",
+            "count": 1
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "average",
+            "count": 15
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "decline",
+            "count": 4
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "latebloomer",
+            "count": 79
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "leader",
+            "count": 1
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "resilience",
+            "count": 58
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "unstoppable",
+            "count": 2
+          },
+          {
+            "actual": "latebloomer",
+            "predicted": "victorious",
+            "count": 20
+          },
+          {
+            "actual": "leader",
+            "predicted": "average",
+            "count": 11
+          },
+          {
+            "actual": "leader",
+            "predicted": "decline",
+            "count": 10
+          },
+          {
+            "actual": "leader",
+            "predicted": "latebloomer",
+            "count": 18
+          },
+          {
+            "actual": "leader",
+            "predicted": "resilience",
+            "count": 3
+          },
+          {
+            "actual": "leader",
+            "predicted": "unstoppable",
+            "count": 20
+          },
+          {
+            "actual": "leader",
+            "predicted": "victorious",
+            "count": 39
+          },
+          {
+            "actual": "resilience",
+            "predicted": "average",
+            "count": 49
+          },
+          {
+            "actual": "resilience",
+            "predicted": "decline",
+            "count": 6
+          },
+          {
+            "actual": "resilience",
+            "predicted": "latebloomer",
+            "count": 42
+          },
+          {
+            "actual": "resilience",
+            "predicted": "resilience",
+            "count": 206
+          },
+          {
+            "actual": "resilience",
+            "predicted": "rollercoaster",
+            "count": 3
+          },
+          {
+            "actual": "resilience",
+            "predicted": "victorious",
+            "count": 21
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "average",
+            "count": 8
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "decline",
+            "count": 5
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "innocent",
+            "count": 1
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "latebloomer",
+            "count": 8
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "resilience",
+            "count": 4
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "slowstarter",
+            "count": 18
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "struggling",
+            "count": 8
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "unlucky",
+            "count": 8
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "unyielding",
+            "count": 5
+          },
+          {
+            "actual": "rollercoaster",
+            "predicted": "victorious",
+            "count": 20
+          },
+          {
+            "actual": "slowstarter",
+            "predicted": "slowstarter",
+            "count": 2
+          },
+          {
+            "actual": "slowstarter",
+            "predicted": "unlucky",
+            "count": 3
+          },
+          {
+            "actual": "slowstarter",
+            "predicted": "unyielding",
+            "count": 2
+          },
+          {
+            "actual": "struggling",
+            "predicted": "average",
+            "count": 10
+          },
+          {
+            "actual": "struggling",
+            "predicted": "decline",
+            "count": 83
+          },
+          {
+            "actual": "struggling",
+            "predicted": "dedication",
+            "count": 1
+          },
+          {
+            "actual": "struggling",
+            "predicted": "latebloomer",
+            "count": 6
+          },
+          {
+            "actual": "struggling",
+            "predicted": "resilience",
+            "count": 12
+          },
+          {
+            "actual": "struggling",
+            "predicted": "rollercoaster",
+            "count": 1
+          },
+          {
+            "actual": "struggling",
+            "predicted": "slowstarter",
+            "count": 157
+          },
+          {
+            "actual": "struggling",
+            "predicted": "struggling",
+            "count": 132
+          },
+          {
+            "actual": "struggling",
+            "predicted": "unlucky",
+            "count": 8
+          },
+          {
+            "actual": "struggling",
+            "predicted": "unyielding",
+            "count": 153
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "average",
+            "count": 7
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "decline",
+            "count": 29
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "innocent",
+            "count": 29
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "slowstarter",
+            "count": 66
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "struggling",
+            "count": 31
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "unlucky",
+            "count": 190
+          },
+          {
+            "actual": "unlucky",
+            "predicted": "unyielding",
+            "count": 10
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "average",
+            "count": 21
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "decline",
+            "count": 16
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "latebloomer",
+            "count": 107
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "leader",
+            "count": 2
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "resilience",
+            "count": 12
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "rollercoaster",
+            "count": 1
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "unstoppable",
+            "count": 146
+          },
+          {
+            "actual": "unstoppable",
+            "predicted": "victorious",
+            "count": 186
+          },
+          {
+            "actual": "unyielding",
+            "predicted": "decline",
+            "count": 6
+          },
+          {
+            "actual": "unyielding",
+            "predicted": "innocent",
+            "count": 1
+          },
+          {
+            "actual": "unyielding",
+            "predicted": "slowstarter",
+            "count": 45
+          },
+          {
+            "actual": "unyielding",
+            "predicted": "struggling",
+            "count": 46
+          },
+          {
+            "actual": "unyielding",
+            "predicted": "unlucky",
+            "count": 13
+          },
+          {
+            "actual": "unyielding",
+            "predicted": "unyielding",
+            "count": 114
+          },
+          {
+            "actual": "victorious",
+            "predicted": "average",
+            "count": 17
+          },
+          {
+            "actual": "victorious",
+            "predicted": "decline",
+            "count": 29
+          },
+          {
+            "actual": "victorious",
+            "predicted": "latebloomer",
+            "count": 27
+          },
+          {
+            "actual": "victorious",
+            "predicted": "resilience",
+            "count": 7
+          },
+          {
+            "actual": "victorious",
+            "predicted": "unstoppable",
+            "count": 21
+          },
+          {
+            "actual": "victorious",
+            "predicted": "victorious",
+            "count": 84
+          }
+        ],
+        "disableBelow40Percent": [
+          "leader",
+          "victorious",
+          "latebloomer",
+          "dedication",
+          "average",
+          "rollercoaster",
+          "decline",
+          "innocent",
+          "slowstarter",
+          "unyielding"
+        ]
+      }
+    }
+  },
+  "paired": {
+    "mvp": {
+      "bothCorrect": 211,
+      "onlyV2Correct": 6,
+      "onlyV21Correct": 22,
+      "bothWrong": 61
+    },
+    "svp": {
+      "bothCorrect": 205,
+      "onlyV2Correct": 9,
+      "onlyV21Correct": 24,
+      "bothWrong": 62
+    }
+  },
+  "adoptionRules": {
+    "MVP_not_lower": true,
+    "SVP_plus_2pp": true,
+    "rho_decline_at_most_001": true,
+    "ordinary_MVP_decline_at_most_2pp": true
+  },
+  "adoptV21": true,
+  "keywordConsistencyDefinition": "precision = correct / predictions; disable individual keyword below 40%; do not tune thresholds on this holdout"
+}

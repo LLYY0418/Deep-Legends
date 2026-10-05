@@ -141,7 +141,7 @@ function compile(names, dependencies = {}, script = source) {
   }
   dependencies = { readSetting: (_key, fallback) => fallback, recordItemSetClientDiagnostic: () => {}, document: { hidden: false }, setTimeout, clearTimeout, riotTab: tab => tab?.region === "kr", isARAMRelatedMatch: () => false, isSummonersRiftMatch: data => Number(data?.mapId) === 11, clusterPremadePlayers: players => players, window: {}, ...dependencies };
   const keys = Object.keys(dependencies);
-  return Function(...keys, `"use strict";\n${names.map((name) => functionSource(script, name)).join("\n")}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
+  return Function(...keys, `"use strict";\n${require("./r220-harness-support.cjs").prelude(script,dependencies)}${names.map((name) => functionSource(script, name)).join("\n")}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
 }
 
 

@@ -130,6 +130,24 @@ func marshalSeasonStatsWithinBudget(cache seasonStatsCache) ([]byte, seasonStats
 	report.Truncated = true
 	report.Steps = append(report.Steps, "augment_samples_dropped")
 
+	// R216: table opponent detail may be trimmed; hero/overall totals survive.
+	for limit := 20; limit >= 0; limit /= 2 {
+		seasonTrimChampionTable(&trimmed, limit)
+		data, err = json.Marshal(trimmed)
+		if err != nil {
+			report.MarshalErr = err
+			return nil, report
+		}
+		if len(data) <= seasonStatsFileBudgetBytes {
+			report.Truncated = true
+			report.Steps = append(report.Steps, "champion_opponents_trimmed")
+			report.WrittenBytes = len(data)
+			return data, report
+		}
+		if limit == 0 {
+			break
+		}
+	}
 	// 第 3 级：可截断项已用尽。Stats 与 GameIDs 一律不动，照原样写入。
 	data, err = json.Marshal(trimmed)
 	if err != nil {

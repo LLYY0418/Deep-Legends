@@ -42,7 +42,7 @@ func (p *riotProvider) cachedPublicIdentityTTL(ctx context.Context, identity str
 	if p.identityDisk == nil {
 		return loader(ctx)
 	}
-	key := riotIdentityKey(identity)
+	key := p.identityKey(identity)
 	result, err := p.identityDisk.loadWithResultTTL(ctx, key, ttl, 0, true, resultTTL, func(ctx context.Context) ([]byte, error) {
 		if err := loader(ctx); err != nil {
 			return nil, err
@@ -53,4 +53,8 @@ func (p *riotProvider) cachedPublicIdentityTTL(ctx context.Context, identity str
 		return err
 	}
 	return json.Unmarshal(result.data, out)
+}
+
+func (p *riotProvider) identityKey(identity string) string {
+	return riotIdentityKey(identity + "|platform:" + p.region())
 }

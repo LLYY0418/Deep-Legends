@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {JSDOM}=require('../../desktop/node_modules/jsdom');
 const {compile:compileSource,extract}=require('./r188-harness.cjs');
 // The shared lightweight extractor does not parse comment apostrophes.
-const compile=(source,names,deps)=>compileSource(source.replace(/^[ \t]*\/\/.*$/gm,''),names,deps);
+const compile=(source,names,deps)=>compileSource(source.replace(/^[ \t]*\/\/.*$/gm,''),names,{recordLiveProgressApply:()=>{},...deps});
 const app=fs.readFileSync(path.join(__dirname,'app.js'),'utf8'),gameplay=fs.readFileSync(path.join(__dirname,'gameplay.js'),'utf8'),html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
 test('R204 Key input is masked and save/clear immediately update status without echo',async()=>{
  const dom=new JSDOM(html);const doc=dom.window.document;const el={};for(const [key,id]of Object.entries({settingRiotKeyInput:'setting-riot-key-input',settingRiotKeyState:'setting-riot-key-state',settingRiotKeySave:'setting-riot-key-save',settingRiotKeyClear:'setting-riot-key-clear',settingRiotKeyReveal:'setting-riot-key-reveal'}))el[key]=doc.getElementById(id);
@@ -43,18 +43,20 @@ test('R204 missing/invalid Key renders only its title and working settings navig
   assert.equal(h.w.document.activeElement.id,'setting-riot-key-input');assert.equal(h.w.document.querySelector('[data-settings-page="privacy"]').hidden,false);
  }finally{h.close();}
 });
-test('R204 same-game pending incremental rows retain known history during background refresh',()=>{
+test('R204 same-game background progress waits for the complete response',()=>{
  const old={playerRef:'opaque',historyState:'ok',recentGames:[{gameId:1}],modeStats:{games:10}};
- const state={liveLoading:true,liveProgressRequestId:'current',liveExpectedGameId:204,beacon:{phase:'ChampSelect'},live:{gameId:204,queueId:440,players:[old]}};
- const f=compile(gameplay,['applyLivePlayerProgress','liveGamePhase'],{state,connected:()=>true,liveSnapshotBehindPhase:()=>false,normalizeLiveGameId:n=>Number(n)||0,renderLive(){}});
- assert(f.applyLivePlayerProgress({requestId:'current',live:{available:true,phase:'ChampSelect',gameId:204,queueId:440,players:[{playerRef:'opaque',historyState:'pending'}]}}));assert.equal(state.live.players[0].recentGames,old.recentGames);assert.equal(state.live.players[0].historyState,'ok');
+ const previous={available:true,gameId:204,queueId:440,players:[old]};
+ const state={liveLoading:true,liveProgressRequestId:'current',liveExpectedGameId:204,beacon:{phase:'ChampSelect'},live:previous};
+ const f=compile(gameplay,['applyLivePlayerProgress','liveGamePhase'],{state,connected:()=>true,liveSnapshotBehindPhase:()=>false,normalizeLiveGameId:n=>Number(n)||0,renderLive(){assert.fail('background progress rendered');}});
+ assert.equal(f.applyLivePlayerProgress({requestId:'current',live:{available:true,phase:'ChampSelect',gameId:204,queueId:440,players:[{playerRef:'opaque',historyState:'pending'}]}}),false);
+ assert.equal(state.live,previous);assert.equal(state.live.players[0].recentGames,old.recentGames);assert.equal(state.live.players[0].historyState,'ok');
 });
 
-test('R204 pending progress does not reuse history across unknown games or changed identity scope',()=>{
- for(const change of [{gameId:0},{queueId:420},{playerRef:'other'},{hidden:true},{privateHistory:true},{identityUnresolved:true}]){
+test('R204 first-load progress never reuses history from another game, queue or identity',()=>{
+ for(const change of [{gameId:0},{gameId:205},{queueId:420},{playerRef:'other'},{hidden:true},{privateHistory:true},{identityUnresolved:true}]){
   const old={playerRef:'opaque',historyState:'ok',recentGames:[{gameId:1}]};
-  const gameId=change.gameId===0?0:204;
-  const state={liveLoading:true,liveProgressRequestId:'current',liveExpectedGameId:gameId,beacon:{phase:'ChampSelect'},live:{gameId,queueId:440,players:[old]}};
+  const gameId=change.gameId??204;
+  const state={liveLoading:true,liveAwaitingGame:true,liveProgressRequestId:'current',liveExpectedGameId:gameId,beacon:{phase:'ChampSelect'},live:{available:true,gameId:204,queueId:440,players:[old]}};
   const f=compile(gameplay,['applyLivePlayerProgress','liveGamePhase','normalizeLiveGameId'],{state,connected:()=>true,liveSnapshotBehindPhase:()=>false,renderLive(){}});
   const player={playerRef:'opaque',historyState:'pending'};
   for(const field of ['playerRef','hidden','privateHistory','identityUnresolved'])if(field in change)player[field]=change[field];

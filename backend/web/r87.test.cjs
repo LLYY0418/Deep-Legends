@@ -15,6 +15,7 @@ function extract(source, name) {
 }
 function compile(file, names, deps = {}, mutation = s => s) {
   const source = mutation(read(file));
+  if (file === "gameplay.js") names = require("./r211-harness-support.cjs").expand(source, names, deps);
   const context = { updateLiveLoadingVisibility() {}, ...deps };
   vm.runInNewContext(names.map(n => extract(source, n)).join('\n') + `\nObject.assign(globalThis,{${names.join(',')}});`, context);
   return context;
@@ -72,12 +73,12 @@ test('R87 participants become dirty, inactive players stay off network, retry is
   const self = { current: true, data: { matches: [{ gameId: 1 }] } }, other = { playerRef: "peer", data: { matches: [{ gameId: 2 }] } };
   const state = { section: 'overview', tabs: [self, other], live:{players:[{playerRef:'peer'}]} }; let active = self;
   const h = compile('gameplay.js', ['markOverviewAfterGame', 'scheduleDirtyOverview'], { ...timer, state, riotTab:()=>false, document: { hidden: false }, connected: () => true,
-    activeTab: () => active, loadOverview: async (tab, force) => { assert.equal(force, true); calls.push(tab); return true; } });
+    window: {}, activeTab: () => active, loadOverview: async (tab, force) => { assert.equal(force, true); calls.push(tab); return true; } });
   h.markOverviewAfterGame('WaitingForStats'); h.markOverviewAfterGame('PreEndOfGame'); h.markOverviewAfterGame('EndOfGame');
-  assert.equal(other.dirty, true); assert.equal(other.dirtyTimer, undefined); assert.equal(calls.length, 0);
+  assert.equal(other.dirty, true); assert.equal(other.dirtyTimer, 0); assert.equal(calls.length, 0);
   await timer.advance(6999); assert.equal(calls.length, 0);
-  await timer.advance(1); await timer.advance(8000); await timer.advance(8000); await timer.advance(60000);
-  assert.equal(calls.length, 3); assert.ok(calls.every(tab => tab === self));
+  await timer.advance(1); await timer.advance(15000); await timer.advance(30000); await timer.advance(60000); await timer.advance(120000);
+  assert.equal(calls.length, 5); assert.equal(self.dirty, false); assert.ok(calls.every(tab => tab === self));
   active = other; h.scheduleDirtyOverview(other); await timer.advance(0);
   assert.equal(calls.at(-1), other);
 });

@@ -549,7 +549,7 @@ func convertYourGGArenaMatch(raw yourGGArenaMatch, champions map[string]champion
 	if subject.CSPerMinute <= 0 {
 		subject.CSPerMinute = perMinute(subject.CS, raw.GameTime)
 	}
-	subject.Gold, subject.Damage, subject.DamageTaken = raw.Me.Gold, raw.Me.Damage, raw.Me.DamageTaken
+	subject.Gold, subject.Damage, subject.DamageTaken = raw.Me.Gold, raw.Me.Damage, &raw.Me.DamageTaken
 	subject.WardsPlaced, subject.WardsKilled = raw.Me.WardPlaced, raw.Me.WardKills
 	for _, item := range raw.Me.Items {
 		if item.ID > 0 {
@@ -577,7 +577,9 @@ func convertYourGGArenaMatch(raw yourGGArenaMatch, champions map[string]champion
 		team.Kills += participant.Kills
 		team.Gold += participant.Gold
 		team.Damage += participant.Damage
-		team.DamageTaken += participant.DamageTaken
+		if participant.DamageTaken != nil {
+			team.DamageTaken += *participant.DamageTaken
+		}
 		team.VisionScore += participant.VisionScore
 		team.CS += participant.CS
 		teamByID[participant.SubteamID] = team

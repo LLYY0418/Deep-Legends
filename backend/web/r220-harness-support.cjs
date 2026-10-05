@@ -1,0 +1,9 @@
+'use strict';
+// Focused legacy harnesses need the actual platform helpers introduced by R220.
+const {extract} = require('./r188-harness.cjs');
+function prelude(source, dependencies = {}) {
+  const constants = ['RIOT_REGIONS','RIOT_REGION_LABELS'].map(name => source.match(new RegExp(`const ${name} = [^\\n]+`))?.[0] || '').join('\n');
+  const helpers = ['riotRegion','clientRegion','isRiotSearchRegion','practicePlayerPosition','livePositionValue','livePositionDisplay'].filter(name => !dependencies[name] && source.includes(`function ${name}(`)).map(name => extract(source,name)).join('\n');
+  return constants+'\nlet searchClientPlatform = "";\n'+helpers+'\n';
+}
+module.exports={prelude};

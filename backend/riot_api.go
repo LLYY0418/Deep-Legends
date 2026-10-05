@@ -109,12 +109,8 @@ func riotKey() string {
 }
 
 const (
-	riotRegionKR = "kr"
-	// Riot ID 解析与 Match-V5 战绩使用大区集群主机（韩服属于 asia）；
-	// 召唤师资料、段位、熟练度使用具体平台主机。
-	riotClusterHost  = "asia.api.riotgames.com"
-	riotPlatformHost = "kr.api.riotgames.com"
-	riotResponseMax  = 4 << 20
+	riotRegionKR    = "kr"
+	riotResponseMax = 4 << 20
 	// 对局时间线包含逐帧事件（击杀伤害明细等），体积远大于常规接口。
 	riotTimelineResponseMax = 16 << 20
 	riotMatchCacheMax       = 600
@@ -145,6 +141,9 @@ type riotMatchFlight struct {
 }
 
 type riotProvider struct {
+	platform         string
+	platformMu       sync.Mutex
+	platforms        map[string]*riotProvider
 	matchDisk        *championDataCache
 	identityDisk     *championDataCache
 	matchConcurrency int
@@ -454,7 +453,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			if err != nil {
 				return err
 			}
-			if err := riotRelays.requestErrorFor(host, requestPath); err != nil {
+			if err := riotRelays.requestErrorFor(host, requestPath, p.region()); err != nil {
 				return err
 			}
 		}
@@ -464,6 +463,9 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 		if err != nil {
 			return err
+		}
+		if source == "relay" {
+			request.Header.Set("X-Riot-Platform", p.region())
 		}
 		if source != "relay" {
 			request.Header.Set("X-Riot-Token", key)
@@ -478,12 +480,12 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		// A different player/provider may have discovered a shared cooldown
 		// while this request was waiting for admission. Recheck before I/O.
 		if source == "relay" {
-			if err := riotRelays.requestErrorFor(host, requestPath); err != nil {
+			if err := riotRelays.requestErrorFor(host, requestPath, p.region()); err != nil {
 				return err
 			}
 		}
 		tracker := riotOverviewCostTrackerFromContext(ctx)
-		isDetail := host == riotClusterHost && strings.HasPrefix(requestPath, "/lol/match/v5/matches/KR_") && !strings.HasSuffix(requestPath, "/timeline")
+		isDetail := host == p.clusterHost() && strings.HasPrefix(requestPath, "/lol/match/v5/matches/"+strings.ToUpper(p.region())+"_") && !strings.HasSuffix(requestPath, "/timeline")
 		if isDetail {
 			tracker.detailInFlight(1)
 		}
@@ -496,14 +498,14 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		if err != nil {
 			p.observeRiotRate(scope, nil, 0)
 			if source == "relay" {
-				riotRelays.recordRequest("network", 0, p.champions.diag)
+				riotRelays.recordRequest("network", 0, riotRelayRequestCategory(requestPath), p.champions.diag)
 			}
 			if isDetail {
 				tracker.detailInFlight(-1)
 			}
 			if source == "relay" && ctx.Err() == nil {
 				riotRelays.failed(relay)
-				return errRiotRelayUnavailable
+				return fmt.Errorf("%w: %w", errRiotRelayUnavailable, err)
 			}
 			if source == "relay" {
 				return ctx.Err()
@@ -525,12 +527,16 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		if source == "relay" {
 			failure := ""
 			switch {
+			// Preserve R208 quota-page detection before normal Riot status
+			// classification: an HTML/1027 relay page is not a Riot 404.
 			case riotRelayQuotaResponse(response.Header, body):
 				failure = "quota_exhausted"
 			case readErr != nil:
 				failure = "read"
 			case response.StatusCode == http.StatusOK && !json.Valid(body):
 				failure = "invalid_json"
+			case response.StatusCode == http.StatusNotFound:
+				failure = "not_found"
 			case response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden:
 				failure = "auth"
 			case response.StatusCode >= 500:
@@ -538,7 +544,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			case response.StatusCode >= 400 && response.StatusCode != http.StatusTooManyRequests:
 				failure = "http"
 			}
-			riotRelays.recordRequest(failure, response.StatusCode, p.champions.diag)
+			riotRelays.recordRequest(failure, response.StatusCode, riotRelayRequestCategory(requestPath), p.champions.diag)
 			if failure == "quota_exhausted" {
 				riotRelays.quotaExhausted(relay)
 				if p.champions.diag != nil {
@@ -584,7 +590,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 				var seconds int
 				cooldown, seconds = riotRelayCooldown(response.Header)
 				retryAfter = time.Duration(seconds) * time.Second
-				riotRelays.observeCooldown(host, requestPath, cooldown, seconds)
+				riotRelays.observeCooldown(host, requestPath, cooldown, seconds, p.region())
 			}
 			rioTracker := riotOverviewCostTrackerFromContext(ctx)
 			rioTracker.recordRateLimit()
@@ -685,12 +691,7 @@ type riotLeagueEntry struct {
 	Losses       int    `json:"losses"`
 }
 
-type riotMasteryEntry struct {
-	ChampionID     int64 `json:"championId"`
-	ChampionLevel  int64 `json:"championLevel"`
-	ChampionPoints int64 `json:"championPoints"`
-	LastPlayTime   int64 `json:"lastPlayTime"`
-}
+type riotMasteryEntry = ChampionMastery
 
 type riotPerkSelections struct {
 	Description string `json:"description"`
@@ -704,6 +705,7 @@ type riotPerkSelections struct {
 }
 
 type riotParticipant struct {
+	scoreMissing   map[string]bool
 	ParticipantID  int64  `json:"participantId"`
 	TeamID         int64  `json:"teamId"`
 	PUUID          string `json:"puuid"`
@@ -716,33 +718,48 @@ type riotParticipant struct {
 	Summoner1ID    int64  `json:"summoner1Id"`
 	Summoner2ID    int64  `json:"summoner2Id"`
 	// 国服 SGP 的 SUMMARY 在部分版本沿用旧字段名；兼容两种响应。
-	Spell1ID                    int64  `json:"spell1Id"`
-	Spell2ID                    int64  `json:"spell2Id"`
-	Item0                       int64  `json:"item0"`
-	Item1                       int64  `json:"item1"`
-	Item2                       int64  `json:"item2"`
-	Item3                       int64  `json:"item3"`
-	Item4                       int64  `json:"item4"`
-	Item5                       int64  `json:"item5"`
-	Item6                       int64  `json:"item6"`
-	TeamPosition                string `json:"teamPosition"`
-	IndividualPosition          string `json:"individualPosition"`
-	Kills                       int    `json:"kills"`
-	Deaths                      int    `json:"deaths"`
-	Assists                     int    `json:"assists"`
-	TotalMinionsKilled          int    `json:"totalMinionsKilled"`
-	NeutralMinionsKilled        int    `json:"neutralMinionsKilled"`
-	GoldEarned                  int    `json:"goldEarned"`
-	TotalDamageDealtToChampions int    `json:"totalDamageDealtToChampions"`
-	TotalDamageTaken            int    `json:"totalDamageTaken"`
-	VisionScore                 int    `json:"visionScore"`
-	WardsPlaced                 int    `json:"wardsPlaced"`
-	WardsKilled                 int    `json:"wardsKilled"`
-	VisionWardsBoughtInGame     *int   `json:"visionWardsBoughtInGame"`
-	GameEndedInEarlySurrender   bool   `json:"gameEndedInEarlySurrender"`
-	GameEndedInSurrender        bool   `json:"gameEndedInSurrender"`
-	Win                         bool   `json:"win"`
-	LargestMultiKill            int    `json:"largestMultiKill"`
+	Spell1ID                       int64  `json:"spell1Id"`
+	Spell2ID                       int64  `json:"spell2Id"`
+	Item0                          int64  `json:"item0"`
+	Item1                          int64  `json:"item1"`
+	Item2                          int64  `json:"item2"`
+	Item3                          int64  `json:"item3"`
+	Item4                          int64  `json:"item4"`
+	Item5                          int64  `json:"item5"`
+	Item6                          int64  `json:"item6"`
+	TeamPosition                   string `json:"teamPosition"`
+	IndividualPosition             string `json:"individualPosition"`
+	Kills                          int    `json:"kills"`
+	Deaths                         int    `json:"deaths"`
+	Assists                        int    `json:"assists"`
+	TotalMinionsKilled             int    `json:"totalMinionsKilled"`
+	NeutralMinionsKilled           int    `json:"neutralMinionsKilled"`
+	GoldEarned                     int    `json:"goldEarned"`
+	TotalDamageDealtToChampions    int    `json:"totalDamageDealtToChampions"`
+	TotalDamageTaken               *int   `json:"totalDamageTaken"`
+	VisionScore                    int    `json:"visionScore"`
+	WardsPlaced                    int    `json:"wardsPlaced"`
+	WardsKilled                    int    `json:"wardsKilled"`
+	DamageSelfMitigated            *int   `json:"damageSelfMitigated"`
+	TotalHealsOnTeammates          *int   `json:"totalHealsOnTeammates"`
+	TotalDamageShieldedOnTeammates *int   `json:"totalDamageShieldedOnTeammates"`
+	TimeCCingOthers                *int   `json:"timeCCingOthers"`
+	DamageDealtToBuildings         *int   `json:"damageDealtToBuildings"`
+	TurretTakedowns                *int   `json:"turretTakedowns"`
+	DoubleKills                    *int   `json:"doubleKills"`
+	TripleKills                    *int   `json:"tripleKills"`
+	QuadraKills                    *int   `json:"quadraKills"`
+	PentaKills                     *int   `json:"pentaKills"`
+	Challenges                     struct {
+		DragonTakedowns     *int `json:"dragonTakedowns"`
+		BaronTakedowns      *int `json:"baronTakedowns"`
+		RiftHeraldTakedowns *int `json:"riftHeraldTakedowns"`
+	} `json:"challenges"`
+	VisionWardsBoughtInGame   *int `json:"visionWardsBoughtInGame"`
+	GameEndedInEarlySurrender bool `json:"gameEndedInEarlySurrender"`
+	GameEndedInSurrender      bool `json:"gameEndedInSurrender"`
+	Win                       bool `json:"win"`
+	LargestMultiKill          int  `json:"largestMultiKill"`
 	// 斗魂竞技场：多支小队同场，playerSubteamId 标记所属小队，
 	// subteamPlacement 是该小队的最终名次。
 	PlayerSubteamID  int64 `json:"playerSubteamId"`
@@ -866,7 +883,7 @@ func (p *riotProvider) fetchAccountByRiotID(ctx context.Context, gameName, tagLi
 	var account riotAccount
 	path := "/riot/account/v1/accounts/by-riot-id/" + url.PathEscape(gameName) + "/" + url.PathEscape(tagLine)
 	err := p.cachedPublicIdentity(ctx, "account:"+strings.ToLower(gameName+"#"+tagLine), 15*time.Minute, &account, func(ctx context.Context) error {
-		if err := p.get(ctx, riotClusterHost, path, nil, &account); err != nil {
+		if err := p.get(ctx, p.accountHost(), path, nil, &account); err != nil {
 			return err
 		}
 		if account.PUUID == "" {
@@ -881,7 +898,7 @@ func (p *riotProvider) fetchAccountByRiotID(ctx context.Context, gameName, tagLi
 func (p *riotProvider) fetchAccountByPUUID(ctx context.Context, puuid string) (riotAccount, error) {
 	var account riotAccount
 	err := p.cachedPublicIdentity(ctx, "account-by-puuid:"+puuid, 6*time.Hour, &account, func(ctx context.Context) error {
-		if err := p.get(ctx, riotClusterHost, "/riot/account/v1/accounts/by-puuid/"+url.PathEscape(puuid), nil, &account); err != nil {
+		if err := p.get(ctx, p.accountHost(), "/riot/account/v1/accounts/by-puuid/"+url.PathEscape(puuid), nil, &account); err != nil {
 			return err
 		}
 		if account.PUUID != puuid || account.GameName == "" || account.TagLine == "" {
@@ -895,7 +912,7 @@ func (p *riotProvider) fetchAccountByPUUID(ctx context.Context, puuid string) (r
 func (p *riotProvider) summonerByPUUID(ctx context.Context, puuid string) (riotSummoner, error) {
 	var summoner riotSummoner
 	err := p.cachedPublicIdentity(ctx, "summoner:"+puuid, 5*time.Minute, &summoner, func(ctx context.Context) error {
-		return p.get(ctx, riotPlatformHost, "/lol/summoner/v4/summoners/by-puuid/"+url.PathEscape(puuid), nil, &summoner)
+		return p.get(ctx, p.platformHost(), "/lol/summoner/v4/summoners/by-puuid/"+url.PathEscape(puuid), nil, &summoner)
 	})
 	return summoner, err
 }
@@ -903,7 +920,7 @@ func (p *riotProvider) summonerByPUUID(ctx context.Context, puuid string) (riotS
 func (p *riotProvider) leagueEntries(ctx context.Context, puuid string) ([]riotLeagueEntry, error) {
 	var entries []riotLeagueEntry
 	err := p.cachedPublicIdentity(ctx, "ranks:"+puuid, 3*time.Minute, &entries, func(ctx context.Context) error {
-		err := p.get(ctx, riotPlatformHost, "/lol/league/v4/entries/by-puuid/"+url.PathEscape(puuid), nil, &entries)
+		err := p.get(ctx, p.platformHost(), "/lol/league/v4/entries/by-puuid/"+url.PathEscape(puuid), nil, &entries)
 		if err == nil {
 			p.observeProSeedRank(puuid, entries)
 		}
@@ -916,7 +933,7 @@ func (p *riotProvider) topMasteries(ctx context.Context, puuid string, count int
 	var entries []riotMasteryEntry
 	query := url.Values{"count": {strconv.Itoa(count)}}
 	err := p.cachedPublicIdentity(ctx, "mastery:"+puuid+"|"+query.Encode(), 30*time.Minute, &entries, func(ctx context.Context) error {
-		return p.get(ctx, riotPlatformHost, "/lol/champion-mastery/v4/champion-masteries/by-puuid/"+url.PathEscape(puuid)+"/top", query, &entries)
+		return p.get(ctx, p.platformHost(), "/lol/champion-mastery/v4/champion-masteries/by-puuid/"+url.PathEscape(puuid)+"/top", query, &entries)
 	})
 	return entries, err
 }
@@ -934,9 +951,14 @@ func (p *riotProvider) matchIDsFiltered(ctx context.Context, puuid string, start
 	if strings.TrimSpace(matchType) != "" {
 		query.Set("type", strings.TrimSpace(matchType))
 	}
-	err := p.cachedPublicIdentity(ctx, "matchIDs:"+puuid+"|"+query.Encode(), time.Minute, &ids, func(ctx context.Context) error {
-		return p.get(ctx, riotClusterHost, "/lol/match/v5/matches/by-puuid/"+url.PathEscape(puuid)+"/ids", query, &ids)
-	})
+	load := func(ctx context.Context) error {
+		return p.get(ctx, p.clusterHost(), "/lol/match/v5/matches/by-puuid/"+url.PathEscape(puuid)+"/ids", query, &ids)
+	}
+	if overviewFreshHistory(ctx) {
+		err := load(ctx)
+		return ids, err
+	}
+	err := p.cachedPublicIdentity(ctx, "matchIDs:"+puuid+"|"+query.Encode(), time.Minute, &ids, load)
 	return ids, err
 }
 
@@ -1004,22 +1026,15 @@ func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID strin
 	}()
 	var match riotMatch
 	status = "miss"
-	key := "riot-match-v2|" + matchID
+	key := "riot-match-v4|" + matchID
 	if p.matchDisk != nil && validRiotMatchID(matchID) {
 		if entry, err := p.matchDisk.readDisk(key); err == nil && time.Now().Before(entry.ExpiresAt) && json.Unmarshal(entry.Data, &match) == nil && match.Metadata.MatchID == matchID && len(match.Info.Participants) > 0 {
 			status = "disk"
 		}
 	}
-	if status != "disk" && !refresh && p.matchDisk != nil && validRiotMatchID(matchID) {
-		match = riotMatch{}
-		if entry, err := p.matchDisk.readDisk("riot-match-v1|" + matchID); err == nil && time.Now().Before(entry.ExpiresAt) && json.Unmarshal(entry.Data, &match) == nil && match.Metadata.MatchID == matchID && len(match.Info.Participants) > 0 {
-			status = "disk"
-			match.Info.PerkStatsStale = true
-		}
-	}
 	if status != "disk" {
 		match = riotMatch{}
-		if err := p.get(ctx, riotClusterHost, "/lol/match/v5/matches/"+url.PathEscape(matchID), nil, &match); err != nil {
+		if err := p.get(ctx, p.clusterHost(), "/lol/match/v5/matches/"+url.PathEscape(matchID), nil, &match); err != nil {
 			return nil, "miss", err
 		}
 		if match.Metadata.MatchID == "" || len(match.Info.Participants) == 0 {
@@ -1039,7 +1054,7 @@ func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID strin
 // 韩服对局的 matchID 由 "KR_" + gameId 构成。
 func (p *riotProvider) matchTimeline(ctx context.Context, matchID string) ([]timelineFrame, error) {
 	var timeline lcuGameTimeline
-	if err := p.getLimited(ctx, riotClusterHost, "/lol/match/v5/matches/"+url.PathEscape(matchID)+"/timeline", nil, &timeline, riotTimelineResponseMax); err != nil {
+	if err := p.getLimited(ctx, p.clusterHost(), "/lol/match/v5/matches/"+url.PathEscape(matchID)+"/timeline", nil, &timeline, riotTimelineResponseMax); err != nil {
 		return nil, err
 	}
 	frames := timeline.frames()
@@ -1235,7 +1250,11 @@ func riotConvertMatch(match *riotMatch, subjectPUUID string, names map[int64]str
 	if len(catalogs) > 0 {
 		labels = catalogs[0]
 	}
-	return convertRiotMatchInfo(&match.Info, subjectPUUID, names, labels, riotRegionKR, "")
+	region := riotPlatform(strings.SplitN(match.Metadata.MatchID, "_", 2)[0])
+	if region == "" {
+		region = riotRegionKR
+	}
+	return convertRiotMatchInfo(&match.Info, subjectPUUID, names, labels, region, "")
 }
 
 // convertRiotMatchInfo 把 Match-V5 风格的对局转换为界面模型；region 标注
@@ -1338,7 +1357,18 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 			Gold: raw.GoldEarned, Damage: raw.TotalDamageDealtToChampions, DamageTaken: raw.TotalDamageTaken,
 			VisionScore: raw.VisionScore, WardsPlaced: raw.WardsPlaced, WardsKilled: raw.WardsKilled,
 			ControlWardsBought: raw.VisionWardsBoughtInGame,
-			Win:                raw.Win, Hidden: hidden, MultiKill: raw.LargestMultiKill,
+			Win:                raw.Win, Hidden: hidden, MultiKill: raw.LargestMultiKill, scoreMissing: raw.scoreMissing,
+			DamageSelfMitigated:            raw.DamageSelfMitigated,
+			TotalHealsOnTeammates:          raw.TotalHealsOnTeammates,
+			TotalDamageShieldedOnTeammates: raw.TotalDamageShieldedOnTeammates,
+			TimeCCingOthers:                raw.TimeCCingOthers,
+			DamageDealtToBuildings:         raw.DamageDealtToBuildings,
+			TurretTakedowns:                raw.TurretTakedowns,
+			DoubleKills:                    raw.DoubleKills,
+			TripleKills:                    raw.TripleKills,
+			QuadraKills:                    raw.QuadraKills,
+			PentaKills:                     raw.PentaKills,
+			DragonTakedowns:                raw.Challenges.DragonTakedowns, BaronTakedowns: raw.Challenges.BaronTakedowns, RiftHeraldTakedowns: raw.Challenges.RiftHeraldTakedowns,
 			SubteamID: raw.PlayerSubteamID, Placement: raw.SubteamPlacement, AugmentIDs: augments, reference: reference,
 		}
 		result.Participants = append(result.Participants, participant)
@@ -1370,7 +1400,9 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 		team.Kills += participant.Kills
 		team.Gold += participant.Gold
 		team.Damage += participant.Damage
-		team.DamageTaken += participant.DamageTaken
+		if participant.DamageTaken != nil {
+			team.DamageTaken += *participant.DamageTaken
+		}
 		team.VisionScore += participant.VisionScore
 		team.CS += participant.CS
 		teamByID[participant.TeamID] = team
@@ -1379,6 +1411,7 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 		result.Teams = append(result.Teams, team)
 	}
 	sort.Slice(result.Teams, func(i, j int) bool { return result.Teams[i].TeamID < result.Teams[j].TeamID })
+	applyMatchScores(&result)
 	return result
 }
 
@@ -1399,7 +1432,8 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	if a.riot == nil {
 		return gameplayOverview{}, errors.New("Riot 查询通道未初始化")
 	}
-	provider := a.riot
+	provider := a.riot.forPlatform(reference.Region)
+	ctx = withRiotPlatform(ctx, provider.region())
 	ctx = withRiotSingleWaitLimit(ctx, 5*time.Second)
 	started := time.Now()
 	tracker := &riotOverviewCostTracker{}
@@ -1453,7 +1487,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 				return gameplayOverview{}, riotNotFoundError("没有找到玩家「%s」：请补全 # 后的编号，或核对名称拼写", gameName)
 			}
 			tracker.recordAccountFailure(err)
-			return gameplayOverview{}, riotNotFoundError("没有找到 Riot ID「%s#%s」：编号可能不对（并非所有玩家都是 KR1），请核对后重试", gameName, tagLine)
+			return gameplayOverview{}, riotNotFoundError("没有找到 Riot ID「%s#%s」：编号可能不对，请核对后重试", gameName, tagLine)
 		}
 		if err != nil {
 			tracker.recordAccountFailure(err)
@@ -1502,6 +1536,9 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		defer identityReads.Done()
 		started := time.Now()
 		ids, idsErr = provider.matchIDsForOverview(ctx, puuid, begIndex, count, matchFilter)
+		if idsErr == nil && begIndex == 0 && matchFilter == "all" {
+			recordOverviewAllHistory(ctx, ids)
+		}
 		phases.markSpan("matchIDs", started, time.Now())
 	}()
 	// Ranks/masteries need only the resolved account, not the match ID list.
@@ -1534,7 +1571,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		}()
 	}
 	identityReads.Wait()
-	reference = mergeGameplayReferences(gameplayReference{PlayerRef: puuid, GameName: gameName, TagLine: tagLine, Region: riotRegionKR}, reference)
+	reference = mergeGameplayReferences(gameplayReference{PlayerRef: puuid, GameName: gameName, TagLine: tagLine, Region: provider.region()}, reference)
 	err := idsErr
 	if err != nil && !errors.Is(err, errRiotNotFound) {
 		return gameplayOverview{}, err
@@ -1543,11 +1580,11 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	if begIndex == 0 {
 		if !strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE") {
 			started := time.Now()
-			historicalRanks = a.cachedOPGGHistoricalRanks(puuid)
+			historicalRanks = a.cachedOPGGHistoricalRanks(puuid, provider.region())
 			a.startOPGGHistoricalRanks(reference, gameName, tagLine, puuid, reference.Privacy)
 			// R127 P1-c.4：与总览并行预热 OP.GG 对局列表，平均段位不再等卡片
 			// 渲染完、滚动到可见才开始取（那一次要 1.5–3.6 秒）。
-			a.startOPGGGameTiers(gameName, tagLine, puuid)
+			a.startOPGGGameTiers(gameName, tagLine, puuid, provider.region())
 			phases.markSpan("opgg-historical", started, time.Now())
 		}
 	}
@@ -1569,7 +1606,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		loadMu.Lock()
 		ready := append([]*riotMatch(nil), details...)
 		loadMu.Unlock()
-		partial := gameplayOverview{Player: gameplayPlayer{PlayerRef: puuid, DisplayName: gameName, GameName: gameName, TagLine: tagLine, ProfileIconID: reference.ProfileIconID, SummonerLevel: reference.SummonerLevel, Region: riotRegionKR, reference: reference}, Pagination: riotOverviewPagination(begIndex, len(ids), count, matchFilter)}
+		partial := gameplayOverview{Player: gameplayPlayer{PlayerRef: puuid, DisplayName: gameName, GameName: gameName, TagLine: tagLine, ProfileIconID: reference.ProfileIconID, SummonerLevel: reference.SummonerLevel, Region: provider.region(), reference: reference}, Pagination: riotOverviewPagination(begIndex, len(ids), count, matchFilter)}
 		partial.Matches = make([]gameplayMatch, 0, len(ready))
 		partial.ProfilePending = true
 		select {
@@ -1597,6 +1634,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			if detail != nil {
 				a.checkArenaRiotMatchTruth(detail)
 				match := riotConvertMatch(detail, puuid, names, queueLabels)
+				a.recordMatchScores("riot", match)
 				if !isCustomGameplayMatch(match) {
 					partial.Matches = append(partial.Matches, match)
 				}
@@ -1662,7 +1700,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	profileWait.Wait()
 	publishPartial() // Flush metadata even when the final frame becomes an error.
 	if errors.Is(summonerErr, errRiotNotFound) {
-		return gameplayOverview{}, riotNotFoundError("「%s#%s」不在韩服（该 Riot ID 属于其他大区）", gameName, tagLine)
+		return gameplayOverview{}, riotNotFoundError("「%s#%s」不在%s（该 Riot ID 属于其他大区）", gameName, tagLine, riotRegionLabel(provider.region()))
 	}
 	if summonerErr != nil {
 		return gameplayOverview{}, summonerErr
@@ -1676,6 +1714,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		}
 		a.checkArenaRiotMatchTruth(detail)
 		match := riotConvertMatch(detail, puuid, names, queueLabels)
+		a.recordMatchScores("riot", match)
 		a.recordDiagnostic(riotMatchItemsDiagnostic(match))
 		a.recordDiagnostic(map[string]any{"event": "riot_match_mode", "queue_id": detail.Info.QueueID, "game_mode": detail.Info.GameMode, "queue_label": match.QueueLabel})
 		if !isCustomGameplayMatch(match) {
@@ -1711,7 +1750,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		Player: gameplayPlayer{
 			PlayerRef: puuid, DisplayName: gameName, GameName: gameName, TagLine: tagLine,
 			ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel,
-			Region: riotRegionKR, Hidden: gameName == "", PrivateHistory: strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE"),
+			Region: provider.region(), Hidden: gameName == "", PrivateHistory: strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE"),
 			IsCurrent: false, reference: reference,
 		},
 		Matches:      matches,
@@ -1756,13 +1795,13 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	// Never crawl a KR season in the background: it shares the foreground Riot budget.
 	response.SeasonStatsProgress = seasonStatsProgress{Unavailable: true, Message: "近期战绩样本（非本赛季汇总）"}
 	response.Positions = positionStats(matches, puuid)
-	response.Ability = buildGameplayAbilityProfile(matches, puuid, ranks, riotRegionKR)
+	response.Ability = buildGameplayAbilityProfile(matches, puuid, ranks, provider.region())
 	// 韩服路径没有海克斯大乱斗队列（ARAMKit 只收录国服），所以只产出
 	// 单双排 / 灵活组排两个页签，行为与 R116-E 之前一致。
 	response.RankedQueues = buildGameplayRankedQueues([]gameplayRankedQueueTab{
 		{Key: "420", Label: rankedQueueLabel(seasonQueueSoloDuo), QueueIDs: []int64{seasonQueueSoloDuo}, Matches: recentRankedMatchesForQueue(matches, 420, defaultMatchCount)},
 		{Key: "440", Label: rankedQueueLabel(seasonQueueFlex), QueueIDs: []int64{seasonQueueFlex}, Matches: recentRankedMatchesForQueue(matches, 440, defaultMatchCount)},
-	}, puuid, ranks, riotRegionKR)
+	}, puuid, ranks, provider.region())
 	response.ActivityHours = activityHours(matches)
 	response.RecentPlayers = recentPlayers(matches, puuid, recentWindowAfter)
 	a.publicizeOverviewReferences(&response)
@@ -1787,7 +1826,7 @@ func (a *app) opggResolveRiotID(ctx context.Context, gameName string) (riotAccou
 	}
 	searchCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	body, err := json.Marshal([]map[string]string{{"region": "kr", "value": gameName, "locale": "zh-cn"}})
+	body, err := json.Marshal([]map[string]string{{"region": opggPlatform(riotContextPlatform(ctx)), "value": gameName, "locale": "zh-cn"}})
 	if err != nil {
 		return riotAccount{}, false
 	}

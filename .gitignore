@@ -59,3 +59,7 @@ riot_key.local.*
 /backend/backend
 /backend/backend.exe
 /Claude outputs/
+
+# R220：校准采集原始数据不入库
+docs/history/reports/*/opgg-*/
+docs/history/reports/*/account-selection/

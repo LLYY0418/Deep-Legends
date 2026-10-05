@@ -1,0 +1,146 @@
+{
+  "removedAt": "2026-10-05T09:08:03.287884+00:00",
+  "paths": [
+    {
+      "path": "docs/history/reports/r211/opgg-samples",
+      "exists": false,
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "docs/history/reports/r211/opgg-validation-new-accounts",
+      "exists": false,
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "docs/history/reports/r216/opgg-holdout",
+      "exists": false,
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "docs/history/reports/r217/opgg-holdout",
+      "exists": false,
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "docs/history/reports/r216/account-selection",
+      "exists": false,
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "docs/history/reports/r217/account-selection",
+      "exists": false,
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "docs/history/reports/r217/training-curves.json",
+      "exists": false,
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "docs/history/reports/r217/training-selected-go.json",
+      "exists": false,
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "docs/history/reports/r217/mode-interval-probe",
+      "exists": false,
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "scripts/r211-refine-calibration.py",
+      "exists": false,
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "scripts/r211-refine-official-calibration.py",
+      "exists": false,
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "scripts/r211-evaluate-new-accounts.py",
+      "exists": false,
+      "files": 0,
+      "bytes": 0
+    }
+  ],
+  "bytesDeleted": 1055661585,
+  "preservedManifests": [
+    {
+      "original": "docs/history/reports/r216/opgg-holdout/manifest-sha256.json",
+      "retained": "docs/history/reports/r216/opgg-holdout-manifest-sha256.json",
+      "bytes": 137441,
+      "sha256": "232ead1a63d388571c3152c28e1b50f7f7862e200eb6abf829a84aec59c50f71"
+    },
+    {
+      "original": "docs/history/reports/r217/opgg-holdout/manifest-sha256.json",
+      "retained": "docs/history/reports/r217/opgg-holdout-manifest-sha256.json",
+      "bytes": 95146,
+      "sha256": "dacb2ba0c0eb837d09bead124bb3e0687f6b89feee2369f869f7432af344d146"
+    }
+  ],
+  "remainingByReportDirectory": [
+    {
+      "path": "docs/history/reports/r211",
+      "files": 45,
+      "bytes": 4727188
+    },
+    {
+      "path": "docs/history/reports/r216",
+      "files": 25,
+      "bytes": 10407128
+    },
+    {
+      "path": "docs/history/reports/r217",
+      "files": 22,
+      "bytes": 2528570
+    }
+  ],
+  "newSkippedTests": [
+    "TestR216PythonV21GoldenConsistency260",
+    "TestR216PythonV2MigrationConsistency260"
+  ],
+  "existingSkippedTests": [
+    "Test1945LivePublicSources",
+    "Test2135LivePublicCurrentGame",
+    "TestCapturedChampionItemDepthPages",
+    "TestOPGGSeasonSummaryObservedResponse",
+    "TestOPGGUserReportCapture",
+    "TestOverviewCurrentGamePublicProbe",
+    "TestParseMayhemRSCRealFixture",
+    "TestProCapturedDirectory",
+    "TestProCapturedLadder",
+    "TestProCapturedSupplements",
+    "TestProRuneLiveCaptureReplay",
+    "TestProRuneLiveIndex",
+    "TestProRuneLiveSupplementLatency",
+    "TestR106LiveProfileBatch",
+    "TestR107LiveImagesWithoutClient",
+    "TestR107LiveProfileActivityBatch",
+    "TestR112FullPublicCapture",
+    "TestR216HistoricalKeywordDump",
+    "TestR216ScoreDump",
+    "TestR217KeywordDump",
+    "TestR73CapturedTeamGateAudit",
+    "TestR92LiveBackground",
+    "TestR92LiveProDirectory",
+    "TestR92LivePublicDiagnosis"
+  ],
+  "requiredGoldenAndEvidenceTestsPassed": [
+    "TestR216LegacyV2JSGolden20",
+    "TestR216OPGGChampionTableObservedPage",
+    "TestR216V21GameplayGolden20",
+    "TestR216V21ProductionFrozenParams",
+    "TestR217LookupCoversAllFrozenCombinationsAndRejectsUnseen"
+  ]
+}

@@ -75,9 +75,11 @@ type LCUClient struct {
 	source                string
 	// region 与 rsoPlatform 来自客户端启动参数（例如 TENCENT / HN1），
 	// 用于确定国服玩家所属的 SGP 大区服务器；读取失败时留空。
-	region        string
-	rsoPlatform   string
-	platformProbe bool
+	region            string
+	rsoPlatform       string
+	platformProbe     bool
+	platformSource    string
+	historyRetrySleep func(context.Context, time.Duration) error
 	// inventoryV1Failures remembers a client-version-specific dead endpoint
 	// during this client session so every snapshot retry does not repeat it.
 	inventoryV1Failures int
@@ -611,7 +613,8 @@ func (c *LCUClient) applyPlatformArgs(commandLine string) {
 	if match := rsoPlatformPattern.FindStringSubmatch(commandLine); len(match) == 2 {
 		c.rsoPlatform = strings.ToUpper(match[1])
 	}
-	if c.region != "" {
+	if c.region != "" && c.rsoPlatform != "" {
+		c.platformSource = "startup-args"
 		c.platformProbe = true
 	}
 }
@@ -622,12 +625,15 @@ func (c *LCUClient) platformInfo() (string, string) {
 	c.mu.RLock()
 	region, platform, probed := c.region, c.rsoPlatform, c.platformProbe
 	c.mu.RUnlock()
-	if region != "" || probed {
+	if region != "" && platform != "" || probed {
 		return region, platform
 	}
 	var args []string
 	if err := c.GetJSON("/riotclient/command-line-args", &args); err == nil {
 		c.applyPlatformArgs(strings.Join(args, " "))
+		c.mu.Lock()
+		c.platformSource = "command-line-query"
+		c.mu.Unlock()
 	}
 	c.mu.Lock()
 	c.platformProbe = true

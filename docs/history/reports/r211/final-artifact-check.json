@@ -1,0 +1,16 @@
+{
+  "frozen_candidate_sha_matches": true,
+  "only_once_evaluation": true,
+  "fresh_at_least_100": true,
+  "source_account_overlap_zero": true,
+  "game_overlap_zero": true,
+  "gate_not_relaxed": true,
+  "not_false_completion": true,
+  "exists_score-calibration-report.md": true,
+  "exists_mastery-field-report.md": true,
+  "exists_verification-report.md": true,
+  "exists_go-all.log": true,
+  "exists_go-vet.log": true,
+  "exists_go-race.log": true,
+  "exists_node-all.log": true
+}

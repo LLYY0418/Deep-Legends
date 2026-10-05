@@ -69,29 +69,42 @@ ManifestDPIAware true
 !macroend
 Var pid
 !macro customCheckAppRunning
-  ; A portable parent must survive cancellation/failure. For a fresh migration,
-  ; detect an occupied destination and abort instead of terminating any app.
-  !insertmacro IS_POWERSHELL_AVAILABLE
-  ClearErrors
-  ${GetOptions} $CMDLINE "--portable-upgrade" $R0
-  ${IfNot} ${Errors}
-    !insertmacro FIND_PROCESS "${APP_EXECUTABLE_FILENAME}" $R0
-    ${If} $R0 == 0
-      SetErrorLevel 2
-      Abort "The destination is still in use"
-    ${EndIf}
-  ${Else}
-    ClearErrors
-    ${GetOptions} $CMDLINE "--parent-exited" $R0
-    StrCpy $R1 "0"
-    ${IfNot} ${Errors}
-    ${AndIf} ${isUpdated}
+  StrCpy $R1 "0"
+  !ifdef BUILD_UNINSTALLER
+    ; The new installer has already waited for the old process before invoking
+    ; an updated uninstaller. Manual uninstall retains its process checks.
+    ${If} ${isUpdated}
       StrCpy $R1 "1"
     ${EndIf}
-    ${If} $R1 != "1"
-      !insertmacro _CHECK_APP_RUNNING
+  !endif
+  ${If} $R1 != "1"
+    ClearErrors
+    ${GetOptions} $CMDLINE "--portable-upgrade" $R0
+    ${IfNot} ${Errors}
+      ; A portable parent must survive cancellation/failure. Check only the
+      ; destination, without terminating a running parent.
+      !insertmacro IS_POWERSHELL_AVAILABLE
+      !insertmacro FIND_PROCESS "${APP_EXECUTABLE_FILENAME}" $R0
+      ${If} $R0 == 0
+        SetErrorLevel 2
+        Abort "The destination is still in use"
+      ${EndIf}
+    ${Else}
+      ClearErrors
+      ${GetOptions} $CMDLINE "--parent-exited" $R0
+      ${IfNot} ${Errors}
+      ${AndIf} ${isUpdated}
+        StrCpy $R1 "1"
+      ${EndIf}
+      ${If} $R1 != "1"
+        !insertmacro IS_POWERSHELL_AVAILABLE
+        !insertmacro _CHECK_APP_RUNNING
+      ${EndIf}
     ${EndIf}
   ${EndIf}
+  !ifndef BUILD_UNINSTALLER
+    !insertmacro DLUpdateTiming check_done
+  !endif
 !macroend
 
 !define MUI_ABORTWARNING

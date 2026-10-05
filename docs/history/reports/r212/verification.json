@@ -1,0 +1,46 @@
+{
+  "baseline_version": "0.12.71",
+  "build_performed": false,
+  "release_performed": false,
+  "node_full": {
+    "tests": 1186,
+    "passed": 1185,
+    "failed": 0,
+    "skipped": 1,
+    "duration_ms": 252596.146834,
+    "log": "node-final.log"
+  },
+  "go_backend_full": {
+    "result": "PASS",
+    "duration_seconds": 266.692,
+    "log": "go-full.log"
+  },
+  "go_backend_final_regression": {
+    "result": "PASS",
+    "duration_seconds": 1.31,
+    "log": "go-targeted-final.log"
+  },
+  "installer_full": {
+    "result": "PASS",
+    "log": "installer-final.log"
+  },
+  "vet": {
+    "backend": "PASS",
+    "installer": "PASS"
+  },
+  "race": {
+    "backend_R212_R208": "PASS",
+    "installer_R212": "PASS"
+  },
+  "mutations": {
+    "payload_after_wait": "assertion FAIL as required",
+    "unconditional_powershell": "assertion FAIL as required"
+  },
+  "archive": {
+    "worklists": 15,
+    "ledgers": 15,
+    "missing_links": 0
+  },
+  "windows_upgrade_timing": "deferred: user explicitly prohibited build/release",
+  "version_incremented": false
+}

@@ -198,6 +198,7 @@ func (a *app) waitForDiscovery(ctx context.Context, delay time.Duration) bool {
 func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error {
 	sessionCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	a.goSafe("connection_manager.platform", func() { a.recordDiagnostic(clientPlatformDiagnostic(client)) })
 	a.beginGameSettingsWatch(sessionCtx, client)
 	requestDiagnosticTicker := time.NewTicker(30 * time.Second)
 	defer requestDiagnosticTicker.Stop()

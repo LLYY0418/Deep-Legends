@@ -252,7 +252,10 @@ func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUCli
 		cache.invalidatePlayer(playerRef)
 	}
 	serverID = strings.ToUpper(strings.TrimSpace(serverID))
-	useRiot := serverID == "KR" && a.riot != nil && validPlayerReference(playerRef)
+	if !isCurrent && serverID == "" {
+		serverID = strings.ToUpper(clientRiotPlatform(client))
+	}
+	useRiot := isRiotRegion(serverID) && a.riot != nil && validPlayerReference(playerRef)
 	preferredSource := dataSourceRiot
 	cacheScope := ""
 	if tierScope {
@@ -325,7 +328,12 @@ func (a *app) loadPlayerRankScoreEntry(ctx context.Context, client *LCUClient, p
 	var milestones *gameplayRankMilestones
 	var capability EndpointCapability
 	if useRiot {
-		ranks, capability = a.riot.loadRiotRanks(ctx, playerRef)
+		ranks, capability = a.riot.forPlatform(serverID).loadRiotRanks(ctx, playerRef)
+		if capability.State != capabilityAvailable && ctx.Err() == nil && client != nil && riotPlatform(serverID) == clientRiotPlatform(client) {
+			riotFailure := capability.Detail
+			ranks, milestones, capability, _ = a.loadGameplayRanksContext(ctx, client, playerRef, isCurrent)
+			capability.Attempts = []DataSourceAttempt{{Source: dataSourceRiot, Outcome: dataSourceFailed, Message: riotFailure}, {Source: dataSourceLCU, Outcome: map[bool]string{true: dataSourceSuccess, false: dataSourceFailed}[capability.State == capabilityAvailable]}}
+		}
 	} else {
 		ranks, milestones, capability = a.loadRanksWithFallback(ctx, client, playerRef, isCurrent, serverID, privacy, tierScope)
 	}
@@ -452,8 +460,8 @@ func (a *app) handleGameplayMatchTiers(w http.ResponseWriter, r *http.Request) {
 	}
 	region := strings.ToLower(strings.TrimSpace(request.Region))
 	if region != "" || len(request.Matches) > 0 {
-		if region != riotRegionKR {
-			http.Error(w, "仅支持韩服批量段位查询", http.StatusBadRequest)
+		if !isRiotRegion(region) {
+			http.Error(w, "查询区服无效", http.StatusBadRequest)
 			return
 		}
 		a.handleRiotMatchTiers(w, r, request)
@@ -488,7 +496,7 @@ func (a *app) handleGameplayMatchTiers(w http.ResponseWriter, r *http.Request) {
 	for _, publicRef := range request.PlayerRefs {
 		reference, ok := a.resolveGameplayReferenceDetails(publicRef)
 		// 韩服玩家来自 Riot 接口，本机客户端查不到，直接跳过。
-		if !ok || strings.EqualFold(reference.Region, riotRegionKR) || seen[reference.PlayerRef] {
+		if !ok || isRiotRegion(reference.Region) || seen[reference.PlayerRef] {
 			continue
 		}
 		serverID := reference.ServerID
@@ -554,7 +562,7 @@ func (a *app) handleRiotMatchTiers(w http.ResponseWriter, r *http.Request, reque
 		return
 	}
 	reference, ok := a.resolveGameplayReferenceDetails(request.PlayerRef)
-	if !ok || !strings.EqualFold(reference.Region, riotRegionKR) {
+	if !ok || !isRiotRegion(reference.Region) || riotPlatform(request.Region) != riotPlatform(reference.Region) {
 		http.Error(w, "玩家引用无效或已过期", http.StatusNotFound)
 		return
 	}
@@ -567,7 +575,7 @@ func (a *app) handleRiotMatchTiers(w http.ResponseWriter, r *http.Request, reque
 		tagLine = strings.TrimSpace(request.TagLine)
 	}
 	if gameName == "" || tagLine == "" {
-		http.Error(w, "韩服玩家的 Riot ID 不完整", http.StatusBadRequest)
+		http.Error(w, "玩家的 Riot ID 不完整", http.StatusBadRequest)
 		return
 	}
 
@@ -598,7 +606,7 @@ func (a *app) handleRiotMatchTiers(w http.ResponseWriter, r *http.Request, reque
 	}
 	// R127 P1-c.3：先吃 7 天长期缓存。命中的对局一个 OP.GG 请求都不用发，
 	// 重开同一个韩服玩家时平均段位是立即显示的。
-	cached, pending, cacheHits := a.splitCachedMatchTiers(matches)
+	cached, pending, cacheHits := a.splitCachedMatchTiers(matches, reference.Region)
 	for key, value := range cached {
 		response[key] = value
 	}
@@ -614,7 +622,7 @@ func (a *app) handleRiotMatchTiers(w http.ResponseWriter, r *http.Request, reque
 
 	ctx, cancel := context.WithTimeout(r.Context(), matchTiersOPGGTimeout)
 	defer cancel()
-	games, err := a.opggGameTiers(ctx, gameName, tagLine, reference.PlayerRef, oldest)
+	games, err := a.opggGameTiers(withRiotPlatform(ctx, reference.Region), gameName, tagLine, reference.PlayerRef, oldest)
 	if err != nil {
 		w.Header().Set("Retry-After", "30")
 		http.Error(w, "平均段位来源暂不可用，请稍后重试", http.StatusServiceUnavailable)
@@ -643,7 +651,7 @@ func (a *app) handleRiotMatchTiers(w http.ResponseWriter, r *http.Request, reque
 		if result.tier != nil {
 			response[strconv.FormatInt(match.GameID, 10)] = result.tier
 			// 已结束的对局平均段位不会再变，落盘 7 天，重开时不再取 OP.GG 页。
-			a.writeMatchTierCache(match.GameID, result.tier)
+			a.writeMatchTierCache(match.GameID, result.tier, reference.Region)
 			matched++
 			bases[result.bestBase]++
 			continue

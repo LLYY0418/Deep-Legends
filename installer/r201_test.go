@@ -47,7 +47,7 @@ func TestR201NSISTimingRecordsRealStages(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stages map[string]int64
-	if json.Unmarshal(data, &stages) != nil || len(stages) != 8 {
+	if json.Unmarshal(data, &stages) != nil || len(stages) != len(timingStageOrder) {
 		t.Fatal(string(data))
 	}
 	if strings.Contains(string(data), root) {

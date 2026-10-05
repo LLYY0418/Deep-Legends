@@ -237,6 +237,10 @@ type app struct {
 	rankedCompletionClosed              bool
 	recommendationModeDiagnosticMu      sync.Mutex
 	recommendationModeDiagnosticKeys    map[string]struct{}
+	matchTagsMu                         sync.Mutex
+	matchTagInputs                      map[string]matchTagInput
+	matchScoreDiagnosticMu              sync.Mutex
+	matchScoreDiagnosticKeys            map[int64]struct{}
 	matchModeDiagnosticMu               sync.Mutex
 	matchModeDiagnosticKeys             map[int64]struct{}
 	championDataDiagnosticMu            sync.Mutex
@@ -321,6 +325,9 @@ type statusResponse struct {
 	IdentityReady              bool                 `json:"identityReady"`
 	SnapshotReady              bool                 `json:"snapshotReady"`
 	ConnectionState            string               `json:"connectionState"`
+	ClientRegion               string               `json:"clientRegion"`
+	ClientRegionLabel          string               `json:"clientRegionLabel"`
+	ClientDiscovery            string               `json:"clientDiscovery"`
 	EventStream                bool                 `json:"eventStream"`
 	Syncing                    bool                 `json:"syncing"`
 	LastSync                   time.Time            `json:"lastSync,omitempty"`
@@ -563,6 +570,8 @@ func main() {
 	mux.HandleFunc("GET /api/account", a.authorized(a.handleAccount))
 	mux.HandleFunc("GET /api/gameplay/overview", a.authorized(a.handleGameplayOverview))
 	mux.HandleFunc("POST /api/gameplay/overview", a.authorized(a.handleGameplayOverview))
+	mux.HandleFunc("GET /api/gameplay/masteries", a.authorized(a.handleGameplayMasteries))
+	mux.HandleFunc("GET /api/gameplay/champion-table", a.authorized(a.handleGameplayChampionTable))
 	mux.HandleFunc("GET /api/gameplay/live", a.authorized(a.handleGameplayLive))
 	mux.HandleFunc("GET /api/gameplay/mayhem-rating", a.authorized(a.handleGameplayMayhemRating))
 	// R116-E P2-6：本人海克斯大乱斗「选了某个海克斯之后通常出什么」静态查询。
@@ -802,8 +811,18 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	backgroundID, backgroundName, backgroundSource, backgroundPath := profileBackground(a.account.Profile)
 	summoner := publicSummoner{DisplayName: a.summoner.DisplayName, GameName: a.summoner.GameName, TagLine: a.summoner.TagLine, ProfileIconID: a.summoner.ProfileIconID, SummonerLevel: a.summoner.SummonerLevel, BackgroundSkinID: backgroundID, BackgroundSkinName: backgroundName, BackgroundSource: backgroundSource, BackgroundPath: backgroundPath}
 	summoner.BackgroundPosterPath, summoner.BackgroundVideoPath = overviewSkinMedia(a.allSkins, backgroundID)
+	clientDiscovery := a.discovery.Result
+	switch clientDiscovery {
+	case "process-not-found", "process-query-failed", "credentials-unreadable", "probe-failed", "connected":
+	default:
+		clientDiscovery = ""
+	}
+	if a.connected {
+		clientDiscovery = "connected"
+	}
 	response := statusResponse{
-		Version: version, BuildFingerprint: buildFingerprint, Connected: a.connected, IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
+		ClientDiscovery: clientDiscovery,
+		Version:         version, BuildFingerprint: buildFingerprint, Connected: a.connected, IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
 		Syncing: a.syncing, LastSync: a.lastSync, LastAttempt: a.lastAttempt, LastDurationMS: a.lastDuration.Milliseconds(),
 		LastError: a.lastError, Summoner: summoner, OwnedCount: ownedCount, ChromaOwnedCount: ownedChromaCount(a.chromas), PoolTotal: a.poolTotal,
 		PoolMatched: a.poolMatched, Remaining: remainingCount, CalculationOK: a.calculationOKLocked(),
@@ -829,6 +848,7 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	}
 	response.Update = a.updates.Status()
 	if response.Connected {
+		response.ClientRegion, response.ClientRegionLabel = clientRegionInfo(client)
 		response.ServerID = clientTencentServerID(client)
 		response.ServerName = tencentServerName(response.ServerID)
 	}

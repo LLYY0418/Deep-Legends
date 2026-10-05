@@ -178,8 +178,8 @@ func TestSeasonStatsAggregateRanksOnlyAndOmitsPUUID(t *testing.T) {
 
 func TestSeasonStatsChampionKDAUsesPerGameAndWeightedOverall(t *testing.T) {
 	stats := map[int64]*gameplaySeasonChampionStat{
-		1: {ChampionID: 1, Games: 2, Wins: 1, Kills: 10, Deaths: 4, Assists: 6},
-		2: {ChampionID: 2, Games: 1, Wins: 1, Kills: 10, Deaths: 2, Assists: 5},
+		1: {ChampionID: 1, Games: 2, Wins: 1, TotalKills: 10, TotalDeaths: 4, TotalAssists: 6},
+		2: {ChampionID: 2, Games: 1, Wins: 1, TotalKills: 10, TotalDeaths: 2, TotalAssists: 5},
 	}
 	rows := seasonStatsFinalize(stats, nil)
 	if rows[0].Kills != 5 || rows[1].Kills != 10 {
@@ -202,7 +202,7 @@ func TestSeasonStatsAccumulateUsesRequestedPlayerReference(t *testing.T) {
 			{PUUID: requestedRef, ChampionID: 13, Win: false, Kills: 2, Deaths: 5, Assists: 4},
 		},
 	}, requestedRef, seasonStartS26.UnixMilli())
-	if len(stats) != 1 || stats[13] == nil || stats[13].Games != 1 || stats[13].Wins != 0 || stats[13].Kills != 2 {
+	if len(stats) != 1 || stats[13] == nil || stats[13].Games != 1 || stats[13].Wins != 0 || stats[13].TotalKills != 2 {
 		t.Fatalf("season stats did not isolate the requested non-current player: %#v", stats)
 	}
 	if _, leaked := stats[1]; leaked || queueStats[440].Games != 1 || queueStats[440].Wins != 0 {
@@ -494,12 +494,12 @@ func TestSeasonRecordRankedMatchMirrorsMayhemCriteriaAndRecordsAugmentSample(t *
 // P0 判据 2：schema 升版后旧缓存必须触发重扫（失效逻辑在 loadSeasonStats）。
 // 工单原文要求 7→8；并行 R117 会话已经占用了 8（K/D/A 改逐场均值），
 // 所以本轮实际是 8→9，用户已裁决顺延。
-func TestSeasonStatsSchemaVersionIsNineAndRejectsEveryOlderFile(t *testing.T) {
-	if seasonStatsCacheSchemaVersion != 9 {
-		t.Fatalf("seasonStatsCacheSchemaVersion = %d, want 9", seasonStatsCacheSchemaVersion)
+func TestSeasonStatsSchemaVersionIsTwelveV21AndRejectsEveryOlderFile(t *testing.T) {
+	if seasonStatsCacheSchemaVersion != 12 {
+		t.Fatalf("seasonStatsCacheSchemaVersion = %d, want 12", seasonStatsCacheSchemaVersion)
 	}
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
-	for _, old := range []int{7, 8} {
+	for _, old := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11} {
 		cache := seasonStatsCache{SchemaVersion: old, Source: seasonStatsSource, Season: "S26", AccountHash: "account"}
 		if err := store.saveSeasonStats(cache); err != nil {
 			t.Fatal(err)

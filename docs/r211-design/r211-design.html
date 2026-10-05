@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>R211 设计稿</title>
+<style>
+/* 设计稿：沿用 app.css dark 主题 token（用户截图里的金色主题）。
+   其他主题只换 --primary / --primary-strong / --primary-soft；标签色板是独立 token，不随主题变。
+   英雄头像、熟练度徽章均为占位图形，实现时换成真实资源。 */
+:root{
+  --bg:#0B0E14;--surface:#131822;--surface-strong:#1A2130;--ink:#E8EAF0;--muted:#8B93A6;--faint:#667085;
+  --primary:#D9A441;--primary-strong:#F0BE5C;--primary-soft:#2A2312;--accent:#5B9BD9;--line:#242D3D;
+  --success:#4CAF7D;--danger:#E05C5C;--win:#5B9BD9;--loss:#E05C5C;
+  --medal-gold-start:#F2CB5C;--medal-gold-end:#D9A441;--medal-silver-start:#E3E7EE;--medal-silver-end:#A9B2C1;
+  --tooltip-surface:#0D1118;
+  /* —— 标签色板（P2）—— */
+  --tag-unstoppable:#E5484D;--tag-leader:#E8A13A;--tag-victorious:#F06AA8;--tag-dedication:#2EB8A6;
+  --tag-latebloomer:#6CC04A;--tag-resilience:#8F6CF2;--tag-average:#7A8396;--tag-rollercoaster:#F2803A;
+  --tag-decline:#A0703F;--tag-struggling:#59617A;--tag-innocent:#3B9EFF;--tag-unlucky:#C85FD6;
+  --tag-slowstarter:#34B6D9;--tag-unyielding:#E0C341;
+  --mk-double:#C2410C;--mk-triple:#DC2626;--mk-quadra:#BE185D;--mk-penta-a:#F59E0B;--mk-penta-b:#DC2626;
+  --tag-deathless:#4CAF7D;
+  --streak-win-a:#FFB547;--streak-win-b:#FF5A36;--streak-loss-a:#7FA4D6;--streak-loss-b:#4A607F;
+  --font:"Segoe UI Variable","Segoe UI","Microsoft YaHei UI","PingFang SC","Noto Sans CJK SC",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:28px;background:#070A0F;color:var(--ink);font:13px/1.45 var(--font)}
+.sheet{display:grid;gap:34px;max-width:1240px;margin:0 auto}
+h1{margin:0 0 4px;font-size:20px}
+.lead{margin:0;color:var(--faint);font-size:12px}
+.frame-title{display:flex;align-items:baseline;gap:12px;margin:0 0 10px}
+.frame-title b{font-size:15px}
+.frame-title span{color:var(--faint);font-size:12px}
+.ptag{display:inline-block;padding:1px 7px;border-radius:5px;background:var(--primary-soft);color:var(--primary-strong);font-size:11px;font-weight:700;margin-right:6px}
+.note{margin:10px 2px 0;color:var(--faint);font-size:11.5px;line-height:1.65}
+.note b{color:var(--muted)}
+.row{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.label-w{color:var(--faint);font-size:11px;margin:0 0 6px}
+
+/* 通用占位头像 */
+.champ{display:inline-grid;place-items:center;flex:0 0 auto;border-radius:8px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgb(0 0 0/.5);overflow:hidden}
+.c36{width:36px;height:36px;font-size:14px}.c32{width:32px;height:32px;font-size:13px}.c30{width:30px;height:30px;font-size:12px}
+.c40{width:40px;height:40px;font-size:15px}.c28{width:28px;height:28px;font-size:11px}.c22{width:22px;height:22px;font-size:10px;border-radius:5px}.c72{width:72px;height:72px;font-size:24px;border-radius:12px}
+
+/* ---------- 共用：标签 ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.chip{display:inline-flex;min-height:20px;align-items:center;padding:1px 7px;border-radius:6px;font-size:11px;font-weight:800;line-height:1;letter-spacing:.3px;white-space:nowrap}
+/* 评价类：MVP / SVP / 名次 */
+.chip.mvp{color:#1B1405;background:linear-gradient(120deg,var(--medal-gold-start),var(--medal-gold-end))}
+.chip.svp{color:#ECEFFA;background:linear-gradient(120deg,#7E8BD9,#5667BE)}
+.chip.rank{color:var(--muted);background:var(--surface-strong);border:1px solid var(--line)}
+.chip.rank.r2{color:#171C22;background:linear-gradient(120deg,var(--medal-silver-start),var(--medal-silver-end));border-color:transparent}
+.chip.rank.r3{color:#1E1206;background:linear-gradient(120deg,#E3A06B,#B36A35);border-color:transparent}
+/* 多杀类：实心 */
+.chip.mk{color:#fff}
+.chip.mk.double{background:var(--mk-double)}.chip.mk.triple{background:var(--mk-triple)}.chip.mk.quadra{background:var(--mk-quadra)}
+.chip.mk.penta{background:linear-gradient(110deg,var(--mk-penta-a),var(--mk-penta-b));box-shadow:0 0 10px rgb(245 158 11/.35)}
+.chip.deathless{color:var(--tag-deathless);background:color-mix(in oklab,var(--tag-deathless) 16%,transparent);border:1px solid color-mix(in oklab,var(--tag-deathless) 45%,transparent)}
+/* 关键词类：浅底 + 同色字 + 细边 */
+.chip.kw{--c:var(--tag-average);color:color-mix(in oklab,var(--c) 82%,white);background:color-mix(in oklab,var(--c) 17%,transparent);border:1px solid color-mix(in oklab,var(--c) 50%,transparent)}
+.kw.unstoppable{--c:var(--tag-unstoppable)}.kw.leader{--c:var(--tag-leader)}.kw.victorious{--c:var(--tag-victorious)}.kw.dedication{--c:var(--tag-dedication)}
+.kw.latebloomer{--c:var(--tag-latebloomer)}.kw.resilience{--c:var(--tag-resilience)}.kw.average{--c:var(--tag-average)}.kw.rollercoaster{--c:var(--tag-rollercoaster)}
+.kw.decline{--c:var(--tag-decline)}.kw.struggling{--c:var(--tag-struggling)}.kw.innocent{--c:var(--tag-innocent)}.kw.unlucky{--c:var(--tag-unlucky)}
+.kw.slowstarter{--c:var(--tag-slowstarter)}.kw.unyielding{--c:var(--tag-unyielding)}
+
+/* ---------- F1 横幅 ---------- */
+.banner{position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;padding:22px 24px;border-radius:14px;overflow:hidden;
+  background:linear-gradient(100deg,rgb(19 24 34/.96),rgb(19 24 34/.78) 55%,rgb(19 24 34/.6)),radial-gradient(circle at 70% 30%,#5a2a2a,#1a1420 60%);border:1px solid var(--line)}
+.avatar{width:84px;height:84px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#c7a6ff,#5b3aa6 60%,#21173d);box-shadow:0 0 0 3px #2a3245}
+.name-line{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:nowrap}
+.sname{font-size:26px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border-radius:6px;padding:0 4px;margin:0 -4px;transition:background .15s}
+
+.stag{color:var(--muted);font-size:15px;font-weight:600}
+.lvl{margin-top:6px;color:var(--muted);font-size:13px;display:flex;gap:8px;align-items:center}
+.lvl i{font-style:normal;padding:1px 6px;border-radius:4px;background:#2B3346;color:#C9D1E3;font-size:11px}
+.streak{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px 0 6px;border-radius:999px;font-size:12.5px;font-weight:800;white-space:nowrap;flex:0 0 auto}
+.streak svg{width:18px;height:18px;overflow:visible}
+.streak.win{color:#2A0E02;background:linear-gradient(110deg,var(--streak-win-a),var(--streak-win-b));box-shadow:0 0 0 1px rgb(255 140 60/.35),0 0 14px rgb(255 100 40/.35)}
+.streak.loss{color:#E6EEF9;background:linear-gradient(110deg,var(--streak-loss-a),var(--streak-loss-b));box-shadow:0 0 0 1px rgb(127 164 214/.35)}
+.streak.win.hot{box-shadow:0 0 0 1px rgb(255 140 60/.5),0 0 22px rgb(255 90 40/.6)}
+@keyframes flick{0%,100%{transform:scale(1,1) translateY(0)}35%{transform:scale(.92,1.08) translateY(-.6px)}70%{transform:scale(1.05,.95) translateY(.3px)}}
+@keyframes flick2{0%,100%{opacity:.95;transform:scale(1)}50%{opacity:.6;transform:scale(.8)}}
+.flame-outer{transform-origin:50% 90%;animation:flick 1.1s ease-in-out infinite}
+.flame-inner{transform-origin:50% 90%;animation:flick2 .8s ease-in-out infinite}
+@keyframes drop{0%{transform:translateY(-1px);opacity:0}25%{opacity:1}100%{transform:translateY(7px);opacity:0}}
+.rain i{}
+.drop1{animation:drop 1.2s linear infinite}.drop2{animation:drop 1.2s linear .4s infinite}.drop3{animation:drop 1.2s linear .8s infinite}
+@media (prefers-reduced-motion:reduce){.flame-outer,.flame-inner,.drop1,.drop2,.drop3{animation:none}}
+.toast{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:10px;background:var(--tooltip-surface);border:1px solid var(--line);box-shadow:0 10px 30px rgb(0 0 0/.45);font-size:12.5px}
+.toast b{color:var(--primary-strong)}
+.tip{position:relative;display:inline-block;padding:6px 10px;border-radius:8px;background:var(--tooltip-surface);border:1px solid var(--line);font-size:12px;color:var(--ink);box-shadow:0 8px 24px rgb(0 0 0/.45);white-space:nowrap}
+.tip small{display:block;color:var(--muted);font-size:11px}
+.ranks{display:flex;gap:26px;align-items:center;padding-left:18px;border-left:1px solid var(--line)}
+.ranks div{text-align:center;font-size:11px;color:var(--muted)}
+.ranks b{display:block;color:var(--ink);font-size:12px}
+.crest-ph{width:54px;height:54px;margin:0 auto 4px;border-radius:50%;background:radial-gradient(circle,#7fb6ff,#1e3d6e 70%)}
+
+/* ---------- F2 战绩卡 ---------- */
+.mcard{display:grid;grid-template-columns:110px 210px 1fr 300px 34px;gap:14px;align-items:center;padding:10px 12px 10px 14px;border-radius:12px;border-left:4px solid var(--win);background:linear-gradient(90deg,#1A2944,#162238)}
+.mcard.loss{border-left-color:var(--loss);background:linear-gradient(90deg,#3A1E25,#2B1A20)}
+.mmeta b{display:block;color:#7DB2F0;font-size:14px}.mcard.loss .mmeta b{color:#F08A8A}
+.mmeta small{display:block;color:var(--muted);font-size:12px}
+.mmeta .res{margin-top:6px;font-weight:800;color:#7DB2F0}.mcard.loss .mmeta .res{color:#F08A8A}
+.mmain{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center}
+.spells{display:grid;grid-template-columns:repeat(2,20px);gap:3px}
+.spells i{width:20px;height:20px;border-radius:4px;background:#2E3A55}
+.kda b{font-size:18px}.kda b em{font-style:normal;color:#F08A8A}.kda small{display:block;color:var(--muted);font-size:12px}
+.items{grid-column:1/-1;display:flex;gap:3px;align-items:center}
+.items i{width:24px;height:24px;border-radius:5px;background:#2A3550;display:inline-block}
+.items i.t{border-radius:50%}
+.mstats{color:var(--muted);font-size:12px;line-height:1.7}
+.mstats b{color:var(--ink)}
+.mtags{grid-column:1/-1}
+.mplayers{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px;font-size:11.5px;color:#C6CDDB}
+.mplayers span{display:flex;gap:5px;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mplayers .me{color:var(--primary-strong);font-weight:700}
+.mexp{align-self:stretch;display:grid;place-items:end center;padding-bottom:6px;border-radius:0 8px 8px 0;background:rgb(255 255 255/.05);color:var(--muted)}
+.palette{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.pgroup{padding:12px 14px}
+.pgroup h4{margin:0 0 8px;font-size:12.5px;color:var(--muted)}
+.prow{display:grid;grid-template-columns:96px 1fr;gap:8px;align-items:center;padding:4px 0;border-top:1px dashed #20283a;font-size:11.5px;color:var(--faint)}
+.prow:first-of-type{border-top:0}
+.prow>.chip,.prow>.chips{justify-self:start}
+
+/* ---------- F3 构建页切换 ---------- */
+.detail{padding:0 0 12px;border-radius:12px;background:#151B27;border:1px solid var(--line);overflow:hidden}
+.dtabs{display:grid;grid-template-columns:repeat(3,1fr);padding:6px;background:#121722}
+.dtabs span{padding:8px;text-align:center;color:var(--muted);border-radius:8px}
+.dtabs span.on{background:#1C2437;color:var(--ink);font-weight:700}
+.picker{display:flex;align-items:center;justify-content:center;gap:14px;margin:10px 12px 0;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line)}
+.side{display:flex;gap:6px;align-items:center;padding-bottom:5px;border-bottom:2px solid var(--win)}
+.side.red{border-bottom-color:var(--loss)}
+.vs{color:var(--faint);font-size:11px;font-weight:800;letter-spacing:1px}
+.pbtn{position:relative;display:inline-flex;margin:0;padding:2px;font:inherit;border-radius:10px;border:2px solid transparent;background:transparent;cursor:pointer;line-height:0}
+.pbtn .champ{opacity:.62;filter:saturate(.75);transition:opacity .15s}
+.pbtn:hover .champ{opacity:1;filter:none}
+.pbtn.on{border-color:var(--primary)}
+.pbtn.on .champ{opacity:1;filter:none}
+.pbtn.self::after{content:"";position:absolute;right:1px;bottom:1px;width:8px;height:8px;border-radius:50%;background:var(--primary-strong);box-shadow:0 0 0 2px #131822}
+.pbtn .lv{position:absolute;left:3px;bottom:3px;padding:0 3px;border-radius:3px;background:rgb(0 0 0/.75);color:#fff;font-size:9px;font-weight:700;line-height:12px}
+.hover-tip{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);z-index:3;line-height:1.35}
+.hover-tip::after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--line)}
+.dsec{margin:10px 12px 0;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line)}
+.dsec h5{margin:0 0 8px;font-size:13px}
+.route{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:var(--faint)}
+.route i{display:inline-block;width:26px;height:26px;border-radius:5px;background:#2A3550}
+.skills{display:flex;gap:4px}
+.skills span{display:grid;place-items:center;width:24px;height:30px;border-radius:5px;background:#1C2437;border:1px solid var(--line);font-size:11px;font-weight:800;color:#8FB7FF}
+.skills span.r{color:#F08A8A;border-color:#5a2a33}
+.arena-picker{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 10px}
+.pair{display:flex;align-items:center;gap:2px;padding:3px 5px 3px 4px;border-radius:9px;background:var(--surface-strong);border:1px solid var(--line)}
+.pair .pl{display:grid;place-items:center;width:18px;height:18px;border-radius:5px;font-size:10px;font-weight:800;color:#1b1405;background:var(--muted)}
+.pair .pl.p1{background:linear-gradient(120deg,var(--medal-gold-start),var(--medal-gold-end))}
+.pair .pl.p2{background:linear-gradient(120deg,var(--medal-silver-start),var(--medal-silver-end))}
+.pair .pl.p3{background:linear-gradient(120deg,#E3A06B,#B36A35)}
+.pair.mine{border-color:color-mix(in oklab,var(--primary) 55%,var(--line))}
+.narrow{width:560px}
+.wide{width:960px}
+
+/* ---------- F4 卡片头部箭头 ---------- */
+.csec{width:380px;padding:0}
+.csec header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.csec header h3{margin:0;font-size:15px}
+.csec header .tools{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
+.more-btn{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:var(--surface-strong);color:var(--muted);cursor:pointer}
+.more-btn:hover{color:var(--ink);border-color:color-mix(in oklab,var(--primary) 50%,var(--line))}
+.more-btn svg{width:14px;height:14px}
+.crow{display:grid;grid-template-columns:40px 1fr auto auto;gap:10px;align-items:center;padding:8px 14px;border-top:1px solid #1d2433;font-size:12px}
+.crow strong{display:block;font-size:13px}.crow small{color:var(--muted)}
+.crow .r{text-align:right}
+.crow .w{color:var(--success);font-weight:800}
+
+/* ---------- F5 熟练度详情 ---------- */
+.subpage{padding:16px 18px 20px}
+.subhead{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.back{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface-strong);color:var(--ink);font-size:12.5px}
+.subhead h3{margin:0;font-size:16px}
+.subhead small{color:var(--muted)}
+.mstats3{display:grid;grid-template-columns:repeat(3,1fr);padding:14px 0;border-radius:10px;background:var(--surface-strong);text-align:center;margin-bottom:14px}
+.mstats3 b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.mstats3 small{color:var(--muted)}
+.mstats3 svg{width:22px;height:22px;display:block;margin:0 auto 4px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:18px 8px}
+.mcell{position:relative;display:grid;justify-items:center;gap:2px;padding:8px 4px 6px;border-radius:10px}
+.mcell:hover,.mcell.hover{background:var(--surface-strong)}
+.mport .lvn{position:absolute;left:50%;bottom:-4px;transform:translateX(-50%);min-width:26px;padding:0 5px;border-radius:9px;background:#11151d;border:1px solid #6B5A2E;color:#F3E2B3;font-size:11.5px;font-weight:800;text-align:center;line-height:17px;font-variant-numeric:tabular-nums}
+.mname{margin-top:6px;font-size:12.5px;font-weight:700;white-space:nowrap;max-width:104px;overflow:hidden;text-overflow:ellipsis}
+.marks{display:flex;gap:3px;height:12px;align-items:center}
+.marks i{width:11px;height:11px;border-radius:50%;background:#2B3346;box-shadow:inset 0 0 0 1px #3b4560}
+.marks i.on{background:radial-gradient(circle at 40% 35%,#c9d4ff,#6c7cf2 60%,#3b44a8);box-shadow:0 0 6px rgb(108 124 242/.6)}
+.mpts{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.mpop{position:absolute;left:50%;bottom:calc(100% - 6px);transform:translateX(-50%);z-index:5;width:260px;padding:12px 14px;border-radius:10px;background:#05070B;border:1px solid var(--line);box-shadow:0 12px 36px rgb(0 0 0/.6)}
+.mpop .top{display:flex;gap:10px;align-items:center;padding-bottom:10px;border-bottom:1px solid #222a3a}
+.mpop .top b{font-size:14px}
+.mpop .grade{display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:var(--muted);font-size:12px}
+.mpop .grade i{font-style:normal;display:inline-grid;place-items:center;min-width:22px;height:20px;padding:0 4px;border:1px solid #556;border-radius:4px;color:#dfe5f2;font-weight:800}
+.mpop .grade em{font-style:normal;color:var(--ink);font-weight:700}
+.mpop .bar{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:12px;font-variant-numeric:tabular-nums}
+.mpop .bar span{flex:1;height:6px;border-radius:3px;background:#2a3142;overflow:hidden}
+.mpop .bar span i{display:block;height:100%;background:linear-gradient(90deg,#9c7b45,#d9b46a)}
+.mpop .last{margin-top:8px;color:var(--faint);font-size:11.5px}
+
+/* ---------- F6 英雄数据表 ---------- */
+.ttabs{display:flex;gap:4px;margin:0 0 12px}
+.ttabs span{padding:6px 12px;border-radius:8px;color:var(--muted);font-size:12.5px}
+.ttabs span.on{background:var(--surface-strong);color:var(--ink);font-weight:700}
+.tscroll{overflow-x:auto;border-radius:10px;border:1px solid var(--line)}
+table.ct{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;min-width:1000px}
+.ct th{position:sticky;top:0;padding:9px 8px;background:#161C29;color:var(--muted);font-weight:600;text-align:center;white-space:nowrap;border-bottom:1px solid var(--line)}
+.ct th.sorted{color:var(--primary-strong)}
+.ct th.sorted::after{content:" ▾"}
+.ct td{padding:7px 8px;text-align:center;border-top:1px solid #1d2433;white-space:nowrap;line-height:1.35}
+.ct td small{display:block;color:var(--muted);font-size:11px}
+.ct .sticky{position:sticky;left:0;z-index:1;background:var(--surface);text-align:left}
+.ct tr.all td{background:#171e2c}.ct tr.all .sticky{background:#171e2c}
+.ct tr.sub td{background:#121823}.ct tr.sub .sticky{background:#121823}
+.cname{display:flex;align-items:center;gap:8px;font-weight:700}
+.cname .vsl{color:var(--faint);font-weight:600;font-size:11px;width:18px;text-align:right}
+.wl{display:inline-flex;height:20px;border-radius:4px;overflow:hidden;font-size:11px;font-weight:700;vertical-align:middle}
+.wl b{display:grid;place-items:center;padding:0 6px;color:#fff}
+.wl .w{background:#4C7FD9}.wl .l{background:#D9534F}
+.pct{margin-left:6px;font-weight:700}
+.pct.hi{color:var(--danger)}
+.kgood{color:#3ECF8E;font-weight:800}
+.more-row td{padding:8px}
+.more-row button{width:100%;height:32px;border-radius:8px;border:1px solid #2d4b7a;background:#16243a;color:#8BB8F5;font-size:12.5px}
+.exp{color:var(--muted)}
+.narrow-table{width:600px}
+
+/* ---------- F7 评分 tooltip ---------- */
+.scoretip{width:280px;padding:10px 12px;border-radius:10px;background:var(--tooltip-surface);border:1px solid var(--line);box-shadow:0 10px 30px rgb(0 0 0/.5);font-size:12px}
+.scoretip header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.scoretip header b{font-size:18px;color:var(--primary-strong)}
+.scoretip .li{display:grid;grid-template-columns:64px 1fr 44px;gap:8px;align-items:center;padding:3px 0;color:var(--muted)}
+.scoretip .li span{height:5px;border-radius:3px;background:#262e40;overflow:hidden}
+.scoretip .li span i{display:block;height:100%;background:var(--primary)}
+.scoretip .li em{font-style:normal;color:var(--ink);text-align:right}
+.bad{position:relative}
+.bad::after{content:"";position:absolute;left:-4px;right:-4px;top:50%;height:2px;background:#E05C5C;transform:rotate(-4deg)}
+
+/* 多杀徽章（图标 + 文字） */
+.mkb{position:relative;display:inline-grid;place-items:center;vertical-align:middle;flex:0 0 auto}
+.mkb svg{display:block;overflow:visible}
+.mkb b{position:absolute;inset:0;display:grid;place-items:center;font-size:11px;font-weight:900;letter-spacing:1px;color:#fff;text-shadow:0 1px 1px rgb(0 0 0/.55);line-height:1}
+.mkb.penta b{color:#3B1D02;text-shadow:0 1px 0 rgb(255 240 200/.6);font-size:12px;padding-top:3px}
+.mkb.quadra b{font-size:11.5px}
+@keyframes shine{0%{transform:translateX(-60px)}55%,100%{transform:translateX(80px)}}
+.shine{animation:shine 2.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:.85}}
+.glow{animation:pulse 1.8s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.shine,.glow{animation:none}}
+.mk-zoom{display:flex;gap:120px;align-items:center;padding:30px 40px 30px 20px}
+.mk-zoom>span{transform:scale(2.4);transform-origin:left center}
+/* 熟练度：与总览横幅一致的圆形头像 + 客户端徽章 */
+.mport{position:relative;width:72px;height:100px}
+.mport .ring{position:absolute;top:0;left:50%;z-index:2;width:56px;height:56px;transform:translateX(-50%);border-radius:50%;border:2px solid #C8A45A;box-shadow:0 3px 10px rgb(0 0 0/.35);overflow:hidden}
+.mport .ring .champ{width:100%;height:100%;border-radius:50%;font-size:20px}
+.mport .crestimg{position:absolute;top:42px;left:50%;z-index:1;width:56px;height:46px;transform:translateX(-50%);object-fit:contain;filter:drop-shadow(0 2px 4px rgb(0 0 0/.38))}
+.mport .lvn{z-index:3}
+</style>
+</head>
+<body>
+<div class="sheet">
+<div>
+  <h1>R211 总览改进 · 设计稿</h1>
+  <p class="lead">dark 主题（用户当前主题）。头像 / 装备 / 熟练度徽章均为占位图形；文字、数字为示例。窄版宽度按桌面最小窗口 780px 时内容区实际宽度绘制。</p>
+</div>
+
+<!-- ================= F1 ================= -->
+<section>
+  <div class="frame-title"><b><span class="ptag">P7</span>横幅：连胜 / 连败标签 + 点击名称复制</b><span>≥3 场才显示；图标为动态（火焰跳动 / 雨滴下落），系统开启“减少动态效果”时静止</span></div>
+  <div class="banner" style="width:1060px">
+    <div class="avatar"></div>
+    <div style="min-width:0">
+      <div class="name-line"><span class="sname" id="nm1">我听见风的颜色</span><span class="stag">#26247</span>
+        <span class="streak win"><svg viewBox="0 0 20 20"><path class="flame-outer" d="M10 1.5c.6 3.2 4.8 4.9 4.8 9.6A4.8 4.8 0 0 1 10 16a4.8 4.8 0 0 1-4.8-4.9c0-2.1 1.1-3.3 1.9-4.1.2 1.4.9 2.3 1.6 2.6C8.4 6.9 9 4 10 1.5Z" fill="#fff4d6"/><path class="flame-inner" d="M10 8.2c.4 1.7 2.3 2.5 2.3 4.5a2.3 2.3 0 0 1-4.6 0c0-1 .5-1.6.9-2 .1.6.4 1 .7 1.2-.1-1.3.3-2.6.7-3.7Z" fill="#FF5A36"/></svg>3连胜</span>
+      </div>
+      <div class="lvl">召唤师等级 624 <i>黑色玫瑰</i></div>
+    </div>
+    <div class="ranks"><div><div class="crest-ph" style="background:radial-gradient(circle,#ff8a8a,#6e1e2a 70%)"></div><b>盲僧</b>Lv.16 · 14万 点</div><div><div class="crest-ph"></div><b>单排/双排</b>铂金 I · 19 LP</div></div>
+  </div>
+  <div class="row" style="margin-top:14px">
+    <div class="card" style="padding:14px 16px">
+      <p class="label-w">连胜 3–4 场</p>
+      <span class="streak win"><svg viewBox="0 0 20 20"><path class="flame-outer" d="M10 1.5c.6 3.2 4.8 4.9 4.8 9.6A4.8 4.8 0 0 1 10 16a4.8 4.8 0 0 1-4.8-4.9c0-2.1 1.1-3.3 1.9-4.1.2 1.4.9 2.3 1.6 2.6C8.4 6.9 9 4 10 1.5Z" fill="#fff4d6"/><path class="flame-inner" d="M10 8.2c.4 1.7 2.3 2.5 2.3 4.5a2.3 2.3 0 0 1-4.6 0c0-1 .5-1.6.9-2 .1.6.4 1 .7 1.2-.1-1.3.3-2.6.7-3.7Z" fill="#FF5A36"/></svg>4连胜</span>
+      <p class="label-w" style="margin-top:12px">连胜 ≥5 场（光晕加强）</p>
+      <span class="streak win hot"><svg viewBox="0 0 20 20"><path class="flame-outer" d="M10 1.5c.6 3.2 4.8 4.9 4.8 9.6A4.8 4.8 0 0 1 10 16a4.8 4.8 0 0 1-4.8-4.9c0-2.1 1.1-3.3 1.9-4.1.2 1.4.9 2.3 1.6 2.6C8.4 6.9 9 4 10 1.5Z" fill="#fff4d6"/><path class="flame-inner" d="M10 8.2c.4 1.7 2.3 2.5 2.3 4.5a2.3 2.3 0 0 1-4.6 0c0-1 .5-1.6.9-2 .1.6.4 1 .7 1.2-.1-1.3.3-2.6.7-3.7Z" fill="#FF5A36"/></svg>7连胜</span>
+    </div>
+    <div class="card" style="padding:14px 16px">
+      <p class="label-w">连败 ≥3 场</p>
+      <span class="streak loss"><svg viewBox="0 0 20 20"><path d="M5.5 10.5a3.5 3.5 0 0 1 .4-7 4.6 4.6 0 0 1 8.7 1.1 3 3 0 0 1-.3 5.9Z" fill="#E6EEF9"/><path class="drop1" d="M7 12.5v2.6" stroke="#E6EEF9" stroke-width="1.6" stroke-linecap="round"/><path class="drop2" d="M10.2 12.5v2.6" stroke="#E6EEF9" stroke-width="1.6" stroke-linecap="round"/><path class="drop3" d="M13.4 12.5v2.6" stroke="#E6EEF9" stroke-width="1.6" stroke-linecap="round"/></svg>5连败</span>
+      <p class="label-w" style="margin-top:12px">最近 20 场全胜（数据到头，加“+”）</p>
+      <span class="streak win hot"><svg viewBox="0 0 20 20"><path class="flame-outer" d="M10 1.5c.6 3.2 4.8 4.9 4.8 9.6A4.8 4.8 0 0 1 10 16a4.8 4.8 0 0 1-4.8-4.9c0-2.1 1.1-3.3 1.9-4.1.2 1.4.9 2.3 1.6 2.6C8.4 6.9 9 4 10 1.5Z" fill="#fff4d6"/><path class="flame-inner" d="M10 8.2c.4 1.7 2.3 2.5 2.3 4.5a2.3 2.3 0 0 1-4.6 0c0-1 .5-1.6.9-2 .1.6.4 1 .7 1.2-.1-1.3.3-2.6.7-3.7Z" fill="#FF5A36"/></svg>20+连胜</span>
+    </div>
+    <div class="card" style="padding:14px 16px;width:300px">
+      <p class="label-w">名称：悬停只变手型指针；点击直接复制「名称#tag」，没有提示、没有高亮</p>
+    </div>
+    <div class="card" style="padding:14px 16px;width:330px">
+      <p class="label-w">窄窗口（780px）：名称过长时只截断名称，标签不截断、不换行</p>
+      <div class="name-line" style="width:290px"><span class="sname" style="font-size:22px">一个非常非常长的召唤师名字测试</span><span class="streak loss" style="height:22px;font-size:11.5px"><svg viewBox="0 0 20 20"><path d="M5.5 10.5a3.5 3.5 0 0 1 .4-7 4.6 4.6 0 0 1 8.7 1.1 3 3 0 0 1-.3 5.9Z" fill="#E6EEF9"/><path class="drop1" d="M7 12.5v2.6" stroke="#E6EEF9" stroke-width="1.6" stroke-linecap="round"/><path class="drop2" d="M10.2 12.5v2.6" stroke="#E6EEF9" stroke-width="1.6" stroke-linecap="round"/><path class="drop3" d="M13.4 12.5v2.6" stroke="#E6EEF9" stroke-width="1.6" stroke-linecap="round"/></svg>3连败</span></div>
+    </div>
+  </div>
+  <p class="note"><b>位置</b>：紧跟名称（和 #tag）之后、同一行垂直居中；职业选手标签等原有 meta 排在连胜标签之后。<b>配色</b>：连胜＝暖色火焰（橙→红渐变，深色字）；连败＝冷色乌云雨滴（灰蓝渐变，浅色字），与对局卡片的蓝胜 / 红负不冲突。</p>
+</section>
+
+<!-- ================= F2 ================= -->
+<section>
+  <div class="frame-title"><b><span class="ptag">P2</span>战绩卡标签</b><span>顺序：评价（MVP / SVP / 名次）→ 多杀 → 本局关键词 → 零阵亡；最多 4 个；放在装备行下方的独立一行</span></div>
+  <div style="display:grid;gap:8px;width:1060px">
+    <div class="mcard">
+      <div class="mmeta"><b>单排/双排</b><small>7天前</small><div class="res">胜利 <span style="color:var(--success);font-size:12px">▲ 20</span></div><small>38分钟16秒</small></div>
+      <div class="mmain"><span class="champ c40" data-c="格雷福斯"></span><div style="display:flex;gap:10px;align-items:center"><div class="spells"><i></i><i></i><i></i><i></i></div><div class="kda"><b>10 / <em>8</em> / 16</b><small>3.25:1 KDA</small></div></div>
+        <div class="items"><i></i><i></i><i></i><i></i><i></i><i></i><i class="t"></i></div>
+        <div class="mtags chips"><span class="chip mvp">MVP</span><span class="chip kw unstoppable">势不可挡</span></div></div>
+      <div class="mstats">击杀参与率 <b>70%</b><br>CS <b>320 (8.4)</b><br>平均段位 <b>王者</b></div>
+      <div class="mplayers"></div>
+      <div class="mexp">⌄</div>
+    </div>
+    <div class="mcard">
+      <div class="mmeta"><b>灵活排位</b><small>1周前</small><div class="res">胜利</div><small>40分钟53秒</small></div>
+      <div class="mmain"><span class="champ c40" data-c="厄运小姐"></span><div style="display:flex;gap:10px;align-items:center"><div class="spells"><i></i><i></i><i></i><i></i></div><div class="kda"><b>23 / <em>9</em> / 12</b><small>3.89:1 KDA</small></div></div>
+        <div class="items"><i></i><i></i><i></i><i></i><i></i><i></i><i class="t"></i></div>
+        <div class="mtags chips"><span class="chip rank r2">2nd</span><span data-mk="double"></span><span class="chip kw victorious">胜者</span></div></div>
+      <div class="mstats">击杀参与率 <b>74%</b><br>CS <b>246 (6)</b><br>平均段位 <b>铂金 1</b></div>
+      <div class="mplayers"></div>
+      <div class="mexp">⌄</div>
+    </div>
+    <div class="mcard loss">
+      <div class="mmeta"><b>极地大乱斗</b><small>1周前</small><div class="res">失败</div><small>15分钟06秒</small></div>
+      <div class="mmain"><span class="champ c40" data-c="金克丝"></span><div style="display:flex;gap:10px;align-items:center"><div class="spells"><i></i><i></i><i></i><i></i></div><div class="kda"><b>11 / <em>9</em> / 12</b><small>2.56:1 KDA</small></div></div>
+        <div class="items"><i></i><i></i><i></i><i></i><i></i><i></i><i class="t"></i></div>
+        <div class="mtags chips"><span class="chip svp">SVP</span><span data-mk="triple"></span><span class="chip kw unlucky">不走运</span></div></div>
+      <div class="mstats">击杀参与率 <b>68%</b><br>CS <b>78 (5.2)</b><br>平均段位 <b>钻石 1</b></div>
+      <div class="mplayers"></div>
+      <div class="mexp">⌄</div>
+    </div>
+    <div class="mcard">
+      <div class="mmeta"><b>单排/双排</b><small>7天前</small><div class="res">胜利 <span style="color:var(--success);font-size:12px">▲ 10</span></div><small>17分钟38秒</small></div>
+      <div class="mmain"><span class="champ c40" data-c="锐雯"></span><div style="display:flex;gap:10px;align-items:center"><div class="spells"><i></i><i></i><i></i><i></i></div><div class="kda"><b>2 / <em>8</em> / 3</b><small>0.63:1 KDA</small></div></div>
+        <div class="items"><i></i><i></i><i></i><i></i><i></i><i></i><i class="t"></i></div>
+        <div class="mtags chips"><span class="chip rank">9th</span><span class="chip kw decline">下坡路</span></div></div>
+      <div class="mstats">击杀参与率 <b>19%</b><br>CS <b>100 (5.7)</b><br>平均段位 <b>王者</b></div>
+      <div class="mplayers"></div>
+      <div class="mexp">⌄</div>
+    </div>
+  </div>
+  <p class="label-w" style="margin-top:18px">全部标签色板（需要维护的完整清单，共 25 个：评价 3 类 + 多杀 4 + 零阵亡 1 + 关键词 14；名次 2nd–10th 视为同一类）</p>
+  <p class="label-w" style="margin-top:18px">多杀徽章放大（2.4×）：形状逐级升级——双杀六边牌、三杀两侧刃尖、四杀双翼 + 呼吸光晕、五杀金色王冠 + 火焰双翼 + 扫光（减少动态效果时静止）</p>
+  <div class="card mk-zoom" style="width:1060px"><span data-mk="double"></span><span data-mk="triple"></span><span data-mk="quadra"></span><span data-mk="penta"></span></div>
+  <div class="palette" style="width:1060px">
+    <div class="card pgroup"><h4>评价 / 多杀（图标徽章）/ 其它</h4>
+      <div class="prow"><span class="chip mvp">MVP</span>胜方评分最高</div>
+      <div class="prow"><span class="chip svp">SVP</span>败方评分最高</div>
+      <div class="prow"><span class="chips"><span class="chip rank r2">2nd</span><span class="chip rank r3">3rd</span><span class="chip rank">4th</span></span>全场评分名次（第 1 名不显示，由 MVP/SVP 代替）</div>
+      <div class="prow"><span data-mk="double"></span>最高连杀＝2</div>
+      <div class="prow"><span data-mk="triple"></span>最高连杀＝3</div>
+      <div class="prow"><span data-mk="quadra"></span>最高连杀＝4</div>
+      <div class="prow"><span data-mk="penta"></span>最高连杀≥5</div>
+      <div class="prow"><span class="chip deathless">零阵亡</span>死亡＝0（保留现有）</div>
+    </div>
+    <div class="card pgroup"><h4>关键词 · 胜方专属（浅底描边）</h4>
+      <div class="prow"><span class="chip kw unstoppable">势不可挡</span>全程高分并获胜</div>
+      <div class="prow"><span class="chip kw leader">领导者</span>队内最高分并获胜</div>
+      <div class="prow"><span class="chip kw victorious">胜者</span>前中期发挥突出获胜</div>
+      <div class="prow"><span class="chip kw latebloomer">大器晚成</span>评分持续走高获胜</div>
+      <div class="prow"><span class="chip kw resilience">坚韧</span>中途低谷后回升获胜</div>
+      <div class="prow"><span class="chip kw dedication">奉献</span>评分偏低但赢下比赛</div>
+      <h4 style="margin-top:12px">关键词 · 胜负都可能</h4>
+      <div class="prow"><span class="chip kw average">平凡</span>走势平稳</div>
+      <div class="prow"><span class="chip kw rollercoaster">过山车</span>起伏剧烈</div>
+      <div class="prow"><span class="chip kw decline">下坡路</span>评分持续走低</div>
+    </div>
+    <div class="card pgroup"><h4>关键词 · 败方专属</h4>
+      <div class="prow"><span class="chip kw innocent">最佳表现</span>败方 SVP 且高分</div>
+      <div class="prow"><span class="chip kw unlucky">不走运</span>表现好但输了</div>
+      <div class="prow"><span class="chip kw slowstarter">慢热型</span>后期走高但来不及</div>
+      <div class="prow"><span class="chip kw unyielding">不屈意志</span>低谷后回升但输了</div>
+      <div class="prow"><span class="chip kw struggling">举步维艰</span>全程低分且输了</div>
+      <p class="note" style="margin-top:12px">右列说明只在设计稿里用来对照规则；<b>界面上关键词悬停只显示一句含义</b>（OP.GG 原句，见工单），不出现阈值和公式。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= F3 ================= -->
+<section>
+  <div class="frame-title"><b><span class="ptag">P3</span>构建页：顶部切换玩家</b><span>选中＝主题色描边、不透明；未选中＝降低不透明度；本人头像右下角小圆点；悬停显示「名称#tag · 英雄」</span></div>
+  <div class="row">
+    <div class="detail wide">
+      <div class="dtabs"><span>概览</span><span>队伍分析</span><span class="on">构建</span></div>
+      <div class="picker" id="pk5"></div>
+      <div class="dsec"><h5>装备路线</h5><div class="route"><i></i><i></i><i></i>›<i></i><i></i>›<i></i>›<i></i><i></i>›<i></i>›<i></i><i></i><i></i></div></div>
+      <div class="dsec"><h5 style="display:flex;justify-content:space-between">技能加点<small style="color:var(--muted);font-weight:400">主升 Q · 副升 W</small></h5><div class="skills"><span>Q</span><span>E</span><span>Q</span><span>W</span><span>Q</span><span class="r">R</span><span>Q</span><span>W</span><span>Q</span><span>W</span><span class="r">R</span><span>W</span><span>W</span><span>E</span></div></div>
+      <div class="dsec"><h5>符文</h5><div style="height:46px;border-radius:8px;background:repeating-linear-gradient(90deg,#1a2130 0 40px,#1d2537 40px 80px)"></div></div>
+    </div>
+    <div style="display:grid;gap:18px">
+      <div class="detail narrow">
+        <div class="dtabs"><span>概览</span><span>队伍分析</span><span class="on">构建</span></div>
+        <div class="picker" id="pk5n" style="gap:8px"></div>
+        <p class="note" style="margin:8px 12px 0">780px 窗口：头像 32→28px，间距 6→4px，仍一行；10 人最小宽度约 360px。</p>
+      </div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:18px">
+    <div class="detail wide">
+      <div class="dtabs"><span>概览</span><span>队伍分析</span><span class="on">构建</span></div>
+      <div class="picker"><div class="arena-picker" id="pkA" style="gap:6px;flex-wrap:nowrap"></div></div>
+      <div class="dsec"><h5>海克斯</h5><div style="height:46px;border-radius:8px;background:repeating-linear-gradient(90deg,#1a2130 0 64px,#211a33 64px 128px)"></div></div>
+    </div>
+    <div class="detail narrow">
+      <div class="dtabs"><span>概览</span><span>队伍分析</span><span class="on">构建</span></div>
+      <div class="picker"><div class="arena-picker" id="pkAn" style="gap:6px"></div></div>
+      <p class="note" style="margin:8px 12px 0">斗魂竞技场 16 人：按小队两两成组，左侧是名次牌（1–3 金银铜），本人小队描边主题色；宽版一行 8 组，容器 &lt; 700px 时自动折成两行 4 组，头像 28→26px。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= F4 ================= -->
+<section>
+  <div class="frame-title"><b><span class="ptag">P4 / P6</span>左栏卡片头部：右上角加箭头按钮</b><span>28×28 图标按钮，悬停提示「查看全部」；数据不足 / 不支持时整颗按钮不渲染</span></div>
+  <div class="row">
+    <div class="card csec"><header><h3>英雄胜率</h3><div class="tools">S26 · 已统计 634 场<span class="more-btn"><svg viewBox="0 0 16 16"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div></header>
+      <div class="crow"><span class="champ c40" style="background:#0f1219;color:var(--primary-strong)">全</span><div><strong>全部英雄</strong><small>CS 99.3 (4.2)</small></div><div class="r"><b>3.09:1 KDA</b><br><small>6.2 / 5.4 / 10.5</small></div><div class="r"><span class="w">47%</span><br><small>634 场</small></div></div>
+      <div class="crow"><span class="champ c40" data-c="探险家"></span><div><strong>探险家</strong><small>CS 182.6 (6.6)</small></div><div class="r"><b>2.91:1 KDA</b><br><small>6.8 / 5.1 / 8.0</small></div><div class="r"><span class="w">48%</span><br><small>33 场</small></div></div>
+      <div class="crow"><span class="champ c40" data-c="虚空之女"></span><div><strong>虚空之女</strong><small>CS 142.1 (6.1)</small></div><div class="r"><b>2.40:1 KDA</b><br><small>5.0 / 5.4 / 8.0</small></div><div class="r"><span class="w">38%</span><br><small>24 场</small></div></div>
+    </div>
+    <div class="card csec"><header><h3>英雄熟练度</h3><div class="tools">最高分<span class="more-btn"><svg viewBox="0 0 16 16"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div></header>
+      <div class="crow"><span class="champ c40" data-c="未来守护者"></span><div><strong>未来守护者</strong><small>76.1万 熟练度</small></div><div></div><div class="r"><b>Lv.72</b></div></div>
+      <div class="crow"><span class="champ c40" data-c="纳祖芒荣耀"></span><div><strong>纳祖芒荣耀</strong><small>65.1万 熟练度</small></div><div></div><div class="r"><b>Lv.62</b></div></div>
+    </div>
+    <div class="card" style="padding:14px 16px;width:300px">
+      <p class="label-w">KDA 修复后对照（P5）</p>
+      <p style="margin:0;color:var(--muted);font-size:12px;line-height:1.7">修复前：<span class="bad">0.00:1 KDA · 0 / 0 / 0</span><br>修复后：每个英雄显示真实场均 K / D / A 与 KDA；表头场次与「全部英雄」场次一致。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= F5 ================= -->
+<section>
+  <div class="frame-title"><b><span class="ptag">P4</span>英雄熟练度详情页（在当前玩家页签内切换，不开新窗口）</b><span>顶部 3 项汇总 + 全部英雄网格（按熟练度点数降序）；悬停弹出详情</span></div>
+  <div class="card subpage wide" style="width:1060px">
+    <div class="subhead"><span class="back">‹ 返回总览</span><h3>英雄熟练度</h3><small>我听见风的颜色#26247</small></div>
+    <div class="mstats3">
+      <div><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6Z" fill="none" stroke="#E8A13A" stroke-width="1.8"/><circle cx="12" cy="11" r="3" fill="#E8A13A"/></svg><b>1,130</b><small>总专精分数</small></div>
+      <div><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6Z" fill="none" stroke="#8B93A6" stroke-width="1.8"/><circle cx="17" cy="17" r="4.5" fill="#8F6CF2"/></svg><b>8,587,156</b><small>总英雄分数</small></div>
+      <div><svg viewBox="0 0 24 24"><circle cx="11" cy="9" r="5" fill="none" stroke="#8B93A6" stroke-width="1.8"/><path d="M4 21c1-4 4-6 7-6" fill="none" stroke="#8B93A6" stroke-width="1.8"/><circle cx="18" cy="17" r="3.5" fill="#E8A13A"/></svg><b>167 / 173</b><small>专精英雄</small></div>
+    </div>
+    <div class="mgrid" id="mg"></div>
+  </div>
+  <div class="row" style="margin-top:18px">
+    <div class="card subpage" style="width:560px">
+      <div class="subhead"><span class="back">‹ 返回总览</span><h3>英雄熟练度</h3></div>
+      <div class="mstats3" style="padding:10px 0"><div><b style="font-size:16px">1,130</b><small>总专精分数</small></div><div><b style="font-size:16px">8,587,156</b><small>总英雄分数</small></div><div><b style="font-size:16px">167 / 173</b><small>专精英雄</small></div></div>
+      <div class="mgrid" id="mgn" style="grid-template-columns:repeat(5,minmax(0,1fr));gap:14px 4px"></div>
+      <p class="note">780px 窗口：每行 5 个，汇总栏图标隐藏、数字缩小；弹窗靠边时向内翻转，不被裁切。</p>
+    </div>
+    <div class="card" style="padding:14px 16px;width:460px">
+      <p class="label-w">左：总览横幅现有的熟练度图标（截自用户截图，客户端资源）。右：详情页沿用同一套——圆形头像金边 + 下方客户端徽章 + 等级数字牌</p><div style="display:flex;gap:26px;align-items:flex-end"><img src="data:image/png;base64,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" style="width:83px;height:101px;border-radius:8px">
+      <div style="display:flex;gap:30px;align-items:flex-end;padding:10px 6px 4px">
+        <div class="mcell"><div class="mport" data-lv="7"></div><div class="mname">等级 7</div></div>
+        <div class="mcell"><div class="mport" data-lv="10"></div><div class="mname">等级 10</div></div>
+        <div class="mcell"><div class="mport" data-lv="72"></div><div class="mname">等级 72</div></div>
+      </div></div>
+      <p class="note">要求：直接复用总览横幅的 <b>summoner-mastery-portrait</b> 结构和 crest-and-banner-mastery-{0..10}.png 资源（≥10 级用 10），放大到 56px 头像；徽章完整显示不裁切；数字牌压在徽章底部居中，3 位数不溢出。设计稿里的徽章是从截图裁出来的同一张，实际按等级取对应资源。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= F6 ================= -->
+<section>
+  <div class="frame-title"><b><span class="ptag">P6</span>英雄数据表（英雄胜率卡 → 箭头进入）</b><span>默认按场次降序、展开第一行；点表头排序；对位行只在单双 / 灵活有；“显示更多”每次 +10</span></div>
+  <div class="card subpage" style="width:1240px">
+    <div class="subhead"><span class="back">‹ 返回总览</span><h3>英雄数据</h3><small>S26 · 我听见风的颜色#26247</small></div>
+    <div class="ttabs"><span class="on">排位（单双+灵活）</span><span>单排/双排</span><span>灵活组排</span><span>海克斯大乱斗</span></div>
+    <div class="tscroll"><table class="ct" id="ctw"></table></div>
+  </div>
+  <div class="row" style="margin-top:18px">
+    <div class="card subpage narrow-table">
+      <div class="subhead"><span class="back">‹ 返回</span><h3>英雄数据</h3></div>
+      <div class="ttabs"><span class="on">排位</span><span>单双</span><span>灵活</span><span>海斗</span></div>
+      <div class="tscroll" style="max-width:100%"><table class="ct" id="ctn"></table></div>
+      <p class="note">窄窗口：表格在卡片内部横向滚动，英雄列固定在左侧；页面本身不出现横向滚动条。三杀 / 四杀 / 五杀列在 &lt; 900px 时合并成一列「多杀」。</p>
+    </div>
+    <div class="card" style="padding:14px 16px;width:600px">
+      <p class="label-w">海克斯大乱斗页签：没有对线 / 视野 / 对位，表格只保留下列列，行不可展开</p>
+      <div class="tscroll"><table class="ct" style="min-width:0"><thead><tr><th class="sticky">英雄</th><th class="sorted">场次</th><th>KDA</th><th>评分</th><th>伤害</th><th>金币</th><th>多杀</th></tr></thead>
+      <tbody><tr><td class="sticky"><span class="cname"><span class="champ c28" data-c="金克丝"></span>金克丝</span></td><td><span class="wl"><b class="w">12胜</b><b class="l">9败</b></span><span class="pct">57%</span></td><td>3.10:1<small>11.2 / 8.1 / 13.9</small></td><td>6.4<small>#3.9</small></td><td>2,410/m<small>31.5%</small></td><td>14,820<small>812/m</small></td><td>双 8 · 三 3 · 四 1</td></tr></tbody></table></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= F7 ================= -->
+<section>
+  <div class="frame-title"><b><span class="ptag">P1</span>评分悬停（v3）</b><span>只显示总分、名次和各项表现条；去掉公式、方法论和“非官方”字样（R128 §2.5）</span></div>
+  <div class="row">
+    <div class="scoretip">
+      <header><span>本局评分 · 全场第 1</span><b>8.6</b></header>
+      <div class="li">伤害占比<span><i style="width:88%"></i></span><em>34%</em></div>
+      <div class="li">击杀参与<span><i style="width:74%"></i></span><em>70%</em></div>
+      <div class="li">击杀<span><i style="width:70%"></i></span><em>10</em></div>
+      <div class="li">死亡<span><i style="width:38%"></i></span><em>8</em></div>
+      <div class="li">经济占比<span><i style="width:64%"></i></span><em>24%</em></div>
+      <div class="li">补刀<span><i style="width:66%"></i></span><em>8.4/m</em></div>
+      <div class="li">承伤<span><i style="width:40%"></i></span><em>19%</em></div>
+      <div class="li">资源<span><i style="width:72%"></i></span><em>5</em></div>
+      <div class="li">视野<span><i style="width:45%"></i></span><em>0.6/m</em></div>
+    </div>
+    <div class="card" style="padding:14px 16px;width:420px">
+      <p class="label-w">现状（删除）</p>
+      <p style="margin:0;color:var(--faint);font-size:11.5px;line-height:1.6" class="bad">DL 单场相对评分 v2（非官方能力分）<br>总分=2+各项贡献；贡献=8×权重×原值/(原值+基准)，KDA先开平方……</p>
+      <p class="note">条长＝该项相对同位置对手（无分路模式＝相对全场其他人）的表现，50% 为持平；数值列是原始值。缺失的项整行不显示。</p>
+    </div>
+  </div>
+</section>
+</div>
+
+<script>
+const D={
+double:`<span class="mkb double" style="width:44px;height:22px"><svg width="44" height="22" viewBox="0 0 44 22"><defs><linearGradient id="gd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FB923C"/><stop offset="1" stop-color="#C2410C"/></linearGradient></defs><path d="M6 1H38L43 11L38 21H6L1 11Z" fill="url(#gd)" stroke="#FED7AA" stroke-opacity=".7"/><path d="M7 3.5H37" stroke="#fff" stroke-opacity=".35"/></svg><b>双杀</b></span>`,
+triple:`<span class="mkb triple" style="width:54px;height:24px"><svg width="54" height="24" viewBox="0 0 54 24"><defs><linearGradient id="gt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F87171"/><stop offset="1" stop-color="#991B1B"/></linearGradient></defs><path d="M1 12L6 6L6 18Z" fill="#FCA5A5"/><path d="M53 12L48 6L48 18Z" fill="#FCA5A5"/><path d="M10 1H44L48 6V18L44 23H10L6 18V6Z" fill="url(#gt)" stroke="#FECACA" stroke-opacity=".8"/><path d="M11 3.5H43" stroke="#fff" stroke-opacity=".35"/></svg><b>三杀</b></span>`,
+quadra:`<span class="mkb quadra" style="width:64px;height:26px"><svg width="64" height="26" viewBox="0 0 64 26"><defs><linearGradient id="gq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F472B6"/><stop offset="1" stop-color="#86198F"/></linearGradient><radialGradient id="gqg"><stop offset="0" stop-color="#F0ABFC" stop-opacity=".9"/><stop offset="1" stop-color="#F0ABFC" stop-opacity="0"/></radialGradient></defs><ellipse class="glow" cx="32" cy="13" rx="34" ry="15" fill="url(#gqg)"/><path d="M14 5C8 3 4 5 1 9C5 8 8 9 10 11C6 11 4 13 3 16C7 14 10 15 13 17Z" fill="#E879F9"/><path d="M50 5C56 3 60 5 63 9C59 8 56 9 54 11C58 11 60 13 61 16C57 14 54 15 51 17Z" fill="#E879F9"/><path d="M16 1H48L53 7V19L48 25H16L11 19V7Z" fill="url(#gq)" stroke="#FBCFE8" stroke-opacity=".85"/><path d="M17 3.5H47" stroke="#fff" stroke-opacity=".4"/></svg><b>四杀</b></span>`,
+penta:`<span class="mkb penta" style="width:74px;height:30px"><svg width="74" height="30" viewBox="0 0 74 30"><defs><linearGradient id="gp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FEF3C7"/><stop offset=".45" stop-color="#FBBF24"/><stop offset="1" stop-color="#B45309"/></linearGradient><linearGradient id="gf" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#DC2626"/><stop offset="1" stop-color="#FB923C"/></linearGradient><clipPath id="cp"><path d="M18 6H56L61 12V24L56 29H18L13 24V12Z"/></clipPath></defs>
+<path d="M16 10C9 6 4 8 1 13C5 12 8 13 10 15C5 16 3 19 3 23C7 20 11 20 15 23Z" fill="url(#gf)"/><path d="M58 10C65 6 70 8 73 13C69 12 66 13 64 15C69 16 71 19 71 23C67 20 63 20 59 23Z" fill="url(#gf)"/>
+<path d="M27 6L29 1L33 4.5L37 0L41 4.5L45 1L47 6Z" fill="#FBBF24" stroke="#FEF3C7" stroke-width=".6"/>
+<path d="M18 6H56L61 12V24L56 29H18L13 24V12Z" fill="url(#gp)" stroke="#FFFBEB" stroke-width=".9"/>
+<g clip-path="url(#cp)"><rect class="shine" x="0" y="0" width="12" height="30" fill="#fff" opacity=".55" transform="skewX(-20)"/></g></svg><b>五杀</b></span>`};
+function mkFill(){document.querySelectorAll("[data-mk]").forEach(el=>{el.outerHTML=D[el.dataset.mk]})}
+
+// 占位头像：按名字生成固定渐变 + 首字
+function hue(s){let h=0;for(const c of s)h=(h*31+c.codePointAt(0))%360;return h}
+function paint(el){const n=el.dataset.c||"?";const h=hue(n);el.style.background=`linear-gradient(135deg,hsl(${h} 55% 52%),hsl(${(h+40)%360} 50% 28%))`;el.textContent=[...n][0]}
+document.querySelectorAll(".champ[data-c]").forEach(paint);
+// 战绩卡右侧名单
+const P1=["TOPKING","evi","기동타격","김출래","抖音丶77","어색했","抖音丶小","얼러","노익스강","Indexy"];
+document.querySelectorAll(".mplayers").forEach((box,bi)=>{box.innerHTML=P1.map((n,i)=>`<span class="${i===0&&bi===0?'me':''}"><span class="champ c22" data-c="${n}"></span>${n}</span>`).join("");box.querySelectorAll(".champ").forEach(paint)});
+// P3 5v5 选择条
+const blue=["纳尔","盲僧","阿狸","卡莎","洛"],red=["剑姬","男枪","发条","艾希","锤石"];
+function picker(id,size,sel,tipIdx){const el=document.getElementById(id);const btn=(n,i,team)=>{const idx=team==="b"?i:i+5;return `<button class="pbtn${idx===sel?' on':''}${idx===0?' self':''}" style="position:relative">${idx===tipIdx?`<span class="tip hover-tip">我听见风的颜色#26247<small>迷失之牙 · 14 级</small></span>`:''}<span class="champ c${size}" data-c="${n}"></span><span class="lv">${14+((i*3)%5)}</span></button>`};
+ el.innerHTML=`<div class="side">${blue.map((n,i)=>btn(n,i,"b")).join("")}</div><span class="vs">VS</span><div class="side red">${red.map((n,i)=>btn(n,i,"r")).join("")}</div>`;el.querySelectorAll(".champ").forEach(paint)}
+picker("pk5",36,0,-1);picker("pk5n",28,7,7);
+document.querySelector("#pk5n .tip").innerHTML='Faker#KR1<small>发条魔灵 · 16 级</small>';
+// P3 斗魂
+const arenaNames=["金克丝","蔚","厄斐琉斯","锤石","亚索","永恩","瑟庄妮","佐伊","德莱文","奥恩","霞","洛","卡莎","纳尔","塞恩","娜美"];
+function arena(id,size,wrapAt){const el=document.getElementById(id);let html="";for(let t=0;t<8;t++){const pl=t+1;html+=`<div class="pair${t===2?' mine':''}"><span class="pl ${pl<=3?'p'+pl:''}">${pl}</span>${[0,1].map(k=>{const idx=t*2+k;return `<button class="pbtn${idx===4?' on':''}${idx===4?' self':''}"><span class="champ c${size}" data-c="${arenaNames[idx]}"></span></button>`}).join("")}</div>`}el.innerHTML=html;if(wrapAt)el.style.maxWidth=wrapAt;el.querySelectorAll(".champ").forEach(paint)}
+arena("pkA",28);arena("pkAn",26,"440px");
+// P4 熟练度网格
+const M=[["未来守护者",72,760846],["纳祖芒荣耀",62,650993],["刀锋舞者",44,456102],["铁血狼母",44,450447],["机械公敌",42,437156],["暗裔剑魔",35,353244],["灵罗娃娃",31,316715],["武器大师",30,298566],["荒漠屠夫",28,284198],["迷失之牙",25,246084],["双界灵兔",19,176812],["海兽祭司",18,173175],["探险家",17,159249],["封魔剑魂",16,149347],["狂暴之心",15,140659],["无双剑姬",15,136430]];
+function crestSVG(lv){const c=lv>=10?"#8F6CF2":lv>=5?"#C78B3B":"#7A8396";return `<svg class="crest" viewBox="0 0 66 52"><path d="M33 4 44 12 60 6 54 24 62 34 44 34 33 48 22 34 4 34 12 24 6 6 22 12Z" fill="${c}" opacity=".9"/><path d="M33 10 41 16 52 13 48 25 53 31 41 31 33 41 25 31 13 31 18 25 14 13 25 16Z" fill="#E8D3A2" opacity=".85"/><circle cx="33" cy="25" r="6" fill="#B9A6FF"/></svg>`}
+function port(el,name,lv){el.innerHTML=`<span class="ring"><span class="champ" data-c="${name}"></span></span><img class="crestimg" src="data:image/png;base64,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" alt=""><span class="lvn">${lv}</span>`;el.querySelectorAll(".champ").forEach(paint)}
+function grid(id,list,hoverIdx){const g=document.getElementById(id);g.innerHTML=list.map(([n,lv,p],i)=>`<div class="mcell${i===hoverIdx?' hover':''}">${i===hoverIdx?`<div class="mpop"><div class="top"><div class="mport" style="transform:scale(.62);transform-origin:top left;width:45px;height:62px" data-n="${n}" data-l="${lv}"></div><div><b>${n}</b><div class="marks" style="margin-top:4px"><i class="on"></i><i class="on"></i></div></div></div><div class="grade"><span><i>S</i>&nbsp; 最高评价</span><span>赛季里程碑 <em>2</em></span></div><div class="bar"><b style="color:#E8A13A">◈</b> 10,115<span><i style="width:92%"></i></span>11,000 点</div><div class="last">最近游玩：2026-08-21</div></div>`:''}<div class="mport" data-n="${n}" data-l="${lv}"></div><div class="mname">${n}</div><div class="marks"><i class="${i<12?'on':''}"></i><i class="${i<9?'on':''}"></i></div><div class="mpts">${p.toLocaleString()}</div></div>`).join("");g.querySelectorAll(".mport[data-n]").forEach(el=>port(el,el.dataset.n,+el.dataset.l));g.querySelectorAll(".mpop .champ").forEach(paint)}
+grid("mg",M,14);grid("mgn",M.slice(0,10),-1);
+document.querySelectorAll(".mport[data-lv]").forEach(el=>port(el,"示例",+el.dataset.lv));
+// P6 表格
+const head=`<thead><tr><th>#</th><th class="sticky">英雄</th><th class="sorted">场次</th><th>KDA</th><th>评分</th><th>伤害</th><th>承伤</th><th>守卫</th><th>补刀</th><th>金币</th><th>双杀</th><th>三杀</th><th>四杀</th><th>五杀</th><th></th></tr></thead>`;
+const R=(i,n,w,l,kda,k,score,rank,dpm,dsh,tk,ward,cs,csm,g,gm,mk,sub,open)=>`<tr class="${i==='-'?'all':sub?'sub':''}"><td class="exp">${sub?'':i}</td><td class="sticky"><span class="cname">${sub?'<span class="vsl">vs</span>':''}<span class="champ c${sub?28:32}" data-c="${n}"></span>${n}</span></td><td><span class="wl"><b class="w">${w}胜</b><b class="l">${l}败</b></span><span class="pct${Math.round(w*100/(w+l))>=60?' hi':''}">${Math.round(w*100/(w+l))}%</span></td><td><b class="${kda>=3?'kgood':''}">${kda.toFixed(2)}:1</b><small>${k}</small></td><td><b>${score}</b><small>#${rank}</small></td><td>${dpm}/m<small>${dsh}</small></td><td>${tk}</td><td>${ward}</td><td>${cs}<small>${csm}/m</small></td><td>${g}<small>${gm}/m</small></td>${mk.map(x=>`<td>${x||'-'}</td>`).join("")}<td class="exp">${sub?'':open?'⌃':'⌄'}</td></tr>`;
+const rows=[R('-',"所有英雄",727,656,2.11,"5.6 / 5.4 / 5.8 (41%)","5.8","4.9","943.9","24.6%","27%","3 (12/4)","210","8.2","11,623","453",[622,73,5,0]),
+R(1,"未来守护者",99,95,1.90,"6.1 / 5.9 / 5.2 (41%)","6.0","4.8","1069.7","27.6%","24%","3 (12/4)","233","9.2","12,287","483",[97,12,1,0],false,true),
+R('',"牧魂人",15,9,2.38,"7.0 / 5.3 / 5.7","6.6","4.2","1215.3","28.8%","22%","2 (12/4)","259","9.4","13,817","501",[15,2,1,0],true),
+R('',"纳祖芒荣耀",13,11,2.32,"6.1 / 5.0 / 5.6","6.3","4.5","1147.1","28.1%","25%","3 (13/4)","238","9.4","12,411","490",[13,3,0,0],true),
+R('',"狂战士",8,8,1.91,"6.1 / 6.9 / 7.0","5.7","5.2","988.1","25.8%","27%","3 (13/5)","225","8.7","12,032","465",[9,1,0,0],true),
+R('',"机械公敌",6,5,1.75,"6.0 / 5.9 / 4.4","5.5","5.1","839.2","24.5%","21%","2 (11/4)","214","8.9","11,447","474",[7,1,0,0],true),
+R('',"刀锋舞者",6,5,1.71,"5.5 / 7.3 / 6.9","5.4","5.3","1004.2","25.9%","26%","3 (12/4)","245","9.1","12,417","463",[2,0,0,0],true),
+`<tr class="more-row sub"><td colspan="15"><button>显示更多对位 ⌄</button></td></tr>`,
+R(2,"纳祖芒荣耀",51,36,3.00,"4.6 / 3.4 / 5.7 (38%)","6.4","4.1","759.8","21%","29%","3 (12/3)","225","8.7","11,325","438",[26,3,0,0]),
+R(3,"铁血狼母",59,24,2.92,"6.2 / 3.8 / 5.0 (38%)","6.7","3.8","996.4","25.8%","23%","2 (10/3)","229","9.0","11,862","468",[39,5,0,0]),
+R(4,"机械公敌",40,38,2.25,"6.3 / 5.3 / 5.6 (41%)","5.9","4.6","1111.6","27.6%","20%","3 (9/2)","223","8.4","12,011","455",[42,2,0,0])];
+document.getElementById("ctw").innerHTML=head+"<tbody>"+rows.join("")+"</tbody>";
+document.getElementById("ctn").innerHTML=head.replace("<th>三杀</th><th>四杀</th><th>五杀</th>","").replace("<th>双杀</th>","<th>多杀</th>")+"<tbody>"+[rows[0],rows[1],rows[2],rows[3]].map(r=>r.replace(/<td>(\d+|-)<\/td><td>(\d+|-)<\/td><td>(\d+|-)<\/td><td>(\d+|-)<\/td><td class="exp">/,(m,a,b,c,d)=>`<td>双 ${a} · 三 ${b}${c!=='-'&&c!=='0'?' · 四 '+c:''}</td><td class="exp">`)).join("")+"</tbody>";
+document.querySelectorAll(".ct .champ[data-c]").forEach(paint);
+mkFill();
+</script>
+</body>
+</html>

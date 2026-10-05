@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-05",
+  "sources": {
+    "platforms": "https://developer.riotgames.com/api-details/summoner-v4",
+    "match": "https://developer.riotgames.com/api-details/match-v5",
+    "account": "https://developer.riotgames.com/apis#account-v1",
+    "static_docs": "https://developer.riotgames.com/docs/lol"
+  },
+  "reference_platforms": [
+    "BR1",
+    "EUN1",
+    "EUW1",
+    "JP1",
+    "KR",
+    "LA1",
+    "LA2",
+    "ME1",
+    "NA1",
+    "OC1",
+    "RU",
+    "SG2",
+    "TR1",
+    "TW2",
+    "VN2"
+  ],
+  "reference_match_clusters": [
+    "AMERICAS",
+    "ASIA",
+    "EUROPE",
+    "SEA"
+  ],
+  "account_clusters": [
+    "AMERICAS",
+    "ASIA",
+    "EUROPE"
+  ],
+  "account_sea_platforms_use": "ASIA",
+  "notes": [
+    "ME1 is present in current API Reference; the static LoL routing table still lists older PH2/TH2 entries and omits ME1.",
+    "Platform-to-Match cluster mapping follows the worklist; endpoint-family host lists and Account routing differences were checked against official references.",
+    "Network verification used public documentation only; no API credential, player identifier, live match request or deployment was used."
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "command": "go test -count=1 ./backend",
+  "startUTC": "2026-10-05T07:49:40.069586+00:00",
+  "startShanghai": "2026-10-05T15:49:40.069586+08:00",
+  "elapsedSeconds": 255.184,
+  "exitCode": 0,
+  "lastFiveLines": [
+    "ok  \tlol-loot-assistant/backend\t253.383s"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "frozenAt": "2026-10-05T07:43:17.211706+00:00",
+  "candidateSHA256": "50bbd1866cee896945b4d57810dfc65b3c7300077c8e11980ff93ab98b90282a",
+  "files": [
+    {
+      "path": "backend/match_score.go",
+      "sha256": "5d243f950daa30a41390cc57ab163b0ee56a8e31072c8e908434441cecf087d0"
+    },
+    {
+      "path": "backend/match_tags.go",
+      "sha256": "5354aeb99165dd9a5f60f149390fd64a10ac71e04e7be9046df5b4e9aa167aa6"
+    },
+    {
+      "path": "backend/match_keyword_rules.go",
+      "sha256": "e46ddbab91b4f9a810ad45c1a63de4f079aecf62c4e7f6b22d39417b9f4b001b"
+    },
+    {
+      "path": "backend/r217_test.go",
+      "sha256": "a492a905a4e4421cc0893b6a84bb5af86f053a988fa75ecc6b2cda1f90510f80"
+    },
+    {
+      "path": "scripts/r217-keyword-utils.py",
+      "sha256": "f27dc9f8edd6e2d086481f6216fcf51833ba3b356b80e8e802eac8411c47ae7c"
+    }
+  ]
+}

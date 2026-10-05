@@ -343,7 +343,7 @@ func championCacheDiskAllowed(key string) bool {
 	if strings.HasPrefix(key, "public-profile-icon|") || strings.HasPrefix(key, "pro-profile-v1|") || strings.HasPrefix(key, "pro-profile-v2|") {
 		return true
 	}
-	if strings.HasPrefix(key, "public-pro-snapshot-v1|") || strings.HasPrefix(key, "normalized-perks-v1|") || strings.HasPrefix(key, "normalized-perks-v2|") || strings.HasPrefix(key, "normalized-augments-v1|") || strings.HasPrefix(key, "riot-identity-v1|") || strings.HasPrefix(key, "riot-match-v1|KR_") || strings.HasPrefix(key, "riot-match-v2|KR_") || strings.HasPrefix(key, "kr-match-tier-v1|KR_") || strings.HasPrefix(key, "hexdata-") || strings.HasPrefix(key, "bootstrap|") || strings.HasPrefix(key, "v2|opgg-rsc|") || strings.HasPrefix(key, "v3|opgg-detail|") {
+	if strings.HasPrefix(key, "public-pro-snapshot-v1|") || strings.HasPrefix(key, "normalized-perks-v1|") || strings.HasPrefix(key, "normalized-perks-v2|") || strings.HasPrefix(key, "normalized-augments-v1|") || strings.HasPrefix(key, "riot-identity-v1|") || publicRiotMatchCacheKey(key) || (strings.HasPrefix(key, "riot-match-tier-v1|") && validRiotMatchID(strings.TrimPrefix(key, "riot-match-tier-v1|"))) || strings.HasPrefix(key, "kr-match-tier-v1|KR_") || strings.HasPrefix(key, "hexdata-") || strings.HasPrefix(key, "bootstrap|") || strings.HasPrefix(key, "v2|opgg-rsc|") || strings.HasPrefix(key, "v3|opgg-detail|") {
 		return true
 	}
 	for _, host := range []string{dataDragonHost, communityDragonHost, hexdataAssetHost, opggChampionHost, opggPageHost, qq101Host} {
@@ -632,4 +632,15 @@ func (c *championDataCache) lookupReady(key string) ([]byte, bool) {
 	c.storeMemoryLocked(key, entry)
 	c.mu.Unlock()
 	return append([]byte(nil), entry.Data...), true
+}
+
+func publicRiotMatchCacheKey(key string) bool {
+	for _, prefix := range []string{"riot-match-v1|", "riot-match-v2|", "riot-match-v3|", "riot-match-v4|"} {
+		if strings.HasPrefix(key, prefix) {
+			id := strings.TrimPrefix(key, prefix)
+			parts := strings.SplitN(id, "_", 2)
+			return len(parts) == 2 && isRiotRegion(parts[0])
+		}
+	}
+	return false
 }

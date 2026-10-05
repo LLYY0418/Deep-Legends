@@ -1,0 +1,12 @@
+{
+  "high": 6,
+  "low": 5.5,
+  "rise": 0.4,
+  "delta": 0.6,
+  "turn": 0.2,
+  "amplitude": 2,
+  "weak": 5,
+  "good": 6,
+  "excellent": 6.5,
+  "struggle": 6
+}

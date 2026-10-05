@@ -24,6 +24,9 @@ func TestClientDiagnosticAcceptsMultipleEventWhitelists(t *testing.T) {
 			if event == "gameflow_phase_client" {
 				body = `{"event":"gameflow_phase_client","reason":"batch","observations":[{"reason":"received","phase":"InProgress","source":"poll","gameId":8980574903}]}`
 			}
+			if event == "overview_dirty_rescan" {
+				body = `{"event":"` + event + `","reason":"` + reason + `","attempt":1,"filter":"flex","finished_game_id":"9014822625","finished_queue_id":2400,"expected_present":false,"outcome":"` + reason + `","since_end_ms":7000}`
+			}
 			request := httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(body))
 			(&app{}).handleClientDiagnostic(recorder, request)
 			if recorder.Code != http.StatusNoContent {

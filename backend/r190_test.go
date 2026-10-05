@@ -38,7 +38,7 @@ func TestR190LCUAndRiotPerkStats(t *testing.T) {
 	}
 }
 
-func TestR190RiotV1ReadRefreshV2AndHTTP(t *testing.T) {
+func TestR190RiotOldCacheInvalidationV4AndHTTP(t *testing.T) {
 	t.Setenv("RIOT_API_KEY", "RGAPI-test")
 	var calls atomic.Int32
 	payload := `{"metadata":{"matchId":"KR_190"},"info":{"gameId":190,"participants":[{"participantId":4,"championId":22,"perks":{"styles":[{"style":8000,"selections":[{"perk":9111,"var1":804,"var2":300}]}]}}]}}`
@@ -51,13 +51,15 @@ func TestR190RiotV1ReadRefreshV2AndHTTP(t *testing.T) {
 	if err := json.Unmarshal([]byte(payload), &old); err != nil {
 		t.Fatal(err)
 	}
-	riot.persistRiotMatch("riot-match-v1|KR_190", &old)
+	for _, version := range []string{"v1", "v2", "v3"} {
+		riot.persistRiotMatch("riot-match-"+version+"|KR_190", &old)
+	}
 	raw, err := riot.matchByID(context.Background(), "KR_190")
 	if err != nil {
 		t.Fatal(err)
 	}
 	converted := riotConvertMatch(raw, "", nil)
-	if !converted.PerkStatsStale || len(converted.Participants[0].PerkStats) != 0 || calls.Load() != 0 {
+	if converted.PerkStatsStale || len(converted.Participants[0].PerkStats) != 1 || calls.Load() != 1 {
 		t.Fatalf("old cache=%#v calls=%d", converted, calls.Load())
 	}
 	a := &app{riot: riot}
@@ -76,9 +78,9 @@ func TestR190RiotV1ReadRefreshV2AndHTTP(t *testing.T) {
 	restart := newRiotProvider(p)
 	disk, err := restart.matchByID(context.Background(), "KR_190")
 	if err != nil || disk.Info.PerkStatsStale || calls.Load() != 1 {
-		t.Fatalf("v2 disk=%#v err=%v calls=%d", disk, err, calls.Load())
+		t.Fatalf("v4 disk=%#v err=%v calls=%d", disk, err, calls.Load())
 	}
-	if _, err := restart.matchDisk.readDisk("riot-match-v2|KR_190"); err != nil {
+	if _, err := restart.matchDisk.readDisk("riot-match-v4|KR_190"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -105,7 +107,7 @@ func TestR190PerkCatalogTemplates(t *testing.T) {
 	if !reflect.DeepEqual(merged, again) {
 		t.Fatalf("normalized eogDescs roundtrip lost: %s", data)
 	}
-	if !championCacheDiskAllowed("normalized-perks-v2|ddragon") || !championCacheDiskAllowed("riot-match-v2|KR_190") {
+	if !championCacheDiskAllowed("normalized-perks-v2|ddragon") || !championCacheDiskAllowed("riot-match-v4|KR_190") {
 		t.Fatal("v2 cache denied")
 	}
 }

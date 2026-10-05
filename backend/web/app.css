@@ -240,6 +240,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .global-tooltip .tooltip-title { color: var(--tooltip-title); font-size: 12px; font-weight: 600; }
 .global-tooltip[data-layout="single"] .tooltip-title { color: var(--tooltip-ink); font-size: 11.5px; font-weight: 500; }
 .global-tooltip .tooltip-body { color: var(--tooltip-muted); font-size: 11.5px; line-height: 1.58; white-space: pre-line; }
+.global-tooltip[data-layout="score"] { display:grid; width:260px; gap:8px; padding:12px; }
+.tooltip-score-header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.tooltip-score-header > b { color:var(--primary); font-size:18px; font-variant-numeric:tabular-nums; }
+.tooltip-score-row { display:grid; grid-template-columns:60px minmax(0,1fr) 52px; align-items:center; gap:8px; font-size:11.5px; }
+.tooltip-score-row > b { text-align:right; font-variant-numeric:tabular-nums; }
+.tooltip-score-bar { height:6px; overflow:hidden; border-radius:3px; background:var(--tooltip-muted); }
+.tooltip-score-bar > i { display:block; height:100%; border-radius:inherit; background:var(--primary); }
 .tooltip-roster { display: grid; gap: 4px; padding-top: 2px; }
 .tooltip-roster-player { display: grid; grid-template-columns: 20px minmax(0,1fr); min-height: 22px; align-items: center; gap: 8px; font-size: 12px; }
 .tooltip-roster-name { min-width: 0; overflow: hidden; color: var(--tooltip-ink); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }

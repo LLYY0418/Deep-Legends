@@ -76,7 +76,18 @@ func resolveRankDataSources(input rankDataSourceInput) dataSourceDecision {
 // Match history prefers SGP because its SUMMARY response contains the complete
 // roster. LCU is a compatible fallback only for the currently connected server;
 // switching sources is therefore an explicit decision, not an HTTP retry.
-func resolveMatchHistoryDataSources(input matchHistoryDataSourceInput) dataSourceDecision {
+func resolveMatchHistoryDataSources(input matchHistoryDataSourceInput, regions ...string) dataSourceDecision {
+	clientRegion := ""
+	if len(regions) > 0 {
+		clientRegion = regions[0]
+	}
+	if isRiotRegion(clientRegion) && input.PlayerReferenceValid {
+		sources := []string{dataSourceRiot}
+		if input.LCUConnected && !input.RemoteServer {
+			sources = append(sources, dataSourceLCU)
+		}
+		return dataSourceDecision{Sources: sources, Reason: "riot-client-platform"}
+	}
 	if !input.PlayerReferenceValid {
 		return dataSourceDecision{Reason: "invalid-player-reference"}
 	}

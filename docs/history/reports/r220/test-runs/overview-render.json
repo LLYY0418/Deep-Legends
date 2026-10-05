@@ -1,0 +1,21 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "desktop/overview-render.test.cjs"
+  ],
+  "startUTC": "2026-10-05T09:10:57.291547+00:00",
+  "startShanghai": "2026-10-05T17:10:57.291547+08:00",
+  "elapsedSeconds": 337.074,
+  "exitCode": 0,
+  "lastFiveLines": [
+    "ℹ fail 0",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0",
+    "ℹ duration_ms 337030.781416"
+  ],
+  "skippedTests": [],
+  "passedTests": [],
+  "failedTests": []
+}

@@ -176,7 +176,7 @@ func TestR98OverviewEndpointCachesAndKeys(t *testing.T) {
 	// Validate actual envelopes and expire both layers; TTL is not just a constant.
 	expected := map[string]time.Duration{"matchIDs": time.Minute, "ranks": 3 * time.Minute, "mastery": 30 * time.Minute}
 	for identity, want := range map[string]time.Duration{"matchIDs:subject|count=20&start=0": expected["matchIDs"], "ranks:subject": expected["ranks"], "mastery:subject|count=5": expected["mastery"]} {
-		hash := sha256.Sum256([]byte(identity))
+		hash := sha256.Sum256([]byte(identity + "|platform:kr"))
 		key := "riot-identity-v1|" + hex.EncodeToString(hash[:])
 		cache := p.identityDisk
 		cache.mu.Lock()

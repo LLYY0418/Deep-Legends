@@ -1,0 +1,40 @@
+{
+  "baseline_version": "0.12.71",
+  "source_scope": "gameplay.js: stamp fullHolder, nextSlot and next before moving images; preserve existing signatures",
+  "before_fix": {
+    "tests": 4,
+    "pass": 1,
+    "fail": 3,
+    "rank_rows_replaced": 4,
+    "log": "node-before-fix.log"
+  },
+  "targeted": {
+    "tests": 39,
+    "pass": 39,
+    "fail": 0,
+    "log": "node-targeted.log"
+  },
+  "node_full": {
+    "command": "node --test backend/web/*.test.cjs",
+    "tests": 919,
+    "pass": 919,
+    "fail": 0,
+    "skipped": 0,
+    "duration_ms": 16484.814584,
+    "log": "node-full.log"
+  },
+  "go_backend_full": {
+    "command": "go test ./backend -count=1",
+    "result": "PASS",
+    "duration_seconds": 261.44,
+    "log": "go-full.log"
+  },
+  "diff_check": "PASS",
+  "independent_review": "r215_stamp_review: no confirmed issue; 11/11 R213 tests passed",
+  "after_fix_rank_rows_replaced": 1,
+  "unchanged_rows_and_images": "original objects preserved",
+  "same_source_images_recreated": 0,
+  "build_performed": false,
+  "release_performed": false,
+  "real_machine_validation": "pending with R213 after build is allowed"
+}

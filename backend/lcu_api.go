@@ -568,10 +568,24 @@ type AccountData struct {
 }
 
 type ChampionMastery struct {
-	ChampionID     int64 `json:"championId"`
-	ChampionLevel  int64 `json:"championLevel"`
-	ChampionPoints int64 `json:"championPoints"`
-	LastPlayTime   int64 `json:"lastPlayTime"`
+	ChampionID                   int64                   `json:"championId"`
+	ChampionLevel                int64                   `json:"championLevel"`
+	ChampionPoints               int64                   `json:"championPoints"`
+	LastPlayTime                 int64                   `json:"lastPlayTime"`
+	ChampionPointsSinceLastLevel *int64                  `json:"championPointsSinceLastLevel,omitempty"`
+	ChampionPointsUntilNextLevel *int64                  `json:"championPointsUntilNextLevel,omitempty"`
+	MarkRequiredForNextLevel     *int64                  `json:"markRequiredForNextLevel,omitempty"`
+	TokensEarned                 *int64                  `json:"tokensEarned,omitempty"`
+	ChampionSeasonMilestone      *int64                  `json:"championSeasonMilestone,omitempty"`
+	MilestoneGrades              []string                `json:"milestoneGrades,omitempty"`
+	NextSeasonMilestone          *masterySeasonMilestone `json:"nextSeasonMilestone,omitempty"`
+}
+
+type masterySeasonMilestone struct {
+	RequireGradeCounts map[string]int `json:"requireGradeCounts"`
+	RewardMarks        int            `json:"rewardMarks"`
+	Bonus              bool           `json:"bonus"`
+	TotalGamesRequires int            `json:"totalGamesRequires"`
 }
 
 type SkinDetailData struct {

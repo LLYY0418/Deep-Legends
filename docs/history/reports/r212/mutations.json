@@ -1,0 +1,16 @@
+{
+  "payload_after_wait": {
+    "expected": "FAIL",
+    "actual": "FAIL",
+    "failure": "payload was not released before parent_exited",
+    "log": "payload-after-wait-final.log",
+    "method": "Go overlay; production source unchanged"
+  },
+  "unconditional_powershell": {
+    "expected": "FAIL",
+    "actual": "FAIL",
+    "failure": "ERR_ASSERTION: parent-exited fast path executes PowerShell",
+    "log": "unconditional-powershell.log",
+    "method": "R212_NSH_SOURCE temporary fixture; production source unchanged"
+  }
+}

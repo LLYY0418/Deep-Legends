@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -194,7 +193,7 @@ func (a *app) handleGameplayMatch(w http.ResponseWriter, r *http.Request) {
 		PlayerRef     string `json:"playerRef"`
 		Refresh       string `json:"refresh"`
 	}
-	if err := decodeJSONRequest(r, &request, 4<<10); err != nil || request.GameID <= 0 || request.ParticipantID <= 0 || request.Region != riotRegionKR || request.Refresh != "perk-stats" {
+	if err := decodeJSONRequest(r, &request, 4<<10); err != nil || request.GameID <= 0 || request.ParticipantID <= 0 || !isRiotRegion(request.Region) || request.Refresh != "perk-stats" {
 		http.Error(w, "查询参数无效", http.StatusBadRequest)
 		return
 	}
@@ -202,7 +201,7 @@ func (a *app) handleGameplayMatch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Riot 接口不可用", http.StatusConflict)
 		return
 	}
-	raw, _, err := a.riot.matchByIDWithCacheMode(r.Context(), fmt.Sprintf("KR_%d", request.GameID), true)
+	raw, _, err := a.riot.forPlatform(request.Region).matchByIDWithCacheMode(r.Context(), riotMatchID(request.Region, request.GameID), true)
 	if err != nil {
 		a.recordDiagnostic(map[string]any{"event": "perk_stats_refresh_failed", "reason": safeDiagnosticReason(err)})
 		http.Error(w, "读取对局失败", http.StatusBadGateway)
@@ -224,6 +223,8 @@ func (a *app) handleGameplayMatch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "对局参与者无效", http.StatusBadRequest)
 		return
 	}
+	applyMatchScores(&match)
+	a.recordMatchScores("riot", match)
 	a.recordRiotPerkDiagnostics("riot", []*riotMatchInfo{&raw.Info}, "", request.ParticipantID)
 	a.publicizeMatchReferences(&match)
 	a.recordDiagnostic(map[string]any{"event": "perk_stats_refreshed", "game_id": request.GameID})

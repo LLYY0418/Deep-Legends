@@ -1,4 +1,6 @@
-const HOSTS = { asia: "asia.api.riotgames.com", kr: "kr.api.riotgames.com" };
+const CLUSTERS = new Set(["americas", "asia", "europe", "sea"]);
+const PLATFORMS = ["br1", "eun1", "euw1", "jp1", "kr", "la1", "la2", "me1", "na1", "oc1", "ru", "sg2", "tr1", "tw2", "vn2"];
+const HOSTS = Object.fromEntries([...CLUSTERS, ...PLATFORMS].map(region => [region, `${region}.api.riotgames.com`]));
 const MAX_BODY = 16 * 1024 * 1024;
 
 export function allowedRoute(url) {
@@ -8,7 +10,7 @@ export function allowedRoute(url) {
   try { segments = parts.slice(3).map(decodeURIComponent); } catch { return null; }
   if (segments.some(s => !s || s.length > 256 || /[\\/\u0000-\u001f?#%]/.test(s) || s === "." || s === "..")) return null;
   const path = "/" + segments.join("/");
-  const rules = parts[2] === "asia" ? [
+  const rules = CLUSTERS.has(parts[2]) ? [
     [/^\/riot\/account\/v1\/accounts\/by-riot-id\/[^/]+\/[^/]+$/, "account", 3600],
     [/^\/riot\/account\/v1\/accounts\/by-puuid\/[^/]+$/, "account", 3600],
     [/^\/lol\/match\/v5\/matches\/by-puuid\/[^/]+\/ids$/, "match-ids", 60],
@@ -18,8 +20,12 @@ export function allowedRoute(url) {
     [/^\/lol\/summoner\/v4\/summoners\/by-puuid\/[^/]+$/, "summoner", 60],
     [/^\/lol\/league\/v4\/entries\/by-puuid\/[^/]+$/, "rank", 60],
     [/^\/lol\/champion-mastery\/v4\/champion-masteries\/by-puuid\/[^/]+\/top$/, "mastery", 60],
+    [/^\/lol\/champion-mastery\/v4\/champion-masteries\/by-puuid\/[^/]+$/, "mastery", 60],
+    [/^\/lol\/champion-mastery\/v4\/scores\/by-puuid\/[^/]+$/, "mastery", 60],
+    [/^\/lol\/spectator\/v5\/active-games\/by-summoner\/[^/]+$/, "spectator", 30],
     [/^\/lol\/status\/v4\/platform-data$/, "status", 60],
   ];
+  if (parts[2] === "sea" && path.startsWith("/riot/account/")) return null;
   const rule = rules.find(([pattern]) => pattern.test(path));
   if (!rule) return null;
   return { host: HOSTS[parts[2]], path: "/" + parts.slice(3).join("/"), category: rule[1], ttl: rule[2] };
@@ -84,9 +90,21 @@ export function createRiotWorker(options = {}) {
       // Only expiring HTTP response caches are used. Cache keys contain neither
       // Riot IDs nor IPs; no KV/D1/R2 or application identity/request logs.
       const cache = options.cache || caches.default;
-      const key = new Request(url.origin + "/_cache/" + await digest(route.host + route.path + url.search));
-      const cooldownKey = new Request(url.origin + "/_cooldown/" + await digest(route.host + route.path));
-      const applicationKey = new Request(url.origin + "/_application_cooldown/" + await digest(route.host));
+      // The caller's validated platform isolates cooldowns even when JP and KR
+      // share ASIA. It is an enum, never an account identifier or credential.
+      const platform = request.headers.get("X-Riot-Platform") || "";
+      if (platform && !PLATFORMS.includes(platform)) return finish(jsonError("Invalid platform", 400));
+      const routeRegion = url.pathname.split("/")[2];
+      const cluster = ["na1", "br1", "la1", "la2"].includes(platform) ? "americas"
+        : ["kr", "jp1"].includes(platform) ? "asia"
+        : ["oc1", "sg2", "tw2", "vn2"].includes(platform) ? "sea" : "europe";
+      const accountCluster = cluster === "sea" ? "asia" : cluster;
+      const expectedRegion = CLUSTERS.has(routeRegion) ? (route.path.startsWith("/riot/account/") ? accountCluster : cluster) : platform;
+      if (platform && routeRegion !== expectedRegion) return finish(jsonError("Invalid platform route", 400));
+      const rateIdentity = route.host + "|" + (platform || routeRegion);
+      const key = new Request(url.origin + "/_cache/" + await digest(rateIdentity + route.path + url.search));
+      const cooldownKey = new Request(url.origin + "/_cooldown/" + await digest(rateIdentity + route.path));
+      const applicationKey = new Request(url.origin + "/_application_cooldown/" + await digest(rateIdentity));
       // Count every request against the IP binding, while preserving the
       // application's host-wide Retry-After even when both limits apply.
       for (const markerKey of permitted.success ? [applicationKey, cooldownKey] : [applicationKey]) {

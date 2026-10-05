@@ -174,9 +174,10 @@ function cssNumber(source, marker, property) {
 }
 
 function compileFunctions(source, names, dependencies = {}) {
+  if (source.includes("function computeOverviewStreak(")) names = require("./r211-harness-support.cjs").expand(source, names, dependencies);
   dependencies = { recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies };
   const bodies = names.map((name) => functionSource(source, name));
-  const compiledDependencies = { gradeBadge: sharedGrades.gradeBadge, gradeRank: sharedGrades.gradeRank, isSummonersRiftMatch: data => Number(data?.mapId) === 11, ...dependencies };
+  const compiledDependencies = { state:{},gradeBadge: sharedGrades.gradeBadge, gradeRank: sharedGrades.gradeRank, isSummonersRiftMatch: data => Number(data?.mapId) === 11, ...dependencies };
   if (source.includes("function loadOverview(")) {
     compiledDependencies.riotTab ||= tab => tab?.region === "kr";
     for (const name of ["syncOverviewSupplementRefs", "overviewSupplementTarget"]) {
@@ -232,7 +233,7 @@ function compileFunctions(source, names, dependencies = {}) {
   const dependencyNames = Object.keys(compiledDependencies);
   const factory = Function(
     ...dependencyNames,
-    `"use strict";\n${bodies.join("\n")}\nreturn { ${names.join(", ")} };`,
+    `"use strict";\n${require("./r220-harness-support.cjs").prelude(source,compiledDependencies)}${bodies.join("\n")}\nreturn { ${names.join(", ")} };`,
   );
   return factory(...dependencyNames.map((name) => compiledDependencies[name]));
 }
@@ -408,7 +409,7 @@ function assertR13ItemColumnContract(championJS, championCSS, liveJS, liveCSS) {
 
 function assertR15PerformanceAndBuildContracts() {
   assert.match(gameplayBackend, /shouldLoadOverviewHistory\(reference, playerRef, matches\)/);
-  assert.match(gameplayBackend, /matchHistoryOn\(ctx, client, reference\.ServerID, playerRef, 0, maximumSummaryMatchCount, true\)/);
+  assert.match(gameplayBackend, /matchHistoryOn\(ctx, client, reference\.ServerID, playerRef, 0, maximumSummaryMatchCount, !force\)/);
   assert.match(gameplayBackend, /capGameplayCoreOptions\(bundle\.Build\.CoreOptions\)/);
   assert.match(gameplayBackend, /func capGameplayCoreOptions[\s\S]*?if len\(options\) > championCoreRecommendationLimit \{[\s\S]*?return options\[:championCoreRecommendationLimit\]/);
   assert.match(gameplayBackend, /"event": "overview_load_cost"/);
@@ -442,7 +443,7 @@ test("R15 performance, fingerprint, and shared build CSS contracts", () => {
 });
 
 test("R15 mutation probes fail for every new guard", () => {
-  assert.throws(() => assert.match(gameplayBackend.replace("maximumSummaryMatchCount, true)", "maximumSummaryMatchCount, false)"), /maximumSummaryMatchCount, true\)/));
+  assert.throws(() => assert.match(gameplayBackend.replace("maximumSummaryMatchCount, !force)", "maximumSummaryMatchCount, false)"), /maximumSummaryMatchCount, !force\)/));
   assert.throws(() => assert.match(gameplayBackend.replace("&& len(matches) == 0", ""), /&& len\(matches\) == 0/));
   assert.throws(() => assert.match(rankInsightsBackend.replace("return flight.entry", "return rankScoreEntry{}"), /return flight\.entry/));
   assert.throws(() => assert.match(gameplayBackend.replace("return options[:5]", "return options[:1]"), /return options\[:5\]/));
@@ -472,7 +473,7 @@ function assertR7Contract(js, css, structuredSource, hexdataSource, gameplaySour
 	assert.match(gameplaySource, /function renderMatchDetailFailure\(gameID, detailState\)/);
 	assert.match(gameplaySource, /data-retry-match-detail/);
 	const matchSource = functionSource(gameplaySource, "renderMatch");
-	assert.match(matchSource, /match-build[^\n]+match-items[^\n]+scorePlacementChip\(subjectScore\)[^\n]+match-badges/);
+	assert.match(matchSource, /match-build[^\n]+match-items[^\n]+match-badges[^\n]+renderMatchTags\(match,subject,subjectScore,tab\)/);
 	assert.doesNotMatch(matchSource, /renderMatchScoreCell\(subjectScore\)|scoreChip\(subjectScore\)/);
 	assert.doesNotMatch(matchSource, /match-score-line|const rankChip/);
 	assert.match(functionSource(gameplaySource, "updateStatus"), /if \(wasConnected\) \{[\s\S]*?ensurePerks\(true\);[\s\S]*?ensureItems\(\);[\s\S]*?ensureSummonerSpells\(\);/);
@@ -640,7 +641,7 @@ test("position-aware recommendation contracts kill documented mutations", () => 
 
     fs.writeFileSync(copies.gameplay, original.gameplay.replace("const baseKey = `${championId}:${gameMode}:${mapId}`;", "const baseKey = `${championId}:${position}:${gameMode}:${mapId}`;"));
     assert.throws(() => assertPositionRecommendationContract(original.champion, original.styles, fs.readFileSync(copies.gameplay, "utf8")));
-	    fs.writeFileSync(copies.gameplay, original.gameplay.replace('const automatic = !target?.positionOverride && payload.positionSource && payload.positionSource !== "requested";', "const automatic = true;"));
+	    fs.writeFileSync(copies.gameplay, original.gameplay.replace('const automatic = String(data?.gameMode || "").toUpperCase() !== "PRACTICETOOL" && !target?.positionOverride && payload.positionSource && payload.positionSource !== "requested";', "const automatic = true;"));
     assert.throws(() => assertPositionRecommendationContract(original.champion, original.styles, fs.readFileSync(copies.gameplay, "utf8")));
 	    fs.writeFileSync(copies.gameplay, original.gameplay.replace("orderedPositions.length >= 1", "orderedPositions.length > 1"));
     assert.throws(() => assertPositionRecommendationContract(original.champion, original.styles, fs.readFileSync(copies.gameplay, "utf8")));
@@ -1430,7 +1431,7 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	const arenaTeamMetaSource = functionSource(gameplayScript, "arenaTeamMeta");
 	assert.match(arenaTeamMetaSource, /iconPath: `\/arena-team-icons\/\$\{mascot\.file\}`/);
 	assert.doesNotMatch(arenaTeamMetaSource, /\/api\/image|lol-game-data\/assets\/UX\/Cherry\/TeamIcons/);
-  assert.match(gameplayScript, /if \(matchPlayerGroups\(match\)\.arena\) \{\s*return `<div[^`]+is-arena-detail[^`]+renderArenaMatchOverview\(match\)/s);
+  assert.match(gameplayScript, /matchPlayerGroups\(match\)\.arena \? renderArenaMatchOverview\(match\) : renderMatchOverview\(match\)/s);
   assert.match(gameplayScript, /function renderArenaMatchOverview\(match\)/);
   assert.match(functionSource(gameplayScript, "renderArenaMatchOverview"), /img data-queued-src="\$\{escapeHTML\(team\.iconPath\)\}"/);
   assert.doesNotMatch(functionSource(gameplayScript, "renderArenaMatchOverview"), /assetIcon\(team\.iconPath/);
@@ -1517,7 +1518,7 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 });
 
 test("arena match detail uses a validated Riot route and fail-closed hydration", () => {
-	assert.match(arenaMatchDetailSource, /\^KR_\[0-9\]\+\$/);
+	assert.match(arenaMatchDetailSource, /return validRiotMatchID\(matchID\)/);
 	assert.match(arenaMatchDetailSource, /matchByIDWithCache/);
 	assert.match(arenaMatchDetailSource, /publicizeMatchReferences/);
 	assert.match(arenaMatchDetailSource, /"event":\s*"arena_match_detail"/);
@@ -2342,7 +2343,7 @@ test("team analysis exposes only metrics supported by each map and mode", () => 
 
 test("match tier hydration is asynchronous and isolated by stable region, server, player and container", () => {
   assert.match(gameplayScript, /function matchTierScope\(tab\)/);
-	assert.match(gameplayScript, /const serverID = riotTab\(tab\) \? "kr" : \(tabServerID\(tab\) \|\| "current"\)/);
+	assert.match(gameplayScript, /const serverID = riotTab\(tab\) \? tab.region : \(tabServerID\(tab\) \|\| "current"\)/);
 	assert.match(gameplayScript, /return `\$\{region\}:\$\{serverID\}:\$\{playerRef\}`/);
 	assert.doesNotMatch(functionSource(gameplayScript, "matchTierScope"), /tab\?\.key|tab\.key/);
   assert.match(gameplayScript, /container\.dataset\.matchTierScope = tierScope/);
@@ -2669,47 +2670,14 @@ test("round 9 match summaries show only placement while details align it beside 
 	assert.equal(scoreBadgeChip({ badge: "" }), "");
 });
 
-test("round 9 match scores assign overall ranks and replace side leaders with MVP and SVP", () => {
-	const { participantGroupKey, computeMatchScores } = compileFunctions(
-		gameplayScript,
-		["participantGroupKey", "computeMatchScores"],
-	);
-	const participant = (participantId, teamId, win, damage) => ({
-		participantId, teamId, win, damage, kills: damage / 1000, assists: 0, deaths: 1,
-		gold: damage, cs: damage / 100, csPerMinute: damage / 1000, visionScore: damage / 2000,
-	});
-	const scores = computeMatchScores({ duration: 1200, participants: [
-		participant(1, 100, true, 10000),
-		participant(2, 100, true, 8000),
-		participant(3, 200, false, 11000),
-		participant(4, 200, false, 9000),
-	] });
-	assert.deepEqual(
-		[...scores.values()].map(({ rank, total, badge }) => ({ rank, total, badge })),
-		[
-			{ rank: 2, total: 4, badge: "MVP" },
-			{ rank: 4, total: 4, badge: "" },
-			{ rank: 1, total: 4, badge: "SVP" },
-			{ rank: 3, total: 4, badge: "" },
-		],
-	);
-});
-
-test("round 9 match score ranks use hidden precision and keep exact ties deterministic", () => {
-	const { participantGroupKey, computeMatchScores } = compileFunctions(
-		gameplayScript,
-		["participantGroupKey", "computeMatchScores"],
-	);
-	const participants = [
-		{ participantId: 1, teamId: 100, win: true, kills: 10, assists: 0, deaths: 1, damage: 10000 },
-		{ participantId: 2, teamId: 100, win: true, kills: 10, assists: 0, deaths: 1, damage: 10000 },
-		{ participantId: 3, teamId: 200, win: false, kills: 9.96, assists: 0, deaths: 1, damage: 9960 },
-		{ participantId: 4, teamId: 200, win: false, kills: 9.94, assists: 0, deaths: 1, damage: 9940 },
-	];
-	const scores = computeMatchScores({ duration: 1200, participants });
-	assert.equal(scores.get(3).score, scores.get(4).score);
-	assert.ok(scores.get(3).rawScore > scores.get(4).rawScore);
-	assert.deepEqual([...scores.values()].map(({ rank }) => rank), [1, 2, 3, 4]);
+// Scoring/ranking assertions migrated intact to TestR216LegacyScoringInvariants,
+// TestR216LegacyRankBadgesAndHiddenPrecision and the old-JS golden in Go.
+test("R216 UI reads backend scores without recalculating", () => {
+  const {readMatchScores} = compileFunctions(gameplayScript, ["readMatchScores"]);
+  const score = {value:6.3,rawScore:6.345,rank:2,total:10,badge:"MVP",parts:[]};
+  assert.deepEqual(readMatchScores({participants:[{participantId:7,score}]}).get(7), {...score,score:6.3});
+  assert.equal(readMatchScores({participants:[{participantId:7,kills:50}]}).size,0);
+  assert.doesNotMatch(gameplayScript,/function computeMatchScores\(/);
 });
 
 test("round 9 augment rendering uses upstream images, descriptions, and all rarity tones", () => {
@@ -3208,7 +3176,7 @@ test("floating tooltip content is structured safely and shown only after placeme
   assert.match(appScript, /titleNode\.textContent = title/);
   assert.match(appScript, /bodyNode\.textContent = body/);
   assert.match(appScript, /tooltip\.replaceChildren\(\.\.\.children\)/);
-  assert.match(appScript, /tooltip\.dataset\.layout = roster \? "roster" : body \? "titled" : "single"/);
+  assert.match(appScript, /tooltip\.dataset\.layout = score \? "score" : roster \? "roster" : body \? "titled" : "single"/);
   assert.match(appScript, /delete tooltip\.dataset\.shown;[\s\S]*tooltip\.hidden = true/);
   const menuBranch = appScript.slice(appScript.indexOf('anchor.dataset.tooltipSide === "menu"'));
   const menuBeforeReturn = menuBranch.slice(0, menuBranch.indexOf("return;"));

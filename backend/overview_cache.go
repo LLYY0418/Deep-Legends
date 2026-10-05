@@ -40,6 +40,9 @@ func riotOverviewQuerySnapshotKey(reference gameplayReference, begIndex, count i
 }
 
 func (a *app) loadRiotOverviewDeduplicated(ctx context.Context, reference gameplayReference, begIndex, count int, force bool, filters ...string) (gameplayOverview, error) {
+	if force {
+		ctx = context.WithValue(ctx, overviewFreshHistoryKey{}, true)
+	}
 	if a.overviewQueries == nil {
 		return a.loadRiotOverview(ctx, reference, begIndex, count, filters...)
 	}
@@ -227,7 +230,7 @@ func (a *app) clearOverviewQuerySnapshots() {
 }
 
 func overviewSnapshotTTL(entry overviewQueryCacheEntry) time.Duration {
-	if entry.response.Player.Region == riotRegionKR {
+	if isRiotRegion(entry.response.Player.Region) {
 		return time.Minute
 	}
 	return overviewQuerySnapshotTTL

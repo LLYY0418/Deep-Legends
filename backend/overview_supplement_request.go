@@ -18,11 +18,11 @@ func (a *app) resolveOverviewSupplement(playerRef, gameName, tagLine, region str
 		return ref, 0
 	}
 	gameName, tagLine = strings.TrimSpace(gameName), strings.TrimSpace(strings.TrimPrefix(tagLine, "#"))
-	if !strings.EqualFold(strings.TrimSpace(region), riotRegionKR) || gameName == "" || tagLine == "" || len([]rune(gameName)) > 40 || len([]rune(tagLine)) > 12 {
+	if !isRiotRegion(region) || gameName == "" || tagLine == "" || len([]rune(gameName)) > 40 || len([]rune(tagLine)) > 12 {
 		return gameplayReference{}, http.StatusBadRequest
 	}
-	key := fmt.Sprintf("opgg-%x", sha256.Sum256([]byte(strings.ToLower(gameName+"#"+tagLine))))
-	return gameplayReference{PlayerRef: key, GameName: gameName, TagLine: tagLine, Region: riotRegionKR, OPGGIdentity: true}, 0
+	key := fmt.Sprintf("opgg-%x", sha256.Sum256([]byte(strings.ToLower(region+":"+gameName+"#"+tagLine))))
+	return gameplayReference{PlayerRef: key, GameName: gameName, TagLine: tagLine, Region: riotPlatform(region), OPGGIdentity: true}, 0
 }
 
 func overviewSupplementCacheIdentity(ref gameplayReference) string {

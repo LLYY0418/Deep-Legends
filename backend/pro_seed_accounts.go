@@ -216,7 +216,7 @@ func (p *riotProvider) proSeedRank(ctx context.Context, puuid string) (json.RawM
 	var rank json.RawMessage
 	err := p.cachedPublicIdentityTTL(ctx, "proseed-rank:v1:"+puuid, 24*time.Hour, proSeedRankTTL, &rank, func(ctx context.Context) error {
 		var entries []riotLeagueEntry
-		if err := p.get(ctx, riotPlatformHost, "/lol/league/v4/entries/by-puuid/"+url.PathEscape(puuid), nil, &entries); err != nil {
+		if err := p.get(ctx, p.platformHost(), "/lol/league/v4/entries/by-puuid/"+url.PathEscape(puuid), nil, &entries); err != nil {
 			return err
 		}
 		rank = proSeedRankFromEntries(entries)
@@ -253,7 +253,7 @@ func (p *riotProvider) observeProSeedRank(puuid string, entries []riotLeagueEntr
 	if c == nil || len(rank) == 0 {
 		return
 	}
-	key := riotIdentityKey("proseed-rank:v1:" + puuid)
+	key := p.identityKey("proseed-rank:v1:" + puuid)
 	c.mu.Lock()
 	old, ok := c.entries[key]
 	c.mu.Unlock()

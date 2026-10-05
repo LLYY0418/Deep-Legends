@@ -18,7 +18,7 @@ function fixture(upstream = async () => new Response('{"ok":true}')) {
     async limit({ key }) { const slot = key + ":" + Math.floor(stamp / 60000); const n = (counts.get(slot) || 0) + 1; counts.set(slot, n); return { success: n <= 300 }; },
   } };
   const worker = createRiotWorker({ cache, now: () => stamp, crypto: webcrypto, log: e => logs.push(e), fetch: async (...args) => { requests.push(args); return upstream(...args); } });
-  return { env, requests, entries, logs, advance(ms) { stamp += ms; }, get(path, method = "GET", ip = "192.0.2.1") {
+  return { worker, env, requests, entries, logs, advance(ms) { stamp += ms; }, get(path, method = "GET", ip = "192.0.2.1") {
     return worker.fetch(new Request("https://relay.example" + path, { method, headers: { "CF-Connecting-IP": ip, Cookie: "not-forwarded", "X-Riot-Token": "client-token-not-forwarded" } }), env);
   } };
 }
@@ -191,4 +191,39 @@ test("R208 application remaining time takes precedence when IP limit also expire
   const kr = await f.get("/r/kr/lol/status/v4/platform-data");
   assert.equal(kr.headers.get("X-Relay-Cooldown"), null);
   assert.equal(kr.headers.get("Retry-After"), "60");
+});
+
+test('R220 every platform and regional cluster has the correct endpoint family',async()=>{
+ const f=fixture();
+ const platforms=['br1','eun1','euw1','jp1','kr','la1','la2','me1','na1','oc1','ru','sg2','tr1','tw2','vn2'];
+ for(const platform of platforms){
+  for(const path of ['/lol/summoner/v4/summoners/by-puuid/fixture','/lol/league/v4/entries/by-puuid/fixture','/lol/champion-mastery/v4/champion-masteries/by-puuid/fixture/top','/lol/champion-mastery/v4/champion-masteries/by-puuid/fixture','/lol/champion-mastery/v4/scores/by-puuid/fixture','/lol/status/v4/platform-data'])assert.equal((await f.get(`/r/${platform}${path}`)).status,200,platform+path);
+  assert.equal((await f.get(`/r/${platform}/lol/match/v5/matches/JP1_220`)).status,404);
+ }
+ for(const cluster of ['americas','asia','europe','sea']){
+  assert.equal((await f.get(`/r/${cluster}/lol/match/v5/matches/by-puuid/fixture/ids`)).status,200,cluster);
+  assert.equal((await f.get(`/r/${cluster}/riot/account/v1/accounts/by-puuid/fixture`)).status,cluster==='sea'?404:200,cluster);
+  assert.equal((await f.get(`/r/${cluster}/lol/status/v4/platform-data`)).status,404,cluster);
+ }
+});
+
+test('R220 validated platform headers isolate JP and KR cooldowns on shared ASIA without forwarding headers',async()=>{
+ const f=fixture(async()=>new Response('{}',{status:429,headers:{'X-Rate-Limit-Type':'application','Retry-After':'60'}}));
+ const path='/r/asia/lol/match/v5/matches/by-puuid/fixture/ids';
+ const get=platform=>f.worker.fetch(new Request('https://relay.example'+path,{headers:{'X-Riot-Platform':platform,'CF-Connecting-IP':'192.0.2.1'}}),f.env);
+ assert.equal((await get('jp1')).status,429);assert.equal((await get('jp1')).status,429);assert.equal(f.requests.length,1);
+ assert.equal((await get('kr')).status,429);assert.equal(f.requests.length,2);
+ assert.equal((await get('private')).status,400);assert.equal((await get('euw1')).status,400);assert.equal(f.requests.length,2);
+ assert.equal(f.requests[0][1].headers['X-Riot-Platform'],undefined);
+});
+
+
+test('R220 shared-cluster responses remain platform-scoped in the relay cache',async()=>{
+ const f=fixture();
+ const path='/r/asia/riot/account/v1/accounts/by-puuid/fixture';
+ const get=platform=>f.worker.fetch(new Request('https://relay.example'+path,{headers:{'X-Riot-Platform':platform,'CF-Connecting-IP':'192.0.2.1'}}),f.env);
+ await get('jp1');await get('jp1');assert.equal(f.requests.length,1);
+ await get('kr');assert.equal(f.requests.length,2);
+ await get('kr');assert.equal(f.requests.length,2);
+ assert(f.entries.size>=2);
 });

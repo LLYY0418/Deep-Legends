@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {JSDOM}=require('../../desktop/node_modules/jsdom');
 const source=fs.readFileSync(path.join(__dirname,'gameplay.js'),'utf8');
 function extract(name){let start=source.indexOf(`function ${name}(`);assert.ok(start>=0,name);return source.slice(start,source.indexOf('\n  }',start)+4)}
-function compile(names,deps){return Function(...Object.keys(deps),names.map(extract).join('\n')+`\nreturn {${names.join(',')}}`)(...Object.values(deps))}
+function compile(names,deps){names=require("./r211-harness-support.cjs").expand(source,names,deps);return Function(...Object.keys(deps),names.map(extract).join('\n')+`\nreturn {${names.join(',')}}`)(...Object.values(deps))}
 const noop=()=>{};
 test('R110 tab selection, progress and unrelated scroll preserve all existing avatar nodes',()=>{
  const dom=new JSDOM('<nav></nav>');try{
@@ -23,7 +23,7 @@ test('R110 a newly streamed root card expands on the first click without replaci
  const dom=new JSDOM('<main></main>');try{
   const main=dom.window.document.querySelector('main'),tab={data:{player:{},matches:[{gameId:1}]},openMatches:new Set(),matchDetailTabs:new Map()};
   const renderMatch=()=>`<article class="match-entry" data-match-id="1"><div class="match-summary"><img data-queued-src="/hero"><button data-toggle-match="1" aria-expanded="${tab.openMatches.has('1')}" aria-label="toggle" data-tooltip="toggle"></button></div>${tab.openMatches.has('1')?'<div class="match-details">details</div>':''}</article>`;
-  const deps={document:dom.window.document,renderMatch,prepareImages:noop,applyRenderedMetricStyles:noop,bindPlayerLinks:noop,bindMatchDetailControls:noop,bindOverviewShareControls:noop,bindMatchFilterControls:noop,bindRankHistoryControls:noop,bindRankedQueueControls:noop,bindMatchSentinel:noop,rerenderTab:()=>assert.fail('whole overview was rendered')};
+  const deps={state:{},riotTab:()=>false,connected:()=>false,document:dom.window.document,renderMatch,prepareImages:noop,applyRenderedMetricStyles:noop,bindPlayerLinks:noop,bindMatchDetailControls:noop,bindOverviewShareControls:noop,bindMatchFilterControls:noop,bindRankHistoryControls:noop,bindRankedQueueControls:noop,bindMatchSentinel:noop,rerenderTab:()=>assert.fail('whole overview was rendered')};
   const ui=compile(['replaceMatchEntry','bindMatchEntryControls','bindOverviewContent'],deps);
   main.innerHTML=renderMatch();const card=main.firstChild,summary=card.firstChild,img=card.querySelector('img'),button=card.querySelector('button');
   ui.bindOverviewContent(card,tab);ui.bindOverviewContent(card,tab);

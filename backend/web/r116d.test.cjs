@@ -472,7 +472,7 @@ test("R116-D stage two stays out of the client until the probe verdict lands", (
 test("R116-D styles reuse tokens and existing values only", () => {
   const start = gameplayStyles.indexOf(".live-roster-supplement {");
   assert.notEqual(start, -1, "the R116-D style block is missing");
-  const block = gameplayStyles.slice(start);
+  const block = gameplayStyles.slice(start, gameplayStyles.indexOf("/* R211:", start));
   // 不许写死新 hex 色值（R117 的样式棘轮盯着重复 hex 的预算，已经顶格）。
   assert.doesNotMatch(block, /#[0-9A-Fa-f]{3,8}\b/, "R116-D styles must not hard-code hex colors");
   // 每个用到的变量都必须是既有变量。

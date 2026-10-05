@@ -1,0 +1,14 @@
+[
+  {
+    "original": "docs/history/reports/r216/opgg-holdout/manifest-sha256.json",
+    "retained": "docs/history/reports/r216/opgg-holdout-manifest-sha256.json",
+    "bytes": 137441,
+    "sha256": "232ead1a63d388571c3152c28e1b50f7f7862e200eb6abf829a84aec59c50f71"
+  },
+  {
+    "original": "docs/history/reports/r217/opgg-holdout/manifest-sha256.json",
+    "retained": "docs/history/reports/r217/opgg-holdout-manifest-sha256.json",
+    "bytes": 95146,
+    "sha256": "dacb2ba0c0eb837d09bead124bb3e0687f6b89feee2369f869f7432af344d146"
+  }
+]

@@ -123,7 +123,7 @@ func TestR191_04V2CacheRoundtrip(t *testing.T) {
 		raw := &riotMatch{Info: info}
 		id := fmt.Sprintf("KR_%d", 191+i)
 		raw.Metadata.MatchID = id
-		newRiotProvider(p).persistRiotMatch("riot-match-v2|"+id, raw)
+		newRiotProvider(p).persistRiotMatch("riot-match-v4|"+id, raw)
 		got, err := newRiotProvider(p).matchByID(context.Background(), id)
 		if err != nil {
 			t.Fatal(err)

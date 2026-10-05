@@ -24,8 +24,15 @@ const (
 
 // matchTierCacheKey 复用韩服对局 ID 的形状（KR_<gameId>），与 riot-matches 的
 // 键前缀区分开，落盘时按内容哈希命名。
-func matchTierCacheKey(gameID int64) string {
-	return "kr-match-tier-v1|KR_" + strconv.FormatInt(gameID, 10)
+func matchTierCacheKey(gameID int64, regions ...string) string {
+	region := riotRegionKR // Legacy callers are the explicitly Korean directory.
+	if len(regions) > 0 && isRiotRegion(regions[0]) {
+		region = riotPlatform(regions[0])
+	}
+	if region == riotRegionKR {
+		return "kr-match-tier-v1|" + riotMatchID(region, gameID)
+	}
+	return "riot-match-tier-v1|" + riotMatchID(region, gameID)
 }
 
 func (a *app) matchTierDiskCache() *championDataCache {
@@ -35,7 +42,7 @@ func (a *app) matchTierDiskCache() *championDataCache {
 	return a.matchTierCache
 }
 
-func (a *app) readMatchTierCache(gameID int64) (*matchTiersResponse, bool) {
+func (a *app) readMatchTierCache(gameID int64, regions ...string) (*matchTiersResponse, bool) {
 	if gameID <= 0 {
 		return nil, false
 	}
@@ -43,14 +50,14 @@ func (a *app) readMatchTierCache(gameID int64) (*matchTiersResponse, bool) {
 	if cache == nil {
 		return nil, false
 	}
-	entry, err := cache.readDisk(matchTierCacheKey(gameID))
+	entry, err := cache.readDisk(matchTierCacheKey(gameID, regions...))
 	if err != nil || len(entry.Data) == 0 {
 		return nil, false
 	}
 	if !entry.ExpiresAt.IsZero() && time.Now().After(entry.ExpiresAt) {
 		// 过期就删掉：隐私声明写的是「保留 7 天」，不能只是读的时候装作没有，
 		// 让文件在目录里一直躺着（目录未满时淘汰逻辑不会碰它）。
-		_ = os.Remove(cache.pathFor(matchTierCacheKey(gameID)))
+		_ = os.Remove(cache.pathFor(matchTierCacheKey(gameID, regions...)))
 		return nil, false
 	}
 	var value matchTiersResponse
@@ -60,7 +67,7 @@ func (a *app) readMatchTierCache(gameID int64) (*matchTiersResponse, bool) {
 	return &value, true
 }
 
-func (a *app) writeMatchTierCache(gameID int64, value *matchTiersResponse) {
+func (a *app) writeMatchTierCache(gameID int64, value *matchTiersResponse, regions ...string) {
 	if gameID <= 0 || value == nil || value.Tier == "" {
 		return
 	}
@@ -74,19 +81,19 @@ func (a *app) writeMatchTierCache(gameID int64, value *matchTiersResponse) {
 	}
 	hash := sha256.Sum256(data)
 	now := time.Now()
-	_ = cache.writeDisk(championCacheEnvelope{Schema: championCacheSchema, Key: matchTierCacheKey(gameID),
+	_ = cache.writeDisk(championCacheEnvelope{Schema: championCacheSchema, Key: matchTierCacheKey(gameID, regions...),
 		FetchedAt: now, ExpiresAt: now.Add(matchTierCacheTTL), StaleUntil: now.Add(matchTierCacheTTL),
 		Hash: hex.EncodeToString(hash[:]), Data: data})
 }
 
 // splitCachedMatchTiers 先把长期缓存命中的对局挑出来，剩下的才需要去查 OP.GG。
 // 命中的部分直接进响应，因此重开同一个玩家时平均段位是立即显示的。
-func (a *app) splitCachedMatchTiers(matches []matchTierMatchRequest) (map[string]*matchTiersResponse, []matchTierMatchRequest, int) {
+func (a *app) splitCachedMatchTiers(matches []matchTierMatchRequest, regions ...string) (map[string]*matchTiersResponse, []matchTierMatchRequest, int) {
 	response := make(map[string]*matchTiersResponse, len(matches))
 	missing := make([]matchTierMatchRequest, 0, len(matches))
 	hits := 0
 	for _, match := range matches {
-		if value, ok := a.readMatchTierCache(match.GameID); ok {
+		if value, ok := a.readMatchTierCache(match.GameID, regions...); ok {
 			response[strconv.FormatInt(match.GameID, 10)] = value
 			hits++
 			continue

@@ -157,7 +157,7 @@ func (a *app) fetchOPGGHistoricalRanks(ctx context.Context, slug string) ([]game
 	if a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) {
 		return nil, errors.New("opgg historical ranks disabled")
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://op.gg/zh-cn/lol/summoners/kr/"+slug, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://op.gg/zh-cn/lol/summoners/"+opggPlatform(riotContextPlatform(ctx))+"/"+slug, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (a *app) opggHistoricalRanks(ctx context.Context, gameName, tagLine, puuid,
 		return nil
 	}
 	var stale []gameplayHistoricalRank
-	cacheKey := sourceScopedKey(dataSourceOPGG, puuid)
+	cacheKey := sourceScopedKey(dataSourceOPGG, opggRegionCacheIdentity(riotContextPlatform(ctx), puuid))
 	for {
 		a.opgg.mu.Lock()
 		entry, cached := a.opgg.histories[cacheKey]
@@ -243,11 +243,15 @@ func (a *app) opggHistoricalRanks(ctx context.Context, gameName, tagLine, puuid,
 	return ranks
 }
 
-func (a *app) cachedOPGGHistoricalRanks(puuid string) []gameplayHistoricalRank {
+func (a *app) cachedOPGGHistoricalRanks(puuid string, regions ...string) []gameplayHistoricalRank {
 	if a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) || a.opgg == nil || !validPlayerReference(puuid) {
 		return nil
 	}
-	key := sourceScopedKey(dataSourceOPGG, puuid)
+	region := ""
+	if len(regions) > 0 {
+		region = regions[0]
+	}
+	key := sourceScopedKey(dataSourceOPGG, opggRegionCacheIdentity(region, puuid))
 	a.opgg.mu.Lock()
 	entry, ok := a.opgg.histories[key]
 	if ok && !opggHistoryEntryFresh(entry, time.Now()) {
@@ -265,7 +269,7 @@ func (a *app) startOPGGHistoricalRanks(reference gameplayReference, gameName, ta
 	if a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) || a.opgg == nil || strings.EqualFold(strings.TrimSpace(privacy), "PRIVATE") || strings.TrimSpace(gameName) == "" || !validPlayerReference(puuid) {
 		return
 	}
-	key := sourceScopedKey(dataSourceOPGG, puuid)
+	key := sourceScopedKey(dataSourceOPGG, opggRegionCacheIdentity(reference.Region, puuid))
 	a.opgg.mu.Lock()
 	if entry, ok := a.opgg.histories[key]; ok && opggHistoryEntryFresh(entry, time.Now()) {
 		a.opgg.mu.Unlock()
@@ -288,7 +292,7 @@ func (a *app) startOPGGHistoricalRanks(reference gameplayReference, gameName, ta
 		ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
 		defer cancel()
 		started := time.Now()
-		ranks := a.opggHistoricalRanks(ctx, gameName, tagLine, puuid, privacy)
+		ranks := a.opggHistoricalRanks(withRiotPlatform(ctx, reference.Region), gameName, tagLine, puuid, privacy)
 		a.recordDiagnostic(map[string]any{"event": "opgg_historical_cost", "duration_ms": time.Since(started).Milliseconds(), "background": true, "count": len(ranks)})
 		if len(ranks) == 0 {
 			return
@@ -397,7 +401,7 @@ func parseOPGGGamesPage(data []byte) ([]opggGameTier, string, error) {
 }
 
 func (a *app) opggFetchGamesPage(ctx context.Context, ref gameplayReference, profileID, endedAt string) ([]opggGameTier, string, error) {
-	body, _ := json.Marshal([]opggGamesRequest{{Locale: "zh-cn", Region: "kr", PUUID: profileID, GameType: "TOTAL", EndedAt: endedAt, Champion: ""}})
+	body, _ := json.Marshal([]opggGamesRequest{{Locale: "zh-cn", Region: opggPlatform(ref.Region), PUUID: profileID, GameType: "TOTAL", EndedAt: endedAt, Champion: ""}})
 	data, err := a.readOPGGPlayerPage(ctx, ref, http.MethodPost, opggGamesAction, body)
 	if err != nil {
 		return nil, "", err
@@ -423,7 +427,7 @@ func (a *app) opggGameTiers(ctx context.Context, gameName, tagLine, puuid string
 		a.recordDiagnostic(map[string]any{"event": "opgg_match_tiers_cost", "duration_ms": time.Since(started).Milliseconds(), "stage": stage, "pages": pages, "cache_hit": cacheHit, "rows": len(result), "success": resultErr == nil, "failure": supplementFailureCode(resultErr)})
 	}()
 	// Bind cached identities to both the trusted Riot ID and our internal ID.
-	key := sourceScopedKey(dataSourceOPGG, puuid+":"+strings.ToLower(gameName+"#"+tagLine))
+	key := sourceScopedKey(dataSourceOPGG, opggRegionCacheIdentity(riotContextPlatform(ctx), puuid+":"+strings.ToLower(gameName+"#"+tagLine)))
 	var entry opggTierCacheEntry
 	for {
 		a.opgg.mu.Lock()
@@ -457,7 +461,7 @@ func (a *app) opggGameTiers(ctx context.Context, gameName, tagLine, puuid string
 		}
 		break
 	}
-	ref := gameplayReference{Region: riotRegionKR, GameName: gameName, TagLine: tagLine}
+	ref := gameplayReference{Region: riotContextPlatform(ctx), GameName: gameName, TagLine: tagLine}
 	entry.err = nil
 	if entry.profileID == "" {
 		stage = "page-identity"
@@ -656,12 +660,16 @@ func opggNearestRowGap(request matchTierMatchRequest, games []opggGameTier) (int
 //
 // oldest 传 0：只预热第一页。需要更老的对局时前台请求会按现有逻辑继续翻页，
 // opggGameTiers 自身的 flight 合并保证不会重复取页。
-func (a *app) startOPGGGameTiers(gameName, tagLine, puuid string) {
+func (a *app) startOPGGGameTiers(gameName, tagLine, puuid string, regions ...string) {
 	if a.champions == nil || a.opgg == nil || !a.champions.featureGates.enabled(featureGateOPGG) ||
 		strings.TrimSpace(gameName) == "" || !validPlayerReference(puuid) {
 		return
 	}
-	key := sourceScopedKey(dataSourceOPGG, puuid+":"+strings.ToLower(gameName+"#"+tagLine))
+	region := ""
+	if len(regions) > 0 {
+		region = regions[0]
+	}
+	key := sourceScopedKey(dataSourceOPGG, opggRegionCacheIdentity(region, puuid+":"+strings.ToLower(gameName+"#"+tagLine)))
 	a.opgg.mu.Lock()
 	entry := a.opgg.tiers[key]
 	fresh := !entry.at.IsZero() && time.Since(entry.at) < opggTierCacheTTL
@@ -675,6 +683,6 @@ func (a *app) startOPGGGameTiers(gameName, tagLine, puuid string) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), matchTiersOPGGTimeout)
 		defer cancel()
-		_, _ = a.opggGameTiers(ctx, gameName, tagLine, puuid, 0, 1)
+		_, _ = a.opggGameTiers(withRiotPlatform(ctx, region), gameName, tagLine, puuid, 0, 1)
 	}()
 }

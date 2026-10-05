@@ -41,11 +41,12 @@ func newRiotMatchDiskCache(p *championProvider) *championDataCache {
 }
 
 func validRiotMatchID(id string) bool {
-	if !strings.HasPrefix(id, "KR_") || len(id) > 32 {
+	parts := strings.SplitN(id, "_", 2)
+	if len(parts) != 2 || !isRiotRegion(parts[0]) || parts[0] != strings.ToUpper(riotPlatform(parts[0])) || len(id) > 32 {
 		return false
 	}
-	n, err := strconv.ParseUint(strings.TrimPrefix(id, "KR_"), 10, 64)
-	return err == nil && n > 0
+	n, err := strconv.ParseUint(parts[1], 10, 64)
+	return err == nil && n > 0 && strconv.FormatUint(n, 10) == parts[1]
 }
 
 func (p *riotProvider) persistRiotMatch(key string, match *riotMatch) {

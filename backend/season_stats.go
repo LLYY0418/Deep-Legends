@@ -23,7 +23,11 @@ var seasonStartS26 = time.Date(2026, 1, 8, 0, 0, 0, 0, time.UTC)
 //	   「逐场平均」（float64），KDA 改用 ratioFloat，旧缓存的数字口径不兼容。
 //	9  放开队列过滤：海克斯大乱斗（2300/2400/3270）计入 Stats/QueueStats/
 //	   RankedMatches，并新增 AugmentSamples 逐场海克斯与成装快照。
-const seasonStatsCacheSchemaVersion = 9
+//
+// 10 持久化原始 K/D/A 累计；响应计算不再改写扫描状态。
+// 11 R216: Go v2 scores and champion/opponent table totals.
+// 12 R216 P4: adopted v2.1 scores; reject all persisted v2 table aggregates.
+const seasonStatsCacheSchemaVersion = 12
 
 const seasonStatsSource = dataSourceSGP
 
@@ -276,6 +280,9 @@ type gameplaySeasonChampionStat struct {
 	ChampionName string  `json:"championName,omitempty"`
 	Games        int     `json:"games"`
 	Wins         int     `json:"wins"`
+	TotalKills   int     `json:"totalKills,omitempty"`
+	TotalDeaths  int     `json:"totalDeaths,omitempty"`
+	TotalAssists int     `json:"totalAssists,omitempty"`
 	Kills        float64 `json:"kills"`
 	Deaths       float64 `json:"deaths"`
 	Assists      float64 `json:"assists"`
@@ -288,15 +295,17 @@ type gameplaySeasonChampionStat struct {
 }
 
 type seasonStatsProgress struct {
-	Season      string `json:"season"`
-	Scanned     int    `json:"scanned"`
-	Complete    bool   `json:"complete"`
-	Collecting  bool   `json:"collecting,omitempty"`
-	Unavailable bool   `json:"unavailable,omitempty"`
-	Message     string `json:"message,omitempty"`
+	TableSupported bool   `json:"tableSupported,omitempty"`
+	Season         string `json:"season"`
+	Scanned        int    `json:"scanned"`
+	Complete       bool   `json:"complete"`
+	Collecting     bool   `json:"collecting,omitempty"`
+	Unavailable    bool   `json:"unavailable,omitempty"`
+	Message        string `json:"message,omitempty"`
 }
 
 type seasonStatsCache struct {
+	ChampionTable []seasonTableBucket          `json:"championTable,omitempty"`
 	SchemaVersion int                          `json:"schemaVersion"`
 	Source        string                       `json:"source"`
 	Season        string                       `json:"season"`
@@ -390,9 +399,9 @@ func seasonStatsAccumulate(stats map[int64]*gameplaySeasonChampionStat, queueSta
 		if participant.Win {
 			item.Wins++
 		}
-		item.Kills += float64(participant.Kills)
-		item.Deaths += float64(participant.Deaths)
-		item.Assists += float64(participant.Assists)
+		item.TotalKills += participant.Kills
+		item.TotalDeaths += participant.Deaths
+		item.TotalAssists += participant.Assists
 		item.TotalCS += participant.TotalMinionsKilled + participant.NeutralMinionsKilled
 		item.Duration += riotMatchDurationSeconds(info)
 		if queueStats != nil {
@@ -552,14 +561,18 @@ func seasonStatsFinalizeQueues(stats map[int64]gameplayAggregate) map[int64]game
 
 func seasonStatsFinalize(stats map[int64]*gameplaySeasonChampionStat, names map[int64]string) []gameplaySeasonChampionStat {
 	result := make([]gameplaySeasonChampionStat, 0, len(stats))
-	for id, item := range stats {
-		item.ChampionName = championName(names, id)
+	for id, original := range stats {
+		copy := *original
+		item := &copy
+		if names != nil {
+			item.ChampionName = championName(names, id)
+		}
 		if item.Games > 0 {
 			item.WinRate = int(float64(item.Wins)*100/float64(item.Games) + 0.5)
-			item.Kills = round1(item.Kills / float64(item.Games))
-			item.Deaths = round1(item.Deaths / float64(item.Games))
-			item.Assists = round1(item.Assists / float64(item.Games))
-			item.KDA = round2(ratioFloat(item.Kills+item.Assists, item.Deaths))
+			item.Kills = round1(float64(item.TotalKills) / float64(item.Games))
+			item.Deaths = round1(float64(item.TotalDeaths) / float64(item.Games))
+			item.Assists = round1(float64(item.TotalAssists) / float64(item.Games))
+			item.KDA = round2(ratioFloat(float64(item.TotalKills+item.TotalAssists), float64(item.TotalDeaths)))
 			item.CS = round1(float64(item.TotalCS) / float64(item.Games))
 			item.CSPerMinute = round1(perMinute(item.TotalCS, item.Duration))
 		}
@@ -588,9 +601,9 @@ func seasonStatsOverall(items []gameplaySeasonChampionStat) gameplayAggregate {
 	for _, item := range items {
 		result.Games += item.Games
 		result.Wins += item.Wins
-		totalKills += item.Kills * float64(item.Games)
-		totalDeaths += item.Deaths * float64(item.Games)
-		totalAssists += item.Assists * float64(item.Games)
+		totalKills += float64(item.TotalKills)
+		totalDeaths += float64(item.TotalDeaths)
+		totalAssists += float64(item.TotalAssists)
 		totalCS += item.TotalCS
 		totalDuration += item.Duration
 	}
@@ -653,7 +666,8 @@ func (a *app) loadSeasonChampionStatsWithHistoryCache(ctx context.Context, clien
 	// 所以回补改成后台任务，进度通过 progress.Complete / Message 透出。
 	a.seasonScanPagesWithHistoryCache(ctx, client, serverID, playerRef, scan, seasonScanForegroundPages, useHistoryCache)
 	a.finishSeasonScan(scan, names, accountHash)
-	progress.Scanned = scan.scanned
+	progress.Scanned = seasonStatsCount(scan.cache.Stats)
+	progress.TableSupported = progress.Scanned >= 20 && len(scan.cache.ChampionTable) > 0
 	progress.Complete = scan.cache.Complete
 	progress.Collecting = !progress.Complete
 	if scan.interrupted {
@@ -662,9 +676,6 @@ func (a *app) loadSeasonChampionStatsWithHistoryCache(ctx context.Context, clien
 	if !scan.cache.Complete {
 		a.startSeasonBackfill(client, reference, player, playerRef, names, serverID, accountHash, season, seasonStart)
 	}
-	if progress.Scanned == 0 && len(scan.cache.GameIDs) > 0 {
-		progress.Scanned = len(scan.cache.GameIDs)
-	}
 	if progress.Message == "" {
 		if progress.Complete {
 			progress.Message = fmt.Sprintf("已统计 %d 场", progress.Scanned)
@@ -672,7 +683,7 @@ func (a *app) loadSeasonChampionStatsWithHistoryCache(ctx context.Context, clien
 			progress.Message = fmt.Sprintf("已统计 %d 场，正在后台补全本赛季", progress.Scanned)
 		}
 	}
-	return scan.cache.Stats, progress, scan.cache.RankedMatches, scan.cache.QueueStats
+	return seasonStatsResponse(scan.cache.Stats), progress, scan.cache.RankedMatches, scan.cache.QueueStats
 }
 
 // loadSeasonChampionStatsSnapshot is deliberately network-free. Overview may
@@ -695,7 +706,8 @@ func (a *app) loadSeasonChampionStatsSnapshot(reference gameplayReference, playe
 	if err != nil {
 		return nil, progress, nil, nil
 	}
-	progress.Scanned = len(cache.GameIDs)
+	progress.Scanned = seasonStatsCount(cache.Stats)
+	progress.TableSupported = progress.Scanned >= 20 && len(cache.ChampionTable) > 0
 	progress.Complete = cache.Complete
 	progress.Collecting = !cache.Complete
 	if cache.Complete {
@@ -703,7 +715,7 @@ func (a *app) loadSeasonChampionStatsSnapshot(reference gameplayReference, playe
 	} else {
 		progress.Message = fmt.Sprintf("已统计 %d 场，正在后台补全本赛季", progress.Scanned)
 	}
-	return cache.Stats, progress, cache.RankedMatches, cache.QueueStats
+	return seasonStatsResponse(cache.Stats), progress, cache.RankedMatches, cache.QueueStats
 }
 
 const (
@@ -722,14 +734,16 @@ func seasonQuerySnapshotKey(serverID, playerRef, season string) string {
 // startSeasonStatsRefresh runs the old foreground scan outside the overview
 // request. Query snapshot, persisted cache and seasonBackfills provide the
 // three deduplication gates required for repeated identical overview loads.
-func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayReference, player Summoner, playerRef string, names map[int64]string) {
+// Fresh requests bypass completed snapshots and time dedup, but keep a shared
+// in-flight scan to avoid simultaneous writes to the same season accumulator.
+func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayReference, player Summoner, playerRef string, names map[int64]string, fresh bool) {
 	season, _ := currentRankedSeason(time.Now())
 	serverID := strings.ToUpper(strings.TrimSpace(reference.ServerID))
 	if client == nil || serverID == "" || a.sgp == nil || a.storage == nil || !validPlayerReference(playerRef) {
 		return
 	}
 	accountHash := a.storage.accountHash(player)
-	if accountHash != "" {
+	if accountHash != "" && !fresh {
 		if cached, err := a.storage.loadSeasonStats(seasonStatsSource, accountHash, season); err == nil && cached.Complete && time.Since(cached.UpdatedAt) < seasonQueryDedupTTL {
 			return
 		}
@@ -737,7 +751,7 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 	key := seasonQuerySnapshotKey(serverID, playerRef, season)
 	now := time.Now()
 	a.seasonBackfillMu.Lock()
-	if previous := a.seasonQuerySnapshotLocked(key, now); !previous.IsZero() && now.Sub(previous) < seasonQueryDedupTTL {
+	if previous := a.seasonQuerySnapshotLocked(key, now); !fresh && !previous.IsZero() && now.Sub(previous) < seasonQueryDedupTTL {
 		a.seasonBackfillMu.Unlock()
 		return
 	}
@@ -763,7 +777,11 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 		}()
 		ctx, cancel := context.WithTimeout(context.Background(), seasonBackfillTimeout)
 		defer cancel()
-		_, progress, _, _ := a.loadSeasonChampionStatsWithHistoryCache(ctx, client, reference, player, playerRef, names, true)
+		cost := &overviewLoadCost{}
+		ctx = context.WithValue(ctx, overviewLoadCostContextKey{}, cost)
+		_, progress, _, _ := a.loadSeasonChampionStatsWithHistoryCache(ctx, client, reference, player, playerRef, names, !fresh)
+		requests, bytes, historyCalls, cacheHits := cost.snapshot()
+		a.recordDiagnostic(map[string]any{"event": "season_stats_head_refresh", "fresh": fresh, "use_history_cache": !fresh, "sgp_requests": requests, "sgp_bytes": bytes, "sgp_history_calls": historyCalls, "sgp_history_cache_hits": cacheHits, "scanned": progress.Scanned, "complete": progress.Complete, "message": progress.Message})
 		publicRef := a.registerGameplayReferenceDetails(mergeGameplayReferences(reference, gameplayReference{PlayerRef: playerRef}))
 		progressEvent, _ := json.Marshal(map[string]any{
 			"type": "season-progress", "season": season, "scanned": progress.Scanned,
@@ -879,6 +897,7 @@ func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUCl
 			scan.cache.GameIDs = append(scan.cache.GameIDs, info.GameID)
 			scan.scanned++
 			seasonStatsAccumulate(scan.stats, scan.queueStats, info, playerRef, scan.seasonStartMillis)
+			seasonAccumulateChampionTable(&scan.cache, info, playerRef, scan.seasonStartMillis)
 			seasonRecordRankedMatch(&scan.cache, info, playerRef)
 		}
 		start += consumed
@@ -899,8 +918,9 @@ func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUCl
 }
 
 func (a *app) finishSeasonScan(scan *seasonScanState, names map[int64]string, accountHash string) {
-	scan.cache.Stats = seasonStatsFinalize(scan.stats, names)
+	scan.cache.Stats = seasonStatsRawRows(scan.stats, names)
 	scan.cache.QueueStats = seasonStatsFinalizeQueues(scan.queueStats)
+	seasonTrimChampionTable(&scan.cache, 40)
 	snapshots := seasonTrimRankedMatches(&scan.cache)
 	augmentDropped := seasonTrimAugmentSamples(&scan.cache)
 	scan.cache.UpdatedAt = time.Now().UTC()
@@ -1011,7 +1031,7 @@ func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference
 			})
 			progressEvent, _ := json.Marshal(map[string]any{
 				"type": "season-progress", "season": season,
-				"scanned": len(scan.cache.GameIDs), "complete": scan.cache.Complete,
+				"scanned": seasonStatsCount(scan.cache.Stats), "complete": scan.cache.Complete,
 				"account": a.registerGameplayReferenceDetails(mergeGameplayReferences(reference, gameplayReference{PlayerRef: playerRef})),
 			})
 			a.clearOverviewQuerySnapshots()

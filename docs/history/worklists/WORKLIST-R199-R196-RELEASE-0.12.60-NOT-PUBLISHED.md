@@ -6,7 +6,7 @@
 
 ## 现象
 
-`docs/r196-execution-ledger.md`「发布与真机边界」写的是"按工单发布 0.12.60 public Release Latest，附安装包、latest.json、SHA256SUMS"。
+`docs/history/ledgers/r196-execution-ledger.md`「发布与真机边界」写的是"按工单发布 0.12.60 public Release Latest，附安装包、latest.json、SHA256SUMS"。
 
 2026-10-03 15:2x（北京时间）匿名核对：
 

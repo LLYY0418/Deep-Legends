@@ -1,0 +1,921 @@
+{
+  "schemaVersion": 1,
+  "frozenAt": "2026-10-05T07:16:34.315559+00:00",
+  "authorization": "R218 P5: freeze existing R217 P1 definitions; no further rule search",
+  "studySHA256": "1cb86075808953ef7c7f300582a6959f7c11189759922f5776d43c3b29679713",
+  "sources": [
+    {
+      "path": "backend/testdata/r216/python-v2-golden.json",
+      "sha256": "fdbf9343ada726d352bbcd871986add7ee6526e6326cb55da7402eda3da1f14f"
+    },
+    {
+      "path": "docs/history/reports/r211/opgg-samples/paired.json",
+      "sha256": "bc55dc80105d0ba4a8be597f07cf4a5acaa3fbb3e2e20419ecc405902ca29ff0"
+    },
+    {
+      "path": "docs/history/reports/r211/opgg-validation-new-accounts/paired.json",
+      "sha256": "18ff2b1ebdb9906a7b02a8ce7b4a81e1334d084d938f1db5ca511c0f15d45589"
+    },
+    {
+      "path": "docs/history/reports/r216/opgg-holdout/paired.json",
+      "sha256": "28f34077586d7ac08b5b8fec4df1ebc9a99de4da462edeef3174fce6daf57ab7"
+    }
+  ],
+  "rules": {
+    "leftThreshold": 4.999986501656231,
+    "rightThreshold": 5.000139982232588,
+    "endingBaseline": 5.0,
+    "endingGap": -0.28250004778752436,
+    "endingWindow": 7,
+    "peakGap": -0.0033912485957667826
+  },
+  "table": [
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "keyword": "unyielding"
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "FAIR",
+      "keyword": "struggling"
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "GOOD",
+      "keyword": "unyielding"
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "FAIR",
+      "keyword": "average"
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "GOOD",
+      "keyword": "slowstarter"
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "POOR",
+      "keyword": "rollercoaster"
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "keyword": "rollercoaster"
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "FAIR",
+      "keyword": "decline"
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "GOOD",
+      "keyword": "average"
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "UP",
+      "right": "UP",
+      "last": "FAIR",
+      "keyword": "unlucky"
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "UP",
+      "right": "UP",
+      "last": "GOOD",
+      "keyword": "innocent"
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "UP",
+      "right": "UP",
+      "last": "POOR",
+      "keyword": "unlucky"
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "keyword": "unyielding"
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "FAIR",
+      "keyword": "struggling"
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "GOOD",
+      "keyword": "unyielding"
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "FAIR",
+      "keyword": "average"
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "GOOD",
+      "keyword": "slowstarter"
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "POOR",
+      "keyword": "rollercoaster"
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "keyword": "rollercoaster"
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "FAIR",
+      "keyword": "decline"
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "GOOD",
+      "keyword": "average"
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "UP",
+      "right": "UP",
+      "last": "FAIR",
+      "keyword": "unlucky"
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "UP",
+      "right": "UP",
+      "last": "GOOD",
+      "keyword": "innocent"
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "UP",
+      "right": "UP",
+      "last": "POOR",
+      "keyword": "unlucky"
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "keyword": "resilience"
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "FAIR",
+      "keyword": "struggling"
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "GOOD",
+      "keyword": "resilience"
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "FAIR",
+      "keyword": "average"
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "GOOD",
+      "keyword": "latebloomer"
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "POOR",
+      "keyword": "rollercoaster"
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "keyword": "rollercoaster"
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "FAIR",
+      "keyword": "decline"
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "GOOD",
+      "keyword": "average"
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "UP",
+      "right": "UP",
+      "last": "FAIR",
+      "keyword": "victorious"
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "UP",
+      "right": "UP",
+      "last": "GOOD",
+      "keyword": "unstoppable"
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "UP",
+      "right": "UP",
+      "last": "POOR",
+      "keyword": "dedication"
+    },
+    {
+      "win": true,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "keyword": "resilience"
+    },
+    {
+      "win": true,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "FAIR",
+      "keyword": "average"
+    },
+    {
+      "win": true,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "GOOD",
+      "keyword": "latebloomer"
+    },
+    {
+      "win": true,
+      "teamMax": true,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "keyword": "rollercoaster"
+    },
+    {
+      "win": true,
+      "teamMax": true,
+      "left": "UP",
+      "right": "UP",
+      "last": "FAIR",
+      "keyword": "victorious"
+    },
+    {
+      "win": true,
+      "teamMax": true,
+      "left": "UP",
+      "right": "UP",
+      "last": "GOOD",
+      "keyword": "unstoppable"
+    }
+  ],
+  "lookupCounts": [
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "counts": {
+        "UNYIELDING": 7
+      },
+      "majority": "UNYIELDING",
+      "majorityShare": 1.0,
+      "participants": 7
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "FAIR",
+      "counts": {
+        "STRUGGLE": 1003
+      },
+      "majority": "STRUGGLE",
+      "majorityShare": 1.0,
+      "participants": 1003
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "GOOD",
+      "counts": {
+        "UNYIELDING": 333
+      },
+      "majority": "UNYIELDING",
+      "majorityShare": 1.0,
+      "participants": 333
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "FAIR",
+      "counts": {
+        "AVERAGE": 37
+      },
+      "majority": "AVERAGE",
+      "majorityShare": 1.0,
+      "participants": 37
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "GOOD",
+      "counts": {
+        "SLOW_STARTER": 6
+      },
+      "majority": "SLOW_STARTER",
+      "majorityShare": 1.0,
+      "participants": 6
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "POOR",
+      "counts": {
+        "ROLLERCOASTER": 52
+      },
+      "majority": "ROLLERCOASTER",
+      "majorityShare": 1.0,
+      "participants": 52
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "counts": {
+        "ROLLERCOASTER": 3
+      },
+      "majority": "ROLLERCOASTER",
+      "majorityShare": 1.0,
+      "participants": 3
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "FAIR",
+      "counts": {
+        "DOWNFALL": 389
+      },
+      "majority": "DOWNFALL",
+      "majorityShare": 1.0,
+      "participants": 389
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "GOOD",
+      "counts": {
+        "AVERAGE": 71
+      },
+      "majority": "AVERAGE",
+      "majorityShare": 1.0,
+      "participants": 71
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "UP",
+      "right": "UP",
+      "last": "FAIR",
+      "counts": {
+        "UNLUCKY": 140
+      },
+      "majority": "UNLUCKY",
+      "majorityShare": 1.0,
+      "participants": 140
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "UP",
+      "right": "UP",
+      "last": "GOOD",
+      "counts": {
+        "INNOCENT": 6
+      },
+      "majority": "INNOCENT",
+      "majorityShare": 1.0,
+      "participants": 6
+    },
+    {
+      "win": false,
+      "teamMax": false,
+      "left": "UP",
+      "right": "UP",
+      "last": "POOR",
+      "counts": {
+        "UNLUCKY": 193
+      },
+      "majority": "UNLUCKY",
+      "majorityShare": 1.0,
+      "participants": 193
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "counts": {
+        "UNYIELDING": 13
+      },
+      "majority": "UNYIELDING",
+      "majorityShare": 1.0,
+      "participants": 13
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "FAIR",
+      "counts": {
+        "STRUGGLE": 36
+      },
+      "majority": "STRUGGLE",
+      "majorityShare": 1.0,
+      "participants": 36
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "GOOD",
+      "counts": {
+        "UNYIELDING": 37
+      },
+      "majority": "UNYIELDING",
+      "majorityShare": 1.0,
+      "participants": 37
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "FAIR",
+      "counts": {
+        "AVERAGE": 47
+      },
+      "majority": "AVERAGE",
+      "majorityShare": 1.0,
+      "participants": 47
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "GOOD",
+      "counts": {
+        "SLOW_STARTER": 10
+      },
+      "majority": "SLOW_STARTER",
+      "majorityShare": 1.0,
+      "participants": 10
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "POOR",
+      "counts": {
+        "ROLLERCOASTER": 14
+      },
+      "majority": "ROLLERCOASTER",
+      "majorityShare": 1.0,
+      "participants": 14
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "counts": {
+        "ROLLERCOASTER": 2
+      },
+      "majority": "ROLLERCOASTER",
+      "majorityShare": 1.0,
+      "participants": 2
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "FAIR",
+      "counts": {
+        "DOWNFALL": 36
+      },
+      "majority": "DOWNFALL",
+      "majorityShare": 1.0,
+      "participants": 36
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "GOOD",
+      "counts": {
+        "AVERAGE": 10
+      },
+      "majority": "AVERAGE",
+      "majorityShare": 1.0,
+      "participants": 10
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "UP",
+      "right": "UP",
+      "last": "FAIR",
+      "counts": {
+        "UNLUCKY": 278
+      },
+      "majority": "UNLUCKY",
+      "majorityShare": 1.0,
+      "participants": 278
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "UP",
+      "right": "UP",
+      "last": "GOOD",
+      "counts": {
+        "INNOCENT": 22
+      },
+      "majority": "INNOCENT",
+      "majorityShare": 1.0,
+      "participants": 22
+    },
+    {
+      "win": false,
+      "teamMax": true,
+      "left": "UP",
+      "right": "UP",
+      "last": "POOR",
+      "counts": {
+        "UNLUCKY": 55
+      },
+      "majority": "UNLUCKY",
+      "majorityShare": 1.0,
+      "participants": 55
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "counts": {
+        "RESILIENT": 227
+      },
+      "majority": "RESILIENT",
+      "majorityShare": 1.0,
+      "participants": 227
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "FAIR",
+      "counts": {
+        "STRUGGLE": 66
+      },
+      "majority": "STRUGGLE",
+      "majorityShare": 1.0,
+      "participants": 66
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "GOOD",
+      "counts": {
+        "RESILIENT": 370
+      },
+      "majority": "RESILIENT",
+      "majorityShare": 1.0,
+      "participants": 370
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "FAIR",
+      "counts": {
+        "AVERAGE": 94
+      },
+      "majority": "AVERAGE",
+      "majorityShare": 1.0,
+      "participants": 94
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "GOOD",
+      "counts": {
+        "LATE_BLOOMER": 310
+      },
+      "majority": "LATE_BLOOMER",
+      "majorityShare": 1.0,
+      "participants": 310
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "POOR",
+      "counts": {
+        "ROLLERCOASTER": 8
+      },
+      "majority": "ROLLERCOASTER",
+      "majorityShare": 1.0,
+      "participants": 8
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "counts": {
+        "ROLLERCOASTER": 62
+      },
+      "majority": "ROLLERCOASTER",
+      "majorityShare": 1.0,
+      "participants": 62
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "FAIR",
+      "counts": {
+        "DOWNFALL": 27
+      },
+      "majority": "DOWNFALL",
+      "majorityShare": 1.0,
+      "participants": 27
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "GOOD",
+      "counts": {
+        "AVERAGE": 82
+      },
+      "majority": "AVERAGE",
+      "majorityShare": 1.0,
+      "participants": 82
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "UP",
+      "right": "UP",
+      "last": "FAIR",
+      "counts": {
+        "VICTOR": 302
+      },
+      "majority": "VICTOR",
+      "majorityShare": 1.0,
+      "participants": 302
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "UP",
+      "right": "UP",
+      "last": "GOOD",
+      "counts": {
+        "UNSTOPPABLE": 516,
+        "LEADER": 157
+      },
+      "majority": "UNSTOPPABLE",
+      "majorityShare": 0.7667161961367014,
+      "participants": 673
+    },
+    {
+      "win": true,
+      "teamMax": false,
+      "left": "UP",
+      "right": "UP",
+      "last": "POOR",
+      "counts": {
+        "DEVOTED": 19
+      },
+      "majority": "DEVOTED",
+      "majorityShare": 1.0,
+      "participants": 19
+    },
+    {
+      "win": true,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "counts": {
+        "RESILIENT": 8
+      },
+      "majority": "RESILIENT",
+      "majorityShare": 1.0,
+      "participants": 8
+    },
+    {
+      "win": true,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "FAIR",
+      "counts": {
+        "AVERAGE": 7
+      },
+      "majority": "AVERAGE",
+      "majorityShare": 1.0,
+      "participants": 7
+    },
+    {
+      "win": true,
+      "teamMax": true,
+      "left": "DOWN",
+      "right": "UP",
+      "last": "GOOD",
+      "counts": {
+        "LATE_BLOOMER": 68
+      },
+      "majority": "LATE_BLOOMER",
+      "majorityShare": 1.0,
+      "participants": 68
+    },
+    {
+      "win": true,
+      "teamMax": true,
+      "left": "UP",
+      "right": "DOWN",
+      "last": "EXCELLENT",
+      "counts": {
+        "ROLLERCOASTER": 5
+      },
+      "majority": "ROLLERCOASTER",
+      "majorityShare": 1.0,
+      "participants": 5
+    },
+    {
+      "win": true,
+      "teamMax": true,
+      "left": "UP",
+      "right": "UP",
+      "last": "FAIR",
+      "counts": {
+        "VICTOR": 53
+      },
+      "majority": "VICTOR",
+      "majorityShare": 1.0,
+      "participants": 53
+    },
+    {
+      "win": true,
+      "teamMax": true,
+      "left": "UP",
+      "right": "UP",
+      "last": "GOOD",
+      "counts": {
+        "UNSTOPPABLE": 373,
+        "LEADER": 46
+      },
+      "majority": "UNSTOPPABLE",
+      "majorityShare": 0.8902147971360382,
+      "participants": 419
+    }
+  ],
+  "unseenCombination": "empty keyword"
+}

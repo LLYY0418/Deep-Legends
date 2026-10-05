@@ -25,16 +25,19 @@ import (
 /* ---------- 与 Riot / SGP / LCU 同构的时间线帧 ---------- */
 
 type timelineEvent struct {
-	Type          string `json:"type"`
-	EventType     string `json:"eventType"`
-	Timestamp     int64  `json:"timestamp"`
-	ParticipantID int64  `json:"participantId"`
-	ItemID        int64  `json:"itemId"`
-	BeforeID      int64  `json:"beforeId"`
-	AfterID       int64  `json:"afterId"`
-	SkillSlot     int    `json:"skillSlot"`
-	LevelUpType   string `json:"levelUpType"`
-	rawKeys       []string
+	KillerID                int64   `json:"killerId"`
+	VictimID                int64   `json:"victimId"`
+	AssistingParticipantIDs []int64 `json:"assistingParticipantIds"`
+	Type                    string  `json:"type"`
+	EventType               string  `json:"eventType"`
+	Timestamp               int64   `json:"timestamp"`
+	ParticipantID           int64   `json:"participantId"`
+	ItemID                  int64   `json:"itemId"`
+	BeforeID                int64   `json:"beforeId"`
+	AfterID                 int64   `json:"afterId"`
+	SkillSlot               int     `json:"skillSlot"`
+	LevelUpType             string  `json:"levelUpType"`
+	rawKeys                 []string
 }
 
 func (event *timelineEvent) UnmarshalJSON(data []byte) error {
@@ -58,8 +61,9 @@ func (event *timelineEvent) UnmarshalJSON(data []byte) error {
 }
 
 type timelineFrame struct {
-	Timestamp int64           `json:"timestamp"`
-	Events    []timelineEvent `json:"events"`
+	Timestamp         int64                      `json:"timestamp"`
+	Events            []timelineEvent            `json:"events"`
+	ParticipantFrames map[string]json.RawMessage `json:"participantFrames,omitempty"`
 }
 
 /* ---------- 对外响应 ---------- */
@@ -80,13 +84,65 @@ type timelineSkillUp struct {
 }
 
 type matchTimelineResponse struct {
-	Available      bool                `json:"available"`
-	Source         string              `json:"source,omitempty"`
-	Detail         string              `json:"detail,omitempty"`
-	Attempts       []DataSourceAttempt `json:"attempts,omitempty"`
-	FallbackReason string              `json:"fallbackReason,omitempty"`
-	ItemGroups     []timelineItemGroup `json:"itemGroups,omitempty"`
-	SkillOrder     []timelineSkillUp   `json:"skillOrder,omitempty"`
+	Tags           []participantMatchTags `json:"tags,omitempty"`
+	Available      bool                   `json:"available"`
+	Source         string                 `json:"source,omitempty"`
+	Detail         string                 `json:"detail,omitempty"`
+	Attempts       []DataSourceAttempt    `json:"attempts,omitempty"`
+	FallbackReason string                 `json:"fallbackReason,omitempty"`
+	ItemGroups     []timelineItemGroup    `json:"itemGroups,omitempty"`
+	SkillOrder     []timelineSkillUp      `json:"skillOrder,omitempty"`
+	Participants   []participantTimeline  `json:"participants,omitempty"`
+}
+
+type participantTimeline struct {
+	ParticipantID int64               `json:"participantId"`
+	ItemGroups    []timelineItemGroup `json:"itemGroups"`
+	SkillOrder    []timelineSkillUp   `json:"skillOrder"`
+}
+
+func extractAllParticipantTimelines(frames []timelineFrame) []participantTimeline {
+	ids := map[int64]bool{}
+	for _, frame := range frames {
+		for key := range frame.ParticipantFrames {
+			if id, err := strconv.ParseInt(key, 10, 64); err == nil && id > 0 {
+				ids[id] = true
+			}
+		}
+		for _, event := range frame.Events {
+			if event.ParticipantID > 0 {
+				ids[event.ParticipantID] = true
+			}
+		}
+	}
+	result := make([]participantTimeline, 0, len(ids))
+	for id := range ids {
+		groups, skills := extractParticipantTimeline(frames, id)
+		result = append(result, participantTimeline{id, groups, skills})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ParticipantID < result[j].ParticipantID })
+	return result
+}
+
+func (response matchTimelineResponse) forParticipant(id int64) matchTimelineResponse {
+	if id <= 0 {
+		return response
+	}
+	participants := response.Participants
+	response.Participants = nil
+	response.ItemGroups, response.SkillOrder = nil, nil
+	response.Available = false
+	for _, row := range participants {
+		if row.ParticipantID == id {
+			response.ItemGroups, response.SkillOrder = row.ItemGroups, row.SkillOrder
+			response.Available = len(row.ItemGroups) > 0 || len(row.SkillOrder) > 0
+			break
+		}
+	}
+	if !response.Available {
+		response.Detail = "时间线里没有该玩家的装备与技能事件"
+	}
+	return response
 }
 
 /* ---------- 事件提取 ---------- */
@@ -384,10 +440,11 @@ type matchTimelineCache struct {
 	mu      sync.Mutex
 	entries map[string]matchTimelineResponse
 	order   []string
+	flights map[string]chan struct{}
 }
 
 func newMatchTimelineCache() *matchTimelineCache {
-	return &matchTimelineCache{entries: make(map[string]matchTimelineResponse)}
+	return &matchTimelineCache{entries: make(map[string]matchTimelineResponse), flights: make(map[string]chan struct{})}
 }
 
 func (c *matchTimelineCache) get(key string) (matchTimelineResponse, bool) {
@@ -430,16 +487,16 @@ func (a *app) handleGameplayMatchTimeline(w http.ResponseWriter, r *http.Request
 		http.Error(w, "查询参数无效", http.StatusBadRequest)
 		return
 	}
-	if request.GameID <= 0 || request.ParticipantID <= 0 {
+	if request.GameID <= 0 || request.ParticipantID < 0 {
 		http.Error(w, "查询参数无效", http.StatusBadRequest)
 		return
 	}
-	isKR := strings.EqualFold(strings.TrimSpace(request.Region), riotRegionKR)
+	isKR := isRiotRegion(request.Region)
 	regionKey := "cn"
 	diagnosticRegion := "cn"
 	if isKR {
-		regionKey = riotRegionKR
-		diagnosticRegion = riotRegionKR
+		regionKey = riotPlatform(request.Region)
+		diagnosticRegion = riotPlatform(request.Region)
 		if strings.TrimSpace(request.ServerID) != "" {
 			http.Error(w, "韩服时间线不能指定国服服务器", http.StatusBadRequest)
 			return
@@ -449,7 +506,7 @@ func (a *app) handleGameplayMatchTimeline(w http.ResponseWriter, r *http.Request
 		var refOK bool
 		if strings.TrimSpace(request.PlayerRef) != "" {
 			reference, refOK = a.resolveGameplayReferenceDetails(request.PlayerRef)
-			if !refOK || strings.EqualFold(reference.Region, riotRegionKR) {
+			if !refOK || isRiotRegion(reference.Region) {
 				http.Error(w, "玩家引用无效或与服务器不一致", http.StatusBadRequest)
 				return
 			}
@@ -482,9 +539,39 @@ func (a *app) handleGameplayMatchTimeline(w http.ResponseWriter, r *http.Request
 			}
 		}
 	}
+	// Serialize misses per game. Re-check the cache after the owner publishes it;
+	// cancelled waiters leave the owner's context and shared result untouched.
+	if a.matchTimelines != nil {
+		flightKey := regionKey + "|" + strconv.FormatInt(request.GameID, 10)
+		for {
+			a.matchTimelines.mu.Lock()
+			if a.matchTimelines.flights == nil {
+				a.matchTimelines.flights = make(map[string]chan struct{})
+			}
+			if done := a.matchTimelines.flights[flightKey]; done != nil {
+				a.matchTimelines.mu.Unlock()
+				select {
+				case <-done:
+					continue
+				case <-r.Context().Done():
+					return
+				}
+			}
+			done := make(chan struct{})
+			a.matchTimelines.flights[flightKey] = done
+			a.matchTimelines.mu.Unlock()
+			defer func() {
+				a.matchTimelines.mu.Lock()
+				delete(a.matchTimelines.flights, flightKey)
+				close(done)
+				a.matchTimelines.mu.Unlock()
+			}()
+			break
+		}
+	}
 	for _, cacheSource := range cacheSources {
 		if cached, ok := a.matchTimelines.get(matchTimelineCacheKey(cacheSource, regionKey, request.GameID, request.ParticipantID)); ok {
-			respondJSON(w, cached)
+			respondJSON(w, cached.forParticipant(request.ParticipantID))
 			return
 		}
 	}
@@ -498,7 +585,7 @@ func (a *app) handleGameplayMatchTimeline(w http.ResponseWriter, r *http.Request
 			http.Error(w, "Riot 接口不可用", http.StatusConflict)
 			return
 		}
-		frames, err = a.riot.matchTimeline(r.Context(), fmt.Sprintf("KR_%d", request.GameID))
+		frames, err = a.riot.forPlatform(request.Region).matchTimeline(r.Context(), riotMatchID(request.Region, request.GameID))
 		source = dataSourceRiot
 		if err == nil {
 			attempts = []DataSourceAttempt{{Source: dataSourceRiot, Outcome: dataSourceSuccess}}
@@ -526,8 +613,18 @@ func (a *app) handleGameplayMatchTimeline(w http.ResponseWriter, r *http.Request
 		respondJSON(w, matchTimelineResponse{Available: false, Detail: detail, Attempts: attempts, FallbackReason: fallbackReason})
 		return
 	}
-	groups, skills := extractParticipantTimeline(frames, request.ParticipantID)
-	response := matchTimelineResponse{Available: len(groups) > 0 || len(skills) > 0, Source: source, Attempts: attempts, FallbackReason: fallbackReason, ItemGroups: groups, SkillOrder: skills}
+	participants := extractAllParticipantTimelines(frames)
+	tags := a.tagsFromTimeline(source, regionKey, request.GameID, frames)
+	if len(tags) > 0 {
+		a.matchTagsDiagnostic(source, request.GameID, tags)
+	}
+	response := matchTimelineResponse{Source: source, Attempts: attempts, FallbackReason: fallbackReason, Participants: participants, Tags: tags}
+	groupCount, skillCount := 0, 0
+	for _, row := range participants {
+		groupCount += len(row.ItemGroups)
+		skillCount += len(row.SkillOrder)
+	}
+	response.Available = groupCount > 0 || skillCount > 0
 	if !response.Available {
 		response.Detail = "时间线里没有该玩家的装备与技能事件"
 		eventCount, eventTypes := summarizeTimelineEventTypes(frames)
@@ -537,17 +634,17 @@ func (a *app) handleGameplayMatchTimeline(w http.ResponseWriter, r *http.Request
 			"event_key_samples": sampleTimelineEventKeys(frames, 3),
 		})
 	} else {
-		a.recordDiagnostic(map[string]any{"event": "match_timeline_succeeded", "region": diagnosticRegion, "source": source, "frames": len(frames), "item_groups": len(groups), "skill_ups": len(skills), "attempts": attempts, "fallback_reason": fallbackReason})
+		a.recordDiagnostic(map[string]any{"event": "match_timeline_succeeded", "region": diagnosticRegion, "source": source, "frames": len(frames), "item_groups": groupCount, "skill_ups": skillCount, "participants": len(participants), "attempts": attempts, "fallback_reason": fallbackReason})
 	}
 	// 空结果通常意味着客户端返回了不兼容的包装或参与者编号；不缓存它，
 	// 让用户再次展开时可以在客户端更新后重试，并保留诊断事件供真机分析。
 	if response.Available {
 		a.matchTimelines.put(matchTimelineCacheKey(source, regionKey, request.GameID, request.ParticipantID), response)
 	}
-	respondJSON(w, response)
+	respondJSON(w, response.forParticipant(request.ParticipantID))
 }
 
 func matchTimelineCacheKey(source, regionKey string, gameID, participantID int64) string {
-	key := regionKey + "|" + strconv.FormatInt(gameID, 10) + "|" + strconv.FormatInt(participantID, 10)
+	key := matchTagModelVersion() + "|" + regionKey + "|" + strconv.FormatInt(gameID, 10)
 	return sourceScopedKey(source, key)
 }

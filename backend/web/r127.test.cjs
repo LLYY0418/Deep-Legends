@@ -316,7 +316,7 @@ test('R127 韩服同屏对局合并成一次请求，并区分「来源暂未收
   };
   vm.runInNewContext(extractFunction(source, 'hydrateMatchTiers'), context);
   const tab = {
-    key: 'player-1', overlay: false, loadingMore: false, filterPaging: false, riotId: {},
+    key: 'player-1', region:'kr', overlay: false, loadingMore: false, filterPaging: false, riotId: {},
     data: { matches, player: { playerRef: 'public-ref', gameName: 'Faker', tagLine: 'KR1' } },
   };
   // 可见性观测器分两次回调（真机日志里是 4 场、2 场、1 场）。

@@ -93,6 +93,7 @@
     artworkPrefetchCache: window.deepLegendsRuntime?.createCache({ max: 128, ttl: 600000 }) || new Map(),
     acquisitionAvailable: null,
     acquisitionFallback: false,
+    installations: [],
     installationsLoaded: false,
     installationLoadedAt: 0,
     installationLoadPromise: null,
@@ -466,8 +467,9 @@
         }
       }
       updateReadingOverlay();
+	  const installationsPromise = !state.status.connected && (!previous || previous.connected || !state.installationsLoaded) ? loadClientInstallations() : null;
 	  renderStatus();
-  if (!state.status.connected && (!previous || previous.connected)) await loadClientInstallations();
+      if (installationsPromise) await installationsPromise;
 	  if (state.section === "favorites" && state.favoritesPage === "collection") {
         if (!state.status.snapshotReady) void ensureCollection();
         else triggerCollectionRescanIfDirty();
@@ -483,13 +485,28 @@
       updateReadingOverlay();
     } catch (error) {
       if (token !== state.statusRequestToken || error.name === "RequestCancelled" || state.destroyed || state.backendExited) return;
-      if (statusReceived) return;
+      if (statusReceived) {
+        reportStatusRenderFailed(error, "refreshStatus");
+        return;
+      }
       state.statusFailures = Number(state.statusFailures || 0) + 1;
       state.statusDelay = Math.min(10000, state.statusFailures * 1000);
       window.deepLegendsStatusRecovery?.(true);
     } finally {
       if (token === state.statusRequestToken) scheduleStatus();
     }
+  }
+
+  function reportStatusRenderFailed(error, fallbackFunction = "refreshStatus") {
+    const types = ["Error", "TypeError", "ReferenceError", "RangeError", "SyntaxError", "URIError", "EvalError", "AggregateError"];
+    const functions = ["refreshStatus", "renderStatus", "renderLaunchpad", "updateReadingOverlay", "renderNotice", "updateWorkspaceAvailability", "renderUpdateStatus", "loadClientInstallations", "loadSkins", "loadAccount", "loadPools"];
+    const errorType = types.includes(error?.name) ? error.name : "Error";
+    // Only fixed function names may leave this process, never the stack,
+    // message, file location or arbitrary error name.
+    const frames = String(error?.stack || "").matchAll(/\bat (?:[A-Za-z0-9_]+\.)?([A-Za-z0-9_]+)\b/g);
+    let functionName = functions.includes(fallbackFunction) ? fallbackFunction : "other";
+    for (const frame of frames) if (functions.includes(frame[1])) { functionName = frame[1]; break; }
+    try { window.reportFlowDiagnostic?.("status_render_failed", "failed", { errorType, functionName }); } catch (_) {}
   }
 
 	function clearDisconnectedClientState() {
@@ -531,14 +548,21 @@
     const identityReady = data.identityReady ?? data.snapshotReady;
     if (data.connected && identityReady) {
       state.overlaySuppressed = false;
-      hideReadingOverlay();
+      hideReadingOverlay("identity-ready");
+      return;
+    }
+    if (!data.connected && ["process-not-found", "process-query-failed"].includes(data.clientDiscovery)) {
+      state.overlaySuppressed = false;
+      state.statusDelay = STATUS_INTERVAL;
+      hideReadingOverlay("no-client-process");
       return;
     }
     if (state.overlaySuppressed) {
-      hideReadingOverlay();
+      hideReadingOverlay("suppressed");
       return;
     }
-    showReadingOverlay(data.connected ? "正在读取召唤师信息" : "正在连接英雄联盟客户端", data.connected ? "正在读取身份与总览数据。" : "检测到客户端正在启动，请稍候。");
+    const starting = ["credentials-unreadable", "probe-failed"].includes(data.clientDiscovery);
+    showReadingOverlay(data.connected ? "正在读取召唤师信息" : "正在连接英雄联盟客户端", data.connected ? "正在读取身份与总览数据。" : starting ? "检测到客户端正在启动，请稍候。" : "正在检测英雄联盟客户端。");
     state.statusDelay = 900;
   }
 
@@ -556,21 +580,21 @@
       window.reportFlowDiagnostic?.("blocking_state_client", "show", { source: "startup" });
       state.startupFallbackTimer = setTimeout(() => {
         state.overlaySuppressed = true;
-        hideReadingOverlay();
+        hideReadingOverlay("timeout");
         window.reportFlowDiagnostic?.("blocking_state_client", "timeout", { source: "startup", durationMs: 15000 });
         if (state.status) renderNotice(state.status);
       }, 15000);
     }
   }
 
-  function hideReadingOverlay() {
+  function hideReadingOverlay(hideReason = "suppressed") {
     state.overlayForced = false;
     state.overlayBaselineAttempt = "";
     clearTimeout(state.startupFallbackTimer);
     state.startupFallbackTimer = 0;
     el.appFrame.removeAttribute("inert");
     clearTimeout(state.overlayTimer);
-    if (!el.startupLoading.hidden) window.reportFlowDiagnostic?.("blocking_state_client", "hide", { source: "startup" });
+    if (!el.startupLoading.hidden) window.reportFlowDiagnostic?.("blocking_state_client", "hide", { source: "startup", hide_reason: hideReason });
     el.startupLoading.hidden = true;
     el.startupLoading.classList.remove("is-leaving");
   }
@@ -810,17 +834,20 @@
   }
 
   async function loadClientInstallations(force = false) {
+    const render = () => {
+      try { renderLaunchpad(state.status || {}); } catch (error) { reportStatusRenderFailed(error, "renderLaunchpad"); }
+    };
     const installationTTL = typeof CLIENT_INSTALLATION_TTL === "number" ? CLIENT_INSTALLATION_TTL : 30_000;
     const now = Date.now();
     if (!force && state.installationLoadPromise) return state.installationLoadPromise;
     if (!force && state.installationsLoaded && now - Number(state.installationLoadedAt || 0) < installationTTL) {
-      renderLaunchpad(state.status || {});
+      render();
       return;
     }
     state.installationsLoaded = false;
     state.installationLoadError = "";
     state.officialLoginMessage = "";
-    renderLaunchpad(state.status || {});
+    render();
     let promise;
     promise = (async () => {
       try {
@@ -828,14 +855,14 @@
         state.installations = Array.isArray(payload.items) ? payload.items : [];
         state.installationsLoaded = true;
         state.installationLoadedAt = Date.now();
-        renderLaunchpad(state.status || {});
+        render();
       } catch (error) {
         if (error.name === "RequestCancelled") return;
         state.installations = [];
         state.installationsLoaded = true;
         state.installationLoadedAt = Date.now();
         state.installationLoadError = error.message || "安装位置检查失败";
-        renderLaunchpad(state.status || {});
+        render();
       } finally {
         if (state.installationLoadPromise === promise) state.installationLoadPromise = null;
       }
@@ -877,13 +904,14 @@
     }
     const launchInFlight = Boolean(state.clientLaunchInFlight);
     const installationFailed = Boolean(state.installationLoadError);
-    const installations = state.installations.filter((item) => item.available && (item.id === "tcls" || item.id === "riot"));
-    el.officialLoginStatus.textContent = installationFailed ? `无法检查客户端安装位置：${state.installationLoadError}` : !state.installationsLoaded ? "正在检查腾讯英雄联盟客户端安装位置。" : state.officialLoginMessage || (installations.length ? "登录并进入大厅后会自动连接。" : "未找到可启动的英雄联盟客户端入口。");
     if (!state.installationsLoaded) {
+      el.officialLoginStatus.textContent = "正在检查英雄联盟客户端安装位置。";
       el.launcherList.hidden = false;
       el.launcherList.innerHTML = '<span class="muted">正在检查 TCLS 与 Riot 客户端…</span>';
       return;
     }
+    const installations = (state.installations || []).filter((item) => item.available && (item.id === "riot" || item.id === "tcls" && !isRiotSearchRegion(state.status?.clientRegion)));
+    el.officialLoginStatus.textContent = installationFailed ? `无法检查客户端安装位置：${state.installationLoadError}` : state.officialLoginMessage || (installations.length ? "登录并进入大厅后会自动连接。" : "未找到可启动的英雄联盟客户端入口。");
     if (installationFailed) {
       el.launcherList.hidden = false;
       el.launcherList.innerHTML = `<div class="empty-state compact"><strong>安装位置检查失败</strong><p>${escapeHTML(state.installationLoadError)}</p><button class="text-button scan-launchers" type="button">重新检查安装位置</button></div>`;
@@ -3324,8 +3352,11 @@
     return true;
   }
 
-  function searchRegion() { return el.playerSearchRegion.dataset.region === "kr" ? "kr" : ""; }
-  function searchServerID() { return searchRegion() === "kr" ? "" : (el.playerSearchRegion.dataset.serverId || ""); }
+  const RIOT_REGION_LABELS = {kr:"韩服",jp1:"日服",na1:"美服",euw1:"欧西",eun1:"欧北东",tw2:"台服",sg2:"东南亚",br1:"巴西",la1:"拉北",la2:"拉南",me1:"中东",oc1:"大洋洲",ru:"俄服",tr1:"土耳其",vn2:"越南"};
+  function isRiotSearchRegion(region) { return Object.hasOwn(RIOT_REGION_LABELS, String(region || "").toLowerCase()); }
+  let searchClientPlatform = "";
+  function searchRegion() { return isRiotSearchRegion(el.playerSearchRegion.dataset.region) ? el.playerSearchRegion.dataset.region : ""; }
+  function searchServerID() { return searchRegion() ? "" : (el.playerSearchRegion.dataset.serverId || ""); }
 
   function submitPlayerSearch() {
     absorbPastedRiotID(el.playerSearchName);
@@ -3335,17 +3366,17 @@
     const tagLine = el.playerSearchTag.value.replace(/#/g, "").trim();
     if (!gameName) { showToast("请填写玩家名称"); el.playerSearchName.focus(); return; }
     // 韩服允许只填名称：后端会用 OP.GG 自动补全出当前编号再查询。
-    if (!tagLine && region !== "kr") { showToast("请填写 # 后的编号，例如 12345"); el.playerSearchTag.focus(); return; }
-    if (region !== "kr" && !serverId && !state.status?.connected) {
+    if (!tagLine && !region) { showToast("请填写 # 后的编号，例如 12345"); el.playerSearchTag.focus(); return; }
+    if (!region && !serverId && !state.status?.connected) {
       showToast("“跟随客户端”需要英雄联盟客户端正在运行");
       el.playerSearchRegion.focus();
       return;
     }
-    if (region !== "kr" && !state.status?.connected) {
+    if (!region && !state.status?.connected) {
       showToast("国服查询需要本机英雄联盟客户端在运行");
       return;
     }
-    if (region !== "kr" && !serverId && !state.status?.serverId) {
+    if (!region && !serverId && !state.status?.serverId) {
       showToast("无法识别当前客户端服务器，请手动选择国服服务器");
       el.playerSearchRegion.focus();
       return;
@@ -3364,8 +3395,8 @@
   }
 
   function updateSearchRegionLabel(data = state.status) {
-    if (el.playerSearchRegion.dataset.region === "kr") {
-      el.playerSearchRegionLabel.textContent = "韩服";
+    if (isRiotSearchRegion(el.playerSearchRegion.dataset.region)) {
+      el.playerSearchRegionLabel.textContent = RIOT_REGION_LABELS[el.playerSearchRegion.dataset.region];
       return;
     }
     const serverId = el.playerSearchRegion.dataset.serverId || "";
@@ -3380,6 +3411,8 @@
   }
 
   function updateSearchRegionStatus(data) {
+    const platform = isRiotSearchRegion(data?.clientRegion) ? data.clientRegion : data?.clientRegion === "TENCENT" ? "cn" : "";
+    if (data?.connected && platform && platform !== searchClientPlatform) {searchClientPlatform = platform; applySearchRegion(platform);}
     const serverId = data?.connected ? String(data.serverId || "").trim().toUpperCase() : "";
     const serverName = data?.connected ? String(data.serverName || "").trim() : "";
     const available = Boolean(serverId && serverName);
@@ -3390,17 +3423,17 @@
   }
 
   function applySearchRegion(value, requestedServerID = "") {
-    const region = value === "kr" ? "kr" : "cn";
-    const serverId = region === "kr" ? "" : String(requestedServerID ?? "").trim().toUpperCase();
+    const region = isRiotSearchRegion(value) ? String(value).toLowerCase() : "cn";
+    const serverId = region !== "cn" ? "" : String(requestedServerID ?? "").trim().toUpperCase();
     const selected = [...el.playerSearchRegionMenu.querySelectorAll("[data-region-option]")].find((option) => (
-      option.dataset.regionOption === region && (region === "kr" || option.dataset.serverId === serverId)
+      option.dataset.regionOption === region && (region !== "cn" || option.dataset.serverId === serverId)
     )) || el.playerSearchRegionMenu.querySelector('[data-region-option="cn"][data-server-id=""]');
     el.playerSearchRegion.dataset.region = region;
-    el.playerSearchRegion.dataset.serverId = region === "kr" ? "" : (selected?.dataset.serverId ?? "");
+    el.playerSearchRegion.dataset.serverId = region !== "cn" ? "" : (selected?.dataset.serverId ?? "");
     for (const option of el.playerSearchRegionMenu.querySelectorAll("[data-region-option]")) {
       option.setAttribute("aria-checked", String(option === selected));
     }
-    if (region === "kr") setCNRegionExpanded(false);
+    if (region !== "cn") setCNRegionExpanded(false);
     updateSearchRegionLabel();
     savePreference("search-region", region);
     if (region === "cn") savePreference("search-server-id", el.playerSearchRegion.dataset.serverId);
@@ -4274,8 +4307,39 @@
 		}
 		children.push(rosterNode);
 	  }
+      let score = null;
+      if (next.dataset.tooltipScore) {
+        try {
+          const parsed = JSON.parse(next.dataset.tooltipScore);
+          if (typeof parsed?.value === "string" && Array.isArray(parsed.parts) && parsed.parts.length <= 10
+            && parsed.parts.every(part => typeof part.label === "string" && typeof part.value === "string" && Number.isFinite(part.norm) && part.norm >= 0 && part.norm <= 1)) score = parsed;
+        } catch (_) {}
+      }
+      if (score) {
+        const header = document.createElement("div");
+        header.className = "tooltip-score-header";
+        const value = document.createElement("b");
+        value.textContent = score.value;
+        header.append(titleNode, value);
+        children.splice(0, children.length, header);
+        for (const part of score.parts) {
+          const row = document.createElement("div");
+          row.className = "tooltip-score-row";
+          const label = document.createElement("span");
+          label.textContent = part.label;
+          const bar = document.createElement("span");
+          bar.className = "tooltip-score-bar";
+          const fill = document.createElement("i");
+          fill.style.width = `${Math.round(part.norm * 10000) / 100}%`;
+          bar.append(fill);
+          const raw = document.createElement("b");
+          raw.textContent = part.value;
+          row.append(label, bar, raw);
+          children.push(row);
+        }
+      }
       tooltip.replaceChildren(...children);
-	  tooltip.dataset.layout = roster ? "roster" : body ? "titled" : "single";
+	  tooltip.dataset.layout = score ? "score" : roster ? "roster" : body ? "titled" : "single";
       tooltip.dataset.size = next.dataset.tooltipSize || "";
       delete tooltip.dataset.shown;
       tooltip.hidden = false;

@@ -411,7 +411,7 @@ func (a *app) handleGameplayMayhemRating(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "player reference expired", http.StatusNotFound)
 			return
 		}
-		if strings.EqualFold(strings.TrimSpace(reference.Region), riotRegionKR) {
+		if isRiotRegion(reference.Region) {
 			response := unavailableMayhemRating("仅支持国服", dataSourceModeUnsupported)
 			respondJSON(w, response)
 			return

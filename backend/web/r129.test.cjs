@@ -56,7 +56,7 @@ function compile(names, dependencies, source = gameplayScript) {
   for (const name of ["champSelectEnemyPlaceholder", "stampLiveRows", "preserveLiveImages", "patchLiveRosterPanel"]) if (!names.includes(name) && names.some(n=>functionSource(source,n).includes(name + "("))) names.push(name);
   const keys = Object.keys(dependencies);
   const body = names.map((name) => functionSource(source, name)).join("\n");
-  return Function(...keys, `"use strict";\n${body}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
+  return Function(...keys, `"use strict";\n${require("./r220-harness-support.cjs").prelude(source,dependencies)}${body}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
 }
 
 // 海斗英雄选择快照：1 名本人玩家、historyState="ok"、当前模式没有近期对局与模式
@@ -110,13 +110,15 @@ function mountFixture(source = gameplayScript) {
   const appScroll = document.getElementById("app-scroll");
   const appMain = document.querySelector(".app-main");
   const writes = { innerHTML: 0, scroll: [] };
-  // 整块重建的唯一入口是 nodes.liveContent.innerHTML = …，给它装一个计数器。
+  // R213 整块重建移入真实节点；兼容统计 innerHTML 与 replaceChildren 入口。
   const innerHTMLDescriptor = Object.getOwnPropertyDescriptor(window.Element.prototype, "innerHTML");
   Object.defineProperty(content, "innerHTML", {
     configurable: true,
     get() { return innerHTMLDescriptor.get.call(this); },
     set(value) { writes.innerHTML += 1; innerHTMLDescriptor.set.call(this, value); },
   });
+  const replaceChildren = content.replaceChildren.bind(content);
+  content.replaceChildren = (...children) => { writes.innerHTML += 1; replaceChildren(...children); };
   // jsdom 不做布局，scrollTop 自己装读写探针，才能验证「替换后恢复滚动位置」。
   for (const [node, key] of [[appScroll, "app-scroll"], [appMain, "app-main"]]) {
     let top = 0;
@@ -338,7 +340,7 @@ test("R129 P2 外壳变化（提示条/页签行）时回退整块重建", (t) =
   assert.equal(fx.writes.innerHTML, 2, "外壳变了必须整块重建");
   assert.deepEqual(fx.state.liveRenderRebuild.counts, { full: 2 });
   assert.equal(fx.buildImages().length, 9);
-  assert.notEqual(fx.buildImages()[0], before[0], "整块重建后节点当然是新的");
+  assertSameNodes(before, fx.buildImages(), "R213 整块重建也复用相同地址图片");
   assert.match(fx.content.innerHTML, /live-roster-notice/);
 });
 

@@ -17,7 +17,7 @@ type updateInstallTiming struct {
 	stages map[string]int64
 }
 
-var timingStageOrder = []string{"installer_start", "parent_exited", "uninstall_old_start", "uninstall_old_done", "extract_start", "extract_done", "copy_done", "relaunch"}
+var timingStageOrder = []string{"installer_start", "parent_exited", "payload_released", "nsis_start", "oninit", "check_done", "uninstall_old_start", "uninstall_old_done", "extract_start", "extract_done", "copy_done", "relaunch"}
 
 func newUpdateInstallTiming() *updateInstallTiming {
 	root := strings.TrimSpace(os.Getenv("LOL_LOOT_DATA_DIR"))
@@ -107,7 +107,7 @@ func (t *updateInstallTiming) importNSIS(directory string) {
 	changed := false
 	for scanner.Scan() {
 		stage, raw, ok := strings.Cut(scanner.Text(), "=")
-		if !ok || (stage != "uninstall_old_start" && stage != "uninstall_old_done" && stage != "extract_start" && stage != "extract_done" && stage != "copy_done") {
+		if !ok || (stage != "oninit" && stage != "check_done" && stage != "uninstall_old_start" && stage != "uninstall_old_done" && stage != "extract_start" && stage != "extract_done" && stage != "copy_done") {
 			continue
 		}
 		value, err := strconv.ParseInt(raw, 10, 64)

@@ -179,7 +179,7 @@
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
-    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client"].includes(event)) return;
+    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "overview_dirty_rescan"].includes(event)) return;
     // Sample local requests by fixed endpoint category so status polling cannot
     // hide page timings. Delivery stays bounded and sampled events never retry.
     const sampled = event === "live_refresh_client" || event === "local_request_client";
@@ -187,6 +187,15 @@
     const now = Date.now();
     if (sampled && (sampledPending.size && event !== "local_request_client" || now - (sampledAt.get(sampleKey) ?? -Infinity) < (event === "local_request_client" ? 10000 : 1000))) { increment("transportSuppressed"); return; }
     const body = { event, reason };
+    if (event === "overview_dirty_rescan") {
+      body.attempt = Math.max(0, Math.min(5, Math.floor(Number(fields.attempt) || 0)));
+      body.filter = fields.filter;
+      body.finished_game_id = String(fields.finished_game_id || "0");
+      body.finished_queue_id = Math.max(0, Math.min(100000, Number(fields.finished_queue_id) || 0));
+      body.expected_present = Boolean(fields.expected_present);
+      body.outcome = fields.outcome;
+      body.since_end_ms = Math.max(0, Math.min(86400000, Math.floor(Number(fields.since_end_ms) || 0)));
+    }
     if (event === "collection_render_client") {
       if (["owned", "remaining", "all", "chromas"].includes(fields.view)) body.view = fields.view;
       body.force = Boolean(fields.force); body.keptVisible = Boolean(fields.keptVisible);
@@ -194,6 +203,7 @@
     if (event === "blocking_state_client" || event === "automatic_read_client") {
       if (["startup", "skin", "chroma", "champions", "career", "facade", "champselect", "update", "confirmation", "artwork_fullscreen", "other", "poll", "event", "direct", "dirty_rescan", "workspace", "manual"].includes(fields.source)) body.source = fields.source;
       if (["friends", "pro-players", "champions", "overview", "facade"].includes(fields.endpoint)) body.endpoint = fields.endpoint;
+      if (event === "blocking_state_client" && reason === "hide" && ["identity-ready", "no-client-process", "timeout", "suppressed"].includes(fields.hide_reason)) body.hide_reason = fields.hide_reason;
     }
     if (event === "arena_header_source") {
       if (Number.isInteger(fields.championId) && fields.championId > 0) body.championId = Math.min(1000000, fields.championId);
@@ -241,12 +251,15 @@
       if (["all", "top", "jungle", "middle", "bottom", "utility", "mid", "adc", "support"].includes(fields[key])) body[key] = fields[key];
     }
     if (event === "live_render_rebuild") {
-      for (const [field,allowed] of [["counts",["full","status","runes","build","insight"]],["sources",["direct","manual","interval","sse","event","poll","resync","recommendation","rune","catalog","unknown"]]]) {
+      for (const [field,allowed] of [["counts",["full","status","runes","build","insight"]],["sources",["direct","manual","interval","sse","event","poll","resync","recommendation","rune","catalog","progress","unknown"]],["fullReasons",["tab-row","banner","panel-count","lane-slot","other"]]]) {
         body[field] = {};
         for (const key of allowed) if (Number.isFinite(fields[field]?.[key])) body[field][key] = Math.max(0,Math.min(1000000,Math.floor(fields[field][key])));
       }
       for (const key of ["total","windowMs","imagesRecreated","rowsReplaced"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0,Math.min(1000000,Math.floor(fields[key])));
       if (["ChampSelect","GameStart","InProgress","Reconnect","EndOfGame","Lobby","None"].includes(fields.phase)) body.phase = fields.phase;
+    }
+    if (event === "live_progress_apply") {
+      for (const key of ["applied","ignored_same_game","ignored_stale","windowMs"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0,Math.min(1000000,Math.floor(fields[key])));
     }
     if (event === "lane_matchup_candidate_fetch") {
       for (const key of ["enemyLockedCount","enemyPositionKnownCount","allyPositionKnownCount","enemyChampionId","rowCount","queueId","gameId"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0,Math.min(1e13,Math.floor(fields[key])));
@@ -265,6 +278,11 @@
     if (event === "renderer_perf") {
       for (const key of ["windowMs","longtaskCount","longtaskTotalMs","longtaskMaxMs","timerLagCount","timerLagMaxMs","heapUsedMb","heapLimitMb","domNodes","imgCount"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1e9, key === "windowMs" ? Math.floor(fields[key]) : fields[key]));
       body.groups = (Array.isArray(fields.groups) ? fields.groups : []).slice(0,32).filter(row => ["overview","live","champions","favorites","suite","settings","pro-players"].includes(row.section) && ["main","watch","rig","facade","sweep","champselect","collection","account","facade-collection","items","pools","icons","banners","runes","build","specialist","pro","opgg"].includes(row.tab)).map(row => ({section:row.section,tab:row.tab,count:Math.max(0,Math.min(1e6,Number(row.count)||0)),totalMs:Math.max(0,Math.min(1e9,Number(row.totalMs)||0)),maxMs:Math.max(0,Math.min(1e9,Number(row.maxMs)||0))}));
+    }
+    if (event === "status_render_failed") {
+      for (const key of Object.keys(body)) if (!["event", "reason"].includes(key)) delete body[key];
+      body.errorType = ["Error", "TypeError", "ReferenceError", "RangeError", "SyntaxError", "URIError", "EvalError", "AggregateError"].includes(fields.errorType) ? fields.errorType : "Error";
+      body.functionName = ["refreshStatus", "renderStatus", "renderLaunchpad", "updateReadingOverlay", "renderNotice", "updateWorkspaceAvailability", "renderUpdateStatus", "loadClientInstallations", "loadSkins", "loadAccount", "loadPools"].includes(fields.functionName) ? fields.functionName : "other";
     }
     const encoded = JSON.stringify(body);
     if (flowPending.has(encoded) || flowSamples.has(encoded) && now - flowSamples.get(encoded) < 30000) { increment("transportSuppressed"); return; }

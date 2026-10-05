@@ -104,6 +104,13 @@ func prepareDestination(input string, installedBytes int64) (string, *failureMes
 func (a *installerApp) install(message uiMessage) {
 	installationStarted := time.Now()
 	w := a.window
+	var released payloadRelease
+	payloadStarted := false
+	defer func() {
+		if released.directory != "" {
+			_ = os.RemoveAll(released.directory)
+		}
+	}()
 	reportFailure := func(failure failureMessage) {
 		if a.options.Update {
 			failure.Message = upgradeFailureMessage
@@ -113,12 +120,12 @@ func (a *installerApp) install(message uiMessage) {
 	}
 	if a.options.Update && !(a.options.FreshInstall && !a.options.ParentFirst) {
 		w.dispatch(func() { a.emit("progress", progressMessage{Percent: 0, Stage: "正在等待旧程序退出…"}) })
-		if !waitUpgradeParent(a.waitParent, func(progress progressMessage) { w.dispatch(func() { a.emit("progress", progress) }) }) {
+		payloadStarted = true
+		released, a.parentExited = releasePayloadWhileWaiting(a.waitParent, func(progress progressMessage) { w.dispatch(func() { a.emit("progress", progress) }) }, releasePayload, a.timing.mark)
+		if !a.parentExited {
 			reportFailure(failureMessage{Message: upgradeFailureMessage})
 			return
 		}
-		a.parentExited = true
-		a.timing.mark("parent_exited")
 	}
 	if a.options.Update && !a.options.FreshInstall {
 		if err := validateUpgradeDestination(message.Path); err != nil {
@@ -136,12 +143,17 @@ func (a *installerApp) install(message uiMessage) {
 			Path string `json:"path"`
 		}{dest})
 	})
-	setup, temporaryDir, err := releasePayload()
-	if err != nil {
+	if !payloadStarted {
+		released.setup, released.directory, released.err = releasePayload()
+		if released.err == nil {
+			a.timing.mark("payload_released")
+		}
+	}
+	if released.err != nil {
 		reportFailure(failureMessage{Message: "无法释放安装包，请检查临时磁盘空间后重试", Detail: dest})
 		return
 	}
-	defer os.RemoveAll(temporaryDir)
+	setup, temporaryDir := released.setup, released.directory
 	cmd := exec.Command(setup)
 	commandLine := installerCommandLine(setup, dest, message.DesktopShortcut, a.options.Update)
 	if a.options.Update && a.parentExited && !a.options.FreshInstall {
@@ -161,6 +173,7 @@ func (a *installerApp) install(message uiMessage) {
 	a.startupWarm = newConfiguredExecutionWarmup(dest, installationStarted, executeWarmHooks{})
 	defer a.startupWarm.Finish()
 	started := time.Now()
+	a.timing.mark("nsis_start")
 	if err := cmd.Start(); err != nil {
 		shortcuts.finish("start_failed")
 		reportFailure(failureMessage{Message: "无法启动安装，请重新下载安装包后重试", Detail: "退出码：未启动；目标路径：" + dest})

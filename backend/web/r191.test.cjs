@@ -23,7 +23,7 @@ function views(both=false){
   rerenderTab:()=>assert.fail('whole tab redraw'),bindMatchDetailControls:()=>{},bindPlayerLinks:()=>{},applyRenderedMetricStyles:()=>{},prepareImages:()=>{},
   rerenderCatalogViews:()=>{for(const tab of state.tabs)tab.matchViewRevision++;document.querySelector('#one').innerHTML='global redraw';},
  };
- const fn=compile(source,['ensureAugmentDescriptions','rerenderAugmentDescriptionViews','rerenderMatch','replaceMatchEntry'],deps);
+ const fn=compile(source,['buildSubject','ensureAugmentDescriptions','rerenderAugmentDescriptionViews','rerenderMatch','replaceMatchEntry'],deps);
  const entries=[...document.querySelectorAll('.match-entry'),...cached.querySelectorAll('.match-entry')];
  return{...fn,state,document,cached,entries,externalMatchViews,nodes,renderMatch};
 }

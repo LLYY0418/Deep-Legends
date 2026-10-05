@@ -10,7 +10,7 @@ function body(name) {
   const end=/\n  (?:async )?function \w+\(/.exec(rest);
   return end?rest.slice(0,end.index):rest;
 }
-function compile(names,deps={}) { return Function(...Object.keys(deps),names.map(body).join('\n')+`\nreturn {${names.join(',')}};`)(...Object.values(deps)); }
+function compile(names,deps={}) { names=require("./r211-harness-support.cjs").expand(source,names,deps); return Function(...Object.keys(deps),require('./r220-harness-support.cjs').prelude(source,deps)+names.map(body).join('\n')+`\nreturn {${names.join(',')}};`)(...Object.values(deps)); }
 test('R89 parallel supplements start before first overview resolves and survive ref adoption without duplicates',async()=>{
   const calls=[],pending=[];
   const state={settings:{matchCount:20},controllers:new Map()};

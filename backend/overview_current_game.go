@@ -389,8 +389,8 @@ func (a *app) parseOPGGCurrentGameValue(raw json.RawMessage, ref gameplayReferen
 			if name == "" {
 				name = p.ChampionName
 			}
-			identity := gameplayReference{PlayerRef: p.PUUID, GameName: p.GameName, TagLine: p.TagLine, Region: "kr", OPGGIdentity: true}
-			player := currentGamePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: a.registerGameplayReferenceDetails(identity), GameName: p.GameName, TagLine: p.TagLine, DisplayName: p.GameName, SummonerLevel: p.Level, Region: "kr"}, ChampionID: int64(meta.ID), ChampionName: name, Rank: currentRank(p.League.Tier, true), PreferredPosition: currentPosition(p.Summary.RecentSummary.Position)}
+			identity := gameplayReference{PlayerRef: p.PUUID, GameName: p.GameName, TagLine: p.TagLine, Region: riotPlatform(ref.Region), OPGGIdentity: true}
+			player := currentGamePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: a.registerGameplayReferenceDetails(identity), GameName: p.GameName, TagLine: p.TagLine, DisplayName: p.GameName, SummonerLevel: p.Level, Region: riotPlatform(ref.Region)}, ChampionID: int64(meta.ID), ChampionName: name, Rank: currentRank(p.League.Tier, true), PreferredPosition: currentPosition(p.Summary.RecentSummary.Position)}
 			player.ProPlayer = a.matchProIdentity(proIndex, "current-game", identity)
 			for _, spell := range p.Spells {
 				if spell.ID > 0 && len(player.Spells) < 2 {
@@ -490,7 +490,7 @@ func (a *app) fetchOPGGCurrentGame(ctx context.Context, ref gameplayReference) (
 	}
 	if !fresh {
 		responseSource = "action"
-		body, _ := json.Marshal([]map[string]string{{"locale": "zh-cn", "region": "kr", "puuid": page.puuid}})
+		body, _ := json.Marshal([]map[string]string{{"locale": "zh-cn", "region": opggPlatform(ref.Region), "puuid": page.puuid}})
 		stage = "current-game-request"
 		data, err = a.readOPGGPlayerPage(ctx, ref, http.MethodPost, opggCurrentGameAction, body)
 		if err != nil {
@@ -522,7 +522,7 @@ func (a *app) fetchOPGGCurrentGame(ctx context.Context, ref gameplayReference) (
 }
 
 func (a *app) loadCurrentGame(ctx context.Context, ref gameplayReference) (*currentGame, error) {
-	if !strings.EqualFold(ref.Region, "kr") || ref.ServerID != "" || a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) {
+	if !isRiotRegion(ref.Region) || ref.ServerID != "" || a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) {
 		return nil, errors.New("韩服当前对局来源不可用")
 	}
 	key := sourceScopedKey("current-game", overviewSupplementCacheIdentity(ref))
@@ -619,7 +619,7 @@ func (a *app) handleOverviewCurrentGame(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "玩家引用已失效或查询参数不完整", status)
 		return
 	}
-	if !strings.EqualFold(ref.Region, "kr") {
+	if !isRiotRegion(ref.Region) {
 		http.Error(w, "仅支持韩服玩家当前对局", http.StatusBadRequest)
 		return
 	}
