@@ -16,8 +16,13 @@ function fixture(t) {
     fs.mkdirSync(path.join(root, dir), { recursive: true });
   }
   for (const name of ["build-desktop.sh", "scripts/build-stage.cjs", "scripts/go-test-shards.cjs", "desktop/package.json", "desktop/package-lock.json", "desktop/release-build.cjs", "desktop/artifact-names.cjs",
-    "desktop/verify-embedded-riot-key.cjs", "desktop/apply-portable-template.cjs", "desktop/verify-build-fingerprint.cjs"]) {
+    "desktop/verify-embedded-riot-key.cjs", "desktop/apply-portable-template.cjs", "desktop/apply-update-timing-template.cjs", "desktop/verify-build-fingerprint.cjs"]) {
     fs.copyFileSync(path.join(project, name), path.join(root, name));
+  }
+  for (const relative of ["include/extractAppPackage.nsh", "installSection.nsh", "installer.nsi", "include/allowOnlyOneInstallerInstance.nsh"]) {
+    const target = path.join(root, "desktop/node_modules/app-builder-lib/templates/nsis", relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(project, "desktop/node_modules/app-builder-lib/templates/nsis", relative), target);
   }
   const prelude = `const fs = require("node:fs"), path = require("node:path");
     const root = process.env.R82_FIXTURE_ROOT;
@@ -31,6 +36,10 @@ function fixture(t) {
   };
   writeScript("bin/go", `
     const args = process.argv.slice(2);
+    if (args[0] === "env" && args[1] === "GOCACHE") {
+      process.stdout.write(path.join(root, "synthetic-system-cache"));
+      return;
+    }
     if (args[0] === "list") {
       process.stdout.write("synthetic\\n");
       return;

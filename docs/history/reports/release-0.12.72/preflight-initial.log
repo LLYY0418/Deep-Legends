@@ -1,0 +1,1014 @@
+✔ confirmed child close traverses main IPC + preload + renderer, offers a real app restart (73.052042ms)
+✔ process exit before renderer subscription is recovered from retained snapshot (15.1815ms)
+✔ late successful status and old running snapshot cannot erase a confirmed exit (9.601875ms)
+✔ unknown, absent or rejected bridge and repeated HTTP errors never prove death (21.528541ms)
+✔ lifecycle bridge cleans listeners and ignores async results after disposal (7.981791ms)
+✔ graceful update/user shutdown does not publish fatal; foreign renderers cannot query or restart (2.66525ms)
+✔ renderer bootstrap actually installs lifecycle subscription (0.313292ms)
+✔ restart IPC failure tells the user to reopen manually instead of reloading a dead service (8.992375ms)
+✔ R201 installer ready hides every window before flushed shutdown quits (1.725458ms)
+✔ built backend must contain the exact source fingerprint (1.781333ms)
+✔ R70 fingerprint tracks embedded assets/build inputs but excludes tests and generated binaries (976.940125ms)
+✔ R86 ADD2 fingerprint fixture prunes large caches without changing the fingerprint (911.510583ms)
+ℹ {"unfiltered":{"milliseconds":232.80779200000006,"files":1012,"bytes":20714382},"filtered":{"milliseconds":207.6703339999999,"files":494,"bytes":20577166},"fingerprint":"7a3e94199464"}
+✔ R86 desktop logs stay within five two-MiB generations and export only reviewed fields (515.905666ms)
+✔ R86 desktop rotation rejects untrusted archive paths without deleting evidence (3.764833ms)
+✔ R86 desktop log byte guard rejects an independent unbounded append path (38.190708ms)
+✔ one event card preserves separate choice owners, partial selection, failures and POST keys (126.19525ms)
+✔ offline national group remains reachable from a pro tab (1.933333ms)
+✔ ordinary and centered artwork use different face coordinates, including load failure (64.283042ms)
+✔ unknown reward quantities are not manufactured as one (0.556875ms)
+✔ 2024 real mode buttons isolate champion and search memories across all modes and reload (87.55425ms)
+✔ 2024 legacy memory migrates only to its saved mode, once (6.136ms)
+✔ 2024 fast ranked filters supersede requests without stuck loading or cross-mode writes (8.634458ms)
+✔ 2024 neutral glyph coloring preserves alpha and never recolors colored/opaque/unknown art (6.15125ms)
+✔ 2024 rarity UI says selection distribution, retains all stages, hides failed empty data (11.831125ms)
+✔ R86 search keeps the input and exposes all-position request failures (14.185833ms)
+✔ 2135 actual search buttons clear submitted fields, keep invalid input, and retain new typing (371.325834ms)
+✔ 2135 glyph tone map preserves dark rim, raises highlights, and retains original colored artwork (6.649958ms)
+✔ 2244 skill summary uses real main/sub priorities after R, without repeated labels (62.30575ms)
+✔ 2244 banner exact animation, no video for unknown skin or reduced motion (17.706291ms)
+✔ event cards group presentation but retain all entitlement rows; unknown events stay separate (9.999833ms)
+✔ 2244 installer uses the actual STM_SETIMAGE constant and distribution is automatic (1.206542ms)
+✔ R87 diagnostics support an optional independent export directory with bounded collision-free names (1.841666ms)
+✔ R71 diagnostics do not redirect foreign downloads, redirects, or missing directory selections (0.315542ms)
+✔ R71 interrupted downloads release reservations and the hook is packaged and disposed (1.145083ms)
+✔ only completed diagnostics downloads enable opening the exported file folder (0.442167ms)
+✔ R87 P8 first export and unusable directories still report the actual Save dialog path (1.083375ms)
+✔ R87 P8 cancellation, invalid save paths and disposed windows never emit completion (0.217958ms)
+✔ R112 correlated exports preserve IDs and still reject foreign/redirected query URLs (0.347916ms)
+✔ R205 upgrade command preserves NSIS shortcut retention and uses the same registry identity (14.371708ms)
+✔ N-1 every visible custom text control receives font (0.311916ms)
+✔ N-2 MUI branding stays hidden (0.159292ms)
+✔ N-3 instfiles hook scoped to preceding custom page (0.099042ms)
+✔ N-4 stock headers never reappear (0.094792ms)
+✔ N-5 gold progress uses BGR (0.07475ms)
+✔ N-6 buttons stay stock and sit on a light footer instead of unreadable dark (0.126ms)
+✔ N-7 progress track colour has visible contrast against the page background (0.058708ms)
+✔ N-8 Core fallback keeps stock system styling (0.094875ms)
+✔ N-9 finish page hides the wizard before the blocking launch call (0.135583ms)
+✔ R74 installer opts out of bitmap DPI virtualization and has a visible progress track (0.10675ms)
+✔ R80 customInstall swaps the executable without changing registry or removal logic (0.106208ms)
+✔ R74 Browse appends Deep Legends once without creating directories prematurely (0.0855ms)
+✔ N-1..5 mutation guards reject each broken contract (4.228042ms)
+✔ 2135 white setup and larger native text/icons without bitmap scaling (0.163333ms)
+✔ R212 generated app-running paths skip PowerShell only after confirmed upgrade exit (1.096625ms)
+✔ R212 real onInit template records its first instruction and repeated probes declare one variable (4.73425ms)
+✔ R212 mutation rejects unconditional PowerShell and updated uninstaller checks (0.907291ms)
+✔ installer build embeds the actual NSIS artifact and publishes only a verified GUI shell (4.713458ms)
+✔ installer build cleans payload and rejects compiler (3.06175ms)
+✔ installer build cleans payload and rejects missing-payload (3.39375ms)
+✔ installer build cleans payload and rejects wrong-format (3.625708ms)
+✔ public installer shell uses the public NSIS artifact (3.715875ms)
+✔ both release entry points wrap NSIS before hashes and before deleting win-unpacked (0.322417ms)
+✔ small uninstaller builds independently before NSIS without embedding payload (3.285416ms)
+✔ uninstaller build removes partial artifact after compiler (3.025833ms)
+✔ uninstaller build removes partial artifact after payload (2.982458ms)
+✔ uninstaller build removes partial artifact after invalid PE (3.836916ms)
+✔ uninstaller design supports retain/delete data, every bridge request and all progress states (150.75225ms)
+✔ installer design executes all bridge interactions, terms, progress and failure without changing layout (332.31525ms)
+✔ installer reports ready only after real template initialization with inline state (169.057833ms)
+✔ installer reports script failure instead of readiness after broken application bootstrap (27.523666ms)
+✔ uninstaller reports ready only after real template initialization with inline state (32.967125ms)
+✔ uninstaller reports script failure instead of readiness after broken application bootstrap (19.075875ms)
+✔ collapsed sidebar hides the label but keeps the live beacon rendered (478.5995ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 DOM teardown disconnects pending observers without disabling live callbacks (1694.654208ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 1110 征召默认值、时间输入、模式能力和总开关真实保存链 (4430.867417ms)
+✔ 平均段位只查询视口内卡片，并在分页加载期间停用 (12.178375ms)
+✔ match-tier failures back off instead of retrying on the next render (7.169167ms)
+✔ match-tier overview diagnostics contain aggregate counts only (0.851416ms)
+✔ non-match overview rerenders preserve the match-list node (16.481458ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 总览战绩卡：点击展开按钮只替换目标卡片并可收起 (20691.479667ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 玩家覆盖层里的战绩详情也能展开 (4721.4825ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 演示数据下总览页渲染出真实内容，且渲染期没有异常 (1697.584291ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 好友真实数据恢复横条模式与计时，SSE 更新不重建战绩或串到其他玩家 (3985.069375ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 演示数据下工具五个页签都渲染完成 (5113.251042ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 2351 自定义暂停事件保留真实总开关和卡片高亮 (3171.642375ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R149 收藏页仍可独立进入头像与旗帜视图 (4881.880292ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R56 工具页状态、确认、下拉与领奖契约完整 (5338.562125ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 全部原生下拉都增强为可键盘操作的应用菜单，包含动态英雄段位 (3189.069417ms)
+✔ R59 生涯头衔读取对象名称且绝不显示原始 UUID (15.247042ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R59 生涯预览完整渲染时不泄漏 playerTitleSelected UUID (3180.286333ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R60 生涯事件刷新头衔、保护脏草稿且不在其它页签后台请求 (5978.582667ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R65 生涯事件 20 连发只请求一次、仅时间戳变化不重建且按压期间不丢点击 (5116.367083ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R64 生涯皮肤与身份控件局部更新，皮肤图片延迟解码 (3290.646ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R64 生涯头衔和勋章仅在真实值上使用强调色 (3190.67175ms)
+✔ R60 生涯勋章缺失槽位稳定回退为未设置 (11.371917ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R58 生涯英雄长下拉支持别名搜索，短下拉不显示搜索框 (3351.114042ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R58 生涯空皮肤刷新保留草稿并在数据补齐后恢复 (5374.198541ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 顶部重新读取实际刷新生涯并丢弃未应用预览 (3224.405042ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 收藏账户条复用主页背景和圆头像，并只保留两项事实 (3128.890333ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 游戏时间分布下方提供等栏宽分享按钮，并在选定路径后生成桌面双列长图 (1862.993084ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 分享图按 50 场设置截断当前已加载战绩 (1994.712791ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 排位分区在负场缺失时也能渲染出胜率提示 (1594.857458ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 渲染异常会切到可重试的错误态，而不是永远停在骨架屏 (3189.448667ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 已有总览刷新时保留当前内容，不退回整页骨架 (3251.50075ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 客户端退出后总览显示可重试提示，不退回空白页 (3131.927125ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'in-flight',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'cached',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 推荐请求期间遮罩只覆盖 tab 下方面板，并按内容提示 (3418.28425ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 对局页出装推荐渲染，且不再出现「后期备选」 (3294.144042ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 核心装只展示胜率与场次，不再展示选取率 (3278.968583ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 技能加点的选取率/胜率/场次与技能图标同一行 (3282.771667ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 对抗样本为空时给出说明文案，而不是一个「—」 (3273.673125ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 英雄位置统计为空时显示明确说明，而不是三项破折号 (3289.1855ms)
+✔ failed build timelines retry on reopening, successful timelines remain cached (0.844875ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 ADD-1 card detail, metric, legacy damage controls and timeline stay local at 200 matches (115352.933625ms)
+✔ R86 ADD optional cs-dialog computed zoom stays one inside the zoomed app frame (132.880291ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 ADD-1 failed timelines wait for explicit retry and keep unrelated cards (3601.301792ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 ADD-1 late timeline cannot reveal a filtered-out card (21710.72075ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 hero search preserves input and coalesces five keystrokes (including bypass mutation) (6737.607334ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 tools fetch only active tab plus rig, then load claims on demand (4246.802791ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 healthy SSE reduces phase polling while closed SSE retains one-second fallback (3237.354292ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 external match expansion preserves unrelated cards (3861.819ms)
+✔ R86 filtering 200 loaded matches hides entries without rebuilding or refetching (24797.162459ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 image listeners and tab scroll remain bounded including independent image-listener bypass (21082.4135ms)
+✔ R86 scroll restoration is resize-driven, restores clamped position and yields to user input (12.239625ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R87 P9 external champselect events preserve modal scroll, input and composition (7209.841666ms)
+✔ R104 quota recovery keeps the first-load skeleton and existing matches visible (15.56475ms)
+✔ R112 KR average-tier errors retry only visible active cards, then cache real values (21.379416ms)
+✔ R117 career column is rebuilt only when its own inputs change (12.800625ms)
+✔ 定制便携版模板存在且保留缓存秒开的关键行为 (0.56425ms)
+✔ 打包配置与模板配套：asarUnpack 后端、不再使用解压期启动图 (0.469041ms)
+✔ 所有桌面运行时本地模块都进入 app.asar 和源码指纹 (1.32725ms)
+✔ Shell 只构建 setup 并复用 Electron 下载缓存 (0.415041ms)
+✔ 历史 portable 模板工具替换指纹占位符并拒绝过期模板 (3.7725ms)
+✔ 模板前置校验拒绝未替换占位符，后端内容变化会改变指纹 (3.344375ms)
+✔ 模板指纹仅读取指定工作目录的四个输入 (2.550166ms)
+✔ 交错执行破坏性模板测试不会污染另一个构建的后端和模板 (5.796333ms)
+✔ 默认只有 setup 目标，安装选项和外观资源保持完整 (0.582541ms)
+✔ R71 executable resource editing stays enabled and branded setup has exactly two choices (0.643833ms)
+✔ NSIS page functions wait until standard builder plugins are available (0.227333ms)
+✔ 职业页懒加载、所有分组/账号、缺失状态、筛选缓存与安全转义 (272.78125ms)
+✔ 加载互斥、失败保留旧表、恢复与来源不可用名单 (248.968375ms)
+✖ 国服每次打开折叠；韩服下方入口可键盘聚焦且不修改大区 (573.521875ms)
+✔ 统一总览按国服、韩服、职业分组，同一账号跨组隔离且保留滚动和目录焦点 (2228.47025ms)
+✔ 补充来源未更新保留提示，重新进入不重复阻塞整页，手动刷新可重试 (226.583875ms)
+✔ 职业列表后台补充自动更新，离开页面停止轮询 (5133.162416ms)
+✔ R73 最近账号、历史折叠、只看最新账号及会话核验 (157.761459ms)
+▶ R73 真正点击后才核验：差异与404标记，502不误判
+  ✔ {"proMismatch":true} (917.250208ms)
+  ✔ {"overviewStatus":404} (810.280916ms)
+  ✔ {"overviewStatus":502} (840.715792ms)
+✔ R73 真正点击后才核验：差异与404标记，502不误判 (2568.919666ms)
+✔ 职业目录仅保留返回总览，返回后保留全部已打开页签 (1645.367458ms)
+✔ 未知更新时间的补充账号保持展示，不出现120天未玩的断言 (88.653458ms)
+✔ 玩家页签各自保留纵向位置，跨页面返回也不串位 (1707.718042ms)
+✔ R112 导出状态只属于当前诊断页；离开、迟到和乱序完成均不污染新页面 (1334.389625ms)
+✔ OPGG season summary actually replaces recent sample in both overview workspaces without a history reload (1301.763791ms)
+✔ 当前对局独立置顶、两队十人、无评分和多余标记，分组后不会污染玩家战绩 (968.129542ms)
+✔ R74 零战绩当前对局也加载技能目录，未加载时不伪造技能名称 (780.211625ms)
+✔ R100 菜单键盘可达空组、异步重绘保焦、离开总览关闭菜单 (905.398875ms)
+✔ 国服总览保留战绩但不渲染或请求当前对局和观战 (594.430708ms)
+✔ R97 management filters and rows exclude expanded and academy teams (97.975458ms)
+✔ R100 empty national/KR/pro groups stay selectable and preserve distinct empty states (912.077708ms)
+✔ TestR102NoPrimaryBadgeRendered (84.1465ms)
+✔ TestR102LatestOnlyTogglesShowsFirstAccountOnly (104.883125ms)
+✔ TestR102ButtonLabelSaysLatestNotPrimary (18.23825ms)
+✔ TestR102HighlightUsesOriginalAccountIndex (104.178792ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '69:mid:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R75/R76 actual page: pro rows, degradation capture, incomplete and offline (4671.605875ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '69:mid:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R75/R76 actual page: pro rows, degradation 1/99, incomplete and offline (4659.051667ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '69:mid:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R75/R76 actual page: pro rows, degradation 10/30, incomplete and offline (4625.004583ms)
+✔ parses Chromium proxy resolution without accepting credentials (1.059ms)
+✔ system proxy resolution times out or falls back to direct safely (6.021167ms)
+✔ R100 P7 first native save persists independently; second and restart save without prompt; no overwrite (8.631167ms)
+✔ R100 P7 deleted/replaced directory re-prompts at actual write; cancel cleans staging (3.685583ms)
+✔ R100 P7 rejects foreign renderer and symbolic link files; packaged controller (2.108167ms)
+✔ R100 P7 failed SavePath access and window disposal remove private staged downloads (8.522625ms)
+✔ R110 either export chooses the same remembered folder and updates settings immediately (4.280042ms)
+✔ R110 first share export updates diagnostic destination without another picker (1.8765ms)
+✔ R110 migrates most recent valid old choice once and does not resurrect cleared settings (2.658875ms)
+✔ R110 settings exposes a single export directory (0.259375ms)
+✔ R110 shared PNG destination revalidates replaced folders and preserves PNG names (3.483708ms)
+✔ R175 actual backend close and restart IPC export only safe panic/relaunch evidence (8.3495ms)
+✔ R175 relaunch marker computes elapsed time, deletes once, tolerates missing/corrupt files (1.592958ms)
+✔ R175 stderr is limited to 64 KiB; frame arguments and unreviewed fields cannot pass export (0.933625ms)
+✔ R185 desktop metrics sample once per minute by process type and export only safe fields (3.594ms)
+✔ R185 unknown backend memory is omitted and disposing a pending sample prevents late export (0.738916ms)
+✔ R196 taskbar reminder crosses trusted IPC and stops on focus (1.945ms)
+✔ R201 patches both real extraction paths and the successful copy boundary, idempotently (0.905458ms)
+✔ R204 old-uninstaller timing wraps both scopes and preserves manual flow (1.158959ms)
+✔ R206 upgrade extracts directly only after successful uninstall; manual uses unchanged 7z-out (1.1745ms)
+✔ R206 parent-exited fast path still checks manual and portable installs (1.070375ms)
+✔ R206 app-running macro expands once to avoid duplicate NSIS labels (1.046667ms)
+✔ desktop/r87-p8-independent-verify.test.cjs (28.659833ms)
+✔ R88 crash hooks write synchronous reviewed records without swallowing fatal exceptions (33.918291ms)
+✔ R88 seven-day desktop export excludes old records in every generation and keeps crash fields private (3.793792ms)
+✔ manual reread recovers a stuck overview and refreshes overview plus live without forcing the overlay (1227.066041ms)
+✔ gameplay soft reset clears stalled pagination and recommendation failures while preserving touched tabs (2.189083ms)
+✔ collection-dirty is accepted by the SSE whitelist and refreshes status (941.945375ms)
+✔ dirty collection rescans on entry and view changes without duplicate refresh requests (1612.208125ms)
+✔ accepted dirty rescan stays gated until clean status or timeout (1.349958ms)
+✔ identical forced collection refresh keeps rendered cards mounted (1.087042ms)
+✔ R70 app and gameplay retain cancellation ownership until body parsing completes (1.304625ms)
+✔ R70 cached collection reentry avoids a request and never uses outgoing DOM snapshots (797.205834ms)
+✔ R70 SSE overflow and reconnect resync refresh visible collection even with unchanged status (1139.689375ms)
+✔ R70 gameflow burst uses one fixed window and one non-aborting trailing request (0.809791ms)
+✔ R70 hidden gameplay pages do not construct DOM, and destroyed pages remain inert (0.677292ms)
+✔ R70 superseded status completion cannot overwrite current state or reschedule polling (0.900958ms)
+✔ R71 collection startup issues one ensure across accepted requests, status events and scan start (0.576ms)
+✔ R71 a failed or lost collection acceptance can retry without a permanent gate (0.27775ms)
+✔ public policy rejects encrypted and plaintext keys; private requires a valid key (2.188417ms)
+✔ build receipt rejects a stale packaged backend and clears obsolete approval (5.352542ms)
+✔ R136 public outputs have distinct names and private outputs keep release names (0.577416ms)
+✔ R86 bash release stops on a real failing Go test, including an independent early-build mutation (2318.26825ms)
+✔ R86 CI uses the package version, installs test dependencies and needs no private Riot key (0.64575ms)
+﹣ R86 Windows release stops on a real failing Go test and rejects an independent early build (0.106208ms) # requires Windows and PowerShell
+✔ format gates exclude local toolchains and GOPATH modules while retaining untracked project source (80.41525ms)
+✔ 分享图文件名会清理路径字符并固定为 PNG (1.23175ms)
+✔ 分享图载荷限制令牌、根节点、大小和主题 (0.706958ms)
+✔ 导出样式固定标准桌面双列并强制恢复生涯栏和水印 (0.880667ms)
+✔ 常规总览保持 2x，超长总览按像素预算安全降采样 (0.140208ms)
+✔ 首次选择目录后持久化，后续自动保存且不覆盖同名 PNG (0.982292ms)
+✔ 取消保存不会创建截图窗口或写文件 (0.110792ms)
+✔ 保存令牌只能使用一次，写入失败会记录脱敏错误 (0.266166ms)
+✔ 不受信任的 renderer 不能选择路径或提交截图 (0.617541ms)
+✔ 设置接口读取并更改主进程保存目录 (0.150625ms)
+✔ preload 只暴露受校验的分享接口，不暴露 ipcRenderer (0.977375ms)
+✔ 分享图独立窗口不携带主窗口 zoom，且使用独立内存会话 (0.322542ms)
+✔ R110 share capture writes through the common validated staging controller (0.260958ms)
+✔ live specialist right overview button opens exact KR overview while rune selection and return remain independent (1747.643042ms)
+✔ R86 initial CSS and JS gzip budget excludes dynamic demo data (96.467583ms)
+✔ R86 demo loads only on demand, queues calls, shows badge, and preserves native fallback (107.2545ms)
+✔ R86 demo-only loading rejects an independent production script route (54.818709ms)
+✔ R77 backend spawn waits for the splash to paint (1.093459ms)
+✔ R77 splash keeps the cheap single-frame logo (0.1415ms)
+✔ R77 the instance lock still gates the backend (0.447333ms)
+✔ R77 mutation guards reject each broken boot order (2.122292ms)
+✔ R82 splash appears only when painted and reports its actual show time (2.667416ms)
+✔ R82 closed splash cannot be resurrected by late readiness (0.557708ms)
+✔ R82 fallback boots a stalled splash; quitting cancels all startup triggers (1.36425ms)
+✔ R82 all four requested splash mutations fail real event-driven checks (3.651375ms)
+✔ summoner-updated is whitelisted for status and overview-player (0.820666ms)
+✔ live-update debounce accumulates both events and updates the current overview in place (46.2215ms)
+✖ updateStatus refreshes a connected current-tab header without resetting catalogs (0.493375ms)
+✖ forced overview aborts a loading request and starts a newer request (1.965416ms)
+✔ overview-player changes only five identity fields on the current tab (0.311875ms)
+✔ overview-player identity slice also updates background fields in place (0.157625ms)
+✔ identity-ready status removes the global startup lock while snapshot loads (10.416458ms)
+✔ overview refresh button exposes a stable disabled loading state (6.55825ms)
+✔ manual reread awaits the backend identity refresh before hard-refresh dispatch (0.153416ms)
+✔ identity status with unresolved backdrop preserves the first overview art (0.21625ms)
+✔ appearance scale options exactly match the desktop steps and precede density (264.315083ms)
+✔ scaling applies without the desktop bridge and follows the window size (592.649292ms)
+✔ desktop preference wins on startup; changes persist and auto labels update the visible custom select (105.867417ms)
+✔ a delayed get cannot undo a user selection made during startup (93.372125ms)
+✔ auto 1366x768 = 1 (0.858875ms)
+✔ auto 1600x900 = 1 (0.056833ms)
+✔ auto 1920x1080 = 1 (0.046333ms)
+✔ auto 2304x1318 = 1.2 (0.060167ms)
+✔ auto 2560x1440 = 1.33 (0.054125ms)
+✔ auto 2560x1600 = 1.33 (0.053ms)
+✔ auto 3440x1440 = 1.6 (0.043125ms)
+✔ auto 3840x2160 = 2 (0.039583ms)
+✔ auto 3840x1600 = 1.78 (0.048916ms)
+✔ auto 5120x2880 = 2.5 (0.088375ms)
+✔ auto 7680x4320 = 2.5 (0.051917ms)
+✔ auto 1024x600 = 1 (0.046333ms)
+✔ continuous scale, quantization, clamps and manual-step normalization (1.428208ms)
+✔ scale mutants turn the corresponding geometry guards red (3.386583ms)
+✔ titlebar, minimum size, reload, resize and display events run through the real main module (5.130083ms)
+✔ IPC restores independent preferences, normalizes fixed values and rejects untrusted senders (3.544542ms)
+✔ main behavior guards reject titlebar, minimum size, trust, reload, debounce and export mutants (15.7545ms)
+✔ preload exposes scale IPC without leaking the Electron event (0.857666ms)
+✔ packaged runtime includes the scaling module (0.349375ms)
+✔ upgrade stdout may arrive after exit but before close without a false startup error (3.792959ms)
+✔ user quit shares the graceful path; unexpected backend death still reports (1.311917ms)
+✔ window bounds store writes and restores visible bounds (1.924292ms)
+✔ window bounds store rejects bounds that no longer intersect a display (0.556083ms)
+✔ window bounds store silently falls back on corrupt or unwritable data (0.572042ms)
+✔ desktop window opens at 72/80 percent of the work area on roomy screens (1.466125ms)
+✔ small screens fall back to the design-width floor instead of 72 percent (0.448375ms)
+✔ desktop window clamps each dimension independently (0.219583ms)
+✔ desktop main and topbar keep the shared sizing and drag-region callers (1.045459ms)
+✔ R47 desktop caller and high-resolution mutation probes fail (3.452208ms)
+✔ R206 Worker forwards only the actual Riot GET route whitelist (23.10075ms)
+✔ R206 Worker rejects arbitrary paths/hosts/methods without Riot I/O (0.687334ms)
+✔ R206 Worker response caching honors category TTL and contains no identity cache keys (1.844292ms)
+✔ R206 Worker per-IP limit rejects request 301 and allows another IP (40.910709ms)
+✔ R206 Worker preserves Riot Retry-After and avoids same-path I/O during cooldown (1.438791ms)
+✔ R206 Worker never exposes or logs its secret, including echoed upstream values (2.889042ms)
+✔ R206 Worker fails closed without a secret or rate limiter (0.409958ms)
+✔ R206 Worker rejects upstream redirects without forwarding the secret or Location (1.306083ms)
+✔ R208 application cooldown blocks every path on its host, with decreasing remaining time (1.166416ms)
+✔ R208 method/service/missing-header cooldowns remain path scoped and default to five seconds (2.074375ms)
+✔ R208 IP 429 and controlled upstream failures are JSON rather than false daily-quota pages (39.440041ms)
+✔ R208 application remaining time takes precedence when IP limit also expires (36.225792ms)
+✔ R220 every platform and regional cluster has the correct endpoint family (18.707209ms)
+✔ R220 validated platform headers isolate JP and KR cooldowns on shared ASIA without forwarding headers (0.862917ms)
+✔ R220 shared-cluster responses remain platform-scoped in the relay cache (0.683334ms)
+✔ build stage reports a live wait then completes without logging arguments (187.375167ms)
+✔ build stage preserves nonzero exits and reports spawn failures (29.583875ms)
+✔ test sharding is stable and covers every test exactly once (19.248083ms)
+✔ known slow tests are spread across shards (0.308042ms)
+✔ shard count is bounded and configurable (0.354208ms)
+✔ setup-only release hashes actual renamed bytes and emits exactly three files (9.610084ms)
+✔ invalid release identities and spaced assets are refused (0.116709ms)
+✔ normalizes build text, preserves BOM and excludes binaries, dependencies and symlinks (5.725542ms)
+构建指纹：62b5b7b6b536
+app_start 版本：（日志里没有带 version 的记录）
+card_image_stalled 事件支持：无法确认（日志里没有带 version 的 app_start 记录），0 条 stall 不算证据
+运行 ID：794083ef4812f210ecde108e
+时间跨度：2026-09-23T09:59:20.000Z ~ 2026-09-23T10:00:00.000Z（0 分 40 秒）
+
+记录总数：4（解析失败 0 行）
+card_image_stalled：1 条
+local_request_client/failed(endpoint=image)：3 条（timeout 3）
+client_diagnostic_rejected：0 条
+窗口口径：stall 前 60000ms ~ 后 10000ms；积压判定阈值 3 条图片失败
+
+  #1 2026-09-23T10:00:00.000Z reason=watchdog active=8 queued=6 sourceIndex=0 imageSource=gtimg
+      窗口内图片失败：3 条 → backlog
+
+判定：backlog-only
+第二层积压：每条 stall 的窗口里都有大量图片失败，说明第二层在正常超时/重试，名额是被排队等满看门狗时长的卡片占住的。该调的是第二层的远程/本机道名额，不是 R130 的合成 error / 看门狗。
+构建指纹：62b5b7b6b536
+app_start 版本：（日志里没有带 version 的记录）
+card_image_stalled 事件支持：无法确认（日志里没有带 version 的 app_start 记录），0 条 stall 不算证据
+运行 ID：794083ef4812f210ecde108e
+时间跨度：2026-09-23T10:00:00.000Z ~ 2026-09-23T10:00:00.000Z（0 分 0 秒）
+
+记录总数：1（解析失败 0 行）
+card_image_stalled：1 条
+local_request_client/failed(endpoint=image)：0 条
+client_diagnostic_rejected：0 条
+窗口口径：stall 前 60000ms ~ 后 10000ms；积压判定阈值 3 条图片失败
+
+  #1 2026-09-23T10:00:00.000Z reason=watchdog active=8 queued=6 sourceIndex=0 imageSource=gtimg
+      窗口内图片失败：0 条 → notify-gap
+
+判定：notify-gap
+通知失败：有 stall 的窗口里一条图片失败都没有，说明第二层放弃时又没能通知到第一层，合成 error 的某个闸门有漏洞。这是新缺陷，按项目惯例另开工单，不要和积压混在一起改。
+{
+  "verdict": "notify-gap",
+  "totals": {
+    "records": 1,
+    "stalls": 1,
+    "imageFailures": 0,
+    "rejected": 0,
+    "malformed": 0
+  },
+  "failureKinds": {},
+  "identity": {
+    "buildFingerprints": [
+      "62b5b7b6b536"
+    ],
+    "runIDs": [
+      "794083ef4812f210ecde108e"
+    ],
+    "versions": []
+  },
+  "eventSupport": {
+    "known": false,
+    "versions": [],
+    "minRequired": "0.12.18",
+    "sufficient": false
+  },
+  "span": {
+    "earliest": 1790157600000,
+    "latest": 1790157600000,
+    "durationMs": 0
+  },
+  "window": {
+    "windowMs": 60000,
+    "forwardMs": 10000,
+    "backlogThreshold": 3
+  },
+  "stalls": [
+    {
+      "at": 1790157600000,
+      "runId": "794083ef4812f210ecde108e",
+      "time": "2026-09-23T10:00:00.000Z",
+      "reason": "watchdog",
+      "activeCardImages": 8,
+      "queued": 6,
+      "sourceIndex": 0,
+      "imageSource": "gtimg",
+      "buildFingerprint": "62b5b7b6b536",
+      "windowImageFailures": 0,
+      "classification": "notify-gap"
+    }
+  ],
+  "rejected": [],
+  "source": {
+    "file": "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r133-bJV8R9/gap.jsonl",
+    "lines": 2
+  }
+}
+用法：node scripts/r133-stall-log-report.cjs <lol-loot-diagnostics-*.jsonl> [--json] [--window 60000] [--forward 10000] [--backlog-threshold 3]
+✔ R133 一条 stall 都没有、且日志出自支持该事件的包时判 clean，P2 可以直接结项 (1.660625ms)
+✔ R133 对抗变异：旧包的日志里 0 条 stall 不得判成 clean (0.9255ms)
+✔ R133 版本比较不引入 semver 依赖也够用 (0.389167ms)
+✔ R133 stall 窗口里有大量图片失败 → 第二层积压，不是 R130 的修复失效 (0.171584ms)
+✔ R134 对抗变异：另一次启动的图片失败不能把通知缺口判成积压 (0.223958ms)
+✔ R134 同一次启动的图片失败仍能判积压，缺 run_id 的旧日志沿用全局窗口 (0.252209ms)
+✔ R133 stall 窗口里一条图片失败都没有 → 通知失败，必须另开工单 (0.1325ms)
+✔ R133 图片失败数不够阈值时判 inconclusive，不猜方向 (0.12125ms)
+✔ R133 对抗变异：把窗口算错（全量计数当成窗口计数）必须被测出来 (0.153834ms)
+✔ R133 白名单被回退时优先级最高，盖过其它判定 (0.236916ms)
+✔ R133 缺 time 字段的 stall 判 undated，不在缺时间戳的情况下判成因 (0.631875ms)
+✔ R133 多条 stall 各自判，不拿全局总数摊平 (0.091917ms)
+✔ R133 坏行不静默跳过，避免把截断的日志当成没有 stall (0.099875ms)
+✔ R133 报告里带上构建指纹与时间跨度，读数的人能确认是不是 0.12.18 那个包 (0.08075ms)
+✔ R133 命令行：参数解析、退出码与 --json (1.61225ms)
+✔ R133 每种判定都有对应的人话结论，不会输出空判词 (0.075209ms)
+✔ R82 synthetic A/B medians enforce the 300ms gate and include prewarm cost (0.8235ms)
+✔ R82 incomplete, repeated and malformed samples cannot pass acceptance (0.425667ms)
+✔ R82 collector joins phases to fingerprint by run_id and installer log by PID (1.145125ms)
+✔ R82 collector rejects a second launch but deduplicates log rotation copies (0.162ms)
+✔ R82 malformed inputs and failed prewarm cannot silently enter the A/B comparison (0.208958ms)
+✔ R82 reads the actual diagnostics.N.jsonl archive naming (1.5335ms)
+✔ R84 collector CLI works without Array.prototype.at and keeps the last matching PID records (64.63175ms)
+✔ R84 collector production source cannot reintroduce .at calls (0.206375ms)
+✔ R84 first-match mutation fails the end-to-end collector assertions (33.314417ms)
+﹣ R82 A/B receipt lookup and deduplication execute the real PowerShell script (0.335459ms) # PowerShell is required; set R82_POWERSHELL to run the real script tests
+﹣ R82 A/B filename, hash mismatch and duplicate mutations reach failing assertions (0.053125ms) # PowerShell is required; set R82_POWERSHELL to run the real script tests
+✖ setup-only Bash build wraps one NSIS result, hashes final bytes and removes legacy outputs (1524.118041ms)
+✖ failed NSIS stops before wrapping or issuing a receipt and cleans the uninstall shell (1299.115709ms)
+✔ compression overrides are explicit and invalid levels fail before packaging (1.241292ms)
+✖ unchanged complete npm dependencies are reused; damage or a lock change reinstalls them (1030.604792ms)
+ℹ tests 334
+ℹ suites 0
+ℹ pass 325
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 3
+ℹ todo 0
+ℹ duration_ms 346639.226875
+
+✖ failing tests:
+
+test at desktop/pro-players.test.cjs:138:1
+✖ 国服每次打开折叠；韩服下方入口可键盘聚焦且不修改大区 (573.521875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + ''
+  - 'player-search-pro'
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/desktop/pro-players.test.cjs:151:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: 'player-search-pro',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at desktop/summoner-identity.test.cjs:136:1
+✖ updateStatus refreshes a connected current-tab header without resetting catalogs (0.493375ms)
+  ReferenceError: clientRegion is not defined
+      at updateStatus (eval at compileFunctions (/Users/ly/personal/personal-work/deep-legends/desktop/summoner-identity.test.cjs:52:19), <anonymous>:43:24)
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/desktop/summoner-identity.test.cjs:157:3)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+
+test at desktop/summoner-identity.test.cjs:167:1
+✖ forced overview aborts a loading request and starts a newer request (1.965416ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/desktop/summoner-identity.test.cjs:199:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/setup-only-build.test.cjs:109:1
+✖ setup-only Bash build wraps one NSIS result, hashes final bytes and removes legacy outputs (1524.118041ms)
+  AssertionError [ERR_ASSERTION]: Public build: no embedded Riot API key; KR queries require RIOT_API_KEY at runtime.
+  verified build fingerprint=abcdef012345
+  electron-cache: checking for a reusable Windows Electron archive
+  electron-cache: check completed
+  Using ELECTRON_DIST: /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-ky5xCq/cached Electron.zip
+  /private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-ky5xCq/bin/go:21
+      if (args[0] !== "build") throw new Error("Unexpected synthetic Go command: " + args[0]);
+                               ^
+  
+  Error: Unexpected synthetic Go command: env
+      at Object.<anonymous> (/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-ky5xCq/bin/go:21:36)
+      at Module._compile (node:internal/modules/cjs/loader:1812:14)
+      at Object..js (node:internal/modules/cjs/loader:1943:10)
+      at Module.load (node:internal/modules/cjs/loader:1533:32)
+      at Module._load (node:internal/modules/cjs/loader:1335:12)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47
+  
+  Node.js v24.14.1
+  [build 2026-10-05T10:35:32.586Z] cleanup: started (0.0s)
+  [build 2026-10-05T10:35:32.602Z] cleanup: completed (0.0s)
+  [build 2026-10-05T10:35:32.635Z] go-test: started (0.0s)
+  [go-test] discovered 2 tests; running 2 shards
+  [go-test] shard 1/2: started (1 tests)
+  [go-test] shard 2/2: started (1 tests)
+  [go-test] shard 1/2: completed (0.0s)
+  [go-test] shard 2/2: completed (0.0s)
+  [build 2026-10-05T10:35:32.768Z] go-test: completed (0.1s)
+  [build 2026-10-05T10:35:32.798Z] go-vet: started (0.0s)
+  [build 2026-10-05T10:35:32.828Z] go-vet: completed (0.0s)
+  [build 2026-10-05T10:35:32.861Z] installer-test: started (0.0s)
+  [build 2026-10-05T10:35:32.890Z] installer-test: completed (0.0s)
+  [build 2026-10-05T10:35:32.919Z] installer-vet: started (0.0s)
+  [build 2026-10-05T10:35:32.949Z] installer-vet: completed (0.0s)
+  [build 2026-10-05T10:35:32.982Z] source-fingerprint: started (0.0s)
+  [build 2026-10-05T10:35:33.019Z] source-fingerprint: completed (0.0s)
+  [build 2026-10-05T10:35:33.053Z] backend-build: started (0.0s)
+  [build 2026-10-05T10:35:33.088Z] backend-build: completed (0.0s)
+  [build 2026-10-05T10:35:33.119Z] backend-fingerprint: started (0.0s)
+  [build 2026-10-05T10:35:33.153Z] backend-fingerprint: completed (0.0s)
+  [build 2026-10-05T10:35:33.217Z] npm-ci: started (0.0s)
+  [build 2026-10-05T10:35:33.538Z] npm-ci: completed (0.3s)
+  [build 2026-10-05T10:35:33.577Z] uninstaller-shell: started (0.0s)
+  [build 2026-10-05T10:35:33.608Z] uninstaller-shell: completed (0.0s)
+  [build 2026-10-05T10:35:33.638Z] nsis: started (0.0s)
+  Cannot find module './apply-update-timing-template.cjs'
+  Require stack:
+  - /private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-ky5xCq/desktop/verify-embedded-riot-key.cjs
+  - /private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-ky5xCq/bin/npm
+  [build 2026-10-05T10:35:33.672Z] nsis: failed: exit 1 (0.0s)
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/scripts/setup-only-build.test.cjs:112:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/setup-only-build.test.cjs:136:1
+✖ failed NSIS stops before wrapping or issuing a receipt and cleans the uninstall shell (1299.115709ms)
+  AssertionError [ERR_ASSERTION]: Public build: no embedded Riot API key; KR queries require RIOT_API_KEY at runtime.
+  verified build fingerprint=abcdef012345
+  electron-cache: checking for a reusable Windows Electron archive
+  electron-cache: check completed
+  Using ELECTRON_DIST: /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-6B8z0W/cached Electron.zip
+  /private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-6B8z0W/bin/go:21
+      if (args[0] !== "build") throw new Error("Unexpected synthetic Go command: " + args[0]);
+                               ^
+  
+  Error: Unexpected synthetic Go command: env
+      at Object.<anonymous> (/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-6B8z0W/bin/go:21:36)
+      at Module._compile (node:internal/modules/cjs/loader:1812:14)
+      at Object..js (node:internal/modules/cjs/loader:1943:10)
+      at Module.load (node:internal/modules/cjs/loader:1533:32)
+      at Module._load (node:internal/modules/cjs/loader:1335:12)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47
+  
+  Node.js v24.14.1
+  [build 2026-10-05T10:35:33.845Z] cleanup: started (0.0s)
+  [build 2026-10-05T10:35:33.860Z] cleanup: completed (0.0s)
+  [build 2026-10-05T10:35:33.895Z] go-test: started (0.0s)
+  [go-test] discovered 2 tests; running 2 shards
+  [go-test] shard 1/2: started (1 tests)
+  [go-test] shard 2/2: started (1 tests)
+  [go-test] shard 1/2: completed (0.0s)
+  [go-test] shard 2/2: completed (0.0s)
+  [build 2026-10-05T10:35:34.034Z] go-test: completed (0.1s)
+  [build 2026-10-05T10:35:34.065Z] go-vet: started (0.0s)
+  [build 2026-10-05T10:35:34.097Z] go-vet: completed (0.0s)
+  [build 2026-10-05T10:35:34.128Z] installer-test: started (0.0s)
+  [build 2026-10-05T10:35:34.160Z] installer-test: completed (0.0s)
+  [build 2026-10-05T10:35:34.192Z] installer-vet: started (0.0s)
+  [build 2026-10-05T10:35:34.359Z] installer-vet: completed (0.2s)
+  [build 2026-10-05T10:35:34.484Z] source-fingerprint: started (0.0s)
+  [build 2026-10-05T10:35:34.516Z] source-fingerprint: completed (0.0s)
+  [build 2026-10-05T10:35:34.548Z] backend-build: started (0.0s)
+  [build 2026-10-05T10:35:34.580Z] backend-build: completed (0.0s)
+  [build 2026-10-05T10:35:34.612Z] backend-fingerprint: started (0.0s)
+  [build 2026-10-05T10:35:34.647Z] backend-fingerprint: completed (0.0s)
+  [build 2026-10-05T10:35:34.714Z] npm-ci: started (0.0s)
+  [build 2026-10-05T10:35:34.801Z] npm-ci: completed (0.1s)
+  [build 2026-10-05T10:35:34.839Z] uninstaller-shell: started (0.0s)
+  [build 2026-10-05T10:35:34.892Z] uninstaller-shell: completed (0.1s)
+  [build 2026-10-05T10:35:34.937Z] nsis: started (0.0s)
+  Cannot find module './apply-update-timing-template.cjs'
+  Require stack:
+  - /private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-6B8z0W/desktop/verify-embedded-riot-key.cjs
+  - /private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-6B8z0W/bin/npm
+  [build 2026-10-05T10:35:34.972Z] nsis: failed: exit 1 (0.0s)
+  
+  
+  1 !== 23
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/scripts/setup-only-build.test.cjs:139:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 23,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/setup-only-build.test.cjs:160:1
+✖ unchanged complete npm dependencies are reused; damage or a lock change reinstalls them (1030.604792ms)
+  AssertionError [ERR_ASSERTION]: Public build: no embedded Riot API key; KR queries require RIOT_API_KEY at runtime.
+  verified build fingerprint=abcdef012345
+  electron-cache: checking for a reusable Windows Electron archive
+  electron-cache: check completed
+  Using ELECTRON_DIST: /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-nXzJJW/cached Electron.zip
+  /private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-nXzJJW/bin/go:21
+      if (args[0] !== "build") throw new Error("Unexpected synthetic Go command: " + args[0]);
+                               ^
+  
+  Error: Unexpected synthetic Go command: env
+      at Object.<anonymous> (/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-nXzJJW/bin/go:21:36)
+      at Module._compile (node:internal/modules/cjs/loader:1812:14)
+      at Object..js (node:internal/modules/cjs/loader:1943:10)
+      at Module.load (node:internal/modules/cjs/loader:1533:32)
+      at Module._load (node:internal/modules/cjs/loader:1335:12)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+      at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+      at node:internal/main/run_main_module:33:47
+  
+  Node.js v24.14.1
+  [build 2026-10-05T10:35:35.155Z] cleanup: started (0.0s)
+  [build 2026-10-05T10:35:35.171Z] cleanup: completed (0.0s)
+  [build 2026-10-05T10:35:35.206Z] go-test: started (0.0s)
+  [go-test] discovered 2 tests; running 2 shards
+  [go-test] shard 1/2: started (1 tests)
+  [go-test] shard 2/2: started (1 tests)
+  [go-test] shard 1/2: completed (0.0s)
+  [go-test] shard 2/2: completed (0.0s)
+  [build 2026-10-05T10:35:35.338Z] go-test: completed (0.1s)
+  [build 2026-10-05T10:35:35.369Z] go-vet: started (0.0s)
+  [build 2026-10-05T10:35:35.399Z] go-vet: completed (0.0s)
+  [build 2026-10-05T10:35:35.429Z] installer-test: started (0.0s)
+  [build 2026-10-05T10:35:35.461Z] installer-test: completed (0.0s)
+  [build 2026-10-05T10:35:35.490Z] installer-vet: started (0.0s)
+  [build 2026-10-05T10:35:35.521Z] installer-vet: completed (0.0s)
+  [build 2026-10-05T10:35:35.552Z] source-fingerprint: started (0.0s)
+  [build 2026-10-05T10:35:35.586Z] source-fingerprint: completed (0.0s)
+  [build 2026-10-05T10:35:35.619Z] backend-build: started (0.0s)
+  [build 2026-10-05T10:35:35.651Z] backend-build: completed (0.0s)
+  [build 2026-10-05T10:35:35.681Z] backend-fingerprint: started (0.0s)
+  [build 2026-10-05T10:35:35.713Z] backend-fingerprint: completed (0.0s)
+  [build 2026-10-05T10:35:35.781Z] npm-ci: started (0.0s)
+  [build 2026-10-05T10:35:35.872Z] npm-ci: completed (0.1s)
+  [build 2026-10-05T10:35:35.906Z] uninstaller-shell: started (0.0s)
+  [build 2026-10-05T10:35:35.937Z] uninstaller-shell: completed (0.0s)
+  [build 2026-10-05T10:35:35.970Z] nsis: started (0.0s)
+  Cannot find module './apply-update-timing-template.cjs'
+  Require stack:
+  - /private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-nXzJJW/desktop/verify-embedded-riot-key.cjs
+  - /private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/setup-only-build-nXzJJW/bin/npm
+  [build 2026-10-05T10:35:36.004Z] nsis: failed: exit 1 (0.0s)
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/scripts/setup-only-build.test.cjs:163:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

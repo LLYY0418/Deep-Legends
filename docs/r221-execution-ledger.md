@@ -86,6 +86,6 @@ ok  	lol-loot-assistant/backend	260.813s
 - 构建及工单列出的 Windows 真机验证：遵循用户约束未执行；日服登录、刚登录 LCU 自动恢复、练习工具阿祈尔、对局玩家数据及切回国服需真实客户端验证。
 - 工单保持进行中；不能把本地 mock 回归记成真实 Riot / Windows 已验证。
 
-## 0.12.72 发布阶段补充（2026-10-05）
+## 0.12.73 发布阶段补充（2026-10-05）
 
-用户要求“发布新版本”后恢复构建和发布授权。生产 Worker 已部署为 `a56f37a5-95bf-4997-949f-4c1336a7ce4c`，15 平台公开状态接口均为 200 有效 JSON，SEA Account 与不支持路径均为 404；没有读取或替换既有 Secret。首轮 Python urllib 请求收到非 JSON 403，改用匿名 curl 重复同一公开 URL 后全部通过，保留两轮原始记录。此验证不替代真实玩家接口和 Windows 客户端验收。完整后续发布与安装升级证据见 [0.12.72 发布账本](history/ledgers/release-0.12.72-execution-ledger.md)。
+用户要求“发布新版本”后恢复构建和发布授权。生产 Worker 已部署为 `a56f37a5-95bf-4997-949f-4c1336a7ce4c`，15 平台公开状态接口均为 200 有效 JSON，SEA Account 与不支持路径均为 404；没有读取或替换既有 Secret。首轮 Python urllib 请求收到非 JSON 403，改用匿名 curl 重复同一公开 URL 后全部通过，保留两轮原始记录。此验证不替代真实玩家接口和 Windows 客户端验收。完整后续发布与安装升级证据见 [0.12.73 发布账本](history/ledgers/release-0.12.73-execution-ledger.md)。

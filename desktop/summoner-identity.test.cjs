@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
+const { prelude } = require("../backend/web/r220-harness-support.cjs");
 
 const WEB = path.join(__dirname, "..", "backend", "web");
 const appSource = fs.readFileSync(path.join(WEB, "app.js"), "utf8");
@@ -51,7 +52,7 @@ function compileFunctions(source, names, dependencies = {}) {
   const dependencyNames = Object.keys(dependencies);
   const factory = Function(
     ...dependencyNames,
-    `"use strict";\n${names.map((name) => functionSource(source, name)).join("\n")}\nreturn { ${names.join(", ")} };`,
+    `"use strict";\n${source === gameplaySource ? prelude(source, dependencies) : ""}${names.map((name) => functionSource(source, name)).join("\n")}\nreturn { ${names.join(", ")} };`,
   );
   return factory(...dependencyNames.map((name) => dependencies[name]));
 }
@@ -178,8 +179,10 @@ test("forced overview aborts a loading request and starts a newer request", asyn
   };
   const { loadOverview } = compileFunctions(gameplaySource, ["loadOverview"], {
     state,
+    connected: () => true,
     loadOPGGSeasonSummary: async () => false,
     loadOverviewCurrentGame: async () => false,
+    loadMayhemRating: async () => false,
     syncOverviewSupplementRefs: () => {},
     riotTab: () => false,
     tabGroup: () => "players",

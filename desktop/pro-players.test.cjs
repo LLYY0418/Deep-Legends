@@ -135,7 +135,7 @@ test("加载互斥、失败保留旧表、恢复与来源不可用名单", async
   assert.match(d.querySelector("#pro-players-content").textContent, /账号来源暂不可用/);
 });
 
-test("国服每次打开折叠；韩服下方入口可键盘聚焦且不修改大区", async (t) => {
+test("国服每次打开折叠；各拳头区服与职业入口可键盘聚焦且不修改大区", async (t) => {
   const { w, d, requests, errors } = boot(t, { full: true });
   await tick(250);
   const trigger = d.querySelector("#player-search-region"), cn = d.querySelector("#player-search-cn-toggle"), options = d.querySelector("#player-search-cn-options");
@@ -147,6 +147,11 @@ test("国服每次打开折叠；韩服下方入口可键盘聚焦且不修改�
   cn.click(); trigger.click(); trigger.click(); assert.equal(options.hidden, true);
   cn.focus(); cn.dispatchEvent(new w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
   assert.equal(d.activeElement.dataset.regionOption, "kr");
+  // R221 added every Riot platform between KR and the professional directory.
+  for (const region of ["jp1", "na1", "euw1", "eun1", "tw2", "sg2", "br1", "la1", "la2", "me1", "oc1", "ru", "tr1", "vn2"]) {
+    d.activeElement.dispatchEvent(new w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    assert.equal(d.activeElement.dataset.regionOption, region);
+  }
   d.activeElement.dispatchEvent(new w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
   assert.equal(d.activeElement.id, "player-search-pro");
   d.activeElement.click(); await tick();
