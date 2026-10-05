@@ -139,4 +139,6 @@ ok  lol-loot-assistant/backend 117.097s
 
 ## R225 核验纠正
 
-上文 R222 三项 Windows backend 名单原第二项误写为不存在的函数，实际 CI 只匹配了另外两项，未证明 DPAPI 保存/重载已在 Windows 测试通过。上表名称已修正；[R225 账本](r225-execution-ledger.md) 记录恢复完整 Windows backend/installer 的方案、逐函数路径映射和防空匹配守卫。R222 的 renderer 提速、生产默认时钟与原断言保留结论不变；Windows 后端覆盖结论以后续 R225 同 SHA 实跑为准。
+上文 R222 三项 Windows backend 名单原第二项误写为不存在的函数，实际 CI 只匹配了另外两项，未证明 DPAPI 保存/重载已在 Windows 测试通过。上表名称已修正；[R225 账本](history/ledgers/r225-execution-ledger.md) 记录恢复完整 Windows backend/installer 的方案、逐函数路径映射和防空匹配守卫。R222 的 renderer 提速、生产默认时钟与原断言保留结论不变；Windows 后端覆盖结论以后续 R225 同 SHA 实跑为准。
+
+R225 最终补验：源码 b46dac17，完整 CI 37322933047 success（12:00）；Windows backend 包 97.174s，全套 Go 测试关键 82 项全部 pass，18 项更新与真实 DPAPI 保存/重载通过；installer 99/99，Node 筛选 2/1/2、0 skip。此前 Windows 覆盖缺口现已修复。

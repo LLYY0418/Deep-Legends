@@ -170,4 +170,4 @@
 
 | R222 | 发布流水线测试去重、并行 CI、拆分慢测试与 tag 前预检 | P1—P4 实现及同 SHA Linux/Windows CI 验收通过；下次正式发布补时间线 | [WORKLIST-R222-RELEASE-PIPELINE-NEAR-ONE-HOUR-TRIPLE-TEST-RUNS-SERIAL-CI-AND-EARLY-TAG.md](WORKLIST-R222-RELEASE-PIPELINE-NEAR-ONE-HOUR-TRIPLE-TEST-RUNS-SERIAL-CI-AND-EARLY-TAG.md) | [r222-execution-ledger.md](r222-execution-ledger.md) | 基线 0.12.73；本次不发布；下次发版记录总时间线 |
 
-| R225 | R222 Windows 后端路径覆盖与测试筛选防空匹配 | 实现完成，本地通过；同 SHA CI 验收进行中 | [WORKLIST-R225-R222-VERIFICATION-WINDOWS-CI-LOST-BACKEND-COVERAGE-AND-NONEXISTENT-TEST-NAME.md](WORKLIST-R225-R222-VERIFICATION-WINDOWS-CI-LOST-BACKEND-COVERAGE-AND-NONEXISTENT-TEST-NAME.md) | [r225-execution-ledger.md](r225-execution-ledger.md) | 基线 1c0508a6 / 0.12.73；恢复完整 Windows backend/installer，保持并行与 CI skip |
+| R225 | R222 Windows 后端路径覆盖与测试筛选防空匹配 | 已关闭：P1/P2 同 SHA CI success，整轮 12 分钟 | [WORKLIST-R225-R222-VERIFICATION-WINDOWS-CI-LOST-BACKEND-COVERAGE-AND-NONEXISTENT-TEST-NAME.md](history/worklists/WORKLIST-R225-R222-VERIFICATION-WINDOWS-CI-LOST-BACKEND-COVERAGE-AND-NONEXISTENT-TEST-NAME.md) | [r225-execution-ledger.md](history/ledgers/r225-execution-ledger.md) | 基线 1c0508a6 / 0.12.73；恢复完整 Windows backend/installer，保持并行与 CI skip |
