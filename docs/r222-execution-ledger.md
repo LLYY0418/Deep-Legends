@@ -26,7 +26,7 @@ Windows 编译约束及平台分支不能被 Linux 替代，windows-build 还单
 
 | 模块 | Windows 用例 |
 | --- | --- |
-| backend | TestSplitRegistryPathSupportsNativeTencentKeys；TestR204KeySaveRejectsUnauthorizedAndEncrypts；TestR204KeyRuntime401AndPrivacy |
+| backend | TestSplitRegistryPathSupportsNativeTencentKeys；TestR204KeySaveAndClear；TestR204KeyRuntime401AndPrivacy |
 | installer | TestWindowsApplicationWindowDetection；TestWindowsMissingApplicationDoesNotYieldAPID；TestR205WindowsShortcutRoundTrip；TestR205WindowsShortcutTargetAlias；TestR205WindowsKeepShortcutsStringValue；TestR205WindowsCOMAlreadyInitialized；TestR86WindowsDestinationPreflightSmoke；TestR86WindowsDialogDirectoryAndDiskHelpers；TestR206IconOnlyChangesIconAndPreservesCreation |
 | installer/internal/webviewhost | TestSettingsUseHRESULTAcrossEntireConfiguration；TestCOMUsesHRESULTInsteadOfThreadLastError；TestFailedNavigationEventIsNotReadiness |
 
@@ -136,3 +136,7 @@ ok  lol-loot-assistant/backend 117.097s
 逐文件计时及无载荷结果：`docs/history/reports/r222/node-timings-ci-linux.json`、`node-timings-ci-windows.json`、`ci-validation-summary.json`。原始 CI 日志及升级详细事件只留本地；自动审批曾拒绝强制提交原始日志到公开仓库，已改为仅公开代码、文档和汇总证据。
 
 **唯一后续验收**：下一次正式发布按 `docs/release-ledger-template.md` 记录 tag→可发布 Latest ≤15min、开始→正式 Latest ≤30min。本次没有实际发版，不能将分支 CI 的 10:57 写成这两项已通过。R222 工单与账本因此暂留 docs 根目录。
+
+## R225 核验纠正
+
+上文 R222 三项 Windows backend 名单原第二项误写为不存在的函数，实际 CI 只匹配了另外两项，未证明 DPAPI 保存/重载已在 Windows 测试通过。上表名称已修正；[R225 账本](r225-execution-ledger.md) 记录恢复完整 Windows backend/installer 的方案、逐函数路径映射和防空匹配守卫。R222 的 renderer 提速、生产默认时钟与原断言保留结论不变；Windows 后端覆盖结论以后续 R225 同 SHA 实跑为准。

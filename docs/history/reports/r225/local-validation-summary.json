@@ -1,0 +1,25 @@
+{
+  "static_guard": "pass",
+  "nonexistent_node_arm": {
+    "exit_code": 1,
+    "error": "unmatched node test filter: R225 missing regression test"
+  },
+  "regressions_passed": 4,
+  "local_backend": {
+    "expected": 1860,
+    "passed": 1834,
+    "skipped": 26,
+    "required_passed": 81,
+    "duration_ms": 150393
+  },
+  "local_installer": {
+    "passed": 87,
+    "skipped": 0,
+    "duration_ms": 3518
+  },
+  "build": {
+    "version": "0.12.73",
+    "key_mode": "public",
+    "fingerprint": "be7741263b5b"
+  }
+}
