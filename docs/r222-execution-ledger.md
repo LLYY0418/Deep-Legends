@@ -2,7 +2,7 @@
 
 日期：2026-10-05（北京时间）。基线：0.12.73，HEAD `4f27d413`；不改用户功能、7z level 9 和在线升级流程。
 
-状态：实现与本地普通全量预检通过，最终 race 及同 SHA Linux/Windows CI 验收进行中；正式发布耗时留待下次发版记录。本次不推 tag、不发布 Latest。
+状态：P1—P4 实现及同 SHA Linux/Windows 完整 CI 验收通过；正式发布耗时留待下次发版记录。本次不推 tag、不发布 Latest。以下本地/前三轮记录为过程证据，最终结论以末尾验收表为准。
 
 ## P1：测试去重与 Windows 覆盖
 
@@ -89,7 +89,7 @@ AGENTS.md 已明确本地预检全部通过→提交版本号→只推 tag。采
 
 ## CI 与最终结果
 
-待写入同 SHA 的 Linux quality、Windows 专属/全量桌面计时/public 构建/实际升级结果。正式发布 tag→可发布 ≤15min、全流程 ≤30min 的验收要在下一次真实发版账本记录，不能用本次分支 CI 的预计值代替。
+同 SHA 的最终结果见末尾验收表。正式发布 tag→可发布 ≤15min、全流程 ≤30min 的验收要在下一次真实发版账本记录，不能用本次分支 CI 的预计值代替。
 
 最终本地 `go test -count=1 ./backend` 在最后一次 Go 修改后执行，通过，耗时 **117.097s**；输出：
 
@@ -116,3 +116,23 @@ ok  lol-loot-assistant/backend 117.097s
 第三轮 CI `37311010804`，SHA `b2d8413d`：Linux 完整 quality 成功，backend race **119.290s**，Node **234.984s**（1262 项，1260 pass、2 skip、0 fail；最慢 external 73.181s）。Windows 专属 Go/Node/PowerShell 全通过；desktop **215.353s**（284 项，282 pass、2 Linux/Bash skip、0 fail），但 external 文件 **91.981s** 超过 90s，images 87.805s。保持所有样本与断言，将 Windows jsdom worker 从 4 限至 3，降低大夹具并发争用；Linux 仍使用全部核心，时间门槛不变。
 
 最终隔离工作树普通 Go 全量 **124.767s** 通过（与 Node 同时运行的 macOS 测量），vet 通过；最终 public 后端再次构建/自检/指纹核验通过，仍为 0.12.73 / be7741263b5b。
+
+## 最终验收（第四轮）
+
+[完整 quality-and-windows-release 37312091768](https://github.com/LLYY0418/Deep-Legends/actions/runs/37312091768) **success**，源码 SHA `7363fa8f`。quality 与 windows-build 20:48:28/20:48:29 并行开始，分别 20:55:36/20:59:25 结束；完整运行 **10 分 57 秒**，包含一次性 Windows 全量桌面计时。它是分支验收，不替代正式发版时间线。
+
+| 验收 | 实际结果 | 门槛 |
+| --- | --- | --- |
+| Linux backend race | **116.493s，全量通过** | ≤120s |
+| Linux web/desktop/scripts | **216.631s**，1262 项，1260 pass、2 Windows skip、0 fail | ≤240s |
+| Linux 最慢文件 | external **79.601s** | 每文件 ≤90s |
+| Windows desktop | **194.356s**，284 项，282 pass、2 Linux/Bash skip、0 fail | ≤240s |
+| Windows 最慢文件 | external **58.311s** | 每文件 ≤90s |
+| Windows 专属 backend/installer/R86/R222/setup-only/R82 PS5.1 | 全部通过，R82 16 组夹具及 7 个 mutant kill 通过 | 不丢平台测试 |
+| Linux Worker、Chromium、installer test/vet、syntax、格式、root vet | 全部通过 | 完整 quality |
+| Windows public 构建、runtime、指纹、receipt、SHA256 | 全部通过；0.12.73 / be7741263b5b，安装包带 `-public` | 保留打包校验 |
+| Windows 真实安装升级 | 0.12.65→0.12.68→本次 public，**14.014s**；卸旧 2.249s、解压 8.229s、8 阶段，图标位置/创建时间稳定 | 原真实升级护栏 |
+
+逐文件计时及无载荷结果：`docs/history/reports/r222/node-timings-ci-linux.json`、`node-timings-ci-windows.json`、`ci-validation-summary.json`。原始 CI 日志及升级详细事件只留本地；自动审批曾拒绝强制提交原始日志到公开仓库，已改为仅公开代码、文档和汇总证据。
+
+**唯一后续验收**：下一次正式发布按 `docs/release-ledger-template.md` 记录 tag→可发布 Latest ≤15min、开始→正式 Latest ≤30min。本次没有实际发版，不能将分支 CI 的 10:57 写成这两项已通过。R222 工单与账本因此暂留 docs 根目录。
