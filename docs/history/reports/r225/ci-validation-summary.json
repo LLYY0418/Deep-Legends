@@ -288,5 +288,111 @@
     "uninstall_old_ms": 2072,
     "stages": 8,
     "old_version": "0.12.65"
-  }
+  },
+  "non_required_backend_skips": [
+    {
+      "name": "Test1945LivePublicSources",
+      "reason": "diagnostics_1945_regression_test.go:234: opt-in network test"
+    },
+    {
+      "name": "Test2135LivePublicCurrentGame",
+      "reason": "diagnostics_2135_test.go:86: opt-in public read-only request"
+    },
+    {
+      "name": "TestParseMayhemRSCRealFixture",
+      "reason": "hexdata_test.go:397: set MAYHEM_RSC_FIXTURE to an OP.GG aram-mayhem RSC payload"
+    },
+    {
+      "name": "TestCapturedChampionItemDepthPages",
+      "reason": "item_depth_completeness_test.go:188: set DEEP_LEGENDS_ITEM_DEPTH_MANIFESTS to captured-page manifests"
+    },
+    {
+      "name": "TestOPGGUserReportCapture",
+      "reason": "opgg_player_page_test.go:92: local user-report capture"
+    },
+    {
+      "name": "TestOPGGSeasonSummaryObservedResponse",
+      "reason": "opgg_season_summary_test.go:141: explicit local fixture probe"
+    },
+    {
+      "name": "TestOverviewCurrentGamePublicProbe",
+      "reason": "overview_current_game_test.go:162: opt-in public-network verification"
+    },
+    {
+      "name": "TestProCapturedSupplements",
+      "reason": "pro_players_supplement_test.go:71: set PRO_PLAYERS_SUPPLEMENT_CAPTURE to directory containing locally captured identity HTML"
+    },
+    {
+      "name": "TestProCapturedDirectory",
+      "reason": "pro_players_test.go:440: set PRO_PLAYERS_CAPTURE to a locally captured OP.GG KR HTML file"
+    },
+    {
+      "name": "TestProCapturedLadder",
+      "reason": "pro_players_test.go:470: set PRO_LADDER_CAPTURE, PRO_LADDER_GAME_NAME and PRO_LADDER_TAG_LINE to a local OP.GG leaderboard capture"
+    },
+    {
+      "name": "TestProRuneLiveCaptureReplay",
+      "reason": "pro_runes_live_test.go:22: set R75_CAPTURE to the public capture directory"
+    },
+    {
+      "name": "TestProRuneLiveSupplementLatency",
+      "reason": "pro_runes_live_test.go:126: set R75_LIVE=1 for public network requests"
+    },
+    {
+      "name": "TestProRuneLiveIndex",
+      "reason": "pro_runes_live_test.go:193: set R75_LIVE=1 for public index validation"
+    },
+    {
+      "name": "TestR106LiveProfileBatch",
+      "reason": "r106_test.go:247: opt-in public profile read"
+    },
+    {
+      "name": "TestR107LiveProfileActivityBatch",
+      "reason": "r107_test.go:135: opt-in network verification"
+    },
+    {
+      "name": "TestR107LiveImagesWithoutClient",
+      "reason": "r107_test.go:210: opt-in public image read"
+    },
+    {
+      "name": "TestR112FullPublicCapture",
+      "reason": "r112_test.go:90: optional public response capture"
+    },
+    {
+      "name": "TestR216PythonV2MigrationConsistency260",
+      "reason": "r216_score_test.go:14: 校准原始样本已清理，见 R220"
+    },
+    {
+      "name": "TestR216PythonV21GoldenConsistency260",
+      "reason": "r216_score_test.go:17: 校准原始样本已清理，见 R220"
+    },
+    {
+      "name": "TestR216ScoreDump",
+      "reason": "r216_score_test.go:300: offline bridge not requested"
+    },
+    {
+      "name": "TestR216HistoricalKeywordDump",
+      "reason": "r216_tags_test.go:87: historical export not requested"
+    },
+    {
+      "name": "TestR217KeywordDump",
+      "reason": "r217_test.go:14: offline bridge not requested"
+    },
+    {
+      "name": "TestR73CapturedTeamGateAudit",
+      "reason": "r73_test.go:192: optional local source capture"
+    },
+    {
+      "name": "TestR92LivePublicDiagnosis",
+      "reason": "r92_diagnosis_test.go:18: real public network only"
+    },
+    {
+      "name": "TestR92LiveBackground",
+      "reason": "r92_diagnosis_test.go:89: real public network only"
+    },
+    {
+      "name": "TestR92LiveProDirectory",
+      "reason": "r92_diagnosis_test.go:109: real public network only"
+    }
+  ]
 }

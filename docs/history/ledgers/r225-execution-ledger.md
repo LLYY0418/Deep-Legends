@@ -21,7 +21,7 @@ R222 漏掉 `TestR204KeySaveAndClear`，原名单的 `TestR204KeySaveRejectsUnau
 
 ## 本地验证
 
-初轮完整 Node 1265 项，1261 pass、4 平台 skip、0 fail，96.389s，最慢文件 49.643s；最终受影响静态/运行守卫、R86/R222 CI 结构断言复验通过。backend JSON 完整 runner 1860 顶层声明，1834 pass、26 平台 skip、81 个关键用例实际 pass；installer 87/87、0 skip。原始日志只留本地，不提交到公开仓库。
+初轮完整 Node 1265 项，1261 pass、4 平台 skip、0 fail，96.389s，最慢文件 49.643s；最终受影响静态/运行守卫、R86/R222 CI 结构断言复验通过。backend JSON 完整 runner 1860 顶层声明，1834 pass、26 个既有 opt-in／缺本地样本 skip、81 个关键用例实际 pass；installer 87/87、0 skip。原始日志只留本地，不提交到公开仓库。
 
 ## 同 SHA CI（最终结果见下方）
 
@@ -49,7 +49,7 @@ R222 漏掉 `TestR204KeySaveAndClear`，原名单的 `TestR204KeySaveRejectsUnau
 
 | 验收 | 实际结果 |
 | --- | --- |
-| Windows backend 全量 | **1861** 个已编译顶层声明均有终态；**1835 pass、26 非关键 opt-in/平台 skip**；**82 个关键用例全部 pass、无 skip** |
+| Windows backend 全量 | **1861** 个已编译顶层声明均有终态；**1835 pass、26 个既有 opt-in／缺本地样本 skip**；**82 个关键用例全部 pass、无 skip** |
 | Windows backend 包/完整 go test 进程 | 包 **97.174s**；含编译及 JSON 输出的进程 **129.568s** |
 | Windows installer 所有包 | **99/99 pass、0 skip**；完整进程 **5.251s** |
 | 更新与 DPAPI | backend 的 **全部 18 个 TestUpdate***、TestR204KeySaveAndClear、TestR204KeyRuntime401AndPrivacy、TestSplitRegistryPathSupportsNativeTencentKeys 在日志逐条 `--- PASS` |
