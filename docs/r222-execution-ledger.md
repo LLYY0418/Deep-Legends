@@ -102,3 +102,5 @@ ok  lol-loot-assistant/backend 117.097s
 最终源码 `go test -count=1 -race ./...` 全量通过，backend **209.067s（macOS）**。Linux race ≤120s 门槛仍须 CI 实测，不能把本机普通测试的 117.097s 代作 race 验收。
 
 公开验收分支只提交代码、文档和不含载荷的汇总 JSON；原始/压缩测试日志仅保存在本地 `docs/history/reports/r222/`。暂存内容已核验无 Riot UUID Key、GitHub token 或私钥模式。
+
+第一次 CI `37308442468`，SHA `270fc3af`：Windows backend/installer/R86/R222/setup-only 专项先通过；首次接入的 R82 PowerShell 5.1 夹具报 `Get-FileHash` 不可用。原因是 pwsh 作业向 powershell.exe 子进程传入了 PowerShell 7 的 PSModulePath；测试 launcher 现在仅针对 Windows PowerShell 子进程清理该环境项，由宿主重建原生模块路径，保留真实哈希与全部变异检查。修复在独立工作树完成，不接触并行 R223 改动。

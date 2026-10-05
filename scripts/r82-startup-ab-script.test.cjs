@@ -5,13 +5,21 @@ const { spawnSync } = require("node:child_process");
 const source = path.join(__dirname, "r82-startup-ab.ps1");
 const harness = path.join(__dirname, "r82-startup-ab-script.test.ps1");
 const engine = process.env.R82_POWERSHELL || (process.platform === "win32" ? "powershell.exe" : "pwsh");
-const probe = spawnSync(engine, ["-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.ToString()"], { encoding: "utf8", timeout: 15000 });
+// PowerShell 7 exports its own PSModulePath to children. Windows PowerShell 5
+// must rebuild its native module path or Get-FileHash cannot be auto-loaded.
+const childEnvironment = { ...process.env };
+if (process.platform === "win32" && /^powershell(?:\.exe)?$/i.test(path.basename(engine))) {
+  for (const name of Object.keys(childEnvironment)) {
+    if (name.toLowerCase() === "psmodulepath") delete childEnvironment[name];
+  }
+}
+const probe = spawnSync(engine, ["-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.ToString()"], { encoding: "utf8", timeout: 15000, env: childEnvironment });
 const skip = !process.env.R82_POWERSHELL && probe.error?.code === "ENOENT"
   ? "PowerShell is required; set R82_POWERSHELL to run the real script tests" : false;
 
 function run(file) {
   assert.equal(probe.status, 0, probe.error?.message || probe.stderr);
-  const result = spawnSync(engine, ["-NoProfile", "-NonInteractive", "-File", harness, "-ScriptPath", file], { encoding: "utf8", timeout: 45000 });
+  const result = spawnSync(engine, ["-NoProfile", "-NonInteractive", "-File", harness, "-ScriptPath", file], { encoding: "utf8", timeout: 45000, env: childEnvironment });
   assert.ifError(result.error);
   return { ...result, output: result.stdout + result.stderr };
 }
