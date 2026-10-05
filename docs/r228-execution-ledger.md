@@ -2,7 +2,7 @@
 
 2026-10-05。用户要求“先按照这个工单继续执行”。目标0.12.74，key mode **public**。
 
-工单：[WORKLIST-R228](WORKLIST-R228-RELEASE-0.12.74-CONSOLIDATE-R223-R227-AND-R222-R225-PIPELINE.md)。当前状态：草稿、分支及tag完整CI、附件验证已完成；保持未发布，停在P6等待用户明确确认。
+工单：[WORKLIST-R228](WORKLIST-R228-RELEASE-0.12.74-CONSOLIDATE-R223-R227-AND-R222-R225-PIPELINE.md)。当前状态：P6用户确认后，0.12.74已正式发布Latest并验证；P7用户Windows真机结果仍待提供。
 
 ## 接手时的事实
 
@@ -12,7 +12,7 @@
 
 版本混合提交、tag先于本单分支CI是R228到达前的真实流程偏差，无法补写成先分支CI后版本提交；不移动现有tag，不假冒另一次tag验证。本轮另补完整分支CI，同步用户说明与草稿元数据，保留两个SHA的证据边界。
 
-## 发布边界
+## 发布边界（P6确认前）
 
 保持草稿，不执行`gh release edit --draft=false --latest`。R223/R224真实Windows游戏客户端验收保持待验。Worker源未改，无新部署、不读取或替换Secret。压缩等级9保留。
 
@@ -46,4 +46,12 @@ P4说明另由e763345c只提交CHANGELOG，package/lock已为0.12.74，未夹带
 
 技术准备23:48:02完成，tag→最终准备49分02秒、开始→准备1小时03分03秒（63分03秒），超过15/30目标。首轮分支预算失败和接手后复验环节已单列，原tag9分10秒自动门槛也单列，不冒充整个R228发布耗时。尚无正式Latest时刻，P6确认后才补匿名0.12.74清单/三个附件与正式发布证明。
 
-[完整发布账本](release-0.12.74-execution-ledger.md)、[最终分支CI汇总](history/reports/release-0.12.74/r228-final-ci-validation-summary.json)、[最终附件](history/reports/release-0.12.74/draft-assets-verified.json)、[P6前保留证明](history/reports/release-0.12.74/r228-prepublication-proof.json)。P7清单已交付，但真机结果仍未提供；不关闭R223/R224。
+[完整发布账本](history/ledgers/release-0.12.74-execution-ledger.md)、[最终分支CI汇总](history/reports/release-0.12.74/r228-final-ci-validation-summary.json)、[最终附件](history/reports/release-0.12.74/draft-assets-verified.json)、[P6前保留证明](history/reports/release-0.12.74/r228-prepublication-proof.json)。P7清单已交付，但真机结果仍未提供；不关闭R223/R224。
+
+## P6用户确认与正式发布（2026-10-06）
+
+用户再次明确要求“发布新版本”，按已完成候选继续正式发布。北京时间 **00:02:04**，0.12.74发布为Latest：[正式Release](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.74)，id403843482，draft=false、prerelease=false、isLatest=true。匿名Latest清单0.12.74与已验manifest字节一致，匿名三个附件size/SHA256全部与草稿/API digest一致，旧16个Release/附件、17个既有tag保留。当前源码/测试与最终成功分支CI不变，没有重新构建占用版本号或移动tag。
+
+[发布证明](history/reports/release-0.12.74/publication-proof.json)、[归档发布账本](history/ledgers/release-0.12.74-execution-ledger.md)。全流程77分05秒，tag→正式Latest63分04秒；保留23:48:02准备完成与15/30目标未达事实，不把用户确认前后的等待当成CI耗时。
+
+GPT的发布、证据与P7步骤交付完成。P7真实账号、游戏客户端及用户0.12.73在线升级结果仍未提供，本单保留进行中以补真实结果；R223/R224不自动关闭。
