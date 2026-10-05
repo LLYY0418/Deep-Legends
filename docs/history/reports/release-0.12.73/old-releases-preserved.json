@@ -1,0 +1,30 @@
+{
+  "old_releases_compared": 15,
+  "old_tags_compared": 16,
+  "all_preserved": true,
+  "ignored_fields": [
+    "updated_at",
+    "download_count",
+    "isLatest"
+  ],
+  "fields_checked": [
+    "id",
+    "tag_name",
+    "target_commitish",
+    "name",
+    "body",
+    "draft",
+    "prerelease",
+    "created_at",
+    "published_at"
+  ],
+  "asset_fields_checked": [
+    "id",
+    "name",
+    "size",
+    "digest",
+    "content_type",
+    "created_at",
+    "browser_download_url"
+  ]
+}

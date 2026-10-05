@@ -14,7 +14,25 @@ package.json、lockfile 与 CHANGELOG 同步 0.12.73。发布所需源码、必�
 
 ## 构建与正式发布
 
-进行中；待补源码提交/指纹、Windows public 构建、完整质量与真实安装升级、三个附件 SHA256、Latest 匿名清单、旧版本与标签保留证据。
+发布源码为 `245a579b7356ffb436b71a528e00da119f230f18`，标签 `v0.12.73` 固定到同一提交，指纹 **7c34391c96f6**。本地桌面/构建/Worker 预检 334 项：331 通过、3 项因 Windows/PowerShell 环境跳过、0 失败，351.030 秒；见 [预检日志](../reports/release-0.12.73/preflight-final.log)。
+
+正式 Windows public 工作流 **37298993273** 成功，草稿 id **403626344** 恰好三个附件。下载实文件与 API size/digest、两条 checksum、manifest 版本/指纹/URL、Release body 和 CHANGELOG 均匹配；独立只读复核无阻塞。public receipt 与内嵌 Key 门禁成功，安装包不含个人 Key。见 [工作流](../reports/release-0.12.73/release-workflow.json)、[构建日志](../reports/release-0.12.73/windows-release.log)、[草稿附件验证](../reports/release-0.12.73/draft-assets-verified.json)。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| Deep-Legends-Setup-0.12.73-public.exe | 111787520 | `091421bc80714eb636f1fea7c644f824f938f179c4b71a3ae62f359de5cc1628` |
+| latest.json | 1606 | `bd11ce293189eda6f23f4c4d6ae9baf5c2fad3c2d420b772b0171fc6b5fc12e6` |
+| SHA256SUMS-public.txt | 182 | `a439852357f07d7f5e4be8bd29a508f9576fe3a177882a38d15d500fef8e792e` |
+
+完整质量流水线 **37298993269** 的 Linux quality 作业成功：Go 全量 race 235.246 秒、vet、前端/桌面 1218 项（1217 通过、1 项需 Windows 跳过、0 失败）、Worker 15/15、真实 Chromium 图片队列与延迟 CSS 护栏、installer 模块、内嵌皮肤池检查全部通过。见 [质量日志](../reports/release-0.12.73/quality-linux.log)。
+
+完整质量与 Windows 工作流 **37298993269** 最终 `conclusion=success`，源码 SHA 与正式构建一致。Windows runner 实际安装 **0.12.65 → 0.12.68 → 0.12.73**；八阶段完整、耗时 **12530ms**，卸载旧版 **1828ms**、copy **262ms**，独立图标位置正确，桌面快捷方式创建时间未变。见 [最终工作流](../reports/release-0.12.73/quality-workflow.json)、[完整日志](../reports/release-0.12.73/quality-full.log)、[实际升级摘要](../reports/release-0.12.73/real-upgrade/real-upgrade-summary.json) 及同目录原始阶段与诊断。
+
+[0.12.73 Release](https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.73) 于 **2026-10-05 19:25:58 +08:00** 正式发布（UTC 11:25:58），release id **403626344**，`draft=false`、`prerelease=false`、`isLatest=true`。Latest 匿名清单为 **0.12.73**，与已验证 `latest.json` 字节一致。
+
+正式 tag 的三个附件另经匿名 curl 下载，禁用 curl 配置、清空 Authorization、no-cache 与唯一查询参数；全部 size/SHA256 与草稿及 API 一致。发布前的 **15** 个旧 Release/附件、**16** 个既有标签均保持不变（含未发布的 v0.12.72 候选），比较仅忽略 updated_at/下载计数等会变化字段。见 [发布证明](../reports/release-0.12.73/publication-proof.json)、[匿名 Latest](../reports/release-0.12.73/anonymous-latest.json)、[正式元数据](../reports/release-0.12.73/published-release.json)、[旧版本保留证明](../reports/release-0.12.73/old-releases-preserved.json)。
+
+public 构建、生产中转部署、正式发布和验证记录收尾完成。此后只提交文档证据，不移动发布标签；真实游戏客户端验收边界继续保留。
 
 ## 真机边界
 

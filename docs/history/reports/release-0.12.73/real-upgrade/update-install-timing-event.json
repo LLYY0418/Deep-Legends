@@ -1,0 +1,21 @@
+{
+  "build_fingerprint": "a24a41472d2b",
+  "copy_ms": 262,
+  "event": "update_install_timing",
+  "extract_ms": 7672,
+  "log_seq": 1,
+  "result": "ok",
+  "run_id": "3ba61dae7220128b8b20ccc9",
+  "stages_ms": {
+    "copy_done_to_relaunch": 266,
+    "extract_done_to_copy_done": 262,
+    "extract_start_to_extract_done": 7672,
+    "installer_start_to_parent_exited": 595,
+    "parent_exited_to_uninstall_old_start": 1830,
+    "uninstall_old_done_to_extract_start": 77,
+    "uninstall_old_start_to_uninstall_old_done": 1828
+  },
+  "time": "2026-10-05T11:24:02.8257236Z",
+  "total_ms": 12530,
+  "uninstall_old_ms": 1828
+}

@@ -1,0 +1,745 @@
+✔ confirmed child close traverses main IPC + preload + renderer, offers a real app restart (69.679667ms)
+✔ process exit before renderer subscription is recovered from retained snapshot (15.418333ms)
+✔ late successful status and old running snapshot cannot erase a confirmed exit (8.568417ms)
+✔ unknown, absent or rejected bridge and repeated HTTP errors never prove death (22.728792ms)
+✔ lifecycle bridge cleans listeners and ignores async results after disposal (8.455209ms)
+✔ graceful update/user shutdown does not publish fatal; foreign renderers cannot query or restart (3.227042ms)
+✔ renderer bootstrap actually installs lifecycle subscription (0.337583ms)
+✔ restart IPC failure tells the user to reopen manually instead of reloading a dead service (10.104292ms)
+✔ R201 installer ready hides every window before flushed shutdown quits (1.397084ms)
+✔ built backend must contain the exact source fingerprint (1.98225ms)
+✔ R70 fingerprint tracks embedded assets/build inputs but excludes tests and generated binaries (960.823375ms)
+✔ R86 ADD2 fingerprint fixture prunes large caches without changing the fingerprint (912.157375ms)
+ℹ {"unfiltered":{"milliseconds":212.31379200000015,"files":1012,"bytes":20714382},"filtered":{"milliseconds":174.43783299999996,"files":494,"bytes":20577166},"fingerprint":"7c34391c96f6"}
+✔ R86 desktop logs stay within five two-MiB generations and export only reviewed fields (515.587041ms)
+✔ R86 desktop rotation rejects untrusted archive paths without deleting evidence (7.98825ms)
+✔ R86 desktop log byte guard rejects an independent unbounded append path (14.247792ms)
+✔ one event card preserves separate choice owners, partial selection, failures and POST keys (150.744208ms)
+✔ offline national group remains reachable from a pro tab (1.906959ms)
+✔ ordinary and centered artwork use different face coordinates, including load failure (67.207ms)
+✔ unknown reward quantities are not manufactured as one (0.668708ms)
+✔ 2024 real mode buttons isolate champion and search memories across all modes and reload (88.91175ms)
+✔ 2024 legacy memory migrates only to its saved mode, once (5.060583ms)
+✔ 2024 fast ranked filters supersede requests without stuck loading or cross-mode writes (7.854375ms)
+✔ 2024 neutral glyph coloring preserves alpha and never recolors colored/opaque/unknown art (9.818ms)
+✔ 2024 rarity UI says selection distribution, retains all stages, hides failed empty data (5.373542ms)
+✔ R86 search keeps the input and exposes all-position request failures (12.625459ms)
+✔ 2135 actual search buttons clear submitted fields, keep invalid input, and retain new typing (363.497375ms)
+✔ 2135 glyph tone map preserves dark rim, raises highlights, and retains original colored artwork (6.252792ms)
+✔ 2244 skill summary uses real main/sub priorities after R, without repeated labels (60.607708ms)
+✔ 2244 banner exact animation, no video for unknown skin or reduced motion (20.134834ms)
+✔ event cards group presentation but retain all entitlement rows; unknown events stay separate (10.933292ms)
+✔ 2244 installer uses the actual STM_SETIMAGE constant and distribution is automatic (1.080792ms)
+✔ R87 diagnostics support an optional independent export directory with bounded collision-free names (2.613875ms)
+✔ R71 diagnostics do not redirect foreign downloads, redirects, or missing directory selections (0.349292ms)
+✔ R71 interrupted downloads release reservations and the hook is packaged and disposed (1.203833ms)
+✔ only completed diagnostics downloads enable opening the exported file folder (0.513167ms)
+✔ R87 P8 first export and unusable directories still report the actual Save dialog path (1.268666ms)
+✔ R87 P8 cancellation, invalid save paths and disposed windows never emit completion (0.244458ms)
+✔ R112 correlated exports preserve IDs and still reject foreign/redirected query URLs (0.315041ms)
+✔ R205 upgrade command preserves NSIS shortcut retention and uses the same registry identity (10.164875ms)
+✔ N-1 every visible custom text control receives font (0.335666ms)
+✔ N-2 MUI branding stays hidden (0.157084ms)
+✔ N-3 instfiles hook scoped to preceding custom page (0.103333ms)
+✔ N-4 stock headers never reappear (0.099334ms)
+✔ N-5 gold progress uses BGR (0.072416ms)
+✔ N-6 buttons stay stock and sit on a light footer instead of unreadable dark (0.125166ms)
+✔ N-7 progress track colour has visible contrast against the page background (0.060166ms)
+✔ N-8 Core fallback keeps stock system styling (0.093709ms)
+✔ N-9 finish page hides the wizard before the blocking launch call (0.137167ms)
+✔ R74 installer opts out of bitmap DPI virtualization and has a visible progress track (0.110542ms)
+✔ R80 customInstall swaps the executable without changing registry or removal logic (0.109417ms)
+✔ R74 Browse appends Deep Legends once without creating directories prematurely (0.089625ms)
+✔ N-1..5 mutation guards reject each broken contract (4.41225ms)
+✔ 2135 white setup and larger native text/icons without bitmap scaling (0.177916ms)
+✔ R212 generated app-running paths skip PowerShell only after confirmed upgrade exit (1.1455ms)
+✔ R212 real onInit template records its first instruction and repeated probes declare one variable (4.059083ms)
+✔ R212 mutation rejects unconditional PowerShell and updated uninstaller checks (0.756417ms)
+✔ installer build embeds the actual NSIS artifact and publishes only a verified GUI shell (5.183916ms)
+✔ installer build cleans payload and rejects compiler (3.474625ms)
+✔ installer build cleans payload and rejects missing-payload (3.611125ms)
+✔ installer build cleans payload and rejects wrong-format (3.480875ms)
+✔ public installer shell uses the public NSIS artifact (3.503125ms)
+✔ both release entry points wrap NSIS before hashes and before deleting win-unpacked (0.257917ms)
+✔ small uninstaller builds independently before NSIS without embedding payload (3.333583ms)
+✔ uninstaller build removes partial artifact after compiler (2.966958ms)
+✔ uninstaller build removes partial artifact after payload (2.980958ms)
+✔ uninstaller build removes partial artifact after invalid PE (3.263834ms)
+✔ uninstaller design supports retain/delete data, every bridge request and all progress states (153.555ms)
+✔ installer design executes all bridge interactions, terms, progress and failure without changing layout (328.204708ms)
+✔ installer reports ready only after real template initialization with inline state (178.188375ms)
+✔ installer reports script failure instead of readiness after broken application bootstrap (27.264208ms)
+✔ uninstaller reports ready only after real template initialization with inline state (30.165042ms)
+✔ uninstaller reports script failure instead of readiness after broken application bootstrap (15.370709ms)
+✔ collapsed sidebar hides the label but keeps the live beacon rendered (480.568625ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 DOM teardown disconnects pending observers without disabling live callbacks (1678.719875ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 1110 征召默认值、时间输入、模式能力和总开关真实保存链 (4391.3825ms)
+✔ 平均段位只查询视口内卡片，并在分页加载期间停用 (12.70575ms)
+✔ match-tier failures back off instead of retrying on the next render (7.704792ms)
+✔ match-tier overview diagnostics contain aggregate counts only (0.8055ms)
+✔ non-match overview rerenders preserve the match-list node (15.665583ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 总览战绩卡：点击展开按钮只替换目标卡片并可收起 (20428.306333ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 玩家覆盖层里的战绩详情也能展开 (4785.866583ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 演示数据下总览页渲染出真实内容，且渲染期没有异常 (1602.910416ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 好友真实数据恢复横条模式与计时，SSE 更新不重建战绩或串到其他玩家 (3984.7275ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 演示数据下工具五个页签都渲染完成 (5089.012917ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 2351 自定义暂停事件保留真实总开关和卡片高亮 (3230.145ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R149 收藏页仍可独立进入头像与旗帜视图 (4879.903334ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R56 工具页状态、确认、下拉与领奖契约完整 (5244.244458ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 全部原生下拉都增强为可键盘操作的应用菜单，包含动态英雄段位 (3162.033333ms)
+✔ R59 生涯头衔读取对象名称且绝不显示原始 UUID (13.519125ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R59 生涯预览完整渲染时不泄漏 playerTitleSelected UUID (3162.969208ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R60 生涯事件刷新头衔、保护脏草稿且不在其它页签后台请求 (5987.108792ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R65 生涯事件 20 连发只请求一次、仅时间戳变化不重建且按压期间不丢点击 (5094.516667ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R64 生涯皮肤与身份控件局部更新，皮肤图片延迟解码 (3281.392083ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R64 生涯头衔和勋章仅在真实值上使用强调色 (3184.25125ms)
+✔ R60 生涯勋章缺失槽位稳定回退为未设置 (10.468167ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R58 生涯英雄长下拉支持别名搜索，短下拉不显示搜索框 (3349.052792ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R58 生涯空皮肤刷新保留草稿并在数据补齐后恢复 (5386.068334ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 顶部重新读取实际刷新生涯并丢弃未应用预览 (3217.120833ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 收藏账户条复用主页背景和圆头像，并只保留两项事实 (3115.228375ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 游戏时间分布下方提供等栏宽分享按钮，并在选定路径后生成桌面双列长图 (1856.7865ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 分享图按 50 场设置截断当前已加载战绩 (2001.955958ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 排位分区在负场缺失时也能渲染出胜率提示 (1600.929416ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 渲染异常会切到可重试的错误态，而不是永远停在骨架屏 (3198.426875ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 已有总览刷新时保留当前内容，不退回整页骨架 (3211.243042ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 客户端退出后总览显示可重试提示，不退回空白页 (3148.918417ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'in-flight',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'cached',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 推荐请求期间遮罩只覆盖 tab 下方面板，并按内容提示 (3422.4485ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 对局页出装推荐渲染，且不再出现「后期备选」 (3281.425375ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 核心装只展示胜率与场次，不再展示选取率 (3287.521333ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 技能加点的选取率/胜率/场次与技能图标同一行 (3267.734208ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 对抗样本为空时给出说明文案，而不是一个「—」 (3276.425834ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ 英雄位置统计为空时显示明确说明，而不是三项破折号 (3329.074791ms)
+✔ failed build timelines retry on reopening, successful timelines remain cached (0.738667ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 ADD-1 card detail, metric, legacy damage controls and timeline stay local at 200 matches (118989.613834ms)
+✔ R86 ADD optional cs-dialog computed zoom stays one inside the zoomed app frame (133.524417ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 ADD-1 failed timelines wait for explicit retry and keep unrelated cards (3640.084583ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 ADD-1 late timeline cannot reveal a filtered-out card (24494.213958ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 hero search preserves input and coalesces five keystrokes (including bypass mutation) (6758.652625ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 tools fetch only active tab plus rig, then load claims on demand (4016.097667ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 healthy SSE reduces phase polling while closed SSE retains one-second fallback (3241.273625ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 external match expansion preserves unrelated cards (3852.594666ms)
+✔ R86 filtering 200 loaded matches hides entries without rebuilding or refetching (23810.391875ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R86 image listeners and tab scroll remain bounded including independent image-listener bypass (21963.04175ms)
+✔ R86 scroll restoration is resize-driven, restores clamped position and yields to user input (11.746459ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '164:top:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R87 P9 external champselect events preserve modal scroll, input and composition (6437.068666ms)
+✔ R104 quota recovery keeps the first-load skeleton and existing matches visible (6.598834ms)
+✔ R112 KR average-tier errors retry only visible active cards, then cache real values (7.703375ms)
+✔ R117 career column is rebuilt only when its own inputs change (12.868375ms)
+✔ 定制便携版模板存在且保留缓存秒开的关键行为 (0.630041ms)
+✔ 打包配置与模板配套：asarUnpack 后端、不再使用解压期启动图 (0.610375ms)
+✔ 所有桌面运行时本地模块都进入 app.asar 和源码指纹 (1.421125ms)
+✔ Shell 只构建 setup 并复用 Electron 下载缓存 (0.427416ms)
+✔ 历史 portable 模板工具替换指纹占位符并拒绝过期模板 (3.537833ms)
+✔ 模板前置校验拒绝未替换占位符，后端内容变化会改变指纹 (3.682666ms)
+✔ 模板指纹仅读取指定工作目录的四个输入 (2.777625ms)
+✔ 交错执行破坏性模板测试不会污染另一个构建的后端和模板 (6.695ms)
+✔ 默认只有 setup 目标，安装选项和外观资源保持完整 (0.627917ms)
+✔ R71 executable resource editing stays enabled and branded setup has exactly two choices (0.615417ms)
+✔ NSIS page functions wait until standard builder plugins are available (0.223125ms)
+✔ 职业页懒加载、所有分组/账号、缺失状态、筛选缓存与安全转义 (268.974875ms)
+✔ 加载互斥、失败保留旧表、恢复与来源不可用名单 (255.5085ms)
+✔ 国服每次打开折叠；各拳头区服与职业入口可键盘聚焦且不修改大区 (873.203ms)
+✔ 统一总览按国服、韩服、职业分组，同一账号跨组隔离且保留滚动和目录焦点 (2152.836583ms)
+✔ 补充来源未更新保留提示，重新进入不重复阻塞整页，手动刷新可重试 (221.274167ms)
+✔ 职业列表后台补充自动更新，离开页面停止轮询 (5135.717416ms)
+✔ R73 最近账号、历史折叠、只看最新账号及会话核验 (152.943125ms)
+▶ R73 真正点击后才核验：差异与404标记，502不误判
+  ✔ {"proMismatch":true} (1007.821458ms)
+  ✔ {"overviewStatus":404} (858.905ms)
+  ✔ {"overviewStatus":502} (907.544125ms)
+✔ R73 真正点击后才核验：差异与404标记，502不误判 (2774.902416ms)
+✔ 职业目录仅保留返回总览，返回后保留全部已打开页签 (1679.510459ms)
+✔ 未知更新时间的补充账号保持展示，不出现120天未玩的断言 (86.586333ms)
+✔ 玩家页签各自保留纵向位置，跨页面返回也不串位 (1651.874917ms)
+✔ R112 导出状态只属于当前诊断页；离开、迟到和乱序完成均不污染新页面 (1299.982125ms)
+✔ OPGG season summary actually replaces recent sample in both overview workspaces without a history reload (1271.218709ms)
+✔ 当前对局独立置顶、两队十人、无评分和多余标记，分组后不会污染玩家战绩 (935.898334ms)
+✔ R74 零战绩当前对局也加载技能目录，未加载时不伪造技能名称 (767.953209ms)
+✔ R100 菜单键盘可达空组、异步重绘保焦、离开总览关闭菜单 (898.672125ms)
+✔ 国服总览保留战绩但不渲染或请求当前对局和观战 (573.8445ms)
+✔ R97 management filters and rows exclude expanded and academy teams (92.763167ms)
+✔ R100 empty national/KR/pro groups stay selectable and preserve distinct empty states (881.8695ms)
+✔ TestR102NoPrimaryBadgeRendered (85.515334ms)
+✔ TestR102LatestOnlyTogglesShowsFirstAccountOnly (112.948667ms)
+✔ TestR102ButtonLabelSaysLatestNotPrimary (23.995833ms)
+✔ TestR102HighlightUsesOriginalAccountIndex (106.315292ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '69:mid:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R75/R76 actual page: pro rows, degradation capture, incomplete and offline (4597.068667ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '69:mid:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R75/R76 actual page: pro rows, degradation 1/99, incomplete and offline (4666.633958ms)
+live recommendation diagnostic failed {
+  reason: 'has-payload',
+  key: '69:mid:CLASSIC:11:emerald_plus:none',
+  error: 'Failed to parse URL from /api/diagnostics/client'
+}
+✔ R75/R76 actual page: pro rows, degradation 10/30, incomplete and offline (4583.5635ms)
+✔ parses Chromium proxy resolution without accepting credentials (1.072209ms)
+✔ system proxy resolution times out or falls back to direct safely (5.190666ms)
+✔ R100 P7 first native save persists independently; second and restart save without prompt; no overwrite (7.611917ms)
+✔ R100 P7 deleted/replaced directory re-prompts at actual write; cancel cleans staging (3.524375ms)
+✔ R100 P7 rejects foreign renderer and symbolic link files; packaged controller (2.141333ms)
+✔ R100 P7 failed SavePath access and window disposal remove private staged downloads (8.321791ms)
+✔ R110 either export chooses the same remembered folder and updates settings immediately (4.26425ms)
+✔ R110 first share export updates diagnostic destination without another picker (1.885625ms)
+✔ R110 migrates most recent valid old choice once and does not resurrect cleared settings (3.048875ms)
+✔ R110 settings exposes a single export directory (0.283083ms)
+✔ R110 shared PNG destination revalidates replaced folders and preserves PNG names (3.0645ms)
+✔ R175 actual backend close and restart IPC export only safe panic/relaunch evidence (7.969208ms)
+✔ R175 relaunch marker computes elapsed time, deletes once, tolerates missing/corrupt files (1.522917ms)
+✔ R175 stderr is limited to 64 KiB; frame arguments and unreviewed fields cannot pass export (0.949916ms)
+✔ R185 desktop metrics sample once per minute by process type and export only safe fields (2.847042ms)
+✔ R185 unknown backend memory is omitted and disposing a pending sample prevents late export (0.643958ms)
+✔ R196 taskbar reminder crosses trusted IPC and stops on focus (1.923375ms)
+✔ R201 patches both real extraction paths and the successful copy boundary, idempotently (0.90625ms)
+✔ R204 old-uninstaller timing wraps both scopes and preserves manual flow (0.96725ms)
+✔ R206 upgrade extracts directly only after successful uninstall; manual uses unchanged 7z-out (0.909542ms)
+✔ R206 parent-exited fast path still checks manual and portable installs (0.289167ms)
+✔ R206 app-running macro expands once to avoid duplicate NSIS labels (0.14325ms)
+✔ desktop/r87-p8-independent-verify.test.cjs (27.877667ms)
+✔ R88 crash hooks write synchronous reviewed records without swallowing fatal exceptions (32.255375ms)
+✔ R88 seven-day desktop export excludes old records in every generation and keeps crash fields private (2.832ms)
+✔ manual reread recovers a stuck overview and refreshes overview plus live without forcing the overlay (1171.299042ms)
+✔ gameplay soft reset clears stalled pagination and recommendation failures while preserving touched tabs (3.520791ms)
+✔ collection-dirty is accepted by the SSE whitelist and refreshes status (934.778583ms)
+✔ dirty collection rescans on entry and view changes without duplicate refresh requests (1540.0125ms)
+✔ accepted dirty rescan stays gated until clean status or timeout (1.633917ms)
+✔ identical forced collection refresh keeps rendered cards mounted (1.463958ms)
+✔ R70 app and gameplay retain cancellation ownership until body parsing completes (1.592875ms)
+✔ R70 cached collection reentry avoids a request and never uses outgoing DOM snapshots (791.846875ms)
+✔ R70 SSE overflow and reconnect resync refresh visible collection even with unchanged status (1157.183334ms)
+✔ R70 gameflow burst uses one fixed window and one non-aborting trailing request (0.735459ms)
+✔ R70 hidden gameplay pages do not construct DOM, and destroyed pages remain inert (0.663375ms)
+✔ R70 superseded status completion cannot overwrite current state or reschedule polling (0.890917ms)
+✔ R71 collection startup issues one ensure across accepted requests, status events and scan start (0.562083ms)
+✔ R71 a failed or lost collection acceptance can retry without a permanent gate (0.269792ms)
+✔ public policy rejects encrypted and plaintext keys; private requires a valid key (2.706125ms)
+✔ build receipt rejects a stale packaged backend and clears obsolete approval (5.413208ms)
+✔ R136 public outputs have distinct names and private outputs keep release names (0.566833ms)
+✔ R86 bash release stops on a real failing Go test, including an independent early-build mutation (2300.534917ms)
+✔ R86 CI uses the package version, installs test dependencies and needs no private Riot key (0.530459ms)
+﹣ R86 Windows release stops on a real failing Go test and rejects an independent early build (0.077875ms) # requires Windows and PowerShell
+✔ format gates exclude local toolchains and GOPATH modules while retaining untracked project source (92.880833ms)
+✔ 分享图文件名会清理路径字符并固定为 PNG (1.362167ms)
+✔ 分享图载荷限制令牌、根节点、大小和主题 (0.628833ms)
+✔ 导出样式固定标准桌面双列并强制恢复生涯栏和水印 (0.823583ms)
+✔ 常规总览保持 2x，超长总览按像素预算安全降采样 (0.128041ms)
+✔ 首次选择目录后持久化，后续自动保存且不覆盖同名 PNG (0.966125ms)
+✔ 取消保存不会创建截图窗口或写文件 (0.112209ms)
+✔ 保存令牌只能使用一次，写入失败会记录脱敏错误 (0.293792ms)
+✔ 不受信任的 renderer 不能选择路径或提交截图 (0.701333ms)
+✔ 设置接口读取并更改主进程保存目录 (0.181917ms)
+✔ preload 只暴露受校验的分享接口，不暴露 ipcRenderer (1.045958ms)
+✔ 分享图独立窗口不携带主窗口 zoom，且使用独立内存会话 (0.380625ms)
+✔ R110 share capture writes through the common validated staging controller (0.273417ms)
+✔ live specialist right overview button opens exact KR overview while rune selection and return remain independent (1662.286042ms)
+✔ R86 initial CSS and JS gzip budget excludes dynamic demo data (97.873375ms)
+✔ R86 demo loads only on demand, queues calls, shows badge, and preserves native fallback (108.34175ms)
+✔ R86 demo-only loading rejects an independent production script route (49.413084ms)
+✔ R77 backend spawn waits for the splash to paint (1.172709ms)
+✔ R77 splash keeps the cheap single-frame logo (0.145125ms)
+✔ R77 the instance lock still gates the backend (0.709416ms)
+✔ R77 mutation guards reject each broken boot order (2.20675ms)
+✔ R82 splash appears only when painted and reports its actual show time (2.319208ms)
+✔ R82 closed splash cannot be resurrected by late readiness (0.507375ms)
+✔ R82 fallback boots a stalled splash; quitting cancels all startup triggers (1.269791ms)
+✔ R82 all four requested splash mutations fail real event-driven checks (3.664917ms)
+✔ summoner-updated is whitelisted for status and overview-player (0.801166ms)
+✔ live-update debounce accumulates both events and updates the current overview in place (46.772375ms)
+✔ updateStatus refreshes a connected current-tab header without resetting catalogs (1.501583ms)
+✔ forced overview aborts a loading request and starts a newer request (2.63875ms)
+✔ overview-player changes only five identity fields on the current tab (1.27925ms)
+✔ overview-player identity slice also updates background fields in place (1.088875ms)
+✔ identity-ready status removes the global startup lock while snapshot loads (10.640125ms)
+✔ overview refresh button exposes a stable disabled loading state (7.505625ms)
+✔ manual reread awaits the backend identity refresh before hard-refresh dispatch (0.169167ms)
+✔ identity status with unresolved backdrop preserves the first overview art (1.741583ms)
+✔ appearance scale options exactly match the desktop steps and precede density (208.304208ms)
+✔ scaling applies without the desktop bridge and follows the window size (518.521041ms)
+✔ desktop preference wins on startup; changes persist and auto labels update the visible custom select (96.199ms)
+✔ a delayed get cannot undo a user selection made during startup (95.728666ms)
+✔ auto 1366x768 = 1 (0.843167ms)
+✔ auto 1600x900 = 1 (0.057875ms)
+✔ auto 1920x1080 = 1 (0.070542ms)
+✔ auto 2304x1318 = 1.2 (0.053333ms)
+✔ auto 2560x1440 = 1.33 (0.054625ms)
+✔ auto 2560x1600 = 1.33 (0.046792ms)
+✔ auto 3440x1440 = 1.6 (0.042334ms)
+✔ auto 3840x2160 = 2 (0.03875ms)
+✔ auto 3840x1600 = 1.78 (0.053166ms)
+✔ auto 5120x2880 = 2.5 (0.085042ms)
+✔ auto 7680x4320 = 2.5 (0.046417ms)
+✔ auto 1024x600 = 1 (0.044209ms)
+✔ continuous scale, quantization, clamps and manual-step normalization (1.290083ms)
+✔ scale mutants turn the corresponding geometry guards red (3.64775ms)
+✔ titlebar, minimum size, reload, resize and display events run through the real main module (5.517041ms)
+✔ IPC restores independent preferences, normalizes fixed values and rejects untrusted senders (3.219041ms)
+✔ main behavior guards reject titlebar, minimum size, trust, reload, debounce and export mutants (14.892958ms)
+✔ preload exposes scale IPC without leaking the Electron event (0.626083ms)
+✔ packaged runtime includes the scaling module (0.220792ms)
+✔ upgrade stdout may arrive after exit but before close without a false startup error (3.8385ms)
+✔ user quit shares the graceful path; unexpected backend death still reports (1.605791ms)
+✔ window bounds store writes and restores visible bounds (1.834041ms)
+✔ window bounds store rejects bounds that no longer intersect a display (0.7075ms)
+✔ window bounds store silently falls back on corrupt or unwritable data (0.6205ms)
+✔ desktop window opens at 72/80 percent of the work area on roomy screens (0.801458ms)
+✔ small screens fall back to the design-width floor instead of 72 percent (0.086417ms)
+✔ desktop window clamps each dimension independently (0.076208ms)
+✔ desktop main and topbar keep the shared sizing and drag-region callers (0.262041ms)
+✔ R47 desktop caller and high-resolution mutation probes fail (2.91525ms)
+✔ R206 Worker forwards only the actual Riot GET route whitelist (21.292041ms)
+✔ R206 Worker rejects arbitrary paths/hosts/methods without Riot I/O (0.539292ms)
+✔ R206 Worker response caching honors category TTL and contains no identity cache keys (1.892916ms)
+✔ R206 Worker per-IP limit rejects request 301 and allows another IP (35.167375ms)
+✔ R206 Worker preserves Riot Retry-After and avoids same-path I/O during cooldown (1.102375ms)
+✔ R206 Worker never exposes or logs its secret, including echoed upstream values (1.916292ms)
+✔ R206 Worker fails closed without a secret or rate limiter (0.18725ms)
+✔ R206 Worker rejects upstream redirects without forwarding the secret or Location (0.97975ms)
+✔ R208 application cooldown blocks every path on its host, with decreasing remaining time (0.981542ms)
+✔ R208 method/service/missing-header cooldowns remain path scoped and default to five seconds (1.975416ms)
+✔ R208 IP 429 and controlled upstream failures are JSON rather than false daily-quota pages (33.38175ms)
+✔ R208 application remaining time takes precedence when IP limit also expires (34.026ms)
+✔ R220 every platform and regional cluster has the correct endpoint family (16.356125ms)
+✔ R220 validated platform headers isolate JP and KR cooldowns on shared ASIA without forwarding headers (0.781084ms)
+✔ R220 shared-cluster responses remain platform-scoped in the relay cache (0.641542ms)
+✔ build stage reports a live wait then completes without logging arguments (185.006041ms)
+✔ build stage preserves nonzero exits and reports spawn failures (30.192709ms)
+✔ test sharding is stable and covers every test exactly once (18.609917ms)
+✔ known slow tests are spread across shards (0.292042ms)
+✔ shard count is bounded and configurable (0.355209ms)
+✔ setup-only release hashes actual renamed bytes and emits exactly three files (9.421417ms)
+✔ invalid release identities and spaced assets are refused (0.147041ms)
+✔ normalizes build text, preserves BOM and excludes binaries, dependencies and symlinks (5.117625ms)
+构建指纹：62b5b7b6b536
+app_start 版本：（日志里没有带 version 的记录）
+card_image_stalled 事件支持：无法确认（日志里没有带 version 的 app_start 记录），0 条 stall 不算证据
+运行 ID：794083ef4812f210ecde108e
+时间跨度：2026-09-23T09:59:20.000Z ~ 2026-09-23T10:00:00.000Z（0 分 40 秒）
+
+记录总数：4（解析失败 0 行）
+card_image_stalled：1 条
+local_request_client/failed(endpoint=image)：3 条（timeout 3）
+client_diagnostic_rejected：0 条
+窗口口径：stall 前 60000ms ~ 后 10000ms；积压判定阈值 3 条图片失败
+
+  #1 2026-09-23T10:00:00.000Z reason=watchdog active=8 queued=6 sourceIndex=0 imageSource=gtimg
+      窗口内图片失败：3 条 → backlog
+
+判定：backlog-only
+第二层积压：每条 stall 的窗口里都有大量图片失败，说明第二层在正常超时/重试，名额是被排队等满看门狗时长的卡片占住的。该调的是第二层的远程/本机道名额，不是 R130 的合成 error / 看门狗。
+构建指纹：62b5b7b6b536
+app_start 版本：（日志里没有带 version 的记录）
+card_image_stalled 事件支持：无法确认（日志里没有带 version 的 app_start 记录），0 条 stall 不算证据
+运行 ID：794083ef4812f210ecde108e
+时间跨度：2026-09-23T10:00:00.000Z ~ 2026-09-23T10:00:00.000Z（0 分 0 秒）
+
+记录总数：1（解析失败 0 行）
+card_image_stalled：1 条
+local_request_client/failed(endpoint=image)：0 条
+client_diagnostic_rejected：0 条
+窗口口径：stall 前 60000ms ~ 后 10000ms；积压判定阈值 3 条图片失败
+
+  #1 2026-09-23T10:00:00.000Z reason=watchdog active=8 queued=6 sourceIndex=0 imageSource=gtimg
+      窗口内图片失败：0 条 → notify-gap
+
+判定：notify-gap
+通知失败：有 stall 的窗口里一条图片失败都没有，说明第二层放弃时又没能通知到第一层，合成 error 的某个闸门有漏洞。这是新缺陷，按项目惯例另开工单，不要和积压混在一起改。
+{
+  "verdict": "notify-gap",
+  "totals": {
+    "records": 1,
+    "stalls": 1,
+    "imageFailures": 0,
+    "rejected": 0,
+    "malformed": 0
+  },
+  "failureKinds": {},
+  "identity": {
+    "buildFingerprints": [
+      "62b5b7b6b536"
+    ],
+    "runIDs": [
+      "794083ef4812f210ecde108e"
+    ],
+    "versions": []
+  },
+  "eventSupport": {
+    "known": false,
+    "versions": [],
+    "minRequired": "0.12.18",
+    "sufficient": false
+  },
+  "span": {
+    "earliest": 1790157600000,
+    "latest": 1790157600000,
+    "durationMs": 0
+  },
+  "window": {
+    "windowMs": 60000,
+    "forwardMs": 10000,
+    "backlogThreshold": 3
+  },
+  "stalls": [
+    {
+      "at": 1790157600000,
+      "runId": "794083ef4812f210ecde108e",
+      "time": "2026-09-23T10:00:00.000Z",
+      "reason": "watchdog",
+      "activeCardImages": 8,
+      "queued": 6,
+      "sourceIndex": 0,
+      "imageSource": "gtimg",
+      "buildFingerprint": "62b5b7b6b536",
+      "windowImageFailures": 0,
+      "classification": "notify-gap"
+    }
+  ],
+  "rejected": [],
+  "source": {
+    "file": "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r133-8RfvBf/gap.jsonl",
+    "lines": 2
+  }
+}
+用法：node scripts/r133-stall-log-report.cjs <lol-loot-diagnostics-*.jsonl> [--json] [--window 60000] [--forward 10000] [--backlog-threshold 3]
+✔ R133 一条 stall 都没有、且日志出自支持该事件的包时判 clean，P2 可以直接结项 (1.773792ms)
+✔ R133 对抗变异：旧包的日志里 0 条 stall 不得判成 clean (0.88675ms)
+✔ R133 版本比较不引入 semver 依赖也够用 (0.433958ms)
+✔ R133 stall 窗口里有大量图片失败 → 第二层积压，不是 R130 的修复失效 (0.18075ms)
+✔ R134 对抗变异：另一次启动的图片失败不能把通知缺口判成积压 (0.179042ms)
+✔ R134 同一次启动的图片失败仍能判积压，缺 run_id 的旧日志沿用全局窗口 (0.19175ms)
+✔ R133 stall 窗口里一条图片失败都没有 → 通知失败，必须另开工单 (0.09425ms)
+✔ R133 图片失败数不够阈值时判 inconclusive，不猜方向 (0.101625ms)
+✔ R133 对抗变异：把窗口算错（全量计数当成窗口计数）必须被测出来 (0.135042ms)
+✔ R133 白名单被回退时优先级最高，盖过其它判定 (0.622833ms)
+✔ R133 缺 time 字段的 stall 判 undated，不在缺时间戳的情况下判成因 (0.130542ms)
+✔ R133 多条 stall 各自判，不拿全局总数摊平 (0.08575ms)
+✔ R133 坏行不静默跳过，避免把截断的日志当成没有 stall (0.100167ms)
+✔ R133 报告里带上构建指纹与时间跨度，读数的人能确认是不是 0.12.18 那个包 (0.08375ms)
+✔ R133 命令行：参数解析、退出码与 --json (1.666542ms)
+✔ R133 每种判定都有对应的人话结论，不会输出空判词 (0.085917ms)
+✔ R82 synthetic A/B medians enforce the 300ms gate and include prewarm cost (0.837583ms)
+✔ R82 incomplete, repeated and malformed samples cannot pass acceptance (0.35025ms)
+✔ R82 collector joins phases to fingerprint by run_id and installer log by PID (1.017625ms)
+✔ R82 collector rejects a second launch but deduplicates log rotation copies (0.148083ms)
+✔ R82 malformed inputs and failed prewarm cannot silently enter the A/B comparison (0.185334ms)
+✔ R82 reads the actual diagnostics.N.jsonl archive naming (1.568083ms)
+✔ R84 collector CLI works without Array.prototype.at and keeps the last matching PID records (146.880291ms)
+✔ R84 collector production source cannot reintroduce .at calls (0.792958ms)
+✔ R84 first-match mutation fails the end-to-end collector assertions (112.144625ms)
+﹣ R82 A/B receipt lookup and deduplication execute the real PowerShell script (0.333209ms) # PowerShell is required; set R82_POWERSHELL to run the real script tests
+﹣ R82 A/B filename, hash mismatch and duplicate mutations reach failing assertions (0.077709ms) # PowerShell is required; set R82_POWERSHELL to run the real script tests
+✔ setup-only Bash build wraps one NSIS result, hashes final bytes and removes legacy outputs (2384.725833ms)
+✔ failed NSIS stops before wrapping or issuing a receipt and cleans the uninstall shell (1212.336209ms)
+✔ compression overrides are explicit and invalid levels fail before packaging (1.914833ms)
+✔ unchanged complete npm dependencies are reused; damage or a lock change reinstalls them (5661.544625ms)
+ℹ tests 334
+ℹ suites 0
+ℹ pass 331
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 3
+ℹ todo 0
+ℹ duration_ms 351029.702208

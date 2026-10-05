@@ -1,0 +1,11 @@
+{
+  "total_ms": 12530,
+  "key_mode": "public",
+  "stages": 8,
+  "old_version": "0.12.65",
+  "intermediate_version": "0.12.68",
+  "icon_location_stable": true,
+  "copy_ms": 262,
+  "uninstall_old_ms": 1828,
+  "created_time_changed": false
+}

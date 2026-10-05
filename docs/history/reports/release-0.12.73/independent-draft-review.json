@@ -1,0 +1,14 @@
+{
+  "reviewer": "read-only subagent release_073_asset_audit",
+  "blocking_findings": [],
+  "checked": [
+    "three downloaded assets and API size/digest",
+    "two checksum lines and checksum file hash",
+    "manifest version/fingerprint/Setup URL/hash",
+    "manifest notes and Release body against CHANGELOG",
+    "source SHA and successful public/Key gate logs"
+  ],
+  "source_commit": "245a579b7356ffb436b71a528e00da119f230f18",
+  "release_id": 403626344,
+  "draft_alias_is_expected": true
+}
