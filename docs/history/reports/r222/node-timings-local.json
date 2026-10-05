@@ -1,613 +1,613 @@
 {
   "scope": "all",
   "platform": "darwin",
-  "concurrency": 7,
+  "concurrency": 8,
   "file_budget_ms": 90000,
   "suite_budget_ms": 240000,
   "files": [
     {
       "file": "backend/web/export-diagnostics.test.cjs",
-      "duration_ms": 148.407708
-    },
-    {
-      "file": "backend/web/api-diagnostics.test.cjs",
-      "duration_ms": 163.786709
+      "duration_ms": 123.422791
     },
     {
       "file": "backend/web/position-filter.test.cjs",
-      "duration_ms": 154.780375
+      "duration_ms": 130.358
     },
     {
-      "file": "backend/web/friends.test.cjs",
-      "duration_ms": 1366.2445
-    },
-    {
-      "file": "backend/web/official-login.test.cjs",
-      "duration_ms": 1374.516458
+      "file": "backend/web/api-diagnostics.test.cjs",
+      "duration_ms": 169.805
     },
     {
       "file": "backend/web/r100.test.cjs",
-      "duration_ms": 1284.868333
+      "duration_ms": 1305.7885
     },
     {
       "file": "backend/web/r104.test.cjs",
-      "duration_ms": 1285.237958
+      "duration_ms": 1228.072041
     },
     {
       "file": "backend/web/r108.test.cjs",
-      "duration_ms": 87.724583
+      "duration_ms": 80.742958
+    },
+    {
+      "file": "backend/web/friends.test.cjs",
+      "duration_ms": 1583.893084
+    },
+    {
+      "file": "backend/web/official-login.test.cjs",
+      "duration_ms": 1586.68275
     },
     {
       "file": "backend/web/r101.test.cjs",
-      "duration_ms": 1599.425708
+      "duration_ms": 1774.856583
     },
     {
       "file": "backend/web/r109.test.cjs",
-      "duration_ms": 1283.372417
-    },
-    {
-      "file": "backend/web/r110.test.cjs",
-      "duration_ms": 1379.8165
-    },
-    {
-      "file": "backend/web/r106.test.cjs",
-      "duration_ms": 1642.297208
+      "duration_ms": 1274.980291
     },
     {
       "file": "backend/web/r114.test.cjs",
-      "duration_ms": 139.361458
-    },
-    {
-      "file": "backend/web/r111.test.cjs",
-      "duration_ms": 1341.482041
+      "duration_ms": 75.221
     },
     {
       "file": "backend/web/r115-scoring.test.cjs",
-      "duration_ms": 120.908667
+      "duration_ms": 71.995583
     },
     {
-      "file": "backend/web/r116d.test.cjs",
-      "duration_ms": 238.085417
+      "file": "backend/web/r111.test.cjs",
+      "duration_ms": 1310.057584
+    },
+    {
+      "file": "backend/web/r106.test.cjs",
+      "duration_ms": 1838.108459
+    },
+    {
+      "file": "backend/web/r110.test.cjs",
+      "duration_ms": 1604.474083
     },
     {
       "file": "backend/web/r116e.test.cjs",
-      "duration_ms": 94.442333
+      "duration_ms": 87.802333
     },
     {
-      "file": "backend/web/r113.test.cjs",
-      "duration_ms": 1418.513875
+      "file": "backend/web/r116d.test.cjs",
+      "duration_ms": 133.593583
     },
     {
       "file": "backend/web/r117-style.test.cjs",
-      "duration_ms": 200.828
+      "duration_ms": 171.29475
     },
     {
-      "file": "backend/web/r115.test.cjs",
-      "duration_ms": 1390.015334
+      "file": "backend/web/r113.test.cjs",
+      "duration_ms": 1695.783584
     },
     {
       "file": "backend/web/r119.test.cjs",
-      "duration_ms": 209.417875
+      "duration_ms": 153.760459
     },
     {
       "file": "backend/web/r123.test.cjs",
-      "duration_ms": 141.994417
+      "duration_ms": 114.946917
     },
     {
       "file": "backend/web/r126.test.cjs",
-      "duration_ms": 96.783959
+      "duration_ms": 82.338958
     },
     {
-      "file": "backend/web/r105.test.cjs",
-      "duration_ms": 4641.780667
+      "file": "backend/web/r115.test.cjs",
+      "duration_ms": 1549.866667
     },
     {
       "file": "backend/web/r128.test.cjs",
-      "duration_ms": 158.0865
-    },
-    {
-      "file": "backend/web/champions.test.cjs",
-      "duration_ms": 6295.989
+      "duration_ms": 84.403416
     },
     {
       "file": "backend/web/r117.test.cjs",
-      "duration_ms": 2041.069375
+      "duration_ms": 1263.19175
     },
     {
-      "file": "backend/web/gameplay.test.cjs",
-      "duration_ms": 6979.82925
+      "file": "backend/web/r105.test.cjs",
+      "duration_ms": 4620.836333
+    },
+    {
+      "file": "backend/web/champions.test.cjs",
+      "duration_ms": 5605.639917
     },
     {
       "file": "backend/web/r146.test.cjs",
-      "duration_ms": 104.50675
+      "duration_ms": 87.756417
     },
     {
       "file": "backend/web/r150.test.cjs",
-      "duration_ms": 117.243708
+      "duration_ms": 100.429333
     },
     {
       "file": "backend/web/r136.test.cjs",
-      "duration_ms": 1675.130708
+      "duration_ms": 1569.740042
     },
     {
       "file": "backend/web/r156.test.cjs",
-      "duration_ms": 77.845084
+      "duration_ms": 74.299
     },
     {
       "file": "backend/web/r127.test.cjs",
-      "duration_ms": 3291.738
+      "duration_ms": 2694.151708
     },
     {
       "file": "backend/web/r129.test.cjs",
-      "duration_ms": 2089.265541
+      "duration_ms": 2375.548208
     },
     {
       "file": "backend/web/r161.test.cjs",
-      "duration_ms": 80.936417
+      "duration_ms": 76.162458
     },
     {
       "file": "backend/web/r163.test.cjs",
-      "duration_ms": 72.908959
+      "duration_ms": 64.882875
     },
     {
       "file": "backend/web/r164.test.cjs",
-      "duration_ms": 95.565083
+      "duration_ms": 67.367458
     },
     {
       "file": "backend/web/r166.test.cjs",
-      "duration_ms": 72.527125
+      "duration_ms": 80.714375
     },
     {
-      "file": "backend/web/r116f.test.cjs",
-      "duration_ms": 5898.325625
+      "file": "backend/web/gameplay.test.cjs",
+      "duration_ms": 7640.970334
     },
     {
       "file": "backend/web/r160.test.cjs",
-      "duration_ms": 1344.265791
+      "duration_ms": 1321.757584
     },
     {
       "file": "backend/web/r154.test.cjs",
-      "duration_ms": 2371.805292
+      "duration_ms": 2448.159875
     },
     {
       "file": "backend/web/r158.test.cjs",
-      "duration_ms": 1767.530125
+      "duration_ms": 2087.220333
     },
     {
       "file": "backend/web/r175.test.cjs",
-      "duration_ms": 1348.630458
+      "duration_ms": 1602.801833
     },
     {
       "file": "backend/web/r185.test.cjs",
-      "duration_ms": 136.30975
+      "duration_ms": 140.61475
     },
     {
-      "file": "backend/web/r116b.test.cjs",
-      "duration_ms": 7095.071958
+      "file": "backend/web/r116f.test.cjs",
+      "duration_ms": 5691.195
     },
     {
       "file": "backend/web/r181.test.cjs",
-      "duration_ms": 1336.201792
-    },
-    {
-      "file": "backend/web/r183.test.cjs",
-      "duration_ms": 1298.713125
+      "duration_ms": 1567.657417
     },
     {
       "file": "backend/web/r180.test.cjs",
-      "duration_ms": 1753.121833
+      "duration_ms": 2065.51325
     },
     {
-      "file": "backend/web/r189.test.cjs",
-      "duration_ms": 1788.695959
+      "file": "backend/web/r183.test.cjs",
+      "duration_ms": 1706.539792
+    },
+    {
+      "file": "backend/web/r116b.test.cjs",
+      "duration_ms": 7383.664458
     },
     {
       "file": "backend/web/r130.test.cjs",
-      "duration_ms": 5777.152917
+      "duration_ms": 6277.955375
+    },
+    {
+      "file": "backend/web/r189.test.cjs",
+      "duration_ms": 2273.297917
     },
     {
       "file": "backend/web/r188.test.cjs",
-      "duration_ms": 2156.651167
-    },
-    {
-      "file": "backend/web/r191.test.cjs",
-      "duration_ms": 1748.964333
-    },
-    {
-      "file": "backend/web/r190.test.cjs",
-      "duration_ms": 2112.815041
+      "duration_ms": 2538.606667
     },
     {
       "file": "backend/web/r179.test.cjs",
-      "duration_ms": 3762.23075
+      "duration_ms": 3879.49425
     },
     {
-      "file": "backend/web/r194.test.cjs",
-      "duration_ms": 1492.482666
+      "file": "backend/web/r191.test.cjs",
+      "duration_ms": 1920.121166
     },
     {
       "file": "backend/web/r193.test.cjs",
-      "duration_ms": 1688.22125
+      "duration_ms": 1748.432417
     },
     {
-      "file": "backend/web/r195.test.cjs",
-      "duration_ms": 2040.866042
+      "file": "backend/web/r190.test.cjs",
+      "duration_ms": 2258.257666
+    },
+    {
+      "file": "backend/web/r194.test.cjs",
+      "duration_ms": 1564.904792
     },
     {
       "file": "backend/web/r206-arena.test.cjs",
-      "duration_ms": 84.830542
+      "duration_ms": 65.972042
     },
     {
       "file": "backend/web/r197.test.cjs",
-      "duration_ms": 1683.071041
+      "duration_ms": 1557.826792
+    },
+    {
+      "file": "backend/web/r195.test.cjs",
+      "duration_ms": 2000.195291
     },
     {
       "file": "backend/web/r198.test.cjs",
-      "duration_ms": 1858.068792
+      "duration_ms": 1567.027791
     },
     {
       "file": "backend/web/r203.test.cjs",
-      "duration_ms": 2025.927667
-    },
-    {
-      "file": "backend/web/r206-relay.test.cjs",
-      "duration_ms": 1433.9245
+      "duration_ms": 1912.70325
     },
     {
       "file": "backend/web/r206-collection-image.test.cjs",
-      "duration_ms": 1816.056959
+      "duration_ms": 1785.598083
+    },
+    {
+      "file": "backend/web/r206-relay.test.cjs",
+      "duration_ms": 1473.49975
     },
     {
       "file": "backend/web/r204.test.cjs",
-      "duration_ms": 2770.705584
+      "duration_ms": 2606.870917
     },
     {
       "file": "backend/web/r208.test.cjs",
-      "duration_ms": 1844.56475
+      "duration_ms": 1443.288584
     },
     {
       "file": "backend/web/r207.test.cjs",
-      "duration_ms": 2579.125416
+      "duration_ms": 2156.393334
     },
     {
       "file": "backend/web/r211.test.cjs",
-      "duration_ms": 2103.338375
-    },
-    {
-      "file": "backend/web/r210.test.cjs",
-      "duration_ms": 3328.7185
+      "duration_ms": 1566.7705
     },
     {
       "file": "backend/web/r214.test.cjs",
-      "duration_ms": 2206.8005
+      "duration_ms": 1714.107042
     },
     {
       "file": "backend/web/r213.test.cjs",
-      "duration_ms": 2840.652
+      "duration_ms": 2294.189167
     },
     {
       "file": "backend/web/r87-p2p3-verify.test.cjs",
-      "duration_ms": 40.507084
+      "duration_ms": 44.834833
+    },
+    {
+      "file": "backend/web/r210.test.cjs",
+      "duration_ms": 2606.70675
     },
     {
       "file": "backend/web/r87-p5-independent-verify.test.cjs",
-      "duration_ms": 51.273792
+      "duration_ms": 46.137958
     },
     {
       "file": "backend/web/r87-p8-independent-verify.test.cjs",
-      "duration_ms": 38.765542
+      "duration_ms": 51.04875
     },
     {
       "file": "backend/web/r87.test.cjs",
-      "duration_ms": 104.399
+      "duration_ms": 105.793666
     },
     {
       "file": "backend/web/r88.test.cjs",
-      "duration_ms": 220.234292
-    },
-    {
-      "file": "backend/web/r196.test.cjs",
-      "duration_ms": 7808.418708
-    },
-    {
-      "file": "backend/web/r216.test.cjs",
-      "duration_ms": 2321.445333
+      "duration_ms": 151.361625
     },
     {
       "file": "backend/web/r89.test.cjs",
-      "duration_ms": 136.811834
+      "duration_ms": 76.850709
     },
     {
       "file": "backend/web/r90.test.cjs",
-      "duration_ms": 97.463875
+      "duration_ms": 81.04875
+    },
+    {
+      "file": "backend/web/r216.test.cjs",
+      "duration_ms": 2197.430417
+    },
+    {
+      "file": "backend/web/r196.test.cjs",
+      "duration_ms": 6640.483291
     },
     {
       "file": "backend/web/r220-region.test.cjs",
-      "duration_ms": 1967.857584
-    },
-    {
-      "file": "backend/web/r219.test.cjs",
-      "duration_ms": 2759.072542
+      "duration_ms": 1644.360125
     },
     {
       "file": "backend/web/remaining-sort.test.cjs",
-      "duration_ms": 115.235
-    },
-    {
-      "file": "backend/web/r209.test.cjs",
-      "duration_ms": 6559.752875
+      "duration_ms": 99.751
     },
     {
       "file": "backend/web/runtime.test.cjs",
-      "duration_ms": 358.288959
+      "duration_ms": 194.298459
+    },
+    {
+      "file": "backend/web/r219.test.cjs",
+      "duration_ms": 2501.232709
     },
     {
       "file": "backend/web/r91-addendum.test.cjs",
-      "duration_ms": 2150.6245
+      "duration_ms": 1811.08925
     },
     {
       "file": "backend/web/r94.test.cjs",
-      "duration_ms": 2155.631625
+      "duration_ms": 1596.726958
+    },
+    {
+      "file": "backend/web/r209.test.cjs",
+      "duration_ms": 5335.254791
     },
     {
       "file": "backend/web/r91.test.cjs",
-      "duration_ms": 2838.873
+      "duration_ms": 2104.925792
     },
     {
       "file": "backend/web/r95.test.cjs",
-      "duration_ms": 2841.501792
-    },
-    {
-      "file": "desktop/desktop-log.test.cjs",
-      "duration_ms": 1446.068791
+      "duration_ms": 1880.483667
     },
     {
       "file": "desktop/backend-lifecycle.test.cjs",
-      "duration_ms": 2193.250375
+      "duration_ms": 1299.344666
     },
     {
       "file": "backend/web/suite.test.cjs",
-      "duration_ms": 2943.492625
+      "duration_ms": 1868.927458
     },
     {
       "file": "desktop/diagnostics-0006.test.cjs",
-      "duration_ms": 1587.094666
+      "duration_ms": 1361.5255
     },
     {
-      "file": "desktop/diagnostics-1042.test.cjs",
-      "duration_ms": 1336.233083
+      "file": "desktop/desktop-log.test.cjs",
+      "duration_ms": 1700.973417
     },
     {
       "file": "desktop/diagnostics-export.test.cjs",
-      "duration_ms": 105.245583
+      "duration_ms": 120.78825
     },
     {
-      "file": "desktop/diagnostics-2024.test.cjs",
-      "duration_ms": 1498.152167
+      "file": "desktop/diagnostics-1042.test.cjs",
+      "duration_ms": 1149.110542
     },
     {
       "file": "desktop/installer-nsh.test.cjs",
-      "duration_ms": 159.1365
+      "duration_ms": 136.433333
+    },
+    {
+      "file": "desktop/diagnostics-2024.test.cjs",
+      "duration_ms": 1326.883459
     },
     {
       "file": "desktop/diagnostics-2244.test.cjs",
-      "duration_ms": 1208.82375
+      "duration_ms": 1409.164083
     },
     {
       "file": "desktop/diagnostics-2135.test.cjs",
-      "duration_ms": 2051.387583
-    },
-    {
-      "file": "desktop/build-fingerprint.test.cjs",
-      "duration_ms": 5146.466042
-    },
-    {
-      "file": "desktop/installer-startup.test.cjs",
-      "duration_ms": 1796.431833
+      "duration_ms": 1926.783958
     },
     {
       "file": "desktop/installer-shell.test.cjs",
-      "duration_ms": 2098.54725
+      "duration_ms": 1965.983584
+    },
+    {
+      "file": "desktop/installer-startup.test.cjs",
+      "duration_ms": 1848.064042
+    },
+    {
+      "file": "desktop/build-fingerprint.test.cjs",
+      "duration_ms": 4123.5505
     },
     {
       "file": "backend/web/r192.test.cjs",
-      "duration_ms": 19980.432291
+      "duration_ms": 17583.72075
     },
     {
       "file": "backend/web/update.test.cjs",
-      "duration_ms": 15475.653958
-    },
-    {
-      "file": "desktop/overview-render-200-filter.test.cjs",
-      "duration_ms": 32225.390333
-    },
-    {
-      "file": "desktop/overview-render-200-timeline.test.cjs",
-      "duration_ms": 32348.788541
-    },
-    {
-      "file": "desktop/overview-render-200-expand.test.cjs",
-      "duration_ms": 37870.212791
-    },
-    {
-      "file": "desktop/overview-render-200-controls.test.cjs",
-      "duration_ms": 41340.782916
-    },
-    {
-      "file": "desktop/overview-render-career.test.cjs",
-      "duration_ms": 40976.055209
+      "duration_ms": 14388.493959
     },
     {
       "file": "desktop/overview-render-controls-mutants.test.cjs",
-      "duration_ms": 28933.691625
+      "duration_ms": 21439.459375
+    },
+    {
+      "file": "desktop/overview-render-200-filter.test.cjs",
+      "duration_ms": 36471.565708
+    },
+    {
+      "file": "desktop/overview-render-200-timeline.test.cjs",
+      "duration_ms": 37441.715458
+    },
+    {
+      "file": "desktop/overview-render-200-expand.test.cjs",
+      "duration_ms": 43889.402667
+    },
+    {
+      "file": "desktop/overview-render-career.test.cjs",
+      "duration_ms": 38627.37975
     },
     {
       "file": "desktop/portable-template.test.cjs",
-      "duration_ms": 283.64375
+      "duration_ms": 242.133708
+    },
+    {
+      "file": "desktop/overview-render-200-controls.test.cjs",
+      "duration_ms": 50161.673125
     },
     {
       "file": "desktop/overview-render-200-images.test.cjs",
-      "duration_ms": 68224.378041
-    },
-    {
-      "file": "desktop/overview-render-tools.test.cjs",
-      "duration_ms": 38549.079709
-    },
-    {
-      "file": "desktop/overview-render-200-external.test.cjs",
-      "duration_ms": 79111.47175
+      "duration_ms": 61910.912916
     },
     {
       "file": "desktop/proxy-resolution.test.cjs",
-      "duration_ms": 119.784
+      "duration_ms": 120.504417
     },
     {
       "file": "desktop/r100.test.cjs",
-      "duration_ms": 200.050792
+      "duration_ms": 149.458125
     },
     {
       "file": "desktop/r110-export.test.cjs",
-      "duration_ms": 248.629625
+      "duration_ms": 165.459542
     },
     {
       "file": "desktop/r175.test.cjs",
-      "duration_ms": 207.15925
+      "duration_ms": 99.539167
     },
     {
       "file": "desktop/r185.test.cjs",
-      "duration_ms": 160.609708
+      "duration_ms": 75.049583
     },
     {
       "file": "desktop/r196.test.cjs",
-      "duration_ms": 206.666291
+      "duration_ms": 137.6855
     },
     {
       "file": "desktop/r201.test.cjs",
-      "duration_ms": 174.630791
+      "duration_ms": 76.141458
     },
     {
       "file": "desktop/r204.test.cjs",
-      "duration_ms": 169.613958
+      "duration_ms": 95.552916
     },
     {
       "file": "desktop/r206.test.cjs",
-      "duration_ms": 146.492666
+      "duration_ms": 94.258667
     },
     {
       "file": "desktop/r87-p8-independent-verify.test.cjs",
-      "duration_ms": 95.621792
+      "duration_ms": 51.035333
     },
     {
       "file": "desktop/r88-diagnostics.test.cjs",
-      "duration_ms": 210.352416
+      "duration_ms": 252.507917
+    },
+    {
+      "file": "desktop/overview-render-tools.test.cjs",
+      "duration_ms": 28804.954959
     },
     {
       "file": "desktop/release-build.test.cjs",
-      "duration_ms": 143.001667
-    },
-    {
-      "file": "desktop/release-quality-gates.test.cjs",
-      "duration_ms": 6259.212125
-    },
-    {
-      "file": "desktop/overview-render-events.test.cjs",
-      "duration_ms": 51164.929167
-    },
-    {
-      "file": "desktop/share-export.test.cjs",
-      "duration_ms": 286.930542
-    },
-    {
-      "file": "desktop/overview-render.test.cjs",
-      "duration_ms": 37515.589542
-    },
-    {
-      "file": "desktop/startup-sequence.test.cjs",
-      "duration_ms": 302.041458
-    },
-    {
-      "file": "desktop/startup-visibility.test.cjs",
-      "duration_ms": 169.410833
-    },
-    {
-      "file": "desktop/startup-assets.test.cjs",
-      "duration_ms": 4863.572084
-    },
-    {
-      "file": "desktop/summoner-identity.test.cjs",
-      "duration_ms": 3729.397958
-    },
-    {
-      "file": "desktop/ui-scale.test.cjs",
-      "duration_ms": 322.143208
-    },
-    {
-      "file": "desktop/update-lifecycle.test.cjs",
-      "duration_ms": 152.799167
-    },
-    {
-      "file": "desktop/window-bounds-store.test.cjs",
-      "duration_ms": 305.441875
-    },
-    {
-      "file": "desktop/window-bounds.test.cjs",
-      "duration_ms": 214.919542
-    },
-    {
-      "file": "scripts/build-stage.test.cjs",
-      "duration_ms": 389.01925
-    },
-    {
-      "file": "scripts/go-test-shards.test.cjs",
-      "duration_ms": 209.056834
-    },
-    {
-      "file": "scripts/make-release.test.cjs",
-      "duration_ms": 130.994083
-    },
-    {
-      "file": "scripts/normalize-source-line-endings.test.cjs",
-      "duration_ms": 100.841083
-    },
-    {
-      "file": "scripts/r133-stall-log-report.test.cjs",
-      "duration_ms": 77.55125
-    },
-    {
-      "file": "scripts/r82-startup-ab-report.test.cjs",
-      "duration_ms": 425.225291
-    },
-    {
-      "file": "scripts/r82-startup-ab-script.test.cjs",
-      "duration_ms": 160.32875
-    },
-    {
-      "file": "desktop/specialist-overview-render.test.cjs",
-      "duration_ms": 12969.35725
-    },
-    {
-      "file": "desktop/ui-scale-render.test.cjs",
-      "duration_ms": 7916.143833
+      "duration_ms": 113.590625
     },
     {
       "file": "desktop/pro-runes-render.test.cjs",
-      "duration_ms": 31506.592791
+      "duration_ms": 19794.610333
+    },
+    {
+      "file": "desktop/share-export.test.cjs",
+      "duration_ms": 103.005375
+    },
+    {
+      "file": "desktop/overview-render-events.test.cjs",
+      "duration_ms": 37738.486
+    },
+    {
+      "file": "desktop/overview-render-200-external.test.cjs",
+      "duration_ms": 70436.770375
+    },
+    {
+      "file": "desktop/startup-sequence.test.cjs",
+      "duration_ms": 127.645875
+    },
+    {
+      "file": "desktop/startup-visibility.test.cjs",
+      "duration_ms": 102.011584
+    },
+    {
+      "file": "desktop/overview-render.test.cjs",
+      "duration_ms": 27541.888791
+    },
+    {
+      "file": "desktop/startup-assets.test.cjs",
+      "duration_ms": 1957.364917
+    },
+    {
+      "file": "desktop/ui-scale.test.cjs",
+      "duration_ms": 143.742042
+    },
+    {
+      "file": "desktop/release-quality-gates.test.cjs",
+      "duration_ms": 4618.378958
+    },
+    {
+      "file": "desktop/window-bounds-store.test.cjs",
+      "duration_ms": 68.873084
+    },
+    {
+      "file": "desktop/update-lifecycle.test.cjs",
+      "duration_ms": 83.972708
+    },
+    {
+      "file": "desktop/window-bounds.test.cjs",
+      "duration_ms": 81.072417
+    },
+    {
+      "file": "desktop/summoner-identity.test.cjs",
+      "duration_ms": 1381.707208
+    },
+    {
+      "file": "scripts/go-test-shards.test.cjs",
+      "duration_ms": 107.539042
+    },
+    {
+      "file": "scripts/make-release.test.cjs",
+      "duration_ms": 108.488542
+    },
+    {
+      "file": "scripts/r133-stall-log-report.test.cjs",
+      "duration_ms": 124.911209
+    },
+    {
+      "file": "scripts/normalize-source-line-endings.test.cjs",
+      "duration_ms": 136.478708
+    },
+    {
+      "file": "scripts/build-stage.test.cjs",
+      "duration_ms": 375.624125
+    },
+    {
+      "file": "scripts/r82-startup-ab-script.test.cjs",
+      "duration_ms": 107.652625
+    },
+    {
+      "file": "scripts/r82-startup-ab-report.test.cjs",
+      "duration_ms": 284.838959
+    },
+    {
+      "file": "desktop/ui-scale-render.test.cjs",
+      "duration_ms": 2862.786458
+    },
+    {
+      "file": "desktop/specialist-overview-render.test.cjs",
+      "duration_ms": 4837.014917
     },
     {
       "file": "desktop/refresh-orchestration.test.cjs",
-      "duration_ms": 21029.781333
-    },
-    {
-      "file": "desktop/overview-render-requests.test.cjs",
-      "duration_ms": 73633.173875
+      "duration_ms": 11835.172459
     },
     {
       "file": "scripts/setup-only-build.test.cjs",
-      "duration_ms": 16841.362042
+      "duration_ms": 11733.181709
     },
     {
       "file": "desktop/pro-players.test.cjs",
-      "duration_ms": 52599.944
+      "duration_ms": 40112.223292
+    },
+    {
+      "file": "desktop/overview-render-requests.test.cjs",
+      "duration_ms": 53965.161375
     }
   ],
   "summary": {
@@ -622,7 +622,7 @@
       "topLevel": 1259,
       "suites": 0
     },
-    "duration_ms": 142601.501667
+    "duration_ms": 113528.491625
   },
   "success": true
 }

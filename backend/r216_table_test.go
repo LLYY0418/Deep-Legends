@@ -96,6 +96,7 @@ func TestR216ChampionTableOpponentEvidence(t *testing.T) {
 }
 
 func TestR216OPGGChampionTableObservedPage(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("../docs/history/reports/r216/kr-champion-table-probe/champions.html")
 	if err != nil {
 		t.Fatal(err)

@@ -16,7 +16,7 @@ const timings = [];
 let summary;
 let failed = false;
 (async () => {
-  for await (const event of run({ files, concurrency: Math.max(2, os.availableParallelism() - 1) })) {
+  for await (const event of run({ files, concurrency: Math.max(2, os.availableParallelism()) })) {
     const data = event.data;
     if (event.type === "test:stdout" || event.type === "test:stderr") process.stdout.write(data.message);
     if (event.type === "test:pass" && !fileNames.has(data.name)) console.log(`PASS ${data.name}`);
@@ -33,7 +33,7 @@ let failed = false;
     if (event.type === "test:summary" && !data.file) summary = data;
   }
   if (!summary?.success || summary.duration_ms > 240000 || timings.length !== files.length) failed = true;
-  const result = { scope, platform: process.platform, concurrency: Math.max(2, os.availableParallelism() - 1),
+  const result = { scope, platform: process.platform, concurrency: Math.max(2, os.availableParallelism()),
     file_budget_ms: 90000, suite_budget_ms: 240000, files: timings, summary, success: !failed };
   if (process.env.R222_NODE_TIMING_OUTPUT) fs.writeFileSync(process.env.R222_NODE_TIMING_OUTPUT, JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify(result, null, 2));

@@ -160,6 +160,7 @@ func TestR203LobbyHeapProfileOncePerGameEvenWhenSettingsUnavailable(t *testing.T
 	}
 }
 func TestR203FiveGamesCacheCountsStabilize(t *testing.T) {
+	t.Parallel()
 	a := &app{}
 	sgp := &sgpProvider{}
 	overview := newOverviewQueryCache()

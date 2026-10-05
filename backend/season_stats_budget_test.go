@@ -68,6 +68,7 @@ func r116eOverBudgetCache() seasonStatsCache {
 
 // P1 判据 1：超限时先截断 RankedMatches，写入照常成功，不 panic、不丢 Stats。
 func TestSeasonStatsBudgetTruncatesRankedMatchesInsteadOfRefusingTheWrite(t *testing.T) {
+	t.Parallel()
 	cache := r116eOverBudgetCache()
 	raw, err := json.Marshal(cache)
 	if err != nil {
@@ -120,6 +121,7 @@ func TestSeasonStatsBudgetTruncatesRankedMatchesInsteadOfRefusingTheWrite(t *tes
 
 // 端到端：saveSeasonStats 挂的就是这条预算，写入必须成功且落盘文件在预算内。
 func TestSeasonStatsSaveAppliesTheBudgetEndToEnd(t *testing.T) {
+	t.Parallel()
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	cache := r116eOverBudgetCache()
 	report, err := store.saveSeasonStatsReported(cache)
@@ -179,11 +181,13 @@ func TestSeasonStatsBudgetLeavesSmallCachesAlone(t *testing.T) {
 // 极端情况：可截断项全丢光仍然超限（Stats/GameIDs 本身撑爆）时，
 // 照写不误并如实报 OverBudget——绝不 panic、绝不整体拒绝写入。
 func TestSeasonStatsBudgetWritesAndReportsWhenNothingCanBeTrimmed(t *testing.T) {
+	t.Parallel()
 	cache := seasonStatsCache{
 		SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource,
 		Season: "S26", AccountHash: "account",
 	}
 	// 只堆 GameIDs：它既不是 RankedMatches 也不是 AugmentSamples，预算不许动它。
+	cache.GameIDs = make([]int64, 0, 1200000)
 	for id := int64(0); id < 1200000; id++ {
 		cache.GameIDs = append(cache.GameIDs, 7000000000000+id)
 	}
@@ -402,6 +406,17 @@ func r120BudgetCache(gameIDs, augmentSamples, rankedMatches int) seasonStatsCach
 			2400: {QueueID: 2400, QueueLabel: "海克斯大乱斗", Games: 40, Wins: 20, Losses: 20, WinRate: 50, Kills: 8.5, Deaths: 4.2, Assists: 9.1, KDA: 4.19},
 		},
 	}
+	cache.Stats = make([]gameplaySeasonChampionStat, 0, 173)
+	if gameIDs > 0 {
+		cache.GameIDs = make([]int64, 0, gameIDs)
+	}
+	if rankedMatches > 0 {
+		cache.RankedMatches = make([]seasonRankedMatch, 0, rankedMatches)
+	}
+	if augmentSamples > 0 {
+		cache.AugmentSamples = make([]seasonAugmentSample, 0, augmentSamples)
+	}
+
 	for id := int64(1); id <= 173; id++ {
 		cache.Stats = append(cache.Stats, gameplaySeasonChampionStat{
 			ChampionID: id, ChampionName: strings.Repeat("英雄名", 4), Games: 40, Wins: 20,
@@ -454,6 +469,7 @@ func r120RequireStep(t *testing.T, report seasonStatsBudgetReport, step string) 
 // 超预算，逼处置走到第三级，再逐项比对写出来的内容：只允许 AugmentSamples 变化，
 // RankedMatches 只能变成第一级裁剪后的那 seasonRankedMatchLimit 条，其余字段一律逐项相等。
 func TestSeasonStatsBudgetThirdStageOnlyDropsAugmentSamples(t *testing.T) {
+	t.Parallel()
 	cache := r120BudgetCache(400000, 800, 120)
 	raw := r120MarshalSize(t, cache)
 	if raw <= seasonStatsFileBudgetBytes {
@@ -515,6 +531,7 @@ func TestSeasonStatsBudgetThirdStageOnlyDropsAugmentSamples(t *testing.T) {
 // 断言处置停在第一个能进预算的档位：结果非空，而且再多留一倍必然超限——
 // 也就是「尽量保留」，既不是清空，也不是过度截断。
 func TestSeasonStatsBudgetKeepsAsManyAugmentSamplesAsFit(t *testing.T) {
+	t.Parallel()
 	const samples = seasonAugmentSampleLimit // 2000：与生产上限一致，去重后条数不变
 	const ranked = 120                       // 超过 seasonRankedMatchLimit，确保第一级一定会触发
 	base := r120MarshalSize(t, r120BudgetCache(0, 0, ranked))

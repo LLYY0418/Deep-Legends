@@ -46,7 +46,7 @@ AGENTS.md 已明确本地预检全部通过→提交版本号→只推 tag。采
 
 ## P4：Go 慢用例实测
 
-基线 `go test -json ./backend` 通过，包 261.368s（本机 macOS arm64；不能当作 Linux race）。前 20 个顶层用例如下，原始 JSON 见 reports/r222/backend-before.jsonl.gz。
+基线 `go test -json ./backend` 通过，包 261.368s（本机 macOS arm64；不能当作 Linux race）。前 20 个顶层用例如下，原始 JSON 仅留本地 reports/r222/backend-before.jsonl.gz；公开汇总见 reports/r222/backend-before-top20.json。
 
 | 用例 | 基线秒 |
 | --- | ---: |
@@ -104,3 +104,11 @@ ok  lol-loot-assistant/backend 117.097s
 公开验收分支只提交代码、文档和不含载荷的汇总 JSON；原始/压缩测试日志仅保存在本地 `docs/history/reports/r222/`。暂存内容已核验无 Riot UUID Key、GitHub token 或私钥模式。
 
 第一次 CI `37308442468`，SHA `270fc3af`：Windows backend/installer/R86/R222/setup-only 专项先通过；首次接入的 R82 PowerShell 5.1 夹具报 `Get-FileHash` 不可用。原因是 pwsh 作业向 powershell.exe 子进程传入了 PowerShell 7 的 PSModulePath；测试 launcher 现在仅针对 Windows PowerShell 子进程清理该环境项，由宿主重建原生模块路径，保留真实哈希与全部变异检查。修复在独立工作树完成，不接触并行 R223 改动。
+
+第二次 CI `37309200638`，SHA `bd8a72b7`：PSModulePath 修复有效，真实哈希及前八组夹具通过；随后 PS5.1 的 ConvertFrom-Json 顶层数组不枚举，让测试的三条记录 Count 变成 1。仅在 harness 读取后加 ForEach-Object 显式展开，真实脚本不改，全部 16 组和 7 个 mutant 断言保留。
+
+首次 Linux race 实测 **152.140s**，Node **244.784s**（1262 项，1260 pass、2 skip、0 fail；所有文件 <90s），均未达到门槛。继续将 Node 文件 worker 由核心数减一改为使用全部核心；8 个无共享状态的 CPU/大夹具用例加 t.Parallel，并给相同百万 GameID/season cache 夹具预分配等容量。数量、内容、nil/empty 语义、断言与门槛不变。新增并行用例为 season budget 的五项、R216 observed OPGG HTML、R203 五场缓存稳定、R86 300 页预算。
+
+该轮最终本地 race 全量 **143.669s** 通过（macOS）；Linux ≤120s 仍待同 SHA CI 证明。
+
+进一步优化后本地 Node 预算 runner：1262 项，1258 pass、4 平台 skip、0 fail，**113.528s**；8 workers，最大文件 external **70.437s**，全部文件 ≤90s。
