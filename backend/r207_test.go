@@ -60,6 +60,21 @@ func TestR207HonorBallotOnlyAtEndgame(t *testing.T) {
 				t.Fatal("honor did not complete")
 			}
 		}
+		// fired is emitted before handleHonor's defer clears honorInProgress.
+		// Wait for that cleanup before the next phase, within the same deadline.
+		for {
+			runner.mu.Lock()
+			inProgress := runner.honorInProgress
+			runner.mu.Unlock()
+			if !inProgress {
+				break
+			}
+			select {
+			case <-deadline:
+				t.Fatal("honor completion did not clear in-progress state")
+			case <-time.After(time.Millisecond):
+			}
+		}
 	}
 }
 

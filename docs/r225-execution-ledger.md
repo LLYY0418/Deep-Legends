@@ -26,3 +26,11 @@ R222 漏掉 `TestR204KeySaveAndClear`，原名单的 `TestR204KeySaveRejectsUnau
 记录 quality、windows-build 及 release 作业：ci.yml 实际只有前两个 job；第三项 release.yml 由 tag 触发，本次分支验收不推 tag、不创建草稿、不覆盖已发布 0.12.73，故第三项应如实记录未触发，不能编造起止时间。完整 CI 总时长必须 ≤15 分钟。
 
 最终 public 后端重新构建并校验指纹；版本 0.12.73，key mode public，指纹 be7741263b5b。最终工具 JS syntax/Go vet 通过；四项独立审查与回归通过，无载荷汇总见 reports/r225/local-validation-summary.json。
+
+## 首轮 CI 与 Windows 全量暴露的夹具竞态
+
+运行 `37321360823`，SHA `d0e6fdf4`：Linux quality success；Windows full backend 中全部 18 个 TestUpdate*、TestR204KeySaveAndClear、TestR204KeyRuntime401AndPrivacy、TestSplitRegistryPathSupportsNativeTencentKeys 已逐条 PASS。但职业目录回退与赛后 honor 的两个旧夹具竞态使整包失败，正确阻止 installer/后续构建。
+
+- TestProDirectoryFailureRetainsRosterAndAuth：loadProPlayers 先 close(done)，随后后台 profile fallback 更新 teams/fetchedAt；handler 会重新读取最新 snapshot。夹具原来依赖 Unavailable=true 时 fallback 尚未完成，Windows 调度可提前完成。现在仅在夹具 transport 暂阻塞 profile 请求，固定首次失败目录响应的观察阶段；cleanup 放行。33 人/53 账号/6 队、available、Unavailable、no-store、query 与鉴权断言原样保留；人工名单及生产逻辑不改。
+- TestR207HonorBallotOnlyAtEndgame：fired 通知先于 handleHonor defer 清除 honorInProgress。夹具收到 fired 后立刻进入下一阶段，会让第二次 handleHonor 被 in-progress 拦下。现在收到 fired 后按 mutex 读取状态并等清理完成，仍共用原 1 秒 deadline，不放宽预算；原早期 0 写入/0 trigger、两个 endgame 触发与完成断言保留。
+- 两项修复在本地 `-race -count=40` 共 80 次重复通过。最终本地 Node 全量 1266 项，1262 pass、4 平台 skip、0 fail，105.761s，最慢文件 62.203s。最终 CI 需再次同 SHA 全部通过。
