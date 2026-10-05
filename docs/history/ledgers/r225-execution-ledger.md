@@ -63,3 +63,7 @@ R222 漏掉 `TestR204KeySaveAndClear`，原名单的 `TestR204KeySaveRejectsUnau
 A 方案最终实测完整 Go 测试成本约 **2 分 15 秒**（backend 129.568s + installer 5.251s），仍使整轮在 12 分钟完成，比维护缩减白名单更能防止未来共享入口漏测。构建脚本仍跳过重复测试，未修改压缩等级、用户功能、身份名单或生产默认行为。
 
 无载荷汇总与逐文件计时位于 `docs/history/reports/r225/ci-validation-summary.json`、`node-timings-ci-linux.json`、`node-timings-ci-windows.json`；原始本地/CI 日志只留本地，关键 pass 名单及完整作业链接已记录到汇总。R222 初始 Windows 覆盖结论已补充纠正。正式发布的 tag/Latest 时间线仍由 R222 下次实际发版记录，本次没有发版。
+
+## 静态数量校验补充
+
+按用户补充，将不带 --test-name-pattern 的 R82 步骤也纳入 Linux 静态守卫：读取整个文件的真实声明数量，与 --expected-tests 比较；正常三组为 2/1/2。新增回归将 R82 数量改成 3 或 invalid，均静态失败；守卫五项回归 5/5，实际 ci.yml 静态验证通过。此次只修改静态扫描及其测试；前述完整 Windows CI 是 b46dac17 的验收记录，本次未重复运行整轮 CI。

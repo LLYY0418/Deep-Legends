@@ -97,12 +97,13 @@ function workflowFilters(source) {
       const packageDirectory = path.posix.join(directory, target[1].replace(/\/\.\.\.$/, ""));
       filters.push({ kind: "go", pattern: filter[1] || filter[2] || filter[3], directory: packageDirectory, recursive });
     }
-    if (line.includes("--test-name-pattern")) {
+    if (line.includes("--test-name-pattern") || line.includes("--expected-tests")) {
       const filter = line.match(/--test-name-pattern(?:=|\s+)(?:'([^']+)'|"([^"]+)"|([^\s]+))/);
       const files = [...line.matchAll(/(?:^|\s)([\w./-]+\.test\.cjs)(?=\s|$)/g)].map(match => match[1]);
-      if (!filter || files.length !== 1) throw new Error(`cannot parse Node filter: ${line}`);
+      if ((line.includes("--test-name-pattern") && !filter) || files.length !== 1) throw new Error(`cannot parse Node filter: ${line}`);
       const expected = line.match(/--expected-tests=(\d+)/);
-      filters.push({ kind: "node", pattern: filter[1] || filter[2] || filter[3], file: files[0], expected: expected ? Number(expected[1]) : undefined });
+      if (line.includes("--expected-tests") && !expected) throw new Error(`cannot parse Node expected count: ${line}`);
+      filters.push({ kind: "node", pattern: filter ? filter[1] || filter[2] || filter[3] : undefined, file: files[0], expected: expected ? Number(expected[1]) : undefined });
     }
   }
   return filters;
@@ -117,8 +118,8 @@ function verifyWorkflow(source, project = root) {
   for (const filter of filters) {
     let declarations = filter.kind === "go" ? goTests(filter.directory, project) : nodeTests(filter.file, project);
     if (filter.kind === "go" && !filter.recursive) declarations = declarations.filter(test => path.dirname(test.file) === filter.directory);
-    const selected = selectTests(filter.pattern, declarations, filter.kind);
-    if (filter.expected !== undefined && selected.length !== filter.expected) throw new Error(`Node filter count ${selected.length} != expected ${filter.expected}: ${filter.pattern}`);
+    const selected = filter.pattern === undefined ? declarations : selectTests(filter.pattern, declarations, filter.kind);
+    if (filter.expected !== undefined && selected.length !== filter.expected) throw new Error(`Node filter count ${selected.length} != expected ${filter.expected}: ${filter.pattern || filter.file}`);
     filter.names = selected.map(test => test.name);
   }
   if (!filters.length) throw new Error("CI has no verifiable test filters");

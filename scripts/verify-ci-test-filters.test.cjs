@@ -15,13 +15,24 @@ test("R225 static names exclude comments and synthetic source strings", t => {
 });
 
 test("R225 actual CI filters resolve every alternative and reject nonexistent names", () => {
-  assert.equal(verifyWorkflow(workflow).length, 2);
+  assert.equal(verifyWorkflow(workflow).length, 3);
   assert.throws(() => verifyWorkflow(workflow.replace('R86 Windows release|R222 Windows', 'R86 Windows release|R222 Windows|R225 nonexistent test')), /unmatched node test filter: R225 nonexistent test/);
   assert.throws(() => verifyWorkflow(workflow.replace('--expected-tests=1', '--expected-tests=2')), /count 1 != expected 2/);
   const go = "go test ./backend -run '^(TestR204KeySaveAndClear|TestR204KeyRuntime401AndPrivacy)$'";
   assert.equal(verifyWorkflow(go)[0].names.length, 2);
   assert.throws(() => verifyWorkflow(go.replace('TestR204KeySaveAndClear', 'TestR204KeySaveRejectsUnauthorizedAndEncrypts')), /unmatched go test filter/);
   assert.throws(() => verifyWorkflow(go.replace('TestR204KeySaveAndClear', 'TestWindowsApplicationWindowDetection')), /unmatched go test filter/, "a name in the installer module must not satisfy a backend filter");
+});
+
+test("R225 static expected counts also cover the unfiltered R82 PowerShell file", () => {
+  const entry = verifyWorkflow(workflow).find(step => step.file === "scripts/r82-startup-ab-script.test.cjs");
+  assert.equal(entry.pattern, undefined);
+  assert.equal(entry.expected, 2);
+  assert.equal(entry.names.length, 2);
+  const command = "--expected-tests=2 scripts/r82-startup-ab-script.test.cjs";
+  assert.ok(workflow.includes(command));
+  assert.throws(() => verifyWorkflow(workflow.replace(command, command.replace("=2", "=3"))), /count 2 != expected 3: scripts\/r82-startup-ab-script\.test\.cjs/);
+  assert.throws(() => verifyWorkflow(workflow.replace(command, command.replace("=2", "=invalid"))), /cannot parse Node expected count/);
 });
 
 test("R225 runtime Go evidence rejects empty, omitted and skipped required tests", () => {
