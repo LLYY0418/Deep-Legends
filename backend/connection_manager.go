@@ -228,6 +228,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 				a.goSafe("connection_manager.runConnectedSession.4", func() { a.primeGameplayState(sessionCtx, client) })
 				a.goSafe("connection_manager.runConnectedSession.5", func() { a.primeWatchState(client) })
 			}, func(event LCUEvent) {
+				a.observeClientShutdownEvent(client, event, time.Now())
 				client.rememberAcceptFocusEvent(event)
 				recordObjectiveEvent(event)
 				a.broadcastGameplayIdentity(event)
@@ -355,6 +356,9 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-champSelectPoll.C:
+			if a.clientShutdownPending(client) {
+				continue
+			}
 			a.maybeStartupPrefetch(client, time.Now())
 			if watch := a.activeWatch(); watch != nil {
 				watch.handleChampSelectAutomation(client)
@@ -431,6 +435,9 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 				return errors.New("LCU inventory refresh failed")
 			}
 		case <-fallback.C:
+			if a.clientShutdownPending(client) {
+				continue
+			}
 			a.mu.RLock()
 			collectionRequested := a.collectionRequested
 			a.mu.RUnlock()
@@ -443,6 +450,9 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 				a.recordDiagnostic(map[string]any{"event": "summoner_identity_fallback_failed", "reason": safeDiagnosticReason(err)})
 			}
 		case <-identityFallback.C:
+			if a.clientShutdownPending(client) {
+				continue
+			}
 			if _, err := a.refreshSummonerIdentity(client); err != nil {
 				a.recordDiagnostic(map[string]any{"event": "summoner_identity_fallback_failed", "reason": safeDiagnosticReason(err)})
 			}
@@ -484,6 +494,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 			eventRetryDelay = eventRetryInitialInterval
 			a.recordDiagnostic(map[string]any{"event": "lcu_event_stream", "result": result})
 		case err := <-eventErrors:
+			a.recordClientShutdownTrace(client, time.Now())
 			a.setEventStream(client, false)
 			droppedEvent, oversizeEvent := eventStreamDropDiagnostics(err)
 			if oversizeEvent != nil {
@@ -843,6 +854,10 @@ func (a *app) setSnapshotPhase(client *LCUClient) {
 		a.mu.Unlock()
 		return
 	}
+	if a.shutdownClient == client {
+		a.mu.Unlock()
+		return
+	}
 	if a.identityReady || a.snapshotReady {
 		a.connectionState = "connected"
 	} else {
@@ -872,6 +887,13 @@ func (a *app) setEventStream(client *LCUClient, connected bool) {
 func (a *app) markDisconnected(message string) {
 	a.mu.Lock()
 	oldClient := a.lcu
+	if a.shutdownTimer != nil {
+		a.shutdownTimer.Stop()
+	}
+	a.shutdownClient = nil
+	a.shutdownEvents = nil
+	a.shutdownChatOfflineAt = time.Time{}
+	a.shutdownFriendsEmptyAt = time.Time{}
 	a.clearSnapshotLocked(message)
 	a.connectionState = "disconnected"
 	a.mu.Unlock()

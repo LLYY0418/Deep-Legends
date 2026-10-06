@@ -19,9 +19,9 @@ test('R216 background timelines pause for KR, hidden, champ select, live and ina
 });
 function tableHarness(queue='ranked'){
  const dom=new JSDOM('<main></main>'),root=dom.window.document.querySelector('main');const row=(id,games)=>({championId:id,championName:`英雄${id}`,games,wins:games/2,losses:games/2,winRate:50,kda:3,opponents:Array.from({length:21},(_,i)=>({championId:100+i,championName:`对位${i}`,games:21-i,wins:2,losses:1,winRate:66}))});
- const data={queue,overall:{championName:'所有英雄',games:30},rows:[row(2,10),row(1,20)]};const tab={overviewSubpageData:data};let f;
+ const data={queue,overall:{championName:'所有英雄',games:30},rows:[row(2,10),row(1,20)]};const tab={overviewSubpageState:{data}};let f;
  const redraw=()=>{root.innerHTML=f.renderChampionTable(data,tab);f.bindChampionTable(root,tab)};
- f=functions(['renderChampionTable','bindChampionTable'],{escapeHTML,iconFigure:()=>'',renderOverviewSubpage:redraw,openOverviewSubpage:async()=>{}});redraw();return{dom,root,tab,data,f};
+ f=functions(['renderChampionTable','bindChampionTable'],{document:dom.window.document,prepareImages:()=>{},escapeHTML,iconFigure:()=>'',renderOverviewSubpage:redraw,openOverviewSubpage:async()=>{}});redraw();return{dom,root,tab,data,f};
 }
 test('R216 table sorts, expands first champion, increments opponents by ten and preserves overall first',()=>{
  const h=tableHarness();try{let rows=h.root.querySelectorAll('tbody tr');assert.match(rows[0].textContent,/所有英雄/);assert.match(rows[1].textContent,/英雄1/);assert.equal(h.root.querySelectorAll('tr.is-opponent').length,6);

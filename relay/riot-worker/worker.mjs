@@ -75,6 +75,7 @@ export function createRiotWorker(options = {}) {
   return {
     async fetch(request, env) {
       const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/health") return new Response(null,{status:204,headers:{"Cache-Control":"no-store"}});
       const route = request.method === "GET" && allowedRoute(url);
       if (!route) return new Response("Not found", { status: 404 });
       const finish = (response, hit = false, limitType = "") => {

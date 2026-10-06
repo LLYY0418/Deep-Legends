@@ -288,8 +288,11 @@ func TestR100QueueLabelsAndArenaRegistry(t *testing.T) {
 		if arenaSquadSize(id) != size {
 			t.Fatalf("queue %d size %d", id, arenaSquadSize(id))
 		}
-		if !strings.Contains(strings.Join(matchHistoryFilterFor("arena").Tags, ","), fmt.Sprintf("q_%d", id)) {
-			t.Fatal("missing filter", id)
+		if _, ok := matchHistoryFilterFor("arena").AllowedQueues[id]; !ok {
+			t.Fatal("missing client filter", id)
+		}
+		if (id == 1700 || id == 1710 || id == 1740 || id == 1750) && !strings.Contains(strings.Join(matchHistoryFilterFor("arena").Tags, ","), fmt.Sprintf("q_%d", id)) {
+			t.Fatal("missing server filter", id)
 		}
 	}
 	for _, mode := range []string{"NEW_UNKNOWN_MODE", "CHERRY", "CLASSIC", "ARAM", "KIWI", "TFT", ""} {

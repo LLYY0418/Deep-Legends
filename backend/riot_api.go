@@ -357,7 +357,7 @@ func (p *riotProvider) wait(ctx context.Context) error {
 			if p.champions != nil && p.champions.diag != nil {
 				p.champions.diag(p.riotQuotaDiagnostic(ctx, seconds))
 			}
-			return fmt.Errorf("%w: %w", errThrottled, &riotStatusError{status: http.StatusTooManyRequests, retryAfter: seconds, message: fmt.Sprintf("韩服查询额度正在恢复，请约 %d 秒后重试；已加载的战绩仍可查看", seconds)})
+			return fmt.Errorf("%w: %w", errThrottled, &riotStatusError{status: http.StatusTooManyRequests, retryAfter: seconds, message: fmt.Sprintf("%s查询额度正在恢复，请约 %d 秒后重试；已加载的战绩仍可查看", riotRegionLabel(p.region()), seconds)})
 		}
 		queuedAt := time.Now()
 		sleepFn := p.limitSleep
@@ -553,29 +553,38 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 				return errRiotRelayQuotaExhausted
 			}
 		}
+		// A completed HTTP response proves the relay is reachable. Auth,
+		// quota and upstream HTTP errors must not trip the network breaker.
+		if source == "relay" {
+			if readErr != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				riotRelays.failed(relay)
+				return errRiotRelayUnavailable
+			}
+			riotRelays.succeeded(relay)
+		}
 		switch response.StatusCode {
 		case http.StatusOK:
 			riotUserKeys.observe(request.Header.Get("X-Riot-Token"), response.StatusCode)
 			if readErr != nil {
-				if source == "relay" {
-					riotRelays.failed(relay)
-					return errRiotRelayUnavailable
-				}
 				return readErr
 			}
 			if err := json.Unmarshal(body, out); err != nil {
 				if source == "relay" {
-					riotRelays.failed(relay)
 					return errRiotRelayUnavailable
 				}
 				return errors.New("Riot 接口返回的数据无法解析，可能接口已变更")
+			}
+			if source == "relay" {
+				riotRelays.succeeded(relay)
 			}
 			return nil
 		case http.StatusNotFound:
 			return errRiotNotFound
 		case http.StatusUnauthorized, http.StatusForbidden:
 			if source == "relay" {
-				riotRelays.failed(relay)
 				return errRiotRelayUnavailable
 			}
 			riotUserKeys.observe(request.Header.Get("X-Riot-Token"), response.StatusCode)
@@ -619,7 +628,6 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			}
 		default:
 			if source == "relay" && response.StatusCode >= 500 {
-				riotRelays.failed(relay)
 				return errRiotRelayUnavailable
 			}
 			return &riotStatusError{message: fmt.Sprintf("Riot 接口返回 HTTP %d", response.StatusCode), status: response.StatusCode, puuidMismatch: response.StatusCode == 400 && strings.Contains(strings.ToLower(string(body)), "decrypt")}
@@ -2016,7 +2024,7 @@ type riotHTTPError struct {
 	CooldownScope string `json:"cooldownScope,omitempty"`
 }
 
-func riotHTTPErrorBody(err error) riotHTTPError {
+func riotHTTPErrorBody(err error, regions ...string) riotHTTPError {
 	body := riotHTTPError{Error: err.Error(), Kind: "http"}
 	var statusErr *riotStatusError
 	if errors.As(err, &statusErr) {
@@ -2028,15 +2036,19 @@ func riotHTTPErrorBody(err error) riotHTTPError {
 		body.RetryAfter = max(1, body.RetryAfter)
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		body.Error = "韩服数据读取超时，请稍后重试"
+		label := "外服"
+		if len(regions) > 0 && isRiotRegion(regions[0]) {
+			label = riotRegionLabel(regions[0])
+		}
+		body.Error = label + "数据读取超时，请稍后重试"
 	}
 	if errors.Is(err, errRiotRelayQuotaExhausted) {
 		body.Kind = "quota_exhausted"
 	}
 	return body
 }
-func writeRiotHTTPError(w http.ResponseWriter, err error) {
-	body := riotHTTPErrorBody(err)
+func writeRiotHTTPError(w http.ResponseWriter, err error, regions ...string) {
+	body := riotHTTPErrorBody(err, regions...)
 	if body.RetryAfter > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(body.RetryAfter))
 	}

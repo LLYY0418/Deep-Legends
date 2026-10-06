@@ -113,11 +113,29 @@ func parseOPGGChampionTable(page []byte, ref gameplayReference, queue string, na
 					Rows     []opggChampionRow `json:"my_champion_stats"`
 				}
 			}
-			if json.Unmarshal(raw, &props) != nil || props.Year != time.Now().Year() || props.Data.GameType != queue || props.Data.SeasonID <= 0 || len(props.Data.Rows) == 0 {
+			if json.Unmarshal(raw, &props) != nil || props.Year != time.Now().Year() || props.Data.GameType != queue || props.Data.SeasonID <= 0 {
 				parseErr = errors.New("OP.GG 当前赛季英雄统计不可核验")
 				return
 			}
 			result := &opggSeasonSummary{Source: "OP.GG", Season: "S" + strconv.Itoa(props.Year), SeasonID: props.Data.SeasonID, Queue: queue, TableSupported: true}
+			if len(props.Data.Rows) == 0 {
+				data, _ := node["data"].(map[string]any)
+				play, playOK := data["play"].(float64)
+				win, winOK := data["win"].(float64)
+				lose, loseOK := data["lose"].(float64)
+				if !playOK || !winOK || !loseOK {
+					parseErr = errors.New("OP.GG 英雄属性缺失")
+					return
+				}
+				if play == 0 && win == 0 && lose == 0 {
+					result.TableRows = []championTableRow{}
+					result.TableOverall = championTableRow{ChampionName: "所有英雄"}
+					selected = result
+					return
+				}
+				parseErr = errors.New("OP.GG 全部英雄总计无法核验")
+				return
+			}
 			all := 0
 			seen := map[int64]bool{}
 			for _, row := range props.Data.Rows {
@@ -214,7 +232,23 @@ func (a *app) fetchOPGGChampionTable(ctx context.Context, ref gameplayReference,
 	if err != nil {
 		return nil, err
 	}
-	return parseOPGGChampionTable(data, ref, queue, a.displayChampionNames(ctx, "champion-table"))
+	result, parseErr := parseOPGGChampionTable(data, ref, queue, a.displayChampionNames(ctx, "champion-table"))
+	if parseErr != nil {
+		reason := "props_missing"
+		message := parseErr.Error()
+		switch {
+		case strings.Contains(message, "当前赛季"):
+			reason = "season_mismatch"
+		case strings.Contains(message, "总计") || strings.Contains(message, "场次"):
+			reason = "total_mismatch"
+		case strings.Contains(message, "重复"):
+			reason = "duplicate_champion"
+		case strings.Contains(message, "对位"):
+			reason = "opponent_identity"
+		}
+		a.recordDiagnostic(map[string]any{"event": "opgg_champion_table_parse", "platform": opggPlatform(ref.Region), "queue": queue, "reason": reason})
+	}
+	return result, parseErr
 }
 
 // Reuse OP.GG's bounded singleflight cache; separate keys from sidebar summaries.

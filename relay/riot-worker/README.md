@@ -21,3 +21,5 @@ Worker 只允许实际使用的固定 Riot GET 路由，禁止任意代理和重
 接近每日10万次时，可升级 Workers Paid，每月最低5美元，含每月1,000万次请求（另有CPU用量额度与超额费用）；见 [Workers 定价](https://developers.cloudflare.com/workers/platform/pricing/)。软件诊断 `riot_relay_request_summary` 每个有实际请求的10分钟窗口记录 `requests`、`rate_limited` 与 `failures` 分类，不记身份或完整URL；被本机冷却拦下的请求不计入。此计数用于估算单台软件的访问量，全服务用量以 Cloudflare 指标为准。
 
 R221（原重号 R220）的 15 平台路由已于 2026-10-05 发布阶段重新部署。生产公开状态接口 15/15 返回有效 JSON，非法路由被拒绝；未读取或替换既有 Secret。真实玩家接口、Windows 游戏客户端及中国网络体验仍待验收。见 [0.12.73 发布记录](../../docs/history/ledgers/release-0.12.73-execution-ledger.md)。
+
+R231：`GET /health` 返回 204，无上游请求、无身份参数。桌面探测只等响应头，每个 origin 限时 8 秒；旧 Worker 返回 404 时兼容回退 status 路径。部署新增健康路径前需用户批准。

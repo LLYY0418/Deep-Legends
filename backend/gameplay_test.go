@@ -1528,12 +1528,28 @@ func TestLoadQueueLabelsCachesPerLCUClientInstance(t *testing.T) {
 	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
 	first := loadQueueLabels(client)
 	first[420] = "mutated"
+	deadline := time.Now().Add(time.Second)
+	for {
+		client.queueLabelsMu.Lock()
+		ready := client.queueLabelsLoaded
+		client.queueLabelsMu.Unlock()
+		if ready {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("queue background did not complete")
+		}
+		time.Sleep(time.Millisecond)
+	}
 	second := loadQueueLabels(client)
 	if calls.Load() != 1 || second[420] != "单双排" {
 		t.Fatalf("queue label session cache = calls:%d first:%#v second:%#v", calls.Load(), first, second)
 	}
 	other := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
 	_ = loadQueueLabels(other)
+	for calls.Load() < 2 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
 	if calls.Load() != 2 {
 		t.Fatalf("a new LCU client did not get a fresh queue catalog: %d", calls.Load())
 	}
@@ -2010,7 +2026,7 @@ func TestGameplayOverviewReturnsCoreBeforeSlowSeasonScan(t *testing.T) {
 		running := len(a.seasonBackfills)
 		a.seasonBackfillMu.Unlock()
 		if running == 0 {
-			backgroundKey := sgpHistoryPageCacheKey("HN1", playerRef, 50, sgpPageSize, nil)
+			backgroundKey := sgpHistoryPageCacheKey("HN1", playerRef, 50, sgpPageSize, seasonStreamTags["ranked"])
 			provider.mu.Lock()
 			_, cached := provider.historyCache[backgroundKey]
 			provider.mu.Unlock()

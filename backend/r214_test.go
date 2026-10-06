@@ -18,7 +18,7 @@ func r214HistoryFixture(t *testing.T) (*app, *LCUClient, string, *atomic.Int64, 
 	gameID.Store(214)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if tag := r.URL.Query().Get("tag"); tag != "" && tag != "q_420" {
+		if tag := r.URL.Query().Get("tag"); tag != "" && tag != "q_420" && tag != "q_2300" {
 			t.Errorf("unexpected tag %q", tag)
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"games": []map[string]any{{"json": map[string]any{
@@ -72,7 +72,7 @@ func TestR214FreshSeasonHeadBypassesCacheAndRecentDedup(t *testing.T) {
 	player := Summoner{PUUID: ref}
 	reference := gameplayReference{ServerID: "HN1", PlayerRef: ref}
 	_, progress, _, _ := a.loadSeasonChampionStatsWithHistoryCache(context.Background(), client, reference, player, ref, nil, true)
-	if !progress.Complete || progress.Scanned != 1 || calls.Load() != 1 {
+	if !progress.Complete || progress.Scanned != 1 || calls.Load() != 2 {
 		t.Fatal(progress, calls.Load())
 	}
 	// Both persisted complete snapshot and the query dedup timestamp are fresh.
@@ -83,12 +83,12 @@ func TestR214FreshSeasonHeadBypassesCacheAndRecentDedup(t *testing.T) {
 	a.seasonBackfillMu.Unlock()
 	id.Store(215)
 	a.startSeasonStatsRefresh(client, reference, player, ref, nil, false)
-	if calls.Load() != 1 {
+	if calls.Load() != 2 {
 		t.Fatal("ordinary overview bypassed dedup", calls.Load())
 	}
 	a.startSeasonStatsRefresh(client, reference, player, ref, nil, true)
 	rows := r175WaitEvent(t, a, "season_stats_head_refresh")
-	if len(rows) != 1 || rows[0]["fresh"] != true || rows[0]["use_history_cache"] != false || rows[0]["sgp_history_calls"] != float64(1) || rows[0]["sgp_history_cache_hits"] != float64(0) || calls.Load() != 2 {
+	if len(rows) != 1 || rows[0]["fresh"] != true || rows[0]["use_history_cache"] != false || rows[0]["sgp_history_calls"] != float64(2) || rows[0]["sgp_history_cache_hits"] != float64(0) || calls.Load() != 4 {
 		t.Fatal(rows, calls.Load())
 	}
 	// Wait for background cleanup before closing the store or inspecting state.
@@ -110,7 +110,7 @@ func TestR214FreshSeasonHeadBypassesCacheAndRecentDedup(t *testing.T) {
 		t.Fatal(cache, err)
 	}
 	a.startSeasonStatsRefresh(client, reference, player, ref, nil, false)
-	if calls.Load() != 2 {
+	if calls.Load() != 4 {
 		t.Fatal("ordinary load stopped using recent snapshot")
 	}
 	t.Logf("fresh season head: upstream=1 sgp_history_cache_hits=%v scanned=%v", rows[0]["sgp_history_cache_hits"], rows[0]["scanned"])

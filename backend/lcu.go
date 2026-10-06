@@ -93,6 +93,7 @@ type LCUClient struct {
 	queueLabelsMu       sync.Mutex
 	queueLabels         map[int64]string
 	queueLabelsLoaded   bool
+	queueLabelsLoading  bool
 	diagnosticMu        sync.Mutex
 	diagnosticObserve   func(map[string]any)
 	requestDiagnostics  map[string]*lcuRequestDiagnosticBucket

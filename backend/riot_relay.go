@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"mime"
+	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"strings"
 	"sync"
@@ -22,19 +25,21 @@ var errRiotRelayUnavailable = errors.New("战绩服务暂时不可用")
 var errRiotRelayQuotaExhausted = fmt.Errorf("%w", errRiotRelayUnavailable)
 
 type riotRelayState struct {
-	mu           sync.Mutex
-	config       string
-	active       string
-	nextTry      time.Time
-	flight       chan struct{}
-	quotaUntil   time.Time
-	ipUntil      time.Time
-	now          func() time.Time
-	summaryAt    time.Time
-	summary      riotRelayRequestSummary
-	summaryTimer *time.Timer
-	paths        map[string]riotRelayPathCooldown
-	applications map[string]time.Time
+	mu              sync.Mutex
+	failures        int
+	networkFailures int
+	config          string
+	active          string
+	nextTry         time.Time
+	flight          chan struct{}
+	quotaUntil      time.Time
+	ipUntil         time.Time
+	now             func() time.Time
+	summaryAt       time.Time
+	summary         riotRelayRequestSummary
+	summaryTimer    *time.Timer
+	paths           map[string]riotRelayPathCooldown
+	applications    map[string]time.Time
 }
 
 type riotRelayPathCooldown struct {
@@ -284,6 +289,9 @@ func riotHTTPClientWithoutRedirects(client *http.Client) *http.Client {
 }
 
 func (s *riotRelayState) ensure(ctx context.Context, client *http.Client, record func(map[string]any)) (string, error) {
+	return s.ensureForce(ctx, client, record, false)
+}
+func (s *riotRelayState) ensureForce(ctx context.Context, client *http.Client, record func(map[string]any), force bool) (string, error) {
 	origins := configuredRiotRelays()
 	if len(origins) == 0 {
 		return "", errRiotKeyMissing
@@ -295,17 +303,23 @@ func (s *riotRelayState) ensure(ctx context.Context, client *http.Client, record
 		s.quotaUntil, s.ipUntil = time.Time{}, time.Time{}
 		s.applications = nil
 		s.paths = nil
+		s.failures = 0
+		s.networkFailures = 0
 	}
 	if err := s.requestErrorLocked(); err != nil {
 		s.mu.Unlock()
 		return "", err
+	}
+	if force && s.flight == nil {
+		s.active = ""
+		s.nextTry = time.Time{}
 	}
 	if s.active != "" {
 		active := s.active
 		s.mu.Unlock()
 		return active, nil
 	}
-	if s.nowLocked().Before(s.nextTry) {
+	if !force && s.nowLocked().Before(s.nextTry) {
 		s.mu.Unlock()
 		return "", errRiotRelayUnavailable
 	}
@@ -313,7 +327,7 @@ func (s *riotRelayState) ensure(ctx context.Context, client *http.Client, record
 	if flight == nil {
 		flight = make(chan struct{})
 		s.flight = flight
-		// A canceled UI waiter must not poison the shared three-second probe.
+		// A canceled UI waiter must not poison the shared bounded probe.
 		go func() {
 			defer recoverPanic("riotRelay.probe")
 			s.probe(origins, config, flight, client, record)
@@ -338,76 +352,131 @@ func (s *riotRelayState) ensure(ctx context.Context, client *http.Client, record
 	return active, nil
 }
 
+func relayBackoff(failures int) time.Duration {
+	return time.Duration(15<<min(3, max(0, failures-1))) * time.Second
+}
 func (s *riotRelayState) probe(origins []string, config string, flight chan struct{}, client *http.Client, record func(map[string]any)) {
-	started := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	active, status := "", 0
+	active := ""
 	quota := false
-	defer func() {
-		s.mu.Lock()
-		if s.config == config && s.flight == flight {
-			if s.nowLocked().Before(s.quotaUntil) {
-				active = ""
-			}
-			s.active, s.flight = active, nil
-			if active == "" && !s.nowLocked().Before(s.nextTry) {
-				s.nextTry = s.nowLocked().Add(5 * time.Minute)
-			}
-		}
-		close(flight)
-		s.mu.Unlock()
-	}()
+	s.mu.Lock()
+	recovering := s.failures > 0 || s.networkFailures > 0
+	s.mu.Unlock()
 	for _, origin := range origins {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, origin+"/r/kr/lol/status/v4/platform-data", nil)
-		if err != nil {
-			continue
+		started := time.Now()
+		connectMS, ttfbMS := int64(0), int64(0)
+		stage := "headers"
+		status := 0
+		bytesReceived := 0
+		var traceMu sync.Mutex
+		var connectStart time.Time
+		trace := &httptrace.ClientTrace{
+			DNSStart:     func(httptrace.DNSStartInfo) { traceMu.Lock(); stage = "dns"; traceMu.Unlock() },
+			ConnectStart: func(string, string) { traceMu.Lock(); stage = "connect"; connectStart = time.Now(); traceMu.Unlock() },
+			ConnectDone: func(string, string, error) {
+				traceMu.Lock()
+				connectMS = time.Since(connectStart).Milliseconds()
+				traceMu.Unlock()
+			},
+			TLSHandshakeStart:    func() { traceMu.Lock(); stage = "tls"; traceMu.Unlock() },
+			WroteRequest:         func(httptrace.WroteRequestInfo) { traceMu.Lock(); stage = "headers"; traceMu.Unlock() },
+			GotFirstResponseByte: func() { traceMu.Lock(); ttfbMS = time.Since(started).Milliseconds(); traceMu.Unlock() },
 		}
-		req.Header.Set("Accept", "application/json")
-		response, err := riotHTTPClientWithoutRedirects(client).Do(req)
-		if err != nil {
-			s.recordRequest("network", 0, "other", record)
-			continue
-		}
-		status = response.StatusCode
-		body, err := readLimited(response.Body, 64<<10)
-		response.Body.Close()
-		if riotRelayQuotaResponse(response.Header, body) {
-			quota = true
-			s.quotaExhausted(origin)
-			s.recordRequest("quota_exhausted", status, "other", record)
+		ctx, cancel := context.WithTimeout(httptrace.WithClientTrace(context.Background(), trace), 8*time.Second)
+		for _, path := range []string{"/health", "/r/kr/lol/status/v4/platform-data"} {
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, origin+path, nil)
+			if err != nil {
+				break
+			}
+			response, err := riotHTTPClientWithoutRedirects(client).Do(req)
+			if err != nil {
+				s.recordRequest("network", 0, "other", record)
+				var dns *net.DNSError
+				if errors.As(err, &dns) {
+					traceMu.Lock()
+					stage = "dns"
+					traceMu.Unlock()
+				}
+				break
+			}
+			status = response.StatusCode
+			if status == 503 {
+				var received bytes.Buffer
+				body, readErr := readLimited(io.TeeReader(response.Body, &received), 64<<10)
+				bytesReceived += received.Len()
+				if readErr != nil {
+					traceMu.Lock()
+					stage = "body"
+					traceMu.Unlock()
+				}
+				if readErr == nil && riotRelayQuotaResponse(response.Header, body) {
+					response.Body.Close()
+					s.quotaExhausted(origin)
+					quota = true
+					s.recordRequest("quota_exhausted", status, "other", record)
+					break
+				}
+			}
+			// Health is header-only; close immediately so a slow body cannot turn
+			// a reachable origin into a failure. Legacy Workers fall back on 404.
+			response.Body.Close()
+			if status >= 200 && status < 300 {
+				active = origin
+				s.recordRequest("", status, "other", record)
+				break
+			}
+			s.recordRequest("http", status, "other", record)
+			if path == "/health" && status == 404 {
+				continue
+			}
 			break
 		}
-		failure := ""
-		if err != nil {
-			failure = "read"
-		} else if !json.Valid(body) {
-			failure = "invalid_json"
-		} else if status != http.StatusOK {
-			failure = "http"
+		cancel()
+		traceMu.Lock()
+		failureStage := stage
+		cm, tm := connectMS, ttfbMS
+		traceMu.Unlock()
+		if active != "" {
+			failureStage = ""
 		}
-		s.recordRequest(failure, status, "other", record)
-		if status == http.StatusTooManyRequests {
-			kind, seconds := riotRelayCooldown(response.Header)
-			// Relay health probe deliberately uses the Korean status endpoint.
-			s.observeCooldown("kr.api.riotgames.com", "/lol/status/v4/platform-data", kind, seconds)
-			active = origin
-			break
+		s.mu.Lock()
+		backoff := relayBackoff(s.failures + 1)
+		s.mu.Unlock()
+		if active != "" {
+			backoff = 0
 		}
-		if status == http.StatusOK && err == nil && json.Valid(body) {
-			active = origin
+		if record != nil {
+			result := "failed"
+			if quota {
+				result = "quota_exhausted"
+			}
+			if active != "" {
+				result = "ok"
+			}
+			record(map[string]any{"event": "riot_relay_probe", "result": result, "duration_ms": time.Since(started).Milliseconds(), "http_status": status, "failure_stage": failureStage, "connect_ms": cm, "ttfb_ms": tm, "bytes": bytesReceived, "backoff_s": int(backoff.Seconds())})
+		}
+		if active != "" {
 			break
 		}
 	}
-	result := "ok"
-	if active == "" {
-		result = "failed"
+	s.mu.Lock()
+	if s.config == config && s.flight == flight {
+		if s.nowLocked().Before(s.quotaUntil) {
+			active = ""
+		}
+		s.active, s.flight = active, nil
+		if active == "" {
+			s.failures++
+			s.nextTry = s.nowLocked().Add(relayBackoff(s.failures))
+		} else {
+			s.failures = 0
+			s.networkFailures = 0
+			s.nextTry = time.Time{}
+		}
 	}
-	if quota {
-		result = "quota_exhausted"
-	}
-	if record != nil {
-		record(map[string]any{"event": "riot_relay_probe", "result": result, "duration_ms": time.Since(started).Milliseconds(), "http_status": status})
+	close(flight)
+	s.mu.Unlock()
+	if active != "" && recovering && record != nil {
+		record(map[string]any{"event": "riot-relay-recovered"})
 	}
 }
 
@@ -417,15 +486,28 @@ func (s *riotRelayState) unavailable() bool {
 	return s.nowLocked().Before(s.quotaUntil) || s.active == "" && s.nowLocked().Before(s.nextTry)
 }
 
-func (s *riotRelayState) failed(origin string) {
+func (s *riotRelayState) succeeded(origin string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.active == origin {
-		s.active = ""
-		if until := s.nowLocked().Add(5 * time.Minute); until.After(s.nextTry) {
-			s.nextTry = until
-		}
+		s.networkFailures = 0
+		s.failures = 0
+		s.nextTry = time.Time{}
 	}
+}
+func (s *riotRelayState) failed(origin string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.active != origin {
+		return
+	}
+	s.networkFailures++
+	if s.networkFailures < 2 {
+		return
+	}
+	s.active = ""
+	s.failures++
+	s.nextTry = s.nowLocked().Add(relayBackoff(s.failures))
 }
 
 func riotRelayCooldown(header http.Header) (string, int) {

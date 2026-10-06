@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -70,6 +72,7 @@ type rendererPerfGroup struct {
 	MaxMS   float64 `json:"maxMs"`
 }
 type clientDiagnosticRequest struct {
+	IsSelf                  bool                        `json:"isSelf,omitempty"`
 	CopyOK                  bool                        `json:"ok"`
 	CopyMethod              string                      `json:"method"`
 	ErrorName               string                      `json:"error_name"`
@@ -231,6 +234,7 @@ var clientDiagnosticEvents = map[string]map[string]bool{
 	"automatic_read_client":         {"request": true},
 	"overview_dirty_rescan":         {"resolved": true, "retry": true, "gave_up": true, "paused_hidden": true},
 	"collection_render_client":      {"unchanged-suppressed": true, "updated": true},
+	"build_player_selection":        {"select": true, "reset-collapse": true, "reset-filter": true},
 	"summoner_copy":                 {"success": true, "failed": true},
 	"overview_card_ready":           {"ready": true},
 	"renderer_perf":                 {"aggregated": true},
@@ -322,6 +326,13 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	event := map[string]any{"event": request.Event, "reason": request.Reason}
+	if request.Event == "build_player_selection" {
+		event["game_id_hash"] = diagnosticGameIDHash(request.GameID)
+		event["is_self"] = request.IsSelf
+		a.recordDiagnostic(event)
+		w.WriteHeader(204)
+		return
+	}
 	if request.Event == "overview_dirty_rescan" {
 		id, valid := normalizeExpectedGameID(request.FinishedGameID)
 		if !valid || request.DirtyAttempt < 0 || request.DirtyAttempt > 5 || request.DirtyOutcome != request.Reason || normalizeGameplayMatchFilter(request.DirtyFilter) != request.DirtyFilter {
@@ -1200,4 +1211,9 @@ func allowSGPGameDecodeDiagnostic(event map[string]any) map[string]any {
 		}
 	}
 	return out
+}
+
+func diagnosticGameIDHash(id int64) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("build-game-v1:%d", id)))
+	return hex.EncodeToString(sum[:8])
 }

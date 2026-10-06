@@ -34,7 +34,7 @@ func TestSeasonRecordRankedMatchMirrorsSeasonStatsCriteria(t *testing.T) {
 	first := cache.RankedMatches[0]
 	// 参团率要的是本队总击杀，不能把敌方的 20 杀算进来。
 	if first.TeamKills != 12 {
-		t.Fatalf("team kills = %d, want 13 (own team only)", first.TeamKills)
+		t.Fatalf("team kills = %d, want 14 (own team only)", first.TeamKills)
 	}
 	if first.Position != "middle" || first.Kills != 8 || first.Deaths != 2 || first.Assists != 6 || !first.Win {
 		t.Fatalf("unexpected ranked snapshot: %#v", first)
@@ -325,7 +325,7 @@ func TestSeasonScanPagesClearsResumeIndexWhenComplete(t *testing.T) {
 	if !scan.cache.Complete || scan.cache.ResumeIndex != 0 {
 		t.Fatalf("completed scan retained a stale resume index: %#v", scan.cache)
 	}
-	foregroundKey := sgpHistoryPageCacheKey("HN1", "subject", 60, sgpPageSize, nil)
+	foregroundKey := sgpHistoryPageCacheKey("HN1", "subject", 0, sgpPageSize, seasonStreamTags["ranked"])
 	provider.mu.Lock()
 	_, cached := provider.historyCache[foregroundKey]
 	provider.mu.Unlock()
@@ -494,12 +494,12 @@ func TestSeasonRecordRankedMatchMirrorsMayhemCriteriaAndRecordsAugmentSample(t *
 // P0 判据 2：schema 升版后旧缓存必须触发重扫（失效逻辑在 loadSeasonStats）。
 // 工单原文要求 7→8；并行 R117 会话已经占用了 8（K/D/A 改逐场均值），
 // 所以本轮实际是 8→9，用户已裁决顺延。
-func TestSeasonStatsSchemaVersionIsThirteenAndRejectsEveryOlderFile(t *testing.T) {
-	if seasonStatsCacheSchemaVersion != 13 {
-		t.Fatalf("seasonStatsCacheSchemaVersion = %d, want 13", seasonStatsCacheSchemaVersion)
+func TestSeasonStatsSchemaVersionIsFourteenAndRejectsEveryOlderFile(t *testing.T) {
+	if seasonStatsCacheSchemaVersion != 14 {
+		t.Fatalf("seasonStatsCacheSchemaVersion = %d, want 14", seasonStatsCacheSchemaVersion)
 	}
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
-	for _, old := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12} {
+	for _, old := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13} {
 		cache := seasonStatsCache{SchemaVersion: old, Source: seasonStatsSource, Season: "S26", AccountHash: "account"}
 		if err := store.saveSeasonStats(cache); err != nil {
 			t.Fatal(err)

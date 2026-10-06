@@ -3,7 +3,7 @@
 const {extract} = require('./r188-harness.cjs');
 function prelude(source, dependencies = {}) {
   const constants = ['RIOT_REGIONS','RIOT_REGION_LABELS'].map(name => source.match(new RegExp(`const ${name} = [^\\n]+`))?.[0] || '').join('\n');
-  const helpers = ['riotRegion','clientRegion','isRiotSearchRegion','practicePlayerPosition','livePositionValue','livePositionDisplay'].filter(name => !dependencies[name] && source.includes(`function ${name}(`)).map(name => extract(source,name)).join('\n');
-  return constants+'\nlet searchClientPlatform = "";\n'+helpers+'\n';
+  const helpers = ['overviewDetailArrow','maskedPlayerName','playerLabel','recordBuildPlayerSelection','resetBuildPlayerSelection','riotRegion','clientRegion','isRiotSearchRegion','practicePlayerPosition','livePositionValue','livePositionDisplay'].filter(name => !dependencies[name] && source.includes(`function ${name}(`)).map(name => extract(source,name)).join('\n');
+  return constants+'\nlet multikillGradientSeq = 0; let searchClientPlatform = "";\n'+helpers+'\n';
 }
 module.exports={prelude};

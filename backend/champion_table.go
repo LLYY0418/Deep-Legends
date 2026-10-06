@@ -344,7 +344,7 @@ func (a *app) handleGameplayChampionTable(w http.ResponseWriter, r *http.Request
 	}
 	if isRiotRegion(reference.Region) {
 		if queue == "mayhem" {
-			respondJSON(w, map[string]any{"available": false, "detail": "当前韩服数据源不支持海克斯大乱斗英雄统计"})
+			respondJSON(w, map[string]any{"available": false, "detail": "当前" + riotRegionLabel(reference.Region) + "数据源不支持海克斯大乱斗英雄统计"})
 			return
 		}
 		gameType := map[string]string{"ranked": "RANKED", "420": "SOLORANKED", "440": "FLEXRANKED"}[queue]
@@ -352,7 +352,7 @@ func (a *app) handleGameplayChampionTable(w http.ResponseWriter, r *http.Request
 		defer cancel()
 		table, err := a.opggChampionTable(ctx, reference, gameType)
 		if err != nil {
-			respondJSON(w, map[string]any{"available": false, "detail": "韩服英雄数据读取失败，请稍后重试"})
+			respondJSON(w, map[string]any{"available": false, "detail": riotRegionLabel(reference.Region) + "英雄数据读取失败，请稍后重试"})
 			return
 		}
 		respondJSON(w, map[string]any{"available": true, "queue": queue, "season": table.Season, "complete": true, "rows": table.TableRows, "overall": table.TableOverall})

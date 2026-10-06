@@ -26,6 +26,8 @@
 	  "connection-state": ["status"],
 	  "friends-updated": ["friends"],
 	  "season-progress": ["overview-season"],
+ "riot-relay-recovered": ["riot-relay-recovered"],
+ "overview-matches": ["overview-matches"],
 	  "historical-ranks": ["overview-ranks"],
 	  "summoner-updated": ["status", "overview-player"],
 	});
@@ -3910,7 +3912,9 @@
 		  const detail = JSON.parse(event.data);
 		  if (detail?.type === "live-player-progress") { window.dispatchEvent(new CustomEvent("deep-legends:live-player-progress", { detail })); return; }
 		  const slices = LIVE_UPDATE_STATE_SLICES[detail?.type] || [];
-		  if (slices.includes("overview-season")) window.dispatchEvent(new CustomEvent("deep-legends:season-progress", { detail }));
+		  if (slices.includes("riot-relay-recovered")) window.dispatchEvent(new CustomEvent("deep-legends:riot-relay-recovered", {detail}));
+          if (slices.includes("overview-matches")) window.dispatchEvent(new CustomEvent("deep-legends:overview-matches", {detail}));
+          if (slices.includes("overview-season")) window.dispatchEvent(new CustomEvent("deep-legends:season-progress", { detail }));
 		  if (slices.includes("overview-ranks")) window.dispatchEvent(new CustomEvent("deep-legends:overview-incremental", { detail }));
 		  if (slices.length) return;
 		} catch (_) {}

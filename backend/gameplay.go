@@ -231,25 +231,27 @@ type gameplayOverview struct {
 	Ranks               []gameplayRank           `json:"ranks"`
 	HistoricalRanks     []gameplayHistoricalRank `json:"historicalRanks,omitempty"`
 	// 国服 SGP 只提供上赛季和历史最高，不等同于韩服的多赛段 HistoricalRanks。
-	RankMilestones      *gameplayRankMilestones             `json:"rankMilestones,omitempty"`
-	RecentRanked        gameplayRecentRankedSummary         `json:"recentRanked"`
-	Ability             *gameplayAbilityProfile             `json:"ability,omitempty"`
-	Overall             gameplayAggregate                   `json:"overall"`
-	ChampionStats       []gameplayChampionStat              `json:"championStats"`
-	SeasonChampionStats []gameplaySeasonChampionStat        `json:"seasonChampionStats,omitempty"`
-	SeasonStatsProgress seasonStatsProgress                 `json:"seasonStatsProgress,omitempty"`
-	SeasonOverall       gameplayAggregate                   `json:"seasonOverall,omitempty"`
-	Positions           []gameplayPositionStat              `json:"positions"`
-	RankedQueues        map[string]gameplayRankedQueueStats `json:"rankedQueues,omitempty"`
-	Masteries           []gameplayMastery                   `json:"masteries"`
-	RecentPlayers       []gameplayRecentPlayer              `json:"recentPlayers"`
-	ActivityHours       []int                               `json:"activityHours"`
-	Matches             []gameplayMatch                     `json:"matches"`
-	Pagination          gameplayPagination                  `json:"pagination"`
-	Capabilities        []EndpointCapability                `json:"capabilities"`
+	RankMilestones       *gameplayRankMilestones             `json:"rankMilestones,omitempty"`
+	RecentRanked         gameplayRecentRankedSummary         `json:"recentRanked"`
+	Ability              *gameplayAbilityProfile             `json:"ability,omitempty"`
+	Overall              gameplayAggregate                   `json:"overall"`
+	ChampionStats        []gameplayChampionStat              `json:"championStats"`
+	SeasonChampionStats  []gameplaySeasonChampionStat        `json:"seasonChampionStats,omitempty"`
+	SeasonStatsProgress  seasonStatsProgress                 `json:"seasonStatsProgress,omitempty"`
+	SeasonOverall        gameplayAggregate                   `json:"seasonOverall,omitempty"`
+	Positions            []gameplayPositionStat              `json:"positions"`
+	RankedQueues         map[string]gameplayRankedQueueStats `json:"rankedQueues,omitempty"`
+	MasteryChampionCount *int                                `json:"masteryChampionCount,omitempty"`
+	Masteries            []gameplayMastery                   `json:"masteries"`
+	RecentPlayers        []gameplayRecentPlayer              `json:"recentPlayers"`
+	ActivityHours        []int                               `json:"activityHours"`
+	Matches              []gameplayMatch                     `json:"matches"`
+	Pagination           gameplayPagination                  `json:"pagination"`
+	Capabilities         []EndpointCapability                `json:"capabilities"`
 }
 
 type gameplayRankedQueueStats struct {
+	SeasonGames        int                          `json:"seasonGames,omitempty"`
 	RecentRanked       *gameplayRecentRankedSummary `json:"recentRanked,omitempty"`
 	Ability            *gameplayAbilityProfile      `json:"ability,omitempty"`
 	AbilitySampleGames int                          `json:"abilitySampleGames"`
@@ -784,6 +786,16 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	if request.FreshHistory != nil {
 		r = r.WithContext(context.WithValue(r.Context(), overviewFreshHistoryKey{}, *request.FreshHistory))
 	}
+	if (request.Force || r.URL.Query().Get("force") == "1") && a.champions != nil {
+		if _, source := riotUserKeys.effective(); source == "relay" && (isRiotRegion(request.Region) || a.currentClientIsRiot()) {
+			_, _ = riotRelays.ensureForce(r.Context(), a.champions.httpClient(), func(event map[string]any) {
+				a.recordDiagnostic(event)
+				if event["event"] == "riot-relay-recovered" {
+					a.broadcastEvent(`{"type":"riot-relay-recovered"}`)
+				}
+			}, true)
+		}
+	}
 	request.PlayerRef = strings.TrimSpace(request.PlayerRef)
 	if request.PlayerRef != "" && !validPlayerReference(request.PlayerRef) {
 		http.Error(w, "玩家标识无效", http.StatusBadRequest)
@@ -886,9 +898,9 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 					riotHTTPError
 					Type   string `json:"type"`
 					Status int    `json:"status"`
-				}{riotHTTPErrorBody(err), "error", riotErrorStatus(err)})
+				}{riotHTTPErrorBody(err, reference.Region), "error", riotErrorStatus(err)})
 			} else {
-				writeRiotHTTPError(w, err)
+				writeRiotHTTPError(w, err, reference.Region)
 			}
 			return
 		}
@@ -1428,7 +1440,13 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 			defer close(rankCh)
 
 			started := time.Now()
-			value, _ := a.playerRankScoreWithCacheStatus(ctx, client, playerRef, isCurrent, reference.ServerID, reference.Privacy, false, force)
+			var value rankScoreEntry
+			if isCurrent && clientRiotPlatform(client) != "" {
+				ranks, milestones, capability, _ := a.loadGameplayRanksContext(ctx, client, playerRef, true)
+				value = rankScoreEntry{ranks: ranks, milestones: milestones, capability: capability}
+			} else {
+				value, _ = a.playerRankScoreWithCacheStatus(ctx, client, playerRef, isCurrent, reference.ServerID, reference.Privacy, false, force)
+			}
 			rankCh <- rankResult{value: value, started: started, ended: time.Now()}
 		}()
 		masteryCh = make(chan masteryResult, 1)
@@ -1439,7 +1457,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 			started := time.Now()
 			capability := EndpointCapability{Name: "champion-mastery", Path: "/lol-champion-mastery/v1/{player}/champion-mastery"}
 			value := map[int64]ChampionMastery{}
-			if region := clientRiotPlatform(client); region != "" {
+			if isCurrent && clientRiotPlatform(client) != "" {
+				value, capability = NewChampionMasteryAPI(client).AllContext(ctx, playerRef)
+			} else if region := clientRiotPlatform(client); region != "" {
 				public, resolveErr := a.resolveClientRiotPUUID(ctx, client, region, playerRef, reference)
 				var rows []riotMasteryEntry
 				if resolveErr == nil {
@@ -1482,7 +1502,16 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 			defer close(rankedCh)
 
 			started := time.Now()
-			value := a.loadRecentRankedSamples(ctx, client, reference, playerRef, matchFilter, pagination, matches, names, queueLabels)
+			value := recentRankedSampleSet{ByQueue: map[int64][]gameplayMatch{}}
+			if isCurrent && clientRiotPlatform(client) != "" {
+				for _, match := range matches {
+					if match.QueueID == 420 || match.QueueID == 440 {
+						value.ByQueue[match.QueueID] = append(value.ByQueue[match.QueueID], match)
+					}
+				}
+			} else {
+				value = a.loadRecentRankedSamples(ctx, client, reference, playerRef, matchFilter, pagination, matches, names, queueLabels)
+			}
 			rankedCh <- recentRankedResult{value: value, started: started, ended: time.Now()}
 		}()
 	}
@@ -1550,6 +1579,10 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		}
 		select {
 		case result := <-masteryCh:
+			count := len(result.value)
+			if result.capability.State == capabilityAvailable {
+				response.MasteryChampionCount = &count
+			}
 			response.Masteries = normalizeMasteries(result.value, names, 6)
 			response.Capabilities = append(response.Capabilities, result.capability)
 			ready["champion-mastery"] = true
@@ -1711,6 +1744,10 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	capabilities = append(capabilities, masteryCapability)
 	masteries := normalizeMasteries(masteryMap, names, 6)
 	response.Ranks = ranks
+	masteryCount := len(masteryMap)
+	if masteryCapability.State == capabilityAvailable {
+		response.MasteryChampionCount = &masteryCount
+	}
 	response.Masteries = masteries
 	a.completeOverviewBackground(&response, playerRef)
 	response.Capabilities = capabilities
@@ -2471,7 +2508,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 	}, clientRegion)
 	attempts := make([]DataSourceAttempt, 0, len(decision.Sources)+1)
 	fallbackReason := ""
-	if isRiotRegion(clientRegion) {
+	if isRiotRegion(clientRegion) && !isCurrent {
 		matches, pagination, err := a.loadClientRiotHistory(ctx, clientRegion, playerRef, begIndex, count, matchFilter, names, queueLabels, reference)
 		attempt := DataSourceAttempt{Source: dataSourceRiot, Outcome: dataSourceSuccess}
 		if err == nil {
@@ -2662,6 +2699,9 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 			ids = append(ids, strconv.FormatInt(match.GameID, 10))
 		}
 		recordOverviewAllHistory(ctx, ids)
+	}
+	if isCurrent && isRiotRegion(clientRegion) && len(matches) > 0 {
+		a.enrichCurrentRiotMatches(client, reference, playerRef, matches, names, queueLabels)
 	}
 	a.recordLCUPerkDiagnostics(rawGames, reference)
 	filterSummary := summarizeLCUGameplayFilters(rawGames)
@@ -10700,41 +10740,55 @@ func loadQueueLabels(client *LCUClient) map[int64]string {
 }
 
 func loadQueueLabelsContext(ctx context.Context, client *LCUClient) map[int64]string {
+	result := map[int64]string{}
+	for _, definition := range supportedQueueDefinitions {
+		result[definition.ID] = definition.Name
+	}
 	if client == nil {
-		return map[int64]string{}
+		return result
 	}
 	client.queueLabelsMu.Lock()
 	if client.queueLabelsLoaded {
-		result := cloneQueueLabels(client.queueLabels)
+		for id, label := range client.queueLabels {
+			result[id] = label
+		}
 		client.queueLabelsMu.Unlock()
 		return result
 	}
-	client.queueLabelsMu.Unlock()
-	var queues []struct {
-		ID        int64  `json:"id"`
-		Name      string `json:"name"`
-		ShortName string `json:"shortName"`
+	if client.queueLabelsLoading {
+		client.queueLabelsMu.Unlock()
+		return result
 	}
-	result := make(map[int64]string)
-	if client.GetJSONContext(ctx, "/lol-game-queues/v1/queues", &queues) == nil {
+	client.queueLabelsLoading = true
+	client.queueLabelsMu.Unlock()
+	go func() {
+		defer recoverPanic("queueLabels.background")
+		defer func() { client.queueLabelsMu.Lock(); client.queueLabelsLoading = false; client.queueLabelsMu.Unlock() }()
+		background, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+		defer cancel()
+		var queues []struct {
+			ID        int64  `json:"id"`
+			Name      string `json:"name"`
+			ShortName string `json:"shortName"`
+		}
+		if client.GetJSONContext(background, "/lol-game-queues/v1/queues", &queues) != nil {
+			return
+		}
+		loaded := map[int64]string{}
 		for _, queue := range queues {
 			name := strings.TrimSpace(queue.ShortName)
 			if name == "" {
 				name = strings.TrimSpace(queue.Name)
 			}
 			if queue.ID > 0 && name != "" {
-				result[queue.ID] = name
+				loaded[queue.ID] = name
 			}
 		}
 		client.queueLabelsMu.Lock()
-		if !client.queueLabelsLoaded {
-			client.queueLabels = cloneQueueLabels(result)
-			client.queueLabelsLoaded = true
-		} else {
-			result = cloneQueueLabels(client.queueLabels)
-		}
+		client.queueLabels = loaded
+		client.queueLabelsLoaded = true
 		client.queueLabelsMu.Unlock()
-	}
+	}()
 	return result
 }
 
@@ -11050,4 +11104,73 @@ func safeGameplayError(err error) string {
 		}
 	}
 	return "请确认客户端仍在英雄选择或大厅阶段"
+}
+
+func (a *app) currentClientIsRiot() bool {
+	a.mu.RLock()
+	client := a.lcu
+	a.mu.RUnlock()
+	region, _ := clientRegionInfo(client)
+	return isRiotRegion(region)
+}
+
+func (a *app) enrichCurrentRiotMatches(client *LCUClient, ref gameplayReference, playerRef string, matches []gameplayMatch, names, labels map[int64]string) {
+	ids := []string{}
+	for _, match := range matches {
+		ids = append(ids, strconv.FormatInt(match.GameID, 10))
+	}
+	key := fmt.Sprintf("%p|%s|%s", client, playerRef, strings.Join(ids, ","))
+	a.mu.Lock()
+	if a.currentRiotDetailFlights == nil {
+		a.currentRiotDetailFlights = map[string]bool{}
+	}
+	if a.currentRiotDetailFlights[key] || len(a.currentRiotDetailFlights) >= 16 {
+		a.mu.Unlock()
+		return
+	}
+	a.currentRiotDetailFlights[key] = true
+	a.mu.Unlock()
+	a.goSafe("overview.currentRiotDetails", func() {
+		defer func() { a.mu.Lock(); delete(a.currentRiotDetailFlights, key); a.mu.Unlock() }()
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+		defer cancel()
+		if a.riot == nil {
+			return
+		}
+		region, _ := clientRegionInfo(client)
+		publicPUUID, err := a.resolveClientRiotPUUID(ctx, client, region, playerRef, ref)
+		if err != nil {
+			return
+		}
+		public := a.registerGameplayReferenceDetails(mergeGameplayReferences(ref, gameplayReference{PlayerRef: playerRef}))
+		enriched := []gameplayMatch{}
+		for _, match := range matches {
+			raw, err := a.riot.forPlatform(region).matchByID(ctx, strings.ToUpper(region)+"_"+strconv.FormatInt(match.GameID, 10))
+			if err != nil {
+				continue
+			}
+			next := riotConvertMatch(raw, publicPUUID, names, labels)
+			for i := range next.Participants {
+				if next.Participants[i].PlayerRef == publicPUUID {
+					next.Participants[i].PlayerRef = playerRef
+					next.Participants[i].reference.PlayerRef = playerRef
+					next.Participants[i].reference.AlternatePlayerRef = publicPUUID
+					next.Participants[i].reference.ClientIdentity = true
+				}
+			}
+			a.recordMatchScores(dataSourceRiot, next)
+			enriched = append(enriched, next)
+		}
+		a.mu.RLock()
+		same := a.lcu == client && a.connected && a.summoner.PUUID == playerRef
+		a.mu.RUnlock()
+		if !same || len(enriched) == 0 {
+			return
+		}
+		for i := range enriched {
+			a.publicizeMatchReferences(&enriched[i])
+		}
+		event, _ := json.Marshal(map[string]any{"type": "overview-matches", "account": public, "matches": enriched})
+		a.broadcastEvent(string(event))
+	})
 }

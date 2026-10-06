@@ -227,3 +227,9 @@ test('R220 shared-cluster responses remain platform-scoped in the relay cache',a
  await get('kr');assert.equal(f.requests.length,2);
  assert(f.entries.size>=2);
 });
+
+test('R231 health is header-only and makes no upstream/quota/identity calls',async()=>{
+ const f=fixture();const response=await f.worker.fetch(new Request('https://relay.example/health'),{});
+ assert.equal(response.status,204);assert.equal(await response.text(),'');assert.equal(f.requests.length,0);assert.equal(f.logs.length,0);assert.equal(f.entries.size,0);
+ assert.equal((await f.get('/health','POST')).status,404);
+});

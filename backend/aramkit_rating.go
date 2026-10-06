@@ -235,7 +235,10 @@ func (c *aramkitRatingClient) lookup(ctx context.Context, gameName, tagLine stri
 
 	outcome := c.fetch(ctx, gameName, tagLine)
 	flight.outcome = outcome
-	ttl := aramkitRatingFailureTTL
+	ttl := 30 * time.Second
+	if outcome.response.UnavailableReason == "未收录" {
+		ttl = aramkitRatingFailureTTL
+	}
 	if outcome.response.Available {
 		ttl = aramkitRatingSuccessTTL
 	}

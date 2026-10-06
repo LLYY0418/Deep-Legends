@@ -116,7 +116,7 @@ func TestR220HistoryRetryCadence(t *testing.T) {
 			return proHTTPBody([]byte(`{"games":{"games":[]}}`)), nil
 		})}
 		c.historyRetrySleep = func(ctx context.Context, d time.Duration) error { delays = append(delays, d); return ctx.Err() }
-		_, caps, _ := loadGameplayHistoryContext(t.Context(), c, "r220-valid-account", true, 0, 5, false)
+		_, caps, _ := loadGameplayHistoryContext(t.Context(), c, "r220-valid-account", false, 0, 5, false)
 		if status == 404 {
 			if calls != 1 || len(delays) != 0 || caps[0].State == capabilityAvailable {
 				t.Fatal(calls, delays, caps)
@@ -160,7 +160,7 @@ func TestR220HistoryDecisionAndFallback(t *testing.T) {
 			return proHTTPBody([]byte(`{"games":{"games":[]}}`)), nil
 		})}
 		a := &app{riot: newRiotProvider(champs)}
-		_, caps, _ := a.loadDetailedMatches(t.Context(), c, gameplayReference{PlayerRef: "r220-valid-account", GameName: "Fixture", TagLine: "JP1"}, "r220-valid-account", true, 0, 5, "all", nil, nil)
+		_, caps, _ := a.loadDetailedMatches(t.Context(), c, gameplayReference{PlayerRef: "r220-valid-account", GameName: "Fixture", TagLine: "JP1"}, "r220-valid-account", false, 0, 5, "all", nil, nil)
 		want := []string{"asia.api.riotgames.com", "asia.api.riotgames.com"}
 		if fail {
 			want = []string{"asia.api.riotgames.com", "lcu"}

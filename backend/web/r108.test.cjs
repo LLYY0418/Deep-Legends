@@ -6,7 +6,7 @@ function extract(name) {
   if(source.slice(start-6,start)==="async ")start-=6;
   return source.slice(start,source.indexOf("\n  }",start)+4);
 }
-function compile(names,deps) { return Function(...Object.keys(deps),names.map(extract).join("\n")+`\nreturn {${names.join(",")}};`)(...Object.values(deps)); }
+function compile(names,deps) { return Function(...Object.keys(deps),require("./r220-harness-support.cjs").prelude(source,deps)+names.map(extract).join("\n")+`\nreturn {${names.join(",")}};`)(...Object.values(deps)); }
 const noop=()=>{};
 const payload=(count=20,beg=0,filter="all")=>({player:{playerRef:"fixture",region:"kr"},matches:Array.from({length:count},(_,i)=>({gameId:beg+i})),pagination:{begIndex:beg,count,hasMore:count===20,filter,serverFiltered:filter!=="all"}});
 function fixture(api) {

@@ -8,9 +8,9 @@ const functions=(names,deps)=>compile(source,expand(source,names,deps),deps);
 test('R230 three queues, games ties use win rate/KDA, whole row and keyboard toggle, top three distinct metrics',()=>{
  const dom=new JSDOM('<main></main>'),root=dom.window.document.querySelector('main'),tab={championTableQueue:'420'};
  const row=(id,winRate,kda,score)=>({championId:id,championName:`英雄${id}`,games:10,wins:6,losses:4,winRate,kda,score,damagePerMinute:score*100,tankShare:score/10,controlWards:score,cs:score*10,gold:score*1000,doubleKills:score,tripleKills:0,quadraKills:null,pentaKills:0,opponents:id===1?[{championId:9,championName:'对位',games:5}]:[]});
- const data={queue:'420',overall:row(0,90,9,10),rows:[row(4,50,3,1),row(2,60,3,3),row(1,60,4,4),row(3,55,5,2),row(5,40,2,2)]};let f;
+ const data={queue:'420',overall:row(0,90,9,10),rows:[row(4,50,3,1),row(2,60,3,3),row(1,60,4,4),row(3,55,5,2),row(5,40,2,2)]};let f;tab.overviewSubpageState={data};
  const redraw=()=>{root.innerHTML=f.renderChampionTable(data,tab);f.bindChampionTable(root,tab);};
- f=functions(['renderChampionTable','bindChampionTable'],{escapeHTML,iconFigure:()=>'',renderOverviewSubpage:redraw,openOverviewSubpage:()=>{}});redraw();
+ f=functions(['renderChampionTable','bindChampionTable'],{document:dom.window.document,prepareImages:()=>{},escapeHTML,iconFigure:()=>'',renderOverviewSubpage:redraw,openOverviewSubpage:()=>{}});redraw();
  assert.deepEqual([...root.querySelectorAll('[data-table-queue]')].map(e=>e.dataset.tableQueue),['420','440','mayhem']);
  assert.deepEqual(f.championTableSortedRows(data,tab).map(e=>e.championId),[1,2,3,4,5]);
  assert.equal(root.querySelectorAll('thead th').length,15);assert.equal(root.querySelector('[data-table-expand]').tagName,'TR');
@@ -39,7 +39,7 @@ test('R230 copy uses browser, Electron and execCommand fallback and always emits
 });
 test('R230 completion event immediately refreshes even below 100 games and inside throttle window',async()=>{
  const tab={key:'self',data:{player:{playerRef:'account'},seasonStatsProgress:{season:'S26',scanned:49,complete:false}}},state={section:'overview',seasonProgressRefreshes:new Map([['account',{lastAt:1000}]] )};let calls=0;
- const f=functions(['handleSeasonProgress'],{state,overviewGroupForSection:()=> 'players',activeTab:()=>tab,document:{getElementById:()=>null},loadOverview:async()=>{calls++},overviewSectionForGroup:()=> 'overview',requestAnimationFrame:fn=>fn(),clearTimeout:()=>{},markSeasonRefreshPending:()=>{}});
+ const f=functions(['handleSeasonProgress'],{state,overviewGroupForSection:()=> 'players',activeTab:()=>tab,document:{getElementById:()=>null},refreshSeasonSummary:async()=>{calls++},overviewSectionForGroup:()=> 'overview',requestAnimationFrame:fn=>fn(),clearTimeout:()=>{},markSeasonRefreshPending:()=>{}});
  assert.equal(await f.handleSeasonProgress({type:'season-progress',account:'account',season:'S26',scanned:90,complete:true},1500),true);assert.equal(calls,1);
 });
 test('R230 null atlas is skeleton; loaded directory filtered to zero is empty; render triggers one automatic request',()=>{

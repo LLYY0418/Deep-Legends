@@ -618,7 +618,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-more-filter { flex: 0 0 154px; }
 .match-more-filter .app-select-trigger { min-height: 34px; }
 .match-more-filter.is-active .app-select-trigger { color: var(--primary-strong); background: var(--primary-soft); border-color: color-mix(in oklab,var(--primary) 44%,var(--line)); font-weight: 700; }
-.match-more-filter .app-select-menu { width: 220px; }
+.match-more-filter .app-select-menu { width: 220px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.match-more-filter .app-select-menu button { flex: 0 0 auto; }
 .match-details-warning { gap: 9px; margin: 8px 0; padding: 9px 11px; border: 1px solid color-mix(in oklab,var(--warning) 38%,var(--line)); }
 .match-details-warning .notice-symbol { flex-basis: 20px; width: 20px; height: 20px; font-size: 11px; }
 .match-details-warning strong { font-size: 11.5px; }
@@ -740,6 +741,9 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .arena-team-roster { display: grid; min-width: 0; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
 .arena-team-roster button { display: flex; min-width: 0; align-items: center; gap: 4px; padding: 0; overflow: hidden; color: var(--muted); background: transparent; border: 0; font-size: 9.5px; text-align: left; }
 .arena-team-roster button span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 两人小队只有两个名字：一个靠左、一个靠右，避免右侧空出一整列。 */
+.arena-team-roster[data-team-size="2"] { display: flex; justify-content: space-between; gap: 8px; }
+.arena-team-roster[data-team-size="2"] button { flex: 0 1 auto; max-width: calc(50% - 4px); }
 .match-loadout-mini.is-augments { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(2,30px); grid-template-rows: repeat(2,30px); }
 .match-loadout-mini.is-augments.is-mayhem { grid-auto-flow: column; grid-template-columns: repeat(2,30px); grid-template-rows: repeat(2,30px); }
 .arena-augment-icon { --augment-accent: var(--rarity-iron); display: inline-flex; flex: 0 0 auto; overflow: hidden; background: #090B0F; border: 1px solid var(--augment-accent); border-radius: 7px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .035); }
@@ -1595,13 +1599,21 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
   .build-core-ranking-row.is-mayhem-build-row > .live-item-ranking { align-self: stretch; border-top: 0; border-left: 1px solid var(--line); }
   .build-core-ranking-row.is-mayhem-build-row > .live-item-ranking > header { min-height: 41px; padding-block: 8px; }
   .build-core-ranking-row .build-item-row { grid-template-columns: minmax(0,1fr); }
-  .build-core-ranking-row .build-item-row[data-depth-count="1"] { grid-template-columns: 310px minmax(0,1fr); }
-  .build-core-ranking-row .build-item-row[data-depth-count="2"] { grid-template-columns: 310px repeat(2,minmax(0,1fr)); }
-  .build-core-ranking-row .build-item-row[data-depth-count="3"] { grid-template-columns: 310px repeat(3,minmax(0,1fr)); }
+  /* 单列：核心装（三件套 + 箭头）比第四/五/六件宽；海斗行容器本身较窄，保持原来的固定宽度。 */
+  .build-core-ranking-row:not(.is-mayhem-build-row) .build-item-row[data-depth-count="1"] { grid-template-columns: minmax(340px,1.5fr) minmax(0,1fr); }
+  .build-core-ranking-row:not(.is-mayhem-build-row) .build-item-row[data-depth-count="2"] { grid-template-columns: minmax(340px,1.5fr) repeat(2,minmax(0,1fr)); }
+  .build-core-ranking-row:not(.is-mayhem-build-row) .build-item-row[data-depth-count="3"] { grid-template-columns: minmax(340px,1.5fr) repeat(3,minmax(0,1fr)); }
+  .build-core-ranking-row.is-mayhem-build-row .build-item-row[data-depth-count="1"] { grid-template-columns: 310px minmax(0,1fr); }
+  .build-core-ranking-row.is-mayhem-build-row .build-item-row[data-depth-count="2"] { grid-template-columns: 310px repeat(2,minmax(0,1fr)); }
+  .build-core-ranking-row.is-mayhem-build-row .build-item-row[data-depth-count="3"] { grid-template-columns: 310px repeat(3,minmax(0,1fr)); }
   .build-core-ranking-row .item-core-column,
   .build-core-ranking-row .item-depth-columns > section { padding-inline: 4px; }
   .build-core-ranking-row .config-option { gap: 4px; padding-inline: 2px; }
+  .build-core-ranking-row:not(.is-mayhem-build-row) .item-core-column,
+  .build-core-ranking-row:not(.is-mayhem-build-row) .item-depth-columns > section { padding-inline: 14px; }
+  .build-core-ranking-row:not(.is-mayhem-build-row) .config-option { gap: 8px; padding-inline: 10px; }
   .build-core-ranking-row .option-stats.is-depth { grid-template-columns: repeat(2,minmax(48px,64px)); column-gap: 0; }
+  .build-core-ranking-row:not(.is-mayhem-build-row) .option-stats.is-depth { grid-template-columns: 44px 40px; column-gap: 10px; }
   .build-core-ranking-row .option-stats dt { font-size: 9px; }
   .build-core-ranking-row .option-stats dd { font-size: 12px; }
 }
@@ -2042,9 +2054,11 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 @keyframes streak-rain { to { transform:translateY(3px); opacity:0; } }
 @media (prefers-reduced-motion:reduce) { .summoner-streak svg * { animation:none; } }
 
-.overview-detail-arrow { display:inline-grid; place-items:center; width:28px; height:28px; margin-left:6px; padding:0; border:0; background:none; color:var(--primary); font-size:24px; font-weight:700; cursor:pointer; }
+.overview-detail-arrow { display:inline-flex; align-items:center; justify-content:center; line-height:0; width:22px; height:22px; padding:0; border:0; background:none; color:var(--primary); font-size:24px; font-weight:700; cursor:pointer; }
 .overview-detail-arrow:hover { color:var(--accent); background:none; }
-.career-section > header > span { display:inline-flex; align-items:center; gap:6px; }
+.career-section > header > span { display:inline-flex; align-items:center; gap:2px; }
+.overview-detail-arrow svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+.champion-performance > header,.mastery-career-section > header { align-items:center; }
 [data-overview-return] { display:inline-flex; align-items:center; gap:6px; min-height:32px; font-size:14px; }
 [data-overview-return] > span { font-size:20px; }
 .overview-detail-page { min-width:0; max-width:100%; }
@@ -2103,8 +2117,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .champion-data-table tr[data-table-expand]:focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
 .champion-data-table .is-opponent .champion-table-hero { padding-left:32px; border-left:2px solid var(--primary); }
 .champion-table-opponent-arrow { display:inline-block; width:12px; margin-right:6px; vertical-align:middle; text-align:center; color:var(--muted); font-weight:400; }
-.champion-data-table [data-table-more] { margin-left:24px; }
-.champion-data-table .is-opponent td[colspan] { text-align:left; border-left:2px solid var(--primary); }
+.champion-data-table [data-table-more] { margin-left:18px; }
+
 .champion-data-table .is-good b { color:#299f67; }
 .champion-table-winbar { --table-winrate:0%; display:inline-block; width:44px; height:4px; margin-right:5px; background:var(--table-loss); border-radius:2px; overflow:hidden; vertical-align:middle; }
 .champion-table-winbar i { width:var(--table-winrate); display:block; height:100%; background:var(--table-green); }
@@ -2183,3 +2197,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .champion-data-table [data-table-more] { color:var(--ink); background:var(--surface-strong); border:1px solid var(--line); }
 
 .player-tab-region { flex: 0 0 auto; color: var(--muted); font-size: 10px; margin-left: 0; }
+
+.multikill-tag.is-mk-2 > b { color:#FFFFFF; }
+.multikill-tag.is-mk-3 > b { color:#FFE4E6; }
+.multikill-tag.is-mk-4 > b { color:#FAE8FF; font-size:11px; }
+.multikill-tag.is-mk-5 > b { color:#3B1A00; font-size:11px; font-weight:800; text-shadow:0 0 2px rgba(255,247,214,.9); }

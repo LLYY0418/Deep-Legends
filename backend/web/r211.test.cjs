@@ -35,7 +35,7 @@ test('R211 load request and identity cache are explicitly wired to the expected 
 const {JSDOM}=require('../../desktop/node_modules/jsdom');
 const {escapeHTML}=require('./r188-harness.cjs');
 test('R211 build selection switches equipment skills rune effects and augments, defaults to self',()=>{
- const state={matchTimelines:new Map()},tab={key:'one'},match={gameId:9,participants:[{participantId:1,teamId:100,championId:1,championName:'一',championLevel:18,gameName:'Self',perkIds:[11]},{participantId:2,teamId:200,championId:2,championName:'二',championLevel:17,hidden:true,perkIds:[22]}]};
+ const state={settings:{maskNames:false},matchTimelines:new Map()},tab={key:'one'},match={gameId:9,participants:[{participantId:1,teamId:100,championId:1,championName:'一',championLevel:18,gameName:'Self',perkIds:[11]},{participantId:2,teamId:200,championId:2,championName:'二',championLevel:17,hidden:true,perkIds:[22]}]};
  state.matchTimelines.set('9',{available:true,participants:match.participants.map(p=>({participantId:p.participantId,itemGroups:[{minute:1,events:[{itemId:100+p.participantId}]}],skillOrder:[{slot:p.participantId,level:1}]}))});
  const f=compile(source,['buildSubject','renderBuildPlayers','matchPlayerGroups','renderBuild'],{state,escapeHTML,number:String,ensureAugmentDescriptions:()=>{},matchTimelineKey:()=> '9',riotTab:()=>false,connected:()=>true,matchAugmentIDs:p=>p.augmentIds||[],iconFigure:(_kind,id)=>`<img src="/${id}">`,renderBuildAugments:ids=>`hex:${ids.join(',')}`,renderUnifiedRuneBoard:p=>`runes:${p.perkIds}`,renderRuneEffects:p=>`effects:${p.perkIds}`,renderRuneYield:p=>`yield:${p.perkIds}`,renderItemRoute:t=>`item:${t.itemGroups[0].events[0].itemId}`,renderSkillOrder:t=>`skill:${t.skillOrder[0].slot}`,skillPrioritySummary:()=>''});
  let html=f.renderBuild(match,match.participants[0],tab);assert.match(html,/item:101/);assert.match(html,/skill:1/);assert.match(html,/runes:11/);assert.match(html,/effects:11/);assert.match(html,/yield:11/);
@@ -43,7 +43,7 @@ test('R211 build selection switches equipment skills rune effects and augments, 
  match.participants[1].augmentIds=[33];assert.match(f.renderBuild(match,match.participants[0],tab),/hex:33/);
  const interaction=new JSDOM('<section></section>'),container=interaction.window.document.querySelector('section');
  tab.openMatches=new Set();tab.buildPlayers.delete('9');let rerenders=0;
- const controls=compile(source,['bindMatchDetailControls'],{bindRuneEffectLinks:()=>{},overviewContainer:()=>container,rerenderMatch:()=>{rerenders++;container.innerHTML=f.renderBuild(match,match.participants[0],tab);controls.bindMatchDetailControls(container,tab);}});
+ const controls=compile(source,['bindMatchDetailControls'],{recordBuildPlayerSelection:()=>{},bindRuneEffectLinks:()=>{},overviewContainer:()=>container,rerenderMatch:()=>{rerenders++;container.innerHTML=f.renderBuild(match,match.participants[0],tab);controls.bindMatchDetailControls(container,tab);}});
  container.innerHTML=f.renderBuild(match,match.participants[0],tab);controls.bindMatchDetailControls(container,tab);
  container.querySelector('[data-build-player="1"]').focus();
  interaction.window.document.activeElement.dispatchEvent(new interaction.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));

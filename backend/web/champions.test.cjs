@@ -1786,21 +1786,21 @@ test("season progress refreshes the active overview without resetting queue choi
 		overviewGroupForSection: () => "players",
 		overviewSectionForGroup: () => "overview",
 		document: { getElementById: (id) => id === "app-scroll" ? scrollRoot : null },
-		loadOverview: async (...args) => { calls.push(args); tab.data.seasonStatsProgress = { season: "S26", scanned: 180, complete: true }; scrollRoot.scrollTop = 0; if (switchDuringRefresh) currentTab = { key: "new-active" }; },
+		refreshSeasonSummary: async (...args) => { calls.push(args); tab.data.seasonStatsProgress = { season: "S26", scanned: 180, complete: true }; scrollRoot.scrollTop = 0; if (switchDuringRefresh) currentTab = { key: "new-active" }; },
 		requestAnimationFrame: (callback) => callback(),
 		setTimeout: (callback, delay) => { timers.push({ callback, delay }); return timers.length; },
 	});
 	assert.equal(await handleSeasonProgress({ type: "season-progress", season: "S26", account: "public-ref", scanned: 180, complete: true }, 20_000), true);
 	assert.equal(calls.length, 1);
-	assert.deepEqual(calls[0].slice(1), [true, false, false, true]);
+	assert.deepEqual(calls[0].slice(1), []);
 	assert.equal(scrollRoot.scrollTop, 321);
 	assert.deepEqual([tab.rankedQueueRecent, tab.rankedQueueAbility, tab.rankedQueuePosition], ["440", "420", "440"]);
 
 	tab.data.seasonStatsProgress = { season: "S26", scanned: 180, complete: false };
-	assert.equal(await handleSeasonProgress({ type: "season-progress", season: "S26", account: "public-ref", scanned: 300, complete: false }, 25_000), false);
-	assert.equal(calls.length, 1, "同一账号十秒内不应再次刷新");
+	assert.equal(await handleSeasonProgress({ type: "season-progress", season: "S26", account: "public-ref", scanned: 300, complete: false }, 21_000), false);
+	assert.equal(calls.length, 1, "同一账号三秒内不应再次刷新");
 	assert.equal(timers.length, 1);
-	assert.equal(timers[0].delay, 5_000);
+	assert.equal(timers[0].delay, 2_000);
 	assert.equal(await handleSeasonProgress({ type: "season-progress", season: "S26", account: "another-player", scanned: 500, complete: true }, 40_000), false);
 
 	tab.data.seasonStatsProgress = { season: "S26", scanned: 180, complete: false };
@@ -3658,7 +3658,12 @@ test("live build recommendations use a wide core column and only the available d
   assert.match(sharedBuildStyles, /\.build-item-row\s*\{[^}]*--build-row-height:\s*64px/s);
 	assert.match(gameplayStyles, /\.build-core-ranking-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
   const wideRanking = cssBlockAfter(gameplayStyles, "@container recommendation-area (min-width: 1081px)");
-  assert.match(wideRanking, /\.build-core-ranking-row \.build-item-row\[data-depth-count="3"\]\s*\{[^}]*grid-template-columns:\s*310px repeat\(3,minmax\(0,1fr\)\)/s);
+  // 核心装列比第四/五/六件宽；列与卡片两侧留空隙；胜率与场次紧凑排列。海斗行保持原来的固定宽度。
+  assert.match(wideRanking, /\.build-core-ranking-row:not\(\.is-mayhem-build-row\) \.build-item-row\[data-depth-count="3"\]\s*\{[^}]*grid-template-columns:\s*minmax\(340px,1\.5fr\) repeat\(3,minmax\(0,1fr\)\)/s);
+  assert.match(wideRanking, /\.build-core-ranking-row\.is-mayhem-build-row \.build-item-row\[data-depth-count="3"\]\s*\{[^}]*grid-template-columns:\s*310px repeat\(3,minmax\(0,1fr\)\)/s);
+  assert.match(wideRanking, /\.build-core-ranking-row:not\(\.is-mayhem-build-row\) \.item-core-column,\s*\.build-core-ranking-row:not\(\.is-mayhem-build-row\) \.item-depth-columns > section\s*\{[^}]*padding-inline:\s*14px/s);
+  assert.match(wideRanking, /\.build-core-ranking-row:not\(\.is-mayhem-build-row\) \.config-option\s*\{[^}]*padding-inline:\s*10px/s);
+  assert.match(wideRanking, /\.build-core-ranking-row:not\(\.is-mayhem-build-row\) \.option-stats\.is-depth\s*\{[^}]*grid-template-columns:\s*44px 40px;[^}]*column-gap:\s*10px/s);
   assert.match(wideRanking, /\.build-core-ranking-row \.option-stats\.is-depth\s*\{[^}]*repeat\(2,minmax\(48px,64px\)\)[^}]*column-gap:\s*0/s);
 	assert.match(gameplayStyles, /\.live-item-ranking \.mayhem-ranking-list\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/s);
   assert.match(gameplayStyles, /\.config-item\s*\{[^}]*width:\s*var\(--option-icon-size,42px\)/s);
@@ -6134,9 +6139,9 @@ test("R63 mandatory contracts reject every documented production regression", ()
 
 		assert.match(goFunctionSource(sources.lcuGo, "RequestJSON"), /httptrace\.WithClientTrace\(ctx, requestTrace\.clientTrace\(\)\)/); // B-1
 		assert.match(goFunctionSource(sources.lcuGo, "getBytes"), /httptrace\.WithClientTrace\(ctx, requestTrace\.clientTrace\(\)\)/);
-		assert.match(sources.gameplayGo, /value, _ := a\.playerRankScoreWithCacheStatus\(ctx, client, playerRef, isCurrent, reference\.ServerID, reference\.Privacy, false, force\)/); // B-2a overview
+		assert.match(sources.gameplayGo, /value, _ = a\.playerRankScoreWithCacheStatus\(ctx, client, playerRef, isCurrent, reference\.ServerID, reference\.Privacy, false, force\)/); // B-2a overview
 		assert.match(sources.gameplayGo, /a\.playerRankScore\(ctx, client, playerRef/); // B-2a live
-		assert.match(goFunctionSource(sources.gameplayGo, "loadQueueLabelsContext"), /if client\.queueLabelsLoaded \{\s*result := cloneQueueLabels\(client\.queueLabels\)\s*client\.queueLabelsMu\.Unlock\(\)\s*return result/); // B-2b
+		assert.match(goFunctionSource(sources.gameplayGo, "loadQueueLabelsContext"), /if client\.queueLabelsLoaded \{\s*for id, label := range client\.queueLabels \{\s*result\[id\] = label\s*\}\s*client\.queueLabelsMu\.Unlock\(\)\s*return result/); // B-2b
 		assert.doesNotMatch(functionSource(sources.gameplayJS, "updateFriendPresenceChips"), /loadOverview|renderOverview|\bapi\(/); // presence updates only its own fragment
 		const tierScope = functionSource(sources.gameplayJS, "matchTierScope");
 		assert.match(tierScope, /return `\$\{region\}:\$\{serverID\}:\$\{playerRef\}`/); // B-3
@@ -6180,7 +6185,7 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		["A-3 honest oldest timestamp", "structured", "depthFetchedAt.Before(response.FetchedAt)", "depthFetchedAt.After(response.FetchedAt)"],
 		["A-4 one source label", "championsJS", '<section class="build-depth-column"><h4><span>${label}</span></h4>', '<section class="build-depth-column"><span class="item-chain-source">${sourceNote}</span><h4><span>${label}</span></h4>'],
 		["B-1 request trace", "lcuGo", "ctx = httptrace.WithClientTrace(ctx, requestTrace.clientTrace())", "// trace attachment removed"],
-		["B-2a overview rank cache", "gameplayGo", "value, _ := a.playerRankScoreWithCacheStatus(ctx,", "value, _ := directRankLookup(ctx,"],
+		["B-2a overview rank cache", "gameplayGo", "value, _ = a.playerRankScoreWithCacheStatus(ctx,", "value, _ := directRankLookup(ctx,"],
 		["B-2a live rank cache", "gameplayGo", "a.playerRankScore(ctx, client, playerRef", "a.directRankLookup(ctx, client, playerRef"],
 		["B-2b queue cache", "gameplayGo", "if client.queueLabelsLoaded {", "if false {"],
 		["B-3 stable tier scope", "gameplayJS", "return `${region}:${serverID}:${playerRef}`;", "return `${region}:${tab.key}:${serverID}:${playerRef}`;"],

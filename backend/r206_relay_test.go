@@ -44,7 +44,7 @@ func TestR206RelayRoutingNoTokenAndDirectPriority(t *testing.T) {
 	if err := p.get(context.Background(), riotPlatformHost, "/lol/status/v4/platform-data", nil, &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(requests) != 3 || requests[0].URL.Path != "/r/kr/lol/status/v4/platform-data" || requests[1].URL.EscapedPath() != "/r/asia"+path || requests[1].URL.RawQuery != "start=0" {
+	if len(requests) != 3 || requests[0].URL.Path != "/health" || requests[1].URL.EscapedPath() != "/r/asia"+path || requests[1].URL.RawQuery != "start=0" {
 		t.Fatal("relay mapping/probe", requests)
 	}
 	for _, r := range requests {
@@ -110,8 +110,8 @@ func TestR206RelayEmptyAndFailureCooldown(t *testing.T) {
 	remaining := time.Until(riotRelays.nextTry)
 	riotRelays.nextTry = time.Now().Add(-time.Second)
 	riotRelays.mu.Unlock()
-	if remaining < 4*time.Minute || remaining > 5*time.Minute {
-		t.Fatal("not five-minute cooldown", remaining)
+	if remaining < 14*time.Second || remaining > 15*time.Second {
+		t.Fatal("not initial fifteen-second backoff", remaining)
 	}
 	_ = p.get(context.Background(), riotPlatformHost, "/lol/status/v4/platform-data", nil, &out)
 	if calls != 2 {

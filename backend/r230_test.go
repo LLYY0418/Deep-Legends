@@ -19,7 +19,7 @@ func TestR230SeasonParseLossRetriesSamePage(t *testing.T) {
 	a.storage = r175App(t).storage
 	reference, _ := a.resolveGameplayReferenceDetails(ref)
 	info := &riotMatchInfo{GameID: 1, QueueID: 420, GameCreation: seasonStartS26.Add(time.Hour).UnixMilli()}
-	a.sgp.cacheHistoryPage("HN1", reference.PlayerRef, 0, 50, nil, sgpHistoryCacheEntry{games: []*riotMatchInfo{info}, consumed: 50, more: false})
+	a.sgp.cacheHistoryPage("HN1", reference.PlayerRef, 0, 50, seasonStreamTags["ranked"], sgpHistoryCacheEntry{games: []*riotMatchInfo{info}, consumed: 50, more: false})
 	scan := &seasonScanState{cache: seasonStatsCache{}, stats: map[int64]*gameplaySeasonChampionStat{}, queueStats: map[int64]gameplayAggregate{}, seen: map[int64]bool{}, seasonStartMillis: seasonStartS26.UnixMilli()}
 	a.seasonScanPages(context.Background(), a.lcu, "HN1", reference.PlayerRef, scan, 1)
 	if scan.cache.Complete || scan.cache.ResumeIndex != 0 || !scan.interrupted {
@@ -50,7 +50,7 @@ func TestR230SeasonCompletionRequiresBoundaryOrCleanTerminalPage(t *testing.T) {
 					infos = append(infos, infos[0])
 				}
 			}
-			a.sgp.cacheHistoryPage("HN1", reference.PlayerRef, 0, 50, nil, sgpHistoryCacheEntry{games: infos, consumed: len(infos), more: tc.more})
+			a.sgp.cacheHistoryPage("HN1", reference.PlayerRef, 0, 50, seasonStreamTags["ranked"], sgpHistoryCacheEntry{games: infos, consumed: len(infos), more: tc.more})
 			scan := &seasonScanState{stats: map[int64]*gameplaySeasonChampionStat{}, queueStats: map[int64]gameplayAggregate{}, seen: map[int64]bool{}, seasonStartMillis: seasonStartS26.UnixMilli()}
 			a.seasonScanPages(context.Background(), a.lcu, "HN1", reference.PlayerRef, scan, 1)
 			if scan.cache.Complete != tc.want {
@@ -285,7 +285,7 @@ func TestR230IncompleteHeadWithoutResumeAdvancesAcrossKnownGames(t *testing.T) {
 	for i := range infos {
 		infos[i] = &riotMatchInfo{GameID: int64(i + 1), GameCreation: seasonStartS26.Add(time.Hour).UnixMilli()}
 	}
-	a.sgp.cacheHistoryPage("HN1", reference.PlayerRef, 0, 50, nil, sgpHistoryCacheEntry{games: infos, consumed: 50, more: true})
+	a.sgp.cacheHistoryPage("HN1", reference.PlayerRef, 0, 50, seasonStreamTags["ranked"], sgpHistoryCacheEntry{games: infos, consumed: 50, more: true})
 	scan := &seasonScanState{stats: map[int64]*gameplaySeasonChampionStat{}, queueStats: map[int64]gameplayAggregate{}, seen: map[int64]bool{1: true}, seasonStartMillis: seasonStartS26.UnixMilli()}
 	a.seasonScanPages(context.Background(), a.lcu, "HN1", reference.PlayerRef, scan, 1)
 	if scan.cache.Complete || scan.cache.ResumeIndex != 50 || scan.cache.PendingIndex != 50 {

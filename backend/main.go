@@ -105,6 +105,13 @@ type app struct {
 	snapshotReady                   bool
 	collectionRequested             bool
 	connectionState                 string
+	shutdownClient                  *LCUClient
+	shutdownAt                      time.Time
+	shutdownTimer                   *time.Timer
+	shutdownEvents                  map[string]time.Time
+	currentRiotDetailFlights        map[string]bool
+	shutdownChatOfflineAt           time.Time
+	shutdownFriendsEmptyAt          time.Time
 	eventStream                     bool
 	summoner                        Summoner
 	summonerIdentityAt              time.Time
@@ -552,6 +559,12 @@ func main() {
 		log.Printf("Deep Legends %s 自检通过：奖池 %d 条，哈希 %s", version, len(builtInPool.Names), builtInPool.Hash[:12])
 		return
 	}
+	championProvider.diag = func(event map[string]any) {
+		a.recordDiagnostic(event)
+		if event["event"] == "riot-relay-recovered" {
+			a.broadcastEvent(`{"type":"riot-relay-recovered"}`)
+		}
+	}
 	mux := http.NewServeMux()
 	// Go 内置的 MIME 表里没有 .woff2，缺省会回落到按内容嗅探出的
 	// application/octet-stream。我们对所有响应都加了 X-Content-Type-Options: nosniff，
@@ -590,6 +603,7 @@ func main() {
 	mux.HandleFunc("GET /api/gameplay/pro-runes", a.authorized(a.handleGameplayProRunes))
 	mux.HandleFunc("POST /api/gameplay/match-tiers", a.authorized(a.handleGameplayMatchTiers))
 	mux.HandleFunc("POST /api/gameplay/current-game", a.authorized(a.handleOverviewCurrentGame))
+	mux.HandleFunc("GET /api/gameplay/season-summary", a.authorized(a.handleGameplaySeasonSummary))
 	mux.HandleFunc("POST /api/gameplay/season-summary", a.authorized(a.handleOPGGSeasonSummary))
 	mux.HandleFunc("POST /api/gameplay/match-timeline", a.authorized(a.handleGameplayMatchTimeline))
 	mux.HandleFunc("POST /api/gameplay/match", a.authorized(a.handleGameplayMatch))
@@ -828,7 +842,7 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	}
 	response := statusResponse{
 		ClientDiscovery: clientDiscovery,
-		Version:         version, BuildFingerprint: buildFingerprint, Connected: a.connected, IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
+		Version:         version, BuildFingerprint: buildFingerprint, Connected: a.connected && a.shutdownClient == nil, IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
 		Syncing: a.syncing, LastSync: a.lastSync, LastAttempt: a.lastAttempt, LastDurationMS: a.lastDuration.Milliseconds(),
 		LastError: a.lastError, Summoner: summoner, OwnedCount: ownedCount, ChromaOwnedCount: ownedChromaCount(a.chromas), PoolTotal: a.poolTotal,
 		PoolMatched: a.poolMatched, Remaining: remainingCount, CalculationOK: a.calculationOKLocked(),

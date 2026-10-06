@@ -16,7 +16,7 @@ func TestR212RelayNotFoundAndHTTPStatusSummary(t *testing.T) {
 	for _, status := range []int{404, 400} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			p, clock, _ := r208Relay(t, r196RoundTrip(func(r *http.Request) (*http.Response, error) {
-				if strings.Contains(r.URL.Path, "/status/") {
+				if r.URL.Path == "/health" || strings.Contains(r.URL.Path, "/status/") {
 					return r206RelayResponse(200, []byte(`{}`)), nil
 				}
 				return r206RelayResponse(status, []byte(`{"status":{"message":"fixture"}}`)), nil
@@ -95,7 +95,7 @@ func TestR212RelayCategoriesAndSummaryReset(t *testing.T) {
 
 func TestR212RelayQuotaPageKeepsR208Priority(t *testing.T) {
 	p, clock, _ := r208Relay(t, r196RoundTrip(func(r *http.Request) (*http.Response, error) {
-		if strings.Contains(r.URL.Path, "/status/") {
+		if r.URL.Path == "/health" || strings.Contains(r.URL.Path, "/status/") {
 			return r206RelayResponse(200, []byte(`{}`)), nil
 		}
 		response := r206RelayResponse(404, []byte(`<html>Error 1027</html>`))

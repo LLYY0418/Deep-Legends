@@ -182,7 +182,7 @@ func TestR208IPPartialResumeWithoutRepeatedSuccessfulDetails(t *testing.T) {
 		path := r.URL.Path
 		calls[path]++
 		switch {
-		case strings.HasSuffix(path, "/platform-data"):
+		case path == "/health" || strings.HasSuffix(path, "/platform-data"):
 			return r206RelayResponse(200, []byte(`{}`)), nil
 		case strings.Contains(path, "/summoners/by-puuid/"):
 			return r206RelayResponse(200, []byte(`{"puuid":"subject","summonerLevel":99}`)), nil

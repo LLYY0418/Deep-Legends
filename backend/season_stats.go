@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -28,7 +31,7 @@ var seasonStartS26 = time.Date(2026, 1, 8, 0, 0, 0, 0, time.UTC)
 // 11 R216: Go v2 scores and champion/opponent table totals.
 // 12 R216 P4: adopted v2.1 scores; reject all persisted v2 table aggregates.
 // 13 R230: discard caches marked complete by malformed SGP history in 0.12.73.
-const seasonStatsCacheSchemaVersion = 13
+const seasonStatsCacheSchemaVersion = 14
 
 const seasonStatsSource = dataSourceSGP
 
@@ -305,14 +308,36 @@ type seasonStatsProgress struct {
 	Message        string `json:"message,omitempty"`
 }
 
+type seasonStatsStream struct {
+	ResumeIndex      int    `json:"resumeIndex,omitempty"`
+	PendingIndex     int    `json:"pendingIndex,omitempty"`
+	Complete         bool   `json:"complete"`
+	CappedByUpstream bool   `json:"capped_by_upstream,omitempty"`
+	StopReason       string `json:"stop_reason,omitempty"`
+	OldestCreatedAt  int64  `json:"oldest_created_at,omitempty"`
+}
+
+var seasonStreamTags = map[string][]string{"ranked": {"q_420", "q_440"}, "mayhem": {"q_2300", "q_2400", "q_3270"}}
+var seasonWriteLocks sync.Map
+
+func seasonWriteLock(key string) *sync.Mutex {
+	lock, _ := seasonWriteLocks.LoadOrStore(key, &sync.Mutex{})
+	return lock.(*sync.Mutex)
+}
+
 type seasonStatsCache struct {
-	ChampionTable []seasonTableBucket          `json:"championTable,omitempty"`
-	SchemaVersion int                          `json:"schemaVersion"`
-	Source        string                       `json:"source"`
-	Season        string                       `json:"season"`
-	AccountHash   string                       `json:"accountHash"`
-	GameIDs       []int64                      `json:"gameIds"`
-	Stats         []gameplaySeasonChampionStat `json:"stats"`
+	Streams           map[string]seasonStatsStream `json:"streams,omitempty"`
+	CappedByUpstream  bool                         `json:"capped_by_upstream,omitempty"`
+	newInfos          map[int64]*riotMatchInfo
+	playerRef         string
+	seasonStartMillis int64
+	ChampionTable     []seasonTableBucket          `json:"championTable,omitempty"`
+	SchemaVersion     int                          `json:"schemaVersion"`
+	Source            string                       `json:"source"`
+	Season            string                       `json:"season"`
+	AccountHash       string                       `json:"accountHash"`
+	GameIDs           []int64                      `json:"gameIds"`
+	Stats             []gameplaySeasonChampionStat `json:"stats"`
 	// QueueStats 与 Stats 来自同一次整季遍历，按队列分开聚合（420/440 与
 	// 海克斯大乱斗的 2300/2400/3270，判据见 seasonStatsQueueAllowed）。
 	// 排位接口缺少负场时只能使用对应队列的数据，不能使用多队列合并总量。
@@ -366,6 +391,81 @@ func (s *localStore) saveSeasonStats(cache seasonStatsCache) error {
 func (s *localStore) saveSeasonStatsReported(cache seasonStatsCache) (seasonStatsBudgetReport, error) {
 	if s == nil || strings.TrimSpace(cache.AccountHash) == "" || strings.TrimSpace(cache.Season) == "" {
 		return seasonStatsBudgetReport{}, errors.New("season stats storage unavailable")
+	}
+	lock := seasonWriteLock(filepath.Join(s.root, seasonStatsFileKey(cache.Source, cache.AccountHash, cache.Season)))
+	lock.Lock()
+	defer lock.Unlock()
+	if disk, err := s.loadSeasonStats(cache.Source, cache.AccountHash, cache.Season); err == nil {
+		diskIDs := map[int64]bool{}
+		incomingIDs := map[int64]bool{}
+
+		for _, id := range cache.GameIDs {
+			incomingIDs[id] = true
+		}
+		for _, id := range disk.GameIDs {
+			diskIDs[id] = true
+
+		}
+		if cache.newInfos != nil {
+			stats := map[int64]*gameplaySeasonChampionStat{}
+			for _, row := range disk.Stats {
+				copy := row
+				stats[row.ChampionID] = &copy
+			}
+			if disk.QueueStats == nil {
+				disk.QueueStats = map[int64]gameplayAggregate{}
+			}
+			for id, info := range cache.newInfos {
+				if !diskIDs[id] {
+					disk.GameIDs = append(disk.GameIDs, id)
+					diskIDs[id] = true
+					seasonStatsAccumulate(stats, disk.QueueStats, info, cache.playerRef, cache.seasonStartMillis)
+					seasonAccumulateChampionTable(&disk, info, cache.playerRef, cache.seasonStartMillis)
+					seasonRecordRankedMatch(&disk, info, cache.playerRef)
+				}
+			}
+			names := bundledChampionNames()
+			for _, row := range disk.Stats {
+				if row.ChampionName != "" {
+					names[row.ChampionID] = row.ChampionName
+				}
+			}
+			for _, row := range cache.Stats {
+				if row.ChampionName != "" {
+					names[row.ChampionID] = row.ChampionName
+				}
+			}
+			cache.Stats = seasonStatsRawRows(stats, names)
+			cache.QueueStats = seasonStatsFinalizeQueues(disk.QueueStats)
+			cache.ChampionTable = disk.ChampionTable
+			cache.RankedMatches = disk.RankedMatches
+			cache.AugmentSamples = disk.AugmentSamples
+		}
+		if cache.Streams == nil {
+			cache.Streams = map[string]seasonStatsStream{}
+		}
+		for key, previous := range disk.Streams {
+			current := cache.Streams[key]
+			if previous.Complete && !current.Complete || !current.Complete && previous.ResumeIndex > current.ResumeIndex {
+				cache.Streams[key] = previous
+			}
+		}
+		if len(cache.Streams) > 0 {
+			cache.Complete = len(cache.Streams) == 2
+			for _, cursor := range cache.Streams {
+				cache.Complete = cache.Complete && cursor.Complete
+				cache.CappedByUpstream = cache.CappedByUpstream || cursor.CappedByUpstream
+			}
+		}
+		for _, id := range disk.GameIDs {
+			if !incomingIDs[id] {
+				cache.GameIDs = append(cache.GameIDs, id)
+				incomingIDs[id] = true
+			}
+		}
+		seasonTrimChampionTable(&cache, 40)
+		seasonTrimRankedMatches(&cache)
+		seasonTrimAugmentSamples(&cache)
 	}
 	data, report := marshalSeasonStatsWithinBudget(cache)
 	if report.MarshalErr != nil {
@@ -659,7 +759,7 @@ func (a *app) loadSeasonChampionStatsWithHistoryCache(ctx context.Context, clien
 	}
 	scan := &seasonScanState{
 		cache: cache, stats: stats, queueStats: queueStats, seen: seen,
-		seasonStartMillis: seasonStart.UnixMilli(),
+		seasonStartMillis: seasonStart.UnixMilli(), headOnly: true,
 	}
 	// 首屏只做「增量头部扫描」：从最新一页往回扫，撞到已缓存的对局就停。
 	// 老玩家第一次打开时缓存是空的，整季回补会是几十页 × 每页约 2.8MB
@@ -675,7 +775,12 @@ func (a *app) loadSeasonChampionStatsWithHistoryCache(ctx context.Context, clien
 		progress.Message = "赛季统计暂时中断，已保留当前进度"
 	}
 	if !scan.cache.Complete {
-		a.startSeasonBackfill(client, reference, player, playerRef, names, serverID, accountHash, season, seasonStart)
+		a.seasonBackfillMu.Lock()
+		_, running := a.seasonBackfills[sourceScopedKey(seasonStatsSource, accountHash+"|"+season)]
+		a.seasonBackfillMu.Unlock()
+		if !running {
+			a.startSeasonBackfill(client, reference, player, playerRef, names, serverID, accountHash, season, seasonStart)
+		}
 	}
 	if progress.Message == "" {
 		if progress.Complete {
@@ -757,7 +862,7 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 		return
 	}
 	a.cacheSeasonQuerySnapshotLocked(key, now)
-	flightKey := "overview:" + key
+	flightKey := sourceScopedKey(seasonStatsSource, accountHash+"|"+season)
 	if a.seasonBackfills == nil {
 		a.seasonBackfills = make(map[string]struct{})
 	}
@@ -775,6 +880,8 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 			a.seasonBackfillMu.Lock()
 			delete(a.seasonBackfills, flightKey)
 			a.seasonBackfillMu.Unlock()
+			_, seasonStart := currentRankedSeason(time.Now())
+			a.startSeasonBackfill(client, reference, player, playerRef, names, serverID, accountHash, season, seasonStart)
 		}()
 		ctx, cancel := context.WithTimeout(context.Background(), seasonBackfillTimeout)
 		defer cancel()
@@ -849,6 +956,11 @@ type seasonScanState struct {
 	queueStats        map[int64]gameplayAggregate
 	seen              map[int64]bool
 	seasonStartMillis int64
+	playerRef         string
+	headOnly          bool
+	serialPages       bool
+	newInfos          map[int64]*riotMatchInfo
+	round             int
 	scanned           int
 	interrupted       bool
 }
@@ -866,73 +978,148 @@ func (a *app) seasonScanPages(ctx context.Context, client *LCUClient, serverID, 
 }
 
 func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUClient, serverID, playerRef string, scan *seasonScanState, budget int, useHistoryCache bool) {
+	scan.interrupted = false
 	if !isTencentClient(client) {
 		scan.interrupted = true
 		return
 	}
-	start := scan.cache.ResumeIndex
-	headScan := start == 0
-	for page := 0; page < budget; page++ {
-		infos, consumed, more, err := a.sgp.matchHistoryOn(ctx, client, serverID, playerRef, start, sgpPageSize, useHistoryCache)
-		// consumed counts upstream entries, including rejected JSON. Retry the same
-		// offset after a parse loss; seen IDs prevent double-counting valid rows.
-		if len(infos) < consumed {
-			scan.cache.Complete = false
-			scan.cache.ResumeIndex = start
-			scan.cache.PendingIndex = start
-			scan.interrupted = true
-			a.recordDiagnostic(map[string]any{"event": "season_scan_parse_dropped", "returned": consumed, "parsed": len(infos), "resume_index": start})
-			return
+	if scan.cache.Streams == nil {
+		scan.cache.Streams = map[string]seasonStatsStream{}
+	}
+	scan.playerRef = playerRef
+	if scan.newInfos == nil {
+		scan.newInfos = map[int64]*riotMatchInfo{}
+	}
+	for _, stream := range []string{"ranked", "mayhem"} {
+		cursor := scan.cache.Streams[stream]
+		if cursor.Complete {
+			cursor.ResumeIndex = 0
+			cursor.PendingIndex = 0
 		}
-		if err != nil {
-			scan.interrupted = true
-			return
+		if !scan.headOnly && cursor.Complete {
+			continue
 		}
-		if consumed <= 0 && !more {
-			scan.cache.Complete = true
-			scan.cache.ResumeIndex = 0
-			return
+		seedContinuation := cursor.ResumeIndex == 0 && !cursor.Complete
+		start := cursor.ResumeIndex
+		if scan.headOnly {
+			start = 0
 		}
-		cachedHit := false
-		reachedSeasonStart := false
-		for _, info := range infos {
-			if info == nil || info.GameID <= 0 {
-				continue
+		type pageResult struct {
+			infos    []*riotMatchInfo
+			consumed int
+			more     bool
+			err      error
+			elapsed  time.Duration
+		}
+		prefetched := map[int]pageResult{}
+		lastFull := false
+		fetch := func(offset int) pageResult {
+			began := time.Now()
+			infos, consumed, more, err := a.sgp.matchHistoryFilteredOn(ctx, client, serverID, playerRef, offset, sgpPageSize, seasonStreamTags[stream], useHistoryCache)
+			return pageResult{infos, consumed, more, err, time.Since(began)}
+		}
+		for page := 0; page < budget; page++ {
+			if _, ok := prefetched[start]; !ok && !scan.headOnly && !scan.serialPages && lastFull && page+1 < budget {
+				next := start + sgpPageSize
+				ch := make(chan pageResult, 1)
+				go func() {
+					result := pageResult{err: errors.New("season prefetch interrupted")}
+					defer func() { ch <- result }()
+					defer recoverPanic("season.prefetch")
+					result = fetch(next)
+				}()
+				prefetched[start] = fetch(start)
+				prefetched[next] = <-ch
+				for _, result := range prefetched {
+					if result.err != nil || result.elapsed > 3*time.Second {
+						scan.serialPages = true
+						a.recordDiagnostic(map[string]any{"event": "season_backfill_concurrency", "stream": stream, "concurrency": 1, "reason": "slow-or-failed"})
+						break
+					}
+				}
 			}
-			created := normalizeEpochMillis(info.GameCreation)
-			if created > 0 && created < scan.seasonStartMillis {
-				reachedSeasonStart = true
+			result, ok := prefetched[start]
+			if ok {
+				delete(prefetched, start)
+			} else {
+				result = fetch(start)
+			}
+			infos, consumed, more, err := result.infos, result.consumed, result.more, result.err
+			lastFull = consumed == sgpPageSize && more
+
+			if err != nil || len(infos) < consumed {
+				scan.interrupted = true
+				if len(infos) < consumed {
+					a.recordDiagnostic(map[string]any{"event": "season_scan_parse_dropped", "stream": stream, "returned": consumed, "parsed": len(infos), "resume_index": start})
+				}
 				break
 			}
-			if scan.seen[info.GameID] {
-				cachedHit = true
-				continue
+			hit, boundary := false, false
+			for _, info := range infos {
+				if info == nil || info.GameID <= 0 {
+					continue
+				}
+				created := normalizeEpochMillis(info.GameCreation)
+				if created > 0 && (cursor.OldestCreatedAt == 0 || created < cursor.OldestCreatedAt) {
+					cursor.OldestCreatedAt = created
+				}
+				if created > 0 && created < scan.seasonStartMillis {
+					boundary = true
+					break
+				}
+				if scan.seen[info.GameID] {
+					hit = true
+					continue
+				}
+				scan.seen[info.GameID] = true
+				scan.cache.GameIDs = append(scan.cache.GameIDs, info.GameID)
+				scan.scanned++
+				scan.newInfos[info.GameID] = info
+				seasonStatsAccumulate(scan.stats, scan.queueStats, info, playerRef, scan.seasonStartMillis)
+				seasonAccumulateChampionTable(&scan.cache, info, playerRef, scan.seasonStartMillis)
+				seasonRecordRankedMatch(&scan.cache, info, playerRef)
 			}
-			scan.seen[info.GameID] = true
-			scan.cache.GameIDs = append(scan.cache.GameIDs, info.GameID)
-			scan.scanned++
-			seasonStatsAccumulate(scan.stats, scan.queueStats, info, playerRef, scan.seasonStartMillis)
-			seasonAccumulateChampionTable(&scan.cache, info, playerRef, scan.seasonStartMillis)
-			seasonRecordRankedMatch(&scan.cache, info, playerRef)
+			start += consumed
+			if boundary || !more {
+				cursor.Complete = true
+				cursor.ResumeIndex = 0
+				cursor.PendingIndex = 0
+				cursor.StopReason = "upstream_end"
+				if boundary {
+					cursor.StopReason = "season_start"
+				} else if start >= 1000 {
+					cursor.StopReason = "upstream_cap_1000"
+					cursor.CappedByUpstream = true
+				}
+
+				break
+			}
+			if scan.headOnly && hit {
+				break
+			}
+			// Only cold head scans seed continuation; completed/in-progress cursors
+			// survive every subsequent stateless head refresh.
+			if !scan.headOnly || seedContinuation {
+				cursor.ResumeIndex = start
+				cursor.PendingIndex = start
+			}
 		}
-		start += consumed
-		scan.cache.ResumeIndex = start
-		if reachedSeasonStart || !more {
-			scan.cache.Complete = true
-			scan.cache.ResumeIndex = 0
-			return
-		}
-		// 增量追新（从 0 开始扫）撞到缓存说明新对局已经全部补齐，可以停；
-		// 但这不代表整季完整，Complete 交给缓存里原本的标记，别在这里置真。
-		// A rejected head page may leave no trustworthy continuation. In that
-		// case advance through the known IDs instead of resetting to offset 0
-		// forever on every retry/backfill round.
-		if headScan && cachedHit && (scan.cache.Complete || scan.cache.PendingIndex > 0) {
-			scan.cache.ResumeIndex = scan.cache.PendingIndex
-			return
+		scan.cache.Streams[stream] = cursor
+		a.recordDiagnostic(map[string]any{"event": "season_backfill_round", "stream": stream, "round": scan.round, "stop_reason": cursor.StopReason, "oldest_created_at": cursor.OldestCreatedAt, "resume_index": cursor.ResumeIndex, "complete": cursor.Complete, "capped_by_upstream": cursor.CappedByUpstream, "head": scan.headOnly})
+		if scan.interrupted {
+			break
 		}
 	}
-	scan.cache.PendingIndex = scan.cache.ResumeIndex
+	scan.cache.Complete = len(scan.cache.Streams) == 2
+	scan.cache.CappedByUpstream = false
+	scan.cache.ResumeIndex = 0
+	scan.cache.PendingIndex = 0
+	for _, cursor := range scan.cache.Streams {
+		scan.cache.Complete = scan.cache.Complete && cursor.Complete
+		scan.cache.CappedByUpstream = scan.cache.CappedByUpstream || cursor.CappedByUpstream
+		scan.cache.ResumeIndex = max(scan.cache.ResumeIndex, cursor.ResumeIndex)
+		scan.cache.PendingIndex = max(scan.cache.PendingIndex, cursor.PendingIndex)
+	}
 }
 
 func (a *app) finishSeasonScan(scan *seasonScanState, names map[int64]string, accountHash string) {
@@ -942,6 +1129,9 @@ func (a *app) finishSeasonScan(scan *seasonScanState, names map[int64]string, ac
 	snapshots := seasonTrimRankedMatches(&scan.cache)
 	augmentDropped := seasonTrimAugmentSamples(&scan.cache)
 	scan.cache.UpdatedAt = time.Now().UTC()
+	scan.cache.newInfos = scan.newInfos
+	scan.cache.playerRef = scan.playerRef
+	scan.cache.seasonStartMillis = scan.seasonStartMillis
 	// 一次性的目录级健康检查（工单 P1 第 1 条第 3 项）：挂在首次扫描收尾，
 	// 每个存储根只跑一次，不做实时监控。
 	a.checkSeasonStatsDirectoryHealth()
@@ -949,6 +1139,21 @@ func (a *app) finishSeasonScan(scan *seasonScanState, names map[int64]string, ac
 	if accountHash != "" && a.storage != nil {
 		report, err := a.storage.saveSeasonStatsReported(scan.cache)
 		budget = report
+		if err == nil {
+			if disk, loadErr := a.storage.loadSeasonStats(seasonStatsSource, accountHash, scan.cache.Season); loadErr == nil {
+				scan.cache = disk
+				scan.stats = map[int64]*gameplaySeasonChampionStat{}
+				for _, row := range disk.Stats {
+					copy := row
+					scan.stats[row.ChampionID] = &copy
+				}
+				scan.queueStats = disk.QueueStats
+				scan.seen = map[int64]bool{}
+				for _, id := range disk.GameIDs {
+					scan.seen[id] = true
+				}
+			}
+		}
 		if err != nil {
 			// 写入失败不能静默：赛季缓存是几十页请求换来的，丢了要能从日志看出来。
 			a.recordDiagnostic(map[string]any{
@@ -957,6 +1162,7 @@ func (a *app) finishSeasonScan(scan *seasonScanState, names map[int64]string, ac
 			})
 		}
 	}
+	scan.newInfos = nil
 	solo, flex := snapshots[seasonQueueSoloDuo], snapshots[seasonQueueFlex]
 	mayhem := seasonMayhemSnapshot(snapshots)
 	a.recordDiagnostic(map[string]any{
@@ -1039,10 +1245,11 @@ func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference
 		// （客户端不给负场，只能等整季统计补胜率）就一直停在「正在统计中」。
 		for round := 1; round <= seasonBackfillMaxRounds; round++ {
 			before := scan.scanned
+			scan.round = round
 			a.seasonScanPagesWithHistoryCache(ctx, client, serverID, playerRef, scan, seasonScanBackgroundPages, false)
 			a.finishSeasonScan(scan, names, accountHash)
 			a.recordDiagnostic(map[string]any{
-				"event": "season_backfill_round", "season": season, "scanned": scan.scanned - before,
+				"event": "season_backfill_batch", "season": season, "scanned": scan.scanned - before,
 				"round": round, "total_games": len(scan.cache.GameIDs),
 				"resume_index": scan.cache.ResumeIndex, "complete": scan.cache.Complete,
 				"interrupted": scan.interrupted, "ranked_samples": len(scan.cache.RankedMatches),
@@ -1274,4 +1481,21 @@ func seasonWinRatePercent(wins, games int) int {
 		return 0
 	}
 	return int(float64(wins)*100/float64(games) + 0.5)
+}
+
+func (a *app) handleGameplaySeasonSummary(w http.ResponseWriter, r *http.Request) {
+	reference, ok := a.resolveGameplayReferenceDetails(strings.TrimSpace(r.URL.Query().Get("playerRef")))
+	if !ok {
+		http.Error(w, "玩家引用已失效", http.StatusNotFound)
+		return
+	}
+	player := Summoner{PUUID: reference.PlayerRef}
+	rows, progress, ranked, queues := a.loadSeasonChampionStatsSnapshot(reference, player, reference.PlayerRef)
+	rankedQueues := buildGameplayRankedQueues(gameplayRankedQueueTabs(nil, ranked), reference.PlayerRef, nil, reference.Region)
+	for key, item := range rankedQueues {
+		queueID, _ := strconv.ParseInt(key, 10, 64)
+		item.SeasonGames = queues[queueID].Games
+		rankedQueues[key] = item
+	}
+	respondJSON(w, map[string]any{"seasonChampionStats": rows, "seasonOverall": seasonStatsOverall(rows), "seasonStatsProgress": progress, "seasonQueueStats": queues, "rankedQueues": rankedQueues})
 }

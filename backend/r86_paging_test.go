@@ -88,7 +88,7 @@ func TestR86TenPageSeasonBackfillDoesNotPopulateHistoryCache(t *testing.T) {
 	a, calls := r86PagingProvider(t, 500)
 	a.storage = trackTestStore(t, &localStore{root: t.TempDir()})
 	season, start := currentRankedSeason(time.Now())
-	cache := seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: season, AccountHash: "r86-fixture", ResumeIndex: 50}
+	cache := seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: season, AccountHash: "r86-fixture", Streams: map[string]seasonStatsStream{"ranked": {ResumeIndex: 50}, "mayhem": {Complete: true}}}
 	if err := a.storage.saveSeasonStats(cache); err != nil {
 		t.Fatal(err)
 	}
@@ -107,8 +107,8 @@ func TestR86TenPageSeasonBackfillDoesNotPopulateHistoryCache(t *testing.T) {
 		}
 		time.Sleep(time.Millisecond)
 	}
-	if calls.Load() != 10 {
-		t.Fatalf("backfill requests=%d want10", calls.Load())
+	if calls.Load() != 11 {
+		t.Fatalf("backfill requests=%d want11 (one terminal-page prefetch)", calls.Load())
 	}
 	result, err := a.storage.loadSeasonStats(seasonStatsSource, cache.AccountHash, season)
 	if err != nil || !result.Complete || len(result.GameIDs) != 499 {

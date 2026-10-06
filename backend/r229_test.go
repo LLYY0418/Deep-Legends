@@ -67,7 +67,7 @@ func TestR229ClientHistoryUsesPublicIdentityAndHighlightsSelf(t *testing.T) {
 		t.Fatal("client PUUID marked public")
 	}
 	for i := 0; i < 2; i++ {
-		matches, caps, _ := a.loadDetailedMatches(t.Context(), client, ref, local, true, 0, 10, "all", nil, nil)
+		matches, caps, _ := a.loadDetailedMatches(t.Context(), client, ref, local, false, 0, 10, "all", nil, nil)
 		var err error
 		if len(caps) == 0 || len(caps[0].Attempts) != 1 || caps[0].Attempts[0].Source != dataSourceRiot {
 			t.Fatal(caps)
@@ -157,7 +157,7 @@ func TestR229MissingRiotIDFallsBackWithoutPublicRequest(t *testing.T) {
 	})}
 	a := &app{riot: newRiotProvider(ch), lcu: client, summoner: Summoner{PUUID: strings.Repeat("l", 48)}}
 	_, caps, _ := a.loadDetailedMatches(t.Context(), client, gameplayReference{}, a.summoner.PUUID, true, 0, 20, "all", nil, nil)
-	if len(caps) == 0 || len(caps[0].Attempts) < 2 || caps[0].Attempts[0].Outcome != dataSourceFailed || caps[0].Attempts[1].Source != dataSourceLCU {
+	if len(caps) == 0 || len(caps[0].Attempts) != 1 || caps[0].Attempts[0].Source != dataSourceLCU {
 		t.Fatal(caps)
 	}
 }

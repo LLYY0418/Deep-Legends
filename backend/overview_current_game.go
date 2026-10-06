@@ -523,7 +523,7 @@ func (a *app) fetchOPGGCurrentGame(ctx context.Context, ref gameplayReference) (
 
 func (a *app) loadCurrentGame(ctx context.Context, ref gameplayReference) (*currentGame, error) {
 	if !isRiotRegion(ref.Region) || ref.ServerID != "" || a.champions == nil || !a.champions.featureGates.enabled(featureGateOPGG) {
-		return nil, errors.New("韩服当前对局来源不可用")
+		return nil, errors.New(riotRegionLabel(ref.Region) + "当前对局来源不可用")
 	}
 	key := sourceScopedKey("current-game", overviewSupplementCacheIdentity(ref))
 	cache := &a.currentGames
@@ -620,7 +620,7 @@ func (a *app) handleOverviewCurrentGame(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if !isRiotRegion(ref.Region) {
-		http.Error(w, "仅支持韩服玩家当前对局", http.StatusBadRequest)
+		http.Error(w, "仅支持外服玩家当前对局", http.StatusBadRequest)
 		return
 	}
 	if strings.EqualFold(strings.TrimSpace(ref.Privacy), "PRIVATE") {

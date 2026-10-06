@@ -61,10 +61,12 @@
                 <div class="region-menu-section region-menu-section-cn" role="none">
                   <div class="region-menu-section-head">
                     <button id="player-search-cn-toggle" class="region-menu-section-toggle" type="button" role="menuitem" aria-expanded="false" aria-controls="player-search-cn-options" data-region-menu-entry><b>国服</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
-                    <button id="player-search-cn-info" class="region-menu-section-info" type="button" aria-label="查看国服合区说明" data-tooltip data-tooltip-side="menu" data-tooltip-size="compact"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10.8v6M12 7.5h.01"/></svg></button>
                   </div>
                   <div id="player-search-cn-options" class="region-menu-cn-options" role="group" aria-label="国服服务器" hidden>
-                    <button id="player-search-follow-client" class="region-menu-follow" type="button" role="menuitemradio" aria-checked="true" data-region-option="cn" data-server-id="" data-region-menu-entry disabled><span class="region-option-dot" aria-hidden="true"></span><span class="region-follow-copy"><b>跟随客户端</b><span id="player-search-follow-status">需要客户端在运行</span></span></button>
+                    <div class="region-menu-follow-row" role="none">
+                      <button id="player-search-follow-client" class="region-menu-follow" type="button" role="menuitemradio" aria-checked="true" data-region-option="cn" data-server-id="" data-region-menu-entry disabled><span class="region-option-dot" aria-hidden="true"></span><span class="region-follow-copy"><b>跟随客户端</b><span id="player-search-follow-status">需要客户端在运行</span></span></button>
+                      <button id="player-search-cn-info" class="region-menu-section-info" type="button" aria-label="查看国服合区说明" data-tooltip data-tooltip-side="menu" data-tooltip-size="compact"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10.8v6M12 7.5h.01"/></svg></button>
+                    </div>
                     <div class="region-menu-divider" role="presentation"></div>
                     <div class="region-server-grid" role="group" aria-label="指定国服服务器">
                       <button type="button" role="menuitemradio" aria-checked="false" data-region-option="cn" data-server-id="HN1" data-region-menu-entry><b>艾欧尼亚</b></button>
