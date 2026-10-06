@@ -2,6 +2,10 @@
 
 const { contextBridge, ipcRenderer } = require("electron");
 
+contextBridge.exposeInMainWorld("desktopClipboard", {
+  copyText(text) { return ipcRenderer.invoke("desktop-copy-text", typeof text === "string" ? text.slice(0, 256) : ""); },
+});
+
 contextBridge.exposeInMainWorld("desktopScale", {
   get() { return ipcRenderer.invoke("desktop-scale-get"); },
   set(mode, value) { ipcRenderer.send("desktop-scale-set", mode, value); },

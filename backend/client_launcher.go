@@ -95,10 +95,14 @@ func buildDetectedClientInstallations(gameRoots, riotExecutables []string, short
 		if installation.ID == "riot" && isTencentInstallPath(installation.shortcut) {
 			continue
 		}
-		add(installation, "shortcut")
+		source := "shortcut"
+		if installation.ID == "wegame" && installation.executable != "" {
+			source = "registry"
+		}
+		add(installation, source)
 	}
 
-	order := map[string]int{"tcls": 0, "riot": 1}
+	order := map[string]int{"tcls": 0, "wegame": 1, "riot": 2}
 	result := make([]clientInstallation, 0, len(byID))
 	for _, installation := range byID {
 		result = append(result, installation)
@@ -108,6 +112,7 @@ func buildDetectedClientInstallations(gameRoots, riotExecutables []string, short
 }
 
 type clientInstallationScan struct {
+	RegistryWeGameFound       bool
 	PlatformSupported         bool
 	RegistryRootFound         bool
 	RegistryLauncherFound     bool
@@ -367,6 +372,7 @@ func (a *app) recordClientLaunchAttempt(id string, failure clientLaunchFailure) 
 }
 
 func (a *app) recordClientLaunchStarted(id, source string) {
+	a.startClientLaunchTiming(id, time.Now())
 	event, safeID := safeClientLaunchEvent(id)
 	a.recordDiagnostic(map[string]any{
 		"event": event, "client_id": safeID, "result": "started", "source": safeClientLaunchSource(source),
@@ -379,7 +385,7 @@ func safeClientLaunchEvent(id string) (string, string) {
 		event = "official_login_launch"
 	}
 	switch id {
-	case "tcls", "riot":
+	case "tcls", "wegame", "riot":
 		return event, id
 	default:
 		return event, "unknown"
@@ -388,7 +394,7 @@ func safeClientLaunchEvent(id string) (string, string) {
 
 func safeClientLaunchSource(source string) string {
 	switch source {
-	case "shortcut", "launcher", "tcls", "riot", "rc_default", "rc_live", "installs-json-other", "drive-guess":
+	case "registry", "shortcut", "launcher", "tcls", "riot", "rc_default", "rc_live", "installs-json-other", "drive-guess":
 		return source
 	default:
 		return "unknown"
@@ -408,12 +414,12 @@ func (a *app) recordClientInstallationScan(scan clientInstallationScan, items []
 	detected := make(map[string]bool, len(items))
 	for _, item := range items {
 		switch item.ID {
-		case "tcls", "riot":
+		case "tcls", "wegame", "riot":
 			detected[item.ID] = true
 		}
 	}
 	ids := make([]string, 0, len(detected))
-	for _, id := range []string{"tcls", "riot"} {
+	for _, id := range []string{"tcls", "wegame", "riot"} {
 		if detected[id] {
 			ids = append(ids, id)
 		}
@@ -428,6 +434,7 @@ func (a *app) recordClientInstallationScan(scan clientInstallationScan, items []
 		"event":                        "client_installations_scan",
 		"result":                       result,
 		"platform_supported":           scan.PlatformSupported,
+		"registry_wegame_found":        scan.RegistryWeGameFound,
 		"registry_root_found":          scan.RegistryRootFound,
 		"registry_launcher_found":      scan.RegistryLauncherFound,
 		"registry_tcls_found":          scan.RegistryTCLSFound,
@@ -444,7 +451,7 @@ func classifyClientShortcut(name string) (id, displayName, kind, description str
 		return "", "", "", ""
 	}
 	if strings.Contains(name, "wegame") {
-		return "", "", "", ""
+		return "wegame", "WeGame", "wegame", "打开 WeGame"
 	}
 	switch {
 	case strings.Contains(name, "英雄联盟") || strings.Contains(name, "league of legends") || strings.Contains(name, "tcls"):

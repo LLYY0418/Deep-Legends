@@ -907,9 +907,9 @@ func TestClientInstallationScanDiagnosticDoesNotExposePaths(t *testing.T) {
 
 func TestClassifyClientShortcut(t *testing.T) {
 	tests := map[string]string{
-		"英雄联盟Wegame版.lnk":                   "",
-		"WeGame.lnk":                        "",
-		"wegame英雄联盟.lnk":                    "",
+		"英雄联盟Wegame版.lnk":                   "wegame",
+		"WeGame.lnk":                        "wegame",
+		"wegame英雄联盟.lnk":                    "wegame",
 		"英雄联盟.lnk":                          "tcls",
 		"TCLS.lnk":                          "tcls",
 		"League of Legends.lnk":             "tcls",

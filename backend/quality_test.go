@@ -667,6 +667,7 @@ var privacyMkdirCallPins = map[string]int{
 }
 
 var privacyStoreWriteCallPins = map[string]int{
+	"arena_squad_store.go": 1, // R230: root arena-squad.json; stores explicitly declares identities and 2h expiry.
 	"match_tags.go":        1, // match-tags/source/server/gameId: sanitized checkpoints and tags; stores explicitly declares 5000-entry LRU.
 	"riot_key_settings.go": 1, // 用户明确保存/清除及升级迁移的本机 Key；stores 明确声明。
 	"game_camera_mode.go":  1, // 根级 game-settings-sync.json：stores 的镜头模式偏好；沿用旧文件名以保留升级前的选择。

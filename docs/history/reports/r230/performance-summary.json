@@ -1,0 +1,1684 @@
+{
+  "normal": {
+    "longtasks": [],
+    "functions": [
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderCareerSections",
+        "duration": 1.899999976158142
+      },
+      {
+        "name": "renderMatch",
+        "duration": 2.8000000715255737
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.2999999523162842
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.3999999761581421
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.3999999761581421
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.7000000476837158
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "bindOverviewContent",
+        "duration": 0.8999999761581421
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "observeMatchTierVisibility",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 13.799999952316284
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.3999999761581421
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.2999999523162842
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.30000007152557373
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 1.899999976158142
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 1
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderCareerSections",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.2999999523162842
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "bindOverviewContent",
+        "duration": 0.3999999761581421
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "observeMatchTierVisibility",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 6.5
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 1.5999999046325684
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 0.5
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderCareerSections",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.5
+      },
+      {
+        "name": "bindOverviewContent",
+        "duration": 0.40000009536743164
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "observeMatchTierVisibility",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 7.100000023841858
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.8999999761581421
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 1.399999976158142
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.5
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.5
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.2999999523162842
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "bindOverviewContent",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 2.399999976158142
+      },
+      {
+        "name": "observeMatchTierVisibility",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 4.5
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.2999999523162842
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 2.200000047683716
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 0.6000000238418579
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderCareerSections",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.40000009536743164
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "bindOverviewContent",
+        "duration": 0.5
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0.30000007152557373
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "observeMatchTierVisibility",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 7.700000047683716
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 2
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 0.30000007152557373
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderCareerSections",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.3999999761581421
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "bindOverviewContent",
+        "duration": 0.5
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "observeMatchTierVisibility",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 7.099999904632568
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.3999999761581421
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.40000009536743164
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "bindOverviewContent",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 2.100000023841858
+      },
+      {
+        "name": "observeMatchTierVisibility",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 3.6999999284744263
+      }
+    ],
+    "errors": []
+  },
+  "stress": {
+    "longtasks": [
+      {
+        "start": 82.89999997615814,
+        "duration": 58
+      }
+    ],
+    "functions": [
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 0
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderCareerSections",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.5
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 1.1999999284744263
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 1.5
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.20000004768371582
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.19999992847442627
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.09999990463256836
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "bindOverviewContent",
+        "duration": 2.6999999284744263
+      },
+      {
+        "name": "applyRenderedMetricStyles",
+        "duration": 1.100000023841858
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.8999999761581421
+      },
+      {
+        "name": "observeMatchTierVisibility",
+        "duration": 0
+      },
+      {
+        "name": "renderOverviewBodyContent",
+        "duration": 54.5
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.3999999761581421
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.2999999523162842
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.2999999523162842
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0.10000002384185791
+      },
+      {
+        "name": "renderMatch",
+        "duration": 0.30000007152557373
+      },
+      {
+        "name": "prepareImages",
+        "duration": 0
+      }
+    ],
+    "errors": [],
+    "matchCount": 200
+  }
+}

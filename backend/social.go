@@ -90,7 +90,7 @@ func (a *app) handleSocialFriends(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "读取好友列表失败："+friendlyError(err), http.StatusBadGateway)
 		return
 	}
-	names := a.championNames()
+	names := a.displayChampionNames(r.Context(), "social-friends")
 	queueLabels := loadQueueLabels(client)
 	friends := convertFriends(rawFriends, names, queueLabels)
 	a.recordSocialPresenceDiagnostics(friends)

@@ -80,6 +80,7 @@ type gameplayOverviewRequest struct {
 	Count        int    `json:"count"`
 	BegIndex     int    `json:"begIndex"`
 	Force        bool   `json:"force,omitempty"`
+	FreshHistory *bool  `json:"freshHistory,omitempty"`
 	ExpectGameID string `json:"expectGameId,omitempty"`
 	// MatchFilter is normalized server-side and mapped to the documented SGP
 	// tag contract. Raw upstream query parameters are never accepted.
@@ -292,6 +293,7 @@ type gameplayPlayer struct {
 // keeps enough identity hints to continue loading match data when the client
 // hides a player's visible name or exposes an obfuscated champ-select ID.
 type gameplayReference struct {
+	ClientIdentity      bool // PUUID came from LCU, not the public Riot API
 	OPGGIdentity        bool // resolve by Riot ID before sending to our Riot API project
 	PlayerRef           string
 	AlternatePlayerRef  string
@@ -775,6 +777,13 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		request.ExpectGameID = r.URL.Query().Get("expectGameId")
 		request.Force = r.URL.Query().Get("force") == "1" || strings.EqualFold(r.URL.Query().Get("force"), "true")
 	}
+	if value := r.URL.Query().Get("freshHistory"); value != "" {
+		fresh := value == "1" || strings.EqualFold(value, "true")
+		request.FreshHistory = &fresh
+	}
+	if request.FreshHistory != nil {
+		r = r.WithContext(context.WithValue(r.Context(), overviewFreshHistoryKey{}, *request.FreshHistory))
+	}
 	request.PlayerRef = strings.TrimSpace(request.PlayerRef)
 	if request.PlayerRef != "" && !validPlayerReference(request.PlayerRef) {
 		http.Error(w, "玩家标识无效", http.StatusBadRequest)
@@ -839,7 +848,7 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	// 韩服玩家（英雄榜单点击、顶部搜索选择韩服、或此前打开的韩服页签）：
 	// 直接走 Riot 官方 API，不依赖本机客户端。
-	if isRiotRegion(reference.Region) || (request.PlayerRef == "" && request.GameName != "" && isRiotRegion(request.Region)) {
+	if isRiotRegion(reference.Region) && !reference.ClientIdentity || (request.PlayerRef == "" && request.GameName != "" && isRiotRegion(request.Region)) {
 		if request.ServerID != "" {
 			http.Error(w, "外服查询不能指定国服服务器", http.StatusBadRequest)
 			return
@@ -1235,7 +1244,7 @@ type recentRankedResult struct {
 }
 
 func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, current Summoner, reference gameplayReference, begIndex, count int, matchFilter string, force bool) gameplayOverview {
-	if force {
+	if force && ctx.Value(overviewFreshHistoryKey{}) == nil {
 		ctx = context.WithValue(ctx, overviewFreshHistoryKey{}, true)
 	}
 	reference = normalizeGameplayReference(reference)
@@ -1249,7 +1258,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	if isCurrent {
 		localRankRegion = ""
 	} // Preserve the connected account's LCU season milestones.
-	if force && a.sgp != nil && !isRiotRegion(reference.Region) {
+	if overviewFreshHistory(ctx) && a.sgp != nil && !isRiotRegion(reference.Region) {
 		historyRef := playerRef
 		if isCurrent {
 			historyRef = current.PUUID
@@ -1430,7 +1439,22 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 			started := time.Now()
 			capability := EndpointCapability{Name: "champion-mastery", Path: "/lol-champion-mastery/v1/{player}/champion-mastery"}
 			value := map[int64]ChampionMastery{}
-			if isRemoteTencentServer(client, reference.ServerID) {
+			if region := clientRiotPlatform(client); region != "" {
+				public, resolveErr := a.resolveClientRiotPUUID(ctx, client, region, playerRef, reference)
+				var rows []riotMasteryEntry
+				if resolveErr == nil {
+					rows, resolveErr = a.riot.forPlatform(region).clientMasteries(ctx, public)
+				}
+				if resolveErr == nil {
+					for _, row := range rows {
+						value[row.ChampionID] = row
+					}
+					capability.State = capabilityAvailable
+					capability.Count = len(rows)
+				} else {
+					value, capability = NewChampionMasteryAPI(client).AllContext(ctx, playerRef)
+				}
+			} else if isRemoteTencentServer(client, reference.ServerID) {
 				capability.State = capabilityUnsupported
 				capability.Detail = "所选服务器暂未提供可核验的跨服熟练度接口"
 			} else {
@@ -2212,7 +2236,11 @@ func positionStatsGames(rows []gameplayPositionStat) int {
 // 这类占位名，合并线上目录后首屏即可显示正确名称。
 func (a *app) overviewChampionNames(ctx context.Context) map[int64]string {
 	if a.riot == nil || a.riot.champions == nil {
-		return a.championNames()
+		names := bundledChampionNames()
+		for id, name := range a.championNames() {
+			names[id] = name
+		}
+		return names
 	}
 	if names := bundledChampionNames(); len(names) > 0 {
 		provider := a.riot.champions
@@ -2444,7 +2472,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 	attempts := make([]DataSourceAttempt, 0, len(decision.Sources)+1)
 	fallbackReason := ""
 	if isRiotRegion(clientRegion) {
-		matches, pagination, err := a.loadClientRiotHistory(ctx, clientRegion, playerRef, begIndex, count, matchFilter, names, queueLabels)
+		matches, pagination, err := a.loadClientRiotHistory(ctx, clientRegion, playerRef, begIndex, count, matchFilter, names, queueLabels, reference)
 		attempt := DataSourceAttempt{Source: dataSourceRiot, Outcome: dataSourceSuccess}
 		if err == nil {
 			attempts = append(attempts, attempt)
@@ -2457,7 +2485,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 		}
 		attempt.Outcome, attempt.Message = dataSourceFailed, riotHistoryFailureMessage(err)
 		attempts = append(attempts, attempt)
-		fallbackReason = "riot-failed"
+		fallbackReason = riotHistoryFailureCategory(err)
 	}
 	if !isRiotRegion(clientRegion) && (len(decision.Sources) == 0 || decision.Sources[0] != dataSourceSGP) {
 		attempts = append(attempts, DataSourceAttempt{Source: dataSourceSGP, Outcome: dataSourceDisabled, Message: "当前查询没有可用的 SGP 路由"})
@@ -2767,6 +2795,7 @@ func safeDiagnosticReason(err error) string {
 }
 
 func mergeGameplayReferences(preferred, fallback gameplayReference) gameplayReference {
+	preferred.ClientIdentity = preferred.ClientIdentity || fallback.ClientIdentity
 	preferred = normalizeGameplayReference(preferred)
 	fallback = normalizeGameplayReference(fallback)
 	if preferred.PlayerRef == "" {
@@ -2840,7 +2869,7 @@ func gameplayReferencesMatch(left, right gameplayReference) bool {
 
 func gameplayReferenceFromSummoner(summoner Summoner) gameplayReference {
 	return normalizeGameplayReference(gameplayReference{
-		PlayerRef: summoner.PUUID, SummonerID: summoner.SummonerID,
+		ClientIdentity: true, PlayerRef: summoner.PUUID, SummonerID: summoner.SummonerID,
 		DisplayName: summoner.DisplayName, GameName: summoner.GameName, TagLine: summoner.TagLine,
 		ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel,
 		Privacy: summoner.Privacy,
@@ -3034,11 +3063,12 @@ func (a *app) removeGameplayReferenceElementLocked(element *list.Element) {
 }
 
 func (a *app) clearGameplayReferences() {
+	a.clearClientRiotIdentities()
 	a.stopMayhemSampler("connection-ended")
 	a.arenaTruth.mu.Lock()
 	a.arenaTruth.records = nil
 	a.arenaTruth.mu.Unlock()
-	a.clearArenaAllies()
+	a.clearArenaAllies(true)
 	a.clearLiveClientProbe()
 	a.gameplayRefsMu.Lock()
 	a.gameplayRefs = make(map[string]string)
@@ -3103,7 +3133,19 @@ func (a *app) loadRanksWithFallback(ctx context.Context, client *LCUClient, play
 	tierScope := len(tierOnly) > 0 && tierOnly[0]
 	if !isCurrent && clientRiotPlatform(client) != "" && a.riot != nil {
 		region := clientRiotPlatform(client)
-		ranks, capability := a.riot.forPlatform(region).loadRiotRanks(ctx, playerRef)
+		public := playerRef
+		ref, knownPublic := a.riotReferenceForPlayer(playerRef)
+		var resolveErr error
+		if !knownPublic {
+			public, resolveErr = a.resolveClientRiotPUUID(ctx, client, region, playerRef, ref)
+		}
+		var ranks []gameplayRank
+		capability := EndpointCapability{Name: "ranked", State: capabilityFailed}
+		if resolveErr == nil {
+			ranks, capability = a.riot.forPlatform(region).loadRiotRanks(ctx, public)
+		} else {
+			capability.Detail = riotHistoryFailureMessage(resolveErr)
+		}
 		if capability.State == capabilityAvailable {
 			return ranks, nil, capability
 		}
@@ -3744,7 +3786,7 @@ func normalizeGameplayMatch(game lcuGame, subject gameplayReference, names map[i
 			}
 		}
 		reference := normalizeGameplayReference(gameplayReference{
-			PlayerRef: visiblePlayerRef, AlternatePlayerRef: identity.Player.ObfuscatedPUUID,
+			ClientIdentity: true, PlayerRef: visiblePlayerRef, AlternatePlayerRef: identity.Player.ObfuscatedPUUID,
 			SummonerID: identity.Player.SummonerID, AlternateSummonerID: identity.Player.ObfuscatedSummonerID,
 			GameName: identity.Player.GameName, TagLine: identity.Player.TagLine,
 			DisplayName: identity.Player.SummonerName, ProfileIconID: identity.Player.ProfileIcon, ServerID: subject.ServerID, Region: subject.Region,
@@ -6713,7 +6755,9 @@ func (a *app) rememberArenaAllies(players []struct {
 	a.arenaAlliesMu.Unlock()
 }
 
-func (a *app) clearArenaAllies() {
+// Connection/reference resets preserve the bounded disk record for restart
+// recovery. An explicit clear or a real gameflow exit must remove it as well.
+func (a *app) clearArenaAllies(preserveDisk ...bool) {
 	if a == nil {
 		return
 	}
@@ -6721,6 +6765,9 @@ func (a *app) clearArenaAllies() {
 	a.arenaAllyKeys = nil
 	a.arenaAllyPlayers = nil
 	a.arenaAllyGameID = 0
+	if a.storage != nil && (len(preserveDisk) == 0 || !preserveDisk[0]) {
+		a.removeArenaSquadFile()
+	}
 	a.arenaAlliesMu.Unlock()
 }
 
@@ -7814,6 +7861,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 				a.arenaAlliesMu.Lock()
 				a.arenaAllyGameID = response.GameID
 				a.arenaAlliesMu.Unlock()
+				a.persistArenaSquad(response.GameID)
 			} else {
 				a.clearArenaAllies()
 			}
@@ -7856,7 +7904,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	// Begin recommendations before the ten-player identity/history fan-out.
 	seed := liveRecommendationSeed{ChampionID: response.CurrentChampionID, QueueID: response.QueueID, MapID: response.MapID, GameMode: response.GameMode}
 	for _, raw := range rawPlayers {
-		ref := gameplayReference{PlayerRef: visibleLivePlayerReference(raw.player), SummonerID: raw.player.SummonerID}
+		ref := gameplayReference{ClientIdentity: true, PlayerRef: visibleLivePlayerReference(raw.player), SummonerID: raw.player.SummonerID}
 		if gameplayLivePlayerIsCurrent(ref, current.PUUID, raw.player.CellID, localPlayerCellID) {
 			if seed.ChampionID <= 0 {
 				seed.ChampionID = raw.player.ChampionID
@@ -7872,11 +7920,27 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	if arenaMode {
 		a.noteArenaPhaseRoster(client, &response)
 	}
+	if arenaMode {
+		a.restoreArenaSquad(response.GameID)
+	}
 	a.arenaAlliesMu.RLock()
 	staleAllies := a.arenaAllyGameID != 0 && a.arenaAllyGameID != response.GameID
 	a.arenaAlliesMu.RUnlock()
 	if staleAllies {
 		a.clearArenaAllies()
+	}
+	// Some ChampSelect sessions expose gameId=0 until GameStart. Bind the
+	// remembered identities once the real ID appears, before any restart.
+	if arenaMode && response.GameID > 0 {
+		a.arenaAlliesMu.Lock()
+		bindSquad := a.arenaAllyGameID == 0 && len(a.arenaAllyPlayers) > 0
+		if bindSquad {
+			a.arenaAllyGameID = response.GameID
+		}
+		a.arenaAlliesMu.Unlock()
+		if bindSquad {
+			a.persistArenaSquad(response.GameID)
+		}
 	}
 	var liveClientSnapshotValue liveClientSnapshot
 	if phase == "InProgress" || phase == "Reconnect" {
@@ -7923,7 +7987,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	progress := response
 	progress.Players = make([]gameplayLivePlayer, len(rawPlayers))
 	for index, raw := range rawPlayers {
-		ref := normalizeGameplayReference(gameplayReference{PlayerRef: visibleLivePlayerReference(raw.player), SummonerID: raw.player.SummonerID, AlternatePlayerRef: raw.player.ObfuscatedPUUID, AlternateSummonerID: raw.player.ObfuscatedSummonerID, GameName: raw.player.GameName, TagLine: raw.player.TagLine, DisplayName: raw.player.SummonerName, ProfileIconID: raw.player.ProfileIconID, Region: clientRiotPlatform(client), ServerID: clientTencentServerID(client)})
+		ref := normalizeGameplayReference(gameplayReference{ClientIdentity: true, PlayerRef: visibleLivePlayerReference(raw.player), SummonerID: raw.player.SummonerID, AlternatePlayerRef: raw.player.ObfuscatedPUUID, AlternateSummonerID: raw.player.ObfuscatedSummonerID, GameName: raw.player.GameName, TagLine: raw.player.TagLine, DisplayName: raw.player.SummonerName, ProfileIconID: raw.player.ProfileIconID, Region: clientRiotPlatform(client), ServerID: clientTencentServerID(client)})
 		summoner := summonerFromGameplayReference(ref)
 		hidden, unresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
 		self := gameplayLivePlayerIsCurrent(ref, current.PUUID, raw.player.CellID, localPlayerCellID)
@@ -7944,7 +8008,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			raw := rawPlayers[index]
 			visiblePlayerRef := visibleLivePlayerReference(raw.player)
 			reference := normalizeGameplayReference(gameplayReference{
-				PlayerRef: visiblePlayerRef, AlternatePlayerRef: raw.player.ObfuscatedPUUID,
+				ClientIdentity: true, PlayerRef: visiblePlayerRef, AlternatePlayerRef: raw.player.ObfuscatedPUUID,
 				SummonerID: raw.player.SummonerID, AlternateSummonerID: raw.player.ObfuscatedSummonerID,
 				DisplayName: raw.player.SummonerName, GameName: raw.player.GameName, TagLine: raw.player.TagLine,
 				ProfileIconID: raw.player.ProfileIconID, Region: clientRiotPlatform(client), ServerID: clientTencentServerID(client),
@@ -8614,7 +8678,7 @@ func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, refe
 			filter = "flex"
 		}
 		// The live cards display ten games; avoid consuming thirty detail requests per player.
-		matches, _, err := a.loadClientRiotHistory(ctx, region, playerRef, 0, 10, filter, names, nil)
+		matches, _, err := a.loadClientRiotHistory(ctx, region, playerRef, 0, 10, filter, names, nil, reference)
 		attempts := []DataSourceAttempt{{Source: dataSourceRiot, Outcome: dataSourceSuccess}}
 		if err == nil {
 			a.recordDiagnostic(map[string]any{"event": "match_history_data_source_decision", "client_region": region, "selected": dataSourceRiot, "attempts": attempts, "reason": "live-riot-platform"})
@@ -8623,7 +8687,7 @@ func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, refe
 		attempts[0].Outcome, attempts[0].Message = dataSourceFailed, riotHistoryFailureMessage(err)
 		fallback := loadLiveLCUMatches(ctx, client, reference, playerRef, isCurrent, names)
 		attempts = append(attempts, DataSourceAttempt{Source: dataSourceLCU, Outcome: map[bool]string{true: dataSourceSuccess, false: dataSourceFailed}[fallback.State != "failed"]})
-		a.recordDiagnostic(map[string]any{"event": "match_history_data_source_decision", "client_region": region, "selected": dataSourceLCU, "attempts": attempts, "reason": "live-riot-platform", "fallback_reason": "riot-failed"})
+		a.recordDiagnostic(map[string]any{"event": "match_history_data_source_decision", "client_region": region, "selected": dataSourceLCU, "attempts": attempts, "reason": "live-riot-platform", "fallback_reason": riotHistoryFailureCategory(err)})
 		return fallback
 	}
 	var lcu, sgp livePlayerMatchesResult

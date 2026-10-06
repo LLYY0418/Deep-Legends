@@ -179,7 +179,7 @@
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
-    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_roster_duplicate_dropped", "stale_team_two_dropped", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "overview_dirty_rescan"].includes(event)) return;
+    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_roster_duplicate_dropped", "stale_team_two_dropped", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "overview_dirty_rescan", "summoner_copy", "overview_card_ready"].includes(event)) return;
     // Sample local requests by fixed endpoint category so status polling cannot
     // hide page timings. Delivery stays bounded and sampled events never retry.
     const sampled = event === "live_refresh_client" || event === "local_request_client";
@@ -187,6 +187,16 @@
     const now = Date.now();
     if (sampled && (sampledPending.size && event !== "local_request_client" || now - (sampledAt.get(sampleKey) ?? -Infinity) < (event === "local_request_client" ? 10000 : 1000))) { increment("transportSuppressed"); return; }
     const body = { event, reason };
+    if(event === "summoner_copy") {
+      body.ok=Boolean(fields.ok);
+      if(["browser","electron","execCommand"].includes(fields.method))body.method=fields.method;
+      if(["NotAllowedError","SecurityError","NotFoundError","AbortError","TypeError","Error"].includes(fields.error_name))body.error_name=fields.error_name;
+    }
+    if(event === "overview_card_ready") {
+      if(["ranks","champions","masteries","positions"].includes(fields.card))body.card=fields.card;
+      if(["snapshot","network","opgg"].includes(fields.source))body.source=fields.source;
+      body.durationMs=Math.max(0,Math.min(3600000,Math.floor(Number(fields.durationMs)||0)));
+    }
     if (event === "overview_dirty_rescan") {
       body.attempt = Math.max(0, Math.min(5, Math.floor(Number(fields.attempt) || 0)));
       body.filter = fields.filter;
@@ -203,6 +213,7 @@
     if (event === "blocking_state_client" || event === "automatic_read_client") {
       if (["startup", "skin", "chroma", "champions", "career", "facade", "champselect", "update", "confirmation", "artwork_fullscreen", "other", "poll", "event", "direct", "dirty_rescan", "workspace", "manual"].includes(fields.source)) body.source = fields.source;
       if (["friends", "pro-players", "champions", "overview", "facade"].includes(fields.endpoint)) body.endpoint = fields.endpoint;
+      if (event === "blocking_state_client" && reason === "skip" && fields.skip_reason === "client-exiting") body.skip_reason = "client-exiting";
       if (event === "blocking_state_client" && reason === "hide" && ["identity-ready", "no-client-process", "timeout", "suppressed"].includes(fields.hide_reason)) body.hide_reason = fields.hide_reason;
     }
     if (event === "arena_header_source") {

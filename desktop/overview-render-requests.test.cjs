@@ -150,15 +150,32 @@ test("已有总览刷新时保留当前内容，不退回整页骨架", async ()
   w.close();
 });
 
-test("客户端退出后总览显示可重试提示，不退回空白页", async () => {
-  const { window: w, errors } = bootDemoApp();
+test("客户端退出后清空本人总览，国服空分组显示启动入口", async () => {
+  const { window: w, errors, eventSources } = bootDemoApp({ liveEvents: true });
   await settled();
   const overview = w.document.getElementById("overview-content");
   assert.ok(overview.querySelector(".summoner-strip"), "断连前总览应已完成渲染");
-  w.dispatchEvent(new w.CustomEvent("deep-legends:status", { detail: { connected: false } }));
-  assert.match(overview.textContent, /等待英雄联盟客户端/);
-  assert.match(overview.textContent, /启动并登录客户端后会自动恢复/);
-  assert.ok(overview.querySelector("[data-gameplay-retry]"), "断连提示应保留手动重试入口");
+  const previousFetch = w.fetch;
+  w.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input?.url || "";
+    if (url.split("?")[0] === "/api/client-installations") {
+      return new w.Response(JSON.stringify({ items: [
+        { id: "tcls", name: "国服纯净入口", available: true },
+        { id: "wegame", name: "WeGame", available: true },
+      ] }));
+    }
+    const response = await previousFetch(input, init);
+    if (url.split("?")[0] !== "/api/status") return response;
+    const status = await response.json();
+    return new w.Response(JSON.stringify({ ...status, connected: false, identityReady: false, snapshotReady: false, clientDiscovery: "process-not-found" }));
+  };
+  eventSources.at(-1).onmessage({ data: "resync-required" });
+  await settled();
+  assert.equal(overview.textContent, "");
+  assert.equal(overview.querySelector("[data-gameplay-retry]"), null);
+  assert.equal(w.document.getElementById("client-launchpad").hidden, false);
+  assert.match(w.document.getElementById("client-launchpad").textContent, /国服纯净入口/);
+  assert.match(w.document.getElementById("client-launchpad").textContent, /WeGame/);
   assert.ok(!overview.querySelector(".gameplay-skeleton"), "断连后不应退回骨架屏");
 	assert.equal(w.document.querySelectorAll("#player-tabs [data-player-tab]").length, 0, "断连后不应残留国服玩家标签");
   await settled();

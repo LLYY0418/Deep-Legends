@@ -657,11 +657,13 @@
 
   async function loadMayhemAtlas(force = false) {
     if (state.mayhemAtlasLoading || state.augments && !force) return;
+    const token=Number(state.mayhemAtlasRequestToken||0)+1;state.mayhemAtlasRequestToken=token;
     state.mayhemAtlasLoading = true;
     state.mayhemAtlasError = "";
     render();
     try {
       const augments = await api("/api/champions/augments", "mayhem-atlas");
+      if(state.mode!=="aram-mayhem" || state.mayhemAtlasRequestToken!==token)return;
       if (!augments || !Array.isArray(augments.rows) || !augments.rows.length) throw new Error("海克斯图鉴数据暂时为空，已保留上次结果");
       state.augments = augments;
       const first = filteredAugments()[0];
@@ -684,10 +686,13 @@
         if (usesHexdata(state.augments?.source)) loadMayhemAugmentDetail(selected);
       }
     } catch (error) {
+      if(state.mode!=="aram-mayhem" || state.mayhemAtlasRequestToken!==token)return;
       state.mayhemAtlasError = error?.message || "海克斯图鉴读取失败";
     } finally {
+      if(state.mayhemAtlasRequestToken===token) {
       state.mayhemAtlasLoading = false;
       render();
+      }
     }
   }
 
@@ -1018,6 +1023,7 @@
     else renderWorkspace();
 	window.deepLegendsSelects?.enhance(root);
     prepareImages();
+    if (state.section === "champions" && state.mode === "aram-mayhem" && state.mayhemView === "atlas" && !state.augments && !state.mayhemAtlasLoading && !state.mayhemAtlasError) void loadMayhemAtlas();
     if (state.section === "champions" && state.mode === "aram-mayhem" && root.querySelector(".mayhem-rarity-panel") && !state.mayhemRarityData && !state.mayhemRarityLoading && !state.mayhemRarityError) void loadMayhemRarity();
     // R116-E P2-6：构筑 tab 真的渲染出来了才去拉个人海斗出装样本。
     // 与上面 mayhem-rarity 的懒加载同一套口径：不在渲染函数里发请求，
@@ -1389,7 +1395,7 @@
   }
 
   function renderMayhemAtlas(items) {
-    if (state.mayhemAtlasLoading && !state.augments) return renderSkeleton();
+    if (!state.augments && !state.mayhemAtlasError) return renderSkeleton();
     if (state.mayhemAtlasError && !state.augments) return renderError(state.mayhemAtlasError);
     const selected = items.find((item) => Number(item.id) === Number(state.mayhemAugmentID)) || null;
     const filters = [["all", "全部"], ["silver", "白银"], ["gold", "黄金"], ["prismatic", "棱彩"]].map(([value, label]) => {
@@ -2739,16 +2745,17 @@
   function resetTransientChampionState({ restorePosition = false } = {}) {
     closeMayhemTierDialog(false);
     closeArenaTierDialog(false);
-	    state.augmentRarity = "all";
+
     // 阶段筛选是会话内的视图状态：换模式/重置时回到英雄级汇总，避免一个记住的
     // 阶段号在新英雄身上把整片推荐过滤空。
     state.mayhemStage = 0;
-    state.mayhemAugmentID = 0;
+
     state.mayhemAugmentDetail = null;
     state.mayhemAugmentLoading = false;
     state.mayhemAugmentError = "";
     state.mayhemAtlasLoading = false;
     state.mayhemAtlasError = "";
+    state.mayhemAtlasRequestToken=Number(state.mayhemAtlasRequestToken||0)+1;
     state.mayhemRarityData = null;
     state.mayhemRarityLoading = false;
     state.mayhemRarityError = "";

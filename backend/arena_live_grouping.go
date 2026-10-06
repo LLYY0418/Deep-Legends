@@ -150,6 +150,7 @@ func (a *app) markRememberedArenaSquad(response *gameplayLiveResponse) {
 	if a == nil || response == nil || !isArenaQueue(response.QueueID, response.GameMode) {
 		return
 	}
+	a.restoreArenaSquad(response.GameID)
 	a.arenaAlliesMu.RLock()
 	remembered := append([]lcuLivePlayer(nil), a.arenaAllyPlayers...)
 	gameID := a.arenaAllyGameID
@@ -181,6 +182,7 @@ func (a *app) applyArenaLiveGrouping(client *LCUClient, current Summoner, respon
 	observedSession := *response
 	observedSession.Players = append([]gameplayLivePlayer(nil), response.Players...)
 	a.markRememberedArenaSquad(response)
+	a.restoreArenaSquad(response.GameID)
 	a.arenaAlliesMu.RLock()
 	remembered := append([]lcuLivePlayer(nil), a.arenaAllyPlayers...)
 	if a.arenaAllyGameID != 0 && a.arenaAllyGameID != response.GameID {

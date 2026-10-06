@@ -252,7 +252,7 @@ func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUCli
 		cache.invalidatePlayer(playerRef)
 	}
 	serverID = strings.ToUpper(strings.TrimSpace(serverID))
-	if !isCurrent && serverID == "" {
+	if serverID == "" && (!isCurrent || clientRiotPlatform(client) != "") {
 		serverID = strings.ToUpper(clientRiotPlatform(client))
 	}
 	useRiot := isRiotRegion(serverID) && a.riot != nil && validPlayerReference(playerRef)
@@ -328,7 +328,18 @@ func (a *app) loadPlayerRankScoreEntry(ctx context.Context, client *LCUClient, p
 	var milestones *gameplayRankMilestones
 	var capability EndpointCapability
 	if useRiot {
-		ranks, capability = a.riot.forPlatform(serverID).loadRiotRanks(ctx, playerRef)
+		public := playerRef
+		ref, knownPublic := a.riotReferenceForPlayer(playerRef)
+		var resolveErr error
+		if client != nil && !knownPublic {
+			public, resolveErr = a.resolveClientRiotPUUID(ctx, client, serverID, playerRef, ref)
+		}
+		if resolveErr == nil {
+			ranks, capability = a.riot.forPlatform(serverID).loadRiotRanks(ctx, public)
+		} else {
+			capability = EndpointCapability{Name: "ranked", State: capabilityFailed, Detail: riotHistoryFailureMessage(resolveErr)}
+		}
+
 		if capability.State != capabilityAvailable && ctx.Err() == nil && client != nil && riotPlatform(serverID) == clientRiotPlatform(client) {
 			riotFailure := capability.Detail
 			ranks, milestones, capability, _ = a.loadGameplayRanksContext(ctx, client, playerRef, isCurrent)

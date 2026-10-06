@@ -10,12 +10,26 @@ import (
 	"time"
 )
 
-// Only history switches sources for the connected Riot account. Its profile,
-// ranks, mastery and season snapshot retain the established local LCU path.
-func (a *app) loadClientRiotHistory(ctx context.Context, region, puuid string, begIndex, count int, filter string, names, labels map[int64]string) ([]gameplayMatch, gameplayPagination, error) {
+// Resolve the client identity before public history requests. The overview
+// retains its LCU profile and season snapshot while public statistics share
+// the same identity resolver.
+func (a *app) loadClientRiotHistory(ctx context.Context, region, puuid string, begIndex, count int, filter string, names, labels map[int64]string, references ...gameplayReference) ([]gameplayMatch, gameplayPagination, error) {
 	if a.riot == nil {
 		return nil, gameplayPagination{}, errRiotKeyMissing
 	}
+	ref := gameplayReference{}
+	if len(references) > 0 {
+		ref = references[0]
+	}
+	clientPUUID := puuid
+	a.mu.RLock()
+	client := a.lcu
+	a.mu.RUnlock()
+	public, resolveErr := a.resolveClientRiotPUUID(ctx, client, region, puuid, ref)
+	if resolveErr != nil {
+		return nil, gameplayPagination{}, resolveErr
+	}
+	puuid = public
 	p := a.riot.forPlatform(region)
 	ids, err := p.matchIDsForOverview(ctx, puuid, begIndex, count, filter)
 	if err != nil {
@@ -64,6 +78,14 @@ func (a *app) loadClientRiotHistory(ctx context.Context, region, puuid string, b
 			return nil, gameplayPagination{}, errRiotNotFound
 		}
 		m := riotConvertMatch(raw, puuid, names, labels)
+		for i := range m.Participants {
+			if m.Participants[i].PlayerRef == puuid {
+				m.Participants[i].PlayerRef = clientPUUID
+				m.Participants[i].reference.PlayerRef = clientPUUID
+				m.Participants[i].reference.AlternatePlayerRef = puuid
+				m.Participants[i].reference.ClientIdentity = true
+			}
+		}
 		a.recordMatchScores(dataSourceRiot, m)
 		if !isCustomGameplayMatch(m) {
 			result = append(result, m)

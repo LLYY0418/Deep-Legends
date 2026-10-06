@@ -214,7 +214,7 @@ func (a *app) fetchOPGGChampionTable(ctx context.Context, ref gameplayReference,
 	if err != nil {
 		return nil, err
 	}
-	return parseOPGGChampionTable(data, ref, queue, a.championNames())
+	return parseOPGGChampionTable(data, ref, queue, a.displayChampionNames(ctx, "champion-table"))
 }
 
 // Reuse OP.GG's bounded singleflight cache; separate keys from sidebar summaries.

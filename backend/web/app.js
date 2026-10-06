@@ -545,6 +545,17 @@
   function updateReadingOverlay() {
     if (!state.status) return;
     const data = state.status;
+    const wasConnected = Boolean(state.overlayWasConnected);
+    state.overlayWasConnected = Boolean(data.connected);
+    if (data.connected) state.launchOverlayPending = false;
+    if (wasConnected && !data.connected) state.clientExitingUntil = Date.now() + 15_000;
+    const exiting = !data.connected && ["credentials-unreadable", "probe-failed"].includes(data.clientDiscovery) && Date.now() < Number(state.clientExitingUntil || 0);
+    const launching = state.launchOverlayPending && Date.now() - Number(state.lastClientLaunchAt || 0) < 120_000;
+    if (exiting && !launching) {
+      hideReadingOverlay("suppressed");
+      window.reportFlowDiagnostic?.("blocking_state_client", "skip", { source: "startup", skip_reason: "client-exiting" });
+      return;
+    }
     const identityReady = data.identityReady ?? data.snapshotReady;
     if (data.connected && identityReady) {
       state.overlaySuppressed = false;
@@ -893,13 +904,11 @@
       }
     }
     state.clientLaunched ||= Object.values(state.clientLaunchWaiting || {})[0] || null;
-    const launchedID = state.clientLaunched?.id === "tcls" || state.clientLaunched?.id === "riot" ? state.clientLaunched.id : "";
-    const launchedTCLS = launchedID === "tcls";
+    const launchedID = ["tcls", "wegame", "riot"].includes(state.clientLaunched?.id) ? state.clientLaunched.id : "";
+    const launchedTCLS = launchedID !== "" && launchedID !== "riot";
     el.launchpadEyebrow.textContent = launchedID ? "已启动" : "英雄联盟客户端未登录";
     el.launchpadTitle.textContent = launchedID ? (launchedTCLS ? "正在登录国服客户端" : "正在登录 Riot 客户端") : "选择登录入口";
-    el.launchpadDescription.textContent = launchedID
-      ? (launchedTCLS ? "请在弹出的腾讯窗口完成登录；登录并进入大厅后会自动连接。" : "请在弹出的 Riot 窗口完成登录；登录并进入大厅后会自动连接。")
-      : "密码、扫码与安全验证只在腾讯官方窗口完成，登录后自动连接。";
+    el.launchpadDescription.textContent = "";
     el.officialLoginStatus.hidden = false;
     const installationFailed = Boolean(state.installationLoadError);
     if (!state.installationsLoaded) {
@@ -908,17 +917,12 @@
       el.launcherList.innerHTML = '<span class="muted">正在检查 TCLS 与 Riot 客户端…</span>';
       return;
     }
-    const installations = (state.installations || []).filter((item) => item.available && (item.id === "riot" || item.id === "tcls" && !isRiotSearchRegion(state.status?.clientRegion)));
-    el.officialLoginStatus.textContent = installationFailed ? `无法检查客户端安装位置：${state.installationLoadError}` : state.officialLoginMessage || (installations.length ? "登录并进入大厅后会自动连接。" : "未找到可启动的英雄联盟客户端入口。");
+    const desiredIDs = (state.overviewGroup || "players") === "kr" ? ["riot"] : ["tcls", "wegame"];
+    const installations = desiredIDs.map(id => (state.installations || []).find(item => item.id === id && item.available) || { id, name: id === "tcls" ? "国服纯净入口" : id === "wegame" ? "WeGame" : "Riot 客户端", available: false });
+    el.officialLoginStatus.textContent = installationFailed ? `无法检查客户端安装位置：${state.installationLoadError}` : state.officialLoginMessage || (installations.some(item => item.available) ? "登录并进入大厅后会自动连接。" : "未找到可启动的英雄联盟客户端入口。");
     if (installationFailed) {
       el.launcherList.hidden = false;
       el.launcherList.innerHTML = `<div class="empty-state compact"><strong>安装位置检查失败</strong><p>${escapeHTML(state.installationLoadError)}</p><button class="text-button scan-launchers" type="button">重新检查安装位置</button></div>`;
-      el.launcherList.querySelector(".scan-launchers")?.addEventListener("click", () => loadClientInstallations(true));
-      return;
-    }
-    if (!installations.length) {
-      el.launcherList.hidden = false;
-      el.launcherList.innerHTML = '<div class="empty-state compact"><strong>没有检测到可启动入口</strong><p>请先安装或从桌面启动英雄联盟客户端。助手会继续在后台等待连接。</p><button class="text-button scan-launchers" type="button">重新检查安装位置</button></div>';
       el.launcherList.querySelector(".scan-launchers")?.addEventListener("click", () => loadClientInstallations(true));
       return;
     }
@@ -927,9 +931,13 @@
       const isTCLS = item.id === "tcls";
       const starting = Boolean(state.clientLaunchPending?.[item.id] || state.clientLaunchWaiting?.[item.id] || state.clientLaunchInFlight === item.id || launchedID === item.id);
       const label = starting ? "正在启动…" : isTCLS ? "国服纯净入口" : item.name;
-      const description = isTCLS ? "跳过 WeGame，直连国服客户端" : item.location || item.description;
-      return `<button${isTCLS ? ' id="official-login"' : ""} class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"${starting ? " disabled" : ""}><span class="launcher-kind">${escapeHTML(isTCLS ? "L" : "R")}</span><span class="launcher-card-copy"><strong>${escapeHTML(label)}</strong><small data-tooltip="${escapeHTML(description)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(description)}</small></span><span class="launcher-arrow" aria-hidden="true">›</span></button>`;
+      const description = isTCLS ? "跳过 WeGame，直连国服客户端" : item.location || item.description || "";
+      return `<button${isTCLS ? ' id="official-login"' : ""} class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"${starting || !item.available ? " disabled" : ""}><span class="launcher-kind">${escapeHTML(isTCLS ? "L" : item.id === "wegame" ? "W" : "R")}</span><span class="launcher-card-copy"><strong>${escapeHTML(label)}</strong><small data-tooltip="${escapeHTML(description)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(description)}</small></span><span class="launcher-arrow" aria-hidden="true">›</span></button>`;
     }).join("") : "";
+    if (!installations.some(item => item.available)) {
+      el.launcherList.innerHTML += '<button class="text-button scan-launchers" type="button">重新检查安装位置</button>';
+      el.launcherList.querySelector(".scan-launchers")?.addEventListener("click", () => loadClientInstallations(true));
+    }
     for (const button of el.launcherList.querySelectorAll("[data-client-id]")) {
       button.addEventListener("click", () => button.dataset.clientId === "tcls" ? launchOfficialLogin(button) : launchDetectedClient(button));
     }
@@ -948,6 +956,7 @@
       if (result?.cancelled) { state.overlaySuppressed = true; hideReadingOverlay("launch-cancelled"); state.clientLaunchInFlight = ""; state.clientLaunched = null; state.officialLoginMessage = ""; renderLaunchpad(state.status || {}); return; }
       state.clientLaunchInFlight = "";
       state.clientLaunched = { id: "tcls", at: Date.now() };
+      state.lastClientLaunchAt = Date.now(); state.launchOverlayPending = true; state.overlaySuppressed = false;
       state.clientLaunchWaiting ||= {}; state.clientLaunchWaiting.tcls = state.clientLaunched;
       state.officialLoginMessage = "";
       renderLaunchpad(state.status || {});
@@ -977,6 +986,7 @@
       if (result?.cancelled || result?.alreadyOpen) { if (result?.cancelled) { state.overlaySuppressed = true; hideReadingOverlay("launch-cancelled"); } state.clientLaunchInFlight = ""; state.clientLaunched = null; state.officialLoginMessage = result?.alreadyOpen ? "Riot 客户端已经打开" : ""; renderLaunchpad(state.status || {}); return; }
       state.clientLaunchInFlight = "";
       state.clientLaunched = { id, at: Date.now() };
+      state.lastClientLaunchAt = Date.now(); state.launchOverlayPending = true; state.overlaySuppressed = false;
       state.clientLaunchWaiting ||= {}; state.clientLaunchWaiting[id] = state.clientLaunched;
       renderLaunchpad(state.status || {});
       showToast("客户端已启动，登录并进入大厅后会自动连接");
@@ -2634,7 +2644,14 @@
   // 总览页切换玩家页签时同步启动入口卡的可见性（只对当前召唤师展示）。
   window.addEventListener("deep-legends:overview-tab", (event) => {
     state.overviewTabIsCurrent = Boolean(event.detail?.current);
+    state.overviewGroup = event.detail?.group || "players";
     if (state.status) renderLaunchpad(state.status);
+  });
+
+  window.addEventListener("deep-legends:overview-ready", () => {
+    if (!state.lastClientLaunchAt || !state.status?.connected) return;
+    state.lastClientLaunchAt = 0;
+    void api("/api/client-launch-overview-ready", { method: "POST" }, "launch-overview-ready").catch(() => {});
   });
 
   // 离开收藏页后还原奖池子页的全部页签与筛选项（不触发数据加载）。
@@ -3083,7 +3100,7 @@
 
   window.desktopDiagnostics?.onError?.(message => showToast(`诊断日志保存失败：${message}`));
   let toastTimer = 0;
-  function showToast(message) { clearTimeout(toastTimer); el.toast.textContent = message; el.toast.hidden = false; toastTimer = setTimeout(() => { el.toast.hidden = true; }, 3200); }
+  function showToast(message, duration = 3200) { clearTimeout(toastTimer); el.toast.textContent = message; el.toast.hidden = false; toastTimer = setTimeout(() => { el.toast.hidden = true; }, duration); }
   window.deepLegendsToast = showToast;
   function localeCompare(left, right) { return String(left || "").localeCompare(String(right || ""), "zh-CN", { numeric: true, sensitivity: "base" }); }
   const rarityKeys = { "卓越": "transcendent", "圣堂": "exalted", "神话": "mythic", "终极": "ultimate", "传说": "legendary", "限定": "limited", "史诗": "epic", "王者": "royal", "勇士": "brave", "典藏": "archive", "未分级": "unranked" };
@@ -3414,7 +3431,7 @@
   function updateSearchRegionLabel(data = state.status) {
     if (el.playerSearchRegion.dataset.region === "riot-follow") {
       const region = data?.connected ? data.clientRegion : "";
-      el.playerSearchRegionLabel.textContent = isRiotSearchRegion(region) ? `外服 · ${RIOT_REGION_LABELS[region]}` : "外服 · 跟随客户端";
+      el.playerSearchRegionLabel.textContent = isRiotSearchRegion(region) ? RIOT_REGION_LABELS[region] : "外服";
       return;
     }
     if (isRiotSearchRegion(el.playerSearchRegion.dataset.region)) {
@@ -3429,7 +3446,7 @@
       return;
     }
     const currentServerName = data?.connected ? String(data.serverName || "").trim() : "";
-    el.playerSearchRegionLabel.textContent = currentServerName ? `国服 · ${currentServerName}` : "国服";
+    el.playerSearchRegionLabel.textContent = currentServerName || "国服";
   }
 
   function updateSearchRegionStatus(data) {

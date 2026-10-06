@@ -148,6 +148,9 @@ func TestR220HistoryDecisionAndFallback(t *testing.T) {
 			if fail {
 				return r206RelayResponse(404, []byte(`{}`)), nil
 			}
+			if strings.Contains(r.URL.Path, "/by-riot-id/") {
+				return proHTTPBody([]byte(`{"puuid":"r220-public-account"}`)), nil
+			}
 			return proHTTPBody([]byte(`[]`)), nil
 		})}
 		c := newLCUClient(1, "fixture")
@@ -157,10 +160,10 @@ func TestR220HistoryDecisionAndFallback(t *testing.T) {
 			return proHTTPBody([]byte(`{"games":{"games":[]}}`)), nil
 		})}
 		a := &app{riot: newRiotProvider(champs)}
-		_, caps, _ := a.loadDetailedMatches(t.Context(), c, gameplayReference{PlayerRef: "r220-valid-account"}, "r220-valid-account", true, 0, 5, "all", nil, nil)
-		want := []string{"asia.api.riotgames.com"}
+		_, caps, _ := a.loadDetailedMatches(t.Context(), c, gameplayReference{PlayerRef: "r220-valid-account", GameName: "Fixture", TagLine: "JP1"}, "r220-valid-account", true, 0, 5, "all", nil, nil)
+		want := []string{"asia.api.riotgames.com", "asia.api.riotgames.com"}
 		if fail {
-			want = append(want, "lcu")
+			want = []string{"asia.api.riotgames.com", "lcu"}
 		}
 		if !reflect.DeepEqual(calls, want) || caps[0].State != capabilityAvailable {
 			t.Fatal(calls, caps)
@@ -217,17 +220,20 @@ func TestR220JPHistoryUsesMatchDetailsAndRegionScopedTags(t *testing.T) {
 	champs.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		hosts = append(hosts, r.URL.Host)
 		paths = append(paths, r.URL.Path)
+		if strings.Contains(r.URL.Path, "/by-riot-id/") {
+			return proHTTPBody([]byte(`{"puuid":"r220-public-account"}`)), nil
+		}
 		if strings.HasSuffix(r.URL.Path, "/ids") {
 			return proHTTPBody([]byte(`["JP1_220"]`)), nil
 		}
-		return proHTTPBody([]byte(`{"metadata":{"matchId":"JP1_220"},"info":{"gameId":220,"gameDuration":1800,"gameMode":"CLASSIC","gameType":"MATCHED_GAME","mapId":11,"queueId":420,"participants":[{"participantId":1,"puuid":"r220-valid-account","teamId":100,"championId":268,"individualPosition":"MIDDLE","win":true},{"participantId":2,"puuid":"r220-other-account","teamId":200,"championId":69,"individualPosition":"MIDDLE","win":false}]}}`)), nil
+		return proHTTPBody([]byte(`{"metadata":{"matchId":"JP1_220"},"info":{"gameId":220,"gameDuration":1800,"gameMode":"CLASSIC","gameType":"MATCHED_GAME","mapId":11,"queueId":420,"participants":[{"participantId":1,"puuid":"r220-public-account","teamId":100,"championId":268,"individualPosition":"MIDDLE","win":true},{"participantId":2,"puuid":"r220-other-account","teamId":200,"championId":69,"individualPosition":"MIDDLE","win":false}]}}`)), nil
 	})}
 	a := &app{riot: newRiotProvider(champs)}
-	matches, _, err := a.loadClientRiotHistory(t.Context(), "jp1", "r220-valid-account", 0, 5, "all", nil, nil)
+	matches, _, err := a.loadClientRiotHistory(t.Context(), "jp1", "r220-valid-account", 0, 5, "all", nil, nil, gameplayReference{GameName: "Fixture", TagLine: "JP1"})
 	if err != nil || len(matches) != 1 || matches[0].GameID != 220 {
 		t.Fatal(matches, err)
 	}
-	if !reflect.DeepEqual(hosts, []string{"asia.api.riotgames.com", "asia.api.riotgames.com"}) || !strings.HasSuffix(paths[1], "JP1_220") {
+	if !reflect.DeepEqual(hosts, []string{"asia.api.riotgames.com", "asia.api.riotgames.com", "asia.api.riotgames.com"}) || !strings.HasSuffix(paths[2], "JP1_220") {
 		t.Fatal(hosts, paths)
 	}
 	if matchTagScope(matches[0]) != "jp1" {

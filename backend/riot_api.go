@@ -622,7 +622,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 				riotRelays.failed(relay)
 				return errRiotRelayUnavailable
 			}
-			return &riotStatusError{message: fmt.Sprintf("Riot 接口返回 HTTP %d", response.StatusCode), status: response.StatusCode}
+			return &riotStatusError{message: fmt.Sprintf("Riot 接口返回 HTTP %d", response.StatusCode), status: response.StatusCode, puuidMismatch: response.StatusCode == 400 && strings.Contains(strings.ToLower(string(body)), "decrypt")}
 		}
 	}
 	return &riotStatusError{message: "Riot 接口限流中（HTTP 429），请稍后重试", status: http.StatusTooManyRequests}
@@ -646,6 +646,7 @@ type riotStatusError struct {
 	message       string
 	status        int
 	relayCooldown string
+	puuidMismatch bool
 }
 
 func (e *riotStatusError) Error() string { return e.message }

@@ -1,0 +1,17 @@
+{
+  "check": "go-vet",
+  "command": [
+    "go",
+    "vet",
+    "./..."
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started_at": "2026-10-06T04:11:25.334Z",
+  "finished_at": "2026-10-06T04:11:26.698Z",
+  "seconds": 1.364,
+  "exit_code": 0,
+  "source_fingerprint": "59cb5070cc47",
+  "last5lines": [
+    ""
+  ]
+}

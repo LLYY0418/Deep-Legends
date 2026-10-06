@@ -1,0 +1,22 @@
+{
+  "check": "installer-test",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "./..."
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends/installer",
+  "started_at": "2026-10-06T04:11:29.734Z",
+  "finished_at": "2026-10-06T04:11:33.431Z",
+  "seconds": 3.697,
+  "exit_code": 0,
+  "source_fingerprint": "59cb5070cc47",
+  "last5lines": [
+    "ok  \tdeeplegends/installer\t3.206s",
+    "ok  \tdeeplegends/installer/internal/webviewhost\t0.725s",
+    "?   \tdeeplegends/installer/payload\t[no test files]",
+    "?   \tdeeplegends/installer/ui\t[no test files]",
+    "ok  \tdeeplegends/installer/uninstall\t0.669s"
+  ]
+}

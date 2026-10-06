@@ -25,7 +25,7 @@ test('R223 default KR, foreign follow including Brazil, and persistent manual se
  const f=menu();try {
   f.applySearchRegion('kr','',false);assert.equal(f.searchRegion(),'kr');assert.equal(f.el.playerSearchRiotFollowClient.disabled,true);
   f.state.status={connected:true,clientRegion:'br1'};f.updateSearchRegionStatus(f.state.status);
-  assert.equal(f.searchRegion(),'br1');assert.equal(f.el.playerSearchRiotFollowClient.disabled,false);assert.equal(f.el.playerSearchRegionLabel.textContent,'外服 · 巴西');
+  assert.equal(f.searchRegion(),'br1');assert.equal(f.el.playerSearchRiotFollowClient.disabled,false);assert.equal(f.el.playerSearchRegionLabel.textContent,'巴西');
   f.applySearchRegion('jp1');assert.equal(f.preferences.get('search-region-manual'),'true');assert.equal(f.el.playerSearchRegionLabel.textContent,'日服');
   f.state.status={connected:true,clientRegion:'TENCENT',serverId:'HN10',serverName:'黑色玫瑰'};f.updateSearchRegionStatus(f.state.status);
   assert.equal(f.searchRegion(),'jp1');assert.equal(f.el.playerSearchRiotFollowClient.disabled,true);assert.equal(f.el.playerSearchFollowClient.disabled,false);
@@ -49,9 +49,9 @@ test('R223 cancelled launch leaves cards visible, suppresses overlay and produce
  try {
   const f=compile(app,['renderLaunchpad','launchOfficialLogin','launchDetectedClient'],{state,el,escapeHTML,api:async()=>({cancelled:true}),hideReadingOverlay:reason=>hidden.push(reason),showToast:()=>assert.fail('cancel toast'),refreshStatus:()=>assert.fail('cancel refresh'),setTimeout:()=>assert.fail('cancel timer'),loadClientInstallations:()=>{}});
   await f.launchOfficialLogin();assert.equal(state.clientLaunched,null);assert.equal(state.clientLaunchInFlight,'');assert.equal(state.overlaySuppressed,true);assert.deepEqual(hidden,['launch-cancelled']);assert.equal(el.launcherList.hidden,false);
-  assert([...el.launcherList.querySelectorAll('button')].every(b=>!b.disabled));
-  state.clientLaunched={id:'riot',at:Date.now()};f.renderLaunchpad(state.status);assert.equal(el.launcherList.hidden,false);assert.equal(el.launcherList.querySelector('[data-client-id="riot"]').disabled,true);assert.equal(el.launcherList.querySelector('[data-client-id="tcls"]').disabled,false);
-  state.clientLaunched.at-=61_000;f.renderLaunchpad({connected:false,clientDiscovery:'process-not-found'});assert.equal(state.clientLaunched,null);assert([...el.launcherList.querySelectorAll('button')].every(b=>!b.disabled));assert.equal(dom.window.document.getElementById('client-launch-reselect'),null);
+  assert([...el.launcherList.querySelectorAll('button')].filter(b=>b.dataset.clientId!=='wegame').every(b=>!b.disabled));
+  state.overviewGroup='kr';state.clientLaunched={id:'riot',at:Date.now()};f.renderLaunchpad(state.status);assert.equal(el.launcherList.hidden,false);assert.equal(el.launcherList.querySelector('[data-client-id="riot"]').disabled,true);assert.equal(el.launcherList.querySelector('[data-client-id="tcls"]'),null);
+  state.clientLaunched.at-=61_000;f.renderLaunchpad({connected:false,clientDiscovery:'process-not-found'});assert.equal(state.clientLaunched,null);assert([...el.launcherList.querySelectorAll('button')].filter(b=>b.dataset.clientId!=='wegame').every(b=>!b.disabled));assert.equal(dom.window.document.getElementById('client-launch-reselect'),null);
  }finally {dom.window.close();}
 });
 

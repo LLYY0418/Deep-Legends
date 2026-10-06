@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {JSDOM}=require('../../desktop/node_modules/jsdom');
 const source=fs.readFileSync(path.join(__dirname,'gameplay.js'),'utf8');
-function extract(name){let start=source.indexOf(`function ${name}(`);assert.ok(start>=0,name);return source.slice(start,source.indexOf('\n  }',start)+4)}
+function extract(name){return require('./r188-harness.cjs').extract(source,name)}
 function compile(names,deps){names=require("./r211-harness-support.cjs").expand(source,names,deps);return Function(...Object.keys(deps),names.map(extract).join('\n')+`\nreturn {${names.join(',')}}`)(...Object.values(deps))}
 const noop=()=>{};
 test('R110 tab selection, progress and unrelated scroll preserve all existing avatar nodes',()=>{

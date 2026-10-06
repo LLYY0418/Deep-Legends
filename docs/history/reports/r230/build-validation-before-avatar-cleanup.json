@@ -1,0 +1,24 @@
+{
+  "version": "0.12.74",
+  "fingerprint": "c5aa393af4f8",
+  "keyMode": "public",
+  "installerBuilt": false,
+  "selfTestExitCode": 0,
+  "publicKeyCheck": {
+    "exitCode": 1,
+    "expected": "Riot API key is not embedded",
+    "passed": true
+  },
+  "artifacts": [
+    {
+      "file": "/private/tmp/deep-legends-0.12.74-r230-public",
+      "size": 31376418,
+      "sha256": "c03db052bb998bb3de510a3b94180c5eced7fd59a17f882e81d572b11dc15366"
+    },
+    {
+      "file": "/private/tmp/deep-legends-0.12.74-r230-public.exe",
+      "size": 32291840,
+      "sha256": "fc3d97e79fa891116d68057dd96c73603b805644da3155ac0af369f5f91870b2"
+    }
+  ]
+}

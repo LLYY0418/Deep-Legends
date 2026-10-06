@@ -70,6 +70,10 @@ type rendererPerfGroup struct {
 	MaxMS   float64 `json:"maxMs"`
 }
 type clientDiagnosticRequest struct {
+	CopyOK                  bool                        `json:"ok"`
+	CopyMethod              string                      `json:"method"`
+	ErrorName               string                      `json:"error_name"`
+	OverviewCard            string                      `json:"card"`
 	ActiveCount             int                         `json:"activeCount,omitempty"`
 	ActiveJobs              int                         `json:"activeJobs,omitempty"`
 	PendingObserved         int                         `json:"pendingObserved,omitempty"`
@@ -200,6 +204,7 @@ type clientDiagnosticRequest struct {
 	RenderErrorType         string                      `json:"errorType,omitempty"`
 	RenderFunctionName      string                      `json:"functionName,omitempty"`
 	HideReason              string                      `json:"hide_reason,omitempty"`
+	SkipReason              string                      `json:"skip_reason,omitempty"`
 	RequestID               int                         `json:"requestId,omitempty"`
 	TransportFailed         int                         `json:"transportFailed,omitempty"`
 	TransportDropped        int                         `json:"transportDropped,omitempty"`
@@ -221,11 +226,13 @@ var clientDiagnosticEvents = map[string]map[string]bool{
 	"card_image_observer_fallback":  {"visible-pending": true},
 	"live_scope_reset":              {"game_changed": true, "enter_champselect": true, "disconnect": true, "await_game": true, "hard_refresh": true, "resync": true, "left_end_of_game": true},
 	"live_recommendation_render":    {"phase": true, "empty": true},
-	"blocking_state_client":         {"show": true, "hide": true, "timeout": true},
+	"blocking_state_client":         {"show": true, "hide": true, "timeout": true, "skip": true},
 	"status_render_failed":          {"failed": true},
 	"automatic_read_client":         {"request": true},
 	"overview_dirty_rescan":         {"resolved": true, "retry": true, "gave_up": true, "paused_hidden": true},
 	"collection_render_client":      {"unchanged-suppressed": true, "updated": true},
+	"summoner_copy":                 {"success": true, "failed": true},
+	"overview_card_ready":           {"ready": true},
 	"renderer_perf":                 {"aggregated": true},
 	"live_render_rebuild":           {"aggregated": true},
 	"live_roster_duplicate_dropped": {"deduplicated": true},
@@ -402,6 +409,9 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 			event["endpoint"] = request.Endpoint
 		}
 		event["duration_ms"] = min(3600000, max(0, request.DurationMS))
+		if request.Event == "blocking_state_client" && request.Reason == "skip" && request.SkipReason == "client-exiting" {
+			event["skip_reason"] = "client-exiting"
+		}
 		if request.Event == "blocking_state_client" && request.Reason == "hide" {
 			switch request.HideReason {
 			case "identity-ready", "no-client-process", "timeout", "suppressed":
@@ -409,6 +419,28 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		a.recordDiagnostic(event)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if request.Event == "summoner_copy" {
+		if request.CopyMethod != "browser" && request.CopyMethod != "electron" && request.CopyMethod != "execCommand" {
+			http.Error(w, "invalid copy method", http.StatusBadRequest)
+			return
+		}
+		a.recordDiagnostic(map[string]any{"event": "summoner_copy", "ok": request.CopyOK, "method": request.CopyMethod, "error_name": sanitizeCopyErrorName(request.ErrorName)})
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if request.Event == "overview_card_ready" {
+		if request.OverviewCard != "ranks" && request.OverviewCard != "champions" && request.OverviewCard != "masteries" && request.OverviewCard != "positions" {
+			http.Error(w, "invalid overview card", http.StatusBadRequest)
+			return
+		}
+		if request.Source != "snapshot" && request.Source != "network" && request.Source != "opgg" {
+			http.Error(w, "invalid overview source", http.StatusBadRequest)
+			return
+		}
+		a.recordDiagnostic(map[string]any{"event": "overview_card_ready", "card": request.OverviewCard, "source": request.Source, "duration_ms": min(3600000, max(0, request.DurationMS))})
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -1137,7 +1169,7 @@ func (a *app) handlePrivacy(w http.ResponseWriter, _ *http.Request) {
 		"explicitWrites":         []string{"设置段位旗：保留头像框偏好，不动表情、守卫皮肤和其它槽位。生涯旗帜目前只读浏览，目录与拥有状态在收藏页查看；点击“检测客户端支持”只读查询头像与旗帜相关接口和拥有状态，不切换、不修改头像、旗帜或背景，结果只写入诊断日志，不记录库存或身份标识", "只有在英雄选择阶段点击“应用到客户端”后才新建一页带“[DL] ”前缀的可编辑符文并设为当前页；页数已满时会删除本工具此前创建的、带精确“[DL] ”前缀且未被客户端显式标记为不可删除的最旧符文页来腾位置，每次最多回收 5 页，绝不删除其它符文页，也不更新或覆盖任何已有页", "只有在英雄选择阶段点击“应用装备方案”后才创建或更新客户端装备方案", "只有点击“回放”后才让英雄联盟客户端下载或启动对应回放", "只有在工具生涯页点击应用后，才修改生涯背景皮肤", "只有在工具生涯页点击应用后，才修改聊天在线状态、个性签名与展示段位", "只有在工具生涯页逐项二次确认后，才修改头像框、挑战勋章、头衔或表情轮盘", "只有在工具领奖页明确勾选并开始领取后，才逐项领取奖励账本、任务或活动奖励；失败不会中断其它条目", "只有在工具维护页明确点击后，才重启、结束或启动客户端界面、关闭客户端或主动断开助手连接", "只有在工具维护页明确点击后，才修改当前客户端设置文件的只读属性；写前校验安装目录与符号链接"},
 		"automaticWrites":        []string{"进入游戏时的镜头模式默认不修改；选择后只修改客户端 General.CameraMode，选人和游戏启动阶段核对并在游戏进程未运行时原子替换本地设置的该单值；只读文件跳过，不修改 WASD 镜头或按键", "默认关闭；仅在工具自动页逐条开启后，才会在 ReadyCheck 阶段自动接受对局", "默认关闭；仅在工具自动页逐条开启后，才会在 EndOfGame 阶段自动发起再来一局", "默认关闭；仅在工具自动页逐条开启后，才会在 Reconnect 阶段自动请求断线重连", "默认关闭；仅在工具自动页逐条开启后，才会在结算阶段按所选策略自动点赞，且不会投给敌方", "默认关闭；仅在工具自动页逐条开启后，才会跳过任务庆祝", "默认关闭；仅在工具自动页逐条开启后，才会在大乱斗类英雄选择中播报阵营位置", "默认关闭；仅在工具自动页逐条开启后，才会把房主随机转交给其他房间成员", "默认关闭；仅在工具自动页逐条开启并配置队列策略后，才会接受或拒绝房间邀请", "默认关闭；仅在工具自动页逐条开启后，才会在满足人数时开始一次匹配；取消后不会自动重排", "征召托管默认开启，但禁用/选用序列为空时不发送任何写请求；仅在工具征召页启用对应序列并配置英雄后，才会在英雄选择阶段自动禁用、提前预选、自动选用或从备战席交换英雄；提前预选随自动选用生效"},
 		"externalReads":          []string{"为了让职业选手账号在改名后仍能认出来，会按已解析的稳定标识向 Riot 官方接口反查当前 Riot ID；只针对内置名单里的职业选手，不针对你和你的好友", "展示臻彩时按炫彩 ID、皮肤原画本机读取失败时按皮肤 ID，从固定的腾讯官方图片域名读取公开原画；不会发送账号信息、客户端令牌或收藏数据", "“英雄”页统计与图标只向固定 OP.GG、腾讯官方图片与 Riot Data Dragon 公共地址请求，已连接客户端时图标优先直接读取本机客户端", "查询韩服玩家时，向固定的 Riot 官方接口域名发送该玩家的 Riot ID 与内嵌 API Key；只填名称时另向 op.gg 公开搜索发送名称以补全编号", "为生成绝活哥符文推荐，会把从 OP.GG 韩服专家榜取得的第三方玩家 Riot ID 发送给 Riot 官方接口，并读取其公开对局以提取该英雄符文；不携带本机账号、Cookie 或客户端令牌，结果在进程内缓存 6 小时", "打开韩服玩家总览时，向 op.gg 公开页发送该玩家的 Riot ID 与 PUUID，换取每场对局的平均段位（当前登录的国服服务器改为向本机客户端逐人查询，不外发；跨服不查询排位）；失败时该行显示“—”，不影响战绩本身。以上请求都不携带本机账号、Cookie 或客户端令牌", "打开国服玩家总览时，向 ARAMKit 发送该玩家的昵称与 Tag，读取海克斯大乱斗第三方估算分；不携带本机账号凭据、Cookie 或客户端令牌，成功结果只在进程内缓存 10 分钟，失败缓存 5 分钟，韩服不发送"},
-		"stores":                 []string{"按来源、大区和对局 ID 保存的本地战绩标签缓存：只含参赛者槽位、关键词、检查点评分与参数版本，最多 5000 局，按最近使用回收，不含账号名、PUUID 或原始时间线，不外发", "用户保存的 Riot API Key：Windows 当前用户 DPAPI 加密，本地开发环境0600；仅用于 Riot 官方接口，凭据不进入诊断或导出", "便携版升级时在本机暂存并复制既有本地数据到默认存储位置；目标已有数据不覆盖，失败保留旧数据，不外发", "内置职业选手名单里人工核对账号的稳定标识锚点（本地缓存，30 天），按稳定标识反查的当前 Riot ID 与种子单双排段位分别缓存 6 小时", "公开韩服查询的身份解析与对局内容（含被查询玩家及公开对局参与者的 Riot ID/PUUID），保存在有界本地缓存，文件名哈希但正文不加密", "按韩服对局 ID 保存的出门装净购买缓存：只含参赛者槽位编号与物品 ID，保留一年，最多 600 条 / 128 MiB，不含账号标识与原始时间线，不外发", "随机脱敏账号标识", "已拥有和三合一剩余的本地历史快照", "按对局 ID 与加盐脱敏账号标识记录的胜点变化", "用户导入的奖池清单", "不含令牌和账号名的诊断事件", "按加盐脱敏账号标识保存的本赛季个人对局统计：逐场对局 ID、逐英雄胜负与 K/D/A/补刀、场均评分及名次、承伤/视野/伤害/经济/多杀与最多 40 个对位英雄聚合、单双排与灵活组排及海克斯大乱斗的逐场快照，以及海克斯大乱斗逐场的海克斯与装备 ID 和胜负（用于本地聚合「选了某个海克斯之后通常出什么」）；单文件上限 4 MiB，超限时先截断逐场快照、绝不丢弃英雄统计；不含原始账号标识，不外发", "按内容哈希命名的公开游戏资源与数据缓存：英雄与皮肤图标、玩家头像、臻彩与皮肤原画、符文与海克斯目录、英雄统计数据的公开信封与构建状态；不含账号标识，各自有条数与体积上限并按最近使用自动回收，不外发", "职业赛事与职业账号的公开数据缓存：赛事日程与对局详情、职业选手的符文与装备明细、职业名单与账号快照（Riot ID、昵称、段位）；来自公开赛事接口与 OP.GG，不含你的账号数据，不外发", "按对局 ID 保存的韩服每场平均段位（来自 OP.GG 公开页，保留 7 天，最多 4000 条 / 8MiB）：只含对局 ID 与该场平均段位，不含账号标识与参与者信息，不外发", "自动更新用到的本地文件：下载的安装包与校验文件、更新设置与最新版本清单；不含账号数据", "本机偏好与界面令牌：随机生成并跨重启复用的本地界面会话令牌、工具页的自动化规则与偏好开关、英雄关系网络数据源设置；不含 Riot 账号凭据，不外发"},
+		"stores":                 []string{"斗魂竞技场本局小队记录（arena-squad.json）：包含按加盐账号标识与大区绑定的 gameId、成员 PUUID、SummonerID、昵称和 Tag、记录时间；仅本地保存以便应用重启恢复，最多 3 人，超过 2 小时、对局不一致或离开对局时删除，不外发，不进入诊断日志", "按来源、大区和对局 ID 保存的本地战绩标签缓存：只含参赛者槽位、关键词、检查点评分与参数版本，最多 5000 局，按最近使用回收，不含账号名、PUUID 或原始时间线，不外发", "用户保存的 Riot API Key：Windows 当前用户 DPAPI 加密，本地开发环境0600；仅用于 Riot 官方接口，凭据不进入诊断或导出", "便携版升级时在本机暂存并复制既有本地数据到默认存储位置；目标已有数据不覆盖，失败保留旧数据，不外发", "内置职业选手名单里人工核对账号的稳定标识锚点（本地缓存，30 天），按稳定标识反查的当前 Riot ID 与种子单双排段位分别缓存 6 小时", "公开韩服查询的身份解析与对局内容（含被查询玩家及公开对局参与者的 Riot ID/PUUID），保存在有界本地缓存，文件名哈希但正文不加密", "按韩服对局 ID 保存的出门装净购买缓存：只含参赛者槽位编号与物品 ID，保留一年，最多 600 条 / 128 MiB，不含账号标识与原始时间线，不外发", "随机脱敏账号标识", "已拥有和三合一剩余的本地历史快照", "按对局 ID 与加盐脱敏账号标识记录的胜点变化", "用户导入的奖池清单", "不含令牌和账号名的诊断事件", "按加盐脱敏账号标识保存的本赛季个人对局统计：逐场对局 ID、逐英雄胜负与 K/D/A/补刀、场均评分及名次、承伤/视野/伤害/经济/多杀与最多 40 个对位英雄聚合、单双排与灵活组排及海克斯大乱斗的逐场快照，以及海克斯大乱斗逐场的海克斯与装备 ID 和胜负（用于本地聚合「选了某个海克斯之后通常出什么」）；单文件上限 4 MiB，超限时先截断逐场快照、绝不丢弃英雄统计；不含原始账号标识，不外发", "按内容哈希命名的公开游戏资源与数据缓存：英雄与皮肤图标、玩家头像、臻彩与皮肤原画、符文与海克斯目录、英雄统计数据的公开信封与构建状态；不含账号标识，各自有条数与体积上限并按最近使用自动回收，不外发", "职业赛事与职业账号的公开数据缓存：赛事日程与对局详情、职业选手的符文与装备明细、职业名单与账号快照（Riot ID、昵称、段位）；来自公开赛事接口与 OP.GG，不含你的账号数据，不外发", "按对局 ID 保存的韩服每场平均段位（来自 OP.GG 公开页，保留 7 天，最多 4000 条 / 8MiB）：只含对局 ID 与该场平均段位，不含账号标识与参与者信息，不外发", "自动更新用到的本地文件：下载的安装包与校验文件、更新设置与最新版本清单；不含账号数据", "本机偏好与界面令牌：随机生成并跨重启复用的本地界面会话令牌、工具页的自动化规则与偏好开关、英雄关系网络数据源设置；不含 Riot 账号凭据，不外发"},
 		"neverStores":            []string{"QQ 账号或密码", "LCU 临时令牌（仅在当前进程内存中短暂使用）", "本机当前账号的 PUUID、AccountID、SummonerID 不外发给第三方，也不出现在前端和诊断日志；公开韩服查询解析出的 PUUID 会在本机缓存目录保存复用（见存储声明），查询目标可按外部读取声明发送至 Riot 官方和 OP.GG", "客户端完整命令行", "战利品、待领取奖励、任务与活动奖励明细"},
 	})
 }

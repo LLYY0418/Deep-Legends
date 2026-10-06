@@ -1,0 +1,83 @@
+{
+  "verified_at": "2026-10-06T04:12:47.826Z",
+  "source_unchanged_from": "v0.12.74",
+  "redeployed": false,
+  "scope": "public platform status only; no player API or credentials",
+  "results": [
+    {
+      "platform": "br1",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "eun1",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "euw1",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "jp1",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "kr",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "la1",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "la2",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "me1",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "na1",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "oc1",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "ru",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "sg2",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "tr1",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "tw2",
+      "http_status": 200,
+      "valid": true
+    },
+    {
+      "platform": "vn2",
+      "http_status": 200,
+      "valid": true
+    }
+  ]
+}

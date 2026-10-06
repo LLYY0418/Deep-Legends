@@ -80,7 +80,7 @@ func (a *app) handleGameplayMasteries(w http.ResponseWriter, r *http.Request) {
 			writeRiotHTTPError(w, err)
 			return
 		}
-		result := masteryDetails(rows, a.riotChampionNames(r.Context()))
+		result := masteryDetails(rows, a.displayChampionNames(r.Context(), "masteries"))
 		var official int64
 		err = p.cachedPublicIdentity(r.Context(), "mastery-score:"+reference.PlayerRef, 30*time.Minute, &official, func(ctx context.Context) error {
 			return p.get(ctx, p.platformHost(), "/lol/champion-mastery/v4/scores/by-puuid/"+url.PathEscape(reference.PlayerRef), nil, &official)
@@ -117,5 +117,5 @@ func (a *app) handleGameplayMasteries(w http.ResponseWriter, r *http.Request) {
 	for _, row := range source {
 		rows = append(rows, row)
 	}
-	respondJSON(w, masteryDetails(rows, a.championNames()))
+	respondJSON(w, masteryDetails(rows, a.displayChampionNames(r.Context(), "masteries")))
 }

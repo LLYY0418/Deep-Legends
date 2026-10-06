@@ -1,0 +1,20 @@
+{
+  "check": "go-race",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-race",
+    "./..."
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started_at": "2026-10-06T04:13:53.060Z",
+  "finished_at": "2026-10-06T04:16:44.853Z",
+  "seconds": 171.793,
+  "exit_code": 0,
+  "source_fingerprint": "59cb5070cc47",
+  "last5lines": [
+    "ok  \tlol-loot-assistant/backend\t158.519s",
+    "?   \tlol-loot-assistant/scripts\t[no test files]"
+  ]
+}

@@ -1597,7 +1597,7 @@ test("small overviews move career statistics into an accessible modal sheet", ()
 	assert.match(gameplayScript, /function renderCareerDialogSections\(data(?:, tab)?\)/);
 	assert.match(gameplayScript, /function renderCareerDialogContent\(data, tab, layout\)/);
 	assert.match(gameplayScript, /const primaryKeys = \["ranks", "champions", "activity"\]/);
-	assert.match(gameplayScript, /const secondaryKeys = \["recent-ranked", "ability", "positions", "masteries", "recent-players"\]/);
+	assert.match(gameplayScript, /const secondaryKeys = \["recent-ranked", "ability", "masteries", "positions", "recent-players"\]/);
 	assert.match(gameplayScript, /layout === "single" \? renderCareerSections\(data, tab\) : renderCareerDialogSections\(data, tab\)/);
 	assert.match(gameplayScript, /dialogWidth <= 640 \? "single" : "masonry"/);
 	assert.match(gameplayScript, /aria-haspopup="dialog" aria-controls="career-dialog" data-open-career-dialog/);

@@ -52,7 +52,8 @@ test("启动入口初始 state 没有 installations 字段也可渲染和重新�
     assert.match(el.launcherList.textContent, /正在检查/);
     state.installationsLoaded = true;
     assert.doesNotThrow(() => render({ connected: false }));
-    assert.match(el.launcherList.textContent, /没有检测到可启动入口/);
+    assert.match(el.officialLoginStatus.textContent, /未找到可启动/);
+    assert.equal(el.launcherList.querySelectorAll("[data-client-id]:disabled").length,2);
     assert(el.launcherList.querySelector(".scan-launchers"));
   } finally { dom.window.close(); }
 });
@@ -65,7 +66,7 @@ test("总览未连接态只提供客户端入口且不提供密码输入", () =>
   assert.doesNotMatch(launchpad, /<input|type="password"|name="(?:account|password|token)"/i);
   const removedLauncherName = ["We", "Game"].join("");
   assert.doesNotMatch(launchpad, new RegExp(`<button[^>]+data-client-id=["']${removedLauncherName}`, "i"));
-  assert.doesNotMatch(source, new RegExp(`item\\.id\\s*===\\s*["']${removedLauncherName}["']`, "i"));
+  assert.match(source, /["']wegame["']/);
   assert.doesNotMatch(launchpad, /官方登录/);
   assert.doesNotMatch(styles, /official-login-button|official-login-action/);
 });
@@ -208,13 +209,13 @@ test("启动成功后入口保持显示，断开或超时恢复", () => {
   assert.equal(el.clientLaunchReselect, null);
   assert.equal(el.launchpadEyebrow.textContent, "已启动");
   assert.equal(el.launchpadTitle.textContent, "正在登录国服客户端");
-  assert.match(el.launchpadDescription.textContent, /弹出的腾讯窗口完成登录/);
+  assert.equal(el.launchpadDescription.textContent, "");
 
   state.clientLaunched = { id: "riot", at: 2 };
   render(state.status);
   assert.equal(el.launcherList.hidden, false);
   assert.equal(el.launchpadTitle.textContent, "正在登录 Riot 客户端");
-  assert.match(el.launchpadDescription.textContent, /弹出的 Riot 窗口完成登录/);
+  assert.equal(el.launchpadDescription.textContent, "");
 
   state.clientLaunched.processSeen = true;
   render({connected:false,clientDiscovery:"process-not-found"});
@@ -224,7 +225,8 @@ test("启动成功后入口保持显示，断开或超时恢复", () => {
   assert.equal(el.launchpadTitle.textContent, "选择登录入口");
   const buttons = Array.from(el.launcherList.querySelectorAll("[data-client-id]"));
   assert.equal(buttons.length, 2);
-  assert.ok(buttons.every((button) => !button.disabled), "reselected launchers must be clickable");
+  assert.equal(el.launcherList.querySelector('[data-client-id="tcls"]').disabled,false);
+  assert.equal(el.launcherList.querySelector('[data-client-id="wegame"]').disabled,true);
 
   state.clientLaunched = { id: "tcls", at: 3 };
   render({ connected: true });
@@ -235,7 +237,7 @@ test("启动成功后入口保持显示，断开或超时恢复", () => {
 
 test("启动入口只渲染可用的 TCLS 与 Riot 客户端并使用统一卡片", () => {
   const render = functionSource("renderLaunchpad");
-  assert.match(render, /item\.available && \(item\.id === "riot" \|\| item\.id === "tcls" && !isRiotSearchRegion/);
+  assert.match(render, /\["riot"\] : \["tcls", "wegame"\]/);
   assert.match(render, /data-client-id=/);
   assert.match(render, /launchOfficialLogin\(button\)/);
   assert.match(render, /国服纯净入口/);

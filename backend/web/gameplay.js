@@ -33,7 +33,7 @@
     status: null,
     section: "overview",
     tabs: [{ key: "current", playerRef: "", label: "当前召唤师", current: true, loading: false, data: null, error: "", ...newTabView() }],
-    activeGroup: "players",
+    activeGroup: readSetting("last-client-player-group", "players") === "kr" ? "kr" : "players",
     activeTabs: { players: "current", kr: "", pro: "" },
     // 两套总览分别保存页签切换历史，关闭页签时只回到同一类账号。
     tabHistories: { players: [], kr: [], pro: [] },
@@ -353,18 +353,18 @@
     return { tabs: nodes.playerTabs, prev: nodes.playerTabsPrev, next: nodes.playerTabsNext, content: nodes.overviewContent, refresh: nodes.overviewRefresh };
   }
   function activeTab(group = overviewGroupForSection()) {
-    return state.tabs.find(tab => tab.key === state.activeTabs[group] && (tabGroup(tab) === group || tab.current && tab.regionResolved === false))
-      || state.tabs.find(tab => tabGroup(tab) === group) || null;
+    return state.tabs.find(tab => (!tab.current || connected()) && tab.key === state.activeTabs[group] && (tabGroup(tab) === group || tab.current && tab.regionResolved === false))
+      || state.tabs.find(tab => (!tab.current || connected()) && tabGroup(tab) === group) || null;
   }
   function playerGroupCount(group) {
-    return state.tabs.filter(tab => tabGroup(tab) === group && (!tab.current || connected() || riotTab(tab))).length;
+    return state.tabs.filter(tab => tabGroup(tab) === group && (!tab.current || connected())).length;
   }
   function visiblePlayerGroups() {
     return Object.keys(PLAYER_GROUPS);
   }
   function selectPlayerGroup(group) {
     if (!visiblePlayerGroups().includes(group)) return;
-    const tab = group === "players" && !connected() ? state.tabs.find(tab => tab.current) : activeTab(group);
+    const tab = activeTab(group);
     if (tab) selectPlayerTab(tab.key);
     else { state.activeGroup = group; renderPlayerTabs(); renderOverview(group); }
   }
@@ -433,7 +433,7 @@
 
   // 韩服页签通过 Riot 官方 API 查询，不依赖本机客户端连接。
   function riotTab(tab) { return riotRegion(tab?.region || tab?.data?.player?.region); }
-  function tabReady(tab) { return connected() || riotTab(tab); }
+  function tabReady(tab) { return (!tab?.current || connected()) && (connected() || riotTab(tab)); }
   function tabServerID(tab) {
     if (riotTab(tab)) return "";
     const serverID = String(tab?.data?.player?.serverId || tab?.serverId || "").toUpperCase();
@@ -517,7 +517,7 @@
     if (Array.isArray(status.queueGroups) && status.queueGroups.length) state.queueGroups = status.queueGroups;
     if (!status.connected && !connectionChanged) return;
     if (!status.connected) {
-      // 客户端断开只清空依赖客户端的数据；韩服页签的数据来自 Riot API，保留。
+      // 本人数据随客户端断开失效；手动打开的外服搜索页签保留。
       resetTencentTabsAfterDisconnect();
       state.overlay = state.overlay.filter((entry) => riotTab(entry));
       state.liveRequestToken = Number(state.liveRequestToken || 0) + 1;
@@ -550,9 +550,10 @@
 	const current = state.tabs.find((tab) => tab.current);
     const nextRegion = clientRegion();
     const nextResolved = Boolean(status.clientRegion || status.serverId);
+    if (nextResolved) { try { localStorage.setItem("lol-loot-last-client-player-group", nextRegion ? "kr" : "players"); } catch (_) {} }
     const platformChanged = Boolean(current && ((current.region || "") !== nextRegion || current.regionResolved === false && nextResolved));
     const wasActive = current && Object.values(state.activeTabs).includes(current.key);
-    if (current) current.regionResolved = nextResolved;
+    if (current) { current.regionResolved = nextResolved; current.closed = false; }
     if (platformChanged) {
       const oldGroup = tabGroup(current);
       current.region = nextRegion; current.serverId = nextRegion ? "" : status.serverId || "";
@@ -582,7 +583,7 @@
       ensureItems();
       ensureSummonerSpells();
 	  if (!identityChanged) renderPlayerTabs();
-	  if (state.section === "overview" && current) loadOverview(current);
+	  if (state.section === "overview" && current) loadOverview(current, true);
       if (state.section === "live") loadLive();
       scheduleBeaconPoll(0);
     }
@@ -592,8 +593,17 @@
     const current = state.tabs.find((tab) => tab.current);
     const koreanTabs = state.tabs.filter((tab) => !tab.current && riotTab(tab));
     const removedTabs = state.tabs.filter((tab) => !tab.current && !riotTab(tab));
-    for (const tab of removedTabs) state.controllers?.get(`overview:${tab.key}`)?.abort();
-    if (current && !riotTab(current)) {
+    const cancelTab = tab => {
+      for (const [key, controller] of state.controllers || []) if (key.endsWith(`:${tab.key}`) || key.includes(`:${tab.key}:`)) controller.abort();
+      clearTimeout(tab.quotaRetry?.timer); clearTimeout(tab.appendTimer); clearTimeout(tab.matchTierRetryTimer);
+      tab.quotaRetry = null; tab.overviewRequestToken = Number(tab.overviewRequestToken || 0) + 1;
+      tab.closed = true;
+    };
+    for (const tab of removedTabs) cancelTab(tab);
+    if (current) {
+      state.activeGroup = tabGroup(current) || state.activeGroup || "players";
+      cancelTab(current); clearTimeout(state.currentGameTimer);
+      current.currentGame = null; current.currentGamePending = ""; current.opggSeason = null; current.riotId = null;
       current.playerRef = "";
       current.playerRefs = new Set();
       current.label = "当前召唤师";
@@ -831,7 +841,7 @@
   }
 
   async function loadOverview(tab, force = false, append = false, manual = false, quiet = false) {
-    if (tab.closed || state.destroyed) return false;
+    if (tab.closed || state.destroyed || tab.current && !connected()) return false;
     if (tab.quotaRetry && !force) {
       if (!manual) return false;
       if (Date.now() < tab.quotaRetry.retryAt) {
@@ -881,6 +891,7 @@
 		return loadOverview(tab, true, false, false, true);
 	  }
 	  if (tab.data && !force) {
+        tab.overviewCardLoad = {startedAt:(typeof performance !== "undefined" ? performance.now() : Date.now()),ready:new Set(),cached:true};
         rerenderTab(tab);
         void loadOPGGSeasonSummary(tab);
         void loadOverviewCurrentGame(tab);
@@ -889,6 +900,7 @@
       }
       tab.loading = true;
 	}
+    if (!append) tab.overviewCardLoad = {startedAt:(typeof performance !== "undefined" ? performance.now() : Date.now()),ready:new Set(),cached:false};
     clearTimeout(tab.quotaRetry?.timer);
     tab.quotaRetry = null;
     const requestToken = Number(tab.overviewRequestToken || 0) + 1;
@@ -915,8 +927,8 @@
       const begIndex = append ? Math.max(0, Number(tab.nextBegIndex ?? (Number(tab.data?.pagination?.begIndex || 0) + Number(tab.data?.pagination?.count || 0)))) : 0;
       const verification = { ...(tabGroup(tab) === "pro" && !append ? { expectedTier: tab.expectedTier || "" } : {}), ...(!append && tab.dirty ? { expectGameId: String(tab.dirtyGameId || "0") } : {}) };
       const body = tab.current && connected() ? null : JSON.stringify(tab.riotId && !tab.playerRef
-		? { ...verification, gameName: tab.riotId.gameName, tagLine: tab.riotId.tagLine, region: tab.region || "", serverId: tab.serverId || "", count: requestCount, begIndex, force, matchFilter: tab.matchFilter }
-		: { ...verification, playerRef: tab.playerRef, serverId: tab.serverId || "", count: requestCount, begIndex, force, matchFilter: tab.matchFilter });
+		? { ...verification, gameName: tab.riotId.gameName, tagLine: tab.riotId.tagLine, region: tab.region || "", serverId: tab.serverId || "", count: requestCount, begIndex, force, freshHistory:manual, matchFilter: tab.matchFilter }
+		: { ...verification, playerRef: tab.playerRef, serverId: tab.serverId || "", count: requestCount, begIndex, force, freshHistory:manual, matchFilter: tab.matchFilter });
       const retryHistory = riotTab(tab) || tab.current && connected() && state.status?.clientRegion !== "TENCENT";
       const timeout = retryHistory ? 190_000 : 25_000;
       const onProgress = retryHistory ? partial => {
@@ -966,7 +978,7 @@
         void loadOverviewCurrentGame(tab, force && !quiet);
       }
       const payload = tab.current && connected()
-		? await api(`/api/gameplay/overview?count=${requestCount}&begIndex=${begIndex}&force=${force ? 1 : 0}&matchFilter=${encodeURIComponent(tab.matchFilter || "all")}${verification.expectGameId ? `&expectGameId=${encodeURIComponent(verification.expectGameId)}` : ""}`, {onProgress}, requestKey, timeout)
+		? await api(`/api/gameplay/overview?count=${requestCount}&begIndex=${begIndex}&force=${force ? 1 : 0}&freshHistory=${manual ? 1 : 0}&matchFilter=${encodeURIComponent(tab.matchFilter || "all")}${verification.expectGameId ? `&expectGameId=${encodeURIComponent(verification.expectGameId)}` : ""}`, {onProgress}, requestKey, timeout)
         : await api("/api/gameplay/overview", { method: "POST", body, onProgress }, requestKey, timeout);
       if (tab.overviewRequestToken !== requestToken) return false;
       if (payload.proMismatch) markProMismatch(tab);
@@ -1163,6 +1175,7 @@
   // One aggregated OP.GG query, independent of Riot history and pagination.
   // Keep its result on this tab; never refresh the entire overview on completion.
   async function loadOPGGSeasonSummary(tab, force = false) {
+    if (tab.current && !connected()) return;
     const target = overviewSupplementTarget(tab);
     if (!target || state.destroyed) return false;
     const ref = target.key;
@@ -1308,7 +1321,7 @@
     if (!workspace.tabs) return;
     let visibleTabs = state.tabs.filter((tab) => tabGroup(tab) === group || group === "players" && tab.current && tab.regionResolved === false);
     if (group === "players" && !connected()) visibleTabs = visibleTabs.filter((tab) => riotTab(tab));
-    const indexedTabs = visibleTabs.map((tab) => ({ tab, index: state.tabs.indexOf(tab) }));
+    const indexedTabs = visibleTabs.filter(tab => !tab.current || connected()).map((tab) => ({ tab, index: state.tabs.indexOf(tab) }));
     const markup = indexedTabs.length ? indexedTabs.map(({ tab, index }) => {
       const selected = tab.key === state.activeTabs[group];
       const masked = state.settings.maskNames && !tab.current;
@@ -1779,29 +1792,13 @@
     for (const key of ["matchObserver", "proMatchObserver", "matchTierObserver", "proMatchTierObserver"]) { state[key]?.disconnect(); state[key] = null; }
     const tab = activeTab(group);
     activateOverviewView(workspace.content, tab);
-    // 通知外层：启动入口卡只在“当前召唤师”页签展示。
-    window.dispatchEvent(new CustomEvent("deep-legends:overview-tab", { detail: { current: Boolean(tab?.current) && (!riotTab(tab) || connected()) } }));
-    if (group !== "players" && !tab) {
-      workspace.content.closest(".gameplay-panel")?.classList.remove("is-disconnected");
-      workspace.content.innerHTML = group === "kr"
-        ? emptyState("查询外服召唤师", "在顶部搜索框输入召唤师名称即可查询。", false, "◉")
-        : emptyState("尚未打开职业选手账号", "请返回职业选手目录选择账号。", false, "◆");
+    window.dispatchEvent(new CustomEvent("deep-legends:overview-tab", { detail: { current: Boolean(tab?.current) || !tab && group !== "pro", group } }));
+    workspace.content.closest(".gameplay-panel")?.classList.remove("is-disconnected");
+    if (!tab) {
+      workspace.content.innerHTML = group === "pro" ? emptyState("尚未打开职业选手账号", "请返回职业选手目录选择账号。", false, "◆") : "";
       return;
     }
-    const groupTabs = state.tabs.filter((item) => tabGroup(item) === group);
-    // 职业账号与已打开的韩服玩家不依赖本机客户端。
-    const panelUsable = group === "pro" ? Boolean(tab) : connected() || groupTabs.some((item) => riotTab(item));
-    workspace.content.closest(".gameplay-panel")?.classList.toggle("is-disconnected", !panelUsable);
-    if (!panelUsable) {
-      // 客户端退出后不能留下空白页：给出明确的等待提示，并保留重试入口。
-      workspace.content.innerHTML = emptyState("等待英雄联盟客户端", "国服召唤师数据需要本机客户端连接后读取。启动并登录客户端后会自动恢复；也可以在顶部搜索框切换到外服直接查询玩家。", true);
-      workspace.content.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => { const target = activeTab(group); if (target) loadOverview(target, true); });
-      return;
-    }
-    if (!tabReady(tab)) {
-      workspace.content.innerHTML = emptyState("等待英雄联盟客户端", "国服召唤师数据需要本机客户端连接后读取；已打开的外服页签不受影响。", false);
-      return;
-    }
+    if (!tabReady(tab)) { workspace.content.innerHTML = ""; return; }
     renderOverviewBody(workspace.content, tab);
     if (tab.restoreScrollPending) restorePlayerScroll(tab);
   }
@@ -1809,9 +1806,18 @@
   // renderOverviewBody 把某个玩家页签（总览页签或覆盖层条目）的总览
   // 渲染到指定容器；总览页与覆盖层共用同一套展示与交互。
 
-  function activateOverviewView(container, tab) {
-    const fields = ["_stripHTML", "_backgroundArt", "_careerSignature", "_careerChildHTML", "_careerHTML",
+  function overviewRenderCacheFields() {
+    return ["_stripHTML", "_backgroundArt", "_careerSignature", "_careerChildHTML", "_careerHTML",
       "_careerObjectTokens", "_careerObjectCounter", "_matchListMatches", "_matchListFilter", "_matchListViewRevision"];
+  }
+
+  function resetOverviewRenderCache(container) {
+    delete container.dataset.matchTierScope;
+    for (const field of overviewRenderCacheFields()) delete container[field];
+  }
+
+  function activateOverviewView(container, tab) {
+    const fields = overviewRenderCacheFields();
     const views = container._overviewViews || (container._overviewViews = new Map());
     for (const cached of views.keys()) {
       if (cached.closed || !state.tabs.includes(cached) && !state.overlay.includes(cached)) views.delete(cached);
@@ -1834,8 +1840,7 @@
       container.dataset.matchTierScope = restored.scope || "";
       for (const field of fields) container[field] = restored.values[field];
     } else {
-      container.dataset.matchTierScope = "";
-      for (const field of fields) delete container[field];
+      resetOverviewRenderCache(container);
     }
     container._overviewViewTab = tab;
     // Keep only a few inactive player views; evicted nodes can be rebuilt normally.
@@ -1955,8 +1960,8 @@
 	  ["recent-ranked", renderRecentRanked(recentQueue.recentRanked, recentQueue.queueId, rankedQueueSwitcher(tab, recentQueue.queueId, "recent", data))],
 	  ["ability", renderAbility(abilityQueue.ability, abilityQueue.queueLabel, rankedQueueSwitcher(tab, abilityQueue.queueId, "ability"), abilityQueue.abilitySampleGames, abilityQueue.queueGames)],
       ["champions", renderChampionStats(championRows, championOverall, championProgress)],
-	  ["positions", renderPositionStats(positionQueue.positions, positionQueue.positionQueueId || positionQueue.queueId, rankedQueueSwitcher(tab, positionQueue.queueId, "position"), positionQueue.positionQueueLabel, positionQueue.queueGames)],
       ["masteries", renderMasteries(data.masteries || [], (data.capabilities || []).some(item => item.name === "champion-mastery" && item.state === "available"))],
+	  ["positions", renderPositionStats(positionQueue.positions, positionQueue.positionQueueId || positionQueue.queueId, rankedQueueSwitcher(tab, positionQueue.queueId, "position"), positionQueue.positionQueueLabel, positionQueue.queueGames)],
       ["recent-players", renderRecentPlayers(data.recentPlayers || [], recentHistoryCapability)],
       ["activity", `${renderActivity(data.activityHours || [])}${renderOverviewShareButton()}`],
     ];
@@ -1970,7 +1975,7 @@
     const sections = new Map(careerSectionEntries(data, tab));
     const renderItem = (key) => `<div class="career-dialog-item is-${key}">${sections.get(key) || ""}</div>`;
     const primaryKeys = ["ranks", "champions", "activity"];
-    const secondaryKeys = ["recent-ranked", "ability", "positions", "masteries", "recent-players"];
+    const secondaryKeys = ["recent-ranked", "ability", "masteries", "positions", "recent-players"];
     return `<div class="career-dialog-stack is-primary">${primaryKeys.map(renderItem).join("")}</div>
       <div class="career-dialog-stack is-secondary">${secondaryKeys.map(renderItem).join("")}</div>`;
   }
@@ -1982,6 +1987,7 @@
     try {
       activateOverviewView(container, tab);
       renderOverviewBodyContent(container, tab);
+      if (tab.current && tab.data && connected()) window.dispatchEvent(new CustomEvent("deep-legends:overview-ready"));
     } catch (error) {
       console.error("总览渲染失败", error);
       container.innerHTML = emptyState("总览渲染失败", `页面渲染时出现异常：${error?.message || error}`, true);
@@ -2063,7 +2069,7 @@
       }
       return `${typeof value}:${String(value)}`;
     }).join("|");
-    const careerSections = sameOverview && container._careerSignature === careerSignature ? "" : renderCareerSections(data, tab);
+    const careerSections = sameOverview && container._careerSignature === careerSignature && container.querySelector(".career-column") ? "" : renderCareerSections(data, tab);
     const stripHTML = `
       <section class="summoner-strip">
         ${backgroundArt}
@@ -2125,9 +2131,25 @@
     container._matchListMatches = rawMatches;
     container._matchListFilter = tab.matchFilter;
     container._matchListViewRevision = Number(tab.matchViewRevision || 0);
+    reportOverviewCardReady(container,tab);
     updateFriendPresenceChips();
     scheduleOverviewCurrentGame(tab);
     if ((data.matches || []).length || tab.currentGame?.data?.status === "active") { ensurePerks(); ensureItems(); ensureSummonerSpells(); observeMatchTierVisibility(container, tab, tierScope); }
+  }
+
+  function reportOverviewCardReady(container, tab) {
+    const load=tab.overviewCardLoad,data=tab.data;
+    if(!load || !data) return;
+    const opgg=tab.opggSeason?.data;
+    const position=rankedQueueData(data,tab,"position");
+    const cards=[["ranks",(data.ranks||[]).length,"network"],
+      ["champions",opgg ? Number(opgg.overall?.games)>0 : Number(data.seasonStatsProgress?.scanned)>0 || (data.seasonChampionStats||data.championStats||[]).length,opgg ? "opgg" : data.seasonStatsProgress ? "snapshot" : "network"],
+      ["masteries",(data.masteries||[]).length,"network"],
+      ["positions",(position.positions||[]).length,"network"]];
+    for(const [card,ready,source] of cards) if(ready && !load.ready.has(card) && container.querySelector(".career-column")) {
+      load.ready.add(card);
+      window.reportFlowDiagnostic?.("overview_card_ready","ready",{card,durationMs:Math.round((typeof performance !== "undefined" ? performance.now() : Date.now())-load.startedAt),source:load.cached ? "snapshot" : source});
+    }
   }
 
   function friendPresenceForTab(tab) {
@@ -2239,7 +2261,7 @@
     prepareImages(root);
   }
   async function loadOverviewCurrentGame(tab, force = false) {
-    if (!riotTab(tab) || document.hidden || !document.hasFocus() || !tab.overlay && (state.section !== "overview" || activeTab() !== tab)) return;
+    if (tab.current && !connected() || !riotTab(tab) || document.hidden || !document.hasFocus() || !tab.overlay && (state.section !== "overview" || activeTab() !== tab)) return;
     let traceID = tab?.currentGameTrace;
     const report = (reason, fields = {}) => { if (typeof window !== "undefined") window.reportFlowDiagnostic?.("current_game_client", reason, { traceId: traceID, forceRefresh: force, ...fields }); };
     const target = overviewSupplementTarget(tab);
@@ -2247,6 +2269,7 @@
     if (!ref || tab.data?.player?.privateHistory && riotTab(tab) || tab.externalRender || state.destroyed) { report("gated", { gate: !ref ? "no-reference" : state.destroyed ? "destroyed" : tab.externalRender ? "external-render" : "private-kr" }); return; }
     if (tab.currentGamePending === ref) { report("in-flight"); return; }
     if (!force && (tab.currentGame?.key || tab.currentGame?.ref) === ref && Date.now() - tab.currentGame.at < 30_000) { report("cached", { cacheAgeMs: Date.now() - tab.currentGame.at, phase: tab.currentGame.error ? "error" : tab.currentGame.data?.status }); return; }
+    const requestGeneration = Number(tab.overviewRequestToken || 0);
     tab.currentGamePending = ref;
     state.currentGameTraceSequence = ((state.currentGameTraceSequence || 0) + 1) % 1000000;
     tab.currentGameTrace = `cg-${Date.now()}-${state.currentGameTraceSequence}`;
@@ -2261,20 +2284,19 @@
         error.errorKind = "invalid-response";
         throw error;
       }
-      if (overviewSupplementTarget(tab)?.key !== ref || state.destroyed) { report("stale", { gate: state.destroyed ? "destroyed" : "reference-changed" }); return; }
+      if (overviewSupplementTarget(tab)?.key !== ref || state.destroyed || tab.closed || tab.current && !connected() || Number(tab.overviewRequestToken || 0) !== requestGeneration) { report("stale", { gate: state.destroyed ? "destroyed" : "reference-changed" }); return; }
       tab.currentGame = { key: ref, ref: tab.data?.player?.playerRef || ref, at: Date.now(), data, traceId: traceID, forceRefresh: force };
       report("received", { phase: data.status, source: data.source, teamsReceived: (data.teams || []).length, durationMs: Date.now()-started, playersReceived: (data.teams || []).reduce((sum, team) => sum + (team.players || []).length, 0) });
       if (data.status === "active") { ensurePerks(); ensureSummonerSpells(); }
     } catch (error) {
       report(error.name === "RequestCancelled" ? "canceled" : "failed", { durationMs: Date.now()-started, httpStatus: error.status || 0, errorKind: error.errorKind || "other" });
-      if (error.name !== "RequestCancelled" && overviewSupplementTarget(tab)?.key === ref && !state.destroyed) tab.currentGame = { key: ref, ref: tab.data?.player?.playerRef || ref, at: Date.now(), error: true, traceId: traceID, forceRefresh: force };
+      if (error.name !== "RequestCancelled" && overviewSupplementTarget(tab)?.key === ref && !state.destroyed && !tab.closed && (!tab.current || connected()) && Number(tab.overviewRequestToken || 0) === requestGeneration) tab.currentGame = { key: ref, ref: tab.data?.player?.playerRef || ref, at: Date.now(), error: true, traceId: traceID, forceRefresh: force };
     } finally {
-      if (tab.currentGamePending === ref) tab.currentGamePending = "";
-      updateCurrentGameCard(tab);
+      if (Number(tab.overviewRequestToken || 0) === requestGeneration) { if (tab.currentGamePending === ref) tab.currentGamePending = ""; updateCurrentGameCard(tab); }
     }
   }
   function scheduleOverviewCurrentGame(tab) {
-    if (!riotTab(tab)) { clearTimeout(state.currentGameTimer); return; }
+    if (tab.current && !connected() || !riotTab(tab)) { clearTimeout(state.currentGameTimer); return; }
     updateCurrentGameCard(tab);
     if (tab.overlay || tab.externalRender || state.section !== "overview" || activeTab() !== tab || document.hidden || !document.hasFocus()) { clearTimeout(state.currentGameTimer); return; }
     clearTimeout(state.currentGameTimer);
@@ -2584,8 +2606,8 @@
 	return `<section class="career-section"><header><h3>位置偏好</h3><div class="career-section-tools">${tools}</div></header><div class="position-list">${rows}</div></section>`;
   }
 
-  function masteryMarks(item) {
-    if (item.markRequiredForNextLevel == null) return "";
+  function masteryMarkProgress(item) {
+    if (item.markRequiredForNextLevel == null && !item.nextSeasonMilestone?.requireGradeCounts) return {slots:0,earned:0};
     let slots = Math.max(0, Math.min(20, Number(item.markRequiredForNextLevel) || 0));
     let earned = Math.min(slots, Math.max(0, Number(item.tokensEarned) || 0));
     // Observed Riot/OP.GG: tokensEarned is a bank; dot slots come from the next
@@ -2600,7 +2622,17 @@
         if(index>=0){earned++;available.splice(index,1);}
       }
     }
-    return `<span class="mastery-marks" aria-label="${earned} / ${slots} 标记">${Array.from({length:slots},(_,i)=>`<i class="mastery-mark${i < earned ? " is-earned" : ""}"></i>`).join("")}</span>`;
+    return {slots:Math.min(20,slots),earned:Math.min(20,earned)};
+  }
+
+  function masteryMarks(item) {
+    const {slots,earned}=masteryMarkProgress(item);
+    return `<span class="mastery-marks" aria-label="${earned} / ${slots} 标记">${Array.from({length:slots},(_,i)=>`<svg class="mastery-mark${i < earned ? " is-earned" : ""}" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1 13 7 7 13 1 7Z"/></svg>`).join("")}</span>`;
+  }
+
+  function masteryGradeBoxes(item) {
+    const {slots,earned}=masteryMarkProgress(item);
+    return `<div class="mastery-grade-progress">${Array.from({length:slots},(_,i)=>`<b class="mastery-grade-box${i<earned ? " is-earned" : ""}">S</b>`).join("")}<span>里程碑 ${item.championSeasonMilestone ?? "—"}</span></div>`;
   }
 
   function masteryDetailsPortrait(item) {
@@ -2615,7 +2647,7 @@
     const since = item.championPointsSinceLastLevel, until = item.championPointsUntilNextLevel;
     const required = since != null && until != null ? Math.max(0, Number(since)+Number(until)) : null;
     const date = Number(item.lastPlayTime)>0 ? new Date(Number(item.lastPlayTime)).toLocaleDateString("sv-SE") : "—";
-    return `<header>${masteryDetailsPortrait(item)}<strong>${escapeHTML(item.championName)}</strong></header>${masteryMarks(item)}<p>本赛季最高评价 <b>${grade}</b> · 赛季里程碑 ${item.championSeasonMilestone ?? "—"}</p>${required != null ? `<progress value="${Math.max(0,Number(since))}" max="${Math.max(1,required)}"></progress><p>${number(since)} / ${number(required)} 点</p>` : ""}<p>最近游玩：${date}</p>`;
+    return `<header>${masteryDetailsPortrait(item)}<strong>${escapeHTML(item.championName)}</strong></header>${masteryGradeBoxes(item)}${required != null ? `<progress value="${Math.max(0,Number(since))}" max="${Math.max(1,required)}"></progress><p>${number(since)} / ${number(required)} 点</p>` : ""}<p>最近游玩：${date}</p>`;
   }
 
   function renderMasteryDetails(data) {
@@ -2655,12 +2687,12 @@
       const av=a[key],bv=b[key];
       if (av == null) return bv == null ? Number(a.championId)-Number(b.championId) : 1;
       if (bv == null) return -1;
-      return direction*(Number(av)-Number(bv)) || Number(a.championId)-Number(b.championId);
+      return direction*(Number(av)-Number(bv)) || (key === "games" ? Number(b.winRate || 0)-Number(a.winRate || 0) || Number(b.kda || 0)-Number(a.kda || 0) : 0) || Number(a.championId)-Number(b.championId);
     });
   }
 
   function renderChampionTable(data, tab) {
-    const queue=data.queue || tab.championTableQueue || "ranked", mayhem=queue==="mayhem";
+    const queue=data.queue || tab.championTableQueue || "420", mayhem=queue==="mayhem";
     const rows=championTableSortedRows(data,tab);
     if (!(tab.championTableExpanded instanceof Set)) tab.championTableExpanded=new Set(!mayhem && rows[0] ? [String(rows[0].championId)] : []);
     if (!(tab.championTableOpponentLimits instanceof Map)) tab.championTableOpponentLimits=new Map();
@@ -2668,28 +2700,35 @@
     const columns=[["games","场次"],["kda","KDA"],["score","评分"],["damagePerMinute","伤害"],["tankShare","承伤"]];
     if(!mayhem)columns.push(["controlWards","守卫"],["cs","补刀"]);
     columns.push(["gold","金币"]);
+    const topValues = Object.fromEntries(["score","damagePerMinute","tankShare","controlWards","cs","gold","doubleKills","tripleKills","quadraKills","pentaKills"].map(key=>[key,new Set([...new Set(rows.map(row=>row[key]).filter(value=>Number.isFinite(value) && value>0))].sort((a,b)=>b-a).slice(0,3))]));
     const cell=(top,bottom="",tone="")=>`<td${tone ? ` class="${tone}"` : ""}><b>${top}</b>${bottom ? `<small>${bottom}</small>` : ""}</td>`;
     const rowMarkup=(row,index,kind="")=> {
       const id=String(row.championId),expanded=tab.championTableExpanded.has(id),opponent=kind==="opponent";
       const multi=["doubleKills","tripleKills","quadraKills","pentaKills"];
-      return `<tr class="${kind ? `is-${kind}` : ""}"><td>${opponent ? "↳" : index || ""}</td><th class="champion-table-hero" scope="row">${row.championId ? iconFigure("champion",row.championId,row.championName,"small") : ""}<span>${escapeHTML(row.championName || "所有英雄")}</span></th>${cell(`${row.games}场 · ${n(row.winRate)}%`,`<span class="champion-table-winbar"><i style="--table-winrate:${Math.max(0,Math.min(100,Number(row.winRate)||0))}%"></i></span>${row.wins}胜 / ${row.losses}负`,row.winRate>=60 ? "is-hot" : "")}${cell(row.kda==null ? "-" : `${n(row.kda,2)}:1`,`${n(row.kills)} / ${n(row.deaths)} / ${n(row.assists)} · ${pct(row.kp)}`,row.kda>=3 ? "is-good" : "")}${cell(n(row.score),row.rank==null ? "-" : `#${n(row.rank)}`)}${cell(n(row.damagePerMinute),pct(row.damageShare))}${cell(pct(row.tankShare))}${mayhem ? "" : cell(`${n(row.controlWards)} (${n(row.wardsPlaced)}/${n(row.wardsKilled)})`)+cell(n(row.cs),n(row.csPerMinute))}${cell(n(row.gold,0),n(row.goldPerMinute))}${multi.map(key=>`<td class="table-multi-single">${n(row[key],0)}</td>`).join("")}<td class="table-multi-combined">${multi.map((key,i)=>`${["双","三","四","五"][i]} ${n(row[key],0)}`).join(" · ")}</td><td>${!mayhem && !opponent && row.championId && row.opponents?.length ? `<button type="button" class="text-button" data-table-expand="${id}" aria-expanded="${expanded}" aria-label="${escapeHTML(row.championName)}的对位">${expanded ? "⌃" : "⌄"}</button>` : ""}</td></tr>`;
+      const highlight=key=>!kind && topValues[key]?.has(row[key]) ? "is-top-metric" : "";
+      const expandable=!mayhem && !kind && row.championId && row.opponents?.length;
+      return `<tr class="${kind ? `is-${kind}` : ""}"${expandable ? ` tabindex="0" data-table-expand="${id}" aria-expanded="${expanded}" aria-label="${escapeHTML(row.championName)}的对位"` : ""}><td>${opponent ? "" : index || ""}</td><th class="champion-table-hero" scope="row">${opponent ? '<span class="champion-table-opponent-arrow" aria-hidden="true">↳</span>' : ""}${row.championId ? iconFigure("champion",row.championId,row.championName,"small") : ""}<span>${escapeHTML(row.championName || "所有英雄")}</span></th>${cell(`${row.games}场 · ${n(row.winRate)}%`,`<span class="champion-table-winbar"><i style="--table-winrate:${Math.max(0,Math.min(100,Number(row.winRate)||0))}%"></i></span>${row.wins}胜 / ${row.losses}负`,row.winRate>=60 ? "is-hot" : "")}${cell(row.kda==null ? "-" : `${n(row.kda,2)}:1`,`${n(row.kills)} / ${n(row.deaths)} / ${n(row.assists)} · ${pct(row.kp)}`,row.kda>=3 ? "is-good" : "")}${cell(n(row.score),row.rank==null ? "-" : `#${n(row.rank)}`,highlight("score"))}${cell(n(row.damagePerMinute),pct(row.damageShare),highlight("damagePerMinute"))}${cell(pct(row.tankShare),"",highlight("tankShare"))}${mayhem ? "" : cell(`${n(row.controlWards)} (${n(row.wardsPlaced)}/${n(row.wardsKilled)})`,"",highlight("controlWards"))+cell(n(row.cs),n(row.csPerMinute),highlight("cs"))}${cell(n(row.gold,0),n(row.goldPerMinute),highlight("gold"))}${multi.map(key=>`<td class="table-multi-single ${highlight(key)}"><b>${n(row[key],0)}</b></td>`).join("")}<td class="table-multi-combined">${multi.map((key,i)=>`<b class="${highlight(key)}">${["双","三","四","五"][i]} ${n(row[key],0)}</b>`).join(" · ")}</td></tr>`;
     };
     const body=rowMarkup(data.overall || {championName:"所有英雄",games:0,wins:0,losses:0,winRate:0},0,"overall")+rows.map((row,index)=>{
       let content=rowMarkup(row,index+1);
       if(!mayhem && tab.championTableExpanded.has(String(row.championId))) {
         const limit=tab.championTableOpponentLimits.get(String(row.championId)) || 5;
         content+=(row.opponents || []).slice(0,limit).map(opp=>rowMarkup(opp,0,"opponent")).join("");
-        if((row.opponents || []).length>limit)content+=`<tr class="is-opponent"><td colspan="${columns.length+8}"><button type="button" class="text-button" data-table-more="${row.championId}">显示更多对位</button></td></tr>`;
+        if((row.opponents || []).length>limit)content+=`<tr class="is-opponent"><td colspan="${columns.length+7}"><button type="button" class="text-button" data-table-more="${row.championId}">显示更多对位</button></td></tr>`;
       }
       return content;
     }).join("");
-    return `<nav class="champion-table-tabs" aria-label="英雄数据队列">${[["ranked","排位"],["420","单排/双排"],["440","灵活组排"],["mayhem","海克斯大乱斗"]].map(([key,label])=>`<button type="button" data-table-queue="${key}" class="${key===queue ? "is-active" : ""}" aria-pressed="${key===queue}">${label}</button>`).join("")}</nav><div class="champion-table-wrap"><table class="champion-data-table"><thead><tr><th>#</th><th class="champion-table-hero">英雄</th>${columns.map(([key,label])=>`<th><button type="button" data-table-sort="${key}">${label}${(tab.championTableSort || "games")===key ? (tab.championTableDirection===1 ? " ↑" : " ↓") : ""}</button></th>`).join("")}${["双杀","三杀","四杀","五杀"].map(label=>`<th class="table-multi-single">${label}</th>`).join("")}<th class="table-multi-combined">多杀</th><th></th></tr></thead><tbody>${body}</tbody></table></div>`;
+    return `<nav class="champion-table-tabs" aria-label="英雄数据队列">${[["420","单排/双排"],["440","灵活组排"],["mayhem","海克斯大乱斗"]].map(([key,label])=>`<button type="button" data-table-queue="${key}" class="${key===queue ? "is-active" : ""}" aria-pressed="${key===queue}">${label}</button>`).join("")}</nav><div class="champion-table-wrap"><table class="champion-data-table"><thead><tr><th>#</th><th class="champion-table-hero">英雄</th>${columns.map(([key,label])=>`<th><button type="button" data-table-sort="${key}">${label}${(tab.championTableSort || "games")===key ? (tab.championTableDirection===1 ? " ↑" : " ↓") : ""}</button></th>`).join("")}${["双杀","三杀","四杀","五杀"].map(label=>`<th class="table-multi-single">${label}</th>`).join("")}<th class="table-multi-combined">多杀</th></tr></thead><tbody>${body}</tbody></table></div>`;
   }
 
   function bindChampionTable(container, tab) {
     const redraw=()=>renderOverviewSubpage(container,tab);
     for(const button of container.querySelectorAll("[data-table-sort]"))button.addEventListener("click",()=>{const key=button.dataset.tableSort;tab.championTableDirection=(tab.championTableSort || "games")===key ? -(tab.championTableDirection ?? -1) : -1;tab.championTableSort=key;redraw();});
-    for(const button of container.querySelectorAll("[data-table-expand]"))button.addEventListener("click",()=>{const id=button.dataset.tableExpand;if(tab.championTableExpanded.has(id))tab.championTableExpanded.delete(id);else tab.championTableExpanded.add(id);redraw();});
+    for(const row of container.querySelectorAll("[data-table-expand]")) {
+      const toggle=()=>{const id=row.dataset.tableExpand;if(tab.championTableExpanded.has(id))tab.championTableExpanded.delete(id);else tab.championTableExpanded.add(id);redraw();};
+      row.addEventListener("click",toggle);
+      row.addEventListener("keydown",event=>{if(["Enter"," "].includes(event.key)){event.preventDefault();toggle();}});
+    }
     for(const button of container.querySelectorAll("[data-table-more]"))button.addEventListener("click",()=>{const id=button.dataset.tableMore;tab.championTableOpponentLimits.set(id,(tab.championTableOpponentLimits.get(id)||5)+10);redraw();});
     for(const button of container.querySelectorAll("[data-table-queue]"))button.addEventListener("click",()=>{tab.championTableQueue=button.dataset.tableQueue;tab.championTableExpanded=null;tab.championTableOpponentLimits=new Map();void openOverviewSubpage(tab,"champion-table");});
   }
@@ -2697,11 +2736,20 @@
   async function openOverviewSubpage(tab, page) {
     const container=overviewContainer(tab),scroll=container?.closest(".player-overlay-scroll") || document.getElementById("app-scroll");
     if (!tab.overviewSubpage) tab.overviewReturnScroll=Number(scroll?.scrollTop||0);
+    if(page==="champion-table" && !tab.championTableQueue) {
+      const queues=tab.data?.rankedQueues || {};
+      const solo=queues["420"],flex=queues["440"];
+      const seasonGames=(type,queue)=>{
+        const rank=(tab.data?.ranks||[]).find(row=>String(row.queueType).toUpperCase()===type);
+        return Number.isFinite(rank?.wins) && Number.isFinite(rank?.losses) ? rank.wins+rank.losses : Number(queue?.recentRanked?.games||0);
+      };
+      tab.championTableQueue=seasonGames("RANKED_SOLO_5X5",solo)===0 && seasonGames("RANKED_FLEX_SR",flex)>0 ? "440" : "420";
+    }
     tab.overviewSubpage=page;
     const token=Number(tab.overviewSubpageRequestToken||0)+1;tab.overviewSubpageRequestToken=token;
     tab.overviewSubpageState={status:"loading",page};rerenderTab(tab);if (scroll) scroll.scrollTop=0;
     try {
-      const data=await api(`/api/gameplay/${page}?playerRef=${encodeURIComponent(tab.data?.player?.playerRef || tab.playerRef || "")}${page==="champion-table" ? `&queue=${encodeURIComponent(tab.championTableQueue || "ranked")}` : ""}`,{},`overview-subpage:${tab.key}`,30000);
+      const data=await api(`/api/gameplay/${page}?playerRef=${encodeURIComponent(tab.data?.player?.playerRef || tab.playerRef || "")}${page==="champion-table" ? `&queue=${encodeURIComponent(tab.championTableQueue || "420")}` : ""}`,{},`overview-subpage:${tab.key}`,30000);
       if (tab.closed || tab.overviewSubpage!==page || tab.overviewSubpageRequestToken!==token) return;
       tab.overviewSubpageState={status:"ready",page,data};
     } catch(error) {
@@ -2712,9 +2760,10 @@
   }
 
   function renderOverviewSubpage(container, tab) {
+    resetOverviewRenderCache(container);
     const current=tab.overviewSubpageState||{};
     const title=tab.overviewSubpage==="masteries" ? "英雄熟练度" : "英雄数据表";
-    container.innerHTML=`<section class="overview-detail-page"><header><button type="button" class="text-button" data-overview-return>‹ 返回总览</button><h2>${title}</h2></header>${current.status==="ready" && current.data?.available ? (tab.overviewSubpage==="masteries" ? renderMasteryDetails(current.data) : renderChampionTable(current.data,tab)) : current.status==="loading" ? '<p class="muted">正在读取…</p>' : `<p class="section-empty">${escapeHTML(current.error || current.data?.detail || "详情读取失败")} <button type="button" class="text-button" data-subpage-retry>重试</button></p>`}</section>`;
+    container.innerHTML=`<section class="overview-detail-page"><header><button type="button" class="text-button" data-overview-return><span aria-hidden="true">‹</span> 返回总览</button><h2>${title}</h2></header>${current.status==="ready" && current.data?.available ? (tab.overviewSubpage==="masteries" ? renderMasteryDetails(current.data) : renderChampionTable(current.data,tab)) : current.status==="loading" ? '<p class="muted">正在读取…</p>' : `<p class="section-empty">${escapeHTML(current.error || current.data?.detail || "详情读取失败")} <button type="button" class="text-button" data-subpage-retry>重试</button></p>`}</section>`;
     container.querySelector("[data-overview-return]")?.addEventListener("click",()=>{
       tab.overviewSubpage="";rerenderTab(tab);
       const scroll=container.closest(".player-overlay-scroll")||document.getElementById("app-scroll");if(scroll)scroll.scrollTop=Number(tab.overviewReturnScroll||0);
@@ -4236,7 +4285,7 @@
     const avatar = item => {
       const own = Number(item.participantId) === Number(self?.participantId), active = Number(item.participantId) === Number(selected?.participantId);
       const title = item.hidden ? "隐藏玩家" : `${item.gameName || item.displayName || "隐藏玩家"}${item.tagLine ? `#${item.tagLine}` : ""}`;
-      return `<button type="button" role="tab" aria-selected="${active}" tabindex="${active ? 0 : -1}" class="build-player${active ? " is-selected" : ""}" data-build-player="${item.participantId}" data-game-id="${match.gameId}" data-tooltip="${escapeHTML(title)}\n${escapeHTML(item.championName || "")} · ${number(item.championLevel || 0)} 级">${iconFigure("champion",item.championId,item.championName)}<small>${number(item.championLevel || 0)}</small>${own ? '<i class="build-player-self" aria-hidden="true"></i>' : ""}</button>`;
+      return `<button type="button" role="tab" aria-selected="${active}" tabindex="${active ? 0 : -1}" class="build-player${active ? " is-selected" : ""}" data-build-player="${item.participantId}" data-game-id="${match.gameId}" data-tooltip="${escapeHTML(title)}\n${escapeHTML(item.championName || "")} · ${number(item.championLevel || 0)} 级">${iconFigure("champion",item.championId,item.championName)}${own ? '<i class="build-player-self" aria-hidden="true"></i>' : ""}</button>`;
     };
     const groups = layout.groups.map((group,index) => `<div class="build-player-group${layout.arena ? " is-arena-group" : ` is-team-${Number(group.teamId) === 100 ? "blue" : "red"}`}${layout.arena && group.players.some(item=>Number(item.participantId)===Number(self?.participantId)) ? " is-self-team" : ""}">${layout.arena ? `<b class="build-group-rank is-rank-${group.placement}">${group.placement || "—"}</b>` : ""}${order(group.players).map(avatar).join("")}</div>`);
     return `<div class="build-player-selector${layout.arena ? " is-arena" : ""}" role="tablist" aria-label="构建玩家">${groups.join(layout.arena ? "" : '<span class="build-player-vs">VS</span>')}</div>`;
@@ -8192,11 +8241,11 @@
     return { matches, playerRef, region: tab.region || "", serverId: tabServerID(tab), loaded: Boolean(tab.data) };
   }
 
-  function showToast(message) {
+  function showToast(message, duration = 3600) {
     nodes.toast.textContent = message;
     nodes.toast.hidden = false;
     clearTimeout(showToast.timer);
-    showToast.timer = setTimeout(() => { nodes.toast.hidden = true; }, 3600);
+    showToast.timer = setTimeout(() => { nodes.toast.hidden = true; }, duration);
   }
 
   function bindPlayerTabWorkspace(group) {
@@ -8272,7 +8321,7 @@
       setOverviewRefreshLoading(overviewGroupForSection(), true);
       try {
         const tab = activeTab();
-        if (tab) await loadOverview(tab, true);
+        if (tab) await loadOverview(tab, true, false, true);
       } finally {
         setOverviewRefreshLoading(overviewGroupForSection(), false);
       }
@@ -8691,11 +8740,36 @@
     return `<span class="summoner-streak is-${win ? "win" : "loss"}${win && streak.count >= 5 ? " is-strong" : ""}">${icon}${streak.count}${streak.plus ? "+" : ""}连${win ? "胜" : "败"}</span>`;
   }
 
+  async function copySummonerText(text) {
+    let method="browser",errorName="";
+    const report=ok=>window.reportFlowDiagnostic?.("summoner_copy",ok ? "success" : "failed",{ok,method,error_name:errorName});
+    const toast=(message)=>{if(window.deepLegendsToast)window.deepLegendsToast(message,3000);else showToast(message,3000);};
+    try {
+      if(!navigator.clipboard?.writeText) throw new Error("ClipboardUnavailable");
+      await navigator.clipboard.writeText(text);
+    } catch(error) {
+      errorName=error?.name || "Error";method="electron";
+      try {
+        if(!window.desktopClipboard?.copyText || await window.desktopClipboard.copyText(text)!==true) throw new Error("ClipboardUnavailable");
+      } catch(error) {
+        errorName=error?.name || "Error";method="execCommand";
+        const previous=document.activeElement,input=document.createElement("textarea");
+        input.value=text;input.setAttribute("readonly","");input.style.cssText="position:fixed;left:-9999px;top:0";document.body.appendChild(input);
+        try {
+          input.select();
+          if(!document.execCommand("copy")) throw new Error("CopyFailed");
+        } catch(error) { errorName=error?.name || "Error";report(false);toast("复制失败");return false; }
+        finally {input.remove();previous?.focus?.({preventScroll:true});}
+      }
+    }
+    report(true);toast("召唤师名称和编号已复制");return true;
+  }
+
   function bindSummonerCopy(container) {
     for (const name of container.querySelectorAll("[data-copy-summoner]")) {
       if (name._summonerCopyBound) continue;
       name._summonerCopyBound = true;
-      const copy = () => { void navigator.clipboard?.writeText(name.dataset.copySummoner).catch(() => {}); };
+      const copy = () => { void copySummonerText(name.dataset.copySummoner); };
       name.addEventListener("click", copy);
       name.addEventListener("keydown", event => { if (["Enter"," "].includes(event.key)) { event.preventDefault(); copy(); } });
     }

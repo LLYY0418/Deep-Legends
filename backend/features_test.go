@@ -27,6 +27,12 @@ func TestClientDiagnosticAcceptsMultipleEventWhitelists(t *testing.T) {
 			if event == "overview_dirty_rescan" {
 				body = `{"event":"` + event + `","reason":"` + reason + `","attempt":1,"filter":"flex","finished_game_id":"9014822625","finished_queue_id":2400,"expected_present":false,"outcome":"` + reason + `","since_end_ms":7000}`
 			}
+			if event == "summoner_copy" {
+				body = `{"event":"summoner_copy","reason":"` + reason + `","ok":true,"method":"browser"}`
+			}
+			if event == "overview_card_ready" {
+				body = `{"event":"overview_card_ready","reason":"ready","card":"champions","source":"snapshot","durationMs":150}`
+			}
 			request := httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(body))
 			(&app{}).handleClientDiagnostic(recorder, request)
 			if recorder.Code != http.StatusNoContent {

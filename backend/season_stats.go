@@ -27,7 +27,8 @@ var seasonStartS26 = time.Date(2026, 1, 8, 0, 0, 0, 0, time.UTC)
 // 10 持久化原始 K/D/A 累计；响应计算不再改写扫描状态。
 // 11 R216: Go v2 scores and champion/opponent table totals.
 // 12 R216 P4: adopted v2.1 scores; reject all persisted v2 table aggregates.
-const seasonStatsCacheSchemaVersion = 12
+// 13 R230: discard caches marked complete by malformed SGP history in 0.12.73.
+const seasonStatsCacheSchemaVersion = 13
 
 const seasonStatsSource = dataSourceSGP
 
@@ -873,11 +874,21 @@ func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUCl
 	headScan := start == 0
 	for page := 0; page < budget; page++ {
 		infos, consumed, more, err := a.sgp.matchHistoryOn(ctx, client, serverID, playerRef, start, sgpPageSize, useHistoryCache)
+		// consumed counts upstream entries, including rejected JSON. Retry the same
+		// offset after a parse loss; seen IDs prevent double-counting valid rows.
+		if len(infos) < consumed {
+			scan.cache.Complete = false
+			scan.cache.ResumeIndex = start
+			scan.cache.PendingIndex = start
+			scan.interrupted = true
+			a.recordDiagnostic(map[string]any{"event": "season_scan_parse_dropped", "returned": consumed, "parsed": len(infos), "resume_index": start})
+			return
+		}
 		if err != nil {
 			scan.interrupted = true
 			return
 		}
-		if consumed <= 0 {
+		if consumed <= 0 && !more {
 			scan.cache.Complete = true
 			scan.cache.ResumeIndex = 0
 			return
@@ -913,7 +924,10 @@ func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUCl
 		}
 		// 增量追新（从 0 开始扫）撞到缓存说明新对局已经全部补齐，可以停；
 		// 但这不代表整季完整，Complete 交给缓存里原本的标记，别在这里置真。
-		if headScan && cachedHit {
+		// A rejected head page may leave no trustworthy continuation. In that
+		// case advance through the known IDs instead of resetting to offset 0
+		// forever on every retry/backfill round.
+		if headScan && cachedHit && (scan.cache.Complete || scan.cache.PendingIndex > 0) {
 			scan.cache.ResumeIndex = scan.cache.PendingIndex
 			return
 		}

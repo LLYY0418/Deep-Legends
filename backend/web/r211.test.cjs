@@ -66,9 +66,9 @@ test('R211 streak skips remakes/custom, stops unknown and uses arena placement',
  const arena=Array.from({length:3},(_,i)=>({...match('loss',i),modeGroup:'arena',subject:{placement:4}}));assert.equal(f.computeOverviewStreak(arena,false,'').result,'win');
  assert.match(f.renderOverviewStreak({result:'loss',count:3}),/streak-rain/);assert.match(f.renderOverviewStreak({result:'win',count:3}),/streak-outer-flame/);
 });
-test('R211 name copy is silent and adds no tooltip; hidden name cannot bind',async()=>{
+test('R230 name copy shows feedback; hidden name cannot bind',async()=>{
  const dom=new JSDOM('<h2 data-copy-summoner="名称#tag" data-tooltip="名称">名称</h2><h2>隐藏玩家</h2>'),writes=[];
- const f=compile(source,['bindSummonerCopy'],{navigator:{clipboard:{writeText:async text=>writes.push(text)}},showToast:()=>assert.fail('toast')});
+ const f=compile(source,['bindSummonerCopy','copySummonerText'],{window:{deepLegendsToast:()=>{}},document:dom.window.document,navigator:{clipboard:{writeText:async text=>writes.push(text)}},showToast:()=>assert.fail('fallback toast')});
  f.bindSummonerCopy(dom.window.document);dom.window.document.querySelector('h2').click();dom.window.document.querySelectorAll('h2')[1].click();await Promise.resolve();assert.deepEqual(writes,['名称#tag']);assert.equal(dom.window.document.querySelector('[data-copy-summoner]').dataset.tooltip,'名称');dom.window.close();
  const css=fs.readFileSync(path.join(__dirname,'gameplay.css'),'utf8');assert.match(css,/summoner-copy-name \{ cursor:pointer/);assert.match(css,/prefers-reduced-motion:reduce/);
 });
@@ -76,7 +76,7 @@ test('R211 name copy is silent and adds no tooltip; hidden name cannot bind',asy
 test('R211 mastery entrance, real milestone mapping, sorted grid and popup fields',()=>{
  const rows=JSON.parse(fs.readFileSync(path.join(__dirname,'../testdata/r211/masteries-topking-five.json'),'utf8'));
  const names={126:'杰斯',897:'奎桑提',39:'艾瑞莉娅',799:'安蓓萨',68:'兰博'};
- const f=compile(source,['masteryDetailsPortrait','masteryMarks','masteryTooltipContent','renderMasteryDetails','renderMasteries'],{number:String,escapeHTML,compactNumber:String,iconFigure:(_kind,id)=>`<span class="game-icon"><img src="/${id}"></span>`});
+ const f=compile(source,['masteryDetailsPortrait','masteryMarkProgress','masteryGradeBoxes','masteryMarks','masteryTooltipContent','renderMasteryDetails','renderMasteries'],{number:String,escapeHTML,compactNumber:String,iconFigure:(_kind,id)=>`<span class="game-icon"><img src="/${id}"></span>`});
  assert.doesNotMatch(f.renderMasteries([],false),/data-overview-subpage/);
  assert.match(f.renderMasteries([],true),/data-overview-subpage="masteries"/);
  assert.match(f.masteryMarks(rows[0]),/0 \/ 2 标记/); // Bank 65 is not 65 completed milestone grades.
@@ -90,7 +90,7 @@ test('R211 mastery entrance, real milestone mapping, sorted grid and popup field
  assert.equal(dom.window.document.querySelector('.mastery-details-level').textContent,'72');
  const popup=f.masteryTooltipContent({...rows[0],championName:'杰斯'});
  assert.match(popup,/summoner-mastery-portrait mastery-details-portrait/);assert.match(popup,/summoner-mastery-crest mastery-details-crest/);
- assert.match(popup,/最高评价 <b>A\+<\/b> · 赛季里程碑 17/);assert.match(popup,/3246 \/ 11000 点/);assert.match(popup,/最近游玩：\d{4}-\d{2}-\d{2}/);
+ assert.match(popup,/mastery-grade-box/);assert.match(popup,/里程碑 17/);assert.doesNotMatch(popup,/最高评价/);assert.match(popup,/3246 \/ 11000 点/);assert.match(popup,/最近游玩：\d{4}-\d{2}-\d{2}/);
  dom.window.close();
  const css=fs.readFileSync(path.join(__dirname,'gameplay.css'),'utf8');assert.match(css,/mastery-details-level[^}]+min-width:30px/);assert.match(css,/mastery-details-crest[^}]+object-fit:contain/);
 });

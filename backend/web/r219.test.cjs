@@ -31,8 +31,8 @@ test('R219 fresh state without installations renders status, scans once and show
     assert.equal(Object.hasOwn(h.state,'installations'),false);
     h.state.status=disconnected('process-not-found');assert.doesNotThrow(()=>h.renderStatus());
     await h.refreshStatus();assert.equal(h.requests.filter(x=>x==='/api/client-installations').length,1);
-    assert.deepEqual([...h.el.launcherList.querySelectorAll('[data-client-id]')].map(n=>n.dataset.clientId),['tcls','riot']);
-    assert.match(h.el.launcherList.textContent,/国服纯净入口/);assert.match(h.el.launcherList.textContent,/Riot 客户端/);
+    assert.deepEqual([...h.el.launcherList.querySelectorAll('[data-client-id]')].map(n=>n.dataset.clientId),['tcls','wegame']);
+    assert.match(h.el.launcherList.textContent,/国服纯净入口/);assert.match(h.el.launcherList.textContent,/WeGame/);
     assert(h.events.some(e=>e.event==='deep-legends:status'));
     await h.refreshStatus();assert.equal(h.requests.filter(x=>x==='/api/client-installations').length,1);
     assert.match(source,/installations:\s*\[\]/);
@@ -42,7 +42,7 @@ test('R219 fresh state without installations renders status, scans once and show
 test('R219 failed and empty installation scans both offer rescan with distinct messages',async()=>{
   for(const options of [{scanError:new Error('fixture failure')},{items:[]}]) {
     const h=harness(options);try {
-      await h.refreshStatus();assert.match(h.el.launcherList.textContent,options.scanError?/安装位置检查失败/:/没有检测到可启动入口/);
+      await h.refreshStatus();if(options.scanError) assert.match(h.el.launcherList.textContent,/安装位置检查失败/);else {assert.match(h.el.officialLoginStatus.textContent,/未找到可启动/);assert.equal(h.el.launcherList.querySelectorAll('[data-client-id]:disabled').length,2);}
       const retry=h.el.launcherList.querySelector('.scan-launchers');assert(retry);retry.click();await new Promise(setImmediate);
       assert(h.requests.includes('/api/client-installations?force=1'));
     }finally{h.close();}

@@ -153,7 +153,7 @@ func (a *app) runConnectionManagerWith(ctx context.Context, ops connectionLoopOp
 		a.updateDiscovery(report)
 		if err != nil {
 			a.markDisconnected(friendlyError(err))
-			if !ops.wait(ctx, backoff) {
+			if !ops.wait(ctx, a.clientDiscoveryInterval(backoff, report, time.Now())) {
 				return
 			}
 			backoff *= 2
@@ -165,7 +165,7 @@ func (a *app) runConnectionManagerWith(ctx context.Context, ops connectionLoopOp
 		if !ops.identity(client) {
 			client.Close()
 			a.setConnectionPhase("error", false)
-			if !ops.wait(ctx, backoff) {
+			if !ops.wait(ctx, a.clientDiscoveryInterval(backoff, report, time.Now())) {
 				return
 			}
 			backoff *= 2

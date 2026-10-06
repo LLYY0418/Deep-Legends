@@ -5,9 +5,9 @@ const read=f=>fs.readFileSync(path.join(__dirname,'../backend/web',f),'utf8');
 test('offline national group remains reachable from a pro tab',()=>{
  const src=read('gameplay.js');
  const functions=src.slice(src.indexOf('  function visiblePlayerGroups('),src.indexOf('  function playerGroupButton('));
- let selected='';const current={key:'current',current:true};
- new Function('PLAYER_GROUPS','playerGroupCount','connected','state','activeTab','selectPlayerTab','assert',`${functions};assert.deepEqual(visiblePlayerGroups(),['players','kr','pro']);selectPlayerGroup('players');`)({players:'国服',kr:'韩服',pro:'职业'},group=>group==='pro'?1:0,()=>false,{tabs:[current]},()=>null,key=>selected=key,assert);
- assert.equal(selected,'current');
+ let selected='', renders=0;const current={key:'current',current:true,region:'jp1'},state={tabs:[current],activeGroup:'pro'};
+ new Function('PLAYER_GROUPS','playerGroupCount','connected','state','activeTab','selectPlayerTab','renderPlayerTabs','renderOverview','assert',`${functions};assert.deepEqual(visiblePlayerGroups(),['players','kr','pro']);selectPlayerGroup('players');`)({players:'国服',kr:'外服',pro:'职业'},group=>group==='pro'?1:0,()=>false,state,()=>null,key=>selected=key,()=>renders++,()=>renders++,assert);
+ assert.equal(selected,'');assert.equal(state.activeGroup,'players');assert.equal(renders,2);
  assert.match(src,/const disabled = false/);
 });
 test('ordinary and centered artwork use different face coordinates, including load failure',()=>{

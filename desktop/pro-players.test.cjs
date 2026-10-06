@@ -527,7 +527,7 @@ test('R100 empty national/KR/pro groups stay selectable and preserve distinct em
  for(const key of ['kr','pro','kr']) {
   assert.equal(d.querySelector(`#player-group-menu [data-player-group="${key}"]`).getAttribute('aria-disabled'),'false');
   choose(key);await tick();assert.equal(d.querySelector('#player-group-button').dataset.playerGroup,key);
-  assert.match(d.querySelector('#overview-content').textContent,key==='kr'?/顶部搜索框/:/职业选手目录/);
+  if(key==='kr') assert.equal(d.querySelector('#overview-content').textContent,'');else assert.match(d.querySelector('#overview-content').textContent,/职业选手目录/);
   if(key==='pro'){assert.equal(d.querySelector('#pro-players-return').hidden,false);d.querySelector('#pro-players-return').click();await tick();assert.equal(d.querySelector('#pro-players-panel').hidden,false);d.querySelector('#pro-players-home').click();await tick();}
  }
  choose('players');await tick();assert.equal(d.querySelector('#player-group-button').dataset.playerGroup,'players');

@@ -7,7 +7,7 @@
 // Recording it here is the only way to tell that cost apart from our own.
 const startupMarks = { jsEntry: Date.now() };
 
-const { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell } = require("electron");
+const { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, session, shell } = require("electron");
 const { spawn } = require("node:child_process");
 const http = require("node:http");
 const fs = require("node:fs");
@@ -562,6 +562,13 @@ function createMainWindow() {
   ipcMain.handle("desktop-scale-get", (event) => {
     if (!isTrustedRenderer(event.sender) || event.sender !== mainWindow?.webContents) return null;
     return uiScaleState();
+  });
+  ipcMain.removeHandler("desktop-copy-text");
+  ipcMain.handle("desktop-copy-text", (event, text) => {
+    if (!isTrustedRenderer(event.sender) || event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow?.webContents.mainFrame) return false;
+    if (typeof text !== "string" || !text || text.length > 256) return false;
+    clipboard.writeText(text);
+    return true;
   });
   ipcMain.removeAllListeners("desktop-scale-set");
   ipcMain.on("desktop-scale-set", (event, mode, value) => {

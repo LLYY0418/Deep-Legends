@@ -27,6 +27,9 @@ func detectClientInstallationsWithScan() ([]clientInstallation, clientInstallati
 		gameRoots = append(gameRoots, string(drive)+`:\WeGameApps\英雄联盟`)
 	}
 	shortcuts := detectClientShortcuts()
+	wegameRoots := wegameRegistryRoots(queryRegistryValues)
+	report.RegistryWeGameFound = len(wegameRoots) > 0
+	shortcuts = append(shortcuts, wegameRegistryInstallations(wegameRoots, regularFile)...)
 	report.ShortcutCandidates = len(shortcuts)
 	paths := riotClientCandidatesWithSources()
 	executables := []string{}
