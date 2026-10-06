@@ -1,0 +1,12 @@
+{
+  "verified_at": "2026-10-06T04:32:31.288Z",
+  "reviewer": "release_final_audit",
+  "publicationMetadata": true,
+  "sameShaWorkflows": true,
+  "oldReleaseAndTagPreservation": true,
+  "anonymousFileHashes": true,
+  "anonymousLatestBytes": true,
+  "rendererBudgets": true,
+  "note": "Scout did not locate the ignored raw quality-final.log; main verified the existing 1MB log directly and exported raw race step to quality-race-evidence.txt.",
+  "mainVerifiedRawRaceLog": true
+}

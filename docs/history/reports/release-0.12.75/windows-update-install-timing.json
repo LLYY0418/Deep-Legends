@@ -1,0 +1,26 @@
+{
+  "build_fingerprint": "09d40c535496",
+  "copy_ms": 1,
+  "event": "update_install_timing",
+  "extract_ms": 7560,
+  "log_seq": 1,
+  "result": "ok",
+  "run_id": "37d770c55b2e8f8dc412f268",
+  "stages_ms": {
+    "check_done_to_uninstall_old_start": 1,
+    "copy_done_to_relaunch": 189,
+    "extract_done_to_copy_done": 1,
+    "extract_start_to_extract_done": 7560,
+    "installer_start_to_parent_exited": 596,
+    "nsis_start_to_oninit": 1079,
+    "oninit_to_check_done": 41,
+    "parent_exited_to_payload_released": 167,
+    "parent_exited_to_uninstall_old_start": 1328,
+    "payload_released_to_nsis_start": 40,
+    "uninstall_old_done_to_extract_start": 83,
+    "uninstall_old_start_to_uninstall_old_done": 2180
+  },
+  "time": "2026-10-06T04:28:22.4729937Z",
+  "total_ms": 11937,
+  "uninstall_old_ms": 2180
+}

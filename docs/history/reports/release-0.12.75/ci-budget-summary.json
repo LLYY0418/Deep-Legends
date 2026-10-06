@@ -1,0 +1,16 @@
+{
+  "backendLinuxRaceSeconds": 118.44,
+  "nodeSeconds": 220.74686032099999,
+  "maxNodeFileSeconds": 68.180708086,
+  "counts": {
+    "tests": 1294,
+    "failed": 0,
+    "passed": 1292,
+    "cancelled": 0,
+    "skipped": 2,
+    "todo": 0,
+    "topLevel": 1291,
+    "suites": 0
+  },
+  "passed": true
+}

@@ -1,0 +1,37 @@
+{
+  "verified_at": "2026-10-06T04:26:42.578Z",
+  "release_id": 404311108,
+  "version": "0.12.75",
+  "sha": "0e11afd6b9e057af9fdae6c479b56f1b4eb000a1",
+  "fingerprint": "09d40c535496",
+  "keyMode": "public",
+  "notesMatch": true,
+  "manifestMatch": true,
+  "files": [
+    {
+      "name": "Deep-Legends-Setup-0.12.75-public.exe",
+      "id": 614465981,
+      "size": 111824384,
+      "sha256": "6c4978997b5cedc2a7595931fede5166111b747c797bd7203a700178722de93c",
+      "apiDigest": "sha256:6c4978997b5cedc2a7595931fede5166111b747c797bd7203a700178722de93c",
+      "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/untagged-74670d414ff67dcd719c/Deep-Legends-Setup-0.12.75-public.exe"
+    },
+    {
+      "name": "latest.json",
+      "id": 614465985,
+      "size": 1720,
+      "sha256": "e9705a9f7affacbdfe62a45392209d963188bda24f5e9b9a2904102f7a83a80e",
+      "apiDigest": "sha256:e9705a9f7affacbdfe62a45392209d963188bda24f5e9b9a2904102f7a83a80e",
+      "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/untagged-74670d414ff67dcd719c/latest.json"
+    },
+    {
+      "name": "SHA256SUMS-public.txt",
+      "id": 614465983,
+      "size": 182,
+      "sha256": "6355f877344a9ed67e6f724598356cfe9b89e637c9c1040aa0781bbc91a805c9",
+      "apiDigest": "sha256:6355f877344a9ed67e6f724598356cfe9b89e637c9c1040aa0781bbc91a805c9",
+      "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/untagged-74670d414ff67dcd719c/SHA256SUMS-public.txt"
+    }
+  ],
+  "passed": true
+}

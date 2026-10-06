@@ -50,3 +50,7 @@ macOS 原生与 Windows amd64 后端均重建，版本 **0.12.74**，key mode **
 - 关闭时不闪启动遮罩；读取新计时事件验证各段真实耗时。连上到首屏约三秒的目标尚无真机证据。
 
 验证产物必须为 **public**（空内嵌 Riot Key），名称含 `-public`；用户自行打包，本单不生成安装包。
+
+## 0.12.75 发布后续（2026-10-06）
+
+本单共同源码已随 0.12.75 public Latest 发布，包含 R230 后续头像数字去除与二级表格箭头调整。发布 SHA `0e11afd6b9e057af9fdae6c479b56f1b4eb000a1`、指纹 `09d40c535496`；最终发布预检、同 SHA 完整 Linux/Windows CI、实际升级及匿名附件均通过。此前失败日志是历史轮次，不代表此次发布状态；真实用户 Windows/LCU 项目继续待验，不自动关闭。见 [0.12.75 发布账本](history/ledgers/release-0.12.75-execution-ledger.md)。

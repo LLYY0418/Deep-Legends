@@ -1,0 +1,6 @@
+quality	Test with race detector	﻿2026-10-06T04:20:52.4228533Z ##[group]Run go test -count=1 -race ./...
+quality	Test with race detector	2026-10-06T04:20:52.4228891Z ^[[36;1mgo test -count=1 -race ./...^[[0m
+quality	Test with race detector	2026-10-06T04:20:52.4291250Z shell: /usr/bin/bash -e {0}
+quality	Test with race detector	2026-10-06T04:20:52.4291512Z ##[endgroup]
+quality	Test with race detector	2026-10-06T04:23:30.9258673Z ok  	lol-loot-assistant/backend	118.440s
+quality	Test with race detector	2026-10-06T04:23:30.9259639Z ?   	lol-loot-assistant/scripts	[no test files]

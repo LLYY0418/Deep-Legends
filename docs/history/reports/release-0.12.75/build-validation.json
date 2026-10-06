@@ -1,0 +1,24 @@
+{
+  "verified_at": "2026-10-06T04:20:10.402Z",
+  "version": "0.12.75",
+  "fingerprint": "09d40c535496",
+  "keyMode": "public",
+  "selfTestExitCode": 0,
+  "selfTestOutput": "2026/10/06 12:20:10 Deep Legends 0.12.75 自检通过：奖池 554 条，哈希 dee5e21f5234",
+  "publicKeyCheck": {
+    "exitCode": 1,
+    "passed": true
+  },
+  "artifacts": [
+    {
+      "file": "/private/tmp/deep-legends-0.12.75-public",
+      "size": 31376418,
+      "sha256": "294c1fb496cdb79efae6e09b66642224bd1fc69fde9b31e6103df2f5742e4636"
+    },
+    {
+      "file": "/private/tmp/deep-legends-0.12.75-public.exe",
+      "size": 32291840,
+      "sha256": "fbad05c8d58afe6f74d8870f151b1303d1edfa676762a5c5e113f4def3b6b88d"
+    }
+  ]
+}
