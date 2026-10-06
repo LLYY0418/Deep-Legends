@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -93,7 +94,7 @@ func TestMatchHistoryFilterSpecsUseDocumentedSGPTags(t *testing.T) {
 		{"more:nexus-blitz", "q_1300"},
 		{"more:doombots", "q_950,q_960"},
 		{"hextech-aram", "q_2300,q_2400,q_3270"},
-		{"arena", "q_1700,q_1701,q_1704,q_1710,q_1720,q_1731,q_1732,q_1740,q_1750"},
+		{"arena", "q_1700,q_1710,q_1740,q_1750"},
 		{"ranked", "ranked"},
 	}
 	for _, test := range tests {
@@ -102,5 +103,20 @@ func TestMatchHistoryFilterSpecsUseDocumentedSGPTags(t *testing.T) {
 		if got != test.tags {
 			t.Errorf("filter %q tags = %q, want %q", test.filter, got, test.tags)
 		}
+	}
+}
+
+// 斗魂竞技场 3x6（1750）曾因 tag 超过 4 个被 normalizeSGPMatchHistoryTags 截断而从筛选里消失。
+func TestArenaFilterTagsSurviveSGPNormalizationAndKeep3x6(t *testing.T) {
+	spec := matchHistoryFilterFor("arena")
+	got := normalizeSGPMatchHistoryTags(spec.Tags)
+	if strings.Join(got, ",") != strings.Join(spec.Tags, ",") {
+		t.Fatalf("arena tags were truncated by normalization: spec=%v normalized=%v", spec.Tags, got)
+	}
+	if !slices.Contains(got, "q_1750") {
+		t.Fatalf("arena filter must request q_1750 (3x6): %v", got)
+	}
+	if _, ok := spec.AllowedQueues[1750]; !ok {
+		t.Fatal("arena filter must accept queue 1750")
 	}
 }

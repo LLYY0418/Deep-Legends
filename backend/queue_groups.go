@@ -190,7 +190,10 @@ func matchHistoryFilterFor(value string) matchHistoryFilterSpec {
 		spec.Tags = []string{"q_2300", "q_2400", "q_3270"}
 		spec.AllowedQueues = int64Set(2300, 2400, 3270)
 	case "arena":
-		spec.Tags = []string{"q_1700", "q_1701", "q_1704", "q_1710", "q_1720", "q_1731", "q_1732", "q_1740", "q_1750"}
+		// SGP 一次最多接受 4 个 tag（normalizeSGPMatchHistoryTags），超出会被静默截断，
+		// 导致排在后面的 1750（3x6）被丢掉。只把真实对局队列放进服务端 tag，
+		// 训练/测试队列仍由 AllowedQueues 在客户端筛选里接受。
+		spec.Tags = []string{"q_1700", "q_1710", "q_1740", "q_1750"}
 		spec.AllowedQueues = int64Set(1700, 1701, 1704, 1710, 1720, 1731, 1732, 1740, 1750)
 	case "ranked":
 		spec.Tags = []string{"ranked"}
