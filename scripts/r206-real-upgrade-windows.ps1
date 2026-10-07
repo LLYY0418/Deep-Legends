@@ -73,9 +73,18 @@ try {
     if ($LASTEXITCODE -ne 0 -or -not $userDataName) { throw 'Cannot determine installed Electron userData name' }
     $userData = Join-Path $env:APPDATA $userDataName
     if (-not (Test-Path $userData)) { throw '0.12.76 did not initialize its actual Electron userData directory' }
+    # Use the state actually persisted by 0.12.76 on this display. An invented
+    # 1050x750 rectangle can be clamped by the CI desktop and legitimately saved
+    # at another size; that does not measure whether the upgrade retained it.
+    $boundsFile = Join-Path $userData 'window-bounds.json'
+    if (-not (Test-Path $boundsFile)) { throw '0.12.76 did not persist its actual window bounds' }
+    $publishedBounds = [IO.File]::ReadAllText($boundsFile)
+    $publishedBoundsValue = $publishedBounds | ConvertFrom-Json
+    if ($publishedBoundsValue.width -le 0 -or $publishedBoundsValue.height -le 0 -or $null -eq $publishedBoundsValue.x -or $null -eq $publishedBoundsValue.y) { throw 'Invalid actual 0.12.76 window bounds' }
+    [IO.File]::WriteAllText((Join-Path $evidence '076-window-bounds-before.json'),$publishedBounds,(New-Object Text.UTF8Encoding($false)))
     $sentinels = @{}
     # Distinct safe fixtures in real persistent directories, without a real account.
-    foreach ($entry in @(@($data,'season-stats/r238-cache-sentinel.json','{"schemaVersion":3,"r238":"season-cache"}'),@($data,'snapshots/r238-collection-sentinel.json','{"r238":"collection"}'),@($userData,'r238-settings-sentinel.json','{"r238":"preferences"}'),@($userData,'window-bounds.json',"{`"width`":1050,`"height`":750,`"x`":40,`"y`":40,`"maximized`":false}`n"),@($userData,'ui-scale.json','{"mode":"fixed","value":1.25,"defaultAuto":1}'))) {
+    foreach ($entry in @(@($data,'season-stats/r238-cache-sentinel.json','{"schemaVersion":3,"r238":"season-cache"}'),@($data,'snapshots/r238-collection-sentinel.json','{"r238":"collection"}'),@($userData,'r238-settings-sentinel.json','{"r238":"preferences"}'),@($userData,'window-bounds.json',$publishedBounds),@($userData,'ui-scale.json','{"mode":"fixed","value":1.25,"defaultAuto":1}'))) {
         $file=Join-Path $entry[0] $entry[1]
         New-Item -ItemType Directory -Force (Split-Path -Parent $file) | Out-Null
         [IO.File]::WriteAllText($file,$entry[2],(New-Object Text.UTF8Encoding($false)))
@@ -124,6 +133,14 @@ try {
         if ($timing.result -eq 'ok') {break}; Start-Sleep -Milliseconds 500
     } while ((Get-Date) -lt $deadline)
     if ($timing.result -ne 'ok' -or $null -eq $timing.uninstall_old_ms) {throw "Eight stages not imported as result=ok"}
+    $comparisons = @()
+    foreach ($file in $sentinels.Keys) {
+        $afterHash = $null
+        if (Test-Path $file) { $afterHash = (Get-FileHash $file -Algorithm SHA256).Hash }
+        $comparisons += @{path=$file;before_sha256=$sentinels[$file];after_sha256=$afterHash}
+    }
+    $comparisons | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $evidence 'persistent-fixture-comparison.json')
+    $comparisons | ConvertTo-Json -Depth 5 | Write-Output
     foreach ($file in $sentinels.Keys) { if (-not (Test-Path $file) -or (Get-FileHash $file -Algorithm SHA256).Hash -ne $sentinels[$file]) { throw "R238 persistent fixture changed: $file" } }
     $sentinels | ConvertTo-Json | Set-Content (Join-Path $evidence 'retained-persistent-fixtures.json')
     $shell = New-Object -ComObject WScript.Shell
@@ -140,6 +157,13 @@ try {
     @{old_version='0.12.65';intermediate_version='0.12.68';upgrade_from='0.12.76';upgrade_to='0.12.77';candidate_online_transport='real loopback HTTP fixture';anonymous_latest_077='pending publication';persistent_sentinels_retained=$true;key_mode='public';stages=$order.Count;icon_location_stable=$true;created_time_changed=$false;total_ms=$timing.total_ms;uninstall_old_ms=$timing.uninstall_old_ms;copy_ms=$timing.copy_ms} | ConvertTo-Json | Set-Content (Join-Path $evidence 'real-upgrade-summary.json')
     Get-Content (Join-Path $evidence 'real-upgrade-summary.json')
 } finally {
+    if ($userData -and (Test-Path $userData)) {
+        foreach ($name in @('window-bounds.json','ui-scale.json','r238-settings-sentinel.json')) {
+            $path=Join-Path $userData $name
+            if (Test-Path $path) { Copy-Item $path (Join-Path $evidence ("077-after-"+$name)) -Force }
+        }
+        Get-ChildItem (Join-Path $userData 'logs') -Filter 'desktop*.log' -ErrorAction SilentlyContinue | ForEach-Object { Copy-Item $_.FullName (Join-Path $evidence $_.Name) }
+    }
     foreach ($name in @('update-install-stages.txt','update-install-nsis-stages.txt','update-install-timing.json')) {
         $path=Join-Path $data $name
         if (Test-Path $path) { Copy-Item $path $evidence -Force }
