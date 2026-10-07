@@ -1,0 +1,25 @@
+✔ R136 public outputs have distinct names and private outputs keep release names (0.840167ms)
+✔ R86 bash release stops on a real failing Go test, including an independent early-build mutation (2321.002917ms)
+✔ R86 CI uses the package version, installs test dependencies and needs no private Riot key (0.749416ms)
+﹣ R86 Windows release stops on a real failing Go test and rejects an independent early build (0.066334ms) # requires Windows and PowerShell
+✔ format gates exclude local toolchains and GOPATH modules while retaining untracked project source (68.312ms)
+✔ R222 CI skip preserves syntax, fingerprints, runtime verification and hashes (0.523875ms)
+﹣ R222 Windows release entry points reject CI skip locally before any side effect (0.056417ms) # requires Windows and PowerShell
+✔ setup-only Bash build wraps one NSIS result, hashes final bytes and removes legacy outputs (2386.023834ms)
+✔ failed NSIS stops before wrapping or issuing a receipt and cleans the uninstall shell (1174.24175ms)
+✔ compression overrides are explicit and invalid levels fail before packaging (1.048458ms)
+✔ unchanged complete npm dependencies are reused; damage or a lock change reinstalls them (5630.140416ms)
+✔ setup-only Windows CI skip leaves NSIS, wrapper and receipt gates unconditional (0.2455ms)
+✔ R225 static names exclude comments and synthetic source strings (2.76525ms)
+✔ R225 actual CI filters resolve every alternative and reject nonexistent names (1154.95825ms)
+✔ R225 static expected counts also cover the unfiltered R82 PowerShell file (485.801209ms)
+✔ R225 runtime Go evidence rejects empty, omitted and skipped required tests (0.342291ms)
+✔ R225 real Node runner proves a selected test passed and rejects an accidental skip (308.787458ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 2
+ℹ todo 0
+ℹ duration_ms 9242.048583

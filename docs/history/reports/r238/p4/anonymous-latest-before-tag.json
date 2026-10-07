@@ -1,0 +1,25 @@
+{
+  "id": 404668937,
+  "tag_name": "v0.12.76",
+  "draft": false,
+  "prerelease": false,
+  "published_at": "2026-10-06T12:19:40Z",
+  "html_url": "https://github.com/LLYY0418/Deep-Legends/releases/tag/v0.12.76",
+  "assets": [
+    {
+      "name": "Deep-Legends-Setup-0.12.76-public.exe",
+      "size": 111854592,
+      "digest": "sha256:01014312b60e591a05bfc87f86e098adf6c5fc5e59520db5aedac5b5dba02ff3"
+    },
+    {
+      "name": "latest.json",
+      "size": 1037,
+      "digest": "sha256:84da21714c5e6205dde9275cc2d3e2f75f6b6f3d66e6a39de220d1b49947eef5"
+    },
+    {
+      "name": "SHA256SUMS-public.txt",
+      "size": 182,
+      "digest": "sha256:a6c50c24378cfd9b69b8499c9d5876f2664e5880bac481457bf409eaafb1f476"
+    }
+  ]
+}

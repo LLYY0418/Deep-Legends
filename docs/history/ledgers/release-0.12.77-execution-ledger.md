@@ -168,3 +168,17 @@ Linux renderer 1332/1330PASS/2原条件skip、断言0失败，最大文件60.14�
 只改调度而不改业务/断言/集合/预算：19个反复创建完整jsdom/200局DOM的文件与145个其他文件分队列同时启动。全局墙钟从两个run启动前到两个run结束，统一240秒；每个文件90秒；计时数量和唯一文件覆盖检查，count逐组相加，任何组失败或缺summary都整体fail，无重试。两个临时合成探针分别让大DOM组/其他组断言FAIL，均整体exit1且两文件完整运行（renderer-group-failure-probes.json）；生产测试不加skip。首个2+1配置本机179.937秒PASS、164文件/1332项/4原skip；最终配置最多3个大DOM+1个其他worker利用等待空档，防止4个大DOM同时争用，完整实跑后再新SHACI。指纹不受测试调度影响，仍129e36bf324c。保留初次配置耗时，不替换为最终配置结果。
 
 最终分组配置本机127.447秒PASS；真实全量164文件、1332项/1328PASS/4原skip，19/145分组完整，统一墙钟127409ms<240000，两个组失败探针仍断言exit1。发布/质量/filter定向13.448s PASS；原2个Windows条件skip没有增加。源码/文档diff --check、JS语法和指纹再次通过。接下来第四轮整轮CI；之前第三轮Windows实际成功证据只归属于40363c2e，不标为新SHA结果。
+
+## P4 第四轮冻结候选
+
+发布分支于22:11:37推送 **e41776ef5c63da34a7cbc1780fdcadd6163d9aa5**，指纹 **129e36bf324c**，版本0.12.77/public/default-license-off；[完整质量37634653783](https://github.com/LLYY0418/Deep-Legends/actions/runs/37634653783)尚在执行，成功前不tag。两个快照均不推送，原审计/STAGING不覆盖。
+
+另外直接拆验第三轮Windows CI实际装过的Setup（原SHA9bad55cefcc3f733bf091638162f9282f650700d2d51391aad1f06a6672fb0da），提取NSIS/ASAR/PE后严格复用授权缺失/Key/digest/fuses/ASAR护栏，0.884s PASS；包中注册码/授权到期文字缺失。提取目录新建，不覆盖旧包；辅助receipt明确为从实际产物字节派生的审计输入，不伪称原始build receipt。Windows实际backend SHA60279e9762f1cf01d461f283bfc5cba134b7e7e9c2277b848f12fca13f729bb6、ASAR SHA54b011ecb1596dcce229477525b9950c757883f05b2c9d0084e8bf072426a2f6。此为本机读取Windows产物的字节审计，不称Windows运行；正式草稿产物随后按其实际摘要再次核验。
+
+## P4 第四轮CI：Linux完整成功 / Windows日志验证时序失败
+
+[37634653783](https://github.com/LLYY0418/Deep-Legends/actions/runs/37634653783)最终failure。Linux quality112837577207完整success：renderer164文件/1332项/1330PASS/2原skip、205497.981ms<240000，R100/R117真实Chromium、Worker16、Go race/vet、installer test/vet均通过。分组19/145，任何断言未改。原完整日志linux-job-112837577207-raw04.log、renderer-timings-ci04.json保留；先前总预算失败不覆盖。
+
+Windows112837577489前面的完整backend/installer/四条件项、正式publicbuild、checksum、真实源代码首帧与076→077检测/下载/SHA/实际安装、版本、五哨兵均过；最后30秒等待update_install_timing result=ok失败，不能称Windows完整success。077原始stage文件实际包含12阶段、八个必需端点单调完整；artifact只捕获旧068 fp a24a41472d2b的partial/missing_fields事件，没有077事件。原windows-job-112837577489-raw04.log与升级artifact完整保留。
+
+验证脚本有两个确切风险：安装器handoff已启动应用后马上强杀再启动，能打断backend一次性consume（文件先删除、缓冲通常200ms落盘）；升级前行offset在轮转/截断后的新日志不成立，finally仅保存当前档又会丢轮转证据。现有artifact不足以证明本轮哪一个先发生，未假称根因已取到。只修脚本：保留真实handoff应用不强杀/二次启动，读取current/1–5档但仅接受当前指纹、本次relaunch-installer_start精确总时长、事件时间≥relaunch；原result=ok与uninstall_old_ms非null断言不动、30秒预算不加。哨兵SHA检查延到事件落盘之后更严格；finally保存所有原始档到dist artifact，原jsonl不提交。定向发布/质量/filter9.277秒PASS，指纹仍129e36bf324c；完整新SHA CI须再跑，未tag/未发布Latest。

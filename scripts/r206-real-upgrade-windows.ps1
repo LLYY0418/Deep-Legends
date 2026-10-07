@@ -95,18 +95,16 @@ try {
     $created = @{}
     foreach ($link in @($desktopLink,$menuLink)) { if (-not (Test-Path $link)) {throw "Old installation shortcut missing"}; $created[$link] = (Get-Item $link).CreationTimeUtc.Ticks }
     $diagnosticFile=Join-Path $data 'logs/diagnostics.jsonl'
-    $diagnosticOffset=0
-    if (Test-Path $diagnosticFile) { $diagnosticOffset=@(Get-Content $diagnosticFile).Count }
+    $expectedFingerprint = (& node desktop/source-fingerprint.cjs).Trim()
+    if ($LASTEXITCODE -ne 0 -or $expectedFingerprint -notmatch '^[0-9a-f]{12}$') { throw 'Cannot determine candidate fingerprint' }
     foreach ($stageFile in @('update-install-stages.txt','update-install-nsis-stages.txt','update-install-timing.json')) {
         $stagePath=Join-Path $data $stageFile
         if (Test-Path $stagePath) { Copy-Item $stagePath (Join-Path $evidence ("076-before-"+$stageFile)); Remove-Item $stagePath }
     }
     Run-Setup $online.download
-    Stop-InstalledApp
+    # Keep the real installer handoff alive until its once-only buffered timing
+    # event is flushed. Killing/relaunching it here can destroy that evidence.
     Assert-InstalledVersion '0.12.77'
-    foreach ($file in $sentinels.Keys) { if (-not (Test-Path $file) -or (Get-FileHash $file -Algorithm SHA256).Hash -ne $sentinels[$file]) { throw "R238 persistent fixture changed: $file" } }
-    $sentinels | ConvertTo-Json | Set-Content (Join-Path $evidence 'retained-persistent-fixtures.json')
-    Start-Process (Join-Path $install 'Deep Legends.exe') | Out-Null
     $stages = @{}
     Get-Content (Join-Path $data "update-install-stages.txt") | ForEach-Object { $pair=$_ -split '=',2; $stages[$pair[0]]=[long]$pair[1] }
     $order = @('installer_start','parent_exited','uninstall_old_start','uninstall_old_done','extract_start','extract_done','copy_done','relaunch')
@@ -117,11 +115,17 @@ try {
     $deadline=(Get-Date).AddSeconds(30)
     do {
         $rows = @()
-        if (Test-Path $diagnosticFile) { $rows = @(Get-Content $diagnosticFile | Select-Object -Skip $diagnosticOffset | ForEach-Object {try {$_ | ConvertFrom-Json} catch {}}) }
-        $timing = @($rows | Where-Object event -eq 'update_install_timing') | Select-Object -Last 1
+        # A line offset becomes invalid after rotation. Read current/archived
+        # generations and accept only this fingerprint AND this exact install.
+        Get-ChildItem (Join-Path $data 'logs') -Filter 'diagnostics*.jsonl' -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^diagnostics(?:\.[1-5])?\.jsonl$' } | ForEach-Object {
+            $rows += @(Get-Content $_.FullName | Where-Object { $_ -match '"event"\s*:\s*"update_install_timing"' } | ForEach-Object {try {$_ | ConvertFrom-Json} catch {}})
+        }
+        $timing = @($rows | Where-Object { $_.event -eq 'update_install_timing' -and $_.build_fingerprint -eq $expectedFingerprint -and $_.total_ms -eq ($stages['relaunch'] - $stages['installer_start']) -and ([DateTimeOffset]::Parse($_.time)).ToUnixTimeMilliseconds() -ge $stages['relaunch'] }) | Select-Object -Last 1
         if ($timing.result -eq 'ok') {break}; Start-Sleep -Milliseconds 500
     } while ((Get-Date) -lt $deadline)
     if ($timing.result -ne 'ok' -or $null -eq $timing.uninstall_old_ms) {throw "Eight stages not imported as result=ok"}
+    foreach ($file in $sentinels.Keys) { if (-not (Test-Path $file) -or (Get-FileHash $file -Algorithm SHA256).Hash -ne $sentinels[$file]) { throw "R238 persistent fixture changed: $file" } }
+    $sentinels | ConvertTo-Json | Set-Content (Join-Path $evidence 'retained-persistent-fixtures.json')
     $shell = New-Object -ComObject WScript.Shell
     $icon = Join-Path $env:LOCALAPPDATA 'deep-legends/app.ico'
     if (-not (Test-Path $icon)) {throw "Stable icon missing"}
@@ -140,6 +144,7 @@ try {
         $path=Join-Path $data $name
         if (Test-Path $path) { Copy-Item $path $evidence -Force }
     }
+    Get-ChildItem (Join-Path $data 'logs') -Filter 'diagnostics*.jsonl' -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^diagnostics(?:\.[1-5])?\.jsonl$' } | ForEach-Object { Copy-Item $_.FullName (Join-Path $evidence $_.Name) }
     $diagnostics=Join-Path $data 'logs/diagnostics.jsonl'
     if (Test-Path $diagnostics) {
         Get-Content $diagnostics | ForEach-Object {try {$row=$_ | ConvertFrom-Json; if ($row.event -in @('update_install_timing','update_shortcut_state')) {$_}} catch {}} | Set-Content (Join-Path $evidence 'install-diagnostics.jsonl')
