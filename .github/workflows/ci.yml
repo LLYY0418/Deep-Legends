@@ -102,6 +102,20 @@ jobs:
         run: node scripts/prepare-r238-update-fixture.cjs
       - name: Install Windows test dependencies
         run: npm ci --prefix desktop
+      # Audit unchanged production source on the fresh native runtime, before
+      # Go/build fixtures create processes and replace npm dependencies.
+      - name: Real default Electron first-frame license absence audit
+        shell: pwsh
+        env:
+          R248_ELECTRON_OUTPUT: ${{ runner.temp }}/deep-legends-r238-default-electron
+        run: |
+          node -e "require('./scripts/r248-electron.cjs').probe({phase:'after',state:'DISABLED',storedBounds:{x:40,y:40,width:1050,height:750,maximized:false}}).then(r=>console.log(JSON.stringify(r.shows))).catch(e=>{console.error(e);process.exitCode=1})"
+          if ($LASTEXITCODE -ne 0) { throw "Default first-frame audit failed" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r238-default-electron-windows
+          path: ${{ runner.temp }}/deep-legends-r238-default-electron/**
       # R225: restore all Windows-compiled shared paths, not only Linux skips.
       # Includes TestUpdate*, TestR204KeySaveAndClear, TestR204KeyRuntime401AndPrivacy
       # and TestSplitRegistryPathSupportsNativeTencentKeys. JSON proves actual passes.
@@ -153,18 +167,6 @@ jobs:
             $actual = (Get-FileHash -Algorithm SHA256 (Join-Path dist/desktop $parts[1])).Hash.ToLowerInvariant()
             if ($actual -ne $parts[0]) { throw "Checksum mismatch: $($parts[1])" }
           }
-      - name: Real default Electron first-frame license absence audit
-        shell: pwsh
-        env:
-          R248_ELECTRON_OUTPUT: ${{ runner.temp }}/deep-legends-r238-default-electron
-        run: |
-          node -e "require('./scripts/r248-electron.cjs').probe({phase:'after',state:'DISABLED',storedBounds:{x:40,y:40,width:1050,height:750,maximized:false}}).then(r=>console.log(JSON.stringify(r.shows))).catch(e=>{console.error(e);process.exitCode=1})"
-          if ($LASTEXITCODE -ne 0) { throw "Default first-frame audit failed" }
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: r238-default-electron-windows
-          path: ${{ runner.temp }}/deep-legends-r238-default-electron/**
       - name: Real 0.12.65/0.12.68/0.12.76 installation and 0.12.77 upgrade
         shell: pwsh
         run: |

@@ -16,7 +16,7 @@ if (process.argv[2] === "--backend") {
 } else {
 async function probe({ phase, state = "ACTIVE", sourceRoot = root, transition = false, rendererDelay = 0, index = 1, flipBeforeAck = false, storedBounds = null }) {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "r240-electron-")), directory = path.join(out, `${phase}-${state}-${index}`);
-  fs.mkdirSync(directory, { recursive: true }); const rows = [], serverRequests = []; let current = state, generation = 1, nativeReads = 0;
+  fs.mkdirSync(directory, { recursive: true }); const rows = [], serverRequests = [], transportEvents = []; let current = state, generation = 1, nativeReads = 0;
   const web = path.join(sourceRoot, "backend/web");
   const server = http.createServer((req, res) => {
     serverRequests.push(req.url);
@@ -38,6 +38,16 @@ async function probe({ phase, state = "ACTIVE", sourceRoot = root, transition = 
     if (!file.startsWith(web + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); res.end(); return; }
     res.setHeader("Content-Type", ({ ".js": "text/javascript", ".css": "text/css", ".html": "text/html", ".png": "image/png" })[path.extname(file)] || "application/octet-stream"); res.end(fs.readFileSync(file));
   });
+  const originalServerEmit = server.emit;
+  server.emit = function(event, ...args) {
+    if (event === "clientError") transportEvents.push({event,at:Date.now(),code:args[0]?.code,message:args[0]?.message});
+    return originalServerEmit.call(this,event,...args);
+  };
+  server.on("connection",socket=>{
+    transportEvents.push({event:"connection",at:Date.now()});
+    socket.on("error",error=>transportEvents.push({event:"socket-error",at:Date.now(),code:error.code,message:error.message}));
+    socket.on("close",()=>transportEvents.push({event:"socket-close",at:Date.now()}));
+  });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve)); const origin = `http://127.0.0.1:${server.address().port}`;
   try {
     const shell = path.join(temp, "desktop"), userData = path.join(temp, "userData"), record = path.join(temp, "record.json"); fs.mkdirSync(shell); fs.mkdirSync(userData);
@@ -55,7 +65,7 @@ async function probe({ phase, state = "ACTIVE", sourceRoot = root, transition = 
 const cp=require('node:child_process'),nativeSpawn=cp.spawn;
 cp.spawn=function(command,args,options){return command===${JSON.stringify(launcher)}?nativeSpawn(${JSON.stringify(process.execPath)},[${JSON.stringify(__filename)},'--backend'],options):nativeSpawn(command,args,options)};
 app.setName('R240 native probe');app.setPath('userData',${JSON.stringify(userData)});
-const origin=${JSON.stringify(origin)},record=${JSON.stringify(record)},directory=${JSON.stringify(directory)},result={shows:[],samples:[],networkRequests:[],platform:process.platform};
+const origin=${JSON.stringify(origin)},record=${JSON.stringify(record)},directory=${JSON.stringify(directory)},result={shows:[],samples:[],networkRequests:[],networkDecisions:[],events:[],platform:process.platform,arch:process.arch,electron:process.versions.electron,execPath:process.execPath};
 let main,shown=0,sampling;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const until=async(fn,limit=5000)=>{const start=Date.now();while(!await fn()){if(Date.now()-start>limit)throw Error('native fixture timeout');await sleep(10)}};
@@ -71,13 +81,20 @@ BrowserWindow.prototype.show=function(...args){const value=originalShow.apply(th
  }
  return value;
 };
-app.on('browser-window-created',(_event,w)=>{if(w.isAlwaysOnTop())return;
+app.on('browser-window-created',(_event,w)=>{
+ result.events.push({event:'browser-window-created',at:Date.now(),id:w.id,alwaysOnTop:w.isAlwaysOnTop()});
+ w.webContents.on('did-start-navigation',(_event,url,inPlace,isMainFrame)=>result.events.push({event:'did-start-navigation',at:Date.now(),url,inPlace,isMainFrame}));
+ w.webContents.on('did-fail-load',(_event,code,description,url,isMainFrame)=>result.events.push({event:'did-fail-load',at:Date.now(),code,description,url,isMainFrame}));
+ w.webContents.on('render-process-gone',(_event,details)=>result.events.push({event:'render-process-gone',at:Date.now(),...details}));
+ w.webContents.on('did-finish-load',()=>result.events.push({event:'did-finish-load',at:Date.now(),url:w.webContents.getURL()}));
+ w.on('ready-to-show',()=>result.events.push({event:'ready-to-show',at:Date.now(),id:w.id}));
+ if(w.isAlwaysOnTop())return;
  // URL is not available during construction; select the application page when loaded.
  w.webContents.once('did-finish-load',()=>{if(!w.webContents.getURL().startsWith(origin))return;main=w;
   sampling=setInterval(()=>{if(!w.isDestroyed())result.samples.push({at:Date.now(),visible:w.isVisible(),opacity:w.getOpacity(),bounds:w.getContentBounds(),maximized:w.isMaximized()})},8);
  });
 });
-app.whenReady().then(()=>require('electron').session.defaultSession.webRequest.onBeforeRequest({urls:['*://*/*']},(d,cb)=>{result.networkRequests.push(d.url);cb({cancel:!d.url.startsWith(origin+'/')})}));
+app.whenReady().then(()=>require('electron').session.defaultSession.webRequest.onBeforeRequest({urls:['*://*/*']},(d,cb)=>{result.networkRequests.push(d.url);const cancel=!d.url.startsWith(origin+'/');result.networkDecisions.push({url:d.url,resourceType:d.resourceType,cancel,at:Date.now()});cb({cancel})}));
 require(${JSON.stringify(path.join(shell, "main.cjs"))});
 (async()=>{await until(()=>main && main.isVisible());await until(()=>result.shows.length>0);
  if(${transition}){await sleep(700);main.maximize();await sleep(500);result.maximizedBefore=main.isMaximized();result.beforeLock={bounds:main.getContentBounds(),normal:main.getNormalBounds()};
@@ -89,14 +106,16 @@ require(${JSON.stringify(path.join(shell, "main.cjs"))});
 `;
     fs.writeFileSync(path.join(temp, "probe.cjs"), wrapper); fs.writeFileSync(path.join(temp, "package.json"), JSON.stringify({ name: "r240-probe", version: "1.0.0", main: "probe.cjs" }));
     const env = { ...process.env, LOOT_BACKEND: launcher, R240_ORIGIN: origin }; delete env.ELECTRON_RUN_AS_NODE;
+    const childOutput = {stdout:"",stderr:""};
+    const saveChildOutput=()=>{for(const [stream,value] of Object.entries(childOutput))fs.writeFileSync(path.join(directory,"electron-"+stream+".log"),value);};
     await new Promise((resolve, reject) => {
       const child = spawn(require(path.join(root, "desktop/node_modules/electron")), ["--disable-gpu", temp], { env, stdio: ["ignore", "pipe", "pipe"] }); let output = "";
-      child.stdout.on("data", c => { output += c; }); child.stderr.on("data", c => { output += c; });
-      const timer = setTimeout(() => { child.kill(); reject(Error("real Electron timeout: " + output.slice(-2000))); }, 30000);
-      child.once("error", reject); child.once("exit", code => { clearTimeout(timer); code === 0 ? resolve() : reject(Error("Electron exited " + code + ": " + output.slice(-2000))); });
+      child.stdout.on("data", c => { output += c; childOutput.stdout += c; }); child.stderr.on("data", c => { output += c; childOutput.stderr += c; });
+      const timer = setTimeout(() => { saveChildOutput(); child.kill(); reject(Error("real Electron timeout: " + output.slice(-2000))); }, 30000);
+      child.once("error", error=>{clearTimeout(timer);saveChildOutput();reject(error);}); child.once("exit", code => { clearTimeout(timer); saveChildOutput(); code === 0 ? resolve() : reject(Error("Electron exited " + code + ": " + output.slice(-2000))); });
     });
     const expectedState = flipBeforeAck ? "LOCKED" : state;
-    const result = { phase, state, expectedState, index, ...JSON.parse(fs.readFileSync(record)), serverRequests, diagnostics: rows, phases: rows.find(r => r.api.endsWith("/startup"))?.value };
+    const result = { phase, state, expectedState, index, ...JSON.parse(fs.readFileSync(record)), serverRequests, transportEvents, diagnostics: rows, phases: rows.find(r => r.api.endsWith("/startup"))?.value };
     fs.writeFileSync(path.join(directory, "result.json"), JSON.stringify(result, null, 2));
     fs.writeFileSync(path.join(directory, "diagnostic-export.jsonl"), rows.filter(r => r.value.event).map(r => JSON.stringify(r.value)).join("\n") + "\n");
     if (result.error) throw Error(result.error);

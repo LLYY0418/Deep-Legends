@@ -182,3 +182,11 @@ Linux renderer 1332/1330PASS/2原条件skip、断言0失败，最大文件60.14�
 Windows112837577489前面的完整backend/installer/四条件项、正式publicbuild、checksum、真实源代码首帧与076→077检测/下载/SHA/实际安装、版本、五哨兵均过；最后30秒等待update_install_timing result=ok失败，不能称Windows完整success。077原始stage文件实际包含12阶段、八个必需端点单调完整；artifact只捕获旧068 fp a24a41472d2b的partial/missing_fields事件，没有077事件。原windows-job-112837577489-raw04.log与升级artifact完整保留。
 
 验证脚本有两个确切风险：安装器handoff已启动应用后马上强杀再启动，能打断backend一次性consume（文件先删除、缓冲通常200ms落盘）；升级前行offset在轮转/截断后的新日志不成立，finally仅保存当前档又会丢轮转证据。现有artifact不足以证明本轮哪一个先发生，未假称根因已取到。只修脚本：保留真实handoff应用不强杀/二次启动，读取current/1–5档但仅接受当前指纹、本次relaunch-installer_start精确总时长、事件时间≥relaunch；原result=ok与uninstall_old_ms非null断言不动、30秒预算不加。哨兵SHA检查延到事件落盘之后更严格；finally保存所有原始档到dist artifact，原jsonl不提交。定向发布/质量/filter9.277秒PASS，指纹仍129e36bf324c；完整新SHA CI须再跑，未tag/未发布Latest。
+
+## P4 第五轮CI：Linux完整成功 / Windows首导航超时
+
+候选57d33c4ad2e5cb13bb05ecdc29c91da1eea8c513于22:29:28推送；[37637124819](https://github.com/LLYY0418/Deep-Legends/actions/runs/37637124819)整体failure。Linux再次完整success；原日志linux-job-112846167222-raw05.log、renderer-timings-ci05.json保留。最终57源码全部21变异又实跑：R235 51.222秒6项、R24111.951秒4项、R24415.295秒7项、R2485.847秒2项、P6 3.443秒2项均原断言FAIL、驱动PASS，副本输入SHA及复原与共享源码逐字节一致，无语法/依赖失败。最终深浅ChromiumR23547.615秒、R24111.920秒、R2442.041秒全部PASS，macOS真实Chromium/合成数据，未写成Windows游戏实跑。
+
+Windows正式build、完整backend/installer与四条件项通过，但源代码首帧探针5秒超时，升级步骤未执行。现场只有backend_ready697ms/main_window_created714ms、唯一导航webRequest到localhost根；parentHTTP服务没有收到根GET，shows/samples为空。现有fixture自行app.quit返回0，父进程原来不保存此路径的stderr，不能从这一记录认定到底导航/renderer/OS环境哪一处。旧超时完整日志windows-job-112846167861-raw05.log与两份artifact结果保留，未以本机成功覆盖。
+
+只增强观测：did-start-navigation/did-fail-load/render-process-gone/ready-to-show、Electron版本/架构/可执行路径、请求cancel决策、HTTP连接/clientError、所有退出路径stdout/stderr。不改prod main/BrowserWindow API、断言、5秒until或30秒总预算，也不加重试/代理绕过。CI将同一份未改生产源码首帧检查安排在npm依赖安装后、Go/打包夹具之前，隔离前序进程/依赖重装影响，formal build/校验/真实升级仍全部执行。检查仍是source-only真实Electron，不伪称已安装包首帧；安装后的真实界面保持P3待真机。本机增强探针1.710秒与发布/质量/filter护栏9.455秒PASS。指纹129e36bf324c不变，下一轮整轮同SHA必须success，未tag。

@@ -1,0 +1,15 @@
+AssertionError [ERR_ASSERTION]: R248 first frame must show disabled main UI
++ actual - expected
+
++ 'locked'
+- 'disabled'
+
+    at Object.probe (/Users/ly/personal/personal-work/deep-legends/scripts/r248-electron.cjs:125:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'locked',
+  expected: 'disabled',
+  operator: 'strictEqual',
+  diff: 'simple'
+}

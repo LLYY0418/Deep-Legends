@@ -1,0 +1,9 @@
+AssertionError [ERR_ASSERTION]: {"mode":"斗魂竞技场","card":{"left":254.953125,"right":1239.046875,"top":419,"bottom":539,"width":984.09375,"height":120},"items":{"left":385.953125,"right":620.953125,"top":494,"bottom":524,"width":235,"height":30},"tags":{"left":632.953125,"right":994.921875,"top":494,"bottom":524,"width":361.96875,"height":30},"gap":212.484375,"rosterWidth":177.125,"wrap":"nowrap","visible":["MVP","双杀","输出","控制","治疗","护盾","击杀"],"hidden":[]}
+    at main (/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r238-final57-mutants-44cxw4bz/scripts/r241-browser.cjs:59:345) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
