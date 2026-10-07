@@ -1220,7 +1220,7 @@ func allowMatchScoreDiagnostic(event map[string]any) map[string]any {
 }
 
 // R223 decode failures never retain values, match IDs, or account identity.
-var sgpGameDecodeDiagnosticFields = map[string]bool{"event": true, "count": true, "field": true, "value_type": true}
+var sgpGameDecodeDiagnosticFields = map[string]bool{"event": true, "count": true, "field": true, "value_type": true, "payload_bytes": true, "first_byte_kind": true, "last_byte_kind": true}
 
 func allowSGPGameDecodeDiagnostic(event map[string]any) map[string]any {
 	out := map[string]any{}

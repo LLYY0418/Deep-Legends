@@ -292,6 +292,9 @@ type app struct {
 	perkDiagnosticCounts                map[string]int
 	diagnosticDedupMu                   sync.Mutex
 	diagnosticDedupCounts               map[string]int
+	proIdentityDiagnosticMu             sync.Mutex
+	proIdentityDiagnosticKeys           map[[32]byte]struct{}
+	proIdentityDiagnosticOrder          [][32]byte
 	rankedWinrateDiagnosticMu           sync.Mutex
 	rankedWinrateDiagnosticBuckets      map[string]*rankedWinrateDiagnosticBucket
 	lcuGameflowShapeDiagnosticMu        sync.Mutex

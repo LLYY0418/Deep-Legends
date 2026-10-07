@@ -623,6 +623,7 @@ func (p *sgpProvider) recordObservation(event map[string]any) {
 
 func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, kind sgpTokenKind, serverID, route, requestPath, endpoint string, out any) (resultErr error) {
 	requestNumber := 0
+	truncatedJSONRetried := false
 	credentialID := ""
 	record := func(event map[string]any) {
 		if credentialID != "" {
@@ -705,10 +706,18 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 					continue
 				}
 				if err := json.Unmarshal(body, out); err != nil {
+					truncated := err.Error() == "unexpected end of JSON input"
 					diagnostic["parse_failed"] = true
+					diagnostic["truncated_json"] = truncated
 					diagnostic["payload_prefix_shape"] = diagnosticPayloadPrefixShape(body)
 					diagnostic["payload_sample_bytes"] = min(len(body), 200)
 					record(diagnostic)
+					// A complete HTTP body may still contain an unfinished JSON page.
+					// Retry that shape once within the existing request/time budget.
+					if truncated && !truncatedJSONRetried && retry < 2 {
+						truncatedJSONRetried = true
+						continue
+					}
 					return errSGPResponseDecode
 				}
 				record(diagnostic)
@@ -924,13 +933,13 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 			decoded, decodeErr := decodeSGPHistoryGame(game.JSON)
 			if decodeErr != nil {
 				decodeFailed++
-				p.recordObservation(sgpGameDecodeDiagnostic(decodeErr))
+				p.recordObservation(sgpGameDecodeDiagnostic(decodeErr, game.JSON))
 				continue
 			}
 			info := *decoded
 			if info.GameID <= 0 {
 				decodeFailed++
-				p.recordObservation(sgpGameDecodeDiagnostic(&json.UnmarshalTypeError{Field: "gameId", Value: "number"}))
+				p.recordObservation(sgpGameDecodeDiagnostic(&json.UnmarshalTypeError{Field: "gameId", Value: "number"}, game.JSON))
 				continue
 			}
 			shouldSample := false

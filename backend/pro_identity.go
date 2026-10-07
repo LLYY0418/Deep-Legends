@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"strconv"
 	"strings"
 	"time"
@@ -216,7 +217,7 @@ func (a *app) proIdentitySnapshot() proIdentityIndex {
 	index.candidates = len(rows)
 	return index
 }
-func (a *app) matchProIdentity(index proIdentityIndex, surface string, reference gameplayReference) *proIdentityBadge {
+func (a *app) matchProIdentity(index proIdentityIndex, surface string, reference gameplayReference, gameIDs ...int64) *proIdentityBadge {
 	var badge *proIdentityBadge
 	matchedBy := "none"
 	if strings.EqualFold(strings.TrimSpace(reference.Region), "kr") {
@@ -237,10 +238,43 @@ func (a *app) matchProIdentity(index proIdentityIndex, surface string, reference
 		}
 	}
 emit:
-	a.recordDiagnostic(map[string]any{"event": "pro_identity_match", "surface": surface, "region": reference.Region, "candidates": index.candidates, "matched_by": matchedBy, "secondary": badge != nil && badge.Secondary})
+	gameID := int64(0)
+	if len(gameIDs) > 0 {
+		gameID = gameIDs[0]
+	}
+	if a.claimProIdentityDiagnostic(reference, gameID) {
+		a.recordDiagnostic(map[string]any{"event": "pro_identity_match", "surface": surface, "region": reference.Region, "candidates": index.candidates, "matched_by": matchedBy, "secondary": badge != nil && badge.Secondary})
+	}
 	if badge == nil {
 		return nil
 	}
 	copy := *badge
 	return &copy
+}
+
+// R238: repeated overview/history renders do not feed the noisy-event counter.
+// Identity exists only as a bounded in-memory digest and is never logged. Keep
+// this guard across diagnostic rotations, which previously restarted flooding.
+func (a *app) claimProIdentityDiagnostic(reference gameplayReference, gameID int64) bool {
+	identity := "puuid:" + strings.TrimSpace(reference.PlayerRef)
+	if reference.PlayerRef == "" {
+		identity = "name:" + strings.ToLower(strings.TrimSpace(reference.GameName)+"#"+strings.TrimSpace(reference.TagLine))
+	}
+	key := sha256.Sum256([]byte(strings.ToLower(reference.Region) + "\x00" + strconv.FormatInt(gameID, 10) + "\x00" + identity))
+	a.proIdentityDiagnosticMu.Lock()
+	defer a.proIdentityDiagnosticMu.Unlock()
+	if a.proIdentityDiagnosticKeys == nil {
+		a.proIdentityDiagnosticKeys = make(map[[32]byte]struct{})
+	}
+	if _, exists := a.proIdentityDiagnosticKeys[key]; exists {
+		return false
+	}
+	const limit = 8192
+	if len(a.proIdentityDiagnosticOrder) >= limit {
+		delete(a.proIdentityDiagnosticKeys, a.proIdentityDiagnosticOrder[0])
+		a.proIdentityDiagnosticOrder = a.proIdentityDiagnosticOrder[1:]
+	}
+	a.proIdentityDiagnosticKeys[key] = struct{}{}
+	a.proIdentityDiagnosticOrder = append(a.proIdentityDiagnosticOrder, key)
+	return true
 }

@@ -905,7 +905,7 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 		ctx = context.WithValue(ctx, overviewLoadCostContextKey{}, cost)
 		progress, skipped, skipReason, newGames := a.refreshSeasonHead(ctx, client, reference, player, playerRef, names)
 		requests, bytes, historyCalls, cacheHits := cost.snapshot()
-		a.recordDiagnostic(map[string]any{"event": "season_stats_head_refresh", "fresh": fresh, "use_history_cache": false, "skipped": skipped, "skip_reason": skipReason, "new_games": newGames, "sgp_requests": requests, "sgp_bytes": bytes, "sgp_history_calls": historyCalls, "sgp_history_cache_hits": cacheHits, "scanned": progress.Scanned, "complete": progress.Complete, "message": progress.Message})
+		a.recordDiagnostic(map[string]any{"event": "season_stats_head_refresh", "fresh": fresh, "use_history_cache": false, "skipped": skipped, "skip_reason": skipReason, "new_games": newGames, "sgp_requests": requests, "sgp_bytes": bytes, "sgp_history_calls": historyCalls, "sgp_history_cache_hits": cacheHits, "decode_failed": cost.decodeFailedCount(), "scanned": progress.Scanned, "complete": progress.Complete, "message": progress.Message})
 		publicRef := a.registerGameplayReferenceDetails(mergeGameplayReferences(reference, gameplayReference{PlayerRef: playerRef}))
 		progressEvent, _ := json.Marshal(map[string]any{
 			"type": "season-progress", "season": season, "scanned": progress.Scanned,
@@ -1069,12 +1069,14 @@ func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUCl
 			infos, consumed, more, err := result.infos, result.consumed, result.more, result.err
 			lastFull = consumed == sgpPageSize && more
 
-			if err != nil || len(infos) < consumed {
+			if err != nil {
 				scan.interrupted = true
-				if len(infos) < consumed {
-					a.recordDiagnostic(map[string]any{"event": "season_scan_parse_dropped", "stream": stream, "returned": consumed, "parsed": len(infos), "resume_index": start})
-				}
 				break
+			}
+			decodeIncomplete := len(infos) < consumed
+			if decodeIncomplete {
+				scan.interrupted = true
+				a.recordDiagnostic(map[string]any{"event": "season_scan_parse_dropped", "stream": stream, "returned": consumed, "parsed": len(infos), "resume_index": start})
 			}
 			hit, boundary := false, false
 			for _, info := range infos {
@@ -1100,6 +1102,11 @@ func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUCl
 				seasonStatsAccumulate(scan.stats, scan.queueStats, info, playerRef, scan.seasonStartMillis)
 				seasonAccumulateChampionTable(&scan.cache, info, playerRef, scan.seasonStartMillis)
 				seasonRecordRankedMatch(&scan.cache, info, playerRef)
+			}
+			if decodeIncomplete {
+				cursor.Complete = false
+				cursor.StopReason = "decode_failed"
+				break
 			}
 			start += consumed
 			if boundary || !more {

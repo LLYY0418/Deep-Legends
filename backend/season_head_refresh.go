@@ -7,7 +7,7 @@ import (
 )
 
 func (a *app) recordSeasonHeadRecent(fresh bool, scanned int, complete bool) {
-	a.recordDiagnostic(map[string]any{"event": "season_stats_head_refresh", "fresh": fresh, "use_history_cache": false, "skipped": true, "skip_reason": "recent", "new_games": 0, "sgp_requests": 0, "sgp_bytes": 0, "sgp_history_calls": 0, "sgp_history_cache_hits": 0, "scanned": scanned, "complete": complete})
+	a.recordDiagnostic(map[string]any{"event": "season_stats_head_refresh", "fresh": fresh, "use_history_cache": false, "skipped": true, "skip_reason": "recent", "new_games": 0, "sgp_requests": 0, "sgp_bytes": 0, "sgp_history_calls": 0, "sgp_history_cache_hits": 0, "decode_failed": 0, "scanned": scanned, "complete": complete})
 }
 
 // The unfiltered marker includes games outside the season's tracked queues.

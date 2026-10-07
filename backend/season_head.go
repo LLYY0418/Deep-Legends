@@ -78,10 +78,14 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 		case <-done:
 			workers--
 		case p := <-pages:
-			if p.err != nil || len(p.infos) < p.consumed {
+			if p.err != nil {
 				scan.interrupted = true
 				p.next <- false
 				continue
+			}
+			decodeIncomplete := len(p.infos) < p.consumed
+			if decodeIncomplete {
+				scan.interrupted = true
 			}
 			if scan.newInfos == nil {
 				scan.newInfos = map[int64]*riotMatchInfo{}
@@ -115,7 +119,12 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 				seasonAccumulateChampionTable(&scan.cache, info, playerRef, scan.seasonStartMillis)
 				seasonRecordRankedMatch(&scan.cache, info, playerRef)
 			}
-			if boundary || !p.more {
+			if decodeIncomplete {
+				// Retain valid games without advancing past an undecodable entry.
+				// A later refresh can retry it; the season must remain incomplete.
+				cursor.Complete = false
+				cursor.StopReason = "decode_failed"
+			} else if boundary || !p.more {
 				cursor.Complete = true
 				cursor.ResumeIndex = 0
 				cursor.PendingIndex = 0
@@ -141,7 +150,7 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 				scan.onPage(scan)
 			}
 			a.recordDiagnostic(map[string]any{"event": "season_backfill_round", "stream": p.stream, "head": true, "stop_reason": cursor.StopReason, "oldest_created_at": cursor.OldestCreatedAt, "capped_by_upstream": cursor.CappedByUpstream})
-			p.next <- !boundary && p.more && !hit
+			p.next <- !decodeIncomplete && !boundary && p.more && !hit
 		}
 	}
 	// A worker may choose the cancellation arm before delivering its error page.

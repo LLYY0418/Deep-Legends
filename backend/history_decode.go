@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"math"
@@ -123,7 +124,7 @@ func decodeSGPHistoryGame(data []byte) (*riotMatchInfo, error) {
 	return &info, nil
 }
 
-func sgpGameDecodeDiagnostic(err error) map[string]any {
+func sgpGameDecodeDiagnostic(err error, payload ...[]byte) map[string]any {
 	field, valueType := "", "invalid-json"
 	var typed *json.UnmarshalTypeError
 	if errors.As(err, &typed) {
@@ -136,5 +137,39 @@ func sgpGameDecodeDiagnostic(err error) map[string]any {
 	default:
 		valueType = "invalid-json"
 	}
-	return allowSGPGameDecodeDiagnostic(map[string]any{"event": "sgp_game_decode_failed", "count": 1, "field": field, "value_type": valueType})
+	event := map[string]any{"event": "sgp_game_decode_failed", "count": 1, "field": field, "value_type": valueType}
+	if len(payload) > 0 {
+		data := bytes.TrimSpace(payload[0])
+		event["payload_bytes"] = len(payload[0])
+		event["first_byte_kind"], event["last_byte_kind"] = "empty", "empty"
+		if len(data) > 0 {
+			event["first_byte_kind"] = diagnosticJSONByteKind(data[0])
+			event["last_byte_kind"] = diagnosticJSONByteKind(data[len(data)-1])
+		}
+	}
+	return allowSGPGameDecodeDiagnostic(event)
+}
+
+// Report categories only, never a byte, substring, match ID or account value.
+func diagnosticJSONByteKind(value byte) string {
+	switch value {
+	case '{':
+		return "object_open"
+	case '}':
+		return "object_close"
+	case '[':
+		return "array_open"
+	case ']':
+		return "array_close"
+	case '"':
+		return "quote"
+	default:
+		if value >= '0' && value <= '9' {
+			return "digit"
+		}
+		if value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z' {
+			return "letter"
+		}
+		return "other"
+	}
 }

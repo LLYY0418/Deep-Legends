@@ -3210,7 +3210,7 @@ func (a *app) publicizeMatchReferencesWithProIndex(match *gameplayMatch, index p
 			PlayerRef: participant.PlayerRef, DisplayName: participant.DisplayName, GameName: participant.GameName,
 			TagLine: participant.TagLine, ProfileIconID: participant.ProfileIconID,
 		})
-		participant.ProPlayer = a.matchProIdentity(index, "match", reference)
+		participant.ProPlayer = a.matchProIdentity(index, "match", reference, match.GameID)
 		participant.PlayerRef = a.registerGameplayReferenceDetails(reference)
 	}
 }
@@ -8306,7 +8306,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	proIndex := a.proIdentitySnapshot()
 	for index := range response.Players {
 		player := &response.Players[index]
-		player.ProPlayer = a.matchProIdentity(proIndex, "live", player.reference)
+		player.ProPlayer = a.matchProIdentity(proIndex, "live", player.reference, response.GameID)
 		player.PlayerRef = a.registerGameplayReferenceDetails(player.reference)
 	}
 	snapshotStats := livePositionSnapshotStats{}
