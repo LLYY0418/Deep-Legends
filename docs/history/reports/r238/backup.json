@@ -1,0 +1,9 @@
+{
+  "backup": "/private/tmp/r238-pre-merge-nqzky9aj",
+  "files": 4559,
+  "copy_sha_verified": true,
+  "bundle_verified": true,
+  "original_branch": "codex/release-0.12.75",
+  "original_head": "b37357b2a6cf29397ac0f16255d37fa1566e87ac",
+  "dist_not_copied": true
+}

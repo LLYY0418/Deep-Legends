@@ -1,0 +1,20 @@
+{
+  "name": "targeted-race",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-race",
+    "-run",
+    "R238|R223|R231|R241Head|R235Head|R98Chovy|SpecialistRunesTimeout",
+    "./backend"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-07T19:28:30.415739+08:00",
+  "end": "2026-10-07T19:28:50.494586+08:00",
+  "elapsed_seconds": 20.079,
+  "exit_code": 0,
+  "last_five": [
+    "ok  \tlol-loot-assistant/backend\t5.481s"
+  ]
+}

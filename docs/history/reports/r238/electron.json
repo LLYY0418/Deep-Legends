@@ -1,0 +1,15 @@
+{
+  "name": "electron",
+  "command": [
+    "node",
+    "scripts/r238-electron.cjs"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-07T19:18:59.287039+08:00",
+  "end": "2026-10-07T19:19:05.438235+08:00",
+  "elapsed_seconds": 6.151,
+  "exit_code": 0,
+  "last_five": [
+    "[{\"phase\":\"migrate\",\"electron\":\"43.3.0\",\"initial\":{\"bounds\":{\"x\":40,\"y\":40,\"width\":1050,\"height\":750},\"content\":{\"x\":40,\"y\":40,\"width\":1050,\"height\":750},\"state\":{\"select\":\"auto\",\"zoom\":\"1\"},\"stored\":{\"mode\":\"auto\",\"defaultAuto\":1}},\"final\":{\"state\":{\"select\":\"1.25\",\"zoom\":\"1.25\"},\"stored\":{\"mode\":\"fixed\",\"value\":1.25,\"defaultAuto\":1}}},{\"phase\":\"restart\",\"electron\":\"43.3.0\",\"initial\":{\"bounds\":{\"x\":40,\"y\":40,\"width\":1050,\"height\":750},\"content\":{\"x\":40,\"y\":40,\"width\":1050,\"height\":750},\"state\":{\"select\":\"1.25\",\"zoom\":\"1.25\"},\"stored\":{\"mode\":\"fixed\",\"value\":1.25,\"defaultAuto\":1}},\"final\":{\"state\":{\"select\":\"1.25\",\"zoom\":\"1.25\"},\"stored\":{\"mode\":\"fixed\",\"value\":1.25,\"defaultAuto\":1}}},{\"phase\":\"measure\",\"electron\":\"43.3.0\",\"initial\":{\"bounds\":{\"x\":40,\"y\":40,\"width\":1050,\"height\":750},\"content\":{\"x\":40,\"y\":40,\"width\":1050,\"height\":750},\"state\":{\"select\":\"1.25\",\"zoom\":\"1.25\"},\"stored\":{\"mode\":\"fixed\",\"value\":1.25,\"defaultAuto\":1}},\"final\":{\"state\":{\"select\":\"auto\",\"zoom\":\"1\"},\"stored\":{\"mode\":\"auto\",\"defaultAuto\":1}},\"measurement\":{\"requestedBounds\":{\"width\":1766,\"height\":1010},\"bounds\":{\"x\":0,\"y\":30,\"width\":1766,\"height\":1010},\"content\":{\"x\":0,\"y\":30,\"width\":1766,\"height\":1010},\"state\":{\"select\":\"auto\",\"zoom\":\"1\"}}}]"
+  ]
+}

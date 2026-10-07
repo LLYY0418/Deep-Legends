@@ -1,0 +1,74 @@
+{
+  "final_release_source": false,
+  "head": "b37357b2a6cf29397ac0f16255d37fa1566e87ac",
+  "files": [
+    {
+      "path": "desktop/main.cjs",
+      "sha256": "dbd0a2cbb95b9e6de494ad8f0c6f9366287088add224d0b60964b1fb3d854b08"
+    },
+    {
+      "path": "desktop/ui-scale.test.cjs",
+      "sha256": "3dc76148bf618598c09ad45d6469d94751ab0df0a329ce4e32a9a8754e18a339"
+    },
+    {
+      "path": "desktop/ui-scale-render.test.cjs",
+      "sha256": "4e954072804eb7bd9f52b476d6e2da1d88cbfd7ec865db10fd7c215771a70a4c"
+    },
+    {
+      "path": "backend/web/app.js",
+      "sha256": "816f2bf47d50aac96691d9f65da3666def31224e20a06e01545274c85d0b1ac6"
+    },
+    {
+      "path": "backend/history_decode.go",
+      "sha256": "f20ed4fa57b4da0d279f07514457f6b14a814ecb46e819f1fc3aee964eb4002b"
+    },
+    {
+      "path": "backend/features.go",
+      "sha256": "046c793b4bb3131f6df343d8aab6779f00797e192b3493ec590fc67f4738683d"
+    },
+    {
+      "path": "backend/sgp_api.go",
+      "sha256": "dab46e97996595e1afe98687eb40bfc833a269f23343bad60112825cfa3d4ef7"
+    },
+    {
+      "path": "backend/season_stats.go",
+      "sha256": "46fb733a00340fadb9394aa12356fb49e9c5db763c97adf5255f9f0ebf4c6120"
+    },
+    {
+      "path": "backend/season_head_refresh.go",
+      "sha256": "82a54938325b5b117e5f484419d1221f2e1c828b564a1698d404f8154b802a2e"
+    },
+    {
+      "path": "backend/season_head.go",
+      "sha256": "fd14b057083e9fea1069619f27d25165e31172156cfcd5f4755e40143880b059"
+    },
+    {
+      "path": "backend/main.go",
+      "sha256": "412337f900705882b0e7894fe11ea503d0e392df761d02aad5f46039cdd26e97"
+    },
+    {
+      "path": "backend/pro_identity.go",
+      "sha256": "b1ec5ffbae07ef99e63fd2214881b7771b48029747742077a20bb27b178fa06e"
+    },
+    {
+      "path": "backend/gameplay.go",
+      "sha256": "3ad85f1d159ec5f203921833e38a7e3956b44368cf40ebe3fbe21cc05d05efbb"
+    },
+    {
+      "path": "backend/live_post_game_reveal.go",
+      "sha256": "14c46a62269a0dce372027fee7c56e6af4aab8c9299a40d676e72f747e9edc59"
+    },
+    {
+      "path": "backend/r238_test.go",
+      "sha256": "9fd6ea63ec27a1e51b19e50ea0c57c58cf29c922f6975b60cbf4fce39231a0b9"
+    },
+    {
+      "path": "scripts/r238-electron.cjs",
+      "sha256": "6190f4dc0a27e478ddaf96642284e342cc3140f2da8520501eb7838e069142df"
+    },
+    {
+      "path": "scripts/r238-mutations.cjs",
+      "sha256": "3fcbc904ffd6c4c4a6b1c0da3f9fe8b7d6e508edf5db29ee3a3b17bd846b1ce8"
+    }
+  ]
+}

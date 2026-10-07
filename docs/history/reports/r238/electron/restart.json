@@ -1,0 +1,73 @@
+{
+  "phase": "restart",
+  "network": [
+    "http://127.0.0.1:57908/",
+    "http://127.0.0.1:57908/app.css",
+    "http://127.0.0.1:57908/build-item-row.css",
+    "http://127.0.0.1:57908/gameplay.css",
+    "http://127.0.0.1:57908/friends.css",
+    "http://127.0.0.1:57908/metrics.css",
+    "http://127.0.0.1:57908/app-icon.png",
+    "http://127.0.0.1:57908/image-unavailable.svg",
+    "http://127.0.0.1:57908/runtime.js",
+    "http://127.0.0.1:57908/license-ui.js",
+    "http://127.0.0.1:57908/image-queue.js",
+    "http://127.0.0.1:57908/overview-art.js",
+    "http://127.0.0.1:57908/augment-artwork.js",
+    "http://127.0.0.1:57908/section-loader.js",
+    "http://127.0.0.1:57908/app.js",
+    "http://127.0.0.1:57908/favorites-facade.js",
+    "http://127.0.0.1:57908/gameplay.js",
+    "http://127.0.0.1:57908/friends.js",
+    "http://127.0.0.1:57908/beaufort-for-lol-bold.woff2",
+    "http://127.0.0.1:57908/beaufort-for-lol-bold.woff2",
+    "http://127.0.0.1:57908/api/diagnostics/client",
+    "http://127.0.0.1:57908/api/champions/network",
+    "http://127.0.0.1:57908/api/status",
+    "http://127.0.0.1:57908/api/gameplay/augments",
+    "http://127.0.0.1:57908/api/gameplay/perks",
+    "http://127.0.0.1:57908/api/events",
+    "http://127.0.0.1:57908/api/diagnostics/client",
+    "http://127.0.0.1:57908/api/diagnostics/client",
+    "http://127.0.0.1:57908/api/client-installations",
+    "http://127.0.0.1:57908/api/diagnostics/client",
+    "http://127.0.0.1:57908/api/diagnostics/client",
+    "http://127.0.0.1:57908/api/diagnostics/client"
+  ],
+  "electron": "43.3.0",
+  "platform": "darwin",
+  "initial": {
+    "bounds": {
+      "x": 40,
+      "y": 40,
+      "width": 1050,
+      "height": 750
+    },
+    "content": {
+      "x": 40,
+      "y": 40,
+      "width": 1050,
+      "height": 750
+    },
+    "state": {
+      "select": "1.25",
+      "zoom": "1.25"
+    },
+    "stored": {
+      "mode": "fixed",
+      "value": 1.25,
+      "defaultAuto": 1
+    }
+  },
+  "final": {
+    "state": {
+      "select": "1.25",
+      "zoom": "1.25"
+    },
+    "stored": {
+      "mode": "fixed",
+      "value": 1.25,
+      "defaultAuto": 1
+    }
+  }
+}
