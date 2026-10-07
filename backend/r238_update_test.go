@@ -56,9 +56,43 @@ func TestR238DefaultOnline076To077(t *testing.T) {
 	}))
 	defer server.Close()
 	target, _ := url.Parse(server.URL)
-	store := trackTestStore(t, &localStore{root: t.TempDir()})
+	storeRoot := t.TempDir()
+	if os.Getenv("R238_UPGRADE_SETUP") != "" {
+		// Exercise the same isolated data directory as the installed application,
+		// rather than a second unrelated Windows temporary volume.
+		storeRoot = os.Getenv("R238_UPGRADE_DATA")
+		if info, err := os.Stat(storeRoot); err != nil || !info.IsDir() {
+			t.Fatalf("real upgrade data directory unavailable: %q %v", storeRoot, err)
+		}
+	}
+	store := trackTestStore(t, &localStore{root: storeRoot})
 	u := newUpdateManager("0.12.76", store, nil)
 	defer u.Close()
+	// Capture the live download state before Close cancels it. The existing
+	// five-second wait and every success assertion remain unchanged.
+	defer func() {
+		if !t.Failed() {
+			return
+		}
+		files := []map[string]any{}
+		entries, readErr := os.ReadDir(u.directory)
+		for _, entry := range entries {
+			if info, err := entry.Info(); err == nil {
+				files = append(files, map[string]any{"name": entry.Name(), "size": info.Size()})
+			}
+		}
+		row := map[string]any{"status": u.Status(), "directory": u.directory, "files": files, "setup_size": len(data), "checks": checks.Load(), "downloads": downloads.Load()}
+		if readErr != nil {
+			row["directory_error"] = readErr.Error()
+		}
+		raw, _ := json.MarshalIndent(row, "", "  ")
+		t.Logf("R238 online failure state: %s", raw)
+		if evidence := os.Getenv("R238_UPGRADE_EVIDENCE"); evidence != "" {
+			if err := os.WriteFile(filepath.Join(evidence, "online-076-077-failure.json"), raw, 0600); err != nil {
+				t.Logf("failure evidence write: %v", err)
+			}
+		}
+	}()
 	u.status.Portable = false
 	u.installDir = filepath.Join(store.root, "installed")
 	if dir := os.Getenv("R238_UPGRADE_INSTALL"); dir != "" {

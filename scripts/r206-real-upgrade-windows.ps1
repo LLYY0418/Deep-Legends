@@ -94,6 +94,7 @@ try {
     # 0.12.77 is still a draft, so the anonymous Latest endpoint stays 0.12.76.
     $env:R238_UPGRADE_SETUP=(Resolve-Path $Setup).Path
     $env:R238_UPGRADE_INSTALL=$install
+    $env:R238_UPGRADE_DATA=$data
     $env:R238_UPGRADE_EVIDENCE=$evidence
     & go test -count=1 -run '^TestR238DefaultOnline076To077$' ./backend *> (Join-Path $evidence 'online-076-077-test.log')
     if ($LASTEXITCODE -ne 0) { throw 'R238 candidate online updater check/download/hash/handoff failed' }
