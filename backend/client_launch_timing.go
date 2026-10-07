@@ -24,28 +24,10 @@ func (a *app) startClientLaunchTiming(id string, now time.Time) {
 	s.mu.Unlock()
 }
 func (a *app) clientDiscoveryInterval(normal time.Duration, report LCUDiscoveryStatus, now time.Time) time.Duration {
-	s := &a.clientLaunchTiming
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.started.IsZero() && s.connected.IsZero() {
-		elapsed := now.Sub(s.started)
-		if elapsed >= 0 && elapsed < 120*time.Second {
-			return time.Second
-		}
-		return normal
+	if report.ProbeErrorKind == "refused" {
+		return 500 * time.Millisecond
 	}
-	starting := report.Result == "credentials-unreadable" || report.Result == "probe-failed"
-	if starting && s.startup.IsZero() {
-		s.startup = now
-	}
-	if starting && !s.startup.IsZero() && now.Sub(s.startup) >= 0 && now.Sub(s.startup) < 120*time.Second {
-		return time.Second
-	}
-	if report.Result == "process-not-found" || report.Result == "connected" {
-		s.startup = time.Time{}
-	}
-
-	return normal
+	return time.Second
 }
 func (a *app) observeClientLaunchDiscovery(report LCUDiscoveryStatus, now time.Time) {
 	s := &a.clientLaunchTiming
@@ -90,6 +72,9 @@ func (a *app) handleClientLaunchOverviewReady(w http.ResponseWriter, r *http.Req
 	a.mu.RLock()
 	connected := a.connected
 	a.mu.RUnlock()
+	if connected {
+		a.observeColdLaunchMilestone("overview_first_card_ms", time.Now())
+	}
 	s := &a.clientLaunchTiming
 	s.mu.Lock()
 	var event map[string]any

@@ -549,7 +549,18 @@
     const data = state.status;
     const wasConnected = Boolean(state.overlayWasConnected);
     state.overlayWasConnected = Boolean(data.connected);
-    if (data.connected) state.launchOverlayPending = false;
+    if (!data.connected) {
+      state.selfOverviewReady = false;
+      clearTimeout(state.selfOverviewTimeoutTimer); state.selfOverviewTimeoutTimer = 0;
+    } else if (!wasConnected && !state.selfOverviewReady) {
+      state.selfOverviewTimeoutTimer = setTimeout(() => {
+        state.selfOverviewTimeoutTimer = 0;
+        if (!state.status?.connected || state.selfOverviewReady) return;
+        state.overlaySuppressed = true;
+        hideReadingOverlay("timeout");
+        window.dispatchEvent(new CustomEvent("deep-legends:self-overview-timeout"));
+      }, 15_000);
+    }
     if (wasConnected && !data.connected) state.clientExitingUntil = Date.now() + 15_000;
     const exiting = !data.connected && ["credentials-unreadable", "probe-failed"].includes(data.clientDiscovery) && Date.now() < Number(state.clientExitingUntil || 0);
     const launching = state.launchOverlayPending && Date.now() - Number(state.lastClientLaunchAt || 0) < 120_000;
@@ -559,17 +570,21 @@
       return;
     }
     const identityReady = data.identityReady ?? data.snapshotReady;
-    if (data.connected && identityReady) {
+    if (data.connected && state.selfOverviewReady) {
+      clearTimeout(state.selfOverviewTimeoutTimer); state.selfOverviewTimeoutTimer = 0;
+      state.launchOverlayPending = false;
       state.overlaySuppressed = false;
-      hideReadingOverlay("identity-ready");
+      hideReadingOverlay("self-tab-ready");
       return;
     }
-    if (!data.connected && ["process-not-found", "process-query-failed"].includes(data.clientDiscovery)) {
-      state.overlaySuppressed = false;
+    if (!data.connected && data.clientDiscovery === "process-not-found") {
       state.statusDelay = STATUS_INTERVAL;
-      hideReadingOverlay("no-client-process");
-      return;
-    }
+      if (!state.clientMissingTimer && (!el.startupLoading.hidden || launching)) state.clientMissingTimer = setTimeout(() => {
+        state.clientMissingTimer = 0;
+        if (!state.status?.connected && state.status?.clientDiscovery === "process-not-found") hideReadingOverlay("connect-failed");
+      }, 5_000);
+      if (el.startupLoading.hidden && !launching) return;
+    } else { clearTimeout(state.clientMissingTimer); state.clientMissingTimer = 0; }
     if (state.overlaySuppressed) {
       hideReadingOverlay("suppressed");
       return;
@@ -593,10 +608,10 @@
       window.reportFlowDiagnostic?.("blocking_state_client", "show", { source: "startup" });
       state.startupFallbackTimer = setTimeout(() => {
         state.overlaySuppressed = true;
-        hideReadingOverlay("timeout");
-        window.reportFlowDiagnostic?.("blocking_state_client", "timeout", { source: "startup", durationMs: 15000 });
+        hideReadingOverlay("hard-timeout");
+        window.reportFlowDiagnostic?.("blocking_state_client", "timeout", { source: "startup", durationMs: 120000 });
         if (state.status) renderNotice(state.status);
-      }, 15000);
+      }, 120000);
     }
   }
 
@@ -605,7 +620,7 @@
     state.overlayBaselineAttempt = "";
     clearTimeout(state.startupFallbackTimer);
     state.startupFallbackTimer = 0;
-    el.appFrame.removeAttribute("inert");
+    if (window.deepLegendsLicense?.isActive()) el.appFrame.removeAttribute("inert");
     clearTimeout(state.overlayTimer);
     if (!el.startupLoading.hidden) window.reportFlowDiagnostic?.("blocking_state_client", "hide", { source: "startup", hide_reason: hideReason });
     el.startupLoading.hidden = true;
@@ -2478,6 +2493,7 @@
     el.privacyContent.innerHTML = '<p class="muted">正在读取隐私说明…</p>';
     try {
       const data = await api("/api/privacy", {}, "privacy");
+      if (data.licenseDisclosure) data.mayhemRatingDisclosure = `${data.licenseDisclosure} ${data.mayhemRatingDisclosure || ""}`;
       el.privacyContent.innerHTML = `<div class="stat-grid"><div class="stat"><span>账号数据处理</span><strong>${data.localOnly ? "仅限本机" : "包含公开数据查询"}</strong></div><div class="stat"><span>账号密码</span><strong>${data.requiresPassword ? "需要" : "不需要"}</strong></div><div class="stat"><span>收藏数据上传</span><strong>${data.uploadsData ? "会上传" : "不会上传"}</strong></div></div><p class="muted">${escapeHTML(data.mayhemRatingDisclosure || "")} 客户端操作需主动点击；自动规则仅在开启后执行。</p>`;
     } catch (error) { renderPanelError(el.privacyContent, "隐私说明读取失败", error.message, loadPrivacy); }
   }
@@ -3904,6 +3920,7 @@
         state.liveEventsReady = true;
         return;
       }
+      if (event.data === "connection-state") { void refreshStatus(); return; }
       if (event.data === "riot-key-updated") { window.dispatchEvent(new CustomEvent("deep-legends:riot-key-updated")); void loadRiotKeySettings(); return; }
       if (event.data === "pro-runes") { window.dispatchEvent(new CustomEvent("deep-legends:pro-runes")); return; }
       if (event.data === "resync-required") { resyncLiveState(); return; }
@@ -4476,14 +4493,37 @@
   applyAppearance();
   applySidebar();
   void setupUiScaleSetting();
-  void setupShareDirectorySetting();
   setupUpdateEvents();
   setupBackendLifecycle();
-  setupLiveUpdates();
   setupScrollControls();
   setupFloatingTooltips();
   setupTitlebarInset();
-  void setupChampionNetwork();
-  showReadingOverlay("正在连接英雄联盟客户端", "正在检测英雄联盟客户端。");
-  refreshStatus(true);
+  window.addEventListener("deep-legends:license", event => {
+    if (event.detail.active) {
+      void setupShareDirectorySetting();
+      setupLiveUpdates();
+      void setupChampionNetwork();
+      state.overlaySuppressed = false;
+      showReadingOverlay("正在连接英雄联盟客户端", "正在检测英雄联盟客户端。");
+      void refreshStatus(true);
+    } else {
+      clearTimeout(state.statusTimer); clearTimeout(state.liveUpdateTimer); clearTimeout(state.eventReconnectTimer);
+      state.eventSource?.close(); state.eventSource = null;
+      for (const controller of state.controllers.values()) controller.abort();
+      state.controllers.clear();
+      clearDisconnectedClientState(); state.status = null; state.items = [];
+      state.skinDetailCache.clear(); state.artworkPrefetchCache.clear();
+      // Recreate the document to discard every page module's identity, caches
+      // and timers. This preserves user preferences and the Go authorization lock.
+      window.location.reload();
+    }
+  });
+  void window.deepLegendsLicense?.poll();
+  window.addEventListener("deep-legends:self-tab-ready", () => {
+    if (!state.status?.connected) return;
+    state.selfOverviewReady = true;
+    void api("/api/client-launch-overview-ready", { method: "POST" }, "launch-overview-ready").catch(() => {});
+    updateReadingOverlay();
+  });
+
 })();

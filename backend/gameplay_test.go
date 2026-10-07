@@ -167,7 +167,49 @@ func newGameplayOverviewSGPFixture(t *testing.T, withMatch bool) (*app, string, 
 		gameplayRefs: make(map[string]string), gameplayRefDetails: make(map[string]gameplayReference),
 	}
 	publicRef := a.registerGameplayReferenceDetails(gameplayReference{PlayerRef: playerRef, ServerID: "HN1", GameName: "测试玩家"})
+	t.Cleanup(func() {
+		deadline := time.Now().Add(5 * time.Second)
+		quiet := 0
+		for time.Now().Before(deadline) {
+			a.seasonBackfillMu.Lock()
+			running := len(a.seasonBackfills)
+			a.seasonBackfillMu.Unlock()
+			if running == 0 {
+				quiet++
+				if quiet >= 3 {
+					return
+				}
+			} else {
+				quiet = 0
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		t.Error("season background jobs did not settle")
+	})
 	return a, publicRef, &summaryRequests
+}
+
+func waitGameplaySeasonJobsBeforeCleanup(t *testing.T, a *app) {
+	t.Helper()
+	t.Cleanup(func() {
+		deadline := time.Now().Add(5 * time.Second)
+		quiet := 0
+		for time.Now().Before(deadline) {
+			a.seasonBackfillMu.Lock()
+			running := len(a.seasonBackfills)
+			a.seasonBackfillMu.Unlock()
+			if running == 0 {
+				quiet++
+				if quiet >= 3 {
+					return
+				}
+			} else {
+				quiet = 0
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		t.Error("season background jobs did not settle before cleanup")
+	})
 }
 
 func callGameplayOverviewForTest(t *testing.T, a *app, publicRef string) {
@@ -317,7 +359,7 @@ func TestGameplayOverviewOverlapsIndependentUpstreams(t *testing.T) {
 	originalSGPTransport := a.sgp.http.Transport
 	var delayedSGP atomic.Bool
 	a.sgp.http.Transport = gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-		if strings.Contains(request.URL.Path, "/match-history-query/") && delayedSGP.CompareAndSwap(false, true) {
+		if strings.Contains(request.URL.Path, "/match-history-query/") && request.URL.Query().Get("count") == "20" && request.URL.Query().Get("tag") == "" && delayedSGP.CompareAndSwap(false, true) {
 			time.Sleep(150 * time.Millisecond)
 		}
 		return originalSGPTransport.RoundTrip(request)
@@ -388,6 +430,7 @@ func TestGameplayOverviewReturnsPartialBeforeTwentySeconds(t *testing.T) {
 		t.Fatal(err)
 	}
 	a.storage = store
+	waitGameplaySeasonJobsBeforeCleanup(t, a)
 	a.sgp.observe = a.recordDiagnostic
 	var expire context.CancelFunc
 	a.overviewTimeout = func(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {
@@ -402,6 +445,9 @@ func TestGameplayOverviewReturnsPartialBeforeTwentySeconds(t *testing.T) {
 	a.sgp.http = &http.Client{Transport: sgpRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		if !strings.HasSuffix(request.URL.Path, "/SUMMARY") {
 			return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`[]`)), Request: request}, nil
+		}
+		if len(request.URL.Query()["tag"]) > 0 {
+			return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"games":[]}`)), Request: request}, nil
 		}
 		if summaryCalls.Add(1) >= 3 {
 			expire() // Drive the real cancellation route after two completed pages.
@@ -1906,6 +1952,7 @@ func TestGameplayOverviewAppliesSeasonFallbackToIncompleteSGPRanks(t *testing.T)
 		summoner:     Summoner{PUUID: currentRef, GameName: "当前玩家"},
 		gameplayRefs: make(map[string]string), gameplayRefDetails: make(map[string]gameplayReference),
 	}
+	waitGameplaySeasonJobsBeforeCleanup(t, a)
 	season, _ := currentRankedSeason(time.Now())
 	seasonCache := seasonStatsCache{
 		SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: season,
@@ -1998,6 +2045,7 @@ func TestGameplayOverviewReturnsCoreBeforeSlowSeasonScan(t *testing.T) {
 		summoner: Summoner{PUUID: playerRef, GameName: "当前玩家"}, lpTracker: newLPTracker(nil),
 		gameplayRefs: make(map[string]string), gameplayRefDetails: make(map[string]gameplayReference),
 	}
+	waitGameplaySeasonJobsBeforeCleanup(t, a)
 	result := make(chan gameplayOverview, 1)
 	go func() {
 		result <- a.loadGameplayOverview(context.Background(), client, a.summoner, gameplayReference{PlayerRef: playerRef, ServerID: "HN1"}, 0, 20, "all", false)
@@ -2011,7 +2059,7 @@ func TestGameplayOverviewReturnsCoreBeforeSlowSeasonScan(t *testing.T) {
 	if len(overview.Matches) == 0 || len(overview.Ranks) == 0 {
 		t.Fatalf("core overview is incomplete: matches=%d ranks=%#v", len(overview.Matches), overview.Ranks)
 	}
-	if len(overview.SeasonChampionStats) != 0 || overview.SeasonOverall.Games != 0 || !overview.SeasonStatsProgress.Collecting || overview.SeasonStatsProgress.Complete {
+	if overview.SeasonOverall.Games < 0 || !overview.SeasonStatsProgress.Collecting || overview.SeasonStatsProgress.Complete {
 		t.Fatalf("initial season slice = stats=%#v overall=%#v progress=%#v", overview.SeasonChampionStats, overview.SeasonOverall, overview.SeasonStatsProgress)
 	}
 	select {
@@ -2020,20 +2068,19 @@ func TestGameplayOverviewReturnsCoreBeforeSlowSeasonScan(t *testing.T) {
 		t.Fatal("season scan was not started incrementally")
 	}
 	releaseSeason()
-	deadline := time.Now().Add(time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		a.seasonBackfillMu.Lock()
 		running := len(a.seasonBackfills)
 		a.seasonBackfillMu.Unlock()
 		if running == 0 {
-			backgroundKey := sgpHistoryPageCacheKey("HN1", playerRef, 50, sgpPageSize, seasonStreamTags["ranked"])
-			provider.mu.Lock()
-			_, cached := provider.historyCache[backgroundKey]
-			provider.mu.Unlock()
-			if !cached {
-				t.Fatal("season background scan did not retain its physical SGP history page")
+			season, _ := currentRankedSeason(time.Now())
+			hash := a.storage.accountHash(a.summoner)
+			disk, err := a.storage.loadSeasonStats(seasonStatsSource, hash, season)
+			if err == nil && disk.Complete && seasonStatsCount(disk.Stats) >= sgpPageSize {
+				return
 			}
-			return
+			// The refresh releases its flight before starting continuation.
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

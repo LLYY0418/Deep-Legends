@@ -224,6 +224,7 @@ type participantCompletenessSummary struct {
 }
 
 type gameplayOverview struct {
+	HistoryGeneration   uint64                   `json:"historyGeneration,omitempty"`
 	ExpectedGamePresent *bool                    `json:"expectedGamePresent,omitempty"`
 	LatestAllGameID     string                   `json:"latestAllGameId,omitempty"`
 	ProfilePending      bool                     `json:"profilePending,omitempty"`
@@ -554,6 +555,13 @@ type gameplayParticipant struct {
 	DragonTakedowns                *int `json:"dragonTakedowns,omitempty"`
 	BaronTakedowns                 *int `json:"baronTakedowns,omitempty"`
 	RiftHeraldTakedowns            *int `json:"riftHeraldTakedowns,omitempty"`
+	TotalHeal                      *int `json:"totalHeal,omitempty"`
+	DamageDealtToTurrets           *int `json:"damageDealtToTurrets,omitempty"`
+	SoloKills                      *int `json:"soloKills,omitempty"`
+	KnockEnemyIntoTeamAndKill      *int `json:"knockEnemyIntoTeamAndKill,omitempty"`
+	KillsNearEnemyTurret           *int `json:"killsNearEnemyTurret,omitempty"`
+	KillsUnderOwnTurret            *int `json:"killsUnderOwnTurret,omitempty"`
+	MaxCsAdvantageOnLaneOpponent   *int `json:"maxCsAdvantageOnLaneOpponent,omitempty"`
 	reference                      gameplayReference
 }
 
@@ -710,6 +718,8 @@ type lcuParticipant struct {
 		QuadraKills                    *lenientInt       `json:"quadraKills"`
 		PentaKills                     *lenientInt       `json:"pentaKills"`
 		VisionWardsBoughtInGame        *lenientInt       `json:"visionWardsBoughtInGame"`
+		TotalHeal                      *lenientInt       `json:"totalHeal"`
+		DamageDealtToTurrets           *lenientInt       `json:"damageDealtToTurrets"`
 		Challenges                     lenientChallenges `json:"challenges"`
 		Win                            bool              `json:"win"`
 	} `json:"stats"`
@@ -787,13 +797,15 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(context.WithValue(r.Context(), overviewFreshHistoryKey{}, *request.FreshHistory))
 	}
 	if (request.Force || r.URL.Query().Get("force") == "1") && a.champions != nil {
-		if _, source := riotUserKeys.effective(); source == "relay" && (isRiotRegion(request.Region) || a.currentClientIsRiot()) {
-			_, _ = riotRelays.ensureForce(r.Context(), a.champions.httpClient(), func(event map[string]any) {
-				a.recordDiagnostic(event)
-				if event["event"] == "riot-relay-recovered" {
-					a.broadcastEvent(`{"type":"riot-relay-recovered"}`)
-				}
-			}, true)
+		if _, source := riotUserKeys.effective(); source == "relay" && (isRiotRegion(request.Region) && (request.PlayerRef != "" || request.GameName != "")) {
+			a.goSafe("overview.force-probe", func() {
+				_, _ = riotRelays.ensureForce(context.Background(), a.champions.httpClient(), func(event map[string]any) {
+					a.recordDiagnostic(event)
+					if event["event"] == "riot-relay-recovered" {
+						a.broadcastEvent(`{"type":"riot-relay-recovered"}`)
+					}
+				}, true)
+			})
 		}
 	}
 	request.PlayerRef = strings.TrimSpace(request.PlayerRef)
@@ -968,9 +980,25 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		reference.ServerID, _ = normalizeTencentServerID(platform)
 	}
 	phases.mark("identity")
+	stream = strings.Contains(r.Header.Get("Accept"), "application/x-ndjson")
+	emit := func(kind string, value gameplayOverview) {
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(map[string]any{"type": kind, "overview": value})
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+	}
+	if stream {
+		r = r.WithContext(context.WithValue(r.Context(), localOverviewProgressKey{}, func(partial gameplayOverview) { emit("progress", partial) }))
+	}
 	response := a.loadGameplayOverviewDeduplicated(r.Context(), client, current, reference, request.BegIndex, request.Count, request.MatchFilter, request.Force)
 	a.verifyExpectedOverviewGame(r.Context(), client, reference, request, &response)
-	respondJSON(w, response)
+	if stream {
+		emit("complete", response)
+	} else {
+		respondJSON(w, response)
+	}
 	phases.mark("serialize")
 }
 
@@ -1094,6 +1122,9 @@ func (a *app) resolveTencentRiotID(ctx context.Context, lcu *LCUClient, gameName
 		return gameplayReference{}, err
 	}
 	defer riotClient.Close()
+	// RiotClientServices has distinct credentials but shares the same software
+	// authorization lifecycle as the current LCU connection.
+	riotClient.local.license = a.license
 	stage = "remote-alias"
 	attempts++
 	aliases, err := riotClient.aliasesByRiotID(ctx, gameName, tagLine)
@@ -1277,6 +1308,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		}
 		a.sgp.invalidatePlayerHistory(reference.ServerID, historyRef)
 	}
+	if begIndex == 0 && !isCurrent && validPlayerReference(playerRef) && reference.ServerID != "" {
+		a.startSeasonStatsRefresh(client, reference, Summoner{PUUID: playerRef}, playerRef, bundledChampionNames(), overviewFreshHistory(ctx))
+	}
 	player := current
 	profileHidden := strings.TrimSpace(player.GameName) == "" && strings.TrimSpace(player.DisplayName) == ""
 	capabilities := make([]EndpointCapability, 0, 5)
@@ -1361,6 +1395,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	if validPlayerReference(player.PUUID) {
 		playerRef = player.PUUID
 		reference = mergeGameplayReferences(gameplayReferenceFromSummoner(player), reference)
+	}
+	if begIndex == 0 {
+		a.startSeasonStatsRefresh(client, reference, player, playerRef, bundledChampionNames(), overviewFreshHistory(ctx))
 	}
 	backgroundCh := make(chan gameplayPlayer, 1)
 	go func() {
@@ -1489,11 +1526,8 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	queueLabels, names := queue.value, namesResultValue.value
 	phases.markSpan("queue_labels", queue.started, queue.finished)
 	phases.markSpan("champion_names", namesResultValue.started, namesResultValue.finished)
-	detailedStarted := time.Now()
-	matches, historyCapabilities, pagination := a.loadDetailedMatches(ctx, client, reference, playerRef, isCurrent, begIndex, count, matchFilter, names, queueLabels)
-	detailedFinished := time.Now()
-	phases.markSpan("detailed_matches", detailedStarted, detailedFinished)
-	capabilities = append(capabilities, historyCapabilities...)
+	var matches []gameplayMatch
+	detailsReady := make(chan struct{})
 	var rankedCh chan recentRankedResult
 	if begIndex == 0 && ctx.Err() == nil {
 		rankedCh = make(chan recentRankedResult, 1)
@@ -1504,17 +1538,31 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 			started := time.Now()
 			value := recentRankedSampleSet{ByQueue: map[int64][]gameplayMatch{}}
 			if isCurrent && clientRiotPlatform(client) != "" {
+				<-detailsReady
 				for _, match := range matches {
 					if match.QueueID == 420 || match.QueueID == 440 {
 						value.ByQueue[match.QueueID] = append(value.ByQueue[match.QueueID], match)
 					}
 				}
 			} else {
-				value = a.loadRecentRankedSamples(ctx, client, reference, playerRef, matchFilter, pagination, matches, names, queueLabels)
+				value = a.loadRecentRankedSamples(ctx, client, reference, playerRef, matchFilter, gameplayPagination{}, nil, names, queueLabels)
 			}
 			rankedCh <- recentRankedResult{value: value, started: started, ended: time.Now()}
 		}()
 	}
+	detailedStarted := time.Now()
+	var historyCapabilities []EndpointCapability
+	var pagination gameplayPagination
+	var historyGeneration uint64
+	if isCurrent && clientRiotPlatform(client) != "" && begIndex == 0 && normalizeGameplayMatchFilter(matchFilter) == "all" {
+		matches, historyCapabilities, pagination, historyGeneration = a.loadCurrentHistoryFast(ctx, client, reference, playerRef, count, names, queueLabels)
+	} else {
+		matches, historyCapabilities, pagination = a.loadDetailedMatches(ctx, client, reference, playerRef, isCurrent, begIndex, count, matchFilter, names, queueLabels)
+	}
+	close(detailsReady)
+	detailedFinished := time.Now()
+	phases.markSpan("detailed_matches", detailedStarted, detailedFinished)
+	capabilities = append(capabilities, historyCapabilities...)
 	a.recordMatchModeClassifications(matches)
 	// 标注本地追踪到的排位胜点变化（仅当前登录玩家的场次有记录）。
 	if isCurrent {
@@ -1526,6 +1574,12 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		Region: reference.Region, ServerID: reference.ServerID, ServerName: tencentServerName(reference.ServerID),
 		Hidden: profileHidden, PrivateHistory: strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE"),
 		IsCurrent: isCurrent, reference: reference,
+	}
+	// Publish the history card before waiting for background/rank/mastery samples.
+	if progress, ok := ctx.Value(localOverviewProgressKey{}).(func(gameplayOverview)); ok && begIndex == 0 && ctx.Err() == nil {
+		partial := gameplayOverview{Player: playerData, Matches: cloneClientHistoryMatches(matches), Capabilities: append([]EndpointCapability(nil), capabilities...), Pagination: pagination, HistoryGeneration: historyGeneration}
+		a.publicizeOverviewReferences(&partial)
+		progress(partial)
 	}
 	select {
 	case background, ok := <-backgroundCh:
@@ -1544,13 +1598,16 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		}
 	}
 	response := gameplayOverview{
-		Player:  playerData,
+		Player: playerData, HistoryGeneration: historyGeneration,
 		Matches: matches, Capabilities: capabilities,
 		Pagination: pagination,
 	}
 	season := <-seasonCh
 	phases.markSpan("season_snapshot", season.started, season.finished)
 	seasonStats, seasonProgress, seasonRanked, seasonByQueue := season.stats, season.progress, season.ranked, season.byQueue
+	if latest, progress, ranked, queues := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef); progress.Scanned > seasonProgress.Scanned {
+		seasonStats, seasonProgress, seasonRanked, seasonByQueue = latest, progress, ranked, queues
+	}
 	response.SeasonChampionStats = seasonStats
 	response.SeasonStatsProgress = seasonProgress
 	response.SeasonOverall = seasonStatsOverall(seasonStats)
@@ -1603,7 +1660,6 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	}
 	// Season history is an incremental state slice. It must never block matches,
 	// ranks or player identity in the core overview response.
-	a.startSeasonStatsRefresh(client, reference, player, playerRef, names, overviewFreshHistory(ctx))
 
 	rankResultValue := <-rankCh
 	phases.markSpan("ranks", rankResultValue.started, rankResultValue.ended)
@@ -1712,7 +1768,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		})
 		a.recordDiagnostic(map[string]any{"event": "sgp_summary_history_skipped", "reason": "reuse_detail_matches", "reused": len(matches)})
 	}
-	if !windowAvailable && !remoteServer {
+	// The detached self-history flight owns this request. A pending or empty
+	// self page must not trigger a second synchronous cold LCU history read.
+	if !windowAvailable && !remoteServer && !(isCurrent && clientRiotPlatform(client) != "") {
 		windowGames, windowCapabilities, _ := loadGameplayHistoryContext(ctx, client, playerRef, isCurrent, 0, maximumSummaryMatchCount, false)
 		windowAvailable = len(windowCapabilities) > 0 && windowCapabilities[0].State == capabilityAvailable
 		if len(windowCapabilities) > 0 {
@@ -1759,6 +1817,11 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	phases.markSpan("recent_ranked", rankedResult.started, rankedResult.ended)
 	aggregationStarted = time.Now()
 	rankedSamples := rankedResult.value
+	for _, queueID := range []int64{420, 440} {
+		if rankedSamples.ByQueue[queueID] == nil {
+			rankedSamples.ByQueue[queueID] = recentRankedMatchesForQueue(matches, queueID, defaultMatchCount)
+		}
+	}
 	rankedSampleMatches := append(append([]gameplayMatch(nil), rankedSamples.ByQueue[420]...), rankedSamples.ByQueue[440]...)
 	response.RecentRanked = recentRankedSummary(rankedSampleMatches, playerRef, nil)
 	windowReachedCutoff := len(windowMatches) > 0 && windowMatches[len(windowMatches)-1].CreatedAt < recentWindowAfter
@@ -3870,6 +3933,13 @@ func normalizeGameplayMatch(game lcuGame, subject gameplayReference, names map[i
 			TripleKills:                    historyIntValue(raw.Stats.TripleKills),
 			QuadraKills:                    historyIntValue(raw.Stats.QuadraKills),
 			PentaKills:                     historyIntValue(raw.Stats.PentaKills),
+			TotalHeal:                      historyIntValue(raw.Stats.TotalHeal),
+			DamageDealtToTurrets:           historyIntValue(raw.Stats.DamageDealtToTurrets),
+			SoloKills:                      historyIntValue(raw.Stats.Challenges.SoloKills),
+			KnockEnemyIntoTeamAndKill:      historyIntValue(raw.Stats.Challenges.KnockEnemyIntoTeamAndKill),
+			KillsNearEnemyTurret:           historyIntValue(raw.Stats.Challenges.KillsNearEnemyTurret),
+			KillsUnderOwnTurret:            historyIntValue(raw.Stats.Challenges.KillsUnderOwnTurret),
+			MaxCsAdvantageOnLaneOpponent:   historyIntValue(raw.Stats.Challenges.MaxCsAdvantageOnLaneOpponent),
 			DragonTakedowns:                historyIntValue(raw.Stats.Challenges.DragonTakedowns),
 			BaronTakedowns:                 historyIntValue(raw.Stats.Challenges.BaronTakedowns),
 			RiftHeraldTakedowns:            historyIntValue(raw.Stats.Challenges.RiftHeraldTakedowns),
@@ -3920,6 +3990,7 @@ func normalizeGameplayMatch(game lcuGame, subject gameplayReference, names map[i
 		match.Teams = append(match.Teams, team)
 	}
 	sort.Slice(match.Teams, func(i, j int) bool { return match.Teams[i].TeamID < match.Teams[j].TeamID })
+	applyArenaResults(&match)
 	applyMatchScores(&match)
 	return match
 }
@@ -8036,6 +8107,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	var progressMu sync.Mutex
 	publishLiveProgress(ctx, progress)
 	playerMS := make([]int64, len(rawPlayers))
+	playersPublishedAt := make([]time.Time, len(rawPlayers))
 	for index := range rawPlayers {
 		wait.Add(1)
 		go func(index int) {
@@ -8093,6 +8165,18 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 					historyResults[index] = historyResult
 					matches = historyResult.Matches
 					matchesFinishedAt[index] = time.Now()
+					// History can render while ranked information is still loading.
+					progressMu.Lock()
+					early := progress.Players[index]
+					early.ModeStats, early.RecentGames = liveRecentPlayerStats(matches, playerRef, response.QueueID)
+					early.HistoryState = liveHistoryState(validRef, historyResult)
+					if response.QueueID == 420 || response.QueueID == 440 {
+						early.RecentRankedRecord = recentRankedRecord(early.RecentGames)
+					}
+					progress.Players[index] = early
+					playersPublishedAt[index] = time.Now()
+					publishLiveProgress(ctx, progress)
+					progressMu.Unlock()
 				}()
 				enrichment.Wait()
 			}
@@ -8108,7 +8192,6 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 				}
 			}
 			modeStats, recentGames := liveRecentPlayerStats(matches, playerRef, response.QueueID)
-			hidden, identityUnresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
 			displayChampionID := raw.player.ChampionID
 			if displayChampionID <= 0 {
 				displayChampionID = raw.player.ChampionPickIntent
@@ -8121,6 +8204,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			if response.QueueID == 420 || response.QueueID == 440 {
 				rankedRecord = recentRankedRecord(recentGames)
 			}
+			hidden, identityUnresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
 			response.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: playerRef, DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Hidden: hidden, PrivateHistory: strings.EqualFold(strings.TrimSpace(summoner.Privacy), "PRIVATE"), Autofill: raw.player.IsAutofilled, IsCurrent: isCurrent, reference: reference}, IdentityUnresolved: identityUnresolved, TeamID: raw.team, IsAlly: isAlly, ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionPickPending: raw.player.ChampionPickPending || raw.player.ChampionPickIntent < 0, ChampionLocked: locked, ChampionName: championName(names, displayChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), Spell1ID: raw.player.Spell1ID, Spell2ID: raw.player.Spell2ID, Rank: rank, ModeStats: modeStats, HistoryState: liveHistoryState(validRef, historyResult), RecentGames: recentGames, RecentRankedRecord: rankedRecord, RecentPositions: liveRecentPositions(matches, playerRef, response.QueueID)}
 			if aramMode || arenaMode {
 				// Unknown non-lane modes have historically rendered "other".
@@ -8141,6 +8225,9 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			ready.PlayerRef = a.registerGameplayReferenceDetails(ready.reference)
 			progressMu.Lock()
 			progress.Players[index] = ready
+			if playersPublishedAt[index].IsZero() {
+				playersPublishedAt[index] = time.Now()
+			}
 			publishLiveProgress(ctx, progress)
 			progressMu.Unlock()
 		}(index)
@@ -8309,16 +8396,26 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			response.Capabilities = append(response.Capabilities, gameplayCapabilityError("champion-abilities", "/lol-game-data/assets/v1/champions/{id}.json", abilitiesErr))
 		}
 	}
-	var sgpMS, lcuMS, slowestPlayerMS int64
+	var sgpMS, lcuMS, slowestPlayerMS, firstPlayerMS int64
+	lcuPlayers := 0
 	for i, result := range historyResults {
 		if result.Evidence != nil {
 			sgpMS = max(sgpMS, result.Evidence.SGPMS)
 			lcuMS = max(lcuMS, result.Evidence.LCUMS)
+			if result.Evidence.LCURequested {
+				lcuPlayers++
+			}
 		}
 		slowestPlayerMS = max(slowestPlayerMS, playerMS[i])
+		if len(response.Players[i].RecentGames) > 0 && !playersPublishedAt[i].IsZero() {
+			elapsed := playersPublishedAt[i].Sub(liveLoadStarted).Milliseconds()
+			if firstPlayerMS == 0 || elapsed < firstPlayerMS {
+				firstPlayerMS = elapsed
+			}
+		}
 	}
 	a.recordDiagnostic(map[string]any{
-		"sgp_ms": sgpMS, "lcu_ms": lcuMS, "slowest_player_ms": slowestPlayerMS,
+		"sgp_ms": sgpMS, "lcu_ms": lcuMS, "slowest_player_ms": slowestPlayerMS, "first_player_ms": firstPlayerMS, "lcu_players": lcuPlayers,
 		"event": "live_load_cost", "players": len(response.Players), "concurrency": concurrency,
 		"ranks_ms": ranksMS, "matches_ms": matchesMS, "total_ms": time.Since(liveLoadStarted).Milliseconds(),
 	})
@@ -8676,7 +8773,7 @@ func (a *app) cachedLivePlayerMatches(ctx context.Context, key string, loader fu
 }
 
 // livePlayerMatches shares the 45-second cache and request flight. All players
-// merge fresh SUMMARY and LCU; self keeps the current-summoner LCU endpoint.
+// use fresh SGP SUMMARY first; LCU is a fallback or a confirmed self catch-up.
 func (a *app) livePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string, queues ...int64) livePlayerMatchesResult {
 	queueID := liveHistoryQueue(queues)
 	key := playerRef + "\x00" + strconv.FormatBool(isCurrent) + fmt.Sprintf("\x00%d", queueID)
@@ -8708,7 +8805,11 @@ func loadLiveLCUMatches(ctx context.Context, client *LCUClient, reference gamepl
 }
 
 func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string, queues ...int64) livePlayerMatchesResult {
-	queueID := liveHistoryQueue(queues)
+	return a.loadLivePlayerMatchesForPrevious(ctx, client, reference, playerRef, isCurrent, names, liveHistoryQueue(queues), 0)
+}
+
+func (a *app) loadLivePlayerMatchesForPrevious(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, names map[int64]string, queueID, previousGameID int64) livePlayerMatchesResult {
+
 	if region := clientRiotPlatform(client); region != "" {
 		reference.Region = region
 		filter := "all"
@@ -8735,7 +8836,9 @@ func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, refe
 	lcu.State = "failed"
 	sgp.State = "failed"
 	var sgpMS, lcuMS int64
+	lcuRequested := false
 	readLCU := func() {
+		lcuRequested = true
 		started := time.Now()
 		defer func() { lcuMS = time.Since(started).Milliseconds() }()
 		defer a.recoverPanic("live-history.lcu")
@@ -8749,20 +8852,13 @@ func (a *app) loadLivePlayerMatches(ctx context.Context, client *LCUClient, refe
 		defer cancel()
 		sgp, sgpOK = a.loadLiveSGPMatches(sgpCtx, client, reference, playerRef, names, queueID)
 	}
-	if isCurrent {
-		// Self still needs the latest LCU result, even when SGP has ten games.
-		var wait sync.WaitGroup
-		wait.Add(2)
-		go func() { defer a.recoverPanic("live-history.self-lcu"); defer wait.Done(); readLCU() }()
-		go func() { defer a.recoverPanic("live-history.self-sgp"); defer wait.Done(); readSGP() }()
-		wait.Wait()
-	} else {
-		readSGP()
-		if !(sgpOK && sgp.Evidence != nil && sgp.Evidence.QueueFiltered && len(recentLiveMatchesForPlayer(sgp.Matches, playerRef, queueID, time.Now())) >= 10) {
-			readLCU()
-		}
+	// A successful empty/short SGP page is still authoritative. Only a known
+	// previous game missing from self's successful SGP page needs an LCU catch-up.
+	readSGP()
+	if !sgpOK || isCurrent && previousGameID > 0 && !liveHistoryContainsGame(sgp.Matches, previousGameID) {
+		readLCU()
 	}
-	evidence := &liveHistoryEvidence{LCU: cloneGameplayMatches(lcu.Matches), SGP: cloneGameplayMatches(sgp.Matches), SGPRequested: sgp.State != "unavailable", SGPOK: sgpOK, SGPMS: sgpMS, LCUMS: lcuMS}
+	evidence := &liveHistoryEvidence{LCU: cloneGameplayMatches(lcu.Matches), SGP: cloneGameplayMatches(sgp.Matches), SGPRequested: sgp.State != "unavailable", SGPOK: sgpOK, SGPMS: sgpMS, LCUMS: lcuMS, LCURequested: lcuRequested}
 	if sgp.Evidence != nil {
 		evidence.QueueFiltered, evidence.PagesRead, evidence.StopReason = sgp.Evidence.QueueFiltered, sgp.Evidence.PagesRead, sgp.Evidence.StopReason
 	}

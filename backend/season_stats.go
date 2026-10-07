@@ -18,8 +18,8 @@ import (
 var seasonStartS26 = time.Date(2026, 1, 8, 0, 0, 0, 0, time.UTC)
 
 // seasonStatsCacheSchemaVersion 是缓存的口径版本。持久化键与载荷都记录来源，
-// 不同来源的对局结构和统计口径不能共用缓存；口径一变就升版本号，让旧文件在
-// loadSeasonStats 里被判为无效并触发重扫。逐版演进：
+// 不同来源的对局结构和统计口径不能共用缓存。R235 起 schema 迁移保留
+// 历史对局 ID 与聚合，只按新口径累计新增对局，不再清空重扫。此前演进：
 //
 //	7  引入「来源」维度（键与载荷都带 source）。
 //	8  gameplaySeasonChampionStat 的 Kills/Deaths/Assists 由「整季累计」改成
@@ -326,6 +326,8 @@ func seasonWriteLock(key string) *sync.Mutex {
 }
 
 type seasonStatsCache struct {
+	HeadGameID        int64                        `json:"headGameId,omitempty"`
+	HeadCheckedAt     time.Time                    `json:"headCheckedAt,omitempty"`
 	Streams           map[string]seasonStatsStream `json:"streams,omitempty"`
 	CappedByUpstream  bool                         `json:"capped_by_upstream,omitempty"`
 	newInfos          map[int64]*riotMatchInfo
@@ -371,9 +373,14 @@ func (s *localStore) loadSeasonStats(source, accountHash, season string) (season
 		return seasonStatsCache{}, err
 	}
 	var cache seasonStatsCache
-	if err := json.Unmarshal(data, &cache); err != nil || cache.SchemaVersion != seasonStatsCacheSchemaVersion || cache.Source != source || cache.AccountHash != accountHash || cache.Season != season {
+	if err := json.Unmarshal(data, &cache); err != nil || (cache.SchemaVersion < 1 || cache.SchemaVersion > seasonStatsCacheSchemaVersion) || cache.Source != source || cache.AccountHash != accountHash || cache.Season != season {
 		return seasonStatsCache{}, errors.New("invalid season stats cache")
 	}
+	// R235: preserve historical IDs and aggregates across schema upgrades.
+	if cache.SchemaVersion < seasonStatsCacheSchemaVersion && len(cache.Streams) == 0 {
+		cache.Complete = false
+	}
+	cache.SchemaVersion = seasonStatsCacheSchemaVersion
 	return cache, nil
 }
 
@@ -396,6 +403,10 @@ func (s *localStore) saveSeasonStatsReported(cache seasonStatsCache) (seasonStat
 	lock.Lock()
 	defer lock.Unlock()
 	if disk, err := s.loadSeasonStats(cache.Source, cache.AccountHash, cache.Season); err == nil {
+		// Backfill snapshots must not overwrite a newer unfiltered head marker.
+		if disk.HeadCheckedAt.After(cache.HeadCheckedAt) {
+			cache.HeadGameID, cache.HeadCheckedAt = disk.HeadGameID, disk.HeadCheckedAt
+		}
 		diskIDs := map[int64]bool{}
 		incomingIDs := map[int64]bool{}
 
@@ -760,6 +771,10 @@ func (a *app) loadSeasonChampionStatsWithHistoryCache(ctx context.Context, clien
 	scan := &seasonScanState{
 		cache: cache, stats: stats, queueStats: queueStats, seen: seen,
 		seasonStartMillis: seasonStart.UnixMilli(), headOnly: true,
+		onPage: func(scan *seasonScanState) {
+			a.finishSeasonScan(scan, names, accountHash)
+			a.publishSeasonSnapshot(reference, playerRef, scan.cache)
+		},
 	}
 	// 首屏只做「增量头部扫描」：从最新一页往回扫，撞到已缓存的对局就停。
 	// 老玩家第一次打开时缓存是空的，整季回补会是几十页 × 每页约 2.8MB
@@ -825,7 +840,7 @@ func (a *app) loadSeasonChampionStatsSnapshot(reference gameplayReference, playe
 }
 
 const (
-	seasonQueryDedupTTL     = 10 * time.Second
+	seasonQueryDedupTTL     = 60 * time.Second
 	seasonQuerySnapshotsMax = 512
 )
 
@@ -840,8 +855,7 @@ func seasonQuerySnapshotKey(serverID, playerRef, season string) string {
 // startSeasonStatsRefresh runs the old foreground scan outside the overview
 // request. Query snapshot, persisted cache and seasonBackfills provide the
 // three deduplication gates required for repeated identical overview loads.
-// Fresh requests bypass completed snapshots and time dedup, but keep a shared
-// in-flight scan to avoid simultaneous writes to the same season accumulator.
+// R241: even explicit refreshes share the 60-second head gate and in-flight scan.
 func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayReference, player Summoner, playerRef string, names map[int64]string, fresh bool) {
 	season, _ := currentRankedSeason(time.Now())
 	serverID := strings.ToUpper(strings.TrimSpace(reference.ServerID))
@@ -849,16 +863,18 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 		return
 	}
 	accountHash := a.storage.accountHash(player)
-	if accountHash != "" && !fresh {
-		if cached, err := a.storage.loadSeasonStats(seasonStatsSource, accountHash, season); err == nil && cached.Complete && time.Since(cached.UpdatedAt) < seasonQueryDedupTTL {
+	if accountHash != "" {
+		if cached, err := a.storage.loadSeasonStats(seasonStatsSource, accountHash, season); err == nil && !cached.HeadCheckedAt.IsZero() && time.Since(cached.HeadCheckedAt) < seasonQueryDedupTTL {
+			a.recordSeasonHeadRecent(fresh, seasonStatsCount(cached.Stats), cached.Complete)
 			return
 		}
 	}
 	key := seasonQuerySnapshotKey(serverID, playerRef, season)
 	now := time.Now()
 	a.seasonBackfillMu.Lock()
-	if previous := a.seasonQuerySnapshotLocked(key, now); !fresh && !previous.IsZero() && now.Sub(previous) < seasonQueryDedupTTL {
+	if previous := a.seasonQuerySnapshotLocked(key, now); !previous.IsZero() && now.Sub(previous) < seasonQueryDedupTTL {
 		a.seasonBackfillMu.Unlock()
+		a.recordSeasonHeadRecent(fresh, 0, false)
 		return
 	}
 	a.cacheSeasonQuerySnapshotLocked(key, now)
@@ -887,9 +903,9 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 		defer cancel()
 		cost := &overviewLoadCost{}
 		ctx = context.WithValue(ctx, overviewLoadCostContextKey{}, cost)
-		_, progress, _, _ := a.loadSeasonChampionStatsWithHistoryCache(ctx, client, reference, player, playerRef, names, !fresh)
+		progress, skipped, skipReason, newGames := a.refreshSeasonHead(ctx, client, reference, player, playerRef, names)
 		requests, bytes, historyCalls, cacheHits := cost.snapshot()
-		a.recordDiagnostic(map[string]any{"event": "season_stats_head_refresh", "fresh": fresh, "use_history_cache": !fresh, "sgp_requests": requests, "sgp_bytes": bytes, "sgp_history_calls": historyCalls, "sgp_history_cache_hits": cacheHits, "scanned": progress.Scanned, "complete": progress.Complete, "message": progress.Message})
+		a.recordDiagnostic(map[string]any{"event": "season_stats_head_refresh", "fresh": fresh, "use_history_cache": false, "skipped": skipped, "skip_reason": skipReason, "new_games": newGames, "sgp_requests": requests, "sgp_bytes": bytes, "sgp_history_calls": historyCalls, "sgp_history_cache_hits": cacheHits, "scanned": progress.Scanned, "complete": progress.Complete, "message": progress.Message})
 		publicRef := a.registerGameplayReferenceDetails(mergeGameplayReferences(reference, gameplayReference{PlayerRef: playerRef}))
 		progressEvent, _ := json.Marshal(map[string]any{
 			"type": "season-progress", "season": season, "scanned": progress.Scanned,
@@ -897,6 +913,7 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 		})
 		a.clearOverviewQuerySnapshots()
 		a.broadcastEvent(string(progressEvent))
+		a.startSelfSeasonSupplement(client, reference, playerRef, names)
 	}()
 }
 
@@ -963,6 +980,7 @@ type seasonScanState struct {
 	round             int
 	scanned           int
 	interrupted       bool
+	onPage            func(*seasonScanState)
 }
 
 // seasonScanPages 从 cache.ResumeIndex 开始往回翻页，最多翻 budget 页。
@@ -978,6 +996,10 @@ func (a *app) seasonScanPages(ctx context.Context, client *LCUClient, serverID, 
 }
 
 func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUClient, serverID, playerRef string, scan *seasonScanState, budget int, useHistoryCache bool) {
+	if scan.headOnly {
+		a.seasonScanHeadConcurrent(ctx, client, serverID, playerRef, scan, budget, useHistoryCache)
+		return
+	}
 	scan.interrupted = false
 	if !isTencentClient(client) {
 		scan.interrupted = true
@@ -1087,8 +1109,8 @@ func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUCl
 				cursor.StopReason = "upstream_end"
 				if boundary {
 					cursor.StopReason = "season_start"
-				} else if start >= 1000 {
-					cursor.StopReason = "upstream_cap_1000"
+				} else if cursor.OldestCreatedAt > scan.seasonStartMillis {
+					cursor.StopReason = "upstream_window"
 					cursor.CappedByUpstream = true
 				}
 
@@ -1261,6 +1283,9 @@ func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference
 			})
 			a.clearOverviewQuerySnapshots()
 			a.broadcastEvent(string(progressEvent))
+			if scan.cache.CappedByUpstream {
+				a.startSelfSeasonSupplement(client, reference, playerRef, names)
+			}
 			if scan.cache.Complete || scan.interrupted || scan.scanned == before || ctx.Err() != nil {
 				return
 			}

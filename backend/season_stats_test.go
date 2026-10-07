@@ -272,8 +272,8 @@ func TestSeasonStatsRejectOldCacheSchema(t *testing.T) {
 	if err := store.saveSeasonStats(cache); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.loadSeasonStats(seasonStatsSource, "account", "S26"); err == nil {
-		t.Fatal("old season cache schema was accepted")
+	if _, err := store.loadSeasonStats(seasonStatsSource, "account", "S26"); err != nil {
+		t.Fatal("old season cache schema was lost")
 	}
 	cache.SchemaVersion = seasonStatsCacheSchemaVersion
 	if err := store.saveSeasonStats(cache); err != nil {
@@ -494,7 +494,7 @@ func TestSeasonRecordRankedMatchMirrorsMayhemCriteriaAndRecordsAugmentSample(t *
 // P0 判据 2：schema 升版后旧缓存必须触发重扫（失效逻辑在 loadSeasonStats）。
 // 工单原文要求 7→8；并行 R117 会话已经占用了 8（K/D/A 改逐场均值），
 // 所以本轮实际是 8→9，用户已裁决顺延。
-func TestSeasonStatsSchemaVersionIsFourteenAndRejectsEveryOlderFile(t *testing.T) {
+func TestSeasonStatsSchemaVersionIsFourteenAndPreservesEveryOlderFile(t *testing.T) {
 	if seasonStatsCacheSchemaVersion != 14 {
 		t.Fatalf("seasonStatsCacheSchemaVersion = %d, want 14", seasonStatsCacheSchemaVersion)
 	}
@@ -504,8 +504,8 @@ func TestSeasonStatsSchemaVersionIsFourteenAndRejectsEveryOlderFile(t *testing.T
 		if err := store.saveSeasonStats(cache); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := store.loadSeasonStats(seasonStatsSource, "account", "S26"); err == nil {
-			t.Fatalf("schema %d cache was accepted; it must be rejected so the scan restarts", old)
+		if _, err := store.loadSeasonStats(seasonStatsSource, "account", "S26"); err != nil {
+			t.Fatalf("schema %d cache was lost: %v", old, err)
 		}
 	}
 	cache := seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: "S26", AccountHash: "account"}

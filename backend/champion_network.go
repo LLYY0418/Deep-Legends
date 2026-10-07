@@ -117,6 +117,10 @@ func (a *app) handleSystemProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	proxy := strings.TrimSpace(request.Proxy)
+	if a.licenseSideEffect(r.Context()) != nil {
+		http.Error(w, "软件授权已失效", http.StatusForbidden)
+		return
+	}
 	if proxy == "" {
 		_ = os.Unsetenv("DEEP_LEGENDS_SYSTEM_PROXY")
 		respondJSON(w, map[string]any{"ok": true, "proxy": ""})
@@ -144,6 +148,10 @@ func (a *app) handleChampionNetwork(w http.ResponseWriter, r *http.Request) {
 	settings, err := validateChampionNetworkSettings(request)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if a.licenseSideEffect(r.Context()) != nil {
+		http.Error(w, "软件授权已失效", http.StatusForbidden)
 		return
 	}
 	if err := saveChampionNetworkSettings(a.storage, settings); err != nil {

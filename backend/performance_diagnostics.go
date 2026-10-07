@@ -228,7 +228,8 @@ func (a *app) runBackendRuntimeMetrics(ctx context.Context, ticks <-chan time.Ti
 			a.eventMu.Lock()
 			sse := len(a.eventSubscribers)
 			a.eventMu.Unlock()
-			a.recordDiagnostic(map[string]any{"event": "backend_runtime_metrics", "window_ms": 60000, "goroutines": runtime.NumGoroutine(), "heap_alloc_mb": float64(m.HeapAlloc) / (1 << 20), "heap_inuse_mb": float64(m.HeapInuse) / (1 << 20), "num_gc": m.NumGC, "gc_pause_delta_ms": float64(pause) / 1e6, "sse_connections": sse, "local_http_inflight": a.localHTTPInFlight.Load()})
+			snapshotP50, snapshotP95 := a.discoverySnapshotPercentiles()
+			a.recordDiagnostic(map[string]any{"event": "backend_runtime_metrics", "process_snapshot_p50_ms": snapshotP50, "process_snapshot_p95_ms": snapshotP95, "window_ms": 60000, "goroutines": runtime.NumGoroutine(), "heap_alloc_mb": float64(m.HeapAlloc) / (1 << 20), "heap_inuse_mb": float64(m.HeapInuse) / (1 << 20), "num_gc": m.NumGC, "gc_pause_delta_ms": float64(pause) / 1e6, "sse_connections": sse, "local_http_inflight": a.localHTTPInFlight.Load()})
 		}
 	}
 }

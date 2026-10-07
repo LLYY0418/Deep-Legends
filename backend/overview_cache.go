@@ -25,10 +25,16 @@ type overviewQueryCacheItem struct {
 	entry overviewQueryCacheEntry
 }
 
+type localOverviewProgressKey struct{}
+
 type overviewQueryFlight struct {
-	done     chan struct{}
-	response gameplayOverview
-	err      error
+	progressMu  sync.Mutex
+	progress    *gameplayOverview
+	listeners   map[uint64]func(gameplayOverview)
+	listenerSeq uint64
+	done        chan struct{}
+	response    gameplayOverview
+	err         error
 }
 
 func riotOverviewQuerySnapshotKey(reference gameplayReference, begIndex, count int, filters ...string) string {
@@ -193,6 +199,8 @@ func (a *app) loadGameplayOverviewDeduplicated(ctx context.Context, client *LCUC
 	}
 	if flight := a.overviewQueries.flights[key]; flight != nil {
 		done := flight.done
+		unsubscribe := flight.subscribeOverview(ctx)
+		defer unsubscribe()
 		a.overviewQueries.mu.Unlock()
 		select {
 		case <-done:
@@ -211,6 +219,9 @@ func (a *app) loadGameplayOverviewDeduplicated(ctx context.Context, client *LCUC
 	a.overviewQueries.flights[key] = flight
 	a.overviewQueries.mu.Unlock()
 
+	unsubscribe := flight.subscribeOverview(ctx)
+	defer unsubscribe()
+	ctx = context.WithValue(ctx, localOverviewProgressKey{}, flight.publishOverview)
 	response := a.loadGameplayOverview(ctx, client, current, reference, begIndex, count, matchFilter, false)
 	a.overviewQueries.complete(key, flight, response, ctx.Err())
 	return response
@@ -234,4 +245,31 @@ func overviewSnapshotTTL(entry overviewQueryCacheEntry) time.Duration {
 		return time.Minute
 	}
 	return overviewQuerySnapshotTTL
+}
+
+func (flight *overviewQueryFlight) subscribeOverview(ctx context.Context) func() {
+	listener, ok := ctx.Value(localOverviewProgressKey{}).(func(gameplayOverview))
+	if !ok {
+		return func() {}
+	}
+	flight.progressMu.Lock()
+	flight.listenerSeq++
+	id := flight.listenerSeq
+	if flight.listeners == nil {
+		flight.listeners = map[uint64]func(gameplayOverview){}
+	}
+	flight.listeners[id] = listener
+	if flight.progress != nil && ctx.Err() == nil {
+		listener(*flight.progress)
+	}
+	flight.progressMu.Unlock()
+	return func() { flight.progressMu.Lock(); delete(flight.listeners, id); flight.progressMu.Unlock() }
+}
+func (flight *overviewQueryFlight) publishOverview(partial gameplayOverview) {
+	flight.progressMu.Lock()
+	defer flight.progressMu.Unlock()
+	flight.progress = &partial
+	for _, listener := range flight.listeners {
+		listener(partial)
+	}
 }

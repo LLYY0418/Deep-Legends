@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -192,7 +193,11 @@ func (a *app) handleClientLaunch(w http.ResponseWriter, r *http.Request) {
 	launched := false
 	defer func() { a.finishClientLaunch(installation.ID, launched) }()
 	a.recordClientLaunch(installation.ID, "requested")
-	result, err := a.launchDetectedClientInstallation(installation)
+	if a.licenseSideEffect(r.Context()) != nil {
+		http.Error(w, "软件授权已失效", http.StatusForbidden)
+		return
+	}
+	result, err := a.launchDetectedClientInstallationContext(r.Context(), installation)
 	for _, failure := range result.Failures {
 		a.recordClientLaunchAttempt(installation.ID, failure)
 	}
@@ -261,10 +266,17 @@ func (a *app) detectedClientInstallationsWithScan() ([]clientInstallation, clien
 }
 
 func (a *app) launchDetectedClientInstallation(installation clientInstallation) (clientLaunchResult, error) {
+	return a.launchDetectedClientInstallationContext(context.Background(), installation)
+}
+
+func (a *app) launchDetectedClientInstallationContext(ctx context.Context, installation clientInstallation) (clientLaunchResult, error) {
+	if err := a.licenseSideEffect(ctx); err != nil {
+		return clientLaunchResult{}, err
+	}
 	if a != nil && a.clientLauncher != nil {
 		return a.clientLauncher(installation)
 	}
-	return launchClientInstallation(installation)
+	return launchClientInstallationContext(ctx, installation)
 }
 
 func (installation clientInstallation) hasLaunchCandidates() bool {

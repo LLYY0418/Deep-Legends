@@ -3079,6 +3079,11 @@
   window.deepLegendsChampionSearch = Object.freeze({ scoreOption: scoreChampionSelectOption });
   window.deepLegendsChampionAsset = Object.freeze({ imageHTML: assetImage, imageURL });
   render();
-  beginStartupPreload();
-  adoptCatalog(state.preload?.catalog);
+  const preloadWhenLicensed = () => {
+    if (!window.deepLegendsLicense?.isActive()) return;
+    beginStartupPreload();
+    adoptCatalog(state.preload?.catalog);
+  };
+  window.addEventListener("deep-legends:license", preloadWhenLicensed);
+  preloadWhenLicensed();
 })();

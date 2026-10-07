@@ -61,7 +61,7 @@ func TestR231TaggedSeasonBeyondMixedWindowAndCap(t *testing.T) {
 		n        int
 		boundary bool
 		stop     string
-	}{{313, true, "season_start"}, {1000, false, "upstream_cap_1000"}} {
+	}{{313, true, "season_start"}, {1000, false, "upstream_window"}} {
 		t.Run(tc.stop, func(t *testing.T) {
 			a, client, ref, counts := r231SeasonFixture(t, tc.n, tc.boundary)
 			scan := r231Scan(ref)
@@ -176,8 +176,12 @@ func TestR231RelayForceBackoffAndSlowBody(t *testing.T) {
 		t.Fatal("single request failure locked relay")
 	}
 	state.failed("https://relay.example")
+	if state.unavailable() {
+		t.Fatal("second failure locked relay")
+	}
+	state.failed("https://relay.example")
 	if !state.unavailable() {
-		t.Fatal("two failures did not back off")
+		t.Fatal("three failures did not back off")
 	}
 	for i, want := range []int{15, 30, 60, 120, 120} {
 		if got := int(relayBackoff(i + 1).Seconds()); got != want {

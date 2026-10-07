@@ -230,6 +230,7 @@ function compileFunctions(source, names, dependencies = {}) {
     if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
   }
   for (const name of ["bindLiveNode", "champSelectEnemyPlaceholder", "stampLiveRows", "preserveLiveImages", "patchLiveRosterPanel"]) if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body=>body.includes(name + "("))) bodies.push(functionSource(source,name));
+  if(!compiledDependencies.overviewContainer && names.includes("updateMatchFilter"))compiledDependencies.overviewContainer=()=>null;
   const dependencyNames = Object.keys(compiledDependencies);
   const factory = Function(
     ...dependencyNames,
@@ -2262,7 +2263,7 @@ test("damage analysis sorts by a real metric and shows full colored values", () 
 	  assert.match(gameplayStyles, /\.match-damage-value\s*\{[^}]*var\(--danger\)/);
   assert.match(gameplayStyles, /\.match-stat-damage\s*>\s*b,\s*\.match-stat-taken > b\s*\{[^}]*display:\s*inline-flex/);
   assert.match(gameplayStyles, /\.match-stat\s*\{[^}]*minmax\(0,1fr\)/s);
-  assert.match(gameplayStyles, /\.match-list\s*\{[^}]*overflow-anchor:\s*auto/s);
+  assert.match(gameplayStyles, /\.match-list\s*\{[^}]*overflow-anchor:\s*none/s);
 	assert.match(gameplayScript, /tab\.paginationStalls = upstreamAdditions > 0 \? 0/);
   assert.match(gameplayScript, /function appendOverviewMatches\(tab, additions\)/);
   assert.match(gameplayScript, /if \(append\) appendOverviewMatches\(tab, appendAdditions\);/);
@@ -6153,7 +6154,7 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		assert.match(goFunctionSource(sources.rankGo, "playerRankScoreWithCacheStatus"), /if flight\.ctx\.Err\(\) == nil \{\s*keys = append\(keys, cacheKey\)\s*if !entry\.negative/);
 		assert.match(goFunctionSource(sources.rankGo, "playerRankScoreWithCacheStatus"), /cache\.finishFlight\(cacheKey, flight, entry, keys\.\.\.\)/);
 		assert.match(goFunctionSource(sources.rankGo, "finishFlight"), /for _, cacheKey := range cacheKeys \{\s*c\.putLocked\(cacheKey, entry\)/);
-		assert.match(sources.rankGo, /var globalMatchTiersRankSemaphore = make\(chan struct\{\}, matchTiersRankConcurrency\)/);
+		assert.match(sources.rankGo, /var globalMatchTiersRankSemaphore = make\(chan struct\{\}, 4\)/);
 		assert.match(functionSource(sources.gameplayJS, "hydrateMatchTiers"), /if \(failure && Number\(failure\.nextRetryAt \|\| 0\) > Date\.now\(\)\)/);
 		assert.match(functionSource(sources.gameplayJS, "shouldReloadOverview"), />= 120_000/); // B-5
 		assert.match(functionSource(sources.gameplayJS, "loadOverview"), /preserveLoadedPages = force[\s\S]*mergedMatches = \[\.\.\.freshMatches, \.\.\.previousMatches\.filter/);
@@ -6191,7 +6192,7 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		["B-3 stable tier scope", "gameplayJS", "return `${region}:${serverID}:${playerRef}`;", "return `${region}:${tab.key}:${serverID}:${playerRef}`;"],
 		["B-4 negative result", "rankGo", "entry.negative = true", "entry.negative = false"],
 		["B-4 negative cache", "rankGo", "if flight.ctx.Err() == nil {", "if flight.ctx.Err() == nil && !entry.negative {"],
-		["B-4 global concurrency gate", "rankGo", "var globalMatchTiersRankSemaphore = make(chan struct{}, matchTiersRankConcurrency)", "// per-handler gate restored"],
+		["B-4 global concurrency gate", "rankGo", "var globalMatchTiersRankSemaphore = make(chan struct{}, 4)", "// per-handler gate restored"],
 		["B-4 frontend backoff", "gameplayJS", "if (failure && Number(failure.nextRetryAt || 0) > Date.now())", "if (false)"],
 		["B-5 two-minute freshness", "gameplayJS", ">= 120_000", ">= 20_000"],
 		["B-5 preserve loaded pages", "gameplayJS", "const preserveLoadedPages = force && sameFilter && !pageWasPending && previousMatches.length > freshMatches.length;", "const preserveLoadedPages = false;"],

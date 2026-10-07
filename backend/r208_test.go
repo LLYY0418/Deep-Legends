@@ -30,6 +30,7 @@ func r208Relay(t *testing.T, transport http.RoundTripper) (*riotProvider, *r208C
 	store := r206RelayFixture(t)
 	c := &r208Clock{stamp: time.Date(2026, 10, 4, 23, 59, 30, 0, time.UTC)}
 	riotRelays.now = c.now
+	riotRelays.lastSuccess = c.now()
 	champions := newChampionProvider()
 	champions.client = &http.Client{Transport: transport}
 	return newRiotProvider(champions), c, store
@@ -42,7 +43,7 @@ func TestR208RelayQuotaDaily(t *testing.T) {
 				var calls atomic.Int32
 				p, clock, store := r208Relay(t, r196RoundTrip(func(r *http.Request) (*http.Response, error) {
 					n := calls.Add(1)
-					if n > 2 || !probe && n == 1 || r.URL.Host == riotPlatformHost {
+					if n > 1 || r.URL.Host == riotPlatformHost {
 						return r206RelayResponse(200, []byte(`{"ok":true}`)), nil
 					}
 					response := r206RelayResponse(503, []byte(`<html>daily quota exhausted</html>`))
@@ -60,7 +61,16 @@ func TestR208RelayQuotaDaily(t *testing.T) {
 				var events []map[string]any
 				p.champions.diag = func(e map[string]any) { events = append(events, e) }
 				var out map[string]any
-				err := p.get(t.Context(), riotPlatformHost, "/lol/status/v4/platform-data", nil, &out)
+				var err error
+				if probe {
+					riotRelays.mu.Lock()
+					riotRelays.active = ""
+					riotRelays.lastSuccess = time.Time{}
+					riotRelays.mu.Unlock()
+					_, err = riotRelays.ensure(t.Context(), p.champions.httpClient(), p.champions.diag)
+				} else {
+					err = p.get(t.Context(), riotPlatformHost, "/lol/status/v4/platform-data", nil, &out)
+				}
 				if err == nil {
 					t.Fatal("quota response must fail")
 				}
@@ -116,7 +126,7 @@ func TestR208RelayQuotaDaily(t *testing.T) {
 func TestR208RelayApplicationSharedAcrossProviders(t *testing.T) {
 	var calls atomic.Int32
 	transport := r196RoundTrip(func(*http.Request) (*http.Response, error) {
-		if calls.Add(1) == 2 {
+		if calls.Add(1) == 1 {
 			r := r206RelayResponse(429, []byte(`{}`))
 			r.Header.Set("Retry-After", "7")
 			r.Header.Set("X-Relay-Cooldown", "application")
@@ -138,11 +148,11 @@ func TestR208RelayApplicationSharedAcrossProviders(t *testing.T) {
 			t.Fatal(body)
 		}
 	}
-	if calls.Load() != 2 {
+	if calls.Load() != 1 {
 		t.Fatal("same-platform cooldown bypassed", calls.Load())
 	}
 	clock.advance(2 * time.Second)
-	if err = other.get(t.Context(), riotClusterHost, "/riot/account/v1/accounts/by-puuid/other", nil, &out); err != nil || calls.Load() != 3 {
+	if err = other.get(t.Context(), riotClusterHost, "/riot/account/v1/accounts/by-puuid/other", nil, &out); err != nil || calls.Load() != 2 {
 		t.Fatal("application cooldown not expired", err, calls.Load())
 	}
 }
@@ -258,8 +268,8 @@ func TestR208RelaySummaryTenMinuteWindow(t *testing.T) {
 	if len(rows) != 1 || rows[0]["requests"] != 4 || rows[0]["rate_limited"] != 1 {
 		t.Fatal(rows)
 	}
-	failures := rows[0]["failures"].(map[string]int)
-	if failures["network"] != 1 || failures["quota_exhausted"] != 1 {
+	failures := rows[0]["failures"].(map[string]any)
+	if failures["network"].(map[string]int)["other"] != 1 || failures["quota_exhausted"] != 1 {
 		t.Fatal(rows)
 	}
 	raw, _ := json.Marshal(rows)
@@ -305,7 +315,7 @@ func TestR208QueuedRequestChecksSharedCooldownBeforeIO(t *testing.T) {
 	}
 	var out map[string]any
 	err := p.get(t.Context(), riotClusterHost, "/riot/account/v1/accounts/by-puuid/queued", nil, &out)
-	if err == nil || riotHTTPErrorBody(err).CooldownScope != "application" || calls.Load() != 1 {
+	if err == nil || riotHTTPErrorBody(err).CooldownScope != "application" || calls.Load() != 0 {
 		t.Fatal("queued request escaped cooldown", err, calls.Load())
 	}
 }

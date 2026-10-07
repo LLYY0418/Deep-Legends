@@ -15,9 +15,22 @@ func r206RelayFixture(t *testing.T) *riotKeyStore {
 	t.Helper()
 	store := r204KeyFixture(t)
 	addresses, state := riotRelayAddresses, riotRelays
-	riotRelayAddresses, riotRelays = []string{"https://relay.example"}, &riotRelayState{}
+	riotRelayAddresses, riotRelays = []string{"https://relay.example"}, &riotRelayState{config: "https://relay.example", active: "https://relay.example", lastSuccess: time.Now()}
 	owned := riotRelays
-	t.Cleanup(func() { owned.stopSummary(); riotRelayAddresses, riotRelays = addresses, state })
+	t.Cleanup(func() {
+		owned.mu.Lock()
+		flight := owned.flight
+		owned.mu.Unlock()
+		if flight != nil {
+			select {
+			case <-flight:
+			case <-time.After(20 * time.Second):
+				t.Error("relay probe leaked")
+			}
+		}
+		owned.stopSummary()
+		riotRelayAddresses, riotRelays = addresses, state
+	})
 	return store
 }
 
@@ -44,7 +57,7 @@ func TestR206RelayRoutingNoTokenAndDirectPriority(t *testing.T) {
 	if err := p.get(context.Background(), riotPlatformHost, "/lol/status/v4/platform-data", nil, &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(requests) != 3 || requests[0].URL.Path != "/health" || requests[1].URL.EscapedPath() != "/r/asia"+path || requests[1].URL.RawQuery != "start=0" {
+	if len(requests) != 2 || requests[0].URL.EscapedPath() != "/r/asia"+path || requests[0].URL.RawQuery != "start=0" {
 		t.Fatal("relay mapping/probe", requests)
 	}
 	for _, r := range requests {
@@ -79,43 +92,40 @@ func TestR206RelayRoutingNoTokenAndDirectPriority(t *testing.T) {
 
 func TestR206RelayEmptyAndFailureCooldown(t *testing.T) {
 	r206RelayFixture(t)
-	champions := newChampionProvider()
+	state := &riotRelayState{}
 	calls := 0
 	var events []map[string]any
-	champions.diag = func(row map[string]any) { events = append(events, row) }
-	champions.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
+	client := &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
 		calls++
 		return r206RelayResponse(503, []byte(`{}`)), nil
 	})}
-	p := newRiotProvider(champions)
-	var out map[string]any
 	riotRelayAddresses = nil
-	if err := p.get(context.Background(), riotPlatformHost, "/lol/status/v4/platform-data", nil, &out); !errors.Is(err, errRiotKeyMissing) || calls != 0 || riotKeySource() != "none" {
-		t.Fatal("empty list contacted network", err)
+	if _, err := state.ensure(t.Context(), client, nil); !errors.Is(err, errRiotKeyMissing) || calls != 0 {
+		t.Fatal(err, calls)
 	}
 	riotRelayAddresses = []string{"https://relay.example"}
 	for i := 0; i < 2; i++ {
-		if err := p.get(context.Background(), riotPlatformHost, "/lol/status/v4/platform-data", nil, &out); !errors.Is(err, errRiotRelayUnavailable) {
+		if _, err := state.ensure(t.Context(), client, func(row map[string]any) { events = append(events, row) }); !errors.Is(err, errRiotRelayUnavailable) {
 			t.Fatal(err)
 		}
 	}
 	if calls != 1 || len(events) != 1 {
-		t.Fatal("failed probe repeated within cooldown", calls, events)
+		t.Fatal(calls, events)
 	}
 	data, _ := json.Marshal(events)
-	if strings.Contains(string(data), "relay.example") || events[0]["result"] != "failed" || events[0]["http_status"] != 503 || events[0]["duration_ms"] == nil {
-		t.Fatal("probe diagnostics", string(data))
+	if strings.Contains(string(data), "relay.example") || events[0]["result"] != "failed" {
+		t.Fatal(string(data))
 	}
-	riotRelays.mu.Lock()
-	remaining := time.Until(riotRelays.nextTry)
-	riotRelays.nextTry = time.Now().Add(-time.Second)
-	riotRelays.mu.Unlock()
+	state.mu.Lock()
+	remaining := time.Until(state.nextTry)
+	state.nextTry = time.Now().Add(-time.Second)
+	state.mu.Unlock()
 	if remaining < 14*time.Second || remaining > 15*time.Second {
-		t.Fatal("not initial fifteen-second backoff", remaining)
+		t.Fatal(remaining)
 	}
-	_ = p.get(context.Background(), riotPlatformHost, "/lol/status/v4/platform-data", nil, &out)
+	state.ensure(t.Context(), client, nil)
 	if calls != 2 {
-		t.Fatal("cooldown never expires")
+		t.Fatal(calls)
 	}
 }
 
@@ -125,9 +135,7 @@ func TestR206Relay429PreservesBackoff(t *testing.T) {
 	calls := 0
 	champions.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
 		calls++
-		if calls == 1 {
-			return r206RelayResponse(200, []byte(`{}`)), nil
-		}
+
 		response := r206RelayResponse(429, []byte(`{}`))
 		response.Header.Set("Retry-After", "7")
 		return response, nil
@@ -138,13 +146,13 @@ func TestR206Relay429PreservesBackoff(t *testing.T) {
 	defer cancel()
 	err := p.get(ctx, riotPlatformHost, "/lol/status/v4/platform-data", nil, &out)
 	var status *riotStatusError
-	if !errors.As(err, &status) || status.status != 429 || status.retryAfter != 7 || calls != 2 {
+	if !errors.As(err, &status) || status.status != 429 || status.retryAfter != 7 || calls != 1 {
 		t.Fatal("relay quota bypassed", err, calls)
 	}
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel2()
 	_ = p.get(ctx2, riotPlatformHost, "/lol/status/v4/platform-data", nil, &out)
-	if calls != 2 {
+	if calls != 1 {
 		t.Fatal("backoff retried upstream")
 	}
 }

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"sort"
 	"strconv"
@@ -158,13 +159,14 @@ type riotProvider struct {
 	rateHosts   map[string]*riotHostRate
 	rateFlights map[riotRateScope]int
 
-	cacheMu        sync.Mutex
-	matchCache     map[string]*riotMatch
-	matchOrder     []string
-	matchFlights   map[string]*riotMatchFlight
-	accountMu      sync.Mutex
-	accountCache   map[string]riotAccountCacheEntry
-	accountFlights map[string]*riotAccountFlight
+	cacheMu          sync.Mutex
+	matchCache       map[string]*riotMatch
+	matchOrder       []string
+	matchFlights     map[string]*riotMatchFlight
+	accountRefreshes sync.Map
+	accountMu        sync.Mutex
+	accountCache     map[string]riotAccountCacheEntry
+	accountFlights   map[string]*riotAccountFlight
 
 	specialistMu      sync.Mutex
 	specialistCache   map[string]specialistRuneCacheEntry
@@ -433,6 +435,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 	}
 	scope := riotRequestRateScope(host, requestPath)
 	ctx = context.WithValue(ctx, riotRateScopeKey{}, scope)
+	networkAttempts := 0
 	for attempt := 0; attempt < 3; attempt++ {
 		key, source := riotUserKeys.effective()
 		if source == "none" {
@@ -494,8 +497,14 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		}
 		p.beginRiotRateRequest(scope)
 		requestedAt := time.Now()
+		attemptContext, cancelAttempt := context.WithTimeout(ctx, 15*time.Second)
+		request = request.WithContext(attemptContext)
+		if source == "relay" {
+			request = request.WithContext(httptrace.WithClientTrace(request.Context(), &httptrace.ClientTrace{GotFirstResponseByte: func() { riotRelays.recordTTFB(time.Since(requestedAt)) }}))
+		}
 		response, err := client.Do(request)
 		if err != nil {
+			cancelAttempt()
 			p.observeRiotRate(scope, nil, 0)
 			if source == "relay" {
 				riotRelays.recordRequest("network", 0, riotRelayRequestCategory(requestPath), p.champions.diag)
@@ -505,6 +514,13 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			}
 			if source == "relay" && ctx.Err() == nil {
 				riotRelays.failed(relay)
+				networkAttempts++
+				if networkAttempts < 2 {
+					if delayErr := waitRiotDelay(ctx, 500*time.Millisecond); delayErr != nil {
+						return delayErr
+					}
+					continue
+				}
 				return fmt.Errorf("%w: %w", errRiotRelayUnavailable, err)
 			}
 			if source == "relay" {
@@ -521,6 +537,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		}
 		body, readErr := readLimited(response.Body, responseMax)
 		response.Body.Close()
+		cancelAttempt()
 		if isDetail {
 			tracker.detailInFlight(-1)
 		}
@@ -532,7 +549,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			case riotRelayQuotaResponse(response.Header, body):
 				failure = "quota_exhausted"
 			case readErr != nil:
-				failure = "read"
+				failure = "network"
 			case response.StatusCode == http.StatusOK && !json.Valid(body):
 				failure = "invalid_json"
 			case response.StatusCode == http.StatusNotFound:
@@ -561,6 +578,13 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 					return ctx.Err()
 				}
 				riotRelays.failed(relay)
+				networkAttempts++
+				if networkAttempts < 2 {
+					if delayErr := waitRiotDelay(ctx, 500*time.Millisecond); delayErr != nil {
+						return delayErr
+					}
+					continue
+				}
 				return errRiotRelayUnavailable
 			}
 			riotRelays.succeeded(relay)
@@ -759,6 +783,8 @@ type riotParticipant struct {
 	TripleKills                    *lenientInt       `json:"tripleKills"`
 	QuadraKills                    *lenientInt       `json:"quadraKills"`
 	PentaKills                     *lenientInt       `json:"pentaKills"`
+	TotalHeal                      *lenientInt       `json:"totalHeal"`
+	DamageDealtToTurrets           *lenientInt       `json:"damageDealtToTurrets"`
 	Challenges                     lenientChallenges `json:"challenges"`
 	VisionWardsBoughtInGame        *lenientInt       `json:"visionWardsBoughtInGame"`
 	GameEndedInEarlySurrender      bool              `json:"gameEndedInEarlySurrender"`
@@ -886,8 +912,15 @@ func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine st
 
 func (p *riotProvider) fetchAccountByRiotID(ctx context.Context, gameName, tagLine string) (riotAccount, error) {
 	var account riotAccount
+	identity := "account:" + strings.ToLower(gameName+"#"+tagLine)
+	diskHit := false
+	if p.identityDisk != nil {
+		if entry, err := p.identityDisk.readDisk(p.identityKey(identity)); err == nil && time.Now().Before(entry.ExpiresAt) {
+			diskHit = true
+		}
+	}
 	path := "/riot/account/v1/accounts/by-riot-id/" + url.PathEscape(gameName) + "/" + url.PathEscape(tagLine)
-	err := p.cachedPublicIdentity(ctx, "account:"+strings.ToLower(gameName+"#"+tagLine), 15*time.Minute, &account, func(ctx context.Context) error {
+	err := p.cachedPublicIdentity(ctx, "account:"+strings.ToLower(gameName+"#"+tagLine), 24*time.Hour, &account, func(ctx context.Context) error {
 		if err := p.get(ctx, p.accountHost(), path, nil, &account); err != nil {
 			return err
 		}
@@ -896,6 +929,9 @@ func (p *riotProvider) fetchAccountByRiotID(ctx context.Context, gameName, tagLi
 		}
 		return nil
 	})
+	if err == nil && diskHit {
+		p.refreshPersistedAccount(identity, path)
+	}
 	return account, err
 }
 
@@ -1373,6 +1409,13 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 			TripleKills:                    historyIntValue(raw.TripleKills),
 			QuadraKills:                    historyIntValue(raw.QuadraKills),
 			PentaKills:                     historyIntValue(raw.PentaKills),
+			TotalHeal:                      historyIntValue(raw.TotalHeal),
+			DamageDealtToTurrets:           historyIntValue(raw.DamageDealtToTurrets),
+			SoloKills:                      historyIntValue(raw.Challenges.SoloKills),
+			KnockEnemyIntoTeamAndKill:      historyIntValue(raw.Challenges.KnockEnemyIntoTeamAndKill),
+			KillsNearEnemyTurret:           historyIntValue(raw.Challenges.KillsNearEnemyTurret),
+			KillsUnderOwnTurret:            historyIntValue(raw.Challenges.KillsUnderOwnTurret),
+			MaxCsAdvantageOnLaneOpponent:   historyIntValue(raw.Challenges.MaxCsAdvantageOnLaneOpponent),
 			DragonTakedowns:                historyIntValue(raw.Challenges.DragonTakedowns), BaronTakedowns: historyIntValue(raw.Challenges.BaronTakedowns), RiftHeraldTakedowns: historyIntValue(raw.Challenges.RiftHeraldTakedowns),
 			SubteamID: raw.PlayerSubteamID, Placement: raw.SubteamPlacement, AugmentIDs: augments, reference: reference,
 		}
@@ -1416,6 +1459,7 @@ func convertRiotMatchInfo(info *riotMatchInfo, subjectPUUID string, names map[in
 		result.Teams = append(result.Teams, team)
 	}
 	sort.Slice(result.Teams, func(i, j int) bool { return result.Teams[i].TeamID < result.Teams[j].TeamID })
+	applyArenaResults(&result)
 	applyMatchScores(&result)
 	return result
 }

@@ -251,7 +251,7 @@
     const participants = arenaChampionPool.map(([championId, championName], index) => {
       const subteamId = Math.floor(index / 3) + 1;
       const placement = placements[subteamId - 1];
-      const win = placement <= 4;
+      const win = placement <= Math.ceil(placements.length / 2);
       const { primaryStyleId, subStyleId, perkIds, ...arenaParticipant } = participant(index + 1, index < 12 ? 100 : 200, championId, championName, 3 + (index % 9), 2 + (index % 6), 5 + (index % 8), win);
       return {
         ...arenaParticipant,

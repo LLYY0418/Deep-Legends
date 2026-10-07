@@ -42,6 +42,12 @@ func historyIntValue(v *lenientInt) *int {
 func historyInt(integer int) *lenientInt { return &lenientInt{value: &integer} }
 
 type lenientChallenges struct {
+	SoloKills                    *lenientInt `json:"soloKills"`
+	KnockEnemyIntoTeamAndKill    *lenientInt `json:"knockEnemyIntoTeamAndKill"`
+	KillsNearEnemyTurret         *lenientInt `json:"killsNearEnemyTurret"`
+	KillsUnderOwnTurret          *lenientInt `json:"killsUnderOwnTurret"`
+	MaxCsAdvantageOnLaneOpponent *lenientInt `json:"maxCsAdvantageOnLaneOpponent"`
+
 	DragonTakedowns     *lenientInt `json:"dragonTakedowns"`
 	BaronTakedowns      *lenientInt `json:"baronTakedowns"`
 	RiftHeraldTakedowns *lenientInt `json:"riftHeraldTakedowns"`

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -8,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -25,7 +27,8 @@ const (
 	aramkitRatingFailureTTL    = 5 * time.Minute
 	aramkitRatingRequestDelay  = 300 * time.Millisecond
 	aramkitRatingRequestJitter = 100 * time.Millisecond
-	aramkitRatingTimeout       = 9 * time.Second
+	aramkitRatingTimeout       = 10 * time.Second
+	aramkitRatingBodyTimeout   = 25 * time.Second
 	aramkitDiagnosticDomain    = "aramkit-rating-player-v1"
 )
 
@@ -105,6 +108,8 @@ type mayhemRatingResponse struct {
 }
 
 type aramkitRatingOutcome struct {
+	ttfb       time.Duration
+	bytes      int
 	response   mayhemRatingResponse
 	code       int
 	httpStatus int
@@ -137,6 +142,7 @@ type aramkitRatingClient struct {
 	sleep         func(context.Context, time.Duration) error
 	jitter        func(time.Duration) time.Duration
 	baseURL       string
+	bodyTimeout   time.Duration
 	timeout       time.Duration
 	minimumDelay  time.Duration
 	maximumJitter time.Duration
@@ -155,6 +161,7 @@ func newAramkitRatingClient(provider *championProvider, observe func(map[string]
 		jitter:        aramkitRandomJitter,
 		baseURL:       "https://" + aramkitRatingHost,
 		timeout:       aramkitRatingTimeout,
+		bodyTimeout:   aramkitRatingBodyTimeout,
 		minimumDelay:  aramkitRatingRequestDelay,
 		maximumJitter: aramkitRatingRequestJitter,
 	}
@@ -235,7 +242,7 @@ func (c *aramkitRatingClient) lookup(ctx context.Context, gameName, tagLine stri
 
 	outcome := c.fetch(ctx, gameName, tagLine)
 	flight.outcome = outcome
-	ttl := 30 * time.Second
+	ttl := time.Duration(0)
 	if outcome.response.UnavailableReason == "未收录" {
 		ttl = aramkitRatingFailureTTL
 	}
@@ -245,7 +252,9 @@ func (c *aramkitRatingClient) lookup(ctx context.Context, gameName, tagLine stri
 	c.mu.Lock()
 	delete(c.flights, key)
 	c.pruneCacheLocked(c.now())
-	c.cache[key] = aramkitRatingCacheEntry{outcome: outcome, expiresAt: c.now().Add(ttl)}
+	if ttl > 0 {
+		c.cache[key] = aramkitRatingCacheEntry{outcome: outcome, expiresAt: c.now().Add(ttl)}
+	}
 	close(flight.done)
 	c.mu.Unlock()
 	c.record(key, false, false, c.now().Sub(started), outcome)
@@ -285,16 +294,21 @@ func (c *aramkitRatingClient) waitForPace(ctx context.Context) error {
 }
 
 func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine string) aramkitRatingOutcome {
+	var ttfb time.Duration
+	var received bytes.Buffer
+	started := time.Now()
 	failed := func(reason, message string, code, status int) aramkitRatingOutcome {
 		response := unavailableMayhemRating(message, dataSourceFailed)
 		response.FetchedAt = c.now().UTC()
-		return aramkitRatingOutcome{response: response, code: code, httpStatus: status, result: "unavailable", reason: reason}
+		return aramkitRatingOutcome{response: response, code: code, httpStatus: status, result: "unavailable", reason: reason, ttfb: ttfb, bytes: received.Len()}
 	}
 	if err := c.waitForPace(ctx); err != nil {
 		return failed("cancelled", "查询已取消", 0, 0)
 	}
-	requestContext, cancel := context.WithTimeout(ctx, c.timeout)
+	requestContext, cancel := context.WithCancel(ctx)
 	defer cancel()
+	timer := time.AfterFunc(c.timeout, cancel)
+	defer timer.Stop()
 	endpoint, err := url.Parse(c.baseURL)
 	if err != nil {
 		return failed("invalid-endpoint", "暂不可用", 0, 0)
@@ -315,17 +329,26 @@ func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine strin
 		baseClient = http.DefaultClient
 	}
 	client := *baseClient
-	client.Timeout = c.timeout
+	client.Timeout = 0
 	response, err := client.Do(request)
 	if err != nil {
 		reason := "network"
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(requestContext.Err(), context.DeadlineExceeded) {
+		if errors.Is(err, context.DeadlineExceeded) || requestContext.Err() != nil && ctx.Err() == nil {
 			reason = "timeout"
 		}
 		return failed(reason, "暂不可用", 0, 0)
 	}
 	defer response.Body.Close()
-	data, readErr := readLimited(response.Body, aramkitRatingResponseMax)
+	ttfb = time.Since(started)
+	if !timer.Stop() {
+		return failed("timeout", "暂不可用", 0, response.StatusCode)
+	}
+	bodyTimeout := c.bodyTimeout
+	if bodyTimeout <= 0 {
+		bodyTimeout = aramkitRatingBodyTimeout
+	}
+	timer.Reset(bodyTimeout)
+	data, readErr := readLimited(io.TeeReader(response.Body, &received), aramkitRatingResponseMax)
 	if readErr != nil {
 		return failed("response-read", "暂不可用", 0, response.StatusCode)
 	}
@@ -360,7 +383,7 @@ func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine strin
 			AverageRating: match.AverageRating, BlueAverage: match.BlueAverage, RedAverage: match.RedAverage,
 		})
 	}
-	return aramkitRatingOutcome{response: result, code: envelope.Code, httpStatus: response.StatusCode, result: "success"}
+	return aramkitRatingOutcome{response: result, code: envelope.Code, httpStatus: response.StatusCode, result: "success", ttfb: ttfb, bytes: received.Len()}
 }
 
 func unavailableMayhemRating(message, outcome string) mayhemRatingResponse {
@@ -381,6 +404,7 @@ func (c *aramkitRatingClient) record(key string, cacheHit, coalesced bool, durat
 	c.observe(map[string]any{
 		"event": "mayhem_rating_lookup", "source": dataSourceARAMKit, "player_hash": identity,
 		"cache_hit": cacheHit, "coalesced": coalesced, "duration_ms": duration.Milliseconds(),
+		"ttfb_ms": outcome.ttfb.Milliseconds(), "bytes": outcome.bytes,
 		"code": outcome.code, "http_status": outcome.httpStatus, "result": outcome.result, "reason": outcome.reason,
 	})
 }
