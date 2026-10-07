@@ -1,0 +1,42 @@
+{
+  "version": "0.12.75",
+  "fingerprint": "213c1bf832b3",
+  "license_build": "STAGING",
+  "key_mode": "public",
+  "window_title": "Deep Legends-STAGING",
+  "license_origin": "https://license-staging.yinxiaobia.net",
+  "license_kid": "staging-2026-10",
+  "online_updates": "disabled at build time; no production Latest or cache",
+  "directory": "/Users/ly/personal/personal-work/deep-legends/dist/R239-staging-public/Deep-Legends-staging-public",
+  "setup": "/Users/ly/personal/personal-work/deep-legends/dist/R239-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe",
+  "setup_sha256": "374b496b058effafb29a03c7d8baaaeb9f83d3893efd58d41d58f54c1f9ec40d",
+  "backend_sha256": "9fcc4b141ab7f8c5e5129e167b59fa70fdff2cc025191009b067141193af5163",
+  "archive_sha256": "a274fa8a588b41c4d636bfe062b4999b3209bf3409df0ceac30f6a0a5bece838",
+  "scope": "Read-only macOS static audit of actual Windows public artifacts; Windows execution pending",
+  "packaged_version": "0.12.75",
+  "setup_bytes": 111429120,
+  "backend_bytes": 32482304,
+  "license_origin_and_kid_and_key_match": true,
+  "finalized_privacy_embedded": true,
+  "r239_css_and_window_module_embedded": true,
+  "test_fixtures_and_known_private_material_absent": true,
+  "personal_riot_key_absent": true,
+  "fixed_backend_digest_matches": true,
+  "fuses": {
+    "RunAsNode": false,
+    "EnableNodeOptionsEnvironmentVariable": false,
+    "EnableNodeCliInspectArguments": false,
+    "EnableEmbeddedAsarIntegrityValidation": true,
+    "OnlyLoadAppFromAsar": true
+  },
+  "asar_integrity": [
+    {
+      "file": "resources\\app.asar",
+      "alg": "SHA256",
+      "value": "5f3ab730024f721e66f748130a8c44399fccaff6e4d86f91287ff2fb558cb1e9"
+    }
+  ],
+  "staging_rejected_by_release_checker": true,
+  "release_staging_material_absent": true,
+  "release_backend_sha256": "ee530eba60c41e8c4e82d128bbfd2d48a037ddba0b7a63cbda806e14846450d4"
+}

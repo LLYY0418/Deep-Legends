@@ -1,0 +1,18 @@
+{
+  "name": "go-race",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-race",
+    "./backend"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started": "2026-10-07T16:35:33.191466+08:00",
+  "finished": "2026-10-07T16:39:22.807495+08:00",
+  "duration_s": 229.614,
+  "exit_code": 0,
+  "last5": [
+    "ok  \tlol-loot-assistant/backend\t228.117s"
+  ]
+}

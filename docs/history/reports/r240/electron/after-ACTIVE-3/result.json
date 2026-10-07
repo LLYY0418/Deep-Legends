@@ -1,0 +1,573 @@
+{
+  "phase": "after",
+  "state": "ACTIVE",
+  "index": 3,
+  "shows": [
+    {
+      "number": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "content": {
+        "state": "active",
+        "overlayHidden": true,
+        "frameHidden": false,
+        "formVisible": false,
+        "icon": {
+          "x": 741,
+          "y": 360.5,
+          "width": 64,
+          "height": 64
+        }
+      },
+      "activationIconGoldPixels": 0,
+      "captureInvokedAtShow": true
+    }
+  ],
+  "samples": [
+    {
+      "at": 1791310923122,
+      "visible": false,
+      "opacity": 0,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923135,
+      "visible": false,
+      "opacity": 0,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923152,
+      "visible": false,
+      "opacity": 0,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923180,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923191,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923199,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923209,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923222,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923232,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923241,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923250,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923258,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923266,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923276,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923286,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923381,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923390,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923399,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923409,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923418,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923428,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923436,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923447,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923457,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923467,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923478,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923487,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923497,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923506,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923514,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310923523,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    }
+  ],
+  "platform": "darwin",
+  "diagnostics": [
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "backend_ready",
+        "elapsedMs": 413
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_created",
+        "elapsedMs": 446
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_did_finish_load",
+        "elapsedMs": 625
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "blocking_state_client",
+        "reason": "show",
+        "source": "startup",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_ready_to_show",
+        "elapsedMs": 626
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 7,
+        "httpStatus": 200,
+        "endpoint": "champions",
+        "startedAt": 1791310923113,
+        "completedAt": 1791310923120,
+        "errorKind": "none",
+        "responseBytes": 2,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 6,
+        "httpStatus": 200,
+        "endpoint": "status",
+        "startedAt": 1791310923114,
+        "completedAt": 1791310923120,
+        "errorKind": "none",
+        "responseBytes": 38,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "live_scope_reset",
+        "reason": "disconnect",
+        "source": "",
+        "previousGameId": 0,
+        "gameId": 0,
+        "previousPhase": "",
+        "phase": "",
+        "clearedRecommendations": 0
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 30,
+        "httpStatus": 200,
+        "endpoint": "other",
+        "startedAt": 1791310923121,
+        "completedAt": 1791310923151,
+        "errorKind": "none",
+        "responseBytes": 2,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "license_window_state",
+        "reason": "transition",
+        "licenseWindow": {
+          "fromState": "PENDING",
+          "toState": "ACTIVE",
+          "wasMaximized": false,
+          "wasFullscreen": false,
+          "displayScale": 2,
+          "retried": false,
+          "waitTimedOut": false,
+          "renderTimedOut": false,
+          "renderMismatch": false,
+          "sizeMismatch": false,
+          "requestedContent": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "actualContent": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "elapsedMs": 209
+        }
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup",
+      "value": {
+        "processToJs": 139,
+        "jsToReady": 75,
+        "readyToSplash": 99,
+        "splashPaint": 167,
+        "splashWindowShown": 461,
+        "spawnToReady": 71,
+        "readyToWindow": 280,
+        "total": 832
+      }
+    }
+  ],
+  "phases": {
+    "processToJs": 139,
+    "jsToReady": 75,
+    "readyToSplash": 99,
+    "splashPaint": 167,
+    "splashWindowShown": 461,
+    "spawnToReady": 71,
+    "readyToWindow": 280,
+    "total": 832
+  }
+}

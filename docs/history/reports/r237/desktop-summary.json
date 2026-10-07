@@ -1,0 +1,10 @@
+{
+  "counts": {
+    "tests": 295,
+    "pass": 293,
+    "fail": 0,
+    "skipped": 2
+  },
+  "dirty_collection_rescans": "passed",
+  "conditional_three_isolated_runs": "not triggered; neither Node suite failed this case"
+}

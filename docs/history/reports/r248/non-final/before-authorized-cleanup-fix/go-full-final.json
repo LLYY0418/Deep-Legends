@@ -1,0 +1,21 @@
+{
+  "name": "go-full",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "./backend"
+  ],
+  "cwd": "/private/tmp/r248-checked-source-r147th5m",
+  "start": "2026-10-07T18:20:12.405034+08:00",
+  "end": "2026-10-07T18:23:40.067342+08:00",
+  "elapsed_seconds": 207.662,
+  "exit_code": 1,
+  "last_five": [
+    "2026/10/07 18:21:39 {\"event\":\"backend_panic\",\"frames\":[\"main.reportBackendPanic\",\"main.(*app).recordRecoveredPanic\",\"main.(*app).recoverPanic\",\"main.TestR203SkinDetailsPanicDoesNotReturnFalseSuccess.func1\",\"main.gameplayRoundTripFunc.RoundTrip\",\"main.(*LCUClient).getBytes\",\"main.(*LCUClient).GetBytesContext\",\"main.StoreAPI.SkinPriceContext\"],\"panic_kind\":\"other\",\"site\":\"main.handleSkinDetails.1\"}",
+    "2026/10/07 18:21:39 {\"event\":\"backend_panic\",\"frames\":[\"main.reportBackendPanic\",\"main.(*app).recordRecoveredPanic\",\"main.(*app).recoverPanic\",\"main.TestR203FacadePanicReleasesWaitersAndAllowsRetry.func1\",\"main.(*app).cachedFacadeState.func1\"],\"panic_kind\":\"other\",\"site\":\"facade_view_cache.cachedFacadeState.1\"}",
+    "FAIL",
+    "FAIL\tlol-loot-assistant/backend\t175.728s",
+    "FAIL"
+  ]
+}

@@ -1,0 +1,370 @@
+{
+  "phase": "after",
+  "state": "LOCKED",
+  "index": 3,
+  "shows": [
+    {
+      "number": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "content": {
+        "state": "locked",
+        "overlayHidden": false,
+        "frameHidden": true,
+        "formVisible": true,
+        "icon": {
+          "x": 398,
+          "y": 171,
+          "width": 64,
+          "height": 64
+        }
+      },
+      "activationIconGoldPixels": 642,
+      "captureInvokedAtShow": true
+    }
+  ],
+  "samples": [
+    {
+      "at": 1791310931288,
+      "visible": false,
+      "opacity": 0,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931296,
+      "visible": false,
+      "opacity": 0,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931304,
+      "visible": false,
+      "opacity": 0,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931364,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931372,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931404,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931414,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931423,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931434,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931443,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931452,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931461,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931472,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931479,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931489,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931499,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931507,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931517,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931528,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931537,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791310931547,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410,
+        "y": 250,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    }
+  ],
+  "platform": "darwin",
+  "diagnostics": [
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "backend_ready",
+        "elapsedMs": 349
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_created",
+        "elapsedMs": 380
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_did_finish_load",
+        "elapsedMs": 494
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_ready_to_show",
+        "elapsedMs": 495
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "license_window_state",
+        "reason": "transition",
+        "licenseWindow": {
+          "fromState": "PENDING",
+          "toState": "LOCKED",
+          "wasMaximized": false,
+          "wasFullscreen": false,
+          "displayScale": 2,
+          "retried": false,
+          "waitTimedOut": false,
+          "renderTimedOut": false,
+          "renderMismatch": false,
+          "sizeMismatch": false,
+          "requestedContent": {
+            "width": 860,
+            "height": 580,
+            "x": 410,
+            "y": 250
+          },
+          "actualContent": {
+            "x": 410,
+            "y": 250,
+            "width": 860,
+            "height": 580
+          },
+          "elapsedMs": 131
+        }
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup",
+      "value": {
+        "processToJs": 172,
+        "jsToReady": 62,
+        "readyToSplash": 97,
+        "splashPaint": 143,
+        "splashWindowShown": 455,
+        "spawnToReady": 46,
+        "readyToWindow": 229,
+        "total": 750
+      }
+    }
+  ],
+  "phases": {
+    "processToJs": 172,
+    "jsToReady": 62,
+    "readyToSplash": 97,
+    "splashPaint": 143,
+    "splashWindowShown": 455,
+    "spawnToReady": 46,
+    "readyToWindow": 229,
+    "total": 750
+  }
+}

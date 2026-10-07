@@ -1,0 +1,4666 @@
+{
+  "phase": "baseline-fractional",
+  "state": "ACTIVE",
+  "expectedState": "ACTIVE",
+  "index": 1,
+  "shows": [
+    {
+      "number": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "content": {
+        "state": "active",
+        "overlayHidden": true,
+        "frameHidden": false,
+        "formVisible": false,
+        "icon": {
+          "x": 741.2000122070312,
+          "y": 360.6000061035156,
+          "width": 64,
+          "height": 64
+        }
+      },
+      "activationIconGoldPixels": 0,
+      "captureInvokedAtShow": true
+    }
+  ],
+  "samples": [
+    {
+      "at": 1791359683326,
+      "visible": false,
+      "opacity": 0,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683336,
+      "visible": false,
+      "opacity": 0,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683346,
+      "visible": false,
+      "opacity": 0,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683459,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683515,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683524,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683532,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683542,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683552,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683562,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683572,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683583,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683591,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683602,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359683612,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684123,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90,
+        "y": 60,
+        "width": 1201,
+        "height": 781
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684131,
+      "visible": true,
+      "opacity": 0,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684145,
+      "visible": true,
+      "opacity": 0,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684154,
+      "visible": true,
+      "opacity": 0,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684164,
+      "visible": true,
+      "opacity": 0,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684174,
+      "visible": true,
+      "opacity": 0,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684184,
+      "visible": true,
+      "opacity": 0,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684192,
+      "visible": true,
+      "opacity": 0,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684201,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684211,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684222,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684232,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684242,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684252,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684262,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684272,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684283,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684293,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684303,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684313,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684323,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684334,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684342,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684353,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684361,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684372,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684382,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684392,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684402,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684412,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684422,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684432,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684442,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684452,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684463,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684471,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684482,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684490,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684501,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684511,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684521,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684531,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684541,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684551,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684562,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684570,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684581,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684591,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684601,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684611,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684621,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684631,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684646,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684657,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684675,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684684,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684692,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684703,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684713,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684723,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684733,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684743,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684753,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684763,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684773,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684784,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684792,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684803,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684813,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684823,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684833,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684842,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684852,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684860,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684871,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684881,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684890,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684900,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684908,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684918,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684927,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684936,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684946,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684956,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684965,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684973,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684983,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359684994,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685002,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685012,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685022,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685031,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685040,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685049,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685059,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685069,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685078,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685088,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685097,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685106,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685117,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685125,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685135,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685145,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685155,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685164,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685173,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685183,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685194,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685202,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685211,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685222,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685232,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685242,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685252,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685262,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685273,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685282,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685290,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685301,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685308,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685317,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685328,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685335,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685344,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685354,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685364,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685373,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685383,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685390,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685401,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685410,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685419,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685427,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685434,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685444,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685453,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685461,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685472,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685481,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685490,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685500,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685510,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685519,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685529,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685538,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685547,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685556,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685565,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685575,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685582,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685590,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685599,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685609,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685619,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685628,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685636,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685646,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685655,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685665,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685675,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685684,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685693,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685703,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685712,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685721,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685730,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685738,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685748,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685756,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685767,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685776,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685785,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685794,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685802,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685812,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685821,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685831,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685839,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685848,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685857,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685865,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685876,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685886,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685896,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685905,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685916,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685924,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685932,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685940,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 410.4,
+        "y": 250.4,
+        "width": 860,
+        "height": 580
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359685949,
+      "visible": true,
+      "opacity": 0,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686455,
+      "visible": true,
+      "opacity": 0,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686463,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686473,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686484,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686493,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686503,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686513,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686523,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686533,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686543,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686554,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686562,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686573,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686583,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686593,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686603,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686614,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686624,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686634,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686644,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686653,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686663,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686673,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686683,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686694,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686703,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686711,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686720,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686728,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686739,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686747,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686758,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686766,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686776,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686786,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686795,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686804,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686813,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686822,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686831,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686840,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686851,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686861,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686871,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686881,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686891,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686900,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686910,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686920,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686929,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686939,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686949,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686958,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686968,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686977,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686987,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359686996,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687006,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687016,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687025,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687034,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687042,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687052,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687060,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687071,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687081,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687091,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687101,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687109,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687117,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687126,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687136,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687144,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687153,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687162,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687173,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687183,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687192,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687202,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687211,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687219,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687229,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687240,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687250,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687260,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687270,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687280,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687291,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687300,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687309,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687319,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687329,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687340,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687348,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687357,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687365,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687375,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687385,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687395,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687404,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687415,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687424,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687434,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687444,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687454,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687464,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687472,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687481,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687491,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687499,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687508,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687517,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687527,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687536,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687546,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687555,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687564,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687574,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687584,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687593,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687603,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687612,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687621,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687629,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687638,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687648,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687658,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687668,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687678,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687688,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687698,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687708,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687718,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687727,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687737,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687746,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687756,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791359687767,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90.4,
+        "y": 60,
+        "width": 1200.8,
+        "height": 780.8
+      },
+      "maximized": false
+    }
+  ],
+  "platform": "darwin",
+  "nativeCalls": [
+    {
+      "name": "setMinimumSize",
+      "args": [
+        780,
+        600
+      ]
+    },
+    {
+      "name": "setBounds",
+      "args": [
+        {
+          "x": 90,
+          "y": 60,
+          "width": 1201,
+          "height": 781
+        }
+      ]
+    },
+    {
+      "name": "setMinimumSize",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "setContentBounds",
+      "args": [
+        {
+          "width": 860,
+          "height": 580,
+          "x": 410,
+          "y": 250
+        }
+      ]
+    },
+    {
+      "name": "setMinimumSize",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "setMinimumSize",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "setMinimumSize",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "setMinimumSize",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "setMinimumSize",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "setMinimumSize",
+      "args": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "setBounds",
+      "args": [
+        {
+          "x": 90.4,
+          "y": 60,
+          "width": 1200.8,
+          "height": 780.8
+        }
+      ]
+    },
+    {
+      "name": "setMinimumSize",
+      "args": [
+        780,
+        600
+      ]
+    }
+  ],
+  "scale": {
+    "requested": 1.25,
+    "screen": 1.25,
+    "dpr": 1.25,
+    "method": "--force-device-scale-factor"
+  },
+  "fractionalRead": true,
+  "beforeLock": {
+    "bounds": {
+      "x": 90.4,
+      "y": 60,
+      "width": 1200.8,
+      "height": 780.8
+    },
+    "normal": {
+      "x": 90.4,
+      "y": 60,
+      "width": 1200.8,
+      "height": 780.8
+    },
+    "maximized": false
+  },
+  "locked": {
+    "bounds": {
+      "x": 410.4,
+      "y": 250.4,
+      "width": 860,
+      "height": 580
+    },
+    "maximized": false,
+    "minimized": false,
+    "content": {
+      "state": "locked",
+      "overlayHidden": false,
+      "frameHidden": true,
+      "formVisible": true,
+      "icon": {
+        "x": 398,
+        "y": 171,
+        "width": 64,
+        "height": 64
+      }
+    }
+  },
+  "restored": {
+    "bounds": {
+      "x": 90.4,
+      "y": 60,
+      "width": 1200.8,
+      "height": 780.8
+    },
+    "normal": {
+      "x": 90.4,
+      "y": 60,
+      "width": 1200.8,
+      "height": 780.8
+    },
+    "maximized": false,
+    "content": {
+      "state": "active",
+      "overlayHidden": true,
+      "frameHidden": false,
+      "formVisible": false,
+      "icon": {
+        "x": 568.7999877929688,
+        "y": 271.8000183105469,
+        "width": 64,
+        "height": 64
+      }
+    },
+    "opacity": 1
+  },
+  "saved": {
+    "width": 1201,
+    "height": 781,
+    "x": 90,
+    "y": 60,
+    "maximized": false
+  },
+  "diagnostics": [
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "backend_ready",
+        "elapsedMs": 260
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_created",
+        "elapsedMs": 284
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_did_finish_load",
+        "elapsedMs": 407
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_ready_to_show",
+        "elapsedMs": 407
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "blocking_state_client",
+        "reason": "show",
+        "source": "startup",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 6,
+        "httpStatus": 200,
+        "endpoint": "other",
+        "startedAt": 1791359683315,
+        "completedAt": 1791359683321,
+        "errorKind": "none",
+        "responseBytes": 76,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 1,
+        "httpStatus": 200,
+        "endpoint": "champions",
+        "startedAt": 1791359683320,
+        "completedAt": 1791359683321,
+        "errorKind": "none",
+        "responseBytes": 2,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 1,
+        "httpStatus": 200,
+        "endpoint": "status",
+        "startedAt": 1791359683321,
+        "completedAt": 1791359683322,
+        "errorKind": "none",
+        "responseBytes": 38,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "live_scope_reset",
+        "reason": "disconnect",
+        "source": "",
+        "previousGameId": 0,
+        "gameId": 0,
+        "previousPhase": "",
+        "phase": "",
+        "clearedRecommendations": 0
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "license_window_state",
+        "reason": "transition",
+        "licenseWindow": {
+          "fromState": "PENDING",
+          "toState": "ACTIVE",
+          "wasMaximized": false,
+          "wasFullscreen": false,
+          "displayScale": 1.25,
+          "statusReadMs": 12,
+          "retried": false,
+          "waitTimedOut": false,
+          "renderTimedOut": false,
+          "renderMismatch": false,
+          "sizeMismatch": false,
+          "fallback_used": false,
+          "requestedContent": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "nativeMs": 1,
+          "renderMs": 142,
+          "actualContent": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "elapsedMs": 143
+        }
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup",
+      "value": {
+        "processToJs": 112,
+        "jsToReady": 46,
+        "readyToSplash": 78,
+        "splashPaint": 99,
+        "splashWindowShown": 334,
+        "spawnToReady": 37,
+        "readyToWindow": 286,
+        "total": 658
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 5,
+        "httpStatus": 200,
+        "endpoint": "other",
+        "startedAt": 1791359684158,
+        "completedAt": 1791359684163,
+        "errorKind": "none",
+        "responseBytes": 65,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "license_window_state",
+        "reason": "transition",
+        "licenseWindow": {
+          "fromState": "ACTIVE",
+          "toState": "REVOKED",
+          "wasMaximized": false,
+          "wasFullscreen": false,
+          "displayScale": 1.25,
+          "statusReadMs": 0,
+          "retried": false,
+          "waitTimedOut": false,
+          "renderTimedOut": false,
+          "renderMismatch": false,
+          "sizeMismatch": false,
+          "fallback_used": false,
+          "requestedContent": {
+            "width": 860,
+            "height": 580,
+            "x": 410,
+            "y": 250
+          },
+          "nativeMs": 2,
+          "renderMs": 62,
+          "actualContent": {
+            "x": 410.4,
+            "y": 250.4,
+            "width": 860,
+            "height": 580
+          },
+          "elapsedMs": 64
+        }
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "blocking_state_client",
+        "reason": "show",
+        "source": "startup",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 1,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "license_window_state",
+        "reason": "transition",
+        "licenseWindow": {
+          "fromState": "REVOKED",
+          "toState": "ACTIVE",
+          "wasMaximized": false,
+          "wasFullscreen": false,
+          "displayScale": 1.25,
+          "statusReadMs": 1,
+          "retried": false,
+          "waitTimedOut": false,
+          "renderTimedOut": false,
+          "renderMismatch": false,
+          "sizeMismatch": false,
+          "fallback_used": false,
+          "requestedContent": {
+            "x": 90.4,
+            "y": 60,
+            "width": 1200.8,
+            "height": 780.8
+          },
+          "nativeMs": 4,
+          "renderMs": 511,
+          "actualContent": {
+            "x": 90.4,
+            "y": 60,
+            "width": 1200.8,
+            "height": 780.8
+          },
+          "elapsedMs": 515
+        }
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 517,
+        "httpStatus": 200,
+        "endpoint": "champions",
+        "startedAt": 1791359685942,
+        "completedAt": 1791359686459,
+        "errorKind": "none",
+        "responseBytes": 2,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 1,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 521,
+        "httpStatus": 200,
+        "endpoint": "status",
+        "startedAt": 1791359685943,
+        "completedAt": 1791359686464,
+        "errorKind": "none",
+        "responseBytes": 38,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 1,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "live_scope_reset",
+        "reason": "disconnect",
+        "source": "",
+        "previousGameId": 0,
+        "gameId": 0,
+        "previousPhase": "",
+        "phase": "",
+        "clearedRecommendations": 0
+      }
+    }
+  ],
+  "phases": {
+    "processToJs": 112,
+    "jsToReady": 46,
+    "readyToSplash": 78,
+    "splashPaint": 99,
+    "splashWindowShown": 334,
+    "spawnToReady": 37,
+    "readyToWindow": 286,
+    "total": 658
+  }
+}

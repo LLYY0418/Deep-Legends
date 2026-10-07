@@ -1,0 +1,18 @@
+{
+  "command": [
+    "node",
+    "--test"
+  ],
+  "cwd": "desktop",
+  "started": "2026-10-07T14:29:31.140909+08:00",
+  "finished": "2026-10-07T14:33:11.533674+08:00",
+  "elapsed_seconds": 220.391,
+  "exit_code": 1,
+  "last_5_lines": [
+    "  'Promise resolution is still pending but the event loop has already resolved'",
+    "",
+    "test at ui-scale.test.cjs:1:1",
+    "✖ ui-scale.test.cjs (289.121791ms)",
+    "  'test failed'"
+  ]
+}

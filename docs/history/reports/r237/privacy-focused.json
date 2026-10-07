@@ -1,0 +1,24 @@
+{
+  "name": "privacy-focused",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-run",
+    "TestR237LicensePrivacyDisclosureFinal",
+    "./backend",
+    "-v"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started_at": "2026-10-06T23:59:28+08:00",
+  "finished_at": "2026-10-06T23:59:39+08:00",
+  "duration_seconds": 11.286,
+  "exit_code": 0,
+  "last_5_lines": [
+    "--- PASS: TestR237LicensePrivacyDisclosureFinal (0.00s)",
+    "    --- PASS: TestR237LicensePrivacyDisclosureFinal/licenseDisclosure (0.00s)",
+    "    --- PASS: TestR237LicensePrivacyDisclosureFinal/installer (0.00s)",
+    "PASS",
+    "ok  \tlol-loot-assistant/backend\t0.741s"
+  ]
+}

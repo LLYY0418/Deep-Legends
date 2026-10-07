@@ -1,0 +1,19 @@
+{
+  "command": [
+    "node",
+    "scripts/test-renderers.cjs",
+    "all"
+  ],
+  "cwd": ".",
+  "started": "2026-10-07T12:54:33.871956+08:00",
+  "finished": "2026-10-07T12:56:09.327185+08:00",
+  "elapsed_seconds": 95.454,
+  "exit_code": 0,
+  "last_5_lines": [
+    "    },",
+    "    \"duration_ms\": 95397.089416",
+    "  },",
+    "  \"success\": true",
+    "}"
+  ]
+}

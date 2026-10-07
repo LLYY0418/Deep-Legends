@@ -1,0 +1,25 @@
+{
+  "name": "r206-race-three",
+  "command": [
+    "go",
+    "test",
+    "-count=3",
+    "-race",
+    "-run",
+    "^TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds$",
+    "./backend",
+    "-v"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started_at": "2026-10-07T00:12:37+08:00",
+  "finished_at": "2026-10-07T00:12:49+08:00",
+  "duration_seconds": 11.959,
+  "exit_code": 0,
+  "last_5_lines": [
+    "=== PAUSE TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds",
+    "=== CONT  TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds",
+    "--- PASS: TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds (2.88s)",
+    "PASS",
+    "ok  \tlol-loot-assistant/backend\t10.376s"
+  ]
+}

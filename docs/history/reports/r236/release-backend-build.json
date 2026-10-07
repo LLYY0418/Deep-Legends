@@ -1,0 +1,25 @@
+{
+  "name": "release-backend-build",
+  "command": [
+    "env",
+    "GOOS=windows",
+    "GOARCH=amd64",
+    "CGO_ENABLED=0",
+    "go",
+    "build",
+    "-tags=",
+    "-buildvcs=false",
+    "-trimpath",
+    "-ldflags",
+    "-s -w -H=windowsgui -buildid= -X main.version=0.12.75 -X main.riotAPIKey= -X main.riotAPIKeyCipher=",
+    "-o",
+    "/private/tmp/r236-backend-public.exe",
+    "./backend"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started_at": "2026-10-06T23:20:28+08:00",
+  "finished_at": "2026-10-06T23:20:55+08:00",
+  "duration_seconds": 26.706,
+  "exit_code": 0,
+  "last_5_lines": []
+}

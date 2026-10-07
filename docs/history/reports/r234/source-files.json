@@ -1,0 +1,47 @@
+[
+  {
+    "file": "backend/license.go",
+    "sha256": "c41dcee0fde9ed81452b3b0feed336a1e2a6f65216037178294a3d69d77ab3f5",
+    "modified": "2026-10-06T21:07:42.016251+08:00"
+  },
+  {
+    "file": "backend/update.go",
+    "sha256": "9f8ee7f5b178cc126ffbeb997f097097289a5f80d17ad4cd34187493d045b50a",
+    "modified": "2026-10-06T21:07:42.045779+08:00"
+  },
+  {
+    "file": "backend/license_json_test.go",
+    "sha256": "68927c07dd623133efa568cd6ea5cd973d94f8f7b284ef25f54cd1d7df742b75",
+    "modified": "2026-10-06T21:17:21.028343+08:00"
+  },
+  {
+    "file": "backend/license_protocol_vectors_test.go",
+    "sha256": "f356eecd47dc8184e9dc00e1f8179deb6392795627e2ca704706f4ee71821c58",
+    "modified": "2026-10-06T21:07:42.071576+08:00"
+  },
+  {
+    "file": "backend/testdata/license-protocol-vectors.json",
+    "sha256": "053eaa3841c73b15cd4f46c1c08e6386896be935d3622a7473515c4473d45c0e",
+    "modified": "2026-10-06T21:07:42.177187+08:00"
+  },
+  {
+    "file": "desktop/verify-license-release.cjs",
+    "sha256": "e434985b4dd7079cec7d877ac7617a6c666900faf56e3b05bb9acb2231797080",
+    "modified": "2026-10-06T21:10:30.325477+08:00"
+  },
+  {
+    "file": "desktop/license-release.test.cjs",
+    "sha256": "f5d283b2ad9e088ba0689de673ff1300045633514e1d427ca03838d63a6ebf0d",
+    "modified": "2026-10-06T21:10:30.366183+08:00"
+  },
+  {
+    "file": "backend/license_config_release.go",
+    "sha256": "cc7eb2d0493efcdf3b82d5d81ac0ff731bdf9b5a04c56f7d723967bca56da0d6",
+    "modified": "2026-10-06T18:08:16.837417+08:00"
+  },
+  {
+    "file": "backend/license_config_staging.go",
+    "sha256": "c7552995eea312b6038f38ae168c81fd6031c8f0c3f9d9003fdd41d3e788599e",
+    "modified": "2026-10-06T18:08:16.837476+08:00"
+  }
+]

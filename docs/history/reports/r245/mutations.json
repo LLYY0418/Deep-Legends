@@ -1,0 +1,15 @@
+{
+  "name": "mutations",
+  "command": [
+    "node",
+    "scripts/r245-mutations.cjs"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started": "2026-10-07T16:06:14.835803+08:00",
+  "finished": "2026-10-07T16:06:31.721650+08:00",
+  "duration_s": 16.886,
+  "exit_code": 0,
+  "last5": [
+    "[{\"name\":\"a-remove-rounding-150percent\",\"started\":\"2026-10-07T08:06:14.871Z\",\"finished\":\"2026-10-07T08:06:14.966Z\",\"exit_code\":1,\"assertion_killed\":true,\"last5\":[\"    actual: 120,\",\"    expected: 191,\",\"    operator: 'strictEqual',\",\"    diff: 'simple'\",\"  }\"]},{\"name\":\"b-return-to-8second-timeout\",\"started\":\"2026-10-07T08:06:14.966Z\",\"finished\":\"2026-10-07T08:06:31.683Z\",\"exit_code\":1,\"assertion_killed\":true,\"last5\":[\"    --- FAIL: TestR245SlowNetwork/renew_headers10s (8.01s)\",\"        license_r245_test.go:62: R245 slow renew headers10s must succeed: 软件尚未激活\",\"FAIL\",\"FAIL\\tlol-loot-assistant/backend\\t8.670s\",\"FAIL\"]}]"
+  ]
+}

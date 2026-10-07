@@ -1,0 +1,19 @@
+{
+  "changed_after_go_checks": [
+    "desktop/license-window.cjs"
+  ],
+  "go_backend_inputs_unchanged": true,
+  "rerun_checks": [
+    "renderers",
+    "desktop",
+    "chromium",
+    "electron-r240",
+    "electron-final",
+    "mutations"
+  ],
+  "real_activation_fixture_added": [
+    "backend/license_r243_test.go",
+    "scripts/r243-electron.cjs"
+  ],
+  "all_go_checks_rerun_after_fixture_addition": true
+}

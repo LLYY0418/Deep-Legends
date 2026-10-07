@@ -1,0 +1,38 @@
+{
+  "checked_at": "2026-10-07T16:36:15.314408+08:00",
+  "scope": "No new installer yet; old artifacts read-only preservation checkpoint",
+  "directories": [
+    {
+      "directory": "dist/R236-staging-public",
+      "files": 26,
+      "file_set_equal": true,
+      "sha256_equal": true
+    },
+    {
+      "directory": "dist/R239-staging-public",
+      "files": 26,
+      "file_set_equal": true,
+      "sha256_equal": true
+    },
+    {
+      "directory": "dist/R240-staging-public",
+      "files": 26,
+      "file_set_equal": true,
+      "sha256_equal": true
+    },
+    {
+      "directory": "dist/R242-staging-public",
+      "files": 26,
+      "file_set_equal": true,
+      "sha256_equal": true
+    },
+    {
+      "directory": "dist/R243-staging-public",
+      "files": 26,
+      "file_set_equal": true,
+      "sha256_equal": true
+    }
+  ],
+  "total_files": 130,
+  "unchanged": true
+}

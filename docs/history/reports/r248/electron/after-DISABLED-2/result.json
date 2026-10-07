@@ -1,0 +1,573 @@
+{
+  "phase": "after",
+  "state": "DISABLED",
+  "expectedState": "DISABLED",
+  "index": 2,
+  "shows": [
+    {
+      "number": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "content": {
+        "state": "disabled",
+        "overlayHidden": true,
+        "frameHidden": false,
+        "frameInert": true,
+        "formVisible": false,
+        "expiryVisible": false
+      },
+      "resizable": true,
+      "maximizable": true,
+      "opacity": 1,
+      "captureInvokedAtShow": true
+    }
+  ],
+  "samples": [
+    {
+      "at": 1791368952100,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952110,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952117,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952125,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952133,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952142,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952152,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952160,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952207,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952215,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952224,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952233,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952243,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952252,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952261,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952269,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952278,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952288,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952297,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952305,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952313,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952321,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952329,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952338,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952347,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791368952357,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "maximized": false
+    }
+  ],
+  "networkRequests": [
+    "http://127.0.0.1:60603/",
+    "http://127.0.0.1:60603/app.css",
+    "http://127.0.0.1:60603/build-item-row.css",
+    "http://127.0.0.1:60603/gameplay.css",
+    "http://127.0.0.1:60603/friends.css",
+    "http://127.0.0.1:60603/metrics.css",
+    "http://127.0.0.1:60603/app-icon.png",
+    "http://127.0.0.1:60603/image-unavailable.svg",
+    "http://127.0.0.1:60603/runtime.js",
+    "http://127.0.0.1:60603/license-ui.js",
+    "http://127.0.0.1:60603/image-queue.js",
+    "http://127.0.0.1:60603/overview-art.js",
+    "http://127.0.0.1:60603/augment-artwork.js",
+    "http://127.0.0.1:60603/section-loader.js",
+    "http://127.0.0.1:60603/app.js",
+    "http://127.0.0.1:60603/favorites-facade.js",
+    "http://127.0.0.1:60603/gameplay.js",
+    "http://127.0.0.1:60603/friends.js",
+    "http://127.0.0.1:60603/beaufort-for-lol-bold.woff2",
+    "http://127.0.0.1:60603/api/champions/network",
+    "http://127.0.0.1:60603/api/diagnostics/client",
+    "http://127.0.0.1:60603/api/status",
+    "http://127.0.0.1:60603/beaufort-for-lol-bold.woff2",
+    "http://127.0.0.1:60603/api/gameplay/augments",
+    "http://127.0.0.1:60603/api/gameplay/perks",
+    "http://127.0.0.1:60603/api/events",
+    "http://127.0.0.1:60603/api/diagnostics/client",
+    "http://127.0.0.1:60603/api/diagnostics/client",
+    "http://127.0.0.1:60603/api/client-installations",
+    "http://127.0.0.1:60603/api/diagnostics/client",
+    "http://127.0.0.1:60603/api/diagnostics/client",
+    "http://127.0.0.1:60603/api/diagnostics/client"
+  ],
+  "platform": "darwin",
+  "serverRequests": [
+    "/api/diagnostics/startup-stage",
+    "/api/system-proxy",
+    "/api/diagnostics/startup-stage",
+    "/",
+    "/app.css",
+    "/build-item-row.css",
+    "/gameplay.css",
+    "/friends.css",
+    "/metrics.css",
+    "/image-unavailable.svg",
+    "/runtime.js",
+    "/license-ui.js",
+    "/app-icon.png",
+    "/augment-artwork.js",
+    "/app.js",
+    "/section-loader.js",
+    "/image-queue.js",
+    "/overview-art.js",
+    "/gameplay.js",
+    "/friends.js",
+    "/favorites-facade.js",
+    "/api/diagnostics/startup-stage",
+    "/api/diagnostics/startup",
+    "/api/champions/network",
+    "/api/diagnostics/client",
+    "/beaufort-for-lol-bold.woff2",
+    "/api/status",
+    "/api/events",
+    "/api/gameplay/augments",
+    "/api/gameplay/perks",
+    "/api/diagnostics/client",
+    "/api/diagnostics/client",
+    "/api/client-installations",
+    "/api/diagnostics/client",
+    "/api/diagnostics/startup-stage",
+    "/api/diagnostics/client",
+    "/api/diagnostics/client",
+    "/api/quit"
+  ],
+  "diagnostics": [
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "backend_ready",
+        "elapsedMs": 385
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_created",
+        "elapsedMs": 415
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_ready_to_show",
+        "elapsedMs": 594
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup",
+      "value": {
+        "processToJs": 150,
+        "jsToReady": 56,
+        "readyToSplash": 89,
+        "splashPaint": 191,
+        "splashWindowShown": 461,
+        "spawnToReady": 48,
+        "readyToWindow": 226,
+        "total": 761
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "blocking_state_client",
+        "reason": "show",
+        "source": "startup",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 59,
+        "httpStatus": 200,
+        "endpoint": "champions",
+        "startedAt": 1791368952026,
+        "completedAt": 1791368952085,
+        "errorKind": "none",
+        "responseBytes": 2,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 58,
+        "httpStatus": 200,
+        "endpoint": "status",
+        "startedAt": 1791368952027,
+        "completedAt": 1791368952085,
+        "errorKind": "none",
+        "responseBytes": 38,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "live_scope_reset",
+        "reason": "disconnect",
+        "source": "",
+        "previousGameId": 0,
+        "gameId": 0,
+        "previousPhase": "",
+        "phase": "",
+        "clearedRecommendations": 0
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_did_finish_load",
+        "elapsedMs": 634
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 59,
+        "httpStatus": 200,
+        "endpoint": "gameplay",
+        "startedAt": 1791368952034,
+        "completedAt": 1791368952093,
+        "errorKind": "none",
+        "responseBytes": 2,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 8,
+        "httpStatus": 200,
+        "endpoint": "other",
+        "startedAt": 1791368952086,
+        "completedAt": 1791368952094,
+        "errorKind": "none",
+        "responseBytes": 2,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 1,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    }
+  ],
+  "phases": {
+    "processToJs": 150,
+    "jsToReady": 56,
+    "readyToSplash": 89,
+    "splashPaint": 191,
+    "splashWindowShown": 461,
+    "spawnToReady": 48,
+    "readyToWindow": 226,
+    "total": 761
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "scope": "Fault injection in temporary test response body parsing only; NOT natural baseline reproduction",
+  "clean_body_delay_ms": 120,
+  "original_assertions_and_budgets_preserved": true,
+  "runs": [
+    {
+      "label": "current-r245-ui",
+      "started": "2026-10-07T16:50:35.830645+08:00",
+      "finished": "2026-10-07T16:50:38.096921+08:00",
+      "duration_s": 2.266,
+      "exit_code": 0,
+      "same_original_assertion_failure": false,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2227.141292"
+      ]
+    },
+    {
+      "label": "without-r245-ui-changes",
+      "started": "2026-10-07T16:50:38.097057+08:00",
+      "finished": "2026-10-07T16:50:40.309679+08:00",
+      "duration_s": 2.213,
+      "exit_code": 0,
+      "same_original_assertion_failure": false,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2172.296209"
+      ]
+    }
+  ],
+  "temporary_directory_deleted": true
+}

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "node",
+    "docs/history/reports/r243/verify-build-inputs.cjs"
+  ],
+  "cwd": ".",
+  "started": "2026-10-07T14:58:08.835738+08:00",
+  "finished": "2026-10-07T14:58:08.945012+08:00",
+  "elapsed_seconds": 0.109,
+  "exit_code": 0,
+  "last_5_lines": [
+    "{\"fingerprint\":\"d674d2584eeb\",\"inputs\":398,\"matched\":true}"
+  ]
+}

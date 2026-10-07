@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-06T13:16:16.526Z",
+  "version": "0.12.75",
+  "scope": "Actual public Windows dir package statically inspected on macOS; Windows runtime acceptance not executed",
+  "public_keys": "release/staging trust tables remain empty; publication blocked",
+  "release": {
+    "directory": "/private/tmp/r234-pack-public/win-unpacked-public",
+    "executable": "Deep Legends.exe",
+    "key_mode": "public",
+    "license_build": "release",
+    "configured_window_title": "Deep Legends",
+    "source_fingerprint": "276fdbb2073d",
+    "backend_bytes": 32490496,
+    "backend_sha256": "d0c8e82794143023da1fe06b7df548bb9c6599a63d139092552561e8e6f4583a",
+    "asar_sha256": "1bc304d93e9ada39c4ad8e1b696b6f213b9623be09324e0b0136163e146ca346",
+    "fuses": {
+      "RunAsNode": false,
+      "EnableNodeOptionsEnvironmentVariable": false,
+      "EnableNodeCliInspectArguments": false,
+      "EnableEmbeddedAsarIntegrityValidation": true,
+      "OnlyLoadAppFromAsar": true
+    },
+    "asar_integrity": [
+      {
+        "file": "resources\\app.asar",
+        "alg": "SHA256",
+        "value": "6984998ba5f5c5a148ec808e7fbff0787cffe2a0c5f04fe9a225052d9cdbef72"
+      }
+    ],
+    "release_isolation": "passed",
+    "test_fixtures_absent": true
+  }
+}

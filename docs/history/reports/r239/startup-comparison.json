@@ -1,0 +1,63 @@
+{
+  "scope": "Real Electron/macOS warm startup; synthetic local status, no real codes or external network",
+  "load": "All required Go/Node checks completed; alternating before/after main source with identical final renderer/backend fixture",
+  "median_ms": {
+    "ACTIVE": {
+      "before-paired": {
+        "processToJs": 144,
+        "jsToReady": 58,
+        "readyToSplash": 81,
+        "splashPaint": 124,
+        "splashWindowShown": 385,
+        "spawnToReady": 89,
+        "readyToWindow": 229,
+        "total": 741
+      },
+      "after-paired": {
+        "processToJs": 134,
+        "jsToReady": 57,
+        "readyToSplash": 82,
+        "splashPaint": 126,
+        "splashWindowShown": 377,
+        "spawnToReady": 89,
+        "readyToWindow": 234,
+        "total": 727
+      }
+    },
+    "LOCKED": {
+      "before-paired": {
+        "processToJs": 159,
+        "jsToReady": 63,
+        "readyToSplash": 93,
+        "splashPaint": 137,
+        "splashWindowShown": 409,
+        "spawnToReady": 89,
+        "readyToWindow": 217,
+        "total": 746
+      },
+      "after-paired": {
+        "processToJs": 192,
+        "jsToReady": 56,
+        "readyToSplash": 88,
+        "splashPaint": 134,
+        "splashWindowShown": 445,
+        "spawnToReady": 94,
+        "readyToWindow": 217,
+        "total": 745
+      }
+    }
+  },
+  "initial_status_read_ms": [
+    63,
+    14,
+    16,
+    18,
+    16,
+    16
+  ],
+  "active_small_window_flash": false,
+  "locked_first_visible_size": [
+    700,
+    470
+  ]
+}

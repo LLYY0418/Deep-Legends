@@ -1,0 +1,19 @@
+{
+  "name": "package",
+  "command": [
+    "node",
+    "scripts/build-no-license-audit.cjs"
+  ],
+  "cwd": "/private/tmp/r248-checked-source-r147th5m",
+  "start": "2026-10-07T18:35:30.949978+08:00",
+  "end": "2026-10-07T18:35:31.784243+08:00",
+  "elapsed_seconds": 0.834,
+  "exit_code": 1,
+  "last_five": [
+    "    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)",
+    "    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)",
+    "    at node:internal/main/run_main_module:33:47",
+    "",
+    "Node.js v24.14.1"
+  ]
+}

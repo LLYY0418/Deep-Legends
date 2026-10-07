@@ -1,0 +1,19 @@
+{
+  "name": "native-export",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-run",
+    "^TestR245WindowInvalidValuesReasonsAndNativeExport$",
+    "./backend"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started": "2026-10-07T16:06:04.276269+08:00",
+  "finished": "2026-10-07T16:06:13.267459+08:00",
+  "duration_s": 8.992,
+  "exit_code": 0,
+  "last5": [
+    "ok  \tlol-loot-assistant/backend\t0.771s"
+  ]
+}

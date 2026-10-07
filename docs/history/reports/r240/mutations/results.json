@@ -1,0 +1,62 @@
+[
+  {
+    "name": "a-default-overlay-visible",
+    "status": 1,
+    "killed": true,
+    "started": "2026-10-06T18:48:09.734Z",
+    "finished": "2026-10-06T18:48:10.649Z",
+    "elapsedMs": 915,
+    "last5": [
+      "  actual: false,",
+      "  expected: true,",
+      "  operator: 'strictEqual',",
+      "  diff: 'simple'",
+      "}"
+    ]
+  },
+  {
+    "name": "b-resize-without-invisibility",
+    "status": 1,
+    "killed": true,
+    "started": "2026-10-06T18:48:10.650Z",
+    "finished": "2026-10-06T18:48:10.740Z",
+    "elapsedMs": 90,
+    "last5": [
+      "    actual: 1,",
+      "    expected: 0,",
+      "    operator: 'strictEqual',",
+      "    diff: 'simple'",
+      "  }"
+    ]
+  },
+  {
+    "name": "c-no-unmaximize-wait",
+    "status": 1,
+    "killed": true,
+    "started": "2026-10-06T18:48:10.741Z",
+    "finished": "2026-10-06T18:48:10.945Z",
+    "elapsedMs": 204,
+    "last5": [
+      "    actual: false,",
+      "    expected: true,",
+      "    operator: 'strictEqual',",
+      "    diff: 'simple'",
+      "  }"
+    ]
+  },
+  {
+    "name": "d-old-replacement-message",
+    "status": 1,
+    "killed": true,
+    "started": "2026-10-06T18:48:10.946Z",
+    "finished": "2026-10-06T18:48:18.199Z",
+    "elapsedMs": 7253,
+    "last5": [
+      "--- FAIL: TestR240ReplacementAndRevocationMessages (0.00s)",
+      "    license_window_r240_test.go:117: REPLACED message 注册码已被其他地方使用",
+      "FAIL",
+      "FAIL\tlol-loot-assistant/backend\t0.663s",
+      "FAIL"
+    ]
+  }
+]

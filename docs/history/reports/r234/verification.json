@@ -1,0 +1,487 @@
+{
+  "version": "0.12.75",
+  "r234_last_go_change": "2026-10-06T21:17:21.028343+08:00",
+  "vector_sha256": "053eaa3841c73b15cd4f46c1c08e6386896be935d3622a7473515c4473d45c0e",
+  "vector_bytes": 31615,
+  "vector_cases": 59,
+  "s15_entries": [
+    "TestR233ProtocolParserVectors",
+    "TestR233RequestSignatureTextContract",
+    "TestR233SharedSignedProtocolVectors"
+  ],
+  "s15_skip_count": 0,
+  "required_checks": {
+    "go-full": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "./backend"
+      ],
+      "started": "2026-10-06T21:33:09.894330+08:00",
+      "finished": "2026-10-06T21:34:14.172357+08:00",
+      "duration_seconds": 64.279,
+      "exit_code": 1,
+      "last_five_lines": [
+        "\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/testing/testing.go:1792 +0xe4",
+        "created by testing.(*T).Run in goroutine 1",
+        "\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/testing/testing.go:1851 +0x374",
+        "FAIL\tlol-loot-assistant/backend\t51.906s",
+        "FAIL"
+      ],
+      "log": "/private/tmp/r234-go-full.log",
+      "archived_log": "go-full.log.gz"
+    },
+    "go-race": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "./backend"
+      ],
+      "started": "2026-10-06T21:29:19.143308+08:00",
+      "finished": "2026-10-06T21:30:49.281027+08:00",
+      "duration_seconds": 90.139,
+      "exit_code": 1,
+      "last_five_lines": [
+        "\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/testing/testing.go:1792 +0x184",
+        "created by testing.(*T).Run in goroutine 1",
+        "\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/testing/testing.go:1851 +0x688",
+        "FAIL\tlol-loot-assistant/backend\t74.723s",
+        "FAIL"
+      ],
+      "log": "/private/tmp/r234-go-race.log",
+      "archived_log": "go-race.log.gz"
+    },
+    "go-vet": {
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "started": "2026-10-06T21:33:07.375136+08:00",
+      "finished": "2026-10-06T21:33:09.459448+08:00",
+      "duration_seconds": 2.084,
+      "exit_code": 0,
+      "last_five_lines": [],
+      "log": "/private/tmp/r234-go-vet.log",
+      "archived_log": "go-vet.log.gz"
+    },
+    "node-all": {
+      "command": [
+        "node",
+        "scripts/test-renderers.cjs",
+        "all"
+      ],
+      "started": "2026-10-06T21:23:28.819656+08:00",
+      "finished": "2026-10-06T21:25:31.067067+08:00",
+      "duration_seconds": 122.246,
+      "exit_code": 0,
+      "last_five_lines": [
+        "    },",
+        "    \"duration_ms\": 122202.121708",
+        "  },",
+        "  \"success\": true",
+        "}"
+      ],
+      "log": "/private/tmp/r234-node-all.log",
+      "archived_log": "node-all.log.gz"
+    },
+    "desktop-node": {
+      "command": [
+        "node",
+        "--test"
+      ],
+      "started": "2026-10-06T21:26:55.471730+08:00",
+      "finished": "2026-10-06T21:28:34.302458+08:00",
+      "duration_seconds": 98.831,
+      "exit_code": 0,
+      "last_five_lines": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 2",
+        "ℹ todo 0",
+        "ℹ duration_ms 98737.442084"
+      ],
+      "log": "/private/tmp/r234-desktop-node.log",
+      "archived_log": "desktop-node.log.gz"
+    }
+  },
+  "additional_checks": {
+    "focused": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "./backend",
+        "-run",
+        "TestR233ProtocolParserVectors|TestR233RequestSignatureTextContract|TestR233SharedSignedProtocolVectors|TestR234",
+        "-v"
+      ],
+      "started": "2026-10-06T21:09:44.432260+08:00",
+      "finished": "2026-10-06T21:09:55.777024+08:00",
+      "duration_seconds": 11.345,
+      "exit_code": 0,
+      "last_five_lines": [
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/trailing-envelope (0.00s)",
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/case-alias-envelope (0.00s)",
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/case-alias-payload (0.00s)",
+        "PASS",
+        "ok  \tlol-loot-assistant/backend\t1.010s"
+      ],
+      "log": "/private/tmp/r234-focused.log",
+      "archived_log": "focused.log.gz"
+    },
+    "focused-final": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "./backend",
+        "-run",
+        "TestR233ProtocolParserVectors|TestR233RequestSignatureTextContract|TestR233SharedSignedProtocolVectors|TestR234",
+        "-v"
+      ],
+      "started": "2026-10-06T21:17:24.914055+08:00",
+      "finished": "2026-10-06T21:17:54.884528+08:00",
+      "duration_seconds": 29.971,
+      "exit_code": 0,
+      "last_five_lines": [
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/trailing-envelope (0.00s)",
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/case-alias-envelope (0.00s)",
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/case-alias-payload (0.00s)",
+        "PASS",
+        "ok  \tlol-loot-assistant/backend\t1.321s"
+      ],
+      "log": "/private/tmp/r234-focused-final.log",
+      "archived_log": "focused-final.log.gz"
+    },
+    "staging-guards": {
+      "command": [
+        "go",
+        "test",
+        "-tags=license_staging",
+        "-count=1",
+        "./backend",
+        "-run",
+        "TestR233(StagingLicenseConfiguration|ProtocolParserVectors|RequestSignatureTextContract|SharedSignedProtocolVectors)|TestR234VectorKeysExcludedFromTrustConfiguration",
+        "-v"
+      ],
+      "started": "2026-10-06T21:12:17.718609+08:00",
+      "finished": "2026-10-06T21:12:29.921730+08:00",
+      "duration_seconds": 12.203,
+      "exit_code": 0,
+      "last_five_lines": [
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/trailing-envelope (0.00s)",
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/case-alias-envelope (0.00s)",
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/case-alias-payload (0.00s)",
+        "PASS",
+        "ok  \tlol-loot-assistant/backend\t0.659s"
+      ],
+      "log": "/private/tmp/r234-staging-guards.log",
+      "archived_log": "staging-guards.log.gz"
+    },
+    "staging-guards-final": {
+      "command": [
+        "go",
+        "test",
+        "-tags=license_staging",
+        "-count=1",
+        "./backend",
+        "-run",
+        "TestR233(StagingLicenseConfiguration|ProtocolParserVectors|RequestSignatureTextContract|SharedSignedProtocolVectors)|TestR234VectorKeysExcludedFromTrustConfiguration",
+        "-v"
+      ],
+      "started": "2026-10-06T21:20:09.062001+08:00",
+      "finished": "2026-10-06T21:20:33.329752+08:00",
+      "duration_seconds": 24.268,
+      "exit_code": 0,
+      "last_five_lines": [
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/trailing-envelope (0.00s)",
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/case-alias-envelope (0.00s)",
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/case-alias-payload (0.00s)",
+        "PASS",
+        "ok  \tlol-loot-assistant/backend\t0.996s"
+      ],
+      "log": "/private/tmp/r234-staging-guards-final.log",
+      "archived_log": "staging-guards-final.log.gz"
+    },
+    "license-race": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "./backend",
+        "-run",
+        "^TestR(232|233|234)",
+        "-v"
+      ],
+      "started": "2026-10-06T21:36:40.704763+08:00",
+      "finished": "2026-10-06T21:36:58.139769+08:00",
+      "duration_seconds": 17.435,
+      "exit_code": 0,
+      "last_five_lines": [
+        "--- PASS: TestR232RequestBindingAndDiagnosticRedaction (0.00s)",
+        "=== RUN   TestR232UpdateSignatureTrust",
+        "--- PASS: TestR232UpdateSignatureTrust (0.00s)",
+        "PASS",
+        "ok  \tlol-loot-assistant/backend\t2.169s"
+      ],
+      "log": "/private/tmp/r234-license-race.log",
+      "archived_log": "license-race.log.gz"
+    },
+    "js-syntax": {
+      "command": [
+        "python3",
+        "/private/tmp/r234-js-syntax.py"
+      ],
+      "started": "2026-10-06T21:16:29.713415+08:00",
+      "finished": "2026-10-06T21:16:49.345993+08:00",
+      "duration_seconds": 19.633,
+      "exit_code": 0,
+      "last_five_lines": [
+        "JS syntax passed: 276 files"
+      ],
+      "log": "/private/tmp/r234-js-syntax.log",
+      "archived_log": "js-syntax.log.gz"
+    },
+    "windows-compile": {
+      "command": [
+        "env",
+        "CGO_ENABLED=0",
+        "GOOS=windows",
+        "GOARCH=amd64",
+        "go",
+        "test",
+        "-c",
+        "-tags=",
+        "-o",
+        "/private/tmp/r234-backend-tests-public.exe",
+        "./backend"
+      ],
+      "started": "2026-10-06T21:16:33.986643+08:00",
+      "finished": "2026-10-06T21:17:32.692293+08:00",
+      "duration_seconds": 58.707,
+      "exit_code": 0,
+      "last_five_lines": [],
+      "log": "/private/tmp/r234-windows-compile.log",
+      "archived_log": "windows-compile.log.gz"
+    },
+    "public-build": {
+      "command": [
+        "bash",
+        "/private/tmp/r234-build-public.sh"
+      ],
+      "started": "2026-10-06T21:15:00.178562+08:00",
+      "finished": "2026-10-06T21:15:11.519691+08:00",
+      "duration_seconds": 11.341,
+      "exit_code": 0,
+      "last_five_lines": [
+        "  • no node modules found in collection, trying next search directory  pm=traversal searchDir=/Users/ly/personal/personal-work/deep-legends/desktop",
+        "  • no node modules returned while searching directories  searchDirectories=[\"\"]",
+        "  • updating asar integrity executable resource  executablePath=/private/tmp/r234-pack-public/win-unpacked/Deep Legends.exe",
+        "  • executing @electron/fuses  electronPath=/private/tmp/r234-pack-public/win-unpacked/Deep Legends.exe",
+        "  • file signing skipped via signExecutable configuration  file=/private/tmp/r234-pack-public/win-unpacked/Deep Legends.exe"
+      ],
+      "log": "/private/tmp/r234-public-build.log",
+      "archived_log": "public-build.log.gz"
+    },
+    "package-audit": {
+      "command": [
+        "node",
+        "/private/tmp/r234-audit.cjs"
+      ],
+      "started": "2026-10-06T21:16:16.363698+08:00",
+      "finished": "2026-10-06T21:16:18.075943+08:00",
+      "duration_seconds": 1.712,
+      "exit_code": 0,
+      "last_five_lines": [
+        "{\"date\":\"2026-10-06T13:16:16.526Z\",\"version\":\"0.12.75\",\"scope\":\"Actual public Windows dir package statically inspected on macOS; Windows runtime acceptance not executed\",\"public_keys\":\"release/staging trust tables remain empty; publication blocked\",\"release\":{\"directory\":\"/private/tmp/r234-pack-public/win-unpacked-public\",\"executable\":\"Deep Legends.exe\",\"key_mode\":\"public\",\"license_build\":\"release\",\"configured_window_title\":\"Deep Legends\",\"source_fingerprint\":\"276fdbb2073d\",\"backend_bytes\":32490496,\"backend_sha256\":\"d0c8e82794143023da1fe06b7df548bb9c6599a63d139092552561e8e6f4583a\",\"asar_sha256\":\"1bc304d93e9ada39c4ad8e1b696b6f213b9623be09324e0b0136163e146ca346\",\"fuses\":{\"RunAsNode\":false,\"EnableNodeOptionsEnvironmentVariable\":false,\"EnableNodeCliInspectArguments\":false,\"EnableEmbeddedAsarIntegrityValidation\":true,\"OnlyLoadAppFromAsar\":true},\"asar_integrity\":[{\"file\":\"resources\\\\app.asar\",\"alg\":\"SHA256\",\"value\":\"6984998ba5f5c5a148ec808e7fbff0787cffe2a0c5f04fe9a225052d9cdbef72\"}],\"release_isolation\":\"passed\",\"test_fixtures_absent\":true}}"
+      ],
+      "log": "/private/tmp/r234-package-audit.log",
+      "archived_log": "package-audit.log.gz"
+    }
+  },
+  "earlier_attempts": {
+    "go-vet-first": {
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "started": "2026-10-06T21:15:37.475627+08:00",
+      "finished": "2026-10-06T21:15:39.358758+08:00",
+      "duration_seconds": 1.883,
+      "exit_code": 1,
+      "last_five_lines": [
+        "# lol-loot-assistant/backend",
+        "# [lol-loot-assistant/backend]",
+        "backend/license_json_test.go:80:3: struct field Status repeats json tag \"status\" also at license_json_test.go:18"
+      ],
+      "log": "/private/tmp/r234-go-vet.log",
+      "archived_log": "go-vet-first.log.gz"
+    },
+    "node-all-first": {
+      "command": [
+        "node",
+        "scripts/test-renderers.cjs",
+        "all"
+      ],
+      "started": "2026-10-06T21:16:14.975391+08:00",
+      "finished": "2026-10-06T21:18:53.315006+08:00",
+      "duration_seconds": 158.341,
+      "exit_code": 1,
+      "last_five_lines": [
+        "    },",
+        "    \"duration_ms\": 158280.51275",
+        "  },",
+        "  \"success\": false",
+        "}"
+      ],
+      "log": "/private/tmp/r234-node-all.log",
+      "archived_log": "node-all-first.log.gz"
+    },
+    "node-all-second": {
+      "command": [
+        "node",
+        "scripts/test-renderers.cjs",
+        "all"
+      ],
+      "started": "2026-10-06T21:20:04.621125+08:00",
+      "finished": "2026-10-06T21:22:30.747184+08:00",
+      "duration_seconds": 146.129,
+      "exit_code": 1,
+      "last_five_lines": [
+        "    },",
+        "    \"duration_ms\": 146066.496875",
+        "  },",
+        "  \"success\": false",
+        "}"
+      ],
+      "log": "/private/tmp/r234-node-all.log",
+      "archived_log": "node-all-second.log.gz"
+    },
+    "go-full-before-test-vet-fix": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "./backend"
+      ],
+      "started": "2026-10-06T21:15:34.551454+08:00",
+      "finished": "2026-10-06T21:17:42.605094+08:00",
+      "duration_seconds": 128.055,
+      "exit_code": 0,
+      "last_five_lines": [
+        "ok  \tlol-loot-assistant/backend\t126.275s"
+      ],
+      "log": "/private/tmp/r234-go-full.log",
+      "archived_log": "go-full-before-test-vet-fix.log.gz"
+    },
+    "go-full-before-shared-edits": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "./backend"
+      ],
+      "started": "2026-10-06T21:18:42.119547+08:00",
+      "finished": "2026-10-06T21:20:39.938383+08:00",
+      "duration_seconds": 117.82,
+      "exit_code": 0,
+      "last_five_lines": [
+        "ok  \tlol-loot-assistant/backend\t115.515s"
+      ],
+      "log": "/private/tmp/r234-go-full.log",
+      "archived_log": "go-full-before-shared-edits.log.gz"
+    },
+    "license-race-build-interruption": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "./backend",
+        "-run",
+        "^TestR(232|233|234)",
+        "-v"
+      ],
+      "started": "2026-10-06T21:33:09.749207+08:00",
+      "finished": "2026-10-06T21:33:31.941323+08:00",
+      "duration_seconds": 22.192,
+      "exit_code": 1,
+      "last_five_lines": [
+        "# lol-loot-assistant/backend",
+        "# [lol-loot-assistant/backend]",
+        "vet: backend/gameplay.go:1512:48: a.loadCurrentHistoryFast undefined (type *app has no field or method loadCurrentHistoryFast)",
+        "FAIL\tlol-loot-assistant/backend [build failed]",
+        "FAIL"
+      ],
+      "log": "/private/tmp/r234-license-race.log",
+      "archived_log": "license-race-build-interruption.log.gz"
+    }
+  },
+  "mutations": [
+    {
+      "mutation": "response-domain",
+      "started": "2026-10-06T21:12:13.970118+08:00",
+      "finished": "2026-10-06T21:12:26.046162+08:00",
+      "duration_seconds": 12.076,
+      "exit_code": 1,
+      "expected_failure": true,
+      "failed_tests": [
+        "--- FAIL: TestR233SharedSignedProtocolVectors (0.01s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors/response/active-standard (0.00s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors/response/active-admin (0.00s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors/response/INVALID_CODE (0.00s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors/response/REPLACED (0.00s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors/response/REVOKED (0.00s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors/response/REPLAY (0.00s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors/response/TIMESTAMP_INVALID (0.00s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors/response/RATE_LIMITED (0.00s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors/response/SERVICE_UNAVAILABLE (0.00s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors/response/UNSUPPORTED_VERSION (0.00s)"
+      ],
+      "last_five_lines": [
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/case-alias-envelope (0.00s)",
+        "    --- PASS: TestR233SharedSignedProtocolVectors/response/case-alias-payload (0.00s)",
+        "FAIL",
+        "FAIL\tlol-loot-assistant/backend\t0.865s",
+        "FAIL"
+      ],
+      "temporary_copy_deleted": true,
+      "log": "/private/tmp/r234-mutation-response-domain.log",
+      "archived_log": "mutation-response-domain.log.gz"
+    },
+    {
+      "mutation": "case-alias-decoder",
+      "started": "2026-10-06T21:12:26.046526+08:00",
+      "finished": "2026-10-06T21:12:35.838402+08:00",
+      "duration_seconds": 9.792,
+      "exit_code": 1,
+      "expected_failure": true,
+      "failed_tests": [
+        "--- FAIL: TestR233ProtocolParserVectors (0.00s)",
+        "--- FAIL: TestR233ProtocolParserVectors/json/case-alias-request (0.00s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors (0.00s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors/response/case-alias-envelope (0.00s)",
+        "--- FAIL: TestR233SharedSignedProtocolVectors/response/case-alias-payload (0.00s)"
+      ],
+      "last_five_lines": [
+        "    --- FAIL: TestR233SharedSignedProtocolVectors/response/case-alias-envelope (0.00s)",
+        "    --- FAIL: TestR233SharedSignedProtocolVectors/response/case-alias-payload (0.00s)",
+        "FAIL",
+        "FAIL\tlol-loot-assistant/backend\t0.636s",
+        "FAIL"
+      ],
+      "temporary_copy_deleted": true,
+      "log": "/private/tmp/r234-mutation-case-alias-decoder.log",
+      "archived_log": "mutation-case-alias-decoder.log.gz"
+    }
+  ],
+  "publication_blocked": true,
+  "full_repository_validation": "NOT PASSED: concurrent non-R234 relay changes caused full Go/race failures; no claim for subsequent shared source",
+  "r234_source_files": "source-files.json"
+}

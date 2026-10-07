@@ -1,0 +1,20 @@
+{
+  "name": "worker",
+  "command": [
+    "node",
+    "--test",
+    "/private/tmp/r248-checked-source-r147th5m/relay/riot-worker/worker.test.mjs"
+  ],
+  "cwd": "/private/tmp/r248-checked-source-r147th5m",
+  "start": "2026-10-07T18:21:39.733708+08:00",
+  "end": "2026-10-07T18:21:40.941380+08:00",
+  "elapsed_seconds": 1.208,
+  "exit_code": 0,
+  "last_five": [
+    "ℹ fail 0",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0",
+    "ℹ duration_ms 1110.558334"
+  ]
+}

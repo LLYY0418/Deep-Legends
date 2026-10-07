@@ -1,0 +1,28 @@
+{
+  "name": "license-default",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-race",
+    "-json",
+    "-run",
+    "R232|R233|R234|R236|R237|R240|R242|R243|R245",
+    "./backend"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started": "2026-10-07T16:24:00.270528+08:00",
+  "finished": "2026-10-07T16:24:39.732625+08:00",
+  "duration_s": 39.465,
+  "exit_code": 0,
+  "last5": [
+    "{\"Time\":\"2026-10-07T16:24:38.629354+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Test\":\"TestR232UpdateSignatureTrust\",\"Output\":\"--- PASS: TestR232UpdateSignatureTrust (0.01s)\\n\"}",
+    "{\"Time\":\"2026-10-07T16:24:38.629599+08:00\",\"Action\":\"pass\",\"Package\":\"lol-loot-assistant/backend\",\"Test\":\"TestR232UpdateSignatureTrust\",\"Elapsed\":0.01}",
+    "{\"Time\":\"2026-10-07T16:24:38.642798+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Output\":\"PASS\\n\"}",
+    "{\"Time\":\"2026-10-07T16:24:39.656613+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Output\":\"ok  \\tlol-loot-assistant/backend\\t35.741s\\n\"}",
+    "{\"Time\":\"2026-10-07T16:24:39.656727+08:00\",\"Action\":\"pass\",\"Package\":\"lol-loot-assistant/backend\",\"Elapsed\":35.745}"
+  ],
+  "pass_count": 50,
+  "skip_count": 0,
+  "fail_count": 0
+}

@@ -1,0 +1,350 @@
+{
+  "date": "2026-10-06",
+  "timezone": "Asia/Shanghai",
+  "version": "0.12.75",
+  "final_checks": [
+    {
+      "name": "go-test",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "./backend"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends",
+      "started_at": "2026-10-06T23:18:00+08:00",
+      "finished_at": "2026-10-06T23:22:10+08:00",
+      "duration_seconds": 250.048,
+      "exit_code": 0,
+      "last_5_lines": [
+        "ok  \tlol-loot-assistant/backend\t209.440s"
+      ]
+    },
+    {
+      "name": "go-race",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "./backend"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends",
+      "started_at": "2026-10-06T23:22:48+08:00",
+      "finished_at": "2026-10-06T23:29:08+08:00",
+      "duration_seconds": 380.846,
+      "exit_code": 0,
+      "last_5_lines": [
+        "ok  \tlol-loot-assistant/backend\t204.064s"
+      ]
+    },
+    {
+      "name": "go-vet",
+      "command": [
+        "go",
+        "vet",
+        "./..."
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends",
+      "started_at": "2026-10-06T23:18:05+08:00",
+      "finished_at": "2026-10-06T23:18:09+08:00",
+      "duration_seconds": 4.75,
+      "exit_code": 0,
+      "last_5_lines": []
+    },
+    {
+      "name": "renderers-all-final",
+      "command": [
+        "node",
+        "scripts/test-renderers.cjs",
+        "all"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends",
+      "started_at": "2026-10-06T23:32:17+08:00",
+      "finished_at": "2026-10-06T23:34:44+08:00",
+      "duration_seconds": 147.463,
+      "exit_code": 1,
+      "last_5_lines": [
+        "    },",
+        "    \"duration_ms\": 147381.292583",
+        "  },",
+        "  \"success\": false",
+        "}"
+      ]
+    },
+    {
+      "name": "desktop-node-test-final",
+      "command": [
+        "node",
+        "--test"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends/desktop",
+      "started_at": "2026-10-06T23:35:55+08:00",
+      "finished_at": "2026-10-06T23:37:44+08:00",
+      "duration_seconds": 109.591,
+      "exit_code": 1,
+      "last_5_lines": [
+        "    actual: undefined,",
+        "    expected: undefined,",
+        "    operator: 'fail',",
+        "    diff: 'simple'",
+        "  }"
+      ]
+    }
+  ],
+  "earlier_attempts": [
+    {
+      "name": "focused-staging",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-tags=license_staging",
+        "./backend",
+        "-run",
+        "Test(R233StagingLicenseConfiguration|R234VectorKeysExcludedFromTrustConfiguration|R236Staging|R233ProtocolParserVectors|R233RequestSignatureTextContract|R233SharedSignedProtocolVectors)$",
+        "-v"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends",
+      "started_at": "2026-10-06T23:14:14+08:00",
+      "finished_at": "2026-10-06T23:14:14+08:00",
+      "duration_seconds": 0.2,
+      "exit_code": 1,
+      "last_5_lines": [
+        "# ./backend",
+        "open /Users/ly/Library/Caches/go-build/30/302f52a1ec13d222f27dc961bc5b2eb3dde6351d00177eaea027a88369366eb3-d: operation not permitted",
+        "FAIL\t./backend [setup failed]",
+        "FAIL"
+      ]
+    },
+    {
+      "name": "renderers-all",
+      "command": [
+        "node",
+        "scripts/test-renderers.cjs",
+        "all"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends",
+      "started_at": "2026-10-06T23:18:27+08:00",
+      "finished_at": "2026-10-06T23:25:39+08:00",
+      "duration_seconds": 432.152,
+      "exit_code": 1,
+      "last_5_lines": [
+        "    },",
+        "    \"duration_ms\": 431787.668791",
+        "  },",
+        "  \"success\": false",
+        "}"
+      ]
+    },
+    {
+      "name": "desktop-node-test",
+      "command": [
+        "node",
+        "--test"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends/desktop",
+      "started_at": "2026-10-06T23:29:48+08:00",
+      "finished_at": "2026-10-06T23:31:22+08:00",
+      "duration_seconds": 93.392,
+      "exit_code": 1,
+      "last_5_lines": [
+        "    actual: undefined,",
+        "    expected: undefined,",
+        "    operator: 'fail',",
+        "    diff: 'simple'",
+        "  }"
+      ]
+    }
+  ],
+  "supplemental_checks": [
+    {
+      "name": "focused-staging-final",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-tags=license_staging",
+        "./backend",
+        "-run",
+        "Test(R233StagingLicenseConfiguration|R234VectorKeysExcludedFromTrustConfiguration|R236Staging.*|R233ProtocolParserVectors|R233RequestSignatureTextContract|R233SharedSignedProtocolVectors)$",
+        "-v"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends",
+      "started_at": "2026-10-06T23:14:33+08:00",
+      "finished_at": "2026-10-06T23:14:46+08:00",
+      "duration_seconds": 13.752,
+      "exit_code": 0,
+      "last_5_lines": [
+        "--- PASS: TestR236StagingUpdatesDisabledWithTrustedReleaseCache (0.03s)",
+        "=== RUN   TestR236StagingUpdateHTTPGate",
+        "--- PASS: TestR236StagingUpdateHTTPGate (0.00s)",
+        "PASS",
+        "ok  \tlol-loot-assistant/backend\t0.806s"
+      ]
+    },
+    {
+      "name": "desktop-focused",
+      "command": [
+        "node",
+        "--test",
+        "license-release.test.cjs"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends/desktop",
+      "started_at": "2026-10-06T23:14:25+08:00",
+      "finished_at": "2026-10-06T23:14:25+08:00",
+      "duration_seconds": 0.171,
+      "exit_code": 0,
+      "last_5_lines": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 112.837"
+      ]
+    },
+    {
+      "name": "ci-filter",
+      "command": [
+        "node",
+        "--test",
+        "scripts/verify-ci-test-filters.test.cjs"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends",
+      "started_at": "2026-10-06T23:17:41+08:00",
+      "finished_at": "2026-10-06T23:17:47+08:00",
+      "duration_seconds": 6.517,
+      "exit_code": 0,
+      "last_5_lines": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 6348.247334"
+      ]
+    },
+    {
+      "name": "staging-race",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-race",
+        "-tags=license_staging",
+        "./backend",
+        "-run",
+        "Test(R233StagingLicenseConfiguration|R234VectorKeysExcludedFromTrustConfiguration|R236Staging.*)$",
+        "-v"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends",
+      "started_at": "2026-10-06T23:22:55+08:00",
+      "finished_at": "2026-10-06T23:25:48+08:00",
+      "duration_seconds": 172.683,
+      "exit_code": 0,
+      "last_5_lines": [
+        "--- PASS: TestR236StagingUpdatesDisabledWithTrustedReleaseCache (0.04s)",
+        "=== RUN   TestR236StagingUpdateHTTPGate",
+        "--- PASS: TestR236StagingUpdateHTTPGate (0.00s)",
+        "PASS",
+        "ok  \tlol-loot-assistant/backend\t2.132s"
+      ]
+    },
+    {
+      "name": "staging-build",
+      "command": [
+        "node",
+        "scripts/build-license-staging.cjs",
+        "--output",
+        "/Users/ly/personal/personal-work/deep-legends/dist/R236-staging-public"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends",
+      "started_at": "2026-10-06T23:15:05+08:00",
+      "finished_at": "2026-10-06T23:25:50+08:00",
+      "duration_seconds": 644.066,
+      "exit_code": 0,
+      "last_5_lines": [
+        "  • file signing skipped via signExecutable configuration  file=/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/deep-legends-STAGING-PBwpgx/dist/desktop/Deep Legends Setup 0.12.75-public.__uninstaller.exe",
+        "  • file signing skipped via signExecutable configuration  file=/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/deep-legends-STAGING-PBwpgx/dist/desktop/Deep Legends Setup 0.12.75-public.exe",
+        "packaged desktop runtime verified: app-title.cjs, backend-digest.cjs, backend-evidence.cjs, backend-integrity.cjs, desktop-log.cjs, diagnostics-directory.cjs, diagnostics-export.cjs, license-gate.cjs, main.cjs, preload.cjs, process-metrics.cjs, proxy-resolution.cjs, share-export.cjs, ui-scale.cjs, window-bounds-store.cjs, window-bounds.cjs",
+        "Installer shell built: Deep Legends Setup 0.12.75-public.exe (349226205 installed bytes)",
+        "{\"version\":\"0.12.75\",\"fingerprint\":\"008a3d957b9a\",\"license_build\":\"STAGING\",\"key_mode\":\"public\",\"window_title\":\"Deep Legends-STAGING\",\"license_origin\":\"https://license-staging.yinxiaobia.net\",\"license_kid\":\"staging-2026-10\",\"online_updates\":\"disabled at build time; no production Latest or cache\",\"directory\":\"/Users/ly/personal/personal-work/deep-legends/dist/R236-staging-public/Deep-Legends-staging-public\",\"setup\":\"/Users/ly/personal/personal-work/deep-legends/dist/R236-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe\",\"setup_sha256\":\"a33b60ba4434a25f1a77f5f08381d12ff0673e6f208659236677c9f98002b7f5\",\"backend_sha256\":\"a895505ee6660158a4ca96e1bb14ef0f3222a1c2fc91d49b07934f0dc7e80a8d\",\"archive_sha256\":\"7713f3407129b449828ca701c78f2f359e41001a192fb4c97426bb6222a2243f\"}"
+      ]
+    },
+    {
+      "name": "release-backend-build",
+      "command": [
+        "env",
+        "GOOS=windows",
+        "GOARCH=amd64",
+        "CGO_ENABLED=0",
+        "go",
+        "build",
+        "-tags=",
+        "-buildvcs=false",
+        "-trimpath",
+        "-ldflags",
+        "-s -w -H=windowsgui -buildid= -X main.version=0.12.75 -X main.riotAPIKey= -X main.riotAPIKeyCipher=",
+        "-o",
+        "/private/tmp/r236-backend-public.exe",
+        "./backend"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends",
+      "started_at": "2026-10-06T23:20:28+08:00",
+      "finished_at": "2026-10-06T23:20:55+08:00",
+      "duration_seconds": 26.706,
+      "exit_code": 0,
+      "last_5_lines": []
+    },
+    {
+      "name": "package-audit",
+      "command": [
+        "node",
+        "/private/tmp/r236-audit.cjs"
+      ],
+      "cwd": "/Users/ly/personal/personal-work/deep-legends",
+      "started_at": "2026-10-06T23:26:40+08:00",
+      "finished_at": "2026-10-06T23:26:42+08:00",
+      "duration_seconds": 2.683,
+      "exit_code": 0,
+      "last_5_lines": [
+        "    }",
+        "  ],",
+        "  \"release_staging_key_origin_and_kid_absent\": true,",
+        "  \"staging_rejected_by_release_checker\": true",
+        "}"
+      ]
+    }
+  ],
+  "desktop_final_counts": {
+    "tests": 295,
+    "pass": 292,
+    "fail": 1,
+    "skipped": 2
+  },
+  "renderer_final_counts": {
+    "tests": 1324,
+    "failed": 1,
+    "passed": 1319,
+    "cancelled": 0,
+    "skipped": 4,
+    "todo": 0,
+    "topLevel": 1321,
+    "suites": 0
+  },
+  "source_files_unchanged": true,
+  "overall_required_checks_passed": false,
+  "remaining_failure": {
+    "file": "desktop/refresh-orchestration.test.cjs",
+    "line": 271,
+    "test": "dirty collection rescans on entry and view changes without duplicate refresh requests",
+    "assertion": "view change after 60 seconds did not start the deferred rescan",
+    "scope": "existing JS/JSDOM collection path; no R236 Go update/build execution link",
+    "root_cause": "not confirmed; no out-of-scope changes"
+  },
+  "unexecuted": [
+    "Windows install/run and two-machine S16",
+    "real activation/renewal and staging management-page operations",
+    "P1 server tests/deploy (different session/repository)"
+  ],
+  "published": false
+}

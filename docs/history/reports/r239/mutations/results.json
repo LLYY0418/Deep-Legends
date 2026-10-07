@@ -1,0 +1,20 @@
+[
+  {
+    "name": "a-closed-dialog-visible",
+    "status": 1,
+    "killed": true,
+    "elapsedMs": 1630
+  },
+  {
+    "name": "b-locked-bounds-write",
+    "status": 1,
+    "killed": true,
+    "elapsedMs": 99
+  },
+  {
+    "name": "c-locked-size-removed",
+    "status": 1,
+    "killed": true,
+    "elapsedMs": 87
+  }
+]

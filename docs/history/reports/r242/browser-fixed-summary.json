@@ -1,0 +1,18 @@
+{
+  "command": [
+    "node",
+    "scripts/r242-browser.cjs"
+  ],
+  "cwd": ".",
+  "started": "2026-10-07T12:40:57.544323+08:00",
+  "finished": "2026-10-07T12:41:04.552549+08:00",
+  "elapsed_seconds": 7.008,
+  "exit_code": 1,
+  "last_5_lines": [
+    "  actual: '请输入注册码激活软件',",
+    "  expected: '注册码已过期',",
+    "  operator: 'strictEqual',",
+    "  diff: 'simple'",
+    "}"
+  ]
+}

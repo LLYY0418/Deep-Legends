@@ -1,0 +1,98 @@
+[
+  {
+    "name": "privacy-backend-placeholder",
+    "file": "backend/features.go",
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-tags=",
+      "-run",
+      "TestR237LicensePrivacyDisclosureFinal",
+      "./backend",
+      "-v"
+    ],
+    "exit_code": 1,
+    "killed_by_assertion": true,
+    "duration_seconds": 7.929,
+    "last_5_lines": [
+      "    --- FAIL: TestR237LicensePrivacyDisclosureFinal/licenseDisclosure (0.00s)",
+      "    --- PASS: TestR237LicensePrivacyDisclosureFinal/installer (0.00s)",
+      "FAIL",
+      "FAIL\tlol-loot-assistant/backend\t0.660s",
+      "FAIL"
+    ]
+  },
+  {
+    "name": "privacy-installer-placeholder",
+    "file": "installer/ui/license.html",
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-tags=",
+      "-run",
+      "TestR237LicensePrivacyDisclosureFinal",
+      "./backend",
+      "-v"
+    ],
+    "exit_code": 1,
+    "killed_by_assertion": true,
+    "duration_seconds": 7.935,
+    "last_5_lines": [
+      "    --- PASS: TestR237LicensePrivacyDisclosureFinal/licenseDisclosure (0.00s)",
+      "    --- FAIL: TestR237LicensePrivacyDisclosureFinal/installer (0.00s)",
+      "FAIL",
+      "FAIL\tlol-loot-assistant/backend\t0.657s",
+      "FAIL"
+    ]
+  },
+  {
+    "name": "release-extra-key",
+    "file": "backend/license_config_release.go",
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-tags=",
+      "-run",
+      "TestR233ReleaseLicenseConfiguration",
+      "./backend",
+      "-v"
+    ],
+    "exit_code": 1,
+    "killed_by_assertion": true,
+    "duration_seconds": 7.924,
+    "last_5_lines": [
+      "    license_config_release_test.go:12: release public configuration must remain unconfigured until supplied by owner",
+      "--- FAIL: TestR233ReleaseLicenseConfiguration (0.00s)",
+      "FAIL",
+      "FAIL\tlol-loot-assistant/backend\t0.647s",
+      "FAIL"
+    ]
+  },
+  {
+    "name": "staging-empty-key",
+    "file": "backend/license_config_staging.go",
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-tags=license_staging",
+      "-run",
+      "TestR233StagingLicenseConfiguration",
+      "./backend",
+      "-v"
+    ],
+    "exit_code": 1,
+    "killed_by_assertion": true,
+    "duration_seconds": 9.235,
+    "last_5_lines": [
+      "    license_config_staging_test.go:13: staging must use its single owner-supplied license key with online updates disabled",
+      "--- FAIL: TestR233StagingLicenseConfiguration (0.00s)",
+      "FAIL",
+      "FAIL\tlol-loot-assistant/backend\t0.622s",
+      "FAIL"
+    ]
+  }
+]

@@ -1,0 +1,367 @@
+{
+  "phase": "after",
+  "state": "NETWORK_LOCKED",
+  "expectedState": "ACTIVE",
+  "index": 1,
+  "shows": [
+    {
+      "number": 1,
+      "bounds": {
+        "x": 90,
+        "y": 60,
+        "width": 1200,
+        "height": 780
+      },
+      "content": {
+        "state": "active",
+        "overlayHidden": true,
+        "frameHidden": false,
+        "formVisible": false,
+        "icon": {
+          "x": 568,
+          "y": 271,
+          "width": 64,
+          "height": 64
+        }
+      },
+      "activationIconGoldPixels": 0,
+      "captureInvokedAtShow": true
+    }
+  ],
+  "samples": [
+    {
+      "at": 1791355691444,
+      "visible": false,
+      "opacity": 0,
+      "bounds": {
+        "x": 90,
+        "y": 60,
+        "width": 1200,
+        "height": 780
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791355691556,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90,
+        "y": 60,
+        "width": 1200,
+        "height": 780
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791355691623,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90,
+        "y": 60,
+        "width": 1200,
+        "height": 780
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791355691650,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90,
+        "y": 60,
+        "width": 1200,
+        "height": 780
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791355691677,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90,
+        "y": 60,
+        "width": 1200,
+        "height": 780
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791355691704,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90,
+        "y": 60,
+        "width": 1200,
+        "height": 780
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791355691729,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90,
+        "y": 60,
+        "width": 1200,
+        "height": 780
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791355691755,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90,
+        "y": 60,
+        "width": 1200,
+        "height": 780
+      },
+      "maximized": false
+    },
+    {
+      "at": 1791355691782,
+      "visible": true,
+      "opacity": 1,
+      "bounds": {
+        "x": 90,
+        "y": 60,
+        "width": 1200,
+        "height": 780
+      },
+      "maximized": false
+    }
+  ],
+  "platform": "darwin",
+  "locked": {
+    "bounds": {
+      "x": 90,
+      "y": 60,
+      "width": 1200,
+      "height": 780
+    },
+    "content": {
+      "state": "active",
+      "overlayHidden": true,
+      "frameHidden": false,
+      "formVisible": false,
+      "icon": {
+        "x": 568,
+        "y": 271,
+        "width": 64,
+        "height": 64
+      }
+    }
+  },
+  "restored": {
+    "bounds": {
+      "x": 90,
+      "y": 60,
+      "width": 1200,
+      "height": 780
+    },
+    "normal": {
+      "x": 90,
+      "y": 60,
+      "width": 1200,
+      "height": 780
+    },
+    "maximized": false,
+    "content": {
+      "state": "active",
+      "overlayHidden": true,
+      "frameHidden": false,
+      "formVisible": false,
+      "icon": {
+        "x": 568,
+        "y": 271,
+        "width": 64,
+        "height": 64
+      }
+    }
+  },
+  "diagnostics": [
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "backend_ready",
+        "elapsedMs": 252
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_created",
+        "elapsedMs": 278
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_did_finish_load",
+        "elapsedMs": 372
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "blocking_state_client",
+        "reason": "show",
+        "source": "startup",
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 5,
+        "httpStatus": 200,
+        "endpoint": "other",
+        "startedAt": 1791355691414,
+        "completedAt": 1791355691419,
+        "errorKind": "none",
+        "responseBytes": 47,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 1,
+        "httpStatus": 200,
+        "endpoint": "champions",
+        "startedAt": 1791355691418,
+        "completedAt": 1791355691419,
+        "errorKind": "none",
+        "responseBytes": 2,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "local_request_client",
+        "reason": "complete",
+        "durationMs": 2,
+        "httpStatus": 200,
+        "endpoint": "status",
+        "startedAt": 1791355691418,
+        "completedAt": 1791355691420,
+        "errorKind": "none",
+        "responseBytes": 38,
+        "transportFailed": 0,
+        "transportDropped": 0,
+        "transportSuppressed": 0,
+        "transportHTTPStatus": 0,
+        "transportErrorKind": "none"
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "live_scope_reset",
+        "reason": "disconnect",
+        "source": "",
+        "previousGameId": 0,
+        "gameId": 0,
+        "previousPhase": "",
+        "phase": "",
+        "clearedRecommendations": 0
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup-stage",
+      "value": {
+        "stage": "main_window_ready_to_show",
+        "elapsedMs": 403
+      }
+    },
+    {
+      "api": "/api/diagnostics/client",
+      "value": {
+        "event": "license_window_state",
+        "reason": "transition",
+        "licenseWindow": {
+          "fromState": "PENDING",
+          "toState": "ACTIVE",
+          "wasMaximized": false,
+          "wasFullscreen": false,
+          "displayScale": 2,
+          "statusReadMs": 15,
+          "retried": false,
+          "waitTimedOut": false,
+          "renderTimedOut": false,
+          "renderMismatch": false,
+          "sizeMismatch": false,
+          "fallback_used": false,
+          "requestedContent": {
+            "x": 90,
+            "y": 60,
+            "width": 1200,
+            "height": 780
+          },
+          "nativeMs": 1,
+          "renderMs": 112,
+          "actualContent": {
+            "x": 90,
+            "y": 60,
+            "width": 1200,
+            "height": 780
+          },
+          "elapsedMs": 113
+        }
+      }
+    },
+    {
+      "api": "/api/diagnostics/startup",
+      "value": {
+        "processToJs": 126,
+        "jsToReady": 49,
+        "readyToSplash": 79,
+        "splashPaint": 94,
+        "splashWindowShown": 347,
+        "spawnToReady": 30,
+        "readyToWindow": 258,
+        "total": 636
+      }
+    }
+  ],
+  "phases": {
+    "processToJs": 126,
+    "jsToReady": 49,
+    "readyToSplash": 79,
+    "splashPaint": 94,
+    "splashWindowShown": 347,
+    "spawnToReady": 30,
+    "readyToWindow": 258,
+    "total": 636
+  },
+  "cacheEvidence": {
+    "expired_cache": true,
+    "renew_requests": 1,
+    "state": "ACTIVE"
+  },
+  "export": "{\"build_fingerprint\":\"dev\",\"event\":\"license_state\",\"generation\":2,\"log_seq\":1,\"run_id\":\"2c337f6773cf2ae9d3dcda04\",\"state\":\"ACTIVE\",\"time\":\"2026-10-07T06:48:10.881231Z\"}\n{\"build_fingerprint\":\"dev\",\"duration_ms\":0,\"event\":\"license_renew\",\"kind\":\"renew\",\"log_seq\":2,\"request_id\":\"49551dfa45b351f05d9cbcee8a3b8fa2\",\"result\":\"ok\",\"revision\":2,\"run_id\":\"2c337f6773cf2ae9d3dcda04\",\"time\":\"2026-10-07T06:48:10.881378Z\"}\n{\"build_fingerprint\":\"dev\",\"duration_ms\":0,\"event\":\"blocking_state_client\",\"log_seq\":3,\"reason\":\"show\",\"run_id\":\"2c337f6773cf2ae9d3dcda04\",\"source\":\"startup\",\"time\":\"2026-10-07T06:48:11.420845Z\"}\n{\"build_fingerprint\":\"dev\",\"completed_at\":1791355691419,\"duration_ms\":5,\"endpoint\":\"other\",\"error_kind\":\"none\",\"event\":\"local_request_client\",\"http_status\":200,\"log_seq\":4,\"reason\":\"complete\",\"response_bytes\":47,\"run_id\":\"2c337f6773cf2ae9d3dcda04\",\"started_at\":1791355691414,\"time\":\"2026-10-07T06:48:11.422131Z\"}\n{\"build_fingerprint\":\"dev\",\"completed_at\":1791355691419,\"duration_ms\":1,\"endpoint\":\"champions\",\"error_kind\":\"none\",\"event\":\"local_request_client\",\"http_status\":200,\"log_seq\":5,\"reason\":\"complete\",\"response_bytes\":2,\"run_id\":\"2c337f6773cf2ae9d3dcda04\",\"started_at\":1791355691418,\"time\":\"2026-10-07T06:48:11.422322Z\"}\n{\"build_fingerprint\":\"dev\",\"completed_at\":1791355691420,\"duration_ms\":2,\"endpoint\":\"status\",\"error_kind\":\"none\",\"event\":\"local_request_client\",\"http_status\":200,\"log_seq\":6,\"reason\":\"complete\",\"response_bytes\":38,\"run_id\":\"2c337f6773cf2ae9d3dcda04\",\"started_at\":1791355691418,\"time\":\"2026-10-07T06:48:11.422993Z\"}\n{\"build_fingerprint\":\"dev\",\"cleared_recommendations\":0,\"event\":\"live_scope_reset\",\"game_id\":0,\"log_seq\":7,\"phase\":\"\",\"previous_game_id\":0,\"previous_phase\":\"\",\"reason\":\"disconnect\",\"run_id\":\"2c337f6773cf2ae9d3dcda04\",\"source\":\"\",\"time\":\"2026-10-07T06:48:11.42323Z\"}\n{\"actual_content\":{\"x\":90,\"y\":60,\"width\":1200,\"height\":780},\"build_fingerprint\":\"dev\",\"display_scale\":2,\"elapsed_ms\":113,\"event\":\"license_window_state\",\"fallback_used\":false,\"from_state\":\"PENDING\",\"log_seq\":8,\"native_ms\":1,\"render_mismatch\":false,\"render_ms\":112,\"render_timed_out\":false,\"requested_content\":{\"x\":90,\"y\":60,\"width\":1200,\"height\":780},\"retried\":false,\"run_id\":\"2c337f6773cf2ae9d3dcda04\",\"size_mismatch\":false,\"status_read_ms\":15,\"time\":\"2026-10-07T06:48:11.55757Z\",\"to_state\":\"ACTIVE\",\"wait_timed_out\":false,\"was_fullscreen\":false,\"was_maximized\":false}\n{\"build_fingerprint\":\"dev\",\"diagnostic_schema\":2,\"duration_ms\":0,\"event\":\"item_set_export_snapshot\",\"game_loaded_recommendation\":\"unknown\",\"game_render_geometry\":\"unobservable\",\"log_seq\":9,\"result\":\"not-connected\",\"run_id\":\"2c337f6773cf2ae9d3dcda04\",\"time\":\"2026-10-07T06:48:12.032787Z\"}\n{\"build_fingerprint\":\"dev\",\"event\":\"accept_focus_inspection_end\",\"log_seq\":10,\"result\":\"client-unavailable\",\"run_id\":\"2c337f6773cf2ae9d3dcda04\",\"time\":\"2026-10-07T06:48:12.032939Z\"}\n"
+}

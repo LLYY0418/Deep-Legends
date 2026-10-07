@@ -1,0 +1,17 @@
+{
+  "name": "go-full",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "./backend"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started": "2026-10-07T16:32:16.480300+08:00",
+  "finished": "2026-10-07T16:35:33.190905+08:00",
+  "duration_s": 196.711,
+  "exit_code": 0,
+  "last5": [
+    "ok  \tlol-loot-assistant/backend\t195.181s"
+  ]
+}

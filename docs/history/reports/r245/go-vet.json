@@ -1,0 +1,14 @@
+{
+  "name": "go-vet",
+  "command": [
+    "go",
+    "vet",
+    "./..."
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started": "2026-10-07T16:39:22.808468+08:00",
+  "finished": "2026-10-07T16:39:24.396118+08:00",
+  "duration_s": 1.587,
+  "exit_code": 0,
+  "last5": []
+}

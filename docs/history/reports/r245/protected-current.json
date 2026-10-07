@@ -1,0 +1,42 @@
+{
+  "backend/testdata/license-protocol-vectors.json": {
+    "before": "5f3fee3c89790cffdcb37f651c4333afb18e0f65f7247b1ac5fdda5dc458b89b",
+    "current": "5f3fee3c89790cffdcb37f651c4333afb18e0f65f7247b1ac5fdda5dc458b89b",
+    "matched": true
+  },
+  "backend/license_config_release.go": {
+    "before": "153235fb7d7caeeb494160225bf06035e4c80d0753253788527a19921e94924f",
+    "current": "153235fb7d7caeeb494160225bf06035e4c80d0753253788527a19921e94924f",
+    "matched": true
+  },
+  "backend/license_config_staging.go": {
+    "before": "822eb8eda63006e815a8b98eae24e4dc58d7a20458bcbcca7157815644397b92",
+    "current": "822eb8eda63006e815a8b98eae24e4dc58d7a20458bcbcca7157815644397b92",
+    "matched": true
+  },
+  "docs/license-protocol.md": {
+    "before": "f18c581094434c692b1036b864a9514f21022a602375baca19cba123e7a71deb",
+    "current": "f18c581094434c692b1036b864a9514f21022a602375baca19cba123e7a71deb",
+    "matched": true
+  },
+  "desktop/package.json": {
+    "before": "8d186aeaef220646059a03e1302f740cf91cf332d7e46fac02c4c88b24ee3bb2",
+    "current": "8d186aeaef220646059a03e1302f740cf91cf332d7e46fac02c4c88b24ee3bb2",
+    "matched": true
+  },
+  "desktop/package-lock.json": {
+    "before": "92633ccc497ab1baf9f603aa17e6640deb932c03267d7ebed35ae1d3f84b6808",
+    "current": "92633ccc497ab1baf9f603aa17e6640deb932c03267d7ebed35ae1d3f84b6808",
+    "matched": true
+  },
+  "backend/web/app.js": {
+    "before": "b858bdbd8fb368d7b45859dddde4b16b8aeedc243d9c80cb363afda55fb2436a",
+    "current": "b858bdbd8fb368d7b45859dddde4b16b8aeedc243d9c80cb363afda55fb2436a",
+    "matched": true
+  },
+  "desktop/refresh-orchestration.test.cjs": {
+    "before": "e728a9268dd88176e3b577943f9f503b1f38e7d78ad22a42043299e310dbfcbc",
+    "current": "e728a9268dd88176e3b577943f9f503b1f38e7d78ad22a42043299e310dbfcbc",
+    "matched": true
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "scope": "Diagnostic current-UI test-file control after old-UI test-file control; not a full renderer acceptance rerun",
+  "command": [
+    "node",
+    "--test",
+    "desktop/refresh-orchestration.test.cjs"
+  ],
+  "started": "2026-10-07T16:53:30.910331+08:00",
+  "finished": "2026-10-07T16:53:36.967269+08:00",
+  "duration_s": 6.057,
+  "exit_code": 0,
+  "same_original_assertion_failure": false,
+  "last5": [
+    "ℹ fail 0",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0",
+    "ℹ duration_ms 6013.245042"
+  ]
+}

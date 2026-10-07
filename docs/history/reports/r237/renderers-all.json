@@ -1,0 +1,20 @@
+{
+  "name": "renderers-all",
+  "command": [
+    "node",
+    "scripts/test-renderers.cjs",
+    "all"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started_at": "2026-10-07T00:14:03+08:00",
+  "finished_at": "2026-10-07T00:15:29+08:00",
+  "duration_seconds": 86.15,
+  "exit_code": 0,
+  "last_5_lines": [
+    "    },",
+    "    \"duration_ms\": 86105.842458",
+    "  },",
+    "  \"success\": true",
+    "}"
+  ]
+}

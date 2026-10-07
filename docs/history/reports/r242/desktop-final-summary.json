@@ -1,0 +1,18 @@
+{
+  "command": [
+    "node",
+    "--test"
+  ],
+  "cwd": "desktop",
+  "started": "2026-10-07T12:56:24.615185+08:00",
+  "finished": "2026-10-07T12:57:39.477303+08:00",
+  "elapsed_seconds": 74.863,
+  "exit_code": 0,
+  "last_5_lines": [
+    "ℹ fail 0",
+    "ℹ cancelled 0",
+    "ℹ skipped 2",
+    "ℹ todo 0",
+    "ℹ duration_ms 74825.230042"
+  ]
+}

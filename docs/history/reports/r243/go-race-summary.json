@@ -1,0 +1,17 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-race",
+    "./backend"
+  ],
+  "cwd": ".",
+  "started": "2026-10-07T14:49:15.999023+08:00",
+  "finished": "2026-10-07T14:53:05.268910+08:00",
+  "elapsed_seconds": 229.272,
+  "exit_code": 0,
+  "last_5_lines": [
+    "ok  \tlol-loot-assistant/backend\t215.530s"
+  ]
+}

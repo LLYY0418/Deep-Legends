@@ -1,0 +1,15 @@
+{
+  "name": "package-audit",
+  "command": [
+    "node",
+    "scripts/r248-audit-package.cjs"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-07T18:52:53.363472+08:00",
+  "end": "2026-10-07T18:52:54.300440+08:00",
+  "elapsed_seconds": 0.937,
+  "exit_code": 0,
+  "last_five": [
+    "{\"schema\":1,\"version\":\"0.12.75\",\"fingerprint\":\"f9c647287d80\",\"mode\":\"public\",\"backendSHA256\":\"452fb18be0112bdf7127950fc2890e1d8df340b530cb12a69afa020bd92f57ac\",\"assets\":{\"Deep Legends Setup 0.12.75-public.exe\":\"61bcbe529eaf9a309da0601e42954275dd0e6ab9f71540aae655ec24e12d59ea\"},\"setup\":\"/Users/ly/personal/personal-work/deep-legends/dist/R248-no-license-public/Deep Legends Setup 0.12.75-public.exe\",\"setup_sha256\":\"61bcbe529eaf9a309da0601e42954275dd0e6ab9f71540aae655ec24e12d59ea\",\"backend_sha256\":\"452fb18be0112bdf7127950fc2890e1d8df340b530cb12a69afa020bd92f57ac\",\"archive_sha256\":\"df1004e37bd43c01285b57779929ecd192fcbaba7023b6c571e6963365c81479\",\"audit_only\":true,\"license_enabled\":false,\"authorization_markers_absent\":true,\"public_riot_key_policy\":true,\"fixed_backend_digest\":true,\"fuses\":{\"RunAsNode\":false,\"EnableNodeOptionsEnvironmentVariable\":false,\"EnableNodeCliInspectArguments\":false,\"EnableEmbeddedAsarIntegrityValidation\":true,\"OnlyLoadAppFromAsar\":true},\"asar_integrity\":[{\"file\":\"resources\\\\app.asar\",\"alg\":\"SHA256\",\"value\":\"cc3e4414403f51d95a245ddcf9016673e2c59f975b56fde94663df05ce21702c\"},{\"file\":\"resources\\\\default_app.asar\",\"alg\":\"SHA256\",\"value\":\"553d6dd413d71a62ae1e67b1db59bd83fadf16ae529f015415dce85787ea437b\"}],\"update_validation\":\"0.12.76 unsigned manifest validation + size/SHA256; actual published asset passed local test\",\"windows_execution\":\"未在 Windows 实跑\"}"
+  ]
+}

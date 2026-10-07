@@ -1,0 +1,27 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-race",
+    "-json",
+    "-run",
+    "R233ProtocolParserVectors|R233RequestSignatureTextContract|R233SharedSignedProtocolVectors|R242",
+    "./backend"
+  ],
+  "cwd": ".",
+  "started": "2026-10-07T12:37:07.237674+08:00",
+  "finished": "2026-10-07T12:37:23.789545+08:00",
+  "elapsed_seconds": 16.552,
+  "exit_code": 0,
+  "last_5_lines": [
+    "{\"Time\":\"2026-10-07T12:37:22.604558+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Test\":\"TestR242ShortLeaseRenewalAndRestart\",\"Output\":\"--- PASS: TestR242ShortLeaseRenewalAndRestart (0.01s)\\n\"}",
+    "{\"Time\":\"2026-10-07T12:37:22.604589+08:00\",\"Action\":\"pass\",\"Package\":\"lol-loot-assistant/backend\",\"Test\":\"TestR242ShortLeaseRenewalAndRestart\",\"Elapsed\":0.01}",
+    "{\"Time\":\"2026-10-07T12:37:22.724191+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Output\":\"PASS\\n\"}",
+    "{\"Time\":\"2026-10-07T12:37:23.73508+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Output\":\"ok  \\tlol-loot-assistant/backend\\t2.111s\\n\"}",
+    "{\"Time\":\"2026-10-07T12:37:23.735226+08:00\",\"Action\":\"pass\",\"Package\":\"lol-loot-assistant/backend\",\"Elapsed\":2.112}"
+  ],
+  "top_level_pass": 7,
+  "skip": 0,
+  "fail": 0
+}

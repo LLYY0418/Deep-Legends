@@ -1,0 +1,8 @@
+{
+  "started": "2026-10-07T00:47:31.565449+08:00",
+  "prechecks_passed": true,
+  "version": "0.12.75",
+  "key_mode": "public",
+  "license_tag": "license_staging",
+  "output": "dist/R239-staging-public"
+}

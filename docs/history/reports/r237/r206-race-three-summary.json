@@ -1,0 +1,10 @@
+{
+  "iterations": 3,
+  "passed": 3,
+  "failed": 0,
+  "test_durations": [
+    "2.88s",
+    "2.88s",
+    "2.88s"
+  ]
+}

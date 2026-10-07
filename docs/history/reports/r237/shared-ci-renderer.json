@@ -1,0 +1,20 @@
+{
+  "name": "shared-ci-renderer",
+  "command": [
+    "node",
+    "--test",
+    "backend/web/r117.test.cjs"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started_at": "2026-10-07T00:28:19+08:00",
+  "finished_at": "2026-10-07T00:28:19+08:00",
+  "duration_seconds": 0.661,
+  "exit_code": 0,
+  "last_5_lines": [
+    "ℹ fail 0",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0",
+    "ℹ duration_ms 626.210625"
+  ]
+}

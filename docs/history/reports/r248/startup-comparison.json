@@ -1,0 +1,60 @@
+{
+  "before": {
+    "total": {
+      "samples": [
+        1044,
+        673,
+        641
+      ],
+      "mean": 786,
+      "median": 673
+    },
+    "readyToWindow": {
+      "samples": [
+        259,
+        156,
+        186
+      ],
+      "mean": 200.33333333333334,
+      "median": 186
+    },
+    "processToJs": {
+      "samples": [
+        303,
+        153,
+        134
+      ],
+      "mean": 196.66666666666666,
+      "median": 153
+    }
+  },
+  "after": {
+    "total": {
+      "samples": [
+        623,
+        761,
+        608
+      ],
+      "mean": 664,
+      "median": 623
+    },
+    "readyToWindow": {
+      "samples": [
+        148,
+        226,
+        149
+      ],
+      "mean": 174.33333333333334,
+      "median": 149
+    },
+    "processToJs": {
+      "samples": [
+        135,
+        150,
+        143
+      ],
+      "mean": 142.66666666666666,
+      "median": 143
+    }
+  }
+}

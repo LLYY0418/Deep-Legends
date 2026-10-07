@@ -1,0 +1,336 @@
+--- backend/web/app.css (R239 before)
++++ backend/web/app.css (R239 final)
+@@ -268,15 +268,27 @@
+ .skip-link:focus { transform: translateY(0); }
+ .startup-loading { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: color-mix(in oklab,var(--bg) 94%,transparent); opacity: 1; transition: opacity 180ms ease-out; }
+ .startup-loading.is-leaving { pointer-events: none; opacity: 0; }
+-.license-overlay { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:24px; background:var(--bg); }
++.license-overlay { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:24px; padding-top:56px; padding-bottom:14px; overflow:hidden; background:var(--bg); }
++.license-overlay::before { content:""; position:fixed; inset:0 0 auto; height:56px; -webkit-app-region:drag; }
+ .license-overlay[hidden], .app-frame[hidden] { display:none; }
+-.license-panel { width:min(420px,100%); display:grid; gap:14px; padding:24px; background:var(--surface); border:1px solid var(--hex-line); border-radius:14px; box-shadow:0 18px 48px rgb(0 0 0/.2); zoom:var(--ui-zoom,1); }
+-.license-panel h1 { margin:0; font-size:22px; }
+-.license-panel input { min-width:0; width:100%; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; }
+-.license-panel p { min-height:2.5em; margin:0; color:var(--muted); }
++.license-panel { width:min(420px,100%); gap:6px; padding:16px; padding-inline:24px; background:var(--surface); border:1px solid var(--hex-line); border-radius:14px; box-shadow:0 18px 48px rgb(0 0 0/.2); zoom:1; }
++/* Closed dialog visibility must remain owned by the browser's UA rule. */
++#license-form, #license-privacy-dialog[open] { display:grid; }
++.license-panel h1 { margin:0; font-size:22px; line-height:28px; text-align:center; }
++#license-form > img { justify-self:center; }
++#license-form label { font-size:12px; line-height:18px; }
++.license-panel input { min-width:0; width:100%; height:42px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; }
++.license-panel p { margin:0; color:var(--muted); }
++#license-message { min-height:20px; height:20px; line-height:20px; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
++#license-message[data-tone="error"] { color:var(--danger); }
++#license-submit { width:100%; height:40px; padding:8px 12px; }
++.license-links { display:flex; justify-content:space-between; align-items:center; margin-top:4px; height:18px; }
+ .license-panel a { color:var(--muted); font-size:12px; }
+-.license-panel:modal { max-height:90dvh; overflow:auto; color:var(--ink); }
+-.license-panel:modal::backdrop { background:rgb(0 0 0/.5); }
++#license-privacy-dialog:modal { top:56px; bottom:0; width:min(520px,calc(100vw - 48px)); max-width:calc(100vw - 48px); max-height:80dvh; margin:auto; grid-template-rows:auto minmax(0,1fr) auto; gap:14px; overflow:hidden; color:var(--ink); }
++#license-privacy-dialog h2 { margin:0; font-size:20px; }
++#license-privacy-text { min-height:0; overflow:auto; white-space:pre-line; }
++#license-privacy-dialog form { text-align:right; }
++#license-privacy-dialog::backdrop { background:rgb(0 0 0/.5); clip-path:inset(56px 0 0); }
+ html[data-license="locked"] .skip-link, html[data-license="locked"] .startup-loading { display:none; }
+ .startup-loading-panel { display: flex; width: min(420px,100%); align-items: center; gap: 18px; padding: 20px; background: var(--surface); border: 1px solid var(--hex-line); border-radius: 14px; box-shadow: 0 18px 48px rgb(0 0 0/.16); }
+ .startup-loading-panel > div:last-child { display: grid; min-width: 0; gap: 3px; }
+--- backend/web/index.html (R239 before)
++++ backend/web/index.html (R239 final)
+@@ -38,13 +38,13 @@
+         <label for="license-code">注册码</label>
+         <input id="license-code" type="text" maxlength="80" autocomplete="off" spellcheck="false" placeholder="DL-XXXXX-XXXXX-XXXXX-XXXXX" required>
+         <p id="license-message" role="status" aria-live="polite">请输入注册码激活软件</p>
+-        <button id="license-submit" type="submit" class="primary-button">激活</button>
+-        <a id="license-privacy" href="/api/privacy">隐私说明</a>
+-        <a href="/api/diagnostics/log" download>导出诊断</a>
++        <button id="license-submit" type="submit" class="button button-primary">激活</button>
++        <div class="license-links"><a id="license-privacy" href="/api/privacy">隐私说明</a>
++        <a href="/api/diagnostics/log" download>导出诊断</a></div>
+       </form>
+       <dialog id="license-privacy-dialog" class="license-panel">
+         <h2>隐私说明</h2><p id="license-privacy-text"></p>
+-        <form method="dialog"><button class="primary-button">关闭</button></form>
++        <form method="dialog"><button class="button button-primary">关闭</button></form>
+       </dialog>
+     </div>
+     <div id="app-frame" class="app-frame" inert hidden>
+--- backend/web/license-ui.js (R239 before)
++++ backend/web/license-ui.js (R239 final)
+@@ -5,7 +5,7 @@
+   const layer = document.getElementById("license-overlay"), form = document.getElementById("license-form");
+   const input = document.getElementById("license-code"), message = document.getElementById("license-message");
+   const button = document.getElementById("license-submit"), frame = document.getElementById("app-frame");
+-  let active = false, generation = 0, requestSequence = 0, busy = false, disposed = false, timer = 0;
++  let active = false, notified = false, generation = 0, requestSequence = 0, busy = false, disposed = false, timer = 0;
+   const requests = new Set();
+   const publicAPI = (path, method) => [
+     "GET /api/license/status", "POST /api/license/activate", "GET /api/privacy", "GET /api/diagnostics/log",
+@@ -14,7 +14,10 @@
+     "GET /api/update/settings", "POST /api/update/settings",
+   ].includes(`${method} ${path}`);
+   const cancelled = () => Object.assign(new Error("请求已取消"), { name: "RequestCancelled" });
+-  function apply(value) {
++  function setMessage(text, error = false) {
++    message.textContent = text; message.dataset.tone = error ? "error" : "normal";
++  }
++  function apply(value, notify = true) {
+     const next = value?.state === "ACTIVE", changed = active !== next;
+     active = next;
+     if (changed) generation += 1;
+@@ -23,14 +26,18 @@
+     if (!active) {
+       frame.setAttribute("inert", "");
+       for (const controller of requests) controller.abort();
+-      requests.clear(); message.textContent = value?.message || "请输入注册码激活软件";
+-      if (!busy && document.activeElement === document.body) input.focus();
++      requests.clear(); setMessage(value?.message || "请输入注册码激活软件", value?.state !== "LOCKED");
++      if (!busy && (changed || document.activeElement === document.body)) input.focus();
+     } else {
+       input.value = "";
+       if (document.getElementById("startup-loading").hidden) frame.removeAttribute("inert");
+     }
++    if (notify && (changed || !notified)) {
++      notified = true;
++      if (active) window.desktopBackend?.licensed?.();
++      else window.desktopBackend?.licenseStateChanged?.();
++    }
+     if (changed) {
+-      if (active) window.desktopBackend?.licensed?.();
+       window.dispatchEvent(new CustomEvent("deep-legends:license", { detail: { active, generation } }));
+     }
+   }
+@@ -69,9 +76,9 @@
+   }
+   form.addEventListener("submit", async event => {
+     event.preventDefault(); if (busy || disposed) return;
+-    busy = true; ++requestSequence; button.disabled = true; input.disabled = true; message.textContent = "正在激活…";
++    busy = true; ++requestSequence; button.disabled = true; input.disabled = true; setMessage("正在激活…");
+     try { apply(await request("/api/license/activate", { method: "POST", body: JSON.stringify({ code: input.value }) })); }
+-    catch (error) { message.textContent = error.name === "AbortError" ? "无法连接激活服务，请联网后重试" : error.message; }
++    catch (error) { setMessage(error.name === "AbortError" ? "无法连接激活服务，请联网后重试" : error.message, true); }
+     finally { busy = false; button.disabled = false; input.disabled = false; clearTimeout(timer); timer = setTimeout(poll, 2000); }
+   });
+   const privacy = document.getElementById("license-privacy-dialog");
+@@ -81,7 +88,7 @@
+       const value = await request("/api/privacy");
+       document.getElementById("license-privacy-text").textContent = value.licenseDisclosure;
+       privacy.showModal();
+-    } catch (_) { message.textContent = "隐私说明读取失败，请重试"; }
++    } catch (_) { setMessage("隐私说明读取失败，请重试", true); }
+   });
+   window.addEventListener("keydown", event => {
+     if (active || privacy?.open) return;
+@@ -99,5 +106,7 @@
+   window.addEventListener("deep-legends:dispose", () => { disposed = true; ++requestSequence; clearTimeout(timer); for (const controller of requests) controller.abort(); });
+   window.addEventListener("focus", () => { void poll(); });
+   window.addEventListener("online", () => { void poll(); });
+-  apply({ state: "LOCKED" });
++  // This placeholder is not a confirmed backend state; notifying native here
++  // would briefly shrink a valid ACTIVE startup before the first status read.
++  apply({ state: "LOCKED" }, false);
+ })();
+--- desktop/main.cjs (R239 before)
++++ desktop/main.cjs (R239 final)
+@@ -71,6 +71,9 @@
+ let processMetrics = null;
+ let uiScalePreference = "auto";
+ let currentUiScale = 1;
++let licenseWindow = null;
++let licenseWindowRead = null;
++let licenseWindowSequence = 0;
+ let startupStageAgent = null;
+ const reportedStartupStages = new Set();
+ 
+@@ -82,7 +85,7 @@
+ } else {
+   app.on("second-instance", () => {
+     if (quitting) return;
+-    if (!mainWindow) {
++    if (!mainWindow || !startupMarks.mainShown) {
+       if (startupMarks.splashWindowShown) { splashWindow?.show(); splashWindow?.focus(); }
+       return;
+     }
+@@ -256,6 +259,7 @@
+ }
+ 
+ function uiScaleState(window = mainWindow) {
++  if (!licenseWindow?.isActive()) return { mode: "fixed", value: 1, auto: 1 };
+   const auto = autoScaleFor(window.getContentBounds());
+   return { mode: uiScalePreference === "auto" ? "auto" : "fixed", value: uiScalePreference === "auto" ? auto : uiScalePreference, auto };
+ }
+@@ -267,6 +271,12 @@
+   // caption overlay is DIP while --topbar-height is CSS px, and the minimum size
+   // has to grow or a 780px window would drop into the phone breakpoints.
+   if (!window || window !== mainWindow || window.isDestroyed()) return;
++  if (!licenseWindow?.isActive()) {
++    currentUiScale = 1;
++    syncTitleBar(1);
++    window.setMinimumSize(0, 0);
++    return;
++  }
+   if (!force && currentUiScale === scale) return;
+   currentUiScale = scale;
+   syncTitleBar(scale);
+@@ -360,11 +370,15 @@
+ }
+ 
+ function setupBackendIPC() {
+-  const trusted = event => event.sender === mainWindow?.webContents && isTrustedRenderer(event.sender);
++  const trusted = event => event.sender === mainWindow?.webContents && event.senderFrame === mainWindow?.webContents.mainFrame && isTrustedRenderer(event.sender);
+   ipcMain.removeAllListeners("desktop-license-active");
+   ipcMain.on("desktop-license-active", event => {
+     if (!trusted(event)) return;
+-    void requireActiveDesktopLicense().then(() => pushSystemProxy()).catch(() => {});
++    void refreshLicenseWindow().then(() => { if (licenseWindow?.isActive()) return pushSystemProxy(); }).catch(() => {});
++  });
++  ipcMain.removeAllListeners("desktop-license-changed");
++  ipcMain.on("desktop-license-changed", event => {
++    if (trusted(event)) void refreshLicenseWindow();
+   });
+   ipcMain.removeAllListeners("desktop-update-ready");
+   ipcMain.on("desktop-update-ready", event => {
+@@ -439,6 +453,19 @@
+ 
+ function requireActiveDesktopLicense() {
+   return require("./license-gate.cjs").requireActiveLicense(http, () => backend && backendReady);
++}
++
++function refreshLicenseWindow() {
++  const window = mainWindow, controller = licenseWindow, sequence = ++licenseWindowSequence, started = Date.now();
++  // IPC is only a notification. Native sizing trusts the authenticated Go state.
++  licenseWindowRead = require("./license-gate.cjs").readLicenseSnapshot(http, () => backend && backendReady)
++    .catch(() => ({ state: "NETWORK_LOCKED" }))
++    .then(value => {
++      if (sequence !== licenseWindowSequence || window !== mainWindow || window?.isDestroyed()) return;
++      controller.setState(value.state);
++      appendDesktopLog("授权窗口状态 " + JSON.stringify({ state: value.state, elapsedMs: Date.now() - started, beforeFirstShow: !startupMarks.mainShown }));
++    });
++  return licenseWindowRead;
+ }
+ 
+ // 系统代理解析不再阻塞后端启动：后端就绪后异步解析并下发，
+@@ -517,12 +544,16 @@
+   });
+   reportStartupStage("main_window_created");
+   mainWindow.on("page-title-updated", event => event.preventDefault());
+-  if (storedBounds?.maximized) mainWindow.maximize();
++  licenseWindow = require("./license-window.cjs").createLicenseWindowController({
++    window: mainWindow, normalBounds: bounds,
++    getWorkArea: () => screen.getDisplayMatching(mainWindow.getBounds()).workArea,
++    onScale: () => { applyUiScale(mainWindow, uiScaleState().value, true); publishUiScale(true); },
++    writeBounds: value => writeWindowBounds(boundsPath, value),
++  });
+   let boundsWriteTimer = null;
+   const persistBounds = () => {
+     if (!mainWindow || mainWindow.isDestroyed()) return;
+-    const normal = mainWindow.isMaximized() ? mainWindow.getNormalBounds() : mainWindow.getBounds();
+-    writeWindowBounds(boundsPath, { ...normal, maximized: mainWindow.isMaximized() });
++    licenseWindow.persistBounds();
+   };
+   const scheduleBoundsWrite = () => {
+     clearTimeout(boundsWriteTimer);
+@@ -540,8 +571,13 @@
+     clearTimeout(boundsWriteTimer);
+     persistBounds();
+   });
+-  mainWindow.once("ready-to-show", () => {
++  mainWindow.once("ready-to-show", async () => {
+     reportStartupStage("main_window_ready_to_show");
++    // Hidden normal-sized construction overlaps rendering and the local status
++    // read. A valid lease never passes through a visible 700x470 window.
++    let pending;
++    do { pending = licenseWindowRead; await pending; } while (pending !== licenseWindowRead);
++    if (quitting || !mainWindow || mainWindow.isDestroyed()) return;
+     mainWindow?.show();
+     closeSplashWindow();
+     startupMarks.mainShown = Date.now();
+@@ -555,6 +591,7 @@
+     lastScaleState = serialized;
+     mainWindow.webContents.send("desktop-scale-changed", state);
+   };
++  void refreshLicenseWindow();
+   mainWindow.webContents.on("did-finish-load", () => {
+     reportStartupStage("main_window_did_finish_load");
+     applyUiScale(mainWindow, uiScaleState().value, true);
+@@ -719,6 +756,8 @@
+     windowShareExportController.clear();
+     if (shareExportController === windowShareExportController) shareExportController = null;
+     mainWindow = null;
++    licenseWindow = null;
++    ++licenseWindowSequence;
+     if (!quitting) app.quit();
+   });
+   const allowedOrigin = new URL(backendReady.baseUrl).origin;
+@@ -798,7 +837,7 @@
+ 
+ app.on("activate", () => {
+   if (quitting) return;
+-  if (mainWindow) mainWindow.show();
++  if (mainWindow && startupMarks.mainShown) mainWindow.show();
+   else if (startupMarks.splashWindowShown) splashWindow?.show();
+ });
+ 
+--- desktop/preload.cjs (R239 before)
++++ desktop/preload.cjs (R239 final)
+@@ -79,6 +79,7 @@
+   getState() { return ipcRenderer.invoke("desktop-backend-state"); },
+   restart() { return ipcRenderer.invoke("desktop-backend-restart"); },
+   licensed() { ipcRenderer.send("desktop-license-active"); },
++  licenseStateChanged() { ipcRenderer.send("desktop-license-changed"); },
+   onStateChanged(callback) {
+     if (typeof callback !== "function") return;
+     const listener = (_event, state) => callback(state);
+--- desktop/package.json (R239 before)
++++ desktop/package.json (R239 final)
+@@ -47,6 +47,7 @@
+       "backend-integrity.cjs",
+       "backend-digest.cjs",
+       "license-gate.cjs",
++      "license-window.cjs",
+       "preload.cjs",
+       "share-export.cjs",
+       "diagnostics-export.cjs",
+--- desktop/test-fixtures/startup-stages.cjs (R239 before)
++++ desktop/test-fixtures/startup-stages.cjs (R239 final)
+@@ -14,7 +14,7 @@
+ Object.assign(app, { isPackaged: true, setAppUserModelId() {}, requestSingleInstanceLock: () => true,
+   whenReady: () => ({ then(fn) { boot = fn; } }), getPath: name => name === "downloads" ? directory : path.join(directory, "existing-user-data"), quit() {} });
+ ipcMain.handle = ipcMain.removeHandler = () => {};
+-Object.assign(screen, { getPrimaryDisplay: () => ({ workAreaSize: { width: 1440, height: 900 } }), getAllDisplays: () => [] });
++Object.assign(screen, { getPrimaryDisplay: () => ({ workAreaSize: { width: 1440, height: 900 } }), getAllDisplays: () => [], getDisplayMatching: () => ({workArea:{x:0,y:0,width:1440,height:900}}) });
+ class Window extends EventEmitter {
+   constructor(options) {
+     super(); this.options = options; this.visible = options.show !== false; this.destroyed = false;
+@@ -32,6 +32,11 @@
+   getContentBounds() { return { width: 1100, height: 780 }; }
+   getBounds() { return this.getContentBounds(); }
+   setMinimumSize() {}
++  setResizable() {}
++  setMaximizable() {}
++  setContentBounds() {}
++  setBounds() {}
++  isFullScreen() { return false; }
+   setTitleBarOverlay() {}
+ }
+ const trackedHTTP = {
+@@ -80,6 +85,8 @@
+ 
+ async function settle() {
+   await Promise.resolve();
++  while (pending.size) await Promise.all([...pending]);
++  await new Promise(resolve => setImmediate(resolve));
+   while (pending.size) await Promise.all([...pending]);
+   assert.ok(responses.every(response => response.status === 204), `diagnostic POST rejected: ${JSON.stringify(responses)}`);
+ }
+--- .github/workflows/ci.yml (R239 before)
++++ .github/workflows/ci.yml (R239 final)
+@@ -74,6 +74,8 @@
+           chrome="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
+           test -n "$chrome" || { echo "no Chrome/Chromium binary on the runner; activation guard must not silently skip" >&2; exit 1; }
+           CHROME_BIN="$chrome" R232_BROWSER_OUTPUT="$RUNNER_TEMP/r232-browser" node scripts/r232-browser.cjs
++          CHROME_BIN="$chrome" R239_BROWSER_OUTPUT="$RUNNER_TEMP/r239-browser" node scripts/r239-browser.cjs
++          CHROME_BIN="$chrome" R239_MUTATION_OUTPUT="$RUNNER_TEMP/r239-mutations" node scripts/r239-mutations.cjs
+       - name: Test installer module
+         working-directory: installer
+         run: go test ./...

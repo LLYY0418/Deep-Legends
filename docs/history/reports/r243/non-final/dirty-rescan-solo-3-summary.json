@@ -1,0 +1,20 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "--test-name-pattern=dirty collection rescans",
+    "desktop/refresh-orchestration.test.cjs"
+  ],
+  "cwd": ".",
+  "started": "2026-10-07T14:44:48.247568+08:00",
+  "finished": "2026-10-07T14:44:50.329383+08:00",
+  "elapsed_seconds": 2.082,
+  "exit_code": 0,
+  "last_5_lines": [
+    "ℹ fail 0",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0",
+    "ℹ duration_ms 2048.046292"
+  ]
+}

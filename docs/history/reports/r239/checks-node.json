@@ -1,0 +1,39 @@
+[
+  {
+    "name": "node-renderers",
+    "command": [
+      "node",
+      "scripts/test-renderers.cjs",
+      "all"
+    ],
+    "cwd": "/Users/ly/personal/personal-work/deep-legends",
+    "started": "2026-10-07T00:36:09.417098+08:00",
+    "finished": "2026-10-07T00:37:42.562261+08:00",
+    "exit_code": 0,
+    "last_5_lines": [
+      "    },",
+      "    \"duration_ms\": 93065.272375",
+      "  },",
+      "  \"success\": true",
+      "}"
+    ]
+  },
+  {
+    "name": "desktop-node",
+    "command": [
+      "node",
+      "--test"
+    ],
+    "cwd": "/Users/ly/personal/personal-work/deep-legends/desktop",
+    "started": "2026-10-07T00:37:42.562657+08:00",
+    "finished": "2026-10-07T00:38:55.458869+08:00",
+    "exit_code": 0,
+    "last_5_lines": [
+      "ℹ fail 0",
+      "ℹ cancelled 0",
+      "ℹ skipped 2",
+      "ℹ todo 0",
+      "ℹ duration_ms 72860.085125"
+    ]
+  }
+]

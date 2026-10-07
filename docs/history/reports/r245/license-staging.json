@@ -1,0 +1,29 @@
+{
+  "name": "license-staging",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-race",
+    "-json",
+    "-tags=license_staging",
+    "-run",
+    "R232|R233|R234|R236|R237|R240|R242|R243|R245",
+    "./backend"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started": "2026-10-07T16:24:39.738246+08:00",
+  "finished": "2026-10-07T16:25:50.616501+08:00",
+  "duration_s": 70.879,
+  "exit_code": 0,
+  "last5": [
+    "{\"Time\":\"2026-10-07T16:25:49.476056+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Test\":\"TestR236StagingUpdateHTTPGate\",\"Output\":\"--- PASS: TestR236StagingUpdateHTTPGate (0.00s)\\n\"}",
+    "{\"Time\":\"2026-10-07T16:25:49.476068+08:00\",\"Action\":\"pass\",\"Package\":\"lol-loot-assistant/backend\",\"Test\":\"TestR236StagingUpdateHTTPGate\",\"Elapsed\":0}",
+    "{\"Time\":\"2026-10-07T16:25:49.478893+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Output\":\"PASS\\n\"}",
+    "{\"Time\":\"2026-10-07T16:25:50.485777+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Output\":\"ok  \\tlol-loot-assistant/backend\\t35.360s\\n\"}",
+    "{\"Time\":\"2026-10-07T16:25:50.485828+08:00\",\"Action\":\"pass\",\"Package\":\"lol-loot-assistant/backend\",\"Elapsed\":35.361}"
+  ],
+  "pass_count": 51,
+  "skip_count": 0,
+  "fail_count": 0
+}

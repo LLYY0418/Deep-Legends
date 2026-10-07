@@ -1,0 +1,58 @@
+{
+  "desktop/license-window.cjs": {
+    "sha256": "bf0294bede284fc5dc1108a81f52888aeeb45539fdab1711de907e30c89efc9b",
+    "mtime_ns": 1791360213759388828
+  },
+  "desktop/license-window.test.cjs": {
+    "sha256": "5a33fa4633f406339217186e7fa0791dc5bacf5fa651704d1776b8b4d37334cb",
+    "mtime_ns": 1791360213764547345
+  },
+  "desktop/ui-scale.test.cjs": {
+    "sha256": "1627f6819081900eefd1ddc88b15bddf34594fb9e18cfea17b595bafb18e3255",
+    "mtime_ns": 1791360798227814631
+  },
+  "backend/license.go": {
+    "sha256": "e5cf33eb8528dbc4f926fede502225ce133be23d7f38005da708245570a113bd",
+    "mtime_ns": 1791359923863370004
+  },
+  "backend/license_failure.go": {
+    "sha256": "b4c6997263f46ffc7e6c912bc9f7cd9a0651e22f87b5969d4ed9c4a45a1caff6",
+    "mtime_ns": 1791359923847501497
+  },
+  "backend/license_trace.go": {
+    "sha256": "e3785041bd8e6d896dbfc07b6f6b8aca9e4759e27f7997cca755f8651a1e1887",
+    "mtime_ns": 1791360213768830366
+  },
+  "backend/license_window_diagnostic.go": {
+    "sha256": "0caf47232fcb3676ff666c10893aaf57a74f65376586da66b74a5d1ba4b4f1b2",
+    "mtime_ns": 1791359923862143343
+  },
+  "backend/license_r245_test.go": {
+    "sha256": "54d7452fb08dd0225640be2a2a4892e3c315cf8eaf16e911e4fa34b7a0bc28e5",
+    "mtime_ns": 1791360278594453976
+  },
+  "backend/license_r243_test.go": {
+    "sha256": "6834e70c070f0b05c311475bbb8285ecf96bb2d9763203ce74d9f5448450c5bb",
+    "mtime_ns": 1791359923848210618
+  },
+  "backend/web/license-ui.js": {
+    "sha256": "629c3e6055a2892062860ee0202b6111e1047b3e8c790bcb8ece2e137b99d2c2",
+    "mtime_ns": 1791359923847783245
+  },
+  "backend/web/license-ui.test.cjs": {
+    "sha256": "f220e10fb2364dae8536159db2cb909b8ceaa4710e44002b2a9d5ee42511404f",
+    "mtime_ns": 1791359967984876485
+  },
+  "scripts/r245-electron.cjs": {
+    "sha256": "619e674de360cd5d2a7733cca88e22fe5e16ab68a9257cbfcd7d2de1848639c2",
+    "mtime_ns": 1791359782219664050
+  },
+  "scripts/r245-mutations.cjs": {
+    "sha256": "f226ecc3591be8a051bfe3258ee89bd9d84160fa19dc57aa45f9b22de05f30f1",
+    "mtime_ns": 1791360278596969838
+  },
+  "scripts/r245-audit-staging.cjs": {
+    "sha256": "2ccd41c58666cec2ffc5ceb72ede877a06ecb62cdb9ef3e838fba3f1e1ed69fb",
+    "mtime_ns": 1791360383441014481
+  }
+}

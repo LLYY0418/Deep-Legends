@@ -1,0 +1,11 @@
+{
+  "file": "/private/tmp/r236-backend-public.exe",
+  "key_mode": "public",
+  "license_build": "release",
+  "version": "0.12.75",
+  "bytes": 32587264,
+  "sha256": "5ed7ccdb9692503c6a3bf5335cd05d23185f18d52c81203c11bce0352ad3bc1a",
+  "staging_origin_and_public_key_absent": true,
+  "test_trust_markers_absent": true,
+  "personal_riot_key_absent": true
+}

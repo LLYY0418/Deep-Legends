@@ -1,0 +1,608 @@
+{
+  "scope": "Real Electron/macOS warm startup; synthetic local status, no real codes or external network",
+  "samples": [
+    {
+      "phase": "p3-diagnostic",
+      "state": "ACTIVE",
+      "index": 1,
+      "phases": {
+        "processToJs": 322,
+        "jsToReady": 114,
+        "readyToSplash": 153,
+        "splashPaint": 199,
+        "splashWindowShown": 758,
+        "spawnToReady": 713,
+        "readyToWindow": 341,
+        "total": 1843
+      },
+      "statusReads": [
+        {
+          "state": "ACTIVE",
+          "elapsedMs": 21,
+          "beforeFirstShow": true
+        },
+        {
+          "state": "ACTIVE",
+          "elapsedMs": 36,
+          "beforeFirstShow": false
+        }
+      ],
+      "stages": [
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "backend_ready",
+            "elapsedMs": 1180
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_created",
+            "elapsedMs": 1214
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_did_finish_load",
+            "elapsedMs": 1401
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_ready_to_show",
+            "elapsedMs": 1406
+          }
+        }
+      ],
+      "native": [
+        {
+          "kind": "sample",
+          "at": 1791309349320,
+          "bounds": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "visible": false
+        },
+        {
+          "kind": "sample",
+          "at": 1791309349629,
+          "bounds": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "visible": true
+        }
+      ],
+      "page": {
+        "state": "active",
+        "privacyDisplay": "none",
+        "zoom": "1"
+      },
+      "visible": true,
+      "content": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "resizable": true,
+      "maximizable": true
+    },
+    {
+      "phase": "p3-diagnostic",
+      "state": "ACTIVE",
+      "index": 2,
+      "phases": {
+        "processToJs": 143,
+        "jsToReady": 63,
+        "readyToSplash": 83,
+        "splashPaint": 124,
+        "splashWindowShown": 389,
+        "spawnToReady": 261,
+        "readyToWindow": 187,
+        "total": 862
+      },
+      "statusReads": [
+        {
+          "state": "ACTIVE",
+          "elapsedMs": 37,
+          "beforeFirstShow": true
+        },
+        {
+          "state": "ACTIVE",
+          "elapsedMs": 19,
+          "beforeFirstShow": false
+        }
+      ],
+      "stages": [
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "backend_ready",
+            "elapsedMs": 532
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_created",
+            "elapsedMs": 561
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_did_finish_load",
+            "elapsedMs": 673
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_ready_to_show",
+            "elapsedMs": 674
+          }
+        }
+      ],
+      "native": [
+        {
+          "kind": "sample",
+          "at": 1791309351445,
+          "bounds": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "visible": false
+        },
+        {
+          "kind": "sample",
+          "at": 1791309351578,
+          "bounds": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "visible": true
+        }
+      ],
+      "page": {
+        "state": "active",
+        "privacyDisplay": "none",
+        "zoom": "1"
+      },
+      "visible": true,
+      "content": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "resizable": true,
+      "maximizable": true
+    },
+    {
+      "phase": "p3-diagnostic",
+      "state": "ACTIVE",
+      "index": 3,
+      "phases": {
+        "processToJs": 137,
+        "jsToReady": 63,
+        "readyToSplash": 89,
+        "splashPaint": 128,
+        "splashWindowShown": 393,
+        "spawnToReady": 138,
+        "readyToWindow": 246,
+        "total": 801
+      },
+      "statusReads": [
+        {
+          "state": "ACTIVE",
+          "elapsedMs": 18,
+          "beforeFirstShow": true
+        },
+        {
+          "state": "ACTIVE",
+          "elapsedMs": 4,
+          "beforeFirstShow": false
+        }
+      ],
+      "stages": [
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "backend_ready",
+            "elapsedMs": 418
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_created",
+            "elapsedMs": 446
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_did_finish_load",
+            "elapsedMs": 605
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_ready_to_show",
+            "elapsedMs": 606
+          }
+        }
+      ],
+      "native": [
+        {
+          "kind": "sample",
+          "at": 1791309353327,
+          "bounds": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "visible": false
+        },
+        {
+          "kind": "sample",
+          "at": 1791309353546,
+          "bounds": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "visible": true
+        }
+      ],
+      "page": {
+        "state": "active",
+        "privacyDisplay": "none",
+        "zoom": "1"
+      },
+      "visible": true,
+      "content": {
+        "x": 67,
+        "y": 46,
+        "width": 1546,
+        "height": 959
+      },
+      "resizable": true,
+      "maximizable": true
+    },
+    {
+      "phase": "p3-diagnostic",
+      "state": "LOCKED",
+      "index": 1,
+      "phases": {
+        "processToJs": 178,
+        "jsToReady": 64,
+        "readyToSplash": 87,
+        "splashPaint": 156,
+        "splashWindowShown": 444,
+        "spawnToReady": 478,
+        "readyToWindow": 174,
+        "total": 1138
+      },
+      "statusReads": [
+        {
+          "state": "LOCKED",
+          "elapsedMs": 16,
+          "beforeFirstShow": true
+        },
+        {
+          "state": "LOCKED",
+          "elapsedMs": 11,
+          "beforeFirstShow": false
+        }
+      ],
+      "stages": [
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "backend_ready",
+            "elapsedMs": 787
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_created",
+            "elapsedMs": 819
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_did_finish_load",
+            "elapsedMs": 931
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_ready_to_show",
+            "elapsedMs": 932
+          }
+        }
+      ],
+      "native": [
+        {
+          "kind": "sample",
+          "at": 1791309355665,
+          "bounds": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "visible": false
+        },
+        {
+          "kind": "sample",
+          "at": 1791309355673,
+          "bounds": {
+            "x": 490,
+            "y": 305,
+            "width": 700,
+            "height": 470
+          },
+          "visible": false
+        },
+        {
+          "kind": "sample",
+          "at": 1791309355822,
+          "bounds": {
+            "x": 490,
+            "y": 305,
+            "width": 700,
+            "height": 470
+          },
+          "visible": true
+        }
+      ],
+      "page": {
+        "state": "locked",
+        "privacyDisplay": "none",
+        "zoom": "1"
+      },
+      "visible": true,
+      "content": {
+        "x": 490,
+        "y": 305,
+        "width": 700,
+        "height": 470
+      },
+      "resizable": false,
+      "maximizable": false
+    },
+    {
+      "phase": "p3-diagnostic",
+      "state": "LOCKED",
+      "index": 2,
+      "phases": {
+        "processToJs": 135,
+        "jsToReady": 54,
+        "readyToSplash": 85,
+        "splashPaint": 132,
+        "splashWindowShown": 379,
+        "spawnToReady": 355,
+        "readyToWindow": 164,
+        "total": 926
+      },
+      "statusReads": [
+        {
+          "state": "LOCKED",
+          "elapsedMs": 16,
+          "beforeFirstShow": true
+        },
+        {
+          "state": "LOCKED",
+          "elapsedMs": 27,
+          "beforeFirstShow": false
+        }
+      ],
+      "stages": [
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "backend_ready",
+            "elapsedMs": 627
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_created",
+            "elapsedMs": 659
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_did_finish_load",
+            "elapsedMs": 771
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_ready_to_show",
+            "elapsedMs": 771
+          }
+        }
+      ],
+      "native": [
+        {
+          "kind": "sample",
+          "at": 1791309357822,
+          "bounds": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "visible": false
+        },
+        {
+          "kind": "sample",
+          "at": 1791309357831,
+          "bounds": {
+            "x": 490,
+            "y": 305,
+            "width": 700,
+            "height": 470
+          },
+          "visible": false
+        },
+        {
+          "kind": "sample",
+          "at": 1791309357977,
+          "bounds": {
+            "x": 490,
+            "y": 305,
+            "width": 700,
+            "height": 470
+          },
+          "visible": true
+        }
+      ],
+      "page": {
+        "state": "locked",
+        "privacyDisplay": "none",
+        "zoom": "1"
+      },
+      "visible": true,
+      "content": {
+        "x": 490,
+        "y": 305,
+        "width": 700,
+        "height": 470
+      },
+      "resizable": false,
+      "maximizable": false
+    },
+    {
+      "phase": "p3-diagnostic",
+      "state": "LOCKED",
+      "index": 3,
+      "phases": {
+        "processToJs": 131,
+        "jsToReady": 56,
+        "readyToSplash": 87,
+        "splashPaint": 134,
+        "splashWindowShown": 383,
+        "spawnToReady": 213,
+        "readyToWindow": 181,
+        "total": 802
+      },
+      "statusReads": [
+        {
+          "state": "LOCKED",
+          "elapsedMs": 56,
+          "beforeFirstShow": true
+        },
+        {
+          "state": "LOCKED",
+          "elapsedMs": 50,
+          "beforeFirstShow": false
+        }
+      ],
+      "stages": [
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "backend_ready",
+            "elapsedMs": 490
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_created",
+            "elapsedMs": 518
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_did_finish_load",
+            "elapsedMs": 642
+          }
+        },
+        {
+          "api": "/api/diagnostics/startup-stage",
+          "value": {
+            "stage": "main_window_ready_to_show",
+            "elapsedMs": 644
+          }
+        }
+      ],
+      "native": [
+        {
+          "kind": "sample",
+          "at": 1791309359882,
+          "bounds": {
+            "x": 67,
+            "y": 46,
+            "width": 1546,
+            "height": 959
+          },
+          "visible": false
+        },
+        {
+          "kind": "sample",
+          "at": 1791309359890,
+          "bounds": {
+            "x": 490,
+            "y": 305,
+            "width": 700,
+            "height": 470
+          },
+          "visible": false
+        },
+        {
+          "kind": "sample",
+          "at": 1791309359994,
+          "bounds": {
+            "x": 490,
+            "y": 305,
+            "width": 700,
+            "height": 470
+          },
+          "visible": true
+        }
+      ],
+      "page": {
+        "state": "locked",
+        "privacyDisplay": "none",
+        "zoom": "1"
+      },
+      "visible": true,
+      "content": {
+        "x": 490,
+        "y": 305,
+        "width": 700,
+        "height": 470
+      },
+      "resizable": false,
+      "maximizable": false
+    }
+  ]
+}

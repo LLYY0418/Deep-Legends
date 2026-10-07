@@ -1,0 +1,27 @@
+{
+  "name": "license-staging-race",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-race",
+    "-tags",
+    "license_staging",
+    "-run",
+    "R232|R233|R234|R236",
+    "./backend",
+    "-v"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started_at": "2026-10-06T23:59:27+08:00",
+  "finished_at": "2026-10-06T23:59:49+08:00",
+  "duration_seconds": 21.546,
+  "exit_code": 0,
+  "last_5_lines": [
+    "--- PASS: TestR236StagingUpdatesDisabledWithTrustedReleaseCache (0.02s)",
+    "=== RUN   TestR236StagingUpdateHTTPGate",
+    "--- PASS: TestR236StagingUpdateHTTPGate (0.00s)",
+    "PASS",
+    "ok  \tlol-loot-assistant/backend\t2.142s"
+  ]
+}

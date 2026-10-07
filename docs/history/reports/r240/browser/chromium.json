@@ -1,0 +1,14 @@
+{
+  "started": "2026-10-06T18:27:21.584Z",
+  "finished": "2026-10-06T18:27:24.589Z",
+  "scope": "Real Chromium client with synthetic local-state API; Windows/deployed-server acceptance pending",
+  "checks": [
+    "real rendered pending: overlay and frame both invisible",
+    "860x580 first frame: closed privacy, input hit/focus, no business requests",
+    "real privacy link/Close/Esc, nonempty scrollable body, bounds and caption area",
+    "privacy read failure keeps original message and stable one-line layout",
+    "real pointer/text/Enter activation, busy disabled, input cleared",
+    "replacement warning remains one line without scrolling"
+  ],
+  "errors": []
+}

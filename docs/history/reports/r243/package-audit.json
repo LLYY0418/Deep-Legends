@@ -1,0 +1,44 @@
+{
+  "version": "0.12.75",
+  "fingerprint": "d674d2584eeb",
+  "license_build": "STAGING",
+  "key_mode": "public",
+  "window_title": "Deep Legends-STAGING",
+  "license_origin": "https://license-staging.yinxiaobia.net",
+  "license_kid": "staging-2026-10",
+  "online_updates": "disabled at build time; no production Latest or cache",
+  "directory": "/Users/ly/personal/personal-work/deep-legends/dist/R243-staging-public/Deep-Legends-staging-public",
+  "setup": "/Users/ly/personal/personal-work/deep-legends/dist/R243-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe",
+  "setup_sha256": "603572946e55911a544284843182dc783e42bca27a96a8166e07285f0838719d",
+  "backend_sha256": "f9cda352673974a3367967c5e2b5c1d743f4a6b4fa01e09114368e952b50c090",
+  "archive_sha256": "4ca7fe51e96854df071682eb2745fe197688f13c9c5a3579edddd925bb244679",
+  "scope": "Read-only macOS static audit of actual Windows public artifacts; Windows execution pending",
+  "packaged_version": "0.12.75",
+  "setup_bytes": 111446016,
+  "backend_bytes": 32543744,
+  "license_origin_and_kid_and_key_match": true,
+  "finalized_privacy_embedded": true,
+  "r240_css_and_window_module_embedded": true,
+  "r242_protocol_and_settings_embedded": true,
+  "r243_failure_retry_and_window_guard_embedded": true,
+  "test_fixtures_and_known_private_material_absent": true,
+  "personal_riot_key_absent": true,
+  "fixed_backend_digest_matches": true,
+  "fuses": {
+    "RunAsNode": false,
+    "EnableNodeOptionsEnvironmentVariable": false,
+    "EnableNodeCliInspectArguments": false,
+    "EnableEmbeddedAsarIntegrityValidation": true,
+    "OnlyLoadAppFromAsar": true
+  },
+  "asar_integrity": [
+    {
+      "file": "resources\\app.asar",
+      "alg": "SHA256",
+      "value": "828c36c0e59ba231b15ec5a009e5e8256853fa25ebf483a1b0f21b38bb11a19d"
+    }
+  ],
+  "staging_rejected_by_release_checker": true,
+  "release_staging_material_absent": true,
+  "release_backend_sha256": "126e46f8e24dc986b46b55effcb280dda7cd1e70be3dad6dfb3a65444488700a"
+}

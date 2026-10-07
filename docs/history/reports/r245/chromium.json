@@ -1,0 +1,15 @@
+{
+  "name": "chromium",
+  "command": [
+    "node",
+    "scripts/r240-browser.cjs"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "started": "2026-10-07T16:06:31.722273+08:00",
+  "finished": "2026-10-07T16:06:33.702750+08:00",
+  "duration_s": 1.981,
+  "exit_code": 0,
+  "last5": [
+    "{\"started\":\"2026-10-07T08:06:31.753Z\",\"finished\":\"2026-10-07T08:06:33.637Z\",\"scope\":\"Real Chromium client with synthetic local-state API; Windows/deployed-server acceptance pending\",\"checks\":[\"real rendered pending: overlay and frame both invisible\",\"860x580 first frame: closed privacy, input hit/focus, no business requests\",\"real privacy link/Close/Esc, nonempty scrollable body, bounds and caption area\",\"privacy read failure keeps original message and stable one-line layout\",\"real pointer/text/Enter activation, busy disabled, input cleared\",\"replacement warning remains one line without scrolling\"],\"errors\":[]}"
+  ]
+}

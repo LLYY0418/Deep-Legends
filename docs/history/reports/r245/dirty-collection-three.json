@@ -1,0 +1,41 @@
+[
+  {
+    "started": "2026-10-07T16:12:53.396127+08:00",
+    "finished": "2026-10-07T16:13:02.661561+08:00",
+    "duration_s": 9.265,
+    "exit_code": 1,
+    "last5": [
+      "    actual: undefined,",
+      "    expected: undefined,",
+      "    operator: 'fail',",
+      "    diff: 'simple'",
+      "  }"
+    ]
+  },
+  {
+    "started": "2026-10-07T16:13:02.661716+08:00",
+    "finished": "2026-10-07T16:13:11.081068+08:00",
+    "duration_s": 8.419,
+    "exit_code": 1,
+    "last5": [
+      "    actual: undefined,",
+      "    expected: undefined,",
+      "    operator: 'fail',",
+      "    diff: 'simple'",
+      "  }"
+    ]
+  },
+  {
+    "started": "2026-10-07T16:13:11.081248+08:00",
+    "finished": "2026-10-07T16:13:21.020664+08:00",
+    "duration_s": 9.94,
+    "exit_code": 1,
+    "last5": [
+      "    actual: undefined,",
+      "    expected: undefined,",
+      "    operator: 'fail',",
+      "    diff: 'simple'",
+      "  }"
+    ]
+  }
+]

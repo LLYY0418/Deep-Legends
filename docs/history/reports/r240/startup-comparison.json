@@ -1,0 +1,223 @@
+{
+  "method": "macOS warm genuine Electron; before/after alternating; fresh isolated profile and synthetic HTTP state; renderer first status delayed500ms to expose first-show race; immediate capturePage+DOM at first real show",
+  "results": [
+    {
+      "state": "ACTIVE",
+      "before": {
+        "total_ms": [
+          985,
+          835,
+          883
+        ],
+        "mean_ms": 901,
+        "median_ms": 883,
+        "first_show_content": [
+          {
+            "state": "locked",
+            "overlayHidden": false,
+            "frameHidden": true,
+            "formVisible": true,
+            "icon": {
+              "x": 745,
+              "y": 369.5,
+              "width": 56,
+              "height": 56
+            }
+          },
+          {
+            "state": "locked",
+            "overlayHidden": false,
+            "frameHidden": true,
+            "formVisible": true,
+            "icon": {
+              "x": 745,
+              "y": 369.5,
+              "width": 56,
+              "height": 56
+            }
+          },
+          {
+            "state": "locked",
+            "overlayHidden": false,
+            "frameHidden": true,
+            "formVisible": true,
+            "icon": {
+              "x": 745,
+              "y": 369.5,
+              "width": 56,
+              "height": 56
+            }
+          }
+        ],
+        "activation_icon_gold_pixels": [
+          474,
+          474,
+          474
+        ]
+      },
+      "after": {
+        "total_ms": [
+          916,
+          913,
+          832
+        ],
+        "mean_ms": 887,
+        "median_ms": 913,
+        "first_show_content": [
+          {
+            "state": "active",
+            "overlayHidden": true,
+            "frameHidden": false,
+            "formVisible": false,
+            "icon": {
+              "x": 741,
+              "y": 360.5,
+              "width": 64,
+              "height": 64
+            }
+          },
+          {
+            "state": "active",
+            "overlayHidden": true,
+            "frameHidden": false,
+            "formVisible": false,
+            "icon": {
+              "x": 741,
+              "y": 360.5,
+              "width": 64,
+              "height": 64
+            }
+          },
+          {
+            "state": "active",
+            "overlayHidden": true,
+            "frameHidden": false,
+            "formVisible": false,
+            "icon": {
+              "x": 741,
+              "y": 360.5,
+              "width": 64,
+              "height": 64
+            }
+          }
+        ],
+        "activation_icon_gold_pixels": [
+          0,
+          0,
+          0
+        ]
+      },
+      "mean_delta_ms": -14,
+      "median_delta_ms": 30
+    },
+    {
+      "state": "LOCKED",
+      "before": {
+        "total_ms": [
+          829,
+          852,
+          844
+        ],
+        "mean_ms": 841.6666666666666,
+        "median_ms": 844,
+        "first_show_content": [
+          {
+            "state": "locked",
+            "overlayHidden": false,
+            "frameHidden": true,
+            "formVisible": true,
+            "icon": {
+              "x": 322,
+              "y": 125,
+              "width": 56,
+              "height": 56
+            }
+          },
+          {
+            "state": "locked",
+            "overlayHidden": false,
+            "frameHidden": true,
+            "formVisible": true,
+            "icon": {
+              "x": 322,
+              "y": 125,
+              "width": 56,
+              "height": 56
+            }
+          },
+          {
+            "state": "locked",
+            "overlayHidden": false,
+            "frameHidden": true,
+            "formVisible": true,
+            "icon": {
+              "x": 322,
+              "y": 125,
+              "width": 56,
+              "height": 56
+            }
+          }
+        ],
+        "activation_icon_gold_pixels": [
+          460,
+          460,
+          460
+        ]
+      },
+      "after": {
+        "total_ms": [
+          876,
+          816,
+          750
+        ],
+        "mean_ms": 814,
+        "median_ms": 816,
+        "first_show_content": [
+          {
+            "state": "locked",
+            "overlayHidden": false,
+            "frameHidden": true,
+            "formVisible": true,
+            "icon": {
+              "x": 398,
+              "y": 171,
+              "width": 64,
+              "height": 64
+            }
+          },
+          {
+            "state": "locked",
+            "overlayHidden": false,
+            "frameHidden": true,
+            "formVisible": true,
+            "icon": {
+              "x": 398,
+              "y": 171,
+              "width": 64,
+              "height": 64
+            }
+          },
+          {
+            "state": "locked",
+            "overlayHidden": false,
+            "frameHidden": true,
+            "formVisible": true,
+            "icon": {
+              "x": 398,
+              "y": 171,
+              "width": 64,
+              "height": 64
+            }
+          }
+        ],
+        "activation_icon_gold_pixels": [
+          642,
+          642,
+          642
+        ]
+      },
+      "mean_delta_ms": -27.66666666666663,
+      "median_delta_ms": -28
+    }
+  ]
+}

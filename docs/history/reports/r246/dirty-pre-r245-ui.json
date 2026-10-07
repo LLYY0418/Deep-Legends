@@ -1,0 +1,64 @@
+{
+  "scope": "Temporary web root reverts only R245 UI activation watchdog and connecting-message tone; original test, app.js, budgets, assertions unchanged",
+  "old_ui_sha256": "3f655ae18f8c0fc81daaf76743c9f186d69266557a7c0a0c4afbb24956c5fc1a",
+  "runs": [
+    {
+      "command": [
+        "node",
+        "--test",
+        "--test-name-pattern=dirty collection rescans",
+        "desktop/refresh-orchestration.test.cjs"
+      ],
+      "started": "2026-10-07T16:47:50.373475+08:00",
+      "finished": "2026-10-07T16:47:52.536577+08:00",
+      "duration_s": 2.163,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2121.908959"
+      ]
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "--test-name-pattern=dirty collection rescans",
+        "desktop/refresh-orchestration.test.cjs"
+      ],
+      "started": "2026-10-07T16:47:52.536769+08:00",
+      "finished": "2026-10-07T16:47:54.702956+08:00",
+      "duration_s": 2.166,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2118.784459"
+      ]
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "--test-name-pattern=dirty collection rescans",
+        "desktop/refresh-orchestration.test.cjs"
+      ],
+      "started": "2026-10-07T16:47:54.703058+08:00",
+      "finished": "2026-10-07T16:47:56.850559+08:00",
+      "duration_s": 2.148,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2099.444833"
+      ]
+    }
+  ],
+  "temporary_directory_deleted": true
+}

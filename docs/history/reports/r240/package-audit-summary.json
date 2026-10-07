@@ -1,0 +1,13 @@
+{
+  "command": [
+    "python3",
+    "docs/history/reports/r240/run-public-release-audit.py"
+  ],
+  "started": "2026-10-07T02:58:44.639120+08:00",
+  "finished": "2026-10-07T02:58:46.165832+08:00",
+  "elapsed_seconds": 1.527,
+  "exit_code": 0,
+  "last_5_lines": [
+    "{\"version\":\"0.12.75\",\"fingerprint\":\"cb0f1e0c1100\",\"license_build\":\"STAGING\",\"key_mode\":\"public\",\"window_title\":\"Deep Legends-STAGING\",\"license_origin\":\"https://license-staging.yinxiaobia.net\",\"license_kid\":\"staging-2026-10\",\"online_updates\":\"disabled at build time; no production Latest or cache\",\"directory\":\"/Users/ly/personal/personal-work/deep-legends/dist/R240-staging-public/Deep-Legends-staging-public\",\"setup\":\"/Users/ly/personal/personal-work/deep-legends/dist/R240-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe\",\"setup_sha256\":\"91abee9452d842260d0ee8ab7823d89963b798d6923b7dec2f53e744be37f89e\",\"backend_sha256\":\"a76fbdc25fb2e7e2604ef77961eb513bd719095cc6b44bbef16b5b756576a330\",\"archive_sha256\":\"965a891646e58d5d51d6e0e70440062ff04418c209e5ddc881635e785ecb3383\",\"scope\":\"Read-only macOS static audit of actual Windows public artifacts; Windows execution pending\",\"packaged_version\":\"0.12.75\",\"setup_bytes\":111436800,\"backend_bytes\":32521216,\"license_origin_and_kid_and_key_match\":true,\"finalized_privacy_embedded\":true,\"r240_css_and_window_module_embedded\":true,\"test_fixtures_and_known_private_material_absent\":true,\"personal_riot_key_absent\":true,\"fixed_backend_digest_matches\":true,\"fuses\":{\"RunAsNode\":false,\"EnableNodeOptionsEnvironmentVariable\":false,\"EnableNodeCliInspectArguments\":false,\"EnableEmbeddedAsarIntegrityValidation\":true,\"OnlyLoadAppFromAsar\":true},\"asar_integrity\":[{\"file\":\"resources\\\\app.asar\",\"alg\":\"SHA256\",\"value\":\"d344150be333f2ced71c2ffe57af3300c91eddfbb1680325e5e2f8366a175acc\"}],\"staging_rejected_by_release_checker\":true,\"release_staging_material_absent\":true,\"release_backend_sha256\":\"c66ac072e01778ae4e12e3065795a5cfd6a230e265504f5aed149caf5596e622\"}"
+  ]
+}

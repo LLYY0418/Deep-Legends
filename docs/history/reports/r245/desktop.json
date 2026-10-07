@@ -1,0 +1,19 @@
+{
+  "name": "desktop",
+  "command": [
+    "node",
+    "--test"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends/desktop",
+  "started": "2026-10-07T16:30:34.280190+08:00",
+  "finished": "2026-10-07T16:31:54.761043+08:00",
+  "duration_s": 80.481,
+  "exit_code": 1,
+  "last5": [
+    "    actual: undefined,",
+    "    expected: undefined,",
+    "    operator: 'fail',",
+    "    diff: 'simple'",
+    "  }"
+  ]
+}

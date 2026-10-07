@@ -1,0 +1,15 @@
+{
+  "version": "0.12.75",
+  "fingerprint": "213c1bf832b3",
+  "license_build": "STAGING",
+  "key_mode": "public",
+  "window_title": "Deep Legends-STAGING",
+  "license_origin": "https://license-staging.yinxiaobia.net",
+  "license_kid": "staging-2026-10",
+  "online_updates": "disabled at build time; no production Latest or cache",
+  "directory": "/Users/ly/personal/personal-work/deep-legends/dist/R239-staging-public/Deep-Legends-staging-public",
+  "setup": "/Users/ly/personal/personal-work/deep-legends/dist/R239-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe",
+  "setup_sha256": "374b496b058effafb29a03c7d8baaaeb9f83d3893efd58d41d58f54c1f9ec40d",
+  "backend_sha256": "9fcc4b141ab7f8c5e5129e167b59fa70fdff2cc025191009b067141193af5163",
+  "archive_sha256": "a274fa8a588b41c4d636bfe062b4999b3209bf3409df0ceac30f6a0a5bece838"
+}

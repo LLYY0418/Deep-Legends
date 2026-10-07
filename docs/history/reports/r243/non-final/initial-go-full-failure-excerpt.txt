@@ -1,0 +1,6 @@
+Captured tool-output excerpt from the initial non-final full Go run (not reconstructed full log):
+--- FAIL: TestClientDiagnosticAcceptsMultipleEventWhitelists (0.00s)
+    features_test.go:42: whitelisted event="license_window_state" reason="transition" returned 400: invalid client diagnostic
+FAIL
+FAIL	lol-loot-assistant/backend	191.978s
+FAIL

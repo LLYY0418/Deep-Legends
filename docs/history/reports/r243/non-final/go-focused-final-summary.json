@@ -1,0 +1,19 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-race",
+    "-run",
+    "R243|R240WindowDiagnostic|TestClientDiagnosticAcceptsMultipleEventWhitelists",
+    "./backend"
+  ],
+  "cwd": ".",
+  "started": "2026-10-07T14:33:14.441110+08:00",
+  "finished": "2026-10-07T14:33:38.420511+08:00",
+  "elapsed_seconds": 23.979,
+  "exit_code": 0,
+  "last_5_lines": [
+    "ok  \tlol-loot-assistant/backend\t10.165s"
+  ]
+}

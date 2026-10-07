@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-06T09:19:47.592Z",
+  "scope": "Static audit of actual Windows dir artifact on macOS, plus digest rejection of a modified actual backend; no Windows runtime claims",
+  "key_mode": "public",
+  "version": "0.12.75",
+  "source_fingerprint": "8b2449e279b8",
+  "directory": "/private/tmp/r232-pack-public/win-unpacked",
+  "fuses": {
+    "RunAsNode": false,
+    "EnableNodeOptionsEnvironmentVariable": false,
+    "EnableNodeCliInspectArguments": false,
+    "EnableEmbeddedAsarIntegrityValidation": true,
+    "OnlyLoadAppFromAsar": true
+  },
+  "asar_integrity": [
+    {
+      "file": "resources\\app.asar",
+      "alg": "SHA256",
+      "value": "8f3bc5975a7d95f88ab86266a4b2646e336bbde75ecd83a90fb7354b89ece058"
+    }
+  ],
+  "backend_sha256": "176b955c71984064ca8217bbc653fba90e90ed1262849daccafd51ed18010c81",
+  "backend_bytes": 32476672,
+  "hash_ms": {
+    "samples": 10,
+    "min": 16.888457999999957,
+    "median": 19.753083000000004,
+    "max": 20.708500000000015
+  },
+  "checks": [
+    "ASAR runtime files complete, no test fixtures",
+    "expected backend digest protected inside ASAR",
+    "modified actual backend plus adjacent checksum rejected by runtime verifier",
+    "modified ASAR header mismatches PE integrity resource",
+    "test trust labels absent from compiled Go backend"
+  ],
+  "retained_directory": "/private/tmp/r232-pack-public/win-unpacked-public",
+  "retained_backend_build": "/private/tmp/r232-backend-public.exe"
+}
