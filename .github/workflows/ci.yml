@@ -32,6 +32,11 @@ jobs:
           test -z "$unformatted"
       - name: Vet
         run: go vet ./...
+      - name: Verify release license isolation
+        shell: bash
+        run: |
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags= -buildvcs=false -o "$RUNNER_TEMP/r233-release-public.exe" ./backend
+          node desktop/verify-license-release.cjs "$RUNNER_TEMP/r233-release-public.exe"
       - name: Verify CI test filters
         run: node scripts/verify-ci-test-filters.cjs
       - name: Test with race detector

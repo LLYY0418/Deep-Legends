@@ -19,7 +19,7 @@ func (a *app) registerUpdateRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/update/settings", a.authorized(a.handleUpdateSettings))
 }
 func (a *app) handleUpdateAction(w http.ResponseWriter, r *http.Request) {
-	if a.updates == nil || !a.updates.Status().Supported {
+	if !licenseOnlineUpdates || a.updates == nil || !a.updates.Status().Supported {
 		http.Error(w, "当前构建不支持更新", http.StatusBadRequest)
 		return
 	}
@@ -52,6 +52,10 @@ func (a *app) handleUpdateAction(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (a *app) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
+	if !licenseOnlineUpdates {
+		http.Error(w, "当前构建不支持更新", http.StatusBadRequest)
+		return
+	}
 	if a.updates == nil {
 		http.Error(w, "更新模块未初始化", http.StatusBadRequest)
 		return

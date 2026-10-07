@@ -31,7 +31,7 @@ func (f updateRoundTrip) RoundTrip(r *http.Request) (*http.Response, error) {
 func updateTestManifest(data []byte) updateManifest {
 	digest := sha256.Sum256(data)
 	name := "Deep-Legends-Setup-0.12.0-a1b2c3d4e5f6.exe"
-	return updateManifest{Schema: 1, Version: "0.12.0", Fingerprint: "a1b2c3d4e5f6", PublishedAt: time.Date(2026, 9, 11, 12, 0, 0, 0, time.UTC), MinSupported: "0.9.0", Notes: "### 新增\n- 更新", Asset: updateAsset{Name: name, Size: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), URL: "https://github.com/" + updateRepo + "/releases/download/v0.12.0/" + name}}
+	return signUpdateTestManifest(updateManifest{Schema: 1, Version: "0.12.0", Fingerprint: "a1b2c3d4e5f6", PublishedAt: time.Date(2026, 9, 11, 12, 0, 0, 0, time.UTC), MinSupported: "0.9.0", Notes: "### 新增\n- 更新", Asset: updateAsset{Name: name, Size: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), URL: "https://github.com/" + updateRepo + "/releases/download/v0.12.0/" + name}})
 }
 func updateTestManager(t *testing.T, data []byte) *updateManager {
 	t.Helper()
@@ -39,7 +39,7 @@ func updateTestManager(t *testing.T, data []byte) *updateManager {
 	if err := os.Mkdir(filepath.Join(root, "updates"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	u := newUpdateManager("0.11.2", trackTestStore(t, &localStore{root: root}), nil)
+	u := newUpdateManagerWithTrust("0.11.2", trackTestStore(t, &localStore{root: root}), nil, testUpdateTrust())
 	t.Cleanup(u.Close)
 	// Each fixture supplies its own complete route inventory; production retains built-ins with custom settings.
 	u.sourceDefaults = []string{}
@@ -159,6 +159,7 @@ func TestUpdateCacheTTLAndNoDowngrade(t *testing.T) {
 			m.Version = latest
 			m.Asset.Name = "Deep-Legends-Setup-" + latest + "-" + m.Fingerprint + ".exe"
 			m.Asset.URL = "https://github.com/" + updateRepo + "/releases/download/v" + latest + "/" + m.Asset.Name
+			m = signUpdateTestManifest(m)
 			u.cache = updateCache{CheckedAt: now.Add(-time.Hour), Current: "0.11.2", Manifest: m}
 			var calls atomic.Int32
 			u.client = &http.Client{Transport: updateRoundTrip(func(*http.Request) (*http.Response, error) {
@@ -186,7 +187,7 @@ func TestUpdateCacheTTLAndNoDowngrade(t *testing.T) {
 			if calls.Load() != 2 {
 				t.Fatal("manual check did not bypass cache")
 			}
-			restored := newUpdateManager("0.11.2", u.store, nil)
+			restored := newUpdateManagerWithTrust("0.11.2", u.store, nil, testUpdateTrust())
 			defer restored.Close()
 			if restored.cache.Manifest.Version != latest {
 				t.Fatal("cache not persisted")
@@ -375,6 +376,7 @@ func TestUpdatePublicManifestCheckAvailableAndReady(t *testing.T) {
 	manifest := updateTestManifest(setup)
 	manifest.Asset.Name = "Deep-Legends-Setup-0.12.0-public.exe"
 	manifest.Asset.URL = "https://github.com/" + updateRepo + "/releases/download/v0.12.0/" + manifest.Asset.Name
+	manifest = signUpdateTestManifest(manifest)
 	encoded, err := json.Marshal(manifest)
 	if err != nil {
 		t.Fatal(err)
@@ -687,6 +689,7 @@ func TestUpdateAfterUpgradeCleanupAndMinimum(t *testing.T) {
 	u := updateTestManager(t, []byte("setup"))
 	m := *u.manifest
 	m.MinSupported = "0.12.0"
+	m = signUpdateTestManifest(m)
 	u.cache = updateCache{CheckedAt: time.Now(), Current: "0.10.0", Manifest: m}
 	os.WriteFile(filepath.Join(u.directory, "old.exe"), []byte("old"), 0600)
 	os.WriteFile(filepath.Join(u.directory, m.Asset.Name+".part"), []byte("old"), 0600)

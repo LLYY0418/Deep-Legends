@@ -41,7 +41,9 @@ function harness({silent=false}={}) {
   if(url==='/api/status')return response(w.r209.state.status);
   return new Promise(()=>{});
  };
- w.eval(read('runtime.js'));w.eval(read('image-queue.js'));
+ w.Response=Response;w.Request=Request;
+ require('../../desktop/license-render-fixture.cjs').installLicenseRenderFixture(w);
+ w.eval(read('runtime.js'));w.eval(read('license-ui.js'));w.eval(read('image-queue.js'));
  const names='state,el,renderItems,loadSkins,activateSection,activateFavoritesPage,resetCollectionControls,openChromaDetails,closeSkinDialog,pumpCardImageQueue,deferCardImageSources,enqueueCardImageJob,cancelDeferredImages,checkCardImageHealth';
  w.eval(app.replace(/\}\)\(\);\s*$/,`window.r209={${names}};})();`));
  const api=w.r209;ready=true;

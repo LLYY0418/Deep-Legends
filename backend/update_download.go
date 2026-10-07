@@ -92,7 +92,16 @@ func verifyUpdateDigest(actual, expected string) error {
 }
 
 func (u *updateManager) Download() error {
+	if !licenseOnlineUpdates {
+		return errors.New("当前构建不支持更新")
+	}
 	u.mu.Lock()
+	if u.manifest != nil {
+		if err := verifyUpdateManifestTrust(*u.manifest, u.trustKeys); err != nil {
+			u.mu.Unlock()
+			return err
+		}
+	}
 	if !u.status.Supported {
 		u.mu.Unlock()
 		return errors.New("请从发布页下载完整安装包")
@@ -455,6 +464,9 @@ func (u *updateManager) Apply() error { return u.apply(false, nil) }
 // acknowledges readiness, before it starts replacing application files.
 func (u *updateManager) ApplyAsync(success func()) error { return u.apply(true, success) }
 func (u *updateManager) apply(async bool, success func()) error {
+	if !licenseOnlineUpdates {
+		return errors.New("当前构建不支持更新")
+	}
 	u.mu.Lock()
 	if !u.status.Supported {
 		u.mu.Unlock()
@@ -465,6 +477,10 @@ func (u *updateManager) apply(async bool, success func()) error {
 		return errors.New("安装包尚未就绪")
 	}
 	asset, dest, portable := u.manifest.Asset, u.installDir, u.status.Portable
+	if err := verifyUpdateManifestTrust(*u.manifest, u.trustKeys); err != nil {
+		u.mu.Unlock()
+		return err
+	}
 
 	u.status.State = "applying"
 	u.status.Error = ""

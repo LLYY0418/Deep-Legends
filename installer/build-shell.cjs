@@ -41,7 +41,7 @@ function buildUninstallShell({ projectRoot, version, run = spawnSync }) {
   const artifact = path.join(projectRoot, "desktop/uninstall-shell.exe");
   fs.rmSync(artifact, { force: true });
   try {
-    const result = run("go", ["build", "-buildvcs=false", "-trimpath", "-ldflags", `-s -w -H=windowsgui -buildid= -X main.version=${version}`, "-o", artifact, "./uninstall"], {
+    const result = run("go", ["build", process.env.DEEP_LEGENDS_LICENSE_BUILD === "1" ? "-tags=license" : "-tags=", "-buildvcs=false", "-trimpath", "-ldflags", `-s -w -H=windowsgui -buildid= -X main.version=${version}`, "-o", artifact, "./uninstall"], {
       cwd: path.join(projectRoot, "installer"),
       env: { ...process.env, GOOS: "windows", GOARCH: "amd64", CGO_ENABLED: "0" },
       stdio: "inherit",
@@ -79,7 +79,7 @@ function buildShell({ projectRoot, version, fingerprint, keyMode = "private", ru
     // The NSIS artifact was just produced by pack:win-setup.
     fs.renameSync(artifact, setup);
     fs.writeFileSync(metadata, JSON.stringify({ version, fingerprint, installedBytes, exeName: "Deep Legends.exe", productFolder: "Deep Legends" }) + "\n");
-    const result = run("go", ["build", "-buildvcs=false", "-trimpath", "-ldflags", "-s -w -H=windowsgui -buildid=", "-o", staging, "."], {
+    const result = run("go", ["build", process.env.DEEP_LEGENDS_LICENSE_BUILD === "1" ? "-tags=license" : "-tags=", "-buildvcs=false", "-trimpath", "-ldflags", "-s -w -H=windowsgui -buildid=", "-o", staging, "."], {
       cwd: moduleRoot,
       env: { ...process.env, GOOS: "windows", GOARCH: "amd64", CGO_ENABLED: "0" },
       stdio: "inherit",

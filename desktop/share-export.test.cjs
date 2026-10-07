@@ -57,7 +57,7 @@ test("常规总览保持 2x，超长总览按像素预算安全降采样", () =>
   assert.throws(() => screenshotScale(200, 300), /尺寸无效/);
 });
 
-function createHarness({ canceled = false, trusted = true, writeError = null, storedDirectory = "", selectedDirectory = "/tmp", existingFiles = [], directoryController } = {}) {
+function createHarness({ canceled = false, trusted = true, writeError = null, storedDirectory = "", selectedDirectory = "/tmp", existingFiles = [], directoryController, requireLicense = async () => async () => {}, onCapture } = {}) {
   const events = [];
   const writes = [];
   const files = new Map();
@@ -84,7 +84,7 @@ function createHarness({ canceled = false, trusted = true, writeError = null, st
           detach() { events.push(["debugger-detach"]); },
           async sendCommand(command, payload) {
             events.push([command, payload]);
-            if (command === "Page.captureScreenshot") return { data: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).toString("base64") };
+            if (command === "Page.captureScreenshot") { onCapture?.(); return { data: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).toString("base64") }; }
             return {};
           },
         },
@@ -131,6 +131,7 @@ function createHarness({ canceled = false, trusted = true, writeError = null, st
     dialog,
     fileSystem,
     isTrustedRenderer: () => trusted,
+    requireLicense,
     getBaseURL: () => "http://127.0.0.1:8787",
     log(message) { logs.push(message); },
     now: () => 1000,
@@ -173,6 +174,18 @@ test("取消保存不会创建截图窗口或写文件", async () => {
   assert.equal(harness.writes.length, 0);
 });
 
+test("R232 native share IPC denies locked work and discards a capture after replacement", async () => {
+  let active = false;
+  const check = async () => { if (!active) throw Error("软件尚未激活"); };
+  const harness = createHarness({ requireLicense: async () => { await check(); return check; }, onCapture: () => { active = false; } });
+  await assert.rejects(harness.controller.prepareSave(harness.event, "share.png"), /尚未激活/);
+  assert.equal(harness.events.length, 0);
+  active = true;
+  await harness.controller.prepareSave(harness.event, "share.png");
+  await assert.rejects(harness.controller.captureAndSave(harness.event, { token: validToken, markup: validMarkup, theme: "dark", density: "" }), /生成失败/);
+  assert.equal(harness.writes.length, 0, "late capture must not write a PNG");
+});
+
 test("保存令牌只能使用一次，写入失败会记录脱敏错误", async () => {
   const harness = createHarness({ writeError: new Error("disk full") });
   await harness.controller.prepareSave(harness.event, "share.png");
@@ -206,6 +219,7 @@ test("preload 只暴露受校验的分享接口，不暴露 ipcRenderer", async 
       return {
         contextBridge: { exposeInMainWorld(name, value) { exposed.set(name, value); } },
         ipcRenderer: {
+          on() {}, removeListener() {},
           send() {},
           invoke(channel, payload) { invokes.push([channel, payload]); return Promise.resolve({ ok: true }); },
         },

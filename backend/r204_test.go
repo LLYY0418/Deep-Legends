@@ -102,7 +102,7 @@ func TestR204EnoughSGPSkipsLCUExceptSelf(t *testing.T) {
 		if len(recentLiveMatchesForPlayer(result.Matches, ref, 440, time.Now())) != 10 {
 			t.Fatal("ten usable games missing")
 		}
-		if !self && f.lcuCalls.Load() != 0 || self && f.lcuCalls.Load() != 1 {
+		if f.lcuCalls.Load() != 0 {
 			t.Fatal("LCU request mismatch", self, f.lcuCalls.Load())
 		}
 		if result.Evidence == nil || result.Evidence.SGPMS < 0 || result.Evidence.LCUMS < 0 {

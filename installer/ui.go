@@ -15,7 +15,7 @@ var uiFiles embed.FS
 
 var templateToken = regexp.MustCompile(`__[A-Z][A-Z0-9_]*__`)
 
-func docsAreTemplateSafe() bool { return checkDocsTemplateSafe(uiFiles) == nil }
+func docsAreTemplateSafe() bool { return checkDocsTemplateSafe(licenseUIFiles(uiFiles)) == nil }
 
 func checkDocsTemplateSafe(files fs.FS) error {
 	for _, name := range []string{"license", "notice"} {
@@ -31,7 +31,7 @@ func checkDocsTemplateSafe(files fs.FS) error {
 	return nil
 }
 
-func renderUI(version string) (string, error) { return renderUIFrom(uiFiles, version) }
+func renderUI(version string) (string, error) { return renderUIFrom(licenseUIFiles(uiFiles), version) }
 
 func renderUIFrom(files fs.FS, version string) (string, error) {
 	if err := checkDocsTemplateSafe(files); err != nil {

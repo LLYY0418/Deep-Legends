@@ -14,13 +14,15 @@ const app = new EventEmitter(), ipcMain = new EventEmitter(), screen = new Event
 Object.assign(app, { isPackaged: true, setAppUserModelId() {}, requestSingleInstanceLock: () => true,
   whenReady: () => ({ then(fn) { boot = fn; } }), getPath: name => name === "downloads" ? directory : path.join(directory, "existing-user-data"), quit() {} });
 ipcMain.handle = ipcMain.removeHandler = () => {};
-Object.assign(screen, { getPrimaryDisplay: () => ({ workAreaSize: { width: 1440, height: 900 } }), getAllDisplays: () => [] });
+Object.assign(screen, { getPrimaryDisplay: () => ({ workAreaSize: { width: 1440, height: 900 } }), getAllDisplays: () => [], getDisplayMatching: () => ({workArea:{x:0,y:0,width:1440,height:900}}) });
 class Window extends EventEmitter {
   constructor(options) {
-    super(); this.options = options; this.visible = options.show !== false; this.destroyed = false;
+    super(); this.options = options; this.visible = options.show !== false; this.destroyed = false; this.bounds = {x:0,y:0,width:1100,height:780};
     this.webContents = new EventEmitter(); this.webContents.session = new EventEmitter();
     Object.assign(this.webContents, { isDestroyed: () => this.destroyed, getURL: () => this.url,
-      executeJavaScript: async () => {}, send() {}, setWindowOpenHandler() {} });
+      mainFrame: {}, executeJavaScript: async () => {}, send: (channel, value) => {
+        if (channel === "desktop-license-apply") setImmediate(() => ipcMain.emit("desktop-license-rendered", {sender:this.webContents,senderFrame:this.webContents.mainFrame}, value.renderId));
+      }, setWindowOpenHandler() {} });
     windows.push(this);
   }
   loadURL(url) { this.url = url; return Promise.resolve(); }
@@ -29,9 +31,15 @@ class Window extends EventEmitter {
   focus() {}
   close() { this.destroyed = true; this.visible = false; this.emit("closed"); }
   isMaximized() { return false; }
-  getContentBounds() { return { width: 1100, height: 780 }; }
+  getContentBounds() { return this.bounds; }
   getBounds() { return this.getContentBounds(); }
   setMinimumSize() {}
+  setResizable() {}
+  setOpacity() {}
+  setMaximizable() {}
+  setContentBounds(value) { this.bounds = {...value}; }
+  setBounds(value) { this.bounds = {...value}; }
+  isFullScreen() { return false; }
   setTitleBarOverlay() {}
 }
 const trackedHTTP = {
@@ -70,6 +78,8 @@ const context = vm.createContext({ __dirname: desktop, URL, Buffer, console,
     if (name === "./share-export.cjs") return { createShareExportController: () => ({ clear() {}, getSaveDirectory: () => ({ directory }) }) };
     if (name === "./window-bounds-store.cjs") return { readWindowBounds: () => null, writeWindowBounds() {} };
     if (name === "./proxy-resolution.cjs") return { resolveSystemProxy: async () => "" };
+    if (name === "./backend-integrity.cjs") return { verifyBackend() {} };
+    if (name === "./backend-digest.cjs") return "0".repeat(64);
     if (name.startsWith("./")) return require(path.join(desktop, name));
     return require(name);
   },
@@ -78,6 +88,8 @@ vm.runInContext(source + "\nglobalThis.closeTestConnections = () => startupStage
 
 async function settle() {
   await Promise.resolve();
+  while (pending.size) await Promise.all([...pending]);
+  await new Promise(resolve => setImmediate(resolve));
   while (pending.size) await Promise.all([...pending]);
   assert.ok(responses.every(response => response.status === 204), `diagnostic POST rejected: ${JSON.stringify(responses)}`);
 }

@@ -124,7 +124,8 @@ const proSeedRefreshInterval = time.Minute
 // One worker per app, independent of directory refresh flights. It always waits
 // a full minute before its first account, even if the directory loads instantly.
 func (a *app) startProSeedRefresh() {
-	if a.riot == nil || !riotKeyConfigured() || a.proRefreshContext == nil {
+	background := a.proBusinessContext()
+	if a.riot == nil || !riotKeyConfigured() || background == nil || background.Err() != nil {
 		return
 	}
 	c := &a.proPlayers
@@ -135,7 +136,7 @@ func (a *app) startProSeedRefresh() {
 	}
 	c.refreshStarted = true
 	c.mu.Unlock()
-	a.goSafe("pro_refresh.startProSeedRefresh.1", func() { a.runProSeedRefresh(a.proRefreshContext) })
+	a.goSafe("pro_refresh.startProSeedRefresh.1", func() { a.runProSeedRefresh(background) })
 }
 func (a *app) runProSeedRefresh(ctx context.Context) {
 	wait, now := a.proPlayers.refreshWait, a.proPlayers.refreshNow

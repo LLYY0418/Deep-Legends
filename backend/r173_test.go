@@ -358,7 +358,14 @@ func TestR173StartupUsesOnlyDiskProfilesThenPageRefreshes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(mainSource), "a.warmProPlayersCaches()") || strings.Contains(string(mainSource), "a.loadProPlayers(runtimeContext, true)") {
+	runtimeSource, err := os.ReadFile("license_runtime.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(mainSource), "a.startApplicationBusiness(runtimeContext)") ||
+		!strings.Contains(string(runtimeSource), "a.warmProPlayersCaches()") ||
+		strings.Contains(string(mainSource), "a.loadProPlayers(runtimeContext, true)") ||
+		strings.Contains(string(runtimeSource), "a.loadProPlayers(business, true)") {
 		t.Fatal("main startup restored forced network refresh")
 	}
 }

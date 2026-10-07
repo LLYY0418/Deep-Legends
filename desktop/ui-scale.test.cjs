@@ -82,6 +82,7 @@ function harness({source=mainSource, stored, width=1920, height=1080}={}) {
   const screen=new EventEmitter();
   screen.getAllDisplays=()=>[];
   screen.getPrimaryDisplay=()=>({workAreaSize:{width:1920,height:1080}});
+  screen.getDisplayMatching=()=>({workArea:{x:0,y:0,width:1920,height:1080}});
   const app=new EventEmitter();
   Object.assign(app,{setAppUserModelId(){},requestSingleInstanceLock:()=>true,whenReady:()=>({then(){}}),getPath:()=>"/user-data",quit(){},isPackaged:true});
   class BrowserWindow extends EventEmitter {
@@ -89,14 +90,24 @@ function harness({source=mainSource, stored, width=1920, height=1080}={}) {
       super(); this.options=options;this.bounds={x:0,y:0,width,height};this.destroyed=false;
       this.url="http://127.0.0.1:8787/";
       this.webContents=new EventEmitter();
-      Object.assign(this.webContents,{session:{},isDestroyed:()=>this.destroyed,getURL:()=>this.url,setZoomFactor:value=>zoom.push(value),send:(...args)=>this.sent.push(args),setWindowOpenHandler(){}});
+      Object.assign(this.webContents,{session:{},mainFrame:{},isDestroyed:()=>this.destroyed,getURL:()=>this.url,setZoomFactor:value=>zoom.push(value),send:(...args)=>{
+        this.sent.push(args);
+        if(args[0]==="desktop-license-apply") queueMicrotask(()=>ipcMain.emit("desktop-license-rendered",{sender:this.webContents,senderFrame:this.webContents.mainFrame},args[1].renderId));
+      },setWindowOpenHandler(){}});
       this.sent=[];windows.push(this);
     }
     isDestroyed(){return this.destroyed;}
     getContentBounds(){return this.bounds;}
     getBounds(){return {...this.bounds,width:this.bounds.width+30,height:this.bounds.height+60};}
+    getNormalBounds(){return {x:0,y:0,...this.getBounds()};}
     isMaximized(){return false;}
     setMinimumSize(...size){minimum.push(size);}
+    setResizable(){}
+    setOpacity(){}
+    setMaximizable(){}
+    setBounds(){}
+    setContentBounds(){}
+    isFullScreen(){return false;}
     setTitleBarOverlay(overlay){overlays.push(overlay);}
     setBackgroundColor(){}
     loadURL(){return Promise.resolve();}
@@ -112,17 +123,21 @@ function harness({source=mainSource, stored, width=1920, height=1080}={}) {
     require(name){
       if(name==="electron")return electron;
       if(name==="node:fs")return fakeFs;
+      if(name==="node:http")return {...require("node:http"),request(){const request=new EventEmitter();request.end=()=>{};return request;}};
       if(name==="./diagnostics-export.cjs")return {attachDiagnosticsExport:()=>()=>{}};
       if(name==="./share-export.cjs")return {createShareExportController:()=>({clear(){}})};
       if(name==="./window-bounds-store.cjs")return {readWindowBounds:()=>null,writeWindowBounds(){}};
+      if(name==="./license-gate.cjs")return {readLicenseSnapshot:async()=>({state:"ACTIVE",generation:1})};
       if(name.startsWith("./"))return require(name);
       return require(name);
     },__dirname,process:{on(){},platform:"win32",env:{}},URL,Buffer,console,
     setTimeout(fn,delay){const id=++seq;timers.set(id,{fn,time:now+delay});return id;},
     clearTimeout(id){timers.delete(id);},setImmediate(fn){fn();},
   });
+  // These guards exercise ordinary default window scaling.
   vm.runInContext(source+`\nglobalThis.probe={titleBarOverlay,applyUiScale,boot(){backendReady={baseUrl:"http://127.0.0.1:8787",bootstrapUrl:"http://127.0.0.1:8787/"};createMainWindow();}};`,context);
   context.probe.boot();
+  minimum.length=0;overlays.length=0;
   // 外壳不再调用 setZoomFactor（真正的缩放在渲染进程的 CSS zoom 上），
   // 所以档位序列改从 setMinimumSize 的调用反推：每次跨档都会写一次 [780*Z, 600*Z]。
   return {window:windows[0],files,writes,zoom,minimum,overlays,ipcMain,nativeTheme,screen,probe:context.probe,

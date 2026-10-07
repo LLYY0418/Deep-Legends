@@ -6,7 +6,7 @@ installWindowCleanup(test);
 test('R86 filtering 200 loaded matches hides entries without rebuilding or refetching', async () => {
  async function check(mutate=false) {
   const matchCount = mutate ? 30 : 200;
-  const {window:w,errors}=bootDemoApp({matchCount,gameplaySourceTransform:mutate ? source=>source.replace('function reconcileFilteredMatchList(list, tab) {','function reconcileFilteredMatchList(list, tab) { list.innerHTML = list.innerHTML;') : undefined});
+  const {window:w,errors}=bootDemoApp({matchCount,gameplaySourceTransform:mutate ? source=>source.replace('list.replaceWith(view.list);','view.list.innerHTML = view.list.innerHTML;list.replaceWith(view.list);') : undefined});
   try {
     await settled();
     const d=w.document, before=[...d.querySelectorAll('.match-list .match-entry')];
@@ -17,13 +17,14 @@ test('R86 filtering 200 loaded matches hides entries without rebuilding or refet
     w.fetch=(url,...args)=>{if(String(url).startsWith('/api/gameplay/overview'))requests++;return fetch(url,...args)};
     d.querySelector('[data-match-filter="arena"]').click();
     await Promise.resolve();
-    const hidden=before.filter(entry=>entry.hidden);
-    assert.ok(hidden.length>0 && hidden.length<matchCount);
+    const retained=before.filter(entry=>!entry.isConnected);
+    assert.equal(retained.length,matchCount);
+    assert(before.every(entry=>entry.parentNode));
     d.querySelector('[data-match-filter="all"]').click();
     await Promise.resolve();
     assert.deepEqual([...d.querySelectorAll('.match-list .match-entry')],before);
     assert.ok(before.every(entry=>!entry.hidden));
-    assert.ok(creates<200,`created ${creates}`);
+    assert.ok(creates<400,`created ${creates}`);
     assert.equal(requests,0,'complete unfiltered dataset needs no first-page request');
     assert.deepEqual(errors,[]);
   } finally {w.close()}

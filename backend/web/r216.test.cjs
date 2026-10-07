@@ -5,7 +5,7 @@ const {read,compile,escapeHTML}=require('./r188-harness.cjs');const source=read(
 const {expand}=require('./r211-harness-support.cjs');
 function functions(names,deps){return compile(source,expand(source,names,deps),deps)}
 test('R216 tags show corrected words, four ordered tags, disabled keyword and unknown suppression',()=>{
- const state={matchTimelines:new Map()};const f=functions(['renderMatchTags'],{state,escapeHTML,matchTimelineKey:()=> 'one',scorePlacementChip:r=>r?.badge?`<b>${r.badge}</b>`:''});
+ const state={matchTimelines:new Map()};const f=functions(['renderMatchTags'],{state,escapeHTML,matchTimelineKey:()=> 'one',scoreBadgeChip:r=>r?.badge?`<b>${r.badge}</b>`:''});
  const match={gameId:1,result:'win'},p={participantId:1,multiKill:5,keyword:'resilience',deaths:0};let html=f.renderMatchTags(match,p,{badge:'MVP'},{});assert.ok(html.indexOf('MVP')<html.indexOf('五杀'));assert.ok(html.indexOf('五杀')<html.indexOf('坚韧'));assert.ok(html.indexOf('坚韧')<html.indexOf('零阵亡'));assert.equal((html.match(/class="(?:multikill-tag|match-keyword-tag|match-zero-deaths)/g)||[]).length,3);
  p.keywordDisabled=true;assert.doesNotMatch(f.renderMatchTags(match,p,{badge:'MVP'},{}),/坚韧/);match.result='unknown';assert.equal(f.renderMatchTags(match,p,{},{}),'');
  for(const [key,label]of [['innocent','竭尽全力'],['slowstarter','慢热'],['unyielding','不屈之志'],['struggling','挣扎'],['dedication','奉献'],['rollercoaster','过山车']])assert.equal(f.matchKeywordMetadata(key)[0],label);
@@ -48,7 +48,7 @@ test('R216 successful keyword computation suppresses background refetch even whe
 });
 
 test('R217 holdout eight closed keywords never render from participant or stale timeline cache',()=>{
- const state={matchTimelines:new Map()},f=functions(['renderMatchTags'],{state,escapeHTML,matchTimelineKey:()=> 'one',scorePlacementChip:()=>''}),match={gameId:1,result:'win'},subject={participantId:1,deaths:1};
+ const state={matchTimelines:new Map()},f=functions(['renderMatchTags'],{state,escapeHTML,matchTimelineKey:()=> 'one',scoreBadgeChip:()=>''}),match={gameId:1,result:'win'},subject={participantId:1,deaths:1};
  for(const key of ['leader','victorious','dedication','average','rollercoaster','decline','innocent','slowstarter']){
   subject.keyword=key;assert.equal(f.renderMatchTags(match,subject,{},{}),'');state.matchTimelines.set('one',{tags:[{participantId:1,keyword:key}]});assert.equal(f.renderMatchTags(match,subject,{},{}),'');state.matchTimelines.clear();
  }
@@ -56,7 +56,7 @@ test('R217 holdout eight closed keywords never render from participant or stale 
 });
 
 test('R217 newly opened keywords use existing site words and palette for participant and cached tags',()=>{
- const state={matchTimelines:new Map()},f=functions(['renderMatchTags'],{state,escapeHTML,matchTimelineKey:()=> 'one',scorePlacementChip:()=>''}),match={gameId:1,result:'win'},subject={participantId:1,deaths:1},css=read('gameplay.css');
+ const state={matchTimelines:new Map()},f=functions(['renderMatchTags'],{state,escapeHTML,matchTimelineKey:()=> 'one',scoreBadgeChip:()=>''}),match={gameId:1,result:'win'},subject={participantId:1,deaths:1},css=read('gameplay.css');
  for(const [key,label,color] of [['latebloomer','大器晚成','#6CC04A'],['unyielding','不屈之志','#E0C341']]){
   subject.keyword=key;let html=f.renderMatchTags(match,subject,{},{});assert.match(html,new RegExp(`is-tag-${key}`));assert.match(html,new RegExp(label));
   state.matchTimelines.set('one',{tags:[{participantId:1,keyword:key}]});subject.keyword='leader';html=f.renderMatchTags(match,subject,{},{});assert.match(html,new RegExp(label));

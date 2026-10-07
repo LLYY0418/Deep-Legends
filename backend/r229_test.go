@@ -222,15 +222,13 @@ func TestR229FastDiscoveryWindowAndNumericMilestones(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = a.storage.Close() })
 	normal := 8 * time.Second
-	if got := a.clientDiscoveryInterval(normal, LCUDiscoveryStatus{Result: "process-not-found"}, now); got != normal {
+	if got := a.clientDiscoveryInterval(normal, LCUDiscoveryStatus{Result: "process-not-found"}, now); got != time.Second {
 		t.Fatal(got)
 	}
 	a.startClientLaunchTiming("wegame", now)
 	for _, seconds := range []int{0, 119, 120, 121} {
 		want := time.Second
-		if seconds >= 120 {
-			want = normal
-		}
+
 		if got := a.clientDiscoveryInterval(normal, LCUDiscoveryStatus{Result: "process-not-found"}, now.Add(time.Duration(seconds)*time.Second)); got != want {
 			t.Fatal(seconds, got)
 		}
@@ -238,7 +236,7 @@ func TestR229FastDiscoveryWindowAndNumericMilestones(t *testing.T) {
 	a.startClientLaunchTiming("wegame", now.Add(-10*time.Second))
 	a.observeClientLaunchDiscovery(LCUDiscoveryStatus{ProcessCount: 1}, now.Add(-9*time.Second))
 	a.observeClientLaunchDiscovery(LCUDiscoveryStatus{Result: "connected", ProcessCount: 1}, now.Add(-7*time.Second))
-	if got := a.clientDiscoveryInterval(normal, LCUDiscoveryStatus{Result: "connected"}, now.Add(4*time.Second)); got != normal {
+	if got := a.clientDiscoveryInterval(normal, LCUDiscoveryStatus{Result: "connected"}, now.Add(4*time.Second)); got != time.Second {
 		t.Fatal(got)
 	}
 	a.clientLaunchTiming.mu.Lock()
@@ -293,12 +291,12 @@ func TestR229FastDiscoveryWindowAndNumericMilestones(t *testing.T) {
 
 	gone := &app{}
 	gone.clientDiscoveryInterval(normal, LCUDiscoveryStatus{Result: "probe-failed"}, now)
-	if gone.clientDiscoveryInterval(normal, LCUDiscoveryStatus{Result: "process-not-found"}, now.Add(time.Second)) != normal {
+	if gone.clientDiscoveryInterval(normal, LCUDiscoveryStatus{Result: "process-not-found"}, now.Add(time.Second)) != time.Second {
 		t.Fatal("passive client exit sped up idle polling")
 	}
 	cold := &app{}
 	probe := LCUDiscoveryStatus{Result: "probe-failed"}
-	if cold.clientDiscoveryInterval(normal, probe, now) != time.Second || cold.clientDiscoveryInterval(normal, probe, now.Add(121*time.Second)) != normal {
+	if cold.clientDiscoveryInterval(normal, probe, now) != time.Second || cold.clientDiscoveryInterval(normal, probe, now.Add(121*time.Second)) != time.Second {
 		t.Fatal("cold window")
 	}
 }

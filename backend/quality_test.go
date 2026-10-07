@@ -443,7 +443,7 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 			t.Fatalf("specialist external-read statement is missing %q: %s", expected, externalReads)
 		}
 	}
-	for _, expected := range []string{"ARAMKit", "国服玩家总览", "昵称与 Tag", "第三方估算分", "10 分钟", "失败缓存 5 分钟", "韩服不发送"} {
+	for _, expected := range []string{"ARAMKit", "国服玩家总览", "昵称与 Tag", "第三方估算分", "10 分钟", "未收录缓存 5 分钟", "韩服不发送"} {
 		if !strings.Contains(externalReads, expected) {
 			t.Fatalf("ARAMKit external-read statement is missing %q: %s", expected, externalReads)
 		}
@@ -487,6 +487,7 @@ var privacyStoreDirectoryCoverage = map[string][]string{
 	"community-images": {"英雄与皮肤图标"},
 	"profile-icons":    {"玩家头像"},
 	"perk-catalog":     {"符文与海克斯目录"},
+	"client-history":   {"本人最近战绩快照", "PUUID"},
 	"riot-identities":  {"锚点", "Riot ID"},
 	"riot-matches":     {"对局内容", "PUUID"},
 	"rune-starters":    {"出门装净购买缓存", "600 条", "128 MiB"},
@@ -589,6 +590,11 @@ func TestPrivacyStoresDeclareEveryLocalDirectory(t *testing.T) {
 				t.Fatalf("storage.go 启动期目录清单里出现无法解析的项 %q，请同步更新本测试", item)
 			}
 		}
+		// R235: client history uses a scoped relative file key; writeLocalStoreFile
+		// creates its parent directory instead of a startup MkdirAll entry.
+		if name == "client_history_snapshot.go" && strings.Contains(text, `filepath.Join("client-history"`) {
+			record("client-history", name)
+		}
 		// (b) newPublicBinaryCache(store, "dir", 条数上限, 字节上限)
 		for _, match := range regexp.MustCompile(`newPublicBinaryCache\([^,]+,\s*"([a-z0-9-]+)"`).FindAllStringSubmatch(text, -1) {
 			record(match[1], name)
@@ -656,6 +662,7 @@ func TestPrivacyStoresDeclareEveryLocalDirectory(t *testing.T) {
 // 任何新写法都会先在这里红，逼作者归类：要么进覆盖表并补 stores 声明，要么写豁免
 // 理由，不允许悄悄多出一个没人审过的落盘点。
 var privacyMkdirCallPins = map[string]int{
+	"license_device.go":              1, // 当前用户 DPAPI 设备凭据、计数器和签名租约；stores 明确声明。
 	"update_data_migration.go":       2, // 既有本地数据的升级暂存与目标复制；stores 明确声明，不新增采集。
 	"champion_images.go":             1, // newPublicBinaryCache：所有公开二进制/数据缓存目录的唯一创建点
 	"item_set_authorized_cleanup.go": 1, // 游戏安装目录里的备份标记（非 store root，属 explicitWrites 范畴）
@@ -667,13 +674,16 @@ var privacyMkdirCallPins = map[string]int{
 }
 
 var privacyStoreWriteCallPins = map[string]int{
-	"arena_squad_store.go": 1, // R230: root arena-squad.json; stores explicitly declares identities and 2h expiry.
-	"match_tags.go":        1, // match-tags/source/server/gameId: sanitized checkpoints and tags; stores explicitly declares 5000-entry LRU.
-	"riot_key_settings.go": 1, // 用户明确保存/清除及升级迁移的本机 Key；stores 明确声明。
-	"game_camera_mode.go":  1, // 根级 game-settings-sync.json：stores 的镜头模式偏好；沿用旧文件名以保留升级前的选择。
-	"season_stats.go":      1, // season-stats/<source>/<hash>-<season>.json（source 子目录由 writeLocalStoreFile 隐式创建）
-	"update.go":            3, // 根级 update-settings.json ×1、update-manifest.json ×2
-	"update_sources.go":    1, // 根级 update-settings.json 的成功线路偏好；既有 stores 自动更新设置，不含账号数据。
+	"collection_retry_cache.go":  1, // R241: declared blank-entry failure digests + 1h expiry; no account/ownership/quantity.
+	"season_head_refresh.go":     1, // R241: existing declared season-stats file, latest GameID/freshness timestamp only; no new directory or source.
+	"arena_squad_store.go":       1, // R230: root arena-squad.json; stores explicitly declares identities and 2h expiry.
+	"client_history_snapshot.go": 1, // R235: self history snapshot; explicitly declared in stores.
+	"match_tags.go":              1, // match-tags/source/server/gameId: sanitized checkpoints and tags; stores explicitly declares 5000-entry LRU.
+	"riot_key_settings.go":       1, // 用户明确保存/清除及升级迁移的本机 Key；stores 明确声明。
+	"game_camera_mode.go":        1, // 根级 game-settings-sync.json：stores 的镜头模式偏好；沿用旧文件名以保留升级前的选择。
+	"season_stats.go":            1, // season-stats/<source>/<hash>-<season>.json（source 子目录由 writeLocalStoreFile 隐式创建）
+	"update.go":                  3, // 根级 update-settings.json ×1、update-manifest.json ×2
+	"update_sources.go":          1, // 根级 update-settings.json 的成功线路偏好；既有 stores 自动更新设置，不含账号数据。
 }
 
 func TestPrivacyStoreDirectoryCreationCallSitesArePinned(t *testing.T) {

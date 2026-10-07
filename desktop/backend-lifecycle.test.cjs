@@ -149,7 +149,8 @@ test("graceful update/user shutdown does not publish fatal; foreign renderers ca
 });
 
 test("renderer bootstrap actually installs lifecycle subscription", () => {
-  assert.match(appSource, /setupBackendLifecycle\(\);\s*setupLiveUpdates\(\)/);
+  assert.match(appSource, /setupBackendLifecycle\(\);/);
+  assert.match(appSource, /"deep-legends:license", event => \{\s*if \(event.detail.active\) \{\s*void setupShareDirectorySetting\(\);\s*setupLiveUpdates\(\)/);
   assert.match(mainSource, /setupBackendIPC\(\);\s*ipcMain.removeHandler\("desktop-scale-get"\)/);
 });
 

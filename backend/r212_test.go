@@ -39,7 +39,7 @@ func TestR212RelayNotFoundAndHTTPStatusSummary(t *testing.T) {
 			}
 			clock.advance(10 * time.Minute)
 			riotRelays.flushSummary(p.champions.diag)
-			failures := summary["failures"].(map[string]int)
+			failures := summary["failures"].(map[string]any)
 			if status == 404 {
 				if len(failures) != 0 || summary["not_found"] != 1 {
 					t.Fatal(summary)
@@ -49,7 +49,7 @@ func TestR212RelayNotFoundAndHTTPStatusSummary(t *testing.T) {
 					t.Fatal(summary)
 				}
 			}
-			if summary["categories"].(map[string]int)["spectator"] != 1 || summary["requests"] != 2 {
+			if summary["categories"].(map[string]int)["spectator"] != 1 || summary["requests"] != 1 {
 				t.Fatal(summary)
 			}
 			raw, _ := json.Marshal(summary)
@@ -82,7 +82,7 @@ func TestR212RelayCategoriesAndSummaryReset(t *testing.T) {
 	}
 	clock.advance(10 * time.Minute)
 	state.flushSummary(record)
-	if summary["not_found"] != 7 || len(summary["failures"].(map[string]int)) != 0 || len(summary["categories"].(map[string]int)) != 7 {
+	if summary["not_found"] != 7 || len(summary["failures"].(map[string]any)) != 0 || len(summary["categories"].(map[string]int)) != 7 {
 		t.Fatal(summary)
 	}
 	state.recordRequest("", 200, "arbitrary identity", record)
@@ -114,7 +114,7 @@ func TestR212RelayQuotaPageKeepsR208Priority(t *testing.T) {
 	}
 	clock.advance(10 * time.Minute)
 	riotRelays.flushSummary(p.champions.diag)
-	if summary["not_found"] != 0 || summary["failures"].(map[string]int)["quota_exhausted"] != 1 || summary["http_statuses"].(map[string]int)["404"] != 1 {
+	if summary["not_found"] != 0 || summary["failures"].(map[string]any)["quota_exhausted"] != 1 || summary["http_statuses"].(map[string]int)["404"] != 1 {
 		t.Fatal(summary)
 	}
 }

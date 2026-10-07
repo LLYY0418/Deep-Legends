@@ -183,7 +183,7 @@ async function renderOverviewPng(BrowserWindow, baseURL, payload) {
   }
 }
 
-function createShareExportController({ BrowserWindow, app, dialog, fileSystem, isTrustedRenderer, getBaseURL, log, now = Date.now, randomToken, directoryController }) {
+function createShareExportController({ BrowserWindow, app, dialog, fileSystem, isTrustedRenderer, requireLicense, getBaseURL, log, now = Date.now, randomToken, directoryController }) {
   const pending = new Map();
   const makeToken = randomToken || (() => crypto.randomBytes(24).toString("base64url"));
   const settingsPath = path.join(app.getPath("userData"), SHARE_SETTINGS_FILE);
@@ -240,13 +240,16 @@ function createShareExportController({ BrowserWindow, app, dialog, fileSystem, i
 
   async function chooseSaveDirectory(event) {
     if (!isTrustedRenderer(event?.sender)) throw new Error("不受信任的页面不能修改分享图设置。");
+    const recheck = await requireLicense();
     const result = await requestDirectory(event, "选择导出位置");
+    await recheck();
     if (!result.canceled) clear(event.sender.id);
     return result;
   }
 
   async function prepareSave(event, suggestedName) {
     if (!isTrustedRenderer(event?.sender)) throw new Error("不受信任的页面不能保存分享图。");
+    const recheck = await requireLicense();
     prune();
     let prompted = false;
     if (directoryController) saveDirectory = directoryController.getSaveDirectory(event).directory;
@@ -258,6 +261,7 @@ function createShareExportController({ BrowserWindow, app, dialog, fileSystem, i
       prompted = true;
     }
     const token = makeToken();
+    await recheck();
     clear(event.sender.id);
     const destination = uniquePngPath(fileSystem, saveDirectory, suggestedName);
     const filePath = directoryController ? directoryController.prepareFile(destination) : destination;
@@ -267,6 +271,7 @@ function createShareExportController({ BrowserWindow, app, dialog, fileSystem, i
 
   async function captureAndSave(event, rawPayload) {
     if (!isTrustedRenderer(event?.sender)) throw new Error("不受信任的页面不能生成分享图。");
+    const recheck = await requireLicense();
     prune();
     const payload = normalizeCapturePayload(rawPayload);
     const entry = pending.get(event.sender.id);
@@ -274,6 +279,7 @@ function createShareExportController({ BrowserWindow, app, dialog, fileSystem, i
     pending.delete(event.sender.id);
     try {
       const result = await renderOverviewPng(BrowserWindow, getBaseURL(), payload);
+      await recheck();
       fileSystem.writeFileSync(entry.filePath, result.png);
       const savedPath = directoryController ? await directoryController.finalizeFile(entry.filePath) : entry.filePath;
       return {

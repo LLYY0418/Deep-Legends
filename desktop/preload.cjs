@@ -75,9 +75,27 @@ contextBridge.exposeInMainWorld("desktopDiagnostics", {
 });
 
 // Independent of the browser HTTP connection pool; expose no process or token.
+const licenseEnabled = typeof process !== "undefined" && process.argv?.includes("--deep-legends-license") === true;
+let pendingLicenseApply = null;
+const licenseApplyListeners = new Set();
+if (licenseEnabled) ipcRenderer.on("desktop-license-apply", (_event, value) => {
+  pendingLicenseApply = value;
+  for (const listener of licenseApplyListeners) listener(value);
+});
 contextBridge.exposeInMainWorld("desktopBackend", {
+  licenseEnabled,
   getState() { return ipcRenderer.invoke("desktop-backend-state"); },
   restart() { return ipcRenderer.invoke("desktop-backend-restart"); },
+  licensed() { if (licenseEnabled) ipcRenderer.send("desktop-license-active"); },
+  licenseStateChanged() { if (licenseEnabled) ipcRenderer.send("desktop-license-changed"); },
+  licenseObserved() { if (licenseEnabled) ipcRenderer.send("desktop-license-observed"); },
+  licenseRendered(id) { if (licenseEnabled && Number.isSafeInteger(id)) ipcRenderer.send("desktop-license-rendered", id); },
+  onLicenseApply(callback) {
+    if (!licenseEnabled || typeof callback !== "function") return;
+    licenseApplyListeners.add(callback);
+    if (pendingLicenseApply) queueMicrotask(() => callback(pendingLicenseApply));
+    return () => licenseApplyListeners.delete(callback);
+  },
   onStateChanged(callback) {
     if (typeof callback !== "function") return;
     const listener = (_event, state) => callback(state);

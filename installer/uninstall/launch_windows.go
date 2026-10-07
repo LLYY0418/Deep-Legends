@@ -106,7 +106,7 @@ func (launch uninstallLaunch) runWithoutUI(silent bool) int {
 	cmd := launch.command(silent, deleteData)
 	err := cmd.Run()
 	code := exitCode(cmd, err)
-	finishUninstall(code, deleteData, os.Getenv("LOCALAPPDATA"), os.RemoveAll, func(string, any) {})
+	finishUninstall(code, deleteData, os.Getenv("LOCALAPPDATA"), os.RemoveAll, func(string, any) {}, os.Getenv("APPDATA"))
 	return code
 }
 

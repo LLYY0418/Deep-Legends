@@ -63,7 +63,7 @@ test('R211 streak skips remakes/custom, stops unknown and uses arena placement',
  assert.equal(f.computeOverviewStreak([match('win',0),match('remake',1),match('win',2),{...match('loss',3),gameType:'CUSTOM_GAME'},match('win',4)],false,'').count,3);
  const all=f.computeOverviewStreak(Array.from({length:20},(_,i)=>match('win',i)),true,'');assert.match(f.renderOverviewStreak(all),/20\+连胜/);
  assert.equal(f.computeOverviewStreak([match('win',0),match('unknown',1),match('win',2)],false,''),null);
- const arena=Array.from({length:3},(_,i)=>({...match('loss',i),modeGroup:'arena',subject:{placement:4}}));assert.equal(f.computeOverviewStreak(arena,false,'').result,'win');
+ const arena=Array.from({length:3},(_,i)=>({...match('win',i),queueId:1700,modeGroup:'arena',subject:{placement:4}}));assert.equal(f.computeOverviewStreak(arena,false,'').result,'win');
  assert.match(f.renderOverviewStreak({result:'loss',count:3}),/streak-rain/);assert.match(f.renderOverviewStreak({result:'win',count:3}),/streak-outer-flame/);
 });
 test('R230 name copy shows feedback; hidden name cannot bind',async()=>{

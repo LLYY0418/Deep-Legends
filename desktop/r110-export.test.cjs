@@ -7,7 +7,7 @@ function fixture(t){
  const dirs=['userData','downloads','pictures','chosen'].map(n=>path.join(root,n));dirs.forEach(d=>fs.mkdirSync(d));
  const [userData,downloads,pictures,chosen]=dirs,sender={id:1},event={sender},changes=[];let canceled=false,prompts=0;
  const args={app:{getPath:key=>({userData,downloads,pictures})[key]},dialog:{showOpenDialog:async()=>{prompts++;return {canceled,filePaths:[chosen]}}},fileSystem:fs,isTrustedRenderer:x=>x===sender,getMainWindow:()=>({webContents:sender}),onChanged:x=>changes.push(x)};
- const share=directoryController=>createShareExportController({...args,BrowserWindow:{},directoryController,randomToken:()=> 'a'.repeat(24)});
+ const share=directoryController=>createShareExportController({...args,BrowserWindow:{},directoryController,requireLicense:async()=>async()=>{},randomToken:()=> 'a'.repeat(24)});
  return {...args,userData,downloads,pictures,chosen,event,changes,share,create:()=>create(args),get prompts(){return prompts},set canceled(v){canceled=v}};
 }
 test('R110 either export chooses the same remembered folder and updates settings immediately',async t=>{

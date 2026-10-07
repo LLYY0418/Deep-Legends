@@ -150,9 +150,9 @@ func TestR202LiveHistoryWindowAndPages(t *testing.T) {
 		stop        string
 	}{
 		{"filtered", true, []int{10}, 0, 10, 1, "enough"},
-		{"filtered-old", true, []int{10}, 1, 7, 1, "window"},
+		{"filtered-old", true, []int{10}, 1, 10, 1, "enough"},
 		{"fallback-enough", false, []int{2, 5, 4}, 0, 10, 3, "enough"},
-		{"fallback-window", false, []int{2, 5, 4}, 2, 4, 2, "window"},
+		{"fallback-window", false, []int{2, 5, 4}, 2, 10, 3, "enough"},
 		{"fallback-limit", false, []int{1, 1, 1, 1}, 0, 4, 4, "page_limit"},
 		{"fallback-exhausted", false, []int{2}, 0, 2, 1, "exhausted"},
 	} {
@@ -205,7 +205,7 @@ func TestR202LiveHistoryWindowAndPages(t *testing.T) {
 				t.Fatal(len(shown), calls, result.Evidence, ok)
 			}
 			e := liveHistoryFreshnessDiagnostic(livePlayerMatchesResult{Matches: result.Matches, Evidence: &liveHistoryEvidence{SGPRequested: true, SGPOK: true, QueueFiltered: result.Evidence.QueueFiltered, PagesRead: result.Evidence.PagesRead, StopReason: result.Evidence.StopReason}}, ref, 420, 100, 0, false, time.Now())
-			if e["shown_count"] != tc.want || e["window_days"] != 30 || e["stop_reason"] != tc.stop {
+			if e["shown_count"] != tc.want || e["header_games"] != tc.want || e["stop_reason"] != tc.stop {
 				t.Fatal(e)
 			}
 		})

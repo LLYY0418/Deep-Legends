@@ -202,7 +202,7 @@ func (a *uninstallerApp) uninstall(deleteData bool) {
 						})
 					})
 				})
-			})
+			}, os.Getenv("APPDATA"))
 			return
 		}
 	}

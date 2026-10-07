@@ -193,7 +193,7 @@
       if(["NotAllowedError","SecurityError","NotFoundError","AbortError","TypeError","Error"].includes(fields.error_name))body.error_name=fields.error_name;
     }
     if(event === "overview_card_ready") {
-      if(["ranks","champions","masteries","positions"].includes(fields.card))body.card=fields.card;
+      if(["matches","ranks","champions","masteries","positions"].includes(fields.card))body.card=fields.card;
       if(["snapshot","network","opgg"].includes(fields.source))body.source=fields.source;
       body.durationMs=Math.max(0,Math.min(3600000,Math.floor(Number(fields.durationMs)||0)));
     }
@@ -214,7 +214,7 @@
       if (["startup", "skin", "chroma", "champions", "career", "facade", "champselect", "update", "confirmation", "artwork_fullscreen", "other", "poll", "event", "direct", "dirty_rescan", "workspace", "manual"].includes(fields.source)) body.source = fields.source;
       if (["friends", "pro-players", "champions", "overview", "facade"].includes(fields.endpoint)) body.endpoint = fields.endpoint;
       if (event === "blocking_state_client" && reason === "skip" && fields.skip_reason === "client-exiting") body.skip_reason = "client-exiting";
-      if (event === "blocking_state_client" && reason === "hide" && ["identity-ready", "no-client-process", "timeout", "suppressed"].includes(fields.hide_reason)) body.hide_reason = fields.hide_reason;
+      if (event === "blocking_state_client" && reason === "hide" && ["self-tab-ready", "connect-failed", "hard-timeout", "timeout", "no-client-process", "suppressed"].includes(fields.hide_reason)) body.hide_reason = fields.hide_reason;
     }
     if (event === "arena_header_source") {
       if (Number.isInteger(fields.championId) && fields.championId > 0) body.championId = Math.min(1000000, fields.championId);

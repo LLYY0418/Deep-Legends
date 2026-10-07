@@ -15,6 +15,7 @@ function harness(script = source, respond) {
   w.HTMLDialogElement.prototype.close = function(){this.open=false;};
   w.fetch = (url, options) => { requests.push([url,options]);if(url === "/api/diagnostics/client")return Promise.resolve({ok:true,status:204});return respond?.(url, options) || new Promise(()=>{}); };
   w.Headers = Headers;
+  w.deepLegendsLicense = { isActive: () => true, poll() { w.dispatchEvent(new w.CustomEvent("deep-legends:license",{detail:{active:true}})); return Promise.resolve(); } };
   w.EventSource = class {
     static CLOSED = 2;
     constructor(url){this.url=url;this.listeners=new Map();streams.push(this);}

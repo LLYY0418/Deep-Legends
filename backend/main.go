@@ -52,6 +52,7 @@ const diagnosticDeduplicationLimit = 512
 var embedded embed.FS
 
 type app struct {
+	license                         *licenseManager
 	collectionDataRetry             *time.Timer
 	collectionDataRetryCount        int
 	collectionDataRetryClient       *LCUClient
@@ -188,6 +189,8 @@ type app struct {
 	clientLauncher                  func(clientInstallation) (clientLaunchResult, error)
 	clientLaunch                    clientLaunchState
 	clientLaunchTiming              clientLaunchTimingState
+	coldLaunch                      coldLaunchTimeline
+	coldDiscovery                   coldLCUDiscovery
 	clientRiotIdentities            clientRiotIdentityState
 	itemSetMu                       sync.Mutex
 	itemSetPriceMu                  sync.Mutex
@@ -463,23 +466,7 @@ func main() {
 		log.Printf("英雄数据代理设置无效，已使用自动模式：%v", err)
 		_ = championProvider.setNetworkSettings(defaultChampionNetworkSettings())
 	}
-	if gateURL := strings.TrimSpace(os.Getenv("DEEP_LEGENDS_FEATURE_GATES_URL")); gateURL != "" {
-		go func() {
-			defer recoverPanic("main.main.1")
 
-			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-			defer cancel()
-			if gateErr := championProvider.featureGates.refresh(ctx, championProvider.httpClient(), gateURL); gateErr != nil {
-				if championProvider.diag != nil {
-					championProvider.diag(map[string]any{"event": "feature_gates_failed", "reason": safeDiagnosticReason(gateErr)})
-				}
-				return
-			}
-			if championProvider.diag != nil {
-				championProvider.diag(map[string]any{"event": "feature_gates_loaded"})
-			}
-		}()
-	}
 	a := &app{
 		token:                 token,
 		startedAt:             time.Now(),
@@ -579,6 +566,8 @@ func main() {
 	staticFiles := newStaticAssetHandler(webFS)
 	mux.HandleFunc("GET /{$}", a.handleBootstrap(staticFiles))
 	mux.Handle("GET /", staticFiles)
+	mux.HandleFunc("GET /api/license/status", a.authorized(a.handleLicenseStatus))
+	mux.HandleFunc("POST /api/license/activate", a.authorized(a.handleLicenseActivate))
 	mux.HandleFunc("GET /api/status", a.authorized(a.handleStatus))
 	mux.HandleFunc("GET /api/events", a.authorized(a.handleEvents))
 	mux.HandleFunc("GET /api/skins", a.authorized(a.handleSkins))
@@ -705,11 +694,9 @@ func main() {
 
 	runtimeContext, runtimeCancel := context.WithCancel(context.Background())
 	a.runtimeCancel = runtimeCancel
-	a.proRefreshContext = runtimeContext
 	a.runtimeMetricsDone = make(chan struct{})
 	a.goSafe("backend_runtime_metrics", func() { defer close(a.runtimeMetricsDone); a.runBackendRuntimeMetrics(runtimeContext, nil, nil) })
-	goSafe("main.main.2", func() { a.runConnectionManager(runtimeContext) })
-	a.warmProPlayersCaches()
+	a.startApplicationBusiness(runtimeContext)
 	a.updates.Start()
 	if !*noBrowser && !*desktopMode {
 		go func() {
@@ -723,7 +710,7 @@ func main() {
 	}
 
 	server := &http.Server{
-		Handler:           a.trackLocalHTTP(securityHeaders(mux)),
+		Handler:           a.trackLocalHTTP(securityHeaders(a.withLicenseProtection(mux))),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       45 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -1306,7 +1293,16 @@ func (a *app) handleMedia(w http.ResponseWriter, r *http.Request) {
 
 func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 	client.setDiagnosticObserver(a.recordDiagnostic)
-	result, err := loadIdentitySnapshot(client)
+	client.mu.RLock()
+	seed := client.discoverySummoner
+	client.mu.RUnlock()
+	var result Snapshot
+	var err error
+	if seed != nil && seed.SummonerID > 0 {
+		result = Snapshot{Summoner: *seed, LoadPhases: map[string]int64{"summoner": 0, "total": 0}}
+	} else {
+		result, err = loadIdentitySnapshot(client)
+	}
 	if err != nil {
 		a.recordDiagnostic(map[string]any{"event": "identity_refresh_failed", "error": friendlyError(err), "load_phases_ms": result.LoadPhases, "phase_group": "identity"})
 		return false
@@ -1345,11 +1341,30 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 	a.recordDiagnostic(map[string]any{"event": "identity_refresh_succeeded", "duration_ms": result.LoadPhases["total"], "load_phases_ms": result.LoadPhases, "phase_group": "identity"})
 	a.broadcastEvent("summoner-updated")
 	a.broadcastEvent("connection-state")
-	if a.proRefreshContext != nil {
+	if seed != nil {
+		a.goSafe("identity.discovery-enrichment", func() {
+			snapshot, loadErr := loadIdentitySnapshot(client)
+			if loadErr != nil {
+				return
+			}
+			a.mu.Lock()
+			if a.lcu != client || a.summoner.SummonerID != seed.SummonerID {
+				a.mu.Unlock()
+				return
+			}
+			a.account.Profile = snapshot.Account.Profile
+			a.account.Capabilities = snapshot.Account.Capabilities
+			a.masteries, a.masteryCapability = snapshot.Masteries, snapshot.MasteryCapability
+			a.mu.Unlock()
+			a.broadcastEvent("account-updated")
+		})
+	}
+
+	if business := a.proBusinessContext(); business != nil {
 		go func() {
 			defer a.recoverPanic("main.refreshIdentityWithClient.1")
 
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			ctx, cancel := context.WithTimeout(business, 15*time.Second)
 			defer cancel()
 			_, _ = a.cachedFacadeState(ctx, false, "poll")
 		}()
@@ -1954,6 +1969,7 @@ func (a *app) enableDiagnosticRotationSnapshot() {
 
 func (a *app) updateDiscovery(report LCUDiscoveryStatus) {
 	a.observeClientLaunchDiscovery(report, time.Now())
+	a.observeColdLaunchDiscovery(report, time.Now())
 	a.mu.Lock()
 	a.discovery = report
 	a.mu.Unlock()
@@ -1969,6 +1985,7 @@ func (a *app) updateDiscovery(report LCUDiscoveryStatus) {
 		"lockfiles_checked":     report.LockfilesChecked,
 		"lockfiles_found":       report.LockfilesFound,
 		"probe_failures":        report.ProbeFailures,
+		"duration_ms":           report.DurationMS, "sweep": report.Sweep, "probe_ms": report.ProbeMS, "probe_error_kind": report.ProbeErrorKind,
 	})
 }
 

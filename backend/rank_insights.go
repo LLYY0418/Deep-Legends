@@ -384,7 +384,7 @@ func (a *app) loadPlayerRankScoreEntry(ctx context.Context, client *LCUClient, p
 	return entry
 }
 
-var globalMatchTiersRankSemaphore = make(chan struct{}, matchTiersRankConcurrency)
+var globalMatchTiersRankSemaphore = make(chan struct{}, 4)
 
 // rankScoreTierOnlyScope 把「只要段位」的结果与需要胜负场的结果分开存放，
 // 避免平均段位的缓存条目被个人资料页当成含胜负场的完整结果复用。

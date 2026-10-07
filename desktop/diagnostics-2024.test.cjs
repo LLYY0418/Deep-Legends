@@ -11,7 +11,7 @@ function workspace(stored = {}) {
   const w = dom.window;
   for (const [key, value] of Object.entries(stored)) w.localStorage.setItem(key, value);
   w.eval(fs.readFileSync(path.join(__dirname, "../backend/web/runtime.js"), "utf8"));
-  w.eval(source.replace('  render();\n  beginStartupPreload();\n  adoptCatalog(state.preload?.catalog);', `
+  w.eval(source.replace('  render();\n  const preloadWhenLicensed =', `
     render = () => {};
     loadWorkspace = async () => {};
     api = async () => ({position:"top", build:{}});
@@ -19,6 +19,7 @@ function workspace(stored = {}) {
     selectArenaChampion = row => {state.selected = row};
     selectMayhemChampion = row => {state.selected = row};
     window.testWorkspace = {state, openDetail, restorePersistedChampionSelection, renderMayhemRarityPanel, loadMayhemRarity, loadRankings, switchChampionMode, setAPI: value => {api=value}};
+    const preloadWhenLicensed =
   `));
   return dom;
 }

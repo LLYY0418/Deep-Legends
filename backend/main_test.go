@@ -188,6 +188,7 @@ func TestEmbeddedFilesystemExcludesDevOnlyFiles(t *testing.T) {
 		"web/champions.test.cjs",
 		"web/remaining-sort.test.cjs",
 		"web/loot-icons/README.md",
+		"testdata/license-protocol-vectors.json",
 	} {
 		if _, err := embedded.ReadFile(absent); !errors.Is(err, fs.ErrNotExist) {
 			t.Fatalf("expected %s to be excluded from the embedded binary, got err=%v", absent, err)

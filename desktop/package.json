@@ -25,6 +25,13 @@
       "en-US"
     ],
     "asar": true,
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
     "asarUnpack": [
       "backend/loot-service.exe"
     ],
@@ -36,6 +43,12 @@
     },
     "files": [
       "main.cjs",
+      "app-title.cjs",
+      "backend-integrity.cjs",
+      "backend-digest.cjs",
+      "license-build.cjs",
+      "license-gate.cjs",
+      "license-window.cjs",
       "preload.cjs",
       "share-export.cjs",
       "diagnostics-export.cjs",

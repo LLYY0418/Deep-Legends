@@ -44,7 +44,7 @@ test("R114 overview automatically queries once with an opaque reference", async 
   const calls = [], renders = [];
   const helpers = compile(["mayhemRatingStatus", "loadMayhemRating"], {
     riotTab: tab => tab.region === "kr", tabServerID:()=>"HN1", URLSearchParams,
-    rerenderTab: tab => renders.push(tab.key),
+    rerenderTab: tab => renders.push(tab.key), updateMayhemRatingPopover: tab => renders.push(tab.key),
     api: async (url, options, key) => { calls.push({ url, options, key }); return { available: true, rating: 2000, ratingType: 0 }; },
   });
   const tab = { key: "cn-player", region: "cn", data: { player: { playerRef: "opaque-reference-only" } }, mayhemRating: { status: "idle", playerRef: "", data: null, error: "" } };

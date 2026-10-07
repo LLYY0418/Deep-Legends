@@ -81,8 +81,13 @@ func TestR211SGPForceSummaryFreshAndAllExpectedReusesFirstPage(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("force did not trigger a season scan")
 	}
-	head := r175Events(t, a, "season_stats_head_refresh")
-	if len(head) != 1 || head[0]["fresh"] != true || head[0]["use_history_cache"] != false || head[0]["sgp_history_calls"] != float64(2) || head[0]["sgp_history_cache_hits"] != float64(0) {
+	head := []map[string]any{}
+	for _, event := range r175Events(t, a, "season_stats_head_refresh") {
+		if event["skipped"] != true {
+			head = append(head, event)
+		}
+	}
+	if len(head) != 1 || head[0]["fresh"] != true || head[0]["use_history_cache"] != false || head[0]["sgp_history_calls"] != float64(3) || head[0]["sgp_history_cache_hits"] != float64(0) {
 		t.Fatal("fresh background season scan missing", head)
 	}
 	warm := foreground.Load()

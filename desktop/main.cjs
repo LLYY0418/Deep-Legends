@@ -12,6 +12,7 @@ const { spawn } = require("node:child_process");
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
+const licenseEnabled = require("./license-build.cjs").enabled === true;
 
 function installDesktopCrashDiagnostics() {
   const record = (kind, details) => {
@@ -71,6 +72,11 @@ let backendStartTimer = null;
 let processMetrics = null;
 let uiScalePreference = "auto";
 let currentUiScale = 1;
+let licenseWindow = null;
+let licenseWindowRead = null;
+let licenseWindowSequence = 0;
+let licenseRenderSequence = 0;
+const licenseRenderWaiters = new Map();
 let startupStageAgent = null;
 const reportedStartupStages = new Set();
 
@@ -82,10 +88,11 @@ if (!hasInstanceLock) {
 } else {
   app.on("second-instance", () => {
     if (quitting) return;
-    if (!mainWindow) {
+    if (!mainWindow || !startupMarks.mainShown) {
       if (startupMarks.splashWindowShown) { splashWindow?.show(); splashWindow?.focus(); }
       return;
     }
+    if (licenseEnabled && !licenseWindow?.canShow()) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
     mainWindow.focus();
@@ -98,14 +105,15 @@ function projectRoot() {
 
 function backendSpec() {
   if (app.isPackaged) {
-    // 后端通过 asarUnpack 直接随包分发，免去以前每次启动
-    // “读取 asar → SHA256 校验 → 释放到用户目录”的成本。
+    // The expected digest is generated before packing and protected inside
+    // app.asar; an adjacent mutable checksum is never a trust root.
     const command = path.join(process.resourcesPath, "app.asar.unpacked", "backend", "loot-service.exe");
     if (!fs.existsSync(command)) {
       const error = new Error("内置数据服务文件缺失或不完整，请重新下载完整客户端。");
       error.diagnostics = [`missing backend executable: ${command}`];
       throw error;
     }
+    require("./backend-integrity.cjs").verifyBackend(command, require("./backend-digest.cjs"));
     return {
       command,
       args: ["--desktop", "--no-browser"],
@@ -255,6 +263,7 @@ function syncTitleBar(scale = currentUiScale) {
 }
 
 function uiScaleState(window = mainWindow) {
+  if (licenseEnabled && !licenseWindow?.isActive()) return { mode: "fixed", value: 1, auto: 1 };
   const auto = autoScaleFor(window.getContentBounds());
   return { mode: uiScalePreference === "auto" ? "auto" : "fixed", value: uiScalePreference === "auto" ? auto : uiScalePreference, auto };
 }
@@ -266,6 +275,12 @@ function applyUiScale(window, scale, force = false) {
   // caption overlay is DIP while --topbar-height is CSS px, and the minimum size
   // has to grow or a 780px window would drop into the phone breakpoints.
   if (!window || window !== mainWindow || window.isDestroyed()) return;
+  if (licenseEnabled && !licenseWindow?.isActive()) {
+    currentUiScale = 1;
+    syncTitleBar(1);
+    window.setMinimumSize(0, 0);
+    return;
+  }
   if (!force && currentUiScale === scale) return;
   currentUiScale = scale;
   syncTitleBar(scale);
@@ -359,7 +374,36 @@ function onBackendClosed(code, signal) {
 }
 
 function setupBackendIPC() {
-  const trusted = event => event.sender === mainWindow?.webContents && isTrustedRenderer(event.sender);
+  const trusted = event => event.sender === mainWindow?.webContents && event.senderFrame === mainWindow?.webContents.mainFrame && isTrustedRenderer(event.sender);
+  ipcMain.removeAllListeners("desktop-license-observed");
+  ipcMain.on("desktop-license-observed", event => {
+    if (trusted(event)) void refreshLicenseWindow().then(() => { if (licenseWindow?.isActive()) return pushSystemProxy(); }).catch(() => {});
+  });
+  ipcMain.removeAllListeners("desktop-license-rendered");
+  ipcMain.on("desktop-license-rendered", async (event, id) => {
+    if (!trusted(event) || !Number.isSafeInteger(id)) return;
+    const waiter = licenseRenderWaiters.get(id);
+    if (!waiter || waiter.window !== mainWindow) return;
+    // The renderer supplies timing only. Recheck authenticated Go state before
+    // restoring opacity, including changes while the two frames were pending.
+    const value = await readWindowLicense();
+    if (!licenseRenderWaiters.has(id)) return;
+    if (value.state !== waiter.state) {
+      waiter.finish({ stale: true, mismatch: true });
+      void refreshLicenseWindow();
+    } else if (value.generation !== waiter.snapshot.generation) {
+      waiter.snapshot = value; waiter.mismatch = true; waiter.send();
+    } else waiter.finish({ mismatch: waiter.mismatch });
+  });
+  ipcMain.removeAllListeners("desktop-license-active");
+  ipcMain.on("desktop-license-active", event => {
+    if (!trusted(event)) return;
+    void refreshLicenseWindow().then(() => { if (licenseWindow?.isActive()) return pushSystemProxy(); }).catch(() => {});
+  });
+  ipcMain.removeAllListeners("desktop-license-changed");
+  ipcMain.on("desktop-license-changed", event => {
+    if (trusted(event)) void refreshLicenseWindow();
+  });
   ipcMain.removeAllListeners("desktop-update-ready");
   ipcMain.on("desktop-update-ready", event => {
     if (!trusted(event) || !mainWindow || mainWindow.isDestroyed()) return;
@@ -429,7 +473,58 @@ function acceptReadyPayload(payload) {
   reportStartupStage("backend_ready");
   setSplashStatus("正在加载界面");
   createMainWindow();
-  void pushSystemProxy();
+  if (!licenseEnabled) void pushSystemProxy();
+}
+
+function requireActiveDesktopLicense() {
+  if (!licenseEnabled) return Promise.resolve(async () => {});
+  return require("./license-gate.cjs").requireActiveLicense(http, () => backend && backendReady, true);
+}
+
+function readWindowLicense() {
+  if (!licenseEnabled) return Promise.resolve({ state: "DISABLED" });
+  return require("./license-gate.cjs").readLicenseSnapshot(http, () => backend && backendReady, true)
+    .catch(() => ({ state: "NETWORK_LOCKED", generation: 0, message: "无法连接激活服务，请联网后重试" }));
+}
+
+function waitForLicenseRender(state, snapshot) {
+  if (!mainWindow || mainWindow.isDestroyed()) return Promise.resolve({ stale: true });
+  return new Promise(resolve => {
+    const id = ++licenseRenderSequence, window = mainWindow;
+    const waiter = { window, state, snapshot, mismatch: false,
+      send() {
+        if (window === mainWindow && !window.isDestroyed() && isTrustedRenderer(window.webContents))
+          window.webContents.send("desktop-license-apply", { state, generation: waiter.snapshot.generation, message: waiter.snapshot.message, license_expires_at: waiter.snapshot.license_expires_at, renderId: id });
+      },
+      finish(result) { clearTimeout(timer); licenseRenderWaiters.delete(id); resolve(result); },
+    };
+    const timer = setTimeout(() => waiter.finish({ timedOut: true }), 1500);
+    licenseRenderWaiters.set(id, waiter); waiter.send();
+  });
+}
+
+function refreshLicenseWindow() {
+  if (!licenseEnabled) return Promise.resolve();
+  const window = mainWindow, controller = licenseWindow, sequence = ++licenseWindowSequence, started = Date.now();
+  // IPC is only a notification. Native sizing trusts the authenticated Go state.
+  licenseWindowRead = readWindowLicense()
+    .then(async value => {
+      if (sequence !== licenseWindowSequence || window !== mainWindow || window?.isDestroyed()) return;
+      await controller.setState(value.state, { ...value, statusReadMs: Date.now() - started });
+      appendDesktopLog("授权窗口状态 " + JSON.stringify({ state: value.state, elapsedMs: Date.now() - started, beforeFirstShow: !startupMarks.mainShown }));
+    });
+  return licenseWindowRead;
+}
+
+function reportLicenseWindowState(value) {
+  appendDesktopLog("license_window_state " + JSON.stringify(value));
+  if (!backendReady) return;
+  const body = Buffer.from(JSON.stringify({ event: "license_window_state", reason: "transition", licenseWindow: value }));
+  const request = http.request(`${backendReady.baseUrl}/api/diagnostics/client`, {
+    method: "POST", headers: { "X-Local-Token": backendReady.token, "Content-Type": "application/json", "Content-Length": body.length }, timeout: 2000,
+  }, response => { if (response.statusCode !== 204) appendDesktopLog("授权窗口诊断发送失败：HTTP " + response.statusCode); response.resume(); });
+  request.once("error", () => appendDesktopLog("授权窗口诊断发送失败"));
+  request.once("timeout", () => request.destroy()); request.end(body);
 }
 
 // 系统代理解析不再阻塞后端启动：后端就绪后异步解析并下发，
@@ -484,7 +579,7 @@ function createMainWindow() {
   const storedBounds = readWindowBounds(boundsPath, screen.getAllDisplays());
   const bounds = storedBounds || initialWindowBounds();
   mainWindow = new BrowserWindow({
-    title: "Deep Legends",
+    title: require("./app-title.cjs"),
     width: bounds.width,
     height: bounds.height,
     minWidth: 780,
@@ -504,13 +599,27 @@ function createMainWindow() {
       webSecurity: true,
       devTools: !app.isPackaged,
       spellcheck: false,
+      // The authorization handshake uses two animation frames while opacity is
+      // zero, including an unfocused/minimized startup. Keep those frames live.
+      ...(licenseEnabled ? { backgroundThrottling: false, additionalArguments: ["--deep-legends-license"] } : {}),
     },
   });
   reportStartupStage("main_window_created");
-  if (storedBounds?.maximized) mainWindow.maximize();
+  mainWindow.on("page-title-updated", event => event.preventDefault());
+  if (licenseEnabled) licenseWindow = require("./license-window.cjs").createLicenseWindowController({
+    window: mainWindow, normalBounds: bounds, getInitialBounds: initialWindowBounds,
+    getWorkArea: () => screen.getDisplayMatching(mainWindow.getBounds()).workArea,
+    getDisplayScale: () => screen.getDisplayMatching(mainWindow.getBounds()).scaleFactor || 1,
+    waitForRender: waitForLicenseRender,
+    recordState: reportLicenseWindowState,
+    onScale: () => { applyUiScale(mainWindow, uiScaleState().value, true); publishUiScale(true); },
+    writeBounds: value => writeWindowBounds(boundsPath, value),
+  });
+  if (!licenseEnabled && storedBounds?.maximized) mainWindow.maximize();
   let boundsWriteTimer = null;
   const persistBounds = () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (licenseEnabled) { licenseWindow.persistBounds(); return; }
     const normal = mainWindow.isMaximized() ? mainWindow.getNormalBounds() : mainWindow.getBounds();
     writeWindowBounds(boundsPath, { ...normal, maximized: mainWindow.isMaximized() });
   };
@@ -530,9 +639,17 @@ function createMainWindow() {
     clearTimeout(boundsWriteTimer);
     persistBounds();
   });
-  mainWindow.once("ready-to-show", () => {
+  mainWindow.once("ready-to-show", async () => {
     reportStartupStage("main_window_ready_to_show");
-    mainWindow?.show();
+    // Hidden normal-sized construction overlaps rendering and the local status
+    // read. First show also waits for the authoritative renderer handshake.
+    if (licenseEnabled) {
+      let pending;
+      do { pending = licenseWindowRead; await pending; } while (pending !== licenseWindowRead);
+    }
+    if (quitting || !mainWindow || mainWindow.isDestroyed()) return;
+    if (licenseEnabled) { if (!licenseWindow?.showInitial()) return; }
+    else mainWindow?.show();
     closeSplashWindow();
     startupMarks.mainShown = Date.now();
     reportStartupPhases();
@@ -545,7 +662,9 @@ function createMainWindow() {
     lastScaleState = serialized;
     mainWindow.webContents.send("desktop-scale-changed", state);
   };
+  void refreshLicenseWindow();
   mainWindow.webContents.on("did-finish-load", () => {
+    for (const waiter of licenseRenderWaiters.values()) waiter.send();
     reportStartupStage("main_window_did_finish_load");
     applyUiScale(mainWindow, uiScaleState().value, true);
     publishUiScale(true);
@@ -603,6 +722,7 @@ function createMainWindow() {
     dialog,
     fileSystem: fs,
     isTrustedRenderer,
+    requireLicense: requireActiveDesktopLicense,
     getBaseURL: () => backendReady?.baseUrl || "",
     log: appendDesktopLog,
   });
@@ -645,7 +765,10 @@ function createMainWindow() {
   ipcMain.removeHandler("desktop-share-prepare-save");
   ipcMain.handle("desktop-share-prepare-save", (event, suggestedName) => windowShareExportController.prepareSave(event, suggestedName));
   ipcMain.removeHandler("desktop-share-get-directory");
-  ipcMain.handle("desktop-share-get-directory", (event) => windowShareExportController.getSaveDirectory(event));
+  ipcMain.handle("desktop-share-get-directory", async (event) => {
+    await requireActiveDesktopLicense();
+    return windowShareExportController.getSaveDirectory(event);
+  });
   ipcMain.removeHandler("desktop-share-choose-directory");
   ipcMain.handle("desktop-share-choose-directory", (event) => windowShareExportController.chooseSaveDirectory(event));
   ipcMain.removeHandler("desktop-share-capture-and-save");
@@ -704,7 +827,10 @@ function createMainWindow() {
     ipcMain.removeAllListeners("desktop-scale-set");
     windowShareExportController.clear();
     if (shareExportController === windowShareExportController) shareExportController = null;
+    for (const waiter of licenseRenderWaiters.values()) waiter.finish({ stale: true });
     mainWindow = null;
+    licenseWindow = null;
+    ++licenseWindowSequence;
     if (!quitting) app.quit();
   });
   const allowedOrigin = new URL(backendReady.baseUrl).origin;
@@ -784,7 +910,7 @@ app.whenReady().then(() => {
 
 app.on("activate", () => {
   if (quitting) return;
-  if (mainWindow) mainWindow.show();
+  if (mainWindow && startupMarks.mainShown && (!licenseEnabled || licenseWindow?.canShow())) mainWindow.show();
   else if (startupMarks.splashWindowShown) splashWindow?.show();
 });
 

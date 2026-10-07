@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path');
 const {JSDOM}=require('../../desktop/node_modules/jsdom');
 const web=__dirname;
-const scripts=['runtime.js','demo-data.js','app.js','favorites-facade.js','gameplay.js','champions.js','friends.js','suite.js'];
+const scripts=['runtime.js','demo-data.js','license-ui.js','app.js','favorites-facade.js','gameplay.js','champions.js','friends.js','suite.js'];
 async function until(check, message='fixture did not settle', timeout=5000){
  const end=Date.now()+timeout;
  while(Date.now()<end){if(check())return;await new Promise(r=>setTimeout(r,10));}
@@ -20,6 +20,7 @@ async function boot(){
  w.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
  w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.Element.prototype.scrollTo=()=>{};
  Object.assign(w,{structuredClone:globalThis.structuredClone,fetch:(input,init)=>String(input).startsWith("/api/diagnostics/client")?Promise.resolve(new globalThis.Response("{}")):globalThis.fetch(input,init),Response:globalThis.Response,Headers:globalThis.Headers,Request:globalThis.Request});
+ require('../../desktop/license-render-fixture.cjs').installLicenseRenderFixture(w);
  let closed=false;
  const close=()=>{if(closed)return;closed=true;w.dispatchEvent(new w.CustomEvent('deep-legends:dispose'));for(const observer of observers)observer.disconnect();w.close();};
  try {

@@ -89,7 +89,7 @@ test("R128 §2.3-A 口径说明的实现、调用点、样式与 shared.js 全�
   // 文件与引用：shared.js 删除，index.html 不再引入。
   assert.equal(fs.existsSync(path.join(webRoot, "shared.js")), false, "shared.js 应已删除");
   assert.doesNotMatch(indexHTML, /shared\.js|deepLegendsShared/);
-  assert.match(indexHTML, /<script src="\/runtime\.js" defer><\/script>\s*<script src="\/image-queue\.js" defer><\/script>/, "删掉引入后其余脚本顺序不变");
+  assert.match(indexHTML, /<script src="\/runtime\.js" defer><\/script>\s*<script src="\/license-ui\.js" defer><\/script>\s*<script src="\/image-queue\.js" defer><\/script>/, "R232 授权层先于业务脚本，原脚本相对顺序不变");
   // Go 侧嵌入清单同步（否则 go test 会因文件缺失而红）。
   assert.doesNotMatch(read(repoRoot, "backend", "static_assets_test.go"), /"shared\.js"/);
   // 样式一并删除。

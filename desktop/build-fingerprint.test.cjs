@@ -22,7 +22,7 @@ function copySourceTree(source, destination) {
 function copyFingerprintFixture(project, root) {
   const source = fs.readFileSync(path.join(__dirname, "source-fingerprint.cjs"), "utf8");
   const inputs = [...source.match(/const buildInputs = \[([\s\S]*?)\]/)[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
-  const runtime = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"))).build.files.filter((name) => name.endsWith(".cjs")).map((name) => `desktop/${name}`);
+  const runtime = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"))).build.files.filter((name) => name.endsWith(".cjs") && name !== "backend-digest.cjs").map((name) => `desktop/${name}`);
   const go = fs.readdirSync(path.join(project, "backend")).filter((name) => name.endsWith(".go") && !name.endsWith("_test.go")).map((name) => `backend/${name}`);
   for (const relative of new Set([...inputs, ...runtime, ...go])) {
     fs.mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
@@ -66,6 +66,7 @@ test("R70 fingerprint tracks embedded assets/build inputs but excludes tests and
   fs.mkdirSync(path.join(root, "desktop", "backend"), { recursive: true });
   fs.writeFileSync(path.join(root, "desktop", "backend", "loot-service.exe"), "generated");
   fs.writeFileSync(path.join(root, "desktop", "uninstall-shell.exe"), "generated uninstaller");
+  fs.writeFileSync(path.join(root, "desktop", "backend-digest.cjs"), "generated backend digest");
   fs.writeFileSync(path.join(root, "installer", "payload", "files", "setup.exe"), "generated NSIS");
   fs.writeFileSync(path.join(root, "installer", "payload", "files", "meta.json"), "generated metadata");
   fs.appendFileSync(path.join(root, "installer", "progress_test.go"), "\n// test only");

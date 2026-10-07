@@ -15,7 +15,8 @@ test('2135 actual search buttons clear submitted fields, keep invalid input, and
   w.ResizeObserver=class{observe(){} unobserve(){} disconnect(){}};
   w.scrollTo=()=>{}; w.HTMLElement.prototype.scrollIntoView=()=>{}; w.Element.prototype.scrollTo=()=>{};
   w.structuredClone=structuredClone; w.fetch=fetch;w.Response=Response;w.Headers=Headers;w.Request=Request;
-  for(const f of ['runtime.js','demo-data.js','app.js'])w.eval(fs.readFileSync(path.join(WEB,f),'utf8'));
+  require("./license-render-fixture.cjs").installLicenseRenderFixture(w);
+  for(const f of ['runtime.js','demo-data.js','license-ui.js','app.js'])w.eval(fs.readFileSync(path.join(WEB,f),'utf8'));
   const d=w.document,name=d.getElementById('player-search-name'),tag=d.getElementById('player-search-tag'),go=d.getElementById('player-search-go');
   const events=[];w.addEventListener('deep-legends:open-player',e=>events.push(e.detail));
   name.value='';tag.value='KR1';go.click();assert.equal(events.length,0);assert.equal(tag.value,'KR1');

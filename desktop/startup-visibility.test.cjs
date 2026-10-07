@@ -40,6 +40,9 @@ function harness(text = source) {
       if (name === "node:http") return { request() { const request = new EventEmitter(); request.end = body => posts.push(JSON.parse(body)); request.destroy = () => {}; return request; } };
       if (name === "./process-metrics.cjs") return { startProcessMetrics: () => ({dispose(){}}) };
       if (name === "./backend-evidence.cjs") return { consumeRelaunchMarker: () => null };
+      if (name === "./backend-integrity.cjs") return {verifyBackend(){}};
+      if (name === "./backend-digest.cjs") return "0".repeat(64);
+      if (name === "./app-title.cjs") return "Deep Legends";
       if (name.startsWith("./")) return { attachDiagnosticsExport() {} };
       return require(name);
     },

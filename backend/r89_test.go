@@ -310,8 +310,12 @@ func TestR89IdentityRestartAndExpiry(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if calls.Load() != 2 {
-		t.Fatalf("restart identity requests=%d", calls.Load())
+	deadline := time.Now().Add(time.Second)
+	for calls.Load() < 3 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if calls.Load() != 3 {
+		t.Fatalf("restart lookup plus background account refresh requests=%d", calls.Load())
 	}
 	p := newRiotProvider(c)
 	var result map[string]any

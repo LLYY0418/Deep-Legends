@@ -15,7 +15,9 @@ test("R225 static names exclude comments and synthetic source strings", t => {
 });
 
 test("R225 actual CI filters resolve every alternative and reject nonexistent names", () => {
-  assert.equal(verifyWorkflow(workflow).length, 3);
+  const filters = verifyWorkflow(workflow);
+  assert.equal(filters.length, 3);
+  assert.ok(filters.every(step => step.kind === "node"));
   assert.throws(() => verifyWorkflow(workflow.replace('R86 Windows release|R222 Windows', 'R86 Windows release|R222 Windows|R225 nonexistent test')), /unmatched node test filter: R225 nonexistent test/);
   assert.throws(() => verifyWorkflow(workflow.replace('--expected-tests=1', '--expected-tests=2')), /count 1 != expected 2/);
   const go = "go test ./backend -run '^(TestR204KeySaveAndClear|TestR204KeyRuntime401AndPrivacy)$'";

@@ -33,7 +33,8 @@ function boot(t, { full = false, response = async () => fixture(), overviewStatu
   w.onerror = (message) => errors.push(message);
   w.console.error = (...args) => errors.push(args.map(String).join(" "));
   w.fetch = async () => new w.Response("{}", { status: 200 });
-  const scripts = full ? ["runtime.js", "demo-data.js", "app.js", "gameplay.js", "pro-players.js"] : ["pro-players.js"];
+  require("./license-render-fixture.cjs").installLicenseRenderFixture(w);
+  const scripts = full ? ["runtime.js", "demo-data.js", "license-ui.js", "app.js", "gameplay.js", "pro-players.js"] : ["pro-players.js"];
   for (const file of scripts) {
     if (file === "pro-players.js" || file === "app.js") {
       const original = w.fetch;

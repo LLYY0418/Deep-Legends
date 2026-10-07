@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-license="disabled">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="/friends.css">
     <link rel="stylesheet" href="/metrics.css">
     <script src="/runtime.js" defer></script>
+    <script src="/license-ui.js" defer></script>
     <script src="/image-queue.js" defer></script>
     <script src="/overview-art.js" defer></script>
     <script src="/augment-artwork.js" defer></script>
@@ -30,7 +31,23 @@
       </div>
     </div>
     <a class="skip-link" href="#overview-panel">跳到主要内容</a>
-    <div id="app-frame" class="app-frame" inert>
+    <div id="license-overlay" class="license-overlay" role="dialog" aria-modal="true" aria-labelledby="license-title" hidden>
+      <form id="license-form" class="license-panel">
+        <img src="/app-icon.png" alt="" width="64" height="64">
+        <h1 id="license-title">激活 Deep Legends</h1>
+        <label for="license-code">注册码</label>
+        <input id="license-code" type="text" maxlength="80" autocomplete="off" spellcheck="false" placeholder="DL-XXXXX-XXXXX-XXXXX-XXXXX" required>
+        <p id="license-message" role="status" aria-live="polite">请输入注册码激活软件</p>
+        <button id="license-submit" type="submit" class="button button-primary">激活</button>
+        <div class="license-links"><a id="license-privacy" href="/api/privacy">隐私说明</a>
+        <a href="/api/diagnostics/log" download>导出诊断</a></div>
+      </form>
+      <dialog id="license-privacy-dialog" class="license-panel">
+        <h2>隐私说明</h2><p id="license-privacy-text"></p>
+        <form method="dialog"><button class="button button-primary">关闭</button></form>
+      </dialog>
+    </div>
+    <div id="app-frame" class="app-frame">
       <aside id="sidebar" class="sidebar" aria-label="主导航">
         <button id="sidebar-toggle" class="sidebar-brand" type="button" aria-label="收起侧边栏" aria-expanded="true" aria-controls="sidebar" data-tooltip="收起侧边栏" data-sidebar-tooltip data-tooltip-side="menu" data-tooltip-size="compact">
           <img src="/app-icon.png" alt="" aria-hidden="true">
@@ -356,6 +373,7 @@
                   </div>
                 </section>
               </div>
+              <section class="setting-card"><p id="setting-license-expiry" hidden>授权到期：永久</p></section>
               <section class="settings-capabilities"><div class="panel-heading compact-heading"><div><h2>对局能力</h2><p>国服客户端接口随版本变化；不支持的能力会单独降级。</p></div></div><div id="gameplay-settings-status" class="data-panel"><p class="muted">打开总览或对局后显示能力状态。</p></div></section>
               <div class="settings-privacy"><div class="panel-heading compact-heading"><div><h2>隐私与安全</h2><p>助手不接受账号密码，也不会上传收藏数据；公开玩家查询的数据边界见下方说明。</p></div></div><div id="privacy-content" class="data-panel"><p class="muted">正在读取隐私说明…</p></div></div>
               <section class="settings-diagnostics"><div class="panel-heading compact-heading"><div><h2>诊断与日志</h2><p>核对客户端连接与皮肤库存来源；日志已脱敏，不包含账号密码或客户端令牌。</p></div></div><div class="diagnostic-actions"><button id="copy-diagnostics" class="text-button" type="button">复制诊断摘要</button><a id="export-diagnostics" class="text-button" href="/api/diagnostics/log" download role="button">导出诊断日志</a><span id="diagnostic-log-meta" class="muted">正在读取日志信息…</span></div><p class="diagnostic-export-note muted">复现问题后导出日志。</p><div id="diagnostics-content"></div></section>

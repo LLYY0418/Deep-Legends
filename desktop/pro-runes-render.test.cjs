@@ -29,7 +29,8 @@ test(`R75/R76 actual page: pro rows, degradation ${coverage ? coverage.failedGam
     w.fetch = fetch; w.Response = Response; w.Headers = Headers; w.Request = Request;
     // Keep the immutable capture inside its original 30-day validation window.
     w.Date.now = () => Date.parse("2026-09-09T04:16:00Z");
-    for (const file of ["runtime.js", "demo-data.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js"]) {
+    require("./license-render-fixture.cjs").installLicenseRenderFixture(w);
+    for (const file of ["runtime.js", "demo-data.js", "license-ui.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js"]) {
       w.eval(fs.readFileSync(path.join(WEB, file), "utf8"));
       if (file !== "demo-data.js") continue;
       const demoFetch = w.fetch;

@@ -16,9 +16,10 @@ function boot({bridge,preference,source=appSource}={}) {
   w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
   w.Element.prototype.scrollTo=()=>{};
   Object.assign(w,{structuredClone,fetch,Response,Headers,Request});
+  require("./license-render-fixture.cjs").installLicenseRenderFixture(w);
   if(bridge)w.desktopScale=bridge;else delete w.desktopScale;
   if(preference)w.localStorage.setItem("lol-loot-ui-scale",preference);
-  for(const file of ["runtime.js","demo-data.js","app.js"])w.eval(file==="app.js"?source:fs.readFileSync(path.join(web,file),"utf8"));
+  for(const file of ["runtime.js","demo-data.js","license-ui.js","app.js"])w.eval(file==="app.js"?source:fs.readFileSync(path.join(web,file),"utf8"));
   w.document.dispatchEvent(new w.Event("DOMContentLoaded"));
   return {w,select:w.document.getElementById("setting-ui-scale"),close(){w.dispatchEvent(new w.CustomEvent("deep-legends:dispose"));w.close();}};
 }

@@ -421,14 +421,14 @@ func TestR196RestartRestoresReadySnapshot(t *testing.T) {
 	waitUpdateCheck(t, u)
 	u.Close()
 	readySnapshot := make(chan updateStatus, 1)
-	restored := newUpdateManager("0.11.2", u.store, func(kind string, value any) {
+	restored := newUpdateManagerWithTrust("0.11.2", u.store, func(kind string, value any) {
 		if kind == "update:status" {
 			status := value.(updateStatus)
 			if status.State == "ready" {
 				readySnapshot <- status
 			}
 		}
-	})
+	}, testUpdateTrust())
 	defer restored.Close()
 	restored.client = &http.Client{Transport: r196RoundTrip(func(*http.Request) (*http.Response, error) {
 		t.Error("fresh manifest cache should avoid network")

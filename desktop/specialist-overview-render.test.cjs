@@ -24,8 +24,9 @@ test("live specialist right overview button opens exact KR overview while rune s
     w.CSS ||= {}; w.CSS.escape ||= value => String(value).replace(/[^a-zA-Z0-9_-]/g, c => `\\${c}`);
     w.structuredClone = structuredClone;
     w.fetch = fetch; w.Response = Response; w.Headers = Headers; w.Request = Request;
+    require("./license-render-fixture.cjs").installLicenseRenderFixture(w);
     w.addEventListener("deep-legends:open-player", e => opened.push(e.detail));
-    for (const file of ["runtime.js", "demo-data.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js"]) {
+    for (const file of ["runtime.js", "demo-data.js", "license-ui.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js"]) {
       w.eval(fs.readFileSync(path.join(WEB, file), "utf8"));
       if (file !== "demo-data.js") continue;
       const demoFetch = w.fetch;

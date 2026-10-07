@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -110,13 +111,14 @@ type updateAsset struct {
 	URL    string `json:"url"`
 }
 type updateManifest struct {
-	Schema       int         `json:"schema"`
-	Version      string      `json:"version"`
-	Fingerprint  string      `json:"fingerprint"`
-	PublishedAt  time.Time   `json:"publishedAt"`
-	MinSupported string      `json:"minSupported"`
-	Notes        string      `json:"notes"`
-	Asset        updateAsset `json:"asset"`
+	SignedManifest *signedLicenseEnvelope `json:"signed_manifest,omitempty"`
+	Schema         int                    `json:"schema"`
+	Version        string                 `json:"version"`
+	Fingerprint    string                 `json:"fingerprint"`
+	PublishedAt    time.Time              `json:"publishedAt"`
+	MinSupported   string                 `json:"minSupported"`
+	Notes          string                 `json:"notes"`
+	Asset          updateAsset            `json:"asset"`
 }
 type updateProgress struct {
 	ReceivedBytes   int64   `json:"receivedBytes"`
@@ -151,6 +153,7 @@ type updateSettings struct {
 }
 
 type updateManager struct {
+	trustKeys          map[string]ed25519.PublicKey
 	migrationDirectory func() (string, error)
 	startSourceTimer   func(time.Duration, func()) func()
 	progressTicks      func() (<-chan time.Time, func())
@@ -215,14 +218,23 @@ func (u *updateManager) recordUpdateCheck(event map[string]any) {
 }
 
 func newUpdateManager(current string, store *localStore, notify func(string, any)) *updateManager {
+	return newUpdateManagerWithTrust(current, store, notify, updateTrustKeys())
+}
+func newUpdateManagerWithTrust(current string, store *localStore, notify func(string, any), keys map[string]ed25519.PublicKey) *updateManager {
 	ctx, cancel := context.WithCancel(context.Background())
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.ResponseHeaderTimeout = updateSourceTimeout
 	transport.TLSHandshakeTimeout = updateSourceTimeout
-	u := &updateManager{store: store, mirrors: append([]string(nil), updateMirrors...), now: time.Now,
+	u := &updateManager{trustKeys: keys, store: store, mirrors: append([]string(nil), updateMirrors...), now: time.Now,
 		client: &http.Client{Transport: transport}, freeBytes: updateDiskFreeBytes, launch: launchUpdateInstaller,
 		notify: notify, ctx: ctx, stop: cancel,
 		status: updateStatus{Current: current, State: "idle", Portable: true, ReleaseURL: updateReleasePage},
+	}
+	// R236: staging never reads a release cache or follows the production Latest.
+	if !licenseOnlineUpdates {
+		u.status.ReleaseURL = ""
+		u.mirrors = nil
+		return u
 	}
 	if current == "dev" {
 		return u
@@ -248,7 +260,7 @@ func newUpdateManager(current string, store *localStore, notify func(string, any
 	}
 	if data, err := readLocalStoreFile(store, "update-manifest.json"); err == nil && len(data) <= 256*1024 {
 		var cached updateCache
-		if json.Unmarshal(data, &cached) == nil && validateUpdateManifest(cached.Manifest) == nil {
+		if strictLicenseJSON(data, &cached) == nil && verifyUpdateManifestTrust(cached.Manifest, u.trustKeys) == nil {
 			u.cache = cached
 		}
 	}
@@ -257,6 +269,9 @@ func newUpdateManager(current string, store *localStore, notify func(string, any
 
 func (u *updateManager) Status() updateStatus {
 	if u == nil {
+		if !licenseOnlineUpdates {
+			return updateStatus{Current: version, State: "idle", Portable: true}
+		}
 		return updateStatus{Current: version, State: "idle", Portable: true, ReleaseURL: updateReleasePage}
 	}
 	u.mu.Lock()
@@ -271,7 +286,7 @@ func (u *updateManager) publish() {
 }
 
 func (u *updateManager) Start() {
-	if !u.Status().Supported {
+	if !licenseOnlineUpdates || !u.Status().Supported {
 		return
 	}
 	if u.diagnostic != nil {
@@ -345,6 +360,9 @@ func (u *updateManager) Settings() updateSettings {
 }
 
 func (u *updateManager) SetSettings(settings updateSettings) error {
+	if !licenseOnlineUpdates {
+		return errors.New("当前构建不支持更新")
+	}
 	if err := validUpdateMirrors(settings.Mirrors); err != nil {
 		return err
 	}
@@ -381,6 +399,9 @@ func (u *updateManager) busyLocked() bool {
 // Manual checks bypass the six-hour cache, but clicks in one five-second burst
 // share the first request. A running check is always single-flight.
 func (u *updateManager) Check(force bool) bool {
+	if !licenseOnlineUpdates {
+		return false
+	}
 	u.mu.Lock()
 	now := u.now()
 	if !u.status.Supported || u.busyLocked() || (force && !u.lastManual.IsZero() && now.Sub(u.lastManual) < 5*time.Second) {
@@ -540,10 +561,10 @@ func (u *updateManager) fetchManifestSource(ctx context.Context, target string) 
 	if len(data) > 256*1024 {
 		return manifest, &updateCheckFailure{stage: "parse", errorKind: "response-too-large", safeError: "manifest-too-large", httpStatus: response.StatusCode, cause: errors.New("更新清单无法读取")}
 	}
-	if err := json.Unmarshal(data, &manifest); err != nil {
+	if err := strictLicenseJSON(data, &manifest); err != nil {
 		return manifest, &updateCheckFailure{stage: "parse", errorKind: "decode", safeError: "manifest-decode-failed", httpStatus: response.StatusCode, cause: errors.New("更新清单无法读取")}
 	}
-	if err := validateUpdateManifest(manifest); err != nil {
+	if err := verifyUpdateManifestTrust(manifest, u.trustKeys); err != nil {
 		return manifest, &updateCheckFailure{stage: "validate", errorKind: "invalid-manifest", safeError: "manifest-invalid", httpStatus: response.StatusCode, cause: err}
 	}
 	return manifest, nil

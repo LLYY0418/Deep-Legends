@@ -6,7 +6,7 @@ function extract(name) {
   if(source.slice(start-6,start)==="async ")start-=6;
   return source.slice(start,source.indexOf("\n  }",start)+4);
 }
-function compile(names,deps) { return Function(...Object.keys(deps),require("./r220-harness-support.cjs").prelude(source,deps)+names.map(extract).join("\n")+`\nreturn {${names.join(",")}};`)(...Object.values(deps)); }
+function compile(names,deps) { return Function(...Object.keys(deps),require("./r220-harness-support.cjs").prelude(source,deps)+require("./r211-harness-support.cjs").expand(source,names,deps).map(extract).join("\n")+`\nreturn {${names.join(",")}};`)(...Object.values(deps)); }
 const noop=()=>{};
 const payload=(count=20,beg=0,filter="all")=>({player:{playerRef:"fixture",region:"kr"},matches:Array.from({length:count},(_,i)=>({gameId:beg+i})),pagination:{begIndex:beg,count,hasMore:count===20,filter,serverFiltered:filter!=="all"}});
 function fixture(api) {
@@ -42,7 +42,7 @@ test("R108 changing modes never merges another queue and returning restores its 
   const h=fixture(async(url,options)=>{calls++;const filter=JSON.parse(options.body).matchFilter;return payload(0,0,filter)});
   const tab={key:"fixture",region:"kr",playerRef:"fixture",matchFilter:"all",data:payload(40),nextBegIndex:40,openMatches:new Set(),matchDetailTabs:new Map()};
   tab.data.pagination.hasMore=true;
-  const methods=compile(["loadOverview","updateMatchFilter"],{...h.deps,rememberMatchScrollTop:noop,matchObserverKey:()=>"observer",renderFilteredMatchView:noop,autoLoadMatchFilter:()=>{throw Error("must not crawl a server-filtered empty mode")}});
+  const methods=compile(["loadOverview","updateMatchFilter"],{...h.deps,overviewContainer:()=>null,rememberMatchScrollTop:noop,matchObserverKey:()=>"observer",renderFilteredMatchView:noop,autoLoadMatchFilter:()=>{throw Error("must not crawl a server-filtered empty mode")}});
   await methods.updateMatchFilter(tab,"hextech-aram");
   assert.equal(calls,1);assert.equal(tab.data.matches.length,0);assert.equal(tab.nextBegIndex,0);assert.equal(tab.data.pagination.hasMore,false);
   await methods.updateMatchFilter(tab,"all");

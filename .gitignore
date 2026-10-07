@@ -58,6 +58,7 @@ riot_key.local.*
 # R135：构建产物与会话导出
 /backend/backend
 /backend/backend.exe
+/desktop/backend-digest.cjs
 /Claude outputs/
 
 # R220：校准采集原始数据不入库

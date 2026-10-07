@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path");
 const { JSDOM } = require("jsdom");
 const WEB = path.join(__dirname, "..", "backend", "web");
-const SCRIPTS = ["runtime.js", "demo-data.js", "app.js", "favorites-facade.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
+const SCRIPTS = ["runtime.js", "demo-data.js", "license-ui.js", "app.js", "favorites-facade.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
 const gameplaySource = fs.readFileSync(process.env.R104_GAMEPLAY_SOURCE || path.join(WEB, "gameplay.js"), "utf8");
 const suiteSource = fs.readFileSync(path.join(WEB, "suite.js"), "utf8");
 const appStyles = fs.readFileSync(path.join(WEB, "app.css"), "utf8");
@@ -104,6 +104,9 @@ function bootDemoApp(options = {}) {
   w.structuredClone = globalThis.structuredClone;
   w.fetch = (input, init) => {
     const url = typeof input === "string" ? input : input?.url || "";
+    if (new URL(url, w.location.href).pathname === "/api/license/status") {
+      return Promise.resolve(new globalThis.Response(JSON.stringify({ state: "ACTIVE", message: "", generation: 1 }), { status: 200 }));
+    }
     // The real diagnostic code still serializes its payload; jsdom has no server.
     if (new URL(url, w.location.href).pathname === "/api/diagnostics/client") {
       return Promise.resolve(new globalThis.Response("{}", { status: 200 }));

@@ -247,7 +247,7 @@ func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, ti
 			defer a.recoverPanic("pro_players.loadProPlayers.1")
 
 			started := time.Now()
-			background := a.proRefreshContext
+			background := a.proBusinessContext()
 			if background == nil {
 				background = context.Background()
 			}

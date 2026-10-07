@@ -24,7 +24,7 @@ function sourceFingerprint(projectRoot = root) {
   const hash = crypto.createHash("sha256");
   const desktopConfig = JSON.parse(fs.readFileSync(path.join(projectRoot, "desktop", "package.json"), "utf8"));
   const desktopRuntimeFiles = desktopConfig.build.files
-    .filter((name) => name.endsWith(".cjs"))
+    .filter((name) => name.endsWith(".cjs") && name !== "backend-digest.cjs")
     .sort()
     .map((name) => path.join(projectRoot, "desktop", name));
   // Include build inputs, not test fixtures or generated binaries (the latter
@@ -35,6 +35,8 @@ function sourceFingerprint(projectRoot = root) {
     "desktop/source-fingerprint.cjs", "desktop/apply-portable-template.cjs", "desktop/apply-update-timing-template.cjs",
     "desktop/verify-embedded-riot-key.cjs", "desktop/verify-build-fingerprint.cjs", "desktop/release-build.cjs",
     "desktop/verify-packaged-runtime.cjs", "desktop/nsis/portable.nsi", "desktop/nsis/installer.nsh",
+    "desktop/generate-backend-digest.cjs",
+    "desktop/verify-license-release.cjs", "desktop/verify-license-staging-pack.cjs", "scripts/build-license-staging.cjs",
     "desktop/assets/hexcore-icon.ico", "installer/ui/app.ico", "backend/data/reroll_pool_14_5.txt", "backend/data/reroll_pool_14_5.json",
     "backend/data/skin_release_dates.json", "backend/data/skin_release_overrides.json",
     "backend/data/augment_catalog_20260924.json", "backend/data/augment_icons_20260924.bin",

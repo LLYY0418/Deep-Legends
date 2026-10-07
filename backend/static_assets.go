@@ -47,6 +47,7 @@ func newStaticAssetHandler(files fs.FS) http.Handler {
 			if asset.err != nil {
 				return
 			}
+			asset.body = frontendBuildAsset(name, asset.body)
 			asset.etag = fmt.Sprintf(`"%x"`, sha256.Sum256(asset.body))
 			asset.contentType = mime.TypeByExtension(path.Ext(name))
 			switch path.Ext(name) {

@@ -85,6 +85,9 @@ test("R117 repeated token hexes and unreferenced class names stay within the aud
   for (const level of [2,3,4,5]) referenced.add(`is-mk-${level}`);
   // R216 keyword keys and their unique tokens are covered by r216.test.cjs.
   for(const key of ["unstoppable","leader","victorious","latebloomer","resilience","dedication","average","rollercoaster","decline","innocent","unlucky","slowstarter","unyielding","struggling"])referenced.add(`is-tag-${key}`);
+  // R235 data tag kinds use one dynamic class; category semantics and overflow
+  // are exercised by r235.test.cjs and the actual Chromium guard.
+  for(const kind of ['damage','efficiency','control','heal','shield','tank','kills','participation','tower','gold','cs','solo','dive','defense','advantage','hook'])referenced.add(`is-data-${kind}`);
   const unreferenced = [...classes].filter((name) => !referenced.has(name));
   assert.ok(unreferenced.length <= 93, `unreferenced CSS class names increased: ${unreferenced.length}`);
 

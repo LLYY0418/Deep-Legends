@@ -68,6 +68,10 @@ if ($KeyMode -eq "public") {
     }
 }
 
+$previousGoFlags = $env:GOFLAGS
+$previousLicenseBuild = $env:DEEP_LEGENDS_LICENSE_BUILD
+$env:GOFLAGS = ""
+$env:DEEP_LEGENDS_LICENSE_BUILD = "0"
 $previousKeyMode = $env:DEEP_LEGENDS_KEY_MODE
 Remove-Item Env:DEEP_LEGENDS_KEY_MODE -ErrorAction SilentlyContinue
 Push-Location $projectRoot
@@ -144,7 +148,7 @@ try {
         $env:GOARCH = "amd64"
         $env:CGO_ENABLED = "0"
         $ldflags = "-s -w -H=windowsgui -buildid= -X main.version=$Version -X main.buildFingerprint=$sourceFingerprint -X main.riotAPIKey= -X main.riotAPIKeyCipher=$RiotAPIKeyCipher"
-        go build -buildvcs=false -trimpath -ldflags $ldflags -o $backendOutput ./backend
+        go build -tags= -buildvcs=false -trimpath -ldflags $ldflags -o $backendOutput ./backend
         if ($LASTEXITCODE -ne 0) { throw "Backend build failed" }
     } finally {
         $env:GOOS = $previousGoos
@@ -213,6 +217,8 @@ try {
     $hashLines | Set-Content -Encoding ascii (Join-Path $projectRoot "dist\desktop\$checksumArtifact")
     Write-Host "Desktop build complete: $(Join-Path $projectRoot 'dist\desktop')"
 } finally {
+    $env:GOFLAGS = $previousGoFlags
+    $env:DEEP_LEGENDS_LICENSE_BUILD = $previousLicenseBuild
     if ($null -eq $previousKeyMode) {
         Remove-Item Env:DEEP_LEGENDS_KEY_MODE -ErrorAction SilentlyContinue
     } else {

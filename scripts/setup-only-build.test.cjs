@@ -16,7 +16,7 @@ function fixture(t) {
     fs.mkdirSync(path.join(root, dir), { recursive: true });
   }
   for (const name of ["build-desktop.sh", "scripts/build-stage.cjs", "scripts/go-test-shards.cjs", "desktop/package.json", "desktop/package-lock.json", "desktop/release-build.cjs", "desktop/artifact-names.cjs",
-    "desktop/verify-embedded-riot-key.cjs", "desktop/apply-portable-template.cjs", "desktop/apply-update-timing-template.cjs", "desktop/verify-build-fingerprint.cjs"]) {
+    "desktop/verify-embedded-riot-key.cjs", "desktop/verify-license-release.cjs", "desktop/app-title.cjs", "desktop/generate-backend-digest.cjs", "desktop/backend-integrity.cjs", "desktop/apply-portable-template.cjs", "desktop/apply-update-timing-template.cjs", "desktop/verify-build-fingerprint.cjs"]) {
     fs.copyFileSync(path.join(project, name), path.join(root, name));
   }
   for (const relative of ["include/extractAppPackage.nsh", "installSection.nsh", "installer.nsi", "include/allowOnlyOneInstallerInstance.nsh"]) {

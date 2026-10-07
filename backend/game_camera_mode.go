@@ -55,6 +55,10 @@ func (a *app) handleCameraModePreference(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "镜头模式无效", 400)
 		return
 	}
+	if a.licenseSideEffect(r.Context()) != nil {
+		http.Error(w, "软件授权已失效", http.StatusForbidden)
+		return
+	}
 	if a.saveGameSettingsPreference(request.Mode) != nil {
 		http.Error(w, "设置保存失败", 503)
 		return
@@ -64,7 +68,8 @@ func (a *app) handleCameraModePreference(w http.ResponseWriter, r *http.Request)
 	client := a.lcu
 	a.mu.RUnlock()
 	if client != nil && request.Mode != "none" {
-		a.goSafe("camera-mode-settings", func() { a.applyGameCameraMode(context.Background(), client, "settings_changed", nil) })
+		business := a.licenseBusinessContext()
+		a.goSafe("camera-mode-settings", func() { a.applyGameCameraMode(business, client, "settings_changed", nil) })
 	}
 }
 func cameraStageAllowed(stage, phase string) bool {

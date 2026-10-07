@@ -6,6 +6,7 @@ const crypto = require("node:crypto");
 const { setupArtifactName } = require("./artifact-names.cjs");
 const { verifyRiotKeyPolicy } = require("./verify-embedded-riot-key.cjs");
 const { verifyBuildFingerprint } = require("./verify-build-fingerprint.cjs");
+const { verifyLicenseRelease } = require("./verify-license-release.cjs");
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 
 // Record the exact outputs of a completed local build. This file stays in
@@ -19,6 +20,8 @@ function recordReleaseBuild({ root = path.resolve(__dirname, ".."), fingerprint,
   verifyBuildFingerprint(backend, fingerprint);
   verifyRiotKeyPolicy(backend, mode);
   verifyRiotKeyPolicy(packaged, mode);
+  verifyLicenseRelease(backend, root);
+  verifyLicenseRelease(packaged, root);
   const backendHash = sha256(fs.readFileSync(backend));
   if (sha256(fs.readFileSync(packaged)) !== backendHash) throw new Error("Packaged backend differs from the verified build");
   const version = JSON.parse(fs.readFileSync(path.join(root, "desktop/package.json"), "utf8")).version;
@@ -47,6 +50,7 @@ function verifyPublicReleaseBuild(root, fingerprint, assets) {
   const backend = path.join(root, "desktop", "backend", "loot-service.exe");
   verifyBuildFingerprint(backend, fingerprint);
   verifyRiotKeyPolicy(backend, "public");
+  verifyLicenseRelease(backend, root);
   if (sha256(fs.readFileSync(backend)) !== receipt.backendSHA256) throw new Error("Backend changed after build verification");
   for (const { input, bytes } of assets) {
     if (receipt.assets?.[input] !== sha256(bytes)) throw new Error(`发布文件与已验证构建不一致：${input}`);

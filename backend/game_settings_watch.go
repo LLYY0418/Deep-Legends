@@ -216,7 +216,11 @@ func (a *app) queueSettingsLockSnapshot(client *LCUClient, location settingsLoca
 	s.mu.Unlock()
 	// A lock action may precede the event stream. It still produces a read-only
 	// snapshot, detached from the HTTP request's short lifetime.
-	a.startGameSettingsWatch(context.Background(), client, true)
+	business := a.licenseBusinessContext()
+	if a.licenseSideEffect(business) != nil {
+		return
+	}
+	a.startGameSettingsWatch(business, client, true)
 	s.mu.Lock()
 	s.enqueueLocked(gameSettingsWatchJob{stage: "lock_action", generation: s.generation, location: &location, lockReadOnlyBefore: &before})
 	s.mu.Unlock()

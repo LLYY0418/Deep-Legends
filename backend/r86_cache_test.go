@@ -149,12 +149,16 @@ func TestR86RankCacheDoesNotAcquireApplicationLock(t *testing.T) {
 
 func TestR86RiotOverviewCancellationStopsQueuedDetails(t *testing.T) {
 	t.Setenv("RIOT_API_KEY", "RGAPI-test")
+	t.Setenv("DEEP_LEGENDS_RIOT_MATCH_CONCURRENCY", "4")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var detailCalls atomic.Int32
 	champions := newChampionProvider()
 	champions.championMeta = map[int]championMetadata{1: {NameZH: "测试"}}
 	champions.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if err := r.Context().Err(); err != nil {
+			return nil, err
+		}
 		body := "[]"
 		switch {
 		case strings.Contains(r.URL.Path, "/lol/summoner/v4/"):
@@ -166,8 +170,13 @@ func TestR86RiotOverviewCancellationStopsQueuedDetails(t *testing.T) {
 			}
 			body = "[" + strings.Join(ids, ",") + "]"
 		case strings.Contains(r.URL.Path, "/lol/match/v5/matches/"):
-			if detailCalls.Add(1) == 5 {
+			calls := detailCalls.Add(1)
+			if calls == 5 {
 				cancel()
+			}
+			if calls > 5 {
+				<-ctx.Done()
+				return nil, ctx.Err()
 			}
 			body = `{"metadata":{"matchId":"fixture"},"info":{"gameId":1,"queueId":420,"gameDuration":1800,"participants":[{"puuid":"subject","participantId":1,"teamId":100,"championId":1}]}}`
 		}

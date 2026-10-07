@@ -3,6 +3,9 @@ set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$project_root"
+# Formal builds always use the default, disabled license implementation.
+export GOFLAGS=""
+export DEEP_LEGENDS_LICENSE_BUILD="0"
 
 run_stage() {
   if [[ -f "$project_root/scripts/build-stage.cjs" ]]; then
@@ -65,10 +68,11 @@ else
 fi
 source_fingerprint="$(run_stage source-fingerprint node desktop/source-fingerprint.cjs)"
 [[ "$source_fingerprint" =~ ^[0-9a-f]{12}$ ]] || { echo "Invalid source fingerprint" >&2; exit 1; }
-run_stage backend-build env GOCACHE="$GOCACHE" GOTMPDIR="${GOTMPDIR:-/private/tmp}" GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -trimpath \
+run_stage backend-build env GOCACHE="$GOCACHE" GOTMPDIR="${GOTMPDIR:-/private/tmp}" GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags= -buildvcs=false -trimpath \
   -ldflags="-s -w -H=windowsgui -buildid= -X main.version=$version -X main.buildFingerprint=$source_fingerprint -X main.riotAPIKey= -X main.riotAPIKeyCipher=$cipher" \
   -o desktop/backend/loot-service.exe ./backend
 run_stage backend-fingerprint node desktop/verify-build-fingerprint.cjs desktop/backend/loot-service.exe "$source_fingerprint"
+run_stage backend-digest node desktop/generate-backend-digest.cjs
 
 # `npm ci` deletes and recreates all dependencies. Cache only a successful
 # install for the exact package manifests; FORCE_NPM_INSTALL=1 remains the
@@ -196,6 +200,8 @@ report_electron_dist() {
   run_stage release-receipt node release-build.cjs "$source_fingerprint"
   cd ../dist/desktop
   run_stage setup-checksum bash -c 'shasum -a 256 "$1" > "$2"' bash "$setup_artifact" "$checksum_artifact"
-  run_stage unpacked-cleanup rm -rf win-unpacked
+  if [[ "${KEEP_UNPACKED_FOR_AUDIT:-0}" != "1" ]]; then
+    run_stage unpacked-cleanup rm -rf win-unpacked
+  fi
   echo "Setup build complete: $setup_artifact"
 )

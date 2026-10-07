@@ -28,6 +28,7 @@ async function main(){
  const output=process.env.R117_BROWSER_OUTPUT||path.join(root,'docs/r117-validation/browser');fs.mkdirSync(output,{recursive:true});
  server=require('node:http').createServer((req,res)=>{
    const pathname=new URL(req.url,'http://localhost').pathname;
+   if(pathname==='/api/license/status'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({state:'ACTIVE'}));return;}
    if(pathname==='/api/image'||pathname==='/api/champion-asset'){res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#364558"/></svg>');return;}
    if(pathname==='/api/events'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache'});res.write(': fixture stream\n\n');return;}
    if(pathname.startsWith('/api/')){res.statusCode=204;res.end();return;}

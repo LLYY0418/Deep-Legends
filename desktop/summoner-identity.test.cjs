@@ -264,12 +264,12 @@ test("overview-player identity slice also updates background fields in place", (
   assert.equal(other.data.player.backgroundPath, "/other.jpg");
 });
 
-test("identity-ready status removes the global startup lock while snapshot loads", () => {
+test("identity and first self card remove the global startup lock", () => {
   const dom = new JSDOM('<!doctype html><div id="app-frame" inert></div><div id="startup-loading"></div>');
   try {
     const appFrame = dom.window.document.querySelector("#app-frame");
     const startupLoading = dom.window.document.querySelector("#startup-loading");
-    const state = { status: { connected: true, identityReady: true, snapshotReady: false }, loading: false, overlayForced: false, overlaySuppressed: false, overlayBaselineAttempt: "", statusDelay: 0 };
+    const state = { selfOverviewReady:true,status: { connected: true, identityReady: true, snapshotReady: false }, loading: false, overlayForced: false, overlaySuppressed: false, overlayBaselineAttempt: "", statusDelay: 0 };
     let hidden = 0;
     const { updateReadingOverlay } = compileFunctions(appSource, ["updateReadingOverlay"], {
       state,

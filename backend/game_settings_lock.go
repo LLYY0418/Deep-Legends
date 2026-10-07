@@ -195,6 +195,10 @@ func (a *app) handleSettingsLock(w http.ResponseWriter, r *http.Request) {
 	if request.Locked {
 		mode = 0o444
 	}
+	if a.licenseSideEffect(r.Context()) != nil {
+		http.Error(w, "软件授权已失效", http.StatusForbidden)
+		return
+	}
 	if err := os.Chmod(resolvedFile, mode); err != nil {
 		a.recordDiagnostic(map[string]any{"event": "rig_maintenance", "action": "settings-lock", "result": "failed", "settings_locked": beforeLocked, "path_kind": settingsWatchPathKind(location, location.file)})
 		http.Error(w, "无法修改设置文件只读状态", http.StatusServiceUnavailable)
