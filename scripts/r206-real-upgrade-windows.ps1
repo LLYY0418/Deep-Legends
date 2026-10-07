@@ -61,7 +61,7 @@ try {
     $userData = Join-Path $env:APPDATA 'Deep Legends'
     $sentinels = @{}
     # Distinct safe fixtures in real persistent directories, without a real account.
-    foreach ($entry in @(@($data,'season-stats/r238-cache-sentinel.json','{"schemaVersion":3,"r238":"season-cache"}'),@($data,'snapshots/r238-collection-sentinel.json','{"r238":"collection"}'),@($userData,'r238-settings-sentinel.json','{"r238":"preferences"}'),@($userData,'window-bounds.json','{"x":40,"y":40,"width":1050,"height":750,"maximized":false}'),@($userData,'ui-scale.json','{"mode":"fixed","value":1.25,"defaultAuto":1}'))) {
+    foreach ($entry in @(@($data,'season-stats/r238-cache-sentinel.json','{"schemaVersion":3,"r238":"season-cache"}'),@($data,'snapshots/r238-collection-sentinel.json','{"r238":"collection"}'),@($userData,'r238-settings-sentinel.json','{"r238":"preferences"}'),@($userData,'window-bounds.json',"{`"width`":1050,`"height`":750,`"x`":40,`"y`":40,`"maximized`":false}`n"),@($userData,'ui-scale.json','{"mode":"fixed","value":1.25,"defaultAuto":1}'))) {
         $file=Join-Path $entry[0] $entry[1]
         New-Item -ItemType Directory -Force (Split-Path -Parent $file) | Out-Null
         [IO.File]::WriteAllText($file,$entry[2],(New-Object Text.UTF8Encoding($false)))
