@@ -7,7 +7,7 @@ const path = require("node:path");
 const { JSDOM } = require("jsdom");
 
 const WEB = process.env.DEEP_LEGENDS_WEB_ROOT || path.join(__dirname, "..", "backend", "web");
-const SCRIPTS = ["runtime.js", "demo-data.js", "app.js", "gameplay.js"];
+const SCRIPTS = ["runtime.js", "demo-data.js", "license-ui.js", "app.js", "gameplay.js"];
 const gameplaySource = fs.readFileSync(path.join(WEB, "gameplay.js"), "utf8");
 
 function functionSource(source, name) {
@@ -55,7 +55,7 @@ function compileFunctions(source, names, dependencies) {
   return factory(...dependencyNames.map((name) => dependencies[name]));
 }
 
-function bootDemoApp({ withEventSource = false } = {}) {
+function bootDemoApp({ withEventSource = false, observeCollectionState = false } = {}) {
   const html = fs.readFileSync(path.join(WEB, "index.html"), "utf8");
   const errors = [];
   const eventSources = [];
@@ -85,7 +85,14 @@ function bootDemoApp({ withEventSource = false } = {}) {
     };
   }
   w.console.error = (...args) => { errors.push(args.map((value) => (value && value.stack) || String(value)).join(" ")); };
-  for (const file of SCRIPTS) w.eval(fs.readFileSync(path.join(WEB, file), "utf8"));
+  require("./license-render-fixture.cjs").installLicenseRenderFixture(w);
+  for (const file of SCRIPTS) {
+    const source = fs.readFileSync(path.join(WEB, file), "utf8");
+    // This read-only observation is injected into the test page, never app.js.
+    w.eval(file === "app.js" && observeCollectionState
+      ? source.replace(/\}\)\(\);\s*$/, "window.__collectionStateForTest = () => ({ dirty: state.status?.collectionDirty, inFlight: state.collectionRescanInFlight });})();")
+      : source);
+  }
   w.document.dispatchEvent(new w.Event("DOMContentLoaded", { bubbles: true }));
   return { window: w, errors, eventSources };
 }
@@ -221,7 +228,7 @@ test("collection-dirty is accepted by the SSE whitelist and refreshes status", {
 });
 
 test("dirty collection rescans on entry and view changes without duplicate refresh requests", { concurrency: false }, async () => {
-  const { window: w, errors, eventSources } = bootDemoApp({ withEventSource: true });
+  const { window: w, errors, eventSources } = bootDemoApp({ withEventSource: true, observeCollectionState: true });
   try {
     await waitFor(() => w.document.querySelector("#overview-content .summoner-strip"), "initial overview did not load");
     let collectionDirty = false;
@@ -247,7 +254,8 @@ test("dirty collection rescans on entry and view changes without duplicate refre
 
     collectionDirty = true;
     source.onmessage({ data: "collection-dirty" });
-    await waitFor(() => completedStatusRequests >= 1, "dirty status did not reach the shell");
+    // Fetch completion precedes body parsing and token validation; wait for committed page state.
+    await waitFor(() => w.__collectionStateForTest().dirty === true && !w.__collectionStateForTest().inFlight, "dirty status did not reach the shell");
     w.document.querySelector('[data-section="favorites"]').click();
     await waitFor(() => refreshRequests === 1, "entering collection did not start the deferred rescan");
     w.document.querySelector('[data-view="all"]').click();
@@ -257,10 +265,10 @@ test("dirty collection rescans on entry and view changes without duplicate refre
 
     collectionDirty = false;
     source.onmessage({ data: "collection-dirty" });
-    await waitFor(() => completedStatusRequests >= 2, "clean status did not release the local rescan gate");
+    await waitFor(() => w.__collectionStateForTest().dirty === false && !w.__collectionStateForTest().inFlight, "clean status did not release the local rescan gate");
     collectionDirty = true;
     source.onmessage({ data: "collection-dirty" });
-    await waitFor(() => completedStatusRequests >= 3, "second dirty status did not reach the shell");
+    await waitFor(() => w.__collectionStateForTest().dirty === true && !w.__collectionStateForTest().inFlight, "second dirty status did not reach the shell");
     w.document.querySelector('[data-view="chromas"]').click();
     await new Promise((resolve) => setTimeout(resolve, 100));
     assert.equal(refreshRequests, 1, "view changes bypassed the 60 second automatic limit");
