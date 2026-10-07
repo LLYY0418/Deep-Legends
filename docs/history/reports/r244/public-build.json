@@ -1,0 +1,10 @@
+{
+  "version": "0.12.75",
+  "key_mode": "public",
+  "license_mode": "production (no license_staging tag)",
+  "fingerprint": "5f96886c0375",
+  "path": "/tmp/Deep-Legends-R244-0.12.75-public.exe",
+  "sha256": "20100e2fa3918b9c5c6450bca441ffbb68c7029f6dc8b28dacab0461461f5be0",
+  "bytes": 32724480,
+  "artifact_type": "Windows backend only; not an installer/release"
+}

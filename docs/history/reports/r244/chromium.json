@@ -1,0 +1,50 @@
+{
+  "scope": "Production Chromium / synthetic local fixtures; real Windows cold-launch pending.",
+  "results": [
+    {
+      "summaries": [
+        {
+          "text": "卡自己十局#DEMO自己上路 · 翡翠 II常用位置：上路近 10 局5胜 5负胜率50%KDA5.00:1",
+          "rows": 10
+        },
+        {
+          "text": "李演示玩家#DEMO打野 · 翡翠 II常用位置：打野近 8 局4胜 4负胜率50%KDA5.00:1",
+          "rows": 8
+        },
+        {
+          "text": "阿六十天前玩家#DEMO中路 · 钻石 II常用位置：中路近 3 局2胜 1负胜率67%KDA5.00:1",
+          "rows": 3
+        },
+        {
+          "text": "金本模式空战绩#DEMO下路 · 翡翠 II常用位置：下路当前模式本模式暂无战绩胜率—KDA—",
+          "rows": 0
+        },
+        {
+          "text": "锤演示玩家#DEMO辅助 · 翡翠 II常用位置：辅助近 8 局4胜 4负胜率50%KDA5.00:1",
+          "rows": 8
+        },
+        {
+          "text": "贾暂无玩家信息，进入游戏后显示",
+          "rows": 0
+        },
+        {
+          "text": "蔚暂无玩家信息，进入游戏后显示",
+          "rows": 0
+        },
+        {
+          "text": "劫暂无玩家信息，进入游戏后显示",
+          "rows": 0
+        },
+        {
+          "text": "卡暂无玩家信息，进入游戏后显示",
+          "rows": 0
+        },
+        {
+          "text": "深暂无玩家信息，进入游戏后显示",
+          "rows": 0
+        }
+      ]
+    }
+  ],
+  "errors": []
+}
