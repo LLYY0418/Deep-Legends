@@ -1,0 +1,24 @@
+{
+  "fake_fetch_delay_ms": 50,
+  "additional_status_trigger": "one visible visibilitychange while first response is pending, reproducing overlapping status reads",
+  "original_assertions_and_budgets_preserved": true,
+  "runs": [
+    {
+      "variant": "probe",
+      "run": 1,
+      "started": "2026-10-07T17:12:53.160844+08:00",
+      "finished": "2026-10-07T17:12:59.918333+08:00",
+      "duration_s": 6.757,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "last5": [
+        "    actual: undefined,",
+        "    expected: undefined,",
+        "    operator: 'fail',",
+        "    diff: 'simple'",
+        "  }"
+      ]
+    }
+  ],
+  "temporary_directory_deleted": true
+}

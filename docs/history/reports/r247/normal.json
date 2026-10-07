@@ -1,0 +1,292 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "--test-name-pattern=dirty collection rescans",
+    "desktop/refresh-orchestration.test.cjs"
+  ],
+  "cpu_load": null,
+  "load_pid": null,
+  "runs": [
+    {
+      "run": 1,
+      "started": "2026-10-07T17:06:55.099696+08:00",
+      "finished": "2026-10-07T17:06:57.336182+08:00",
+      "duration_s": 2.236,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2193.949958"
+      ]
+    },
+    {
+      "run": 2,
+      "started": "2026-10-07T17:06:57.336570+08:00",
+      "finished": "2026-10-07T17:06:59.688313+08:00",
+      "duration_s": 2.352,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2306.089333"
+      ]
+    },
+    {
+      "run": 3,
+      "started": "2026-10-07T17:06:59.688557+08:00",
+      "finished": "2026-10-07T17:07:01.877387+08:00",
+      "duration_s": 2.189,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2141.133083"
+      ]
+    },
+    {
+      "run": 4,
+      "started": "2026-10-07T17:07:01.877765+08:00",
+      "finished": "2026-10-07T17:07:04.122397+08:00",
+      "duration_s": 2.245,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2199.003708"
+      ]
+    },
+    {
+      "run": 5,
+      "started": "2026-10-07T17:07:04.122707+08:00",
+      "finished": "2026-10-07T17:07:07.762597+08:00",
+      "duration_s": 3.64,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 3588.687333"
+      ]
+    },
+    {
+      "run": 6,
+      "started": "2026-10-07T17:07:07.762948+08:00",
+      "finished": "2026-10-07T17:07:12.010413+08:00",
+      "duration_s": 4.248,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 4189.157833"
+      ]
+    },
+    {
+      "run": 7,
+      "started": "2026-10-07T17:07:12.010910+08:00",
+      "finished": "2026-10-07T17:07:14.484870+08:00",
+      "duration_s": 2.474,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2403.539417"
+      ]
+    },
+    {
+      "run": 8,
+      "started": "2026-10-07T17:07:14.485105+08:00",
+      "finished": "2026-10-07T17:07:16.773540+08:00",
+      "duration_s": 2.288,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2246.579458"
+      ]
+    },
+    {
+      "run": 9,
+      "started": "2026-10-07T17:07:16.774554+08:00",
+      "finished": "2026-10-07T17:07:20.152430+08:00",
+      "duration_s": 3.378,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 3313.863959"
+      ]
+    },
+    {
+      "run": 10,
+      "started": "2026-10-07T17:07:20.152827+08:00",
+      "finished": "2026-10-07T17:07:22.350899+08:00",
+      "duration_s": 2.198,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2159.253708"
+      ]
+    },
+    {
+      "run": 11,
+      "started": "2026-10-07T17:07:22.351149+08:00",
+      "finished": "2026-10-07T17:07:24.555817+08:00",
+      "duration_s": 2.205,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2168.904708"
+      ]
+    },
+    {
+      "run": 12,
+      "started": "2026-10-07T17:07:24.556071+08:00",
+      "finished": "2026-10-07T17:07:26.744774+08:00",
+      "duration_s": 2.189,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2150.802666"
+      ]
+    },
+    {
+      "run": 13,
+      "started": "2026-10-07T17:07:26.745146+08:00",
+      "finished": "2026-10-07T17:07:29.091258+08:00",
+      "duration_s": 2.346,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2307.508167"
+      ]
+    },
+    {
+      "run": 14,
+      "started": "2026-10-07T17:07:29.091555+08:00",
+      "finished": "2026-10-07T17:07:31.331785+08:00",
+      "duration_s": 2.24,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2195.5505"
+      ]
+    },
+    {
+      "run": 15,
+      "started": "2026-10-07T17:07:31.332181+08:00",
+      "finished": "2026-10-07T17:07:33.556247+08:00",
+      "duration_s": 2.224,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2177.763209"
+      ]
+    },
+    {
+      "run": 16,
+      "started": "2026-10-07T17:07:33.556524+08:00",
+      "finished": "2026-10-07T17:07:35.794349+08:00",
+      "duration_s": 2.238,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2201.708375"
+      ]
+    },
+    {
+      "run": 17,
+      "started": "2026-10-07T17:07:35.794753+08:00",
+      "finished": "2026-10-07T17:07:37.978686+08:00",
+      "duration_s": 2.184,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2136.348167"
+      ]
+    },
+    {
+      "run": 18,
+      "started": "2026-10-07T17:07:37.979072+08:00",
+      "finished": "2026-10-07T17:07:40.203476+08:00",
+      "duration_s": 2.224,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2184.961875"
+      ]
+    },
+    {
+      "run": 19,
+      "started": "2026-10-07T17:07:40.203776+08:00",
+      "finished": "2026-10-07T17:07:42.402892+08:00",
+      "duration_s": 2.199,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2163.437917"
+      ]
+    },
+    {
+      "run": 20,
+      "started": "2026-10-07T17:07:42.403157+08:00",
+      "finished": "2026-10-07T17:07:44.660280+08:00",
+      "duration_s": 2.257,
+      "exit_code": 0,
+      "last5": [
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 2220.261125"
+      ]
+    }
+  ]
+}

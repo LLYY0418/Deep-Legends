@@ -1,0 +1,9 @@
+{
+  "all_assert_statements_unchanged": true,
+  "all_setTimeout_lines_unchanged": true,
+  "waitFor_5000ms_unchanged": true,
+  "60001_clock_advance_unchanged": true,
+  "app_js_sha256_unchanged": true,
+  "version_and_lockfile_unchanged": true,
+  "vectors_sha256_unchanged": true
+}
