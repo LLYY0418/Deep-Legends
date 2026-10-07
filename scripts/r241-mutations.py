@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+import os
 import json,subprocess,hashlib,time
 from pathlib import Path
-root=Path(__file__).resolve().parents[1];out=root/'docs/history/reports/r241';out.mkdir(exist_ok=True)
+root=Path(__file__).resolve().parents[1];out=Path(os.environ.get('R241_MUTATION_OUT',root/'docs/history/reports/r241'));out.mkdir(parents=True,exist_ok=True)
 mutations=[
  ('p2-mode-filter','backend/web/gameplay.js',lambda s:s.replace('const modeSet=Number(match.mapId)===11 ? "rift" : Number(match.mapId)===12 ? "aram" : Number(match.mapId)===30 ? "arena" : "other";','const modeSet="rift";'),['node','--test','--test-name-pattern=map matrix','backend/web/r241.test.cjs']),
  ('p3-wrap','backend/web/gameplay.css',lambda s:s.replace('grid-column: 1 / -1; flex-wrap: nowrap;','grid-column: 1 / -1; flex-wrap: wrap;'),['node','scripts/r241-browser.cjs','--guard-only']),
@@ -14,7 +15,8 @@ for name,file,mutate,cmd in mutations:
  started=time.monotonic()
  try:
   p.write_bytes(changed)
-  result=subprocess.run(cmd,cwd=root,capture_output=True,timeout=100)
+  env=os.environ.copy();env['R241_BROWSER_OUT']=str(out/name/'chromium')
+  result=subprocess.run(cmd,cwd=root,env=env,capture_output=True,timeout=100)
   log=result.stdout+result.stderr;(out/(name+'.log')).write_bytes(log)
   killed=result.returncode!=0 and (b'AssertionError' in log or b'r241_test.go:' in log) and b'build failed' not in log and b'timeout !' not in log
   rows.append({'name':name,'file':file,'command':cmd,'exit_code':result.returncode,'killed':killed,'seconds':round(time.monotonic()-started,3)})

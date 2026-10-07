@@ -1,7 +1,7 @@
 "use strict";
 // Exactly one default public package via the formal build script, in isolation.
 const fs=require("node:fs"),path=require("node:path"),os=require("node:os"),{spawnSync}=require("node:child_process");
-const root=path.resolve(__dirname,".."),output=path.join(root,"dist/R248-no-license-public");
+const root=path.resolve(__dirname,".."),output=process.env.R248_PACKAGE_DIR||path.join(root,"dist/R248-no-license-public");
 if(fs.existsSync(output)&&fs.readdirSync(output).length)throw Error("R248 audit output must be empty; do not rebuild");
 const snapshot=fs.mkdtempSync(path.join(os.tmpdir(),"r248-default-public-"));
 try{

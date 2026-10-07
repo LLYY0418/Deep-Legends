@@ -1,6 +1,6 @@
 "use strict";
 const fs=require("node:fs"),path=require("node:path"),os=require("node:os"),assert=require("node:assert/strict"),{spawnSync}=require("node:child_process");
-const root=path.resolve(__dirname,".."),out=path.join(root,"docs/history/reports/r248/mutations");fs.mkdirSync(out,{recursive:true});
+const root=path.resolve(__dirname,".."),out=process.env.R248_MUTATION_OUT||path.join(root,"docs/history/reports/r248/mutations");fs.mkdirSync(out,{recursive:true});
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),"r248-mutations-")),results=[];
 function killed(name,args,env,pattern){const begin=Date.now(),p=spawnSync(process.execPath,args,{cwd:root,env:{...process.env,...env},encoding:"utf8",timeout:45000});const log=p.stdout+p.stderr;fs.writeFileSync(path.join(out,name+".log"),log);assert.equal(p.status,1,name+" must fail assertions");assert.match(log,pattern);results.push({name,status:p.status,elapsed_ms:Date.now()-begin,assertion_failed:true});}
 try{

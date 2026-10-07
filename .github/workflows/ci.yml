@@ -25,6 +25,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Prepare verified published update compatibility input
+        run: node scripts/prepare-r238-update-fixture.cjs
       - name: Check formatting
         shell: bash
         run: |
@@ -88,6 +90,8 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: desktop/package-lock.json
+      - name: Prepare verified published update compatibility input
+        run: node scripts/prepare-r238-update-fixture.cjs
       - name: Install Windows test dependencies
         run: npm ci --prefix desktop
       # R225: restore all Windows-compiled shared paths, not only Linux skips.
@@ -141,7 +145,19 @@ jobs:
             $actual = (Get-FileHash -Algorithm SHA256 (Join-Path dist/desktop $parts[1])).Hash.ToLowerInvariant()
             if ($actual -ne $parts[0]) { throw "Checksum mismatch: $($parts[1])" }
           }
-      - name: Real 0.12.65 installation and upgrade
+      - name: Real default Electron first-frame license absence audit
+        shell: pwsh
+        env:
+          R248_ELECTRON_OUTPUT: ${{ runner.temp }}/deep-legends-r238-default-electron
+        run: |
+          node -e "require('./scripts/r248-electron.cjs').probe({phase:'after',state:'DISABLED',storedBounds:{x:40,y:40,width:1050,height:750,maximized:false}}).then(r=>console.log(JSON.stringify(r.shows))).catch(e=>{console.error(e);process.exitCode=1})"
+          if ($LASTEXITCODE -ne 0) { throw "Default first-frame audit failed" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r238-default-electron-windows
+          path: ${{ runner.temp }}/deep-legends-r238-default-electron/**
+      - name: Real 0.12.65/0.12.68/0.12.76 installation and 0.12.77 upgrade
         shell: pwsh
         run: |
           $version = node -p "require('./desktop/package.json').version"

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+import os
 """R235: mutate real production source, require assertion failure, always restore bytes."""
 import hashlib,json,pathlib,subprocess,time
 root=pathlib.Path(__file__).resolve().parents[1]
-out=root/'docs/history/reports/r235'
+out=pathlib.Path(os.environ.get('R235_MUTATION_OUT',root/'docs/history/reports/r235'))
 out.mkdir(parents=True,exist_ok=True)
 
 def shared_budget(s):

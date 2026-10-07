@@ -52,11 +52,39 @@ try {
     $legacyDiagnostics=Join-Path $data 'logs/diagnostics.jsonl'
     if (Test-Path $legacyDiagnostics) { Get-Content $legacyDiagnostics | ForEach-Object {try {$row=$_ | ConvertFrom-Json; if ($row.event -eq 'update_install_timing') {$_}} catch {}} | Set-Content (Join-Path $evidence 'legacy-install-timing.jsonl') }
     Stop-InstalledApp
+    # R238: install the exact published 0.12.76 public release before the candidate.
+    $published076 = Join-Path $root 'Deep-Legends-Setup-0.12.76-public.exe'
+    Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.76/Deep-Legends-Setup-0.12.76-public.exe' -OutFile $published076
+    if ((Get-FileHash $published076 -Algorithm SHA256).Hash.ToLowerInvariant() -ne '01014312b60e591a05bfc87f86e098adf6c5fc5e59520db5aedac5b5dba02ff3') { throw 'Published 0.12.76 setup checksum mismatch' }
+    Run-Setup $published076
+    Stop-InstalledApp
+    $userData = Join-Path $env:APPDATA 'Deep Legends'
+    $sentinels = @{}
+    # Distinct safe fixtures in real persistent directories, without a real account.
+    foreach ($entry in @(@($data,'season-stats/r238-cache-sentinel.json','{"schemaVersion":3,"r238":"season-cache"}'),@($data,'snapshots/r238-collection-sentinel.json','{"r238":"collection"}'),@($userData,'r238-settings-sentinel.json','{"r238":"preferences"}'),@($userData,'window-bounds.json','{"x":40,"y":40,"width":1050,"height":750,"maximized":false}'),@($userData,'ui-scale.json','{"mode":"fixed","value":1.25,"defaultAuto":1}'))) {
+        $file=Join-Path $entry[0] $entry[1]
+        New-Item -ItemType Directory -Force (Split-Path -Parent $file) | Out-Null
+        [IO.File]::WriteAllText($file,$entry[2],(New-Object Text.UTF8Encoding($false)))
+        $sentinels[$file]=(Get-FileHash $file -Algorithm SHA256).Hash
+    }
+    # Production updater Check/Download/Apply, using a candidate HTTP fixture:
+    # 0.12.77 is still a draft, so the anonymous Latest endpoint stays 0.12.76.
+    $env:R238_UPGRADE_SETUP=(Resolve-Path $Setup).Path
+    $env:R238_UPGRADE_INSTALL=$install
+    $env:R238_UPGRADE_EVIDENCE=$evidence
+    & go test -count=1 -run '^TestR238DefaultOnline076To077$' ./backend *> (Join-Path $evidence 'online-076-077-test.log')
+    if ($LASTEXITCODE -ne 0) { throw 'R238 candidate online updater check/download/hash/handoff failed' }
+    $online=Get-Content -Raw (Join-Path $evidence 'online-076-077.json') | ConvertFrom-Json
+    if ((Get-FileHash $online.download -Algorithm SHA256).Hash.ToLowerInvariant() -ne $online.sha256) { throw 'R238 verified online download changed before installation' }
     $desktopLink = Join-Path ([Environment]::GetFolderPath('Desktop')) "Deep Legends.lnk"
     $menuLink = Join-Path ([Environment]::GetFolderPath('Programs')) "Deep Legends.lnk"
     $created = @{}
     foreach ($link in @($desktopLink,$menuLink)) { if (-not (Test-Path $link)) {throw "Old installation shortcut missing"}; $created[$link] = (Get-Item $link).CreationTimeUtc.Ticks }
-    Run-Setup (Resolve-Path $Setup)
+    Run-Setup $online.download
+    Stop-InstalledApp
+    foreach ($file in $sentinels.Keys) { if (-not (Test-Path $file) -or (Get-FileHash $file -Algorithm SHA256).Hash -ne $sentinels[$file]) { throw "R238 persistent fixture changed: $file" } }
+    $sentinels | ConvertTo-Json | Set-Content (Join-Path $evidence 'retained-persistent-fixtures.json')
+    Start-Process (Join-Path $install 'Deep Legends.exe') | Out-Null
     $stages = @{}
     Get-Content (Join-Path $data "update-install-stages.txt") | ForEach-Object { $pair=$_ -split '=',2; $stages[$pair[0]]=[long]$pair[1] }
     $order = @('installer_start','parent_exited','uninstall_old_start','uninstall_old_done','extract_start','extract_done','copy_done','relaunch')
@@ -82,7 +110,7 @@ try {
     }
     $timing | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'update-install-timing-event.json')
     Copy-Item (Join-Path $data 'update-install-stages.txt'),(Join-Path $data 'update-install-nsis-stages.txt') $evidence
-    @{old_version='0.12.65';intermediate_version='0.12.68';key_mode='public';stages=$order.Count;icon_location_stable=$true;created_time_changed=$false;total_ms=$timing.total_ms;uninstall_old_ms=$timing.uninstall_old_ms;copy_ms=$timing.copy_ms} | ConvertTo-Json | Set-Content (Join-Path $evidence 'real-upgrade-summary.json')
+    @{old_version='0.12.65';intermediate_version='0.12.68';upgrade_from='0.12.76';upgrade_to='0.12.77';candidate_online_transport='real loopback HTTP fixture';anonymous_latest_077='pending publication';persistent_sentinels_retained=$true;key_mode='public';stages=$order.Count;icon_location_stable=$true;created_time_changed=$false;total_ms=$timing.total_ms;uninstall_old_ms=$timing.uninstall_old_ms;copy_ms=$timing.copy_ms} | ConvertTo-Json | Set-Content (Join-Path $evidence 'real-upgrade-summary.json')
     Get-Content (Join-Path $evidence 'real-upgrade-summary.json')
 } finally {
     foreach ($name in @('update-install-stages.txt','update-install-nsis-stages.txt','update-install-timing.json')) {

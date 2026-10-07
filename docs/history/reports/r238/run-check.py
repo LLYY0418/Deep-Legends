@@ -7,12 +7,14 @@ import sys
 import time
 
 root = pathlib.Path(__file__).resolve().parents[4]
-out = pathlib.Path(__file__).resolve().parent
+out = pathlib.Path(os.environ.get("R238_CHECK_OUT", pathlib.Path(__file__).resolve().parent))
+out.mkdir(parents=True, exist_ok=True)
 name, command = sys.argv[1], sys.argv[2:]
 cwd = pathlib.Path(os.environ.get("R238_CHECK_CWD", root))
 start = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+name += "-" + start.strftime("%Y%m%dT%H%M%S.%f")
 begin = time.monotonic()
-with (out / (name + ".log")).open("w") as log:
+with (out / (name + ".log")).open("x") as log:
     result = subprocess.run(command, cwd=cwd, stdout=log, stderr=subprocess.STDOUT)
 end = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
 lines = (out / (name + ".log")).read_text(errors="replace").splitlines()
