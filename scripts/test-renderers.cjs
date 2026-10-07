@@ -12,30 +12,51 @@ const files = directories.flatMap(directory => fs.readdirSync(path.join(root, di
   .filter(name => name.endsWith(".test.cjs")).sort().map(name => path.join(root, directory, name)));
 const fileNames = new Set(files);
 const timings = [];
-// Keep real file workers overlapped, but avoid four simultaneous 200-match
-// jsdom trees contending on CI. Retain every test and the 90s/240s budgets.
-const concurrency = Math.min(3, Math.max(2, os.availableParallelism()));
-let summary;
+const concurrency = Math.min(4, Math.max(2, os.availableParallelism()));
+// These files repeatedly build full jsdom applications, including 200 matches.
+// Reserve one worker for the other files while capping large DOM workers at
+// three. Both queues start together: light files use waits in the large DOM
+// queue, without four large trees contending. Discovery/assertions/budgets stay intact.
+const largeDOM = file => {
+  const relative = path.relative(root, file).replaceAll(path.sep, "/");
+  return /^desktop\/(?:overview-render|pro-players|pro-runes-render|refresh-orchestration|specialist-overview-render)/.test(relative) ||
+    ["backend/web/update.test.cjs", "backend/web/r192.test.cjs", "backend/web/r231.test.cjs"].includes(relative);
+};
+const groups = [
+  { name: "large-dom", files: files.filter(largeDOM), concurrency: concurrency - 1 },
+  { name: "other", files: files.filter(file => !largeDOM(file)), concurrency: 1 },
+].filter(group => group.files.length);
+const summaries = [];
 let failed = false;
 (async () => {
-  for await (const event of run({ files, concurrency })) {
-    const data = event.data;
-    if (event.type === "test:stdout" || event.type === "test:stderr") process.stdout.write(data.message);
-    if (event.type === "test:pass" && !fileNames.has(data.name)) console.log(`PASS ${data.name}`);
-    if (event.type === "test:fail") {
-      failed = true;
-      console.error(`FAIL ${data.name}: ${data.details.error?.stack || data.details.error}`);
-      if (data.details.error?.cause) console.error(data.details.error.cause);
+  const start = performance.now();
+  await Promise.all(groups.map(async group => {
+    let groupSummary;
+    for await (const event of run({ files: group.files, concurrency: group.concurrency })) {
+      const data = event.data;
+      if (event.type === "test:stdout" || event.type === "test:stderr") process.stdout.write(data.message);
+      if (event.type === "test:pass" && !fileNames.has(data.name)) console.log(`PASS ${data.name}`);
+      if (event.type === "test:fail") {
+        failed = true;
+        console.error(`FAIL ${data.name}: ${data.details.error?.stack || data.details.error}`);
+        if (data.details.error?.cause) console.error(data.details.error.cause);
+      }
+      if (event.type === "test:complete" && fileNames.has(data.name)) {
+        const row = { file: path.relative(root, data.file).replaceAll(path.sep, "/"), duration_ms: data.details.duration_ms, group: group.name };
+        timings.push(row);
+        if (row.duration_ms > 90000) { failed = true; console.error(`File exceeded 90s: ${JSON.stringify(row)}`); }
+      }
+      if (event.type === "test:summary" && !data.file) groupSummary = data;
     }
-    if (event.type === "test:complete" && fileNames.has(data.name)) {
-      const row = { file: path.relative(root, data.file).replaceAll(path.sep, "/"), duration_ms: data.details.duration_ms };
-      timings.push(row);
-      if (row.duration_ms > 90000) { failed = true; console.error(`File exceeded 90s: ${JSON.stringify(row)}`); }
-    }
-    if (event.type === "test:summary" && !data.file) summary = data;
-  }
-  if (!summary?.success || summary.duration_ms > 240000 || timings.length !== files.length) failed = true;
-  const result = { scope, platform: process.platform, concurrency,
+    if (!groupSummary?.success) failed = true;
+    summaries.push({ name: group.name, files: group.files.length, concurrency: group.concurrency, summary: groupSummary });
+  }));
+  const duration_ms = performance.now() - start;
+  const counts = {};
+  for (const group of summaries) for (const [name, count] of Object.entries(group.summary?.counts || {})) counts[name] = (counts[name] || 0) + count;
+  const summary = { success: summaries.length === groups.length && summaries.every(group => group.summary?.success), counts, duration_ms };
+  if (!summary.success || summary.duration_ms > 240000 || timings.length !== files.length || new Set(timings.map(row => row.file)).size !== files.length) failed = true;
+  const result = { scope, platform: process.platform, concurrency, groups: summaries,
     file_budget_ms: 90000, suite_budget_ms: 240000, files: timings, summary, success: !failed };
   if (process.env.R222_NODE_TIMING_OUTPUT) fs.writeFileSync(process.env.R222_NODE_TIMING_OUTPUT, JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify(result, null, 2));

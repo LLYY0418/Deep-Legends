@@ -1,0 +1,95 @@
+PASS large-dom probe
+FAIL other probe: Error [ERR_TEST_FAILURE]: Expected values to be strictly equal:
+
+1 !== 2
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+1 !== 2
+
+    at TestContext.<anonymous> (/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r238-group-failure-9ii__0tz/backend/web/group-probe.test.cjs:1:101)
+    at Test.runInAsyncScope (node:async_hooks:228:14)
+    at Test.run (node:internal/test_runner/test:1118:25)
+    at Test.start (node:internal/test_runner/test:1015:17)
+    at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 2,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+{
+  "scope": "all",
+  "platform": "darwin",
+  "concurrency": 4,
+  "groups": [
+    {
+      "name": "large-dom",
+      "files": 1,
+      "concurrency": 3,
+      "summary": {
+        "success": true,
+        "counts": {
+          "tests": 1,
+          "failed": 0,
+          "passed": 1,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "topLevel": 1,
+          "suites": 0
+        },
+        "duration_ms": 56.116667
+      }
+    },
+    {
+      "name": "other",
+      "files": 1,
+      "concurrency": 1,
+      "summary": {
+        "success": false,
+        "counts": {
+          "tests": 1,
+          "failed": 1,
+          "passed": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "topLevel": 1,
+          "suites": 0
+        },
+        "duration_ms": 58.560917
+      }
+    }
+  ],
+  "file_budget_ms": 90000,
+  "suite_budget_ms": 240000,
+  "files": [
+    {
+      "file": "desktop/overview-render-probe.test.cjs",
+      "duration_ms": 52.18575,
+      "group": "large-dom"
+    },
+    {
+      "file": "backend/web/group-probe.test.cjs",
+      "duration_ms": 57.9145,
+      "group": "other"
+    }
+  ],
+  "summary": {
+    "success": false,
+    "counts": {
+      "tests": 2,
+      "failed": 1,
+      "passed": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "topLevel": 2,
+      "suites": 0
+    },
+    "duration_ms": 60.603292
+  },
+  "success": false
+}

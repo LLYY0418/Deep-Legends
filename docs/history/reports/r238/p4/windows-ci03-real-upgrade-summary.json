@@ -1,0 +1,16 @@
+{
+  "upgrade_to": "0.12.77",
+  "persistent_sentinels_retained": true,
+  "candidate_online_transport": "real loopback HTTP fixture",
+  "uninstall_old_ms": 425,
+  "total_ms": 8572,
+  "old_version": "0.12.65",
+  "icon_location_stable": true,
+  "stages": 8,
+  "intermediate_version": "0.12.68",
+  "anonymous_latest_077": "pending publication",
+  "upgrade_from": "0.12.76",
+  "copy_ms": 0,
+  "created_time_changed": false,
+  "key_mode": "public"
+}

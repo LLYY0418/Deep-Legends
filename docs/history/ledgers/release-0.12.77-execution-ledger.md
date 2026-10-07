@@ -1,6 +1,6 @@
 # 0.12.77 发布执行账本（R238，进行中）
 
-日期：2026-10-07，Asia/Shanghai。已亲自通读 R238 全文、项目记忆两份文档、AGENTS 与发布账本模板。目标 0.12.77，key mode **public**，默认不带注册码。本次继续执行前为 `codex/release-0.12.75` / `b37357b2a6cf29397ac0f16255d37fa1566e87ac`；现在已合并 v0.12.76，新建 `codex/release-0.12.77`，本地最终预检通过后版本已更新为 **0.12.77**（版本提交f8f727bb）。业务已按工单拆提交；本地public候选已构建与审计，指纹 **7e1229c2a79c**。尚未推送、打tag或发布；最终CI SHA、Release id和正式草稿附件摘要待产生。**未在 Windows 实跑**。
+日期：2026-10-07，Asia/Shanghai。已亲自通读R238全文、自己的账本、项目记忆两份文档、AGENTS与发布模板。发布候选版本 **0.12.77**，key mode **public**，默认无注册码；分支 `codex/release-0.12.77`，最新候选SHA **40363c2e2676d76ae0dccb0a6d6b2bce895f661b**，生产指纹 **129e36bf324c**。P0/P6/P7既有结果保留，P1完成，最终本地P2/变异/截图/两份public候选审计完成，P3真机清单已给。前两轮CI失败原始记录保留；第三轮完整质量工作流37631380966进行中。尚未tag、创建草稿或发布Latest。Windows CI已实跑的项目与仍待游戏真机的项目分开记录；所有待真机项**未在 Windows 实跑**。下文旧SHA/旧指纹/旧“未推送”是当时阶段的历史状态，不代表当前状态。
 
 ## P0 发布闸门
 
@@ -152,3 +152,19 @@ CI范围内修复后的本地结果：受影响build/quality/filter护栏11.108s
 Windows正式构建、专属条件四项、真实Electron源代码首帧已实跑PASS，完整Windows仍因升级脚本失败。首帧实际Windows CI显示正常主框、无遮罩/激活表单/授权到期/小窗，实际显示bounds(40,40,1024,720)、总启动1176ms；CI虚拟显示器的工作区钳位不能称1050×750真机尺寸一致，仍待用户清单。完整升级到安装076后版本断言失败：从固定SHA的公开076 Setup只读提取PE/ASAR核验，ProductVersion实际0.12.76.0、FileVersion和ASAR为0.12.76（p4/public076-version-resource.json）；原脚本把四段字段与三段版本比较。改为三个字段同时精确等于Version.0/Version/Version并保存安装路径/SHA/时间，严格验证增强、无业务代码变化。原Windows日志p4/windows-job-112818255780-raw02.log及失败升级artifact保留；不把已过的首帧当升级通过。
 
 本次只改验证诊断/版本字段核对，指纹仍129e36bf324c，第二份本地包对应的生产输入未变化，原审计结果仍有效。受影响R100/R117结构/构建/质量/filter检查9.458s PASS，2个原Windows条件skip；本机真实R100 1.333s PASS，旧Linux启动失败不被此结果覆盖。下一轮同SHA完整CI结束前Windows整体保持未通过，Latest仍076。
+
+## P4 第三轮候选与等待状态
+
+2026-10-07 21:47:53推送候选 **40363c2e2676d76ae0dccb0a6d6b2bce895f661b**。完整工作流[37631380966](https://github.com/LLYY0418/Deep-Legends/actions/runs/37631380966)按同SHA执行Linux quality/Windows build；未结束前不标成功、不tag。本机R117真实Chromium3.398s PASS，原断言/20秒启动/45秒CDP预算保留。两次失败原记录不替换，全部生产构建输入仍与public-02/macos-public-02相同，指纹129e36bf324c。
+
+原始CI日志本身含行末空格与空行，保留本机原字节，不为格式门禁改写；源码/文档diff --check保持严格，归档日志检查单独排除原字节log。Git对Windows CRLF的规范化不改变本机保存原始日志。没有提交禁止的大日志/原始jsonl或dist包。
+
+## P4 第三轮CI：Windows完整成功 / Linux仍超总预算
+
+[37631380966](https://github.com/LLYY0418/Deep-Legends/actions/runs/37631380966)最终failure。Windows job112826235595于13:57:21Z完整success：backend/installer、原四个Windows/PowerShell条件项全部实际PASS，public构建/校验和、源代码真实Electron首帧、065/068/076真实安装与候选077升级全部PASS。PE076.0/077.0、FileVersion与ASAR076/077均精确匹配；在线1次检测、1次下载111880704字节、SHA/Apply交接成功，8阶段完整、total8572ms，缓存/收藏/设置/窗口/缩放5个哨兵SHA相同、快捷方式创建时间/IconLocation不变。在线候选使用真实loopback HTTP与精确GitHub URL映射；匿名077 Latest待发布后真机。完整原日志windows-job-112826235595-raw03.log，摘要证据windows-ci03-*.json。不是玩家真实缓存与收藏的证据，不修改P3待真机状态。
+
+Linux renderer 1332/1330PASS/2原条件skip、断言0失败，最大文件60.14秒<90，但全量258446.702ms>240秒，正确FAIL；Worker/Chromium之后步骤未执行。原日志linux-job-112826235265-raw03.log、净化副本、renderer-timings-ci03.json与watch失败保持。不能以Windowssuccess代替整轮success，未tag。
+
+只改调度而不改业务/断言/集合/预算：19个反复创建完整jsdom/200局DOM的文件与145个其他文件分队列同时启动。全局墙钟从两个run启动前到两个run结束，统一240秒；每个文件90秒；计时数量和唯一文件覆盖检查，count逐组相加，任何组失败或缺summary都整体fail，无重试。两个临时合成探针分别让大DOM组/其他组断言FAIL，均整体exit1且两文件完整运行（renderer-group-failure-probes.json）；生产测试不加skip。首个2+1配置本机179.937秒PASS、164文件/1332项/4原skip；最终配置最多3个大DOM+1个其他worker利用等待空档，防止4个大DOM同时争用，完整实跑后再新SHACI。指纹不受测试调度影响，仍129e36bf324c。保留初次配置耗时，不替换为最终配置结果。
+
+最终分组配置本机127.447秒PASS；真实全量164文件、1332项/1328PASS/4原skip，19/145分组完整，统一墙钟127409ms<240000，两个组失败探针仍断言exit1。发布/质量/filter定向13.448s PASS；原2个Windows条件skip没有增加。源码/文档diff --check、JS语法和指纹再次通过。接下来第四轮整轮CI；之前第三轮Windows实际成功证据只归属于40363c2e，不标为新SHA结果。

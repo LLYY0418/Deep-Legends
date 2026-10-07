@@ -1,0 +1,22 @@
+{
+  "name": "grouped-runner-gates-20261007T220828.159245",
+  "command": [
+    "node",
+    "--test",
+    "desktop/release-quality-gates.test.cjs",
+    "scripts/setup-only-build.test.cjs",
+    "scripts/verify-ci-test-filters.test.cjs"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-07T22:08:28.159245+08:00",
+  "end": "2026-10-07T22:08:41.606612+08:00",
+  "elapsed_seconds": 13.448,
+  "exit_code": 0,
+  "last_five": [
+    "ℹ fail 0",
+    "ℹ cancelled 0",
+    "ℹ skipped 2",
+    "ℹ todo 0",
+    "ℹ duration_ms 13406.260292"
+  ]
+}
