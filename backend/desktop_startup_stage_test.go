@@ -22,6 +22,10 @@ func startupStageServer(t *testing.T, store *localStore) *httptest.Server {
 	mux.HandleFunc("POST /api/diagnostics/startup-stage", a.authorized(a.handleDesktopStartupStage))
 	mux.HandleFunc("POST /api/diagnostics/startup", a.authorized(a.handleDesktopStartup))
 	mux.HandleFunc("GET /api/diagnostics/log", a.authorized(a.handleDiagnosticLog))
+	mux.HandleFunc("POST /api/diagnostics/client", a.authorized(a.handleClientDiagnostic))
+	mux.HandleFunc("GET /api/license/status", a.authorized(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]any{"state": "LOCKED", "generation": 0})
+	}))
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 	return server

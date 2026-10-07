@@ -22,8 +22,8 @@ const (
 	facadeEventThrottleInterval = 5 * time.Second
 	eventRetryInitialInterval   = 5 * time.Second
 	eventRetryMaxInterval       = time.Minute
-	minimumDiscoveryBackoff     = 3 * time.Second
-	maximumDiscoveryBackoff     = 8 * time.Second
+	minimumDiscoveryBackoff     = time.Second
+	maximumDiscoveryBackoff     = time.Second
 	snapshotRetryInterval       = 5 * time.Second
 	snapshotRetryMaxInterval    = 60 * time.Second
 	snapshotRetryFailureBudget  = 10
@@ -128,7 +128,7 @@ type connectionLoopOps struct {
 }
 
 func (a *app) runConnectionManager(ctx context.Context) {
-	a.runConnectionManagerWith(ctx, connectionLoopOps{discoverLCUDetailed, a.refreshIdentityWithClient, a.runConnectedSession, a.waitForDiscovery})
+	a.runConnectionManagerWith(ctx, connectionLoopOps{a.licensedDiscovery, a.refreshIdentityWithClient, a.runConnectedSession, a.waitForDiscovery})
 }
 
 // Dependencies are explicit so tests drive the same loop without sleeping
@@ -151,6 +151,17 @@ func (a *app) runConnectionManagerWith(ctx context.Context, ops connectionLoopOp
 		a.setConnectionPhase("connecting", false)
 		client, report, err := ops.discover()
 		a.updateDiscovery(report)
+		if err != nil && client != nil && report.PortOpen {
+			if readyErr := a.waitForDiscoverySummoner(ctx, client); readyErr == nil {
+				report.Result = "connected"
+				report.SummonerReadyAt = time.Now()
+				a.updateDiscovery(report)
+				err = nil
+			} else {
+				report.ProbeErrorKind = discoveryProbeErrorKind(readyErr)
+				client.Close()
+			}
+		}
 		if err != nil {
 			a.markDisconnected(friendlyError(err))
 			if !ops.wait(ctx, a.clientDiscoveryInterval(backoff, report, time.Now())) {
@@ -162,6 +173,7 @@ func (a *app) runConnectionManagerWith(ctx context.Context, ops connectionLoopOp
 			}
 			continue
 		}
+		a.observeColdLaunchMilestone("connected_ms", time.Now())
 		if !ops.identity(client) {
 			client.Close()
 			a.setConnectionPhase("error", false)
@@ -175,6 +187,7 @@ func (a *app) runConnectionManagerWith(ctx context.Context, ops connectionLoopOp
 			continue
 		}
 		backoff = minimumDiscoveryBackoff
+		a.observeColdLaunchMilestone("identity_ms", time.Now())
 		a.setSnapshotPhase(client)
 		if err := ops.session(ctx, client); err != nil && !errors.Is(err, context.Canceled) {
 			a.disconnectClient(client, friendlyError(err))
@@ -199,7 +212,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 	sessionCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	a.goSafe("connection_manager.platform", func() { a.recordDiagnostic(clientPlatformDiagnostic(client)) })
-	a.beginGameSettingsWatch(sessionCtx, client)
+	a.goSafe("connection_manager.settings-watch", func() { a.beginGameSettingsWatch(sessionCtx, client) })
 	requestDiagnosticTicker := time.NewTicker(30 * time.Second)
 	defer requestDiagnosticTicker.Stop()
 	a.goSafe("connection_manager.runConnectedSession.1", func() { client.runRequestDiagnosticFlush(sessionCtx, requestDiagnosticTicker.C) })

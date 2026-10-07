@@ -74,7 +74,7 @@ func (a *app) resolveClientRiotPUUID(ctx context.Context, client *LCUClient, reg
 	var public string
 	err := errClientRiotIdentity
 	if strings.TrimSpace(ref.GameName) != "" && strings.TrimSpace(ref.TagLine) != "" {
-		account, loadErr := a.riot.forPlatform(region).fetchAccountByRiotID(ctx, ref.GameName, ref.TagLine)
+		account, loadErr := a.riot.forPlatform(region).accountByRiotID(ctx, ref.GameName, ref.TagLine)
 		public, err = account.PUUID, loadErr
 	}
 	c.mu.Lock()

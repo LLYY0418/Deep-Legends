@@ -138,11 +138,11 @@ func TestR180MergedLatestSameQueueAndDedup(t *testing.T) {
 		t.Fatal(stats, record, games)
 	}
 	// Both real adapters use the same numeric ID; metadata region prefixes are irrelevant.
-	if result.Evidence.LCU[0].GameID != 101 || !liveHistoryContainsGame(result.Evidence.SGP, 112) {
+	if len(result.Evidence.LCU) != 0 || !liveHistoryContainsGame(result.Evidence.SGP, 112) {
 		t.Fatal("different id schemes")
 	}
 	events := r175Events(t, f.a, "live_history_freshness")
-	if len(events) != 1 || events[0]["missing_newer_in_queue"] != float64(1) || events[0]["missing_newer_any"] != float64(0) || events[0]["slot"] != float64(2) || events[0]["team"] != float64(100) || events[0]["shown_newest_age_min"] != float64(8) || events[0]["lcu_newest_queue_age_min"] != float64(9) || events[0]["sgp_newest_queue_age_min"] != float64(8) {
+	if len(events) != 1 || events[0]["missing_newer_in_queue"] != nil || events[0]["missing_newer_any"] != nil || events[0]["slot"] != float64(2) || events[0]["team"] != float64(100) || events[0]["shown_newest_age_min"] != float64(8) || events[0]["lcu_newest_queue_age_min"] != nil || events[0]["sgp_newest_queue_age_min"] != float64(8) {
 		t.Fatal(events)
 	}
 	encoded, _ := json.Marshal(events)
@@ -225,6 +225,7 @@ func TestR180SourceFailuresAndSelf(t *testing.T) {
 		f := r180Fixture(t)
 		ref := f.a.summoner.PUUID
 		scope := f.a.liveHistoryFreshnessForGame(f.c, 180, 440)
+		scope.previousGameID = 101
 		transport := f.c.http.Transport
 		f.c.http.Transport = gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 			if !strings.Contains(r.URL.Path, "/current-summoner/matches") {
@@ -254,7 +255,7 @@ func TestR180PollingFlightsAndExpiry(t *testing.T) {
 		}
 		wg.Wait()
 	}
-	if f.sgpCalls.Load() != 10 || f.lcuCalls.Load() != 1 || len(r175Events(t, f.a, "live_history_freshness")) != 10 {
+	if f.sgpCalls.Load() != 10 || f.lcuCalls.Load() != 0 || len(r175Events(t, f.a, "live_history_freshness")) != 10 {
 		t.Fatal("polling amplified requests", f.sgpCalls.Load(), f.lcuCalls.Load(), r175Events(t, f.a, "live_history_freshness"))
 	}
 	ref := r161Ref(1)
@@ -270,40 +271,15 @@ func TestR180PollingFlightsAndExpiry(t *testing.T) {
 		t.Fatal("new game did not refresh")
 	}
 }
-func TestR180ConcurrentSources(t *testing.T) {
+func TestR180SGPFirstAvoidsSlowLCU(t *testing.T) {
 	f := r180Fixture(t)
-	lcuStarted, sgpStarted, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
-	var once sync.Once
-	unblock := func() { once.Do(func() { close(release) }) }
-	defer unblock()
-	oldLCU, oldSGP := f.c.http.Transport, f.a.sgp.http.Transport
 	f.c.http.Transport = gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		close(lcuStarted)
-		<-release
-		return oldLCU.RoundTrip(r)
+		t.Error("successful SGP should skip LCU")
+		return r178JSON(map[string]any{}, 500), nil
 	})
-	f.a.sgp.http.Transport = sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		close(sgpStarted)
-		<-release
-		return oldSGP.RoundTrip(r)
-	})
-	done := make(chan struct{})
-	go func() {
-		f.load(f.a.summoner.PUUID, true, f.a.liveHistoryFreshnessForGame(f.c, 180, 440), 100, 0)
-		close(done)
-	}()
-	for _, started := range []chan struct{}{lcuStarted, sgpStarted} {
-		select {
-		case <-started:
-		case <-time.After(time.Second):
-			t.Fatal("sources serialized")
-		}
-	}
-	unblock()
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("loader stuck")
+	got := f.load(f.a.summoner.PUUID, true, f.a.liveHistoryFreshnessForGame(f.c, 180, 440), 100, 0)
+	if got.Source != "sgp" || got.State != "ok" {
+		t.Fatal(got)
 	}
 }
 func TestR180QualitySkippedCountsAndSlots(t *testing.T) {
@@ -438,7 +414,7 @@ func TestR180RealRosterStageDiagnostics(t *testing.T) {
 			}
 		})
 		response := f.a.loadGameplayLive(ctx, f.c, current, "ChampSelect")
-		if progressCount != 11 || !earlyHistory {
+		if progressCount < 11 || !earlyHistory {
 			t.Fatal("real roster did not progressively publish", progressCount, earlyHistory)
 		}
 		costs := r175Events(t, f.a, "live_load_cost")

@@ -36,7 +36,7 @@ test('R229 empty groups expose only their own launchers, searched and connected 
  }finally{dom.window.close()}
 });
 test('R229 client exiting is suppressed for 15s; cold startup and new launch still show',()=>{
- let now=100_000;const logs=[],shown=[],hidden=[];const state={status:{connected:true,identityReady:true}};const f=compile(app,['updateReadingOverlay'],{state,Date:{now:()=>now},STATUS_INTERVAL:5000,showReadingOverlay:(...v)=>shown.push(v),hideReadingOverlay:r=>hidden.push(r),window:{reportFlowDiagnostic:(...v)=>logs.push(v)}});
+ let now=100_000;const logs=[],shown=[],hidden=[];const state={selfOverviewReady:true,status:{connected:true,identityReady:true}};const f=compile(app,['updateReadingOverlay'],{state,Date:{now:()=>now},STATUS_INTERVAL:5000,showReadingOverlay:(...v)=>shown.push(v),hideReadingOverlay:r=>hidden.push(r),window:{reportFlowDiagnostic:(...v)=>logs.push(v)}});
  f.updateReadingOverlay();state.status={connected:false,clientDiscovery:'credentials-unreadable'};f.updateReadingOverlay();assert.equal(shown.length,0);assert.equal(logs.at(-1)[1],'skip');assert.equal(logs.at(-1)[2].skip_reason,'client-exiting');now+=14999;f.updateReadingOverlay();assert.equal(shown.length,0);
  now++;f.updateReadingOverlay();assert.equal(shown.length,1);state.clientExitingUntil=now+15_000;state.lastClientLaunchAt=now;state.launchOverlayPending=true;f.updateReadingOverlay();assert.equal(shown.length,2);
  state.clientExitingUntil=0;state.launchOverlayPending=false;f.updateReadingOverlay();assert.equal(shown.length,3);
@@ -44,7 +44,17 @@ test('R229 client exiting is suppressed for 15s; cold startup and new launch sti
 test('R229 reconnecting the same JP account reloads self and stores its client group',()=>{
  const loads=[],stored=[];const current={key:'current',current:true,closed:true,region:'jp1',regionResolved:true,playerRef:'',data:null,label:'Fixture#JP1',icon:1};
  const state={status:{connected:false},tabs:[current],activeTabs:{players:'',kr:'current',pro:''},activeGroup:'kr',section:'overview'};
- const f=compile(gameplay,['updateStatus','connected','tabGroup','riotTab','summonerLabel'],{state,localStorage:{setItem:(k,v)=>stored.push([k,v])},renderPlayerTabs:()=>{},loadOverview:(tab,force)=>loads.push([tab.key,force]),ensurePerks:()=>{},ensureItems:()=>{},ensureSummonerSpells:()=>{},scheduleBeaconPoll:()=>{},loadLive:()=>{}});
+ const f=compile(gameplay,['updateStatus','connected','tabGroup','riotTab','summonerLabel'],{state,localStorage:{setItem:(k,v)=>stored.push([k,v])},renderOverview:()=>{},renderPlayerTabs:()=>{},loadOverview:(tab,force)=>loads.push([tab.key,force]),ensurePerks:()=>{},ensureItems:()=>{},ensureSummonerSpells:()=>{},scheduleBeaconPoll:()=>{},loadLive:()=>{}});
  f.updateStatus({connected:true,identityReady:true,clientRegion:'jp1',summoner:{gameName:'Fixture',tagLine:'JP1',profileIconId:1}});
  assert.equal(current.closed,false);assert.equal(current.data,null);assert.deepEqual(loads,[['current',true]]);assert.deepEqual(stored,[['lol-loot-last-client-player-group','kr']]);
+});
+
+test('R235 resolving the self platform follows it unless a manual group switch happened within ten seconds',()=>{
+ for(const recent of [false,true]) {
+  const current={key:'current',current:true,region:'',regionResolved:false,group:'players',label:'Fixture#JP1',icon:1};
+  const state={status:{connected:false},tabs:[current],activeTabs:{players:'current',kr:'',pro:'searched'},activeGroup:'pro',section:'overview',lastManualTabAt:recent ? Date.now()-1000 : Date.now()-11000};
+  const f=compile(gameplay,['updateStatus','connected','tabGroup','riotTab','summonerLabel'],{state,localStorage:{setItem:()=>{}},renderOverview:()=>{},renderPlayerTabs:()=>{},loadOverview:()=>{},ensurePerks:()=>{},ensureItems:()=>{},ensureSummonerSpells:()=>{},scheduleBeaconPoll:()=>{},loadLive:()=>{}});
+  f.updateStatus({connected:true,identityReady:true,clientRegion:'jp1',summoner:{gameName:'Fixture',tagLine:'JP1',profileIconId:1}});
+  assert.equal(state.activeGroup,recent?'pro':'kr');assert.equal(current.group,'kr');assert.equal(state.activeTabs.kr,'current');
+ }
 });

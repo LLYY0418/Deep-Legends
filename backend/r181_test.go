@@ -25,7 +25,7 @@ func TestR181SelfLatestMergeAndPreviousGame(t *testing.T) {
 	scope := r181SelfScope(f, 440)
 	result := f.load(ref, true, scope, 100, 0)
 	shown := recentMatchesForPlayer(result.Matches, ref, 10, 440)
-	if len(shown) != 10 || shown[0].GameID != 112 || result.Source != "lcu+sgp" {
+	if len(shown) != 10 || shown[0].GameID != 112 || result.Source != "sgp" {
 		t.Fatalf("self missing latest: %#v source=%s", shown, result.Source)
 	}
 	stats, games := liveRecentPlayerStats(result.Matches, ref, 440)
@@ -40,7 +40,7 @@ func TestR181SelfLatestMergeAndPreviousGame(t *testing.T) {
 		seen[m.GameID] = true
 	}
 	events := r175Events(t, f.a, "live_history_freshness")
-	if len(events) != 1 || events[0]["source"] != "lcu+sgp" || events[0]["missing_newer_in_queue"] != float64(1) || events[0]["prev_game_in_lcu"] != false || events[0]["prev_game_in_sgp"] != true || events[0]["prev_game_shown"] != true || events[0]["load_index"] != float64(1) {
+	if len(events) != 1 || events[0]["source"] != "sgp" || events[0]["missing_newer_in_queue"] != nil || events[0]["prev_game_in_lcu"] != nil || events[0]["prev_game_in_sgp"] != true || events[0]["prev_game_shown"] != true || events[0]["load_index"] != float64(1) {
 		t.Fatal(events)
 	}
 	encoded, _ := json.Marshal(events)

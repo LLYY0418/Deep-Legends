@@ -204,7 +204,7 @@ func r178FreshnessFixture(t *testing.T, failed bool) (*app, *LCUClient, *atomic.
 	return a, a.lcu, lcuCalls, sgpCalls
 }
 
-// R180 replaces evidence-driven later switching with immediate source merging.
+// R244 uses successful SGP pages directly, including empty pages.
 func TestR178FreshnessEvidenceSwitchAndSelf(t *testing.T) {
 	a, c, lcu, sgp := r178FreshnessFixture(t, false)
 	scope := a.liveHistoryFreshnessForGame(c, 178, 440)
@@ -213,11 +213,11 @@ func TestR178FreshnessEvidenceSwitchAndSelf(t *testing.T) {
 		return a.livePlayerMatchesForGame(context.Background(), c, gameplayReference{PlayerRef: ref, ServerID: "HN1"}, ref, self, nil, scope, 100, 0)
 	}
 	first, second := load(false), load(false)
-	if first.Source != "lcu+sgp" || len(first.Matches) != 3 || !reflect.DeepEqual(first, second) || lcu.Load() != 1 || sgp.Load() != 1 {
+	if first.Source != "sgp" || len(first.Matches) != 3 || !reflect.DeepEqual(first, second) || lcu.Load() != 0 || sgp.Load() != 1 {
 		t.Fatal(first, second, lcu.Load(), sgp.Load())
 	}
 	events := r175Events(t, a, "live_history_freshness")
-	if len(events) != 1 || events[0]["missing_newer_any"] != float64(2) {
+	if len(events) != 1 || events[0]["missing_newer_any"] != nil {
 		t.Fatal(events)
 	}
 	oldTransport := c.http.Transport
@@ -228,7 +228,7 @@ func TestR178FreshnessEvidenceSwitchAndSelf(t *testing.T) {
 		return oldTransport.RoundTrip(r)
 	})
 	self := load(true)
-	if self.Source != "lcu+sgp" || lcu.Load() != 2 || sgp.Load() != 2 {
+	if self.Source != "sgp" || lcu.Load() != 0 || sgp.Load() != 2 {
 		t.Fatal("self changed", self, lcu.Load(), sgp.Load())
 	}
 	c.http.Transport = oldTransport
@@ -255,7 +255,7 @@ func TestR178FreshnessEvidenceSwitchAndSelf(t *testing.T) {
 	a.sgp.http = &http.Client{Transport: sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		return r178JSON(map[string]any{"games": []any{}}, 200), nil
 	})}
-	if emptyFallback := load(false); emptyFallback.Source != "lcu" || len(emptyFallback.Matches) != 1 {
+	if emptyFallback := load(false); emptyFallback.Source != "sgp" || len(emptyFallback.Matches) != 0 {
 		t.Fatal(emptyFallback)
 	}
 	next := a.liveHistoryFreshnessForGame(c, 179, 440)

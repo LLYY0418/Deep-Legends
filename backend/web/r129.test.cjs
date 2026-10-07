@@ -275,7 +275,7 @@ test("R129 P1 对抗变异：把骨架判据改回依赖 liveLoading，节点身
   // 变异体＝R129 修复前的原始判据：词表里是 "ready"（后端从来不下发），于是
   // historyState="ok" 被当成「还在读取」，加载期就出骨架屏。
   const mutatedInsight = `if (state.liveLoading === true && !player.recentGames?.length && !["ready", "empty", "unavailable", "failed"].includes(player.historyState)) return '<div class="insight-match-row is-history-pending"`;
-  const mutatedPlayer = `const historyPending = state.liveLoading === true && !player.recentGames?.length && !Number(stats.games) && !["ready", "empty", "unavailable", "failed"].includes(player.historyState);`;
+  const mutatedPlayer = `const historyPending = state.liveLoading === true && !player.recentGames?.length && !Number(displayStats.games) && !["ready", "empty", "unavailable", "failed"].includes(player.historyState);`;
   assert.ok(gameplayScript.includes(fixedInsight) && gameplayScript.includes(fixedPlayer), "变异锚点没匹配上：改了生产代码要同步这里");
   const mutated = gameplayScript.replace(fixedInsight, mutatedInsight).replace(fixedPlayer, mutatedPlayer);
   assert.notEqual(mutated, gameplayScript);

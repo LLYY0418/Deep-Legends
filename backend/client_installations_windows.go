@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -61,8 +62,18 @@ func detectClientInstallationsWithScan() ([]clientInstallation, clientInstallati
 }
 
 func launchClientInstallation(installation clientInstallation) (clientLaunchResult, error) {
+	return launchClientInstallationContext(context.Background(), installation)
+}
+
+func launchClientInstallationContext(ctx context.Context, installation clientInstallation) (clientLaunchResult, error) {
+	if err := ctx.Err(); err != nil {
+		return clientLaunchResult{}, err
+	}
+	attempt := func(candidate clientLaunchCandidate) (clientLaunchFailure, error) {
+		return launchWindowsClientCandidateContext(ctx, candidate)
+	}
 	if installation.ID != "riot" {
-		return launchClientCandidates(installation, launchWindowsClientCandidate)
+		return launchClientCandidates(installation, attempt)
 	}
 	result := clientLaunchResult{}
 	if candidates := installation.candidates(); len(candidates) > 0 {
@@ -82,6 +93,9 @@ func launchClientInstallation(installation clientInstallation) (clientLaunchResu
 		result.ProductInstallClass = "tencent"
 	}
 	// A running Riot Client must never receive a second launch-product request.
+	if err := ctx.Err(); err != nil {
+		return result, err
+	}
 	if running, foreground := focusRunningRiotClient(); running {
 		result.AlreadyOpen = !foreground
 		result.Source = result.PathClass
@@ -90,7 +104,7 @@ func launchClientInstallation(installation clientInstallation) (clientLaunchResu
 	if result.ProductInstallClass != "riot" {
 		return result, errRiotProductUnavailable
 	}
-	launched, err := launchClientCandidates(installation, launchWindowsClientCandidate)
+	launched, err := launchClientCandidates(installation, attempt)
 	launched.PathClass = result.PathClass
 	if launched.Source != "" {
 		launched.PathClass = launched.Source
@@ -102,6 +116,10 @@ func launchClientInstallation(installation clientInstallation) (clientLaunchResu
 }
 
 func launchWindowsClientCandidate(candidate clientLaunchCandidate) (clientLaunchFailure, error) {
+	return launchWindowsClientCandidateContext(context.Background(), candidate)
+}
+
+func launchWindowsClientCandidateContext(ctx context.Context, candidate clientLaunchCandidate) (clientLaunchFailure, error) {
 	failure := clientLaunchFailure{Source: candidate.Source}
 	path := candidate.executable
 	if candidate.shortcut != "" {
@@ -137,6 +155,10 @@ func launchWindowsClientCandidate(candidate clientLaunchCandidate) (clientLaunch
 			failure.Stage = "encode"
 			return failure, err
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		failure.Stage = "validate"
+		return failure, err
 	}
 	if err := windows.ShellExecute(0, verb, file, parameters, cwd, windows.SW_SHOWNORMAL); err != nil {
 		failure.Stage = "shell-execute"

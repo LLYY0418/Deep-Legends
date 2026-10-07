@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 const (
@@ -39,7 +41,13 @@ func nativeRiotClientProcessCommands() (processQueryResult, error) {
 	return nativeProcessCommands("RiotClientServices.exe")
 }
 
+func nativeLeagueProcessSnapshot() (processQueryResult, error) {
+	return nativeProcessSnapshot(false, "LeagueClientUx.exe", "LeagueClient.exe")
+}
 func nativeProcessCommands(processNames ...string) (processQueryResult, error) {
+	return nativeProcessSnapshot(true, processNames...)
+}
+func nativeProcessSnapshot(readCommands bool, processNames ...string) (processQueryResult, error) {
 	result := processQueryResult{Method: "native"}
 	accepted := make(map[string]struct{}, len(processNames))
 	for _, name := range processNames {
@@ -59,6 +67,19 @@ func nativeProcessCommands(processNames ...string) (processQueryResult, error) {
 		name := syscall.UTF16ToString(entry.ExeFile[:])
 		if _, ok := accepted[strings.ToLower(name)]; ok {
 			result.ProcessCount++
+			result.ProcessIDs = append(result.ProcessIDs, entry.ProcessID)
+			if !readCommands {
+				err = syscall.Process32Next(snapshot, &entry)
+				if err != nil {
+					break
+				}
+				continue
+			}
+			if strings.EqualFold(name, "LeagueClient.exe") {
+				if path := windowsProcessImagePath(entry.ProcessID); path != "" {
+					result.ImagePaths = append(result.ImagePaths, path)
+				}
+			}
 			commandLine, commandErr := windowsProcessCommandLine(entry.ProcessID)
 			if commandErr != nil || strings.TrimSpace(commandLine) == "" {
 				result.Unreadable++
@@ -129,4 +150,18 @@ func queryProcessCommandLine(handle syscall.Handle) (string, error) {
 		return "", errors.New("empty command line")
 	}
 	return commandLine, nil
+}
+
+func windowsProcessImagePath(pid uint32) string {
+	handle, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+	if err != nil {
+		return ""
+	}
+	defer windows.CloseHandle(handle)
+	buffer := make([]uint16, 32768)
+	size := uint32(len(buffer))
+	if windows.QueryFullProcessImageName(handle, 0, &buffer[0], &size) != nil {
+		return ""
+	}
+	return windows.UTF16ToString(buffer[:size])
 }

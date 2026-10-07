@@ -51,6 +51,7 @@ type liveHistoryEvidence struct {
 	PagesRead     int
 	StopReason    string
 	SGPMS, LCUMS  int64
+	LCURequested  bool
 }
 
 func (a *app) clearLiveHistoryFreshness() {
@@ -88,7 +89,7 @@ func (a *app) livePlayerMatchesForGame(ctx context.Context, client *LCUClient, r
 		return a.livePlayerMatches(ctx, client, reference, playerRef, isCurrent, names)
 	}
 	result := a.cachedLivePlayerMatches(ctx, liveHistoryCacheKey(scope, playerRef, isCurrent), func(loadCtx context.Context) livePlayerMatchesResult {
-		return a.loadLivePlayerMatches(loadCtx, client, reference, playerRef, isCurrent, names, scope.queueID)
+		return a.loadLivePlayerMatchesForPrevious(loadCtx, client, reference, playerRef, isCurrent, names, scope.queueID, scope.previousGameID)
 	})
 	if slot >= 0 {
 		a.recordLiveHistoryFreshness(result, playerRef, isCurrent, scope, team, slot)
@@ -124,6 +125,9 @@ func (a *app) recordLiveHistoryFreshness(result livePlayerMatchesResult, playerR
 			lcu, sgp = result.Evidence.LCU, result.Evidence.SGP
 		}
 		event["prev_game_in_lcu"] = liveHistoryContainsGame(lcu, scope.previousGameID)
+		if result.Evidence != nil && !result.Evidence.LCURequested {
+			event["prev_game_in_lcu"] = nil
+		}
 		event["prev_game_in_sgp"] = liveHistoryContainsGame(sgp, scope.previousGameID)
 		event["prev_game_shown"] = liveHistoryContainsGame(shown, scope.previousGameID)
 	}
@@ -182,25 +186,12 @@ func liveHistoryQueue(queues []int64) int64 {
 }
 
 func recentLiveMatchesForPlayer(matches []gameplayMatch, playerRef string, queueID int64, now time.Time) []gameplayMatch {
-	cutoff := now.Add(-30 * 24 * time.Hour).UnixMilli()
-	window := make([]gameplayMatch, 0, len(matches))
-	for _, match := range matches {
-		if match.CreatedAt >= cutoff {
-			window = append(window, match)
-		}
-	}
-	return recentMatchesForPlayer(window, playerRef, 10, queueID)
+	return recentMatchesForPlayer(matches, playerRef, 10, queueID)
 }
 
 func liveHistoryPageStop(matches []gameplayMatch, playerRef string, queueID int64, now time.Time, more bool, pages int) string {
 	if len(recentLiveMatchesForPlayer(matches, playerRef, queueID, now)) >= 10 {
 		return "enough"
-	}
-	cutoff := now.Add(-30 * 24 * time.Hour).UnixMilli()
-	for _, match := range matches {
-		if match.CreatedAt > 0 && match.CreatedAt < cutoff {
-			return "window"
-		}
 	}
 	if !more {
 		return "exhausted"
@@ -336,6 +327,25 @@ func liveNewestAgeMinutes(matches []gameplayMatch, queueID int64, now time.Time)
 	age := round2(max(0, float64(now.UnixMilli()-newest)/60000))
 	return &age
 }
+
+// Derive the diagnostic header count through the same aggregate used by the row.
+func liveHistoryHeaderGames(matches []gameplayMatch, playerRef string, queueID int64) int {
+	stats, _ := liveRecentPlayerStats(matches, playerRef, queueID)
+	return stats.Games
+}
+func liveOldestAgeDays(matches []gameplayMatch, now time.Time) *float64 {
+	var oldest int64
+	for _, match := range matches {
+		if match.CreatedAt > 0 && (oldest == 0 || match.CreatedAt < oldest) {
+			oldest = match.CreatedAt
+		}
+	}
+	if oldest == 0 {
+		return nil
+	}
+	age := round2(max(0, float64(now.UnixMilli()-oldest)/float64(24*time.Hour/time.Millisecond)))
+	return &age
+}
 func liveHistoryFreshnessDiagnostic(result livePlayerMatchesResult, playerRef string, queueID, team int64, slot int, isCurrent bool, now time.Time) map[string]any {
 	lcu := result.Matches
 	if result.Evidence != nil {
@@ -360,7 +370,7 @@ func liveHistoryFreshnessDiagnostic(result livePlayerMatchesResult, playerRef st
 		"source": result.Source, "window_games": len(lcu), "queue_games": queueGames,
 		"newest_any_age_min": liveNewestAgeMinutes(lcu, 0, now), "newest_queue_age_min": liveNewestAgeMinutes(lcu, queueID, now),
 		"lcu_newest_queue_age_min": liveNewestAgeMinutes(lcu, queueID, now), "subject_unmatched": unmatched, "remake_skipped": skipped,
-		"shown_newest_age_min": liveNewestAgeMinutes(shown, 0, now), "window_days": 30, "shown_count": len(shown), "queue_filtered": false, "pages_read": 0, "stop_reason": liveHistoryPageStop(result.Matches, playerRef, queueID, now, false, 0)}
+		"shown_newest_age_min": liveNewestAgeMinutes(shown, 0, now), "oldest_shown_age_days": liveOldestAgeDays(shown, now), "header_games": liveHistoryHeaderGames(result.Matches, playerRef, queueID), "shown_count": len(shown), "queue_filtered": false, "pages_read": 0, "stop_reason": liveHistoryPageStop(result.Matches, playerRef, queueID, now, false, 0)}
 	if evidence := result.Evidence; evidence != nil && evidence.SGPRequested {
 		event["queue_filtered"], event["pages_read"] = evidence.QueueFiltered, evidence.PagesRead
 		if len(shown) >= 10 {

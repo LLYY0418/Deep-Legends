@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
@@ -21,6 +22,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -37,26 +39,36 @@ var (
 
 type processQueryResult struct {
 	CommandLines []string
+	ProcessIDs   []uint32
+	ImagePaths   []string
 	ProcessCount int
 	Unreadable   int
 	Method       string
 }
 
 type LCUDiscoveryStatus struct {
-	AttemptAt            time.Time `json:"attemptAt"`
-	Method               string    `json:"method"`
-	ProcessCount         int       `json:"processCount"`
-	UnreadableProcesses  int       `json:"unreadableProcesses"`
-	CommandLineCount     int       `json:"commandLineCount"`
-	CredentialCandidates int       `json:"credentialCandidates"`
-	LockfilesChecked     int       `json:"lockfilesChecked"`
-	LockfilesFound       int       `json:"lockfilesFound"`
-	ProbeFailures        int       `json:"probeFailures"`
-	Result               string    `json:"result"`
-	Detail               string    `json:"detail"`
+	DurationMS                                                           int64     `json:"durationMs"`
+	Sweep                                                                bool      `json:"sweep"`
+	ProbeMS                                                              int64     `json:"probeMs"`
+	ProbeErrorKind                                                       string    `json:"probeErrorKind"`
+	PortOpen                                                             bool      `json:"portOpen"`
+	ProcessAt, CommandLineAt, CredentialsAt, PortOpenAt, SummonerReadyAt time.Time `json:"-"`
+	AttemptAt                                                            time.Time `json:"attemptAt"`
+	Method                                                               string    `json:"method"`
+	ProcessCount                                                         int       `json:"processCount"`
+	UnreadableProcesses                                                  int       `json:"unreadableProcesses"`
+	CommandLineCount                                                     int       `json:"commandLineCount"`
+	CredentialCandidates                                                 int       `json:"credentialCandidates"`
+	LockfilesChecked                                                     int       `json:"lockfilesChecked"`
+	LockfilesFound                                                       int       `json:"lockfilesFound"`
+	ProbeFailures                                                        int       `json:"probeFailures"`
+	Result                                                               string    `json:"result"`
+	Detail                                                               string    `json:"detail"`
 }
 
 type LCUClient struct {
+	discoverySummoner     *Summoner
+	license               *licenseManager
 	gameplaySummoners     gameplaySummonerCache
 	acceptFocusSampling   atomic.Bool
 	acceptFocusLastTrace  atomic.Value
@@ -460,22 +472,38 @@ func discoverLCUDetailed() (*LCUClient, LCUDiscoveryStatus, error) {
 }
 
 func discoverLCUFromProcesses(query processQueryResult, commandErr error, candidates func([]string) []string) (*LCUClient, LCUDiscoveryStatus, error) {
-	report := LCUDiscoveryStatus{AttemptAt: time.Now(), Result: "searching"}
+	return discoverLCUFromProcessesWith(query, commandErr, candidates, time.Now())
+}
+func discoverLCUFromProcessesWith(query processQueryResult, commandErr error, candidates func([]string) []string, started time.Time) (found *LCUClient, report LCUDiscoveryStatus, resultErr error) {
+	defer func() { report.DurationMS = time.Since(started).Milliseconds() }()
+	report = LCUDiscoveryStatus{AttemptAt: time.Now(), Result: "searching"}
 	lines := query.CommandLines
 	report.Method = query.Method
 	report.ProcessCount = query.ProcessCount
 	report.UnreadableProcesses = query.Unreadable
 	report.CommandLineCount = len(lines)
+	if query.ProcessCount > 0 {
+		report.ProcessAt = started
+	}
+	if len(lines) > 0 {
+		report.CommandLineAt = time.Now()
+	}
 	for _, commandLine := range lines {
 		if client, ok := clientFromCommandLine(commandLine); ok {
 			report.CredentialCandidates++
+			report.CredentialsAt = time.Now()
 			client.source = "process"
-			if err := client.probe(); err == nil {
+			if err := probeDiscoveredClient(client, &report); err == nil {
 				report.Result = "connected"
 				report.Detail = "已通过客户端进程连接"
 				return client, report, nil
 			}
 			report.ProbeFailures++
+			if report.PortOpen {
+				report.Result = "probe-failed"
+				report.Detail = "客户端端口已响应，等待召唤师"
+				return client, report, errLCUProbeFailed
+			}
 			client.Close()
 		}
 	}
@@ -484,7 +512,12 @@ func discoverLCUFromProcesses(query processQueryResult, commandErr error, candid
 	// Only a successful, unambiguous empty process snapshot may skip disk I/O.
 	// Permission/query failures must retain the lockfile recovery path.
 	if commandErr != nil || query.ProcessCount > 0 || query.Unreadable > 0 || len(lines) > 0 {
-		lockfiles = candidates(lines)
+		if commandErr != nil || query.Unreadable > 0 || len(lines) == 0 {
+			report.Sweep = true
+			lockfiles = candidates(lines)
+		} else {
+			lockfiles = targetedLockfileCandidates(query)
+		}
 	}
 	report.LockfilesChecked = len(lockfiles)
 	for _, path := range lockfiles {
@@ -494,12 +527,19 @@ func discoverLCUFromProcesses(query processQueryResult, commandErr error, candid
 		client, err := clientFromLockfile(path)
 		if err == nil {
 			client.source = "lockfile"
-			if err := client.probe(); err == nil {
+			report.CredentialCandidates++
+			report.CredentialsAt = time.Now()
+			if err := probeDiscoveredClient(client, &report); err == nil {
 				report.Result = "connected"
 				report.Detail = "已通过客户端 lockfile 连接"
 				return client, report, nil
 			}
 			report.ProbeFailures++
+			if report.PortOpen {
+				report.Result = "probe-failed"
+				report.Detail = "客户端端口已响应，等待召唤师"
+				return client, report, errLCUProbeFailed
+			}
 			client.Close()
 		}
 	}
@@ -530,6 +570,8 @@ func leagueProcessCommands() (processQueryResult, error) {
 	}
 	fallback, fallbackErr := powerShellLeagueProcessCommands()
 	if fallbackErr == nil {
+		fallback.ImagePaths = native.ImagePaths
+		fallback.ProcessIDs = native.ProcessIDs
 		if native.ProcessCount > fallback.ProcessCount {
 			fallback.ProcessCount = native.ProcessCount
 		}
@@ -814,15 +856,96 @@ func newLCUClient(port int, token string) *LCUClient {
 	}
 }
 
+const discoveryProbeTimeout = 1500 * time.Millisecond
+
+var errLCUNoSummoner = errors.New("LCU probe returned no active summoner")
+
 func (c *LCUClient) probe() error {
-	var value map[string]any
+	var value Summoner
 	if err := c.GetJSON("/lol-summoner/v1/current-summoner", &value); err != nil {
 		return err
 	}
-	if firstInt(value, "summonerId") <= 0 {
-		return errors.New("LCU probe returned no active summoner")
+	if value.SummonerID <= 0 {
+		return errLCUNoSummoner
 	}
 	return nil
+}
+func (c *LCUClient) discoveryProbe(parent context.Context) (Summoner, bool, error) {
+	ctx, cancel := context.WithTimeout(parent, discoveryProbeTimeout)
+	defer cancel()
+	var value Summoner
+	data, err := c.GetBytesContext(ctx, "/lol-summoner/v1/current-summoner")
+	if err != nil {
+		var httpErr *LCUHTTPError
+		return value, errors.As(err, &httpErr), err
+	}
+	// A response with a not-yet-initialized/malformed body still proves the
+	// port is open. Subscribe immediately instead of waiting for another poll.
+	if json.Unmarshal(data, &value) != nil || value.SummonerID <= 0 {
+		return value, true, errLCUNoSummoner
+	}
+	c.mu.Lock()
+	c.discoverySummoner = &value
+	c.mu.Unlock()
+	return value, true, nil
+}
+func probeDiscoveredClient(client *LCUClient, report *LCUDiscoveryStatus) error {
+	started := time.Now()
+	_, portOpen, err := client.discoveryProbe(context.Background())
+	report.ProbeMS += time.Since(started).Milliseconds()
+	report.ProbeErrorKind = discoveryProbeErrorKind(err)
+	report.PortOpen = portOpen
+	if portOpen {
+		report.PortOpenAt = time.Now()
+	}
+	if err == nil {
+		report.SummonerReadyAt = time.Now()
+	}
+	return err
+}
+func discoveryProbeErrorKind(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errors.Is(err, errLCUNoSummoner) {
+		return "no-summoner"
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) || strings.Contains(strings.ToLower(err.Error()), "connection refused") || strings.Contains(err.Error(), "actively refused") {
+		return "refused"
+	}
+	var httpErr *LCUHTTPError
+	if errors.As(err, &httpErr) {
+		return fmt.Sprintf("http-%d", httpErr.StatusCode)
+	}
+	var netErr net.Error
+	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) && netErr.Timeout() {
+		return "timeout"
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "tls") || strings.Contains(strings.ToLower(err.Error()), "certificate") {
+		return "tls"
+	}
+	return "other"
+}
+func targetedLockfileCandidates(query processQueryResult) []string {
+	paths := []string{}
+	for _, line := range query.CommandLines {
+		if match := installPattern.FindStringSubmatch(line); len(match) == 2 {
+			paths = append(paths, filepath.Join(strings.Trim(match[1], `"`), "lockfile"))
+		}
+	}
+	for _, path := range query.ImagePaths {
+		paths = append(paths, filepath.Join(filepath.Dir(path), "lockfile"))
+	}
+	seen := map[string]bool{}
+	unique := []string{}
+	for _, path := range paths {
+		key := strings.ToLower(filepath.Clean(path))
+		if !seen[key] {
+			seen[key] = true
+			unique = append(unique, path)
+		}
+	}
+	return unique
 }
 
 func (c *LCUClient) GetJSON(path string, target any) error {
@@ -844,6 +967,11 @@ func (c *LCUClient) GetJSONContext(ctx context.Context, path string, target any)
 // loopback LCU service. Callers remain responsible for using a fixed, reviewed
 // endpoint; arbitrary paths are never accepted from the renderer.
 func (c *LCUClient) RequestJSON(ctx context.Context, method, path string, body, target any) error {
+	ctx, release, gateErr := c.licenseRequestContext(ctx)
+	if gateErr != nil {
+		return gateErr
+	}
+	defer release()
 	if err := validateLCURequestPath(path); err != nil {
 		return err
 	}
@@ -889,12 +1017,18 @@ func (c *LCUClient) RequestJSON(ctx context.Context, method, path string, body, 
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
+	if err := c.licenseResult(ctx); err != nil {
+		return err
+	}
 	response, err := c.http.Do(request)
 	if err != nil {
 		return fmt.Errorf("LCU %s %s: %w", method, path, err)
 	}
 	httpStatus = response.StatusCode
 	defer response.Body.Close()
+	if err := c.licenseResult(ctx); err != nil {
+		return err
+	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		data, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
 		_, _ = io.Copy(io.Discard, response.Body)
@@ -915,6 +1049,9 @@ func (c *LCUClient) RequestJSON(ctx context.Context, method, path string, body, 
 	}
 	if len(bytes.TrimSpace(data)) == 0 {
 		return nil
+	}
+	if err := c.licenseResult(ctx); err != nil {
+		return err
 	}
 	if err := json.Unmarshal(data, target); err != nil {
 		return fmt.Errorf("decode %s %s: %w", method, path, err)
@@ -955,6 +1092,11 @@ func (c *LCUClient) GetMediaBytesContext(ctx context.Context, path string) ([]by
 }
 
 func (c *LCUClient) getBytes(ctx context.Context, path string, limit int64, accept string) ([]byte, error) {
+	ctx, release, gateErr := c.licenseRequestContext(ctx)
+	if gateErr != nil {
+		return nil, gateErr
+	}
+	defer release()
 	if !strings.HasPrefix(path, "/") {
 		return nil, errors.New("LCU path must be absolute")
 	}
@@ -994,6 +1136,9 @@ func (c *LCUClient) getBytes(ctx context.Context, path string, limit int64, acce
 	data, err := readLimited(response.Body, limit)
 	if err != nil {
 		return nil, fmt.Errorf("LCU GET %s: %w", path, err)
+	}
+	if err := c.licenseResult(ctx); err != nil {
+		return nil, err
 	}
 	return data, nil
 }

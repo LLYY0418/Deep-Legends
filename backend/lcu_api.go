@@ -40,6 +40,7 @@ type SummonerProfile struct {
 }
 
 type LootItem struct {
+	catalogRevision      string
 	DataPending          bool   `json:"dataPending,omitempty"`
 	Blank                bool   `json:"blank,omitempty"`
 	LootID               string `json:"lootId"`
@@ -170,6 +171,7 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 			championNames[skin.ChampionID] = skin.ChampionName
 		}
 	}
+	catalogRevision := ""
 	kept := items[:0]
 	for index := range items {
 		item := &items[index]
@@ -306,6 +308,10 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 				// real quantity but never claims a category it cannot know.
 				item.Blank = true
 				item.DataPending = true
+				if catalogRevision == "" {
+					catalogRevision = collectionCatalogRevision(skins, metadata)
+				}
+				item.catalogRevision = catalogRevision
 				item.Kind = "类型未知"
 				// LCU can build a .png URL from an empty loot name. There is no
 				// usable artwork for an identity-less record, so let the card use

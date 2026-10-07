@@ -58,3 +58,43 @@ func (p *riotProvider) cachedPublicIdentityTTL(ctx context.Context, identity str
 func (p *riotProvider) identityKey(identity string) string {
 	return riotIdentityKey(identity + "|platform:" + p.region())
 }
+
+// A disk hit serves the overview immediately; one refresh per identity/session
+// updates the disk and memory snapshot after the account lookup completes.
+func (p *riotProvider) refreshPersistedAccount(identity, path string) {
+	if _, loaded := p.accountRefreshes.LoadOrStore(identity, true); loaded {
+		return
+	}
+	go func() {
+		defer recoverPanic("riot.accountRefresh")
+		ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+		defer cancel()
+		var account riotAccount
+		if p.get(ctx, p.accountHost(), path, nil, &account) != nil || account.PUUID == "" {
+			return
+		}
+		data, err := json.Marshal(account)
+		if err != nil {
+			return
+		}
+		sum := sha256.Sum256(data)
+		now := time.Now()
+		key := p.identityKey(identity)
+		entry := championCacheEnvelope{Schema: championCacheSchema, Key: key, FetchedAt: now, ExpiresAt: now.Add(24 * time.Hour), StaleUntil: now.Add(24 * time.Hour), Hash: hex.EncodeToString(sum[:]), Data: data}
+		if p.identityDisk.writeDisk(entry) != nil {
+			return
+		}
+		p.identityDisk.mu.Lock()
+		p.identityDisk.storeMemoryLocked(key, entry)
+		p.identityDisk.mu.Unlock()
+		p.accountMu.Lock()
+		cacheKey := strings.TrimPrefix(identity, "account:")
+		cacheKey = strings.ReplaceAll(cacheKey, "#", "\x1f")
+		if existing, ok := p.accountCache[cacheKey]; ok {
+			existing.account = account
+			existing.expiresAt = entry.ExpiresAt
+			p.accountCache[cacheKey] = existing
+		}
+		p.accountMu.Unlock()
+	}()
+}

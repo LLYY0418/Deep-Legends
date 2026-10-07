@@ -38,7 +38,7 @@ func TestR86ConnectionBackoffResetsAfterSuccessfulDiscovery(t *testing.T) {
 			return true
 		},
 	})
-	want := []time.Duration{3 * time.Second, 6 * time.Second, 8 * time.Second, 3 * time.Second}
+	want := []time.Duration{time.Second, time.Second, time.Second, time.Second}
 	if len(delays) != len(want) {
 		t.Fatal(delays)
 	}

@@ -45,17 +45,17 @@ test('R193 3 hidden card omits empty win-rate and KDA columns without em dashes'
     assert.equal(d.window.document.querySelectorAll('dl > div').length, 1);
     assert.equal(d.window.document.querySelector('dt').textContent, '当前模式');
     assert.equal(d.window.document.querySelector('.win-rate-value, .live-kda-value'), null);
-    const withStats = current.renderLivePlayer({...hidden, modeStats: {games: 2, wins: 1, losses: 1, winRate: 50, kda: 3}}, 0);
+    const withStats = current.renderLivePlayer({...hidden, recentGames: [{win: true, kills: 2, deaths: 1, assists: 1}, {win: false, kills: 2, deaths: 1, assists: 1}], modeStats: {games: 2, wins: 1, losses: 1, winRate: 50, kda: 3}}, 0);
     assert.match(withStats, /win-rate-value/); assert.match(withStats, /live-kda-value/);
   } finally { d.window.close(); }
 });
 test('R193 4 unresolved identity, private history and ordinary no-sample cards match baseline', () => {
-  for (const {player, html} of before.cards) assert.equal(combined(current, player), html);
+  for (const {player, html} of before.cards) assert.equal(combined(current, player), html.replace('暂无样本', '本模式暂无战绩'));
   assert.match(combined(current, {...hidden, hidden: false, identityUnresolved: true}), /身份尚未公开/);
 });
 test('R193 5 ordinary unranked player retains rank subtitle', () => {
   const html = current.renderLivePlayer({...hidden, hidden: false, gameName: '普通玩家'}, 0);
   assert.match(html, /打野 · 未定级/);
   const normal = before.cards[2];
-  assert.equal(combined(current, normal.player), normal.html);
+  assert.equal(combined(current, normal.player), normal.html.replace('暂无样本', '本模式暂无战绩'));
 });

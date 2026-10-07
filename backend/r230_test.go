@@ -69,8 +69,8 @@ func TestR230Schema12FalseCompleteTriggersBackfill(t *testing.T) {
 	if err := a.storage.saveSeasonStats(seasonStatsCache{SchemaVersion: 12, Source: seasonStatsSource, AccountHash: hash, Season: season, Complete: true, GameIDs: []int64{999}, Stats: []gameplaySeasonChampionStat{{ChampionID: 1, Games: 1}}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.storage.loadSeasonStats(seasonStatsSource, hash, season); err == nil {
-		t.Fatal("schema12 accepted")
+	if loaded, err := a.storage.loadSeasonStats(seasonStatsSource, hash, season); err != nil || len(loaded.GameIDs) != 1 || len(loaded.Stats) != 1 {
+		t.Fatal("schema12 history lost")
 	}
 	// Two full current-season pages fill the foreground budget; backfill must
 	// fetch the terminal third page. Completion is awaited before store cleanup.
