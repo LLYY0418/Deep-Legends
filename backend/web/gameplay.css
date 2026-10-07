@@ -624,7 +624,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-details-warning .notice-symbol { flex-basis: 20px; width: 20px; height: 20px; font-size: 11px; }
 .match-details-warning strong { font-size: 11.5px; }
 .match-details-warning p { max-width: none; margin-top: 1px; font-size: 10.5px; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
-.match-list { display: grid; gap: 8px; overflow-anchor: auto; }
+.match-list { display: grid; gap: 8px; overflow-anchor: none; }
 .match-pagination { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 9px; color: var(--muted); font-size: 11px; }
 .match-filter-paging { display: flex; min-height: 132px; align-items: center; justify-content: center; gap: 9px; color: var(--muted); font-size: 11px; }
 .match-pagination .text-button { min-height: 30px; }
@@ -662,8 +662,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 /* 中部主区：第一行 英雄+技能符文 / KDA / 数据列，第二行装备栏 + 徽章。
    中列弹性伸缩：宽度变化时 KDA 居中、数据列贴住右侧玩家名单，
    多余空间均匀分布在块之间，而不是堆在数据列右侧。 */
-.match-main { display: grid; align-self: start; min-width: 0; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); align-items: center; gap: 9px 22px; }
-.match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); }
+.match-main { display: grid; align-self: start; min-width: 0; grid-template-columns: minmax(0,auto) minmax(96px,1fr) minmax(188px,1.4fr); align-items: center; gap: 9px 22px; }
+.match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(96px,1fr) minmax(188px,1.4fr); }
 .match-champion { position: relative; display: grid; min-width: 0; min-height: 63px; grid-template-columns: 58px minmax(0,auto); align-items: center; gap: 7px; }
 .champion-level { position: absolute; top: 44px; left: 40px; display: grid; width: 22px; height: 22px; place-items: center; color: white; background: #171717; border-radius: 50%; font-size: 10px; }
 /* 召唤师技能一列、主副系符文一列（各上下两格） */
@@ -678,7 +678,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
    固定最小宽度并靠右，保证多张卡片的左右边缘对齐 */
 /* R132 P3：数据列定宽。平均段位异步回填（「…」→「💠 铂金 III」）时列宽不能跟着内容变，
    否则同一页里已回填和未回填的卡片，参团率/CS 的数值会左右错位。 */
-.match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; width: 188px; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }
+.match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; width: calc(100% - 64px); min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }
 .match-stats.is-arena { align-content: start; grid-template-rows: repeat(3,18px); min-height: 54px; }
 .match-stat { display: grid; min-width: 0; grid-template-columns: 72px minmax(0,1fr); align-items: baseline; gap: 8px; font-size: 11px; cursor: help; white-space: nowrap; }
 .match-stat > em { min-width: 0; color: var(--faint); font-size: 10.5px; font-style: normal; }
@@ -691,7 +691,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-stat-damage > b, .match-stat-taken > b { display: inline-flex; align-items: baseline; gap: 3px; }
 .match-tier-crest { width: 19px; height: 19px; object-fit: contain; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .35)); }
 .match-tier-unknown { color: var(--faint); font-weight: 600; }
-.match-build { display: flex; min-width: 0; grid-column: 1 / -1; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.match-build { display: flex; min-width: 0; grid-column: 1 / -1; flex-wrap: nowrap; align-items: center; gap: 6px 12px; }
 .match-items { display: flex; flex: 0 0 auto; align-items: center; gap: 3px; }
 /* 装备槽：按原始槽位渲染，空位保留暗色占位框；第 7 格为饰品（圆形、留间隔） */
 .item-slot { position: relative; display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; }
@@ -781,7 +781,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 @container matches-column (max-width: 1080px) {
 	.match-summary { --match-roster-width: clamp(146px,20cqi,180px); }
 	.match-summary, .match-summary.is-arena { grid-template-columns: 108px minmax(0,1fr) var(--match-roster-width,clamp(146px,20cqi,180px)) 40px; gap: 8px; }
-	.match-main { gap: 8px 12px; }
+	.match-main { gap: 8px 12px; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); }
+	.match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); }
 	.match-stats { width: 180px; padding-left: 10px; }
 	.arena-team-row-compact { padding-inline: 4px; }
 }
@@ -827,15 +828,15 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
    compact layout below 900px stays unchanged. */
 @container matches-column (min-width: 900px) {
 	.match-summary {
-		--match-roster-width: clamp(220px,25cqi,260px);
-		min-height: 116px;
+		--match-roster-width: clamp(150px,18cqi,190px);
+		min-height: 118px;
 	}
 	.match-main, .match-main.is-arena { row-gap: 0; }
 	.match-summary.is-arena { min-height: 118px; }
 }
 
 @container matches-column (min-width: 1080px) {
-	.match-summary { --match-roster-width: 370px; }
+	.match-summary { --match-roster-width: clamp(150px,18cqi,190px); }
 }
 
 .match-detail { padding: 0 8px 8px; border-top: 1px solid var(--line); }
@@ -2060,7 +2061,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .overview-detail-arrow svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
 .champion-performance > header,.mastery-career-section > header { align-items:center; }
 [data-overview-return] { display:inline-flex; align-items:center; gap:6px; min-height:32px; font-size:14px; }
-[data-overview-return] > span { font-size:20px; }
+[data-overview-return] > svg { display:block; width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+.champion-table-wrap { overflow-anchor:none; }
 .overview-detail-page { min-width:0; max-width:100%; }
 .overview-detail-page > header { display:flex; align-items:center; gap:24px; margin-bottom:24px; }
 .overview-detail-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin-bottom:26px; gap:12px; padding:20px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
@@ -2144,25 +2146,25 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 --mk-2-start:#FB923C;--mk-2-end:#C2410C;--mk-3-start:#F87171;--mk-3-end:#991B1B;--mk-4-start:#F472B6;--mk-4-end:#86198F;--mk-5-start:#FEF3C7;--mk-5-end:#B45309;--mk-5-middle:#FBBF24;--mk-4-wing:#E879F9;--mk-5-flame-end:#DC2626;--tag-zero:#39b578;
 }
 .is-tag-unstoppable { --tag-color:var(--tag-unstoppable); }
-[data-theme="light"] .is-tag-unstoppable { color:#722426; background:#fceded; }
+[data-theme="light"] .is-tag-unstoppable,[data-theme="light"] .is-data-damage,[data-theme="light"] .is-data-efficiency,[data-theme="light"] .is-data-kills { --tag-light-ink:#722426; --tag-light-bg:#fceded; color:var(--tag-light-ink); background:var(--tag-light-bg); }
 .is-tag-leader { --tag-color:var(--tag-leader); }
-[data-theme="light"] .is-tag-leader { color:#74501d; background:#fdf6eb; }
+[data-theme="light"] .is-tag-leader,[data-theme="light"] .is-data-cs,[data-theme="light"] .is-data-gold,[data-theme="light"] .is-data-tower,[data-theme="light"] .is-data-participation { --tag-light-ink:#74501d; --tag-light-bg:#fdf6eb; color:var(--tag-light-ink); background:var(--tag-light-bg); }
 .is-tag-victorious { --tag-color:var(--tag-victorious); }
 [data-theme="light"] .is-tag-victorious { color:#783554; background:#fef0f6; }
 .is-tag-latebloomer { --tag-color:var(--tag-latebloomer); }
 [data-theme="light"] .is-tag-latebloomer { color:#366025; background:#f0f9ed; }
 .is-tag-resilience { --tag-color:var(--tag-resilience); }
-[data-theme="light"] .is-tag-resilience { color:#483679; background:#f4f0fe; }
+[data-theme="light"] .is-tag-resilience,[data-theme="light"] .is-data-control { --tag-light-ink:#483679; --tag-light-bg:#f4f0fe; color:var(--tag-light-ink); background:var(--tag-light-bg); }
 .is-tag-dedication { --tag-color:var(--tag-dedication); }
-[data-theme="light"] .is-tag-dedication { color:#175c53; background:#eaf8f6; }
+[data-theme="light"] .is-tag-dedication,[data-theme="light"] .is-data-tank,[data-theme="light"] .is-data-heal,[data-theme="light"] .is-data-shield { --tag-light-ink:#175c53; --tag-light-bg:#eaf8f6; color:var(--tag-light-ink); background:var(--tag-light-bg); }
 .is-tag-average { --tag-color:var(--tag-average); }
-[data-theme="light"] .is-tag-average { color:#3d424b; background:#f2f3f4; }
+[data-theme="light"] .is-tag-average,[data-theme="light"] .match-tags-more { --tag-light-ink:#3d424b; --tag-light-bg:#f2f3f4; color:var(--tag-light-ink); background:var(--tag-light-bg); }
 .is-tag-rollercoaster { --tag-color:var(--tag-rollercoaster); }
 [data-theme="light"] .is-tag-rollercoaster { color:#79401d; background:#fef2eb; }
 .is-tag-decline { --tag-color:var(--tag-decline); }
 [data-theme="light"] .is-tag-decline { color:#503820; background:#f6f1ec; }
 .is-tag-innocent { --tag-color:var(--tag-innocent); }
-[data-theme="light"] .is-tag-innocent { color:#1e4f80; background:#ebf5ff; }
+[data-theme="light"] .is-tag-innocent,[data-theme="light"] .is-data-solo,[data-theme="light"] .is-data-dive,[data-theme="light"] .is-data-defense,[data-theme="light"] .is-data-advantage,[data-theme="light"] .is-data-hook { --tag-light-ink:#1e4f80; --tag-light-bg:#ebf5ff; color:var(--tag-light-ink); background:var(--tag-light-bg); }
 .is-tag-unlucky { --tag-color:var(--tag-unlucky); }
 [data-theme="light"] .is-tag-unlucky { color:#64306b; background:#faeffb; }
 .is-tag-slowstarter { --tag-color:var(--tag-slowstarter); }
@@ -2172,7 +2174,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .is-tag-struggling { --tag-color:var(--tag-struggling); }
 [data-theme="light"] .is-tag-struggling { color:#2c303d; background:#eeeff2; }
 
-.match-build .match-badges { flex:0 1 auto; width:auto; min-width:max-content; flex-wrap:nowrap; justify-content:flex-start; min-height:30px; max-width:100%; gap:4px; align-items:center; }
+.match-build .match-badges { flex:1 1 0; min-width:0; overflow:hidden; flex-wrap:nowrap; justify-content:flex-start; height:30px; gap:4px; align-items:center; }
 .match-keyword-tag,.match-zero-deaths { display:inline-flex; padding:3px 6px; border:1px solid color-mix(in srgb,var(--tag-color,var(--tag-zero)) 55%,transparent); border-radius:5px; background:color-mix(in srgb,var(--tag-color,var(--tag-zero)) 14%,var(--surface)); color:color-mix(in srgb,var(--tag-color,var(--tag-zero)) 65%,white); font-size:10px; line-height:1.2; white-space:nowrap; }
 .match-zero-deaths { --tag-color:var(--tag-zero); }
 [data-theme="light"] .match-zero-deaths { color:#1d653f; background:#e9f8ef; }
@@ -2202,3 +2204,36 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .multikill-tag.is-mk-3 > b { color:#FFE4E6; }
 .multikill-tag.is-mk-4 > b { color:#FAE8FF; font-size:11px; }
 .multikill-tag.is-mk-5 > b { color:#3B1A00; font-size:11px; font-weight:800; text-shadow:0 0 2px rgba(255,247,214,.9); }
+
+/* R241: wide windows distribute the main tracks even when the career/sidebar
+   leave the match container below its compact breakpoint. Narrow windows keep
+   the existing compact arrangement; the roster retains its clamped width. */
+@media (min-width:1101px) {
+  @container matches-column (min-width:720px) {
+    .match-main,.match-main.is-arena { grid-template-columns:minmax(0,auto) minmax(96px,1fr) minmax(188px,1.4fr); }
+    .match-stats { width:calc(100% - 64px); }
+  }
+}
+
+/* R241: data tags share the existing keyword palette and outline language. */
+.match-tags-collection { display:flex; flex-wrap:nowrap; align-items:center; gap:4px; width:100%; height:30px; min-width:0; overflow:hidden; white-space:nowrap; }
+.match-tags-collection > [data-match-tag] { display:inline-flex; flex:none; align-items:center; }
+.match-tags-collection > [hidden] { display:none !important; }
+.match-data-tag,.match-tags-more { display:inline-flex; flex:none; align-items:center; height:20px; padding:2px 7px; border:1px solid color-mix(in srgb,var(--tag-color) 55%,transparent); border-radius:5px; background:color-mix(in srgb,var(--tag-color) 14%,var(--surface)); color:color-mix(in srgb,var(--tag-color) 65%,white); font-size:10px; font-weight:600; line-height:1.2; white-space:nowrap; }
+.match-data-tag.is-global { background:color-mix(in srgb,var(--tag-color) 26%,var(--surface)); border-color:color-mix(in srgb,var(--tag-color) 75%,transparent); font-weight:700; }
+.match-tags-more { --tag-color:var(--muted); cursor:pointer; }
+.match-tags-more:focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
+.is-data-damage,.is-data-efficiency,.is-data-kills { --tag-color:var(--tag-unstoppable); }
+.is-data-control { --tag-color:var(--tag-resilience); }
+.is-data-tank,.is-data-heal,.is-data-shield { --tag-color:var(--tag-dedication); }
+.is-data-cs,.is-data-gold,.is-data-tower,.is-data-participation { --tag-color:var(--tag-leader); }
+.is-data-solo,.is-data-dive,.is-data-defense,.is-data-advantage,.is-data-hook { --tag-color:var(--tag-innocent); }
+[data-theme="light"] .match-data-tag { color:var(--tag-light-ink); background:var(--tag-light-bg); }
+[data-theme="light"] .match-data-tag.is-global { background:color-mix(in srgb,var(--tag-color) 26%,var(--surface)); }
+.match-badges .match-tags-collection,.match-badges [data-match-tag] { padding:0; border-radius:0; background:none; color:inherit; justify-content:flex-start; }
+.match-tags-popover { position:fixed; z-index:54; display:flex; flex-wrap:wrap; align-items:center; gap:6px; width:max-content; max-width:min(320px,calc(100vw - 24px)); padding:9px 12px 10px; background:var(--surface-strong); border:1px solid var(--line); border-radius:var(--radius-sm); box-shadow:0 14px 34px var(--tooltip-shadow-cast),0 2px 8px var(--tooltip-shadow-contact); }
+.match-tags-popover[hidden] { display:none; }
+.match-tags-popover > span { display:inline-flex; align-items:center; }
+.match-tags-popover::after { content:""; position:absolute; left:var(--tag-arrow-left); width:8px; height:8px; background:var(--surface-strong); border:1px solid var(--line); transform:translateX(-50%) rotate(45deg); }
+.match-tags-popover[data-placement="top"]::after { bottom:-5px; border-top:0; border-left:0; }
+.match-tags-popover[data-placement="bottom"]::after { top:-5px; border-bottom:0; border-right:0; }

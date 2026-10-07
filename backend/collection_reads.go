@@ -70,6 +70,12 @@ func (a *app) scheduleCollectionDataRetry(client *LCUClient, account AccountData
 	}()
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.lcu == client && a.connected {
+		if settled, suppressed := a.storage.suppressCachedCollectionBlanks(account, time.Now()); suppressed > 0 {
+			account = settled
+			a.account, _ = a.storage.suppressCachedCollectionBlanks(a.account, time.Now())
+		}
+	}
 	if a.collectionDataRetryClient != client || !collectionDataPending(account) {
 		if a.collectionDataRetry != nil {
 			a.collectionDataRetry.Stop()
@@ -83,8 +89,13 @@ func (a *app) scheduleCollectionDataRetry(client *LCUClient, account AccountData
 		// Every retry read the same record back. Stop presenting it as "not
 		// synced yet": the client is returning it as-is.
 		if settled, blanks := settleBlankLoot(a.account); blanks > 0 {
+			kinds, samples, lastError := collectionBlankDiagnostics(a.account)
+			cacheErr := a.storage.cacheExhaustedCollectionBlanks(a.account, time.Now())
 			a.account = settled
-			exhausted = map[string]any{"event": "collection_data_retry_exhausted", "attempts": a.collectionDataRetryCount, "blank_entries": blanks}
+			exhausted = map[string]any{"event": "collection_data_retry_exhausted", "attempts": a.collectionDataRetryCount, "blank_entries": blanks, "blank_kinds": kinds, "blank_samples": samples, "last_error_kind": lastError}
+			if cacheErr != nil {
+				exhausted["negative_cache_error_kind"] = "local_write"
+			}
 		}
 		return
 	}

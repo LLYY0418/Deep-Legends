@@ -363,6 +363,7 @@
     return Object.keys(PLAYER_GROUPS);
   }
   function selectPlayerGroup(group) {
+    state.lastManualTabAt = Date.now();
     if (!visiblePlayerGroups().includes(group)) return;
     const tab = activeTab(group);
     if (tab) selectPlayerTab(tab.key);
@@ -513,6 +514,7 @@
     const wasConnected = connected();
     const wasIdentityReady = Boolean(state.status?.identityReady);
     const connectionChanged = !state.status || wasConnected !== Boolean(status.connected);
+    if (!wasConnected && status.connected) state.followSelfPending = true;
     state.status = status;
     if (Array.isArray(status.queueGroups) && status.queueGroups.length) state.queueGroups = status.queueGroups;
     if (!status.connected && !connectionChanged) return;
@@ -559,11 +561,20 @@
       current.region = nextRegion; current.serverId = nextRegion ? "" : status.serverId || "";
       current.playerRef = ""; current.playerRefs = new Set(); current.data = null;
       current.group = nextRegion ? "kr" : "players";
-      if (wasActive) { state.activeTabs[current.group] = current.key; state.activeGroup = current.group; }
+      if (wasActive) { state.activeTabs[current.group] = current.key; if(Date.now()-Number(state.lastManualTabAt || 0)>=10_000)state.activeGroup = current.group; }
       renderPlayerTabs();
     }
     if (wasConnected && status.connected && current && (platformChanged || !wasIdentityReady && status.identityReady)) {
       void loadOverview(current, true);
+    }
+	if (current && status.identityReady && state.followSelfPending) {
+      state.followSelfPending = false;
+      if (Date.now() - Number(state.lastManualTabAt || 0) >= 10_000) {
+        state.activeGroup = current.group || (nextRegion ? "kr" : "players");
+        state.activeTabs[state.activeGroup] = current.key;
+        renderPlayerTabs();
+        if (state.section === "overview") renderOverview(state.activeGroup);
+      }
     }
 	const nextLabel = summonerLabel(status.summoner || {});
 	const nextIcon = Number(status.summoner?.profileIconId) || 0;
@@ -833,6 +844,7 @@
       sentinel.querySelector("[data-load-more]")?.addEventListener("click", () => loadOverview(tab, false, true, true));
     }
     observeMatchTierVisibility(container, tab, container.dataset.matchTierScope || matchTierScope(tab));
+    fitMatchTags(container);
     bindMatchSentinel(container, tab);
     if (list) list._matchData = new Map((tab.data?.matches || []).map(match => [String(match.gameId), match]));
     container._matchListMatches = tab.data?.matches;
@@ -931,7 +943,7 @@
 		: { ...verification, playerRef: tab.playerRef, serverId: tab.serverId || "", count: requestCount, begIndex, force, freshHistory:manual, matchFilter: tab.matchFilter });
       const retryHistory = riotTab(tab) || tab.current && connected() && state.status?.clientRegion !== "TENCENT";
       const timeout = retryHistory ? 190_000 : 25_000;
-      const onProgress = retryHistory ? partial => {
+      const onProgress = partial => {
         if (tab.overviewRequestToken !== requestToken || tab.closed || state.destroyed) return;
         if (!partial?.player || !Array.isArray(partial.matches)) return;
         // Pagination commits once: progress must not replace the existing page,
@@ -971,7 +983,7 @@
         if (ref) { rememberTabPlayerRef(tab, ref); tab.playerRef = ref; }
         tab.label = playerLabel(partial.player);
         rerenderTab(tab);
-      } : undefined;
+      };
       const requestKey = `${append ? "overview-more" : "overview"}:${tab.key}`;
       if (!append) {
         void loadOPGGSeasonSummary(tab, force && !quiet);
@@ -1219,11 +1231,11 @@
 	  }
 	}
 
-  async function refreshSeasonSummary(tab) {
+  async function refreshSeasonSummary(tab, snapshot = null) {
     const playerRef=tab.data?.player?.playerRef || tab.playerRef;
     if(!playerRef)return false;
     try {
-      const data=await api(`/api/gameplay/season-summary?playerRef=${encodeURIComponent(playerRef)}`,{},`season-summary:${tab.key}`,5000);
+      const data=snapshot || await api(`/api/gameplay/season-summary?playerRef=${encodeURIComponent(playerRef)}`,{},`season-summary:${tab.key}`,5000);
       if(tab.closed || (tab.data?.player?.playerRef || tab.playerRef)!==playerRef)return false;
       tab.data={...tab.data,seasonChampionStats:data.seasonChampionStats,seasonOverall:data.seasonOverall,seasonStatsProgress:data.seasonStatsProgress};
       tab.data.rankedQueues={...(tab.data.rankedQueues || {})};
@@ -1249,15 +1261,47 @@
     }catch(error){if(error.name!=="RequestCancelled")tab.seasonRefreshPending=true;return false;}
   }
 
+  function mergeCurrentHistoryHead(matches, head) {
+    const seen=new Set(head.map(match=>String(match.gameId)));
+    return [...head,...matches.slice(head.length).filter(match=>!seen.has(String(match.gameId)))];
+  }
+
+  function syncOverviewStreak(tab) {
+    if(typeof document==="undefined")return;
+    const container=overviewContainer(tab),root=container?._overviewSubpageStash || container;
+    const meta=root?.querySelector(".summoner-name-meta");if(!meta)return;
+    const previous=meta.querySelector(".summoner-streak"),template=document.createElement("template");
+    template.innerHTML=renderOverviewStreak(tab.overviewStreak);const next=template.content.firstElementChild;
+    if((previous?.outerHTML || "")===(next?.outerHTML || ""))return;
+    if(!next)previous?.remove();else if(previous)previous.replaceWith(next);else meta.appendChild(next);
+    // The next header render must use the new result; the existing header,
+    // avatar and profile controls remain mounted during this SSE update.
+    if(container)delete container._stripHTML;
+  }
+
   function handleOverviewMatches(detail) {
     if(!Array.isArray(detail?.matches))return;
-    state.riotMatchPatches ||= new Map();state.riotMatchPatches.set(detail.account,detail);
+    state.riotMatchPatches ||= new Map();
+    const generation=Number(detail.historyGeneration || 0),previous=state.riotMatchPatches.get(detail.account);
+    if(generation && generation<Number(previous?.historyGeneration || 0))return;
+    state.riotMatchPatches.set(detail.account,detail);
     while(state.riotMatchPatches.size>32)state.riotMatchPatches.delete(state.riotMatchPatches.keys().next().value);
     for(const tab of [...(state.tabs || []),...(state.overlay || [])]) {
       if((tab.data?.player?.playerRef || tab.playerRef)!==detail.account || !tab.data)continue;
+      if(detail.replace) {
+        if(generation && generation<Number(tab.data.historyGeneration || 0))continue;
+        if((tab.matchFilter || "all")!=="all")continue;
+        const previous=tab.data.matches || [],matches=mergeCurrentHistoryHead(previous,detail.matches);
+        const hasTail=previous.length>detail.matches.length;
+        tab.data={...tab.data,historyGeneration:generation,matches,pagination:{...(detail.pagination || tab.data.pagination),count:matches.length,hasMore:hasTail ? Boolean(tab.data.pagination?.hasMore) : Boolean(detail.pagination?.hasMore)}};
+        tab.overviewStreak=computeOverviewStreak(matches,tab.data.pagination.hasMore,tab.data.player?.playerRef);
+        syncOverviewStreak(tab);
+        renderFilteredMatchView(tab);continue;
+      }
       const changed=new Map(detail.matches.map(match=>[String(match.gameId),match]));
       tab.data.matches=tab.data.matches.map(match=>changed.get(String(match.gameId)) || match);
       for(const id of changed.keys())rerenderMatch(tab,id);
+      if((tab.matchFilter || "all")==="all") {tab.overviewStreak=computeOverviewStreak(tab.data.matches,tab.data.pagination?.hasMore,tab.data.player?.playerRef);syncOverviewStreak(tab);}
     }
   }
   async function handleRelayRecovered() {
@@ -1300,7 +1344,7 @@
 	  const tabKey = tab.key;
 	  const scrollRoot = document.getElementById("app-scroll");
 	  const scrollTop = Number(scrollRoot?.scrollTop || 0);
-	  await refreshSeasonSummary(tab);
+	  if(detail.snapshot)await refreshSeasonSummary(tab,detail.snapshot);else await refreshSeasonSummary(tab);
 	  if (state.section !== overviewSectionForGroup(group) || activeTab(group)?.key !== tabKey) return false;
 	  requestAnimationFrame(() => {
 		if (scrollRoot?.isConnected) scrollRoot.scrollTop = scrollTop;
@@ -1618,6 +1662,7 @@
   window.addEventListener("deep-legends:before-section", savePlayerScroll);
 
   function selectPlayerTab(key) {
+    state.lastManualTabAt = Date.now();
     const tab = state.tabs.find((item) => item.key === key);
     if (!tab) return;
     const group = tabGroup(tab);
@@ -2047,6 +2092,9 @@
     if (container._overviewSubpageStash) {
       container.replaceChildren(container._overviewSubpageStash);
       delete container._overviewSubpageStash;
+      reportOverviewCardReady(container,tab);
+      prepareImages(container);
+      return;
     }
     const tierScope = matchTierScope(tab);
     const quotaMessage = tab.quotaRetry ? `<p role="status" data-quota-recovery>外服查询额度恢复中，约 ${Math.max(1, Math.ceil((tab.quotaRetry.retryAt - Date.now()) / 1000))} 秒后自动重试；已加载的战绩仍可查看。</p>` : "";
@@ -2192,12 +2240,16 @@
     if(!load || !data) return;
     const opgg=tab.opggSeason?.data;
     const position=rankedQueueData(data,tab,"position");
-    const cards=[["ranks",(data.ranks||[]).length,"network"],
+    const cards=[["matches",Array.isArray(data.matches) && (data.matches.length > 0 || data.pagination && !data.pagination.partial),"network"],["ranks",(data.ranks||[]).length,"network"],
       ["champions",opgg ? Number(opgg.overall?.games)>0 : Number(data.seasonStatsProgress?.scanned)>0 || (data.seasonChampionStats||data.championStats||[]).length,opgg ? "opgg" : data.seasonStatsProgress ? "snapshot" : "network"],
       ["masteries",(data.masteries||[]).length,"network"],
       ["positions",(position.positions||[]).length,"network"]];
-    for(const [card,ready,source] of cards) if(ready && !load.ready.has(card) && container.querySelector(".career-column")) {
+    for(const [card,ready,source] of cards) if(ready && !load.ready.has(card) && container.querySelector(card === "matches" ? ".match-list" : ".career-column")) {
       load.ready.add(card);
+      if(tab.current && container.isConnected && !load.selfReady) {
+       load.selfReady = true;
+       window.dispatchEvent(new CustomEvent("deep-legends:self-tab-ready"));
+      }
       window.reportFlowDiagnostic?.("overview_card_ready","ready",{card,durationMs:Math.round((typeof performance !== "undefined" ? performance.now() : Date.now())-load.startedAt),source:load.cached ? "snapshot" : source});
     }
   }
@@ -2558,7 +2610,7 @@
       mayhemValue = escapeHTML(rating.data?.unavailableReason || "未收录");
       mayhemDetail = "ARAMKit 未返回可核验的分数";
     } else if (rating.status === "error") {
-      mayhemValue = "暂不可用";
+      mayhemValue = '暂不可用 <button type="button" class="text-button" data-mayhem-rating-retry>重试</button>';
       mayhemDetail = rating.error || "第三方查询暂不可用";
     }
     return `<div class="rank-mmr-control">
@@ -2597,23 +2649,47 @@
 
   async function loadMayhemRating(tab, quietStart = false) {
     const current = mayhemRatingStatus(tab);
-    const permanent = current.status === "ready" && (current.data?.available || current.data?.unavailableReason === "未收录");
-    if (!current.playerRef || current.status === "loading" || permanent || (current.status !== "idle" && Date.now()-Number(current.at || 0)<60_000) || riotTab(tab) || !tabServerID(tab)) return;
+    const permanent = current.status === "ready" && (current.data?.available || current.data?.unavailableReason === "未收录" && Date.now()-Number(current.at || 0)<300_000);
+    if (!current.playerRef || current.status === "loading" || permanent || riotTab(tab) || !tabServerID(tab)) return;
     const requestToken = Number(tab.mayhemRatingRequestToken || 0) + 1;
     tab.mayhemRatingRequestToken = requestToken;
     tab.mayhemRating = { status: "loading", playerRef: current.playerRef, data: null, error: "" };
-    if (!quietStart) rerenderTab(tab);
+    if (!quietStart) updateMayhemRatingPopover(tab);
     try {
       const params = new URLSearchParams({ playerRef: current.playerRef });
-      const data = await api(`/api/gameplay/mayhem-rating?${params}`, {}, `mayhem-rating:${tab.key}`, 12000);
+      const data = await api(`/api/gameplay/mayhem-rating?${params}`, {}, `mayhem-rating:${tab.key}`, 40000);
       if (tab.closed || tab.mayhemRatingRequestToken !== requestToken || mayhemRatingStatus(tab).playerRef !== current.playerRef) return;
-      tab.mayhemRating = { status: "ready", playerRef: current.playerRef, data, error: "", at: Date.now() };
+      tab.mayhemRating = { status: data.available || data.unavailableReason === "未收录" ? "ready" : "error", playerRef: current.playerRef, data, error: "", at: Date.now() };
     } catch (error) {
       if (tab.closed || tab.mayhemRatingRequestToken !== requestToken) return;
-      if (error.name === "RequestCancelled") { tab.mayhemRating = { status: "idle", playerRef: current.playerRef, data: null, error: "" }; rerenderTab(tab); return; }
+      if (error.name === "RequestCancelled") { tab.mayhemRating = { status: "idle", playerRef: current.playerRef, data: null, error: "" }; updateMayhemRatingPopover(tab); return; }
       tab.mayhemRating = { status: "error", playerRef: current.playerRef, data: null, error: "查询暂不可用", at: Date.now() };
     }
-    rerenderTab(tab);
+    updateMayhemRatingPopover(tab);
+  }
+
+  function bindMayhemRatingControls(container,tab) {
+    for (const control of container.querySelectorAll(".rank-mmr-control")) {
+      control.dataset.ratingTab=tab.key;
+      const trigger = control.querySelector("[data-rank-mmr-trigger]");
+      const setExpanded = (expanded) => {trigger?.setAttribute("aria-expanded", String(expanded)); if(expanded && mayhemRatingStatus(tab).status !== "loading") void loadMayhemRating(tab);};
+      control.querySelector("[data-mayhem-rating-retry]")?.addEventListener("click", () => {tab.mayhemRating = {...mayhemRatingStatus(tab),status:"idle"};void loadMayhemRating(tab);});
+      control.addEventListener("mouseenter", () => setExpanded(true));
+      control.addEventListener("mouseleave", () => setExpanded(false));
+      control.addEventListener("focusin", () => setExpanded(true));
+      control.addEventListener("focusout", (event) => { if (!control.contains(event.relatedTarget)) setExpanded(false); });
+    }
+  }
+
+  function updateMayhemRatingPopover(tab) {
+    if(typeof document==="undefined") {rerenderTab(tab);return;}
+    const template=document.createElement("template");template.innerHTML=renderRankMMRPopover(tab);
+    const fresh=template.content.querySelector(".rank-mmr-popover");
+    for(const control of document.querySelectorAll(".rank-mmr-control")) {
+      if(control.dataset.ratingTab!==tab.key || !fresh)continue;
+      control.querySelector(".rank-mmr-popover").innerHTML=fresh.innerHTML;
+      control.querySelector("[data-mayhem-rating-retry]")?.addEventListener("click",()=>{tab.mayhemRating={...mayhemRatingStatus(tab),status:"idle"};void loadMayhemRating(tab);});
+    }
   }
 
   function renderChampionStats(items, overall, progress) {
@@ -2781,8 +2857,10 @@
     const body=container.querySelector("tbody"), rowCache=new Map();
     const remember=()=>{ for(const row of body?.children || [])rowCache.set(row.dataset.tableRow,row); };
     remember();
-    const redraw=()=>{
+    const redraw=(anchor=null)=>{
       if(!body)return;
+      const before=anchor?.getBoundingClientRect().top;
+      const scroll=container.closest(".player-overlay-scroll") || document.getElementById("app-scroll");
       remember();
       const template=document.createElement("template");
       template.innerHTML=renderChampionTable(tab.overviewSubpageState.data,tab);
@@ -2795,6 +2873,7 @@
       });
       // Move existing nodes, preserving queued/loaded images and their listeners.
       body.replaceChildren(...nodes);
+      if(anchor && scroll && Number.isFinite(before))scroll.scrollTop+=anchor.getBoundingClientRect().top-before;
       for(const row of inserted)prepareImages(row);
       for(const button of container.querySelectorAll("[data-table-sort]")) {
         const key=button.dataset.tableSort;
@@ -2805,9 +2884,9 @@
     for(const button of container.querySelectorAll("[data-table-sort]"))button.addEventListener("click",()=>{const key=button.dataset.tableSort;tab.championTableDirection=(tab.championTableSort || "games")===key ? -(tab.championTableDirection ?? -1) : -1;tab.championTableSort=key;redraw();});
     const activate=event=>{
       const more=event.target.closest("[data-table-more]");
-      if(more){const id=more.dataset.tableMore;tab.championTableOpponentLimits.set(id,(tab.championTableOpponentLimits.get(id)||5)+10);redraw();return;}
+      if(more){const id=more.dataset.tableMore;tab.championTableOpponentLimits.set(id,(tab.championTableOpponentLimits.get(id)||5)+10);redraw(more.closest("tr"));return;}
       const row=event.target.closest("[data-table-expand]");if(!row)return;
-      const id=row.dataset.tableExpand;tab.championTableExpandedId=tab.championTableExpandedId===id ? "" : id;redraw();
+      const id=row.dataset.tableExpand;tab.championTableExpandedId=tab.championTableExpandedId===id ? "" : id;redraw(row);
     };
     body?.addEventListener("click",activate);
     body?.addEventListener("keydown",event=>{if(["Enter"," "].includes(event.key) && event.target.matches("[data-table-expand]")){event.preventDefault();activate(event);}});
@@ -2849,7 +2928,7 @@
     }
     const current=tab.overviewSubpageState||{};
     const title=tab.overviewSubpage==="masteries" ? "英雄熟练度" : "英雄数据表";
-    container.innerHTML=`<section class="overview-detail-page"><header><button type="button" class="text-button" data-overview-return><span aria-hidden="true">‹</span> 返回总览</button><h2>${title}</h2></header>${tab.overviewSubpage==="champion-table" && !(current.status==="ready" && current.data?.available) ? championTableQueueTabs(tab.championTableQueue || "420") : ""}${current.status==="ready" && current.data?.available ? (tab.overviewSubpage==="masteries" ? renderMasteryDetails(current.data) : renderChampionTable(current.data,tab)) : current.status==="loading" ? '<p class="muted">正在读取…</p>' : `<p class="section-empty">${escapeHTML(current.error || current.data?.detail || "详情读取失败")} <button type="button" class="text-button" data-subpage-retry>重试</button></p>`}</section>`;
+    container.innerHTML=`<section class="overview-detail-page"><header><button type="button" class="text-button" data-overview-return><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 3-5 5 5 5"/></svg><span>返回总览</span></button><h2>${title}</h2></header>${tab.overviewSubpage==="champion-table" && !(current.status==="ready" && current.data?.available) ? championTableQueueTabs(tab.championTableQueue || "420") : ""}${current.status==="ready" && current.data?.available ? (tab.overviewSubpage==="masteries" ? renderMasteryDetails(current.data) : renderChampionTable(current.data,tab)) : current.status==="loading" ? '<p class="muted">正在读取…</p>' : `<p class="section-empty">${escapeHTML(current.error || current.data?.detail || "详情读取失败")} <button type="button" class="text-button" data-subpage-retry>重试</button></p>`}</section>`;
     container.querySelector("[data-overview-return]")?.addEventListener("click",()=>{
       tab.overviewSubpage="";rerenderTab(tab);
       const scroll=container.closest(".player-overlay-scroll")||document.getElementById("app-scroll");if(scroll)scroll.scrollTop=Number(tab.overviewReturnScroll||0);
@@ -3013,6 +3092,7 @@
     bindOverviewShareControls(nodes.careerDialogContent, overviewContainer(tab), tab);
     bindRankHistoryControls(nodes.careerDialogContent);
     bindRankedQueueControls(nodes.careerDialogContent, tab);
+    bindMayhemRatingControls(nodes.careerDialogContent,tab);
     applyRenderedMetricStyles(nodes.careerDialogContent);
     prepareImages(nodes.careerDialogContent);
     nodes.careerDialogContent.scrollTop = scrollTop;
@@ -3510,16 +3590,146 @@
     return `<b class="multikill-tag is-mk-${level}"><svg viewBox="0 0 ${width} ${height}" aria-hidden="true"><defs><linearGradient id="${id}" x2="0" y2="1"><stop style="stop-color:var(--mk-${level}-start)"/>${level===5 ? '<stop offset=".5" style="stop-color:var(--mk-5-middle)"/>' : ""}<stop offset="1" style="stop-color:var(--mk-${level}-end)"/></linearGradient>${level===5 ? `<linearGradient id="${id}-flame"><stop style="stop-color:var(--mk-2-start)"/><stop offset="1" style="stop-color:var(--mk-5-flame-end)"/></linearGradient>` : ""}</defs>${wings ? `<path class="mk-wings" d="${wings}"${level===5 ? ` style="fill:url(#${id}-flame)"` : ""}/>` : ""}<path class="mk-plate" d="${path}" fill="url(#${id})"/>${level===2 ? '<path class="mk-highlight" d="M8 4H36"/>' : ""}</svg><b>${["","","双杀","三杀","四杀","五杀"][level]}</b></b>`;
   }
 
+  function arenaPlacementResult(match, placement) {
+    if (!(Number(placement)>0)) return "unknown";
+    const teams=new Set((match.participants || []).map(p=>Number(p.subteamId)).filter(id=>id>0));
+    const queue=Number(match.queueId);
+    const count=teams.size>=2 ? teams.size : queue===1750 ? 6 : [1700,1710].includes(queue) ? 8 : 0;
+    if(!count)return "unknown";
+    return Number(placement)<=Math.ceil(count/2) ? "win" : "loss";
+  }
+
+  function matchDataTags(match, subject) {
+    const players=match.participants || [],tags=[];
+    const modeSet=Number(match.mapId)===11 ? "rift" : Number(match.mapId)===12 ? "aram" : Number(match.mapId)===30 ? "arena" : "other";
+    if(!subject || players.length<2)return tags;
+    const sameTeam=p=>Number(subject.subteamId)>0 ? p.subteamId===subject.subteamId : p.teamId===subject.teamId;
+    const team=players.filter(sameTeam),numeric=v=>v!=null && Number.isFinite(Number(v));
+    const value=(p,key)=>numeric(p[key]) ? Number(p[key]) : null;
+    const kp=p=>{const mates=players.filter(q=>Number(p.subteamId)>0 ? q.subteamId===p.subteamId : q.teamId===p.teamId);const kills=mates.reduce((n,q)=>n+Number(q.kills || 0),0);return kills>0 ? (Number(p.kills || 0)+Number(p.assists || 0))/kills : null;};
+    const add=(label,priority,kind,description,star=false)=>tags.push({label,priority,kind,description,star});
+    const leaders=[
+      ["damage","输出",1800,1750,"damage"],["efficiency","伤转率",1800,930,"efficiency"],
+      ["timeCCingOthers","控制",1750,1700,"control"],["totalHeal","治疗",1600,1550,"heal"],
+      ["totalDamageShieldedOnTeammates","护盾",1500,1450,"shield"],["damageTaken","承伤",1400,1350,"tank"],
+      ["kills","击杀",1200,1150,"kills"],["kp","参团",1100,1050,"participation"],
+      ["damageDealtToTurrets","拆塔",900,850,"tower"],["gold","经济",700,650,"gold"],["cs","补兵",600,0,"cs"]
+    ];
+    for(const [key,label,globalPriority,teamPriority,kind] of leaders) {
+      if(["kp","damageDealtToTurrets","gold","cs"].includes(key) && modeSet!=="rift")continue;
+      if(key==="efficiency" && !["rift","aram"].includes(modeSet))continue;
+      const read=p=>key==="efficiency" ? (Number(p.gold)>0 && numeric(p.damage) ? Number(p.damage)/Number(p.gold) : null) : key==="kp" ? kp(p) : value(p,key);
+      const own=read(subject);if(!(own>0))continue;
+      // Incomplete optional observations cannot establish a maximum.
+      const global=players.every(p=>read(p)!=null) && players.every(p=>read(p)<=own);
+      const local=team.length>1 && team.every(p=>read(p)!=null) && team.every(p=>read(p)<=own);
+      if(!global && (!local || !teamPriority))continue;
+      const formatted=key==="kp" ? `${(own*100).toFixed(1)}%` : key==="efficiency" ? own.toFixed(2) : String(Math.round(own));
+      const teamDamage=team.reduce((sum,p)=>sum+Number(p.damage || 0),0);
+      const detail=`${global ? "全场" : "队内"}最高${label}：${formatted}${key==="damage" && teamDamage>0 ? `，占队伍伤害的 ${(own/teamDamage*100).toFixed(1)}%` : ""}`;
+      add(label,global ? globalPriority : teamPriority,kind,detail,global);
+    }
+    if(modeSet==="rift" && value(subject,"soloKills")>=2)add(`单杀×${subject.soloKills}`,1700,"solo",`单杀：${subject.soloKills} 次`);
+    const minutes=Number(match.durationSeconds || match.duration || 0)/60;
+    if(minutes>0 && modeSet==="rift") {
+      for(const [key,label,divisor,priority,kind] of [["killsNearEnemyTurret","越塔",5,1660,"dive"],["killsUnderOwnTurret","塔之子",6,1640,"defense"]]) {
+        const n=value(subject,key);if(n>0 && n>=minutes/divisor)add(`${label}×${n}`,priority,kind,`${label}击杀：${n} 次`);
+      }
+    }
+    const advantage=value(subject,"maxCsAdvantageOnLaneOpponent");
+    if(modeSet==="rift" && advantage>=40)add(`压刀×${advantage}`,750+10*advantage,"advantage",`最大对位补刀领先：${advantage}`);
+    const hooks=value(subject,"knockEnemyIntoTeamAndKill");
+    if(["rift","aram"].includes(modeSet) && hooks>=6)add(`好钩×${hooks}`,660,"hook",`将敌人击入队伍并击杀：${hooks} 次`);
+    return tags;
+  }
+
   function renderMatchTags(match, subject, record, tab) {
-    if(match.result==="remake" || match.result==="unknown")return "";
-    const tags=[];
-    const evaluation=scorePlacementChip(record);if(evaluation)tags.push(evaluation);
-    const multi=renderMultiKillTag(subject.multiKill,match.gameId);if(multi)tags.push(multi);
+    if(match.result==="remake" || match.result==="unknown" || !subject)return "";
+    const tags=matchDataTags(match,subject).map(tag=>({...tag,priority:20000+tag.priority,markup:`<b class="match-data-tag is-data-${tag.kind}${tag.star ? " is-global" : ""}" data-tooltip="${escapeHTML(tag.description)}" data-tooltip-size="compact">${escapeHTML(tag.label)}</b>`}));
+    const add=(markup,label,priority,description=label)=>{if(markup)tags.push({markup,label,priority,description});};
+    const evaluation=scoreBadgeChip(record);add(evaluation,record?.badge || "评分",50000);
+    const levels=[[5,"pentaKills",20000],[4,"quadraKills",1300],[3,"tripleKills",300],[2,"doubleKills",100]];
+    const observed=levels.some(([,key])=>subject[key]!=null);
+    let higher=0;
+    for(const [level,key,priority] of levels) {
+      const count=observed ? Math.max(0,Number(subject[key] || 0)-higher) : Number(subject.multiKill)===level ? 1 : 0;
+      if(observed)higher=Number(subject[key] || 0);
+      if(count) {const label=["","","双杀","三杀","四杀","五杀"][level];add(renderMultiKillTag(level,match.gameId),label,40000+level*1000+Math.min(count,99),`${label}：${count} 次`);}
+    }
     const cached=state.matchTimelines?.get(matchTimelineKey(match,subject,tab))?.tags?.find(row=>Number(row.participantId)===Number(subject.participantId));
     const key=cached ? cached.keyword : subject.keyword,meta=matchKeywordMetadata(key);
-    if(meta && ["unstoppable","latebloomer","resilience","unlucky","unyielding","struggling"].includes(key) && !subject.keywordDisabled && !cached?.disabled)tags.push(`<b class="match-keyword-tag is-tag-${key}" data-tooltip="${escapeHTML(meta[1])}" data-tooltip-size="compact">${meta[0]}</b>`);
-    if(subject.deaths===0)tags.push('<b class="match-zero-deaths">零阵亡</b>');
-    return tags.slice(0,4).join("");
+    if(meta && ["unstoppable","latebloomer","resilience","unlucky","unyielding","struggling"].includes(key) && !subject.keywordDisabled && !cached?.disabled)add(`<b class="match-keyword-tag is-tag-${key}" data-tooltip="${escapeHTML(meta[1])}" data-tooltip-size="compact">${meta[0]}</b>`,meta[0],30000,meta[1]);
+    if(subject.deaths===0)add('<b class="match-zero-deaths">零阵亡</b>',"零阵亡",10000,"阵亡：0 次");
+    if(!tags.length)return "";
+    tags.sort((a,b)=>b.priority-a.priority);
+    return `<span class="match-tags-collection">${tags.map(tag=>`<span data-match-tag${tag.markup.includes("data-tooltip=") ? "" : ` data-tooltip="${escapeHTML(tag.description)}" data-tooltip-size="compact"`}${tag.priority===50000 ? ' data-match-tag-pinned=""' : ""}>${tag.markup}</span>`).join("")}<button type="button" class="match-tags-more" data-match-tags-more aria-label="查看其余标签" aria-expanded="false" hidden></button></span>`;
+  }
+
+  // One body-level panel survives list/filter DOM moves; rows hold no global listeners.
+  function bindMatchTagsPopover(collection) {
+    const doc=collection.ownerDocument,win=doc.defaultView;
+    if(!doc._matchTagsPopover) {
+      const panel=doc.createElement("div");panel.className="match-tags-popover";panel.id="match-tags-popover";
+      panel.setAttribute("role","tooltip");panel.hidden=true;doc.body.append(panel);
+      let anchor=null,leaveTimer=0,touchUntil=0;
+      const observer=new win.MutationObserver(()=>{if(anchor && !anchor.isConnected)close();});
+      const cancelLeave=()=>{win.clearTimeout(leaveTimer);leaveTimer=0;};
+      const close=()=>{observer.disconnect();cancelLeave();if(anchor){anchor.setAttribute("aria-expanded","false");anchor.removeAttribute("aria-describedby");}anchor=null;panel.hidden=true;panel.replaceChildren();};
+      const show=button=>{
+        const hidden=[...button.parentElement.querySelectorAll("[data-match-tag]")].filter(item=>item.hidden);
+        if(!hidden.length)return close();
+        close();anchor=button;panel.replaceChildren(...hidden.map(item=>{const clone=item.cloneNode(true);clone.hidden=false;clone.removeAttribute("data-match-tag");
+          // Cloned multikill gradients need distinct IDs while the source stays in the row.
+          for(const node of clone.querySelectorAll("[id]")) {const old=node.id,next=`${panel.id}-${old}`;node.id=next;for(const target of clone.querySelectorAll("*"))for(const attr of [...target.attributes])if(attr.value.includes(`url(#${old})`))target.setAttribute(attr.name,attr.value.replaceAll(`url(#${old})`,`url(#${next})`));}
+          if(clone.matches("[data-tooltip]"))clone.tabIndex=0;clone.querySelectorAll("[data-tooltip]").forEach(tag=>tag.tabIndex=0);return clone;}));
+        panel.hidden=false;button.setAttribute("aria-expanded","true");button.setAttribute("aria-describedby",panel.id);
+        const rect=button.getBoundingClientRect(),padding=12,gap=8,width=panel.offsetWidth,height=panel.offsetHeight;
+        const above=rect.top>=height+gap+padding;
+        const left=Math.max(padding,Math.min(win.innerWidth-width-padding,rect.left+rect.width/2-width/2));
+        panel.dataset.placement=above ? "top" : "bottom";
+        panel.style.left=`${left}px`;panel.style.top=`${Math.max(padding,above ? rect.top-height-gap : Math.min(win.innerHeight-height-padding,rect.bottom+gap))}px`;
+        panel.style.setProperty("--tag-arrow-left",`${Math.max(8,Math.min(width-8,rect.left+rect.width/2-left))}px`);
+        observer.observe(doc.body,{childList:true,subtree:true});
+      };
+      const buttonOf=node=>node?.closest?.("[data-match-tags-more]");
+      doc.addEventListener("pointerdown",event=>{if(event.pointerType==="touch")touchUntil=Date.now()+800;});
+      doc.addEventListener("pointerover",event=>{const button=buttonOf(event.target);if(panel.contains(event.target)||button===anchor)cancelLeave();else if(button && Date.now()>touchUntil)show(button);});
+      doc.addEventListener("pointerout",event=>{if(!anchor)return;const next=event.relatedTarget;if(panel.contains(next)||anchor.contains(next))return; if(panel.contains(event.target)||anchor.contains(event.target))leaveTimer=win.setTimeout(close,60);});
+      doc.addEventListener("focusin",event=>{const button=buttonOf(event.target);if(button && Date.now()>touchUntil)show(button);});
+      doc.addEventListener("focusout",event=>{if(anchor && (anchor.contains(event.target)||panel.contains(event.target)) && !panel.contains(event.relatedTarget))close();});
+      doc.addEventListener("click",event=>{const button=buttonOf(event.target);if(button){event.stopPropagation();anchor===button ? close() : show(button);}else if(anchor && !panel.contains(event.target))close();});
+      doc.addEventListener("keydown",event=>{if(event.key==="Escape")close();});
+      doc.addEventListener("scroll",close,true);win.addEventListener("resize",close);win.addEventListener("blur",close);
+      doc._matchTagsPopover={close,get anchor(){return anchor;}};
+    }
+    return doc._matchTagsPopover;
+  }
+
+  function fitMatchTags(container, onlyNew = false) {
+    for(const collection of container.querySelectorAll(".match-tags-collection")) {
+      if(onlyNew && collection._tagObserver)continue;
+      const popup=bindMatchTagsPopover(collection);
+      const fit=()=>{
+        if(typeof collection.checkVisibility==="function" && !collection.checkVisibility({contentVisibilityAuto:true}))return;
+        const items=[...collection.querySelectorAll("[data-match-tag]")],more=collection.querySelector("[data-match-tags-more]");
+        if(!more)return;
+        const width=collection.clientWidth;if(!width || collection._tagFitWidth===width)return;
+        collection._tagFitWidth=width;
+        if(popup.anchor===more)popup.close();
+        for(const item of items)item.hidden=false;more.hidden=true;
+        let used=0,hidden=0;
+        const widths=items.map(item=>item.getBoundingClientRect().width+4);
+        for(let i=0;i<items.length;i++) {
+          const reserve=i<items.length-1 ? 32 : 0;
+          if(!items[i].hasAttribute("data-match-tag-pinned") && (hidden || used+widths[i]+reserve>width)){items[i].hidden=true;hidden++;}
+          else used+=widths[i];
+        }
+        more.hidden=!hidden;more.textContent=`+${hidden}`;
+        more.setAttribute("aria-label",`查看其余 ${hidden} 个标签`);
+      };
+      fit();
+      if(typeof ResizeObserver!=="undefined" && !collection._tagObserver) {collection._tagObserver=new ResizeObserver(fit);collection._tagObserver.observe(collection);}
+    }
   }
 
   function matchTagsBackgroundAllowed(tab) {
@@ -3968,7 +4178,7 @@
       const team = arenaTeamMeta(group);
       const kills = group.players.reduce((sum, item) => sum + (Number(item.kills) || 0), 0);
       const damage = group.players.reduce((sum, item) => sum + (Number(item.damage) || 0), 0);
-      const tone = group.placement === 1 ? " is-first" : group.placement > 0 && group.placement <= 4 ? " is-top" : "";
+      const tone = group.placement === 1 ? " is-first" : arenaPlacementResult(match, group.placement) === "win" ? " is-top" : "";
       const emblem = team.iconPath ? `<span class="game-icon is-small"><img data-queued-src="${escapeHTML(team.iconPath)}" alt="" loading="lazy" decoding="async" data-game-image></span>` : "";
       const players = group.players.map((item, index) => {
         const record = scores.get(Number(item.participantId));
@@ -4565,12 +4775,58 @@
     });
   }
 
+  function stashMatchFilterDOM(tab, view) {
+    const container=overviewContainer(tab),list=container?.querySelector(".match-list");
+    if(!list)return;
+    const fragment=document.createDocumentFragment();
+    const placeholder=list.cloneNode(false);list.replaceWith(placeholder);fragment.appendChild(list);
+    Object.assign(view,{fragment,list,openMatches:new Set(tab.openMatches),matchDetailTabs:new Map(tab.matchDetailTabs),buildPlayers:new Map(tab.buildPlayers || [])});
+    while(tab.matchViews.size>4) {const oldest=tab.matchViews.keys().next().value;tab.matchViews.delete(oldest);}
+  }
+
+  function restoreMatchFilterDOM(tab, view) {
+    const container=overviewContainer(tab),list=container?.querySelector(".match-list");
+    if(!list || !view.list)return false;
+    list.replaceWith(view.list);view.fragment?.appendChild(list);
+    tab.openMatches=new Set(view.openMatches || []);tab.matchDetailTabs=new Map(view.matchDetailTabs || []);tab.buildPlayers=new Map(view.buildPlayers || []);
+    const filterbar=container.querySelector(".match-filterbar");if(filterbar)filterbar.outerHTML=renderMatchFilters(tab);
+    bindMatchFilterControls(container,tab);
+    container._matchListMatches=tab.data.matches;container._matchListFilter=tab.matchFilter;container._matchListViewRevision=Number(tab.matchViewRevision || 0);
+    bindMatchSentinel(container,tab);restoreMatchScrollTop(tab);
+    requestAnimationFrame(()=>fitMatchTags(view.list,true));
+    return true;
+  }
+
+  async function refreshMatchFilterHead(tab, filter, view) {
+    if(tab.closed || view.refreshing)return;
+    view.refreshing=true;
+    try {
+      const count=Number(state.settings?.matchCount || 20),playerRef=tab.data?.player?.playerRef || tab.playerRef;
+      const data=await api("/api/gameplay/overview",{method:"POST",body:JSON.stringify({playerRef,serverId:tab.serverId || "",count,begIndex:0,matchFilter:filter,freshHistory:true})},`filter-head:${tab.key}:${filter}`,25000);
+      if(tab.closed || tab.matchViews.get(filter)!==view)return;
+      const known=new Set((view.matches || []).map(match=>String(match.gameId)));
+      const additions=(data.matches || []).filter(match=>!known.has(String(match.gameId)));
+      view.at=Date.now();
+      if(!additions.length)return;
+      view.matches=[...additions,...view.matches];
+      const player=tab.data?.player?.playerRef || tab.playerRef;
+      const fragment=document.createDocumentFragment();
+      for(const match of additions){const template=document.createElement("template");template.innerHTML=renderMatch(match,player,tab);const entry=template.content.firstElementChild;bindOverviewContent(entry,tab);prepareImages(entry);fragment.appendChild(entry);}
+      view.list.prepend(fragment);view.list._matchData=new Map(view.matches.map(match=>[String(match.gameId),match]));
+      if(tab.matchFilter===filter) {tab.data={...tab.data,matches:view.matches};const container=overviewContainer(tab);if(container)container._matchListMatches=view.matches;fitMatchTags(view.list);}
+    } catch(error) {if(error.name!=="RequestCancelled")view.refreshFailed=true;}
+    finally {view.refreshing=false;}
+  }
+
 	async function updateMatchFilter(tab, value) {
     if (!value || value === tab.matchFilter) return;
     rememberMatchScrollTop(tab, tab.matchFilter);
     if (!(tab.matchViews instanceof Map)) tab.matchViews = new Map();
     if (tab.data && !tab.loading && !tab.loadingMore && !tab.initialPagePending && !tab.quotaRetry) {
-      tab.matchViews.set(tab.matchFilter || "all", { matches: tab.data.matches, pagination: tab.data.pagination, nextBegIndex: tab.nextBegIndex, at: Date.now() });
+      const previous=tab.matchFilter || "all";
+      const view={ matches: tab.data.matches, pagination: tab.data.pagination, nextBegIndex: tab.nextBegIndex, at: tab.matchViews.get(previous)?.at || Date.now() };
+      tab.matchViews.delete(previous);tab.matchViews.set(previous,view);
+      stashMatchFilterDOM(tab,view);
     }
     clearTimeout(tab.quotaRetry?.timer);
     tab.quotaRetry = null;
@@ -4597,7 +4853,7 @@
 	const token = Number(tab.filterPagingToken || 0) + 1;
 	tab.filterPagingToken = token;
     const cachedView = tab.matchViews?.get(value);
-    if (cachedView && Date.now() - cachedView.at < 60_000) {
+    if (cachedView && Date.now() - cachedView.at < 300_000) {
       state.controllers.get(`overview:${tab.key}`)?.abort();
       state.controllers.get(`overview-more:${tab.key}`)?.abort();
       tab.overviewRequestToken = Number(tab.overviewRequestToken || 0) + 1;
@@ -4606,7 +4862,9 @@
       tab.data = { ...tab.data, matches: cachedView.matches, pagination: cachedView.pagination };
       tab.nextBegIndex = cachedView.nextBegIndex;
       tab.filterPaging = false; tab.filterPagingPage = 0;
-      renderFilteredMatchView(tab, true);
+      tab.matchViews.delete(value);tab.matchViews.set(value,cachedView);
+      if(!restoreMatchFilterDOM(tab,cachedView))renderFilteredMatchView(tab, true);
+      if(Date.now()-cachedView.at>30_000)setTimeout(()=>{void refreshMatchFilterHead(tab,value,cachedView);},0);
       return;
     }
     // A complete unfiltered dataset needs no new server pagination coordinate.
@@ -4759,7 +5017,13 @@
     const cached = workspace?._overviewViews?.get(tab)?.content;
     const scope = tab.overlay && state.overlay[state.overlay.length - 1] !== tab ? cached : container || cached;
     const entry = [...(scope?.querySelectorAll(".match-entry") || [])].find(item => item.dataset.matchId === String(id));
-    if (entry) replaceMatchEntry(entry, tab, () => rerenderTab(tab), scope === cached);
+    if (entry) {replaceMatchEntry(entry,tab,()=>rerenderTab(tab),scope===cached);return;}
+    for(const [filter,view] of tab.matchViews || []) {
+      const retainedEntry=view.list?.querySelector(`[data-match-id="${id}"]`);
+      if(!retainedEntry)continue;
+      const retainedTab={...tab,matchFilter:filter,data:{...tab.data,matches:view.matches},openMatches:view.openMatches || tab.openMatches,matchDetailTabs:view.matchDetailTabs || tab.matchDetailTabs,buildPlayers:view.buildPlayers || tab.buildPlayers};
+      replaceMatchEntry(retainedEntry,retainedTab,()=>{},true);
+    }
   }
 
   function replaceMatchEntry(entry, tab, rerender, retained = false) {
@@ -4922,6 +5186,7 @@
   }
 
   function bindOverviewContent(container, tab) {
+    requestAnimationFrame(()=>{if(container.isConnected)fitMatchTags(container,true);});
     setTimeout(()=>hydrateVisibleMatchTags(container,tab),0);
     const scroll=matchTierScrollRoot(container);
     if(scroll && scroll._matchTagTab!==tab) {if(scroll._matchTagHandler)scroll.removeEventListener("scroll",scroll._matchTagHandler);scroll._matchTagTab=tab;scroll._matchTagHandler=()=>hydrateVisibleMatchTags(overviewContainer(tab)||container,tab);scroll.addEventListener("scroll",scroll._matchTagHandler,{passive:true});}
@@ -4937,14 +5202,7 @@
     container.querySelector("[data-load-more]")?.addEventListener("click", () => loadOverview(tab, false, true, true));
     bindRankHistoryControls(container);
     bindRankedQueueControls(container, tab);
-    for (const control of container.querySelectorAll(".rank-mmr-control")) {
-      const trigger = control.querySelector("[data-rank-mmr-trigger]");
-      const setExpanded = (expanded) => trigger?.setAttribute("aria-expanded", String(expanded));
-      control.addEventListener("mouseenter", () => setExpanded(true));
-      control.addEventListener("mouseleave", () => setExpanded(false));
-      control.addEventListener("focusin", () => setExpanded(true));
-      control.addEventListener("focusout", (event) => { if (!control.contains(event.relatedTarget)) setExpanded(false); });
-    }
+    bindMayhemRatingControls(container,tab);
     bindMatchSentinel(container, tab);
     if (container.matches?.(".match-entry")) bindMatchEntryControls(container, tab, rerender);
     for (const entry of container.querySelectorAll(".match-entry")) bindMatchEntryControls(entry, tab, rerender);
@@ -6326,13 +6584,11 @@
       return `<article class="live-player">${iconFigure("champion", liveDisplayedChampionId(player, currentChampionId), player.championName, "live")}<div class="live-player-copy live-player-placeholder">暂无玩家信息，进入游戏后显示</div></article>`;
     }
     const rank = player.rank;
-    const stats = player.modeStats || {};
-    const rankedRecord = player.recentRankedRecord;
-    const recordGames = Number(rankedRecord?.games) || 0;
-    const displayStats = recordGames ? {
-      games: recordGames, wins: Number(rankedRecord.wins) || 0, losses: Number(rankedRecord.losses) || 0,
-      winRate: (Number(rankedRecord.wins) || 0) * 100 / recordGames, kda: stats.kda,
-    } : stats;
+    const games = Array.isArray(player.recentGames) ? player.recentGames.slice(0, 10) : [];
+    const recordGames = games.length;
+    const wins = games.filter(game => game.win === true).length;
+    const totals = games.reduce((total, game) => ({kills: total.kills + Number(game.kills || 0), deaths: total.deaths + Number(game.deaths || 0), assists: total.assists + Number(game.assists || 0)}), {kills: 0, deaths: 0, assists: 0});
+    const displayStats = {games: recordGames, wins, losses: recordGames - wins, winRate: recordGames ? wins * 100 / recordGames : 0, kda: (totals.kills + totals.assists) / Math.max(1, totals.deaths)};
     const displayName = maskedPlayerName(player, index);
     const championId = liveDisplayedChampionId(player, currentChampionId);
 	const historyState = liveHistoryStateOf(player);
@@ -6344,7 +6600,7 @@
     const hiddenChip = `${player.privateHistory === true ? '<span class="player-tab-hidden">隐藏战绩</span>' : ""}${player.hidden === true ? '<span class="player-tab-hidden">隐藏身份</span>' : player.identityUnresolved === true ? '<span class="player-tab-hidden">身份待公开</span>' : ""}`;
     const liveAutofillChip = player.autofill === true ? '<span class="match-autofill-chip">补位</span>' : "";
     const premadeTag = renderLivePremadeTag(player, premadePlayers, currentChampionId);
-	const emptySummary = historyState === "unavailable" ? player.identityUnresolved === true ? "身份尚未公开" : "客户端未公开该玩家" : historyState === "failed" ? "读取失败" : "暂无样本";
+	const emptySummary = historyState === "unavailable" ? player.identityUnresolved === true ? "身份尚未公开" : "客户端未公开该玩家" : historyState === "failed" ? "读取失败" : "本模式暂无战绩";
 	const historySummary = historyPending
 	  ? '<dl class="is-history-pending" aria-label="战绩读取中"><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div></dl>'
 	  : `<dl><div><dt>${recordGames ? `近 ${number(recordGames)} 局` : "当前模式"}</dt><dd class="live-record-value">${displayStats.games ? `${number(displayStats.wins)}胜 ${number(displayStats.losses)}负` : emptySummary}</dd></div>${player.hidden === true && !displayStats.games ? "" : `<div><dt>胜率</dt><dd class="win-rate-value">${displayStats.games ? percent(displayStats.winRate) : "—"}</dd></div><div><dt>KDA</dt><dd class="live-kda-value">${displayStats.games ? `${kda(displayStats.kda)}:1` : "—"}</dd></div>`}</dl>`;
@@ -6857,7 +7113,7 @@
   }
 
   function renderInsightMatches(player) {
-    if (player.hidden === true) return "";
+	if (player.hidden === true) return "";
 	// R129 P1：与 renderLivePlayer 共用同一个判据，两处词表不会再各写一份。
 	if (!liveHistorySettled(player)) return '<div class="insight-match-row is-history-pending" aria-label="战绩读取中"><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span></div>';
     const games = (player.recentGames || []).slice(0, 10);
@@ -8653,6 +8909,14 @@
       void loadLive(Boolean(state.liveGameRefreshQueued), source);
     }, Math.max(180, 1000 - (Date.now() - Number(state.liveLoadStartedAt || 0))));
   }
+  function handleSelfOverviewTimeout() {
+    for (const tab of state.tabs || []) if (tab.current && !tab.overviewCardLoad?.selfReady) {
+      tab.error = "总览读取超时，请重试";
+      rerenderTab(tab);
+    }
+  }
+  window.addEventListener("deep-legends:self-overview-timeout", handleSelfOverviewTimeout);
+
   window.addEventListener("deep-legends:pro-runes", () => {
     const target = proRequestTarget(state.live);
     const entry = target && state.proRunes.get(target.key);
@@ -8834,8 +9098,8 @@
       if (match.result === "remake" || Number(match.queueId) === 0 || String(match.modeGroup || "").toLowerCase() === "custom" || /CUSTOM/i.test(`${match.gameType || ""} ${match.gameMode || ""}`)) continue;
       const subject = matchSubject(match, playerRef);
       const arena = match.modeGroup === "arena" || /ARENA|CHERRY/i.test(match.gameMode || "") || Number(subject?.subteamId) > 0;
-      const next = arena ? (Number(subject?.placement) > 0 ? (Number(subject.placement) <= 4 ? "win" : "loss") : "") : ["win","loss"].includes(match.result) ? match.result : "";
-      if (!next || (result && next !== result)) { exhausted = false; break; }
+      const next = arena ? (["win","loss"].includes(match.result) ? match.result : arenaPlacementResult(match, subject?.placement)) : ["win","loss"].includes(match.result) ? match.result : "";
+      if (!["win","loss"].includes(next) || (result && next !== result)) { exhausted = false; break; }
       result = next; count++;
     }
     return count >= 3 ? {result,count,plus:Boolean(exhausted && hasMore)} : null;
