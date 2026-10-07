@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "version": "0.12.76",
+  "fingerprint": "7e2e42599170",
+  "publishedAt": "2026-10-06T12:14:24.201Z",
+  "minSupported": "0.9.0",
+  "notes": "- 修复斗魂竞技场 3×6 对局在斗魂筛选中被遗漏的问题。\n- 调整赛季对局回补与统计刷新，分别扫描排位和海克斯大乱斗，改善重复扫描与缓存写入。\n- 修复返回总览时的重复刷新、英雄数据表展开闪烁及排序后的状态丢失。\n- 改善外服总览读取和中转连接失败后的重试恢复。\n- 修复海克斯大乱斗评级加载卡住的问题，完善客户端关闭时的状态提示。\n- 调整箭头、玩家名字提示和多杀图标，将国服合区说明移到“跟随客户端”右侧。",
+  "asset": {
+    "name": "Deep-Legends-Setup-0.12.76-public.exe",
+    "size": 111854592,
+    "sha256": "01014312b60e591a05bfc87f86e098adf6c5fc5e59520db5aedac5b5dba02ff3",
+    "url": "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.76/Deep-Legends-Setup-0.12.76-public.exe"
+  }
+}

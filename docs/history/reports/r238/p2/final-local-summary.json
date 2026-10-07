@@ -1,0 +1,26 @@
+{
+  "default_checks": "PASS",
+  "go_full_seconds": 180.904,
+  "race_seconds": 216.844,
+  "renderer": {
+    "tests": 1332,
+    "pass": 1328,
+    "skip": 4,
+    "seconds": 147.024
+  },
+  "desktop": {
+    "tests": 296,
+    "pass": 294,
+    "skip": 2
+  },
+  "worker": 16,
+  "mutants": 21,
+  "license_half_finished_failures": [
+    "TestR233FailedCounterSaveDoesNotRefreshCachedLifetime",
+    "TestR242LicenseExpiryStrictSignedField"
+  ],
+  "windows_execution": "未在 Windows 实跑",
+  "version_before_bump": "0.12.76",
+  "tested_product_source_sha": "7d0332a0abfd2f919cc8c8784067513911ccb322",
+  "p2_harness_changes_committed_next": true
+}

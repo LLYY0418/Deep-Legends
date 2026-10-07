@@ -58,6 +58,7 @@ try {
     if ((Get-FileHash $published076 -Algorithm SHA256).Hash.ToLowerInvariant() -ne '01014312b60e591a05bfc87f86e098adf6c5fc5e59520db5aedac5b5dba02ff3') { throw 'Published 0.12.76 setup checksum mismatch' }
     Run-Setup $published076
     Stop-InstalledApp
+    if ((Get-Item (Join-Path $install 'Deep Legends.exe')).VersionInfo.ProductVersion -ne '0.12.76') { throw '0.12.76 was not actually installed' }
     $userData = Join-Path $env:APPDATA 'Deep Legends'
     $sentinels = @{}
     # Distinct safe fixtures in real persistent directories, without a real account.
@@ -80,8 +81,16 @@ try {
     $menuLink = Join-Path ([Environment]::GetFolderPath('Programs')) "Deep Legends.lnk"
     $created = @{}
     foreach ($link in @($desktopLink,$menuLink)) { if (-not (Test-Path $link)) {throw "Old installation shortcut missing"}; $created[$link] = (Get-Item $link).CreationTimeUtc.Ticks }
+    $diagnosticFile=Join-Path $data 'logs/diagnostics.jsonl'
+    $diagnosticOffset=0
+    if (Test-Path $diagnosticFile) { $diagnosticOffset=@(Get-Content $diagnosticFile).Count }
+    foreach ($stageFile in @('update-install-stages.txt','update-install-nsis-stages.txt','update-install-timing.json')) {
+        $stagePath=Join-Path $data $stageFile
+        if (Test-Path $stagePath) { Copy-Item $stagePath (Join-Path $evidence ("076-before-"+$stageFile)); Remove-Item $stagePath }
+    }
     Run-Setup $online.download
     Stop-InstalledApp
+    if ((Get-Item (Join-Path $install 'Deep Legends.exe')).VersionInfo.ProductVersion -ne '0.12.77') { throw '0.12.77 was not actually installed' }
     foreach ($file in $sentinels.Keys) { if (-not (Test-Path $file) -or (Get-FileHash $file -Algorithm SHA256).Hash -ne $sentinels[$file]) { throw "R238 persistent fixture changed: $file" } }
     $sentinels | ConvertTo-Json | Set-Content (Join-Path $evidence 'retained-persistent-fixtures.json')
     Start-Process (Join-Path $install 'Deep Legends.exe') | Out-Null
@@ -94,7 +103,8 @@ try {
     if (-not ($raw -match '^uninstall_old_done=')) {throw "NSIS did not write uninstall_old_done"}
     $deadline=(Get-Date).AddSeconds(30)
     do {
-        $rows = @(Get-Content (Join-Path $data 'logs/diagnostics.jsonl') | ForEach-Object {try {$_ | ConvertFrom-Json} catch {}})
+        $rows = @()
+        if (Test-Path $diagnosticFile) { $rows = @(Get-Content $diagnosticFile | Select-Object -Skip $diagnosticOffset | ForEach-Object {try {$_ | ConvertFrom-Json} catch {}}) }
         $timing = @($rows | Where-Object event -eq 'update_install_timing') | Select-Object -Last 1
         if ($timing.result -eq 'ok') {break}; Start-Sleep -Milliseconds 500
     } while ((Get-Date) -lt $deadline)

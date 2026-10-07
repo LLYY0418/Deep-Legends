@@ -1,0 +1,21 @@
+{
+  "name": "installer-test-20261007T203541.466810",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "./..."
+  ],
+  "cwd": "installer",
+  "start": "2026-10-07T20:35:41.466810+08:00",
+  "end": "2026-10-07T20:35:44.766304+08:00",
+  "elapsed_seconds": 3.3,
+  "exit_code": 0,
+  "last_five": [
+    "ok  \tdeeplegends/installer\t3.074s",
+    "ok  \tdeeplegends/installer/internal/webviewhost\t0.435s",
+    "?   \tdeeplegends/installer/payload\t[no test files]",
+    "?   \tdeeplegends/installer/ui\t[no test files]",
+    "ok  \tdeeplegends/installer/uninstall\t0.412s"
+  ]
+}

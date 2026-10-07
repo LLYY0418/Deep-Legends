@@ -1,0 +1,802 @@
+[
+  {
+    "file": "dist/R248-no-license-public/Deep Legends Setup 0.12.75-public.exe",
+    "bytes": 111552512,
+    "sha256": "61bcbe529eaf9a309da0601e42954275dd0e6ab9f71540aae655ec24e12d59ea"
+  },
+  {
+    "file": "dist/R248-no-license-public/SHA256SUMS-public.txt",
+    "bytes": 104,
+    "sha256": "e595d54e2929af00be615c6f341ab2af24b536dbbe56981138eed9e8baaea313"
+  },
+  {
+    "file": "dist/R248-no-license-public/builder-debug.yml",
+    "bytes": 7860,
+    "sha256": "cccaad9d90ea510a671d13993697a1eaba8b9b240d746c2d926258bf83bb6b16"
+  },
+  {
+    "file": "dist/R248-no-license-public/r248-audit.json",
+    "bytes": 1588,
+    "sha256": "5d5ad6b42b7e81bfede2e0802302302ee63772b03c000fcc0bdd3745e8fed30d"
+  },
+  {
+    "file": "dist/R248-no-license-public/release-build.json",
+    "bytes": 313,
+    "sha256": "3af68200159cb01cddfa64d56097ef42368fb77de5612dc5caffe9759c9488c7"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/Deep Legends.exe",
+    "bytes": 225565184,
+    "sha256": "2b53b4626bf69cad5c94270ed674eac60f68a0766d9e866696b010729cde4205"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/LICENSE.electron.txt",
+    "bytes": 1096,
+    "sha256": "5154e165bd6c2cc0cfbcd8916498c7abab0497923bafcd5cb07673fe8480087d"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/LICENSES.chromium.html",
+    "bytes": 20313957,
+    "sha256": "b911161e6594ec76b872498b423c54406168f2974e0d407a847f7de1e5ff94dd"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/chrome_100_percent.pak",
+    "bytes": 119905,
+    "sha256": "d76fe8fa3a14cd73e4c858746e2ab2d2fa6f2df38a906fa5814b50a8a895fc96"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/chrome_200_percent.pak",
+    "bytes": 197089,
+    "sha256": "b74ad439f3d3762657f3ba533a6af3ac63315c838ed46519891366f43d834a0e"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/d3dcompiler_47.dll",
+    "bytes": 4741488,
+    "sha256": "a05f99734f7c4822fefc12b367af21fd0976ed6608752fb1e1e80b6ece7ecbbb"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/dxcompiler.dll",
+    "bytes": 25616384,
+    "sha256": "56a29f483555dddbefb491aa470b8c5c268d66a149892a8a40a582f3e92b1895"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/dxil.dll",
+    "bytes": 1509760,
+    "sha256": "77e039c905030a641e53658a008b74e90635a5ea9b6b79eabd0f2003bdfca59a"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/ffmpeg.dll",
+    "bytes": 3067904,
+    "sha256": "afb4f083d34c470bdafc6d1d3801142ea2a71b76553329485d91a35534c086df"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/icudtl.dat",
+    "bytes": 10876560,
+    "sha256": "bd8c145abdf3f8383276ce01dfa4ae48709bef9fef1c0711eb7c3fab4f6eb7c2"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/libEGL.dll",
+    "bytes": 474624,
+    "sha256": "a3b40bb99acd821d955e4a26555b43efe12bd98056a8b7693be0e63b9ed53910"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/libGLESv2.dll",
+    "bytes": 8031744,
+    "sha256": "01eeec6f3451d5981ce883e9ec7a346c96173bb58854c5c3f3452e1637fb6d6f"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/locales/en-US.pak",
+    "bytes": 566095,
+    "sha256": "74404352908184e834397df60b238f23462e77d69ac4136b4f20af2db6191436"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/locales/zh-CN.pak",
+    "bytes": 571748,
+    "sha256": "0386ef8bf3ce4e24c604ee039273e452d12f8b1d6e5ac7e746995e8b39fab379"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/resources/app.asar",
+    "bytes": 302519,
+    "sha256": "df1004e37bd43c01285b57779929ecd192fcbaba7023b6c571e6963365c81479"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/resources/app.asar.unpacked/backend/loot-service.exe",
+    "bytes": 32610816,
+    "sha256": "452fb18be0112bdf7127950fc2890e1d8df340b530cb12a69afa020bd92f57ac"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/resources/default_app.asar",
+    "bytes": 111073,
+    "sha256": "06d4a28be095a80eff94dbd18edcfac5b5805e1b5538e0fb7cee7c7ae81db76a"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/resources/elevate.exe",
+    "bytes": 33280,
+    "sha256": "bb01cf9f5e651ab16804d37a7269db932664989c34d26ccd204038995aa8fad3"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/resources.pak",
+    "bytes": 7236975,
+    "sha256": "dbc09df898b959d93a7355dc833f0559474d55ab884da9e103e221e0603b3a8e"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/snapshot_blob.bin",
+    "bytes": 365488,
+    "sha256": "8dfab590b9780a198fae51cd101c468d61cce40556734db3ec501be11df61051"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/v8_context_snapshot.bin",
+    "bytes": 740048,
+    "sha256": "8a51c6fa8fe292f533dcdab7e77705213fee2de64247b5638e02c257c47f34be"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/version",
+    "bytes": 6,
+    "sha256": "0094bae899827d1f488ae9946b19b68a8e0104e88f3cee7914eb33bfde558995"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/vk_swiftshader.dll",
+    "bytes": 5502464,
+    "sha256": "dfd6f3d220e963e5d43dc1f76ddf67796d2ca1b7be1ee291728e3505f700264e"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/vk_swiftshader_icd.json",
+    "bytes": 106,
+    "sha256": "32d83ff113fef532a9f97e0d2831f8656628ab1c99e9060f0332b1532839afd9"
+  },
+  {
+    "file": "dist/R248-no-license-public/win-unpacked/vulkan-1.dll",
+    "bytes": 930304,
+    "sha256": "dd4f81864cfd0436a93e7a47292bf3ea143ab10d780a1ec85bf89c63bdbc53e3"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe",
+    "bytes": 111430144,
+    "sha256": "a33b60ba4434a25f1a77f5f08381d12ff0673e6f208659236677c9f98002b7f5"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/Deep Legends.exe",
+    "bytes": 225565184,
+    "sha256": "11514896edd66ecefcb68f5f28789e897bba73e8251b2defdff24887523b324a"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/LICENSE.electron.txt",
+    "bytes": 1096,
+    "sha256": "5154e165bd6c2cc0cfbcd8916498c7abab0497923bafcd5cb07673fe8480087d"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/LICENSES.chromium.html",
+    "bytes": 20313957,
+    "sha256": "b911161e6594ec76b872498b423c54406168f2974e0d407a847f7de1e5ff94dd"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/chrome_100_percent.pak",
+    "bytes": 119905,
+    "sha256": "d76fe8fa3a14cd73e4c858746e2ab2d2fa6f2df38a906fa5814b50a8a895fc96"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/chrome_200_percent.pak",
+    "bytes": 197089,
+    "sha256": "b74ad439f3d3762657f3ba533a6af3ac63315c838ed46519891366f43d834a0e"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/d3dcompiler_47.dll",
+    "bytes": 4741488,
+    "sha256": "a05f99734f7c4822fefc12b367af21fd0976ed6608752fb1e1e80b6ece7ecbbb"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/dxcompiler.dll",
+    "bytes": 25616384,
+    "sha256": "56a29f483555dddbefb491aa470b8c5c268d66a149892a8a40a582f3e92b1895"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/dxil.dll",
+    "bytes": 1509760,
+    "sha256": "77e039c905030a641e53658a008b74e90635a5ea9b6b79eabd0f2003bdfca59a"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/ffmpeg.dll",
+    "bytes": 3067904,
+    "sha256": "afb4f083d34c470bdafc6d1d3801142ea2a71b76553329485d91a35534c086df"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/icudtl.dat",
+    "bytes": 10876560,
+    "sha256": "bd8c145abdf3f8383276ce01dfa4ae48709bef9fef1c0711eb7c3fab4f6eb7c2"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/libEGL.dll",
+    "bytes": 474624,
+    "sha256": "a3b40bb99acd821d955e4a26555b43efe12bd98056a8b7693be0e63b9ed53910"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/libGLESv2.dll",
+    "bytes": 8031744,
+    "sha256": "01eeec6f3451d5981ce883e9ec7a346c96173bb58854c5c3f3452e1637fb6d6f"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/locales/en-US.pak",
+    "bytes": 566095,
+    "sha256": "74404352908184e834397df60b238f23462e77d69ac4136b4f20af2db6191436"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/locales/zh-CN.pak",
+    "bytes": 571748,
+    "sha256": "0386ef8bf3ce4e24c604ee039273e452d12f8b1d6e5ac7e746995e8b39fab379"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/resources/app.asar",
+    "bytes": 283746,
+    "sha256": "7713f3407129b449828ca701c78f2f359e41001a192fb4c97426bb6222a2243f"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/resources/app.asar.unpacked/backend/loot-service.exe",
+    "bytes": 32480256,
+    "sha256": "a895505ee6660158a4ca96e1bb14ef0f3222a1c2fc91d49b07934f0dc7e80a8d"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/resources/elevate.exe",
+    "bytes": 33280,
+    "sha256": "bb01cf9f5e651ab16804d37a7269db932664989c34d26ccd204038995aa8fad3"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/resources.pak",
+    "bytes": 7236975,
+    "sha256": "dbc09df898b959d93a7355dc833f0559474d55ab884da9e103e221e0603b3a8e"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/snapshot_blob.bin",
+    "bytes": 365488,
+    "sha256": "8dfab590b9780a198fae51cd101c468d61cce40556734db3ec501be11df61051"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/v8_context_snapshot.bin",
+    "bytes": 740048,
+    "sha256": "8a51c6fa8fe292f533dcdab7e77705213fee2de64247b5638e02c257c47f34be"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/vk_swiftshader.dll",
+    "bytes": 5502464,
+    "sha256": "dfd6f3d220e963e5d43dc1f76ddf67796d2ca1b7be1ee291728e3505f700264e"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/vk_swiftshader_icd.json",
+    "bytes": 106,
+    "sha256": "32d83ff113fef532a9f97e0d2831f8656628ab1c99e9060f0332b1532839afd9"
+  },
+  {
+    "file": "dist/R236-staging-public/Deep-Legends-staging-public/vulkan-1.dll",
+    "bytes": 930304,
+    "sha256": "dd4f81864cfd0436a93e7a47292bf3ea143ab10d780a1ec85bf89c63bdbc53e3"
+  },
+  {
+    "file": "dist/R236-staging-public/SHA256SUMS-staging-public.txt",
+    "bytes": 112,
+    "sha256": "384f64b96baa8528871b24968e483f8dda81193a2d4c888b383d674587748833"
+  },
+  {
+    "file": "dist/R236-staging-public/staging-build.json",
+    "bytes": 841,
+    "sha256": "5eb7f9cd26773c6f38b0fbc3f1faa3de76d0afbc4133834effe3ad55602eed61"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe",
+    "bytes": 111429120,
+    "sha256": "374b496b058effafb29a03c7d8baaaeb9f83d3893efd58d41d58f54c1f9ec40d"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/Deep Legends.exe",
+    "bytes": 225565184,
+    "sha256": "81cc97deddd18c8e62cdaf6b2321cacd092bebb49081c47e0921183cb7b91091"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/LICENSE.electron.txt",
+    "bytes": 1096,
+    "sha256": "5154e165bd6c2cc0cfbcd8916498c7abab0497923bafcd5cb07673fe8480087d"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/LICENSES.chromium.html",
+    "bytes": 20313957,
+    "sha256": "b911161e6594ec76b872498b423c54406168f2974e0d407a847f7de1e5ff94dd"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/chrome_100_percent.pak",
+    "bytes": 119905,
+    "sha256": "d76fe8fa3a14cd73e4c858746e2ab2d2fa6f2df38a906fa5814b50a8a895fc96"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/chrome_200_percent.pak",
+    "bytes": 197089,
+    "sha256": "b74ad439f3d3762657f3ba533a6af3ac63315c838ed46519891366f43d834a0e"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/d3dcompiler_47.dll",
+    "bytes": 4741488,
+    "sha256": "a05f99734f7c4822fefc12b367af21fd0976ed6608752fb1e1e80b6ece7ecbbb"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/dxcompiler.dll",
+    "bytes": 25616384,
+    "sha256": "56a29f483555dddbefb491aa470b8c5c268d66a149892a8a40a582f3e92b1895"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/dxil.dll",
+    "bytes": 1509760,
+    "sha256": "77e039c905030a641e53658a008b74e90635a5ea9b6b79eabd0f2003bdfca59a"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/ffmpeg.dll",
+    "bytes": 3067904,
+    "sha256": "afb4f083d34c470bdafc6d1d3801142ea2a71b76553329485d91a35534c086df"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/icudtl.dat",
+    "bytes": 10876560,
+    "sha256": "bd8c145abdf3f8383276ce01dfa4ae48709bef9fef1c0711eb7c3fab4f6eb7c2"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/libEGL.dll",
+    "bytes": 474624,
+    "sha256": "a3b40bb99acd821d955e4a26555b43efe12bd98056a8b7693be0e63b9ed53910"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/libGLESv2.dll",
+    "bytes": 8031744,
+    "sha256": "01eeec6f3451d5981ce883e9ec7a346c96173bb58854c5c3f3452e1637fb6d6f"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/locales/en-US.pak",
+    "bytes": 566095,
+    "sha256": "74404352908184e834397df60b238f23462e77d69ac4136b4f20af2db6191436"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/locales/zh-CN.pak",
+    "bytes": 571748,
+    "sha256": "0386ef8bf3ce4e24c604ee039273e452d12f8b1d6e5ac7e746995e8b39fab379"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/resources/app.asar",
+    "bytes": 288444,
+    "sha256": "a274fa8a588b41c4d636bfe062b4999b3209bf3409df0ceac30f6a0a5bece838"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/resources/app.asar.unpacked/backend/loot-service.exe",
+    "bytes": 32482304,
+    "sha256": "9fcc4b141ab7f8c5e5129e167b59fa70fdff2cc025191009b067141193af5163"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/resources/elevate.exe",
+    "bytes": 33280,
+    "sha256": "bb01cf9f5e651ab16804d37a7269db932664989c34d26ccd204038995aa8fad3"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/resources.pak",
+    "bytes": 7236975,
+    "sha256": "dbc09df898b959d93a7355dc833f0559474d55ab884da9e103e221e0603b3a8e"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/snapshot_blob.bin",
+    "bytes": 365488,
+    "sha256": "8dfab590b9780a198fae51cd101c468d61cce40556734db3ec501be11df61051"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/v8_context_snapshot.bin",
+    "bytes": 740048,
+    "sha256": "8a51c6fa8fe292f533dcdab7e77705213fee2de64247b5638e02c257c47f34be"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/vk_swiftshader.dll",
+    "bytes": 5502464,
+    "sha256": "dfd6f3d220e963e5d43dc1f76ddf67796d2ca1b7be1ee291728e3505f700264e"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/vk_swiftshader_icd.json",
+    "bytes": 106,
+    "sha256": "32d83ff113fef532a9f97e0d2831f8656628ab1c99e9060f0332b1532839afd9"
+  },
+  {
+    "file": "dist/R239-staging-public/Deep-Legends-staging-public/vulkan-1.dll",
+    "bytes": 930304,
+    "sha256": "dd4f81864cfd0436a93e7a47292bf3ea143ab10d780a1ec85bf89c63bdbc53e3"
+  },
+  {
+    "file": "dist/R239-staging-public/SHA256SUMS-staging-public.txt",
+    "bytes": 112,
+    "sha256": "4cf7083b13d6683a0dfdbe5ae4d52fa24c8f50a85e88a9179f2e480f3403d910"
+  },
+  {
+    "file": "dist/R239-staging-public/staging-build.json",
+    "bytes": 841,
+    "sha256": "5c8acbf981d714a13b51061489afc3536d3db9698ba83e77e3a08024b5362f01"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe",
+    "bytes": 111436800,
+    "sha256": "91abee9452d842260d0ee8ab7823d89963b798d6923b7dec2f53e744be37f89e"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/Deep Legends.exe",
+    "bytes": 225565184,
+    "sha256": "b475d5943493c728e2b7845d779d0b2fcdc2d484b276ad8895eead75c77440d8"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/LICENSE.electron.txt",
+    "bytes": 1096,
+    "sha256": "5154e165bd6c2cc0cfbcd8916498c7abab0497923bafcd5cb07673fe8480087d"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/LICENSES.chromium.html",
+    "bytes": 20313957,
+    "sha256": "b911161e6594ec76b872498b423c54406168f2974e0d407a847f7de1e5ff94dd"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/chrome_100_percent.pak",
+    "bytes": 119905,
+    "sha256": "d76fe8fa3a14cd73e4c858746e2ab2d2fa6f2df38a906fa5814b50a8a895fc96"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/chrome_200_percent.pak",
+    "bytes": 197089,
+    "sha256": "b74ad439f3d3762657f3ba533a6af3ac63315c838ed46519891366f43d834a0e"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/d3dcompiler_47.dll",
+    "bytes": 4741488,
+    "sha256": "a05f99734f7c4822fefc12b367af21fd0976ed6608752fb1e1e80b6ece7ecbbb"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/dxcompiler.dll",
+    "bytes": 25616384,
+    "sha256": "56a29f483555dddbefb491aa470b8c5c268d66a149892a8a40a582f3e92b1895"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/dxil.dll",
+    "bytes": 1509760,
+    "sha256": "77e039c905030a641e53658a008b74e90635a5ea9b6b79eabd0f2003bdfca59a"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/ffmpeg.dll",
+    "bytes": 3067904,
+    "sha256": "afb4f083d34c470bdafc6d1d3801142ea2a71b76553329485d91a35534c086df"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/icudtl.dat",
+    "bytes": 10876560,
+    "sha256": "bd8c145abdf3f8383276ce01dfa4ae48709bef9fef1c0711eb7c3fab4f6eb7c2"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/libEGL.dll",
+    "bytes": 474624,
+    "sha256": "a3b40bb99acd821d955e4a26555b43efe12bd98056a8b7693be0e63b9ed53910"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/libGLESv2.dll",
+    "bytes": 8031744,
+    "sha256": "01eeec6f3451d5981ce883e9ec7a346c96173bb58854c5c3f3452e1637fb6d6f"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/locales/en-US.pak",
+    "bytes": 566095,
+    "sha256": "74404352908184e834397df60b238f23462e77d69ac4136b4f20af2db6191436"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/locales/zh-CN.pak",
+    "bytes": 571748,
+    "sha256": "0386ef8bf3ce4e24c604ee039273e452d12f8b1d6e5ac7e746995e8b39fab379"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/resources/app.asar",
+    "bytes": 296707,
+    "sha256": "965a891646e58d5d51d6e0e70440062ff04418c209e5ddc881635e785ecb3383"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/resources/app.asar.unpacked/backend/loot-service.exe",
+    "bytes": 32521216,
+    "sha256": "a76fbdc25fb2e7e2604ef77961eb513bd719095cc6b44bbef16b5b756576a330"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/resources/elevate.exe",
+    "bytes": 33280,
+    "sha256": "bb01cf9f5e651ab16804d37a7269db932664989c34d26ccd204038995aa8fad3"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/resources.pak",
+    "bytes": 7236975,
+    "sha256": "dbc09df898b959d93a7355dc833f0559474d55ab884da9e103e221e0603b3a8e"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/snapshot_blob.bin",
+    "bytes": 365488,
+    "sha256": "8dfab590b9780a198fae51cd101c468d61cce40556734db3ec501be11df61051"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/v8_context_snapshot.bin",
+    "bytes": 740048,
+    "sha256": "8a51c6fa8fe292f533dcdab7e77705213fee2de64247b5638e02c257c47f34be"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/vk_swiftshader.dll",
+    "bytes": 5502464,
+    "sha256": "dfd6f3d220e963e5d43dc1f76ddf67796d2ca1b7be1ee291728e3505f700264e"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/vk_swiftshader_icd.json",
+    "bytes": 106,
+    "sha256": "32d83ff113fef532a9f97e0d2831f8656628ab1c99e9060f0332b1532839afd9"
+  },
+  {
+    "file": "dist/R240-staging-public/Deep-Legends-staging-public/vulkan-1.dll",
+    "bytes": 930304,
+    "sha256": "dd4f81864cfd0436a93e7a47292bf3ea143ab10d780a1ec85bf89c63bdbc53e3"
+  },
+  {
+    "file": "dist/R240-staging-public/SHA256SUMS-staging-public.txt",
+    "bytes": 112,
+    "sha256": "8f173a3bcaf2f4e74ba8b3ccfef6a6dd14fc0b7d6b585fac2ab59143f3e3a4b4"
+  },
+  {
+    "file": "dist/R240-staging-public/staging-build.json",
+    "bytes": 841,
+    "sha256": "147ecd3af0e9e4d41b75a85da9ef2057f6d8623990fe3e732cd761bded25a14a"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe",
+    "bytes": 111440384,
+    "sha256": "0d78d3318012b8b632ce15350f36418bc91c4f70e8366e1a13973301b472c3f8"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/Deep Legends.exe",
+    "bytes": 225565184,
+    "sha256": "b0d02940f00b6fa455c9a35cb1e9ce8e4c93562b9b805529b9f16ac363f52b1c"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/LICENSE.electron.txt",
+    "bytes": 1096,
+    "sha256": "5154e165bd6c2cc0cfbcd8916498c7abab0497923bafcd5cb07673fe8480087d"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/LICENSES.chromium.html",
+    "bytes": 20313957,
+    "sha256": "b911161e6594ec76b872498b423c54406168f2974e0d407a847f7de1e5ff94dd"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/chrome_100_percent.pak",
+    "bytes": 119905,
+    "sha256": "d76fe8fa3a14cd73e4c858746e2ab2d2fa6f2df38a906fa5814b50a8a895fc96"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/chrome_200_percent.pak",
+    "bytes": 197089,
+    "sha256": "b74ad439f3d3762657f3ba533a6af3ac63315c838ed46519891366f43d834a0e"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/d3dcompiler_47.dll",
+    "bytes": 4741488,
+    "sha256": "a05f99734f7c4822fefc12b367af21fd0976ed6608752fb1e1e80b6ece7ecbbb"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/dxcompiler.dll",
+    "bytes": 25616384,
+    "sha256": "56a29f483555dddbefb491aa470b8c5c268d66a149892a8a40a582f3e92b1895"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/dxil.dll",
+    "bytes": 1509760,
+    "sha256": "77e039c905030a641e53658a008b74e90635a5ea9b6b79eabd0f2003bdfca59a"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/ffmpeg.dll",
+    "bytes": 3067904,
+    "sha256": "afb4f083d34c470bdafc6d1d3801142ea2a71b76553329485d91a35534c086df"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/icudtl.dat",
+    "bytes": 10876560,
+    "sha256": "bd8c145abdf3f8383276ce01dfa4ae48709bef9fef1c0711eb7c3fab4f6eb7c2"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/libEGL.dll",
+    "bytes": 474624,
+    "sha256": "a3b40bb99acd821d955e4a26555b43efe12bd98056a8b7693be0e63b9ed53910"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/libGLESv2.dll",
+    "bytes": 8031744,
+    "sha256": "01eeec6f3451d5981ce883e9ec7a346c96173bb58854c5c3f3452e1637fb6d6f"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/locales/en-US.pak",
+    "bytes": 566095,
+    "sha256": "74404352908184e834397df60b238f23462e77d69ac4136b4f20af2db6191436"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/locales/zh-CN.pak",
+    "bytes": 571748,
+    "sha256": "0386ef8bf3ce4e24c604ee039273e452d12f8b1d6e5ac7e746995e8b39fab379"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/resources/app.asar",
+    "bytes": 296763,
+    "sha256": "269c989d28014093feaeb14e47f63105c251ec2fcba428ee9e0f09420764080e"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/resources/app.asar.unpacked/backend/loot-service.exe",
+    "bytes": 32523264,
+    "sha256": "923ec82b6fcceea7c780f486d440b701653ff81ff18aee68cf57b4584a430910"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/resources/elevate.exe",
+    "bytes": 33280,
+    "sha256": "bb01cf9f5e651ab16804d37a7269db932664989c34d26ccd204038995aa8fad3"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/resources.pak",
+    "bytes": 7236975,
+    "sha256": "dbc09df898b959d93a7355dc833f0559474d55ab884da9e103e221e0603b3a8e"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/snapshot_blob.bin",
+    "bytes": 365488,
+    "sha256": "8dfab590b9780a198fae51cd101c468d61cce40556734db3ec501be11df61051"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/v8_context_snapshot.bin",
+    "bytes": 740048,
+    "sha256": "8a51c6fa8fe292f533dcdab7e77705213fee2de64247b5638e02c257c47f34be"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/vk_swiftshader.dll",
+    "bytes": 5502464,
+    "sha256": "dfd6f3d220e963e5d43dc1f76ddf67796d2ca1b7be1ee291728e3505f700264e"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/vk_swiftshader_icd.json",
+    "bytes": 106,
+    "sha256": "32d83ff113fef532a9f97e0d2831f8656628ab1c99e9060f0332b1532839afd9"
+  },
+  {
+    "file": "dist/R242-staging-public/Deep-Legends-staging-public/vulkan-1.dll",
+    "bytes": 930304,
+    "sha256": "dd4f81864cfd0436a93e7a47292bf3ea143ab10d780a1ec85bf89c63bdbc53e3"
+  },
+  {
+    "file": "dist/R242-staging-public/SHA256SUMS-staging-public.txt",
+    "bytes": 112,
+    "sha256": "03827c86b1acacabff6c334eac465f38f74ee0d845b5c99b9a1bf5e3f3a048e2"
+  },
+  {
+    "file": "dist/R242-staging-public/staging-build.json",
+    "bytes": 841,
+    "sha256": "1ed3bbe8cc587f882ca38950385ab694016ad319c7e6afcfc0d06081c01cabcc"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe",
+    "bytes": 111446016,
+    "sha256": "603572946e55911a544284843182dc783e42bca27a96a8166e07285f0838719d"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/Deep Legends.exe",
+    "bytes": 225565184,
+    "sha256": "f1feca2495a282cea8b931383e9da593181bfdd20def3ed6a9d263d30184f8ea"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/LICENSE.electron.txt",
+    "bytes": 1096,
+    "sha256": "5154e165bd6c2cc0cfbcd8916498c7abab0497923bafcd5cb07673fe8480087d"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/LICENSES.chromium.html",
+    "bytes": 20313957,
+    "sha256": "b911161e6594ec76b872498b423c54406168f2974e0d407a847f7de1e5ff94dd"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/chrome_100_percent.pak",
+    "bytes": 119905,
+    "sha256": "d76fe8fa3a14cd73e4c858746e2ab2d2fa6f2df38a906fa5814b50a8a895fc96"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/chrome_200_percent.pak",
+    "bytes": 197089,
+    "sha256": "b74ad439f3d3762657f3ba533a6af3ac63315c838ed46519891366f43d834a0e"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/d3dcompiler_47.dll",
+    "bytes": 4741488,
+    "sha256": "a05f99734f7c4822fefc12b367af21fd0976ed6608752fb1e1e80b6ece7ecbbb"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/dxcompiler.dll",
+    "bytes": 25616384,
+    "sha256": "56a29f483555dddbefb491aa470b8c5c268d66a149892a8a40a582f3e92b1895"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/dxil.dll",
+    "bytes": 1509760,
+    "sha256": "77e039c905030a641e53658a008b74e90635a5ea9b6b79eabd0f2003bdfca59a"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/ffmpeg.dll",
+    "bytes": 3067904,
+    "sha256": "afb4f083d34c470bdafc6d1d3801142ea2a71b76553329485d91a35534c086df"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/icudtl.dat",
+    "bytes": 10876560,
+    "sha256": "bd8c145abdf3f8383276ce01dfa4ae48709bef9fef1c0711eb7c3fab4f6eb7c2"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/libEGL.dll",
+    "bytes": 474624,
+    "sha256": "a3b40bb99acd821d955e4a26555b43efe12bd98056a8b7693be0e63b9ed53910"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/libGLESv2.dll",
+    "bytes": 8031744,
+    "sha256": "01eeec6f3451d5981ce883e9ec7a346c96173bb58854c5c3f3452e1637fb6d6f"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/locales/en-US.pak",
+    "bytes": 566095,
+    "sha256": "74404352908184e834397df60b238f23462e77d69ac4136b4f20af2db6191436"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/locales/zh-CN.pak",
+    "bytes": 571748,
+    "sha256": "0386ef8bf3ce4e24c604ee039273e452d12f8b1d6e5ac7e746995e8b39fab379"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/resources/app.asar",
+    "bytes": 298651,
+    "sha256": "4ca7fe51e96854df071682eb2745fe197688f13c9c5a3579edddd925bb244679"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/resources/app.asar.unpacked/backend/loot-service.exe",
+    "bytes": 32543744,
+    "sha256": "f9cda352673974a3367967c5e2b5c1d743f4a6b4fa01e09114368e952b50c090"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/resources/elevate.exe",
+    "bytes": 33280,
+    "sha256": "bb01cf9f5e651ab16804d37a7269db932664989c34d26ccd204038995aa8fad3"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/resources.pak",
+    "bytes": 7236975,
+    "sha256": "dbc09df898b959d93a7355dc833f0559474d55ab884da9e103e221e0603b3a8e"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/snapshot_blob.bin",
+    "bytes": 365488,
+    "sha256": "8dfab590b9780a198fae51cd101c468d61cce40556734db3ec501be11df61051"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/v8_context_snapshot.bin",
+    "bytes": 740048,
+    "sha256": "8a51c6fa8fe292f533dcdab7e77705213fee2de64247b5638e02c257c47f34be"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/vk_swiftshader.dll",
+    "bytes": 5502464,
+    "sha256": "dfd6f3d220e963e5d43dc1f76ddf67796d2ca1b7be1ee291728e3505f700264e"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/vk_swiftshader_icd.json",
+    "bytes": 106,
+    "sha256": "32d83ff113fef532a9f97e0d2831f8656628ab1c99e9060f0332b1532839afd9"
+  },
+  {
+    "file": "dist/R243-staging-public/Deep-Legends-staging-public/vulkan-1.dll",
+    "bytes": 930304,
+    "sha256": "dd4f81864cfd0436a93e7a47292bf3ea143ab10d780a1ec85bf89c63bdbc53e3"
+  },
+  {
+    "file": "dist/R243-staging-public/SHA256SUMS-staging-public.txt",
+    "bytes": 112,
+    "sha256": "79429ec92d25fd33890e45acf3e596df2a1ab40e1122f7d311cbd4de445811a6"
+  },
+  {
+    "file": "dist/R243-staging-public/staging-build.json",
+    "bytes": 841,
+    "sha256": "58a67b2bc3e9a64e65282e211bba3c29e16c8c21f80aa0ff08389621ca4dc4f1"
+  }
+]

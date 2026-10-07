@@ -86,3 +86,25 @@ P2升级验证脚本已补精确公开076 Setup（大小与SHA固定）、076→
 license首轮3项失败：R237指向默认license.html，改读取R248已移动的license-activation.html，隐私文字与断言不变；R233失败计数租约锚夹具硬编码10+5分钟、R242有效到期夹具900秒，二者均与R246已改2小时合同冲突，按用户要求记录半成品，不修/不放宽安全规则。[首轮日志](../reports/r238/p2/license-retained-20261007T203623.764155.log)。
 
 Renderer最终检查1332项/1328通过/4原条件skip，147.024秒，预算不变；默认集没有license测试。installer test/vet、root vet、Worker16、Go格式585文件与JS语法313文件通过；完整证据在p2目录。Windows真机清单已形成，所有实际游戏项保持待真机。
+
+Chromium R235首轮失败：[原日志](../reports/r238/p2/chromium-r235-20261007T204053.493976.log)。旧对比度采样只把rgb数字除255，R241的color-mix计算样式为color(srgb ...)时误把0–1值当0–255；改用R241现有canvas像素采样，4.5断言阈值与所有预算未改。初轮截图保留于chromium-r235-01，下一轮用-02。
+
+R235截图第二轮颜色断言通过后，在旧+N定位超时：[原日志](../reports/r238/p2/chromium-r235-measured-20261007T204205.090662.log)。R241已将+N改为独立match-tags-popover，R235驱动仍等global-tooltip；改等待实际展开的popover含同一单杀文本，20秒预算不变、不改产品。第二轮截图仍保留，第三轮用-03。
+
+R235截图第三轮仍超时（-03保留）：正常宽度下单杀是高优先级可见标签，R241的+N只列隐藏项；驱动使用R241已验证的窄容器夹具让标签全部进入+N，仍要求单杀文本与原等待预算。R235变异首轮5项断言杀死，第6项因R241新增data-match-tag属性导致旧精确定位失效（未注入、非有效变异）；只更新定位前缀，完整6项在新-02目录再跑，首轮结果不替换。
+
+第四轮+N超时定位为驱动等待旧状态：隐藏数>5在缩窄前已经成立，ResizeObserver重算后关闭旧popup，而鼠标没有第二次pointerover。等待条件改为该单杀标签已隐藏（布局状态提交），原20秒不增、不加重试。第五轮加DOM/截图失败诊断，不以偶然通过代替这一等待修复。
+
+macOS未安装pwsh，附加PowerShell解析检查没有执行（启动报ENOENT，非脚本通过）；不安装工具、不写成Windows结果。4个renderer条件跳过是R86/R222 Windows两个与R82 PowerShell两个，Windows CI明确选择精确计数实跑；run-check已补启动失败持久化，现有失败原始记录保留。
+
+第六轮R235已通过+N和两主题主要截图，最后Page.navigate 30秒超时：前面各场景的SSE页面从未关闭，同源HTTP连接累计耗尽。驱动现在每个独立场景完成截图/断言后关闭target，原CDP预算不改，不重试。-06证据保留；R241/R244两主题与R100/R117在同一最终源码已通过。Windows升级脚本另补已装076与候选077的真实ProductVersion核对，清晰分离旧阶段文件/诊断offset，防止拿旧成功事件当本轮通过，原30秒预算不变。
+
+## P2 本地预检完成 / P3 清单完成
+
+2026-10-07 20:55（Asia/Shanghai）：最终Go全量180.904秒、全量race216.844秒、最终vet1.491秒全部PASS；原首轮Go/race失败均保留。默认Go集合238个test文件，license_*为0（inventory记录具体数以JSON为准）。Installer test3.300秒/vet0.227秒PASS。Renderer1332/1328 PASS/4原条件skip、147.024秒；desktop独立296/294/2条件skip、76.714秒；Worker16/16、0skip。setup-only/release-quality-gates/verify-ci-test-filters单独再次PASS，未改断言/预算。默认Electron首帧2.108秒：主界面可见、无激活表单/授权小窗、设置无到期、授权API/域名0、license事件0；startup-loading的inert属于R235等待本人标签页，不是授权层。
+
+全部21变异：R235 6、R241 4、R244 7、R248 2、P6 2均断言FAIL，驱动PASS，无语法/依赖失败。R235/R241变异使用与最终生产文件SHA逐一一致的临时输入副本（它们原驱动会修改工作区），其余overlay；真实发布源码没有被变异。R235深浅Chromium第七轮46.058秒PASS，anchor/箭头误差0、对比度最低5.39>4.5、切回全部15/16.7ms且原节点保持；R241 11.718秒24结果/0异常，R244 1.964秒真实Chromium+合成10行/0异常；R100/R117 PASS。旧失败、原截图保留，不替换。
+
+license标签再次编译并运行，仅余TestR233FailedCounterSaveDoesNotRefreshCachedLifetime、TestR242LicenseExpiryStrictSignedField两个已定位的R246半成品合同冲突（license.go:28是2小时，夹具分别硬编码10+5分钟/900秒），按授权记录，不修/不放宽安全规则。R237移动后的精确隐私断言已经PASS。macOS缺pwsh启动记录为UNAVAILABLE，不标Windows执行；真正PowerShell/升级将由CI实跑。
+
+[Windows真机清单](../reports/r238/windows-device-checklist.md)已完成，含通过标准与日志路径，所有真实游戏/账号/晚高峰项目均待真机；匿名077 Latest在线路径待用户确认发布后真机。本地Go默认更新兼容已用已发布076清单与111854592字节公开资产核验，通过076 unsigned/固定URL/大小/SHA策略。接下来才更新077元数据，产公共候选和同SHA CI；包、WindowsCI及草稿附件尚待完成。

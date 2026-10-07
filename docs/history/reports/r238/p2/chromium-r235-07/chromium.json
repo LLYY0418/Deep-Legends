@@ -1,0 +1,422 @@
+{
+  "scope": "Production Chromium with synthetic fixtures. No Windows/LCU or real upstream claims.",
+  "results": [
+    {
+      "theme": "dark",
+      "width": 1280,
+      "kind": "masteries",
+      "returnCenterDelta": 0
+    },
+    {
+      "theme": "dark",
+      "width": 1280,
+      "kind": "champion-table",
+      "returnCenterDelta": 0
+    },
+    {
+      "theme": "dark",
+      "anchorBefore": 805,
+      "anchorAfter": 805
+    },
+    {
+      "theme": "dark",
+      "moreBefore": 544,
+      "moreAfter": 544
+    },
+    {
+      "theme": "dark",
+      "width": 780,
+      "kind": "masteries",
+      "returnCenterDelta": 0
+    },
+    {
+      "theme": "dark",
+      "width": 780,
+      "kind": "champion-table",
+      "returnCenterDelta": 0
+    },
+    {
+      "theme": "dark",
+      "contrasts": [
+        {
+          "label": "输出",
+          "ratio": 5.393855795258766
+        },
+        {
+          "label": "伤转率",
+          "ratio": 5.393855795258766
+        },
+        {
+          "label": "控制",
+          "ratio": 5.555448122474448
+        },
+        {
+          "label": "单杀×3",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "越塔×10",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "塔之子×8",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "治疗",
+          "ratio": 6.141996057698894
+        },
+        {
+          "label": "护盾",
+          "ratio": 6.141996057698894
+        },
+        {
+          "label": "压刀×60",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "击杀",
+          "ratio": 5.393855795258766
+        },
+        {
+          "label": "参团",
+          "ratio": 6.467093505158215
+        },
+        {
+          "label": "拆塔",
+          "ratio": 6.467093505158215
+        },
+        {
+          "label": "经济",
+          "ratio": 6.467093505158215
+        },
+        {
+          "label": "好钩×6",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "输出",
+          "ratio": 6.307655189349617
+        },
+        {
+          "label": "控制",
+          "ratio": 5.555448122474448
+        },
+        {
+          "label": "单杀×3",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "越塔×10",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "塔之子×8",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "治疗",
+          "ratio": 6.141996057698894
+        },
+        {
+          "label": "护盾",
+          "ratio": 6.141996057698894
+        },
+        {
+          "label": "压刀×60",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "击杀",
+          "ratio": 5.393855795258766
+        },
+        {
+          "label": "参团",
+          "ratio": 6.467093505158215
+        },
+        {
+          "label": "伤转率",
+          "ratio": 6.307655189349617
+        },
+        {
+          "label": "拆塔",
+          "ratio": 6.467093505158215
+        },
+        {
+          "label": "好钩×6",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "经济",
+          "ratio": 8.469345251899767
+        },
+        {
+          "label": "输出",
+          "ratio": 5.393855795258766
+        },
+        {
+          "label": "伤转率",
+          "ratio": 5.393855795258766
+        },
+        {
+          "label": "控制",
+          "ratio": 5.555448122474448
+        },
+        {
+          "label": "单杀×3",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "越塔×10",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "塔之子×8",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "治疗",
+          "ratio": 6.141996057698894
+        },
+        {
+          "label": "护盾",
+          "ratio": 6.141996057698894
+        },
+        {
+          "label": "压刀×60",
+          "ratio": 7.450501071655269
+        },
+        {
+          "label": "击杀",
+          "ratio": 5.393855795258766
+        },
+        {
+          "label": "参团",
+          "ratio": 6.467093505158215
+        },
+        {
+          "label": "拆塔",
+          "ratio": 6.467093505158215
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "filterPerf": {
+        "duration": 15,
+        "longTasks": [],
+        "same": true,
+        "nodes": 200
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1280,
+      "kind": "masteries",
+      "returnCenterDelta": 0
+    },
+    {
+      "theme": "light",
+      "width": 1280,
+      "kind": "champion-table",
+      "returnCenterDelta": 0
+    },
+    {
+      "theme": "light",
+      "anchorBefore": 805,
+      "anchorAfter": 805
+    },
+    {
+      "theme": "light",
+      "moreBefore": 544,
+      "moreAfter": 544
+    },
+    {
+      "theme": "light",
+      "width": 780,
+      "kind": "masteries",
+      "returnCenterDelta": 0
+    },
+    {
+      "theme": "light",
+      "width": 780,
+      "kind": "champion-table",
+      "returnCenterDelta": 0
+    },
+    {
+      "theme": "light",
+      "contrasts": [
+        {
+          "label": "输出",
+          "ratio": 6.941867360205275
+        },
+        {
+          "label": "伤转率",
+          "ratio": 6.941867360205275
+        },
+        {
+          "label": "控制",
+          "ratio": 6.9971277482837655
+        },
+        {
+          "label": "单杀×3",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "越塔×10",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "塔之子×8",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "治疗",
+          "ratio": 5.83160973720471
+        },
+        {
+          "label": "护盾",
+          "ratio": 5.83160973720471
+        },
+        {
+          "label": "压刀×60",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "击杀",
+          "ratio": 6.941867360205275
+        },
+        {
+          "label": "参团",
+          "ratio": 5.58632528833909
+        },
+        {
+          "label": "拆塔",
+          "ratio": 5.58632528833909
+        },
+        {
+          "label": "经济",
+          "ratio": 5.58632528833909
+        },
+        {
+          "label": "好钩×6",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "输出",
+          "ratio": 9.257171371760785
+        },
+        {
+          "label": "控制",
+          "ratio": 6.9971277482837655
+        },
+        {
+          "label": "单杀×3",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "越塔×10",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "塔之子×8",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "治疗",
+          "ratio": 5.83160973720471
+        },
+        {
+          "label": "护盾",
+          "ratio": 5.83160973720471
+        },
+        {
+          "label": "压刀×60",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "击杀",
+          "ratio": 6.941867360205275
+        },
+        {
+          "label": "参团",
+          "ratio": 5.58632528833909
+        },
+        {
+          "label": "伤转率",
+          "ratio": 9.257171371760785
+        },
+        {
+          "label": "拆塔",
+          "ratio": 5.58632528833909
+        },
+        {
+          "label": "好钩×6",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "经济",
+          "ratio": 6.726192465044216
+        },
+        {
+          "label": "输出",
+          "ratio": 6.941867360205275
+        },
+        {
+          "label": "伤转率",
+          "ratio": 6.941867360205275
+        },
+        {
+          "label": "控制",
+          "ratio": 6.9971277482837655
+        },
+        {
+          "label": "单杀×3",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "越塔×10",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "塔之子×8",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "治疗",
+          "ratio": 5.83160973720471
+        },
+        {
+          "label": "护盾",
+          "ratio": 5.83160973720471
+        },
+        {
+          "label": "压刀×60",
+          "ratio": 7.660001615444678
+        },
+        {
+          "label": "击杀",
+          "ratio": 6.941867360205275
+        },
+        {
+          "label": "参团",
+          "ratio": 5.58632528833909
+        },
+        {
+          "label": "拆塔",
+          "ratio": 5.58632528833909
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "filterPerf": {
+        "duration": 16.700000002980232,
+        "longTasks": [],
+        "same": true,
+        "nodes": 200
+      }
+    }
+  ],
+  "errors": []
+}

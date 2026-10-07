@@ -1,0 +1,101 @@
+[
+  {
+    "mutation": "restore-30-day-cutoff",
+    "killed": true,
+    "shared_source_unchanged": true,
+    "returncode": 1,
+    "test_command": [
+      "go",
+      "test",
+      "./backend",
+      "-run",
+      "^TestR244OldLiveHistoryAndHeaderShareRows$",
+      "-count=1"
+    ],
+    "isolation": "go-overlay"
+  },
+  {
+    "mutation": "restore-independent-header",
+    "killed": true,
+    "shared_source_unchanged": true,
+    "returncode": 1,
+    "test_command": [
+      "node",
+      "--test",
+      "backend/web/r244.test.cjs"
+    ],
+    "isolation": "temporary-source"
+  },
+  {
+    "mutation": "restore-dual-lcu-sgp",
+    "killed": true,
+    "shared_source_unchanged": true,
+    "returncode": 1,
+    "test_command": [
+      "go",
+      "test",
+      "./backend",
+      "-run",
+      "^TestR244SGPAuthoritativeShortEmptyAndSelfCatchUp$",
+      "-count=1"
+    ],
+    "isolation": "go-overlay"
+  },
+  {
+    "mutation": "restore-idle-backoff",
+    "killed": true,
+    "shared_source_unchanged": true,
+    "returncode": 1,
+    "test_command": [
+      "go",
+      "test",
+      "./backend",
+      "-run",
+      "^TestR244ColdConnectionSequenceAndSummonerEvent$",
+      "-count=1"
+    ],
+    "isolation": "go-overlay"
+  },
+  {
+    "mutation": "restore-repeated-sweep",
+    "killed": true,
+    "shared_source_unchanged": true,
+    "returncode": 1,
+    "test_command": [
+      "go",
+      "test",
+      "./backend",
+      "-run",
+      "^TestR244LightDiscoveryAndOneSweepPerLaunch$",
+      "-count=1"
+    ],
+    "isolation": "go-overlay"
+  },
+  {
+    "mutation": "restore-serial-ranked",
+    "killed": true,
+    "shared_source_unchanged": true,
+    "returncode": 1,
+    "test_command": [
+      "go",
+      "test",
+      "./backend",
+      "-run",
+      "^TestR244OverviewParallelAndEarlyMatches$",
+      "-count=1"
+    ],
+    "isolation": "go-overlay"
+  },
+  {
+    "mutation": "remove-15s-fallback",
+    "killed": true,
+    "shared_source_unchanged": true,
+    "returncode": 1,
+    "test_command": [
+      "node",
+      "--test",
+      "backend/web/r244.test.cjs"
+    ],
+    "isolation": "temporary-source"
+  }
+]

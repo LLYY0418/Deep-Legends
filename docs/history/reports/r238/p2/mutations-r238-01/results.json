@@ -1,0 +1,14 @@
+[
+  {
+    "name": "always-reset",
+    "exit_code": 1,
+    "elapsed_ms": 1672,
+    "assertion_failed": true
+  },
+  {
+    "name": "no-migration",
+    "exit_code": 1,
+    "elapsed_ms": 1475,
+    "assertion_failed": true
+  }
+]
