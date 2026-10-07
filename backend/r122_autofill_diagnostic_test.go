@@ -313,6 +313,13 @@ func TestR122SGPSummaryHistoryEventCarriesAutofillCounts(t *testing.T) {
 		gameplayRefs: make(map[string]string), gameplayRefDetails: make(map[string]gameplayReference),
 	}
 
+	// 本用例只验证 autofill 诊断；预置赛季刷新去重记录，避免无关后台
+	// 回补在测试结束后继续写入即将清理的临时存储。
+	season, _ := currentRankedSeason(time.Now())
+	a.seasonBackfillMu.Lock()
+	a.cacheSeasonQuerySnapshotLocked(seasonQuerySnapshotKey("HN1", playerRef, season), time.Now())
+	a.seasonBackfillMu.Unlock()
+
 	result := make(chan gameplayOverview, 1)
 	go func() {
 		result <- a.loadGameplayOverview(context.Background(), client, a.summoner, gameplayReference{PlayerRef: playerRef, ServerID: "HN1"}, 0, 20, "all", false)

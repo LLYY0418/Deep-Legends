@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -59,8 +60,11 @@ func TestSocialFriendsNeverProbesSpectatorForInGameFriends(t *testing.T) {
 	puuid := strings.Repeat("p", 48)
 	methods := make([]string, 0)
 	spectatorRequests := 0
+	var methodsMu sync.Mutex
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methodsMu.Lock()
 		methods = append(methods, r.Method)
+		methodsMu.Unlock()
 		switch r.URL.Path {
 		case "/lol-chat/v1/friend-groups":
 			_, _ = io.WriteString(w, `[]`)
@@ -69,7 +73,9 @@ func TestSocialFriendsNeverProbesSpectatorForInGameFriends(t *testing.T) {
 		case "/lol-game-data/assets/v1/queues.json":
 			_, _ = io.WriteString(w, `[]`)
 		case "/lol-spectator/v1/spectate/launch":
+			methodsMu.Lock()
 			spectatorRequests++
+			methodsMu.Unlock()
 			_, _ = io.WriteString(w, `{"canLaunch":false,"secret":"token-value","player":"`+puuid+`"}`)
 		default:
 			http.Error(w, "unexpected endpoint", http.StatusNotFound)
@@ -89,10 +95,14 @@ func TestSocialFriendsNeverProbesSpectatorForInGameFriends(t *testing.T) {
 			t.Fatalf("status = %d: %s", recorder.Code, recorder.Body.String())
 		}
 	}
-	if spectatorRequests != 0 {
-		t.Fatalf("spectator GET requests = %d, want none", spectatorRequests)
+	methodsMu.Lock()
+	capturedMethods := append([]string(nil), methods...)
+	capturedSpectatorRequests := spectatorRequests
+	methodsMu.Unlock()
+	if capturedSpectatorRequests != 0 {
+		t.Fatalf("spectator GET requests = %d, want none", capturedSpectatorRequests)
 	}
-	for _, method := range methods {
+	for _, method := range capturedMethods {
 		if method != http.MethodGet {
 			t.Fatalf("read-only social probe used %s", method)
 		}
