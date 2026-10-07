@@ -22,7 +22,7 @@ func TestR237LicensePrivacyDisclosureFinal(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &privacy); err != nil {
 		t.Fatal(err)
 	}
-	installer, err := os.ReadFile(filepath.Join("..", "installer", "ui", "license.html"))
+	installer, err := os.ReadFile(filepath.Join("..", "installer", "ui", "license-activation.html"))
 	if err != nil {
 		t.Fatal(err)
 	}

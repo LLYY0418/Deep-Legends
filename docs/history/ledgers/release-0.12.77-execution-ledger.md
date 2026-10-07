@@ -78,3 +78,11 @@ P1整理后将在最终合并源码完整执行P2（默认集无授权、全部�
 P2准备：验证脚本只增加独立输出路径，不改断言/预算；run-check每次生成不可覆盖的时间戳日志。默认更新兼容测试依赖076的公开111MB安装包，未将大资产提交；CI测试前下载固定公开版本并核验大小/SHA，保留原测试的严格文件校验。
 
 P2升级验证脚本已补精确公开076 Setup（大小与SHA固定）、076→077候选清单、真实loopback HTTP检测/下载/SHA/Apply交接、实际Windows安装和持久目录哨兵校验。该HTTP夹具只在测试transport映射合法GitHub URL，不改产品信任策略；不能标成匿名Latest实测，匿名077 Latest直到用户确认发布后才能验证。缓存/收藏/偏好哨兵保留不代替真实账号真机验收。
+
+## P2 首轮失败（原始证据保留）
+
+默认Go全量首轮175.866秒失败：`TestSGPRequestObservationTracksRetryAndSafeParseShape`严格拒绝P7新增的HTTP事件字段truncated_json。修复删除该冗余未审查字段，保留已有parse_failed/payload_prefix_shape/payload_sample_bytes和截断最多一次重试；没有扩展白名单或放宽断言。[原始日志](../reports/r238/p2/go-full-20261007T203533.661534.log)。最终Go/race须重跑。
+
+license首轮3项失败：R237指向默认license.html，改读取R248已移动的license-activation.html，隐私文字与断言不变；R233失败计数租约锚夹具硬编码10+5分钟、R242有效到期夹具900秒，二者均与R246已改2小时合同冲突，按用户要求记录半成品，不修/不放宽安全规则。[首轮日志](../reports/r238/p2/license-retained-20261007T203623.764155.log)。
+
+Renderer最终检查1332项/1328通过/4原条件skip，147.024秒，预算不变；默认集没有license测试。installer test/vet、root vet、Worker16、Go格式585文件与JS语法313文件通过；完整证据在p2目录。Windows真机清单已形成，所有实际游戏项保持待真机。

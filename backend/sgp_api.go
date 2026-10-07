@@ -708,7 +708,6 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 				if err := json.Unmarshal(body, out); err != nil {
 					truncated := err.Error() == "unexpected end of JSON input"
 					diagnostic["parse_failed"] = true
-					diagnostic["truncated_json"] = truncated
 					diagnostic["payload_prefix_shape"] = diagnosticPayloadPrefixShape(body)
 					diagnostic["payload_sample_bytes"] = min(len(body), 200)
 					record(diagnostic)
