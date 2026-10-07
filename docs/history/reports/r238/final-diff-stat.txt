@@ -1,0 +1,1324 @@
+ .github/workflows/ci.yml                           |    23 +-
+ .gitignore                                         |     1 +
+ CHANGELOG.md                                       |     9 +
+ backend/aramkit_rating.go                          |    42 +-
+ backend/arena_result.go                            |    42 +
+ backend/champion_network.go                        |     8 +
+ backend/client_history_snapshot.go                 |   146 +
+ backend/client_installations_other.go              |    12 +-
+ backend/client_installations_windows.go            |    26 +-
+ backend/client_launch_timing.go                    |    27 +-
+ backend/client_launcher.go                         |    16 +-
+ backend/cold_client_discovery.go                   |   262 +
+ backend/collection_reads.go                        |    13 +-
+ backend/collection_retry_cache.go                  |   149 +
+ backend/connection_manager.go                      |    21 +-
+ backend/connection_manager_test.go                 |     2 +-
+ backend/desktop_startup_stage_test.go              |     4 +
+ backend/disabled_build_test.go                     |   110 +
+ backend/feature_gates_runtime.go                   |    28 +
+ backend/features.go                                |    33 +-
+ backend/features_test.go                           |     3 +
+ backend/game_camera_mode.go                        |     7 +-
+ backend/game_settings_lock.go                      |     4 +
+ backend/game_settings_watch.go                     |     6 +-
+ backend/gameplay.go                                |   170 +-
+ backend/gameplay_test.go                           |    67 +-
+ backend/history_decode.go                          |    45 +-
+ backend/lcu.go                                     |   181 +-
+ backend/lcu_api.go                                 |     6 +
+ backend/license.go                                 |   904 +
+ backend/license_assets.go                          |    13 +
+ backend/license_config_release.go                  |    14 +
+ backend/license_config_release_test.go             |    19 +
+ backend/license_config_staging.go                  |    23 +
+ backend/license_config_staging_test.go             |    22 +
+ backend/license_device.go                          |   115 +
+ backend/license_device_other.go                    |    17 +
+ backend/license_device_windows.go                  |    41 +
+ backend/license_disabled.go                        |    76 +
+ backend/license_failure.go                         |   138 +
+ backend/license_json_test.go                       |   185 +
+ backend/license_privacy.go                         |     9 +
+ backend/license_privacy_r237_test.go               |    41 +
+ backend/license_protocol_vectors_test.go           |   222 +
+ backend/license_r233_test.go                       |   369 +
+ backend/license_r242_network_test.go               |    29 +
+ backend/license_r242_test.go                       |   195 +
+ backend/license_r243_test.go                       |   331 +
+ backend/license_r245_test.go                       |   296 +
+ backend/license_r246_test.go                       |   216 +
+ backend/license_runtime.go                         |   261 +
+ backend/license_test.go                            |   473 +
+ backend/license_trace.go                           |    77 +
+ backend/license_update_cache_release_test.go       |    36 +
+ backend/license_window_diagnostic.go               |   193 +
+ backend/license_window_r240_test.go                |   124 +
+ backend/live_history_freshness.go                  |    42 +-
+ backend/live_post_game_reveal.go                   |     2 +-
+ backend/main.go                                    |    66 +-
+ backend/main_test.go                               |     1 +
+ backend/overview_cache.go                          |    44 +-
+ backend/performance_diagnostics.go                 |     3 +-
+ backend/pro_identity.go                            |    38 +-
+ backend/pro_players.go                             |     2 +-
+ backend/pro_refresh.go                             |     5 +-
+ backend/process_other.go                           |     4 +
+ backend/process_windows.go                         |    35 +
+ backend/quality_test.go                            |    26 +-
+ backend/r173_test.go                               |     9 +-
+ backend/r178_test.go                               |    10 +-
+ backend/r180_test.go                               |    46 +-
+ backend/r181_test.go                               |     4 +-
+ backend/r196_test.go                               |     4 +-
+ backend/r202_test.go                               |     6 +-
+ backend/r204_test.go                               |     2 +-
+ backend/r206_relay_test.go                         |    60 +-
+ backend/r208_test.go                               |    26 +-
+ backend/r211_test.go                               |     9 +-
+ backend/r212_test.go                               |     8 +-
+ backend/r214_test.go                               |    23 +-
+ backend/r229_test.go                               |    12 +-
+ backend/r230_test.go                               |     4 +-
+ backend/r231_test.go                               |     8 +-
+ backend/r235_test.go                               |   394 +
+ backend/r238_test.go                               |   184 +
+ backend/r238_update_test.go                        |   133 +
+ backend/r241_test.go                               |   223 +
+ backend/r244_test.go                               |   426 +
+ backend/r86_cache_test.go                          |    11 +-
+ backend/r87_test.go                                |     4 +-
+ backend/r89_test.go                                |     8 +-
+ backend/rank_insights.go                           |     2 +-
+ backend/riot_api.go                                |    62 +-
+ backend/riot_client_identity.go                    |     2 +-
+ backend/riot_identity_cache.go                     |    40 +
+ backend/riot_relay.go                              |   121 +-
+ backend/season_head.go                             |   168 +
+ backend/season_head_refresh.go                     |    89 +
+ backend/season_stats.go                            |    66 +-
+ backend/season_stats_test.go                       |    10 +-
+ backend/season_supplement.go                       |   160 +
+ backend/sgp_api.go                                 |    12 +-
+ backend/static_assets.go                           |     1 +
+ backend/testdata/license-protocol-vectors.json     |   551 +
+ backend/testdata/r88/protected-layout-rules.json   |    13 +-
+ backend/update.go                                  |    45 +-
+ backend/update_download.go                         |    16 +
+ backend/update_http.go                             |     6 +-
+ backend/update_signature.go                        |    31 +
+ backend/update_signature_test.go                   |    37 +
+ backend/update_staging_test.go                     |    97 +
+ backend/update_test.go                             |     9 +-
+ backend/update_unsigned_test.go                    |     8 +
+ backend/web/app.css                                |    24 +
+ backend/web/app.js                                 |    81 +-
+ backend/web/champions.js                           |     9 +-
+ backend/web/champions.test.cjs                     |     7 +-
+ backend/web/demo-data.js                           |     2 +-
+ backend/web/gameplay.css                           |    69 +-
+ backend/web/gameplay.js                            |   368 +-
+ backend/web/index.html                             |    22 +-
+ backend/web/license-ui.js                          |   166 +
+ backend/web/license-ui.license.cjs                 |    67 +
+ backend/web/r108.test.cjs                          |     4 +-
+ backend/web/r110.test.cjs                          |     2 +-
+ backend/web/r114.test.cjs                          |     2 +-
+ backend/web/r117-style.test.cjs                    |     3 +
+ backend/web/r128.test.cjs                          |     2 +-
+ backend/web/r129.test.cjs                          |     2 +-
+ backend/web/r192-harness.cjs                       |     3 +-
+ backend/web/r193.test.cjs                          |     6 +-
+ backend/web/r203.test.cjs                          |     8 +-
+ backend/web/r209.test.cjs                          |     4 +-
+ backend/web/r211-harness-support.cjs               |     2 +-
+ backend/web/r211.test.cjs                          |     2 +-
+ backend/web/r216.test.cjs                          |     6 +-
+ backend/web/r219.test.cjs                          |    36 +-
+ backend/web/r229.test.cjs                          |    14 +-
+ backend/web/r231.test.cjs                          |     4 +-
+ backend/web/r235.test.cjs                          |    74 +
+ backend/web/r241.test.cjs                          |    31 +
+ backend/web/r244.test.cjs                          |    54 +
+ backend/web/runtime.js                             |     4 +-
+ backend/web/update-harness.cjs                     |     1 +
+ build-desktop-windows.ps1                          |     8 +-
+ build-desktop.sh                                   |    10 +-
+ desktop/app-title.cjs                              |     2 +
+ desktop/backend-integrity.cjs                      |    15 +
+ desktop/backend-integrity.test.cjs                 |    10 +
+ desktop/backend-lifecycle.test.cjs                 |     3 +-
+ desktop/build-fingerprint.test.cjs                 |     3 +-
+ desktop/diagnostics-2024.test.cjs                  |     3 +-
+ desktop/diagnostics-2135.test.cjs                  |     3 +-
+ desktop/disabled-build.test.cjs                    |    22 +
+ desktop/generate-backend-digest.cjs                |    10 +
+ desktop/license-build.cjs                          |     3 +
+ desktop/license-gate.cjs                           |    44 +
+ desktop/license-gate.license.cjs                   |    29 +
+ desktop/license-release.license.cjs                |    48 +
+ desktop/license-render-fixture.cjs                 |    18 +
+ desktop/license-window.cjs                         |   150 +
+ desktop/license-window.license.cjs                 |   149 +
+ desktop/main.cjs                                   |   171 +-
+ desktop/overview-render-200-filter.test.cjs        |     9 +-
+ desktop/overview-render-200-timeline.test.cjs      |    11 +-
+ desktop/overview-render-helpers.cjs                |     5 +-
+ desktop/package-lock.json                          |     4 +-
+ desktop/package.json                               |    15 +-
+ desktop/portable-template.test.cjs                 |     4 +
+ desktop/preload.cjs                                |    18 +
+ desktop/pro-players.test.cjs                       |     3 +-
+ desktop/pro-runes-render.test.cjs                  |     3 +-
+ desktop/r110-export.test.cjs                       |     2 +-
+ desktop/r117-browser.cjs                           |     1 +
+ desktop/r196.test.cjs                              |     2 +-
+ desktop/r230-clipboard.test.cjs                    |     2 +-
+ desktop/refresh-orchestration.test.cjs             |    22 +-
+ desktop/release-build.cjs                          |     4 +
+ desktop/share-export.cjs                           |     8 +-
+ desktop/share-export.test.cjs                      |    18 +-
+ desktop/source-fingerprint.cjs                     |     4 +-
+ desktop/specialist-overview-render.test.cjs        |     3 +-
+ desktop/startup-visibility.test.cjs                |     3 +
+ desktop/summoner-identity.test.cjs                 |     4 +-
+ desktop/test-fixtures/startup-stages.cjs           |    20 +-
+ desktop/ui-scale-render.test.cjs                   |    34 +-
+ desktop/ui-scale.test.cjs                          |    47 +-
+ desktop/verify-embedded-riot-key.cjs               |     2 +
+ desktop/verify-license-release.cjs                 |    49 +
+ desktop/verify-license-staging-pack.cjs            |    27 +
+ docs/WORKLIST-INDEX.md                             |    26 +-
+ ...CE-TAKEOVER-ADMIN-CODE-AND-TAMPER-RESISTANCE.md |   303 +
+ ...-AND-STORE-WRITE-FAILURE-LOCKS-UNTIL-REENTRY.md |   223 +
+ ...FIELD-NAMES-AND-SHARED-VECTORS-NOT-INSTALLED.md |    76 +
+ ...STARTUP-OVERLAY-FILTER-SWITCH-AND-AKARI-TAGS.md |   476 +
+ ...TED-IN-WORKERS-AND-STAGING-TRUST-KEY-HANDOFF.md |    83 +
+ ...O-DELETION-CHANNEL-AND-STAGING-TAG-TEST-TRAP.md |    75 +
+ ...-R232-R237-AFTER-LICENSE-CLOSES-NO-ISOLATION.md |   118 +
+ ...LE-BLOCKS-CODE-INPUT-AND-LOCK-WINDOW-700X470.md |    79 +
+ ...WINDOW-AND-ADMIN-DISABLE-ENABLE-AUTO-REFRESH.md |   100 +
+ ...S-AND-HEAD-REFRESH-REFETCHES-11MB-EVERY-OPEN.md |   232 +
+ ...DMIN-CODE-EXPIRY-BULK-ACTIONS-AND-AUDIT-PAGE.md |   226 +
+ ...NETWORK-LOCKED-TO-ACTIVE-WINDOW-NOT-RESTORED.md |   148 +
+ ...-AND-COLD-CLIENT-DETECTION-SLOWER-THAN-AKARI.md |   138 +
+ ...VALID-BOUNDS-AND-CHINA-TO-LAX-RENEW-TIMEOUTS.md |   110 +
+ ...RS-AFTER-15-MIN-LAX-OUTAGE-LOCKED-ACTIVE-APP.md |   113 +
+ ...FOR-FETCH-NOT-STATE-COMMIT-BLOCKS-R246-BUILD.md |    63 +
+ ...BUILD-TAG-DEFAULT-OFF-AND-RELEASE-WITHOUT-IT.md |   110 +
+ .../ledgers/release-0.12.77-execution-ledger.md    |   110 +
+ docs/history/reports/r232/chromium.json            |    13 +
+ docs/history/reports/r232/dark-1-locked.png        |   Bin 0 -> 30870 bytes
+ docs/history/reports/r232/dark-1.5-locked.png      |   Bin 0 -> 30870 bytes
+ docs/history/reports/r232/light-1-locked.png       |   Bin 0 -> 34148 bytes
+ docs/history/reports/r232/light-1.5-locked.png     |   Bin 0 -> 34179 bytes
+ docs/history/reports/r232/package-audit.json       |    39 +
+ docs/history/reports/r232/verification.json        |   270 +
+ docs/history/reports/r233/package-audit.json       |    60 +
+ docs/history/reports/r233/renderer-summary.json    |    14 +
+ docs/history/reports/r233/verification.json        |   417 +
+ docs/history/reports/r234/mutations.json           |    58 +
+ docs/history/reports/r234/package-audit.json       |    33 +
+ docs/history/reports/r234/renderer-summary.json    |    14 +
+ docs/history/reports/r234/source-files.json        |    47 +
+ docs/history/reports/r234/verification.json        |   487 +
+ .../reports/r235/arena-threshold-search.txt        |     7 +
+ docs/history/reports/r235/chromium.json            |   422 +
+ .../r235/dark-arena-3x6-no-false-streak.png        |   Bin 0 -> 235064 bytes
+ .../reports/r235/dark-mayhem-failure-retry.png     |   Bin 0 -> 184790 bytes
+ .../reports/r235/dark-mayhem-retry-ready.png       |   Bin 0 -> 186748 bytes
+ .../r235/dark-return-champion-table-1280.png       |   Bin 0 -> 207431 bytes
+ .../r235/dark-return-champion-table-780.png        |   Bin 0 -> 85277 bytes
+ .../reports/r235/dark-return-masteries-1280.png    |   Bin 0 -> 77186 bytes
+ .../reports/r235/dark-return-masteries-780.png     |   Bin 0 -> 57513 bytes
+ docs/history/reports/r235/dark-startup-overlay.png |   Bin 0 -> 29770 bytes
+ docs/history/reports/r235/dark-table-anchor.png    |   Bin 0 -> 245910 bytes
+ docs/history/reports/r235/dark-table-anchor.webm   |   Bin 0 -> 171100 bytes
+ .../reports/r235/dark-tags-overflow-tooltip.png    |   Bin 0 -> 313633 bytes
+ docs/history/reports/r235/dark-tags-star-team.png  |   Bin 0 -> 262476 bytes
+ .../r235/light-arena-3x6-no-false-streak.png       |   Bin 0 -> 251067 bytes
+ .../reports/r235/light-mayhem-failure-retry.png    |   Bin 0 -> 192764 bytes
+ .../reports/r235/light-mayhem-retry-ready.png      |   Bin 0 -> 193886 bytes
+ .../r235/light-return-champion-table-1280.png      |   Bin 0 -> 210447 bytes
+ .../r235/light-return-champion-table-780.png       |   Bin 0 -> 86288 bytes
+ .../reports/r235/light-return-masteries-1280.png   |   Bin 0 -> 78072 bytes
+ .../reports/r235/light-return-masteries-780.png    |   Bin 0 -> 58264 bytes
+ .../history/reports/r235/light-startup-overlay.png |   Bin 0 -> 36276 bytes
+ docs/history/reports/r235/light-table-anchor.png   |   Bin 0 -> 249699 bytes
+ docs/history/reports/r235/light-table-anchor.webm  |   Bin 0 -> 155493 bytes
+ .../reports/r235/light-tags-overflow-tooltip.png   |   Bin 0 -> 324223 bytes
+ docs/history/reports/r235/light-tags-star-team.png |   Bin 0 -> 274088 bytes
+ docs/history/reports/r235/mutations.json           |    94 +
+ docs/history/reports/r235/public-build.json        |    43 +
+ docs/history/reports/r235/r235-only.diff           |  3700 ++
+ docs/history/reports/r235/renderer-summary.json    |   680 +
+ docs/history/reports/r235/scope.json               |   120 +
+ docs/history/reports/r235/worker-deployment.json   |    38 +
+ .../reports/r236/SHA256SUMS-staging-public.txt     |     1 +
+ .../reports/r236/build-source-comparison.json      |     6 +
+ docs/history/reports/r236/ci-filter.json           |    20 +
+ docs/history/reports/r236/desktop-focused.json     |    20 +
+ .../reports/r236/desktop-node-test-final.json      |    19 +
+ docs/history/reports/r236/desktop-node-test.json   |    19 +
+ .../reports/r236/focused-staging-final.json        |    25 +
+ docs/history/reports/r236/focused-staging.json     |    24 +
+ docs/history/reports/r236/go-race.json             |    18 +
+ docs/history/reports/r236/go-test.json             |    17 +
+ docs/history/reports/r236/go-vet.json              |    14 +
+ docs/history/reports/r236/mutations.json           |    94 +
+ .../reports/r236/package-audit-details.json        |    41 +
+ docs/history/reports/r236/package-audit.json       |    19 +
+ docs/history/reports/r236/release-audit.json       |    11 +
+ .../reports/r236/release-backend-build.json        |    25 +
+ .../reports/r236/renderers-all-final-summary.json  |   680 +
+ docs/history/reports/r236/renderers-all-final.json |    20 +
+ .../reports/r236/renderers-all-summary.json        |   680 +
+ docs/history/reports/r236/renderers-all.json       |    20 +
+ docs/history/reports/r236/source-files.json        |    67 +
+ .../reports/r236/staging-build-receipt.json        |    15 +
+ docs/history/reports/r236/staging-build.json       |    21 +
+ docs/history/reports/r236/staging-race.json        |    26 +
+ docs/history/reports/r236/verification.json        |   350 +
+ docs/history/reports/r237/desktop-node-test.json   |    19 +
+ docs/history/reports/r237/desktop-summary.json     |    10 +
+ docs/history/reports/r237/go-race-final.json       |    18 +
+ docs/history/reports/r237/go-race.json             |    22 +
+ docs/history/reports/r237/go-test.json             |    17 +
+ docs/history/reports/r237/go-vet.json              |    14 +
+ .../history/reports/r237/license-default-race.json |    25 +
+ .../reports/r237/license-matrix-summary.json       |    77 +
+ .../history/reports/r237/license-staging-race.json |    27 +
+ docs/history/reports/r237/mutations.json           |    98 +
+ docs/history/reports/r237/privacy-focused.json     |    24 +
+ .../history/reports/r237/privacy-replacements.json |    18 +
+ .../reports/r237/r206-race-three-summary.json      |    10 +
+ docs/history/reports/r237/r206-race-three.json     |    25 +
+ .../reports/r237/r236-artifact-preservation.json   |     5 +
+ .../history/reports/r237/r236-artifacts-after.json |   184 +
+ .../reports/r237/r236-artifacts-before.json        |   184 +
+ docs/history/reports/r237/renderer-summary.json    |   680 +
+ docs/history/reports/r237/renderers-all.json       |    20 +
+ docs/history/reports/r237/shared-ci-affected.json  |    21 +
+ docs/history/reports/r237/shared-ci-current.json   |     7 +
+ docs/history/reports/r237/shared-ci-renderer.json  |    20 +
+ .../reports/r237/shared-source-changes.json        |     8 +
+ docs/history/reports/r237/source-files.json        |    67 +
+ docs/history/reports/r237/verification.json        |   490 +
+ docs/history/reports/r238/backup.json              |     9 +
+ docs/history/reports/r238/diff-check.json          |    14 +
+ docs/history/reports/r238/electron.json            |    15 +
+ docs/history/reports/r238/electron/measure.json    |   142 +
+ docs/history/reports/r238/electron/measure.png     |   Bin 0 -> 200973 bytes
+ docs/history/reports/r238/electron/migrate.json    |    73 +
+ docs/history/reports/r238/electron/migrate.png     |   Bin 0 -> 152851 bytes
+ docs/history/reports/r238/electron/restart.json    |    73 +
+ docs/history/reports/r238/electron/restart.png     |   Bin 0 -> 116691 bytes
+ docs/history/reports/r238/electron/results.json    |   294 +
+ docs/history/reports/r238/go-vet.json              |    14 +
+ docs/history/reports/r238/mutations/results.json   |    14 +
+ .../non-final/pro-identity-invalid-fixture.json    |    24 +
+ docs/history/reports/r238/p1-diff-stat.txt         |  1043 +
+ docs/history/reports/r238/p1-separation.json       |    14 +
+ .../p2/chromium-r100-01/confirmed-backend-exit.png |   Bin 0 -> 20162 bytes
+ .../reports/r238/p2/chromium-r100-01/result.json   |     8 +
+ .../chromium-r100-01/status-with-hung-images.png   |   Bin 0 -> 4655 bytes
+ .../p2/chromium-r100-20261007T205136.206097.json   |    16 +
+ .../p2/chromium-r100-20261007T205136.206097.log    |     2 +
+ .../reports/r238/p2/chromium-r117-01/result.json   |    21 +
+ .../p2/chromium-r117-20261007T205137.599313.json   |    16 +
+ .../p2/chromium-r117-20261007T205137.599313.log    |     2 +
+ .../dark-return-champion-table-1280.png            |   Bin 0 -> 207428 bytes
+ .../dark-return-champion-table-780.png             |   Bin 0 -> 85285 bytes
+ .../dark-return-masteries-1280.png                 |   Bin 0 -> 77186 bytes
+ .../chromium-r235-01/dark-return-masteries-780.png |   Bin 0 -> 57513 bytes
+ .../r238/p2/chromium-r235-01/dark-table-anchor.png |   Bin 0 -> 245918 bytes
+ .../p2/chromium-r235-01/dark-table-anchor.webm     |   Bin 0 -> 171775 bytes
+ .../p2/chromium-r235-01/dark-tags-star-team.png    |   Bin 0 -> 287194 bytes
+ .../dark-return-champion-table-1280.png            |   Bin 0 -> 207431 bytes
+ .../dark-return-champion-table-780.png             |   Bin 0 -> 85307 bytes
+ .../dark-return-masteries-1280.png                 |   Bin 0 -> 77186 bytes
+ .../chromium-r235-02/dark-return-masteries-780.png |   Bin 0 -> 57729 bytes
+ .../r238/p2/chromium-r235-02/dark-table-anchor.png |   Bin 0 -> 245917 bytes
+ .../p2/chromium-r235-02/dark-table-anchor.webm     |   Bin 0 -> 171860 bytes
+ .../p2/chromium-r235-02/dark-tags-star-team.png    |   Bin 0 -> 280525 bytes
+ .../dark-return-champion-table-1280.png            |   Bin 0 -> 207462 bytes
+ .../dark-return-champion-table-780.png             |   Bin 0 -> 85318 bytes
+ .../dark-return-masteries-1280.png                 |   Bin 0 -> 77349 bytes
+ .../chromium-r235-03/dark-return-masteries-780.png |   Bin 0 -> 57513 bytes
+ .../r238/p2/chromium-r235-03/dark-table-anchor.png |   Bin 0 -> 245941 bytes
+ .../p2/chromium-r235-03/dark-table-anchor.webm     |   Bin 0 -> 171875 bytes
+ .../p2/chromium-r235-03/dark-tags-star-team.png    |   Bin 0 -> 280558 bytes
+ .../dark-return-champion-table-1280.png            |   Bin 0 -> 207431 bytes
+ .../dark-return-champion-table-780.png             |   Bin 0 -> 85104 bytes
+ .../dark-return-masteries-1280.png                 |   Bin 0 -> 77186 bytes
+ .../chromium-r235-04/dark-return-masteries-780.png |   Bin 0 -> 57513 bytes
+ .../r238/p2/chromium-r235-04/dark-table-anchor.png |   Bin 0 -> 245909 bytes
+ .../p2/chromium-r235-04/dark-table-anchor.webm     |   Bin 0 -> 171764 bytes
+ .../p2/chromium-r235-04/dark-tags-star-team.png    |   Bin 0 -> 280869 bytes
+ .../dark-arena-3x6-no-false-streak.png             |   Bin 0 -> 227258 bytes
+ .../chromium-r235-05/dark-mayhem-failure-retry.png |   Bin 0 -> 181534 bytes
+ .../chromium-r235-05/dark-mayhem-retry-ready.png   |   Bin 0 -> 183582 bytes
+ .../dark-return-champion-table-1280.png            |   Bin 0 -> 207392 bytes
+ .../dark-return-champion-table-780.png             |   Bin 0 -> 85298 bytes
+ .../dark-return-masteries-1280.png                 |   Bin 0 -> 77186 bytes
+ .../chromium-r235-05/dark-return-masteries-780.png |   Bin 0 -> 57513 bytes
+ .../p2/chromium-r235-05/dark-startup-overlay.png   |   Bin 0 -> 52361 bytes
+ .../r238/p2/chromium-r235-05/dark-table-anchor.png |   Bin 0 -> 245928 bytes
+ .../p2/chromium-r235-05/dark-table-anchor.webm     |   Bin 0 -> 172885 bytes
+ .../dark-tags-overflow-tooltip.png                 |   Bin 0 -> 290202 bytes
+ .../p2/chromium-r235-05/dark-tags-star-team.png    |   Bin 0 -> 280908 bytes
+ .../p2/chromium-r235-05/light-popover-failure.json |   104 +
+ .../p2/chromium-r235-05/light-popover-failure.png  |   Bin 0 -> 286752 bytes
+ .../light-return-champion-table-1280.png           |   Bin 0 -> 210531 bytes
+ .../light-return-champion-table-780.png            |   Bin 0 -> 86249 bytes
+ .../light-return-masteries-1280.png                |   Bin 0 -> 77465 bytes
+ .../light-return-masteries-780.png                 |   Bin 0 -> 58264 bytes
+ .../p2/chromium-r235-05/light-table-anchor.png     |   Bin 0 -> 249903 bytes
+ .../p2/chromium-r235-05/light-table-anchor.webm    |   Bin 0 -> 155686 bytes
+ .../p2/chromium-r235-05/light-tags-star-team.png   |   Bin 0 -> 299850 bytes
+ .../dark-arena-3x6-no-false-streak.png             |   Bin 0 -> 227283 bytes
+ .../chromium-r235-06/dark-mayhem-failure-retry.png |   Bin 0 -> 181527 bytes
+ .../chromium-r235-06/dark-mayhem-retry-ready.png   |   Bin 0 -> 183563 bytes
+ .../dark-return-champion-table-1280.png            |   Bin 0 -> 207431 bytes
+ .../dark-return-champion-table-780.png             |   Bin 0 -> 85276 bytes
+ .../dark-return-masteries-1280.png                 |   Bin 0 -> 77186 bytes
+ .../chromium-r235-06/dark-return-masteries-780.png |   Bin 0 -> 57513 bytes
+ .../p2/chromium-r235-06/dark-startup-overlay.png   |   Bin 0 -> 52361 bytes
+ .../r238/p2/chromium-r235-06/dark-table-anchor.png |   Bin 0 -> 245661 bytes
+ .../p2/chromium-r235-06/dark-table-anchor.webm     |   Bin 0 -> 171830 bytes
+ .../dark-tags-overflow-tooltip.png                 |   Bin 0 -> 290182 bytes
+ .../p2/chromium-r235-06/dark-tags-star-team.png    |   Bin 0 -> 280914 bytes
+ .../light-mayhem-failure-retry.png                 |   Bin 0 -> 188050 bytes
+ .../chromium-r235-06/light-mayhem-retry-ready.png  |   Bin 0 -> 189255 bytes
+ .../light-return-champion-table-1280.png           |   Bin 0 -> 210507 bytes
+ .../light-return-champion-table-780.png            |   Bin 0 -> 86302 bytes
+ .../light-return-masteries-1280.png                |   Bin 0 -> 77388 bytes
+ .../light-return-masteries-780.png                 |   Bin 0 -> 58460 bytes
+ .../p2/chromium-r235-06/light-table-anchor.png     |   Bin 0 -> 249901 bytes
+ .../p2/chromium-r235-06/light-table-anchor.webm    |   Bin 0 -> 157632 bytes
+ .../light-tags-overflow-tooltip.png                |   Bin 0 -> 301763 bytes
+ .../p2/chromium-r235-06/light-tags-star-team.png   |   Bin 0 -> 293614 bytes
+ .../reports/r238/p2/chromium-r235-07/chromium.json |   422 +
+ .../dark-arena-3x6-no-false-streak.png             |   Bin 0 -> 227281 bytes
+ .../chromium-r235-07/dark-mayhem-failure-retry.png |   Bin 0 -> 181567 bytes
+ .../chromium-r235-07/dark-mayhem-retry-ready.png   |   Bin 0 -> 183634 bytes
+ .../dark-return-champion-table-1280.png            |   Bin 0 -> 207392 bytes
+ .../dark-return-champion-table-780.png             |   Bin 0 -> 85277 bytes
+ .../dark-return-masteries-1280.png                 |   Bin 0 -> 77186 bytes
+ .../chromium-r235-07/dark-return-masteries-780.png |   Bin 0 -> 57513 bytes
+ .../p2/chromium-r235-07/dark-startup-overlay.png   |   Bin 0 -> 52361 bytes
+ .../r238/p2/chromium-r235-07/dark-table-anchor.png |   Bin 0 -> 245882 bytes
+ .../p2/chromium-r235-07/dark-table-anchor.webm     |   Bin 0 -> 171823 bytes
+ .../dark-tags-overflow-tooltip.png                 |   Bin 0 -> 290130 bytes
+ .../p2/chromium-r235-07/dark-tags-star-team.png    |   Bin 0 -> 280922 bytes
+ .../light-arena-3x6-no-false-streak.png            |   Bin 0 -> 234456 bytes
+ .../light-mayhem-failure-retry.png                 |   Bin 0 -> 201098 bytes
+ .../chromium-r235-07/light-mayhem-retry-ready.png  |   Bin 0 -> 203802 bytes
+ .../light-return-champion-table-1280.png           |   Bin 0 -> 210540 bytes
+ .../light-return-champion-table-780.png            |   Bin 0 -> 86281 bytes
+ .../light-return-masteries-1280.png                |   Bin 0 -> 77465 bytes
+ .../light-return-masteries-780.png                 |   Bin 0 -> 58264 bytes
+ .../p2/chromium-r235-07/light-startup-overlay.png  |   Bin 0 -> 76709 bytes
+ .../p2/chromium-r235-07/light-table-anchor.png     |   Bin 0 -> 249987 bytes
+ .../p2/chromium-r235-07/light-table-anchor.webm    |   Bin 0 -> 159468 bytes
+ .../light-tags-overflow-tooltip.png                |   Bin 0 -> 301727 bytes
+ .../p2/chromium-r235-07/light-tags-star-team.png   |   Bin 0 -> 293734 bytes
+ .../p2/chromium-r235-20261007T204053.493976.json   |    19 +
+ .../p2/chromium-r235-20261007T204053.493976.log    |     9 +
+ ...-r235-close-targets-20261007T205414.454436.json |    15 +
+ ...m-r235-close-targets-20261007T205414.454436.log |     1 +
+ ...mium-r235-committed-20261007T205031.773707.json |    18 +
+ ...omium-r235-committed-20261007T205031.773707.log |     4 +
+ ...235-current-popover-20261007T204357.461309.json |    17 +
+ ...r235-current-popover-20261007T204357.461309.log |     3 +
+ ...ium-r235-diagnostic-20261007T204847.333206.json |    18 +
+ ...mium-r235-diagnostic-20261007T204847.333206.log |     4 +
+ ...omium-r235-measured-20261007T204205.090662.json |    17 +
+ ...romium-r235-measured-20261007T204205.090662.log |     3 +
+ ...omium-r235-overflow-20261007T204634.713208.json |    17 +
+ ...romium-r235-overflow-20261007T204634.713208.log |     3 +
+ .../reports/r238/p2/chromium-r241-06/chromium.json |  4662 ++
+ .../p2/chromium-r241-06/dark-after-aram-1280.png   |   Bin 0 -> 36244 bytes
+ .../p2/chromium-r241-06/dark-after-aram-1600.png   |   Bin 0 -> 35528 bytes
+ .../p2/chromium-r241-06/dark-after-aram-1920.png   |   Bin 0 -> 34751 bytes
+ .../p2/chromium-r241-06/dark-after-aram-780.png    |   Bin 0 -> 21781 bytes
+ .../p2/chromium-r241-06/dark-after-aram-900.png    |   Bin 0 -> 21585 bytes
+ .../p2/chromium-r241-06/dark-after-arena-1280.png  |   Bin 0 -> 31100 bytes
+ .../p2/chromium-r241-06/dark-after-arena-1600.png  |   Bin 0 -> 32708 bytes
+ .../p2/chromium-r241-06/dark-after-arena-1920.png  |   Bin 0 -> 33360 bytes
+ .../p2/chromium-r241-06/dark-after-arena-780.png   |   Bin 0 -> 19508 bytes
+ .../p2/chromium-r241-06/dark-after-arena-900.png   |   Bin 0 -> 19923 bytes
+ .../dark-after-cards-1280-zoom-1.5.png             |   Bin 0 -> 179731 bytes
+ .../dark-after-cards-1280-zoom-1.png               |   Bin 0 -> 268948 bytes
+ .../dark-after-cards-1600-zoom-1.5.png             |   Bin 0 -> 268783 bytes
+ .../dark-after-cards-1600-zoom-1.png               |   Bin 0 -> 355187 bytes
+ .../dark-after-cards-1920-zoom-1.5.png             |   Bin 0 -> 284419 bytes
+ .../dark-after-cards-1920-zoom-1.png               |   Bin 0 -> 359225 bytes
+ .../dark-after-cards-780-zoom-1.png                |   Bin 0 -> 181668 bytes
+ .../dark-after-cards-900-zoom-1.png                |   Bin 0 -> 152815 bytes
+ .../p2/chromium-r241-06/dark-after-rift-1280.png   |   Bin 0 -> 36897 bytes
+ .../p2/chromium-r241-06/dark-after-rift-1600.png   |   Bin 0 -> 36918 bytes
+ .../p2/chromium-r241-06/dark-after-rift-1920.png   |   Bin 0 -> 38870 bytes
+ .../p2/chromium-r241-06/dark-after-rift-780.png    |   Bin 0 -> 22151 bytes
+ .../p2/chromium-r241-06/dark-after-rift-900.png    |   Bin 0 -> 22856 bytes
+ .../p2/chromium-r241-06/dark-only-more-780.png     |   Bin 0 -> 101034 bytes
+ .../p2/chromium-r241-06/dark-popover-bottom.png    |   Bin 0 -> 320688 bytes
+ .../chromium-r241-06/dark-popover-tag-tooltip.png  |   Bin 0 -> 317698 bytes
+ .../r238/p2/chromium-r241-06/dark-popover-top.png  |   Bin 0 -> 311331 bytes
+ .../p2/chromium-r241-06/light-after-aram-1280.png  |   Bin 0 -> 38180 bytes
+ .../p2/chromium-r241-06/light-after-aram-1600.png  |   Bin 0 -> 37431 bytes
+ .../p2/chromium-r241-06/light-after-aram-1920.png  |   Bin 0 -> 36541 bytes
+ .../p2/chromium-r241-06/light-after-aram-780.png   |   Bin 0 -> 23102 bytes
+ .../p2/chromium-r241-06/light-after-aram-900.png   |   Bin 0 -> 23063 bytes
+ .../p2/chromium-r241-06/light-after-arena-1280.png |   Bin 0 -> 32349 bytes
+ .../p2/chromium-r241-06/light-after-arena-1600.png |   Bin 0 -> 34197 bytes
+ .../p2/chromium-r241-06/light-after-arena-1920.png |   Bin 0 -> 34722 bytes
+ .../p2/chromium-r241-06/light-after-arena-780.png  |   Bin 0 -> 20455 bytes
+ .../p2/chromium-r241-06/light-after-arena-900.png  |   Bin 0 -> 20911 bytes
+ .../light-after-cards-1280-zoom-1.5.png            |   Bin 0 -> 189222 bytes
+ .../light-after-cards-1280-zoom-1.png              |   Bin 0 -> 280775 bytes
+ .../light-after-cards-1600-zoom-1.5.png            |   Bin 0 -> 282415 bytes
+ .../light-after-cards-1600-zoom-1.png              |   Bin 0 -> 371583 bytes
+ .../light-after-cards-1920-zoom-1.5.png            |   Bin 0 -> 299203 bytes
+ .../light-after-cards-1920-zoom-1.png              |   Bin 0 -> 374627 bytes
+ .../light-after-cards-780-zoom-1.png               |   Bin 0 -> 190455 bytes
+ .../light-after-cards-900-zoom-1.png               |   Bin 0 -> 159980 bytes
+ .../p2/chromium-r241-06/light-after-rift-1280.png  |   Bin 0 -> 38381 bytes
+ .../p2/chromium-r241-06/light-after-rift-1600.png  |   Bin 0 -> 38741 bytes
+ .../p2/chromium-r241-06/light-after-rift-1920.png  |   Bin 0 -> 40533 bytes
+ .../p2/chromium-r241-06/light-after-rift-780.png   |   Bin 0 -> 23343 bytes
+ .../p2/chromium-r241-06/light-after-rift-900.png   |   Bin 0 -> 23881 bytes
+ .../p2/chromium-r241-06/light-only-more-780.png    |   Bin 0 -> 105775 bytes
+ .../p2/chromium-r241-06/light-popover-bottom.png   |   Bin 0 -> 332037 bytes
+ .../chromium-r241-06/light-popover-tag-tooltip.png |   Bin 0 -> 328784 bytes
+ .../r238/p2/chromium-r241-06/light-popover-top.png |   Bin 0 -> 322508 bytes
+ ...mium-r241-committed-20261007T205122.325068.json |    15 +
+ ...omium-r241-committed-20261007T205122.325068.log |     1 +
+ .../chromium-r244-06/champselect-history-dark.png  |   Bin 0 -> 178326 bytes
+ .../chromium-r244-06/champselect-history-light.png |   Bin 0 -> 180014 bytes
+ .../reports/r238/p2/chromium-r244-06/chromium.json |    50 +
+ ...mium-r244-committed-20261007T205134.159281.json |    15 +
+ ...omium-r244-committed-20261007T205134.159281.log |     1 +
+ .../after-DISABLED-1/result.json                   |   479 +
+ .../after-DISABLED-1/show-1.png                    |   Bin 0 -> 143564 bytes
+ .../default-electron-20261007T204433.396655.json   |    16 +
+ .../p2/default-electron-20261007T204433.396655.log |     1 +
+ ...t-license-inventory-20261007T204115.789820.json |    16 +
+ ...lt-license-inventory-20261007T204115.789820.log |     1 +
+ .../p2/desktop-all-20261007T203900.277016.json     |    19 +
+ .../r238/p2/desktop-all-20261007T203900.277016.log |   321 +
+ .../r238/p2/existing-dist-before-build.json        |   802 +
+ .../reports/r238/p2/final-local-summary.json       |    26 +
+ .../r238/p2/final-vet-20261007T204515.418362.json  |    14 +
+ .../r238/p2/final-vet-20261007T204515.418362.log   |     0
+ .../r238/p2/go-full-20261007T203533.661534.json    |    21 +
+ .../r238/p2/go-full-20261007T203533.661534.log     |    10 +
+ .../p2/go-full-final-20261007T204306.318696.json   |    18 +
+ .../p2/go-full-final-20261007T204306.318696.log    |     2 +
+ .../r238/p2/go-vet-20261007T203535.431007.json     |    14 +
+ .../r238/p2/go-vet-20261007T203535.431007.log      |     0
+ .../p2/installer-test-20261007T203541.466810.json  |    21 +
+ .../p2/installer-test-20261007T203541.466810.log   |     5 +
+ .../p2/installer-vet-20261007T203601.017648.json   |    14 +
+ .../p2/installer-vet-20261007T203601.017648.log    |     0
+ .../license-retained-20261007T203623.764155.json   |    25 +
+ .../p2/license-retained-20261007T203623.764155.log |    10 +
+ ...retained-after-path-20261007T203856.352801.json |    25 +
+ ...-retained-after-path-20261007T203856.352801.log |     7 +
+ ...macos-public-backend-20261007T205910.018737.log |     4 +
+ .../reports/r238/p2/mutation-source-input.json     |    34 +
+ .../r238/p2/mutations-r235-01/mutations.json       |    80 +
+ .../p2/mutations-r235-01/p1-clear-migration.log    |     5 +
+ .../r238/p2/mutations-r235-01/p11-fixed-four.log   |     5 +
+ .../p2/mutations-r235-01/p2-serial-streams.log     |     5 +
+ .../mutations-r235-01/p5-shared-probe-budget.log   |     5 +
+ .../r238/p2/mutations-r235-01/p8-fixed-15s.log     |    49 +
+ .../r238/p2/mutations-r235-02/mutations.json       |    94 +
+ .../p2/mutations-r235-02/p1-clear-migration.log    |     5 +
+ .../r238/p2/mutations-r235-02/p11-fixed-four.log   |     5 +
+ .../p2/mutations-r235-02/p2-serial-streams.log     |     5 +
+ .../mutations-r235-02/p5-shared-probe-budget.log   |     5 +
+ .../r238/p2/mutations-r235-02/p8-fixed-15s.log     |    49 +
+ .../r238/p2/mutations-r235-02/p9-slice-four.log    |    30 +
+ .../p2/mutations-r235-20261007T204427.662185.json  |    19 +
+ .../p2/mutations-r235-20261007T204427.662185.log   |    10 +
+ ...r235-target-aligned-20261007T204703.181285.json |    19 +
+ ...-r235-target-aligned-20261007T204703.181285.log |     6 +
+ .../r238/p2/mutations-r238-01/always-reset.log     |   103 +
+ .../r238/p2/mutations-r238-01/no-migration.log     |   101 +
+ .../reports/r238/p2/mutations-r238-01/results.json |    14 +
+ .../p2/mutations-r238-20261007T204823.768125.json  |    15 +
+ .../p2/mutations-r238-20261007T204823.768125.log   |     1 +
+ .../r238/p2/mutations-r241-02/mutations.json       |    54 +
+ .../r238/p2/mutations-r241-02/p2-mode-filter.log   |    57 +
+ .../reports/r238/p2/mutations-r241-02/p3-wrap.log  |    12 +
+ .../r238/p2/mutations-r241-02/p4-no-freshness.log  |     5 +
+ .../r238/p2/mutations-r241-02/p6-empty-tail.log    |     9 +
+ ...r241-target-aligned-20261007T204720.353332.json |    18 +
+ ...-r241-target-aligned-20261007T204720.353332.log |     4 +
+ .../mutation-remove-15s-fallback.log               |    33 +
+ .../mutation-restore-30-day-cutoff.log             |     8 +
+ .../mutation-restore-dual-lcu-sgp.log              |     5 +
+ .../mutation-restore-idle-backoff.log              |     5 +
+ .../mutation-restore-independent-header.log        |    34 +
+ .../mutation-restore-repeated-sweep.log            |     5 +
+ .../mutation-restore-serial-ranked.log             |     5 +
+ .../r238/p2/mutations-r244-01/mutations.json       |   101 +
+ .../p2/mutations-r244-20261007T204731.418633.json  |    19 +
+ .../p2/mutations-r244-20261007T204731.418633.log   |     7 +
+ .../r238/p2/mutations-r248-01/default-network.log  |     5 +
+ .../r238/p2/mutations-r248-01/default-overlay.log  |    15 +
+ .../electron-overlay/after-DISABLED-1/result.json  |   522 +
+ .../electron-overlay/after-DISABLED-1/show-1.png   |   Bin 0 -> 88878 bytes
+ .../reports/r238/p2/mutations-r248-01/results.json |    15 +
+ .../p2/mutations-r248-20261007T204813.760141.json  |    15 +
+ .../p2/mutations-r248-20261007T204813.760141.log   |     1 +
+ .../named-build-gates-20261007T204707.846465.json  |    22 +
+ .../named-build-gates-20261007T204707.846465.log   |    25 +
+ .../p7-after-field-fix-20261007T204019.476302.json |    20 +
+ .../p7-after-field-fix-20261007T204019.476302.log  |     1 +
+ .../public-setup-build-20261007T205818.871373.log  |    85 +
+ .../r238/p2/race-20261007T203647.748260.json       |    22 +
+ .../r238/p2/race-20261007T203647.748260.log        |    10 +
+ .../r238/p2/race-final-20261007T204302.373694.json |    19 +
+ .../r238/p2/race-final-20261007T204302.373694.log  |     2 +
+ .../reports/r238/p2/renderer-timings-01.json       |   680 +
+ .../p2/renderers-all-20261007T203644.158755.json   |    20 +
+ .../p2/renderers-all-20261007T203644.158755.log    |  2114 +
+ .../syntax-format-diff-20261007T203601.527542.json |    17 +
+ .../syntax-format-diff-20261007T203601.527542.log  |     2 +
+ ...de-powershell-syntax-20261007T204906.952015.log |     0
+ ...ershell-unavailable-20261007T205008.652429.json |    22 +
+ ...wershell-unavailable-20261007T205008.652429.log |    19 +
+ .../r238/p2/worker-20261007T203556.140382.json     |    20 +
+ .../r238/p2/worker-20261007T203556.140382.log      |    24 +
+ .../reports/r238/partial-source-manifest.json      |    74 +
+ docs/history/reports/r238/run-check.py             |    30 +
+ docs/history/reports/r238/scale-mutations.json     |    15 +
+ docs/history/reports/r238/targeted-node.json       |    21 +
+ docs/history/reports/r238/targeted-race.json       |    20 +
+ docs/history/reports/r238/verification.json        |   101 +
+ .../reports/r238/windows-device-checklist.md       |    26 +
+ docs/history/reports/r239/boundary-checks.json     |     6 +
+ docs/history/reports/r239/browser/chromium.json    |    13 +
+ .../history/reports/r239/browser/dark-1-locked.png |   Bin 0 -> 26138 bytes
+ .../reports/r239/browser/dark-2.5-locked.png       |   Bin 0 -> 26138 bytes
+ .../reports/r239/browser/light-1-locked.png        |   Bin 0 -> 29253 bytes
+ .../reports/r239/browser/light-2.5-locked.png      |   Bin 0 -> 29215 bytes
+ .../reports/r239/build-source-comparison.json      |  2112 +
+ docs/history/reports/r239/build-start.json         |     8 +
+ docs/history/reports/r239/checks-go.json           |    48 +
+ docs/history/reports/r239/checks-node.json         |    39 +
+ docs/history/reports/r239/mutations/results.json   |    20 +
+ docs/history/reports/r239/package-audit.json       |    42 +
+ docs/history/reports/r239/r232-chromium.json       |    13 +
+ .../history/reports/r239/r236-artifacts-after.json |   184 +
+ .../reports/r239/r236-artifacts-before.json        |   184 +
+ docs/history/reports/r239/r239-changes.diff        |   336 +
+ docs/history/reports/r239/renderer-timings.json    |   684 +
+ docs/history/reports/r239/source-files.json        |   128 +
+ .../reports/r239/staging-build-receipt.json        |    15 +
+ .../reports/r239/staging-build-summary.json        |    18 +
+ docs/history/reports/r239/startup-after-final.json |   602 +
+ docs/history/reports/r239/startup-after.json       |   530 +
+ docs/history/reports/r239/startup-before.json      |   359 +
+ docs/history/reports/r239/startup-comparison.json  |    63 +
+ .../reports/r239/startup-p3-diagnostic.json        |   608 +
+ .../r239/startup-paired-with-race-tail.json        |  1112 +
+ docs/history/reports/r239/startup-paired.json      |  1112 +
+ .../history/reports/r239/visibility-inventory.json |  1568 +
+ .../reports/r240/artifact-preservation.json        |    12 +
+ docs/history/reports/r240/browser/chromium.json    |    14 +
+ .../history/reports/r240/browser/dark-1-locked.png |   Bin 0 -> 29067 bytes
+ .../reports/r240/browser/dark-2.5-locked.png       |   Bin 0 -> 29067 bytes
+ .../reports/r240/browser/light-1-locked.png        |   Bin 0 -> 32423 bytes
+ .../reports/r240/browser/light-2.5-locked.png      |   Bin 0 -> 32410 bytes
+ .../reports/r240/build-source-comparison.json      |    16 +
+ docs/history/reports/r240/checks-go-first.json     |   116 +
+ docs/history/reports/r240/checks-go.json           |   108 +
+ docs/history/reports/r240/checks-node.json         |    41 +
+ docs/history/reports/r240/electron/acceptance.json |  7927 +++
+ .../r240/electron/after-ACTIVE-1/result.json       |  6996 +++
+ .../r240/electron/after-ACTIVE-1/show-1.png        |   Bin 0 -> 118923 bytes
+ .../r240/electron/after-ACTIVE-2/result.json       |   570 +
+ .../r240/electron/after-ACTIVE-2/show-1.png        |   Bin 0 -> 73703 bytes
+ .../r240/electron/after-ACTIVE-3/result.json       |   573 +
+ .../r240/electron/after-ACTIVE-3/show-1.png        |   Bin 0 -> 182469 bytes
+ .../r240/electron/after-LOCKED-1/result.json       |   359 +
+ .../r240/electron/after-LOCKED-1/show-1.png        |   Bin 0 -> 75372 bytes
+ .../r240/electron/after-LOCKED-2/result.json       |   370 +
+ .../r240/electron/after-LOCKED-2/show-1.png        |   Bin 0 -> 73703 bytes
+ .../r240/electron/after-LOCKED-3/result.json       |   370 +
+ .../r240/electron/after-LOCKED-3/show-1.png        |   Bin 0 -> 73703 bytes
+ .../r240/electron/baseline-ACTIVE-1/result.json    |  7101 +++
+ .../r240/electron/baseline-ACTIVE-1/show-1.png     |   Bin 0 -> 84616 bytes
+ docs/history/reports/r240/electron/baseline.json   |  7103 +++
+ .../r240/electron/before-ACTIVE-1/result.json      |   350 +
+ .../r240/electron/before-ACTIVE-1/show-1.png       |   Bin 0 -> 82797 bytes
+ .../r240/electron/before-ACTIVE-2/result.json      |   350 +
+ .../r240/electron/before-ACTIVE-2/show-1.png       |   Bin 0 -> 84616 bytes
+ .../r240/electron/before-ACTIVE-3/result.json      |   290 +
+ .../r240/electron/before-ACTIVE-3/show-1.png       |   Bin 0 -> 82797 bytes
+ .../r240/electron/before-LOCKED-1/result.json      |   290 +
+ .../r240/electron/before-LOCKED-1/show-1.png       |   Bin 0 -> 65005 bytes
+ .../r240/electron/before-LOCKED-2/result.json      |   290 +
+ .../r240/electron/before-LOCKED-2/show-1.png       |   Bin 0 -> 65005 bytes
+ .../r240/electron/before-LOCKED-3/result.json      |   290 +
+ .../r240/electron/before-LOCKED-3/show-1.png       |   Bin 0 -> 65005 bytes
+ docs/history/reports/r240/electron/startup.json    |  4631 ++
+ docs/history/reports/r240/final-source-files.json  |  3098 +
+ docs/history/reports/r240/fingerprint-inputs.json  |  1992 +
+ .../reports/r240/go-test-final-summary.json        |    19 +
+ .../reports/r240/go-test-stable-summary.json       |    15 +
+ .../history/reports/r240/go-vet-final-summary.json |    12 +
+ docs/history/reports/r240/interrupted-checks.json  |     6 +
+ .../reports/r240/ledger-completed-checks.md        |   113 +
+ docs/history/reports/r240/mutations/results.json   |    62 +
+ .../reports/r240/package-audit-summary.json        |    13 +
+ docs/history/reports/r240/package-audit.json       |    42 +
+ docs/history/reports/r240/protected-files.json     |    26 +
+ .../history/reports/r240/r236-artifacts-after.json |   184 +
+ .../reports/r240/r236-artifacts-prebuild.json      |   184 +
+ .../history/reports/r240/r239-artifacts-after.json |   184 +
+ .../reports/r240/r239-artifacts-before.json        |   184 +
+ .../reports/r240/r239-artifacts-prebuild.json      |   184 +
+ docs/history/reports/r240/renderer-timings.json    |   688 +
+ docs/history/reports/r240/run-artifact-command.py  |    14 +
+ docs/history/reports/r240/run-final-checks.py      |    21 +
+ .../reports/r240/run-public-release-audit.py       |     8 +
+ .../reports/r240/shared-source-changes.json        |    26 +
+ .../reports/r240/source-before-shared-updates.json |  3094 +
+ .../reports/r240/staging-build-summary.json        |    19 +
+ docs/history/reports/r240/startup-comparison.json  |   223 +
+ .../reports/r240/unrelated-go-focused-summary.json |    17 +
+ docs/history/reports/r240/verify-build-inputs.cjs  |    16 +
+ docs/history/reports/r241/baseline/README.md       |     1 +
+ .../r241/baseline/backend/collection_reads.go      |   131 +
+ .../reports/r241/baseline/backend/features.go      |  1232 +
+ .../reports/r241/baseline/backend/gameplay_test.go |  6143 ++
+ .../reports/r241/baseline/backend/lcu_api.go       |  1501 +
+ .../reports/r241/baseline/backend/quality_test.go  |  1096 +
+ .../reports/r241/baseline/backend/r211_test.go     |   286 +
+ .../reports/r241/baseline/backend/r214_test.go     |   117 +
+ .../reports/r241/baseline/backend/r87_test.go      |   263 +
+ .../reports/r241/baseline/backend/season_head.go   |   147 +
+ .../reports/r241/baseline/backend/season_stats.go  |  1519 +
+ .../testdata/r88/protected-layout-rules.json       |    15 +
+ .../reports/r241/baseline/backend/web/gameplay.css |  2231 +
+ .../reports/r241/baseline/backend/web/gameplay.js  |  9224 +++
+ .../r241/baseline/backend/web/r216.test.cjs        |    66 +
+ .../r241/baseline/backend/web/r235.test.cjs        |    74 +
+ .../reports/r241/baseline/desktop/r196.test.cjs    |    16 +
+ .../r241/baseline/desktop/r230-clipboard.test.cjs  |    15 +
+ .../r241/baseline/desktop/share-export.test.cjs    |   273 +
+ .../reports/r241/baseline/docs/WORKLIST-INDEX.md   |   186 +
+ docs/history/reports/r241/baseline/go.mod          |     5 +
+ docs/history/reports/r241/build-validation.py      |    18 +
+ docs/history/reports/r241/chromium-before.json     |  5270 ++
+ docs/history/reports/r241/chromium.json            |  4662 ++
+ docs/history/reports/r241/dark-after-aram-1280.png |   Bin 0 -> 36244 bytes
+ docs/history/reports/r241/dark-after-aram-1600.png |   Bin 0 -> 35528 bytes
+ docs/history/reports/r241/dark-after-aram-1920.png |   Bin 0 -> 34751 bytes
+ docs/history/reports/r241/dark-after-aram-780.png  |   Bin 0 -> 21781 bytes
+ docs/history/reports/r241/dark-after-aram-900.png  |   Bin 0 -> 21585 bytes
+ .../history/reports/r241/dark-after-arena-1280.png |   Bin 0 -> 31100 bytes
+ .../history/reports/r241/dark-after-arena-1600.png |   Bin 0 -> 32708 bytes
+ .../history/reports/r241/dark-after-arena-1920.png |   Bin 0 -> 33360 bytes
+ docs/history/reports/r241/dark-after-arena-780.png |   Bin 0 -> 19513 bytes
+ docs/history/reports/r241/dark-after-arena-900.png |   Bin 0 -> 19923 bytes
+ .../r241/dark-after-cards-1280-zoom-1.5.png        |   Bin 0 -> 179749 bytes
+ .../reports/r241/dark-after-cards-1280-zoom-1.png  |   Bin 0 -> 268946 bytes
+ .../r241/dark-after-cards-1600-zoom-1.5.png        |   Bin 0 -> 268783 bytes
+ .../reports/r241/dark-after-cards-1600-zoom-1.png  |   Bin 0 -> 355233 bytes
+ .../r241/dark-after-cards-1920-zoom-1.5.png        |   Bin 0 -> 284638 bytes
+ .../reports/r241/dark-after-cards-1920-zoom-1.png  |   Bin 0 -> 359225 bytes
+ .../reports/r241/dark-after-cards-780-zoom-1.png   |   Bin 0 -> 181725 bytes
+ .../reports/r241/dark-after-cards-900-zoom-1.png   |   Bin 0 -> 152817 bytes
+ docs/history/reports/r241/dark-after-rift-1280.png |   Bin 0 -> 36890 bytes
+ docs/history/reports/r241/dark-after-rift-1600.png |   Bin 0 -> 36922 bytes
+ docs/history/reports/r241/dark-after-rift-1920.png |   Bin 0 -> 38857 bytes
+ docs/history/reports/r241/dark-after-rift-780.png  |   Bin 0 -> 22135 bytes
+ docs/history/reports/r241/dark-after-rift-900.png  |   Bin 0 -> 22876 bytes
+ .../history/reports/r241/dark-before-aram-1280.png |   Bin 0 -> 40607 bytes
+ .../history/reports/r241/dark-before-aram-1600.png |   Bin 0 -> 44363 bytes
+ .../history/reports/r241/dark-before-aram-1920.png |   Bin 0 -> 44265 bytes
+ docs/history/reports/r241/dark-before-aram-780.png |   Bin 0 -> 26653 bytes
+ docs/history/reports/r241/dark-before-aram-900.png |   Bin 0 -> 26354 bytes
+ .../reports/r241/dark-before-arena-1280.png        |   Bin 0 -> 36384 bytes
+ .../reports/r241/dark-before-arena-1600.png        |   Bin 0 -> 37096 bytes
+ .../reports/r241/dark-before-arena-1920.png        |   Bin 0 -> 41090 bytes
+ .../history/reports/r241/dark-before-arena-780.png |   Bin 0 -> 24203 bytes
+ .../history/reports/r241/dark-before-arena-900.png |   Bin 0 -> 23882 bytes
+ .../r241/dark-before-cards-1280-zoom-1.5.png       |   Bin 0 -> 177188 bytes
+ .../reports/r241/dark-before-cards-1280-zoom-1.png |   Bin 0 -> 240801 bytes
+ .../r241/dark-before-cards-1600-zoom-1.5.png       |   Bin 0 -> 260181 bytes
+ .../reports/r241/dark-before-cards-1600-zoom-1.png |   Bin 0 -> 333776 bytes
+ .../r241/dark-before-cards-1920-zoom-1.5.png       |   Bin 0 -> 281458 bytes
+ .../reports/r241/dark-before-cards-1920-zoom-1.png |   Bin 0 -> 339887 bytes
+ .../reports/r241/dark-before-cards-780-zoom-1.png  |   Bin 0 -> 168923 bytes
+ .../reports/r241/dark-before-cards-900-zoom-1.png  |   Bin 0 -> 153014 bytes
+ .../history/reports/r241/dark-before-rift-1280.png |   Bin 0 -> 41073 bytes
+ .../history/reports/r241/dark-before-rift-1600.png |   Bin 0 -> 44803 bytes
+ .../history/reports/r241/dark-before-rift-1920.png |   Bin 0 -> 45153 bytes
+ docs/history/reports/r241/dark-before-rift-780.png |   Bin 0 -> 26696 bytes
+ docs/history/reports/r241/dark-before-rift-900.png |   Bin 0 -> 18669 bytes
+ docs/history/reports/r241/dark-only-more-780.png   |   Bin 0 -> 100957 bytes
+ docs/history/reports/r241/dark-popover-bottom.png  |   Bin 0 -> 320672 bytes
+ .../reports/r241/dark-popover-tag-tooltip.png      |   Bin 0 -> 317628 bytes
+ docs/history/reports/r241/dark-popover-top.png     |   Bin 0 -> 311197 bytes
+ .../reports/r241/final-check-start-fingerprint.txt |     1 +
+ docs/history/reports/r241/final-summary.json       |    79 +
+ docs/history/reports/r241/js-syntax.json           |     4 +
+ docs/history/reports/r241/layout-comparison.json   |   506 +
+ .../history/reports/r241/light-after-aram-1280.png |   Bin 0 -> 38180 bytes
+ .../history/reports/r241/light-after-aram-1600.png |   Bin 0 -> 37431 bytes
+ .../history/reports/r241/light-after-aram-1920.png |   Bin 0 -> 36541 bytes
+ docs/history/reports/r241/light-after-aram-780.png |   Bin 0 -> 23102 bytes
+ docs/history/reports/r241/light-after-aram-900.png |   Bin 0 -> 23063 bytes
+ .../reports/r241/light-after-arena-1280.png        |   Bin 0 -> 32349 bytes
+ .../reports/r241/light-after-arena-1600.png        |   Bin 0 -> 34197 bytes
+ .../reports/r241/light-after-arena-1920.png        |   Bin 0 -> 34722 bytes
+ .../history/reports/r241/light-after-arena-780.png |   Bin 0 -> 20455 bytes
+ .../history/reports/r241/light-after-arena-900.png |   Bin 0 -> 20911 bytes
+ .../r241/light-after-cards-1280-zoom-1.5.png       |   Bin 0 -> 189489 bytes
+ .../reports/r241/light-after-cards-1280-zoom-1.png |   Bin 0 -> 280792 bytes
+ .../r241/light-after-cards-1600-zoom-1.5.png       |   Bin 0 -> 282931 bytes
+ .../reports/r241/light-after-cards-1600-zoom-1.png |   Bin 0 -> 371392 bytes
+ .../r241/light-after-cards-1920-zoom-1.5.png       |   Bin 0 -> 299024 bytes
+ .../reports/r241/light-after-cards-1920-zoom-1.png |   Bin 0 -> 375080 bytes
+ .../reports/r241/light-after-cards-780-zoom-1.png  |   Bin 0 -> 190409 bytes
+ .../reports/r241/light-after-cards-900-zoom-1.png  |   Bin 0 -> 160039 bytes
+ .../history/reports/r241/light-after-rift-1280.png |   Bin 0 -> 38484 bytes
+ .../history/reports/r241/light-after-rift-1600.png |   Bin 0 -> 38517 bytes
+ .../history/reports/r241/light-after-rift-1920.png |   Bin 0 -> 40503 bytes
+ docs/history/reports/r241/light-after-rift-780.png |   Bin 0 -> 23146 bytes
+ docs/history/reports/r241/light-after-rift-900.png |   Bin 0 -> 24225 bytes
+ .../reports/r241/light-before-aram-1280.png        |   Bin 0 -> 42663 bytes
+ .../reports/r241/light-before-aram-1600.png        |   Bin 0 -> 46547 bytes
+ .../reports/r241/light-before-aram-1920.png        |   Bin 0 -> 46104 bytes
+ .../history/reports/r241/light-before-aram-780.png |   Bin 0 -> 28291 bytes
+ .../history/reports/r241/light-before-aram-900.png |   Bin 0 -> 27866 bytes
+ .../reports/r241/light-before-arena-1280.png       |   Bin 0 -> 37815 bytes
+ .../reports/r241/light-before-arena-1600.png       |   Bin 0 -> 38607 bytes
+ .../reports/r241/light-before-arena-1920.png       |   Bin 0 -> 42595 bytes
+ .../reports/r241/light-before-arena-780.png        |   Bin 0 -> 25135 bytes
+ .../reports/r241/light-before-arena-900.png        |   Bin 0 -> 24946 bytes
+ .../r241/light-before-cards-1280-zoom-1.5.png      |   Bin 0 -> 186918 bytes
+ .../r241/light-before-cards-1280-zoom-1.png        |   Bin 0 -> 250746 bytes
+ .../r241/light-before-cards-1600-zoom-1.5.png      |   Bin 0 -> 273471 bytes
+ .../r241/light-before-cards-1600-zoom-1.png        |   Bin 0 -> 347756 bytes
+ .../r241/light-before-cards-1920-zoom-1.5.png      |   Bin 0 -> 295005 bytes
+ .../r241/light-before-cards-1920-zoom-1.png        |   Bin 0 -> 354388 bytes
+ .../reports/r241/light-before-cards-780-zoom-1.png |   Bin 0 -> 176838 bytes
+ .../reports/r241/light-before-cards-900-zoom-1.png |   Bin 0 -> 160297 bytes
+ .../reports/r241/light-before-rift-1280.png        |   Bin 0 -> 43013 bytes
+ .../reports/r241/light-before-rift-1600.png        |   Bin 0 -> 46916 bytes
+ .../reports/r241/light-before-rift-1920.png        |   Bin 0 -> 46837 bytes
+ .../history/reports/r241/light-before-rift-780.png |   Bin 0 -> 27920 bytes
+ .../history/reports/r241/light-before-rift-900.png |   Bin 0 -> 19926 bytes
+ docs/history/reports/r241/light-only-more-780.png  |   Bin 0 -> 105334 bytes
+ docs/history/reports/r241/light-popover-bottom.png |   Bin 0 -> 332324 bytes
+ .../reports/r241/light-popover-tag-tooltip.png     |   Bin 0 -> 328985 bytes
+ docs/history/reports/r241/light-popover-top.png    |   Bin 0 -> 322354 bytes
+ docs/history/reports/r241/mutations.json           |    54 +
+ docs/history/reports/r241/public-build.json        |    45 +
+ docs/history/reports/r241/r241-only.diff           |  1468 +
+ docs/history/reports/r241/renderer-summary.json    |   688 +
+ docs/history/reports/r241/renderer-workers.cjs     |     1 +
+ docs/history/reports/r241/scope.json               |    81 +
+ .../reports/r242/artifact-preservation.json        |    14 +
+ docs/history/reports/r242/artifacts-after.json     |   554 +
+ docs/history/reports/r242/artifacts-before.json    |   554 +
+ docs/history/reports/r242/audit-package.py         |     8 +
+ .../reports/r242/browser-final-summary.json        |    16 +
+ .../reports/r242/browser-fixed-summary.json        |    18 +
+ .../history/reports/r242/browser-pass-summary.json |    14 +
+ docs/history/reports/r242/browser-summary.json     |    17 +
+ docs/history/reports/r242/browser/chromium.json    |    16 +
+ .../history/reports/r242/browser/dark-1-locked.png |   Bin 0 -> 29067 bytes
+ .../reports/r242/browser/dark-2.5-locked.png       |   Bin 0 -> 29067 bytes
+ .../reports/r242/browser/light-1-locked.png        |   Bin 0 -> 32451 bytes
+ .../reports/r242/browser/light-2.5-locked.png      |   Bin 0 -> 32458 bytes
+ .../reports/r242/browser/settings-expiry.png       |   Bin 0 -> 125319 bytes
+ .../reports/r242/build-source-comparison.json      |     5 +
+ docs/history/reports/r242/checks-final.json        |   140 +
+ .../reports/r242/desktop-final-summary.json        |    18 +
+ docs/history/reports/r242/final-source-files.json  |  3862 ++
+ docs/history/reports/r242/fingerprint-inputs.json  |  1992 +
+ docs/history/reports/r242/fingerprint-summary.json |    14 +
+ docs/history/reports/r242/focused-summary.json     |    27 +
+ .../reports/r242/go-race-final-summary.json        |    17 +
+ .../reports/r242/go-test-final-summary.json        |    16 +
+ .../r242/license-default-final-summary.json        |    27 +
+ .../reports/r242/license-default-summary.json      |    27 +
+ .../r242/license-staging-final-summary.json        |    28 +
+ .../reports/r242/package-audit-summary.json        |    14 +
+ docs/history/reports/r242/package-audit.json       |    43 +
+ .../reports/r242/prebuild-source-comparison.json   |     5 +
+ .../reports/r242/renderers-final-summary.json      |    19 +
+ docs/history/reports/r242/renderers-result.json    |   688 +
+ docs/history/reports/r242/run-check.py             |    59 +
+ .../reports/r242/staging-build-summary.json        |    20 +
+ docs/history/reports/r242/verify-build-inputs.cjs  |    16 +
+ docs/history/reports/r242/vet-final-summary.json   |    13 +
+ docs/history/reports/r242/write-ledger.py          |    97 +
+ .../r243/affected-check-reconciliation.json        |    19 +
+ .../reports/r243/artifact-preservation.json        |    10 +
+ docs/history/reports/r243/artifacts-after.json     |   106 +
+ docs/history/reports/r243/artifacts-before.json    |   106 +
+ docs/history/reports/r243/audit-package.py         |     8 +
+ .../history/reports/r243/build-inputs-summary.json |    14 +
+ docs/history/reports/r243/checks-final.json        |   216 +
+ docs/history/reports/r243/chromium-summary.json    |    16 +
+ docs/history/reports/r243/chromium/chromium.json   |    14 +
+ .../reports/r243/chromium/dark-1-locked.png        |   Bin 0 -> 29067 bytes
+ .../reports/r243/chromium/dark-2.5-locked.png      |   Bin 0 -> 29067 bytes
+ .../reports/r243/chromium/light-1-locked.png       |   Bin 0 -> 32451 bytes
+ .../reports/r243/chromium/light-2.5-locked.png     |   Bin 0 -> 32446 bytes
+ docs/history/reports/r243/desktop-summary.json     |    18 +
+ .../reports/r243/dirty-rescan-solo-1-summary.json  |    20 +
+ .../reports/r243/dirty-rescan-solo-2-summary.json  |    20 +
+ .../reports/r243/dirty-rescan-solo-3-summary.json  |    20 +
+ .../reports/r243/electron-activation-summary.json  |    14 +
+ .../reports/r243/electron-final-summary.json       |    15 +
+ .../reports/r243/electron-r240-summary.json        |    17 +
+ .../electron/after-NETWORK_LOCKED-1/restored.png   |   Bin 0 -> 173951 bytes
+ .../electron/after-NETWORK_LOCKED-1/result.json    |   367 +
+ .../electron/after-NETWORK_LOCKED-1/show-1.png     |   Bin 0 -> 172267 bytes
+ .../electron/after-NETWORK_LOCKED-2/restored.png   |   Bin 0 -> 174166 bytes
+ .../electron/after-NETWORK_LOCKED-2/result.json    |  7610 +++
+ .../electron/after-NETWORK_LOCKED-2/show-1.png     |   Bin 0 -> 76657 bytes
+ .../electron/after-NETWORK_LOCKED-3/restored.png   |   Bin 0 -> 199241 bytes
+ .../electron/after-NETWORK_LOCKED-3/result.json    |  7646 +++
+ .../electron/after-NETWORK_LOCKED-3/show-1.png     |   Bin 0 -> 76657 bytes
+ .../electron/after-NETWORK_LOCKED-4/restored.png   |   Bin 0 -> 197092 bytes
+ .../electron/after-NETWORK_LOCKED-4/result.json    |  7672 +++
+ .../electron/after-NETWORK_LOCKED-4/show-1.png     |   Bin 0 -> 76657 bytes
+ .../electron/after-NETWORK_LOCKED-5/restored.png   |   Bin 0 -> 174187 bytes
+ .../electron/after-NETWORK_LOCKED-5/result.json    |  7853 +++
+ .../electron/after-NETWORK_LOCKED-5/show-1.png     |   Bin 0 -> 76657 bytes
+ .../electron/after-NETWORK_LOCKED-6/restored.png   |   Bin 0 -> 197061 bytes
+ .../electron/after-NETWORK_LOCKED-6/result.json    |  7805 +++
+ .../electron/after-NETWORK_LOCKED-6/show-1.png     |   Bin 0 -> 76657 bytes
+ .../electron/after-NETWORK_LOCKED-7/restored.png   |   Bin 0 -> 174145 bytes
+ .../electron/after-NETWORK_LOCKED-7/result.json    |  7264 +++
+ .../electron/after-NETWORK_LOCKED-7/show-1.png     |   Bin 0 -> 76657 bytes
+ .../electron/after-NETWORK_LOCKED-8/restored.png   |   Bin 0 -> 174177 bytes
+ .../electron/after-NETWORK_LOCKED-8/result.json    |  4035 ++
+ .../electron/after-NETWORK_LOCKED-8/show-1.png     |   Bin 0 -> 76657 bytes
+ docs/history/reports/r243/electron/after.json      | 50254 +++++++++++++++
+ .../baseline-NETWORK_LOCKED-1/restored.png         |   Bin 0 -> 174178 bytes
+ .../electron/baseline-NETWORK_LOCKED-1/result.json |  7614 +++
+ .../electron/baseline-NETWORK_LOCKED-1/show-1.png  |   Bin 0 -> 76657 bytes
+ .../baseline-NETWORK_LOCKED-2/restored.png         |   Bin 0 -> 197102 bytes
+ .../electron/baseline-NETWORK_LOCKED-2/result.json |  7722 +++
+ .../electron/baseline-NETWORK_LOCKED-2/show-1.png  |   Bin 0 -> 76657 bytes
+ .../baseline-NETWORK_LOCKED-3/restored.png         |   Bin 0 -> 150478 bytes
+ .../electron/baseline-NETWORK_LOCKED-3/result.json |  7111 +++
+ .../electron/baseline-NETWORK_LOCKED-3/show-1.png  |   Bin 0 -> 76657 bytes
+ docs/history/reports/r243/electron/baseline.json   | 22449 +++++++
+ docs/history/reports/r243/fingerprint-inputs.json  |  1997 +
+ .../reports/r243/go-focused-final-summary.json     |    19 +
+ docs/history/reports/r243/go-full-summary.json     |    16 +
+ docs/history/reports/r243/go-race-summary.json     |    17 +
+ docs/history/reports/r243/go-vet-summary.json      |    13 +
+ .../reports/r243/license-default-summary.json      |    27 +
+ .../reports/r243/license-staging-summary.json      |    28 +
+ docs/history/reports/r243/mutations-summary.json   |    14 +
+ .../mutation-NETWORK_LOCKED-1/restored.png         |   Bin 0 -> 150500 bytes
+ .../electron/mutation-NETWORK_LOCKED-1/result.json |  7733 +++
+ .../electron/mutation-NETWORK_LOCKED-1/show-1.png  |   Bin 0 -> 76657 bytes
+ docs/history/reports/r243/mutations/results.json   |    44 +
+ .../non-final/activation-unproxied-result.json     |  7786 +++
+ .../reports/r243/non-final/chromium-summary.json   |    16 +
+ .../reports/r243/non-final/desktop-summary.json    |    18 +
+ .../non-final/dirty-rescan-solo-1-summary.json     |    20 +
+ .../non-final/dirty-rescan-solo-2-summary.json     |    20 +
+ .../non-final/dirty-rescan-solo-3-summary.json     |    20 +
+ .../r243/non-final/electron-final-summary.json     |    19 +
+ .../r243/non-final/electron-r240-summary.json      |    20 +
+ .../r243/non-final/go-focused-final-summary.json   |    19 +
+ .../reports/r243/non-final/go-full-summary.json    |    16 +
+ .../reports/r243/non-final/go-race-summary.json    |    17 +
+ .../reports/r243/non-final/go-vet-summary.json     |    13 +
+ .../non-final/initial-go-full-failure-excerpt.txt  |     6 +
+ .../r243/non-final/license-default-summary.json    |    27 +
+ .../r243/non-final/license-staging-summary.json    |    28 +
+ .../reports/r243/non-final/mutations-summary.json  |    14 +
+ .../reports/r243/non-final/renderers-summary.json  |    19 +
+ .../reports/r243/package-audit-summary.json        |    14 +
+ docs/history/reports/r243/package-audit.json       |    44 +
+ .../reports/r243/r240-electron/acceptance.json     |  8131 +++
+ .../r243/r240-electron/after-ACTIVE-1/result.json  |  7128 +++
+ .../r243/r240-electron/after-ACTIVE-1/show-1.png   |   Bin 0 -> 195089 bytes
+ .../r243/r240-electron/after-ACTIVE-2/result.json  |   638 +
+ .../r243/r240-electron/after-ACTIVE-2/show-1.png   |   Bin 0 -> 73703 bytes
+ .../r243/r240-electron/after-LOCKED-1/result.json  |   363 +
+ .../r243/r240-electron/after-LOCKED-1/show-1.png   |   Bin 0 -> 73703 bytes
+ docs/history/reports/r243/renderers-summary.json   |    19 +
+ .../reports/r243/run-activation-electron.cjs       |     2 +
+ docs/history/reports/r243/run-check.py             |    12 +
+ docs/history/reports/r243/run-final-checks.py      |    29 +
+ .../reports/r243/source-final-before-checks.json   |   920 +
+ docs/history/reports/r243/source-preservation.json |     5 +
+ .../reports/r243/staging-build-summary.json        |    20 +
+ docs/history/reports/r243/verify-build-inputs.cjs  |    16 +
+ docs/history/reports/r243/write-ledger.py          |    43 +
+ .../reports/r244/champselect-history-dark.png      |   Bin 0 -> 178334 bytes
+ .../reports/r244/champselect-history-light.png     |   Bin 0 -> 180211 bytes
+ docs/history/reports/r244/chromium.json            |    50 +
+ docs/history/reports/r244/mutations.json           |   101 +
+ docs/history/reports/r244/public-build.json        |    10 +
+ .../r245/artifact-preservation-pending.json        |    38 +
+ docs/history/reports/r245/artifacts-before.json    |   662 +
+ docs/history/reports/r245/baseline-source.json     |     6 +
+ docs/history/reports/r245/chromium.json            |    15 +
+ docs/history/reports/r245/chromium/chromium.json   |    14 +
+ .../reports/r245/chromium/dark-1-locked.png        |   Bin 0 -> 29067 bytes
+ .../reports/r245/chromium/dark-2.5-locked.png      |   Bin 0 -> 29067 bytes
+ .../reports/r245/chromium/light-1-locked.png       |   Bin 0 -> 32423 bytes
+ .../reports/r245/chromium/light-2.5-locked.png     |   Bin 0 -> 32417 bytes
+ docs/history/reports/r245/desktop.json             |    19 +
+ .../reports/r245/dirty-collection-three.json       |    41 +
+ docs/history/reports/r245/dirty-current-three.json |    41 +
+ docs/history/reports/r245/dirty-probe-temp.json    |     1 +
+ .../history/reports/r245/dirty-proposed-three.json |    14 +
+ .../electron-final/after-ACTIVE-1/restored.png     |   Bin 0 -> 155171 bytes
+ .../r245/electron-final/after-ACTIVE-1/result.json |  4801 ++
+ .../r245/electron-final/after-ACTIVE-1/show-1.png  |   Bin 0 -> 155045 bytes
+ .../electron-final/after-ACTIVE-10/restored.png    |   Bin 0 -> 167390 bytes
+ .../electron-final/after-ACTIVE-10/result.json     |  5221 ++
+ .../r245/electron-final/after-ACTIVE-10/show-1.png |   Bin 0 -> 143112 bytes
+ .../electron-final/after-ACTIVE-11/restored.png    |   Bin 0 -> 144091 bytes
+ .../electron-final/after-ACTIVE-11/result.json     |  5329 ++
+ .../r245/electron-final/after-ACTIVE-11/show-1.png |   Bin 0 -> 143112 bytes
+ .../electron-final/after-ACTIVE-12/restored.png    |   Bin 0 -> 144430 bytes
+ .../electron-final/after-ACTIVE-12/result.json     |  5614 ++
+ .../r245/electron-final/after-ACTIVE-12/show-1.png |   Bin 0 -> 143112 bytes
+ .../electron-final/after-ACTIVE-2/restored.png     |   Bin 0 -> 110174 bytes
+ .../r245/electron-final/after-ACTIVE-2/result.json |  5053 ++
+ .../r245/electron-final/after-ACTIVE-2/show-1.png  |   Bin 0 -> 155045 bytes
+ .../electron-final/after-ACTIVE-3/restored.png     |   Bin 0 -> 155207 bytes
+ .../r245/electron-final/after-ACTIVE-3/result.json |  5377 ++
+ .../r245/electron-final/after-ACTIVE-3/show-1.png  |   Bin 0 -> 155045 bytes
+ .../electron-final/after-ACTIVE-4/restored.png     |   Bin 0 -> 155173 bytes
+ .../r245/electron-final/after-ACTIVE-4/result.json |  4318 ++
+ .../r245/electron-final/after-ACTIVE-4/show-1.png  |   Bin 0 -> 155045 bytes
+ .../electron-final/after-ACTIVE-5/restored.png     |   Bin 0 -> 120690 bytes
+ .../r245/electron-final/after-ACTIVE-5/result.json |  5317 ++
+ .../r245/electron-final/after-ACTIVE-5/show-1.png  |   Bin 0 -> 119238 bytes
+ .../electron-final/after-ACTIVE-6/restored.png     |   Bin 0 -> 138329 bytes
+ .../r245/electron-final/after-ACTIVE-6/result.json |  5029 ++
+ .../r245/electron-final/after-ACTIVE-6/show-1.png  |   Bin 0 -> 119238 bytes
+ .../electron-final/after-ACTIVE-7/restored.png     |   Bin 0 -> 120429 bytes
+ .../r245/electron-final/after-ACTIVE-7/result.json |  5209 ++
+ .../r245/electron-final/after-ACTIVE-7/show-1.png  |   Bin 0 -> 76148 bytes
+ .../electron-final/after-ACTIVE-8/restored.png     |   Bin 0 -> 120904 bytes
+ .../r245/electron-final/after-ACTIVE-8/result.json |  5494 ++
+ .../r245/electron-final/after-ACTIVE-8/show-1.png  |   Bin 0 -> 119238 bytes
+ .../electron-final/after-ACTIVE-9/restored.png     |   Bin 0 -> 144450 bytes
+ .../r245/electron-final/after-ACTIVE-9/result.json |  5425 ++
+ .../r245/electron-final/after-ACTIVE-9/show-1.png  |   Bin 0 -> 143112 bytes
+ .../after-fractional-ACTIVE-1/restored.png         |   Bin 0 -> 155177 bytes
+ .../after-fractional-ACTIVE-1/result.json          |  4753 ++
+ .../after-fractional-ACTIVE-1/show-1.png           |   Bin 0 -> 101422 bytes
+ .../after-fractional-ACTIVE-2/restored.png         |   Bin 0 -> 120597 bytes
+ .../after-fractional-ACTIVE-2/result.json          |  5401 ++
+ .../after-fractional-ACTIVE-2/show-1.png           |   Bin 0 -> 76148 bytes
+ .../after-fractional-ACTIVE-3/restored.png         |   Bin 0 -> 144375 bytes
+ .../after-fractional-ACTIVE-3/result.json          |  5341 ++
+ .../after-fractional-ACTIVE-3/show-1.png           |   Bin 0 -> 137825 bytes
+ .../r245/electron-final/after-fractional.json      | 15497 +++++
+ .../history/reports/r245/electron-final/after.json | 62189 +++++++++++++++++++
+ docs/history/reports/r245/electron-fractional.json |    16 +
+ .../baseline-fractional-ACTIVE-1/restored.png      |   Bin 0 -> 82989 bytes
+ .../baseline-fractional-ACTIVE-1/result.json       |  5747 ++
+ .../baseline-fractional-ACTIVE-1/show-1.png        |   Bin 0 -> 149237 bytes
+ .../baseline-fractional-ACTIVE-2/restored.png      |   Bin 0 -> 134354 bytes
+ .../baseline-fractional-ACTIVE-2/result.json       |  5771 ++
+ .../baseline-fractional-ACTIVE-2/show-1.png        |   Bin 0 -> 77205 bytes
+ .../baseline-fractional-ACTIVE-3/restored.png      |   Bin 0 -> 125484 bytes
+ .../baseline-fractional-ACTIVE-3/result.json       |  5735 ++
+ .../baseline-fractional-ACTIVE-3/show-1.png        |   Bin 0 -> 137825 bytes
+ .../baseline-fractional.json                       | 17255 +++++
+ .../baseline-fractional-ACTIVE-1/restored.png      |   Bin 0 -> 82963 bytes
+ .../baseline-fractional-ACTIVE-1/result.json       |  5555 ++
+ .../baseline-fractional-ACTIVE-1/show-1.png        |   Bin 0 -> 107179 bytes
+ .../baseline-fractional-ACTIVE-2/restored.png      |   Bin 0 -> 134386 bytes
+ .../baseline-fractional-ACTIVE-2/result.json       |  5507 ++
+ .../baseline-fractional-ACTIVE-2/show-1.png        |   Bin 0 -> 125386 bytes
+ .../baseline-fractional-ACTIVE-3/restored.png      |   Bin 0 -> 125491 bytes
+ .../baseline-fractional-ACTIVE-3/result.json       |  5693 ++
+ .../baseline-fractional-ACTIVE-3/show-1.png        |   Bin 0 -> 131905 bytes
+ docs/history/reports/r245/electron-summary.json    |  1430 +
+ docs/history/reports/r245/electron.json            |    16 +
+ .../r245/electron/after-ACTIVE-1/restored.png      |   Bin 0 -> 155107 bytes
+ .../r245/electron/after-ACTIVE-1/result.json       |  3961 ++
+ .../r245/electron/after-ACTIVE-1/show-1.png        |   Bin 0 -> 155188 bytes
+ .../r245/electron/after-ACTIVE-10/restored.png     |   Bin 0 -> 167394 bytes
+ .../r245/electron/after-ACTIVE-10/result.json      |  5077 ++
+ .../r245/electron/after-ACTIVE-10/show-1.png       |   Bin 0 -> 143112 bytes
+ .../r245/electron/after-ACTIVE-11/restored.png     |   Bin 0 -> 144123 bytes
+ .../r245/electron/after-ACTIVE-11/result.json      |  5449 ++
+ .../r245/electron/after-ACTIVE-11/show-1.png       |   Bin 0 -> 143112 bytes
+ .../r245/electron/after-ACTIVE-12/restored.png     |   Bin 0 -> 144361 bytes
+ .../r245/electron/after-ACTIVE-12/result.json      |  5614 ++
+ .../r245/electron/after-ACTIVE-12/show-1.png       |   Bin 0 -> 137825 bytes
+ .../r245/electron/after-ACTIVE-2/restored.png      |   Bin 0 -> 110132 bytes
+ .../r245/electron/after-ACTIVE-2/result.json       |  4705 ++
+ .../r245/electron/after-ACTIVE-2/show-1.png        |   Bin 0 -> 101324 bytes
+ .../r245/electron/after-ACTIVE-3/restored.png      |   Bin 0 -> 155152 bytes
+ .../r245/electron/after-ACTIVE-3/result.json       |  5173 ++
+ .../r245/electron/after-ACTIVE-3/show-1.png        |   Bin 0 -> 101408 bytes
+ .../r245/electron/after-ACTIVE-4/restored.png      |   Bin 0 -> 155004 bytes
+ .../r245/electron/after-ACTIVE-4/result.json       |  4246 ++
+ .../r245/electron/after-ACTIVE-4/show-1.png        |   Bin 0 -> 155045 bytes
+ .../r245/electron/after-ACTIVE-5/restored.png      |   Bin 0 -> 120717 bytes
+ .../r245/electron/after-ACTIVE-5/result.json       |  5233 ++
+ .../r245/electron/after-ACTIVE-5/show-1.png        |   Bin 0 -> 76148 bytes
+ .../r245/electron/after-ACTIVE-6/restored.png      |   Bin 0 -> 137881 bytes
+ .../r245/electron/after-ACTIVE-6/result.json       |  5077 ++
+ .../r245/electron/after-ACTIVE-6/show-1.png        |   Bin 0 -> 76148 bytes
+ .../r245/electron/after-ACTIVE-7/restored.png      |   Bin 0 -> 120409 bytes
+ .../r245/electron/after-ACTIVE-7/result.json       |  5413 ++
+ .../r245/electron/after-ACTIVE-7/show-1.png        |   Bin 0 -> 77139 bytes
+ .../r245/electron/after-ACTIVE-8/restored.png      |   Bin 0 -> 120926 bytes
+ .../r245/electron/after-ACTIVE-8/result.json       |  5554 ++
+ .../r245/electron/after-ACTIVE-8/show-1.png        |   Bin 0 -> 119238 bytes
+ .../r245/electron/after-ACTIVE-9/restored.png      |   Bin 0 -> 144385 bytes
+ .../r245/electron/after-ACTIVE-9/result.json       |  5449 ++
+ .../r245/electron/after-ACTIVE-9/show-1.png        |   Bin 0 -> 143112 bytes
+ docs/history/reports/r245/electron/after.json      | 60953 ++++++++++++++++++
+ .../r245/electron/baseline-ACTIVE-1/restored.png   |   Bin 0 -> 155144 bytes
+ .../r245/electron/baseline-ACTIVE-1/result.json    |  4689 ++
+ .../r245/electron/baseline-ACTIVE-1/show-1.png     |   Bin 0 -> 107179 bytes
+ .../r245/electron/baseline-ACTIVE-10/restored.png  |   Bin 0 -> 167375 bytes
+ .../r245/electron/baseline-ACTIVE-10/result.json   |  5157 ++
+ .../r245/electron/baseline-ACTIVE-10/show-1.png    |   Bin 0 -> 216659 bytes
+ .../r245/electron/baseline-ACTIVE-11/restored.png  |   Bin 0 -> 144301 bytes
+ .../r245/electron/baseline-ACTIVE-11/result.json   |  5445 ++
+ .../r245/electron/baseline-ACTIVE-11/show-1.png    |   Bin 0 -> 131905 bytes
+ .../r245/electron/baseline-ACTIVE-12/restored.png  |   Bin 0 -> 144226 bytes
+ .../r245/electron/baseline-ACTIVE-12/result.json   |  5562 ++
+ .../r245/electron/baseline-ACTIVE-12/show-1.png    |   Bin 0 -> 131905 bytes
+ .../r245/electron/baseline-ACTIVE-2/restored.png   |   Bin 0 -> 110069 bytes
+ .../r245/electron/baseline-ACTIVE-2/result.json    |  4869 ++
+ .../r245/electron/baseline-ACTIVE-2/show-1.png     |   Bin 0 -> 107179 bytes
+ .../r245/electron/baseline-ACTIVE-3/restored.png   |   Bin 0 -> 155149 bytes
+ .../r245/electron/baseline-ACTIVE-3/result.json    |  4845 ++
+ .../r245/electron/baseline-ACTIVE-3/show-1.png     |   Bin 0 -> 107179 bytes
+ .../r245/electron/baseline-ACTIVE-4/restored.png   |   Bin 0 -> 155014 bytes
+ .../r245/electron/baseline-ACTIVE-4/result.json    |  4230 ++
+ .../r245/electron/baseline-ACTIVE-4/show-1.png     |   Bin 0 -> 107179 bytes
+ .../r245/electron/baseline-ACTIVE-5/restored.png   |   Bin 0 -> 120581 bytes
+ .../r245/electron/baseline-ACTIVE-5/result.json    |  5445 ++
+ .../r245/electron/baseline-ACTIVE-5/show-1.png     |   Bin 0 -> 81461 bytes
+ .../r245/electron/baseline-ACTIVE-6/restored.png   |   Bin 0 -> 138443 bytes
+ .../r245/electron/baseline-ACTIVE-6/result.json    |  5145 ++
+ .../r245/electron/baseline-ACTIVE-6/show-1.png     |   Bin 0 -> 81461 bytes
+ .../r245/electron/baseline-ACTIVE-7/restored.png   |   Bin 0 -> 120459 bytes
+ .../r245/electron/baseline-ACTIVE-7/result.json    |  5397 ++
+ .../r245/electron/baseline-ACTIVE-7/show-1.png     |   Bin 0 -> 133063 bytes
+ .../r245/electron/baseline-ACTIVE-8/restored.png   |   Bin 0 -> 120565 bytes
+ .../r245/electron/baseline-ACTIVE-8/result.json    |  5586 ++
+ .../r245/electron/baseline-ACTIVE-8/show-1.png     |   Bin 0 -> 133063 bytes
+ .../r245/electron/baseline-ACTIVE-9/restored.png   |   Bin 0 -> 144447 bytes
+ .../r245/electron/baseline-ACTIVE-9/result.json    |  5349 ++
+ .../r245/electron/baseline-ACTIVE-9/show-1.png     |   Bin 0 -> 216659 bytes
+ .../baseline-fractional-ACTIVE-1/restored.png      |   Bin 0 -> 155172 bytes
+ .../baseline-fractional-ACTIVE-1/result.json       |  4666 ++
+ .../baseline-fractional-ACTIVE-1/show-1.png        |   Bin 0 -> 107179 bytes
+ .../baseline-fractional-ACTIVE-2/restored.png      |   Bin 0 -> 120685 bytes
+ .../baseline-fractional-ACTIVE-2/result.json       |  5350 ++
+ .../baseline-fractional-ACTIVE-2/show-1.png        |   Bin 0 -> 81461 bytes
+ .../baseline-fractional-ACTIVE-3/restored.png      |   Bin 0 -> 144451 bytes
+ .../baseline-fractional-ACTIVE-3/result.json       |  5458 ++
+ .../baseline-fractional-ACTIVE-3/show-1.png        |   Bin 0 -> 216659 bytes
+ .../reports/r245/electron/baseline-fractional.json | 15476 +++++
+ docs/history/reports/r245/electron/baseline.json   | 61721 ++++++++++++++++++
+ .../reports/r245/final-source-before-checks.json   |   931 +
+ docs/history/reports/r245/go-final-inputs.json     |   468 +
+ docs/history/reports/r245/go-full.json             |    17 +
+ docs/history/reports/r245/go-input-changes.json    |     3 +
+ docs/history/reports/r245/go-race.json             |    18 +
+ .../reports/r245/go-source-preservation.json       |     6 +
+ docs/history/reports/r245/go-vet.json              |    14 +
+ docs/history/reports/r245/license-default.json     |    28 +
+ docs/history/reports/r245/license-staging.json     |    29 +
+ docs/history/reports/r245/mutations.json           |    15 +
+ docs/history/reports/r245/mutations/results.json   |    30 +
+ .../reports/r245/native-export-fractional.json     |    19 +
+ docs/history/reports/r245/native-export.json       |    19 +
+ docs/history/reports/r245/non-final/desktop.json   |    19 +
+ docs/history/reports/r245/non-final/go-full.json   |    21 +
+ docs/history/reports/r245/non-final/renderers.json |    20 +
+ docs/history/reports/r245/protected-before.json    |    10 +
+ docs/history/reports/r245/protected-current.json   |    42 +
+ docs/history/reports/r245/r245-source-files.json   |    58 +
+ docs/history/reports/r245/renderers.json           |    20 +
+ docs/history/reports/r245/run-checks.py            |    26 +
+ docs/history/reports/r246/dirty-analysis.md        |    37 +
+ docs/history/reports/r246/dirty-current-file.json  |    20 +
+ docs/history/reports/r246/dirty-delayed-clean.json |    38 +
+ .../reports/r246/dirty-pre-r245-ui-file.json       |    21 +
+ docs/history/reports/r246/dirty-pre-r245-ui.json   |    64 +
+ docs/history/reports/r246/dirty-three.json         |    59 +
+ docs/history/reports/r246/mutations.json           |    36 +
+ docs/history/reports/r246/protected-stop.json      |    43 +
+ docs/history/reports/r246/run-checks.py            |    29 +
+ docs/history/reports/r246/run-mutation.py          |    13 +
+ docs/history/reports/r246/vector-candidate.json    |    16 +
+ docs/history/reports/r247/before.json              |    11 +
+ docs/history/reports/r247/constraints.json         |     9 +
+ docs/history/reports/r247/load.json                |   152 +
+ docs/history/reports/r247/mutation-probe.json      |    24 +
+ docs/history/reports/r247/mutations.json           |   168 +
+ .../reports/r247/non-final/mutation-probe.json     |    23 +
+ docs/history/reports/r247/normal.json              |   292 +
+ .../r247/refresh-orchestration.before.cjs.txt      |   498 +
+ docs/history/reports/r247/run-mutations.py         |    27 +
+ docs/history/reports/r247/run-repeat.py            |    19 +
+ .../reports/r248/artifact-preservation.json        |     7 +
+ docs/history/reports/r248/checked-snapshot.json    |  2012 +
+ docs/history/reports/r248/chromium-css-final.json  |    16 +
+ .../history/reports/r248/chromium-image-final.json |    16 +
+ .../reports/r248/concurrent-source-changes.json    |    50 +
+ docs/history/reports/r248/current-vs-frozen.json   |     5 +
+ docs/history/reports/r248/desktop-final.json       |    19 +
+ docs/history/reports/r248/electron-final.json      |    16 +
+ .../r248/electron/after-DISABLED-1/result.json     |   549 +
+ .../r248/electron/after-DISABLED-1/show-1.png      |   Bin 0 -> 161313 bytes
+ .../r248/electron/after-DISABLED-2/result.json     |   573 +
+ .../r248/electron/after-DISABLED-2/show-1.png      |   Bin 0 -> 118876 bytes
+ .../r248/electron/after-DISABLED-3/result.json     |   525 +
+ .../r248/electron/after-DISABLED-3/show-1.png      |   Bin 0 -> 161313 bytes
+ .../r248/electron/after-DISABLED-4/result.json     |   477 +
+ .../r248/electron/after-DISABLED-4/show-1.png      |   Bin 0 -> 143564 bytes
+ .../r248/electron/before-DISABLED-1/result.json    |   380 +
+ .../r248/electron/before-DISABLED-1/show-1.png     |   Bin 0 -> 118711 bytes
+ .../r248/electron/before-DISABLED-2/result.json    |   534 +
+ .../r248/electron/before-DISABLED-2/show-1.png     |   Bin 0 -> 146494 bytes
+ .../r248/electron/before-DISABLED-3/result.json    |   510 +
+ .../r248/electron/before-DISABLED-3/show-1.png     |   Bin 0 -> 116719 bytes
+ docs/history/reports/r248/electron/startup.json    |  3550 ++
+ docs/history/reports/r248/final-confirmation.json  |    10 +
+ docs/history/reports/r248/final-inputs.json        |   912 +
+ .../history/reports/r248/go-default-inventory.json |   925 +
+ docs/history/reports/r248/go-full-final.json       |    17 +
+ .../history/reports/r248/go-license-inventory.json |   928 +
+ docs/history/reports/r248/go-race-final.json       |    18 +
+ .../reports/r248/go-staging-only-inventory.json    |   925 +
+ docs/history/reports/r248/go-vet-final.json        |    14 +
+ .../history/reports/r248/installer-test-final.json |    21 +
+ docs/history/reports/r248/installer-vet-final.json |    14 +
+ docs/history/reports/r248/lcu-before-gofmt.go.txt  |  1166 +
+ docs/history/reports/r248/license-go-final.json    |    25 +
+ .../electron-overlay/after-DISABLED-1/result.json  |   497 +
+ .../electron-overlay/after-DISABLED-1/show-1.png   |   Bin 0 -> 88878 bytes
+ docs/history/reports/r248/mutations/results.json   |    15 +
+ .../go-full-final.json                             |    21 +
+ .../go-race-final.json                             |    18 +
+ .../go-vet-final.json                              |    14 +
+ .../chromium-css-final.json                        |    16 +
+ .../chromium-image-final.json                      |    16 +
+ .../desktop-final.json                             |    19 +
+ .../go-full-final.json                             |    17 +
+ .../go-race-final.json                             |    18 +
+ .../go-vet-final.json                              |    14 +
+ .../installer-test-final.json                      |    21 +
+ .../installer-vet-final.json                       |    14 +
+ .../license-go-final.json                          |    25 +
+ .../renderers-final.json                           |    20 +
+ .../syntax-final.json                              |     5 +
+ .../worker-final.json                              |    20 +
+ .../after-DISABLED-1/result.json                   |   560 +
+ .../after-DISABLED-1/show-1.png                    |   Bin 0 -> 146494 bytes
+ .../after-DISABLED-2/result.json                   |   584 +
+ .../after-DISABLED-2/show-1.png                    |   Bin 0 -> 161313 bytes
+ .../after-DISABLED-3/result.json                   |   476 +
+ .../after-DISABLED-3/show-1.png                    |   Bin 0 -> 116753 bytes
+ .../after-DISABLED-4/result.json                   |   512 +
+ .../after-DISABLED-4/show-1.png                    |   Bin 0 -> 143564 bytes
+ .../before-DISABLED-1/result.json                  |   476 +
+ .../before-DISABLED-1/show-1.png                   |   Bin 0 -> 161313 bytes
+ .../before-DISABLED-2/result.json                  |   570 +
+ .../before-DISABLED-2/show-1.png                   |   Bin 0 -> 161313 bytes
+ .../before-DISABLED-3/result.json                  |   582 +
+ .../before-DISABLED-3/show-1.png                   |   Bin 0 -> 161313 bytes
+ .../electron-with-concurrent-load/startup.json     |  3762 ++
+ .../package-final.json                             |    19 +
+ .../package-format-preflight/package-final.json    |    19 +
+ .../package-final.json                             |    19 +
+ .../renderers-before-privacy-checker-final.json    |    20 +
+ docs/history/reports/r248/package-audit-final.json |    15 +
+ docs/history/reports/r248/package-audit.json       |    40 +
+ docs/history/reports/r248/package-final.json       |    19 +
+ .../reports/r248/proposed-season-cleanup.patch     |    10 +
+ docs/history/reports/r248/renderer-summary.json    |   688 +
+ docs/history/reports/r248/renderers-final.json     |    20 +
+ docs/history/reports/r248/run-check.py             |    26 +
+ docs/history/reports/r248/snapshot.json            |    18 +
+ docs/history/reports/r248/startup-comparison.json  |    60 +
+ docs/history/reports/r248/syntax-final.json        |     5 +
+ docs/history/reports/r248/verification.json        |   252 +
+ docs/history/reports/r248/worker-final.json        |    20 +
+ .../release-0.12.76/anonymous-assets/latest.json   |    14 +
+ docs/license-protocol.md                           |   149 +
+ docs/license-shelved-reenable.md                   |    26 +
+ .../browser/confirmed-backend-exit.png             |   Bin 22235 -> 20162 bytes
+ docs/r100-validation/browser/result.json           |     2 +-
+ .../browser/status-with-hung-images.png            |   Bin 4747 -> 4655 bytes
+ docs/r117-validation/browser/result.json           |    21 +
+ docs/r232-execution-ledger.md                      |  1435 +
+ docs/r235-execution-ledger.md                      |   134 +
+ docs/r241-execution-ledger.md                      |   122 +
+ docs/r244-execution-ledger.md                      |    87 +
+ installer/build-shell.cjs                          |     4 +-
+ installer/disabled_build_test.go                   |    20 +
+ installer/license_disabled.go                      |     7 +
+ installer/license_enabled.go                       |    21 +
+ installer/ui.go                                    |     4 +-
+ installer/ui/license-activation.html               |    14 +
+ installer/uninstall/finish.go                      |     3 +-
+ installer/uninstall/launch_windows.go              |     2 +-
+ installer/uninstall/license_cleanup.go             |    16 +
+ installer/uninstall/license_disabled.go            |     5 +
+ installer/uninstall/license_test.go                |    26 +
+ installer/uninstall/webview_windows.go             |     2 +-
+ scripts/build-license-staging.cjs                  |    67 +
+ scripts/build-no-license-audit.cjs                 |    32 +
+ scripts/prepare-r238-update-fixture.cjs            |    28 +
+ scripts/r206-real-upgrade-windows.ps1              |    44 +-
+ scripts/r232-browser.cjs                           |    63 +
+ scripts/r235-browser.cjs                           |    89 +
+ scripts/r235-mutations.py                          |    37 +
+ scripts/r238-electron.cjs                          |    87 +
+ scripts/r238-mutations.cjs                         |    29 +
+ scripts/r239-audit-staging.cjs                     |    56 +
+ scripts/r239-browser.cjs                           |   107 +
+ scripts/r239-mutations.cjs                         |    32 +
+ scripts/r239-startup-probe.cjs                     |    93 +
+ scripts/r240-audit-staging.cjs                     |    60 +
+ scripts/r240-browser.cjs                           |   107 +
+ scripts/r240-electron.cjs                          |   150 +
+ scripts/r240-mutations.cjs                         |    36 +
+ scripts/r241-browser.cjs                           |    85 +
+ scripts/r241-mutations.py                          |    27 +
+ scripts/r242-audit-staging.cjs                     |    62 +
+ scripts/r242-browser.cjs                           |   129 +
+ scripts/r243-audit-staging.cjs                     |    68 +
+ scripts/r243-electron.cjs                          |   188 +
+ scripts/r243-mutations.cjs                         |    18 +
+ scripts/r244-browser.cjs                           |    39 +
+ scripts/r244-mutations.py                          |    50 +
+ scripts/r245-audit-staging.cjs                     |    70 +
+ scripts/r245-electron.cjs                          |   144 +
+ scripts/r245-mutations.cjs                         |    14 +
+ scripts/r246-audit-staging.cjs                     |    75 +
+ scripts/r248-audit-package.cjs                     |    26 +
+ scripts/r248-electron.cjs                          |   134 +
+ scripts/r248-mutations.cjs                         |    17 +
+ scripts/setup-only-build.test.cjs                  |     2 +-
+ scripts/test-license.cjs                           |     6 +
+ scripts/verify-ci-test-filters.test.cjs            |     4 +-
+ 1323 files changed, 841237 insertions(+), 568 deletions(-)

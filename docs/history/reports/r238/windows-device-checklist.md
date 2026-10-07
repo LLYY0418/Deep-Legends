@@ -2,7 +2,7 @@
 
 本清单不以macOS、模拟API、CI安装器代替真实游戏客户端。每项记录日期、安装包SHA、应用版本/指纹、服务器、同run日志，结果保持待真机。
 
-日志位置：后端默认 `%LOCALAPPDATA%\LOLLootAssistant\logs\diagnostics.jsonl`（含轮转文件）；如配置 `LOL_LOOT_DATA_DIR`，以该目录的 `logs` 为准。桌面日志在 `%APPDATA%\Deep Legends\logs`，窗口文件为同目录 `window-bounds.json`、`ui-scale.json`。可在设置的诊断导出中一并导出后端/桌面日志；原始日志勿只截最后几行。
+日志位置：后端默认 `%LOCALAPPDATA%\LOLLootAssistant\logs\diagnostics.jsonl`（含轮转文件）；如配置 `LOL_LOOT_DATA_DIR`，以该目录的 `logs` 为准。桌面日志在 `%APPDATA%\deep-legends-desktop\logs`，窗口文件为同目录 `window-bounds.json`、`ui-scale.json`。可在设置的诊断导出中一并导出后端/桌面日志；原始日志勿只截最后几行。
 
 | 项目 | 操作和通过标准 | 状态 |
 |---|---|---|

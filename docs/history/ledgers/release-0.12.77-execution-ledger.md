@@ -1,6 +1,6 @@
 # 0.12.77 发布执行账本（R238，进行中）
 
-日期：2026-10-07，Asia/Shanghai。已亲自通读 R238 全文、项目记忆两份文档、AGENTS 与发布账本模板。目标 0.12.77，key mode **public**，默认不带注册码。本次继续执行前为 `codex/release-0.12.75` / `b37357b2a6cf29397ac0f16255d37fa1566e87ac`；现在已合并 v0.12.76，新建 `codex/release-0.12.77`，版本暂为 **0.12.76**。业务已按工单拆提交，尚未构建候选、推送、打 tag 或发布。最终 SHA、指纹、Release id 和新附件 SHA-256 尚未产生。**未在 Windows 实跑**。
+日期：2026-10-07，Asia/Shanghai。已亲自通读 R238 全文、项目记忆两份文档、AGENTS 与发布账本模板。目标 0.12.77，key mode **public**，默认不带注册码。本次继续执行前为 `codex/release-0.12.75` / `b37357b2a6cf29397ac0f16255d37fa1566e87ac`；现在已合并 v0.12.76，新建 `codex/release-0.12.77`，本地最终预检通过后版本已更新为 **0.12.77**（版本提交f8f727bb）。业务已按工单拆提交；本地public候选已构建与审计，指纹 **7e1229c2a79c**。尚未推送、打tag或发布；最终CI SHA、Release id和正式草稿附件摘要待产生。**未在 Windows 实跑**。
 
 ## P0 发布闸门
 
@@ -108,3 +108,27 @@ macOS未安装pwsh，附加PowerShell解析检查没有执行（启动报ENOENT�
 license标签再次编译并运行，仅余TestR233FailedCounterSaveDoesNotRefreshCachedLifetime、TestR242LicenseExpiryStrictSignedField两个已定位的R246半成品合同冲突（license.go:28是2小时，夹具分别硬编码10+5分钟/900秒），按授权记录，不修/不放宽安全规则。R237移动后的精确隐私断言已经PASS。macOS缺pwsh启动记录为UNAVAILABLE，不标Windows执行；真正PowerShell/升级将由CI实跑。
 
 [Windows真机清单](../reports/r238/windows-device-checklist.md)已完成，含通过标准与日志路径，所有真实游戏/账号/晚高峰项目均待真机；匿名077 Latest在线路径待用户确认发布后真机。本地Go默认更新兼容已用已发布076清单与111854592字节公开资产核验，通过076 unsigned/固定URL/大小/SHA策略。接下来才更新077元数据，产公共候选和同SHA CI；包、WindowsCI及草稿附件尚待完成。
+
+安装包ASAR核验纠正日志位置：package.name是deep-legends-desktop，顶层productName未设置；main未setName，因此实际ElectronuserData默认为APPDATA/deep-legends-desktop。升级脚本直接从已安装076的ASAR解析productName||name并要求该目录已存在，避免在错误目录种哨兵而虚报保留；真机清单已更正。此项是验证脚本修正，未改产品存储逻辑。
+
+## P2 本地public包审计 / P4进入Windows CI
+
+正式build-desktop.sh在逐文件复制的临时构建输入运行（无license标签、public mode、无私钥/真实码），源码仍是主发布分支；190.216秒完成唯一新本地Setup。输出全新dist/R238-0.12.77-public，macOS后端为dist/R238-0.12.77-macos-public。原有160个STAGING/R248审计文件大小与SHA全相同。没有创建便携包。
+
+| 最终本地检查 | 结果 / 证据 |
+|---|---|
+| Go全量 / 全量race / vet | PASS；180.904s / 216.844s / 1.491s；p2/go-full-final、race-final、final-vet |
+| Installer test/vet | PASS；3.300s / 0.227s |
+| Renderer all / desktop node --test / Worker | PASS；1332/1328/4 skip、296/294/2 skip、16/16/0 skip；未新增skip |
+| build/quality/filter护栏 / gofmt / JS / diff | PASS；PowerShell仅本机UNAVAILABLE、待实际Windows CI |
+| license编译专项 | 编译通过；仅2个R246半成品时长夹具失败已记录，R237精确隐私测试通过 |
+| 21变异 / R235-R241-R244深浅Chromium / R100-R117 | PASS；全部原断言与预算保留 |
+| 默认首帧 / API与域名0请求 / license事件0 | 真实Electron/macOS PASS；Windows源码首帧待CI，真实安装后界面待用户 |
+| 新public包授权域名/kid/公钥/隐私句缺失、Riot Key缺失 | PASS；[完整包审计](../reports/r238/p2/package-audit.json) |
+| 后端digest/fingerprint、ASAR与fuses | PASS；固定digest/ASAR header实际匹配；RunAsNode/NodeOptions/Inspect关闭、ASARIntegrity/OnlyASAR开启 |
+| 默认在线更新策略 | 与076一致，unsigned manifest/schema/固定URL/size/SHA；已用真实076公开清单和资产验证 |
+| macOS backend / 隔离数据自检 | PASS；0.12.77/7e1229c2a79c，奖池554，哈希dee5e21f5234；未在Windows实跑 |
+
+本地Setup SHA-256 **1a9a7ad155460849c075338d3857f703a2b4137191a52bc6aefad8f4bf2b6ce4**；Windows后端SHA-256 **a67dc62bd94bcecf2a7a832084f6db7778ef887dd8e6f08e559d74faa8095702**；macOS后端SHA-256 **3bf5b1fed5ff28eb8625449f51222ebfb2dc081d72a293585ad1fa5984c3cd9e**。这份本地包用于审计，正式附件以Windows工作流实际生成的草稿为准，不能混用两个摘要。
+
+玩家说明已按工单写入077 CHANGELOG，无R编号、注册码或隐藏识别。按用户本轮指定顺序推发布分支、同SHA完整质量通过后再tag；快照分支不推。与日常R222只推tag的去重顺序不同，本轮遵循用户明确的分支质量闸门，记录可能的同SHA tag复检。到Latest明确停下等待确认；真实账号/晚高峰/匿名077在线仍待真机或发布后，不标通过。

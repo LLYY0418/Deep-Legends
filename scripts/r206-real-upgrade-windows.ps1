@@ -59,7 +59,10 @@ try {
     Run-Setup $published076
     Stop-InstalledApp
     if ((Get-Item (Join-Path $install 'Deep Legends.exe')).VersionInfo.ProductVersion -ne '0.12.76') { throw '0.12.76 was not actually installed' }
-    $userData = Join-Path $env:APPDATA 'Deep Legends'
+    $userDataName = (& node -e "const p=JSON.parse(require('./desktop/node_modules/@electron/asar').extractFile(process.argv[1],'package.json'));console.log(p.productName||p.name)" (Join-Path $install 'resources/app.asar')).Trim()
+    if ($LASTEXITCODE -ne 0 -or -not $userDataName) { throw 'Cannot determine installed Electron userData name' }
+    $userData = Join-Path $env:APPDATA $userDataName
+    if (-not (Test-Path $userData)) { throw '0.12.76 did not initialize its actual Electron userData directory' }
     $sentinels = @{}
     # Distinct safe fixtures in real persistent directories, without a real account.
     foreach ($entry in @(@($data,'season-stats/r238-cache-sentinel.json','{"schemaVersion":3,"r238":"season-cache"}'),@($data,'snapshots/r238-collection-sentinel.json','{"r238":"collection"}'),@($userData,'r238-settings-sentinel.json','{"r238":"preferences"}'),@($userData,'window-bounds.json',"{`"width`":1050,`"height`":750,`"x`":40,`"y`":40,`"maximized`":false}`n"),@($userData,'ui-scale.json','{"mode":"fixed","value":1.25,"defaultAuto":1}'))) {

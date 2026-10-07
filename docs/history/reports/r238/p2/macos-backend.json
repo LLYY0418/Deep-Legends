@@ -1,0 +1,9 @@
+{
+  "version": "0.12.77",
+  "key_mode": "public",
+  "fingerprint": "7e1229c2a79c",
+  "binary_sha256": "3bf5b1fed5ff28eb8625449f51222ebfb2dc081d72a293585ad1fa5984c3cd9e",
+  "isolated_data_dir": "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r238-macos-selfcheck-tmhmytgn",
+  "platform": "macOS",
+  "windows_execution": "未在 Windows 实跑"
+}
