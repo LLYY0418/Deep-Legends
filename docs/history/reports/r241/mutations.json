@@ -1,0 +1,54 @@
+[
+  {
+    "name": "p2-mode-filter",
+    "file": "backend/web/gameplay.js",
+    "command": [
+      "node",
+      "--test",
+      "--test-name-pattern=map matrix",
+      "backend/web/r241.test.cjs"
+    ],
+    "exit_code": 1,
+    "killed": true,
+    "seconds": 0.468
+  },
+  {
+    "name": "p3-wrap",
+    "file": "backend/web/gameplay.css",
+    "command": [
+      "node",
+      "scripts/r241-browser.cjs",
+      "--guard-only"
+    ],
+    "exit_code": 1,
+    "killed": true,
+    "seconds": 2.075
+  },
+  {
+    "name": "p4-no-freshness",
+    "file": "backend/season_head_refresh.go",
+    "command": [
+      "go",
+      "test",
+      "./backend",
+      "-run",
+      "^TestR241HeadFreshness",
+      "-count=1"
+    ],
+    "exit_code": 1,
+    "killed": true,
+    "seconds": 12.303
+  },
+  {
+    "name": "p6-empty-tail",
+    "file": "backend/web/gameplay.css",
+    "command": [
+      "node",
+      "scripts/r241-browser.cjs",
+      "--guard-only"
+    ],
+    "exit_code": 1,
+    "killed": true,
+    "seconds": 1.668
+  }
+]

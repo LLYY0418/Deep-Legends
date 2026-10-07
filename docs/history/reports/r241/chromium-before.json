@@ -1,0 +1,5270 @@
+{
+  "scope": "Production Chromium with synthetic fixtures. No Windows/LCU or real upstream claims.",
+  "results": [
+    {
+      "theme": "dark",
+      "contrastMinimum": 5.917727239820875,
+      "contrasts": [
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "参团",
+          "kind": "match-data-tag is-data-participation",
+          "ratio": 6.5757082040845765
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "参团",
+          "kind": "match-data-tag is-data-participation",
+          "ratio": 6.5757082040845765
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "参团",
+          "kind": "match-data-tag is-data-participation",
+          "ratio": 6.5757082040845765
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "参团",
+          "kind": "match-data-tag is-data-participation",
+          "ratio": 6.5757082040845765
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "参团",
+          "kind": "match-data-tag is-data-participation",
+          "ratio": 6.5757082040845765
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "参团",
+          "kind": "match-data-tag is-data-participation",
+          "ratio": 6.5757082040845765
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "width": 1280,
+      "zoom": 1,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 254.953125,
+            "right": 1239.046875,
+            "top": 419,
+            "bottom": 571,
+            "width": 984.09375,
+            "height": 152
+          },
+          "items": {
+            "left": 385.953125,
+            "right": 620.953125,
+            "top": 494,
+            "bottom": 524,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 385.953125,
+            "right": 926.03125,
+            "top": 535,
+            "bottom": 555,
+            "width": 540.078125,
+            "height": 20
+          },
+          "gap": 120.078125,
+          "rosterWidth": 246.015625,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "参团",
+            "★拆塔"
+          ],
+          "hidden": [
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 254.953125,
+            "right": 1239.046875,
+            "top": 579,
+            "bottom": 731,
+            "width": 984.09375,
+            "height": 152
+          },
+          "items": {
+            "left": 385.953125,
+            "right": 620.953125,
+            "top": 654,
+            "bottom": 684,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 385.953125,
+            "right": 926.03125,
+            "top": 695,
+            "bottom": 715,
+            "width": 540.078125,
+            "height": 20
+          },
+          "gap": 120.078125,
+          "rosterWidth": 246.015625,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "★参团"
+          ],
+          "hidden": [
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 254.953125,
+            "right": 1239.046875,
+            "top": 739,
+            "bottom": 891,
+            "width": 984.09375,
+            "height": 152
+          },
+          "items": {
+            "left": 385.953125,
+            "right": 620.953125,
+            "top": 814,
+            "bottom": 844,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 385.953125,
+            "right": 926.03125,
+            "top": 855,
+            "bottom": 875,
+            "width": 540.078125,
+            "height": 20
+          },
+          "gap": 128.078125,
+          "rosterWidth": 246.015625,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60"
+          ],
+          "hidden": [
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 254.953125,
+            "right": 1239.046875,
+            "top": 899,
+            "bottom": 1051,
+            "width": 984.09375,
+            "height": 152
+          },
+          "items": {
+            "left": 385.953125,
+            "right": 620.953125,
+            "top": 974,
+            "bottom": 1004,
+            "width": 235,
+            "height": 30
+          },
+          "tags": null,
+          "gap": 120.078125,
+          "rosterWidth": 246.015625,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "width": 1600,
+      "zoom": 1,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 577.1875,
+            "right": 1548.8125,
+            "top": 373,
+            "bottom": 525,
+            "width": 971.625,
+            "height": 152
+          },
+          "items": {
+            "left": 708.1875,
+            "right": 943.1875,
+            "top": 448,
+            "bottom": 478,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 708.1875,
+            "right": 1238.90625,
+            "top": 489,
+            "bottom": 509,
+            "width": 530.71875,
+            "height": 20
+          },
+          "gap": 110.71875,
+          "rosterWidth": 242.90625,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "参团"
+          ],
+          "hidden": [
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 577.1875,
+            "right": 1548.8125,
+            "top": 533,
+            "bottom": 685,
+            "width": 971.625,
+            "height": 152
+          },
+          "items": {
+            "left": 708.1875,
+            "right": 943.1875,
+            "top": 608,
+            "bottom": 638,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 708.1875,
+            "right": 1238.90625,
+            "top": 649,
+            "bottom": 669,
+            "width": 530.71875,
+            "height": 20
+          },
+          "gap": 110.71875,
+          "rosterWidth": 242.90625,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "★参团"
+          ],
+          "hidden": [
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 577.1875,
+            "right": 1548.8125,
+            "top": 693,
+            "bottom": 845,
+            "width": 971.625,
+            "height": 152
+          },
+          "items": {
+            "left": 708.1875,
+            "right": 943.1875,
+            "top": 768,
+            "bottom": 798,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 708.1875,
+            "right": 1238.90625,
+            "top": 809,
+            "bottom": 829,
+            "width": 530.71875,
+            "height": 20
+          },
+          "gap": 118.71875,
+          "rosterWidth": 242.90625,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60"
+          ],
+          "hidden": [
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 577.1875,
+            "right": 1548.8125,
+            "top": 853,
+            "bottom": 1005,
+            "width": 971.625,
+            "height": 152
+          },
+          "items": {
+            "left": 708.1875,
+            "right": 943.1875,
+            "top": 928,
+            "bottom": 958,
+            "width": 235,
+            "height": 30
+          },
+          "tags": null,
+          "gap": 110.71875,
+          "rosterWidth": 242.90625,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "width": 1920,
+      "zoom": 1,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 618,
+            "right": 1868,
+            "top": 373,
+            "bottom": 525,
+            "width": 1250,
+            "height": 152
+          },
+          "items": {
+            "left": 749,
+            "right": 984,
+            "top": 448,
+            "bottom": 478,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 749,
+            "right": 1431,
+            "top": 488,
+            "bottom": 510,
+            "width": 682,
+            "height": 22
+          },
+          "gap": 234,
+          "rosterWidth": 370,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ],
+          "hidden": []
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 618,
+            "right": 1868,
+            "top": 533,
+            "bottom": 685,
+            "width": 1250,
+            "height": 152
+          },
+          "items": {
+            "left": 749,
+            "right": 984,
+            "top": 608,
+            "bottom": 638,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 749,
+            "right": 1431,
+            "top": 649,
+            "bottom": 669,
+            "width": 682,
+            "height": 20
+          },
+          "gap": 234,
+          "rosterWidth": 370,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "★参团",
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币"
+          ],
+          "hidden": [
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 618,
+            "right": 1868,
+            "top": 693,
+            "bottom": 845,
+            "width": 1250,
+            "height": 152
+          },
+          "items": {
+            "left": 749,
+            "right": 984,
+            "top": 768,
+            "bottom": 798,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 749,
+            "right": 1431,
+            "top": 806,
+            "bottom": 832,
+            "width": 682,
+            "height": 26
+          },
+          "gap": 242,
+          "rosterWidth": 370,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "四杀",
+            "★击杀",
+            "★参团"
+          ],
+          "hidden": [
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 618,
+            "right": 1868,
+            "top": 853,
+            "bottom": 1005,
+            "width": 1250,
+            "height": 152
+          },
+          "items": {
+            "left": 749,
+            "right": 984,
+            "top": 928,
+            "bottom": 958,
+            "width": 235,
+            "height": 30
+          },
+          "tags": null,
+          "gap": 234,
+          "rosterWidth": 370,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "width": 900,
+      "zoom": 1,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 242.796875,
+            "right": 871.203125,
+            "top": 414,
+            "bottom": 652,
+            "width": 628.40625,
+            "height": 238
+          },
+          "items": {
+            "left": 373.796875,
+            "right": 601.796875,
+            "top": 575,
+            "bottom": 605,
+            "width": 228,
+            "height": 30
+          },
+          "tags": {
+            "left": 373.796875,
+            "right": 812.203125,
+            "top": 616,
+            "bottom": 636,
+            "width": 438.40625,
+            "height": 20
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "★治疗",
+            "★护盾",
+            "压刀×60"
+          ],
+          "hidden": [
+            "★击杀",
+            "参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 242.796875,
+            "right": 871.203125,
+            "top": 660,
+            "bottom": 898,
+            "width": 628.40625,
+            "height": 238
+          },
+          "items": {
+            "left": 373.796875,
+            "right": 601.796875,
+            "top": 821,
+            "bottom": 851,
+            "width": 228,
+            "height": 30
+          },
+          "tags": {
+            "left": 373.796875,
+            "right": 812.203125,
+            "top": 862,
+            "bottom": 882,
+            "width": 438.40625,
+            "height": 20
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60"
+          ],
+          "hidden": [
+            "★击杀",
+            "★参团",
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 242.796875,
+            "right": 871.203125,
+            "top": 906,
+            "bottom": 1144,
+            "width": 628.40625,
+            "height": 238
+          },
+          "items": {
+            "left": 373.796875,
+            "right": 601.796875,
+            "top": 1067,
+            "bottom": 1097,
+            "width": 228,
+            "height": 30
+          },
+          "tags": {
+            "left": 373.796875,
+            "right": 812.203125,
+            "top": 1108,
+            "bottom": 1128,
+            "width": 438.40625,
+            "height": 20
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗"
+          ],
+          "hidden": [
+            "★护盾",
+            "压刀×60",
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 242.796875,
+            "right": 871.203125,
+            "top": 1152,
+            "bottom": 1390,
+            "width": 628.40625,
+            "height": 238
+          },
+          "items": {
+            "left": 373.796875,
+            "right": 601.796875,
+            "top": 1313,
+            "bottom": 1343,
+            "width": 228,
+            "height": 30
+          },
+          "tags": null,
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "width": 780,
+      "zoom": 1,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 94.953125,
+            "right": 755.046875,
+            "top": 414,
+            "bottom": 574,
+            "width": 660.09375,
+            "height": 160
+          },
+          "items": {
+            "left": 225.953125,
+            "right": 460.953125,
+            "top": 497,
+            "bottom": 527,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 225.953125,
+            "right": 696.046875,
+            "top": 538,
+            "bottom": 558,
+            "width": 470.09375,
+            "height": 20
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀"
+          ],
+          "hidden": [
+            "参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 94.953125,
+            "right": 755.046875,
+            "top": 582,
+            "bottom": 742,
+            "width": 660.09375,
+            "height": 160
+          },
+          "items": {
+            "left": 225.953125,
+            "right": 460.953125,
+            "top": 665,
+            "bottom": 695,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 225.953125,
+            "right": 696.046875,
+            "top": 706,
+            "bottom": 726,
+            "width": 470.09375,
+            "height": 20
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀"
+          ],
+          "hidden": [
+            "★参团",
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 94.953125,
+            "right": 755.046875,
+            "top": 750,
+            "bottom": 910,
+            "width": 660.09375,
+            "height": 160
+          },
+          "items": {
+            "left": 225.953125,
+            "right": 460.953125,
+            "top": 833,
+            "bottom": 863,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 225.953125,
+            "right": 696.046875,
+            "top": 874,
+            "bottom": 894,
+            "width": 470.09375,
+            "height": 20
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾"
+          ],
+          "hidden": [
+            "压刀×60",
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 94.953125,
+            "right": 755.046875,
+            "top": 918,
+            "bottom": 1078,
+            "width": 660.09375,
+            "height": 160
+          },
+          "items": {
+            "left": 225.953125,
+            "right": 460.953125,
+            "top": 1001,
+            "bottom": 1031,
+            "width": 235,
+            "height": 30
+          },
+          "tags": null,
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "width": 1280,
+      "zoom": 1.5,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 382.4375,
+            "right": 1218.5625,
+            "top": 626.5,
+            "bottom": 982,
+            "width": 836.125,
+            "height": 355.5
+          },
+          "items": {
+            "left": 578.4375,
+            "right": 920.4375,
+            "top": 867,
+            "bottom": 912,
+            "width": 342,
+            "height": 45
+          },
+          "tags": {
+            "left": 578.4375,
+            "right": 1130.5625,
+            "top": 928.5,
+            "bottom": 958.5,
+            "width": 552.125,
+            "height": 30
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制"
+          ],
+          "hidden": [
+            "单杀×3",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 382.4375,
+            "right": 1218.5625,
+            "top": 994,
+            "bottom": 1349.5,
+            "width": 836.125,
+            "height": 355.5
+          },
+          "items": {
+            "left": 578.4375,
+            "right": 920.4375,
+            "top": 1234.5,
+            "bottom": 1279.5,
+            "width": 342,
+            "height": 45
+          },
+          "tags": {
+            "left": 578.4375,
+            "right": 1130.5625,
+            "top": 1296,
+            "bottom": 1326,
+            "width": 552.125,
+            "height": 30
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10"
+          ],
+          "hidden": [
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "★参团",
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 382.4375,
+            "right": 1218.5625,
+            "top": 1361.5,
+            "bottom": 1717,
+            "width": 836.125,
+            "height": 355.5
+          },
+          "items": {
+            "left": 578.4375,
+            "right": 920.4375,
+            "top": 1602,
+            "bottom": 1647,
+            "width": 342,
+            "height": 45
+          },
+          "tags": {
+            "left": 578.4375,
+            "right": 1130.5625,
+            "top": 1663.5,
+            "bottom": 1693.5,
+            "width": 552.125,
+            "height": 30
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制"
+          ],
+          "hidden": [
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 382.4375,
+            "right": 1218.5625,
+            "top": 1729,
+            "bottom": 2084.5,
+            "width": 836.125,
+            "height": 355.5
+          },
+          "items": {
+            "left": 578.4375,
+            "right": 920.4375,
+            "top": 1969.5,
+            "bottom": 2014.5,
+            "width": 342,
+            "height": 45
+          },
+          "tags": null,
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "width": 1600,
+      "zoom": 1.5,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 397.796875,
+            "right": 1523.203125,
+            "top": 626.5,
+            "bottom": 865.5,
+            "width": 1125.40625,
+            "height": 239
+          },
+          "items": {
+            "left": 593.796875,
+            "right": 946.296875,
+            "top": 750.5,
+            "bottom": 795.5,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": {
+            "left": 593.796875,
+            "right": 1153.109375,
+            "top": 812,
+            "bottom": 842,
+            "width": 559.3125,
+            "height": 30
+          },
+          "gap": -70.6875,
+          "rosterWidth": 270.09375,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3"
+          ],
+          "hidden": [
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 397.796875,
+            "right": 1523.203125,
+            "top": 877.5,
+            "bottom": 1116.5,
+            "width": 1125.40625,
+            "height": 239
+          },
+          "items": {
+            "left": 593.796875,
+            "right": 946.296875,
+            "top": 1001.5,
+            "bottom": 1046.5,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": {
+            "left": 593.796875,
+            "right": 1153.109375,
+            "top": 1063,
+            "bottom": 1093,
+            "width": 559.3125,
+            "height": 30
+          },
+          "gap": -59.34375,
+          "rosterWidth": 270.09375,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10"
+          ],
+          "hidden": [
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "★参团",
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 397.796875,
+            "right": 1523.203125,
+            "top": 1128.5,
+            "bottom": 1367.5,
+            "width": 1125.40625,
+            "height": 239
+          },
+          "items": {
+            "left": 593.796875,
+            "right": 946.296875,
+            "top": 1252.5,
+            "bottom": 1297.5,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": {
+            "left": 593.796875,
+            "right": 1153.109375,
+            "top": 1314,
+            "bottom": 1344,
+            "width": 559.3125,
+            "height": 30
+          },
+          "gap": -58.6875,
+          "rosterWidth": 270.09375,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3"
+          ],
+          "hidden": [
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 397.796875,
+            "right": 1523.203125,
+            "top": 1379.5,
+            "bottom": 1618.5,
+            "width": 1125.40625,
+            "height": 239
+          },
+          "items": {
+            "left": 593.796875,
+            "right": 946.296875,
+            "top": 1503.5,
+            "bottom": 1548.5,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": null,
+          "gap": -70.6875,
+          "rosterWidth": 270.09375,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "width": 1920,
+      "zoom": 1.5,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 399,
+            "right": 1842,
+            "top": 626,
+            "bottom": 853,
+            "width": 1443,
+            "height": 227
+          },
+          "items": {
+            "left": 595,
+            "right": 947.5,
+            "top": 738,
+            "bottom": 783,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": {
+            "left": 595,
+            "right": 1381.25,
+            "top": 799.5,
+            "bottom": 829.5,
+            "width": 786.25,
+            "height": 30
+          },
+          "gap": 156.25,
+          "rosterWidth": 360.75,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "★治疗",
+            "★护盾"
+          ],
+          "hidden": [
+            "压刀×60",
+            "★击杀",
+            "参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 399,
+            "right": 1842,
+            "top": 865,
+            "bottom": 1092,
+            "width": 1443,
+            "height": 227
+          },
+          "items": {
+            "left": 595,
+            "right": 947.5,
+            "top": 977,
+            "bottom": 1022,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": {
+            "left": 595,
+            "right": 1381.25,
+            "top": 1038.5,
+            "bottom": 1068.5,
+            "width": 786.25,
+            "height": 30
+          },
+          "gap": 156.25,
+          "rosterWidth": 360.75,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾"
+          ],
+          "hidden": [
+            "压刀×60",
+            "★击杀",
+            "★参团",
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 399,
+            "right": 1842,
+            "top": 1104,
+            "bottom": 1331,
+            "width": 1443,
+            "height": 227
+          },
+          "items": {
+            "left": 595,
+            "right": 947.5,
+            "top": 1216,
+            "bottom": 1261,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": {
+            "left": 595,
+            "right": 1381.25,
+            "top": 1277.5,
+            "bottom": 1307.5,
+            "width": 786.25,
+            "height": 30
+          },
+          "gap": 168.25,
+          "rosterWidth": 360.75,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "越塔×10"
+          ],
+          "hidden": [
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 399,
+            "right": 1842,
+            "top": 1343,
+            "bottom": 1570,
+            "width": 1443,
+            "height": 227
+          },
+          "items": {
+            "left": 595,
+            "right": 947.5,
+            "top": 1455,
+            "bottom": 1500,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": null,
+          "gap": 156.25,
+          "rosterWidth": 360.75,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "contrastMinimum": 5.917727239820875,
+      "contrasts": [
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "参团",
+          "kind": "match-data-tag is-data-participation",
+          "ratio": 6.5757082040845765
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "参团",
+          "kind": "match-data-tag is-data-participation",
+          "ratio": 6.5757082040845765
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "参团",
+          "kind": "match-data-tag is-data-participation",
+          "ratio": 6.5757082040845765
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "参团",
+          "kind": "match-data-tag is-data-participation",
+          "ratio": 6.5757082040845765
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "参团",
+          "kind": "match-data-tag is-data-participation",
+          "ratio": 6.5757082040845765
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "越塔×10",
+          "kind": "match-data-tag is-data-dive",
+          "ratio": 7.502377193634824
+        },
+        {
+          "label": "塔之子×8",
+          "kind": "match-data-tag is-data-defense",
+          "ratio": 7.456322669581537
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "★伤害",
+          "kind": "match-data-tag is-data-damage is-star",
+          "ratio": 12.378057026584726
+        },
+        {
+          "label": "★伤转率",
+          "kind": "match-data-tag is-data-efficiency is-star",
+          "ratio": 13.232507365383373
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "参团",
+          "kind": "match-data-tag is-data-participation",
+          "ratio": 6.5757082040845765
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        },
+        {
+          "label": "金币",
+          "kind": "match-data-tag is-data-gold",
+          "ratio": 6.886997440681695
+        },
+        {
+          "label": "伤害",
+          "kind": "match-data-tag is-data-damage",
+          "ratio": 7.785746718961639
+        },
+        {
+          "label": "★控制",
+          "kind": "match-data-tag is-data-control is-star",
+          "ratio": 13.013452478934393
+        },
+        {
+          "label": "单杀×3",
+          "kind": "match-data-tag is-data-solo",
+          "ratio": 8.146184661413864
+        },
+        {
+          "label": "★治疗",
+          "kind": "match-data-tag is-data-heal is-star",
+          "ratio": 11.185516248781841
+        },
+        {
+          "label": "★护盾",
+          "kind": "match-data-tag is-data-shield is-star",
+          "ratio": 11.313249048194113
+        },
+        {
+          "label": "压刀×60",
+          "kind": "match-data-tag is-data-advantage",
+          "ratio": 5.917727239820875
+        },
+        {
+          "label": "★击杀",
+          "kind": "match-data-tag is-data-kills is-star",
+          "ratio": 13.142582541593473
+        },
+        {
+          "label": "★参团",
+          "kind": "match-data-tag is-data-participation is-star",
+          "ratio": 11.595390307669746
+        },
+        {
+          "label": "伤转率",
+          "kind": "match-data-tag is-data-efficiency",
+          "ratio": 7.644579618646847
+        },
+        {
+          "label": "★拆塔",
+          "kind": "match-data-tag is-data-tower is-star",
+          "ratio": 12.109081829044479
+        },
+        {
+          "label": "★金币",
+          "kind": "match-data-tag is-data-gold is-star",
+          "ratio": 12.2364746798753
+        },
+        {
+          "label": "好钩×6",
+          "kind": "match-data-tag is-data-hook",
+          "ratio": 6.301609874176916
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "width": 1280,
+      "zoom": 1,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 254.953125,
+            "right": 1239.046875,
+            "top": 419,
+            "bottom": 571,
+            "width": 984.09375,
+            "height": 152
+          },
+          "items": {
+            "left": 385.953125,
+            "right": 620.953125,
+            "top": 494,
+            "bottom": 524,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 385.953125,
+            "right": 926.03125,
+            "top": 535,
+            "bottom": 555,
+            "width": 540.078125,
+            "height": 20
+          },
+          "gap": 120.078125,
+          "rosterWidth": 246.015625,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "参团",
+            "★拆塔"
+          ],
+          "hidden": [
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 254.953125,
+            "right": 1239.046875,
+            "top": 579,
+            "bottom": 731,
+            "width": 984.09375,
+            "height": 152
+          },
+          "items": {
+            "left": 385.953125,
+            "right": 620.953125,
+            "top": 654,
+            "bottom": 684,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 385.953125,
+            "right": 926.03125,
+            "top": 695,
+            "bottom": 715,
+            "width": 540.078125,
+            "height": 20
+          },
+          "gap": 120.078125,
+          "rosterWidth": 246.015625,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "★参团"
+          ],
+          "hidden": [
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 254.953125,
+            "right": 1239.046875,
+            "top": 739,
+            "bottom": 891,
+            "width": 984.09375,
+            "height": 152
+          },
+          "items": {
+            "left": 385.953125,
+            "right": 620.953125,
+            "top": 814,
+            "bottom": 844,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 385.953125,
+            "right": 926.03125,
+            "top": 855,
+            "bottom": 875,
+            "width": 540.078125,
+            "height": 20
+          },
+          "gap": 128.078125,
+          "rosterWidth": 246.015625,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60"
+          ],
+          "hidden": [
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 254.953125,
+            "right": 1239.046875,
+            "top": 899,
+            "bottom": 1051,
+            "width": 984.09375,
+            "height": 152
+          },
+          "items": {
+            "left": 385.953125,
+            "right": 620.953125,
+            "top": 974,
+            "bottom": 1004,
+            "width": 235,
+            "height": 30
+          },
+          "tags": null,
+          "gap": 120.078125,
+          "rosterWidth": 246.015625,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "width": 1600,
+      "zoom": 1,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 577.1875,
+            "right": 1548.8125,
+            "top": 373,
+            "bottom": 525,
+            "width": 971.625,
+            "height": 152
+          },
+          "items": {
+            "left": 708.1875,
+            "right": 943.1875,
+            "top": 448,
+            "bottom": 478,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 708.1875,
+            "right": 1238.90625,
+            "top": 489,
+            "bottom": 509,
+            "width": 530.71875,
+            "height": 20
+          },
+          "gap": 110.71875,
+          "rosterWidth": 242.90625,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "参团"
+          ],
+          "hidden": [
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 577.1875,
+            "right": 1548.8125,
+            "top": 533,
+            "bottom": 685,
+            "width": 971.625,
+            "height": 152
+          },
+          "items": {
+            "left": 708.1875,
+            "right": 943.1875,
+            "top": 608,
+            "bottom": 638,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 708.1875,
+            "right": 1238.90625,
+            "top": 649,
+            "bottom": 669,
+            "width": 530.71875,
+            "height": 20
+          },
+          "gap": 110.71875,
+          "rosterWidth": 242.90625,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "★参团"
+          ],
+          "hidden": [
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 577.1875,
+            "right": 1548.8125,
+            "top": 693,
+            "bottom": 845,
+            "width": 971.625,
+            "height": 152
+          },
+          "items": {
+            "left": 708.1875,
+            "right": 943.1875,
+            "top": 768,
+            "bottom": 798,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 708.1875,
+            "right": 1238.90625,
+            "top": 809,
+            "bottom": 829,
+            "width": 530.71875,
+            "height": 20
+          },
+          "gap": 118.71875,
+          "rosterWidth": 242.90625,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60"
+          ],
+          "hidden": [
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 577.1875,
+            "right": 1548.8125,
+            "top": 853,
+            "bottom": 1005,
+            "width": 971.625,
+            "height": 152
+          },
+          "items": {
+            "left": 708.1875,
+            "right": 943.1875,
+            "top": 928,
+            "bottom": 958,
+            "width": 235,
+            "height": 30
+          },
+          "tags": null,
+          "gap": 110.71875,
+          "rosterWidth": 242.90625,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "width": 1920,
+      "zoom": 1,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 618,
+            "right": 1868,
+            "top": 373,
+            "bottom": 525,
+            "width": 1250,
+            "height": 152
+          },
+          "items": {
+            "left": 749,
+            "right": 984,
+            "top": 448,
+            "bottom": 478,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 749,
+            "right": 1431,
+            "top": 488,
+            "bottom": 510,
+            "width": 682,
+            "height": 22
+          },
+          "gap": 234,
+          "rosterWidth": 370,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ],
+          "hidden": []
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 618,
+            "right": 1868,
+            "top": 533,
+            "bottom": 685,
+            "width": 1250,
+            "height": 152
+          },
+          "items": {
+            "left": 749,
+            "right": 984,
+            "top": 608,
+            "bottom": 638,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 749,
+            "right": 1431,
+            "top": 649,
+            "bottom": 669,
+            "width": 682,
+            "height": 20
+          },
+          "gap": 234,
+          "rosterWidth": 370,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "★参团",
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币"
+          ],
+          "hidden": [
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 618,
+            "right": 1868,
+            "top": 693,
+            "bottom": 845,
+            "width": 1250,
+            "height": 152
+          },
+          "items": {
+            "left": 749,
+            "right": 984,
+            "top": 768,
+            "bottom": 798,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 749,
+            "right": 1431,
+            "top": 806,
+            "bottom": 832,
+            "width": 682,
+            "height": 26
+          },
+          "gap": 242,
+          "rosterWidth": 370,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "四杀",
+            "★击杀",
+            "★参团"
+          ],
+          "hidden": [
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 618,
+            "right": 1868,
+            "top": 853,
+            "bottom": 1005,
+            "width": 1250,
+            "height": 152
+          },
+          "items": {
+            "left": 749,
+            "right": 984,
+            "top": 928,
+            "bottom": 958,
+            "width": 235,
+            "height": 30
+          },
+          "tags": null,
+          "gap": 234,
+          "rosterWidth": 370,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "width": 900,
+      "zoom": 1,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 242.796875,
+            "right": 871.203125,
+            "top": 414,
+            "bottom": 652,
+            "width": 628.40625,
+            "height": 238
+          },
+          "items": {
+            "left": 373.796875,
+            "right": 601.796875,
+            "top": 575,
+            "bottom": 605,
+            "width": 228,
+            "height": 30
+          },
+          "tags": {
+            "left": 373.796875,
+            "right": 812.203125,
+            "top": 616,
+            "bottom": 636,
+            "width": 438.40625,
+            "height": 20
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "★治疗",
+            "★护盾",
+            "压刀×60"
+          ],
+          "hidden": [
+            "★击杀",
+            "参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 242.796875,
+            "right": 871.203125,
+            "top": 660,
+            "bottom": 898,
+            "width": 628.40625,
+            "height": 238
+          },
+          "items": {
+            "left": 373.796875,
+            "right": 601.796875,
+            "top": 821,
+            "bottom": 851,
+            "width": 228,
+            "height": 30
+          },
+          "tags": {
+            "left": 373.796875,
+            "right": 812.203125,
+            "top": 862,
+            "bottom": 882,
+            "width": 438.40625,
+            "height": 20
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60"
+          ],
+          "hidden": [
+            "★击杀",
+            "★参团",
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 242.796875,
+            "right": 871.203125,
+            "top": 906,
+            "bottom": 1144,
+            "width": 628.40625,
+            "height": 238
+          },
+          "items": {
+            "left": 373.796875,
+            "right": 601.796875,
+            "top": 1067,
+            "bottom": 1097,
+            "width": 228,
+            "height": 30
+          },
+          "tags": {
+            "left": 373.796875,
+            "right": 812.203125,
+            "top": 1108,
+            "bottom": 1128,
+            "width": 438.40625,
+            "height": 20
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗"
+          ],
+          "hidden": [
+            "★护盾",
+            "压刀×60",
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 242.796875,
+            "right": 871.203125,
+            "top": 1152,
+            "bottom": 1390,
+            "width": 628.40625,
+            "height": 238
+          },
+          "items": {
+            "left": 373.796875,
+            "right": 601.796875,
+            "top": 1313,
+            "bottom": 1343,
+            "width": 228,
+            "height": 30
+          },
+          "tags": null,
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "width": 780,
+      "zoom": 1,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 94.953125,
+            "right": 755.046875,
+            "top": 414,
+            "bottom": 574,
+            "width": 660.09375,
+            "height": 160
+          },
+          "items": {
+            "left": 225.953125,
+            "right": 460.953125,
+            "top": 497,
+            "bottom": 527,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 225.953125,
+            "right": 696.046875,
+            "top": 538,
+            "bottom": 558,
+            "width": 470.09375,
+            "height": 20
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀"
+          ],
+          "hidden": [
+            "参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 94.953125,
+            "right": 755.046875,
+            "top": 582,
+            "bottom": 742,
+            "width": 660.09375,
+            "height": 160
+          },
+          "items": {
+            "left": 225.953125,
+            "right": 460.953125,
+            "top": 665,
+            "bottom": 695,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 225.953125,
+            "right": 696.046875,
+            "top": 706,
+            "bottom": 726,
+            "width": 470.09375,
+            "height": 20
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀"
+          ],
+          "hidden": [
+            "★参团",
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 94.953125,
+            "right": 755.046875,
+            "top": 750,
+            "bottom": 910,
+            "width": 660.09375,
+            "height": 160
+          },
+          "items": {
+            "left": 225.953125,
+            "right": 460.953125,
+            "top": 833,
+            "bottom": 863,
+            "width": 235,
+            "height": 30
+          },
+          "tags": {
+            "left": 225.953125,
+            "right": 696.046875,
+            "top": 874,
+            "bottom": 894,
+            "width": 470.09375,
+            "height": 20
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾"
+          ],
+          "hidden": [
+            "压刀×60",
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 94.953125,
+            "right": 755.046875,
+            "top": 918,
+            "bottom": 1078,
+            "width": 660.09375,
+            "height": 160
+          },
+          "items": {
+            "left": 225.953125,
+            "right": 460.953125,
+            "top": 1001,
+            "bottom": 1031,
+            "width": 235,
+            "height": 30
+          },
+          "tags": null,
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "width": 1280,
+      "zoom": 1.5,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 382.4375,
+            "right": 1218.5625,
+            "top": 626.5,
+            "bottom": 982,
+            "width": 836.125,
+            "height": 355.5
+          },
+          "items": {
+            "left": 578.4375,
+            "right": 920.4375,
+            "top": 867,
+            "bottom": 912,
+            "width": 342,
+            "height": 45
+          },
+          "tags": {
+            "left": 578.4375,
+            "right": 1130.5625,
+            "top": 928.5,
+            "bottom": 958.5,
+            "width": 552.125,
+            "height": 30
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制"
+          ],
+          "hidden": [
+            "单杀×3",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 382.4375,
+            "right": 1218.5625,
+            "top": 994,
+            "bottom": 1349.5,
+            "width": 836.125,
+            "height": 355.5
+          },
+          "items": {
+            "left": 578.4375,
+            "right": 920.4375,
+            "top": 1234.5,
+            "bottom": 1279.5,
+            "width": 342,
+            "height": 45
+          },
+          "tags": {
+            "left": 578.4375,
+            "right": 1130.5625,
+            "top": 1296,
+            "bottom": 1326,
+            "width": 552.125,
+            "height": 30
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10"
+          ],
+          "hidden": [
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "★参团",
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 382.4375,
+            "right": 1218.5625,
+            "top": 1361.5,
+            "bottom": 1717,
+            "width": 836.125,
+            "height": 355.5
+          },
+          "items": {
+            "left": 578.4375,
+            "right": 920.4375,
+            "top": 1602,
+            "bottom": 1647,
+            "width": 342,
+            "height": 45
+          },
+          "tags": {
+            "left": 578.4375,
+            "right": 1130.5625,
+            "top": 1663.5,
+            "bottom": 1693.5,
+            "width": 552.125,
+            "height": 30
+          },
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制"
+          ],
+          "hidden": [
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 382.4375,
+            "right": 1218.5625,
+            "top": 1729,
+            "bottom": 2084.5,
+            "width": 836.125,
+            "height": 355.5
+          },
+          "items": {
+            "left": 578.4375,
+            "right": 920.4375,
+            "top": 1969.5,
+            "bottom": 2014.5,
+            "width": 342,
+            "height": 45
+          },
+          "tags": null,
+          "gap": null,
+          "rosterWidth": 0,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "width": 1600,
+      "zoom": 1.5,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 397.796875,
+            "right": 1523.203125,
+            "top": 626.5,
+            "bottom": 865.5,
+            "width": 1125.40625,
+            "height": 239
+          },
+          "items": {
+            "left": 593.796875,
+            "right": 946.296875,
+            "top": 750.5,
+            "bottom": 795.5,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": {
+            "left": 593.796875,
+            "right": 1153.109375,
+            "top": 812,
+            "bottom": 842,
+            "width": 559.3125,
+            "height": 30
+          },
+          "gap": -70.6875,
+          "rosterWidth": 270.09375,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3"
+          ],
+          "hidden": [
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 397.796875,
+            "right": 1523.203125,
+            "top": 877.5,
+            "bottom": 1116.5,
+            "width": 1125.40625,
+            "height": 239
+          },
+          "items": {
+            "left": 593.796875,
+            "right": 946.296875,
+            "top": 1001.5,
+            "bottom": 1046.5,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": {
+            "left": 593.796875,
+            "right": 1153.109375,
+            "top": 1063,
+            "bottom": 1093,
+            "width": 559.3125,
+            "height": 30
+          },
+          "gap": -59.34375,
+          "rosterWidth": 270.09375,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10"
+          ],
+          "hidden": [
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "★击杀",
+            "★参团",
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 397.796875,
+            "right": 1523.203125,
+            "top": 1128.5,
+            "bottom": 1367.5,
+            "width": 1125.40625,
+            "height": 239
+          },
+          "items": {
+            "left": 593.796875,
+            "right": 946.296875,
+            "top": 1252.5,
+            "bottom": 1297.5,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": {
+            "left": 593.796875,
+            "right": 1153.109375,
+            "top": 1314,
+            "bottom": 1344,
+            "width": 559.3125,
+            "height": 30
+          },
+          "gap": -58.6875,
+          "rosterWidth": 270.09375,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3"
+          ],
+          "hidden": [
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 397.796875,
+            "right": 1523.203125,
+            "top": 1379.5,
+            "bottom": 1618.5,
+            "width": 1125.40625,
+            "height": 239
+          },
+          "items": {
+            "left": 593.796875,
+            "right": 946.296875,
+            "top": 1503.5,
+            "bottom": 1548.5,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": null,
+          "gap": -70.6875,
+          "rosterWidth": 270.09375,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "width": 1920,
+      "zoom": 1.5,
+      "layouts": [
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 399,
+            "right": 1842,
+            "top": 626,
+            "bottom": 853,
+            "width": 1443,
+            "height": 227
+          },
+          "items": {
+            "left": 595,
+            "right": 947.5,
+            "top": 738,
+            "bottom": 783,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": {
+            "left": 595,
+            "right": 1381.25,
+            "top": 799.5,
+            "bottom": 829.5,
+            "width": 786.25,
+            "height": 30
+          },
+          "gap": 156.25,
+          "rosterWidth": 360.75,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "★治疗",
+            "★护盾"
+          ],
+          "hidden": [
+            "压刀×60",
+            "★击杀",
+            "参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6",
+            "双杀"
+          ]
+        },
+        {
+          "mode": "海克斯大乱斗",
+          "card": {
+            "left": 399,
+            "right": 1842,
+            "top": 865,
+            "bottom": 1092,
+            "width": 1443,
+            "height": 227
+          },
+          "items": {
+            "left": 595,
+            "right": 947.5,
+            "top": 977,
+            "bottom": 1022,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": {
+            "left": 595,
+            "right": 1381.25,
+            "top": 1038.5,
+            "bottom": 1068.5,
+            "width": 786.25,
+            "height": 30
+          },
+          "gap": 156.25,
+          "rosterWidth": 360.75,
+          "wrap": "wrap",
+          "visible": [
+            "伤害",
+            "★控制",
+            "单杀×3",
+            "越塔×10",
+            "塔之子×8",
+            "★治疗",
+            "★护盾"
+          ],
+          "hidden": [
+            "压刀×60",
+            "★击杀",
+            "★参团",
+            "伤转率",
+            "★拆塔",
+            "好钩×6",
+            "金币",
+            "三杀"
+          ]
+        },
+        {
+          "mode": "灵活组排",
+          "card": {
+            "left": 399,
+            "right": 1842,
+            "top": 1104,
+            "bottom": 1331,
+            "width": 1443,
+            "height": 227
+          },
+          "items": {
+            "left": 595,
+            "right": 947.5,
+            "top": 1216,
+            "bottom": 1261,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": {
+            "left": 595,
+            "right": 1381.25,
+            "top": 1277.5,
+            "bottom": 1307.5,
+            "width": 786.25,
+            "height": 30
+          },
+          "gap": 168.25,
+          "rosterWidth": 360.75,
+          "wrap": "wrap",
+          "visible": [
+            "MVP",
+            "★伤害",
+            "★伤转率",
+            "★控制",
+            "单杀×3",
+            "越塔×10"
+          ],
+          "hidden": [
+            "塔之子×8",
+            "★治疗",
+            "★护盾",
+            "压刀×60",
+            "四杀",
+            "★击杀",
+            "★参团",
+            "★拆塔",
+            "★金币",
+            "好钩×6"
+          ]
+        },
+        {
+          "mode": "斗魂竞技场",
+          "card": {
+            "left": 399,
+            "right": 1842,
+            "top": 1343,
+            "bottom": 1570,
+            "width": 1443,
+            "height": 227
+          },
+          "items": {
+            "left": 595,
+            "right": 947.5,
+            "top": 1455,
+            "bottom": 1500,
+            "width": 352.5,
+            "height": 45
+          },
+          "tags": null,
+          "gap": 156.25,
+          "rosterWidth": 360.75,
+          "wrap": "wrap",
+          "visible": [],
+          "hidden": []
+        }
+      ]
+    }
+  ],
+  "errors": []
+}
