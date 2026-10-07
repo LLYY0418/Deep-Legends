@@ -12,7 +12,20 @@ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r117-browser-'));
 let proc,ws,server;
 async function main(){
  proc=spawn(chrome,['--headless=new','--disable-background-timer-throttling','--disable-renderer-backgrounding','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${temp}`,'about:blank'],{stdio:['ignore','ignore','pipe']});
- const url=await new Promise((resolve,reject)=>{let output=''; const timer=setTimeout(()=>reject(Error('Chrome startup timeout')),20000);proc.once('error',reject);proc.stderr.on('data',chunk=>{output+=chunk;const m=output.match(/DevTools listening on (ws:\/\/[^\s]+)/);if(m){clearTimeout(timer);resolve(m[1]);}});proc.once('exit',code=>reject(Error(`Chrome exited ${code}: ${output.slice(-1000)}`)));});
+ const startupAt=Date.now();
+ const url=await new Promise((resolve,reject)=>{
+  let output='',recorded=false;
+  const record=result=>{
+   if(recorded)return;recorded=true;
+   const directory=process.env.R117_BROWSER_OUTPUT||path.join(root,'docs/r117-validation/browser');fs.mkdirSync(directory,{recursive:true});
+   fs.writeFileSync(path.join(directory,'chrome-startup-stderr.log'),output);
+   fs.writeFileSync(path.join(directory,'chrome-startup.json'),JSON.stringify({result,chrome,pid:proc.pid,exitCode:proc.exitCode,signalCode:proc.signalCode,elapsedMs:Date.now()-startupAt},null,2)+'\n');
+  };
+  const timer=setTimeout(()=>{record('timeout');reject(Error(`Chrome startup timeout (pid=${proc.pid}, exit=${proc.exitCode}, signal=${proc.signalCode}): ${output.slice(-2000)}`));},20000);
+  proc.once('error',error=>{clearTimeout(timer);record('spawn-error');reject(error);});
+  proc.stderr.on('data',chunk=>{output+=chunk;const m=output.match(/DevTools listening on (ws:\/\/[^\s]+)/);if(m){clearTimeout(timer);record('connected');resolve(m[1]);}});
+  proc.once('exit',code=>{clearTimeout(timer);record('exit');reject(Error(`Chrome exited ${code}: ${output.slice(-2000)}`));});
+ });
  ws=new WebSocket(url); await new Promise((res,rej)=>{ws.addEventListener('open',res,{once:true});ws.addEventListener('error',rej,{once:true});});
  let seq=0;const pending=new Map();ws.addEventListener('message',e=>{const msg=JSON.parse(e.data);if(pending.has(msg.id)){const [resolve,reject]=pending.get(msg.id);pending.delete(msg.id);msg.error?reject(Error(JSON.stringify(msg.error))):resolve(msg.result);}});
  const send=(method,params={},sessionId)=>new Promise((resolve,reject)=>{const id=++seq;const timer=setTimeout(()=>{pending.delete(id);reject(Error('CDP timeout '+method));},45000);pending.set(id,[value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)}]);ws.send(JSON.stringify({id,method,params,sessionId}));});

@@ -70,6 +70,14 @@ jobs:
           echo "using $chrome"
           CHROME_BIN="$chrome" R100_BROWSER_OUTPUT="$RUNNER_TEMP/r100-browser" node desktop/r100-browser.cjs
           CHROME_BIN="$chrome" R117_BROWSER_OUTPUT="$RUNNER_TEMP/r117-browser" node desktop/r117-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium-guards-linux
+          path: |
+            ${{ runner.temp }}/r100-browser/**
+            ${{ runner.temp }}/r117-browser/**
+          if-no-files-found: warn
       - name: Test installer module
         working-directory: installer
         run: go test ./...

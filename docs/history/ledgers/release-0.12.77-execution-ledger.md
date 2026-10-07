@@ -144,3 +144,11 @@ Linux race等已PASS；renderer1332项/1330PASS/2 Windows条件skip、断言0失
 Windows包/首帧/实际升级尚未执行，不能算Windows整体通过。0.12.77没有tag/Release，Latest仍076。构建脚本输入变化导致新指纹，前一个本地候选与macOS后端保留审计目录；接下来使用全新-02目录重新构建和审计，不覆盖任何既有包。
 
 CI范围内修复后的本地结果：受影响build/quality/filter护栏11.108s PASS，默认renderer1332项/1328PASS/4原skip、141.749s PASS，90/240秒未改；格式/JS/filter/diff再次PASS。正式Bash输入的完整Go分片/installer/vet与新public包178.746秒通过，源码Go业务和夹具没有变化，前述Go全量/race仍对应这些文件；下一轮CI按新SHA再跑全部。新指纹 **129e36bf324c**，新本地Setup SHA **34e811cc30e2b3575186e8485b8da3c0ef1528d21d57d6ea10e335ea70174482**，Windowsbackend SHA **8cbbaea70908d1aa3603ca35dc3ae9231636db13ce3c4ff37d30f0759d09d965**，macOSbackend SHA **0a44dbe86d353a04a973ddac00dba3d1cbfaf09e88b80c1b00246f69b5037ad5**；新-02包再次授权材料/Key/digest/fuses/ASAR严格审计PASS。旧包、旧160个STAGING/R248文件与全部失败不覆盖。真正Windows升级与匿名077 Latest仍未通过，不标完成。
+
+## P4 第二轮同SHA CI失败（原记录保留）
+
+候选a83abff77f5cf10fe8ddf5580c2bd7e2ea9849c9于21:30:39推送；[37629060990](https://github.com/LLYY0418/Deep-Legends/actions/runs/37629060990)两作业最终failure，未tag。Linux原renderer总预算失败已解除，全部renderer通过；真实Chromium r100在20秒启动预算内未取得DevTools地址而失败，r117未执行。既有驱动超时不保存stderr，无法从这轮证据认定sandbox或具体冷启动根因；没有添加no-sandbox、不增加20秒、不重试。两个驱动补启动PID/退出状态/耗时与stderr，CI无论通过失败均上传原始诊断；原第二轮完整日志p4/linux-job-112818255359-raw02.log和净化副本保留。
+
+Windows正式构建、专属条件四项、真实Electron源代码首帧已实跑PASS，完整Windows仍因升级脚本失败。首帧实际Windows CI显示正常主框、无遮罩/激活表单/授权到期/小窗，实际显示bounds(40,40,1024,720)、总启动1176ms；CI虚拟显示器的工作区钳位不能称1050×750真机尺寸一致，仍待用户清单。完整升级到安装076后版本断言失败：从固定SHA的公开076 Setup只读提取PE/ASAR核验，ProductVersion实际0.12.76.0、FileVersion和ASAR为0.12.76（p4/public076-version-resource.json）；原脚本把四段字段与三段版本比较。改为三个字段同时精确等于Version.0/Version/Version并保存安装路径/SHA/时间，严格验证增强、无业务代码变化。原Windows日志p4/windows-job-112818255780-raw02.log及失败升级artifact保留；不把已过的首帧当升级通过。
+
+本次只改验证诊断/版本字段核对，指纹仍129e36bf324c，第二份本地包对应的生产输入未变化，原审计结果仍有效。受影响R100/R117结构/构建/质量/filter检查9.458s PASS，2个原Windows条件skip；本机真实R100 1.333s PASS，旧Linux启动失败不被此结果覆盖。下一轮同SHA完整CI结束前Windows整体保持未通过，Latest仍076。

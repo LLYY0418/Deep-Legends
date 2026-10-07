@@ -1,0 +1,24 @@
+{
+  "name": "ci-fix-quality-watch-20261007T213136.191935",
+  "command": [
+    "gh",
+    "run",
+    "watch",
+    "37629060990",
+    "--exit-status",
+    "--interval",
+    "30"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-07T21:31:36.191935+08:00",
+  "end": "2026-10-07T21:40:23.279930+08:00",
+  "elapsed_seconds": 527.091,
+  "exit_code": 1,
+  "last_five": [
+    "windows-build: .github#2",
+    "",
+    "X Process completed with exit code 1.",
+    "windows-build: .github#11",
+    ""
+  ]
+}

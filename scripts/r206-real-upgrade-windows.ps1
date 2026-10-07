@@ -35,6 +35,16 @@ function Stop-InstalledApp {
     Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($install, [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Start-Sleep -Milliseconds 500
 }
+function Assert-InstalledVersion([string]$Version) {
+    $exe = Get-Item (Join-Path $install 'Deep Legends.exe')
+    $package = (& node -e "console.log(require('./desktop/node_modules/@electron/asar').extractFile(process.argv[1],'package.json').toString())" (Join-Path $install 'resources/app.asar')) | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or -not $package.version) { throw 'Cannot read installed Electron package version' }
+    $record = @{expected=$Version;path=$exe.FullName;product_version=$exe.VersionInfo.ProductVersion;file_version=$exe.VersionInfo.FileVersion;asar_version=$package.version;exe_sha256=(Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant();last_write_utc=$exe.LastWriteTimeUtc.ToString('o')}
+    $record | ConvertTo-Json | Set-Content (Join-Path $evidence ("installed-version-"+$Version+".json"))
+    # electron-builder writes a four-component PE ProductVersion, while the
+    # FileVersion and package version are the release's exact three components.
+    if ($record.product_version -ne "$Version.0" -or $record.file_version -ne $Version -or $record.asar_version -ne $Version) { throw ("Unexpected installed version: "+($record | ConvertTo-Json -Compress)) }
+}
 try {
     Run-Setup $old
     Stop-InstalledApp
@@ -58,7 +68,7 @@ try {
     if ((Get-FileHash $published076 -Algorithm SHA256).Hash.ToLowerInvariant() -ne '01014312b60e591a05bfc87f86e098adf6c5fc5e59520db5aedac5b5dba02ff3') { throw 'Published 0.12.76 setup checksum mismatch' }
     Run-Setup $published076
     Stop-InstalledApp
-    if ((Get-Item (Join-Path $install 'Deep Legends.exe')).VersionInfo.ProductVersion -ne '0.12.76') { throw '0.12.76 was not actually installed' }
+    Assert-InstalledVersion '0.12.76'
     $userDataName = (& node -e "const p=JSON.parse(require('./desktop/node_modules/@electron/asar').extractFile(process.argv[1],'package.json'));console.log(p.productName||p.name)" (Join-Path $install 'resources/app.asar')).Trim()
     if ($LASTEXITCODE -ne 0 -or -not $userDataName) { throw 'Cannot determine installed Electron userData name' }
     $userData = Join-Path $env:APPDATA $userDataName
@@ -93,7 +103,7 @@ try {
     }
     Run-Setup $online.download
     Stop-InstalledApp
-    if ((Get-Item (Join-Path $install 'Deep Legends.exe')).VersionInfo.ProductVersion -ne '0.12.77') { throw '0.12.77 was not actually installed' }
+    Assert-InstalledVersion '0.12.77'
     foreach ($file in $sentinels.Keys) { if (-not (Test-Path $file) -or (Get-FileHash $file -Algorithm SHA256).Hash -ne $sentinels[$file]) { throw "R238 persistent fixture changed: $file" } }
     $sentinels | ConvertTo-Json | Set-Content (Join-Path $evidence 'retained-persistent-fixtures.json')
     Start-Process (Join-Path $install 'Deep Legends.exe') | Out-Null
