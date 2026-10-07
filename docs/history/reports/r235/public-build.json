@@ -1,0 +1,43 @@
+{
+  "built_at_utc": "2026-10-06T14:50:44.865002+00:00",
+  "version": "0.12.75",
+  "source_fingerprint": "e7a91facbf4b",
+  "key_mode": "public",
+  "scope": "Backend validation binaries only. Includes shared workspace source; not packaged or published. Windows execution/upgrade not verified.",
+  "artifacts": [
+    {
+      "platform": "darwin",
+      "path": "/Users/ly/personal/personal-work/deep-legends/dist/r235-validation/loot-service-0.12.75-r235-darwin-arm64-public",
+      "bytes": 31647794,
+      "sha256": "7d4a5f66227f4eaa64e48b8fc997b5111d390ca605a633e66f2ee9b1f8c334a0",
+      "command": [
+        "go",
+        "build",
+        "-buildvcs=false",
+        "-trimpath",
+        "-ldflags",
+        "-s -w -buildid= -X main.version=0.12.75 -X main.buildFingerprint=e7a91facbf4b -X main.riotAPIKey= -X main.riotAPIKeyCipher=",
+        "-o",
+        "/Users/ly/personal/personal-work/deep-legends/dist/r235-validation/loot-service-0.12.75-r235-darwin-arm64-public",
+        "./backend"
+      ]
+    },
+    {
+      "platform": "windows",
+      "path": "/Users/ly/personal/personal-work/deep-legends/dist/r235-validation/loot-service-0.12.75-r235-public.exe",
+      "bytes": 32587264,
+      "sha256": "0cfe69bf711abda899e19dd3cc7f893c7ed874885786965c6c8285638fd1e33f",
+      "command": [
+        "go",
+        "build",
+        "-buildvcs=false",
+        "-trimpath",
+        "-ldflags",
+        "-H=windowsgui -s -w -buildid= -X main.version=0.12.75 -X main.buildFingerprint=e7a91facbf4b -X main.riotAPIKey= -X main.riotAPIKeyCipher=",
+        "-o",
+        "/Users/ly/personal/personal-work/deep-legends/dist/r235-validation/loot-service-0.12.75-r235-public.exe",
+        "./backend"
+      ]
+    }
+  ]
+}

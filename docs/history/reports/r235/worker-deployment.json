@@ -1,0 +1,38 @@
+{
+  "deployed_at_beijing": "2026-10-06 21:32:33",
+  "version_id": "87c17775-fafe-48bf-930a-8c575852d8b1",
+  "origin": "https://riot.yinxiaobia.net",
+  "key_mode": "Worker secret only; client public builds carry no Riot key",
+  "health_status": 204,
+  "health_cache_control": "no-store",
+  "outside_route_status": 404,
+  "platform_status": 200,
+  "evidence": [
+    {
+      "file": "r235-health-headers.txt",
+      "headers": [
+        "HTTP/2 204 ",
+        "date: Tue, 06 Oct 2026 13:32:33 GMT",
+        "cache-control: no-store"
+      ]
+    },
+    {
+      "file": "r235-bad-route-headers.txt",
+      "headers": [
+        "HTTP/2 404 ",
+        "date: Tue, 06 Oct 2026 13:32:34 GMT",
+        "content-type: text/plain;charset=UTF-8"
+      ]
+    },
+    {
+      "file": "r235-status-headers.txt",
+      "headers": [
+        "HTTP/2 200 ",
+        "date: Tue, 06 Oct 2026 13:32:35 GMT",
+        "content-type: application/json; charset=utf-8",
+        "cache-control: public, max-age=60",
+        "x-app-rate-limit: 100:120,20:1"
+      ]
+    }
+  ]
+}
