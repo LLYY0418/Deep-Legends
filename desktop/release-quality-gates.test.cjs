@@ -95,6 +95,9 @@ test("R86 Windows release stops on a real failing Go test and rejects an indepen
       fs.writeFileSync(path.join(directory,"desktop/package.json"),JSON.stringify({version:"99.1.2"}));
       fs.writeFileSync(path.join(directory,"go.mod"),"module releasegate\n\ngo 1.24\n");
       fs.writeFileSync(path.join(directory,"main.go"),"package main\n\nfunc main() {}\n");
+      // R238: real Windows gofmt must reach the intentional Go failure even
+      // when the full source inventory exceeds the Win32 command-line limit.
+      for (let index=0;index<600;index++) fs.writeFileSync(path.join(directory,`format-inventory-${index}-long-source-filename.go`),"package main\n");
       fs.writeFileSync(path.join(directory,"gate_test.go"),'package main\n\nimport "testing"\n\nfunc TestReleaseGate(t *testing.T) { t.Fatal("R86_INTENTIONAL_FAILURE") }\n');
       fs.writeFileSync(path.join(directory,".gomodcache/invalid.go"),"invalid dependency parser fixture");
       fs.writeFileSync(path.join(directory,".gopath/pkg/mod/dependency@v1.0.0/invalid.go"),"invalid dependency parser fixture");

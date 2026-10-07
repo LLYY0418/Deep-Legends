@@ -1,0 +1,19 @@
+{
+  "name": "macos-public-backend-after-ci-fix-20261007T212225.749515",
+  "command": [
+    "python3",
+    "-c",
+    "import os,pathlib,subprocess,tempfile,hashlib,json; root=pathlib.Path.cwd(); out=root/\"dist/R238-0.12.77-macos-public-02\"; out.mkdir(exist_ok=False); fp=subprocess.check_output([\"node\",\"desktop/source-fingerprint.cjs\"],text=True).strip(); binary=out/\"loot-service\"; subprocess.run([\"go\",\"build\",\"-tags=\",\"-buildvcs=false\",\"-trimpath\",\"-ldflags=-s -w -buildid= -X main.version=0.12.77 -X main.buildFingerprint=\"+fp+\" -X main.riotAPIKey= -X main.riotAPIKeyCipher=\",\"-o\",str(binary),\"./backend\"],check=True,env={**os.environ,\"GOFLAGS\":\"\",\"CGO_ENABLED\":\"0\"}); subprocess.run([\"node\",\"desktop/verify-build-fingerprint.cjs\",str(binary),fp],check=True); subprocess.run([\"node\",\"-e\",\"require(\\\"./desktop/verify-embedded-riot-key.cjs\\\").verifyRiotKeyPolicy(process.argv[1],\\\"public\\\");require(\\\"./desktop/verify-license-release.cjs\\\").verifyLicenseRelease(process.argv[1]);console.log(\\\"public Riot key and license isolation PASS\\\")\",str(binary)],check=True); data=tempfile.mkdtemp(prefix=\"r238-macos-selfcheck-02-\"); subprocess.run([str(binary),\"--self-test\"],check=True,env={**os.environ,\"LOL_LOOT_DATA_DIR\":data,\"RIOT_API_KEY\":\"\"}); row={\"version\":\"0.12.77\",\"key_mode\":\"public\",\"fingerprint\":fp,\"binary_sha256\":hashlib.sha256(binary.read_bytes()).hexdigest(),\"isolated_data_dir\":data,\"platform\":\"macOS\",\"windows_execution\":\"未在 Windows 实跑\"}; (root/\"docs/history/reports/r238/p4/macos-backend-02.json\").write_text(json.dumps(row,ensure_ascii=False,indent=2)); print(json.dumps(row,ensure_ascii=False))"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-07T21:22:25.749515+08:00",
+  "end": "2026-10-07T21:22:27.998723+08:00",
+  "elapsed_seconds": 2.249,
+  "exit_code": 0,
+  "last_five": [
+    "verified build fingerprint=129e36bf324c",
+    "public Riot key and license isolation PASS",
+    "2026/10/07 21:22:27 Deep Legends 0.12.77 自检通过：奖池 554 条，哈希 dee5e21f5234",
+    "{\"version\": \"0.12.77\", \"key_mode\": \"public\", \"fingerprint\": \"129e36bf324c\", \"binary_sha256\": \"0a44dbe86d353a04a973ddac00dba3d1cbfaf09e88b80c1b00246f69b5037ad5\", \"isolated_data_dir\": \"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r238-macos-selfcheck-02-kxoeervg\", \"platform\": \"macOS\", \"windows_execution\": \"未在 Windows 实跑\"}"
+  ]
+}

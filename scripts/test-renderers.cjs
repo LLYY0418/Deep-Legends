@@ -12,11 +12,9 @@ const files = directories.flatMap(directory => fs.readdirSync(path.join(root, di
   .filter(name => name.endsWith(".test.cjs")).sort().map(name => path.join(root, directory, name)));
 const fileNames = new Set(files);
 const timings = [];
-// Two-core private runners must still overlap test files. Windows jsdom
-// workers contend more heavily; cap at three to keep each 200-match file <90s.
-const concurrency = process.platform === "win32"
-  ? Math.min(3, Math.max(2, os.availableParallelism()))
-  : Math.max(2, os.availableParallelism());
+// Keep real file workers overlapped, but avoid four simultaneous 200-match
+// jsdom trees contending on CI. Retain every test and the 90s/240s budgets.
+const concurrency = Math.min(3, Math.max(2, os.availableParallelism()));
 let summary;
 let failed = false;
 (async () => {

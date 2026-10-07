@@ -132,3 +132,15 @@ license标签再次编译并运行，仅余TestR233FailedCounterSaveDoesNotRefre
 本地Setup SHA-256 **1a9a7ad155460849c075338d3857f703a2b4137191a52bc6aefad8f4bf2b6ce4**；Windows后端SHA-256 **a67dc62bd94bcecf2a7a832084f6db7778ef887dd8e6f08e559d74faa8095702**；macOS后端SHA-256 **3bf5b1fed5ff28eb8625449f51222ebfb2dc081d72a293585ad1fa5984c3cd9e**。这份本地包用于审计，正式附件以Windows工作流实际生成的草稿为准，不能混用两个摘要。
 
 玩家说明已按工单写入077 CHANGELOG，无R编号、注册码或隐藏识别。按用户本轮指定顺序推发布分支、同SHA完整质量通过后再tag；快照分支不推。与日常R222只推tag的去重顺序不同，本轮遵循用户明确的分支质量闸门，记录可能的同SHA tag复检。到Latest明确停下等待确认；真实账号/晚高峰/匿名077在线仍待真机或发布后，不标通过。
+
+发布分支于2026-10-07 21:04:56（Asia/Shanghai）推送成功，冻结源码SHA **078cc6de7f072927fa9f21ef1b55992f517961a9**，指纹7e1229c2a79c，key mode public。完整质量工作流[37625739383](https://github.com/LLYY0418/Deep-Legends/actions/runs/37625739383)在2026-10-07T13:05:01Z启动Linux quality/Windows build两作业，当前尚未结束，不标PASS。两个本地快照均未推送；tag/草稿/Latest仍未创建。
+
+## P4 首轮同SHA CI失败（未tag，原日志不覆盖）
+
+[37625739383](https://github.com/LLYY0418/Deep-Legends/actions/runs/37625739383) conclusion=failure。Windows完整backend/installer与全部专属/PowerShell护栏已经实跑PASS，但正式构建在gofmt启动失败：585个绝对路径估算命令35352字符>Win32 32767上限，PowerShell报StandardOutputEncoding只在redirect时支持。修为每100文件一批，保留全部585文件、每批检查退出码与全部未格式化输出；现有Windows R86夹具补600个合法长文件名，原失败Go测试和early-build变异断言/60秒预算不改。原Windows完整日志保存为p4/windows-job-112806901067-raw01.log与ANSI净化副本。
+
+Linux race等已PASS；renderer1332项/1330PASS/2 Windows条件skip、断言0失败，单文件最大75588ms<90秒，但总245554ms>240秒，故正确FAIL。并发4在CI互相争用；现在统一采用既有Windows的上限3（本地R235验收也使用3），不改文件集合/断言/90或240秒预算，重跑后才判PASS。原Linux完整日志p4/linux-job-112806901255-raw01.log、净化副本与watch失败结果全部保留，不引用重跑覆盖此失败。
+
+Windows包/首帧/实际升级尚未执行，不能算Windows整体通过。0.12.77没有tag/Release，Latest仍076。构建脚本输入变化导致新指纹，前一个本地候选与macOS后端保留审计目录；接下来使用全新-02目录重新构建和审计，不覆盖任何既有包。
+
+CI范围内修复后的本地结果：受影响build/quality/filter护栏11.108s PASS，默认renderer1332项/1328PASS/4原skip、141.749s PASS，90/240秒未改；格式/JS/filter/diff再次PASS。正式Bash输入的完整Go分片/installer/vet与新public包178.746秒通过，源码Go业务和夹具没有变化，前述Go全量/race仍对应这些文件；下一轮CI按新SHA再跑全部。新指纹 **129e36bf324c**，新本地Setup SHA **34e811cc30e2b3575186e8485b8da3c0ef1528d21d57d6ea10e335ea70174482**，Windowsbackend SHA **8cbbaea70908d1aa3603ca35dc3ae9231636db13ce3c4ff37d30f0759d09d965**，macOSbackend SHA **0a44dbe86d353a04a973ddac00dba3d1cbfaf09e88b80c1b00246f69b5037ad5**；新-02包再次授权材料/Key/digest/fuses/ASAR严格审计PASS。旧包、旧160个STAGING/R248文件与全部失败不覆盖。真正Windows升级与匿名077 Latest仍未通过，不标完成。

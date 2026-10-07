@@ -96,8 +96,15 @@ try {
     # Match relative paths so a hidden ancestor of the checkout does not hide source.
     $goSources = @(Get-ChildItem -Recurse -File -Filter '*.go' | Where-Object { $_.FullName.Substring($projectRoot.Length) -notmatch '[\\/](\.[^\\/]+|node_modules|vendor|dist)[\\/]' } | ForEach-Object { $_.FullName })
     if ($goSources.Count -eq 0) { throw "No project Go sources found" }
-    $unformatted = @(gofmt -l $goSources)
-    if ($LASTEXITCODE -ne 0) { throw "Go formatting check failed" }
+    # Win32 command lines are limited to 32767 characters. The shelved source
+    # remains in the formatting inventory; check every file in bounded batches.
+    $unformatted = @()
+    for ($goIndex = 0; $goIndex -lt $goSources.Count; $goIndex += 100) {
+        $goLast = [Math]::Min($goIndex + 99, $goSources.Count - 1)
+        $goBatch = @($goSources[$goIndex..$goLast])
+        $unformatted += @(gofmt -l $goBatch)
+        if ($LASTEXITCODE -ne 0) { throw "Go formatting check failed" }
+    }
     if ($unformatted.Count -gt 0) { throw "Go files are not formatted: $($unformatted -join ', ')" }
     if (-not $SkipTestsInCI) {
         go test ./...

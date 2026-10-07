@@ -1,0 +1,106 @@
+[build 2026-10-07T13:22:24.179Z] cleanup: started (0.0s)
+[build 2026-10-07T13:22:24.202Z] cleanup: completed (0.0s)
+[build 2026-10-07T13:22:24.511Z] go-test: started (0.0s)
+[go-test] discovered 1948 tests; running 5 shards
+[go-test] shard 1/5: started (1 tests)
+[go-test] shard 2/5: started (430 tests)
+[go-test] shard 3/5: started (494 tests)
+[go-test] shard 4/5: started (430 tests)
+[go-test] shard 5/5: started (593 tests)
+[build 2026-10-07T13:22:34.516Z] go-test: still running (10.0s)
+ok  	lol-loot-assistant/backend	0.438s
+[go-test] shard 1/5: completed (1.4s)
+[build 2026-10-07T13:22:44.518Z] go-test: still running (20.0s)
+[build 2026-10-07T13:22:54.521Z] go-test: still running (30.0s)
+[build 2026-10-07T13:23:04.523Z] go-test: still running (40.0s)
+ok  	lol-loot-assistant/backend	38.638s
+[go-test] shard 3/5: completed (39.9s)
+[build 2026-10-07T13:23:14.524Z] go-test: still running (50.0s)
+[build 2026-10-07T13:23:24.526Z] go-test: still running (60.0s)
+ok  	lol-loot-assistant/backend	51.327s
+[go-test] shard 5/5: completed (52.9s)
+ok  	lol-loot-assistant/backend	58.311s
+[go-test] shard 2/5: completed (59.8s)
+[build 2026-10-07T13:23:34.528Z] go-test: still running (70.0s)
+ok  	lol-loot-assistant/backend	66.533s
+[go-test] shard 4/5: completed (67.9s)
+[build 2026-10-07T13:23:42.171Z] go-test: completed (77.7s)
+[build 2026-10-07T13:23:42.200Z] go-vet: started (0.0s)
+[build 2026-10-07T13:23:43.278Z] go-vet: completed (1.1s)
+[build 2026-10-07T13:23:43.307Z] installer-test: started (0.0s)
+ok  	deeplegends/installer	3.169s
+ok  	deeplegends/installer/internal/webviewhost	0.514s
+?   	deeplegends/installer/payload	[no test files]
+?   	deeplegends/installer/ui	[no test files]
+ok  	deeplegends/installer/uninstall	0.533s
+[build 2026-10-07T13:23:46.865Z] installer-test: completed (3.6s)
+[build 2026-10-07T13:23:46.894Z] installer-vet: started (0.0s)
+[build 2026-10-07T13:23:47.044Z] installer-vet: completed (0.1s)
+Public build: no embedded Riot API key; KR queries require RIOT_API_KEY at runtime.
+[build 2026-10-07T13:23:47.074Z] source-fingerprint: started (0.0s)
+[build 2026-10-07T13:23:47.146Z] source-fingerprint: completed (0.1s)
+[build 2026-10-07T13:23:47.176Z] backend-build: started (0.0s)
+[build 2026-10-07T13:23:47.815Z] backend-build: completed (0.6s)
+[build 2026-10-07T13:23:47.843Z] backend-fingerprint: started (0.0s)
+verified build fingerprint=129e36bf324c
+[build 2026-10-07T13:23:47.888Z] backend-fingerprint: completed (0.0s)
+[build 2026-10-07T13:23:47.917Z] backend-digest: started (0.0s)
+[build 2026-10-07T13:23:47.964Z] backend-digest: completed (0.0s)
+npm-ci: skipped by SKIP_NPM_INSTALL=1
+electron-cache: checking for a reusable Windows Electron archive
+electron-cache: check completed
+Reusing cached Electron distribution: /Users/ly/Library/Caches/electron/85f2b7422cd2141b6caa99bac0fc0658b0f22b533b571f6a2ec9a49f2ac23c0a/electron-v43.3.0-win32-x64.zip
+[build 2026-10-07T13:23:50.655Z] uninstaller-shell: started (0.0s)
+Uninstaller shell built: uninstall-shell.exe
+[build 2026-10-07T13:23:50.833Z] uninstaller-shell: completed (0.2s)
+[build 2026-10-07T13:23:50.862Z] nsis: started (0.0s)
+npm warn Unknown user config "scripts-prepend-node-path". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> deep-legends-desktop@0.12.77 pack:win-setup
+> electron-builder --win nsis --x64 --config.win.signExecutable=false --config.nsis.artifactName=Deep Legends Setup ${version}-public.${ext} --config.electronDist=/Users/ly/Library/Caches/electron/85f2b7422cd2141b6caa99bac0fc0658b0f22b533b571f6a2ec9a49f2ac23c0a/electron-v43.3.0-win32-x64.zip
+
+  • electron-builder  version=26.15.7 os=27.0.0
+  • loaded configuration  file=package.json ("build" field)
+Setup compression: 7z level 9 (default 9)
+  • executing @electron/rebuild  electronVersion=43.3.0 arch=x64 buildFromSource=false workspaceRoot=/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r248-default-public-ZcwWeq/desktop projectDir=./ appDir=./
+  • installing native dependencies  arch=x64
+  • completed installing native dependencies
+  • packaging       platform=win32 arch=x64 electron=43.3.0 appOutDir=/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r248-default-public-ZcwWeq/dist/desktop/win-unpacked
+  • using custom electronDist zip file  zipFile=/Users/ly/Library/Caches/electron/85f2b7422cd2141b6caa99bac0fc0658b0f22b533b571f6a2ec9a49f2ac23c0a/electron-v43.3.0-win32-x64.zip
+  • searching for node modules  pm=npm searchDir=/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r248-default-public-ZcwWeq/desktop
+  • no node modules found in collection, trying next search directory  pm=npm searchDir=/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r248-default-public-ZcwWeq/desktop
+  • searching for node modules  pm=traversal searchDir=/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r248-default-public-ZcwWeq/desktop
+  • using manual traversal of node_modules to build dependency tree
+  • no node modules found in collection, trying next search directory  pm=traversal searchDir=/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r248-default-public-ZcwWeq/desktop
+  • no node modules returned while searching directories  searchDirectories=[""]
+  • updating asar integrity executable resource  executablePath=/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r248-default-public-ZcwWeq/dist/desktop/win-unpacked/Deep Legends.exe
+  • executing @electron/fuses  electronPath=/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r248-default-public-ZcwWeq/dist/desktop/win-unpacked/Deep Legends.exe
+  • file signing skipped via signExecutable configuration  file=/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r248-default-public-ZcwWeq/dist/desktop/win-unpacked/Deep Legends.exe
+  • building        target=nsis file=/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r248-default-public-ZcwWeq/dist/desktop/Deep Legends Setup 0.12.77-public.exe archs=x64 oneClick=false perMachine=false
+[build 2026-10-07T13:24:00.868Z] nsis: still running (10.0s)
+[build 2026-10-07T13:24:10.870Z] nsis: still running (20.0s)
+[build 2026-10-07T13:24:20.872Z] nsis: still running (30.0s)
+[build 2026-10-07T13:24:30.874Z] nsis: still running (40.0s)
+[build 2026-10-07T13:24:40.876Z] nsis: still running (50.0s)
+[build 2026-10-07T13:24:50.878Z] nsis: still running (60.0s)
+[build 2026-10-07T13:25:00.879Z] nsis: still running (70.0s)
+[build 2026-10-07T13:25:10.882Z] nsis: still running (80.0s)
+  • file signing skipped via signExecutable configuration  file=/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r248-default-public-ZcwWeq/dist/desktop/Deep Legends Setup 0.12.77-public.__uninstaller.exe
+  • file signing skipped via signExecutable configuration  file=/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r248-default-public-ZcwWeq/dist/desktop/Deep Legends Setup 0.12.77-public.exe
+[build 2026-10-07T13:25:16.594Z] nsis: completed (85.7s)
+[build 2026-10-07T13:25:16.631Z] installer-shell: started (0.0s)
+Installer shell built: Deep Legends Setup 0.12.77-public.exe (349468648 installed bytes)
+[build 2026-10-07T13:25:18.495Z] installer-shell: completed (1.9s)
+[build 2026-10-07T13:25:18.525Z] packaged-runtime: started (0.0s)
+packaged desktop runtime verified: app-title.cjs, backend-digest.cjs, backend-evidence.cjs, backend-integrity.cjs, desktop-log.cjs, diagnostics-directory.cjs, diagnostics-export.cjs, license-build.cjs, license-gate.cjs, license-window.cjs, main.cjs, preload.cjs, process-metrics.cjs, proxy-resolution.cjs, share-export.cjs, ui-scale.cjs, window-bounds-store.cjs, window-bounds.cjs
+[build 2026-10-07T13:25:18.567Z] packaged-runtime: completed (0.0s)
+[build 2026-10-07T13:25:18.596Z] packaged-fingerprint: started (0.0s)
+verified build fingerprint=129e36bf324c
+[build 2026-10-07T13:25:18.645Z] packaged-fingerprint: completed (0.0s)
+[build 2026-10-07T13:25:18.673Z] release-receipt: started (0.0s)
+Build distribution verified: public · 129e36bf324c
+[build 2026-10-07T13:25:19.351Z] release-receipt: completed (0.7s)
+[build 2026-10-07T13:25:19.380Z] setup-checksum: started (0.0s)
+[build 2026-10-07T13:25:19.748Z] setup-checksum: completed (0.4s)
+Setup build complete: Deep Legends Setup 0.12.77-public.exe
+R248 single default public audit package: dist/R238-0.12.77-public-02

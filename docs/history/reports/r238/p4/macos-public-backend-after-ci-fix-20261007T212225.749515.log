@@ -1,0 +1,4 @@
+verified build fingerprint=129e36bf324c
+public Riot key and license isolation PASS
+2026/10/07 21:22:27 Deep Legends 0.12.77 自检通过：奖池 554 条，哈希 dee5e21f5234
+{"version": "0.12.77", "key_mode": "public", "fingerprint": "129e36bf324c", "binary_sha256": "0a44dbe86d353a04a973ddac00dba3d1cbfaf09e88b80c1b00246f69b5037ad5", "isolated_data_dir": "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r238-macos-selfcheck-02-kxoeervg", "platform": "macOS", "windows_execution": "未在 Windows 实跑"}

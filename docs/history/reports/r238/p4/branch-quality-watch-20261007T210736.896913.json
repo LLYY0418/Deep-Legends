@@ -1,0 +1,24 @@
+{
+  "name": "branch-quality-watch-20261007T210736.896913",
+  "command": [
+    "gh",
+    "run",
+    "watch",
+    "37625739383",
+    "--exit-status",
+    "--interval",
+    "30"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-07T21:07:36.896913+08:00",
+  "end": "2026-10-07T21:14:10.333716+08:00",
+  "elapsed_seconds": 393.441,
+  "exit_code": 1,
+  "last_five": [
+    "quality: .github#2121",
+    "",
+    "- \"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748\"",
+    "quality: .github#1",
+    ""
+  ]
+}
