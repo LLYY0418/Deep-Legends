@@ -1,0 +1,8 @@
+--- FAIL: TestR244OldLiveHistoryAndHeaderShareRows (0.00s)
+    --- FAIL: TestR244OldLiveHistoryAndHeaderShareRows/10 (0.00s)
+        r244_test.go:41: {0  0 0 0 0 0 0 0 0 0 0 false} [] map[event:live_history_freshness header_games:0 is_current:true lcu_newest_queue_age_min:0x1400046c7c0 newest_any_age_min:0x1400046c7b0 newest_queue_age_min:0x1400046c7b8 oldest_shown_age_days:<nil> pages_read:0 queue_filtered:false queue_games:11 remake_skipped:1 shown_count:0 shown_newest_age_min:<nil> slot:0 source: stop_reason:exhausted subject_unmatched:0 team:100 window_games:16]
+    --- FAIL: TestR244OldLiveHistoryAndHeaderShareRows/3 (0.00s)
+        r244_test.go:41: {0  0 0 0 0 0 0 0 0 0 0 false} [] map[event:live_history_freshness header_games:0 is_current:true lcu_newest_queue_age_min:0x1400046c808 newest_any_age_min:0x1400046c7f8 newest_queue_age_min:0x1400046c800 oldest_shown_age_days:<nil> pages_read:0 queue_filtered:false queue_games:4 remake_skipped:1 shown_count:0 shown_newest_age_min:<nil> slot:0 source: stop_reason:exhausted subject_unmatched:0 team:100 window_games:16]
+FAIL
+FAIL	lol-loot-assistant/backend	0.721s
+FAIL

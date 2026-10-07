@@ -1,0 +1,5 @@
+--- FAIL: TestR235HeadStreamsConcurrentAndFirstPagePush (0.62s)
+    r235_test.go:98: streams serialized: 513.375583ms
+FAIL
+FAIL	lol-loot-assistant/backend	1.352s
+FAIL

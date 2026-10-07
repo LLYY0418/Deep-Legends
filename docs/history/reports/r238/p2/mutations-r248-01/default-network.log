@@ -1,0 +1,5 @@
+--- FAIL: TestR248DisabledStartupNoAuthorizationNetwork (0.00s)
+    disabled_build_test.go:66: default startup must issue zero authorization requests 1
+FAIL
+FAIL	lol-loot-assistant/backend	0.648s
+FAIL

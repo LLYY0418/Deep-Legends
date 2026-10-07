@@ -1,0 +1,49 @@
+✖ R219 timeout and suppressed hides retain their fixed reasons and bounded fallback (99.832667ms)
+✖ R235 a 30-second startup remains covered and only the 120-second hard timer hides it (40.92475ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 494.573083
+
+✖ failing tests:
+
+test at backend/web/r219.test.cjs:73:1
+✖ R219 timeout and suppressed hides retain their fixed reasons and bounded fallback (99.832667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  15000 !== 120000
+  
+      at TestContext.<anonymous> (/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r238-final-mutation-input-wm8j5isy/backend/web/r219.test.cjs:76:53)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 15000,
+    expected: 120000,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at backend/web/r219.test.cjs:108:1
+✖ R235 a 30-second startup remains covered and only the 120-second hard timer hides it (40.92475ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert(![...h.timers.values()].some(t=>t.delay<=30000))
+  
+      at TestContext.<anonymous> (/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r238-final-mutation-input-wm8j5isy/backend/web/r219.test.cjs:110:49)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

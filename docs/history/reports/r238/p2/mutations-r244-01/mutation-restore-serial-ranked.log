@@ -1,0 +1,5 @@
+--- FAIL: TestR244OverviewParallelAndEarlyMatches (1.04s)
+    r244_test.go:334: 1.016940791s 2026-10-07 20:48:12.629625 +0800 CST m=+0.527131584 3
+FAIL
+FAIL	lol-loot-assistant/backend	1.702s
+FAIL

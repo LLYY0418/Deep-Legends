@@ -1,0 +1,18 @@
+[build 2026-10-07T12:58:21.283Z] cleanup: started (0.0s)
+[build 2026-10-07T12:58:21.298Z] cleanup: completed (0.0s)
+[build 2026-10-07T12:58:21.503Z] go-test: started (0.0s)
+[go-test] discovered 1948 tests; running 5 shards
+[go-test] shard 1/5: started (1 tests)
+[go-test] shard 2/5: started (430 tests)
+[go-test] shard 3/5: started (494 tests)
+[go-test] shard 4/5: started (430 tests)
+[go-test] shard 5/5: started (593 tests)
+[build 2026-10-07T12:58:31.507Z] go-test: still running (10.0s)
+ok  	lol-loot-assistant/backend	0.533s
+[go-test] shard 1/5: completed (1.7s)
+[build 2026-10-07T12:58:41.509Z] go-test: still running (20.0s)
+[build 2026-10-07T12:58:51.511Z] go-test: still running (30.0s)
+[build 2026-10-07T12:59:01.512Z] go-test: still running (40.0s)
+ok  	lol-loot-assistant/backend	36.482s
+[go-test] shard 3/5: completed (37.8s)
+[build 2026-10-07T12:59:11.512Z] go-test: still running (50.0s)

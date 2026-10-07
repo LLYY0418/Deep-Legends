@@ -1,0 +1,5 @@
+--- FAIL: TestR241HeadFreshnessSmallRequestNewGamesAndRecentGate (0.10s)
+    r241_test.go:65: {false S26 2 true false false 已统计 2 场} false  0
+FAIL
+FAIL	lol-loot-assistant/backend	0.759s
+FAIL

@@ -1,0 +1,5 @@
+--- FAIL: TestR235MigrationKeepsHistoricalGames (0.02s)
+    r235_test.go:26: schema 1 lost history: main.seasonStatsCache{HeadGameID:0, HeadCheckedAt:time.Date(1, time.January, 1, 0, 0, 0, 0, time.UTC), Streams:map[string]main.seasonStatsStream(nil), CappedByUpstream:false, newInfos:map[int64]*main.riotMatchInfo(nil), playerRef:"", seasonStartMillis:0, ChampionTable:[]main.seasonTableBucket(nil), SchemaVersion:14, Source:"sgp", Season:"S26", AccountHash:"self", GameIDs:[]int64(nil), Stats:[]main.gameplaySeasonChampionStat(nil), QueueStats:map[int64]main.gameplayAggregate(nil), RankedMatches:[]main.seasonRankedMatch(nil), AugmentSamples:[]main.seasonAugmentSample(nil), ResumeIndex:0, PendingIndex:0, UpdatedAt:time.Date(1, time.January, 1, 0, 0, 0, 0, time.UTC), Complete:false} <nil>
+FAIL
+FAIL	lol-loot-assistant/backend	0.806s
+FAIL

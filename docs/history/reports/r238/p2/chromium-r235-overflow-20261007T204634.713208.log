@@ -1,0 +1,3 @@
+Error: timeout document.querySelector('.match-tags-popover:not([hidden])')?.textContent.includes('单杀')
+    at Object.until (/Users/ly/personal/personal-work/deep-legends/scripts/r235-browser.cjs:43:140)
+    at async main (/Users/ly/personal/personal-work/deep-legends/scripts/r235-browser.cjs:76:252)

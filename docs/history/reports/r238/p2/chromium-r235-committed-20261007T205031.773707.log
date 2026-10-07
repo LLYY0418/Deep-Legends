@@ -1,0 +1,4 @@
+Error: CDP timeout Page.navigate
+    at Timeout._onTimeout (/Users/ly/personal/personal-work/deep-legends/scripts/r235-browser.cjs:30:137)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)

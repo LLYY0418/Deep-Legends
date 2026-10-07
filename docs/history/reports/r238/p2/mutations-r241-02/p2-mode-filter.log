@@ -1,0 +1,57 @@
+✖ R241 map matrix filters before excluded observations are read (5.091375ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 345.010541
+
+✖ failing tests:
+
+test at backend/web/r241.test.cjs:10:1
+✖ R241 map matrix filters before excluded observations are read (5.091375ms)
+  AssertionError [ERR_ASSERTION]: map 12
+  + actual - expected
+  
+    [
+  +   'advantage',
+      'control',
+  +   'cs',
+      'damage',
+  +   'defense',
+  +   'dive',
+      'efficiency',
+  +   'gold',
+      'heal',
+      'hook',
+      'kills',
+  +   'participation',
+      'shield',
+  +   'solo',
+      'tank',
+  +   'tower'
+    ]
+  
+      at TestContext.<anonymous> (/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r238-final-mutation-input-wm8j5isy/backend/web/r241.test.cjs:10:297)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [
+      'advantage',  'control',
+      'cs',         'damage',
+      'defense',    'dive',
+      'efficiency', 'gold',
+      'heal',       'hook',
+      'kills',      'participation',
+      'shield',     'solo',
+      'tank',       'tower'
+    ],
+    expected: [ 'control', 'damage', 'efficiency', 'heal', 'hook', 'kills', 'shield', 'tank' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

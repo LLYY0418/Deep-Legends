@@ -1,0 +1,24 @@
+✔ R206 Worker forwards only the actual Riot GET route whitelist (23.639792ms)
+✔ R206 Worker rejects arbitrary paths/hosts/methods without Riot I/O (0.562958ms)
+✔ R206 Worker response caching honors category TTL and contains no identity cache keys (1.926125ms)
+✔ R206 Worker per-IP limit rejects request 301 and allows another IP (36.321417ms)
+✔ R206 Worker preserves Riot Retry-After and avoids same-path I/O during cooldown (1.073042ms)
+✔ R206 Worker never exposes or logs its secret, including echoed upstream values (1.720583ms)
+✔ R206 Worker fails closed without a secret or rate limiter (0.17775ms)
+✔ R206 Worker rejects upstream redirects without forwarding the secret or Location (1.005958ms)
+✔ R208 application cooldown blocks every path on its host, with decreasing remaining time (1.087625ms)
+✔ R208 method/service/missing-header cooldowns remain path scoped and default to five seconds (2.123625ms)
+✔ R208 IP 429 and controlled upstream failures are JSON rather than false daily-quota pages (33.274125ms)
+✔ R208 application remaining time takes precedence when IP limit also expires (41.437541ms)
+✔ R220 every platform and regional cluster has the correct endpoint family (15.071959ms)
+✔ R220 validated platform headers isolate JP and KR cooldowns on shared ASIA without forwarding headers (0.818ms)
+✔ R220 shared-cluster responses remain platform-scoped in the relay cache (0.692666ms)
+✔ R231 health is header-only and makes no upstream/quota/identity calls (0.11625ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 217.208583

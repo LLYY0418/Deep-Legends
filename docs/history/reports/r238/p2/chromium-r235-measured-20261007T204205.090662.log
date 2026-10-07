@@ -1,0 +1,3 @@
+Error: timeout document.querySelector('.global-tooltip')?.textContent.includes('单杀')
+    at Object.until (/Users/ly/personal/personal-work/deep-legends/scripts/r235-browser.cjs:43:140)
+    at async main (/Users/ly/personal/personal-work/deep-legends/scripts/r235-browser.cjs:75:252)

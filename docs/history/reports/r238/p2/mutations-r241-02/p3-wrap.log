@@ -1,0 +1,12 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+'wrap' !== 'nowrap'
+
+    at main (/private/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r238-final-mutation-input-wm8j5isy/scripts/r241-browser.cjs:59:53) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'wrap',
+  expected: 'nowrap',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
