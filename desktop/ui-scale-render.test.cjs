@@ -7,7 +7,7 @@ const {JSDOM}=require("jsdom");
 const {UI_SCALE_STEPS}=require("./ui-scale.cjs");
 const web=path.join(__dirname,"..","backend","web");
 const appSource=fs.readFileSync(path.join(web,"app.js"),"utf8");
-function boot({bridge,preference,source=appSource}={}) {
+function boot({bridge,preference,migrated,source=appSource}={}) {
   const dom=new JSDOM(fs.readFileSync(path.join(web,"index.html"),"utf8"),{url:"http://127.0.0.1:1/?demo",runScripts:"outside-only",pretendToBeVisual:true});
   const w=dom.window;
   w.IntersectionObserver=class{observe(){}unobserve(){}disconnect(){}};
@@ -19,6 +19,7 @@ function boot({bridge,preference,source=appSource}={}) {
   require("./license-render-fixture.cjs").installLicenseRenderFixture(w);
   if(bridge)w.desktopScale=bridge;else delete w.desktopScale;
   if(preference)w.localStorage.setItem("lol-loot-ui-scale",preference);
+  if(migrated)w.localStorage.setItem("lol-loot-ui-scale-default-auto",migrated);
   for(const file of ["runtime.js","demo-data.js","license-ui.js","app.js"])w.eval(file==="app.js"?source:fs.readFileSync(path.join(web,file),"utf8"));
   w.document.dispatchEvent(new w.Event("DOMContentLoaded"));
   return {w,select:w.document.getElementById("setting-ui-scale"),close(){w.dispatchEvent(new w.CustomEvent("deep-legends:dispose"));w.close();}};
@@ -67,7 +68,7 @@ test("scaling applies without the desktop bridge and follows the window size",as
   // 变异：不写 --ui-zoom / 不监听 resize / 只在有桌面外壳时才缩放，三种都必须被抓住。
   await assert.rejects(()=>verify(appSource.replace('document.documentElement.style.setProperty("--ui-zoom", String(scale));',"")));
   await assert.rejects(()=>verify(appSource.replace('window.addEventListener("resize", scheduleUiScale, { passive: true });',"")));
-  await assert.rejects(()=>verify(appSource.replace("  async function setupUiScaleSetting() {\n    applyUiScale();","  async function setupUiScaleSetting() {\n    if (!window.desktopScale) return;\n    applyUiScale();")));
+  await assert.rejects(()=>verify(appSource.replace("  async function setupUiScaleSetting() {","  async function setupUiScaleSetting() {\n    if (!window.desktopScale) return;")));
 });
 test("desktop preference wins on startup; changes persist and auto labels update the visible custom select",async()=>{
   let receive,unsubscribed=false;const sent=[];
@@ -95,5 +96,31 @@ test("a delayed get cannot undo a user selection made during startup",async()=>{
     h.select.value="2.25";h.select.dispatchEvent(new h.w.Event("change"));
     resolve({mode:"fixed",value:1,auto:1});await settle();
     assert.equal(h.select.value,"2.25");assert.deepEqual(sent.at(-1),["fixed",2.25]);
+  }finally{h.close();}
+});
+
+test("R238 browser fixed preference resets once and subsequent fixed choices survive",async()=>{
+  const h=boot({preference:"1.25"});
+  let preference,migrated;
+  try{
+    await settle();
+    assert.equal(h.select.value,"auto");
+    assert.equal(h.w.localStorage.getItem("lol-loot-ui-scale-default-auto"),"1");
+    h.select.value="1.25";h.select.dispatchEvent(new h.w.Event("change"));
+    preference=h.w.localStorage.getItem("lol-loot-ui-scale");
+    migrated=h.w.localStorage.getItem("lol-loot-ui-scale-default-auto");
+    assert.equal(preference,"1.25");
+  }finally{h.close();}
+  const restarted=boot({preference,migrated});
+  try{await settle();assert.equal(restarted.select.value,"1.25");}
+  finally{restarted.close();}
+});
+
+test("R238 shell auto overrides a stale fixed browser preference",async()=>{
+  const h=boot({preference:"1.25",bridge:{get:async()=>({mode:"auto",value:1,auto:1}),onChanged(){},set(){}}});
+  try{
+    await settle();
+    assert.equal(h.select.value,"auto");
+    assert.equal(h.w.localStorage.getItem("lol-loot-ui-scale"),"auto");
   }finally{h.close();}
 });

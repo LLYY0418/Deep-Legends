@@ -181,10 +181,10 @@ test("titlebar, minimum size, reload, resize and display events run through the 
 });
 
 test("IPC restores independent preferences, normalizes fixed values and rejects untrusted senders", () => {
-  const h=harness({stored:JSON.stringify({mode:"fixed",value:2})});
+  const h=harness({stored:JSON.stringify({mode:"fixed",value:2,defaultAuto:1})});
   h.window.webContents.emit("did-finish-load");assert.deepEqual(h.get(),{mode:"fixed",value:2,auto:1});
   h.set("fixed",1.6);assert.equal(h.get().value,1.5);
-  assert.deepEqual(JSON.parse(h.files.get(storedScalePath)),{mode:"fixed",value:1.5});
+  assert.deepEqual(JSON.parse(h.files.get(storedScalePath)),{mode:"fixed",value:1.5,defaultAuto:1});
   assert.ok(h.writes.every(file=>file.endsWith("ui-scale.json.tmp")));
   const count=h.writes.length;h.set("fixed",1.5);assert.equal(h.writes.length,count);
   h.window.bounds={width:3840,height:2160};h.screen.emit("display-metrics-changed");assert.equal(h.get().value,1.5);assert.equal(h.get().auto,2);
@@ -201,7 +201,7 @@ test("IPC restores independent preferences, normalizes fixed values and rejects 
 test("main behavior guards reject titlebar, minimum size, trust, reload, debounce and export mutants", () => {
   function titleGuard(source){const h=harness({source});assert.equal(h.probe.titleBarOverlay("dark",false,2).height,112);}
   function minimumGuard(source){const h=harness({source});h.set("fixed",2);assert.deepEqual(h.minimum.at(-1),[1560,1200]);}
-  function trustGuard(source){const h=harness({source});h.window.url="https://untrusted.invalid/";h.set("fixed",2);h.window.url="http://127.0.0.1:8787/";assert.equal(h.get().mode,"auto");assert.equal(h.writes.length,0);}
+  function trustGuard(source){const h=harness({source});const writes=h.writes.length;h.window.url="https://untrusted.invalid/";h.set("fixed",2);h.window.url="http://127.0.0.1:8787/";assert.equal(h.get().mode,"auto");assert.equal(h.writes.length,writes);}
   function reloadGuard(source){const h=harness({source});h.window.webContents.emit("did-finish-load");h.window.webContents.emit("did-finish-load");assert.deepEqual(h.scales(),[1,1]);}
   function resizeGuard(source){const h=harness({source});h.window.webContents.emit("did-finish-load");h.resetScales();for(let i=0;i<20;i++)h.window.emit("resize");h.tick(300);assert.equal(h.scales().length,0);}
   function appliedGuard(source){const h=harness({source});h.ipcMain.emit("desktop-scale-applied",{sender:{isDestroyed:()=>false,getURL:()=>"https://untrusted.invalid/"}},2);assert.deepEqual(h.scales(),[]);}
@@ -228,4 +228,28 @@ test("preload exposes scale IPC without leaking the Electron event", async () =>
 
 test("packaged runtime includes the scaling module", () => {
   assert.ok(require("./package.json").build.files.includes("ui-scale.cjs"));
+});
+
+test("R238 old fixed scale migrates once, then preserves the user's fixed choice", () => {
+  const h=harness({stored:JSON.stringify({mode:"fixed",value:1.25})});
+  assert.equal(h.get().mode,"auto");
+  assert.deepEqual(JSON.parse(h.files.get(storedScalePath)),{mode:"auto",defaultAuto:1});
+  const migrated=harness({stored:h.files.get(storedScalePath)});
+  assert.equal(migrated.get().mode,"auto");
+  assert.equal(migrated.writes.length,0,"marked preference must not be rewritten at startup");
+  migrated.set("fixed",1.25);
+  assert.deepEqual(JSON.parse(migrated.files.get(storedScalePath)),{mode:"fixed",value:1.25,defaultAuto:1});
+  const restarted=harness({stored:migrated.files.get(storedScalePath)});
+  assert.equal(restarted.get().mode,"fixed");
+  assert.equal(restarted.get().value,1.25);
+  assert.equal(restarted.writes.length,0);
+});
+
+test("R238 missing, corrupt and oversized scale files migrate to marked auto", () => {
+  for(const stored of [undefined,"invalid","x".repeat(1025),"null"]) {
+    const h=harness({stored});
+    assert.equal(h.get().mode,"auto");
+    assert.deepEqual(JSON.parse(h.files.get(storedScalePath)),{mode:"auto",defaultAuto:1});
+    assert.equal(h.writes.length,1);
+  }
 });

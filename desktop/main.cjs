@@ -570,12 +570,27 @@ function createMainWindow() {
   const scalePath = path.join(app.getPath("userData"), "ui-scale.json");
   uiScalePreference = "auto";
   currentUiScale = 1;
+  const persistUiScalePreference = () => {
+    const fixed = uiScalePreference !== "auto";
+    const stored = { mode: fixed ? "fixed" : "auto", ...(fixed ? { value: uiScalePreference } : {}), defaultAuto: 1 };
+    try {
+      fs.mkdirSync(path.dirname(scalePath), { recursive: true });
+      fs.writeFileSync(`${scalePath}.tmp`, JSON.stringify(stored), { mode: 0o600 });
+      fs.renameSync(`${scalePath}.tmp`, scalePath);
+    } catch (error) { appendDesktopLog(`界面缩放偏好保存失败：${error.message}`); }
+  };
+  let scaleMigrated = false;
   try {
     if (fs.statSync(scalePath).size <= 1024) {
       const stored = JSON.parse(fs.readFileSync(scalePath, "utf8"));
-      uiScalePreference = stored.mode === "fixed" ? normalizeScale(stored.value) : "auto";
+      if (stored.defaultAuto === 1) {
+        scaleMigrated = true;
+        uiScalePreference = stored.mode === "fixed" ? normalizeScale(stored.value) : "auto";
+      }
     }
   } catch (_) { /* Missing or invalid preferences use auto. */ }
+  // R238: reset pre-migration preferences once; subsequent user choices survive.
+  if (!scaleMigrated) persistUiScalePreference();
   const storedBounds = readWindowBounds(boundsPath, screen.getAllDisplays());
   const bounds = storedBounds || initialWindowBounds();
   mainWindow = new BrowserWindow({
@@ -697,11 +712,7 @@ function createMainWindow() {
     if (mode === "fixed" && next === "auto") return;
     if (next !== uiScalePreference) {
       uiScalePreference = next;
-      try {
-        fs.mkdirSync(path.dirname(scalePath), { recursive: true });
-        fs.writeFileSync(`${scalePath}.tmp`, JSON.stringify({ mode, value: next }), { mode: 0o600 });
-        fs.renameSync(`${scalePath}.tmp`, scalePath);
-      } catch (error) { appendDesktopLog(`界面缩放偏好保存失败：${error.message}`); }
+      persistUiScalePreference();
     }
     applyUiScale(mainWindow, uiScaleState().value);
     publishUiScale();

@@ -2907,6 +2907,13 @@
   }
 
   async function setupUiScaleSetting() {
+    // The desktop file owns migration in the shell. Direct browser previews
+    // have an independent origin preference and migrate that preference once.
+    if (!window.desktopScale && preference("ui-scale-default-auto", "") !== "1") {
+      savePreference("ui-scale", "auto");
+      savePreference("ui-scale-default-auto", "1");
+      renderUiScaleSetting();
+    }
     applyUiScale();
     window.addEventListener("resize", scheduleUiScale, { passive: true });
     if (!window.desktopScale || !el.settingUiScale) return;
