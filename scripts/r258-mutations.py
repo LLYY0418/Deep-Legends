@@ -13,6 +13,7 @@ mutations=[
  ('restore-eight-second-probe','backend/connection_manager.go','client.probeContext(ctx, discoveryProbeTimeout)','client.probeContext(ctx, 8*time.Second)','^TestR258Unsignaled'),
  ('default-visible','backend/web/default/index.html','class="startup-loading" hidden','class="startup-loading"','R258_HTML_SOURCE'),
  ('show-starting-overlay','backend/web/app.js','el.startupLoading.hidden = true;','el.startupLoading.hidden = false;','R258_APP_SOURCE'),
+ ('tag-fit-query-before-width','backend/web/gameplay.js','const width=collection.clientWidth;if(!width || collection._tagFitWidth===width)return;\n        const items=[...collection.querySelectorAll("[data-match-tag]")],more=collection.querySelector("[data-match-tags-more]");\n        if(!more)return;','const items=[...collection.querySelectorAll("[data-match-tag]")],more=collection.querySelector("[data-match-tags-more]");\n        if(!more)return;\n        const width=collection.clientWidth;if(!width || collection._tagFitWidth===width)return;','R258_GAMEPLAY_SOURCE'),
 ]
 before={p:hashlib.sha256((root/p).read_bytes()).hexdigest() for _,p,*_ in mutations};rows=[]
 for name,target,old,new,check in mutations:
