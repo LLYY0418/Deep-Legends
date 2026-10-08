@@ -85,7 +85,15 @@
     const icon = grade === "OP" ? "op" : `yourgg-${grade.toLowerCase()}`;
     return `<img class="tier-badge${extra ? ` ${extra}` : ""}" src="/tier-icons/${icon}.svg" alt="梯度 ${grade}" decoding="async">`;
   };
-  window.deepLegendsRuntime = Object.freeze({ createCache: (options) => new ResponseCache(options), escapeHTML, gradeRank, gradeBadge });
+  // Shared by the hero directory and history selector; metadata supplies the
+  // server's Chinese/pinyin/initial/alias terms, never inferred from match names.
+  function scoreChampionSearchOption(query, value, label, meta) {
+    const normalize=value=>String(value || "").normalize("NFKC").toLocaleLowerCase("zh-CN").replace(/[\s\p{P}\p{S}]+/gu, "");
+    query=normalize(query);if(!query)return 0;
+    const score=value=>{if(value===query)return 100;if(value.startsWith(query))return 80-Math.min(20,value.length-query.length);const index=value.indexOf(query);if(index>=0)return 60-Math.min(20,index);if(query.length<3 || value.length>Math.max(48,query.length*8))return 0;let i=0;for(const c of value)if(c===query[i])i++;return i===query.length?10:0;};
+    return Math.max(0,...[label,value,meta?.key,meta?.slug,meta?.nameZh,meta?.titleZh,meta?.nameEn,meta?.titleEn,...(meta?.searchTerms || [])].map(normalize).filter(Boolean).map(score));
+  }
+  window.deepLegendsRuntime = Object.freeze({ createCache: (options) => new ResponseCache(options), escapeHTML, gradeRank, gradeBadge, scoreChampionSearchOption });
   const flowSamples = new Map();
   const flowPending = new Set();
   const sampledPending = new Set();
@@ -179,7 +187,13 @@
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
-    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_roster_duplicate_dropped", "stale_team_two_dropped", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "overview_dirty_rescan", "summoner_copy", "overview_card_ready"].includes(event)) return;
+    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_roster_duplicate_dropped", "stale_team_two_dropped", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "overview_dirty_rescan", "summoner_copy", "overview_card_ready", "self_tab_client", "browser_cold_requests_client", "champselect_request_client"].includes(event)) return;
+    if(event==='browser_cold_requests_client') {
+      // Cumulative frames remain unsampled so a late body can amend the count.
+      const body={event,reason,startedAt:Math.max(0,Math.min(1e13,Math.floor(fields.startedAt || 0))),count:Math.max(-1,Math.min(1000000,Math.floor(fields.count ?? -1))),resourceCount:Math.max(0,Math.min(1000000,Math.floor(fields.resourceCount || 0))),windowElapsed:fields.windowElapsed===true,timingAvailable:fields.timingAvailable===true};
+      const encoded=JSON.stringify(body);if(flowPending.has(encoded) || flowSamples.has(encoded))return;
+      if(flowPending.size>=32){increment("transportDropped");return;}flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
+    }
     // Sample local requests by fixed endpoint category so status polling cannot
     // hide page timings. Delivery stays bounded and sampled events never retry.
     const sampled = event === "live_refresh_client" || event === "local_request_client";
@@ -193,6 +207,7 @@
       if(["NotAllowedError","SecurityError","NotFoundError","AbortError","TypeError","Error"].includes(fields.error_name))body.error_name=fields.error_name;
     }
     if(event === "overview_card_ready") {
+      body.isSelf=Boolean(fields.isSelf);
       if(["matches","ranks","champions","masteries","positions"].includes(fields.card))body.card=fields.card;
       if(["snapshot","network","opgg"].includes(fields.source))body.source=fields.source;
       body.durationMs=Math.max(0,Math.min(3600000,Math.floor(Number(fields.durationMs)||0)));
@@ -216,6 +231,7 @@
       if (event === "blocking_state_client" && reason === "skip" && fields.skip_reason === "client-exiting") body.skip_reason = "client-exiting";
       if (event === "blocking_state_client" && reason === "hide" && ["self-tab-ready", "connect-failed", "hard-timeout", "timeout", "no-client-process", "suppressed"].includes(fields.hide_reason)) body.hide_reason = fields.hide_reason;
     }
+    if(["self_tab_client","overview_card_ready"].includes(event) && Number.isFinite(fields.startedAt))body.startedAt=Math.max(0,Math.min(1e13,Math.floor(fields.startedAt)));
     if (event === "arena_header_source") {
       if (Number.isInteger(fields.championId) && fields.championId > 0) body.championId = Math.min(1000000, fields.championId);
       if (Number.isInteger(fields.rank) && fields.rank >= 0) body.rank = Math.min(1000000, fields.rank);
@@ -232,7 +248,7 @@
       if (["direct", "event", "sse", "poll", "resync", "interval"].includes(fields.source)) body.source = fields.source;
       if (["overview", "live", "champions", "favorites", "suite", "collection", "tools"].includes(fields.section)) body.section = fields.section;
     }
-    if (event === "local_request_client" || event === "image_queue_slow") {
+    if (event === "local_request_client" || event === "image_queue_slow" || event === "champselect_request_client") {
       if (["status", "gameplay", "champions", "collection", "pro-players", "friends", "image", "section-loader", "other", "overview", "live", "facade", "watch", "rig", "claim", "champselect"].includes(fields.endpoint)) body.endpoint = fields.endpoint;
       for (const key of ["startedAt", "completedAt"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1e13, Math.floor(fields[key])));
       // R127 P0-2：图片队列的排队/加载计时与来源类别（不含具体路径）。
@@ -289,7 +305,7 @@
       if (Number.isInteger(fields.enemyChampionId)) body.enemyChampionId = Math.max(0,Math.min(1000000,fields.enemyChampionId));
       if (["all","iron","bronze","silver","gold","gold_plus","platinum","platinum_plus","emerald","emerald_plus","diamond","diamond_plus","master","master_plus","grandmaster","challenger"].includes(fields.tier)) body.tier = fields.tier;
     }
-    if (event === "local_request_client" && Number.isFinite(fields.responseBytes)) body.responseBytes = Math.max(0, Math.min(2147483648, Math.floor(fields.responseBytes)));
+    if (["local_request_client","champselect_request_client"].includes(event) && Number.isFinite(fields.responseBytes)) body.responseBytes = Math.max(0, Math.min(2147483648, Math.floor(fields.responseBytes)));
     if (event === "renderer_perf") {
       for (const key of ["windowMs","longtaskCount","longtaskTotalMs","longtaskMaxMs","timerLagCount","timerLagMaxMs","heapUsedMb","heapLimitMb","domNodes","imgCount"]) if (Number.isFinite(fields[key])) body[key] = Math.max(0, Math.min(1e9, key === "windowMs" ? Math.floor(fields[key]) : fields[key]));
       body.groups = (Array.isArray(fields.groups) ? fields.groups : []).slice(0,32).filter(row => ["overview","live","champions","favorites","suite","settings","pro-players"].includes(row.section) && ["main","watch","rig","facade","sweep","champselect","collection","account","facade-collection","items","pools","icons","banners","runes","build","specialist","pro","opgg"].includes(row.tab)).map(row => ({section:row.section,tab:row.tab,count:Math.max(0,Math.min(1e6,Number(row.count)||0)),totalMs:Math.max(0,Math.min(1e9,Number(row.totalMs)||0)),maxMs:Math.max(0,Math.min(1e9,Number(row.maxMs)||0))}));
@@ -297,7 +313,7 @@
     if (event === "status_render_failed") {
       for (const key of Object.keys(body)) if (!["event", "reason"].includes(key)) delete body[key];
       body.errorType = ["Error", "TypeError", "ReferenceError", "RangeError", "SyntaxError", "URIError", "EvalError", "AggregateError"].includes(fields.errorType) ? fields.errorType : "Error";
-      body.functionName = ["refreshStatus", "renderStatus", "renderLaunchpad", "updateReadingOverlay", "renderNotice", "updateWorkspaceAvailability", "renderUpdateStatus", "loadClientInstallations", "loadSkins", "loadAccount", "loadPools"].includes(fields.functionName) ? fields.functionName : "other";
+      body.functionName = ["refreshStatus", "renderStatus", "renderLaunchpad", "acceptClientView", "renderClientConnection", "updateReadingOverlay", "renderNotice", "updateWorkspaceAvailability", "renderUpdateStatus", "loadClientInstallations", "loadSkins", "loadAccount", "loadPools"].includes(fields.functionName) ? fields.functionName : "other";
     }
     const encoded = JSON.stringify(body);
     if (flowPending.has(encoded) || flowSamples.has(encoded) && now - flowSamples.get(encoded) < 30000) { increment("transportSuppressed"); return; }
@@ -313,6 +329,7 @@
 (() => {
   "use strict";
   const sections = ["overview","live","champions","favorites","suite","settings","pro-players"];
+  let exactChampselectSequence = 0;
   const localOrigin = typeof location === "undefined" ? "" : location.origin;
   const tabs = ["main","watch","rig","facade","sweep","champselect","collection","account","facade-collection","items","pools","icons","banners","runes","build","specialist","pro","opgg"];
   const page = () => {
@@ -347,7 +364,8 @@
   function measuredFetch(native, report, input, init) {
     const endpoint=localEndpoint(input);if(!endpoint)return native(input,init);
     const startedAt=Date.now();let finished=false,bytes, status=0;
-    const finish=(errorKind="none")=>{if(finished)return;finished=true;const completedAt=Date.now();try {report("local_request_client",errorKind==="none"?"complete":"failed",{endpoint,startedAt,completedAt,durationMs:completedAt-startedAt,httpStatus:status,errorKind,...(bytes===undefined?{}:{responseBytes:bytes})});} catch {}};
+    const exactChampselect = new URL(typeof input==="string"?input:input.url,localOrigin).pathname === "/api/champselect/state";
+    const finish=(errorKind="none")=>{if(finished)return;finished=true;const completedAt=Date.now();try {report("local_request_client",errorKind==="none"?"complete":"failed",{endpoint,startedAt,completedAt,durationMs:completedAt-startedAt,httpStatus:status,errorKind,...(bytes===undefined?{}:{responseBytes:bytes})});if(exactChampselect)report("champselect_request_client",errorKind==="none"?"complete":"failed",{requestId:++exactChampselectSequence,endpoint:"champselect",startedAt,completedAt,durationMs:completedAt-startedAt,httpStatus:status,errorKind,...(bytes===undefined?{}:{responseBytes:bytes})});} catch {}};
     return Promise.resolve(native(input,init)).then(response=>{
       status=response.status;const length=response.headers?.get?.("Content-Length");if(length!==null&&length!==undefined&&/^\d+$/.test(length))bytes=Number(length);
       if(!response.ok){finish("http");return response;}if(status===204||status===202){finish();return response;}
@@ -422,3 +440,62 @@ function installBlockingDiagnostics(win, doc) {
   doc.addEventListener("close", event => finish(event.target), true);
 }
 if (typeof window !== "undefined" && typeof document !== "undefined") installBlockingDiagnostics(window, document);
+
+// Observe the actual startup element, including regressions that make it visible.
+function installStartupVisibilityDiagnostics(win, doc) {
+  const overlay = doc.getElementById?.("startup-loading");
+  if (!overlay || !win.MutationObserver) return;
+  let visible = false;
+  const observe = () => {
+    const next = !overlay.hidden;
+    if (next && !visible) win.reportFlowDiagnostic?.("self_tab_client", "overlay-shown");
+    visible = next;
+  };
+  observe();
+  const observer = new win.MutationObserver(observe);
+  observer.observe(overlay, {attributes:true,attributeFilter:["hidden"]});
+  win.addEventListener("deep-legends:dispose", () => observer.disconnect(), {once:true});
+}
+if (typeof window !== "undefined" && typeof document !== "undefined") installStartupVisibilityDiagnostics(window, document);
+
+// R258: count completed local ResourceTiming entries beginning in the first
+// three seconds after process detection. Exclude DNS/connect time from the
+// pre-send wait. Late completions amend the same epoch; unsupported timing is
+// sent as unavailable. No URL, account, payload or image path leaves this code.
+(() => {
+  'use strict';
+  let windowStart=0,timer=0,publishTimer=0,elapsed=false,available=false,windowAvailable=false,droppedAt=0;
+  let windowCounts={queued:0,resources:0};
+  const records=[];
+  const report=()=>{
+    if(!windowStart)return;
+    const selected=windowCounts;
+    window.reportFlowDiagnostic?.('browser_cold_requests_client','sample',{startedAt:windowStart,count:windowAvailable?selected.queued:-1,resourceCount:selected.resources,windowElapsed:elapsed,timingAvailable:windowAvailable});
+  };
+  const scheduleReport=()=>{if(!publishTimer)publishTimer=setTimeout(()=>{publishTimer=0;report();},250);};
+  const consume=entries=>{
+    let changed=false;
+    for(const entry of entries) {
+      let url;try{url=new URL(entry.name,location.origin);}catch(_){continue;}
+      if(url.origin!==location.origin || url.pathname.startsWith('/api/diagnostics/') || url.pathname==='/api/events' || !Number.isFinite(entry.requestStart) || entry.requestStart<=0)continue;
+      const dns=Math.max(0,entry.domainLookupEnd-entry.domainLookupStart),connect=Math.max(0,entry.connectEnd-entry.connectStart);
+      const row={at:performance.timeOrigin+entry.fetchStart,wait:Math.max(0,entry.requestStart-entry.fetchStart-dns-connect)};
+      records.push(row);if(records.length>4096)droppedAt=records.shift().at;
+      if(windowStart && row.at>=windowStart && row.at<windowStart+3000){windowCounts.resources++;if(row.wait>100)windowCounts.queued++;changed=true;}
+    }
+    if(changed)scheduleReport();
+  };
+  try {
+    if(typeof PerformanceObserver==='function' && PerformanceObserver.supportedEntryTypes?.includes('resource')) {
+      const observer=new PerformanceObserver(list=>consume(list.getEntries()));observer.observe({type:'resource',buffered:true});available=true;
+    }
+  }catch(_){}
+  const startColdRequestWindow=at=>{
+    if(!Number.isFinite(at) || at<=0 || at<=windowStart)return;
+    clearTimeout(timer);windowStart=at;elapsed=Date.now()>=at+3000;windowAvailable=available && (!droppedAt || at>droppedAt);
+    const selected=records.filter(row=>row.at>=at && row.at<at+3000);windowCounts={queued:selected.filter(row=>row.wait>100).length,resources:selected.length};report();
+    if(!elapsed)timer=setTimeout(()=>{elapsed=true;report();},Math.max(0,at+3000-Date.now()));
+  };
+  if(window.deepLegendsPerformance)window.deepLegendsPerformance.startColdRequestWindow=startColdRequestWindow;
+  window.addEventListener?.('deep-legends:dispose',()=>{clearTimeout(timer);clearTimeout(publishTimer);},{once:true});
+})();

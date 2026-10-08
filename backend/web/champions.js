@@ -2659,6 +2659,7 @@
   }
 
   function scoreChampionSelectOption(query, value, label) {
+    if(globalThis.deepLegendsRuntime?.scoreChampionSearchOption)return globalThis.deepLegendsRuntime.scoreChampionSearchOption(query,value,label,championMeta(value));
 	const normalizedQuery = normalizeSearch(query);
 	if (!normalizedQuery) return 0;
 	const meta = championMeta(value);
@@ -3065,7 +3066,7 @@
   });
 
   window.addEventListener("pagehide", flushChampionSearch);
-  window.deepLegendsChampionSearch = Object.freeze({ scoreOption: scoreChampionSelectOption });
+  window.deepLegendsChampionSearch = Object.freeze({ scoreOption: scoreChampionSelectOption, getCatalog: () => state.catalog });
   window.deepLegendsChampionAsset = Object.freeze({ imageHTML: assetImage, imageURL });
   render();
   const preloadWhenLicensed = () => {
