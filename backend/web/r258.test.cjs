@@ -197,3 +197,20 @@ test('R258 catalogs arriving together invalidate views once at the next frame',(
  f.scheduleCatalogViews();assert.equal(frames.length,1);
  state.destroyed=true;frames.shift()();assert.equal(renders,1);
 });
+
+test('R258 tag fitting skips descendant scans until a visible row width changes',()=>{
+ let width=0,queries=0,measurements=0;
+ const items=Array.from({length:3},()=>({hidden:false,hasAttribute:()=>false,
+  getBoundingClientRect:()=>{measurements++;return {width:55};}}));
+ const more={hidden:true,setAttribute:()=>{}};
+ const row={checkVisibility:()=>true,get clientWidth(){return width;},
+  querySelectorAll:()=>{queries++;return items;},querySelector:()=>{queries++;return more;}};
+ const root={querySelectorAll:()=>[row]};
+ const f=compile(gameplay,['fitMatchTags'],{bindMatchTagsPopover:()=>({anchor:null})});
+ f.fitMatchTags(root);assert.equal(queries,0);assert.equal(measurements,0);
+ width=150;f.fitMatchTags(root);assert.equal(queries,2);assert.equal(measurements,3);
+ assert.equal(more.textContent,'+1');assert.equal(items[2].hidden,true);
+ f.fitMatchTags(root);assert.equal(queries,2);assert.equal(measurements,3);
+ width=220;f.fitMatchTags(root);assert.equal(queries,4);assert.equal(measurements,6);
+ assert(items.every(item=>!item.hidden));assert.equal(more.hidden,true);
+});
