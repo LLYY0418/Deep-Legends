@@ -2192,7 +2192,8 @@
     const preserveMatchList = Boolean(retainedMatchList
       && sameOverview
       && container._matchListViewRevision === Number(tab.matchViewRevision || 0));
-    if (preserveMatchList) retainedMatchList.remove();
+    const retainMatchListContainer = Boolean(retainedMatchList && sameOverview);
+    if (retainMatchListContainer) retainedMatchList.remove();
     const playerIndex = Math.max(1, state.tabs.findIndex((item) => item.key === tab.key));
     const maskProfile = state.settings.maskNames && !player.isCurrent;
     const profileName = maskProfile ? (player.hidden ? "隐藏玩家" : `玩家 ${String(playerIndex).padStart(2, "0")}`) : (player.gameName || player.displayName || "隐藏玩家");
@@ -2280,6 +2281,14 @@
     if (preserveMatchList) {
       container.querySelector(".match-list")?.replaceWith(retainedMatchList);
       reconcileFilteredMatchList(retainedMatchList, tab);
+    } else if (retainMatchListContainer) {
+      // Catalog revisions still replace stale cards and their icons. Keep the
+      // list itself stable while those fresh, already-bound children arrive.
+      const replacement = container.querySelector(".match-list");
+      if (replacement) {
+        retainedMatchList.replaceChildren(...replacement.childNodes);
+        replacement.replaceWith(retainedMatchList);
+      }
     }
     if (retainedStrip) container.querySelector(".summoner-strip")?.replaceWith(retainedStrip);
     if (retainedArt) container.querySelector(".summoner-strip-art")?.replaceWith(retainedArt);
