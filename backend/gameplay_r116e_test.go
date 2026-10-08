@@ -162,8 +162,12 @@ func TestR116EClassicTabsAreUnaffectedByMayhemSamples(t *testing.T) {
 		420: {r116eMatch(1, 420, "win", "top"), r116eMatch(2, 420, "loss", "top")},
 		440: {r116eMatch(3, 440, "win", "jungle")},
 	}
-	without := buildGameplayRankedQueues(gameplayRankedQueueTabs(matches, nil), "subject", nil, "")
-	with := buildGameplayRankedQueues(gameplayRankedQueueTabs(matches, r116eSeasonCache()), "subject", nil, "")
+	// 两边保持相同的经典队列缓存，只增加海斗快照，避免把经典缓存接线的
+	// 变化误当成海斗污染。经典快照使用已有详情的 GameID，不扩张详情样本。
+	cached := r116eSeasonCache()
+	cached[0].GameID, cached[1].GameID = 1, 3
+	without := buildGameplayRankedQueues(gameplayRankedQueueTabs(matches, cached[:2]), "subject", nil, "")
+	with := buildGameplayRankedQueues(gameplayRankedQueueTabs(matches, cached), "subject", nil, "")
 	if len(without) != 2 {
 		t.Fatalf("without mayhem samples there must be exactly two tabs, got %#v", without)
 	}

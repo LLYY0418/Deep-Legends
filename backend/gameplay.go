@@ -1828,10 +1828,11 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	response.ChampionStats = championStats(matches, playerRef, names)
 	defaultRankedMatches := recentRankedMatchesForQueue(rankedSampleMatches, response.RecentRanked.QueueID, defaultMatchCount)
 	response.Positions = positionStats(defaultRankedMatches, playerRef)
-	response.Ability = buildGameplayAbilityProfile(defaultRankedMatches, playerRef, ranks, reference.Region)
 	// 海斗页签的数据来自赛季缓存的逐场快照（seasonRanked），首屏样本路径
 	// rankedSamples.ByQueue 只有 420/440 两个键。
 	response.RankedQueues = buildGameplayRankedQueues(gameplayRankedQueueTabs(rankedSamples.ByQueue, seasonRanked), playerRef, ranks, reference.Region)
+	// 默认队列的顶层雷达复用页签结果，详情与快照的样本选择只做一次。
+	response.Ability = response.RankedQueues[strconv.FormatInt(response.RecentRanked.QueueID, 10)].Ability
 	response.ActivityHours = activityHours(windowMatches)
 	// “最近一起玩”需要每场的完整参与者名单，因此基于已读取的详情页
 	// 战绩统计，并限定在最近 30 天内。
@@ -2026,8 +2027,8 @@ type gameplayRankedQueueTab struct {
 // 才产出：没有海斗场次的玩家不该看到一个点进去全是空的页签（评审 6.1）。
 func gameplayRankedQueueTabs(byQueue map[int64][]gameplayMatch, seasonRanked []seasonRankedMatch) []gameplayRankedQueueTab {
 	tabs := []gameplayRankedQueueTab{
-		{Key: "420", Label: rankedQueueLabel(seasonQueueSoloDuo), QueueIDs: []int64{seasonQueueSoloDuo}, Matches: byQueue[seasonQueueSoloDuo]},
-		{Key: "440", Label: rankedQueueLabel(seasonQueueFlex), QueueIDs: []int64{seasonQueueFlex}, Matches: byQueue[seasonQueueFlex]},
+		{Key: "420", Label: rankedQueueLabel(seasonQueueSoloDuo), QueueIDs: []int64{seasonQueueSoloDuo}, Matches: byQueue[seasonQueueSoloDuo], Cached: seasonRanked},
+		{Key: "440", Label: rankedQueueLabel(seasonQueueFlex), QueueIDs: []int64{seasonQueueFlex}, Matches: byQueue[seasonQueueFlex], Cached: seasonRanked},
 	}
 	mayhem := make([]seasonRankedMatch, 0, len(seasonRanked))
 	for _, item := range seasonRanked {
@@ -2069,7 +2070,7 @@ func buildGameplayRankedQueues(tabs []gameplayRankedQueueTab, playerRef string, 
 			PositionQueueID: queueID, PositionQueueLabel: tab.Label,
 		}
 		if len(tab.QueueIDs) == 1 {
-			// 单队列页签（420/440）走既有路径，行为与 R116-E 之前逐字节一致。
+			// 单队列页签（420/440）优先详情战绩，不足时按队列读取赛季快照。
 			recent := recentRankedSummaryForQueue(samples, playerRef, cached, queueID)
 			stats.RecentRanked = &recent
 		} else {
@@ -2077,8 +2078,8 @@ func buildGameplayRankedQueues(tabs []gameplayRankedQueueTab, playerRef string, 
 			stats.RecentRanked = &recent
 		}
 		if tab.gameplayRankedTabHasPositions() {
-			stats.Ability = buildGameplayAbilityProfileForQueue(samples, playerRef, ranks, region, queueID)
-			stats.AbilitySampleGames = gameplayAbilitySampleGamesForQueue(samples, playerRef, queueID)
+			stats.Ability = buildGameplayAbilityProfileForQueueWithSnapshot(samples, playerRef, cached, ranks, region, queueID)
+			stats.AbilitySampleGames = gameplayAbilitySampleGamesForQueueWithSnapshot(samples, playerRef, cached, queueID)
 			stats.Positions = positionStatsForQueue(samples, playerRef, queueID)
 		}
 		// 页签名以后端为准回写一次，避免调用方传空 Label 时前端只能猜。

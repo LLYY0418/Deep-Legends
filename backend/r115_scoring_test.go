@@ -18,6 +18,12 @@ func TestR115AbilityPairsExactlyTheSameGames(t *testing.T) {
 	if p.games != 3 || b.games != 3 || p.kills != 12 {
 		t.Fatalf("unpaired stats: %#v / %#v", p, b)
 	}
+	cached := []seasonRankedMatch{seasonAbilityTestMatch(1, 420), seasonAbilityTestMatch(2, 420), seasonAbilityTestMatch(3, 420), seasonAbilityTestMatch(4, 420)}
+	cached[3].Ability.Opponent = nil
+	p, b, _ = seasonAbilityStatsForQueue(cached, 420)
+	if p.games != 3 || b.games != 3 {
+		t.Fatal("snapshot admitted unpaired sample")
+	}
 }
 
 func TestR115AbilityMissingMetricDoesNotEraseOtherMetrics(t *testing.T) {

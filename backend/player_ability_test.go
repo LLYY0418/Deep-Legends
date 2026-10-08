@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func abilityTestMatch(id int64) gameplayMatch {
 	return gameplayMatch{
@@ -118,14 +121,61 @@ func seasonAbilityTestMatch(gameID int64, queueID int64) seasonRankedMatch {
 	}
 }
 
-func TestAbilityProfileDetailWindowDoesNotInventFlexGames(t *testing.T) {
+func TestAbilityProfileFallsBackToSeasonSnapshotWhenDetailWindowHasNoFlexGames(t *testing.T) {
+	// 详情窗口里一场灵活组排都没有（真机日志实测：队列只有 420/1750/2400）。
 	detailMatches := []gameplayMatch{abilityTestMatch(1), abilityTestMatch(2), abilityTestMatch(3)}
+	cached := []seasonRankedMatch{seasonAbilityTestMatch(11, 440), seasonAbilityTestMatch(12, 440), seasonAbilityTestMatch(13, 440)}
+
 	if got := buildGameplayAbilityProfileForQueue(detailMatches, "subject", nil, riotRegionKR, 440); got != nil {
 		t.Fatalf("detail-only flex profile should still be nil: %#v", got)
 	}
+	profile := buildGameplayAbilityProfileForQueueWithSnapshot(detailMatches, "subject", cached, nil, riotRegionKR, 440)
+	if profile == nil {
+		t.Fatal("flex ability profile must come from the season snapshot")
+	}
+	if profile.QueueID != 440 || profile.QueueLabel != "灵活组排" || profile.PositionLabel != "上路" {
+		t.Fatalf("snapshot profile = %#v", profile)
+	}
+	if profile.SampleGames != 3 || profile.BaselineGames != 3 || len(profile.Metrics) != 7 {
+		t.Fatalf("snapshot samples = %#v", profile)
+	}
+	// 口径必须与详情路径完全一致，否则单双排和灵活组排的雷达没法互相比较。
 	detail := buildGameplayAbilityProfileForQueue(detailMatches, "subject", nil, riotRegionKR, 420)
 	if detail == nil {
 		t.Fatal("solo detail profile is nil")
+	}
+	for index := range detail.Metrics {
+		if detail.Metrics[index].Player != profile.Metrics[index].Player || detail.Metrics[index].Baseline != profile.Metrics[index].Baseline {
+			t.Fatalf("metric %s drifted between the detail and snapshot paths: %#v vs %#v", detail.Metrics[index].Key, detail.Metrics[index], profile.Metrics[index])
+		}
+	}
+	if got := gameplayAbilitySampleGamesForQueueWithSnapshot(detailMatches, "subject", cached, 440); got != 3 {
+		t.Fatalf("snapshot sample games = %d", got)
+	}
+}
+
+func TestSeasonSnapshotAbilityIgnoresEntriesWithoutTheNewFields(t *testing.T) {
+	// 老缓存（schemaVersion < 5）没有 Ability 字段，必须整条跳过而不是当成 0 场统计。
+	legacy := []seasonRankedMatch{{QueueID: 440, Position: "top"}, {QueueID: 440, Position: "top"}, {QueueID: 440, Position: "top"}}
+	if got := buildGameplayAbilityProfileForQueueWithSnapshot(nil, "subject", legacy, nil, riotRegionKR, 440); got != nil {
+		t.Fatalf("legacy snapshot entries must not produce a profile: %#v", got)
+	}
+	// 有对位样本但不足 3 场时同样不出图。
+	short := []seasonRankedMatch{seasonAbilityTestMatch(11, 440), seasonAbilityTestMatch(12, 440)}
+	if got := buildGameplayAbilityProfileForQueueWithSnapshot(nil, "subject", short, nil, riotRegionKR, 440); got != nil {
+		t.Fatalf("short snapshot sample must not produce a profile: %#v", got)
+	}
+	// 只有本人没有对位（同位置对手缺失）时也不出图：没有基线就没有雷达。
+	noOpponent := []seasonRankedMatch{seasonAbilityTestMatch(11, 440), seasonAbilityTestMatch(12, 440), seasonAbilityTestMatch(13, 440)}
+	for index := range noOpponent {
+		noOpponent[index].Ability.Opponent = nil
+	}
+	if got := buildGameplayAbilityProfileForQueueWithSnapshot(nil, "subject", noOpponent, nil, riotRegionKR, 440); got != nil {
+		t.Fatalf("snapshot without lane opponents must not produce a profile: %#v", got)
+	}
+	// 队列必须隔离：灵活组排的快照不能被拿去填单双排。
+	if got := buildGameplayAbilityProfileForQueueWithSnapshot(nil, "subject", []seasonRankedMatch{seasonAbilityTestMatch(11, 440), seasonAbilityTestMatch(12, 440), seasonAbilityTestMatch(13, 440)}, nil, riotRegionKR, 420); got != nil {
+		t.Fatalf("flex snapshot leaked into the solo queue: %#v", got)
 	}
 }
 
@@ -154,6 +204,91 @@ func TestSeasonRecordRankedMatchCapturesAbilitySample(t *testing.T) {
 	// 对位必须取敌方同位置那一个，取错队伍或取错位置都会让基线失去意义。
 	if sample.Opponent == nil || sample.Opponent.Damage != 5000 || sample.Opponent.CS != 120 || sample.Opponent.TeamKills != 15 || sample.Opponent.TeamDamage != 18000 {
 		t.Fatalf("opponent side = %#v", sample.Opponent)
+	}
+}
+
+func TestBuildGameplayRankedQueuesFlexAbilityFromSeasonSnapshot(t *testing.T) {
+	details := []gameplayMatch{abilityTestMatch(1), abilityTestMatch(2), abilityTestMatch(3)}
+	cached := []seasonRankedMatch{seasonAbilityTestMatch(11, 440), seasonAbilityTestMatch(12, 440), seasonAbilityTestMatch(13, 440)}
+	for index := range cached {
+		cached[index].Ability.Player.Damage = 14000
+	}
+	// 另一队列的快照故意给出完全不同的数据和场数，暴露串队列或覆盖详情的问题。
+	for id := int64(21); id <= 24; id++ {
+		item := seasonAbilityTestMatch(id, 420)
+		item.Ability.Player.Damage = 50000
+		cached = append(cached, item)
+	}
+	queues := buildGameplayRankedQueues(gameplayRankedQueueTabs(map[int64][]gameplayMatch{420: details}, cached), "subject", nil, "")
+	flex := queues["440"]
+	if flex.Ability == nil || flex.Ability.QueueID != 440 || flex.Ability.SampleGames != 3 || len(flex.Ability.Metrics) != 7 || flex.AbilitySampleGames != 3 {
+		t.Fatalf("flex snapshot radar missing or mixed: %#v", flex)
+	}
+	if flex.RecentRanked == nil || flex.RecentRanked.Games != 3 {
+		t.Fatalf("flex recent summary disagrees with snapshot radar: %#v", flex.RecentRanked)
+	}
+	if want := buildGameplayAbilityProfileForQueueWithSnapshot(nil, "subject", cached[:3], nil, "", 440); !reflect.DeepEqual(flex.Ability, want) {
+		t.Fatalf("solo snapshots polluted flex radar: got %#v, want %#v", flex.Ability, want)
+	}
+	solo := queues["420"]
+	if want := buildGameplayAbilityProfileForQueue(details, "subject", nil, "", 420); !reflect.DeepEqual(solo.Ability, want) || solo.AbilitySampleGames != 3 {
+		t.Fatalf("snapshot replaced sufficient solo details: got %#v, want %#v", solo, want)
+	}
+}
+
+func TestBuildGameplayRankedQueuesLegacySnapshotDoesNotInventAbility(t *testing.T) {
+	details := []gameplayMatch{abilityTestMatch(1), abilityTestMatch(2), abilityTestMatch(3)}
+	cached := []seasonRankedMatch{seasonAbilityTestMatch(11, 440), seasonAbilityTestMatch(12, 440), seasonAbilityTestMatch(13, 440)}
+	for index := range cached {
+		cached[index].Ability = nil
+	}
+	flex := buildGameplayRankedQueues(gameplayRankedQueueTabs(map[int64][]gameplayMatch{420: details}, cached), "subject", nil, "")["440"]
+	if flex.Ability != nil || flex.AbilitySampleGames != 0 {
+		t.Fatalf("legacy snapshot produced radar samples: %#v", flex)
+	}
+	if flex.RecentRanked == nil || flex.RecentRanked.Games != 3 {
+		t.Fatalf("legacy snapshot lost its existing recent summary: %#v", flex.RecentRanked)
+	}
+}
+
+func TestBuildGameplayRankedQueuesSeasonSummaryUsesSnapshotOnly(t *testing.T) {
+	cached := []seasonRankedMatch{seasonAbilityTestMatch(11, 440), seasonAbilityTestMatch(12, 440), seasonAbilityTestMatch(13, 440)}
+	for id := int64(21); id <= 23; id++ {
+		item := seasonAbilityTestMatch(id, seasonMayhemPrimaryQueueID)
+		item.Position = "" // 海斗实际写入侧没有分路；即使有 Ability 也不得出雷达。
+		cached = append(cached, item)
+	}
+	// 与 handleGameplaySeasonSummary 相同的生产构造路径：没有任何详情样本。
+	queues := buildGameplayRankedQueues(gameplayRankedQueueTabs(nil, cached), "subject", nil, "")
+	flex := queues["440"]
+	if flex.Ability == nil || flex.Ability.QueueID != 440 || flex.Ability.SampleGames != 3 || len(flex.Ability.Metrics) != 7 || flex.AbilitySampleGames != 3 {
+		t.Fatalf("snapshot-only season summary has no flex radar: %#v", flex)
+	}
+	if solo := queues["420"]; solo.Ability != nil || solo.AbilitySampleGames != 0 {
+		t.Fatalf("flex snapshot leaked into solo: %#v", solo)
+	}
+	if mayhem := queues["2300"]; mayhem.Ability != nil || mayhem.AbilitySampleGames != 0 || mayhem.Positions != nil || len(mayhem.RecentRanked.Positions) != 0 {
+		t.Fatalf("mayhem acquired radar or positions: %#v", mayhem)
+	}
+}
+
+func TestBuildGameplayRankedQueuesRejectsUnusableSnapshotPairs(t *testing.T) {
+	for _, invalid := range []string{"duration", "position", "opponent"} {
+		t.Run(invalid, func(t *testing.T) {
+			cached := []seasonRankedMatch{seasonAbilityTestMatch(11, 440), seasonAbilityTestMatch(12, 440), seasonAbilityTestMatch(13, 440)}
+			switch invalid {
+			case "duration":
+				cached[2].Ability.Duration = 0
+			case "position":
+				cached[2].Position = "unknown"
+			case "opponent":
+				cached[2].Ability.Opponent = nil
+			}
+			flex := buildGameplayRankedQueues(gameplayRankedQueueTabs(nil, cached), "subject", nil, "")["440"]
+			if flex.Ability != nil || flex.AbilitySampleGames != 0 {
+				t.Fatalf("unusable pair admitted to snapshot radar: %#v", flex)
+			}
+		})
 	}
 }
 
