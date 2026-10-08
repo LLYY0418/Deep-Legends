@@ -2192,7 +2192,8 @@
     const preserveMatchList = Boolean(retainedMatchList
       && sameOverview
       && container._matchListViewRevision === Number(tab.matchViewRevision || 0));
-    const retainMatchListContainer = Boolean(retainedMatchList && sameOverview);
+    const retainMatchListContainer = Boolean(retainedMatchList && sameOverview
+      && (preserveMatchList || tab.catalogViewRevision === Number(tab.matchViewRevision || 0)));
     if (retainMatchListContainer) retainedMatchList.remove();
     const playerIndex = Math.max(1, state.tabs.findIndex((item) => item.key === tab.key));
     const maskProfile = state.settings.maskNames && !player.isCurrent;
@@ -4785,6 +4786,7 @@
     // same. Invalidate retained match DOM before the normal scoped redraw.
     for (const tab of new Set([...(state.tabs || []), ...(state.overlay || [])])) {
       tab.matchViewRevision = Number(tab.matchViewRevision || 0) + 1;
+      tab.catalogViewRevision = tab.matchViewRevision;
     }
     if (state.section === "overview") renderOverview();
     if (state.section === "live") { state.liveRenderTrigger = "catalog"; renderLive(); }
