@@ -1,0 +1,16 @@
+{
+  "command": [
+    "gh",
+    "run",
+    "download",
+    "37729564138",
+    "--name",
+    "renderer-timings-linux",
+    "--name",
+    "chromium-guards-linux",
+    "--dir",
+    "docs/history/reports/r252/ci-04/linux-artifacts"
+  ],
+  "exit_code": 0,
+  "timeout_seconds": 120
+}

@@ -203,4 +203,4 @@
 
 | R251 | 隐藏玩家实际效果收口：完整Riot ID补查、已知敌方展示、Go到Chromium联合验证 | 未纳入0.12.77；原实现/测试完整保存在本地快照 | 快照分支保存 | 快照分支保存 | codex/r249-r251-hidden-identity-snapshot / 6fb02a6a；不推送 |
 
-| R252 | 0.12.77 候选后的遗留修复与稳定性验证 | 进行中；不发布、不 bump，R104 根因待证据 | [WORKLIST-R252](WORKLIST-R252-POST-0.12.77-LEFTOVERS.md) | [执行台账](history/ledgers/post-0.12.77-execution-ledger.md) | codex/post-0.12.77-fixes |
+| R252 | 0.12.77 候选后的遗留修复与稳定性验证 | 可验证修复及完整CI通过；R104/旧R206偶发未解决，8保护文件缺失待原备份；不发布、不 bump | [WORKLIST-R252](WORKLIST-R252-POST-0.12.77-LEFTOVERS.md) | [执行台账](history/ledgers/post-0.12.77-execution-ledger.md) | codex/post-0.12.77-fixes |

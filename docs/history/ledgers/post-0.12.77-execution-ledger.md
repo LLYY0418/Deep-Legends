@@ -151,3 +151,41 @@ C1：四worker实际Linux199.209秒仍不足20%余量；完整集合含DOM计算
 C2：补取旧tag CI原文，[37642767328](https://github.com/LLYY0418/Deep-Legends/actions/runs/37642767328)，旧SHA29d57bb2。测试15:21:22.847开始，15:21:39.446首先`foreground search stuck`，随后15:21:43.639 TempDir RemoveAll在riot-matches/.tmp文件占用FAIL20.79秒；另一同SHA历史CI37644705543这项PASS0.67秒。[原始片段/分析](../reports/r252/r104-historical/r104-historical-analysis.json)。不能把文件占用视为唯一根因或只修清理后宣称前台超时已解决。独立探子两项候选经原文排除：pro_refresh.go:28–30同样使用limitNow；riot-matches由newPublicBinaryCache构造strictDisk=true，writeDisk只对!strictDisk排异步prune；本夹具client/storage nil亦不会启动季赛后台。因此不采用错误的cache-prune/season-drain修复。旧日志缺请求/FIFO/磁盘写各阶段及失败堆栈，无法确认Windows fsync/调度具体因果，**仍未解决**；本轮新增时间线与失败堆栈留作后续定位。新Windows前三轮各30加本地30，累计120次0失败，仍不声称修复。
 
 第二轮219MB artifact总体下载11:51未返回，终止本轮自身只读下载，原日志与超时记录保留；后续120秒时限仅下载R104/首帧小artifact成功，不重跑测试。Mac public与Windows默认包来源指纹仍f2794a1d683c；调度/CI接法不改变应用生产指纹。12:36保护tag/发布分支与原值一致，Draft405971661整个JSON与draft-before逐字值一致（draft=true、published_at=null、updated_at未动），无发布动作。
+
+## 完整成功验收与未解决项（13:10）
+
+生产修复提交 **e392b3baaf77e9edbfec458ce31a5c72ce795ea9**，[完整CI37729564138](https://github.com/LLYY0418/Deep-Legends/actions/runs/37729564138) **conclusion=success**，Linux quality与windows-build均整体success。[原始CI状态/日志](../reports/r252/ci-04/run.json)。版本0.12.77、key mode public、生产指纹f2794a1d683c。此前三轮failure仍原样保留，不引用其他SHA/其他分支结果。
+
+| 最终生产源码检查 | 实跑结果 |
+|---|---|
+| 全量gofmt / go vet / 默认授权隔离 / CI过滤护栏 | Linux CI全部PASS；默认集合无tagged注册码测试 |
+| go test -count=1 ./... | 本地183.779秒PASS；public snapshot1951项全量PASS；最终Windows backend1951/installer100全部PASS |
+| go test -count=1 -race ./... | 同SHA Linux CI PASS；此前R206一次超3秒FAIL保留且未宣称修复 |
+| installer test/vet | 同SHA Linux CI PASS，Windows全量100项PASS |
+| tags license全量编译与两fixture | 同SHA CI compile PASS，精确expected=2/pass=2/skip=0，生产协议/租约/签名/错误码/共享向量未改 |
+| 全量renderer / JS语法 | Linux1337项PASS（1335通过、2原有平台skip），Mac1337项PASS（1333通过、4原有平台skip），未增加skip/删断言 |
+| C1 Linux至少20%余量 | **191591.351834ms**，预算240000ms，余量**20.17027%**；五worker、166文件，最长pro-players64157.51495ms；单文件90000与总240000未放宽 |
+| Worker / 真实Chromium R100/R117 | 同SHA Linux16项Worker与两个浏览器护栏PASS，原始截图/JSON已保留 |
+| Windows平台护栏/时间转换变异/实际升级 | 同SHA全PASS；旧Parse(object)分数时间断言kill；0.12.65/0.12.68/0.12.76→0.12.77实际安装升级及数据sentinel保留 |
+| B1–B3/一次DOM索引/内容隔离/旧fixture变异 | 最终生产代码未再变化，12个指定断言kill结果与前后source SHA一致证明保留；原生Windows额外Parse变异也kill |
+| B深浅截图 | 实际默认HTML/JS + 合成API数据；图名synthetic及报告注明合成；Mac Chromium实跑，**未在 Windows 实跑**，不替代真实LCU/玩家结果 |
+| 默认public包结束审计 | 13:03再审计PASS1.101秒：[最终收据](../reports/r252/package-audit-final-04.json)，无授权文案/域名/kid/公钥/隐私句，public空Key、digest、fuses/ASAR完整性通过；真实Electron授权请求/事件0 |
+
+Windows第四轮R104独立30次0失败，本地30+四轮Windows120共**150次/0失败**；全部时间线原样保留。**C2未解决**：历史主失败是foreground超时，旧日志没有请求/FIFO/disk阶段及堆栈，不能确认fsync/调度因果，亦未实施无证据的prune/season清理修复。时钟、strict cache与季赛候选排除均有代码点验出处，不以循环全绿宣称已修复。
+
+| 项目 | 状态与限制 |
+|---|---|
+| A3 mayhem晚高峰 / A4 facade首卡争用 | **无证据，保持现状**；仍缺三晚20–22点真实分布及同次首卡连接时间线 |
+| A5 specialist超时/重复事件 | **无证据，保持生产现状**；合成独立失败区/备选来源回归通过，缺6事件关联请求/真实复现 |
+| A6隐藏识别 / A7 R246 | 范围排除/继续搁置；未合入或改动R249–R251，未恢复R246生产功能 |
+| A8环境护栏 | 三护栏本地及Windows适用项全部实跑PASS；升级验证器时间转换缺陷另有原生断言变异与实际升级证明 |
+| B1 / B2 / B3 | **已修复**，逐项断言/变异/合成深浅截图完整 |
+| C1 / C3 | **已修复**（C1实际Linux20.17%余量；C3只改两个测试前置） |
+| 新发现旧R206 | **未解决**；一次全量race3.062762007秒超原3秒，隔离30与后续全量通过不替换失败记录；未获额外调度授权前不改该测试 |
+| 160个STAGING/R248保护文件 | **不能验收为全部未变**：152一致、8缺失，原因未确认，仍待原SHA备份。没有根dist写入/重建/覆盖操作，所有新包只在tmp |
+
+Windows本地审计Setup SHA-256 `a9719726622ad7e5f98da779ba41c6c18843765d0e79f4a7259289fa5c8b2dea`；backend SHA-256 `10c0eafb3f6e066decaed3b9b12b735802c576b63e9ffab9491728de526e1af2`；Mac public后端SHA-256 `3374f445381b56a2d2e8b0e84b9ea7cc09834f6100d6c80c584b79cf5cc42a79`。本地交叉构建的Setup **未在 Windows 实跑**，Windows CI另构建public包并实跑升级；不混用平台结果。
+
+范围核验初次错误地断言“所有含license字样的生产路径都无diff”，因新增合法`//go:build license`资产wrapper断言失败，记录保留；按原生产协议/租约文件与新增wrapper分别核验后PASS，原license逻辑及raw UI未改，共享向量39377b860440d8f609f9d28162afe086e4e01ac91d3d2ff39da2a45d5eebfcc7。[范围凭据](../reports/r252/scope-review-e392b3ba.json)。
+
+本节归档仅增加账本/索引/原始证据，无生产源码更改。归档后的最终HEAD仍须完整分支CI整体success；终态只读验收凭据保存[final-validation.json](../reports/r252/final-validation.json)，最终回复给出该HEAD及具体CI链接，不把归档前SHA冒充最终SHA。成功验收后不再改提交，保持0.12.77，不bump、不打tag、不建Release、不发布Latest，等待用户决定后续版本安排。

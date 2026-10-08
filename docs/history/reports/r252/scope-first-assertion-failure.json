@@ -1,0 +1,7 @@
+{
+  "outcome": "AssertionError",
+  "assumption": "no diff for any production path with license in its filename",
+  "actual_allowed_new_path": "backend/frontend_assets_license.go",
+  "reason": "new build-tagged embedding wrapper required by default content isolation; existing protocol/lease logic unchanged",
+  "original_stderr": "Traceback (most recent call last):\n  File \"<stdin>\", line 6, in <module>\nAssertionError\n"
+}

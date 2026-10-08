@@ -58,3 +58,9 @@ C3. 只修TestR233FailedCounterSaveDoesNotRefreshCachedLifetime与TestR242Licens
 - 待范围授权前，不改R206测试调度/断言/预算/业务。独立renderer/Worker/Chromium/installer在前序失败后继续收集结果；失败仍使quality job及整体工作流失败，无continue-on-error。
 
 后续实证：新增条件接法被原R117护栏拒绝（浏览器与前端步骤均不得有if），已全部撤回，不改断言。四worker Linux199209ms仍超目标；改为全量五个有界worker、desktop单独scope仍四个，保持发现集合和90/240秒预算，实际Linux≤192000ms为最终判定。R104找到旧tag原文为foreground超时后临时文件占用，不能仅修清理就宣称根因已解决。
+
+## 已验证结果与未解决边界
+
+生产修复提交e392b3ba的完整CI37729564138 success（Linux quality、Windows全量/构建/实际升级）。Linux191591.351834ms，240秒预算余量20.17027%，166文件/1337测试/1335PASS/2既有平台skip，最长文件64157.51495ms；原90/240秒断言不变。默认public包结束审计通过。归档提交后仍以最终SHA的完整分支CI为准，验收凭据保存reports/r252/final-validation.json。
+
+B1–B3及默认授权内容隔离已修复；C3仅修两fixture且通过。A3–A5无真实因果证据保持生产现状（A5补合成失败区回归）；A6范围排除、A7保持搁置；A8护栏实跑通过。C2仍未解决，当前本地30与Windows四轮各30共150次0失败不能覆盖历史foreground超时。旧R206单次全量race超3秒未修复、不改预算。保护文件152一致/8缺失，原因未确认，未获原SHA备份，不能写成160全部未变。不推tag、不发布、不改Draft；后续版本安排由用户决定。
