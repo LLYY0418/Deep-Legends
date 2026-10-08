@@ -651,11 +651,25 @@ func TestSpecialistRunesSkipsPlayerAfterThreeConsecutiveDetailFailures(t *testin
 	}
 }
 
+type specialistCancelOnClose struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (body specialistCancelOnClose) Close() error {
+	err := body.ReadCloser.Close()
+	body.cancel()
+	return err
+}
+
 func TestSpecialistRunesTimeoutReturnsCompletedPartialResults(t *testing.T) {
 	t.Setenv("RIOT_API_KEY", "RGAPI-test")
 	if specialistRuneRequestBudget > 90 {
 		t.Fatalf("specialist request budget = %d, exceeds Riot long-window limit", specialistRuneRequestBudget)
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	secondStarted := make(chan struct{})
 	players := []championTopPlayer{{Name: "First", Tagline: "KR1"}, {Name: "Second", Tagline: "KR1"}}
 	provider := specialistTestProvider(gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		switch {
@@ -664,20 +678,51 @@ func TestSpecialistRunesTimeoutReturnsCompletedPartialResults(t *testing.T) {
 		case strings.Contains(request.URL.Path, "/accounts/by-riot-id/First/"):
 			return specialistTestResponse(request, http.StatusOK, `{"puuid":"first-puuid"}`)
 		case strings.Contains(request.URL.Path, "/accounts/by-riot-id/Second/"):
+			close(secondStarted)
 			<-request.Context().Done()
 			return nil, request.Context().Err()
 		case strings.Contains(request.URL.Path, "/by-puuid/first-puuid/ids"):
 			return specialistTestResponse(request, http.StatusOK, `["KR_1"]`)
 		case strings.Contains(request.URL.Path, "/lol/match/v5/matches/KR_1"):
-			return specialistTestResponse(request, http.StatusOK, specialistMatchBodyAtPosition("KR_1", "first-puuid", 64, "complete", "MIDDLE", true, false))
+			select {
+			case <-secondStarted:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+			response, err := specialistTestResponse(request, http.StatusOK, specialistMatchBodyAtPosition("KR_1", "first-puuid", 64, "complete", "MIDDLE", true, false))
+			// Cancel only after the complete detail response has been consumed,
+			// and the second player has entered its deliberately blocked request.
+			response.Body = specialistCancelOnClose{ReadCloser: response.Body, cancel: cancel}
+			return response, err
 		default:
 			return specialistTestResponse(request, http.StatusNotFound, `{}`)
 		}
 	}))
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
 	started := time.Now()
-	runes, outcome := provider.specialistRunes(ctx, 64, "leesin", "李青", "mid")
+	type result struct {
+		runes   []gameplayRecommendationRune
+		outcome specialistOutcome
+	}
+	done := make(chan result, 1)
+	go func() {
+		runes, outcome := provider.specialistRunes(ctx, 64, "leesin", "李青", "mid")
+		done <- result{runes, outcome}
+	}()
+	watchdog := time.NewTimer(4 * time.Second)
+	defer watchdog.Stop()
+	var got result
+	select {
+	case got = <-done:
+	case <-watchdog.C:
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Error("specialist request did not stop after watchdog cancellation")
+		}
+		t.Fatal("specialist partial-result request exceeded watchdog")
+	}
+	runes, outcome := got.runes, got.outcome
 	if len(runes) != 1 || outcome != specialistOutcomeSuccess || runes[0].PlayerName != "First" || time.Since(started) > time.Second {
 		t.Fatalf("timeout partial result = runes:%#v outcome:%q duration:%v", runes, outcome, time.Since(started))
 	}
