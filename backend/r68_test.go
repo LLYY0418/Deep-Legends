@@ -478,7 +478,7 @@ func TestR68PositionBroadcastModesTeamLookupAndRetryGate(t *testing.T) {
 				}
 				diagnostics <- event
 			}
-			result := runner.broadcastPosition(client, Summoner{SummonerID: 68}, watchBroadcastRule{Visibility: "self"})
+			result := runner.broadcastPositionContext(context.Background(), client, Summoner{SummonerID: 68}, watchBroadcastRule{Visibility: "self"})
 			if result != test.wantResult || (messages.Load() > 0) != test.wantMessage {
 				t.Fatalf("broadcast result=%q messages=%d", result, messages.Load())
 			}

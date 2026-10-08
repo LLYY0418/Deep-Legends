@@ -655,7 +655,7 @@ func TestHexdataCircuitStatePersistsAcrossRestart(t *testing.T) {
 	}
 	restarted := newHexdataClient(provider, trackTestStore(t, &localStore{root: root}))
 	restarted.now = func() time.Time { return now.Add(30 * time.Second) }
-	circuit := restarted.circuitSnapshot("heroes")
+	circuit := restarted.snapshot().Circuits["heroes"]
 	if !circuit.Until.Equal(now.Add(time.Minute)) {
 		t.Fatalf("persisted circuit = %#v", circuit)
 	}
@@ -684,7 +684,7 @@ func TestR154HeroJSONCircuitAppliesAcrossChampionIDs(t *testing.T) {
 	for range hexdataCircuitFailureLimit {
 		h.recordLoadFailure("hero-json", context.DeadlineExceeded)
 	}
-	if circuit := h.circuitSnapshot("hero-json"); circuit.Failures != hexdataCircuitFailureLimit || circuit.Until.IsZero() {
+	if circuit := h.snapshot().Circuits["hero-json"]; circuit.Failures != hexdataCircuitFailureLimit || circuit.Until.IsZero() {
 		t.Fatalf("hero-json circuit did not trip: %#v", circuit)
 	}
 	for _, id := range []string{"89", "105"} {
@@ -743,7 +743,7 @@ func TestHexdataShapeCircuitBacksOffAndSuccessResetsIt(t *testing.T) {
 
 	for failure := 1; failure < hexdataCircuitFailureLimit; failure++ {
 		client.recordShapeFailure("heroes", 8, 40, hexdataTestBuild)
-		circuit := client.circuitSnapshot("heroes")
+		circuit := client.snapshot().Circuits["heroes"]
 		if !circuit.Until.IsZero() || !circuit.ProbeAt.IsZero() || circuit.Failures != failure {
 			t.Fatalf("shape failure %d tripped early: %#v", failure, circuit)
 		}
@@ -751,7 +751,7 @@ func TestHexdataShapeCircuitBacksOffAndSuccessResetsIt(t *testing.T) {
 	durations := []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, hexdataCircuitDuration}
 	for index, duration := range durations {
 		client.recordShapeFailure("heroes", 8, 40, hexdataTestBuild)
-		circuit := client.circuitSnapshot("heroes")
+		circuit := client.snapshot().Circuits["heroes"]
 		failure := index + hexdataCircuitFailureLimit
 		if !circuit.Until.Equal(now.Add(duration)) || circuit.Failures != failure {
 			t.Fatalf("shape failure %d state = %#v", failure, circuit)
@@ -760,23 +760,23 @@ func TestHexdataShapeCircuitBacksOffAndSuccessResetsIt(t *testing.T) {
 		if !circuit.ProbeAt.Equal(now.Add(probeDelay)) {
 			t.Fatalf("shape failure %d probe = %v, want %v", failure, circuit.ProbeAt, now.Add(probeDelay))
 		}
-		if other := client.circuitSnapshot("augments"); other.Failures != 0 || !other.Until.IsZero() {
+		if other := client.snapshot().Circuits["augments"]; other.Failures != 0 || !other.Until.IsZero() {
 			t.Fatalf("heroes shape failure leaked into augments: %#v", other)
 		}
 	}
 	client.recordShapeFailure("heroes", 8, 40, hexdataTestBuild)
-	if circuit := client.circuitSnapshot("heroes"); circuit.Failures != hexdataCircuitFailureMax || !circuit.Until.Equal(now.Add(hexdataCircuitDuration)) {
+	if circuit := client.snapshot().Circuits["heroes"]; circuit.Failures != hexdataCircuitFailureMax || !circuit.Until.Equal(now.Add(hexdataCircuitDuration)) {
 		t.Fatalf("failure count was not capped: %#v", circuit)
 	}
 
 	now = now.Add(hexdataCircuitFailureDecay + time.Minute)
 	client.recordShapeFailure("heroes", 8, 40, hexdataTestBuild)
-	if circuit := client.circuitSnapshot("heroes"); circuit.Failures != 1 || !circuit.Until.IsZero() || !circuit.ProbeAt.IsZero() {
+	if circuit := client.snapshot().Circuits["heroes"]; circuit.Failures != 1 || !circuit.Until.IsZero() || !circuit.ProbeAt.IsZero() {
 		t.Fatalf("failure window did not decay: %#v", circuit)
 	}
 
 	client.recordSuccess("heroes", "/heroes")
-	if circuit := client.circuitSnapshot("heroes"); !circuit.Until.IsZero() || !circuit.ProbeAt.IsZero() || circuit.Failures != 0 {
+	if circuit := client.snapshot().Circuits["heroes"]; !circuit.Until.IsZero() || !circuit.ProbeAt.IsZero() || circuit.Failures != 0 {
 		t.Fatalf("successful request did not reset circuit state: %#v", circuit)
 	}
 }
@@ -784,13 +784,13 @@ func TestHexdataShapeCircuitBacksOffAndSuccessResetsIt(t *testing.T) {
 func TestHexdataCircuitStateWorksWithoutPersistentStore(t *testing.T) {
 	client := newHexdataClient(newChampionProvider(), nil)
 	client.recordShapeFailure("augments", 0, 0, hexdataTestBuild)
-	circuit := client.circuitSnapshot("augments")
+	circuit := client.snapshot().Circuits["augments"]
 	if circuit.Failures != 1 || !circuit.Until.IsZero() {
 		t.Fatalf("single shape failure should not trip the circuit: %#v", circuit)
 	}
 	client.recordShapeFailure("augments", 0, 0, hexdataTestBuild)
 	client.recordShapeFailure("augments", 0, 0, hexdataTestBuild)
-	circuit = client.circuitSnapshot("augments")
+	circuit = client.snapshot().Circuits["augments"]
 	remaining := circuit.Until.Sub(client.now())
 	if circuit.Failures != 3 || remaining <= 0 || remaining > time.Minute {
 		t.Fatalf("in-memory circuit was not initialized: %#v", circuit)
@@ -799,7 +799,7 @@ func TestHexdataCircuitStateWorksWithoutPersistentStore(t *testing.T) {
 	for range hexdataCircuitFailureLimit {
 		client.recordLoadFailure("augments", errHexdataEmptyPayload)
 	}
-	circuit = client.circuitSnapshot("augments")
+	circuit = client.snapshot().Circuits["augments"]
 	remaining = circuit.Until.Sub(client.now())
 	if circuit.Failures != 3 || remaining <= 0 || remaining > 30*time.Second {
 		t.Fatalf("empty-payload circuit did not use the short backoff: %#v", circuit)
@@ -824,7 +824,7 @@ func TestHexdataHTTP429OpensPersistentCircuitBeforeNextRequest(t *testing.T) {
 	if got := requests.Load(); got != hexdataCircuitFailureLimit {
 		t.Fatalf("HTTP 429 made %d requests, want %d without retries", got, hexdataCircuitFailureLimit)
 	}
-	if circuit := provider.hexdata.circuitSnapshot("heroes"); !circuit.Until.Equal(now.Add(time.Minute)) || circuit.Failures != hexdataCircuitFailureLimit {
+	if circuit := provider.hexdata.snapshot().Circuits["heroes"]; !circuit.Until.Equal(now.Add(time.Minute)) || circuit.Failures != hexdataCircuitFailureLimit {
 		t.Fatalf("HTTP 429 circuit = %#v", circuit)
 	}
 
@@ -869,7 +869,7 @@ func TestHexdataEmptyPayloadKeepsLastSuccessfulCacheAndTripsOnlyAfterThreeFailur
 		if err != nil || page.Cache != championCacheStateStale || !bytes.Equal(page.Data, valid) {
 			t.Fatalf("failure %d stale page = cache:%q bytes:%d err:%v", failure, page.Cache, len(page.Data), err)
 		}
-		circuit := provider.hexdata.circuitSnapshot("augments")
+		circuit := provider.hexdata.snapshot().Circuits["augments"]
 		if circuit.Failures != failure {
 			t.Fatalf("failure %d circuit = %#v", failure, circuit)
 		}
@@ -877,7 +877,7 @@ func TestHexdataEmptyPayloadKeepsLastSuccessfulCacheAndTripsOnlyAfterThreeFailur
 			t.Fatalf("failure %d tripped early: %#v", failure, circuit)
 		}
 	}
-	if circuit := provider.hexdata.circuitSnapshot("augments"); circuit.Until.IsZero() || circuit.Until.Sub(provider.hexdata.now()) > time.Minute {
+	if circuit := provider.hexdata.snapshot().Circuits["augments"]; circuit.Until.IsZero() || circuit.Until.Sub(provider.hexdata.now()) > time.Minute {
 		t.Fatalf("empty payload did not use short backoff: %#v", circuit)
 	}
 	if got := requests.Load(); got != 2*hexdataCircuitFailureLimit {
@@ -903,7 +903,7 @@ func TestHexdataCircuitProbesLazilyOnNextLoadAndClosesOnSuccess(t *testing.T) {
 	for range hexdataCircuitFailureLimit {
 		client.recordShapeFailure("augments", 0, 0, "")
 	}
-	circuit := client.circuitSnapshot("augments")
+	circuit := client.snapshot().Circuits["augments"]
 	client.mu.Lock()
 	circuit.Until = now.Add(5 * time.Minute)
 	circuit.ProbeAt = now.Add(time.Minute)
@@ -918,7 +918,7 @@ func TestHexdataCircuitProbesLazilyOnNextLoadAndClosesOnSuccess(t *testing.T) {
 	if _, err := client.load(context.Background(), "augments", "all", "/augments", "text/html,application/xhtml+xml", false); err != nil {
 		t.Fatalf("lazy half-open load failed: %v", err)
 	}
-	if circuit := client.circuitSnapshot("augments"); circuit.Failures != 0 || !circuit.Until.IsZero() {
+	if circuit := client.snapshot().Circuits["augments"]; circuit.Failures != 0 || !circuit.Until.IsZero() {
 		t.Fatalf("successful lazy probe did not close circuit: %#v", circuit)
 	}
 	if got := requests.Load(); got != 1 {
@@ -965,7 +965,7 @@ func TestHexdataRequestUsesHonestUserAgent(t *testing.T) {
 	})}
 	provider.hexdata.minInterval = 0
 	provider.hexdata.maximumJitter = 0
-	if _, _, err := provider.hexdata.fetchOnce(context.Background(), "/heroes", "text/html", nil); err != nil {
+	if _, _, err := provider.hexdata.fetchOnceKind(context.Background(), "direct", "/heroes", "text/html", nil); err != nil {
 		t.Fatal(err)
 	}
 	for _, required := range []string{"DeepLegends/", "github.com/LLYY0418/Deep-Legends", "用户触发查询"} {
@@ -1015,14 +1015,14 @@ func TestHexdataPaceAllowsFourIdleBurstRequestsThenJitters(t *testing.T) {
 	})
 
 	for index := 0; index < hexdataBurstAllowance; index++ {
-		if _, _, err := provider.hexdata.fetchOnce(context.Background(), "/heroes", "text/html", nil); err != nil {
+		if _, _, err := provider.hexdata.fetchOnceKind(context.Background(), "direct", "/heroes", "text/html", nil); err != nil {
 			t.Fatal(err)
 		}
 		if len(slept) != 0 {
 			t.Fatalf("burst request %d waited: %v", index+1, slept)
 		}
 	}
-	if _, _, err := provider.hexdata.fetchOnce(context.Background(), "/heroes", "text/html", nil); err != nil {
+	if _, _, err := provider.hexdata.fetchOnceKind(context.Background(), "direct", "/heroes", "text/html", nil); err != nil {
 		t.Fatal(err)
 	}
 	if len(slept) != 1 || slept[0] != 417*time.Millisecond {
@@ -1083,7 +1083,7 @@ func TestDecorateHexdataAugmentsKeepsOfflineDescriptionWhenAugmentsAreUnavailabl
 		return nil, errors.New("augment catalogs unavailable")
 	})}
 	rows := []championMetricRow{{Assets: []championAsset{{ID: 1323, Kind: "augment", Name: "海克斯1323"}}}}
-	provider.decorateHexdataAugments(context.Background(), rows)
+	provider.decorateHexdataAugmentsWithCatalog(rows, gameplayAugmentIndexAll(provider.loadAugmentMetadataCatalog(context.Background())))
 	if got := rows[0].Assets[0].Description; got != augmentOfflineDescription {
 		t.Fatalf("degraded live description = %q, want %q", got, augmentOfflineDescription)
 	}
@@ -1109,12 +1109,12 @@ func TestDecorateHexdataAugmentsPersistsMissingMetadataDiagnostic(t *testing.T) 
 	a := &app{storage: store}
 	provider.diag = a.recordDiagnostic
 	known := []championMetricRow{{Assets: []championAsset{{ID: 2031, Kind: "augment", Name: "空投熊"}}}}
-	provider.decorateHexdataAugments(context.Background(), known)
+	provider.decorateHexdataAugmentsWithCatalog(known, gameplayAugmentIndexAll(provider.loadAugmentMetadataCatalog(context.Background())))
 	if known[0].Assets[0].Source != "builtin" || known[0].Assets[0].Path != "/augments/2031.png" {
 		t.Fatal("Drop Bear must use its verified colored artwork", known)
 	}
 	rows := []championMetricRow{{Assets: []championAsset{{ID: 999999, Kind: "augment", Name: "未知海克斯"}}}}
-	provider.decorateHexdataAugments(context.Background(), rows)
+	provider.decorateHexdataAugmentsWithCatalog(rows, gameplayAugmentIndexAll(provider.loadAugmentMetadataCatalog(context.Background())))
 	data, err := store.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)

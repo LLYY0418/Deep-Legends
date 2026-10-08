@@ -74,10 +74,14 @@ func TestRankScoreCacheDoesNotCrossReadSources(t *testing.T) {
 	cache := newRankScoreCache()
 	player := "same-player"
 	now := time.Now()
-	cache.put(rankScoreCacheKey(dataSourceSGP, "HN1", player), rankScoreEntry{score: 1234, known: true, at: now})
-	cache.put(rankScoreCacheKey(dataSourceLCU, "HN1", player), rankScoreEntry{score: 5678, known: true, at: now})
-	sgp, sgpOK := cache.get(rankScoreCacheKey(dataSourceSGP, "HN1", player))
-	lcu, lcuOK := cache.get(rankScoreCacheKey(dataSourceLCU, "HN1", player))
+	cache.mu.Lock()
+	cache.putLocked(rankScoreCacheKeyScoped(dataSourceSGP, "HN1", player, ""), rankScoreEntry{score: 1234, known: true, at: now})
+	cache.mu.Unlock()
+	cache.mu.Lock()
+	cache.putLocked(rankScoreCacheKeyScoped(dataSourceLCU, "HN1", player, ""), rankScoreEntry{score: 5678, known: true, at: now})
+	cache.mu.Unlock()
+	sgp, sgpOK := cache.get(rankScoreCacheKeyScoped(dataSourceSGP, "HN1", player, ""))
+	lcu, lcuOK := cache.get(rankScoreCacheKeyScoped(dataSourceLCU, "HN1", player, ""))
 	if !sgpOK || !lcuOK || sgp.score != 1234 || lcu.score != 5678 {
 		t.Fatalf("source-scoped rank cache values = sgp:%#v/%v lcu:%#v/%v", sgp, sgpOK, lcu, lcuOK)
 	}

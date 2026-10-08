@@ -131,14 +131,6 @@ func (t *lpTracker) recordObservation(event map[string]any) {
 	}
 }
 
-func (t *lpTracker) wait(duration time.Duration) {
-	if t != nil && t.sleep != nil {
-		t.sleep(duration)
-		return
-	}
-	time.Sleep(duration)
-}
-
 func validLPAccountHash(value string) bool {
 	if len(value) != 16 {
 		return false

@@ -242,7 +242,7 @@ func TestR87PositionBroadcastFailureHasReason(t *testing.T) {
 	var event map[string]any
 	r.observe = func(e map[string]any) { event = e }
 	c := &LCUClient{baseURL: "https://127.0.0.1:2999", token: "fixture", http: &http.Client{Transport: gameplayRoundTripFunc(func(*http.Request) (*http.Response, error) { return nil, errors.New("offline") })}}
-	if r.broadcastPosition(c, Summoner{}, watchBroadcastRule{}) != "failed" || event["reason"] != "session-read-failed" {
+	if r.broadcastPositionContext(context.Background(), c, Summoner{}, watchBroadcastRule{}) != "failed" || event["reason"] != "session-read-failed" {
 		t.Fatalf("diagnostic=%v", event)
 	}
 }

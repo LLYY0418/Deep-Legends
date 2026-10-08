@@ -42,10 +42,6 @@ type facadeIconCache struct {
 	terms func(string) []string
 }
 
-func (a *app) loadIconCatalog(ctx context.Context, client *LCUClient) ([]facadeIcon, error) {
-	catalog, err := a.loadIconCatalogResult(ctx, client)
-	return catalog.Icons, err
-}
 func (a *app) loadIconCatalogResult(ctx context.Context, client *LCUClient) (facadeIconCatalog, error) {
 	c := &a.facadeIcons
 	c.mu.Lock()

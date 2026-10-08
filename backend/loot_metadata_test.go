@@ -173,7 +173,7 @@ func TestLootNamingSharedDeadlineAndOfflineFallback(t *testing.T) {
 	if time.Since(started) > time.Second || peak.Load() != int32(len(lootMetadataCatalogs)) || len(metadata) != 0 {
 		t.Fatalf("catalogs did not share a concurrent deadline: peak=%d, entries=%d", peak.Load(), len(metadata))
 	}
-	items := enrichLootItems([]LootItem{{LootID: "CHEST_128", Count: 1}, {LootID: "MATERIAL_clashtickets", Count: 1}}, nil)
+	items := enrichLootItemsWithMetadata([]LootItem{{LootID: "CHEST_128", Count: 1}, {LootID: "MATERIAL_clashtickets", Count: 1}}, nil, nil, nil)
 	for _, item := range items {
 		if item.DisplayName != lootNames0912[item.LootID] || item.Asset == "" {
 			t.Fatalf("verified legacy fallback failed offline: %#v", item)

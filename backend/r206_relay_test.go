@@ -28,7 +28,12 @@ func r206RelayFixture(t *testing.T) *riotKeyStore {
 				t.Error("relay probe leaked")
 			}
 		}
-		owned.stopSummary()
+		owned.mu.Lock()
+		if owned.summaryTimer != nil {
+			owned.summaryTimer.Stop()
+			owned.summaryTimer = nil
+		}
+		owned.mu.Unlock()
 		riotRelayAddresses, riotRelays = addresses, state
 	})
 	return store
@@ -100,12 +105,12 @@ func TestR206RelayEmptyAndFailureCooldown(t *testing.T) {
 		return r206RelayResponse(503, []byte(`{}`)), nil
 	})}
 	riotRelayAddresses = nil
-	if _, err := state.ensure(t.Context(), client, nil); !errors.Is(err, errRiotKeyMissing) || calls != 0 {
+	if _, err := state.ensureForce(t.Context(), client, nil, false); !errors.Is(err, errRiotKeyMissing) || calls != 0 {
 		t.Fatal(err, calls)
 	}
 	riotRelayAddresses = []string{"https://relay.example"}
 	for i := 0; i < 2; i++ {
-		if _, err := state.ensure(t.Context(), client, func(row map[string]any) { events = append(events, row) }); !errors.Is(err, errRiotRelayUnavailable) {
+		if _, err := state.ensureForce(t.Context(), client, func(row map[string]any) { events = append(events, row) }, false); !errors.Is(err, errRiotRelayUnavailable) {
 			t.Fatal(err)
 		}
 	}
@@ -123,7 +128,7 @@ func TestR206RelayEmptyAndFailureCooldown(t *testing.T) {
 	if remaining < 14*time.Second || remaining > 15*time.Second {
 		t.Fatal(remaining)
 	}
-	state.ensure(t.Context(), client, nil)
+	state.ensureForce(t.Context(), client, nil, false)
 	if calls != 2 {
 		t.Fatal(calls)
 	}

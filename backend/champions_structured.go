@@ -489,10 +489,6 @@ func expandedOPGGItemDepths(data []byte) string {
 	return expandRSCReferences(flight)
 }
 
-func parseOPGGDepthRows(data []byte) map[int][]championMetricRow {
-	return parseExpandedOPGGDepthRows(expandedOPGGItemDepths(data))
-}
-
 func parseExpandedOPGGDepthRows(expanded string) map[int][]championMetricRow {
 	result := make(map[int][]championMetricRow, 3)
 	for _, depth := range []int{4, 5, 6} {
@@ -1541,10 +1537,6 @@ func (p *championProvider) loadStructuredDetail(ctx context.Context, mode, champ
 	return response, nil
 }
 
-func (p *championProvider) structuredMetrics(values []opggMetric, assetKind string, limit int) []championMetricRow {
-	return p.structuredMetricsForKind(values, assetKind, assetKind, limit)
-}
-
 type structuredMetricCandidate struct {
 	row   championMetricRow
 	games int
@@ -1740,10 +1732,6 @@ func arenaAverage(value float64, total int) float64 {
 	return value / float64(total)
 }
 
-func (p *championProvider) structuredCounters(values []opggCounter) championCounterSections {
-	return p.structuredCountersForChampion(values, 0)
-}
-
 func (p *championProvider) structuredCountersForChampion(values []opggCounter, subjectID int) championCounterSections {
 	return championCounterSectionsFromRows(p.structuredCounterRowsForChampion(values, subjectID))
 }
@@ -1893,11 +1881,6 @@ func runeShardSlots(statModIDs []int, chosen *[]championAsset) [][]championAsset
 
 func runeShardName(id int) string {
 	return map[int]string{5001: "成长生命值", 5005: "攻击速度", 5007: "技能急速", 5008: "适应之力", 5010: "移动速度", 5011: "生命值", 5013: "韧性"}[id]
-}
-
-func (p *championProvider) structuredArenaAugmentGroups(ctx context.Context, groups []opggArenaAugmentGroup) []arenaAugmentGroup {
-	catalog, err := p.loadCommunityDragonAugments(ctx)
-	return p.structuredArenaAugmentGroupsWithCatalog(groups, catalog, err)
 }
 
 func (p *championProvider) structuredArenaAugmentGroupsWithCatalog(groups []opggArenaAugmentGroup, catalog []gameplayAugment, err error) []arenaAugmentGroup {
@@ -2642,12 +2625,6 @@ func applyLocalArenaAugmentGrades(groups []arenaAugmentGroup) {
 		// only contributes Grade and must not become a displayed score.
 		groups[ref.group].Rows[ref.row].Grade = graded[index].Grade
 	}
-}
-
-func arenaAugmentRows(groups []opggArenaAugmentGroup, catalog []gameplayAugment) []championMetricRow {
-	// Keep every quality group available to callers; presentation layers apply
-	// their own per-quality cap after rarity has been resolved.
-	return flattenArenaAugmentGroups(arenaAugmentGroups(groups, catalog), 0)
 }
 
 func firstPositiveInt(values ...int) int {

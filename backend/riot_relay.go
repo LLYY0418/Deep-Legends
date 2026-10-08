@@ -293,15 +293,6 @@ func (s *riotRelayState) flushSummary(record func(map[string]any)) {
 	}
 }
 
-func (s *riotRelayState) stopSummary() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.summaryTimer != nil {
-		s.summaryTimer.Stop()
-		s.summaryTimer = nil
-	}
-}
-
 var riotRelays = &riotRelayState{}
 
 func configuredRiotRelays() []string {
@@ -321,9 +312,6 @@ func riotHTTPClientWithoutRedirects(client *http.Client) *http.Client {
 	return &copy
 }
 
-func (s *riotRelayState) ensure(ctx context.Context, client *http.Client, record func(map[string]any)) (string, error) {
-	return s.ensureForce(ctx, client, record, false)
-}
 func (s *riotRelayState) ensureForce(ctx context.Context, client *http.Client, record func(map[string]any), force bool) (string, error) {
 	origins := configuredRiotRelays()
 	if len(origins) == 0 {

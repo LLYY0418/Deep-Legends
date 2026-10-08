@@ -41,7 +41,13 @@ func currentGameFixture(t *testing.T) (*app, []byte, gameplayReference, time.Tim
 }
 func TestOverviewCurrentGameObservedContract(t *testing.T) {
 	a, data, ref, now := currentGameFixture(t)
-	game, err := a.parseOPGGCurrentGame(data, ref, now)
+	game, err := func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult(data)
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, ref, now)
+	}()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,24 +74,60 @@ func TestOverviewCurrentGameObservedContract(t *testing.T) {
 	}
 	badRef := ref
 	badRef.PlayerRef = "unrelated-player-00000000001"
-	if _, err = a.parseOPGGCurrentGame(data, badRef, now); err == nil {
+	if _, err = func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult(data)
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, badRef, now)
+	}(); err == nil {
 		t.Fatal("accepted unrelated match")
 	}
-	if _, err = a.parseOPGGCurrentGame(data, ref, now.Add(7*time.Hour)); err == nil {
+	if _, err = func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult(data)
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, ref, now.Add(7*time.Hour))
+	}(); err == nil {
 		t.Fatal("accepted stale game")
 	}
 	duplicate := bytes.Replace(data, []byte("current-game-fixture-1-0-0000000001"), []byte(ref.PlayerRef), 1)
-	if _, err = a.parseOPGGCurrentGame(duplicate, ref, now); err == nil {
+	if _, err = func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult(duplicate)
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, ref, now)
+	}(); err == nil {
 		t.Fatal("accepted duplicate identity")
 	}
 	finished := bytes.Replace(data, []byte(`"is_finished":false`), []byte(`"is_finished":true`), 1)
-	if game, err = a.parseOPGGCurrentGame(finished, ref, now); err != nil || game.Status != "none" {
+	if game, err = func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult(finished)
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, ref, now)
+	}(); err != nil || game.Status != "none" {
 		t.Fatal("finished game shown live")
 	}
-	if game, err = a.parseOPGGCurrentGame([]byte("0:{\"a\":\"$@1\"}\n1:\"$undefined\""), ref, now); err != nil || game.Status != "none" {
+	if game, err = func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult([]byte("0:{\"a\":\"$@1\"}\n1:\"$undefined\""))
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, ref, now)
+	}(); err != nil || game.Status != "none" {
 		t.Fatal("explicit no-game failed")
 	}
-	if _, err = a.parseOPGGCurrentGame([]byte("0:{\"a\":\"$@1\"}\n1:{}"), ref, now); err == nil {
+	if _, err = func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult([]byte("0:{\"a\":\"$@1\"}\n1:{}"))
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, ref, now)
+	}(); err == nil {
 		t.Fatal("invalid result treated as idle")
 	}
 }
@@ -179,7 +221,13 @@ func TestOverviewCurrentGamePublicProbe(t *testing.T) {
 		t.Fatal("public champion catalogue:", err)
 	}
 	if data, err := os.ReadFile("/private/tmp/opgg-ingame-response.txt"); err == nil {
-		result, err := a.parseOPGGCurrentGame(data, ref, time.Date(2026, 9, 8, 16, 0, 0, 0, time.UTC))
+		result, err := func() (*currentGame, error) {
+			raw, err := normalizedCurrentActionResult(data)
+			if err != nil {
+				return nil, err
+			}
+			return a.parseOPGGCurrentGameValue(raw, ref, time.Date(2026, 9, 8, 16, 0, 0, 0, time.UTC))
+		}()
 		if err != nil {
 			t.Fatal("observed response:", err)
 		}

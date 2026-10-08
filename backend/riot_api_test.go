@@ -109,7 +109,7 @@ func TestRiotMatchConversionPreservesControlWardZero(t *testing.T) {
 		QueueID:      420,
 		Participants: []riotParticipant{{
 			ParticipantID: 1, TeamID: 100, PUUID: "subject", ChampionID: 64,
-			VisionWardsBoughtInGame: historyInt(controlWardsBought),
+			VisionWardsBoughtInGame: &lenientInt{value: &controlWardsBought},
 		}},
 	}
 

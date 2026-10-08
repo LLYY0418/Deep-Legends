@@ -119,10 +119,6 @@ func ownedRecommendedFile(file string) ([]byte, error) {
 	return data, nil
 }
 
-func writeRecommendedItemSet(location settingsLocation, set recommendedItemSet, beforeWrite func() error) error {
-	return writeRecommendedItemSetTraced(location, set, beforeWrite, &itemSetWriteTrace{})
-}
-
 func writeRecommendedItemSetTraced(location settingsLocation, set recommendedItemSet, beforeWrite func() error, trace *itemSetWriteTrace) (err error) {
 	expectedBlocks := trace.ExpectedBlocks
 	if len(expectedBlocks) == 0 {

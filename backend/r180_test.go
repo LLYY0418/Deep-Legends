@@ -156,8 +156,12 @@ func TestR180BypassStaleSGPCacheWithoutWriting(t *testing.T) {
 	f := r180Fixture(t)
 	ref := r161Ref(1)
 	ctx := context.Background()
+	platform, _, available := f.a.sgp.available(f.c)
+	if !available {
+		t.Fatal("SGP fixture unavailable")
+	}
 	f.generation.Store(0)
-	if _, _, _, err := f.a.sgp.matchHistory(ctx, f.c, ref, 0, 30, true); err != nil {
+	if _, _, _, err := f.a.sgp.matchHistoryOn(ctx, f.c, platform, ref, 0, 30, true); err != nil {
 		t.Fatal(err)
 	}
 	f.a.sgp.mu.Lock()
@@ -182,7 +186,7 @@ func TestR180BypassStaleSGPCacheWithoutWriting(t *testing.T) {
 	if !unchanged {
 		t.Fatal("live request wrote five-minute page cache")
 	}
-	old, _, _, err := f.a.sgp.matchHistory(ctx, f.c, ref, 0, 30, true)
+	old, _, _, err := f.a.sgp.matchHistoryOn(ctx, f.c, platform, ref, 0, 30, true)
 	if err != nil || f.sgpCalls.Load() != 2 || len(old) != 12 {
 		t.Fatal("shared stale cache was replaced", len(old), err, f.sgpCalls.Load())
 	}

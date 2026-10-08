@@ -40,7 +40,7 @@ func TestR58ClearTitleRetriesWithNullAfterEmptyString(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	if err := (&app{}).applyFacadeAction(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "clear-title"}); err != nil {
+	if _, err := (&app{}).applyFacadeActionResultDetails(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "clear-title"}); err != nil {
 		t.Fatal(err)
 	}
 	first, second := <-bodies, <-bodies

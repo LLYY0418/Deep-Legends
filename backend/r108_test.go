@@ -224,7 +224,7 @@ func TestR108FacadeStateReturnsResolvedBackdropAndBanner(t *testing.T) {
 	})
 	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 7}, allSkinsWithBase: []Skin{{ID: 64000, ChampionID: 64, Name: "盲僧", SplashPath: image}}}
 	a.facadeIdentityShapeDiagnosticClient = client
-	state := a.loadFacadeState(context.Background())
+	state := a.loadFacadeStateTriggered(context.Background(), "poll")
 	data, err := json.Marshal(state)
 	if err != nil || state.Profile.BackgroundSkinID != 64000 || state.BannerAccent != "actual-accent" || !strings.Contains(string(data), `"backgroundPath":"`+image+`"`) {
 		t.Fatal(string(data), err)

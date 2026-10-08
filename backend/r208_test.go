@@ -67,7 +67,7 @@ func TestR208RelayQuotaDaily(t *testing.T) {
 					riotRelays.active = ""
 					riotRelays.lastSuccess = time.Time{}
 					riotRelays.mu.Unlock()
-					_, err = riotRelays.ensure(t.Context(), p.champions.httpClient(), p.champions.diag)
+					_, err = riotRelays.ensureForce(t.Context(), p.champions.httpClient(), p.champions.diag, false)
 				} else {
 					err = p.get(t.Context(), riotPlatformHost, "/lol/status/v4/platform-data", nil, &out)
 				}
@@ -250,7 +250,14 @@ func TestR208IPPartialResumeWithoutRepeatedSuccessfulDetails(t *testing.T) {
 func TestR208RelaySummaryTenMinuteWindow(t *testing.T) {
 	c := &r208Clock{stamp: time.Date(2026, 10, 4, 0, 0, 0, 0, time.UTC)}
 	s := &riotRelayState{now: c.now}
-	t.Cleanup(s.stopSummary)
+	t.Cleanup(func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.summaryTimer != nil {
+			s.summaryTimer.Stop()
+			s.summaryTimer = nil
+		}
+	})
 	var rows []map[string]any
 	record := func(e map[string]any) { rows = append(rows, e) }
 	s.recordRequest("", 200, "other", record)

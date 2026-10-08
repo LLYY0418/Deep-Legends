@@ -74,11 +74,11 @@ func TestLCUClientCloseErasesCredential(t *testing.T) {
 
 func TestRelevantLCUEventClassification(t *testing.T) {
 	for _, uri := range []string{"/lol-inventory/v2/inventory/CHAMPION_SKIN", "/lol-champion-mastery/v1/player/champion-mastery", "/lol-loot/v1/player-loot-map/item", "/lol-rewards/v1/grants/1", "/lol-summoner/v1/current-summoner"} {
-		if !shouldRefreshForLCUEvent(LCUEvent{URI: uri}) {
+		if !(lcuEventRefreshScope(LCUEvent{URI: uri}) != "") {
 			t.Fatalf("expected relevant event: %s", uri)
 		}
 	}
-	if shouldRefreshForLCUEvent(LCUEvent{URI: "/lol-chat/v1/friends"}) {
+	if (lcuEventRefreshScope(LCUEvent{URI: "/lol-chat/v1/friends"}) != "") {
 		t.Fatal("unrelated chat event must not trigger inventory refresh")
 	}
 	if scope := lcuEventRefreshScope(LCUEvent{URI: "/lol-loot/v1/player-loot-map/item"}); scope != "account" {
@@ -128,7 +128,7 @@ func TestSkinAcquisitionDatesRequireOwnedPurchaseDate(t *testing.T) {
 		map[string]any{"id": float64(103002), "ownership": map[string]any{"owned": false, "purchaseDate": float64(1709164800000)}},
 		map[string]any{"id": float64(103003), "owned": true, "purchaseDate": float64(1)},
 	}
-	dates := extractSkinAcquisitionDates(fixture, time.Date(2026, 8, 7, 0, 0, 0, 0, time.UTC))
+	dates := extractSkinAcquisitionDatesForOwned(fixture, time.Date(2026, 8, 7, 0, 0, 0, 0, time.UTC), nil)
 	if dates[103001] != "2024-02-29T00:00:00Z" || dates[103004] != "2024-02-29T00:30:00Z" || dates[103005] != "2024-03-02T00:00:00Z" || dates[103006] != "2024-03-03T00:00:00Z" || len(dates) != 4 {
 		t.Fatalf("dates=%#v", dates)
 	}
@@ -177,7 +177,7 @@ func TestEnrichLootItemsUsesChineseNamesAndCatalogSkinNames(t *testing.T) {
 		{LootID: "CHEST_champion_mastery", Type: "CHEST", Count: 54},
 		{LootID: "CHEST_promotion", Type: "CHEST", Count: 1},
 	}
-	items = enrichLootItems(items, []Skin{{ID: 143002, Name: "K/DA ALL OUT 萨勒芬妮 独立音乐人", ChampionID: 143, ChampionName: "萨勒芬妮", TilePath: "/lol-game-data/assets/skin.png", Owned: true}, {ID: 45000, Name: "维迦", ChampionID: 45, ChampionName: "维迦"}})
+	items = enrichLootItemsWithMetadata(items, []Skin{{ID: 143002, Name: "K/DA ALL OUT 萨勒芬妮 独立音乐人", ChampionID: 143, ChampionName: "萨勒芬妮", TilePath: "/lol-game-data/assets/skin.png", Owned: true}, {ID: 45000, Name: "维迦", ChampionID: 45, ChampionName: "维迦"}}, nil, nil)
 	want := []string{"K/DA ALL OUT 萨勒芬妮 独立音乐人", "蓝色精粹", "橙色精粹", "战利品宝箱钥匙", "钥匙碎片", "维迦", "材料", "战利品宝箱", "紫色宝箱"}
 	for index, expected := range want {
 		if items[index].DisplayName != expected {
@@ -208,11 +208,11 @@ func TestEnrichLootItemsUsesChineseNamesAndCatalogSkinNames(t *testing.T) {
 }
 
 func TestEnrichLootItemsRetainsTheLCUPendingShell(t *testing.T) {
-	items := enrichLootItems([]LootItem{
+	items := enrichLootItemsWithMetadata([]LootItem{
 		{Count: 30, rawKeyEmpty: true},
 		{LootID: "CHEST_224", LocalizedName: "未命名战利品", Count: 1},
 		{LootName: "MATERIAL_REAL", Count: 1},
-	}, nil)
+	}, nil, nil, nil)
 	if len(items) != 3 || !items[0].DataPending || !items[0].Blank || items[0].DisplayName != "" || items[0].Kind != "类型未知" {
 		t.Fatalf("empty-shell filtering dropped non-empty loot: %#v", items)
 	}
@@ -258,7 +258,11 @@ func TestCommunityDragonLootMetadataNamesMasterworkChestAndKeepsPromotionFallbac
 		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
 	})}
 	provider.clientMu.Unlock()
-	metadata, err := provider.loadCommunityDragonLootMetadata(context.Background())
+	data, err := provider.fetch(context.Background(), communityDragonHost, "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/loot.json", nil, championCacheMaxEntry, "application/json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := parseLootCatalog(data)
 	if err != nil {
 		t.Fatal(err)
 	}

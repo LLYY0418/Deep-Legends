@@ -133,10 +133,6 @@ type CatalogStats struct {
 	Fingerprint   string `json:"fingerprint"`
 }
 
-func loadSnapshotWithClient(client *LCUClient, pool PoolManifest) (Snapshot, error) {
-	return loadSnapshotWithClientProvider(client, pool, nil, nil)
-}
-
 func loadSnapshotWithClientProvider(client *LCUClient, pool PoolManifest, provider *championProvider, observe func(map[string]any)) (Snapshot, error) {
 	identity, err := loadIdentitySnapshot(client)
 	if err != nil {
@@ -208,10 +204,6 @@ func loadIdentitySnapshot(client *LCUClient) (Snapshot, error) {
 		PhaseGroup: "identity", LoadPhases: loadPhases,
 		Account: AccountData{Profile: profile, Capabilities: []EndpointCapability{profileCapability, masteryCapability}},
 	}, nil
-}
-
-func loadCollectionSnapshot(client *LCUClient, pool PoolManifest, identity Snapshot) (Snapshot, error) {
-	return loadCollectionSnapshotWithProvider(client, pool, identity, nil, nil)
 }
 
 func loadCollectionSnapshotWithProvider(client *LCUClient, pool PoolManifest, identity Snapshot, provider *championProvider, observe func(map[string]any)) (Snapshot, error) {
@@ -962,21 +954,6 @@ func catalogEmblemNames(object map[string]any) []string {
 	return names
 }
 
-func loadOwnedSkinIDs(client *LCUClient, summonerID int64, catalog []Skin) (map[int64]bool, []string) {
-	ids, statuses, err := loadOwnedSkinInventory(client, summonerID, catalog)
-	var details []string
-	for _, status := range statuses {
-		if status.State != "success" && status.State != "unsupported" {
-			details = append(details, status.Path+": "+status.Detail)
-		}
-	}
-	if err != nil {
-		details = append(details, err.Error())
-		return map[int64]bool{}, details
-	}
-	return ids, details
-}
-
 func loadOwnedSkinInventory(client *LCUClient, summonerID int64, catalog []Skin, shared ...*collectionReads) (map[int64]bool, []OwnershipSourceStatus, error) {
 	get := client.GetBytes
 	fast := len(shared) > 0 && shared[0] != nil
@@ -1252,10 +1229,6 @@ func markOwnershipSource(status *OwnershipSourceStatus, state, detail string) {
 	} else {
 		status.Detail += "; " + detail
 	}
-}
-
-func extractOwnedIDs(value any, presenceMeansOwned bool) map[int64]bool {
-	return extractOwnedEvidence(value, presenceMeansOwned).OwnedIDs
 }
 
 type ownedEvidence struct {

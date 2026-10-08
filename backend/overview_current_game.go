@@ -257,13 +257,6 @@ func currentActionResult(data []byte) (json.RawMessage, error) {
 	}
 	return value, nil
 }
-func (a *app) parseOPGGCurrentGame(data []byte, ref gameplayReference, now time.Time) (*currentGame, error) {
-	raw, err := normalizedCurrentActionResult(data)
-	if err != nil {
-		return nil, err
-	}
-	return a.parseOPGGCurrentGameValue(raw, ref, now)
-}
 
 // Server Actions use the same Flight references/undefined values as page
 // snapshots. Normalize only approved game fields; never resolve spectate code.

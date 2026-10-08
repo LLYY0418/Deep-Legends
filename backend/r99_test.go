@@ -87,8 +87,8 @@ func TestR99ConnectionNeverWritesAndProbesOnce(t *testing.T) {
 		}
 	})
 	a := &app{connected: true, lcu: client, summoner: Summoner{SummonerID: 1}}
-	a.loadFacadeState(context.Background())
-	a.loadFacadeState(context.Background())
+	a.loadFacadeStateTriggered(context.Background(), "poll")
+	a.loadFacadeStateTriggered(context.Background(), "poll")
 	if writes.Load() != 0 || reads.Load() != 1 {
 		t.Fatalf("writes=%d probes=%d", writes.Load(), reads.Load())
 	}
@@ -137,7 +137,7 @@ func TestR99IconCatalogProjectionCachingAndClientSwitch(t *testing.T) {
 		t.Fatalf("uncached terms=%d requests=%d", terms.Load(), gets.Load())
 	}
 	a.lcu = r99Client(t, handler)
-	a.loadIconCatalog(context.Background(), a.lcu)
+	a.loadIconCatalogResult(context.Background(), a.lcu)
 	if gets.Load() != 2 || terms.Load() != 4 {
 		t.Fatal("client switch reused cache")
 	}

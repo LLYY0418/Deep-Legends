@@ -479,12 +479,12 @@ func TestOPGGDetailCacheIdentityIncludesModeAndRegion(t *testing.T) {
 func TestStructuredMetricsRejectsTinyAndRelativeLongTailSamples(t *testing.T) {
 	provider := newChampionProvider()
 	provider.patch = "16.16.1"
-	rows := provider.structuredMetrics([]opggMetric{
+	rows := provider.structuredMetricsForKind([]opggMetric{
 		{IDs: []int{1001}, Play: 10000, Win: 5000, PickRate: 0.9},
 		{IDs: []int{1002}, Play: 99, Win: 55, PickRate: 0.009},
 		{IDs: []int{1003}, Play: 100, Win: 52, PickRate: 0.01},
 		{IDs: []int{1004}, Play: 49, Win: 20, PickRate: 0.004},
-	}, "item", 10)
+	}, "item", "item", 10)
 	if len(rows) != 2 || rows[0].Assets[0].ID != 1001 || rows[1].Assets[0].ID != 1003 {
 		t.Fatalf("sample gate rows = %#v", rows)
 	}
@@ -927,7 +927,7 @@ func TestStructuredDetailFallbackKeepsFallbackPositions(t *testing.T) {
 func TestArenaAugmentRowsUseCommunityDragonMetadata(t *testing.T) {
 	groups := []opggArenaAugmentGroup{{Rarity: 8, Augments: []opggAugmentMetric{{ID: 225, Play: 50, Win: 35, PickRate: 0.18, WinRate: 0.7}}}}
 	catalog := []gameplayAugment{{ID: 225, Name: "中文海克斯", Description: "中文说明", IconPath: "/lol-game-data/assets/ASSETS/Maps/Cherry/Augments/Icons/test.png"}}
-	rows := arenaAugmentRows(groups, catalog)
+	rows := flattenArenaAugmentGroups(arenaAugmentGroups(groups, catalog), 0)
 	if len(rows) != 1 || len(rows[0].Assets) != 1 {
 		t.Fatalf("arena augment rows = %#v", rows)
 	}
@@ -1143,7 +1143,7 @@ func TestCommunityDragonAugmentIndexIgnoresIconDirectory(t *testing.T) {
 
 func TestArenaAugmentRowsSurviveMissingCommunityDragonMetadata(t *testing.T) {
 	groups := []opggArenaAugmentGroup{{Rarity: 4, Augments: []opggAugmentMetric{{ID: 412, Play: 80, Win: 44, TotalPlace: 270, FirstPlace: 20, PickRate: 0.12}}}}
-	rows := arenaAugmentRows(groups, nil)
+	rows := flattenArenaAugmentGroups(arenaAugmentGroups(groups, nil), 0)
 	if len(rows) != 1 || len(rows[0].Assets) != 1 {
 		t.Fatalf("arena augment fallback rows = %#v", rows)
 	}
@@ -1161,7 +1161,7 @@ func TestArenaAugmentRowsPreserveAllQualityRows(t *testing.T) {
 	for index := range metrics {
 		metrics[index] = opggAugmentMetric{ID: index + 1, Play: 100 + index, Win: 50, PickRate: float64(index+1) / 100}
 	}
-	rows := arenaAugmentRows([]opggArenaAugmentGroup{{Rarity: 8, Augments: metrics}}, nil)
+	rows := flattenArenaAugmentGroups(arenaAugmentGroups([]opggArenaAugmentGroup{{Rarity: 8, Augments: metrics}}, nil), 0)
 	if len(rows) != len(metrics) {
 		t.Fatalf("arena augment rows were truncated: got %d, want %d", len(rows), len(metrics))
 	}
@@ -1271,7 +1271,8 @@ func TestArenaAugmentDiagnosticsUseSafeFields(t *testing.T) {
 		}, nil
 	})}
 	groups := []opggArenaAugmentGroup{{Rarity: 4, Augments: []opggAugmentMetric{{ID: 412, Play: 80, Win: 44}}}}
-	result := provider.structuredArenaAugmentGroups(context.Background(), groups)
+	catalog, catalogErr := provider.loadCommunityDragonAugments(context.Background())
+	result := provider.structuredArenaAugmentGroupsWithCatalog(groups, catalog, catalogErr)
 	if len(result) != 1 || len(result[0].Rows) != 1 {
 		t.Fatalf("fallback augment groups = %#v", result)
 	}

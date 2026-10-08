@@ -20,12 +20,16 @@ func TestR187InvalidatePlayerAllSourcesScopesAndFlights(t *testing.T) {
 		for _, scope := range []string{"", rankScoreTierOnlyScope} {
 			key := rankScoreCacheKeyScoped(source, "HN1", ref, scope)
 			keys = append(keys, key)
-			cache.put(key, entry)
-			cache.put(rankScoreCacheKeyScoped(source, "HN1", other, scope), entry)
+			cache.mu.Lock()
+			cache.putLocked(key, entry)
+			cache.mu.Unlock()
+			cache.mu.Lock()
+			cache.putLocked(rankScoreCacheKeyScoped(source, "HN1", other, scope), entry)
+			cache.mu.Unlock()
 		}
 	}
 	old, _ := cache.beginFlight(keys[0], context.Background())
-	foreignKey := rankScoreCacheKey(dataSourceLCU, "HN1", other)
+	foreignKey := rankScoreCacheKeyScoped(dataSourceLCU, "HN1", other, "")
 	foreign, _ := cache.beginFlight(foreignKey, context.Background())
 	cache.invalidatePlayer(ref)
 	for _, key := range keys {
@@ -255,7 +259,7 @@ func TestR187ForceOverviewReadsAndRepopulatesRankCache(t *testing.T) {
 	if f.reads.Load() != 2 {
 		t.Fatal("manual refresh reused ranks", f.reads.Load())
 	}
-	entry, ok := f.a.rankScores.get(rankScoreCacheKey(dataSourceLCU, "HN1", f.a.summoner.PUUID))
+	entry, ok := f.a.rankScores.get(rankScoreCacheKeyScoped(dataSourceLCU, "HN1", f.a.summoner.PUUID, ""))
 	if !ok || len(entry.ranks) != 1 || entry.ranks[0].LeaguePoints != 67 {
 		t.Fatal("fresh ranks not cached", entry)
 	}
@@ -303,7 +307,9 @@ func TestR187EndOfGameInvalidatesTierOnlyAndOtherSources(t *testing.T) {
 		for _, scope := range []string{"", rankScoreTierOnlyScope} {
 			key := rankScoreCacheKeyScoped(source, "HN1", f.a.summoner.PUUID, scope)
 			keys = append(keys, key)
-			f.a.rankScores.put(key, rankScoreEntry{at: time.Now()})
+			f.a.rankScores.mu.Lock()
+			f.a.rankScores.putLocked(key, rankScoreEntry{at: time.Now()})
+			f.a.rankScores.mu.Unlock()
 		}
 	}
 	// Even if WaitingForStats already passed, entering EndOfGame clears a later refill.

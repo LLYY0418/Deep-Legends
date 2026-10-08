@@ -30,7 +30,7 @@ func r71Recommendation(title string) recommendedItemSet {
 func TestR71RecommendedFilesAreBoundedBackedUpAndGameCompatible(t *testing.T) {
 	location := r71GameLocation(t)
 	for _, title := range []string{"DL · 中路", "DL · 下路", "DL · 打野"} {
-		if err := writeRecommendedItemSet(location, r71Recommendation(title), nil); err != nil {
+		if err := writeRecommendedItemSetTraced(location, r71Recommendation(title), nil, &itemSetWriteTrace{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -97,7 +97,7 @@ func TestR71RecommendedFilesFailClosedOnForeignFilesAndLinks(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := writeRecommendedItemSet(loc, r71Recommendation("DL"), nil); err == nil {
+			if err := writeRecommendedItemSetTraced(loc, r71Recommendation("DL"), nil, &itemSetWriteTrace{}); err == nil {
 				t.Fatal("unsafe location/file accepted")
 			}
 			if foreignPath != "" {
@@ -114,13 +114,13 @@ func TestR71RecommendedGuardRunsBeforeAndImmediatelyBeforeWrite(t *testing.T) {
 	for _, rejectAt := range []int{1, 2} {
 		loc := r71GameLocation(t)
 		calls := 0
-		err := writeRecommendedItemSet(loc, r71Recommendation("DL"), func() error {
+		err := writeRecommendedItemSetTraced(loc, r71Recommendation("DL"), func() error {
 			calls++
 			if calls == rejectAt {
 				return errors.New("phase changed")
 			}
 			return nil
-		})
+		}, &itemSetWriteTrace{})
 		if err == nil || calls != rejectAt {
 			t.Fatalf("calls=%d err=%v", calls, err)
 		}
@@ -264,7 +264,7 @@ func TestR71RecommendedInternationalConfigAndExecutableRoots(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = writeRecommendedItemSet(location, r71Recommendation("DL"), nil)
+			err = writeRecommendedItemSetTraced(location, r71Recommendation("DL"), nil, &itemSetWriteTrace{})
 			if linkedGame {
 				if err == nil {
 					t.Fatal("external executable link accepted")
@@ -376,9 +376,6 @@ func TestR71ClaimIdentityQuantityAndDiagnostics(t *testing.T) {
 	first := claimEntry{Source: "grant", ID: "private-grant", Title: "private-title", Items: one.Items, Actionable: true}
 	second := first
 	second.Items = []RewardItem{{ID: "r1", ItemID: "currency", ItemType: "CURRENCY", Quantity: 50}}
-	if claimSignature(first) == claimSignature(second) {
-		t.Fatal("overlap ignored quantity")
-	}
 	shape := claimScanShape(claimScanResponse{Items: []claimEntry{first, second}})
 	data, _ := json.Marshal(shape)
 	for _, private := range []string{"private-grant", "private-title", "currency\"", "r1"} {
@@ -430,7 +427,7 @@ func TestR71ClaimScanKeepsConflictsNonActionableAndResolvesExactQuantities(t *te
 			}))
 			defer server.Close()
 			client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
-			result := scanClaims(context.Background(), client)
+			result := scanClaimsObserved(context.Background(), client, nil)
 			if len(result.Items) != 1 || len(result.Items[0].Items) != 1 {
 				t.Fatalf("unexpected scan: %+v", result)
 			}

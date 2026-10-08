@@ -49,8 +49,8 @@ func TestR65FacadeStateOnlyExposesStableRenderFields(t *testing.T) {
 			GameName: "稳定名字", TagLine: "1234", ProfileIconID: 27, SummonerLevel: 526, Privacy: "PRIVATE",
 		},
 	}
-	first := a.loadFacadeState(context.Background())
-	second := a.loadFacadeState(context.Background())
+	first := a.loadFacadeStateTriggered(context.Background(), "poll")
+	second := a.loadFacadeStateTriggered(context.Background(), "poll")
 	firstJSON, err := json.Marshal(first)
 	if err != nil {
 		t.Fatal(err)

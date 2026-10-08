@@ -255,9 +255,7 @@ func TestSeasonStatsExcludeRemakes(t *testing.T) {
 }
 
 func TestUnavailableSeasonStatsDoesNotClaimComplete(t *testing.T) {
-	_, progress, matches, byQueue := (&app{}).loadSeasonChampionStats(
-		t.Context(), nil, gameplayReference{}, Summoner{}, "invalid", nil,
-	)
+	_, progress, matches, byQueue := (&app{}).loadSeasonChampionStatsWithHistoryCache(t.Context(), nil, gameplayReference{}, Summoner{}, "invalid", nil, true)
 	if progress.Complete || !progress.Unavailable || progress.Message != "" {
 		t.Fatalf("unavailable progress = %#v", progress)
 	}
@@ -269,14 +267,14 @@ func TestUnavailableSeasonStatsDoesNotClaimComplete(t *testing.T) {
 func TestSeasonStatsRejectOldCacheSchema(t *testing.T) {
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	cache := seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion - 1, Source: seasonStatsSource, Season: "S26", AccountHash: "account"}
-	if err := store.saveSeasonStats(cache); err != nil {
+	if _, err := store.saveSeasonStatsReported(cache); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.loadSeasonStats(seasonStatsSource, "account", "S26"); err != nil {
 		t.Fatal("old season cache schema was lost")
 	}
 	cache.SchemaVersion = seasonStatsCacheSchemaVersion
-	if err := store.saveSeasonStats(cache); err != nil {
+	if _, err := store.saveSeasonStatsReported(cache); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.loadSeasonStats(seasonStatsSource, "account", "S26"); err != nil {
@@ -290,7 +288,7 @@ func TestSeasonStatsCacheDoesNotCrossReadSources(t *testing.T) {
 		SchemaVersion: seasonStatsCacheSchemaVersion, Source: dataSourceSGP,
 		Season: "S26", AccountHash: "same-account", Complete: true,
 	}
-	if err := store.saveSeasonStats(cache); err != nil {
+	if _, err := store.saveSeasonStatsReported(cache); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.loadSeasonStats(dataSourceLCU, "same-account", "S26"); err == nil {
@@ -321,7 +319,7 @@ func TestSeasonScanPagesClearsResumeIndexWhenComplete(t *testing.T) {
 		seasonStartMillis: seasonStartS26.UnixMilli(),
 	}
 
-	(&app{sgp: provider}).seasonScanPages(t.Context(), client, "HN1", "subject", scan, 1)
+	(&app{sgp: provider}).seasonScanPagesWithHistoryCache(t.Context(), client, "HN1", "subject", scan, 1, true)
 	if !scan.cache.Complete || scan.cache.ResumeIndex != 0 {
 		t.Fatalf("completed scan retained a stale resume index: %#v", scan.cache)
 	}
@@ -501,7 +499,7 @@ func TestSeasonStatsSchemaVersionIsFourteenAndPreservesEveryOlderFile(t *testing
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	for _, old := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13} {
 		cache := seasonStatsCache{SchemaVersion: old, Source: seasonStatsSource, Season: "S26", AccountHash: "account"}
-		if err := store.saveSeasonStats(cache); err != nil {
+		if _, err := store.saveSeasonStatsReported(cache); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := store.loadSeasonStats(seasonStatsSource, "account", "S26"); err != nil {
@@ -509,7 +507,7 @@ func TestSeasonStatsSchemaVersionIsFourteenAndPreservesEveryOlderFile(t *testing
 		}
 	}
 	cache := seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: "S26", AccountHash: "account"}
-	if err := store.saveSeasonStats(cache); err != nil {
+	if _, err := store.saveSeasonStatsReported(cache); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.loadSeasonStats(seasonStatsSource, "account", "S26"); err != nil {

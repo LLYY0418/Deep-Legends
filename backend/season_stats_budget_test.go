@@ -148,7 +148,7 @@ func TestSeasonStatsSaveAppliesTheBudgetEndToEnd(t *testing.T) {
 		t.Fatalf("unexpected reload: ranked=%d stats=%d", len(loaded.RankedMatches), len(loaded.Stats))
 	}
 	// 走 saveSeasonStats（不返回报告的那条）也必须同样安全。
-	if err := store.saveSeasonStats(cache); err != nil {
+	if _, err := store.saveSeasonStatsReported(cache); err != nil {
 		t.Fatalf("saveSeasonStats failed: %v", err)
 	}
 }
@@ -364,7 +364,7 @@ func TestSeasonStatsSynthetic2000MayhemGamesStayWithinBudget(t *testing.T) {
 
 	// 端到端写一次，确认落盘大小与 report 一致。
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
-	if err := store.saveSeasonStats(cache); err != nil {
+	if _, err := store.saveSeasonStatsReported(cache); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(store.root, seasonStatsFileKey(cache.Source, cache.AccountHash, cache.Season))

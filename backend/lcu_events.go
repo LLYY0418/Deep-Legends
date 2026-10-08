@@ -128,10 +128,6 @@ func (c *LCUClient) ListenEvents(ctx context.Context, onReady func(), onEvent fu
 	}
 }
 
-func shouldRefreshForLCUEvent(event LCUEvent) bool {
-	return lcuEventRefreshScope(event) != ""
-}
-
 // URI services and prefixes are ASCII. Fold only the compared bytes; the usual
 // lowercase path needs neither a copy nor a scan of an unrelated suffix. Keep
 // the old Unicode ToLower semantics on the rare non-ASCII comparison path.

@@ -137,11 +137,6 @@ func (c *rankScoreCache) get(playerRef string) (rankScoreEntry, bool) {
 	return item.entry, true
 }
 
-func (c *rankScoreCache) put(playerRef string, entry rankScoreEntry) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.putLocked(playerRef, entry)
-}
 func (c *rankScoreCache) putLocked(playerRef string, entry rankScoreEntry) {
 	if element, ok := c.entries[playerRef]; ok {
 		element.Value = rankScoreCacheItem{key: playerRef, entry: entry}
@@ -389,10 +384,6 @@ var globalMatchTiersRankSemaphore = make(chan struct{}, 4)
 // rankScoreTierOnlyScope 把「只要段位」的结果与需要胜负场的结果分开存放，
 // 避免平均段位的缓存条目被个人资料页当成含胜负场的完整结果复用。
 const rankScoreTierOnlyScope = "tier-only"
-
-func rankScoreCacheKey(source, serverID, playerRef string) string {
-	return rankScoreCacheKeyScoped(source, serverID, playerRef, "")
-}
 
 func rankScoreCacheKeyScoped(source, serverID, playerRef, scope string) string {
 	if scope != "" {

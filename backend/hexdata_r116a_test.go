@@ -1052,7 +1052,9 @@ func TestHexdataJSONKindsSurviveSoftTTLBecauseTheyArePromoted(t *testing.T) {
 	if _, err := provider.loadHexdataPostmatch(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.loadHexdataHextechInsights(context.Background()); err != nil {
+	if snapshot, metaErr := provider.loadHexdataMeta(context.Background()); metaErr != nil {
+		t.Fatal(metaErr)
+	} else if _, err := provider.loadHexdataHextechInsightsWithSnapshot(context.Background(), snapshot); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := provider.loadMayhemDetail(context.Background(), "157"); err != nil {
@@ -1096,7 +1098,9 @@ func TestHexdataJSONKindsSurviveSoftTTLBecauseTheyArePromoted(t *testing.T) {
 	if _, err := restarted.loadHexdataPostmatch(context.Background()); err != nil {
 		t.Fatalf("postmatch had no disk fallback after the soft TTL: %v", err)
 	}
-	if _, err := restarted.loadHexdataHextechInsights(context.Background()); err != nil {
+	if snapshot, metaErr := restarted.loadHexdataMeta(context.Background()); metaErr != nil {
+		t.Fatal(metaErr)
+	} else if _, err := restarted.loadHexdataHextechInsightsWithSnapshot(context.Background(), snapshot); err != nil {
 		t.Fatalf("hextech-insights had no disk fallback after the soft TTL: %v", err)
 	}
 	if _, err := restarted.loadMayhemDetail(context.Background(), "157"); err != nil {
@@ -1150,11 +1154,17 @@ func TestLoadHexdataPostmatchFetchesOnceAcrossTwoCalls(t *testing.T) {
 func TestLoadHexdataHextechInsightsFetchesOnceAndParsesIDs(t *testing.T) {
 	recorder := &r116aRecorder{}
 	provider, _ := r116aMayhemProvider(t, recorder, r116aFixture(t, "hexdata-hero-157.json"))
-	first, err := provider.loadHexdataHextechInsights(context.Background())
+	snapshot, metaErr := provider.loadHexdataMeta(context.Background())
+	if metaErr != nil {
+		t.Fatal(metaErr)
+	}
+	first, err := provider.loadHexdataHextechInsightsWithSnapshot(context.Background(), snapshot)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.loadHexdataHextechInsights(context.Background()); err != nil {
+	if snapshot, metaErr := provider.loadHexdataMeta(context.Background()); metaErr != nil {
+		t.Fatal(metaErr)
+	} else if _, err := provider.loadHexdataHextechInsightsWithSnapshot(context.Background(), snapshot); err != nil {
 		t.Fatal(err)
 	}
 	if got := recorder.count(hexdataHextechInsightsPath); got != 1 {
@@ -1197,7 +1207,7 @@ func TestParseHexdataAggregatesDropUnparseableIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsed, dropped, err := parseHexdataPostmatch(data)
+	parsed, _, dropped, err := parseHexdataPostmatchWithPresence(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1237,6 +1247,7 @@ func TestHexdataDeadHTMLChainIsGone(t *testing.T) {
 	// 不算死引用；漏删的调用点编译期就会报错，这里再兜一层。
 	for _, symbol := range []string{
 		"p.decorateHexdataItems(", "func (p *championProvider) decorateHexdataItems(",
+		"p.decorateHexdataAugments(", "func (p *championProvider) decorateHexdataAugments(",
 		"p.hydrateMayhemAugmentCopy(", "func (p *championProvider) hydrateMayhemAugmentCopy(",
 		"p.mayhemAugmentCopy(", "func (p *championProvider) mayhemAugmentCopy(",
 		"p.fetchMayhemAugmentCopy(", "func (p *championProvider) fetchMayhemAugmentCopy(",
@@ -1251,8 +1262,8 @@ func TestHexdataDeadHTMLChainIsGone(t *testing.T) {
 		}
 	}
 	// R159 放行经过严格校验的 augmentIconUrl，保留 R116-A 对 itemImageUrl 的限制。
-	if !strings.Contains(body, "func (p *championProvider) decorateHexdataAugments(") {
-		t.Fatal("decorateHexdataAugments was deleted but must be kept")
+	if !strings.Contains(body, "func (p *championProvider) decorateHexdataAugmentsWithCatalog(") {
+		t.Fatal("decorateHexdataAugmentsWithCatalog was deleted but must be kept")
 	}
 	for _, forbidden := range []string{"itemImageUrl"} {
 		if strings.Contains(body, forbidden) {

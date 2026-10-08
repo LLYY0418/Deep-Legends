@@ -34,7 +34,13 @@ func Test2135ObservedCurrentActionUndefinedEmptyIDPartialRoster(t *testing.T) {
 	data := append([]byte("0:{\"a\":\"$@1\"}\n1:"), compact.Bytes()...)
 	ref := gameplayReference{Region: "kr", PlayerRef: fixture.TargetRef}
 	now := time.Date(2026, 9, 9, 13, 49, 0, 0, time.UTC)
-	game, err := a.parseOPGGCurrentGame(data, ref, now)
+	game, err := func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult(data)
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, ref, now)
+	}()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,12 +55,24 @@ func Test2135ObservedCurrentActionUndefinedEmptyIDPartialRoster(t *testing.T) {
 		t.Fatal("source identity leaked")
 	}
 	finished := bytes.Replace(data, []byte(`"is_finished":"$undefined"`), []byte(`"is_finished":true`), 1)
-	game, err = a.parseOPGGCurrentGame(finished, ref, now)
+	game, err = func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult(finished)
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, ref, now)
+	}()
 	if err != nil || game.Status != "none" {
 		t.Fatal("finished response must be none", err)
 	}
 	ref.PlayerRef = "unrelated-fixture-player-00000001"
-	if _, err = a.parseOPGGCurrentGame(data, ref, now); supplementFailureCode(err) != "opgg-current-target-mismatch" {
+	if _, err = func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult(data)
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, ref, now)
+	}(); supplementFailureCode(err) != "opgg-current-target-mismatch" {
 		t.Fatal("partial roster lost target binding", err)
 	}
 }
@@ -64,7 +82,13 @@ func Test2135CurrentActionReferencesAndOptionalFields(t *testing.T) {
 	data = bytes.Replace(data, []byte(`"is_finished":false`), []byte(`"is_finished":"$undefined","windows_script":"$missing-private-code"`), 1)
 	data = bytes.Replace(data, []byte(`"game_map":"SUMMONERS_RIFT"`), []byte(`"game_map":"$f:map"`), 1)
 	data = append(data, []byte("\nf:{\"map\":\"SUMMONERS_RIFT\"}")...)
-	game, err := a.parseOPGGCurrentGame(data, ref, now)
+	game, err := func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult(data)
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, ref, now)
+	}()
 	if err != nil || game.Status != "active" {
 		t.Fatal("valid referenced response failed", err)
 	}

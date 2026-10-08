@@ -170,8 +170,8 @@ func TestR56FacadeSummaryLoadsForStateAndShapeDiagnosticIsOncePerConnection(t *t
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	a := &app{connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: root}), summoner: Summoner{SummonerID: 1}}
-	first := a.loadFacadeState(context.Background())
-	second := a.loadFacadeState(context.Background())
+	first := a.loadFacadeStateTriggered(context.Background(), "poll")
+	second := a.loadFacadeStateTriggered(context.Background(), "poll")
 	if !first.Connected || first.Reason != "" || !second.Connected || second.Reason != "" {
 		t.Fatalf("catalog 404 blocked facade state: first=%#v second=%#v", first, second)
 	}

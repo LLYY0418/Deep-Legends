@@ -80,7 +80,10 @@ test('R117 core frontend contracts remain wired to visible degradation and diagn
   assert.ok(
     championsApi.indexOf('if (error.name === "RequestCancelled") throw error;') < championsApi.indexOf('本地请求超时，请重试'),
     'RequestCancelled 放行必须排在超时分支之前');
-  assert.match(gameplay, /careerSectionsSignature[\s\S]*container\._careerSignature/);
+  const overview = functionSource(gameplay, 'renderOverviewBodyContent');
+  assert.match(overview, /const careerSignature = \[/);
+  assert.match(overview, /sameOverview && container\._careerSignature === careerSignature/);
+  assert.match(overview, /container\._careerSignature = careerSignature/);
   assert.match(gameplay, /poll-failed/);
   // P2-3：两个 skipped 埋点必须留在各自的拒绝分支，函数级总数无法发现错配。
   const applyItemSet = functionSource(gameplay, 'applyItemSet');

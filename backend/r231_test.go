@@ -164,7 +164,7 @@ func TestR231RelayForceBackoffAndSlowBody(t *testing.T) {
 		}
 		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(&r231SlowReader{})}, nil
 	})}
-	if _, err := state.ensure(t.Context(), client, nil); !errors.Is(err, errRiotRelayUnavailable) {
+	if _, err := state.ensureForce(t.Context(), client, nil, false); !errors.Is(err, errRiotRelayUnavailable) {
 		t.Fatal(err)
 	}
 	began := time.Now()
@@ -431,11 +431,11 @@ func TestR231ProbeCountsReadErrorResponseBytes(t *testing.T) {
 		return &http.Response{StatusCode: 503, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body))}, nil
 	})}
 	events := make(chan map[string]any, 1)
-	state.ensure(t.Context(), client, func(row map[string]any) {
+	state.ensureForce(t.Context(), client, func(row map[string]any) {
 		if row["event"] == "riot_relay_probe" {
 			events <- row
 		}
-	})
+	}, false)
 	if row := <-events; row["bytes"] != len(body) {
 		t.Fatal(row)
 	}

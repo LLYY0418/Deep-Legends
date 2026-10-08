@@ -63,8 +63,8 @@ func TestR60FacadeSelectedChallengesUseCachedCompactCatalog(t *testing.T) {
 	)
 	defer closeServer()
 
-	first := a.loadFacadeState(context.Background())
-	second := a.loadFacadeState(context.Background())
+	first := a.loadFacadeStateTriggered(context.Background(), "poll")
+	second := a.loadFacadeStateTriggered(context.Background(), "poll")
 	for _, state := range []facadeState{first, second} {
 		if got := facadeChallengeNames(state.Challenges); strings.Join(got, ",") != "目录勋章 1,目录勋章 2,目录勋章 3" {
 			t.Fatalf("selected challenges = %v", got)
@@ -84,7 +84,7 @@ func TestR60FacadeSelectedChallengesUseCachedCompactCatalog(t *testing.T) {
 		t.Fatalf("catalog reads = %d, want one per LCU connection", catalogReads.Load())
 	}
 	a.clearFacadeChallengeCatalog(client)
-	_ = a.loadFacadeState(context.Background())
+	_ = a.loadFacadeStateTriggered(context.Background(), "poll")
 	if catalogReads.Load() != 2 {
 		t.Fatalf("catalog reads after invalidation = %d, want 2", catalogReads.Load())
 	}
@@ -105,7 +105,7 @@ func TestR60FacadeChallengesFallbackAndEmptyStates(t *testing.T) {
 			func(w http.ResponseWriter) { http.Error(w, `{"message":"not found"}`, http.StatusNotFound) },
 		)
 		defer closeServer()
-		state := a.loadFacadeState(context.Background())
+		state := a.loadFacadeStateTriggered(context.Background(), "poll")
 		if !state.Connected {
 			t.Fatalf("catalog 404 blocked facade state: %#v", state)
 		}
@@ -120,7 +120,7 @@ func TestR60FacadeChallengesFallbackAndEmptyStates(t *testing.T) {
 			func(w http.ResponseWriter) { _, _ = w.Write([]byte(`{}`)) },
 		)
 		defer closeServer()
-		state := a.loadFacadeState(context.Background())
+		state := a.loadFacadeStateTriggered(context.Background(), "poll")
 		if len(state.Challenges) != 0 {
 			t.Fatalf("empty summary fabricated challenges: %#v", state.Challenges)
 		}

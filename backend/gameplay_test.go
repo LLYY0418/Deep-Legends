@@ -34,15 +34,15 @@ func (fn gameplayRoundTripFunc) RoundTrip(request *http.Request) (*http.Response
 func TestGameplayReferenceDoesNotExposeStablePlayerID(t *testing.T) {
 	a := &app{token: "session-secret", gameplayRefs: make(map[string]string)}
 	raw := strings.Repeat("p", 48)
-	public := a.registerGameplayReference(raw)
+	public := a.registerGameplayReferenceDetails(gameplayReference{PlayerRef: raw})
 	if public == "" || public == raw || strings.Contains(public, raw) {
 		t.Fatalf("public reference leaked stable id: %q", public)
 	}
-	if resolved, ok := a.resolveGameplayReference(public); !ok || resolved != raw {
-		t.Fatalf("reference did not resolve: %q, %v", resolved, ok)
+	if resolved, ok := a.resolveGameplayReferenceDetails(public); !ok || resolved.PlayerRef != raw {
+		t.Fatalf("reference did not resolve: %#v, %v", resolved, ok)
 	}
 	a.clearGameplayReferences()
-	if _, ok := a.resolveGameplayReference(public); ok {
+	if _, ok := a.resolveGameplayReferenceDetails(public); ok {
 		t.Fatal("reference survived session reset")
 	}
 	if !gameplaySummonerChanged(Summoner{}, Summoner{PUUID: raw}) || gameplaySummonerChanged(Summoner{PUUID: raw}, Summoner{PUUID: raw}) {
@@ -553,7 +553,7 @@ func TestGameplayHistoryUsesRequestedPageWindow(t *testing.T) {
 	}))
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	_, _, total := loadGameplayHistory(client, strings.Repeat("p", 48), false, 30, 50, true)
+	_, _, total := loadGameplayHistoryContext(context.Background(), client, strings.Repeat("p", 48), false, 30, 50, true)
 	if gotQuery != "begIndex=30&endIndex=79" {
 		t.Fatalf("query = %q, want paged window", gotQuery)
 	}
@@ -734,7 +734,7 @@ func TestLCUSingleParticipantSummaryFetchesFullGameDetail(t *testing.T) {
 	defer server.Close()
 
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client(), platformProbe: true, region: "NA"}
-	games, capabilities, _ := loadGameplayHistory(client, playerRef, true, 0, 5, true)
+	games, capabilities, _ := loadGameplayHistoryContext(context.Background(), client, playerRef, true, 0, 5, true)
 	if len(games) != 1 || len(games[0].Participants) != 10 || requests["/lol-match-history/v1/games/91"] != 1 {
 		t.Fatalf("games=%#v requests=%#v", games, requests)
 	}
@@ -763,7 +763,7 @@ func TestLCUSingleParticipantDetailRemainsExplicitlyIncomplete(t *testing.T) {
 	defer server.Close()
 
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client(), platformProbe: true, region: "NA"}
-	_, capabilities, _ := loadGameplayHistory(client, strings.Repeat("p", 48), true, 0, 5, true)
+	_, capabilities, _ := loadGameplayHistoryContext(context.Background(), client, strings.Repeat("p", 48), true, 0, 5, true)
 	if len(capabilities) < 2 || capabilities[1].State != capabilityFailed || !strings.Contains(capabilities[1].Detail, "参与者不完整") {
 		t.Fatalf("capabilities=%#v", capabilities)
 	}
@@ -1086,7 +1086,13 @@ func TestRankedQueueStatsKeepQueuesSeparateWhenSoloHasNoSample(t *testing.T) {
 	if !ok || solo.RecentRanked == nil || solo.RecentRanked.QueueID != 420 || solo.RecentRanked.Games != 0 {
 		t.Fatalf("solo recent stats unexpectedly used flex data: %#v", solo)
 	}
-	if solo.PositionQueueID != 420 || solo.PositionQueueLabel != "单双排" || len(solo.Positions) != 5 || positionStatsGames(solo.Positions) != 0 {
+	if solo.PositionQueueID != 420 || solo.PositionQueueLabel != "单双排" || len(solo.Positions) != 5 || func() int {
+		total := 0
+		for _, row := range solo.Positions {
+			total += row.Games
+		}
+		return total
+	}() != 0 {
 		t.Fatalf("solo position stats unexpectedly used flex source: %#v", solo)
 	}
 	flex := queues["440"]
@@ -1553,8 +1559,8 @@ func TestPlayerRankScoreCachesSGPFallbackUnderPreferredLCUKey(t *testing.T) {
 	if lcuCalls != 1 || sgpCalls != 1 {
 		t.Fatalf("cached fallback repeated upstream requests: lcu=%d sgp=%d", lcuCalls, sgpCalls)
 	}
-	preferred, preferredOK := a.rankScores.get(rankScoreCacheKey(dataSourceLCU, "HN1", playerRef))
-	actual, actualOK := a.rankScores.get(rankScoreCacheKey(dataSourceSGP, "HN1", playerRef))
+	preferred, preferredOK := a.rankScores.get(rankScoreCacheKeyScoped(dataSourceLCU, "HN1", playerRef, ""))
+	actual, actualOK := a.rankScores.get(rankScoreCacheKeyScoped(dataSourceSGP, "HN1", playerRef, ""))
 	if !preferredOK || !actualOK || preferred.source != dataSourceSGP || actual.source != dataSourceSGP {
 		t.Fatalf("fallback cache provenance = preferred:%#v/%v actual:%#v/%v", preferred, preferredOK, actual, actualOK)
 	}
@@ -1652,7 +1658,7 @@ func TestPlayerRankScoreUsesRiotForKROpponentAndCachesMetadata(t *testing.T) {
 	if !reflect.DeepEqual(second, first) || requests.Load() != 1 {
 		t.Fatalf("riot rank cache = first:%#v second:%#v requests:%d", first, second, requests.Load())
 	}
-	if cached, ok := a.rankScores.get(rankScoreCacheKey(dataSourceRiot, "KR", puuid)); !ok || !reflect.DeepEqual(cached, first) {
+	if cached, ok := a.rankScores.get(rankScoreCacheKeyScoped(dataSourceRiot, "KR", puuid, "")); !ok || !reflect.DeepEqual(cached, first) {
 		t.Fatalf("riot rank cache entry = %#v ok=%v", cached, ok)
 	}
 }
@@ -1761,7 +1767,7 @@ func TestRankedWinRateDiagnosticsRecordSGPAndLCUSources(t *testing.T) {
 		a := &app{storage: store}
 		client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
 		playerRef := strings.Repeat("l", 48)
-		_, _ = a.loadGameplayRanks(client, playerRef, false)
+		_, _, _, _ = a.loadGameplayRanksContext(context.Background(), client, playerRef, false)
 		a.flushRankedWinrateDiagnostics()
 		data, err := store.readDiagnosticLog()
 		if err != nil {
@@ -1901,7 +1907,7 @@ func TestSeasonRankFallbackAppearsAfterRefreshSnapshotCompletes(t *testing.T) {
 		AccountHash: store.accountHash(player), GameIDs: []int64{1, 2}, Complete: true, UpdatedAt: time.Now(),
 		QueueStats: map[int64]gameplayAggregate{420: {QueueID: 420, Games: 2, Wins: 1, Losses: 1, WinRate: 50}},
 	}
-	if err := store.saveSeasonStats(cache); err != nil {
+	if _, err := store.saveSeasonStatsReported(cache); err != nil {
 		t.Fatal(err)
 	}
 	_, refreshedProgress, _, refreshedQueues := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
@@ -1960,7 +1966,7 @@ func TestGameplayOverviewAppliesSeasonFallbackToIncompleteSGPRanks(t *testing.T)
 		Stats:      []gameplaySeasonChampionStat{{ChampionID: 103, Games: 2, Wins: 1, WinRate: 50}},
 		QueueStats: map[int64]gameplayAggregate{420: {QueueID: 420, Games: 2, Wins: 1, Losses: 1, WinRate: 50}},
 	}
-	if err := store.saveSeasonStats(seasonCache); err != nil {
+	if _, err := store.saveSeasonStatsReported(seasonCache); err != nil {
 		t.Fatal(err)
 	}
 	publicRef := a.registerGameplayReferenceDetails(gameplayReference{PlayerRef: playerRef, ServerID: "HN1", GameName: "测试玩家"})
@@ -2104,7 +2110,7 @@ func TestNormalizeGameplayMatchIncludesStatPerks(t *testing.T) {
 	participant.Stats.PerkPrimaryStyle = 8000
 	participant.Stats.PerkSubStyle = 8300
 	controlWardsBought := 0
-	participant.Stats.VisionWardsBoughtInGame = historyInt(controlWardsBought)
+	participant.Stats.VisionWardsBoughtInGame = &lenientInt{value: &controlWardsBought}
 	game.ParticipantIdentities = []lcuParticipantIdentity{identity}
 	game.Participants = []lcuParticipant{participant}
 
@@ -2347,16 +2353,16 @@ func TestCurrentChampionFallbackDrivesRecommendationTarget(t *testing.T) {
 		t.Fatalf("current champion = %d, %v", currentChampionID, err)
 	}
 
-	championID, position := gameplayLiveRecommendationTarget([]gameplayLivePlayer{{
+	championID, position := gameplayLiveRecommendationTargetWithChampSelect([]gameplayLivePlayer{{
 		gameplayPlayer: gameplayPlayer{IsCurrent: false}, ChampionID: 103, Position: "mid",
-	}}, currentChampionID)
+	}}, currentChampionID, lcuChampSelectSession{})
 	if championID != 64 || position != "" {
 		t.Fatalf("fallback target = %d/%q, want 64 with unknown position", championID, position)
 	}
 
-	championID, position = gameplayLiveRecommendationTarget([]gameplayLivePlayer{{
+	championID, position = gameplayLiveRecommendationTargetWithChampSelect([]gameplayLivePlayer{{
 		gameplayPlayer: gameplayPlayer{IsCurrent: true}, ChampionID: 103, Position: "mid",
-	}}, currentChampionID)
+	}}, currentChampionID, lcuChampSelectSession{})
 	if championID != 103 || position != "mid" {
 		t.Fatalf("identified player did not take priority: %d/%q", championID, position)
 	}
@@ -2999,12 +3005,9 @@ func TestR62ArenaPlayerListProbesReconnectAndInvalidatesGameCache(t *testing.T) 
 }
 
 func TestR62ArenaGroupValidationRejectsOversizedGroups(t *testing.T) {
-	players := []gameplayLivePlayer{
-		{ArenaGroup: "1"}, {ArenaGroup: "1"}, {ArenaGroup: "1"}, {ArenaGroup: "1"},
-		{ArenaGroup: "2"}, {ArenaGroup: "2"},
-	}
-	if validateArenaLiveGroups(players, 3) {
-		t.Fatalf("four-player Arena group passed validation: %#v", players)
+	groups := []string{"1", "1", "1", "1", "2", "2"}
+	if validArenaGroupAssignments(groups, 3) {
+		t.Fatalf("four-player Arena group passed validation: %#v", groups)
 	}
 	if liveClientArenaDistribution(map[string]int{"1": 9, "2": 9}, 18, 3) {
 		t.Fatal("two coarse nine-player teams passed Arena distribution validation")
@@ -3339,27 +3342,6 @@ func TestArenaPlayerListDoesNotCachePositionOnlySnapshotAsFinalGrouping(t *testi
 	snapshot, _ := a.liveClientSnapshotForGame(context.Background(), 9901, "InProgress", 18)
 	if probes.Load() != 2 || len(snapshot.Grouping.ByIdentity) == 0 {
 		t.Fatalf("Arena playerlist did not retry to a grouped snapshot: probes=%d snapshot=%#v", probes.Load(), snapshot)
-	}
-}
-
-func TestArenaSessionOrderGroupingIgnoresPremadePartyBoundaries(t *testing.T) {
-	players := make([]lcuLivePlayer, 18)
-	for index := range players {
-		players[index].TeamParticipantID = int64(index + 1)
-	}
-	if groups, ok := arenaSessionOrderGroups(1750, players); !ok || len(groups) != 18 || groups[0] != "1" || groups[17] != "6" {
-		t.Fatalf("valid Arena session order = %#v/%v", groups, ok)
-	}
-	players[1].TeamParticipantID = players[0].TeamParticipantID
-	if groups, ok := arenaSessionOrderGroups(1750, players); !ok || groups[0] != groups[1] {
-		t.Fatalf("party contained within an Arena squad was rejected: %#v/%v", groups, ok)
-	}
-	players[3].TeamParticipantID = players[0].TeamParticipantID
-	if groups, ok := arenaSessionOrderGroups(1750, players); !ok || len(groups) != 18 {
-		t.Fatalf("premade IDs incorrectly rejected order: %#v", groups)
-	}
-	if groups, ok := arenaSessionOrderGroups(1750, players[:17]); ok || groups != nil {
-		t.Fatalf("partial Arena roster was accepted as ordered: %#v", groups)
 	}
 }
 
@@ -4184,7 +4166,7 @@ func TestGameplayRecommendationsAdaptCompleteOPGGData(t *testing.T) {
 			FourthItems:  []championMetricRow{{Assets: []championAsset{{ID: 3089}}, WinRate: 61.58, GamesUnavailable: true}},
 		},
 	}
-	result := gameplayRecommendationsFromChampionDetail(164, "top", detail)
+	result := gameplayRecommendationsFromResolvedDetail(164, "top", detail, gameplayRecommendationModeResolution{InternalMode: "ranked", QueueID: 420})
 	if result.Hero.Tier == nil || *result.Hero.Tier != 2 || result.Hero.WinRate != 52.3 || result.Hero.EmptyReason != "" || len(result.Hero.StrongAgainst) != 1 || result.Hero.StrongAgainst[0].ChampionID != 24 {
 		t.Fatalf("hero recommendation = %#v", result.Hero)
 	}
@@ -4247,7 +4229,7 @@ func TestGameplayRecommendationsAdaptCompleteOPGGData(t *testing.T) {
 			PrismItems: []championMetricRow{{Assets: []championAsset{{ID: 447101}}, Tier: "B", WinRate: 62.45, AveragePlacement: 2.92, FirstPlaceRate: 24.38, Games: 983}},
 		},
 	}
-	arena := gameplayRecommendationsFromChampionDetail(164, "mid", arenaDetail)
+	arena := gameplayRecommendationsFromResolvedDetail(164, "mid", arenaDetail, gameplayRecommendationModeResolution{InternalMode: "arena", QueueID: 420})
 	if arena.Source != "arena" || len(arena.Augments) != 1 || arena.Hero.Tier != nil || arena.Hero.Grade != "" || len(arena.Runes.OPGG) != 0 || len(arena.Build.CoreOptions) != 1 || len(arena.Build.PrismOptions) != 1 {
 		t.Fatalf("arena recommendation = %#v", arena)
 	}
@@ -4267,17 +4249,17 @@ func TestGameplayRecommendationsAdaptCompleteOPGGData(t *testing.T) {
 		t.Fatalf("arena build metrics were not preserved: core=%#v prism=%#v", core, prism)
 	}
 	mayhemTier := 1
-	mayhem := gameplayRecommendationsFromChampionDetail(164, "", championDetailResponse{
+	mayhem := gameplayRecommendationsFromResolvedDetail(164, "", championDetailResponse{
 		Mode:  "hextech-aram",
 		Stats: championDetailStats{Tier: &mayhemTier, Grade: "S", WinRate: 54.7, PickRate: 7.8},
-	})
+	}, gameplayRecommendationModeResolution{InternalMode: "hextech-aram", QueueID: 420})
 	if mayhem.Source != "hextech-aram" || mayhem.Hero.Tier == nil || *mayhem.Hero.Tier != 1 || mayhem.Hero.Grade != "S" || mayhem.Hero.WinRate != 54.7 {
 		t.Fatalf("mayhem hero recommendation = %#v", mayhem.Hero)
 	}
 }
 
 func TestGameplayRecommendationsExplainMissingPositionSample(t *testing.T) {
-	result := gameplayRecommendationsFromChampionDetail(5, "mid", championDetailResponse{})
+	result := gameplayRecommendationsFromResolvedDetail(5, "mid", championDetailResponse{}, gameplayRecommendationModeResolution{InternalMode: "ranked", QueueID: 420})
 	if result.Hero.EmptyReason != "该英雄在这个位置没有统计样本" {
 		t.Fatalf("empty reason = %q", result.Hero.EmptyReason)
 	}
@@ -4292,7 +4274,7 @@ func TestGameplayRecommendationsPreserveAllArenaAugments(t *testing.T) {
 	for index := range rows {
 		rows[index] = championMetricRow{Assets: []championAsset{{ID: index + 1, Name: fmt.Sprintf("海克斯 %d", index+1)}}}
 	}
-	result := gameplayRecommendationsFromChampionDetail(64, "mid", championDetailResponse{Mode: "arena", ArenaAugments: rows})
+	result := gameplayRecommendationsFromResolvedDetail(64, "mid", championDetailResponse{Mode: "arena", ArenaAugments: rows}, gameplayRecommendationModeResolution{InternalMode: "arena", QueueID: 420})
 	if len(result.Augments) != len(rows) {
 		t.Fatalf("arena recommendation augments were truncated: got %d, want %d", len(result.Augments), len(rows))
 	}
@@ -5015,7 +4997,7 @@ func TestLiveRecentGamesKeepNewestTenInCurrentQueue(t *testing.T) {
 	for i := 1; i <= 12; i++ {
 		matches = append(matches, gameplayMatch{CreatedAt: int64(i * 1000), QueueID: 440, Result: "win", Participants: []gameplayParticipant{{PlayerRef: "player", ChampionID: int64(i)}}})
 	}
-	games := recentGamesFromMatches(matches, "player", 10, 440)
+	games := recentGamesFromSelectedMatches(recentMatchesForPlayer(matches, "player", 10, 440), "player")
 	if len(games) != 10 || games[0].ChampionID != 12 || games[9].ChampionID != 3 {
 		t.Fatalf("expected newest ten games from queue 440, got %#v", games)
 	}
@@ -5116,7 +5098,7 @@ func TestGameplayLiveReturnsExplicitTFTUnsupportedState(t *testing.T) {
 }
 
 func TestGameplayRecommendationBundleEncodesEmptyAugmentsAsArray(t *testing.T) {
-	bundle := gameplayRecommendationsFromChampionDetail(64, "mid", championDetailResponse{Mode: "aram"})
+	bundle := gameplayRecommendationsFromResolvedDetail(64, "mid", championDetailResponse{Mode: "aram"}, gameplayRecommendationModeResolution{InternalMode: "aram", QueueID: 420})
 	data, err := json.Marshal(bundle)
 	if err != nil {
 		t.Fatal(err)

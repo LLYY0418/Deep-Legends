@@ -1709,9 +1709,6 @@
     video.removeAttribute("src");
     try { video.load(); } catch (_) {}
   }
-  function loadImageAlternatives(image, fallback, paths, onComplete = null) {
-    loadImageSources(image, fallback, localImageSources(paths), onComplete);
-  }
   function clearCardImageWatchdog(image) {
     const timer = state.cardImageWatchdogs.get(image);
     if (timer === undefined) return;

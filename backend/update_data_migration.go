@@ -17,11 +17,6 @@ func defaultUpdateDataDirectory() (string, error) {
 	return filepath.Join(base, "LOLLootAssistant"), nil
 }
 
-// Publish a complete copy only after every file has been read. Existing data is
-// never replaced; a failed copy removes only the private staging directory.
-func migrateUpdateData(source, destination string) (string, error) {
-	return copyUpdateData(source, destination, true)
-}
 func copyUpdateData(source, destination string, publish bool) (string, error) {
 	if strings.EqualFold(filepath.Clean(source), filepath.Clean(destination)) {
 		return "shared", nil

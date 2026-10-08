@@ -104,11 +104,6 @@ var riotEmbeddedKey = sync.OnceValue(func() string {
 	return strings.TrimSpace(riotAPIKey)
 })
 
-func riotKey() string {
-	key, _ := riotUserKeys.effective()
-	return key
-}
-
 const (
 	riotRegionKR    = "kr"
 	riotResponseMax = 4 << 20
@@ -274,14 +269,6 @@ func newRiotProvider(champions *championProvider) *riotProvider {
 		champions: champions, matchCache: make(map[string]*riotMatch), accountCache: make(map[string]riotAccountCacheEntry), accountFlights: make(map[string]*riotAccountFlight),
 		specialistCache: make(map[string]specialistRuneCacheEntry), specialistFlights: make(map[string]*specialistRuneFlight), specialistRecent: make(map[string]specialistRecentSummaryCacheEntry), specialistSlots: make(chan struct{}, specialistRunePlayerLimit),
 	}
-}
-
-func riotKeyConfiguredValue(ciphertext string) bool {
-	if strings.TrimSpace(ciphertext) == "" {
-		return false
-	}
-	plain, err := decryptRiotKeyCipher(ciphertext)
-	return err == nil && strings.TrimSpace(plain) != ""
 }
 
 func riotKeyConfigured() bool { return riotKeySource() != "none" }

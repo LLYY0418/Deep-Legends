@@ -175,7 +175,7 @@ func TestEntitlementsTokenErrorsDistinguishStatusAndEmptyField(t *testing.T) {
 			}))
 			defer server.Close()
 			client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-			_, err := newSGPProvider().entitlementsToken(client, false)
+			_, err := newSGPProvider().entitlementsTokenContext(context.Background(), client, false)
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("error = %v, want %q", err, test.want)
 			}

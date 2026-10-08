@@ -116,7 +116,7 @@ func TestPruneStaleHexdataBuildsRemovesExpiredBuildsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := cache.pruneStaleHexdataBuilds(r116aCurrentBuild); err != nil {
+	if _, err := cache.pruneStaleHexdataBuildsCount(r116aCurrentBuild); err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range []string{current, currentMeta} {
@@ -145,7 +145,7 @@ func TestPruneStaleHexdataBuildsHonorsGracePeriod(t *testing.T) {
 	now := time.Now()
 	cache.now = func() time.Time { return now }
 	fresh := r116aWriteHexdataEntry(t, cache, r116aPreviousBuild+"|hero-json|157", now.Add(-24*time.Hour), `{"items":[]}`)
-	if err := cache.pruneStaleHexdataBuilds(r116aCurrentBuild); err != nil {
+	if _, err := cache.pruneStaleHexdataBuildsCount(r116aCurrentBuild); err != nil {
 		t.Fatal(err)
 	}
 	if !r116aExists(fresh) {
@@ -153,7 +153,7 @@ func TestPruneStaleHexdataBuildsHonorsGracePeriod(t *testing.T) {
 	}
 	// 刚好卡在宽限期边界内（文件年龄 = 8 天 − 1 小时）：仍然保留。
 	cache.now = func() time.Time { return now.Add(hexdataStaleBuildGrace - 25*time.Hour) }
-	if err := cache.pruneStaleHexdataBuilds(r116aCurrentBuild); err != nil {
+	if _, err := cache.pruneStaleHexdataBuildsCount(r116aCurrentBuild); err != nil {
 		t.Fatal(err)
 	}
 	if !r116aExists(fresh) {
@@ -161,7 +161,7 @@ func TestPruneStaleHexdataBuildsHonorsGracePeriod(t *testing.T) {
 	}
 	// 过了宽限期（文件年龄 = 8 天 + 24 小时）：删除。
 	cache.now = func() time.Time { return now.Add(hexdataStaleBuildGrace) }
-	if err := cache.pruneStaleHexdataBuilds(r116aCurrentBuild); err != nil {
+	if _, err := cache.pruneStaleHexdataBuildsCount(r116aCurrentBuild); err != nil {
 		t.Fatal(err)
 	}
 	if r116aExists(fresh) {
@@ -202,7 +202,7 @@ func TestPruneStaleHexdataBuildsBoundsDiskAcrossPatchHistory(t *testing.T) {
 	}
 	newest := builds[len(builds)-1]
 	// 最新 build 自己也超过宽限期没关系：prune 只删「不等于 currentBuildID」的文件。
-	if err := cache.pruneStaleHexdataBuilds(newest); err != nil {
+	if _, err := cache.pruneStaleHexdataBuildsCount(newest); err != nil {
 		t.Fatal(err)
 	}
 	remaining, err := filepath.Glob(filepath.Join(dir, "hexdata-*.json"))
@@ -267,7 +267,7 @@ func TestPruneStaleHexdataBuildsIgnoresUnreadableFiles(t *testing.T) {
 	if err := os.WriteFile(stale, rewritten, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := cache.pruneStaleHexdataBuilds(r116aCurrentBuild); err != nil {
+	if _, err := cache.pruneStaleHexdataBuildsCount(r116aCurrentBuild); err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range []string{garbage, noKey, stale} {
@@ -285,7 +285,7 @@ func TestPruneStaleHexdataBuildsRequiresValidBuildID(t *testing.T) {
 		now := time.Now()
 		cache.now = func() time.Time { return now }
 		path := r116aWriteHexdataEntry(t, cache, r116aAncientBuild+"|hero-json|157", now.Add(-90*24*time.Hour), `{}`)
-		if err := cache.pruneStaleHexdataBuilds(buildID); err != nil {
+		if _, err := cache.pruneStaleHexdataBuildsCount(buildID); err != nil {
 			t.Fatalf("buildID %q returned %v", buildID, err)
 		}
 		if !r116aExists(path) {
@@ -294,7 +294,7 @@ func TestPruneStaleHexdataBuildsRequiresValidBuildID(t *testing.T) {
 	}
 	// 目录不存在时安静返回，不报错。
 	missing := &championDataCache{dir: filepath.Join(t.TempDir(), "nope")}
-	if err := missing.pruneStaleHexdataBuilds(r116aCurrentBuild); err != nil {
+	if _, err := missing.pruneStaleHexdataBuildsCount(r116aCurrentBuild); err != nil {
 		t.Fatalf("missing cache dir returned %v", err)
 	}
 }
@@ -421,7 +421,7 @@ func TestPruneStaleHexdataBuildsReportsMigrationFailure(t *testing.T) {
 	path := r116aWriteHexdataEntry(t, cache, r116aAncientBuild+"|hero-json|157", now.Add(-30*24*time.Hour), `{}`)
 	r116aDrainDiskPrune(cache)
 	cache.migrationErr = fmt.Errorf("fixture migration failure")
-	if err := cache.pruneStaleHexdataBuilds(r116aCurrentBuild); err == nil {
+	if _, err := cache.pruneStaleHexdataBuildsCount(r116aCurrentBuild); err == nil {
 		t.Fatal("migration failure was swallowed")
 	}
 	if !r116aExists(path) {
@@ -430,7 +430,7 @@ func TestPruneStaleHexdataBuildsReportsMigrationFailure(t *testing.T) {
 	// 读文件失败时（注入 readFile）不报错也不删，交给下一次清理。
 	cache.migrationErr = nil
 	cache.readFile = func(string) ([]byte, error) { return nil, os.ErrPermission }
-	if err := cache.pruneStaleHexdataBuilds(r116aCurrentBuild); err != nil {
+	if _, err := cache.pruneStaleHexdataBuildsCount(r116aCurrentBuild); err != nil {
 		t.Fatalf("unreadable cache files returned %v", err)
 	}
 	if !r116aExists(path) {

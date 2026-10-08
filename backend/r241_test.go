@@ -109,7 +109,7 @@ func TestR241HeadFreshnessSmallRequestNewGamesAndRecentGate(t *testing.T) {
 	group.Add(2)
 	go func() {
 		defer group.Done()
-		if err := a.storage.saveSeasonStats(old); err != nil {
+		if _, err := a.storage.saveSeasonStatsReported(old); err != nil {
 			t.Error(err)
 		}
 	}()

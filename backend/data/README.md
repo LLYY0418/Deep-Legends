@@ -3,7 +3,7 @@
 - 官方公告：<https://lol.qq.com/news/detail.shtml?docid=12008689032502035596>
 - 公告日期：2024-02-29
 - 生效版本：国服 14.5
-- 原始图片：`reroll_pool_14_5_source.jpg`
+- 原始图片：`reroll_pool_14_5_source.jpg`，原图见提交 `74c4b63ceab6c5aa7f7951b3136f37e7d85f648c`。
 - 人工可读转录：`reroll_pool_14_5.txt`
 - 稳定 ID 清单：`reroll_pool_14_5.json`
 

@@ -12,19 +12,19 @@ import (
 	"testing"
 )
 
-func TestRiotKeyConfiguredValueRejectsMissingAndCorruptCiphertext(t *testing.T) {
+func TestRiotKeyDecryptionRejectsMissingAndCorruptCiphertext(t *testing.T) {
 	ciphertext, err := encryptRiotKey("RGAPI-test-key")
 	if err != nil {
 		t.Fatalf("encryptRiotKey: %v", err)
 	}
-	if !riotKeyConfiguredValue(ciphertext) {
-		t.Fatal("valid Riot key ciphertext was rejected")
-	}
-	if riotKeyConfiguredValue("") {
-		t.Fatal("empty Riot key ciphertext was accepted")
-	}
-	if riotKeyConfiguredValue("not-a-valid-ciphertext") {
-		t.Fatal("corrupt Riot key ciphertext was accepted")
+	for _, test := range []struct {
+		ciphertext string
+		want       bool
+	}{{ciphertext, true}, {"", false}, {"not-a-valid-ciphertext", false}} {
+		plain, err := decryptRiotKeyCipher(test.ciphertext)
+		if valid := err == nil && strings.TrimSpace(plain) != ""; valid != test.want {
+			t.Fatalf("decryption validity = %v, want %v", valid, test.want)
+		}
 	}
 }
 

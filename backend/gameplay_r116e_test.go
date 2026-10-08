@@ -124,7 +124,13 @@ func TestR116EMayhemTabRendersNoPositionsAndNoAbilityRadar(t *testing.T) {
 	}
 	// 单双排页签照样有位置与能力样本（回归：不能被海斗的处置带坏）。
 	solo := queues["420"]
-	if positionStatsGames(solo.Positions) == 0 {
+	if func() int {
+		total := 0
+		for _, row := range solo.Positions {
+			total += row.Games
+		}
+		return total
+	}() == 0 {
 		t.Fatalf("solo tab lost its position stats: %#v", solo.Positions)
 	}
 	if solo.AbilitySampleGames == 0 {
@@ -135,7 +141,13 @@ func TestR116EMayhemTabRendersNoPositionsAndNoAbilityRadar(t *testing.T) {
 	if got := positionStatsForQueue(matches, "subject", 2400); got != nil {
 		t.Fatalf("positionStatsForQueue(2400) = %#v, want nil (ARAM has no lanes)", got)
 	}
-	if got := positionStatsGames(positionStatsForQueue(matches, "subject", 420)); got != 3 {
+	if got := func() int {
+		total := 0
+		for _, row := range positionStatsForQueue(matches, "subject", 420) {
+			total += row.Games
+		}
+		return total
+	}(); got != 3 {
 		t.Fatalf("positionStatsForQueue(420) games = %d, want 3", got)
 	}
 	if got := liveRecentPositions(matches, "subject", 2400); got != nil {
@@ -322,7 +334,7 @@ func r116eMayhemBuildsApp(t *testing.T, samples []seasonAugmentSample) (*app, st
 		Season: season, AccountHash: store.accountHash(subject.summoner),
 		AugmentSamples: samples, Complete: true,
 	}
-	if err := store.saveSeasonStats(cache); err != nil {
+	if _, err := store.saveSeasonStatsReported(cache); err != nil {
 		t.Fatalf("saving the synthetic season cache failed: %v", err)
 	}
 	return subject, season

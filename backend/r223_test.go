@@ -370,7 +370,7 @@ func TestR223ForeignAndUnknownClientCannotUseExplicitTencentReferences(t *testin
 			t.Fatal("foreign/unknown Tencent SGP request")
 			return nil, nil
 		})}
-		_, progress, _, _ := a.loadSeasonChampionStats(t.Context(), client, gameplayReference{ServerID: "HN1"}, Summoner{}, strings.Repeat("p", 48), nil)
+		_, progress, _, _ := a.loadSeasonChampionStatsWithHistoryCache(t.Context(), client, gameplayReference{ServerID: "HN1"}, Summoner{}, strings.Repeat("p", 48), nil, true)
 		if !progress.Unavailable {
 			t.Fatal(progress)
 		}

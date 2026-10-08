@@ -27,7 +27,7 @@ func TestR86EmptyProcessDiscoverySkipsDiskButErrorsRetainFallback(t *testing.T) 
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := 0
-			_, report, err := discoverLCUFromProcesses(tc.query, tc.err, func([]string) []string { calls++; return nil })
+			_, report, err := discoverLCUFromProcessesWith(tc.query, tc.err, func([]string) []string { calls++; return nil }, time.Now())
 			if calls != tc.wantCalls || err == nil {
 				t.Fatalf("calls=%d report=%+v err=%v", calls, report, err)
 			}

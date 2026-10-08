@@ -119,10 +119,6 @@ func (e *facadeTitleRestoreNoCandidateError) Error() string {
 	return "客户端返回的头衔数据缺少可回填的标识（itemId / contentId 都为空），为避免把你的头衔一起清掉，本次操作已中止。"
 }
 
-func (a *app) loadFacadeState(ctx context.Context) facadeState {
-	return a.loadFacadeStateTriggered(ctx, "poll")
-}
-
 func (a *app) loadFacadeStateTriggered(ctx context.Context, trigger string) facadeState {
 	return a.loadFacadeStateParts(ctx, trigger, true)
 }
@@ -811,16 +807,6 @@ func facadeApplyDiagnostic(action, result string, applyResult facadeApplyResult)
 	return diagnostic
 }
 
-func (a *app) applyFacadeAction(ctx context.Context, client *LCUClient, current Summoner, request facadeApplyRequest) error {
-	_, err := a.applyFacadeActionResult(ctx, client, current, request)
-	return err
-}
-
-func (a *app) applyFacadeActionResult(ctx context.Context, client *LCUClient, current Summoner, request facadeApplyRequest) (string, error) {
-	result, err := a.applyFacadeActionResultDetails(ctx, client, current, request)
-	return result.TitleRestore, err
-}
-
 func (a *app) applyFacadeActionResultDetails(ctx context.Context, client *LCUClient, current Summoner, request facadeApplyRequest) (facadeApplyResult, error) {
 	switch request.Action {
 	case "clear-objectives":
@@ -1011,11 +997,6 @@ func facadeTitleItemID(summary map[string]any) (int64, bool) {
 	}
 	value, err := strconv.ParseInt(id, 10, 64)
 	return value, err == nil && value > 0
-}
-
-func facadeSummaryHasTitle(summary map[string]any) bool {
-	_, hasTitle := facadeTitleRestorePlan(summary, nil)
-	return hasTitle
 }
 
 // facadeTitleRestorePlan is intentionally broader than projectFacadeTitle:

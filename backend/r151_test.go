@@ -23,7 +23,7 @@ func TestR151YourGGAugmentsKeepOfficialGradesScoresAndCatalogRarity(t *testing.T
 		{ID: 902, Name: "黄金测试", Rarity: "kGold", IconPath: "/lol-game-data/assets/ASSETS/Augments/gold.png"},
 		{ID: 903, Name: "棱彩测试", Rarity: "kPrismatic", IconPath: "/lol-game-data/assets/ASSETS/Augments/prismatic.png"},
 	}
-	groups, err := mapYourGGArenaAggregateAugments(payload.Response.Augments, catalog)
+	groups, _, err := mapYourGGArenaAggregateAugmentsWithStats(payload.Response.Augments, catalog)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestR151PartialYourGGAugmentsFallBackAsAWhole(t *testing.T) {
 		t.Fatal(err)
 	}
 	catalog := []gameplayAugment{{ID: 901, Rarity: "kSilver"}}
-	if _, err := mapYourGGArenaAggregateAugments(payload.Response.Augments, catalog); err == nil {
+	if _, _, err := mapYourGGArenaAggregateAugmentsWithStats(payload.Response.Augments, catalog); err == nil {
 		t.Fatal("one quality must not replace the whole OP.GG augment list")
 	}
 	for _, malformed := range []string{
@@ -74,7 +74,7 @@ func TestR151PartialYourGGAugmentsFallBackAsAWhole(t *testing.T) {
 		if err := json.Unmarshal([]byte(malformed), &row); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := mapYourGGArenaAggregateAugments([]yourGGArenaAggregateAugment{row}, catalog); err == nil {
+		if _, _, err := mapYourGGArenaAggregateAugmentsWithStats([]yourGGArenaAggregateAugment{row}, catalog); err == nil {
 			t.Fatalf("incomplete upstream row was accepted: %s", malformed)
 		}
 	}

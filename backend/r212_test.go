@@ -70,7 +70,14 @@ func TestR212RelayCategoriesAndSummaryReset(t *testing.T) {
 	routes := map[string]string{"/riot/account/v1/accounts/by-riot-id/PRIVATE/NAME": "account", "/lol/summoner/v4/summoners/by-puuid/PRIVATE": "summoner", "/lol/match/v5/matches/KR_PRIVATE": "match", "/lol/league/v4/entries/by-puuid/PRIVATE": "league", "/lol/spectator/v5/active-games/by-summoner/PRIVATE": "spectator", "/lol/champion-mastery/v4/champion-masteries/by-puuid/PRIVATE": "mastery", "/unknown/PRIVATE": "other"}
 	clock := &r208Clock{stamp: time.Now()}
 	state := &riotRelayState{now: clock.now}
-	t.Cleanup(state.stopSummary)
+	t.Cleanup(func() {
+		state.mu.Lock()
+		defer state.mu.Unlock()
+		if state.summaryTimer != nil {
+			state.summaryTimer.Stop()
+			state.summaryTimer = nil
+		}
+	})
 	var summary map[string]any
 	record := func(row map[string]any) { summary = row }
 	for route, want := range routes {

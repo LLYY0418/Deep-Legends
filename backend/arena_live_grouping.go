@@ -4,7 +4,6 @@ import (
 	"context"
 	"maps"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -33,31 +32,6 @@ func validArenaGroupAssignments(groups []string, squadSize int) bool {
 		counts[group]++
 	}
 	return liveClientArenaDistribution(counts, len(groups), squadSize)
-}
-
-func validateArenaLiveGroups(players []gameplayLivePlayer, squadSize int) bool {
-	groups := make([]string, len(players))
-	for i, p := range players {
-		groups[i] = p.ArenaGroup
-	}
-	return validArenaGroupAssignments(groups, squadSize)
-}
-
-// Both sources use the same queue registry and require complete block boundaries.
-// Premade party IDs are deliberately irrelevant to Arena squad membership.
-func arenaSessionOrderGroups(queueID int64, players []lcuLivePlayer) ([]string, bool) {
-	return arenaOrderGroups(len(players), arenaSquadSize(queueID))
-}
-
-func arenaOrderGroups(count, squadSize int) ([]string, bool) {
-	if squadSize < 2 || count < 6 || count > 18 || count%squadSize != 0 {
-		return nil, false
-	}
-	groups := make([]string, count)
-	for index := range groups {
-		groups[index] = strconv.Itoa(index/squadSize + 1)
-	}
-	return groups, true
 }
 
 // Resolved identity is shared by grouping and position matching. CN gameflow

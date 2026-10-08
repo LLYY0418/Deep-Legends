@@ -144,12 +144,6 @@ func (a *app) countFacadeBroadcastLocked() {
 	}
 	a.facadeEventPendingSources = nil
 }
-func (a *app) flushFacadeEventSources() {
-	a.facadeEventMu.Lock()
-	generation := a.facadeEventSummaryGeneration
-	a.facadeEventMu.Unlock()
-	a.flushFacadeEventSourcesGeneration(generation)
-}
 func (a *app) flushFacadeEventSourcesGeneration(generation uint64) {
 	a.facadeEventMu.Lock()
 	if generation != a.facadeEventSummaryGeneration {

@@ -85,7 +85,10 @@ func TestR73AmbiguousLadderNoRequest(t *testing.T) {
 	for _, name := range []string{"has space", "has-hyphen"} {
 		raw := proFixtureAccount(name, "secret", "MASTER", 1, 10)
 		src := []opggProTeam{{ID: 632, Members: []opggProMember{proFixtureMember(632, "Bin", "Chen Ze-Bin", raw)}}}
-		enrichProLadderRanks(context.Background(), provider, src)
+		pipeline := newProLadderPipeline(context.Background(), provider)
+		pipeline.submit(src)
+		pipeline.finish()
+		pipeline.apply(src)
 		if src[0].Members[0].Summoners[0].LadderRankKnown {
 			t.Fatal("ambiguous ladder known")
 		}

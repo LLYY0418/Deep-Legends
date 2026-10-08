@@ -91,7 +91,7 @@ func TestR55ClaimScanOnlyFlagsAmbiguousChoices(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	scan := scanClaims(context.Background(), client)
+	scan := scanClaimsObserved(context.Background(), client, nil)
 	choices := map[string]bool{}
 	for _, entry := range scan.Items {
 		choices[entry.ID] = entry.NeedsChoice

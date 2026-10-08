@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -263,42 +262,4 @@ func sgpTimeBucket(seconds int64) string {
 	default:
 		return "over-1h"
 	}
-}
-
-func sgpResponseDiagnostic(response *http.Response) map[string]any {
-	fields := map[string]any{"content_type": "other", "content_length": response.ContentLength, "auth_challenge_present": response.Header.Get("WWW-Authenticate") != "", "location_present": response.Header.Get("Location") != ""}
-	contentType := strings.ToLower(strings.Split(response.Header.Get("Content-Type"), ";")[0])
-	for _, known := range []string{"application/json", "application/problem+json", "text/html", "text/plain"} {
-		if contentType == known {
-			fields["content_type"] = known
-		}
-	}
-	fields["auth_challenge_classes"] = sgpAuthClasses(response.Header.Get("WWW-Authenticate"))
-	allowed := map[string]bool{}
-	allowHeaders := response.Header.Values("Allow")
-	fields["allow_header_present"] = len(allowHeaders) > 0
-	for _, header := range allowHeaders {
-		if len(header) > 1024 {
-			continue
-		}
-		for _, method := range strings.Split(header, ",") {
-			switch strings.TrimSpace(method) {
-			case "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS":
-				allowed[strings.TrimSpace(method)] = true
-			}
-		}
-	}
-	fields["allowed_methods"] = allowed // Evidence only; never authorizes a different method.
-	if date, err := http.ParseTime(response.Header.Get("Date")); err == nil {
-		fields["server_clock_relative"] = sgpTimeBucket(date.Unix() - time.Now().Unix())
-	}
-	fields["retry_after_present"] = response.Header.Get("Retry-After") != ""
-	// Header values can contain opaque credentials. Record only fixed names
-	// and presence, so a missing server correlation/challenge is explicit.
-	correlation := map[string]bool{}
-	for _, name := range []string{"X-Request-Id", "X-Correlation-Id", "Traceparent", "X-B3-Traceid"} {
-		correlation[name] = response.Header.Get(name) != ""
-	}
-	fields["correlation_headers_present"] = correlation
-	return fields
 }

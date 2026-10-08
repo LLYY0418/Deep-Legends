@@ -398,8 +398,6 @@ func TestR104RefreshDiagnosticsCountRequestsAndBudgetSkips(t *testing.T) {
 	p.longWindow = nil
 	p.shortWindow = nil
 	p.limitMu.Unlock()
-	teams := []opggProTeam{{ID: seed.OPGGID, Members: []opggProMember{{TeamID: seed.OPGGID, Nickname: seed.Player, RealName: seed.RealName, Authority: "PROGAMER", Summoners: []opggProAccount{{PUUID: "upstream", GameName: "upstream", TagLine: "KR1"}}}}}}
-	a.enrichProActivity(context.Background(), teams, nil)
 	data, err := store.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)
@@ -407,14 +405,14 @@ func TestR104RefreshDiagnosticsCountRequestsAndBudgetSkips(t *testing.T) {
 	var costs []map[string]any
 	for _, line := range strings.Split(string(data), "\n") {
 		var event map[string]any
-		if json.Unmarshal([]byte(line), &event) == nil && (event["event"] == "pro_seed_cost" || event["event"] == "pro_activity_cost") {
+		if json.Unmarshal([]byte(line), &event) == nil && event["event"] == "pro_seed_cost" {
 			costs = append(costs, event)
 		}
 	}
-	if len(costs) != 3 {
-		t.Fatalf("missing seed/activity events: %s", data)
+	if len(costs) != 2 {
+		t.Fatalf("missing seed events: %s", data)
 	}
-	want := [][4]int{{1, 1, 3, 0}, {1, 0, 0, 1}, {1, 1, 1, 0}}
+	want := [][4]int{{1, 1, 3, 0}, {1, 0, 0, 1}}
 	for i, event := range costs {
 		for j, key := range []string{"accounts_total", "accounts_refreshed", "riot_requests", "skipped_by_budget"} {
 			if event[key] != float64(want[i][j]) {

@@ -858,12 +858,6 @@ func (h *hexdataClient) snapshot() hexdataState {
 	return state
 }
 
-func (h *hexdataClient) circuitSnapshot(kind string) hexdataCircuitState {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.state.Circuits[kind]
-}
-
 func inspectHexdataPayload(kind, requestPath string, data []byte, reporters ...func(map[string]any)) (hexdataPayloadShape, error) {
 	shape := hexdataPayloadShape{}
 	if len(strings.TrimSpace(string(data))) == 0 {
@@ -1438,10 +1432,6 @@ func (h *hexdataClient) waitForPace(ctx context.Context) (func(), time.Duration,
 		}
 	}
 	return release, wait, nil
-}
-
-func (h *hexdataClient) fetchOnce(ctx context.Context, requestPath, accept string, stale []byte) ([]byte, int, error) {
-	return h.fetchOnceKind(ctx, "direct", requestPath, accept, stale)
 }
 
 func (h *hexdataClient) fetchOnceKind(ctx context.Context, kind, requestPath, accept string, stale []byte) ([]byte, int, error) {
@@ -2897,14 +2887,6 @@ func (p *championProvider) decorateHexdataItemAssets(ctx context.Context, rows [
 	}
 }
 
-// parseHexdataPostmatch 解析 /api/hexdata/postmatch：顶层 map 的 key 是英雄 ID
-// 字符串。key 转不成合法 ID 的条目整条丢弃并计数，不塞进 map 的 0 键。
-// R116-A 的签名与语义保持不变；字段存在性核对拆到了下面的 WithPresence 版本。
-func parseHexdataPostmatch(data []byte) (map[int]hexdataPostmatchRow, int, error) {
-	rows, _, dropped, err := parseHexdataPostmatchWithPresence(data)
-	return rows, dropped, err
-}
-
 // parseHexdataPostmatchWithPresence 在上面的基础上额外返回「每个英雄实际在 JSON
 // 里出现过哪些字段名」。
 // 为什么需要它：encoding/json 对缺失字段静默填 0，光看 hexdataPostmatchRow 无法
@@ -3155,17 +3137,6 @@ func parseHexdataHextechInsights(data []byte) (hexdataHextechInsightsPayload, in
 		return payload, dropped, errors.New("hexdata hextech-insights payload is empty")
 	}
 	return payload, dropped, nil
-}
-
-// loadHexdataHextechInsights 取全量 tier/topItems/topAugments 目录：与 postmatch
-// 同性质，每个 buildID 只取一次，长期缓存。R116-D 的推荐页概览优先从这里取数，
-// 不需要对每个英雄单独调 /heroes/{id}。
-func (p *championProvider) loadHexdataHextechInsights(ctx context.Context) (hexdataHextechInsights, error) {
-	snapshot, err := p.loadHexdataMeta(ctx)
-	if err != nil {
-		return hexdataHextechInsights{}, err
-	}
-	return p.loadHexdataHextechInsightsWithSnapshot(ctx, snapshot)
 }
 
 // loadHexdataHextechInsightsWithSnapshot 是上面那个入口的实现体，单独拆出来只为
@@ -3523,10 +3494,6 @@ func (p *championProvider) loadHexdataRarity(ctx context.Context) (championAugme
 		p.hexdata.recordSuccess("rarity", "/augment-rarity")
 	}
 	return championAugmentRarityResponse{Source: "Hexdata", Citation: &citation, MeasurementTechnique: p.loadHexdataMeasurementTechnique(ctx), Stages: rows}, nil
-}
-
-func (p *championProvider) decorateHexdataAugments(ctx context.Context, rows []championMetricRow) {
-	p.decorateHexdataAugmentsWithCatalog(rows, gameplayAugmentIndexAll(p.loadAugmentMetadataCatalog(ctx)))
 }
 
 func (p *championProvider) decorateHexdataAugmentsWithCatalog(rows []championMetricRow, byID map[int]gameplayAugment) {
@@ -3969,10 +3936,6 @@ func (p *championProvider) reportRSCRejectedItems(rows []rscRejectedItem) {
 	for _, row := range rows {
 		p.diag(map[string]any{"event": "rsc_core_item_rejected", "id": row.ID, "reason": row.Reason})
 	}
-}
-
-func (p *championProvider) loadMayhemRSC(ctx context.Context, slug string) (mayhemRSCDetail, error) {
-	return p.loadMayhemRSCWithPhases(ctx, slug, nil)
 }
 
 func (p *championProvider) loadMayhemRSCWithPhases(ctx context.Context, slug string, phases *mayhemRSCPhases) (mayhemRSCDetail, error) {

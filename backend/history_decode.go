@@ -40,7 +40,6 @@ func historyIntValue(v *lenientInt) *int {
 	}
 	return v.value
 }
-func historyInt(integer int) *lenientInt { return &lenientInt{value: &integer} }
 
 type lenientChallenges struct {
 	SoloKills                    *lenientInt `json:"soloKills"`

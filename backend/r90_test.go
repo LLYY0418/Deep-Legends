@@ -198,22 +198,6 @@ func TestR90QueueSquadSizesAndSessionFallback(t *testing.T) {
 		if arenaSquadSize(tc.queue) != tc.size {
 			t.Fatal(tc)
 		}
-		raw := make([]lcuLivePlayer, tc.count)
-		for i := range raw {
-			raw[i].TeamParticipantID = 5
-		}
-		groups, ok := arenaSessionOrderGroups(tc.queue, raw)
-		if !ok {
-			t.Fatal(tc)
-		}
-		for i, g := range groups {
-			if g != fmt.Sprint(i/tc.size+1) {
-				t.Fatal(groups)
-			}
-		}
-		if _, ok := arenaSessionOrderGroups(tc.queue, raw[:len(raw)-1]); ok {
-			t.Fatal("partial block accepted")
-		}
 		if liveClientArenaDistribution(map[string]int{"1": 3, "2": 3}, 6, 2) {
 			t.Fatal("three in a duo squad")
 		}

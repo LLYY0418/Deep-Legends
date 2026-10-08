@@ -484,12 +484,6 @@ func (p *championProvider) startQQ101Probe(ctx context.Context, champion string,
 	}()
 }
 
-func (p *championProvider) qq101Probe(ctx context.Context, champion string, championID int, tier, position string) map[string]any {
-	started := time.Now()
-	patch, err := p.loadQQ101LatestPatch(ctx)
-	return p.qq101ProbeWithPatch(ctx, champion, championID, tier, position, patch, err, started)
-}
-
 func (p *championProvider) qq101ProbeWithPatch(ctx context.Context, champion string, championID int, tier, position, patch string, err error, started time.Time) map[string]any {
 	if err != nil {
 		if isCancellation(err) {

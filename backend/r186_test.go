@@ -292,7 +292,7 @@ func TestR186MigrationPreflightStopsInstallerAndRejectsNestedTarget(t *testing.T
 	if u.Apply() == nil || launches != 0 || u.Status().State != "failed" {
 		t.Fatal("failed preflight installed", launches, u.Status())
 	}
-	if _, err := migrateUpdateData(source, filepath.Join(source, "nested")); err == nil {
+	if _, err := copyUpdateData(source, filepath.Join(source, "nested"), true); err == nil {
 		t.Fatal("nested migration accepted")
 	}
 }

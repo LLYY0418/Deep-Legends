@@ -118,61 +118,14 @@ func seasonAbilityTestMatch(gameID int64, queueID int64) seasonRankedMatch {
 	}
 }
 
-func TestAbilityProfileFallsBackToSeasonSnapshotWhenDetailWindowHasNoFlexGames(t *testing.T) {
-	// 详情窗口里一场灵活组排都没有（真机日志实测：队列只有 420/1750/2400）。
+func TestAbilityProfileDetailWindowDoesNotInventFlexGames(t *testing.T) {
 	detailMatches := []gameplayMatch{abilityTestMatch(1), abilityTestMatch(2), abilityTestMatch(3)}
-	cached := []seasonRankedMatch{seasonAbilityTestMatch(11, 440), seasonAbilityTestMatch(12, 440), seasonAbilityTestMatch(13, 440)}
-
 	if got := buildGameplayAbilityProfileForQueue(detailMatches, "subject", nil, riotRegionKR, 440); got != nil {
 		t.Fatalf("detail-only flex profile should still be nil: %#v", got)
 	}
-	profile := buildGameplayAbilityProfileForQueueWithSnapshot(detailMatches, "subject", cached, nil, riotRegionKR, 440)
-	if profile == nil {
-		t.Fatal("flex ability profile must come from the season snapshot")
-	}
-	if profile.QueueID != 440 || profile.QueueLabel != "灵活组排" || profile.PositionLabel != "上路" {
-		t.Fatalf("snapshot profile = %#v", profile)
-	}
-	if profile.SampleGames != 3 || profile.BaselineGames != 3 || len(profile.Metrics) != 7 {
-		t.Fatalf("snapshot samples = %#v", profile)
-	}
-	// 口径必须与详情路径完全一致，否则单双排和灵活组排的雷达没法互相比较。
 	detail := buildGameplayAbilityProfileForQueue(detailMatches, "subject", nil, riotRegionKR, 420)
 	if detail == nil {
 		t.Fatal("solo detail profile is nil")
-	}
-	for index := range detail.Metrics {
-		if detail.Metrics[index].Player != profile.Metrics[index].Player || detail.Metrics[index].Baseline != profile.Metrics[index].Baseline {
-			t.Fatalf("metric %s drifted between the detail and snapshot paths: %#v vs %#v", detail.Metrics[index].Key, detail.Metrics[index], profile.Metrics[index])
-		}
-	}
-	if got := gameplayAbilitySampleGamesForQueueWithSnapshot(detailMatches, "subject", cached, 440); got != 3 {
-		t.Fatalf("snapshot sample games = %d", got)
-	}
-}
-
-func TestSeasonSnapshotAbilityIgnoresEntriesWithoutTheNewFields(t *testing.T) {
-	// 老缓存（schemaVersion < 5）没有 Ability 字段，必须整条跳过而不是当成 0 场统计。
-	legacy := []seasonRankedMatch{{QueueID: 440, Position: "top"}, {QueueID: 440, Position: "top"}, {QueueID: 440, Position: "top"}}
-	if got := buildGameplayAbilityProfileForQueueWithSnapshot(nil, "subject", legacy, nil, riotRegionKR, 440); got != nil {
-		t.Fatalf("legacy snapshot entries must not produce a profile: %#v", got)
-	}
-	// 有对位样本但不足 3 场时同样不出图。
-	short := []seasonRankedMatch{seasonAbilityTestMatch(11, 440), seasonAbilityTestMatch(12, 440)}
-	if got := buildGameplayAbilityProfileForQueueWithSnapshot(nil, "subject", short, nil, riotRegionKR, 440); got != nil {
-		t.Fatalf("short snapshot sample must not produce a profile: %#v", got)
-	}
-	// 只有本人没有对位（同位置对手缺失）时也不出图：没有基线就没有雷达。
-	noOpponent := []seasonRankedMatch{seasonAbilityTestMatch(11, 440), seasonAbilityTestMatch(12, 440), seasonAbilityTestMatch(13, 440)}
-	for index := range noOpponent {
-		noOpponent[index].Ability.Opponent = nil
-	}
-	if got := buildGameplayAbilityProfileForQueueWithSnapshot(nil, "subject", noOpponent, nil, riotRegionKR, 440); got != nil {
-		t.Fatalf("snapshot without lane opponents must not produce a profile: %#v", got)
-	}
-	// 队列必须隔离：灵活组排的快照不能被拿去填单双排。
-	if got := buildGameplayAbilityProfileForQueueWithSnapshot(nil, "subject", []seasonRankedMatch{seasonAbilityTestMatch(11, 440), seasonAbilityTestMatch(12, 440), seasonAbilityTestMatch(13, 440)}, nil, riotRegionKR, 420); got != nil {
-		t.Fatalf("flex snapshot leaked into the solo queue: %#v", got)
 	}
 }
 
@@ -241,7 +194,13 @@ func TestBuildGameplayRankedQueuesCapsEveryRecentCardAtTwentyMatches(t *testing.
 	if solo.Ability == nil || solo.Ability.SampleGames != defaultMatchCount || solo.AbilitySampleGames != defaultMatchCount {
 		t.Fatalf("ability sample did not share the 20-match window: %#v", solo)
 	}
-	if got := positionStatsGames(solo.Positions); got != defaultMatchCount {
+	if got := func() int {
+		total := 0
+		for _, row := range solo.Positions {
+			total += row.Games
+		}
+		return total
+	}(); got != defaultMatchCount {
 		t.Fatalf("position sample games = %d, want %d", got, defaultMatchCount)
 	}
 }

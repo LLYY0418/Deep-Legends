@@ -920,99 +920,7 @@ func TestRecordLiveClientItemsParsedEmitsBoundedDiagnostic(t *testing.T) {
 // P1-4 阶段二：纯函数（已实现、未接线）
 // ---------------------------------------------------------------------------
 
-func TestGameplayOwnedTerminalItemIDsFiltersConsumablesAndJunk(t *testing.T) {
-	items := []liveClientItem{
-		{ItemID: 3153, Count: 1},
-		{ItemID: 2003, Count: 2, Consumable: true}, // 药水
-		{ItemID: 3364, Count: 1, Consumable: true}, // 眼位
-		{ItemID: 0},  // 空槽
-		{ItemID: -1}, // 垃圾
-		{ItemID: 6333, Count: 1},
-		{ItemID: 3153, Count: 1}, // 重复
-	}
-	got := gameplayOwnedTerminalItemIDs(items)
-	want := []int{3153, 6333}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("owned ids = %#v, want %#v", got, want)
-	}
-	if ids := gameplayOwnedTerminalItemIDs(nil); ids != nil {
-		t.Fatalf("nil items = %#v, want nil", ids)
-	}
-	if ids := gameplayOwnedTerminalItemIDs([]liveClientItem{{ItemID: 2003, Consumable: true}}); ids != nil {
-		t.Fatalf("consumables only = %#v, want nil", ids)
-	}
-}
-
-// 工单 P1-4 阶段二验证判据 2：构造「本人已出 A+B 两件，trio 表里有一条 A:B:C」
-// 的 fixture，验证推荐出现 C 且带正确的 winRate/games。用的是真实夹具里的
-// terminalItemTrios[0] = 3153:6333:123430（破败王者之刃 + 死亡之舞 + 毁坏仪式）。
-func TestGameplayNextItemSuggestionMatchesTrioPrefix(t *testing.T) {
-	detail := r116dHeroDetail(t)
-	if len(detail.TerminalItemTrios) == 0 {
-		t.Fatal("fixture has no terminalItemTrios")
-	}
-	first := detail.TerminalItemTrios[0]
-	if first.TrioKey != "3153:6333:123430" || len(first.ItemIDs) != 3 {
-		t.Fatalf("fixture anchor moved: %#v", first)
-	}
-	suggestion, ok := gameplayNextItemSuggestionFromTrios([]int{3153, 6333}, detail.TerminalItemTrios)
-	if !ok {
-		t.Fatal("prefix match failed on a trio that is literally the first row")
-	}
-	if suggestion.ItemID != 123430 {
-		t.Fatalf("suggested item = %d, want 123430", suggestion.ItemID)
-	}
-	if suggestion.WinRate != first.WinRate || suggestion.Games != first.Games {
-		t.Fatalf("winRate/games = %v/%d, want upstream %v/%d", suggestion.WinRate, suggestion.Games, first.WinRate, first.Games)
-	}
-	if suggestion.TrioKey != first.TrioKey {
-		t.Fatalf("trioKey = %q, want %q", suggestion.TrioKey, first.TrioKey)
-	}
-	if !strings.Contains(suggestion.ItemName, "毁坏仪式") {
-		t.Fatalf("item name = %q, want the upstream Chinese name", suggestion.ItemName)
-	}
-	// 上游顺序就是样本量优先级：已出 3031+3153 时应命中第 2 条 3031:3153:123430，
-	// 而不是自己另排一套。
-	second, ok := gameplayNextItemSuggestionFromTrios([]int{3031, 3153}, detail.TerminalItemTrios)
-	if !ok || second.TrioKey != "3031:3153:123430" {
-		t.Fatalf("upstream order was not respected: ok=%v %#v", ok, second)
-	}
-}
-
-// 降级规则（工单 P1-4 阶段二第 5 条）：items 解析失败、结构不符、或没有任何
-// trio 前缀匹配时返回 ok=false，调用方整行不渲染。绝不返回「大概是这件」。
-func TestGameplayNextItemSuggestionDegradesToNothing(t *testing.T) {
-	detail := r116dHeroDetail(t)
-	trio := []hexdataTrioRow{{TrioKey: "1:2:3", ItemIDs: []int{1, 2, 3}, ItemNames: []string{"甲", "乙", "丙"}, WinRate: 0.6, Games: 1000}}
-	tests := []struct {
-		name  string
-		owned []int
-		trios []hexdataTrioRow
-	}{
-		{name: "no items at all", owned: nil, trios: trio},
-		{name: "only one item", owned: []int{1}, trios: trio},
-		{name: "two items but no trio", owned: []int{1, 2}, trios: nil},
-		{name: "prefix does not match", owned: []int{1, 3}, trios: trio},
-		{name: "already owns all three", owned: []int{1, 2, 3}, trios: trio},
-		{name: "trio has wrong length", owned: []int{1, 2}, trios: []hexdataTrioRow{{TrioKey: "1:2", ItemIDs: []int{1, 2}}}},
-		{name: "trio has a zero id", owned: []int{1, 2}, trios: []hexdataTrioRow{{TrioKey: "1:2:0", ItemIDs: []int{1, 2, 0}}}},
-		{name: "owned ids are all junk", owned: []int{0, -1}, trios: trio},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			suggestion, ok := gameplayNextItemSuggestionFromTrios(test.owned, test.trios)
-			if ok || suggestion != (gameplayNextItemSuggestion{}) {
-				t.Fatalf("expected no suggestion, got ok=%v %#v", ok, suggestion)
-			}
-		})
-	}
-	// 真实夹具上也要验一次「已出两件但不构成任何 trio 前缀」。
-	if _, ok := gameplayNextItemSuggestionFromTrios([]int{1001, 1053}, detail.TerminalItemTrios); ok {
-		t.Fatal("boots + a component should not match any terminal trio prefix")
-	}
-}
-
-// 阶段二「已实现但未接线」这条事实本身要有测试钉住：一旦有人把它接到生产路径上
+// 阶段二尚未具备真机字段证据，删除未接线计算后仍要有测试钉住：一旦有人把它接到生产路径上
 // 而没有先确认真实海斗 items 的字段形状，这条就会红。
 func TestR116DStageTwoStaysUnwired(t *testing.T) {
 	source, err := os.ReadFile("gameplay.go")
@@ -1020,11 +928,11 @@ func TestR116DStageTwoStaysUnwired(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 注释里刻意点了这两个名字（说明接线条件与接线点），所以先把 // 注释行剔掉，
-	// 只数真实代码里的出现次数：定义 1 次、调用 0 次。
+	// 只数真实代码里的出现次数：定义和调用都应为 0 次。
 	code := r116dStripLineComments(string(source))
 	for _, name := range []string{"gameplayNextItemSuggestionFromTrios", "gameplayOwnedTerminalItemIDs"} {
-		if got := strings.Count(code, name); got != 1 {
-			t.Fatalf("%s appears %d times in gameplay.go code, want exactly 1 (the definition, no caller). "+
+		if got := strings.Count(code, name); got != 0 {
+			t.Fatalf("%s appears %d times in gameplay.go code, want exactly 0 (no definition or caller). "+
 				"Wiring stage two requires observed live-client items and element keys from a real mayhem game.", name, got)
 		}
 	}

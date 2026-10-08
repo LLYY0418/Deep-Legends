@@ -164,10 +164,6 @@ func newWatchRunner(store *localStore, notify func(event string)) *watchRunner {
 	}
 }
 
-func newConvenienceRunner(store *localStore, notify func(event string)) *convenienceRunner {
-	return newWatchRunner(store, notify)
-}
-
 func loadWatchSettings(store *localStore) watchSettings {
 	settings := defaultWatchSettings()
 	if store == nil {
@@ -203,11 +199,6 @@ func loadWatchSettings(store *localStore) watchSettings {
 	return normalizeWatchSettings(settings)
 }
 
-func loadConvenienceSettings(store *localStore) convenienceSettings {
-	settings := loadWatchSettings(store)
-	return legacyConvenienceSettings(settings)
-}
-
 func saveWatchSettings(store *localStore, settings watchSettings) error {
 	if store == nil {
 		return errors.New("本地存储不可用")
@@ -220,14 +211,6 @@ func saveWatchSettings(store *localStore, settings watchSettings) error {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	return atomicWriteFile(filepath.Join(store.root, convenienceSettingsFile), data, 0o600)
-}
-
-func saveConvenienceSettings(store *localStore, legacy convenienceSettings) error {
-	settings := loadWatchSettings(store)
-	settings.Rules.AutoAccept.Enabled = legacy.AutoAccept
-	settings.Rules.AutoPlayAgain.Enabled = legacy.AutoPlayAgain
-	settings.Rules.AutoReconnect.Enabled = legacy.AutoReconnect
-	return saveWatchSettings(store, settings)
 }
 
 func normalizeWatchSettings(settings watchSettings) watchSettings {
@@ -1381,10 +1364,6 @@ func (r *watchRunner) handleInvitations(client *LCUClient, rule watchInvitationR
 			r.emit("watch:fired:invitations")
 		}
 	}
-}
-
-func (r *watchRunner) broadcastPosition(client *LCUClient, current Summoner, rule watchBroadcastRule) string {
-	return r.broadcastPositionContext(context.Background(), client, current, rule)
 }
 
 func (r *watchRunner) broadcastPositionContext(parent context.Context, client *LCUClient, current Summoner, rule watchBroadcastRule) string {

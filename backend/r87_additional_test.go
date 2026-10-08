@@ -166,7 +166,7 @@ func TestR87CollectionThreeComparisonsAndBoundedPendingRetry(t *testing.T) {
 	})}}
 	run := func(shared bool) time.Duration {
 		start := time.Now()
-		api := NewInventoryAPI(c)
+		api := InventoryAPI{client: c}
 		if shared {
 			api.reads = newCollectionReads(c)
 		}
@@ -274,7 +274,7 @@ func TestR87PositionBroadcastEveryFailureReason(t *testing.T) {
 					return fail()
 				}
 			})}}
-			r.broadcastPosition(c, Summoner{}, watchBroadcastRule{})
+			r.broadcastPositionContext(context.Background(), c, Summoner{}, watchBroadcastRule{})
 			if len(events) < 2 || events[len(events)-1]["reason"] != reason {
 				t.Fatalf("reason=%s events=%v", reason, events)
 			}

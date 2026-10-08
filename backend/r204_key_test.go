@@ -41,11 +41,11 @@ func r204ValidationClient(status int) *http.Client {
 }
 func TestR204KeyPriority(t *testing.T) {
 	s := r204KeyFixture(t)
-	if riotKeySource() != "none" || riotKey() != "" {
+	if effectiveKey, _ := riotUserKeys.effective(); riotKeySource() != "none" || effectiveKey != "" {
 		t.Fatal("expected no key")
 	}
 	riotEmbeddedKey = func() string { return "fixture-embedded" }
-	if riotKey() != "" || riotKeySource() != "none" {
+	if effectiveKey, _ := riotUserKeys.effective(); effectiveKey != "" || riotKeySource() != "none" {
 		t.Fatal("legacy embedded key must not be a runtime fallback after R206")
 	}
 	s.mu.Lock()
@@ -54,11 +54,11 @@ func TestR204KeyPriority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if riotKey() != r204FixtureKey || riotKeySource() != "user" {
+	if effectiveKey, _ := riotUserKeys.effective(); effectiveKey != r204FixtureKey || riotKeySource() != "user" {
 		t.Fatal("user must override embedded")
 	}
 	t.Setenv("RIOT_API_KEY", "fixture-env")
-	if riotKey() != "fixture-env" || riotKeySource() != "env" {
+	if effectiveKey, _ := riotUserKeys.effective(); effectiveKey != "fixture-env" || riotKeySource() != "env" {
 		t.Fatal("env must override both")
 	}
 }
@@ -80,7 +80,7 @@ func TestR204KeySaveAndClear(t *testing.T) {
 			if status == 0 {
 				want = "network_error"
 			}
-			if result != want || riotKey() != key || riotKeyState() != "configured" {
+			if effectiveKey, _ := riotUserKeys.effective(); result != want || effectiveKey != key || riotKeyState() != "configured" {
 				t.Fatal("accepted credential unavailable")
 			}
 			reloaded := loadRiotKeyStore(s.store)
@@ -107,7 +107,7 @@ func TestR204KeySaveAndClear(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if riotKey() != "" || riotKeySource() != "none" {
+	if effectiveKey, _ := riotUserKeys.effective(); effectiveKey != "" || riotKeySource() != "none" {
 		t.Fatal("clear unexpectedly reactivated legacy embedded key")
 	}
 	riotEmbeddedKey = func() string { return "" }
@@ -164,7 +164,7 @@ func TestR204KeyRuntime401AndPrivacy(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/riot-key", strings.NewReader(`{"key":"`+r204FixtureKey+`"}`))
 	w := httptest.NewRecorder()
 	a.handleRiotKeySettings(w, req)
-	if w.Code != 200 || riotKey() != r204FixtureKey {
+	if effectiveKey, _ := riotUserKeys.effective(); w.Code != 200 || effectiveKey != r204FixtureKey {
 		t.Fatal("settings save failed", w.Code)
 	}
 	// Exercise the actual authenticated Riot request branch, not observe alone.

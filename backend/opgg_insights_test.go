@@ -22,7 +22,7 @@ func TestMatchOPGGAverageTierUsesClosestValidGame(t *testing.T) {
 		{createdAt: createdAt + 90_000, duration: 1_805, tier: matchTiersResponse{Tier: "GOLD", Division: "I"}},
 		{createdAt: createdAt + 10_000, duration: 1_815, tier: matchTiersResponse{Tier: "EMERALD", Division: "II", LP: 44}},
 	}
-	got := matchOPGGAverageTier(createdAt, 1_800, games)
+	got := matchOPGGAverageTierDetailed(matchTierMatchRequest{CreatedAt: createdAt, Duration: 1_800}, games).tier
 	if got == nil || got.Tier != "EMERALD" || got.Division != "II" || got.LP != 44 {
 		t.Fatalf("closest tier = %#v", got)
 	}
@@ -30,22 +30,22 @@ func TestMatchOPGGAverageTierUsesClosestValidGame(t *testing.T) {
 	if games[1].tier.Tier != "EMERALD" {
 		t.Fatal("returned value aliases the OP.GG cache entry")
 	}
-	if got := matchOPGGAverageTier(createdAt, 1_800, []opggGameTier{{
+	if got := matchOPGGAverageTierDetailed(matchTierMatchRequest{CreatedAt: createdAt, Duration: 1_800}, []opggGameTier{{
 		createdAt: createdAt + opggGamesTimeSlack,
 		duration:  1_800 + opggGamesSpanSlack,
 		tier:      matchTiersResponse{Tier: "SILVER"},
-	}}); got == nil || got.Tier != "SILVER" {
+	}}).tier; got == nil || got.Tier != "SILVER" {
 		t.Fatalf("inclusive boundary did not match: %#v", got)
 	}
 	for name, got := range map[string]*matchTiersResponse{
-		"missing timestamp": matchOPGGAverageTier(0, 1_800, games),
-		"missing duration":  matchOPGGAverageTier(createdAt, 0, games),
-		"time outside": matchOPGGAverageTier(createdAt, 1_800, []opggGameTier{{
+		"missing timestamp": matchOPGGAverageTierDetailed(matchTierMatchRequest{CreatedAt: 0, Duration: 1_800}, games).tier,
+		"missing duration":  matchOPGGAverageTierDetailed(matchTierMatchRequest{CreatedAt: createdAt, Duration: 0}, games).tier,
+		"time outside": matchOPGGAverageTierDetailed(matchTierMatchRequest{CreatedAt: createdAt, Duration: 1_800}, []opggGameTier{{
 			createdAt: createdAt + opggGamesTimeSlack + 1, duration: 1_800, tier: matchTiersResponse{Tier: "GOLD"},
-		}}),
-		"duration outside": matchOPGGAverageTier(createdAt, 1_800, []opggGameTier{{
+		}}).tier,
+		"duration outside": matchOPGGAverageTierDetailed(matchTierMatchRequest{CreatedAt: createdAt, Duration: 1_800}, []opggGameTier{{
 			createdAt: createdAt, duration: 1_800 + opggGamesSpanSlack + 1, tier: matchTiersResponse{Tier: "GOLD"},
-		}}),
+		}}).tier,
 	} {
 		if got != nil {
 			t.Fatalf("%s unexpectedly matched: %#v", name, got)

@@ -24,14 +24,20 @@ func TestR185FacadeFingerprintAndSummary(t *testing.T) {
 	t.Cleanup(a.clearFacadeEventThrottle)
 	a.handleFacadeLCUEvent(r185Chat("private-signature", 0))
 	<-events
-	a.flushFacadeEventSources()
+	a.facadeEventMu.Lock()
+	generation := a.facadeEventSummaryGeneration
+	a.facadeEventMu.Unlock()
+	a.flushFacadeEventSourcesGeneration(generation)
 	for i := 0; i < 30; i++ {
 		a.handleFacadeLCUEvent(r185Chat("private-signature", i+1))
 	}
 	if len(events) != 0 {
 		t.Fatalf("timestamp events broadcast %d", len(events))
 	}
-	a.flushFacadeEventSources()
+	a.facadeEventMu.Lock()
+	generation = a.facadeEventSummaryGeneration
+	a.facadeEventMu.Unlock()
+	a.flushFacadeEventSourcesGeneration(generation)
 	rows := r175Events(t, a, "facade_event_source")
 	last := rows[len(rows)-1]
 	if last["received"] != float64(30) || last["ignored"] != float64(30) || last["broadcast"] != float64(0) {

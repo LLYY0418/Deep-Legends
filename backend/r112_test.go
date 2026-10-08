@@ -27,7 +27,7 @@ func TestR112AverageTierMixedPublicResponse(t *testing.T) {
 	}
 	found := 0
 	for _, game := range games {
-		tier := matchOPGGAverageTier(game.createdAt, game.duration, games)
+		tier := matchOPGGAverageTierDetailed(matchTierMatchRequest{CreatedAt: game.createdAt, Duration: game.duration}, games).tier
 		if tier != nil {
 			found++
 			if (tier.Tier != "CHALLENGER" && tier.Tier != "GRANDMASTER") || tier.Division != "" {

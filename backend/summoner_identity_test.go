@@ -102,7 +102,7 @@ func TestRefreshSummonerIdentityAccountChangeClearsReferencesAndRequestsSnapshot
 	client := newSummonerIdentityClient(t, next, &requests)
 	a := identityTestApp(client, current)
 	a.token = "session-token"
-	publicRef := a.registerGameplayReference(current.PUUID)
+	publicRef := a.registerGameplayReferenceDetails(gameplayReference{PlayerRef: current.PUUID})
 	if publicRef == "" {
 		t.Fatal("failed to seed gameplay references")
 	}
@@ -110,7 +110,7 @@ func TestRefreshSummonerIdentityAccountChangeClearsReferencesAndRequestsSnapshot
 	if changed, err := a.refreshSummonerIdentity(client); err != nil || !changed {
 		t.Fatalf("refreshSummonerIdentity changed=%v err=%v", changed, err)
 	}
-	if _, ok := a.resolveGameplayReference(publicRef); ok {
+	if _, ok := a.resolveGameplayReferenceDetails(publicRef); ok {
 		t.Fatal("account change left gameplay references intact")
 	}
 	select {

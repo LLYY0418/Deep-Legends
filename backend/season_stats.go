@@ -384,17 +384,11 @@ func (s *localStore) loadSeasonStats(source, accountHash, season string) (season
 	return cache, nil
 }
 
-// saveSeasonStats 写入前先过一遍磁盘预算（season_stats_budget.go）。
+// saveSeasonStatsReported 写入前先过一遍磁盘预算（season_stats_budget.go）。
 // 预算的处置顺序是「先截断 RankedMatches，再截断 AugmentSamples」，
 // 绝不整体拒绝写入、绝不丢弃 Stats、绝不 panic——赛季英雄统计是用户
 // 唯一拿不回来的东西（重扫要几十页请求），宁可少留几场单场快照。
-func (s *localStore) saveSeasonStats(cache seasonStatsCache) error {
-	_, err := s.saveSeasonStatsReported(cache)
-	return err
-}
-
-// saveSeasonStatsReported 与 saveSeasonStats 同一条写入路径，额外把预算处置
-// 结果交回调用方记诊断事件（排障时能看出这一轮到底截断了什么）。
+// 将预算处置结果交回调用方记诊断事件。
 func (s *localStore) saveSeasonStatsReported(cache seasonStatsCache) (seasonStatsBudgetReport, error) {
 	if s == nil || strings.TrimSpace(cache.AccountHash) == "" || strings.TrimSpace(cache.Season) == "" {
 		return seasonStatsBudgetReport{}, errors.New("season stats storage unavailable")
@@ -732,10 +726,6 @@ func seasonStatsOverall(items []gameplaySeasonChampionStat) gameplayAggregate {
 	return result
 }
 
-func (a *app) loadSeasonChampionStats(ctx context.Context, client *LCUClient, reference gameplayReference, player Summoner, playerRef string, names map[int64]string) ([]gameplaySeasonChampionStat, seasonStatsProgress, []seasonRankedMatch, map[int64]gameplayAggregate) {
-	return a.loadSeasonChampionStatsWithHistoryCache(ctx, client, reference, player, playerRef, names, true)
-}
-
 func (a *app) loadSeasonChampionStatsWithHistoryCache(ctx context.Context, client *LCUClient, reference gameplayReference, player Summoner, playerRef string, names map[int64]string, useHistoryCache bool) ([]gameplaySeasonChampionStat, seasonStatsProgress, []seasonRankedMatch, map[int64]gameplayAggregate) {
 	season, seasonStart := currentRankedSeason(time.Now())
 	progress := seasonStatsProgress{Season: season, Collecting: true}
@@ -984,7 +974,7 @@ type seasonScanState struct {
 	onPage            func(*seasonScanState)
 }
 
-// seasonScanPages 从 cache.ResumeIndex 开始往回翻页，最多翻 budget 页。
+// seasonScanPagesWithHistoryCache 从 cache.ResumeIndex 开始往回翻页，最多翻 budget 页。
 // 返回时 cache.ResumeIndex 指向下次该继续的服务器偏移量。
 //
 // ★这里有个曾经写错过的判据：老逻辑「撞到已缓存对局就把 Complete 置真」，
@@ -992,10 +982,6 @@ type seasonScanState struct {
 // 后台若干批），上一批留下的缓存会让下一批在第一页就撞上并误判为完整，
 // 整季的尾巴永远补不上。所以只有真正扫到赛季起点之前、或上游没有更多数据时
 // 才算完整；撞到缓存只是说明"头部这一段已经有了"，要跳到 ResumeIndex 继续。
-func (a *app) seasonScanPages(ctx context.Context, client *LCUClient, serverID, playerRef string, scan *seasonScanState, budget int) {
-	a.seasonScanPagesWithHistoryCache(ctx, client, serverID, playerRef, scan, budget, true)
-}
-
 func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUClient, serverID, playerRef string, scan *seasonScanState, budget int, useHistoryCache bool) {
 	if scan.headOnly {
 		a.seasonScanHeadConcurrent(ctx, client, serverID, playerRef, scan, budget, useHistoryCache)

@@ -569,12 +569,6 @@ func opggTierTimeBases(request matchTierMatchRequest) []opggTierTimeBase {
 	return bases
 }
 
-// matchOPGGAverageTier 保留旧的两参数形状（只有 gameCreation 可用时的兼容入口）。
-// 生产路径走 matchOPGGAverageTierDetailed。
-func matchOPGGAverageTier(createdAt, duration int64, games []opggGameTier) *matchTiersResponse {
-	return matchOPGGAverageTierDetailed(matchTierMatchRequest{CreatedAt: createdAt, Duration: duration}, games).tier
-}
-
 // matchOPGGAverageTierDetailed 按时间和时长把一场 Riot 对局映射到 OP.GG 的不透明
 // 对局记录。返回副本，避免调用方持有缓存切片内部字段的地址。
 func matchOPGGAverageTierDetailed(request matchTierMatchRequest, games []opggGameTier) opggTierMatch {

@@ -207,7 +207,6 @@
     }
     return state.championIndex = { source, rows, ids, keys, terms: new WeakMap() };
   }
-  function catalogChampions() { return championIndex().rows; }
   function rankingRows() { return objectRows(state.rankings?.rows); }
   function tierLabel(value) { return catalogTiers().find((item) => item.value === value)?.label || fallbackTiers.find((item) => item.value === value)?.label || value; }
   function championMeta(id) { return championIndex().ids.get(Number(id)) || null; }
@@ -1899,16 +1898,6 @@
   function teamName(team) {
     const name = (team?.champions || []).map((champion) => champion.name).filter(Boolean).join(" + ") || "未知队伍";
     return escapeHTML(name);
-  }
-
-  function renderAugmentGroups(items) {
-    const groups = new Map();
-    for (const item of items) {
-      const grade = String(item.grade || "").trim().toUpperCase();
-      if (!groups.has(grade)) groups.set(grade, []);
-      groups.get(grade).push(item);
-    }
-    return `<div class="augment-tier-groups">${[...groups.entries()].sort((a, b) => gradeRank(a[0]) - gradeRank(b[0])).map(([grade, rows]) => `<section class="augment-tier-group"><header>${gradeBadge(grade, "augment-tier-letter")}<div><h4>海克斯</h4><p>${rows.length} 个，优先展示更高品质</p></div></header><div class="augment-grid">${rows.map(renderAugmentCard).join("")}</div></section>`).join("")}</div>`;
   }
 
   function renderChampionTable(rows, metrics, rankOffset = 0) {

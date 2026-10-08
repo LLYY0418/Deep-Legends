@@ -82,10 +82,6 @@ func (a *app) handleClaimScan(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, scanClaimsObserved(r.Context(), client, a.recordDiagnostic))
 }
 
-func scanClaims(ctx context.Context, client *LCUClient) claimScanResponse {
-	return scanClaimsObserved(ctx, client, nil)
-}
-
 func scanClaimsObserved(ctx context.Context, client *LCUClient, observe func(map[string]any)) claimScanResponse {
 	response := claimScanResponse{Connected: true, ScannedAt: time.Now().UTC(), Items: []claimEntry{}, Sources: emptyClaimSources()}
 	grants, grantCapability := NewRewardsAPI(client).PendingGrantsContext(ctx)
@@ -584,23 +580,6 @@ func eventRewardGroupIDs(value any) []string {
 	}
 	walk(value)
 	return result
-}
-
-func claimSignature(entry claimEntry) string {
-	items := make([]string, 0, len(entry.Items))
-	for _, item := range entry.Items {
-		id := item.ItemID
-		if id == "" {
-			id = item.ID
-		}
-		if id == "" {
-			return ""
-		}
-		encoded, _ := json.Marshal([]any{id, strings.ToUpper(item.ItemType), item.Quantity})
-		items = append(items, string(encoded))
-	}
-	sort.Strings(items)
-	return strings.Join(items, ",")
 }
 
 func (a *app) handleClaimExecute(w http.ResponseWriter, r *http.Request) {

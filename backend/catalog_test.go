@@ -102,7 +102,7 @@ func TestLoadSnapshotIndependentRefreshesOverlap(t *testing.T) {
 	defer server.Close()
 
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	if _, err := loadSnapshotWithClient(client, PoolManifest{}); err == nil {
+	if _, err := loadSnapshotWithClientProvider(client, PoolManifest{}, nil, nil); err == nil {
 		t.Fatal("expected the controlled ownership failure")
 	}
 	if got := maxActive.Load(); got < 2 {
@@ -208,7 +208,7 @@ func TestR87LoadCollectionSnapshotReusesOwnershipPayloads(t *testing.T) {
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	identity := Snapshot{Summoner: Summoner{SummonerID: 1, PUUID: "test-puuid"}}
 	pool := PoolManifest{Entries: []PoolEntry{{ID: 1001, Name: "测试皮肤"}}, Names: []string{"测试皮肤"}}
-	snapshot, err := loadCollectionSnapshot(client, pool, identity)
+	snapshot, err := loadCollectionSnapshotWithProvider(client, pool, identity, nil, nil)
 	if err != nil {
 		t.Fatalf("loadCollectionSnapshot failed: %v", err)
 	}
@@ -306,7 +306,7 @@ func TestExtractOwnedIDs(t *testing.T) {
 		map[string]any{"itemId": "1003", "inventoryType": "CHAMPION_SKIN"},
 		map[string]any{"skinId": float64(1004), "ownership": map[string]any{"owned": true}},
 	}
-	got := extractOwnedIDs(fixture, false)
+	got := extractOwnedEvidence(fixture, false).OwnedIDs
 	for _, id := range []int64{1001, 1004} {
 		if !got[id] {
 			t.Errorf("expected skin %d to be owned", id)
@@ -318,12 +318,12 @@ func TestExtractOwnedIDs(t *testing.T) {
 		}
 	}
 
-	presence := extractOwnedIDs(fixture, true)
+	presence := extractOwnedEvidence(fixture, true).OwnedIDs
 	if !presence[1003] {
 		t.Error("skin 1003 should be owned for an inventory endpoint where presence is authoritative")
 	}
 
-	available := extractOwnedIDs(map[string]any{"id": float64(1005), "status": "AVAILABLE"}, true)
+	available := extractOwnedEvidence(map[string]any{"id": float64(1005), "status": "AVAILABLE"}, true).OwnedIDs
 	if available[1005] {
 		t.Error("AVAILABLE must not be interpreted as owned")
 	}
@@ -338,7 +338,7 @@ func TestPresenceInventoryRequiresPermanentChampionSkin(t *testing.T) {
 		map[string]any{"itemId": float64(1005)},
 		map[string]any{"id": float64(1006), "inventoryType": "CHAMPION_SKIN"},
 	}
-	got := extractOwnedIDs(fixture, true)
+	got := extractOwnedEvidence(fixture, true).OwnedIDs
 	if !got[1001] || !got[1005] || len(got) != 2 {
 		t.Fatalf("scoped presence IDs = %#v, want 1001 and type-implicit item 1005", got)
 	}
@@ -350,7 +350,7 @@ func TestPresenceInventoryReadsTencentItemKeyContainers(t *testing.T) {
 		map[string]any{"itemKey": map[string]any{"itemId": float64(1002), "inventoryType": "CHAMPION_SKIN"}, "quantity": float64(0)},
 		map[string]any{"itemKey": map[string]any{"itemId": float64(1003), "inventoryType": "CHROMA"}, "quantity": float64(1)},
 	}}
-	got := extractOwnedIDs(fixture, true)
+	got := extractOwnedEvidence(fixture, true).OwnedIDs
 	if len(got) != 1 || !got[1001] {
 		t.Fatalf("itemKey inventory IDs = %#v, want only 1001", got)
 	}
@@ -526,7 +526,7 @@ func TestChampionSkinsContainerIsTraversed(t *testing.T) {
 			map[string]any{"skinId": float64(1002), "owned": false},
 		},
 	}}
-	got := extractOwnedIDs(fixture, false)
+	got := extractOwnedEvidence(fixture, false).OwnedIDs
 	if !got[1001] || got[1002] {
 		t.Fatalf("championSkins ownership was not parsed: %#v", got)
 	}
@@ -534,7 +534,7 @@ func TestChampionSkinsContainerIsTraversed(t *testing.T) {
 
 func TestConflictingOwnershipEvidenceIsRejected(t *testing.T) {
 	fixture := map[string]any{"id": float64(1001), "owned": true, "status": "AVAILABLE"}
-	if got := extractOwnedIDs(fixture, false); len(got) != 0 {
+	if got := extractOwnedEvidence(fixture, false).OwnedIDs; len(got) != 0 {
 		t.Fatalf("conflicting ownership must fail closed: %#v", got)
 	}
 }
@@ -555,7 +555,16 @@ func TestOwnedSourcesMustAgree(t *testing.T) {
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	catalog := []Skin{{ID: 1001, Name: "皮肤一", ChampionID: 1}, {ID: 2001, Name: "皮肤二", ChampionID: 2}}
-	got, failures := loadOwnedSkinIDs(client, 42, catalog)
+	got, statuses, err := loadOwnedSkinInventory(client, 42, catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var failures []string
+	for _, status := range statuses {
+		if status.State != "success" && status.State != "unsupported" {
+			failures = append(failures, status.Path+": "+status.Detail)
+		}
+	}
 	if len(got) != 2 {
 		t.Fatalf("owned IDs = %#v, failures=%#v", got, failures)
 	}
@@ -577,7 +586,16 @@ func TestPartialOwnedSourceStopsCalculation(t *testing.T) {
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	catalog := []Skin{{ID: 1001, Name: "皮肤一", ChampionID: 1}, {ID: 2001, Name: "皮肤二", ChampionID: 2}}
-	got, failures := loadOwnedSkinIDs(client, 42, catalog)
+	got, statuses, err := loadOwnedSkinInventory(client, 42, catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var failures []string
+	for _, status := range statuses {
+		if status.State != "success" && status.State != "unsupported" {
+			failures = append(failures, status.Path+": "+status.Detail)
+		}
+	}
 	if len(got) != 2 || len(failures) != 1 || !strings.Contains(failures[0], "presence-only audit differs") {
 		t.Fatalf("explicit full-coverage source should survive a partial presence audit: got=%#v failures=%#v", got, failures)
 	}

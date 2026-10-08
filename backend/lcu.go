@@ -460,20 +460,6 @@ type Summoner struct {
 	Privacy string `json:"privacy,omitempty"`
 }
 
-func discoverLCUDetailed() (*LCUClient, LCUDiscoveryStatus, error) {
-	report := LCUDiscoveryStatus{AttemptAt: time.Now(), Result: "searching"}
-	if err := ensureWindows(); err != nil {
-		report.Result = "unsupported"
-		report.Detail = "当前系统不支持客户端发现"
-		return nil, report, err
-	}
-	query, commandErr := leagueProcessCommands()
-	return discoverLCUFromProcesses(query, commandErr, lockfileCandidates)
-}
-
-func discoverLCUFromProcesses(query processQueryResult, commandErr error, candidates func([]string) []string) (*LCUClient, LCUDiscoveryStatus, error) {
-	return discoverLCUFromProcessesWith(query, commandErr, candidates, time.Now())
-}
 func discoverLCUFromProcessesWith(query processQueryResult, commandErr error, candidates func([]string) []string, started time.Time) (found *LCUClient, report LCUDiscoveryStatus, resultErr error) {
 	defer func() { report.DurationMS = time.Since(started).Milliseconds() }()
 	report = LCUDiscoveryStatus{AttemptAt: time.Now(), Result: "searching"}

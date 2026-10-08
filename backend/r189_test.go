@@ -119,7 +119,7 @@ func TestR189UnknownLootFallbackAndDiagnostic(t *testing.T) {
 func TestR189OwnershipFromItemStatus(t *testing.T) {
 	for _, kind := range []string{"EMOTE", "WARDSKIN", "SUMMONERICON"} {
 		for _, status := range []string{"OWNED", "NONE", "", "UNKNOWN"} {
-			item := enrichLootItems([]LootItem{{LootID: kind + "_777777", Type: kind, ItemStatus: status, Owned: true, OwnedKnown: true}}, nil)[0]
+			item := enrichLootItemsWithMetadata([]LootItem{{LootID: kind + "_777777", Type: kind, ItemStatus: status, Owned: true, OwnedKnown: true}}, nil, nil, nil)[0]
 			if item.OwnedKnown != (status == "OWNED" || status == "NONE") || item.Owned != (status == "OWNED") {
 				t.Fatal(kind, status, item)
 			}
@@ -132,7 +132,7 @@ func TestR189OwnershipFromItemStatus(t *testing.T) {
 		}
 	}
 	// ItemStatus does not reinterpret skin ownership from the real inventory.
-	got := enrichLootItems([]LootItem{{LootID: "SKIN_103001", IsSkinRelated: true, ItemStatus: "NONE"}}, []Skin{{ID: 103001, Name: "测试皮肤", Owned: true}})[0]
+	got := enrichLootItemsWithMetadata([]LootItem{{LootID: "SKIN_103001", IsSkinRelated: true, ItemStatus: "NONE"}}, []Skin{{ID: 103001, Name: "测试皮肤", Owned: true}}, nil, nil)[0]
 	if !got.SkinOwnedKnown || !got.SkinOwned || got.OwnedKnown {
 		t.Fatal(got)
 	}

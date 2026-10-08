@@ -122,7 +122,7 @@ func TestR115_BroadcastContentsAndGuards(t *testing.T) {
 				}
 				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
 			})}}
-			got := runner.broadcastPosition(client, Summoner{SummonerID: 115}, tc.rule)
+			got := runner.broadcastPositionContext(context.Background(), client, Summoner{SummonerID: 115}, tc.rule)
 			if tc.name == "unsafe id" && got != "failed" {
 				t.Fatalf("unsafe conversation not rejected at discovery: %s", got)
 			}

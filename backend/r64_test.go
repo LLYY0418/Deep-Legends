@@ -45,12 +45,12 @@ func TestR64ClearChallengesPreservesTitle(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	restore, err := (&app{}).applyFacadeActionResult(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "clear-challenges"})
+	result, err := (&app{}).applyFacadeActionResultDetails(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "clear-challenges"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if restore != "item-id-string" {
-		t.Fatalf("title_restore = %q, want item-id-string", restore)
+	if result.TitleRestore != "item-id-string" {
+		t.Fatalf("title_restore = %q, want item-id-string", result.TitleRestore)
 	}
 	assertR64PreferenceBody(t, posted, []int64{}, "5")
 	if string(posted["title"]) != `"77"` {
@@ -65,12 +65,12 @@ func TestR64ClearChallengesRefusesToDropUnsupportedTitle(t *testing.T) {
 		http.Error(w, `{"message":"title itemId rejected"}`, http.StatusUnprocessableEntity)
 	})
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	restore, err := (&app{}).applyFacadeActionResult(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "clear-challenges"})
+	result, err := (&app{}).applyFacadeActionResultDetails(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "clear-challenges"})
 	if err == nil {
 		t.Fatal("clear-challenges silently dropped the current title")
 	}
-	if restore != "refused" {
-		t.Fatalf("title_restore = %q, want refused", restore)
+	if result.TitleRestore != "refused" {
+		t.Fatalf("title_restore = %q, want refused", result.TitleRestore)
 	}
 	body := <-bodies
 	assertR64PreferenceBody(t, body, []int64{}, "5")

@@ -86,12 +86,12 @@ func Test1945FacadeApplyUsesDisplayedCatalogAndCanonicalChampionIdentity(t *test
 		if !byID[id].IsVariant {
 			t.Fatalf("quest variant missing: %d", id)
 		}
-		if err := a.applyFacadeAction(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "background", SkinID: id}); err != nil {
+		if _, err := a.applyFacadeActionResultDetails(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "background", SkinID: id}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	for _, id := range []int64{67065, 67066, 999999} {
-		if err := a.applyFacadeAction(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "background", SkinID: id}); !errors.Is(err, errFacadeInvalid) {
+		if _, err := a.applyFacadeActionResultDetails(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "background", SkinID: id}); !errors.Is(err, errFacadeInvalid) {
 			t.Fatalf("unknown/chroma accepted %d: %v", id, err)
 		}
 	}

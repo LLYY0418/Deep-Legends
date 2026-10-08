@@ -34,7 +34,7 @@ func TestGameplayRecommendationBundleDropsAugmentStages(t *testing.T) {
 		t.Fatalf("详情页的 augment 2095 应该带 4 条阶段行，实际 %d 条", len(source.Stages))
 	}
 
-	bundle := gameplayRecommendationsFromChampionDetail(157, "", detail)
+	bundle := gameplayRecommendationsFromResolvedDetail(157, "", detail, gameplayRecommendationModeResolution{InternalMode: "hextech-aram", QueueID: 420})
 	if len(bundle.Augments) != len(detail.RecommendedAugments) {
 		t.Fatalf("局内 bundle 的海克斯行数变了：%d，详情页是 %d", len(bundle.Augments), len(detail.RecommendedAugments))
 	}

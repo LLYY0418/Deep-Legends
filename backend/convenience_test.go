@@ -17,10 +17,14 @@ func TestConvenienceSettingsPersist(t *testing.T) {
 	root := t.TempDir()
 	store := trackTestStore(t, &localStore{root: root})
 	want := convenienceSettings{AutoAccept: true, AutoReconnect: true}
-	if err := saveConvenienceSettings(store, want); err != nil {
+	settings := loadWatchSettings(store)
+	settings.Rules.AutoAccept.Enabled = want.AutoAccept
+	settings.Rules.AutoPlayAgain.Enabled = want.AutoPlayAgain
+	settings.Rules.AutoReconnect.Enabled = want.AutoReconnect
+	if err := saveWatchSettings(store, settings); err != nil {
 		t.Fatal(err)
 	}
-	got := loadConvenienceSettings(store)
+	got := legacyConvenienceSettings(loadWatchSettings(store))
 	if !got.AutoAccept || got.AutoPlayAgain || !got.AutoReconnect {
 		t.Fatalf("loaded %+v, want %+v", got, want)
 	}
@@ -32,7 +36,7 @@ func TestConvenienceSettingsPersist(t *testing.T) {
 func TestHandleGameplayConvenienceRoundTrip(t *testing.T) {
 	root := t.TempDir()
 	store := trackTestStore(t, &localStore{root: root})
-	a := &app{storage: store, convenience: newConvenienceRunner(store, nil)}
+	a := &app{storage: store, convenience: newWatchRunner(store, nil)}
 
 	get := httptest.NewRequest(http.MethodGet, "/api/gameplay/convenience", nil)
 	recorder := httptest.NewRecorder()
@@ -60,7 +64,7 @@ func TestHandleGameplayConvenienceRoundTrip(t *testing.T) {
 	if !current.AutoAccept || !current.AutoPlayAgain || current.AutoReconnect {
 		t.Fatalf("in-memory settings = %+v", current)
 	}
-	saved := loadConvenienceSettings(store)
+	saved := legacyConvenienceSettings(loadWatchSettings(store))
 	if saved != current {
 		t.Fatalf("disk %+v != memory %+v", saved, current)
 	}
@@ -101,7 +105,7 @@ func TestConvenienceReadyCheckPostsAcceptOnce(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	runner := newConvenienceRunner(nil, nil)
+	runner := newWatchRunner(nil, nil)
 	settings := defaultWatchSettings()
 	settings.Rules.AutoAccept.Enabled = true
 	settings.Rules.AutoAccept.DelayMS = 0
@@ -138,7 +142,7 @@ func TestConvenienceDisabledPhaseDoesNotCallClient(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	runner := newConvenienceRunner(nil, nil)
+	runner := newWatchRunner(nil, nil)
 	runner.handlePhase(client, "ReadyCheck")
 	runner.handlePhase(client, "EndOfGame")
 	runner.handlePhase(client, "Reconnect")
@@ -158,7 +162,7 @@ func TestConvenienceReconnectPostsAndNotifies(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
-	runner := newConvenienceRunner(nil, func(event string) { events <- event })
+	runner := newWatchRunner(nil, func(event string) { events <- event })
 	fire := make(chan struct{})
 	waiting := make(chan time.Duration, 1)
 	runner.wait = func(ctx context.Context, d time.Duration) error {

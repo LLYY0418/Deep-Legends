@@ -588,7 +588,7 @@ func TestR127TierOnlyRankModePrefersSGPAndSkipsWinLossCompletion(t *testing.T) {
 	if got := rankSourcesTierOnly([]string{dataSourceLCU, dataSourceSGP}); len(got) != 2 || got[0] != dataSourceSGP || got[1] != dataSourceLCU {
 		t.Fatalf("rankSourcesTierOnly = %#v", got)
 	}
-	if rankScoreCacheKey(dataSourceSGP, "HN1", playerRef) == rankScoreCacheKeyScoped(dataSourceSGP, "HN1", playerRef, rankScoreTierOnlyScope) {
+	if rankScoreCacheKeyScoped(dataSourceSGP, "HN1", playerRef, "") == rankScoreCacheKeyScoped(dataSourceSGP, "HN1", playerRef, rankScoreTierOnlyScope) {
 		t.Fatal("只要段位与需要胜负场的缓存键必须分开，否则个人资料页会读到没有胜负场的结果")
 	}
 	if matchTiersRankConcurrency != 8 {

@@ -395,7 +395,7 @@ func TestFacadeRankAndLoginResetValidation(t *testing.T) {
 		StatusMessageEnabled: true, StatusMessage: "重设签名", RankEnabled: true,
 		Rank: map[string]any{"rankedLeagueQueue": "RANKED_SOLO_5X5", "rankedLeagueTier": "DIAMOND", "rankedLeagueDivision": "II"},
 	}
-	if err := a.applyFacadeAction(context.Background(), nil, Summoner{}, facadeApplyRequest{Action: "login-reset", LoginReset: &reset}); err != nil {
+	if _, err := a.applyFacadeActionResultDetails(context.Background(), nil, Summoner{}, facadeApplyRequest{Action: "login-reset", LoginReset: &reset}); err != nil {
 		t.Fatal(err)
 	}
 	got := runner.currentWatch().Facade
@@ -419,7 +419,7 @@ func TestFacadeBackgroundWritesOnlySkinID(t *testing.T) {
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	a := &app{allSkinsWithBase: []Skin{{ID: 99001}}}
-	if err := a.applyFacadeAction(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "background", SkinID: 99001}); err != nil {
+	if _, err := a.applyFacadeActionResultDetails(context.Background(), client, Summoner{}, facadeApplyRequest{Action: "background", SkinID: 99001}); err != nil {
 		t.Fatal(err)
 	}
 	body := <-bodies

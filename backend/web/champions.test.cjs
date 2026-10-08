@@ -51,6 +51,7 @@ const queueGroupsBackend = fs.readFileSync(path.join(root, "queue_groups.go"), "
 const riotBackend = fs.readFileSync(path.join(root, "riot_api.go"), "utf8");
 const sgpBackend = fs.readFileSync(path.join(root, "sgp_api.go"), "utf8");
 const lcuAPIBackend = fs.readFileSync(path.join(root, "lcu_api.go"), "utf8");
+const lootMetadataBackend = fs.readFileSync(path.join(root, "loot_metadata.go"), "utf8");
 const lcuBackend = fs.readFileSync(path.join(root, "lcu.go"), "utf8");
 const lcuEventsBackend = fs.readFileSync(path.join(root, "lcu_events.go"), "utf8");
 const connectionManagerBackend = fs.readFileSync(path.join(root, "connection_manager.go"), "utf8");
@@ -2857,9 +2858,11 @@ test("live recommendations can temporarily use a champ-select pick intent", () =
   assert.match(gameplayBackend, /ChampionLocked\s+bool\s+`json:"championLocked"`/);
 	assert.match(gameplayBackend, /pickIntent := positiveChampionPickIntent\(selected\.ChampionPickIntent\)/);
 	assert.match(gameplayBackend, /ChampionPickPending: selected\.ChampionPickIntent < 0/);
-  assert.match(gameplayBackend, /func gameplayLiveRecommendationTarget\(players \[\]gameplayLivePlayer, currentChampionID int64\)/);
-  assert.match(gameplayBackend, /championID = player\.ChampionPickIntent/);
-  assert.match(gameplayBackend, /if currentChampionID > 0 \{\s*return currentChampionID, position/s);
+  const target = goFunctionSource(gameplayBackend, "gameplayLiveRecommendationTargetWithChampSelect");
+  assert.match(target, /players \[\]gameplayLivePlayer, currentChampionID int64, champSelect lcuChampSelectSession/);
+  assert.match(gameplayBackend, /gameplayLiveRecommendationTargetWithChampSelect\(response\.Players, response\.CurrentChampionID, champSelect\)/);
+  assert.match(target, /championID = player\.ChampionPickIntent/);
+  assert.match(target, /if currentChampionID > 0 \{\s*return currentChampionID, position/s);
 });
 
 test("live recommendation champion ids reject negative pick sentinels and use resolved live fallback", () => {
@@ -2973,7 +2976,9 @@ test("position filters use icons and transient search state is reset", () => {
 
 test("rune shards use crisp login-independent Data Dragon assets", () => {
   assert.match(backend, /StatModsAttackSpeedIcon\.png/);
-  assert.match(backend, /asset\.Kind, asset\.Source, asset\.Path = "perkShard", "ddragon", shardPath/);
+  const shards = goFunctionSource(structuredBackend, "runeShardSlots");
+  assert.match(shards, /path, _ := dataDragonRuneShardPath\(id\)/);
+  assert.match(shards, /championAsset\{[^}]*Kind: "perk"[^}]*Source: "ddragon", Path: path/);
   assert.match(gameplayScript, /function dataDragonRuneShardPath\(id\)/);
   assert.match(gameplayScript, /remoteStaticIcon\("ddragon", shardPath/);
   assert.match(gameplayScript, /5001:\s*"StatModsHealthPlusIcon\.png"/);
@@ -6005,6 +6010,7 @@ test("R61 every mandatory contract rejects its documented production mutation", 
 		sgp: sgpBackend,
 		gameplayGo: gameplayBackend,
 		lcu: lcuAPIBackend,
+		lootMetadata: lootMetadataBackend,
 		lcuEvents: lcuEventsBackend,
 		connection: connectionManagerBackend,
 		catalog: catalogBackend,
@@ -6040,7 +6046,7 @@ test("R61 every mandatory contract rejects its documented production mutation", 
 		assert.match(sources.gameplayGo, /"event": "overview_phases_ms"/);
 
 		assert.match(sources.appJS, /const displayLoot = \[\.\.\.loot\];/); // B-1
-		assert.match(sources.lcu, /global\/zh_cn\/v1\/loot\.json/); // B-2
+		assert.match(sources.lootMetadata, /\{"loot", "\/lol-game-data\/assets\/v1\/loot\.json", "\/latest\/plugins\/rcp-be-lol-game-data\/global\/zh_cn\/v1\/loot\.json", parseLootCatalog\}/); // B-2
 		assert.match(sources.lcu, /"CHEST_PROMOTION":\s+"紫色宝箱"/);
 		assert.match(sources.lcu, /"event": "loot_category_assigned"/); // B-3
 		for (const event of ["loot_map_shape", "loot_name_fallback", "loot_category_assigned"]) { // B-4
@@ -6065,7 +6071,7 @@ test("R61 every mandatory contract rejects its documented production mutation", 
 		assert.doesNotMatch(rankedBuild, /\$\{sourceNote\}/);
 		assert.doesNotMatch(depthGroups, /item-chain-source|sourceNote/);
 		assert.match(sources.championsJS, /R60 cleanup marker: GamesUnavailable/); // C-6
-		assert.match(sources.championsGo, /R60 cleanup marker: this legacy HTML parser/);
+		assert.doesNotMatch(sources.championsGo, /func parseChampionRunes\(/);
 		assert.match(sources.qq101, /R60 cleanup marker: _runeinfo and _skill/);
 
 		const enter = functionSource(sources.championsJS, "enterChampionSection");
@@ -6092,6 +6098,7 @@ test("R61 every mandatory contract rejects its documented production mutation", 
 		["A-10 URI counters", "lcuEvents", "stat.Count++", "// stat.Count removed"],
 		["A-11 complete phase set", "gameplayGo", '"ranks", "mastery", "recent_ranked"', '"ranks", "mastery_removed", "recent_ranked"'],
 		["B-1 retain unknown loot", "appJS", "const displayLoot = [...loot];", "const displayLoot = loot.filter((item) => lootName(item) !== item.lootId);"],
+		["B-2 public catalog path", "lootMetadata", "global/zh_cn/v1/loot.json", "global/zh_cn/v1/loot-removed.json"],
 		["B-2 hard-coded promotion fallback", "lcu", '"CHEST_PROMOTION":        "紫色宝箱"', '"CHEST_PROMOTION_REMOVED": "紫色宝箱"'],
 		["B-3 category diagnostic", "lcu", '"event": "loot_category_assigned"', '"event": "loot_category_removed"'],
 		["B-4 fallback diagnostic privacy", "lcu", '"loot_id_prefix": lootIDPrefix(item.LootID)', '"loot_id_prefix": item.LootID'],
@@ -6100,6 +6107,7 @@ test("R61 every mandatory contract rejects its documented production mutation", 
 		["C-2 role-rate fallback", "structured", "roleRate = percentOf(raw.Stats.Play, payload.Data.Summary.AverageStats.Play)", "roleRate = 0"],
 		["C-3 QQ101 append-only", "qq101", "if !merged[item.Position] {", "if merged[item.Position] {"],
 		["C-4 source label placement", "championsJS", '<section class="build-depth-column"><h4><span>${label}</span></h4>', '<section class="build-depth-column"><span class="item-chain-source">${build?.itemSource} · ${build?.itemWindow}</span><h4><span>${label}</span></h4>'],
+		["C-6 forbid dead HTML rune parser", "championsGo", "func newChampionProvider()", "func parseChampionRunes() {}\nfunc newChampionProvider()"],
 		["C-6 cleanup annotations", "championsJS", "R60 cleanup marker: GamesUnavailable", "cleanup marker removed"],
 		["D-1 restore before render", "championsJS", "const restored = restorePersistedChampionSelection();\n      if (restored) state.selected = restored;\n      render();", "render();\n      const restored = restorePersistedChampionSelection();\n      if (restored) state.selected = restored;"],
 		["D-2 preserve detail cache", "championsJS", "function resetTransientChampionState({ restorePosition = false } = {}) {\n    closeMayhemTierDialog(false);", "function resetTransientChampionState({ restorePosition = false } = {}) {\n    closeMayhemTierDialog(false);\n    state.detailCache.clear();"],

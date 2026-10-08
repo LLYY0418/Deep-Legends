@@ -113,7 +113,7 @@ func TestR70ScanPreservesUnsafeRewardEvidenceWithoutAdvertisingClaim(t *testing.
 	}))
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
-	scan := scanClaims(context.Background(), client)
+	scan := scanClaimsObserved(context.Background(), client, nil)
 	if len(scan.Items) != 3 {
 		t.Fatalf("evidence lost: %+v", scan.Items)
 	}

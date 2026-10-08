@@ -195,7 +195,9 @@ func TestQQ101ProbeKeepsPartialResults(t *testing.T) {
 			return nil, errors.New("unexpected QQ101 request: " + request.URL.String())
 		}
 	})}
-	event := provider.qq101Probe(t.Context(), "ryze", 13, "emerald_plus", "mid")
+	started := time.Now()
+	patch, patchErr := provider.loadQQ101LatestPatch(t.Context())
+	event := provider.qq101ProbeWithPatch(t.Context(), "ryze", 13, "emerald_plus", "mid", patch, patchErr, started)
 	if event == nil || event["ok"] != false || event["forth_n"] != 2 || event["fifth_n"] != 1 || event["sixth_n"] != 1 || event["spells_n"] != 2 {
 		t.Fatalf("probe event = %#v", event)
 	}

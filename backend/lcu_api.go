@@ -123,18 +123,6 @@ type communityDragonLootCatalog struct {
 	} `json:"LootItems"`
 }
 
-func (p *championProvider) loadCommunityDragonLootMetadata(ctx context.Context) (map[string]lootMetadata, error) {
-	if p == nil {
-		return nil, errors.New("loot metadata provider is unavailable")
-	}
-	const requestPath = "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/loot.json"
-	data, err := p.fetch(ctx, communityDragonHost, requestPath, nil, championCacheMaxEntry, "application/json")
-	if err != nil {
-		return nil, err
-	}
-	return parseLootCatalog(data)
-}
-
 func parseLootCatalog(data []byte) (map[string]lootMetadata, error) {
 	var payload communityDragonLootCatalog
 	if json.Unmarshal(data, &payload) != nil || len(payload.LootItems) == 0 {
@@ -152,10 +140,6 @@ func parseLootCatalog(data []byte) (map[string]lootMetadata, error) {
 		}
 	}
 	return result, nil
-}
-
-func enrichLootItems(items []LootItem, skins []Skin) []LootItem {
-	return enrichLootItemsWithMetadata(items, skins, nil, nil)
 }
 
 func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[string]lootMetadata, observe func(map[string]any)) []LootItem {
@@ -630,7 +614,6 @@ type SkinAppearanceAPI struct{ client *LCUClient }
 
 func NewSummonerAPI(client *LCUClient) SummonerAPI       { return SummonerAPI{client: client} }
 func NewSkinCatalogAPI(client *LCUClient) SkinCatalogAPI { return SkinCatalogAPI{client: client} }
-func NewInventoryAPI(client *LCUClient) InventoryAPI     { return InventoryAPI{client: client} }
 func NewLootAPI(client *LCUClient) LootAPI               { return LootAPI{client: client} }
 func NewObservedLootAPI(client *LCUClient, observe func(map[string]any)) LootAPI {
 	return LootAPI{client: client, observe: observe}
@@ -817,9 +800,6 @@ func (api ChampionMasteryAPI) AllContext(ctx context.Context, puuid string) (map
 	return result, capability
 }
 
-func (api StoreAPI) SkinPrice(skinID int64) (int, bool) {
-	return api.SkinPriceContext(context.Background(), skinID)
-}
 func (api StoreAPI) SkinPriceContext(ctx context.Context, skinID int64) (int, bool) {
 	if skinID <= 0 {
 		return 0, false
@@ -835,9 +815,6 @@ func (api StoreAPI) SkinPriceContext(ctx context.Context, skinID int64) (int, bo
 	return extractRPPrice(root)
 }
 
-func (api SkinAppearanceAPI) BorderStatus(skin Skin) (hasBorder, ownershipKnown, owned bool) {
-	return api.BorderStatusContext(context.Background(), skin)
-}
 func (api SkinAppearanceAPI) BorderStatusContext(ctx context.Context, skin Skin) (hasBorder, ownershipKnown, owned bool) {
 	data, err := api.client.GetBytesContext(ctx, fmt.Sprintf("/lol-game-data/assets/v1/champions/%d.json", skin.ChampionID))
 	if err != nil {
@@ -1245,10 +1222,6 @@ func extractOwnedChampionIDs(value any) map[int64]bool {
 	}
 	walk(value)
 	return result
-}
-
-func extractSkinAcquisitionDates(value any, now time.Time) map[int64]string {
-	return extractSkinAcquisitionDatesForOwned(value, now, nil)
 }
 
 func extractSkinAcquisitionDatesForOwned(value any, now time.Time, ownedIDs map[int64]bool) map[int64]string {

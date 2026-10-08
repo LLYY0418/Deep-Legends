@@ -122,10 +122,12 @@ func TestR109CNMatchTimeoutKeepsReadyRankAndMastery(t *testing.T) {
 	a, publicRef, _ := newGameplayOverviewSGPFixture(t, true)
 	subject := strings.Repeat("o", 48)
 	a.rankScores = newRankScoreCache()
-	a.rankScores.put(rankScoreCacheKey(dataSourceLCU, "HN1", subject), rankScoreEntry{
+	a.rankScores.mu.Lock()
+	a.rankScores.putLocked(rankScoreCacheKeyScoped(dataSourceLCU, "HN1", subject, ""), rankScoreEntry{
 		at: time.Now(), ranks: []gameplayRank{{QueueType: "RANKED_SOLO_5x5", Tier: "MASTER"}},
 		capability: EndpointCapability{Name: "ranked-stats", State: capabilityAvailable},
 	})
+	a.rankScores.mu.Unlock()
 	lcuTransport := a.lcu.http.Transport
 	a.lcu.http.Transport = gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if strings.Contains(r.URL.Path, "/lol-champion-mastery/") {

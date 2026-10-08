@@ -133,15 +133,9 @@ func TestOverviewCatalogPreservesBothCompositions(t *testing.T) {
 
 func TestAcceptWindowDiagnosticsDoNotSerializeHandles(t *testing.T) {
 	events := []map[string]any{}
-	calls := 0
-	finish := observeAcceptRequest(func(event map[string]any) { events = append(events, event) }, func() acceptWindowSnapshot {
-		calls++
-		if calls == 1 {
-			return acceptWindowSnapshot{123456789, "other"}
-		}
-		return acceptWindowSnapshot{987654321, "league-client"}
-	})
-	finish()
+	before := acceptWindowSnapshot{123456789, "other"}
+	after := acceptWindowSnapshot{987654321, "league-client"}
+	events = append(events, acceptWindowDiagnostic("before-http", before, before), acceptWindowDiagnostic("after-http", before, after))
 	raw, _ := json.Marshal(events)
 	if len(events) != 2 || events[1]["foreground_changed"] != true || events[1]["window_action"] != "none" {
 		t.Fatal(events)

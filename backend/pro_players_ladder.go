@@ -49,16 +49,6 @@ func proRankedLadderAccounts(teams []opggProTeam) []proAccount {
 	return accounts
 }
 
-// OP.GG's pro directory exposes tier and LP but not the server-wide ladder
-// position. Its public KR leaderboard can locate one Riot ID and renders the
-// authoritative position in the first cell of that account's highlighted row.
-func enrichProLadderRanks(ctx context.Context, provider *championProvider, teams []opggProTeam) {
-	pipeline := newProLadderPipeline(ctx, provider)
-	pipeline.submit(teams)
-	pipeline.finish()
-	pipeline.apply(teams)
-}
-
 // The directory and each completed supplement can discover new accounts. Queue
 // only reviewed identities, without waiting for unrelated supplements. Workers
 // keep results separate from the immutable snapshots published to readers.

@@ -239,9 +239,6 @@ func (a *app) applyGameCameraMode(parent context.Context, client *LCUClient, sta
 		event["file_skipped"] = "read_only"
 	}
 }
-func applyCameraModeFile(location settingsLocation, target int, valid func() bool) (string, string, string) {
-	return applyCameraModeFileWithPermissions(location, target, valid, cameraFilePermissions)
-}
 func applyCameraModeFileWithPermissions(location settingsLocation, target int, valid func() bool, permissions func(string, os.FileInfo) (func(bool) error, error), lockState ...*bool) (beforeValue, afterValue, result string) {
 	if !settingsWatchNoSymlinks(location, location.file) {
 		return "unknown", "unknown", "write_failed"

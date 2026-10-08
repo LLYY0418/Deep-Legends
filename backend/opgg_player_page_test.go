@@ -62,7 +62,13 @@ func TestOPGGCurrentPageFreshnessAndReferences(t *testing.T) {
 	if err != nil || !fresh {
 		t.Fatal(err)
 	}
-	result, err := a.parseOPGGCurrentGame(data, ref, now)
+	result, err := func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult(data)
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, ref, now)
+	}()
 	if err != nil || result.Status != "active" {
 		t.Fatalf("%v %v", result, err)
 	}
@@ -126,7 +132,13 @@ func TestOPGGUserReportCapture(t *testing.T) {
 		t.Fatalf("page current: %v %v", fresh, err)
 	}
 	ref.PlayerRef = page.puuid
-	game, err := a.parseOPGGCurrentGame(data, ref, stamp)
+	game, err := func() (*currentGame, error) {
+		raw, err := normalizedCurrentActionResult(data)
+		if err != nil {
+			return nil, err
+		}
+		return a.parseOPGGCurrentGameValue(raw, ref, stamp)
+	}()
 	if err != nil || game.Status != "active" {
 		t.Fatalf("roster: %v %v", game, err)
 	}

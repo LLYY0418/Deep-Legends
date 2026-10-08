@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -56,26 +55,15 @@ func TestSGPErrorBodiesAndHeadersStayBounded(t *testing.T) {
 			t.Fatalf("err=%v log=%s", err, encoded)
 		}
 	}
-	fields := sgpResponseDiagnostic(&http.Response{Header: http.Header{"Www-Authenticate": {`Bearer error="invalid_token", error_description="audience sensitive-secret"`}, "Location": {"https://sensitive-host/path"}, "Date": {time.Now().UTC().Format(http.TimeFormat)}}})
-	encoded, _ := json.Marshal(fields)
-	if strings.Contains(string(encoded), "sensitive-") || fields["auth_challenge_present"] != true || fields["location_present"] != true {
-		t.Fatal(string(encoded))
-	}
 }
 
 func TestSGPMethodEvidenceIsFixedAndDoesNotAuthorizeWrites(t *testing.T) {
-	response := &http.Response{Header: http.Header{"Allow": {"GET, POST, sensitive-user-token", "OPTIONS"}}}
-	fields := sgpResponseDiagnostic(response)
-	allowed := fields["allowed_methods"].(map[string]bool)
-	if fields["allow_header_present"] != true || len(allowed) != 3 || !allowed["POST"] {
-		t.Fatal(fields)
-	}
 	diagnostic := sgpAuthDiagnostic([]byte(`{"status":{"message":"Method not allowed", "status_code":405}, "errorCode":"METHOD_NOT_ALLOWED", "details":{"code":"sensitive-user-token"}}`), "sensitive-token")
 	details := diagnostic["auth_field_details"].(map[string]any)
 	if diagnostic["auth_error_class"] != "method-not-allowed" || details["status.status_code"].(map[string]any)["http_status"] != 405 || details["errorCode"].(map[string]any)["known_code"] != "METHOD_NOT_ALLOWED" {
 		t.Fatal(diagnostic)
 	}
-	encoded, _ := json.Marshal([]any{fields, diagnostic})
+	encoded, _ := json.Marshal(diagnostic)
 	if strings.Contains(string(encoded), "sensitive-") {
 		t.Fatal(string(encoded))
 	}

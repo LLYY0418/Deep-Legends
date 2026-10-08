@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -48,108 +47,6 @@ var disabledMatchKeywords = map[string]bool{
 const matchTagCacheSchemaVersion = 3
 
 var matchKeywordKeys = []string{"unstoppable", "leader", "victorious", "latebloomer", "resilience", "dedication", "average", "rollercoaster", "decline", "innocent", "unlucky", "slowstarter", "unyielding", "struggling"}
-
-type matchCurveFeatures struct {
-	Early     float64 `json:"early"`
-	Late      float64 `json:"late"`
-	Delta     float64 `json:"delta"`
-	Low       float64 `json:"low"`
-	Amplitude float64 `json:"amplitude"`
-	Turns     int     `json:"turns"`
-	Final     float64 `json:"final"`
-	Minimum   float64 `json:"minimum"`
-}
-
-func matchCurve(scores []float64, turn float64) matchCurveFeatures {
-	n := len(scores)
-	if n == 0 {
-		return matchCurveFeatures{}
-	}
-	third := max(1, n/3)
-	f := matchCurveFeatures{Low: scores[0], Final: scores[n-1], Minimum: scores[0]}
-	maximum := scores[0]
-	for i, s := range scores {
-		if i < third {
-			f.Early += s / float64(third)
-		}
-		if i >= n-third {
-			f.Late += s / float64(third)
-		}
-		f.Minimum = math.Min(f.Minimum, s)
-		maximum = math.Max(maximum, s)
-	}
-	f.Low = f.Minimum
-	if n > 2 {
-		f.Low = scores[1]
-		for _, s := range scores[1 : n-1] {
-			f.Low = math.Min(f.Low, s)
-		}
-	}
-	f.Amplitude = maximum - f.Minimum
-	f.Delta = f.Late - f.Early
-	direction := 0
-	for i := 1; i < n; i++ {
-		d := scores[i] - scores[i-1]
-		if math.Abs(d) < turn {
-			continue
-		}
-		next := 1
-		if d < 0 {
-			next = -1
-		}
-		if direction != 0 && next != direction {
-			f.Turns++
-		}
-		direction = next
-	}
-	return f
-}
-func classifyMatchKeyword(scores []float64, win bool, badge string, params matchKeywordParams) string {
-	if len(scores) < 3 {
-		return ""
-	}
-	f := matchCurve(scores, params.Turn)
-	key := "average"
-	if win {
-		switch {
-		case badge == "MVP" && f.Minimum >= params.High:
-			key = "unstoppable"
-		case f.Low <= params.Low && f.Final-f.Low >= params.Rise:
-			key = "resilience"
-		case f.Delta >= params.Delta:
-			key = "latebloomer"
-		case f.Early >= params.High && f.Delta > -params.Delta:
-			key = "victorious"
-		case badge == "MVP":
-			key = "leader"
-		case f.Delta <= -params.Delta:
-			key = "decline"
-		case f.Turns >= 2 && f.Amplitude >= params.Amplitude:
-			key = "rollercoaster"
-		case f.Final < params.Weak:
-			key = "dedication"
-		}
-	}
-	if !win {
-		switch {
-		case badge == "SVP" && f.Final >= params.Excellent:
-			key = "innocent"
-		case f.Low <= params.Low && f.Final-f.Low >= params.Rise:
-			key = "unyielding"
-		case f.Delta >= params.Delta:
-			key = "slowstarter"
-		case f.Final >= params.Good:
-			key = "unlucky"
-		case f.Delta <= -params.Delta:
-			key = "decline"
-		case f.Turns >= 2 && f.Amplitude >= params.Amplitude:
-			key = "rollercoaster"
-		case f.Final < params.Struggle && f.Late < params.Struggle:
-			key = "struggling"
-		}
-	}
-	return key
-}
 
 type participantMatchTags struct {
 	ParticipantID int64     `json:"participantId"`

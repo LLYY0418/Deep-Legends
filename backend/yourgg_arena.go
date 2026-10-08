@@ -192,11 +192,6 @@ type yourGGArenaAugmentMapStats struct {
 	SkippedDuplicate int
 }
 
-func mapYourGGArenaAggregateAugments(values []yourGGArenaAggregateAugment, catalog []gameplayAugment) ([]arenaAugmentGroup, error) {
-	groups, _, err := mapYourGGArenaAggregateAugmentsWithStats(values, catalog)
-	return groups, err
-}
-
 func mapYourGGArenaAggregateAugmentsWithStats(values []yourGGArenaAggregateAugment, catalog []gameplayAugment) ([]arenaAugmentGroup, yourGGArenaAugmentMapStats, error) {
 	stats := yourGGArenaAugmentMapStats{RowsIn: len(values)}
 	if len(values) == 0 || len(catalog) == 0 {

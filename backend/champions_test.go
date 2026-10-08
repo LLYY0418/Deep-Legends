@@ -386,28 +386,6 @@ func TestDecodeNextFlightAndExtractBestArray(t *testing.T) {
 	}
 }
 
-func TestParseArenaTeamCompositionsAndStats(t *testing.T) {
-	decoded := `{"average_stats":{"win_rate":48.77,"pick_rate":13.85,"ban_rate":42.49,"first_place":16.07,"avg_place":3.56},"teamData":[{"champion_ids":[44,350,11],"champion_id":11,"champions":[{"id":44,"key":"taric","name":"瓦洛兰之盾","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Taric.png"},{"id":350,"key":"yuumi","name":"魔法猫咪","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/Yuumi.png"},{"id":11,"key":"masteryi","name":"无极剑圣","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/champion/MasterYi.png"}],"combination_size":3,"play":"342","win_rate":68.13,"first_place_rate":29.53,"average_place":2.85,"pick_rate":0.53}]}`
-	teams := parseArenaTeamCompositions(decoded, `"teamData":`, 11, 3)
-	if len(teams) != 1 || len(teams[0].Champions) != 3 || teams[0].Champions[0].Key != "masteryi" || teams[0].Champions[1].Key != "taric" || teams[0].Champions[2].Key != "yuumi" {
-		t.Fatalf("arena team champions were not parsed: %#v", teams)
-	}
-	if teams[0].Games != 342 || teams[0].AveragePlacement != 2.85 || teams[0].FirstPlaceRate != 29.53 || teams[0].WinRate != 68.13 {
-		t.Fatalf("arena team metrics were not parsed: %#v", teams[0])
-	}
-}
-
-func TestParseArenaAugmentsKeepsMetricsAndTooltip(t *testing.T) {
-	decoded := `{"data":{"id":52,"name":"闪电打击","image_url":"https://opgg-static.akamaized.net/meta/images/lol/latest/augment/lightningstrikes_large.png","pick_rate":18.86,"win_rate":54.09,"play":"29,587","desc":"获得<attention>总攻击速度</attention>。"}}`
-	rows := parseArenaAugments(decoded)
-	if len(rows) != 1 || len(rows[0].Assets) != 1 {
-		t.Fatalf("arena augment row was not parsed: %#v", rows)
-	}
-	if rows[0].Games != 29587 || rows[0].PickRate != 18.86 || rows[0].WinRate != 54.09 || rows[0].Assets[0].Description != "获得总攻击速度。" {
-		t.Fatalf("arena augment metrics changed: %#v", rows[0])
-	}
-}
-
 func TestBalancedJSONArrayHandlesQuotedBrackets(t *testing.T) {
 	source := `[{"name":"[not a boundary]","description":"escaped \"]\""},{"id":2}] trailing`
 	data, end, ok := balancedJSONArray(source, 0)
@@ -530,21 +508,6 @@ func TestParseChampionCountersAcceptsNonDivSectionHeadings(t *testing.T) {
 	}
 	if counters.WeakAgainst[0].Key != "yunara" || counters.StrongAgainst[0].Key != "vayne" {
 		t.Fatalf("counter grouping changed: %#v", counters)
-	}
-}
-
-func TestParseChampionRunesKeepsFullTreeAndShards(t *testing.T) {
-	decoded := `{"rune_pages":[{"play":1200,"pick_rate":0.64,"win_rate":0.5275,"builds":[{"primary_perk_style":{"id":8100,"name":"主宰","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perkStyle/8100.png"},"perk_sub_style":{"id":8300,"name":"启迪","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perkStyle/8300.png"},"main_runes":[[{"id":8112,"name":"电刑","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8112.png","isActive":true},{"id":8124,"name":"掠食者","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8124.png"}]],"sub_runes":[[{"id":8345,"name":"饼干配送","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perk/8345.png","isActive":true}]],"shards":[[{"id":5005,"name":"攻击速度","image_url":"https://opgg-static.akamaized.net/meta/images/lol/16.15.1/perkShard/5005.png","isActive":true}]]}]}]}`
-	pages := parseChampionRunes(decoded)
-	if len(pages) != 1 || len(pages[0].PrimarySlots) != 1 || len(pages[0].PrimarySlots[0]) != 2 || len(pages[0].SubSlots) != 1 || len(pages[0].ShardSlots) != 1 {
-		t.Fatalf("full rune tree was not preserved: %#v", pages)
-	}
-	if len(pages[0].Selected) != 3 || !pages[0].PrimarySlots[0][0].Active || pages[0].PickRate != 64 || pages[0].WinRate != 52.75 {
-		t.Fatalf("selected rune state or metrics changed: %#v", pages[0])
-	}
-	shard := pages[0].ShardSlots[0][0]
-	if shard.Source != "ddragon" || shard.Path != "/cdn/img/perk-images/StatMods/StatModsAttackSpeedIcon.png" || !strings.Contains(shard.Description, "10%攻击速度") {
-		t.Fatalf("rune shard did not use the crisp Data Dragon asset: %#v", shard)
 	}
 }
 
@@ -722,14 +685,14 @@ func TestStructuredCountersNeverCallLosingMatchupsStrong(t *testing.T) {
 	for id := 100; id < 106; id++ {
 		provider.championMeta[id] = championMetadata{ID: id, Key: strconv.Itoa(id), NameZH: strconv.Itoa(id)}
 	}
-	counters := provider.structuredCounters([]opggCounter{
+	counters := provider.structuredCountersForChampion([]opggCounter{
 		{ChampionID: 100, Play: 100, Win: 40},
 		{ChampionID: 101, Play: 100, Win: 41},
 		{ChampionID: 102, Play: 100, Win: 42},
 		{ChampionID: 103, Play: 100, Win: 43},
 		{ChampionID: 104, Play: 100, Win: 44},
 		{ChampionID: 105, Play: 100, Win: 45},
-	})
+	}, 0)
 	if len(counters.StrongAgainst) != 0 {
 		t.Fatalf("losing matchups leaked into StrongAgainst: %#v", counters.StrongAgainst)
 	}
@@ -743,14 +706,14 @@ func TestStructuredCountersNeverCallWinningMatchupsWeak(t *testing.T) {
 	for id := 100; id < 106; id++ {
 		provider.championMeta[id] = championMetadata{ID: id, Key: strconv.Itoa(id), NameZH: strconv.Itoa(id)}
 	}
-	counters := provider.structuredCounters([]opggCounter{
+	counters := provider.structuredCountersForChampion([]opggCounter{
 		{ChampionID: 100, Play: 100, Win: 51},
 		{ChampionID: 101, Play: 100, Win: 52},
 		{ChampionID: 102, Play: 100, Win: 53},
 		{ChampionID: 103, Play: 100, Win: 54},
 		{ChampionID: 104, Play: 100, Win: 55},
 		{ChampionID: 105, Play: 100, Win: 56},
-	})
+	}, 0)
 	if len(counters.WeakAgainst) != 0 {
 		t.Fatalf("winning matchups were labeled weak: %#v", counters.WeakAgainst)
 	}
@@ -760,7 +723,7 @@ func TestParseOPGGItemDepthsExpandsDelayedFifthItemGames(t *testing.T) {
 	payload := []byte(`1:["$","tr",null,{"children":["depth_4_item_0",{"metaType":"item","metaId":6333},{"children":["61.19","%"]},{"children":"572 场"}]}]
 2:["$","tr",null,{"children":["depth_5_item_0",{"metaId":3026,"metaType":"item"},{"children":["57.14","%"]},"$L7e"]}]
 7e:["$","span",null,{"children":"49 场"}]`)
-	depths := parseOPGGDepthRows(payload)
+	depths := parseExpandedOPGGDepthRows(expandedOPGGItemDepths(payload))
 	if len(depths[4]) != 1 || depths[4][0].Assets[0].ID != 6333 || depths[4][0].WinRate != 61.19 || depths[4][0].Games != 572 {
 		t.Fatalf("fourth items = %#v", depths[4])
 	}
@@ -824,7 +787,7 @@ func TestParseOPGGItemDepthsDeduplicatesExpandedRowsBeforeApplyingLimit(t *testi
 		`"depth_5_item_3",{"metaType":"item","metaId":3110,"children":[58.33,"%"],"sample":"12 场"}`,
 		`"depth_5_item_4",{"metaType":"item","metaId":3165,"children":[75,"%"],"sample":"4 场"}`,
 	}
-	depths := parseOPGGDepthRows([]byte(strings.Join(rows, "\n")))
+	depths := parseExpandedOPGGDepthRows(expandedOPGGItemDepths([]byte(strings.Join(rows, "\n"))))
 	if len(depths[5]) != 5 {
 		t.Fatalf("fifth-item rows = %#v", depths[5])
 	}
@@ -853,7 +816,7 @@ func TestRankedCoreRecommendationsKeepCompleteOPGGOrderBelowLocalSampleGate(t *t
 func TestParseOPGGItemDepthsAcceptsCurrentNumericRSCPercentages(t *testing.T) {
 	payload := []byte(`1:["$","tr",null,{"children":["depth_4_item_0",{"metaType":"item","metaId":6333},{"children":[54.05,"%"]},{"children":"1,112 场"}]}]
 2:["$","tr",null,{"children":["depth_5_item_0",{"metaType":"item","metaId":3026},{"children":[63.19,"%"]},{"children":"49 场"}]}]`)
-	depths := parseOPGGDepthRows(payload)
+	depths := parseExpandedOPGGDepthRows(expandedOPGGItemDepths(payload))
 	if len(depths[4]) != 1 || depths[4][0].WinRate != 54.05 || depths[4][0].Games != 1112 {
 		t.Fatalf("current fourth item shape was not parsed: %#v", depths[4])
 	}
@@ -865,7 +828,7 @@ func TestParseOPGGItemDepthsAcceptsCurrentNumericRSCPercentages(t *testing.T) {
 func TestParseOPGGItemDepthsKeepsZeroWinRateWithRealGames(t *testing.T) {
 	payload := []byte(`1:["$","tr",null,{"children":["depth_5_item_0",{"metaType":"item","metaId":3110},{"children":[0,"%"]},{"children":"1 场"}]}]
 2:["$","tr",null,{"children":["depth_6_item_0",{"metaType":"item","metaId":3089},{"children":[0,"%"]},{"children":"1场"}]}]`)
-	depths := parseOPGGDepthRows(payload)
+	depths := parseExpandedOPGGDepthRows(expandedOPGGItemDepths(payload))
 	for _, depth := range []int{5, 6} {
 		if len(depths[depth]) != 1 || depths[depth][0].WinRate != 0 || depths[depth][0].Games != 1 {
 			t.Fatalf("zero-win depth %d row was dropped: %#v", depth, depths[depth])
@@ -875,7 +838,7 @@ func TestParseOPGGItemDepthsKeepsZeroWinRateWithRealGames(t *testing.T) {
 
 func TestParseOPGGItemDepthsIncludesSixthItem(t *testing.T) {
 	payload := []byte(`1:["$","tr",null,{"children":["depth_6_item_0",{"metaType":"item","metaId":3089},{"children":[55.5,"%"]},{"children":"123 场"}]}]`)
-	depths := parseOPGGDepthRows(payload)
+	depths := parseExpandedOPGGDepthRows(expandedOPGGItemDepths(payload))
 	if len(depths[6]) != 1 || depths[6][0].Assets[0].ID != 3089 || depths[6][0].Games != 123 {
 		t.Fatalf("sixth items = %#v", depths[6])
 	}
@@ -925,7 +888,7 @@ func TestParseOPGGItemDepthsKeepsThreeRowsForFiveChampionFixtures(t *testing.T) 
 				rows = append(rows, fmt.Sprintf(`%d:["$","tr",null,{"children":["depth_%d_item_%d",{"metaType":"item","metaId":%d},{"children":[55.0,"%%"]},{"children":"%d 场"}]}]`, len(rows)+1, depth, index, depth*100+index, 200-index))
 			}
 		}
-		depths := parseOPGGDepthRows([]byte(strings.Join(rows, "\n")))
+		depths := parseExpandedOPGGDepthRows(expandedOPGGItemDepths([]byte(strings.Join(rows, "\n"))))
 		for _, depth := range []int{4, 5, 6} {
 			if len(depths[depth]) < 3 {
 				t.Fatalf("%s depth %d rows = %#v", champion, depth, depths[depth])

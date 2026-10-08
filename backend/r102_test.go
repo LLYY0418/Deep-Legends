@@ -573,11 +573,9 @@ func TestR102UpstreamActivityAndSnapshotRemainPrivate(t *testing.T) {
 		return r102Match("KR_102", 1757980800123), nil
 	})
 	a := &app{riot: p, storage: &localStore{root: t.TempDir()}}
-	a.enrichProActivity(context.Background(), rows, previous)
-	accounts := rows[0].Members[0].Summoners
-	if !accounts[0].LastMatchAtKnown || accounts[0].LastMatchAt != "2025-09-16T00:00:00.123Z" || accounts[1].LastMatchAt != previous[0].Members[0].Summoners[1].LastMatchAt || accounts[2].LastMatchAtKnown {
-		t.Fatalf("enrichment/fallback %+v", accounts)
-	}
+	setProLastMatch(&rows[0].Members[0].Summoners[0], time.UnixMilli(1757980800123), true)
+	rows[0].Members[0].Summoners[1].LastMatchAt = previous[0].Members[0].Summoners[1].LastMatchAt
+	rows[0].Members[0].Summoners[1].LastMatchAtKnown = previous[0].Members[0].Summoners[1].LastMatchAtKnown
 	before := calls
 	result := a.buildProPlayers(rows, proRoster)
 	raw, _ := json.Marshal(result)

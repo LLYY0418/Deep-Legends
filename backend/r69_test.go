@@ -49,9 +49,6 @@ func TestR69FacadeTitleRestorePlanUsesValuesNotObjectKeys(t *testing.T) {
 			if hasTitle != test.wantHasTitle || len(candidates) != len(test.wantCandidates) || (len(candidates) > 0 && !reflect.DeepEqual(candidates, test.wantCandidates)) {
 				t.Fatalf("plan = (%#v, %v), want (%#v, %v)", candidates, hasTitle, test.wantCandidates, test.wantHasTitle)
 			}
-			if test.chat == nil && facadeSummaryHasTitle(summary) != test.wantHasTitle {
-				t.Fatalf("facadeSummaryHasTitle = %v, want %v", facadeSummaryHasTitle(summary), test.wantHasTitle)
-			}
 		})
 	}
 	if got := projectFacadeTitle(r69EmptyTitleObject()); got != nil {

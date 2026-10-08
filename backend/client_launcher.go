@@ -265,10 +265,6 @@ func (a *app) detectedClientInstallationsWithScan() ([]clientInstallation, clien
 	return detectClientInstallationsWithScan()
 }
 
-func (a *app) launchDetectedClientInstallation(installation clientInstallation) (clientLaunchResult, error) {
-	return a.launchDetectedClientInstallationContext(context.Background(), installation)
-}
-
 func (a *app) launchDetectedClientInstallationContext(ctx context.Context, installation clientInstallation) (clientLaunchResult, error) {
 	if err := a.licenseSideEffect(ctx); err != nil {
 		return clientLaunchResult{}, err

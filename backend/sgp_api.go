@@ -286,16 +286,6 @@ func (p *sgpProvider) available(client *LCUClient) (string, string, bool) {
 	return strings.ToUpper(platform), base, true
 }
 
-func (p *sgpProvider) markFailure() {
-	p.mu.Lock()
-	p.failUntil = time.Now().Add(sgpFailureDelay)
-	p.mu.Unlock()
-}
-
-func (p *sgpProvider) entitlementsToken(client *LCUClient, force bool) (string, error) {
-	return p.entitlementsTokenContext(context.Background(), client, force)
-}
-
 func (p *sgpProvider) entitlementsTokenContext(ctx context.Context, client *LCUClient, force bool) (string, error) {
 	p.mu.Lock()
 	if !force && p.token != "" && p.tokenClient == client && time.Since(p.tokenAt) < sgpTokenTTL {
@@ -747,23 +737,6 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 
 func (p *sgpProvider) getJSON(ctx context.Context, client *LCUClient, serverID, route, requestPath, endpoint string, out any) error {
 	return p.getJSONWithToken(ctx, client, sgpTokenEntitlements, serverID, route, requestPath, endpoint, out)
-}
-
-// matchHistory 读取指定玩家的完整战绩（每场包含全部十名参与者）。
-// 结果按 startIndex 起始，按需分页拉取，并做短期缓存以支撑对局页轮询。
-// 除对局列表外还返回两个分页参数：consumed 是本次在服务器侧实际消费的
-// 条目数（包含缺少 json 或参与者的对局，调用方用它推进下一页偏移量），
-// more 表示服务器侧是否可能还有更早的对局。
-func (p *sgpProvider) matchHistory(ctx context.Context, client *LCUClient, puuid string, start, count int, useCache bool) ([]*riotMatchInfo, int, bool, error) {
-	platform, _, ok := p.available(client)
-	if !ok {
-		return nil, 0, false, errors.New("SGP 服务器不可用")
-	}
-	games, consumed, more, err := p.matchHistoryOn(ctx, client, platform, puuid, start, count, useCache)
-	if err != nil && !isCancellation(err) {
-		p.markFailure()
-	}
-	return games, consumed, more, err
 }
 
 // matchHistoryOn 与 matchHistory 相同，但明确指定国服子服务器；

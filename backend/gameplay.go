@@ -2323,14 +2323,6 @@ func recentRankedMatchesForQueue(matches []gameplayMatch, queueID int64, limit i
 	return filtered
 }
 
-func positionStatsGames(rows []gameplayPositionStat) int {
-	total := 0
-	for _, row := range rows {
-		total += row.Games
-	}
-	return total
-}
-
 // overviewChampionNames 合并本机客户端目录与 Data Dragon 中文目录：
 // 客户端目录在启动初期可能尚未加载完成，导致首次渲染出现“英雄 35”
 // 这类占位名，合并线上目录后首屏即可显示正确名称。
@@ -3021,9 +3013,6 @@ func mergeSummonerIdentity(preferred, fallback Summoner) Summoner {
 	return preferred
 }
 
-func loadGameplaySummonerUncached(client *LCUClient, reference gameplayReference) (Summoner, EndpointCapability) {
-	return loadGameplaySummonerUncachedContext(context.Background(), client, reference)
-}
 func loadGameplaySummonerUncachedContext(ctx context.Context, client *LCUClient, reference gameplayReference) (Summoner, EndpointCapability) {
 	reference = normalizeGameplayReference(reference)
 	capability := EndpointCapability{Name: "summoner", Path: "/lol-summoner/v2/summoners/puuid/{player} 或 /lol-summoner/v1/summoners/{id}"}
@@ -3074,10 +3063,6 @@ type gameplayReferenceCacheItem struct {
 	publicRef string
 }
 
-func (a *app) registerGameplayReference(playerRef string) string {
-	return a.registerGameplayReferenceDetails(gameplayReference{PlayerRef: playerRef})
-}
-
 func (a *app) registerGameplayReferenceDetails(reference gameplayReference) string {
 	reference = normalizeGameplayReference(reference)
 	playerRef := reference.PlayerRef
@@ -3108,17 +3093,6 @@ func (a *app) registerGameplayReferenceDetails(reference gameplayReference) stri
 	}
 	a.gameplayRefsMu.Unlock()
 	return publicRef
-}
-
-func (a *app) resolveGameplayReference(publicRef string) (string, bool) {
-	publicRef = strings.TrimSpace(publicRef)
-	a.gameplayRefsMu.Lock()
-	playerRef, ok := a.gameplayRefs[publicRef]
-	if element := a.gameplayRefEntries[publicRef]; element != nil {
-		a.gameplayRefOrder.MoveToFront(element)
-	}
-	a.gameplayRefsMu.Unlock()
-	return playerRef, ok && validPlayerReference(playerRef)
 }
 
 func (a *app) resolveGameplayReferenceDetails(publicRef string) (gameplayReference, bool) {
@@ -3628,11 +3602,6 @@ func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability En
 	return ranks, capability
 }
 
-func (a *app) loadGameplayRanks(client *LCUClient, playerRef string, current bool) ([]gameplayRank, EndpointCapability) {
-	ranks, _, capability, _ := a.loadGameplayRanksContext(context.Background(), client, playerRef, current)
-	return ranks, capability
-}
-
 func (a *app) loadGameplayRanksContext(ctx context.Context, client *LCUClient, playerRef string, current bool) ([]gameplayRank, *gameplayRankMilestones, EndpointCapability, error) {
 	path := "/lol-ranked/v1/ranked-stats/" + url.PathEscape(playerRef)
 	publicPath := "/lol-ranked/v1/ranked-stats/{player}"
@@ -3715,10 +3684,6 @@ func verifiedRankWinRate(wins, losses int) (int, bool) {
 		return 0, true
 	}
 	return int(math.Round(float64(wins) * 100 / float64(total))), true
-}
-
-func loadGameplayHistory(client *LCUClient, playerRef string, current bool, begIndex, count int, details bool) ([]lcuGame, []EndpointCapability, int) {
-	return loadGameplayHistoryContext(context.Background(), client, playerRef, current, begIndex, count, details)
 }
 
 func loadGameplayHistoryContext(ctx context.Context, client *LCUClient, playerRef string, current bool, begIndex, count int, details bool) ([]lcuGame, []EndpointCapability, int) {
@@ -4654,19 +4619,6 @@ type gameplayTeamPortrait struct {
 	HeroPoolSize   int                         `json:"heroPoolSize,omitempty"`
 	// R128 §2.3：前端不展示（队伍画像的 tooltip 只留「本队 N 位英雄进入统计」）。
 	MeasurementTechnique string `json:"measurementTechnique,omitempty"`
-}
-
-// gameplayNextItemSuggestion 是 P1-4 阶段二「下一件推荐」的纯计算结果。
-//
-// 已实现但未接线。海斗（KIWI）的 playerlist 形状尚无真实观测，
-// 19 键基线仅在斗魂 CHERRY 下测得；确认海斗 items 字段及元素键名之前不接渲染层。
-// 接线条件与接线点见 gameplayNextItemSuggestionFromTrios 的注释。
-type gameplayNextItemSuggestion struct {
-	ItemID   int     `json:"itemId"`
-	ItemName string  `json:"itemName,omitempty"`
-	WinRate  float64 `json:"winRate"`
-	Games    int     `json:"games"`
-	TrioKey  string  `json:"trioKey,omitempty"`
 }
 
 type gameplayRecommendationRunes struct {
@@ -6707,112 +6659,6 @@ func liveClientItemsForIdentities(snapshot liveClientSnapshot, summonerNames, ri
 	return nil, ""
 }
 
-// ---------------------------------------------------------------------------
-// R116-D P1-4 阶段二：纯计算部分。
-//
-// ⚠️ 已实现、有完整单测，但**未接线**。
-//
-// 接线前须用 Windows 真机的海斗对局确认 playerlist 含 items，
-// 且 $.allPlayers[].items 的元素键名与斗魂基线一致。当前尚无真实海斗观测；
-// 若探测否定，只保留诊断解析，不猜字段结构。
-//
-// 所以本轮把能力备好、接线留空：
-//   - 下面两个函数是纯函数，输入输出完全确定，单测覆盖前缀匹配、消耗品过滤、
-//     无匹配降级三条路径；
-//   - 它们没有任何调用方（除测试），不进 gameplayRecommendationBundle，
-//     前端 gameplay.js 里也没有对应的渲染分支；
-//   - 接线条件：playerlist 确认含 items，且 items 元素
-//     键名与斗魂基线（itemID/slot/count/canUse/consumable）一致；
-//   - 接线点（两处，各一行量级）：
-//       1. 后端——在 gameplayApplyRosterInsights 里把 liveClientSnapshot
-//          .ItemsByIdentity 的本人装备喂给 gameplayOwnedTerminalItemIDs +
-//          gameplayNextItemSuggestionFromTrios，结果挂到 bundle 的新字段上；
-//       2. 前端——backend/web/gameplay.js 的 renderBuildRecommendation
-//          （当前 5694 行附近）里加一行「下一件推荐」补充行，不替换现有的
-//          静态核心装路线；items 解析失败 / 结构不符 / 无 trio 前缀匹配时
-//          整行不渲染（工单 P1-4 阶段二第 5 条的降级规则）。
-// ---------------------------------------------------------------------------
-
-// gameplayOwnedTerminalItemIDs 把 playerlist 的 items[] 过滤成「可用于 trio 前缀
-// 比对」的装备 ID 集合：丢掉 itemID ≤ 0 与消耗品（药水/眼位，consumable=true）。
-//
-// 未解决：工单还要求滤掉「未成型的空槽」，但 playerlist 的 items[] 元素里没有
-// 任何能区分「成品件」与「合成组件」的字段（canUse 是「能不能主动使用」，
-// 与是否成型无关）。要真正过滤组件，需要一份成品件 ID 目录，而那不在本轮
-// 当前已有的目录里。
-// 接线前必须用真机数据核对：如果组件也会进 items[]，前缀匹配会假命中。
-func gameplayOwnedTerminalItemIDs(items []liveClientItem) []int {
-	if len(items) == 0 {
-		return nil
-	}
-	ids := make([]int, 0, len(items))
-	seen := make(map[int]struct{}, len(items))
-	for _, item := range items {
-		if item.ItemID <= 0 || item.Consumable {
-			continue
-		}
-		if _, duplicate := seen[item.ItemID]; duplicate {
-			continue
-		}
-		seen[item.ItemID] = struct{}{}
-		ids = append(ids, item.ItemID)
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	return ids
-}
-
-// gameplayNextItemSuggestionFromTrios 是 P1-4 阶段二的核心：本人已出装备里
-// 恰好包含某个 terminalItemTrio 的前两件、且第三件还没出时，推荐第三件。
-//
-// trios 必须按上游顺序传入（R116-A 已按 games 降序裁剪到 top-50），本函数取
-// **第一条**命中的 trio，不自造排序键——上游的 games 降序就是样本量优先级，
-// 在这里重新排序等于用本地口径覆盖上游口径。
-//
-// 降级规则（工单 P1-4 阶段二第 5 条）：已出装备不足 2 件、trios 为空、
-// trio 的 itemIds 不是恰好 3 个、或没有任何前缀匹配 → 返回 ok=false，
-// 调用方整行不渲染。绝不返回一个「大概是这件」的猜测值。
-func gameplayNextItemSuggestionFromTrios(ownedItemIDs []int, trios []hexdataTrioRow) (gameplayNextItemSuggestion, bool) {
-	if len(ownedItemIDs) < 2 || len(trios) == 0 {
-		return gameplayNextItemSuggestion{}, false
-	}
-	owned := make(map[int]struct{}, len(ownedItemIDs))
-	for _, id := range ownedItemIDs {
-		if id > 0 {
-			owned[id] = struct{}{}
-		}
-	}
-	if len(owned) < 2 {
-		return gameplayNextItemSuggestion{}, false
-	}
-	for _, trio := range trios {
-		if len(trio.ItemIDs) != 3 {
-			continue
-		}
-		first, second, third := trio.ItemIDs[0], trio.ItemIDs[1], trio.ItemIDs[2]
-		if first <= 0 || second <= 0 || third <= 0 {
-			continue
-		}
-		if _, ok := owned[first]; !ok {
-			continue
-		}
-		if _, ok := owned[second]; !ok {
-			continue
-		}
-		if _, already := owned[third]; already {
-			// 三件都出齐了，不是「下一件」。
-			continue
-		}
-		name := ""
-		if len(trio.ItemNames) == 3 {
-			name = strings.TrimSpace(trio.ItemNames[2])
-		}
-		return gameplayNextItemSuggestion{ItemID: third, ItemName: name, WinRate: trio.WinRate, Games: trio.Games, TrioKey: trio.TrioKey}, true
-	}
-	return gameplayNextItemSuggestion{}, false
-}
-
 func arenaAllyIdentityKeys(player lcuLivePlayer) []string {
 	set := make(map[string]struct{})
 	for _, value := range []string{player.PUUID, player.ObfuscatedPUUID} {
@@ -7307,16 +7153,6 @@ func resolveGameplayRecommendationPosition(value string, positions []championPos
 	return "mid", "fallback", nil
 }
 
-func gameplayRecommendationsFromChampionDetail(championID int64, position string, detail championDetailResponse) gameplayRecommendationBundle {
-	mode := normalizeInternalChampionMode(detail.Mode)
-	if _, ok := opggModeSpecs[mode]; !ok {
-		mode = "ranked"
-	}
-	result := gameplayRecommendationsFromResolvedDetail(championID, position, detail, gameplayRecommendationModeResolution{InternalMode: mode, QueueID: 420})
-	result.PositionSource = "client"
-	return result
-}
-
 // applyArenaRankingToRecommendation makes the live Arena hero header use the
 // same YOUR.GG row as the left ranking. Missing rows hide the grade and all
 // hero-level statistics rather than substituting OP.GG's different sample.
@@ -7611,10 +7447,6 @@ func recentGamesFromSelectedMatches(matches []gameplayMatch, playerRef string) [
 		})
 	}
 	return result
-}
-
-func recentGamesFromMatches(matches []gameplayMatch, playerRef string, limit int, queueID int64) []gameplayRecentGame {
-	return recentGamesFromSelectedMatches(recentMatchesForPlayer(matches, playerRef, limit, queueID), playerRef)
 }
 
 func liveRecentPlayerStats(matches []gameplayMatch, playerRef string, queueID int64) (gameplayAggregate, []gameplayRecentGame) {
@@ -8432,10 +8264,6 @@ func loadCurrentChampionID(client *LCUClient) (int64, error) {
 		return 0, nil
 	}
 	return championID, nil
-}
-
-func gameplayLiveRecommendationTarget(players []gameplayLivePlayer, currentChampionID int64) (int64, string) {
-	return gameplayLiveRecommendationTargetWithChampSelect(players, currentChampionID, lcuChampSelectSession{})
 }
 
 func gameplayLiveRecommendationTargetWithChampSelect(players []gameplayLivePlayer, currentChampionID int64, champSelect lcuChampSelectSession) (int64, string) {
@@ -10882,14 +10710,6 @@ func loadQueueLabelsContext(ctx context.Context, client *LCUClient) map[int64]st
 	return result
 }
 
-func cloneQueueLabels(labels map[int64]string) map[int64]string {
-	result := make(map[int64]string, len(labels))
-	for queueID, label := range labels {
-		result[queueID] = label
-	}
-	return result
-}
-
 func queueLabel(queueID int64, mode string, labels map[int64]string) string {
 	if label := strings.TrimSpace(labels[queueID]); containsChineseQueueLabel(label) {
 		return label
@@ -11194,14 +11014,6 @@ func safeGameplayError(err error) string {
 		}
 	}
 	return "请确认客户端仍在英雄选择或大厅阶段"
-}
-
-func (a *app) currentClientIsRiot() bool {
-	a.mu.RLock()
-	client := a.lcu
-	a.mu.RUnlock()
-	region, _ := clientRegionInfo(client)
-	return isRiotRegion(region)
 }
 
 func (a *app) enrichCurrentRiotMatches(client *LCUClient, ref gameplayReference, playerRef string, matches []gameplayMatch, names, labels map[int64]string) {

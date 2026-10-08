@@ -190,7 +190,10 @@ func TestFetchAndEnrichProLadderRankUsesFixedKRLeaderboard(t *testing.T) {
 
 	account := proFixtureAccount("fixtureaccount", "fixture", "CHALLENGER", 1, 1200)
 	source := []opggProTeam{{ID: 632, Name: "Bilibili Gaming", Members: []opggProMember{proFixtureMember(632, "Bin", "Chen Ze-Bin (陈泽彬)", account)}}}
-	enrichProLadderRanks(context.Background(), provider, source)
+	pipeline := newProLadderPipeline(context.Background(), provider)
+	pipeline.submit(source)
+	pipeline.finish()
+	pipeline.apply(source)
 	result := new(app).buildProPlayers(source, proRoster)
 	got := result.Teams[0].Players[0].Accounts
 	if calls.Load() != 1 || len(got) != 1 || !got[0].LadderRankKnown || got[0].LadderRank != 42 || result.LadderRankPartial {
@@ -641,9 +644,6 @@ func TestR97ManagementAndBadgesShareReviewedSixTeams(t *testing.T) {
 	}
 	if a.matchProIdentity(index, "overview", gameplayReference{Region: "kr", GameName: "OutsideRoster", TagLine: "KR1"}) != nil {
 		t.Fatal("unreviewed player accepted")
-	}
-	if len(proDirectoryRoster(teams, proRoster)) <= 6 {
-		t.Fatal("generic expansion infrastructure was removed")
 	}
 	for _, account := range proRankedLadderAccounts(teams) {
 		if !strings.HasPrefix(account.GameName, "R97") {

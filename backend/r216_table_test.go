@@ -27,15 +27,15 @@ func TestR216ChampionTableThreeGamesAndMissing(t *testing.T) {
 				p.TotalMinionsKilled = 120
 				p.Win = i != 2
 				two := 2
-				p.DoubleKills = historyInt(two)
+				p.DoubleKills = &lenientInt{value: &two}
 				zero := 0
-				p.VisionWardsBoughtInGame = historyInt(zero)
+				p.VisionWardsBoughtInGame = &lenientInt{value: &zero}
 			}
 			if j == 5 {
 				p.ChampionID = enemy
 			}
 			taken := 10000
-			p.TotalDamageTaken = historyInt(taken)
+			p.TotalDamageTaken = &lenientInt{value: &taken}
 			ps = append(ps, p)
 		}
 		info := &riotMatchInfo{GameID: int64(216 + i), GameCreation: 1700000000000, GameDuration: 1200, QueueID: 420, Participants: ps}

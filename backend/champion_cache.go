@@ -479,18 +479,13 @@ func (c *championDataCache) pruneDiskLocked() error {
 // checkedPage 的 PreviousBuildID 回退路径会被抽掉，造成回源请求风暴。
 const hexdataStaleBuildGrace = 8 * 24 * time.Hour
 
-// pruneStaleHexdataBuilds 回收已经过期的 buildID 对应的 hexdata- 落盘文件，
+// pruneStaleHexdataBuildsCount 回收已经过期的 buildID 对应的 hexdata- 落盘文件，
 // 补上「hexdata- 前缀永久豁免磁盘预算」留下的静默增长缺口。这是与
 // pruneDiskLocked 里 protected 判断并行的第二条清理路径：protected 继续防止
 // 「访问不频繁被普通 LRU 按 mtime 误杀」，这里只处理「buildID 已经过期」。
 // 文件名是 key 的 sha256（不含 buildID），所以 buildID 只能从信封的 Key 字段
 // （{buildID}|{kind}|{id}）里解出来。宽限期按 c.cacheNow() 比较，时间可注入。
-func (c *championDataCache) pruneStaleHexdataBuilds(currentBuildID string) error {
-	_, err := c.pruneStaleHexdataBuildsCount(currentBuildID)
-	return err
-}
-
-// pruneStaleHexdataBuildsCount 与上同，另外返回删除的文件数，供诊断事件使用。
+// 返回删除的文件数，供诊断事件使用。
 func (c *championDataCache) pruneStaleHexdataBuildsCount(currentBuildID string) (int, error) {
 	currentBuildID = strings.TrimSpace(currentBuildID)
 	if c.dir == "" || !strings.HasPrefix(currentBuildID, "hexdata-") {

@@ -8,22 +8,7 @@ import (
 	"testing"
 )
 
-func TestR216FourteenKeywords(t *testing.T) {
-	cases := []struct {
-		key   string
-		curve []float64
-		win   bool
-		badge string
-	}{
-		{"unstoppable", []float64{7, 7, 7}, true, "MVP"}, {"leader", []float64{6, 6, 6}, true, "MVP"}, {"victorious", []float64{7, 7, 6}, true, ""}, {"latebloomer", []float64{5, 6, 7}, true, ""}, {"resilience", []float64{5, 4, 7}, true, ""}, {"dedication", []float64{4.8, 4.8, 4.8}, true, ""}, {"average", []float64{5.5, 5.5, 5.5}, true, ""}, {"rollercoaster", []float64{5.8, 9, 5.8, 9, 5.8}, true, ""}, {"decline", []float64{6.3, 5.5, 4.7}, true, ""}, {"innocent", []float64{7, 7, 7}, false, "SVP"}, {"unlucky", []float64{6.1, 6.1, 6.1}, false, ""}, {"slowstarter", []float64{4.9, 5.5, 6.5}, false, ""}, {"unyielding", []float64{5, 4, 7}, false, ""}, {"struggling", []float64{4, 4, 4}, false, ""}}
-	for _, c := range cases {
-		if got := classifyMatchKeyword(c.curve, c.win, c.badge, initialMatchKeywordParams); got != c.key {
-			t.Errorf("%s got %s", c.key, got)
-		}
-	}
-	if classifyMatchKeyword([]float64{7, 7}, true, "MVP", initialMatchKeywordParams) != "" {
-		t.Fatal("short curve")
-	}
+func TestR216ArenaHasNoMatchKeywords(t *testing.T) {
 	m := r216Game(r216Person(1, 100), r216Person(2, 200))
 	applyMatchScores(&m)
 	m.QueueID = 1700

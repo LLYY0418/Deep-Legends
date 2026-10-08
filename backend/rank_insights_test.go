@@ -10,7 +10,9 @@ func TestRankScoreCacheUsesBoundedLRUForLargeInsertions(t *testing.T) {
 	cache := newRankScoreCache()
 	now := time.Now()
 	for index := 0; index < 5000; index++ {
-		cache.put(fmt.Sprintf("player-%d", index), rankScoreEntry{score: index, known: true, at: now})
+		cache.mu.Lock()
+		cache.putLocked(fmt.Sprintf("player-%d", index), rankScoreEntry{score: index, known: true, at: now})
+		cache.mu.Unlock()
 	}
 	if got := len(cache.entries); got != rankScoreCacheMax {
 		t.Fatalf("cache size = %d, want %d", got, rankScoreCacheMax)
@@ -33,12 +35,16 @@ func TestRankScoreCacheGetKeepsHotEntry(t *testing.T) {
 	cache := newRankScoreCache()
 	now := time.Now()
 	for index := 0; index < rankScoreCacheMax; index++ {
-		cache.put(fmt.Sprintf("player-%d", index), rankScoreEntry{score: index, known: true, at: now})
+		cache.mu.Lock()
+		cache.putLocked(fmt.Sprintf("player-%d", index), rankScoreEntry{score: index, known: true, at: now})
+		cache.mu.Unlock()
 	}
 	if _, ok := cache.get("player-0"); !ok {
 		t.Fatal("hot entry missing before eviction")
 	}
-	cache.put("new-player", rankScoreEntry{score: 9999, known: true, at: now})
+	cache.mu.Lock()
+	cache.putLocked("new-player", rankScoreEntry{score: 9999, known: true, at: now})
+	cache.mu.Unlock()
 	if _, ok := cache.get("player-0"); !ok {
 		t.Fatal("recently accessed entry was evicted")
 	}
@@ -49,7 +55,9 @@ func TestRankScoreCacheGetKeepsHotEntry(t *testing.T) {
 
 func TestRankScoreCacheRemovesExpiredEntry(t *testing.T) {
 	cache := newRankScoreCache()
-	cache.put("expired", rankScoreEntry{score: 1, known: true, at: time.Now().Add(-rankScoreCacheTTL - time.Second)})
+	cache.mu.Lock()
+	cache.putLocked("expired", rankScoreEntry{score: 1, known: true, at: time.Now().Add(-rankScoreCacheTTL - time.Second)})
+	cache.mu.Unlock()
 	if _, ok := cache.get("expired"); ok {
 		t.Fatal("expired entry returned as a cache hit")
 	}

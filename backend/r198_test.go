@@ -181,7 +181,7 @@ func TestR198UnsafeFilePathsRejected(t *testing.T) {
 				}
 				location.file = filepath.Join(dir, "PersistedSettings.json")
 			}
-			_, _, result := applyCameraModeFile(location, 0, func() bool { return true })
+			_, _, result := applyCameraModeFileWithPermissions(location, 0, func() bool { return true }, cameraFilePermissions)
 			if result != "write_failed" || r198Read(t, outside) != r198JSON {
 				t.Fatalf("unsafe result=%s", result)
 			}
@@ -277,7 +277,7 @@ func TestR198FinalRecheckAfterStageProbe(t *testing.T) {
 			v := newR198Fixture(t)
 			outside := filepath.Join(t.TempDir(), "outside.json")
 			os.WriteFile(outside, []byte(r198JSON), 0600)
-			_, _, result := applyCameraModeFile(v.f.location, 0, func() bool {
+			_, _, result := applyCameraModeFileWithPermissions(v.f.location, 0, func() bool {
 				switch change {
 				case "read-only":
 					os.Chmod(v.f.location.file, 0444)
@@ -290,7 +290,7 @@ func TestR198FinalRecheckAfterStageProbe(t *testing.T) {
 					}
 				}
 				return true
-			})
+			}, cameraFilePermissions)
 			if result != "write_failed" {
 				t.Fatal("final unsafe replacement", result)
 			}

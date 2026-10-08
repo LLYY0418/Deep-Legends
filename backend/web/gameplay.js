@@ -2016,25 +2016,6 @@
     return `<div class="ranked-queue-switcher" role="group" aria-label="${groupLabel}" data-ranked-queue-scope="${scope}"><button type="button" class="ranked-queue-button${selected === "420" ? " is-active" : ""}" data-ranked-queue="420" aria-pressed="${selected === "420"}">单双排</button><button type="button" class="ranked-queue-button${selected === "440" ? " is-active" : ""}" data-ranked-queue="440" aria-pressed="${selected === "440"}">灵活组排</button>${mayhemButton}</div>`;
   }
 
-  const careerObjectTokens = new WeakMap();
-  let careerObjectToken = 0;
-  function careerReference(value) {
-    if (value && typeof value === "object") {
-      if (!careerObjectTokens.has(value)) careerObjectTokens.set(value, ++careerObjectToken);
-      return `object:${careerObjectTokens.get(value)}`;
-    }
-    return `${typeof value}:${String(value)}`;
-  }
-  function careerSectionsSignature(data, tab) {
-    return [
-      data.player, data.capabilities, data.ranks, data.historicalRanks, data.rankMilestones, data.seasonStatsProgress,
-      data.seasonChampionStats, data.seasonOverall, data.championStats, data.overall,
-      data.masteries, data.activityHours, data.recentPlayers, data.positions,
-      data.recentRanked, data.ability, data.rankedQueues, tab?.opggSeason?.data,
-      tab?.opggSeasonStale, tab?.opggSeasonPending, tab?.rankedQueueRecent,
-      tab?.rankedQueueAbility, tab?.rankedQueuePosition, tab?.mayhemRating,
-    ].map(careerReference).join("|");
-  }
   function careerSectionEntries(data, tab) {
     const recentHistoryCapability = (data.capabilities || []).find((item) => item.name === "seven-day-history");
     const recentQueue = rankedQueueData(data, tab, "recent");
@@ -7661,20 +7642,6 @@
       5011: "获得65生命值。",
       5013: "获得10%韧性和减速抗性。",
     })[Number(id)] || "";
-  }
-
-  function perkRecord(id) {
-    const direct = (state.perks?.perks || []).find((item) => Number(item.id) === Number(id));
-    if (direct) return direct;
-    for (const style of state.perks?.styles || []) for (const slot of style.slots || []) {
-      const found = (slot.perks || []).find((item) => Number(item.id) === Number(id));
-      if (found) return found;
-    }
-    for (const slot of state.perks?.statModSlots || []) {
-      const found = (slot.perks || []).find((item) => Number(item.id) === Number(id));
-      if (found) return found;
-    }
-    return { id, name: `属性碎片 ${id}`, iconPath: assetPath("perk", id) };
   }
 
   function renderRecommendationStats(stats) {

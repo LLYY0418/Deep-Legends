@@ -125,7 +125,6 @@ test("R150 grade sorting uses letter then official score then samples", () => {
   const rows = [{ id: 1, grade: "S", score: 90, games: 1 }, { id: 2, grade: "OP", score: 1, games: 1 }, { id: 3, grade: "S", score: 90, games: 10 }, { id: 4, grade: "", score: 100, games: 100 }];
   for (const sort of [sortedGradeRows, sortedArenaItemRows]) assert.deepEqual(sort(rows).map((row) => row.id), [2, 3, 1, 4]);
   assert.deepEqual(rows.map((row) => row.id), [1, 2, 3, 4]);
-  assert.doesNotMatch(functionSource(script, "renderAugmentGroups"), /Number\(item\.tier\)/);
 });
 
 function checkSidebar(source = css) {

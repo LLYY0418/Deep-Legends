@@ -74,7 +74,7 @@ func TestR72RecommendedFailureStages(t *testing.T) {
 			case "backup-ownership":
 				must(os.WriteFile(file+".bak", []byte(`{"uid":"foreign"}`), 0600))
 			case "backup-write":
-				must(writeRecommendedItemSet(location, r71Recommendation("first"), nil))
+				must(writeRecommendedItemSetTraced(location, r71Recommendation("first"), nil, &itemSetWriteTrace{}))
 			}
 			calls := 0
 			guard := func() error {

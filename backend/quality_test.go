@@ -113,7 +113,7 @@ func TestExplicitOwnershipDoesNotWalkUnknownNestedObjects(t *testing.T) {
 		"metadata": map[string]any{"id": float64(1001), "owned": true},
 		"skins":    []any{map[string]any{"id": float64(1002), "owned": true}},
 	}
-	ids := extractOwnedIDs(fixture, false)
+	ids := extractOwnedEvidence(fixture, false).OwnedIDs
 	if ids[1001] || !ids[1002] || len(ids) != 1 {
 		t.Fatalf("only schema-bound skins container should be traversed: %#v", ids)
 	}

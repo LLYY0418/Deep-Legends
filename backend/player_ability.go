@@ -33,21 +33,6 @@ func (a *gameplayAbilityAccumulator) add(player gameplayParticipant, team gamepl
 	a.duration += duration
 }
 
-func (a *gameplayAbilityAccumulator) addSide(side seasonRankedAbilitySide, duration int64) {
-	a.games++
-	a.kdaTotal += ratio(side.Kills+side.Assists, side.Deaths)
-	a.kills += side.Kills
-	a.deaths += side.Deaths
-	a.assists += side.Assists
-	a.damage += side.Damage
-	a.cs += side.CS
-	a.gold += side.Gold
-	a.vision += side.Vision
-	a.teamKills += side.TeamKills
-	a.teamDamage += side.TeamDamage
-	a.duration += duration
-}
-
 func abilityTeam(match gameplayMatch, teamID int64) gameplayTeam {
 	for _, team := range match.Teams {
 		if team.TeamID == teamID {
@@ -79,38 +64,6 @@ func buildGameplayAbilityProfile(matches []gameplayMatch, playerRef string, rank
 func buildGameplayAbilityProfileForQueue(matches []gameplayMatch, playerRef string, ranks []gameplayRank, region string, queueID int64) *gameplayAbilityProfile {
 	playerStats, baselineStats, positions := gameplayAbilityStatsForQueue(matches, playerRef, queueID)
 	return abilityProfileFrom(playerStats, baselineStats, positions, region, queueID)
-}
-
-// buildGameplayAbilityProfileForQueueWithSnapshot 在详情战绩样本不够时改用赛季
-// 排位快照。首屏只拉 20 场详情，玩家最近 20 场里没有某个队列（灵活组排尤其
-// 常见）时，「近 20 场排位」靠快照有数据、能力表现却空着，两张卡片自相矛盾。
-// 快照里存的是与详情路径同口径的对位原料，因此两条路径可以互相替代。
-func buildGameplayAbilityProfileForQueueWithSnapshot(matches []gameplayMatch, playerRef string, cached []seasonRankedMatch, ranks []gameplayRank, region string, queueID int64) *gameplayAbilityProfile {
-	if profile := buildGameplayAbilityProfileForQueue(matches, playerRef, ranks, region, queueID); profile != nil {
-		return profile
-	}
-	playerStats, baselineStats, positions := seasonAbilityStatsForQueue(cached, queueID)
-	return abilityProfileFrom(playerStats, baselineStats, positions, region, queueID)
-}
-
-// seasonAbilityStatsForQueue 把赛季快照折叠成与 gameplayAbilityStatsForQueue
-// 完全相同的三元组。没有 Ability 字段的老快照条目直接跳过。
-func seasonAbilityStatsForQueue(cached []seasonRankedMatch, queueID int64) (gameplayAbilityAccumulator, gameplayAbilityAccumulator, map[string]int) {
-	var playerStats, baselineStats gameplayAbilityAccumulator
-	positions := make(map[string]int)
-	for _, item := range cached {
-		if item.QueueID != queueID || item.Ability == nil || item.Ability.Duration <= 0 || item.Ability.Opponent == nil {
-			continue
-		}
-		position := strings.ToLower(strings.TrimSpace(item.Position))
-		if !abilityPositionKnown(position) {
-			continue
-		}
-		playerStats.addSide(item.Ability.Player, item.Ability.Duration)
-		positions[position]++
-		baselineStats.addSide(*item.Ability.Opponent, item.Ability.Duration)
-	}
-	return playerStats, baselineStats, positions
 }
 
 func abilityProfileFrom(playerStats, baselineStats gameplayAbilityAccumulator, positions map[string]int, region string, queueID int64) *gameplayAbilityProfile {
@@ -180,21 +133,6 @@ func gameplayAbilityStatsForQueue(matches []gameplayMatch, playerRef string, que
 
 func gameplayAbilitySampleGamesForQueue(matches []gameplayMatch, playerRef string, queueID int64) int {
 	playerStats, baselineStats, _ := gameplayAbilityStatsForQueue(matches, playerRef, queueID)
-	return minAbilityGames(playerStats, baselineStats)
-}
-
-// gameplayAbilitySampleGamesForQueueWithSnapshot 与
-// buildGameplayAbilityProfileForQueueWithSnapshot 取同一份样本，
-// 否则前端会拿详情样本数去解释快照算出来的雷达。
-func gameplayAbilitySampleGamesForQueueWithSnapshot(matches []gameplayMatch, playerRef string, cached []seasonRankedMatch, queueID int64) int {
-	playerStats, baselineStats, _ := gameplayAbilityStatsForQueue(matches, playerRef, queueID)
-	if games := minAbilityGames(playerStats, baselineStats); games >= minimumAbilitySampleGames {
-		return games
-	}
-	snapshotPlayer, snapshotBaseline, _ := seasonAbilityStatsForQueue(cached, queueID)
-	if snapshotGames := minAbilityGames(snapshotPlayer, snapshotBaseline); snapshotGames >= minimumAbilitySampleGames {
-		return snapshotGames
-	}
 	return minAbilityGames(playerStats, baselineStats)
 }
 

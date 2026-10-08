@@ -4,7 +4,7 @@ package main
 // OP.GG includes coaches, academy teams and historical team assignments. Keep
 // roster changes reviewable and retain the reviewed ownership.
 // Production directory rows and badges both use
-// these six reviewed teams; proDirectoryRoster is reserved for future expansion.
+// these six reviewed teams; unreviewed directory rows do not widen this roster.
 // Exact PUUID/full Riot ID lookup is allowed;
 // never infer membership from an account name substring or team prefix.
 const proRosterVerifiedAt = "2026-09-08"
