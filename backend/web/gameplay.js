@@ -5323,9 +5323,10 @@
 
 	function bindMatchDetailControls(container, tab) {
     bindRuneEffectLinks(container);
-    // Collapsed cards render no detail controls. Their summary rune links
-    // still bind above; opening a card binds its freshly rendered details.
-    if (tab.openMatches?.size === 0) return;
+    // Overview/external list producers render no controls in collapsed cards.
+    // Detached build widgets retain the generic binding path below.
+    if (tab.openMatches?.size === 0
+      && (container.dataset?.matchTierScope || tab.externalRender)) return;
     for (const button of container.querySelectorAll("[data-build-player]")) {
       button.addEventListener("click", () => {
         if (!(tab.buildPlayers instanceof Map)) tab.buildPlayers = new Map();
