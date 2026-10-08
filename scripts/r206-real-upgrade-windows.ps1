@@ -1,5 +1,6 @@
 param([Parameter(Mandatory=$true)][string]$Setup)
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'r252-diagnostic-time.ps1')
 $root = Join-Path $env:RUNNER_TEMP "deep-legends-r206-real-upgrade"
 $install = Join-Path $root "installed"
 $data = Join-Path $root "data"
@@ -130,7 +131,7 @@ try {
         Get-ChildItem (Join-Path $data 'logs') -Filter 'diagnostics*.jsonl' -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^diagnostics(?:\.[1-5])?\.jsonl$' } | ForEach-Object {
             $rows += @(Get-Content $_.FullName | Where-Object { $_ -match '"event"\s*:\s*"update_install_timing"' } | ForEach-Object {try {$_ | ConvertFrom-Json} catch {}})
         }
-        $timing = @($rows | Where-Object { $_.event -eq 'update_install_timing' -and $_.build_fingerprint -eq $expectedFingerprint -and $_.total_ms -eq ($stages['relaunch'] - $stages['installer_start']) -and ([DateTimeOffset]::Parse($_.time)).ToUnixTimeMilliseconds() -ge $stages['relaunch'] }) | Select-Object -Last 1
+        $timing = @($rows | Where-Object { $_.event -eq 'update_install_timing' -and $_.build_fingerprint -eq $expectedFingerprint -and $_.total_ms -eq ($stages['relaunch'] - $stages['installer_start']) -and (Get-R252DiagnosticTimeMilliseconds $_.time) -ge $stages['relaunch'] }) | Select-Object -Last 1
         if ($timing.result -eq 'ok') {break}; Start-Sleep -Milliseconds 500
     } while ((Get-Date) -lt $deadline)
     if ($timing.result -ne 'ok' -or $null -eq $timing.uninstall_old_ms) {throw "Eight stages not imported as result=ok"}

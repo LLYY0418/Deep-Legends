@@ -13,19 +13,15 @@ const files = directories.flatMap(directory => fs.readdirSync(path.join(root, di
 const fileNames = new Set(files);
 const timings = [];
 const concurrency = Math.min(4, Math.max(2, os.availableParallelism()));
-// These files repeatedly build full jsdom applications, including 200 matches.
-// Reserve one worker for the other files while capping large DOM workers at
-// three. Both queues start together: light files use waits in the large DOM
-// queue, without four large trees contending. Discovery/assertions/budgets stay intact.
-const largeDOM = file => {
-  const relative = path.relative(root, file).replaceAll(path.sep, "/");
-  return /^desktop\/(?:overview-render|pro-players|pro-runes-render|refresh-orchestration|specialist-overview-render)/.test(relative) ||
-    ["backend/web/update.test.cjs", "backend/web/r192.test.cjs", "backend/web/r231.test.cjs"].includes(relative);
-};
-const groups = [
-  { name: "large-dom", files: files.filter(largeDOM), concurrency: concurrency - 1 },
-  { name: "other", files: files.filter(file => !largeDOM(file)), concurrency: 1 },
-].filter(group => group.files.length);
+// One bounded worker pool consumes all discovered files, longest first. The
+// previous reserved serial lane became the 203s bottleneck on Linux. Measured
+// costs only order execution; they never omit tests or change either budget.
+const costs = require("./renderer-costs.json");
+const ordered = files.slice().sort((a,b) => {
+  const relative = file => path.relative(root,file).replaceAll(path.sep,"/");
+  return (costs[relative(b)] || 1000) - (costs[relative(a)] || 1000) || a.localeCompare(b);
+});
+const groups = [{ name: "shared-pool", files: ordered, concurrency }];
 const summaries = [];
 let failed = false;
 (async () => {
