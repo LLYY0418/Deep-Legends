@@ -171,14 +171,16 @@ func TestR233FailedCounterSaveDoesNotRefreshCachedLifetime(t *testing.T) {
 	store := &licenseTestStore{}
 	m := s.Manager(store)
 	testActivate(t, m, false)
-	s.clock.Advance(10 * time.Minute)
+	elapsed := 10 * time.Minute
+	s.clock.Advance(elapsed)
 	s.offline.Store(true)
 	_ = m.Renew(context.Background()) // counter persists a newer high-water mark
 	restored := s.Manager(store)
-	if !restored.Allowed() || restored.deadline.Sub(s.clock.Elapsed()) > 5*time.Minute {
+	remaining := licenseLifetime - elapsed
+	if !restored.Allowed() || restored.deadline.Sub(s.clock.Elapsed()) > remaining {
 		t.Fatal("failed renew refreshed the cached lease anchor")
 	}
-	s.clock.Advance(5 * time.Minute)
+	s.clock.Advance(remaining)
 	if restored.Allowed() {
 		t.Fatal("offline requests kept expired disk lease alive")
 	}

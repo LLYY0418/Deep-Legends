@@ -1,0 +1,20 @@
+{
+  "name": "hydration-fixed-20261008T093539.561490",
+  "command": [
+    "node",
+    "--test",
+    "backend/web/r252.test.cjs"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-08T09:35:39.561490+08:00",
+  "end": "2026-10-08T09:35:40.247239+08:00",
+  "elapsed_seconds": 0.686,
+  "exit_code": 1,
+  "last_five": [
+    "      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/backend/web/r252.test.cjs:11:48)",
+    "      at Test.runInAsyncScope (node:async_hooks:228:14)",
+    "      at Test.run (node:internal/test_runner/test:1118:25)",
+    "      at Test.start (node:internal/test_runner/test:1015:17)",
+    "      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)"
+  ]
+}

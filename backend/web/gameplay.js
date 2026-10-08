@@ -3594,14 +3594,16 @@
     if (!(Number(placement)>0)) return "unknown";
     const teams=new Set((match.participants || []).map(p=>Number(p.subteamId)).filter(id=>id>0));
     const queue=Number(match.queueId);
-    const count=teams.size>=2 ? teams.size : queue===1750 ? 6 : [1700,1710].includes(queue) ? 8 : 0;
-    if(!count)return "unknown";
+    const count=Math.max(teams.size, queue===1750 ? 6 : [1700,1710,1701,1704,1720,1731,1732,1740].includes(queue) ? 8 : 0);
+    if(count<2)return "unknown";
     return Number(placement)<=Math.ceil(count/2) ? "win" : "loss";
   }
 
   function matchDataTags(match, subject) {
     const players=match.participants || [],tags=[];
-    const modeSet=Number(match.mapId)===11 ? "rift" : Number(match.mapId)===12 ? "aram" : Number(match.mapId)===30 ? "arena" : "other";
+    const map=Number(match.mapId || 0),group=String(match.modeGroup || "").toLowerCase();
+    const fallback=["solo","flex","match"].includes(group) ? "rift" : ["aram","hextech-aram","hextech-classic","hextech-qualifier"].includes(group) ? "aram" : group==="arena" ? "arena" : "other";
+    const modeSet=map===11 ? "rift" : map===12 ? "aram" : map===30 ? "arena" : map===0 ? fallback : "other";
     if(!subject || players.length<2)return tags;
     const sameTeam=p=>Number(subject.subteamId)>0 ? p.subteamId===subject.subteamId : p.teamId===subject.teamId;
     const team=players.filter(sameTeam),numeric=v=>v!=null && Number.isFinite(Number(v));
@@ -3739,7 +3741,11 @@
   function hydrateVisibleMatchTags(container, tab) {
     if(!matchTagsBackgroundAllowed(tab) || tab.matchTagsHydrating)return;
     const root=matchTierScrollRoot(container);
-    const matches=(tab.data?.matches || []).filter(match=>!match.tagsAvailable && match.result!=="remake" && match.result!=="unknown" && ![1700,1710].includes(Number(match.queueId)) && matchTierNodeIsVisible(container.querySelector(`[data-match-id="${match.gameId}"]`),root));
+    // Index once: querying the full card tree separately for every match is
+    // quadratic in large histories. Preserve the first-node lookup rule.
+    const nodes=new Map();
+    for(const node of container.querySelectorAll("[data-match-id]")){const id=node.getAttribute("data-match-id");if(!nodes.has(id))nodes.set(id,node);}
+    const matches=(tab.data?.matches || []).filter(match=>!match.tagsAvailable && match.result!=="remake" && match.result!=="unknown" && ![1700,1710].includes(Number(match.queueId)) && matchTierNodeIsVisible(nodes.get(String(match.gameId)),root));
     tab.matchTagsHydrating=true;let next=0;
     const keys=new Set(),monitor=setInterval(()=>{if(!matchTagsBackgroundAllowed(tab) || !container.isConnected)for(const key of keys)state.controllers?.get(key)?.abort();},200);
     const worker=async()=>{while(next<matches.length && matchTagsBackgroundAllowed(tab) && container.isConnected) {

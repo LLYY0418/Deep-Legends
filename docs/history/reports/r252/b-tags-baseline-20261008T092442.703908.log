@@ -1,0 +1,62 @@
+✖ R252 missing map falls back to the server mode group; explicit maps keep precedence (5.87775ms)
+✔ R241 map matrix filters before excluded observations are read (8.738ms)
+✔ R241 hidden tags only, pinned score and one body popup with focus/escape/scroll/touch cleanup (172.102917ms)
+✔ R241 skips offscreen and unchanged-width cards (18.556ms)
+✔ R241 does not render an empty tags container (2.795875ms)
+✔ R241 numeric placement tags are absent; MVP/SVP remain pinned (3.755125ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 862.329291
+
+✖ failing tests:
+
+test at backend/web/r241.test.cjs:10:1
+✖ R252 missing map falls back to the server mode group; explicit maps keep precedence (5.87775ms)
+  AssertionError [ERR_ASSERTION]: solo/0
+  + actual - expected
+  
+    [
+  -   'advantage',
+      'control',
+  -   'cs',
+      'damage',
+  -   'defense',
+  -   'dive',
+  -   'efficiency',
+  -   'gold',
+      'heal',
+  -   'hook',
+      'kills',
+  -   'participation',
+      'shield',
+  -   'solo',
+      'tank',
+  -   'tower'
+    ]
+  
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/backend/web/r241.test.cjs:13:117)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'control', 'damage', 'heal', 'kills', 'shield', 'tank' ],
+    expected: [
+      'advantage',  'control',
+      'cs',         'damage',
+      'defense',    'dive',
+      'efficiency', 'gold',
+      'heal',       'hook',
+      'kills',      'participation',
+      'shield',     'solo',
+      'tank',       'tower'
+    ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

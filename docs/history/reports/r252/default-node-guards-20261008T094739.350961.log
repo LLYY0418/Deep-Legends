@@ -1,0 +1,29 @@
+✔ R248 disabled first frame never waits for authorization and hides expiry (247.458958ms)
+✔ R248 default native gate allows IPC without status requests (2.407375ms)
+✔ R248 default release rejects both authorization origins (8.043208ms)
+✔ R252 disabled release rejects embedded activation text and default assets contain no activation UI (168.586917ms)
+✔ R136 public outputs have distinct names and private outputs keep release names (7.431417ms)
+✔ R86 bash release stops on a real failing Go test, including an independent early-build mutation (2887.765ms)
+✔ R86 CI uses the package version, installs test dependencies and needs no private Riot key (1.78725ms)
+﹣ R86 Windows release stops on a real failing Go test and rejects an independent early build (0.092417ms) # requires Windows and PowerShell
+✔ format gates exclude local toolchains and GOPATH modules while retaining untracked project source (196.639458ms)
+✔ R222 CI skip preserves syntax, fingerprints, runtime verification and hashes (0.944291ms)
+﹣ R222 Windows release entry points reject CI skip locally before any side effect (0.06725ms) # requires Windows and PowerShell
+✔ setup-only Bash build wraps one NSIS result, hashes final bytes and removes legacy outputs (4609.737084ms)
+✔ failed NSIS stops before wrapping or issuing a receipt and cleans the uninstall shell (2375.675542ms)
+✔ compression overrides are explicit and invalid levels fail before packaging (4.803875ms)
+✔ unchanged complete npm dependencies are reused; damage or a lock change reinstalls them (10067.266792ms)
+✔ setup-only Windows CI skip leaves NSIS, wrapper and receipt gates unconditional (0.650042ms)
+✔ R225 static names exclude comments and synthetic source strings (15.071959ms)
+✔ R225 actual CI filters resolve every alternative and reject nonexistent names (2490.332875ms)
+✔ R225 static expected counts also cover the unfiltered R82 PowerShell file (1026.084417ms)
+✔ R225 runtime Go evidence rejects empty, omitted and skipped required tests (0.328083ms)
+✔ R225 real Node runner proves a selected test passed and rejects an accidental skip (436.949584ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 2
+ℹ todo 0
+ℹ duration_ms 17238.506375

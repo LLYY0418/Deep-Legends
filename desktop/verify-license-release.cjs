@@ -22,6 +22,9 @@ function verifyLicenseRelease(file, root = path.resolve(__dirname,".."), enabled
     if (marker.length && binary.includes(marker)) throw Error("Release backend contains a test trust marker");
   }
   if (!enabled) {
+    for (const value of ["注册码", "授权到期", "DL-XXXXX"]) {
+      if (binary.includes(Buffer.from(value)) || binary.includes(Buffer.from(value,"utf16le"))) throw Error("Disabled backend contains activation UI content");
+    }
     const flag = path.join(root,"desktop/license-build.cjs");
     if (fs.existsSync(flag) && require(flag).enabled !== false) throw Error("Release desktop must disable license build");
     if (/license(?:-staging)?\.yinxiaobia\.net/i.test(binary.toString("latin1"))) throw Error("Disabled backend contains license origin");

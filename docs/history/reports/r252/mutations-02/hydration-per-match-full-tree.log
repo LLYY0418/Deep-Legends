@@ -1,0 +1,27 @@
+✖ R252 visible tag hydration indexes the tree once without losing or admitting games (95.675708ms)
+✔ R252 arena detail and unknown-result fallback preserve partial and larger team counts (3.230583ms)
+✔ R252 specialist upstream timeout keeps OPGG, pro and client backup selectable (3.728625ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 409.044167
+
+✖ failing tests:
+
+test at backend/web/r252.test.cjs:5:1
+✖ R252 visible tag hydration indexes the tree once without losing or admitting games (95.675708ms)
+  AssertionError [ERR_ASSERTION]: full-tree reads=196 for 200 cards
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/backend/web/r252.test.cjs:19:9)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

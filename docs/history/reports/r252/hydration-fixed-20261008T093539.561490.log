@@ -1,0 +1,24 @@
+✖ R252 visible tag hydration indexes the tree once without losing or admitting games (64.671875ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 641.013042
+
+✖ failing tests:
+
+test at backend/web/r252.test.cjs:5:1
+✖ R252 visible tag hydration indexes the tree once without losing or admitting games (64.671875ms)
+  Error: Unbalanced function hydrateVisibleMatchTags
+      at extract (/Users/ly/personal/personal-work/deep-legends/backend/web/r188-harness.cjs:19:9)
+      at /Users/ly/personal/personal-work/deep-legends/backend/web/r188-harness.cjs:23:136
+      at Array.map (<anonymous>)
+      at compile (/Users/ly/personal/personal-work/deep-legends/backend/web/r188-harness.cjs:23:124)
+      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/backend/web/r252.test.cjs:11:48)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)

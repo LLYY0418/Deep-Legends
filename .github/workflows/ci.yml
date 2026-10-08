@@ -39,6 +39,8 @@ jobs:
         run: |
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags= -buildvcs=false -o "$RUNNER_TEMP/r233-release-public.exe" ./backend
           node desktop/verify-license-release.cjs "$RUNNER_TEMP/r233-release-public.exe"
+      - name: R252 compile shelved license code and verify corrected fixtures
+        run: node scripts/r252-license-check.cjs
       - name: Verify CI test filters
         run: node scripts/verify-ci-test-filters.cjs
       - name: Test with race detector
@@ -59,6 +61,8 @@ jobs:
         with:
           name: renderer-timings-linux
           path: ${{ runner.temp }}/renderer-timings-linux.json
+      - name: Enforce R252 renderer budget margin
+        run: python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["success"] and r["scope"]=="all" and r["platform"]=="linux"; assert r["summary"]["duration_ms"]<=192000, r["summary"]; print("R252 renderer margin >=20%", r["summary"]["duration_ms"])' "$RUNNER_TEMP/renderer-timings-linux.json"
       - name: Test Riot relay Worker
         run: node --test relay/riot-worker/*.test.mjs
       # P1-2：这两个脚本以前从不在任何流程里执行，护栏失效了半年没人发现。
@@ -109,7 +113,7 @@ jobs:
         env:
           R248_ELECTRON_OUTPUT: ${{ runner.temp }}/deep-legends-r238-default-electron
         run: |
-          node -e "require('./scripts/r248-electron.cjs').probe({phase:'after',state:'DISABLED',storedBounds:{x:40,y:40,width:1050,height:750,maximized:false}}).then(r=>console.log(JSON.stringify(r.shows))).catch(e=>{console.error(e);process.exitCode=1})"
+          node -e "require('./scripts/r248-electron.cjs').probe({phase:'after',state:'DISABLED',frontendAssetDirectory:'default',storedBounds:{x:40,y:40,width:1050,height:750,maximized:false}}).then(r=>console.log(JSON.stringify(r.shows))).catch(e=>{console.error(e);process.exitCode=1})"
           if ($LASTEXITCODE -ne 0) { throw "Default first-frame audit failed" }
       - uses: actions/upload-artifact@v4
         if: always()
@@ -126,6 +130,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Windows backend tests or pass inventory failed" }
           node scripts/run-ci-tests.cjs go installer
           if ($LASTEXITCODE -ne 0) { throw "Windows installer tests or pass inventory failed" }
+      - name: R252 thirty independent R104 cold-start timelines
+        shell: pwsh
+        run: |
+          go test -c -o "$env:RUNNER_TEMP/r252-r104.test.exe" ./backend
+          if ($LASTEXITCODE -ne 0) { throw "R104 soak compilation failed" }
+          python scripts/r252-r104-soak.py --binary "$env:RUNNER_TEMP/r252-r104.test.exe" --output "$env:RUNNER_TEMP/r252-r104-windows" --iterations 30
+          if ($LASTEXITCODE -ne 0) { throw "R104 soak failure; original timelines retained" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r252-r104-windows
+          path: ${{ runner.temp }}/r252-r104-windows/**
       # Filtered platform gates must match their exact counts with zero skips.
       - name: Test Windows-only release and PowerShell guards
         shell: pwsh

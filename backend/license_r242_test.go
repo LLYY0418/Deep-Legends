@@ -145,8 +145,8 @@ func TestR242LicenseExpiryStrictSignedField(t *testing.T) {
 			}
 		})
 	}
-	base["license_expires_at"] = issued + 900
-	if p, err := m.verify(testSignedEnvelope(s.key, "test-issuer", "DL-LICENSE-RESPONSE-V1", base), ""); err != nil || p.LicenseExpiresAt != issued+900 {
+	base["license_expires_at"] = m.lease.ExpiresAt
+	if p, err := m.verify(testSignedEnvelope(s.key, "test-issuer", "DL-LICENSE-RESPONSE-V1", base), ""); err != nil || p.LicenseExpiresAt != m.lease.ExpiresAt {
 		t.Fatal("valid signed expiry rejected", err)
 	}
 	delete(base, "license_expires_at")

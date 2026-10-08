@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -200,6 +201,16 @@ func TestR104OldSnapshotWithoutRevisionRemainsUnknown(t *testing.T) {
 }
 
 func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
+	wallStart := time.Now()
+	trace := func(stage string) {
+		t.Logf("R252_R104 stage=%s elapsed_ms=%d", stage, time.Since(wallStart).Milliseconds())
+	}
+	t.Cleanup(func() {
+		if t.Failed() {
+			stack := make([]byte, 1<<20)
+			t.Logf("R252_R104 failure_goroutines\n%s", stack[:runtime.Stack(stack, true)])
+		}
+	})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	body := r104FixtureFlight(t)
@@ -211,6 +222,14 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 			} else {
 				foreground.Add(1)
 			}
+			kind := "account"
+			if strings.Contains(r.URL.Path, "/matches/") {
+				kind = "detail"
+				if strings.HasSuffix(r.URL.Path, "/ids") {
+					kind = "ids"
+				}
+			}
+			t.Logf("R252_R104 transport=%s background=%t bg=%d fg=%d elapsed_ms=%d", kind, isRiotBackground(r.Context()), background.Load(), foreground.Load(), time.Since(wallStart).Milliseconds())
 			return r104RiotResponse(r)
 		}
 		if r.URL.Path == proPlayersPath {
@@ -237,20 +256,25 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 	a := &app{riot: p, champions: p.champions, proRefreshContext: ctx}
 	a.proPlayers.refreshNow = now
 	a.proPlayers.refreshWait = func(ctx context.Context, d time.Duration) error {
+		trace("worker_wait_enter")
 		waits <- d
 		select {
 		case <-ticks:
+			trace("worker_tick")
 			nanos.Add(int64(d))
 			return nil
 		case <-ctx.Done():
+			trace("worker_stopped")
 			close(stopped)
 			return ctx.Err()
 		}
 	}
 	awaitWait := func() {
 		t.Helper()
+		trace("await_worker_wait")
 		select {
 		case d := <-waits:
+			trace("worker_wait_observed")
 			if d != time.Minute {
 				t.Fatalf("drip interval=%s", d)
 			}
@@ -258,9 +282,11 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 			t.Fatal("startup/worker stuck")
 		}
 	}
+	trace("directory_start")
 	if _, _, err := a.loadProPlayers(ctx, false); err != nil {
 		t.Fatal(err)
 	}
+	trace("directory_returned")
 	awaitWait() // final directory + supplements + ladder publication completed
 	if background.Load() != 0 || foreground.Load() != 0 || directoryCalls.Load() != 1 {
 		t.Fatalf("startup unexpectedly called Riot: bg=%d fg=%d directory=%d", background.Load(), foreground.Load(), directoryCalls.Load())
@@ -275,6 +301,7 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	trace("foreground_fifo_held")
 	released := false
 	defer func() {
 		if !released {
@@ -287,7 +314,9 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 	}
 	result := make(chan outcome, 1)
 	go func() {
+		trace("foreground_start")
 		data, err := a.loadRiotOverview(ctx, gameplayReference{GameName: "Foreground", TagLine: "KR1", Region: "kr", Privacy: "PRIVATE"}, 0, 20)
+		trace("foreground_returned")
 		result <- outcome{data, err}
 	}()
 	deadline := time.Now().Add(3 * time.Second)
@@ -310,6 +339,7 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 		t.Errorf("background inserted requests ahead of waiting foreground: %d -> %d", before, background.Load())
 	}
 	release()
+	trace("foreground_fifo_released")
 	released = true
 	select {
 	case got := <-result:

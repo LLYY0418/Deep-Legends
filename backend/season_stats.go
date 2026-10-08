@@ -855,7 +855,8 @@ func seasonQuerySnapshotKey(serverID, playerRef, season string) string {
 // startSeasonStatsRefresh runs the old foreground scan outside the overview
 // request. Query snapshot, persisted cache and seasonBackfills provide the
 // three deduplication gates required for repeated identical overview loads.
-// R241: even explicit refreshes share the 60-second head gate and in-flight scan.
+// Automatic opens share the 60-second gate. A manual refresh still probes the
+// newest game, while sharing the in-flight scan and skipping an unchanged head.
 func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayReference, player Summoner, playerRef string, names map[int64]string, fresh bool) {
 	season, _ := currentRankedSeason(time.Now())
 	serverID := strings.ToUpper(strings.TrimSpace(reference.ServerID))
@@ -863,7 +864,7 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 		return
 	}
 	accountHash := a.storage.accountHash(player)
-	if accountHash != "" {
+	if !fresh && accountHash != "" {
 		if cached, err := a.storage.loadSeasonStats(seasonStatsSource, accountHash, season); err == nil && !cached.HeadCheckedAt.IsZero() && time.Since(cached.HeadCheckedAt) < seasonQueryDedupTTL {
 			a.recordSeasonHeadRecent(fresh, seasonStatsCount(cached.Stats), cached.Complete)
 			return
@@ -872,7 +873,7 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 	key := seasonQuerySnapshotKey(serverID, playerRef, season)
 	now := time.Now()
 	a.seasonBackfillMu.Lock()
-	if previous := a.seasonQuerySnapshotLocked(key, now); !previous.IsZero() && now.Sub(previous) < seasonQueryDedupTTL {
+	if previous := a.seasonQuerySnapshotLocked(key, now); !fresh && !previous.IsZero() && now.Sub(previous) < seasonQueryDedupTTL {
 		a.seasonBackfillMu.Unlock()
 		a.recordSeasonHeadRecent(fresh, 0, false)
 		return

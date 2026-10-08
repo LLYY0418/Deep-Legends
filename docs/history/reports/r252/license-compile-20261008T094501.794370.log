@@ -1,0 +1,4 @@
+# ./...
+pattern ./...: open /Users/ly/Library/Caches/go-build/56/568a8d29cbc960252e3a8a8e41a8a45b6bf3aa52529acabdc257778c6487c918-d: operation not permitted
+FAIL	./... [setup failed]
+FAIL

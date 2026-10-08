@@ -1,0 +1,20 @@
+{
+  "name": "b-tags-fixed-20261008T092652.200736",
+  "command": [
+    "node",
+    "--test",
+    "backend/web/r241.test.cjs"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-08T09:26:52.200736+08:00",
+  "end": "2026-10-08T09:26:53.346690+08:00",
+  "elapsed_seconds": 1.146,
+  "exit_code": 0,
+  "last_five": [
+    "ℹ fail 0",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0",
+    "ℹ duration_ms 1048.099334"
+  ]
+}

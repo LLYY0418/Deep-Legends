@@ -1,0 +1,5 @@
+--- FAIL: TestR252ManualSeasonHeadBypassesRecentGateAndStillProbes (1.11s)
+    r252_test.go:73: manual head refresh remained throttled [map[build_fingerprint:dev complete:true decode_failed:0 event:season_stats_head_refresh fresh:false log_seq:7 new_games:0 run_id:d62c565d556db07f471ae835 scanned:1 sgp_bytes:0 sgp_history_cache_hits:0 sgp_history_calls:0 sgp_requests:0 skip_reason:recent skipped:true time:2026-10-08T02:10:39.41359Z use_history_cache:false] map[build_fingerprint:dev complete:true decode_failed:0 event:season_stats_head_refresh fresh:true log_seq:8 new_games:0 run_id:d62c565d556db07f471ae835 scanned:1 sgp_bytes:0 sgp_history_cache_hits:0 sgp_history_calls:0 sgp_requests:0 skip_reason:recent skipped:true time:2026-10-08T02:10:39.413744Z use_history_cache:false]]
+FAIL
+FAIL	lol-loot-assistant/backend	1.741s
+FAIL

@@ -1,0 +1,21 @@
+{
+  "name": "mutations-20261008T094707.994286",
+  "command": [
+    "python3",
+    "scripts/r252-mutations.py",
+    "--output",
+    "docs/history/reports/r252/mutations-01"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-08T09:47:07.994286+08:00",
+  "end": "2026-10-08T09:48:29.593009+08:00",
+  "elapsed_seconds": 81.598,
+  "exit_code": 0,
+  "last_five": [
+    "{\"name\": \"hydration-per-match-full-tree\", \"target\": \"backend/web/gameplay.js\", \"start\": \"2026-10-08T09:47:56.243039+08:00\", \"elapsed_seconds\": 0.716, \"exit_code\": 1, \"assertion_killed\": true, \"mutated_sha256\": \"9d8a18fde8d9e72a9a65b2cd9038f50eeca9bd1439328638cb1666048ef1bc46\", \"command\": [\"node\", \"--test\", \"backend/web/r252.test.cjs\"]}",
+    "{\"name\": \"old-license_r233_test\", \"target\": \"backend/license_r233_test.go\", \"start\": \"2026-10-08T09:47:56.983144+08:00\", \"elapsed_seconds\": 12.063, \"exit_code\": 1, \"assertion_killed\": true, \"mutated_sha256\": \"41311ce231992e35c86251f5c435ca39e1e40132133ba814ba84552867df6c84\", \"command\": [\"go\", \"test\", \"-overlay\", \"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-4n49aao0/overlay.json\", \"-count=1\", \"-tags\", \"license\", \"-run\", \"^TestR233FailedCounterSaveDoesNotRefreshCachedLifetime$\", \"./backend\"]}",
+    "{\"name\": \"old-license_r242_test\", \"target\": \"backend/license_r242_test.go\", \"start\": \"2026-10-08T09:48:09.063922+08:00\", \"elapsed_seconds\": 8.708, \"exit_code\": 1, \"assertion_killed\": true, \"mutated_sha256\": \"660df32e36d5aafc5255d49b0864d50c9888c95e6680dd4a85fb7a434bc70a1a\", \"command\": [\"go\", \"test\", \"-overlay\", \"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-_9qdun_z/overlay.json\", \"-count=1\", \"-tags\", \"license\", \"-run\", \"^TestR242LicenseExpiryStrictSignedField$\", \"./backend\"]}",
+    "{\"name\": \"default-embeds-activation\", \"target\": \"backend/frontend_assets_disabled.go\", \"start\": \"2026-10-08T09:48:17.773488+08:00\", \"elapsed_seconds\": 11.1, \"exit_code\": 1, \"assertion_killed\": true, \"mutated_sha256\": \"03a958b13702d5809d5abc259ac77f4b42f9ad48fafadc13a8d8fa5bdaa4ea50\", \"command\": [\"go\", \"test\", \"-overlay\", \"/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-m_doyr2e/overlay.json\", \"-count=1\", \"-run\", \"^TestR252DefaultEmbeddedAssets\", \"./backend\"]}",
+    "{\"name\": \"default-audit-misses-text\", \"target\": \"desktop/verify-license-release.cjs\", \"start\": \"2026-10-08T09:48:28.875242+08:00\", \"elapsed_seconds\": 0.706, \"exit_code\": 1, \"assertion_killed\": true, \"mutated_sha256\": \"880a4a0677c6c9767df3574f57143a01a3be21541a0be4289ae63d2f1eddd3fb\", \"command\": [\"node\", \"--test\", \"desktop/disabled-build.test.cjs\"]}"
+  ]
+}

@@ -1,0 +1,17 @@
+✔ R252 missing map falls back to the server mode group; explicit maps keep precedence (5.068708ms)
+✔ R241 map matrix filters before excluded observations are read (8.646333ms)
+✔ R241 hidden tags only, pinned score and one body popup with focus/escape/scroll/touch cleanup (168.836ms)
+✔ R241 skips offscreen and unchanged-width cards (16.951125ms)
+✔ R241 does not render an empty tags container (3.605208ms)
+✔ R241 numeric placement tags are absent; MVP/SVP remain pinned (3.384042ms)
+✔ R252 visible tag hydration indexes the tree once without losing or admitting games (67.486542ms)
+✔ R252 arena detail and unknown-result fallback preserve partial and larger team counts (3.317ms)
+✔ R252 specialist upstream timeout keeps OPGG, pro and client backup selectable (5.418375ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 607.573541

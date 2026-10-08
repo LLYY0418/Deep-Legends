@@ -1,0 +1,19 @@
+{
+  "name": "final-license-helper-20261008T101003.091791",
+  "command": [
+    "node",
+    "scripts/r252-license-check.cjs"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-08T10:10:03.091791+08:00",
+  "end": "2026-10-08T10:10:21.603128+08:00",
+  "elapsed_seconds": 18.512,
+  "exit_code": 0,
+  "last_five": [
+    "{\"Time\":\"2026-10-08T10:10:21.522909+08:00\",\"Action\":\"pass\",\"Package\":\"lol-loot-assistant/backend\",\"Test\":\"TestR242LicenseExpiryStrictSignedField\",\"Elapsed\":0}",
+    "{\"Time\":\"2026-10-08T10:10:21.523021+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Output\":\"PASS\\n\"}",
+    "{\"Time\":\"2026-10-08T10:10:21.524031+08:00\",\"Action\":\"output\",\"Package\":\"lol-loot-assistant/backend\",\"Output\":\"ok  \\tlol-loot-assistant/backend\\t0.575s\\n\"}",
+    "{\"Time\":\"2026-10-08T10:10:21.524075+08:00\",\"Action\":\"pass\",\"Package\":\"lol-loot-assistant/backend\",\"Elapsed\":0.576}",
+    "R252_LICENSE_FIXTURES_VERIFIED {\"expected\":2,\"passed\":2,\"skipped\":0,\"required\":2,\"requiredPassed\":[\"lol-loot-assistant/backend/TestR233FailedCounterSaveDoesNotRefreshCachedLifetime\",\"lol-loot-assistant/backend/TestR242LicenseExpiryStrictSignedField\"]}"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "license-compile-20261008T094501.794370",
+  "command": [
+    "go",
+    "test",
+    "-tags",
+    "license",
+    "-run",
+    "^$",
+    "./..."
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-08T09:45:01.794370+08:00",
+  "end": "2026-10-08T09:45:02.249600+08:00",
+  "elapsed_seconds": 0.455,
+  "exit_code": 1,
+  "last_five": [
+    "# ./...",
+    "pattern ./...: open /Users/ly/Library/Caches/go-build/56/568a8d29cbc960252e3a8a8e41a8a45b6bf3aa52529acabdc257778c6487c918-d: operation not permitted",
+    "FAIL\t./... [setup failed]",
+    "FAIL"
+  ]
+}

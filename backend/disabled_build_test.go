@@ -3,8 +3,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,6 +16,35 @@ import (
 	"sync/atomic"
 	"testing"
 )
+
+func TestR252DefaultEmbeddedAssetsHaveNoActivationContent(t *testing.T) {
+	if err := fs.WalkDir(embedded, "web", func(name string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		body, err := fs.ReadFile(embedded, name)
+		if err != nil {
+			return err
+		}
+		for _, marker := range []string{"注册码", "授权到期", "DL-XXXXX", "license.yinxiaobia.net", "license-staging.yinxiaobia.net"} {
+			if bytes.Contains(body, []byte(marker)) {
+				t.Errorf("default embedded asset %s contains %s", name, marker)
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	files, err := fs.Sub(embedded, "web")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"index.html", "license-ui.js", "gameplay.js"} {
+		if _, err := fs.ReadFile(files, name); err != nil {
+			t.Fatal("default frontend route missing", name, err)
+		}
+	}
+}
 
 func TestR248DisabledHTTPAndPrivacy(t *testing.T) {
 	a := &app{}

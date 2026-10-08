@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -35,21 +34,6 @@ var version = "dev"
 var buildFingerprint = "dev"
 
 const diagnosticDeduplicationLimit = 512
-
-// 侧边栏字标用的 Beaufort for LOL Bold（英雄联盟官方定制字体，见
-// web/beaufort-for-lol-notice.txt——这不是开源字体，字体自带 name 表里的版权/商标
-// 声明和 EULA 链接原样转录在那份 notice 里；本项目是非官方、非商业的粉丝向 LOL
-// 战绩查询工具，随 EXE 分发这份 notice 是为了让版权与授权来源可追溯）。
-// 这里逐个文件写死而不是加 web/*.woff2、web/*.txt 两条通配：R14 就是因为 web/*
-// 通配把 *.test.cjs、README 一起打进 EXE 还能被 HTTP 直接下载，通配符在这个目录下
-// 已经被证明是不安全的默认。
-//
-//go:embed web/*.js web/*.css web/*.html web/*.png web/*.svg
-//go:embed web/arena-team-icons/*.svg web/position-icons/*.svg web/tier-icons/*.svg
-//go:embed web/rune-styles/*.svg web/loot-icons/*.svg web/loot-icons/*.png web/rank-crests/*.png
-//go:embed web/beaufort-for-lol-bold.woff2 web/beaufort-for-lol-notice.txt
-//go:embed data/reroll_pool_14_5.txt data/reroll_pool_14_5.json
-var embedded embed.FS
 
 type app struct {
 	license                         *licenseManager

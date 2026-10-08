@@ -1,0 +1,275 @@
+{
+  "source_inputs": {
+    "backend/arena_result.go": "4c7eed0bd4599965e1afa148cd713bf78bdb949bf2cc97458ddcde6d06a34ab2",
+    "backend/season_stats.go": "e755ffaa2f0bb58a091f39b41f388279d96b01f2cc46df243d358560fea45424",
+    "backend/web/gameplay.js": "e8be1972d1f1b9fb69571294b752af22da81dc0de0621b0a600b9ef53b38b4d5",
+    "backend/license_r233_test.go": "6bfb5e28892dfa384cd33182219f29fbdf54b7153175260797e8abee75e83d31",
+    "backend/license_r242_test.go": "53ffedc3b28ab0c438273df982c9a7785a35352a28906a1335b29aab399ed063",
+    "backend/frontend_assets_disabled.go": "895cbb0e0c379a43793584cf346693686cd06b0f9c2b24f4b5ff74e8c2893da7",
+    "desktop/verify-license-release.cjs": "a82a542584dfda5038c3ce2384178832240fa339d7dd7560224d77610417d14b"
+  },
+  "unchanged_after_mutations": true,
+  "rows": [
+    {
+      "expected_assertion": "TestR252Arena",
+      "failed_tests": [
+        "--- FAIL: TestR252ArenaTeamCountIsMaximumOfObservedAndKnown (0.00s)"
+      ],
+      "name": "arena-observed-only",
+      "target": "backend/arena_result.go",
+      "start": "2026-10-08T10:10:06.888687+08:00",
+      "elapsed_seconds": 14.718,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "de0471b191797ba42dc8449b7caa971e3fbe57da0cca257b574fcd4a4a2e18a0",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-3x7haujj/overlay.json",
+        "-count=1",
+        "-run",
+        "^TestR252Arena",
+        "./backend"
+      ]
+    },
+    {
+      "expected_assertion": "TestR252Arena",
+      "failed_tests": [
+        "--- FAIL: TestR252ArenaTeamCountIsMaximumOfObservedAndKnown (0.00s)"
+      ],
+      "name": "arena-fixed-truncates-observed",
+      "target": "backend/arena_result.go",
+      "start": "2026-10-08T10:10:21.609880+08:00",
+      "elapsed_seconds": 9.522,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "7490b12478635375671195e03a194c90367878824ceab14032fab72ab23a04eb",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-k9pyuefp/overlay.json",
+        "-count=1",
+        "-run",
+        "^TestR252Arena",
+        "./backend"
+      ]
+    },
+    {
+      "expected_assertion": "TestR252Manual",
+      "failed_tests": [
+        "--- FAIL: TestR252ManualSeasonHeadBypassesRecentGateAndStillProbes (1.11s)"
+      ],
+      "name": "manual-persisted-gate",
+      "target": "backend/season_stats.go",
+      "start": "2026-10-08T10:10:31.133381+08:00",
+      "elapsed_seconds": 9.467,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "e873be3c74301a38e082e479fcd44915965755d6bd8263884b0619b6413cf253",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-dty0x0eu/overlay.json",
+        "-count=1",
+        "-run",
+        "^TestR252Manual",
+        "./backend"
+      ]
+    },
+    {
+      "expected_assertion": "TestR252Manual",
+      "failed_tests": [
+        "--- FAIL: TestR252ManualSeasonHeadBypassesRecentGateAndStillProbes (1.07s)"
+      ],
+      "name": "manual-query-gate",
+      "target": "backend/season_stats.go",
+      "start": "2026-10-08T10:10:40.603488+08:00",
+      "elapsed_seconds": 14.576,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "a8d8d5643756d33a2583b2b2c68b96324caf481f18d95ad764f15ae9c42d0bf4",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-5q8tysok/overlay.json",
+        "-count=1",
+        "-run",
+        "^TestR252Manual",
+        "./backend"
+      ]
+    },
+    {
+      "expected_assertion": "R252 missing map",
+      "failed_tests": [
+        "\u2716 R252 missing map falls back to the server mode group; explicit maps keep precedence (5.107792ms)",
+        "\u2716 R252 missing map falls back to the server mode group; explicit maps keep precedence (5.107792ms)"
+      ],
+      "name": "tags-no-map-fallback",
+      "target": "backend/web/gameplay.js",
+      "start": "2026-10-08T10:10:55.184338+08:00",
+      "elapsed_seconds": 0.924,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "641aae78eb5116d2bea49c395a3bf28ca9fec4f161c094475c0842d001c10a42",
+      "command": [
+        "node",
+        "--test",
+        "backend/web/r241.test.cjs"
+      ]
+    },
+    {
+      "expected_assertion": "R252 arena detail",
+      "failed_tests": [
+        "\u2716 R252 arena detail and unknown-result fallback preserve partial and larger team counts (4.0055ms)",
+        "\u2716 R252 arena detail and unknown-result fallback preserve partial and larger team counts (4.0055ms)"
+      ],
+      "name": "js-arena-observed-only",
+      "target": "backend/web/gameplay.js",
+      "start": "2026-10-08T10:10:56.112164+08:00",
+      "elapsed_seconds": 0.755,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "9f9bfe47cf26f7a1624dcde3952a0b7238f53ebeb9cde4426860b1bb42f9498c",
+      "command": [
+        "node",
+        "--test",
+        "backend/web/r252.test.cjs"
+      ]
+    },
+    {
+      "expected_assertion": "R252 arena detail",
+      "failed_tests": [
+        "\u2716 R252 arena detail and unknown-result fallback preserve partial and larger team counts (4.5785ms)",
+        "\u2716 R252 arena detail and unknown-result fallback preserve partial and larger team counts (4.5785ms)"
+      ],
+      "name": "js-arena-fixed-truncates-observed",
+      "target": "backend/web/gameplay.js",
+      "start": "2026-10-08T10:10:56.870305+08:00",
+      "elapsed_seconds": 0.479,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "6b404533cb16ac99282ad9a8cb1c6caea3928e37a0e6b964d3f8188722718901",
+      "command": [
+        "node",
+        "--test",
+        "backend/web/r252.test.cjs"
+      ]
+    },
+    {
+      "expected_assertion": "R252 visible tag hydration",
+      "failed_tests": [
+        "\u2716 R252 visible tag hydration indexes the tree once without losing or admitting games (98.934625ms)",
+        "\u2716 R252 visible tag hydration indexes the tree once without losing or admitting games (98.934625ms)"
+      ],
+      "name": "hydration-per-match-full-tree",
+      "target": "backend/web/gameplay.js",
+      "start": "2026-10-08T10:10:57.375345+08:00",
+      "elapsed_seconds": 0.49,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "d040c993150721803496239ca965f10a91b933dc8232d228a0956fc202d2871d",
+      "command": [
+        "node",
+        "--test",
+        "backend/web/r252.test.cjs"
+      ]
+    },
+    {
+      "expected_assertion": "TestR233FailedCounterSave",
+      "failed_tests": [
+        "--- FAIL: TestR233FailedCounterSaveDoesNotRefreshCachedLifetime (0.00s)"
+      ],
+      "name": "old-license_r233_test",
+      "target": "backend/license_r233_test.go",
+      "start": "2026-10-08T10:10:57.882907+08:00",
+      "elapsed_seconds": 12.363,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "41311ce231992e35c86251f5c435ca39e1e40132133ba814ba84552867df6c84",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-a1dbn5ma/overlay.json",
+        "-count=1",
+        "-tags",
+        "license",
+        "-run",
+        "^TestR233FailedCounterSaveDoesNotRefreshCachedLifetime$",
+        "./backend"
+      ]
+    },
+    {
+      "expected_assertion": "TestR242LicenseExpiry",
+      "failed_tests": [
+        "--- FAIL: TestR242LicenseExpiryStrictSignedField (0.00s)"
+      ],
+      "name": "old-license_r242_test",
+      "target": "backend/license_r242_test.go",
+      "start": "2026-10-08T10:11:10.262875+08:00",
+      "elapsed_seconds": 8.748,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "660df32e36d5aafc5255d49b0864d50c9888c95e6680dd4a85fb7a434bc70a1a",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-j7cgqb5f/overlay.json",
+        "-count=1",
+        "-tags",
+        "license",
+        "-run",
+        "^TestR242LicenseExpiryStrictSignedField$",
+        "./backend"
+      ]
+    },
+    {
+      "expected_assertion": "TestR252DefaultEmbeddedAssets",
+      "failed_tests": [
+        "--- FAIL: TestR252DefaultEmbeddedAssetsHaveNoActivationContent (0.01s)"
+      ],
+      "name": "default-embeds-activation",
+      "target": "backend/frontend_assets_disabled.go",
+      "start": "2026-10-08T10:11:19.012217+08:00",
+      "elapsed_seconds": 8.099,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "03a958b13702d5809d5abc259ac77f4b42f9ad48fafadc13a8d8fa5bdaa4ea50",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-yykgfsu1/overlay.json",
+        "-count=1",
+        "-run",
+        "^TestR252DefaultEmbeddedAssets",
+        "./backend"
+      ]
+    },
+    {
+      "expected_assertion": "R252 disabled release rejects embedded activation text",
+      "failed_tests": [
+        "\u2716 R252 disabled release rejects embedded activation text and default assets contain no activation UI (1.782334ms)",
+        "\u2716 R252 disabled release rejects embedded activation text and default assets contain no activation UI (1.782334ms)"
+      ],
+      "name": "default-audit-misses-text",
+      "target": "desktop/verify-license-release.cjs",
+      "start": "2026-10-08T10:11:27.111655+08:00",
+      "elapsed_seconds": 0.484,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "880a4a0677c6c9767df3574f57143a01a3be21541a0be4289ae63d2f1eddd3fb",
+      "command": [
+        "node",
+        "--test",
+        "desktop/disabled-build.test.cjs"
+      ]
+    }
+  ],
+  "all_assertion_killed": true
+}

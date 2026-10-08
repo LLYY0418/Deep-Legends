@@ -1,7 +1,8 @@
 package main
 
 // Same match-local result feeds card color, aggregates and streaks. Actual
-// subteams take precedence over queue fallback; no placement means unknown.
+// subteams and the known queue size provide independent lower bounds. Partial
+// participant lists must not shrink a known arena, or truncate larger arenas.
 func arenaPlacementResult(m gameplayMatch, placement int) string {
 	if placement <= 0 {
 		return "unknown"
@@ -13,14 +14,13 @@ func arenaPlacementResult(m gameplayMatch, placement int) string {
 		}
 	}
 	count := len(teams)
+	if m.QueueID == 1750 {
+		count = max(count, 6)
+	} else if isArenaQueue(m.QueueID, "") {
+		count = max(count, 8)
+	}
 	if count < 2 {
-		if m.QueueID == 1750 {
-			count = 6
-		} else if isArenaQueue(m.QueueID, "") {
-			count = 8
-		} else {
-			return "unknown"
-		}
+		return "unknown"
 	}
 	if placement > (count+1)/2 {
 		return "loss"

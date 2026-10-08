@@ -14,7 +14,7 @@ if (process.argv[2] === "--backend") {
   console.log("LOOT_READY " + JSON.stringify({ baseUrl: process.env.R240_ORIGIN, bootstrapUrl: process.env.R240_ORIGIN, token: "r240-synthetic-token-".repeat(3) }));
   setInterval(() => {}, 1000);
 } else {
-async function probe({ phase, state = "ACTIVE", sourceRoot = root, transition = false, rendererDelay = 0, index = 1, flipBeforeAck = false, storedBounds = null }) {
+async function probe({ phase, state = "ACTIVE", sourceRoot = root, transition = false, rendererDelay = 0, index = 1, flipBeforeAck = false, storedBounds = null, frontendAssetDirectory = "" }) {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "r240-electron-")), directory = path.join(out, `${phase}-${state}-${index}`);
   fs.mkdirSync(directory, { recursive: true }); const rows = [], serverRequests = [], transportEvents = []; let current = state, generation = 1, nativeReads = 0;
   const web = path.join(sourceRoot, "backend/web");
@@ -34,7 +34,8 @@ async function probe({ phase, state = "ACTIVE", sourceRoot = root, transition = 
     if (name === "/api/events") { res.writeHead(200, { "Content-Type": "text/event-stream" }); res.write(": fixture\n\n"); return; }
     if (name === "/api/status") return json({ connected: false, installations: [] });
     if (name.startsWith("/api/")) return json({});
-    const file = path.resolve(web, name === "/" ? "index.html" : "." + name);
+    const relative = name === "/" ? "index.html" : name.slice(1);
+    const file = path.resolve(web, frontendAssetDirectory && ["index.html", "license-ui.js"].includes(relative) ? path.join(frontendAssetDirectory, relative) : relative);
     if (!file.startsWith(web + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); res.end(); return; }
     res.setHeader("Content-Type", ({ ".js": "text/javascript", ".css": "text/css", ".html": "text/html", ".png": "image/png" })[path.extname(file)] || "application/octet-stream"); res.end(fs.readFileSync(file));
   });

@@ -202,3 +202,5 @@
 | R238 | 0.12.77 发布（默认无注册码） | P0/P1保留完成；本地最终全量/变异/Chromium/public审计通过，P3真机清单已给；三轮失败保留、Windows实际升级已过；最终分组调度本地全量127.41s通过，等待新SHA完整CI/草稿/Latest确认 | [WORKLIST-R238](WORKLIST-R238-RELEASE-0.12.77-WITH-LICENSE-R232-R237-AFTER-LICENSE-CLOSES-NO-ISOLATION.md) | [发布账本](history/ledgers/release-0.12.77-execution-ledger.md) | 0.12.77 / public / 129e36bf324c；Setup-only；未tag、未发布 |
 
 | R251 | 隐藏玩家实际效果收口：完整Riot ID补查、已知敌方展示、Go到Chromium联合验证 | 未纳入0.12.77；原实现/测试完整保存在本地快照 | 快照分支保存 | 快照分支保存 | codex/r249-r251-hidden-identity-snapshot / 6fb02a6a；不推送 |
+
+| R252 | 0.12.77 候选后的遗留修复与稳定性验证 | 进行中；不发布、不 bump，R104 根因待证据 | [WORKLIST-R252](WORKLIST-R252-POST-0.12.77-LEFTOVERS.md) | [执行台账](history/ledgers/post-0.12.77-execution-ledger.md) | codex/post-0.12.77-fixes |

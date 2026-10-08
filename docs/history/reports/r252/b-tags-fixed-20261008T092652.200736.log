@@ -1,0 +1,14 @@
+✔ R252 missing map falls back to the server mode group; explicit maps keep precedence (6.227833ms)
+✔ R241 map matrix filters before excluded observations are read (9.215209ms)
+✔ R241 hidden tags only, pinned score and one body popup with focus/escape/scroll/touch cleanup (243.473125ms)
+✔ R241 skips offscreen and unchanged-width cards (33.517291ms)
+✔ R241 does not render an empty tags container (2.388292ms)
+✔ R241 numeric placement tags are absent; MVP/SVP remain pinned (3.610625ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1048.099334

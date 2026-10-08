@@ -1,0 +1,23 @@
+{
+  "name": "r104-soak-local-20261008T093804.146873",
+  "command": [
+    "python3",
+    "scripts/r252-r104-soak.py",
+    "--binary",
+    "/private/tmp/r252-r104-baseline.test",
+    "--output",
+    "docs/history/reports/r252/r104-local-30"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-08T09:38:04.146873+08:00",
+  "end": "2026-10-08T09:38:23.279852+08:00",
+  "elapsed_seconds": 19.133,
+  "exit_code": 0,
+  "last_five": [
+    "{\"iteration\": 26, \"start\": \"2026-10-08T09:38:20.065796+08:00\", \"elapsed_seconds\": 0.664, \"exit_code\": 0, \"passed\": true, \"timeline_logged\": true}",
+    "{\"iteration\": 27, \"start\": \"2026-10-08T09:38:20.729740+08:00\", \"elapsed_seconds\": 0.633, \"exit_code\": 0, \"passed\": true, \"timeline_logged\": true}",
+    "{\"iteration\": 28, \"start\": \"2026-10-08T09:38:21.362940+08:00\", \"elapsed_seconds\": 0.646, \"exit_code\": 0, \"passed\": true, \"timeline_logged\": true}",
+    "{\"iteration\": 29, \"start\": \"2026-10-08T09:38:22.008922+08:00\", \"elapsed_seconds\": 0.613, \"exit_code\": 0, \"passed\": true, \"timeline_logged\": true}",
+    "{\"iteration\": 30, \"start\": \"2026-10-08T09:38:22.621993+08:00\", \"elapsed_seconds\": 0.644, \"exit_code\": 0, \"passed\": true, \"timeline_logged\": true}"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "b-go-real-listener-20261008T092657.117362",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-run",
+    "TestR252|TestR241HeadFreshness|TestR214FreshSeason",
+    "./backend"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-08T09:26:57.117362+08:00",
+  "end": "2026-10-08T09:27:11.063492+08:00",
+  "elapsed_seconds": 13.946,
+  "exit_code": 0,
+  "last_five": [
+    "ok  \tlol-loot-assistant/backend\t0.941s"
+  ]
+}

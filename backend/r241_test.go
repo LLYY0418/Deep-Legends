@@ -81,9 +81,10 @@ func TestR241HeadFreshnessSmallRequestNewGamesAndRecentGate(t *testing.T) {
 	}
 	requests = nil
 	mu.Unlock()
-	// All repeated opens, including explicit refresh, remain request-free for 60s.
+	// Repeated automatic opens remain request-free for 60s; manual refresh is
+	// covered by TestR252ManualSeasonHeadBypassesRecentGateAndStillProbes.
 	a.startSeasonStatsRefresh(client, reference, player, ref, nil, false)
-	a.startSeasonStatsRefresh(client, reference, player, ref, nil, true)
+	a.startSeasonStatsRefresh(client, reference, player, ref, nil, false)
 	mu.Lock()
 	if len(requests) != 0 {
 		t.Fatal(requests)

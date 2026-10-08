@@ -1,0 +1,6 @@
+--- FAIL: TestR252ArenaTeamCountIsMaximumOfObservedAndKnown (0.00s)
+    r252_test.go:26: queue=1750 observed=3 placement=3 got=loss want=win
+    r252_test.go:26: queue=1700 observed=3 placement=4 got=loss want=win
+FAIL
+FAIL	lol-loot-assistant/backend	0.644s
+FAIL

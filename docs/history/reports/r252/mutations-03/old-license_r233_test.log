@@ -1,0 +1,5 @@
+--- FAIL: TestR233FailedCounterSaveDoesNotRefreshCachedLifetime (0.00s)
+    license_r233_test.go:179: failed renew refreshed the cached lease anchor
+FAIL
+FAIL	lol-loot-assistant/backend	0.691s
+FAIL

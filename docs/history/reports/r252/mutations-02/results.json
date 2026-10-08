@@ -1,0 +1,222 @@
+{
+  "source_inputs": {
+    "backend/arena_result.go": "4c7eed0bd4599965e1afa148cd713bf78bdb949bf2cc97458ddcde6d06a34ab2",
+    "backend/season_stats.go": "e755ffaa2f0bb58a091f39b41f388279d96b01f2cc46df243d358560fea45424",
+    "backend/web/gameplay.js": "4c89d1c49dec05f4b6bf51c7b97772def9fdbb61057d45e26ad4f10a52def53d",
+    "backend/license_r233_test.go": "6bfb5e28892dfa384cd33182219f29fbdf54b7153175260797e8abee75e83d31",
+    "backend/license_r242_test.go": "53ffedc3b28ab0c438273df982c9a7785a35352a28906a1335b29aab399ed063",
+    "backend/frontend_assets_disabled.go": "895cbb0e0c379a43793584cf346693686cd06b0f9c2b24f4b5ff74e8c2893da7",
+    "desktop/verify-license-release.cjs": "a82a542584dfda5038c3ce2384178832240fa339d7dd7560224d77610417d14b"
+  },
+  "unchanged_after_mutations": true,
+  "rows": [
+    {
+      "name": "arena-observed-only",
+      "target": "backend/arena_result.go",
+      "start": "2026-10-08T10:01:11.183415+08:00",
+      "elapsed_seconds": 8.175,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "de0471b191797ba42dc8449b7caa971e3fbe57da0cca257b574fcd4a4a2e18a0",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-kra7blav/overlay.json",
+        "-count=1",
+        "-run",
+        "^TestR252Arena",
+        "./backend"
+      ]
+    },
+    {
+      "name": "arena-fixed-truncates-observed",
+      "target": "backend/arena_result.go",
+      "start": "2026-10-08T10:01:19.356378+08:00",
+      "elapsed_seconds": 8.704,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "7490b12478635375671195e03a194c90367878824ceab14032fab72ab23a04eb",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-slmkmwtb/overlay.json",
+        "-count=1",
+        "-run",
+        "^TestR252Arena",
+        "./backend"
+      ]
+    },
+    {
+      "name": "manual-persisted-gate",
+      "target": "backend/season_stats.go",
+      "start": "2026-10-08T10:01:28.058055+08:00",
+      "elapsed_seconds": 9.438,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "e873be3c74301a38e082e479fcd44915965755d6bd8263884b0619b6413cf253",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-rfd4l_rf/overlay.json",
+        "-count=1",
+        "-run",
+        "^TestR252Manual",
+        "./backend"
+      ]
+    },
+    {
+      "name": "manual-query-gate",
+      "target": "backend/season_stats.go",
+      "start": "2026-10-08T10:01:37.495154+08:00",
+      "elapsed_seconds": 9.273,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "a8d8d5643756d33a2583b2b2c68b96324caf481f18d95ad764f15ae9c42d0bf4",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-nvcnzmyf/overlay.json",
+        "-count=1",
+        "-run",
+        "^TestR252Manual",
+        "./backend"
+      ]
+    },
+    {
+      "name": "tags-no-map-fallback",
+      "target": "backend/web/gameplay.js",
+      "start": "2026-10-08T10:01:46.770324+08:00",
+      "elapsed_seconds": 0.771,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "4367c8a4a4908ca0544f9130a6da558350375d4e83db9d5af020569b8ee04ea0",
+      "command": [
+        "node",
+        "--test",
+        "backend/web/r241.test.cjs"
+      ]
+    },
+    {
+      "name": "js-arena-observed-only",
+      "target": "backend/web/gameplay.js",
+      "start": "2026-10-08T10:01:47.543581+08:00",
+      "elapsed_seconds": 0.442,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "9f9bfe47cf26f7a1624dcde3952a0b7238f53ebeb9cde4426860b1bb42f9498c",
+      "command": [
+        "node",
+        "--test",
+        "backend/web/r252.test.cjs"
+      ]
+    },
+    {
+      "name": "js-arena-fixed-truncates-observed",
+      "target": "backend/web/gameplay.js",
+      "start": "2026-10-08T10:01:47.987455+08:00",
+      "elapsed_seconds": 0.417,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "9fd46d0352b81d4eebe36c91aada80bf76ee196e51ab03d9c613015b6cf3579b",
+      "command": [
+        "node",
+        "--test",
+        "backend/web/r252.test.cjs"
+      ]
+    },
+    {
+      "name": "hydration-per-match-full-tree",
+      "target": "backend/web/gameplay.js",
+      "start": "2026-10-08T10:01:48.423198+08:00",
+      "elapsed_seconds": 0.443,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "b1a76807c9e1da42d9cec6a8deab923271bfaf404d93de164ef4a23423b72e8c",
+      "command": [
+        "node",
+        "--test",
+        "backend/web/r252.test.cjs"
+      ]
+    },
+    {
+      "name": "old-license_r233_test",
+      "target": "backend/license_r233_test.go",
+      "start": "2026-10-08T10:01:48.881304+08:00",
+      "elapsed_seconds": 8.123,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "41311ce231992e35c86251f5c435ca39e1e40132133ba814ba84552867df6c84",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-7gdwj9kt/overlay.json",
+        "-count=1",
+        "-tags",
+        "license",
+        "-run",
+        "^TestR233FailedCounterSaveDoesNotRefreshCachedLifetime$",
+        "./backend"
+      ]
+    },
+    {
+      "name": "old-license_r242_test",
+      "target": "backend/license_r242_test.go",
+      "start": "2026-10-08T10:01:57.019428+08:00",
+      "elapsed_seconds": 7.918,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "660df32e36d5aafc5255d49b0864d50c9888c95e6680dd4a85fb7a434bc70a1a",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-auvhz077/overlay.json",
+        "-count=1",
+        "-tags",
+        "license",
+        "-run",
+        "^TestR242LicenseExpiryStrictSignedField$",
+        "./backend"
+      ]
+    },
+    {
+      "name": "default-embeds-activation",
+      "target": "backend/frontend_assets_disabled.go",
+      "start": "2026-10-08T10:02:04.937798+08:00",
+      "elapsed_seconds": 7.76,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "03a958b13702d5809d5abc259ac77f4b42f9ad48fafadc13a8d8fa5bdaa4ea50",
+      "command": [
+        "go",
+        "test",
+        "-overlay",
+        "/var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/r252-mutant-o_roz0uy/overlay.json",
+        "-count=1",
+        "-run",
+        "^TestR252DefaultEmbeddedAssets",
+        "./backend"
+      ]
+    },
+    {
+      "name": "default-audit-misses-text",
+      "target": "desktop/verify-license-release.cjs",
+      "start": "2026-10-08T10:02:12.699017+08:00",
+      "elapsed_seconds": 0.468,
+      "exit_code": 1,
+      "assertion_killed": true,
+      "mutated_sha256": "880a4a0677c6c9767df3574f57143a01a3be21541a0be4289ae63d2f1eddd3fb",
+      "command": [
+        "node",
+        "--test",
+        "desktop/disabled-build.test.cjs"
+      ]
+    }
+  ],
+  "all_assertion_killed": true
+}
