@@ -156,6 +156,14 @@ func waitR100PerkEnrichment(t *testing.T, a *app, key string) {
 	t.Helper()
 	a.perkCatalogMu.Lock()
 	done := a.perkAugmentJobs[key]
+	if key == "lcu" && done == nil {
+		for candidate, job := range a.perkAugmentJobs {
+			if strings.HasPrefix(candidate, "lcu-unversioned:") {
+				done = job
+				break
+			}
+		}
+	}
 	a.perkCatalogMu.Unlock()
 	if done != nil {
 		select {
@@ -192,7 +200,7 @@ func TestR100PerksNeverWaitForOptionalAugmentsAndPersist(t *testing.T) {
 	}))
 	defer server.Close()
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
-	client := &LCUClient{baseURL: server.URL, token: "fixture", http: server.Client()}
+	client := &LCUClient{baseURL: server.URL, token: "fixture", http: server.Client(), gameVersion: "26.19.1", region: "TENCENT", rsoPlatform: "HN1"}
 	a := &app{connected: true, lcu: client, champions: p, storage: store}
 	started := time.Now()
 	w := httptest.NewRecorder()
@@ -225,9 +233,10 @@ func TestR100PerksNeverWaitForOptionalAugmentsAndPersist(t *testing.T) {
 	if time.Since(started) > 2*time.Second {
 		t.Error("parallel perks blocked behind optional I/O")
 	}
-	waitR100PerkEnrichment(t, a, "lcu")
+	key, _ := clientCatalogKey(client)
+	waitR100PerkEnrichment(t, a, key)
 	reboot := &app{storage: store}
-	cached, err := reboot.cachedGameplayPerkCatalog(context.Background(), "lcu", func() (gameplayPerkCatalogResponse, error) {
+	cached, err := reboot.cachedGameplayPerkCatalog(context.Background(), key, func() (gameplayPerkCatalogResponse, error) {
 		t.Error("restart fetched normalized catalog again")
 		return gameplayPerkCatalogResponse{}, errors.New("network unavailable")
 	})

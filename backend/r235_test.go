@@ -212,8 +212,8 @@ func TestR235CurrentHistorySnapshotImmediateAndSSE(t *testing.T) {
 	a.summoner = Summoner{PUUID: ref}
 	events := make(chan string, 8)
 	a.eventSubscribers = map[chan string]struct{}{events: {}}
-	key := a.clientHistorySnapshotKey("jp1", ref)
-	raw, _ := json.Marshal(clientHistorySnapshot{Matches: []gameplayMatch{{GameID: 111, Result: "win"}}})
+	key := a.clientHistorySnapshotKey("jp1", "", ref)
+	raw, _ := json.Marshal(clientHistorySnapshot{Matches: []gameplayMatch{{GameID: 111, Result: "win"}}, Capabilities: []EndpointCapability{{Name: "match-history", State: capabilityAvailable}}})
 	if err := writeLocalStoreFile(a.storage, key, raw); err != nil {
 		t.Fatal(err)
 	}
@@ -357,8 +357,8 @@ func TestR235SelfOverviewBypassesRelayAndColdHistory(t *testing.T) {
 			events := make(chan string, 8)
 			a.eventSubscribers = map[chan string]struct{}{events: {}}
 			if cached {
-				raw, _ := json.Marshal(clientHistorySnapshot{Matches: []gameplayMatch{{GameID: 111, QueueID: 420, Result: "win", CreatedAt: time.Now().UnixMilli()}}})
-				if err := writeLocalStoreFile(a.storage, a.clientHistorySnapshotKey("jp1", ref), raw); err != nil {
+				raw, _ := json.Marshal(clientHistorySnapshot{Matches: []gameplayMatch{{GameID: 111, QueueID: 420, Result: "win", CreatedAt: time.Now().UnixMilli()}}, Capabilities: []EndpointCapability{{Name: "match-history", State: capabilityAvailable}}})
+				if err := writeLocalStoreFile(a.storage, a.clientHistorySnapshotKey("jp1", "", ref), raw); err != nil {
 					t.Fatal(err)
 				}
 			}

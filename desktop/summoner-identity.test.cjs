@@ -1,3 +1,4 @@
+const {viewStatus}=require("../backend/web/r258-client-view-fixture.cjs");
 "use strict";
 
 const test = require("node:test");
@@ -67,12 +68,12 @@ function summonerLabel(summoner) {
   return `${summoner.gameName || summoner.displayName || "当前召唤师"}${summoner.tagLine ? `#${summoner.tagLine}` : ""}`;
 }
 
-test("summoner-updated is whitelisted for status and overview-player", () => {
+test("R258 summoner notification is superseded by direct client view", () => {
   const mapping = liveUpdateMapping();
-  assert.deepEqual(mapping["summoner-updated"], ["status", "overview-player"]);
+  assert.deepEqual(mapping["summoner-updated"], []);
 });
 
-test("live-update debounce accumulates both events and updates the current overview in place", async () => {
+test("R258 account debounce and direct identity view update independently in place", async () => {
   const dom = new JSDOM("<!doctype html><body></body>", { url: "http://localhost/" });
   try {
     const w = dom.window;
@@ -91,7 +92,7 @@ test("live-update debounce accumulates both events and updates the current overv
       renderPlayerTabs: () => {},
       rerenderTab: () => {},
     });
-    w.addEventListener("deep-legends:overview-player", (event) => applyOverviewPlayerIdentity(event.detail.summoner));
+    w.addEventListener("deep-legends:client-view", (event) => applyOverviewPlayerIdentity(event.detail.summoner));
 
     const timers = [];
     const appState = {
@@ -118,10 +119,11 @@ test("live-update debounce accumulates both events and updates the current overv
     assert.equal(timers.length, 1, "events share a fixed window instead of postponing refresh");
     assert.equal(timers[0].canceled, false);
     assert.equal(timers[0].delay, 180);
-    assert.deepEqual([...appState.liveUpdateSlices].sort(), ["account", "overview-player", "status"]);
+    assert.deepEqual([...appState.liveUpdateSlices].sort(), ["account"]);
     await flushLiveUpdateSlices();
 
-    assert.equal(statusRefreshes, 1);
+    assert.equal(statusRefreshes, 0);
+    w.dispatchEvent(new w.CustomEvent("deep-legends:client-view",{detail:{type:"client-view",state:"ready",generation:1,summoner:nextSummoner}}));
     assert.equal(accountLoads, 1);
     assert.equal(current.data.player.gameName, "新名字");
     assert.equal(current.data.player.profileIconId, 22);
@@ -138,9 +140,9 @@ test("updateStatus refreshes a connected current-tab header without resetting ca
   const perks = { styles: [{ id: 1 }] };
   const items = { items: [{ id: 1001 }] };
   const spells = { spells: [{ id: 4 }] };
-  const current = { key: "current", current: true, label: "旧名字#OLD", icon: 10 };
+  const current = { key: "current", current: true, region:"",serverId:"HN1", label: "旧名字#OLD", icon: 10 };
   const state = {
-    status: { connected: true }, tabs: [current], activeTabs:{players:"current",kr:"",pro:""}, queueGroups: [],
+    status: viewStatus({ connected: true,identityReady:true,clientRegion:"TENCENT",sgpReady:true,serverId:"HN1" }), tabs: [current], activeTabs:{players:"current",kr:"",pro:""}, queueGroups: [],
     perks, items, summonerSpells: spells, section: "overview",
   };
   let tabRenders = 0;
@@ -148,14 +150,14 @@ test("updateStatus refreshes a connected current-tab header without resetting ca
   const { updateStatus } = compileFunctions(gameplaySource, ["updateStatus"], {
     state,
     connected: () => Boolean(state.status?.connected),
-    summonerLabel,
+    summonerLabel, localStorage:{setItem:()=>{}}, window:{},
     renderPlayerTabs: () => { tabRenders += 1; },
     ensurePerks: () => { catalogLoads += 1; },
     ensureItems: () => { catalogLoads += 1; },
     ensureSummonerSpells: () => { catalogLoads += 1; },
   });
 
-  updateStatus({ connected: true, summoner: { gameName: "新名字", tagLine: "CN1", profileIconId: 22 } });
+  updateStatus(viewStatus({ connected: true,identityReady:true,clientRegion:"TENCENT",sgpReady:true,serverId:"HN1", summoner: { gameName: "新名字", tagLine: "CN1", profileIconId: 22 } }));
   assert.equal(current.label, "新名字#CN1");
   assert.equal(current.icon, 22);
   assert.equal(tabRenders, 1);
@@ -224,7 +226,7 @@ test("overview-player changes only five identity fields on the current tab", () 
   let contentRenders = 0;
   const { applyOverviewPlayerIdentity } = compileFunctions(gameplaySource, ["applyOverviewPlayerIdentity"], {
     state,
-    summonerLabel,
+    summonerLabel, localStorage:{setItem:()=>{}}, window:{},
     renderPlayerTabs: () => { tabRenders += 1; },
     rerenderTab: () => { contentRenders += 1; },
   });
@@ -272,14 +274,15 @@ test("identity and first self card remove the global startup lock", () => {
     const state = { selfOverviewReady:true,status: { connected: true, identityReady: true, snapshotReady: false }, loading: false, overlayForced: false, overlaySuppressed: false, overlayBaselineAttempt: "", statusDelay: 0 };
     let hidden = 0;
     const { updateReadingOverlay } = compileFunctions(appSource, ["updateReadingOverlay"], {
-      state,
+      state, el:{startupLoading},
       hideReadingOverlay: () => { hidden += 1; appFrame.removeAttribute("inert"); },
       showReadingOverlay: () => { startupLoading.hidden = false; appFrame.setAttribute("inert", ""); },
       snapshotRetryText: () => "",
     });
     updateReadingOverlay(false);
-    assert.equal(hidden, 1);
-    assert.equal(appFrame.hasAttribute("inert"), false);
+    assert.equal(hidden, 0);
+    assert.equal(startupLoading.hidden, true);
+    assert.equal(appFrame.hasAttribute("inert"), true);
   } finally {
     dom.window.close();
   }

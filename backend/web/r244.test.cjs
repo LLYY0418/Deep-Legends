@@ -22,22 +22,14 @@ function overlay(){
  const f=compile(app,['updateReadingOverlay','showReadingOverlay','hideReadingOverlay','snapshotRetryText'],{state,el,window,CustomEvent:dom.window.CustomEvent,STATUS_INTERVAL:3600000,setTimeout:(fn,delay)=>{timers.set(++seq,{fn,delay});return seq},clearTimeout:id=>timers.delete(id),renderNotice:()=>{}});
  return {state,timers,events,el,...f,close:()=>dom.window.close()};
 }
-test('R244 first self card hides immediately and 15-second no-card fallback remains retryable',()=>{
- const h=overlay();try{
-  h.state.status={connected:false,clientDiscovery:'probe-failed'};h.updateReadingOverlay();
-  h.state.status={connected:true,identityReady:true};h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,false);
-  const timer=[...h.timers.values()].find(t=>t.delay===15000);assert(timer,'missing 15s fallback');timer.fn();
-  assert.equal(h.el.startupLoading.hidden,true);assert(h.events.some(e=>e.type==='deep-legends:self-overview-timeout'));
-  h.state.selfOverviewReady=true;h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,true);assert.equal(h.state.overlaySuppressed,false);
- }finally{h.close()}
- const ready=overlay();try{ready.state.status={connected:true,identityReady:true};ready.updateReadingOverlay();const start=performance.now();ready.state.selfOverviewReady=true;ready.updateReadingOverlay();assert.equal(ready.el.startupLoading.hidden,true);assert(performance.now()-start<=300);assert.equal(ready.events.find(e=>e.reason==='hide').hide_reason,'self-tab-ready');assert(![...ready.timers.values()].some(t=>t.delay===15000));}finally{ready.close()}
-});
-test('R244 connection-state starts status request within 100ms',()=>{
+test('R258 first card and client startup never depend on a global overlay',()=>{const h=overlay();try{for(const status of [{connected:false,clientDiscovery:'probe-failed'},{connected:true,identityReady:true}]){h.state.status=status;h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,true);assert.equal(h.el.appFrame.hasAttribute('inert'),false);}assert.equal(h.timers.size,0);}finally{h.close();}});
+
+test('R258 legacy connection notifications do not pull status',()=>{
  let eventSource,calledAt;
  class EventSource {constructor(){eventSource=this}addEventListener(){}close(){}}
  const state={},window={EventSource,dispatchEvent:()=>{}};
  const f=compile(app,['setupLiveUpdates'],{state,window,EventSource,CustomEvent:class{},clearTimeout:()=>{},setTimeout:()=>1,refreshStatus:()=>{calledAt=performance.now()},queueLiveUpdateSlices:()=>assert.fail('connection-state debounced'),LIVE_UPDATE_STATE_SLICES:{'connection-state':['status']},resyncLiveState:()=>{},renderUpdateStatus:()=>{},updateUI:{}});
- f.setupLiveUpdates();const start=performance.now();eventSource.onmessage({data:'connection-state'});assert(calledAt!==undefined);assert(calledAt-start<=100);
+ f.setupLiveUpdates();eventSource.onmessage({data:'connection-state'});assert.equal(calledAt,undefined);
 });
 test('R244 matches card emits readiness from the rendered list and only once for self',()=>{
  const dom=new JSDOM('<main><div class="match-list"></div></main>');try{

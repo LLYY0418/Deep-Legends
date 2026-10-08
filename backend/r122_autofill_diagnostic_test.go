@@ -268,6 +268,7 @@ func TestR122SGPSummaryHistoryEventCarriesAutofillCounts(t *testing.T) {
 	}
 	playerRef := strings.Repeat("w", 48)
 
+	// R258 本人首屏不再补窗口；本用例使用另一名玩家验证窗口诊断。
 	// 窗口分支的进入条件是「详情页返回 0 场可见对局」。这里用与详情页测试
 	// **完全相同**的三场对局，只把 gameType 换成 CUSTOM_GAME：它们会被
 	// isCustomGameplayMatch 过滤掉（matches 为空），但 QueueID 仍是 420/440，
@@ -309,7 +310,7 @@ func TestR122SGPSummaryHistoryEventCarriesAutofillCounts(t *testing.T) {
 	store := r122Store(t)
 	a := &app{
 		sgp: provider, lcu: client, connected: true, storage: store,
-		summoner: Summoner{PUUID: playerRef, GameName: "当前玩家"}, lpTracker: newLPTracker(nil),
+		summoner: Summoner{PUUID: strings.Repeat("z", 48), GameName: "当前玩家"}, lpTracker: newLPTracker(nil),
 		gameplayRefs: make(map[string]string), gameplayRefDetails: make(map[string]gameplayReference),
 	}
 

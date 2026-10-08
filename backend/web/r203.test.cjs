@@ -20,9 +20,8 @@ test('R203 1183 cards survive lastSync changes every eight seconds without globa
 test('R203 first empty collection shows only a grid placeholder and no indefinite loading flag',async()=>{
  const f=fixture();try{f.state.status.snapshotReady=false;await f.loadSkins();f.updateReadingOverlay(true);assert.equal(f.el.grid.querySelectorAll('.skeleton').length,8);assert.equal(f.el.grid.querySelector('button'),null);assert.equal(f.el.startupLoading.hidden,true);assert.equal(f.el.appFrame.hasAttribute('inert'),false);assert.equal(f.state.loading,false);}finally{f.dom.window.close();}
 });
-test('R203 missing self card escapes at 15 seconds across repeated shows and retries',async()=>{
- const f=fixture();try{f.state.selfOverviewReady=false;f.state.status.identityReady=false;f.updateReadingOverlay();assert(f.el.appFrame.hasAttribute('inert'));for(let i=0;i<3;i++){await f.advance(3000);f.updateReadingOverlay();if(i<2)await f.retrySummonerIdentity();}await f.advance(5999);assert.equal(f.el.startupLoading.hidden,false);await f.advance(1);assert.equal(f.el.startupLoading.hidden,true);assert.equal(f.el.appFrame.hasAttribute('inert'),false);assert(f.events.some(e=>e[0]==='deep-legends:self-overview-timeout'));for(let i=0;i<4;i++){f.updateReadingOverlay();await f.advance(1000);assert.equal(f.el.startupLoading.hidden,true);}}finally{f.dom.window.close();}
-});
+test('R258 missing self identity never blocks collection or adds overlay timers',async()=>{const f=fixture();try{f.state.selfOverviewReady=false;f.state.status.identityReady=false;for(let i=0;i<4;i++){f.updateReadingOverlay();await f.advance(3000);assert.equal(f.el.startupLoading.hidden,true);assert.equal(f.el.appFrame.hasAttribute('inert'),false);}assert.equal(f.timers.size,0);}finally{f.dom.window.close();}});
+
 test('R203 overlay retry is identity-only, single-flight and one-second debounced',async()=>{
  const f=fixture();try{await Promise.all([f.retrySummonerIdentity(),f.retrySummonerIdentity()]);await f.retrySummonerIdentity();assert.deepEqual(f.requests,['/api/identity/refresh?source=overlay_retry']);await f.advance(1000);await f.retrySummonerIdentity();assert.equal(f.requests.length,2);assert(!f.requests.some(x=>x.startsWith('/api/refresh')));assert.match(source,/startupLoadingRetry\?\.addEventListener\("click", retrySummonerIdentity\)/);}finally{f.dom.window.close();}
 });

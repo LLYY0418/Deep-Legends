@@ -214,6 +214,8 @@ func TestR231ClientShutdownSignalAndRestore(t *testing.T) {
 	if a.restoreClientShutdown(client, now.Add(14*time.Second)) {
 		t.Fatal("early restore")
 	}
+	a.eventStream = true
+	a.clientLastEventAt = now.Add(14 * time.Second)
 	if !a.restoreClientShutdown(client, now.Add(15*time.Second)) || a.connectionState != "connected" {
 		t.Fatal("did not restore")
 	}

@@ -49,36 +49,11 @@ test('R219 failed and empty installation scans both offer rescan with distinct m
   }
 });
 
-test('R235 no-process hides only after five continuous seconds',()=>{
- const h=harness();try {h.state.status=disconnected('');h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,false);
- h.state.status=disconnected('process-not-found');h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,false);
- const timer=[...h.timers.values()].find(t=>t.delay===5000);assert(timer);timer.fn();assert.equal(h.el.startupLoading.hidden,true);assert.equal(h.events.find(e=>e.reason==='hide').hide_reason,'connect-failed');
- }finally{h.close()}
-});
+test('R258 no-process stays nonblocking immediately',()=>{const h=harness();try{h.state.status=disconnected('process-not-found');h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,true);assert.equal(h.el.appFrame.hasAttribute('inert'),false);assert.equal(h.timers.size,0);}finally{h.close();}});
 
-test('R219 checking and detected-process overlays have truthful copy and late client starts can reopen',()=>{
-  const h=harness();try {
-    h.state.status=disconnected('');h.updateReadingOverlay();assert.equal(h.el.startupLoadingCopy.textContent,'正在检测英雄联盟客户端。');
-    h.state.status=disconnected('process-not-found');h.updateReadingOverlay();[...h.timers.values()].find(t=>t.delay===5000).fn();assert.equal(h.el.startupLoading.hidden,true);
-    for(const result of ['credentials-unreadable','probe-failed']) {
-      h.state.status=disconnected(result);h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,false);
-      assert.equal(h.el.startupLoadingCopy.textContent,'检测到客户端正在启动，请稍候。');assert.equal(h.state.statusDelay,900);
-    }
-    h.state.status={connected:true,identityReady:false};h.updateReadingOverlay();assert.equal(h.el.startupLoadingTitle.textContent,'正在读取召唤师信息');
-    h.state.status.identityReady=true;h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,false);h.state.selfOverviewReady=true;h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,true);
-    assert.equal(h.events.filter(e=>e.reason==='hide').at(-1).hide_reason,'self-tab-ready');
-  }finally{h.close();}
-});
+test('R258 discovery and identity transitions never show startup overlay',()=>{const h=harness();try{for(const clientDiscovery of ['','process-not-found','credentials-unreadable','probe-failed','exiting']){h.state.status=disconnected(clientDiscovery);h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,true);assert.equal(h.el.appFrame.hasAttribute('inert'),false);}h.state.status={connected:true,identityReady:true};h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,true);assert.equal(h.timers.size,0);}finally{h.close();}});
 
-test('R219 timeout and suppressed hides retain their fixed reasons and bounded fallback',()=>{
-  const h=harness();try {
-    h.state.status=disconnected('probe-failed');h.updateReadingOverlay();
-    const fallback=[...h.timers.values()][0];assert.equal(fallback.delay,120000);fallback.fn();
-    assert.equal(h.el.startupLoading.hidden,true);assert.equal(h.state.overlaySuppressed,true);
-    assert.equal(h.events.find(e=>e.reason==='hide').hide_reason,'hard-timeout');assert.equal(h.events.filter(e=>e.reason==='timeout').length,1);
-    h.el.startupLoading.hidden=false;h.updateReadingOverlay();assert.equal(h.events.filter(e=>e.reason==='hide').at(-1).hide_reason,'suppressed');
-  }finally{h.close();}
-});
+test('R258 removed client overlay cannot reopen or release authorization inert',()=>{const h=harness();try{h.el.appFrame.setAttribute('inert','');h.showReadingOverlay('unused','unused');h.hideReadingOverlay();assert.equal(h.el.startupLoading.hidden,true);assert.equal(h.el.appFrame.hasAttribute('inert'),true);assert.equal(h.timers.size,0);}finally{h.close();}});
 
 test('R219 launchpad render exceptions are reported without blocking installation requests or blaming status transport',async()=>{
   const h=harness({throwLaunchpad:true});try {
@@ -105,10 +80,4 @@ test('R219 runtime permits only fixed render metadata and overlay hide reasons',
   }finally{dom.window.close();}
 });
 
-test('R235 a 30-second startup remains covered and only the 120-second hard timer hides it',()=>{
- const h=harness();try {h.state.status=disconnected('probe-failed');h.updateReadingOverlay();
- assert.equal(h.el.startupLoading.hidden,false);assert(![...h.timers.values()].some(t=>t.delay<=30000));
- h.state.status={connected:true,identityReady:true};h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,false);
- assert.equal([...h.timers.values()].filter(t=>t.delay===120000).length,1);assert.equal([...h.timers.values()].filter(t=>t.delay===15000).length,1);
- }finally{h.close()}
-});
+test('R258 waiting for startup creates no overlay timers or fast status polling',()=>{const h=harness();try{h.state.status=disconnected('probe-failed');h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,true);assert.equal(h.timers.size,0);assert.equal(h.state.statusDelay,10000);}finally{h.close();}});

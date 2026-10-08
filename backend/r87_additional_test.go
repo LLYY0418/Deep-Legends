@@ -284,11 +284,11 @@ func TestR87PositionBroadcastEveryFailureReason(t *testing.T) {
 
 func TestR87SGPForceInvalidationRejectsOldFlightAndKeepsOtherPlayer(t *testing.T) {
 	p := newSGPProvider()
-	p.cacheHistoryPage("HN1", "self", 0, 20, nil, sgpHistoryCacheEntry{bytes: 1})
-	p.cacheHistoryPage("HN1", "other", 0, 20, nil, sgpHistoryCacheEntry{bytes: 2})
+	p.cacheHistoryPage("HN1", "self", 0, 20, nil, sgpHistoryPage{bytes: 1})
+	p.cacheHistoryPage("HN1", "other", 0, 20, nil, sgpHistoryPage{bytes: 2})
 	old := p.historyGeneration
 	p.invalidatePlayerHistory("HN1", "self")
-	p.cacheHistoryPage("HN1", "self", 0, 20, nil, sgpHistoryCacheEntry{bytes: 1}, old)
+	p.cacheHistoryPage("HN1", "self", 0, 20, nil, sgpHistoryPage{bytes: 1}, old)
 	if _, _, ok := p.cachedHistoryPage("HN1", "self", 0, 20, nil); ok {
 		t.Fatal("late response restored old page")
 	}

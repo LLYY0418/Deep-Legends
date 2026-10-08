@@ -321,17 +321,19 @@ func TestR244OverviewParallelAndEarlyMatches(t *testing.T) {
 		return old.RoundTrip(r)
 	})
 	var progressAt time.Time
+	var firstCardRequests int32
 	ctx := context.WithValue(context.Background(), overviewPhasesContextKey{}, phases)
 	ctx = context.WithValue(ctx, localOverviewProgressKey{}, func(partial gameplayOverview) {
 		progressAt = time.Now()
+		firstCardRequests = count.Load()
 		if len(partial.Matches) == 0 || strings.Contains(partial.Player.PlayerRef, a.summoner.PUUID) {
 			t.Error("bad early page", partial)
 		}
 	})
 	response := a.loadGameplayOverview(ctx, a.lcu, a.summoner, gameplayReference{}, 0, 20, "all", false)
 	elapsed := time.Since(started)
-	if elapsed >= 800*time.Millisecond || progressAt.IsZero() || len(response.Matches) == 0 || count.Load() != 3 {
-		t.Fatal(elapsed, progressAt, count.Load())
+	if elapsed >= 800*time.Millisecond || progressAt.IsZero() || len(response.Matches) == 0 || firstCardRequests != 1 {
+		t.Fatal(elapsed, progressAt, firstCardRequests, count.Load())
 	}
 	snapshot := phases.snapshot(time.Now())
 	spans := snapshot["spans"].(map[string][][2]int64)

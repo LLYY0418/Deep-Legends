@@ -179,7 +179,7 @@ func TestR203FiveGamesCacheCountsStabilize(t *testing.T) {
 			overview.putLocked(key, overviewQueryCacheEntry{at: now, response: gameplayOverview{}})
 			timeline.put(key, matchTimelineResponse{})
 			riot.storeMatchLocked(key, &riotMatch{Info: riotMatchInfo{GameID: int64(i + 1), Participants: make([]riotParticipant, 10)}})
-			sgp.cacheHistoryPage("HN1", key, 0, 10, nil, sgpHistoryCacheEntry{bytes: 16, games: []*riotMatchInfo{{GameID: int64(i + 1)}}})
+			sgp.cacheHistoryPage("HN1", key, 0, 10, nil, sgpHistoryPage{bytes: 16, games: []*riotMatchInfo{{GameID: int64(i + 1)}}})
 			a.cachedLivePlayerMatches(context.Background(), key, func(context.Context) livePlayerMatchesResult {
 				return livePlayerMatchesResult{State: "ready", Matches: []gameplayMatch{{GameID: int64(i + 1)}}}
 			})

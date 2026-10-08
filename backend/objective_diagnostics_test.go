@@ -45,6 +45,9 @@ func TestObjectiveDiagnosticsReadonlyContractAndStateTransition(t *testing.T) {
 	if !a.collectObjectiveDiagnostics(context.Background(), client, "manual") {
 		t.Fatal("not collected")
 	}
+	if !a.collectObjectiveDiagnostics(context.Background(), client, "export") {
+		t.Fatal("export not collected")
+	}
 	a.recordObjectiveState(client, "/lol-missions/v1/missions", "websocket", "Update", []byte(after))
 	count := client.objectiveDiagnostics.events
 	a.recordObjectiveState(client, "/lol-missions/v1/missions", "websocket", "Update", []byte(after))

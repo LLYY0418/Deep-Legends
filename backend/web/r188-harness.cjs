@@ -20,7 +20,7 @@ function extract(source, name) {
 }
 function compile(source, names, dependencies = {}) {
   dependencies = { recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies };
-  return Function(...Object.keys(dependencies), require('./r220-harness-support.cjs').prelude(source,dependencies) + names.map(name => extract(source, name)).join('\n') + `\nreturn {${names.join(',')}};`)(...Object.values(dependencies));
+  return Function(...Object.keys(dependencies), require('./r220-harness-support.cjs').prelude(source,{...dependencies,...Object.fromEntries(names.map(name=>[name,true]))}) + names.map(name => extract(source, name)).join('\n') + `\nreturn {${names.join(',')}};`)(...Object.values(dependencies));
 }
 const escapeHTML = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 function fixture({directory = web, gameplaySource, active = 'runes', locked = false, pending = false, notice = ''} = {}) {
