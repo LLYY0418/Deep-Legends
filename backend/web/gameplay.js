@@ -4785,6 +4785,17 @@
     }
   }
 
+  function scheduleCatalogViews() {
+    if (state.destroyed || state.catalogRenderPending) return;
+    state.catalogRenderPending = true;
+    const flush = () => {
+      state.catalogRenderPending = false;
+      if (!state.destroyed) rerenderCatalogViews();
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(flush);
+    else flush();
+  }
+
   // 图标目录（符文/装备/召唤师技能）：客户端连接时来自本机客户端；
   // 未连接时后端会回退到 Data Dragon，因此不再限制连接状态。
   async function ensureAugments() {
@@ -4794,7 +4805,7 @@
       const result = await api("/api/gameplay/augments", {}, "augments", 5000);
       if (state.destroyed || !Array.isArray(result?.augments) || !result.augments.length) return;
       state.augmentCatalog = new Map(result.augments.map((item) => [Number(item.id), item]));
-      rerenderCatalogViews();
+      scheduleCatalogViews();
     } catch (_) {
       // The full perk catalog remains the existing fallback for this index.
     } finally {
@@ -4818,7 +4829,7 @@
     finally {
       if (state.perksRequestToken === requestToken) {
         state.perksLoading = false;
-        if (state.perks) rerenderCatalogViews();
+        if (state.perks) scheduleCatalogViews();
         clearTimeout(state.perksAugmentTimer);
         if (state.perks?.augmentsPending && !state.destroyed) state.perksAugmentTimer = setTimeout(() => { if (!state.destroyed) void ensurePerks(true); }, 1000);
       }
@@ -4852,7 +4863,7 @@
       state.itemsLoading = false;
       if (state.items) {
         state.itemsRetryAt = 0;
-        rerenderCatalogViews();
+        scheduleCatalogViews();
       } else {
         state.itemsRetryAt = Date.now() + 30_000;
         clearTimeout(state.itemsRetryTimer);
@@ -4877,7 +4888,7 @@
       state.summonerSpellsLoading = false;
       if (state.summonerSpells) {
         state.summonerSpellsRetryAt = 0;
-        rerenderCatalogViews();
+        scheduleCatalogViews();
       } else {
         state.summonerSpellsRetryAt = Date.now() + 30_000;
         setTimeout(() => {
@@ -5389,9 +5400,9 @@
     }
   }
 
-  function bindMatchEntryControls(entry, tab, rerender) {
+  function bindMatchEntryControls(entry, tab, rerender, toggleButtons) {
     if (!entry) return;
-    for (const button of entry.querySelectorAll("[data-toggle-match]")) {
+    for (const button of toggleButtons || entry.querySelectorAll("[data-toggle-match]")) {
       if (button._matchToggleBound) continue;
       button._matchToggleBound = true;
       button.addEventListener("click", () => {
@@ -5429,8 +5440,12 @@
     bindRankedQueueControls(container, tab);
     bindMayhemRatingControls(container,tab);
     bindMatchSentinel(container, tab);
-    if (container.matches?.(".match-entry")) bindMatchEntryControls(container, tab, rerender);
-    for (const entry of container.querySelectorAll(".match-entry")) bindMatchEntryControls(entry, tab, rerender);
+    // One tree walk covers every card; per-card selectors repeat that work on
+    // large histories. Keep the event closure scoped to its original entry.
+    for (const button of container.querySelectorAll("[data-toggle-match]")) {
+      const entry = button.closest(".match-entry");
+      if (entry) bindMatchEntryControls(entry, tab, rerender, [button]);
+    }
     bindMatchDetailControls(container, tab);
     for (const button of container.querySelectorAll("[data-replay]")) button.addEventListener("click", () => replay(button));
   }
