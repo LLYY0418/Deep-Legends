@@ -123,3 +123,19 @@ Windows全量backend1951/installer100测试与PASS清单、默认首帧、四项
 升级helper修复候选仅把DateTime/DateTimeOffset按实际类型取Unix毫秒，string仍Parse；CI新增原生测试覆盖en-US/zh-CN、string/typed对象/真实ConvertFrom-Json、界限前旧事件拒绝。原Parse(object)必须触发分数断言失败才能通过mutation护栏；本机无pwsh，未在 Windows 实跑，下一轮CI证实。原30秒和exact fingerprint/total/time不改，不将第一次失败说成安装失败或已排除根因。
 
 未推送候选5e9c4653误包含下载artifact中的106.69MiB Setup，GitHub100MiB限制拒绝。实际Setup保留为本地证据（size/SHA receipt），移出Git索引，不删除任何原始失败日志；重写仅该未推送post提交，不涉及保护tag/分支。R252报告目录使用-text属性保留Windows原始CRLF/BOM字节，增加exe忽略防止重现。请求类拆分边界末尾空白规范化（source diff检查要求），全部test body/断言不变。
+
+## 第二轮CI与默认包审计（12:32）
+
+候选`4c48777a95426293f8e1146485bbfb7bb6d708f3`，[37726779989](https://github.com/LLYY0418/Deep-Legends/actions/runs/37726779989) **整体failure；windows-build整体success、quality failure**。[原始日志与状态](../reports/r252/ci-02/run.json)。不引用其他分支通过结果。
+
+Windows全量backend1951/installer100、默认Electron首帧、R104独立30轮、原生PowerShell平台护栏、public构建/校验和、0.12.65/0.12.68/0.12.76→0.12.77实际升级通过。原生分数时间验证成功；旧Parse(object)变异精确断言FAIL：en-US/DateTimeOffset被截成1791426591000，正确值1791426591534。修复仅验证器按类型取毫秒，实际升级本轮也通过，未改变生产更新或30秒预算。R104这轮Windows30次仍0失败，累计本地30+两轮Windows60=90次0失败，**旧tag偶发仍未解决**。
+
+Linux格式/vet/默认授权隔离/标签编译两fixture/filter通过；全量race在旧`TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds`耗时3.062762007秒FAIL，原3秒断言未改。相关测试、catalog与metadata生产链相对0505fbb diff为空。隔离race原样30轮PASS，88.339秒test时间（外部命令101.981秒）；[分析](../reports/r252/r206-failure-analysis-02.json)与全部轮次日志保留。隔离通过不足以确认并行资源竞争根因，不将这次CI失败替换为PASS。已向用户询问限定测试调度修复范围；未获回复前保持测试和生产逻辑原样。
+
+这次前序race使renderer及下游护栏未执行，C1的Linux≤192000ms仍待实证。为补齐独立证据，将后续JS/依赖/renderer/20%门槛/Worker/Chromium/installer步骤设为`!cancelled()`，不加continue-on-error；任何失败依旧使job及整体失败。三个相关CI静态护栏PASS2.734秒，两个既有Windows条件skip不变。
+
+独立public审计构建02 **PASS200.962秒**，先在该snapshot实跑完整Go1951与installer预检，再构建0.12.77；路径`/private/tmp/R252-0.12.77-no-license-public-02`，不写根dist。实际Windows包审计PASS1.085秒，版本0.12.77、key mode public、指纹f2794a1d683c、授权文案/域名/kid/公钥/隐私定稿句缺失、fuses及ASAR完整性与后端摘要通过；[收据](../reports/r252/package-audit-02.json)。Windows Setup SHA-256 `a9719726622ad7e5f98da779ba41c6c18843765d0e79f4a7259289fa5c8b2dea`；Windows后端SHA-256 `10c0eafb3f6e066decaed3b9b12b735802c576b63e9ffab9491728de526e1af2`。这是本地交叉构建审计包，**未在 Windows 实跑**；上述Windows CI包与实际升级为独立实跑证据。
+
+Mac public后端build PASS5.582秒，actual binary SHA-256 `3374f445381b56a2d2e8b0e84b9ea7cc09834f6100d6c80c584b79cf5cc42a79`；隔离全新LOL_LOOT_DATA_DIR自检PASS0.667秒。Mac二进制授权缺失/空Key/指纹及实际Windows ASAR18个脚本/HTML的UTF8、UTF16授权文案缺失追加审计PASS0.427秒；[Mac收据](../reports/r252/macos-public-audit-02.json)。一次手动CLI误传verify-embedded-riot-key.cjs参数（该CLI只读默认路径，不接收参数），报desktop/backend缺失；改用导出的verifyRiotKeyPolicy(binary,"public")验证实际Mac文件，未改验证器或放宽断言，未读取Key。
+
+12:32再次核验152个size/SHA一致、8文件仍缺失、现存文件变更0；[逐项异常](../reports/r252/protected-followup-1234.json)。本会话root dist写入0，不宣称160全部不变。共享向量SHA仍39377b860440d8f609f9d28162afe086e4e01ac91d3d2ff39da2a45d5eebfcc7。

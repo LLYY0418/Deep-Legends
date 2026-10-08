@@ -1,0 +1,388 @@
+﻿2026-10-08T04:17:33.1267345Z Current runner version: '2.337.0'
+2026-10-08T04:17:33.1302894Z ##[group]Runner Image Provisioner
+2026-10-08T04:17:33.1304348Z Hosted Compute Agent
+2026-10-08T04:17:33.1305536Z Version: 20261002.596
+2026-10-08T04:17:33.1306942Z Commit: c3d12f3313a95f25162a1503be624f3b0617f8c0
+2026-10-08T04:17:33.1308240Z Build Date: 2026-10-02T22:28:27Z
+2026-10-08T04:17:33.1309659Z Worker ID: {784dac60-979f-4f06-884f-1c204a2ac8c7}
+2026-10-08T04:17:33.1311140Z Region: eastus2
+2026-10-08T04:17:33.1312232Z Cloud: Azure
+2026-10-08T04:17:33.1313330Z ##[endgroup]
+2026-10-08T04:17:33.1315638Z ##[group]Operating System
+2026-10-08T04:17:33.1317181Z Ubuntu
+2026-10-08T04:17:33.1318157Z 24.04.5
+2026-10-08T04:17:33.1319151Z LTS
+2026-10-08T04:17:33.1320154Z ##[endgroup]
+2026-10-08T04:17:33.1321165Z ##[group]Runner Image
+2026-10-08T04:17:33.1322410Z Image: ubuntu-24.04
+2026-10-08T04:17:33.1323680Z Version: 20261004.327.1
+2026-10-08T04:17:33.1325967Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261004.327/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-08T04:17:33.1328945Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261004.327
+2026-10-08T04:17:33.1330765Z ##[endgroup]
+2026-10-08T04:17:33.1332720Z ##[group]GITHUB_TOKEN Permissions
+2026-10-08T04:17:33.1335736Z Contents: read
+2026-10-08T04:17:33.1337003Z Metadata: read
+2026-10-08T04:17:33.1338265Z ##[endgroup]
+2026-10-08T04:17:33.1341201Z Secret source: Actions
+2026-10-08T04:17:33.1342802Z Cache mode: write
+2026-10-08T04:17:33.1343955Z Prepare workflow directory
+2026-10-08T04:17:33.1811665Z Prepare all required actions
+2026-10-08T04:17:33.1880510Z Getting action download info
+2026-10-08T04:17:33.3949988Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-08T04:17:33.4841292Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+2026-10-08T04:17:33.7019146Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-10-08T04:17:33.7874243Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-10-08T04:17:34.0157464Z Complete job name: quality
+2026-10-08T04:17:34.1018184Z ##[group]Run actions/checkout@v4
+2026-10-08T04:17:34.1019087Z with:
+2026-10-08T04:17:34.1019547Z   repository: LLYY0418/Deep-Legends
+2026-10-08T04:17:34.1023276Z   token: ***
+2026-10-08T04:17:34.1023723Z   ssh-strict: true
+2026-10-08T04:17:34.1024175Z   ssh-user: git
+2026-10-08T04:17:34.1024628Z   persist-credentials: true
+2026-10-08T04:17:34.1025124Z   clean: true
+2026-10-08T04:17:34.1025576Z   sparse-checkout-cone-mode: true
+2026-10-08T04:17:34.1026117Z   fetch-depth: 1
+2026-10-08T04:17:34.1026832Z   fetch-tags: false
+2026-10-08T04:17:34.1027299Z   show-progress: true
+2026-10-08T04:17:34.1027761Z   lfs: false
+2026-10-08T04:17:34.1028180Z   submodules: false
+2026-10-08T04:17:34.1028646Z   set-safe-directory: true
+2026-10-08T04:17:34.1029161Z   allow-unsafe-pr-checkout: false
+2026-10-08T04:17:34.1029987Z ##[endgroup]
+2026-10-08T04:17:34.2210791Z Syncing repository: LLYY0418/Deep-Legends
+2026-10-08T04:17:34.2213242Z ##[group]Getting Git version info
+2026-10-08T04:17:34.2214139Z Working directory is '/home/runner/work/Deep-Legends/Deep-Legends'
+2026-10-08T04:17:34.2215270Z [command]/usr/bin/git version
+2026-10-08T04:17:34.2313057Z git version 2.55.0
+2026-10-08T04:17:34.2335884Z ##[endgroup]
+2026-10-08T04:17:34.2353296Z Temporarily overriding HOME='/home/runner/work/_temp/c9ac6732-4ed3-4ebd-9949-76ed627c7a1a' before making global git config changes
+2026-10-08T04:17:34.2355866Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-08T04:17:34.2359594Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Deep-Legends/Deep-Legends
+2026-10-08T04:17:34.2416088Z Deleting the contents of '/home/runner/work/Deep-Legends/Deep-Legends'
+2026-10-08T04:17:34.2421051Z ##[group]Initializing the repository
+2026-10-08T04:17:34.2426005Z [command]/usr/bin/git init /home/runner/work/Deep-Legends/Deep-Legends
+2026-10-08T04:17:34.2550910Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-08T04:17:34.2552632Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-08T04:17:34.2554023Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-08T04:17:34.2554822Z hint: call:
+2026-10-08T04:17:34.2555561Z hint:
+2026-10-08T04:17:34.2556113Z hint: 	git config --global init.defaultBranch <name>
+2026-10-08T04:17:34.2557024Z hint:
+2026-10-08T04:17:34.2557647Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-08T04:17:34.2558611Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-08T04:17:34.2559386Z hint:
+2026-10-08T04:17:34.2559820Z hint: 	git branch -m <name>
+2026-10-08T04:17:34.2560315Z hint:
+2026-10-08T04:17:34.2560965Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-08T04:17:34.2566870Z Initialized empty Git repository in /home/runner/work/Deep-Legends/Deep-Legends/.git/
+2026-10-08T04:17:34.2577904Z [command]/usr/bin/git remote add origin https://github.com/LLYY0418/Deep-Legends
+2026-10-08T04:17:34.2671710Z ##[endgroup]
+2026-10-08T04:17:34.2672982Z ##[group]Disabling automatic garbage collection
+2026-10-08T04:17:34.2677198Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-08T04:17:34.2711325Z ##[endgroup]
+2026-10-08T04:17:34.2712512Z ##[group]Setting up auth
+2026-10-08T04:17:34.2720203Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-08T04:17:34.2759528Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-08T04:17:34.3154016Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-08T04:17:34.3190997Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-08T04:17:34.3437950Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-08T04:17:34.3465399Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-08T04:17:34.3691854Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-08T04:17:34.3732885Z ##[endgroup]
+2026-10-08T04:17:34.3733791Z ##[group]Fetching the repository
+2026-10-08T04:17:34.3742737Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4c48777a95426293f8e1146485bbfb7bb6d708f3:refs/remotes/origin/codex/post-0.12.77-fixes
+2026-10-08T04:17:39.4040325Z From https://github.com/LLYY0418/Deep-Legends
+2026-10-08T04:17:39.4042912Z  * [new ref]         4c48777a95426293f8e1146485bbfb7bb6d708f3 -> origin/codex/post-0.12.77-fixes
+2026-10-08T04:17:39.4048302Z ##[endgroup]
+2026-10-08T04:17:39.4050582Z ##[group]Determining the checkout info
+2026-10-08T04:17:39.4053045Z ##[endgroup]
+2026-10-08T04:17:39.4055612Z [command]/usr/bin/git sparse-checkout disable
+2026-10-08T04:17:39.4111501Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-08T04:17:39.4144552Z ##[group]Checking out the ref
+2026-10-08T04:17:39.4149006Z [command]/usr/bin/git checkout --progress --force -B codex/post-0.12.77-fixes refs/remotes/origin/codex/post-0.12.77-fixes
+2026-10-08T04:17:40.4257312Z Updating files:  94% (4784/5086)
+2026-10-08T04:17:40.4280525Z Updating files:  95% (4832/5086)
+2026-10-08T04:17:40.4312404Z Updating files:  96% (4883/5086)
+2026-10-08T04:17:40.4342525Z Updating files:  97% (4934/5086)
+2026-10-08T04:17:40.4373507Z Updating files:  98% (4985/5086)
+2026-10-08T04:17:40.4406542Z Updating files:  99% (5036/5086)
+2026-10-08T04:17:40.4408147Z Updating files: 100% (5086/5086)
+2026-10-08T04:17:40.4409264Z Updating files: 100% (5086/5086), done.
+2026-10-08T04:17:40.4469139Z Switched to a new branch 'codex/post-0.12.77-fixes'
+2026-10-08T04:17:40.4476351Z branch 'codex/post-0.12.77-fixes' set up to track 'origin/codex/post-0.12.77-fixes'.
+2026-10-08T04:17:40.4524428Z ##[endgroup]
+2026-10-08T04:17:40.4573325Z [command]/usr/bin/git log -1 --format=%H
+2026-10-08T04:17:40.4601755Z 4c48777a95426293f8e1146485bbfb7bb6d708f3
+2026-10-08T04:17:40.4877909Z ##[group]Run actions/setup-go@v5
+2026-10-08T04:17:40.4878337Z with:
+2026-10-08T04:17:40.4878628Z   go-version-file: go.mod
+2026-10-08T04:17:40.4878959Z   cache: true
+2026-10-08T04:17:40.4879245Z   check-latest: false
+2026-10-08T04:17:40.4882009Z   token: ***
+2026-10-08T04:17:40.4882311Z ##[endgroup]
+2026-10-08T04:17:40.6191716Z Setup go version spec 1.24
+2026-10-08T04:17:40.6570497Z Found in cache @ /opt/hostedtoolcache/go/1.24.13/x64
+2026-10-08T04:17:40.6577382Z (node:2324) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-08T04:17:40.6578846Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-08T04:17:40.6579913Z Added go to the path
+2026-10-08T04:17:40.6582685Z Successfully set up Go version 1.24
+2026-10-08T04:17:41.5274430Z [command]/opt/hostedtoolcache/go/1.24.13/x64/bin/go env GOMODCACHE
+2026-10-08T04:17:41.5317954Z [command]/opt/hostedtoolcache/go/1.24.13/x64/bin/go env GOCACHE
+2026-10-08T04:17:41.5399885Z /home/runner/go/pkg/mod
+2026-10-08T04:17:41.5419292Z /home/runner/.cache/go-build
+2026-10-08T04:17:41.6249130Z Cache hit for: setup-go-Linux-x64-ubuntu24-go-1.24.13-a9fc12c66c581ebd975c04924614d911b843067079247990d4be659063ce44db
+2026-10-08T04:17:41.6358715Z (node:2324) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-10-08T04:17:42.1637396Z Received 95419484 of 95419484 (100.0%), 187.6 MBs/sec
+2026-10-08T04:17:42.1638285Z Cache Size: ~91 MB (95419484 B)
+2026-10-08T04:17:42.1776881Z [command]/usr/bin/tar -xf /home/runner/work/_temp/9a16c7b0-ba6d-4066-b7f4-06db1b264002/cache.tzst -P -C /home/runner/work/Deep-Legends/Deep-Legends --use-compress-program unzstd
+2026-10-08T04:17:42.8289082Z Cache restored successfully
+2026-10-08T04:17:42.8344752Z Cache restored from key: setup-go-Linux-x64-ubuntu24-go-1.24.13-a9fc12c66c581ebd975c04924614d911b843067079247990d4be659063ce44db
+2026-10-08T04:17:42.8370897Z go version go1.24.13 linux/amd64
+2026-10-08T04:17:42.8371320Z 
+2026-10-08T04:17:42.8371963Z ##[group]go env
+2026-10-08T04:17:42.8606548Z AR='ar'
+2026-10-08T04:17:42.8606973Z CC='gcc'
+2026-10-08T04:17:42.8607356Z CGO_CFLAGS='-O2 -g'
+2026-10-08T04:17:42.8607751Z CGO_CPPFLAGS=''
+2026-10-08T04:17:42.8608151Z CGO_CXXFLAGS='-O2 -g'
+2026-10-08T04:17:42.8608548Z CGO_ENABLED='1'
+2026-10-08T04:17:42.8608921Z CGO_FFLAGS='-O2 -g'
+2026-10-08T04:17:42.8609352Z CGO_LDFLAGS='-O2 -g'
+2026-10-08T04:17:42.8609833Z CXX='g++'
+2026-10-08T04:17:42.8610181Z GCCGO='gccgo'
+2026-10-08T04:17:42.8610549Z GO111MODULE=''
+2026-10-08T04:17:42.8610782Z GOAMD64='v1'
+2026-10-08T04:17:42.8610994Z GOARCH='amd64'
+2026-10-08T04:17:42.8611198Z GOAUTH='netrc'
+2026-10-08T04:17:42.8611395Z GOBIN=''
+2026-10-08T04:17:42.8611648Z GOCACHE='/home/runner/.cache/go-build'
+2026-10-08T04:17:42.8611956Z GOCACHEPROG=''
+2026-10-08T04:17:42.8612194Z GODEBUG=''
+2026-10-08T04:17:42.8612431Z GOENV='/home/runner/.config/go/env'
+2026-10-08T04:17:42.8612696Z GOEXE=''
+2026-10-08T04:17:42.8612902Z GOEXPERIMENT=''
+2026-10-08T04:17:42.8613122Z GOFIPS140='off'
+2026-10-08T04:17:42.8613335Z GOFLAGS=''
+2026-10-08T04:17:42.8614015Z GOGCCFLAGS='-fPIC -m64 -pthread -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=/tmp/go-build3213097995=/tmp/go-build -gno-record-gcc-switches'
+2026-10-08T04:17:42.8614735Z GOHOSTARCH='amd64'
+2026-10-08T04:17:42.8614953Z GOHOSTOS='linux'
+2026-10-08T04:17:42.8615164Z GOINSECURE=''
+2026-10-08T04:17:42.8615792Z GOMOD='/home/runner/work/Deep-Legends/Deep-Legends/go.mod'
+2026-10-08T04:17:42.8616485Z GOMODCACHE='/home/runner/go/pkg/mod'
+2026-10-08T04:17:42.8616833Z GONOPROXY=''
+2026-10-08T04:17:42.8617048Z GONOSUMDB=''
+2026-10-08T04:17:42.8617246Z GOOS='linux'
+2026-10-08T04:17:42.8617454Z GOPATH='/home/runner/go'
+2026-10-08T04:17:42.8617698Z GOPRIVATE=''
+2026-10-08T04:17:42.8617963Z GOPROXY='https://proxy.golang.org,direct'
+2026-10-08T04:17:42.8618539Z GOROOT='/opt/hostedtoolcache/go/1.24.13/x64'
+2026-10-08T04:17:42.8618868Z GOSUMDB='sum.golang.org'
+2026-10-08T04:17:42.8619118Z GOTELEMETRY='local'
+2026-10-08T04:17:42.8619395Z GOTELEMETRYDIR='/home/runner/.config/go/telemetry'
+2026-10-08T04:17:42.8619710Z GOTMPDIR=''
+2026-10-08T04:17:42.8619919Z GOTOOLCHAIN='auto'
+2026-10-08T04:17:42.8620301Z GOTOOLDIR='/opt/hostedtoolcache/go/1.24.13/x64/pkg/tool/linux_amd64'
+2026-10-08T04:17:42.8620700Z GOVCS=''
+2026-10-08T04:17:42.8620903Z GOVERSION='go1.24.13'
+2026-10-08T04:17:42.8621128Z GOWORK=''
+2026-10-08T04:17:42.8621377Z PKG_CONFIG='pkg-config'
+2026-10-08T04:17:42.8621531Z 
+2026-10-08T04:17:42.8621841Z ##[endgroup]
+2026-10-08T04:17:42.8831703Z ##[group]Run actions/setup-node@v4
+2026-10-08T04:17:42.8832023Z with:
+2026-10-08T04:17:42.8832249Z   node-version: 22
+2026-10-08T04:17:42.8832487Z   always-auth: false
+2026-10-08T04:17:42.8832724Z   check-latest: false
+2026-10-08T04:17:42.8835232Z   token: ***
+2026-10-08T04:17:42.8835456Z ##[endgroup]
+2026-10-08T04:17:43.0264801Z Found in cache @ /opt/hostedtoolcache/node/22.23.3/x64
+2026-10-08T04:17:43.0269166Z (node:2378) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-08T04:17:43.0270006Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-08T04:17:43.0272429Z ##[group]Environment details
+2026-10-08T04:17:43.4543882Z node: v22.23.3
+2026-10-08T04:17:43.4544618Z npm: 10.9.9
+2026-10-08T04:17:43.4545156Z yarn: 1.22.22
+2026-10-08T04:17:43.4546131Z ##[endgroup]
+2026-10-08T04:17:43.4675348Z ##[group]Run node scripts/prepare-r238-update-fixture.cjs
+2026-10-08T04:17:43.4675883Z [36;1mnode scripts/prepare-r238-update-fixture.cjs[0m
+2026-10-08T04:17:43.4955417Z shell: /usr/bin/bash -e {0}
+2026-10-08T04:17:43.4955726Z ##[endgroup]
+2026-10-08T04:17:44.5543296Z {"version":"0.12.76","public":true,"size":111854592,"sha256":"01014312b60e591a05bfc87f86e098adf6c5fc5e59520db5aedac5b5dba02ff3","directory":"/home/runner/work/Deep-Legends/Deep-Legends/docs/history/reports/release-0.12.76/anonymous-assets"}
+2026-10-08T04:17:44.5761347Z ##[group]Run unformatted="$(find . -type d \( -name '.*' ! -name . -o -name node_modules -o -name vendor -o -name dist \) -prune -o -type f -name '*.go' -print0 | xargs -0 gofmt -l)"
+2026-10-08T04:17:44.5762570Z [36;1munformatted="$(find . -type d \( -name '.*' ! -name . -o -name node_modules -o -name vendor -o -name dist \) -prune -o -type f -name '*.go' -print0 | xargs -0 gofmt -l)"[0m
+2026-10-08T04:17:44.5763293Z [36;1mtest -z "$unformatted"[0m
+2026-10-08T04:17:44.5829779Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-08T04:17:44.5830153Z ##[endgroup]
+2026-10-08T04:17:45.2528833Z ##[group]Run go vet ./...
+2026-10-08T04:17:45.2529145Z [36;1mgo vet ./...[0m
+2026-10-08T04:17:45.2592060Z shell: /usr/bin/bash -e {0}
+2026-10-08T04:17:45.2592350Z ##[endgroup]
+2026-10-08T04:17:51.8415987Z ##[group]Run CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags= -buildvcs=false -o "$RUNNER_TEMP/r233-release-public.exe" ./backend
+2026-10-08T04:17:51.8417477Z [36;1mCGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags= -buildvcs=false -o "$RUNNER_TEMP/r233-release-public.exe" ./backend[0m
+2026-10-08T04:17:51.8418240Z [36;1mnode desktop/verify-license-release.cjs "$RUNNER_TEMP/r233-release-public.exe"[0m
+2026-10-08T04:17:51.8483399Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-08T04:17:51.8483754Z ##[endgroup]
+2026-10-08T04:17:51.8845624Z go: downloading golang.org/x/sys v0.35.0
+2026-10-08T04:18:10.3329550Z Release license isolation verified
+2026-10-08T04:18:10.3401667Z ##[group]Run node scripts/r252-license-check.cjs
+2026-10-08T04:18:10.3402076Z [36;1mnode scripts/r252-license-check.cjs[0m
+2026-10-08T04:18:10.3464372Z shell: /usr/bin/bash -e {0}
+2026-10-08T04:18:10.3464637Z ##[endgroup]
+2026-10-08T04:18:26.4218742Z ok  	lol-loot-assistant/backend	0.013s [no tests to run]
+2026-10-08T04:18:26.4219295Z ?   	lol-loot-assistant/scripts	[no test files]
+2026-10-08T04:18:28.1910726Z TestR233FailedCounterSaveDoesNotRefreshCachedLifetime
+2026-10-08T04:18:28.1911675Z TestR242LicenseExpiryStrictSignedField
+2026-10-08T04:18:28.1912345Z ok  	lol-loot-assistant/backend	0.012s
+2026-10-08T04:18:30.0082413Z {"Time":"2026-10-08T04:18:29.976158158Z","Action":"start","Package":"lol-loot-assistant/backend"}
+2026-10-08T04:18:30.0084418Z {"Time":"2026-10-08T04:18:29.987201656Z","Action":"run","Package":"lol-loot-assistant/backend","Test":"TestR233FailedCounterSaveDoesNotRefreshCachedLifetime"}
+2026-10-08T04:18:30.0087941Z {"Time":"2026-10-08T04:18:29.987256849Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR233FailedCounterSaveDoesNotRefreshCachedLifetime","Output":"=== RUN   TestR233FailedCounterSaveDoesNotRefreshCachedLifetime\n"}
+2026-10-08T04:18:30.0091748Z {"Time":"2026-10-08T04:18:29.988469334Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR233FailedCounterSaveDoesNotRefreshCachedLifetime","Output":"--- PASS: TestR233FailedCounterSaveDoesNotRefreshCachedLifetime (0.00s)\n"}
+2026-10-08T04:18:30.0094826Z {"Time":"2026-10-08T04:18:29.988484773Z","Action":"pass","Package":"lol-loot-assistant/backend","Test":"TestR233FailedCounterSaveDoesNotRefreshCachedLifetime","Elapsed":0}
+2026-10-08T04:18:30.0097235Z {"Time":"2026-10-08T04:18:29.988492417Z","Action":"run","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField"}
+2026-10-08T04:18:30.0099581Z {"Time":"2026-10-08T04:18:29.988497527Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField","Output":"=== RUN   TestR242LicenseExpiryStrictSignedField\n"}
+2026-10-08T04:18:30.0102224Z {"Time":"2026-10-08T04:18:29.989093245Z","Action":"run","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/zero"}
+2026-10-08T04:18:30.0105316Z {"Time":"2026-10-08T04:18:29.989109004Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/zero","Output":"=== RUN   TestR242LicenseExpiryStrictSignedField/zero\n"}
+2026-10-08T04:18:30.0109268Z {"Time":"2026-10-08T04:18:29.989296927Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/zero","Output":"--- PASS: TestR242LicenseExpiryStrictSignedField/zero (0.00s)\n"}
+2026-10-08T04:18:30.0112130Z {"Time":"2026-10-08T04:18:29.989313588Z","Action":"pass","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/zero","Elapsed":0}
+2026-10-08T04:18:30.0114651Z {"Time":"2026-10-08T04:18:29.989322545Z","Action":"run","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/negative"}
+2026-10-08T04:18:30.0117019Z {"Time":"2026-10-08T04:18:29.989326372Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/negative","Output":"=== RUN   TestR242LicenseExpiryStrictSignedField/negative\n"}
+2026-10-08T04:18:30.0118911Z {"Time":"2026-10-08T04:18:29.989508193Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/negative","Output":"--- PASS: TestR242LicenseExpiryStrictSignedField/negative (0.00s)\n"}
+2026-10-08T04:18:30.0121201Z {"Time":"2026-10-08T04:18:29.989522049Z","Action":"pass","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/negative","Elapsed":0}
+2026-10-08T04:18:30.0123503Z {"Time":"2026-10-08T04:18:29.98952793Z","Action":"run","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/null"}
+2026-10-08T04:18:30.0127716Z {"Time":"2026-10-08T04:18:29.989531086Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/null","Output":"=== RUN   TestR242LicenseExpiryStrictSignedField/null\n"}
+2026-10-08T04:18:30.0131078Z {"Time":"2026-10-08T04:18:29.989734278Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/null","Output":"--- PASS: TestR242LicenseExpiryStrictSignedField/null (0.00s)\n"}
+2026-10-08T04:18:30.0133836Z {"Time":"2026-10-08T04:18:29.989749095Z","Action":"pass","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/null","Elapsed":0}
+2026-10-08T04:18:30.0136134Z {"Time":"2026-10-08T04:18:29.989759274Z","Action":"run","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/before-issued"}
+2026-10-08T04:18:30.0139355Z {"Time":"2026-10-08T04:18:29.989764735Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/before-issued","Output":"=== RUN   TestR242LicenseExpiryStrictSignedField/before-issued\n"}
+2026-10-08T04:18:30.0143102Z {"Time":"2026-10-08T04:18:29.989921028Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/before-issued","Output":"--- PASS: TestR242LicenseExpiryStrictSignedField/before-issued (0.00s)\n"}
+2026-10-08T04:18:30.0145019Z {"Time":"2026-10-08T04:18:29.989936707Z","Action":"pass","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/before-issued","Elapsed":0}
+2026-10-08T04:18:30.0146653Z {"Time":"2026-10-08T04:18:29.989944642Z","Action":"run","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/string"}
+2026-10-08T04:18:30.0149474Z {"Time":"2026-10-08T04:18:29.989947688Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/string","Output":"=== RUN   TestR242LicenseExpiryStrictSignedField/string\n"}
+2026-10-08T04:18:30.0151507Z {"Time":"2026-10-08T04:18:29.990121414Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/string","Output":"--- PASS: TestR242LicenseExpiryStrictSignedField/string (0.00s)\n"}
+2026-10-08T04:18:30.0153052Z {"Time":"2026-10-08T04:18:29.99013534Z","Action":"pass","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/string","Elapsed":0}
+2026-10-08T04:18:30.0154299Z {"Time":"2026-10-08T04:18:29.99014079Z","Action":"run","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/fraction"}
+2026-10-08T04:18:30.0155841Z {"Time":"2026-10-08T04:18:29.990143946Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/fraction","Output":"=== RUN   TestR242LicenseExpiryStrictSignedField/fraction\n"}
+2026-10-08T04:18:30.0157996Z {"Time":"2026-10-08T04:18:29.990306191Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/fraction","Output":"--- PASS: TestR242LicenseExpiryStrictSignedField/fraction (0.00s)\n"}
+2026-10-08T04:18:30.0159588Z {"Time":"2026-10-08T04:18:29.990316219Z","Action":"pass","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/fraction","Elapsed":0}
+2026-10-08T04:18:30.0160830Z {"Time":"2026-10-08T04:18:29.990324214Z","Action":"run","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/exponent"}
+2026-10-08T04:18:30.0162367Z {"Time":"2026-10-08T04:18:29.990333131Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/exponent","Output":"=== RUN   TestR242LicenseExpiryStrictSignedField/exponent\n"}
+2026-10-08T04:18:30.0164218Z {"Time":"2026-10-08T04:18:29.990510213Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/exponent","Output":"--- PASS: TestR242LicenseExpiryStrictSignedField/exponent (0.00s)\n"}
+2026-10-08T04:18:30.0166346Z {"Time":"2026-10-08T04:18:29.99052458Z","Action":"pass","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/exponent","Elapsed":0}
+2026-10-08T04:18:30.0167694Z {"Time":"2026-10-08T04:18:29.990532084Z","Action":"run","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/overflow"}
+2026-10-08T04:18:30.0169290Z {"Time":"2026-10-08T04:18:29.990537284Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/overflow","Output":"=== RUN   TestR242LicenseExpiryStrictSignedField/overflow\n"}
+2026-10-08T04:18:30.0171150Z {"Time":"2026-10-08T04:18:29.990714346Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/overflow","Output":"--- PASS: TestR242LicenseExpiryStrictSignedField/overflow (0.00s)\n"}
+2026-10-08T04:18:30.0172709Z {"Time":"2026-10-08T04:18:29.990730577Z","Action":"pass","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/overflow","Elapsed":0}
+2026-10-08T04:18:30.0173955Z {"Time":"2026-10-08T04:18:29.990736989Z","Action":"run","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/boolean"}
+2026-10-08T04:18:30.0175485Z {"Time":"2026-10-08T04:18:29.990742599Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/boolean","Output":"=== RUN   TestR242LicenseExpiryStrictSignedField/boolean\n"}
+2026-10-08T04:18:30.0177698Z {"Time":"2026-10-08T04:18:29.990920102Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/boolean","Output":"--- PASS: TestR242LicenseExpiryStrictSignedField/boolean (0.00s)\n"}
+2026-10-08T04:18:30.0179266Z {"Time":"2026-10-08T04:18:29.990935471Z","Action":"pass","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/boolean","Elapsed":0}
+2026-10-08T04:18:30.0180577Z {"Time":"2026-10-08T04:18:29.990943206Z","Action":"run","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/lease-after-expiry"}
+2026-10-08T04:18:30.0182277Z {"Time":"2026-10-08T04:18:29.990946312Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/lease-after-expiry","Output":"=== RUN   TestR242LicenseExpiryStrictSignedField/lease-after-expiry\n"}
+2026-10-08T04:18:30.0184413Z {"Time":"2026-10-08T04:18:29.991113105Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/lease-after-expiry","Output":"--- PASS: TestR242LicenseExpiryStrictSignedField/lease-after-expiry (0.00s)\n"}
+2026-10-08T04:18:30.0186406Z {"Time":"2026-10-08T04:18:29.991125818Z","Action":"pass","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField/lease-after-expiry","Elapsed":0}
+2026-10-08T04:18:30.0188052Z {"Time":"2026-10-08T04:18:29.991443545Z","Action":"output","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField","Output":"--- PASS: TestR242LicenseExpiryStrictSignedField (0.00s)\n"}
+2026-10-08T04:18:30.0189572Z {"Time":"2026-10-08T04:18:29.991456098Z","Action":"pass","Package":"lol-loot-assistant/backend","Test":"TestR242LicenseExpiryStrictSignedField","Elapsed":0}
+2026-10-08T04:18:30.0190620Z {"Time":"2026-10-08T04:18:29.991683164Z","Action":"output","Package":"lol-loot-assistant/backend","Output":"PASS\n"}
+2026-10-08T04:18:30.0191684Z {"Time":"2026-10-08T04:18:29.992445057Z","Action":"output","Package":"lol-loot-assistant/backend","Output":"ok  \tlol-loot-assistant/backend\t0.016s\n"}
+2026-10-08T04:18:30.0192670Z {"Time":"2026-10-08T04:18:29.99246834Z","Action":"pass","Package":"lol-loot-assistant/backend","Elapsed":0.016}
+2026-10-08T04:18:30.0194259Z R252_LICENSE_FIXTURES_VERIFIED {"expected":2,"passed":2,"skipped":0,"required":2,"requiredPassed":["lol-loot-assistant/backend/TestR233FailedCounterSaveDoesNotRefreshCachedLifetime","lol-loot-assistant/backend/TestR242LicenseExpiryStrictSignedField"]}
+2026-10-08T04:18:30.0251961Z ##[group]Run node scripts/verify-ci-test-filters.cjs
+2026-10-08T04:18:30.0252395Z [36;1mnode scripts/verify-ci-test-filters.cjs[0m
+2026-10-08T04:18:30.0314341Z shell: /usr/bin/bash -e {0}
+2026-10-08T04:18:30.0314610Z ##[endgroup]
+2026-10-08T04:18:30.3391373Z [
+2026-10-08T04:18:30.3391785Z   {
+2026-10-08T04:18:30.3392068Z     "kind": "node",
+2026-10-08T04:18:30.3392471Z     "pattern": "R86 Windows release|R222 Windows",
+2026-10-08T04:18:30.3392955Z     "file": "desktop/release-quality-gates.test.cjs",
+2026-10-08T04:18:30.3393321Z     "expected": 2,
+2026-10-08T04:18:30.3393564Z     "names": [
+2026-10-08T04:18:30.3394172Z       "R86 Windows release stops on a real failing Go test and rejects an independent early build",
+2026-10-08T04:18:30.3394977Z       "R222 Windows release entry points reject CI skip locally before any side effect"
+2026-10-08T04:18:30.3395407Z     ]
+2026-10-08T04:18:30.3395592Z   },
+2026-10-08T04:18:30.3395774Z   {
+2026-10-08T04:18:30.3396038Z     "kind": "node",
+2026-10-08T04:18:30.3396651Z     "pattern": "setup-only Windows CI skip",
+2026-10-08T04:18:30.3397145Z     "file": "scripts/setup-only-build.test.cjs",
+2026-10-08T04:18:30.3397502Z     "expected": 1,
+2026-10-08T04:18:30.3397763Z     "names": [
+2026-10-08T04:18:30.3398350Z       "setup-only Windows CI skip leaves NSIS, wrapper and receipt gates unconditional"
+2026-10-08T04:18:30.3398811Z     ]
+2026-10-08T04:18:30.3398997Z   },
+2026-10-08T04:18:30.3399200Z   {
+2026-10-08T04:18:30.3399432Z     "kind": "node",
+2026-10-08T04:18:30.3399802Z     "file": "scripts/r82-startup-ab-script.test.cjs",
+2026-10-08T04:18:30.3400178Z     "expected": 2,
+2026-10-08T04:18:30.3400427Z     "names": [
+2026-10-08T04:18:30.3401003Z       "R82 A/B receipt lookup and deduplication execute the real PowerShell script",
+2026-10-08T04:18:30.3401801Z       "R82 A/B filename, hash mismatch and duplicate mutations reach failing assertions"
+2026-10-08T04:18:30.3402268Z     ]
+2026-10-08T04:18:30.3402471Z   }
+2026-10-08T04:18:30.3402705Z ]
+2026-10-08T04:18:30.3469317Z ##[group]Run go test -count=1 -race ./...
+2026-10-08T04:18:30.3469690Z [36;1mgo test -count=1 -race ./...[0m
+2026-10-08T04:18:30.3533440Z shell: /usr/bin/bash -e {0}
+2026-10-08T04:18:30.3533714Z ##[endgroup]
+2026-10-08T04:22:07.5247103Z 2026/10/08 04:19:36 http: TLS handshake error from 127.0.0.1:51330: write tcp 127.0.0.1:40185->127.0.0.1:51330: use of closed network connection
+2026-10-08T04:22:07.5251975Z 2026/10/08 04:20:03 {"event":"backend_panic","frames":["main.reportBackendPanic","main.(*app).recordRecoveredPanic","main.(*app).cachedLivePlayerMatches.func1","main.TestR203LiveHistoryPanicReleasesFlightForNextRequest.func1.2","main.(*app).cachedLivePlayerMatches","main.TestR203LiveHistoryPanicReleasesFlightForNextRequest.func1","main.TestR203LiveHistoryPanicReleasesFlightForNextRequest"],"panic_kind":"other","site":"cachedLivePlayerMatches"}
+2026-10-08T04:22:07.5259022Z 2026/10/08 04:20:03 {"event":"backend_panic","frames":["main.reportBackendPanic","main.(*app).recordRecoveredPanic","main.(*app).recoverPanic","main.TestR203SkinDetailsPanicDoesNotReturnFalseSuccess.func1","main.gameplayRoundTripFunc.RoundTrip","main.(*LCUClient).getBytes","main.(*LCUClient).GetBytesContext","main.SkinAppearanceAPI.BorderStatusContext"],"panic_kind":"other","site":"main.handleSkinDetails.2"}
+2026-10-08T04:22:07.5265152Z 2026/10/08 04:20:03 {"event":"backend_panic","frames":["main.reportBackendPanic","main.(*app).recordRecoveredPanic","main.(*app).recoverPanic","main.TestR203SkinDetailsPanicDoesNotReturnFalseSuccess.func1","main.gameplayRoundTripFunc.RoundTrip","main.(*LCUClient).getBytes","main.(*LCUClient).GetBytesContext","main.StoreAPI.SkinPriceContext"],"panic_kind":"other","site":"main.handleSkinDetails.1"}
+2026-10-08T04:22:07.5270752Z 2026/10/08 04:20:03 {"event":"backend_panic","frames":["main.reportBackendPanic","main.(*app).recordRecoveredPanic","main.(*app).recoverPanic","main.TestR203FacadePanicReleasesWaitersAndAllowsRetry.func1","main.(*app).cachedFacadeState.func1"],"panic_kind":"other","site":"facade_view_cache.cachedFacadeState.1"}
+2026-10-08T04:22:07.5274268Z 2026/10/08 04:21:19 http: TLS handshake error from 127.0.0.1:35156: read tcp 127.0.0.1:40315->127.0.0.1:35156: use of closed network connection
+2026-10-08T04:22:07.5276413Z 2026/10/08 04:21:19 http: TLS handshake error from 127.0.0.1:35166: read tcp 127.0.0.1:40315->127.0.0.1:35166: use of closed network connection
+2026-10-08T04:22:07.5291149Z 2026/10/08 04:21:19 http: TLS handshake error from 127.0.0.1:35152: write tcp 127.0.0.1:40315->127.0.0.1:35152: use of closed network connection
+2026-10-08T04:22:07.5292710Z 2026/10/08 04:21:19 http: TLS handshake error from 127.0.0.1:35180: write tcp 127.0.0.1:40315->127.0.0.1:35180: use of closed network connection
+2026-10-08T04:22:07.5294080Z --- FAIL: TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds (3.07s)
+2026-10-08T04:22:07.5295343Z     r206_collection_image_test.go:198: full refresh blocked 3.062762007s
+2026-10-08T04:22:07.5295754Z FAIL
+2026-10-08T04:22:07.5296435Z FAIL	lol-loot-assistant/backend	175.394s
+2026-10-08T04:22:07.5296861Z ?   	lol-loot-assistant/scripts	[no test files]
+2026-10-08T04:22:07.5297283Z FAIL
+2026-10-08T04:22:07.6590548Z ##[error]Process completed with exit code 1.
+2026-10-08T04:22:07.6705806Z ##[group]Run actions/upload-artifact@v4
+2026-10-08T04:22:07.6706384Z with:
+2026-10-08T04:22:07.6706666Z   name: renderer-timings-linux
+2026-10-08T04:22:07.6707001Z   path: /home/runner/work/_temp/renderer-timings-linux.json
+2026-10-08T04:22:07.6707351Z   if-no-files-found: warn
+2026-10-08T04:22:07.6707585Z   compression-level: 6
+2026-10-08T04:22:07.6707808Z   overwrite: false
+2026-10-08T04:22:07.6708026Z   include-hidden-files: false
+2026-10-08T04:22:07.6708266Z ##[endgroup]
+2026-10-08T04:22:07.8366812Z (node:9139) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-08T04:22:07.8368663Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-08T04:22:07.8433230Z ##[warning]No files were found with the provided path: /home/runner/work/_temp/renderer-timings-linux.json. No artifacts will be uploaded.
+2026-10-08T04:22:07.8643367Z ##[group]Run actions/upload-artifact@v4
+2026-10-08T04:22:07.8643829Z with:
+2026-10-08T04:22:07.8644153Z   name: chromium-guards-linux
+2026-10-08T04:22:07.8644817Z   path: /home/runner/work/_temp/r100-browser/**
+/home/runner/work/_temp/r117-browser/**
+
+2026-10-08T04:22:07.8645531Z   if-no-files-found: warn
+2026-10-08T04:22:07.8645916Z   compression-level: 6
+2026-10-08T04:22:07.8646447Z   overwrite: false
+2026-10-08T04:22:07.8646803Z   include-hidden-files: false
+2026-10-08T04:22:07.8647192Z ##[endgroup]
+2026-10-08T04:22:08.0445870Z (node:9151) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-08T04:22:08.0446973Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-08T04:22:08.0507671Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2026-10-08T04:22:08.0510646Z The least common ancestor is /home/runner/work/_temp. This will be the root directory of the artifact
+2026-10-08T04:22:08.0514156Z ##[warning]No files were found with the provided path: /home/runner/work/_temp/r100-browser/**
+/home/runner/work/_temp/r117-browser/**. No artifacts will be uploaded.
+2026-10-08T04:22:08.0834585Z Post job cleanup.
+2026-10-08T04:22:08.1771391Z [command]/usr/bin/git version
+2026-10-08T04:22:08.1819987Z git version 2.55.0
+2026-10-08T04:22:08.1860620Z Temporarily overriding HOME='/home/runner/work/_temp/ac91e2f8-a322-43ba-aa96-3ce245ad17b0' before making global git config changes
+2026-10-08T04:22:08.1862245Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-08T04:22:08.1865864Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Deep-Legends/Deep-Legends
+2026-10-08T04:22:08.1908439Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-08T04:22:08.1946517Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-08T04:22:08.2210203Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-08T04:22:08.2238991Z http.https://github.com/.extraheader
+2026-10-08T04:22:08.2252281Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-08T04:22:08.2289197Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-08T04:22:08.2561941Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-08T04:22:08.2615503Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-08T04:22:08.3139527Z Cleaning up orphan processes
+2026-10-08T04:22:08.3546058Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, actions/setup-node@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

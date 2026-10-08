@@ -51,3 +51,8 @@ C3. 只修TestR233FailedCounterSaveDoesNotRefreshCachedLifetime与TestR242Licens
 - Windows实际安装版本/8阶段/精确fingerprint/total_ms=9017及result=ok存在，但CI匹配失败。候选根因是ConvertFrom-Json返回DateTime后隐式string Parse丢失毫秒；仅修验证时间转换，不改更新生产逻辑/30秒预算/精确本次安装匹配。新增Windows原生分数时间、旧事件拒绝与原Parse(object)断言变异；以实际CI回归证据判断，不靠重跑掩盖。
 - 共享工作区已被另一会话切到R253；R252后续改动仅在/private/tmp/r252-post-0.12.77的原post分支，不合入R253/R254/隐藏识别。
 - 全160保护项的中期核验一致，结束检查现8文件缺失（原因未确认；R253初始核验亦记录同8缺失）；152个仍一致，等待原SHA备份来源，不重建、不覆盖，不宣称160全部未变。
+
+## 第二轮CI后的独立取证
+
+- Windows原生时间转换及旧Parse变异通过，Windows作业整体成功；Linux旧R206并行耗时测试3.062762007秒超过既有3秒，相关测试/生产链相对0505fbb无差异。保存失败，隔离race30次只作为定位证据，不宣称修复。
+- 待范围授权前，不改R206测试调度/断言/预算/业务。独立renderer/Worker/Chromium/installer在前序失败后继续收集结果；失败仍使quality job及整体工作流失败，无continue-on-error。

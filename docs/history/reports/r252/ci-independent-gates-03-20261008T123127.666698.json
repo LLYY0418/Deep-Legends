@@ -1,0 +1,22 @@
+{
+  "name": "ci-independent-gates-03-20261008T123127.666698",
+  "command": [
+    "node",
+    "--test",
+    "desktop/verify-ci-test-filters.test.cjs",
+    "desktop/release-quality-gates.test.cjs",
+    "desktop/setup-only-build.test.cjs"
+  ],
+  "cwd": "/private/tmp/r252-post-0.12.77",
+  "start": "2026-10-08T12:31:27.666698+08:00",
+  "end": "2026-10-08T12:31:30.400551+08:00",
+  "elapsed_seconds": 2.734,
+  "exit_code": 0,
+  "last_five": [
+    "ℹ fail 0",
+    "ℹ cancelled 0",
+    "ℹ skipped 2",
+    "ℹ todo 0",
+    "ℹ duration_ms 2696.047458"
+  ]
+}

@@ -1,0 +1,15 @@
+✔ R136 public outputs have distinct names and private outputs keep release names (1.00525ms)
+✔ R86 bash release stops on a real failing Go test, including an independent early-build mutation (2568.580667ms)
+✔ R86 CI uses the package version, installs test dependencies and needs no private Riot key (1.868667ms)
+﹣ R86 Windows release stops on a real failing Go test and rejects an independent early build (0.111333ms) # requires Windows and PowerShell
+✔ format gates exclude local toolchains and GOPATH modules while retaining untracked project source (77.410792ms)
+✔ R222 CI skip preserves syntax, fingerprints, runtime verification and hashes (0.611292ms)
+﹣ R222 Windows release entry points reject CI skip locally before any side effect (0.057666ms) # requires Windows and PowerShell
+ℹ tests 7
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 2
+ℹ todo 0
+ℹ duration_ms 2696.047458

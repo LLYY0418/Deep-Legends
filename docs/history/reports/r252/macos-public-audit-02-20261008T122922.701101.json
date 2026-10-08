@@ -1,0 +1,15 @@
+{
+  "name": "macos-public-audit-02-20261008T122922.701101",
+  "command": [
+    "node",
+    "docs/history/reports/r252/audit-macos-public.cjs"
+  ],
+  "cwd": "/private/tmp/r252-post-0.12.77",
+  "start": "2026-10-08T12:29:22.701101+08:00",
+  "end": "2026-10-08T12:29:23.128483+08:00",
+  "elapsed_seconds": 0.427,
+  "exit_code": 0,
+  "last_five": [
+    "{\"version\":\"0.12.77\",\"mode\":\"public\",\"fingerprint\":\"f2794a1d683c\",\"binary\":\"/private/tmp/R252-0.12.77-no-license-public-02/macos/loot-service-public\",\"sha256\":\"3374f445381b56a2d2e8b0e84b9ea7cc09834f6100d6c80c584b79cf5cc42a79\",\"license_absent\":true,\"key_policy\":true,\"actual_asar_script_and_html_entries\":18,\"asar_license_text_absent\":true,\"execution_platform\":\"darwin\",\"windows_execution\":\"未在 Windows 实跑\"}"
+  ]
+}

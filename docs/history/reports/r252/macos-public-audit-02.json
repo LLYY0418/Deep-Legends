@@ -1,0 +1,13 @@
+{
+  "version": "0.12.77",
+  "mode": "public",
+  "fingerprint": "f2794a1d683c",
+  "binary": "/private/tmp/R252-0.12.77-no-license-public-02/macos/loot-service-public",
+  "sha256": "3374f445381b56a2d2e8b0e84b9ea7cc09834f6100d6c80c584b79cf5cc42a79",
+  "license_absent": true,
+  "key_policy": true,
+  "actual_asar_script_and_html_entries": 18,
+  "asar_license_text_absent": true,
+  "execution_platform": "darwin",
+  "windows_execution": "未在 Windows 实跑"
+}
