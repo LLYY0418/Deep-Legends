@@ -235,7 +235,7 @@ function compileFunctions(source, names, dependencies = {}) {
   const dependencyNames = Object.keys(compiledDependencies);
   const factory = Function(
     ...dependencyNames,
-    `"use strict";\n${require("./r220-harness-support.cjs").prelude(source,compiledDependencies)}${bodies.join("\n")}\nreturn { ${names.join(", ")} };`,
+    `"use strict";\n${require("./r220-harness-support.cjs").prelude(source,{...compiledDependencies,...Object.fromEntries(names.map(name=>[name,true]))})}${bodies.join("\n")}\nreturn { ${names.join(", ")} };`,
   );
   return factory(...dependencyNames.map((name) => compiledDependencies[name]));
 }
@@ -415,7 +415,7 @@ function assertR15PerformanceAndBuildContracts() {
   assert.match(gameplayBackend, /capGameplayCoreOptions\(bundle\.Build\.CoreOptions\)/);
   assert.match(gameplayBackend, /func capGameplayCoreOptions[\s\S]*?if len\(options\) > championCoreRecommendationLimit \{[\s\S]*?return options\[:championCoreRecommendationLimit\]/);
   assert.match(gameplayBackend, /"event": "overview_load_cost"/);
-  assert.match(gameplayBackend, /if shouldLoadOverviewHistory\(reference, playerRef, matches\)/);
+  assert.match(gameplayBackend, /if !isCurrent && shouldLoadOverviewHistory\(reference, playerRef, matches\)/);
   assert.match(rankInsightsBackend, /case <-flight\.done:\s*if flight\.invalidated \{\s*continue\s*\}\s*return flight\.entry/);
   assert.match(gameplayScript, /const MATCH_TIERS_MAX_REFS = 24/);
   assert.match(rankInsightsBackend, /matchTiersMaxRefs\s*=\s*24/);
@@ -478,7 +478,9 @@ function assertR7Contract(js, css, structuredSource, hexdataSource, gameplaySour
 	assert.match(matchSource, /match-build[^\n]+match-items[^\n]+match-badges[^\n]+renderMatchTags\(match,subject,subjectScore,tab\)/);
 	assert.doesNotMatch(matchSource, /renderMatchScoreCell\(subjectScore\)|scoreChip\(subjectScore\)/);
 	assert.doesNotMatch(matchSource, /match-score-line|const rankChip/);
-	assert.match(functionSource(gameplaySource, "updateStatus"), /if \(wasConnected\) \{[\s\S]*?ensurePerks\(true\);[\s\S]*?ensureItems\(\);[\s\S]*?ensureSummonerSpells\(\);/);
+	const statusSource = functionSource(gameplaySource, "applyClientViewStatus");
+	assert.doesNotMatch(statusSource.slice(0, statusSource.indexOf("if (status.clientVersion")), /state\.(perks|items|summonerSpells) = null/);
+	assert.doesNotMatch(statusSource.slice(statusSource.indexOf("if (!selfTabReady(status))")), /state\.(perks|items|summonerSpells) = null/);
 	assert.match(gameplayCSSSource, /\.match-detail-failure\s*\{[^}]*border-top:/s);
 }
 
@@ -1182,13 +1184,13 @@ test("R7 repeated disconnected status events preserve fallback item and augment 
 	const { updateStatus } = compileFunctions(gameplayScript, ["updateStatus", "resetTencentTabsAfterDisconnect"], {
 		state,
 		resetLiveGameScopedState: () => {},
-		connected: () => Boolean(state.status?.connected),
+		connected: () => state.status?.clientView?.state === "ready",
 		riotTab: () => false,
 		tabGroup: (tab) => tab?.group === "pro" ? "pro" : tab?.region === "kr" ? "kr" : "players",
 		ensurePerks: (force) => loads.push(["perks", force]),
 		ensureItems: () => loads.push(["items"]),
 		ensureSummonerSpells: () => loads.push(["spells"]),
-		updateBeacon: () => {}, renderPlayerTabs: () => {}, renderOverview: () => {}, renderLive: () => {}, renderOverlay: () => {},
+		updateDisconnectedPlayerDOM: () => {}, updateBeacon: () => {}, renderPlayerTabs: () => {}, renderOverview: () => {}, renderLive: () => {}, renderOverlay: () => {},
 	});
 	const fallback = { perks: state.perks, items: state.items, spells: state.summonerSpells };
 	updateStatus({ connected: false });
@@ -1197,12 +1199,12 @@ test("R7 repeated disconnected status events preserve fallback item and augment 
 	assert.equal(state.summonerSpells, fallback.spells);
 	assert.deepEqual(loads, []);
 
-	state.status = { connected: true };
-	updateStatus({ connected: false });
-	assert.equal(state.perks, null);
-	assert.equal(state.items, null);
-	assert.equal(state.summonerSpells, null);
-	assert.deepEqual(loads, [["perks", true], ["items"], ["spells"]]);
+	state.status = {clientView:{type:"client-view",state:"ready",generation:1}};
+	updateStatus({clientView:{type:"client-view",state:"no-client",generation:2}});
+	assert.equal(state.perks, fallback.perks);
+	assert.equal(state.items, fallback.items);
+	assert.equal(state.summonerSpells, fallback.spells);
+	assert.deepEqual(loads, []);
 });
 
 test("disconnection drops Tencent player identity while preserving Korean tabs", () => {
@@ -1218,13 +1220,13 @@ test("disconnection drops Tencent player identity while preserving Korean tabs",
 		state, riotTab: (tab) => tab.region === "kr", tabGroup: (tab) => tab?.group === "pro" ? "pro" : tab?.region === "kr" ? "kr" : "players",
 	});
 	resetTencentTabsAfterDisconnect();
-	assert.deepEqual(state.tabs.map((tab) => tab.key), ["current", "kr"]);
-	assert.equal(state.activeTabs.players, "current");
-	assert.equal(state.activeTabs.kr, "kr");
-	assert.equal(current.label, "当前召唤师");
-	assert.equal(current.playerRef, "");
-	assert.equal(current.icon, 0);
-	assert.equal(aborted, 1);
+	assert.deepEqual(state.tabs.map((tab) => tab.key), ["current", "cn", "kr"]);
+	assert.equal(state.activeTabs.players, "cn");
+	assert.equal(current.closed, true);
+	assert.equal(current.label, "当前玩家#1");
+	assert.equal(current.playerRef, "current-ref");
+	assert.equal(current.icon, 12);
+	assert.equal(aborted, 0);
 });
 
 test("R7 contracts reject UI, parser, backend grade, and retry mutations on true copies", () => {
@@ -1263,7 +1265,7 @@ test("R7 contracts reject UI, parser, backend grade, and retry mutations on true
 		assert.throws(() => check({ structured: original.structured.replace("applyLocalAugmentGrades(response.Build.PrismItems)", "") }));
 		assert.throws(() => check({ hexdata: original.hexdata.replace("func hexdataRankingRowsFromInsights(", "func removedRankingRowsFromInsights(") }));
 		assert.throws(() => check({ gameplay: original.gameplay.replaceAll("data-retry-match-detail", "data-broken-retry") }));
-		assert.throws(() => check({ gameplay: original.gameplay.replace("if (wasConnected) {", "if (true) {") }));
+		assert.throws(() => check({ gameplay: original.gameplay.replace("state.status = status;", "state.status = status; state.perks = null;") }));
 	} finally {
 		fs.rmSync(temp, { recursive: true, force: true });
 	}
@@ -1816,7 +1818,7 @@ test("live updates target explicit state slices and clear client state on discon
 	assert.match(appScript, /const LIVE_UPDATE_STATE_SLICES = Object\.freeze\(\{/);
 	for (const [eventType, slice] of [
 		["account-updated", "account"], ["snapshot-updated", "collection"],
-		["connection-state", "status"], ["season-progress", "overview-season"],
+		["season-progress", "overview-season"],
 		["historical-ranks", "overview-ranks"],
 	]) {
 		assert.match(appScript, new RegExp(`"${eventType}": \\[[^\\]]*"${slice}"`));
@@ -2135,14 +2137,14 @@ test("match history surfaces SGP failures and uses an accessible custom mode men
 	assert.match(gameplayScript, /Number\(match\.queueId\) !== 0/);
 	assert.match(gameplayScript, /CUSTOM_GAME/);
 	assert.match(gameplayScript, /String\(match\.modeGroup \|\| ""\)\.toLowerCase\(\) !== "custom"/);
-	assert.match(gameplayScript, /if \(filter === "all"\) return matches/);
+	assert.match(gameplayScript, /if \(filter === "all"\) return apply\(matches\)/);
 	assert.match(gameplayScript, /const MORE_MODE_OPTIONS = \[\s*\["aram", "极地大乱斗", null\]/);
 	assert.match(gameplayScript, /\["hextech-qualifier", "海克斯大乱斗 海选赛", null\]/);
 	assert.match(gameplayScript, /const direct = \[\["all", "全部"\], \["solo", "单排\/双排"\], \["flex", "灵活组排"\], \["hextech-aram", "海克斯大乱斗"\], \["arena", "斗魂竞技场"\]\]/);
 	assert.match(gameplayScript, /\["hextech-classic", "海克斯大乱斗 经典模式版", null\]/);
 	assert.match(gameplayScript, /riotTab\(tab\) \? MORE_MODE_OPTIONS\.filter\(\(\[key\]\) => key !== "hextech-qualifier"\)/);
-	assert.match(gameplayScript, /if \(key === "aram"\) return matches\.filter\(\(match\) => matchModeKind\(match\) === "aram"\)/);
-	assert.match(gameplayScript, /if \(filter === "hextech-aram"\) return matches\.filter\(isOrdinaryHextechMatch\)/);
+	assert.match(gameplayScript, /if \(key === "aram"\) return apply\(matches\.filter\(\(match\) => matchModeKind\(match\) === "aram"\)\)/);
+	assert.match(gameplayScript, /if \(filter === "hextech-aram"\) return apply\(matches\.filter\(isOrdinaryHextechMatch\)\)/);
 	assert.match(gameplayScript, /aria-haspopup="menu" aria-expanded="false" data-app-select-trigger/);
 	assert.match(gameplayScript, /role="menuitemradio" aria-checked=/);
 	assert.match(gameplayScript, /\["ArrowDown", "ArrowUp", "Home", "End"\]/);
@@ -2177,7 +2179,7 @@ test("player tab avatars have no tooltip while overflowing names retain their ow
     const tabs = dom.window.document.getElementById("tabs");
     const state = { tabs: [{ key: "current", current: true, icon: 17, label: "测试玩家的完整名字" }], activeTabs: { players: "current" }, settings: {} };
     const functions = compileFunctions(gameplayScript, ["renderPlayerTabWorkspace", "assetIcon", "proxyAsset"], {
-      state, document: dom.window.document, overviewWorkspace: () => ({ tabs }), connected: () => true, tabGroup: () => "players", riotTab: () => false,
+      state, document: dom.window.document, overviewWorkspace: () => ({ tabs }), selfTabReady: () => true, connected: () => true, tabGroup: () => "players", riotTab: () => false,
       assetPath: (_kind, id) => `/lol-game-data/assets/v1/profile-icons/${id}.jpg`,
       escapeHTML: (value) => String(value ?? ""), prepareImages: () => {}, requestAnimationFrame: () => {},
     });
@@ -2384,7 +2386,7 @@ test("top search and player navigation preserve the selected Chinese server", ()
   assert.match(appScript, /“跟随客户端”需要英雄联盟客户端正在运行/);
   assert.match(mainSource, /ServerID\s+string\s+`json:"serverId,omitempty"`/);
   assert.match(mainSource, /ServerName\s+string\s+`json:"serverName,omitempty"`/);
-  assert.match(mainSource, /response\.ServerID = clientTencentServerID\(client\)/);
+  assert.match(mainSource, /response\.ServerID, _ = normalizeTencentServerID\(platform\)/);
   assert.match(mainSource, /response\.ServerName = tencentServerName\(response\.ServerID\)/);
   assert.match(gameplayScript, /serverId: tab\.serverId \|\| ""/);
   assert.match(gameplayScript, /tab\.serverId = payload\.player\?\.serverId/);
@@ -3117,7 +3119,8 @@ test("perk stat mod slots are separated from rune styles", () => {
 
 test("perk catalogs supply icons while entertainment recommendations come from the current hero", () => {
 	assert.match(gameplayScript, /ensurePerks\(true\)/);
-	assert.match(gameplayScript, /renderCapabilitySettings\(\);\s*ensureAugments\(\);\s*ensurePerks\(\);/);
+	assert.match(gameplayScript, /renderCapabilitySettings\(\);\s*ensureAugments\(\);/);
+	assert.doesNotMatch(gameplayScript.slice(gameplayScript.lastIndexOf("  bindSettings();")), /ensurePerks\(\)/);
 	assert.match(gameplayBackend, /gameplayPerkCatalogTTL = 30 \* time\.Minute/);
 	assert.match(gameplayBackend, /cachedGameplayPerkCatalog\(r.Context\(\), cacheKey/);
 	assert.match(gameplayScript, /function matchAugmentIDs\(subject, limit = 4\)/);
@@ -5178,7 +5181,7 @@ test("live beacon reacts to active phase changes and has a one second fallback",
   assert.equal(state.beacon.active, false);
   assert.match(gameplayScript, /const BEACON_FAST_POLL_MS = 1_000/);
   assert.match(gameplayScript, /const BEACON_DISCONNECTED_POLL_MS = 1_000/);
-  assert.match(functionSource(gameplayScript, "updateStatus"), /scheduleBeaconPoll\(0\)/);
+  assert.match(functionSource(gameplayScript, "applyClientViewStatus"), /scheduleBeaconPoll\(0\)/);
 	  assert.match(functionSource(gameplayScript, "pollGameflowPhase"), /!connected\(\)[\s\S]*BEACON_DISCONNECTED_POLL_MS/);
 	  assert.match(gameplayStyles, /:root\[data-sidebar="collapsed"\] #section-live\s*\{[^}]*overflow:\s*visible/s);
 	  assert.match(gameplayStyles, /:root\[data-sidebar="collapsed"\] #section-live \.live-beacon\s*\{[^}]*right:\s*7px/s);
@@ -6025,7 +6028,7 @@ test("R61 every mandatory contract rejects its documented production mutation", 
 		assert.match(sources.sgp, /for retry := 0; retry <= 2; retry\+\+/); // A-1
 		assert.match(sources.sgp, /retryableSGPStatus\(response\.StatusCode\)/);
 		const historyPageKey = goFunctionSource(sources.sgp, "sgpHistoryPageCacheKey"); // A-2
-		assert.match(historyPageKey, /fmt\.Sprintf\("%s\|%s\|%d\|%d\|%s", serverID, puuid, startIndex, pageSize, strings\.Join\(tags, ","\)\)/);
+		assert.match(historyPageKey, /fmt\.Sprintf\("%s\|%s\|%d\|%d\|%s", strings\.ToUpper\(strings\.TrimSpace\(serverID\)\), puuid, startIndex, pageSize, strings\.Join\(tags, ","\)\)/);
 		assert.match(sources.sgp, /cachedHistoryPage\(serverID, puuid, pageStart, pageSize, tags\)/);
 		assert.match(sources.sgp, /cacheHistoryPage\(serverID, puuid, pageStart, pageSize, tags/);
 		assert.match(sources.gameplayGo, /if timeout == nil\s*\{\s*timeout = context\.WithTimeout/);
@@ -6086,7 +6089,7 @@ test("R61 every mandatory contract rejects its documented production mutation", 
 	assertContracts(originals);
 	const mutations = [
 		["A-1 retry budget", "sgp", "for retry := 0; retry <= 2; retry++", "for retry := 0; retry < 1; retry++"],
-		["A-2 pageSize key dimension", "sgp", 'fmt.Sprintf("%s|%s|%d|%d|%s", serverID, puuid, startIndex, pageSize, strings.Join(tags, ","))', 'fmt.Sprintf("%s|%s|%d|%s", serverID, puuid, startIndex, strings.Join(tags, ","))'],
+		["A-2 pageSize key dimension", "sgp", 'fmt.Sprintf("%s|%s|%d|%d|%s", strings.ToUpper(strings.TrimSpace(serverID)), puuid, startIndex, pageSize, strings.Join(tags, ","))', 'fmt.Sprintf("%s|%s|%d|%s", serverID, puuid, startIndex, strings.Join(tags, ","))'],
 		["A-3 overview deadline", "gameplayGo", "timeout(r.Context(), budget)", "context.WithCancel(r.Context())"],
 		["A-4 50-row cold page", "sgp", "sgpPageSize         = 50", "sgpPageSize         = 20"],
 		["A-5 one-shot participant sample", "sgp", "shouldSample = cost.claimParticipantShapeSample()", "shouldSample = true"],

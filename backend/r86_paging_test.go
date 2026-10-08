@@ -92,7 +92,7 @@ func TestR86TenPageSeasonBackfillDoesNotPopulateHistoryCache(t *testing.T) {
 	if _, err := a.storage.saveSeasonStatsReported(cache); err != nil {
 		t.Fatal(err)
 	}
-	a.sgp.cacheHistoryPage("HN1", "subject", 0, 50, nil, sgpHistoryCacheEntry{bytes: 1})
+	a.sgp.cacheHistoryPage("HN1", "subject", 0, 50, nil, sgpHistoryPage{bytes: 1})
 	a.startSeasonBackfill(a.lcu, gameplayReference{PlayerRef: "subject", ServerID: "HN1"}, Summoner{}, "subject", nil, "HN1", cache.AccountHash, season, start)
 	deadline := time.Now().Add(3 * time.Second)
 	for {

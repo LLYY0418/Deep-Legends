@@ -135,13 +135,22 @@ func TestSummonerIdentityEventDebouncesToLatestPayload(t *testing.T) {
 	current := Summoner{SummonerID: 7, PUUID: strings.Repeat("j", 48), GameName: "旧名字", ProfileIconID: 6}
 	client := &LCUClient{}
 	a := identityTestApp(client, current)
-	updates := make(chan string, 2)
+	updates := make(chan string, 4)
 	a.eventSubscribers[updates] = struct{}{}
 	if !a.handleSummonerIdentityEvent(client, json.RawMessage(`{"summonerId":7,"puuid":"`+current.PUUID+`","gameName":"中间值","profileIconId":7}`)) {
 		t.Fatal("first valid identity event was rejected")
 	}
 	if !a.handleSummonerIdentityEvent(client, json.RawMessage(`{"summonerId":7,"puuid":"`+current.PUUID+`","gameName":"最终值","profileIconId":8}`)) {
 		t.Fatal("second valid identity event was rejected")
+	}
+	select {
+	case event := <-updates:
+		var view clientView
+		if json.Unmarshal([]byte(event), &view) != nil || view.Type != "client-view" || view.Summoner.GameName != "最终值" {
+			t.Fatalf("view=%q", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("identity view did not broadcast")
 	}
 	// State is committed before broadcastEvent runs. Waiting for the state and
 	// then using a non-blocking receive races the publisher under -race/load.
@@ -218,7 +227,7 @@ func TestSummonerProfileEventUpdatesOnlyProfile(t *testing.T) {
 	loot := []LootItem{{LootID: "keep", Count: 2}}
 	a := identityTestApp(client, Summoner{SummonerID: 7})
 	a.account = AccountData{Profile: SummonerProfile{BackgroundSkinID: 1}, Loot: loot}
-	updates := make(chan string, 2)
+	updates := make(chan string, 4)
 	a.eventSubscribers[updates] = struct{}{}
 
 	if !a.handleSummonerProfileEvent(client, json.RawMessage(`{"backgroundSkinId":103000,"backgroundSkinName":"新背景"}`)) {
@@ -229,6 +238,10 @@ func TestSummonerProfileEventUpdatesOnlyProfile(t *testing.T) {
 	}
 	if len(a.account.Loot) != 1 || a.account.Loot[0].LootID != "keep" {
 		t.Fatalf("profile event replaced other account fields: %#v", a.account)
+	}
+	var view clientView
+	if json.Unmarshal([]byte(<-updates), &view) != nil || view.Summoner.BackgroundSkinID != 103000 {
+		t.Fatalf("profile view=%+v", view)
 	}
 	for _, want := range []string{"summoner-updated", "facade:changed"} {
 		select {

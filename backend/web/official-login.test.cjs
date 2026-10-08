@@ -218,7 +218,7 @@ test("启动成功后入口保持显示，断开或超时恢复", () => {
   assert.equal(el.launchpadDescription.textContent, "");
 
   state.clientLaunched.processSeen = true;
-  render({connected:false,clientDiscovery:"process-not-found"});
+  render({state:"no-client"});
   assert.equal(state.clientLaunched, null);
   assert.equal(state.clientLaunchInFlight, "");
   assert.equal(el.launcherList.hidden, false);
@@ -229,7 +229,7 @@ test("启动成功后入口保持显示，断开或超时恢复", () => {
   assert.equal(el.launcherList.querySelector('[data-client-id="wegame"]').disabled,true);
 
   state.clientLaunched = { id: "tcls", at: 3 };
-  render({ connected: true });
+  render({state:"ready"});
   assert.equal(state.clientLaunched, null, "connected client must clear the waiting state");
   assert.equal(state.clientLaunchInFlight, "");
   assert.equal(el.clientLaunchpad.hidden, true);

@@ -227,17 +227,8 @@ func (a *app) loadGameplayOverviewDeduplicated(ctx context.Context, client *LCUC
 	return response
 }
 
-func (a *app) clearOverviewQuerySnapshots() {
-	if a.overviewQueries == nil {
-		return
-	}
-	a.overviewQueries.mu.Lock()
-	a.overviewQueries.entries = make(map[string]*list.Element)
-	a.overviewQueries.recent.Init()
-	// Detach old flights. Their waiters still finish, but new queries must not
-	// join them, and completion must not repopulate an invalidated snapshot.
-	a.overviewQueries.flights = make(map[string]*overviewQueryFlight)
-	a.overviewQueries.mu.Unlock()
+func (a *app) clearOverviewQuerySnapshots(playerRef string) {
+	a.invalidateOverviewPlayer(playerRef)
 }
 
 func overviewSnapshotTTL(entry overviewQueryCacheEntry) time.Duration {

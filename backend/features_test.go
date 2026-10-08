@@ -36,6 +36,9 @@ func TestClientDiagnosticAcceptsMultipleEventWhitelists(t *testing.T) {
 			if event == "overview_card_ready" {
 				body = `{"event":"overview_card_ready","reason":"ready","card":"champions","source":"snapshot","durationMs":150}`
 			}
+			if event == "browser_cold_requests_client" {
+				body = `{"event":"browser_cold_requests_client","reason":"sample","startedAt":1,"count":-1,"resourceCount":0,"timingAvailable":false,"windowElapsed":true}`
+			}
 			request := httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(body))
 			(&app{}).handleClientDiagnostic(recorder, request)
 			if recorder.Code != http.StatusNoContent {

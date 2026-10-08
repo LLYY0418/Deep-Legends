@@ -370,7 +370,11 @@ func (a *app) collectObjectiveDiagnostics(ctx context.Context, client *LCUClient
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	a.recordDiagnostic(map[string]any{"event": "objective_badge_capture", "trace_id": trace, "source": source, "mode": "read-only", "event_window_seconds": 120, "event_limit": 300})
-	for _, path := range []string{"/lol-missions/v1/missions", "/lol-missions/v1/series", "/lol-missions/v1/data", "/lol-notifications/v1/notifications", "/swagger/v3/openapi.json", "/swagger/v2/swagger.json"} {
+	paths := []string{"/lol-missions/v1/missions", "/lol-missions/v1/series", "/lol-missions/v1/data", "/lol-notifications/v1/notifications"}
+	if source == "export" {
+		paths = append(paths, "/swagger/v3/openapi.json", "/swagger/v2/swagger.json")
+	}
+	for _, path := range paths {
 		if ctx.Err() != nil {
 			break
 		}

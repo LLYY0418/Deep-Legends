@@ -77,7 +77,6 @@ const (
 	sgpPageSize         = 50
 	sgpFallbackPageSize = 20
 	sgpResponseMax      = 24 << 20
-	sgpTokenTTL         = 90 * time.Second
 	sgpFailureDelay     = 45 * time.Second
 	sgpCacheTTL         = 5 * time.Minute
 	sgpCacheMax         = 256
@@ -158,6 +157,7 @@ type sgpProvider struct {
 	retryWait       func(context.Context, time.Duration) error
 	http            *http.Client
 	observe         func(map[string]any)
+	requestBytes    func(*LCUClient, int)
 	rankedShapeOnce sync.Once
 	// serverBases is copied per provider so tests and future runtime overrides
 	// never mutate the package-level verified production table.
@@ -168,12 +168,15 @@ type sgpProvider struct {
 	mu                 sync.Mutex
 	token              string
 	tokenAt            time.Time
+	tokenFlights       map[sgpTokenFlightKey]*sgpTokenFlight
+	tokenEpoch         [2]uint64
 	tokenClient        *LCUClient
 	sessionToken       string
 	sessionAt          time.Time
 	sessionOwner       *LCUClient
 	failUntil          time.Time
 	historyCache       map[string]sgpHistoryCacheEntry
+	historyGames       *historyGameCache
 	historyGeneration  uint64
 	historyBytes       int
 	historyLastUsed    time.Time
@@ -185,11 +188,56 @@ type sgpProvider struct {
 type sgpHistoryCacheEntry struct {
 	at           time.Time
 	lastUsed     time.Time
+	gameIDs      []int64
+	consumed     int
+	decodeFailed int
+	more         bool
+	bytes        int
+}
+
+// Materialized results are detached copies; the page index never stores payloads.
+type sgpHistoryPage struct {
+	at           time.Time
+	lastUsed     time.Time
 	games        []*riotMatchInfo
 	consumed     int
 	decodeFailed int
 	more         bool
 	bytes        int
+}
+
+func (p *sgpProvider) materializeHistoryPageLocked(serverID, puuid string, entry sgpHistoryCacheEntry) (sgpHistoryPage, bool) {
+	page := sgpHistoryPage{at: entry.at, lastUsed: entry.lastUsed, consumed: entry.consumed, decodeFailed: entry.decodeFailed, more: entry.more, bytes: entry.bytes}
+	store := p.historyGamesLocked()
+	for _, id := range entry.gameIDs {
+		game, ok := store.sgp(serverID, id)
+		if !ok {
+			return sgpHistoryPage{}, false
+		}
+		if riotRosterIncomplete(*game) && len(game.Participants) > 0 {
+			found := false
+			for _, participant := range game.Participants {
+				if participant.PUUID == puuid {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return sgpHistoryPage{}, false
+			}
+		}
+		page.games = append(page.games, game)
+	}
+	return page, true
+}
+func (p *sgpProvider) retainedHistoryPage(serverID, puuid string, count int) (sgpHistoryPage, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	entry, ok := p.historyCache[sgpHistoryPageCacheKey(serverID, puuid, 0, count, nil)]
+	if !ok {
+		return sgpHistoryPage{}, false
+	}
+	return p.materializeHistoryPageLocked(serverID, puuid, entry)
 }
 
 type sgpSummonerCacheEntry struct {
@@ -287,33 +335,7 @@ func (p *sgpProvider) available(client *LCUClient) (string, string, bool) {
 }
 
 func (p *sgpProvider) entitlementsTokenContext(ctx context.Context, client *LCUClient, force bool) (string, error) {
-	p.mu.Lock()
-	if !force && p.token != "" && p.tokenClient == client && time.Since(p.tokenAt) < sgpTokenTTL {
-		token := p.token
-		p.mu.Unlock()
-		return token, nil
-	}
-	p.mu.Unlock()
-	var payload struct {
-		AccessToken string `json:"accessToken"`
-	}
-	if err := p.readTokenJSON(ctx, client, "/entitlements/v1/token", &payload); err != nil {
-		var httpErr *LCUHTTPError
-		if errors.As(err, &httpErr) {
-			return "", fmt.Errorf("客户端 SGP 令牌端点返回 HTTP %d: %w", httpErr.StatusCode, err)
-		}
-		return "", fmt.Errorf("客户端 SGP 令牌请求失败: %w", err)
-	}
-	if strings.TrimSpace(payload.AccessToken) == "" {
-		p.recordEmptyToken(ctx, "entitlements")
-		return "", errors.New("客户端 SGP 令牌端点响应成功，但 accessToken 字段为空")
-	}
-	p.mu.Lock()
-	p.token = payload.AccessToken
-	p.tokenAt = time.Now()
-	p.tokenClient = client
-	p.mu.Unlock()
-	return payload.AccessToken, nil
+	return p.cachedToken(ctx, client, sgpTokenEntitlements, force)
 }
 
 type sgpMatchHistoryPage struct {
@@ -335,27 +357,7 @@ func (e *sgpPartialHistoryError) Error() string {
 func (e *sgpPartialHistoryError) Unwrap() error { return e.Cause }
 
 func (p *sgpProvider) leagueSessionTokenContext(ctx context.Context, client *LCUClient, force bool) (string, error) {
-	p.mu.Lock()
-	if !force && p.sessionToken != "" && p.sessionOwner == client && time.Since(p.sessionAt) < sgpTokenTTL {
-		token := p.sessionToken
-		p.mu.Unlock()
-		return token, nil
-	}
-	p.mu.Unlock()
-	var token string
-	if err := p.readTokenJSON(ctx, client, "/lol-league-session/v1/league-session-token", &token); err != nil {
-		return "", fmt.Errorf("客户端未提供 league-session 令牌: %w", err)
-	}
-	if strings.TrimSpace(token) == "" {
-		p.recordEmptyToken(ctx, "session")
-		return "", errors.New("客户端返回的 league-session 令牌为空")
-	}
-	p.mu.Lock()
-	p.sessionToken = token
-	p.sessionAt = time.Now()
-	p.sessionOwner = client
-	p.mu.Unlock()
-	return token, nil
+	return p.cachedToken(ctx, client, sgpTokenLeagueSession, force)
 }
 
 // tokenKind 标记 getJSON 请求所需的令牌类型。
@@ -622,6 +624,11 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 		if event["error_kind"] == "canceled" || event["error_kind"] == "timeout" {
 			event["cancel_scope"] = gameplayCancellationScope(ctx)
 		}
+		if p.requestBytes != nil {
+			if size, ok := event["body_bytes"].(int); ok {
+				p.requestBytes(client, size)
+			}
+		}
 		p.recordObservation(event)
 	}
 	lastAuthStatus := http.StatusUnauthorized
@@ -637,6 +644,10 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 			token, err = p.entitlementsTokenContext(ctx, client, tokenAttempt > 0)
 		}
 		if err != nil {
+			// A token-only timeout leaves the history context usable for LCU fallback.
+			if ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+				return errors.New("SGP 令牌等待超过 1.5 秒，回退客户端")
+			}
 			return err
 		}
 		credentialID = p.credentialVersion(client, kind, token)
@@ -746,10 +757,10 @@ func (p *sgpProvider) matchHistoryOn(ctx context.Context, client *LCUClient, ser
 }
 
 func sgpHistoryPageCacheKey(serverID, puuid string, startIndex, pageSize int, tags []string) string {
-	return sourceScopedKey(dataSourceSGP, fmt.Sprintf("%s|%s|%d|%d|%s", serverID, puuid, startIndex, pageSize, strings.Join(tags, ",")))
+	return sourceScopedKey(dataSourceSGP, fmt.Sprintf("%s|%s|%d|%d|%s", strings.ToUpper(strings.TrimSpace(serverID)), puuid, startIndex, pageSize, strings.Join(tags, ",")))
 }
 
-func (p *sgpProvider) cachedHistoryPage(serverID, puuid string, startIndex, maxPageSize int, tags []string) (sgpHistoryCacheEntry, int, bool) {
+func (p *sgpProvider) cachedHistoryPage(serverID, puuid string, startIndex, maxPageSize int, tags []string) (sgpHistoryPage, int, bool) {
 	now := time.Now()
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -760,15 +771,17 @@ func (p *sgpProvider) cachedHistoryPage(serverID, puuid string, startIndex, maxP
 			continue
 		}
 		if now.Sub(entry.at) >= sgpCacheTTL {
-			p.historyBytes -= entry.bytes
-			delete(p.historyCache, key)
+			continue
+		}
+		page, found := p.materializeHistoryPageLocked(serverID, puuid, entry)
+		if !found {
 			continue
 		}
 		entry.lastUsed = p.nextHistoryLastUsed(now)
 		p.historyCache[key] = entry
-		return entry, pageSize, true
+		return page, pageSize, true
 	}
-	return sgpHistoryCacheEntry{}, 0, false
+	return sgpHistoryPage{}, 0, false
 }
 
 // Windows clocks may return the same tick for consecutive accesses. Keep the
@@ -781,7 +794,7 @@ func (p *sgpProvider) nextHistoryLastUsed(now time.Time) time.Time {
 	return now
 }
 
-func (p *sgpProvider) cacheHistoryPage(serverID, puuid string, startIndex, pageSize int, tags []string, entry sgpHistoryCacheEntry, expectedGeneration ...uint64) {
+func (p *sgpProvider) cacheHistoryPage(serverID, puuid string, startIndex, pageSize int, tags []string, page sgpHistoryPage, expectedGeneration ...uint64) {
 	now := time.Now()
 	key := sgpHistoryPageCacheKey(serverID, puuid, startIndex, pageSize, tags)
 	p.mu.Lock()
@@ -789,8 +802,15 @@ func (p *sgpProvider) cacheHistoryPage(serverID, puuid string, startIndex, pageS
 	if len(expectedGeneration) > 0 && expectedGeneration[0] != p.historyGeneration {
 		return
 	}
-	entry.at = now
-	entry.lastUsed = p.nextHistoryLastUsed(now)
+	entry := sgpHistoryCacheEntry{at: now, lastUsed: p.nextHistoryLastUsed(now), consumed: page.consumed, decodeFailed: page.decodeFailed, more: page.more}
+	store := p.historyGamesLocked()
+	for _, game := range page.games {
+		if game != nil && game.GameID > 0 {
+			store.putSGP(serverID, game)
+			entry.gameIDs = append(entry.gameIDs, game.GameID)
+		}
+	}
+	entry.bytes = 64 + 8*len(entry.gameIDs)
 	if p.historyCache == nil {
 		p.historyCache = make(map[string]sgpHistoryCacheEntry)
 	}
@@ -799,12 +819,6 @@ func (p *sgpProvider) cacheHistoryPage(serverID, puuid string, startIndex, pageS
 	}
 	p.historyCache[key] = entry
 	p.historyBytes += entry.bytes
-	for candidate, cached := range p.historyCache {
-		if now.Sub(cached.at) >= sgpCacheTTL {
-			p.historyBytes -= cached.bytes
-			delete(p.historyCache, candidate)
-		}
-	}
 	for len(p.historyCache) > sgpCacheMax || p.historyBytes > sgpCacheMaxBytes {
 		oldestKey := ""
 		var oldestAt time.Time
@@ -861,6 +875,15 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 		}
 		pageStart := start + fetched
 		if useCache {
+			if pageStart == 0 && len(tags) == 0 {
+				if refreshed, ok := p.refreshExpiredHistoryPage(ctx, client, serverID, puuid, pageSize); ok {
+					overviewCostFromContext(ctx).addHistoryCacheHit()
+					games = append(games, refreshed.games...)
+					fetched += refreshed.consumed
+					lastPageFull = refreshed.more
+					break
+				}
+			}
 			if cached, cachedPageSize, ok := p.cachedHistoryPage(serverID, puuid, pageStart, pageSize, tags); ok {
 				overviewCostFromContext(ctx).addHistoryCacheHit()
 				games = append(games, cached.games...)
@@ -935,8 +958,16 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 			// 诊断日志能够明确指出 SGP 返回了空 roster；可展示列表会
 			// 在转换前过滤它，避免渲染没有主体的空卡片。
 			if info.GameID > 0 {
-				games = append(games, &info)
-				parsedPageGames = append(parsedPageGames, &info)
+				p.mu.Lock()
+				store := p.historyGamesLocked()
+				p.mu.Unlock()
+				store.putSGP(serverID, &info)
+				immutable := &info
+				if cached, ok := store.sgp(serverID, info.GameID, true); ok {
+					immutable = cached
+				}
+				games = append(games, immutable)
+				parsedPageGames = append(parsedPageGames, immutable)
 			}
 		}
 		if len(participantKeys) > 0 {
@@ -956,7 +987,7 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 			for _, game := range page.Games {
 				pageBytes += len(game.JSON)
 			}
-			p.cacheHistoryPage(serverID, puuid, pageStart, pageSize, tags, sgpHistoryCacheEntry{
+			p.cacheHistoryPage(serverID, puuid, pageStart, pageSize, tags, sgpHistoryPage{
 				games: append([]*riotMatchInfo(nil), parsedPageGames...), consumed: consumed, decodeFailed: decodeFailed, more: lastPageFull, bytes: pageBytes,
 			}, generation)
 		}
@@ -1167,6 +1198,9 @@ func (p *sgpProvider) summonerByPUUIDOn(ctx context.Context, client *LCUClient, 
 		}
 		payload, readErr := readLimited(response.Body, sgpResponseMax)
 		response.Body.Close()
+		if p.requestBytes != nil {
+			p.requestBytes(client, len(payload))
+		}
 		diagnostic := map[string]any{
 			"event": "sgp_request", "method": http.MethodPost, "route": "SUMMONER", "path": "/summoner-ledge/v1/regions/{server_id}/summoners/puuids",
 			"credential_id": credentialID,

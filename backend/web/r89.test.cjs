@@ -11,7 +11,7 @@ function body(name) {
   return end?rest.slice(0,end.index):rest;
 }
 function compile(names,deps={}) { names=require("./r211-harness-support.cjs").expand(source,names,deps); return Function(...Object.keys(deps),require('./r220-harness-support.cjs').prelude(source,deps)+names.map(body).join('\n')+`\nreturn {${names.join(',')}};`)(...Object.values(deps)); }
-test('R89 parallel supplements start before first overview resolves and survive ref adoption without duplicates',async()=>{
+test('R258 supplements follow the first history card and survive ref adoption without duplicates',async()=>{
   const calls=[],pending=[];
   const state={section:"overview",settings:{matchCount:20},controllers:new Map()};
   const tab={key:'kr:fixture',region:'kr',riotId:{gameName:'Fixture',tagLine:'KR1'}};
@@ -25,20 +25,22 @@ test('R89 parallel supplements start before first overview resolves and survive 
     api:(url,options)=>new Promise(resolve=>{calls.push({url,body:JSON.parse(options.body),at:performance.now()});pending.push({url,resolve,onProgress:options.onProgress});})
   });
   const first=helpers.loadOverview(tab);
-  assert.equal(calls.length,3,'all three requests must already be in flight');
-  assert.ok(Math.max(...calls.map(c=>c.at))-Math.min(...calls.map(c=>c.at))<300);
-  assert.equal(calls.find(c=>c.url.endsWith('/overview')).body.count,10);
-  assert.deepEqual(calls.find(c=>c.url.endsWith('/season-summary')).body,{gameName:'Fixture',tagLine:'KR1',region:'kr',force:false});
-  pending.find(c=>c.url.endsWith('/season-summary')).resolve({source:'OP.GG',queue:'RANKED',season:'S2026',champions:[],overall:{games:20}});
-  pending.find(c=>c.url.endsWith('/current-game')).resolve({source:'OP.GG',status:'none'});
-  await new Promise(r=>setImmediate(r));
+  assert.equal(calls.length,1,'only overview is in flight before the first card');
+  assert.equal(calls[0].body.count,10);
   const payload=n=>({player:{playerRef:'opaque-ref',gameName:'Fixture',tagLine:'KR1',region:'kr'},matches:Array.from({length:n},(_,i)=>({gameId:i})),pagination:{count:n,hasMore:true},overall:{games:n}});
   pending.find(c=>c.url.endsWith('/overview')).onProgress(payload(5));
   assert.equal(tab.data.matches.length,5,'first screen remains visible during completion');
+  // The renderer releases these after reporting the first history card.
+  void helpers.loadOPGGSeasonSummary(tab);void helpers.loadOverviewCurrentGame(tab);
+  assert.equal(calls.length,3);
+  pending.find(c=>c.url.endsWith('/season-summary')).resolve({source:'OP.GG',queue:'RANKED',season:'S2026',champions:[],overall:{games:20}});
+  pending.find(c=>c.url.endsWith('/current-game')).resolve({source:'OP.GG',status:'none'});
+  await new Promise(r=>setImmediate(r));
+
   // Supplement references are adopted when the complete snapshot arrives.
   assert.equal(calls.filter(c=>c.url.endsWith('/season-summary')).length,1);
   assert.equal(calls.filter(c=>c.url.endsWith('/current-game')).length,1);
-  assert.equal(calls.at(-1).body.count,10);
+  assert.equal(calls.find(c=>c.url.endsWith('/overview')).body.count,10);
   pending.find(c=>c.url.endsWith('/overview')).resolve(payload(20));await first;assert.equal(calls.filter(c=>c.url.endsWith('/overview')).length,1);assert.equal(tab.opggSeason.playerRef,'opaque-ref');assert.equal(tab.currentGame.ref,'opaque-ref');
   assert.equal(tab.data.matches.length,20);assert.equal(tab.data.overall.games,20);assert.equal(tab.initialPagePending,false);
 });

@@ -9,12 +9,14 @@ import (
 )
 
 type gameplayFlowState struct {
-	mu     sync.Mutex
-	client *LCUClient
-	phase  string
-	ended  bool
-	ctx    context.Context
-	cancel context.CancelFunc
+	pollClient  *LCUClient
+	pollChanges chan struct{}
+	mu          sync.Mutex
+	client      *LCUClient
+	phase       string
+	ended       bool
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 func (a *app) primeGameplayState(ctx context.Context, client *LCUClient) {
@@ -56,6 +58,7 @@ func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase
 		f.ended = true
 	}
 	f.mu.Unlock()
+	a.signalGameplayPhase(client)
 	if ended || changed && phase == "EndOfGame" {
 		a.invalidateRankPlayer(a.currentPlayerRef())
 	}

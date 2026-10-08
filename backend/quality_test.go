@@ -474,6 +474,7 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 // 必须出现的关键词。声明写的是存了什么内容而不是目录名，所以这里用内容关键词对齐，
 // 一个目录的全部关键词都命中才算被声明覆盖。
 var privacyStoreDirectoryCoverage = map[string][]string{
+	"client-catalog": {"client-catalog", "装备", "符文", "召唤师技能", "不含账号标识"},
 	// storage.go openLocalStore 启动期创建
 	"updates":          {"自动更新", "安装包"},
 	"pools":            {"奖池清单"},

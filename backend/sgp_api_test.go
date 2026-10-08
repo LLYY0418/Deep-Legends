@@ -274,7 +274,7 @@ func TestMatchHistoryParsesFullRosterFromPlayerRoute(t *testing.T) {
 func TestMatchHistoryCacheAvoidsDuplicateSummaryAndReportsHit(t *testing.T) {
 	requests := 0
 	puuid := strings.Repeat("h", 48)
-	responseBody := `{"games":[{"json":{"gameId":91,"queueId":420,"participants":[{"participantId":1}]}}]}`
+	responseBody := `{"games":[{"json":{"gameId":91,"queueId":420,"participants":[{"participantId":1,"puuid":"` + puuid + `"}]}}]}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
 		_, _ = w.Write([]byte(responseBody))
@@ -429,8 +429,8 @@ func TestMatchHistoryPhysicalPageCacheSeparatesPageSizesAtSameStart(t *testing.T
 	provider := newSGPProvider()
 	puuid := strings.Repeat("p", 48)
 	tags := []string{"q_420"}
-	provider.cacheHistoryPage("HN1", puuid, 0, 20, tags, sgpHistoryCacheEntry{consumed: 20, more: true})
-	provider.cacheHistoryPage("HN1", puuid, 0, 50, tags, sgpHistoryCacheEntry{consumed: 50, more: false})
+	provider.cacheHistoryPage("HN1", puuid, 0, 20, tags, sgpHistoryPage{consumed: 20, more: true})
+	provider.cacheHistoryPage("HN1", puuid, 0, 50, tags, sgpHistoryPage{consumed: 50, more: false})
 
 	if len(provider.historyCache) != 2 {
 		t.Fatalf("physical cache entries = %d, want 2 (pageSize must be part of the key)", len(provider.historyCache))
@@ -888,32 +888,23 @@ func TestSGPSummonerSuccessIsCached(t *testing.T) {
 	}
 }
 
-func TestMatchHistoryCacheEvictsByBytes(t *testing.T) {
+func TestMatchHistoryPageIndexStoresIDsWithoutDuplicatedPayloadBytes(t *testing.T) {
 	provider := newSGPProvider()
-	puuid := strings.Repeat("b", 48)
-	var previousUse time.Time
+	game := &riotMatchInfo{GameID: 99, Participants: make([]riotParticipant, 10)}
 	for start := 0; start < 3; start++ {
-		provider.cacheHistoryPage("HN1", puuid, start, 50, nil, sgpHistoryCacheEntry{
-			consumed: 50,
-			bytes:    10 << 20,
-		})
-		provider.mu.Lock()
-		lastUsed := provider.historyCache[sgpHistoryPageCacheKey("HN1", puuid, start, 50, nil)].lastUsed
-		provider.mu.Unlock()
-		if !lastUsed.After(previousUse) {
-			t.Fatal("history cache access order did not advance")
-		}
-		previousUse = lastUsed
+		provider.cacheHistoryPage("HN1", "subject", start, 20, nil, sgpHistoryPage{games: []*riotMatchInfo{game}, consumed: 1, bytes: 10 << 20})
 	}
 	provider.mu.Lock()
 	defer provider.mu.Unlock()
-	if len(provider.historyCache) != 2 {
-		t.Fatalf("history cache entries = %d, want 2", len(provider.historyCache))
+	if len(provider.historyCache) != 3 || provider.historyBytes != 3*(64+8) {
+		t.Fatalf("indexes=%d bytes=%d", len(provider.historyCache), provider.historyBytes)
 	}
-	if provider.historyBytes > sgpCacheMaxBytes {
-		t.Fatalf("history cache bytes = %d, want <= %d", provider.historyBytes, sgpCacheMaxBytes)
+	for _, entry := range provider.historyCache {
+		if len(entry.gameIDs) != 1 || entry.gameIDs[0] != 99 {
+			t.Fatalf("IDs=%v", entry.gameIDs)
+		}
 	}
-	if _, ok := provider.historyCache[sgpHistoryPageCacheKey("HN1", puuid, 0, 50, nil)]; ok {
-		t.Fatal("oldest byte-heavy history page was not evicted")
+	if len(provider.historyGames.entries) != 1 {
+		t.Fatal("same immutable game was duplicated per page")
 	}
 }

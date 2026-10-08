@@ -62,6 +62,8 @@ type championDataCache struct {
 	strictDisk        bool
 	diskMaxEntries    int
 	diskMaxBytes      int64
+	memoryMaxEntries  int
+	memoryMaxBytes    int
 	strictEntries     map[string]binaryDiskEntry
 	strictBytes       int64
 	readFile          func(string) ([]byte, error)
@@ -228,7 +230,14 @@ func (c *championDataCache) storeMemoryLocked(key string, entry championCacheEnv
 	c.entries[key] = entry
 	c.bytes += len(entry.Data)
 	c.touchLocked(key)
-	for len(c.entries) > championMemoryMaxEntries || c.bytes > championMemoryMaxBytes {
+	maxEntries, maxBytes := c.memoryMaxEntries, c.memoryMaxBytes
+	if maxEntries <= 0 {
+		maxEntries = championMemoryMaxEntries
+	}
+	if maxBytes <= 0 {
+		maxBytes = championMemoryMaxBytes
+	}
+	for len(c.entries) > maxEntries || c.bytes > maxBytes {
 		if len(c.order) == 0 {
 			break
 		}
@@ -337,6 +346,9 @@ func (c *championDataCache) scheduleDiskPrune(written int64) {
 }
 
 func championCacheDiskAllowed(key string) bool {
+	if strings.HasPrefix(key, "client-catalog-v1|lcu-versioned|") {
+		return true
+	}
 	if strings.HasPrefix(key, "rune-starters-v1|KR_") {
 		return true
 	}

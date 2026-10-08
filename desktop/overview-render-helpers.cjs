@@ -38,6 +38,7 @@ function functionSource(source, name) {
 
 function compileFunctions(source, names, dependencies) {
   names = require("../backend/web/r211-harness-support.cjs").expand(source, names, dependencies);
+  if (names.includes("renderOverviewBodyContent") && !names.includes("renderSelfIdentityHeader")) names = [...names,"renderSelfIdentityHeader"];
   const dependencyNames = Object.keys(dependencies);
   const factory = Function(
     ...dependencyNames,

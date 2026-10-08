@@ -102,7 +102,7 @@ func TestR223SGPDoesNotRefillDecodedPage(t *testing.T) {
 			requests++
 			games := make([]map[string]any, 20)
 			for i := range games {
-				participant := map[string]any{"participantId": 1, "kills": 3, "timeCCingOthers": 12.5, "challenges": map[string]any{"dragonTakedowns": "2.0"}}
+				participant := map[string]any{"puuid": strings.Repeat("p", 48), "participantId": 1, "kills": 3, "timeCCingOthers": 12.5, "challenges": map[string]any{"dragonTakedowns": "2.0"}}
 				if i == 7 {
 					participant["kills"] = "broken"
 				}

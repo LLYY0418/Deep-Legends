@@ -13,20 +13,20 @@ import (
 func TestR70OverviewInvalidationDetachesOldFlights(t *testing.T) {
 	cache := newOverviewQueryCache()
 	old := &overviewQueryFlight{done: make(chan struct{})}
-	cache.flights["player"] = old
-	(&app{overviewQueries: cache}).clearOverviewQuerySnapshots()
+	cache.flights["riot:self|0|20|all|"] = old
+	(&app{overviewQueries: cache}).clearOverviewQuerySnapshots("self")
 	current := &overviewQueryFlight{done: make(chan struct{})}
-	cache.flights["player"] = current
-	cache.complete("player", old, gameplayOverview{}, nil)
+	cache.flights["riot:self|0|20|all|"] = current
+	cache.complete("riot:self|0|20|all|", old, gameplayOverview{}, nil)
 	select {
 	case <-old.done:
 	default:
 		t.Fatal("old waiters were stranded")
 	}
-	if cache.flights["player"] != current || len(cache.entries) != 0 {
+	if cache.flights["riot:self|0|20|all|"] != current || len(cache.entries) != 0 {
 		t.Fatal("stale completion replaced new flight or repopulated invalidated cache")
 	}
-	cache.complete("player", current, gameplayOverview{}, nil)
+	cache.complete("riot:self|0|20|all|", current, gameplayOverview{}, nil)
 	if len(cache.entries) != 1 || len(cache.flights) != 0 {
 		t.Fatal("current generation did not populate cache")
 	}

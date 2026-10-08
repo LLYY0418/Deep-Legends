@@ -301,7 +301,7 @@ func (a *app) startOPGGHistoricalRanks(reference gameplayReference, gameName, ta
 			"type": "historical-ranks", "account": a.registerGameplayReferenceDetails(mergeGameplayReferences(reference, gameplayReference{PlayerRef: puuid})),
 			"count": len(ranks), "historicalRanks": ranks,
 		})
-		a.clearOverviewQuerySnapshots()
+		a.clearOverviewQuerySnapshots(puuid)
 		a.broadcastEvent(string(payload))
 	}()
 }

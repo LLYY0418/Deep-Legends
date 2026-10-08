@@ -1,3 +1,4 @@
+const {viewStatus,clientView}=require('./r258-client-view-fixture.cjs');
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {JSDOM}=require('../../desktop/node_modules/jsdom');
@@ -27,7 +28,7 @@ test('R223 default KR, foreign follow including Brazil, and persistent manual se
   f.state.status={connected:true,clientRegion:'br1'};f.updateSearchRegionStatus(f.state.status);
   assert.equal(f.searchRegion(),'br1');assert.equal(f.el.playerSearchRiotFollowClient.disabled,false);assert.equal(f.el.playerSearchRegionLabel.textContent,'巴西');
   f.applySearchRegion('jp1');assert.equal(f.preferences.get('search-region-manual'),'true');assert.equal(f.el.playerSearchRegionLabel.textContent,'日服');
-  f.state.status={connected:true,clientRegion:'TENCENT',serverId:'HN10',serverName:'黑色玫瑰'};f.updateSearchRegionStatus(f.state.status);
+  f.state.status={connected:true,clientRegion:'TENCENT',serverId:'HN10',sgpReady:true,serverName:'黑色玫瑰'};f.updateSearchRegionStatus(f.state.status);
   assert.equal(f.searchRegion(),'jp1');assert.equal(f.el.playerSearchRiotFollowClient.disabled,true);assert.equal(f.el.playerSearchFollowClient.disabled,false);
   f.state.status={connected:true,clientRegion:''};f.updateSearchRegionStatus(f.state.status);assert.equal(f.el.playerSearchFollowClient.disabled,true);
  }finally {f.dom.window.close();}
@@ -35,23 +36,23 @@ test('R223 default KR, foreign follow including Brazil, and persistent manual se
 
 test('R223 unknown current tab stays ungrouped and resolves to JP once',()=>{
  const current={key:'current',current:true,label:'Fixture#JP1',icon:1,region:'',regionResolved:false,playerRefs:new Set()},loads=[];
- const state={status:{connected:true,identityReady:true},tabs:[current],activeTabs:{players:'current',kr:'',pro:''},activeGroup:'players',section:'overview'};
- const f=compile(gameplay,['connected','updateStatus','tabGroup','riotTab','summonerLabel','tabServerLabel','tabServerID','tabServerTitle','summonerRegionChip'],{state,escapeHTML,CN_SERVER_LABELS:{HN10:'黑色玫瑰'},renderPlayerTabs:()=>{},loadOverview:(tab,force)=>loads.push({key:tab.key,force}),ensurePerks:()=>{},ensureItems:()=>{},ensureSummonerSpells:()=>{},scheduleBeaconPoll:()=>{},loadLive:()=>{}});
+ const state={controllers:new Map(),status:{connected:true,identityReady:true},tabs:[current],activeTabs:{players:'current',kr:'',pro:''},activeGroup:'players',section:'overview'};
+ const f=compile(gameplay,['connected','updateStatus','tabGroup','riotTab','summonerLabel','tabServerLabel','tabServerID','tabServerTitle','summonerRegionChip'],{state,setTimeout:()=>1,clearTimeout:()=>{},activateOverviewTabPanel:()=>{},escapeHTML,CN_SERVER_LABELS:{HN10:'黑色玫瑰'},renderPlayerTabs:()=>{},loadOverview:(tab,force)=>loads.push({key:tab.key,force}),ensurePerks:()=>{},ensureItems:()=>{},ensureSummonerSpells:()=>{},scheduleBeaconPoll:()=>{},loadLive:()=>{}});
  const unknown={connected:true,identityReady:true,clientRegion:'',summoner:{gameName:'Fixture',tagLine:'JP1',profileIconId:1}};
- f.updateStatus(unknown);assert.equal(f.tabGroup(current),'');assert.equal(f.summonerRegionChip(current),'');assert.equal(loads.length,0);
- f.updateStatus({...unknown,clientRegion:'jp1'});assert.equal(f.tabGroup(current),'kr');assert.equal(state.activeGroup,'kr');assert.match(f.summonerRegionChip(current),/日服/);assert.equal(loads.length,1);
- f.updateStatus({...unknown,clientRegion:'jp1'});assert.equal(loads.length,1);
- f.updateStatus({...unknown,clientRegion:'TENCENT',serverId:'HN10'});assert.equal(f.tabGroup(current),'players');assert.match(f.summonerRegionChip(current),/黑色玫瑰/);assert.equal(loads.length,2);
+ f.updateStatus(viewStatus(unknown));assert.equal(f.tabGroup(current),'');assert.equal(f.summonerRegionChip(current),'');assert.equal(loads.length,0);
+ f.updateStatus(viewStatus({...unknown,clientRegion:'jp1'}));assert.equal(f.tabGroup(current),'kr');assert.equal(state.activeGroup,'kr');assert.match(f.summonerRegionChip(current),/日服/);assert.equal(loads.length,1);
+ f.updateStatus(viewStatus({...unknown,clientRegion:'jp1'}));assert.equal(loads.length,1);
+ f.updateStatus(viewStatus({...unknown,clientRegion:'TENCENT',serverId:'HN10',sgpReady:true}));assert.equal(f.tabGroup(current),'players');assert.match(f.summonerRegionChip(current),/黑色玫瑰/);assert.equal(loads.length,2);
 });
 
 test('R223 cancelled launch leaves cards visible, suppresses overlay and produces no toast or refresh',async()=>{
  const dom=new JSDOM(html),el=elements(dom.window.document),state={section:'overview',status:{connected:false},installationsLoaded:true,installations:[{id:'tcls',available:true,name:'TCLS'},{id:'riot',available:true,name:'Riot'}]},hidden=[];
  try {
   const f=compile(app,['renderLaunchpad','launchOfficialLogin','launchDetectedClient'],{state,el,escapeHTML,api:async()=>({cancelled:true}),hideReadingOverlay:reason=>hidden.push(reason),showToast:()=>assert.fail('cancel toast'),refreshStatus:()=>assert.fail('cancel refresh'),setTimeout:()=>assert.fail('cancel timer'),loadClientInstallations:()=>{}});
-  await f.launchOfficialLogin();assert.equal(state.clientLaunched,null);assert.equal(state.clientLaunchInFlight,'');assert.equal(state.overlaySuppressed,true);assert.deepEqual(hidden,['launch-cancelled']);assert.equal(el.launcherList.hidden,false);
+  await f.launchOfficialLogin();assert.equal(state.clientLaunched,null);assert.equal(state.clientLaunchInFlight,'');assert.equal(state.overlaySuppressed,undefined);assert.deepEqual(hidden,[]);assert.equal(el.launcherList.hidden,false);
   assert([...el.launcherList.querySelectorAll('button')].filter(b=>b.dataset.clientId!=='wegame').every(b=>!b.disabled));
-  state.overviewGroup='kr';state.clientLaunched={id:'riot',at:Date.now()};f.renderLaunchpad(state.status);assert.equal(el.launcherList.hidden,false);assert.equal(el.launcherList.querySelector('[data-client-id="riot"]').disabled,true);assert.equal(el.launcherList.querySelector('[data-client-id="tcls"]'),null);
-  state.clientLaunched.at-=61_000;f.renderLaunchpad({connected:false,clientDiscovery:'process-not-found'});assert.equal(state.clientLaunched,null);assert([...el.launcherList.querySelectorAll('button')].filter(b=>b.dataset.clientId!=='wegame').every(b=>!b.disabled));assert.equal(dom.window.document.getElementById('client-launch-reselect'),null);
+  state.overviewGroup='kr';state.clientLaunched={id:'riot',at:Date.now()};f.renderLaunchpad(clientView(state.status));assert.equal(el.launcherList.hidden,false);assert.equal(el.launcherList.querySelector('[data-client-id="riot"]').disabled,true);assert.equal(el.launcherList.querySelector('[data-client-id="tcls"]'),null);
+  state.clientLaunched.at-=61_000;f.renderLaunchpad(clientView({connected:false,clientDiscovery:'process-not-found'}));assert.equal(state.clientLaunched,null);assert([...el.launcherList.querySelectorAll('button')].filter(b=>b.dataset.clientId!=='wegame').every(b=>!b.disabled));assert.equal(dom.window.document.getElementById('client-launch-reselect'),null);
  }finally {dom.window.close();}
 });
 

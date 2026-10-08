@@ -73,6 +73,7 @@ func (a *app) handleClientLaunchOverviewReady(w http.ResponseWriter, r *http.Req
 	connected := a.connected
 	a.mu.RUnlock()
 	if connected {
+		a.observeConnectionFirstCard()
 		a.observeColdLaunchMilestone("overview_first_card_ms", time.Now())
 	}
 	s := &a.clientLaunchTiming

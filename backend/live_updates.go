@@ -59,6 +59,16 @@ func (a *app) handleEvents(w http.ResponseWriter, r *http.Request) {
 		a.eventMu.Unlock()
 	}()
 	_, _ = fmt.Fprint(w, "data: ready\n\n")
+	view, _ := json.Marshal(a.currentClientView())
+	if err := writeLiveEvent(w, string(view)); err != nil {
+		return
+	}
+	if window := a.coldRequestWindow(); window != nil {
+		raw, _ := json.Marshal(window)
+		if err := writeLiveEvent(w, string(raw)); err != nil {
+			return
+		}
+	}
 	// Include an updater snapshot on initial subscribe as well as reconnect;
 	// a check may have finished between the renderer's status fetch and SSE.
 	if a.updates != nil {

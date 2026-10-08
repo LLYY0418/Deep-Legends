@@ -15,6 +15,7 @@ function Run-Setup([string]$File, [switch]$MonitorLegacy) {
     # existing progress flow; /S alone would leave the Go setup page waiting.
     $process = Start-Process -FilePath $File -ArgumentList "--update --dest `"$install`"" -PassThru
     $deadline=(Get-Date).AddSeconds(180)
+    $script:lastSetupDeadline=$deadline
     $snapshots=@(); $last=""
     while (-not $process.WaitForExit(50)) {
         if ((Get-Date) -gt $deadline) { Stop-Process -Id $process.Id -Force; throw "Real installer timed out" }
@@ -68,16 +69,24 @@ try {
     Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.76/Deep-Legends-Setup-0.12.76-public.exe' -OutFile $published076
     if ((Get-FileHash $published076 -Algorithm SHA256).Hash.ToLowerInvariant() -ne '01014312b60e591a05bfc87f86e098adf6c5fc5e59520db5aedac5b5dba02ff3') { throw 'Published 0.12.76 setup checksum mismatch' }
     Run-Setup $published076
-    Stop-InstalledApp
     Assert-InstalledVersion '0.12.76'
     $userDataName = (& node -e "const p=JSON.parse(require('./desktop/node_modules/@electron/asar').extractFile(process.argv[1],'package.json'));console.log(p.productName||p.name)" (Join-Path $install 'resources/app.asar')).Trim()
     if ($LASTEXITCODE -ne 0 -or -not $userDataName) { throw 'Cannot determine installed Electron userData name' }
     $userData = Join-Path $env:APPDATA $userDataName
-    if (-not (Test-Path $userData)) { throw '0.12.76 did not initialize its actual Electron userData directory' }
     # Use the state actually persisted by 0.12.76 on this display. An invented
     # 1050x750 rectangle can be clamped by the CI desktop and legitimately saved
     # at another size; that does not measure whether the upgrade retained it.
     $boundsFile = Join-Path $userData 'window-bounds.json'
+    # The installer exits before Electron has necessarily shown its main
+    # window. Force-killing it here bypasses the real close/persistence path.
+    # Use the existing 180s setup deadline; never invent a rectangle or extend
+    # that budget. A normal close records the actual displayed window bounds.
+    while (-not (Test-Path $boundsFile) -and (Get-Date) -lt $script:lastSetupDeadline) {
+        Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $install 'Deep Legends.exe') -and $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -eq 'Deep Legends' } | ForEach-Object { [void]$_.CloseMainWindow() }
+        Start-Sleep -Milliseconds 50
+    }
+    Stop-InstalledApp
+    if (-not (Test-Path $userData)) { throw '0.12.76 did not initialize its actual Electron userData directory' }
     if (-not (Test-Path $boundsFile)) { throw '0.12.76 did not persist its actual window bounds' }
     $publishedBounds = [IO.File]::ReadAllText($boundsFile)
     $publishedBoundsValue = $publishedBounds | ConvertFrom-Json

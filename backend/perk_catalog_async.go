@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -36,7 +37,7 @@ func (a *app) enrichPerkAugments(key string, client *LCUClient, payload gameplay
 
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		data, err := cache.load(ctx, "normalized-augments-v1|"+key, gameplayPerkCatalogTTL, 24*time.Hour, true, func(ctx context.Context) ([]byte, error) {
+		data, err := cache.load(ctx, "normalized-augments-v1|"+key, gameplayPerkCatalogTTL, 24*time.Hour, !strings.HasPrefix(key, "lcu-unversioned:"), func(ctx context.Context) ([]byte, error) {
 			var augments []gameplayAugment
 			var err error
 			if client != nil {

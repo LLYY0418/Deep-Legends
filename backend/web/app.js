@@ -22,13 +22,14 @@
 	  "snapshot-updated": ["status", "collection", "account", "pools"],
 	  "collection-dirty": ["status"],
 	  "account-updated": ["account"],
-	  "connection-state": ["status"],
+	  "connection-state": [],
 	  "friends-updated": ["friends"],
 	  "season-progress": ["overview-season"],
  "riot-relay-recovered": ["riot-relay-recovered"],
  "overview-matches": ["overview-matches"],
 	  "historical-ranks": ["overview-ranks"],
-	  "summoner-updated": ["status", "overview-player"],
+      "overview-incremental": ["overview-ranks"],
+	  "summoner-updated": [],
 	});
   const CN_SERVER_MERGE_NOTE = [
     "国服大区合并对照",
@@ -107,13 +108,8 @@
     showPrestigeChromas: true,
     chromaCapability: null,
     chromaRenderedItems: [],
-    startupFallbackTimer: 0,
     staleSnapshot: false,
     staleSnapshotAt: "",
-    overlayForced: false,
-    overlayBaselineAttempt: "",
-    overlayTimer: 0,
-    overlaySuppressed: false,
     renderFrames: new Set(),
     poolRenderFrames: new Set(),
     cardImageObserver: null,
@@ -458,7 +454,6 @@
       }
 	  if (!state.status.connected) clearDisconnectedClientState();
       state.statusDelay = STATUS_INTERVAL;
-      if (!previous?.connected && state.status.connected) state.overlaySuppressed = false;
 	  const changed = !previous || previous.lastSync !== state.status.lastSync || previous.lastAttempt !== state.status.lastAttempt || previous.calculationOK !== state.status.calculationOK || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.clientRegion !== state.status.clientRegion || previous.serverId !== state.status.serverId || previous.identityReady !== state.status.identityReady || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotRetryCount !== state.status.snapshotRetryCount || previous.snapshotRetryExhausted !== state.status.snapshotRetryExhausted || previous.snapshotFallback !== state.status.snapshotFallback || previous.collectionDirty !== state.status.collectionDirty;
       if (changed) {
         if (!(state.section === "favorites" && state.favoritesPage === "account")) state.accountLoaded = false;
@@ -500,7 +495,7 @@
 
   function reportStatusRenderFailed(error, fallbackFunction = "refreshStatus") {
     const types = ["Error", "TypeError", "ReferenceError", "RangeError", "SyntaxError", "URIError", "EvalError", "AggregateError"];
-    const functions = ["refreshStatus", "renderStatus", "renderLaunchpad", "updateReadingOverlay", "renderNotice", "updateWorkspaceAvailability", "renderUpdateStatus", "loadClientInstallations", "loadSkins", "loadAccount", "loadPools"];
+    const functions = ["refreshStatus", "renderStatus", "renderLaunchpad", "acceptClientView", "renderClientConnection", "updateReadingOverlay", "renderNotice", "updateWorkspaceAvailability", "renderUpdateStatus", "loadClientInstallations", "loadSkins", "loadAccount", "loadPools"];
     const errorType = types.includes(error?.name) ? error.name : "Error";
     // Only fixed function names may leave this process, never the stack,
     // message, file location or arbitrary error name.
@@ -543,87 +538,17 @@
     return `已重试 ${count} 次，耗时 ${duration}，${data?.snapshotRetryExhausted ? "将每 60 秒继续尝试" : "稍后自动重试"}`;
   }
 
+  // Client discovery never blocks the application. Authorization owns inert.
   function updateReadingOverlay() {
-    if (!state.status) return;
-    const data = state.status;
-    const wasConnected = Boolean(state.overlayWasConnected);
-    state.overlayWasConnected = Boolean(data.connected);
-    if (!data.connected) {
-      state.selfOverviewReady = false;
-      clearTimeout(state.selfOverviewTimeoutTimer); state.selfOverviewTimeoutTimer = 0;
-    } else if (!wasConnected && !state.selfOverviewReady) {
-      state.selfOverviewTimeoutTimer = setTimeout(() => {
-        state.selfOverviewTimeoutTimer = 0;
-        if (!state.status?.connected || state.selfOverviewReady) return;
-        state.overlaySuppressed = true;
-        hideReadingOverlay("timeout");
-        window.dispatchEvent(new CustomEvent("deep-legends:self-overview-timeout"));
-      }, 15_000);
-    }
-    if (wasConnected && !data.connected) state.clientExitingUntil = Date.now() + 15_000;
-    const exiting = !data.connected && ["credentials-unreadable", "probe-failed"].includes(data.clientDiscovery) && Date.now() < Number(state.clientExitingUntil || 0);
-    const launching = state.launchOverlayPending && Date.now() - Number(state.lastClientLaunchAt || 0) < 120_000;
-    if (exiting && !launching) {
-      hideReadingOverlay("suppressed");
-      window.reportFlowDiagnostic?.("blocking_state_client", "skip", { source: "startup", skip_reason: "client-exiting" });
-      return;
-    }
-    const identityReady = data.identityReady ?? data.snapshotReady;
-    if (data.connected && state.selfOverviewReady) {
-      clearTimeout(state.selfOverviewTimeoutTimer); state.selfOverviewTimeoutTimer = 0;
-      state.launchOverlayPending = false;
-      state.overlaySuppressed = false;
-      hideReadingOverlay("self-tab-ready");
-      return;
-    }
-    if (!data.connected && data.clientDiscovery === "process-not-found") {
-      state.statusDelay = STATUS_INTERVAL;
-      if (!state.clientMissingTimer && (!el.startupLoading.hidden || launching)) state.clientMissingTimer = setTimeout(() => {
-        state.clientMissingTimer = 0;
-        if (!state.status?.connected && state.status?.clientDiscovery === "process-not-found") hideReadingOverlay("connect-failed");
-      }, 5_000);
-      if (el.startupLoading.hidden && !launching) return;
-    } else { clearTimeout(state.clientMissingTimer); state.clientMissingTimer = 0; }
-    if (state.overlaySuppressed) {
-      hideReadingOverlay("suppressed");
-      return;
-    }
-    const starting = ["credentials-unreadable", "probe-failed"].includes(data.clientDiscovery);
-    showReadingOverlay(data.connected ? "正在读取召唤师信息" : "正在连接英雄联盟客户端", data.connected ? "正在读取身份与总览数据。" : starting ? "检测到客户端正在启动，请稍候。" : "正在检测英雄联盟客户端。");
-    state.statusDelay = 900;
-  }
-
-  function showReadingOverlay(title, copy) {
-    if (state.overlaySuppressed) return;
-    clearTimeout(state.overlayTimer);
-    el.startupLoadingTitle.textContent = title;
-    el.startupLoadingCopy.textContent = copy;
-    if (el.startupLoadingMeta) el.startupLoadingMeta.textContent = snapshotRetryText(state.status);
-    if (el.startupLoadingRetry) el.startupLoadingRetry.hidden = !state.status?.connected;
-    el.startupLoading.hidden = false;
-    el.startupLoading.classList.remove("is-leaving");
-    el.appFrame.setAttribute("inert", "");
-    if (!state.startupFallbackTimer) {
-      window.reportFlowDiagnostic?.("blocking_state_client", "show", { source: "startup" });
-      state.startupFallbackTimer = setTimeout(() => {
-        state.overlaySuppressed = true;
-        hideReadingOverlay("hard-timeout");
-        window.reportFlowDiagnostic?.("blocking_state_client", "timeout", { source: "startup", durationMs: 120000 });
-        if (state.status) renderNotice(state.status);
-      }, 120000);
-    }
-  }
-
-  function hideReadingOverlay(hideReason = "suppressed") {
-    state.overlayForced = false;
-    state.overlayBaselineAttempt = "";
-    clearTimeout(state.startupFallbackTimer);
-    state.startupFallbackTimer = 0;
-    if (window.deepLegendsLicense?.isActive()) el.appFrame.removeAttribute("inert");
-    clearTimeout(state.overlayTimer);
-    if (!el.startupLoading.hidden) window.reportFlowDiagnostic?.("blocking_state_client", "hide", { source: "startup", hide_reason: hideReason });
     el.startupLoading.hidden = true;
-    el.startupLoading.classList.remove("is-leaving");
+  }
+
+  function showReadingOverlay() {
+    updateReadingOverlay();
+  }
+
+  function hideReadingOverlay() {
+    updateReadingOverlay();
   }
 
   async function retrySummonerIdentity() {
@@ -759,32 +684,9 @@
     document.body.classList.remove("is-fatal");
     el.refresh.disabled = data.syncing || state.manualRefreshing;
     el.refresh.classList.toggle("is-loading", data.syncing || state.manualRefreshing);
-    el.connection.className = "connection";
-    const summoner = data.summoner || {};
-    const name = summoner.gameName || summoner.displayName || "当前召唤师";
-    const tag = summoner.tagLine ? `#${summoner.tagLine}` : "";
-    if (data.connected && summoner.profileIconId) {
-      el.connectionAvatar.hidden = false;
-      el.connectionAvatar.setAttribute("data-queued-src", `/api/image?path=${encodeURIComponent(`/lol-game-data/assets/v1/profile-icons/${summoner.profileIconId}.jpg`)}`);
-      el.connectionAvatar.onerror = () => { el.connectionAvatar.hidden = true; };
-    } else {
-      el.connectionAvatar.hidden = true;
-      el.connectionAvatar.removeAttribute("data-queued-src");
-      el.connectionAvatar.removeAttribute("src");
-    }
-    if (data.connected && (data.identityReady ?? data.snapshotReady)) {
-      el.connection.classList.add("is-connected");
-      el.connection.lastElementChild.textContent = `${name}${tag}`;
-    } else if (data.connected) {
-      el.connection.classList.add("is-connecting");
-      el.connection.lastElementChild.textContent = `${name}${tag}`;
-    } else {
-      el.connection.classList.add(data.connectionState === "connecting" ? "is-connecting" : "is-error");
-      el.connection.lastElementChild.textContent = data.syncing || data.connectionState === "connecting" ? "正在检查客户端" : "未检测到英雄联盟客户端";
-    }
-    el.connection.dataset.tooltip = el.connection.lastElementChild.textContent;
-    el.connection.dataset.tooltipOverflow = ".connection-label";
-    el.connection.dataset.tooltipSize = "compact";
+    acceptClientView(data.clientView);
+    data.clientView = state.clientView;
+    renderClientConnection();
     el.ownedCount.textContent = data.snapshotReady || data.snapshotFallback ? formatNumber(data.ownedCount) : "—";
     el.chromaCount.textContent = data.snapshotReady ? formatNumber(data.chromaOwnedCount || 0) : "—";
     el.poolCount.textContent = data.poolTotal ? formatNumber(data.poolTotal) : "—";
@@ -796,10 +698,53 @@
       el.settingsBuildIdentity.textContent = `版本 ${data.version || "未知"} · 构建 ${fingerprint}`;
     }
     renderNotice(data);
-    renderLaunchpad(data);
+    renderLaunchpad();
     updateWorkspaceAvailability(data);
     renderUpdateStatus(data.update);
     window.dispatchEvent(new CustomEvent("deep-legends:status", { detail: data }));
+  }
+
+  function acceptClientView(view) {
+    if (view?.type !== "client-view" || !["ready", "exiting", "no-client"].includes(view.state) || !Number.isSafeInteger(view.generation) || view.generation <= Number(state.clientView?.generation || 0)) return false;
+    const previous = state.clientView;
+    state.clientView = view;
+    // Legacy business consumers receive the same committed presentation state;
+    // this notification never fetches status or decides tab visibility itself.
+    if (state.status) state.status = {...state.status, clientView:view, connected:view.state === "ready", identityReady:view.state === "ready", sgpReady:view.sgpReady, clientRegion:view.region || "", serverId:view.serverId || "", summoner:view.summoner || {}};
+    if (previous?.state === "ready" && view.state !== "ready") clearDisconnectedClientState();
+    renderClientConnection();
+    renderLaunchpad();
+    window.dispatchEvent(new CustomEvent("deep-legends:client-view", {detail:view}));
+    if (state.status) window.dispatchEvent(new CustomEvent("deep-legends:status", {detail:state.status}));
+    if (state.section === "favorites") queueLiveUpdateSlices(["status"]);
+    return true;
+  }
+
+  function renderClientConnection() {
+    el.connection.className = "connection";
+    const selfReady = state.clientView?.state === "ready";
+    const summoner = state.clientView?.summoner || {};
+    const name = summoner.gameName || summoner.displayName || "当前召唤师";
+    const tag = summoner.tagLine ? `#${summoner.tagLine}` : "";
+    if (selfReady && summoner.profileIconId) {
+      el.connectionAvatar.hidden = false;
+      el.connectionAvatar.setAttribute("data-queued-src", `/api/image?path=${encodeURIComponent(`/lol-game-data/assets/v1/profile-icons/${summoner.profileIconId}.jpg`)}`);
+      el.connectionAvatar.onerror = () => { el.connectionAvatar.hidden = true; };
+    } else {
+      el.connectionAvatar.hidden = true;
+      el.connectionAvatar.removeAttribute("data-queued-src");
+      el.connectionAvatar.removeAttribute("src");
+    }
+    if (selfReady) {
+      el.connection.classList.add("is-connected");
+      el.connection.lastElementChild.textContent = `${name}${tag}`;
+    } else {
+      el.connection.classList.add("is-error");
+      el.connection.lastElementChild.textContent = "未检测到英雄联盟客户端";
+    }
+    el.connection.dataset.tooltip = el.connection.lastElementChild.textContent;
+    el.connection.dataset.tooltipOverflow = ".connection-label";
+    el.connection.dataset.tooltipSize = "compact";
   }
 
   // 未连接客户端时，收藏页与奖池页隐藏全部筛选控件，只保留居中的提示卡。
@@ -826,13 +771,6 @@
   }
 
   function renderNotice(data) {
-    if (state.overlaySuppressed && data.connected && !(data.identityReady ?? data.snapshotReady)) {
-      el.notice.hidden = false;
-      el.notice.className = "notice is-warning";
-      el.notice.innerHTML = '<div class="notice-symbol" aria-hidden="true">!</div><div><strong>召唤师信息读取失败</strong><button class="text-button identity-retry" type="button">重试</button></div>';
-      el.notice.querySelector(".identity-retry")?.addEventListener("click", retrySummonerIdentity);
-      return;
-    }
     if (state.section !== "favorites" || state.favoritesPage !== "collection") {
       el.notice.hidden = true;
       return;
@@ -862,7 +800,7 @@
 
   async function loadClientInstallations(force = false) {
     const render = () => {
-      try { renderLaunchpad(state.status || {}); } catch (error) { reportStatusRenderFailed(error, "renderLaunchpad"); }
+      try { renderLaunchpad(); } catch (error) { reportStatusRenderFailed(error, "renderLaunchpad"); }
     };
     const installationTTL = typeof CLIENT_INSTALLATION_TTL === "number" ? CLIENT_INSTALLATION_TTL : 30_000;
     const now = Date.now();
@@ -898,24 +836,24 @@
     return promise;
   }
 
-  function renderLaunchpad(data) {
+  function renderLaunchpad(view = state.clientView) {
     // 启动入口卡只在总览页“当前召唤师”页签展示；搜索出的玩家页签（无论
     // 是否查到结果）都不展示，避免干扰查看他人战绩。
-    if (data.connected) {
+    const selfReady = view?.state === "ready";
+    if (selfReady) {
       state.clientLaunchInFlight = "";
       state.clientLaunchPending = {}; state.clientLaunchWaiting = {};
       state.clientLaunched = null;
       state.officialLoginMessage = "";
     }
-    const visible = !data.connected && state.section === "overview" && state.overviewTabIsCurrent !== false;
+    const visible = !selfReady && state.section === "overview" && state.overviewTabIsCurrent !== false;
     el.clientLaunchpad.hidden = !visible;
     if (!visible) return;
     if (state.clientLaunched && !state.clientLaunchWaiting?.[state.clientLaunched.id]) {
       state.clientLaunchWaiting ||= {}; state.clientLaunchWaiting[state.clientLaunched.id] = state.clientLaunched;
     }
     for (const [id, launched] of Object.entries(state.clientLaunchWaiting || {})) {
-      if (["credentials-unreadable", "probe-failed"].includes(data.clientDiscovery)) launched.processSeen = true;
-      if (data.clientDiscovery === "process-not-found" && (launched.processSeen || Date.now() - launched.at >= 60_000)) {
+      if (view?.state === "no-client" && Date.now() - launched.at >= 60_000) {
         delete state.clientLaunchWaiting[id]; if (state.clientLaunched?.id === id) state.clientLaunched = null; state.officialLoginMessage = "";
       }
     }
@@ -965,17 +903,17 @@
     state.clientLaunchInFlight = "tcls";
     state.clientLaunched = null;
     state.officialLoginMessage = "正在打开国服纯净入口。";
-    renderLaunchpad(state.status || {});
+    renderLaunchpad();
     try {
       const result = await api("/api/client-launch", { method: "POST", body: JSON.stringify({ id: "tcls" }) }, "official-login-launch", 120_000);
       delete state.clientLaunchPending.tcls;
-      if (result?.cancelled) { state.overlaySuppressed = true; hideReadingOverlay("launch-cancelled"); state.clientLaunchInFlight = ""; state.clientLaunched = null; state.officialLoginMessage = ""; renderLaunchpad(state.status || {}); return; }
+      if (result?.cancelled) { state.clientLaunchInFlight = ""; state.clientLaunched = null; state.officialLoginMessage = ""; renderLaunchpad(); return; }
       state.clientLaunchInFlight = "";
       state.clientLaunched = { id: "tcls", at: Date.now() };
-      state.lastClientLaunchAt = Date.now(); state.launchOverlayPending = true; state.overlaySuppressed = false;
+      state.lastClientLaunchAt = Date.now();
       state.clientLaunchWaiting ||= {}; state.clientLaunchWaiting.tcls = state.clientLaunched;
       state.officialLoginMessage = "";
-      renderLaunchpad(state.status || {});
+      renderLaunchpad();
       showToast("国服客户端已打开");
       setTimeout(() => refreshStatus(false), 1200);
     } catch (error) {
@@ -983,7 +921,7 @@
       state.clientLaunchInFlight = "";
       state.clientLaunched = null;
       state.officialLoginMessage = error.message;
-      renderLaunchpad(state.status || {});
+      renderLaunchpad();
       showToast(error.message);
     }
   }
@@ -995,16 +933,16 @@
     state.clientLaunchInFlight = id;
     state.clientLaunched = null;
     state.officialLoginMessage = "";
-    renderLaunchpad(state.status || {});
+    renderLaunchpad();
     try {
       const result = await api("/api/client-launch", { method: "POST", body: JSON.stringify({ id }) }, "client-launch", 120_000);
       delete state.clientLaunchPending[id];
-      if (result?.cancelled || result?.alreadyOpen) { if (result?.cancelled) { state.overlaySuppressed = true; hideReadingOverlay("launch-cancelled"); } state.clientLaunchInFlight = ""; state.clientLaunched = null; state.officialLoginMessage = result?.alreadyOpen ? "Riot 客户端已经打开" : ""; renderLaunchpad(state.status || {}); return; }
+      if (result?.cancelled || result?.alreadyOpen) { if (result?.cancelled) { } state.clientLaunchInFlight = ""; state.clientLaunched = null; state.officialLoginMessage = result?.alreadyOpen ? "Riot 客户端已经打开" : ""; renderLaunchpad(); return; }
       state.clientLaunchInFlight = "";
       state.clientLaunched = { id, at: Date.now() };
-      state.lastClientLaunchAt = Date.now(); state.launchOverlayPending = true; state.overlaySuppressed = false;
+      state.lastClientLaunchAt = Date.now();
       state.clientLaunchWaiting ||= {}; state.clientLaunchWaiting[id] = state.clientLaunched;
-      renderLaunchpad(state.status || {});
+      renderLaunchpad();
       showToast("客户端已启动，登录并进入大厅后会自动连接");
       setTimeout(() => refreshStatus(false), 3000);
     } catch (error) {
@@ -1012,7 +950,7 @@
       state.clientLaunchInFlight = "";
       state.clientLaunched = null;
       state.officialLoginMessage = error.message;
-      renderLaunchpad(state.status || {});
+      renderLaunchpad();
       showToast(error.message);
     }
   }
@@ -2618,7 +2556,7 @@
       loadDiagnostics();
     }
     if (state.status) renderNotice(state.status);
-    if (state.status) renderLaunchpad(state.status);
+    if (state.status) renderLaunchpad();
   }
 
   window.addEventListener("deep-legends:navigate", (event) => {
@@ -2659,7 +2597,7 @@
   window.addEventListener("deep-legends:overview-tab", (event) => {
     state.overviewTabIsCurrent = Boolean(event.detail?.current);
     state.overviewGroup = event.detail?.group || "players";
-    if (state.status) renderLaunchpad(state.status);
+    if (state.status) renderLaunchpad();
   });
 
   window.addEventListener("deep-legends:overview-ready", () => {
@@ -3848,8 +3786,8 @@
 	state.liveUpdateSlices.clear();
 	if (!slices.size || state.destroyed) return;
 	if (slices.has("status")) await refreshStatus(slices.has("resync"));
-	if (slices.has("overview-player") && state.status?.connected) {
-	  window.dispatchEvent(new CustomEvent("deep-legends:overview-player", { detail: { summoner: state.status.summoner || {} } }));
+	if (slices.has("overview-player") && state.clientView?.state === "ready") {
+	  window.dispatchEvent(new CustomEvent("deep-legends:overview-player", { detail: { summoner: state.clientView.summoner || {} } }));
 	}
 	if (slices.has("collection") && !slices.has("status") && state.section === "favorites" && state.favoritesPage === "collection") await loadSkins(true);
 	if (slices.has("account") && !slices.has("resync") && state.section === "favorites" && state.favoritesPage === "account") await loadAccount();
@@ -3923,13 +3861,15 @@
         state.liveEventsReady = true;
         return;
       }
-      if (event.data === "connection-state") { void refreshStatus(); return; }
+      if (event.data === "connection-state" || event.data === "summoner-updated") return;
       if (event.data === "riot-key-updated") { window.dispatchEvent(new CustomEvent("deep-legends:riot-key-updated")); void loadRiotKeySettings(); return; }
       if (event.data === "pro-runes") { window.dispatchEvent(new CustomEvent("deep-legends:pro-runes")); return; }
       if (event.data === "resync-required") { resyncLiveState(); return; }
 	  if (typeof event.data === "string" && event.data.startsWith("{")) {
 		try {
 		  const detail = JSON.parse(event.data);
+          if(detail?.type === "client-cold-window") {window.deepLegendsPerformance?.startColdRequestWindow?.(detail.processAt);return;}
+          if (detail?.type === "client-view") { try { acceptClientView(detail); } catch (error) { reportStatusRenderFailed(error, "acceptClientView"); } return; }
 		  if (detail?.type === "live-player-progress") { window.dispatchEvent(new CustomEvent("deep-legends:live-player-progress", { detail })); return; }
 		  const slices = LIVE_UPDATE_STATE_SLICES[detail?.type] || [];
 		  if (slices.includes("riot-relay-recovered")) window.dispatchEvent(new CustomEvent("deep-legends:riot-relay-recovered", {detail}));
@@ -4506,8 +4446,6 @@
       void setupShareDirectorySetting();
       setupLiveUpdates();
       void setupChampionNetwork();
-      state.overlaySuppressed = false;
-      showReadingOverlay("正在连接英雄联盟客户端", "正在检测英雄联盟客户端。");
       void refreshStatus(true);
     } else {
       clearTimeout(state.statusTimer); clearTimeout(state.liveUpdateTimer); clearTimeout(state.eventReconnectTimer);

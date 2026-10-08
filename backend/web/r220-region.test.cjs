@@ -1,3 +1,4 @@
+const {viewStatus,clientView}=require('./r258-client-view-fixture.cjs');
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {JSDOM}=require('../../desktop/node_modules/jsdom');
@@ -14,18 +15,18 @@ test('R220 every Riot tab is client independent, grouped with Korea, and labelle
 
 test('R220 JP status moves the current tab and identityReady reissues its overview once',()=>{
  const current={key:'current',current:true,label:'Fixture#JP1',icon:1,region:'',playerRefs:new Set()},loads=[];
- const state={status:{connected:true,identityReady:false},tabs:[current],activeTabs:{players:'current',kr:'',pro:''},activeGroup:'players',section:'overview'};
- const f=compile(gameplay,['connected','updateStatus','tabGroup','riotTab','summonerLabel'],{state,renderPlayerTabs:()=>{},loadOverview:(tab,force)=>loads.push({key:tab.key,force}),ensurePerks:()=>{},ensureItems:()=>{},ensureSummonerSpells:()=>{},scheduleBeaconPoll:()=>{},loadLive:()=>{}});
+ const state={controllers:new Map(),status:{connected:true,identityReady:false},tabs:[current],activeTabs:{players:'current',kr:'',pro:''},activeGroup:'players',section:'overview'};
+ const f=compile(gameplay,['connected','updateStatus','tabGroup','riotTab','summonerLabel'],{state,localStorage:{setItem:()=>{}},window:{},setTimeout:()=>1,clearTimeout:()=>{},activateOverviewTabPanel:()=>{},renderPlayerTabs:()=>{},loadOverview:(tab,force)=>loads.push({key:tab.key,force}),ensurePerks:()=>{},ensureItems:()=>{},ensureSummonerSpells:()=>{},scheduleBeaconPoll:()=>{},loadLive:()=>{}});
  const status={connected:true,identityReady:false,clientRegion:'jp1',summoner:{gameName:'Fixture',tagLine:'JP1',profileIconId:1}};
- f.updateStatus(status);assert.equal(current.region,'jp1');assert.equal(f.tabGroup(current),'kr');assert.equal(state.activeGroup,'kr');assert.equal(state.activeTabs.kr,'current');assert.equal(loads.length,1);
- f.updateStatus({...status,identityReady:true});assert.equal(loads.length,2);assert.equal(loads.at(-1).force,true);
- f.updateStatus({...status,identityReady:true});assert.equal(loads.length,2);
+ f.updateStatus(viewStatus(status));assert.equal(current.region,'');assert.equal(loads.length,0);
+ f.updateStatus(viewStatus({...status,identityReady:true}));assert.equal(loads.length,1);assert.equal(loads.at(-1).force,true);
+ f.updateStatus(viewStatus({...status,identityReady:true}));assert.equal(loads.length,1);
 });
 
 test('R220 top search defaults to the connected platform, keeps manual choice, and clears Tencent server IDs',()=>{
  const dom=new JSDOM(html),el={};try{
  for(const id of ['player-search-region','player-search-region-label','player-search-region-menu','player-search-cn-toggle','player-search-cn-options','player-search-follow-client','player-search-follow-status','player-search-riot-toggle','player-search-riot-options','player-search-riot-follow-client','player-search-riot-follow-status'])el[id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase())]=dom.window.document.getElementById(id);
- const state={status:{connected:true,clientRegion:'jp1'}},preferences=[];
+ const state={controllers:new Map(),status:{connected:true,clientRegion:'jp1'}},preferences=[];
  const f=compile(app,['searchRegion','searchServerID','applySearchRegion','updateSearchRegionLabel','updateSearchRegionStatus','setCNRegionExpanded'],{state,el,savePreference:(...x)=>preferences.push(x)});
  f.updateSearchRegionStatus(state.status);assert.equal(f.searchRegion(),'jp1');assert.equal(el.playerSearchRegionLabel.textContent,'日服');assert.equal(f.searchServerID(),'');
  f.applySearchRegion('na1','HN1');assert.equal(f.searchRegion(),'na1');assert.equal(f.searchServerID(),'');f.updateSearchRegionStatus(state.status);assert.equal(f.searchRegion(),'na1');
@@ -59,7 +60,7 @@ test('R220 practice NONE position displays the OPGG primary lane without fallbac
 });
 
 test('R220 external capability diagnostics hide Tencent SGP and ARAMKit entry quietly',()=>{
- const state={status:{clientRegion:'jp1'},lastCapabilities:[{name:'match-details',state:'failed',path:'sgp: /match',detail:'腾讯 SGP失败'},{name:'match-history',state:'available',path:'riot: /match',attempts:[{source:'riot',outcome:'success'},{source:'sgp',outcome:'disabled'}]}]},nodes={gameplaySettingsStatus:{innerHTML:''}};
+ const state={controllers:new Map(),status:{clientRegion:'jp1'},lastCapabilities:[{name:'match-details',state:'failed',path:'sgp: /match',detail:'腾讯 SGP失败'},{name:'match-history',state:'available',path:'riot: /match',attempts:[{source:'riot',outcome:'success'},{source:'sgp',outcome:'disabled'}]}]},nodes={gameplaySettingsStatus:{innerHTML:''}};
  const f=compile(gameplay,['renderCapabilitySettings','capabilityAttemptSummary','renderRankMMRPopover'],{state,nodes,escapeHTML,number:String,riotTab:t=>t.region==='jp1'});f.renderCapabilitySettings();assert.match(nodes.gameplaySettingsStatus.innerHTML,/Riot API/);assert.doesNotMatch(nodes.gameplaySettingsStatus.innerHTML,/SGP|腾讯/);assert.equal(f.renderRankMMRPopover({region:'jp1'}),'');
 });
 

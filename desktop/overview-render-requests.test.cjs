@@ -167,7 +167,7 @@ test("客户端退出后清空本人总览，国服空分组显示启动入口",
     const response = await previousFetch(input, init);
     if (url.split("?")[0] !== "/api/status") return response;
     const status = await response.json();
-    return new w.Response(JSON.stringify({ ...status, connected: false, identityReady: false, snapshotReady: false, clientDiscovery: "process-not-found" }));
+    return new w.Response(JSON.stringify({ ...status, clientView:{type:"client-view",state:"no-client",generation:status.clientView.generation+1}, connected: false, identityReady: false, snapshotReady: false, clientDiscovery: "process-not-found" }));
   };
   eventSources.at(-1).onmessage({ data: "resync-required" });
   await settled();
