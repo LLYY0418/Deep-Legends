@@ -76,6 +76,9 @@ var (
 )
 
 type championProvider struct {
+	// Set before use; zero keeps the production translation budget.
+	lootTranslationTimeout time.Duration
+
 	lootTranslationsMu    sync.Mutex
 	lootTranslations      map[string]lootMetadata
 	imageCache            *championDataCache

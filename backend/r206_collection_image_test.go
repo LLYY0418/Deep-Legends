@@ -116,6 +116,11 @@ func TestR206TranslationsTimeoutUsesPreviousCache(t *testing.T) {
 
 func TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds(t *testing.T) {
 	t.Parallel()
+	const injectedTimeout = 300 * time.Millisecond
+	translationStarted := make(chan time.Time, 1)
+	translationDone := make(chan time.Time, 1)
+	deadlineRemaining := make(chan time.Duration, 1)
+	abort := make(chan struct{})
 	type catalogEntry struct {
 		ID         int64  `json:"id"`
 		Name       string `json:"name"`
@@ -174,11 +179,25 @@ func TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds(t *testing
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	pool := PoolManifest{ID: "test", Names: []string{targetName}, Entries: []PoolEntry{{ID: targetID, Name: targetName}}, Hash: "test-hash"}
 	provider := newChampionProvider()
+	provider.lootTranslationTimeout = injectedTimeout
 	provider.lootTranslations = map[string]lootMetadata{"CHEST_FIXTURE": {Name: "缓存名称"}}
 	provider.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
 		if strings.HasSuffix(r.URL.Path, "trans.json") {
-			<-r.Context().Done()
-			return nil, r.Context().Err()
+			arrived := time.Now()
+			translationStarted <- arrived
+			deadline, ok := r.Context().Deadline()
+			if !ok {
+				deadlineRemaining <- 0
+			} else {
+				deadlineRemaining <- deadline.Sub(arrived)
+			}
+			select {
+			case <-r.Context().Done():
+				translationDone <- time.Now()
+				return nil, r.Context().Err()
+			case <-abort:
+				return nil, context.Canceled
+			}
 		}
 		return updateResponse(404, []byte(`{}`)), nil
 	})}
@@ -191,11 +210,48 @@ func TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds(t *testing
 		pools:             map[string]PoolManifest{pool.ID: pool},
 		eventSubscribers:  make(map[chan string]struct{}),
 	}
-	if alive := a.refreshWithClient(client); !alive {
-		t.Fatal("successful fixture was treated as a dead client")
+	completed := make(chan bool, 1)
+	go func() { completed <- a.refreshWithClient(client) }()
+	select {
+	case alive := <-completed:
+		if !alive {
+			t.Fatal("successful fixture was treated as a dead client")
+		}
+	case <-time.After(8 * time.Second):
+		close(abort)
+		select {
+		case <-completed:
+		case <-time.After(time.Second):
+		}
+		t.Fatal("translation refresh exceeded eight-second watchdog")
 	}
-	if elapsed := time.Since(started); elapsed > 3*time.Second {
+	finished := time.Now()
+	select {
+	case arrived := <-translationStarted:
+		select {
+		case expired := <-translationDone:
+			remaining := <-deadlineRemaining
+			// The translation timeout includes the local catalog attempt before
+			// this public fallback. Its deadline minus the injected duration is
+			// the start of that exact timeout window; keep the fallback wait
+			// separately measured so it is not overstated as a full 300ms.
+			timeoutStarted := arrived.Add(remaining - injectedTimeout)
+			if expired.Sub(timeoutStarted) < injectedTimeout || remaining <= 0 || expired.Sub(arrived) < remaining {
+				t.Fatalf("translation did not really wait for injected timeout: window=%s fallback=%s remaining=%s injected=%s", expired.Sub(timeoutStarted), expired.Sub(arrived), remaining, injectedTimeout)
+			}
+			t.Logf("R259_PHASE {\"test\":\"R206\",\"before_ms\":%.3f,\"wait_ms\":%.3f,\"after_ms\":%.3f,\"total_ms\":%.3f,\"deadline_remaining_ms\":%.3f}", float64(arrived.Sub(started))/float64(time.Millisecond), float64(expired.Sub(arrived))/float64(time.Millisecond), float64(finished.Sub(expired))/float64(time.Millisecond), float64(finished.Sub(started))/float64(time.Millisecond), float64(remaining)/float64(time.Millisecond))
+		default:
+			t.Fatal("translation context did not expire")
+		}
+	default:
+		t.Fatal("translation fixture did not receive request")
+	}
+	if elapsed := finished.Sub(started); elapsed >= 3*time.Second {
 		t.Fatalf("full refresh blocked %s", elapsed)
+	}
+	// Catch an ignored injection even on an otherwise fast machine.
+	if elapsed := finished.Sub(started); elapsed >= 1500*time.Millisecond {
+		t.Fatalf("short translation timeout ignored: full refresh blocked %s", elapsed)
 	}
 	if provider.lootTranslations["CHEST_FIXTURE"].Name != "缓存名称" {
 		t.Fatal("previous translation cache lost")
@@ -204,6 +260,33 @@ func TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds(t *testing
 	defer a.mu.RUnlock()
 	if !a.snapshotReady || a.collectionDirty || !a.collectionDirtyAt.IsZero() {
 		t.Fatalf("successful refresh state: ready=%v dirty=%v dirtyAt=%v error=%q", a.snapshotReady, a.collectionDirty, a.collectionDirtyAt, a.lastError)
+	}
+}
+
+func TestR206TranslationDefaultTimeoutStaysUnderThreeSeconds(t *testing.T) {
+	t.Parallel()
+	type deadlineObservation struct {
+		present   bool
+		remaining time.Duration
+	}
+	observed := make(chan deadlineObservation, 1)
+	provider := newChampionProvider()
+	provider.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
+		if strings.HasSuffix(r.URL.Path, "trans.json") {
+			deadline, ok := r.Context().Deadline()
+			observed <- deadlineObservation{ok, time.Until(deadline)}
+			return nil, context.DeadlineExceeded
+		}
+		return updateResponse(404, []byte(`{}`)), nil
+	})}
+	loadLootMetadata(context.Background(), nil, provider, nil)
+	select {
+	case got := <-observed:
+		if !got.present || got.remaining < 2500*time.Millisecond || got.remaining > 2800*time.Millisecond || got.remaining >= 3*time.Second {
+			t.Fatalf("production translation deadline changed: present=%v remaining=%s", got.present, got.remaining)
+		}
+	default:
+		t.Fatal("translation fixture did not receive default request")
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -337,12 +338,18 @@ func TestR104SeedTotalBudgetIsBoundedRegardlessOfAccountCount(t *testing.T) {
 }
 func TestR102SeedOneAccountFailureDoesNotBlockOthers(t *testing.T) {
 	seed := r102FixtureSeed(3)
-	timedOut := false
+	var timedOut atomic.Bool
+	abort := make(chan struct{})
+	started := time.Now()
 	p := r99SeedProvider(t, t.TempDir(), func(r *http.Request) (*http.Response, error) {
 		if strings.Contains(r.URL.Path, "/by-riot-id/fixture1/") {
-			<-r.Context().Done()
-			timedOut = true
-			return nil, r.Context().Err()
+			select {
+			case <-r.Context().Done():
+				timedOut.Store(true)
+				return nil, r.Context().Err()
+			case <-abort:
+				return nil, context.Canceled
+			}
 		}
 		if strings.Contains(r.URL.Path, "/league/") {
 			return r99Response(r101SoloEntries), nil
@@ -352,18 +359,46 @@ func TestR102SeedOneAccountFailureDoesNotBlockOthers(t *testing.T) {
 		}
 		return r102AccountResponse(r), nil
 	})
+	accountIndex := 0
 	a := &app{riot: p, proSeedTimeout: func(ctx context.Context, budget time.Duration) (context.Context, context.CancelFunc) {
 		if budget != 4*time.Second {
 			t.Fatalf("account timeout changed: %v", budget)
 		}
-		return context.WithTimeout(ctx, 200*time.Millisecond)
+		index := accountIndex
+		accountIndex++
+		accountStart := time.Now()
+		accountCtx, cancel := context.WithTimeout(ctx, time.Second)
+		return accountCtx, func() {
+			ended := time.Now()
+			errText := "none"
+			if err := accountCtx.Err(); err != nil {
+				errText = err.Error()
+			}
+			t.Logf("R259_ACCOUNT {\"account\":%d,\"start_ms\":%.3f,\"end_ms\":%.3f,\"duration_ms\":%.3f,\"context_error\":%q}", index, float64(accountStart.Sub(started))/float64(time.Millisecond), float64(ended.Sub(started))/float64(time.Millisecond), float64(ended.Sub(accountStart))/float64(time.Millisecond), errText)
+			cancel()
+		}
 	}}
-	rows := a.loadProSeedAccounts(context.Background(), nil, []proSeedAccount{seed})
+	completed := make(chan []opggProTeam, 1)
+	go func() {
+		defer close(completed)
+		completed <- a.loadProSeedAccounts(context.Background(), nil, []proSeedAccount{seed})
+	}()
+	var rows []opggProTeam
+	select {
+	case rows = <-completed:
+	case <-time.After(8 * time.Second):
+		close(abort)
+		select {
+		case <-completed:
+		case <-time.After(time.Second):
+		}
+		t.Fatal("seed accounts exceeded eight-second watchdog")
+	}
 	if len(rows) != 1 || len(rows[0].Members[0].Summoners) != 3 {
 		t.Fatal("failed account discarded", rows)
 	}
 	accounts := rows[0].Members[0].Summoners
-	if !timedOut || accounts[0].PUUID != "id-fixture0" || accounts[2].PUUID != "id-fixture2" || len(accounts[0].Rank) == 0 || len(accounts[2].Rank) == 0 || accounts[1].LastMatchAtKnown {
+	if !timedOut.Load() || accounts[0].PUUID != "id-fixture0" || accounts[2].PUUID != "id-fixture2" || len(accounts[0].Rank) == 0 || len(accounts[2].Rank) == 0 || accounts[1].LastMatchAtKnown {
 		t.Fatalf("account failure contaminated others: %+v", accounts)
 	}
 }

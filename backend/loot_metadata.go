@@ -46,7 +46,11 @@ func loadLootMetadata(ctx context.Context, client *LCUClient, provider *champion
 			catalogCtx := ctx
 			if catalog.name == "translations" {
 				var cancel context.CancelFunc
-				catalogCtx, cancel = context.WithTimeout(ctx, 2800*time.Millisecond)
+				timeout := 2800 * time.Millisecond
+				if provider != nil && provider.lootTranslationTimeout > 0 {
+					timeout = provider.lootTranslationTimeout
+				}
+				catalogCtx, cancel = context.WithTimeout(ctx, timeout)
 				defer cancel()
 				defer func() {
 					if provider == nil {
