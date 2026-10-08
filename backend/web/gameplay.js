@@ -3841,9 +3841,10 @@
       const popup=bindMatchTagsPopover(collection);
       const fit=()=>{
         if(typeof collection.checkVisibility==="function" && !collection.checkVisibility({contentVisibilityAuto:true}))return;
+        // Hidden or unchanged rows need no descendant scan or layout work.
+        const width=collection.clientWidth;if(!width || collection._tagFitWidth===width)return;
         const items=[...collection.querySelectorAll("[data-match-tag]")],more=collection.querySelector("[data-match-tags-more]");
         if(!more)return;
-        const width=collection.clientWidth;if(!width || collection._tagFitWidth===width)return;
         collection._tagFitWidth=width;
         if(popup.anchor===more)popup.close();
         for(const item of items)item.hidden=false;more.hidden=true;
