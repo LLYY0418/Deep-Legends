@@ -3,7 +3,7 @@
 // R222: use Node's real file workers, retaining every assertion while recording
 // file wall times (including startup) and enforcing the worklist's time budgets.
 const { run } = require("node:test");
-const fs = require("node:fs"), path = require("node:path"), os = require("node:os");
+const fs = require("node:fs"), path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const scope = process.argv[2] || "all";
 if (!["all", "desktop"].includes(scope)) throw new Error("scope must be all or desktop");
@@ -12,7 +12,9 @@ const files = directories.flatMap(directory => fs.readdirSync(path.join(root, di
   .filter(name => name.endsWith(".test.cjs")).sort().map(name => path.join(root, directory, name)));
 const fileNames = new Set(files);
 const timings = [];
-const concurrency = Math.min(4, Math.max(2, os.availableParallelism()));
+// Full coverage includes both DOM work and asynchronous fixture waits. Five
+// bounded workers let those waits overlap; the desktop-only scope keeps four.
+const concurrency = scope === "all" ? 5 : 4;
 // One bounded worker pool consumes all discovered files, longest first. The
 // previous reserved serial lane became the 203s bottleneck on Linux. Measured
 // costs only order execution; they never omit tests or change either budget.

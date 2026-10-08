@@ -48,17 +48,13 @@ jobs:
       - name: Test with race detector
         run: go test -count=1 -race ./...
       - name: Validate frontend JavaScript
-        # Collect independent evidence after a failure; failed steps still fail the job.
-        if: ${{ !cancelled() }}
         run: |
           node --check backend/web/app.js
           node --check backend/web/suite.js
           node --check desktop/main.cjs
       - name: Install desktop test dependencies
-        if: ${{ !cancelled() }}
         run: npm ci --prefix desktop
       - name: Test frontend and desktop renderers
-        if: ${{ !cancelled() }}
         env:
           R222_NODE_TIMING_OUTPUT: ${{ runner.temp }}/renderer-timings-linux.json
         run: node scripts/test-renderers.cjs all
@@ -68,15 +64,12 @@ jobs:
           name: renderer-timings-linux
           path: ${{ runner.temp }}/renderer-timings-linux.json
       - name: Enforce R252 renderer budget margin
-        if: ${{ !cancelled() }}
         run: python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["success"] and r["scope"]=="all" and r["platform"]=="linux"; assert r["summary"]["duration_ms"]<=192000, r["summary"]; print("R252 renderer margin >=20%", r["summary"]["duration_ms"])' "$RUNNER_TEMP/renderer-timings-linux.json"
       - name: Test Riot relay Worker
-        if: ${{ !cancelled() }}
         run: node --test relay/riot-worker/*.test.mjs
       # P1-2：这两个脚本以前从不在任何流程里执行，护栏失效了半年没人发现。
       # 找不到浏览器时直接失败，不允许静默跳过。
       - name: Real Chromium image-queue and lazy-CSS guards
-        if: ${{ !cancelled() }}
         run: |
           chrome="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
           test -n "$chrome" || { echo "no Chrome/Chromium binary on the runner; browser guards must not silently skip" >&2; exit 1; }
@@ -92,11 +85,9 @@ jobs:
             ${{ runner.temp }}/r117-browser/**
           if-no-files-found: warn
       - name: Test installer module
-        if: ${{ !cancelled() }}
         working-directory: installer
         run: go test ./...
       - name: Vet installer module
-        if: ${{ !cancelled() }}
         working-directory: installer
         run: go vet ./...
 
