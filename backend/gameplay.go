@@ -224,6 +224,7 @@ type participantCompletenessSummary struct {
 }
 
 type gameplayOverview struct {
+	SeasonStart         time.Time                `json:"seasonStart"`
 	HistoryGeneration   uint64                   `json:"historyGeneration,omitempty"`
 	ExpectedGamePresent *bool                    `json:"expectedGamePresent,omitempty"`
 	LatestAllGameID     string                   `json:"latestAllGameId,omitempty"`
@@ -739,7 +740,14 @@ type lcuTeam struct {
 }
 
 func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
-	a.scheduleItemIconWarmup(true)
+	a.mu.RLock()
+	warmClient := a.lcu
+	a.mu.RUnlock()
+	a.goSafe("overview-icon-warm", func() {
+		if a.waitConnectionPriority(a.licenseBusinessContext(), warmClient) {
+			a.scheduleItemIconWarmup(true)
+		}
+	})
 	loadStarted := time.Now()
 	request := gameplayOverviewRequest{Count: defaultMatchCount}
 	stream := false
@@ -1477,6 +1485,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 			defer close(rankCh)
 
 			started := time.Now()
+			if isCurrent && isTencentClient(client) {
+				a.waitConnectionPriority(ctx, client)
+			}
 			var value rankScoreEntry
 			if isCurrent && clientRiotPlatform(client) != "" {
 				ranks, milestones, capability, _ := a.loadGameplayRanksContext(ctx, client, playerRef, true)
@@ -1537,7 +1548,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 
 			started := time.Now()
 			value := recentRankedSampleSet{ByQueue: map[int64][]gameplayMatch{}}
-			if isCurrent && clientRiotPlatform(client) != "" {
+			if isCurrent {
 				<-detailsReady
 				for _, match := range matches {
 					if match.QueueID == 420 || match.QueueID == 440 {
@@ -1554,7 +1565,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	var historyCapabilities []EndpointCapability
 	var pagination gameplayPagination
 	var historyGeneration uint64
-	if isCurrent && clientRiotPlatform(client) != "" && begIndex == 0 && normalizeGameplayMatchFilter(matchFilter) == "all" {
+	if isCurrent && begIndex == 0 && normalizeGameplayMatchFilter(matchFilter) == "all" {
 		matches, historyCapabilities, pagination, historyGeneration = a.loadCurrentHistoryFast(ctx, client, reference, playerRef, count, names, queueLabels)
 	} else {
 		matches, historyCapabilities, pagination = a.loadDetailedMatches(ctx, client, reference, playerRef, isCurrent, begIndex, count, matchFilter, names, queueLabels)
@@ -1580,6 +1591,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		partial := gameplayOverview{Player: playerData, Matches: cloneClientHistoryMatches(matches), Capabilities: append([]EndpointCapability(nil), capabilities...), Pagination: pagination, HistoryGeneration: historyGeneration}
 		a.publicizeOverviewReferences(&partial)
 		progress(partial)
+	}
+	if isCurrent && begIndex == 0 {
+		a.startOverviewRankedSupplement(client, reference, playerRef, matches, names, queueLabels)
 	}
 	select {
 	case background, ok := <-backgroundCh:
@@ -1685,7 +1699,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	windowExhausted := false
 	remoteServer := isRemoteTencentServer(client, reference.ServerID)
 	shouldLoadWindow := false
-	if shouldLoadOverviewHistory(reference, playerRef, matches) {
+	if !isCurrent && shouldLoadOverviewHistory(reference, playerRef, matches) {
 		shouldLoadWindow = true
 	}
 	if a.sgp != nil && shouldLoadWindow && !isRiotRegion(reference.Region) {
@@ -1770,7 +1784,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	}
 	// The detached self-history flight owns this request. A pending or empty
 	// self page must not trigger a second synchronous cold LCU history read.
-	if !windowAvailable && !remoteServer && !(isCurrent && clientRiotPlatform(client) != "") {
+	if !windowAvailable && !remoteServer && !isCurrent {
 		windowGames, windowCapabilities, _ := loadGameplayHistoryContext(ctx, client, playerRef, isCurrent, 0, maximumSummaryMatchCount, false)
 		windowAvailable = len(windowCapabilities) > 0 && windowCapabilities[0].State == capabilityAvailable
 		if len(windowCapabilities) > 0 {
@@ -2609,6 +2623,9 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 			}
 			attempts = append(attempts, attempt)
 			matches := make([]gameplayMatch, 0, len(infos))
+			if begIndex == 0 && len(infos) > 0 && infos[0] != nil && sgpPageDecodeFailures(ctx) == 0 {
+				recordOverviewHistoryHead(ctx, infos[0].GameID)
+			}
 			participantSummary := summarizeRiotParticipants(infos)
 			filterSummary := summarizeRiotGameplayFilters(infos)
 			for _, info := range infos {
@@ -2623,6 +2640,9 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 				}
 			}
 			a.recordRiotPerkDiagnostics("sgp", infos, playerRef, 0)
+			if isCurrent && begIndex == 0 {
+				a.observeOverviewSource("sgp")
+			}
 			detailState := capabilityAvailable
 			detailText := "通过官方 SGP 网关读取完整对局数据"
 			if participantSummary.Incomplete > 0 {
@@ -2715,6 +2735,10 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 		filterResolution.FallbackReason = "SGP 服务端筛选不可用，已使用客户端筛选"
 	}
 	rawGames, capabilities, total := loadGameplayHistoryContext(ctx, client, playerRef, isCurrent, begIndex, count, true)
+	if begIndex == 0 && len(rawGames) > 0 {
+		recordOverviewHistoryHead(ctx, rawGames[0].GameID)
+	}
+
 	lcuAttempt := DataSourceAttempt{Source: dataSourceLCU, Outcome: dataSourceModeUnsupported, Message: "客户端未返回兼容的战绩列表"}
 	lcuCanceled := false
 	for index := range capabilities {
@@ -2723,6 +2747,9 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 		}
 		switch capabilities[index].State {
 		case capabilityAvailable:
+			if isCurrent && begIndex == 0 {
+				a.observeOverviewSource("lcu")
+			}
 			lcuAttempt.Outcome, lcuAttempt.Message = dataSourceSuccess, ""
 		case capabilityFailed:
 			lcuAttempt.Outcome, lcuAttempt.Message = dataSourceFailed, capabilities[index].Detail
@@ -3157,6 +3184,7 @@ func (a *app) clearGameplayReferences() {
 }
 
 func (a *app) publicizeOverviewReferences(response *gameplayOverview) {
+	response.SeasonStart = seasonStartS26
 	playerReference := mergeGameplayReferences(response.Player.reference, gameplayReference{PlayerRef: response.Player.PlayerRef, DisplayName: response.Player.DisplayName, GameName: response.Player.GameName, TagLine: response.Player.TagLine, ProfileIconID: response.Player.ProfileIconID, SummonerLevel: response.Player.SummonerLevel, Region: response.Player.Region, ServerID: response.Player.ServerID})
 	index := a.proIdentitySnapshot()
 	response.Player.ProPlayer = a.matchProIdentity(index, "overview", playerReference)
@@ -3709,6 +3737,13 @@ func loadGameplayHistoryContext(ctx context.Context, client *LCUClient, playerRe
 	if len(games) > count {
 		games = games[:count]
 	}
+	store, scope := client.historyGameStore()
+	for i := range games {
+		store.putLCU(scope, games[i])
+		if cached, ok := store.lcu(scope, games[i].GameID, true); ok {
+			games[i] = cached
+		}
+	}
 	total := payload.Games.GameCount
 	if total <= begIndex+len(games) {
 		total = 0
@@ -3745,8 +3780,8 @@ func loadGameplayHistoryContext(ctx context.Context, client *LCUClient, playerRe
 				return
 			}
 			defer func() { <-semaphore }()
-			var detail lcuGame
-			if err := client.GetJSONContext(ctx, fmt.Sprintf("/lol-match-history/v1/games/%d", games[index].GameID), &detail); err != nil {
+			detail, err := client.cachedHistoryDetail(ctx, games[index].GameID)
+			if err != nil {
 				return
 			}
 			games[index] = detail
@@ -10099,7 +10134,7 @@ type gameplayPerkCatalogCacheEntry struct {
 func (a *app) handleGameplayPerks(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
 	client, _, clientErr := a.gameplayClient()
-	cacheKey := "lcu"
+	cacheKey, _ := clientCatalogKey(client)
 	if clientErr != nil {
 		client = nil
 		cacheKey = "ddragon"
@@ -10140,6 +10175,10 @@ func (a *app) handleGameplayAugments(w http.ResponseWriter, r *http.Request) {
 	}{Augments: augments})
 }
 
+type gameplayPerkCatalogFallback struct{ payload gameplayPerkCatalogResponse }
+
+func (e *gameplayPerkCatalogFallback) Error() string { return "catalog fallback bypasses client cache" }
+
 func (a *app) cachedGameplayPerkCatalog(ctx context.Context, key string, loader func() (gameplayPerkCatalogResponse, error)) (gameplayPerkCatalogResponse, error) {
 	a.perkCatalogMu.Lock()
 	if entry, ok := a.perkCatalog[key]; ok && time.Since(entry.loadedAt) < gameplayPerkCatalogTTL {
@@ -10151,13 +10190,20 @@ func (a *app) cachedGameplayPerkCatalog(ctx context.Context, key string, loader 
 	}
 	cache := a.perkCatalogDisk
 	a.perkCatalogMu.Unlock()
-	data, err := cache.load(ctx, "normalized-perks-v2|"+key, gameplayPerkCatalogTTL, 24*time.Hour, true, func(context.Context) ([]byte, error) {
+	var fallback *gameplayPerkCatalogFallback
+	data, err := cache.load(ctx, "normalized-perks-v2|"+key, gameplayPerkCatalogTTL, 24*time.Hour, !strings.HasPrefix(key, "lcu-unversioned:"), func(context.Context) ([]byte, error) {
 		payload, err := loader()
 		if err != nil {
 			return nil, err
 		}
+		if strings.HasPrefix(key, "lcu-versioned|") && payload.source == "ddragon" {
+			return nil, &gameplayPerkCatalogFallback{payload: payload}
+		}
 		return json.Marshal(payload)
 	})
+	if errors.As(err, &fallback) {
+		return fallback.payload, nil
+	}
 	if err != nil {
 		return gameplayPerkCatalogResponse{}, err
 	}
@@ -10166,6 +10212,9 @@ func (a *app) cachedGameplayPerkCatalog(ctx context.Context, key string, loader 
 		return payload, err
 	}
 	payload.source = key
+	if strings.HasPrefix(key, "lcu-") {
+		payload.source = "lcu"
+	}
 	a.perkCatalogMu.Lock()
 	defer a.perkCatalogMu.Unlock()
 	if a.perkCatalog == nil {
@@ -10174,6 +10223,15 @@ func (a *app) cachedGameplayPerkCatalog(ctx context.Context, key string, loader 
 	// Do not overwrite enrichment already published by an overlapping request.
 	if entry, ok := a.perkCatalog[key]; ok && time.Since(entry.loadedAt) < gameplayPerkCatalogTTL {
 		return entry.payload, nil
+	}
+	if len(a.perkCatalog) >= 8 {
+		oldest := ""
+		for candidate, entry := range a.perkCatalog {
+			if oldest == "" || entry.loadedAt.Before(a.perkCatalog[oldest].loadedAt) {
+				oldest = candidate
+			}
+		}
+		delete(a.perkCatalog, oldest)
 	}
 	a.perkCatalog[key] = gameplayPerkCatalogCacheEntry{loadedAt: time.Now(), payload: payload}
 	return payload, nil
@@ -10202,7 +10260,7 @@ func (a *app) loadGameplayPerkCatalog(ctx context.Context, client *LCUClient) (g
 		})
 		return gameplayPerkCatalogResponse{source: "ddragon", Styles: styles, StatModSlots: statModSlots, Perks: perks}, nil
 	}
-	styleData, styleErr := client.GetBytesContext(ctx, "/lol-game-data/assets/v1/perkstyles.json")
+	styleData, styleErr := a.clientCatalogBytes(ctx, client, "/lol-game-data/assets/v1/perkstyles.json")
 	var styles []gameplayPerkStyle
 	if styleErr == nil {
 		styles, styleErr = parseGameplayPerkStyles(styleData)
@@ -10219,7 +10277,7 @@ func (a *app) loadGameplayPerkCatalog(ctx context.Context, client *LCUClient) (g
 		})
 	}
 	var perks []gameplayPerk
-	perkErr := client.GetJSON("/lol-game-data/assets/v1/perks.json", &perks)
+	perkErr := a.clientCatalogJSON(ctx, client, "/lol-game-data/assets/v1/perks.json", &perks)
 	if perkErr != nil {
 		a.recordDiagnostic(map[string]any{
 			"event": "perk_catalog_failed", "source": "lcu", "catalog": "perks.json", "reason": safeDiagnosticReason(perkErr),
@@ -10467,7 +10525,7 @@ func (a *app) handleGameplayItems(w http.ResponseWriter, r *http.Request) {
 		PriceTotal       int64  `json:"priceTotal"`
 	}
 	catalogStarted := time.Now()
-	catalogErr := client.GetJSONContext(r.Context(), "/lol-game-data/assets/v1/items.json", &raw)
+	catalogErr := a.clientCatalogJSON(r.Context(), client, "/lol-game-data/assets/v1/items.json", &raw)
 	a.reportCatalogLoad("items", "lcu", len(raw), catalogStarted, catalogErr)
 	if catalogErr != nil || len(raw) == 0 {
 		items, fallbackErr := a.fallbackGameplayItems(r.Context())
@@ -10525,7 +10583,7 @@ func (a *app) handleGameplaySummonerSpells(w http.ResponseWriter, r *http.Reques
 		ImagePath   string `json:"imagePath"`
 	}
 	catalogStarted := time.Now()
-	catalogErr := client.GetJSONContext(r.Context(), "/lol-game-data/assets/v1/summoner-spells.json", &raw)
+	catalogErr := a.clientCatalogJSON(r.Context(), client, "/lol-game-data/assets/v1/summoner-spells.json", &raw)
 	a.reportCatalogLoad("summoner-spells", "lcu", len(raw), catalogStarted, catalogErr)
 	if catalogErr != nil || len(raw) == 0 {
 		spells, fallbackErr := a.fallbackGameplaySummonerSpells(r.Context())

@@ -211,14 +211,49 @@ func (a *app) waitForDiscovery(ctx context.Context, delay time.Duration) bool {
 func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error {
 	sessionCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	a.beginConnectionPriority(sessionCtx, client)
 	a.goSafe("connection_manager.platform", func() { a.recordDiagnostic(clientPlatformDiagnostic(client)) })
-	a.goSafe("connection_manager.settings-watch", func() { a.beginGameSettingsWatch(sessionCtx, client) })
+	a.scheduleConnectionWork(sessionCtx, client, "connection_manager.settings-watch", false, func() { a.beginGameSettingsWatch(sessionCtx, client) })
+	a.scheduleConnectionWork(sessionCtx, client, "connection_manager.catalog-version", false, func() { a.warmClientCatalogVersion(sessionCtx, client) })
 	requestDiagnosticTicker := time.NewTicker(30 * time.Second)
 	defer requestDiagnosticTicker.Stop()
 	a.goSafe("connection_manager.runConnectedSession.1", func() { client.runRequestDiagnosticFlush(sessionCtx, requestDiagnosticTicker.C) })
 	defer a.stopMayhemSamplerForClient("connection-ended", client)
-	champSelectPoll := time.NewTicker(time.Second)
-	defer champSelectPoll.Stop()
+	phaseChanges, unsubscribePhase := a.subscribeGameplayPhase(client)
+	defer unsubscribePhase()
+	champSelectPoll := &champSelectPolling{}
+	defer champSelectPoll.stop()
+	var startupIdleTimer *time.Timer
+	var startupIdleTick <-chan time.Time
+	defer func() {
+		if startupIdleTimer != nil {
+			startupIdleTimer.Stop()
+		}
+	}()
+	syncPhaseTimers := func() {
+		champSelectPoll.sync(a, client)
+		if startupIdleTimer != nil {
+			startupIdleTimer.Stop()
+			startupIdleTimer = nil
+			startupIdleTick = nil
+		}
+		if a.clientShutdownPending(client) {
+			return
+		}
+		a.maybeStartupPrefetch(client, time.Now())
+		a.mu.RLock()
+		at := a.startupIdleAt
+		done := a.startupPrefetchDone && (a.startupConnectionsWarmed || a.champions == nil)
+		a.mu.RUnlock()
+		if !at.IsZero() && !done {
+			delay := time.Until(at.Add(10 * time.Second))
+			if delay > 0 {
+				startupIdleTimer = time.NewTimer(delay)
+				startupIdleTick = startupIdleTimer.C
+			}
+		}
+	}
+	syncPhaseTimers()
 	eventTriggers := make(chan string, 4)
 	champSelectTriggers := make(chan struct{}, 8)
 	friendTriggers := make(chan struct{}, 1)
@@ -229,7 +264,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 	defer func() {
 		a.recordDiagnostic(map[string]any{"event": "champselect_delivery", "reason": "connection-ended", "events": champEvents.Load(), "ui_coalesced": champCoalesced.Load()})
 	}()
-	a.goSafe("connection_manager.runConnectedSession.2", func() { a.collectObjectiveDiagnostics(sessionCtx, client, "connected") })
+	a.scheduleConnectionWork(sessionCtx, client, "connection_manager.objective", true, func() { a.collectObjectiveDiagnostics(sessionCtx, client, "connected") })
 	startEvents := func() {
 		a.goSafe("connection_manager.runConnectedSession.3", func() {
 			err := client.ListenEvents(sessionCtx, func() {
@@ -239,8 +274,16 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 				default:
 				}
 				a.goSafe("connection_manager.runConnectedSession.4", func() { a.primeGameplayState(sessionCtx, client) })
-				a.goSafe("connection_manager.runConnectedSession.5", func() { a.primeWatchState(client) })
+				a.scheduleConnectionWork(sessionCtx, client, "connection_manager.watch", false, func() { a.primeWatchState(client) })
+				a.warmSGPTokens(sessionCtx, client)
 			}, func(event LCUEvent) {
+				a.mu.RLock()
+				currentTokenClient := a.lcu == client && a.connected && a.shutdownClient != client
+				a.mu.RUnlock()
+				if currentTokenClient {
+					a.sgp.observeTokenEvent(client, event)
+					a.observeClientCatalogVersion(client, event)
+				}
 				a.observeClientShutdownEvent(client, event, time.Now())
 				client.rememberAcceptFocusEvent(event)
 				recordObjectiveEvent(event)
@@ -368,11 +411,17 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-champSelectPoll.C:
-			if a.clientShutdownPending(client) {
+		case <-phaseChanges:
+			syncPhaseTimers()
+		case <-startupIdleTick:
+			startupIdleTick = nil
+			if !a.clientShutdownPending(client) {
+				a.maybeStartupPrefetch(client, time.Now())
+			}
+		case <-champSelectPoll.ticks:
+			if !champSelectPoll.sync(a, client) {
 				continue
 			}
-			a.maybeStartupPrefetch(client, time.Now())
 			if watch := a.activeWatch(); watch != nil {
 				watch.handleChampSelectAutomation(client)
 			}
@@ -514,7 +563,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 				a.recordDiagnostic(oversizeEvent)
 			}
 			a.recordDiagnostic(droppedEvent)
-			if err := client.probe(); err != nil {
+			if err := a.probeAfterEventStreamClose(sessionCtx, client); err != nil {
 				return err
 			}
 			a.recordDiagnostic(map[string]any{"event": "lcu_event_stream", "result": "retrying"})
@@ -536,6 +585,23 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 			startEvents()
 		}
 	}
+}
+
+// A shutdown signal needs no HTTP round trip. A WS-only loss gets a bounded
+// health probe, then retains the existing five-second event reconnect interval.
+func (a *app) probeAfterEventStreamClose(ctx context.Context, client *LCUClient) error {
+	if a.clientShutdownPending(client) {
+		a.disconnectClient(client, "客户端正在退出")
+		return errors.New("LCU shutting down")
+	}
+	if err := client.probeContext(ctx, discoveryProbeTimeout); err != nil {
+		a.mu.Lock()
+		a.beginClientCloseLocked(client, time.Now())
+		a.mu.Unlock()
+		a.disconnectClient(client, "客户端事件流断开")
+		return err
+	}
+	return nil
 }
 
 func eventStreamDropDiagnostics(err error) (map[string]any, map[string]any) {
@@ -809,7 +875,7 @@ func (a *app) maybeStartupPrefetch(client *LCUClient, now time.Time) bool {
 	a.gameplayFlow.mu.Unlock()
 	idle := phaseClient == client && (phase == "None" || phase == "Lobby" || phase == "Matchmaking" || phase == "ReadyCheck")
 	a.mu.Lock()
-	if a.lcu != client || !a.connected || !a.identityReady || !idle {
+	if a.lcu != client || !a.connected || a.shutdownClient == client || !a.identityReady || !idle {
 		a.startupIdleAt = time.Time{}
 		a.mu.Unlock()
 		return false
@@ -822,7 +888,9 @@ func (a *app) maybeStartupPrefetch(client *LCUClient, now time.Time) bool {
 		a.startupConnectionsWarmed = true
 	}
 	ready := !a.startupPrefetchDone && !a.collectionRequested && !a.snapshotReady && now.Sub(a.startupIdleAt) >= 10*time.Second
-	if ready {
+	// Existing collection work owns its retry lifecycle. The idle prefetch must
+	// not wait for it or schedule a second collection request after it finishes.
+	if now.Sub(a.startupIdleAt) >= 10*time.Second && (ready || a.collectionRequested || a.snapshotReady) {
 		a.startupPrefetchDone = true
 	}
 	a.mu.Unlock()
@@ -877,7 +945,7 @@ func (a *app) setSnapshotPhase(client *LCUClient) {
 		a.connectionState = "connecting"
 	}
 	a.mu.Unlock()
-	a.broadcastEvent("connection-state")
+	a.publishClientView()
 }
 
 func (a *app) setConnectionPhase(phase string, eventStream bool) {
@@ -885,7 +953,7 @@ func (a *app) setConnectionPhase(phase string, eventStream bool) {
 	a.connectionState = phase
 	a.eventStream = eventStream
 	a.mu.Unlock()
-	a.broadcastEvent("connection-state")
+	a.publishClientView()
 }
 
 func (a *app) setEventStream(client *LCUClient, connected bool) {
@@ -894,49 +962,56 @@ func (a *app) setEventStream(client *LCUClient, connected bool) {
 		a.eventStream = connected
 	}
 	a.mu.Unlock()
-	a.broadcastEvent("connection-state")
+	a.publishClientView()
+	a.signalGameplayPhase(client)
 }
 
 func (a *app) markDisconnected(message string) {
 	a.mu.Lock()
 	oldClient := a.lcu
+	playerRef := a.summoner.PUUID
 	if a.shutdownTimer != nil {
 		a.shutdownTimer.Stop()
 	}
 	a.shutdownClient = nil
 	a.shutdownEvents = nil
+	a.clientLastEventAt = time.Time{}
 	a.shutdownChatOfflineAt = time.Time{}
 	a.shutdownFriendsEmptyAt = time.Time{}
 	a.clearSnapshotLocked(message)
 	a.connectionState = "disconnected"
 	a.mu.Unlock()
-	a.clearOverviewQuerySnapshots()
+	a.clearOverviewQuerySnapshots(playerRef)
 	a.clearFacadeEventThrottle()
 	a.clearFacadeChallengeCatalog(oldClient)
 	if oldClient != nil {
 		oldClient.Close()
 	}
-	a.clearAssetCache()
-	a.broadcastEvent("connection-state")
+	a.publishClientView()
 }
 
 func (a *app) disconnectClient(client *LCUClient, message string) {
 	a.mu.Lock()
 	disconnectedCurrent := a.lcu == client
+	playerRef := a.summoner.PUUID
 	if a.lcu == client {
+		if a.shutdownTimer != nil {
+			a.shutdownTimer.Stop()
+		}
+		a.shutdownClient = nil
+		a.clientLastEventAt = time.Time{}
 		a.clearSnapshotLocked(message)
 		a.connectionState = "disconnected"
 	}
 	a.mu.Unlock()
 	if disconnectedCurrent {
 		a.stopPostGameReveal()
-		a.clearOverviewQuerySnapshots()
+		a.clearOverviewQuerySnapshots(playerRef)
 		a.clearFacadeEventThrottle()
 	}
 	a.clearFacadeChallengeCatalog(client)
 	client.Close()
-	a.clearAssetCache()
-	a.broadcastEvent("connection-state")
+	a.publishClientView()
 }
 
 // Both game-start and settlement use this uncached, identical rank loader.

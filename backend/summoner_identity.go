@@ -112,6 +112,8 @@ func (a *app) applySummonerIdentity(client *LCUClient, next Summoner, observedAt
 			}
 		}
 	}
+	a.refreshSelfReadinessAsync(client)
+	a.publishClientView()
 	a.broadcastEvent("summoner-updated")
 	a.queueFacadeChangedEvent(time.Now())
 	return true, nil
@@ -142,6 +144,7 @@ func (a *app) applySummonerProfile(client *LCUClient, profile SummonerProfile, c
 	}
 	a.mu.Unlock()
 	if changed {
+		a.publishClientView()
 		a.broadcastEvent("summoner-updated")
 		a.queueFacadeChangedEvent(time.Now())
 	}

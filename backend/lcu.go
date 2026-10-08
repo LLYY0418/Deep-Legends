@@ -67,6 +67,7 @@ type LCUDiscoveryStatus struct {
 }
 
 type LCUClient struct {
+	historyGames          *historyGameCache
 	discoverySummoner     *Summoner
 	license               *licenseManager
 	gameplaySummoners     gameplaySummonerCache
@@ -88,6 +89,7 @@ type LCUClient struct {
 	// region 与 rsoPlatform 来自客户端启动参数（例如 TENCENT / HN1），
 	// 用于确定国服玩家所属的 SGP 大区服务器；读取失败时留空。
 	region             string
+	gameVersion        string
 	rsoPlatform        string
 	platformProbe      bool
 	platformSource     string
@@ -108,6 +110,7 @@ type LCUClient struct {
 	queueLabelsLoading  bool
 	diagnosticMu        sync.Mutex
 	diagnosticObserve   func(map[string]any)
+	requestStarted      func(time.Time)
 	requestDiagnostics  map[string]*lcuRequestDiagnosticBucket
 }
 
@@ -460,7 +463,7 @@ type Summoner struct {
 	Privacy string `json:"privacy,omitempty"`
 }
 
-func discoverLCUFromProcessesWith(query processQueryResult, commandErr error, candidates func([]string) []string, started time.Time) (found *LCUClient, report LCUDiscoveryStatus, resultErr error) {
+func discoverLCUFromProcessesWith(query processQueryResult, commandErr error, candidates func([]string) []string, started time.Time, initialize ...func(*LCUClient)) (found *LCUClient, report LCUDiscoveryStatus, resultErr error) {
 	defer func() { report.DurationMS = time.Since(started).Milliseconds() }()
 	report = LCUDiscoveryStatus{AttemptAt: time.Now(), Result: "searching"}
 	lines := query.CommandLines
@@ -479,6 +482,11 @@ func discoverLCUFromProcessesWith(query processQueryResult, commandErr error, ca
 			report.CredentialCandidates++
 			report.CredentialsAt = time.Now()
 			client.source = "process"
+			for _, init := range initialize {
+				if init != nil {
+					init(client)
+				}
+			}
 			if err := probeDiscoveredClient(client, &report); err == nil {
 				report.Result = "connected"
 				report.Detail = "已通过客户端进程连接"
@@ -513,6 +521,11 @@ func discoverLCUFromProcessesWith(query processQueryResult, commandErr error, ca
 		client, err := clientFromLockfile(path)
 		if err == nil {
 			client.source = "lockfile"
+			for _, init := range initialize {
+				if init != nil {
+					init(client)
+				}
+			}
 			report.CredentialCandidates++
 			report.CredentialsAt = time.Now()
 			if err := probeDiscoveredClient(client, &report); err == nil {
@@ -847,8 +860,14 @@ const discoveryProbeTimeout = 1500 * time.Millisecond
 var errLCUNoSummoner = errors.New("LCU probe returned no active summoner")
 
 func (c *LCUClient) probe() error {
+	return c.probeContext(context.Background(), 8*time.Second)
+}
+
+func (c *LCUClient) probeContext(parent context.Context, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(parent, timeout)
+	defer cancel()
 	var value Summoner
-	if err := c.GetJSON("/lol-summoner/v1/current-summoner", &value); err != nil {
+	if err := c.RequestJSON(ctx, http.MethodGet, "/lol-summoner/v1/current-summoner", nil, &value); err != nil {
 		return err
 	}
 	if value.SummonerID <= 0 {
@@ -1006,6 +1025,7 @@ func (c *LCUClient) RequestJSON(ctx context.Context, method, path string, body, 
 	if err := c.licenseResult(ctx); err != nil {
 		return err
 	}
+	c.noteRequestStarted()
 	response, err := c.http.Do(request)
 	if err != nil {
 		return fmt.Errorf("LCU %s %s: %w", method, path, err)
@@ -1106,6 +1126,7 @@ func (c *LCUClient) getBytes(ctx context.Context, path string, limit int64, acce
 	auth := base64.StdEncoding.EncodeToString([]byte("riot:" + token))
 	request.Header.Set("Authorization", "Basic "+auth)
 	request.Header.Set("Accept", accept)
+	c.noteRequestStarted()
 	response, err := c.http.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("LCU GET %s: %w", path, err)

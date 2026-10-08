@@ -900,6 +900,13 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 
 	go func() {
 		defer a.recoverPanic("season_stats.startSeasonStatsRefresh.1")
+		// Keep the first history page ahead of season network scans.
+		if !a.waitConnectionPriority(a.licenseBusinessContext(), client) {
+			a.seasonBackfillMu.Lock()
+			delete(a.seasonBackfills, flightKey)
+			a.seasonBackfillMu.Unlock()
+			return
+		}
 
 		defer func() {
 			a.seasonBackfillMu.Lock()
@@ -908,7 +915,7 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 			_, seasonStart := currentRankedSeason(time.Now())
 			a.startSeasonBackfill(client, reference, player, playerRef, names, serverID, accountHash, season, seasonStart)
 		}()
-		ctx, cancel := context.WithTimeout(context.Background(), seasonBackfillTimeout)
+		ctx, cancel := context.WithTimeout(a.overviewSupplementContext(client), seasonBackfillTimeout)
 		defer cancel()
 		cost := &overviewLoadCost{}
 		ctx = context.WithValue(ctx, overviewLoadCostContextKey{}, cost)
@@ -920,7 +927,7 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 			"type": "season-progress", "season": season, "scanned": progress.Scanned,
 			"complete": progress.Complete, "account": publicRef,
 		})
-		a.clearOverviewQuerySnapshots()
+		a.clearOverviewQuerySnapshots(playerRef)
 		a.broadcastEvent(string(progressEvent))
 		a.startSelfSeasonSupplement(client, reference, playerRef, names)
 	}()
@@ -1253,7 +1260,7 @@ func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference
 			delete(a.seasonBackfills, key)
 			a.seasonBackfillMu.Unlock()
 		}()
-		ctx, cancel := context.WithTimeout(context.Background(), seasonBackfillTimeout)
+		ctx, cancel := context.WithTimeout(a.overviewSupplementContext(client), seasonBackfillTimeout)
 		defer cancel()
 		cache, err := a.storage.loadSeasonStats(seasonStatsSource, accountHash, season)
 		if err != nil || cache.Complete {
@@ -1293,7 +1300,7 @@ func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference
 				"scanned": seasonStatsCount(scan.cache.Stats), "complete": scan.cache.Complete,
 				"account": a.registerGameplayReferenceDetails(mergeGameplayReferences(reference, gameplayReference{PlayerRef: playerRef})),
 			})
-			a.clearOverviewQuerySnapshots()
+			a.clearOverviewQuerySnapshots(playerRef)
 			a.broadcastEvent(string(progressEvent))
 			if scan.cache.CappedByUpstream {
 				a.startSelfSeasonSupplement(client, reference, playerRef, names)

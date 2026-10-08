@@ -87,11 +87,24 @@ type app struct {
 	connected                       bool
 	manualDisconnected              bool
 	identityReady                   bool
+	selfReadinessClient             *LCUClient
+	selfReadinessAccount            string
+	selfReadinessPending            bool
+	selfSGPReady                    bool
+	assetClientVersion              string
+	historyGamesMu                  sync.Mutex
+	historyGames                    *historyGameCache
+	clientViewMu                    sync.Mutex
+	clientViewSignature             string
+	clientViewGeneration            uint64
+	connectionPriority              *connectionPriority
 	snapshotReady                   bool
 	collectionRequested             bool
 	connectionState                 string
 	shutdownClient                  *LCUClient
 	shutdownAt                      time.Time
+	clientLastEventAt               time.Time
+	clientClose                     clientCloseTimeline
 	shutdownTimer                   *time.Timer
 	shutdownEvents                  map[string]time.Time
 	currentRiotDetailFlights        map[string]bool
@@ -198,6 +211,7 @@ type app struct {
 	facadeMu                        sync.Mutex
 	facadeManualVersion             uint64
 	perkCatalogDisk                 *championDataCache
+	clientCatalogCache              *championDataCache
 	perkAugmentJobs                 map[string]chan struct{}
 	perkAugmentAttempts             map[string]time.Time
 	perkCatalogMu                   sync.Mutex
@@ -320,14 +334,17 @@ type app struct {
 }
 
 type statusResponse struct {
+	ClientView                 clientView           `json:"clientView"`
 	Update                     updateStatus         `json:"update"`
 	Version                    string               `json:"version"`
 	BuildFingerprint           string               `json:"buildFingerprint"`
 	Connected                  bool                 `json:"connected"`
 	IdentityReady              bool                 `json:"identityReady"`
+	SGPReady                   bool                 `json:"sgpReady"`
 	SnapshotReady              bool                 `json:"snapshotReady"`
 	ConnectionState            string               `json:"connectionState"`
 	ClientRegion               string               `json:"clientRegion"`
+	ClientVersion              string               `json:"clientVersion"`
 	ClientRegionLabel          string               `json:"clientRegionLabel"`
 	ClientDiscovery            string               `json:"clientDiscovery"`
 	EventStream                bool                 `json:"eventStream"`
@@ -362,6 +379,7 @@ type statusResponse struct {
 }
 
 type publicSummoner struct {
+	PlayerRef            string `json:"playerRef,omitempty"`
 	DisplayName          string `json:"displayName,omitempty"`
 	GameName             string `json:"gameName,omitempty"`
 	TagLine              string `json:"tagLine,omitempty"`
@@ -496,6 +514,7 @@ func main() {
 		return loadGameplayAugmentsFromClient(client)
 	}
 	a.sgp.observe = a.recordDiagnostic
+	a.sgp.requestBytes = a.recordColdSGPBytes
 	a.liveRecommendationPrewarmer = newLiveRecommendationPrewarmer(championProvider, a.recordDiagnostic)
 	a.sgp.gatewayAccount = func(client *LCUClient) string {
 		a.mu.RLock()
@@ -795,6 +814,7 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 		issues = issues[:100]
 	}
 	client := a.lcu
+	identity := a.summoner
 	identityReady := a.identityReady || (a.connected && a.summoner.SummonerID != 0)
 	ownedCount := len(a.owned)
 	remainingCount := len(a.remaining)
@@ -811,10 +831,14 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	default:
 		clientDiscovery = ""
 	}
-	if a.connected {
+	if a.shutdownClient != nil {
+		clientDiscovery = "exiting"
+	} else if a.connected {
 		clientDiscovery = "connected"
 	}
 	response := statusResponse{
+		ClientVersion:   client.cachedGameVersion(),
+		SGPReady:        a.selfReadinessClient == client && a.selfReadinessAccount == identity.PUUID && a.selfSGPReady,
 		ClientDiscovery: clientDiscovery,
 		Version:         version, BuildFingerprint: buildFingerprint, Connected: a.connected && a.shutdownClient == nil, IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
 		Syncing: a.syncing, LastSync: a.lastSync, LastAttempt: a.lastAttempt, LastDurationMS: a.lastDuration.Milliseconds(),
@@ -842,11 +866,30 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	}
 	response.Update = a.updates.Status()
 	if response.Connected {
-		client.resolvePlatform(true)
-		response.ClientRegion, response.ClientRegionLabel = clientRegionInfo(client)
-		response.ServerID = clientTencentServerID(client)
+		if client != nil {
+			client.mu.RLock()
+			region, platform := client.region, client.rsoPlatform
+			client.mu.RUnlock()
+			if strings.EqualFold(region, "TENCENT") {
+				response.ClientRegion, response.ClientRegionLabel = "TENCENT", "国服"
+				response.ServerID, _ = normalizeTencentServerID(platform)
+			} else {
+				response.ClientRegion = riotPlatformFromClientRegion(platform)
+				if response.ClientRegion == "" {
+					response.ClientRegion = riotPlatformFromClientRegion(region)
+				}
+				response.ClientRegionLabel = riotRegionLabel(response.ClientRegion)
+			}
+		}
 		response.ServerName = tencentServerName(response.ServerID)
+		referenceRegion := response.ClientRegion
+		if referenceRegion == "TENCENT" {
+			referenceRegion = ""
+		}
+		response.Summoner.PlayerRef = a.registerGameplayReferenceDetails(gameplayReference{PlayerRef: identity.PUUID, Region: referenceRegion, ServerID: response.ServerID})
+		a.refreshSelfReadinessAsync(client)
 	}
+	response.ClientView = a.currentClientView()
 	respondJSON(w, response)
 }
 
@@ -1279,6 +1322,8 @@ func (a *app) handleMedia(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
+	a.bindHistoryGameCache(client)
+	a.bindColdRequestCounters(client)
 	client.setDiagnosticObserver(a.recordDiagnostic)
 	client.mu.RLock()
 	seed := client.discoverySummoner
@@ -1326,8 +1371,9 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 	a.lcu = client
 	a.mu.Unlock()
 	a.recordDiagnostic(map[string]any{"event": "identity_refresh_succeeded", "duration_ms": result.LoadPhases["total"], "load_phases_ms": result.LoadPhases, "phase_group": "identity"})
+	a.refreshSelfReadinessAsync(client)
+	a.publishClientView()
 	a.broadcastEvent("summoner-updated")
-	a.broadcastEvent("connection-state")
 	if seed != nil {
 		a.goSafe("identity.discovery-enrichment", func() {
 			snapshot, loadErr := loadIdentitySnapshot(client)
@@ -1416,6 +1462,7 @@ func (a *app) queueCollectionRefresh(source string) {
 }
 
 func (a *app) refreshWithClient(client *LCUClient) bool {
+	a.bindHistoryGameCache(client)
 	client.setDiagnosticObserver(a.recordDiagnostic)
 	a.mu.RLock()
 	queuedEvent := a.collectionRefreshPending
@@ -1537,7 +1584,7 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 			a.catalog = result.Catalog
 		}
 		a.mu.Unlock()
-		a.clearAssetCache()
+		a.publishClientView()
 		a.recordDiagnostic(map[string]any{"event": "collection_refresh_lifecycle", "stage": "failed", "error_kind": diagnosticErrorKind(err), "duration_ms": time.Since(started).Milliseconds()})
 		a.recordDiagnostic(map[string]any{"event": "refresh_failed", "error": message, "client_alive": clientAlive, "duration_ms": time.Since(started).Milliseconds(), "load_phases_ms": result.LoadPhases, "phase_group": result.PhaseGroup, "pool_id": pool.ID, "pool_hash": pool.Hash, "catalog": result.Catalog, "ownership_sources": result.Ownership})
 		a.broadcastEvent("refresh-failed")
@@ -1580,6 +1627,8 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 	savedSnapshot := a.snapshotLocked()
 	calculationOK := a.calculationOKLocked()
 	a.mu.Unlock()
+	a.refreshSelfReadinessAsync(client)
+	a.publishClientView()
 	a.recordDiagnostic(map[string]any{"event": "refresh_succeeded", "duration_ms": time.Since(started).Milliseconds(), "load_phases_ms": result.LoadPhases, "phase_group": result.PhaseGroup, "pool_id": pool.ID, "pool_hash": pool.Hash, "owned": len(result.Owned), "remaining": len(result.Remaining), "matched": result.PoolMatched, "catalog": result.Catalog, "ownership_sources": result.Ownership})
 	if calculationOK && a.storage != nil {
 		if _, saveErr := a.storage.saveSnapshot(savedSnapshot, pool); saveErr != nil {
@@ -1616,6 +1665,7 @@ func (a *app) refreshAccountWithClient(client *LCUClient) {
 	}
 	a.syncing = false
 	a.mu.Unlock()
+	a.publishClientView()
 	a.broadcastEvent("account-updated")
 }
 

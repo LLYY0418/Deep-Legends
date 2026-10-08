@@ -59,7 +59,7 @@ func (a *app) discoverColdLCU() (*LCUClient, LCUDiscoveryStatus, error) {
 		}
 		return s.sweepPaths
 	}
-	client, report, err := discoverLCUFromProcessesWith(query, commandErr, once, started)
+	client, report, err := discoverLCUFromProcessesWith(query, commandErr, once, started, a.bindColdRequestCounters)
 	report.Sweep = sweptThisAttempt
 	if sweptThisAttempt {
 		foundPaths := []string{}
@@ -170,9 +170,18 @@ type coldLaunchTimeline struct {
 	process                                 time.Time
 	milestones                              map[string]int64
 	attempts, sweeps                        int
+	matchesSource                           string
+	overviewSource                          string
+	overlayShown                            int
+	lcuStarts                               []time.Time
+	sgpFirstScreenBytes                     int64
+	sgpSamples                              []coldSGPBytes
+	browserMeasured, browserWindowElapsed   bool
+	browserQueued, browserResources         int
+	metricsRevision                         uint64
 }
 
-var coldLaunchMilestones = []string{"ux_cmdline_ms", "credentials_ms", "port_open_ms", "summoner_ready_ms", "connected_ms", "identity_ms", "overview_first_card_ms", "overlay_hidden_ms"}
+var coldLaunchMilestones = []string{"ux_cmdline_ms", "credentials_ms", "port_open_ms", "summoner_ready_ms", "connected_ms", "identity_ms", "sgp_token_ms", "overview_first_card_ms", "overlay_hidden_ms", "ui_first_change_ms", "self_tab_header_ms", "matches_card_ms"}
 
 func (a *app) observeColdLaunchDiscovery(report LCUDiscoveryStatus, now time.Time) {
 	s := &a.coldLaunch
@@ -184,6 +193,15 @@ func (a *app) observeColdLaunchDiscovery(report LCUDiscoveryStatus, now time.Tim
 	if report.Result == "process-not-found" {
 		event := s.finishLocked()
 		s.seen, s.emitted, s.milestones = false, false, nil
+		s.matchesSource, s.overviewSource, s.overlayShown = "", "", 0
+		s.lcuStarts = nil
+		s.sgpFirstScreenBytes = 0
+		s.sgpSamples = nil
+		s.browserMeasured = false
+		s.browserWindowElapsed = false
+		s.browserQueued = 0
+		s.browserResources = 0
+		s.metricsRevision = 0
 		s.mu.Unlock()
 		if event != nil {
 			a.recordDiagnostic(event)
@@ -194,6 +212,7 @@ func (a *app) observeColdLaunchDiscovery(report LCUDiscoveryStatus, now time.Tim
 		s.mu.Unlock()
 		return
 	}
+	newWindow := !s.seen
 	if !s.seen {
 		s.seen = true
 		s.process = report.ProcessAt
@@ -218,9 +237,14 @@ func (a *app) observeColdLaunchDiscovery(report LCUDiscoveryStatus, now time.Tim
 		s.markLocked(name, at)
 	}
 	s.mu.Unlock()
+	if newWindow {
+		if window := a.coldRequestWindow(); window != nil {
+			func() { raw, _ := json.Marshal(window); a.broadcastEvent(string(raw)) }()
+		}
+	}
 }
 func (s *coldLaunchTimeline) markLocked(name string, now time.Time) {
-	if !s.seen || now.IsZero() {
+	if !s.seen || now.IsZero() || now.Before(s.process) {
 		return
 	}
 	if _, ok := s.milestones[name]; !ok {
@@ -231,7 +255,17 @@ func (a *app) observeColdLaunchMilestone(name string, now time.Time) {
 	s := &a.coldLaunch
 	s.mu.Lock()
 	s.markLocked(name, now)
+	if name == "self_tab_header_ms" {
+		s.markLocked("ui_first_change_ms", now)
+	}
 	var event map[string]any
+	if name == "matches_card_ms" || name == "self_tab_header_ms" {
+		_, header := s.milestones["self_tab_header_ms"]
+		_, matches := s.milestones["matches_card_ms"]
+		if header && matches {
+			event = s.finishLocked()
+		}
+	}
 	if name == "overlay_hidden_ms" || name == "overview_first_card_ms" {
 		if _, hidden := s.milestones["overlay_hidden_ms"]; hidden {
 			_, ready := s.milestones["overview_first_card_ms"]
@@ -245,12 +279,69 @@ func (a *app) observeColdLaunchMilestone(name string, now time.Time) {
 		a.recordDiagnostic(event)
 	}
 }
+func (a *app) observeFirstMatchesCard(source string, now time.Time) {
+	a.coldLaunch.mu.Lock()
+	if !a.coldLaunch.seen || now.Before(a.coldLaunch.process) {
+		a.coldLaunch.mu.Unlock()
+		return
+	}
+	if a.coldLaunch.matchesSource == "" {
+		if a.coldLaunch.overviewSource == "snapshot" {
+			source = "snapshot"
+		}
+		a.coldLaunch.sgpFirstScreenBytes = 0
+		for _, sample := range a.coldLaunch.sgpSamples {
+			if !sample.at.After(now) {
+				a.coldLaunch.sgpFirstScreenBytes += sample.bytes
+			}
+		}
+		a.coldLaunch.matchesSource = source
+	}
+	a.coldLaunch.mu.Unlock()
+	a.observeColdLaunchMilestone("matches_card_ms", now)
+}
+
+func (a *app) observeStartupOverlayShown() {
+	a.coldLaunch.mu.Lock()
+	a.coldLaunch.overlayShown++
+	a.coldLaunch.mu.Unlock()
+	a.mu.Lock()
+	if !a.clientClose.started.IsZero() {
+		a.clientClose.overlayShown++
+	}
+	a.mu.Unlock()
+}
+
 func (s *coldLaunchTimeline) finishLocked() map[string]any {
 	if !s.seen || s.emitted {
 		return nil
 	}
 	s.emitted = true
+	return s.eventLocked()
+}
+func (s *coldLaunchTimeline) eventLocked() map[string]any {
+	s.metricsRevision++
 	event := map[string]any{"event": "client_cold_launch_timeline", "process_ms": int64(0), "attempts": s.attempts, "sweeps": s.sweeps, "client_running_at_app_start": s.initialRunning}
+	event["matches_card_source"], event["overlay_shown"] = s.matchesSource, s.overlayShown
+	event["overview_source"] = s.overviewSource
+	event["process_at"] = s.process.UnixMilli()
+	event["timeline_revision"] = s.metricsRevision
+	count := 0
+	for _, at := range s.lcuStarts {
+		if !at.Before(s.process) && at.Before(s.process.Add(3*time.Second)) {
+			count++
+		}
+	}
+	event["lcu_requests_first_3s"] = count
+	event["lcu_requests_window_elapsed"] = time.Since(s.process) >= 3*time.Second
+	event["sgp_bytes_first_screen"] = s.sgpFirstScreenBytes
+	event["browser_queued_requests_first_3s"] = -1
+	if s.browserMeasured {
+		event["browser_queued_requests_first_3s"] = s.browserQueued
+	}
+	event["browser_resource_count_first_3s"] = s.browserResources
+	event["browser_requests_window_elapsed"] = s.browserWindowElapsed
+	event["browser_queue_measurement"] = "resource-timing-excluding-dns-connect"
 	for _, name := range coldLaunchMilestones {
 		value, ok := s.milestones[name]
 		if !ok {

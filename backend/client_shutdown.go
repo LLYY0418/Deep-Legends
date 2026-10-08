@@ -9,6 +9,36 @@ import (
 
 const clientShutdownGrace = 15 * time.Second
 
+type clientCloseTimeline struct {
+	client       *LCUClient
+	started      time.Time
+	tabRemovedMS int64
+	restoredFlip int
+	overlayShown int
+}
+
+func (a *app) beginClientCloseLocked(client *LCUClient, now time.Time) {
+	if a.clientClose.client != client || a.clientClose.started.IsZero() || a.clientClose.restoredFlip > 0 {
+		a.clientClose = clientCloseTimeline{client: client, started: now, tabRemovedMS: -1}
+	}
+}
+
+func (a *app) recordClientTabRemoved(now time.Time) {
+	a.mu.Lock()
+	if a.clientClose.started.IsZero() || now.Before(a.clientClose.started) {
+		a.mu.Unlock()
+		return
+	}
+	a.clientClose.tabRemovedMS = max(0, now.Sub(a.clientClose.started).Milliseconds())
+	event := a.clientClose.event()
+	a.mu.Unlock()
+	a.recordDiagnostic(event)
+}
+
+func (s clientCloseTimeline) event() map[string]any {
+	return map[string]any{"event": "client_close_timeline", "shutdown_signal_ms": int64(0), "shutdown_signal_at": s.started.UnixMilli(), "tab_removed_ms": s.tabRemovedMS, "overlay_shown": s.overlayShown, "restored_flip": s.restoredFlip}
+}
+
 func (a *app) clientShutdownPending(client *LCUClient) bool {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -45,6 +75,7 @@ func (a *app) observeClientShutdownEvent(client *LCUClient, event LCUEvent, now 
 		a.mu.Unlock()
 		return
 	}
+	a.clientLastEventAt = now
 	if a.shutdownEvents == nil {
 		a.shutdownEvents = map[string]time.Time{}
 	}
@@ -97,6 +128,7 @@ func (a *app) observeClientShutdownEvent(client *LCUClient, event LCUEvent, now 
 		return
 	}
 	a.shutdownClient = client
+	a.beginClientCloseLocked(client, now)
 	a.shutdownAt = now
 	a.connectionState = "client-exiting"
 	if a.shutdownTimer != nil {
@@ -105,11 +137,12 @@ func (a *app) observeClientShutdownEvent(client *LCUClient, event LCUEvent, now 
 	a.shutdownTimer = time.AfterFunc(clientShutdownGrace, func() { a.restoreClientShutdown(client, time.Now()) })
 	a.mu.Unlock()
 	a.recordDiagnostic(map[string]any{"event": "client_shutdown_trace", "reason": reason})
-	a.broadcastEvent("connection-state")
+	a.publishClientView()
+	a.signalGameplayPhase(client)
 }
 func (a *app) restoreClientShutdown(client *LCUClient, now time.Time) bool {
 	a.mu.Lock()
-	if a.lcu != client || !a.connected || a.shutdownClient != client || now.Sub(a.shutdownAt) < clientShutdownGrace {
+	if a.lcu != client || !a.connected || a.shutdownClient != client || now.Sub(a.shutdownAt) < clientShutdownGrace || !a.eventStream || a.clientLastEventAt.IsZero() || now.Sub(a.clientLastEventAt) > 5*time.Second {
 		a.mu.Unlock()
 		return false
 	}
@@ -118,9 +151,13 @@ func (a *app) restoreClientShutdown(client *LCUClient, now time.Time) bool {
 	a.shutdownFriendsEmptyAt = time.Time{}
 	a.shutdownTimer = nil
 	a.connectionState = "connected"
+	a.clientClose.restoredFlip++
+	closeEvent := a.clientClose.event()
 	a.mu.Unlock()
+	a.recordDiagnostic(closeEvent)
 	a.recordDiagnostic(map[string]any{"event": "client_shutdown_trace", "reason": "false-positive-restored"})
-	a.broadcastEvent("connection-state")
+	a.publishClientView()
+	a.signalGameplayPhase(client)
 	return true
 }
 func (a *app) recordClientShutdownTrace(client *LCUClient, now time.Time) {
