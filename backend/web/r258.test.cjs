@@ -214,3 +214,13 @@ test('R258 tag fitting skips descendant scans until a visible row width changes'
  width=220;f.fitMatchTags(root);assert.equal(queries,4);assert.equal(measurements,6);
  assert(items.every(item=>!item.hidden));assert.equal(more.hidden,true);
 });
+
+test('R258 collapsed cards retain rune links without scanning absent detail controls',()=>{
+ let runeBindings=0,scans=0;
+ const root={querySelectorAll:()=>assert.fail('collapsed detail tree scan')};
+ const tab={openMatches:new Set(),matchDetailTabs:new Map()};
+ const f=compile(gameplay,['bindMatchDetailControls'],{bindRuneEffectLinks:()=>runeBindings++});
+ f.bindMatchDetailControls(root,tab);assert.equal(runeBindings,1);
+ root.querySelectorAll=()=>{scans++;return [];};tab.openMatches.add('1');
+ f.bindMatchDetailControls(root,tab);assert.equal(runeBindings,2);assert(scans>0);
+});
