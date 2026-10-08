@@ -163,6 +163,7 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 func (a *app) publishSeasonSnapshot(reference gameplayReference, playerRef string, cache seasonStatsCache) {
 	stats := seasonStatsResponse(cache.Stats)
 	progress := seasonStatsProgress{Season: cache.Season, Scanned: seasonStatsCount(cache.Stats), Complete: cache.Complete, Collecting: !cache.Complete, TableSupported: len(cache.ChampionTable) > 0 && seasonStatsCount(cache.Stats) >= 20}
+	progress.applyUpstreamBoundary(cache)
 	event, _ := json.Marshal(map[string]any{"type": "season-progress", "season": cache.Season, "account": a.registerGameplayReferenceDetails(mergeGameplayReferences(reference, gameplayReference{PlayerRef: playerRef})), "scanned": progress.Scanned, "complete": progress.Complete, "snapshot": map[string]any{"seasonChampionStats": stats, "seasonOverall": seasonStatsOverall(stats), "seasonStatsProgress": progress, "seasonQueueStats": cache.QueueStats}})
 	a.broadcastEvent(string(event))
 }

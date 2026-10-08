@@ -369,6 +369,8 @@ func (a *app) handleGameplayChampionTable(w http.ResponseWriter, r *http.Request
 		respondJSON(w, map[string]any{"available": false, "detail": "本赛季数据仍在读取，请稍后重试"})
 		return
 	}
+	progress := seasonStatsProgress{Season: season, Complete: cache.Complete}
+	progress.applyUpstreamBoundary(cache)
 	rows, total := championTableRows(cache, queue, a.displayChampionNames(r.Context(), "champion-table"))
-	respondJSON(w, map[string]any{"available": true, "queue": queue, "season": season, "complete": cache.Complete, "rows": rows, "overall": total})
+	respondJSON(w, map[string]any{"available": true, "queue": queue, "season": season, "complete": cache.Complete, "seasonStatsProgress": progress, "rows": rows, "overall": total})
 }

@@ -2673,6 +2673,57 @@
     }
   }
 
+  function renderSeasonDataNote(progress, queue, games, ranks = []) {
+    // R257: explicitly requested copy; keep it here when cleaning old UI notes.
+    const copy = {title:"数据说明", limit:"受官方接口限制，仅能查询到 {date} 之后的对局。", counted:"已统计 {games} 场", official:" · 官方总场次 {games} 场", future:"此后的新对局会自动累计。"};
+    const oldest=Number(queue==="mayhem" ? progress?.mayhemOldestAt : progress?.rankedOldestAt);
+    if (!progress?.upstreamCapped || progress.foreign || !Number.isFinite(oldest) || oldest<=0) return "";
+    const date=new Date(oldest);
+    if (!Number.isFinite(date.getTime())) return "";
+    const dateLabel=`${date.getFullYear()===new Date().getFullYear() ? "" : `${date.getFullYear()}年`}${date.getMonth()+1}月${date.getDate()}日`;
+    const type=queue==="440" ? "RANKED_FLEX_SR" : "RANKED_SOLO_5X5";
+    const row=(ranks || []).find(rank=>String(rank.queueType).toUpperCase()===type);
+    const official=Number.isInteger(row?.wins) && row.wins>=0 && Number.isInteger(row?.losses) && row.losses>=0 ? row.wins+row.losses : null;
+    const counted=copy.counted.replace("{games}",String(games));
+    const countLine=queue==="mayhem" ? counted : official!==null && official>=games ? counted+copy.official.replace("{games}",String(official)) : "";
+    const lines=[copy.title,copy.limit.replace("{date}",dateLabel),countLine,copy.future].filter(Boolean);
+    return `<button type="button" class="season-data-note" data-season-data-note="${escapeHTML(JSON.stringify(lines))}" aria-label="${copy.title}" aria-expanded="false"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 7v4M8 4.5v.5"/></svg></button>`;
+  }
+
+  function bindSeasonDataNotes(container) {
+    const doc=container.ownerDocument,win=doc.defaultView;
+    if (doc._seasonDataNotes) return;
+    // Reuse the R241 body portal, theme, shadow and arrow; one panel per document.
+    const panel=doc.createElement("div");panel.className="match-tags-popover season-data-note-popover";panel.id="season-data-note-popover";
+    panel.setAttribute("role","tooltip");panel.hidden=true;doc.body.append(panel);
+    let anchor=null,touchUntil=0;
+    const observer=new win.MutationObserver(()=>{if(anchor && !anchor.isConnected)close();});
+    const close=()=>{observer.disconnect();if(anchor){anchor.setAttribute("aria-expanded","false");anchor.removeAttribute("aria-describedby");}anchor=null;panel.hidden=true;panel.replaceChildren();};
+    const show=button=>{
+      close();anchor=button;
+      const lines=JSON.parse(button.dataset.seasonDataNote);
+      panel.replaceChildren(...lines.map((line,index)=>{const node=doc.createElement(index===0 ? "strong" : "p");node.textContent=line;return node;}));
+      panel.hidden=false;button.setAttribute("aria-expanded","true");button.setAttribute("aria-describedby",panel.id);
+      const rect=button.getBoundingClientRect(),width=panel.offsetWidth,height=panel.offsetHeight,padding=12,gap=8;
+      const left=Math.max(padding,Math.min(rect.left,win.innerWidth-width-padding));
+      const above=rect.bottom+gap+height>win.innerHeight-padding && rect.top>=height+gap+padding;
+      panel.dataset.placement=above ? "top" : "bottom";
+      panel.style.left=`${left}px`;panel.style.top=`${Math.max(padding,above ? rect.top-height-gap : Math.min(rect.bottom+gap,win.innerHeight-height-padding))}px`;
+      panel.style.setProperty("--tag-arrow-left",`${Math.max(8,Math.min(width-8,rect.left+rect.width/2-left))}px`);
+      observer.observe(doc.body,{childList:true,subtree:true});
+    };
+    const buttonOf=node=>node?.closest?.("[data-season-data-note]");
+    doc.addEventListener("pointerdown",event=>{if(event.pointerType==="touch")touchUntil=Date.now()+800;});
+    doc.addEventListener("pointerover",event=>{const button=buttonOf(event.target);if(button && Date.now()>touchUntil)show(button);});
+    doc.addEventListener("pointerout",event=>{if(anchor?.contains(event.target) && !anchor.contains(event.relatedTarget))close();});
+    doc.addEventListener("focusin",event=>{const button=buttonOf(event.target);if(button && Date.now()>touchUntil)show(button);});
+    doc.addEventListener("focusout",event=>{if(anchor?.contains(event.target))close();});
+    doc.addEventListener("click",event=>{const button=buttonOf(event.target);if(button){event.stopPropagation();anchor===button ? close() : show(button);}else if(anchor && !panel.contains(event.target))close();},true);
+    doc.addEventListener("keydown",event=>{if(event.key==="Escape")close();});
+    doc.addEventListener("scroll",close,true);win.addEventListener("resize",close);win.addEventListener("blur",close);
+    doc._seasonDataNotes={close};
+  }
+
   function renderChampionStats(items, overall, progress) {
     if (progress?.seasonOnly && progress.unavailable) return `<section class="career-section champion-performance"><header><h3>英雄胜率</h3><span>本赛季${progress.tableSupported ? overviewDetailArrow("champion-table", "查看英雄数据表") : ""}</span></header>${progress.message && progress.message !== "当前数据源不提供赛季统计" ? `<p class="section-empty">${escapeHTML(progress.message)}</p>` : ""}</section>`;
     const rankedGames = (items || []).reduce((total, item) => total + Number(item.games || 0), 0);
@@ -2909,7 +2960,10 @@
     }
     const current=tab.overviewSubpageState||{};
     const title=tab.overviewSubpage==="masteries" ? "英雄熟练度" : "英雄数据表";
-    container.innerHTML=`<section class="overview-detail-page"><header><button type="button" class="text-button" data-overview-return><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 3-5 5 5 5"/></svg><span>返回总览</span></button><h2>${title}</h2></header>${tab.overviewSubpage==="champion-table" && !(current.status==="ready" && current.data?.available) ? championTableQueueTabs(tab.championTableQueue || "420") : ""}${current.status==="ready" && current.data?.available ? (tab.overviewSubpage==="masteries" ? renderMasteryDetails(current.data) : renderChampionTable(current.data,tab)) : current.status==="loading" ? '<p class="muted">正在读取…</p>' : `<p class="section-empty">${escapeHTML(current.error || current.data?.detail || "详情读取失败")} <button type="button" class="text-button" data-subpage-retry>重试</button></p>`}</section>`;
+    const note=tab.overviewSubpage==="champion-table" && current.status==="ready" && current.data?.available ? renderSeasonDataNote(current.data.seasonStatsProgress,current.data.queue || tab.championTableQueue || "420",Number(current.data.overall?.games || 0),tab.data?.ranks) : "";
+    const heading=tab.overviewSubpage==="champion-table" ? `<div class="champion-table-title"><h2>${title}</h2>${note}</div>` : `<h2>${title}</h2>`;
+    container.innerHTML=`<section class="overview-detail-page"><header><button type="button" class="text-button" data-overview-return><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 3-5 5 5 5"/></svg><span>返回总览</span></button>${heading}</header>${tab.overviewSubpage==="champion-table" && !(current.status==="ready" && current.data?.available) ? championTableQueueTabs(tab.championTableQueue || "420") : ""}${current.status==="ready" && current.data?.available ? (tab.overviewSubpage==="masteries" ? renderMasteryDetails(current.data) : renderChampionTable(current.data,tab)) : current.status==="loading" ? '<p class="muted">正在读取…</p>' : `<p class="section-empty">${escapeHTML(current.error || current.data?.detail || "详情读取失败")} <button type="button" class="text-button" data-subpage-retry>重试</button></p>`}</section>`;
+    if(note)bindSeasonDataNotes(container);
     container.querySelector("[data-overview-return]")?.addEventListener("click",()=>{
       tab.overviewSubpage="";rerenderTab(tab);
       const scroll=container.closest(".player-overlay-scroll")||document.getElementById("app-scroll");if(scroll)scroll.scrollTop=Number(tab.overviewReturnScroll||0);

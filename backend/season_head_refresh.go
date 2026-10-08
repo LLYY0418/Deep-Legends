@@ -17,6 +17,7 @@ func (a *app) refreshSeasonHead(ctx context.Context, client *LCUClient, referenc
 	hash := a.storage.accountHash(player)
 	cache, _ := a.storage.loadSeasonStats(seasonStatsSource, hash, season)
 	progress := seasonStatsProgress{Season: season, Scanned: seasonStatsCount(cache.Stats), Complete: cache.Complete, Collecting: !cache.Complete}
+	progress.applyUpstreamBoundary(cache)
 	infos, consumed, _, err := a.sgp.matchHistoryFilteredOn(ctx, client, reference.ServerID, playerRef, 0, 1, nil, false)
 	if err != nil || len(infos) < consumed {
 		progress.Message = "赛季统计暂时中断，已保留当前进度"

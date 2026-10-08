@@ -2237,3 +2237,14 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-tags-popover::after { content:""; position:absolute; left:var(--tag-arrow-left); width:8px; height:8px; background:var(--surface-strong); border:1px solid var(--line); transform:translateX(-50%) rotate(45deg); }
 .match-tags-popover[data-placement="top"]::after { bottom:-5px; border-top:0; border-left:0; }
 .match-tags-popover[data-placement="bottom"]::after { top:-5px; border-bottom:0; border-right:0; }
+
+/* R257 shares the R241 portal's theme/arrow/shadow; only the content differs. */
+.season-data-note { display:inline-flex; flex:none; align-items:center; justify-content:center; width:26px; height:26px; padding:5px; border:0; border-radius:var(--radius-sm); background:transparent; color:var(--muted); cursor:pointer; }
+.season-data-note svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; }
+.season-data-note:hover,.season-data-note:focus-visible { color:var(--primary); }
+.season-data-note:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+.champion-table-title { display:flex; align-items:center; gap:8px; }
+.champion-table-title > h2 { margin:0; }
+.season-data-note-popover { display:block; box-sizing:border-box; width:288px; color:var(--ink); font-size:13px; line-height:1.6; }
+.season-data-note-popover > strong { display:block; margin-bottom:6px; font-size:14px; }
+.season-data-note-popover > p { margin:6px 0 0; }

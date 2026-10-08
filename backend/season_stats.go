@@ -299,6 +299,9 @@ type gameplaySeasonChampionStat struct {
 }
 
 type seasonStatsProgress struct {
+	UpstreamCapped bool   `json:"upstreamCapped,omitempty"`
+	RankedOldestAt int64  `json:"rankedOldestAt,omitempty"`
+	MayhemOldestAt int64  `json:"mayhemOldestAt,omitempty"`
 	TableSupported bool   `json:"tableSupported,omitempty"`
 	Season         string `json:"season"`
 	Scanned        int    `json:"scanned"`
@@ -306,6 +309,19 @@ type seasonStatsProgress struct {
 	Collecting     bool   `json:"collecting,omitempty"`
 	Unavailable    bool   `json:"unavailable,omitempty"`
 	Message        string `json:"message,omitempty"`
+}
+
+// Only expose the persisted boundary of a capped stream. The aggregate cap flag
+// alone cannot distinguish ranked from mayhem, and an uncapped stream's oldest
+// match is not an API limit. This projection performs no requests or scans.
+func (p *seasonStatsProgress) applyUpstreamBoundary(cache seasonStatsCache) {
+	p.UpstreamCapped = cache.CappedByUpstream
+	if cache.CappedByUpstream && cache.Streams["ranked"].CappedByUpstream {
+		p.RankedOldestAt = cache.Streams["ranked"].OldestCreatedAt
+	}
+	if cache.CappedByUpstream && cache.Streams["mayhem"].CappedByUpstream {
+		p.MayhemOldestAt = cache.Streams["mayhem"].OldestCreatedAt
+	}
 }
 
 type seasonStatsStream struct {
@@ -772,6 +788,7 @@ func (a *app) loadSeasonChampionStatsWithHistoryCache(ctx context.Context, clien
 	// 所以回补改成后台任务，进度通过 progress.Complete / Message 透出。
 	a.seasonScanPagesWithHistoryCache(ctx, client, serverID, playerRef, scan, seasonScanForegroundPages, useHistoryCache)
 	a.finishSeasonScan(scan, names, accountHash)
+	progress.applyUpstreamBoundary(scan.cache)
 	progress.Scanned = seasonStatsCount(scan.cache.Stats)
 	progress.TableSupported = progress.Scanned >= 20 && len(scan.cache.ChampionTable) > 0
 	progress.Complete = scan.cache.Complete
@@ -817,6 +834,7 @@ func (a *app) loadSeasonChampionStatsSnapshot(reference gameplayReference, playe
 	if err != nil {
 		return nil, progress, nil, nil
 	}
+	progress.applyUpstreamBoundary(cache)
 	progress.Scanned = seasonStatsCount(cache.Stats)
 	progress.TableSupported = progress.Scanned >= 20 && len(cache.ChampionTable) > 0
 	progress.Complete = cache.Complete
