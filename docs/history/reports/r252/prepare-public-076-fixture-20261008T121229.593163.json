@@ -1,0 +1,15 @@
+{
+  "name": "prepare-public-076-fixture-20261008T121229.593163",
+  "command": [
+    "node",
+    "scripts/prepare-r238-update-fixture.cjs"
+  ],
+  "cwd": "/private/tmp/r252-post-0.12.77",
+  "start": "2026-10-08T12:12:29.593163+08:00",
+  "end": "2026-10-08T12:12:57.903468+08:00",
+  "elapsed_seconds": 28.31,
+  "exit_code": 0,
+  "last_five": [
+    "{\"version\":\"0.12.76\",\"public\":true,\"size\":111854592,\"sha256\":\"01014312b60e591a05bfc87f86e098adf6c5fc5e59520db5aedac5b5dba02ff3\",\"directory\":\"/private/tmp/r252-post-0.12.77/docs/history/reports/release-0.12.76/anonymous-assets\"}"
+  ]
+}

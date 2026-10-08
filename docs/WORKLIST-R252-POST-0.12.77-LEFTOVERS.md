@@ -44,3 +44,10 @@ C3. 只修TestR233FailedCounterSaveDoesNotRefreshCachedLifetime与TestR242Licens
 - 默认public包重新构建并严格审计（授权缺失、Key策略、指纹/digest/fuses/ASAR/隔离数据）；独立目录，不覆盖160个受保护文件。
 - 台账docs/history/ledgers/post-0.12.77-execution-ledger.md记录每项复现/修复/变异/失败/CI及源码SHA；WORKLIST-INDEX加R252，R238发布状态保持原样。
 - 最终只回复分支/SHA、每项已修复/无证据/未解决、CI链接、失败原因、dist/STAGING是否改动；保留用户决定后续版本归属，不发布Latest。
+
+## P4 依据首轮CI补充的验证修复（2026-10-08中断后）
+
+- 首轮CI37717392380原样留档：Linux整体202984.504ms未达到192000ms目标。将原串行other组和固定3个大DOM worker改为共享原上限4个worker的最长文件优先队列；请求类长文件拆两份，测试body逐字节相同、集合不漏、不增加skip，90/240秒不变。
+- Windows实际安装版本/8阶段/精确fingerprint/total_ms=9017及result=ok存在，但CI匹配失败。候选根因是ConvertFrom-Json返回DateTime后隐式string Parse丢失毫秒；仅修验证时间转换，不改更新生产逻辑/30秒预算/精确本次安装匹配。新增Windows原生分数时间、旧事件拒绝与原Parse(object)断言变异；以实际CI回归证据判断，不靠重跑掩盖。
+- 共享工作区已被另一会话切到R253；R252后续改动仅在/private/tmp/r252-post-0.12.77的原post分支，不合入R253/R254/隐藏识别。
+- 全160保护项的中期核验一致，结束检查现8文件缺失（原因未确认；R253初始核验亦记录同8缺失）；152个仍一致，等待原SHA备份来源，不重建、不覆盖，不宣称160全部未变。

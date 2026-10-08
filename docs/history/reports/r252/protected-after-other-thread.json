@@ -1,0 +1,13 @@
+{
+  "protected_files": 160,
+  "mismatches": [
+    "dist/R248-no-license-public/Deep Legends Setup 0.12.75-public.exe",
+    "dist/R248-no-license-public/win-unpacked/Deep Legends.exe",
+    "dist/R240-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe",
+    "dist/R240-staging-public/Deep-Legends-staging-public/Deep Legends.exe",
+    "dist/R242-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe",
+    "dist/R242-staging-public/Deep-Legends-staging-public/Deep Legends.exe",
+    "dist/R243-staging-public/Deep-Legends-Setup-0.12.75-staging-public.exe",
+    "dist/R243-staging-public/Deep-Legends-staging-public/Deep Legends.exe"
+  ]
+}

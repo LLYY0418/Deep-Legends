@@ -1,0 +1,7 @@
+First push of unpublished commit 5e9c4653faf5aebeee86d91c3f6afcdb909f3b3c rejected (tool output preserved here):
+remote: error: Trace: 61cca6d940262c743ba04d6bd0b5c093737bac1e57fa280b70df4fc9efd99656
+remote: error: See https://gh.io/lfs for more information.
+remote: error: File docs/history/reports/r252/ci-01/r206-real-upgrade-evidence/Deep-Legends-Setup-0.12.77-public.exe is 106.69 MB; this exceeds GitHub's file size limit of 100.00 MB
+remote: error: GH001: Large files detected. You may want to try Git Large File Storage - https://git-lfs.github.com.
+ ! [remote rejected] HEAD -> codex/post-0.12.77-fixes (pre-receive hook declined)
+error: failed to push some refs to https://github.com/LLYY0418/Deep-Legends.git

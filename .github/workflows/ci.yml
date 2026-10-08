@@ -142,6 +142,9 @@ jobs:
         with:
           name: r252-r104-windows
           path: ${{ runner.temp }}/r252-r104-windows/**
+      - name: R252 native diagnostic timestamp regression and assertion mutation
+        shell: pwsh
+        run: ./scripts/r252-diagnostic-time.test.ps1
       # Filtered platform gates must match their exact counts with zero skips.
       - name: Test Windows-only release and PowerShell guards
         shell: pwsh

@@ -1,0 +1,50 @@
+[build 2026-10-08T02:17:48.216Z] cleanup: started (0.0s)
+[build 2026-10-08T02:17:48.233Z] cleanup: completed (0.0s)
+[build 2026-10-08T02:17:48.461Z] go-test: started (0.0s)
+[build 2026-10-08T02:17:58.466Z] go-test: still running (10.0s)
+[go-test] discovered 1951 tests; running 5 shards
+[go-test] shard 1/5: started (1 tests)
+[go-test] shard 2/5: started (431 tests)
+[go-test] shard 3/5: started (494 tests)
+[go-test] shard 4/5: started (431 tests)
+[go-test] shard 5/5: started (594 tests)
+ok  	lol-loot-assistant/backend	0.495s
+[go-test] shard 1/5: completed (4.4s)
+[build 2026-10-08T02:18:08.467Z] go-test: still running (20.0s)
+[build 2026-10-08T02:18:18.467Z] go-test: still running (30.0s)
+ok  	lol-loot-assistant/backend	24.099s
+[go-test] shard 3/5: completed (28.2s)
+[build 2026-10-08T02:18:28.469Z] go-test: still running (40.0s)
+[build 2026-10-08T02:18:38.470Z] go-test: still running (50.0s)
+[build 2026-10-08T02:18:49.547Z] go-test: still running (61.4s)
+[build 2026-10-08T02:18:59.552Z] go-test: still running (71.1s)
+[build 2026-10-08T02:19:09.556Z] go-test: still running (81.1s)
+2026/10/08 10:18:27 {"event":"backend_panic","frames":["main.reportBackendPanic","main.(*app).recordRecoveredPanic","main.(*app).cachedLivePlayerMatches.func1","main.TestR203LiveHistoryPanicReleasesFlightForNextRequest.func1.2","main.(*app).cachedLivePlayerMatches","main.TestR203LiveHistoryPanicReleasesFlightForNextRequest.func1","main.TestR203LiveHistoryPanicReleasesFlightForNextRequest"],"panic_kind":"other","site":"cachedLivePlayerMatches"}
+2026/10/08 10:18:57 http: TLS handshake error from 127.0.0.1:55507: write tcp 127.0.0.1:55504->127.0.0.1:55507: use of closed network connection
+2026/10/08 10:18:57 http: TLS handshake error from 127.0.0.1:55508: write tcp 127.0.0.1:55504->127.0.0.1:55508: use of closed network connection
+--- FAIL: TestSessionTokenPrivacyDocumentationMatchesDiskPersistence (0.00s)
+    readme_privacy_test.go:23: README is missing the desktop session-token paragraph
+--- FAIL: TestR92RiotMatchConcreteDiskBudget (16.76s)
+    r92_test.go:26: open /var/folders/0n/pkflntvd76d53gtp1vj_n9gr0000gn/T/TestR92RiotMatchConcreteDiskBudget568157198/001/riot-matches/.tmp-3059095412: no space left on device
+FAIL
+FAIL	lol-loot-assistant/backend	72.758s
+FAIL
+[go-test] shard 5/5: failed (exit 1, 76.8s)
+[go-test] shard 4/5: failed (exit 143, 76.9s)
+[go-test] shard 2/5: failed (exit 143, 76.9s)
+[build 2026-10-08T02:19:16.488Z] go-test: failed: exit 1 (88.0s)
+/Users/ly/personal/personal-work/deep-legends/scripts/build-no-license-audit.cjs:27
+ if(result.error)throw result.error;if(result.status!==0)throw Error("Formal public audit build failed: "+result.status);
+                                                         ^
+
+Error: Formal public audit build failed: 1
+    at Object.<anonymous> (/Users/ly/personal/personal-work/deep-legends/scripts/build-no-license-audit.cjs:27:64)
+    at Module._compile (node:internal/modules/cjs/loader:1812:14)
+    at Object..js (node:internal/modules/cjs/loader:1943:10)
+    at Module.load (node:internal/modules/cjs/loader:1533:32)
+    at Module._load (node:internal/modules/cjs/loader:1335:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47
+
+Node.js v24.14.1

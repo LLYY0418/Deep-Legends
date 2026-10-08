@@ -1,0 +1,12 @@
+installer_start=1791426563958
+parent_exited=1791426564447
+payload_released=1791426564593
+nsis_start=1791426564688
+oninit=1791426567828
+check_done=1791426567861
+uninstall_old_start=1791426567861
+uninstall_old_done=1791426569694
+extract_start=1791426569766
+extract_done=1791426575612
+copy_done=1791426575613
+relaunch=1791426575767

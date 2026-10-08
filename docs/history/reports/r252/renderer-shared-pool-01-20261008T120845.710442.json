@@ -1,0 +1,22 @@
+{
+  "name": "renderer-shared-pool-01-20261008T120845.710442",
+  "command": [
+    "env",
+    "R222_NODE_TIMING_OUTPUT=docs/history/reports/r252/renderer-timings-shared-pool-01.json",
+    "node",
+    "scripts/test-renderers.cjs",
+    "all"
+  ],
+  "cwd": "/private/tmp/r252-post-0.12.77",
+  "start": "2026-10-08T12:08:45.710442+08:00",
+  "end": "2026-10-08T12:10:37.718300+08:00",
+  "elapsed_seconds": 112.016,
+  "exit_code": 0,
+  "last_five": [
+    "    },",
+    "    \"duration_ms\": 111924.90929200001",
+    "  },",
+    "  \"success\": true",
+    "}"
+  ]
+}

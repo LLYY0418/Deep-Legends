@@ -1,0 +1,15 @@
+{
+  "original": "desktop/overview-render-requests.test.cjs",
+  "original_sha256": "3ac255b6a21f195cafcbfca49295874c540fb3ac5e87c46d4ebe76af9a9328bc",
+  "prelude_identical": true,
+  "test_bodies_byte_identical": true,
+  "original_tests": 16,
+  "after_tests": 16,
+  "added_file": "desktop/overview-render-requests-live.test.cjs",
+  "worker_limit": 4,
+  "budgets_unchanged": [
+    90000,
+    240000
+  ],
+  "separator_whitespace_at_split_boundary": "normalized final blank line to single EOF newline; all test bodies/claims unchanged"
+}

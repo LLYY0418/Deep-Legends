@@ -1,0 +1,19 @@
+{
+  "name": "public-audit-build-20261008T101740.599020",
+  "command": [
+    "node",
+    "scripts/build-no-license-audit.cjs"
+  ],
+  "cwd": "/Users/ly/personal/personal-work/deep-legends",
+  "start": "2026-10-08T10:17:40.599020+08:00",
+  "end": "2026-10-08T10:19:19.789852+08:00",
+  "elapsed_seconds": 99.194,
+  "exit_code": 1,
+  "last_five": [
+    "    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)",
+    "    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)",
+    "    at node:internal/main/run_main_module:33:47",
+    "",
+    "Node.js v24.14.1"
+  ]
+}

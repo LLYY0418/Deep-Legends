@@ -1,0 +1,42 @@
+[
+  {
+    "stage_lines": [
+      "uninstall_old_start=1791426550872"
+    ],
+    "observed_at": "2026-10-08T02:29:10.8961799Z"
+  },
+  {
+    "stage_lines": [
+      "uninstall_old_done=1791426552431",
+      ""
+    ],
+    "observed_at": "2026-10-08T02:29:12.4837065Z"
+  },
+  {
+    "stage_lines": [
+      "extract_start=1791426552486",
+      "431",
+      ""
+    ],
+    "observed_at": "2026-10-08T02:29:12.5468351Z"
+  },
+  {
+    "stage_lines": [
+      "extract_done=1791426558384",
+      "",
+      "431",
+      ""
+    ],
+    "observed_at": "2026-10-08T02:29:18.4222349Z"
+  },
+  {
+    "stage_lines": [
+      "copy_done=1791426558582",
+      "4",
+      "",
+      "431",
+      ""
+    ],
+    "observed_at": "2026-10-08T02:29:18.6067711Z"
+  }
+]

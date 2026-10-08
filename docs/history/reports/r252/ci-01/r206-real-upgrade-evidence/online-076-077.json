@@ -1,0 +1,12 @@
+{
+  "checks": 1,
+  "current": "0.12.76",
+  "download": "D:\\a\\_temp\\deep-legends-r206-real-upgrade\\evidence\\Deep-Legends-Setup-0.12.77-public.exe",
+  "downloads": 1,
+  "install_handoff": true,
+  "latest": "0.12.77",
+  "sha256": "4018358b5a4d836b051a736cc417d0185e8bd4be0fff0456fd742676d7a34fbc",
+  "size": 111877632,
+  "transport": "real loopback HTTP with exact GitHub URL mapping; not anonymous Latest",
+  "unsigned_validation": true
+}

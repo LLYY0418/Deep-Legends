@@ -97,3 +97,29 @@ C3：两个旧夹具在`license-two-baseline`语义断言失败；R233原10+5分
 最终第三轮renderer **PASS118622.712ms**，165文件、1337测试/1333PASS/4既有SKIP，预算90/240秒不变；[timings-local-03](../reports/r252/renderer-timings-local-03.json)。本机macOS结果不替代Linux192000ms门槛，待同SHA完整CI。全部本地预检结束，public审计包开始在`/private/tmp/R252-0.12.77-no-license-public-20261008T1017`构建，无根dist写入。
 
 原始Node失败日志自带空白行末空格，暂存全量diff检查报告22处raw `.log` whitespace；[原输出](../reports/r252/raw-log-whitespace-check.log)保留，未改任何日志字节。源码/文档/JSON仅排除本轮raw `.log`后git diff --cached --check PASS，未放宽源码检查，[精确命令](../reports/r252/source-diff-check.json)。
+
+## 首轮分支CI与构建失败（原记录保留）
+
+修复提交`104b62838c68b87d50b5b3980a8baf2abb26a363`已推，仅post分支；[37717392380](https://github.com/LLYY0418/Deep-Legends/actions/runs/37717392380) **failure**。[原job日志/全部artifact](../reports/r252/ci-01/run.json)。Linux格式/vet/严格默认授权缺失/license compile与两fixture/race/fullrenderer1337项均通过；renderer202984.504ms未达到192000ms硬门槛（未改）。大DOM197734.694、串行other202970.589，故继续调度修复。被后续step阻断的Worker/Chromium/installer未执行，不能算这一SHA的整体验证。
+
+Windows全量backend1951/installer100测试与PASS清单、默认首帧、四项条件项（R235具体由全量inventory证明）、30次独立R104均通过。R104 **0/30失败**，[Windows每轮时间线](../reports/r252/ci-01/r252-r104-windows/summary.json)；结合本地60轮0失败仍无法确定旧tag偶发根因，保持未解决。Windowspublic构建/校验和通过，但实际升级step失败`Eight stages not imported as result=ok`，随后最终包artifact未上传。
+
+升级证据安装版本0.12.77.0/file0.12.77/asar0.12.77；relaunch1791426591181、installer_start1791426582164、total9017ms，diagnostic事件实际时间2026-10-08T02:29:51.5344331Z（1791426591534），fingerprint f2794a1d683c，result=ok。三个精确条件本应匹配，怀疑JSON时间已经DateTime又Parse成string丢失毫秒，原函数路径在PowerShell6+存在该类型转换（[微软说明](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/convertfrom-json?view=powershell-7.5)）。仅验证helper按类型保留分数；新增原生断言/旧Parse变异，下一轮CI确认再定修复，30s预算和指纹/total/时间界限未放宽。
+
+第一次`gh api .../logs`工具拒绝ANSI输出，原0字节文件+失败JSON保留；第二次按gh明示allow-escape-sequences获取原始字节，未重跑CI。
+
+本地public审计构建99.194s在预检阶段失败：README夹具缺段落（另一会话同时改README，未反向恢复）和R92 ENOSPC；尚未产出新的本地包，原.log/.json保留。首次push自动审批因远端可信性证据不足拒绝；只读gh确认当前认证用户/远端owner同为LLYY0418，公开repo和用户指定tag/Draft一致后原动作获准。未换接口绕过，未推任何保护ref。
+
+缓存清理调用被用户中断；没有本轮derived-cache-cleanup结果，不重试删除。共享根工作区后续成为R253，独立worktree从104b创建，后续R252代码只在原post分支。不可把R253通过结果用作R252证据。
+
+### 保护文件核验异常
+
+10:15中期160个均一致（protected-midpoint.json）；中断恢复后8个PE缺失，原因未确认。独立探子核对R253的protected-validation-before/after也为152一致/8缺失，未找到原实体备份，不归因到R253；[实际缺失清单](../reports/r252/protected-after-other-thread.json)。已向用户询问原SHA备份来源，不能重建/替换，不写成160全部未变。本轮所有public审计使用tmp输出，没有执行root dist清理命令。
+
+### C1第二阶段与原生验证候选（12:11）
+
+四worker共享队列按首轮CI实测cost最长优先，发现集合166文件（新增拆分文件），所有文件最大并发仍4，预算90/240秒不变。原requests 361行按overview/live两块拆分，共用原前置导入，测试body拼接逐字节等于原文件；[拆分证明](../reports/r252/renderer-split-proof.json)。本机全量 **111924.909ms PASS**，测试1337/1333PASS/4SKIP，未减断言/集合；生产指纹仍f2794a1d683c，Linux20%目标待下一SHA。
+
+升级helper修复候选仅把DateTime/DateTimeOffset按实际类型取Unix毫秒，string仍Parse；CI新增原生测试覆盖en-US/zh-CN、string/typed对象/真实ConvertFrom-Json、界限前旧事件拒绝。原Parse(object)必须触发分数断言失败才能通过mutation护栏；本机无pwsh，未在 Windows 实跑，下一轮CI证实。原30秒和exact fingerprint/total/time不改，不将第一次失败说成安装失败或已排除根因。
+
+未推送候选5e9c4653误包含下载artifact中的106.69MiB Setup，GitHub100MiB限制拒绝。实际Setup保留为本地证据（size/SHA receipt），移出Git索引，不删除任何原始失败日志；重写仅该未推送post提交，不涉及保护tag/分支。R252报告目录使用-text属性保留Windows原始CRLF/BOM字节，增加exe忽略防止重现。请求类拆分边界末尾空白规范化（source diff检查要求），全部test body/断言不变。

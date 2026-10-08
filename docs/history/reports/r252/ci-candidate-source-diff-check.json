@@ -1,0 +1,14 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(exclude,glob)docs/history/reports/r252/**"
+  ],
+  "exit_code": 0,
+  "source_and_docs_clean": true,
+  "generated_raw_evidence_bytes_preserved": true
+}

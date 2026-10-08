@@ -1,0 +1,5 @@
+{
+  "command": "gh api actions/jobs/113116911436/logs",
+  "exit_code": 1,
+  "reason": "gh refused terminal escape sequences; first raw log empty; no test/CI rerun"
+}
